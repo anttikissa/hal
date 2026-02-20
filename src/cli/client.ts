@@ -394,7 +394,7 @@ function handleDoubleEnter(): void {
 	const active = activeTab()
 	if (!active || !wasBusyOnLastSubmit) return
 	appendBusCommand(makeCommand("pause", source, undefined, active.sessionId)).catch(() => {})
-	flashHeader("\x1b[33m⏎⏎ steering\x1b[0m")
+	pushLocal("local.warn", "⏎⏎ steering — pausing current generation")
 }
 
 
