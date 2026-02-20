@@ -211,6 +211,13 @@ function repairMessages(messages: any[]): any[] {
 				return true
 			})
 			if (filtered.length > 0) result.push({ ...msg, content: filtered })
+		} else if (msg.role === "assistant" && Array.isArray(msg.content)) {
+			// Drop thinking blocks without signatures (incomplete from interrupted generation)
+			const filtered = msg.content.filter((b: any) => {
+				if (b.type === "thinking" && !b.signature) return false
+				return true
+			})
+			if (filtered.length > 0) result.push({ ...msg, content: filtered })
 		} else {
 			result.push(msg)
 		}

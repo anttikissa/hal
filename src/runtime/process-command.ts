@@ -20,23 +20,8 @@ import {
 	sortedBusySessionIds,
 	isSessionBusy,
 	emitStatus,
-	lastCommandAtBySource,
 } from "./sessions.ts"
 
-const RAPID_COMMAND_PAUSE_MS = 1500
-const URGENT_PAUSE_PATTERNS = [
-	/\bstop\b/i, /\bsto+p+\b/i, /\bno+\b/i, /\bdon't\b/i, /\bdont\b/i,
-	/\bwait\b/i, /\bhold on\b/i, /\bcancel\b/i, /\babort\b/i,
-	/\bnevermind\b/i, /\bnot that\b/i,
-]
-
-function sourceKey(source: RuntimeCommand["source"], sessionId: string | null): string {
-	return `${source.kind}:${source.clientId}:${sessionId ?? "-"}`
-}
-
-function promptLooksLikeUrgentPause(text: string): boolean {
-	return URGENT_PAUSE_PATTERNS.some((p) => p.test(text))
-}
 
 function resolveSessionId(command: RuntimeCommand): string | null {
 	const explicit = typeof command.sessionId === "string" ? command.sessionId.trim() : ""
@@ -114,28 +99,20 @@ async function runPause(sessionId: string | null): Promise<void> {
 }
 
 async function maybeAutoPause(command: RuntimeCommand): Promise<void> {
-	const key = sourceKey(command.source, command.sessionId ?? null)
-	const now = Date.now()
-	const lastAt = lastCommandAtBySource.get(key) ?? null
-	lastCommandAtBySource.set(key, now)
-
 	const sessionId = command.sessionId ?? null
 	if (!sessionId) return
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (!runtime || !isSessionBusy(sessionId) || runtime.pausedByUser) return
 
-	const reason =
-		command.type === "prompt" && typeof command.text === "string" && promptLooksLikeUrgentPause(command.text)
-			? "[pause] auto-pause: urgent stop phrase detected"
-			: (lastAt !== null && (now - lastAt) <= RAPID_COMMAND_PAUSE_MS
-				? `[pause] auto-pause: two commands within ${RAPID_COMMAND_PAUSE_MS}ms`
-				: null)
-	if (!reason) return
-	await publishLine(reason, "warn", sessionId)
-	await runPause(sessionId)
+	// Any new prompt on a busy session pauses the current generation
+	if (command.type === "prompt") {
+		await publishLine("[pause] new prompt — pausing current generation", "warn", sessionId)
+		await runPause(sessionId)
+	}
 }
 
 export async function processCommand(command: RuntimeCommand): Promise<void> {
+
 	const sessionId = await normalizeCommandSession(command)
 	if (sessionId) markSessionAsActive(sessionId)
 

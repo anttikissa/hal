@@ -65,6 +65,8 @@ export async function runAgentLoop(
 			const cleanBlocks = parsed.contentBlocks.filter((b: any) => {
 				if (!b) return false
 				if (b.type === "tool_use" && typeof b.input === "string") return false
+				// Drop thinking blocks without signatures (incomplete due to pause/abort)
+				if (b.type === "thinking" && !b.signature) return false
 				return true
 			})
 			if (cleanBlocks.length > 0) {
@@ -168,8 +170,8 @@ function sanitizeMessages(provider: Provider, messages: any[]): any[] {
 			}
 			return b
 		})
-		return filtered.length > 0 ? { ...m, content: filtered } : m
-	})
+		return { ...m, content: filtered }
+	}).filter(m => !Array.isArray(m.content) || m.content.length > 0)
 
 	// Fix orphaned tool_use: ensure every tool_use has a matching tool_result
 	const fixed: typeof sanitized = []
