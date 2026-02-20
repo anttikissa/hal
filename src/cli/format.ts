@@ -34,15 +34,24 @@ const KIND_STYLE: Record<string, string> = {
 	"local.tabs": DIM,
 }
 
-let prevKind = ""
+// Track prevKind per session so interleaved events from different sessions
+// don't inject spurious newlines into each other's output.
+const prevKindBySession = new Map<string, string>()
+const LOCAL_KEY = "__local__"
 
-export function resetFormat(): void {
-	prevKind = ""
+export function resetFormat(sessionId?: string): void {
+	if (sessionId) {
+		prevKindBySession.delete(sessionId)
+	} else {
+		prevKindBySession.clear()
+	}
 }
 
-export function pushFragment(kind: string, text: string): string {
-	const continuing = kind === prevKind
-	prevKind = kind
+export function pushFragment(kind: string, text: string, sessionId?: string | null): string {
+	const key = sessionId ?? LOCAL_KEY
+	const prev = prevKindBySession.get(key) ?? ""
+	const continuing = kind === prev
+	prevKindBySession.set(key, kind)
 
 	const style = KIND_STYLE[kind] ?? ""
 	const reset = style ? RESET : ""
@@ -59,12 +68,14 @@ export function pushEvent(
 	event: RuntimeEvent,
 	localSource: RuntimeCommand["source"],
 ): string {
+	const sessionId = "sessionId" in event ? event.sessionId : null
+
 	if (event.type === "chunk") {
-		return pushFragment(`chunk.${event.channel}`, event.text)
+		return pushFragment(`chunk.${event.channel}`, event.text, sessionId)
 	}
 
 	if (event.type === "line") {
-		return pushFragment(`line.${event.level}`, event.text)
+		return pushFragment(`line.${event.level}`, event.text, sessionId)
 	}
 
 	if (event.type === "prompt") {
@@ -74,13 +85,14 @@ export function pushEvent(
 		const text = local
 			? event.text
 			: `[prompt:${event.source.kind}:${event.source.clientId.slice(0, 6)}] ${event.text}`
-		return pushFragment("prompt", text)
+		return pushFragment("prompt", text, sessionId)
 	}
 
 	if (event.type === "command" && event.phase === "failed") {
 		return pushFragment(
 			"command.failed",
 			`[command:${event.commandId}] ${event.message ?? "unknown"}`,
+			sessionId,
 		)
 	}
 
