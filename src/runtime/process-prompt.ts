@@ -54,12 +54,12 @@ function parseInputContent(input: string): any {
 export async function processPrompt(sessionId: string, input: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	const config = loadConfig()
-	const model = resolveModel(config.model)
-	const providerName = providerForModel(config.model)
+	const fullModel = resolveModel(config.model)
+	const providerName = providerForModel(fullModel)
 
 	await logPrompt(sessionId, {
 		timestamp: new Date().toISOString(),
-		model,
+		model: fullModel,
 		provider: providerName,
 		prompt: input,
 	})

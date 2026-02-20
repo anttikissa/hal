@@ -1,5 +1,5 @@
 import { resolve } from "path"
-import { loadConfig, resolveModel, providerForModel, modelAlias } from "../config.ts"
+import { loadConfig, resolveModel, providerForModel, modelIdForModel } from "../config.ts"
 import { getProvider } from "../provider.ts"
 import { loadSystemPrompt } from "../prompt.ts"
 import {
@@ -157,9 +157,9 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 export async function reloadSystemPromptForSession(sessionId: string, runtime?: SessionRuntimeCache): Promise<string[]> {
 	const target = runtime ?? (await getOrLoadSessionRuntime(sessionId))
 	const config = loadConfig()
-	const model = resolveModel(config.model)
+	const modelId = modelIdForModel(config.model)
 	const workingDir = getSessionWorkingDir(sessionId)
-	const { blocks, systemBytes, loaded } = await loadSystemPrompt({ model, halDir, workingDir })
+	const { blocks, systemBytes, loaded } = await loadSystemPrompt({ model: modelId, halDir, workingDir })
 	target.systemPrompt = blocks
 	target.systemBytes = systemBytes
 	return loaded
@@ -225,13 +225,12 @@ async function initialize(): Promise<void> {
 	}
 
 	const config = loadConfig()
-	const model = resolveModel(config.model)
-	const alias = modelAlias(model)
+	const fullModel = resolveModel(config.model)
 	const cwd = getSessionWorkingDir(initialSessionId)
 	const loaded = await reloadSystemPromptForSession(initialSessionId, runtime)
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
 	await publishLine(
-		`[model] ${providerForModel(config.model)}/${alias}  cwd=${cwd}${promptDesc}`,
+		`[model] ${fullModel}  cwd=${cwd}${promptDesc}`,
 		"status", initialSessionId,
 	)
 	await publishLine(

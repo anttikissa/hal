@@ -5,55 +5,71 @@ import { HAL_DIR } from "./state.ts"
 const CONFIG_PATH = `${HAL_DIR}/config.ason`
 
 export interface Config {
-	provider: string
-	model: string
+	model: string // "provider/model-id", e.g. "anthropic/claude-opus-4-6"
 	compactModel?: string
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
 }
 
-// User-facing aliases → actual model IDs
+// User-facing aliases → full provider/model strings
 export const MODEL_ALIASES: Record<string, string> = {
-	claude: "claude-opus-4-6",
-	codex: "gpt-5.3-codex",
+	claude: "anthropic/claude-opus-4-6",
+	codex: "openai/gpt-5.3-codex",
 }
 
 export const COMPACT_MODEL_FOR: Record<string, string> = {
-	claude: "claude-sonnet-4-20250514",
-	codex: "gpt-5.1-mini",
+	"anthropic/claude-opus-4-6": "anthropic/claude-sonnet-4-20250514",
+	"openai/gpt-5.3-codex": "openai/gpt-5.1-mini",
 }
 
-// Reverse lookup: model ID → alias
-export function modelAlias(modelId: string): string {
-	for (const [alias, id] of Object.entries(MODEL_ALIASES)) {
-		if (id === modelId) return alias
+/** Parse "provider/model-id" → { provider, modelId } */
+export function parseModel(model: string): { provider: string; modelId: string } {
+	const slash = model.indexOf("/")
+	if (slash > 0) return { provider: model.slice(0, slash), modelId: model.slice(slash + 1) }
+	// Bare model name — infer provider
+	if (model.startsWith("claude") || model.startsWith("anthropic")) return { provider: "anthropic", modelId: model }
+	if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4")) return { provider: "openai", modelId: model }
+	return { provider: "anthropic", modelId: model }
+}
+
+/** Resolve alias or pass through. Always returns "provider/model-id". */
+export function resolveModel(nameOrId: string): string {
+	if (MODEL_ALIASES[nameOrId]) return MODEL_ALIASES[nameOrId]
+	// Already has provider prefix
+	if (nameOrId.includes("/")) return nameOrId
+	// Bare model ID — add provider
+	const { provider, modelId } = parseModel(nameOrId)
+	return `${provider}/${modelId}`
+}
+
+/** Extract provider from a model string (alias, full, or bare) */
+export function providerForModel(nameOrId: string): string {
+	return parseModel(resolveModel(nameOrId)).provider
+}
+
+/** Extract model ID (without provider) from a model string */
+export function modelIdForModel(nameOrId: string): string {
+	return parseModel(resolveModel(nameOrId)).modelId
+}
+
+/** Reverse lookup: "provider/model-id" → alias (or short display name) */
+export function modelAlias(fullModel: string): string {
+	for (const [alias, full] of Object.entries(MODEL_ALIASES)) {
+		if (full === fullModel) return alias
 	}
+	// Strip provider prefix for display
+	const { modelId } = parseModel(fullModel)
 	return modelId
 }
 
-export function resolveModel(nameOrId: string): string {
-	return MODEL_ALIASES[nameOrId] ?? nameOrId
-}
-
-export function resolveCompactModel(nameOrId: string): string {
-	return COMPACT_MODEL_FOR[nameOrId] ?? nameOrId
-}
-
-// Provider detection from model name/alias
-export function providerForModel(nameOrId: string): string {
-	const id = resolveModel(nameOrId)
-	if (id.startsWith("claude") || id.startsWith("anthropic")) return "anthropic"
-	if (id.startsWith("gpt") || id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4")) return "openai"
-	// Fallback: check alias
-	if (nameOrId === "claude") return "anthropic"
-	if (nameOrId === "codex") return "openai"
-	return "anthropic"
+export function resolveCompactModel(model: string): string {
+	const full = resolveModel(model)
+	return COMPACT_MODEL_FOR[full] ?? full
 }
 
 const DEFAULTS: Config = {
-	provider: "anthropic",
-	model: "claude",
+	model: "anthropic/claude-opus-4-6",
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 2,
 	maxPromptLines: 15,
@@ -65,7 +81,16 @@ export function loadConfig(): Config {
 	if (_config) return _config
 	try {
 		const raw = readFileSync(CONFIG_PATH, "utf-8")
-		_config = { ...DEFAULTS, ...parse(raw) }
+		const parsed = parse(raw) as any
+		// Migrate old format: if provider field exists and model has no slash, combine them
+		if (parsed.provider && parsed.model && !parsed.model.includes("/")) {
+			parsed.model = `${parsed.provider}/${resolveModel(parsed.model).split("/").pop()}`
+			delete parsed.provider
+		} else if (parsed.model && !parsed.model.includes("/")) {
+			// Bare alias or model ID — resolve to full form
+			parsed.model = resolveModel(parsed.model)
+		}
+		_config = { ...DEFAULTS, ...parsed }
 	} catch {
 		_config = { ...DEFAULTS }
 	}

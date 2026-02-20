@@ -1,7 +1,7 @@
 import { resolve } from "path"
 import type { RuntimeCommand } from "../protocol.ts"
 import { clearSession, performHandoff, loadHandoff, saveSession } from "../session.ts"
-import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias } from "../config.ts"
+import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias, modelIdForModel } from "../config.ts"
 import { getProvider } from "../provider.ts"
 import { drainQueuedCommands } from "./command-scheduler.ts"
 import { publishLine, publishCommandPhase, publishPrompt } from "./event-publisher.ts"
@@ -86,8 +86,7 @@ async function runHandoff(sessionId: string, text?: string): Promise<void> {
 	// Use compact model for handoff summary
 	const config = loadConfig()
 	const compactModel = resolveCompactModel(config.model)
-	const providerName = providerForModel(compactModel)
-	const provider = getProvider(providerName)
+	const provider = getProvider(providerForModel(compactModel))
 	await provider.refreshAuth()
 
 	const systemPrompt = `You are summarizing a coding session for handoff. Produce a concise markdown summary that captures:
@@ -117,7 +116,7 @@ Be specific about file paths, function names, and technical details. The summary
 		: `Summarize this coding session for handoff:\n\n${conversationText}`
 
 	const { text: summary, error } = await provider.complete({
-		model: compactModel,
+		model: modelIdForModel(compactModel),
 		system: systemPrompt,
 		userMessage: userMsg,
 		maxTokens: 4000,
@@ -164,20 +163,19 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	const name = text.trim()
 	if (!name) {
 		const config = loadConfig()
-		await publishLine(`[model] current: ${config.model} (${resolveModel(config.model)})`, "info", sessionId)
+		await publishLine(`[model] current: ${config.model}`, "info", sessionId)
 		return
 	}
 
-	const config = updateConfig({ model: name, provider: providerForModel(name) })
-	const modelId = resolveModel(name)
-	const alias = modelAlias(modelId)
+	const fullModel = resolveModel(name)
+	const config = updateConfig({ model: fullModel })
 
 	// Reload system prompt for new model
 	const loaded = await reloadSystemPromptForSession(sessionId)
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
 
 	await publishLine(
-		`[model] switched to ${providerForModel(name)}/${alias}${promptDesc}`,
+		`[model] switched to ${fullModel}${promptDesc}`,
 		"status", sessionId,
 	)
 }

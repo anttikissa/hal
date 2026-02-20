@@ -1,5 +1,5 @@
 import { writeFile } from "fs/promises"
-import { loadConfig, resolveModel, providerForModel } from "../config.ts"
+import { loadConfig, resolveModel, providerForModel, modelIdForModel } from "../config.ts"
 import { getProvider, type Provider } from "../provider.ts"
 import { tools, runTool, RESTART_SIGNAL } from "../tools.ts"
 import { contextStatus, shouldWarn } from "../context.ts"
@@ -24,9 +24,9 @@ export async function runAgentLoop(
 	await emitStatus(true)
 
 	const config = loadConfig()
-	const modelId = resolveModel(config.model)
-	const providerName = providerForModel(config.model)
-	const provider = getProvider(providerName)
+	const fullModel = resolveModel(config.model)
+	const modelId = modelIdForModel(fullModel)
+	const provider = getProvider(providerForModel(fullModel))
 
 	let done = false
 	while (!done && !runtime.pausedByUser) {
