@@ -183,8 +183,17 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 }
 
 async function runSystem(sessionId: string): Promise<void> {
-	const loaded = await reloadSystemPromptForSession(sessionId)
-	await publishLine(`[system] reloaded: ${loaded.join(", ") || "(none)"}`, "status", sessionId)
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	const blocks = runtime.systemPrompt
+	if (!blocks || blocks.length === 0) {
+		await publishLine("[system] (no system prompt loaded)", "info", sessionId)
+		return
+	}
+	const text = blocks.map((b: any) => b.text ?? "").join("\n---\n")
+	const lines = text.split("\n")
+	const preview = lines.slice(0, 40).join("\n")
+	const suffix = lines.length > 40 ? `\n... (${lines.length - 40} more lines)` : ""
+	await publishLine(`[system] ${blocks.length} block(s), ${runtime.systemBytes} bytes:\n${preview}${suffix}`, "info", sessionId)
 }
 
 async function runCd(sessionId: string, text: string): Promise<void> {

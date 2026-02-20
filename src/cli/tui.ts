@@ -69,6 +69,7 @@ function rows(): number { return process.stdout.rows || 24 }
 const BG_DARK = "\x1b[48;5;236m"
 const RESET = "\x1b[0m"
 const DIM = "\x1b[2m"
+const STATUS_DIM = "\x1b[38;5;242m"
 
 function rawWrite(text: string): void { process.stdout.write(text.replace(/\n/g, "\r\n")) }
 function directWrite(text: string): void { process.stdout.write(text) }
@@ -82,12 +83,29 @@ function showCursor(): void { directWrite(`\x1b[?25h`) }
 function saveCursor(): void { directWrite(`\x1b7`) }
 function restoreCursor(): void { directWrite(`\x1b8`) }
 
-/** How many screen lines the current input text occupies */
+/** Word-wrap a string into lines of at most `width` chars, breaking at spaces */
+function wordWrapLines(text: string, width: number): string[] {
+	if (width <= 0) return [text]
+	const lines: string[] = []
+	let remaining = text
+	while (remaining.length > width) {
+		let breakAt = remaining.lastIndexOf(" ", width)
+		if (breakAt <= 0) breakAt = width // no space found, hard break
+		lines.push(remaining.slice(0, breakAt))
+		// skip the space at the break point if we broke at a space
+		remaining = remaining[breakAt] === " " ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
+	}
+	lines.push(remaining)
+	return lines
+}
+
+/** How many screen lines the current input text occupies (with word wrap) */
 function promptLineCount(): number {
 	const c = cols()
 	if (c <= 0) return 1
-	const textLen = inputPromptStr.length + inputBuf.length
-	return Math.max(1, Math.min(Math.ceil(textLen / c) || 1, maxPromptLines))
+	const text = inputPromptStr + inputBuf
+	const lines = wordWrapLines(text, c)
+	return Math.max(1, Math.min(lines.length, maxPromptLines))
 }
 
 /** Total footer height: status(1) + padTop(1) + promptLines + padBottom(1) */
@@ -107,17 +125,16 @@ function setupScrollRegion(): void {
 	setScrollRegion(1, outputBottom())
 }
 
-/** Build the dash status line: -[tab1]-tab2-...----- Context: X% / 200k - */
+/** Build the status line with box-drawing chars: ─[tab1]── Context: X% / 200k ─ */
 function buildStatusLine(): string {
 	const c = cols()
 	const left = statusTabsStr
 	const right = headerFlash || statusRightStr
-	// Right side with dash separator
-	const rightPart = right ? ` ${right} -` : " -"
-	const leftPart = left ? `-${left}-` : "-"
+	const rightPart = right ? ` ${right} ─` : " ─"
+	const leftPart = left ? `─${left}─` : "─"
 	const dashCount = Math.max(0, c - leftPart.length - rightPart.length)
-	const line = leftPart + "-".repeat(dashCount) + rightPart
-	return `${DIM}${line.slice(0, c)}${RESET}`
+	const line = leftPart + "─".repeat(dashCount) + rightPart
+	return `${STATUS_DIM}${line.slice(0, c)}${RESET}`
 }
 
 function drawStatusLine(): void {
@@ -136,11 +153,12 @@ function drawDarkPad(row: number): void {
 function drawPromptLines(): void {
 	const c = cols()
 	const text = inputPromptStr + inputBuf
-	const pLines = promptLineCount()
+	const wrapped = wordWrapLines(text, c)
+	const pLines = Math.min(wrapped.length, maxPromptLines)
 	const firstRow = promptFirstRow()
 
 	for (let i = 0; i < pLines; i++) {
-		const chunk = text.slice(i * c, (i + 1) * c)
+		const chunk = wrapped[i] ?? ""
 		const padded = chunk + " ".repeat(Math.max(0, c - chunk.length))
 		moveTo(firstRow + i, 1)
 		clearLine()
@@ -148,22 +166,60 @@ function drawPromptLines(): void {
 	}
 }
 
+/** Map an absolute char offset in the unwrapped text to (row, col) in word-wrapped layout */
+function cursorToRowCol(absPos: number, width: number): { row: number; col: number } {
+	const text = inputPromptStr + inputBuf
+	const wrapped = wordWrapLines(text, width)
+	let charsSoFar = 0
+	for (let i = 0; i < wrapped.length; i++) {
+		const lineLen = wrapped[i].length
+		// account for the space that was consumed at the break
+		const consumed = lineLen + (i < wrapped.length - 1 && charsSoFar + lineLen < text.length && text[charsSoFar + lineLen] === " " ? 1 : 0)
+		if (absPos <= charsSoFar + lineLen) {
+			return { row: i, col: absPos - charsSoFar }
+		}
+		charsSoFar += consumed
+	}
+	// Past end: last line
+	const lastLine = wrapped.length - 1
+	return { row: lastLine, col: wrapped[lastLine]?.length ?? 0 }
+}
+
 function positionCursorAtInput(): void {
 	const c = cols()
 	const absPos = inputPromptStr.length + inputCursor
-	const row = promptFirstRow() + Math.floor(absPos / c)
-	const col = (absPos % c) + 1
-	moveTo(row, col)
+	const { row, col } = cursorToRowCol(absPos, c)
+	moveTo(promptFirstRow() + row, col + 1)
+}
+
+/** Clear all footer rows and redraw */
+function fullRedrawFooter(): void {
+	const r = rows()
+	// Clear from status row to bottom of terminal
+	for (let row = Math.max(1, r - lastFooterH - 2); row <= r; row++) {
+		moveTo(row, 1)
+		clearLine()
+	}
+	const newH = footerHeight()
+	lastFooterH = newH
+	const bottom = outputBottom()
+	if (outputCursorRow > bottom) outputCursorRow = bottom
+	setupScrollRegion()
+
+	hideCursor()
+	drawStatusLine()
+	drawDarkPad(promptTopPadRow())
+	drawPromptLines()
+	drawDarkPad(promptBottomPadRow())
+	positionCursorAtInput()
+	showCursor()
 }
 
 function redrawFooter(): void {
 	const newH = footerHeight()
 	if (newH !== lastFooterH) {
-		// Footer size changed — adjust scroll region
-		lastFooterH = newH
-		const bottom = outputBottom()
-		if (outputCursorRow > bottom) outputCursorRow = bottom
-		setupScrollRegion()
+		fullRedrawFooter()
+		return
 	}
 
 	hideCursor()
@@ -241,6 +297,13 @@ function wordBoundaryLeft(buf: string, cursor: number): number {
 	return i
 }
 
+function wordBoundaryRight(buf: string, cursor: number): number {
+	let i = cursor
+	while (i < buf.length && buf[i] !== " ") i++
+	while (i < buf.length && buf[i] === " ") i++
+	return i
+}
+
 function suspendForegroundJob(): void {
 	suspended = true
 	directWrite("\x1b[?2004l")
@@ -307,10 +370,27 @@ function handleKey(key: string): void {
 		return
 	}
 
+	// Arrow left / right
 	if (key === "\x1b[D" || key === "\x1bOD") { if (inputCursor > 0) { inputCursor--; redrawFooter() }; return }
 	if (key === "\x1b[C" || key === "\x1bOC") { if (inputCursor < inputBuf.length) { inputCursor++; redrawFooter() }; return }
-	if (key === "\x1b[H" || key === "\x1bOH" || key === "\x01") { inputCursor = 0; redrawFooter(); return }
-	if (key === "\x1b[F" || key === "\x1bOF" || key === "\x05") { inputCursor = inputBuf.length; redrawFooter(); return }
+
+	// Opt-left / Opt-right (word jump) — \x1b[1;3D / \x1b[1;3C or \x1bb / \x1bf
+	if (key === "\x1b[1;3D" || key === "\x1bb") { inputCursor = wordBoundaryLeft(inputBuf, inputCursor); redrawFooter(); return }
+	if (key === "\x1b[1;3C" || key === "\x1bf") { inputCursor = wordBoundaryRight(inputBuf, inputCursor); redrawFooter(); return }
+
+	// Cmd-left / Cmd-right (line start/end) — various sequences across terminals
+	// \x1b[1;2D = Shift-Left (some terminals map Cmd-Left here)
+	// \x1b[1;9D = Cmd-Left in some kitty/iTerm configs
+	// \x1b[H / \x1bOH = Home, \x1b[F / \x1bOF = End
+	// Ctrl-A / Ctrl-E = Home / End
+	if (key === "\x1b[H" || key === "\x1bOH" || key === "\x01" || key === "\x1b[1;9D" || key === "\x1b[1;2D") {
+		inputCursor = 0; redrawFooter(); return
+	}
+	if (key === "\x1b[F" || key === "\x1bOF" || key === "\x05" || key === "\x1b[1;9C" || key === "\x1b[1;2C") {
+		inputCursor = inputBuf.length; redrawFooter(); return
+	}
+
+	// Ctrl-U / Ctrl-K
 	if (key === "\x15") { inputBuf = inputBuf.slice(inputCursor); inputCursor = 0; redrawFooter(); return }
 	if (key === "\x0b") { inputBuf = inputBuf.slice(0, inputCursor); redrawFooter(); return }
 
@@ -343,7 +423,20 @@ function handleKey(key: string): void {
 	if (key === "\t") {
 		if (tabCompleter) {
 			const matches = tabCompleter(inputBuf)
-			if (matches.length === 1) { inputBuf = matches[0]; inputCursor = inputBuf.length; redrawFooter() }
+			if (matches.length === 1) {
+				inputBuf = matches[0]; inputCursor = inputBuf.length; redrawFooter()
+			} else if (matches.length > 1) {
+				// Complete common prefix
+				let common = matches[0]
+				for (let i = 1; i < matches.length; i++) {
+					while (common.length > 0 && !matches[i].startsWith(common)) {
+						common = common.slice(0, -1)
+					}
+				}
+				if (common.length > inputBuf.length) {
+					inputBuf = common; inputCursor = inputBuf.length; redrawFooter()
+				}
+			}
 		}
 		return
 	}
@@ -408,11 +501,8 @@ function writeToOutput(text: string): void {
 
 function onResize(): void {
 	if (!initialized || suspended) return
-	const bottom = outputBottom()
-	if (outputCursorRow > bottom) outputCursorRow = bottom
 	outputCursorSaved = false
-	setupScrollRegion()
-	redrawFooter()
+	fullRedrawFooter()
 }
 
 function enterRawMode(): void {

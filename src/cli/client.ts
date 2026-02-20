@@ -430,13 +430,13 @@ function render(event: RuntimeEvent): void {
 	renderEventToTab(tab, event, false)
 }
 
-/** Build tab portion for the dash status line: [tab1]-tab2-tab3 */
+/** Build tab portion for the status line: [1:tab] 2:tab  3:tab */
 function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ""
 	return tabs.slice(0, 9).map((tab, i) => {
 		const label = `${i + 1}:${tab.name}`
-		return i === activeTabIndex ? `[${label}]` : label
-	}).join("-")
+		return i === activeTabIndex ? `[${label}]` : ` ${label} `
+	}).join("")
 }
 
 function renderBusyStatus(): void {
