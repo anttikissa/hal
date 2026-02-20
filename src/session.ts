@@ -145,6 +145,26 @@ export async function clearSession(sessionId: string): Promise<void> {
 	if (existsSync(path)) await unlink(path)
 }
 
+const MAX_HISTORY = 200
+
+export async function loadInputHistory(sessionId: string): Promise<string[]> {
+	const path = `${sessionDir(sessionId)}/history.ason`
+	if (!existsSync(path)) return []
+	try {
+		const raw = await readFile(path, "utf-8")
+		const data = parse(raw)
+		return Array.isArray(data) ? data.slice(-MAX_HISTORY) : []
+	} catch {
+		return []
+	}
+}
+
+export async function saveInputHistory(sessionId: string, history: string[]): Promise<void> {
+	await ensureSessionDir(sessionId)
+	await writeFile(`${sessionDir(sessionId)}/history.ason`, stringify(history.slice(-MAX_HISTORY)) + "\n")
+}
+
+
 // Handoff
 
 export async function performHandoff(sessionId: string, handoffContent: string): Promise<void> {

@@ -9,16 +9,19 @@ import {
 import * as tui from "./tui.ts"
 import {
 	flashHeader,
+	getInputHistory,
 	getOutputSnapshot,
 	setActivityLine,
 	setEscHandler,
 	setInputEchoFilter,
+	setInputHistory,
 	setInputKeyHandler,
 	setMaxPromptLines,
 	setOutputSnapshot,
 	setStatusLine,
 	setTabCompleter,
 } from "./tui.ts"
+
 import { makeCommand, type CommandType, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from "../protocol.ts"
 import { pushEvent, pushFragment, resetFormat, stripAnsi } from "./format.ts"
 import {
@@ -31,6 +34,8 @@ import {
 } from "./keys.ts"
 import { COMMAND_NAMES, handleCommand, isExit } from "./commands.ts"
 import { LAUNCH_CWD } from "../state.ts"
+import { loadInputHistory, saveInputHistory } from "../session.ts"
+
 import { loadConfig, MODEL_ALIASES } from "../config.ts"
 
 export class Client {
@@ -68,7 +73,9 @@ interface CliTab {
 	contextStatus: string | null
 	activity: string
 	busy: boolean
+	inputHistory: string[]
 }
+
 
 function completeInput(prefix: string): string[] {
 	if (prefix.startsWith("/") && !prefix.includes(" ")) {
@@ -140,7 +147,13 @@ export async function start(): Promise<void> {
 			if (!trimmed) continue
 			if (isExit(normalized)) break
 			await handleCommand(input, client)
-		}
+			// Persist input history for the active tab
+			const tab = activeTab()
+			if (tab) {
+				tab.inputHistory = getInputHistory()
+				saveInputHistory(tab.sessionId, tab.inputHistory).catch(() => {})
+			}
+
 	} finally {
 		setInputKeyHandler(null)
 		setEscHandler(null)
@@ -171,15 +184,20 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 		contextStatus: null,
 		activity: "",
 		busy: false,
+		inputHistory: [],
 	}]
+
 	activeTabIndex = 0
 	applyActiveTabSnapshot(false)
 }
 
 function captureActiveOutput(): void {
 	const active = activeTab()
-	if (active) active.output = getOutputSnapshot()
+	if (!active) return
+	active.output = getOutputSnapshot()
+	active.inputHistory = getInputHistory()
 }
+
 
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	const active = activeTab()
@@ -187,6 +205,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	resetFormat()
 	lastContextStatus = active.contextStatus
 	setActivityLine(active.busy ? active.activity || "Working..." : "")
+	setInputHistory(active.inputHistory)
 	if (clearWhenEmpty) {
 		// Full redraw: clear screen and rewrite content (tab switch / initial load)
 		if (active.output.length > 0) tui.replaceOutput(active.output)
@@ -198,6 +217,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	ensureTabBootstrap(active)
 	renderBusyStatus()
 }
+
 
 function ensureTabBootstrap(tab: CliTab): void {
 	if (!tab || tab.output.trim().length > 0) return
@@ -241,7 +261,9 @@ async function createTab(): Promise<void> {
 		contextStatus: null,
 		activity: "",
 		busy: false,
+		inputHistory: [],
 	})
+
 	activeTabIndex = tabs.length - 1
 	applyActiveTabSnapshot(true)
 	pushLocal("local.tab", `[tab] opened ${activeTabIndex + 1}: ${launchCwd}`)
@@ -284,7 +306,9 @@ function syncTabsFromSessions(
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
 			activity: preserveActiveOutput ? (existing?.activity ?? "") : "",
 			busy: preserveActiveOutput ? (existing?.busy ?? false) : false,
+			inputHistory: existing?.inputHistory ?? [],
 		}
+
 	})
 
 	const targetSessionId =
@@ -345,7 +369,9 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		contextStatus: null,
 		activity: "",
 		busy: false,
+		inputHistory: [],
 	}
+
 	tabs.push(tab)
 	renderBusyStatus()
 	return tab
@@ -383,9 +409,15 @@ async function bootstrapState(): Promise<void> {
 			if (tab) updateTabStatusMetadata(tab, event.text)
 		}
 
+		// Load persisted input history for each tab
+		await Promise.all(tabs.map(async (tab) => {
+			tab.inputHistory = await loadInputHistory(tab.sessionId)
+		}))
+
 		applyActiveTabSnapshot(true)
 		for (const tab of tabs) ensureTabBootstrap(tab)
 		renderBusyStatus()
+
 	} catch (e: any) {
 		pushLocal("local.status", `bootstrap failed: ${e.message || e}`)
 		ensureFallbackTab(null)

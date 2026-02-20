@@ -29,6 +29,14 @@ export function setTabCompleter(fn: TabCompleter): void { tabCompleter = fn }
 export function setInputKeyHandler(handler: InputKeyHandler | null): void { inputKeyHandler = handler }
 export function setInputEchoFilter(handler: InputEchoFilter | null): void { inputEchoFilter = handler }
 
+export function getInputHistory(): string[] { return inputHistory }
+export function setInputHistory(history: string[]): void {
+	inputHistory = history
+	historyIndex = -1
+	historyDraft = ""
+}
+
+
 function safeStringify(value: unknown): string {
 	if (typeof value === "string") return value
 	try { return stringify(value) } catch { return String(value) }
