@@ -3,6 +3,7 @@ export type StreamEvent =
 	| { type: "text_delta"; index: number; text: string }
 	| { type: "thinking_start"; index: number }
 	| { type: "thinking_delta"; index: number; text: string }
+	| { type: "activity"; text: string }
 	| { type: "signature_delta"; index: number; signature: string }
 	| { type: "tool_use_start"; index: number; id: string; name: string }
 	| { type: "tool_input_delta"; index: number; json: string }

@@ -5,10 +5,11 @@ import { HAL_DIR } from "./state.ts"
 const CONFIG_PATH = `${HAL_DIR}/config.ason`
 
 export interface DebugConfig {
-	toolCalls?: boolean   // log tool calls to state/tool-calls.ason
-	ipc?: boolean         // log IPC commands/events
-	streaming?: boolean   // log raw SSE events
-	tokens?: boolean      // log token counts per turn
+	toolCalls?: boolean       // log tool calls to state/tool-calls.ason
+	responseLogging?: boolean // log API responses to state/responses.ason
+	ipc?: boolean             // log IPC commands/events
+	streaming?: boolean       // log raw SSE events
+	tokens?: boolean          // log token counts per turn
 }
 
 export interface Config {

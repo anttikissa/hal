@@ -22,7 +22,7 @@ import {
 } from "../session.ts"
 import { tailCommands } from "../ipc.ts"
 import type { SessionInfo } from "../protocol.ts"
-import { HAL_DIR, LAUNCH_CWD, ensureStateDir } from "../state.ts"
+import { HAL_DIR, LAUNCH_CWD, ensureStateDir, sessionDir } from "../state.ts"
 import {
 	createCommandScheduler,
 	ensureSessionQueue,
@@ -230,7 +230,7 @@ async function initialize(): Promise<void> {
 			"status", initialSessionId,
 		)
 	} else {
-		await publishLine("[session] new session", "status", initialSessionId)
+		await publishLine(`[session] new session — ${sessionDir(initialSessionId)}`, "status", initialSessionId)
 	}
 
 	const config = loadConfig()

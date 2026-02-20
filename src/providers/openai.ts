@@ -153,6 +153,45 @@ function extractErrorMessage(payload: any): string {
 	return "unknown"
 }
 
+function cleanActivity(text: unknown): string {
+	if (typeof text !== "string") return ""
+	const trimmed = text.replace(/\s+/g, " ").trim()
+	if (!trimmed) return ""
+	return trimmed.slice(0, 180)
+}
+
+function extractActivityText(event: any): string {
+	if (!event || typeof event !== "object") return ""
+
+	const direct = [
+		event.activity,
+		event.message,
+		event.description,
+		event.status_message,
+		event.status_text,
+		event.delta,
+		event.text,
+	]
+	for (const candidate of direct) {
+		const cleaned = cleanActivity(candidate)
+		if (cleaned) return cleaned
+	}
+
+	const details = event.status_details
+	if (details && typeof details === "object") {
+		const fromDetails = cleanActivity(details.message ?? details.description ?? details.summary)
+		if (fromDetails) return fromDetails
+	}
+
+	const responseDetails = event.response?.status_details
+	if (responseDetails && typeof responseDetails === "object") {
+		const fromResponseDetails = cleanActivity(responseDetails.message ?? responseDetails.description ?? responseDetails.summary)
+		if (fromResponseDetails) return fromResponseDetails
+	}
+
+	return ""
+}
+
 // Per-stream state
 interface StreamState {
 	itemMap: Map<number, number>
@@ -217,6 +256,8 @@ export const openaiProvider: Provider = {
 
 		if (model.startsWith("o")) {
 			body.reasoning = { effort: "high", summary: "auto" }
+		} else if (codex && model.includes("codex")) {
+			body.reasoning = { summary: "auto" }
 		}
 
 		return body
@@ -228,16 +269,38 @@ export const openaiProvider: Provider = {
 		const type = event.type
 		if (!type) return []
 
+		const activityText = extractActivityText(event)
+		if (activityText && (
+			type === "response.created"
+			|| type === "response.in_progress"
+			|| type === "response.output_item.in_progress"
+		)) {
+			return [{ type: "activity", text: activityText }]
+		}
+
 		if (type === "response.output_item.added") {
 			const item = event.item
 			const oi = event.output_index ?? 0
 			const bi = streamState.nextBlockIndex++
 			streamState.itemMap.set(oi, bi)
-			if (item.type === "reasoning") return [{ type: "thinking_start", index: bi }]
-			if (item.type === "message") return [{ type: "text_start", index: bi }]
+			if (item.type === "reasoning") {
+				return [
+					{ type: "thinking_start", index: bi },
+					{ type: "activity", text: "Planning response..." },
+				]
+			}
+			if (item.type === "message") {
+				return [
+					{ type: "text_start", index: bi },
+					{ type: "activity", text: "Composing answer..." },
+				]
+			}
 			if (item.type === "function_call") {
 				streamState.toolInputs.set(oi, "")
-				return [{ type: "tool_use_start", index: bi, id: item.call_id ?? `call_${bi}`, name: item.name ?? "" }]
+				return [
+					{ type: "tool_use_start", index: bi, id: item.call_id ?? `call_${bi}`, name: item.name ?? "" },
+					{ type: "activity", text: item.name ? `Preparing tool call: ${item.name}` : "Preparing tool call..." },
+				]
 			}
 			return []
 		}
@@ -298,8 +361,16 @@ export const openaiProvider: Provider = {
 			return events
 		}
 
-		if (type === "error" || type === "response.failed") {
-			return [{ type: "error", message: `${type}: ${extractErrorMessage(event)}` }]
+		if (type === "error") {
+			const message = extractErrorMessage(event)
+			const code =
+				(typeof event?.code === "string" && event.code)
+				|| (typeof event?.error?.code === "string" && event.error.code)
+				|| "error"
+			return [{ type: "error", message: `${code}: ${message}` }]
+		}
+		if (type === "response.failed") {
+			return [{ type: "error", message: `response.failed: ${extractErrorMessage(event)}` }]
 		}
 
 		return []

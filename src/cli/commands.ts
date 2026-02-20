@@ -50,6 +50,11 @@ async function clear(_args: string, client: Client): Promise<void> {
 	client.clear()
 }
 
+async function todo(args: string, client: Client): Promise<void> {
+	if (!args) { client.log("local.usage", "usage: /todo <task description>"); return }
+	await client.command("prompt", `[todo] ${args}`)
+}
+
 async function restart(_args: string, client: Client): Promise<void> {
 	await client.command("restart")
 	client.log("local.queue", "restart")
@@ -58,7 +63,7 @@ async function restart(_args: string, client: Client): Promise<void> {
 function exit(_args: string, _client: Client): void {}
 
 const COMMANDS: Record<string, Handler> = {
-	help, model, system, pause, handoff, cd, close, reset, clear, restart, exit,
+	help, model, system, pause, handoff, cd, close, reset, clear, todo, restart, exit,
 }
 
 const ALIASES: Record<string, string> = {

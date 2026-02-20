@@ -1,5 +1,6 @@
-import { writeFile } from "fs/promises"
-import { loadConfig, resolveModel, providerForModel, modelIdForModel } from "../config.ts"
+import { writeFile, appendFile } from "fs/promises"
+import { loadConfig, resolveModel, providerForModel, modelIdForModel, debugEnabled } from "../config.ts"
+import { RESPONSE_LOG } from "../state.ts"
 import { getProvider, type Provider } from "../provider.ts"
 import { tools, runTool, RESTART_SIGNAL } from "../tools.ts"
 import { contextStatus, shouldWarn } from "../context.ts"
@@ -50,6 +51,11 @@ export async function runAgentLoop(
 
 		const parsed = await parseResponseStream(sessionId, runtime, provider, res)
 		if (!parsed) break
+
+		if (debugEnabled("responseLogging")) {
+			const entry = { ts: new Date().toISOString(), sessionId, stopReason: parsed.stopReason, usage: parsed.usage, blocks: parsed.contentBlocks.length }
+			await appendFile(RESPONSE_LOG, stringify(entry) + "\n").catch(() => {})
+		}
 
 		if (Object.keys(parsed.usage).length > 0) {
 			await logTokenUsage(sessionId, runtime, provider, parsed.usage)
@@ -136,10 +142,9 @@ export async function runAgentLoop(
 
 	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
 
-	// Post-turn context check: no auto-compaction, just warn at 80%
 	if (runtime.lastUsage && shouldWarn(runtime.lastUsage)) {
 		await publishLine(
-			"[context] >80% full. Consider /handoff to start fresh with a summary.",
+			"[context] >66% full. Consider /handoff to start fresh with a summary.",
 			"warn", sessionId,
 		)
 	}
@@ -314,6 +319,9 @@ async function parseResponseStream(
 			const events = provider.parseSSE({ type: eventType, data: eventData })
 			for (const evt of events) {
 				switch (evt.type) {
+					case "activity":
+						if (evt.text.trim()) await publishActivity(evt.text, sessionId)
+						break
 					case "text_start":
 						contentBlocks[evt.index] = { type: "text", text: "" }
 						await publishActivity("Writing...", sessionId)

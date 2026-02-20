@@ -29,7 +29,7 @@ export function estimatedContextStatus(systemTokens: number, messageTokens: numb
 }
 
 export function shouldWarn(usage: any): boolean {
-	return totalInputTokens(usage) / MAX_CONTEXT >= 0.8
+	return totalInputTokens(usage) / MAX_CONTEXT >= 0.666
 }
 
 export function estimateMessageTokens(msg: any): number {
