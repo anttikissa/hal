@@ -64,8 +64,9 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 		return `${prefix}${style}${text}${reset}`
 	}
 
-
-	return `${style}${text}${reset}\n`
+	// When previous output was a streaming chunk (no trailing newline), add one
+	const needsNewline = prev.startsWith("chunk.")
+	return `${needsNewline ? "\n" : ""}${style}${text}${reset}\n`
 }
 
 export function pushEvent(
