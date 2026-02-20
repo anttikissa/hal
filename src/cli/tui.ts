@@ -111,7 +111,7 @@ function promptLineCount(): number {
 	const c = cols()
 	if (c <= 0) return 1
 	const text = inputPromptStr + inputBuf
-	const lines = wordWrapLines(text, c)
+	const lines = wordWrapLines(text, c - 1)
 	return Math.max(1, Math.min(lines.length, maxPromptLines))
 }
 
@@ -168,8 +168,9 @@ function drawDarkPad(row: number): void {
 
 function drawPromptLines(): void {
 	const c = cols()
+	const usable = c - 1 // 1-char right margin
 	const text = inputPromptStr + inputBuf
-	const wrapped = wordWrapLines(text, c)
+	const wrapped = wordWrapLines(text, usable)
 	const pLines = Math.min(wrapped.length, maxPromptLines)
 	const firstRow = promptFirstRow()
 
@@ -206,7 +207,7 @@ function cursorToRowCol(absPos: number, width: number): { row: number; col: numb
 function positionCursorAtInput(): void {
 	const c = cols()
 	const absPos = inputPromptStr.length + inputCursor
-	const { row, col } = cursorToRowCol(absPos, c)
+	const { row, col } = cursorToRowCol(absPos, c - 1)
 	// Continuation lines have 1-char indent in drawPromptLines
 	const indent = row > 0 ? 1 : 0
 	moveTo(promptFirstRow() + row, col + 1 + indent)
