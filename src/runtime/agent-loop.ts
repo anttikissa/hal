@@ -11,7 +11,7 @@ import {
 	emitStatus,
 	type SessionRuntimeCache,
 } from "./sessions.ts"
-import { publishLine, publishChunk } from "./event-publisher.ts"
+import { publishLine, publishChunk, publishActivity } from "./event-publisher.ts"
 
 const REQ_LOG = "/tmp/hal-req.ason"
 
@@ -44,6 +44,7 @@ export async function runAgentLoop(
 		})
 		await writeFile(REQ_LOG, stringify(body) + "\n").catch(() => {})
 
+		await publishActivity("Sending request...", sessionId)
 		const res = await fetchWithRetry(sessionId, runtime, provider, body)
 		if (!res || runtime.pausedByUser) break
 
@@ -97,6 +98,7 @@ export async function runAgentLoop(
 		if (toolBlocks.length > 0) {
 			const toolResults = await Promise.all(
 				toolBlocks.map(async (block: any) => {
+					await publishActivity(`Running: ${block.name}`, sessionId)
 					const output = await runTool(block.name, block.input, {
 						logger: (line, level = "tool") => publishLine(line, level, sessionId),
 						cwd: getSessionWorkingDir(sessionId),
@@ -221,6 +223,7 @@ async function fetchWithRetry(
 			if (runtime.pausedByUser) return null
 			if (attempt < MAX_RETRIES - 1) {
 				const delay = Math.min(2000 * Math.pow(2, attempt), 30000)
+				await publishActivity(`Retrying (${attempt + 1}/${MAX_RETRIES})...`, sessionId)
 				await publishLine(
 					`[retry] network error: ${e.message}. retrying in ${(delay / 1000).toFixed(0)}s... (${attempt + 1}/${MAX_RETRIES})`,
 					"warn", sessionId,
@@ -313,6 +316,7 @@ async function parseResponseStream(
 				switch (evt.type) {
 					case "text_start":
 						contentBlocks[evt.index] = { type: "text", text: "" }
+						await publishActivity("Writing...", sessionId)
 						break
 					case "text_delta":
 						if (evt.text && contentBlocks[evt.index]) {
@@ -322,6 +326,7 @@ async function parseResponseStream(
 						break
 					case "thinking_start":
 						contentBlocks[evt.index] = { type: "thinking", thinking: "" }
+						await publishActivity("Thinking...", sessionId)
 						break
 					case "thinking_delta":
 						if (evt.text && contentBlocks[evt.index]) {
@@ -336,6 +341,7 @@ async function parseResponseStream(
 						break
 					case "tool_use_start":
 						contentBlocks[evt.index] = { type: "tool_use", id: evt.id, name: evt.name, input: "" }
+						await publishActivity(`Calling tool: ${evt.name}`, sessionId)
 						break
 					case "tool_input_delta":
 						if (contentBlocks[evt.index]?.type === "tool_use") {
@@ -373,8 +379,10 @@ async function parseResponseStream(
 						break
 					case "stop":
 						stopReason = evt.stopReason
+						await publishActivity("", sessionId)
 						break
 					case "error":
+						await publishActivity(`Error: ${evt.message}`, sessionId)
 						await publishLine(`[stream error] ${evt.message}`, "error", sessionId)
 						await publishLine("hint: you can re-send your message, or use /reset to start fresh", "warn", sessionId)
 						break

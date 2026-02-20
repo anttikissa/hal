@@ -42,20 +42,25 @@ export const anthropicProvider: Provider = {
 			"Content-Type": "application/json",
 			Authorization: `Bearer ${auth?.accessToken ?? ""}`,
 			"anthropic-version": "2023-06-01",
-			"anthropic-beta": "oauth-2025-04-20,interleaved-thinking-2025-05-14",
+			"anthropic-beta": "oauth-2025-04-20",
 			"user-agent": "hal-claude/0.1.0",
 		}
 	},
 
 	buildRequestBody({ model, messages, system, tools, maxTokens }) {
-		return {
+		const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(model)
+		const body: any = {
 			model,
 			max_tokens: maxTokens,
 			stream: true,
 			system,
 			tools,
 			messages,
+			thinking: isAdaptive
+				? { type: "adaptive" }
+				: { type: "enabled", budget_tokens: Math.min(10000, maxTokens - 1) },
 		}
+		return body
 	},
 
 	parseSSE(rawEvent: { type: string; data: string }): StreamEvent[] {

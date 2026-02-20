@@ -3,13 +3,14 @@
  *
  * Layout:
  *   Rows 1..(rows - footerH)   = output (scroll region, append-only)
- *   Row  (rows - footerH + 1)  = status line (dashes with tabs + context)
- *   Row  (rows - footerH + 2)  = empty dark-grey line
+ *   Row  (rows - footerH + 1)  = activity line (dim, what the model is doing)
+ *   Row  (rows - footerH + 2)  = status line (dashes with tabs + context)
+ *   Row  (rows - footerH + 3)  = empty dark-grey line
  *   Rows ...                    = prompt text lines (dark-grey bg)
  *   Row  rows                   = empty dark-grey line
  *
- * Footer height = 1 (status) + 1 (pad top) + promptLines + 1 (pad bottom)
- *               = 3 + promptLines  (min 4 when promptLines=1)
+ * Footer height = 1 (activity) + 1 (status) + 1 (pad top) + promptLines + 1 (pad bottom)
+ *               = 4 + promptLines  (min 5 when promptLines=1)
  */
 
 import { stringify } from "../utils/ason.ts"
@@ -42,6 +43,9 @@ let initialized = false
 let ended = false
 let suspended = false
 let transcript = ""
+
+// Activity line content (what the model is doing)
+let activityStr = ""
 
 // Status line content (dash line with tabs + context)
 let statusTabsStr = ""
@@ -108,13 +112,14 @@ function promptLineCount(): number {
 	return Math.max(1, Math.min(lines.length, maxPromptLines))
 }
 
-/** Total footer height: status(1) + padTop(1) + promptLines + padBottom(1) */
-function footerHeight(): number { return 3 + promptLineCount() }
+/** Total footer height: activity(1) + status(1) + padTop(1) + promptLines + padBottom(1) */
+function footerHeight(): number { return 4 + promptLineCount() }
 
 let lastFooterH = 0
 
 function outputBottom(): number { return Math.max(1, rows() - footerHeight()) }
-function statusRow(): number { return rows() - footerHeight() + 1 }
+function activityRow(): number { return rows() - footerHeight() + 1 }
+function statusRow(): number { return activityRow() + 1 }
 function promptTopPadRow(): number { return statusRow() + 1 }
 function promptFirstRow(): number { return promptTopPadRow() + 1 }
 function promptBottomPadRow(): number { return rows() }
@@ -135,6 +140,14 @@ function buildStatusLine(): string {
 	const dashCount = Math.max(0, c - leftPart.length - rightPart.length)
 	const line = leftPart + "─".repeat(dashCount) + rightPart
 	return `${STATUS_DIM}${line.slice(0, c)}${RESET}`
+}
+
+function drawActivityLine(): void {
+	moveTo(activityRow(), 1)
+	clearLine()
+	const c = cols()
+	const text = activityStr ? `  Model: ${activityStr}` : "  Model: Idle"
+	directWrite(`${DIM}${text.slice(0, c)}${RESET}`)
 }
 
 function drawStatusLine(): void {
@@ -207,6 +220,7 @@ function fullRedrawFooter(): void {
 	setupScrollRegion()
 
 	hideCursor()
+	drawActivityLine()
 	drawStatusLine()
 	drawDarkPad(promptTopPadRow())
 	drawPromptLines()
@@ -223,6 +237,7 @@ function redrawFooter(): void {
 	}
 
 	hideCursor()
+	drawActivityLine()
 	drawStatusLine()
 	drawDarkPad(promptTopPadRow())
 	drawPromptLines()
@@ -546,6 +561,13 @@ export function write(text: string): void { writeToOutput(text) }
 
 export function log(...args: any[]): void {
 	write(args.map(a => safeStringify(a)).join(" ") + "\n")
+}
+
+/** Set the activity line content (what the model is doing) */
+export function setActivityLine(text: string): void {
+	if (activityStr === text) return
+	activityStr = text
+	if (initialized) redrawFooter()
 }
 
 /** Set the status line content. tabsStr = formatted tab names, rightStr = context info */

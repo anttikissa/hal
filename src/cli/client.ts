@@ -10,6 +10,7 @@ import * as tui from "./tui.ts"
 import {
 	flashHeader,
 	getOutputSnapshot,
+	setActivityLine,
 	setEscHandler,
 	setInputEchoFilter,
 	setInputKeyHandler,
@@ -336,6 +337,7 @@ function handleEsc(): void {
 	if (!active || !runtimeBusy) return
 	appendBusCommand(makeCommand("pause", source, undefined, active.sessionId)).catch(() => {})
 	flashHeader("\x1b[33mpausing...\x1b[0m")
+	setActivityLine("Paused")
 }
 
 async function bootstrapState(): Promise<void> {
@@ -404,6 +406,11 @@ function render(event: RuntimeEvent): void {
 
 	if (event.type === "status") {
 		runtimeBusy = Boolean(event.busy)
+		if ("activity" in event && event.activity !== undefined) {
+			setActivityLine(event.activity)
+		} else if (!event.busy) {
+			setActivityLine("")
+		}
 		renderBusyStatus()
 		return
 	}

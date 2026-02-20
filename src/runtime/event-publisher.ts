@@ -110,6 +110,21 @@ export async function publishStatus(snapshot: StatusSnapshot, force = false): Pr
 	})
 }
 
+export async function publishActivity(
+	activity: string,
+	sessionId: string | null,
+): Promise<void> {
+	await emit({
+		type: "status",
+		sessionId,
+		busySessionIds: [],
+		activeSessionId: null,
+		busy: true,
+		queueLength: 0,
+		activity,
+	})
+}
+
 export async function publishSessions(
 	activeSessionId: string | null,
 	registryActiveSessionId: string | null,

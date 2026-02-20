@@ -71,6 +71,7 @@ export type RuntimeEvent =
 		activeSessionId: string | null
 		busy: boolean
 		queueLength: number
+		activity?: string
 		createdAt: string
 	}
 	| {
