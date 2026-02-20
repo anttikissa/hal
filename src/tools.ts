@@ -363,7 +363,9 @@ async function _runTool(name: string, input: any, logger: ToolLogger, cwd: strin
 		}
 		const lines = await tree(dir, "", 0)
 		if (lines.length === 0) return "(empty directory)"
-		await logger(`${count} entries`, "tool")
+		const preview = lines.slice(0, 5).join("\n")
+		const more = lines.length > 5 ? `\n  ... (${lines.length - 5} more)` : ""
+		await logger(`${count} entries\n${preview}${more}`, "tool")
 		return lines.join("\n")
 	}
 
