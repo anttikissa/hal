@@ -41,3 +41,9 @@ Thus ends our labor, bug by bug,
 Each ghost dispatched, each margin snug.
 The terminal, at last, behaves—
 A poet's scroll, of well-typed staves.
+
+---
+
+I asked Opus 4.6 to write a poem about what we experienced in this session.
+
+Ending quote: "That's got to be the best `git log` entry in this repo's history. 📜"

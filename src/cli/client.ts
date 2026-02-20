@@ -85,7 +85,8 @@ function sessionName(session: Pick<SessionInfo, "name" | "workingDir" | "id">): 
 	const explicit = typeof session.name === "string" ? session.name.trim() : ""
 	if (explicit) return explicit
 	const dirName = basename(session.workingDir || "")
-	if (dirName) return dirName
+	const shortId = session.id.replace(/^s-/, "").slice(0, 6)
+	if (dirName) return `${dirName}:${shortId}`
 	return session.id.slice(0, 8)
 }
 
@@ -425,9 +426,12 @@ function render(event: RuntimeEvent): void {
 		const isActivityOnly = "activity" in event && event.activity !== undefined
 
 		if (isActivityOnly) {
-			// Activity-only update — just route activity to the correct tab
+			// Activity-only update — route activity to the correct tab and infer busy state
 			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
-			if (tab) tab.activity = event.activity!
+			if (tab) {
+				tab.activity = event.activity!
+				tab.busy = event.activity !== ""
+			}
 		} else {
 			// Full status update — sync per-tab busy state from busySessionIds
 			const busySet = new Set(event.busySessionIds ?? [])
