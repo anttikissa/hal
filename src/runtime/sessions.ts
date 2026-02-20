@@ -11,6 +11,7 @@ import {
 } from "../context.ts"
 import {
 	loadSession,
+	loadHandoff,
 	loadSessionRegistry,
 	makeSessionId,
 	saveSessionRegistry,
@@ -140,8 +141,15 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	if (existing) return existing
 
 	const restored = await loadSession(sessionId)
+	let messages = restored?.messages ?? []
+	if (messages.length === 0) {
+		const handoff = await loadHandoff(sessionId)
+		if (handoff) {
+			messages = [{ role: "user", content: `[handoff]\n\n${handoff.trim()}` }]
+		}
+	}
 	const runtime: SessionRuntimeCache = {
-		messages: restored?.messages ?? [],
+		messages,
 		tokenTotals: { ...EMPTY_TOTALS, ...(restored?.tokenTotals ?? EMPTY_TOTALS) },
 		lastUsage: null,
 		systemPrompt: [],

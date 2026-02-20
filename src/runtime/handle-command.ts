@@ -1,6 +1,6 @@
 import { resolve, isAbsolute } from "path"
 import type { RuntimeCommand } from "../protocol.ts"
-import { clearSession, performHandoff, loadHandoff, saveSession } from "../session.ts"
+import { clearSession, performHandoff, saveSession } from "../session.ts"
 import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias, modelIdForModel } from "../config.ts"
 import { getProvider } from "../provider.ts"
 import { drainQueuedCommands } from "./command-scheduler.ts"

@@ -598,6 +598,12 @@ export function clearOutput(): void {
 	redrawFooter()
 }
 
+export function replaceOutput(snapshot: string): void {
+	clearOutput()
+	if (snapshot) writeToOutput(snapshot)
+}
+
+
 export function setEscHandler(handler: (() => void) | null): void { escHandler = handler }
 
 export function input(promptStr: string): Promise<string | null> {

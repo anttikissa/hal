@@ -182,8 +182,14 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	if (!active) return
 	resetFormat()
 	lastContextStatus = active.contextStatus
-	if (active.output.length > 0) setOutputSnapshot(active.output)
-	else if (clearWhenEmpty) tui.clearOutput()
+	if (clearWhenEmpty) {
+		// Full redraw: clear screen and rewrite content (tab switch / initial load)
+		if (active.output.length > 0) tui.replaceOutput(active.output)
+		else tui.clearOutput()
+	} else {
+		// Just update transcript, no visual change
+		if (active.output.length > 0) setOutputSnapshot(active.output)
+	}
 	ensureTabBootstrap(active)
 	renderBusyStatus()
 }
