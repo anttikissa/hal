@@ -66,6 +66,8 @@ interface CliTab {
 	name: string
 	output: string
 	contextStatus: string | null
+	activity: string
+	busy: boolean
 }
 
 function completeInput(prefix: string): string[] {
@@ -91,7 +93,6 @@ function sessionName(session: Pick<SessionInfo, "name" | "workingDir" | "id">): 
 let source: RuntimeCommand["source"]
 let isOwner = false
 let stopped = false
-let runtimeBusy = false
 let lastContextStatus: string | null = null
 let roleLabel = ""
 
@@ -167,6 +168,8 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 		output: "",
 		contextStatus: null,
+		activity: "",
+		busy: false,
 	}]
 	activeTabIndex = 0
 	applyActiveTabSnapshot(false)
@@ -182,6 +185,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	if (!active) return
 	resetFormat()
 	lastContextStatus = active.contextStatus
+	setActivityLine(active.busy ? active.activity || "Working..." : "")
 	if (clearWhenEmpty) {
 		// Full redraw: clear screen and rewrite content (tab switch / initial load)
 		if (active.output.length > 0) tui.replaceOutput(active.output)
@@ -234,6 +238,8 @@ async function createTab(): Promise<void> {
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 		output: "",
 		contextStatus: null,
+		activity: "",
+		busy: false,
 	})
 	activeTabIndex = tabs.length - 1
 	applyActiveTabSnapshot(true)
@@ -275,6 +281,8 @@ function syncTabsFromSessions(
 			name: sessionName(session),
 			output: preserveActiveOutput ? (existing?.output ?? "") : "",
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
+			activity: preserveActiveOutput ? (existing?.activity ?? "") : "",
+			busy: preserveActiveOutput ? (existing?.busy ?? false) : false,
 		}
 	})
 
@@ -332,6 +340,8 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 		output: "",
 		contextStatus: null,
+		activity: "",
+		busy: false,
 	}
 	tabs.push(tab)
 	renderBusyStatus()
@@ -340,7 +350,7 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 
 function handleEsc(): void {
 	const active = activeTab()
-	if (!active || !runtimeBusy) return
+	if (!active || !active.busy) return
 	appendBusCommand(makeCommand("pause", source, undefined, active.sessionId)).catch(() => {})
 	flashHeader("\x1b[33mpausing...\x1b[0m")
 	setActivityLine("Paused")
@@ -349,7 +359,7 @@ function handleEsc(): void {
 async function bootstrapState(): Promise<void> {
 	try {
 		const state = await readState()
-		runtimeBusy = Boolean(state.busy)
+		const busySet = new Set(state.busySessionIds ?? [])
 
 		if (Array.isArray(state.sessions) && state.sessions.length > 0) {
 			syncTabsFromSessions(state.sessions, state.activeSessionId ?? null, {
@@ -358,6 +368,7 @@ async function bootstrapState(): Promise<void> {
 		} else {
 			ensureFallbackTab(state.activeSessionId ?? null)
 		}
+		for (const tab of tabs) tab.busy = busySet.has(tab.sessionId)
 
 		const recent = await readRecentEvents(500)
 		hydrateTabsFromRecentLines(recent)
@@ -411,12 +422,28 @@ function render(event: RuntimeEvent): void {
 	}
 
 	if (event.type === "status") {
-		runtimeBusy = Boolean(event.busy)
-		if ("activity" in event && event.activity !== undefined) {
-			setActivityLine(event.activity)
-		} else if (!event.busy) {
-			setActivityLine("")
+		const isActivityOnly = "activity" in event && event.activity !== undefined
+
+		if (isActivityOnly) {
+			// Activity-only update — just route activity to the correct tab
+			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
+			if (tab) tab.activity = event.activity!
+		} else {
+			// Full status update — sync per-tab busy state from busySessionIds
+			const busySet = new Set(event.busySessionIds ?? [])
+			for (const tab of tabs) {
+				const wasBusy = tab.busy
+				tab.busy = busySet.has(tab.sessionId)
+				if (!tab.busy && wasBusy) tab.activity = ""
+			}
 		}
+
+		// Only update the displayed activity line based on the active tab
+		const active = activeTab()
+		if (active) {
+			setActivityLine(active.busy ? active.activity || "Working..." : "")
+		}
+
 		renderBusyStatus()
 		return
 	}
