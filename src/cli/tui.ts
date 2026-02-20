@@ -71,6 +71,8 @@ let historyDraft = ""
 let waitingResolve: ((value: string | null) => void) | null = null
 
 let escHandler: (() => void) | null = null
+let doubleEnterHandler: (() => void) | null = null
+let lastSubmitTime = 0
 let headerFlash = ""
 let headerFlashTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -371,7 +373,19 @@ function handleKey(key: string): void {
 
 	if (key === "\r" || key === "\n") {
 		const value = inputBuf
-		if (value.trim()) inputHistory.push(value)
+		const now = Date.now()
+
+		// Double-enter: empty buffer shortly after a submit → steer
+		if (!value.trim() && lastSubmitTime > 0 && (now - lastSubmitTime) < 500) {
+			lastSubmitTime = 0
+			if (doubleEnterHandler) doubleEnterHandler()
+			return
+		}
+
+		if (value.trim()) {
+			inputHistory.push(value)
+			lastSubmitTime = now
+		}
 		historyIndex = -1
 		historyDraft = ""
 		inputBuf = ""
@@ -688,6 +702,7 @@ export function replaceOutput(snapshot: string): void {
 
 
 export function setEscHandler(handler: (() => void) | null): void { escHandler = handler }
+export function setDoubleEnterHandler(handler: (() => void) | null): void { doubleEnterHandler = handler }
 
 export function input(promptStr: string): Promise<string | null> {
 	if (!initialized) init()

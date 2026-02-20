@@ -18,7 +18,6 @@ import {
 	getCachedSessionRuntime,
 	markSessionAsActive,
 	sortedBusySessionIds,
-	isSessionBusy,
 	emitStatus,
 } from "./sessions.ts"
 
@@ -98,19 +97,6 @@ async function runPause(sessionId: string | null): Promise<void> {
 	await publishLine("[pause] generation paused", "warn", sessionId)
 }
 
-async function maybeAutoPause(command: RuntimeCommand): Promise<void> {
-	const sessionId = command.sessionId ?? null
-	if (!sessionId) return
-	const runtime = getCachedSessionRuntime(sessionId)
-	if (!runtime || !isSessionBusy(sessionId) || runtime.pausedByUser) return
-
-	// Any new prompt on a busy session pauses the current generation
-	if (command.type === "prompt") {
-		await publishLine("[pause] new prompt — pausing current generation", "warn", sessionId)
-		await runPause(sessionId)
-	}
-}
-
 export async function processCommand(command: RuntimeCommand): Promise<void> {
 
 	const sessionId = await normalizeCommandSession(command)
@@ -124,8 +110,6 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		await emitStatus(true)
 		return
 	}
-
-	await maybeAutoPause(command)
 
 	if (command.type === "reset" && sessionId) {
 		const dropped = await dropQueuedCommands("dropped by /reset", sessionId)

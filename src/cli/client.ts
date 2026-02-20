@@ -19,6 +19,7 @@ import {
 	setMaxPromptLines,
 	setOutputSnapshot,
 	setStatusLine,
+	setDoubleEnterHandler,
 	setTabCompleter,
 } from "./tui.ts"
 
@@ -103,6 +104,7 @@ let isOwner = false
 let stopped = false
 let lastContextStatus: string | null = null
 let roleLabel = ""
+let wasBusyOnLastSubmit = false
 
 const client = new Client()
 let tabs: CliTab[] = []
@@ -120,6 +122,7 @@ export async function start(): Promise<void> {
 	tui.init()
 	setTabCompleter(completeInput)
 	setEscHandler(() => handleEsc())
+	setDoubleEnterHandler(() => handleDoubleEnter())
 	setInputKeyHandler((key) => handleInputKey(key))
 	setInputEchoFilter((value) => !isExit(normalizeCommandInput(value)))
 	roleLabel = isOwner ? "owner" : "client"
@@ -146,6 +149,7 @@ export async function start(): Promise<void> {
 			const normalized = normalizeCommandInput(input)
 			if (!trimmed) continue
 			if (isExit(normalized)) break
+			wasBusyOnLastSubmit = activeTab()?.busy ?? false
 			await handleCommand(input, client)
 			// Persist input history for the active tab
 			const tab = activeTab()
@@ -157,6 +161,7 @@ export async function start(): Promise<void> {
 	} finally {
 		setInputKeyHandler(null)
 		setEscHandler(null)
+		setDoubleEnterHandler(null)
 		setInputEchoFilter(null)
 		stopped = true
 		try { tui.cleanup() } catch {}
@@ -384,6 +389,14 @@ function handleEsc(): void {
 	flashHeader("\x1b[33mpausing...\x1b[0m")
 	setActivityLine("Paused")
 }
+
+function handleDoubleEnter(): void {
+	const active = activeTab()
+	if (!active || !wasBusyOnLastSubmit) return
+	appendBusCommand(makeCommand("pause", source, undefined, active.sessionId)).catch(() => {})
+	flashHeader("\x1b[33m⏎⏎ steering\x1b[0m")
+}
+
 
 async function bootstrapState(): Promise<void> {
 	try {
