@@ -166,7 +166,13 @@ export async function performHandoff(sessionId: string, handoffContent: string):
 export async function loadHandoff(sessionId: string): Promise<string | null> {
 	const hPath = handoffPath(sessionId)
 	if (!existsSync(hPath)) return null
-	try { return await readFile(hPath, "utf-8") } catch { return null }
+	try {
+		const content = await readFile(hPath, "utf-8")
+		// Preserve for debugging, then remove
+		const prevPath = `${sessionDir(sessionId)}/handoff-previous.md`
+		await rename(hPath, prevPath)
+		return content
+	} catch { return null }
 }
 
 // Prompt logging
