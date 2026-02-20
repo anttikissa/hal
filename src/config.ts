@@ -10,6 +10,7 @@ export interface Config {
 	compactModel?: string
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
+	maxPromptLines: number
 }
 
 // User-facing aliases → actual model IDs
@@ -55,6 +56,7 @@ const DEFAULTS: Config = {
 	model: "claude",
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 2,
+	maxPromptLines: 15,
 }
 
 let _config: Config | null = null

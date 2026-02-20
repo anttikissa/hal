@@ -2,9 +2,14 @@
  * Terminal UI with raw mode input and managed footer.
  *
  * Layout:
- *   Rows 1..(rows - FOOTER_H)  = output (scroll region, append-only)
- *   Row  (rows - 1)             = header (tab strip + status)
- *   Row  rows                   = input line ("> " prompt + buffer)
+ *   Rows 1..(rows - footerH)   = output (scroll region, append-only)
+ *   Row  (rows - footerH + 1)  = status line (dashes with tabs + context)
+ *   Row  (rows - footerH + 2)  = empty dark-grey line
+ *   Rows ...                    = prompt text lines (dark-grey bg)
+ *   Row  rows                   = empty dark-grey line
+ *
+ * Footer height = 1 (status) + 1 (pad top) + promptLines + 1 (pad bottom)
+ *               = 3 + promptLines  (min 4 when promptLines=1)
  */
 
 import { stringify } from "../utils/ason.ts"
@@ -28,15 +33,19 @@ function safeStringify(value: unknown): string {
 	try { return stringify(value) } catch { return String(value) }
 }
 
-const FOOTER_H = 2
+// Footer geometry
+let maxPromptLines = 15
+
+export function setMaxPromptLines(n: number): void { maxPromptLines = Math.max(1, Math.min(n, 50)) }
 
 let initialized = false
 let ended = false
 let suspended = false
 let transcript = ""
 
-let headerLeft = ""
-let headerRight = ""
+// Status line content (dash line with tabs + context)
+let statusTabsStr = ""
+let statusRightStr = ""
 
 let outputCursorRow = 1
 let outputCursorSaved = false
@@ -56,6 +65,11 @@ let headerFlashTimer: ReturnType<typeof setTimeout> | null = null
 function cols(): number { return process.stdout.columns || 80 }
 function rows(): number { return process.stdout.rows || 24 }
 
+// Dark grey background
+const BG_DARK = "\x1b[48;5;236m"
+const RESET = "\x1b[0m"
+const DIM = "\x1b[2m"
+
 function rawWrite(text: string): void { process.stdout.write(text.replace(/\n/g, "\r\n")) }
 function directWrite(text: string): void { process.stdout.write(text) }
 
@@ -68,44 +82,109 @@ function showCursor(): void { directWrite(`\x1b[?25h`) }
 function saveCursor(): void { directWrite(`\x1b7`) }
 function restoreCursor(): void { directWrite(`\x1b8`) }
 
-function outputBottom(): number { return Math.max(1, rows() - FOOTER_H) }
-function headerRow(): number { return rows() - 1 }
-function inputRow(): number { return rows() }
-
-function setupScrollRegion(): void { setScrollRegion(1, outputBottom()) }
-
-function drawHeader(): void {
+/** How many screen lines the current input text occupies */
+function promptLineCount(): number {
 	const c = cols()
-	const left = headerLeft.slice(0, c)
-	const right = (headerFlash || headerRight).slice(0, c - left.length)
-	const gap = Math.max(0, c - left.length - right.length)
-	moveTo(headerRow(), 1)
+	if (c <= 0) return 1
+	const textLen = inputPromptStr.length + inputBuf.length
+	return Math.max(1, Math.min(Math.ceil(textLen / c) || 1, maxPromptLines))
+}
+
+/** Total footer height: status(1) + padTop(1) + promptLines + padBottom(1) */
+function footerHeight(): number { return 3 + promptLineCount() }
+
+let lastFooterH = 0
+
+function outputBottom(): number { return Math.max(1, rows() - footerHeight()) }
+function statusRow(): number { return rows() - footerHeight() + 1 }
+function promptTopPadRow(): number { return statusRow() + 1 }
+function promptFirstRow(): number { return promptTopPadRow() + 1 }
+function promptBottomPadRow(): number { return rows() }
+
+function setupScrollRegion(): void {
+	const fh = footerHeight()
+	lastFooterH = fh
+	setScrollRegion(1, outputBottom())
+}
+
+/** Build the dash status line: -[tab1]-tab2-...----- Context: X% / 200k - */
+function buildStatusLine(): string {
+	const c = cols()
+	const left = statusTabsStr
+	const right = headerFlash || statusRightStr
+	// Right side with dash separator
+	const rightPart = right ? ` ${right} -` : " -"
+	const leftPart = left ? `-${left}-` : "-"
+	const dashCount = Math.max(0, c - leftPart.length - rightPart.length)
+	const line = leftPart + "-".repeat(dashCount) + rightPart
+	return `${DIM}${line.slice(0, c)}${RESET}`
+}
+
+function drawStatusLine(): void {
+	moveTo(statusRow(), 1)
 	clearLine()
-	directWrite(left + " ".repeat(gap) + right)
+	directWrite(buildStatusLine())
+}
+
+/** Draw a full-width dark-grey empty line at the given row */
+function drawDarkPad(row: number): void {
+	moveTo(row, 1)
+	clearLine()
+	directWrite(`${BG_DARK}${" ".repeat(cols())}${RESET}`)
+}
+
+function drawPromptLines(): void {
+	const c = cols()
+	const text = inputPromptStr + inputBuf
+	const pLines = promptLineCount()
+	const firstRow = promptFirstRow()
+
+	for (let i = 0; i < pLines; i++) {
+		const chunk = text.slice(i * c, (i + 1) * c)
+		const padded = chunk + " ".repeat(Math.max(0, c - chunk.length))
+		moveTo(firstRow + i, 1)
+		clearLine()
+		directWrite(`${BG_DARK}${padded}${RESET}`)
+	}
+}
+
+function positionCursorAtInput(): void {
+	const c = cols()
+	const absPos = inputPromptStr.length + inputCursor
+	const row = promptFirstRow() + Math.floor(absPos / c)
+	const col = (absPos % c) + 1
+	moveTo(row, col)
+}
+
+function redrawFooter(): void {
+	const newH = footerHeight()
+	if (newH !== lastFooterH) {
+		// Footer size changed — adjust scroll region
+		lastFooterH = newH
+		const bottom = outputBottom()
+		if (outputCursorRow > bottom) outputCursorRow = bottom
+		setupScrollRegion()
+	}
+
+	hideCursor()
+	drawStatusLine()
+	drawDarkPad(promptTopPadRow())
+	drawPromptLines()
+	drawDarkPad(promptBottomPadRow())
+	positionCursorAtInput()
+	showCursor()
 }
 
 export function flashHeader(text: string, durationMs = 1500): void {
 	if (headerFlashTimer) clearTimeout(headerFlashTimer)
 	headerFlash = text
-	if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+	if (initialized) redrawFooter()
 	headerFlashTimer = setTimeout(() => {
 		headerFlash = ""
 		headerFlashTimer = null
-		if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+		if (initialized) redrawFooter()
 	}, durationMs)
 }
-
-function drawInputLine(): void {
-	const line = inputPromptStr + inputBuf
-	const cursorCol = inputPromptStr.length + inputCursor + 1
-	moveTo(inputRow(), 1)
-	clearLine()
-	directWrite(line)
-	moveTo(inputRow(), cursorCol)
-}
-
-function redrawFooter(): void { hideCursor(); drawHeader(); drawInputLine(); showCursor() }
-function positionCursorAtInput(): void { moveTo(inputRow(), inputPromptStr.length + inputCursor + 1) }
 
 // Key parsing
 
@@ -155,8 +234,6 @@ function parseKeys(data: string): string[] {
 	return keys
 }
 
-function redrawInput(): void { drawInputLine() }
-
 function wordBoundaryLeft(buf: string, cursor: number): number {
 	let i = cursor
 	while (i > 0 && buf[i - 1] === " ") i--
@@ -186,7 +263,7 @@ function handleKey(key: string): void {
 			if (!clean) return
 			inputBuf = inputBuf.slice(0, inputCursor) + clean + inputBuf.slice(inputCursor)
 			inputCursor += clean.length
-			redrawInput()
+			redrawFooter()
 		})
 		return
 	}
@@ -198,7 +275,7 @@ function handleKey(key: string): void {
 		historyDraft = ""
 		inputBuf = ""
 		inputCursor = 0
-		redrawInput()
+		redrawFooter()
 		if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(value) }
 		return
 	}
@@ -208,7 +285,7 @@ function handleKey(key: string): void {
 			const b = wordBoundaryLeft(inputBuf, inputCursor)
 			inputBuf = inputBuf.slice(0, b) + inputBuf.slice(inputCursor)
 			inputCursor = b
-			redrawInput()
+			redrawFooter()
 		}
 		return
 	}
@@ -217,7 +294,7 @@ function handleKey(key: string): void {
 		if (inputCursor > 0) {
 			inputBuf = inputBuf.slice(0, inputCursor - 1) + inputBuf.slice(inputCursor)
 			inputCursor--
-			redrawInput()
+			redrawFooter()
 		}
 		return
 	}
@@ -225,17 +302,17 @@ function handleKey(key: string): void {
 	if (key === "\x1b[3~") {
 		if (inputCursor < inputBuf.length) {
 			inputBuf = inputBuf.slice(0, inputCursor) + inputBuf.slice(inputCursor + 1)
-			redrawInput()
+			redrawFooter()
 		}
 		return
 	}
 
-	if (key === "\x1b[D" || key === "\x1bOD") { if (inputCursor > 0) { inputCursor--; redrawInput() }; return }
-	if (key === "\x1b[C" || key === "\x1bOC") { if (inputCursor < inputBuf.length) { inputCursor++; redrawInput() }; return }
-	if (key === "\x1b[H" || key === "\x1bOH" || key === "\x01") { inputCursor = 0; redrawInput(); return }
-	if (key === "\x1b[F" || key === "\x1bOF" || key === "\x05") { inputCursor = inputBuf.length; redrawInput(); return }
-	if (key === "\x15") { inputBuf = inputBuf.slice(inputCursor); inputCursor = 0; redrawInput(); return }
-	if (key === "\x0b") { inputBuf = inputBuf.slice(0, inputCursor); redrawInput(); return }
+	if (key === "\x1b[D" || key === "\x1bOD") { if (inputCursor > 0) { inputCursor--; redrawFooter() }; return }
+	if (key === "\x1b[C" || key === "\x1bOC") { if (inputCursor < inputBuf.length) { inputCursor++; redrawFooter() }; return }
+	if (key === "\x1b[H" || key === "\x1bOH" || key === "\x01") { inputCursor = 0; redrawFooter(); return }
+	if (key === "\x1b[F" || key === "\x1bOF" || key === "\x05") { inputCursor = inputBuf.length; redrawFooter(); return }
+	if (key === "\x15") { inputBuf = inputBuf.slice(inputCursor); inputCursor = 0; redrawFooter(); return }
+	if (key === "\x0b") { inputBuf = inputBuf.slice(0, inputCursor); redrawFooter(); return }
 
 	if (key === "\x1b[A" || key === "\x1bOA") {
 		if (inputHistory.length === 0) return
@@ -244,7 +321,7 @@ function handleKey(key: string): void {
 		else return
 		inputBuf = inputHistory[historyIndex]
 		inputCursor = inputBuf.length
-		redrawInput()
+		redrawFooter()
 		return
 	}
 
@@ -259,14 +336,14 @@ function handleKey(key: string): void {
 			historyDraft = ""
 		}
 		inputCursor = inputBuf.length
-		redrawInput()
+		redrawFooter()
 		return
 	}
 
 	if (key === "\t") {
 		if (tabCompleter) {
 			const matches = tabCompleter(inputBuf)
-			if (matches.length === 1) { inputBuf = matches[0]; inputCursor = inputBuf.length; redrawInput() }
+			if (matches.length === 1) { inputBuf = matches[0]; inputCursor = inputBuf.length; redrawFooter() }
 		}
 		return
 	}
@@ -287,7 +364,7 @@ function handleKey(key: string): void {
 		inputBuf = inputBuf.slice(0, inputCursor) + clean + inputBuf.slice(inputCursor)
 		inputCursor += clean.length
 	}
-	redrawInput()
+	redrawFooter()
 }
 
 function flushStdinBuffer(): void {
@@ -362,6 +439,7 @@ export function init(): void {
 	inputCursor = 0
 	outputCursorRow = 1
 	outputCursorSaved = false
+	lastFooterH = 0
 
 	enterRawMode()
 	directWrite("\x1b[?2004h")
@@ -380,14 +458,18 @@ export function log(...args: any[]): void {
 	write(args.map(a => safeStringify(a)).join(" ") + "\n")
 }
 
-export function setStatus(text: string, rightText = ""): void {
-	headerRight = rightText ? `${text ? text + "  " : ""}${rightText}` : text
-	if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+/** Set the status line content. tabsStr = formatted tab names, rightStr = context info */
+export function setStatusLine(tabsStr: string, rightStr: string): void {
+	statusTabsStr = tabsStr
+	statusRightStr = rightStr
+	if (initialized) redrawFooter()
 }
 
-export function setHeader(text: string): void {
-	headerLeft = text
-	if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+// Keep old API for compatibility — maps to setStatusLine
+export function setHeader(text: string): void { statusTabsStr = text; if (initialized) redrawFooter() }
+export function setStatus(text: string, _rightText = ""): void {
+	statusRightStr = text ? (text + (_rightText ? `  ${_rightText}` : "")) : _rightText
+	if (initialized) redrawFooter()
 }
 
 export function getOutputSnapshot(): string { return transcript }
@@ -412,7 +494,7 @@ export function input(promptStr: string): Promise<string | null> {
 	inputPromptStr = promptStr
 	inputBuf = ""
 	inputCursor = 0
-	redrawInput()
+	redrawFooter()
 	if (ended) return Promise.resolve(null)
 	return new Promise((resolve) => { waitingResolve = resolve })
 }

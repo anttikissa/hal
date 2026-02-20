@@ -3,6 +3,14 @@
 export HAL_DIR="${HAL_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 export LAUNCH_CWD="${LAUNCH_CWD:-$(pwd)}"
 export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
+
+# -f: fresh state in a temp directory
+if [[ "$1" == "-f" ]]; then
+	shift
+	export HAL_STATE_DIR=$(mktemp -d "/tmp/hal-state-XXXXXX")
+	echo "[fresh] state dir: $HAL_STATE_DIR"
+fi
+
 cd "$HAL_DIR" || exit 1
 
 while true; do

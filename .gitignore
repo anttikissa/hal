@@ -3,5 +3,7 @@ config.ason
 auth.ason
 node_modules/
 *.log
+*.swp
+.DS_Store
 
-.idea
+.idea/

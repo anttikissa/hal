@@ -27,7 +27,6 @@ export function estimatedContextStatus(systemTokens: number, messageTokens: numb
 	const color = ratio >= 0.8 ? "\x1b[31m" : ratio >= 0.5 ? "\x1b[33m" : "\x1b[32m"
 	return `${color}[context] Context: ~${pct}%/${fmtTokens(MAX_CONTEXT)}\x1b[0m`
 }
-}
 
 export function shouldWarn(usage: any): boolean {
 	return totalInputTokens(usage) / MAX_CONTEXT >= 0.8

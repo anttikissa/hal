@@ -11,10 +11,11 @@ import {
 	flashHeader,
 	getOutputSnapshot,
 	setEscHandler,
-	setHeader,
 	setInputEchoFilter,
 	setInputKeyHandler,
+	setMaxPromptLines,
 	setOutputSnapshot,
+	setStatusLine,
 	setTabCompleter,
 } from "./tui.ts"
 import { makeCommand, type CommandType, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from "../protocol.ts"
@@ -29,7 +30,7 @@ import {
 } from "./keys.ts"
 import { COMMAND_NAMES, handleCommand, isExit } from "./commands.ts"
 import { LAUNCH_CWD } from "../state.ts"
-import { MODEL_ALIASES } from "../config.ts"
+import { loadConfig, MODEL_ALIASES } from "../config.ts"
 
 export class Client {
 	async command(type: CommandType, text?: string): Promise<void> {
@@ -102,6 +103,7 @@ export function init(src: RuntimeCommand["source"], owner: boolean): void {
 	source = src
 	isOwner = owner
 	launchCwd = resolve(LAUNCH_CWD)
+	setMaxPromptLines(loadConfig().maxPromptLines)
 }
 
 export async function start(): Promise<void> {
@@ -428,19 +430,18 @@ function render(event: RuntimeEvent): void {
 	renderEventToTab(tab, event, false)
 }
 
-function renderTabStrip(): string {
+/** Build tab portion for the dash status line: [tab1]-tab2-tab3 */
+function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ""
-	const BOLD_INV = "\x1b[1;7m"
-	const DIM = "\x1b[2m"
-	const RESET = "\x1b[0m"
 	return tabs.slice(0, 9).map((tab, i) => {
-		const label = `${i + 1} ${tab.name}`
-		return i === activeTabIndex ? `${BOLD_INV} ${label} ${RESET}` : `${DIM}${label}${RESET}`
-	}).join(" ")
+		const label = `${i + 1}:${tab.name}`
+		return i === activeTabIndex ? `[${label}]` : label
+	}).join("-")
 }
 
 function renderBusyStatus(): void {
-	setHeader(renderTabStrip())
+	const tabStr = renderTabsForStatus()
 	const contextOnly = lastContextStatus?.replace(/^\[context\]\s*/, "") ?? ""
-	tui.setStatus(contextOnly, roleLabel)
+	const right = contextOnly || ""
+	setStatusLine(tabStr, right)
 }
