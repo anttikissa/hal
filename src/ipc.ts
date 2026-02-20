@@ -54,7 +54,14 @@ export async function ensureBus(): Promise<void> {
 
 export async function resetBusEvents(): Promise<void> {
 	assertInit()
-	await writeFile(eventsFile, "")
+	// Keep last 500 events so clients can hydrate scroll history after owner restart
+	const raw = await readFile(eventsFile, "utf-8").catch(() => "")
+	const all = parseAll(raw) as RuntimeEvent[]
+	if (all.length > 500) {
+		const kept = all.slice(-500).map(e => stringify(e)).join("\n") + "\n"
+		await writeFile(eventsFile, kept)
+	}
+	// If ≤500, leave as-is
 }
 
 export async function readState(): Promise<RuntimeState> {
