@@ -11,6 +11,7 @@ export const IPC_DIR = `${STATE_DIR}/ipc`
 export const SESSIONS_DIR = `${STATE_DIR}/sessions`
 export const SESSIONS_INDEX = `${SESSIONS_DIR}/index.ason`
 export const CALIBRATION_FILE = `${STATE_DIR}/calibration.ason`
+export const TOOL_LOG = `${STATE_DIR}/tool-calls.ason`
 
 export function sessionDir(id: string): string {
 	return `${SESSIONS_DIR}/${id}`

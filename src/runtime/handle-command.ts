@@ -1,4 +1,4 @@
-import { resolve } from "path"
+import { resolve, isAbsolute } from "path"
 import type { RuntimeCommand } from "../protocol.ts"
 import { clearSession, performHandoff, loadHandoff, saveSession } from "../session.ts"
 import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias, modelIdForModel } from "../config.ts"
@@ -16,6 +16,8 @@ import {
 	emitStatus,
 	emitSessions,
 	busySessions,
+	previousWorkingDirBySession,
+	getHalDir,
 } from "./sessions.ts"
 
 export async function dropQueuedCommands(reason: string, sessionId: string): Promise<number> {
@@ -194,32 +196,49 @@ async function runSystem(sessionId: string): Promise<void> {
 	await publishLine(`[system] ${blocks.length} block(s), ${runtime.systemBytes} bytes:\n${preview}${suffix}`, "info", sessionId)
 }
 
+function resolveCdPath(sessionId: string, input: string, baseDir: string): string {
+	const trimmed = input.trim()
+	const halDir = getHalDir()
+	const home = process.env.HOME ? resolve(process.env.HOME) : null
+	if (!trimmed || trimmed === ".hal") return halDir
+	if (trimmed === "-") {
+		const prev = previousWorkingDirBySession.get(sessionId)
+		if (prev) return prev
+	}
+	if (trimmed === "~") return home ?? baseDir
+	if (trimmed.startsWith("~/") && home) return resolve(home, trimmed.slice(2))
+	if (isAbsolute(trimmed)) return resolve(trimmed)
+	return resolve(baseDir, trimmed)
+}
+
 async function runCd(sessionId: string, text: string): Promise<void> {
-	const target = text.trim()
-	if (!target) {
+	if (!text.trim()) {
 		await publishLine(`[cd] ${getSessionWorkingDir(sessionId)}`, "info", sessionId)
 		return
 	}
 
-	const cwd = getSessionWorkingDir(sessionId)
-	const newDir = resolve(cwd, target)
+	const previous = getSessionWorkingDir(sessionId)
+	const next = resolveCdPath(sessionId, text, previous)
 
 	const { existsSync, statSync } = await import("fs")
-	if (!existsSync(newDir) || !statSync(newDir).isDirectory()) {
-		await publishLine(`[cd] not a directory: ${newDir}`, "error", sessionId)
+	if (!existsSync(next) || !statSync(next).isDirectory()) {
+		await publishLine(`[cd] not a directory: ${next}`, "error", sessionId)
 		return
 	}
 
+	if (previous !== next) previousWorkingDirBySession.set(sessionId, previous)
+
 	const meta = getSessionMeta(sessionId)
 	if (meta) {
-		meta.workingDir = newDir
+		meta.workingDir = next
 		meta.updatedAt = new Date().toISOString()
 		await persistRegistry()
 	}
 
 	const loaded = await reloadSystemPromptForSession(sessionId)
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
-	await publishLine(`[cd] ${newDir}${promptDesc}`, "status", sessionId)
+	const dirMsg = previous !== next ? `${previous} -> ${next}` : next
+	await publishLine(`[cd] ${dirMsg}${promptDesc}`, "status", sessionId)
 }
 
 async function runClose(sessionId: string): Promise<void> {
@@ -232,6 +251,7 @@ async function runClose(sessionId: string): Promise<void> {
 	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
 	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } = await import("./sessions.ts")
 	getSessionCache().delete(sessionId)
+	previousWorkingDirBySession.delete(sessionId)
 
 	const registry = getRegistry()
 	registry.sessions = registry.sessions.filter(s => s.id !== sessionId)

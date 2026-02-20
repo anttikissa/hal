@@ -4,12 +4,20 @@ import { HAL_DIR } from "./state.ts"
 
 const CONFIG_PATH = `${HAL_DIR}/config.ason`
 
+export interface DebugConfig {
+	toolCalls?: boolean   // log tool calls to state/tool-calls.ason
+	ipc?: boolean         // log IPC commands/events
+	streaming?: boolean   // log raw SSE events
+	tokens?: boolean      // log token counts per turn
+}
+
 export interface Config {
 	model: string // "provider/model-id", e.g. "anthropic/claude-opus-4-6"
 	compactModel?: string
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
+	debug: DebugConfig
 }
 
 // User-facing aliases → full provider/model strings
@@ -73,6 +81,7 @@ const DEFAULTS: Config = {
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 2,
 	maxPromptLines: 15,
+	debug: {},
 }
 
 let _config: Config | null = null
@@ -106,4 +115,8 @@ export function updateConfig(updates: Partial<Config>): Config {
 	const config = { ...loadConfig(), ...updates }
 	saveConfig(config)
 	return config
+}
+
+export function debugEnabled(flag: keyof DebugConfig): boolean {
+	return loadConfig().debug?.[flag] === true
 }

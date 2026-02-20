@@ -1,9 +1,12 @@
 import { $ } from "bun"
-import { readFile, writeFile, mkdir } from "fs/promises"
+import { readFile, writeFile, appendFile, mkdir } from "fs/promises"
 import { isAbsolute, resolve } from "path"
 import { hashLine, applyEdit, applyInsert } from "./hashline.ts"
 import { randomBytes } from "crypto"
 import { homedir } from "os"
+import { stringify } from "./utils/ason.ts"
+import { TOOL_LOG } from "./state.ts"
+import { debugEnabled } from "./config.ts"
 
 const HOME = homedir()
 export function shortenHome(text: string): string {
@@ -168,17 +171,36 @@ function resolveToolPath(cwd: string, maybePath?: string): string {
 	return isAbsolute(maybePath) ? maybePath : resolve(cwd, maybePath)
 }
 
+async function logToolCall(name: string, input: any, output: string, durationMs: number, ok: boolean): Promise<void> {
+	if (!debugEnabled("toolCalls")) return
+	try {
+		const entry = {
+			ts: new Date().toISOString(),
+			tool: name,
+			input,
+			output: output.length > 500 ? output.slice(0, 500) + "..." : output,
+			durationMs,
+			ok,
+		}
+		await appendFile(TOOL_LOG, stringify(entry) + "\n")
+	} catch {}
+}
+
 export async function runTool(
 	name: string, input: any,
 	options: { logger?: ToolLogger; cwd?: string } = {}
 ): Promise<string> {
 	const logger: ToolLogger = options.logger ?? ((line) => console.log(line))
 	const cwd = resolve(options.cwd ?? process.cwd())
+	const start = Date.now()
 	try {
-		return await _runTool(name, input, logger, cwd)
+		const result = await _runTool(name, input, logger, cwd)
+		await logToolCall(name, input, result, Date.now() - start, true)
+		return result
 	} catch (e: any) {
 		const msg = `error: ${e.message || e}`
 		await logger(msg, "error")
+		await logToolCall(name, input, msg, Date.now() - start, false)
 		return msg
 	}
 }

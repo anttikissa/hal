@@ -46,6 +46,52 @@ const emitBootstrap = async (text: string, level: EventLevel = "status") => {
 	})
 }
 
+function isAddrInUse(error: unknown): boolean {
+	const msg = String((error as any)?.message ?? error ?? "")
+	return (error as any)?.code === "EADDRINUSE" || msg.includes("EADDRINUSE") || msg.includes("Address already in use")
+}
+
+function listListeningPids(port: number): { pid: number; command: string }[] {
+	const platform = process.platform
+	let result: { exitCode: number; stdout: { toString(): string } }
+	if (platform === "darwin") {
+		result = Bun.spawnSync(["lsof", "-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fp"])
+	} else {
+		// Linux: use ss + parse, or fuser as fallback
+		result = Bun.spawnSync(["fuser", `${port}/tcp`])
+	}
+	if (result.exitCode !== 0) return []
+	const pids: number[] = []
+	if (platform === "darwin") {
+		for (const line of result.stdout.toString().split("\n")) {
+			if (line.startsWith("p")) {
+				const pid = parseInt(line.slice(1), 10)
+				if (pid > 0) pids.push(pid)
+			}
+		}
+	} else {
+		for (const tok of result.stdout.toString().trim().split(/\s+/)) {
+			const pid = parseInt(tok, 10)
+			if (pid > 0) pids.push(pid)
+		}
+	}
+	return pids.filter(pid => pid !== process.pid).map(pid => {
+		const ps = Bun.spawnSync(["ps", "-o", "command=", "-p", String(pid)])
+		const command = ps.exitCode === 0 ? ps.stdout.toString().trim() : ""
+		return { pid, command }
+	})
+}
+
+function findSuspendedHalProcesses(port: number): { pid: number; command: string }[] {
+	return listListeningPids(port).filter(({ pid, command }) => {
+		const ps = Bun.spawnSync(["ps", "-o", "state=", "-p", String(pid)])
+		const state = ps.exitCode === 0 ? ps.stdout.toString().trim() : ""
+		const isSuspended = state.startsWith("T")
+		const looksLikeHal = command.includes("bun main.ts") || command.includes("/bin/bash ./run")
+		return isSuspended && looksLikeHal
+	})
+}
+
 if (isOwner) {
 	await resetBusEvents()
 	if (fresh) await emitBootstrap(`[fresh] state dir: ${STATE_DIR}`)
@@ -53,7 +99,45 @@ if (isOwner) {
 		const web = startWebServer(webPort)
 		await emitBootstrap(`[web] http://localhost:${web.port}`)
 	} catch (e: any) {
-		await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
+		if (isAddrInUse(e)) {
+			const suspended = findSuspendedHalProcesses(webPort)
+			if (suspended.length > 0) {
+				const pids = suspended.map(s => s.pid).join(", ")
+				process.stdout.write(`\nPort ${webPort} held by suspended HAL process${suspended.length > 1 ? "es" : ""} (PID ${pids})\nKill and reclaim? [Y/n] `)
+				const response = await new Promise<string>(resolve => {
+					let buf = ""
+					const onData = (chunk: Buffer) => {
+						buf += chunk.toString()
+						if (buf.includes("\n")) {
+							process.stdin.removeListener("data", onData)
+							process.stdin.pause()
+							if ((process.stdin as any).setRawMode) (process.stdin as any).setRawMode(false)
+							resolve(buf.trim())
+						}
+					}
+					process.stdin.resume()
+					process.stdin.on("data", onData)
+				})
+				if (!response || response.toLowerCase() === "y" || response.toLowerCase() === "yes") {
+					for (const { pid } of suspended) {
+						try { process.kill(pid, "SIGKILL") } catch {}
+					}
+					await Bun.sleep(200)
+					try {
+						const web = startWebServer(webPort)
+						await emitBootstrap(`[web] http://localhost:${web.port} (reclaimed from PID ${pids})`)
+					} catch (retryErr: any) {
+						await emitBootstrap(`[web] disabled: ${retryErr.message || retryErr}`, "warn")
+					}
+				} else {
+					await emitBootstrap(`[web] disabled: port ${webPort} in use`, "warn")
+				}
+			} else {
+				await emitBootstrap(`[web] disabled: port ${webPort} in use by another process`, "warn")
+			}
+		} else {
+			await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
+		}
 	}
 
 	startRuntime(ownerId).catch(async (e) => {

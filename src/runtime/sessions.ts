@@ -56,6 +56,7 @@ let registry: SessionRegistry = { activeSessionId: null, sessions: [] }
 const sessionCache = new Map<string, SessionRuntimeCache>()
 let activeSessionId: string | null = null
 export const busySessions = new Set<string>()
+export const previousWorkingDirBySession = new Map<string, string>()
 export const lastCommandAtBySource = new Map<string, number>()
 
 // Accessors
