@@ -153,7 +153,7 @@ export async function start(): Promise<void> {
 				tab.inputHistory = getInputHistory()
 				saveInputHistory(tab.sessionId, tab.inputHistory).catch(() => {})
 			}
-
+		}
 	} finally {
 		setInputKeyHandler(null)
 		setEscHandler(null)

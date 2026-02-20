@@ -14,6 +14,16 @@ export function shortenHome(text: string): string {
 	return text.replaceAll(HOME, "~")
 }
 
+/** Preview content: show up to 3 lines, omit rest with (+N lines) */
+function contentPreview(text: string): string {
+	const lines = text.split("\n")
+	const show = lines.slice(0, 3)
+	const rest = lines.length - show.length
+	const suffix = rest > 0 ? `\n(+${rest} lines)` : ""
+	return show.join("\n") + suffix
+}
+
+
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
 const MAX_LINE_LEN = 2000
