@@ -12,6 +12,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Prefer tabs for indentation (width 4).
 - Commit messages should start with a capital letter (conventional prefixes like `fix: ` may be lowercase).
 - If asked to learn something, write it to `AGENTS.md` so I can remember it the next time.
+- `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.
 
 ## TODOs
 
