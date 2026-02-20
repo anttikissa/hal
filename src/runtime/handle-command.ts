@@ -4,7 +4,7 @@ import { clearSession, performHandoff, loadHandoff, saveSession } from "../sessi
 import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias } from "../config.ts"
 import { getProvider } from "../provider.ts"
 import { drainQueuedCommands } from "./command-scheduler.ts"
-import { publishLine, publishCommandPhase } from "./event-publisher.ts"
+import { publishLine, publishCommandPhase, publishPrompt } from "./event-publisher.ts"
 import { processPrompt } from "./process-prompt.ts"
 import {
 	getOrLoadSessionRuntime,
@@ -32,6 +32,7 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 	try {
 		switch (command.type) {
 			case "prompt":
+				await publishPrompt(sessionId, command.text ?? "", command.source)
 				await processPrompt(sessionId, command.text ?? "")
 				break
 
