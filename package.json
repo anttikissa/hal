@@ -1,0 +1,13 @@
+{
+	"name": "hal-claude",
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"start": "./run",
+		"dev": "bun main.ts",
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"bun-types": "^1.3.9"
+	}
+}

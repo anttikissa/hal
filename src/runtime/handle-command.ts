@@ -1,0 +1,244 @@
+import { resolve } from "path"
+import type { RuntimeCommand } from "../protocol.ts"
+import { clearSession, performHandoff, loadHandoff, saveSession } from "../session.ts"
+import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias } from "../config.ts"
+import { getProvider } from "../provider.ts"
+import { drainQueuedCommands } from "./command-scheduler.ts"
+import { publishLine, publishCommandPhase } from "./event-publisher.ts"
+import { processPrompt } from "./process-prompt.ts"
+import {
+	getOrLoadSessionRuntime,
+	reloadSystemPromptForSession,
+	getSessionWorkingDir,
+	getSessionMeta,
+	markSessionAsActive,
+	persistRegistry,
+	emitStatus,
+	emitSessions,
+	busySessions,
+} from "./sessions.ts"
+
+export async function dropQueuedCommands(reason: string, sessionId: string): Promise<number> {
+	const dropped = drainQueuedCommands(sessionId)
+	for (const cmd of dropped) {
+		await publishCommandPhase(cmd.id, "failed", reason, sessionId)
+	}
+	return dropped.length
+}
+
+export async function handleCommand(command: RuntimeCommand, sessionId: string): Promise<void> {
+	await publishCommandPhase(command.id, "started", undefined, sessionId)
+
+	try {
+		switch (command.type) {
+			case "prompt":
+				await processPrompt(sessionId, command.text ?? "")
+				break
+
+			case "handoff":
+				await runHandoff(sessionId, command.text)
+				break
+
+			case "reset":
+				await runReset(sessionId)
+				break
+
+			case "model":
+				await runModel(sessionId, command.text ?? "")
+				break
+
+			case "system":
+				await runSystem(sessionId)
+				break
+
+			case "cd":
+				await runCd(sessionId, command.text ?? "")
+				break
+
+			case "close":
+				await runClose(sessionId)
+				break
+
+			case "restart":
+				await saveSessionBeforeExit(sessionId)
+				process.exit(100)
+
+			default:
+				await publishLine(`[command] unknown: ${command.type}`, "warn", sessionId)
+		}
+		await publishCommandPhase(command.id, "done", undefined, sessionId)
+	} catch (e: any) {
+		await publishLine(`[error] ${e.message || e}`, "error", sessionId)
+		await publishCommandPhase(command.id, "failed", e.message, sessionId)
+	}
+}
+
+async function runHandoff(sessionId: string, text?: string): Promise<void> {
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	if (runtime.messages.length === 0) {
+		await publishLine("[handoff] nothing to hand off — session is empty", "warn", sessionId)
+		return
+	}
+
+	await publishLine("[handoff] generating summary...", "status", sessionId)
+
+	// Use compact model for handoff summary
+	const config = loadConfig()
+	const compactModel = resolveCompactModel(config.model)
+	const providerName = providerForModel(compactModel)
+	const provider = getProvider(providerName)
+	await provider.refreshAuth()
+
+	const systemPrompt = `You are summarizing a coding session for handoff. Produce a concise markdown summary that captures:
+1. What was being worked on (goals, context)
+2. What was accomplished so far
+3. Current state (what files were changed, what's working/broken)
+4. What needs to be done next
+5. Any important decisions or context the next session should know
+
+Be specific about file paths, function names, and technical details. The summary should let a new session continue seamlessly.`
+
+	const conversationText = runtime.messages.map((m: any) => {
+		const role = m.role
+		const content = typeof m.content === "string" ? m.content
+			: Array.isArray(m.content) ? m.content.map((b: any) => {
+				if (b.type === "text") return b.text
+				if (b.type === "thinking") return `[thinking] ${b.thinking}`
+				if (b.type === "tool_use") return `[tool: ${b.name}] ${JSON.stringify(b.input)}`
+				if (b.type === "tool_result") return `[result] ${typeof b.content === "string" ? b.content : JSON.stringify(b.content)}`
+				return ""
+			}).filter(Boolean).join("\n") : ""
+		return `[${role}]\n${content}`
+	}).join("\n\n---\n\n")
+
+	const userMsg = text
+		? `${text}\n\n---\n\nHere is the full conversation:\n\n${conversationText}`
+		: `Summarize this coding session for handoff:\n\n${conversationText}`
+
+	const { text: summary, error } = await provider.complete({
+		model: compactModel,
+		system: systemPrompt,
+		userMessage: userMsg,
+		maxTokens: 4000,
+	})
+
+	if (error) {
+		await publishLine(`[handoff] failed: ${error}`, "error", sessionId)
+		return
+	}
+
+	await performHandoff(sessionId, summary)
+	await publishLine("[handoff] summary saved to handoff.md, session rotated to session-previous.ason", "status", sessionId)
+	await publishLine("[handoff] new session started — handoff context loaded", "status", sessionId)
+
+	// Clear runtime cache so next prompt loads fresh
+	const { getSessionCache } = await import("./sessions.ts")
+	getSessionCache().delete(sessionId)
+}
+
+async function runReset(sessionId: string): Promise<void> {
+	// Pause if busy
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	if (busySessions.has(sessionId)) {
+		runtime.pausedByUser = true
+		runtime.activeAbort?.abort()
+	}
+
+	await clearSession(sessionId)
+	const { getSessionCache } = await import("./sessions.ts")
+	getSessionCache().delete(sessionId)
+
+	const meta = getSessionMeta(sessionId)
+	if (meta) {
+		meta.messageCount = 0
+		meta.updatedAt = new Date().toISOString()
+		await persistRegistry()
+	}
+
+	await publishLine("[reset] session cleared", "status", sessionId)
+	await emitSessions(true)
+}
+
+async function runModel(sessionId: string, text: string): Promise<void> {
+	const name = text.trim()
+	if (!name) {
+		const config = loadConfig()
+		await publishLine(`[model] current: ${config.model} (${resolveModel(config.model)})`, "info", sessionId)
+		return
+	}
+
+	const config = updateConfig({ model: name, provider: providerForModel(name) })
+	const modelId = resolveModel(name)
+	const alias = modelAlias(modelId)
+
+	// Reload system prompt for new model
+	const loaded = await reloadSystemPromptForSession(sessionId)
+	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
+
+	await publishLine(
+		`[model] switched to ${providerForModel(name)}/${alias}${promptDesc}`,
+		"status", sessionId,
+	)
+}
+
+async function runSystem(sessionId: string): Promise<void> {
+	const loaded = await reloadSystemPromptForSession(sessionId)
+	await publishLine(`[system] reloaded: ${loaded.join(", ") || "(none)"}`, "status", sessionId)
+}
+
+async function runCd(sessionId: string, text: string): Promise<void> {
+	const target = text.trim()
+	if (!target) {
+		await publishLine(`[cd] ${getSessionWorkingDir(sessionId)}`, "info", sessionId)
+		return
+	}
+
+	const cwd = getSessionWorkingDir(sessionId)
+	const newDir = resolve(cwd, target)
+
+	const { existsSync, statSync } = await import("fs")
+	if (!existsSync(newDir) || !statSync(newDir).isDirectory()) {
+		await publishLine(`[cd] not a directory: ${newDir}`, "error", sessionId)
+		return
+	}
+
+	const meta = getSessionMeta(sessionId)
+	if (meta) {
+		meta.workingDir = newDir
+		meta.updatedAt = new Date().toISOString()
+		await persistRegistry()
+	}
+
+	const loaded = await reloadSystemPromptForSession(sessionId)
+	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
+	await publishLine(`[cd] ${newDir}${promptDesc}`, "status", sessionId)
+}
+
+async function runClose(sessionId: string): Promise<void> {
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	if (busySessions.has(sessionId)) {
+		runtime.pausedByUser = true
+		runtime.activeAbort?.abort()
+	}
+
+	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } = await import("./sessions.ts")
+	getSessionCache().delete(sessionId)
+
+	const registry = getRegistry()
+	registry.sessions = registry.sessions.filter(s => s.id !== sessionId)
+	if (registry.activeSessionId === sessionId) {
+		registry.activeSessionId = registry.sessions[0]?.id ?? null
+	}
+	if (getActiveSessionId() === sessionId) {
+		setActiveSessionId(registry.sessions[0]?.id ?? null)
+	}
+	await persistRegistry()
+	await publishLine(`[close] session ${sessionId} closed`, "status", null)
+	await emitSessions(true)
+}
+
+async function saveSessionBeforeExit(sessionId: string): Promise<void> {
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+}

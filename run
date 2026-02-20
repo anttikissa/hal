@@ -1,0 +1,12 @@
+#!/bin/bash
+
+export HAL_DIR="${HAL_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+export LAUNCH_CWD="${LAUNCH_CWD:-$(pwd)}"
+export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
+cd "$HAL_DIR" || exit 1
+
+while true; do
+	bun main.ts "$@"
+	code=$?
+	[ "$code" -ne 100 ] && exit "$code"
+done

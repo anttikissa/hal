@@ -1,0 +1,442 @@
+/**
+ * Terminal UI with raw mode input and managed footer.
+ *
+ * Layout:
+ *   Rows 1..(rows - FOOTER_H)  = output (scroll region, append-only)
+ *   Row  (rows - 1)             = header (tab strip + status)
+ *   Row  rows                   = input line ("> " prompt + buffer)
+ */
+
+import { stringify } from "../utils/ason.ts"
+import { pasteFromClipboard, saveMultilinePaste } from "./clipboard.ts"
+export { stripAnsi } from "./format.ts"
+
+type TabCompleter = (prefix: string) => string[]
+type InputKeyHandler = (key: string) => boolean | void
+type InputEchoFilter = (value: string) => boolean
+
+let tabCompleter: TabCompleter | null = null
+let inputKeyHandler: InputKeyHandler | null = null
+let inputEchoFilter: InputEchoFilter | null = null
+
+export function setTabCompleter(fn: TabCompleter): void { tabCompleter = fn }
+export function setInputKeyHandler(handler: InputKeyHandler | null): void { inputKeyHandler = handler }
+export function setInputEchoFilter(handler: InputEchoFilter | null): void { inputEchoFilter = handler }
+
+function safeStringify(value: unknown): string {
+	if (typeof value === "string") return value
+	try { return stringify(value) } catch { return String(value) }
+}
+
+const FOOTER_H = 2
+
+let initialized = false
+let ended = false
+let suspended = false
+let transcript = ""
+
+let headerLeft = ""
+let headerRight = ""
+
+let outputCursorRow = 1
+let outputCursorSaved = false
+
+let inputBuf = ""
+let inputCursor = 0
+let inputPromptStr = "> "
+let inputHistory: string[] = []
+let historyIndex = -1
+let historyDraft = ""
+let waitingResolve: ((value: string | null) => void) | null = null
+
+let escHandler: (() => void) | null = null
+let headerFlash = ""
+let headerFlashTimer: ReturnType<typeof setTimeout> | null = null
+
+function cols(): number { return process.stdout.columns || 80 }
+function rows(): number { return process.stdout.rows || 24 }
+
+function rawWrite(text: string): void { process.stdout.write(text.replace(/\n/g, "\r\n")) }
+function directWrite(text: string): void { process.stdout.write(text) }
+
+function setScrollRegion(top: number, bottom: number): void { directWrite(`\x1b[${top};${bottom}r`) }
+function resetScrollRegion(): void { directWrite(`\x1b[r`) }
+function moveTo(row: number, col: number): void { directWrite(`\x1b[${row};${col}H`) }
+function clearLine(): void { directWrite(`\x1b[2K`) }
+function hideCursor(): void { directWrite(`\x1b[?25l`) }
+function showCursor(): void { directWrite(`\x1b[?25h`) }
+function saveCursor(): void { directWrite(`\x1b7`) }
+function restoreCursor(): void { directWrite(`\x1b8`) }
+
+function outputBottom(): number { return Math.max(1, rows() - FOOTER_H) }
+function headerRow(): number { return rows() - 1 }
+function inputRow(): number { return rows() }
+
+function setupScrollRegion(): void { setScrollRegion(1, outputBottom()) }
+
+function drawHeader(): void {
+	const c = cols()
+	const left = headerLeft.slice(0, c)
+	const right = (headerFlash || headerRight).slice(0, c - left.length)
+	const gap = Math.max(0, c - left.length - right.length)
+	moveTo(headerRow(), 1)
+	clearLine()
+	directWrite(left + " ".repeat(gap) + right)
+}
+
+export function flashHeader(text: string, durationMs = 1500): void {
+	if (headerFlashTimer) clearTimeout(headerFlashTimer)
+	headerFlash = text
+	if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+	headerFlashTimer = setTimeout(() => {
+		headerFlash = ""
+		headerFlashTimer = null
+		if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+	}, durationMs)
+}
+
+function drawInputLine(): void {
+	const line = inputPromptStr + inputBuf
+	const cursorCol = inputPromptStr.length + inputCursor + 1
+	moveTo(inputRow(), 1)
+	clearLine()
+	directWrite(line)
+	moveTo(inputRow(), cursorCol)
+}
+
+function redrawFooter(): void { hideCursor(); drawHeader(); drawInputLine(); showCursor() }
+function positionCursorAtInput(): void { moveTo(inputRow(), inputPromptStr.length + inputCursor + 1) }
+
+// Key parsing
+
+const PASTE_START = "\x1b[200~"
+const PASTE_END = "\x1b[201~"
+let stdinBuffer = ""
+let stdinTimer: ReturnType<typeof setTimeout> | null = null
+const STDIN_COALESCE_MS = 50
+
+function parseKeys(data: string): string[] {
+	const keys: string[] = []
+	let i = 0
+	while (i < data.length) {
+		if (data.startsWith(PASTE_START, i)) {
+			const contentStart = i + PASTE_START.length
+			const endIdx = data.indexOf(PASTE_END, contentStart)
+			if (endIdx >= 0) {
+				const pasted = data.slice(contentStart, endIdx)
+				if (pasted) keys.push(pasted)
+				i = endIdx + PASTE_END.length
+			} else {
+				const pasted = data.slice(contentStart)
+				if (pasted) keys.push(pasted)
+				i = data.length
+			}
+			continue
+		}
+		if (data[i] === "\x1b") {
+			if (i + 1 < data.length && (data[i + 1] === "[" || data[i + 1] === "O")) {
+				let j = i + 2
+				while (j < data.length && data.charCodeAt(j) >= 0x20 && data.charCodeAt(j) <= 0x3f) j++
+				if (j < data.length) j++
+				keys.push(data.slice(i, j))
+				i = j
+			} else if (i + 1 < data.length) {
+				keys.push(data.slice(i, i + 2))
+				i += 2
+			} else {
+				keys.push("\x1b")
+				i++
+			}
+		} else {
+			keys.push(data[i])
+			i++
+		}
+	}
+	return keys
+}
+
+function redrawInput(): void { drawInputLine() }
+
+function wordBoundaryLeft(buf: string, cursor: number): number {
+	let i = cursor
+	while (i > 0 && buf[i - 1] === " ") i--
+	while (i > 0 && buf[i - 1] !== " ") i--
+	return i
+}
+
+function suspendForegroundJob(): void {
+	suspended = true
+	directWrite("\x1b[?2004l")
+	resetScrollRegion()
+	if (process.stdin.isTTY) process.stdin.setRawMode(false)
+	try { process.kill(0, "SIGSTOP") } catch { process.kill(process.pid, "SIGSTOP") }
+}
+
+function handleKey(key: string): void {
+	if (inputKeyHandler && inputKeyHandler(key)) return
+
+	if (key === "\x03") { cleanup(); process.exit(100) }
+	if (key === "\x04") { if (inputBuf.length === 0) { cleanup(); process.exit(0) }; return }
+	if (key === "\x1a") { suspendForegroundJob(); return }
+
+	if (key === "\x16") {
+		pasteFromClipboard().then(content => {
+			if (!content) return
+			const clean = content.replace(/[\x00-\x1f]/g, "")
+			if (!clean) return
+			inputBuf = inputBuf.slice(0, inputCursor) + clean + inputBuf.slice(inputCursor)
+			inputCursor += clean.length
+			redrawInput()
+		})
+		return
+	}
+
+	if (key === "\r" || key === "\n") {
+		const value = inputBuf
+		if (value.trim()) inputHistory.push(value)
+		historyIndex = -1
+		historyDraft = ""
+		inputBuf = ""
+		inputCursor = 0
+		redrawInput()
+		if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(value) }
+		return
+	}
+
+	if (key === "\x1b\x7f") {
+		if (inputCursor > 0) {
+			const b = wordBoundaryLeft(inputBuf, inputCursor)
+			inputBuf = inputBuf.slice(0, b) + inputBuf.slice(inputCursor)
+			inputCursor = b
+			redrawInput()
+		}
+		return
+	}
+
+	if (key === "\x7f" || key === "\b") {
+		if (inputCursor > 0) {
+			inputBuf = inputBuf.slice(0, inputCursor - 1) + inputBuf.slice(inputCursor)
+			inputCursor--
+			redrawInput()
+		}
+		return
+	}
+
+	if (key === "\x1b[3~") {
+		if (inputCursor < inputBuf.length) {
+			inputBuf = inputBuf.slice(0, inputCursor) + inputBuf.slice(inputCursor + 1)
+			redrawInput()
+		}
+		return
+	}
+
+	if (key === "\x1b[D" || key === "\x1bOD") { if (inputCursor > 0) { inputCursor--; redrawInput() }; return }
+	if (key === "\x1b[C" || key === "\x1bOC") { if (inputCursor < inputBuf.length) { inputCursor++; redrawInput() }; return }
+	if (key === "\x1b[H" || key === "\x1bOH" || key === "\x01") { inputCursor = 0; redrawInput(); return }
+	if (key === "\x1b[F" || key === "\x1bOF" || key === "\x05") { inputCursor = inputBuf.length; redrawInput(); return }
+	if (key === "\x15") { inputBuf = inputBuf.slice(inputCursor); inputCursor = 0; redrawInput(); return }
+	if (key === "\x0b") { inputBuf = inputBuf.slice(0, inputCursor); redrawInput(); return }
+
+	if (key === "\x1b[A" || key === "\x1bOA") {
+		if (inputHistory.length === 0) return
+		if (historyIndex < 0) { historyDraft = inputBuf; historyIndex = inputHistory.length - 1 }
+		else if (historyIndex > 0) historyIndex--
+		else return
+		inputBuf = inputHistory[historyIndex]
+		inputCursor = inputBuf.length
+		redrawInput()
+		return
+	}
+
+	if (key === "\x1b[B" || key === "\x1bOB") {
+		if (historyIndex < 0) return
+		if (historyIndex < inputHistory.length - 1) {
+			historyIndex++
+			inputBuf = inputHistory[historyIndex]
+		} else {
+			historyIndex = -1
+			inputBuf = historyDraft
+			historyDraft = ""
+		}
+		inputCursor = inputBuf.length
+		redrawInput()
+		return
+	}
+
+	if (key === "\t") {
+		if (tabCompleter) {
+			const matches = tabCompleter(inputBuf)
+			if (matches.length === 1) { inputBuf = matches[0]; inputCursor = inputBuf.length; redrawInput() }
+		}
+		return
+	}
+
+	if (key === "\x1b") { if (escHandler) escHandler(); return }
+
+	if (key.length === 1 && key.charCodeAt(0) < 0x20) return
+	if (key.startsWith("\x1b")) return
+
+	const isMultiline = key.length > 1 && key.includes("\n")
+	if (isMultiline) {
+		const ref = saveMultilinePaste(key)
+		inputBuf = inputBuf.slice(0, inputCursor) + ref + inputBuf.slice(inputCursor)
+		inputCursor += ref.length
+	} else {
+		const clean = key.replace(/[\x00-\x1f]/g, "")
+		if (!clean) return
+		inputBuf = inputBuf.slice(0, inputCursor) + clean + inputBuf.slice(inputCursor)
+		inputCursor += clean.length
+	}
+	redrawInput()
+}
+
+function flushStdinBuffer(): void {
+	const data = stdinBuffer
+	stdinBuffer = ""
+	stdinTimer = null
+	for (const key of parseKeys(data)) handleKey(key)
+}
+
+const onStdinData = (chunk: Buffer | string) => {
+	const text = typeof chunk === "string" ? chunk : chunk.toString("utf8")
+	if (!text) return
+	stdinBuffer += text
+	if (stdinTimer) clearTimeout(stdinTimer)
+	if (stdinBuffer.includes(PASTE_START) && !stdinBuffer.includes(PASTE_END)) {
+		stdinTimer = setTimeout(flushStdinBuffer, STDIN_COALESCE_MS)
+	} else {
+		flushStdinBuffer()
+	}
+}
+
+const onStdinEnd = () => {
+	if (suspended) return
+	ended = true
+	if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) }
+}
+
+function writeToOutput(text: string): void {
+	if (!text) return
+	hideCursor()
+	if (outputCursorSaved) restoreCursor()
+	else { moveTo(outputCursorRow, 1); outputCursorSaved = true }
+	rawWrite(text)
+	const newlines = (text.match(/\n/g) || []).length
+	if (newlines > 0) outputCursorRow = Math.min(outputCursorRow + newlines, outputBottom())
+	saveCursor()
+	redrawFooter()
+	showCursor()
+	transcript += text
+}
+
+function onResize(): void {
+	if (!initialized || suspended) return
+	const bottom = outputBottom()
+	if (outputCursorRow > bottom) outputCursorRow = bottom
+	outputCursorSaved = false
+	setupScrollRegion()
+	redrawFooter()
+}
+
+function enterRawMode(): void {
+	process.stdin.setEncoding("utf8")
+	if (process.stdin.isTTY) process.stdin.setRawMode(true)
+	process.stdin.resume()
+}
+
+function onSigCont(): void {
+	suspended = false
+	ended = false
+	enterRawMode()
+	directWrite("\x1b[?2004h")
+	setupScrollRegion()
+	redrawFooter()
+}
+
+export function init(): void {
+	if (initialized) return
+	initialized = true
+	ended = false
+	suspended = false
+	inputBuf = ""
+	inputCursor = 0
+	outputCursorRow = 1
+	outputCursorSaved = false
+
+	enterRawMode()
+	directWrite("\x1b[?2004h")
+	process.stdin.on("data", onStdinData)
+	process.stdin.on("end", onStdinEnd)
+	process.on("SIGCONT", onSigCont)
+	process.stdout.on("resize", onResize)
+
+	setupScrollRegion()
+	redrawFooter()
+}
+
+export function write(text: string): void { writeToOutput(text) }
+
+export function log(...args: any[]): void {
+	write(args.map(a => safeStringify(a)).join(" ") + "\n")
+}
+
+export function setStatus(text: string, rightText = ""): void {
+	headerRight = rightText ? `${text ? text + "  " : ""}${rightText}` : text
+	if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+}
+
+export function setHeader(text: string): void {
+	headerLeft = text
+	if (initialized) { hideCursor(); drawHeader(); positionCursorAtInput(); showCursor() }
+}
+
+export function getOutputSnapshot(): string { return transcript }
+export function setOutputSnapshot(snapshot: string): void { transcript = snapshot }
+
+export function clearOutput(): void {
+	transcript = ""
+	outputCursorRow = 1
+	outputCursorSaved = false
+	if (process.stdout.isTTY) {
+		const bottom = outputBottom()
+		for (let r = 1; r <= bottom; r++) { moveTo(r, 1); clearLine() }
+	}
+	redrawFooter()
+}
+
+export function setEscHandler(handler: (() => void) | null): void { escHandler = handler }
+
+export function input(promptStr: string): Promise<string | null> {
+	if (!initialized) init()
+	if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) }
+	inputPromptStr = promptStr
+	inputBuf = ""
+	inputCursor = 0
+	redrawInput()
+	if (ended) return Promise.resolve(null)
+	return new Promise((resolve) => { waitingResolve = resolve })
+}
+
+export function prompt(message: string, promptStr: string): Promise<string | null> {
+	write(`${message}\n`)
+	return input(promptStr)
+}
+
+export function cleanup(): void {
+	if (!initialized) return
+	initialized = false
+	suspended = false
+	if (headerFlashTimer) { clearTimeout(headerFlashTimer); headerFlashTimer = null }
+	headerFlash = ""
+	directWrite("\x1b[?2004l")
+	resetScrollRegion()
+	showCursor()
+	moveTo(rows(), 1)
+	directWrite("\r\n")
+	if (process.stdin.isTTY) process.stdin.setRawMode(false)
+	process.stdin.off("data", onStdinData)
+	process.stdin.off("end", onStdinEnd)
+	process.off("SIGCONT", onSigCont)
+	process.stdout.off("resize", onResize)
+	if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) }
+}
