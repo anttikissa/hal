@@ -110,8 +110,8 @@ function wordWrapLines(text: string, width: number): string[] {
 function promptLineCount(): number {
 	const c = cols()
 	if (c <= 0) return 1
-	const text = inputPromptStr + inputBuf
-	const lines = wordWrapLines(text, c - 2)
+	const contentWidth = c - 1 - inputPromptStr.length // right margin + left margin
+	const lines = wordWrapLines(inputBuf, contentWidth)
 	return Math.max(1, Math.min(lines.length, maxPromptLines))
 }
 
@@ -168,15 +168,14 @@ function drawDarkPad(row: number): void {
 
 function drawPromptLines(): void {
 	const c = cols()
-	const usable = c - 2 // 1-char continuation indent + 1-char right margin
-	const text = inputPromptStr + inputBuf
-	const wrapped = wordWrapLines(text, usable)
+	const contentWidth = c - 1 - inputPromptStr.length
+	const wrapped = wordWrapLines(inputBuf, contentWidth)
 	const pLines = Math.min(wrapped.length, maxPromptLines)
 	const firstRow = promptFirstRow()
 
 	for (let i = 0; i < pLines; i++) {
-		// Indent continuation lines to match the prompt prefix width
-		const chunk = i > 0 ? " " + wrapped[i] : wrapped[i] ?? ""
+		// Same left margin on all lines (prompt prefix)
+		const chunk = inputPromptStr + wrapped[i]
 		const padded = chunk + " ".repeat(Math.max(0, c - chunk.length))
 		moveTo(firstRow + i, 1)
 		clearLine()
@@ -186,13 +185,12 @@ function drawPromptLines(): void {
 
 /** Map an absolute char offset in the unwrapped text to (row, col) in word-wrapped layout */
 function cursorToRowCol(absPos: number, width: number): { row: number; col: number } {
-	const text = inputPromptStr + inputBuf
-	const wrapped = wordWrapLines(text, width)
+	const wrapped = wordWrapLines(inputBuf, width)
 	let charsSoFar = 0
 	for (let i = 0; i < wrapped.length; i++) {
 		const lineLen = wrapped[i].length
 		// account for the break char consumed between wrapped lines (space or newline)
-		const breakChar = i < wrapped.length - 1 && charsSoFar + lineLen < text.length ? text[charsSoFar + lineLen] : ""
+		const breakChar = i < wrapped.length - 1 && charsSoFar + lineLen < inputBuf.length ? inputBuf[charsSoFar + lineLen] : ""
 		const consumed = lineLen + (breakChar === " " || breakChar === "\n" ? 1 : 0)
 		if (absPos <= charsSoFar + lineLen) {
 			return { row: i, col: absPos - charsSoFar }
@@ -206,11 +204,10 @@ function cursorToRowCol(absPos: number, width: number): { row: number; col: numb
 
 function positionCursorAtInput(): void {
 	const c = cols()
-	const absPos = inputPromptStr.length + inputCursor
-	const { row, col } = cursorToRowCol(absPos, c - 2)
-	// Continuation lines have 1-char indent in drawPromptLines
-	const indent = row > 0 ? 1 : 0
-	moveTo(promptFirstRow() + row, col + 1 + indent)
+	const contentWidth = c - 1 - inputPromptStr.length
+	const { row, col } = cursorToRowCol(inputCursor, contentWidth)
+	// All lines have the same left margin (inputPromptStr)
+	moveTo(promptFirstRow() + row, col + 1 + inputPromptStr.length)
 }
 
 /** Clear all footer rows and redraw */
