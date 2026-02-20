@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { fresh, headless } from "./src/args.ts"
 import { randomBytes } from "crypto"
 import {
 	appendEvent,
@@ -15,6 +16,7 @@ import type { EventLevel } from "./src/protocol.ts"
 import { registerProvider } from "./src/provider.ts"
 import { anthropicProvider } from "./src/providers/anthropic.ts"
 import { openaiProvider } from "./src/providers/openai.ts"
+import { STATE_DIR } from "./src/state.ts"
 
 registerProvider(anthropicProvider)
 registerProvider(openaiProvider)
@@ -22,8 +24,6 @@ registerProvider(openaiProvider)
 initBus()
 await ensureBus()
 
-const args = new Set(process.argv.slice(2))
-const headless = args.has("--headless")
 const configuredWebPort = Number.parseInt(process.env.HAL_WEB_PORT ?? "9001", 10)
 const webPort = Number.isFinite(configuredWebPort) && configuredWebPort > 0 ? configuredWebPort : 9001
 
@@ -48,6 +48,7 @@ const emitBootstrap = async (text: string, level: EventLevel = "status") => {
 
 if (isOwner) {
 	await resetBusEvents()
+	if (fresh) await emitBootstrap(`[fresh] state dir: ${STATE_DIR}`)
 	try {
 		const web = startWebServer(webPort)
 		await emitBootstrap(`[web] http://localhost:${web.port}`)
