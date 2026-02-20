@@ -531,6 +531,10 @@ function writeToOutput(text: string): void {
 function onResize(): void {
 	if (!initialized || suspended) return
 	outputCursorSaved = false
+	// Clear everything below output to remove ghost footer from old size
+	const bottom = Math.max(1, rows() - footerHeight())
+	moveTo(bottom + 1, 1)
+	directWrite("\x1b[J") // clear from cursor to end of screen
 	fullRedrawFooter()
 }
 
