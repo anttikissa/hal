@@ -188,8 +188,16 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 		return
 	}
 
+	const prevModel = loadConfig().model
 	const fullModel = resolveModel(name)
 	const config = updateConfig({ model: fullModel })
+
+	// Record model change in conversation history so handoff summaries capture it
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	runtime.messages.push({
+		role: "user",
+		content: `[model changed from ${prevModel} to ${fullModel}]`,
+	})
 
 	// Reload system prompt for new model
 	const loaded = await reloadSystemPromptForSession(sessionId)
