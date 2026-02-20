@@ -428,6 +428,22 @@ function handleKey(key: string): void {
 	if (key === "\x0b") { inputBuf = inputBuf.slice(0, inputCursor); redrawFooter(); return }
 
 	if (key === "\x1b[A" || key === "\x1bOA") {
+		// If multi-line and not on first line, move cursor up
+		if (inputBuf.includes("\n")) {
+			const pos = inputCursor
+			// Find start of current line
+			const lineStart = inputBuf.lastIndexOf("\n", pos - 1)
+			if (lineStart >= 0) {
+				// There's a line above — move up
+				const colInLine = pos - lineStart - 1
+				const prevLineStart = inputBuf.lastIndexOf("\n", lineStart - 1) + 1
+				const prevLineLen = lineStart - prevLineStart
+				inputCursor = prevLineStart + Math.min(colInLine, prevLineLen)
+				redrawFooter()
+				return
+			}
+		}
+		// First line or single-line: history navigation
 		if (inputHistory.length === 0) return
 		if (historyIndex < 0) { historyDraft = inputBuf; historyIndex = inputHistory.length - 1 }
 		else if (historyIndex > 0) historyIndex--
@@ -439,6 +455,23 @@ function handleKey(key: string): void {
 	}
 
 	if (key === "\x1b[B" || key === "\x1bOB") {
+		// If multi-line and not on last line, move cursor down
+		if (inputBuf.includes("\n")) {
+			const pos = inputCursor
+			const nextNewline = inputBuf.indexOf("\n", pos)
+			if (nextNewline >= 0) {
+				// There's a line below — move down
+				const lineStart = inputBuf.lastIndexOf("\n", pos - 1) + 1
+				const colInLine = pos - lineStart
+				const nextLineStart = nextNewline + 1
+				const nextNextNewline = inputBuf.indexOf("\n", nextLineStart)
+				const nextLineLen = (nextNextNewline >= 0 ? nextNextNewline : inputBuf.length) - nextLineStart
+				inputCursor = nextLineStart + Math.min(colInLine, nextLineLen)
+				redrawFooter()
+				return
+			}
+		}
+		// Last line or single-line: history navigation
 		if (historyIndex < 0) return
 		if (historyIndex < inputHistory.length - 1) {
 			historyIndex++
