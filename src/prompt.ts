@@ -19,10 +19,12 @@ export async function loadSystemPrompt(options: {
 	model?: string
 	halDir?: string
 	workingDir?: string
+	sessionDir?: string
 } = {}): Promise<SystemPromptResult> {
 	const model = options.model ?? ""
 	const halDir = resolve(options.halDir ?? HAL_DIR)
 	const workingDir = resolve(options.workingDir ?? halDir)
+	const sessDir = options.sessionDir ?? ""
 	const parts: string[] = []
 	const loaded: string[] = []
 
@@ -50,7 +52,7 @@ export async function loadSystemPrompt(options: {
 
 	const processed = parts
 		.map(p => processModelTags(p, model))
-		.map(p => p.replace(/\$\{model\}/g, model).replace(/\$\{cwd\}/g, workingDir).replace(/\$\{date\}/g, today))
+		.map(p => p.replace(/\$\{model\}/g, model).replace(/\$\{cwd\}/g, workingDir).replace(/\$\{date\}/g, today).replace(/\$\{session_dir\}/g, sessDir))
 		.map(p => p.replace(/\n{3,}/g, "\n\n"))
 
 	const blocks = processed

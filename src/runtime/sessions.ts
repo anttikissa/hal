@@ -168,7 +168,7 @@ export async function reloadSystemPromptForSession(sessionId: string, runtime?: 
 	const config = loadConfig()
 	const modelId = modelIdForModel(config.model)
 	const workingDir = getSessionWorkingDir(sessionId)
-	const { blocks, systemBytes, loaded } = await loadSystemPrompt({ model: modelId, halDir, workingDir })
+	const { blocks, systemBytes, loaded } = await loadSystemPrompt({ model: modelId, halDir, workingDir, sessionDir: sessionDir(sessionId) })
 	target.systemPrompt = blocks
 	target.systemBytes = systemBytes
 	return loaded
