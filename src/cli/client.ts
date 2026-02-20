@@ -131,7 +131,7 @@ export async function start(): Promise<void> {
 
 	try {
 		while (!stopped) {
-			const input = await tui.input("> ")
+			const input = await tui.input(" ")
 			if (input === null) break
 			const trimmed = input.trim()
 			const normalized = normalizeCommandInput(input)

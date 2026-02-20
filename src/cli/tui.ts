@@ -174,7 +174,8 @@ function drawPromptLines(): void {
 	const firstRow = promptFirstRow()
 
 	for (let i = 0; i < pLines; i++) {
-		const chunk = wrapped[i] ?? ""
+		// Indent continuation lines to match the prompt prefix width
+		const chunk = i > 0 ? " " + wrapped[i] : wrapped[i] ?? ""
 		const padded = chunk + " ".repeat(Math.max(0, c - chunk.length))
 		moveTo(firstRow + i, 1)
 		clearLine()
@@ -206,7 +207,9 @@ function positionCursorAtInput(): void {
 	const c = cols()
 	const absPos = inputPromptStr.length + inputCursor
 	const { row, col } = cursorToRowCol(absPos, c)
-	moveTo(promptFirstRow() + row, col + 1)
+	// Continuation lines have 1-char indent in drawPromptLines
+	const indent = row > 0 ? 1 : 0
+	moveTo(promptFirstRow() + row, col + 1 + indent)
 }
 
 /** Clear all footer rows and redraw */
