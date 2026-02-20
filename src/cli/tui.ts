@@ -530,11 +530,34 @@ function writeToOutput(text: string): void {
 
 function onResize(): void {
 	if (!initialized || suspended) return
+
+	// Reset scroll region so we can write anywhere
+	resetScrollRegion()
+
+	// Clear entire screen
+	moveTo(1, 1)
+	directWrite("\x1b[J")
+
+	// Set up new scroll region for the resized terminal
+	setupScrollRegion()
+
+	// Rewrite visible output from transcript
+	outputCursorRow = 1
 	outputCursorSaved = false
-	// Clear everything below output to remove ghost footer from old size
-	const bottom = Math.max(1, rows() - footerHeight())
-	moveTo(bottom + 1, 1)
-	directWrite("\x1b[J") // clear from cursor to end of screen
+	if (transcript) {
+		const bottom = outputBottom()
+		// Take the tail of the transcript that fits on screen
+		const lines = transcript.split("\n")
+		// We want at most `bottom` lines (the output area height)
+		const visibleLines = lines.slice(-bottom)
+		const visible = visibleLines.join("\n")
+		moveTo(1, 1)
+		rawWrite(visible)
+		outputCursorRow = Math.min(visibleLines.length, bottom)
+		saveCursor()
+		outputCursorSaved = true
+	}
+
 	fullRedrawFooter()
 }
 
