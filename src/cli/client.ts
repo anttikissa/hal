@@ -294,8 +294,10 @@ function syncTabsFromSessions(
 
 	const nextIndex = tabs.findIndex(t => t.sessionId === targetSessionId)
 	activeTabIndex = nextIndex >= 0 ? nextIndex : 0
-	if (options.render ?? true) applyActiveTabSnapshot(false)
+	const activeChanged = targetSessionId !== previousActive
+	if (options.render ?? true) applyActiveTabSnapshot(activeChanged)
 	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
+
 }
 
 function hydrateTabsFromRecentLines(events: RuntimeEvent[], maxLinesPerTab = 120): void {
