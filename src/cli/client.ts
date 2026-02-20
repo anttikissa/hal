@@ -115,7 +115,7 @@ export async function start(): Promise<void> {
 	setInputEchoFilter((value) => !isExit(normalizeCommandInput(value)))
 	roleLabel = isOwner ? "owner" : "client"
 
-	pushLocal("local.info", "HAL connected. Type a message or /help.")
+	pushLocal("local.info", `HAL connected (${roleLabel}). Type a message or /help.`)
 	await bootstrapState()
 
 	void (async () => {
