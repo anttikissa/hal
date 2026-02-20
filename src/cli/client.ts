@@ -455,6 +455,6 @@ function renderTabsForStatus(): string {
 function renderBusyStatus(): void {
 	const tabStr = renderTabsForStatus()
 	const contextOnly = lastContextStatus?.replace(/^\[context\]\s*/, "") ?? ""
-	const right = contextOnly || ""
-	setStatusLine(tabStr, right)
+	const parts = [roleLabel, contextOnly].filter(Boolean)
+	setStatusLine(tabStr, parts.join("  "))
 }
