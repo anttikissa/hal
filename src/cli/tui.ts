@@ -90,17 +90,20 @@ function restoreCursor(): void { directWrite(`\x1b8`) }
 /** Word-wrap a string into lines of at most `width` chars, breaking at spaces */
 function wordWrapLines(text: string, width: number): string[] {
 	if (width <= 0) return [text]
-	const lines: string[] = []
-	let remaining = text
-	while (remaining.length > width) {
-		let breakAt = remaining.lastIndexOf(" ", width)
-		if (breakAt <= 0) breakAt = width // no space found, hard break
-		lines.push(remaining.slice(0, breakAt))
-		// skip the space at the break point if we broke at a space
-		remaining = remaining[breakAt] === " " ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
+	const result: string[] = []
+	// Split on explicit newlines first, then word-wrap each line
+	for (const segment of text.split("\n")) {
+		let remaining = segment
+		while (remaining.length > width) {
+			let breakAt = remaining.lastIndexOf(" ", width)
+			if (breakAt <= 0) breakAt = width // no space found, hard break
+			result.push(remaining.slice(0, breakAt))
+			// skip the space at the break point if we broke at a space
+			remaining = remaining[breakAt] === " " ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
+		}
+		result.push(remaining)
 	}
-	lines.push(remaining)
-	return lines
+	return result
 }
 
 /** How many screen lines the current input text occupies (with word wrap) */
@@ -186,8 +189,9 @@ function cursorToRowCol(absPos: number, width: number): { row: number; col: numb
 	let charsSoFar = 0
 	for (let i = 0; i < wrapped.length; i++) {
 		const lineLen = wrapped[i].length
-		// account for the space that was consumed at the break
-		const consumed = lineLen + (i < wrapped.length - 1 && charsSoFar + lineLen < text.length && text[charsSoFar + lineLen] === " " ? 1 : 0)
+		// account for the break char consumed between wrapped lines (space or newline)
+		const breakChar = i < wrapped.length - 1 && charsSoFar + lineLen < text.length ? text[charsSoFar + lineLen] : ""
+		const consumed = lineLen + (breakChar === " " || breakChar === "\n" ? 1 : 0)
 		if (absPos <= charsSoFar + lineLen) {
 			return { row: i, col: absPos - charsSoFar }
 		}
@@ -337,12 +341,22 @@ function handleKey(key: string): void {
 	if (key === "\x16") {
 		pasteFromClipboard().then(content => {
 			if (!content) return
-			const clean = content.replace(/[\x00-\x1f]/g, "")
+			const clean = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, "")
 			if (!clean) return
 			inputBuf = inputBuf.slice(0, inputCursor) + clean + inputBuf.slice(inputCursor)
 			inputCursor += clean.length
 			redrawFooter()
 		})
+		return
+	}
+
+	// Shift+Enter / Option+Enter: insert newline
+	// \x1b\r = Option+Enter (macOS), \x1b\n = Alt+Enter variant
+	// \x1b[13;2u = Shift+Enter (kitty protocol), \x1b[27;2;13~ = Shift+Enter (xterm modifyOtherKeys)
+	if (key === "\x1b\r" || key === "\x1b\n" || key === "\x1b[13;2u" || key === "\x1b[27;2;13~") {
+		inputBuf = inputBuf.slice(0, inputCursor) + "\n" + inputBuf.slice(inputCursor)
+		inputCursor++
+		redrawFooter()
 		return
 	}
 
