@@ -198,13 +198,13 @@ async function logToolCall(name: string, input: any, output: string, durationMs:
 
 export async function runTool(
 	name: string, input: any,
-	options: { logger?: ToolLogger; cwd?: string } = {}
+	options: { logger?: ToolLogger; cwd?: string; signal?: AbortSignal } = {}
 ): Promise<string> {
 	const logger: ToolLogger = options.logger ?? ((line) => console.log(line))
 	const cwd = resolve(options.cwd ?? process.cwd())
 	const start = Date.now()
 	try {
-		const result = await _runTool(name, input, logger, cwd)
+		const result = await _runTool(name, input, logger, cwd, options.signal)
 		await logToolCall(name, input, result, Date.now() - start, true)
 		return result
 	} catch (e: any) {
@@ -215,7 +215,7 @@ export async function runTool(
 	}
 }
 
-async function _runTool(name: string, input: any, logger: ToolLogger, cwd: string): Promise<string> {
+async function _runTool(name: string, input: any, logger: ToolLogger, cwd: string, signal?: AbortSignal): Promise<string> {
 	if (name === "bash") {
 		let command = String(input.command ?? "")
 		const cdMatch = command.match(/^cd\s+(\S+)\s*&&\s*/)
@@ -225,11 +225,22 @@ async function _runTool(name: string, input: any, logger: ToolLogger, cwd: strin
 		}
 		await logger(shortenHome(`[bash] ${command}`), "tool")
 		const proc = Bun.spawn(["bash", "-lc", command], { cwd, stdout: "pipe", stderr: "pipe" })
+
+		// Kill subprocess when paused/aborted
+		if (signal) {
+			const onAbort = () => { try { proc.kill("SIGTERM") } catch {} }
+			if (signal.aborted) onAbort()
+			else signal.addEventListener("abort", onAbort, { once: true })
+		}
+
 		const [stdout, stderr, exitCode] = await Promise.all([
 			new Response(proc.stdout).text(),
 			new Response(proc.stderr).text(),
 			proc.exited,
 		])
+
+		if (signal?.aborted) return stdout + stderr + "\n[interrupted]"
+
 		const stderrWarn = exitCode === 0 && stderr && looksLikeError(stderr)
 			? "[warn: possible error despite exit 0 — check stderr above]\n" : ""
 		const exitNote = exitCode === 0 ? "" : `\n[exit ${exitCode}]`

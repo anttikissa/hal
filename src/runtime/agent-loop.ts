@@ -110,6 +110,7 @@ export async function runAgentLoop(
 					const output = await runTool(block.name, block.input, {
 						logger: (line, level = "tool") => publishLine(line, level, sessionId),
 						cwd: getSessionWorkingDir(sessionId),
+						signal: runtime.activeAbort?.signal,
 					})
 					return { id: block.id, output }
 				}),
