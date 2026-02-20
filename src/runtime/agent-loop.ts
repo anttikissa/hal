@@ -374,8 +374,9 @@ async function parseResponseStream(
 						if (block?.type === "server_tool_use" && block?.name === "web_search") {
 							await publishLine(`[web_search] ${stringify(block.input ?? {})}`, "tool", sessionId)
 						}
-						if (block?.type === "thinking" && block.thinking?.trim()) await publishChunk("\n", "thinking", sessionId)
-						if (block?.type === "text" && block.text?.trim()) await publishChunk("\n", "assistant", sessionId)
+						if (block?.type === "thinking" && block.thinking?.trim() && !block.thinking.endsWith("\n")) await publishChunk("\n", "thinking", sessionId)
+						if (block?.type === "text" && block.text?.trim() && !block.text.endsWith("\n")) await publishChunk("\n", "assistant", sessionId)
+
 						break
 					}
 					case "web_search":

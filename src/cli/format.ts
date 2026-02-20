@@ -57,9 +57,13 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	const reset = style ? RESET : ""
 
 	if (kind === "chunk.assistant" || kind === "chunk.thinking") {
-		const prefix = continuing ? "" : "\n"
+		// Only add blank-line separator for chunk→chunk transitions (thinking↔assistant).
+		// Non-chunk types (lines, prompts) already end with \n, so no extra prefix needed.
+		const isChunkTransition = !continuing && prev.startsWith("chunk.")
+		const prefix = isChunkTransition ? "\n" : ""
 		return `${prefix}${style}${text}${reset}`
 	}
+
 
 	return `${style}${text}${reset}\n`
 }

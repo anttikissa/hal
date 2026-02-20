@@ -81,6 +81,7 @@ function completeInput(prefix: string): string[] {
 	return []
 }
 
+// TODO: session IDs in tab names take too much space — move to a /status command or tooltip
 function sessionName(session: Pick<SessionInfo, "name" | "workingDir" | "id">): string {
 	const explicit = typeof session.name === "string" ? session.name.trim() : ""
 	if (explicit) return explicit
