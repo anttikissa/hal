@@ -4,8 +4,9 @@ import { clearSession, performHandoff, saveSession } from "../session.ts"
 import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias, modelIdForModel } from "../config.ts"
 import { getProvider } from "../provider.ts"
 import { drainQueuedCommands } from "./command-scheduler.ts"
-import { publishLine, publishCommandPhase, publishPrompt } from "./event-publisher.ts"
+import { publishLine, publishCommandPhase, publishPrompt, publishActivity } from "./event-publisher.ts"
 import { processPrompt } from "./process-prompt.ts"
+import { estimatedContextStatus, estimateMessageTokens, getCalibration, estimateTokensSync } from "../context.ts"
 import {
 	getOrLoadSessionRuntime,
 	reloadSystemPromptForSession,
@@ -76,6 +77,19 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 	}
 }
 
+/** Publish an estimated context % so the status bar stays up-to-date after session changes */
+async function publishEstimatedContext(sessionId: string): Promise<void> {
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	const cal = await getCalibration()
+	const systemTokens = estimateTokensSync(runtime.systemBytes, cal)
+	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m), 0)
+	await publishLine(
+		estimatedContextStatus(systemTokens, msgTokens, runtime.messages.length),
+		"status", sessionId,
+	)
+}
+
+
 async function runHandoff(sessionId: string, text?: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	if (runtime.messages.length === 0) {
@@ -83,6 +97,7 @@ async function runHandoff(sessionId: string, text?: string): Promise<void> {
 		return
 	}
 
+	await publishActivity("Generating handoff summary...", sessionId)
 	await publishLine("[handoff] generating summary...", "status", sessionId)
 
 	// Use compact model for handoff summary
@@ -125,17 +140,20 @@ Be specific about file paths, function names, and technical details. The summary
 	})
 
 	if (error) {
+		await publishActivity("", sessionId)
 		await publishLine(`[handoff] failed: ${error}`, "error", sessionId)
 		return
 	}
 
 	await performHandoff(sessionId, summary)
+	await publishActivity("", sessionId)
 	await publishLine("[handoff] summary saved to handoff.md, session rotated to session-previous.ason", "status", sessionId)
 	await publishLine("[handoff] new session started — handoff context loaded", "status", sessionId)
 
-	// Clear runtime cache so next prompt loads fresh
+	// Clear runtime cache so next prompt loads fresh, then publish updated context
 	const { getSessionCache } = await import("./sessions.ts")
 	getSessionCache().delete(sessionId)
+	await publishEstimatedContext(sessionId)
 }
 
 async function runReset(sessionId: string): Promise<void> {
@@ -158,6 +176,7 @@ async function runReset(sessionId: string): Promise<void> {
 	}
 
 	await publishLine("[reset] session cleared", "status", sessionId)
+	await publishEstimatedContext(sessionId)
 	await emitSessions(true)
 }
 
