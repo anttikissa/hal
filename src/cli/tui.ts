@@ -346,13 +346,18 @@ function suspendForegroundJob(): void {
 function handleKey(key: string): void {
 	if (inputKeyHandler && inputKeyHandler(key)) return
 
+	// Ctrl-C: restart (exit 100) via sentinel, or immediate exit if no input pending
 	if (key === "\x03") { if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r("\x03") } else { cleanup(); process.exit(100) }; return }
 
+	// Ctrl-D: quit (only on empty input)
 	if (key === "\x04") { if (inputBuf.length === 0 && waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) }; return }
 
+	// Ctrl-Z: suspend
 	if (key === "\x1a") { suspendForegroundJob(); return }
 
+	// Ctrl-V: paste
 	if (key === "\x16") {
+
 		pasteFromClipboard().then(content => {
 			if (!content) return
 			const clean = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, "")
