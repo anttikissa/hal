@@ -17,28 +17,41 @@ export function tailFile(
 
 	return new ReadableStream<Uint8Array>({
 		start(controller) {
+			let reading = false
+			let pending = false
+
 			const read = async () => {
+				if (reading) { pending = true; return }
+				reading = true
 				try {
-					const size = (await stat(path)).size
-					if (size < offset) {
-						if (options.dropOnTruncate) {
-							offset = size
-							return
+					// Loop to drain any data that arrived while we were reading
+					do {
+						pending = false
+						try {
+							const size = (await stat(path)).size
+							if (size < offset) {
+								if (options.dropOnTruncate) {
+									offset = size
+									continue
+								}
+								offset = 0 // file was truncated
+							}
+							if (size === offset) continue
+							const len = size - offset
+							const fh = await open(path, "r")
+							const buf = Buffer.alloc(len)
+							const { bytesRead } = await fh.read(buf, 0, len, offset)
+							await fh.close()
+							if (bytesRead === 0) continue
+							offset += bytesRead
+							controller.enqueue(bytesRead < len ? buf.subarray(0, bytesRead) : buf)
+						} catch (e: any) {
+							if (e?.code === "ENOENT") continue // file does not exist yet
+							// Do not kill the stream on transient errors.
 						}
-						offset = 0 // file was truncated
-					}
-					if (size === offset) return
-					const len = size - offset
-					const fh = await open(path, "r")
-					const buf = Buffer.alloc(len)
-					const { bytesRead } = await fh.read(buf, 0, len, offset)
-					await fh.close()
-					if (bytesRead === 0) return
-					offset += bytesRead
-					controller.enqueue(bytesRead < len ? buf.subarray(0, bytesRead) : buf)
-				} catch (e: any) {
-					if (e?.code === "ENOENT") return // file does not exist yet
-					// Do not kill the stream on transient errors.
+					} while (pending)
+				} finally {
+					reading = false
 				}
 			}
 
