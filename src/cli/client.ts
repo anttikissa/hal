@@ -121,6 +121,14 @@ export function init(src: RuntimeCommand["source"], owner: boolean): void {
 	setMaxPromptLines(loadConfig().maxPromptLines)
 }
 
+export function promoteToOwner(): void {
+	isOwner = true
+	roleLabel = "owner"
+	pushLocal("local.status", "[promoted] this process is now the owner")
+	renderBusyStatus()
+}
+
+
 export async function start(): Promise<void> {
 	tui.init()
 	setTabCompleter(completeInput)

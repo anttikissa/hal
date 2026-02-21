@@ -10,7 +10,8 @@ import {
 	resetBusEvents,
 } from "./src/ipc.ts"
 import { startRuntime } from "./src/runtime/sessions.ts"
-import { init as initClient, start as startClient } from "./src/cli/client.ts"
+import { init as initClient, start as startClient, promoteToOwner } from "./src/cli/client.ts"
+
 import { startWebServer } from "./src/web.ts"
 import type { EventLevel } from "./src/protocol.ts"
 import { registerProvider } from "./src/provider.ts"
@@ -163,12 +164,38 @@ if (headless) {
 	initClient({ kind: "cli", clientId }, isOwner)
 	let exitCode = 0
 	let exitingViaSigint = false
+	let promoted = false
+
+	// If we're a client, poll for dead owner and promote ourselves
+	let ownerWatchTimer: ReturnType<typeof setInterval> | null = null
+	if (!isOwner) {
+		ownerWatchTimer = setInterval(async () => {
+			if (promoted) return
+			const result = await claimOwner(ownerId)
+			if (!result.owner) return
+			promoted = true
+			if (ownerWatchTimer) { clearInterval(ownerWatchTimer); ownerWatchTimer = null }
+
+			promoteToOwner()
+			try {
+				const web = startWebServer(webPort)
+				await emitBootstrap(`[web] http://localhost:${web.port}`)
+			} catch (e: any) {
+				await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
+			}
+			startRuntime(ownerId).catch(async (e) => {
+				await emitBootstrap(`[engine] crashed: ${e.message || e}`, "error")
+				await releaseOwner(ownerId)
+			})
+		}, 2000)
+	}
 
 	process.on("SIGINT", () => {
 		if (exitingViaSigint) return
 		exitingViaSigint = true
 		void (async () => {
-			if (isOwner) await releaseOwner(ownerId)
+			if (ownerWatchTimer) clearInterval(ownerWatchTimer)
+			if (isOwner || promoted) await releaseOwner(ownerId)
 			process.exit(100)
 		})()
 	})
@@ -180,6 +207,8 @@ if (headless) {
 		await emitBootstrap(`[cli] crashed: ${e?.message || e}`, "error")
 	}
 
-	if (isOwner) await releaseOwner(ownerId)
+	if (ownerWatchTimer) clearInterval(ownerWatchTimer)
+	if (isOwner || promoted) await releaseOwner(ownerId)
 	process.exit(exitCode)
 }
+
