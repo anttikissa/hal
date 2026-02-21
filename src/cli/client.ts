@@ -128,6 +128,12 @@ export function promoteToOwner(): void {
 	renderBusyStatus()
 }
 
+let onOwnerReleased: (() => void) | null = null
+export function setOwnerReleaseHandler(handler: (() => void) | null): void {
+	onOwnerReleased = handler
+}
+
+
 
 export async function start(): Promise<void> {
 	tui.init()
@@ -475,10 +481,17 @@ function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: bool
 }
 
 function render(event: RuntimeEvent): void {
+	// Owner released — try to promote
+	if (event.type === "line" && event.text === "[owner-released]") {
+		if (onOwnerReleased) onOwnerReleased()
+		return
+	}
+
 	if (event.type === "sessions") {
 		syncTabsFromSessions(event.sessions, event.activeSessionId ?? null)
 		return
 	}
+
 
 	if (event.type === "status") {
 		const isActivityOnly = "activity" in event && event.activity !== undefined

@@ -159,8 +159,18 @@ export async function releaseOwner(ownerId: string): Promise<void> {
 				s.busySessionIds = []
 			}
 		})
+		// Notify clients so they can claim ownership immediately
+		await appendEvent({
+			id: `${Date.now()}-${process.pid}-release`,
+			type: "line",
+			sessionId: null,
+			text: "[owner-released]",
+			level: "status",
+			createdAt: new Date().toISOString(),
+		})
 	} catch {}
 }
+
 
 export async function appendCommand(command: RuntimeCommand): Promise<void> {
 	assertInit()

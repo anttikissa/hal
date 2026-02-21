@@ -10,7 +10,8 @@ import {
 	resetBusEvents,
 } from "./src/ipc.ts"
 import { startRuntime } from "./src/runtime/sessions.ts"
-import { init as initClient, start as startClient, promoteToOwner } from "./src/cli/client.ts"
+import { init as initClient, start as startClient, promoteToOwner, setOwnerReleaseHandler } from "./src/cli/client.ts"
+
 
 import { startWebServer } from "./src/web.ts"
 import type { EventLevel } from "./src/protocol.ts"
@@ -166,29 +167,33 @@ if (headless) {
 	let exitingViaSigint = false
 	let promoted = false
 
-	// If we're a client, poll for dead owner and promote ourselves
+	async function tryPromote(): Promise<void> {
+		if (isOwner || promoted) return
+		const result = await claimOwner(ownerId)
+		if (!result.owner) return
+		promoted = true
+		if (ownerWatchTimer) { clearInterval(ownerWatchTimer); ownerWatchTimer = null }
+
+		promoteToOwner()
+		try {
+			const web = startWebServer(webPort)
+			await emitBootstrap(`[web] http://localhost:${web.port}`)
+		} catch (e: any) {
+			await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
+		}
+		startRuntime(ownerId).catch(async (e) => {
+			await emitBootstrap(`[engine] crashed: ${e.message || e}`, "error")
+			await releaseOwner(ownerId)
+		})
+	}
+
+	// If we're a client, watch for owner release event + poll as fallback
 	let ownerWatchTimer: ReturnType<typeof setInterval> | null = null
 	if (!isOwner) {
-		ownerWatchTimer = setInterval(async () => {
-			if (promoted) return
-			const result = await claimOwner(ownerId)
-			if (!result.owner) return
-			promoted = true
-			if (ownerWatchTimer) { clearInterval(ownerWatchTimer); ownerWatchTimer = null }
-
-			promoteToOwner()
-			try {
-				const web = startWebServer(webPort)
-				await emitBootstrap(`[web] http://localhost:${web.port}`)
-			} catch (e: any) {
-				await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
-			}
-			startRuntime(ownerId).catch(async (e) => {
-				await emitBootstrap(`[engine] crashed: ${e.message || e}`, "error")
-				await releaseOwner(ownerId)
-			})
-		}, 2000)
+		setOwnerReleaseHandler(() => tryPromote())
+		ownerWatchTimer = setInterval(() => tryPromote(), 5000)
 	}
+
 
 	process.on("SIGINT", () => {
 		if (exitingViaSigint) return
