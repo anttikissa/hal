@@ -1,19 +1,21 @@
 /**
  * Streaming debug log for reproducing UI bugs.
  *
+ * Gated on config.debug.recordEverything.
  * Writes append-only to state/debug/process.<pid>.ason.
  * Starts with snapshots of all state files + config, then streams keypresses.
  * /snapshot (or the snapshot tool) appends a terminal content capture.
  */
 
 import { appendFile, mkdir, readFile, readdir, stat } from "fs/promises"
-import { existsSync } from "fs"
 import { resolve, relative } from "path"
 import { stringify } from "./utils/ason.ts"
 import { STATE_DIR, HAL_DIR } from "./state.ts"
+import { loadConfig } from "./config.ts"
 
 const DEBUG_DIR = `${STATE_DIR}/debug`
 let logPath: string | null = null
+let enabled = false
 let buffer: any[] = []
 let flushTimer: ReturnType<typeof setTimeout> | null = null
 const FLUSH_MS = 100
@@ -35,7 +37,7 @@ function scheduleFlush(): void {
 }
 
 function push(record: any): void {
-	if (!logPath) return
+	if (!enabled) return
 	buffer.push(record)
 	scheduleFlush()
 }
@@ -45,7 +47,10 @@ export function logKeypress(key: string): void {
 }
 
 export function logSnapshot(terminal: string): void {
-	push({ t: Date.now(), type: "snapshot", terminal })
+	// Snapshots always work (even when not recording) so /snapshot is useful on its own
+	if (!logPath) return
+	buffer.push({ t: Date.now(), type: "snapshot", terminal })
+	scheduleFlush()
 }
 
 /** Walk a directory, calling fn for each file. Skips the debug dir. */
@@ -67,6 +72,9 @@ async function walkFiles(dir: string, fn: (path: string) => Promise<void>): Prom
 export async function initDebugLog(pid: number): Promise<void> {
 	await mkdir(DEBUG_DIR, { recursive: true })
 	logPath = resolve(DEBUG_DIR, `process.${pid}.ason`)
+	enabled = loadConfig().debug?.recordEverything === true
+
+	if (!enabled) return
 
 	// Snapshot config.ason (non-secret settings)
 	try {

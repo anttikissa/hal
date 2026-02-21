@@ -10,6 +10,7 @@ export interface DebugConfig {
 	ipc?: boolean             // log IPC commands/events
 	streaming?: boolean       // log raw SSE events
 	tokens?: boolean          // log token counts per turn
+	recordEverything?: boolean // streaming debug log: state files, keypresses, snapshots
 }
 
 export interface Config {
