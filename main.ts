@@ -37,6 +37,8 @@ const clientId = randomBytes(3).toString("hex")
 const claim = await claimOwner(ownerId)
 const isOwner = claim.owner
 
+let webServer: ReturnType<typeof startWebServer> | null = null
+
 let eventCounter = 0
 const emitBootstrap = async (text: string, level: EventLevel = "status") => {
 	eventCounter += 1
@@ -100,8 +102,9 @@ if (isOwner) {
 	await resetBusEvents()
 	if (fresh) await emitBootstrap(`[fresh] state dir: ${STATE_DIR}`)
 	try {
-		const web = startWebServer(webPort)
-		await emitBootstrap(`[web] http://localhost:${web.port}`)
+		webServer = startWebServer(webPort)
+		await emitBootstrap(`[web] http://localhost:${webServer.port}`)
+
 	} catch (e: any) {
 		if (isAddrInUse(e)) {
 			const suspended = findSuspendedHalProcesses(webPort)
@@ -128,8 +131,9 @@ if (isOwner) {
 					}
 					await Bun.sleep(200)
 					try {
-						const web = startWebServer(webPort)
-						await emitBootstrap(`[web] http://localhost:${web.port} (reclaimed from PID ${pids})`)
+						webServer = startWebServer(webPort)
+						await emitBootstrap(`[web] http://localhost:${webServer.port} (reclaimed from PID ${pids})`)
+
 					} catch (retryErr: any) {
 						await emitBootstrap(`[web] disabled: ${retryErr.message || retryErr}`, "warn")
 					}
@@ -157,7 +161,8 @@ if (headless) {
 		process.exit(0)
 	}
 	await emitBootstrap("[runtime] headless mode", "status")
-	const shutdown = async () => { await releaseOwner(ownerId); process.exit(0) }
+	const shutdown = async () => { if (webServer) webServer.stop(); await releaseOwner(ownerId); process.exit(0) }
+
 	process.on("SIGINT", shutdown)
 	process.on("SIGTERM", shutdown)
 	await new Promise(() => {})
@@ -176,8 +181,9 @@ if (headless) {
 
 		promoteToOwner()
 		try {
-			const web = startWebServer(webPort)
-			await emitBootstrap(`[web] http://localhost:${web.port}`)
+			webServer = startWebServer(webPort)
+			await emitBootstrap(`[web] http://localhost:${webServer.port}`)
+
 		} catch (e: any) {
 			await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
 		}
@@ -200,9 +206,11 @@ if (headless) {
 		exitingViaSigint = true
 		void (async () => {
 			if (ownerWatchTimer) clearInterval(ownerWatchTimer)
+			if (webServer) webServer.stop()
 			if (isOwner || promoted) await releaseOwner(ownerId)
 			process.exit(100)
 		})()
+
 	})
 
 	try {
@@ -213,7 +221,9 @@ if (headless) {
 	}
 
 	if (ownerWatchTimer) clearInterval(ownerWatchTimer)
+	if (webServer) webServer.stop()
 	if (isOwner || promoted) await releaseOwner(ownerId)
 	process.exit(exitCode)
+
 }
 
