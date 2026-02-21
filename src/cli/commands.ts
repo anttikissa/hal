@@ -1,5 +1,6 @@
 import type { Client } from "./client.ts"
-import { logSnapshot, getDebugLogPath } from "../debug-log.ts"
+import { logSnapshot, getDebugLogPath, saveBugReport } from "../debug-log.ts"
+
 
 type Handler = (args: string, client: Client) => Promise<void> | void
 
@@ -68,11 +69,25 @@ async function snapshot(_args: string, client: Client): Promise<void> {
 	client.log("local.status", `[snapshot] terminal captured → ${path}`)
 }
 
+async function bug(args: string, client: Client): Promise<void> {
+	if (!args) { client.log("local.usage", "usage: /bug <description of what went wrong>"); return }
+	const terminal = client.getTranscript()
+	const bugPath = await saveBugReport(args, terminal)
+	if (!bugPath) {
+		client.log("local.warn", "[bug] debug logging not active — enable config.debug.recordEverything")
+		return
+	}
+	client.log("local.status", `[bug] saved → ${bugPath}`)
+	// Send to model so it can investigate
+	await client.command("prompt", `[bug] ${args}\n\nDebug log saved to: ${bugPath}\nPlease investigate using the debug log. You can read it with parseAll() to see the initial state, keypresses, and terminal snapshot.`)
+}
+
 function exit(_args: string, _client: Client): void {}
 
 const COMMANDS: Record<string, Handler> = {
-	help, model, system, pause, handoff, cd, close, reset, clear, todo, restart, snapshot, exit,
+	help, model, system, pause, handoff, cd, close, reset, clear, todo, restart, snapshot, bug, exit,
 }
+
 
 const ALIASES: Record<string, string> = {
 	bye: "exit", quit: "exit", q: "exit",
