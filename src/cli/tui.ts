@@ -550,10 +550,8 @@ function flushStdinBuffer(): void {
 	const data = stdinBuffer
 	stdinBuffer = ""
 	stdinTimer = null
-	for (const key of parseKeys(data)) {
-		logKeypress(key)
-		handleKey(key)
-	}
+	logKeypress(data)
+	for (const key of parseKeys(data)) handleKey(key)
 }
 
 const onStdinData = (chunk: Buffer | string) => {
