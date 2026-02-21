@@ -15,6 +15,7 @@
 
 import { stringify } from "../utils/ason.ts"
 import { pasteFromClipboard, saveMultilinePaste } from "./clipboard.ts"
+import { logKeypress } from "../debug-log.ts"
 export { stripAnsi } from "./format.ts"
 
 type TabCompleter = (prefix: string) => string[]
@@ -549,7 +550,10 @@ function flushStdinBuffer(): void {
 	const data = stdinBuffer
 	stdinBuffer = ""
 	stdinTimer = null
-	for (const key of parseKeys(data)) handleKey(key)
+	for (const key of parseKeys(data)) {
+		logKeypress(key)
+		handleKey(key)
+	}
 }
 
 const onStdinData = (chunk: Buffer | string) => {

@@ -1,4 +1,5 @@
 import type { Client } from "./client.ts"
+import { logSnapshot, getDebugLogPath } from "../debug-log.ts"
 
 type Handler = (args: string, client: Client) => Promise<void> | void
 
@@ -60,10 +61,17 @@ async function restart(_args: string, client: Client): Promise<void> {
 	client.log("local.queue", "restart")
 }
 
+async function snapshot(_args: string, client: Client): Promise<void> {
+	const terminal = client.getTranscript()
+	logSnapshot(terminal)
+	const path = getDebugLogPath()
+	client.log("local.status", `[snapshot] terminal captured → ${path}`)
+}
+
 function exit(_args: string, _client: Client): void {}
 
 const COMMANDS: Record<string, Handler> = {
-	help, model, system, pause, handoff, cd, close, reset, clear, todo, restart, exit,
+	help, model, system, pause, handoff, cd, close, reset, clear, todo, restart, snapshot, exit,
 }
 
 const ALIASES: Record<string, string> = {

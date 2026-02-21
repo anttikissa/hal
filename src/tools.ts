@@ -7,6 +7,7 @@ import { homedir } from "os"
 import { stringify } from "./utils/ason.ts"
 import { TOOL_LOG } from "./state.ts"
 import { debugEnabled } from "./config.ts"
+import { logSnapshot, getDebugLogPath } from "./debug-log.ts"
 
 const HOME = homedir()
 export function shortenHome(text: string): string {
@@ -163,6 +164,11 @@ new_content is raw file content — no hashline prefixes.`,
 		type: "web_search_20250305",
 		name: "web_search",
 		max_uses: 5,
+	},
+	{
+		name: "snapshot",
+		description: "Capture a debug snapshot of the terminal output. Returns the current terminal transcript for self-debugging UI issues.",
+		input_schema: { type: "object", properties: {} },
 	},
 	{
 		name: "restart",
@@ -388,6 +394,24 @@ async function _runTool(name: string, input: any, logger: ToolLogger, cwd: strin
 		const more = lines.length > 5 ? `\n  ... (${lines.length - 5} more)` : ""
 		await logger(`${count} entries\n${preview}${more}`, "tool")
 		return lines.join("\n")
+	}
+
+	if (name === "snapshot") {
+		await logger("[snapshot] capturing debug snapshot", "tool")
+		// Read the tail of the events log — this is what's been rendered on screen
+		const { IPC_DIR } = await import("./state.ts")
+		const eventsPath = `${IPC_DIR}/events.ason`
+		try {
+			const content = await readFile(eventsPath, "utf-8")
+			const lines = content.trim().split("\n")
+			const tail = lines.slice(-200).join("\n")
+			logSnapshot(tail)
+			const path = getDebugLogPath()
+			await logger(`[snapshot] saved to ${path}`, "tool")
+			return `Snapshot saved to ${path}. Last ${Math.min(200, lines.length)} events captured.`
+		} catch (e: any) {
+			return `error: ${e.message}`
+		}
 	}
 
 	if (name === "restart") {

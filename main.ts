@@ -17,12 +17,14 @@ import { registerProvider } from "./src/provider.ts"
 import { anthropicProvider } from "./src/providers/anthropic.ts"
 import { openaiProvider } from "./src/providers/openai.ts"
 import { STATE_DIR } from "./src/state.ts"
+import { initDebugLog } from "./src/debug-log.ts"
 
 registerProvider(anthropicProvider)
 registerProvider(openaiProvider)
 
 initBus()
 await ensureBus()
+await initDebugLog(process.pid)
 
 const configuredWebPort = Number.parseInt(process.env.HAL_WEB_PORT ?? "9001", 10)
 const webPort = Number.isFinite(configuredWebPort) && configuredWebPort > 0 ? configuredWebPort : 9001

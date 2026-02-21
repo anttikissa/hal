@@ -49,6 +49,9 @@ export class Client {
 	async prompt(message: string, promptStr: string): Promise<string | null> {
 		return tui.prompt(message, promptStr)
 	}
+	getTranscript(): string {
+		return tui.getOutputSnapshot()
+	}
 	clear(): void {
 		tui.clearOutput()
 	}
