@@ -346,8 +346,9 @@ function suspendForegroundJob(): void {
 function handleKey(key: string): void {
 	if (inputKeyHandler && inputKeyHandler(key)) return
 
-	if (key === "\x03") { cleanup(); process.exit(100) }
-	if (key === "\x04") { if (inputBuf.length === 0) { cleanup(); process.exit(0) }; return }
+	if (key === "\x03") { if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) } else { cleanup(); process.exit(100) }; return }
+	if (key === "\x04") { if (inputBuf.length === 0 && waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) }; return }
+
 	if (key === "\x1a") { suspendForegroundJob(); return }
 
 	if (key === "\x16") {
