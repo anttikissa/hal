@@ -144,7 +144,13 @@ export async function start(): Promise<void> {
 	setInputEchoFilter((value) => !isExit(normalizeCommandInput(value)))
 	roleLabel = isOwner ? "owner" : "client"
 
-	pushLocal("local.info", `HAL connected (${roleLabel}). Type a message or /help.`)
+	const config = loadConfig()
+	pushLocal("local.info", `HAL connected (${roleLabel}).`)
+	if (config.debug?.recordEverything) {
+		pushLocal("local.info", "debug.recordEverything is active — use /bug <report> to report and fix immediately")
+	}
+	pushLocal("local.info", "/q or Ctrl-D to quit · Ctrl-V to paste images · /help for more")
+
 	await bootstrapState()
 
 	void (async () => {
