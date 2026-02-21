@@ -8,6 +8,7 @@ import {
 } from "../ipc.ts"
 import * as tui from "./tui.ts"
 import {
+	CTRL_C,
 	flashHeader,
 	getInputHistory,
 	getOutputSnapshot,
@@ -22,6 +23,7 @@ import {
 	setDoubleEnterHandler,
 	setTabCompleter,
 } from "./tui.ts"
+
 
 import { makeCommand, type CommandType, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from "../protocol.ts"
 import { pushEvent, pushFragment, resetFormat, stripAnsi } from "./format.ts"
@@ -169,7 +171,8 @@ export async function start(): Promise<number> {
 	try {
 		while (!stopped) {
 			const input = await tui.input(" ")
-			if (input === "\x03") { restart = true; break }
+			if (input === CTRL_C) { restart = true; break }
+
 			if (input === null) break
 			const trimmed = input.trim()
 			const normalized = normalizeCommandInput(input)

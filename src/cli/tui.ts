@@ -18,6 +18,17 @@ import { pasteFromClipboard, saveMultilinePaste } from "./clipboard.ts"
 import { logKeypress } from "../debug-log.ts"
 export { stripAnsi } from "./format.ts"
 
+// Control key constants
+export const CTRL_C = "\x03"
+
+const CTRL_D = "\x04"
+const CTRL_K = "\x0b"
+const CTRL_U = "\x15"
+const CTRL_V = "\x16"
+const CTRL_Z = "\x1a"
+
+
+
 type TabCompleter = (prefix: string) => string[]
 type InputKeyHandler = (key: string) => boolean | void
 type InputEchoFilter = (value: string) => boolean
@@ -346,17 +357,12 @@ function suspendForegroundJob(): void {
 function handleKey(key: string): void {
 	if (inputKeyHandler && inputKeyHandler(key)) return
 
-	// Ctrl-C: restart (exit 100) via sentinel, or immediate exit if no input pending
-	if (key === "\x03") { if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r("\x03") } else { cleanup(); process.exit(100) }; return }
+	if (key === CTRL_C) { if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(CTRL_C) } else { cleanup(); process.exit(100) }; return }
+	if (key === CTRL_D) { if (inputBuf.length === 0 && waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) }; return }
+	if (key === CTRL_Z) { suspendForegroundJob(); return }
 
-	// Ctrl-D: quit (only on empty input)
-	if (key === "\x04") { if (inputBuf.length === 0 && waitingResolve) { const r = waitingResolve; waitingResolve = null; r(null) }; return }
+	if (key === CTRL_V) {
 
-	// Ctrl-Z: suspend
-	if (key === "\x1a") { suspendForegroundJob(); return }
-
-	// Ctrl-V: paste
-	if (key === "\x16") {
 
 		pasteFromClipboard().then(content => {
 			if (!content) return
@@ -451,8 +457,10 @@ function handleKey(key: string): void {
 	}
 
 	// Ctrl-U / Ctrl-K
-	if (key === "\x15") { inputBuf = inputBuf.slice(inputCursor); inputCursor = 0; redrawFooter(); return }
-	if (key === "\x0b") { inputBuf = inputBuf.slice(0, inputCursor); redrawFooter(); return }
+	if (key === CTRL_U) { inputBuf = inputBuf.slice(inputCursor); inputCursor = 0; redrawFooter(); return }
+
+	if (key === CTRL_K) { inputBuf = inputBuf.slice(0, inputCursor); redrawFooter(); return }
+
 
 	if (key === "\x1b[A" || key === "\x1bOA") {
 		// If multi-line and not on first line, move cursor up
