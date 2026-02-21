@@ -135,7 +135,8 @@ export function setOwnerReleaseHandler(handler: (() => void) | null): void {
 
 
 
-export async function start(): Promise<void> {
+export async function start(): Promise<number> {
+
 	tui.init()
 	setTabCompleter(completeInput)
 	setEscHandler(() => handleEsc())
@@ -164,9 +165,11 @@ export async function start(): Promise<void> {
 		}
 	})()
 
+	let restart = false
 	try {
 		while (!stopped) {
 			const input = await tui.input(" ")
+			if (input === "\x03") { restart = true; break }
 			if (input === null) break
 			const trimmed = input.trim()
 			const normalized = normalizeCommandInput(input)
@@ -189,6 +192,8 @@ export async function start(): Promise<void> {
 		stopped = true
 		try { tui.cleanup() } catch {}
 	}
+	return restart ? 100 : 0
+
 }
 
 // Internal helpers

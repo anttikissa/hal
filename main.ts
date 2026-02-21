@@ -224,7 +224,7 @@ if (headless) {
 	})
 
 	try {
-		await startClient()
+		exitCode = await startClient()
 	} catch (e: any) {
 		exitCode = 1
 		await emitBootstrap(`[cli] crashed: ${e?.message || e}`, "error")
@@ -234,6 +234,7 @@ if (headless) {
 	if (webServer) webServer.stop()
 	if (isOwner || promoted) await releaseOwner(ownerId)
 	process.exit(exitCode)
+
 
 }
 
