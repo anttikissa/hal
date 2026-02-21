@@ -1,21 +1,21 @@
-import { randomBytes } from "crypto"
-import type { SessionInfo } from "./session.ts"
+import { randomBytes } from 'crypto'
+import type { SessionInfo } from './session.ts'
 
 export type { SessionInfo }
 
 export type CommandType =
-	| "prompt"
-	| "pause"
-	| "handoff"
-	| "reset"
-	| "close"
-	| "restart"
-	| "model"
-	| "system"
-	| "cd"
+	| 'prompt'
+	| 'pause'
+	| 'handoff'
+	| 'reset'
+	| 'close'
+	| 'restart'
+	| 'model'
+	| 'system'
+	| 'cd'
 
 export interface RuntimeSource {
-	kind: "cli" | "web"
+	kind: 'cli' | 'web'
 	clientId: string
 }
 
@@ -35,7 +35,7 @@ export function makeCommand(
 	sessionId?: string | null,
 ): RuntimeCommand {
 	return {
-		id: randomBytes(8).toString("hex"),
+		id: randomBytes(8).toString('hex'),
 		type,
 		sessionId: sessionId ?? null,
 		text,
@@ -44,60 +44,60 @@ export function makeCommand(
 	}
 }
 
-export type EventLevel = "info" | "warn" | "error" | "tool" | "status"
+export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'status'
 
 export type RuntimeEvent =
 	| {
-		id: string
-		type: "line"
-		sessionId: string | null
-		text: string
-		level: EventLevel
-		createdAt: string
-	}
+			id: string
+			type: 'line'
+			sessionId: string | null
+			text: string
+			level: EventLevel
+			createdAt: string
+	  }
 	| {
-		id: string
-		type: "chunk"
-		sessionId: string | null
-		text: string
-		channel: "assistant" | "thinking"
-		createdAt: string
-	}
+			id: string
+			type: 'chunk'
+			sessionId: string | null
+			text: string
+			channel: 'assistant' | 'thinking'
+			createdAt: string
+	  }
 	| {
-		id: string
-		type: "status"
-		sessionId: string | null
-		busySessionIds?: string[]
-		activeSessionId: string | null
-		busy: boolean
-		queueLength: number
-		activity?: string
-		createdAt: string
-	}
+			id: string
+			type: 'status'
+			sessionId: string | null
+			busySessionIds?: string[]
+			activeSessionId: string | null
+			busy: boolean
+			queueLength: number
+			activity?: string
+			createdAt: string
+	  }
 	| {
-		id: string
-		type: "sessions"
-		activeSessionId: string | null
-		sessions: SessionInfo[]
-		createdAt: string
-	}
+			id: string
+			type: 'sessions'
+			activeSessionId: string | null
+			sessions: SessionInfo[]
+			createdAt: string
+	  }
 	| {
-		id: string
-		type: "command"
-		sessionId: string | null
-		commandId: string
-		phase: "queued" | "started" | "done" | "failed"
-		message?: string
-		createdAt: string
-	}
+			id: string
+			type: 'command'
+			sessionId: string | null
+			commandId: string
+			phase: 'queued' | 'started' | 'done' | 'failed'
+			message?: string
+			createdAt: string
+	  }
 	| {
-		id: string
-		type: "prompt"
-		sessionId: string | null
-		text: string
-		source: RuntimeSource
-		createdAt: string
-	}
+			id: string
+			type: 'prompt'
+			sessionId: string | null
+			text: string
+			source: RuntimeSource
+			createdAt: string
+	  }
 
 export interface RuntimeState {
 	ownerPid: number | null

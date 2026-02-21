@@ -1,4 +1,4 @@
-import type { RuntimeCommand } from "../protocol.ts"
+import type { RuntimeCommand } from '../protocol.ts'
 
 export interface SchedulerHooks {
 	afterRun?: (sessionId: string) => Promise<void> | void
@@ -17,13 +17,16 @@ interface SchedulerState {
 let state: SchedulerState | null = null
 
 function getState(): SchedulerState {
-	if (!state) throw new Error("command scheduler not initialized")
+	if (!state) throw new Error('command scheduler not initialized')
 	return state
 }
 
 function getOrCreateQueue(s: SchedulerState, sessionId: string): RuntimeCommand[] {
 	let q = s.queues.get(sessionId)
-	if (!q) { q = []; s.queues.set(sessionId, q) }
+	if (!q) {
+		q = []
+		s.queues.set(sessionId, q)
+	}
 	return q
 }
 
@@ -49,7 +52,11 @@ function drain(s: SchedulerState): void {
 	}
 }
 
-async function runOne(s: SchedulerState, sessionId: string, command: RuntimeCommand): Promise<void> {
+async function runOne(
+	s: SchedulerState,
+	sessionId: string,
+	command: RuntimeCommand,
+): Promise<void> {
 	try {
 		await s.runCommand(sessionId, command)
 	} catch (error) {

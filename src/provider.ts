@@ -1,19 +1,19 @@
 export type StreamEvent =
-	| { type: "text_start"; index: number }
-	| { type: "text_delta"; index: number; text: string }
-	| { type: "thinking_start"; index: number }
-	| { type: "thinking_delta"; index: number; text: string }
-	| { type: "activity"; text: string }
-	| { type: "signature_delta"; index: number; signature: string }
-	| { type: "tool_use_start"; index: number; id: string; name: string }
-	| { type: "tool_input_delta"; index: number; json: string }
-	| { type: "raw_block"; index: number; block: any }
-	| { type: "block_stop"; index: number }
-	| { type: "web_search"; query: string }
-	| { type: "web_search_results"; results: string }
-	| { type: "usage"; usage: Record<string, number> }
-	| { type: "stop"; stopReason: string }
-	| { type: "error"; message: string }
+	| { type: 'text_start'; index: number }
+	| { type: 'text_delta'; index: number; text: string }
+	| { type: 'thinking_start'; index: number }
+	| { type: 'thinking_delta'; index: number; text: string }
+	| { type: 'activity'; text: string }
+	| { type: 'signature_delta'; index: number; signature: string }
+	| { type: 'tool_use_start'; index: number; id: string; name: string }
+	| { type: 'tool_input_delta'; index: number; json: string }
+	| { type: 'raw_block'; index: number; block: any }
+	| { type: 'block_stop'; index: number }
+	| { type: 'web_search'; query: string }
+	| { type: 'web_search_results'; results: string }
+	| { type: 'usage'; usage: Record<string, number> }
+	| { type: 'stop'; stopReason: string }
+	| { type: 'error'; message: string }
 
 export interface ToolDef {
 	name: string
@@ -63,7 +63,8 @@ export function registerProvider(provider: Provider): void {
 
 export function getProvider(name: string): Provider {
 	const p = providers.get(name)
-	if (!p) throw new Error(`Unknown provider: ${name}. Available: ${[...providers.keys()].join(", ")}`)
+	if (!p)
+		throw new Error(`Unknown provider: ${name}. Available: ${[...providers.keys()].join(', ')}`)
 	return p
 }
 

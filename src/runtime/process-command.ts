@@ -1,10 +1,10 @@
-import { stat } from "fs/promises"
-import { resolve } from "path"
-import type { RuntimeCommand } from "../protocol.ts"
-import { makeSessionId } from "../session.ts"
-import { enqueueCommand } from "./command-scheduler.ts"
-import { publishLine, publishCommandPhase } from "./event-publisher.ts"
-import { dropQueuedCommands } from "./handle-command.ts"
+import { stat } from 'fs/promises'
+import { resolve } from 'path'
+import type { RuntimeCommand } from '../protocol.ts'
+import { makeSessionId } from '../session.ts'
+import { enqueueCommand } from './command-scheduler.ts'
+import { publishLine, publishCommandPhase } from './event-publisher.ts'
+import { dropQueuedCommands } from './handle-command.ts'
 import {
 	sanitizeSessionId,
 	getActiveSessionId,
@@ -19,11 +19,10 @@ import {
 	markSessionAsActive,
 	sortedBusySessionIds,
 	emitStatus,
-} from "./sessions.ts"
-
+} from './sessions.ts'
 
 function resolveSessionId(command: RuntimeCommand): string | null {
-	const explicit = typeof command.sessionId === "string" ? command.sessionId.trim() : ""
+	const explicit = typeof command.sessionId === 'string' ? command.sessionId.trim() : ''
 	if (explicit) return sanitizeSessionId(explicit)
 	if (getActiveSessionId()) return getActiveSessionId()
 	if (getRegistryActiveSessionId()) return getRegistryActiveSessionId()
@@ -32,31 +31,34 @@ function resolveSessionId(command: RuntimeCommand): string | null {
 
 async function normalizeCommandSession(command: RuntimeCommand): Promise<string | null> {
 	// Pause: prefer currently busy session
-	if (command.type === "pause") {
-		const explicitRaw = typeof command.sessionId === "string" ? command.sessionId.trim() : ""
+	if (command.type === 'pause') {
+		const explicitRaw = typeof command.sessionId === 'string' ? command.sessionId.trim() : ''
 		const explicit = explicitRaw ? sanitizeSessionId(explicitRaw) : null
-		if (explicit) { command.sessionId = explicit; return explicit }
+		if (explicit) {
+			command.sessionId = explicit
+			return explicit
+		}
 		const busyIds = sortedBusySessionIds()
 		const active = getActiveSessionId()
 		const fallback =
-			(active && busyIds.includes(active) ? active : null)
-			?? busyIds[0]
-			?? active
-			?? getRegistryActiveSessionId()
-			?? getFirstSessionId()
-			?? null
+			(active && busyIds.includes(active) ? active : null) ??
+			busyIds[0] ??
+			active ??
+			getRegistryActiveSessionId() ??
+			getFirstSessionId() ??
+			null
 		command.sessionId = fallback
 		return fallback
 	}
 
-	if (command.type === "close") {
+	if (command.type === 'close') {
 		const sessionId = resolveSessionId(command)
 		command.sessionId = sessionId
 		return sessionId
 	}
 
 	// cd: ensure session exists
-	if (command.type === "cd") {
+	if (command.type === 'cd') {
 		let sessionId = resolveSessionId(command)
 		if (!sessionId) sessionId = makeSessionId()
 		const active = getActiveSessionId()
@@ -94,36 +96,39 @@ async function runPause(sessionId: string | null): Promise<void> {
 	if (!runtime) return
 	runtime.pausedByUser = true
 	runtime.activeAbort?.abort()
-	await publishLine("[pause] generation paused", "warn", sessionId)
+	await publishLine('[pause] generation paused', 'warn', sessionId)
 }
 
 export async function processCommand(command: RuntimeCommand): Promise<void> {
-
 	const sessionId = await normalizeCommandSession(command)
 	if (sessionId) markSessionAsActive(sessionId)
 
-	if (command.type === "pause") {
-		await publishCommandPhase(command.id, "queued", undefined, sessionId ?? null)
-		await publishCommandPhase(command.id, "started", undefined, sessionId ?? null)
+	if (command.type === 'pause') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		await runPause(sessionId)
-		await publishCommandPhase(command.id, "done", undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
 		await emitStatus(true)
 		return
 	}
 
-	if (command.type === "reset" && sessionId) {
-		const dropped = await dropQueuedCommands("dropped by /reset", sessionId)
+	if (command.type === 'reset' && sessionId) {
+		const dropped = await dropQueuedCommands('dropped by /reset', sessionId)
 		if (dropped > 0) {
-			await publishLine(`[queue] dropped ${dropped} queued command(s) due to /reset`, "warn", sessionId)
+			await publishLine(
+				`[queue] dropped ${dropped} queued command(s) due to /reset`,
+				'warn',
+				sessionId,
+			)
 		}
 	}
 
 	if (!sessionId) {
-		await publishCommandPhase(command.id, "failed", "no session available", null)
+		await publishCommandPhase(command.id, 'failed', 'no session available', null)
 		return
 	}
 
 	enqueueCommand(sessionId, command)
-	await publishCommandPhase(command.id, "queued", undefined, sessionId)
+	await publishCommandPhase(command.id, 'queued', undefined, sessionId)
 	await emitStatus(true)
 }

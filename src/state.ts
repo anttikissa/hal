@@ -1,5 +1,5 @@
-import { mkdirSync, existsSync } from "fs"
-import { resolve } from "path"
+import { mkdirSync, existsSync } from 'fs'
+import { resolve } from 'path'
 
 export const HAL_DIR = process.env.HAL_DIR ? resolve(process.env.HAL_DIR) : process.cwd()
 export const LAUNCH_CWD = process.env.LAUNCH_CWD ? resolve(process.env.LAUNCH_CWD) : process.cwd()

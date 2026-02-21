@@ -51,14 +51,16 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 		if (obj.length === 0) return '[]'
 
 		// Try inline first
-		const items = obj.map(v => stringifyValue(v, 0, depth, maxWidth))
+		const items = obj.map((v) => stringifyValue(v, 0, depth, maxWidth))
 		const inline = `[${items.join(', ')}]`
 		if (col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 
 		// Multi-line
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
-		const lines = obj.map((v, i) => `${pad}${stringifyValue(v, pad.length, childDepth, maxWidth)},`)
+		const lines = obj.map(
+			(v, i) => `${pad}${stringifyValue(v, pad.length, childDepth, maxWidth)},`,
+		)
 		return `[\n${lines.join('\n')}\n${'  '.repeat(depth)}]`
 	}
 
@@ -67,14 +69,16 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 		if (keys.length === 0) return '{}'
 
 		// Try inline first
-		const pairs = keys.map(k => `${quoteKey(k)}: ${stringifyValue(obj[k], 0, depth, maxWidth)}`)
+		const pairs = keys.map(
+			(k) => `${quoteKey(k)}: ${stringifyValue(obj[k], 0, depth, maxWidth)}`,
+		)
 		const inline = `{ ${pairs.join(', ')} }`
 		if (col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 
 		// Multi-line
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
-		const lines = keys.map(k => {
+		const lines = keys.map((k) => {
 			const prefix = `${pad}${quoteKey(k)}: `
 			const val = stringifyValue(obj[k], prefix.length, childDepth, maxWidth)
 			return `${prefix}${val},`
@@ -109,12 +113,21 @@ class Parser {
 
 	private error(msg: string): never {
 		// Find line/col from pos
-		let line = 1, col = 1
+		let line = 1,
+			col = 1
 		for (let i = 0; i < this.pos && i < this.src.length; i++) {
-			if (this.src[i] === '\n') { line++; col = 1 } else { col++ }
+			if (this.src[i] === '\n') {
+				line++
+				col = 1
+			} else {
+				col++
+			}
 		}
 		const lineText = this.lines[line - 1] ?? ''
-		throw new ParseError(`${msg} at ${line}:${col}:\n    ${lineText}\n    ${' '.repeat(col - 1)}^`, this.pos)
+		throw new ParseError(
+			`${msg} at ${line}:${col}:\n    ${lineText}\n    ${' '.repeat(col - 1)}^`,
+			this.pos,
+		)
 	}
 
 	skipWhitespace(): void {
@@ -189,7 +202,10 @@ class Parser {
 		if (this.src[this.pos] === '-') this.pos++
 		while (this.pos < this.src.length && /[0-9.]/.test(this.src[this.pos])) this.pos++
 		// Scientific notation
-		if (this.pos < this.src.length && (this.src[this.pos] === 'e' || this.src[this.pos] === 'E')) {
+		if (
+			this.pos < this.src.length &&
+			(this.src[this.pos] === 'e' || this.src[this.pos] === 'E')
+		) {
 			this.pos++
 			if (this.src[this.pos] === '+' || this.src[this.pos] === '-') this.pos++
 			while (this.pos < this.src.length && /[0-9]/.test(this.src[this.pos])) this.pos++
@@ -215,7 +231,10 @@ class Parser {
 		const obj: Record<string, any> = {}
 		while (true) {
 			const ch = this.peek()
-			if (ch === '}') { this.pos++; return obj }
+			if (ch === '}') {
+				this.pos++
+				return obj
+			}
 			const key = this.parseKey()
 			if (this.peek() !== ':') this.error("Expected ':'")
 			this.pos++ // skip :
@@ -230,7 +249,10 @@ class Parser {
 		const arr: any[] = []
 		while (true) {
 			const ch = this.peek()
-			if (ch === ']') { this.pos++; return arr }
+			if (ch === ']') {
+				this.pos++
+				return arr
+			}
 			arr.push(this.parseValue())
 			const next = this.peek()
 			if (next === ',') this.pos++ // skip comma
@@ -364,21 +386,44 @@ function findBalancedContainerEnd(input: string, start: number): number {
 			continue
 		}
 		if (blockComment) {
-			if (ch === '*' && input[i + 1] === '/') { blockComment = false; i++ }
+			if (ch === '*' && input[i + 1] === '/') {
+				blockComment = false
+				i++
+			}
 			continue
 		}
 
 		if (quote) {
-			if (escaped) { escaped = false; continue }
-			if (ch === '\\') { escaped = true; continue }
+			if (escaped) {
+				escaped = false
+				continue
+			}
+			if (ch === '\\') {
+				escaped = true
+				continue
+			}
 			if (ch === quote) quote = null
 			continue
 		}
 
-		if (ch === '/' && input[i + 1] === '/') { lineComment = true; i++; continue }
-		if (ch === '/' && input[i + 1] === '*') { blockComment = true; i++; continue }
-		if (ch === "'" || ch === '"') { quote = ch; continue }
-		if (ch === '{' || ch === '[') { stack.push(ch); continue }
+		if (ch === '/' && input[i + 1] === '/') {
+			lineComment = true
+			i++
+			continue
+		}
+		if (ch === '/' && input[i + 1] === '*') {
+			blockComment = true
+			i++
+			continue
+		}
+		if (ch === "'" || ch === '"') {
+			quote = ch
+			continue
+		}
+		if (ch === '{' || ch === '[') {
+			stack.push(ch)
+			continue
+		}
 		if (ch !== '}' && ch !== ']') continue
 
 		const last = stack.pop()
@@ -447,7 +492,10 @@ async function* parseStreamStrictPath(
 		appendChunk(next.value)
 		while (state.buf.length > 0) {
 			const parsed = parseBufferValue(state.buf)
-			if (parsed.kind === 'empty') { state.buf = ''; break }
+			if (parsed.kind === 'empty') {
+				state.buf = ''
+				break
+			}
 			if (parsed.kind === 'fatal') throw parsed.error
 			if (parsed.kind === 'parse_error') {
 				// Parse errors at the current buffer end are treated as incomplete
@@ -496,24 +544,39 @@ async function* parseStreamRecoveryPath(
 	const recoverStep = async function* (flush: boolean): AsyncGenerator<any> {
 		while (state.buf.length > 0) {
 			const start = findNextNonWhitespace(state.buf, 0)
-			if (start < 0) { state.buf = ''; break }
+			if (start < 0) {
+				state.buf = ''
+				break
+			}
 			const head = state.buf[start]
 
 			if (head !== '{' && head !== '[') {
 				const boundary = findRecoveryStart(state.buf, start)
-				if (boundary >= 0) { state.buf = state.buf.slice(boundary); continue }
-				if (flush) { state.buf = ''; break }
+				if (boundary >= 0) {
+					state.buf = state.buf.slice(boundary)
+					continue
+				}
+				if (flush) {
+					state.buf = ''
+					break
+				}
 				break
 			}
 
 			const end = findBalancedContainerEnd(state.buf, start)
 			if (end === -1) {
-				if (flush) { state.buf = ''; break }
+				if (flush) {
+					state.buf = ''
+					break
+				}
 				break
 			}
 			if (end === -2) {
 				const boundary = findRecoveryStart(state.buf, start + 1)
-				if (boundary >= 0) { state.buf = state.buf.slice(boundary); continue }
+				if (boundary >= 0) {
+					state.buf = state.buf.slice(boundary)
+					continue
+				}
 				state.buf = state.buf.slice(Math.max(1, start + 1))
 				continue
 			}
@@ -524,19 +587,35 @@ async function* parseStreamRecoveryPath(
 				value = parse(candidate)
 			} catch (e) {
 				const boundary = findRecoveryStart(state.buf, end)
-				if (boundary >= 0) { state.buf = state.buf.slice(boundary); continue }
-				if (flush) { state.buf = ''; break }
+				if (boundary >= 0) {
+					state.buf = state.buf.slice(boundary)
+					continue
+				}
+				if (flush) {
+					state.buf = ''
+					break
+				}
 				state.buf = state.buf.slice(end)
 				continue
 			}
 			if (!isStreamableValue(value) || hasDangerousContinuation(state.buf, end)) {
 				const boundary = findRecoveryStart(state.buf, end)
-				if (boundary >= 0) { state.buf = state.buf.slice(boundary); continue }
-				if (flush) { state.buf = ''; break }
+				if (boundary >= 0) {
+					state.buf = state.buf.slice(boundary)
+					continue
+				}
+				if (flush) {
+					state.buf = ''
+					break
+				}
 				break
 			}
 
-			if (!flush && findNextNonWhitespace(state.buf, end) < 0 && !/[\r\n]/.test(state.buf.slice(end))) {
+			if (
+				!flush &&
+				findNextNonWhitespace(state.buf, end) < 0 &&
+				!/[\r\n]/.test(state.buf.slice(end))
+			) {
 				const maybeMore = await pump.readOrTimeout(RECOVER_HEAD_GRACE_MS)
 				if (maybeMore) {
 					if (maybeMore.done) {
@@ -555,7 +634,10 @@ async function* parseStreamRecoveryPath(
 
 	while (!streamDone) {
 		const next = await pump.read()
-		if (next.done) { streamDone = true; break }
+		if (next.done) {
+			streamDone = true
+			break
+		}
 		appendChunk(next.value)
 		yield* recoverStep(false)
 	}
@@ -576,12 +658,16 @@ export async function* parseStream(
 	const state = { buf: '' }
 
 	const fail = (e: unknown, phase: 'mid-stream' | 'flush'): never => {
-		const wrapped = new Error(`ASON parseStream ${phase} error: ${e instanceof Error ? e.message : String(e)}`)
+		const wrapped = new Error(
+			`ASON parseStream ${phase} error: ${e instanceof Error ? e.message : String(e)}`,
+		)
 		;(wrapped as any).cause = e
 		throw wrapped
 	}
 
-	const appendChunk = (value: Uint8Array) => { state.buf += decoder.decode(value, { stream: true }) }
+	const appendChunk = (value: Uint8Array) => {
+		state.buf += decoder.decode(value, { stream: true })
+	}
 
 	if (!recover) {
 		yield* parseStreamStrictPath(pump, state, appendChunk, fail)

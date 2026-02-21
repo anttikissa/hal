@@ -1,14 +1,14 @@
-import { resolve } from "path"
-import { loadConfig, resolveModel, providerForModel, modelIdForModel } from "../config.ts"
-import { getProvider } from "../provider.ts"
-import { loadSystemPrompt } from "../prompt.ts"
+import { resolve } from 'path'
+import { loadConfig, resolveModel, providerForModel, modelIdForModel } from '../config.ts'
+import { getProvider } from '../provider.ts'
+import { loadSystemPrompt } from '../prompt.ts'
 import {
 	estimatedContextStatus,
 	estimateMessageTokens,
 	estimateTokensSync,
 	getCalibration,
 	MAX_CONTEXT,
-} from "../context.ts"
+} from '../context.ts'
 import {
 	loadSession,
 	loadHandoff,
@@ -19,23 +19,18 @@ import {
 	type SessionRegistry,
 	type TokenTotals,
 	EMPTY_TOTALS,
-} from "../session.ts"
-import { tailCommands } from "../ipc.ts"
-import type { SessionInfo } from "../protocol.ts"
-import { HAL_DIR, LAUNCH_CWD, ensureStateDir, sessionDir } from "../state.ts"
+} from '../session.ts'
+import { tailCommands } from '../ipc.ts'
+import type { SessionInfo } from '../protocol.ts'
+import { HAL_DIR, LAUNCH_CWD, ensureStateDir, sessionDir } from '../state.ts'
 import {
 	createCommandScheduler,
 	ensureSessionQueue,
 	totalQueuedCommands,
-} from "./command-scheduler.ts"
-import { processCommand } from "./process-command.ts"
-import { handleCommand } from "./handle-command.ts"
-import {
-	initPublisher,
-	publishLine,
-	publishStatus,
-	publishSessions,
-} from "./event-publisher.ts"
+} from './command-scheduler.ts'
+import { processCommand } from './process-command.ts'
+import { handleCommand } from './handle-command.ts'
+import { initPublisher, publishLine, publishStatus, publishSessions } from './event-publisher.ts'
 
 // Runtime cache per session
 export interface SessionRuntimeCache {
@@ -60,13 +55,27 @@ export const busySessions = new Set<string>()
 export const previousWorkingDirBySession = new Map<string, string>()
 
 // Accessors
-export function getOwnerId(): string { return ownerId }
-export function getHalDir(): string { return halDir }
-export function getDefaultWorkingDir(): string { return _defaultWorkingDir }
-export function getActiveSessionId(): string | null { return activeSessionId }
-export function setActiveSessionId(id: string | null): void { activeSessionId = id }
-export function getRegistryActiveSessionId(): string | null { return registry.activeSessionId ?? null }
-export function getFirstSessionId(): string | null { return registry.sessions[0]?.id ?? null }
+export function getOwnerId(): string {
+	return ownerId
+}
+export function getHalDir(): string {
+	return halDir
+}
+export function getDefaultWorkingDir(): string {
+	return _defaultWorkingDir
+}
+export function getActiveSessionId(): string | null {
+	return activeSessionId
+}
+export function setActiveSessionId(id: string | null): void {
+	activeSessionId = id
+}
+export function getRegistryActiveSessionId(): string | null {
+	return registry.activeSessionId ?? null
+}
+export function getFirstSessionId(): string | null {
+	return registry.sessions[0]?.id ?? null
+}
 
 export function getSessionWorkingDir(sessionId: string | null): string {
 	return getSessionMeta(sessionId)?.workingDir ?? _defaultWorkingDir
@@ -98,7 +107,7 @@ export function markSessionAsActive(sessionId: string): void {
 }
 
 export function sanitizeSessionId(sessionId: string): string {
-	return sessionId.trim().replace(/[^a-zA-Z0-9_-]/g, "_") || makeSessionId()
+	return sessionId.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || makeSessionId()
 }
 
 // Session management
@@ -107,7 +116,9 @@ export function getSessionMeta(sessionId: string | null): SessionInfo | null {
 	return registry.sessions.find((s) => s.id === sessionId) ?? null
 }
 
-export function getRegistry(): SessionRegistry { return registry }
+export function getRegistry(): SessionRegistry {
+	return registry
+}
 
 export async function persistRegistry(): Promise<void> {
 	await saveSessionRegistry(registry)
@@ -144,7 +155,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	if (messages.length === 0) {
 		const handoff = await loadHandoff(sessionId)
 		if (handoff) {
-			messages = [{ role: "user", content: `[handoff]\n\n${handoff.trim()}` }]
+			messages = [{ role: 'user', content: `[handoff]\n\n${handoff.trim()}` }]
 		}
 	}
 	const runtime: SessionRuntimeCache = {
@@ -162,12 +173,20 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	return runtime
 }
 
-export async function reloadSystemPromptForSession(sessionId: string, runtime?: SessionRuntimeCache): Promise<string[]> {
+export async function reloadSystemPromptForSession(
+	sessionId: string,
+	runtime?: SessionRuntimeCache,
+): Promise<string[]> {
 	const target = runtime ?? (await getOrLoadSessionRuntime(sessionId))
 	const config = loadConfig()
 	const modelId = modelIdForModel(config.model)
 	const workingDir = getSessionWorkingDir(sessionId)
-	const { blocks, systemBytes, loaded } = await loadSystemPrompt({ model: modelId, halDir, workingDir, sessionDir: sessionDir(sessionId) })
+	const { blocks, systemBytes, loaded } = await loadSystemPrompt({
+		model: modelId,
+		halDir,
+		workingDir,
+		sessionDir: sessionDir(sessionId),
+	})
 	target.systemPrompt = blocks
 	target.systemBytes = systemBytes
 	return loaded
@@ -182,13 +201,16 @@ function snapshotSessions(): SessionInfo[] {
 }
 
 export async function emitStatus(force = false): Promise<void> {
-	await publishStatus({
-		busySessionIds: sortedBusySessionIds(),
-		activeSessionId,
-		registryActiveSessionId: registry.activeSessionId ?? null,
-		queueLength: totalQueuedCommands(),
-		sessions: snapshotSessions(),
-	}, force)
+	await publishStatus(
+		{
+			busySessionIds: sortedBusySessionIds(),
+			activeSessionId,
+			registryActiveSessionId: registry.activeSessionId ?? null,
+			queueLength: totalQueuedCommands(),
+			sessions: snapshotSessions(),
+		},
+		force,
+	)
 }
 
 export async function emitSessions(force = false): Promise<void> {
@@ -226,24 +248,27 @@ async function initialize(): Promise<void> {
 		const pct = ((totalTokens / MAX_CONTEXT) * 100).toFixed(0)
 		await publishLine(
 			`[session] restored ${runtime.messages.length} messages (~${pct}% context) — ${sessionDir(initialSessionId)}`,
-			"status", initialSessionId,
+			'status',
+			initialSessionId,
 		)
 	} else {
-		await publishLine(`[session] new session — ${sessionDir(initialSessionId)}`, "status", initialSessionId)
+		await publishLine(
+			`[session] new session — ${sessionDir(initialSessionId)}`,
+			'status',
+			initialSessionId,
+		)
 	}
 
 	const config = loadConfig()
 	const fullModel = resolveModel(config.model)
 	const cwd = getSessionWorkingDir(initialSessionId)
 	const loaded = await reloadSystemPromptForSession(initialSessionId, runtime)
-	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
-	await publishLine(
-		`[model] ${fullModel}  cwd=${cwd}${promptDesc}`,
-		"status", initialSessionId,
-	)
+	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
+	await publishLine(`[model] ${fullModel}  cwd=${cwd}${promptDesc}`, 'status', initialSessionId)
 	await publishLine(
 		estimatedContextStatus(sysTokenEst, msgTokens, runtime.messages.length),
-		"status", initialSessionId,
+		'status',
+		initialSessionId,
 	)
 	await emitStatus(true)
 }
@@ -271,7 +296,8 @@ export async function startRuntime(
 			onError: async (sessionId, error) => {
 				await publishLine(
 					`[scheduler] session ${sessionId} failed: ${(error as any)?.message || error}`,
-					"error", sessionId,
+					'error',
+					sessionId,
 				)
 			},
 			afterRun: async () => {

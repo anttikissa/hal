@@ -1,15 +1,10 @@
-import {
-	appendCommand,
-	readRecentEvents,
-	readState,
-	tailEvents,
-} from "./ipc.ts"
-import { makeCommand, type RuntimeCommand } from "./protocol.ts"
-import { stringify } from "./utils/ason.ts"
+import { appendCommand, readRecentEvents, readState, tailEvents } from './ipc.ts'
+import { makeCommand, type RuntimeCommand } from './protocol.ts'
+import { stringify } from './utils/ason.ts'
 
 function sseEvent(value: any): string {
-	const lines = stringify(value).split("\n")
-	return lines.map(l => `data: ${l}`).join("\n") + "\n\n"
+	const lines = stringify(value).split('\n')
+	return lines.map((l) => `data: ${l}`).join('\n') + '\n\n'
 }
 
 function htmlPage() {
@@ -123,34 +118,44 @@ export function startWebServer(port = 9001): ReturnType<typeof Bun.serve> {
 		async fetch(req) {
 			const url = new URL(req.url)
 
-			if (url.pathname === "/") {
+			if (url.pathname === '/') {
 				return new Response(htmlPage(), {
-					headers: { "content-type": "text/html; charset=utf-8" },
+					headers: { 'content-type': 'text/html; charset=utf-8' },
 				})
 			}
 
-			if (url.pathname === "/state") {
+			if (url.pathname === '/state') {
 				return Response.json(await readState())
 			}
 
-			if (url.pathname === "/commands" && req.method === "POST") {
+			if (url.pathname === '/commands' && req.method === 'POST') {
 				let body: any
-				try { body = await req.json() } catch { return new Response("invalid json", { status: 400 }) }
+				try {
+					body = await req.json()
+				} catch {
+					return new Response('invalid json', { status: 400 })
+				}
 
-				const type = String(body?.type || "") as RuntimeCommand["type"]
-				const text = typeof body?.text === "string" ? body.text : undefined
-				if (type === "prompt" && !text?.trim()) return new Response("prompt text required", { status: 400 })
+				const type = String(body?.type || '') as RuntimeCommand['type']
+				const text = typeof body?.text === 'string' ? body.text : undefined
+				if (type === 'prompt' && !text?.trim())
+					return new Response('prompt text required', { status: 400 })
 
-				const clientId = typeof body?.clientId === "string" && body.clientId.trim() ? body.clientId.trim() : "web"
-				const sessionId = typeof body?.sessionId === "string" && body.sessionId.trim()
-					? body.sessionId.trim() : (await readState()).activeSessionId
+				const clientId =
+					typeof body?.clientId === 'string' && body.clientId.trim()
+						? body.clientId.trim()
+						: 'web'
+				const sessionId =
+					typeof body?.sessionId === 'string' && body.sessionId.trim()
+						? body.sessionId.trim()
+						: (await readState()).activeSessionId
 
-				const command = makeCommand(type, { kind: "web", clientId }, text, sessionId)
+				const command = makeCommand(type, { kind: 'web', clientId }, text, sessionId)
 				await appendCommand(command)
 				return Response.json({ ok: true, commandId: command.id })
 			}
 
-			if (url.pathname === "/events") {
+			if (url.pathname === '/events') {
 				const stream = new ReadableStream({
 					async start(controller) {
 						let closed = false
@@ -160,23 +165,33 @@ export function startWebServer(port = 9001): ReturnType<typeof Bun.serve> {
 							if (closed) return
 							closed = true
 							if (heartbeat) clearInterval(heartbeat)
-							try { controller.close() } catch {}
+							try {
+								controller.close()
+							} catch {}
 						}
 
 						const enqueue = (chunk: string): boolean => {
 							if (closed) return false
-							try { controller.enqueue(chunk); return true } catch { cleanup(); return false }
+							try {
+								controller.enqueue(chunk)
+								return true
+							} catch {
+								cleanup()
+								return false
+							}
 						}
 
-						enqueue("retry: 1000\n\n")
+						enqueue('retry: 1000\n\n')
 
 						const recent = await readRecentEvents(80)
 						for (const event of recent) {
 							if (!enqueue(sseEvent(event))) return
 						}
 
-						heartbeat = setInterval(() => { enqueue(": ping\n\n") }, 5000)
-						req.signal.addEventListener("abort", cleanup, { once: true })
+						heartbeat = setInterval(() => {
+							enqueue(': ping\n\n')
+						}, 5000)
+						req.signal.addEventListener('abort', cleanup, { once: true })
 
 						void (async () => {
 							try {
@@ -184,21 +199,24 @@ export function startWebServer(port = 9001): ReturnType<typeof Bun.serve> {
 									if (closed) break
 									if (!enqueue(sseEvent(event))) break
 								}
-							} catch {} finally { cleanup() }
+							} catch {
+							} finally {
+								cleanup()
+							}
 						})()
 					},
 				})
 
 				return new Response(stream, {
 					headers: {
-						"content-type": "text/event-stream",
-						"cache-control": "no-cache",
-						connection: "keep-alive",
+						'content-type': 'text/event-stream',
+						'cache-control': 'no-cache',
+						connection: 'keep-alive',
 					},
 				})
 			}
 
-			return new Response("not found", { status: 404 })
+			return new Response('not found', { status: 404 })
 		},
 	})
 }

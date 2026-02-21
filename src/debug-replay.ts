@@ -7,25 +7,26 @@
  * to a fresh directory. Also prints a summary of keypresses and events.
  */
 
-import { readFile, writeFile, mkdir } from "fs/promises"
-import { resolve, dirname } from "path"
-import { parseAll } from "./utils/ason.ts"
+import { readFile, writeFile, mkdir } from 'fs/promises'
+import { resolve, dirname } from 'path'
+import { parseAll } from './utils/ason.ts'
 
 async function main() {
 	const args = process.argv.slice(2)
 	if (args.length === 0) {
-		console.log("Usage: bun src/debug-replay.ts <bug-log.ason> [--dir <output-dir>]")
+		console.log('Usage: bun src/debug-replay.ts <bug-log.ason> [--dir <output-dir>]')
 		process.exit(1)
 	}
 
 	const logFile = args[0]
-	const dirIdx = args.indexOf("--dir")
-	const outDir = dirIdx >= 0 && args[dirIdx + 1]
-		? resolve(args[dirIdx + 1])
-		: resolve(`/tmp/hal-replay-${Date.now()}`)
+	const dirIdx = args.indexOf('--dir')
+	const outDir =
+		dirIdx >= 0 && args[dirIdx + 1]
+			? resolve(args[dirIdx + 1])
+			: resolve(`/tmp/hal-replay-${Date.now()}`)
 
 	console.log(`Reading ${logFile}...`)
-	const raw = await readFile(logFile, "utf-8")
+	const raw = await readFile(logFile, 'utf-8')
 	const records = parseAll(raw)
 	console.log(`${records.length} records found`)
 
@@ -38,22 +39,34 @@ async function main() {
 
 	for (const r of records) {
 		switch (r.type) {
-			case "config": configs.push(r); break
-			case "file": files.push(r); break
-			case "keypress": keypresses.push(r); break
-			case "snapshot": snapshots.push(r); break
-			case "bug": bugs.push(r); break
+			case 'config':
+				configs.push(r)
+				break
+			case 'file':
+				files.push(r)
+				break
+			case 'keypress':
+				keypresses.push(r)
+				break
+			case 'snapshot':
+				snapshots.push(r)
+				break
+			case 'bug':
+				bugs.push(r)
+				break
 		}
 	}
 
-	console.log(`  ${configs.length} config, ${files.length} files, ${keypresses.length} keypresses, ${snapshots.length} snapshots, ${bugs.length} bugs`)
+	console.log(
+		`  ${configs.length} config, ${files.length} files, ${keypresses.length} keypresses, ${snapshots.length} snapshots, ${bugs.length} bugs`,
+	)
 
 	// Restore state
 	await mkdir(outDir, { recursive: true })
 
 	// Write config
 	if (configs.length > 0) {
-		const configPath = resolve(outDir, "config.ason")
+		const configPath = resolve(outDir, 'config.ason')
 		await writeFile(configPath, configs[0].content)
 		console.log(`  wrote config.ason`)
 	}
@@ -75,13 +88,14 @@ async function main() {
 		// Reconstruct typed text from keypresses
 		const typed: string[] = []
 		for (const k of keypresses) {
-			if (k.key === "\r") typed.push("⏎")
-			else if (k.key === "\x1b") typed.push("⎋")
-			else if (k.key.startsWith("[")) continue // focus/escape sequences
+			if (k.key === '\r') typed.push('⏎')
+			else if (k.key === '\x1b') typed.push('⎋')
+			else if (k.key.startsWith('['))
+				continue // focus/escape sequences
 			else typed.push(k.key)
 		}
 		console.log(`\n  Keypresses (${duration}s, ${keypresses.length} keys):`)
-		console.log(`  ${typed.join("")}`)
+		console.log(`  ${typed.join('')}`)
 	}
 
 	// Print bug descriptions
@@ -92,8 +106,8 @@ async function main() {
 	// Print last snapshot excerpt
 	if (snapshots.length > 0) {
 		const last = snapshots[snapshots.length - 1]
-		const lines = last.terminal.split("\n")
-		const tail = lines.slice(-20).join("\n")
+		const lines = last.terminal.split('\n')
+		const tail = lines.slice(-20).join('\n')
 		console.log(`\n  Last snapshot (${lines.length} lines, showing last 20):`)
 		console.log(tail)
 	}
@@ -102,4 +116,7 @@ async function main() {
 	console.log(`  To use: HAL_STATE_DIR=${outDir}/state HAL_DIR=${outDir} bun main.ts`)
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+main().catch((e) => {
+	console.error(e)
+	process.exit(1)
+})

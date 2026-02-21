@@ -1,12 +1,30 @@
-import { resolve, isAbsolute } from "path"
-import type { RuntimeCommand } from "../protocol.ts"
-import { clearSession, performHandoff, saveSession } from "../session.ts"
-import { loadConfig, updateConfig, resolveModel, resolveCompactModel, providerForModel, modelAlias, modelIdForModel } from "../config.ts"
-import { getProvider } from "../provider.ts"
-import { drainQueuedCommands } from "./command-scheduler.ts"
-import { publishLine, publishCommandPhase, publishPrompt, publishActivity } from "./event-publisher.ts"
-import { processPrompt } from "./process-prompt.ts"
-import { estimatedContextStatus, estimateMessageTokens, getCalibration, estimateTokensSync } from "../context.ts"
+import { resolve, isAbsolute } from 'path'
+import type { RuntimeCommand } from '../protocol.ts'
+import { clearSession, performHandoff, saveSession } from '../session.ts'
+import {
+	loadConfig,
+	updateConfig,
+	resolveModel,
+	resolveCompactModel,
+	providerForModel,
+	modelAlias,
+	modelIdForModel,
+} from '../config.ts'
+import { getProvider } from '../provider.ts'
+import { drainQueuedCommands } from './command-scheduler.ts'
+import {
+	publishLine,
+	publishCommandPhase,
+	publishPrompt,
+	publishActivity,
+} from './event-publisher.ts'
+import { processPrompt } from './process-prompt.ts'
+import {
+	estimatedContextStatus,
+	estimateMessageTokens,
+	getCalibration,
+	estimateTokensSync,
+} from '../context.ts'
 import {
 	getOrLoadSessionRuntime,
 	reloadSystemPromptForSession,
@@ -19,61 +37,61 @@ import {
 	busySessions,
 	previousWorkingDirBySession,
 	getHalDir,
-} from "./sessions.ts"
+} from './sessions.ts'
 
 export async function dropQueuedCommands(reason: string, sessionId: string): Promise<number> {
 	const dropped = drainQueuedCommands(sessionId)
 	for (const cmd of dropped) {
-		await publishCommandPhase(cmd.id, "failed", reason, sessionId)
+		await publishCommandPhase(cmd.id, 'failed', reason, sessionId)
 	}
 	return dropped.length
 }
 
 export async function handleCommand(command: RuntimeCommand, sessionId: string): Promise<void> {
-	await publishCommandPhase(command.id, "started", undefined, sessionId)
+	await publishCommandPhase(command.id, 'started', undefined, sessionId)
 
 	try {
 		switch (command.type) {
-			case "prompt":
-				await publishPrompt(sessionId, command.text ?? "", command.source)
-				await processPrompt(sessionId, command.text ?? "")
+			case 'prompt':
+				await publishPrompt(sessionId, command.text ?? '', command.source)
+				await processPrompt(sessionId, command.text ?? '')
 				break
 
-			case "handoff":
+			case 'handoff':
 				await runHandoff(sessionId, command.text)
 				break
 
-			case "reset":
+			case 'reset':
 				await runReset(sessionId)
 				break
 
-			case "model":
-				await runModel(sessionId, command.text ?? "")
+			case 'model':
+				await runModel(sessionId, command.text ?? '')
 				break
 
-			case "system":
+			case 'system':
 				await runSystem(sessionId)
 				break
 
-			case "cd":
-				await runCd(sessionId, command.text ?? "")
+			case 'cd':
+				await runCd(sessionId, command.text ?? '')
 				break
 
-			case "close":
+			case 'close':
 				await runClose(sessionId)
 				break
 
-			case "restart":
+			case 'restart':
 				await saveSessionBeforeExit(sessionId)
 				process.exit(100)
 
 			default:
-				await publishLine(`[command] unknown: ${command.type}`, "warn", sessionId)
+				await publishLine(`[command] unknown: ${command.type}`, 'warn', sessionId)
 		}
-		await publishCommandPhase(command.id, "done", undefined, sessionId)
+		await publishCommandPhase(command.id, 'done', undefined, sessionId)
 	} catch (e: any) {
-		await publishLine(`[error] ${e.message || e}`, "error", sessionId)
-		await publishCommandPhase(command.id, "failed", e.message, sessionId)
+		await publishLine(`[error] ${e.message || e}`, 'error', sessionId)
+		await publishCommandPhase(command.id, 'failed', e.message, sessionId)
 	}
 }
 
@@ -85,20 +103,20 @@ async function publishEstimatedContext(sessionId: string): Promise<void> {
 	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m), 0)
 	await publishLine(
 		estimatedContextStatus(systemTokens, msgTokens, runtime.messages.length),
-		"status", sessionId,
+		'status',
+		sessionId,
 	)
 }
-
 
 async function runHandoff(sessionId: string, text?: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	if (runtime.messages.length === 0) {
-		await publishLine("[handoff] nothing to hand off — session is empty", "warn", sessionId)
+		await publishLine('[handoff] nothing to hand off — session is empty', 'warn', sessionId)
 		return
 	}
 
-	await publishActivity("Generating handoff summary...", sessionId)
-	await publishLine("[handoff] generating summary...", "status", sessionId)
+	await publishActivity('Generating handoff summary...', sessionId)
+	await publishLine('[handoff] generating summary...', 'status', sessionId)
 
 	// Use compact model for handoff summary
 	const config = loadConfig()
@@ -115,18 +133,29 @@ async function runHandoff(sessionId: string, text?: string): Promise<void> {
 
 Be specific about file paths, function names, and technical details. The summary should let a new session continue seamlessly.`
 
-	const conversationText = runtime.messages.map((m: any) => {
-		const role = m.role
-		const content = typeof m.content === "string" ? m.content
-			: Array.isArray(m.content) ? m.content.map((b: any) => {
-				if (b.type === "text") return b.text
-				if (b.type === "thinking") return `[thinking] ${b.thinking}`
-				if (b.type === "tool_use") return `[tool: ${b.name}] ${JSON.stringify(b.input)}`
-				if (b.type === "tool_result") return `[result] ${typeof b.content === "string" ? b.content : JSON.stringify(b.content)}`
-				return ""
-			}).filter(Boolean).join("\n") : ""
-		return `[${role}]\n${content}`
-	}).join("\n\n---\n\n")
+	const conversationText = runtime.messages
+		.map((m: any) => {
+			const role = m.role
+			const content =
+				typeof m.content === 'string'
+					? m.content
+					: Array.isArray(m.content)
+						? m.content
+								.map((b: any) => {
+									if (b.type === 'text') return b.text
+									if (b.type === 'thinking') return `[thinking] ${b.thinking}`
+									if (b.type === 'tool_use')
+										return `[tool: ${b.name}] ${JSON.stringify(b.input)}`
+									if (b.type === 'tool_result')
+										return `[result] ${typeof b.content === 'string' ? b.content : JSON.stringify(b.content)}`
+									return ''
+								})
+								.filter(Boolean)
+								.join('\n')
+						: ''
+			return `[${role}]\n${content}`
+		})
+		.join('\n\n---\n\n')
 
 	const userMsg = text
 		? `${text}\n\n---\n\nHere is the full conversation:\n\n${conversationText}`
@@ -140,18 +169,22 @@ Be specific about file paths, function names, and technical details. The summary
 	})
 
 	if (error) {
-		await publishActivity("", sessionId)
-		await publishLine(`[handoff] failed: ${error}`, "error", sessionId)
+		await publishActivity('', sessionId)
+		await publishLine(`[handoff] failed: ${error}`, 'error', sessionId)
 		return
 	}
 
 	await performHandoff(sessionId, summary)
-	await publishActivity("", sessionId)
-	await publishLine("[handoff] summary saved to handoff.md, session rotated to session-previous.ason", "status", sessionId)
-	await publishLine("[handoff] new session started — handoff context loaded", "status", sessionId)
+	await publishActivity('', sessionId)
+	await publishLine(
+		'[handoff] summary saved to handoff.md, session rotated to session-previous.ason',
+		'status',
+		sessionId,
+	)
+	await publishLine('[handoff] new session started — handoff context loaded', 'status', sessionId)
 
 	// Clear runtime cache so next prompt loads fresh, then publish updated context
-	const { getSessionCache } = await import("./sessions.ts")
+	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
 	await publishEstimatedContext(sessionId)
 }
@@ -165,7 +198,7 @@ async function runReset(sessionId: string): Promise<void> {
 	}
 
 	await clearSession(sessionId)
-	const { getSessionCache } = await import("./sessions.ts")
+	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
 
 	const meta = getSessionMeta(sessionId)
@@ -175,7 +208,7 @@ async function runReset(sessionId: string): Promise<void> {
 		await persistRegistry()
 	}
 
-	await publishLine("[reset] session cleared", "status", sessionId)
+	await publishLine('[reset] session cleared', 'status', sessionId)
 	await publishEstimatedContext(sessionId)
 	await emitSessions(true)
 }
@@ -184,7 +217,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	const name = text.trim()
 	if (!name) {
 		const config = loadConfig()
-		await publishLine(`[model] current: ${config.model}`, "info", sessionId)
+		await publishLine(`[model] current: ${config.model}`, 'info', sessionId)
 		return
 	}
 
@@ -195,61 +228,62 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	// Record model change in conversation history so handoff summaries capture it
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	runtime.messages.push({
-		role: "user",
+		role: 'user',
 		content: `[model changed from ${prevModel} to ${fullModel}]`,
 	})
 
 	// Reload system prompt for new model
 	const loaded = await reloadSystemPromptForSession(sessionId)
-	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
+	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
 
-	await publishLine(
-		`[model] switched to ${fullModel}${promptDesc}`,
-		"status", sessionId,
-	)
+	await publishLine(`[model] switched to ${fullModel}${promptDesc}`, 'status', sessionId)
 }
 
 async function runSystem(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	const blocks = runtime.systemPrompt
 	if (!blocks || blocks.length === 0) {
-		await publishLine("[system] (no system prompt loaded)", "info", sessionId)
+		await publishLine('[system] (no system prompt loaded)', 'info', sessionId)
 		return
 	}
-	const text = blocks.map((b: any) => b.text ?? "").join("\n---\n")
-	const lines = text.split("\n")
-	const preview = lines.slice(0, 40).join("\n")
-	const suffix = lines.length > 40 ? `\n... (${lines.length - 40} more lines)` : ""
-	await publishLine(`[system] ${blocks.length} block(s), ${runtime.systemBytes} bytes:\n${preview}${suffix}`, "info", sessionId)
+	const text = blocks.map((b: any) => b.text ?? '').join('\n---\n')
+	const lines = text.split('\n')
+	const preview = lines.slice(0, 40).join('\n')
+	const suffix = lines.length > 40 ? `\n... (${lines.length - 40} more lines)` : ''
+	await publishLine(
+		`[system] ${blocks.length} block(s), ${runtime.systemBytes} bytes:\n${preview}${suffix}`,
+		'info',
+		sessionId,
+	)
 }
 
 function resolveCdPath(sessionId: string, input: string, baseDir: string): string {
 	const trimmed = input.trim()
 	const halDir = getHalDir()
 	const home = process.env.HOME ? resolve(process.env.HOME) : null
-	if (!trimmed || trimmed === ".hal") return halDir
-	if (trimmed === "-") {
+	if (!trimmed || trimmed === '.hal') return halDir
+	if (trimmed === '-') {
 		const prev = previousWorkingDirBySession.get(sessionId)
 		if (prev) return prev
 	}
-	if (trimmed === "~") return home ?? baseDir
-	if (trimmed.startsWith("~/") && home) return resolve(home, trimmed.slice(2))
+	if (trimmed === '~') return home ?? baseDir
+	if (trimmed.startsWith('~/') && home) return resolve(home, trimmed.slice(2))
 	if (isAbsolute(trimmed)) return resolve(trimmed)
 	return resolve(baseDir, trimmed)
 }
 
 async function runCd(sessionId: string, text: string): Promise<void> {
 	if (!text.trim()) {
-		await publishLine(`[cd] ${getSessionWorkingDir(sessionId)}`, "info", sessionId)
+		await publishLine(`[cd] ${getSessionWorkingDir(sessionId)}`, 'info', sessionId)
 		return
 	}
 
 	const previous = getSessionWorkingDir(sessionId)
 	const next = resolveCdPath(sessionId, text, previous)
 
-	const { existsSync, statSync } = await import("fs")
+	const { existsSync, statSync } = await import('fs')
 	if (!existsSync(next) || !statSync(next).isDirectory()) {
-		await publishLine(`[cd] not a directory: ${next}`, "error", sessionId)
+		await publishLine(`[cd] not a directory: ${next}`, 'error', sessionId)
 		return
 	}
 
@@ -263,9 +297,9 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 	}
 
 	const loaded = await reloadSystemPromptForSession(sessionId)
-	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(", ")}` : ""
+	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
 	const dirMsg = previous !== next ? `${previous} -> ${next}` : next
-	await publishLine(`[cd] ${dirMsg}${promptDesc}`, "status", sessionId)
+	await publishLine(`[cd] ${dirMsg}${promptDesc}`, 'status', sessionId)
 }
 
 async function runClose(sessionId: string): Promise<void> {
@@ -276,12 +310,13 @@ async function runClose(sessionId: string): Promise<void> {
 	}
 
 	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
-	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } = await import("./sessions.ts")
+	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } =
+		await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
 	previousWorkingDirBySession.delete(sessionId)
 
 	const registry = getRegistry()
-	registry.sessions = registry.sessions.filter(s => s.id !== sessionId)
+	registry.sessions = registry.sessions.filter((s) => s.id !== sessionId)
 	if (registry.activeSessionId === sessionId) {
 		registry.activeSessionId = registry.sessions[0]?.id ?? null
 	}
@@ -289,7 +324,7 @@ async function runClose(sessionId: string): Promise<void> {
 		setActiveSessionId(registry.sessions[0]?.id ?? null)
 	}
 	await persistRegistry()
-	await publishLine(`[close] session ${sessionId} closed`, "status", null)
+	await publishLine(`[close] session ${sessionId} closed`, 'status', null)
 	await emitSessions(true)
 }
 

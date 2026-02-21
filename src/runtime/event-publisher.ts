@@ -1,14 +1,14 @@
-import { shortenHome } from "../tools.ts"
-import { appendEvent, updateState } from "../ipc.ts"
-import type { EventLevel, RuntimeEvent, RuntimeSource, SessionInfo } from "../protocol.ts"
-import { stringify } from "../utils/ason.ts"
+import { shortenHome } from '../tools.ts'
+import { appendEvent, updateState } from '../ipc.ts'
+import type { EventLevel, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
+import { stringify } from '../utils/ason.ts'
 
 const ANSI_PATTERN = /\x1b\[[0-9;]*m/g
 
 let ownerId: string
 let eventCounter = 0
-let lastStatus = ""
-let lastSessionsKey = ""
+let lastStatus = ''
+let lastSessionsKey = ''
 
 function eventId(): string {
 	eventCounter += 1
@@ -20,12 +20,12 @@ export function initPublisher(owner: string): void {
 }
 
 type EventPayload =
-	| Omit<Extract<RuntimeEvent, { type: "line" }>, "id" | "createdAt">
-	| Omit<Extract<RuntimeEvent, { type: "chunk" }>, "id" | "createdAt">
-	| Omit<Extract<RuntimeEvent, { type: "status" }>, "id" | "createdAt">
-	| Omit<Extract<RuntimeEvent, { type: "sessions" }>, "id" | "createdAt">
-	| Omit<Extract<RuntimeEvent, { type: "command" }>, "id" | "createdAt">
-	| Omit<Extract<RuntimeEvent, { type: "prompt" }>, "id" | "createdAt">
+	| Omit<Extract<RuntimeEvent, { type: 'line' }>, 'id' | 'createdAt'>
+	| Omit<Extract<RuntimeEvent, { type: 'chunk' }>, 'id' | 'createdAt'>
+	| Omit<Extract<RuntimeEvent, { type: 'status' }>, 'id' | 'createdAt'>
+	| Omit<Extract<RuntimeEvent, { type: 'sessions' }>, 'id' | 'createdAt'>
+	| Omit<Extract<RuntimeEvent, { type: 'command' }>, 'id' | 'createdAt'>
+	| Omit<Extract<RuntimeEvent, { type: 'prompt' }>, 'id' | 'createdAt'>
 
 async function emit(payload: EventPayload): Promise<void> {
 	const event = {
@@ -42,28 +42,28 @@ export async function publishLine(
 	sessionId: string | null,
 ): Promise<void> {
 	await emit({
-		type: "line",
+		type: 'line',
 		sessionId,
-		text: shortenHome(text.replace(ANSI_PATTERN, "")),
+		text: shortenHome(text.replace(ANSI_PATTERN, '')),
 		level,
 	})
 }
 
 export async function publishChunk(
 	text: string,
-	channel: "assistant" | "thinking",
+	channel: 'assistant' | 'thinking',
 	sessionId: string | null,
 ): Promise<void> {
-	await emit({ type: "chunk", sessionId, text, channel })
+	await emit({ type: 'chunk', sessionId, text, channel })
 }
 
 export async function publishCommandPhase(
 	commandId: string,
-	phase: "queued" | "started" | "done" | "failed",
+	phase: 'queued' | 'started' | 'done' | 'failed',
 	message: string | undefined,
 	sessionId: string | null,
 ): Promise<void> {
-	await emit({ type: "command", sessionId, commandId, phase, message })
+	await emit({ type: 'command', sessionId, commandId, phase, message })
 }
 
 export async function publishPrompt(
@@ -71,7 +71,7 @@ export async function publishPrompt(
 	text: string,
 	source: RuntimeSource,
 ): Promise<void> {
-	await emit({ type: "prompt", sessionId, text, source })
+	await emit({ type: 'prompt', sessionId, text, source })
 }
 
 export interface StatusSnapshot {
@@ -83,10 +83,11 @@ export interface StatusSnapshot {
 }
 
 export async function publishStatus(snapshot: StatusSnapshot, force = false): Promise<void> {
-	const { busySessionIds, activeSessionId, registryActiveSessionId, queueLength, sessions } = snapshot
+	const { busySessionIds, activeSessionId, registryActiveSessionId, queueLength, sessions } =
+		snapshot
 	const busy = busySessionIds.length > 0
 	const effectiveActiveId = registryActiveSessionId ?? activeSessionId
-	const key = `${busy}:${queueLength}:${busySessionIds.join(",")}:${effectiveActiveId ?? "-"}`
+	const key = `${busy}:${queueLength}:${busySessionIds.join(',')}:${effectiveActiveId ?? '-'}`
 	if (!force && key === lastStatus) return
 	lastStatus = key
 
@@ -101,7 +102,7 @@ export async function publishStatus(snapshot: StatusSnapshot, force = false): Pr
 	})
 
 	await emit({
-		type: "status",
+		type: 'status',
 		sessionId: busySessionIds[0] ?? null,
 		busySessionIds,
 		activeSessionId: effectiveActiveId ?? null,
@@ -110,12 +111,9 @@ export async function publishStatus(snapshot: StatusSnapshot, force = false): Pr
 	})
 }
 
-export async function publishActivity(
-	activity: string,
-	sessionId: string | null,
-): Promise<void> {
+export async function publishActivity(activity: string, sessionId: string | null): Promise<void> {
 	await emit({
-		type: "status",
+		type: 'status',
 		sessionId,
 		busySessionIds: [],
 		activeSessionId: null,
@@ -135,11 +133,14 @@ export async function publishSessions(
 	const key = stringify({
 		activeSessionId: effectiveActiveId,
 		sessions: sessions.map((s) => ({
-			id: s.id, workingDir: s.workingDir, messageCount: s.messageCount,
-			busy: s.busy, updatedAt: s.updatedAt,
+			id: s.id,
+			workingDir: s.workingDir,
+			messageCount: s.messageCount,
+			busy: s.busy,
+			updatedAt: s.updatedAt,
 		})),
 	})
 	if (!force && key === lastSessionsKey) return
 	lastSessionsKey = key
-	await emit({ type: "sessions", activeSessionId: effectiveActiveId ?? null, sessions })
+	await emit({ type: 'sessions', activeSessionId: effectiveActiveId ?? null, sessions })
 }

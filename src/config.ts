@@ -1,15 +1,15 @@
-import { readFileSync, writeFileSync } from "fs"
-import { stringify, parse } from "./utils/ason.ts"
-import { HAL_DIR } from "./state.ts"
+import { readFileSync, writeFileSync } from 'fs'
+import { stringify, parse } from './utils/ason.ts'
+import { HAL_DIR } from './state.ts'
 
 const CONFIG_PATH = `${HAL_DIR}/config.ason`
 
 export interface DebugConfig {
-	toolCalls?: boolean       // log tool calls to state/tool-calls.ason
+	toolCalls?: boolean // log tool calls to state/tool-calls.ason
 	responseLogging?: boolean // log API responses to state/responses.ason
-	ipc?: boolean             // log IPC commands/events
-	streaming?: boolean       // log raw SSE events
-	tokens?: boolean          // log token counts per turn
+	ipc?: boolean // log IPC commands/events
+	streaming?: boolean // log raw SSE events
+	tokens?: boolean // log token counts per turn
 	recordEverything?: boolean // streaming debug log: state files, keypresses, snapshots
 }
 
@@ -24,30 +24,37 @@ export interface Config {
 
 // User-facing aliases → full provider/model strings
 export const MODEL_ALIASES: Record<string, string> = {
-	claude: "anthropic/claude-opus-4-6",
-	codex: "openai/gpt-5.3-codex",
+	claude: 'anthropic/claude-opus-4-6',
+	codex: 'openai/gpt-5.3-codex',
 }
 
 export const COMPACT_MODEL_FOR: Record<string, string> = {
-	"anthropic/claude-opus-4-6": "anthropic/claude-sonnet-4-20250514",
-	"openai/gpt-5.3-codex": "openai/gpt-5.1-mini",
+	'anthropic/claude-opus-4-6': 'anthropic/claude-sonnet-4-20250514',
+	'openai/gpt-5.3-codex': 'openai/gpt-5.1-mini',
 }
 
 /** Parse "provider/model-id" → { provider, modelId } */
 export function parseModel(model: string): { provider: string; modelId: string } {
-	const slash = model.indexOf("/")
+	const slash = model.indexOf('/')
 	if (slash > 0) return { provider: model.slice(0, slash), modelId: model.slice(slash + 1) }
 	// Bare model name — infer provider
-	if (model.startsWith("claude") || model.startsWith("anthropic")) return { provider: "anthropic", modelId: model }
-	if (model.startsWith("gpt") || model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4")) return { provider: "openai", modelId: model }
-	return { provider: "anthropic", modelId: model }
+	if (model.startsWith('claude') || model.startsWith('anthropic'))
+		return { provider: 'anthropic', modelId: model }
+	if (
+		model.startsWith('gpt') ||
+		model.startsWith('o1') ||
+		model.startsWith('o3') ||
+		model.startsWith('o4')
+	)
+		return { provider: 'openai', modelId: model }
+	return { provider: 'anthropic', modelId: model }
 }
 
 /** Resolve alias or pass through. Always returns "provider/model-id". */
 export function resolveModel(nameOrId: string): string {
 	if (MODEL_ALIASES[nameOrId]) return MODEL_ALIASES[nameOrId]
 	// Already has provider prefix
-	if (nameOrId.includes("/")) return nameOrId
+	if (nameOrId.includes('/')) return nameOrId
 	// Bare model ID — add provider
 	const { provider, modelId } = parseModel(nameOrId)
 	return `${provider}/${modelId}`
@@ -79,7 +86,7 @@ export function resolveCompactModel(model: string): string {
 }
 
 const DEFAULTS: Config = {
-	model: "anthropic/claude-opus-4-6",
+	model: 'anthropic/claude-opus-4-6',
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 2,
 	maxPromptLines: 15,
@@ -91,13 +98,13 @@ let _config: Config | null = null
 export function loadConfig(): Config {
 	if (_config) return _config
 	try {
-		const raw = readFileSync(CONFIG_PATH, "utf-8")
+		const raw = readFileSync(CONFIG_PATH, 'utf-8')
 		const parsed = parse(raw) as any
 		// Migrate old format: if provider field exists and model has no slash, combine them
-		if (parsed.provider && parsed.model && !parsed.model.includes("/")) {
-			parsed.model = `${parsed.provider}/${resolveModel(parsed.model).split("/").pop()}`
+		if (parsed.provider && parsed.model && !parsed.model.includes('/')) {
+			parsed.model = `${parsed.provider}/${resolveModel(parsed.model).split('/').pop()}`
 			delete parsed.provider
-		} else if (parsed.model && !parsed.model.includes("/")) {
+		} else if (parsed.model && !parsed.model.includes('/')) {
 			// Bare alias or model ID — resolve to full form
 			parsed.model = resolveModel(parsed.model)
 		}
@@ -110,7 +117,7 @@ export function loadConfig(): Config {
 
 export function saveConfig(config: Config): void {
 	_config = config
-	writeFileSync(CONFIG_PATH, stringify(config) + "\n")
+	writeFileSync(CONFIG_PATH, stringify(config) + '\n')
 }
 
 export function updateConfig(updates: Partial<Config>): Config {

@@ -1,43 +1,43 @@
-import type { RuntimeCommand, RuntimeEvent } from "../protocol.ts"
+import type { RuntimeCommand, RuntimeEvent } from '../protocol.ts'
 
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
 
 export function stripAnsi(text: string): string {
-	return text.replace(ANSI_RE, "")
+	return text.replace(ANSI_RE, '')
 }
 
-const DIM = "\x1b[2m"
-const BOLD = "\x1b[1m"
-const RED = "\x1b[31m"
-const YELLOW = "\x1b[33m"
-const CYAN = "\x1b[36m"
-const RESET = "\x1b[0m"
+const DIM = '\x1b[2m'
+const BOLD = '\x1b[1m'
+const RED = '\x1b[31m'
+const YELLOW = '\x1b[33m'
+const CYAN = '\x1b[36m'
+const RESET = '\x1b[0m'
 
 const KIND_STYLE: Record<string, string> = {
-	"chunk.assistant": "",
-	"chunk.thinking": DIM,
-	"line.info": DIM,
-	"line.warn": YELLOW,
-	"line.error": RED,
-	"line.tool": CYAN,
-	"line.status": DIM,
+	'chunk.assistant': '',
+	'chunk.thinking': DIM,
+	'line.info': DIM,
+	'line.warn': YELLOW,
+	'line.error': RED,
+	'line.tool': CYAN,
+	'line.status': DIM,
 	prompt: BOLD,
-	"command.failed": RED,
-	"local.info": DIM,
-	"local.warn": YELLOW,
-	"local.error": RED,
-	"local.status": DIM,
-	"local.queue": DIM,
-	"local.help": "",
-	"local.usage": DIM,
-	"local.tab": DIM,
-	"local.tabs": DIM,
+	'command.failed': RED,
+	'local.info': DIM,
+	'local.warn': YELLOW,
+	'local.error': RED,
+	'local.status': DIM,
+	'local.queue': DIM,
+	'local.help': '',
+	'local.usage': DIM,
+	'local.tab': DIM,
+	'local.tabs': DIM,
 }
 
 // Track prevKind per session so interleaved events from different sessions
 // don't inject spurious newlines into each other's output.
 const prevKindBySession = new Map<string, string>()
-const LOCAL_KEY = "__local__"
+const LOCAL_KEY = '__local__'
 
 export function resetFormat(sessionId?: string): void {
 	if (sessionId) {
@@ -49,57 +49,53 @@ export function resetFormat(sessionId?: string): void {
 
 export function pushFragment(kind: string, text: string, sessionId?: string | null): string {
 	const key = sessionId ?? LOCAL_KEY
-	const prev = prevKindBySession.get(key) ?? ""
+	const prev = prevKindBySession.get(key) ?? ''
 	const continuing = kind === prev
 	prevKindBySession.set(key, kind)
 
-	const style = KIND_STYLE[kind] ?? ""
-	const reset = style ? RESET : ""
+	const style = KIND_STYLE[kind] ?? ''
+	const reset = style ? RESET : ''
 
-	if (kind === "chunk.assistant" || kind === "chunk.thinking") {
+	if (kind === 'chunk.assistant' || kind === 'chunk.thinking') {
 		// Only add blank-line separator for chunk→chunk transitions (thinking↔assistant).
 		// Non-chunk types (lines, prompts) already end with \n, so no extra prefix needed.
-		const isChunkTransition = !continuing && prev.startsWith("chunk.")
-		const prefix = isChunkTransition ? "\n" : ""
+		const isChunkTransition = !continuing && prev.startsWith('chunk.')
+		const prefix = isChunkTransition ? '\n' : ''
 		return `${prefix}${style}${text}${reset}`
 	}
 
 	// When previous output was a streaming chunk (no trailing newline), add one
-	const needsNewline = prev.startsWith("chunk.")
-	return `${needsNewline ? "\n" : ""}${style}${text}${reset}\n`
+	const needsNewline = prev.startsWith('chunk.')
+	return `${needsNewline ? '\n' : ''}${style}${text}${reset}\n`
 }
 
-export function pushEvent(
-	event: RuntimeEvent,
-	localSource: RuntimeCommand["source"],
-): string {
-	const sessionId = "sessionId" in event ? event.sessionId : null
+export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {
+	const sessionId = 'sessionId' in event ? event.sessionId : null
 
-	if (event.type === "chunk") {
+	if (event.type === 'chunk') {
 		return pushFragment(`chunk.${event.channel}`, event.text, sessionId)
 	}
 
-	if (event.type === "line") {
+	if (event.type === 'line') {
 		return pushFragment(`line.${event.level}`, event.text, sessionId)
 	}
 
-	if (event.type === "prompt") {
+	if (event.type === 'prompt') {
 		const local =
-			event.source.kind === localSource.kind &&
-			event.source.clientId === localSource.clientId
+			event.source.kind === localSource.kind && event.source.clientId === localSource.clientId
 		const text = local
 			? event.text
 			: `[prompt:${event.source.kind}:${event.source.clientId.slice(0, 6)}] ${event.text}`
-		return pushFragment("prompt", text, sessionId)
+		return pushFragment('prompt', text, sessionId)
 	}
 
-	if (event.type === "command" && event.phase === "failed") {
+	if (event.type === 'command' && event.phase === 'failed') {
 		return pushFragment(
-			"command.failed",
-			`[command:${event.commandId}] ${event.message ?? "unknown"}`,
+			'command.failed',
+			`[command:${event.commandId}] ${event.message ?? 'unknown'}`,
 			sessionId,
 		)
 	}
 
-	return ""
+	return ''
 }

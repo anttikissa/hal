@@ -1,5 +1,5 @@
-import { open, stat } from "fs/promises"
-import { watch, type FSWatcher } from "fs"
+import { open, stat } from 'fs/promises'
+import { watch, type FSWatcher } from 'fs'
 
 /**
  * Create a ReadableStream that tails a file from a byte offset.
@@ -21,7 +21,10 @@ export function tailFile(
 			let pending = false
 
 			const read = async () => {
-				if (reading) { pending = true; return }
+				if (reading) {
+					pending = true
+					return
+				}
 				reading = true
 				try {
 					// Loop to drain any data that arrived while we were reading
@@ -38,7 +41,7 @@ export function tailFile(
 							}
 							if (size === offset) continue
 							const len = size - offset
-							const fh = await open(path, "r")
+							const fh = await open(path, 'r')
 							const buf = Buffer.alloc(len)
 							const { bytesRead } = await fh.read(buf, 0, len, offset)
 							await fh.close()
@@ -46,7 +49,7 @@ export function tailFile(
 							offset += bytesRead
 							controller.enqueue(bytesRead < len ? buf.subarray(0, bytesRead) : buf)
 						} catch (e: any) {
-							if (e?.code === "ENOENT") continue // file does not exist yet
+							if (e?.code === 'ENOENT') continue // file does not exist yet
 							// Do not kill the stream on transient errors.
 						}
 					} while (pending)

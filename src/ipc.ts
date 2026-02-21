@@ -1,10 +1,10 @@
-import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from "fs/promises"
-import { existsSync } from "fs"
-import type { RuntimeCommand, RuntimeEvent, RuntimeState } from "./protocol.ts"
-import { IPC_DIR } from "./state.ts"
-import { stringify, parse, parseAll, parseStream } from "./utils/ason.ts"
-import { isPidAlive } from "./utils/is-pid-alive.ts"
-import { tailFile } from "./utils/tail-file.ts"
+import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import type { RuntimeCommand, RuntimeEvent, RuntimeState } from './protocol.ts'
+import { IPC_DIR } from './state.ts'
+import { stringify, parse, parseAll, parseStream } from './utils/ason.ts'
+import { isPidAlive } from './utils/is-pid-alive.ts'
+import { tailFile } from './utils/tail-file.ts'
 
 let rootDir: string
 let commandsFile: string
@@ -14,7 +14,7 @@ let ownerFile: string
 let stateWriteLock: Promise<void> = Promise.resolve()
 
 function assertInit(): void {
-	if (!rootDir) throw new Error("ipc bus not initialized — call initBus() first")
+	if (!rootDir) throw new Error('ipc bus not initialized — call initBus() first')
 }
 
 export function initBus(dir = IPC_DIR): void {
@@ -41,7 +41,7 @@ function defaultState(): RuntimeState {
 }
 
 async function touch(path: string): Promise<void> {
-	if (!existsSync(path)) await writeFile(path, "")
+	if (!existsSync(path)) await writeFile(path, '')
 }
 
 export async function ensureBus(): Promise<void> {
@@ -55,10 +55,14 @@ export async function ensureBus(): Promise<void> {
 export async function resetBusEvents(): Promise<void> {
 	assertInit()
 	// Keep last 500 events so clients can hydrate scroll history after owner restart
-	const raw = await readFile(eventsFile, "utf-8").catch(() => "")
+	const raw = await readFile(eventsFile, 'utf-8').catch(() => '')
 	const all = parseAll(raw) as RuntimeEvent[]
 	if (all.length > 500) {
-		const kept = all.slice(-500).map(e => stringify(e)).join("\n") + "\n"
+		const kept =
+			all
+				.slice(-500)
+				.map((e) => stringify(e))
+				.join('\n') + '\n'
 		await writeFile(eventsFile, kept)
 	}
 	// If ≤500, leave as-is
@@ -67,7 +71,7 @@ export async function resetBusEvents(): Promise<void> {
 export async function readState(): Promise<RuntimeState> {
 	assertInit()
 	try {
-		const raw = await readFile(stateFile, "utf-8")
+		const raw = await readFile(stateFile, 'utf-8')
 		return { ...defaultState(), ...parse(raw) }
 	} catch {
 		const fallback = defaultState()
@@ -81,7 +85,7 @@ export async function writeState(runtimeState: RuntimeState): Promise<void> {
 	const doWrite = async () => {
 		const tmp = `${stateFile}.tmp.${process.pid}`
 		runtimeState.updatedAt = new Date().toISOString()
-		await writeFile(tmp, stringify(runtimeState) + "\n")
+		await writeFile(tmp, stringify(runtimeState) + '\n')
 		await rename(tmp, stateFile)
 	}
 	stateWriteLock = stateWriteLock.then(doWrite, doWrite)
@@ -103,24 +107,27 @@ export async function claimOwner(
 
 	const tryClaim = async (): Promise<boolean> => {
 		try {
-			const fh = await open(ownerFile, "wx")
+			const fh = await open(ownerFile, 'wx')
 			await fh.writeFile(payload)
 			await fh.close()
 			return true
 		} catch (e: any) {
-			if (e?.code === "EEXIST") return false
+			if (e?.code === 'EEXIST') return false
 			throw e
 		}
 	}
 
 	if (await tryClaim()) {
-		await updateState((s) => { s.ownerPid = process.pid; s.ownerId = ownerId })
+		await updateState((s) => {
+			s.ownerPid = process.pid
+			s.ownerId = ownerId
+		})
 		return { owner: true, currentOwnerPid: process.pid }
 	}
 
 	let ownerPid: number | null = null
 	try {
-		const lockRaw = await readFile(ownerFile, "utf-8")
+		const lockRaw = await readFile(ownerFile, 'utf-8')
 		const lock = parse(lockRaw) as any
 		ownerPid = Number.isInteger(lock?.pid) ? lock.pid : null
 	} catch {
@@ -132,10 +139,15 @@ export async function claimOwner(
 	}
 
 	// Stale lock — remove and retry
-	try { await rm(ownerFile) } catch {}
+	try {
+		await rm(ownerFile)
+	} catch {}
 
 	if (await tryClaim()) {
-		await updateState((s) => { s.ownerPid = process.pid; s.ownerId = ownerId })
+		await updateState((s) => {
+			s.ownerPid = process.pid
+			s.ownerId = ownerId
+		})
 		return { owner: true, currentOwnerPid: process.pid }
 	}
 
@@ -146,7 +158,7 @@ export async function claimOwner(
 export async function releaseOwner(ownerId: string): Promise<void> {
 	assertInit()
 	try {
-		const raw = await readFile(ownerFile, "utf-8")
+		const raw = await readFile(ownerFile, 'utf-8')
 		const lock = parse(raw) as any
 		if (lock?.ownerId !== ownerId) return
 		await rm(ownerFile)
@@ -162,40 +174,39 @@ export async function releaseOwner(ownerId: string): Promise<void> {
 		// Notify clients so they can claim ownership immediately
 		await appendEvent({
 			id: `${Date.now()}-${process.pid}-release`,
-			type: "line",
+			type: 'line',
 			sessionId: null,
-			text: "[owner-released]",
-			level: "status",
+			text: '[owner-released]',
+			level: 'status',
 			createdAt: new Date().toISOString(),
 		})
 	} catch {}
 }
 
-
 export async function appendCommand(command: RuntimeCommand): Promise<void> {
 	assertInit()
-	await appendFile(commandsFile, stringify(command) + "\n")
+	await appendFile(commandsFile, stringify(command) + '\n')
 }
 
 export async function appendEvent(event: RuntimeEvent): Promise<void> {
 	assertInit()
-	await appendFile(eventsFile, stringify(event) + "\n")
+	await appendFile(eventsFile, stringify(event) + '\n')
 }
 
 export async function readRecentEvents(limit: number): Promise<RuntimeEvent[]> {
 	assertInit()
-	const raw = await readFile(eventsFile, "utf-8")
+	const raw = await readFile(eventsFile, 'utf-8')
 	const all = parseAll(raw) as RuntimeEvent[]
 	return all.slice(-limit)
 }
 
-export async function *tailCommands(): AsyncGenerator<RuntimeCommand> {
+export async function* tailCommands(): AsyncGenerator<RuntimeCommand> {
 	assertInit()
 	const offset = (await stat(commandsFile)).size
 	yield* parseStream(tailFile(commandsFile, offset), { recover: true })
 }
 
-export async function *tailEvents(): AsyncGenerator<RuntimeEvent> {
+export async function* tailEvents(): AsyncGenerator<RuntimeEvent> {
 	assertInit()
 	const offset = (await stat(eventsFile)).size
 	yield* parseStream(tailFile(eventsFile, offset, { dropOnTruncate: true }), { recover: true })

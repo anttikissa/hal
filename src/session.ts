@@ -1,9 +1,9 @@
-import { mkdir, readFile, writeFile, unlink, rename } from "fs/promises"
-import { existsSync } from "fs"
-import { randomBytes } from "crypto"
-import { stringify, parse } from "./utils/ason.ts"
-import { sessionDir, SESSIONS_DIR, SESSIONS_INDEX, ensureStateDir, LAUNCH_CWD } from "./state.ts"
-import { resolve } from "path"
+import { mkdir, readFile, writeFile, unlink, rename } from 'fs/promises'
+import { existsSync } from 'fs'
+import { randomBytes } from 'crypto'
+import { stringify, parse } from './utils/ason.ts'
+import { sessionDir, SESSIONS_DIR, SESSIONS_INDEX, ensureStateDir, LAUNCH_CWD } from './state.ts'
+import { resolve } from 'path'
 
 export type TokenTotals = { input: number; output: number; cacheCreate: number; cacheRead: number }
 export const EMPTY_TOTALS: TokenTotals = { input: 0, output: 0, cacheCreate: 0, cacheRead: 0 }
@@ -31,7 +31,7 @@ interface SessionFile {
 }
 
 export function makeSessionId(): string {
-	return `s-${randomBytes(3).toString("hex")}`
+	return `s-${randomBytes(3).toString('hex')}`
 }
 
 function nowIso(): string {
@@ -39,7 +39,7 @@ function nowIso(): string {
 }
 
 function sanitizeSessionId(id: string): string {
-	return id.trim().replace(/[^a-zA-Z0-9_-]/g, "_") || "s-default"
+	return id.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 's-default'
 }
 
 function sessionPath(id: string): string {
@@ -65,39 +65,51 @@ async function ensureSessionDir(id: string): Promise<void> {
 
 function createSessionInfo(id: string, workingDir: string): SessionInfo {
 	const ts = nowIso()
-	return { id: sanitizeSessionId(id), workingDir: resolve(workingDir), busy: false, messageCount: 0, createdAt: ts, updatedAt: ts }
+	return {
+		id: sanitizeSessionId(id),
+		workingDir: resolve(workingDir),
+		busy: false,
+		messageCount: 0,
+		createdAt: ts,
+		updatedAt: ts,
+	}
 }
 
 // Registry
 
-export async function loadSessionRegistry(options: { defaultWorkingDir?: string } = {}): Promise<SessionRegistry> {
+export async function loadSessionRegistry(
+	options: { defaultWorkingDir?: string } = {},
+): Promise<SessionRegistry> {
 	const defaultWorkingDir = resolve(options.defaultWorkingDir ?? LAUNCH_CWD)
 	ensureStateDir()
 
 	if (!existsSync(SESSIONS_INDEX)) {
-		const session = createSessionInfo("s-default", defaultWorkingDir)
+		const session = createSessionInfo('s-default', defaultWorkingDir)
 		const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
 		await saveSessionRegistry(registry)
 		return registry
 	}
 
 	try {
-		const raw = await readFile(SESSIONS_INDEX, "utf-8")
+		const raw = await readFile(SESSIONS_INDEX, 'utf-8')
 		const parsed = parse(raw) as Partial<SessionRegistry>
 		const sessions = Array.isArray(parsed.sessions)
 			? parsed.sessions.filter((s: any) => s?.id).map((s: any) => ({ ...s, busy: false }))
 			: []
 		if (sessions.length === 0) {
-			const session = createSessionInfo("s-default", defaultWorkingDir)
+			const session = createSessionInfo('s-default', defaultWorkingDir)
 			const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
 			await saveSessionRegistry(registry)
 			return registry
 		}
-		const activeSessionId = typeof parsed.activeSessionId === "string" && sessions.some((s: any) => s.id === parsed.activeSessionId)
-			? parsed.activeSessionId : sessions[0].id
+		const activeSessionId =
+			typeof parsed.activeSessionId === 'string' &&
+			sessions.some((s: any) => s.id === parsed.activeSessionId)
+				? parsed.activeSessionId
+				: sessions[0].id
 		return { activeSessionId, sessions }
 	} catch {
-		const session = createSessionInfo("s-default", defaultWorkingDir)
+		const session = createSessionInfo('s-default', defaultWorkingDir)
 		const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
 		await saveSessionRegistry(registry)
 		return registry
@@ -106,16 +118,18 @@ export async function loadSessionRegistry(options: { defaultWorkingDir?: string 
 
 export async function saveSessionRegistry(registry: SessionRegistry): Promise<void> {
 	ensureStateDir()
-	await writeFile(SESSIONS_INDEX, stringify(registry) + "\n")
+	await writeFile(SESSIONS_INDEX, stringify(registry) + '\n')
 }
 
 // Session load/save
 
-export async function loadSession(sessionId: string): Promise<{ messages: any[]; tokenTotals: TokenTotals } | null> {
+export async function loadSession(
+	sessionId: string,
+): Promise<{ messages: any[]; tokenTotals: TokenTotals } | null> {
 	const path = sessionPath(sessionId)
 	if (!existsSync(path)) return null
 	try {
-		const raw = await readFile(path, "utf-8")
+		const raw = await readFile(path, 'utf-8')
 		const session: SessionFile = parse(raw)
 		if (!Array.isArray(session.messages) || session.messages.length === 0) return null
 		const messages = repairMessages(session.messages)
@@ -125,19 +139,25 @@ export async function loadSession(sessionId: string): Promise<{ messages: any[];
 	}
 }
 
-export async function saveSession(sessionId: string, messages: any[], tokenTotals: TokenTotals): Promise<void> {
+export async function saveSession(
+	sessionId: string,
+	messages: any[],
+	tokenTotals: TokenTotals,
+): Promise<void> {
 	await ensureSessionDir(sessionId)
 	const path = sessionPath(sessionId)
 	const now = nowIso()
 	let createdAt = now
 	try {
 		if (existsSync(path)) {
-			const existing = parse(await readFile(path, "utf-8"))
+			const existing = parse(await readFile(path, 'utf-8'))
 			if (existing.createdAt) createdAt = existing.createdAt
 		}
-	} catch { /* use now */ }
+	} catch {
+		/* use now */
+	}
 	const session: SessionFile = { messages, tokenTotals, createdAt, updatedAt: now }
-	await writeFile(path, stringify(session) + "\n")
+	await writeFile(path, stringify(session) + '\n')
 }
 
 export async function clearSession(sessionId: string): Promise<void> {
@@ -151,7 +171,7 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 	const path = `${sessionDir(sessionId)}/history.ason`
 	if (!existsSync(path)) return []
 	try {
-		const raw = await readFile(path, "utf-8")
+		const raw = await readFile(path, 'utf-8')
 		const data = parse(raw)
 		return Array.isArray(data) ? data.slice(-MAX_HISTORY) : []
 	} catch {
@@ -161,9 +181,11 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 
 export async function saveInputHistory(sessionId: string, history: string[]): Promise<void> {
 	await ensureSessionDir(sessionId)
-	await writeFile(`${sessionDir(sessionId)}/history.ason`, stringify(history.slice(-MAX_HISTORY)) + "\n")
+	await writeFile(
+		`${sessionDir(sessionId)}/history.ason`,
+		stringify(history.slice(-MAX_HISTORY)) + '\n',
+	)
 }
-
 
 // Handoff
 
@@ -187,29 +209,38 @@ export async function loadHandoff(sessionId: string): Promise<string | null> {
 	const hPath = handoffPath(sessionId)
 	if (!existsSync(hPath)) return null
 	try {
-		const content = await readFile(hPath, "utf-8")
+		const content = await readFile(hPath, 'utf-8')
 		// Preserve for debugging, then remove
 		const prevPath = `${sessionDir(sessionId)}/handoff-previous.md`
 		await rename(hPath, prevPath)
 		return content
-	} catch { return null }
+	} catch {
+		return null
+	}
 }
 
 // Prompt logging
 
-export async function logPrompt(sessionId: string, entry: {
-	timestamp: string
-	model: string
-	provider: string
-	prompt: string
-}): Promise<void> {
+export async function logPrompt(
+	sessionId: string,
+	entry: {
+		timestamp: string
+		model: string
+		provider: string
+		prompt: string
+	},
+): Promise<void> {
 	await ensureSessionDir(sessionId)
-	const { $ } = await import("bun")
-	let gitHash = ""
-	try { gitHash = (await $`git rev-parse HEAD`.quiet().text()).trim().slice(0, 8) } catch { /* no git */ }
+	const { $ } = await import('bun')
+	let gitHash = ''
+	try {
+		gitHash = (await $`git rev-parse HEAD`.quiet().text()).trim().slice(0, 8)
+	} catch {
+		/* no git */
+	}
 	const record = { ...entry, gitHash }
-	const { appendFile } = await import("fs/promises")
-	await appendFile(promptsPath(sessionId), stringify(record) + "\n")
+	const { appendFile } = await import('fs/promises')
+	await appendFile(promptsPath(sessionId), stringify(record) + '\n')
 }
 
 // Repair
@@ -217,24 +248,25 @@ export async function logPrompt(sessionId: string, entry: {
 function repairMessages(messages: any[]): any[] {
 	const toolUseIds = new Set<string>()
 	for (const msg of messages) {
-		if (msg.role === "assistant" && Array.isArray(msg.content)) {
+		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			for (const b of msg.content) {
-				if (b.type === "tool_use" && b.id) toolUseIds.add(b.id)
+				if (b.type === 'tool_use' && b.id) toolUseIds.add(b.id)
 			}
 		}
 	}
 	const result: any[] = []
 	for (const msg of messages) {
-		if (msg.role === "user" && Array.isArray(msg.content)) {
+		if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const filtered = msg.content.filter((b: any) => {
-				if (b.type === "tool_result" && b.tool_use_id && !toolUseIds.has(b.tool_use_id)) return false
+				if (b.type === 'tool_result' && b.tool_use_id && !toolUseIds.has(b.tool_use_id))
+					return false
 				return true
 			})
 			if (filtered.length > 0) result.push({ ...msg, content: filtered })
-		} else if (msg.role === "assistant" && Array.isArray(msg.content)) {
+		} else if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			// Drop thinking blocks without signatures (incomplete from interrupted generation)
 			const filtered = msg.content.filter((b: any) => {
-				if (b.type === "thinking" && !b.signature) return false
+				if (b.type === 'thinking' && !b.signature) return false
 				return true
 			})
 			if (filtered.length > 0) result.push({ ...msg, content: filtered })
