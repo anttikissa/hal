@@ -530,7 +530,22 @@ function handleKey(key: string): void {
 	if (key === "\x1b") { if (escHandler) escHandler(); return }
 
 	if (key.length === 1 && key.charCodeAt(0) < 0x20) return
+
+	// Decode xterm modifyOtherKeys: \x1b[27;<modifier>;<charcode>~ → character
+	// modifier 2 = Shift, but the charcode already reflects the shift state
+	const modifyOtherKeys = key.match(/^\x1b\[27;\d+;(\d+)~$/)
+	if (modifyOtherKeys) {
+		const ch = String.fromCharCode(Number(modifyOtherKeys[1]))
+		if (ch) {
+			inputBuf = inputBuf.slice(0, inputCursor) + ch + inputBuf.slice(inputCursor)
+			inputCursor += ch.length
+			redrawFooter()
+		}
+		return
+	}
+
 	if (key.startsWith("\x1b")) return
+
 
 	const isMultiline = key.length > 1 && key.includes("\n")
 	if (isMultiline) {
