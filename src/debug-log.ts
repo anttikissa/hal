@@ -8,7 +8,8 @@
  * /bug <desc> appends a bug record with terminal snapshot and saves a copy.
  */
 
-import { appendFile, mkdir, readFile, readdir, stat, copyFile } from "fs/promises"
+import { appendFile, mkdir, readFile, readdir, stat } from "fs/promises"
+
 import { resolve, relative } from "path"
 import { stringify } from "./utils/ason.ts"
 import { STATE_DIR, HAL_DIR } from "./state.ts"
@@ -61,12 +62,14 @@ export async function saveBugReport(description: string, terminal: string): Prom
 	// Append the bug record + snapshot
 	buffer.push({ t: Date.now(), type: "bug", description, terminal })
 	await flush()
-	// Copy the debug log to bugs dir
+	// Copy the debug log to bugs dir without blocking the event loop
 	await mkdir(BUGS_DIR, { recursive: true })
 	const id = `bug-${Date.now()}`
 	const bugPath = resolve(BUGS_DIR, `${id}.ason`)
-	await copyFile(logPath, bugPath)
+	const proc = Bun.spawn(["cp", logPath, bugPath])
+	await proc.exited
 	return bugPath
+
 }
 
 /** Walk a directory, calling fn for each file. Skips the debug dir. */
