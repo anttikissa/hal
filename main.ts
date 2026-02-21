@@ -221,14 +221,26 @@ if (headless) {
 				await emitBootstrap(`[web] http://localhost:${webServer.port}`)
 				break
 			} catch (e: any) {
-				if (!isAddrInUse(e) || attempt === 9) {
-					await emitBootstrap(`[web] disabled: ${e.message || e}`, 'warn')
-					break
+				if (isAddrInUse(e)) {
+					// If another HAL owner took over during retry, stop trying in this process.
+					const current = await claimOwner(ownerId)
+					if (!current.owner) {
+						await emitBootstrap('[web] skipped: another owner is active', 'status')
+						break
+					}
+					if (attempt === 9) {
+						await emitBootstrap(`[web] disabled: ${e.message || e}`, 'warn')
+						break
+					}
+					await Bun.sleep(delay)
+					delay = Math.min(delay * 1.4, 10000)
+					continue
 				}
-				await Bun.sleep(delay)
-				delay = Math.min(delay * 1.4, 10000)
+				await emitBootstrap(`[web] disabled: ${e.message || e}`, 'warn')
+				break
 			}
 		}
+
 
 		startRuntime(ownerId).catch(async (e) => {
 			await emitBootstrap(`[engine] crashed: ${e.message || e}`, 'error')
