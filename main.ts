@@ -180,13 +180,23 @@ if (headless) {
 		if (ownerWatchTimer) { clearInterval(ownerWatchTimer); ownerWatchTimer = null }
 
 		promoteToOwner()
-		try {
-			webServer = startWebServer(webPort)
-			await emitBootstrap(`[web] http://localhost:${webServer.port}`)
-
-		} catch (e: any) {
-			await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
+		// Retry web server with exponential backoff — port may still be closing
+		let delay = 350
+		for (let attempt = 0; attempt < 10; attempt++) {
+			try {
+				webServer = startWebServer(webPort)
+				await emitBootstrap(`[web] http://localhost:${webServer.port}`)
+				break
+			} catch (e: any) {
+				if (!isAddrInUse(e) || attempt === 9) {
+					await emitBootstrap(`[web] disabled: ${e.message || e}`, "warn")
+					break
+				}
+				await Bun.sleep(delay)
+				delay = Math.min(delay * 1.4, 10000)
+			}
 		}
+
 		startRuntime(ownerId).catch(async (e) => {
 			await emitBootstrap(`[engine] crashed: ${e.message || e}`, "error")
 			await releaseOwner(ownerId)
