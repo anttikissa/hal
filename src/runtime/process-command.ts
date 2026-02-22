@@ -10,9 +10,10 @@ import {
 	sessionQueueLength,
 	sessionQueuedCommands,
 	drainQueuedCommands as drainSchedulerQueue,
+	removeSessionQueue,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
-import { dropQueuedCommands } from './handle-command.ts'
+import { dropQueuedCommands, runClose } from './handle-command.ts'
 import {
 	sanitizeSessionId,
 	getActiveSessionId,
@@ -130,6 +131,27 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		await emitStatus(true)
 		return
 	}
+
+	// Close: run immediately, bypassing the concurrency-limited scheduler.
+	// Close is a session management op, not a model task — it must not wait
+	// for other busy sessions to finish.
+	if (command.type === 'close') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (sessionId) {
+			// Drop any queued commands for this session first
+			const dropped = drainSchedulerQueue(sessionId)
+			for (const cmd of dropped) {
+				await publishCommandPhase(cmd.id, 'failed', 'session closed', sessionId)
+			}
+			removeSessionQueue(sessionId)
+			await runClose(sessionId)
+		}
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
+		await emitStatus(true)
+		return
+	}
+
 
 	// Resume: unfreeze queue, let scheduler continue
 	if (command.type === 'resume') {

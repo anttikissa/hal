@@ -78,9 +78,8 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 				await runCd(sessionId, command.text ?? '')
 				break
 
-			case 'close':
-				await runClose(sessionId)
-				break
+			// 'close' is handled immediately in processCommand (bypasses scheduler)
+
 
 			case 'fork':
 				await runFork(sessionId, command)
@@ -381,7 +380,7 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 
 }
 
-async function runClose(sessionId: string): Promise<void> {
+export async function runClose(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	if (busySessions.has(sessionId)) {
 		runtime.pausedByUser = true
