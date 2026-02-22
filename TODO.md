@@ -6,3 +6,4 @@
 - cmd-z should undo edits to prompt — e.g. accidental ctrl-K deleting too much.
 - Do we support tool call streaming? We should, in case bash script produces slow output.
 
+- Windows/tabs should have their own edit buffer
