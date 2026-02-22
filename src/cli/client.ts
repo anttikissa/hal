@@ -140,7 +140,7 @@ export function setOwnerReleaseHandler(handler: (() => void) | null): void {
 	onOwnerReleased = handler
 }
 
-export async function start(): Promise<number> {
+export async function start(options?: { startupEpoch?: number | null }): Promise<number> {
 	tui.init()
 	setTabCompleter(completeInput)
 	setEscHandler(() => handleEsc())
@@ -160,6 +160,10 @@ export async function start(): Promise<number> {
 	pushLocal('local.info', '/q or Ctrl-D to quit · Ctrl-V to paste images · /help for more')
 
 	await bootstrapState()
+	if (options?.startupEpoch) {
+		const elapsed = Date.now() - options.startupEpoch
+		pushLocal('local.status', `[perf] startup: ${elapsed}ms`)
+	}
 
 	void (async () => {
 		try {

@@ -189,11 +189,6 @@ if (isOwner) {
 	})
 }
 
-if (startupEpoch) {
-	const elapsed = Date.now() - startupEpoch
-	await emitBootstrap(`[perf] startup: ${elapsed}ms`)
-}
-
 if (headless) {
 	if (!isOwner) {
 		await emitBootstrap('[runtime] --headless but not owner; exiting', 'warn')
@@ -279,7 +274,7 @@ if (headless) {
 	})
 
 	try {
-		exitCode = await startClient()
+		exitCode = await startClient({ startupEpoch })
 	} catch (e: any) {
 		exitCode = 1
 		await emitBootstrap(`[cli] crashed: ${e?.message || e}`, 'error')
