@@ -15,7 +15,6 @@ import { drainQueuedCommands } from './command-scheduler.ts'
 import {
 	publishLine,
 	publishCommandPhase,
-	publishPrompt,
 	publishActivity,
 } from './event-publisher.ts'
 import { processPrompt } from './process-prompt.ts'
@@ -53,7 +52,7 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 	try {
 		switch (command.type) {
 			case 'prompt':
-				await publishPrompt(sessionId, command.text ?? '', command.source)
+				// Prompt already echoed in processCommand for immediate display
 				await processPrompt(sessionId, command.text ?? '')
 				break
 

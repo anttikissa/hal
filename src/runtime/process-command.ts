@@ -3,7 +3,7 @@ import { resolve } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
 import { makeSessionId, forkSession } from '../session.ts'
 import { enqueueCommand } from './command-scheduler.ts'
-import { publishLine, publishCommandPhase } from './event-publisher.ts'
+import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
 import { dropQueuedCommands } from './handle-command.ts'
 import {
 	sanitizeSessionId,
@@ -176,6 +176,11 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 	if (!sessionId) {
 		await publishCommandPhase(command.id, 'failed', 'no session available', null)
 		return
+	}
+
+	// Echo prompt immediately so it appears in the client before the scheduler runs it
+	if (command.type === 'prompt') {
+		await publishPrompt(sessionId, command.text ?? '', command.source)
 	}
 
 	enqueueCommand(sessionId, command)
