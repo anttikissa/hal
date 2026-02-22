@@ -1,4 +1,6 @@
 import { resolve } from 'path'
+import { mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
 
 const HAL_DIR = resolve(import.meta.dir, '../..')
 
@@ -18,12 +20,15 @@ export interface TestHal {
 }
 
 export async function startHal(options?: { env?: Record<string, string> }): Promise<TestHal> {
+	// Each test gets its own isolated state dir so tests never touch live state
+	const stateDir = mkdtempSync(resolve(tmpdir(), 'hal-test-'))
+
 	const proc = Bun.spawn(['bun', 'main.ts', '--test'], {
 		cwd: HAL_DIR,
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'inherit',
-		env: { ...process.env, ...options?.env },
+		env: { ...process.env, HAL_STATE_DIR: stateDir, ...options?.env },
 	})
 
 	const records: any[] = []
@@ -109,6 +114,10 @@ export async function startHal(options?: { env?: Record<string, string> }): Prom
 			proc.stdin.end()
 		} catch {}
 		const exitCode = await proc.exited
+		// Clean up isolated state dir
+		try {
+			rmSync(stateDir, { recursive: true, force: true })
+		} catch {}
 		return { exitCode }
 	}
 
