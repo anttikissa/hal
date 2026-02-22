@@ -12,6 +12,7 @@ interface SchedulerState {
 	queues: Map<string, RuntimeCommand[]>
 	scheduled: string[]
 	running: Set<string>
+	paused: Set<string>
 }
 
 let state: SchedulerState | null = null
@@ -39,6 +40,7 @@ function drain(s: SchedulerState): void {
 	while (s.running.size < s.maxConcurrent) {
 		const idx = s.scheduled.findIndex((id) => {
 			if (s.running.has(id)) return false
+			if (s.paused.has(id)) return false
 			const q = s.queues.get(id)
 			return Boolean(q && q.length > 0)
 		})
@@ -82,6 +84,7 @@ export function createCommandScheduler(
 		queues: new Map(),
 		scheduled: [],
 		running: new Set(),
+		paused: new Set(),
 	}
 }
 
@@ -96,6 +99,7 @@ export function removeSessionQueue(sessionId: string): void {
 		if (s.scheduled[i] === sessionId) s.scheduled.splice(i, 1)
 	}
 	s.running.delete(sessionId)
+	s.paused.delete(sessionId)
 }
 
 export function totalQueuedCommands(): number {
@@ -103,6 +107,10 @@ export function totalQueuedCommands(): number {
 	let total = 0
 	for (const q of s.queues.values()) total += q.length
 	return total
+}
+
+export function sessionQueueLength(sessionId: string): number {
+	return getState().queues.get(sessionId)?.length ?? 0
 }
 
 export function enqueueCommand(sessionId: string, command: RuntimeCommand): void {
@@ -123,4 +131,25 @@ export function drainQueuedCommands(sessionId?: string | null): RuntimeCommand[]
 		while (q.length > 0) dropped.push(q.shift()!)
 	}
 	return dropped
+}
+
+/** Freeze a session's queue — queued commands stay but won't run. */
+export function pauseSession(sessionId: string): void {
+	getState().paused.add(sessionId)
+}
+
+/** Unfreeze a session's queue and kick the scheduler. */
+export function resumeSession(sessionId: string): void {
+	const s = getState()
+	s.paused.delete(sessionId)
+	const q = s.queues.get(sessionId)
+	if (q && q.length > 0) scheduleSession(s, sessionId)
+}
+
+export function isSessionPaused(sessionId: string): boolean {
+	return getState().paused.has(sessionId)
+}
+
+export function pausedSessionIds(): string[] {
+	return [...getState().paused]
 }

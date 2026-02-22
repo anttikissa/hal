@@ -27,6 +27,15 @@ async function pause(_args: string, client: Client): Promise<void> {
 	client.log('local.queue', 'pause')
 }
 
+async function resume(_args: string, client: Client): Promise<void> {
+	await client.command('resume')
+}
+
+async function drop(_args: string, client: Client): Promise<void> {
+	await client.command('drop')
+}
+
+
 async function handoff(args: string, client: Client): Promise<void> {
 	await client.command('handoff', args || undefined)
 	client.log('local.queue', 'handoff')
@@ -108,6 +117,8 @@ const COMMANDS: Record<string, Handler> = {
 	model,
 	system,
 	pause,
+	resume,
+	drop,
 	handoff,
 	cd,
 	close,

@@ -28,6 +28,7 @@ import {
 	createCommandScheduler,
 	ensureSessionQueue,
 	totalQueuedCommands,
+	pausedSessionIds as getSchedulerPausedIds,
 } from './command-scheduler.ts'
 import { processCommand } from './process-command.ts'
 import { handleCommand } from './handle-command.ts'
@@ -213,6 +214,7 @@ export async function emitStatus(force = false): Promise<void> {
 	await publishStatus(
 		{
 			busySessionIds: sortedBusySessionIds(),
+			pausedSessionIds: getSchedulerPausedIds(),
 			activeSessionId,
 			registryActiveSessionId: registry.activeSessionId ?? null,
 			queueLength: totalQueuedCommands(),

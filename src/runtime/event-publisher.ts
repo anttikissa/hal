@@ -76,6 +76,7 @@ export async function publishPrompt(
 
 export interface StatusSnapshot {
 	busySessionIds: string[]
+	pausedSessionIds: string[]
 	activeSessionId: string | null
 	registryActiveSessionId: string | null
 	queueLength: number
@@ -83,11 +84,17 @@ export interface StatusSnapshot {
 }
 
 export async function publishStatus(snapshot: StatusSnapshot, force = false): Promise<void> {
-	const { busySessionIds, activeSessionId, registryActiveSessionId, queueLength, sessions } =
-		snapshot
+	const {
+		busySessionIds,
+		pausedSessionIds,
+		activeSessionId,
+		registryActiveSessionId,
+		queueLength,
+		sessions,
+	} = snapshot
 	const busy = busySessionIds.length > 0
 	const effectiveActiveId = registryActiveSessionId ?? activeSessionId
-	const key = `${busy}:${queueLength}:${busySessionIds.join(',')}:${effectiveActiveId ?? '-'}`
+	const key = `${busy}:${queueLength}:${busySessionIds.join(',')}:${pausedSessionIds.join(',')}:${effectiveActiveId ?? '-'}`
 	if (!force && key === lastStatus) return
 	lastStatus = key
 
@@ -105,6 +112,7 @@ export async function publishStatus(snapshot: StatusSnapshot, force = false): Pr
 		type: 'status',
 		sessionId: busySessionIds[0] ?? null,
 		busySessionIds,
+		pausedSessionIds,
 		activeSessionId: effectiveActiveId ?? null,
 		busy,
 		queueLength,

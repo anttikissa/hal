@@ -2,7 +2,14 @@ import { stat } from 'fs/promises'
 import { resolve } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
 import { makeSessionId, forkSession } from '../session.ts'
-import { enqueueCommand } from './command-scheduler.ts'
+import {
+	enqueueCommand,
+	pauseSession,
+	resumeSession,
+	isSessionPaused,
+	sessionQueueLength,
+	drainQueuedCommands as drainSchedulerQueue,
+} from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
 import { dropQueuedCommands } from './handle-command.ts'
 import {
@@ -99,7 +106,17 @@ async function runPause(sessionId: string | null): Promise<void> {
 	if (!runtime) return
 	runtime.pausedByUser = true
 	runtime.activeAbort?.abort()
-	await publishLine('[pause] generation paused', 'warn', sessionId)
+	pauseSession(sessionId)
+	const queued = sessionQueueLength(sessionId)
+	if (queued > 0) {
+		await publishLine(
+			`[pause] paused — ${queued} queued message(s). Enter to resume, /drop to clear.`,
+			'warn',
+			sessionId,
+		)
+	} else {
+		await publishLine('[pause] generation paused', 'warn', sessionId)
+	}
 }
 
 export async function processCommand(command: RuntimeCommand): Promise<void> {
@@ -114,6 +131,57 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		await emitStatus(true)
 		return
 	}
+
+	// Resume: unfreeze queue, let scheduler continue
+	if (command.type === 'resume') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (sessionId && isSessionPaused(sessionId)) {
+			const runtime = getCachedSessionRuntime(sessionId)
+			if (runtime) runtime.pausedByUser = false
+			const queued = sessionQueueLength(sessionId)
+			resumeSession(sessionId)
+			if (queued > 0) {
+				await publishLine(
+					`[resume] processing ${queued} queued message(s)`,
+					'status',
+					sessionId,
+				)
+			}
+		}
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
+		await emitStatus(true)
+		return
+	}
+
+	// Drop: clear queued commands
+	if (command.type === 'drop') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (sessionId) {
+			const dropped = drainSchedulerQueue(sessionId)
+			for (const cmd of dropped) {
+				await publishCommandPhase(cmd.id, 'failed', 'dropped by user', sessionId)
+			}
+			if (dropped.length > 0) {
+				await publishLine(
+					`[drop] cleared ${dropped.length} queued message(s)`,
+					'warn',
+					sessionId,
+				)
+			} else {
+				await publishLine('[drop] queue is empty', 'status', sessionId)
+			}
+			// Unpause since there's nothing to resume
+			const runtime = getCachedSessionRuntime(sessionId)
+			if (runtime) runtime.pausedByUser = false
+			resumeSession(sessionId)
+		}
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
+		await emitStatus(true)
+		return
+	}
+
 
 	// Fork: handled immediately (not queued) — refuse if session is busy
 	if (command.type === 'fork') {
@@ -171,6 +239,10 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 				sessionId,
 			)
 		}
+		// Reset always clears paused state
+		const runtime = getCachedSessionRuntime(sessionId)
+		if (runtime) runtime.pausedByUser = false
+		resumeSession(sessionId)
 	}
 
 	if (!sessionId) {
@@ -185,6 +257,14 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 
 	enqueueCommand(sessionId, command)
 	await publishCommandPhase(command.id, 'queued', undefined, sessionId)
+
+	// Auto-resume: sending a new prompt while paused means you're ready to continue
+	if (command.type === 'prompt' && isSessionPaused(sessionId)) {
+		const runtime = getCachedSessionRuntime(sessionId)
+		if (runtime) runtime.pausedByUser = false
+		resumeSession(sessionId)
+	}
+
 	// Note: don't emitStatus here — the scheduler callback emits status before and
 	// after handleCommand. Emitting here would race with publishActivity inside
 	// command handlers (e.g. handoff), causing the client to reset busy state.

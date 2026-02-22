@@ -86,6 +86,7 @@ interface CliTab {
 	contextStatus: string | null
 	activity: string
 	busy: boolean
+	paused: boolean
 	inputHistory: string[]
 }
 
@@ -195,7 +196,14 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			if (input === null) break
 			const trimmed = input.trim()
 			const normalized = normalizeCommandInput(input)
-			if (!trimmed) continue
+			// Empty Enter while paused = resume queue
+			if (!trimmed) {
+				const tab = activeTab()
+				if (tab?.paused) {
+					await client.command('resume')
+				}
+				continue
+			}
 			if (isExit(normalized)) break
 			wasBusyOnLastSubmit = activeTab()?.busy ?? false
 			await handleCommand(input, client)
@@ -241,6 +249,7 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 			contextStatus: null,
 			activity: '',
 			busy: false,
+			paused: false,
 			inputHistory: [],
 		},
 	]
@@ -342,6 +351,7 @@ async function createTab(): Promise<void> {
 		contextStatus: null,
 		activity: '',
 		busy: false,
+		paused: false,
 		inputHistory: [],
 	})
 
@@ -416,6 +426,7 @@ function syncTabsFromSessions(
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
 			activity: preserveActiveOutput ? (existing?.activity ?? '') : '',
 			busy: preserveActiveOutput ? (existing?.busy ?? false) : false,
+			paused: preserveActiveOutput ? (existing?.paused ?? false) : false,
 			inputHistory: existing?.inputHistory ?? [],
 		}
 	})
@@ -485,6 +496,7 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		contextStatus: null,
 		activity: '',
 		busy: false,
+		paused: false,
 		inputHistory: [],
 	}
 
@@ -599,11 +611,13 @@ function render(event: RuntimeEvent): void {
 				tab.busy = event.activity !== ''
 			}
 		} else {
-			// Full status update — sync per-tab busy state from busySessionIds
+			// Full status update — sync per-tab busy and paused state
 			const busySet = new Set(event.busySessionIds ?? [])
+			const pausedSet = new Set(event.pausedSessionIds ?? [])
 			for (const tab of tabs) {
 				const wasBusy = tab.busy
 				tab.busy = busySet.has(tab.sessionId)
+				tab.paused = pausedSet.has(tab.sessionId)
 				if (!tab.busy && wasBusy) tab.activity = ''
 			}
 		}
@@ -611,7 +625,11 @@ function render(event: RuntimeEvent): void {
 		// Only update the displayed activity line based on the active tab
 		const active = activeTab()
 		if (active) {
-			setActivityLine(active.busy ? active.activity || 'Working...' : '')
+			if (active.paused) {
+				setActivityLine('Paused — Enter to resume, /drop to clear queue')
+			} else {
+				setActivityLine(active.busy ? active.activity || 'Working...' : '')
+			}
 		}
 
 		renderBusyStatus()

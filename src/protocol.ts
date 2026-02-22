@@ -6,6 +6,8 @@ export type { SessionInfo }
 export type CommandType =
 	| 'prompt'
 	| 'pause'
+	| 'resume'
+	| 'drop'
 	| 'handoff'
 	| 'reset'
 	| 'close'
@@ -69,6 +71,7 @@ export type RuntimeEvent =
 			type: 'status'
 			sessionId: string | null
 			busySessionIds?: string[]
+			pausedSessionIds?: string[]
 			activeSessionId: string | null
 			busy: boolean
 			queueLength: number
