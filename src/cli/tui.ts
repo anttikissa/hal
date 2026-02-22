@@ -112,6 +112,81 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 
+// Streaming word-wrapper: tracks column position across writes,
+// inserts line breaks at word boundaries when a line would overflow.
+const ANSI_ESC_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
+let wrapCol = 0
+
+function resetWrapCol(): void {
+	wrapCol = 0
+}
+
+/** Visible length of a string (ignoring ANSI escapes) */
+function visibleLength(s: string): number {
+	return s.replace(ANSI_ESC_RE, '').length
+}
+
+/**
+ * Word-wrap text for output, tracking column position across streaming writes.
+ * Breaks at spaces when a word would overflow the terminal width.
+ * Preserves ANSI escape sequences (zero-width).
+ */
+function wrapOutputText(text: string, width: number): string {
+	if (width <= 0) return text
+	let out = ''
+	let i = 0
+	while (i < text.length) {
+		// Pass through ANSI escape sequences without counting width
+		const escMatch = text.slice(i).match(/^\x1b\[[0-9;?]*[ -/]*[@-~]/)
+		if (escMatch) {
+			out += escMatch[0]
+			i += escMatch[0].length
+			continue
+		}
+
+		const ch = text[i]
+		i++
+
+		if (ch === '\n') {
+			out += '\n'
+			wrapCol = 0
+			continue
+		}
+
+		// At a space: if next word would overflow, break before it
+		if (ch === ' ') {
+			// Peek ahead to find next word length
+			let wordLen = 0
+			let j = i
+			while (j < text.length) {
+				const esc2 = text.slice(j).match(/^\x1b\[[0-9;?]*[ -/]*[@-~]/)
+				if (esc2) { j += esc2[0].length; continue }
+				if (text[j] === ' ' || text[j] === '\n') break
+				wordLen++
+				j++
+			}
+			if (wrapCol + 1 + wordLen > width && wrapCol > 0) {
+				out += '\n'
+				wrapCol = 0
+				continue // skip the space at break point
+			}
+			out += ' '
+			wrapCol++
+			continue
+		}
+
+		// Hard break if a single long word exceeds width
+		if (wrapCol >= width) {
+			out += '\n'
+			wrapCol = 0
+		}
+		out += ch
+		wrapCol++
+	}
+	return out
+}
+
+
 function rawWrite(text: string): void {
 	process.stdout.write(text.replace(/\n/g, '\r\n'))
 }
@@ -309,7 +384,24 @@ function fullRedrawFooter(): void {
 	showCursor()
 }
 
+let footerRedrawScheduled = false
+
+/** Debounced footer redraw — coalesces rapid calls (e.g. keystrokes) into one. */
 function redrawFooter(): void {
+	if (footerRedrawScheduled) return
+	footerRedrawScheduled = true
+	queueMicrotask(redrawFooterNow)
+}
+
+/** Immediate footer redraw — used by writeToOutput where cursor state matters. */
+function redrawFooterSync(): void {
+	footerRedrawScheduled = false
+	redrawFooterNow()
+}
+
+function redrawFooterNow(): void {
+	footerRedrawScheduled = false
+	if (!initialized || ended || suspended) return
 	const newH = footerHeight()
 	if (newH !== lastFooterH) {
 		fullRedrawFooter()
@@ -744,19 +836,20 @@ const onStdinEnd = () => {
 
 function writeToOutput(text: string): void {
 	if (!text) return
+	const wrapped = wrapOutputText(text, cols() - 1) // -1 for right margin safety
 	hideCursor()
 	if (outputCursorSaved) restoreCursor()
 	else {
 		moveTo(outputCursorRow, 1)
 		outputCursorSaved = true
 	}
-	rawWrite(text)
-	const newlines = (text.match(/\n/g) || []).length
+	rawWrite(wrapped)
+	const newlines = (wrapped.match(/\n/g) || []).length
 	if (newlines > 0) outputCursorRow = Math.min(outputCursorRow + newlines, outputBottom())
 	saveCursor()
 	redrawFooter()
 	showCursor()
-	transcript += text
+	transcript += wrapped
 }
 
 function onResize(): void {
@@ -872,6 +965,7 @@ export function clearOutput(): void {
 	transcript = ''
 	outputCursorRow = 1
 	outputCursorSaved = false
+	resetWrapCol()
 	if (process.stdout.isTTY) {
 		const bottom = outputBottom()
 		for (let r = 1; r <= bottom; r++) {
