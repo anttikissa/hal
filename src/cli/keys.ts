@@ -4,6 +4,7 @@
 
 export const CTRL_T_KEYS = new Set(['\x14', '\x1b[116;5u'])
 export const CTRL_W_KEYS = new Set(['\x17', '\x1b[119;5u'])
+export const CTRL_F_KEYS = new Set(['\x06', '\x1b[102;5u'])
 
 export const CTRL_DIGIT_KEYS: Record<string, number> = {
 	'\x1b[49;5u': 1,

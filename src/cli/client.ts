@@ -35,6 +35,7 @@ import { pushEvent, pushFragment, resetFormat, stripAnsi } from './format.ts'
 import {
 	ALT_DIGIT_KEYS,
 	CTRL_DIGIT_KEYS,
+	CTRL_F_KEYS,
 	CTRL_NEXT_TAB,
 	CTRL_PREV_TAB,
 	CTRL_T_KEYS,
@@ -284,6 +285,11 @@ function handleInputKey(key: string): boolean {
 		void closeActiveTab()
 		return true
 	}
+	// Ctrl-F: fork current tab
+	if (CTRL_F_KEYS.has(key)) {
+		void forkTab()
+		return true
+	}
 
 	const digit = CTRL_DIGIT_KEYS[key] ?? ALT_DIGIT_KEYS[key]
 	if (digit) {
@@ -331,7 +337,7 @@ async function createTab(): Promise<void> {
 	activeTabIndex = tabs.length - 1
 	applyActiveTabSnapshot(true)
 	pushLocal('local.tab', `[tab] opened ${activeTabIndex + 1}: ${launchCwd}`)
-	let hint = '[tabs] Switch: Alt-1..9 | Cycle: Ctrl-P/N | Close: Ctrl-W'
+	let hint = '[tabs] Switch: Alt-1..9 | Cycle: Ctrl-P/N | Fork: Ctrl-F | Close: Ctrl-W'
 	if (process.platform === 'darwin') {
 		const term = process.env.TERM_PROGRAM ?? ''
 		if (term === 'iTerm.app')
@@ -352,6 +358,17 @@ async function closeActiveTab(): Promise<void> {
 	}
 	await appendBusCommand(makeCommand('close', source, undefined, active.sessionId))
 	pushLocal('local.queue', `close tab ${active.sessionId.slice(0, 8)}`)
+}
+
+async function forkTab(): Promise<void> {
+	const active = activeTab()
+	if (!active) return
+	if (tabs.length >= 9) {
+		pushLocal('local.warn', '[tabs] max 9 tabs')
+		return
+	}
+	await appendBusCommand(makeCommand('fork', source, undefined, active.sessionId))
+	pushLocal('local.queue', 'fork')
 }
 
 function syncTabsFromSessions(
