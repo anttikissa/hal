@@ -1,6 +1,5 @@
-import { mkdtempSync } from 'fs'
+import { mkdirSync, mkdtempSync } from 'fs'
 import { join } from 'path'
-import { tmpdir } from 'os'
 
 const rawArgs = process.argv.slice(2)
 const argv = new Set(rawArgs)
@@ -30,6 +29,8 @@ export const headless = has('--headless')
 
 export const fresh = has('-f', '--fresh')
 if (fresh) {
-	const dir = mkdtempSync(join(tmpdir(), 'hal-state-'))
+	const base = '/tmp/hal/state'
+	mkdirSync(base, { recursive: true })
+	const dir = mkdtempSync(join(base, '/'))
 	process.env.HAL_STATE_DIR = dir
 }
