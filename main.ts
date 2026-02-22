@@ -32,6 +32,14 @@ initBus()
 await ensureBus()
 await initDebugLog(process.pid)
 
+// Startup perf: read epoch saved by run script
+const startupEpochFile = `/tmp/hal-startup-${process.ppid}.txt`
+let startupEpoch: number | null = null
+try {
+	const raw = await Bun.file(startupEpochFile).text()
+	startupEpoch = parseInt(raw.trim(), 10)
+} catch {}
+
 const configuredWebPort = Number.parseInt(process.env.HAL_WEB_PORT ?? '9001', 10)
 const webPort =
 	Number.isFinite(configuredWebPort) && configuredWebPort > 0 ? configuredWebPort : 9001
@@ -181,6 +189,11 @@ if (isOwner) {
 	})
 }
 
+if (startupEpoch) {
+	const elapsed = Date.now() - startupEpoch
+	await emitBootstrap(`[perf] startup: ${elapsed}ms`)
+}
+
 if (headless) {
 	if (!isOwner) {
 		await emitBootstrap('[runtime] --headless but not owner; exiting', 'warn')
@@ -240,7 +253,6 @@ if (headless) {
 				break
 			}
 		}
-
 
 		startRuntime(ownerId).catch(async (e) => {
 			await emitBootstrap(`[engine] crashed: ${e.message || e}`, 'error')

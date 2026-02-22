@@ -6,6 +6,7 @@ export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
 cd "$HAL_DIR" || exit 1
 
 while true; do
+	echo $(($(date +%s%N)/1000000)) > "/tmp/hal-startup-$$.txt"
 	bun main.ts "$@"
 	code=$?
 	[ "$code" -ne 100 ] && exit "$code"
