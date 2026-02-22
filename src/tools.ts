@@ -24,9 +24,24 @@ function contentPreview(text: string): string {
 	return show.join('\n') + suffix
 }
 
+/** Cap output for TUI display: show head + tail with omission note */
+function displayPreview(text: string, maxLines = MAX_DISPLAY_LINES): string {
+	const lines = text.split('\n')
+	if (lines.length <= maxLines) return text
+	const headCount = Math.ceil(maxLines / 2)
+	const tailCount = maxLines - headCount
+	const omitted = lines.length - headCount - tailCount
+	return [
+		...lines.slice(0, headCount),
+		`[${omitted} lines omitted]`,
+		...lines.slice(-tailCount),
+	].join('\n')
+}
+
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
 const MAX_LINE_LEN = 2000
+const MAX_DISPLAY_LINES = 15 // max lines shown in TUI scroll buffer
 const TOOL_OUTPUT_DIR = '/tmp/hal/tool-output'
 
 async function truncateOutput(
@@ -348,10 +363,10 @@ async function _runTool(
 		const { text, truncated, fullPath } = await truncateOutput(output, 'tail')
 		if (truncated) {
 			await logger(shortenHome(`[truncated -> ${fullPath}]`), 'warn')
-			const preview = raw.split('\n').slice(-50).join('\n')
+			const preview = displayPreview(raw.split('\n').slice(-50).join('\n'))
 			if (preview) await logger(preview, 'tool')
 		} else {
-			if (raw) await logger(raw, 'tool')
+			if (raw) await logger(displayPreview(raw), 'tool')
 		}
 		return text || '(empty)'
 	}
