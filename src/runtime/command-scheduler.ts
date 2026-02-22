@@ -117,6 +117,12 @@ export function sessionQueuedCommands(sessionId: string): readonly RuntimeComman
 	return getState().queues.get(sessionId) ?? []
 }
 
+export function concurrencyStatus(): { running: number; max: number } {
+	const s = getState()
+	return { running: s.running.size, max: s.maxConcurrent }
+}
+
+
 
 export function enqueueCommand(sessionId: string, command: RuntimeCommand): void {
 	const s = getState()

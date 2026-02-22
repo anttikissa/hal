@@ -11,6 +11,7 @@ import {
 	sessionQueuedCommands,
 	drainQueuedCommands as drainSchedulerQueue,
 	removeSessionQueue,
+	concurrencyStatus,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
 import { dropQueuedCommands, runClose } from './handle-command.ts'
@@ -281,6 +282,16 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 
 	enqueueCommand(sessionId, command)
 	await publishCommandPhase(command.id, 'queued', undefined, sessionId)
+
+	// Notify if command won't start immediately because all slots are full
+	const { running, max } = concurrencyStatus()
+	if (running >= max && !isSessionBusy(sessionId)) {
+		await publishLine(
+			`[queue] ${running}/${max} sessions busy — will run when a slot opens`,
+			'status',
+			sessionId,
+		)
+	}
 
 	// Auto-resume: sending a new prompt while paused means you're ready to continue
 	if (command.type === 'prompt' && isSessionPaused(sessionId)) {
