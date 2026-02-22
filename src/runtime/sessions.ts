@@ -256,13 +256,13 @@ async function initialize(): Promise<void> {
 		const totalTokens = sysTokenEst + msgTokens
 		const pct = ((totalTokens / MAX_CONTEXT) * 100).toFixed(0)
 		await publishLine(
-			`[session] restored ${runtime.messages.length} messages (~${pct}% context)`,
+			`[session] restored ${runtime.messages.length} messages (~${pct}% context) — ${sessionDir(initialSessionId)}`,
 			'status',
 			initialSessionId,
 		)
 	} else {
 		await publishLine(
-			`[session] new session — ${initialSessionId}`,
+			`[session] new session — ${sessionDir(initialSessionId)}`,
 			'status',
 			initialSessionId,
 		)
