@@ -162,9 +162,8 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 	await bootstrapState()
 	if (options?.startupEpoch) {
 		const elapsed = Date.now() - options.startupEpoch
-		if (elapsed > 100) {
-			pushLocal('local.warn', `[perf] slow startup: ${elapsed}ms`)
-		}
+		const level = elapsed > 100 ? 'local.warn' : 'local.status'
+		pushLocal(level, `[perf] startup: ${elapsed}ms`)
 	}
 
 	void (async () => {
