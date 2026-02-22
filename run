@@ -5,19 +5,36 @@ export LAUNCH_CWD="${LAUNCH_CWD:-$(pwd)}"
 export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
 cd "$HAL_DIR" || exit 1
 
-# If -f/--fresh, create a temp state dir once and reuse across restarts.
+# If -f/--fresh, create a 4-char alphanumeric temp state dir once
+# and reuse it across restarts. Strip -f so args.ts doesn't re-create.
+pass_args=()
 for arg in "$@"; do
 	if [[ "$arg" == "-f" || "$arg" == "--fresh" ]]; then
-		base="/tmp/hal/state"
-		mkdir -p "$base"
-		export HAL_STATE_DIR=$(mktemp -d "$base/XXXXXX")
-		break
+		if [[ -z "$_hal_fresh_dir" ]]; then
+			base="/tmp/hal/state"
+			mkdir -p "$base"
+			_hal_fresh_dir=$(perl -e '
+				my @c = ("a".."z","A".."Z",0..9);
+				for (1..100) {
+					my $id = join "", map { $c[rand @c] } 1..4;
+					my $d = "'"$base"'/$id";
+					next if -d $d;
+					mkdir $d or next;
+					print $d;
+					exit 0;
+				}
+				die "could not create unique dir";
+			')
+			export HAL_STATE_DIR="$_hal_fresh_dir"
+		fi
+	else
+		pass_args+=("$arg")
 	fi
 done
 
 while true; do
 	perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000' > "/tmp/hal-startup-$$.txt"
-	bun main.ts "$@"
+	bun main.ts "${pass_args[@]}"
 	code=$?
 	[ "$code" -ne 100 ] && exit "$code"
 done

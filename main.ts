@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { fresh, headless, testMode } from './src/args.ts'
+import { headless, testMode } from './src/args.ts'
 import { randomBytes } from 'crypto'
 import {
 	appendEvent,
@@ -119,7 +119,7 @@ function findSuspendedHalProcesses(port: number): { pid: number; command: string
 
 if (isOwner) {
 	await resetBusEvents()
-	if (fresh) await emitBootstrap(`[fresh] state dir: ${STATE_DIR}`)
+	if (STATE_DIR.startsWith('/tmp/hal/state/')) await emitBootstrap(`[fresh] state dir: ${STATE_DIR}`)
 	try {
 		webServer = startWebServer(webPort)
 		await emitBootstrap(`[web] http://localhost:${webServer.port}`)
