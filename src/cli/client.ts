@@ -44,6 +44,7 @@ import {
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { loadInputHistory, saveInputHistory } from '../session.ts'
+import { countSourceStats } from '../utils/cloc.ts'
 
 import { loadConfig, MODEL_ALIASES } from '../config.ts'
 
@@ -638,33 +639,4 @@ function renderBusyStatus(): void {
 	const contextOnly = lastContextStatus?.replace(/^\[context\]\s*/, '') ?? ''
 	const parts = [roleLabel, contextOnly].filter(Boolean)
 	setStatusLine(tabStr, parts.join('  '))
-}
-
-async function countSourceStats(dir: string): Promise<{ files: number; lines: number }> {
-	let files = 0
-	let code = 0
-	const countFile = async (path: string) => {
-		files++
-		const content = await Bun.file(path).text()
-		let inBlock = false
-		for (const line of content.split('\n')) {
-			const t = line.trim()
-			if (inBlock) {
-				if (t.includes('*/')) inBlock = false
-				continue
-			}
-			if (!t || t.startsWith('//')) continue
-			if (t.startsWith('/*')) {
-				if (!t.includes('*/')) inBlock = true
-				continue
-			}
-			code++
-		}
-	}
-	const glob = new Bun.Glob('**/*.ts')
-	for await (const path of glob.scan({ cwd: `${dir}/src`, onlyFiles: true })) {
-		await countFile(`${dir}/src/${path}`)
-	}
-	await countFile(`${dir}/main.ts`)
-	return { files, lines: code }
 }
