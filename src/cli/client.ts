@@ -348,7 +348,7 @@ async function createTab(): Promise<void> {
 	activeTabIndex = tabs.length - 1
 	applyActiveTabSnapshot(true)
 	pushLocal('local.tab', `[tab] opened ${activeTabIndex + 1}: ${launchCwd}`)
-	let hint = '[tabs] Switch: Alt-1..9 | Cycle: Ctrl-P/N | Fork: Ctrl-F | Close: Ctrl-W'
+	let hint = '[tabs] Switch: Alt-1..9 | Cycle: Ctrl-P/N or Ctrl-PgUp/PgDn | Fork: Ctrl-F | Close: Ctrl-W'
 	if (process.platform === 'darwin') {
 		const term = process.env.TERM_PROGRAM ?? ''
 		if (term === 'iTerm.app')

@@ -1,6 +1,6 @@
 // Key sequence constants for tab management.
-// Each set contains both the legacy byte and the kitty keyboard protocol
-// sequence (CSI u encoding) for the same logical key.
+// Each set contains the legacy byte, kitty CSI u encoding, and common
+// terminal variants (Ctrl-PageUp/Down, Ctrl-Tab/Ctrl-Shift-Tab).
 
 export const CTRL_T_KEYS = new Set(['\x14', '\x1b[116;5u'])
 export const CTRL_W_KEYS = new Set(['\x17', '\x1b[119;5u'])
@@ -39,5 +39,5 @@ export const ALT_DIGIT_KEYS: Record<string, number> = {
 	'\x1b[57;3u': 9,
 }
 
-export const CTRL_PREV_TAB = new Set(['\x10', '\x1b[112;5u'])
-export const CTRL_NEXT_TAB = new Set(['\x0e', '\x1b[110;5u'])
+export const CTRL_PREV_TAB = new Set(['\x10', '\x1b[112;5u', '\x1b[5;5~', '\x1b[9;6u'])
+export const CTRL_NEXT_TAB = new Set(['\x0e', '\x1b[110;5u', '\x1b[6;5~', '\x1b[9;5u'])
