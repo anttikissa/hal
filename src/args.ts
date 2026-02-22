@@ -1,7 +1,3 @@
-import { existsSync, mkdirSync } from 'fs'
-import { join } from 'path'
-import { randomBytes } from 'crypto'
-
 const rawArgs = process.argv.slice(2)
 const argv = new Set(rawArgs)
 const has = (...flags: string[]) => flags.some((f) => argv.has(f))
@@ -35,18 +31,6 @@ export const testMode = has('--test')
 // This path covers standalone `bun main.ts -f` and --test.
 export const fresh = has('-f', '--fresh') || testMode
 if (fresh && !process.env.HAL_STATE_DIR) {
-	const base = '/tmp/hal/state'
-	mkdirSync(base, { recursive: true })
-	const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-	for (let attempt = 0; attempt < 100; attempt++) {
-		const id = Array.from(randomBytes(4))
-			.map((b) => chars[b % chars.length])
-			.join('')
-		const dir = join(base, id)
-		if (!existsSync(dir)) {
-			mkdirSync(dir)
-			process.env.HAL_STATE_DIR = dir
-			break
-		}
-	}
+	const { makeFreshDir } = await import('./fresh-dir.ts')
+	process.env.HAL_STATE_DIR = makeFreshDir()
 }

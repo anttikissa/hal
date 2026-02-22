@@ -10,23 +10,8 @@ cd "$HAL_DIR" || exit 1
 pass_args=()
 for arg in "$@"; do
 	if [[ "$arg" == "-f" || "$arg" == "--fresh" ]]; then
-		if [[ -z "$_hal_fresh_dir" ]]; then
-			base="/tmp/hal/state"
-			mkdir -p "$base"
-			_hal_fresh_dir=$(perl -e '
-				my @c = ("a".."z","A".."Z",0..9);
-				for (1..100) {
-					my $id = join "", map { $c[rand @c] } 1..4;
-					my $d = "'"$base"'/$id";
-					next if -d $d;
-					mkdir $d or next;
-					print $d;
-					exit 0;
-				}
-				die "could not create unique dir";
-			')
-			export HAL_STATE_DIR="$_hal_fresh_dir"
-		fi
+		[[ -z "$_hal_fresh_dir" ]] && _hal_fresh_dir=$(bun src/fresh-dir.ts)
+		export HAL_STATE_DIR="$_hal_fresh_dir"
 	else
 		pass_args+=("$arg")
 	fi
