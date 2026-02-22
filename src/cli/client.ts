@@ -646,15 +646,19 @@ async function countSourceStats(dir: string): Promise<{ files: number; lines: nu
 	const countFile = async (path: string) => {
 		files++
 		const content = await Bun.file(path).text()
+		let inBlock = false
 		for (const line of content.split('\n')) {
-			const trimmed = line.trim()
-			if (
-				trimmed &&
-				!trimmed.startsWith('//') &&
-				!trimmed.startsWith('/*') &&
-				!trimmed.startsWith('*')
-			)
-				code++
+			const t = line.trim()
+			if (inBlock) {
+				if (t.includes('*/')) inBlock = false
+				continue
+			}
+			if (!t || t.startsWith('//')) continue
+			if (t.startsWith('/*')) {
+				if (!t.includes('*/')) inBlock = true
+				continue
+			}
+			code++
 		}
 	}
 	const glob = new Bun.Glob('**/*.ts')
