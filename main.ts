@@ -9,7 +9,7 @@ import {
 	releaseOwner,
 	resetBusEvents,
 } from './src/ipc.ts'
-import { startRuntime } from './src/runtime/sessions.ts'
+import { startRuntime, saveAllSessions } from './src/runtime/sessions.ts'
 import {
 	init as initClient,
 	start as startClient,
@@ -197,6 +197,7 @@ if (headless) {
 	await emitBootstrap('[runtime] headless mode', 'status')
 	const shutdown = async () => {
 		if (webServer) webServer.stop()
+		await saveAllSessions()
 		await releaseOwner(ownerId)
 		process.exit(0)
 	}
@@ -262,16 +263,23 @@ if (headless) {
 		ownerWatchTimer = setInterval(() => tryPromote(), 5000)
 	}
 
+	const shutdown = async (code: number) => {
+		if (ownerWatchTimer) clearInterval(ownerWatchTimer)
+		if (webServer) webServer.stop()
+		if (isOwner || promoted) {
+			await saveAllSessions()
+			await releaseOwner(ownerId)
+		}
+		process.exit(code)
+	}
+
 	process.on('SIGINT', () => {
 		if (exitingViaSigint) return
 		exitingViaSigint = true
-		void (async () => {
-			if (ownerWatchTimer) clearInterval(ownerWatchTimer)
-			if (webServer) webServer.stop()
-			if (isOwner || promoted) await releaseOwner(ownerId)
-			process.exit(100)
-		})()
+		void shutdown(100)
 	})
+	process.on('SIGHUP', () => void shutdown(0))
+	process.on('SIGTERM', () => void shutdown(0))
 
 	try {
 		exitCode = await startClient({ startupEpoch })
@@ -280,8 +288,5 @@ if (headless) {
 		await emitBootstrap(`[cli] crashed: ${e?.message || e}`, 'error')
 	}
 
-	if (ownerWatchTimer) clearInterval(ownerWatchTimer)
-	if (webServer) webServer.stop()
-	if (isOwner || promoted) await releaseOwner(ownerId)
-	process.exit(exitCode)
+	await shutdown(exitCode)
 }

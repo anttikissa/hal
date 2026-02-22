@@ -14,6 +14,7 @@ import {
 	loadHandoff,
 	loadSessionRegistry,
 	makeSessionId,
+	saveSession,
 	saveSessionRegistry,
 	timeSince,
 	type SessionRegistry,
@@ -121,6 +122,14 @@ export function getRegistry(): SessionRegistry {
 }
 
 export async function persistRegistry(): Promise<void> {
+	await saveSessionRegistry(registry)
+}
+
+/** Save all in-memory session state to disk. Called on shutdown. */
+export async function saveAllSessions(): Promise<void> {
+	for (const [id, runtime] of sessionCache) {
+		await saveSession(id, runtime.messages, runtime.tokenTotals)
+	}
 	await saveSessionRegistry(registry)
 }
 
