@@ -2,7 +2,7 @@ import { resolve } from 'path'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 
-const SOURCE_DIR = resolve(import.meta.dir, '../..')
+const SOURCE_DIR = resolve(import.meta.dir, '../../..')
 
 export interface TestHal {
 	/** Send a line to stdin (prompt or /command) */
