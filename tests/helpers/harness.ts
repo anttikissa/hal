@@ -1,8 +1,8 @@
 import { resolve } from 'path'
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 
-const HAL_DIR = resolve(import.meta.dir, '../..')
+const SOURCE_DIR = resolve(import.meta.dir, '../..')
 
 export interface TestHal {
 	/** Send a line to stdin (prompt or /command) */
@@ -20,15 +20,21 @@ export interface TestHal {
 }
 
 export async function startHal(options?: { env?: Record<string, string> }): Promise<TestHal> {
-	// Each test gets its own isolated state dir so tests never touch live state
-	const stateDir = mkdtempSync(resolve(tmpdir(), 'hal-test-'))
+	// Fully isolated: both HAL_DIR and HAL_STATE_DIR point to a temp dir
+	// so tests never read or write the real config, auth, or state files
+	const halDir = mkdtempSync(resolve(tmpdir(), 'hal-test-'))
+	const stateDir = `${halDir}/state`
+	mkdirSync(stateDir, { recursive: true })
+
+	// Seed minimal config so tests don't inherit the user's real config
+	writeFileSync(`${halDir}/config.ason`, "{ model: 'anthropic/claude-opus-4-6' }\n")
 
 	const proc = Bun.spawn(['bun', 'main.ts', '--test'], {
-		cwd: HAL_DIR,
+		cwd: SOURCE_DIR,
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'inherit',
-		env: { ...process.env, HAL_STATE_DIR: stateDir, ...options?.env },
+		env: { ...process.env, HAL_DIR: halDir, HAL_STATE_DIR: stateDir, ...options?.env },
 	})
 
 	const records: any[] = []
@@ -114,9 +120,9 @@ export async function startHal(options?: { env?: Record<string, string> }): Prom
 			proc.stdin.end()
 		} catch {}
 		const exitCode = await proc.exited
-		// Clean up isolated state dir
+		// Clean up entire isolated hal dir (includes state)
 		try {
-			rmSync(stateDir, { recursive: true, force: true })
+			rmSync(halDir, { recursive: true, force: true })
 		} catch {}
 		return { exitCode }
 	}

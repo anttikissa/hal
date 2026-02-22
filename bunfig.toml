@@ -1,3 +1,4 @@
 [test]
-# bare `bun test` only scans src/; use `bun run test` for full suite (src + tests)
+# Bun has no test exclude/ignore support, so we restrict root to src/.
+# Use `bun run test` (not bare `bun test`) for the full suite (src + tests).
 root = "src"
