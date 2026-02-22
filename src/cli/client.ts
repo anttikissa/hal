@@ -121,6 +121,7 @@ const client = new Client()
 let tabs: CliTab[] = []
 let activeTabIndex = 0
 let launchCwd = ''
+let pendingForkOutput: string | null = null
 
 export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src
@@ -376,6 +377,8 @@ async function forkTab(): Promise<void> {
 		pushLocal('local.warn', '[tabs] max 9 tabs')
 		return
 	}
+	captureActiveOutput()
+	pendingForkOutput = active.output
 	await appendBusCommand(makeCommand('fork', source, undefined, active.sessionId))
 	pushLocal('local.queue', 'fork')
 }
@@ -392,13 +395,18 @@ function syncTabsFromSessions(
 	const previousById = new Map(tabs.map((t) => [t.sessionId, t]))
 	const previousActive = activeTab()?.sessionId ?? null
 
+	const forkOutput = pendingForkOutput
+	pendingForkOutput = null
+
 	tabs = sessions.slice(0, 9).map((session) => {
 		const existing = previousById.get(session.id)
+		// New tab from fork: seed with the source tab's output
+		const isNewFromFork = !existing && forkOutput !== null
 		return {
 			sessionId: session.id,
 			workingDir: session.workingDir,
 			name: sessionName(session),
-			output: preserveActiveOutput ? (existing?.output ?? '') : '',
+			output: preserveActiveOutput ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
 			activity: preserveActiveOutput ? (existing?.activity ?? '') : '',
 			busy: preserveActiveOutput ? (existing?.busy ?? false) : false,
