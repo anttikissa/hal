@@ -113,6 +113,11 @@ export function sessionQueueLength(sessionId: string): number {
 	return getState().queues.get(sessionId)?.length ?? 0
 }
 
+export function sessionQueuedCommands(sessionId: string): readonly RuntimeCommand[] {
+	return getState().queues.get(sessionId) ?? []
+}
+
+
 export function enqueueCommand(sessionId: string, command: RuntimeCommand): void {
 	const s = getState()
 	getOrCreateQueue(s, sessionId).push(command)

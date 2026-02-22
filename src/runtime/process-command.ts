@@ -8,6 +8,7 @@ import {
 	resumeSession,
 	isSessionPaused,
 	sessionQueueLength,
+	sessionQueuedCommands,
 	drainQueuedCommands as drainSchedulerQueue,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
@@ -182,6 +183,26 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		return
 	}
 
+	// Queue: show queued commands for this session
+	if (command.type === 'queue') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (sessionId) {
+			const queued = sessionQueuedCommands(sessionId)
+			if (queued.length === 0) {
+				await publishLine('[queue] empty', 'status', sessionId)
+			} else {
+				await publishLine(`[queue] ${queued.length} message(s):`, 'status', sessionId)
+				for (let i = 0; i < queued.length; i++) {
+					const text = queued[i].text ?? queued[i].type
+					const preview = text.length > 80 ? text.slice(0, 77) + '...' : text
+					await publishLine(`  ${i + 1}. ${preview}`, 'status', sessionId)
+				}
+			}
+		}
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
+		return
+	}
 
 	// Fork: handled immediately (not queued) — refuse if session is busy
 	if (command.type === 'fork') {

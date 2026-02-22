@@ -35,6 +35,9 @@ async function drop(_args: string, client: Client): Promise<void> {
 	await client.command('drop')
 }
 
+async function queue(_args: string, client: Client): Promise<void> {
+	await client.command('queue')
+}
 
 async function handoff(args: string, client: Client): Promise<void> {
 	await client.command('handoff', args || undefined)
@@ -119,6 +122,7 @@ const COMMANDS: Record<string, Handler> = {
 	pause,
 	resume,
 	drop,
+	queue,
 	handoff,
 	cd,
 	close,

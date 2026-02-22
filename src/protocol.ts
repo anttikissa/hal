@@ -8,6 +8,7 @@ export type CommandType =
 	| 'pause'
 	| 'resume'
 	| 'drop'
+	| 'queue'
 	| 'handoff'
 	| 'reset'
 	| 'close'
