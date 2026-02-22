@@ -180,5 +180,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 
 	enqueueCommand(sessionId, command)
 	await publishCommandPhase(command.id, 'queued', undefined, sessionId)
-	await emitStatus(true)
+	// Note: don't emitStatus here — the scheduler callback emits status before and
+	// after handleCommand. Emitting here would race with publishActivity inside
+	// command handlers (e.g. handoff), causing the client to reset busy state.
 }
