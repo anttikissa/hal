@@ -6,26 +6,18 @@ export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
 cd "$HAL_DIR" || exit 1
 
 # If -f/--fresh, create a temp state dir once and reuse across restarts.
-# Strip the flag so args.ts doesn't create yet another dir.
-fresh_args=()
-is_fresh=false
 for arg in "$@"; do
 	if [[ "$arg" == "-f" || "$arg" == "--fresh" ]]; then
-		is_fresh=true
-	else
-		fresh_args+=("$arg")
+		base="/tmp/hal/state"
+		mkdir -p "$base"
+		export HAL_STATE_DIR=$(mktemp -d "$base/XXXXXX")
+		break
 	fi
 done
 
-if $is_fresh; then
-	base="/tmp/hal/state"
-	mkdir -p "$base"
-	export HAL_STATE_DIR=$(mktemp -d "$base/XXXXXX")
-fi
-
 while true; do
 	perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000' > "/tmp/hal-startup-$$.txt"
-	bun main.ts "${fresh_args[@]}"
+	bun main.ts "$@"
 	code=$?
 	[ "$code" -ne 100 ] && exit "$code"
 done
