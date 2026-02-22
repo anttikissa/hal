@@ -119,7 +119,18 @@ async function runPause(sessionId: string | null): Promise<void> {
 	}
 }
 
+/** Guard against duplicate delivery from IPC tail (watcher + poll can race) */
+const processedCommandIds = new Set<string>()
+
 export async function processCommand(command: RuntimeCommand): Promise<void> {
+	if (processedCommandIds.has(command.id)) return
+	processedCommandIds.add(command.id)
+	// Keep bounded — command IDs are ephemeral, no need to remember old ones
+	if (processedCommandIds.size > 500) {
+		const first = processedCommandIds.values().next().value
+		if (first) processedCommandIds.delete(first)
+	}
+
 	const sessionId = await normalizeCommandSession(command)
 	if (sessionId) markSessionAsActive(sessionId)
 
