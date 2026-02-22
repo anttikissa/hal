@@ -8,3 +8,4 @@
 
 - Windows/tabs should have their own edit buffer
 - Different tabs should be able to use different models; fork and give task to one model in one tab and another in another
+- /todo command should list todos
