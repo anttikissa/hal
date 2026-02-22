@@ -25,8 +25,14 @@ import { openaiProvider } from './src/providers/openai.ts'
 import { STATE_DIR } from './src/state.ts'
 import { initDebugLog } from './src/debug-log.ts'
 
-registerProvider(anthropicProvider)
-registerProvider(openaiProvider)
+if (testMode) {
+	const { testAnthropicProvider, testOpenaiProvider } = await import('./src/providers/test.ts')
+	registerProvider(testAnthropicProvider)
+	registerProvider(testOpenaiProvider)
+} else {
+	registerProvider(anthropicProvider)
+	registerProvider(openaiProvider)
+}
 
 initBus()
 await ensureBus()
