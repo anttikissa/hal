@@ -271,9 +271,14 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		return
 	}
 
-	// Echo prompt immediately so it appears in the client before the scheduler runs it
+	// Echo prompt immediately — label it [steering] if submitted while model is busy
 	if (command.type === 'prompt') {
-		await publishPrompt(sessionId, command.text ?? '', command.source)
+		const text = command.text ?? ''
+		if (isSessionBusy(sessionId)) {
+			await publishPrompt(sessionId, `[steering] ${text}`, command.source)
+		} else {
+			await publishPrompt(sessionId, text, command.source)
+		}
 	}
 
 	enqueueCommand(sessionId, command)
