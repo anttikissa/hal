@@ -11,7 +11,7 @@ import {
 	modelIdForModel,
 } from '../config.ts'
 import { getProvider } from '../provider.ts'
-import { drainQueuedCommands } from './command-scheduler.ts'
+import { drainQueuedCommands, resumeSession } from './command-scheduler.ts'
 import {
 	publishLine,
 	publishCommandPhase,
@@ -26,6 +26,8 @@ import {
 } from '../context.ts'
 import {
 	getOrLoadSessionRuntime,
+	getCachedSessionRuntime,
+	ensureSession,
 	reloadSystemPromptForSession,
 	getSessionWorkingDir,
 	getSessionMeta,
@@ -80,6 +82,10 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 				await runClose(sessionId)
 				break
 
+			case 'fork':
+				await runFork(sessionId, command)
+				break
+
 			case 'restart':
 				await saveSessionBeforeExit(sessionId)
 				process.exit(100)
@@ -93,6 +99,36 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 		await publishCommandPhase(command.id, 'failed', e.message, sessionId)
 	}
 }
+
+async function runFork(sessionId: string, _command: RuntimeCommand): Promise<void> {
+	// Save current runtime state to disk before copying
+	const runtime = getCachedSessionRuntime(sessionId)
+	if (runtime) {
+		await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+	}
+	const { forkSession } = await import('../session.ts')
+	const newId = await forkSession(sessionId)
+	const workingDir = getSessionWorkingDir(sessionId)
+	await ensureSession(newId, workingDir)
+
+	// Record fork in both conversation histories
+	if (runtime) {
+		runtime.messages.push({ role: 'user', content: `[forked to ${newId}]` })
+	}
+	const forkRuntime = await getOrLoadSessionRuntime(newId)
+	forkRuntime.messages.push({ role: 'user', content: `[forked from ${sessionId}]` })
+
+	// Original session resumes (unfrozen), new session stays idle
+	if (runtime) runtime.pausedByUser = false
+	resumeSession(sessionId)
+
+	markSessionAsActive(newId)
+	await persistRegistry()
+	await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'status', sessionId)
+	await emitSessions(true)
+	await emitStatus(true)
+}
+
 
 /** Publish an estimated context % so the status bar stays up-to-date after session changes */
 async function publishEstimatedContext(sessionId: string): Promise<void> {

@@ -1,7 +1,7 @@
 import { stat } from 'fs/promises'
 import { resolve } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { makeSessionId, forkSession } from '../session.ts'
+import { makeSessionId } from '../session.ts'
 import {
 	enqueueCommand,
 	pauseSession,
@@ -28,8 +28,6 @@ import {
 	markSessionAsActive,
 	sortedBusySessionIds,
 	emitStatus,
-	emitSessions,
-	persistRegistry,
 } from './sessions.ts'
 
 function resolveSessionId(command: RuntimeCommand): string | null {
@@ -204,51 +202,18 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		return
 	}
 
-	// Fork: handled immediately (not queued) — refuse if session is busy
+	// Fork: auto-pause if busy, then enqueue (runs after agent loop stops)
 	if (command.type === 'fork') {
-		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
-		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		if (!sessionId) {
+			await publishCommandPhase(command.id, 'queued', undefined, null)
 			await publishCommandPhase(command.id, 'failed', 'no session to fork', null)
 			return
 		}
 		if (isSessionBusy(sessionId)) {
-			await publishLine(
-				'[fork] cannot fork while session is busy — use /pause first',
-				'warn',
-				sessionId,
-			)
-			await publishCommandPhase(command.id, 'failed', 'session busy', sessionId)
-			return
+			await runPause(sessionId)
+			await publishLine('[fork] paused — forking after current task finishes', 'status', sessionId)
 		}
-		// Save current runtime state to disk before copying
-		const runtime = getCachedSessionRuntime(sessionId)
-		if (runtime) {
-			const { saveSession } = await import('../session.ts')
-			await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
-		}
-		const newId = await forkSession(sessionId)
-		const workingDir = getSessionWorkingDir(sessionId)
-		await ensureSession(newId, workingDir)
-		// Record fork in both conversation histories
-		if (runtime) {
-			runtime.messages.push({
-				role: 'user',
-				content: `[forked to ${newId}]`,
-			})
-		}
-		const forkRuntime = await getOrLoadSessionRuntime(newId)
-		forkRuntime.messages.push({
-			role: 'user',
-			content: `[forked from ${sessionId}]`,
-		})
-		markSessionAsActive(newId)
-		await persistRegistry()
-		await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'status', sessionId)
-		await publishCommandPhase(command.id, 'done', newId, sessionId)
-		await emitSessions(true)
-		await emitStatus(true)
-		return
+		// Fall through to enqueue — scheduler runs it after current command
 	}
 
 	if (command.type === 'reset' && sessionId) {
