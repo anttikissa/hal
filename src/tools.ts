@@ -296,11 +296,45 @@ async function _runTool(
 			else signal.addEventListener('abort', onAbort, { once: true })
 		}
 
-		const [stdout, stderr, exitCode] = await Promise.all([
-			new Response(proc.stdout).text(),
-			new Response(proc.stderr).text(),
-			proc.exited,
-		])
+		// Stream stdout with progress heartbeats for long-running commands
+		const stdoutChunks: string[] = []
+		let lineCount = 0
+		let lastHeartbeatLines = 0
+		let lastHeartbeatTime = Date.now()
+		const HEARTBEAT_MS = 2000 // emit progress at most every 2s
+		const HEARTBEAT_MIN_LINES = 10 // only emit if meaningful output accumulated
+		const decoder = new TextDecoder()
+		let partial = ''
+		let firstLine: string | null = null
+
+		const reader = proc.stdout.getReader()
+		while (true) {
+			const { done, value } = await reader.read()
+			if (done) break
+			const chunk = decoder.decode(value, { stream: true })
+			stdoutChunks.push(chunk)
+			partial += chunk
+			const lines = partial.split('\n')
+			partial = lines.pop()! // keep incomplete last line
+			if (!firstLine && lines.length > 0) firstLine = lines[0]
+			lineCount += lines.length
+
+			const now = Date.now()
+			const newLines = lineCount - lastHeartbeatLines
+			if (newLines >= HEARTBEAT_MIN_LINES && now - lastHeartbeatTime >= HEARTBEAT_MS) {
+				if (lastHeartbeatLines === 0 && firstLine) {
+					await logger(firstLine, 'tool')
+				}
+				await logger(`[+ ${newLines} lines, total ${lineCount}]`, 'tool')
+				lastHeartbeatLines = lineCount
+				lastHeartbeatTime = now
+			}
+		}
+		if (partial) lineCount += 1 // count trailing partial line
+
+		const stdout = stdoutChunks.join('')
+		const stderr = await new Response(proc.stderr).text()
+		const exitCode = await proc.exited
 
 		if (signal?.aborted) return stdout + stderr + '\n[interrupted]'
 
