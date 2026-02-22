@@ -16,7 +16,7 @@
 import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
-export { stripAnsi } from './format.ts'
+export { stripAnsi } from './format/index.ts'
 
 // Control key constants
 export const CTRL_C = '\x03'

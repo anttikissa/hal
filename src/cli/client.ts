@@ -31,7 +31,7 @@ import {
 	type RuntimeEvent,
 	type SessionInfo,
 } from '../protocol.ts'
-import { pushEvent, pushFragment, resetFormat, stripAnsi } from './format.ts'
+import { pushEvent, pushFragment, resetFormat, stripAnsi } from './format/index.ts'
 import {
 	ALT_DIGIT_KEYS,
 	CTRL_DIGIT_KEYS,

@@ -1,1 +1,3 @@
 [test]
+# bare `bun test` only scans src/; use `bun run test` for full suite (src + tests)
+root = "src"
