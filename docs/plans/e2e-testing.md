@@ -2,164 +2,132 @@
 
 ## Test commands
 
-- `bun test` — unit tests only (fast, src/**/*.test.ts)
-- `bun run test:e2e` — e2e tests only (tests/**/*.test.ts)
+- `bun test` — unit tests only (fast, `src/**/*.test.ts`)
+- `bun run test:e2e` — e2e tests only (`tests/**/*.test.ts`)
 - `bun run test:all` — both
 
-Configuration: add `[test] root = "src"` to `bunfig.toml` so bare
-`bun test` stays fast. E2e script runs `bun test ./tests`.
+Config: `bunfig.toml` sets `[test] root = "src"` so bare `bun test`
+stays fast. E2e script runs `bun test ./tests`.
+
+## Test mode (`--test`)
+
+Hal gains a `--test` flag. In test mode:
+
+- No TUI, no raw mode, no ANSI escapes.
+- Stdout emits one structured ASON record per event/output.
+- Stdin accepts lines: prompts or `/commands`.
+- Runs as owner with a fresh temp state dir.
+
+### Stdout format
+
+Each line is an ASON object:
+
+```
+{type:'ready'}
+{type:'line', level:'status', session:'s-abc123', text:'[session] new session'}
+{type:'line', level:'status', session:'s-abc123', text:'[model] anthropic/claude-opus-4-6'}
+{type:'chunk', channel:'assistant', session:'s-abc123', text:'Hello'}
+{type:'prompt', session:'s-abc123', text:'hi'}
+{type:'status', busy:true, sessions:['s-abc123']}
+{type:'sessions', active:'s-abc123', sessions:[{id:'s-abc123', workingDir:'/tmp/test'}]}
+```
+
+### Stdin format
+
+Plain text lines — same as typing in the TUI:
+
+```
+hello world
+/model codex
+/cd /tmp
+/fork
+```
+
+### Why this approach
+
+- Tests the full pipeline: stdin → command parsing → IPC → runtime →
+  events → structured output.
+- No PTY, no ANSI parsing, fully deterministic.
+- Easy to assert: read lines, parse ASON, match fields.
+
+## TUI rendering tests (later, separate)
+
+Unit tests of `tui.ts` with a `getScreenState()` function that returns
+the current state of each region (status bar, activity, output, prompt).
+Not e2e — fast unit tests that call TUI functions directly.
 
 ## Test harness
 
-Two approaches, use both:
-
-### 1. IPC-based (runtime logic)
-
-Start hal in **headless mode** with a fresh temp state dir. Write
-commands to `commands.ason`, read events from `events.ason`. No TUI,
-no PTY needed. Fast and deterministic.
-
-Good for: session lifecycle, commands, model switching, handoff, fork,
-IPC event ordering, command scheduling.
-
 ```ts
 // tests/helpers/harness.ts
-interface HalProcess {
-  proc: Subprocess
-  stateDir: string
-  sendCommand(type: string, text?: string): Promise<void>
-  waitForEvent(match: (e: RuntimeEvent) => boolean, timeoutMs?: number): Promise<RuntimeEvent>
-  waitForLine(pattern: string | RegExp, timeoutMs?: number): Promise<string>
-  stop(): Promise<void>
+interface TestHal {
+	sendLine(text: string): void
+	waitFor(match: (record: any) => boolean, timeoutMs?: number): Promise<any>
+	waitForLine(pattern: string | RegExp, timeoutMs?: number): Promise<any>
+	waitForReady(timeoutMs?: number): Promise<void>
+	stop(): Promise<{ exitCode: number }>
+	stateDir: string
+	records: any[] // all records received so far
 }
 
-async function startHal(options?: { fresh?: boolean }): Promise<HalProcess>
+function startHal(options?: { env?: Record<string, string> }): Promise<TestHal>
 ```
-
-### 2. PTY-based (TUI behavior)
-
-Spawn hal inside a pseudo-terminal. Send raw keystrokes, read screen
-output. Needed for input handling, rendering, resize, key combos.
-
-Save for later — IPC-based covers most logic. PTY tests are slower
-and platform-dependent.
 
 ## Test files
 
-Organized by subsystem. Each file tests one area.
-
 ### tests/startup.test.ts — Startup & lifecycle
 
-From commits: owner election, Ctrl-C restart (exit 100), Ctrl-D exit,
-web server port, headless mode, fresh state.
-
-| Test | What |
-|------|------|
-| starts in headless mode | spawn with --headless, verify owner claim |
-| fresh state dir is empty | -f flag creates temp state, no sessions |
-| startup emits session + model events | first events contain [session] and [model] lines |
-| startup emits context status | [context] line present in startup events |
+| Test                 | What                                     |
+| -------------------- | ---------------------------------------- |
+| emits ready          | process starts, emits `{type:'ready'}`   |
+| emits session event  | startup produces `[session]` status line |
+| emits model event    | startup produces `[model]` status line   |
+| emits context status | startup produces `[context]` status line |
+| exits cleanly on EOF | close stdin, process exits 0             |
 
 ### tests/session.test.ts — Session management
 
-From commits: session create/load/save, registry, /reset, /close,
-/cd, per-tab input history.
-
-| Test | What |
-|------|------|
-| new session appears in registry | send prompt, verify session in registry |
-| /reset clears session | send prompt, /reset, verify empty |
-| /cd changes working dir | /cd /tmp, verify session workingDir updated |
-| /cd to nonexistent dir fails | /cd /nonexistent, verify error event |
-| /cd - returns to previous dir | /cd /tmp, /cd -, verify back |
-| /close removes session | create 2 sessions, close one, verify removed |
+| Test                     | What                                         |
+| ------------------------ | -------------------------------------------- |
+| /reset clears session    | send prompt, /reset, verify `[reset]` event  |
+| /cd changes working dir  | /cd /tmp, verify sessions event with new dir |
+| /cd to nonexistent fails | /cd /nonexistent, verify error event         |
+| /cd - returns to prev    | /cd /tmp, /cd -, verify original dir         |
 
 ### tests/fork.test.ts — Fork
 
-From commits: /fork command, fork metadata.
-
-| Test | What |
-|------|------|
-| fork creates new session | send prompt, /fork, verify 2 sessions |
-| fork copies conversation history | fork, load new session, messages match |
-| fork while busy is refused | start long prompt, /fork, verify error |
-| fork after pause works | start prompt, /pause, /fork, verify success |
-| forked sessions are independent | fork, send different prompts to each |
-
-### tests/handoff.test.ts — Handoff
-
-From commits: handoff summary, session rotation, handoff-previous.md.
-
-| Test | What |
-|------|------|
-| handoff creates handoff.md | send prompts, /handoff, verify file |
-| handoff rotates session | after handoff, session-previous.ason exists |
-| handoff loads in new session | handoff, new prompt, verify handoff in messages |
-
-### tests/model.test.ts — Model switching
-
-From commits: /model command, model change in history, system prompt
-reload.
-
-| Test | What |
-|------|------|
-| /model shows current model | /model with no args, verify info event |
-| /model switches model | /model codex, verify config updated |
-| model change recorded in history | switch model, verify [model changed] message |
-| system prompt reloads on model change | switch model, verify prompt reload event |
-
-### tests/ipc.test.ts — IPC event system
-
-From commits: file-backed IPC, tailFile reliability, event publishing,
-command scheduling.
-
-| Test | What |
-|------|------|
-| commands flow through to events | send command, verify matching event |
-| multiple sessions scheduled | send prompts to 2 sessions, both get responses |
-| pause interrupts active session | start prompt, /pause, verify paused event |
-| events are session-scoped | events for session A don't leak to session B |
+| Test                     | What                                         |
+| ------------------------ | -------------------------------------------- |
+| fork creates new session | /fork, verify sessions event with 2 sessions |
+| fork while busy refused  | start prompt, /fork before done, verify warn |
 
 ### tests/commands.test.ts — CLI commands
 
-From commits: /help, /system, /todo, /bug, /snapshot.
+| Test                 | What                                       |
+| -------------------- | ------------------------------------------ |
+| /model shows current | /model, verify info line with model name   |
+| /model switches      | /model codex, verify status line           |
+| /system shows prompt | /system, verify info line with prompt text |
 
-| Test | What |
-|------|------|
-| /help lists commands | verify event contains command names |
-| /system shows prompt | verify event contains system prompt text |
-| /todo appends to TODO.md | /todo test item, verify file updated |
+### tests/ipc.test.ts — IPC & event flow
 
-### tests/prompt.test.ts — Prompt processing
-
-From commits: system prompt loading, SYSTEM.md + AGENTS.md, model
-tags, variable substitution.
-
-| Test | What |
-|------|------|
-| system prompt loads SYSTEM.md | verify system prompt contains expected content |
-| AGENTS.md is appended | create AGENTS.md in workingDir, verify loaded |
-| model tags filter correctly | claude model gets claude block, not codex block |
-| variables are substituted | ${cwd}, ${model}, ${date} replaced |
+| Test                   | What                                         |
+| ---------------------- | -------------------------------------------- |
+| prompt flows through   | send prompt, verify prompt + response events |
+| pause stops generation | start prompt, /pause, verify pause event     |
 
 ## Priority order
 
-1. **Harness** (`tests/helpers/harness.ts`) — without this nothing works
-2. **startup.test.ts** — proves the harness works
-3. **session.test.ts** — core session lifecycle
-4. **ipc.test.ts** — event reliability
-5. **fork.test.ts** — new feature, needs coverage
-6. **commands.test.ts** — command routing
-7. **model.test.ts** — model switching
-8. **handoff.test.ts** — needs provider mock (generates summary)
-9. **prompt.test.ts** — system prompt assembly
+1. `--test` mode in main.ts (structured output, stdin reader)
+2. `tests/helpers/harness.ts`
+3. `tests/startup.test.ts` — proves everything works
+4. Remaining test files
 
 ## Notes
 
-- Each test gets a fresh temp state dir (cleaned up after).
-- Tests must not depend on auth tokens — mock the provider or use a
-  dummy that echoes back.
-- Timeout: 5s per test default, 15s for handoff (LLM call).
-- The harness `waitForEvent` should use tailFile internally for
-  efficiency.
-- Tests should not depend on timing — use event matching, not sleeps.
+- Each test gets a fresh temp state dir (auto-cleaned).
+- Tests must not need auth tokens — either mock providers or test
+  only commands that don't hit LLMs.
+- Default timeout: 5s per test.
+- Harness `waitFor` reads stdout lines, parses ASON, matches.
+- No sleeps — always wait for specific events.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { fresh, headless } from './src/args.ts'
+import { fresh, headless, testMode } from './src/args.ts'
 import { randomBytes } from 'crypto'
 import {
 	appendEvent,
@@ -189,7 +189,103 @@ if (isOwner) {
 	})
 }
 
-if (headless) {
+if (testMode) {
+	// Test mode: structured JSON output, line-based stdin, no TUI
+	const { tailEvents, appendCommand } = await import('./src/ipc.ts')
+	const { makeCommand } = await import('./src/protocol.ts')
+	const { isExit } = await import('./src/cli/commands.ts')
+
+	const testSource = { kind: 'cli' as const, clientId }
+
+	const writeLine = (record: any) => {
+		process.stdout.write(JSON.stringify(record) + '\n')
+	}
+
+	// Start runtime (we are always owner in test mode)
+	startRuntime(ownerId).catch(async (e) => {
+		writeLine({ type: 'error', text: `runtime crashed: ${e.message || e}` })
+		await releaseOwner(ownerId)
+		process.exit(1)
+	})
+
+	// Tail events → structured stdout; emit 'ready' after first status event
+	let readySent = false
+	void (async () => {
+		for await (const event of tailEvents()) {
+			if (event.type === 'line') {
+				writeLine({
+					type: 'line',
+					level: event.level,
+					session: event.sessionId,
+					text: event.text,
+				})
+			} else if (event.type === 'chunk') {
+				writeLine({
+					type: 'chunk',
+					channel: event.channel,
+					session: event.sessionId,
+					text: event.text,
+				})
+			} else if (event.type === 'prompt') {
+				writeLine({
+					type: 'prompt',
+					session: event.sessionId,
+					text: event.text,
+				})
+			} else if (event.type === 'sessions') {
+				writeLine({
+					type: 'sessions',
+					active: event.activeSessionId,
+					sessions: event.sessions,
+				})
+			} else if (event.type === 'status') {
+				writeLine({
+					type: 'status',
+					busy: event.busy,
+					busySessions: event.busySessionIds,
+					session: event.sessionId,
+				})
+				// Emit ready after first full status (runtime initialized)
+				if (!readySent) {
+					readySent = true
+					writeLine({ type: 'ready' })
+				}
+			} else if (event.type === 'command') {
+				writeLine({
+					type: 'command',
+					commandId: event.commandId,
+					phase: event.phase,
+					message: event.message,
+					session: event.sessionId,
+				})
+			}
+		}
+	})()
+
+	// Read stdin lines → send as commands
+	const reader = (await import('readline')).createInterface({ input: process.stdin })
+	for await (const line of reader) {
+		const trimmed = line.trim()
+		if (!trimmed) continue
+		if (isExit(trimmed.toLowerCase())) break
+		if (trimmed.startsWith('/')) {
+			const spaceIdx = trimmed.indexOf(' ')
+			const name = spaceIdx < 0 ? trimmed.slice(1) : trimmed.slice(1, spaceIdx)
+			const args = spaceIdx < 0 ? '' : trimmed.slice(spaceIdx + 1).trim()
+			const cmd = makeCommand(name as any, testSource, args || undefined, null)
+			await appendCommand(cmd)
+		} else {
+			const cmd = makeCommand('prompt', testSource, trimmed, null)
+			await appendCommand(cmd)
+		}
+	}
+
+	// Cleanup
+	if (webServer) webServer.stop()
+	await saveAllSessions()
+	await releaseOwner(ownerId)
+	process.exit(0)
+} else if (headless) {
 	if (!isOwner) {
 		await emitBootstrap('[runtime] --headless but not owner; exiting', 'warn')
 		process.exit(0)
