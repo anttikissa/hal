@@ -141,8 +141,18 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		const newId = await forkSession(sessionId)
 		const workingDir = getSessionWorkingDir(sessionId)
 		await ensureSession(newId, workingDir)
-		// Load the forked session runtime so it's warm
-		await getOrLoadSessionRuntime(newId)
+		// Record fork in both conversation histories
+		if (runtime) {
+			runtime.messages.push({
+				role: 'user',
+				content: `[forked to ${newId}]`,
+			})
+		}
+		const forkRuntime = await getOrLoadSessionRuntime(newId)
+		forkRuntime.messages.push({
+			role: 'user',
+			content: `[forked from ${sessionId}]`,
+		})
 		markSessionAsActive(newId)
 		await persistRegistry()
 		await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'status', sessionId)
