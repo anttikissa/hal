@@ -122,6 +122,7 @@ let tabs: CliTab[] = []
 let activeTabIndex = 0
 let launchCwd = ''
 let pendingForkOutput: string | null = null
+let pendingForkSwitch = false
 
 export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src
@@ -379,6 +380,7 @@ async function forkTab(): Promise<void> {
 	}
 	captureActiveOutput()
 	pendingForkOutput = active.output
+	pendingForkSwitch = true
 	await appendBusCommand(makeCommand('fork', source, undefined, active.sessionId))
 	pushLocal('local.queue', 'fork')
 }
@@ -396,12 +398,16 @@ function syncTabsFromSessions(
 	const previousActive = activeTab()?.sessionId ?? null
 
 	const forkOutput = pendingForkOutput
+	const switchToFork = pendingForkSwitch
 	pendingForkOutput = null
+	pendingForkSwitch = false
+	let forkedSessionId: string | null = null
 
 	tabs = sessions.slice(0, 9).map((session) => {
 		const existing = previousById.get(session.id)
 		// New tab from fork: seed with the source tab's output
 		const isNewFromFork = !existing && forkOutput !== null
+		if (isNewFromFork) forkedSessionId = session.id
 		return {
 			sessionId: session.id,
 			workingDir: session.workingDir,
@@ -415,6 +421,10 @@ function syncTabsFromSessions(
 	})
 
 	const targetSessionId =
+		// After fork, switch focus to the new tab
+		(switchToFork && forkedSessionId
+			? forkedSessionId
+			: null) ??
 		(previousActive && tabs.some((t) => t.sessionId === previousActive)
 			? previousActive
 			: null) ??
