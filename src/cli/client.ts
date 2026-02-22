@@ -642,16 +642,25 @@ function renderBusyStatus(): void {
 
 async function countSourceStats(dir: string): Promise<{ files: number; lines: number }> {
 	let files = 0
-	let lines = 0
+	let code = 0
 	const countFile = async (path: string) => {
 		files++
 		const content = await Bun.file(path).text()
-		lines += content.split('\n').length
+		for (const line of content.split('\n')) {
+			const trimmed = line.trim()
+			if (
+				trimmed &&
+				!trimmed.startsWith('//') &&
+				!trimmed.startsWith('/*') &&
+				!trimmed.startsWith('*')
+			)
+				code++
+		}
 	}
 	const glob = new Bun.Glob('**/*.ts')
 	for await (const path of glob.scan({ cwd: `${dir}/src`, onlyFiles: true })) {
 		await countFile(`${dir}/src/${path}`)
 	}
 	await countFile(`${dir}/main.ts`)
-	return { files, lines }
+	return { files, lines: code }
 }
