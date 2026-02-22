@@ -15,6 +15,13 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.
 - `/bug <description>` — captures terminal snapshot + debug log. You can paste images and text. Use it to self-debug UI issues.
 
+## Testing
+
+- After changes, run quick unit tests: `bun run test:quick` (~200ms, src/ only).
+- After big changes (new features, refactors), run the full suite: `bun test` (includes e2e tests, several seconds).
+- E2e tests only: `bun run test:e2e`.
+
+
 
 ## TODOs
 
