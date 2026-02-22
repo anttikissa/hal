@@ -108,6 +108,64 @@ async function publishEstimatedContext(sessionId: string): Promise<void> {
 	)
 }
 
+/** Max chars per tool result in handoff text — full output isn't needed for summarization */
+const MAX_TOOL_RESULT_CHARS = 500
+/** Target max chars for the conversation text sent to the compact model */
+const MAX_CONVERSATION_CHARS = 300_000
+/** How many chars to keep from the start when windowing */
+const WINDOW_HEAD_CHARS = 30_000
+
+/**
+ * Convert messages to a compact text representation for handoff summarization.
+ * Strips thinking blocks and truncates large tool results.
+ */
+export function formatMessagesForHandoff(messages: any[]): string {
+	return messages
+		.map((m: any) => {
+			const role = m.role
+			const content =
+				typeof m.content === 'string'
+					? m.content
+					: Array.isArray(m.content)
+						? m.content
+								.map((b: any) => {
+									if (b.type === 'text') return b.text
+									// Skip thinking blocks — not useful for summarization
+									if (b.type === 'thinking') return ''
+									if (b.type === 'tool_use')
+										return `[tool: ${b.name}] ${JSON.stringify(b.input)}`
+									if (b.type === 'tool_result') {
+										const raw =
+											typeof b.content === 'string'
+												? b.content
+												: JSON.stringify(b.content)
+										return raw.length > MAX_TOOL_RESULT_CHARS
+											? `[result] ${raw.slice(0, MAX_TOOL_RESULT_CHARS)}…`
+											: `[result] ${raw}`
+									}
+									return ''
+								})
+								.filter(Boolean)
+								.join('\n')
+						: ''
+			return `[${role}]\n${content}`
+		})
+		.join('\n\n---\n\n')
+}
+
+/**
+ * If conversation text is too long, keep the beginning (project context)
+ * and the end (recent work) with a gap marker.
+ */
+export function windowConversationText(text: string): string {
+	if (text.length <= MAX_CONVERSATION_CHARS) return text
+	const tailChars = MAX_CONVERSATION_CHARS - WINDOW_HEAD_CHARS - 200 // 200 for marker
+	const head = text.slice(0, WINDOW_HEAD_CHARS)
+	const tail = text.slice(-tailChars)
+	const omitted = Math.round((text.length - WINDOW_HEAD_CHARS - tailChars) / 1000)
+	return `${head}\n\n[... ~${omitted}K chars of conversation omitted for brevity ...]\n\n${tail}`
+}
+
 async function runHandoff(sessionId: string, text?: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	if (runtime.messages.length === 0) {
@@ -124,54 +182,38 @@ async function runHandoff(sessionId: string, text?: string): Promise<void> {
 	const provider = getProvider(providerForModel(compactModel))
 	await provider.refreshAuth()
 
-	const systemPrompt = `You are summarizing a coding session for handoff. Produce a concise markdown summary that captures:
+	const systemPrompt = `You are summarizing a coding session for handoff to a fresh session. Produce a concise markdown summary that captures:
 1. What was being worked on (goals, context)
 2. What was accomplished so far
 3. Current state (what files were changed, what's working/broken)
 4. What needs to be done next
 5. Any important decisions or context the next session should know
 
-Be specific about file paths, function names, and technical details. The summary should let a new session continue seamlessly.`
+IMPORTANT: Do NOT reproduce the conversation. Synthesize and summarize. Be specific about file paths, function names, and technical details. Focus especially on the MOST RECENT work — that's what the next session needs to continue.`
 
-	const conversationText = runtime.messages
-		.map((m: any) => {
-			const role = m.role
-			const content =
-				typeof m.content === 'string'
-					? m.content
-					: Array.isArray(m.content)
-						? m.content
-								.map((b: any) => {
-									if (b.type === 'text') return b.text
-									if (b.type === 'thinking') return `[thinking] ${b.thinking}`
-									if (b.type === 'tool_use')
-										return `[tool: ${b.name}] ${JSON.stringify(b.input)}`
-									if (b.type === 'tool_result')
-										return `[result] ${typeof b.content === 'string' ? b.content : JSON.stringify(b.content)}`
-									return ''
-								})
-								.filter(Boolean)
-								.join('\n')
-						: ''
-			return `[${role}]\n${content}`
-		})
-		.join('\n\n---\n\n')
+	const conversationText = windowConversationText(
+		formatMessagesForHandoff(runtime.messages),
+	)
 
 	const userMsg = text
-		? `${text}\n\n---\n\nHere is the full conversation:\n\n${conversationText}`
+		? `${text}\n\n---\n\nHere is the conversation to summarize:\n\n${conversationText}`
 		: `Summarize this coding session for handoff:\n\n${conversationText}`
 
-	const { text: summary, error } = await provider.complete({
+	const { text: summary, error, truncated } = await provider.complete({
 		model: modelIdForModel(compactModel),
 		system: systemPrompt,
 		userMessage: userMsg,
-		maxTokens: 4000,
+		maxTokens: 8192,
 	})
 
 	if (error) {
 		await publishActivity('', sessionId)
 		await publishLine(`[handoff] failed: ${error}`, 'error', sessionId)
 		return
+	}
+
+	if (truncated) {
+		await publishLine('[handoff] warning: summary was truncated (output limit)', 'warn', sessionId)
 	}
 
 	await performHandoff(sessionId, summary)

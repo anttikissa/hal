@@ -492,6 +492,7 @@ export const openaiProvider: Provider = {
 				}
 			}
 		}
-		return { text: parts.join('\n') || 'No response.' }
+		const truncated = data.status === 'incomplete' && data.incomplete_details?.reason === 'max_output_tokens'
+		return { text: parts.join('\n') || 'No response.', truncated }
 	},
 }

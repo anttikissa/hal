@@ -52,7 +52,7 @@ export interface Provider {
 		system: string
 		userMessage: string
 		maxTokens: number
-	}): Promise<{ text: string; error?: string }>
+	}): Promise<{ text: string; error?: string; truncated?: boolean }>
 }
 
 const providers = new Map<string, Provider>()

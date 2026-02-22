@@ -199,6 +199,7 @@ export const anthropicProvider: Provider = {
 		const data = (await res.json()) as any
 		if (data.error) return { text: '', error: data.error.message }
 		const text = data.content?.find((b: any) => b.type === 'text')?.text || 'No response.'
-		return { text }
+		const truncated = data.stop_reason === 'max_tokens'
+		return { text, truncated }
 	},
 }
