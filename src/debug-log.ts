@@ -101,13 +101,16 @@ export async function initDebugLog(pid: number): Promise<void> {
 
 	if (!enabled) return
 
-	// Snapshot config.ason (non-secret settings)
+	// Snapshot config + state files in the background (don't block startup)
+	snapshotState().catch(() => {})
+}
+
+async function snapshotState(): Promise<void> {
 	try {
 		const content = await readFile(resolve(HAL_DIR, 'config.ason'), 'utf-8')
 		push({ t: Date.now(), type: 'config', content })
 	} catch {}
 
-	// Snapshot all state files
 	await walkFiles(STATE_DIR, async (full) => {
 		try {
 			const content = await readFile(full, 'utf-8')
@@ -116,6 +119,5 @@ export async function initDebugLog(pid: number): Promise<void> {
 		} catch {}
 	})
 
-	// Force initial flush
 	await flush()
 }
