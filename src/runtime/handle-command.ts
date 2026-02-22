@@ -300,6 +300,8 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
 	const dirMsg = previous !== next ? `${previous} -> ${next}` : next
 	await publishLine(`[cd] ${dirMsg}${promptDesc}`, 'status', sessionId)
+	await emitSessions(true)
+
 }
 
 async function runClose(sessionId: string): Promise<void> {
