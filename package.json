@@ -5,7 +5,9 @@
 	"scripts": {
 		"start": "./run",
 		"dev": "bun main.ts",
-		"test": "bun test"
+		"test": "bun test",
+		"test:e2e": "bun test ./tests",
+		"test:all": "bun test ./src ./tests"
 	},
 	"devDependencies": {
 		"bun-types": "^1.3.9",
