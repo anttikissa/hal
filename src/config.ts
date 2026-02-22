@@ -88,7 +88,7 @@ export function resolveCompactModel(model: string): string {
 const DEFAULTS: Config = {
 	model: 'anthropic/claude-opus-4-6',
 	contextWarnThreshold: 0.8,
-	maxConcurrentSessions: 2,
+	maxConcurrentSessions: 4,
 	maxPromptLines: 15,
 	debug: {},
 }
