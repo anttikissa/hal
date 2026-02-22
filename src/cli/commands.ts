@@ -92,7 +92,7 @@ async function bug(args: string, client: Client): Promise<void> {
 	// Send to model so it can investigate
 	await client.command(
 		'prompt',
-		`[bug] ${args}\n\nDebug log saved to: ${bugPath}\nPlease investigate using the debug log. You can read it with parseAll() to see the initial state, keypresses, and terminal snapshot.`,
+		`[bug] ${args}\n\nFix it. If you need the keyboard transcript or full context, the debug log is here: ${bugPath}`,
 	)
 }
 
