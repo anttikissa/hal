@@ -13,6 +13,7 @@ export type CommandType =
 	| 'model'
 	| 'system'
 	| 'cd'
+	| 'fork'
 
 export interface RuntimeSource {
 	kind: 'cli' | 'web'

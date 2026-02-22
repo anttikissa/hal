@@ -96,6 +96,11 @@ async function bug(args: string, client: Client): Promise<void> {
 	)
 }
 
+async function fork(_args: string, client: Client): Promise<void> {
+	await client.command('fork')
+	client.log('local.queue', 'fork')
+}
+
 function exit(_args: string, _client: Client): void {}
 
 const COMMANDS: Record<string, Handler> = {
@@ -112,6 +117,7 @@ const COMMANDS: Record<string, Handler> = {
 	restart,
 	snapshot,
 	bug,
+	fork,
 	exit,
 }
 

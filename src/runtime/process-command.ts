@@ -1,7 +1,7 @@
 import { stat } from 'fs/promises'
 import { resolve } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { makeSessionId } from '../session.ts'
+import { makeSessionId, forkSession } from '../session.ts'
 import { enqueueCommand } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase } from './event-publisher.ts'
 import { dropQueuedCommands } from './handle-command.ts'
@@ -16,9 +16,12 @@ import {
 	ensureSession,
 	getOrLoadSessionRuntime,
 	getCachedSessionRuntime,
+	isSessionBusy,
 	markSessionAsActive,
 	sortedBusySessionIds,
 	emitStatus,
+	emitSessions,
+	persistRegistry,
 } from './sessions.ts'
 
 function resolveSessionId(command: RuntimeCommand): string | null {
@@ -108,6 +111,43 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		await runPause(sessionId)
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
+		await emitStatus(true)
+		return
+	}
+
+	// Fork: handled immediately (not queued) — refuse if session is busy
+	if (command.type === 'fork') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (!sessionId) {
+			await publishCommandPhase(command.id, 'failed', 'no session to fork', null)
+			return
+		}
+		if (isSessionBusy(sessionId)) {
+			await publishLine(
+				'[fork] cannot fork while session is busy — use /pause first',
+				'warn',
+				sessionId,
+			)
+			await publishCommandPhase(command.id, 'failed', 'session busy', sessionId)
+			return
+		}
+		// Save current runtime state to disk before copying
+		const runtime = getCachedSessionRuntime(sessionId)
+		if (runtime) {
+			const { saveSession } = await import('../session.ts')
+			await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+		}
+		const newId = await forkSession(sessionId)
+		const workingDir = getSessionWorkingDir(sessionId)
+		await ensureSession(newId, workingDir)
+		// Load the forked session runtime so it's warm
+		await getOrLoadSessionRuntime(newId)
+		markSessionAsActive(newId)
+		await persistRegistry()
+		await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'status', sessionId)
+		await publishCommandPhase(command.id, 'done', newId, sessionId)
+		await emitSessions(true)
 		await emitStatus(true)
 		return
 	}

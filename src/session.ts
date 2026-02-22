@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, unlink, rename } from 'fs/promises'
+import { mkdir, readFile, writeFile, unlink, rename, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { stringify, parse } from './utils/ason.ts'
@@ -241,6 +241,22 @@ export async function logPrompt(
 	const record = { ...entry, gitHash }
 	const { appendFile } = await import('fs/promises')
 	await appendFile(promptsPath(sessionId), stringify(record) + '\n')
+}
+
+// Fork: copy session state to a new session
+export async function forkSession(sourceId: string): Promise<string> {
+	const newId = makeSessionId()
+	const srcDir = sessionDir(sourceId)
+	const dstDir = sessionDir(newId)
+	await mkdir(dstDir, { recursive: true })
+
+	// Copy session data and input history (not prompts — those are logs)
+	for (const file of ['session.ason', 'history.ason']) {
+		const src = `${srcDir}/${file}`
+		if (existsSync(src)) await copyFile(src, `${dstDir}/${file}`)
+	}
+
+	return newId
 }
 
 // Repair
