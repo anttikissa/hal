@@ -52,6 +52,13 @@ ls: List directory tree with indentation. Ignores node_modules, .git, dist, etc.
 
 These tools are faster, have built-in truncation, and respect .gitignore.
 
+## ASON logs
+
+- `prompts.ason` is ASON, not JSON/JSONL.
+- Parse with ASON parsing (`ason.parseAll()` or equivalent), not line-by-line `JSON.parse`.
+- Prompt logs are append-only object entries.
+
+
 ## General Rules
 
 After completing a task, always commit the changes to git.
