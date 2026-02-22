@@ -1,30 +1,36 @@
-I wrote two coding agents
+# HAL
 
-They are in ../.hal9001 and ../.hal9002 
+Small, fast, zero-dependency coding agent.
 
-Read those both - I've analyzed those, read machine-findings.md and human-findings.md from both.
+## Core goals
 
-I want you to combine the strengths of those projects and make me a new coding agent in this directory from scratch.
+- Be small: minimal architecture, minimal moving parts.
+- Be fast: quick startup, fast feedback, low-latency TUI.
+- Be dependency-free at runtime: Bun + standard library + local code only.
+- Be useful: strong coding workflow (tools, sessions, handoff, tabs).
+- Be operable: clear logs, reproducible behavior, practical tests.
 
-Suggest what to implement now, what to implement later. Write a plan.md first.
+## Product stance
 
-Interrogate me for what I want first. I think .hal9001 is a better starting
-point as it has more functionality, but here's an opportunity to reorganize it.
+HAL is not trying to be a giant framework.
 
-Must haves:
-- must support Claude Code using OAuth token 
-- must support Codex 5.3 using OAuth token
-- Minimal and lean architecture
-- A minimal amount of tests that I can run manually
-- CLI tool should work and support session structure roughly like .hal9001 does
+HAL should feel like a sharp terminal tool:
 
-Some files you can just copy over, like ason (it's battle tested)
+- predictable
+- keyboard-first
+- easy to debug
+- easy to extend without bloat
 
-Others - rewrite from scratch to fit the new architecture.
+## Implementation principles
 
-Oh - can you switch the code style from spaces to tabs (width 4)? My IDE likes that.
+- Prefer simple data flow over abstraction layers.
+- Keep state file-backed and inspectable.
+- Add features only when they improve real task completion.
+- Bias toward TUI quality and command ergonomics.
+- Keep advanced functionality optional and lightweight.
 
-You can pick up access tokens from ./.hal9001/.env and copy them over to this
-project (but I'd prefer gitignored config.ason or something instead of .env) -
-they should work.
+## Testing policy
 
+- After normal changes: run `bun run test:quick`.
+- After big changes: run `bun test`.
+- E2e only when needed: run `bun run test:e2e`.
