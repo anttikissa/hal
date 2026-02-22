@@ -42,7 +42,7 @@ import {
 	CTRL_W_KEYS,
 } from './keys.ts'
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
-import { LAUNCH_CWD } from '../state.ts'
+import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { loadInputHistory, saveInputHistory } from '../session.ts'
 
 import { loadConfig, MODEL_ALIASES } from '../config.ts'
@@ -163,7 +163,10 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 	if (options?.startupEpoch) {
 		const elapsed = Date.now() - options.startupEpoch
 		const level = elapsed > 100 ? 'local.warn' : 'local.status'
-		pushLocal(level, `[perf] startup: ${elapsed}ms`)
+		// Count modules/loc in background, then show perf line
+		void countSourceStats(HAL_DIR).then(({ files, lines }) => {
+			pushLocal(level, `[perf] startup: ${elapsed}ms (${files} modules, ${lines} loc)`)
+		})
 	}
 
 	void (async () => {
@@ -635,4 +638,16 @@ function renderBusyStatus(): void {
 	const contextOnly = lastContextStatus?.replace(/^\[context\]\s*/, '') ?? ''
 	const parts = [roleLabel, contextOnly].filter(Boolean)
 	setStatusLine(tabStr, parts.join('  '))
+}
+
+async function countSourceStats(dir: string): Promise<{ files: number; lines: number }> {
+	const glob = new Bun.Glob('**/*.ts')
+	let files = 0
+	let lines = 0
+	for await (const path of glob.scan({ cwd: dir, onlyFiles: true })) {
+		files++
+		const content = await Bun.file(`${dir}/${path}`).text()
+		lines += content.split('\n').length
+	}
+	return { files, lines }
 }
