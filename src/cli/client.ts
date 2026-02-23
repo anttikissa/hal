@@ -5,7 +5,9 @@ import {
 	readRecentEvents,
 	readState,
 	tailEvents,
+	updateState,
 } from '../ipc.ts'
+
 import * as tui from './tui.ts'
 import {
 	CTRL_C,
@@ -236,8 +238,12 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			}
 		}
 	} finally {
-		// Persist input drafts so they survive app restart
+		// Persist active tab and input drafts so they survive app restart
 		captureActiveOutput()
+		const exitSessionId = activeTab()?.sessionId ?? null
+		if (exitSessionId) {
+			updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {})
+		}
 		for (const tab of tabs) {
 			if (tab.inputDraft) {
 				saveInputHistory(tab.sessionId, [
@@ -255,6 +261,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			tui.cleanup()
 		} catch {}
 	}
+
 
 	return restart ? 100 : 0
 }
