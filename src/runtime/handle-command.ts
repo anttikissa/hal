@@ -336,7 +336,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 
 	// Reload system prompt for new model
 	const loaded = await reloadSystemPromptForSession(sessionId)
-	await publishLine(`[model] switched to ${fullModel}`, 'meta', sessionId)
+	await publishLine(`[model] ${prevModel} -> ${fullModel}`, 'meta', sessionId)
 	if (loaded.length > 0) {
 		await publishLine(`[system] reloaded ${loaded.join(', ')} (model changed)`, 'meta', sessionId)
 	}
