@@ -5,19 +5,25 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 	const lines = text.split('\n')
 	const result: string[] = []
 	let inFence = false
+	let fenceLine = 0
 	let accept = true
 
-	for (const line of lines) {
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]
+
 		const openMatch = line.match(/^:{3,}\s+if\s+(\w+)="([^"]+)"\s*$/)
-		if (openMatch && !inFence) {
+		if (openMatch) {
+			if (inFence) throw new Error(`nested ::: if at line ${i + 1} (outer opened at line ${fenceLine})`)
 			inFence = true
+			fenceLine = i + 1
 			const value = vars[openMatch[1]] ?? ''
 			const regex = new RegExp('^' + openMatch[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
 			accept = regex.test(value)
 			continue
 		}
 
-		if (/^:{3,}\s*$/.test(line) && inFence) {
+		if (/^:{3,}\s*$/.test(line)) {
+			if (!inFence) throw new Error(`unexpected ::: at line ${i + 1} (no matching opener)`)
 			inFence = false
 			accept = true
 			continue
@@ -25,6 +31,8 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 
 		if (accept) result.push(line)
 	}
+
+	if (inFence) throw new Error(`unclosed ::: if opened at line ${fenceLine}`)
 
 	return result.join('\n')
 }
@@ -102,18 +110,30 @@ describe('processDirectives', () => {
 		expect(processDirectives(text, { model: 'anything' })).toBe('hello\nworld')
 	})
 
-	test('ignores nested opener inside an active block', () => {
-		// A second opener while already inside a block is treated as plain text
+	test('throws on nested opener', () => {
 		const text = [
 			'::: if model="gpt-*"',
 			'line1',
 			'::: if model="gpt-5*"',
 			'line2',
 			':::',
-			'after',
 		].join('\n')
-		// The inner opener is ignored; first ::: closes the block
-		const result = processDirectives(text, { model: 'gpt-5' })
-		expect(result).toBe('line1\n::: if model="gpt-5*"\nline2\nafter')
+		expect(() => processDirectives(text, { model: 'gpt-5' })).toThrow(/nested.*line 3.*line 1/)
+	})
+
+	test('throws on stray closing fence', () => {
+		const text = [
+			'some text',
+			':::',
+		].join('\n')
+		expect(() => processDirectives(text, {})).toThrow(/unexpected.*line 2/)
+	})
+
+	test('throws on unclosed fence', () => {
+		const text = [
+			'::: if model="gpt-*"',
+			'content',
+		].join('\n')
+		expect(() => processDirectives(text, { model: 'gpt-5' })).toThrow(/unclosed.*line 1/)
 	})
 })

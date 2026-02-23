@@ -24,13 +24,18 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 	const lines = text.split('\n')
 	const result: string[] = []
 	let inFence = false
+	let fenceLine = 0
 	let accept = true
 
-	for (const line of lines) {
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]
+
 		// Opening fence: 3+ colons, then "if key="pattern""
 		const openMatch = line.match(/^:{3,}\s+if\s+(\w+)="([^"]+)"\s*$/)
-		if (openMatch && !inFence) {
+		if (openMatch) {
+			if (inFence) throw new Error(`nested ::: if at line ${i + 1} (outer opened at line ${fenceLine})`)
 			inFence = true
+			fenceLine = i + 1
 			const value = vars[openMatch[1]] ?? ''
 			const regex = new RegExp('^' + openMatch[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
 			accept = regex.test(value)
@@ -38,7 +43,8 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 		}
 
 		// Closing fence: 3+ colons on a line by itself
-		if (/^:{3,}\s*$/.test(line) && inFence) {
+		if (/^:{3,}\s*$/.test(line)) {
+			if (!inFence) throw new Error(`unexpected ::: at line ${i + 1} (no matching opener)`)
 			inFence = false
 			accept = true
 			continue
@@ -46,6 +52,8 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 
 		if (accept) result.push(line)
 	}
+
+	if (inFence) throw new Error(`unclosed ::: if opened at line ${fenceLine}`)
 
 	return result.join('\n')
 }
