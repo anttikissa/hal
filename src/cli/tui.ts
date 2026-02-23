@@ -763,8 +763,10 @@ function handleKey(key: string): void {
 				if (common.length > inputBuf.length) {
 					inputBuf = common
 					inputCursor = inputBuf.length
-					redrawFooter()
 				}
+				// Show available completions
+				writeToOutput(`\x1b[2m${matches.join('  ')}\x1b[0m\n`)
+				redrawFooter()
 			}
 		}
 		return
