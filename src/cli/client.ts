@@ -236,6 +236,16 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			}
 		}
 	} finally {
+		// Persist input drafts so they survive app restart
+		captureActiveOutput()
+		for (const tab of tabs) {
+			if (tab.inputDraft) {
+				saveInputHistory(tab.sessionId, [
+					...tab.inputHistory.filter((h) => h !== tab.inputDraft),
+					tab.inputDraft,
+				]).catch(() => {})
+			}
+		}
 		setInputKeyHandler(null)
 		setEscHandler(null)
 		setDoubleEnterHandler(null)
@@ -245,6 +255,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			tui.cleanup()
 		} catch {}
 	}
+
 	return restart ? 100 : 0
 }
 
