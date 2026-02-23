@@ -457,9 +457,8 @@ function syncTabsFromSessions(
 			: tabs[0].sessionId
 	}
 
-
-
 	const nextIndex = tabs.findIndex((t) => t.sessionId === targetSessionId)
+
 	activeTabIndex = nextIndex >= 0 ? nextIndex : 0
 
 	const activeChanged = targetSessionId !== previousActive
