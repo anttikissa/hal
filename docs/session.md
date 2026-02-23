@@ -6,7 +6,7 @@ Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
 - `session.ason` -- current message history + token totals
 - `session-previous.ason` -- previous full history after `/handoff`
-- `handoff.md` -- handoff summary markdown
+- `handoff.md` -- handoff summary markdown (consumed on next session load)
 - `prompts.ason` -- append-only user prompt log
 
 Registry metadata lives in `state/sessions/index.ason`.
@@ -30,14 +30,15 @@ Core logic: `src/session.ts`.
 2. writes `handoff.md`
 3. rotates `session.ason` -> `session-previous.ason`
 4. clears runtime cache for that session
+5. publishes estimated context for the fresh session
 
-Important: blue currently does **not** auto-inject `handoff.md` back into the next prompt path. `loadHandoff(...)` exists in `src/session.ts` but is not wired into normal restore flow.
+On next session load, `getOrLoadSessionRuntime(...)` calls `loadHandoff(...)` which reads `handoff.md`, injects it as a `[handoff]` user message, and renames the file to `handoff-previous.md`.
 
 ## Context Tracking
 
 - Max context is fixed at `200_000` tokens in `src/context.ts` (`MAX_CONTEXT`).
 - Usage from provider responses is reported after turns.
-- Runtime warns when context exceeds ~80% (`shouldWarn(...)`).
+- Runtime warns when context exceeds ~66% (`shouldWarn(...)`).
 - Estimated context at startup uses calibrated bytes->tokens ratio.
 
 ## Token Calibration
@@ -57,7 +58,7 @@ Calibration file: `state/calibration.ason`.
 ## CLI vs Web Session UX
 
 - CLI client has tab/session management behavior.
-- Web UI in blue is currently a simpler single-stream UI (no tab strip), though commands still carry `sessionId` and backend multiplexing remains session-aware.
+- Web UI is a simpler single-stream UI (no tab strip), though commands still carry `sessionId` and backend multiplexing remains session-aware.
 
 ## State Directory Summary
 

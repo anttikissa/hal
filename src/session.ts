@@ -1,3 +1,5 @@
+// See docs/session.md for architecture overview.
+
 import { mkdir, readFile, writeFile, unlink, rename, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomBytes } from 'crypto'

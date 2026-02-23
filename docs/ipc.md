@@ -76,4 +76,4 @@ Owner updates this via `publishStatus(...)` in `src/runtime/event-publisher.ts`.
 
 - Owner startup truncates `events.ason` (`resetBusEvents`) to avoid replaying stale history.
 - Event tailing uses `parseStream(..., { recover: true })` to tolerate partial writes.
-- `status` events used for transient model activity are emitted with `activity` text and are not a separate `activity` event type in blue.
+- `status` events used for transient model activity are emitted with `activity` text and are not a separate `activity` event type.
