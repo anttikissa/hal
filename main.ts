@@ -15,6 +15,7 @@ import {
 	start as startClient,
 	promoteToOwner,
 	setOwnerReleaseHandler,
+	noSessionsLeft,
 } from './src/cli/client.ts'
 
 import { startWebServer } from './src/web.ts'
@@ -23,7 +24,7 @@ import { registerProvider } from './src/provider.ts'
 import { anthropicProvider } from './src/providers/anthropic.ts'
 import { openaiProvider } from './src/providers/openai.ts'
 import { mockProvider } from './src/providers/mock.ts'
-import { STATE_DIR } from './src/state.ts'
+import { SESSIONS_INDEX, STATE_DIR } from './src/state.ts'
 import { initDebugLog } from './src/debug-log.ts'
 
 if (testMode) {
@@ -373,7 +374,7 @@ if (testMode) {
 		if (webServer) webServer.stop()
 		if (isOwner || promoted) {
 			await saveAllSessions()
-			await releaseOwner(ownerId)
+			await releaseOwner(ownerId, noSessionsLeft ? 'no-sessions' : undefined)
 		}
 		process.exit(code)
 	}

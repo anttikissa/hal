@@ -155,7 +155,7 @@ export async function claimOwner(
 	return { owner: false, currentOwnerPid: currentState.ownerPid }
 }
 
-export async function releaseOwner(ownerId: string): Promise<void> {
+export async function releaseOwner(ownerId: string, reason?: string): Promise<void> {
 	assertInit()
 	try {
 		const raw = await readFile(ownerFile, 'utf-8')
@@ -176,7 +176,7 @@ export async function releaseOwner(ownerId: string): Promise<void> {
 			id: `${Date.now()}-${process.pid}-release`,
 			type: 'line',
 			sessionId: null,
-			text: '[owner-released]',
+			text: reason ? `[owner-released] ${reason}` : '[owner-released]',
 			level: 'meta',
 			createdAt: new Date().toISOString(),
 		})
