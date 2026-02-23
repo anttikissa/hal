@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 import { basename, resolve } from 'path'
 import {
 	appendCommand as appendBusCommand,
+	appendEvent,
 	readRecentEvents,
 	readState,
 	tailEvents,
@@ -134,7 +135,6 @@ function sessionName(session: Pick<SessionInfo, 'name' | 'workingDir' | 'id'>): 
 let source: RuntimeCommand['source']
 let isOwner = false
 let stopped = false
-export let noSessionsLeft = false
 let lastContextStatus: string | null = null
 let roleLabel = ''
 let wasBusyOnLastSubmit = false
@@ -461,7 +461,14 @@ async function closeActiveTab(): Promise<void> {
 	if (!active) return
 	await appendBusCommand(makeCommand('close', source, undefined, active.sessionId))
 	if (tabs.length <= 1) {
-		noSessionsLeft = true
+		// Tell all clients (including self) there are no sessions left
+		await appendEvent({
+			id: `${Date.now()}-${process.pid}-close-last`,
+			type: 'sessions',
+			activeSessionId: null,
+			sessions: [],
+			createdAt: new Date().toISOString(),
+		})
 		stopped = true
 		tui.cancelInput()
 		return
@@ -488,7 +495,11 @@ function syncTabsFromSessions(
 	preferredActiveSessionId: string | null,
 	options: { preserveActiveOutput?: boolean; render?: boolean; bootstrap?: boolean } = {},
 ): void {
-	if (!Array.isArray(sessions) || sessions.length === 0) return
+	if (!Array.isArray(sessions) || sessions.length === 0) {
+		stopped = true
+		tui.cancelInput()
+		return
+	}
 	const preserveActiveOutput = options.preserveActiveOutput ?? true
 	if (preserveActiveOutput) captureActiveOutput()
 
@@ -690,13 +701,8 @@ function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: bool
 }
 
 function render(event: RuntimeEvent): void {
-	// Owner released — try to promote (unless no sessions left)
-	if (event.type === 'line' && typeof event.text === 'string' && event.text.startsWith('[owner-released]')) {
-		if (event.text.includes('no-sessions')) {
-			stopped = true
-			tui.cancelInput()
-			return
-		}
+	// Owner released — try to promote
+	if (event.type === 'line' && event.text === '[owner-released]') {
 		if (onOwnerReleased) onOwnerReleased()
 		return
 	}
