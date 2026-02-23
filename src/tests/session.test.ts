@@ -16,7 +16,7 @@ describe('session', () => {
 		await hal.waitForReady()
 		hal.sendLine('/reset')
 		const event = await hal.waitForLine(/\[reset\] session cleared/)
-		expect(event.level).toBe('status')
+		expect(event.level).toBe('meta')
 	})
 
 	test('/cd changes working dir', async () => {
@@ -24,7 +24,7 @@ describe('session', () => {
 		await hal.waitForReady()
 		hal.sendLine('/cd /tmp')
 		const line = await hal.waitForLine(/\[cd\].*\/tmp/)
-		expect(line.level).toBe('status')
+		expect(line.level).toBe('meta')
 		// Sessions event should reflect the new working dir
 		const sessions = await hal.waitFor(
 			(r) =>
@@ -62,6 +62,6 @@ describe('session', () => {
 		// Then cd - should go back to /tmp
 		hal.sendLine('/cd -')
 		const back = await hal.waitForLine(/\[cd\].*\/ -> \/tmp/)
-		expect(back.level).toBe('status')
+		expect(back.level).toBe('meta')
 	})
 })

@@ -178,7 +178,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 			if (queued > 0) {
 				await publishLine(
 					`[resume] processing ${queued} queued message(s)`,
-					'status',
+					'meta',
 					sessionId,
 				)
 			}
@@ -204,7 +204,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 					sessionId,
 				)
 			} else {
-				await publishLine('[drop] queue is empty', 'status', sessionId)
+				await publishLine('[drop] queue is empty', 'meta', sessionId)
 			}
 			// Unpause since there's nothing to resume
 			const runtime = getCachedSessionRuntime(sessionId)
@@ -223,13 +223,13 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		if (sessionId) {
 			const queued = sessionQueuedCommands(sessionId)
 			if (queued.length === 0) {
-				await publishLine('[queue] empty', 'status', sessionId)
+				await publishLine('[queue] empty', 'meta', sessionId)
 			} else {
-				await publishLine(`[queue] ${queued.length} message(s):`, 'status', sessionId)
+				await publishLine(`[queue] ${queued.length} message(s):`, 'meta', sessionId)
 				for (let i = 0; i < queued.length; i++) {
 					const text = queued[i].text ?? queued[i].type
 					const preview = text.length > 80 ? text.slice(0, 77) + '...' : text
-					await publishLine(`  ${i + 1}. ${preview}`, 'status', sessionId)
+					await publishLine(`  ${i + 1}. ${preview}`, 'meta', sessionId)
 				}
 			}
 		}
@@ -292,7 +292,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 	if (running >= max && !isSessionBusy(sessionId)) {
 		await publishLine(
 			`[queue] ${running}/${max} sessions busy — will run when a slot opens`,
-			'status',
+			'meta',
 			sessionId,
 		)
 	}

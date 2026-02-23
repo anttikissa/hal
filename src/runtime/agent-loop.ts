@@ -8,7 +8,7 @@ import {
 import { RESPONSE_LOG } from '../state.ts'
 import { getProvider, type Provider } from '../provider.ts'
 import { tools, runTool, RESTART_SIGNAL } from '../tools.ts'
-import { contextStatus, saveCalibration, shouldWarn } from '../context.ts'
+import { totalInputTokens, MAX_CONTEXT, saveCalibration, shouldWarn } from '../context.ts'
 import { saveSession } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
@@ -20,7 +20,7 @@ import {
 	setCalibrated,
 	type SessionRuntimeCache,
 } from './sessions.ts'
-import { publishLine, publishChunk, publishActivity } from './event-publisher.ts'
+import { publishLine, publishChunk, publishActivity, publishContext } from './event-publisher.ts'
 
 const REQ_LOG = '/tmp/hal-req.ason'
 
@@ -545,7 +545,7 @@ async function logTokenUsage(
 		const msgs = msgCount === 1 ? '1 message' : `${msgCount} messages`
 		await publishLine(
 			`[debug.tokens.sys] SYSTEM.md + AGENTS.md + tools + ${msgs} = ${totalInput} tokens`,
-			'status',
+			'meta',
 			sessionId,
 		)
 	}
@@ -573,7 +573,13 @@ async function logTokenUsage(
 	parts.push(totalPart)
 
 	if (debugTokens('spam')) {
-		await publishLine(`[debug.tokens.spam] ${parts.join(' | ')}`, 'status', sessionId)
+		await publishLine(`[debug.tokens.spam] ${parts.join(' | ')}`, 'meta', sessionId)
 	}
-	await publishLine(contextStatus(usage, runtime.messages), 'status', sessionId)
+	const used = totalInputTokens(usage)
+	await publishContext(sessionId, { used, max: MAX_CONTEXT })
+	if (debugTokens('context')) {
+		const pct = ((used / MAX_CONTEXT) * 100).toFixed(1)
+		await publishLine(`[debug.tokens.context] ${pct}%/${MAX_CONTEXT}`, 'meta', sessionId)
+	}
 }
+

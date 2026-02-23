@@ -7,6 +7,7 @@ const CONFIG_PATH = `${HAL_DIR}/config.ason`
 export interface DebugTokensConfig {
 	sys?: boolean // system prompt token count on first response per session
 	spam?: boolean // token counts on every response
+	context?: boolean // context percentage in scrollback
 }
 
 export interface DebugConfig {

@@ -48,7 +48,7 @@ export function makeCommand(
 	}
 }
 
-export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'status'
+export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta'
 
 export type RuntimeEvent =
 	| {
@@ -67,6 +67,14 @@ export type RuntimeEvent =
 			channel: 'assistant' | 'thinking'
 			createdAt: string
 	  }
+	/**
+	 * Global runtime status. Emitted on busy/idle transitions and after each
+	 * API response. Drives the TUI statusline — never shown in scrollback.
+	 *
+	 * `context` carries the latest token usage so the statusline can show a
+	 * percentage bar. The server always includes it when known; the client
+	 * computes `used / max` for display.
+	 */
 	| {
 			id: string
 			type: 'status'
@@ -77,6 +85,7 @@ export type RuntimeEvent =
 			busy: boolean
 			queueLength: number
 			activity?: string
+			context?: { used: number; max: number }
 			createdAt: string
 	  }
 	| {

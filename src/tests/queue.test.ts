@@ -16,7 +16,7 @@ describe('queue', () => {
 		await hal.waitForReady()
 		hal.sendLine('/queue')
 		const event = await hal.waitForLine(/\[queue\] empty/)
-		expect(event.level).toBe('status')
+		expect(event.level).toBe('meta')
 	})
 
 	test('/drop on empty queue shows empty', async () => {
@@ -24,7 +24,7 @@ describe('queue', () => {
 		await hal.waitForReady()
 		hal.sendLine('/drop')
 		const event = await hal.waitForLine(/\[drop\] queue is empty/)
-		expect(event.level).toBe('status')
+		expect(event.level).toBe('meta')
 	})
 
 	test('/resume on non-paused session is silent', async () => {

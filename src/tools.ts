@@ -234,7 +234,7 @@ new_content is raw file content — no hashline prefixes.`,
 
 export const RESTART_SIGNAL = '__HAL_RESTART__'
 
-type ToolLogLevel = 'info' | 'warn' | 'error' | 'tool' | 'status'
+type ToolLogLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta'
 type ToolLogger = (line: string, level?: ToolLogLevel) => void | Promise<void>
 
 function resolveToolPath(cwd: string, maybePath?: string): string {

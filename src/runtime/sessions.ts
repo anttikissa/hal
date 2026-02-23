@@ -2,7 +2,6 @@ import { resolve } from 'path'
 import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../system-prompt.ts'
 import {
-	estimatedContextStatus,
 	estimateMessageTokens,
 	estimateTokensSync,
 	getCalibration,
@@ -31,7 +30,7 @@ import {
 } from './command-scheduler.ts'
 import { processCommand } from './process-command.ts'
 import { handleCommand } from './handle-command.ts'
-import { initPublisher, publishLine, publishStatus, publishSessions } from './event-publisher.ts'
+import { initPublisher, publishLine, publishStatus, publishSessions, publishContext } from './event-publisher.ts'
 
 // Runtime cache per session
 export interface SessionRuntimeCache {
@@ -198,16 +197,13 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	ensureSessionQueue(sessionId)
 	await reloadSystemPromptForSession(sessionId, runtime)
 
-	// Emit context estimate so the status bar is populated immediately
+	// Emit context estimate so the statusline is populated immediately
 	const cal = await getCalibration()
 	const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 	let msgTokens = 0
 	for (const msg of messages) msgTokens += estimateMessageTokens(msg, cal)
-	await publishLine(
-		estimatedContextStatus(sysTokenEst, msgTokens, messages.length),
-		'status',
-		sessionId,
-	)
+	const used = sysTokenEst + msgTokens
+	await publishContext(sessionId, { used, max: MAX_CONTEXT })
 
 	return runtime
 }
@@ -289,13 +285,13 @@ async function initialize(): Promise<void> {
 		const pct = ((totalTokens / MAX_CONTEXT) * 100).toFixed(0)
 		await publishLine(
 			`[session] restored ${runtime.messages.length} messages (~${pct}% context) — ${sessionDir(initialSessionId)}`,
-			'status',
+			'meta',
 			initialSessionId,
 		)
 	} else {
 		await publishLine(
 			`[session] new session — ${sessionDir(initialSessionId)}`,
-			'status',
+			'meta',
 			initialSessionId,
 		)
 	}
@@ -306,7 +302,7 @@ async function initialize(): Promise<void> {
 	const promptDesc = runtime.systemPromptFiles.length > 0
 		? `  prompt=${runtime.systemPromptFiles.join(', ')}`
 		: ''
-	await publishLine(`[model] ${fullModel}  cwd=${cwd}${promptDesc}`, 'status', initialSessionId)
+	await publishLine(`[model] ${fullModel}  cwd=${cwd}${promptDesc}`, 'meta', initialSessionId)
 	await emitStatus(true)
 }
 

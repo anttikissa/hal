@@ -14,13 +14,14 @@ import {
 	publishLine,
 	publishCommandPhase,
 	publishActivity,
+	publishContext,
 } from './event-publisher.ts'
 import { processPrompt } from './process-prompt.ts'
 import {
-	estimatedContextStatus,
 	estimateMessageTokens,
 	getCalibration,
 	estimateTokensSync,
+	MAX_CONTEXT,
 } from '../context.ts'
 import {
 	getOrLoadSessionRuntime,
@@ -142,23 +143,20 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 
 	markSessionAsActive(newId)
 	await persistRegistry()
-	await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'status', sessionId)
+	await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'meta', sessionId)
 	await emitSessions(true)
 	await emitStatus(true)
 }
 
 
-/** Publish an estimated context % so the status bar stays up-to-date after session changes */
+/** Emit an estimated context so the statusline stays up-to-date after session changes */
 async function publishEstimatedContext(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	const cal = await getCalibration()
 	const systemTokens = estimateTokensSync(runtime.systemBytes, cal)
 	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m, cal), 0)
-	await publishLine(
-		estimatedContextStatus(systemTokens, msgTokens, runtime.messages.length),
-		'status',
-		sessionId,
-	)
+	const used = systemTokens + msgTokens
+	await publishContext(sessionId, { used, max: MAX_CONTEXT })
 }
 
 /** Max chars per tool result in handoff text — full output isn't needed for summarization */
@@ -227,7 +225,7 @@ async function runHandoff(sessionId: string, text?: string): Promise<void> {
 	}
 
 	await publishActivity('Generating handoff summary...', sessionId)
-	await publishLine('[handoff] generating summary...', 'status', sessionId)
+	await publishLine('[handoff] generating summary...', 'meta', sessionId)
 
 	// Use compact model for handoff summary (derived from session's model)
 	const sessionModel = getSessionModel(sessionId)
@@ -273,10 +271,10 @@ IMPORTANT: Do NOT reproduce the conversation. Synthesize and summarize. Be speci
 	await publishActivity('', sessionId)
 	await publishLine(
 		'[handoff] summary saved to handoff.md, session rotated to session-previous.ason',
-		'status',
+		'meta',
 		sessionId,
 	)
-	await publishLine('[handoff] new session started — handoff context loaded', 'status', sessionId)
+	await publishLine('[handoff] new session started — handoff context loaded', 'meta', sessionId)
 
 	// Clear runtime cache so next prompt loads fresh, then publish updated context
 	const { getSessionCache } = await import('./sessions.ts')
@@ -305,7 +303,7 @@ async function runReset(sessionId: string): Promise<void> {
 		await persistRegistry()
 	}
 
-	await publishLine('[reset] session cleared', 'status', sessionId)
+	await publishLine('[reset] session cleared', 'meta', sessionId)
 	await publishEstimatedContext(sessionId)
 	await emitSessions(true)
 }
@@ -343,7 +341,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	const loaded = await reloadSystemPromptForSession(sessionId)
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
 
-	await publishLine(`[model] switched to ${fullModel}${promptDesc}`, 'status', sessionId)
+	await publishLine(`[model] switched to ${fullModel}${promptDesc}`, 'meta', sessionId)
 }
 
 async function runSystem(sessionId: string): Promise<void> {
@@ -406,7 +404,7 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 	const loaded = await reloadSystemPromptForSession(sessionId)
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
 	const dirMsg = previous !== next ? `${previous} -> ${next}` : next
-	await publishLine(`[cd] ${dirMsg}${promptDesc}`, 'status', sessionId)
+	await publishLine(`[cd] ${dirMsg}${promptDesc}`, 'meta', sessionId)
 	await publishEstimatedContext(sessionId)
 	await emitSessions(true)
 
@@ -434,7 +432,7 @@ export async function runClose(sessionId: string): Promise<void> {
 		setActiveSessionId(registry.sessions[0]?.id ?? null)
 	}
 	await persistRegistry()
-	await publishLine(`[close] session ${sessionId} closed`, 'status', null)
+	await publishLine(`[close] session ${sessionId} closed`, 'meta', null)
 	await emitSessions(true)
 }
 

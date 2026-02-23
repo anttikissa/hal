@@ -49,6 +49,10 @@ import { countSourceStats } from '../utils/cloc.ts'
 import { loadConfig, MODEL_ALIASES } from '../config.ts'
 import { loadActiveTheme } from './format/theme.ts'
 
+function fmtK(tokens: number): string {
+	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens)
+}
+
 
 export class Client {
 	async command(type: CommandType, text?: string): Promise<void> {
@@ -475,10 +479,7 @@ function hydrateTabsFromRecentLines(events: RuntimeEvent[], maxLinesPerTab = 120
 		const tab = findTabBySessionId(sessionId)
 		if (!tab) continue
 
-		if (event.type === 'line' && event.level === 'status') {
-			updateTabStatusMetadata(tab, event.text)
-			continue
-		}
+		if (event.type === 'line' && event.level === 'meta') continue
 
 		const formatted = pushEvent(event, source)
 		if (!formatted) continue
@@ -556,11 +557,15 @@ async function bootstrapState(): Promise<void> {
 		const recent = await readRecentEvents(500)
 		hydrateTabsFromRecentLines(recent)
 		for (const event of recent) {
-			if (event.type !== 'line' || event.level !== 'status') continue
+			if (event.type !== 'status' || !event.context) continue
 			const sessionId = event.sessionId ?? activeTab()?.sessionId ?? null
 			if (!sessionId) continue
 			const tab = findTabBySessionId(sessionId)
-			if (tab) updateTabStatusMetadata(tab, event.text)
+			if (tab) {
+				const { used, max } = event.context
+				const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
+				tab.contextStatus = `${pct}%/${fmtK(max)}`
+			}
 		}
 
 		// Load persisted input history for each tab
@@ -588,14 +593,14 @@ async function appendCommand(type: RuntimeCommand['type'], text?: string): Promi
 	await appendBusCommand(makeCommand(type, source, text, activeSessionId()))
 }
 
-function updateTabStatusMetadata(tab: CliTab, line: string): void {
-	const stripped = stripAnsi(line).trim()
-	if (stripped.startsWith('[context]')) tab.contextStatus = line
-}
-
 function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: boolean): void {
-	if (event.type === 'line' && event.level === 'status') {
-		updateTabStatusMetadata(tab, event.text)
+	if (event.type === 'line' && event.level === 'meta') {
+		if (renderToScreen && tab === activeTab()) renderBusyStatus()
+	}
+	if (event.type === 'status' && event.context) {
+		const { used, max } = event.context
+		const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
+		tab.contextStatus = `${pct}%/${fmtK(max)}`
 		if (renderToScreen && tab === activeTab()) lastContextStatus = tab.contextStatus
 	}
 
@@ -689,7 +694,6 @@ function renderTabsForStatus(): string {
 
 function renderBusyStatus(): void {
 	const tabStr = renderTabsForStatus()
-	const contextOnly = lastContextStatus?.replace(/^\[context\]\s*/, '') ?? ''
-	const parts = [roleLabel, contextOnly].filter(Boolean)
+	const parts = [roleLabel, lastContextStatus ?? ''].filter(Boolean)
 	setStatusLine(tabStr, parts.join('  '))
 }

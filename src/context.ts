@@ -4,7 +4,7 @@ import { CALIBRATION_FILE } from './state.ts'
 
 export const MAX_CONTEXT = 200_000
 
-function totalInputTokens(usage: any): number {
+export function totalInputTokens(usage: any): number {
 	return (
 		(usage.input_tokens ?? 0) +
 		(usage.cache_creation_input_tokens ?? 0) +
@@ -12,29 +12,6 @@ function totalInputTokens(usage: any): number {
 	)
 }
 
-function fmtTokens(n: number): string {
-	return n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`
-}
-
-export function contextStatus(usage: any, messages: any[]): string {
-	const tokens = totalInputTokens(usage)
-	const ratio = tokens / MAX_CONTEXT
-	const pct = (ratio * 100).toFixed(1)
-	const color = ratio >= 0.8 ? '\x1b[31m' : ratio >= 0.5 ? '\x1b[33m' : '\x1b[32m'
-	return `${color}[context] Context: ${pct}%/${fmtTokens(MAX_CONTEXT)}\x1b[0m`
-}
-
-export function estimatedContextStatus(
-	systemTokens: number,
-	messageTokens: number,
-	messageCount: number,
-): string {
-	const tokens = systemTokens + messageTokens
-	const ratio = tokens / MAX_CONTEXT
-	const pct = (ratio * 100).toFixed(1)
-	const color = ratio >= 0.8 ? '\x1b[31m' : ratio >= 0.5 ? '\x1b[33m' : '\x1b[32m'
-	return `${color}[context] Context: ~${pct}%/${fmtTokens(MAX_CONTEXT)}\x1b[0m`
-}
 
 export function shouldWarn(usage: any): boolean {
 	return totalInputTokens(usage) / MAX_CONTEXT >= 0.666

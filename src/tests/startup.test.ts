@@ -21,7 +21,7 @@ describe('startup', () => {
 		await hal.waitForReady()
 		const event = await hal.waitForLine(/\[session\]/)
 		expect(event.text).toContain('[session]')
-		expect(event.level).toBe('status')
+		expect(event.level).toBe('meta')
 	})
 
 	test('emits model event', async () => {
@@ -29,14 +29,16 @@ describe('startup', () => {
 		await hal.waitForReady()
 		const event = await hal.waitForLine(/\[model\]/)
 		expect(event.text).toContain('[model]')
-		expect(event.level).toBe('status')
+		expect(event.level).toBe('meta')
 	})
 
 	test('emits context status', async () => {
 		hal = await startHal()
 		await hal.waitForReady()
-		const event = await hal.waitForLine(/\[context\]/)
-		expect(event.text).toContain('Context:')
+		const event = await hal.waitFor((e) => e.type === 'status' && !!e.context)
+		expect(event.context).toBeDefined()
+		expect(event.context.used).toBeGreaterThanOrEqual(0)
+		expect(event.context.max).toBeGreaterThan(0)
 	})
 
 	test('emits sessions list', async () => {

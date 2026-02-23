@@ -252,6 +252,7 @@ if (testMode) {
 					busy: event.busy,
 					busySessions: event.busySessionIds,
 					session: event.sessionId,
+					...(event.context ? { context: event.context } : {}),
 				})
 				// Emit ready after first full status (runtime initialized)
 				if (!readySent) {

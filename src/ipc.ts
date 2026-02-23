@@ -177,7 +177,7 @@ export async function releaseOwner(ownerId: string): Promise<void> {
 			type: 'line',
 			sessionId: null,
 			text: '[owner-released]',
-			level: 'status',
+			level: 'meta',
 			createdAt: new Date().toISOString(),
 		})
 	} catch {}
