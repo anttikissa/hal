@@ -411,6 +411,8 @@ function syncTabsFromSessions(
 
 	const previousById = new Map(tabs.map((t) => [t.sessionId, t]))
 	const previousActive = activeTab()?.sessionId ?? null
+	const previousActiveIndex = activeTabIndex
+
 
 	const forkOutput = pendingForkOutput
 	const switchToFork = pendingForkSwitch
@@ -436,21 +438,34 @@ function syncTabsFromSessions(
 		}
 	})
 
+	// When active tab was closed, pick its left neighbor (or right if it was first)
+	const previousActiveGone = previousActive && !tabs.some((t) => t.sessionId === previousActive)
+	const neighborIndex = previousActiveIndex > 0 ? previousActiveIndex - 1 : 0
+	const neighborId = previousActiveGone
+		? tabs[Math.min(neighborIndex, tabs.length - 1)]?.sessionId ?? null
+		: null
+
 	const targetSessionId =
 		// After fork, switch focus to the new tab
 		(switchToFork && forkedSessionId
 			? forkedSessionId
 			: null) ??
+		// Active tab still exists — keep it
 		(previousActive && tabs.some((t) => t.sessionId === previousActive)
 			? previousActive
 			: null) ??
+		// Active tab closed — pick neighbor
+		neighborId ??
+		// Server's preferred active
 		(preferredActiveSessionId && tabs.some((t) => t.sessionId === preferredActiveSessionId)
 			? preferredActiveSessionId
 			: null) ??
 		tabs[0].sessionId
 
+
 	const nextIndex = tabs.findIndex((t) => t.sessionId === targetSessionId)
 	activeTabIndex = nextIndex >= 0 ? nextIndex : 0
+
 	const activeChanged = targetSessionId !== previousActive
 	if (options.render ?? true) applyActiveTabSnapshot(activeChanged)
 	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
