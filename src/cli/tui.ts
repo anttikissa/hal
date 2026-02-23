@@ -1009,6 +1009,15 @@ export function input(promptStr: string): Promise<string | null> {
 	})
 }
 
+export function cancelInput(): void {
+	if (waitingResolve) {
+		const r = waitingResolve
+		waitingResolve = null
+		r(null)
+	}
+}
+
+
 export function prompt(message: string, promptStr: string): Promise<string | null> {
 	write(`${message}\n`)
 	return input(promptStr)

@@ -382,11 +382,11 @@ async function createTab(): Promise<void> {
 async function closeActiveTab(): Promise<void> {
 	const active = activeTab()
 	if (!active) return
+	await appendBusCommand(makeCommand('close', source, undefined, active.sessionId))
 	if (tabs.length <= 1) {
-		pushLocal('local.warn', '[tabs] cannot close last tab (type exit to quit)')
+		tui.cancelInput()
 		return
 	}
-	await appendBusCommand(makeCommand('close', source, undefined, active.sessionId))
 	pushLocal('local.queue', `close tab ${active.sessionId.slice(0, 8)}`)
 }
 
