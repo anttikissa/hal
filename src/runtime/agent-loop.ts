@@ -21,8 +21,10 @@ import {
 	getSessionModel,
 	busySessions,
 	emitStatus,
+	sessionMetaSnapshot,
 	type SessionRuntimeCache,
 } from './sessions.ts'
+
 import { publishLine, publishChunk, publishActivity, publishContext } from './event-publisher.ts'
 
 const REQ_LOG = '/tmp/hal-req.ason'
@@ -160,7 +162,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			}
 
 			if (shouldRestart) {
-				await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+				await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 				process.exit(100)
 			}
 		}
@@ -173,7 +175,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	busySessions.delete(sessionId)
 	await emitStatus(true)
 
-	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
 	if (runtime.lastUsage && shouldWarn(runtime.lastUsage)) {
 		await publishLine(

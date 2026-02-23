@@ -61,6 +61,32 @@ function promptsPath(id: string): string {
 	return `${sessionDir(id)}/prompts.ason`
 }
 
+function metaPath(id: string): string {
+	return `${sessionDir(id)}/meta.ason`
+}
+
+export interface SessionMeta {
+	workingDir: string
+	model?: string
+	updatedAt: string
+	lastPrompt?: string
+}
+
+export async function saveSessionMeta(id: string, meta: SessionMeta): Promise<void> {
+	await ensureSessionDir(id)
+	await writeFile(metaPath(id), stringify(meta) + '\n')
+}
+
+export async function loadSessionMeta(id: string): Promise<SessionMeta | null> {
+	const path = metaPath(id)
+	if (!existsSync(path)) return null
+	try {
+		return parse(await readFile(path, 'utf-8')) as SessionMeta
+	} catch {
+		return null
+	}
+}
+
 async function ensureSessionDir(id: string): Promise<void> {
 	const dir = sessionDir(id)
 	if (!existsSync(dir)) await mkdir(dir, { recursive: true })
@@ -142,10 +168,27 @@ export async function loadSession(
 	}
 }
 
+/** Extract the last user prompt text from messages (skipping internal markers). */
+export function extractLastPrompt(messages: any[]): string {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i]
+		if (msg.role !== 'user') continue
+		const content = typeof msg.content === 'string'
+			? msg.content
+			: Array.isArray(msg.content)
+				? msg.content.find((b: any) => b.type === 'text')?.text ?? ''
+				: ''
+		if (content.startsWith('[')) continue
+		return content.split('\n')[0].slice(0, 120)
+	}
+	return ''
+}
+
 export async function saveSession(
 	sessionId: string,
 	messages: any[],
 	tokenTotals: TokenTotals,
+	meta?: Omit<SessionMeta, 'updatedAt' | 'lastPrompt'>,
 ): Promise<void> {
 	await ensureSessionDir(sessionId)
 	const path = sessionPath(sessionId)
@@ -161,6 +204,13 @@ export async function saveSession(
 	}
 	const session: SessionFile = { messages, tokenTotals, createdAt, updatedAt: now }
 	await writeFile(path, stringify(session) + '\n')
+	if (meta) {
+		await saveSessionMeta(sessionId, {
+			...meta,
+			updatedAt: now,
+			lastPrompt: extractLastPrompt(messages),
+		})
+	}
 }
 
 export async function clearSession(sessionId: string): Promise<void> {

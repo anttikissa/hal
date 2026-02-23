@@ -75,7 +75,14 @@ export class Client {
 	async closeTab(): Promise<void> {
 		await closeActiveTab()
 	}
+	async openSession(sessionId: string, workingDir: string): Promise<void> {
+		await openSessionTab(sessionId, workingDir)
+	}
+	getActiveSessionIds(): string[] {
+		return tabs.map((t) => t.sessionId)
+	}
 }
+
 
 const ALL_MODELS = [...Object.keys(MODEL_ALIASES), ...Object.values(MODEL_ALIASES)]
 
@@ -394,6 +401,41 @@ async function createTab(): Promise<void> {
 	}
 	pushLocal('local.tabs', hint)
 }
+
+async function openSessionTab(sessionId: string, workingDir: string): Promise<void> {
+	if (tabs.length >= 9) {
+		pushLocal('local.warn', '[tabs] max 9 tabs')
+		return
+	}
+	// If already open, just switch to it
+	const existing = tabs.findIndex((t) => t.sessionId === sessionId)
+	if (existing >= 0) {
+		switchToTab(existing)
+		pushLocal('local.tab', `[restore] switched to existing tab ${existing + 1}`)
+		return
+	}
+	captureActiveOutput()
+	const inputHistory = await loadInputHistory(sessionId)
+	tabs.push({
+		sessionId,
+		workingDir,
+		name: sessionName({ id: sessionId, name: undefined, workingDir }),
+		output: '',
+		contextStatus: null,
+		activity: '',
+		busy: false,
+		paused: false,
+		inputHistory,
+		inputDraft: '',
+		inputCursor: 0,
+		bootstrapSent: false,
+	})
+
+	activeTabIndex = tabs.length - 1
+	applyActiveTabSnapshot(true)
+	pushLocal('local.tab', `[restore] opened session ${sessionId} in tab ${activeTabIndex + 1}`)
+}
+
 
 async function closeActiveTab(): Promise<void> {
 	const active = activeTab()

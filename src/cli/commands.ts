@@ -1,5 +1,10 @@
+import { readdir } from 'fs/promises'
+import { existsSync } from 'fs'
 import type { Client } from './client.ts'
 import { logSnapshot, getDebugLogPath, saveBugReport } from '../debug-log.ts'
+import { SESSIONS_DIR } from '../state.ts'
+import { loadSessionMeta, timeSince, type SessionMeta } from '../session.ts'
+
 
 type Handler = (args: string, client: Client) => Promise<void> | void
 
@@ -113,6 +118,76 @@ async function fork(_args: string, client: Client): Promise<void> {
 	client.log('local.queue', 'fork')
 }
 
+interface RestorableSession {
+	id: string
+	meta: SessionMeta
+}
+
+// Remembered from last /restore listing
+let lastRestoreList: RestorableSession[] = []
+
+async function listClosedSessions(activeIds: Set<string>): Promise<RestorableSession[]> {
+	if (!existsSync(SESSIONS_DIR)) return []
+	const entries = await readdir(SESSIONS_DIR, { withFileTypes: true })
+	const results: RestorableSession[] = []
+
+	for (const entry of entries) {
+		if (!entry.isDirectory() || !entry.name.startsWith('s-')) continue
+		if (activeIds.has(entry.name)) continue
+		const meta = await loadSessionMeta(entry.name)
+		if (!meta) continue
+		results.push({ id: entry.name, meta })
+	}
+
+	results.sort((a, b) => new Date(b.meta.updatedAt).getTime() - new Date(a.meta.updatedAt).getTime())
+	return results.slice(0, 8)
+}
+
+async function restore(args: string, client: Client): Promise<void> {
+	const arg = args.trim()
+
+	if (!arg) {
+		const activeIds = new Set(client.getActiveSessionIds())
+		const sessions = await listClosedSessions(activeIds)
+		if (sessions.length === 0) {
+			client.log('local.status', '[restore] no closed sessions found')
+			return
+		}
+		lastRestoreList = sessions
+		const lines = sessions.map((s, i) => {
+			const num = `${i + 1}.`
+			const age = timeSince(s.meta.updatedAt)
+			const model = s.meta.model ? `  ${s.meta.model}` : ''
+			const preview = s.meta.lastPrompt ? ` — ${s.meta.lastPrompt}` : ''
+			return `  ${num} ${s.id}  ${age}${model}${preview}`
+		})
+		client.log('local.status', `[restore] closed sessions:\n${lines.join('\n')}\n  /restore <number> or /restore <session-id>`)
+		return
+	}
+
+	// Resolve arg to a session
+	const num = parseInt(arg, 10)
+	let target: RestorableSession | undefined
+	if (!isNaN(num) && num >= 1 && num <= lastRestoreList.length) {
+		target = lastRestoreList[num - 1]
+	} else {
+		const id = arg.startsWith('s-') ? arg : `s-${arg}`
+		target = lastRestoreList.find((s) => s.id === id)
+		if (!target) {
+			const meta = await loadSessionMeta(id)
+			if (meta) target = { id, meta }
+		}
+	}
+
+	if (!target) {
+		client.log('local.warn', `[restore] session not found: ${arg}`)
+		return
+	}
+
+	await client.openSession(target.id, target.meta.workingDir)
+}
+
+
 function exit(_args: string, _client: Client): void {}
 
 const COMMANDS: Record<string, Handler> = {
@@ -133,8 +208,10 @@ const COMMANDS: Record<string, Handler> = {
 	snapshot,
 	bug,
 	fork,
+	restore,
 	exit,
 }
+
 
 const ALIASES: Record<string, string> = {
 	bye: 'exit',

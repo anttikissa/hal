@@ -1,6 +1,6 @@
 import { resolve, isAbsolute } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { clearSession, performHandoff, saveSession } from '../session.ts'
+import { clearSession, performHandoff, saveSession, saveSessionMeta, extractLastPrompt } from '../session.ts'
 import {
 	loadConfig,
 	resolveModel,
@@ -37,6 +37,7 @@ import {
 	busySessions,
 	previousWorkingDirBySession,
 	getHalDir,
+	sessionMetaSnapshot,
 } from './sessions.ts'
 
 export async function dropQueuedCommands(reason: string, sessionId: string): Promise<number> {
@@ -79,7 +80,6 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 
 			// 'close' and 'fork' are handled immediately in processCommand (bypass scheduler)
 
-
 			case 'restart':
 				await saveSessionBeforeExit(sessionId)
 				process.exit(100)
@@ -100,7 +100,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	// Save current runtime state to disk before copying
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (runtime) {
-		await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+		await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 	}
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
@@ -145,7 +145,6 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	await emitSessions(true)
 	await emitStatus(true)
 }
-
 
 /** Emit an estimated context so the statusline stays up-to-date after session changes */
 async function publishEstimatedContext(sessionId: string): Promise<void> {
@@ -292,7 +291,6 @@ async function runReset(sessionId: string): Promise<void> {
 	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
 
-
 	const meta = getSessionMeta(sessionId)
 	if (meta) {
 		meta.messageCount = 0
@@ -332,6 +330,12 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	runtime.messages.push({
 		role: 'user',
 		content: `[model changed from ${prevModel} to ${fullModel}]`,
+	})
+
+	await saveSessionMeta(sessionId, {
+		...sessionMetaSnapshot(sessionId),
+		updatedAt: new Date().toISOString(),
+		lastPrompt: extractLastPrompt(runtime.messages),
 	})
 
 	// Reload system prompt for new model
@@ -399,6 +403,13 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 		await persistRegistry()
 	}
 
+	const runtime = await getOrLoadSessionRuntime(sessionId)
+	await saveSessionMeta(sessionId, {
+		...sessionMetaSnapshot(sessionId),
+		updatedAt: new Date().toISOString(),
+		lastPrompt: extractLastPrompt(runtime.messages),
+	})
+
 	const loaded = await reloadSystemPromptForSession(sessionId)
 	const dirMsg = previous !== next ? `${previous} -> ${next}` : next
 	await publishLine(`[cd] ${dirMsg}`, 'meta', sessionId)
@@ -417,7 +428,7 @@ export async function runClose(sessionId: string): Promise<void> {
 		runtime.activeAbort?.abort()
 	}
 
-	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } =
 		await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
@@ -438,5 +449,5 @@ export async function runClose(sessionId: string): Promise<void> {
 
 async function saveSessionBeforeExit(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	await saveSession(sessionId, runtime.messages, runtime.tokenTotals)
+	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 }

@@ -92,6 +92,14 @@ export function getSessionModel(sessionId: string | null): string {
 	return resolveModel(meta?.model ?? loadConfig().model)
 }
 
+/** Build meta snapshot for persisting alongside session data. */
+export function sessionMetaSnapshot(sessionId: string): { workingDir: string; model?: string } {
+	return {
+		workingDir: getSessionWorkingDir(sessionId),
+		model: getSessionModel(sessionId),
+	}
+}
+
 export function hasSession(sessionId: string): boolean {
 	return Boolean(getSessionMeta(sessionId))
 }
@@ -138,7 +146,7 @@ export async function persistRegistry(): Promise<void> {
 /** Save all in-memory session state to disk. Called on shutdown. */
 export async function saveAllSessions(): Promise<void> {
 	for (const [id, runtime] of sessionCache) {
-		await saveSession(id, runtime.messages, runtime.tokenTotals)
+		await saveSession(id, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(id))
 	}
 	await saveSessionRegistry(registry)
 }
