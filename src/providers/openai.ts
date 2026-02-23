@@ -1,4 +1,4 @@
-import type { Provider, StreamEvent, ToolDef } from '../provider.ts'
+import { Provider, type StreamEvent, type ToolDef } from '../provider.ts'
 import { getProviderAuth, updateProviderAuth } from '../auth.ts'
 
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
@@ -231,12 +231,12 @@ interface StreamState {
 let streamState: StreamState = { itemMap: new Map(), nextBlockIndex: 0, toolInputs: new Map() }
 let currentSessionId = ''
 
-export const openaiProvider: Provider = {
-	name: 'openai',
+class OpenAIProvider extends Provider {
+	name = 'openai'
 
 	async refreshAuth() {
 		await doRefresh()
-	},
+	}
 
 	async fetch(body: any, signal?: AbortSignal) {
 		const token = getToken()
@@ -261,9 +261,9 @@ export const openaiProvider: Provider = {
 			body: JSON.stringify(body),
 			signal,
 		})
-	},
+	}
 
-	buildRequestBody({ model, messages, system, tools, maxTokens, sessionId }) {
+	buildRequestBody({ model, messages, system, tools, maxTokens, sessionId }: any) {
 		streamState = { itemMap: new Map(), nextBlockIndex: 0, toolInputs: new Map() }
 		if (sessionId) currentSessionId = sessionId
 
@@ -296,7 +296,7 @@ export const openaiProvider: Provider = {
 		}
 
 		return body
-	},
+	}
 
 	parseSSE(rawEvent: { type: string; data: string }): StreamEvent[] {
 		let event: any
@@ -430,40 +430,9 @@ export const openaiProvider: Provider = {
 		}
 
 		return []
-	},
+	}
 
-	finalizeBlocks(blocks: any[]): any[] {
-		for (const block of blocks) {
-			if (!block) continue
-			if (block.type === 'tool_use' && typeof block.input === 'string') {
-				try {
-					block.input = JSON.parse(block.input)
-				} catch {
-					block.input = {}
-				}
-			}
-		}
-		return blocks
-	},
-
-	addCacheBreakpoints(msgs: any[]): any[] {
-		return msgs // OpenAI doesn't use Anthropic-style cache breakpoints
-	},
-
-	toolResultMessage(toolUseId: string, content: string) {
-		return { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUseId, content }] }
-	},
-
-	normalizeUsage(usage: Record<string, number>) {
-		return {
-			input: usage.input_tokens ?? 0,
-			output: usage.output_tokens ?? 0,
-			cacheCreate: usage.cache_creation_input_tokens ?? 0,
-			cacheRead: usage.cache_read_input_tokens ?? 0,
-		}
-	},
-
-	async complete({ model, system, userMessage, maxTokens }) {
+	async complete({ model, system, userMessage, maxTokens }: any) {
 		await doRefresh()
 		const token = getToken()
 		const codex = usesCodex(token)
@@ -492,5 +461,7 @@ export const openaiProvider: Provider = {
 		}
 		const truncated = data.status === 'incomplete' && data.incomplete_details?.reason === 'max_output_tokens'
 		return { text: parts.join('\n') || 'No response.', truncated }
-	},
+	}
 }
+
+export const openaiProvider = new OpenAIProvider()

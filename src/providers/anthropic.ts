@@ -1,4 +1,4 @@
-import type { Provider, StreamEvent, ToolDef } from '../provider.ts'
+import { Provider } from '../provider.ts'
 import { getProviderAuth, updateProviderAuth } from '../auth.ts'
 
 const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
@@ -28,13 +28,12 @@ async function doRefresh(): Promise<void> {
 	})
 }
 
-export const anthropicProvider: Provider = {
-	name: 'anthropic',
-
+class AnthropicProvider extends Provider {
+	name = 'anthropic'
 
 	async refreshAuth() {
 		await doRefresh()
-	},
+	}
 
 	async fetch(body: any, signal?: AbortSignal) {
 		const auth = getProviderAuth('anthropic')
@@ -50,11 +49,11 @@ export const anthropicProvider: Provider = {
 			body: JSON.stringify(body),
 			signal,
 		})
-	},
+	}
 
-	buildRequestBody({ model, messages, system, tools, maxTokens }) {
+	buildRequestBody({ model, messages, system, tools, maxTokens }: any) {
 		const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(model)
-		const body: any = {
+		return {
 			model,
 			max_tokens: maxTokens,
 			stream: true,
@@ -65,87 +64,7 @@ export const anthropicProvider: Provider = {
 				? { type: 'adaptive' }
 				: { type: 'enabled', budget_tokens: Math.min(10000, maxTokens - 1) },
 		}
-		return body
-	},
-
-	parseSSE(rawEvent: { type: string; data: string }): StreamEvent[] {
-		let event: any
-		try {
-			event = JSON.parse(rawEvent.data)
-		} catch {
-			return []
-		}
-
-		if (event.type === 'message_start') {
-			if (event.message?.usage) return [{ type: 'usage', usage: event.message.usage }]
-			return []
-		}
-
-		if (event.type === 'content_block_start') {
-			const block = event.content_block
-			const idx = event.index
-			if (block.type === 'thinking') return [{ type: 'thinking_start', index: idx }]
-			if (block.type === 'text') return [{ type: 'text_start', index: idx }]
-			if (block.type === 'tool_use')
-				return [{ type: 'tool_use_start', index: idx, id: block.id, name: block.name }]
-			if (block.type === 'server_tool_use' && block.name === 'web_search') {
-				return [{ type: 'raw_block', index: idx, block: { ...block } }]
-			}
-			if (block.type === 'web_search_tool_result') {
-				const results = (block.content || [])
-					.filter((r: any) => r.type === 'web_search_result')
-					.map((r: any, i: number) => `${i + 1}. ${r.title} - ${r.url}`)
-					.join('\n')
-				const events: StreamEvent[] = [
-					{ type: 'raw_block', index: idx, block: { ...block } },
-				]
-				if (results) events.push({ type: 'web_search_results', results })
-				return events
-			}
-			return []
-		}
-
-		if (event.type === 'content_block_delta') {
-			const delta = event.delta
-			const idx = event.index
-			if (delta.type === 'thinking_delta')
-				return [{ type: 'thinking_delta', index: idx, text: delta.thinking }]
-			if (delta.type === 'text_delta')
-				return [{ type: 'text_delta', index: idx, text: delta.text }]
-			if (delta.type === 'input_json_delta')
-				return [{ type: 'tool_input_delta', index: idx, json: delta.partial_json }]
-			if (delta.type === 'signature_delta')
-				return [{ type: 'signature_delta', index: idx, signature: delta.signature }]
-		}
-
-		if (event.type === 'content_block_stop') {
-			return [{ type: 'block_stop', index: event.index }]
-		}
-
-		if (event.type === 'message_delta') {
-			const events: StreamEvent[] = []
-			if (event.delta?.stop_reason)
-				events.push({ type: 'stop', stopReason: event.delta.stop_reason })
-			if (event.usage) events.push({ type: 'usage', usage: event.usage })
-			return events
-		}
-
-		return []
-	},
-
-	finalizeBlocks(blocks: any[]): any[] {
-		for (const block of blocks) {
-			if (!block) continue
-			if (block.type === 'tool_use' && typeof block.input === 'string') {
-				try {
-					block.input = JSON.parse(block.input)
-				} catch {
-					block.input = {}
-				}
-			}
-		}
-		return blocks
-	},
+	}
 
 	addCacheBreakpoints(msgs: any[]): any[] {
 		if (msgs.length === 0) return msgs
@@ -171,25 +90,9 @@ export const anthropicProvider: Provider = {
 			}
 		}
 		return cloned
-	},
+	}
 
-	toolResultMessage(toolUseId: string, content: string) {
-		return {
-			role: 'user',
-			content: [{ type: 'tool_result', tool_use_id: toolUseId, content }],
-		}
-	},
-
-	normalizeUsage(usage: Record<string, number>) {
-		return {
-			input: usage.input_tokens ?? 0,
-			output: usage.output_tokens ?? 0,
-			cacheCreate: usage.cache_creation_input_tokens ?? 0,
-			cacheRead: usage.cache_read_input_tokens ?? 0,
-		}
-	},
-
-	async complete({ model, system, userMessage, maxTokens }) {
+	async complete({ model, system, userMessage, maxTokens }: any) {
 		await doRefresh()
 		const body = {
 			model,
@@ -203,5 +106,7 @@ export const anthropicProvider: Provider = {
 		const text = data.content?.find((b: any) => b.type === 'text')?.text || 'No response.'
 		const truncated = data.stop_reason === 'max_tokens'
 		return { text, truncated }
-	},
+	}
 }
+
+export const anthropicProvider = new AnthropicProvider()
