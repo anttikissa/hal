@@ -163,7 +163,10 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 	}
 
+	await publishActivity('', sessionId)
+
 	runtime.activeAbort = null
+
 	busySessions.delete(sessionId)
 	await emitStatus(true)
 
