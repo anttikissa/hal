@@ -223,7 +223,7 @@ export async function reloadSystemPromptForSession(
 	})
 	target.systemPrompt = blocks
 	target.systemBytes = systemBytes
-	for (const w of warnings) await publishLine(`[warn] ${w}`, 'warn', sessionId)
+	for (const w of warnings) await publishLine(`[error] ${w}`, 'error', sessionId)
 	return loaded
 }
 
