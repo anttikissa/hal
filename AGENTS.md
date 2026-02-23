@@ -10,6 +10,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Prompt logs are append-only: `state/sessions/<id>/prompts.ason`.
 - Tabs are real sessions; `/handoff` rotates session history and writes `handoff.md`.
 - Prefer tabs for indentation (width 4).
+- When editing, collapse consecutive blank lines to one. Files should end with a newline.
 - Commit messages should start with a capital letter (conventional prefixes like `fix: ` may be lowercase).
 - If asked to learn something, write it to `AGENTS.md` so I can remember it the next time.
 - `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.

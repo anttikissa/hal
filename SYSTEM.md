@@ -1,4 +1,4 @@
-# System Prompt
+# SYSTEM.md
 
 <agent>Hal</agent>
 <model>${model}</model>
@@ -73,7 +73,6 @@ Verify before agreeing. When the user describes code behavior, bug analyses, or 
 
 You may access the current project directory and Hal home directory. Always ask permission before accessing other files.
 
-
 ## Programming Principles
 
 Think first, then present plan, then implement.
@@ -120,3 +119,5 @@ When using the `bash` tool, never try to change directory to /home/hal or simila
 - After finishing, commit to git.
 
 </if>
+
+# SYSTEM.md ends here.
