@@ -9,6 +9,7 @@
 - Raw mode & statusline
 - How about - HAL should have its own cursor - blinking orange one, and user would have blinking blue one
 - File lease broadcasting via IPC — tabs announce which files they're editing so other tabs can avoid conflicts. Lightweight alternative to worktrees for concurrent multi-tab editing.
+- Owner->client handoff should not pause the activity - or if that's not possible, it should resume it immediately - a bit like steering messages do
 - Styling - colors, better layout, status line, etc.
 - Revisit theme system for paddings etc.
 - Title bar and maybe automatic generation/update of title; should session name generate too?
