@@ -59,8 +59,9 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = obj.map(
-			(v, i) => `${pad}${stringifyValue(v, pad.length, childDepth, maxWidth)},`,
+			(v, i) => `${pad}${stringifyValue(v, pad.length, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`,
 		)
+
 		return `[\n${lines.join('\n')}\n${'  '.repeat(depth)}]`
 	}
 
@@ -78,11 +79,12 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 		// Multi-line
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
-		const lines = keys.map((k) => {
+		const lines = keys.map((k, i) => {
 			const prefix = `${pad}${quoteKey(k)}: `
 			const val = stringifyValue(obj[k], prefix.length, childDepth, maxWidth)
-			return `${prefix}${val},`
+			return `${prefix}${val}${i < keys.length - 1 ? ',' : ''}`
 		})
+
 		return `{\n${lines.join('\n')}\n${'  '.repeat(depth)}}`
 	}
 

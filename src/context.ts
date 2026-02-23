@@ -1,6 +1,4 @@
-import { readFile, writeFile } from 'fs/promises'
-import { stringify, parse } from './utils/ason.ts'
-import { CALIBRATION_FILE } from './state.ts'
+import { estimateTokensSync, type TokenCalibration } from './token-calibration.ts'
 
 export const MAX_CONTEXT = 200_000
 
@@ -12,12 +10,11 @@ export function totalInputTokens(usage: any): number {
 	)
 }
 
-
 export function shouldWarn(usage: any): boolean {
 	return totalInputTokens(usage) / MAX_CONTEXT >= 0.666
 }
 
-export function estimateMessageTokens(msg: any, calibration?: Calibration | null): number {
+export function estimateMessageTokens(msg: any, calibration?: TokenCalibration | null): number {
 	if (typeof msg.content === 'string') return estimateTokensSync(msg.content.length, calibration ?? null)
 	if (Array.isArray(msg.content)) {
 		let chars = 0
@@ -34,38 +31,4 @@ export function estimateMessageTokens(msg: any, calibration?: Calibration | null
 		return estimateTokensSync(chars, calibration ?? null)
 	}
 	return 0
-}
-
-// Calibration
-
-interface Calibration {
-	systemBytes: number
-	systemTokens: number
-	bytesPerToken: number
-	calibratedAt: string
-}
-
-const DEFAULT_BYTES_PER_TOKEN = 4
-
-export async function getCalibration(): Promise<Calibration | null> {
-	try {
-		return parse(await readFile(CALIBRATION_FILE, 'utf-8')) as Calibration
-	} catch {
-		return null
-	}
-}
-
-export async function saveCalibration(systemBytes: number, systemTokens: number): Promise<void> {
-	const cal: Calibration = {
-		systemBytes,
-		systemTokens,
-		bytesPerToken: systemBytes / systemTokens,
-		calibratedAt: new Date().toISOString(),
-	}
-	await writeFile(CALIBRATION_FILE, stringify(cal) + '\n')
-}
-
-export function estimateTokensSync(bytes: number, calibration: Calibration | null): number {
-	const ratio = calibration?.bytesPerToken ?? DEFAULT_BYTES_PER_TOKEN
-	return Math.ceil(bytes / ratio)
 }

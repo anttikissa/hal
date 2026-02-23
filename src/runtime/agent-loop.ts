@@ -8,7 +8,12 @@ import {
 import { RESPONSE_LOG } from '../state.ts'
 import { getProvider, type Provider } from '../provider.ts'
 import { tools, runTool, RESTART_SIGNAL } from '../tools.ts'
-import { totalInputTokens, MAX_CONTEXT, saveCalibration, shouldWarn } from '../context.ts'
+import { totalInputTokens, MAX_CONTEXT, shouldWarn } from '../context.ts'
+import {
+	isModelCalibrated,
+	markModelCalibrated,
+	saveTokenCalibration,
+} from '../token-calibration.ts'
 import { saveSession } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
@@ -16,8 +21,6 @@ import {
 	getSessionModel,
 	busySessions,
 	emitStatus,
-	calibrated,
-	setCalibrated,
 	type SessionRuntimeCache,
 } from './sessions.ts'
 import { publishLine, publishChunk, publishActivity, publishContext } from './event-publisher.ts'
@@ -68,7 +71,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 
 		if (Object.keys(parsed.usage).length > 0) {
-			await logTokenUsage(sessionId, runtime, provider, parsed.usage)
+			await logTokenUsage(sessionId, runtime, provider, fullModel, parsed.usage)
 		}
 
 		if (runtime.pausedByUser || parsed.aborted) {
@@ -520,6 +523,7 @@ async function logTokenUsage(
 	sessionId: string,
 	runtime: SessionRuntimeCache,
 	provider: Provider,
+	modelKey: string,
 	usage: any,
 ): Promise<void> {
 	runtime.lastUsage = usage
@@ -533,13 +537,13 @@ async function logTokenUsage(
 
 	// Calibrate bytes->tokens ratio on first API response
 	const totalInput = input + cacheCreate + cacheRead
-	if (!calibrated()) {
-		setCalibrated()
+	if (!isModelCalibrated(modelKey)) {
+		markModelCalibrated(modelKey)
 		if (totalInput > 0 && runtime.systemBytes > 0) {
 			let msgBytes = 0
 			for (const msg of runtime.messages) msgBytes += messageBytes(msg)
 			const totalBytes = runtime.systemBytes + msgBytes
-			await saveCalibration(totalBytes, totalInput)
+			await saveTokenCalibration(totalBytes, totalInput, modelKey)
 		}
 	}
 	if (debugTokens('sys') && totalInput > 0 && !runtime.tokenLogShown) {
@@ -585,4 +589,3 @@ async function logTokenUsage(
 		await publishLine(`[debug.tokens.context] ${pct}%/${MAX_CONTEXT}`, 'meta', sessionId)
 	}
 }
-

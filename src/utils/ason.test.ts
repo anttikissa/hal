@@ -49,7 +49,7 @@ describe('stringify', () => {
 				delta: 'fourth item',
 			}
 			expect(stringify(obj)).toBe(
-				"{\n  alpha: 'something long',\n  beta: 'another thing',\n  gamma: 'third value',\n  delta: 'fourth item',\n}",
+				"{\n  alpha: 'something long',\n  beta: 'another thing',\n  gamma: 'third value',\n  delta: 'fourth item'\n}",
 			)
 		})
 
@@ -58,7 +58,7 @@ describe('stringify', () => {
 				outer: { alpha: 'something', beta: 'another', gamma: 'third', delta: 'fourth' },
 			}
 			expect(stringify(obj)).toBe(
-				"{\n  outer: {\n    alpha: 'something',\n    beta: 'another',\n    gamma: 'third',\n    delta: 'fourth',\n  },\n}",
+				"{\n  outer: {\n    alpha: 'something',\n    beta: 'another',\n    gamma: 'third',\n    delta: 'fourth'\n  }\n}",
 			)
 		})
 		test('nested stays inline if short', () => {
@@ -83,7 +83,7 @@ describe('stringify', () => {
 				'fourth item too',
 			]
 			expect(stringify(obj)).toBe(
-				"[\n  'something longer',\n  'another thing here',\n  'third value is big',\n  'fourth item too',\n]",
+				"[\n  'something longer',\n  'another thing here',\n  'third value is big',\n  'fourth item too'\n]",
 			)
 		})
 		test('array of objects', () => {
@@ -96,7 +96,7 @@ describe('stringify', () => {
 				{ name: 'charlie', score: 300 },
 			]
 			expect(stringify(obj)).toBe(
-				"[\n  { name: 'alice', score: 100 },\n  { name: 'bob', score: 200 },\n  { name: 'charlie', score: 300 },\n]",
+				"[\n  { name: 'alice', score: 100 },\n  { name: 'bob', score: 200 },\n  { name: 'charlie', score: 300 }\n]",
 			)
 		})
 	})

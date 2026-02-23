@@ -4,10 +4,9 @@ import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../system-prompt.ts'
 import {
 	estimateMessageTokens,
-	estimateTokensSync,
-	getCalibration,
 	MAX_CONTEXT,
 } from '../context.ts'
+import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
 	loadSession,
 	loadHandoff,
@@ -59,16 +58,6 @@ const sessionCache = new Map<string, SessionRuntimeCache>()
 let activeSessionId: string | null = null
 export const busySessions = new Set<string>()
 export const previousWorkingDirBySession = new Map<string, string>()
-const _calibratedModels = new Set<string>()
-export function calibrated(model: string | null): boolean {
-	return !!model && _calibratedModels.has(model)
-}
-export function setCalibrated(model: string | null, value = true): void {
-	if (!model) return
-	if (value) _calibratedModels.add(model)
-	else _calibratedModels.delete(model)
-}
-
 
 // Accessors
 export function getOwnerId(): string {
@@ -205,7 +194,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	await reloadSystemPromptForSession(sessionId, runtime)
 
 	// Emit context estimate so the statusline is populated immediately
-	const cal = await getCalibration(getSessionModel(sessionId))
+	const cal = await getTokenCalibration(getSessionModel(sessionId))
 	const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 	let msgTokens = 0
 	for (const msg of messages) msgTokens += estimateMessageTokens(msg, cal)
@@ -254,7 +243,7 @@ function watchSystemPromptFiles(): void {
 			await publishLine(`[system] reloaded ${label} (file changed)`, 'meta', sid)
 			const runtime = sessionCache.get(sid)
 			if (runtime) {
-				const cal = await getCalibration(getSessionModel(sid))
+				const cal = await getTokenCalibration(getSessionModel(sid))
 				const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 				let msgTokens = 0
 				for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
@@ -343,7 +332,7 @@ async function initialize(): Promise<void> {
 	await emitSessions(true)
 
 	if (runtime.messages.length > 0) {
-		const cal = await getCalibration(getSessionModel(initialSessionId))
+		const cal = await getTokenCalibration(getSessionModel(initialSessionId))
 		const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 		let msgTokens = 0
 		for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)

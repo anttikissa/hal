@@ -11,10 +11,20 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Tabs are real sessions; `/handoff` rotates session history and writes `handoff.md`.
 - Prefer tabs for indentation (width 4).
 - When editing, collapse consecutive blank lines to one. Files should end with a newline.
+- After completing a task, commit to git.
 - Commit messages should start with a capital letter (conventional prefixes like `fix: ` may be lowercase).
 - If asked to learn something, write it to `AGENTS.md` so I can remember it the next time.
+- If learning requires editing new code, edit the code and ask user to restart. 
 - `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.
 - `/bug <description>` — captures terminal snapshot + debug log. You can paste images and text. Use it to self-debug UI issues.
+- Keep code MINIMAL. Don't take measures to maintain backwards compatibility unless explicitly required.
+
+## User interface guidelines
+
+Hal is plumbing-visible by default: don't try to hide complexity, file paths, or the like.
+
+Bad: "[system] system prompt reloaded (file changed)"
+Good: "[system] reloaded SYSTEM.md (file changed)" or "(model changed)"
 
 ## Testing
 
