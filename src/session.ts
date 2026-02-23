@@ -178,11 +178,12 @@ export function extractLastPrompt(messages: any[]): string {
 			: Array.isArray(msg.content)
 				? msg.content.find((b: any) => b.type === 'text')?.text ?? ''
 				: ''
-		if (content.startsWith('[')) continue
+		if (!content || content.startsWith('[')) continue
 		return content.split('\n')[0].slice(0, 120)
 	}
 	return ''
 }
+
 
 export async function saveSession(
 	sessionId: string,
