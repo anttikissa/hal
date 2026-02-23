@@ -14,6 +14,8 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - If asked to learn something, write it to `AGENTS.md` so I can remember it the next time.
 - `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.
 - `/bug <description>` — captures terminal snapshot + debug log. You can paste images and text. Use it to self-debug UI issues.
+- You may access the current project directory and Hal home directory. Always ask permission before accessing other files.
+
 
 ## Testing
 
