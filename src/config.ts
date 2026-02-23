@@ -16,11 +16,13 @@ export interface DebugConfig {
 export interface Config {
 	model: string // "provider/model-id", e.g. "anthropic/claude-opus-4-6"
 	compactModel?: string
+	theme: string // theme name, resolved to themes/<name>.ason
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
 	debug: DebugConfig
 }
+
 
 // User-facing aliases → full provider/model strings
 export const MODEL_ALIASES: Record<string, string> = {
@@ -87,11 +89,13 @@ export function resolveCompactModel(model: string): string {
 
 const DEFAULTS: Config = {
 	model: 'anthropic/claude-opus-4-6',
+	theme: 'default',
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 4,
 	maxPromptLines: 15,
 	debug: {},
 }
+
 
 let _config: Config | null = null
 

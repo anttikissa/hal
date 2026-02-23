@@ -47,6 +47,8 @@ import { loadInputHistory, saveInputHistory } from '../session.ts'
 import { countSourceStats } from '../utils/cloc.ts'
 
 import { loadConfig, MODEL_ALIASES } from '../config.ts'
+import { loadActiveTheme } from './format/theme.ts'
+
 
 export class Client {
 	async command(type: CommandType, text?: string): Promise<void> {
@@ -129,8 +131,11 @@ export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src
 	isOwner = owner
 	launchCwd = resolve(LAUNCH_CWD)
-	setMaxPromptLines(loadConfig().maxPromptLines)
+	const config = loadConfig()
+	setMaxPromptLines(config.maxPromptLines)
+	loadActiveTheme(HAL_DIR, config.theme)
 }
+
 
 export function promoteToOwner(): void {
 	isOwner = true

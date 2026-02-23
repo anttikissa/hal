@@ -1,47 +1,8 @@
 import type { RuntimeCommand, RuntimeEvent } from '../../protocol.ts'
 import type { Formatter } from './types.ts'
-import { RESET } from './ansi.ts'
+import { getStyle } from './theme.ts'
 
-// Per-kind formatter registry — each kind has its own file
-import chunkAssistant from './chunk.assistant.ts'
-import chunkThinking from './chunk.thinking.ts'
-import lineInfo from './line.info.ts'
-import lineWarn from './line.warn.ts'
-import lineError from './line.error.ts'
-import lineTool from './line.tool.ts'
-import lineStatus from './line.status.ts'
-import prompt from './prompt.ts'
-import commandFailed from './command.failed.ts'
-import localInfo from './local.info.ts'
-import localWarn from './local.warn.ts'
-import localError from './local.error.ts'
-import localStatus from './local.status.ts'
-import localQueue from './local.queue.ts'
-import localHelp from './local.help.ts'
-import localUsage from './local.usage.ts'
-import localTab from './local.tab.ts'
-import localTabs from './local.tabs.ts'
-
-const FORMATTERS: Record<string, Formatter> = {
-	'chunk.assistant': chunkAssistant,
-	'chunk.thinking': chunkThinking,
-	'line.info': lineInfo,
-	'line.warn': lineWarn,
-	'line.error': lineError,
-	'line.tool': lineTool,
-	'line.status': lineStatus,
-	prompt,
-	'command.failed': commandFailed,
-	'local.info': localInfo,
-	'local.warn': localWarn,
-	'local.error': localError,
-	'local.status': localStatus,
-	'local.queue': localQueue,
-	'local.help': localHelp,
-	'local.usage': localUsage,
-	'local.tab': localTab,
-	'local.tabs': localTabs,
-}
+const RESET = '\x1b[0m'
 
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
 
@@ -54,7 +15,22 @@ function termCols(): number {
 }
 
 function getFormatter(kind: string): Formatter {
-	return FORMATTERS[kind] ?? { style: '' }
+	if (kind === 'prompt') {
+		return {
+			style: getStyle('prompt.text'),
+			blockStart(cols: number): string {
+				const bar = getStyle('prompt.bar')
+				const w = Math.max(0, cols - 1)
+				return `\n${bar}${' '.repeat(w)}${RESET}\n`
+			},
+			blockEnd(cols: number): string {
+				const bar = getStyle('prompt.bar')
+				const w = Math.max(0, cols - 1)
+				return `${bar}${' '.repeat(w)}${RESET}\n`
+			},
+		}
+	}
+	return { style: getStyle(kind) }
 }
 
 // Track prevKind per session so interleaved events from different sessions

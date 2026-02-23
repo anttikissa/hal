@@ -1,0 +1,30 @@
+{
+  // Streaming content
+  'chunk.assistant': '',
+  'chunk.thinking': 'dim',
+
+  // Server-side lines
+  'line.info': 'dim',
+  'line.warn': 'yellow',
+  'line.error': 'red',
+  'line.tool': 'cyan',
+  'line.status': 'dim',
+
+  // Prompt block
+  'prompt.text': 'bold',
+  'prompt.bar': 'bg236',
+
+  // Command results
+  'command.failed': 'red',
+
+  // Local (client-side) lines
+  'local.info': 'dim',
+  'local.warn': 'yellow',
+  'local.error': 'red',
+  'local.status': 'dim',
+  'local.queue': 'dim',
+  'local.help': '',
+  'local.usage': 'dim',
+  'local.tab': 'dim',
+  'local.tabs': 'dim',
+}
