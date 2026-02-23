@@ -94,6 +94,7 @@ interface CliTab {
 	busy: boolean
 	paused: boolean
 	inputHistory: string[]
+	bootstrapSent: boolean
 }
 
 function completeInput(prefix: string): string[] {
@@ -260,6 +261,7 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 			busy: false,
 			paused: false,
 			inputHistory: [],
+			bootstrapSent: false,
 		},
 	]
 
@@ -294,7 +296,8 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 }
 
 function ensureTabBootstrap(tab: CliTab): void {
-	if (!tab || tab.output.trim().length > 0) return
+	if (!tab || tab.bootstrapSent || tab.output.trim().length > 0) return
+	tab.bootstrapSent = true
 	appendBusCommand(makeCommand('cd', source, tab.workingDir, tab.sessionId)).catch(() => {})
 }
 
@@ -362,6 +365,7 @@ async function createTab(): Promise<void> {
 		busy: false,
 		paused: false,
 		inputHistory: [],
+		bootstrapSent: false,
 	})
 
 	activeTabIndex = tabs.length - 1
@@ -439,6 +443,7 @@ function syncTabsFromSessions(
 			busy: preserveActiveOutput ? (existing?.busy ?? false) : false,
 			paused: preserveActiveOutput ? (existing?.paused ?? false) : false,
 			inputHistory: existing?.inputHistory ?? [],
+			bootstrapSent: existing?.bootstrapSent ?? false,
 		}
 	})
 
@@ -514,6 +519,7 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		busy: false,
 		paused: false,
 		inputHistory: [],
+		bootstrapSent: false,
 	}
 
 	tabs.push(tab)
