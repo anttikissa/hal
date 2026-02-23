@@ -215,7 +215,7 @@ export async function reloadSystemPromptForSession(
 	const fullModel = getSessionModel(sessionId)
 	const modelId = modelIdForModel(fullModel)
 	const workingDir = getSessionWorkingDir(sessionId)
-	const { blocks, systemBytes, loaded } = await loadSystemPrompt({
+	const { blocks, systemBytes, loaded, warnings } = await loadSystemPrompt({
 		model: modelId,
 		halDir,
 		workingDir,
@@ -223,6 +223,7 @@ export async function reloadSystemPromptForSession(
 	})
 	target.systemPrompt = blocks
 	target.systemBytes = systemBytes
+	for (const w of warnings) await publishLine(`[warn] ${w}`, 'warn', sessionId)
 	return loaded
 }
 

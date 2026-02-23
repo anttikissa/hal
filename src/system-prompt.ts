@@ -62,6 +62,7 @@ export interface SystemPromptResult {
 	blocks: any[]
 	systemBytes: number
 	loaded: string[]
+	warnings: string[]
 }
 
 export async function loadSystemPrompt(
@@ -108,8 +109,16 @@ export async function loadSystemPrompt(
 		session_dir: sessDir,
 	}
 
+	const warnings: string[] = []
 	const processed = parts
-		.map((p) => processDirectives(p, vars))
+		.map((p, i) => {
+			try {
+				return processDirectives(p, vars)
+			} catch (e: any) {
+				warnings.push(`${loaded[i] ?? 'unknown'}: ${e.message}`)
+				return p // fall back to raw text
+			}
+		})
 		.map((p) =>
 			p
 				.replace(/\$\{model\}/g, model)
@@ -130,5 +139,5 @@ export async function loadSystemPrompt(
 	let systemBytes = 0
 	for (const block of blocks) systemBytes += block.text?.length ?? 0
 
-	return { blocks, systemBytes, loaded }
+	return { blocks, systemBytes, loaded, warnings }
 }
