@@ -23,7 +23,7 @@ describe('commands', () => {
 		hal = await startHal()
 		await hal.waitForReady()
 		hal.sendLine('/model codex')
-		const event = await hal.waitForLine(/\[model\] switched to/)
+		const event = await hal.waitForLine(/\[model\] .*->.*codex/)
 		expect(event.level).toBe('meta')
 		expect(event.text).toContain('codex')
 	})

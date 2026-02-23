@@ -10,10 +10,12 @@ import * as tui from './tui.ts'
 import {
 	CTRL_C,
 	flashHeader,
+	getInputDraft,
 	getInputHistory,
 	getOutputSnapshot,
 	setActivityLine,
 	setEscHandler,
+	setInputDraft,
 	setInputEchoFilter,
 	setInputHistory,
 	setInputKeyHandler,
@@ -94,6 +96,8 @@ interface CliTab {
 	busy: boolean
 	paused: boolean
 	inputHistory: string[]
+	inputDraft: string
+	inputCursor: number
 	bootstrapSent: boolean
 }
 
@@ -261,6 +265,8 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 			busy: false,
 			paused: false,
 			inputHistory: [],
+			inputDraft: '',
+			inputCursor: 0,
 			bootstrapSent: false,
 		},
 	]
@@ -274,6 +280,9 @@ function captureActiveOutput(): void {
 	if (!active) return
 	active.output = getOutputSnapshot()
 	active.inputHistory = getInputHistory()
+	const draft = getInputDraft()
+	active.inputDraft = draft.text
+	active.inputCursor = draft.cursor
 }
 
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
@@ -283,6 +292,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	lastContextStatus = active.contextStatus
 	setActivityLine(active.busy ? active.activity || 'Working...' : '')
 	setInputHistory(active.inputHistory)
+	setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) {
 		// Full redraw: clear screen and rewrite content (tab switch / initial load)
 		if (active.output.length > 0) tui.replaceOutput(active.output)
@@ -365,6 +375,8 @@ async function createTab(): Promise<void> {
 		busy: false,
 		paused: false,
 		inputHistory: [],
+		inputDraft: '',
+		inputCursor: 0,
 		bootstrapSent: false,
 	})
 
@@ -443,6 +455,8 @@ function syncTabsFromSessions(
 			busy: preserveActiveOutput ? (existing?.busy ?? false) : false,
 			paused: preserveActiveOutput ? (existing?.paused ?? false) : false,
 			inputHistory: existing?.inputHistory ?? [],
+			inputDraft: existing?.inputDraft ?? '',
+			inputCursor: existing?.inputCursor ?? 0,
 			bootstrapSent: existing?.bootstrapSent ?? false,
 		}
 	})
@@ -519,6 +533,8 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		busy: false,
 		paused: false,
 		inputHistory: [],
+		inputDraft: '',
+		inputCursor: 0,
 		bootstrapSent: false,
 	}
 

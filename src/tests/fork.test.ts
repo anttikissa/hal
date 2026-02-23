@@ -42,7 +42,7 @@ describe('fork', () => {
 
 		// Switch to mock provider (streams song slowly at 120ms/syllable)
 		hal.sendLine('/model mock')
-		await hal.waitForLine(/switched to mock/)
+		await hal.waitForLine(/\[model\] .*->.*mock/)
 
 		// Start generating a song (~5 seconds of streaming)
 		hal.sendLine('song')

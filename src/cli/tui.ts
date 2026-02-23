@@ -53,6 +53,16 @@ export function setInputHistory(history: string[]): void {
 	historyIndex = -1
 	historyDraft = ''
 }
+export function getInputDraft(): { text: string; cursor: number } {
+	return { text: inputBuf, cursor: inputCursor }
+}
+export function setInputDraft(text: string, cursor?: number): void {
+	inputBuf = text
+	inputCursor = cursor ?? text.length
+	historyIndex = -1
+	historyDraft = ''
+}
+
 
 function safeStringify(value: unknown): string {
 	if (typeof value === 'string') return value
