@@ -438,29 +438,25 @@ function syncTabsFromSessions(
 		}
 	})
 
-	// When active tab was closed, pick its left neighbor (or right if it was first)
-	const previousActiveGone = previousActive && !tabs.some((t) => t.sessionId === previousActive)
-	const neighborIndex = previousActiveIndex > 0 ? previousActiveIndex - 1 : 0
-	const neighborId = previousActiveGone
-		? tabs[Math.min(neighborIndex, tabs.length - 1)]?.sessionId ?? null
-		: null
+	// Pick which tab to focus next
+	let targetSessionId: string
+	const previousStillExists = previousActive && tabs.some((t) => t.sessionId === previousActive)
 
-	const targetSessionId =
-		// After fork, switch focus to the new tab
-		(switchToFork && forkedSessionId
-			? forkedSessionId
-			: null) ??
-		// Active tab still exists — keep it
-		(previousActive && tabs.some((t) => t.sessionId === previousActive)
-			? previousActive
-			: null) ??
-		// Active tab closed — pick neighbor
-		neighborId ??
-		// Server's preferred active
-		(preferredActiveSessionId && tabs.some((t) => t.sessionId === preferredActiveSessionId)
+	if (switchToFork && forkedSessionId) {
+		targetSessionId = forkedSessionId
+	} else if (previousStillExists) {
+		targetSessionId = previousActive!
+	} else if (previousActive) {
+		// Closed tab — pick left neighbor (or right if it was first)
+		const idx = previousActiveIndex > 0 ? previousActiveIndex - 1 : 0
+		targetSessionId = tabs[Math.min(idx, tabs.length - 1)]?.sessionId ?? tabs[0].sessionId
+	} else {
+		targetSessionId = preferredActiveSessionId
+			&& tabs.some((t) => t.sessionId === preferredActiveSessionId)
 			? preferredActiveSessionId
-			: null) ??
-		tabs[0].sessionId
+			: tabs[0].sessionId
+	}
+
 
 
 	const nextIndex = tabs.findIndex((t) => t.sessionId === targetSessionId)
