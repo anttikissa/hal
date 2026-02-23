@@ -14,7 +14,8 @@ import {
 	concurrencyStatus,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
-import { dropQueuedCommands, runClose } from './handle-command.ts'
+import { dropQueuedCommands, runClose, runFork } from './handle-command.ts'
+
 import {
 	sanitizeSessionId,
 	getActiveSessionId,
@@ -236,19 +237,22 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		return
 	}
 
-	// Fork: auto-pause if busy, then enqueue (runs after agent loop stops)
+	// Fork: run immediately (bypasses scheduler, like close)
 	if (command.type === 'fork') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		if (!sessionId) {
-			await publishCommandPhase(command.id, 'queued', undefined, null)
 			await publishCommandPhase(command.id, 'failed', 'no session to fork', null)
 			return
 		}
 		if (isSessionBusy(sessionId)) {
 			await runPause(sessionId)
-			await publishLine('[fork] paused — forking after current task finishes', 'status', sessionId)
 		}
-		// Fall through to enqueue — scheduler runs it after current command
+		await runFork(sessionId, command)
+		await publishCommandPhase(command.id, 'done', undefined, sessionId)
+		return
 	}
+
 
 	if (command.type === 'reset' && sessionId) {
 		const dropped = await dropQueuedCommands('dropped by /reset', sessionId)

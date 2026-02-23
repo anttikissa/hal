@@ -78,12 +78,8 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 				await runCd(sessionId, command.text ?? '')
 				break
 
-			// 'close' is handled immediately in processCommand (bypasses scheduler)
+			// 'close' and 'fork' are handled immediately in processCommand (bypass scheduler)
 
-
-			case 'fork':
-				await runFork(sessionId, command)
-				break
 
 			case 'restart':
 				await saveSessionBeforeExit(sessionId)
@@ -99,7 +95,8 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 	}
 }
 
-async function runFork(sessionId: string, _command: RuntimeCommand): Promise<void> {
+export async function runFork(sessionId: string, _command: RuntimeCommand): Promise<void> {
+
 	// Save current runtime state to disk before copying
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (runtime) {
