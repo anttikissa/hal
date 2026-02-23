@@ -83,13 +83,13 @@ Comments: add judiciously, answer "why does this code exist".
 
 A module should contain no unnecessary functions, a function no unnecessary statements, a statement no unnecessary expressions. YAGNI.
 
-<if model="claude-*">
+::: if model="claude-*"
 Don't do things I didn't ask for.
 
 When using the `bash` tool, never try to change directory to /home/hal or similar. Use `pwd` to find your working directory first.
-</if>
+:::
 
-<if model="gpt-*">
+::: if model="gpt-*"
 
 ## Tool honesty (hard rule)
 
@@ -118,6 +118,6 @@ When using the `bash` tool, never try to change directory to /home/hal or simila
 - After code changes, run a relevant check when possible.
 - After finishing, commit to git.
 
-</if>
+:::
 
 # SYSTEM.md ends here.

@@ -1,6 +1,6 @@
 import { resolve } from 'path'
 import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
-import { loadSystemPrompt } from '../prompt.ts'
+import { loadSystemPrompt } from '../system-prompt.ts'
 import {
 	estimatedContextStatus,
 	estimateMessageTokens,

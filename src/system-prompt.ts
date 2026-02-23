@@ -1,0 +1,154 @@
+import { readFile } from 'fs/promises'
+import { resolve } from 'path'
+import { HAL_DIR } from './state.ts'
+
+/**
+ * Process fenced directives in the system prompt.
+ *
+ * Uses Pandoc-style colon-fenced syntax (not part of CommonMark, but widely
+ * adopted by Pandoc fenced_divs and MyST Markdown). Editors treat `:::` as
+ * inert text, unlike `<if>` which Markdown parsers treat as inline HTML.
+ *
+ * Syntax:
+ *
+ *   ::: if model="<glob>"
+ *   content included when the model matches
+ *   :::
+ *
+ * The glob supports `*` (any chars) and `?` (single char).
+ *
+ * Nesting uses more colons on the outer fence:
+ *
+ *   :::: if model="gpt-*"
+ *   outer content
+ *   ::: if model="o3-*"
+ *   inner content
+ *   :::
+ *   ::::
+ *
+ * A closing fence matches when it has the same or fewer colons as the opener.
+ *
+ * References:
+ *   - Pandoc fenced divs: https://pandoc.org/demo/example33/8.18-divs-and-spans.html
+ *   - MyST directives:    https://mystmd.org/guide/syntax-overview
+ */
+function processDirectives(text: string, vars: Record<string, string>): string {
+	const lines = text.split('\n')
+	const result: string[] = []
+
+	// Stack of { colons, included } for nested fences
+	const stack: { colons: number; included: boolean }[] = []
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]
+
+		// Opening fence: 3+ colons, then "if key="pattern""
+		const openMatch = line.match(/^(:{3,})\s+if\s+(\w+)="([^"]+)"\s*$/)
+		if (openMatch) {
+			const colons = openMatch[1].length
+			const key = openMatch[2]
+			const pattern = openMatch[3]
+			const value = vars[key] ?? ''
+			const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+			const matches = regex.test(value)
+			// Only include if this block matches AND all parent blocks are included
+			const parentIncluded = stack.length === 0 || stack[stack.length - 1].included
+			stack.push({ colons, included: matches && parentIncluded })
+			continue
+		}
+
+		// Closing fence: 3+ colons on a line by itself
+		const closeMatch = line.match(/^(:{3,})\s*$/)
+		if (closeMatch && stack.length > 0) {
+			const colons = closeMatch[1].length
+			const top = stack[stack.length - 1]
+			// Closes the innermost fence with same or more colons
+			if (colons <= top.colons) {
+				stack.pop()
+				continue
+			}
+		}
+
+		// Include line if no active fence or all fences are included
+		if (stack.length === 0 || stack[stack.length - 1].included) {
+			result.push(line)
+		}
+	}
+
+	return result.join('\n')
+}
+
+export interface SystemPromptResult {
+	blocks: any[]
+	systemBytes: number
+	loaded: string[]
+}
+
+export async function loadSystemPrompt(
+	options: {
+		model?: string
+		halDir?: string
+		workingDir?: string
+		sessionDir?: string
+	} = {},
+): Promise<SystemPromptResult> {
+	const model = options.model ?? ''
+	const halDir = resolve(options.halDir ?? HAL_DIR)
+	const workingDir = resolve(options.workingDir ?? halDir)
+	const sessDir = options.sessionDir ?? ''
+	const parts: string[] = []
+	const loaded: string[] = []
+
+	try {
+		let text = await readFile(`${halDir}/SYSTEM.md`, 'utf-8')
+		text = text.replace(/<!--[\s\S]*?-->/g, '')
+		parts.push(text)
+		loaded.push('SYSTEM.md')
+	} catch {
+		parts.push('You are a helpful coding assistant.')
+	}
+
+	try {
+		const agents = await readFile(`${workingDir}/AGENTS.md`, 'utf-8')
+		parts.push(agents)
+		loaded.push(workingDir !== halDir ? `AGENTS.md (${workingDir})` : 'AGENTS.md')
+	} catch {
+		// No AGENTS.md
+	}
+
+	const d = new Date()
+	const iso = d.toISOString().slice(0, 10)
+	const weekday = d.toLocaleDateString('en-US', { weekday: 'long' })
+	const today = `${iso}, ${weekday}`
+
+	const vars: Record<string, string> = {
+		model,
+		cwd: workingDir,
+		date: today,
+		session_dir: sessDir,
+	}
+
+	const processed = parts
+		.map((p) => processDirectives(p, vars))
+		.map((p) =>
+			p
+				.replace(/\$\{model\}/g, model)
+				.replace(/\$\{cwd\}/g, workingDir)
+				.replace(/\$\{date\}/g, today)
+				.replace(/\$\{session_dir\}/g, sessDir),
+		)
+		.map((p) => p.replace(/\n{3,}/g, '\n\n'))
+
+	const blocks = processed
+		.filter((text) => text.trim().length > 0)
+		.map((text, i, arr) => {
+			const block: any = { type: 'text', text }
+			if (i === arr.length - 1) block.cache_control = { type: 'ephemeral' }
+			return block
+		})
+
+	let systemBytes = 0
+	for (const block of blocks) systemBytes += block.text?.length ?? 0
+
+	return { blocks, systemBytes, loaded }
+}
