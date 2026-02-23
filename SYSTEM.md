@@ -87,6 +87,7 @@ A module should contain no unnecessary functions, a function no unnecessary stat
 Don't do things I didn't ask for.
 
 When using the `bash` tool, never try to change directory to /home/hal or similar. Use `pwd` to find your working directory first.
+
 :::
 
 ::: if model="gpt-*"

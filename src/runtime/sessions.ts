@@ -39,6 +39,7 @@ export interface SessionRuntimeCache {
 	tokenTotals: TokenTotals
 	lastUsage: any
 	systemPrompt: any[]
+	systemPromptFiles: string[]
 	systemBytes: number
 	pausedByUser: boolean
 	activeAbort: AbortController | null
@@ -184,6 +185,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 		tokenTotals: { ...EMPTY_TOTALS, ...(restored?.tokenTotals ?? EMPTY_TOTALS) },
 		lastUsage: null,
 		systemPrompt: [],
+		systemPromptFiles: [],
 		systemBytes: 0,
 		pausedByUser: false,
 		activeAbort: null,
@@ -222,6 +224,7 @@ export async function reloadSystemPromptForSession(
 		sessionDir: sessionDir(sessionId),
 	})
 	target.systemPrompt = blocks
+	target.systemPromptFiles = loaded
 	target.systemBytes = systemBytes
 	for (const w of warnings) await publishLine(`[error] ${w}`, 'error', sessionId)
 	return loaded
@@ -296,8 +299,10 @@ async function initialize(): Promise<void> {
 
 	const fullModel = getSessionModel(initialSessionId)
 	const cwd = getSessionWorkingDir(initialSessionId)
-	const loaded = await reloadSystemPromptForSession(initialSessionId, runtime)
-	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
+	// System prompt was already loaded by getOrLoadSessionRuntime — use cached file list
+	const promptDesc = runtime.systemPromptFiles.length > 0
+		? `  prompt=${runtime.systemPromptFiles.join(', ')}`
+		: ''
 	await publishLine(`[model] ${fullModel}  cwd=${cwd}${promptDesc}`, 'status', initialSessionId)
 	await emitStatus(true)
 }
