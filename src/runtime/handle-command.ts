@@ -122,6 +122,22 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 		runtime.messages.push({ role: 'user', content: `[forked to ${newId}]` })
 	}
 	const forkRuntime = await getOrLoadSessionRuntime(newId)
+
+	// If the source session is mid-generation, snapshot the in-progress
+	// content blocks so the forked session sees the partial response.
+	if (busy && runtime?.streamingBlocks) {
+		const blocks = runtime.streamingBlocks.filter((b: any) => {
+			if (!b) return false
+			if (b.type === 'thinking' && !b.signature) return false
+			if (b.type === 'tool_use' && typeof b.input === 'string') return false
+			if (b.type === 'text' && !b.text?.trim()) return false
+			return true
+		})
+		if (blocks.length > 0) {
+			forkRuntime.messages.push({ role: 'assistant', content: structuredClone(blocks) })
+		}
+	}
+
 	forkRuntime.messages.push({ role: 'user', content: `[forked from ${sessionId}]` })
 
 	markSessionAsActive(newId)

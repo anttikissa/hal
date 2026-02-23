@@ -42,6 +42,8 @@ export interface SessionRuntimeCache {
 	systemBytes: number
 	pausedByUser: boolean
 	activeAbort: AbortController | null
+	/** In-progress content blocks during streaming (for fork snapshots) */
+	streamingBlocks: any[] | null
 }
 
 // Module state
@@ -185,6 +187,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 		systemBytes: 0,
 		pausedByUser: false,
 		activeAbort: null,
+		streamingBlocks: null,
 	}
 	sessionCache.set(sessionId, runtime)
 	ensureSessionQueue(sessionId)

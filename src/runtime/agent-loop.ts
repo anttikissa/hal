@@ -330,6 +330,7 @@ async function parseResponseStream(
 	aborted: boolean
 } | null> {
 	const contentBlocks: any[] = []
+	runtime.streamingBlocks = contentBlocks
 	let stopReason: string | null = null
 	const usage: any = {}
 	let aborted = false
@@ -488,6 +489,7 @@ async function parseResponseStream(
 	}
 
 	provider.finalizeBlocks(contentBlocks)
+	runtime.streamingBlocks = null
 	return { contentBlocks, stopReason, usage, aborted }
 }
 
