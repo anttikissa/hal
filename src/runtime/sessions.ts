@@ -184,6 +184,18 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	sessionCache.set(sessionId, runtime)
 	ensureSessionQueue(sessionId)
 	await reloadSystemPromptForSession(sessionId, runtime)
+
+	// Emit context estimate so the status bar is populated immediately
+	const cal = await getCalibration()
+	const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
+	let msgTokens = 0
+	for (const msg of messages) msgTokens += estimateMessageTokens(msg, cal)
+	await publishLine(
+		estimatedContextStatus(sysTokenEst, msgTokens, messages.length),
+		'status',
+		sessionId,
+	)
+
 	return runtime
 }
 
@@ -253,12 +265,11 @@ async function initialize(): Promise<void> {
 	await persistRegistry()
 	await emitSessions(true)
 
-	const cal = await getCalibration()
-	const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
-	let msgTokens = 0
-	for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg)
-
 	if (runtime.messages.length > 0) {
+		const cal = await getCalibration()
+		const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
+		let msgTokens = 0
+		for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
 		const totalTokens = sysTokenEst + msgTokens
 		const pct = ((totalTokens / MAX_CONTEXT) * 100).toFixed(0)
 		await publishLine(
@@ -280,11 +291,6 @@ async function initialize(): Promise<void> {
 	const loaded = await reloadSystemPromptForSession(initialSessionId, runtime)
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
 	await publishLine(`[model] ${fullModel}  cwd=${cwd}${promptDesc}`, 'status', initialSessionId)
-	await publishLine(
-		estimatedContextStatus(sysTokenEst, msgTokens, runtime.messages.length),
-		'status',
-		initialSessionId,
-	)
 	await emitStatus(true)
 }
 

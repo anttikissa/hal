@@ -40,8 +40,8 @@ export function shouldWarn(usage: any): boolean {
 	return totalInputTokens(usage) / MAX_CONTEXT >= 0.666
 }
 
-export function estimateMessageTokens(msg: any): number {
-	if (typeof msg.content === 'string') return Math.ceil(msg.content.length / 4)
+export function estimateMessageTokens(msg: any, calibration?: Calibration | null): number {
+	if (typeof msg.content === 'string') return estimateTokensSync(msg.content.length, calibration ?? null)
 	if (Array.isArray(msg.content)) {
 		let chars = 0
 		for (const block of msg.content) {
@@ -54,7 +54,7 @@ export function estimateMessageTokens(msg: any): number {
 						? block.content.length
 						: JSON.stringify(block.content ?? '').length
 		}
-		return Math.ceil(chars / 4)
+		return estimateTokensSync(chars, calibration ?? null)
 	}
 	return 0
 }

@@ -131,7 +131,7 @@ async function publishEstimatedContext(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	const cal = await getCalibration()
 	const systemTokens = estimateTokensSync(runtime.systemBytes, cal)
-	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m), 0)
+	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m, cal), 0)
 	await publishLine(
 		estimatedContextStatus(systemTokens, msgTokens, runtime.messages.length),
 		'status',
