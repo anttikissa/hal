@@ -1,4 +1,5 @@
 import { resolve } from 'path'
+import { watch, type FSWatcher } from 'fs'
 import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../system-prompt.ts'
 import {
@@ -229,6 +230,60 @@ export async function reloadSystemPromptForSession(
 	return loaded
 }
 
+/** Watch SYSTEM.md and AGENTS.md for changes; auto-reload system prompt. */
+function watchSystemPromptFiles(): void {
+	const files = new Map<string, FSWatcher>()
+	let debounce: ReturnType<typeof setTimeout> | null = null
+
+	const reload = async () => {
+		for (const [id, runtime] of sessionCache) {
+			await reloadSystemPromptForSession(id, runtime)
+		}
+		const sid = activeSessionId
+		if (sid) {
+			await publishLine('[system] system prompt reloaded (file changed)', 'meta', sid)
+			const runtime = sessionCache.get(sid)
+			if (runtime) {
+				const cal = await getCalibration()
+				const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
+				let msgTokens = 0
+				for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
+				await publishContext(sid, { used: sysTokenEst + msgTokens, max: MAX_CONTEXT, estimated: true })
+			}
+		}
+	}
+
+	const onChange = () => {
+		if (debounce) clearTimeout(debounce)
+		debounce = setTimeout(() => void reload(), 150)
+	}
+
+	const tryWatch = (path: string) => {
+		// Clean up previous watcher for this path
+		files.get(path)?.close()
+		try {
+			const w = watch(path, { persistent: false }, onChange)
+			files.set(path, w)
+		} catch {
+			// File doesn't exist (yet) — ignore
+			files.delete(path)
+		}
+	}
+
+	// Watch SYSTEM.md in halDir
+	tryWatch(`${halDir}/SYSTEM.md`)
+
+	// Watch AGENTS.md in each unique working dir
+	const watchedAgentsDirs = new Set<string>()
+	for (const s of registry.sessions) {
+		const dir = s.workingDir ?? _defaultWorkingDir
+		if (!watchedAgentsDirs.has(dir)) {
+			watchedAgentsDirs.add(dir)
+			tryWatch(`${dir}/AGENTS.md`)
+		}
+	}
+}
+
 // Event helpers
 function snapshotSessions(): SessionInfo[] {
 	return registry.sessions.map((s) => ({
@@ -340,6 +395,7 @@ export async function startRuntime(
 	)
 
 	await initialize()
+	watchSystemPromptFiles()
 
 	for await (const command of tailCommands()) {
 		await processCommand(command)
