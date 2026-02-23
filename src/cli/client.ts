@@ -486,7 +486,11 @@ function syncTabsFromSessions(
 	preferredActiveSessionId: string | null,
 	options: { preserveActiveOutput?: boolean; render?: boolean; bootstrap?: boolean } = {},
 ): void {
-	if (!Array.isArray(sessions) || sessions.length === 0) return
+	if (!Array.isArray(sessions) || sessions.length === 0) {
+		stopped = true
+		tui.cancelInput()
+		return
+	}
 	const preserveActiveOutput = options.preserveActiveOutput ?? true
 	if (preserveActiveOutput) captureActiveOutput()
 
