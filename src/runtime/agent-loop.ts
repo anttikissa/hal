@@ -264,12 +264,7 @@ async function fetchWithRetry(
 
 		let res: Response
 		try {
-			res = await fetch(provider.apiUrl, {
-				method: 'POST',
-				headers: provider.getHeaders(),
-				body: JSON.stringify(body),
-				signal: runtime.activeAbort?.signal,
-			})
+			res = await provider.fetch(body, runtime.activeAbort?.signal)
 		} catch (e: any) {
 			if (runtime.pausedByUser) return null
 			if (attempt < MAX_RETRIES - 1) {

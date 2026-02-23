@@ -1,6 +1,6 @@
 /**
  * Test provider — returns canned responses, no network calls.
- * Register under both 'anthropic' and 'openai' to intercept all models.
+ * Registered under both 'anthropic' and 'openai' to intercept all models in --test mode.
  */
 import type { Provider, StreamEvent, ToolDef } from '../provider.ts'
 
@@ -8,8 +8,10 @@ function makeTestProvider(name: string): Provider {
 	return {
 		name,
 		async refreshAuth() {},
-		getHeaders() {
-			return {}
+		async fetch(_body: any, _signal?: AbortSignal) {
+			// Tests that don't send prompts never reach here.
+			// Return a failed response so accidental calls are obvious.
+			return new Response('test provider: no real API', { status: 500 })
 		},
 		buildRequestBody(params: {
 			model: string
@@ -20,7 +22,6 @@ function makeTestProvider(name: string): Provider {
 		}) {
 			return params
 		},
-		apiUrl: 'http://localhost:0/test',
 		parseSSE(_event: { type: string; data: string }): StreamEvent[] {
 			return []
 		},

@@ -27,7 +27,7 @@ export interface ToolDef {
 export interface Provider {
 	name: string
 	refreshAuth(): Promise<void>
-	getHeaders(): Record<string, string>
+	fetch(body: any, signal?: AbortSignal): Promise<Response>
 	buildRequestBody(params: {
 		model: string
 		messages: any[]
@@ -36,7 +36,6 @@ export interface Provider {
 		maxTokens: number
 		sessionId?: string
 	}): any
-	apiUrl: string
 	parseSSE(event: { type: string; data: string }): StreamEvent[]
 	finalizeBlocks(blocks: any[]): any[]
 	addCacheBreakpoints(messages: any[]): any[]

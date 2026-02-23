@@ -30,21 +30,26 @@ async function doRefresh(): Promise<void> {
 
 export const anthropicProvider: Provider = {
 	name: 'anthropic',
-	apiUrl: 'https://api.anthropic.com/v1/messages?beta=true',
+
 
 	async refreshAuth() {
 		await doRefresh()
 	},
 
-	getHeaders() {
+	async fetch(body: any, signal?: AbortSignal) {
 		const auth = getProviderAuth('anthropic')
-		return {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${auth?.accessToken ?? ''}`,
-			'anthropic-version': '2023-06-01',
-			'anthropic-beta': 'oauth-2025-04-20',
-			'user-agent': 'hal-claude/0.1.0',
-		}
+		return fetch('https://api.anthropic.com/v1/messages?beta=true', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${auth?.accessToken ?? ''}`,
+				'anthropic-version': '2023-06-01',
+				'anthropic-beta': 'oauth-2025-04-20',
+				'user-agent': 'hal-claude/0.1.0',
+			},
+			body: JSON.stringify(body),
+			signal,
+		})
 	},
 
 	buildRequestBody({ model, messages, system, tools, maxTokens }) {
@@ -186,16 +191,13 @@ export const anthropicProvider: Provider = {
 
 	async complete({ model, system, userMessage, maxTokens }) {
 		await doRefresh()
-		const res = await fetch('https://api.anthropic.com/v1/messages?beta=true', {
-			method: 'POST',
-			headers: this.getHeaders(),
-			body: JSON.stringify({
-				model,
-				max_tokens: maxTokens,
-				system: [{ type: 'text', text: system }],
-				messages: [{ role: 'user', content: userMessage }],
-			}),
-		})
+		const body = {
+			model,
+			max_tokens: maxTokens,
+			system: [{ type: 'text', text: system }],
+			messages: [{ role: 'user', content: userMessage }],
+		}
+		const res = await this.fetch(body)
 		const data = (await res.json()) as any
 		if (data.error) return { text: '', error: data.error.message }
 		const text = data.content?.find((b: any) => b.type === 'text')?.text || 'No response.'

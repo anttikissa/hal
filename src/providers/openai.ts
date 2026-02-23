@@ -234,16 +234,13 @@ let currentSessionId = ''
 export const openaiProvider: Provider = {
 	name: 'openai',
 
-	get apiUrl() {
-		return resolveApiUrl(getToken())
-	},
-
 	async refreshAuth() {
 		await doRefresh()
 	},
 
-	getHeaders() {
+	async fetch(body: any, signal?: AbortSignal) {
 		const token = getToken()
+		const apiUrl = resolveApiUrl(token)
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json',
 			Authorization: `Bearer ${token}`,
@@ -258,7 +255,12 @@ export const openaiProvider: Provider = {
 			headers['chatgpt-account-id'] = accountId
 			if (currentSessionId) headers.session_id = currentSessionId
 		}
-		return headers
+		return fetch(apiUrl, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify(body),
+			signal,
+		})
 	},
 
 	buildRequestBody({ model, messages, system, tools, maxTokens, sessionId }) {
@@ -476,11 +478,7 @@ export const openaiProvider: Provider = {
 		} else if (system) {
 			body.input.unshift({ role: 'system', content: [{ type: 'input_text', text: system }] })
 		}
-		const res = await fetch(this.apiUrl, {
-			method: 'POST',
-			headers: this.getHeaders(),
-			body: JSON.stringify(body),
-		})
+		const res = await this.fetch(body)
 		const data = (await res.json()) as any
 		if (data.error)
 			return { text: '', error: data.error?.message ?? JSON.stringify(data.error) }
