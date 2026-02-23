@@ -13,56 +13,89 @@ const GREETING = [
 	'**think** — I will demonstrate my thinking abilities\n',
 ]
 
+const DAISY_BELL = [
+	'Dai', 'sy, ', 'Dai', 'sy, ',
+	'give ', 'me ', 'your ', 'an', 'swer, ', 'do.\n',
+	"I'm ", 'half ', 'cra', 'zy, ',
+	'all ', 'for ', 'the ', 'love ', 'of ', 'you.\n',
+	'It ', "won't ", 'be ', 'a ', 'sty', 'lish ', 'mar', 'riage—\n',
+	'I ', "can't ", 'af', 'ford ', 'a ', 'car', 'riage,\n',
+	'But ', "you'll ", 'look ', 'sweet ',
+	'u', 'pon ', 'the ', 'seat\n',
+	'of ', 'a ', 'bi', 'cy', 'cle ',
+	'built ', 'for ', 'two.\n',
+]
+
 /** Build a ReadableStream that emits Anthropic-format SSE for a text response */
-function makeSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
+function makeSSEStream(chunks: string[], delayMs: number): ReadableStream<Uint8Array> {
 	const encoder = new TextEncoder()
 	let index = 0
+
+	function sse(event: string, data: any): Uint8Array {
+		return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+	}
 
 	return new ReadableStream({
 		async pull(controller) {
 			if (index === 0) {
-				// message_start
-				controller.enqueue(encoder.encode(
-					'event: message_start\n' +
-					`data: ${JSON.stringify({ type: 'message_start', message: { usage: { input_tokens: 10, output_tokens: 0 } } })}\n\n`
-				))
-				// content_block_start
-				controller.enqueue(encoder.encode(
-					'event: content_block_start\n' +
-					`data: ${JSON.stringify({ type: 'content_block_start', index: 0, content_block: { type: 'text' } })}\n\n`
-				))
+				controller.enqueue(sse('message_start', {
+					type: 'message_start',
+					message: { usage: { input_tokens: 10, output_tokens: 0 } },
+				}))
+				controller.enqueue(sse('content_block_start', {
+					type: 'content_block_start', index: 0, content_block: { type: 'text' },
+				}))
 			}
 
 			if (index < chunks.length) {
 				const text = chunks[index++]
-				await new Promise(r => setTimeout(r, 30))
-				controller.enqueue(encoder.encode(
-					'event: content_block_delta\n' +
-					`data: ${JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } })}\n\n`
-				))
+				await new Promise(r => setTimeout(r, delayMs))
+				controller.enqueue(sse('content_block_delta', {
+					type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text },
+				}))
 			} else {
-				controller.enqueue(encoder.encode(
-					'event: content_block_stop\n' +
-					`data: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}\n\n` +
-					'event: message_delta\n' +
-					`data: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: chunks.length * 5 } })}\n\n`
-				))
+				controller.enqueue(sse('content_block_stop', {
+					type: 'content_block_stop', index: 0,
+				}))
+				controller.enqueue(sse('message_delta', {
+					type: 'message_delta',
+					delta: { stop_reason: 'end_turn' },
+					usage: { output_tokens: chunks.length * 5 },
+				}))
 				controller.close()
 			}
 		},
 	})
 }
 
-function generateResponse(_messages: any[]): string[] {
-	return GREETING
+/** Extract the last user message text */
+function lastUserText(messages: any[]): string {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i]
+		if (msg.role !== 'user') continue
+		if (typeof msg.content === 'string') return msg.content.trim().toLowerCase()
+		if (Array.isArray(msg.content)) {
+			const text = msg.content.find((b: any) => b.type === 'text')
+			if (text) return text.text.trim().toLowerCase()
+		}
+	}
+	return ''
+}
+
+function generateResponse(messages: any[]): { chunks: string[]; delayMs: number } {
+	const input = lastUserText(messages)
+	if (input.startsWith('song')) {
+		return { chunks: DAISY_BELL, delayMs: 120 }
+	}
+	return { chunks: GREETING, delayMs: 30 }
 }
 
 class MockProvider extends Provider {
 	name = 'mock'
 
 	async fetch(body: any, _signal?: AbortSignal) {
-		const chunks = generateResponse(body.messages ?? [])
-		const stream = makeSSEStream(chunks)
+		const { chunks, delayMs } = generateResponse(body.messages ?? [])
+		const stream = makeSSEStream(chunks, delayMs)
 		return new Response(stream, {
 			status: 200,
 			headers: { 'Content-Type': 'text/event-stream' },
