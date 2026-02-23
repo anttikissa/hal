@@ -4,6 +4,7 @@
 
 - System.md analysis and revamp - what to add/remove - also better <if> for codex
 - Fix Codex by better prompt or something
+- I liked hal9001's exact estimate of how many tokens SYSTEM + AGENTS + tools had
 - Input: make moving up and down work
 - Raw mode & statusline
 - How about - HAL should have its own cursor - blinking orange one, and user would have blinking blue one
