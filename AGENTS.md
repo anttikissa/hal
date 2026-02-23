@@ -23,6 +23,14 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - E2e tests only: `bun run test:e2e`.
 - All tests live under `src/` (unit tests alongside code, e2e tests in `src/tests/`).
 
+## SYSTEM.md preprocessor
+
+`SYSTEM.md` is preprocessed before being sent to the model (`src/system-prompt.ts`):
+- `${model}`, `${cwd}`, `${date}`, `${session_dir}` are replaced with runtime values.
+- `::: if model="glob"` ... `:::` fenced blocks conditionally include content by model name.
+- HTML comments are stripped.
+- Consecutive blank lines are collapsed.
+- `prompts.ason` files use ASON format — parse with `ason.parseAll()`, not line-by-line JSON.
 
 
 ## TODOs

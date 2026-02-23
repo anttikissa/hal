@@ -278,7 +278,7 @@ class OpenAIProvider extends Provider {
 		if (!codex) {
 			body.max_output_tokens = maxTokens
 		} else {
-			body.text = { verbosity: 'medium' }
+			body.text = { verbosity: 'high' }
 			body.include = ['reasoning.encrypted_content']
 			if (sessionId) body.prompt_cache_key = sessionId
 		}
