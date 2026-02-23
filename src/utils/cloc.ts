@@ -22,8 +22,10 @@ export async function countSourceStats(dir: string): Promise<{ files: number; li
 	}
 	const glob = new Bun.Glob('**/*.ts')
 	for await (const path of glob.scan({ cwd: `${dir}/src`, onlyFiles: true })) {
+		if (path.endsWith('.test.ts') || path.startsWith('tests/')) continue
 		await countFile(`${dir}/src/${path}`)
 	}
+
 	await countFile(`${dir}/main.ts`)
 	return { files, lines: code }
 }
