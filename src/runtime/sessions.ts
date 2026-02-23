@@ -45,6 +45,8 @@ export interface SessionRuntimeCache {
 	activeAbort: AbortController | null
 	/** In-progress content blocks during streaming (for fork snapshots) */
 	streamingBlocks: any[] | null
+	/** Has the first-response token log been shown for this session? */
+	tokenLogShown: boolean
 }
 
 // Module state
@@ -190,6 +192,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 		pausedByUser: false,
 		activeAbort: null,
 		streamingBlocks: null,
+		tokenLogShown: false,
 	}
 	sessionCache.set(sessionId, runtime)
 	ensureSessionQueue(sessionId)

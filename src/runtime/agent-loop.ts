@@ -538,7 +538,8 @@ async function logTokenUsage(
 			await saveCalibration(totalBytes, totalInput)
 		}
 	}
-	if (debugEnabled('tokens') && totalInput > 0) {
+	if (debugEnabled('tokens') && totalInput > 0 && !runtime.tokenLogShown) {
+		runtime.tokenLogShown = true
 		const msgCount = runtime.messages.length
 		const msgs = msgCount === 1 ? '1 message' : `${msgCount} messages`
 		await publishLine(
