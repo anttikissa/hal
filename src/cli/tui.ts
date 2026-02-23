@@ -280,6 +280,12 @@ function setupScrollRegion(): void {
 	setScrollRegion(1, outputBottom())
 }
 
+function resaveOutputCursor(): void {
+	if (!outputCursorSaved) return
+	moveTo(outputCursorRow, Math.max(1, Math.min(cols(), wrapCol + 1)))
+	saveCursor()
+}
+
 /** Build the status line with box-drawing chars: ─[tab1]── Context: X% / 200k ─ */
 function buildStatusLine(): string {
 	const c = cols()
@@ -373,6 +379,9 @@ function fullRedrawFooter(): void {
 	const bottom = outputBottom()
 	if (outputCursorRow > bottom) outputCursorRow = bottom
 	setupScrollRegion()
+	// Footer height changes can push the saved output cursor into the footer area.
+	// Re-save it at the clamped row before we move around to redraw footer lines.
+	resaveOutputCursor()
 
 	hideCursor()
 	drawActivityLine()
