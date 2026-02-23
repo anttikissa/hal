@@ -539,8 +539,10 @@ function handleKey(key: string): void {
 				.replace(/\r/g, '\n')
 				.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
 			if (!clean) return
-			inputBuf = inputBuf.slice(0, inputCursor) + clean + inputBuf.slice(inputCursor)
-			inputCursor += clean.length
+			const isMultiline = clean.includes('\n')
+			const insert = isMultiline ? saveMultilinePaste(clean) : clean
+			inputBuf = inputBuf.slice(0, inputCursor) + insert + inputBuf.slice(inputCursor)
+			inputCursor += insert.length
 			redrawFooter()
 		})
 		return
