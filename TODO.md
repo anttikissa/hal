@@ -33,3 +33,4 @@
 - /todo command should list todos
 
 
+- restore session does not replay stuff to screen immediately
