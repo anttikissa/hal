@@ -562,9 +562,9 @@ async function bootstrapState(): Promise<void> {
 			if (!sessionId) continue
 			const tab = findTabBySessionId(sessionId)
 			if (tab) {
-				const { used, max } = event.context
+				const { used, max, estimated } = event.context
 				const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
-				tab.contextStatus = `${pct}%/${fmtK(max)}`
+				tab.contextStatus = `${estimated ? '~' : ''}${pct}%/${fmtK(max)}`
 			}
 		}
 
@@ -598,9 +598,9 @@ function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: bool
 		if (renderToScreen && tab === activeTab()) renderBusyStatus()
 	}
 	if (event.type === 'status' && event.context) {
-		const { used, max } = event.context
+		const { used, max, estimated } = event.context
 		const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
-		tab.contextStatus = `${pct}%/${fmtK(max)}`
+		tab.contextStatus = `${estimated ? '~' : ''}${pct}%/${fmtK(max)}`
 		if (renderToScreen && tab === activeTab()) lastContextStatus = tab.contextStatus
 	}
 

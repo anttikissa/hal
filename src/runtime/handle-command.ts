@@ -156,7 +156,7 @@ async function publishEstimatedContext(sessionId: string): Promise<void> {
 	const systemTokens = estimateTokensSync(runtime.systemBytes, cal)
 	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m, cal), 0)
 	const used = systemTokens + msgTokens
-	await publishContext(sessionId, { used, max: MAX_CONTEXT })
+	await publishContext(sessionId, { used, max: MAX_CONTEXT, estimated: true })
 }
 
 /** Max chars per tool result in handoff text — full output isn't needed for summarization */

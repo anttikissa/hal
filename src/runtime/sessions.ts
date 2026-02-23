@@ -203,7 +203,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	let msgTokens = 0
 	for (const msg of messages) msgTokens += estimateMessageTokens(msg, cal)
 	const used = sysTokenEst + msgTokens
-	await publishContext(sessionId, { used, max: MAX_CONTEXT })
+	await publishContext(sessionId, { used, max: MAX_CONTEXT, estimated: true })
 
 	return runtime
 }

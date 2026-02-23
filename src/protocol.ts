@@ -85,7 +85,7 @@ export type RuntimeEvent =
 			busy: boolean
 			queueLength: number
 			activity?: string
-			context?: { used: number; max: number }
+			context?: { used: number; max: number; estimated?: boolean }
 			createdAt: string
 	  }
 	| {
