@@ -12,6 +12,8 @@ for arg in "$@"; do
 	if [[ "$arg" == "-f" || "$arg" == "--fresh" ]]; then
 		[[ -z "$_hal_fresh_dir" ]] && _hal_fresh_dir=$(bun src/fresh-dir.ts)
 		export HAL_STATE_DIR="$_hal_fresh_dir"
+	elif [[ "$arg" == "-s" || "$arg" == "--self" ]]; then
+		export LAUNCH_CWD="$HAL_DIR"
 	else
 		pass_args+=("$arg")
 	fi
