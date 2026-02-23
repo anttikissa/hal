@@ -1,0 +1,30 @@
+{
+  // Streaming content
+  'chunk.assistant': '',
+  'chunk.thinking': 'fg245',              // warm grey, not full dim
+
+  // Server-side lines
+  'line.info': 'fg246',                   // lighter grey for readability
+  'line.warn': 'fg214',                   // amber/orange — stands out from text
+  'line.error': 'fg203',                  // soft red — urgent but not harsh
+  'line.tool': 'fg109',                   // muted teal — tools are infrastructure
+  'line.status': 'fg243',                 // mid grey
+
+  // Prompt block
+  'prompt.text': 'bold fg255',            // bright white — your words matter
+  'prompt.bar': 'bg237',                  // slightly lighter separator
+
+  // Command results
+  'command.failed': 'fg203',              // same soft red as errors
+
+  // Local (client-side) lines
+  'local.info': 'fg246',
+  'local.warn': 'fg214',
+  'local.error': 'fg203',
+  'local.status': 'fg243',
+  'local.queue': 'fg243',
+  'local.help': 'fg252',                  // near-white for help text
+  'local.usage': 'fg243',
+  'local.tab': 'fg243',
+  'local.tabs': 'fg243',
+}
