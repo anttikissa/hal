@@ -9,13 +9,15 @@ import {
 import { RESPONSE_LOG } from '../state.ts'
 import { getProvider, type Provider } from '../provider.ts'
 import { tools, runTool, RESTART_SIGNAL } from '../tools.ts'
-import { contextStatus, shouldWarn } from '../context.ts'
+import { contextStatus, saveCalibration, shouldWarn } from '../context.ts'
 import { saveSession } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
 	getSessionWorkingDir,
 	busySessions,
 	emitStatus,
+	calibrated,
+	setCalibrated,
 	type SessionRuntimeCache,
 } from './sessions.ts'
 import { publishLine, publishChunk, publishActivity } from './event-publisher.ts'
@@ -496,6 +498,25 @@ async function parseResponseStream(
 	return { contentBlocks, stopReason, usage, aborted }
 }
 
+function messageBytes(msg: any): number {
+	if (typeof msg.content === 'string') return msg.content.length
+	if (Array.isArray(msg.content)) {
+		let bytes = 0
+		for (const block of msg.content) {
+			if (block.type === 'text') bytes += block.text?.length ?? 0
+			else if (block.type === 'thinking') bytes += block.thinking?.length ?? 0
+			else if (block.type === 'tool_use') bytes += JSON.stringify(block.input ?? {}).length
+			else if (block.type === 'tool_result')
+				bytes +=
+					typeof block.content === 'string'
+						? block.content.length
+						: JSON.stringify(block.content ?? '').length
+		}
+		return bytes
+	}
+	return 0
+}
+
 async function logTokenUsage(
 	sessionId: string,
 	runtime: SessionRuntimeCache,
@@ -511,7 +532,18 @@ async function logTokenUsage(
 	runtime.tokenTotals.cacheCreate += cacheCreate
 	runtime.tokenTotals.cacheRead += cacheRead
 
+	// Calibrate bytes->tokens ratio on first API response
 	const totalInput = input + cacheCreate + cacheRead
+	if (!calibrated()) {
+		setCalibrated()
+		if (totalInput > 0 && runtime.systemBytes > 0) {
+			let msgBytes = 0
+			for (const msg of runtime.messages) msgBytes += messageBytes(msg)
+			const totalBytes = runtime.systemBytes + msgBytes
+			await saveCalibration(totalBytes, totalInput)
+		}
+	}
+
 	const parts = [`in: ${totalInput}`]
 	if (cacheRead || cacheCreate) {
 		parts[0] += ` (${input} new`

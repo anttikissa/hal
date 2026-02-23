@@ -55,6 +55,10 @@ const sessionCache = new Map<string, SessionRuntimeCache>()
 let activeSessionId: string | null = null
 export const busySessions = new Set<string>()
 export const previousWorkingDirBySession = new Map<string, string>()
+let _calibrated = false
+export function calibrated(): boolean { return _calibrated }
+export function setCalibrated(value = true): void { _calibrated = value }
+
 
 // Accessors
 export function getOwnerId(): string {

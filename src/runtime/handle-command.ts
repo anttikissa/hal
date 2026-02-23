@@ -38,6 +38,7 @@ import {
 	busySessions,
 	previousWorkingDirBySession,
 	getHalDir,
+	setCalibrated,
 } from './sessions.ts'
 
 export async function dropQueuedCommands(reason: string, sessionId: string): Promise<number> {
@@ -273,6 +274,8 @@ async function runReset(sessionId: string): Promise<void> {
 	await clearSession(sessionId)
 	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
+	setCalibrated(false)
+
 
 	const meta = getSessionMeta(sessionId)
 	if (meta) {
