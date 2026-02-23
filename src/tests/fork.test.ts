@@ -32,8 +32,51 @@ describe('fork', () => {
 		)
 		expect(sessions.sessions.length).toBeGreaterThanOrEqual(2)
 
-
 		// Original session should still exist
 		expect(sessions.sessions.some((s: any) => s.id === originalId)).toBe(true)
 	})
+
+	test('/fork while generating does not interrupt original session', async () => {
+		hal = await startHal()
+		await hal.waitForReady()
+
+		// Switch to mock provider (streams song slowly at 120ms/syllable)
+		hal.sendLine('/model mock')
+		await hal.waitForLine(/switched to mock/)
+
+		// Start generating a song (~5 seconds of streaming)
+		hal.sendLine('song')
+
+		// Wait for a few chunks to confirm generation started
+		await hal.waitFor(
+			(r) => r.type === 'chunk' && r.channel === 'assistant' && /Dai/.test(r.text ?? ''),
+		)
+
+		// Fork while generating
+		hal.sendLine('/fork')
+		await hal.waitForLine(/\[fork\] forked/)
+
+		// Record how many chunks we had at fork time
+		const chunksAtFork = hal.records.filter(
+			(r) => r.type === 'chunk' && r.channel === 'assistant',
+		).length
+
+		// Wait for the song to finish — "two.\n" is the last syllable
+		await hal.waitFor(
+			(r) => r.type === 'chunk' && r.channel === 'assistant' && /two/.test(r.text ?? ''),
+			10000,
+		)
+
+		// Should have received more chunks after the fork
+		const chunksAtEnd = hal.records.filter(
+			(r) => r.type === 'chunk' && r.channel === 'assistant',
+		).length
+		expect(chunksAtEnd).toBeGreaterThan(chunksAtFork)
+
+		// Should have 2 sessions now
+		const sessions = await hal.waitFor(
+			(r) => r.type === 'sessions' && r.sessions?.length >= 2,
+		)
+		expect(sessions.sessions.length).toBeGreaterThanOrEqual(2)
+	}, 15000)
 })
