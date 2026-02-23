@@ -15,3 +15,8 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
 	echo "NOTE: $BIN_DIR is not in your PATH. Add it to your shell profile, e.g.:"
 	echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
 fi
+
+echo ""
+echo "Try it now:"
+echo "  cd ~/project/my-project; hal    # work on a project"
+echo "  hal -s                           # edit self"
