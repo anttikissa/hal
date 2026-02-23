@@ -33,11 +33,16 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 		// Opening fence: 3+ colons, then "if key="pattern""
 		const openMatch = line.match(/^:{3,}\s+if\s+(\w+)="([^"]+)"\s*$/)
 		if (openMatch) {
-			if (inFence) throw new Error(`nested ::: if at line ${i + 1} (outer opened at line ${fenceLine})`)
+			if (inFence)
+				throw new Error(
+					`nested ::: if at line ${i + 1} (outer opened at line ${fenceLine})`,
+				)
 			inFence = true
 			fenceLine = i + 1
 			const value = vars[openMatch[1]] ?? ''
-			const regex = new RegExp('^' + openMatch[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+			const regex = new RegExp(
+				'^' + openMatch[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
+			)
 			accept = regex.test(value)
 			continue
 		}
@@ -107,6 +112,7 @@ export async function loadSystemPrompt(
 		cwd: workingDir,
 		date: today,
 		session_dir: sessDir,
+		hal_dir: halDir,
 	}
 
 	const warnings: string[] = []
@@ -124,7 +130,8 @@ export async function loadSystemPrompt(
 				.replace(/\$\{model\}/g, model)
 				.replace(/\$\{cwd\}/g, workingDir)
 				.replace(/\$\{date\}/g, today)
-				.replace(/\$\{session_dir\}/g, sessDir),
+				.replace(/\$\{session_dir\}/g, sessDir)
+				.replace(/\$\{hal_dir\}/g, halDir),
 		)
 		.map((p) => p.replace(/\n{3,}/g, '\n\n'))
 
