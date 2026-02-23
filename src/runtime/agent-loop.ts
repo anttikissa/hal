@@ -536,11 +536,13 @@ async function logTokenUsage(
 			for (const msg of runtime.messages) msgBytes += messageBytes(msg)
 			const totalBytes = runtime.systemBytes + msgBytes
 			await saveCalibration(totalBytes, totalInput)
-			await publishLine(
-				`[system] prompt + tools + first message = ${totalInput} tokens`,
-				'status',
-				sessionId,
-			)
+			if (debugEnabled('tokens')) {
+				await publishLine(
+					`[system] prompt + tools + first message = ${totalInput} tokens`,
+					'status',
+					sessionId,
+				)
+			}
 		}
 	}
 
