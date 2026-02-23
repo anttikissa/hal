@@ -9,10 +9,13 @@
 - How about - HAL should have its own cursor - blinking orange one, and user would have blinking blue one
 - File lease broadcasting via IPC — tabs announce which files they're editing so other tabs can avoid conflicts. Lightweight alternative to worktrees for concurrent multi-tab editing.
 - Styling - colors, better layout, status line, etc.
+- Revisit theme system for paddings etc.
 - Title bar and maybe automatic generation/update of title; should session name generate too?
 - Find names of UI elements properly - title, scrollback buffer, statusline, command input, etc.
 - Check that editing other projects than hal works - separate hal-dir and cwd?
 - Fix cursor movements on input line
+- Add a tiny markdown parser for parsing llm output
+- Make the tail file thing use "tail -f" - save a few lines
 - Add mouse movements on input line, selecting - multicursor maybe? - cmd-a, etc. QoL improvements
 
 ## Old TODO items:
