@@ -597,12 +597,6 @@ function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: bool
 	if (event.type === 'line' && event.level === 'meta') {
 		if (renderToScreen && tab === activeTab()) renderBusyStatus()
 	}
-	if (event.type === 'status' && event.context) {
-		const { used, max, estimated } = event.context
-		const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
-		tab.contextStatus = `${estimated ? '~' : ''}${pct}%/${fmtK(max)}`
-		if (renderToScreen && tab === activeTab()) lastContextStatus = tab.contextStatus
-	}
 
 	const text = pushEvent(event, source)
 	if (!text) return
@@ -651,6 +645,17 @@ function render(event: RuntimeEvent): void {
 				setActivityLine('Paused — Enter to resume, /drop to clear queue')
 			} else {
 				setActivityLine(active.busy ? active.activity || 'Working...' : '')
+			}
+		}
+
+		// Update context percentage from structured context data
+		if (event.context) {
+			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : activeTab()
+			if (tab) {
+				const { used, max, estimated } = event.context
+				const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
+				tab.contextStatus = `${estimated ? '~' : ''}${pct}%/${fmtK(max)}`
+				if (tab === activeTab()) lastContextStatus = tab.contextStatus
 			}
 		}
 
