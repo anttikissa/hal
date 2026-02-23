@@ -170,7 +170,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 	if (runtime.lastUsage && shouldWarn(runtime.lastUsage)) {
 		await publishLine(
-			'[context] >66% full. Consider /handoff to start fresh with a summary.',
+			'[context] >66% full. /handoff to produce handoff file and continue, or /reset to start afresh.',
 			'warn',
 			sessionId,
 		)
