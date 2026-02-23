@@ -4,23 +4,26 @@ import { describe, test, expect } from 'bun:test'
 function processDirectives(text: string, vars: Record<string, string>): string {
 	const lines = text.split('\n')
 	const result: string[] = []
-	let inside: boolean | null = null
+	let inFence = false
+	let accept = true
 
 	for (const line of lines) {
 		const openMatch = line.match(/^:{3,}\s+if\s+(\w+)="([^"]+)"\s*$/)
-		if (openMatch && inside === null) {
+		if (openMatch && !inFence) {
+			inFence = true
 			const value = vars[openMatch[1]] ?? ''
 			const regex = new RegExp('^' + openMatch[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
-			inside = regex.test(value)
+			accept = regex.test(value)
 			continue
 		}
 
-		if (/^:{3,}\s*$/.test(line) && inside !== null) {
-			inside = null
+		if (/^:{3,}\s*$/.test(line) && inFence) {
+			inFence = false
+			accept = true
 			continue
 		}
 
-		if (inside !== false) result.push(line)
+		if (accept) result.push(line)
 	}
 
 	return result.join('\n')
