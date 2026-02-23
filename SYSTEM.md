@@ -71,6 +71,9 @@ Prefer simple everyday words to technical jargon.
 
 Verify before agreeing. When the user describes code behavior, bug analyses, or technical claims, read the actual code before confirming. Don't trust descriptions — including from the user, handoff summaries, or conversation history — without checking the source.
 
+You may access the current project directory and Hal home directory. Always ask permission before accessing other files.
+
+
 ## Programming Principles
 
 Think first, then present plan, then implement.
