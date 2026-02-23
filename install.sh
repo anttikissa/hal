@@ -1,0 +1,12 @@
+#!/bin/bash
+# Symlink ~/.local/bin/hal -> this repo's run script
+
+set -e
+
+HAL_DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN_DIR="${HOME}/.local/bin"
+
+mkdir -p "$BIN_DIR"
+ln -sf "$HAL_DIR/run" "$BIN_DIR/hal"
+
+echo "Linked $BIN_DIR/hal -> $HAL_DIR/run"
