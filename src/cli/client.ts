@@ -460,6 +460,7 @@ async function closeActiveTab(): Promise<void> {
 	if (!active) return
 	await appendBusCommand(makeCommand('close', source, undefined, active.sessionId))
 	if (tabs.length <= 1) {
+		stopped = true
 		tui.cancelInput()
 		return
 	}

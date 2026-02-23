@@ -18,5 +18,5 @@ fi
 
 echo ""
 echo "Try it now:"
-echo "  cd ~/project/my-project; hal    # work on a project"
-echo "  hal -s                           # edit self"
+echo "  cd ~/project/my-project; hal   # work on a project"
+echo "  hal -s                         # work on hal itself"
