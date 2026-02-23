@@ -19,10 +19,9 @@ import {
 import { processPrompt } from './process-prompt.ts'
 import {
 	estimateMessageTokens,
-	getCalibration,
-	estimateTokensSync,
 	MAX_CONTEXT,
 } from '../context.ts'
+import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
 	getOrLoadSessionRuntime,
 	getCachedSessionRuntime,
@@ -38,7 +37,6 @@ import {
 	busySessions,
 	previousWorkingDirBySession,
 	getHalDir,
-	setCalibrated,
 } from './sessions.ts'
 
 export async function dropQueuedCommands(reason: string, sessionId: string): Promise<number> {
@@ -152,7 +150,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 /** Emit an estimated context so the statusline stays up-to-date after session changes */
 async function publishEstimatedContext(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	const cal = await getCalibration()
+	const cal = await getTokenCalibration(getSessionModel(sessionId))
 	const systemTokens = estimateTokensSync(runtime.systemBytes, cal)
 	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m, cal), 0)
 	const used = systemTokens + msgTokens
@@ -293,7 +291,6 @@ async function runReset(sessionId: string): Promise<void> {
 	await clearSession(sessionId)
 	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
-	setCalibrated(false)
 
 
 	const meta = getSessionMeta(sessionId)
@@ -339,9 +336,10 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 
 	// Reload system prompt for new model
 	const loaded = await reloadSystemPromptForSession(sessionId)
-	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
-
-	await publishLine(`[model] switched to ${fullModel}${promptDesc}`, 'meta', sessionId)
+	await publishLine(`[model] switched to ${fullModel}`, 'meta', sessionId)
+	if (loaded.length > 0) {
+		await publishLine(`[system] reloaded ${loaded.join(', ')} (model changed)`, 'meta', sessionId)
+	}
 }
 
 async function runSystem(sessionId: string): Promise<void> {
@@ -402,9 +400,11 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 	}
 
 	const loaded = await reloadSystemPromptForSession(sessionId)
-	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''
 	const dirMsg = previous !== next ? `${previous} -> ${next}` : next
-	await publishLine(`[cd] ${dirMsg}${promptDesc}`, 'meta', sessionId)
+	await publishLine(`[cd] ${dirMsg}`, 'meta', sessionId)
+	if (loaded.length > 0) {
+		await publishLine(`[system] reloaded ${loaded.join(', ')} (cwd changed)`, 'meta', sessionId)
+	}
 	await publishEstimatedContext(sessionId)
 	await emitSessions(true)
 
