@@ -11,7 +11,7 @@ import {
 	modelIdForModel,
 } from '../config.ts'
 import { getProvider } from '../provider.ts'
-import { drainQueuedCommands, resumeSession } from './command-scheduler.ts'
+import { drainQueuedCommands } from './command-scheduler.ts'
 import {
 	publishLine,
 	publishCommandPhase,
@@ -97,6 +97,7 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 }
 
 export async function runFork(sessionId: string, _command: RuntimeCommand): Promise<void> {
+	const busy = busySessions.has(sessionId)
 
 	// Save current runtime state to disk before copying
 	const runtime = getCachedSessionRuntime(sessionId)
@@ -108,16 +109,14 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	const workingDir = getSessionWorkingDir(sessionId)
 	await ensureSession(newId, workingDir)
 
-	// Record fork in both conversation histories
-	if (runtime) {
+	// Record fork in conversation histories.
+	// Skip the marker on the original if busy — inserting a user message
+	// mid-response would corrupt the alternating user/assistant pattern.
+	if (runtime && !busy) {
 		runtime.messages.push({ role: 'user', content: `[forked to ${newId}]` })
 	}
 	const forkRuntime = await getOrLoadSessionRuntime(newId)
 	forkRuntime.messages.push({ role: 'user', content: `[forked from ${sessionId}]` })
-
-	// Original session resumes (unfrozen), new session stays idle
-	if (runtime) runtime.pausedByUser = false
-	resumeSession(sessionId)
 
 	markSessionAsActive(newId)
 	await persistRegistry()

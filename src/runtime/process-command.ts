@@ -238,15 +238,15 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 	}
 
 	// Fork: run immediately (bypasses scheduler, like close)
+	// Don't pause the original session — let it keep generating.
+	// runtime.messages is consistent at any sync point (partial streaming
+	// content isn't pushed until the response completes).
 	if (command.type === 'fork') {
 		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
 		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		if (!sessionId) {
 			await publishCommandPhase(command.id, 'failed', 'no session to fork', null)
 			return
-		}
-		if (isSessionBusy(sessionId)) {
-			await runPause(sessionId)
 		}
 		await runFork(sessionId, command)
 		await publishCommandPhase(command.id, 'done', undefined, sessionId)
