@@ -4,37 +4,23 @@ import { describe, test, expect } from 'bun:test'
 function processDirectives(text: string, vars: Record<string, string>): string {
 	const lines = text.split('\n')
 	const result: string[] = []
-	const stack: { colons: number; included: boolean }[] = []
+	let inside: boolean | null = null
 
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i]
-
-		const openMatch = line.match(/^(:{3,})\s+if\s+(\w+)="([^"]+)"\s*$/)
-		if (openMatch) {
-			const colons = openMatch[1].length
-			const key = openMatch[2]
-			const pattern = openMatch[3]
-			const value = vars[key] ?? ''
-			const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
-			const matches = regex.test(value)
-			const parentIncluded = stack.length === 0 || stack[stack.length - 1].included
-			stack.push({ colons, included: matches && parentIncluded })
+	for (const line of lines) {
+		const openMatch = line.match(/^:{3,}\s+if\s+(\w+)="([^"]+)"\s*$/)
+		if (openMatch && inside === null) {
+			const value = vars[openMatch[1]] ?? ''
+			const regex = new RegExp('^' + openMatch[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+			inside = regex.test(value)
 			continue
 		}
 
-		const closeMatch = line.match(/^(:{3,})\s*$/)
-		if (closeMatch && stack.length > 0) {
-			const colons = closeMatch[1].length
-			const top = stack[stack.length - 1]
-			if (colons <= top.colons) {
-				stack.pop()
-				continue
-			}
+		if (/^:{3,}\s*$/.test(line) && inside !== null) {
+			inside = null
+			continue
 		}
 
-		if (stack.length === 0 || stack[stack.length - 1].included) {
-			result.push(line)
-		}
+		if (inside !== false) result.push(line)
 	}
 
 	return result.join('\n')
@@ -89,45 +75,6 @@ describe('processDirectives', () => {
 		expect(processDirectives(text, { model: 'o42-mini' })).toBe('')
 	})
 
-	test('nested blocks with more colons on outer', () => {
-		const text = [
-			':::: if model="gpt-*"',
-			'outer',
-			'::: if model="gpt-5*"',
-			'inner',
-			':::',
-			'still outer',
-			'::::',
-			'after',
-		].join('\n')
-
-		// gpt-5.3 matches both
-		const r1 = processDirectives(text, { model: 'gpt-5.3-codex' })
-		expect(r1).toBe('outer\ninner\nstill outer\nafter')
-
-		// gpt-4o matches outer but not inner
-		const r2 = processDirectives(text, { model: 'gpt-4o' })
-		expect(r2).toBe('outer\nstill outer\nafter')
-
-		// claude matches neither
-		const r3 = processDirectives(text, { model: 'claude-opus-4-6' })
-		expect(r3).toBe('after')
-	})
-
-	test('inner block excluded when outer block excluded', () => {
-		const text = [
-			':::: if model="claude-*"',
-			'claude only',
-			'::: if model="claude-opus*"',
-			'opus only',
-			':::',
-			'::::',
-		].join('\n')
-		// gpt should see nothing
-		const result = processDirectives(text, { model: 'gpt-5' })
-		expect(result).toBe('')
-	})
-
 	test('supports arbitrary variable names', () => {
 		const text = [
 			'::: if provider="openai"',
@@ -152,16 +99,18 @@ describe('processDirectives', () => {
 		expect(processDirectives(text, { model: 'anything' })).toBe('hello\nworld')
 	})
 
-	test('colon fence inside included block is not mistaken for close', () => {
-		// A `::::` inside a `:::` block should close it (fewer or equal colons)
-		// But `::::` inside a `::::` block closes normally
+	test('ignores nested opener inside an active block', () => {
+		// A second opener while already inside a block is treated as plain text
 		const text = [
-			':::: if model="gpt-*"',
+			'::: if model="gpt-*"',
 			'line1',
-			'::::',
+			'::: if model="gpt-5*"',
+			'line2',
+			':::',
 			'after',
 		].join('\n')
+		// The inner opener is ignored; first ::: closes the block
 		const result = processDirectives(text, { model: 'gpt-5' })
-		expect(result).toBe('line1\nafter')
+		expect(result).toBe('line1\n::: if model="gpt-5*"\nline2\nafter')
 	})
 })

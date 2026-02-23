@@ -9,24 +9,12 @@ import { HAL_DIR } from './state.ts'
  * adopted by Pandoc fenced_divs and MyST Markdown). Editors treat `:::` as
  * inert text, unlike `<if>` which Markdown parsers treat as inline HTML.
  *
- * Syntax:
- *
  *   ::: if model="<glob>"
  *   content included when the model matches
  *   :::
  *
  * The glob supports `*` (any chars) and `?` (single char).
- *
- * Nesting uses more colons on the outer fence:
- *
- *   :::: if model="gpt-*"
- *   outer content
- *   ::: if model="o3-*"
- *   inner content
- *   :::
- *   ::::
- *
- * A closing fence matches when it has the same or fewer colons as the opener.
+ * Nesting is not supported — directives cannot be placed inside other directives.
  *
  * References:
  *   - Pandoc fenced divs: https://pandoc.org/demo/example33/8.18-divs-and-spans.html
@@ -35,44 +23,25 @@ import { HAL_DIR } from './state.ts'
 function processDirectives(text: string, vars: Record<string, string>): string {
 	const lines = text.split('\n')
 	const result: string[] = []
+	let inside: boolean | null = null // null = outside, true = included, false = excluded
 
-	// Stack of { colons, included } for nested fences
-	const stack: { colons: number; included: boolean }[] = []
-
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i]
-
+	for (const line of lines) {
 		// Opening fence: 3+ colons, then "if key="pattern""
-		const openMatch = line.match(/^(:{3,})\s+if\s+(\w+)="([^"]+)"\s*$/)
-		if (openMatch) {
-			const colons = openMatch[1].length
-			const key = openMatch[2]
-			const pattern = openMatch[3]
-			const value = vars[key] ?? ''
-			const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
-			const matches = regex.test(value)
-			// Only include if this block matches AND all parent blocks are included
-			const parentIncluded = stack.length === 0 || stack[stack.length - 1].included
-			stack.push({ colons, included: matches && parentIncluded })
+		const openMatch = line.match(/^:{3,}\s+if\s+(\w+)="([^"]+)"\s*$/)
+		if (openMatch && inside === null) {
+			const value = vars[openMatch[1]] ?? ''
+			const regex = new RegExp('^' + openMatch[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+			inside = regex.test(value)
 			continue
 		}
 
 		// Closing fence: 3+ colons on a line by itself
-		const closeMatch = line.match(/^(:{3,})\s*$/)
-		if (closeMatch && stack.length > 0) {
-			const colons = closeMatch[1].length
-			const top = stack[stack.length - 1]
-			// Closes the innermost fence with same or more colons
-			if (colons <= top.colons) {
-				stack.pop()
-				continue
-			}
+		if (/^:{3,}\s*$/.test(line) && inside !== null) {
+			inside = null
+			continue
 		}
 
-		// Include line if no active fence or all fences are included
-		if (stack.length === 0 || stack[stack.length - 1].included) {
-			result.push(line)
-		}
+		if (inside !== false) result.push(line)
 	}
 
 	return result.join('\n')
