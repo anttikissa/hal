@@ -527,7 +527,7 @@ async function logTokenUsage(
 	runtime.tokenTotals.cacheCreate += cacheCreate
 	runtime.tokenTotals.cacheRead += cacheRead
 
-	// Calibrate bytes->tokens ratio on first API response and log system prompt size
+	// Calibrate bytes->tokens ratio on first API response
 	const totalInput = input + cacheCreate + cacheRead
 	if (!calibrated()) {
 		setCalibrated()
@@ -536,14 +536,16 @@ async function logTokenUsage(
 			for (const msg of runtime.messages) msgBytes += messageBytes(msg)
 			const totalBytes = runtime.systemBytes + msgBytes
 			await saveCalibration(totalBytes, totalInput)
-			if (debugEnabled('tokens')) {
-				await publishLine(
-					`[system] prompt + tools + first message = ${totalInput} tokens`,
-					'status',
-					sessionId,
-				)
-			}
 		}
+	}
+	if (debugEnabled('tokens') && totalInput > 0) {
+		const msgCount = runtime.messages.length
+		const msgs = msgCount === 1 ? '1 message' : `${msgCount} messages`
+		await publishLine(
+			`[system] SYSTEM.md + AGENTS.md + tools + ${msgs} = ${totalInput} tokens`,
+			'status',
+			sessionId,
+		)
 	}
 
 	const parts = [`in: ${totalInput}`]
