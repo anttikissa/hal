@@ -1,4 +1,4 @@
-import { resolve } from 'path'
+import { basename, resolve } from 'path'
 import { watch, type FSWatcher } from 'fs'
 import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../system-prompt.ts'
@@ -59,9 +59,15 @@ const sessionCache = new Map<string, SessionRuntimeCache>()
 let activeSessionId: string | null = null
 export const busySessions = new Set<string>()
 export const previousWorkingDirBySession = new Map<string, string>()
-let _calibrated = false
-export function calibrated(): boolean { return _calibrated }
-export function setCalibrated(value = true): void { _calibrated = value }
+const _calibratedModels = new Set<string>()
+export function calibrated(model: string | null): boolean {
+	return !!model && _calibratedModels.has(model)
+}
+export function setCalibrated(model: string | null, value = true): void {
+	if (!model) return
+	if (value) _calibratedModels.add(model)
+	else _calibratedModels.delete(model)
+}
 
 
 // Accessors
@@ -199,7 +205,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	await reloadSystemPromptForSession(sessionId, runtime)
 
 	// Emit context estimate so the statusline is populated immediately
-	const cal = await getCalibration()
+	const cal = await getCalibration(getSessionModel(sessionId))
 	const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 	let msgTokens = 0
 	for (const msg of messages) msgTokens += estimateMessageTokens(msg, cal)
@@ -234,17 +240,21 @@ export async function reloadSystemPromptForSession(
 function watchSystemPromptFiles(): void {
 	const files = new Map<string, FSWatcher>()
 	let debounce: ReturnType<typeof setTimeout> | null = null
+	const changedFiles = new Set<string>()
 
 	const reload = async () => {
+		const names = [...changedFiles]
+		changedFiles.clear()
 		for (const [id, runtime] of sessionCache) {
 			await reloadSystemPromptForSession(id, runtime)
 		}
 		const sid = activeSessionId
 		if (sid) {
-			await publishLine('[system] system prompt reloaded (file changed)', 'meta', sid)
+			const label = names.length > 0 ? names.join(', ') : 'system prompt'
+			await publishLine(`[system] reloaded ${label} (file changed)`, 'meta', sid)
 			const runtime = sessionCache.get(sid)
 			if (runtime) {
-				const cal = await getCalibration()
+				const cal = await getCalibration(getSessionModel(sid))
 				const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 				let msgTokens = 0
 				for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
@@ -253,7 +263,8 @@ function watchSystemPromptFiles(): void {
 		}
 	}
 
-	const onChange = () => {
+	const onChange = (filePath: string) => {
+		changedFiles.add(basename(filePath))
 		if (debounce) clearTimeout(debounce)
 		debounce = setTimeout(() => void reload(), 150)
 	}
@@ -262,7 +273,7 @@ function watchSystemPromptFiles(): void {
 		// Clean up previous watcher for this path
 		files.get(path)?.close()
 		try {
-			const w = watch(path, { persistent: false }, onChange)
+			const w = watch(path, { persistent: false }, () => onChange(path))
 			files.set(path, w)
 		} catch {
 			// File doesn't exist (yet) — ignore
@@ -332,7 +343,7 @@ async function initialize(): Promise<void> {
 	await emitSessions(true)
 
 	if (runtime.messages.length > 0) {
-		const cal = await getCalibration()
+		const cal = await getCalibration(getSessionModel(initialSessionId))
 		const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 		let msgTokens = 0
 		for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
