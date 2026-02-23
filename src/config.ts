@@ -28,6 +28,7 @@ export interface Config {
 export const MODEL_ALIASES: Record<string, string> = {
 	claude: 'anthropic/claude-opus-4-6',
 	codex: 'openai/gpt-5.3-codex',
+	mock: 'mock/mock-1',
 }
 
 export const COMPACT_MODEL_FOR: Record<string, string> = {
@@ -40,6 +41,7 @@ export function parseModel(model: string): { provider: string; modelId: string }
 	const slash = model.indexOf('/')
 	if (slash > 0) return { provider: model.slice(0, slash), modelId: model.slice(slash + 1) }
 	// Bare model name — infer provider
+	if (model.startsWith('mock')) return { provider: 'mock', modelId: model }
 	if (model.startsWith('claude') || model.startsWith('anthropic'))
 		return { provider: 'anthropic', modelId: model }
 	if (

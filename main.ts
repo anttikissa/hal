@@ -22,6 +22,7 @@ import type { EventLevel } from './src/protocol.ts'
 import { registerProvider } from './src/provider.ts'
 import { anthropicProvider } from './src/providers/anthropic.ts'
 import { openaiProvider } from './src/providers/openai.ts'
+import { mockProvider } from './src/providers/mock.ts'
 import { STATE_DIR } from './src/state.ts'
 import { initDebugLog } from './src/debug-log.ts'
 
@@ -33,6 +34,7 @@ if (testMode) {
 	registerProvider(anthropicProvider)
 	registerProvider(openaiProvider)
 }
+registerProvider(mockProvider)
 
 initBus()
 await ensureBus()
