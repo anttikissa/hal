@@ -4,12 +4,17 @@ import { HAL_DIR } from './state.ts'
 
 const CONFIG_PATH = `${HAL_DIR}/config.ason`
 
+export interface DebugTokensConfig {
+	sys?: boolean // system prompt token count on first response per session
+	spam?: boolean // token counts on every response
+}
+
 export interface DebugConfig {
 	toolCalls?: boolean // log tool calls to state/tool-calls.ason
 	responseLogging?: boolean // log API responses to state/responses.ason
 	ipc?: boolean // log IPC commands/events
 	streaming?: boolean // log raw SSE events
-	tokens?: boolean // log token counts per turn
+	tokens?: DebugTokensConfig // token logging
 	recordEverything?: boolean // streaming debug log: state files, keypresses, snapshots
 }
 
@@ -133,5 +138,12 @@ export function updateConfig(updates: Partial<Config>): Config {
 }
 
 export function debugEnabled(flag: keyof DebugConfig): boolean {
-	return loadConfig().debug?.[flag] === true
+	const val = loadConfig().debug?.[flag]
+	return val === true || (typeof val === 'object' && val !== null)
+}
+
+export function debugTokens(flag: keyof DebugTokensConfig): boolean {
+	const tokens = loadConfig().debug?.tokens
+	if (!tokens || typeof tokens !== 'object') return false
+	return tokens[flag] === true
 }

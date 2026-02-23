@@ -3,6 +3,7 @@ import {
 	providerForModel,
 	modelIdForModel,
 	debugEnabled,
+	debugTokens,
 } from '../config.ts'
 import { RESPONSE_LOG } from '../state.ts'
 import { getProvider, type Provider } from '../provider.ts'
@@ -538,12 +539,12 @@ async function logTokenUsage(
 			await saveCalibration(totalBytes, totalInput)
 		}
 	}
-	if (debugEnabled('tokens') && totalInput > 0 && !runtime.tokenLogShown) {
+	if (debugTokens('sys') && totalInput > 0 && !runtime.tokenLogShown) {
 		runtime.tokenLogShown = true
 		const msgCount = runtime.messages.length
 		const msgs = msgCount === 1 ? '1 message' : `${msgCount} messages`
 		await publishLine(
-			`[system] SYSTEM.md + AGENTS.md + tools + ${msgs} = ${totalInput} tokens`,
+			`[debug.tokens.sys] SYSTEM.md + AGENTS.md + tools + ${msgs} = ${totalInput} tokens`,
 			'status',
 			sessionId,
 		)
@@ -571,6 +572,8 @@ async function logTokenUsage(
 	totalPart += ` out: ${runtime.tokenTotals.output}`
 	parts.push(totalPart)
 
-	await publishLine(`[tokens] ${parts.join(' | ')}`, 'status', sessionId)
+	if (debugTokens('spam')) {
+		await publishLine(`[debug.tokens.spam] ${parts.join(' | ')}`, 'status', sessionId)
+	}
 	await publishLine(contextStatus(usage, runtime.messages), 'status', sessionId)
 }
