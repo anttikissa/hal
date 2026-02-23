@@ -1,6 +1,5 @@
 import { resolve } from 'path'
-import { loadConfig, resolveModel, providerForModel, modelIdForModel } from '../config.ts'
-import { getProvider } from '../provider.ts'
+import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../prompt.ts'
 import {
 	estimatedContextStatus,
@@ -85,6 +84,12 @@ export function getFirstSessionId(): string | null {
 
 export function getSessionWorkingDir(sessionId: string | null): string {
 	return getSessionMeta(sessionId)?.workingDir ?? _defaultWorkingDir
+}
+
+/** Resolve which model a session should use: per-session override or global default. */
+export function getSessionModel(sessionId: string | null): string {
+	const meta = getSessionMeta(sessionId)
+	return resolveModel(meta?.model ?? loadConfig().model)
 }
 
 export function hasSession(sessionId: string): boolean {
@@ -204,8 +209,8 @@ export async function reloadSystemPromptForSession(
 	runtime?: SessionRuntimeCache,
 ): Promise<string[]> {
 	const target = runtime ?? (await getOrLoadSessionRuntime(sessionId))
-	const config = loadConfig()
-	const modelId = modelIdForModel(config.model)
+	const fullModel = getSessionModel(sessionId)
+	const modelId = modelIdForModel(fullModel)
 	const workingDir = getSessionWorkingDir(sessionId)
 	const { blocks, systemBytes, loaded } = await loadSystemPrompt({
 		model: modelId,
@@ -285,8 +290,7 @@ async function initialize(): Promise<void> {
 		)
 	}
 
-	const config = loadConfig()
-	const fullModel = resolveModel(config.model)
+	const fullModel = getSessionModel(initialSessionId)
 	const cwd = getSessionWorkingDir(initialSessionId)
 	const loaded = await reloadSystemPromptForSession(initialSessionId, runtime)
 	const promptDesc = loaded.length > 0 ? `  prompt=${loaded.join(', ')}` : ''

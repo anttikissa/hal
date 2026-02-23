@@ -3,11 +3,9 @@ import type { RuntimeCommand } from '../protocol.ts'
 import { clearSession, performHandoff, saveSession } from '../session.ts'
 import {
 	loadConfig,
-	updateConfig,
 	resolveModel,
 	resolveCompactModel,
 	providerForModel,
-	modelAlias,
 	modelIdForModel,
 } from '../config.ts'
 import { getProvider } from '../provider.ts'
@@ -30,6 +28,7 @@ import {
 	ensureSession,
 	reloadSystemPromptForSession,
 	getSessionWorkingDir,
+	getSessionModel,
 	getSessionMeta,
 	markSessionAsActive,
 	persistRegistry,
@@ -107,7 +106,14 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
 	const workingDir = getSessionWorkingDir(sessionId)
-	await ensureSession(newId, workingDir)
+	const newSession = await ensureSession(newId, workingDir)
+
+	// Inherit parent's per-session model
+	const parentMeta = getSessionMeta(sessionId)
+	if (parentMeta?.model) {
+		newSession.model = parentMeta.model
+		await persistRegistry()
+	}
 
 	// Record fork in conversation histories.
 	// Skip the marker on the original if busy — inserting a user message
@@ -207,9 +213,9 @@ async function runHandoff(sessionId: string, text?: string): Promise<void> {
 	await publishActivity('Generating handoff summary...', sessionId)
 	await publishLine('[handoff] generating summary...', 'status', sessionId)
 
-	// Use compact model for handoff summary
-	const config = loadConfig()
-	const compactModel = resolveCompactModel(config.model)
+	// Use compact model for handoff summary (derived from session's model)
+	const sessionModel = getSessionModel(sessionId)
+	const compactModel = resolveCompactModel(sessionModel)
 	const provider = getProvider(providerForModel(compactModel))
 	await provider.refreshAuth()
 
@@ -291,14 +297,24 @@ async function runReset(sessionId: string): Promise<void> {
 async function runModel(sessionId: string, text: string): Promise<void> {
 	const name = text.trim()
 	if (!name) {
-		const config = loadConfig()
-		await publishLine(`[model] current: ${config.model}`, 'info', sessionId)
+		const current = getSessionModel(sessionId)
+		const meta = getSessionMeta(sessionId)
+		const globalDefault = resolveModel(loadConfig().model)
+		const suffix = meta?.model ? ` (global default: ${globalDefault})` : ' (global default)'
+		await publishLine(`[model] current: ${current}${suffix}`, 'info', sessionId)
 		return
 	}
 
-	const prevModel = loadConfig().model
+	const prevModel = getSessionModel(sessionId)
 	const fullModel = resolveModel(name)
-	const config = updateConfig({ model: fullModel })
+
+	// Set per-session model override
+	const meta = getSessionMeta(sessionId)
+	if (meta) {
+		meta.model = fullModel
+		meta.updatedAt = new Date().toISOString()
+		await persistRegistry()
+	}
 
 	// Record model change in conversation history so handoff summaries capture it
 	const runtime = await getOrLoadSessionRuntime(sessionId)

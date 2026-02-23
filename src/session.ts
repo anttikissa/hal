@@ -11,6 +11,7 @@ export const EMPTY_TOTALS: TokenTotals = { input: 0, output: 0, cacheCreate: 0, 
 export interface SessionInfo {
 	id: string
 	name?: string
+	model?: string // per-session model override; falls back to global config
 	workingDir: string
 	busy: boolean
 	messageCount: number

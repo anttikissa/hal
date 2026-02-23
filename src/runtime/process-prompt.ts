@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'fs'
-import { loadConfig, resolveModel, providerForModel } from '../config.ts'
+import { providerForModel } from '../config.ts'
 import { getProvider } from '../provider.ts'
 import { logPrompt } from '../session.ts'
-import { getOrLoadSessionRuntime } from './sessions.ts'
+import { getOrLoadSessionRuntime, getSessionModel } from './sessions.ts'
 import { runAgentLoop } from './agent-loop.ts'
 
 // Parse inline image/file references: [path/to/file.png]
@@ -61,8 +61,7 @@ function parseInputContent(input: string): any {
 
 export async function processPrompt(sessionId: string, input: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	const config = loadConfig()
-	const fullModel = resolveModel(config.model)
+	const fullModel = getSessionModel(sessionId)
 	const providerName = providerForModel(fullModel)
 
 	await logPrompt(sessionId, {

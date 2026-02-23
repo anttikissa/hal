@@ -1,7 +1,5 @@
 import { writeFile, appendFile } from 'fs/promises'
 import {
-	loadConfig,
-	resolveModel,
 	providerForModel,
 	modelIdForModel,
 	debugEnabled,
@@ -14,6 +12,7 @@ import { saveSession } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
 	getSessionWorkingDir,
+	getSessionModel,
 	busySessions,
 	emitStatus,
 	calibrated,
@@ -29,8 +28,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	runtime.pausedByUser = false
 	await emitStatus(true)
 
-	const config = loadConfig()
-	const fullModel = resolveModel(config.model)
+	const fullModel = getSessionModel(sessionId)
 	const modelId = modelIdForModel(fullModel)
 	const provider = getProvider(providerForModel(fullModel))
 
