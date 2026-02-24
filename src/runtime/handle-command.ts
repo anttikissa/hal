@@ -145,8 +145,9 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	forkRuntime.messages.push({ role: 'user', content: `[forked from ${sessionId}]` })
 
 	const ts = new Date().toISOString()
-	await appendConversation(sessionId, { type: 'fork', to: newId, ts })
-	await appendConversation(newId, { type: 'fork', from: sessionId, ts })
+	const forkEvent = { type: 'fork' as const, base: sessionId, new: newId, ts }
+	await appendConversation(sessionId, forkEvent)
+	await appendConversation(newId, forkEvent)
 
 	markSessionAsActive(newId)
 	await persistRegistry()
