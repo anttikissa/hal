@@ -19,6 +19,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - `/bug <description>` — captures terminal snapshot + debug log. You can paste images and text. Use it to self-debug UI issues.
 - Keep code MINIMAL. Don't take measures to maintain backwards compatibility unless explicitly required.
 - Don't reimplement what the system already provides. For example, `open('wx')` is an atomic exclusive-create — no need to build a `mkdir`-based mutex on top of it.
+- Doing a big task? 1. Read files and thing. 2. Plan - write it to file (docs/plans). 3. Implement.
 
 ## User interface guidelines
 
