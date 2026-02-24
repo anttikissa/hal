@@ -71,6 +71,12 @@ type SelectionRange = {
 	endCol: number
 }
 type SelectionMode = 'char' | 'word' | 'line'
+type InputUndoSnapshot = {
+	text: string
+	cursor: number
+	selAnchor: number | null
+	selFocus: number | null
+}
 
 // ── Callbacks ──
 
@@ -117,6 +123,7 @@ export function setInputDraft(text: string, cursor?: number): void {
 	inputBuf = text
 	inputCursor = cursor ?? text.length
 	clearInputTextSelection()
+	clearInputUndoHistory()
 	historyIndex = -1
 	historyDraft = ''
 }
@@ -156,6 +163,7 @@ let inputPromptStr = '> '
 let inputSelAnchor: number | null = null
 let inputSelFocus: number | null = null
 let inputSelActive = false
+let inputUndoStack: InputUndoSnapshot[] = []
 let waitingResolve: ((value: string | null) => void) | null = null
 let lastSubmitTime = 0
 
@@ -340,6 +348,49 @@ function getInputTextSelectionRange(): { start: number; end: number } | null {
 	return a < b ? { start: a, end: b } : { start: b, end: a }
 }
 
+function clearInputUndoHistory(): void {
+	inputUndoStack = []
+}
+
+function currentInputUndoSnapshot(): InputUndoSnapshot {
+	return {
+		text: inputBuf,
+		cursor: inputCursor,
+		selAnchor: inputSelAnchor,
+		selFocus: inputSelFocus,
+	}
+}
+
+function pushInputUndoSnapshot(): void {
+	const prev = inputUndoStack[inputUndoStack.length - 1]
+	if (
+		prev &&
+		prev.text === inputBuf &&
+		prev.cursor === inputCursor &&
+		prev.selAnchor === inputSelAnchor &&
+		prev.selFocus === inputSelFocus
+	) {
+		return
+	}
+	inputUndoStack.push(currentInputUndoSnapshot())
+	if (inputUndoStack.length > 200) inputUndoStack.splice(0, inputUndoStack.length - 200)
+}
+
+function restoreInputUndoSnapshot(snap: InputUndoSnapshot): void {
+	inputBuf = snap.text
+	inputCursor = clampInputPos(snap.cursor)
+	inputSelAnchor = snap.selAnchor === null ? null : clampInputPos(snap.selAnchor)
+	inputSelFocus = snap.selFocus === null ? null : clampInputPos(snap.selFocus)
+	inputSelActive = false
+}
+
+function undoInputEdit(): boolean {
+	const snap = inputUndoStack.pop()
+	if (!snap) return false
+	restoreInputUndoSnapshot(snap)
+	return true
+}
+
 function clearInputTextSelection(): void {
 	inputSelAnchor = null
 	inputSelFocus = null
@@ -358,6 +409,7 @@ function setInputCursor(pos: number, extendSelection = false): void {
 }
 
 function replaceInputRange(start: number, end: number, text: string): void {
+	pushInputUndoSnapshot()
 	const a = clampInputPos(start)
 	const b = clampInputPos(end)
 	const lo = Math.min(a, b)
@@ -380,6 +432,7 @@ function insertIntoInput(text: string): void {
 		replaceInputRange(sel.start, sel.end, text)
 		return
 	}
+	pushInputUndoSnapshot()
 	inputBuf = inputBuf.slice(0, inputCursor) + text + inputBuf.slice(inputCursor)
 	inputCursor += text.length
 }
@@ -474,6 +527,14 @@ function pasteClipboardIntoInput(): void {
 	})
 }
 
+function setInputTextWithUndo(text: string, cursor = text.length): void {
+	if (text === inputBuf && cursor === inputCursor) return
+	pushInputUndoSnapshot()
+	inputBuf = text
+	inputCursor = clampInputPos(cursor)
+	clearInputTextSelection()
+}
+
 function handleInputClipboardShortcutKey(key: string): boolean {
 	const modOther = key.match(/^\x1b\[27;(\d+);(\d+)~$/)
 	const csiU = key.match(/^\x1b\[(\d+);(\d+)u$/)
@@ -499,6 +560,10 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 		inputCursor = inputBuf.length
 		inputSelActive = false
 		render()
+		return true
+	}
+	if (ch === 'z') {
+		if (undoInputEdit()) render()
 		return true
 	}
 	return false
@@ -1013,6 +1078,10 @@ function handleKey(key: string): void {
 		suspendForegroundJob()
 		return
 	}
+	if (key === '\x1bz') {
+		if (undoInputEdit()) render()
+		return
+	}
 	if (handleInputClipboardShortcutKey(key)) return
 
 	if (key === CTRL_X) {
@@ -1059,6 +1128,7 @@ function handleKey(key: string): void {
 		inputBuf = ''
 		inputCursor = 0
 		clearInputTextSelection()
+		clearInputUndoHistory()
 		render()
 		if (waitingResolve) {
 			const r = waitingResolve
@@ -1076,8 +1146,7 @@ function handleKey(key: string): void {
 		}
 		if (inputCursor > 0) {
 			const b = wordBoundaryLeft(inputBuf, inputCursor)
-			inputBuf = inputBuf.slice(0, b) + inputBuf.slice(inputCursor)
-			inputCursor = b
+			replaceInputRange(b, inputCursor, '')
 			render()
 		}
 		return
@@ -1090,8 +1159,7 @@ function handleKey(key: string): void {
 			return
 		}
 		if (inputCursor > 0) {
-			inputBuf = inputBuf.slice(0, inputCursor - 1) + inputBuf.slice(inputCursor)
-			inputCursor--
+			replaceInputRange(inputCursor - 1, inputCursor, '')
 			render()
 		}
 		return
@@ -1104,7 +1172,7 @@ function handleKey(key: string): void {
 			return
 		}
 		if (inputCursor < inputBuf.length) {
-			inputBuf = inputBuf.slice(0, inputCursor) + inputBuf.slice(inputCursor + 1)
+			replaceInputRange(inputCursor, inputCursor + 1, '')
 			render()
 		}
 		return
@@ -1225,8 +1293,7 @@ function handleKey(key: string): void {
 			render()
 			return
 		}
-		inputBuf = inputBuf.slice(inputCursor)
-		inputCursor = 0
+		replaceInputRange(0, inputCursor, '')
 		render()
 		return
 	}
@@ -1235,7 +1302,7 @@ function handleKey(key: string): void {
 			render()
 			return
 		}
-		inputBuf = inputBuf.slice(0, inputCursor)
+		replaceInputRange(inputCursor, inputBuf.length, '')
 		render()
 		return
 	}
@@ -1261,8 +1328,7 @@ function handleKey(key: string): void {
 			historyIndex = inputHistory.length - 1
 		} else if (historyIndex > 0) historyIndex--
 		else return
-		inputBuf = inputHistory[historyIndex]
-		inputCursor = inputBuf.length
+		setInputTextWithUndo(inputHistory[historyIndex])
 		render()
 		return
 	}
@@ -1288,13 +1354,12 @@ function handleKey(key: string): void {
 		if (historyIndex < 0) return
 		if (historyIndex < inputHistory.length - 1) {
 			historyIndex++
-			inputBuf = inputHistory[historyIndex]
+			setInputTextWithUndo(inputHistory[historyIndex])
 		} else {
 			historyIndex = -1
-			inputBuf = historyDraft
+			setInputTextWithUndo(historyDraft)
 			historyDraft = ''
 		}
-		inputCursor = inputBuf.length
 		render()
 		return
 	}
@@ -1322,9 +1387,7 @@ function handleKey(key: string): void {
 		if (tabCompleter) {
 			const matches = tabCompleter(inputBuf)
 			if (matches.length === 1) {
-				inputBuf = matches[0]
-				inputCursor = inputBuf.length
-				clearInputTextSelection()
+				setInputTextWithUndo(matches[0])
 				render()
 			} else if (matches.length > 1) {
 				let common = matches[0]
@@ -1334,9 +1397,7 @@ function handleKey(key: string): void {
 					}
 				}
 				if (common.length > inputBuf.length) {
-					inputBuf = common
-					inputCursor = inputBuf.length
-					clearInputTextSelection()
+					setInputTextWithUndo(common)
 				}
 				writeToOutput(`\x1b[2m${matches.join('  ')}\x1b[0m\n`)
 				render()
@@ -1567,6 +1628,7 @@ export function init(): void {
 	inputBuf = ''
 	inputCursor = 0
 	clearInputTextSelection()
+	clearInputUndoHistory()
 	outputLines = ['']
 	scrollOffset = 0
 	lastWrapCols = 0
@@ -1647,6 +1709,7 @@ export function input(promptStr: string): Promise<string | null> {
 	inputBuf = ''
 	inputCursor = 0
 	clearInputTextSelection()
+	clearInputUndoHistory()
 	render()
 	if (ended) return Promise.resolve(null)
 	return new Promise((resolve) => {
