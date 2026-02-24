@@ -17,7 +17,6 @@ Exactly one process is elected **owner** via `state/ipc/owner.lock` (or `${HAL_S
 ```
 state/ipc/
   owner.lock       -- lockfile: { ownerId, pid, createdAt }
-  owner-claim/     -- mkdir-based lock for owner election race resolution
   commands.ason    -- append-only command log (all clients write)
   events.ason      -- append-only event log (owner writes)
   state.ason       -- latest runtime snapshot
@@ -48,7 +47,7 @@ Commands are created with `makeCommand(...)` and appended to `commands.ason`.
 
 - Commands are queued per session (FIFO within a session).
 - Multiple sessions run concurrently up to `config.ason:maxConcurrentSessions` (default `4`).
-- Immediate commands (bypass the session queue): `pause`, `resume`, `drop`, `queue`, `close`, `fork`.
+- Immediate commands (bypass the session queue): `pause`, `resume`, `drop`, `queue`, `close`, `fork`, `cd`.
 - `reset` drops queued commands for that same session before reset executes.
 - Sending a prompt while paused auto-resumes the session.
 

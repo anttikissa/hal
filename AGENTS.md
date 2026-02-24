@@ -18,6 +18,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.
 - `/bug <description>` — captures terminal snapshot + debug log. You can paste images and text. Use it to self-debug UI issues.
 - Keep code MINIMAL. Don't take measures to maintain backwards compatibility unless explicitly required.
+- Don't reimplement what the system already provides. For example, `open('wx')` is an atomic exclusive-create — no need to build a `mkdir`-based mutex on top of it.
 
 ## User interface guidelines
 
