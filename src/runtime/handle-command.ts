@@ -440,15 +440,16 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 
 async function runTitle(sessionId: string, text: string): Promise<void> {
 	const title = text.trim()
+	const meta = getSessionMeta(sessionId)
 	if (!title) {
-		const meta = getSessionMeta(sessionId)
 		const current = meta?.title || '(none)'
 		await publishLine(`[title] ${current}`, 'info', sessionId)
 		return
 	}
 
+	const prev = meta?.title
 	await setSessionTitle(sessionId, title)
-	await appendConversation(sessionId, { type: 'title', text: title, ts: new Date().toISOString() })
+	await appendConversation(sessionId, { type: 'title', from: prev, to: title, ts: new Date().toISOString() })
 	await publishLine(`[title] ${title}`, 'meta', sessionId)
 }
 
@@ -503,6 +504,7 @@ async function maybeAutoTitle(sessionId: string): Promise<void> {
 
 		if (error || !title?.trim()) return
 		await setSessionTitle(sessionId, title.trim())
+		await appendConversation(sessionId, { type: 'title', to: title.trim(), auto: true, ts: new Date().toISOString() })
 	} catch {
 		// Non-critical — silently ignore
 	}

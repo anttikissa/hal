@@ -101,7 +101,7 @@ export type ConversationEvent =
 	| { type: 'assistant'; text: string; ts: string }
 	| { type: 'model'; from: string; to: string; ts: string }
 	| { type: 'fork'; from?: string; to?: string; ts: string }
-	| { type: 'title'; text: string; auto?: boolean; ts: string }
+	| { type: 'title'; from?: string; to: string; auto?: boolean; ts: string }
 	| { type: 'handoff'; ts: string }
 	| { type: 'reset'; ts: string }
 	| { type: 'cd'; from: string; to: string; ts: string }
