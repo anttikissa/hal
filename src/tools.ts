@@ -259,7 +259,7 @@ async function logToolCall(
 			durationMs,
 			ok,
 		}
-		await appendFile(TOOL_LOG, stringify(entry) + '\n')
+		await appendFile(TOOL_LOG, stringify(entry, 'short') + '\n')
 	} catch {}
 }
 

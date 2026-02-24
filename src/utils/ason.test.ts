@@ -102,6 +102,42 @@ describe('stringify', () => {
 	})
 })
 
+describe('stringify modes', () => {
+	const wide = {
+		name: 'alice',
+		email: 'alice@example.com',
+		score: 100,
+		tags: ['admin', 'user', 'moderator'],
+	}
+
+	test('short is always single-line', () => {
+		const result = stringify(wide, 'short')
+		expect(result).not.toContain('\n')
+		expect(result).toContain("name: 'alice'")
+	})
+
+	test('smart breaks wide objects to multi-line', () => {
+		const result = stringify(wide, 'smart')
+		expect(result).toContain('\n')
+	})
+
+	test('smart keeps narrow objects inline', () => {
+		expect(stringify({ a: 1 }, 'smart')).toBe('{ a: 1 }')
+	})
+
+	test('long always uses multi-line', () => {
+		const result = stringify({ a: 1 }, 'long')
+		expect(result).toContain('\n')
+		expect(result).toBe('{\n  a: 1\n}')
+	})
+
+	test('default is smart', () => {
+		expect(stringify(wide)).toBe(stringify(wide, 'smart'))
+	})
+})
+
+
+
 describe('parse', () => {
 	describe('primitives', () => {
 		test('null', () => expect(parse('null')).toBe(null))
@@ -272,25 +308,24 @@ describe('parseStream', () => {
 		})
 	}
 
-	async function collect(
-		stream: ReadableStream<Uint8Array>,
-		options?: Parameters<typeof parseStream>[1],
-	): Promise<any[]> {
+	async function collect(stream: ReadableStream<Uint8Array>): Promise<any[]> {
 		const results: any[] = []
-		for await (const value of parseStream(stream, options)) results.push(value)
+		for await (const value of parseStream(stream)) results.push(value)
 		return results
 	}
 
-	test('single value', async () => {
-		await expect(collect(toStream(['42']))).rejects.toThrow(/objects\/arrays/)
+	test('single line', async () => {
+		expect(await collect(toStream(["{ a: 1 }\n"]))).toEqual([{ a: 1 }])
 	})
 
-	test('multiple values', async () => {
+	test('multiple lines', async () => {
 		expect(await collect(toStream(['{ a: 1 }\n{ b: 2 }\n']))).toEqual([{ a: 1 }, { b: 2 }])
 	})
-	test('value split across chunks', async () => {
+
+	test('line split across chunks', async () => {
 		expect(await collect(toStream(['{ a:', ' 1 }\n']))).toEqual([{ a: 1 }])
 	})
+
 	test('multiple chunks multiple values', async () => {
 		expect(await collect(toStream(['{ a: 1 }\n{ b', ': 2 }\n{ c: 3 }\n']))).toEqual([
 			{ a: 1 },
@@ -298,57 +333,31 @@ describe('parseStream', () => {
 			{ c: 3 },
 		])
 	})
+
 	test('empty stream', async () => {
 		expect(await collect(toStream([]))).toEqual([])
 	})
+
 	test('trailing value without newline', async () => {
 		expect(await collect(toStream(['{ a: 1 }']))).toEqual([{ a: 1 }])
 	})
 
-	test('multiline object across chunks', async () => {
-		expect(await collect(toStream(['{\n  a: 1,\n', '  b: 2,\n}\n']))).toEqual([{ a: 1, b: 2 }])
+	test('blank lines are skipped', async () => {
+		expect(await collect(toStream(['{ a: 1 }\n\n\n{ b: 2 }\n']))).toEqual([{ a: 1 }, { b: 2 }])
 	})
+
 	test('throws on invalid token', async () => {
 		expect(collect(toStream(['{ a: @@@ }\n']))).rejects.toThrow(/Unexpected token/)
 	})
+
 	test('yields valid values then throws on invalid token', async () => {
 		const iter = parseStream(toStream(['{ a: 1 }\n@@@\n']))
 		const first = await iter.next()
 		expect(first.value).toEqual({ a: 1 })
 		expect(iter.next()).rejects.toThrow(/Unexpected token/)
 	})
-	test('parseStream recover skips junk until next object', async () => {
-		const values = await collect(toStream(['garbage}\n{ a: 1 }\n{ b: 2 }\n']), {
-			recover: true,
-		})
-		expect(values).toEqual([{ a: 1 }, { b: 2 }])
-	})
-	test('parseStream recover skips primitive from corrupted prefix and resumes at next object', async () => {
-		const values = await collect(
-			toStream([
-				"3Z',\n  id: '1771455385223-29749-238',\n}\n{\n  type: 'command',\n  sessionId: 's-ae17c9',\n}\n",
-			]),
-			{ recover: true },
-		)
-		expect(values).toEqual([{ type: 'command', sessionId: 's-ae17c9' }])
-	})
-	test('parseStream recover ignores trailing junk at end-of-stream', async () => {
-		const values = await collect(toStream(['{ a: 1 }\n@@@\n']), { recover: true })
-		expect(values).toEqual([{ a: 1 }])
-	})
-	test('parseStream recover does not emit nested object fragment as top-level record', async () => {
-		const values = await collect(toStream(["{ foo: 'bar' } } { next: 'record' }\n"]), {
-			recover: true,
-		})
-		expect(values).toEqual([{ next: 'record' }])
-	})
-	test('parseStream recover does not emit nested fragment when split across chunks', async () => {
-		const values = await collect(toStream(["{ foo: 'bar' }", " } { next: 'record' }\n"]), {
-			recover: true,
-		})
-		expect(values).toEqual([{ next: 'record' }])
-	})
-	test('parseStream recover yields newline-terminated first record immediately on open stream', async () => {
+
+	test('yields immediately on newline-terminated record', async () => {
 		const encoder = new TextEncoder()
 		let controller: ReadableStreamDefaultController<Uint8Array> | null = null
 		const stream = new ReadableStream<Uint8Array>({
@@ -357,7 +366,7 @@ describe('parseStream', () => {
 			},
 		})
 
-		const iter = parseStream(stream, { recover: true })
+		const iter = parseStream(stream)
 		controller!.enqueue(encoder.encode("{ event: 'keypress', data: 'a' }\n"))
 
 		const result = await Promise.race([
@@ -374,38 +383,6 @@ describe('parseStream', () => {
 		controller!.close()
 		await iter.return(undefined)
 	})
-	test('parseStream recover yields no-newline first record after grace period', async () => {
-		const encoder = new TextEncoder()
-		let controller: ReadableStreamDefaultController<Uint8Array> | null = null
-		const stream = new ReadableStream<Uint8Array>({
-			start(c) {
-				controller = c
-			},
-		})
-
-		const iter = parseStream(stream, { recover: true })
-		controller!.enqueue(encoder.encode("{ event: 'keypress', data: 'a' }"))
-
-		const nextPromise = iter.next()
-		const early = await Promise.race([
-			nextPromise.then(() => 'value' as const),
-			Bun.sleep(25).then(() => 'timeout' as const),
-		])
-		expect(early).toBe('timeout')
-
-		const late = await Promise.race([
-			nextPromise,
-			Bun.sleep(200).then(() => ({ timeout: true }) as const),
-		])
-		expect('timeout' in late).toBe(false)
-		if (!('timeout' in late)) {
-			expect(late.done).toBe(false)
-			expect(late.value).toEqual({ event: 'keypress', data: 'a' })
-		}
-
-		controller!.close()
-		await iter.return(undefined)
-	})
 })
 
 describe('parseStream e2e', () => {
@@ -414,7 +391,6 @@ describe('parseStream e2e', () => {
 		await Bun.write(path, '')
 
 		const tail = Bun.spawn(['tail', '-f', path], { stdout: 'pipe' })
-		const results: any[] = []
 		const iter = parseStream(tail.stdout as ReadableStream<Uint8Array>)
 
 		async function nextValue(): Promise<any> {
@@ -423,10 +399,8 @@ describe('parseStream e2e', () => {
 			return value
 		}
 
-		// Write first object
 		await Bun.write(path, "{ name: 'alice', score: 100 }\n")
 		expect(await nextValue()).toEqual({ name: 'alice', score: 100 })
-		expect(results.length === 0) // nothing pushed to results yet
 
 		// Append second object
 		const f = Bun.file(path)
@@ -434,26 +408,12 @@ describe('parseStream e2e', () => {
 		await Bun.write(path, prev + "{ name: 'bob', score: 200 }\n")
 		expect(await nextValue()).toEqual({ name: 'bob', score: 200 })
 
-		// Append a multiline object
+		// Append a partial line, then complete it
 		const prev2 = await Bun.file(path).text()
-		await Bun.write(
-			path,
-			prev2 +
-				`{
-	name: 'charlie',
-	score: 300,
-}\n`,
-		)
-		expect(await nextValue()).toEqual({ name: 'charlie', score: 300 })
-
-		// Append a partial object, then complete it in the next write
-		const prev3 = await Bun.file(path).text()
-		await Bun.write(path, prev3 + "{ key: 'val")
-		// Give tail -f a moment to deliver the partial chunk
+		await Bun.write(path, prev2 + "{ key: 'val")
 		await Bun.sleep(50)
-		// Complete the object and start another one in the same write
-		const prev4 = await Bun.file(path).text()
-		await Bun.write(path, prev4 + "ue' }\n{ more: 42 }\n")
+		const prev3 = await Bun.file(path).text()
+		await Bun.write(path, prev3 + "ue' }\n{ more: 42 }\n")
 		expect(await nextValue()).toEqual({ key: 'value' })
 		expect(await nextValue()).toEqual({ more: 42 })
 

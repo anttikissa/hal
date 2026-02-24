@@ -91,9 +91,13 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 	throw new Error(`TODO: unsupported type ${typeof obj}`)
 }
 
-export function stringify(obj: any): string {
-	return stringifyValue(obj, 0, 0, 80)
+export type StringifyMode = 'short' | 'smart' | 'long'
+
+export function stringify(obj: any, mode: StringifyMode = 'smart'): string {
+	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
+	return stringifyValue(obj, 0, 0, maxWidth)
 }
+
 
 class ParseError extends Error {
 	pos: number
@@ -329,354 +333,29 @@ export function parseAll(str: string): any[] {
 	return new Parser(str).parseMultiple()
 }
 
-type ParseAttempt =
-	| { kind: 'empty' }
-	| { kind: 'ok'; value: any; end: number }
-	| { kind: 'parse_error'; error: ParseError }
-	| { kind: 'fatal'; error: unknown }
-
-type ReaderReadResult = { done: true; value?: Uint8Array } | { done: false; value: Uint8Array }
-const RECOVER_HEAD_GRACE_MS = 50
-
-// Stream records must be top-level objects/arrays. Primitives are rejected.
-function isStreamableValue(val: any): boolean {
-	if (val === null) return false
-	return typeof val === 'object'
-}
-
-function findRecoveryStart(input: string, from = 0): number {
-	for (let i = Math.max(0, from); i < input.length; i++) {
-		const ch = input[i]
-		if (ch !== '}' && ch !== ']') continue
-		let j = i + 1
-		while (j < input.length && /\s/.test(input[j])) j++
-		if (j < input.length && (input[j] === '{' || input[j] === '[')) return j
-	}
-	return -1
-}
-
-function findNextNonWhitespace(input: string, from: number): number {
-	let i = Math.max(0, from)
-	while (i < input.length && /\s/.test(input[i])) i++
-	return i < input.length ? i : -1
-}
-
-function hasDangerousContinuation(input: string, from: number): boolean {
-	const idx = findNextNonWhitespace(input, from)
-	return idx >= 0 && (input[idx] === '}' || input[idx] === ']' || input[idx] === ',')
-}
-
-// Finds the end (exclusive) of a balanced top-level object/array starting at
-// `start` (`{` or `[`). Returns:
-// - >= 0: matching end index
-// - -1: incomplete (need more bytes)
-// - -2: structurally invalid (mismatched closer)
-function findBalancedContainerEnd(input: string, start: number): number {
-	const open = input[start]
-	if (open !== '{' && open !== '[') return -2
-	const stack: string[] = [open]
-	let quote: "'" | '"' | null = null
-	let escaped = false
-	let lineComment = false
-	let blockComment = false
-
-	for (let i = start + 1; i < input.length; i++) {
-		const ch = input[i]
-
-		if (lineComment) {
-			if (ch === '\n') lineComment = false
-			continue
-		}
-		if (blockComment) {
-			if (ch === '*' && input[i + 1] === '/') {
-				blockComment = false
-				i++
-			}
-			continue
-		}
-
-		if (quote) {
-			if (escaped) {
-				escaped = false
-				continue
-			}
-			if (ch === '\\') {
-				escaped = true
-				continue
-			}
-			if (ch === quote) quote = null
-			continue
-		}
-
-		if (ch === '/' && input[i + 1] === '/') {
-			lineComment = true
-			i++
-			continue
-		}
-		if (ch === '/' && input[i + 1] === '*') {
-			blockComment = true
-			i++
-			continue
-		}
-		if (ch === "'" || ch === '"') {
-			quote = ch
-			continue
-		}
-		if (ch === '{' || ch === '[') {
-			stack.push(ch)
-			continue
-		}
-		if (ch !== '}' && ch !== ']') continue
-
-		const last = stack.pop()
-		if (!last) return -2
-		if ((last === '{' && ch !== '}') || (last === '[' && ch !== ']')) return -2
-		if (stack.length === 0) return i + 1
-	}
-
-	return -1
-}
-
-function parseBufferValue(buf: string): ParseAttempt {
-	const parser = new Parser(buf)
-	parser.skipWhitespace()
-	if (parser.getPosition() >= buf.length) return { kind: 'empty' }
-	try {
-		return { kind: 'ok', value: parser.parseValue(), end: parser.getPosition() }
-	} catch (e) {
-		if (e instanceof ParseError) return { kind: 'parse_error', error: e }
-		return { kind: 'fatal', error: e }
-	}
-}
-
-function makeReadPump(reader: { read: () => Promise<ReaderReadResult> }) {
-	let pending: Promise<ReaderReadResult> | null = null
-	const read = async () => {
-		if (!pending) pending = reader.read()
-		const result = await pending
-		pending = null
-		return result
-	}
-	const readOrTimeout = async (ms: number): Promise<ReaderReadResult | null> => {
-		if (!pending) pending = reader.read()
-		const timeoutToken = Symbol('timeout')
-		const raced = await Promise.race([
-			pending,
-			new Promise<symbol>((resolve) => setTimeout(() => resolve(timeoutToken), ms)),
-		])
-		if (raced === timeoutToken) return null
-		const result = raced as ReaderReadResult
-		pending = null
-		return result
-	}
-	return { read, readOrTimeout }
-}
-
-type ReadPump = ReturnType<typeof makeReadPump>
-type StreamFail = (e: unknown, phase: 'mid-stream' | 'flush') => never
-
-async function* parseStreamStrictPath(
-	pump: ReadPump,
-	state: { buf: string },
-	appendChunk: (value: Uint8Array) => void,
-	fail: StreamFail,
-): AsyncGenerator<any> {
-	// Strict path (`recover: false`):
-	// parse from buffer start only, never resync/skip junk, throw on clear errors.
-	// Strict mode: parse sequentially from buffer start and fail fast on
-	// malformed mid-buffer data. Only "error at buffer end" waits for more bytes.
-	// Example mid-stream state after a read:
-	//   buf = "{ a: 1 }\n{ b: 2"
-	// We yield { a: 1 }, then stop and wait because "{ b: 2" is incomplete.
-	while (true) {
-		const next = await pump.read()
-		if (next.done) break
-		appendChunk(next.value)
-		while (state.buf.length > 0) {
-			const parsed = parseBufferValue(state.buf)
-			if (parsed.kind === 'empty') {
-				state.buf = ''
-				break
-			}
-			if (parsed.kind === 'fatal') throw parsed.error
-			if (parsed.kind === 'parse_error') {
-				// Parse errors at the current buffer end are treated as incomplete
-				// chunks (for example "{ foo: 123"), so we wait for more bytes.
-				if (parsed.error.pos < state.buf.length - 1) fail(parsed.error, 'mid-stream')
-				break
-			}
-			if (!isStreamableValue(parsed.value)) {
-				throw new Error('ASON parseStream only supports objects/arrays by default')
-			}
-			// Parsed one full top-level record from buffer start.
-			// Remove consumed bytes so next parse starts at the next record.
-			state.buf = state.buf.slice(parsed.end)
-			yield parsed.value
-		}
-	}
-
-	state.buf = state.buf.trim()
-	// Flush example at EOF:
-	//   buf might still be "{ b: 2 }" (yield it) or "{ b: 2" (throw flush error).
-	while (state.buf.length > 0) {
-		const parsed = parseBufferValue(state.buf)
-		if (parsed.kind === 'empty') break
-		if (parsed.kind === 'fatal') fail(parsed.error, 'flush')
-		if (parsed.kind === 'parse_error') fail(parsed.error, 'flush')
-		if (!isStreamableValue(parsed.value)) {
-			throw new Error('ASON parseStream only supports objects/arrays by default')
-		}
-		state.buf = state.buf.slice(parsed.end)
-		yield parsed.value
-	}
-}
-
-async function* parseStreamRecoveryPath(
-	pump: ReadPump,
-	state: { buf: string },
-	appendChunk: (value: Uint8Array) => void,
-): AsyncGenerator<any> {
-	// Recovery path (`recover: true`):
-	// frame one balanced top-level object/array at a time, parse it strictly,
-	// and on corruption/misalignment resync to next boundary.
-	// For the first ambiguous candidate without delimiter/newline, wait up to
-	// RECOVER_HEAD_GRACE_MS (50ms) before yielding to avoid partial fragments.
-	let streamDone = false
-
-	const recoverStep = async function* (flush: boolean): AsyncGenerator<any> {
-		while (state.buf.length > 0) {
-			const start = findNextNonWhitespace(state.buf, 0)
-			if (start < 0) {
-				state.buf = ''
-				break
-			}
-			const head = state.buf[start]
-
-			if (head !== '{' && head !== '[') {
-				const boundary = findRecoveryStart(state.buf, start)
-				if (boundary >= 0) {
-					state.buf = state.buf.slice(boundary)
-					continue
-				}
-				if (flush) {
-					state.buf = ''
-					break
-				}
-				break
-			}
-
-			const end = findBalancedContainerEnd(state.buf, start)
-			if (end === -1) {
-				if (flush) {
-					state.buf = ''
-					break
-				}
-				break
-			}
-			if (end === -2) {
-				const boundary = findRecoveryStart(state.buf, start + 1)
-				if (boundary >= 0) {
-					state.buf = state.buf.slice(boundary)
-					continue
-				}
-				state.buf = state.buf.slice(Math.max(1, start + 1))
-				continue
-			}
-
-			const candidate = state.buf.slice(start, end)
-			let value: any
-			try {
-				value = parse(candidate)
-			} catch (e) {
-				const boundary = findRecoveryStart(state.buf, end)
-				if (boundary >= 0) {
-					state.buf = state.buf.slice(boundary)
-					continue
-				}
-				if (flush) {
-					state.buf = ''
-					break
-				}
-				state.buf = state.buf.slice(end)
-				continue
-			}
-			if (!isStreamableValue(value) || hasDangerousContinuation(state.buf, end)) {
-				const boundary = findRecoveryStart(state.buf, end)
-				if (boundary >= 0) {
-					state.buf = state.buf.slice(boundary)
-					continue
-				}
-				if (flush) {
-					state.buf = ''
-					break
-				}
-				break
-			}
-
-			if (
-				!flush &&
-				findNextNonWhitespace(state.buf, end) < 0 &&
-				!/[\r\n]/.test(state.buf.slice(end))
-			) {
-				const maybeMore = await pump.readOrTimeout(RECOVER_HEAD_GRACE_MS)
-				if (maybeMore) {
-					if (maybeMore.done) {
-						streamDone = true
-					} else {
-						appendChunk(maybeMore.value)
-						continue
-					}
-				}
-			}
-
-			state.buf = state.buf.slice(end)
-			yield value
-		}
-	}
-
-	while (!streamDone) {
-		const next = await pump.read()
-		if (next.done) {
-			streamDone = true
-			break
-		}
-		appendChunk(next.value)
-		yield* recoverStep(false)
-	}
-
-	state.buf = state.buf.trim()
-	yield* recoverStep(true)
-}
-
 export async function* parseStream(
 	stream: ReadableStream<Uint8Array>,
-	options: { recover?: boolean } = {},
 ): AsyncGenerator<any> {
-	const recover = !!options.recover
+	const reader = stream.getReader()
 	const decoder = new TextDecoder()
-	const pump = makeReadPump(stream.getReader())
-	// Bytes already read from the stream but not yet consumed by parser.
-	// EOF means no future bytes from the stream, but buf may still contain data.
-	const state = { buf: '' }
+	let buf = ''
 
-	const fail = (e: unknown, phase: 'mid-stream' | 'flush'): never => {
-		const wrapped = new Error(
-			`ASON parseStream ${phase} error: ${e instanceof Error ? e.message : String(e)}`,
-		)
-		;(wrapped as any).cause = e
-		throw wrapped
+	while (true) {
+		const { done, value } = await reader.read()
+		if (done) break
+		buf += decoder.decode(value, { stream: true })
+		const lines = buf.split('\n')
+		buf = lines.pop()! // keep incomplete last line
+		for (const line of lines) {
+			const trimmed = line.trim()
+			if (!trimmed) continue
+			yield parse(trimmed)
+		}
 	}
 
-	const appendChunk = (value: Uint8Array) => {
-		state.buf += decoder.decode(value, { stream: true })
-	}
-
-	if (!recover) {
-		yield* parseStreamStrictPath(pump, state, appendChunk, fail)
-		return
-	}
-
-	yield* parseStreamRecoveryPath(pump, state, appendChunk)
+	// Flush remaining buffer
+	const trimmed = buf.trim()
+	if (trimmed) yield parse(trimmed)
 }
 
 export default { stringify, parse, parseAll, parseStream }

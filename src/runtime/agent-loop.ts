@@ -69,7 +69,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				usage: parsed.usage,
 				blocks: parsed.contentBlocks.length,
 			}
-			await appendFile(RESPONSE_LOG, stringify(entry) + '\n').catch(() => {})
+			await appendFile(RESPONSE_LOG, stringify(entry, 'short') + '\n').catch(() => {})
 		}
 
 		if (Object.keys(parsed.usage).length > 0) {

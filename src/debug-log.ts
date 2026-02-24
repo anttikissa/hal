@@ -32,7 +32,7 @@ async function flush(): Promise<void> {
 	const records = buffer
 	buffer = []
 	flushTimer = null
-	const lines = records.map((r) => stringify(r)).join('\n') + '\n'
+	const lines = records.map((r) => stringify(r, 'short')).join('\n') + '\n'
 	await appendFile(logPath, lines)
 }
 

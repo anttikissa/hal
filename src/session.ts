@@ -108,7 +108,7 @@ export type ConversationEvent =
 
 export async function appendConversation(sessionId: string, event: ConversationEvent): Promise<void> {
 	await ensureSessionDir(sessionId)
-	await appendFile(conversationPath(sessionId), stringify(event) + '\n')
+	await appendFile(conversationPath(sessionId), stringify(event, 'short') + '\n')
 }
 
 export async function loadConversation(sessionId: string): Promise<ConversationEvent[]> {

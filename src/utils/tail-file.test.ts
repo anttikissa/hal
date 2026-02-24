@@ -15,7 +15,7 @@ describe('tailFile', () => {
 		const received: number[] = []
 
 		const readerTask = (async () => {
-			for await (const event of parseStream(stream, { recover: true })) {
+			for await (const event of parseStream(stream)) {
 				if (event && typeof event.n === 'number') {
 					received.push(event.n)
 					if (received.length >= 200) break
@@ -25,7 +25,7 @@ describe('tailFile', () => {
 
 		// Burst writes in parallel to stress watcher callbacks.
 		await Promise.all(
-			Array.from({ length: 200 }, (_, i) => appendFile(file, stringify({ n: i }) + '\n')),
+			Array.from({ length: 200 }, (_, i) => appendFile(file, stringify({ n: i }, 'short') + '\n')),
 		)
 
 		await readerTask
