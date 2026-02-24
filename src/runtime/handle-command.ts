@@ -56,6 +56,7 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 			case 'prompt':
 				// Prompt already echoed in processCommand for immediate display
 				await processPrompt(sessionId, command.text ?? '')
+				void maybeAutoTitle(sessionId)
 				break
 
 			case 'handoff':
@@ -76,6 +77,10 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 
 			case 'cd':
 				await runCd(sessionId, command.text ?? '')
+				break
+
+			case 'title':
+				await runTitle(sessionId, command.text ?? '')
 				break
 
 			// 'close' and 'fork' are handled immediately in processCommand (bypass scheduler)
@@ -419,6 +424,65 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 	await publishEstimatedContext(sessionId)
 	await emitSessions(true)
 
+}
+
+async function runTitle(sessionId: string, text: string): Promise<void> {
+	const title = text.trim()
+	if (!title) {
+		const meta = getSessionMeta(sessionId)
+		const current = meta?.title || '(none)'
+		await publishLine(`[title] ${current}`, 'info', sessionId)
+		return
+	}
+
+	await setSessionTitle(sessionId, title)
+	await publishLine(`[title] ${title}`, 'meta', sessionId)
+}
+
+export async function setSessionTitle(sessionId: string, title: string): Promise<void> {
+	const meta = getSessionMeta(sessionId)
+	if (meta) {
+		meta.title = title
+		meta.updatedAt = new Date().toISOString()
+		await persistRegistry()
+	}
+	await emitSessions(true)
+}
+
+/** Generate a title for the conversation after the first real exchange. */
+async function maybeAutoTitle(sessionId: string): Promise<void> {
+	const meta = getSessionMeta(sessionId)
+	if (meta?.title) return
+
+	const runtime = getCachedSessionRuntime(sessionId)
+	if (!runtime) return
+
+	// Need at least one user message and one assistant response
+	const userMsgs = runtime.messages.filter(
+		(m) => m.role === 'user' && typeof m.content === 'string' && !m.content.startsWith('['),
+	)
+	const assistantMsgs = runtime.messages.filter((m) => m.role === 'assistant')
+	if (userMsgs.length === 0 || assistantMsgs.length === 0) return
+
+	try {
+		const sessionModel = getSessionModel(sessionId)
+		const compactModel = resolveCompactModel(sessionModel)
+		const provider = getProvider(providerForModel(compactModel))
+		await provider.refreshAuth()
+
+		const firstPrompt = userMsgs[0].content
+		const { text: title, error } = await provider.complete({
+			model: modelIdForModel(compactModel),
+			system: 'Generate a short title (3-8 words) for this conversation. Reply with ONLY the title, no quotes, no punctuation at the end.',
+			userMessage: firstPrompt.slice(0, 500),
+			maxTokens: 30,
+		})
+
+		if (error || !title?.trim()) return
+		await setSessionTitle(sessionId, title.trim())
+	} catch {
+		// Non-critical — silently ignore
+	}
 }
 
 export async function runClose(sessionId: string): Promise<void> {

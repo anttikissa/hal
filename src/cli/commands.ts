@@ -188,6 +188,14 @@ async function restore(args: string, client: Client): Promise<void> {
 }
 
 
+async function title(args: string, client: Client): Promise<void> {
+	if (!args) {
+		client.log('local.usage', 'usage: /title <conversation title>')
+		return
+	}
+	await client.command('title', args)
+}
+
 function exit(_args: string, _client: Client): void {}
 
 const COMMANDS: Record<string, Handler> = {
@@ -209,6 +217,7 @@ const COMMANDS: Record<string, Handler> = {
 	bug,
 	fork,
 	restore,
+	title,
 	exit,
 }
 

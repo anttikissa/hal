@@ -160,6 +160,7 @@ export async function publishSessions(
 		sessions: sessions.map((s) => ({
 			id: s.id,
 			workingDir: s.workingDir,
+			title: s.title,
 			messageCount: s.messageCount,
 			busy: s.busy,
 			updatedAt: s.updatedAt,

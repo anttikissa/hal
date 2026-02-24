@@ -93,10 +93,12 @@ export function getSessionModel(sessionId: string | null): string {
 }
 
 /** Build meta snapshot for persisting alongside session data. */
-export function sessionMetaSnapshot(sessionId: string): { workingDir: string; model?: string } {
+export function sessionMetaSnapshot(sessionId: string): { workingDir: string; model?: string; title?: string } {
+	const meta = getSessionMeta(sessionId)
 	return {
 		workingDir: getSessionWorkingDir(sessionId),
 		model: getSessionModel(sessionId),
+		title: meta?.title,
 	}
 }
 

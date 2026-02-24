@@ -25,6 +25,7 @@ import {
 	setMaxPromptLines,
 	setOutputSnapshot,
 	setStatusLine,
+	setTitleBar,
 	setDoubleEnterHandler,
 	setTabCompleter,
 } from './tui.ts'
@@ -100,6 +101,7 @@ interface CliTab {
 	sessionId: string
 	workingDir: string
 	name: string
+	title: string
 	output: string
 	contextStatus: string | null
 	activity: string
@@ -285,6 +287,7 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 			sessionId,
 			workingDir: launchCwd,
 			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
+			title: '',
 			output: '',
 			contextStatus: null,
 			activity: '',
@@ -317,6 +320,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	resetFormat()
 	lastContextStatus = active.contextStatus
 	setActivityLine(active.busy ? active.activity || 'Working...' : '')
+	setTitleBar(active.title)
 	setInputHistory(active.inputHistory)
 	setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) {
@@ -395,6 +399,7 @@ async function createTab(): Promise<void> {
 		sessionId,
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
+		title: '',
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -439,6 +444,7 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 		sessionId,
 		workingDir,
 		name: sessionName({ id: sessionId, name: undefined, workingDir }),
+		title: '',
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -523,6 +529,7 @@ function syncTabsFromSessions(
 			sessionId: session.id,
 			workingDir: session.workingDir,
 			name: sessionName(session),
+			title: session.title ?? existing?.title ?? '',
 			output: preserveActiveOutput ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
 			activity: preserveActiveOutput ? (existing?.activity ?? '') : '',
@@ -601,6 +608,7 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		sessionId,
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
+		title: '',
 		output: '',
 		contextStatus: null,
 		activity: '',

@@ -1,13 +1,14 @@
 /**
- * Terminal UI with raw mode input and managed footer.
+ * Terminal UI with raw mode input, title bar, and managed footer.
  *
  * Layout:
- *   Rows 1..(rows - footerH)   = output (scroll region, append-only)
- *   Row  (rows - footerH + 1)  = activity line (dim, what the model is doing)
- *   Row  (rows - footerH + 2)  = status line (dashes with tabs + context)
- *   Row  (rows - footerH + 3)  = empty dark-grey line
- *   Rows ...                    = prompt text lines (dark-grey bg)
- *   Row  rows                   = empty dark-grey line
+ *   Row  1                        = title bar (pinned)
+ *   Rows 2..(rows - footerH)     = output (scroll region, append-only)
+ *   Row  (rows - footerH + 1)    = activity line (dim, what the model is doing)
+ *   Row  (rows - footerH + 2)    = status line (dashes with tabs + context)
+ *   Row  (rows - footerH + 3)    = empty dark-grey line
+ *   Rows ...                      = prompt text lines (dark-grey bg)
+ *   Row  rows                     = empty dark-grey line
  *
  * Footer height = 1 (activity) + 1 (status) + 1 (pad top) + promptLines + 1 (pad bottom)
  *               = 4 + promptLines  (min 5 when promptLines=1)
@@ -85,6 +86,9 @@ let ended = false
 let suspended = false
 let transcript = ''
 
+// Title bar content (row 1)
+let titleBarStr = ''
+
 // Activity line content (what the model is doing)
 let activityStr = ''
 
@@ -92,7 +96,7 @@ let activityStr = ''
 let statusTabsStr = ''
 let statusRightStr = ''
 
-let outputCursorRow = 1
+let outputCursorRow = 2
 let outputCursorSaved = false
 
 let inputBuf = ''
@@ -287,7 +291,7 @@ function promptBottomPadRow(): number {
 function setupScrollRegion(): void {
 	const fh = footerHeight()
 	lastFooterH = fh
-	setScrollRegion(1, outputBottom())
+	setScrollRegion(2, outputBottom())
 }
 
 function resaveOutputCursor(): void {
@@ -306,6 +310,17 @@ function buildStatusLine(): string {
 	const dashCount = Math.max(0, c - leftPart.length - rightPart.length)
 	const line = leftPart + '─'.repeat(dashCount) + rightPart
 	return `${STATUS_DIM}${line.slice(0, c)}${RESET}`
+}
+
+const TITLE_DIM = '\x1b[38;5;245m'
+
+function drawTitleBar(): void {
+	moveTo(1, 1)
+	clearLine()
+	const c = cols()
+	const text = titleBarStr || 'New conversation'
+	const display = `  ${text}`
+	directWrite(`${TITLE_DIM}${display.slice(0, c)}${RESET}`)
 }
 
 function drawActivityLine(): void {
@@ -394,6 +409,7 @@ function fullRedrawFooter(): void {
 	resaveOutputCursor()
 
 	hideCursor()
+	drawTitleBar()
 	drawActivityLine()
 	drawStatusLine()
 	drawDarkPad(promptTopPadRow())
@@ -889,18 +905,18 @@ function onResize(): void {
 	setupScrollRegion()
 
 	// Rewrite visible output from transcript
-	outputCursorRow = 1
+	outputCursorRow = 2
 	outputCursorSaved = false
 	if (transcript) {
 		const bottom = outputBottom()
+		const outputHeight = bottom - 1 // rows 2..bottom
 		// Take the tail of the transcript that fits on screen
 		const lines = transcript.split('\n')
-		// We want at most `bottom` lines (the output area height)
-		const visibleLines = lines.slice(-bottom)
+		const visibleLines = lines.slice(-outputHeight)
 		const visible = visibleLines.join('\n')
-		moveTo(1, 1)
+		moveTo(2, 1)
 		rawWrite(visible)
-		outputCursorRow = Math.min(visibleLines.length, bottom)
+		outputCursorRow = Math.min(visibleLines.length + 1, bottom)
 		saveCursor()
 		outputCursorSaved = true
 	}
@@ -930,7 +946,7 @@ export function init(): void {
 	suspended = false
 	inputBuf = ''
 	inputCursor = 0
-	outputCursorRow = 1
+	outputCursorRow = 2
 	outputCursorSaved = false
 	lastFooterH = 0
 
@@ -960,6 +976,19 @@ export function setActivityLine(text: string): void {
 	if (initialized) redrawFooter()
 }
 
+/** Set the title bar content (row 1). */
+export function setTitleBar(text: string): void {
+	if (titleBarStr === text) return
+	titleBarStr = text
+	if (initialized && !ended && !suspended) {
+		hideCursor()
+		drawTitleBar()
+		positionCursorAtInput()
+		showCursor()
+	}
+}
+
+
 /** Set the status line content. tabsStr = formatted tab names, rightStr = context info */
 export function setStatusLine(tabsStr: string, rightStr: string): void {
 	statusTabsStr = tabsStr
@@ -986,12 +1015,12 @@ export function setOutputSnapshot(snapshot: string): void {
 
 export function clearOutput(): void {
 	transcript = ''
-	outputCursorRow = 1
+	outputCursorRow = 2
 	outputCursorSaved = false
 	resetWrapCol()
 	if (process.stdout.isTTY) {
 		const bottom = outputBottom()
-		for (let r = 1; r <= bottom; r++) {
+		for (let r = 2; r <= bottom; r++) {
 			moveTo(r, 1)
 			clearLine()
 		}

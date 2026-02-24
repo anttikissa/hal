@@ -13,6 +13,7 @@ export const EMPTY_TOTALS: TokenTotals = { input: 0, output: 0, cacheCreate: 0, 
 export interface SessionInfo {
 	id: string
 	name?: string
+	title?: string
 	model?: string // per-session model override; falls back to global config
 	workingDir: string
 	busy: boolean
@@ -68,6 +69,7 @@ function metaPath(id: string): string {
 export interface SessionMeta {
 	workingDir: string
 	model?: string
+	title?: string
 	updatedAt: string
 	lastPrompt?: string
 }
