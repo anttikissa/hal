@@ -141,7 +141,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		await runPause(sessionId)
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
-		await emitStatus(true)
+		await emitStatus()
 		return
 	}
 
@@ -161,7 +161,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 			await runClose(sessionId)
 		}
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
-		await emitStatus(true)
+		await emitStatus()
 		return
 	}
 
@@ -184,7 +184,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 			}
 		}
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
-		await emitStatus(true)
+		await emitStatus()
 		return
 	}
 
@@ -212,7 +212,7 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 			resumeSession(sessionId)
 		}
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
-		await emitStatus(true)
+		await emitStatus()
 		return
 	}
 

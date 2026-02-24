@@ -1,14 +1,11 @@
 import { shortenHome } from '../tools.ts'
 import { appendEvent, updateState } from '../ipc.ts'
 import type { EventLevel, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
-import { stringify } from '../utils/ason.ts'
 
 const ANSI_PATTERN = /\x1b\[[0-9;]*m/g
 
 let ownerId: string
 let eventCounter = 0
-let lastStatus = ''
-let lastSessionsKey = ''
 
 function eventId(): string {
 	eventCounter += 1
@@ -83,7 +80,7 @@ export interface StatusSnapshot {
 	sessions: SessionInfo[]
 }
 
-export async function publishStatus(snapshot: StatusSnapshot, force = false): Promise<void> {
+export async function publishStatus(snapshot: StatusSnapshot): Promise<void> {
 	const {
 		busySessionIds,
 		pausedSessionIds,
@@ -94,9 +91,6 @@ export async function publishStatus(snapshot: StatusSnapshot, force = false): Pr
 	} = snapshot
 	const busy = busySessionIds.length > 0
 	const effectiveActiveId = registryActiveSessionId ?? activeSessionId
-	const key = `${busy}:${queueLength}:${busySessionIds.join(',')}:${pausedSessionIds.join(',')}:${effectiveActiveId ?? '-'}`
-	if (!force && key === lastStatus) return
-	lastStatus = key
 
 	await updateState((state) => {
 		if (state.ownerId === ownerId) {
@@ -117,6 +111,8 @@ export async function publishStatus(snapshot: StatusSnapshot, force = false): Pr
 		busy,
 		queueLength,
 	})
+
+	await emit({ type: 'sessions', activeSessionId: effectiveActiveId ?? null, sessions })
 }
 
 export async function publishActivity(activity: string, sessionId: string | null): Promise<void> {
@@ -145,28 +141,4 @@ export async function publishContext(
 		queueLength: 0,
 		context,
 	})
-}
-
-
-export async function publishSessions(
-	activeSessionId: string | null,
-	registryActiveSessionId: string | null,
-	sessions: SessionInfo[],
-	force = false,
-): Promise<void> {
-	const effectiveActiveId = registryActiveSessionId ?? activeSessionId
-	const key = stringify({
-		activeSessionId: effectiveActiveId,
-		sessions: sessions.map((s) => ({
-			id: s.id,
-			workingDir: s.workingDir,
-			title: s.title,
-			messageCount: s.messageCount,
-			busy: s.busy,
-			updatedAt: s.updatedAt,
-		})),
-	})
-	if (!force && key === lastSessionsKey) return
-	lastSessionsKey = key
-	await emit({ type: 'sessions', activeSessionId: effectiveActiveId ?? null, sessions })
 }

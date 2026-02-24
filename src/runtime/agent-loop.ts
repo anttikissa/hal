@@ -32,7 +32,7 @@ const REQ_LOG = '/tmp/hal-req.ason'
 export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCache): Promise<void> {
 	busySessions.add(sessionId)
 	runtime.pausedByUser = false
-	await emitStatus(true)
+	await emitStatus()
 
 	const fullModel = getSessionModel(sessionId)
 	const modelId = modelIdForModel(fullModel)
@@ -182,7 +182,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	runtime.activeAbort = null
 
 	busySessions.delete(sessionId)
-	await emitStatus(true)
+	await emitStatus()
 
 	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 

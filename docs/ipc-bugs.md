@@ -71,7 +71,7 @@ This document summarizes how `state/ipc/*` is used and the bugs found while trac
 
 8. **Per-session model changes are not broadcast live via `sessions` events (regression from per-tab model feature).**
 	- `SessionInfo` now includes `model`.
-	- `/model` persists the per-session override, but `runModel()` does not call `emitSessions(true)`.
+	- `/model` persists the per-session override, but `runModel()` does not call `emitStatus()`.
 	- Existing clients that rely on `sessions` events do not get the model metadata change live.
 	- They may only see it after reconnect/bootstrap via `state.ason` or another session-list event.
 	- References: `src/session.ts:11`, `src/session.ts:14`, `src/runtime/handle-command.ts:311`, `src/runtime/handle-command.ts:328`, `src/runtime/handle-command.ts:330`.

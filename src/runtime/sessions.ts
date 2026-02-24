@@ -30,7 +30,7 @@ import {
 } from './command-scheduler.ts'
 import { processCommand } from './process-command.ts'
 import { handleCommand } from './handle-command.ts'
-import { initPublisher, publishLine, publishStatus, publishSessions, publishContext } from './event-publisher.ts'
+import { initPublisher, publishLine, publishStatus, publishContext } from './event-publisher.ts'
 
 // Runtime cache per session
 export interface SessionRuntimeCache {
@@ -171,7 +171,7 @@ export async function ensureSession(sessionId: string, workingDir: string): Prom
 	if (!registry.activeSessionId) registry.activeSessionId = session.id
 	ensureSessionQueue(session.id)
 	await persistRegistry()
-	await emitSessions(true)
+	await emitStatus()
 	return session
 }
 
@@ -302,73 +302,15 @@ function snapshotSessions(): SessionInfo[] {
 	}))
 }
 
-export async function emitStatus(force = false): Promise<void> {
-	await publishStatus(
-		{
-			busySessionIds: sortedBusySessionIds(),
-			pausedSessionIds: getSchedulerPausedIds(),
-			activeSessionId,
-			registryActiveSessionId: registry.activeSessionId ?? null,
-			queueLength: totalQueuedCommands(),
-			sessions: snapshotSessions(),
-		},
-		force,
-	)
-}
-
-/**
- * Broadcast the current session list to all connected TUI/web clients.
- *
- * Emits a `sessions` IPC event containing every session's metadata (id, title,
- * workingDir, busy flag, messageCount, etc.) plus which session is active.
- * Clients use this to rebuild their tab bar — adding/removing/reordering tabs,
- * updating titles, and choosing which tab to focus.
- *
- * ### IPC delivery
- *
- * `emitSessions` → `publishSessions` → `appendEvent` — writes to the events
- * file only. Clients that are already running receive it via `tailEvents`.
- *
- * It does **not** write to the state file. That's `emitStatus`'s job — its
- * `publishStatus` calls `updateState`, which persists sessions into
- * `state.ason` so that newly connecting clients can bootstrap via `readState`.
- * Most call sites that call `emitSessions` also call `emitStatus` (or it runs
- * shortly after via the command scheduler's `afterRun` hook), so the state
- * file stays in sync.
- *
- * `publishSessions` deduplicates by payload hash, so repeated calls with
- * identical data are no-ops unless `force` is true.
- *
- * ### When is it called?
- *
- * Every mutation that changes the set of sessions or their tab-visible metadata:
- *
- * - **ensureSession** — a new session was created (new tab appears).
- * - **initialize** — on startup, after the initial session is loaded.
- * - **runFork** — a session was forked (new tab, active tab switches).
- * - **runReset** — session was cleared (messageCount drops to 0).
- * - **runCd** — working dir changed (tab subtitle updates).
- * - **runClose** — a session was removed (tab disappears).
- * - **setSessionTitle** — title changed, either manually (`/title`) or via
- *   auto-title after the first exchange.
- *
- * All call sites pass `force = true` because the mutation is already known to
- * be meaningful — the dedup check would likely pass anyway, but forcing avoids
- * any risk of a stale hash masking a real change.
- *
- * ### What does NOT call it?
- *
- * `emitStatus` handles busy/paused/queue state separately. Model changes
- * (`/model`) don't call it because model isn't shown in the tab bar.
- * Prompt processing and streaming use `emitStatus` + line/chunk events instead.
- */
-export async function emitSessions(force = false): Promise<void> {
-	await publishSessions(
+export async function emitStatus(): Promise<void> {
+	await publishStatus({
+		busySessionIds: sortedBusySessionIds(),
+		pausedSessionIds: getSchedulerPausedIds(),
 		activeSessionId,
-		registry.activeSessionId ?? null,
-		snapshotSessions(),
-		force,
-	)
+		registryActiveSessionId: registry.activeSessionId ?? null,
+		queueLength: totalQueuedCommands(),
+		sessions: snapshotSessions(),
+	})
 }
 
 // Startup
@@ -385,7 +327,7 @@ async function initialize(): Promise<void> {
 	markSessionAsActive(initialSessionId)
 	const runtime = await getOrLoadSessionRuntime(initialSessionId)
 	await persistRegistry()
-	await emitSessions(true)
+	await emitStatus()
 
 	if (runtime.messages.length > 0) {
 		const cal = await getTokenCalibration(getSessionModel(initialSessionId))
@@ -414,7 +356,7 @@ async function initialize(): Promise<void> {
 		? `  prompt=${runtime.systemPromptFiles.join(', ')}`
 		: ''
 	await publishLine(`[model] ${fullModel}  cwd=${cwd}${promptDesc}`, 'meta', initialSessionId)
-	await emitStatus(true)
+	await emitStatus()
 }
 
 export async function startRuntime(
@@ -432,9 +374,9 @@ export async function startRuntime(
 		config.maxConcurrentSessions,
 		async (sessionId, command) => {
 			markSessionAsActive(sessionId)
-			await emitStatus(true)
+			await emitStatus()
 			await handleCommand(command, sessionId)
-			await emitStatus(true)
+			await emitStatus()
 		},
 		{
 			onError: async (sessionId, error) => {
@@ -445,7 +387,7 @@ export async function startRuntime(
 				)
 			},
 			afterRun: async () => {
-				await emitStatus(true)
+				await emitStatus()
 			},
 		},
 	)

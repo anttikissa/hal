@@ -120,7 +120,7 @@ This matches user expectation when comparing models or branching a conversation.
 
 `SessionInfo` events can carry the model so CLI/Web can display per-tab model labels.
 
-If adding model to session events, update the `publishSessions()` dedupe key too, or model-only changes may not emit a new sessions event.
+If adding model to session events, call `emitStatus()` after the change so clients see it.
 
 - `src/runtime/event-publisher.ts:135`
 - `src/runtime/event-publisher.ts:141`

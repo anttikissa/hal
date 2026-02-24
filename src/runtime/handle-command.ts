@@ -33,7 +33,6 @@ import {
 	markSessionAsActive,
 	persistRegistry,
 	emitStatus,
-	emitSessions,
 	busySessions,
 	previousWorkingDirBySession,
 	getHalDir,
@@ -152,8 +151,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	markSessionAsActive(newId)
 	await persistRegistry()
 	await publishLine(`[fork] forked ${sessionId} -> ${newId}`, 'meta', sessionId)
-	await emitSessions(true)
-	await emitStatus(true)
+	await emitStatus()
 }
 
 /** Emit an estimated context so the statusline stays up-to-date after session changes */
@@ -312,7 +310,7 @@ async function runReset(sessionId: string): Promise<void> {
 	await appendConversation(sessionId, { type: 'reset', ts: new Date().toISOString() })
 	await publishLine('[reset] session cleared', 'meta', sessionId)
 	await publishEstimatedContext(sessionId)
-	await emitSessions(true)
+	await emitStatus()
 }
 
 async function runModel(sessionId: string, text: string): Promise<void> {
@@ -435,7 +433,7 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 		await publishLine(`[system] reloaded ${loaded.join(', ')} (cwd changed)`, 'meta', sessionId)
 	}
 	await publishEstimatedContext(sessionId)
-	await emitSessions(true)
+	await emitStatus()
 
 }
 
@@ -461,7 +459,7 @@ export async function setSessionTitle(sessionId: string, title: string): Promise
 		meta.updatedAt = new Date().toISOString()
 		await persistRegistry()
 	}
-	await emitSessions(true)
+	await emitStatus()
 }
 
 /** Extract first real user prompt text from messages (skipping internal markers). */
@@ -534,7 +532,7 @@ export async function runClose(sessionId: string): Promise<void> {
 	}
 	await persistRegistry()
 	await publishLine(`[close] session ${sessionId} closed`, 'meta', null)
-	await emitSessions(true)
+	await emitStatus()
 }
 
 async function saveSessionBeforeExit(sessionId: string): Promise<void> {
