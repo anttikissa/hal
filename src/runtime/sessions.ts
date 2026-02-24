@@ -316,6 +316,40 @@ export async function emitStatus(force = false): Promise<void> {
 	)
 }
 
+/**
+ * Broadcast the current session list to all connected TUI/web clients.
+ *
+ * Emits a `sessions` IPC event containing every session's metadata (id, title,
+ * workingDir, busy flag, messageCount, etc.) plus which session is active.
+ * Clients use this to rebuild their tab bar — adding/removing/reordering tabs,
+ * updating titles, and choosing which tab to focus.
+ *
+ * The underlying `publishSessions` deduplicates by payload hash, so repeated
+ * calls with identical data are no-ops unless `force` is true.
+ *
+ * ### When is it called?
+ *
+ * Every mutation that changes the set of sessions or their tab-visible metadata:
+ *
+ * - **ensureSession** — a new session was created (new tab appears).
+ * - **initialize** — on startup, after the initial session is loaded.
+ * - **runFork** — a session was forked (new tab, active tab switches).
+ * - **runReset** — session was cleared (messageCount drops to 0).
+ * - **runCd** — working dir changed (tab subtitle updates).
+ * - **runClose** — a session was removed (tab disappears).
+ * - **setSessionTitle** — title changed, either manually (`/title`) or via
+ *   auto-title after the first exchange.
+ *
+ * All call sites pass `force = true` because the mutation is already known to
+ * be meaningful — the dedup check would likely pass anyway, but forcing avoids
+ * any risk of a stale hash masking a real change.
+ *
+ * ### What does NOT call it?
+ *
+ * `emitStatus` handles busy/paused/queue state separately. Model changes
+ * (`/model`) don't call it because model isn't shown in the tab bar.
+ * Prompt processing and streaming use `emitStatus` + line/chunk events instead.
+ */
 export async function emitSessions(force = false): Promise<void> {
 	await publishSessions(
 		activeSessionId,
