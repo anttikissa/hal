@@ -1,4 +1,4 @@
-// See docs/ipc.md for architecture overview.
+// See docs/ipc.md — keep it in sync when changing this file.
 
 import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'

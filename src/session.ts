@@ -1,4 +1,4 @@
-// See docs/session.md for architecture overview.
+// See docs/session.md — keep it in sync when changing this file.
 
 import { appendFile, mkdir, readFile, writeFile, unlink, rename, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
