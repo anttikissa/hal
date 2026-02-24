@@ -324,8 +324,20 @@ export async function emitStatus(force = false): Promise<void> {
  * Clients use this to rebuild their tab bar — adding/removing/reordering tabs,
  * updating titles, and choosing which tab to focus.
  *
- * The underlying `publishSessions` deduplicates by payload hash, so repeated
- * calls with identical data are no-ops unless `force` is true.
+ * ### IPC delivery
+ *
+ * `emitSessions` → `publishSessions` → `appendEvent` — writes to the events
+ * file only. Clients that are already running receive it via `tailEvents`.
+ *
+ * It does **not** write to the state file. That's `emitStatus`'s job — its
+ * `publishStatus` calls `updateState`, which persists sessions into
+ * `state.ason` so that newly connecting clients can bootstrap via `readState`.
+ * Most call sites that call `emitSessions` also call `emitStatus` (or it runs
+ * shortly after via the command scheduler's `afterRun` hook), so the state
+ * file stays in sync.
+ *
+ * `publishSessions` deduplicates by payload hash, so repeated calls with
+ * identical data are no-ops unless `force` is true.
  *
  * ### When is it called?
  *
