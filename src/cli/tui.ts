@@ -1279,9 +1279,16 @@ function onResize(): void {
 // ── SIGCONT ──
 
 function onSigCont(): void {
+	if (!initialized) return
 	suspended = false
 	ended = false
-	enterRawMode()
+	try {
+		enterRawMode()
+	} catch {
+		// Terminal gone (e.g. kill %), bail out
+		cleanup()
+		process.exit(0)
+	}
 	directWrite('\x1b[?1049h') // re-enter alt screen
 	enableMouse()
 	render()
