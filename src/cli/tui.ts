@@ -25,7 +25,11 @@ import {
 	wordBoundaryRight,
 	wordWrapLines,
 } from './tui-text.ts'
-import { cursorToWrappedRowCol } from './tui-input-layout.ts'
+import {
+	cursorToWrappedRowCol,
+	getWrappedInputLayout,
+	wrappedRowColToCursor,
+} from './tui-input-layout.ts'
 export { stripAnsi } from './format/index.ts'
 import { stripAnsi } from './format/index.ts'
 
@@ -55,7 +59,7 @@ const TITLE_DIM = '\x1b[38;5;245m'
 type TabCompleter = (prefix: string) => string[]
 type InputKeyHandler = (key: string) => boolean | void
 type InputEchoFilter = (value: string) => boolean
-type SelectionSurface = 'output' | 'status'
+type SelectionSurface = 'output' | 'status' | 'input'
 type SelectionPoint = { surface: SelectionSurface; row: number; col: number }
 type SelectionRange = {
 	surface: SelectionSurface
@@ -110,6 +114,7 @@ export function getInputDraft(): { text: string; cursor: number } {
 export function setInputDraft(text: string, cursor?: number): void {
 	inputBuf = text
 	inputCursor = cursor ?? text.length
+	clearInputTextSelection()
 	historyIndex = -1
 	historyDraft = ''
 }
@@ -146,6 +151,9 @@ let headerFlashTimer: ReturnType<typeof setTimeout> | null = null
 let inputBuf = ''
 let inputCursor = 0
 let inputPromptStr = '> '
+let inputSelAnchor: number | null = null
+let inputSelFocus: number | null = null
+let inputSelActive = false
 let waitingResolve: ((value: string | null) => void) | null = null
 let lastSubmitTime = 0
 
@@ -315,6 +323,211 @@ function buildStatusLine(): string {
 	return `${STATUS_DIM}${line.slice(0, c)}${RESET}`
 }
 
+// ── Input selection/edit helpers ──
+
+function clampInputPos(pos: number): number {
+	return Math.max(0, Math.min(pos, inputBuf.length))
+}
+
+function getInputTextSelectionRange(): { start: number; end: number } | null {
+	if (inputSelAnchor === null || inputSelFocus === null) return null
+	const a = clampInputPos(inputSelAnchor)
+	const b = clampInputPos(inputSelFocus)
+	if (a === b) return null
+	return a < b ? { start: a, end: b } : { start: b, end: a }
+}
+
+function clearInputTextSelection(): void {
+	inputSelAnchor = null
+	inputSelFocus = null
+	inputSelActive = false
+}
+
+function setInputCursor(pos: number, extendSelection = false): void {
+	const next = clampInputPos(pos)
+	if (extendSelection) {
+		if (inputSelAnchor === null) inputSelAnchor = inputCursor
+		inputSelFocus = next
+	} else {
+		clearInputTextSelection()
+	}
+	inputCursor = next
+}
+
+function replaceInputRange(start: number, end: number, text: string): void {
+	const a = clampInputPos(start)
+	const b = clampInputPos(end)
+	const lo = Math.min(a, b)
+	const hi = Math.max(a, b)
+	inputBuf = inputBuf.slice(0, lo) + text + inputBuf.slice(hi)
+	inputCursor = lo + text.length
+	clearInputTextSelection()
+}
+
+function deleteInputTextSelection(): boolean {
+	const sel = getInputTextSelectionRange()
+	if (!sel) return false
+	replaceInputRange(sel.start, sel.end, '')
+	return true
+}
+
+function insertIntoInput(text: string): void {
+	const sel = getInputTextSelectionRange()
+	if (sel) {
+		replaceInputRange(sel.start, sel.end, text)
+		return
+	}
+	inputBuf = inputBuf.slice(0, inputCursor) + text + inputBuf.slice(inputCursor)
+	inputCursor += text.length
+}
+
+function collapseInputSelection(edge: 'start' | 'end'): boolean {
+	const sel = getInputTextSelectionRange()
+	if (!sel) return false
+	inputCursor = edge === 'start' ? sel.start : sel.end
+	clearInputTextSelection()
+	return true
+}
+
+function lineBoundaryLeft(buf: string, cursor: number): number {
+	return buf.lastIndexOf('\n', Math.max(0, cursor) - 1) + 1
+}
+
+function lineBoundaryRight(buf: string, cursor: number): number {
+	const i = buf.indexOf('\n', Math.max(0, cursor))
+	return i >= 0 ? i : buf.length
+}
+
+function inputWordRangeAt(pos: number): { start: number; end: number } {
+	const clamped = clampInputPos(pos)
+	if (inputBuf.length === 0) return { start: 0, end: 0 }
+	let start = clamped
+	let end = clamped
+	if (clamped < inputBuf.length && /\s/.test(inputBuf[clamped])) {
+		while (start > 0 && /\s/.test(inputBuf[start - 1])) start--
+		while (end < inputBuf.length && /\s/.test(inputBuf[end])) end++
+		return { start, end }
+	}
+	start = wordBoundaryLeft(inputBuf, clamped)
+	end = wordBoundaryRight(inputBuf, clamped)
+	return { start, end }
+}
+
+function inputLineRangeAt(pos: number): { start: number; end: number } {
+	const clamped = clampInputPos(pos)
+	return {
+		start: lineBoundaryLeft(inputBuf, clamped),
+		end: lineBoundaryRight(inputBuf, clamped),
+	}
+}
+
+function writeClipboardText(text: string): void {
+	if (!text) return
+	try {
+		const proc = Bun.spawn(['pbcopy'], { stdin: 'pipe' })
+		proc.stdin.write(text)
+		proc.stdin.end()
+	} catch {
+		// Ignore clipboard failures
+	}
+}
+
+function copyInputTextSelectionToClipboard(): boolean {
+	const sel = getInputTextSelectionRange()
+	if (!sel) return false
+	writeClipboardText(inputBuf.slice(sel.start, sel.end))
+	return true
+}
+
+function cutInputTextSelectionToClipboard(): boolean {
+	const sel = getInputTextSelectionRange()
+	if (!sel) return false
+	writeClipboardText(inputBuf.slice(sel.start, sel.end))
+	replaceInputRange(sel.start, sel.end, '')
+	return true
+}
+
+function pasteClipboardIntoInput(): void {
+	pasteFromClipboard().then((content) => {
+		if (!content) return
+		const clean = content
+			.replace(/\r\n/g, '\n')
+			.replace(/\r/g, '\n')
+			.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
+		if (!clean) return
+		const insert = clean.includes('\n') ? saveMultilinePaste(clean) : clean
+		insertIntoInput(insert)
+		render()
+	})
+}
+
+function handleInputClipboardShortcutKey(key: string): boolean {
+	const modOther = key.match(/^\x1b\[27;(\d+);(\d+)~$/)
+	const csiU = key.match(/^\x1b\[(\d+);(\d+)u$/)
+	const modifier = Number(modOther?.[1] ?? csiU?.[2] ?? NaN)
+	const codepoint = Number(modOther?.[2] ?? csiU?.[1] ?? NaN)
+	if (!Number.isFinite(modifier) || !Number.isFinite(codepoint) || modifier < 9) return false
+	const ch = String.fromCharCode(codepoint).toLowerCase()
+	if (ch === 'c') {
+		if (copyInputTextSelectionToClipboard()) render()
+		return true
+	}
+	if (ch === 'x') {
+		if (cutInputTextSelectionToClipboard()) render()
+		return true
+	}
+	if (ch === 'v') {
+		pasteClipboardIntoInput()
+		return true
+	}
+	if (ch === 'a') {
+		inputSelAnchor = 0
+		inputSelFocus = inputBuf.length
+		inputCursor = inputBuf.length
+		inputSelActive = false
+		render()
+		return true
+	}
+	return false
+}
+
+function inputPosFromWrappedPoint(row: number, col: number): number {
+	const width = cols() - 1 - inputPromptStr.length
+	return wrappedRowColToCursor(inputBuf, row, Math.max(0, col), width)
+}
+
+function inputWrappedPointFromScreen(x: number, y: number): { row: number; col: number } | null {
+	const c = cols()
+	const contentWidth = c - 1 - inputPromptStr.length
+	const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
+	const pLines = Math.min(lines.length, maxPromptLines)
+	const firstRow = promptFirstRow()
+	const row = y - (firstRow - 1)
+	if (row < 0 || row >= pLines) return null
+	const col = Math.max(0, x - inputPromptStr.length)
+	return { row, col }
+}
+
+function renderPromptLineWithInputSelection(
+	lineText: string,
+	lineStart: number,
+	screenCols: number,
+	inputSel: { start: number; end: number } | null,
+): string {
+	const baseLen = inputPromptStr.length + lineText.length
+	const pad = ' '.repeat(Math.max(0, screenCols - baseLen))
+	if (!inputSel) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
+
+	const selStart = Math.max(0, Math.min(lineText.length, inputSel.start - lineStart))
+	const selEnd = Math.max(0, Math.min(lineText.length, inputSel.end - lineStart))
+	if (selStart >= selEnd) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
+
+	const before = lineText.slice(0, selStart)
+	const selected = lineText.slice(selStart, selEnd)
+	const after = lineText.slice(selEnd)
+	return `${BG_DARK}${inputPromptStr}${before}\x1b[7m${selected}\x1b[27m${after}${pad}${RESET}`
+}
+
 // ── Mouse selection ──
 
 function getSelectionRange(): {
@@ -368,6 +581,10 @@ function getSelectionRange(): {
 
 function selectionLine(pt: SelectionPoint): string {
 	if (pt.surface === 'status') return lastStatusLine
+	if (pt.surface === 'input') {
+		const width = cols() - 1 - inputPromptStr.length
+		return getWrappedInputLayout(inputBuf, width).lines[pt.row] ?? ''
+	}
 	return lastVisibleOutput[pt.row] ?? ''
 }
 
@@ -445,6 +662,9 @@ function renderLineWithSelection(
 }
 
 function pointFromScreenCoords(x: number, y: number): SelectionPoint | null {
+	const inputPt = inputWrappedPointFromScreen(x, y)
+	if (inputPt) return { surface: 'input', row: inputPt.row, col: inputPt.col }
+
 	// y is 0-based row on screen. Output starts at row 2 (index 1).
 	const oh = Math.max(0, outputBottom() - 1)
 	const outputRow = y - 1
@@ -461,7 +681,10 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 	if (kind === 'press') {
 		const pt = pointFromScreenCoords(x, y)
 		if (!pt) {
-			clearSelection()
+			const hadInputSel = inputSelAnchor !== null || inputSelFocus !== null
+			clearInputTextSelection()
+			if (selAnchor) clearSelection()
+			else if (hadInputSel) render()
 			return
 		}
 		const now = Date.now()
@@ -483,6 +706,31 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		else if (clickCount === 2) selMode = 'word'
 		else selMode = 'line'
 
+		if (pt.surface === 'input') {
+			if (selAnchor) clearSelection(false)
+			const pos = inputPosFromWrappedPoint(pt.row, pt.col)
+			if (clickCount === 2) {
+				const range = inputWordRangeAt(pos)
+				inputSelAnchor = range.start
+				inputSelFocus = range.end
+				inputCursor = range.end
+			} else if (clickCount >= 3) {
+				const range = inputLineRangeAt(pos)
+				inputSelAnchor = range.start
+				inputSelFocus = range.end
+				inputCursor = range.end
+			} else {
+				inputSelAnchor = pos
+				inputSelFocus = pos
+				inputCursor = pos
+			}
+			inputSelActive = true
+			render()
+			return
+		}
+
+		clearInputTextSelection()
+
 		selAnchor = pt
 		selCurrent = pt
 		selActive = true
@@ -498,11 +746,34 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		return
 	}
 
+	if (kind === 'move' && inputSelActive) {
+		const pt = pointFromScreenCoords(x, y)
+		if (!pt || pt.surface !== 'input') return
+		const pos = inputPosFromWrappedPoint(pt.row, pt.col)
+		inputSelFocus = pos
+		inputCursor = pos
+		render()
+		return
+	}
+
 	if (kind === 'release' && selActive) {
 		const pt = pointFromScreenCoords(x, y)
 		if (pt && selAnchor && pt.surface === selAnchor.surface) selCurrent = pt
 		selActive = false
 		copySelectionToClipboard()
+		render()
+		return
+	}
+
+	if (kind === 'release' && inputSelActive) {
+		const pt = pointFromScreenCoords(x, y)
+		if (pt && pt.surface === 'input') {
+			const pos = inputPosFromWrappedPoint(pt.row, pt.col)
+			inputSelFocus = pos
+			inputCursor = pos
+		}
+		inputSelActive = false
+		copyInputTextSelectionToClipboard()
 		render()
 	}
 }
@@ -524,21 +795,15 @@ function copySelectionToClipboard(): void {
 	const text = lines.join('\n')
 	if (!text) return
 
-	try {
-		const proc = Bun.spawn(['pbcopy'], { stdin: 'pipe' })
-		proc.stdin.write(text)
-		proc.stdin.end()
-	} catch {
-		// Ignore clipboard failures
-	}
+	writeClipboardText(text)
 }
 
-function clearSelection(): void {
+function clearSelection(renderNow = true): void {
 	if (!selAnchor) return
 	selAnchor = null
 	selCurrent = null
 	selActive = false
-	render()
+	if (renderNow) render()
 }
 
 // ── Mouse/paste terminal modes ──
@@ -631,14 +896,16 @@ function render(): void {
 
 	// Prompt lines
 	const contentWidth = c - 1 - inputPromptStr.length
-	const wrapped = wordWrapLines(inputBuf, contentWidth)
+	const wrappedInput = getWrappedInputLayout(inputBuf, contentWidth)
+	const wrapped = wrappedInput.lines
+	const inputSelRange = getInputTextSelectionRange()
 	const pLines = Math.min(wrapped.length, maxPromptLines)
 	const firstRow = promptFirstRow()
 	for (let i = 0; i < pLines; i++) {
-		const chunk = inputPromptStr + wrapped[i]
-		const padded = chunk + ' '.repeat(Math.max(0, c - chunk.length))
 		chunks.push(`\x1b[${firstRow + i};1H\x1b[2K`)
-		chunks.push(`${BG_DARK}${padded}${RESET}`)
+		chunks.push(
+			renderPromptLineWithInputSelection(wrapped[i], wrappedInput.starts[i] ?? 0, c, inputSelRange),
+		)
 	}
 
 	// Prompt bottom pad
@@ -690,8 +957,7 @@ function handleBracketedPaste(text: string): void {
 	if (!clean) return
 	const isMultiline = clean.includes('\n')
 	const insert = isMultiline ? saveMultilinePaste(clean) : clean
-	inputBuf = inputBuf.slice(0, inputCursor) + insert + inputBuf.slice(inputCursor)
-	inputCursor += insert.length
+	insertIntoInput(insert)
 	render()
 }
 
@@ -723,28 +989,16 @@ function handleKey(key: string): void {
 		suspendForegroundJob()
 		return
 	}
+	if (handleInputClipboardShortcutKey(key)) return
 
 	if (key === CTRL_V) {
-		pasteFromClipboard().then((content) => {
-			if (!content) return
-			const clean = content
-				.replace(/\r\n/g, '\n')
-				.replace(/\r/g, '\n')
-				.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
-			if (!clean) return
-			const isMultiline = clean.includes('\n')
-			const insert = isMultiline ? saveMultilinePaste(clean) : clean
-			inputBuf = inputBuf.slice(0, inputCursor) + insert + inputBuf.slice(inputCursor)
-			inputCursor += insert.length
-			render()
-		})
+		pasteClipboardIntoInput()
 		return
 	}
 
 	// Shift+Enter / Option+Enter: insert newline
 	if (key === '\x1b\r' || key === '\x1b\n' || key === '\x1b[13;2u' || key === '\x1b[27;2;13~') {
-		inputBuf = inputBuf.slice(0, inputCursor) + '\n' + inputBuf.slice(inputCursor)
-		inputCursor++
+		insertIntoInput('\n')
 		render()
 		return
 	}
@@ -767,6 +1021,7 @@ function handleKey(key: string): void {
 		historyDraft = ''
 		inputBuf = ''
 		inputCursor = 0
+		clearInputTextSelection()
 		render()
 		if (waitingResolve) {
 			const r = waitingResolve
@@ -778,6 +1033,10 @@ function handleKey(key: string): void {
 
 	// Option+Backspace: delete word left
 	if (key === '\x1b\x7f') {
+		if (deleteInputTextSelection()) {
+			render()
+			return
+		}
 		if (inputCursor > 0) {
 			const b = wordBoundaryLeft(inputBuf, inputCursor)
 			inputBuf = inputBuf.slice(0, b) + inputBuf.slice(inputCursor)
@@ -789,6 +1048,10 @@ function handleKey(key: string): void {
 
 	// Backspace
 	if (key === '\x7f' || key === '\b') {
+		if (deleteInputTextSelection()) {
+			render()
+			return
+		}
 		if (inputCursor > 0) {
 			inputBuf = inputBuf.slice(0, inputCursor - 1) + inputBuf.slice(inputCursor)
 			inputCursor--
@@ -799,6 +1062,10 @@ function handleKey(key: string): void {
 
 	// Delete
 	if (key === '\x1b[3~') {
+		if (deleteInputTextSelection()) {
+			render()
+			return
+		}
 		if (inputCursor < inputBuf.length) {
 			inputBuf = inputBuf.slice(0, inputCursor) + inputBuf.slice(inputCursor + 1)
 			render()
@@ -807,16 +1074,44 @@ function handleKey(key: string): void {
 	}
 
 	// Arrow left / right
+	if (key === '\x1b[1;2D') {
+		setInputCursor(inputCursor - 1, true)
+		render()
+		return
+	}
+	if (key === '\x1b[1;2C') {
+		setInputCursor(inputCursor + 1, true)
+		render()
+		return
+	}
+	if (key === '\x1b[1;4D') {
+		setInputCursor(wordBoundaryLeft(inputBuf, inputCursor), true)
+		render()
+		return
+	}
+	if (key === '\x1b[1;4C') {
+		setInputCursor(wordBoundaryRight(inputBuf, inputCursor), true)
+		render()
+		return
+	}
 	if (key === '\x1b[D' || key === '\x1bOD') {
+		if (collapseInputSelection('start')) {
+			render()
+			return
+		}
 		if (inputCursor > 0) {
-			inputCursor--
+			setInputCursor(inputCursor - 1)
 			render()
 		}
 		return
 	}
 	if (key === '\x1b[C' || key === '\x1bOC') {
+		if (collapseInputSelection('end')) {
+			render()
+			return
+		}
 		if (inputCursor < inputBuf.length) {
-			inputCursor++
+			setInputCursor(inputCursor + 1)
 			render()
 		}
 		return
@@ -824,12 +1119,42 @@ function handleKey(key: string): void {
 
 	// Opt-left / Opt-right (word jump)
 	if (key === '\x1b[1;3D' || key === '\x1bb') {
-		inputCursor = wordBoundaryLeft(inputBuf, inputCursor)
+		if (collapseInputSelection('start')) {
+			render()
+			return
+		}
+		setInputCursor(wordBoundaryLeft(inputBuf, inputCursor))
 		render()
 		return
 	}
 	if (key === '\x1b[1;3C' || key === '\x1bf') {
-		inputCursor = wordBoundaryRight(inputBuf, inputCursor)
+		if (collapseInputSelection('end')) {
+			render()
+			return
+		}
+		setInputCursor(wordBoundaryRight(inputBuf, inputCursor))
+		render()
+		return
+	}
+
+	// Shift+Home / Shift+End
+	if (key === '\x1b[1;2H') {
+		setInputCursor(0, true)
+		render()
+		return
+	}
+	if (key === '\x1b[1;2F') {
+		setInputCursor(inputBuf.length, true)
+		render()
+		return
+	}
+	if (key === '\x1b[1;10D') {
+		setInputCursor(0, true)
+		render()
+		return
+	}
+	if (key === '\x1b[1;10C') {
+		setInputCursor(inputBuf.length, true)
 		render()
 		return
 	}
@@ -839,10 +1164,9 @@ function handleKey(key: string): void {
 		key === '\x1b[H' ||
 		key === '\x1bOH' ||
 		key === '\x01' ||
-		key === '\x1b[1;9D' ||
-		key === '\x1b[1;2D'
+		key === '\x1b[1;9D'
 	) {
-		inputCursor = 0
+		setInputCursor(0)
 		render()
 		return
 	}
@@ -851,22 +1175,29 @@ function handleKey(key: string): void {
 		key === '\x1b[F' ||
 		key === '\x1bOF' ||
 		key === '\x05' ||
-		key === '\x1b[1;9C' ||
-		key === '\x1b[1;2C'
+		key === '\x1b[1;9C'
 	) {
-		inputCursor = inputBuf.length
+		setInputCursor(inputBuf.length)
 		render()
 		return
 	}
 
 	// Ctrl-U / Ctrl-K
 	if (key === CTRL_U) {
+		if (deleteInputTextSelection()) {
+			render()
+			return
+		}
 		inputBuf = inputBuf.slice(inputCursor)
 		inputCursor = 0
 		render()
 		return
 	}
 	if (key === CTRL_K) {
+		if (deleteInputTextSelection()) {
+			render()
+			return
+		}
 		inputBuf = inputBuf.slice(0, inputCursor)
 		render()
 		return
@@ -874,6 +1205,7 @@ function handleKey(key: string): void {
 
 	// Arrow up
 	if (key === '\x1b[A' || key === '\x1bOA') {
+		clearInputTextSelection()
 		if (inputBuf.includes('\n')) {
 			const pos = inputCursor
 			const lineStart = inputBuf.lastIndexOf('\n', pos - 1)
@@ -900,6 +1232,7 @@ function handleKey(key: string): void {
 
 	// Arrow down
 	if (key === '\x1b[B' || key === '\x1bOB') {
+		clearInputTextSelection()
 		if (inputBuf.includes('\n')) {
 			const pos = inputCursor
 			const nextNewline = inputBuf.indexOf('\n', pos)
@@ -954,6 +1287,7 @@ function handleKey(key: string): void {
 			if (matches.length === 1) {
 				inputBuf = matches[0]
 				inputCursor = inputBuf.length
+				clearInputTextSelection()
 				render()
 			} else if (matches.length > 1) {
 				let common = matches[0]
@@ -965,6 +1299,7 @@ function handleKey(key: string): void {
 				if (common.length > inputBuf.length) {
 					inputBuf = common
 					inputCursor = inputBuf.length
+					clearInputTextSelection()
 				}
 				writeToOutput(`\x1b[2m${matches.join('  ')}\x1b[0m\n`)
 				render()
@@ -987,8 +1322,7 @@ function handleKey(key: string): void {
 	if (modifyOtherKeys) {
 		const ch = String.fromCharCode(Number(modifyOtherKeys[1]))
 		if (ch) {
-			inputBuf = inputBuf.slice(0, inputCursor) + ch + inputBuf.slice(inputCursor)
-			inputCursor += ch.length
+			insertIntoInput(ch)
 			render()
 		}
 		return
@@ -1001,13 +1335,11 @@ function handleKey(key: string): void {
 	const isMultiline = key.length > 1 && key.includes('\n')
 	if (isMultiline) {
 		const ref = saveMultilinePaste(key)
-		inputBuf = inputBuf.slice(0, inputCursor) + ref + inputBuf.slice(inputCursor)
-		inputCursor += ref.length
+		insertIntoInput(ref)
 	} else {
 		const clean = key.replace(/[\x00-\x1f]/g, '')
 		if (!clean) return
-		inputBuf = inputBuf.slice(0, inputCursor) + clean + inputBuf.slice(inputCursor)
-		inputCursor += clean.length
+		insertIntoInput(clean)
 	}
 	render()
 }
@@ -1197,6 +1529,7 @@ export function init(): void {
 	suspended = false
 	inputBuf = ''
 	inputCursor = 0
+	clearInputTextSelection()
 	outputLines = ['']
 	scrollOffset = 0
 	lastWrapCols = 0
@@ -1276,6 +1609,7 @@ export function input(promptStr: string): Promise<string | null> {
 	inputPromptStr = promptStr
 	inputBuf = ''
 	inputCursor = 0
+	clearInputTextSelection()
 	render()
 	if (ended) return Promise.resolve(null)
 	return new Promise((resolve) => {
