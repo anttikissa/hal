@@ -50,10 +50,10 @@ See `TODO.md`.
 ## Architecture (high level)
 
 - `main.ts` — owner election + CLI/web startup.
-- `src/ipc.ts` — file-backed IPC bus (`state/ipc/`).
+- `src/ipc.ts` — file-backed IPC bus (`state/ipc/`). See `docs/ipc.md`.
 - `src/runtime/*` — owner runtime (scheduling, commands, agent loop).
 - `src/cli/*` — TUI + CLI client.
 - `src/web.ts` — web UI + SSE.
-- `src/session.ts` — session persistence + handoff rotation.
+- `src/session.ts` — session persistence + handoff rotation. See `docs/session.md`.
 - `src/provider.ts` + `src/providers/*` — provider adapters.
 - `src/utils/ason.ts` — ASON serialization.
