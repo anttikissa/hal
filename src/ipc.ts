@@ -11,6 +11,7 @@ let commandsFile: string
 let eventsFile: string
 let stateFile: string
 let ownerFile: string
+let ownerClaimDir: string
 let stateWriteLock: Promise<void> = Promise.resolve()
 
 function assertInit(): void {
@@ -23,6 +24,7 @@ export function initBus(dir = IPC_DIR): void {
 	eventsFile = `${dir}/events.ason`
 	stateFile = `${dir}/state.ason`
 	ownerFile = `${dir}/owner.lock`
+	ownerClaimDir = `${dir}/owner-claim`
 	stateWriteLock = Promise.resolve()
 }
 
@@ -99,10 +101,79 @@ export async function updateState(mutator: (state: RuntimeState) => void): Promi
 	return state
 }
 
+type OwnerClaim = {
+	ownerId: string
+	pid: number
+	createdAtMs: number
+	createdAt: string
+}
+
+const OWNER_CLAIM_STALE_MS = 10_000
+
+async function acquireOwnerClaim(ownerId: string): Promise<boolean> {
+	const payload: OwnerClaim = {
+		ownerId,
+		pid: process.pid,
+		createdAtMs: Date.now(),
+		createdAt: new Date().toISOString(),
+	}
+	try {
+		await mkdir(ownerClaimDir)
+		await writeFile(`${ownerClaimDir}/claim.ason`, stringify(payload) + '\n')
+		return true
+	} catch (e: any) {
+		if (e?.code !== 'EEXIST') throw e
+	}
+
+	let stale = false
+	try {
+		const raw = await readFile(`${ownerClaimDir}/claim.ason`, 'utf-8')
+		const claim = parse(raw) as Partial<OwnerClaim>
+		const pid = Number.isInteger(claim?.pid) ? (claim.pid as number) : null
+		const createdAtMs = Number.isInteger(claim?.createdAtMs) ? (claim.createdAtMs as number) : null
+		const tooOld = createdAtMs !== null ? Date.now() - createdAtMs > OWNER_CLAIM_STALE_MS : true
+		const dead = pid !== null ? !isPidAlive(pid) : true
+		stale = tooOld || dead
+	} catch {
+		stale = true
+	}
+
+	if (!stale) return false
+
+	try {
+		await rm(ownerClaimDir, { recursive: true, force: true })
+	} catch {}
+
+	try {
+		await mkdir(ownerClaimDir)
+		await writeFile(`${ownerClaimDir}/claim.ason`, stringify(payload) + '\n')
+		return true
+	} catch (e: any) {
+		if (e?.code === 'EEXIST') return false
+		throw e
+	}
+}
+
+export async function releaseOwnerClaim(ownerId: string): Promise<void> {
+	assertInit()
+	try {
+		const raw = await readFile(`${ownerClaimDir}/claim.ason`, 'utf-8')
+		const claim = parse(raw) as any
+		if (claim?.ownerId !== ownerId) return
+		await rm(ownerClaimDir, { recursive: true, force: true })
+	} catch {}
+}
+
 export async function claimOwner(
 	ownerId: string,
 ): Promise<{ owner: boolean; currentOwnerPid: number | null }> {
 	assertInit()
+	const hasClaim = await acquireOwnerClaim(ownerId)
+	if (!hasClaim) {
+		const currentState = await readState()
+		return { owner: false, currentOwnerPid: currentState.ownerPid }
+	}
+
 	const payload = stringify({ ownerId, pid: process.pid, createdAt: new Date().toISOString() })
 
 	const tryClaim = async (): Promise<boolean> => {
@@ -122,6 +193,7 @@ export async function claimOwner(
 			s.ownerPid = process.pid
 			s.ownerId = ownerId
 		})
+		await releaseOwnerClaim(ownerId)
 		return { owner: true, currentOwnerPid: process.pid }
 	}
 
@@ -135,10 +207,10 @@ export async function claimOwner(
 	}
 
 	if (ownerPid !== null && isPidAlive(ownerPid)) {
+		await releaseOwnerClaim(ownerId)
 		return { owner: false, currentOwnerPid: ownerPid }
 	}
 
-	// Stale lock — remove and retry
 	try {
 		await rm(ownerFile)
 	} catch {}
@@ -148,9 +220,11 @@ export async function claimOwner(
 			s.ownerPid = process.pid
 			s.ownerId = ownerId
 		})
+		await releaseOwnerClaim(ownerId)
 		return { owner: true, currentOwnerPid: process.pid }
 	}
 
+	await releaseOwnerClaim(ownerId)
 	const currentState = await readState()
 	return { owner: false, currentOwnerPid: currentState.ownerPid }
 }
@@ -171,7 +245,7 @@ export async function releaseOwner(ownerId: string): Promise<void> {
 				s.busySessionIds = []
 			}
 		})
-		// Notify clients so they can claim ownership immediately
+		await releaseOwnerClaim(ownerId)
 		await appendEvent({
 			id: `${Date.now()}-${process.pid}-release`,
 			type: 'line',
