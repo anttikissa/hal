@@ -16,6 +16,15 @@
 import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
+import {
+	parseKeys,
+	readEscapeSequence,
+	truncateAnsi,
+	wrapAnsi,
+	wordBoundaryLeft,
+	wordBoundaryRight,
+	wordWrapLines,
+} from './tui-text.ts'
 export { stripAnsi } from './format/index.ts'
 import { stripAnsi } from './format/index.ts'
 
@@ -159,24 +168,6 @@ function rows(): number {
 	return process.stdout.rows || 24
 }
 
-/** Word-wrap a plain string into lines of at most `width` chars, breaking at spaces */
-function wordWrapLines(text: string, width: number): string[] {
-	if (width <= 0) return [text]
-	const result: string[] = []
-	for (const segment of text.split('\n')) {
-		let remaining = segment
-		while (remaining.length > width) {
-			let breakAt = remaining.lastIndexOf(' ', width)
-			if (breakAt <= 0) breakAt = width
-			result.push(remaining.slice(0, breakAt))
-			remaining =
-				remaining[breakAt] === ' ' ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
-		}
-		result.push(remaining)
-	}
-	return result
-}
-
 function promptLineCount(): number {
 	const c = cols()
 	if (c <= 0) return 1
@@ -216,140 +207,8 @@ function directWrite(text: string): void {
 	process.stdout.write(text)
 }
 
-function moveTo(row: number, col: number): void {
-	directWrite(`\x1b[${row};${col}H`)
-}
-
-function clearLine(): void {
-	directWrite(`\x1b[2K`)
-}
-
-function hideCursor(): void {
-	directWrite(`\x1b[?25l`)
-}
-
 function showCursor(): void {
 	directWrite(`\x1b[?25h`)
-}
-
-// ── ANSI-aware helpers ──
-
-function readEscapeSequence(line: string, start: number): number {
-	if (line[start] !== '\x1b') return 0
-	const next = line[start + 1]
-	if (!next) return 1
-	if (next === '[') {
-		for (let i = start + 2; i < line.length; i++) {
-			const code = line.charCodeAt(i)
-			if (code >= 0x40 && code <= 0x7e) return i - start + 1
-		}
-		return line.length - start
-	}
-	if (next === ']') {
-		for (let i = start + 2; i < line.length; i++) {
-			if (line[i] === '\x07') return i - start + 1
-			if (line[i] === '\x1b' && line[i + 1] === '\\') return i - start + 2
-		}
-		return line.length - start
-	}
-	return 2
-}
-
-/** Truncate an ANSI-colored line to maxCols visible characters */
-function truncateAnsi(line: string, maxCols: number): string {
-	if (maxCols <= 0 || !line) return ''
-	let out = ''
-	let visCols = 0
-	let i = 0
-	let sawAnsi = false
-	while (i < line.length && visCols < maxCols) {
-		if (line[i] === '\x1b') {
-			const seqLen = readEscapeSequence(line, i)
-			out += line.slice(i, i + seqLen)
-			i += seqLen
-			sawAnsi = true
-			continue
-		}
-		out += line[i]
-		visCols++
-		i++
-	}
-	if (sawAnsi) out += RESET
-	return out
-}
-
-/**
- * Word-wrap an ANSI-colored logical line into visual lines.
- * Preserves ANSI state across wraps.
- */
-function wrapAnsi(line: string, maxCols: number): string[] {
-	if (maxCols <= 0) return ['']
-	if (!line) return ['']
-
-	const result: string[] = []
-	let current = ''
-	let visCols = 0
-	let i = 0
-	let activeAnsi = ''
-
-	// Word-wrap break point tracking
-	let lastSpaceI = -1
-	let lastSpaceCols = -1
-	let lastSpaceCurrent = ''
-	let lastSpaceAnsi = ''
-
-	while (i < line.length) {
-		if (line[i] === '\x1b') {
-			const seqLen = readEscapeSequence(line, i)
-			const seq = line.slice(i, i + seqLen)
-			current += seq
-			if (seq.startsWith('\x1b[') && seq.endsWith('m')) {
-				if (seq === '\x1b[0m') activeAnsi = ''
-				else activeAnsi += seq
-			}
-			i += seqLen
-			continue
-		}
-
-		if (line[i] === ' ') {
-			lastSpaceI = i + 1
-			lastSpaceCols = visCols + 1
-			lastSpaceCurrent = current + ' '
-			lastSpaceAnsi = activeAnsi
-		}
-
-		if (visCols >= maxCols) {
-			// Try word break
-			if (lastSpaceCols > 0 && lastSpaceCols > maxCols * 0.3) {
-				result.push(lastSpaceCurrent + RESET)
-				activeAnsi = lastSpaceAnsi
-				current = activeAnsi
-				visCols = 0
-				i = lastSpaceI
-				lastSpaceI = -1
-				lastSpaceCols = -1
-				lastSpaceCurrent = ''
-				lastSpaceAnsi = ''
-				continue
-			}
-			// Hard break
-			result.push(current + RESET)
-			current = activeAnsi
-			visCols = 0
-			lastSpaceI = -1
-			lastSpaceCols = -1
-			lastSpaceCurrent = ''
-			lastSpaceAnsi = ''
-			continue
-		}
-
-		current += line[i]
-		visCols++
-		i++
-	}
-
-	result.push(current)
-	return result
 }
 
 // ── Output storage ──
@@ -761,65 +620,6 @@ function render(): void {
 	directWrite(chunks.join(''))
 }
 
-// ── Key parsing ──
-
-function parseKeys(data: string): string[] {
-	const keys: string[] = []
-	let i = 0
-	while (i < data.length) {
-		if (data.startsWith(PASTE_START, i)) {
-			const contentStart = i + PASTE_START.length
-			const endIdx = data.indexOf(PASTE_END, contentStart)
-			if (endIdx >= 0) {
-				const pasted = data.slice(contentStart, endIdx)
-				if (pasted) keys.push(pasted)
-				i = endIdx + PASTE_END.length
-			} else {
-				const pasted = data.slice(contentStart)
-				if (pasted) keys.push(pasted)
-				i = data.length
-			}
-			continue
-		}
-		if (data[i] === '\x1b') {
-			if (i + 1 < data.length && (data[i + 1] === '[' || data[i + 1] === 'O')) {
-				let j = i + 2
-				while (j < data.length && data.charCodeAt(j) >= 0x20 && data.charCodeAt(j) <= 0x3f)
-					j++
-				if (j < data.length) j++
-				keys.push(data.slice(i, j))
-				i = j
-			} else if (i + 1 < data.length) {
-				keys.push(data.slice(i, i + 2))
-				i += 2
-			} else {
-				keys.push('\x1b')
-				i++
-			}
-		} else {
-			keys.push(data[i])
-			i++
-		}
-	}
-	return keys
-}
-
-// ── Word boundary helpers ──
-
-function wordBoundaryLeft(buf: string, cursor: number): number {
-	let i = cursor
-	while (i > 0 && buf[i - 1] === ' ') i--
-	while (i > 0 && buf[i - 1] !== ' ') i--
-	return i
-}
-
-function wordBoundaryRight(buf: string, cursor: number): number {
-	let i = cursor
-	while (i < buf.length && buf[i] !== ' ') i++
-	while (i < buf.length && buf[i] === ' ') i++
-	return i
-}
-
 // ── Suspend/resume ──
 
 function suspendForegroundJob(): void {
@@ -1190,7 +990,7 @@ function flushStdinBuffer(): void {
 		clearSelection()
 	}
 
-	for (const key of parseKeys(data)) handleKey(key)
+	for (const key of parseKeys(data, PASTE_START, PASTE_END)) handleKey(key)
 }
 
 const onStdinData = (chunk: Buffer | string) => {
@@ -1401,16 +1201,6 @@ export function setTitleBar(text: string): void {
 export function setStatusLine(tabsStr: string, rightStr: string): void {
 	statusTabsStr = tabsStr
 	statusRightStr = rightStr
-	if (initialized) scheduleRender()
-}
-
-// Compat wrappers
-export function setHeader(text: string): void {
-	statusTabsStr = text
-	if (initialized) scheduleRender()
-}
-export function setStatus(text: string, _rightText = ''): void {
-	statusRightStr = text ? text + (_rightText ? `  ${_rightText}` : '') : _rightText
 	if (initialized) scheduleRender()
 }
 
