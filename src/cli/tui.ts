@@ -492,17 +492,19 @@ function getSelectionRange(): {
 		if (selMode === 'word') {
 			const aSwap = expandToWordBoundary(selCurrent, 'start')
 			const bSwap = expandToWordBoundary(selAnchor, 'end')
-			return { startRow: aSwap.row, startCol: aSwap.col, endRow: bSwap.row, endCol: bSwap.col }
+			return {
+				startRow: aSwap.row,
+				startCol: aSwap.col,
+				endRow: bSwap.row,
+				endCol: bSwap.col,
+			}
 		}
 		return { startRow: b.row, startCol: b.col, endRow: a.row, endCol: a.col }
 	}
 	return { startRow: a.row, startCol: a.col, endRow: b.row, endCol: b.col }
 }
 
-function expandToWordBoundary(
-	pt: SelectionPoint,
-	side: 'start' | 'end',
-): SelectionPoint {
+function expandToWordBoundary(pt: SelectionPoint, side: 'start' | 'end'): SelectionPoint {
 	const line = lastVisibleOutput[pt.row] ?? ''
 	const plain = stripAnsi(line)
 	const col = Math.min(pt.col, plain.length)
@@ -700,7 +702,6 @@ function render(): void {
 	const titleText = titleBarStr || 'New conversation'
 	chunks.push(truncateAnsi(`${TITLE_DIM}  ${titleText}`, c))
 
-
 	// Rows 2..ob: output viewport
 	for (let row = 2; row <= ob; row++) {
 		chunks.push(`\x1b[${row};1H\x1b[2K`)
@@ -718,7 +719,6 @@ function render(): void {
 	chunks.push(`\x1b[${aRow};1H\x1b[2K`)
 	const actText = activityStr ? `  Model: ${activityStr}` : '  Model: Idle'
 	chunks.push(truncateAnsi(`${DIM}${actText}`, c))
-
 
 	// Status line
 	const sRow = statusRow()
@@ -1405,10 +1405,6 @@ export function replaceOutput(snapshot: string): void {
 	if (initialized) render()
 }
 
-
-
-
-
 export function input(promptStr: string): Promise<string | null> {
 	if (!initialized) init()
 	if (waitingResolve) {
@@ -1451,24 +1447,27 @@ export function cleanup(): void {
 
 	// Capture visible output before leaving alt screen
 	const c = cols()
-	const r = rows()
 	const oh = Math.max(0, outputBottom() - 1)
 	const visible = getVisibleWrapped(oh)
 	const dumpLines = visible.map((line) => truncateAnsi(line, c))
 
 	showCursor()
 	disableMouse()
-	directWrite('\x1b[?1049l') // leave alt screen
+	directWrite('\x1b[?1049l') // leave alt screen — restores pre-TUI screen + cursor
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 	process.stdin.off('data', onStdinData)
 	process.stdin.off('end', onStdinEnd)
 	process.off('SIGCONT', onSigCont)
 	process.stdout.off('resize', onResize)
 
-	// Dump output to main screen so it persists in scrollback
+	// Dump output to main screen so it persists in scrollback.
+	// Move to bottom row first so the dump scrolls naturally below existing content.
+	directWrite(`\x1b[${rows()};1H\r\n`)
 	for (const line of dumpLines) {
 		directWrite(line + '\r\n')
 	}
+
+
 
 	if (waitingResolve) {
 		const r = waitingResolve
@@ -1476,4 +1475,3 @@ export function cleanup(): void {
 		r(null)
 	}
 }
-
