@@ -1,3 +1,5 @@
+// See docs/ipc.md for architecture overview.
+
 import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState } from './protocol.ts'
