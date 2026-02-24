@@ -74,15 +74,13 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 				await runSystem(sessionId)
 				break
 
-			case 'cd':
-				await runCd(sessionId, command.text ?? '')
-				break
+
 
 			case 'title':
 				await runTitle(sessionId, command.text ?? '')
 				break
 
-			// 'close' and 'fork' are handled immediately in processCommand (bypass scheduler)
+			// 'close', 'fork', and 'cd' are handled immediately in processCommand (bypass scheduler)
 
 			case 'restart':
 				await saveSessionBeforeExit(sessionId)
@@ -391,7 +389,7 @@ function resolveCdPath(sessionId: string, input: string, baseDir: string): strin
 	return resolve(baseDir, trimmed)
 }
 
-async function runCd(sessionId: string, text: string): Promise<void> {
+export async function runCd(sessionId: string, text: string): Promise<void> {
 	if (!text.trim()) {
 		await publishLine(`[cd] ${getSessionWorkingDir(sessionId)}`, 'info', sessionId)
 		return

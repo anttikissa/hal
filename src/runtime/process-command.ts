@@ -14,7 +14,7 @@ import {
 	concurrencyStatus,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
-import { dropQueuedCommands, runClose, runFork, runSystem } from './handle-command.ts'
+import { dropQueuedCommands, runClose, runFork, runSystem, runCd } from './handle-command.ts'
 
 import {
 	sanitizeSessionId,
@@ -258,6 +258,15 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
 		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		if (sessionId) await runSystem(sessionId)
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
+		return
+	}
+
+	// cd: metadata-only — bypass scheduler so tab name updates immediately
+	if (command.type === 'cd') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (sessionId) await runCd(sessionId, command.text ?? '')
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
 		return
 	}
