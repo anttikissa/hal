@@ -25,6 +25,7 @@ import {
 	wordBoundaryRight,
 	wordWrapLines,
 } from './tui-text.ts'
+import { cursorToWrappedRowCol } from './tui-input-layout.ts'
 export { stripAnsi } from './format/index.ts'
 import { stripAnsi } from './format/index.ts'
 
@@ -312,27 +313,6 @@ function buildStatusLine(): string {
 	const dashCount = Math.max(0, c - fixedLen)
 	const line = leftPart + '─'.repeat(dashCount) + scrollPart + rightPart
 	return `${STATUS_DIM}${line.slice(0, c)}${RESET}`
-}
-
-// ── Input cursor mapping ──
-
-function cursorToRowCol(absPos: number, width: number): { row: number; col: number } {
-	const wrapped = wordWrapLines(inputBuf, width)
-	let charsSoFar = 0
-	for (let i = 0; i < wrapped.length; i++) {
-		const lineLen = wrapped[i].length
-		const breakChar =
-			i < wrapped.length - 1 && charsSoFar + lineLen < inputBuf.length
-				? inputBuf[charsSoFar + lineLen]
-				: ''
-		const consumed = lineLen + (breakChar === ' ' || breakChar === '\n' ? 1 : 0)
-		if (absPos <= charsSoFar + lineLen) {
-			return { row: i, col: absPos - charsSoFar }
-		}
-		charsSoFar += consumed
-	}
-	const lastLine = wrapped.length - 1
-	return { row: lastLine, col: wrapped[lastLine]?.length ?? 0 }
 }
 
 // ── Mouse selection ──
@@ -666,7 +646,7 @@ function render(): void {
 	chunks.push(`${BG_DARK}${' '.repeat(c)}${RESET}`)
 
 	// Position cursor at input
-	const { row: curRow, col: curCol } = cursorToRowCol(inputCursor, contentWidth)
+	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
 	const cursorScreenRow = firstRow + curRow
 	const cursorScreenCol = curCol + 1 + inputPromptStr.length
 	chunks.push(`\x1b[${cursorScreenRow};${cursorScreenCol}H`)
