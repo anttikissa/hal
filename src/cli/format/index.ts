@@ -20,13 +20,14 @@ function getFormatter(kind: string): Formatter {
 			style: getStyle('prompt.text'),
 			blockStart(cols: number): string {
 				const bar = getStyle('prompt.bar')
-				const w = Math.max(0, cols - 1)
-				return `\n${bar}${' '.repeat(w)}${RESET}\n`
+				void cols
+				// Fill the whole viewport row at render time so prompt separators reflow on resize.
+				return `\n${bar}\x1b[K${RESET}\n`
 			},
 			blockEnd(cols: number): string {
 				const bar = getStyle('prompt.bar')
-				const w = Math.max(0, cols - 1)
-				return `${bar}${' '.repeat(w)}${RESET}\n`
+				void cols
+				return `${bar}\x1b[K${RESET}\n`
 			},
 		}
 	}
