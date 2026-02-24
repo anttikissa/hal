@@ -664,6 +664,9 @@ function disableMouse(): void {
 // ── Render ──
 
 let renderScheduled = false
+// Cached from last render for resize scroll preservation
+let lastRenderedOutputHeight = 0
+let lastRenderedTotalVisual = 0
 
 function scheduleRender(): void {
 	if (renderScheduled) return
@@ -691,6 +694,8 @@ function render(): void {
 	const visibleOutput = getVisibleWrapped(outputHeight)
 	lastVisibleOutput = visibleOutput
 	lastOutputHeight = outputHeight
+	lastRenderedOutputHeight = outputHeight
+	lastRenderedTotalVisual = getTotalVisualLines()
 
 	const selRange = getSelectionRange()
 
@@ -1283,8 +1288,20 @@ function writeToOutput(text: string): void {
 
 function onResize(): void {
 	if (!initialized || suspended) return
-	// Invalidate wrap cache
-	lastWrapCols = 0
+
+	if (scrollOffset > 0 && lastRenderedTotalVisual > 0) {
+		// Preserve viewport center position across re-wrap
+		const centerFromBottom = scrollOffset + lastRenderedOutputHeight / 2
+		const fraction = centerFromBottom / lastRenderedTotalVisual
+
+		lastWrapCols = 0 // invalidate before recomputing
+		const newTotal = getTotalVisualLines()
+		const newOutputHeight = Math.max(0, Math.max(1, rows() - footerHeight()) - 1)
+		scrollOffset = Math.max(0, Math.round(fraction * newTotal - newOutputHeight / 2))
+	} else {
+		lastWrapCols = 0
+	}
+
 	render()
 }
 
