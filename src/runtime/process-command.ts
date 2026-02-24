@@ -14,7 +14,7 @@ import {
 	concurrencyStatus,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
-import { dropQueuedCommands, runClose, runFork } from './handle-command.ts'
+import { dropQueuedCommands, runClose, runFork, runSystem } from './handle-command.ts'
 
 import {
 	sanitizeSessionId,
@@ -250,6 +250,15 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		}
 		await runFork(sessionId, command)
 		await publishCommandPhase(command.id, 'done', undefined, sessionId)
+		return
+	}
+
+	// System: read-only display — bypass scheduler so it works while session is busy
+	if (command.type === 'system') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (sessionId) await runSystem(sessionId)
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
 		return
 	}
 

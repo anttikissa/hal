@@ -360,7 +360,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	}
 }
 
-async function runSystem(sessionId: string): Promise<void> {
+export async function runSystem(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	const blocks = runtime.systemPrompt
 	if (!blocks || blocks.length === 0) {
