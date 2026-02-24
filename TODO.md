@@ -2,6 +2,8 @@
 
 ## Do next:
 
+- When I restart the app, I need to see past messages. Whether the app is client, or owner. This sometimes happens but sometimes it's buggy
+
 - Architect commands vs keybindings so they can't diverge: every keybinding should call the same function as its corresponding slash command. Audit all pairs (ctrl-w / /close, ctrl-t / /new, etc.) and make the architecture obvious enough that dumb models won't re-introduce duplicate code paths.
 - System.md analysis and revamp - what to add/remove - also better <if> for codex
 - Fix Codex by better prompt or something
