@@ -276,9 +276,14 @@ export async function readRecentEvents(limit: number): Promise<RuntimeEvent[]> {
 	return all.slice(-limit)
 }
 
-export async function* tailCommands(): AsyncGenerator<RuntimeCommand> {
+export async function commandFileOffset(): Promise<number> {
 	assertInit()
-	const offset = (await stat(commandsFile)).size
+	return (await stat(commandsFile)).size
+}
+
+export async function* tailCommands(fromOffset?: number): AsyncGenerator<RuntimeCommand> {
+	assertInit()
+	const offset = fromOffset ?? (await stat(commandsFile)).size
 	yield* parseStream(tailFile(commandsFile, offset), { recover: true })
 }
 
