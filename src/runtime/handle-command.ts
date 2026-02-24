@@ -1,6 +1,6 @@
 import { resolve, isAbsolute } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { clearSession, performHandoff, saveSession, saveSessionMeta, extractLastPrompt } from '../session.ts'
+import { clearSession, performHandoff, saveSession, saveSessionInfo, extractLastPrompt, appendConversation } from '../session.ts'
 import {
 	loadConfig,
 	resolveModel,
@@ -144,6 +144,10 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 
 	forkRuntime.messages.push({ role: 'user', content: `[forked from ${sessionId}]` })
 
+	const ts = new Date().toISOString()
+	await appendConversation(sessionId, { type: 'fork', to: newId, ts })
+	await appendConversation(newId, { type: 'fork', from: sessionId, ts })
+
 	markSessionAsActive(newId)
 	await persistRegistry()
 	await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'meta', sessionId)
@@ -270,6 +274,7 @@ IMPORTANT: Do NOT reproduce the conversation. Synthesize and summarize. Be speci
 	}
 
 	await performHandoff(sessionId, summary)
+	await appendConversation(sessionId, { type: 'handoff', ts: new Date().toISOString() })
 	await publishActivity('', sessionId)
 	await publishLine(
 		'[handoff] summary saved to handoff.md, session rotated to session-previous.ason',
@@ -303,6 +308,7 @@ async function runReset(sessionId: string): Promise<void> {
 		await persistRegistry()
 	}
 
+	await appendConversation(sessionId, { type: 'reset', ts: new Date().toISOString() })
 	await publishLine('[reset] session cleared', 'meta', sessionId)
 	await publishEstimatedContext(sessionId)
 	await emitSessions(true)
@@ -337,11 +343,13 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 		content: `[model changed from ${prevModel} to ${fullModel}]`,
 	})
 
-	await saveSessionMeta(sessionId, {
+	await saveSessionInfo(sessionId, {
 		...sessionMetaSnapshot(sessionId),
 		updatedAt: new Date().toISOString(),
 		lastPrompt: extractLastPrompt(runtime.messages),
 	})
+
+	await appendConversation(sessionId, { type: 'model', from: prevModel, to: fullModel, ts: new Date().toISOString() })
 
 	// Reload system prompt for new model
 	const loaded = await reloadSystemPromptForSession(sessionId)
@@ -409,11 +417,15 @@ async function runCd(sessionId: string, text: string): Promise<void> {
 	}
 
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	await saveSessionMeta(sessionId, {
+	await saveSessionInfo(sessionId, {
 		...sessionMetaSnapshot(sessionId),
 		updatedAt: new Date().toISOString(),
 		lastPrompt: extractLastPrompt(runtime.messages),
 	})
+
+	if (previous !== next) {
+		await appendConversation(sessionId, { type: 'cd', from: previous, to: next, ts: new Date().toISOString() })
+	}
 
 	const loaded = await reloadSystemPromptForSession(sessionId)
 	const dirMsg = previous !== next ? `${previous} -> ${next}` : next
@@ -436,6 +448,7 @@ async function runTitle(sessionId: string, text: string): Promise<void> {
 	}
 
 	await setSessionTitle(sessionId, title)
+	await appendConversation(sessionId, { type: 'title', text: title, ts: new Date().toISOString() })
 	await publishLine(`[title] ${title}`, 'meta', sessionId)
 }
 
@@ -480,6 +493,7 @@ async function maybeAutoTitle(sessionId: string): Promise<void> {
 
 		if (error || !title?.trim()) return
 		await setSessionTitle(sessionId, title.trim())
+		await appendConversation(sessionId, { type: 'title', text: title.trim(), auto: true, ts: new Date().toISOString() })
 	} catch {
 		// Non-critical — silently ignore
 	}

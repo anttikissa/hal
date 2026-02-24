@@ -49,7 +49,7 @@ import {
 } from './keys.ts'
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
-import { loadInputHistory, saveInputHistory } from '../session.ts'
+import { loadInputHistory } from '../session.ts'
 import { countSourceStats } from '../utils/cloc.ts'
 
 import { loadConfig, MODEL_ALIASES } from '../config.ts'
@@ -233,27 +233,15 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			if (isExit(normalized)) break
 			wasBusyOnLastSubmit = activeTab()?.busy ?? false
 			await handleCommand(input, client)
-			// Persist input history for the active tab
 			const tab = activeTab()
-			if (tab) {
-				tab.inputHistory = getInputHistory()
-				saveInputHistory(tab.sessionId, tab.inputHistory).catch(() => {})
-			}
+			if (tab) tab.inputHistory = getInputHistory()
 		}
 	} finally {
-		// Persist active tab and input drafts so they survive app restart
+		// Persist active tab so it survives app restart
 		captureActiveOutput()
 		const exitSessionId = activeTab()?.sessionId ?? null
 		if (exitSessionId) {
 			updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {})
-		}
-		for (const tab of tabs) {
-			if (tab.inputDraft) {
-				saveInputHistory(tab.sessionId, [
-					...tab.inputHistory.filter((h) => h !== tab.inputDraft),
-					tab.inputDraft,
-				]).catch(() => {})
-			}
 		}
 		setInputKeyHandler(null)
 		setEscHandler(null)

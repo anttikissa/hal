@@ -14,7 +14,7 @@ import {
 	markModelCalibrated,
 	saveTokenCalibration,
 } from '../token-calibration.ts'
-import { saveSession } from '../session.ts'
+import { saveSession, appendConversation } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
 	getSessionWorkingDir,
@@ -112,6 +112,15 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				!(b.type === 'thinking' && !b.thinking?.trim()),
 		)
 		runtime.messages.push({ role: 'assistant', content: validBlocks })
+
+		// Log assistant text to conversation (skip tool-only responses)
+		const textContent = validBlocks
+			.filter((b: any) => b.type === 'text')
+			.map((b: any) => b.text)
+			.join('\n')
+		if (textContent.trim()) {
+			await appendConversation(sessionId, { type: 'assistant', text: textContent.trim(), ts: new Date().toISOString() })
+		}
 
 		const hasToolUse = parsed.contentBlocks.some((b: any) => b?.type === 'tool_use')
 		done = parsed.stopReason === 'end_turn' || (!hasToolUse && parsed.stopReason !== 'tool_use')

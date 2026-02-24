@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 import type { Client } from './client.ts'
 import { logSnapshot, getDebugLogPath, saveBugReport } from '../debug-log.ts'
 import { SESSIONS_DIR } from '../state.ts'
-import { loadSessionMeta, timeSince, type SessionMeta } from '../session.ts'
+import { loadSessionInfo, timeSince, type SessionMeta } from '../session.ts'
 
 
 type Handler = (args: string, client: Client) => Promise<void> | void
@@ -134,7 +134,7 @@ async function listClosedSessions(activeIds: Set<string>): Promise<RestorableSes
 	for (const entry of entries) {
 		if (!entry.isDirectory() || !entry.name.startsWith('s-')) continue
 		if (activeIds.has(entry.name)) continue
-		const meta = await loadSessionMeta(entry.name)
+		const meta = await loadSessionInfo(entry.name)
 		if (!meta) continue
 		results.push({ id: entry.name, meta })
 	}
@@ -174,7 +174,7 @@ async function restore(args: string, client: Client): Promise<void> {
 		const id = arg.startsWith('s-') ? arg : `s-${arg}`
 		target = lastRestoreList.find((s) => s.id === id)
 		if (!target) {
-			const meta = await loadSessionMeta(id)
+			const meta = await loadSessionInfo(id)
 			if (meta) target = { id, meta }
 		}
 	}

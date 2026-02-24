@@ -1,9 +1,9 @@
 // See docs/session.md for architecture overview.
 
-import { mkdir, readFile, writeFile, unlink, rename, copyFile } from 'fs/promises'
+import { appendFile, mkdir, readFile, writeFile, unlink, rename, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomBytes } from 'crypto'
-import { stringify, parse } from './utils/ason.ts'
+import { stringify, parse, parseAll } from './utils/ason.ts'
 import { sessionDir, SESSIONS_DIR, SESSIONS_INDEX, ensureStateDir, LAUNCH_CWD } from './state.ts'
 import { resolve } from 'path'
 
@@ -58,13 +58,15 @@ function handoffPath(id: string): string {
 	return `${sessionDir(id)}/handoff.md`
 }
 
-function promptsPath(id: string): string {
-	return `${sessionDir(id)}/prompts.ason`
+function infoPath(id: string): string {
+	return `${sessionDir(id)}/info.ason`
 }
 
-function metaPath(id: string): string {
-	return `${sessionDir(id)}/meta.ason`
+function conversationPath(id: string): string {
+	return `${sessionDir(id)}/conversation.ason`
 }
+
+// Session info (persisted per-session metadata)
 
 export interface SessionMeta {
 	workingDir: string
@@ -74,19 +76,58 @@ export interface SessionMeta {
 	lastPrompt?: string
 }
 
-export async function saveSessionMeta(id: string, meta: SessionMeta): Promise<void> {
+export async function saveSessionInfo(id: string, meta: SessionMeta): Promise<void> {
 	await ensureSessionDir(id)
-	await writeFile(metaPath(id), stringify(meta) + '\n')
+	await writeFile(infoPath(id), stringify(meta) + '\n')
 }
 
-export async function loadSessionMeta(id: string): Promise<SessionMeta | null> {
-	const path = metaPath(id)
-	if (!existsSync(path)) return null
-	try {
-		return parse(await readFile(path, 'utf-8')) as SessionMeta
-	} catch {
-		return null
+export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
+	// Try info.ason first, fall back to legacy meta.ason
+	for (const path of [infoPath(id), `${sessionDir(id)}/meta.ason`]) {
+		if (!existsSync(path)) continue
+		try {
+			return parse(await readFile(path, 'utf-8')) as SessionMeta
+		} catch {
+			continue
+		}
 	}
+	return null
+}
+
+// Conversation event log
+
+export type ConversationEvent =
+	| { type: 'user'; text: string; ts: string }
+	| { type: 'assistant'; text: string; ts: string }
+	| { type: 'model'; from: string; to: string; ts: string }
+	| { type: 'fork'; from?: string; to?: string; ts: string }
+	| { type: 'title'; text: string; auto?: boolean; ts: string }
+	| { type: 'handoff'; ts: string }
+	| { type: 'reset'; ts: string }
+	| { type: 'cd'; from: string; to: string; ts: string }
+
+export async function appendConversation(sessionId: string, event: ConversationEvent): Promise<void> {
+	await ensureSessionDir(sessionId)
+	await appendFile(conversationPath(sessionId), stringify(event) + '\n')
+}
+
+export async function loadConversation(sessionId: string): Promise<ConversationEvent[]> {
+	const path = conversationPath(sessionId)
+	if (!existsSync(path)) return []
+	try {
+		return parseAll(await readFile(path, 'utf-8')) as ConversationEvent[]
+	} catch {
+		return []
+	}
+}
+
+// Input history derived from conversation events
+export async function loadInputHistory(sessionId: string): Promise<string[]> {
+	const events = await loadConversation(sessionId)
+	return events
+		.filter((e): e is ConversationEvent & { type: 'user' } => e.type === 'user')
+		.map((e) => e.text)
+		.slice(-200)
 }
 
 async function ensureSessionDir(id: string): Promise<void> {
@@ -186,7 +227,6 @@ export function extractLastPrompt(messages: any[]): string {
 	return ''
 }
 
-
 export async function saveSession(
 	sessionId: string,
 	messages: any[],
@@ -208,7 +248,7 @@ export async function saveSession(
 	const session: SessionFile = { messages, tokenTotals, createdAt, updatedAt: now }
 	await writeFile(path, stringify(session) + '\n')
 	if (meta) {
-		await saveSessionMeta(sessionId, {
+		await saveSessionInfo(sessionId, {
 			...meta,
 			updatedAt: now,
 			lastPrompt: extractLastPrompt(messages),
@@ -219,28 +259,6 @@ export async function saveSession(
 export async function clearSession(sessionId: string): Promise<void> {
 	const path = sessionPath(sessionId)
 	if (existsSync(path)) await unlink(path)
-}
-
-const MAX_HISTORY = 200
-
-export async function loadInputHistory(sessionId: string): Promise<string[]> {
-	const path = `${sessionDir(sessionId)}/history.ason`
-	if (!existsSync(path)) return []
-	try {
-		const raw = await readFile(path, 'utf-8')
-		const data = parse(raw)
-		return Array.isArray(data) ? data.slice(-MAX_HISTORY) : []
-	} catch {
-		return []
-	}
-}
-
-export async function saveInputHistory(sessionId: string, history: string[]): Promise<void> {
-	await ensureSessionDir(sessionId)
-	await writeFile(
-		`${sessionDir(sessionId)}/history.ason`,
-		stringify(history.slice(-MAX_HISTORY)) + '\n',
-	)
 }
 
 // Handoff
@@ -275,30 +293,6 @@ export async function loadHandoff(sessionId: string): Promise<string | null> {
 	}
 }
 
-// Prompt logging
-
-export async function logPrompt(
-	sessionId: string,
-	entry: {
-		timestamp: string
-		model: string
-		provider: string
-		prompt: string
-	},
-): Promise<void> {
-	await ensureSessionDir(sessionId)
-	const { $ } = await import('bun')
-	let gitHash = ''
-	try {
-		gitHash = (await $`git rev-parse HEAD`.quiet().text()).trim().slice(0, 8)
-	} catch {
-		/* no git */
-	}
-	const record = { ...entry, gitHash }
-	const { appendFile } = await import('fs/promises')
-	await appendFile(promptsPath(sessionId), stringify(record) + '\n')
-}
-
 // Fork: copy session state to a new session
 export async function forkSession(sourceId: string): Promise<string> {
 	const newId = makeSessionId()
@@ -306,8 +300,7 @@ export async function forkSession(sourceId: string): Promise<string> {
 	const dstDir = sessionDir(newId)
 	await mkdir(dstDir, { recursive: true })
 
-	// Copy session data and input history (not prompts — those are logs)
-	for (const file of ['session.ason', 'history.ason']) {
+	for (const file of ['session.ason', 'conversation.ason']) {
 		const src = `${srcDir}/${file}`
 		if (existsSync(src)) await copyFile(src, `${dstDir}/${file}`)
 	}
