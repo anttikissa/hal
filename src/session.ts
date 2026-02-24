@@ -100,7 +100,7 @@ export type ConversationEvent =
 	| { type: 'user'; text: string; ts: string }
 	| { type: 'assistant'; text: string; ts: string }
 	| { type: 'model'; from: string; to: string; ts: string }
-	| { type: 'fork'; base: string; new: string; ts: string }
+	| { type: 'fork'; parent: string; child: string; ts: string }
 	| { type: 'title'; from?: string; to: string; auto?: boolean; ts: string }
 	| { type: 'handoff'; ts: string }
 	| { type: 'reset'; ts: string }

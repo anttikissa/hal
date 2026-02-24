@@ -145,7 +145,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	forkRuntime.messages.push({ role: 'user', content: `[forked from ${sessionId}]` })
 
 	const ts = new Date().toISOString()
-	const forkEvent = { type: 'fork' as const, base: sessionId, new: newId, ts }
+	const forkEvent = { type: 'fork' as const, parent: sessionId, child: newId, ts }
 	await appendConversation(sessionId, forkEvent)
 	await appendConversation(newId, forkEvent)
 
