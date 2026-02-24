@@ -1448,6 +1448,14 @@ export function cleanup(): void {
 		headerFlashTimer = null
 	}
 	headerFlash = ''
+
+	// Capture visible output before leaving alt screen
+	const c = cols()
+	const r = rows()
+	const oh = Math.max(0, outputBottom() - 1)
+	const visible = getVisibleWrapped(oh)
+	const dumpLines = visible.map((line) => truncateAnsi(line, c))
+
 	showCursor()
 	disableMouse()
 	directWrite('\x1b[?1049l') // leave alt screen
@@ -1456,9 +1464,16 @@ export function cleanup(): void {
 	process.stdin.off('end', onStdinEnd)
 	process.off('SIGCONT', onSigCont)
 	process.stdout.off('resize', onResize)
+
+	// Dump output to main screen so it persists in scrollback
+	for (const line of dumpLines) {
+		directWrite(line + '\r\n')
+	}
+
 	if (waitingResolve) {
 		const r = waitingResolve
 		waitingResolve = null
 		r(null)
 	}
 }
+
