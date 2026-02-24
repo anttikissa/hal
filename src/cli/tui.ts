@@ -54,7 +54,15 @@ const TITLE_DIM = '\x1b[38;5;245m'
 type TabCompleter = (prefix: string) => string[]
 type InputKeyHandler = (key: string) => boolean | void
 type InputEchoFilter = (value: string) => boolean
-type SelectionPoint = { row: number; col: number }
+type SelectionSurface = 'output' | 'status'
+type SelectionPoint = { surface: SelectionSurface; row: number; col: number }
+type SelectionRange = {
+	surface: SelectionSurface
+	startRow: number
+	startCol: number
+	endRow: number
+	endCol: number
+}
 type SelectionMode = 'char' | 'word' | 'line'
 
 // ── Callbacks ──
@@ -149,7 +157,7 @@ let lastClickTime = 0
 let lastClickPos: SelectionPoint | null = null
 let clickCount = 0
 let lastVisibleOutput: string[] = []
-let lastOutputHeight = 0
+let lastStatusLine = ''
 
 // Bracketed paste
 let bracketedPasteBuffer: string | null = null
@@ -330,12 +338,14 @@ function cursorToRowCol(absPos: number, width: number): { row: number; col: numb
 // ── Mouse selection ──
 
 function getSelectionRange(): {
+	surface: SelectionSurface
 	startRow: number
 	startCol: number
 	endRow: number
 	endCol: number
 } | null {
 	if (!selAnchor || !selCurrent) return null
+	if (selAnchor.surface !== selCurrent.surface) return null
 	let a = selAnchor
 	let b = selCurrent
 
@@ -343,8 +353,8 @@ function getSelectionRange(): {
 		a = expandToWordBoundary(a, 'start')
 		b = expandToWordBoundary(b, 'end')
 	} else if (selMode === 'line') {
-		a = { row: a.row, col: 0 }
-		b = { row: b.row, col: cols() }
+		a = { ...a, col: 0 }
+		b = { ...b, col: cols() }
 	}
 
 	if (a.row > b.row || (a.row === b.row && a.col > b.col)) {
@@ -352,40 +362,58 @@ function getSelectionRange(): {
 			const aSwap = expandToWordBoundary(selCurrent, 'start')
 			const bSwap = expandToWordBoundary(selAnchor, 'end')
 			return {
+				surface: aSwap.surface,
 				startRow: aSwap.row,
 				startCol: aSwap.col,
 				endRow: bSwap.row,
 				endCol: bSwap.col,
 			}
 		}
-		return { startRow: b.row, startCol: b.col, endRow: a.row, endCol: a.col }
+		return {
+			surface: b.surface,
+			startRow: b.row,
+			startCol: b.col,
+			endRow: a.row,
+			endCol: a.col,
+		}
 	}
-	return { startRow: a.row, startCol: a.col, endRow: b.row, endCol: b.col }
+	return {
+		surface: a.surface,
+		startRow: a.row,
+		startCol: a.col,
+		endRow: b.row,
+		endCol: b.col,
+	}
+}
+
+function selectionLine(pt: SelectionPoint): string {
+	if (pt.surface === 'status') return lastStatusLine
+	return lastVisibleOutput[pt.row] ?? ''
 }
 
 function expandToWordBoundary(pt: SelectionPoint, side: 'start' | 'end'): SelectionPoint {
-	const line = lastVisibleOutput[pt.row] ?? ''
+	const line = selectionLine(pt)
 	const plain = stripAnsi(line)
 	const col = Math.min(pt.col, plain.length)
 
 	if (side === 'start') {
 		let i = Math.min(col, plain.length - 1)
-		if (i < 0) return { row: pt.row, col: 0 }
+		if (i < 0) return { ...pt, col: 0 }
 		while (i > 0 && /\s/.test(plain[i])) i--
 		while (i > 0 && !/\s/.test(plain[i - 1])) i--
-		return { row: pt.row, col: i }
+		return { ...pt, col: i }
 	} else {
 		let i = col
 		while (i < plain.length && /\s/.test(plain[i])) i++
 		while (i < plain.length && !/\s/.test(plain[i])) i++
-		return { row: pt.row, col: i }
+		return { ...pt, col: i }
 	}
 }
 
 function renderLineWithSelection(
 	line: string,
 	row: number,
-	sel: { startRow: number; startCol: number; endRow: number; endCol: number },
+	sel: SelectionRange,
 ): string {
 	const plain = stripAnsi(line)
 	const truncated = plain.slice(0, cols())
@@ -408,7 +436,11 @@ function renderLineWithSelection(
 	while (i < line.length && visCol < c) {
 		if (line[i] === '\x1b') {
 			const seqLen = readEscapeSequence(line, i)
-			result.push(line.slice(i, i + seqLen))
+			const seq = line.slice(i, i + seqLen)
+			result.push(seq)
+			// Embedded SGR (especially \x1b[0m) can cancel inverse-video mid-selection.
+			// Re-apply selection highlight so dragging stays visually continuous.
+			if (inSel && seq.startsWith('\x1b[') && seq.endsWith('m')) result.push('\x1b[7m')
 			i += seqLen
 			continue
 		}
@@ -432,22 +464,32 @@ function renderLineWithSelection(
 	return result.join('')
 }
 
-function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'release'): void {
-	// Only handle clicks in the output area (rows 2..outputBottom, 0-indexed: 1..outputBottom-1)
+function pointFromScreenCoords(x: number, y: number): SelectionPoint | null {
+	// y is 0-based row on screen. Output starts at row 2 (index 1).
 	const oh = Math.max(0, outputBottom() - 1)
-	// y is 0-based row on screen, output starts at row index 1 (row 2 on screen)
-	const outputRow = y - 1 // convert to 0-based index into visible output
-	if (outputRow < 0 || outputRow >= oh) {
-		if (kind === 'press') clearSelection()
-		return
+	const outputRow = y - 1
+	if (outputRow >= 0 && outputRow < oh) {
+		return { surface: 'output', row: outputRow, col: x }
 	}
+	if (y === statusRow() - 1) {
+		return { surface: 'status', row: 0, col: x }
+	}
+	return null
+}
 
-	const pt: SelectionPoint = { row: outputRow, col: x }
-
+function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'release'): void {
 	if (kind === 'press') {
+		const pt = pointFromScreenCoords(x, y)
+		if (!pt) {
+			clearSelection()
+			return
+		}
 		const now = Date.now()
 		const samePos =
-			lastClickPos && lastClickPos.row === outputRow && Math.abs(lastClickPos.col - x) <= 1
+			lastClickPos &&
+			lastClickPos.surface === pt.surface &&
+			lastClickPos.row === pt.row &&
+			Math.abs(lastClickPos.col - x) <= 1
 
 		if (samePos && now - lastClickTime < 400) {
 			clickCount = Math.min(clickCount + 1, 3)
@@ -465,11 +507,20 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		selCurrent = pt
 		selActive = true
 		render()
-	} else if (kind === 'move' && selActive) {
+		return
+	}
+
+	if (kind === 'move' && selActive) {
+		const pt = pointFromScreenCoords(x, y)
+		if (!pt || !selAnchor || pt.surface !== selAnchor.surface) return
 		selCurrent = pt
 		render()
-	} else if (kind === 'release' && selActive) {
-		selCurrent = pt
+		return
+	}
+
+	if (kind === 'release' && selActive) {
+		const pt = pointFromScreenCoords(x, y)
+		if (pt && selAnchor && pt.surface === selAnchor.surface) selCurrent = pt
 		selActive = false
 		copySelectionToClipboard()
 		render()
@@ -482,7 +533,9 @@ function copySelectionToClipboard(): void {
 
 	const lines: string[] = []
 	for (let row = sel.startRow; row <= sel.endRow; row++) {
-		const plain = stripAnsi(lastVisibleOutput[row] ?? '')
+		const line =
+			sel.surface === 'status' ? (row === 0 ? lastStatusLine : '') : (lastVisibleOutput[row] ?? '')
+		const plain = stripAnsi(line)
 		const start = row === sel.startRow ? sel.startCol : 0
 		const end = row === sel.endRow ? sel.endCol : plain.length
 		lines.push(plain.slice(start, end))
@@ -552,7 +605,6 @@ function render(): void {
 
 	const visibleOutput = getVisibleWrapped(outputHeight)
 	lastVisibleOutput = visibleOutput
-	lastOutputHeight = outputHeight
 	lastRenderedOutputHeight = outputHeight
 	lastRenderedTotalVisual = getTotalVisualLines()
 
@@ -571,7 +623,7 @@ function render(): void {
 		chunks.push(`\x1b[${row};1H\x1b[2K`)
 		const idx = row - 2
 		const lineText = visibleOutput[idx] ?? ''
-		if (selRange && idx >= selRange.startRow && idx <= selRange.endRow) {
+		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow) {
 			chunks.push(renderLineWithSelection(lineText, idx, selRange))
 		} else {
 			chunks.push(truncateAnsi(lineText, c))
@@ -586,8 +638,11 @@ function render(): void {
 
 	// Status line
 	const sRow = statusRow()
+	const statusLine = buildStatusLine()
+	lastStatusLine = statusLine
 	chunks.push(`\x1b[${sRow};1H\x1b[2K`)
-	chunks.push(buildStatusLine())
+	if (selRange?.surface === 'status') chunks.push(renderLineWithSelection(statusLine, 0, selRange))
+	else chunks.push(statusLine)
 
 	// Prompt top pad
 	const ptRow = promptTopPadRow()
