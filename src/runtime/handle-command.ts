@@ -462,6 +462,20 @@ export async function setSessionTitle(sessionId: string, title: string): Promise
 	await emitSessions(true)
 }
 
+/** Extract first real user prompt text from messages (skipping internal markers). */
+function firstUserPrompt(messages: any[]): string | null {
+	for (const m of messages) {
+		if (m.role !== 'user') continue
+		const text = typeof m.content === 'string'
+			? m.content
+			: Array.isArray(m.content)
+				? m.content.find((b: any) => b.type === 'text')?.text ?? ''
+				: ''
+		if (text && !text.startsWith('[')) return text
+	}
+	return null
+}
+
 /** Generate a title for the conversation after the first real exchange. */
 async function maybeAutoTitle(sessionId: string): Promise<void> {
 	const meta = getSessionMeta(sessionId)
@@ -470,12 +484,9 @@ async function maybeAutoTitle(sessionId: string): Promise<void> {
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (!runtime) return
 
-	// Need at least one user message and one assistant response
-	const userMsgs = runtime.messages.filter(
-		(m) => m.role === 'user' && typeof m.content === 'string' && !m.content.startsWith('['),
-	)
-	const assistantMsgs = runtime.messages.filter((m) => m.role === 'assistant')
-	if (userMsgs.length === 0 || assistantMsgs.length === 0) return
+	const hasAssistant = runtime.messages.some((m) => m.role === 'assistant')
+	const prompt = firstUserPrompt(runtime.messages)
+	if (!prompt || !hasAssistant) return
 
 	try {
 		const sessionModel = getSessionModel(sessionId)
@@ -483,17 +494,15 @@ async function maybeAutoTitle(sessionId: string): Promise<void> {
 		const provider = getProvider(providerForModel(compactModel))
 		await provider.refreshAuth()
 
-		const firstPrompt = userMsgs[0].content
 		const { text: title, error } = await provider.complete({
 			model: modelIdForModel(compactModel),
 			system: 'Generate a short title (3-8 words) for this conversation. Reply with ONLY the title, no quotes, no punctuation at the end.',
-			userMessage: firstPrompt.slice(0, 500),
+			userMessage: prompt.slice(0, 500),
 			maxTokens: 30,
 		})
 
 		if (error || !title?.trim()) return
 		await setSessionTitle(sessionId, title.trim())
-		await appendConversation(sessionId, { type: 'title', text: title.trim(), auto: true, ts: new Date().toISOString() })
 	} catch {
 		// Non-critical — silently ignore
 	}
