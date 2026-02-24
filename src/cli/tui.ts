@@ -1466,6 +1466,9 @@ export function cleanup(): void {
 	for (const line of dumpLines) {
 		directWrite(line + '\r\n')
 	}
+	// Push shell prompt to bottom — match the footer height we had
+	const padding = footerHeight() - 1 // -1 because shell itself occupies a line
+	for (let i = 0; i < padding; i++) directWrite('\r\n')
 
 
 
