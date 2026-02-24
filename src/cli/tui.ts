@@ -41,6 +41,8 @@ const CTRL_D = '\x04'
 const CTRL_K = '\x0b'
 const CTRL_U = '\x15'
 const CTRL_V = '\x16'
+const CTRL_X = '\x18'
+const CTRL_Y = '\x19'
 const CTRL_Z = '\x1a'
 
 const PASTE_START = '\x1b[200~'
@@ -59,7 +61,7 @@ const TITLE_DIM = '\x1b[38;5;245m'
 type TabCompleter = (prefix: string) => string[]
 type InputKeyHandler = (key: string) => boolean | void
 type InputEchoFilter = (value: string) => boolean
-type SelectionSurface = 'output' | 'status' | 'input'
+type SelectionSurface = 'output' | 'activity' | 'status' | 'input'
 type SelectionPoint = { surface: SelectionSurface; row: number; col: number }
 type SelectionRange = {
 	surface: SelectionSurface
@@ -166,6 +168,7 @@ let lastClickTime = 0
 let lastClickPos: SelectionPoint | null = null
 let clickCount = 0
 let lastVisibleOutput: string[] = []
+let lastActivityLine = ''
 let lastStatusLine = ''
 
 // Bracketed paste
@@ -439,6 +442,16 @@ function copyInputTextSelectionToClipboard(): boolean {
 	return true
 }
 
+function copyCurrentSelectionToClipboard(): boolean {
+	if (copyInputTextSelectionToClipboard()) return true
+	const sel = getSelectionRange()
+	if (!sel) return false
+	const text = screenSelectionText(sel)
+	if (!text) return false
+	writeClipboardText(text)
+	return true
+}
+
 function cutInputTextSelectionToClipboard(): boolean {
 	const sel = getInputTextSelectionRange()
 	if (!sel) return false
@@ -469,7 +482,7 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 	if (!Number.isFinite(modifier) || !Number.isFinite(codepoint) || modifier < 9) return false
 	const ch = String.fromCharCode(codepoint).toLowerCase()
 	if (ch === 'c') {
-		if (copyInputTextSelectionToClipboard()) render()
+		if (copyCurrentSelectionToClipboard()) render()
 		return true
 	}
 	if (ch === 'x') {
@@ -530,6 +543,24 @@ function renderPromptLineWithInputSelection(
 
 // ── Mouse selection ──
 
+function screenSelectionLine(surface: SelectionSurface, row: number): string {
+	if (surface === 'activity') return row === 0 ? lastActivityLine : ''
+	if (surface === 'status') return row === 0 ? lastStatusLine : ''
+	if (surface === 'output') return lastVisibleOutput[row] ?? ''
+	return ''
+}
+
+function screenSelectionText(sel: SelectionRange): string {
+	const lines: string[] = []
+	for (let row = sel.startRow; row <= sel.endRow; row++) {
+		const plain = stripAnsi(screenSelectionLine(sel.surface, row))
+		const start = row === sel.startRow ? sel.startCol : 0
+		const end = row === sel.endRow ? sel.endCol : plain.length
+		lines.push(plain.slice(start, end))
+	}
+	return lines.join('\n')
+}
+
 function getSelectionRange(): {
 	surface: SelectionSurface
 	startRow: number
@@ -580,12 +611,11 @@ function getSelectionRange(): {
 }
 
 function selectionLine(pt: SelectionPoint): string {
-	if (pt.surface === 'status') return lastStatusLine
 	if (pt.surface === 'input') {
 		const width = cols() - 1 - inputPromptStr.length
 		return getWrappedInputLayout(inputBuf, width).lines[pt.row] ?? ''
 	}
-	return lastVisibleOutput[pt.row] ?? ''
+	return screenSelectionLine(pt.surface, pt.row)
 }
 
 function expandToWordBoundary(pt: SelectionPoint, side: 'start' | 'end'): SelectionPoint {
@@ -670,6 +700,9 @@ function pointFromScreenCoords(x: number, y: number): SelectionPoint | null {
 	const outputRow = y - 1
 	if (outputRow >= 0 && outputRow < oh) {
 		return { surface: 'output', row: outputRow, col: x }
+	}
+	if (y === activityRow() - 1) {
+		return { surface: 'activity', row: 0, col: x }
 	}
 	if (y === statusRow() - 1) {
 		return { surface: 'status', row: 0, col: x }
@@ -781,18 +814,7 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 function copySelectionToClipboard(): void {
 	const sel = getSelectionRange()
 	if (!sel) return
-
-	const lines: string[] = []
-	for (let row = sel.startRow; row <= sel.endRow; row++) {
-		const line =
-			sel.surface === 'status' ? (row === 0 ? lastStatusLine : '') : (lastVisibleOutput[row] ?? '')
-		const plain = stripAnsi(line)
-		const start = row === sel.startRow ? sel.startCol : 0
-		const end = row === sel.endRow ? sel.endCol : plain.length
-		lines.push(plain.slice(start, end))
-	}
-
-	const text = lines.join('\n')
+	const text = screenSelectionText(sel)
 	if (!text) return
 
 	writeClipboardText(text)
@@ -877,9 +899,11 @@ function render(): void {
 
 	// Activity line
 	const aRow = activityRow()
+	const activityLine = truncateAnsi(`${DIM}${activityStr ? `  Model: ${activityStr}` : '  Model: Idle'}`, c)
+	lastActivityLine = activityLine
 	chunks.push(`\x1b[${aRow};1H\x1b[2K`)
-	const actText = activityStr ? `  Model: ${activityStr}` : '  Model: Idle'
-	chunks.push(truncateAnsi(`${DIM}${actText}`, c))
+	if (selRange?.surface === 'activity') chunks.push(renderLineWithSelection(activityLine, 0, selRange))
+	else chunks.push(activityLine)
 
 	// Status line
 	const sRow = statusRow()
@@ -990,6 +1014,19 @@ function handleKey(key: string): void {
 		return
 	}
 	if (handleInputClipboardShortcutKey(key)) return
+
+	if (key === CTRL_X) {
+		if (cutInputTextSelectionToClipboard()) render()
+		return
+	}
+	if (key === CTRL_Y) {
+		pasteClipboardIntoInput()
+		return
+	}
+	if (key === '\x1bw') {
+		if (copyCurrentSelectionToClipboard()) render()
+		return
+	}
 
 	if (key === CTRL_V) {
 		pasteClipboardIntoInput()
