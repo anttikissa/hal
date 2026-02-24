@@ -558,7 +558,7 @@ function syncTabsFromSessions(
 	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
 }
 
-function hydrateTabsFromRecentLines(events: RuntimeEvent[], maxLinesPerTab = 120): void {
+function hydrateTabsFromRecentLines(events: RuntimeEvent[]): void {
 	const bySession = new Map<string, string[]>()
 	for (const event of events) {
 		if (!('sessionId' in event)) continue
@@ -571,10 +571,9 @@ function hydrateTabsFromRecentLines(events: RuntimeEvent[], maxLinesPerTab = 120
 
 		const formatted = pushEvent(event, source)
 		if (!formatted) continue
-		const lines = bySession.get(sessionId) ?? []
-		lines.push(formatted)
-		if (lines.length > maxLinesPerTab) lines.splice(0, lines.length - maxLinesPerTab)
-		bySession.set(sessionId, lines)
+		const parts = bySession.get(sessionId) ?? []
+		parts.push(formatted)
+		bySession.set(sessionId, parts)
 	}
 
 	for (const tab of tabs) {
