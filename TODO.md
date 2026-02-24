@@ -38,3 +38,4 @@
 
 - restore session does not replay stuff to screen immediately
 - What should we do when the owner process presses ctrl-z? It should maybe record that user suspended and the clients should show it
+- What should we do when the owner process presses ctrl-z? It should maybe record that user suspended and the clients should show it
