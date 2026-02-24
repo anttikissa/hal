@@ -7,6 +7,8 @@ Sessions are stored per session id under `state/sessions/<sessionId>/`:
 - `session.ason` -- current message history + token totals
 - `session-previous.ason` -- previous full history after `/handoff`
 - `handoff.md` -- handoff summary markdown (consumed on next session load)
+- `info.ason` -- per-session metadata (workingDir, model, title, lastPrompt)
+- `conversation.ason` -- append-only conversation event log (user/assistant/model/fork/title/handoff/reset/cd)
 - `prompts.ason` -- append-only user prompt log
 
 Registry metadata lives in `state/sessions/index.ason`.
@@ -21,6 +23,8 @@ Core logic: `src/session.ts`.
 - `/reset` clears `session.ason` for that session and drops in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
+- `/fork` copies `session.ason` and `conversation.ason` to a new session.
+- Auto-titling: after the first assistant response, runtime generates a short title.
 
 ## Handoff Behavior
 
