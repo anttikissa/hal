@@ -819,10 +819,22 @@ function wordBoundaryRight(buf: string, cursor: number): number {
 
 function suspendForegroundJob(): void {
 	suspended = true
+
+	// Dump visible output before leaving alt screen so it's readable while suspended
+	const c = cols()
+	const oh = Math.max(0, outputBottom() - 1)
+	const visible = getVisibleWrapped(oh)
+
 	disableMouse()
 	showCursor()
 	directWrite('\x1b[?1049l') // leave alt screen
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
+
+	directWrite(`\x1b[${rows()};1H\r\n`)
+	for (const line of visible) {
+		directWrite(truncateAnsi(line, c) + '\r\n')
+	}
+
 	try {
 		process.kill(0, 'SIGSTOP')
 	} catch {
@@ -1285,8 +1297,8 @@ function onSigCont(): void {
 	try {
 		enterRawMode()
 	} catch {
-		// Terminal gone (e.g. kill %), bail out
-		cleanup()
+		// Terminal gone (e.g. kill %), just exit
+		initialized = false
 		process.exit(0)
 	}
 	directWrite('\x1b[?1049h') // re-enter alt screen
