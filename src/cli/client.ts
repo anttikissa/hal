@@ -161,7 +161,7 @@ export function init(src: RuntimeCommand['source'], owner: boolean): void {
 export function promoteToOwner(): void {
 	isOwner = true
 	roleLabel = 'owner'
-	pushLocal('local.status', '[promoted] this process is now the owner')
+	pushLocal('local.status', `[promoted] this process (pid ${process.pid}) is now the owner`)
 	renderBusyStatus()
 }
 
@@ -180,7 +180,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 	roleLabel = isOwner ? 'owner' : 'client'
 
 	const config = loadConfig()
-	pushLocal('local.info', `HAL connected (${roleLabel}).`)
+	pushLocal('local.info', `HAL ${roleLabel} (pid ${process.pid})`)
 	if (config.debug?.recordEverything) {
 		pushLocal(
 			'local.info',

@@ -127,6 +127,7 @@ function findSuspendedHalProcesses(port: number): { pid: number; command: string
 
 if (isOwner) {
 	await resetBusEvents()
+	await emitBootstrap(`[owner] pid ${process.pid}`)
 	if (STATE_DIR.startsWith('/tmp/hal/state/')) await emitBootstrap(`[fresh] state dir: ${STATE_DIR}`)
 	try {
 		webServer = startWebServer(webPort)
@@ -327,6 +328,7 @@ if (testMode) {
 		}
 
 		promoteToOwner()
+		await emitBootstrap(`[promoted] pid ${process.pid} is now the owner`)
 		// Retry web server with exponential backoff — port may still be closing
 		let delay = 350
 		for (let attempt = 0; attempt < 10; attempt++) {
