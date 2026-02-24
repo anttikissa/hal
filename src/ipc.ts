@@ -1,6 +1,6 @@
 // See docs/ipc.md — keep it in sync when changing this file.
 
-import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'fs/promises'
+import { appendFile, mkdir, open, readFile, rename, rm, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState } from './protocol.ts'
 import { IPC_DIR } from './state.ts'
@@ -204,19 +204,12 @@ export async function readRecentEvents(limit: number): Promise<RuntimeEvent[]> {
 	return all.slice(-limit)
 }
 
-export async function commandFileOffset(): Promise<number> {
+export function tailCommands(): AsyncGenerator<RuntimeCommand> {
 	assertInit()
-	return (await stat(commandsFile)).size
+	return parseStream(tailFile(commandsFile))
 }
 
-export async function* tailCommands(fromOffset?: number): AsyncGenerator<RuntimeCommand> {
+export function tailEvents(): AsyncGenerator<RuntimeEvent> {
 	assertInit()
-	const offset = fromOffset ?? (await stat(commandsFile)).size
-	yield* parseStream(tailFile(commandsFile, offset))
-}
-
-export async function* tailEvents(): AsyncGenerator<RuntimeEvent> {
-	assertInit()
-	const offset = (await stat(eventsFile)).size
-	yield* parseStream(tailFile(eventsFile, offset, { dropOnTruncate: true }))
+	return parseStream(tailFile(eventsFile))
 }

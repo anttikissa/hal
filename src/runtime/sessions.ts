@@ -19,7 +19,7 @@ import {
 	type TokenTotals,
 	EMPTY_TOTALS,
 } from '../session.ts'
-import { tailCommands, commandFileOffset } from '../ipc.ts'
+import { tailCommands } from '../ipc.ts'
 import type { SessionInfo } from '../protocol.ts'
 import { HAL_DIR, LAUNCH_CWD, ensureStateDir, sessionDir } from '../state.ts'
 import {
@@ -392,14 +392,14 @@ export async function startRuntime(
 		},
 	)
 
-	// Capture command file offset BEFORE initialize — 'ready' is emitted
-	// during init, so clients may send commands before the tail loop starts.
-	const cmdOffset = await commandFileOffset()
+	// Start tailing before initialize — the stream buffers commands
+	// sent by clients during init (e.g. after 'ready' is emitted).
+	const commands = tailCommands()
 
 	await initialize()
 	watchSystemPromptFiles()
 
-	for await (const command of tailCommands(cmdOffset)) {
+	for await (const command of commands) {
 		await processCommand(command)
 	}
 }

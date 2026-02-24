@@ -11,7 +11,7 @@ describe('tailFile', () => {
 		const file = join(dir, 'events.ason')
 		await writeFile(file, '')
 
-		const stream = tailFile(file, 0, { dropOnTruncate: true })
+		const stream = tailFile(file)
 		const received: number[] = []
 
 		const readerTask = (async () => {
@@ -22,6 +22,9 @@ describe('tailFile', () => {
 				}
 			}
 		})()
+
+		// Give tail -f a moment to start watching
+		await Bun.sleep(100)
 
 		// Burst writes in parallel to stress watcher callbacks.
 		await Promise.all(

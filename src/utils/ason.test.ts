@@ -387,11 +387,17 @@ describe('parseStream', () => {
 
 describe('parseStream e2e', () => {
 	test('tail -f a file, parse objects as they are appended', async () => {
+		const { tailFile } = await import('./tail-file')
+		const { appendFile } = await import('fs/promises')
 		const path = '/tmp/hal-ason-e2e-test.ason'
 		await Bun.write(path, '')
 
-		const tail = Bun.spawn(['tail', '-f', path], { stdout: 'pipe' })
-		const iter = parseStream(tail.stdout as ReadableStream<Uint8Array>)
+		const stream = tailFile(path)
+		const iter = parseStream(stream)
+
+		// Give tail -f a moment to start watching
+		await Bun.sleep(100)
+
 
 		async function nextValue(): Promise<any> {
 			const { done, value } = await iter.next()
@@ -399,26 +405,21 @@ describe('parseStream e2e', () => {
 			return value
 		}
 
-		await Bun.write(path, "{ name: 'alice', score: 100 }\n")
+		await appendFile(path, "{ name: 'alice', score: 100 }\n")
 		expect(await nextValue()).toEqual({ name: 'alice', score: 100 })
 
-		// Append second object
-		const f = Bun.file(path)
-		const prev = await f.text()
-		await Bun.write(path, prev + "{ name: 'bob', score: 200 }\n")
+		await appendFile(path, "{ name: 'bob', score: 200 }\n")
 		expect(await nextValue()).toEqual({ name: 'bob', score: 200 })
 
-		// Append a partial line, then complete it
-		const prev2 = await Bun.file(path).text()
-		await Bun.write(path, prev2 + "{ key: 'val")
+		// Partial line, then complete it
+		await appendFile(path, "{ key: 'val")
 		await Bun.sleep(50)
-		const prev3 = await Bun.file(path).text()
-		await Bun.write(path, prev3 + "ue' }\n{ more: 42 }\n")
+		await appendFile(path, "ue' }\n{ more: 42 }\n")
 		expect(await nextValue()).toEqual({ key: 'value' })
 		expect(await nextValue()).toEqual({ more: 42 })
 
 		// Clean up
-		tail.kill()
+		await iter.return(undefined)
 		;(await Bun.file(path).exists()) && (await Bun.$`rm ${path}`)
 	}, 5000)
 })
