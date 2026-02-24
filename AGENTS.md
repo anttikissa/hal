@@ -26,6 +26,9 @@ Hal is plumbing-visible by default: don't try to hide complexity, file paths, or
 Bad: "[system] system prompt reloaded (file changed)"
 Good: "[system] reloaded SYSTEM.md (file changed)" or "(model changed)"
 
+Bad: "[promoted] this process is now the owner"
+Good: "[promoted] pid 12345 is now the owner"
+
 ## Testing
 
 - After changes, run quick unit tests: `bun run test:quick` (~200ms, src/ only).
