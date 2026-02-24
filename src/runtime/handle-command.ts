@@ -151,7 +151,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 
 	markSessionAsActive(newId)
 	await persistRegistry()
-	await publishLine(`[fork] forked ${sessionId} → ${newId}`, 'meta', sessionId)
+	await publishLine(`[fork] forked ${sessionId} -> ${newId}`, 'meta', sessionId)
 	await emitSessions(true)
 	await emitStatus(true)
 }
