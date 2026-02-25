@@ -406,6 +406,7 @@ function setInputCursor(pos: number, extendSelection = false): void {
 		clearInputTextSelection()
 	}
 	inputCursor = next
+	if (extendSelection) copyInputTextSelectionToClipboard()
 }
 
 function replaceInputRange(start: number, end: number, text: string): void {
@@ -559,6 +560,7 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 		inputSelFocus = inputBuf.length
 		inputCursor = inputBuf.length
 		inputSelActive = false
+		copyInputTextSelectionToClipboard()
 		render()
 		return true
 	}
