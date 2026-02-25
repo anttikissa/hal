@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { linkifyLine, truncateAnsi, wrapAnsi } from './tui-text.ts'
+import { linkifyLine } from './tui-links.ts'
+import { truncateAnsi, wrapAnsi } from './tui-text.ts'
 
 const osc8 = (url: string, text: string) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`
 

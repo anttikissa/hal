@@ -16,8 +16,8 @@
 import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
+import { linkifyLine } from './tui-links.ts'
 import {
-	linkifyLine,
 	parseKeys,
 	readEscapeSequence,
 	truncateAnsi,
