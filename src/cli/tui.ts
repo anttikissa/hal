@@ -56,7 +56,8 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
-const KITTY_KEYBOARD_ENABLE = '\x1b[>1u'
+// Flags: 1=disambiguate, 2=report event types, 8=report all keys as escape codes
+const KITTY_KEYBOARD_ENABLE = '\x1b[>11u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 
 // ── Types ──
@@ -181,9 +182,10 @@ let clickCount = 0
 let lastVisibleOutput: string[] = []
 let lastActivityLine = ''
 let lastStatusLine = ''
-// Link hover
+// Link hover (Cmd+hover)
 let hoverOutputRow = -1
 let hoverUrl: string | null = null
+let superHeld = false
 
 // Bracketed paste
 let bracketedPasteBuffer: string | null = null
@@ -241,8 +243,9 @@ function directWrite(text: string): void {
 	process.stdout.write(text)
 }
 
-function isKittyTerminal(): boolean {
-	return !!process.env.KITTY_PID || process.env.TERM === 'xterm-kitty' || process.env.TERM_PROGRAM === 'kitty'
+function supportsKittyKeyboard(): boolean {
+	const tp = process.env.TERM_PROGRAM
+	return !!process.env.KITTY_PID || tp === 'kitty' || tp === 'ghostty' || tp === 'WezTerm'
 }
 
 function showCursor(): void {
@@ -870,15 +873,17 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		return
 	}
 
-	// Hover detection for link underline
+	// Cmd+hover detection for link underline
 	if (kind === 'move' && !selActive && !inputSelActive) {
-		const pt = pointFromScreenCoords(x, y)
 		let newRow = -1
 		let newUrl: string | null = null
-		if (pt?.surface === 'output') {
-			const line = lastVisibleOutput[pt.row] ?? ''
-			newUrl = urlAtCol(line, pt.col)
-			if (newUrl) newRow = pt.row
+		if (superHeld) {
+			const pt = pointFromScreenCoords(x, y)
+			if (pt?.surface === 'output') {
+				const line = lastVisibleOutput[pt.row] ?? ''
+				newUrl = urlAtCol(line, pt.col)
+				if (newUrl) newRow = pt.row
+			}
 		}
 		if (newRow !== hoverOutputRow || newUrl !== hoverUrl) {
 			hoverOutputRow = newRow
@@ -949,13 +954,13 @@ function clearSelection(renderNow = true): void {
 // ── Mouse/paste terminal modes ──
 
 function enableMouse(): void {
-	if (isKittyTerminal()) directWrite(KITTY_KEYBOARD_ENABLE)
+	if (supportsKittyKeyboard()) directWrite(KITTY_KEYBOARD_ENABLE)
 	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h')
 	directWrite('\x1b[?2004h')
 }
 
 function disableMouse(): void {
-	if (isKittyTerminal()) directWrite(KITTY_KEYBOARD_DISABLE)
+	if (supportsKittyKeyboard()) directWrite(KITTY_KEYBOARD_DISABLE)
 	directWrite('\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l')
 	directWrite('\x1b[?2004l')
 }
@@ -1106,27 +1111,71 @@ function handleBracketedPaste(text: string): void {
 	render()
 }
 
-function normalizeKittyCtrlKey(key: string): string | null {
+const SUPER_L = 57444
+const SUPER_R = 57445
+
+/** Parse CSI u (Kitty keyboard protocol) sequences. Returns the legacy key
+ *  string for press events, or null to suppress the event (release/repeat/modifier-only). */
+function normalizeKittyKey(key: string): string | null {
 	const csiU = key.match(/^\x1b\[(\d+);(\d+)(?::(\d+))?u$/)
 	if (!csiU) return key
 	const codepoint = Number(csiU[1])
 	const rawModifier = Number(csiU[2])
-	const eventType = Number(csiU[3] ?? 1)
+	const eventType = Number(csiU[3] ?? 1) // 1=press, 2=repeat, 3=release
 	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier)) return key
+
+	// Track Super/Cmd key state for Cmd+hover
+	if (codepoint === SUPER_L || codepoint === SUPER_R) {
+		const wasHeld = superHeld
+		superHeld = eventType !== 3
+		if (wasHeld !== superHeld) {
+			// Clear hover when Cmd released, re-check when pressed
+			if (!superHeld && hoverUrl) {
+				hoverOutputRow = -1
+				hoverUrl = null
+				render()
+			}
+		}
+		return null
+	}
+
+	// Only process press events (ignore repeat and release)
 	if (eventType !== 1) return null
+
 	const mods = Math.max(0, rawModifier - 1)
-	if ((mods & 8) !== 0) return key // keep Cmd/Super shortcuts on CSI-u path
-	if ((mods & 4) === 0) return key // only normalize Ctrl combos here
-	if (codepoint < 0 || codepoint > 0x7f) return key
-	const ctrl = String.fromCharCode(codepoint & 0x1f)
-	if ((mods & 2) !== 0) return `\x1b${ctrl}` // Alt+Ctrl
-	return ctrl
+
+	// Super combos: keep as CSI u for handlers that want them
+	if ((mods & 8) !== 0) return key
+
+	// Ctrl combos: normalize to legacy control codes
+	if ((mods & 4) !== 0 && codepoint >= 0 && codepoint <= 0x7f) {
+		const ctrl = String.fromCharCode(codepoint & 0x1f)
+		if ((mods & 2) !== 0) return `\x1b${ctrl}` // Alt+Ctrl
+		if ((mods & 1) !== 0) return ctrl // Shift+Ctrl (shift doesn't change ctrl code)
+		return ctrl
+	}
+
+	// Alt combos: ESC prefix
+	if ((mods & 2) !== 0 && !(mods & 4) && codepoint >= 0x20 && codepoint <= 0x7e) {
+		return `\x1b${String.fromCharCode(codepoint)}`
+	}
+
+	// Plain key or Shift-only: convert codepoint to character
+	if (mods === 0 || mods === 1) {
+		if (codepoint === 13) return '\r'
+		if (codepoint === 9) return '\t'
+		if (codepoint === 27) return '\x1b'
+		if (codepoint === 127) return '\x7f'
+		if (codepoint >= 0x20) return String.fromCodePoint(codepoint)
+	}
+
+	return key
 }
 
 // ── Key handler ──
 
 function handleKey(key: string): void {
-	const normalizedKitty = normalizeKittyCtrlKey(key)
+	const normalizedKitty = normalizeKittyKey(key)
 	if (normalizedKitty === null) return
 	key = normalizedKitty
 	if (inputKeyHandler && inputKeyHandler(key)) return
