@@ -17,6 +17,7 @@ import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
 import {
+	linkifyLine,
 	parseKeys,
 	readEscapeSequence,
 	truncateAnsi,
@@ -294,7 +295,7 @@ function getVisibleWrapped(outputHeight: number): string[] {
 	const allWrapped: string[] = []
 
 	for (let li = outputLines.length - 1; li >= 0; li--) {
-		const wrapped = wrapAnsi(outputLines[li], c)
+		const wrapped = wrapAnsi(linkifyLine(outputLines[li]), c)
 		for (let wi = wrapped.length - 1; wi >= 0; wi--) {
 			allWrapped.push(wrapped[wi])
 		}
