@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { linkifyLine, urlAtCol } from './tui-links.ts'
+import { linkifyLine, underlineOsc8Link, urlAtCol } from './tui-links.ts'
 import { truncateAnsi, wrapAnsi } from './tui-text.ts'
 
 const osc8 = (url: string, text: string) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`
@@ -230,5 +230,38 @@ describe('urlAtCol', () => {
 		const line = 'see \x1b[34mhttps://example.com\x1b[0m here'
 		expect(urlAtCol(line, 4)).toBe('https://example.com')
 		expect(urlAtCol(line, 0)).toBeNull()
+	})
+})
+
+describe('underlineOsc8Link', () => {
+	it('underlines matching OSC 8 link', () => {
+		const line = linkifyLine('visit https://example.com here')
+		const result = underlineOsc8Link(line, 'https://example.com')
+		expect(result).toContain('\x1b[4m')
+		expect(result).toContain('\x1b[24m')
+		// The URL text should be between underline on/off
+		const match = result.match(/\x1b\[4m(.*?)\x1b\[24m/)
+		expect(match).not.toBeNull()
+		expect(match![1]).toContain('https://example.com')
+	})
+
+	it('does not underline non-matching URL', () => {
+		const line = linkifyLine('visit https://example.com here')
+		const result = underlineOsc8Link(line, 'https://other.com')
+		expect(result).not.toContain('\x1b[4m')
+	})
+
+	it('returns line unchanged when no OSC 8 links', () => {
+		const line = 'plain text no links'
+		expect(underlineOsc8Link(line, 'https://example.com')).toBe(line)
+	})
+
+	it('only underlines the matching link among multiple', () => {
+		const line = linkifyLine('see https://a.com and https://b.com end')
+		const result = underlineOsc8Link(line, 'https://b.com')
+		const matches = result.match(/\x1b\[4m/g)
+		expect(matches).toHaveLength(1)
+		const section = result.match(/\x1b\[4m(.*?)\x1b\[24m/)
+		expect(section![1]).toContain('https://b.com')
 	})
 })

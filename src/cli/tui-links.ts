@@ -155,3 +155,33 @@ export function urlAtCol(line: string, col: number): string | null {
 	}
 	return null
 }
+
+/** Add underline to the text inside an OSC 8 link matching targetUrl */
+export function underlineOsc8Link(line: string, targetUrl: string): string {
+	let result = ''
+	let i = 0
+	let inTarget = false
+
+	while (i < line.length) {
+		if (line[i] === '\x1b') {
+			const len = readEscapeSequence(line, i)
+			const seq = line.slice(i, i + len)
+			const uri = parseOsc8Uri(seq)
+			if (uri !== null) {
+				if (inTarget) result += '\x1b[24m'
+				result += seq
+				inTarget = uri === targetUrl
+				if (inTarget) result += '\x1b[4m'
+			} else {
+				result += seq
+			}
+			i += len
+			continue
+		}
+		result += line[i]
+		i++
+	}
+	if (inTarget) result += '\x1b[24m'
+	return result
+}
+

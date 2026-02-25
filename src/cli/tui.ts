@@ -16,7 +16,7 @@
 import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
-import { linkifyLine, urlAtCol } from './tui-links.ts'
+import { linkifyLine, underlineOsc8Link, urlAtCol } from './tui-links.ts'
 import {
 	parseKeys,
 	readEscapeSequence,
@@ -181,6 +181,9 @@ let clickCount = 0
 let lastVisibleOutput: string[] = []
 let lastActivityLine = ''
 let lastStatusLine = ''
+// Link hover
+let hoverOutputRow = -1
+let hoverUrl: string | null = null
 
 // Bracketed paste
 let bracketedPasteBuffer: string | null = null
@@ -317,6 +320,8 @@ function scroll(lines: number): void {
 	const totalVisual = getTotalVisualLines()
 	const maxScroll = Math.max(0, totalVisual - oh)
 	scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset + lines))
+	hoverOutputRow = -1
+	hoverUrl = null
 	render()
 }
 
@@ -487,12 +492,6 @@ function inputLineRangeAt(pos: number): { start: number; end: number } {
 
 function writeClipboardText(text: string): void {
 	if (!text) return
-	try {
-		const b64 = Buffer.from(text, 'utf8').toString('base64')
-		directWrite(`\x1b]52;c;${b64}\x07`)
-	} catch {
-		// Ignore OSC 52 failures
-	}
 	try {
 		const proc = Bun.spawn(['pbcopy'], { stdin: 'pipe' })
 		proc.stdin.write(text)
@@ -871,6 +870,24 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		return
 	}
 
+	// Hover detection for link underline
+	if (kind === 'move' && !selActive && !inputSelActive) {
+		const pt = pointFromScreenCoords(x, y)
+		let newRow = -1
+		let newUrl: string | null = null
+		if (pt?.surface === 'output') {
+			const line = lastVisibleOutput[pt.row] ?? ''
+			newUrl = urlAtCol(line, pt.col)
+			if (newUrl) newRow = pt.row
+		}
+		if (newRow !== hoverOutputRow || newUrl !== hoverUrl) {
+			hoverOutputRow = newRow
+			hoverUrl = newUrl
+			render()
+		}
+		return
+	}
+
 	if (kind === 'release' && selActive) {
 		const pt = pointFromScreenCoords(x, y)
 		if (pt && selAnchor && pt.surface === selAnchor.surface) selCurrent = pt
@@ -933,13 +950,13 @@ function clearSelection(renderNow = true): void {
 
 function enableMouse(): void {
 	if (isKittyTerminal()) directWrite(KITTY_KEYBOARD_ENABLE)
-	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1006h')
+	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h')
 	directWrite('\x1b[?2004h')
 }
 
 function disableMouse(): void {
 	if (isKittyTerminal()) directWrite(KITTY_KEYBOARD_DISABLE)
-	directWrite('\x1b[?1006l\x1b[?1002l\x1b[?1000l')
+	directWrite('\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l')
 	directWrite('\x1b[?2004l')
 }
 
@@ -992,7 +1009,8 @@ function render(): void {
 	for (let row = 2; row <= ob; row++) {
 		chunks.push(`\x1b[${row};1H\x1b[2K`)
 		const idx = row - 2
-		const lineText = visibleOutput[idx] ?? ''
+		let lineText = visibleOutput[idx] ?? ''
+		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
 		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow) {
 			chunks.push(renderLineWithSelection(lineText, idx, selRange))
 		} else {
@@ -1088,9 +1106,29 @@ function handleBracketedPaste(text: string): void {
 	render()
 }
 
+function normalizeKittyCtrlKey(key: string): string | null {
+	const csiU = key.match(/^\x1b\[(\d+);(\d+)(?::(\d+))?u$/)
+	if (!csiU) return key
+	const codepoint = Number(csiU[1])
+	const rawModifier = Number(csiU[2])
+	const eventType = Number(csiU[3] ?? 1)
+	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier)) return key
+	if (eventType !== 1) return null
+	const mods = Math.max(0, rawModifier - 1)
+	if ((mods & 8) !== 0) return key // keep Cmd/Super shortcuts on CSI-u path
+	if ((mods & 4) === 0) return key // only normalize Ctrl combos here
+	if (codepoint < 0 || codepoint > 0x7f) return key
+	const ctrl = String.fromCharCode(codepoint & 0x1f)
+	if ((mods & 2) !== 0) return `\x1b${ctrl}` // Alt+Ctrl
+	return ctrl
+}
+
 // ── Key handler ──
 
 function handleKey(key: string): void {
+	const normalizedKitty = normalizeKittyCtrlKey(key)
+	if (normalizedKitty === null) return
+	key = normalizedKitty
 	if (inputKeyHandler && inputKeyHandler(key)) return
 
 	if (key === CTRL_C) {
@@ -1545,6 +1583,8 @@ const onStdinData = (chunk: Buffer | string) => {
 			else if (baseButton === 65) scrollDelta -= 3
 			else if (baseButton === 0) {
 				handleMouseEvent(x - 1, y - 1, isRelease ? 'release' : isMove ? 'move' : 'press')
+			} else if (baseButton === 3 && isMove) {
+				handleMouseEvent(x - 1, y - 1, 'move')
 			}
 			mouseMatch = mouseRe.exec(text)
 		} while (mouseMatch)
