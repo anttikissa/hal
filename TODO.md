@@ -22,6 +22,7 @@
 - Add a tiny markdown parser for parsing llm output
 - Make the tail file thing use "tail -f" - save a few lines
 - Add mouse movements on input line, selecting - multicursor maybe? - cmd-a, etc. QoL improvements
+- The steering / enqueue system does not really work. Figure out how to make it to work.
 
 ## Old TODO items:
 
