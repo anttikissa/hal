@@ -3,10 +3,18 @@
 ## Scope
 
 `src/cli/tui.ts` is the terminal UI engine used by the CLI client.
+This document is the umbrella mental-model doc for the TUI module family in `src/cli/tui*.ts`.
 
 Core logic: `src/cli/tui.ts`.
 
-Keep this document up to date when changing `src/cli/tui.ts` behavior (rendering, input parsing, key normalization, terminal modes, or public API). Update the doc in the same commit as the code change.
+Keep this document up to date when changing TUI behavior in any of these files:
+
+- `src/cli/tui.ts`
+- `src/cli/tui-text.ts`
+- `src/cli/tui-input-layout.ts`
+- `src/cli/tui-links.ts`
+
+If a change affects rendering, input parsing/tokenization, key normalization, input layout mapping, link hit-testing, terminal modes, or the TUI public API, update this doc in the same commit as the code change.
 
 It is a single stateful module (module-level mutable state, no classes) that owns:
 
@@ -17,6 +25,19 @@ It is a single stateful module (module-level mutable state, no classes) that own
 - terminal mode management (mouse, bracketed paste, Kitty keyboard protocol)
 
 It does **not** own app-level behavior like tabs/sessions/commands. `src/cli/client.ts` wires those in via callbacks (`setInputKeyHandler`, `setTabCompleter`, etc).
+
+## TUI Module Family (Who Owns What)
+
+- `src/cli/tui.ts`
+  - orchestration: state, render loop, key handling, mouse handling, lifecycle
+- `src/cli/tui-text.ts`
+  - ANSI-aware wrapping/truncation and key tokenization (`parseKeys`)
+- `src/cli/tui-input-layout.ts`
+  - wrapped input cursor/row/col mapping
+- `src/cli/tui-links.ts`
+  - OSC-8 parsing, URL linkification, hit-testing, hover underline helpers
+- `src/cli/tui-text.test.ts`
+  - tests for text/wrapping/tokenization helper behavior
 
 ## Layout (Mental Model)
 
