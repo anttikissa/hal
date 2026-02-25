@@ -1121,7 +1121,7 @@ function handleBracketedPaste(text: string): void {
 }
 
 const SUPER_L = 57444
-const SUPER_R = 57445
+const SUPER_R = 57450
 
 type KittyCsiUKey = {
 	codepoint: number
@@ -1149,15 +1149,16 @@ function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
 
 /** Strip Kitty event-type from functional key CSI sequences (arrows, home, end, F-keys, etc).
  *  E.g. \x1b[1;1:2A (repeat arrow-up) → \x1b[A, \x1b[1;3:2D (repeat opt-left) → \x1b[1;3D.
- *  Returns null for release events, or the legacy sequence for press/repeat. */
-function normalizeKittyFunctionalKey(key: string): string | null {
-	if (!key.startsWith('\x1b[')) return null
+ *  Returns undefined if not a Kitty-enhanced sequence, null to suppress (release), or the
+ *  normalized legacy sequence for press/repeat. */
+function normalizeKittyFunctionalKey(key: string): string | null | undefined {
+	if (!key.startsWith('\x1b[')) return undefined
 	// Functional keys end with ~ A-D H F P-S
 	const terminator = key[key.length - 1]
-	if (!/^[~A-DHFP-S]$/.test(terminator)) return null
+	if (!/^[~A-DHFP-S]$/.test(terminator)) return undefined
 	const body = key.slice(2, -1)
 	// Must contain : (event type) in the modifier field to be a Kitty-enhanced sequence
-	if (!body.includes(':')) return null
+	if (!body.includes(':')) return undefined
 	const fields = body.split(';')
 	let eventType = 1
 	// Event type is in the last field after ':'
@@ -1180,7 +1181,10 @@ function normalizeKittyFunctionalKey(key: string): string | null {
  *  string for press events, or null to suppress the event (release/modifier-only). */
 function normalizeKittyKey(key: string): string | null {
 	const csiU = parseKittyCsiUKey(key)
-	if (!csiU) return normalizeKittyFunctionalKey(key) ?? key
+	if (!csiU) {
+		const functional = normalizeKittyFunctionalKey(key)
+		return functional !== undefined ? functional : key
+	}
 	const { codepoint, rawModifier, eventType } = csiU
 
 	// Track Super/Cmd key state for Cmd+hover
@@ -1225,8 +1229,14 @@ function normalizeKittyKey(key: string): string | null {
 		if (codepoint === 9) return '\t'
 		if (codepoint === 27) return '\x1b'
 		if (codepoint === 127) return '\x7f'
+		// Kitty functional keys live in the BMP Private Use Area (U+E000–U+F8FF);
+		// these are modifiers, F13+, numpad, etc. — never printable text
+		if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
 		if (codepoint >= 0x20) return String.fromCodePoint(codepoint)
 	}
+
+	// Suppress Kitty functional keys that fall through with other modifier combos
+	if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
 
 	return key
 }
