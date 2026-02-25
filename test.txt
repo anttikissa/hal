@@ -1,0 +1,4 @@
+]8;;https://example.com\Click me]8;;\
+]8;;https://example.comClick me BEL]8;;
+]8;;https://github.com/ghostty-org/ghostty\Ghostty repo]8;;\
+plain text https://example.com no OSC8

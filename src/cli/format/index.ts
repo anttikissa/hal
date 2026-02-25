@@ -4,7 +4,7 @@ import { getStyle } from './theme.ts'
 
 const RESET = '\x1b[0m'
 
-const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
+const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
 
 export function stripAnsi(text: string): string {
 	return text.replace(ANSI_RE, '')

@@ -421,7 +421,6 @@ function setInputCursor(pos: number, extendSelection = false): void {
 		clearInputTextSelection()
 	}
 	inputCursor = next
-	if (extendSelection) copyInputTextSelectionToClipboard()
 }
 
 function replaceInputRange(start: number, end: number, text: string): void {
@@ -529,6 +528,17 @@ function cutInputTextSelectionToClipboard(): boolean {
 	return true
 }
 
+function cutCurrentInputLineToClipboard(): boolean {
+	const start = inputBuf.lastIndexOf('\n', Math.max(0, inputCursor - 1)) + 1
+	const nextNewline = inputBuf.indexOf('\n', inputCursor)
+	const end = nextNewline === -1 ? inputBuf.length : nextNewline + 1
+	if (start >= end) return false
+	writeClipboardText(inputBuf.slice(start, end))
+	replaceInputRange(start, end, '')
+	return true
+}
+
+
 function pasteClipboardIntoInput(): void {
 	pasteFromClipboard().then((content) => {
 		if (!content) return
@@ -565,7 +575,7 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 		return true
 	}
 	if (ch === 'x') {
-		if (cutInputTextSelectionToClipboard()) render()
+		if (cutInputTextSelectionToClipboard() || cutCurrentInputLineToClipboard()) render()
 		return true
 	}
 	if (ch === 'v') {
@@ -577,7 +587,6 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 		inputSelFocus = inputBuf.length
 		inputCursor = inputBuf.length
 		inputSelActive = false
-		copyInputTextSelectionToClipboard()
 		render()
 		return true
 	}
@@ -916,7 +925,6 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 				return
 			}
 		}
-		copySelectionToClipboard()
 		render()
 		return
 	}
@@ -929,7 +937,6 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 			inputCursor = pos
 		}
 		inputSelActive = false
-		copyInputTextSelectionToClipboard()
 		render()
 	}
 }
@@ -1103,7 +1110,10 @@ function suspendForegroundJob(): void {
 
 function handleBracketedPaste(text: string): void {
 	if (!waitingResolve) return
-	const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+	const clean = text
+		.replace(/\r\n/g, '\n')
+		.replace(/\r/g, '\n')
+		.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
 	if (!clean) return
 	const isMultiline = clean.includes('\n')
 	const insert = isMultiline ? saveMultilinePaste(clean) : clean
@@ -1215,6 +1225,14 @@ function handleKey(key: string): void {
 	}
 	if (key === CTRL_Y) {
 		pasteClipboardIntoInput()
+		return
+	}
+	if (key === '\x1ba' || key === '\x1bA') {
+		inputSelAnchor = 0
+		inputSelFocus = inputBuf.length
+		inputCursor = inputBuf.length
+		inputSelActive = false
+		render()
 		return
 	}
 	if (key === '\x1bw') {
@@ -1671,8 +1689,14 @@ function writeToOutput(text: string): void {
 		selActive = false
 	}
 	const wasAtBottom = scrollOffset === 0
+	const prevTotalVisual = !wasAtBottom ? getTotalVisualLines() : 0
 	appendOutput(text)
-	if (wasAtBottom) scrollOffset = 0 // stay at bottom
+	if (wasAtBottom) {
+		scrollOffset = 0 // stay at bottom
+	} else {
+		const nextTotalVisual = getTotalVisualLines()
+		scrollOffset = Math.max(0, scrollOffset + (nextTotalVisual - prevTotalVisual))
+	}
 	render()
 }
 
