@@ -245,7 +245,7 @@ function directWrite(text: string): void {
 
 function supportsKittyKeyboard(): boolean {
 	const tp = process.env.TERM_PROGRAM
-	return !!process.env.KITTY_PID || tp === 'kitty' || process.env.TERM === 'xterm-kitty'
+	return !!process.env.KITTY_PID || tp === 'kitty' || tp === 'ghostty' || process.env.TERM === 'xterm-kitty'
 }
 
 function showCursor(): void {
