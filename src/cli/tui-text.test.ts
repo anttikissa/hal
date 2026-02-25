@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { linkifyLine, underlineOsc8Link, urlAtCol } from './tui-links.ts'
+import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
 import { truncateAnsi, wrapAnsi } from './tui-text.ts'
 
 const osc8 = (url: string, text: string) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`
@@ -265,3 +265,19 @@ describe('underlineOsc8Link', () => {
 		expect(section![1]).toContain('https://b.com')
 	})
 })
+
+
+describe('normalizeDetectedUrl', () => {
+	it('strips markdown/code wrappers around URL', () => {
+		expect(normalizeDetectedUrl('`http://localhost:9001`')).toBe('http://localhost:9001')
+		expect(normalizeDetectedUrl('**http://localhost:9001**')).toBe('http://localhost:9001')
+		expect(normalizeDetectedUrl('<http://localhost:9001>')).toBe('http://localhost:9001')
+		expect(normalizeDetectedUrl('(http://localhost:9001)')).toBe('http://localhost:9001')
+	})
+
+	it('trims prose punctuation after wrapper cleanup', () => {
+		expect(normalizeDetectedUrl('`http://localhost:9001`.')).toBe('http://localhost:9001')
+		expect(normalizeDetectedUrl('"https://example.com,"')).toBe('https://example.com')
+	})
+})
+

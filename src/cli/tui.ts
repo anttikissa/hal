@@ -16,7 +16,7 @@
 import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
-import { linkifyLine, underlineOsc8Link, urlAtCol } from './tui-links.ts'
+import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
 import {
 	parseKeys,
 	readEscapeSequence,
@@ -56,8 +56,8 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
-// Flags: 1=disambiguate, 2=report events, 8=report all, 16=report associated text
-const KITTY_KEYBOARD_ENABLE = '\x1b[>27u'
+// Flag 1 = disambiguate. Same as nvim. Cmd+hover is handled by Ghostty natively.
+const KITTY_KEYBOARD_ENABLE = '\x1b[>1u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 
 // ── Types ──
@@ -323,8 +323,6 @@ function scroll(lines: number): void {
 	const totalVisual = getTotalVisualLines()
 	const maxScroll = Math.max(0, totalVisual - oh)
 	scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset + lines))
-	hoverOutputRow = -1
-	hoverUrl = null
 	render()
 }
 
@@ -881,25 +879,8 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		return
 	}
 
-	// Cmd+hover detection for link underline
-	if (kind === 'move' && !selActive && !inputSelActive) {
-		let newRow = -1
-		let newUrl: string | null = null
-		if (superHeld) {
-			const pt = pointFromScreenCoords(x, y)
-			if (pt?.surface === 'output') {
-				const line = lastVisibleOutput[pt.row] ?? ''
-				newUrl = urlAtCol(line, pt.col)
-				if (newUrl) newRow = pt.row
-			}
-		}
-		if (newRow !== hoverOutputRow || newUrl !== hoverUrl) {
-			hoverOutputRow = newRow
-			hoverUrl = newUrl
-			render()
-		}
-		return
-	}
+	// Non-selection move: nothing to do (Cmd+hover handled by terminal natively)
+	if (kind === 'move' && !selActive && !inputSelActive) return
 
 	if (kind === 'release' && selActive) {
 		const pt = pointFromScreenCoords(x, y)
@@ -920,7 +901,12 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 				selAnchor = null
 				selCurrent = null
 				render()
-				Bun.spawn(['open', url])
+				const normalized = normalizeDetectedUrl(url)
+				if (!normalized) {
+					render()
+					return
+				}
+				Bun.spawn(['open', normalized])
 				return
 			}
 		}
@@ -1020,8 +1006,7 @@ function render(): void {
 	for (let row = 2; row <= ob; row++) {
 		chunks.push(`\x1b[${row};1H\x1b[2K`)
 		const idx = row - 2
-		let lineText = visibleOutput[idx] ?? ''
-		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
+		const lineText = visibleOutput[idx] ?? ''
 		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow) {
 			chunks.push(renderLineWithSelection(lineText, idx, selRange))
 		} else {
@@ -1145,15 +1130,7 @@ function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
 	}
 	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier) || !Number.isFinite(eventType))
 		return null
-	// Parse associated text (third field): colon-separated codepoints
-	let text: string | undefined
-	if (fields.length >= 3 && fields[2]) {
-		const cps = fields[2].split(':').map(Number)
-		if (cps.length > 0 && cps.every((n) => Number.isFinite(n) && n > 0)) {
-			text = String.fromCodePoint(...cps)
-		}
-	}
-	return { codepoint, rawModifier, eventType, text }
+	return { codepoint, rawModifier, eventType }
 }
 
 /** Strip Kitty event-type from functional key CSI sequences (arrows, home, end, F-keys, etc).

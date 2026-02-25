@@ -55,6 +55,33 @@ function trimUrlEnd(url: string): string {
 	return url.slice(0, end)
 }
 
+export function normalizeDetectedUrl(url: string): string {
+	let value = url.trim()
+	let changed = true
+	while (changed && value.length > 1) {
+		changed = false
+		const first = value[0]
+		const last = value[value.length - 1]
+		if (
+			(first === '`' && last === '`') ||
+			(first === '*' && last === '*') ||
+			(first === '_' && last === '_') ||
+			(first === '~' && last === '~') ||
+			(first === '"' && last === '"') ||
+			(first === "'" && last === "'") ||
+			(first === '<' && last === '>') ||
+			(first === '(' && last === ')') ||
+			(first === '[' && last === ']') ||
+			(first === '{' && last === '}')
+		) {
+			value = value.slice(1, -1).trim()
+			changed = true
+		}
+	}
+	return trimUrlEnd(value)
+}
+
+
 /**
  * Wrap URLs in an ANSI-colored line with OSC 8 hyperlink sequences.
  * Skips lines that already contain OSC 8.
