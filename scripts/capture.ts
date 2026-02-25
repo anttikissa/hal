@@ -464,7 +464,12 @@ async function captureStepUntilDelimiter(
 	queue: RawInputQueue,
 	delimiter: Buffer,
 	timeoutMs: number,
+	opts: { endDelimiterCount?: number; trimDelimiterCount?: number } = {},
 ): Promise<{ status: CaptureStatus; payload: Buffer; durationMs: number }> {
+	const endDelimiterCount = Math.max(1, opts.endDelimiterCount ?? 1)
+	const trimDelimiterCount = Math.max(1, opts.trimDelimiterCount ?? 1)
+	const endDelimiter = Buffer.concat(Array.from({ length: endDelimiterCount }, () => delimiter))
+	const trimBytes = delimiter.length * trimDelimiterCount
 	const startedAt = Date.now()
 	const parts: Buffer[] = []
 	let total = Buffer.alloc(0)
@@ -476,8 +481,8 @@ async function captureStepUntilDelimiter(
 		}
 		parts.push(chunk)
 		total = Buffer.concat(parts)
-		if (bufEndsWith(total, delimiter)) {
-			const payload = total.subarray(0, total.length - delimiter.length)
+		if (bufEndsWith(total, endDelimiter)) {
+			const payload = total.subarray(0, Math.max(0, total.length - trimBytes))
 			return {
 				status: payload.length === 0 ? 'empty' : 'captured',
 				payload,
@@ -572,7 +577,8 @@ function printStepPrompt(index: number, total: number, stepDef: CaptureStep): vo
 	if (stepDef.note) line(`Note: ${stepDef.note}`)
 	line('Action: press the target key/combo, then press Esc as delimiter to end this step.')
 	if (stepDef.escTwice) line('For this step, press the target first, then press Esc again to end.')
-	line('Pressing only Esc records an empty capture (useful when terminal/OS intercepts the target).')
+	if (!stepDef.escTwice)
+		line('Pressing only Esc records an empty capture (useful when terminal/OS intercepts the target).')
 }
 
 function buildMatrix(steps: CaptureStep[], profiles: ProfileRun[]) {
@@ -674,9 +680,12 @@ async function main(): Promise<void> {
 				for (let i = 0; i < steps.length; i++) {
 					const stepDef = steps[i]
 					await drainInput(queue)
-					printStepPrompt(i, steps.length, stepDef)
-					const timeoutMs = stepDef.timeoutMs ?? opts.stepTimeoutMs
-					const result = await captureStepUntilDelimiter(queue, delimiter, timeoutMs)
+						printStepPrompt(i, steps.length, stepDef)
+						const timeoutMs = stepDef.timeoutMs ?? opts.stepTimeoutMs
+						const result = await captureStepUntilDelimiter(queue, delimiter, timeoutMs, {
+							endDelimiterCount: stepDef.escTwice ? 2 : 1,
+							trimDelimiterCount: 1,
+						})
 					const sum = summarizeBytes(result.payload)
 					const record: StepCapture = {
 						stepId: stepDef.id,
