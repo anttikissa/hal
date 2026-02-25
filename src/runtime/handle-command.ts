@@ -1,6 +1,8 @@
 import { resolve, isAbsolute } from 'path'
+import { rename } from 'fs/promises'
 import type { RuntimeCommand } from '../protocol.ts'
-import { clearSession, performHandoff, saveSession, saveSessionInfo, extractLastPrompt, appendConversation } from '../session.ts'
+import { clearSession, performHandoff, saveSession, saveSessionInfo, extractLastPrompt, appendConversation, makeSessionId } from '../session.ts'
+import { sessionDir } from '../state.ts'
 import {
 	loadConfig,
 	resolveModel,
@@ -515,6 +517,15 @@ export async function runClose(sessionId: string): Promise<void> {
 	}
 
 	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+
+	// Rename session dir so the ID is freed (e.g. s-default can be fresh on restart)
+	if (runtime.messages.length > 0) {
+		const archiveId = makeSessionId()
+		try {
+			await rename(sessionDir(sessionId), sessionDir(archiveId))
+		} catch {}
+	}
+
 	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } =
 		await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
