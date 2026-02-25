@@ -601,13 +601,8 @@ async function clearProfile(profile: CaptureProfile): Promise<void> {
 
 function printStepPrompt(index: number, total: number, stepDef: CaptureStep): void {
 	line()
-	line(`[${index + 1}/${total}] ${stepDef.label} (${stepDef.id})`)
-	line(`Category: ${stepDef.category}`)
-	if (stepDef.note) line(`Note: ${stepDef.note}`)
-	line('Action: press the target key/combo, then press Esc as delimiter to end this step.')
-	if (stepDef.escTwice) line('For this step, press the target first, then press Esc again to end.')
-	if (!stepDef.escTwice)
-		line('Pressing only Esc records an empty capture (useful when terminal/OS intercepts the target).')
+	line(`[${index + 1}/${total}] Press ${stepDef.label}, then Esc`)
+	if (stepDef.escTwice) line('Use Esc twice for this step (target Esc, then delimiter Esc).')
 }
 
 function buildMatrix(steps: CaptureStep[], profiles: ProfileRun[]) {
