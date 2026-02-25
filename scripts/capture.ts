@@ -189,6 +189,7 @@ const TUI_STEPS: CaptureStep[] = [
 		timeoutMs: 15_000,
 	}),
 	step('cmd_x', 'Cmd-X', 'cmd', { note: 'macOS: terminal/OS may intercept cut.' }),
+	step('cmd_z', 'Cmd-Z', 'cmd', { note: 'macOS: terminal/OS may intercept undo.' }),
 ]
 
 const FULL_STEPS: CaptureStep[] = [
@@ -445,15 +446,6 @@ function tokenizeCapture(text: string): CaptureToken[] {
 	}))
 }
 
-function bufEndsWith(buf: Buffer, suffix: Buffer): boolean {
-	if (suffix.length === 0) return false
-	if (buf.length < suffix.length) return false
-	for (let i = 0; i < suffix.length; i++) {
-		if (buf[buf.length - suffix.length + i] !== suffix[i]) return false
-	}
-	return true
-}
-
 async function drainInput(queue: RawInputQueue, idleMs = 80, maxDrains = 20): Promise<void> {
 	for (let i = 0; i < maxDrains; i++) {
 		const chunk = await queue.nextChunk(idleMs)
@@ -491,12 +483,9 @@ async function captureStepUntilDelimiter(
 	queue: RawInputQueue,
 	delimiter: Buffer,
 	timeoutMs: number,
-	opts: { endDelimiterCount?: number; trimDelimiterCount?: number } = {},
+	opts: { endDelimiterCount?: number } = {},
 ): Promise<{ status: CaptureStatus; payload: Buffer; durationMs: number }> {
 	const endDelimiterCount = Math.max(1, opts.endDelimiterCount ?? 1)
-	const trimDelimiterCount = Math.max(1, opts.trimDelimiterCount ?? 1)
-	const endDelimiter = Buffer.concat(Array.from({ length: endDelimiterCount }, () => delimiter))
-	const trimBytes = delimiter.length * trimDelimiterCount
 	const startedAt = Date.now()
 	const parts: Buffer[] = []
 	let total = Buffer.alloc(0)
@@ -508,8 +497,21 @@ async function captureStepUntilDelimiter(
 		}
 		parts.push(chunk)
 		total = Buffer.concat(parts)
-		if (bufEndsWith(total, endDelimiter)) {
-			const payload = total.subarray(0, Math.max(0, total.length - trimBytes))
+		let occ = 0
+		let searchFrom = 0
+		let endDelimStart = -1
+		while (true) {
+			const idx = total.indexOf(delimiter, searchFrom)
+			if (idx < 0) break
+			occ++
+			if (occ === endDelimiterCount) {
+				endDelimStart = idx
+				break
+			}
+			searchFrom = idx + delimiter.length
+		}
+		if (endDelimStart >= 0) {
+			const payload = total.subarray(0, endDelimStart)
 			return {
 				status: payload.length === 0 ? 'empty' : 'captured',
 				payload,
@@ -754,7 +756,6 @@ async function main(): Promise<void> {
 						const timeoutMs = stepDef.timeoutMs ?? opts.stepTimeoutMs
 						const result = await captureStepUntilDelimiter(queue, delimiter, timeoutMs, {
 							endDelimiterCount: stepDef.escTwice ? 2 : 1,
-							trimDelimiterCount: 1,
 						})
 					const sum = summarizeBytes(result.payload)
 					const record: StepCapture = {
