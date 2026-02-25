@@ -1147,11 +1147,40 @@ function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
 	return { codepoint, rawModifier, eventType }
 }
 
+/** Strip Kitty event-type from functional key CSI sequences (arrows, home, end, F-keys, etc).
+ *  E.g. \x1b[1;1:2A (repeat arrow-up) → \x1b[A, \x1b[1;3:2D (repeat opt-left) → \x1b[1;3D.
+ *  Returns null for release events, or the legacy sequence for press/repeat. */
+function normalizeKittyFunctionalKey(key: string): string | null {
+	if (!key.startsWith('\x1b[')) return null
+	// Functional keys end with ~ A-D H F P-S
+	const terminator = key[key.length - 1]
+	if (!/^[~A-DHFP-S]$/.test(terminator)) return null
+	const body = key.slice(2, -1)
+	// Must contain : (event type) in the modifier field to be a Kitty-enhanced sequence
+	if (!body.includes(':')) return null
+	const fields = body.split(';')
+	let eventType = 1
+	// Event type is in the last field after ':'
+	const lastField = fields[fields.length - 1]
+	const colonIdx = lastField.indexOf(':')
+	if (colonIdx !== -1) {
+		eventType = Number(lastField.slice(colonIdx + 1))
+		fields[fields.length - 1] = lastField.slice(0, colonIdx)
+	}
+	if (eventType === 3) return null // release
+	// Reconstruct legacy sequence, stripping default modifiers
+	// Remove trailing fields that are just "1" (default modifier)
+	while (fields.length > 1 && fields[fields.length - 1] === '1') fields.pop()
+	if (fields.length === 1 && fields[0] === '1' && terminator !== '~') fields[0] = ''
+	const newBody = fields.join(';')
+	return `\x1b[${newBody}${terminator}`
+}
+
 /** Parse CSI u (Kitty keyboard protocol) sequences. Returns the legacy key
- *  string for press events, or null to suppress the event (release/repeat/modifier-only). */
+ *  string for press events, or null to suppress the event (release/modifier-only). */
 function normalizeKittyKey(key: string): string | null {
 	const csiU = parseKittyCsiUKey(key)
-	if (!csiU) return key
+	if (!csiU) return normalizeKittyFunctionalKey(key) ?? key
 	const { codepoint, rawModifier, eventType } = csiU
 
 	// Track Super/Cmd key state for Cmd+hover
