@@ -56,8 +56,8 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
-// Flag 1 = disambiguate (special keys use CSI u; shifted text stays plain)
-const KITTY_KEYBOARD_ENABLE = '\x1b[>1u'
+// Flags: 1=disambiguate, 2=report events, 8=report all, 16=report associated text
+const KITTY_KEYBOARD_ENABLE = '\x1b[>27u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 
 // ── Types ──
@@ -1127,6 +1127,7 @@ type KittyCsiUKey = {
 	codepoint: number
 	rawModifier: number
 	eventType: number
+	text?: string // associated text from flag 16
 }
 
 function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
@@ -1144,7 +1145,15 @@ function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
 	}
 	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier) || !Number.isFinite(eventType))
 		return null
-	return { codepoint, rawModifier, eventType }
+	// Parse associated text (third field): colon-separated codepoints
+	let text: string | undefined
+	if (fields.length >= 3 && fields[2]) {
+		const cps = fields[2].split(':').map(Number)
+		if (cps.length > 0 && cps.every((n) => Number.isFinite(n) && n > 0)) {
+			text = String.fromCodePoint(...cps)
+		}
+	}
+	return { codepoint, rawModifier, eventType, text }
 }
 
 /** Strip Kitty event-type from functional key CSI sequences (arrows, home, end, F-keys, etc).
@@ -1185,7 +1194,7 @@ function normalizeKittyKey(key: string): string | null {
 		const functional = normalizeKittyFunctionalKey(key)
 		return functional !== undefined ? functional : key
 	}
-	const { codepoint, rawModifier, eventType } = csiU
+	const { codepoint, rawModifier, eventType, text } = csiU
 
 	// Track Super/Cmd key state for Cmd+hover
 	if (codepoint === SUPER_L || codepoint === SUPER_R) {
@@ -1241,8 +1250,10 @@ function normalizeKittyKey(key: string): string | null {
 	// Kitty functional keys (BMP Private Use Area U+E000–U+F8FF): suppress
 	if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
 
-	// Plain or Shift-only printable: convert codepoint to character
-	if ((mods === 0 || mods === 1) && codepoint >= 0x20) return String.fromCodePoint(codepoint)
+	// Plain or Shift-only printable: prefer associated text (accounts for shift/layout)
+	if ((mods === 0 || mods === 1) && (text || codepoint >= 0x20)) {
+		return text ?? String.fromCodePoint(codepoint)
+	}
 
 	return key
 }
