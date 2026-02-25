@@ -4,6 +4,10 @@
 
 `src/cli/tui.ts` is the terminal UI engine used by the CLI client.
 
+Core logic: `src/cli/tui.ts`.
+
+Keep this document up to date when changing `src/cli/tui.ts` behavior (rendering, input parsing, key normalization, terminal modes, or public API). Update the doc in the same commit as the code change.
+
 It is a single stateful module (module-level mutable state, no classes) that owns:
 
 - alternate-screen rendering
