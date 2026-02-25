@@ -1258,6 +1258,17 @@ function normalizeKittyKey(key: string): string | null {
 	return key
 }
 
+export const _testTuiKeys = {
+	parseKittyCsiUKey,
+	normalizeKittyFunctionalKey,
+	normalizeKittyKey,
+	resetState(): void {
+		hoverOutputRow = -1
+		hoverUrl = null
+		superHeld = false
+	},
+}
+
 // ── Key handler ──
 
 function handleKey(key: string): void {
