@@ -1169,8 +1169,8 @@ function normalizeKittyKey(key: string): string | null {
 		return null
 	}
 
-	// Only process press events (ignore repeat and release)
-	if (eventType !== 1) return null
+	// Only process press and repeat events (ignore release)
+	if (eventType === 3) return null
 
 	const mods = Math.max(0, rawModifier - 1)
 
