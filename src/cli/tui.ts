@@ -55,6 +55,8 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
+const KITTY_KEYBOARD_ENABLE = '\x1b[>1u'
+const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 
 // ── Types ──
 
@@ -233,6 +235,10 @@ function promptFirstRow(): number {
 
 function directWrite(text: string): void {
 	process.stdout.write(text)
+}
+
+function isKittyTerminal(): boolean {
+	return !!process.env.KITTY_PID || process.env.TERM === 'xterm-kitty' || process.env.TERM_PROGRAM === 'kitty'
 }
 
 function showCursor(): void {
@@ -481,6 +487,12 @@ function inputLineRangeAt(pos: number): { start: number; end: number } {
 function writeClipboardText(text: string): void {
 	if (!text) return
 	try {
+		const b64 = Buffer.from(text, 'utf8').toString('base64')
+		directWrite(`\x1b]52;c;${b64}\x07`)
+	} catch {
+		// Ignore OSC 52 failures
+	}
+	try {
 		const proc = Bun.spawn(['pbcopy'], { stdin: 'pipe' })
 		proc.stdin.write(text)
 		proc.stdin.end()
@@ -538,7 +550,9 @@ function setInputTextWithUndo(text: string, cursor = text.length): void {
 
 function handleInputClipboardShortcutKey(key: string): boolean {
 	const modOther = key.match(/^\x1b\[27;(\d+);(\d+)~$/)
-	const csiU = key.match(/^\x1b\[(\d+);(\d+)u$/)
+	const csiU = key.match(/^\x1b\[(\d+);(\d+)(?::(\d+))?u$/)
+	const eventType = Number(csiU?.[3] ?? 1)
+	if (csiU && Number.isFinite(eventType) && eventType !== 1) return true
 	const modifier = Number(modOther?.[1] ?? csiU?.[2] ?? NaN)
 	const codepoint = Number(modOther?.[2] ?? csiU?.[1] ?? NaN)
 	if (!Number.isFinite(modifier) || !Number.isFinite(codepoint) || modifier < 9) return false
@@ -898,11 +912,13 @@ function clearSelection(renderNow = true): void {
 // ── Mouse/paste terminal modes ──
 
 function enableMouse(): void {
+	if (isKittyTerminal()) directWrite(KITTY_KEYBOARD_ENABLE)
 	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1006h')
 	directWrite('\x1b[?2004h')
 }
 
 function disableMouse(): void {
+	if (isKittyTerminal()) directWrite(KITTY_KEYBOARD_DISABLE)
 	directWrite('\x1b[?1006l\x1b[?1002l\x1b[?1000l')
 	directWrite('\x1b[?2004l')
 }
