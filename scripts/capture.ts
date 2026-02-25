@@ -8,6 +8,7 @@ const PASTE_START = '\x1b[200~'
 const PASTE_END = '\x1b[201~'
 const ESC = '\x1b'
 const KITTY_DISABLE = '\x1b[<u'
+const CMD_V_KNOWN_CLIPBOARD_TEXT = 'hal-capture-cmd-v'
 
 type CapturePreset = 'smoke' | 'tui' | 'full'
 type CaptureStatus = 'captured' | 'empty' | 'timeout'
@@ -184,8 +185,12 @@ const TUI_STEPS: CaptureStep[] = [
 	step('ctrl_z', 'Ctrl-Z', 'ctrl'),
 	step('alt_1', 'Option/Alt-1', 'alt'),
 	step('cmd_a', 'Cmd-A', 'cmd', { note: 'macOS: may be intercepted or sent only in Kitty mode.' }),
-	step('cmd_v', 'Cmd-V', 'cmd', {
-		note: 'macOS: may paste clipboard content instead of sending key. Empty or pasted text are both useful.',
+	step('cmd_v_empty', 'Cmd-V (empty clipboard)', 'cmd', {
+		note: 'Script clears clipboard before this step. Empty capture or pasted-empty result are both useful.',
+		timeoutMs: 15_000,
+	}),
+	step('cmd_v_known', 'Cmd-V (known clipboard)', 'cmd', {
+		note: `Script sets clipboard to "${CMD_V_KNOWN_CLIPBOARD_TEXT}" before this step.`,
 		timeoutMs: 15_000,
 	}),
 	step('cmd_x', 'Cmd-X', 'cmd', { note: 'macOS: terminal/OS may intercept cut.' }),
@@ -599,6 +604,27 @@ async function clearProfile(profile: CaptureProfile): Promise<void> {
 	await Bun.sleep(25)
 }
 
+async function writeClipboardForCapture(text: string): Promise<void> {
+	if (process.platform !== 'darwin') return
+	try {
+		const proc = Bun.spawn(['pbcopy'], { stdin: 'pipe', stdout: 'ignore', stderr: 'ignore' })
+		if (text) proc.stdin.write(text)
+		proc.stdin.end()
+		await proc.exited
+	} catch {}
+}
+
+async function prepareStepCapture(stepDef: CaptureStep): Promise<void> {
+	if (stepDef.id === 'cmd_v_empty') {
+		await writeClipboardForCapture('')
+		return
+	}
+	if (stepDef.id === 'cmd_v_known') {
+		await writeClipboardForCapture(CMD_V_KNOWN_CLIPBOARD_TEXT)
+		return
+	}
+}
+
 function printStepPrompt(index: number, total: number, stepDef: CaptureStep): void {
 	line()
 	line(`[${index + 1}/${total}] Press ${stepDef.label}, then Esc`)
@@ -722,13 +748,12 @@ async function main(): Promise<void> {
 	})
 	try {
 		line('HAL TUI key capture')
-			line(`Preset: ${opts.preset} (${steps.length} steps)`)
-			line(`Profiles: ${profiles.map((p) => p.id).join(', ')}`)
-			line(`Output: ${outPath}`)
-			line(`Terminal label: ${terminalLabel}`)
-			if (selected) line(`Step mode: only step ${selected.index + 1} (${selected.step.id})`)
-			line()
-			line('Tip: clear clipboard before Cmd-V steps if you want shorter captures.')
+		line(`Preset: ${opts.preset} (${steps.length} steps)`)
+		line(`Profiles: ${profiles.map((p) => p.id).join(', ')}`)
+		line(`Output: ${outPath}`)
+		line(`Terminal label: ${terminalLabel}`)
+		if (selected) line(`Step mode: only step ${selected.index + 1} (${selected.step.id})`)
+		line()
 		line('The script is now entering raw mode.')
 		stdin.resume()
 		if (stdin.isTTY) {
@@ -746,6 +771,7 @@ async function main(): Promise<void> {
 			if (delimiter) {
 				for (let i = 0; i < steps.length; i++) {
 					const stepDef = steps[i]
+					await prepareStepCapture(stepDef)
 					await drainInput(queue)
 						printStepPrompt(i, steps.length, stepDef)
 						const timeoutMs = stepDef.timeoutMs ?? opts.stepTimeoutMs
