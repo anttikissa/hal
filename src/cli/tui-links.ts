@@ -111,3 +111,47 @@ export function linkifyLine(line: string): string {
 	result += line.slice(lastOrigEnd)
 	return result
 }
+
+/** Find the URL at a given visible column in an ANSI-colored line, or null */
+export function urlAtCol(line: string, col: number): string | null {
+	if (!line) return null
+	// First check for OSC 8 hyperlinks already in the line
+	let i = 0
+	let visCol = 0
+	let currentUri = ''
+	while (i < line.length) {
+		if (line[i] === '\x1b') {
+			const len = readEscapeSequence(line, i)
+			const seq = line.slice(i, i + len)
+			const uri = parseOsc8Uri(seq)
+			if (uri !== null) currentUri = uri
+			i += len
+			continue
+		}
+		if (visCol === col && currentUri) return currentUri
+		visCol++
+		i++
+	}
+
+	// Fall back to regex URL detection on plain text
+	const plainChars: string[] = []
+	i = 0
+	while (i < line.length) {
+		if (line[i] === '\x1b') {
+			i += readEscapeSequence(line, i)
+			continue
+		}
+		plainChars.push(line[i])
+		i++
+	}
+	const plainText = plainChars.join('')
+	URL_RE.lastIndex = 0
+	let match
+	while ((match = URL_RE.exec(plainText)) !== null) {
+		const trimmed = trimUrlEnd(match[0])
+		const start = match.index
+		const end = start + trimmed.length
+		if (col >= start && col < end) return trimmed
+	}
+	return null
+}

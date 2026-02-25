@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { linkifyLine } from './tui-links.ts'
+import { linkifyLine, urlAtCol } from './tui-links.ts'
 import { truncateAnsi, wrapAnsi } from './tui-text.ts'
 
 const osc8 = (url: string, text: string) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`
@@ -198,5 +198,37 @@ describe('truncateAnsi with OSC 8', () => {
 		// Count OSC 8 close sequences — should be exactly 1 (from the original)
 		const closes = result.split('\x1b]8;;\x1b\\').length - 1
 		expect(closes).toBe(1)
+	})
+})
+
+describe('urlAtCol', () => {
+	it('finds URL at column in plain text', () => {
+		const line = 'visit https://example.com here'
+		expect(urlAtCol(line, 6)).toBe('https://example.com')
+		expect(urlAtCol(line, 15)).toBe('https://example.com')
+		expect(urlAtCol(line, 24)).toBe('https://example.com')
+	})
+
+	it('returns null outside URL', () => {
+		const line = 'visit https://example.com here'
+		expect(urlAtCol(line, 0)).toBeNull()
+		expect(urlAtCol(line, 5)).toBeNull()
+		expect(urlAtCol(line, 25)).toBeNull()
+	})
+
+	it('finds URL via OSC 8 in linkified line', () => {
+		const line = linkifyLine('visit https://example.com here')
+		expect(urlAtCol(line, 6)).toBe('https://example.com')
+		expect(urlAtCol(line, 15)).toBe('https://example.com')
+	})
+
+	it('returns null for empty line', () => {
+		expect(urlAtCol('', 0)).toBeNull()
+	})
+
+	it('finds URL with ANSI around it', () => {
+		const line = 'see \x1b[34mhttps://example.com\x1b[0m here'
+		expect(urlAtCol(line, 4)).toBe('https://example.com')
+		expect(urlAtCol(line, 0)).toBeNull()
 	})
 })

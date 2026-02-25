@@ -16,7 +16,7 @@
 import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
-import { linkifyLine } from './tui-links.ts'
+import { linkifyLine, urlAtCol } from './tui-links.ts'
 import {
 	parseKeys,
 	readEscapeSequence,
@@ -875,6 +875,25 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		const pt = pointFromScreenCoords(x, y)
 		if (pt && selAnchor && pt.surface === selAnchor.surface) selCurrent = pt
 		selActive = false
+		// Single click (no drag) on output — check for URL
+		if (
+			clickCount === 1 &&
+			pt &&
+			selAnchor &&
+			pt.surface === 'output' &&
+			pt.row === selAnchor.row &&
+			pt.col === selAnchor.col
+		) {
+			const line = lastVisibleOutput[pt.row] ?? ''
+			const url = urlAtCol(line, pt.col)
+			if (url) {
+				selAnchor = null
+				selCurrent = null
+				render()
+				Bun.spawn(['open', url])
+				return
+			}
+		}
 		copySelectionToClipboard()
 		render()
 		return
