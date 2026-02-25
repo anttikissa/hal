@@ -1133,11 +1133,15 @@ function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
 	if (!key.startsWith('\x1b[') || !key.endsWith('u')) return null
 	const body = key.slice(2, -1)
 	const fields = body.split(';')
-	if (fields.length < 2) return null
+	if (fields.length < 1) return null
 	const codepoint = Number((fields[0] || '').split(':', 1)[0])
-	const [rawModifierStr, eventTypeStr] = (fields[1] || '').split(':', 2)
-	const rawModifier = Number(rawModifierStr)
-	const eventType = Number(eventTypeStr ?? '1') // 1=press, 2=repeat, 3=release
+	let rawModifier = 1
+	let eventType = 1 // 1=press, 2=repeat, 3=release
+	if (fields.length >= 2) {
+		const [rawModifierStr, eventTypeStr] = (fields[1] ?? '').split(':', 2)
+		if (rawModifierStr) rawModifier = Number(rawModifierStr)
+		if (eventTypeStr) eventType = Number(eventTypeStr)
+	}
 	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier) || !Number.isFinite(eventType))
 		return null
 	return { codepoint, rawModifier, eventType }
