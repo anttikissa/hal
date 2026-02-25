@@ -19,6 +19,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - `/bug <description>` — captures terminal snapshot + debug log. You can paste images and text. Use it to self-debug UI issues.
 - Keep code MINIMAL. Don't take measures to maintain backwards compatibility unless explicitly required.
 - For one-off/throwaway helper scripts (debugging, calibration, capture) and rare new-test scaffolding/generators, prefer the shortest thing that works. Start with a zero-argument happy path and sensible defaults (infer from env/project context when possible). Don't front-load flags/presets/options unless explicitly requested, and don't add lots of optional flags the user won't use.
+- For interactive key-capture/test prompts, assume a laptop keyboard by default (no dedicated Home/End/PageUp/PageDown keys) unless the user says otherwise. Start with a minimal key set and add more only as needed.
 - Prefer one working mechanism over layered fallbacks/proof-of-concept additions; only add another path when the first is clearly insufficient.
 - Don't reimplement what the system already provides. For example, `open('wx')` is an atomic exclusive-create — no need to build a `mkdir`-based mutex on top of it.
 - Doing a big task? 1. Read files and thing. 2. Plan - write it to file (docs/plans). 3. Implement.

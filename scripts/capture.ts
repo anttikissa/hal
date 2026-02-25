@@ -147,10 +147,6 @@ const TUI_STEPS: CaptureStep[] = [
 	step('a', 'a', 'basic'),
 	step('A', 'Shift-A', 'basic'),
 	step('space', 'Space', 'basic'),
-	step('slash', '/', 'basic'),
-	step('single_quote', 'Single quote (\')', 'basic'),
-	step('double_quote', 'Double quote (\")', 'basic'),
-	step('backtick', 'Backtick (`)', 'basic'),
 	step('enter', 'Enter', 'editing'),
 	step('shift_enter', 'Shift-Enter', 'editing'),
 	step('alt_enter', 'Option/Alt-Enter', 'editing'),
@@ -160,7 +156,6 @@ const TUI_STEPS: CaptureStep[] = [
 	step('delete', 'Delete (Forward Delete)', 'editing', {
 		note: 'On macOS laptop keyboards this is usually Fn-Delete.',
 	}),
-	step('option_backspace', 'Option/Alt-Backspace', 'editing'),
 	step('left', 'Left Arrow', 'nav'),
 	step('right', 'Right Arrow', 'nav'),
 	step('up', 'Up Arrow', 'nav'),
@@ -171,16 +166,6 @@ const TUI_STEPS: CaptureStep[] = [
 	step('shift_down', 'Shift-Down Arrow', 'nav'),
 	step('alt_left', 'Option/Alt-Left Arrow', 'nav'),
 	step('alt_right', 'Option/Alt-Right Arrow', 'nav'),
-	step('shift_alt_left', 'Shift-Option/Alt-Left Arrow', 'nav'),
-	step('shift_alt_right', 'Shift-Option/Alt-Right Arrow', 'nav'),
-	step('shift_alt_up', 'Shift-Option/Alt-Up Arrow', 'nav'),
-	step('shift_alt_down', 'Shift-Option/Alt-Down Arrow', 'nav'),
-	step('home', 'Home', 'nav'),
-	step('end', 'End', 'nav'),
-	step('shift_home', 'Shift-Home', 'nav'),
-	step('shift_end', 'Shift-End', 'nav'),
-	step('page_up', 'Page Up', 'nav'),
-	step('page_down', 'Page Down', 'nav'),
 	step('ctrl_a', 'Ctrl-A', 'ctrl'),
 	step('ctrl_c', 'Ctrl-C', 'ctrl'),
 	step('ctrl_d', 'Ctrl-D', 'ctrl'),
@@ -197,30 +182,22 @@ const TUI_STEPS: CaptureStep[] = [
 	step('ctrl_y', 'Ctrl-Y', 'ctrl'),
 	step('ctrl_z', 'Ctrl-Z', 'ctrl'),
 	step('alt_1', 'Option/Alt-1', 'alt'),
-	step('alt_2', 'Option/Alt-2', 'alt'),
-	step('alt_3', 'Option/Alt-3', 'alt'),
-	step('ctrl_1', 'Ctrl-1', 'ctrl'),
-	step('ctrl_2', 'Ctrl-2', 'ctrl'),
-	step('ctrl_3', 'Ctrl-3', 'ctrl'),
 	step('cmd_a', 'Cmd-A', 'cmd', { note: 'macOS: may be intercepted or sent only in Kitty mode.' }),
-	step('cmd_c', 'Cmd-C', 'cmd', { note: 'macOS: terminal/OS may intercept copy.' }),
 	step('cmd_v', 'Cmd-V', 'cmd', {
 		note: 'macOS: may paste clipboard content instead of sending key. Empty or pasted text are both useful.',
 		timeoutMs: 15_000,
 	}),
 	step('cmd_x', 'Cmd-X', 'cmd', { note: 'macOS: terminal/OS may intercept cut.' }),
-	step('cmd_z', 'Cmd-Z', 'cmd', { note: 'macOS: terminal/OS may intercept undo.' }),
-	step('cmd_left', 'Cmd-Left Arrow', 'cmd'),
-	step('cmd_right', 'Cmd-Right Arrow', 'cmd'),
-	step('cmd_shift_left', 'Cmd-Shift-Left Arrow', 'cmd'),
-	step('cmd_shift_right', 'Cmd-Shift-Right Arrow', 'cmd'),
-	step('cmd_esc', 'Cmd-Esc', 'cmd', { note: 'Likely intercepted by OS/App switchers. Empty capture expected.' }),
 ]
 
 const FULL_STEPS: CaptureStep[] = [
 	...TUI_STEPS,
 	...rangeSteps('alt', 'Option/Alt-', 'alt', 4, 9),
 	...rangeSteps('ctrl', 'Ctrl-', 'ctrl', 4, 9),
+	step('home', 'Home', 'nav'),
+	step('end', 'End', 'nav'),
+	step('page_up', 'Page Up', 'nav'),
+	step('page_down', 'Page Down', 'nav'),
 	step('alt_up', 'Option/Alt-Up Arrow', 'nav'),
 	step('alt_down', 'Option/Alt-Down Arrow', 'nav'),
 	step('cmd_up', 'Cmd-Up Arrow', 'cmd'),
@@ -298,7 +275,7 @@ class RawInputQueue {
 function parseArgs(argv: string[]): CliOptions {
 	const opts: CliOptions = {
 		preset: 'tui',
-		profiles: ['raw', 'hal11', 'kitty31'],
+		profiles: ['hal11'],
 		stepTimeoutMs: 8_000,
 		calibrationTimeoutMs: 15_000,
 		idleMs: 600,
@@ -349,7 +326,7 @@ Interactive terminal key capture for TUI keyboard fixtures.
 
 Options:
 	--preset <smoke|tui|full>         Step preset (default: tui)
-	--profiles <ids>                  Comma list: raw,hal11,kitty31 (default: raw,hal11,kitty31)
+	--profiles <ids>                  Comma list: raw,hal11,kitty31 (default: hal11)
 	--terminal <label>                Terminal label for output filename (default: TERM_PROGRAM or TERM)
 	--out <path>                      Output ASON path (default: src/tests/fixtures/keys/keys-<terminal>.ason)
 	--step-timeout-ms <n>             Per-step timeout waiting for delimiter Esc (default: 8000)
