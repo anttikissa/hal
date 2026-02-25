@@ -563,11 +563,10 @@ function setInputTextWithUndo(text: string, cursor = text.length): void {
 
 function handleInputClipboardShortcutKey(key: string): boolean {
 	const modOther = key.match(/^\x1b\[27;(\d+);(\d+)~$/)
-	const csiU = key.match(/^\x1b\[(\d+);(\d+)(?::(\d+))?u$/)
-	const eventType = Number(csiU?.[3] ?? 1)
-	if (csiU && Number.isFinite(eventType) && eventType !== 1) return true
-	const modifier = Number(modOther?.[1] ?? csiU?.[2] ?? NaN)
-	const codepoint = Number(modOther?.[2] ?? csiU?.[1] ?? NaN)
+	const csiU = parseKittyCsiUKey(key)
+	if (csiU && csiU.eventType !== 1) return true
+	const modifier = Number(modOther?.[1] ?? csiU?.rawModifier ?? NaN)
+	const codepoint = Number(modOther?.[2] ?? csiU?.codepoint ?? NaN)
 	if (!Number.isFinite(modifier) || !Number.isFinite(codepoint) || modifier < 9) return false
 	const ch = String.fromCharCode(codepoint).toLowerCase()
 	if (ch === 'c') {
@@ -1124,15 +1123,32 @@ function handleBracketedPaste(text: string): void {
 const SUPER_L = 57444
 const SUPER_R = 57445
 
+type KittyCsiUKey = {
+	codepoint: number
+	rawModifier: number
+	eventType: number
+}
+
+function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
+	if (!key.startsWith('\x1b[') || !key.endsWith('u')) return null
+	const body = key.slice(2, -1)
+	const fields = body.split(';')
+	if (fields.length < 2) return null
+	const codepoint = Number((fields[0] || '').split(':', 1)[0])
+	const [rawModifierStr, eventTypeStr] = (fields[1] || '').split(':', 2)
+	const rawModifier = Number(rawModifierStr)
+	const eventType = Number(eventTypeStr ?? '1') // 1=press, 2=repeat, 3=release
+	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier) || !Number.isFinite(eventType))
+		return null
+	return { codepoint, rawModifier, eventType }
+}
+
 /** Parse CSI u (Kitty keyboard protocol) sequences. Returns the legacy key
  *  string for press events, or null to suppress the event (release/repeat/modifier-only). */
 function normalizeKittyKey(key: string): string | null {
-	const csiU = key.match(/^\x1b\[(\d+);(\d+)(?::(\d+))?u$/)
+	const csiU = parseKittyCsiUKey(key)
 	if (!csiU) return key
-	const codepoint = Number(csiU[1])
-	const rawModifier = Number(csiU[2])
-	const eventType = Number(csiU[3] ?? 1) // 1=press, 2=repeat, 3=release
-	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier)) return key
+	const { codepoint, rawModifier, eventType } = csiU
 
 	// Track Super/Cmd key state for Cmd+hover
 	if (codepoint === SUPER_L || codepoint === SUPER_R) {
