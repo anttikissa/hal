@@ -56,8 +56,8 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
-// Flags: 1=disambiguate, 2=report event types, 8=report all keys as escape codes
-const KITTY_KEYBOARD_ENABLE = '\x1b[>11u'
+// Flag 1 = disambiguate (special keys use CSI u; shifted text stays plain)
+const KITTY_KEYBOARD_ENABLE = '\x1b[>1u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 
 // ── Types ──
@@ -1223,20 +1223,26 @@ function normalizeKittyKey(key: string): string | null {
 		return `\x1b${String.fromCharCode(codepoint)}`
 	}
 
-	// Plain key or Shift-only: convert codepoint to character
-	if (mods === 0 || mods === 1) {
+	// Unmodified special keys → legacy bytes
+	if (mods === 0) {
 		if (codepoint === 13) return '\r'
 		if (codepoint === 9) return '\t'
 		if (codepoint === 27) return '\x1b'
 		if (codepoint === 127) return '\x7f'
-		// Kitty functional keys live in the BMP Private Use Area (U+E000–U+F8FF);
-		// these are modifiers, F13+, numpad, etc. — never printable text
-		if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
-		if (codepoint >= 0x20) return String.fromCodePoint(codepoint)
 	}
 
-	// Suppress Kitty functional keys that fall through with other modifier combos
+	// Shift-only: Esc and Backspace behave as unmodified; Enter/Tab preserve CSI u
+	// so handlers can distinguish Shift+Enter from Enter
+	if (mods === 1) {
+		if (codepoint === 27) return '\x1b'
+		if (codepoint === 127) return '\x7f'
+	}
+
+	// Kitty functional keys (BMP Private Use Area U+E000–U+F8FF): suppress
 	if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
+
+	// Plain or Shift-only printable: convert codepoint to character
+	if ((mods === 0 || mods === 1) && codepoint >= 0x20) return String.fromCodePoint(codepoint)
 
 	return key
 }
