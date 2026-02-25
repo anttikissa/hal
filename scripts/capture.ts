@@ -1,7 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { stdin, stdout } from 'node:process'
-import { stringify } from '../src/utils/ason.ts'
+import { parse, stringify } from '../src/utils/ason.ts'
 import { parseKeys } from '../src/cli/tui-text.ts'
 
 const PASTE_START = '\x1b[200~'
@@ -76,6 +76,7 @@ type CliOptions = {
 	outPath?: string
 	preset: CapturePreset
 	profiles: string[]
+	step?: string
 	stepTimeoutMs: number
 	calibrationTimeoutMs: number
 	idleMs: number
@@ -285,13 +286,14 @@ function parseArgs(argv: string[]): CliOptions {
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i]
 		const next = () => argv[++i]
-		if (arg === '--help' || arg === '-h') opts.help = true
-		else if (arg === '--list-steps') opts.listSteps = true
-		else if (arg === '--terminal') opts.terminalLabel = next()
-		else if (arg === '--out') opts.outPath = next()
-		else if (arg === '--preset') {
-			const v = next() as CapturePreset
-			if (!PRESET_STEPS[v]) throw new Error(`Unknown preset: ${v}`)
+			if (arg === '--help' || arg === '-h') opts.help = true
+			else if (arg === '--list-steps') opts.listSteps = true
+			else if (arg === '--terminal') opts.terminalLabel = next()
+			else if (arg === '--out') opts.outPath = next()
+			else if (arg === '--step') opts.step = next()
+			else if (arg === '--preset') {
+				const v = next() as CapturePreset
+				if (!PRESET_STEPS[v]) throw new Error(`Unknown preset: ${v}`)
 			opts.preset = v
 		} else if (arg === '--profiles') {
 			const raw = (next() || '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -327,6 +329,7 @@ Interactive terminal key capture for TUI keyboard fixtures.
 Options:
 	--preset <smoke|tui|full>         Step preset (default: tui)
 	--profiles <ids>                  Comma list: raw,hal11,kitty31 (default: hal11)
+	--step <n|id>                     Capture only one step by 1-based index or step id and rewrite it in output file
 	--terminal <label>                Terminal label for output filename (default: TERM_PROGRAM or TERM)
 	--out <path>                      Output ASON path (default: src/tests/fixtures/keys/keys-<terminal>.ason)
 	--step-timeout-ms <n>             Per-step timeout waiting for delimiter Esc (default: 8000)
@@ -350,6 +353,30 @@ function listSteps(preset: CapturePreset): void {
 		const note = s.note ? ` [${s.note}]` : ''
 		stdout.write(`${String(i + 1).padStart(2, ' ')}. ${s.id} :: ${s.label} (${s.category})${note}\n`)
 	}
+}
+
+function stepDescriptors(steps: CaptureStep[]) {
+	return steps.map((s) => ({
+		id: s.id,
+		label: s.label,
+		category: s.category,
+		note: s.note,
+		timeoutMs: s.timeoutMs,
+		escTwice: !!s.escTwice,
+	}))
+}
+
+function resolveSelectedStep(allSteps: CaptureStep[], selector: string): { step: CaptureStep; index: number } {
+	const trimmed = selector.trim()
+	if (/^\d+$/.test(trimmed)) {
+		const index = Number(trimmed) - 1
+		if (index < 0 || index >= allSteps.length)
+			throw new Error(`--step index out of range: ${trimmed} (1..${allSteps.length})`)
+		return { step: allSteps[index], index }
+	}
+	const index = allSteps.findIndex((s) => s.id === trimmed)
+	if (index < 0) throw new Error(`--step id not found: ${trimmed}`)
+	return { step: allSteps[index], index }
 }
 
 function slug(s: string): string {
@@ -600,6 +627,46 @@ function buildMatrix(steps: CaptureStep[], profiles: ProfileRun[]) {
 	return matrix
 }
 
+async function loadExistingCapture(path: string): Promise<any | null> {
+	try {
+		const raw = await readFile(path, 'utf8')
+		if (!raw.trim()) return null
+		return parse(raw)
+	} catch {
+		return null
+	}
+}
+
+function mergeCaptureDocument(existing: any, nextDoc: any, allSteps: CaptureStep[]): any {
+	if (!existing || typeof existing !== 'object') return nextDoc
+	const merged: any = { ...existing, ...nextDoc }
+	const existingProfiles = Array.isArray(existing.profiles) ? existing.profiles.map((p: any) => ({ ...p })) : []
+	const byId = new Map<string, any>()
+	for (const p of existingProfiles) {
+		if (p && typeof p.id === 'string') byId.set(p.id, p)
+	}
+	for (const p of nextDoc.profiles ?? []) {
+		if (!p || typeof p.id !== 'string') continue
+		const target = byId.get(p.id) ?? { id: p.id, steps: [] }
+		target.label = p.label
+		if ('enable' in p) target.enable = p.enable
+		if ('disable' in p) target.disable = p.disable
+		if (p.calibration) target.calibration = p.calibration
+		const steps = Array.isArray(target.steps) ? [...target.steps] : []
+		for (const step of p.steps ?? []) {
+			const idx = steps.findIndex((s: any) => s?.stepId === step.stepId)
+			if (idx >= 0) steps[idx] = step
+			else steps.push(step)
+		}
+		target.steps = steps
+		byId.set(p.id, target)
+	}
+	merged.steps = stepDescriptors(allSteps)
+	merged.profiles = [...byId.values()]
+	merged.matrix = buildMatrix(allSteps, merged.profiles as ProfileRun[])
+	return merged
+}
+
 function envSnapshot() {
 	return {
 		platform: process.platform,
@@ -623,10 +690,12 @@ async function main(): Promise<void> {
 		listSteps(opts.preset)
 		return
 	}
-	const steps = PRESET_STEPS[opts.preset]
-	const terminalLabel = opts.terminalLabel || defaultTerminalLabel()
-	const outPath = resolve(opts.outPath || defaultOutPath(terminalLabel))
-	const profiles = opts.profiles.map(profileById)
+		const allSteps = PRESET_STEPS[opts.preset]
+		const selected = opts.step ? resolveSelectedStep(allSteps, opts.step) : null
+		const steps = selected ? [selected.step] : allSteps
+		const terminalLabel = opts.terminalLabel || defaultTerminalLabel()
+		const outPath = resolve(opts.outPath || defaultOutPath(terminalLabel))
+		const profiles = opts.profiles.map(profileById)
 	const queue = new RawInputQueue()
 	let activeProfile: CaptureProfile | null = null
 	let rawModeEnabled = false
@@ -656,12 +725,13 @@ async function main(): Promise<void> {
 	})
 	try {
 		line('HAL TUI key capture')
-		line(`Preset: ${opts.preset} (${steps.length} steps)`)
-		line(`Profiles: ${profiles.map((p) => p.id).join(', ')}`)
-		line(`Output: ${outPath}`)
-		line(`Terminal label: ${terminalLabel}`)
-		line()
-		line('Tip: clear clipboard before Cmd-V steps if you want shorter captures.')
+			line(`Preset: ${opts.preset} (${steps.length} steps)`)
+			line(`Profiles: ${profiles.map((p) => p.id).join(', ')}`)
+			line(`Output: ${outPath}`)
+			line(`Terminal label: ${terminalLabel}`)
+			if (selected) line(`Step mode: only step ${selected.index + 1} (${selected.step.id})`)
+			line()
+			line('Tip: clear clipboard before Cmd-V steps if you want shorter captures.')
 		line('The script is now entering raw mode.')
 		stdin.resume()
 		if (stdin.isTTY) {
@@ -724,10 +794,10 @@ async function main(): Promise<void> {
 			await drainInput(queue)
 		}
 		await mkdir(dirname(outPath), { recursive: true })
-		const document = {
-			type: 'terminal-key-capture',
-			version: 1,
-			createdAt: new Date().toISOString(),
+			let document: any = {
+				type: 'terminal-key-capture',
+				version: 1,
+				createdAt: new Date().toISOString(),
 			terminalLabel,
 			env: envSnapshot(),
 			config: {
@@ -737,18 +807,15 @@ async function main(): Promise<void> {
 				calibrationTimeoutMs: opts.calibrationTimeoutMs,
 				idleMs: opts.idleMs,
 			},
-			steps: steps.map((s) => ({
-				id: s.id,
-				label: s.label,
-				category: s.category,
-				note: s.note,
-				timeoutMs: s.timeoutMs,
-				escTwice: !!s.escTwice,
-			})),
-			profiles: profileRuns,
-			matrix: buildMatrix(steps, profileRuns),
-		}
-		await writeFile(outPath, stringify(document, 'long') + '\n', 'utf8')
+				steps: stepDescriptors(allSteps),
+				profiles: profileRuns,
+				matrix: buildMatrix(allSteps, profileRuns),
+			}
+			if (selected) {
+				const existing = await loadExistingCapture(outPath)
+				document = mergeCaptureDocument(existing, document, allSteps)
+			}
+			await writeFile(outPath, stringify(document, 'long') + '\n', 'utf8')
 		line()
 		line(`[done] Wrote capture to ${outPath}`)
 		line('You can run this in each terminal (kitty/ghostty/iTerm/Terminal.app) with different --terminal labels.')
