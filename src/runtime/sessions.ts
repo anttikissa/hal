@@ -160,7 +160,6 @@ export async function ensureSession(sessionId: string, workingDir: string): Prom
 
 	session = {
 		id: cleanId,
-		name: undefined,
 		workingDir: resolve(workingDir || _defaultWorkingDir),
 		busy: false,
 		messageCount: 0,
