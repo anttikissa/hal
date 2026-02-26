@@ -19,7 +19,7 @@ export function buildPromptBlockFormatter(cols: number): PromptBlockFormatter {
 		blockEnd: `${bar}\x1b[K${RESET}\n`,
 		formatText(text: string): string {
 			return wrapPlainTextWithPadding(text, cols, PROMPT_SIDE_PADDING)
-				.map((line) => `${bar}${textStyle}${line}${RESET}`)
+				.map((line) => `${bar}${textStyle}${line}\x1b[K${RESET}`)
 				.join('\n')
 		},
 	}
