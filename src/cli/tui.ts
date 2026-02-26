@@ -56,7 +56,7 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
-// Flags: 1=disambiguate, 2=report events, 8=report all, 16=report associated text
+// Flags: 1=disambiguate, 2=report events, 8=report all (Super key), 16=report associated text
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 
