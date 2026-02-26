@@ -12,6 +12,7 @@ import {
 	drainQueuedCommands as drainSchedulerQueue,
 	removeSessionQueue,
 	concurrencyStatus,
+	isSessionRunning,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
 import { dropQueuedCommands, runClose, runFork, runSystem, runCd } from './handle-command.ts'
@@ -305,11 +306,14 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 	enqueueCommand(sessionId, command)
 	await publishCommandPhase(command.id, 'queued', undefined, sessionId)
 
-	// Notify if command won't start immediately because all slots are full
+	// Notify if command is waiting on a global concurrency slot.
+	// If this session is already running, the new command is just queued behind it
+	// and does not need a free global slot right now.
 	const { running, max } = concurrencyStatus()
-	if (running >= max && !isSessionBusy(sessionId)) {
+	const runningOtherSessions = running - (isSessionRunning(sessionId) ? 1 : 0)
+	if (runningOtherSessions >= max && !isSessionBusy(sessionId)) {
 		await publishLine(
-			`[queue] ${running}/${max} sessions busy — will run when a slot opens`,
+			`[queue] ${runningOtherSessions}/${max} other sessions busy — will run when a slot opens`,
 			'meta',
 			sessionId,
 		)

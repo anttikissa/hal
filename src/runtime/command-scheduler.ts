@@ -122,6 +122,10 @@ export function concurrencyStatus(): { running: number; max: number } {
 	return { running: s.running.size, max: s.maxConcurrent }
 }
 
+export function isSessionRunning(sessionId: string): boolean {
+	return getState().running.has(sessionId)
+}
+
 
 
 export function enqueueCommand(sessionId: string, command: RuntimeCommand): void {
