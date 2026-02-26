@@ -1,5 +1,4 @@
 const RESET = '\x1b[0m'
-const DIM = '\x1b[2m'
 
 export function buildStatusBarLine(
 	cols: number,
@@ -14,5 +13,5 @@ export function buildStatusBarLine(
 	if (scrollOffset > 0) line += `${line ? '  ' : ''}↑${scrollOffset}`
 	if (cleanRight) line += `${line ? '  ' : ''}${cleanRight}`
 	if (line.length < cols) line += ' '.repeat(cols - line.length)
-	return `${DIM}${line.slice(0, cols)}${RESET}`
+	return `${line.slice(0, cols)}${RESET}`
 }
