@@ -22,9 +22,9 @@ leaving `src/cli/format/index.ts` with truncated code — a function call cut of
 5. **Tool input validation** — guards on read/write/edit for missing path/content
 6. **Test harness extensions** — config injection, setup hooks, public halDir
 
-## What I did
+## Commits made (7 total)
 
-### Commits made (4):
+### Phase 1: Salvaging Codex's uncommitted work
 
 1. **`c68a4bb` fix: prompt echo padding — use formatText API with horizontal padding**
    - Fixed the critical incompatibility: `index.ts` now calls `f.formatText(text)` instead
@@ -44,21 +44,43 @@ leaving `src/cli/format/index.ts` with truncated code — a function call cut of
    - Oldest files deleted first, active log preserved
    - Includes test and config option `debug.maxDiskBytes`
 
-### Test status:
+### Phase 2: Fixing UI bugs from TODO.md
+
+5. **`c6d0eaa` fix: apply style per line for all output, not just chunks**
+   - Root cause of "tool output first 2 lines turquoise, rest plain" bug
+   - Non-chunk output was wrapping entire content in single STYLE...RESET pair
+   - When content had newlines, only first outputLine retained the style
+   - Now uses `applyStylePerLine` for ALL output types (matching what chunks do)
+   - Also fixes prompt echo and list output brightness inconsistencies
+
+6. **`ece5f13` fix: reject directory paths in write tool to prevent EISDIR errors**
+   - Write tool accepted directory paths like `~/.hal`, causing EISDIR from OS
+   - Now checks if path is a directory before writing (matches read tool's guard)
+
+### Phase 3: Cleanup
+
+7. **TODO.md and RESULTS.md updated** (this commit)
+   - Marked fixed UI bugs as DONE
+   - Removed duplicate entries
+   - Removed items already implemented (input up/down, tab names, status line, etc.)
+
+## UI bugs — resolution status
+
+| Bug | Status | Fix |
+|-----|--------|-----|
+| Prompt echo not grey on every line | FIXED | `c68a4bb` — formatText API with padding |
+| Tool output first 2 lines turquoise only | FIXED | `c6d0eaa` — applyStylePerLine for all |
+| Bright word seams in list output | FIXED | `ff9e104` (Codex) + `c6d0eaa` |
+| Prompt initial words brighter | FIXED | `c6d0eaa` — same root cause |
+| EISDIR write error on directory | FIXED | `ece5f13` — directory path check |
+| Tab activity indicators | OPEN | Not yet implemented |
+
+## Test status
 - Quick tests: 152 pass, 0 fail
-- No new type errors introduced (all remaining tsc errors are pre-existing ASON type widening)
+- No new type errors introduced (71 pre-existing, all ASON type widening)
 
-## Still remaining (not touched)
-
-- `TODO.md` has uncommitted edits (Codex updated task descriptions) — left as-is
-- `WHERE-TO-CONTINUE.md` — Codex's session notes, left for reference
-- `codex-backup/` — backup copies of all modified files before any changes
+## Files left around
+- `codex-backup/` — backup copies of Codex-modified files (safe to delete)
+- `codex-backup-index-ts.diff` — diff of Codex's broken index.ts
+- `WHERE-TO-CONTINUE.md` — Codex's session notes
 - `docs/plans/prompt-output-padding-fix-2026-02-26.md` — Codex's plan doc
-
-## Open UI bugs from TODO.md
-
-These are still listed as unresolved:
-- Tool call turquoise coloring bug (first 2 lines bright, rest not) — screenshot at `/tmp/hal/images/8258sp.png`
-- Prompt echo showing brighter initial words — screenshot at `/tmp/hal/images/7heiwj.png`
-- Tab activity indicators (!, ?, *, checkmark) not yet implemented
-- Bright word seams in list output — screenshot at `/tmp/hal/images/mkm576.png`
