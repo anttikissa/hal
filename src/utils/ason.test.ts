@@ -12,6 +12,7 @@ describe('stringify', () => {
 		test('NaN', () => expect(stringify(NaN)).toBe('NaN'))
 		test('Infinity', () => expect(stringify(Infinity)).toBe('Infinity'))
 		test('-Infinity', () => expect(stringify(-Infinity)).toBe('-Infinity'))
+		test('undefined → null', () => expect(stringify(undefined as any)).toBe('null'))
 		test('simple string', () => expect(stringify('hello')).toBe("'hello'"))
 		test('empty string', () => expect(stringify('')).toBe("''"))
 		test('string with newline', () => expect(stringify('a\nb')).toBe("'a\\nb'"))
@@ -63,6 +64,10 @@ describe('stringify', () => {
 		test('nested stays inline if short', () => {
 			expect(stringify({ a: { b: { c: 1 } } })).toBe('{ a: { b: { c: 1 } } }')
 		})
+		test('undefined values omitted', () =>
+			expect(stringify({ a: 1, b: undefined, c: 3 } as any)).toBe('{ a: 1, c: 3 }'))
+		test('all undefined → empty object', () =>
+			expect(stringify({ a: undefined } as any)).toBe('{}'))
 	})
 
 	describe('arrays', () => {
@@ -74,6 +79,8 @@ describe('stringify', () => {
 				"[1, null, 'this', { object: [1, 2, 3] }]",
 			)
 		})
+		test('undefined elements → null', () =>
+			expect(stringify([1, undefined, 3] as any)).toBe('[1, null, 3]'))
 		test('wide array breaks lines', () => {
 			const obj = [
 				'something longer',
