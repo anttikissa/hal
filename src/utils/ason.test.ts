@@ -145,7 +145,24 @@ describe('parse', () => {
 		test('true', () => expect(parse('true')).toBe(true))
 		test('false', () => expect(parse('false')).toBe(false))
 		test('integer', () => expect(parse('42')).toBe(42))
+		test('zero', () => expect(parse('0')).toBe(0))
+		test('negative integer', () => expect(parse('-1')).toBe(-1))
+		test('float', () => expect(parse('3.14')).toBe(3.14))
 		test('negative float', () => expect(parse('-3.14')).toBe(-3.14))
+		test('invalid: leading decimal', () => expect(() => parse('-.5')).toThrow())
+		test('invalid: trailing dot', () => expect(() => parse('1.')).toThrow())
+
+		test('scientific notation', () => expect(parse('1e10')).toBe(1e10))
+		test('scientific uppercase', () => expect(parse('1E10')).toBe(1e10))
+		test('scientific positive exponent', () => expect(parse('1e+10')).toBe(1e10))
+		test('scientific negative exponent', () => expect(parse('1e-10')).toBe(1e-10))
+		test('float with exponent', () => expect(parse('1.5e2')).toBe(150))
+		test('negative float with exponent', () => expect(parse('-1.5e-2')).toBe(-0.015))
+		test('invalid: double dot', () => expect(() => parse('1.2.3')).toThrow())
+		test('invalid: bare minus', () => expect(() => parse('-')).toThrow())
+		test('invalid: missing exponent', () => expect(() => parse('1e')).toThrow())
+		test('invalid: missing exponent digits', () => expect(() => parse('1e+')).toThrow())
+
 		test('NaN', () => expect(parse('NaN')).toBeNaN())
 		test('Infinity', () => expect(parse('Infinity')).toBe(Infinity))
 		test('-Infinity', () => expect(parse('-Infinity')).toBe(-Infinity))
@@ -154,6 +171,13 @@ describe('parse', () => {
 		test('string with escapes', () => expect(parse("'a\\nb\\tc'")).toBe('a\nb\tc'))
 		test('string with escaped quote', () => expect(parse("'it\\'s'")).toBe("it's"))
 		test('double-quoted with single inside', () => expect(parse('"it\'s"')).toBe("it's"))
+		test('string with backspace escape', () => expect(parse("'a\\bc'")).toBe('a\bc'))
+		test('string with form feed escape', () => expect(parse("'a\\fc'")).toBe('a\fc'))
+		test('string with unicode escape', () => expect(parse("'\\u0041'")).toBe('A'))
+		test('string with unicode accented char', () => expect(parse("'caf\\u00e9'")).toBe('café'))
+		test('string with unicode CJK', () => expect(parse("'\\u4e16'")).toBe('世'))
+		test('invalid unicode escape: too short', () => expect(() => parse("'\\u00'")).toThrow(/Invalid unicode escape/))
+		test('invalid unicode escape: bad hex', () => expect(() => parse("'\\uXXXX'")).toThrow(/Invalid unicode escape/))
 	})
 
 	describe('objects', () => {
@@ -367,11 +391,23 @@ describe('parseStream', () => {
 		expect(await collect(toStream(['{ a: 1 }\n\n\n{ b: 2 }\n']))).toEqual([{ a: 1 }, { b: 2 }])
 	})
 
-	test('throws on invalid token', async () => {
-		expect(collect(toStream(['{ a: @@@ }\n']))).rejects.toThrow(/Unexpected token/)
+	test('invalid first line is silently skipped', async () => {
+		expect(await collect(toStream(['{ a: @@@ }\n{ b: 2 }']))).toEqual([{b: 2}])
 	})
 
-	test('yields valid values then throws on invalid token', async () => {
+	test('first line partial record is silently skipped', async () => {
+		expect(await collect(toStream(['artial }\n{ a: 1 }\n']))).toEqual([{ a: 1 }])
+	})
+
+	test('first line partial record with valid records after', async () => {
+		expect(await collect(toStream(['{ x: 1 } }\n{ a: 1 }\n{ b: 2 }\n']))).toEqual([{ a: 1 }, { b: 2 }])
+	})
+
+	test('first line valid record is not skipped', async () => {
+		expect(await collect(toStream(['{ a: 1 }\n{ b: 2 }\n']))).toEqual([{ a: 1 }, { b: 2 }])
+	})
+
+	test('second line invalid still throws', async () => {
 		const iter = parseStream(toStream(['{ a: 1 }\n@@@\n']))
 		const first = await iter.next()
 		expect(first.value).toEqual({ a: 1 })

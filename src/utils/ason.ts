@@ -91,7 +91,6 @@ export function stringify(obj: any, mode: StringifyMode = 'smart'): string {
 
 type Ctx = { buf: string; pos: number }
 
-
 class ParseError extends Error {
 	pos: number
 	constructor(msg: string, pos: number) {
@@ -113,12 +112,8 @@ function fail(ctx: Ctx, msg: string): never {
 	)
 }
 
-
-function isIdent(ch: string | undefined): boolean {
-	if (!ch) return false
-	const c = ch.charCodeAt(0)
-	// 0-9, A-Z, a-z, _, $
-	return (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 36
+function isIdent(ch: string): boolean {
+	return /[a-zA-Z0-9_$]/.test(ch)
 }
 
 function skipWhite(ctx: Ctx): void {
@@ -167,7 +162,17 @@ function parseString(ctx: Ctx, quote: string): string {
 			if (esc === 'n') result += '\n'
 			else if (esc === 't') result += '\t'
 			else if (esc === 'r') result += '\r'
-			else result += esc
+			else if (esc === 'b') result += '\b'
+			else if (esc === 'f') result += '\f'
+			else if (esc === 'u') {
+				let hex = ''
+				for (let i = 0; i < 4; i++) {
+					ctx.pos++
+					if (!/[0-9a-fA-F]/.test(peek(ctx))) fail(ctx, 'Invalid unicode escape')
+					hex += peek(ctx)
+				}
+				result += String.fromCharCode(parseInt(hex, 16))
+			} else result += esc
 			ctx.pos++
 			continue
 		}
@@ -178,18 +183,14 @@ function parseString(ctx: Ctx, quote: string): string {
 	fail(ctx, 'Unterminated string')
 }
 
+const NUM_RE = /-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/y
+
 function parseNumber(ctx: Ctx): number {
-	const start = ctx.pos
-	if (peek(ctx) === '-') ctx.pos++
-	while (peek(ctx) >= '0' && peek(ctx) <= '9' || peek(ctx) === '.') ctx.pos++
-	if (peek(ctx) === 'e' || peek(ctx) === 'E') {
-		ctx.pos++
-		if (peek(ctx) === '+' || peek(ctx) === '-') ctx.pos++
-		while (peek(ctx) >= '0' && peek(ctx) <= '9') ctx.pos++
-	}
-	const num = Number(ctx.buf.slice(start, ctx.pos))
-	if (isNaN(num)) fail(ctx, 'Invalid number')
-	return num
+	NUM_RE.lastIndex = ctx.pos
+	const m = NUM_RE.exec(ctx.buf)
+	if (!m) fail(ctx, 'Invalid number')
+	ctx.pos = NUM_RE.lastIndex
+	return Number(m[0])
 }
 
 function parseKey(ctx: Ctx): string {
@@ -201,7 +202,6 @@ function parseKey(ctx: Ctx): string {
 	if (ctx.pos === start) fail(ctx, 'Expected object key')
 	return ctx.buf.slice(start, ctx.pos)
 }
-
 
 function parseObject(ctx: Ctx): Record<string, any> {
 	ctx.pos++ // skip {
@@ -249,7 +249,6 @@ function parseAny(ctx: Ctx): any {
 	fail(ctx, 'Unexpected token')
 }
 
-
 export function parse(str: string): any {
 	const ctx: Ctx = { buf: str, pos: 0 }
 	const value = parseAny(ctx)
@@ -269,28 +268,37 @@ export function parseAll(str: string): any[] {
 	return results
 }
 
+/** Yields newline-delimited lines from a byte stream.
+ *  split('\n') always produces a trailing element after the last \n;
+ *  pop() keeps that incomplete fragment in buf for the next chunk.
+ *  e.g. "a\nb\nc" → ["a","b","c"] → yield "a","b", buf="c" */
+async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+	const decoder = new TextDecoder()
+	let buf = ''
+	for await (const chunk of stream) {
+		buf += decoder.decode(chunk, { stream: true })
+		const lines = buf.split('\n')
+		buf = lines.pop()!
+		for (const line of lines) yield line
+	}
+	if (buf) yield buf
+}
+
+/** Yields parsed ASON values from a byte stream, one per newline-delimited record.
+ *  The first line silently ignores parse errors (the stream may start mid-record). */
 export async function* parseStream(
 	stream: ReadableStream<Uint8Array>,
 ): AsyncGenerator<any> {
-	const reader = stream.getReader()
-	const decoder = new TextDecoder()
-	let buf = ''
-
-	while (true) {
-		const { done, value } = await reader.read()
-		if (done) break
-		buf += decoder.decode(value, { stream: true })
-		const lines = buf.split('\n')
-		buf = lines.pop()!
-		for (const line of lines) {
-			const trimmed = line.trim()
-			if (!trimmed) continue
-			yield parse(trimmed)
+	let first = true
+	for await (const line of streamLines(stream)) {
+		if (!line.trim()) continue
+		if (first) {
+			first = false
+			try { yield parse(line) } catch {}
+		} else {
+			yield parse(line)
 		}
 	}
-
-	const trimmed = buf.trim()
-	if (trimmed) yield parse(trimmed)
 }
 
 export default { stringify, parse, parseAll, parseStream }
