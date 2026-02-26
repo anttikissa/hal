@@ -67,7 +67,7 @@ const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 type TabCompleter = (prefix: string) => string[]
 type InputKeyHandler = (key: string) => boolean | void
 type InputEchoFilter = (value: string) => boolean
-type SelectionSurface = 'output' | 'activity' | 'status' | 'input'
+type SelectionSurface = 'title' | 'output' | 'activity' | 'status' | 'input'
 type SelectionPoint = { surface: SelectionSurface; row: number; col: number }
 type SelectionRange = {
 	surface: SelectionSurface
@@ -184,6 +184,7 @@ let clickCount = 0
 let lastVisibleOutput: string[] = []
 let lastActivityLine = ''
 let lastStatusLine = ''
+let lastTitleLine = ''
 // Link hover (Cmd+hover)
 let hoverOutputRow = -1
 let hoverUrl: string | null = null
@@ -645,6 +646,7 @@ function renderPromptLineWithInputSelection(
 // ── Mouse selection ──
 
 function screenSelectionLine(surface: SelectionSurface, row: number): string {
+	if (surface === 'title') return row === 0 ? lastTitleLine : ''
 	if (surface === 'activity') return row === 0 ? lastActivityLine : ''
 	if (surface === 'status') return row === 0 ? lastStatusLine : ''
 	if (surface === 'output') return lastVisibleOutput[row] ?? ''
@@ -795,6 +797,7 @@ function renderLineWithSelection(
 function pointFromScreenCoords(x: number, y: number): SelectionPoint | null {
 	const inputPt = inputWrappedPointFromScreen(x, y)
 	if (inputPt) return { surface: 'input', row: inputPt.row, col: inputPt.col }
+	if (y === 0) return { surface: 'title', row: 0, col: x }
 
 	// y is 0-based row on screen. Output starts at row 2 (index 1).
 	const oh = Math.max(0, outputBottom() - 1)
@@ -1063,6 +1066,7 @@ function render(): void {
 		? `${TITLE_BG}${TITLE_TOPIC}  ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
 		: `${TITLE_BG}${TITLE_TOPIC}  ${topic}`
 	chunks.push(truncateAnsi(titleLine, c) + RESET)
+	lastTitleLine = truncateAnsi(`  ${titleText}`, c)
 
 	// Rows 2..ob: output viewport
 	for (let row = 2; row <= ob; row++) {
