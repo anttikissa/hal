@@ -292,7 +292,7 @@ class OpenAIProvider extends Provider {
 		if (model.startsWith('o')) {
 			body.reasoning = { effort: 'high', summary: 'auto' }
 		} else if (codex && model.includes('codex')) {
-			body.reasoning = { summary: 'auto' }
+			body.reasoning = { effort: 'xhigh', summary: 'auto' }
 		}
 
 		return body

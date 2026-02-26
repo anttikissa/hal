@@ -896,8 +896,18 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		const pt = pointFromScreenCoords(x, y)
 		if (!pt || pt.surface !== 'input') return
 		const pos = inputPosFromWrappedPoint(pt.row, pt.col)
-		inputSelFocus = pos
-		inputCursor = pos
+		if (selMode === 'word') {
+			const range = inputWordRangeAt(pos)
+			inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
+				? range.start : range.end
+		} else if (selMode === 'line') {
+			const range = inputLineRangeAt(pos)
+			inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
+				? range.start : range.end
+		} else {
+			inputSelFocus = pos
+		}
+		inputCursor = inputSelFocus
 		render()
 		return
 	}
@@ -946,8 +956,21 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		const pt = pointFromScreenCoords(x, y)
 		if (pt && pt.surface === 'input') {
 			const pos = inputPosFromWrappedPoint(pt.row, pt.col)
-			inputSelFocus = pos
-			inputCursor = pos
+			if (selMode === 'word') {
+				const range = inputWordRangeAt(pos)
+				// Extend toward whichever side is farther from anchor
+				inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
+					? range.start : range.end
+				inputCursor = inputSelFocus
+			} else if (selMode === 'line') {
+				const range = inputLineRangeAt(pos)
+				inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
+					? range.start : range.end
+				inputCursor = inputSelFocus
+			} else {
+				inputSelFocus = pos
+				inputCursor = pos
+			}
 		}
 		inputSelActive = false
 		render()
