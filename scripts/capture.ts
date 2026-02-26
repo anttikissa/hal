@@ -155,7 +155,7 @@ const TUI_STEPS: CaptureStep[] = [
 	step('tab', 'Tab', 'editing'),
 	step('shift_tab', 'Shift-Tab', 'editing'),
 	step('backspace', 'Backspace', 'editing'),
-	step('delete', 'Delete (Forward Delete)', 'editing', {
+	step('delete', 'Forward Delete (Fn-Backspace on Mac laptop)', 'editing', {
 		note: 'On macOS laptop keyboards this is usually Fn-Delete.',
 	}),
 	step('left', 'Left Arrow', 'nav'),
@@ -491,6 +491,8 @@ async function captureStepUntilDelimiter(
 	opts: { endDelimiterCount?: number } = {},
 ): Promise<{ status: CaptureStatus; payload: Buffer; durationMs: number }> {
 	const endDelimiterCount = Math.max(1, opts.endDelimiterCount ?? 1)
+	const delimiterText = delimiter.toString('utf8')
+	const delimiterTokens = parseKeys(delimiterText, PASTE_START, PASTE_END)
 	const startedAt = Date.now()
 	const parts: Buffer[] = []
 	let total = Buffer.alloc(0)
@@ -502,19 +504,7 @@ async function captureStepUntilDelimiter(
 		}
 		parts.push(chunk)
 		total = Buffer.concat(parts)
-		let occ = 0
-		let searchFrom = 0
-		let endDelimStart = -1
-		while (true) {
-			const idx = total.indexOf(delimiter, searchFrom)
-			if (idx < 0) break
-			occ++
-			if (occ === endDelimiterCount) {
-				endDelimStart = idx
-				break
-			}
-			searchFrom = idx + delimiter.length
-		}
+		const endDelimStart = findDelimiterStartByTokenSequence(total, delimiterTokens, endDelimiterCount)
 		if (endDelimStart >= 0) {
 			const payload = total.subarray(0, endDelimStart)
 			return {
@@ -525,6 +515,38 @@ async function captureStepUntilDelimiter(
 		}
 	}
 	return { status: 'timeout', payload: total, durationMs: Date.now() - startedAt }
+}
+
+function findDelimiterStartByTokenSequence(
+	buf: Buffer,
+	delimiterTokens: string[],
+	endDelimiterCount: number,
+): number {
+	if (delimiterTokens.length === 0) return -1
+	const totalText = buf.toString('utf8')
+	const tokens = parseKeys(totalText, PASTE_START, PASTE_END)
+	if (tokens.length === 0) return -1
+	const starts: number[] = []
+	let bytePos = 0
+	for (const token of tokens) {
+		starts.push(bytePos)
+		bytePos += Buffer.byteLength(token)
+	}
+	let occ = 0
+	for (let i = 0; i + delimiterTokens.length <= tokens.length; i++) {
+		let match = true
+		for (let j = 0; j < delimiterTokens.length; j++) {
+			if (tokens[i + j] !== delimiterTokens[j]) {
+				match = false
+				break
+			}
+		}
+		if (!match) continue
+		occ++
+		if (occ === endDelimiterCount) return starts[i] ?? -1
+		i += delimiterTokens.length - 1
+	}
+	return -1
 }
 
 function summarizeBytes(buf: Buffer) {
