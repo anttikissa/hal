@@ -1065,7 +1065,9 @@ function render(): void {
 	const titleLine = session
 		? `${TITLE_BG}${TITLE_TOPIC}  ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
 		: `${TITLE_BG}${TITLE_TOPIC}  ${topic}`
-	chunks.push(truncateAnsi(titleLine, c) + RESET)
+	const renderedTitleLine = truncateAnsi(titleLine, c) + RESET
+	if (selRange?.surface === 'title') chunks.push(renderLineWithSelection(renderedTitleLine, 0, selRange))
+	else chunks.push(renderedTitleLine)
 	lastTitleLine = truncateAnsi(`  ${titleText}`, c).padEnd(c, ' ')
 
 	// Rows 2..ob: output viewport
