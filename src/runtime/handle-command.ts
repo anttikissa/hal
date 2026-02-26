@@ -268,11 +268,18 @@ IMPORTANT: Do NOT reproduce the conversation. Synthesize and summarize. Be speci
 		return
 	}
 
+	const handoffSummary = summary.trim()
+	if (!handoffSummary || handoffSummary === 'No response.') {
+		await publishActivity('', sessionId)
+		await publishLine('[handoff] failed: summary model returned empty output', 'error', sessionId)
+		return
+	}
+
 	if (truncated) {
 		await publishLine('[handoff] warning: summary was truncated (output limit)', 'warn', sessionId)
 	}
 
-	await performHandoff(sessionId, summary)
+	await performHandoff(sessionId, handoffSummary)
 	await appendConversation(sessionId, { type: 'handoff', ts: new Date().toISOString() })
 	await publishActivity('', sessionId)
 	await publishLine(
