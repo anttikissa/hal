@@ -1286,6 +1286,16 @@ function handleKey(key: string): void {
 	key = normalizedKitty
 	if (inputKeyHandler && inputKeyHandler(key)) return
 
+	// Clipboard shortcuts that reference selection — handle before clearing
+	if (handleInputClipboardShortcutKey(key)) return
+	if (key === '\x1bw') {
+		if (copyCurrentSelectionToClipboard()) render()
+		return
+	}
+
+	// Any real (non-modifier, non-clipboard) keypress clears output selection
+	if (selAnchor) clearSelection()
+
 	if (key === CTRL_C) {
 		if (waitingResolve) {
 			const r = waitingResolve
@@ -1313,7 +1323,6 @@ function handleKey(key: string): void {
 		if (undoInputEdit()) render()
 		return
 	}
-	if (handleInputClipboardShortcutKey(key)) return
 
 	if (key === CTRL_X) {
 		if (cutInputTextSelectionToClipboard()) render()
@@ -1329,10 +1338,6 @@ function handleKey(key: string): void {
 		inputCursor = inputBuf.length
 		inputSelActive = false
 		render()
-		return
-	}
-	if (key === '\x1bw') {
-		if (copyCurrentSelectionToClipboard()) render()
 		return
 	}
 
@@ -1677,10 +1682,7 @@ function flushStdinBuffer(): void {
 	stdinTimer = null
 	logKeypress(data)
 
-	// Any non-mouse keypress clears selection
-	if (selAnchor && !data.includes('\x1b[<')) {
-		clearSelection()
-	}
+	// Selection clearing moved into handleKey (per-key, after modifier/clipboard filtering)
 
 	for (const key of parseKeys(data, PASTE_START, PASTE_END)) handleKey(key)
 }

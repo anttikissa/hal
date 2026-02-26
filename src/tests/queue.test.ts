@@ -26,15 +26,4 @@ describe('queue', () => {
 		const event = await hal.waitForLine(/\[drop\] queue is empty/)
 		expect(event.level).toBe('meta')
 	})
-
-	test('/resume on non-paused session is silent', async () => {
-		hal = await startHal()
-		await hal.waitForReady()
-		hal.sendLine('/resume')
-		// Should complete without error — wait for the done phase
-		const event = await hal.waitFor(
-			(r) => r.type === 'command' && r.phase === 'done',
-		)
-		expect(event.phase).toBe('done')
-	})
 })
