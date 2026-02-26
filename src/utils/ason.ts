@@ -1,27 +1,18 @@
 // ASON — A Saner Object Notation
-//
-// Like JSON, but human-friendly:
-//   - stringify() produces readable output ({ foo: [123, 'a'] })
-//   - prettier-like output (don't indent if object fits in 80 chars)
-//   - Keys are unquoted when possible: { name: 'hal', version: 1 }
-//   - Comments: // line comments and /* block comments */
-//   - Streaming support built-in (like JSONL — multiple values in one stream)
-//   - Backwards compatible: any JSON or JSONL file is valid ASON
-//
-// API:
-//   stringify(obj)      - object → ASON string
-//   parse(str)          - ASON string → object
-//   parseAll(str)       - ASON string → array of values (JSONL-style)
-//   parseStream(stream) - async generator yielding values from a byte stream
+// See docs/ason.md for format specification.
 
+/** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')
 
+/** Any value representable in ASON. */
 export type AsonValue =
 	| string | number | boolean | null | undefined
 	| AsonArray
 	| AsonObject
 
+/** Array with optional comment metadata per element. */
 export type AsonArray = AsonValue[] & { [COMMENTS]?: (string | undefined)[] }
+/** Object with optional comment metadata per key. */
 export type AsonObject = { [key: string]: AsonValue; [COMMENTS]?: Record<string, string> }
 
 // --- Stringify ---
@@ -104,6 +95,7 @@ function stringifyValue(obj: AsonValue, col: number, depth: number, maxWidth: nu
 
 export type StringifyMode = 'short' | 'smart' | 'long'
 
+/** Convert a value to an ASON string. Mode: 'smart' (default, 80-col wrap), 'short' (single line), 'long' (always expanded). */
 export function stringify(obj: AsonValue, mode: StringifyMode = 'smart'): string {
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
 	return stringifyValue(obj, 0, 0, maxWidth)
@@ -302,6 +294,7 @@ function parseAny(ctx: Ctx): AsonValue {
 	fail(ctx, 'Unexpected token')
 }
 
+/** Parse a single ASON value. Pass `{ comments: true }` to preserve comments as `[COMMENTS]` metadata. */
 export function parse(str: string, opts?: { comments?: boolean }): AsonValue {
 	const ctx: Ctx = { buf: str, pos: 0, comments: opts?.comments }
 	const value = parseAny(ctx)
@@ -310,6 +303,7 @@ export function parse(str: string, opts?: { comments?: boolean }): AsonValue {
 	return value
 }
 
+/** Parse multiple ASON values from a single string (like JSONL — one value per line or concatenated). */
 export function parseAll(str: string): AsonValue[] {
 	const ctx: Ctx = { buf: str, pos: 0 }
 	const results: AsonValue[] = []
