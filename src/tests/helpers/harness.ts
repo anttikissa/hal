@@ -9,7 +9,7 @@ export class TestHal {
 	records: any[] = []
 
 	private proc: ReturnType<typeof Bun.spawn>
-	private halDir: string
+	readonly halDir: string
 	private waiters: Array<{
 		match: (r: any) => boolean
 		resolve: (r: any) => void
@@ -110,7 +110,13 @@ export class TestHal {
 	}
 }
 
-export async function startHal(options?: { env?: Record<string, string> }): Promise<TestHal> {
+export interface StartHalOptions {
+	env?: Record<string, string>
+	config?: string
+	setup?: (paths: { halDir: string; stateDir: string }) => Promise<void> | void
+}
+
+export async function startHal(options?: StartHalOptions): Promise<TestHal> {
 	// Fully isolated: both HAL_DIR and HAL_STATE_DIR point to a temp dir
 	// so tests never read or write the real config, auth, or state files
 	const halDir = mkdtempSync(resolve(tmpdir(), 'hal-test-'))
@@ -118,14 +124,20 @@ export async function startHal(options?: { env?: Record<string, string> }): Prom
 	mkdirSync(stateDir, { recursive: true })
 
 	// Seed minimal config so tests don't inherit the user's real config
-	writeFileSync(`${halDir}/config.ason`, "{ model: 'anthropic/claude-opus-4-6' }\n")
+	writeFileSync(`${halDir}/config.ason`, options?.config ?? "{ model: 'anthropic/claude-opus-4-6' }\n")
+	if (options?.setup) await options.setup({ halDir, stateDir })
 
+	const baseEnv: Record<string, string> = { ...process.env }
+	if (options?.env) {
+		for (const [k, v] of Object.entries(options.env)) baseEnv[k] = v
+	}
+	const mergedEnv = { ...baseEnv, HAL_DIR: halDir, HAL_STATE_DIR: stateDir }
 	const proc = Bun.spawn(['bun', 'main.ts', '--test'], {
 		cwd: SOURCE_DIR,
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'inherit',
-		env: { ...process.env, HAL_DIR: halDir, HAL_STATE_DIR: stateDir, ...options?.env },
+		env: mergedEnv,
 	})
 
 	return new TestHal(proc, halDir)
