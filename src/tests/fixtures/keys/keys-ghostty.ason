@@ -1,12 +1,12 @@
 {
   type: 'terminal-key-capture',
   version: 1,
-  createdAt: '2026-02-26T14:40:49.343Z',
+  createdAt: '2026-02-26T15:05:59.499Z',
   terminalLabel: 'ghostty',
   env: {
     platform: 'darwin',
     arch: 'arm64',
-    pid: 31936,
+    pid: 34393,
     term: 'xterm-ghostty',
     termProgram: 'ghostty',
     termProgramVersion: '1.2.3',
@@ -16,7 +16,7 @@
   config: {
     preset: 'tui',
     profiles: [
-      'kitty11'
+      'kitty31'
     ],
     stepTimeoutMs: 8000,
     calibrationTimeoutMs: 15000,
@@ -3520,6 +3520,458 @@
           ]
         }
       ]
+    },
+    {
+      id: 'kitty31',
+      steps: [
+        {
+          stepId: 'cmd_a',
+          label: 'Cmd-A',
+          category: 'cmd',
+          status: 'captured',
+          note: 'macOS: may be intercepted or sent only in Kitty mode.',
+          timeoutMs: 8000,
+          durationMs: 4545,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            57,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+          text: 'ESC[57444;9uESC[57444;1:3u',
+          display: 'ESC[57444;9uESC[57444;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57444;9u',
+              display: 'ESC[57444;9u',
+              hex: '1b 5b 35 37 34 34 34 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57444;1:3u',
+              display: 'ESC[57444;1:3u',
+              hex: '1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'cmd_x',
+          label: 'Cmd-X',
+          category: 'cmd',
+          status: 'captured',
+          note: 'macOS: terminal/OS may intercept cut.',
+          timeoutMs: 8000,
+          durationMs: 2664,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            57,
+            117,
+            27,
+            91,
+            49,
+            50,
+            48,
+            59,
+            57,
+            117,
+            27,
+            91,
+            49,
+            50,
+            48,
+            59,
+            57,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 31 32 30 3b 39 75 1b 5b 31 32 30 3b 39 3a 33 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+          text: 'ESC[57444;9uESC[120;9uESC[120;9:3uESC[57444;1:3u',
+          display: 'ESC[57444;9uESC[120;9uESC[120;9:3uESC[57444;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57444;9u',
+              display: 'ESC[57444;9u',
+              hex: '1b 5b 35 37 34 34 34 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[120;9u',
+              display: 'ESC[120;9u',
+              hex: '1b 5b 31 32 30 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[120;9:3u',
+              display: 'ESC[120;9:3u',
+              hex: '1b 5b 31 32 30 3b 39 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57444;1:3u',
+              display: 'ESC[57444;1:3u',
+              hex: '1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'cmd_z',
+          label: 'Cmd-Z',
+          category: 'cmd',
+          status: 'captured',
+          note: 'macOS: terminal/OS may intercept undo.',
+          timeoutMs: 8000,
+          durationMs: 2326,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            57,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+          text: 'ESC[57444;9uESC[57444;1:3u',
+          display: 'ESC[57444;9uESC[57444;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57444;9u',
+              display: 'ESC[57444;9u',
+              hex: '1b 5b 35 37 34 34 34 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57444;1:3u',
+              display: 'ESC[57444;1:3u',
+              hex: '1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'cmd_v_empty',
+          label: 'Cmd-V (empty clipboard)',
+          category: 'cmd',
+          status: 'captured',
+          note: 'Script clears clipboard before this step. Empty capture or pasted-empty result are both useful.',
+          timeoutMs: 15000,
+          durationMs: 3078,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            57,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+          text: 'ESC[57444;9uESC[57444;1:3u',
+          display: 'ESC[57444;9uESC[57444;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57444;9u',
+              display: 'ESC[57444;9u',
+              hex: '1b 5b 35 37 34 34 34 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57444;1:3u',
+              display: 'ESC[57444;1:3u',
+              hex: '1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'cmd_v_known',
+          label: 'Cmd-V (known clipboard)',
+          category: 'cmd',
+          status: 'captured',
+          note: 'Script sets clipboard to "hal-capture-cmd-v" before this step.',
+          timeoutMs: 15000,
+          durationMs: 2477,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            57,
+            117,
+            104,
+            97,
+            108,
+            45,
+            99,
+            97,
+            112,
+            116,
+            117,
+            114,
+            101,
+            45,
+            99,
+            109,
+            100,
+            45,
+            118,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 34 3b 39 75 68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+          text: 'ESC[57444;9uhal-capture-cmd-vESC[57444;1:3u',
+          display: 'ESC[57444;9uhal-capture-cmd-vESC[57444;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57444;9u',
+              display: 'ESC[57444;9u',
+              hex: '1b 5b 35 37 34 34 34 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'h',
+              display: 'h',
+              hex: '68',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'l',
+              display: 'l',
+              hex: '6c',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'p',
+              display: 'p',
+              hex: '70',
+              kind: 'char'
+            },
+            {
+              text: 't',
+              display: 't',
+              hex: '74',
+              kind: 'char'
+            },
+            {
+              text: 'u',
+              display: 'u',
+              hex: '75',
+              kind: 'char'
+            },
+            {
+              text: 'r',
+              display: 'r',
+              hex: '72',
+              kind: 'char'
+            },
+            {
+              text: 'e',
+              display: 'e',
+              hex: '65',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'm',
+              display: 'm',
+              hex: '6d',
+              kind: 'char'
+            },
+            {
+              text: 'd',
+              display: 'd',
+              hex: '64',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'v',
+              display: 'v',
+              hex: '76',
+              kind: 'char'
+            },
+            {
+              text: 'ESC[57444;1:3u',
+              display: 'ESC[57444;1:3u',
+              hex: '1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u',
+            'char'
+          ]
+        }
+      ],
+      label: 'Kitty keyboard mode (>31u)',
+      enable: 'ESC[>31u',
+      disable: 'ESC[<u',
+      calibration: {
+        status: 'captured',
+        durationMs: 1602,
+        idleMs: 600,
+        bytes: [
+          27,
+          91,
+          50,
+          55,
+          117,
+          27,
+          91,
+          50,
+          55,
+          59,
+          49,
+          58,
+          51,
+          117
+        ],
+        hex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+        text: 'ESC[27uESC[27;1:3u',
+        display: 'ESC[27uESC[27;1:3u'
+      }
     }
   ],
   matrix: {
@@ -3788,6 +4240,14 @@
         tokenKinds: [
           'kitty-csi-u'
         ]
+      },
+      kitty31: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+        display: 'ESC[57444;9uESC[57444;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_v_empty: {
@@ -3798,10 +4258,27 @@
         tokenKinds: [
           'kitty-csi-u'
         ]
+      },
+      kitty31: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+        display: 'ESC[57444;9uESC[57444;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_v_known: {
       kitty11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 34 3b 39 75 68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+        display: 'ESC[57444;9uhal-capture-cmd-vESC[57444;1:3u',
+        tokenKinds: [
+          'kitty-csi-u',
+          'char'
+        ]
+      },
+      kitty31: {
         status: 'captured',
         hex: '1b 5b 35 37 34 34 34 3b 39 75 68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
         display: 'ESC[57444;9uhal-capture-cmd-vESC[57444;1:3u',
@@ -3829,10 +4306,26 @@
         tokenKinds: [
           'kitty-csi-u'
         ]
+      },
+      kitty31: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 31 32 30 3b 39 75 1b 5b 31 32 30 3b 39 3a 33 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+        display: 'ESC[57444;9uESC[120;9uESC[120;9:3uESC[57444;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_z: {
       kitty11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+        display: 'ESC[57444;9uESC[57444;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      },
+      kitty31: {
         status: 'captured',
         hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
         display: 'ESC[57444;9uESC[57444;1:3u',

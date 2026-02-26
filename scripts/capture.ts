@@ -77,7 +77,7 @@ type CliOptions = {
 	outPath?: string
 	preset: CapturePreset
 	profiles: string[]
-	step?: string
+	steps?: string[]
 	stepTimeoutMs: number
 	calibrationTimeoutMs: number
 	idleMs: number
@@ -287,7 +287,11 @@ function parseArgs(argv: string[]): CliOptions {
 			else if (arg === '--list-steps') opts.listSteps = true
 			else if (arg === '--terminal') opts.terminalLabel = next()
 			else if (arg === '--out') opts.outPath = next()
-			else if (arg === '--step') opts.step = next()
+			else if (arg === '--step') {
+				const raw = (next() || '').split(',').map((s) => s.trim()).filter(Boolean)
+				if (raw.length === 0) throw new Error('--step requires at least one step id')
+				opts.steps = raw
+			}
 			else if (arg === '--preset') {
 				const v = next() as CapturePreset
 				if (!PRESET_STEPS[v]) throw new Error(`Unknown preset: ${v}`)
@@ -326,7 +330,7 @@ Interactive terminal key capture for TUI keyboard fixtures.
 Options:
 	--preset <smoke|tui|full>         Step preset (default: tui)
 	--profiles <ids>                  Comma list: raw,kitty11,kitty31 (default: kitty11)
-	--step <n|id>                     Capture only one step by 1-based index or step id and rewrite it in output file
+	--step <ids>                      Capture specific steps (comma-separated ids or indices)
 	--terminal <label>                Terminal label for output filename (default: TERM_PROGRAM or TERM)
 	--out <path>                      Output ASON path (default: src/tests/fixtures/keys/keys-<terminal>.ason)
 	--step-timeout-ms <n>             Per-step timeout waiting for delimiter Esc (default: 8000)
@@ -363,17 +367,17 @@ function stepDescriptors(steps: CaptureStep[]) {
 	}))
 }
 
-function resolveSelectedStep(allSteps: CaptureStep[], selector: string): { step: CaptureStep; index: number } {
+function resolveStep(allSteps: CaptureStep[], selector: string): CaptureStep {
 	const trimmed = selector.trim()
 	if (/^\d+$/.test(trimmed)) {
 		const index = Number(trimmed) - 1
 		if (index < 0 || index >= allSteps.length)
 			throw new Error(`--step index out of range: ${trimmed} (1..${allSteps.length})`)
-		return { step: allSteps[index], index }
+		return allSteps[index]
 	}
-	const index = allSteps.findIndex((s) => s.id === trimmed)
-	if (index < 0) throw new Error(`--step id not found: ${trimmed}`)
-	return { step: allSteps[index], index }
+	const step = allSteps.find((s) => s.id === trimmed)
+	if (!step) throw new Error(`--step id not found: ${trimmed}`)
+	return step
 }
 
 function slug(s: string): string {
@@ -750,9 +754,10 @@ async function main(): Promise<void> {
 		listSteps(opts.preset)
 		return
 	}
-		const allSteps = PRESET_STEPS[opts.preset]
-		const selected = opts.step ? resolveSelectedStep(allSteps, opts.step) : null
-		const steps = selected ? [selected.step] : allSteps
+	const allSteps = PRESET_STEPS[opts.preset]
+	const steps = opts.steps
+		? opts.steps.map((s) => resolveStep(allSteps, s))
+		: allSteps
 		const terminalLabel = opts.terminalLabel || defaultTerminalLabel()
 		const outPath = resolve(opts.outPath || defaultOutPath(terminalLabel))
 		const profiles = opts.profiles.map(profileById)

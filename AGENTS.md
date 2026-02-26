@@ -4,7 +4,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 
 ## Rules
 
-- Use Bun. No build step.
+- Use Bun, never node.js. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).
 - Secrets live in `auth.ason` (gitignored). Non-secrets in `config.ason`.
 - Prompt logs are append-only: `state/sessions/<id>/prompts.ason`.
