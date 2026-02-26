@@ -376,6 +376,8 @@ async function _runTool(
 	}
 
 	if (name === 'read') {
+		if (typeof input?.path !== 'string' || !input.path.trim())
+			return 'error: read requires path'
 		const path = resolveToolPath(cwd, input.path)
 		const info = await stat(path)
 		if (info.isDirectory()) return `error: ${path} is a directory, not a file. Use the ls tool to list directory contents.`
@@ -407,14 +409,23 @@ async function _runTool(
 	}
 
 	if (name === 'write') {
+		if (typeof input?.path !== 'string' || !input.path.trim())
+			return 'error: write requires path'
+		if (typeof input?.content !== 'string') return 'error: write requires content'
 		const path = resolveToolPath(cwd, input.path)
-		const content = input.content ?? ''
+		const content = input.content
 		await logger(shortenHome(`[write] ${path} (${content.length} chars)`), 'tool')
 		await writeFile(path, content)
 		return 'ok'
 	}
 
 	if (name === 'edit') {
+		if (typeof input?.path !== 'string' || !input.path.trim())
+			return 'error: edit requires path'
+		if (input.operation !== 'replace' && input.operation !== 'insert')
+			return `error: unknown operation "${input.operation}"`
+		if (typeof input.new_content !== 'string')
+			return 'error: edit requires new_content'
 		const path = resolveToolPath(cwd, input.path)
 		const content = await readFile(path, 'utf-8')
 		let result: { result?: string; error?: string }
@@ -426,12 +437,10 @@ async function _runTool(
 				'tool',
 			)
 			result = applyEdit(content, input.start_ref, input.end_ref, input.new_content)
-		} else if (input.operation === 'insert') {
+		} else {
 			if (!input.after_ref) return 'error: insert requires after_ref'
 			await logger(shortenHome(`[edit] ${path} insert after ${input.after_ref}`), 'tool')
 			result = applyInsert(content, input.after_ref, input.new_content)
-		} else {
-			return `error: unknown operation "${input.operation}"`
 		}
 		if (result.error)
 			return `error: ${result.error}\n\nRe-read the file to get updated LINE:HASH references.`
