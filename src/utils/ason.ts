@@ -1,5 +1,5 @@
 // ASON — A Saner Object Notation
-// See docs/ason.md for format specification.
+// See docs/ason.md — keep it in sync when changing this file.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')

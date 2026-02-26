@@ -65,11 +65,12 @@ ASON files can contain multiple values, one per line — like JSONL.
 Used for append-only logs (`prompts.ason`, IPC files).
 
 - `parseAll(str)` — parse all values from a string.
-- `parseStream(stream)` — async generator from a `ReadableStream<Uint8Array>`. The first line silently ignores parse errors (supports reading from mid-stream).
+- `parseStream(stream)` — async generator from a `ReadableStream<Uint8Array>`. Reading from mid-stream is supported (ignores parse errors on the first line).
 
 ## Comment preservation
 
 `parse(str, { comments: true })` attaches comments to the parsed result as symbol-keyed metadata.
+Trailing comments and comments outside the root value are lost (sorry!).
 
 ```ts
 import { parse, stringify, COMMENTS } from './src/utils/ason.ts'
@@ -90,14 +91,6 @@ stringify(obj)
 // }
 ```
 
-### How it works
-
-- **Objects**: `obj[COMMENTS]` is a `Record<string, string>` mapping key → comment text.
-- **Arrays**: `arr[COMMENTS]` is a sparse `(string | undefined)[]` mapping index → comment text.
-- **Blank lines**: A blank line before a comment is encoded as a leading `\n` in the comment string.
-- Comments between a value and the next key/element attach to the next key/element.
-- Only comments *before* keys/elements survive roundtrip. Trailing comments are lost.
-
 ## Types
 
 ```ts
@@ -112,7 +105,7 @@ type AsonObject = { [key: string]: AsonValue; [COMMENTS]?: Record<string, string
 
 ## API
 
-```ts
+```
 // Parse
 parse(str)                          → AsonValue
 parse(str, { comments: true })      → AsonValue (with [COMMENTS] metadata)
@@ -123,9 +116,6 @@ parseStream(stream)                 → AsyncGenerator<AsonValue>
 stringify(value)                    → string (smart mode, 80-col wrap)
 stringify(value, 'short')           → string (single line, no comments)
 stringify(value, 'long')            → string (always expanded)
-
-// Comment symbol
-COMMENTS                            → Symbol('comments')
 ```
 
 ## Implementation
