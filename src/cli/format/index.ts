@@ -1,6 +1,7 @@
 import type { RuntimeCommand, RuntimeEvent } from '../../protocol.ts'
 import type { Formatter } from './types.ts'
 import { getStyle } from './theme.ts'
+import { buildPromptBlockFormatter } from '../tui/format/prompt.ts'
 
 const RESET = '\x1b[0m'
 
@@ -17,17 +18,19 @@ function termCols(): number {
 function getFormatter(kind: string): Formatter {
 	if (kind === 'prompt') {
 		return {
-			style: getStyle('prompt.text'),
+			style: '',
 			blockStart(cols: number): string {
-				const bar = getStyle('prompt.bar')
-				void cols
-				// Fill the whole viewport row at render time so prompt separators reflow on resize.
-				return `\n${bar}\x1b[K${RESET}\n`
+				return buildPromptBlockFormatter(cols).blockStart
 			},
 			blockEnd(cols: number): string {
-				const bar = getStyle('prompt.bar')
-				void cols
-				return `${bar}\x1b[K${RESET}\n`
+				return buildPromptBlockFormatter(cols).blockEnd
+			},
+			formatText(text: string): string {
+				const f = buildPromptBlockFormatter(termCols())
+				return text
+					.split('\n')
+					.map((line) => `${f.lineStart}${line}${f.lineEnd}`)
+					.join('\n')
 			},
 		}
 	}
