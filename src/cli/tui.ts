@@ -1549,17 +1549,12 @@ function handleKey(key: string): void {
 	// Arrow up
 	if (key === '\x1b[A' || key === '\x1bOA') {
 		clearInputTextSelection()
-		if (inputBuf.includes('\n')) {
-			const pos = inputCursor
-			const lineStart = inputBuf.lastIndexOf('\n', pos - 1)
-			if (lineStart >= 0) {
-				const colInLine = pos - lineStart - 1
-				const prevLineStart = inputBuf.lastIndexOf('\n', lineStart - 1) + 1
-				const prevLineLen = lineStart - prevLineStart
-				inputCursor = prevLineStart + Math.min(colInLine, prevLineLen)
-				render()
-				return
-			}
+		const contentWidth = cols() - 1 - inputPromptStr.length
+		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
+		if (row > 0) {
+			inputCursor = wrappedRowColToCursor(inputBuf, row - 1, col, contentWidth)
+			render()
+			return
 		}
 		if (inputHistory.length === 0) return
 		if (historyIndex < 0) {
@@ -1575,20 +1570,13 @@ function handleKey(key: string): void {
 	// Arrow down
 	if (key === '\x1b[B' || key === '\x1bOB') {
 		clearInputTextSelection()
-		if (inputBuf.includes('\n')) {
-			const pos = inputCursor
-			const nextNewline = inputBuf.indexOf('\n', pos)
-			if (nextNewline >= 0) {
-				const lineStart = inputBuf.lastIndexOf('\n', pos - 1) + 1
-				const colInLine = pos - lineStart
-				const nextLineStart = nextNewline + 1
-				const nextNextNewline = inputBuf.indexOf('\n', nextLineStart)
-				const nextLineLen =
-					(nextNextNewline >= 0 ? nextNextNewline : inputBuf.length) - nextLineStart
-				inputCursor = nextLineStart + Math.min(colInLine, nextLineLen)
-				render()
-				return
-			}
+		const contentWidth = cols() - 1 - inputPromptStr.length
+		const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
+		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
+		if (row < lines.length - 1) {
+			inputCursor = wrappedRowColToCursor(inputBuf, row + 1, col, contentWidth)
+			render()
+			return
 		}
 		if (historyIndex < 0) return
 		if (historyIndex < inputHistory.length - 1) {
