@@ -4,6 +4,7 @@ import { getStyle } from './theme.ts'
 import { styleLinePrefix } from '../tui/format/line-prefix.ts'
 import { buildPromptBlockFormatter } from '../tui/format/prompt.ts'
 import { chunkPrefixForStability } from '../tui/format/chunk-stability.ts'
+import { applyStylePerLine } from '../tui/format/line-style.ts'
 
 const RESET = '\x1b[0m'
 
@@ -69,7 +70,7 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	if (kind === 'chunk.assistant' || kind === 'chunk.thinking') {
 		// Keep ANSI state stable when switching channel/style so wrapped lines don't get brightness seams.
 		const prefix = chunkPrefixForStability(kind, prev)
-		return `${prefix}${style}${content}${reset}`
+		return `${prefix}${applyStylePerLine(style, content)}`
 	}
 
 	// When previous output was a streaming chunk (no trailing newline), add one
