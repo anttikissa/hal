@@ -30,7 +30,8 @@ function trimUrlEnd(url: string): string {
 	let end = url.length
 	while (end > 0) {
 		const ch = url[end - 1]
-		if (ch === '.' || ch === ',' || ch === ';' || ch === ':' || ch === '!' || ch === '?') {
+		if (ch === '.' || ch === ',' || ch === ';' || ch === ':' || ch === '!' || ch === '?' ||
+			ch === '*' || ch === '`' || ch === '_' || ch === '~') {
 			end--
 			continue
 		}
@@ -55,11 +56,38 @@ function trimUrlEnd(url: string): string {
 	return url.slice(0, end)
 }
 
+/** Trim trailing prose punctuation only (not markdown chars like * ` _ ~) */
+function trimProsePunctuation(url: string): string {
+	let end = url.length
+	while (end > 0) {
+		const ch = url[end - 1]
+		if (ch === '.' || ch === ',' || ch === ';' || ch === ':' || ch === '!' || ch === '?') {
+			end--
+			continue
+		}
+		if (ch === ')' && countChar(url, ')', end) > countChar(url, '(', end)) {
+			end--
+			continue
+		}
+		if (ch === ']' && countChar(url, ']', end) > countChar(url, '[', end)) {
+			end--
+			continue
+		}
+		if (ch === "'" || ch === '"' || ch === '>') {
+			end--
+			continue
+		}
+		break
+	}
+	return url.slice(0, end)
+}
+
 export function normalizeDetectedUrl(url: string): string {
 	let value = url.trim()
 	let changed = true
 	while (changed && value.length > 1) {
 		changed = false
+		// Try matching wrapper pairs first (before trimming eats the closing char)
 		const first = value[0]
 		const last = value[value.length - 1]
 		if (
@@ -76,8 +104,16 @@ export function normalizeDetectedUrl(url: string): string {
 		) {
 			value = value.slice(1, -1).trim()
 			changed = true
+			continue
+		}
+		// Strip trailing prose punctuation (preserves markdown chars for pair matching)
+		const trimmed = trimProsePunctuation(value)
+		if (trimmed.length < value.length) {
+			value = trimmed
+			changed = true
 		}
 	}
+	// Final pass: strip any remaining trailing markdown chars (no leading match)
 	return trimUrlEnd(value)
 }
 

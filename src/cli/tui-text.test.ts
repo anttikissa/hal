@@ -279,5 +279,12 @@ describe('normalizeDetectedUrl', () => {
 		expect(normalizeDetectedUrl('`http://localhost:9001`.')).toBe('http://localhost:9001')
 		expect(normalizeDetectedUrl('"https://example.com,"')).toBe('https://example.com')
 	})
+
+	it('handles URL with trailing markdown chars (no leading match)', () => {
+		// urlAtCol returns "http://localhost:9001**" when regex grabs trailing **
+		expect(normalizeDetectedUrl('http://localhost:9001**')).toBe('http://localhost:9001')
+		expect(normalizeDetectedUrl('http://localhost:9001`')).toBe('http://localhost:9001')
+		expect(normalizeDetectedUrl('http://localhost:9001__')).toBe('http://localhost:9001')
+	})
 })
 
