@@ -2,13 +2,13 @@
  * State-driven terminal UI with alternate screen buffer.
  *
  * Layout:
- *   Row  1                        = title bar (dim)
- *   Rows 2..(rows - footerH)     = output viewport (word-wrapped, scrollable)
- *   Row  (rows - footerH + 1)    = activity line (dim)
- *   Row  (rows - footerH + 2)    = status line (─[tabs]── context ─)
- *   Row  (rows - footerH + 3)    = empty dark-grey pad
- *   Rows ...                      = prompt text lines (dark-grey bg)
- *   Row  rows                     = empty dark-grey pad
+ *   Row  1                        = Title bar
+ *   Rows 2..(rows - footerH)     = Output (word-wrapped, scrollable)
+ *   Row  (rows - footerH + 1)    = Activity bar
+ *   Row  (rows - footerH + 2)    = Tab bar / status bar
+ *   Row  (rows - footerH + 3)    = Input top pad (dark-grey)
+ *   Rows ...                      = Input (dark-grey background)
+ *   Row  rows                     = Input bottom pad (dark-grey)
  *
  * Single render() redraws every row from state on each change.
  */

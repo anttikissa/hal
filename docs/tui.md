@@ -20,7 +20,7 @@ It is a single stateful module (module-level mutable state, no classes) that own
 
 - alternate-screen rendering
 - input line editing
-- output viewport scrolling/wrapping
+- output scrolling/wrapping
 - mouse selection + link hover/click support
 - terminal mode management (mouse, bracketed paste, Kitty keyboard protocol)
 
@@ -43,14 +43,14 @@ It does **not** own app-level behavior like tabs/sessions/commands. `src/cli/cli
 
 The TUI is a **state-driven full redraw renderer**.
 
-- Row 1: title bar
-- Rows `2..outputBottom()`: output viewport (scrollable, wrapped)
+- Row 1: **Title bar**
+- Rows `2..outputBottom()`: **Output** (scrollable, wrapped)
 - Footer:
-  - activity line
-  - status line
-  - top pad
-  - prompt lines (1..`maxPromptLines`)
-  - bottom pad
+  - **Activity bar**
+  - **Tab bar / status bar**
+  - input top pad
+  - **Input** lines (1..`maxPromptLines`)
+  - input bottom pad
 
 `render()` redraws every row from current state. There is no diffing/patching layer.
 
@@ -108,7 +108,7 @@ Wrapping is computed on demand:
 - `getTotalVisualLines()` caches total wrapped rows by terminal width
 - `getVisibleWrapped(...)` builds only the visible window (plus scroll offset slack) by walking backward from the tail
 
-The output viewport is therefore:
+The **Output** region is therefore:
 
 - stored as logical lines
 - rendered as wrapped visual rows
@@ -120,7 +120,7 @@ The output viewport is therefore:
 
 - recomputes viewport geometry
 - clamps scroll offset
-- renders title/output/activity/status/prompt rows into a string chunk array
+- renders title/output/activity/tab/input rows into a string chunk array
 - writes one combined ANSI frame to stdout
 - positions cursor for input editing
 
