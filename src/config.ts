@@ -17,6 +17,7 @@ export interface DebugConfig {
 	streaming?: boolean // log raw SSE events
 	tokens?: DebugTokensConfig // token logging
 	recordEverything?: boolean // streaming debug log: state files, keypresses, snapshots
+	maxDiskBytes?: number // max bytes for state/debug + state/bugs (default: 2 GiB)
 }
 
 export interface Config {
@@ -148,4 +149,12 @@ export function debugTokens(flag: keyof DebugTokensConfig): boolean {
 	const tokens = loadConfig().debug?.tokens
 	if (!tokens || typeof tokens !== 'object') return false
 	return tokens[flag] === true
+}
+
+const DEFAULT_DEBUG_MAX_DISK_BYTES = 2 * 1024 * 1024 * 1024
+
+export function debugMaxDiskBytes(): number {
+	const raw = loadConfig().debug?.maxDiskBytes
+	if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return DEFAULT_DEBUG_MAX_DISK_BYTES
+	return Math.floor(raw)
 }

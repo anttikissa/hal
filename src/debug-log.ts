@@ -8,12 +8,12 @@
  * /bug <desc> appends a bug record with terminal snapshot and saves a copy.
  */
 
-import { appendFile, mkdir, readFile, readdir, stat } from 'fs/promises'
+import { appendFile, mkdir, readFile, readdir, rm, stat } from 'fs/promises'
 
 import { resolve, relative } from 'path'
 import { stringify } from './utils/ason.ts'
 import { STATE_DIR, HAL_DIR } from './state.ts'
-import { loadConfig } from './config.ts'
+import { loadConfig, debugMaxDiskBytes } from './config.ts'
 
 const DEBUG_DIR = `${STATE_DIR}/debug`
 const BUGS_DIR = `${STATE_DIR}/bugs`
@@ -22,6 +22,8 @@ let enabled = false
 let buffer: any[] = []
 let flushTimer: ReturnType<typeof setTimeout> | null = null
 const FLUSH_MS = 100
+let pruning = false
+let pendingPrune = false
 
 export function getDebugLogPath(): string | null {
 	return logPath
@@ -34,6 +36,61 @@ async function flush(): Promise<void> {
 	flushTimer = null
 	const lines = records.map((r) => stringify(r, 'short')).join('\n') + '\n'
 	await appendFile(logPath, lines)
+	schedulePrune()
+}
+
+async function runPrune(): Promise<void> {
+	if (pruning) {
+		pendingPrune = true
+		return
+	}
+	pruning = true
+	try {
+		const limit = debugMaxDiskBytes()
+		if (limit <= 0) return
+		type Entry = { path: string; size: number; mtimeMs: number }
+		const entries: Entry[] = []
+		for (const dir of [DEBUG_DIR, BUGS_DIR]) {
+			let names: string[]
+			try {
+				names = await readdir(dir)
+			} catch {
+				continue
+			}
+			for (const name of names) {
+				const full = resolve(dir, name)
+				let s: Awaited<ReturnType<typeof stat>>
+				try {
+					s = await stat(full)
+				} catch {
+					continue
+				}
+				if (!s.isFile()) continue
+				entries.push({ path: full, size: s.size, mtimeMs: s.mtimeMs })
+			}
+		}
+		let total = entries.reduce((sum, e) => sum + e.size, 0)
+		if (total <= limit) return
+		entries.sort((a, b) => a.mtimeMs - b.mtimeMs)
+		for (const entry of entries) {
+			if (total <= limit) break
+			if (entry.path === logPath) continue
+			try {
+				await rm(entry.path, { force: true })
+				total -= entry.size
+			} catch {}
+		}
+	} finally {
+		pruning = false
+		if (pendingPrune) {
+			pendingPrune = false
+			void runPrune()
+		}
+	}
+}
+
+function schedulePrune(): void {
+	void runPrune()
 }
 
 function scheduleFlush(): void {
@@ -68,8 +125,8 @@ export async function saveBugReport(description: string, terminal: string): Prom
 	await mkdir(BUGS_DIR, { recursive: true })
 	const id = `bug-${Date.now()}`
 	const bugPath = resolve(BUGS_DIR, `${id}.ason`)
-	const proc = Bun.spawn(['cp', logPath, bugPath])
-	await proc.exited
+	await Bun.write(bugPath, Bun.file(logPath))
+	schedulePrune()
 	return bugPath
 }
 
@@ -98,6 +155,7 @@ export async function initDebugLog(pid: number): Promise<void> {
 	await mkdir(DEBUG_DIR, { recursive: true })
 	logPath = resolve(DEBUG_DIR, `process.${pid}.ason`)
 	enabled = loadConfig().debug?.recordEverything === true
+	schedulePrune()
 
 	if (!enabled) return
 

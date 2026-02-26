@@ -127,7 +127,7 @@ export async function startHal(options?: StartHalOptions): Promise<TestHal> {
 	writeFileSync(`${halDir}/config.ason`, options?.config ?? "{ model: 'anthropic/claude-opus-4-6' }\n")
 	if (options?.setup) await options.setup({ halDir, stateDir })
 
-	const baseEnv: Record<string, string> = { ...process.env }
+	const baseEnv: Record<string, string> = { ...process.env } as Record<string, string>
 	if (options?.env) {
 		for (const [k, v] of Object.entries(options.env)) baseEnv[k] = v
 	}
