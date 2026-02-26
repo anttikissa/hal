@@ -149,7 +149,7 @@ function completeInput(prefix: string): string[] {
 function activityBarText(tab: CliTab): string {
 	if (tab.paused) return `Paused • ${tab.modelLabel} — Enter to resume, /drop to clear queue`
 	if (tab.busy) return `${tab.modelLabel} • ${tab.activity || 'Working...'}`
-	return `Idle • ${tab.modelLabel}`
+	return `Done. • ${tab.modelLabel}`
 }
 
 function sessionName(session: Pick<SessionInfo, 'name' | 'workingDir' | 'id'>): string {
@@ -780,11 +780,10 @@ function render(event: RuntimeEvent): void {
 		const isActivityOnly = 'activity' in event && event.activity !== undefined
 
 		if (isActivityOnly) {
-			// Activity-only update — route activity to the correct tab and infer busy state
+			// Activity-only update — route to the correct tab (busy state comes only from full status events)
 			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
 			if (tab) {
 				tab.activity = event.activity!
-				tab.busy = event.activity !== ''
 			}
 		} else {
 			// Full status update — sync per-tab busy and paused state

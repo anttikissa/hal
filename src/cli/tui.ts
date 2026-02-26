@@ -1085,7 +1085,7 @@ function render(): void {
 
 	// Activity line
 	const aRow = activityRow()
-	const activityLine = truncateAnsi(`${DIM}${activityStr ? `  Model: ${activityStr}` : '  Model: Idle'}`, c)
+	const activityLine = truncateAnsi(`${DIM}${activityStr ? `  Model: ${activityStr}` : '  Model: Done.'}`, c)
 	lastActivityLine = activityLine
 	chunks.push(`\x1b[${aRow};1H\x1b[2K`)
 	if (selRange?.surface === 'activity') chunks.push(renderLineWithSelection(activityLine, 0, selRange))
