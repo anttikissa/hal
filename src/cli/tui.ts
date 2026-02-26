@@ -1244,6 +1244,9 @@ function normalizeKittyKey(key: string): string | null {
 	// Only process press and repeat events (ignore release)
 	if (eventType === 3) return null
 
+	// Modifier-only keys (Shift, Ctrl, Alt, etc.) — suppress even with other modifiers held
+	if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
+
 	const mods = Math.max(0, rawModifier - 1)
 
 	// Super combos: keep as CSI u for handlers that want them
@@ -1276,9 +1279,6 @@ function normalizeKittyKey(key: string): string | null {
 		if (codepoint === 27) return '\x1b'
 		if (codepoint === 127) return '\x7f'
 	}
-
-	// Kitty functional keys (BMP Private Use Area U+E000–U+F8FF): suppress
-	if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
 
 	// Plain or Shift-only printable: prefer associated text (accounts for shift/layout)
 	if ((mods === 0 || mods === 1) && (text || codepoint >= 0x20)) {

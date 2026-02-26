@@ -160,6 +160,58 @@ describe('Kitty functional key normalization regressions', () => {
 	})
 })
 
+// ── Modifier-only key suppression ──
+
+describe('modifier-only keys are suppressed', () => {
+	// PUA codepoints: Shift_L=57441 Shift_R=57442 Ctrl_L=57443 Alt_L=57445
+	// rawModifier bits: Shift=1 Alt=2 Ctrl=4 Super=8 (add 1 for CSI u encoding)
+
+	it('suppresses bare Shift press', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[57441;2:1u')).toBeNull()
+	})
+
+	it('suppresses Shift release', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[57441;2:3u')).toBeNull()
+	})
+
+	it('suppresses Cmd+Shift (Shift press while Super held)', () => {
+		_testTuiKeys.resetState()
+		// rawModifier = Shift(1) + Super(8) + 1 = 10
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[57441;10:1u')).toBeNull()
+	})
+
+	it('suppresses Ctrl+Shift (Shift press while Ctrl held)', () => {
+		_testTuiKeys.resetState()
+		// rawModifier = Shift(1) + Ctrl(4) + 1 = 6
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[57441;6:1u')).toBeNull()
+	})
+
+	it('suppresses Cmd+Ctrl+Shift (Shift press while Super+Ctrl held)', () => {
+		_testTuiKeys.resetState()
+		// rawModifier = Shift(1) + Ctrl(4) + Super(8) + 1 = 14
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[57441;14:1u')).toBeNull()
+	})
+
+	it('suppresses bare Alt/Option press', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[57445;3:1u')).toBeNull()
+	})
+
+	it('suppresses bare Ctrl press', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[57443;5:1u')).toBeNull()
+	})
+
+	it('does NOT suppress real keys with Super modifier (e.g. Cmd+A)', () => {
+		_testTuiKeys.resetState()
+		// codepoint 97 = 'a', rawModifier = Super(8) + 1 = 9
+		const result = _testTuiKeys.normalizeKittyKey('\x1b[97;9u')
+		expect(result).not.toBeNull()
+	})
+})
+
 // ── Ghostty-specific normalization (original tests) ──
 
 describe('tui Kitty/Ghostty key interpretation (Ghostty fixture baseline)', () => {
