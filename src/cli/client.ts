@@ -133,6 +133,11 @@ function sessionName(session: Pick<SessionInfo, 'name' | 'workingDir' | 'id'>): 
 	return session.id.slice(0, 8)
 }
 
+function titleBarText(tab: Pick<CliTab, 'title' | 'name' | 'workingDir' | 'sessionId'>): string {
+	const sessionLabel = tab.name || basename(tab.workingDir || '') || tab.sessionId.slice(0, 8)
+	return tab.title ? `${tab.title} — ${sessionLabel}` : sessionLabel
+}
+
 // Module state
 let source: RuntimeCommand['source']
 let isOwner = false
@@ -308,7 +313,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	resetFormat()
 	lastContextStatus = active.contextStatus
 	setActivityLine(active.busy ? active.activity || 'Working...' : '')
-	setTitleBar(active.title)
+	setTitleBar(titleBarText(active))
 	setInputHistory(active.inputHistory)
 	setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) {

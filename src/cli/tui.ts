@@ -56,6 +56,7 @@ const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
+const TITLE_BG = '\x1b[48;5;238m'
 // Flags: 1=disambiguate, 2=report events, 8=report all (Super key), 16=report associated text
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
@@ -1058,7 +1059,8 @@ function render(): void {
 	// Row 1: title bar
 	chunks.push(`\x1b[1;1H\x1b[2K`)
 	const titleText = titleBarStr || 'New conversation'
-	chunks.push(truncateAnsi(`${TITLE_DIM}  ${titleText}`, c))
+	const titleLine = `${TITLE_BG}${TITLE_DIM}  ${titleText}`
+	chunks.push(truncateAnsi(titleLine, c) + RESET
 
 	// Rows 2..ob: output viewport
 	for (let row = 2; row <= ob; row++) {
