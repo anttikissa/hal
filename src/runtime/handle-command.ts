@@ -9,6 +9,7 @@ import {
 	resolveCompactModel,
 	providerForModel,
 	modelIdForModel,
+	MODEL_ALIASES,
 } from '../config.ts'
 import { getProvider } from '../provider.ts'
 import { drainQueuedCommands } from './command-scheduler.ts'
@@ -328,6 +329,11 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 		const globalDefault = resolveModel(loadConfig().model)
 		const suffix = meta?.model ? ` (global default: ${globalDefault})` : ' (global default)'
 		await publishLine(`[model] current: ${current}${suffix}`, 'info', sessionId)
+		const aliases = Object.entries(MODEL_ALIASES).map(([alias, full]) => {
+			const marker = full === current ? ' (active)' : ''
+			return `  ${alias} → ${full}${marker}`
+		})
+		await publishLine(`[model] available:\n${aliases.join('\n')}`, 'info', sessionId)
 		return
 	}
 

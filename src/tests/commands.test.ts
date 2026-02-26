@@ -11,12 +11,14 @@ afterEach(async () => {
 })
 
 describe('commands', () => {
-	test('/model shows current model', async () => {
+	test('/model shows current model and lists available', async () => {
 		hal = await startHal()
 		await hal.waitForReady()
 		hal.sendLine('/model')
-		const event = await hal.waitForLine(/\[model\] current:/)
-		expect(event.level).toBe('info')
+		await hal.waitForLine(/\[model\] current:/)
+		const list = await hal.waitForLine(/\[model\] available:/)
+		expect(list.level).toBe('info')
+		expect(list.text).toContain('claude')
 	})
 
 	test('/model switches model', async () => {
