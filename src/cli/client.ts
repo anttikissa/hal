@@ -107,6 +107,9 @@ export class Client {
 
 
 const ALL_MODELS = [...Object.keys(MODEL_ALIASES), ...Object.values(MODEL_ALIASES)]
+const TAB_ACTIVE = '\x1b[97m'
+const TAB_INACTIVE = '\x1b[38;5;245m'
+const TAB_RESET = '\x1b[0m'
 
 function normalizeCommandInput(input: string): string {
 	return stripAnsi(input)
@@ -158,6 +161,29 @@ function sessionName(session: Pick<SessionInfo, 'name' | 'workingDir' | 'id'>): 
 	return session.id.slice(0, 8)
 }
 
+function tabNameBase(tab: Pick<CliTab, 'workingDir' | 'name'>): string {
+	const dir = basename(tab.workingDir || '')
+	if (dir) return dir
+	const fallback = tab.name.split(':', 1)[0].trim()
+	return fallback || 'tab'
+}
+
+function tabDisplayNames(items: CliTab[]): string[] {
+	const counts = new Map<string, number>()
+	for (const tab of items) {
+		const base = tabNameBase(tab)
+		counts.set(base, (counts.get(base) ?? 0) + 1)
+	}
+	const seen = new Map<string, number>()
+	return items.map((tab) => {
+		const base = tabNameBase(tab)
+		if ((counts.get(base) ?? 0) <= 1) return base
+		const idx = (seen.get(base) ?? 0) + 1
+		seen.set(base, idx)
+		return `${base}.${idx}`
+	})
+}
+
 function titleBarText(tab: Pick<CliTab, 'title' | 'name' | 'workingDir' | 'sessionId'>): string {
 	const sessionLabel = tab.name || basename(tab.workingDir || '') || tab.sessionId.slice(0, 8)
 	return tab.title ? `${tab.title} — ${sessionLabel}` : sessionLabel
@@ -177,6 +203,7 @@ let activeTabIndex = 0
 let launchCwd = ''
 let pendingForkOutput: string | null = null
 let pendingForkSwitch = false
+let tabHasActivity = new Set<string>()
 
 export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src
@@ -320,6 +347,7 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 	]
 
 	activeTabIndex = 0
+	tabHasActivity = new Set()
 	applyActiveTabSnapshot(false)
 }
 
@@ -563,6 +591,7 @@ function syncTabsFromSessions(
 			bootstrapSent: existing?.bootstrapSent ?? false,
 		}
 	})
+	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id))
 
 	// Pick which tab to focus next
 	let targetSessionId: string
@@ -726,8 +755,13 @@ function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: bool
 
 	const text = pushEvent(event, source)
 	if (!text) return
-	if (renderToScreen) tui.write(text)
-	else tab.output += text
+	if (renderToScreen) {
+		tui.write(text)
+		tabHasActivity.delete(tab.sessionId)
+	} else {
+		tab.output += text
+		tabHasActivity.add(tab.sessionId)
+	}
 }
 
 function render(event: RuntimeEvent): void {
@@ -797,6 +831,7 @@ function render(event: RuntimeEvent): void {
 	if (!tab) return
 
 	if (tab === activeTab()) {
+	tabHasActivity.delete(tab.sessionId)
 		renderEventToTab(tab, event, true)
 		renderBusyStatus()
 		return
@@ -805,16 +840,21 @@ function render(event: RuntimeEvent): void {
 	renderEventToTab(tab, event, false)
 }
 
-/** Build tab portion for the status line: [1:tab] 2:tab  3:tab */
+/** Build tab bar: [1 .hal] 2 .config  3* project.2 */
 function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ''
-	return tabs
-		.slice(0, 9)
+	const visibleTabs = tabs.slice(0, 9)
+	const labels = tabDisplayNames(visibleTabs)
+	return visibleTabs
 		.map((tab, i) => {
-			const label = `${i + 1}:${tab.name}`
-			return i === activeTabIndex ? `[${label}]` : ` ${label} `
+			const number = String(i + 1)
+			const active = i === activeTabIndex
+			const activity = !active && tabHasActivity.has(tab.sessionId) ? '*' : ' '
+			const text = `${number}${activity}${labels[i]}`
+			if (active) return `${TAB_ACTIVE}[${text}]${TAB_RESET}`
+			return `${TAB_INACTIVE}${text}${TAB_RESET}`
 		})
-		.join('')
+		.join('  ')
 }
 
 function renderBusyStatus(): void {

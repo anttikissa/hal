@@ -33,6 +33,7 @@ import {
 } from './tui-input-layout.ts'
 export { stripAnsi } from './format/index.ts'
 import { stripAnsi } from './format/index.ts'
+import { buildStatusBarLine } from './tui/format/status-bar.ts'
 
 // ── Constants ──
 
@@ -54,7 +55,6 @@ const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m'
 const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
-const STATUS_DIM = '\x1b[38;5;242m'
 const TITLE_DIM = '\x1b[38;5;245m'
 const TITLE_BG = '\x1b[48;5;238m'
 // Flags: 1=disambiguate, 2=report events, 8=report all (Super key), 16=report associated text
@@ -341,22 +341,7 @@ function scroll(lines: number): void {
 // ── Status line builder ──
 
 function buildStatusLine(): string {
-	const c = cols()
-	const left = statusTabsStr
-	const right = headerFlash || statusRightStr
-	const rightPart = right ? ` ${right} ─` : ' ─'
-	const leftPart = left ? `─${left}─` : '─'
-
-	// Scroll indicator
-	let scrollPart = ''
-	if (scrollOffset > 0) {
-		scrollPart = ` ↑${scrollOffset} `
-	}
-
-	const fixedLen = leftPart.length + scrollPart.length + rightPart.length
-	const dashCount = Math.max(0, c - fixedLen)
-	const line = leftPart + '─'.repeat(dashCount) + scrollPart + rightPart
-	return `${STATUS_DIM}${line.slice(0, c)}${RESET}`
+	return buildStatusBarLine(cols(), statusTabsStr, headerFlash || statusRightStr, scrollOffset)
 }
 
 // ── Input selection/edit helpers ──
