@@ -14,6 +14,16 @@
 //   parseAll(str)       - ASON string → array of values (JSONL-style)
 //   parseStream(stream) - async generator yielding values from a byte stream
 
+export const COMMENTS = Symbol('comments')
+
+export type AsonValue =
+	| string | number | boolean | null | undefined
+	| AsonArray
+	| AsonObject
+
+export type AsonArray = AsonValue[] & { [COMMENTS]?: (string | undefined)[] }
+export type AsonObject = { [key: string]: AsonValue; [COMMENTS]?: Record<string, string> }
+
 // --- Stringify ---
 
 function quoteString(s: string): string {
@@ -39,7 +49,7 @@ function indentComment(comment: string, pad: string): string {
 	return lines.map(l => l ? pad + l : '').join('\n')
 }
 
-function stringifyValue(obj: any, col: number, depth: number, maxWidth: number): string {
+function stringifyValue(obj: AsonValue, col: number, depth: number, maxWidth: number): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
@@ -53,7 +63,7 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
-		const comments = maxWidth < Infinity ? (obj as any)[COMMENTS] as (string | undefined)[] | undefined : undefined
+		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
 		const items = obj.map((v) => stringifyValue(v, 0, depth, maxWidth))
 		const inline = `[${items.join(', ')}]`
 		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
@@ -68,11 +78,12 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 	}
 
 	if (typeof obj === 'object') {
-		const keys = Object.keys(obj)
+		const rec = obj as AsonObject
+		const keys = Object.keys(rec)
 		if (keys.length === 0) return '{}'
-		const comments = maxWidth < Infinity ? obj[COMMENTS] as Record<string, string> | undefined : undefined
+		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
 		const pairs = keys.map(
-			(k) => `${quoteKey(k)}: ${stringifyValue(obj[k], 0, depth, maxWidth)}`,
+			(k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`,
 		)
 		const inline = `{ ${pairs.join(', ')} }`
 		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
@@ -82,7 +93,7 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 			const comment = comments?.[k]
 			const prefix = comment ? indentComment(comment, pad) + '\n' : ''
 			const keyPrefix = `${pad}${quoteKey(k)}: `
-			const val = stringifyValue(obj[k], keyPrefix.length, childDepth, maxWidth)
+			const val = stringifyValue(rec[k], keyPrefix.length, childDepth, maxWidth)
 			return `${prefix}${keyPrefix}${val}${i < keys.length - 1 ? ',' : ''}`
 		})
 		return `{\n${lines.join('\n')}\n${'  '.repeat(depth)}}`
@@ -93,14 +104,12 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 
 export type StringifyMode = 'short' | 'smart' | 'long'
 
-export function stringify(obj: any, mode: StringifyMode = 'smart'): string {
+export function stringify(obj: AsonValue, mode: StringifyMode = 'smart'): string {
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
 	return stringifyValue(obj, 0, 0, maxWidth)
 }
 
 // --- Parse ---
-
-export const COMMENTS = Symbol('comments')
 
 type Ctx = { buf: string; pos: number; comments?: boolean }
 
@@ -233,9 +242,9 @@ function parseKey(ctx: Ctx): string {
 	return ctx.buf.slice(start, ctx.pos)
 }
 
-function parseObject(ctx: Ctx): Record<string, any> {
+function parseObject(ctx: Ctx): AsonObject {
 	ctx.pos++ // skip {
-	const obj: Record<string, any> = {}
+	const obj: AsonObject = {}
 	let commentMap: Record<string, string> | undefined
 	while (true) {
 		const comment = skipWhite(ctx)
@@ -254,9 +263,9 @@ function parseObject(ctx: Ctx): Record<string, any> {
 	return obj
 }
 
-function parseArray(ctx: Ctx): any[] {
+function parseArray(ctx: Ctx): AsonArray {
 	ctx.pos++ // skip [
-	const arr: any[] = []
+	const arr: AsonArray = [] as AsonArray
 	let commentArr: (string | undefined)[] | undefined
 	while (true) {
 		const comment = skipWhite(ctx)
@@ -269,11 +278,11 @@ function parseArray(ctx: Ctx): any[] {
 		skipWhite(ctx)
 		if (peek(ctx) === ',') ctx.pos++
 	}
-	if (commentArr) (arr as any)[COMMENTS] = commentArr
+	if (commentArr) arr[COMMENTS] = commentArr
 	return arr
 }
 
-function parseAny(ctx: Ctx): any {
+function parseAny(ctx: Ctx): AsonValue {
 	skipWhite(ctx)
 	const ch = peek(ctx)
 	if (ch === '{') return parseObject(ctx)
@@ -293,7 +302,7 @@ function parseAny(ctx: Ctx): any {
 	fail(ctx, 'Unexpected token')
 }
 
-export function parse(str: string, opts?: { comments?: boolean }): any {
+export function parse(str: string, opts?: { comments?: boolean }): AsonValue {
 	const ctx: Ctx = { buf: str, pos: 0, comments: opts?.comments }
 	const value = parseAny(ctx)
 	skipWhite(ctx)
@@ -301,9 +310,9 @@ export function parse(str: string, opts?: { comments?: boolean }): any {
 	return value
 }
 
-export function parseAll(str: string): any[] {
+export function parseAll(str: string): AsonValue[] {
 	const ctx: Ctx = { buf: str, pos: 0 }
-	const results: any[] = []
+	const results: AsonValue[] = []
 	skipWhite(ctx)
 	while (ctx.pos < ctx.buf.length) {
 		results.push(parseAny(ctx))
@@ -332,7 +341,7 @@ async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<
  *  The first line silently ignores parse errors (the stream may start mid-record). */
 export async function* parseStream(
 	stream: ReadableStream<Uint8Array>,
-): AsyncGenerator<any> {
+): AsyncGenerator<AsonValue> {
 	let first = true
 	for await (const line of streamLines(stream)) {
 		if (!line.trim()) continue
