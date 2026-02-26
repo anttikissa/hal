@@ -1,0 +1,69 @@
+diff --git a/src/cli/format/index.ts b/src/cli/format/index.ts
+index 0b308f0..7ba2278 100644
+--- a/src/cli/format/index.ts
++++ b/src/cli/format/index.ts
+@@ -1,8 +1,5 @@
+ import type { RuntimeCommand, RuntimeEvent } from '../../protocol.ts'
+-import type { Formatter } from './types.ts'
+-import { getStyle } from './theme.ts'
+-import { styleLinePrefix } from '../tui/format/line-prefix.ts'
+-import { buildPromptBlockFormatter } from '../tui/format/prompt.ts'
++import type { Formatter } from './typesui/format/prompt.ts'
+ import { chunkPrefixForStability } from '../tui/format/chunk-stability.ts'
+ import { applyStylePerLine } from '../tui/format/line-style.ts'
+
+@@ -29,14 +26,7 @@ function getFormatter(kind: string): Formatter {
+ 				return buildPromptBlockFormatter(cols).blockEnd
+ 			},
+ 			formatText(text: string): string {
+-				const f = buildPromptBlockFormatter(termCols())
+-				return text
+-					.split('\n')
+-					.map((line) => `${f.lineStart}${line}${f.lineEnd}`)
+-					.join('\n')
+-			},
+-		}
+-	}
++				return buildPromptBlockFormatter(termCols	}
+ 	return { style: getStyle(kind) }
+ }
+
+@@ -55,37 +45,7 @@ export function resetFormat(sessionId?: string): void {
+
+ export function pushFragment(kind: string, text: string, sessionId?: string | null): string {
+ 	const key = sessionId ?? LOCAL_KEY
+-	const prev = prevKindBySession.get(key) ?? ''
+-	const continuing = kind === prev
+-	prevKindBySession.set(key, kind)
+-
+-	const fmt = getFormatter(kind)
+-	const style = fmt.style
+-	const reset = style ? RESET : ''
+-	let content = fmt.formatText ? fmt.formatText(text) : text
+-	if (kind === 'line.tool' || kind === 'local.queue' || kind === 'local.tab' || kind === 'local.tabs') {
+-		content = styleLinePrefix(kind, content)
+-	}
+-
+-	if (kind === 'chunk.assistant' || kind === 'chunk.thinking') {
+-		// Keep ANSI state stable when switching channel/style so wrapped lines don't get brightness seams.
+-		const prefix = chunkPrefixForStability(kind, prev)
+-		return `${prefix}${applyStylePerLine(style, content)}`
+-	}
+-
+-	// When previous output was a streaming chunk (no trailing newline), add one
+-	const needsNewline = prev.startsWith('chunk.')
+-
+-	// Block decorations (e.g. prompt grey bars)
+-	const cols = termCols()
+-	const blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
+-	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
+-
+-	return `${needsNewline ? '\n' : ''}${blockStart}${style}${content}${reset}\n${blockEnd}`
+-}
+-
+-export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {
+-	const sessionId = 'sessionId' in event ? event.sessionId : null
++	const prev = prevKindBySession.get(key) ??
+
+ 	if (event.type === 'chunk') {
+ 		return pushFragment(`chunk.${event.channel}`, event.text, sessionId)

@@ -13,8 +13,6 @@
 
 ### UI work:
 
-PARTIALLY DONE - MAYBE?
-
 (sort of done - there's a bug) Prompt that is written to screen after I press enter must be grey on every line, not just
 line-before and line-after
 
@@ -30,7 +28,6 @@ And the same applies to my prompt shown here: ("Okay I got a mega task for you")
 
 - when you list stuff, the initial words look brighter than the rest - sometimes it cuts in weird positions, like "4. Tabs redes<HERE>ign: ..." [/tmp/hal/images/mkm576.png] where does this come from? Suggest to do something about it!
 
-### END UI WORK
 
 
 

@@ -777,13 +777,16 @@ function render(event: RuntimeEvent): void {
 	}
 
 	if (event.type === 'status') {
-		const isActivityOnly = 'activity' in event && event.activity !== undefined
+		// Partial updates (activity-only, context-only) don't carry authoritative busy state
+		const isPartial =
+			('activity' in event && event.activity !== undefined) ||
+			('context' in event && event.context !== undefined)
 
-		if (isActivityOnly) {
-			// Activity-only update — route to the correct tab (busy state comes only from full status events)
-			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
-			if (tab) {
-				tab.activity = event.activity!
+		if (isPartial) {
+			// Route activity text to the correct tab
+			if ('activity' in event && event.activity !== undefined) {
+				const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
+				if (tab) tab.activity = event.activity!
 			}
 		} else {
 			// Full status update — sync per-tab busy and paused state
