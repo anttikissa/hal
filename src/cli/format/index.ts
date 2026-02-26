@@ -3,6 +3,7 @@ import type { Formatter } from './types.ts'
 import { getStyle } from './theme.ts'
 import { styleLinePrefix } from '../tui/format/line-prefix.ts'
 import { buildPromptBlockFormatter } from '../tui/format/prompt.ts'
+import { chunkPrefixForStability } from '../tui/format/chunk-stability.ts'
 
 const RESET = '\x1b[0m'
 
@@ -66,10 +67,8 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	}
 
 	if (kind === 'chunk.assistant' || kind === 'chunk.thinking') {
-		// Only add blank-line separator for chunk→chunk transitions (thinking↔assistant).
-		// Non-chunk types (lines, prompts) already end with \n, so no extra prefix needed.
-		const isChunkTransition = !continuing && prev.startsWith('chunk.')
-		const prefix = isChunkTransition ? '\n' : ''
+		// Keep ANSI state stable when switching channel/style so wrapped lines don't get brightness seams.
+		const prefix = chunkPrefixForStability(kind, prev)
 		return `${prefix}${style}${content}${reset}`
 	}
 
