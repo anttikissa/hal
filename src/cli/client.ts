@@ -854,7 +854,7 @@ function renderTabsForStatus(): string {
 			if (active) return `${TAB_ACTIVE}[${text}]${TAB_RESET}`
 			return `${TAB_INACTIVE} ${text} ${TAB_RESET}`
 		})
-		.join('  ')
+		.join('')
 }
 
 function renderBusyStatus(): void {
