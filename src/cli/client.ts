@@ -852,7 +852,7 @@ function renderTabsForStatus(): string {
 			const activity = !active && tabHasActivity.has(tab.sessionId) ? '*' : ' '
 			const text = `${number}${activity}${labels[i]}`
 			if (active) return `${TAB_ACTIVE}[${text}]${TAB_RESET}`
-			return `${TAB_INACTIVE}${text}${TAB_RESET}`
+			return `${TAB_INACTIVE} ${text} ${TAB_RESET}`
 		})
 		.join('  ')
 }
