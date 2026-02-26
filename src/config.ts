@@ -54,7 +54,8 @@ export function parseModel(model: string): { provider: string; modelId: string }
 		model.startsWith('gpt') ||
 		model.startsWith('o1') ||
 		model.startsWith('o3') ||
-		model.startsWith('o4')
+		model.startsWith('o4') ||
+		model.startsWith('codex')
 	)
 		return { provider: 'openai', modelId: model }
 	return { provider: 'anthropic', modelId: model }
