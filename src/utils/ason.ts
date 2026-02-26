@@ -6,7 +6,7 @@ export const COMMENTS = Symbol('comments')
 
 /** Any value representable in ASON. */
 export type AsonValue =
-	| string | number | boolean | null
+	| string | number | boolean | null | undefined
 	| AsonArray
 	| AsonObject
 
@@ -41,7 +41,8 @@ function indentComment(comment: string, pad: string): string {
 }
 
 function stringifyValue(obj: AsonValue | undefined, col: number, depth: number, maxWidth: number): string {
-	if (obj === undefined || obj === null) return 'null'
+	if (obj === null) return 'null'
+	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
 	if (typeof obj === 'number') {
 		if (Number.isNaN(obj)) return 'NaN'
@@ -69,7 +70,7 @@ function stringifyValue(obj: AsonValue | undefined, col: number, depth: number, 
 
 	if (typeof obj === 'object') {
 		const rec = obj as AsonObject
-		const keys = Object.keys(rec).filter(k => rec[k] !== undefined)
+		const keys = Object.keys(rec)
 		if (keys.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
 		const pairs = keys.map(
@@ -287,6 +288,7 @@ function parseAny(ctx: Ctx): AsonValue {
 	if (ch === 't') { eatWord(ctx, 'true'); return true }
 	if (ch === 'f') { eatWord(ctx, 'false'); return false }
 	if (ch === 'n') { eatWord(ctx, 'null'); return null }
+	if (ch === 'u') { eatWord(ctx, 'undefined'); return undefined }
 	if (ch === 'N') { eatWord(ctx, 'NaN'); return NaN }
 	if (ch === 'I') { eatWord(ctx, 'Infinity'); return Infinity }
 	fail(ctx, 'Unexpected token')

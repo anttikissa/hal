@@ -4,6 +4,7 @@ import { stringify, parse, parseAll, parseStream, COMMENTS } from './ason'
 describe('stringify', () => {
 	describe('primitives', () => {
 		test('null', () => expect(stringify(null)).toBe('null'))
+		test('undefined', () => expect(stringify(undefined)).toBe('undefined'))
 		test('true', () => expect(stringify(true)).toBe('true'))
 		test('false', () => expect(stringify(false)).toBe('false'))
 		test('zero', () => expect(stringify(0)).toBe('0'))
@@ -12,7 +13,6 @@ describe('stringify', () => {
 		test('NaN', () => expect(stringify(NaN)).toBe('NaN'))
 		test('Infinity', () => expect(stringify(Infinity)).toBe('Infinity'))
 		test('-Infinity', () => expect(stringify(-Infinity)).toBe('-Infinity'))
-		test('undefined → null', () => expect(stringify(undefined as any)).toBe('null'))
 		test('simple string', () => expect(stringify('hello')).toBe("'hello'"))
 		test('empty string', () => expect(stringify('')).toBe("''"))
 		test('string with newline', () => expect(stringify('a\nb')).toBe("'a\\nb'"))
@@ -64,10 +64,6 @@ describe('stringify', () => {
 		test('nested stays inline if short', () => {
 			expect(stringify({ a: { b: { c: 1 } } })).toBe('{ a: { b: { c: 1 } } }')
 		})
-		test('undefined values omitted', () =>
-			expect(stringify({ a: 1, b: undefined, c: 3 } as any)).toBe('{ a: 1, c: 3 }'))
-		test('all undefined → empty object', () =>
-			expect(stringify({ a: undefined } as any)).toBe('{}'))
 	})
 
 	describe('arrays', () => {
@@ -79,8 +75,6 @@ describe('stringify', () => {
 				"[1, null, 'this', { object: [1, 2, 3] }]",
 			)
 		})
-		test('undefined elements → null', () =>
-			expect(stringify([1, undefined, 3] as any)).toBe('[1, null, 3]'))
 		test('wide array breaks lines', () => {
 			const obj = [
 				'something longer',
@@ -147,6 +141,7 @@ describe('stringify modes', () => {
 describe('parse', () => {
 	describe('primitives', () => {
 		test('null', () => expect(parse('null')).toBe(null))
+		test('undefined', () => expect(parse('undefined')).toBe(undefined))
 		test('true', () => expect(parse('true')).toBe(true))
 		test('false', () => expect(parse('false')).toBe(false))
 		test('integer', () => expect(parse('42')).toBe(42))
@@ -300,7 +295,7 @@ describe('parse', () => {
 			expect(() => parse('tru')).toThrow(/Expected 'e', got 'EOF' at 1:4/)
 			expect(() => parse('truee')).toThrow(/Unexpected character after 'true' at 1:5/)
 			expect(() => parse('fals')).toThrow(/Expected 'e', got 'EOF' at 1:5/)
-			expect(() => parse('undefined')).toThrow(/Unexpected token at 1:1/)
+			expect(() => parse('undefinedd')).toThrow(/Unexpected character after 'undefined' at 1:10/)
 			expect(() => parse('-Infinityx')).toThrow(/Unexpected character after '-Infinity' at 1:10/)
 			expect(() => parse('NaNx')).toThrow(/Unexpected character after 'NaN' at 1:4/)
 		})

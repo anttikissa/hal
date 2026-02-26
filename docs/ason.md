@@ -10,6 +10,7 @@ Any valid JSON or JSONL file is valid ASON.
 All JSON types, plus:
 - Unquoted keys: `{ name: 'hal', version: 1 }` — alphanumeric keys don't need quotes
 - Single-quoted strings: `'hello'` — prefers double quotes in cases like "it's"
+- `undefined` literal
 - Number literals `NaN`, `Infinity`, `-Infinity` supported
 - Comments: `// line` and `/* block */` — survive parse/stringify roundtrip with `{ comments: true }`
 - Trailing commas allowed
@@ -95,7 +96,7 @@ stringify(obj)
 
 ```ts
 type AsonValue =
-  | string | number | boolean | null
+  | string | number | boolean | null | undefined
   | AsonArray
   | AsonObject
 
