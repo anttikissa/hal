@@ -591,7 +591,7 @@ function syncTabsFromSessions(
 			bootstrapSent: existing?.bootstrapSent ?? false,
 		}
 	})
-	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id))
+	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id)))
 
 	// Pick which tab to focus next
 	let targetSessionId: string

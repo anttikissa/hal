@@ -1045,7 +1045,7 @@ function render(): void {
 	chunks.push(`\x1b[1;1H\x1b[2K`)
 	const titleText = titleBarStr || 'New conversation'
 	const titleLine = `${TITLE_BG}${TITLE_DIM}  ${titleText}`
-	chunks.push(truncateAnsi(titleLine, c) + RESET
+	chunks.push(truncateAnsi(titleLine, c) + RESET)
 
 	// Rows 2..ob: output viewport
 	for (let row = 2; row <= ob; row++) {
