@@ -29,11 +29,7 @@ function getFormatter(kind: string): Formatter {
 				return buildPromptBlockFormatter(cols).blockEnd
 			},
 			formatText(text: string): string {
-				const f = buildPromptBlockFormatter(termCols())
-				return text
-					.split('\n')
-					.map((line) => `${f.lineStart}${line}${f.lineEnd}`)
-					.join('\n')
+				return buildPromptBlockFormatter(termCols()).formatText(text)
 			},
 		}
 	}
