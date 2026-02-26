@@ -37,3 +37,4 @@ export function buildStatusBarLine(
 	const gapLen = Math.max(2, cols - visibleLength(leftPart) - rightLen)
 	const line = `${leftPart}${' '.repeat(gapLen)}${cleanRight}`
 	return `${line}${RESET}`
+}
