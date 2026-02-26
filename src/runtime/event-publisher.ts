@@ -130,7 +130,7 @@ export async function publishActivity(activity: string, sessionId: string | null
 /** Emit a lightweight status event carrying only context token data (for statusline). */
 export async function publishContext(
 	sessionId: string | null,
-	context: { used: number; max: number },
+	context: { used: number; max: number; estimated?: boolean },
 ): Promise<void> {
 	await emit({
 		type: 'status',
