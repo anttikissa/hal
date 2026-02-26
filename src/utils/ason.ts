@@ -40,8 +40,8 @@ function indentComment(comment: string, pad: string): string {
 	return lines.map(l => l ? pad + l : '').join('\n')
 }
 
-function stringifyValue(obj: AsonValue, col: number, depth: number, maxWidth: number): string {
-	if (obj === null) return 'null'
+function stringifyValue(obj: AsonValue | undefined, col: number, depth: number, maxWidth: number): string {
+	if (obj === undefined || obj === null) return 'null'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
 	if (typeof obj === 'number') {
 		if (Number.isNaN(obj)) return 'NaN'
@@ -69,7 +69,7 @@ function stringifyValue(obj: AsonValue, col: number, depth: number, maxWidth: nu
 
 	if (typeof obj === 'object') {
 		const rec = obj as AsonObject
-		const keys = Object.keys(rec)
+		const keys = Object.keys(rec).filter(k => rec[k] !== undefined)
 		if (keys.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
 		const pairs = keys.map(
