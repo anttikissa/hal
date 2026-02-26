@@ -35,7 +35,8 @@ function quoteKey(key: string): string {
 }
 
 function indentComment(comment: string, pad: string): string {
-	return comment.split('\n').filter(l => l).map(l => pad + l).join('\n')
+	const lines = comment.replace(/\n$/, '').split('\n')
+	return lines.map(l => l ? pad + l : '').join('\n')
 }
 
 function stringifyValue(obj: any, col: number, depth: number, maxWidth: number): string {
@@ -130,15 +131,21 @@ function isIdent(ch: string): boolean {
 
 function skipWhite(ctx: Ctx): string {
 	let collected = ''
+	let newlines = 0
 	while (ctx.pos < ctx.buf.length) {
 		const ch = peek(ctx)
-		if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { ctx.pos++; continue }
+		if (ch === '\n') { ctx.pos++; newlines++; continue }
+		if (ch === ' ' || ch === '\t' || ch === '\r') { ctx.pos++; continue }
 		if (ch === '/' && peek2(ctx) === '/') {
 			const start = ctx.pos
 			ctx.pos += 2
 			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n') ctx.pos++
 			if (ctx.pos < ctx.buf.length) ctx.pos++ // include \n
-			if (ctx.comments) collected += ctx.buf.slice(start, ctx.pos)
+			if (ctx.comments) {
+				if (newlines >= 2) collected += '\n'
+				collected += ctx.buf.slice(start, ctx.pos)
+			}
+			newlines = 0
 			continue
 		}
 		if (ch === '/' && peek2(ctx) === '*') {
@@ -148,7 +155,11 @@ function skipWhite(ctx: Ctx): string {
 				if (peek(ctx) === '*' && peek2(ctx) === '/') { ctx.pos += 2; break }
 				ctx.pos++
 			}
-			if (ctx.comments) collected += ctx.buf.slice(start, ctx.pos)
+			if (ctx.comments) {
+				if (newlines >= 2) collected += '\n'
+				collected += ctx.buf.slice(start, ctx.pos)
+			}
+			newlines = 0
 			continue
 		}
 		break

@@ -564,5 +564,19 @@ describe('comments', () => {
 			const parsed = parse(src, { comments: true })
 			expect(stringify(parsed)).toBe(src)
 		})
+
+		test('blank line before comment survives roundtrip', () => {
+			const src = '{\n  a: 1,\n\n  // section two\n  b: 2\n}'
+			const parsed = parse(src, { comments: true })
+			expect(parsed[COMMENTS]).toEqual({ b: '\n// section two\n' })
+			expect(stringify(parsed)).toBe(src)
+		})
+
+		test('no blank line before first comment', () => {
+			const src = '{\n  // first key\n  a: 1,\n  b: 2\n}'
+			const parsed = parse(src, { comments: true })
+			expect(parsed[COMMENTS]).toEqual({ a: '// first key\n' })
+			expect(stringify(parsed)).toBe(src)
+		})
 	})
 })
