@@ -1066,7 +1066,7 @@ function render(): void {
 		? `${TITLE_BG}${TITLE_TOPIC}  ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
 		: `${TITLE_BG}${TITLE_TOPIC}  ${topic}`
 	chunks.push(truncateAnsi(titleLine, c) + RESET)
-	lastTitleLine = truncateAnsi(`  ${titleText}`, c)
+	lastTitleLine = truncateAnsi(`  ${titleText}`, c).padEnd(c, ' ')
 
 	// Rows 2..ob: output viewport
 	for (let row = 2; row <= ob; row++) {
