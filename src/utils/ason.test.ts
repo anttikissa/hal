@@ -231,7 +231,7 @@ describe('parse', () => {
 
 	describe('errors', () => {
 		test('unexpected token', () => {
-			expect(() => parse('tru')).toThrow(/Unexpected token/)
+			expect(() => parse('tru')).toThrow(/Expected 'e', got 'EOF'/)
 			expect(() => parse('tru')).toThrow(/tru/)
 			expect(() => parse('tru')).toThrow(/\^/)
 		})
@@ -240,9 +240,10 @@ describe('parse', () => {
 				parse('{ value: tru }')
 				throw new Error('should have thrown')
 			} catch (e: any) {
-				expect(e.message).toContain('1:10')
+				expect(e.message).toContain('1:13')
+				expect(e.message).toContain("Expected 'e', got ' '")
 				expect(e.message).toContain('value: tru }')
-				expect(e.message).toMatch(/\n {13}\^/) // 4 padding + 9 col offset
+
 			}
 		})
 		test('error on correct line and column', () => {
@@ -250,9 +251,29 @@ describe('parse', () => {
 				parse('{\n  a: 1,\n  b: tru,\n}')
 				throw new Error('should have thrown')
 			} catch (e: any) {
-				expect(e.message).toContain('3:6')
+				expect(e.message).toContain('3:9')
+				expect(e.message).toContain("Expected 'e', got ','")
 				expect(e.message).toContain('b: tru,')
+
 			}
+		})
+		test('error caret aligns with tabs', () => {
+			try {
+				parse('{\n\tfoo: bar\n}\n')
+				throw new Error('should have thrown')
+			} catch (e: any) {
+				expect(e.message).toContain('2:7')
+				expect(e.message).toMatch(/\n {4}\t {5}\^/)
+			}
+		})
+		test('mistyped keywords', () => {
+			expect(() => parse('nulls')).toThrow(/Unexpected character after 'null' at 1:5/)
+			expect(() => parse('tru')).toThrow(/Expected 'e', got 'EOF' at 1:4/)
+			expect(() => parse('truee')).toThrow(/Unexpected character after 'true' at 1:5/)
+			expect(() => parse('fals')).toThrow(/Expected 'e', got 'EOF' at 1:5/)
+			expect(() => parse('undefinedd')).toThrow(/Unexpected character after 'undefined' at 1:10/)
+			expect(() => parse('-Infinityx')).toThrow(/Unexpected character after '-Infinity' at 1:10/)
+			expect(() => parse('NaNx')).toThrow(/Unexpected character after 'NaN' at 1:4/)
 		})
 	})
 })

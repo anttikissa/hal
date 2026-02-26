@@ -14,6 +14,8 @@
 //   parseAll(str)       - ASON string → array of values (JSONL-style)
 //   parseStream(stream) - async generator yielding values from a byte stream
 
+// --- Stringify ---
+
 function quoteString(s: string): string {
 	const escaped = s
 		.replace(/\\/g, '\\\\')
@@ -22,7 +24,6 @@ function quoteString(s: string): string {
 		.replace(/\t/g, '\\t')
 	const hasSingle = s.includes("'")
 	const hasDouble = s.includes('"')
-	// Prefer single quotes; use double if string contains ' but not "
 	if (hasSingle && !hasDouble) return `"${escaped}"`
 	return `'${escaped.replace(/'/g, "\\'")}'`
 }
@@ -33,8 +34,6 @@ function quoteKey(key: string): string {
 	return IDENT_RE.test(key) ? key : quoteString(key)
 }
 
-// col = column position where this value starts (for inline width check)
-// depth = nesting depth (for indentation of multi-line output)
 function stringifyValue(obj: any, col: number, depth: number, maxWidth: number): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
@@ -49,34 +48,25 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
-
-		// Try inline first
 		const items = obj.map((v) => stringifyValue(v, 0, depth, maxWidth))
 		const inline = `[${items.join(', ')}]`
 		if (col + inline.length <= maxWidth && !inline.includes('\n')) return inline
-
-		// Multi-line
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = obj.map(
 			(v, i) => `${pad}${stringifyValue(v, pad.length, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`,
 		)
-
 		return `[\n${lines.join('\n')}\n${'  '.repeat(depth)}]`
 	}
 
 	if (typeof obj === 'object') {
 		const keys = Object.keys(obj)
 		if (keys.length === 0) return '{}'
-
-		// Try inline first
 		const pairs = keys.map(
 			(k) => `${quoteKey(k)}: ${stringifyValue(obj[k], 0, depth, maxWidth)}`,
 		)
 		const inline = `{ ${pairs.join(', ')} }`
 		if (col + inline.length <= maxWidth && !inline.includes('\n')) return inline
-
-		// Multi-line
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = keys.map((k, i) => {
@@ -84,7 +74,6 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 			const val = stringifyValue(obj[k], prefix.length, childDepth, maxWidth)
 			return `${prefix}${val}${i < keys.length - 1 ? ',' : ''}`
 		})
-
 		return `{\n${lines.join('\n')}\n${'  '.repeat(depth)}}`
 	}
 
@@ -98,6 +87,10 @@ export function stringify(obj: any, mode: StringifyMode = 'smart'): string {
 	return stringifyValue(obj, 0, 0, maxWidth)
 }
 
+// --- Parse ---
+
+type Ctx = { buf: string; pos: number }
+
 
 class ParseError extends Error {
 	pos: number
@@ -107,230 +100,173 @@ class ParseError extends Error {
 	}
 }
 
-class Parser {
-	private src: string
-	private pos: number = 0
-	private lines: string[]
-
-	constructor(src: string) {
-		this.src = src
-		this.lines = src.split('\n')
+function fail(ctx: Ctx, msg: string): never {
+	let line = 1, col = 1
+	for (const c of ctx.buf.slice(0, ctx.pos)) {
+		if (c === '\n') { line++; col = 1 } else col++
 	}
+	const lineText = ctx.buf.split('\n')[line - 1] ?? ''
+	const pad = lineText.slice(0, col - 1).replace(/[^\t]/g, ' ')
+	throw new ParseError(
+		`${msg} at ${line}:${col}:\n    ${lineText}\n    ${pad}^`,
+		ctx.pos,
+	)
+}
 
-	private error(msg: string): never {
-		// Find line/col from pos
-		let line = 1,
-			col = 1
-		for (let i = 0; i < this.pos && i < this.src.length; i++) {
-			if (this.src[i] === '\n') {
-				line++
-				col = 1
-			} else {
-				col++
-			}
+
+function isIdent(ch: string | undefined): boolean {
+	if (!ch) return false
+	const c = ch.charCodeAt(0)
+	// 0-9, A-Z, a-z, _, $
+	return (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 36
+}
+
+function skipWhite(ctx: Ctx): void {
+	while (ctx.pos < ctx.buf.length) {
+		const ch = peek(ctx)
+		if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { ctx.pos++; continue }
+		if (ch === '/' && peek2(ctx) === '/') {
+			ctx.pos += 2
+			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n') ctx.pos++
+			continue
 		}
-		const lineText = this.lines[line - 1] ?? ''
-		throw new ParseError(
-			`${msg} at ${line}:${col}:\n    ${lineText}\n    ${' '.repeat(col - 1)}^`,
-			this.pos,
-		)
-	}
-
-	skipWhitespace(): void {
-		while (this.pos < this.src.length) {
-			const ch = this.src[this.pos]
-			// Whitespace
-			if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-				this.pos++
-				continue
+		if (ch === '/' && peek2(ctx) === '*') {
+			ctx.pos += 2
+			while (ctx.pos < ctx.buf.length) {
+				if (peek(ctx) === '*' && peek2(ctx) === '/') { ctx.pos += 2; break }
+				ctx.pos++
 			}
-			// Line comment
-			if (ch === '/' && this.src[this.pos + 1] === '/') {
-				this.pos += 2
-				while (this.pos < this.src.length && this.src[this.pos] !== '\n') this.pos++
-				continue
-			}
-			// Block comment
-			if (ch === '/' && this.src[this.pos + 1] === '*') {
-				this.pos += 2
-				while (this.pos < this.src.length) {
-					if (this.src[this.pos] === '*' && this.src[this.pos + 1] === '/') {
-						this.pos += 2
-						break
-					}
-					this.pos++
-				}
-				continue
-			}
-			break
+			continue
 		}
-	}
-
-	getPosition(): number {
-		return this.pos
-	}
-
-	private peek(): string {
-		this.skipWhitespace()
-		return this.src[this.pos] ?? ''
-	}
-
-	private parseString(quote: string): string {
-		this.pos++ // skip opening quote
-		let result = ''
-		while (this.pos < this.src.length) {
-			const ch = this.src[this.pos]
-			if (ch === '\\') {
-				this.pos++
-				const esc = this.src[this.pos]
-				if (esc === 'n') result += '\n'
-				else if (esc === 't') result += '\t'
-				else if (esc === 'r') result += '\r'
-				else if (esc === '\\') result += '\\'
-				else if (esc === "'") result += "'"
-				else if (esc === '"') result += '"'
-				else result += esc
-				this.pos++
-				continue
-			}
-			if (ch === quote) {
-				this.pos++ // skip closing quote
-				return result
-			}
-			result += ch
-			this.pos++
-		}
-		this.error('Unterminated string')
-	}
-
-	private parseNumber(): number {
-		const start = this.pos
-		if (this.src[this.pos] === '-') this.pos++
-		while (this.pos < this.src.length && /[0-9.]/.test(this.src[this.pos])) this.pos++
-		// Scientific notation
-		if (
-			this.pos < this.src.length &&
-			(this.src[this.pos] === 'e' || this.src[this.pos] === 'E')
-		) {
-			this.pos++
-			if (this.src[this.pos] === '+' || this.src[this.pos] === '-') this.pos++
-			while (this.pos < this.src.length && /[0-9]/.test(this.src[this.pos])) this.pos++
-		}
-		const num = Number(this.src.slice(start, this.pos))
-		if (isNaN(num)) this.error('Invalid number')
-		return num
-	}
-
-	private parseKey(): string {
-		const ch = this.peek()
-		// Quoted key
-		if (ch === "'" || ch === '"') return this.parseString(ch)
-		// Unquoted identifier key
-		const start = this.pos
-		while (this.pos < this.src.length && /[a-zA-Z0-9_$]/.test(this.src[this.pos])) this.pos++
-		if (this.pos === start) this.error('Expected object key')
-		return this.src.slice(start, this.pos)
-	}
-
-	private parseObject(): Record<string, any> {
-		this.pos++ // skip {
-		const obj: Record<string, any> = {}
-		while (true) {
-			const ch = this.peek()
-			if (ch === '}') {
-				this.pos++
-				return obj
-			}
-			const key = this.parseKey()
-			if (this.peek() !== ':') this.error("Expected ':'")
-			this.pos++ // skip :
-			obj[key] = this.parseValue()
-			const next = this.peek()
-			if (next === ',') this.pos++ // skip comma
-		}
-	}
-
-	private parseArray(): any[] {
-		this.pos++ // skip [
-		const arr: any[] = []
-		while (true) {
-			const ch = this.peek()
-			if (ch === ']') {
-				this.pos++
-				return arr
-			}
-			arr.push(this.parseValue())
-			const next = this.peek()
-			if (next === ',') this.pos++ // skip comma
-		}
-	}
-
-	private parseKeyword(): any {
-		const remaining = this.src.slice(this.pos)
-		const keywords: [string, any][] = [
-			['null', null],
-			['undefined', undefined],
-			['true', true],
-			['false', false],
-			['NaN', NaN],
-			['Infinity', Infinity],
-			['-Infinity', -Infinity],
-		]
-		for (const [kw, val] of keywords) {
-			if (remaining.startsWith(kw) && !/[a-zA-Z0-9_$]/.test(remaining[kw.length] ?? '')) {
-				this.pos += kw.length
-				return val
-			}
-		}
-		this.error('Unexpected token')
-	}
-
-	parseValue(): any {
-		const ch = this.peek()
-		if (ch === '{') return this.parseObject()
-		if (ch === '[') return this.parseArray()
-		if (ch === "'" || ch === '"') return this.parseString(ch)
-		if (ch === '-') {
-			// Could be -Infinity or a number
-			if (this.src.slice(this.pos).startsWith('-Infinity')) {
-				const after = this.src[this.pos + 9] ?? ''
-				if (!/[a-zA-Z0-9_$]/.test(after)) {
-					this.pos += 9
-					return -Infinity
-				}
-			}
-			return this.parseNumber()
-		}
-		if (ch >= '0' && ch <= '9') return this.parseNumber()
-		return this.parseKeyword()
-	}
-
-	parseRoot(): any {
-		const value = this.parseValue()
-		this.skipWhitespace()
-		if (this.pos < this.src.length) this.error('Unexpected content after value')
-		return value
-	}
-
-	/** Returns true if there's more non-whitespace/comment content to parse */
-	hasMore(): boolean {
-		this.skipWhitespace()
-		return this.pos < this.src.length
-	}
-
-	parseMultiple(): any[] {
-		const results: any[] = []
-		while (this.hasMore()) results.push(this.parseValue())
-		return results
+		break
 	}
 }
 
+function peek(ctx: Ctx): string { return ctx.buf[ctx.pos] ?? '' }
+
+function peek2(ctx: Ctx): string { return ctx.buf[ctx.pos + 1] ?? '' }
+
+function eat(ctx: Ctx, ch: string): void {
+	if (peek(ctx) !== ch) fail(ctx, `Expected '${ch}', got '${peek(ctx) || 'EOF'}'`)
+	ctx.pos++
+}
+
+function eatWord(ctx: Ctx, word: string): void {
+	for (const c of word) eat(ctx, c)
+	if (isIdent(peek(ctx))) fail(ctx, `Unexpected character after '${word}'`)
+}
+
+function parseString(ctx: Ctx, quote: string): string {
+	ctx.pos++ // skip opening quote
+	let result = ''
+	while (ctx.pos < ctx.buf.length) {
+		const ch = peek(ctx)
+		if (ch === '\\') {
+			ctx.pos++
+			const esc = peek(ctx)
+			if (esc === 'n') result += '\n'
+			else if (esc === 't') result += '\t'
+			else if (esc === 'r') result += '\r'
+			else result += esc
+			ctx.pos++
+			continue
+		}
+		if (ch === quote) { ctx.pos++; return result }
+		result += ch
+		ctx.pos++
+	}
+	fail(ctx, 'Unterminated string')
+}
+
+function parseNumber(ctx: Ctx): number {
+	const start = ctx.pos
+	if (peek(ctx) === '-') ctx.pos++
+	while (peek(ctx) >= '0' && peek(ctx) <= '9' || peek(ctx) === '.') ctx.pos++
+	if (peek(ctx) === 'e' || peek(ctx) === 'E') {
+		ctx.pos++
+		if (peek(ctx) === '+' || peek(ctx) === '-') ctx.pos++
+		while (peek(ctx) >= '0' && peek(ctx) <= '9') ctx.pos++
+	}
+	const num = Number(ctx.buf.slice(start, ctx.pos))
+	if (isNaN(num)) fail(ctx, 'Invalid number')
+	return num
+}
+
+function parseKey(ctx: Ctx): string {
+	skipWhite(ctx)
+	const ch = peek(ctx)
+	if (ch === "'" || ch === '"') return parseString(ctx, ch)
+	const start = ctx.pos
+	while (isIdent(peek(ctx))) ctx.pos++
+	if (ctx.pos === start) fail(ctx, 'Expected object key')
+	return ctx.buf.slice(start, ctx.pos)
+}
+
+
+function parseObject(ctx: Ctx): Record<string, any> {
+	ctx.pos++ // skip {
+	const obj: Record<string, any> = {}
+	while (true) {
+		skipWhite(ctx)
+		if (peek(ctx) === '}') { ctx.pos++; return obj }
+		const key = parseKey(ctx)
+		skipWhite(ctx); eat(ctx, ':')
+		obj[key] = parseAny(ctx)
+		skipWhite(ctx)
+		if (peek(ctx) === ',') ctx.pos++
+	}
+}
+
+function parseArray(ctx: Ctx): any[] {
+	ctx.pos++ // skip [
+	const arr: any[] = []
+	while (true) {
+		skipWhite(ctx)
+		if (peek(ctx) === ']') { ctx.pos++; return arr }
+		arr.push(parseAny(ctx))
+		skipWhite(ctx)
+		if (peek(ctx) === ',') ctx.pos++
+	}
+}
+
+function parseAny(ctx: Ctx): any {
+	skipWhite(ctx)
+	const ch = peek(ctx)
+	if (ch === '{') return parseObject(ctx)
+	if (ch === '[') return parseArray(ctx)
+	if (ch === "'" || ch === '"') return parseString(ctx, ch)
+	if (ch === '-') {
+		if (peek2(ctx) === 'I') { eatWord(ctx, '-Infinity'); return -Infinity }
+		return parseNumber(ctx)
+	}
+	if (/[0-9]/.test(ch)) return parseNumber(ctx)
+	if (ch === 't') { eatWord(ctx, 'true'); return true }
+	if (ch === 'f') { eatWord(ctx, 'false'); return false }
+	if (ch === 'n') { eatWord(ctx, 'null'); return null }
+	if (ch === 'u') { eatWord(ctx, 'undefined'); return undefined }
+	if (ch === 'N') { eatWord(ctx, 'NaN'); return NaN }
+	if (ch === 'I') { eatWord(ctx, 'Infinity'); return Infinity }
+	fail(ctx, 'Unexpected token')
+}
+
+
 export function parse(str: string): any {
-	return new Parser(str).parseRoot()
+	const ctx: Ctx = { buf: str, pos: 0 }
+	const value = parseAny(ctx)
+	skipWhite(ctx)
+	if (ctx.pos < ctx.buf.length) fail(ctx, 'Unexpected content after value')
+	return value
 }
 
 export function parseAll(str: string): any[] {
-	return new Parser(str).parseMultiple()
+	const ctx: Ctx = { buf: str, pos: 0 }
+	const results: any[] = []
+	skipWhite(ctx)
+	while (ctx.pos < ctx.buf.length) {
+		results.push(parseAny(ctx))
+		skipWhite(ctx)
+	}
+	return results
 }
 
 export async function* parseStream(
@@ -345,7 +281,7 @@ export async function* parseStream(
 		if (done) break
 		buf += decoder.decode(value, { stream: true })
 		const lines = buf.split('\n')
-		buf = lines.pop()! // keep incomplete last line
+		buf = lines.pop()!
 		for (const line of lines) {
 			const trimmed = line.trim()
 			if (!trimmed) continue
@@ -353,7 +289,6 @@ export async function* parseStream(
 		}
 	}
 
-	// Flush remaining buffer
 	const trimmed = buf.trim()
 	if (trimmed) yield parse(trimmed)
 }
