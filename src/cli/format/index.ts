@@ -6,8 +6,6 @@ import { buildPromptBlockFormatter } from '../tui/format/prompt.ts'
 import { chunkPrefixForStability } from '../tui/format/chunk-stability.ts'
 import { applyStylePerLine } from '../tui/format/line-style.ts'
 
-const RESET = '\x1b[0m'
-
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
 
 export function stripAnsi(text: string): string {
@@ -52,12 +50,10 @@ export function resetFormat(sessionId?: string): void {
 export function pushFragment(kind: string, text: string, sessionId?: string | null): string {
 	const key = sessionId ?? LOCAL_KEY
 	const prev = prevKindBySession.get(key) ?? ''
-	const continuing = kind === prev
 	prevKindBySession.set(key, kind)
 
 	const fmt = getFormatter(kind)
 	const style = fmt.style
-	const reset = style ? RESET : ''
 	let content = fmt.formatText ? fmt.formatText(text) : text
 	if (kind === 'line.tool' || kind === 'local.queue' || kind === 'local.tab' || kind === 'local.tabs') {
 		content = styleLinePrefix(kind, content)
@@ -77,7 +73,8 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	const blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
 	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
 
-	return `${needsNewline ? '\n' : ''}${blockStart}${style}${content}${reset}\n${blockEnd}`
+	const styledContent = applyStylePerLine(style, content)
+	return `${needsNewline ? '\n' : ''}${blockStart}${styledContent}\n${blockEnd}`
 }
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {
