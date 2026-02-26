@@ -324,7 +324,14 @@ function scroll(lines: number): void {
 	const oh = Math.max(0, outputBottom() - 1)
 	const totalVisual = getTotalVisualLines()
 	const maxScroll = Math.max(0, totalVisual - oh)
+	const prev = scrollOffset
 	scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset + lines))
+	const delta = scrollOffset - prev
+	// Shift output selection so it tracks the same content
+	if (delta !== 0 && selAnchor?.surface === 'output') {
+		selAnchor = { ...selAnchor, row: selAnchor.row + delta }
+		if (selCurrent) selCurrent = { ...selCurrent, row: selCurrent.row + delta }
+	}
 	hoverOutputRow = -1
 	hoverUrl = null
 	render()
