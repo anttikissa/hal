@@ -413,6 +413,12 @@ async function _runTool(
 			return 'error: write requires path'
 		if (typeof input?.content !== 'string') return 'error: write requires content'
 		const path = resolveToolPath(cwd, input.path)
+		try {
+			const info = await stat(path)
+			if (info.isDirectory()) return `error: ${path} is a directory, not a file`
+		} catch {
+			// Path doesn't exist yet — that's fine for write
+		}
 		const content = input.content
 		await logger(shortenHome(`[write] ${path} (${content.length} chars)`), 'tool')
 		await writeFile(path, content)
