@@ -26,8 +26,12 @@ function contentPreview(text: string): string {
 
 /** Cap output for TUI display: show head + tail with omission note */
 function displayPreview(text: string, maxLines = MAX_DISPLAY_LINES): string {
-	const lines = text.split('\n')
-	if (lines.length <= maxLines) return text
+	const lines = text
+		.split('\n')
+		.map((line) =>
+			line.length > MAX_LINE_LEN ? line.slice(0, MAX_LINE_LEN) + '… [line truncated]' : line,
+		)
+	if (lines.length <= maxLines) return lines.join('\n')
 	const headCount = Math.ceil(maxLines / 2)
 	const tailCount = maxLines - headCount
 	const omitted = lines.length - headCount - tailCount

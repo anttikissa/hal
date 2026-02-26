@@ -1,7 +1,11 @@
-import { describe, test, expect, afterEach } from 'bun:test'
+import { describe, test, expect, afterEach, beforeEach } from 'bun:test'
 import { startHal, type TestHal } from './helpers/harness.ts'
 
 let hal: TestHal | null = null
+
+beforeEach(() => {
+	Bun.env.HAL_TEST_NO_UI = '1'
+})
 
 afterEach(async () => {
 	if (hal) {

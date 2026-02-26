@@ -38,7 +38,7 @@ registerProvider(mockProvider)
 
 initBus()
 await ensureBus()
-await initDebugLog(process.pid)
+if (process.env.HAL_TEST_NO_UI !== '1') await initDebugLog(process.pid)
 
 // Startup perf: read epoch saved by run script
 const startupEpochFile = `/tmp/hal-startup-${process.ppid}.txt`
