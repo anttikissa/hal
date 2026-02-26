@@ -1,6 +1,6 @@
 # Terminal Key Sequences
 
-Captured key behavior across 4 macOS terminals with HAL's `hal11` profile
+Captured key behavior across 4 macOS terminals with the `kitty11` profile
 (kitty keyboard protocol `>11u`). Data from `src/tests/fixtures/keys/`.
 
 ## Terminals tested

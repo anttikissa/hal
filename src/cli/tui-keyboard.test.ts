@@ -85,7 +85,7 @@ function normalizeStep(step: FixtureStep): string[] {
 const fixtures = Object.fromEntries(
 	Object.keys(FIXTURE_FILES).map((name) => {
 		const doc = loadFixture(name)
-		return [name, { doc, steps: getStepMap(doc, 'hal11') }]
+		return [name, { doc, steps: getStepMap(doc, 'kitty11') }]
 	}),
 )
 
@@ -98,18 +98,18 @@ function getCapturedStep(terminal: string, stepId: string): FixtureStep | null {
 
 // ── Ghostty baseline (original tests) ──
 
-describe('tui keyboard fixture baseline (Ghostty, hal11)', () => {
+describe('tui keyboard fixture baseline (Ghostty, kitty11)', () => {
 	const ghosttyDoc = fixtures.ghostty.doc
-	const ghosttyHal11 = getProfile(ghosttyDoc, 'hal11')
+	const ghosttyKitty11 = getProfile(ghosttyDoc, 'kitty11')
 
 	it('loads the Ghostty fixture', () => {
 		expect(ghosttyDoc.terminalLabel).toBe('ghostty')
-		expect(ghosttyHal11.id).toBe('hal11')
-		expect(ghosttyHal11.steps.length).toBeGreaterThan(30)
+		expect(ghosttyKitty11.id).toBe('kitty11')
+		expect(ghosttyKitty11.steps.length).toBeGreaterThan(30)
 	})
 
 	it('replays parseKeys tokenization for all captured Ghostty steps', () => {
-		for (const step of ghosttyHal11.steps) {
+		for (const step of ghosttyKitty11.steps) {
 			const parsed = parseKeys(bytesToRaw(step.bytes), PASTE_START, PASTE_END)
 			const parsedHex = parsed.map(textToHex)
 			const fixtureHex = (step.tokens ?? []).map((t) => t.hex)
@@ -220,7 +220,7 @@ describe('tui Kitty/Ghostty key interpretation (Ghostty fixture baseline)', () =
 
 describe('parseKeys tokenization (all terminals)', () => {
 	for (const [name, { doc }] of Object.entries(fixtures)) {
-		const profile = getProfile(doc, 'hal11')
+		const profile = getProfile(doc, 'kitty11')
 
 		it(`round-trips all captured ${name} steps through parseKeys`, () => {
 			for (const step of profile.steps) {

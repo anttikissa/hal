@@ -90,9 +90,9 @@ const PROFILE_DEFS: Record<string, CaptureProfile> = {
 		id: 'raw',
 		label: 'Raw (no keyboard protocol)',
 	},
-	hal11: {
-		id: 'hal11',
-		label: 'HAL Kitty keyboard mode (>11u)',
+	kitty11: {
+		id: 'kitty11',
+		label: 'Kitty keyboard mode (>11u)',
 		enable: '\x1b[>11u',
 		disable: KITTY_DISABLE,
 	},
@@ -273,7 +273,7 @@ class RawInputQueue {
 function parseArgs(argv: string[]): CliOptions {
 	const opts: CliOptions = {
 		preset: 'tui',
-		profiles: ['hal11'],
+		profiles: ['kitty11'],
 		stepTimeoutMs: 8_000,
 		calibrationTimeoutMs: 15_000,
 		idleMs: 600,
@@ -325,7 +325,7 @@ Interactive terminal key capture for TUI keyboard fixtures.
 
 Options:
 	--preset <smoke|tui|full>         Step preset (default: tui)
-	--profiles <ids>                  Comma list: raw,hal11,kitty31 (default: hal11)
+	--profiles <ids>                  Comma list: raw,kitty11,kitty31 (default: kitty11)
 	--step <n|id>                     Capture only one step by 1-based index or step id and rewrite it in output file
 	--terminal <label>                Terminal label for output filename (default: TERM_PROGRAM or TERM)
 	--out <path>                      Output ASON path (default: src/tests/fixtures/keys/keys-<terminal>.ason)
@@ -562,6 +562,7 @@ async function runCalibration(
 	line()
 	const idleSec = (opts.idleMs / 1000).toFixed(1).replace(/\.0$/, '')
 	line(`[${profile.id}] First, we need to learn how your terminal sends Esc.`)
+	line()
 	line(`[0/1] Press Esc. Then wait ${idleSec}s for the script to continue.`)
 	await drainInput(queue)
 	const { raw, durationMs } = await captureGestureUntilIdle(

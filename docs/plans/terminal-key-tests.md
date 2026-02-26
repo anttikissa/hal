@@ -12,7 +12,7 @@
 - `keys-iterm-app.ason` — iTerm (kitty protocol, 25 captured)
 - `keys-apple-terminal.ason` — Apple Terminal (legacy only, 24 captured)
 
-All use the `hal11` profile (kitty keyboard mode `>11u`).
+All use the `kitty11` profile (kitty keyboard mode `>11u`).
 
 ## Test structure
 

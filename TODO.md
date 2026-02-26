@@ -2,6 +2,35 @@
 
 ## Do next:
 
+UI work:
+
+Title needs to be visible (some kind of background, grey maybe)
+
+Title needs to have maybe the session name (since we will remove from tab bar)
+
+Model name must be super visible somewhere (as Opus 4.5, not blabla/claude-opus-4.5)
+
+Add names to different parts - what is the place where user writes? What are the statuslines above that?
+So I can call them by names
+
+Tabs need to be like so:
+
+ [1 .hal] 2 lines  3 lippu.1  4 lippu.2
+
+So only the directory is shown, and if there are two in same dir, then .1 etc. disambiguates.
+Active tab must be very white - and inactives can be grey but still readable (good contrast)
+Let's try to drop the ------ line from background
+
+The line "Model: Idle" line needs more info - maybe the Opus 4.5 / Codex 5.2 can show there?
+
+Prompt that is written to screen after I press enter must be grey on every line, not just
+line-before and line-after
+
+I want to see tab activity in the tab view. Maybe put an a character between the number and
+directory when there's activity?
+
+
+
 - When I restart the app, I need to see past messages. Whether the app is client, or owner. This sometimes happens but sometimes it's buggy
 
 - Architect commands vs keybindings so they can't diverge: every keybinding should call the same function as its corresponding slash command. Audit all pairs (ctrl-w / /close, ctrl-t / /new, etc.) and make the architecture obvious enough that dumb models won't re-introduce duplicate code paths.
