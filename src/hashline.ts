@@ -65,6 +65,7 @@ export function applyEdit(
 	if (start.line > end.line)
 		return { error: `Start line ${start.line} is after end line ${end.line}` }
 
+	newContent = newContent.replace(/\n$/, '')
 	const newLines = newContent === '' ? [] : newContent.split('\n')
 	return {
 		result: [...lines.slice(0, start.line - 1), ...newLines, ...lines.slice(end.line)].join(
@@ -78,6 +79,7 @@ export function applyInsert(
 	afterRef: string,
 	newContent: string,
 ): { result?: string; error?: string } {
+	newContent = newContent.replace(/\n$/, '')
 	const lines = content.split('\n')
 	const newLines = newContent.split('\n')
 	if (afterRef === '0:000') return { result: [...newLines, ...lines].join('\n') }

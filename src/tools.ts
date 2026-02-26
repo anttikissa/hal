@@ -149,7 +149,7 @@ export const tools = [
 		description: `Edit a file using hashline refs from read. Hashes are verified; mismatch = re-read needed.
 - replace: replace start_ref..end_ref (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
 - insert: insert new_content after after_ref. Use "0:000" for beginning of file.
-new_content is raw file content — no hashline prefixes.`,
+new_content is raw file content \u2014 no hashline prefixes. A trailing newline in new_content is stripped (each line in the file already has one).`,
 		input_schema: {
 			type: 'object',
 			properties: {
