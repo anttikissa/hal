@@ -52,11 +52,29 @@ import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { loadInputHistory } from '../session.ts'
 import { countSourceStats } from '../utils/cloc.ts'
 
-import { loadConfig, MODEL_ALIASES } from '../config.ts'
+import { loadConfig, MODEL_ALIASES, modelIdForModel, resolveModel } from '../config.ts'
 import { loadActiveTheme } from './format/theme.ts'
 
 function fmtK(tokens: number): string {
 	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens)
+}
+
+function modelDisplayName(model: string): string {
+	const id = modelIdForModel(resolveModel(model))
+	if (/^claude-opus-4-6/.test(id)) return 'Opus 4.6'
+	if (/^claude-opus-4-5/.test(id)) return 'Opus 4.5'
+	if (/^claude-sonnet-4-6/.test(id)) return 'Sonnet 4.6'
+	if (/^claude-sonnet-4-5/.test(id)) return 'Sonnet 4.5'
+	if (/^claude-sonnet-4/.test(id)) return 'Sonnet 4'
+	if (/^gpt-5\.3-codex/.test(id)) return 'Codex 5.3'
+	if (/^gpt-5\.2-codex/.test(id)) return 'Codex 5.2'
+	if (/^gpt-5\.1-codex/.test(id)) return 'Codex 5.1'
+	if (/^gpt-5(?:[.-]|$)/.test(id)) return 'GPT-5'
+	if (/^gpt-4\.1(?:[.-]|$)/.test(id)) return 'GPT-4.1'
+	if (/^gpt-4o(?:[.-]|$)/.test(id)) return 'GPT-4o'
+	if (/^o1(?:[.-]|$)/.test(id)) return 'o1'
+	if (/^o3(?:[.-]|$)/.test(id)) return 'o3'
+	return id
 }
 
 
@@ -102,6 +120,7 @@ interface CliTab {
 	workingDir: string
 	name: string
 	title: string
+	modelLabel: string
 	output: string
 	contextStatus: string | null
 	activity: string
@@ -122,6 +141,12 @@ function completeInput(prefix: string): string[] {
 		return ALL_MODELS.filter((m) => m.startsWith(partial)).map((m) => `/model ${m}`)
 	}
 	return []
+}
+
+function activityBarText(tab: CliTab): string {
+	if (tab.paused) return `Paused • ${tab.modelLabel} — Enter to resume, /drop to clear queue`
+	if (tab.busy) return `${tab.modelLabel} • ${tab.activity || 'Working...'}`
+	return `Idle • ${tab.modelLabel}`
 }
 
 function sessionName(session: Pick<SessionInfo, 'name' | 'workingDir' | 'id'>): string {
@@ -281,6 +306,7 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 			workingDir: launchCwd,
 			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 			title: '',
+			modelLabel: modelDisplayName(loadConfig().model),
 			output: '',
 			contextStatus: null,
 			activity: '',
@@ -312,7 +338,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	if (!active) return
 	resetFormat()
 	lastContextStatus = active.contextStatus
-	setActivityLine(active.busy ? active.activity || 'Working...' : '')
+	setActivityLine(activityBarText(active))
 	setTitleBar(titleBarText(active))
 	setInputHistory(active.inputHistory)
 	setInputDraft(active.inputDraft, active.inputCursor)
@@ -393,6 +419,7 @@ async function createTab(): Promise<void> {
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 		title: '',
+		modelLabel: modelDisplayName(loadConfig().model),
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -438,6 +465,7 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 		workingDir,
 		name: sessionName({ id: sessionId, name: undefined, workingDir }),
 		title: '',
+		modelLabel: modelDisplayName(loadConfig().model),
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -523,6 +551,7 @@ function syncTabsFromSessions(
 			workingDir: session.workingDir,
 			name: sessionName(session),
 			title: session.title ?? existing?.title ?? '',
+			modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().model),
 			output: preserveActiveOutput ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
 			activity: preserveActiveOutput ? (existing?.activity ?? '') : '',
@@ -601,6 +630,7 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 		title: '',
+		modelLabel: modelDisplayName(loadConfig().model),
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -622,7 +652,7 @@ function handleEsc(): void {
 	if (!active || !active.busy) return
 	appendBusCommand(makeCommand('pause', source, undefined, active.sessionId)).catch(() => {})
 	flashHeader('\x1b[33mpausing...\x1b[0m')
-	setActivityLine('Paused')
+	setActivityLine(`Paused • ${active.modelLabel} — Enter to resume, /drop to clear queue`)
 }
 
 function handleDoubleEnter(): void {
@@ -736,13 +766,7 @@ function render(event: RuntimeEvent): void {
 
 		// Only update the displayed activity line based on the active tab
 		const active = activeTab()
-		if (active) {
-			if (active.paused) {
-				setActivityLine('Paused — Enter to resume, /drop to clear queue')
-			} else {
-				setActivityLine(active.busy ? active.activity || 'Working...' : '')
-			}
-		}
+		if (active) setActivityLine(activityBarText(active))
 
 		// Update context percentage from structured context data
 		if (event.context) {
