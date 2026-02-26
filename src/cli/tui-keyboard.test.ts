@@ -160,8 +160,7 @@ describe('tui Kitty/Ghostty key interpretation (Ghostty fixture baseline)', () =
 	})
 
 	it('normalizes Ctrl combos to control bytes', () => {
-		expect(normalizeFixtureStep('ctrl_a')).toEqual(['\x01'])
-		expect(normalizeFixtureStep('ctrl_w')).toEqual(['\x17'])
+		expect(normalizeFixtureStep('ctrl_c')).toEqual(['\x03'])
 		expect(normalizeFixtureStep('ctrl_z')).toEqual(['\x1a'])
 	})
 
