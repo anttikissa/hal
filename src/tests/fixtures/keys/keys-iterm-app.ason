@@ -1,12 +1,12 @@
 {
   type: 'terminal-key-capture',
   version: 1,
-  createdAt: '2026-02-26T14:29:49.524Z',
+  createdAt: '2026-02-26T14:41:46.849Z',
   terminalLabel: 'iTerm.app',
   env: {
     platform: 'darwin',
     arch: 'arm64',
-    pid: 29891,
+    pid: 32355,
     term: 'xterm-256color',
     termProgram: 'iTerm.app',
     termProgramVersion: '3.6.6',
@@ -248,6 +248,14 @@
       escTwice: false
     },
     {
+      id: 'cmd_v_image',
+      label: 'Cmd-V (image clipboard)',
+      category: 'cmd',
+      note: 'Script puts a 1x1 PNG on the clipboard. Press Cmd-V to paste image data.',
+      timeoutMs: 15000,
+      escTwice: false
+    },
+    {
       id: 'cmd_x',
       label: 'Cmd-X',
       category: 'cmd',
@@ -272,7 +280,7 @@
       disable: 'ESC[<u',
       calibration: {
         status: 'captured',
-        durationMs: 4276,
+        durationMs: 3132,
         idleMs: 600,
         bytes: [
           27,
@@ -2182,6 +2190,42 @@
           display: '',
           tokens: [],
           tokenKinds: []
+        },
+        {
+          stepId: 'cmd_v_image',
+          label: 'Cmd-V (image clipboard)',
+          category: 'cmd',
+          status: 'captured',
+          note: 'Script puts a 1x1 PNG on the clipboard. Press Cmd-V to paste image data.',
+          timeoutMs: 15000,
+          durationMs: 4761,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            49,
+            49,
+            56,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 31 31 38 3b 31 3a 33 75',
+          text: 'ESC[118;1:3u',
+          display: 'ESC[118;1:3u',
+          tokens: [
+            {
+              text: 'ESC[118;1:3u',
+              display: 'ESC[118;1:3u',
+              hex: '1b 5b 31 31 38 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         }
       ]
     }
@@ -2471,6 +2515,16 @@
         display: 'hal-capture-cmd-v',
         tokenKinds: [
           'char'
+        ]
+      }
+    },
+    cmd_v_image: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 31 31 38 3b 31 3a 33 75',
+        display: 'ESC[118;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
         ]
       }
     },

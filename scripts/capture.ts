@@ -180,6 +180,10 @@ const TUI_STEPS: CaptureStep[] = [
 		note: `Script sets clipboard to "${CMD_V_KNOWN_CLIPBOARD_TEXT}" before this step.`,
 		timeoutMs: 15_000,
 	}),
+	step('cmd_v_image', 'Cmd-V (image clipboard)', 'cmd', {
+		note: 'Script puts a 1x1 PNG on the clipboard. Press Cmd-V to paste image data.',
+		timeoutMs: 15_000,
+	}),
 	step('cmd_x', 'Cmd-X', 'cmd', { note: 'macOS: terminal/OS may intercept cut.' }),
 	step('cmd_z', 'Cmd-Z', 'cmd', { note: 'macOS: terminal/OS may intercept undo.' }),
 ]
@@ -556,9 +560,9 @@ async function runCalibration(
 	opts: CliOptions,
 ): Promise<{ delimiter: Buffer | null; calibration: CalibrationCapture }> {
 	line()
-	line(`== Profile: ${profile.label} (${profile.id}) ==`)
-	line('Calibration: press Esc once and wait until the script continues (no need to press Enter).')
-	line('This records the terminal-specific Esc event shape for this profile.')
+	const idleSec = (opts.idleMs / 1000).toFixed(1).replace(/\.0$/, '')
+	line(`[${profile.id}] First, we need to learn how your terminal sends Esc.`)
+	line(`[0/1] Press Esc. Then wait ${idleSec}s for the script to continue.`)
 	await drainInput(queue)
 	const { raw, durationMs } = await captureGestureUntilIdle(
 		queue,
@@ -623,6 +627,24 @@ async function writeClipboardForCapture(text: string): Promise<void> {
 	} catch {}
 }
 
+async function writeImageToClipboard(): Promise<void> {
+	if (process.platform !== 'darwin') return
+	try {
+		// 1x1 red PNG
+		const png = Buffer.from(
+			'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==',
+			'base64',
+		)
+		const script = `set the clipboard to (read (POSIX file "${'/tmp/hal-capture-image.png'}") as «class PNGf»)`
+		await Bun.write('/tmp/hal-capture-image.png', png)
+		const proc = Bun.spawn(['osascript', '-e', script], {
+			stdout: 'ignore',
+			stderr: 'ignore',
+		})
+		await proc.exited
+	} catch {}
+}
+
 async function prepareStepCapture(stepDef: CaptureStep): Promise<void> {
 	if (stepDef.id === 'cmd_v_empty') {
 		await writeClipboardForCapture('')
@@ -632,12 +654,17 @@ async function prepareStepCapture(stepDef: CaptureStep): Promise<void> {
 		await writeClipboardForCapture(CMD_V_KNOWN_CLIPBOARD_TEXT)
 		return
 	}
+	if (stepDef.id === 'cmd_v_image') {
+		await writeImageToClipboard()
+		return
+	}
 }
 
 function printStepPrompt(index: number, total: number, stepDef: CaptureStep): void {
 	line()
-	line(`[${index + 1}/${total}] Press ${stepDef.label}, then Esc`)
-	if (stepDef.escTwice) line('Use Esc twice for this step (target Esc, then delimiter Esc).')
+	const suffix = stepDef.escTwice ? ', then Esc again to end' : ', then Esc'
+	const note = stepDef.note ? `  (${stepDef.note})` : ''
+	line(`[${index + 1}/${total}] ${stepDef.label}${suffix}${note}`)
 }
 
 function buildMatrix(steps: CaptureStep[], profiles: ProfileRun[]) {
@@ -756,14 +783,8 @@ async function main(): Promise<void> {
 		} catch {}
 	})
 	try {
-		line('HAL TUI key capture')
-		line(`Preset: ${opts.preset} (${steps.length} steps)`)
-		line(`Profiles: ${profiles.map((p) => p.id).join(', ')}`)
-		line(`Output: ${outPath}`)
-		line(`Terminal label: ${terminalLabel}`)
-		if (selected) line(`Step mode: only step ${selected.index + 1} (${selected.step.id})`)
-		line()
-		line('The script is now entering raw mode.')
+		line(`Key capture: ${terminalLabel}, ${steps.length} steps → ${outPath}`)
+		if (selected) line(`(single step: ${selected.step.id})`)
 		stdin.resume()
 		if (stdin.isTTY) {
 			stdin.setRawMode(true)
@@ -848,8 +869,7 @@ async function main(): Promise<void> {
 			}
 			await writeFile(outPath, stringify(document, 'long') + '\n', 'utf8')
 		line()
-		line(`[done] Wrote capture to ${outPath}`)
-		line('You can run this in each terminal (kitty/ghostty/iTerm/Terminal.app) with different --terminal labels.')
+		line(`[done] ${outPath}`)
 	} finally {
 		await restore()
 	}

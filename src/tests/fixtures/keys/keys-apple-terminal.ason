@@ -1,12 +1,12 @@
 {
   type: 'terminal-key-capture',
   version: 1,
-  createdAt: '2026-02-26T14:20:19.559Z',
+  createdAt: '2026-02-26T14:41:24.895Z',
   terminalLabel: 'Apple_Terminal',
   env: {
     platform: 'darwin',
     arch: 'arm64',
-    pid: 27808,
+    pid: 32172,
     term: 'xterm-256color',
     termProgram: 'Apple_Terminal',
     termProgramVersion: '453',
@@ -248,6 +248,14 @@
       escTwice: false
     },
     {
+      id: 'cmd_v_image',
+      label: 'Cmd-V (image clipboard)',
+      category: 'cmd',
+      note: 'Script puts a 1x1 PNG on the clipboard. Press Cmd-V to paste image data.',
+      timeoutMs: 15000,
+      escTwice: false
+    },
+    {
       id: 'cmd_x',
       label: 'Cmd-X',
       category: 'cmd',
@@ -272,7 +280,7 @@
       disable: 'ESC[<u',
       calibration: {
         status: 'captured',
-        durationMs: 2978,
+        durationMs: 2025,
         idleMs: 600,
         bytes: [
           27
@@ -1192,6 +1200,22 @@
           display: '',
           tokens: [],
           tokenKinds: []
+        },
+        {
+          stepId: 'cmd_v_image',
+          label: 'Cmd-V (image clipboard)',
+          category: 'cmd',
+          status: 'empty',
+          note: 'Script puts a 1x1 PNG on the clipboard. Press Cmd-V to paste image data.',
+          timeoutMs: 15000,
+          durationMs: 3940,
+          delimiterHex: '1b',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
         }
       ]
     }
@@ -1471,6 +1495,14 @@
         tokenKinds: [
           'char'
         ]
+      }
+    },
+    cmd_v_image: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
       }
     },
     cmd_x: {

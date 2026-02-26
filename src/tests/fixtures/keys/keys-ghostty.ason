@@ -1,12 +1,12 @@
 {
   type: 'terminal-key-capture',
   version: 1,
-  createdAt: '2026-02-25T08:58:46.905Z',
+  createdAt: '2026-02-26T14:40:49.343Z',
   terminalLabel: 'ghostty',
   env: {
     platform: 'darwin',
     arch: 'arm64',
-    pid: 507,
+    pid: 31936,
     term: 'xterm-ghostty',
     termProgram: 'ghostty',
     termProgramVersion: '1.2.3',
@@ -15,7 +15,9 @@
   },
   config: {
     preset: 'tui',
-    profiles: ['hal11'],
+    profiles: [
+      'hal11'
+    ],
     stepTimeoutMs: 8000,
     calibrationTimeoutMs: 15000,
     idleMs: 600
@@ -111,7 +113,7 @@
     },
     {
       id: 'delete',
-      label: 'Delete (Forward Delete)',
+      label: 'Forward Delete (Fn-Backspace on Mac laptop)',
       category: 'editing',
       note: 'On macOS laptop keyboards this is usually Fn-Delete.',
       timeoutMs: undefined,
@@ -198,104 +200,8 @@
       escTwice: false
     },
     {
-      id: 'ctrl_a',
-      label: 'Ctrl-A',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
       id: 'ctrl_c',
       label: 'Ctrl-C',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_d',
-      label: 'Ctrl-D',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_e',
-      label: 'Ctrl-E',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_f',
-      label: 'Ctrl-F',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_k',
-      label: 'Ctrl-K',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_p',
-      label: 'Ctrl-P',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_t',
-      label: 'Ctrl-T',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_u',
-      label: 'Ctrl-U',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_v',
-      label: 'Ctrl-V',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_w',
-      label: 'Ctrl-W',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_x',
-      label: 'Ctrl-X',
-      category: 'ctrl',
-      note: undefined,
-      timeoutMs: undefined,
-      escTwice: false
-    },
-    {
-      id: 'ctrl_y',
-      label: 'Ctrl-Y',
       category: 'ctrl',
       note: undefined,
       timeoutMs: undefined,
@@ -342,6 +248,14 @@
       escTwice: false
     },
     {
+      id: 'cmd_v_image',
+      label: 'Cmd-V (image clipboard)',
+      category: 'cmd',
+      note: 'Script puts a 1x1 PNG on the clipboard. Press Cmd-V to paste image data.',
+      timeoutMs: 15000,
+      escTwice: false
+    },
+    {
       id: 'cmd_x',
       label: 'Cmd-X',
       category: 'cmd',
@@ -366,9 +280,24 @@
       disable: 'ESC[<u',
       calibration: {
         status: 'captured',
-        durationMs: 4223,
+        durationMs: 1792,
         idleMs: 600,
-        bytes: [27, 91, 50, 55, 117, 27, 91, 50, 55, 59, 49, 58, 51, 117],
+        bytes: [
+          27,
+          91,
+          50,
+          55,
+          117,
+          27,
+          91,
+          50,
+          55,
+          59,
+          49,
+          58,
+          51,
+          117
+        ],
         hex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
         text: 'ESC[27uESC[27;1:3u',
         display: 'ESC[27uESC[27;1:3u'
@@ -383,7 +312,22 @@
           timeoutMs: 8000,
           durationMs: 3773,
           delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
-          bytes: [27, 91, 50, 55, 117, 27, 91, 50, 55, 59, 49, 58, 51, 117],
+          bytes: [
+            27,
+            91,
+            50,
+            55,
+            117,
+            27,
+            91,
+            50,
+            55,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
           hex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
           text: 'ESC[27uESC[27;1:3u',
           display: 'ESC[27uESC[27;1:3u',
@@ -401,7 +345,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'shift_esc',
@@ -507,7 +453,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'a',
@@ -518,7 +466,22 @@
           timeoutMs: 8000,
           durationMs: 4457,
           delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
-          bytes: [27, 91, 57, 55, 117, 27, 91, 57, 55, 59, 49, 58, 51, 117],
+          bytes: [
+            27,
+            91,
+            57,
+            55,
+            117,
+            27,
+            91,
+            57,
+            55,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
           hex: '1b 5b 39 37 75 1b 5b 39 37 3b 31 3a 33 75',
           text: 'ESC[97uESC[97;1:3u',
           display: 'ESC[97uESC[97;1:3u',
@@ -536,7 +499,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'A',
@@ -616,7 +581,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'space',
@@ -627,7 +594,22 @@
           timeoutMs: 8000,
           durationMs: 3073,
           delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
-          bytes: [27, 91, 51, 50, 117, 27, 91, 51, 50, 59, 49, 58, 51, 117],
+          bytes: [
+            27,
+            91,
+            51,
+            50,
+            117,
+            27,
+            91,
+            51,
+            50,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
           hex: '1b 5b 33 32 75 1b 5b 33 32 3b 31 3a 33 75',
           text: 'ESC[32uESC[32;1:3u',
           display: 'ESC[32uESC[32;1:3u',
@@ -645,7 +627,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'enter',
@@ -656,7 +640,22 @@
           timeoutMs: 8000,
           durationMs: 3294,
           delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
-          bytes: [27, 91, 49, 51, 117, 27, 91, 49, 51, 59, 49, 58, 51, 117],
+          bytes: [
+            27,
+            91,
+            49,
+            51,
+            117,
+            27,
+            91,
+            49,
+            51,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
           hex: '1b 5b 31 33 75 1b 5b 31 33 3b 31 3a 33 75',
           text: 'ESC[13uESC[13;1:3u',
           display: 'ESC[13uESC[13;1:3u',
@@ -674,7 +673,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'shift_enter',
@@ -754,7 +755,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'alt_enter',
@@ -834,7 +837,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'tab',
@@ -845,7 +850,20 @@
           timeoutMs: 8000,
           durationMs: 6437,
           delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
-          bytes: [27, 91, 57, 117, 27, 91, 57, 59, 49, 58, 51, 117],
+          bytes: [
+            27,
+            91,
+            57,
+            117,
+            27,
+            91,
+            57,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
           hex: '1b 5b 39 75 1b 5b 39 3b 31 3a 33 75',
           text: 'ESC[9uESC[9;1:3u',
           display: 'ESC[9uESC[9;1:3u',
@@ -863,7 +881,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'shift_tab',
@@ -941,7 +961,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'backspace',
@@ -987,7 +1009,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'delete',
@@ -998,7 +1022,20 @@
           timeoutMs: 8000,
           durationMs: 7143,
           delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
-          bytes: [27, 91, 51, 126, 27, 91, 51, 59, 49, 58, 51, 126],
+          bytes: [
+            27,
+            91,
+            51,
+            126,
+            27,
+            91,
+            51,
+            59,
+            49,
+            58,
+            51,
+            126
+          ],
           hex: '1b 5b 33 7e 1b 5b 33 3b 31 3a 33 7e',
           text: 'ESC[3~ESC[3;1:3~',
           display: 'ESC[3~ESC[3;1:3~',
@@ -1016,7 +1053,10 @@
               kind: 'csi-tilde'
             }
           ],
-          tokenKinds: ['csi', 'csi-tilde']
+          tokenKinds: [
+            'csi',
+            'csi-tilde'
+          ]
         },
         {
           stepId: 'left',
@@ -1062,7 +1102,9 @@
               kind: 'csi'
             }
           ],
-          tokenKinds: ['csi']
+          tokenKinds: [
+            'csi'
+          ]
         },
         {
           stepId: 'right',
@@ -1108,7 +1150,9 @@
               kind: 'csi'
             }
           ],
-          tokenKinds: ['csi']
+          tokenKinds: [
+            'csi'
+          ]
         },
         {
           stepId: 'up',
@@ -1154,7 +1198,9 @@
               kind: 'csi'
             }
           ],
-          tokenKinds: ['csi']
+          tokenKinds: [
+            'csi'
+          ]
         },
         {
           stepId: 'down',
@@ -1200,7 +1246,9 @@
               kind: 'csi'
             }
           ],
-          tokenKinds: ['csi']
+          tokenKinds: [
+            'csi'
+          ]
         },
         {
           stepId: 'shift_left',
@@ -1280,7 +1328,10 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'csi']
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
         },
         {
           stepId: 'shift_right',
@@ -1360,7 +1411,10 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'csi']
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
         },
         {
           stepId: 'shift_up',
@@ -1440,7 +1494,10 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'csi']
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
         },
         {
           stepId: 'shift_down',
@@ -1520,7 +1577,10 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'csi']
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
         },
         {
           stepId: 'alt_left',
@@ -1567,7 +1627,12 @@
               hex: '1b 5b 35 37 34 34 33 3b 33 75',
               kind: 'kitty-csi-u'
             },
-            { text: 'ESCb', display: 'ESCb', hex: '1b 62', kind: 'escape' },
+            {
+              text: 'ESCb',
+              display: 'ESCb',
+              hex: '1b 62',
+              kind: 'escape'
+            },
             {
               text: 'ESC[57443;1:3u',
               display: 'ESC[57443;1:3u',
@@ -1575,7 +1640,10 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'escape']
+          tokenKinds: [
+            'kitty-csi-u',
+            'escape'
+          ]
         },
         {
           stepId: 'alt_right',
@@ -1622,7 +1690,12 @@
               hex: '1b 5b 35 37 34 34 33 3b 33 75',
               kind: 'kitty-csi-u'
             },
-            { text: 'ESCf', display: 'ESCf', hex: '1b 66', kind: 'escape' },
+            {
+              text: 'ESCf',
+              display: 'ESCf',
+              hex: '1b 66',
+              kind: 'escape'
+            },
             {
               text: 'ESC[57443;1:3u',
               display: 'ESC[57443;1:3u',
@@ -1630,7 +1703,10 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'escape']
+          tokenKinds: [
+            'kitty-csi-u',
+            'escape'
+          ]
         },
         {
           stepId: 'ctrl_a',
@@ -1710,7 +1786,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_c',
@@ -1790,7 +1868,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_d',
@@ -1872,7 +1952,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_e',
@@ -1954,7 +2036,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_f',
@@ -2036,7 +2120,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_k',
@@ -2118,7 +2204,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_p',
@@ -2200,7 +2288,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_t',
@@ -2282,7 +2372,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_u',
@@ -2364,7 +2456,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_v',
@@ -2446,7 +2540,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_w',
@@ -2528,7 +2624,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_x',
@@ -2610,7 +2708,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_y',
@@ -2692,7 +2792,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'ctrl_z',
@@ -2774,7 +2876,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'alt_1',
@@ -2854,7 +2958,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'cmd_a',
@@ -2906,7 +3012,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'cmd_v',
@@ -2955,10 +3063,30 @@
               hex: '1b 5b 35 37 34 34 34 3b 39 75',
               kind: 'kitty-csi-u'
             },
-            { text: 'd', display: 'd', hex: '64', kind: 'char' },
-            { text: 's', display: 's', hex: '73', kind: 'char' },
-            { text: 'f', display: 'f', hex: '66', kind: 'char' },
-            { text: ' ', display: ' ', hex: '20', kind: 'char' },
+            {
+              text: 'd',
+              display: 'd',
+              hex: '64',
+              kind: 'char'
+            },
+            {
+              text: 's',
+              display: 's',
+              hex: '73',
+              kind: 'char'
+            },
+            {
+              text: 'f',
+              display: 'f',
+              hex: '66',
+              kind: 'char'
+            },
+            {
+              text: ' ',
+              display: ' ',
+              hex: '20',
+              kind: 'char'
+            },
             {
               text: 'ESC[57444;1:3u',
               display: 'ESC[57444;1:3u',
@@ -2966,7 +3094,10 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'char']
+          tokenKinds: [
+            'kitty-csi-u',
+            'char'
+          ]
         },
         {
           stepId: 'cmd_x',
@@ -3048,7 +3179,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'cmd_z',
@@ -3100,7 +3233,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'cmd_v_empty',
@@ -3152,7 +3287,9 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u']
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         },
         {
           stepId: 'cmd_v_known',
@@ -3214,23 +3351,108 @@
               hex: '1b 5b 35 37 34 34 34 3b 39 75',
               kind: 'kitty-csi-u'
             },
-            { text: 'h', display: 'h', hex: '68', kind: 'char' },
-            { text: 'a', display: 'a', hex: '61', kind: 'char' },
-            { text: 'l', display: 'l', hex: '6c', kind: 'char' },
-            { text: '-', display: '-', hex: '2d', kind: 'char' },
-            { text: 'c', display: 'c', hex: '63', kind: 'char' },
-            { text: 'a', display: 'a', hex: '61', kind: 'char' },
-            { text: 'p', display: 'p', hex: '70', kind: 'char' },
-            { text: 't', display: 't', hex: '74', kind: 'char' },
-            { text: 'u', display: 'u', hex: '75', kind: 'char' },
-            { text: 'r', display: 'r', hex: '72', kind: 'char' },
-            { text: 'e', display: 'e', hex: '65', kind: 'char' },
-            { text: '-', display: '-', hex: '2d', kind: 'char' },
-            { text: 'c', display: 'c', hex: '63', kind: 'char' },
-            { text: 'm', display: 'm', hex: '6d', kind: 'char' },
-            { text: 'd', display: 'd', hex: '64', kind: 'char' },
-            { text: '-', display: '-', hex: '2d', kind: 'char' },
-            { text: 'v', display: 'v', hex: '76', kind: 'char' },
+            {
+              text: 'h',
+              display: 'h',
+              hex: '68',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'l',
+              display: 'l',
+              hex: '6c',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'p',
+              display: 'p',
+              hex: '70',
+              kind: 'char'
+            },
+            {
+              text: 't',
+              display: 't',
+              hex: '74',
+              kind: 'char'
+            },
+            {
+              text: 'u',
+              display: 'u',
+              hex: '75',
+              kind: 'char'
+            },
+            {
+              text: 'r',
+              display: 'r',
+              hex: '72',
+              kind: 'char'
+            },
+            {
+              text: 'e',
+              display: 'e',
+              hex: '65',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'm',
+              display: 'm',
+              hex: '6d',
+              kind: 'char'
+            },
+            {
+              text: 'd',
+              display: 'd',
+              hex: '64',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'v',
+              display: 'v',
+              hex: '76',
+              kind: 'char'
+            },
             {
               text: 'ESC[57444;1:3u',
               display: 'ESC[57444;1:3u',
@@ -3238,7 +3460,64 @@
               kind: 'kitty-csi-u'
             }
           ],
-          tokenKinds: ['kitty-csi-u', 'char']
+          tokenKinds: [
+            'kitty-csi-u',
+            'char'
+          ]
+        },
+        {
+          stepId: 'cmd_v_image',
+          label: 'Cmd-V (image clipboard)',
+          category: 'cmd',
+          status: 'captured',
+          note: 'Script puts a 1x1 PNG on the clipboard. Press Cmd-V to paste image data.',
+          timeoutMs: 15000,
+          durationMs: 3271,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            57,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+          text: 'ESC[57444;9uESC[57444;1:3u',
+          display: 'ESC[57444;9uESC[57444;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57444;9u',
+              display: 'ESC[57444;9u',
+              hex: '1b 5b 35 37 34 34 34 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57444;1:3u',
+              display: 'ESC[57444;1:3u',
+              hex: '1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         }
       ]
     }
@@ -3249,7 +3528,9 @@
         status: 'captured',
         hex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
         display: 'ESC[27uESC[27;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     shift_esc: {
@@ -3257,7 +3538,9 @@
         status: 'timeout',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 32 37 3b 32 75 1b 5b 32 37 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75 1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[27;2uESC[27;2:3uESC[57441;1:3uESC[27uESC[27;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     a: {
@@ -3265,7 +3548,9 @@
         status: 'captured',
         hex: '1b 5b 39 37 75 1b 5b 39 37 3b 31 3a 33 75',
         display: 'ESC[97uESC[97;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     A: {
@@ -3273,7 +3558,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 39 37 3b 32 75 1b 5b 39 37 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[97;2uESC[97;2:3uESC[57441;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     space: {
@@ -3281,7 +3568,9 @@
         status: 'captured',
         hex: '1b 5b 33 32 75 1b 5b 33 32 3b 31 3a 33 75',
         display: 'ESC[32uESC[32;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     enter: {
@@ -3289,7 +3578,9 @@
         status: 'captured',
         hex: '1b 5b 31 33 75 1b 5b 31 33 3b 31 3a 33 75',
         display: 'ESC[13uESC[13;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     shift_enter: {
@@ -3297,7 +3588,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 33 3b 32 75 1b 5b 31 33 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[13;2uESC[13;2:3uESC[57441;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     alt_enter: {
@@ -3305,7 +3598,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 5b 31 33 3b 33 75 1b 5b 31 33 3b 33 3a 33 75 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
         display: 'ESC[57443;3uESC[13;3uESC[13;3:3uESC[57443;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     tab: {
@@ -3313,7 +3608,9 @@
         status: 'captured',
         hex: '1b 5b 39 75 1b 5b 39 3b 31 3a 33 75',
         display: 'ESC[9uESC[9;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     shift_tab: {
@@ -3321,7 +3618,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 39 3b 32 75 1b 5b 39 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[9;2uESC[9;2:3uESC[57441;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     backspace: {
@@ -3329,7 +3628,9 @@
         status: 'captured',
         hex: '1b 5b 31 32 37 75 1b 5b 31 32 37 3b 31 3a 33 75',
         display: 'ESC[127uESC[127;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     delete: {
@@ -3337,7 +3638,10 @@
         status: 'captured',
         hex: '1b 5b 33 7e 1b 5b 33 3b 31 3a 33 7e',
         display: 'ESC[3~ESC[3;1:3~',
-        tokenKinds: ['csi', 'csi-tilde']
+        tokenKinds: [
+          'csi',
+          'csi-tilde'
+        ]
       }
     },
     left: {
@@ -3345,7 +3649,9 @@
         status: 'captured',
         hex: '1b 5b 31 3b 31 3a 31 44 1b 5b 31 3b 31 3a 33 44',
         display: 'ESC[1;1:1DESC[1;1:3D',
-        tokenKinds: ['csi']
+        tokenKinds: [
+          'csi'
+        ]
       }
     },
     right: {
@@ -3353,7 +3659,9 @@
         status: 'captured',
         hex: '1b 5b 31 3b 31 3a 31 43 1b 5b 31 3b 31 3a 33 43',
         display: 'ESC[1;1:1CESC[1;1:3C',
-        tokenKinds: ['csi']
+        tokenKinds: [
+          'csi'
+        ]
       }
     },
     up: {
@@ -3361,7 +3669,9 @@
         status: 'captured',
         hex: '1b 5b 31 3b 31 3a 31 41 1b 5b 31 3b 31 3a 33 41',
         display: 'ESC[1;1:1AESC[1;1:3A',
-        tokenKinds: ['csi']
+        tokenKinds: [
+          'csi'
+        ]
       }
     },
     down: {
@@ -3369,7 +3679,9 @@
         status: 'captured',
         hex: '1b 5b 31 3b 31 3a 31 42 1b 5b 31 3b 31 3a 33 42',
         display: 'ESC[1;1:1BESC[1;1:3B',
-        tokenKinds: ['csi']
+        tokenKinds: [
+          'csi'
+        ]
       }
     },
     shift_left: {
@@ -3377,7 +3689,10 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 3a 31 44 1b 5b 31 3b 32 3a 33 44 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[1;2:1DESC[1;2:3DESC[57441;1:3u',
-        tokenKinds: ['kitty-csi-u', 'csi']
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
       }
     },
     shift_right: {
@@ -3385,7 +3700,10 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 3a 31 43 1b 5b 31 3b 32 3a 33 43 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[1;2:1CESC[1;2:3CESC[57441;1:3u',
-        tokenKinds: ['kitty-csi-u', 'csi']
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
       }
     },
     shift_up: {
@@ -3393,7 +3711,10 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 3a 31 41 1b 5b 31 3b 32 3a 33 41 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[1;2:1AESC[1;2:3AESC[57441;1:3u',
-        tokenKinds: ['kitty-csi-u', 'csi']
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
       }
     },
     shift_down: {
@@ -3401,7 +3722,10 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 3a 31 42 1b 5b 31 3b 32 3a 33 42 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
         display: 'ESC[57441;2uESC[1;2:1BESC[1;2:3BESC[57441;1:3u',
-        tokenKinds: ['kitty-csi-u', 'csi']
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
       }
     },
     alt_left: {
@@ -3409,7 +3733,10 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 62 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
         display: 'ESC[57443;3uESCbESC[57443;1:3u',
-        tokenKinds: ['kitty-csi-u', 'escape']
+        tokenKinds: [
+          'kitty-csi-u',
+          'escape'
+        ]
       }
     },
     alt_right: {
@@ -3417,15 +3744,10 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 66 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
         display: 'ESC[57443;3uESCfESC[57443;1:3u',
-        tokenKinds: ['kitty-csi-u', 'escape']
-      }
-    },
-    ctrl_a: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 39 37 3b 35 75 1b 5b 39 37 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[97;5uESC[97;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u',
+          'escape'
+        ]
       }
     },
     ctrl_c: {
@@ -3433,95 +3755,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 39 39 3b 35 75 1b 5b 39 39 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
         display: 'ESC[57442;5uESC[99;5uESC[99;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_d: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 30 30 3b 35 75 1b 5b 31 30 30 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[100;5uESC[100;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_e: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 30 31 3b 35 75 1b 5b 31 30 31 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[101;5uESC[101;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_f: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 30 32 3b 35 75 1b 5b 31 30 32 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[102;5uESC[102;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_k: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 30 37 3b 35 75 1b 5b 31 30 37 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[107;5uESC[107;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_p: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 31 32 3b 35 75 1b 5b 31 31 32 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[112;5uESC[112;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_t: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 31 36 3b 35 75 1b 5b 31 31 36 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[116;5uESC[116;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_u: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 31 37 3b 35 75 1b 5b 31 31 37 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[117;5uESC[117;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_v: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 31 38 3b 35 75 1b 5b 31 31 38 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[118;5uESC[118;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_w: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 31 39 3b 35 75 1b 5b 31 31 39 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[119;5uESC[119;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_x: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 32 30 3b 35 75 1b 5b 31 32 30 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[120;5uESC[120;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
-      }
-    },
-    ctrl_y: {
-      hal11: {
-        status: 'captured',
-        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 32 31 3b 35 75 1b 5b 31 32 31 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
-        display: 'ESC[57442;5uESC[121;5uESC[121;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     ctrl_z: {
@@ -3529,7 +3765,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 32 32 3b 35 75 1b 5b 31 32 32 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
         display: 'ESC[57442;5uESC[122;5uESC[122;5:3uESC[57442;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     alt_1: {
@@ -3537,7 +3775,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 5b 34 39 3b 33 75 1b 5b 34 39 3b 33 3a 33 75 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
         display: 'ESC[57443;3uESC[49;3uESC[49;3:3uESC[57443;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_a: {
@@ -3545,7 +3785,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
         display: 'ESC[57444;9uESC[57444;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_v_empty: {
@@ -3553,7 +3795,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
         display: 'ESC[57444;9uESC[57444;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_v_known: {
@@ -3561,7 +3805,20 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 34 3b 39 75 68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
         display: 'ESC[57444;9uhal-capture-cmd-vESC[57444;1:3u',
-        tokenKinds: ['kitty-csi-u', 'char']
+        tokenKinds: [
+          'kitty-csi-u',
+          'char'
+        ]
+      }
+    },
+    cmd_v_image: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+        display: 'ESC[57444;9uESC[57444;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_x: {
@@ -3569,7 +3826,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 31 32 30 3b 39 75 1b 5b 31 32 30 3b 39 3a 33 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
         display: 'ESC[57444;9uESC[120;9uESC[120;9:3uESC[57444;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_z: {
@@ -3577,7 +3836,9 @@
         status: 'captured',
         hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
         display: 'ESC[57444;9uESC[57444;1:3u',
-        tokenKinds: ['kitty-csi-u']
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     }
   }
