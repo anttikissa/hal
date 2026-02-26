@@ -860,5 +860,5 @@ function renderTabsForStatus(): string {
 function renderBusyStatus(): void {
 	const tabStr = renderTabsForStatus()
 	const parts = [roleLabel, lastContextStatus ?? ''].filter(Boolean)
-	setStatusLine(tabStr, parts.join(' '))
+	setStatusLine(tabStr, parts.join(' · '))
 }

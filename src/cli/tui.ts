@@ -55,8 +55,9 @@ const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m'
 const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
-const TITLE_DIM = '\x1b[38;5;245m'
 const TITLE_BG = '\x1b[48;5;238m'
+const TITLE_TOPIC = '\x1b[38;5;245m'
+const TITLE_SESSION = '\x1b[38;5;252m'
 // Flags: 1=disambiguate, 2=report events, 8=report all (Super key), 16=report associated text
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
@@ -198,6 +199,18 @@ let stdinBuffer = ''
 let stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
 
+function splitTitleParts(text: string): { topic: string; session: string } {
+	const trimmed = text.trim()
+	if (!trimmed) return { topic: 'New conversation', session: '' }
+	const sep = ' — '
+	const idx = trimmed.lastIndexOf(sep)
+	if (idx <= 0) return { topic: trimmed, session: '' }
+	const topic = trimmed.slice(0, idx).trim()
+	const session = trimmed.slice(idx + sep.length).trim()
+	if (!topic || !session) return { topic: trimmed, session: '' }
+	return { topic, session }
+}
+
 // ── Geometry helpers ──
 
 function cols(): number {
@@ -207,11 +220,14 @@ function rows(): number {
 	return process.stdout.rows || 24
 }
 
-function promptLineCount(): number {
+function promptContentWidth(): number {
 	const c = cols()
 	if (c <= 0) return 1
-	const contentWidth = c - 1 - inputPromptStr.length
-	const lines = wordWrapLines(inputBuf, contentWidth)
+	return Math.max(1, c - inputPromptStr.length)
+}
+
+function promptLineCount(): number {
+	const lines = wordWrapLines(inputBuf, promptContentWidth())
 	return Math.max(1, Math.min(lines.length, maxPromptLines))
 }
 
@@ -592,13 +608,11 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 }
 
 function inputPosFromWrappedPoint(row: number, col: number): number {
-	const width = cols() - 1 - inputPromptStr.length
-	return wrappedRowColToCursor(inputBuf, row, Math.max(0, col), width)
+	return wrappedRowColToCursor(inputBuf, row, Math.max(0, col), promptContentWidth())
 }
 
 function inputWrappedPointFromScreen(x: number, y: number): { row: number; col: number } | null {
-	const c = cols()
-	const contentWidth = c - 1 - inputPromptStr.length
+	const contentWidth = promptContentWidth()
 	const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
 	const pLines = Math.min(lines.length, maxPromptLines)
 	const firstRow = promptFirstRow()
@@ -699,7 +713,7 @@ function getSelectionRange(): {
 
 function selectionLine(pt: SelectionPoint): string {
 	if (pt.surface === 'input') {
-		const width = cols() - 1 - inputPromptStr.length
+		const width = promptContentWidth()
 		return getWrappedInputLayout(inputBuf, width).lines[pt.row] ?? ''
 	}
 	return screenSelectionLine(pt.surface, pt.row)
@@ -1044,7 +1058,10 @@ function render(): void {
 	// Row 1: title bar
 	chunks.push(`\x1b[1;1H\x1b[2K`)
 	const titleText = titleBarStr || 'New conversation'
-	const titleLine = `${TITLE_BG}${TITLE_DIM}  ${titleText}`
+	const { topic, session } = splitTitleParts(titleText)
+	const titleLine = session
+		? `${TITLE_BG}${TITLE_TOPIC}  ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
+		: `${TITLE_BG}${TITLE_TOPIC}  ${topic}`
 	chunks.push(truncateAnsi(titleLine, c) + RESET)
 
 	// Rows 2..ob: output viewport
@@ -1082,7 +1099,7 @@ function render(): void {
 	chunks.push(`${BG_DARK}${' '.repeat(c)}${RESET}`)
 
 	// Prompt lines
-	const contentWidth = c - 1 - inputPromptStr.length
+	const contentWidth = promptContentWidth()
 	const wrappedInput = getWrappedInputLayout(inputBuf, contentWidth)
 	const wrapped = wrappedInput.lines
 	const inputSelRange = getInputTextSelectionRange()
@@ -1571,7 +1588,7 @@ function handleKey(key: string): void {
 	// Arrow up
 	if (key === '\x1b[A' || key === '\x1bOA') {
 		clearInputTextSelection()
-		const contentWidth = cols() - 1 - inputPromptStr.length
+		const contentWidth = promptContentWidth()
 		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
 		if (row > 0) {
 			inputCursor = wrappedRowColToCursor(inputBuf, row - 1, col, contentWidth)
@@ -1592,7 +1609,7 @@ function handleKey(key: string): void {
 	// Arrow down
 	if (key === '\x1b[B' || key === '\x1bOB') {
 		clearInputTextSelection()
-		const contentWidth = cols() - 1 - inputPromptStr.length
+		const contentWidth = promptContentWidth()
 		const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
 		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
 		if (row < lines.length - 1) {
