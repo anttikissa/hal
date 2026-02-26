@@ -1,0 +1,2494 @@
+{
+  type: 'terminal-key-capture',
+  version: 1,
+  createdAt: '2026-02-26T14:29:49.524Z',
+  terminalLabel: 'iTerm.app',
+  env: {
+    platform: 'darwin',
+    arch: 'arm64',
+    pid: 29891,
+    term: 'xterm-256color',
+    termProgram: 'iTerm.app',
+    termProgramVersion: '3.6.6',
+    kittyPid: '',
+    lang: 'fi_FI.UTF-8'
+  },
+  config: {
+    preset: 'tui',
+    profiles: [
+      'hal11'
+    ],
+    stepTimeoutMs: 8000,
+    calibrationTimeoutMs: 15000,
+    idleMs: 600
+  },
+  steps: [
+    {
+      id: 'esc',
+      label: 'Esc',
+      category: 'basic',
+      note: 'Press Esc twice: first is target, second ends step.',
+      timeoutMs: undefined,
+      escTwice: true
+    },
+    {
+      id: 'shift_esc',
+      label: 'Shift-Esc',
+      category: 'basic',
+      note: 'Often same bytes as Esc; press Shift-Esc, then Esc again to end.',
+      timeoutMs: undefined,
+      escTwice: true
+    },
+    {
+      id: 'a',
+      label: 'a',
+      category: 'basic',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'A',
+      label: 'Shift-A',
+      category: 'basic',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'space',
+      label: 'Space',
+      category: 'basic',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'enter',
+      label: 'Enter',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_enter',
+      label: 'Shift-Enter',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_enter',
+      label: 'Option/Alt-Enter',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'tab',
+      label: 'Tab',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_tab',
+      label: 'Shift-Tab',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'backspace',
+      label: 'Backspace',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'delete',
+      label: 'Forward Delete (Fn-Backspace on Mac laptop)',
+      category: 'editing',
+      note: 'On macOS laptop keyboards this is usually Fn-Delete.',
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'left',
+      label: 'Left Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'right',
+      label: 'Right Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'up',
+      label: 'Up Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'down',
+      label: 'Down Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_left',
+      label: 'Shift-Left Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_right',
+      label: 'Shift-Right Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_up',
+      label: 'Shift-Up Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_down',
+      label: 'Shift-Down Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_left',
+      label: 'Option/Alt-Left Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_right',
+      label: 'Option/Alt-Right Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'ctrl_c',
+      label: 'Ctrl-C',
+      category: 'ctrl',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'ctrl_z',
+      label: 'Ctrl-Z',
+      category: 'ctrl',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_1',
+      label: 'Option/Alt-1',
+      category: 'alt',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'cmd_a',
+      label: 'Cmd-A',
+      category: 'cmd',
+      note: 'macOS: may be intercepted or sent only in Kitty mode.',
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'cmd_v_empty',
+      label: 'Cmd-V (empty clipboard)',
+      category: 'cmd',
+      note: 'Script clears clipboard before this step. Empty capture or pasted-empty result are both useful.',
+      timeoutMs: 15000,
+      escTwice: false
+    },
+    {
+      id: 'cmd_v_known',
+      label: 'Cmd-V (known clipboard)',
+      category: 'cmd',
+      note: 'Script sets clipboard to "hal-capture-cmd-v" before this step.',
+      timeoutMs: 15000,
+      escTwice: false
+    },
+    {
+      id: 'cmd_x',
+      label: 'Cmd-X',
+      category: 'cmd',
+      note: 'macOS: terminal/OS may intercept cut.',
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'cmd_z',
+      label: 'Cmd-Z',
+      category: 'cmd',
+      note: 'macOS: terminal/OS may intercept undo.',
+      timeoutMs: undefined,
+      escTwice: false
+    }
+  ],
+  profiles: [
+    {
+      id: 'hal11',
+      label: 'HAL Kitty keyboard mode (>11u)',
+      enable: 'ESC[>11u',
+      disable: 'ESC[<u',
+      calibration: {
+        status: 'captured',
+        durationMs: 4276,
+        idleMs: 600,
+        bytes: [
+          27,
+          91,
+          50,
+          55,
+          117,
+          27,
+          91,
+          50,
+          55,
+          59,
+          49,
+          58,
+          51,
+          117
+        ],
+        hex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+        text: 'ESC[27uESC[27;1:3u',
+        display: 'ESC[27uESC[27;1:3u'
+      },
+      steps: [
+        {
+          stepId: 'esc',
+          label: 'Esc',
+          category: 'basic',
+          status: 'captured',
+          note: 'Press Esc twice: first is target, second ends step.',
+          timeoutMs: 8000,
+          durationMs: 2990,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            50,
+            55,
+            117,
+            27,
+            91,
+            50,
+            55,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          text: 'ESC[27uESC[27;1:3u',
+          display: 'ESC[27uESC[27;1:3u',
+          tokens: [
+            {
+              text: 'ESC[27u',
+              display: 'ESC[27u',
+              hex: '1b 5b 32 37 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[27;1:3u',
+              display: 'ESC[27;1:3u',
+              hex: '1b 5b 32 37 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'shift_esc',
+          label: 'Shift-Esc',
+          category: 'basic',
+          status: 'timeout',
+          note: 'Often same bytes as Esc; press Shift-Esc, then Esc again to end.',
+          timeoutMs: 8000,
+          durationMs: 8001,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            50,
+            55,
+            59,
+            50,
+            117,
+            27,
+            91,
+            50,
+            55,
+            59,
+            50,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117,
+            27,
+            91,
+            50,
+            55,
+            117,
+            27,
+            91,
+            50,
+            55,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 32 37 3b 32 75 1b 5b 32 37 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75 1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[27;2uESC[27;2:3uESC[57441;1:3uESC[27uESC[27;1:3u',
+          display: 'ESC[57441;2uESC[27;2uESC[27;2:3uESC[57441;1:3uESC[27uESC[27;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[27;2u',
+              display: 'ESC[27;2u',
+              hex: '1b 5b 32 37 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[27;2:3u',
+              display: 'ESC[27;2:3u',
+              hex: '1b 5b 32 37 3b 32 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[27u',
+              display: 'ESC[27u',
+              hex: '1b 5b 32 37 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[27;1:3u',
+              display: 'ESC[27;1:3u',
+              hex: '1b 5b 32 37 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'a',
+          label: 'a',
+          category: 'basic',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 3239,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            57,
+            55,
+            117,
+            27,
+            91,
+            57,
+            55,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 39 37 75 1b 5b 39 37 3b 31 3a 33 75',
+          text: 'ESC[97uESC[97;1:3u',
+          display: 'ESC[97uESC[97;1:3u',
+          tokens: [
+            {
+              text: 'ESC[97u',
+              display: 'ESC[97u',
+              hex: '1b 5b 39 37 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[97;1:3u',
+              display: 'ESC[97;1:3u',
+              hex: '1b 5b 39 37 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'A',
+          label: 'Shift-A',
+          category: 'basic',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2144,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            57,
+            55,
+            59,
+            50,
+            117,
+            27,
+            91,
+            57,
+            55,
+            59,
+            50,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 39 37 3b 32 75 1b 5b 39 37 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[97;2uESC[97;2:3uESC[57441;1:3u',
+          display: 'ESC[57441;2uESC[97;2uESC[97;2:3uESC[57441;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[97;2u',
+              display: 'ESC[97;2u',
+              hex: '1b 5b 39 37 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[97;2:3u',
+              display: 'ESC[97;2:3u',
+              hex: '1b 5b 39 37 3b 32 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'space',
+          label: 'Space',
+          category: 'basic',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1919,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            51,
+            50,
+            117,
+            27,
+            91,
+            51,
+            50,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 33 32 75 1b 5b 33 32 3b 31 3a 33 75',
+          text: 'ESC[32uESC[32;1:3u',
+          display: 'ESC[32uESC[32;1:3u',
+          tokens: [
+            {
+              text: 'ESC[32u',
+              display: 'ESC[32u',
+              hex: '1b 5b 33 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[32;1:3u',
+              display: 'ESC[32;1:3u',
+              hex: '1b 5b 33 32 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'enter',
+          label: 'Enter',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1773,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            49,
+            51,
+            117,
+            27,
+            91,
+            49,
+            51,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 31 33 75 1b 5b 31 33 3b 31 3a 33 75',
+          text: 'ESC[13uESC[13;1:3u',
+          display: 'ESC[13uESC[13;1:3u',
+          tokens: [
+            {
+              text: 'ESC[13u',
+              display: 'ESC[13u',
+              hex: '1b 5b 31 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[13;1:3u',
+              display: 'ESC[13;1:3u',
+              hex: '1b 5b 31 33 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'shift_enter',
+          label: 'Shift-Enter',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1924,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            49,
+            51,
+            59,
+            50,
+            117,
+            27,
+            91,
+            49,
+            51,
+            59,
+            50,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 33 3b 32 75 1b 5b 31 33 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[13;2uESC[13;2:3uESC[57441;1:3u',
+          display: 'ESC[57441;2uESC[13;2uESC[13;2:3uESC[57441;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[13;2u',
+              display: 'ESC[13;2u',
+              hex: '1b 5b 31 33 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[13;2:3u',
+              display: 'ESC[13;2:3u',
+              hex: '1b 5b 31 33 3b 32 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'alt_enter',
+          label: 'Option/Alt-Enter',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2648,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            51,
+            117,
+            27,
+            91,
+            49,
+            51,
+            59,
+            51,
+            117,
+            27,
+            91,
+            49,
+            51,
+            59,
+            51,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 5b 31 33 3b 33 75 1b 5b 31 33 3b 33 3a 33 75 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+          text: 'ESC[57443;3uESC[13;3uESC[13;3:3uESC[57443;1:3u',
+          display: 'ESC[57443;3uESC[13;3uESC[13;3:3uESC[57443;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57443;3u',
+              display: 'ESC[57443;3u',
+              hex: '1b 5b 35 37 34 34 33 3b 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[13;3u',
+              display: 'ESC[13;3u',
+              hex: '1b 5b 31 33 3b 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[13;3:3u',
+              display: 'ESC[13;3:3u',
+              hex: '1b 5b 31 33 3b 33 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57443;1:3u',
+              display: 'ESC[57443;1:3u',
+              hex: '1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'tab',
+          label: 'Tab',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1626,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            57,
+            117,
+            27,
+            91,
+            57,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 39 75 1b 5b 39 3b 31 3a 33 75',
+          text: 'ESC[9uESC[9;1:3u',
+          display: 'ESC[9uESC[9;1:3u',
+          tokens: [
+            {
+              text: 'ESC[9u',
+              display: 'ESC[9u',
+              hex: '1b 5b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[9;1:3u',
+              display: 'ESC[9;1:3u',
+              hex: '1b 5b 39 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'shift_tab',
+          label: 'Shift-Tab',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1895,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            57,
+            59,
+            50,
+            117,
+            27,
+            91,
+            57,
+            59,
+            50,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 39 3b 32 75 1b 5b 39 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[9;2uESC[9;2:3uESC[57441;1:3u',
+          display: 'ESC[57441;2uESC[9;2uESC[9;2:3uESC[57441;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[9;2u',
+              display: 'ESC[9;2u',
+              hex: '1b 5b 39 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[9;2:3u',
+              display: 'ESC[9;2:3u',
+              hex: '1b 5b 39 3b 32 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'backspace',
+          label: 'Backspace',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1722,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            49,
+            50,
+            55,
+            117,
+            27,
+            91,
+            49,
+            50,
+            55,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 31 32 37 75 1b 5b 31 32 37 3b 31 3a 33 75',
+          text: 'ESC[127uESC[127;1:3u',
+          display: 'ESC[127uESC[127;1:3u',
+          tokens: [
+            {
+              text: 'ESC[127u',
+              display: 'ESC[127u',
+              hex: '1b 5b 31 32 37 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[127;1:3u',
+              display: 'ESC[127;1:3u',
+              hex: '1b 5b 31 32 37 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'delete',
+          label: 'Forward Delete (Fn-Backspace on Mac laptop)',
+          category: 'editing',
+          status: 'captured',
+          note: 'On macOS laptop keyboards this is usually Fn-Delete.',
+          timeoutMs: 8000,
+          durationMs: 2473,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            51,
+            126,
+            27,
+            91,
+            51,
+            59,
+            49,
+            58,
+            51,
+            126
+          ],
+          hex: '1b 5b 33 7e 1b 5b 33 3b 31 3a 33 7e',
+          text: 'ESC[3~ESC[3;1:3~',
+          display: 'ESC[3~ESC[3;1:3~',
+          tokens: [
+            {
+              text: 'ESC[3~',
+              display: 'ESC[3~',
+              hex: '1b 5b 33 7e',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[3;1:3~',
+              display: 'ESC[3;1:3~',
+              hex: '1b 5b 33 3b 31 3a 33 7e',
+              kind: 'csi-tilde'
+            }
+          ],
+          tokenKinds: [
+            'csi',
+            'csi-tilde'
+          ]
+        },
+        {
+          stepId: 'left',
+          label: 'Left Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1814,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            68,
+            27,
+            91,
+            49,
+            59,
+            49,
+            58,
+            51,
+            68
+          ],
+          hex: '1b 5b 44 1b 5b 31 3b 31 3a 33 44',
+          text: 'ESC[DESC[1;1:3D',
+          display: 'ESC[DESC[1;1:3D',
+          tokens: [
+            {
+              text: 'ESC[D',
+              display: 'ESC[D',
+              hex: '1b 5b 44',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;1:3D',
+              display: 'ESC[1;1:3D',
+              hex: '1b 5b 31 3b 31 3a 33 44',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'right',
+          label: 'Right Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1144,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            67,
+            27,
+            91,
+            49,
+            59,
+            49,
+            58,
+            51,
+            67
+          ],
+          hex: '1b 5b 43 1b 5b 31 3b 31 3a 33 43',
+          text: 'ESC[CESC[1;1:3C',
+          display: 'ESC[CESC[1;1:3C',
+          tokens: [
+            {
+              text: 'ESC[C',
+              display: 'ESC[C',
+              hex: '1b 5b 43',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;1:3C',
+              display: 'ESC[1;1:3C',
+              hex: '1b 5b 31 3b 31 3a 33 43',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'up',
+          label: 'Up Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1156,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            65,
+            27,
+            91,
+            49,
+            59,
+            49,
+            58,
+            51,
+            65
+          ],
+          hex: '1b 5b 41 1b 5b 31 3b 31 3a 33 41',
+          text: 'ESC[AESC[1;1:3A',
+          display: 'ESC[AESC[1;1:3A',
+          tokens: [
+            {
+              text: 'ESC[A',
+              display: 'ESC[A',
+              hex: '1b 5b 41',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;1:3A',
+              display: 'ESC[1;1:3A',
+              hex: '1b 5b 31 3b 31 3a 33 41',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'down',
+          label: 'Down Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1007,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            66,
+            27,
+            91,
+            49,
+            59,
+            49,
+            58,
+            51,
+            66
+          ],
+          hex: '1b 5b 42 1b 5b 31 3b 31 3a 33 42',
+          text: 'ESC[BESC[1;1:3B',
+          display: 'ESC[BESC[1;1:3B',
+          tokens: [
+            {
+              text: 'ESC[B',
+              display: 'ESC[B',
+              hex: '1b 5b 42',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;1:3B',
+              display: 'ESC[1;1:3B',
+              hex: '1b 5b 31 3b 31 3a 33 42',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_left',
+          label: 'Shift-Left Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1852,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            49,
+            59,
+            50,
+            68,
+            27,
+            91,
+            49,
+            59,
+            50,
+            58,
+            51,
+            68,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 44 1b 5b 31 3b 32 3a 33 44 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[1;2DESC[1;2:3DESC[57441;1:3u',
+          display: 'ESC[57441;2uESC[1;2DESC[1;2:3DESC[57441;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[1;2D',
+              display: 'ESC[1;2D',
+              hex: '1b 5b 31 3b 32 44',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;2:3D',
+              display: 'ESC[1;2:3D',
+              hex: '1b 5b 31 3b 32 3a 33 44',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_right',
+          label: 'Shift-Right Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1676,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            49,
+            59,
+            50,
+            67,
+            27,
+            91,
+            49,
+            59,
+            50,
+            58,
+            51,
+            67,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 43 1b 5b 31 3b 32 3a 33 43 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[1;2CESC[1;2:3CESC[57441;1:3u',
+          display: 'ESC[57441;2uESC[1;2CESC[1;2:3CESC[57441;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[1;2C',
+              display: 'ESC[1;2C',
+              hex: '1b 5b 31 3b 32 43',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;2:3C',
+              display: 'ESC[1;2:3C',
+              hex: '1b 5b 31 3b 32 3a 33 43',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_up',
+          label: 'Shift-Up Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1711,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            49,
+            59,
+            50,
+            65,
+            27,
+            91,
+            49,
+            59,
+            50,
+            58,
+            51,
+            65,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 41 1b 5b 31 3b 32 3a 33 41 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[1;2AESC[1;2:3AESC[57441;1:3u',
+          display: 'ESC[57441;2uESC[1;2AESC[1;2:3AESC[57441;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[1;2A',
+              display: 'ESC[1;2A',
+              hex: '1b 5b 31 3b 32 41',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;2:3A',
+              display: 'ESC[1;2:3A',
+              hex: '1b 5b 31 3b 32 3a 33 41',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_down',
+          label: 'Shift-Down Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1633,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            50,
+            117,
+            27,
+            91,
+            49,
+            59,
+            50,
+            66,
+            27,
+            91,
+            49,
+            59,
+            50,
+            58,
+            51,
+            66,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            49,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 42 1b 5b 31 3b 32 3a 33 42 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+          text: 'ESC[57441;2uESC[1;2BESC[1;2:3BESC[57441;1:3u',
+          display: 'ESC[57441;2uESC[1;2BESC[1;2:3BESC[57441;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57441;2u',
+              display: 'ESC[57441;2u',
+              hex: '1b 5b 35 37 34 34 31 3b 32 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[1;2B',
+              display: 'ESC[1;2B',
+              hex: '1b 5b 31 3b 32 42',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[1;2:3B',
+              display: 'ESC[1;2:3B',
+              hex: '1b 5b 31 3b 32 3a 33 42',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[57441;1:3u',
+              display: 'ESC[57441;1:3u',
+              hex: '1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u',
+            'csi'
+          ]
+        },
+        {
+          stepId: 'alt_left',
+          label: 'Option/Alt-Left Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 5037,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            51,
+            117,
+            27,
+            27,
+            91,
+            68,
+            27,
+            91,
+            49,
+            59,
+            51,
+            58,
+            51,
+            68,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 1b 5b 44 1b 5b 31 3b 33 3a 33 44 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+          text: 'ESC[57443;3uESCESC[DESC[1;3:3DESC[57443;1:3u',
+          display: 'ESC[57443;3uESCESC[DESC[1;3:3DESC[57443;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57443;3u',
+              display: 'ESC[57443;3u',
+              hex: '1b 5b 35 37 34 34 33 3b 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESCESC',
+              display: 'ESCESC',
+              hex: '1b 1b',
+              kind: 'escape'
+            },
+            {
+              text: '[',
+              display: '[',
+              hex: '5b',
+              kind: 'char'
+            },
+            {
+              text: 'D',
+              display: 'D',
+              hex: '44',
+              kind: 'char'
+            },
+            {
+              text: 'ESC[1;3:3D',
+              display: 'ESC[1;3:3D',
+              hex: '1b 5b 31 3b 33 3a 33 44',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[57443;1:3u',
+              display: 'ESC[57443;1:3u',
+              hex: '1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u',
+            'escape',
+            'char',
+            'csi'
+          ]
+        },
+        {
+          stepId: 'alt_right',
+          label: 'Option/Alt-Right Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2083,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            51,
+            117,
+            27,
+            27,
+            91,
+            67,
+            27,
+            91,
+            49,
+            59,
+            51,
+            58,
+            51,
+            67,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 1b 5b 43 1b 5b 31 3b 33 3a 33 43 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+          text: 'ESC[57443;3uESCESC[CESC[1;3:3CESC[57443;1:3u',
+          display: 'ESC[57443;3uESCESC[CESC[1;3:3CESC[57443;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57443;3u',
+              display: 'ESC[57443;3u',
+              hex: '1b 5b 35 37 34 34 33 3b 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESCESC',
+              display: 'ESCESC',
+              hex: '1b 1b',
+              kind: 'escape'
+            },
+            {
+              text: '[',
+              display: '[',
+              hex: '5b',
+              kind: 'char'
+            },
+            {
+              text: 'C',
+              display: 'C',
+              hex: '43',
+              kind: 'char'
+            },
+            {
+              text: 'ESC[1;3:3C',
+              display: 'ESC[1;3:3C',
+              hex: '1b 5b 31 3b 33 3a 33 43',
+              kind: 'csi'
+            },
+            {
+              text: 'ESC[57443;1:3u',
+              display: 'ESC[57443;1:3u',
+              hex: '1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u',
+            'escape',
+            'char',
+            'csi'
+          ]
+        },
+        {
+          stepId: 'ctrl_c',
+          label: 'Ctrl-C',
+          category: 'ctrl',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2514,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            50,
+            59,
+            53,
+            117,
+            27,
+            91,
+            57,
+            57,
+            59,
+            53,
+            117,
+            27,
+            91,
+            57,
+            57,
+            59,
+            53,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            50,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 39 39 3b 35 75 1b 5b 39 39 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
+          text: 'ESC[57442;5uESC[99;5uESC[99;5:3uESC[57442;1:3u',
+          display: 'ESC[57442;5uESC[99;5uESC[99;5:3uESC[57442;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57442;5u',
+              display: 'ESC[57442;5u',
+              hex: '1b 5b 35 37 34 34 32 3b 35 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[99;5u',
+              display: 'ESC[99;5u',
+              hex: '1b 5b 39 39 3b 35 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[99;5:3u',
+              display: 'ESC[99;5:3u',
+              hex: '1b 5b 39 39 3b 35 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57442;1:3u',
+              display: 'ESC[57442;1:3u',
+              hex: '1b 5b 35 37 34 34 32 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'ctrl_z',
+          label: 'Ctrl-Z',
+          category: 'ctrl',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2016,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            50,
+            59,
+            53,
+            117,
+            27,
+            91,
+            49,
+            50,
+            50,
+            59,
+            53,
+            117,
+            27,
+            91,
+            49,
+            50,
+            50,
+            59,
+            53,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            50,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 32 32 3b 35 75 1b 5b 31 32 32 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
+          text: 'ESC[57442;5uESC[122;5uESC[122;5:3uESC[57442;1:3u',
+          display: 'ESC[57442;5uESC[122;5uESC[122;5:3uESC[57442;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57442;5u',
+              display: 'ESC[57442;5u',
+              hex: '1b 5b 35 37 34 34 32 3b 35 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[122;5u',
+              display: 'ESC[122;5u',
+              hex: '1b 5b 31 32 32 3b 35 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[122;5:3u',
+              display: 'ESC[122;5:3u',
+              hex: '1b 5b 31 32 32 3b 35 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57442;1:3u',
+              display: 'ESC[57442;1:3u',
+              hex: '1b 5b 35 37 34 34 32 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'alt_1',
+          label: 'Option/Alt-1',
+          category: 'alt',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2684,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            51,
+            117,
+            27,
+            91,
+            52,
+            57,
+            59,
+            51,
+            117,
+            27,
+            91,
+            52,
+            57,
+            59,
+            51,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            51,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 5b 34 39 3b 33 75 1b 5b 34 39 3b 33 3a 33 75 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+          text: 'ESC[57443;3uESC[49;3uESC[49;3:3uESC[57443;1:3u',
+          display: 'ESC[57443;3uESC[49;3uESC[49;3:3uESC[57443;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57443;3u',
+              display: 'ESC[57443;3u',
+              hex: '1b 5b 35 37 34 34 33 3b 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[49;3u',
+              display: 'ESC[49;3u',
+              hex: '1b 5b 34 39 3b 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[49;3:3u',
+              display: 'ESC[49;3:3u',
+              hex: '1b 5b 34 39 3b 33 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57443;1:3u',
+              display: 'ESC[57443;1:3u',
+              hex: '1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
+        },
+        {
+          stepId: 'cmd_a',
+          label: 'Cmd-A',
+          category: 'cmd',
+          status: 'empty',
+          note: 'macOS: may be intercepted or sent only in Kitty mode.',
+          timeoutMs: 8000,
+          durationMs: 3263,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        },
+        {
+          stepId: 'cmd_v_empty',
+          label: 'Cmd-V (empty clipboard)',
+          category: 'cmd',
+          status: 'empty',
+          note: 'Script clears clipboard before this step. Empty capture or pasted-empty result are both useful.',
+          timeoutMs: 15000,
+          durationMs: 2445,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        },
+        {
+          stepId: 'cmd_v_known',
+          label: 'Cmd-V (known clipboard)',
+          category: 'cmd',
+          status: 'captured',
+          note: 'Script sets clipboard to "hal-capture-cmd-v" before this step.',
+          timeoutMs: 15000,
+          durationMs: 3445,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            104,
+            97,
+            108,
+            45,
+            99,
+            97,
+            112,
+            116,
+            117,
+            114,
+            101,
+            45,
+            99,
+            109,
+            100,
+            45,
+            118
+          ],
+          hex: '68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76',
+          text: 'hal-capture-cmd-v',
+          display: 'hal-capture-cmd-v',
+          tokens: [
+            {
+              text: 'h',
+              display: 'h',
+              hex: '68',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'l',
+              display: 'l',
+              hex: '6c',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'p',
+              display: 'p',
+              hex: '70',
+              kind: 'char'
+            },
+            {
+              text: 't',
+              display: 't',
+              hex: '74',
+              kind: 'char'
+            },
+            {
+              text: 'u',
+              display: 'u',
+              hex: '75',
+              kind: 'char'
+            },
+            {
+              text: 'r',
+              display: 'r',
+              hex: '72',
+              kind: 'char'
+            },
+            {
+              text: 'e',
+              display: 'e',
+              hex: '65',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'm',
+              display: 'm',
+              hex: '6d',
+              kind: 'char'
+            },
+            {
+              text: 'd',
+              display: 'd',
+              hex: '64',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'v',
+              display: 'v',
+              hex: '76',
+              kind: 'char'
+            }
+          ],
+          tokenKinds: [
+            'char'
+          ]
+        },
+        {
+          stepId: 'cmd_x',
+          label: 'Cmd-X',
+          category: 'cmd',
+          status: 'empty',
+          note: 'macOS: terminal/OS may intercept cut.',
+          timeoutMs: 8000,
+          durationMs: 3999,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        },
+        {
+          stepId: 'cmd_z',
+          label: 'Cmd-Z',
+          category: 'cmd',
+          status: 'empty',
+          note: 'macOS: terminal/OS may intercept undo.',
+          timeoutMs: 8000,
+          durationMs: 2559,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        }
+      ]
+    }
+  ],
+  matrix: {
+    esc: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+        display: 'ESC[27uESC[27;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    shift_esc: {
+      hal11: {
+        status: 'timeout',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 32 37 3b 32 75 1b 5b 32 37 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75 1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[27;2uESC[27;2:3uESC[57441;1:3uESC[27uESC[27;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    a: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 39 37 75 1b 5b 39 37 3b 31 3a 33 75',
+        display: 'ESC[97uESC[97;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    A: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 39 37 3b 32 75 1b 5b 39 37 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[97;2uESC[97;2:3uESC[57441;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    space: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 33 32 75 1b 5b 33 32 3b 31 3a 33 75',
+        display: 'ESC[32uESC[32;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    enter: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 31 33 75 1b 5b 31 33 3b 31 3a 33 75',
+        display: 'ESC[13uESC[13;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    shift_enter: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 33 3b 32 75 1b 5b 31 33 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[13;2uESC[13;2:3uESC[57441;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    alt_enter: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 5b 31 33 3b 33 75 1b 5b 31 33 3b 33 3a 33 75 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+        display: 'ESC[57443;3uESC[13;3uESC[13;3:3uESC[57443;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    tab: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 39 75 1b 5b 39 3b 31 3a 33 75',
+        display: 'ESC[9uESC[9;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    shift_tab: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 39 3b 32 75 1b 5b 39 3b 32 3a 33 75 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[9;2uESC[9;2:3uESC[57441;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    backspace: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 31 32 37 75 1b 5b 31 32 37 3b 31 3a 33 75',
+        display: 'ESC[127uESC[127;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    delete: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 33 7e 1b 5b 33 3b 31 3a 33 7e',
+        display: 'ESC[3~ESC[3;1:3~',
+        tokenKinds: [
+          'csi',
+          'csi-tilde'
+        ]
+      }
+    },
+    left: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 44 1b 5b 31 3b 31 3a 33 44',
+        display: 'ESC[DESC[1;1:3D',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    right: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 43 1b 5b 31 3b 31 3a 33 43',
+        display: 'ESC[CESC[1;1:3C',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    up: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 41 1b 5b 31 3b 31 3a 33 41',
+        display: 'ESC[AESC[1;1:3A',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    down: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 42 1b 5b 31 3b 31 3a 33 42',
+        display: 'ESC[BESC[1;1:3B',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    shift_left: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 44 1b 5b 31 3b 32 3a 33 44 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[1;2DESC[1;2:3DESC[57441;1:3u',
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
+      }
+    },
+    shift_right: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 43 1b 5b 31 3b 32 3a 33 43 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[1;2CESC[1;2:3CESC[57441;1:3u',
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
+      }
+    },
+    shift_up: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 41 1b 5b 31 3b 32 3a 33 41 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[1;2AESC[1;2:3AESC[57441;1:3u',
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
+      }
+    },
+    shift_down: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 31 3b 32 75 1b 5b 31 3b 32 42 1b 5b 31 3b 32 3a 33 42 1b 5b 35 37 34 34 31 3b 31 3a 33 75',
+        display: 'ESC[57441;2uESC[1;2BESC[1;2:3BESC[57441;1:3u',
+        tokenKinds: [
+          'kitty-csi-u',
+          'csi'
+        ]
+      }
+    },
+    alt_left: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 1b 5b 44 1b 5b 31 3b 33 3a 33 44 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+        display: 'ESC[57443;3uESCESC[DESC[1;3:3DESC[57443;1:3u',
+        tokenKinds: [
+          'kitty-csi-u',
+          'escape',
+          'char',
+          'csi'
+        ]
+      }
+    },
+    alt_right: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 1b 5b 43 1b 5b 31 3b 33 3a 33 43 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+        display: 'ESC[57443;3uESCESC[CESC[1;3:3CESC[57443;1:3u',
+        tokenKinds: [
+          'kitty-csi-u',
+          'escape',
+          'char',
+          'csi'
+        ]
+      }
+    },
+    ctrl_c: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 39 39 3b 35 75 1b 5b 39 39 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
+        display: 'ESC[57442;5uESC[99;5uESC[99;5:3uESC[57442;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    ctrl_z: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 32 3b 35 75 1b 5b 31 32 32 3b 35 75 1b 5b 31 32 32 3b 35 3a 33 75 1b 5b 35 37 34 34 32 3b 31 3a 33 75',
+        display: 'ESC[57442;5uESC[122;5uESC[122;5:3uESC[57442;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    alt_1: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 33 3b 33 75 1b 5b 34 39 3b 33 75 1b 5b 34 39 3b 33 3a 33 75 1b 5b 35 37 34 34 33 3b 31 3a 33 75',
+        display: 'ESC[57443;3uESC[49;3uESC[49;3:3uESC[57443;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
+      }
+    },
+    cmd_a: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    },
+    cmd_v_empty: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    },
+    cmd_v_known: {
+      hal11: {
+        status: 'captured',
+        hex: '68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76',
+        display: 'hal-capture-cmd-v',
+        tokenKinds: [
+          'char'
+        ]
+      }
+    },
+    cmd_x: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    },
+    cmd_z: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    }
+  }
+}

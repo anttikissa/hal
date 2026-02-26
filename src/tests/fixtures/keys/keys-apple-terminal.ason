@@ -1,0 +1,1493 @@
+{
+  type: 'terminal-key-capture',
+  version: 1,
+  createdAt: '2026-02-26T14:20:19.559Z',
+  terminalLabel: 'Apple_Terminal',
+  env: {
+    platform: 'darwin',
+    arch: 'arm64',
+    pid: 27808,
+    term: 'xterm-256color',
+    termProgram: 'Apple_Terminal',
+    termProgramVersion: '453',
+    kittyPid: '',
+    lang: ''
+  },
+  config: {
+    preset: 'tui',
+    profiles: [
+      'hal11'
+    ],
+    stepTimeoutMs: 8000,
+    calibrationTimeoutMs: 15000,
+    idleMs: 600
+  },
+  steps: [
+    {
+      id: 'esc',
+      label: 'Esc',
+      category: 'basic',
+      note: 'Press Esc twice: first is target, second ends step.',
+      timeoutMs: undefined,
+      escTwice: true
+    },
+    {
+      id: 'shift_esc',
+      label: 'Shift-Esc',
+      category: 'basic',
+      note: 'Often same bytes as Esc; press Shift-Esc, then Esc again to end.',
+      timeoutMs: undefined,
+      escTwice: true
+    },
+    {
+      id: 'a',
+      label: 'a',
+      category: 'basic',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'A',
+      label: 'Shift-A',
+      category: 'basic',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'space',
+      label: 'Space',
+      category: 'basic',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'enter',
+      label: 'Enter',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_enter',
+      label: 'Shift-Enter',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_enter',
+      label: 'Option/Alt-Enter',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'tab',
+      label: 'Tab',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_tab',
+      label: 'Shift-Tab',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'backspace',
+      label: 'Backspace',
+      category: 'editing',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'delete',
+      label: 'Forward Delete (Fn-Backspace on Mac laptop)',
+      category: 'editing',
+      note: 'On macOS laptop keyboards this is usually Fn-Delete.',
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'left',
+      label: 'Left Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'right',
+      label: 'Right Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'up',
+      label: 'Up Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'down',
+      label: 'Down Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_left',
+      label: 'Shift-Left Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_right',
+      label: 'Shift-Right Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_up',
+      label: 'Shift-Up Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'shift_down',
+      label: 'Shift-Down Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_left',
+      label: 'Option/Alt-Left Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_right',
+      label: 'Option/Alt-Right Arrow',
+      category: 'nav',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'ctrl_c',
+      label: 'Ctrl-C',
+      category: 'ctrl',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'ctrl_z',
+      label: 'Ctrl-Z',
+      category: 'ctrl',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'alt_1',
+      label: 'Option/Alt-1',
+      category: 'alt',
+      note: undefined,
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'cmd_a',
+      label: 'Cmd-A',
+      category: 'cmd',
+      note: 'macOS: may be intercepted or sent only in Kitty mode.',
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'cmd_v_empty',
+      label: 'Cmd-V (empty clipboard)',
+      category: 'cmd',
+      note: 'Script clears clipboard before this step. Empty capture or pasted-empty result are both useful.',
+      timeoutMs: 15000,
+      escTwice: false
+    },
+    {
+      id: 'cmd_v_known',
+      label: 'Cmd-V (known clipboard)',
+      category: 'cmd',
+      note: 'Script sets clipboard to "hal-capture-cmd-v" before this step.',
+      timeoutMs: 15000,
+      escTwice: false
+    },
+    {
+      id: 'cmd_x',
+      label: 'Cmd-X',
+      category: 'cmd',
+      note: 'macOS: terminal/OS may intercept cut.',
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
+      id: 'cmd_z',
+      label: 'Cmd-Z',
+      category: 'cmd',
+      note: 'macOS: terminal/OS may intercept undo.',
+      timeoutMs: undefined,
+      escTwice: false
+    }
+  ],
+  profiles: [
+    {
+      id: 'hal11',
+      label: 'HAL Kitty keyboard mode (>11u)',
+      enable: 'ESC[>11u',
+      disable: 'ESC[<u',
+      calibration: {
+        status: 'captured',
+        durationMs: 2978,
+        idleMs: 600,
+        bytes: [
+          27
+        ],
+        hex: '1b',
+        text: 'ESC',
+        display: 'ESC'
+      },
+      steps: [
+        {
+          stepId: 'esc',
+          label: 'Esc',
+          category: 'basic',
+          status: 'timeout',
+          note: 'Press Esc twice: first is target, second ends step.',
+          timeoutMs: 8000,
+          durationMs: 8002,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            27
+          ],
+          hex: '1b 1b',
+          text: 'ESCESC',
+          display: 'ESCESC',
+          tokens: [
+            {
+              text: 'ESCESC',
+              display: 'ESCESC',
+              hex: '1b 1b',
+              kind: 'escape'
+            }
+          ],
+          tokenKinds: [
+            'escape'
+          ]
+        },
+        {
+          stepId: 'shift_esc',
+          label: 'Shift-Esc',
+          category: 'basic',
+          status: 'timeout',
+          note: 'Often same bytes as Esc; press Shift-Esc, then Esc again to end.',
+          timeoutMs: 8000,
+          durationMs: 8002,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            27
+          ],
+          hex: '1b 1b',
+          text: 'ESCESC',
+          display: 'ESCESC',
+          tokens: [
+            {
+              text: 'ESCESC',
+              display: 'ESCESC',
+              hex: '1b 1b',
+              kind: 'escape'
+            }
+          ],
+          tokenKinds: [
+            'escape'
+          ]
+        },
+        {
+          stepId: 'a',
+          label: 'a',
+          category: 'basic',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1879,
+          delimiterHex: '1b',
+          bytes: [
+            97
+          ],
+          hex: '61',
+          text: 'a',
+          display: 'a',
+          tokens: [
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            }
+          ],
+          tokenKinds: [
+            'char'
+          ]
+        },
+        {
+          stepId: 'A',
+          label: 'Shift-A',
+          category: 'basic',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2260,
+          delimiterHex: '1b',
+          bytes: [
+            65
+          ],
+          hex: '41',
+          text: 'A',
+          display: 'A',
+          tokens: [
+            {
+              text: 'A',
+              display: 'A',
+              hex: '41',
+              kind: 'char'
+            }
+          ],
+          tokenKinds: [
+            'char'
+          ]
+        },
+        {
+          stepId: 'space',
+          label: 'Space',
+          category: 'basic',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1486,
+          delimiterHex: '1b',
+          bytes: [
+            32
+          ],
+          hex: '20',
+          text: ' ',
+          display: ' ',
+          tokens: [
+            {
+              text: ' ',
+              display: ' ',
+              hex: '20',
+              kind: 'char'
+            }
+          ],
+          tokenKinds: [
+            'char'
+          ]
+        },
+        {
+          stepId: 'enter',
+          label: 'Enter',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1582,
+          delimiterHex: '1b',
+          bytes: [
+            13
+          ],
+          hex: '0d',
+          text: '\\r',
+          display: '\\r',
+          tokens: [
+            {
+              text: '\\r',
+              display: '\\r',
+              hex: '0d',
+              kind: 'control'
+            }
+          ],
+          tokenKinds: [
+            'control'
+          ]
+        },
+        {
+          stepId: 'shift_enter',
+          label: 'Shift-Enter',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2251,
+          delimiterHex: '1b',
+          bytes: [
+            13
+          ],
+          hex: '0d',
+          text: '\\r',
+          display: '\\r',
+          tokens: [
+            {
+              text: '\\r',
+              display: '\\r',
+              hex: '0d',
+              kind: 'control'
+            }
+          ],
+          tokenKinds: [
+            'control'
+          ]
+        },
+        {
+          stepId: 'alt_enter',
+          label: 'Option/Alt-Enter',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 3276,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            13
+          ],
+          hex: '1b 0d',
+          text: 'ESC\\r',
+          display: 'ESC\\r',
+          tokens: [
+            {
+              text: 'ESC\\r',
+              display: 'ESC\\r',
+              hex: '1b 0d',
+              kind: 'escape'
+            }
+          ],
+          tokenKinds: [
+            'escape'
+          ]
+        },
+        {
+          stepId: 'tab',
+          label: 'Tab',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1811,
+          delimiterHex: '1b',
+          bytes: [
+            9
+          ],
+          hex: '09',
+          text: '\\t',
+          display: '\\t',
+          tokens: [
+            {
+              text: '\\t',
+              display: '\\t',
+              hex: '09',
+              kind: 'control'
+            }
+          ],
+          tokenKinds: [
+            'control'
+          ]
+        },
+        {
+          stepId: 'shift_tab',
+          label: 'Shift-Tab',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2470,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            90
+          ],
+          hex: '1b 5b 5a',
+          text: 'ESC[Z',
+          display: 'ESC[Z',
+          tokens: [
+            {
+              text: 'ESC[Z',
+              display: 'ESC[Z',
+              hex: '1b 5b 5a',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'backspace',
+          label: 'Backspace',
+          category: 'editing',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1552,
+          delimiterHex: '1b',
+          bytes: [
+            127
+          ],
+          hex: '7f',
+          text: '\\x7f',
+          display: '\\x7f',
+          tokens: [
+            {
+              text: '\\x7f',
+              display: '\\x7f',
+              hex: '7f',
+              kind: 'char'
+            }
+          ],
+          tokenKinds: [
+            'char'
+          ]
+        },
+        {
+          stepId: 'delete',
+          label: 'Forward Delete (Fn-Backspace on Mac laptop)',
+          category: 'editing',
+          status: 'captured',
+          note: 'On macOS laptop keyboards this is usually Fn-Delete.',
+          timeoutMs: 8000,
+          durationMs: 3100,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            51,
+            126
+          ],
+          hex: '1b 5b 33 7e',
+          text: 'ESC[3~',
+          display: 'ESC[3~',
+          tokens: [
+            {
+              text: 'ESC[3~',
+              display: 'ESC[3~',
+              hex: '1b 5b 33 7e',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'left',
+          label: 'Left Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2452,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            68
+          ],
+          hex: '1b 5b 44',
+          text: 'ESC[D',
+          display: 'ESC[D',
+          tokens: [
+            {
+              text: 'ESC[D',
+              display: 'ESC[D',
+              hex: '1b 5b 44',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'right',
+          label: 'Right Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1340,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            67
+          ],
+          hex: '1b 5b 43',
+          text: 'ESC[C',
+          display: 'ESC[C',
+          tokens: [
+            {
+              text: 'ESC[C',
+              display: 'ESC[C',
+              hex: '1b 5b 43',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'up',
+          label: 'Up Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1532,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            65
+          ],
+          hex: '1b 5b 41',
+          text: 'ESC[A',
+          display: 'ESC[A',
+          tokens: [
+            {
+              text: 'ESC[A',
+              display: 'ESC[A',
+              hex: '1b 5b 41',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'down',
+          label: 'Down Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 1051,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            66
+          ],
+          hex: '1b 5b 42',
+          text: 'ESC[B',
+          display: 'ESC[B',
+          tokens: [
+            {
+              text: 'ESC[B',
+              display: 'ESC[B',
+              hex: '1b 5b 42',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_left',
+          label: 'Shift-Left Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2401,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            49,
+            59,
+            50,
+            68
+          ],
+          hex: '1b 5b 31 3b 32 44',
+          text: 'ESC[1;2D',
+          display: 'ESC[1;2D',
+          tokens: [
+            {
+              text: 'ESC[1;2D',
+              display: 'ESC[1;2D',
+              hex: '1b 5b 31 3b 32 44',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_right',
+          label: 'Shift-Right Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2174,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            49,
+            59,
+            50,
+            67
+          ],
+          hex: '1b 5b 31 3b 32 43',
+          text: 'ESC[1;2C',
+          display: 'ESC[1;2C',
+          tokens: [
+            {
+              text: 'ESC[1;2C',
+              display: 'ESC[1;2C',
+              hex: '1b 5b 31 3b 32 43',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_up',
+          label: 'Shift-Up Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 3005,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            65
+          ],
+          hex: '1b 5b 41',
+          text: 'ESC[A',
+          display: 'ESC[A',
+          tokens: [
+            {
+              text: 'ESC[A',
+              display: 'ESC[A',
+              hex: '1b 5b 41',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'shift_down',
+          label: 'Shift-Down Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2606,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            91,
+            66
+          ],
+          hex: '1b 5b 42',
+          text: 'ESC[B',
+          display: 'ESC[B',
+          tokens: [
+            {
+              text: 'ESC[B',
+              display: 'ESC[B',
+              hex: '1b 5b 42',
+              kind: 'csi'
+            }
+          ],
+          tokenKinds: [
+            'csi'
+          ]
+        },
+        {
+          stepId: 'alt_left',
+          label: 'Option/Alt-Left Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 4030,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            98
+          ],
+          hex: '1b 62',
+          text: 'ESCb',
+          display: 'ESCb',
+          tokens: [
+            {
+              text: 'ESCb',
+              display: 'ESCb',
+              hex: '1b 62',
+              kind: 'escape'
+            }
+          ],
+          tokenKinds: [
+            'escape'
+          ]
+        },
+        {
+          stepId: 'alt_right',
+          label: 'Option/Alt-Right Arrow',
+          category: 'nav',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2626,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            102
+          ],
+          hex: '1b 66',
+          text: 'ESCf',
+          display: 'ESCf',
+          tokens: [
+            {
+              text: 'ESCf',
+              display: 'ESCf',
+              hex: '1b 66',
+              kind: 'escape'
+            }
+          ],
+          tokenKinds: [
+            'escape'
+          ]
+        },
+        {
+          stepId: 'ctrl_c',
+          label: 'Ctrl-C',
+          category: 'ctrl',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2771,
+          delimiterHex: '1b',
+          bytes: [
+            3
+          ],
+          hex: '03',
+          text: '\\x03',
+          display: '\\x03',
+          tokens: [
+            {
+              text: '\\x03',
+              display: '\\x03',
+              hex: '03',
+              kind: 'control'
+            }
+          ],
+          tokenKinds: [
+            'control'
+          ]
+        },
+        {
+          stepId: 'ctrl_z',
+          label: 'Ctrl-Z',
+          category: 'ctrl',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2389,
+          delimiterHex: '1b',
+          bytes: [
+            26
+          ],
+          hex: '1a',
+          text: '\\x1a',
+          display: '\\x1a',
+          tokens: [
+            {
+              text: '\\x1a',
+              display: '\\x1a',
+              hex: '1a',
+              kind: 'control'
+            }
+          ],
+          tokenKinds: [
+            'control'
+          ]
+        },
+        {
+          stepId: 'alt_1',
+          label: 'Option/Alt-1',
+          category: 'alt',
+          status: 'captured',
+          note: undefined,
+          timeoutMs: 8000,
+          durationMs: 2369,
+          delimiterHex: '1b',
+          bytes: [
+            27,
+            49
+          ],
+          hex: '1b 31',
+          text: 'ESC1',
+          display: 'ESC1',
+          tokens: [
+            {
+              text: 'ESC1',
+              display: 'ESC1',
+              hex: '1b 31',
+              kind: 'escape'
+            }
+          ],
+          tokenKinds: [
+            'escape'
+          ]
+        },
+        {
+          stepId: 'cmd_a',
+          label: 'Cmd-A',
+          category: 'cmd',
+          status: 'empty',
+          note: 'macOS: may be intercepted or sent only in Kitty mode.',
+          timeoutMs: 8000,
+          durationMs: 3163,
+          delimiterHex: '1b',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        },
+        {
+          stepId: 'cmd_v_empty',
+          label: 'Cmd-V (empty clipboard)',
+          category: 'cmd',
+          status: 'empty',
+          note: 'Script clears clipboard before this step. Empty capture or pasted-empty result are both useful.',
+          timeoutMs: 15000,
+          durationMs: 5833,
+          delimiterHex: '1b',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        },
+        {
+          stepId: 'cmd_v_known',
+          label: 'Cmd-V (known clipboard)',
+          category: 'cmd',
+          status: 'captured',
+          note: 'Script sets clipboard to "hal-capture-cmd-v" before this step.',
+          timeoutMs: 15000,
+          durationMs: 2201,
+          delimiterHex: '1b',
+          bytes: [
+            104,
+            97,
+            108,
+            45,
+            99,
+            97,
+            112,
+            116,
+            117,
+            114,
+            101,
+            45,
+            99,
+            109,
+            100,
+            45,
+            118
+          ],
+          hex: '68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76',
+          text: 'hal-capture-cmd-v',
+          display: 'hal-capture-cmd-v',
+          tokens: [
+            {
+              text: 'h',
+              display: 'h',
+              hex: '68',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'l',
+              display: 'l',
+              hex: '6c',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'a',
+              display: 'a',
+              hex: '61',
+              kind: 'char'
+            },
+            {
+              text: 'p',
+              display: 'p',
+              hex: '70',
+              kind: 'char'
+            },
+            {
+              text: 't',
+              display: 't',
+              hex: '74',
+              kind: 'char'
+            },
+            {
+              text: 'u',
+              display: 'u',
+              hex: '75',
+              kind: 'char'
+            },
+            {
+              text: 'r',
+              display: 'r',
+              hex: '72',
+              kind: 'char'
+            },
+            {
+              text: 'e',
+              display: 'e',
+              hex: '65',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'c',
+              display: 'c',
+              hex: '63',
+              kind: 'char'
+            },
+            {
+              text: 'm',
+              display: 'm',
+              hex: '6d',
+              kind: 'char'
+            },
+            {
+              text: 'd',
+              display: 'd',
+              hex: '64',
+              kind: 'char'
+            },
+            {
+              text: '-',
+              display: '-',
+              hex: '2d',
+              kind: 'char'
+            },
+            {
+              text: 'v',
+              display: 'v',
+              hex: '76',
+              kind: 'char'
+            }
+          ],
+          tokenKinds: [
+            'char'
+          ]
+        },
+        {
+          stepId: 'cmd_x',
+          label: 'Cmd-X',
+          category: 'cmd',
+          status: 'empty',
+          note: 'macOS: terminal/OS may intercept cut.',
+          timeoutMs: 8000,
+          durationMs: 2434,
+          delimiterHex: '1b',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        },
+        {
+          stepId: 'cmd_z',
+          label: 'Cmd-Z',
+          category: 'cmd',
+          status: 'empty',
+          note: 'macOS: terminal/OS may intercept undo.',
+          timeoutMs: 8000,
+          durationMs: 2149,
+          delimiterHex: '1b',
+          bytes: [],
+          hex: '',
+          text: '',
+          display: '',
+          tokens: [],
+          tokenKinds: []
+        }
+      ]
+    }
+  ],
+  matrix: {
+    esc: {
+      hal11: {
+        status: 'timeout',
+        hex: '1b 1b',
+        display: 'ESCESC',
+        tokenKinds: [
+          'escape'
+        ]
+      }
+    },
+    shift_esc: {
+      hal11: {
+        status: 'timeout',
+        hex: '1b 1b',
+        display: 'ESCESC',
+        tokenKinds: [
+          'escape'
+        ]
+      }
+    },
+    a: {
+      hal11: {
+        status: 'captured',
+        hex: '61',
+        display: 'a',
+        tokenKinds: [
+          'char'
+        ]
+      }
+    },
+    A: {
+      hal11: {
+        status: 'captured',
+        hex: '41',
+        display: 'A',
+        tokenKinds: [
+          'char'
+        ]
+      }
+    },
+    space: {
+      hal11: {
+        status: 'captured',
+        hex: '20',
+        display: ' ',
+        tokenKinds: [
+          'char'
+        ]
+      }
+    },
+    enter: {
+      hal11: {
+        status: 'captured',
+        hex: '0d',
+        display: '\\r',
+        tokenKinds: [
+          'control'
+        ]
+      }
+    },
+    shift_enter: {
+      hal11: {
+        status: 'captured',
+        hex: '0d',
+        display: '\\r',
+        tokenKinds: [
+          'control'
+        ]
+      }
+    },
+    alt_enter: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 0d',
+        display: 'ESC\\r',
+        tokenKinds: [
+          'escape'
+        ]
+      }
+    },
+    tab: {
+      hal11: {
+        status: 'captured',
+        hex: '09',
+        display: '\\t',
+        tokenKinds: [
+          'control'
+        ]
+      }
+    },
+    shift_tab: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 5a',
+        display: 'ESC[Z',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    backspace: {
+      hal11: {
+        status: 'captured',
+        hex: '7f',
+        display: '\\x7f',
+        tokenKinds: [
+          'char'
+        ]
+      }
+    },
+    delete: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 33 7e',
+        display: 'ESC[3~',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    left: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 44',
+        display: 'ESC[D',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    right: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 43',
+        display: 'ESC[C',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    up: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 41',
+        display: 'ESC[A',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    down: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 42',
+        display: 'ESC[B',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    shift_left: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 31 3b 32 44',
+        display: 'ESC[1;2D',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    shift_right: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 31 3b 32 43',
+        display: 'ESC[1;2C',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    shift_up: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 41',
+        display: 'ESC[A',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    shift_down: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 5b 42',
+        display: 'ESC[B',
+        tokenKinds: [
+          'csi'
+        ]
+      }
+    },
+    alt_left: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 62',
+        display: 'ESCb',
+        tokenKinds: [
+          'escape'
+        ]
+      }
+    },
+    alt_right: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 66',
+        display: 'ESCf',
+        tokenKinds: [
+          'escape'
+        ]
+      }
+    },
+    ctrl_c: {
+      hal11: {
+        status: 'captured',
+        hex: '03',
+        display: '\\x03',
+        tokenKinds: [
+          'control'
+        ]
+      }
+    },
+    ctrl_z: {
+      hal11: {
+        status: 'captured',
+        hex: '1a',
+        display: '\\x1a',
+        tokenKinds: [
+          'control'
+        ]
+      }
+    },
+    alt_1: {
+      hal11: {
+        status: 'captured',
+        hex: '1b 31',
+        display: 'ESC1',
+        tokenKinds: [
+          'escape'
+        ]
+      }
+    },
+    cmd_a: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    },
+    cmd_v_empty: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    },
+    cmd_v_known: {
+      hal11: {
+        status: 'captured',
+        hex: '68 61 6c 2d 63 61 70 74 75 72 65 2d 63 6d 64 2d 76',
+        display: 'hal-capture-cmd-v',
+        tokenKinds: [
+          'char'
+        ]
+      }
+    },
+    cmd_x: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    },
+    cmd_z: {
+      hal11: {
+        status: 'empty',
+        hex: '',
+        display: '',
+        tokenKinds: []
+      }
+    }
+  }
+}

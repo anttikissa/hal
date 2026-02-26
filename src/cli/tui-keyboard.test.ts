@@ -6,7 +6,6 @@ import { parseKeys } from './tui-text.ts'
 
 const PASTE_START = '\x1b[200~'
 const PASTE_END = '\x1b[201~'
-const GHOSTTY_FIXTURE_PATH = new URL('../tests/fixtures/keys/keys-ghostty.ason', import.meta.url)
 const KNOWN_CMD_V_CLIPBOARD = 'hal-capture-cmd-v'
 
 type FixtureToken = {
@@ -30,14 +29,19 @@ type FixtureDoc = {
 	profiles?: FixtureProfile[]
 }
 
-// These tests are intentionally pinned to the Ghostty capture fixture (HAL `hal11` profile).
-// They document what Ghostty currently emits and how HAL normalizes it.
-const ghosttyDoc = loadGhosttyFixture()
-const ghosttyHal11 = getProfile(ghosttyDoc, 'hal11')
-const ghosttySteps = new Map(ghosttyHal11.steps.map((step) => [step.stepId, step]))
+// ── Fixture loading ──
 
-function loadGhosttyFixture(): FixtureDoc {
-	const raw = readFileSync(GHOSTTY_FIXTURE_PATH, 'utf8')
+const FIXTURES_DIR = new URL('../tests/fixtures/keys/', import.meta.url)
+
+const FIXTURE_FILES: Record<string, string> = {
+	ghostty: 'keys-ghostty.ason',
+	kitty: 'keys-xterm-kitty.ason',
+	iterm: 'keys-iterm-app.ason',
+	apple: 'keys-apple-terminal.ason',
+}
+
+function loadFixture(name: string): FixtureDoc {
+	const raw = readFileSync(new URL(FIXTURE_FILES[name], FIXTURES_DIR), 'utf8')
 	return parseAson(raw) as FixtureDoc
 }
 
@@ -47,10 +51,9 @@ function getProfile(doc: FixtureDoc, id: string): FixtureProfile {
 	return profile
 }
 
-function getStep(id: string): FixtureStep {
-	const step = ghosttySteps.get(id)
-	if (!step) throw new Error(`Missing Ghostty fixture step: ${id}`)
-	return step
+function getStepMap(doc: FixtureDoc, profileId: string): Map<string, FixtureStep> {
+	const prof = getProfile(doc, profileId)
+	return new Map(prof.steps.map((s) => [s.stepId, s]))
 }
 
 function bytesToRaw(bytes: number[]): string {
@@ -59,11 +62,6 @@ function bytesToRaw(bytes: number[]): string {
 
 function textToHex(text: string): string {
 	return [...Buffer.from(text)].map((b) => b.toString(16).padStart(2, '0')).join(' ')
-}
-
-function parseFixtureStepTokens(stepId: string): string[] {
-	const step = getStep(stepId)
-	return parseKeys(bytesToRaw(step.bytes), PASTE_START, PASTE_END)
 }
 
 function normalizeTokens(tokens: string[]): string[] {
@@ -76,11 +74,34 @@ function normalizeTokens(tokens: string[]): string[] {
 	return normalized
 }
 
-function normalizeFixtureStep(stepId: string): string[] {
-	return normalizeTokens(parseFixtureStepTokens(stepId))
+function normalizeStep(step: FixtureStep): string[] {
+	const raw = bytesToRaw(step.bytes)
+	const tokens = parseKeys(raw, PASTE_START, PASTE_END)
+	return normalizeTokens(tokens)
 }
 
+// ── Preload all fixtures ──
+
+const fixtures = Object.fromEntries(
+	Object.keys(FIXTURE_FILES).map((name) => {
+		const doc = loadFixture(name)
+		return [name, { doc, steps: getStepMap(doc, 'hal11') }]
+	}),
+)
+
+// Helper: get step from a specific fixture, skip if missing/not captured
+function getCapturedStep(terminal: string, stepId: string): FixtureStep | null {
+	const step = fixtures[terminal].steps.get(stepId)
+	if (!step || step.status !== 'captured' || step.bytes.length === 0) return null
+	return step
+}
+
+// ── Ghostty baseline (original tests) ──
+
 describe('tui keyboard fixture baseline (Ghostty, hal11)', () => {
+	const ghosttyDoc = fixtures.ghostty.doc
+	const ghosttyHal11 = getProfile(ghosttyDoc, 'hal11')
+
 	it('loads the Ghostty fixture', () => {
 		expect(ghosttyDoc.terminalLabel).toBe('ghostty')
 		expect(ghosttyHal11.id).toBe('hal11')
@@ -96,6 +117,8 @@ describe('tui keyboard fixture baseline (Ghostty, hal11)', () => {
 		}
 	})
 })
+
+// ── CSI-u parsing unit tests ──
 
 describe('Kitty CSI-u parsing regressions', () => {
 	it('accepts compact and extended CSI-u shapes used by Kitty/Ghostty', () => {
@@ -123,6 +146,8 @@ describe('Kitty CSI-u parsing regressions', () => {
 	})
 })
 
+// ── Functional key normalization unit tests ──
+
 describe('Kitty functional key normalization regressions', () => {
 	it('strips kitty event type and default modifiers for functional keys', () => {
 		expect(_testTuiKeys.normalizeKittyFunctionalKey('\x1b[1;1:2A')).toBe('\x1b[A')
@@ -135,50 +160,254 @@ describe('Kitty functional key normalization regressions', () => {
 	})
 })
 
+// ── Ghostty-specific normalization (original tests) ──
+
 describe('tui Kitty/Ghostty key interpretation (Ghostty fixture baseline)', () => {
+	function normalizeGhosttyStep(stepId: string): string[] {
+		const step = fixtures.ghostty.steps.get(stepId)
+		if (!step) throw new Error(`Missing Ghostty fixture step: ${stepId}`)
+		return normalizeStep(step)
+	}
+
 	it('normalizes printable keys and suppresses release events', () => {
-		expect(normalizeFixtureStep('a')).toEqual(['a'])
-		expect(normalizeFixtureStep('space')).toEqual([' '])
-		expect(normalizeFixtureStep('enter')).toEqual(['\r'])
-		expect(normalizeFixtureStep('tab')).toEqual(['\t'])
+		expect(normalizeGhosttyStep('a')).toEqual(['a'])
+		expect(normalizeGhosttyStep('space')).toEqual([' '])
+		expect(normalizeGhosttyStep('enter')).toEqual(['\r'])
+		expect(normalizeGhosttyStep('tab')).toEqual(['\t'])
 	})
 
 	it('preserves Shift-Enter and Shift-Tab as CSI-u while suppressing modifier key noise', () => {
-		expect(normalizeFixtureStep('shift_enter')).toEqual(['\x1b[13;2u'])
-		expect(normalizeFixtureStep('shift_tab')).toEqual(['\x1b[9;2u'])
+		expect(normalizeGhosttyStep('shift_enter')).toEqual(['\x1b[13;2u'])
+		expect(normalizeGhosttyStep('shift_tab')).toEqual(['\x1b[9;2u'])
 	})
 
 	it('normalizes enhanced arrow keys back to legacy/modified CSI sequences', () => {
-		expect(normalizeFixtureStep('up')).toEqual(['\x1b[A'])
-		expect(normalizeFixtureStep('left')).toEqual(['\x1b[D'])
-		expect(normalizeFixtureStep('shift_down')).toEqual(['\x1b[1;2B'])
+		expect(normalizeGhosttyStep('up')).toEqual(['\x1b[A'])
+		expect(normalizeGhosttyStep('left')).toEqual(['\x1b[D'])
+		expect(normalizeGhosttyStep('shift_down')).toEqual(['\x1b[1;2B'])
 	})
 
 	it('preserves Option word-motion as ESC-prefixed chars', () => {
-		expect(normalizeFixtureStep('alt_left')).toEqual(['\x1bb'])
-		expect(normalizeFixtureStep('alt_right')).toEqual(['\x1bf'])
+		expect(normalizeGhosttyStep('alt_left')).toEqual(['\x1bb'])
+		expect(normalizeGhosttyStep('alt_right')).toEqual(['\x1bf'])
 	})
 
 	it('normalizes Ctrl combos to control bytes', () => {
-		expect(normalizeFixtureStep('ctrl_c')).toEqual(['\x03'])
-		expect(normalizeFixtureStep('ctrl_z')).toEqual(['\x1a'])
+		expect(normalizeGhosttyStep('ctrl_c')).toEqual(['\x03'])
+		expect(normalizeGhosttyStep('ctrl_z')).toEqual(['\x1a'])
 	})
 
 	it('keeps Cmd+letter CSI-u payloads when the terminal sends them', () => {
-		expect(normalizeFixtureStep('cmd_x')).toEqual(['\x1b[120;9u'])
+		expect(normalizeGhosttyStep('cmd_x')).toEqual(['\x1b[120;9u'])
 	})
 
 	it('shows Ghostty Cmd-A / Cmd-Z / empty Cmd-V as no normalized key token in this fixture', () => {
-		expect(normalizeFixtureStep('cmd_a')).toEqual([])
-		expect(normalizeFixtureStep('cmd_z')).toEqual([])
-		expect(normalizeFixtureStep('cmd_v_empty')).toEqual([])
+		expect(normalizeGhosttyStep('cmd_a')).toEqual([])
+		expect(normalizeGhosttyStep('cmd_z')).toEqual([])
+		expect(normalizeGhosttyStep('cmd_v_empty')).toEqual([])
 	})
 
 	it('treats Ghostty Cmd-V with known clipboard content as pasted text', () => {
-		const normalized = normalizeFixtureStep('cmd_v_known')
+		const normalized = normalizeGhosttyStep('cmd_v_known')
 		expect(normalized.join('')).toBe(KNOWN_CMD_V_CLIPBOARD)
 	})
 
 	it.todo('handle Cmd-Z semantics when a terminal forwards Cmd-Z as a key event (not only Super press/release)')
 	it.todo('handle Cmd-V shortcut semantics when a terminal forwards Cmd-V as a key event instead of paste text')
+})
+
+// ── Cross-terminal parseKeys tokenization ──
+
+describe('parseKeys tokenization (all terminals)', () => {
+	for (const [name, { doc }] of Object.entries(fixtures)) {
+		const profile = getProfile(doc, 'hal11')
+
+		it(`round-trips all captured ${name} steps through parseKeys`, () => {
+			for (const step of profile.steps) {
+				if (step.status !== 'captured' || step.bytes.length === 0) continue
+				const parsed = parseKeys(bytesToRaw(step.bytes), PASTE_START, PASTE_END)
+				const parsedHex = parsed.map(textToHex)
+				const fixtureHex = (step.tokens ?? []).map((t) => t.hex)
+				expect(parsedHex, `${name}/${step.stepId}`).toEqual(fixtureHex)
+			}
+		})
+	}
+})
+
+// ── Cross-terminal normalization convergence ──
+// Keys that should produce identical normalized output across all kitty-capable terminals.
+
+describe('normalization convergence (kitty-capable terminals)', () => {
+	const kittyTerminals = ['ghostty', 'kitty', 'iterm'] as const
+
+	// stepId → expected normalized output
+	const convergent: Record<string, string[]> = {
+		a: ['a'],
+		space: [' '],
+		enter: ['\r'],
+		tab: ['\t'],
+		backspace: ['\x7f'],
+		esc: ['\x1b'],
+		delete: ['\x1b[3~'],
+		up: ['\x1b[A'],
+		down: ['\x1b[B'],
+		left: ['\x1b[D'],
+		right: ['\x1b[C'],
+		shift_left: ['\x1b[1;2D'],
+		shift_right: ['\x1b[1;2C'],
+		shift_up: ['\x1b[1;2A'],
+		shift_down: ['\x1b[1;2B'],
+		shift_enter: ['\x1b[13;2u'],
+		shift_tab: ['\x1b[9;2u'],
+		ctrl_c: ['\x03'],
+		ctrl_z: ['\x1a'],
+		alt_1: ['\x1b1'],
+	}
+
+	for (const [stepId, expected] of Object.entries(convergent)) {
+		it(`${stepId} normalizes identically across Ghostty/Kitty/iTerm`, () => {
+			for (const terminal of kittyTerminals) {
+				const step = getCapturedStep(terminal, stepId)
+				if (!step) continue
+				expect(normalizeStep(step), `${terminal}/${stepId}`).toEqual(expected)
+			}
+		})
+	}
+
+	it('Cmd-V with known clipboard yields paste text on all kitty-capable terminals', () => {
+		for (const terminal of kittyTerminals) {
+			const step = getCapturedStep(terminal, 'cmd_v_known')
+			if (!step) continue
+			const normalized = normalizeStep(step)
+			expect(normalized.join(''), `${terminal}/cmd_v_known`).toBe(KNOWN_CMD_V_CLIPBOARD)
+		}
+	})
+})
+
+// ── Apple Terminal (legacy-only) ──
+
+describe('Apple Terminal legacy key handling', () => {
+	function normalizeAppleStep(stepId: string): string[] | null {
+		const step = getCapturedStep('apple', stepId)
+		if (!step) return null
+		return normalizeStep(step)
+	}
+
+	it('passes through basic keys unchanged', () => {
+		expect(normalizeAppleStep('a')).toEqual(['a'])
+		expect(normalizeAppleStep('space')).toEqual([' '])
+		expect(normalizeAppleStep('enter')).toEqual(['\r'])
+		expect(normalizeAppleStep('tab')).toEqual(['\t'])
+		expect(normalizeAppleStep('backspace')).toEqual(['\x7f'])
+	})
+
+	it('passes through legacy arrow keys', () => {
+		expect(normalizeAppleStep('up')).toEqual(['\x1b[A'])
+		expect(normalizeAppleStep('down')).toEqual(['\x1b[B'])
+		expect(normalizeAppleStep('left')).toEqual(['\x1b[D'])
+		expect(normalizeAppleStep('right')).toEqual(['\x1b[C'])
+	})
+
+	it('handles Shift-A as uppercase (no kitty protocol)', () => {
+		expect(normalizeAppleStep('A')).toEqual(['A'])
+	})
+
+	it('does not distinguish Shift+arrow from plain arrow', () => {
+		// Apple Terminal ignores shift modifier for arrows
+		expect(normalizeAppleStep('shift_up')).toEqual(['\x1b[A'])
+		expect(normalizeAppleStep('shift_down')).toEqual(['\x1b[B'])
+	})
+
+	it('sends Shift+arrow as modified CSI for left/right', () => {
+		expect(normalizeAppleStep('shift_left')).toEqual(['\x1b[1;2D'])
+		expect(normalizeAppleStep('shift_right')).toEqual(['\x1b[1;2C'])
+	})
+
+	it('sends legacy Shift-Tab as ESC[Z', () => {
+		expect(normalizeAppleStep('shift_tab')).toEqual(['\x1b[Z'])
+	})
+
+	it('sends Option word-motion as ESC-prefixed chars', () => {
+		expect(normalizeAppleStep('alt_left')).toEqual(['\x1bb'])
+		expect(normalizeAppleStep('alt_right')).toEqual(['\x1bf'])
+	})
+
+	it('sends Ctrl combos as legacy control bytes', () => {
+		expect(normalizeAppleStep('ctrl_c')).toEqual(['\x03'])
+		expect(normalizeAppleStep('ctrl_z')).toEqual(['\x1a'])
+	})
+
+	it('delivers Cmd-V clipboard as pasted text (OS-level paste)', () => {
+		const step = getCapturedStep('apple', 'cmd_v_known')
+		if (!step) return
+		const normalized = normalizeStep(step)
+		expect(normalized.join('')).toBe(KNOWN_CMD_V_CLIPBOARD)
+	})
+})
+
+// ── Known terminal-specific divergences ──
+
+describe('known terminal-specific divergences', () => {
+	it('Shift-A: kitty-capable terminals normalize to lowercase a; Apple sends uppercase A', () => {
+		for (const t of ['ghostty', 'kitty', 'iterm'] as const) {
+			const step = getCapturedStep(t, 'A')
+			if (!step) continue
+			expect(normalizeStep(step), t).toEqual(['a'])
+		}
+		const apple = getCapturedStep('apple', 'A')
+		if (apple) expect(normalizeStep(apple)).toEqual(['A'])
+	})
+
+	it('Alt+Left: Ghostty/Apple → ESCb, Kitty → ESC[1;3D, iTerm → mis-tokenized', () => {
+		const ghostty = getCapturedStep('ghostty', 'alt_left')
+		if (ghostty) expect(normalizeStep(ghostty)).toEqual(['\x1bb'])
+
+		const apple = getCapturedStep('apple', 'alt_left')
+		if (apple) expect(normalizeStep(apple)).toEqual(['\x1bb'])
+
+		// Kitty sends standard CSI Alt+Left instead of ESCb
+		const kitty = getCapturedStep('kitty', 'alt_left')
+		if (kitty) expect(normalizeStep(kitty)).toEqual(['\x1b[1;3D'])
+
+		// iTerm sends ESC ESC[D which gets mis-tokenized
+		const iterm = getCapturedStep('iterm', 'alt_left')
+		if (iterm) {
+			const normalized = normalizeStep(iterm)
+			// Documents current (broken) behavior: ESC-ESC pair + orphaned [ and D
+			expect(normalized.length).toBeGreaterThan(1)
+		}
+	})
+
+	it('Alt+Right: Ghostty/Apple → ESCf, Kitty → ESC[1;3C, iTerm → mis-tokenized', () => {
+		const ghostty = getCapturedStep('ghostty', 'alt_right')
+		if (ghostty) expect(normalizeStep(ghostty)).toEqual(['\x1bf'])
+
+		const apple = getCapturedStep('apple', 'alt_right')
+		if (apple) expect(normalizeStep(apple)).toEqual(['\x1bf'])
+
+		const kitty = getCapturedStep('kitty', 'alt_right')
+		if (kitty) expect(normalizeStep(kitty)).toEqual(['\x1b[1;3C'])
+
+		const iterm = getCapturedStep('iterm', 'alt_right')
+		if (iterm) {
+			const normalized = normalizeStep(iterm)
+			expect(normalized.length).toBeGreaterThan(1)
+		}
+	})
+
+	it('Cmd-A: Ghostty suppresses, Kitty sends CSI-u, iTerm/Apple → empty (OS intercept)', () => {
+		const ghostty = getCapturedStep('ghostty', 'cmd_a')
+		if (ghostty) expect(normalizeStep(ghostty)).toEqual([])
+
+		const kitty = getCapturedStep('kitty', 'cmd_a')
+		if (kitty) expect(normalizeStep(kitty)).toEqual(['\x1b[97;9u'])
+	})
+
+	it('Cmd-Z: Ghostty suppresses, Kitty sends CSI-u, iTerm/Apple → empty (OS intercept)', () => {
+		const ghostty = getCapturedStep('ghostty', 'cmd_z')
+		if (ghostty) expect(normalizeStep(ghostty)).toEqual([])
+
+		const kitty = getCapturedStep('kitty', 'cmd_z')
+		if (kitty) expect(normalizeStep(kitty)).toEqual(['\x1b[122;9u'])
+	})
 })
