@@ -470,17 +470,29 @@ export async function setSessionTitle(sessionId: string, title: string): Promise
 }
 
 /** Extract first real user prompt text from messages (skipping internal markers). */
-function firstUserPrompt(messages: any[]): string | null {
+function extractMessageText(m: any): string {
+	if (typeof m.content === 'string') return m.content
+	if (Array.isArray(m.content)) return m.content.find((b: any) => b.type === 'text')?.text ?? ''
+	return ''
+}
+
+/** Build a summary of the first exchange for title generation. */
+function titleContext(messages: any[]): string | null {
+	let userText: string | null = null
+	let assistantText: string | null = null
 	for (const m of messages) {
-		if (m.role !== 'user') continue
-		const text = typeof m.content === 'string'
-			? m.content
-			: Array.isArray(m.content)
-				? m.content.find((b: any) => b.type === 'text')?.text ?? ''
-				: ''
-		if (text && !text.startsWith('[')) return text
+		if (!userText && m.role === 'user') {
+			const t = extractMessageText(m)
+			if (t && !t.startsWith('[')) userText = t
+		} else if (userText && !assistantText && m.role === 'assistant') {
+			assistantText = extractMessageText(m)
+		}
+		if (userText && assistantText) break
 	}
-	return null
+	if (!userText) return null
+	let ctx = `User: ${userText.slice(0, 400)}`
+	if (assistantText) ctx += `\n\nAssistant: ${assistantText.slice(0, 400)}`
+	return ctx
 }
 
 /** Generate a title for the conversation after the first real exchange. */
@@ -492,8 +504,8 @@ async function maybeAutoTitle(sessionId: string): Promise<void> {
 	if (!runtime) return
 
 	const hasAssistant = runtime.messages.some((m) => m.role === 'assistant')
-	const prompt = firstUserPrompt(runtime.messages)
-	if (!prompt || !hasAssistant) return
+	const ctx = titleContext(runtime.messages)
+	if (!ctx || !hasAssistant) return
 
 	try {
 		const sessionModel = getSessionModel(sessionId)
@@ -503,8 +515,8 @@ async function maybeAutoTitle(sessionId: string): Promise<void> {
 
 		const { text: title, error } = await provider.complete({
 			model: modelIdForModel(compactModel),
-			system: 'Generate a short title (3-8 words) for this conversation. Reply with ONLY the title, no quotes, no punctuation at the end.',
-			userMessage: prompt.slice(0, 500),
+			system: 'Generate a short title (3-6 words) for this conversation based on what the user is actually doing. Be specific and concrete. Reply with ONLY the title, no quotes, no punctuation at the end.',
+			userMessage: ctx,
 			maxTokens: 30,
 		})
 
