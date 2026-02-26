@@ -186,6 +186,8 @@ let lastStatusLine = ''
 let hoverOutputRow = -1
 let hoverUrl: string | null = null
 let superHeld = false
+let lastMouseX = -1
+let lastMouseY = -1
 
 // Bracketed paste
 let bracketedPasteBuffer: string | null = null
@@ -802,6 +804,25 @@ function pointFromScreenCoords(x: number, y: number): SelectionPoint | null {
 	return null
 }
 
+function updateHoverLink(): void {
+	let newRow = -1
+	let newUrl: string | null = null
+	if (superHeld && lastMouseX >= 0) {
+		const pt = pointFromScreenCoords(lastMouseX, lastMouseY)
+		if (pt?.surface === 'output') {
+			const line = lastVisibleOutput[pt.row] ?? ''
+			newUrl = urlAtCol(line, pt.col)
+			if (newUrl) newRow = pt.row
+		}
+	}
+	if (newRow !== hoverOutputRow || newUrl !== hoverUrl) {
+		hoverOutputRow = newRow
+		hoverUrl = newUrl
+		render()
+	}
+}
+
+
 function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'release'): void {
 	if (kind === 'press') {
 		const pt = pointFromScreenCoords(x, y)
@@ -883,21 +904,9 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 
 	// Cmd+hover detection for link underline
 	if (kind === 'move' && !selActive && !inputSelActive) {
-		let newRow = -1
-		let newUrl: string | null = null
-		if (superHeld) {
-			const pt = pointFromScreenCoords(x, y)
-			if (pt?.surface === 'output') {
-				const line = lastVisibleOutput[pt.row] ?? ''
-				newUrl = urlAtCol(line, pt.col)
-				if (newUrl) newRow = pt.row
-			}
-		}
-		if (newRow !== hoverOutputRow || newUrl !== hoverUrl) {
-			hoverOutputRow = newRow
-			hoverUrl = newUrl
-			render()
-		}
+		lastMouseX = x
+		lastMouseY = y
+		updateHoverLink()
 		return
 	}
 
@@ -1205,14 +1214,7 @@ function normalizeKittyKey(key: string): string | null {
 	if (codepoint === SUPER_L || codepoint === SUPER_R) {
 		const wasHeld = superHeld
 		superHeld = eventType !== 3
-		if (wasHeld !== superHeld) {
-			// Clear hover when Cmd released, re-check when pressed
-			if (!superHeld && hoverUrl) {
-				hoverOutputRow = -1
-				hoverUrl = null
-				render()
-			}
-		}
+		if (wasHeld !== superHeld) updateHoverLink()
 		return null
 	}
 
@@ -1271,6 +1273,8 @@ export const _testTuiKeys = {
 		hoverOutputRow = -1
 		hoverUrl = null
 		superHeld = false
+		lastMouseX = -1
+		lastMouseY = -1
 	},
 }
 
