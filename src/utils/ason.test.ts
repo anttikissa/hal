@@ -4,7 +4,6 @@ import { stringify, parse, parseAll, parseStream, COMMENTS } from './ason'
 describe('stringify', () => {
 	describe('primitives', () => {
 		test('null', () => expect(stringify(null)).toBe('null'))
-		test('undefined', () => expect(stringify(undefined)).toBe('undefined'))
 		test('true', () => expect(stringify(true)).toBe('true'))
 		test('false', () => expect(stringify(false)).toBe('false'))
 		test('zero', () => expect(stringify(0)).toBe('0'))
@@ -141,7 +140,6 @@ describe('stringify modes', () => {
 describe('parse', () => {
 	describe('primitives', () => {
 		test('null', () => expect(parse('null')).toBe(null))
-		test('undefined', () => expect(parse('undefined')).toBe(undefined))
 		test('true', () => expect(parse('true')).toBe(true))
 		test('false', () => expect(parse('false')).toBe(false))
 		test('integer', () => expect(parse('42')).toBe(42))
@@ -295,7 +293,7 @@ describe('parse', () => {
 			expect(() => parse('tru')).toThrow(/Expected 'e', got 'EOF' at 1:4/)
 			expect(() => parse('truee')).toThrow(/Unexpected character after 'true' at 1:5/)
 			expect(() => parse('fals')).toThrow(/Expected 'e', got 'EOF' at 1:5/)
-			expect(() => parse('undefinedd')).toThrow(/Unexpected character after 'undefined' at 1:10/)
+			expect(() => parse('undefined')).toThrow(/Unexpected token at 1:1/)
 			expect(() => parse('-Infinityx')).toThrow(/Unexpected character after '-Infinity' at 1:10/)
 			expect(() => parse('NaNx')).toThrow(/Unexpected character after 'NaN' at 1:4/)
 		})

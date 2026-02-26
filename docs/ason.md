@@ -8,12 +8,11 @@ Any valid JSON or JSONL file is valid ASON.
 ### Values
 
 All JSON types, plus:
-- **Unquoted keys**: `{ name: 'hal', version: 1 }` — keys matching `/^[a-zA-Z_$][a-zA-Z0-9_$]*$/` don't need quotes.
-- **Single-quoted strings**: `'hello'` — preferred over double quotes (double quotes used when the string contains single quotes).
-- **`undefined`**: a first-class value (unlike JSON).
-- **`NaN`, `Infinity`, `-Infinity`**: supported as number literals.
-- **Comments**: `// line` and `/* block */` — ignored during parse unless `{ comments: true }`.
-- **Trailing commas**: allowed in objects and arrays.
+- Unquoted keys: `{ name: 'hal', version: 1 }` — alphanumeric keys don't need quotes
+- Single-quoted strings: `'hello'` — prefers double quotes in cases like "it's"
+- Number literals `NaN`, `Infinity`, `-Infinity` supported
+- Comments: `// line` and `/* block */` — survive parse/stringify roundtrip with `{ comments: true }`
+- Trailing commas allowed
 
 ### Example
 
@@ -30,15 +29,35 @@ All JSON types, plus:
 
 ## Stringify modes
 
-`stringify(value, mode)` formats values with prettier-like line wrapping:
+Given `const obj = { model: 'anthropic/claude-opus-4-6', theme: 'hal', debug: { tokens: { sys: true, spam: false } } }`:
 
-| Mode | Behavior |
-|------|----------|
-| `'smart'` (default) | Inline if ≤80 cols, otherwise expanded with 2-space indent |
-| `'short'` | Always single line, no comments |
-| `'long'` | Always expanded |
+`stringify(obj)` — smart (default): inline if ≤80 cols, otherwise expanded. Emits comments.
+```
+{
+  model: 'anthropic/claude-opus-4-6',
+  theme: 'hal',
+  debug: { tokens: { sys: true, spam: false } }
+}
+```
 
-Comments attached via `[COMMENTS]` are emitted in `smart` and `long` modes.
+`stringify(obj, 'short')` — always single line, no comments.
+```
+{ model: 'anthropic/claude-opus-4-6', theme: 'hal', debug: { tokens: { sys: true, spam: false } } }
+```
+
+`stringify(obj, 'long')` — always expanded. Emits comments.
+```
+{
+  model: 'anthropic/claude-opus-4-6',
+  theme: 'hal',
+  debug: {
+    tokens: {
+      sys: true,
+      spam: false
+    }
+  }
+}
+```
 
 ## Streaming (JSONL-style)
 
@@ -83,7 +102,7 @@ stringify(obj)
 
 ```ts
 type AsonValue =
-  | string | number | boolean | null | undefined
+  | string | number | boolean | null
   | AsonArray
   | AsonObject
 
@@ -111,4 +130,4 @@ COMMENTS                            → Symbol('comments')
 
 ## Implementation
 
-Source: `src/utils/ason.ts` (~360 lines). Tests: `src/utils/ason.test.ts`.
+Source: `src/utils/ason.ts` (~350 lines). Tests: `src/utils/ason.test.ts`.

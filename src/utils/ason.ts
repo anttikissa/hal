@@ -6,7 +6,7 @@ export const COMMENTS = Symbol('comments')
 
 /** Any value representable in ASON. */
 export type AsonValue =
-	| string | number | boolean | null | undefined
+	| string | number | boolean | null
 	| AsonArray
 	| AsonObject
 
@@ -42,7 +42,6 @@ function indentComment(comment: string, pad: string): string {
 
 function stringifyValue(obj: AsonValue, col: number, depth: number, maxWidth: number): string {
 	if (obj === null) return 'null'
-	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
 	if (typeof obj === 'number') {
 		if (Number.isNaN(obj)) return 'NaN'
@@ -288,7 +287,6 @@ function parseAny(ctx: Ctx): AsonValue {
 	if (ch === 't') { eatWord(ctx, 'true'); return true }
 	if (ch === 'f') { eatWord(ctx, 'false'); return false }
 	if (ch === 'n') { eatWord(ctx, 'null'); return null }
-	if (ch === 'u') { eatWord(ctx, 'undefined'); return undefined }
 	if (ch === 'N') { eatWord(ctx, 'NaN'); return NaN }
 	if (ch === 'I') { eatWord(ctx, 'Infinity'); return Infinity }
 	fail(ctx, 'Unexpected token')
