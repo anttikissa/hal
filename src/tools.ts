@@ -1,5 +1,5 @@
 import { $ } from 'bun'
-import { readFile, writeFile, appendFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, appendFile, mkdir, stat } from 'fs/promises'
 import { isAbsolute, resolve } from 'path'
 import { hashLine, applyEdit, applyInsert } from './hashline.ts'
 import { randomBytes } from 'crypto'
@@ -373,6 +373,8 @@ async function _runTool(
 
 	if (name === 'read') {
 		const path = resolveToolPath(cwd, input.path)
+		const info = await stat(path)
+		if (info.isDirectory()) return `error: ${path} is a directory, not a file. Use the ls tool to list directory contents.`
 		const content = await readFile(path, 'utf-8')
 		const lines = content.split('\n')
 		const total = lines.length
@@ -402,8 +404,9 @@ async function _runTool(
 
 	if (name === 'write') {
 		const path = resolveToolPath(cwd, input.path)
-		await logger(shortenHome(`[write] ${path} (${input.content.length} chars)`), 'tool')
-		await writeFile(path, input.content)
+		const content = input.content ?? ''
+		await logger(shortenHome(`[write] ${path} (${content.length} chars)`), 'tool')
+		await writeFile(path, content)
 		return 'ok'
 	}
 
