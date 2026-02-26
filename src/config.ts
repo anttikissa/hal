@@ -111,7 +111,7 @@ export function loadConfig(): Config {
 	if (_config) return _config
 	try {
 		const raw = readFileSync(CONFIG_PATH, 'utf-8')
-		const parsed = parse(raw) as any
+		const parsed = parse(raw, { comments: true }) as any
 		// Migrate old format: if provider field exists and model has no slash, combine them
 		if (parsed.provider && parsed.model && !parsed.model.includes('/')) {
 			parsed.model = `${parsed.provider}/${resolveModel(parsed.model).split('/').pop()}`
