@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { stringify, parse, parseAll, parseStream } from './ason'
+import { stringify, parse, parseAll, parseStream, COMMENTS } from './ason'
 
 describe('stringify', () => {
 	describe('primitives', () => {
@@ -479,4 +479,90 @@ describe('parseStream e2e', () => {
 		await iter.return(undefined)
 		;(await Bun.file(path).exists()) && (await Bun.$`rm ${path}`)
 	}, 5000)
+})
+
+
+describe('comments', () => {
+	describe('parse with comments', () => {
+		test('block comment before object key', () => {
+			const r = parse('{ /* greeting */ a: 1 }', { comments: true })
+			expect(r.a).toBe(1)
+			expect(r[COMMENTS]).toEqual({ a: '/* greeting */' })
+		})
+
+		test('line comment before object key', () => {
+			const r = parse('{\n// hello\na: 1\n}', { comments: true })
+			expect(r.a).toBe(1)
+			expect(r[COMMENTS]).toEqual({ a: '// hello\n' })
+		})
+
+		test('multiple comments before key are concatenated', () => {
+			const r = parse('{\n// first\n// second\na: 1\n}', { comments: true })
+			expect(r.a).toBe(1)
+			expect(r[COMMENTS]).toEqual({ a: '// first\n// second\n' })
+		})
+
+		test('comments on different keys', () => {
+			const r = parse('{ /* a */ a: 1, /* b */ b: 2 }', { comments: true })
+			expect(r.a).toBe(1)
+			expect(r.b).toBe(2)
+			expect(r[COMMENTS]).toEqual({ a: '/* a */', b: '/* b */' })
+		})
+
+		test('comment after value attaches to next key', () => {
+			const r = parse('{ a: 1, // between\nb: 2 }', { comments: true })
+			expect(r.a).toBe(1)
+			expect(r.b).toBe(2)
+			expect(r[COMMENTS]).toEqual({ b: '// between\n' })
+		})
+
+		test('no COMMENTS symbol without option', () => {
+			const r = parse('{ /* greeting */ a: 1 }')
+			expect(r[COMMENTS]).toBeUndefined()
+		})
+
+		test('no COMMENTS symbol when no comments present', () => {
+			const r = parse('{ a: 1 }', { comments: true })
+			expect(r[COMMENTS]).toBeUndefined()
+		})
+
+		test('array with comments — sparse array', () => {
+			const r = parse('[/* first */ 1, 2, /* third */ 3]', { comments: true })
+			expect([...r]).toEqual([1, 2, 3])
+			const c = r[COMMENTS]
+			expect(c[0]).toBe('/* first */')
+			expect(c[1]).toBeUndefined()
+			expect(c[2]).toBe('/* third */')
+		})
+	})
+
+	describe('stringify with comments', () => {
+		test('object with comments', () => {
+			const obj = { a: 1, b: 2, [COMMENTS]: { a: '/* greeting */' } }
+			expect(stringify(obj)).toBe('{\n  /* greeting */\n  a: 1,\n  b: 2\n}')
+		})
+
+		test('array with comments', () => {
+			const arr = Object.assign([1, 2, 3], { [COMMENTS]: ['/* first */',,, ] })
+			expect(stringify(arr)).toBe('[\n  /* first */\n  1,\n  2,\n  3\n]')
+		})
+
+		test('short mode skips comments', () => {
+			const obj = { a: 1, [COMMENTS]: { a: '/* hi */' } }
+			expect(stringify(obj, 'short')).toBe('{ a: 1 }')
+		})
+
+		test('multi-line comment indented correctly', () => {
+			const obj = { a: { b: 1, [COMMENTS]: { b: '// inner\n' } } }
+			expect(stringify(obj)).toBe('{\n  a: {\n    // inner\n    b: 1\n  }\n}')
+		})
+	})
+
+	describe('roundtrip', () => {
+		test('object comments survive roundtrip', () => {
+			const src = '{\n  /* greeting */\n  a: 1,\n  b: 2\n}'
+			const parsed = parse(src, { comments: true })
+			expect(stringify(parsed)).toBe(src)
+		})
+	})
 })

@@ -34,6 +34,10 @@ function quoteKey(key: string): string {
 	return IDENT_RE.test(key) ? key : quoteString(key)
 }
 
+function indentComment(comment: string, pad: string): string {
+	return comment.split('\n').filter(l => l).map(l => pad + l).join('\n')
+}
+
 function stringifyValue(obj: any, col: number, depth: number, maxWidth: number): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
@@ -48,31 +52,37 @@ function stringifyValue(obj: any, col: number, depth: number, maxWidth: number):
 
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
+		const comments = maxWidth < Infinity ? (obj as any)[COMMENTS] as (string | undefined)[] | undefined : undefined
 		const items = obj.map((v) => stringifyValue(v, 0, depth, maxWidth))
 		const inline = `[${items.join(', ')}]`
-		if (col + inline.length <= maxWidth && !inline.includes('\n')) return inline
+		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
-		const lines = obj.map(
-			(v, i) => `${pad}${stringifyValue(v, pad.length, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`,
-		)
+		const lines = obj.map((v, i) => {
+			const comment = comments?.[i]
+			const prefix = comment ? indentComment(comment, pad) + '\n' : ''
+			return `${prefix}${pad}${stringifyValue(v, pad.length, childDepth, maxWidth)}${i < obj.length - 1 ? ',' : ''}`
+		})
 		return `[\n${lines.join('\n')}\n${'  '.repeat(depth)}]`
 	}
 
 	if (typeof obj === 'object') {
 		const keys = Object.keys(obj)
 		if (keys.length === 0) return '{}'
+		const comments = maxWidth < Infinity ? obj[COMMENTS] as Record<string, string> | undefined : undefined
 		const pairs = keys.map(
 			(k) => `${quoteKey(k)}: ${stringifyValue(obj[k], 0, depth, maxWidth)}`,
 		)
 		const inline = `{ ${pairs.join(', ')} }`
-		if (col + inline.length <= maxWidth && !inline.includes('\n')) return inline
+		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = keys.map((k, i) => {
-			const prefix = `${pad}${quoteKey(k)}: `
-			const val = stringifyValue(obj[k], prefix.length, childDepth, maxWidth)
-			return `${prefix}${val}${i < keys.length - 1 ? ',' : ''}`
+			const comment = comments?.[k]
+			const prefix = comment ? indentComment(comment, pad) + '\n' : ''
+			const keyPrefix = `${pad}${quoteKey(k)}: `
+			const val = stringifyValue(obj[k], keyPrefix.length, childDepth, maxWidth)
+			return `${prefix}${keyPrefix}${val}${i < keys.length - 1 ? ',' : ''}`
 		})
 		return `{\n${lines.join('\n')}\n${'  '.repeat(depth)}}`
 	}
@@ -89,7 +99,9 @@ export function stringify(obj: any, mode: StringifyMode = 'smart'): string {
 
 // --- Parse ---
 
-type Ctx = { buf: string; pos: number }
+export const COMMENTS = Symbol('comments')
+
+type Ctx = { buf: string; pos: number; comments?: boolean }
 
 class ParseError extends Error {
 	pos: number
@@ -116,25 +128,32 @@ function isIdent(ch: string): boolean {
 	return /[a-zA-Z0-9_$]/.test(ch)
 }
 
-function skipWhite(ctx: Ctx): void {
+function skipWhite(ctx: Ctx): string {
+	let collected = ''
 	while (ctx.pos < ctx.buf.length) {
 		const ch = peek(ctx)
 		if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { ctx.pos++; continue }
 		if (ch === '/' && peek2(ctx) === '/') {
+			const start = ctx.pos
 			ctx.pos += 2
 			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n') ctx.pos++
+			if (ctx.pos < ctx.buf.length) ctx.pos++ // include \n
+			if (ctx.comments) collected += ctx.buf.slice(start, ctx.pos)
 			continue
 		}
 		if (ch === '/' && peek2(ctx) === '*') {
+			const start = ctx.pos
 			ctx.pos += 2
 			while (ctx.pos < ctx.buf.length) {
 				if (peek(ctx) === '*' && peek2(ctx) === '/') { ctx.pos += 2; break }
 				ctx.pos++
 			}
+			if (ctx.comments) collected += ctx.buf.slice(start, ctx.pos)
 			continue
 		}
 		break
 	}
+	return collected
 }
 
 function peek(ctx: Ctx): string { return ctx.buf[ctx.pos] ?? '' }
@@ -206,27 +225,41 @@ function parseKey(ctx: Ctx): string {
 function parseObject(ctx: Ctx): Record<string, any> {
 	ctx.pos++ // skip {
 	const obj: Record<string, any> = {}
+	let commentMap: Record<string, string> | undefined
 	while (true) {
-		skipWhite(ctx)
-		if (peek(ctx) === '}') { ctx.pos++; return obj }
+		const comment = skipWhite(ctx)
+		if (peek(ctx) === '}') { ctx.pos++; break }
 		const key = parseKey(ctx)
+		if (comment) {
+			commentMap ??= {}
+			commentMap[key] = comment
+		}
 		skipWhite(ctx); eat(ctx, ':')
 		obj[key] = parseAny(ctx)
 		skipWhite(ctx)
 		if (peek(ctx) === ',') ctx.pos++
 	}
+	if (commentMap) obj[COMMENTS] = commentMap
+	return obj
 }
 
 function parseArray(ctx: Ctx): any[] {
 	ctx.pos++ // skip [
 	const arr: any[] = []
+	let commentArr: (string | undefined)[] | undefined
 	while (true) {
-		skipWhite(ctx)
-		if (peek(ctx) === ']') { ctx.pos++; return arr }
+		const comment = skipWhite(ctx)
+		if (peek(ctx) === ']') { ctx.pos++; break }
+		if (comment) {
+			commentArr ??= []
+			commentArr[arr.length] = comment
+		}
 		arr.push(parseAny(ctx))
 		skipWhite(ctx)
 		if (peek(ctx) === ',') ctx.pos++
 	}
+	if (commentArr) (arr as any)[COMMENTS] = commentArr
+	return arr
 }
 
 function parseAny(ctx: Ctx): any {
@@ -249,8 +282,8 @@ function parseAny(ctx: Ctx): any {
 	fail(ctx, 'Unexpected token')
 }
 
-export function parse(str: string): any {
-	const ctx: Ctx = { buf: str, pos: 0 }
+export function parse(str: string, opts?: { comments?: boolean }): any {
+	const ctx: Ctx = { buf: str, pos: 0, comments: opts?.comments }
 	const value = parseAny(ctx)
 	skipWhite(ctx)
 	if (ctx.pos < ctx.buf.length) fail(ctx, 'Unexpected content after value')
@@ -301,5 +334,5 @@ export async function* parseStream(
 	}
 }
 
-export default { stringify, parse, parseAll, parseStream }
+export default { stringify, parse, parseAll, parseStream, COMMENTS }
 export type { ParseError }
