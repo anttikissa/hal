@@ -52,7 +52,6 @@ directory when there's activity?
 - Make the tail file thing use "tail -f" - save a few lines
 - Add mouse movements on input line, selecting - multicursor maybe? - cmd-a, etc. QoL improvements
 - The steering / enqueue system does not really work. Figure out how to make it to work.
-- BUG: when output comes to terminal, I cannot copy paste from there - selection is cleared!
 
 ## Old TODO items:
 

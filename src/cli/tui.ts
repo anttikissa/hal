@@ -1791,20 +1791,27 @@ const onStdinEnd = () => {
 
 function writeToOutput(text: string): void {
 	if (!text) return
-	// Clear selection on new output (positions become stale)
-	if (selAnchor) {
-		selAnchor = null
-		selCurrent = null
-		selActive = false
-	}
 	const wasAtBottom = scrollOffset === 0
-	const prevTotalVisual = !wasAtBottom ? getTotalVisualLines() : 0
+	const prevTotalVisual = getTotalVisualLines()
 	appendOutput(text)
+	const nextTotalVisual = getTotalVisualLines()
+	const addedLines = nextTotalVisual - prevTotalVisual
 	if (wasAtBottom) {
 		scrollOffset = 0 // stay at bottom
+		// Viewport shifts down — adjust selection rows up
+		if (selAnchor && selAnchor.surface === 'output') {
+			selAnchor = { ...selAnchor, row: selAnchor.row - addedLines }
+			if (selCurrent) selCurrent = { ...selCurrent, row: selCurrent.row - addedLines }
+			// Clear if selection scrolled out of view
+			if ((selCurrent && selCurrent.row < 0) || selAnchor.row < 0) {
+				selAnchor = null
+				selCurrent = null
+				selActive = false
+			}
+		}
 	} else {
-		const nextTotalVisual = getTotalVisualLines()
-		scrollOffset = Math.max(0, scrollOffset + (nextTotalVisual - prevTotalVisual))
+		// Scrolled up — scroll offset compensates, viewport unchanged, selection stays valid
+		scrollOffset = Math.max(0, scrollOffset + addedLines)
 	}
 	render()
 }
