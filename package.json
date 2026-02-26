@@ -7,7 +7,9 @@
 		"dev": "bun main.ts",
 		"test": "bun test",
 		"test:quick": "bun test src/hashline.test.ts src/utils/",
-		"test:e2e": "bun test src/tests/"
+		"test:e2e": "bun test src/tests/",
+		"capture": "bun run scripts/capture",
+		"cloc": "cloc src/ main.ts --exclude-dir=tests --not-match-f=\\.test\\.ts$"
 	},
 	"devDependencies": {
 		"bun-types": "^1.3.9",
