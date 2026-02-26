@@ -1762,8 +1762,8 @@ const onStdinData = (chunk: Buffer | string) => {
 			const isMove = (button & 32) !== 0
 			const baseButton = button & ~32
 
-			if (baseButton === 64) scrollDelta += 3
-			else if (baseButton === 65) scrollDelta -= 3
+			if (baseButton === 64) scrollDelta += 1
+			else if (baseButton === 65) scrollDelta -= 1
 			else if (baseButton === 0) {
 				handleMouseEvent(x - 1, y - 1, isRelease ? 'release' : isMove ? 'move' : 'press')
 			} else if (baseButton === 3 && isMove) {
