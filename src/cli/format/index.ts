@@ -1,6 +1,7 @@
 import type { RuntimeCommand, RuntimeEvent } from '../../protocol.ts'
 import type { Formatter } from './types.ts'
 import { getStyle } from './theme.ts'
+import { styleLinePrefix } from '../tui/format/line-prefix.ts'
 import { buildPromptBlockFormatter } from '../tui/format/prompt.ts'
 
 const RESET = '\x1b[0m'
@@ -59,7 +60,10 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	const fmt = getFormatter(kind)
 	const style = fmt.style
 	const reset = style ? RESET : ''
-	const content = fmt.formatText ? fmt.formatText(text) : text
+	let content = fmt.formatText ? fmt.formatText(text) : text
+	if (kind === 'line.tool' || kind === 'local.queue' || kind === 'local.tab' || kind === 'local.tabs') {
+		content = styleLinePrefix(kind, content)
+	}
 
 	if (kind === 'chunk.assistant' || kind === 'chunk.thinking') {
 		// Only add blank-line separator for chunk→chunk transitions (thinking↔assistant).
