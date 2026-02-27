@@ -16,9 +16,6 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
 	LINE='export PATH="$HOME/.local/bin:$PATH"'
 
 	for rc in "$HOME/.zshrc" "$HOME/.bash_profile"; do
-		if grep -qF '.local/bin' "$rc" 2>/dev/null; then
-			continue
-		fi
 		echo "" >> "$rc"
 		echo "$LINE" >> "$rc"
 		echo "Added PATH entry to $rc"
