@@ -16,8 +16,12 @@ function termCols(): number {
 	return process.stdout.columns || 80
 }
 
+function isBlockKind(kind: string): boolean {
+	return kind === 'prompt' || kind === 'prompt.steering'
+}
+
 function getFormatter(kind: string): Formatter {
-	if (kind === 'prompt' || kind === 'prompt.steering') {
+	if (isBlockKind(kind)) {
 		const steering = kind === 'prompt.steering'
 		return {
 			style: '',
@@ -35,16 +39,19 @@ function getFormatter(kind: string): Formatter {
 	return { style: getStyle(kind) }
 }
 
-// Track prevKind per session so interleaved events from different sessions
-// don't inject spurious newlines into each other's output.
+// Track prevKind and last block row count per session so interleaved events
+// from different sessions don't inject spurious newlines into each other's output.
 const prevKindBySession = new Map<string, string>()
+const lastBlockRows = new Map<string, number>()
 const LOCAL_KEY = '__local__'
 
 export function resetFormat(sessionId?: string): void {
 	if (sessionId) {
 		prevKindBySession.delete(sessionId)
+		lastBlockRows.delete(sessionId)
 	} else {
 		prevKindBySession.clear()
+		lastBlockRows.clear()
 	}
 }
 
@@ -74,13 +81,38 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 		? ` ${getStyle('line.warn')}--\x1b[0m\n`
 		: wasChunk ? '\n' : ''
 
-	// Block decorations (e.g. prompt grey bars)
+	// Block decorations (e.g. prompt grey bars).
+	// Skip leading blank line if previous output was also a block (avoid double spacing).
 	const cols = termCols()
-	const blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
+	let blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
+	if (blockStart && isBlockKind(prev)) {
+		blockStart = blockStart.replace(/^\n/, '')
+	}
 	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
 
+	// In-place redraw: if steering immediately follows a queued prompt block
+	// (nothing in between), cursor-up over the previous block and overwrite.
+	let redraw = ''
+	if (kind === 'prompt.steering' && prev === 'prompt') {
+		const prevRows = lastBlockRows.get(key) ?? 0
+		if (prevRows > 0) {
+			redraw = `\x1b[${prevRows}A\x1b[J`
+			// Restore the leading blank line since we're replacing from scratch
+			blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
+		}
+	}
+
 	const styledContent = applyStylePerLine(style, content)
-	return `${truncMarker}${blockStart}${styledContent}\n${blockEnd}`
+	const output = `${truncMarker}${redraw}${blockStart}${styledContent}\n${blockEnd}`
+
+	// Track row count for block kinds (for potential future redraw)
+	if (isBlockKind(kind)) {
+		lastBlockRows.set(key, (output.match(/\n/g) ?? []).length)
+	} else {
+		lastBlockRows.delete(key)
+	}
+
+	return output
 }
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {

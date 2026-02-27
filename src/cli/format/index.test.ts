@@ -35,6 +35,77 @@ describe('cli format index', () => {
 	})
 })
 
+describe('consecutive block spacing', () => {
+	test('no blank line between consecutive prompt blocks', () => {
+		resetFormat('blk1')
+		pushFragment('prompt', 'first message', 'blk1')
+		const second = pushFragment('prompt', 'second message', 'blk1')
+
+		// Second block should not start with \n (blank separator is suppressed)
+		expect(second).not.toMatch(/^\n/)
+	})
+
+	test('no blank line between queued and steering prompt', () => {
+		resetFormat('blk2')
+		pushFragment('prompt', '[queued] msg', 'blk2')
+		const steering = pushFragment('prompt.steering', '[steering] msg', 'blk2')
+
+		expect(steering).not.toMatch(/^\n/)
+	})
+
+	test('prompt after non-block line still has blank line separator', () => {
+		resetFormat('blk3')
+		pushFragment('line.info', 'some info', 'blk3')
+		const prompt = pushFragment('prompt', 'my message', 'blk3')
+
+		// Should start with \n (blank separator)
+		expect(prompt).toMatch(/^\n/)
+	})
+})
+
+describe('in-place redraw for steering', () => {
+	test('steering after queued prompt includes cursor-up escape', () => {
+		resetFormat('rdr1')
+		pushFragment('prompt', '[queued] hello', 'rdr1')
+		const steering = pushFragment('prompt.steering', '[steering] hello', 'rdr1')
+
+		// Should contain CSI cursor-up sequence: \x1b[<N>A
+		expect(steering).toMatch(/\x1b\[\d+A/)
+		// Should contain CSI clear-to-end: \x1b[J
+		expect(steering).toContain('\x1b[J')
+	})
+
+	test('steering after queued restores leading blank line', () => {
+		resetFormat('rdr2')
+		pushFragment('prompt', '[queued] msg', 'rdr2')
+		const steering = pushFragment('prompt.steering', '[steering] msg', 'rdr2')
+
+		// After the cursor-up + clear, should have the full block start with \n
+		// (the blank separator is restored since we're rewriting from scratch)
+		const afterClear = steering.split('\x1b[J')[1] ?? ''
+		expect(afterClear).toMatch(/^\n/)
+	})
+
+	test('no cursor-up when model output is between queued and steering', () => {
+		resetFormat('rdr3')
+		pushFragment('prompt', '[queued] msg', 'rdr3')
+		pushFragment('chunk.assistant', 'model says stuff', 'rdr3')
+		const steering = pushFragment('prompt.steering', '[steering] msg', 'rdr3')
+
+		// prev is 'chunk.assistant', not 'prompt', so no cursor-up
+		expect(steering).not.toMatch(/\x1b\[\d+A/)
+	})
+
+	test('no cursor-up for non-steering prompt after prompt', () => {
+		resetFormat('rdr4')
+		pushFragment('prompt', 'first', 'rdr4')
+		const second = pushFragment('prompt', 'second', 'rdr4')
+
+		// Two normal prompts — no redraw
+		expect(second).not.toMatch(/\x1b\[\d+A/)
+	})
+})
+
 describe('chunk to prompt truncation marker', () => {
 	test('shows -- marker when chunk transitions to prompt', () => {
 		resetFormat('trunc1')
