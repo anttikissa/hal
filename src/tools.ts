@@ -9,6 +9,16 @@ import { TOOL_LOG } from './state.ts'
 import { debugEnabled } from './config.ts'
 import { logSnapshot, getDebugLogPath } from './debug-log.ts'
 
+// Serialize write/edit operations per file path to prevent corruption from concurrent writes
+const fileLocks = new Map<string, Promise<void>>()
+function withFileLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+	const prev = fileLocks.get(path) ?? Promise.resolve()
+	const result = prev.then(fn, fn)
+	const done = result.then(() => {}, () => {})
+	fileLocks.set(path, done)
+	done.then(() => { if (fileLocks.get(path) === done) fileLocks.delete(path) })
+	return result
+}
 const HOME = homedir()
 export function shortenHome(text: string): string {
 	if (!HOME) return text
@@ -414,16 +424,18 @@ async function _runTool(
 			return 'error: write requires path'
 		if (typeof input?.content !== 'string') return 'error: write requires content'
 		const path = resolveToolPath(cwd, input.path)
-		try {
-			const info = await stat(path)
-			if (info.isDirectory()) return `error: ${path} is a directory, not a file`
-		} catch {
-			// Path doesn't exist yet — that's fine for write
-		}
 		const content = input.content
 		await logger(shortenHome(`[write] ${path} (${content.length} chars)`), 'tool')
-		await writeFile(path, content)
-		return 'ok'
+		return withFileLock(path, async () => {
+			try {
+				const info = await stat(path)
+				if (info.isDirectory()) return `error: ${path} is a directory, not a file`
+			} catch {
+				// Path doesn't exist yet — that's fine for write
+			}
+			await writeFile(path, content)
+			return 'ok'
+		})
 	}
 
 	if (name === 'edit') {
@@ -434,25 +446,27 @@ async function _runTool(
 		if (typeof input.new_content !== 'string')
 			return 'error: edit requires new_content'
 		const path = resolveToolPath(cwd, input.path)
-		const content = await readFile(path, 'utf-8')
-		let result: { result?: string; error?: string }
-		if (input.operation === 'replace') {
-			if (!input.start_ref || !input.end_ref)
-				return 'error: replace requires start_ref and end_ref'
-			await logger(
-				shortenHome(`[edit] ${path} replace ${input.start_ref}..${input.end_ref}`),
-				'tool',
-			)
-			result = applyEdit(content, input.start_ref, input.end_ref, input.new_content)
-		} else {
-			if (!input.after_ref) return 'error: insert requires after_ref'
-			await logger(shortenHome(`[edit] ${path} insert after ${input.after_ref}`), 'tool')
-			result = applyInsert(content, input.after_ref, input.new_content)
-		}
-		if (result.error)
-			return `error: ${result.error}\n\nRe-read the file to get updated LINE:HASH references.`
-		await writeFile(path, result.result!)
-		return 'ok'
+		return withFileLock(path, async () => {
+			const content = await readFile(path, 'utf-8')
+			let result: { result?: string; error?: string }
+			if (input.operation === 'replace') {
+				if (!input.start_ref || !input.end_ref)
+					return 'error: replace requires start_ref and end_ref'
+				await logger(
+					shortenHome(`[edit] ${path} replace ${input.start_ref}..${input.end_ref}`),
+					'tool',
+				)
+				result = applyEdit(content, input.start_ref, input.end_ref, input.new_content)
+			} else {
+				if (!input.after_ref) return 'error: insert requires after_ref'
+				await logger(shortenHome(`[edit] ${path} insert after ${input.after_ref}`), 'tool')
+				result = applyInsert(content, input.after_ref, input.new_content)
+			}
+			if (result.error)
+				return `error: ${result.error}\n\nRe-read the file to get updated LINE:HASH references.`
+			await writeFile(path, result.result!)
+			return 'ok'
+		})
 	}
 
 	if (name === 'grep') {
