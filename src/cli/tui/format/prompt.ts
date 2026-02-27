@@ -17,7 +17,7 @@ export function buildPromptBlockFormatter(cols: number, steering = false): Promp
 	const textStyle = getStyle(steering ? 'prompt.steering.text' : 'prompt.text')
 	return {
 		blockStart: `\n${bar}${CLEAR_EOL}${RESET}\n`,
-		blockEnd: `${bar}${CLEAR_EOL}${RESET}\n`,
+		blockEnd: `${bar}${CLEAR_EOL}${RESET}\n\n`,
 		formatText(text: string): string {
 			return wrapPlainTextWithPadding(text, cols, PROMPT_SIDE_PADDING)
 				.map((line) => `${bar}${textStyle}${line}${CLEAR_EOL}${RESET}`)
