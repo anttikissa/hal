@@ -30,7 +30,7 @@ Definitions are in `src/protocol.ts`.
 
 ### Command Types
 
-`prompt`, `pause`, `resume`, `drop`, `queue`, `handoff`, `reset`, `close`, `restart`, `model`, `system`, `cd`, `fork`, `title`
+`prompt`, `pause`, `resume`, `drop`, `queue`, `handoff`, `reset`, `close`, `restart`, `model`, `system`, `cd`, `fork`, `topic`
 
 Commands are created with `makeCommand(...)` and appended to `commands.ason`.
 

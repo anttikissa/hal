@@ -13,7 +13,7 @@ export const EMPTY_TOTALS: TokenTotals = { input: 0, output: 0, cacheCreate: 0, 
 export interface SessionInfo {
 	id: string
 	name?: string
-	title?: string
+	topic?: string
 	model?: string // per-session model override; falls back to global config
 	workingDir: string
 	busy: boolean
@@ -71,7 +71,7 @@ function conversationPath(id: string): string {
 export interface SessionMeta {
 	workingDir: string
 	model?: string
-	title?: string
+	topic?: string
 	updatedAt: string
 	lastPrompt?: string
 }
@@ -101,7 +101,7 @@ export type ConversationEvent =
 	| { type: 'assistant'; text: string; ts: string }
 	| { type: 'model'; from: string; to: string; ts: string }
 	| { type: 'fork'; parent: string; child: string; ts: string }
-	| { type: 'title'; from?: string; to: string; auto?: boolean; ts: string }
+	| { type: 'topic'; from?: string; to: string; auto?: boolean; ts: string }
 	| { type: 'handoff'; ts: string }
 	| { type: 'reset'; ts: string }
 	| { type: 'cd'; from: string; to: string; ts: string }

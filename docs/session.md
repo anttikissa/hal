@@ -5,10 +5,10 @@
 Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
 - `session.ason` -- full message history sent to the model (user, assistant, tool_use, tool_result blocks). Used for API context. Replaced on `/handoff`, cleared on `/reset`.
-- `conversation.ason` -- append-only human-readable event log (user text, assistant text, model changes, cd, title, fork, handoff, reset). Used for TUI replay on restart and input history. Never truncated.
+- `conversation.ason` -- append-only human-readable event log (user text, assistant text, model changes, cd, topic, fork, handoff, reset). Used for TUI replay on restart and input history. Never truncated.
 - `session-previous.ason` -- previous full history after `/handoff`
 - `handoff.md` -- handoff summary markdown (consumed on next session load)
-- `info.ason` -- per-session metadata (workingDir, model, title, lastPrompt)
+- `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt)
 
 Registry metadata lives in `state/sessions/index.ason`.
 
@@ -23,7 +23,7 @@ Core logic: `src/session.ts`.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
 - `/fork` copies `session.ason` and `conversation.ason` to a new session.
-- Auto-titling: after the first assistant response, runtime generates a short title.
+- Auto-topic: after the first assistant response, runtime generates a short topic.
 ## Handoff Behavior
 
 `/handoff` currently:

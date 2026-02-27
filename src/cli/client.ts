@@ -122,7 +122,7 @@ interface CliTab {
 	sessionId: string
 	workingDir: string
 	name: string
-	title: string
+	topic: string
 	modelLabel: string
 	output: string
 	contextStatus: string | null
@@ -184,9 +184,9 @@ function tabDisplayNames(items: CliTab[]): string[] {
 	})
 }
 
-function titleBarText(tab: Pick<CliTab, 'title' | 'name' | 'workingDir' | 'sessionId'>): string {
+function titleBarText(tab: Pick<CliTab, 'topic' | 'name' | 'workingDir' | 'sessionId'>): string {
 	const sessionLabel = tab.name || basename(tab.workingDir || '') || tab.sessionId.slice(0, 8)
-	return tab.title ? `${tab.title} — ${sessionLabel}` : sessionLabel
+	return tab.topic ? `${tab.topic} — ${sessionLabel}` : sessionLabel
 }
 
 // Module state
@@ -339,7 +339,7 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 			sessionId,
 			workingDir: launchCwd,
 			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-			title: '',
+			topic: '',
 			modelLabel: modelDisplayName(loadConfig().model),
 			output: '',
 			contextStatus: null,
@@ -453,7 +453,7 @@ async function createTab(): Promise<void> {
 		sessionId,
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-		title: '',
+		topic: '',
 		modelLabel: modelDisplayName(loadConfig().model),
 		output: '',
 		contextStatus: null,
@@ -499,7 +499,7 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 		sessionId,
 		workingDir,
 		name: sessionName({ id: sessionId, name: undefined, workingDir }),
-		title: '',
+		topic: '',
 		modelLabel: modelDisplayName(loadConfig().model),
 		output: '',
 		contextStatus: null,
@@ -585,7 +585,7 @@ function syncTabsFromSessions(
 			sessionId: session.id,
 			workingDir: session.workingDir,
 			name: sessionName(session),
-			title: session.title ?? existing?.title ?? '',
+			topic: session.topic ?? existing?.topic ?? '',
 			modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().model),
 			output: preserveActiveOutput ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
@@ -665,7 +665,7 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		sessionId,
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-		title: '',
+		topic: '',
 		modelLabel: modelDisplayName(loadConfig().model),
 		output: '',
 		contextStatus: null,

@@ -58,7 +58,7 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 			case 'prompt':
 				// Prompt already echoed in processCommand for immediate display
 				await processPrompt(sessionId, command.text ?? '')
-				void maybeAutoTitle(sessionId)
+				void maybeAutoTopic(sessionId)
 				break
 
 			case 'handoff':
@@ -79,8 +79,8 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 
 
 
-			case 'title':
-				await runTitle(sessionId, command.text ?? '')
+			case 'topic':
+				await runTopic(sessionId, command.text ?? '')
 				break
 
 			// 'close', 'fork', and 'cd' are handled immediately in processCommand (bypass scheduler)
@@ -450,25 +450,25 @@ export async function runCd(sessionId: string, text: string): Promise<void> {
 
 }
 
-async function runTitle(sessionId: string, text: string): Promise<void> {
-	const title = text.trim()
+async function runTopic(sessionId: string, text: string): Promise<void> {
+	const topic = text.trim()
 	const meta = getSessionMeta(sessionId)
-	if (!title) {
-		const current = meta?.title || '(none)'
-		await publishLine(`[title] ${current}`, 'info', sessionId)
+	if (!topic) {
+		const current = meta?.topic || '(none)'
+		await publishLine(`[topic] ${current}`, 'info', sessionId)
 		return
 	}
 
-	const prev = meta?.title
-	await setSessionTitle(sessionId, title)
-	await appendConversation(sessionId, { type: 'title', from: prev, to: title, ts: new Date().toISOString() })
-	await publishLine(`[title] ${title}`, 'meta', sessionId)
+	const prev = meta?.topic
+	await setSessionTopic(sessionId, topic)
+	await appendConversation(sessionId, { type: 'topic', from: prev, to: topic, ts: new Date().toISOString() })
+	await publishLine(`[topic] ${topic}`, 'meta', sessionId)
 }
 
-export async function setSessionTitle(sessionId: string, title: string): Promise<void> {
+export async function setSessionTopic(sessionId: string, topic: string): Promise<void> {
 	const meta = getSessionMeta(sessionId)
 	if (meta) {
-		meta.title = title
+		meta.topic = topic
 		meta.updatedAt = new Date().toISOString()
 		await persistRegistry()
 	}
@@ -482,8 +482,8 @@ function extractMessageText(m: any): string {
 	return ''
 }
 
-/** Build a summary of the first exchange for title generation. */
-function titleContext(messages: any[]): string | null {
+/** Build a summary of the first exchange for topic generation. */
+function topicContext(messages: any[]): string | null {
 	let userText: string | null = null
 	let assistantText: string | null = null
 	for (const m of messages) {
@@ -501,16 +501,16 @@ function titleContext(messages: any[]): string | null {
 	return ctx
 }
 
-/** Generate a title for the conversation after the first real exchange. */
-async function maybeAutoTitle(sessionId: string): Promise<void> {
+/** Generate a topic for the conversation after the first real exchange. */
+async function maybeAutoTopic(sessionId: string): Promise<void> {
 	const meta = getSessionMeta(sessionId)
-	if (meta?.title) return
+	if (meta?.topic) return
 
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (!runtime) return
 
 	const hasAssistant = runtime.messages.some((m) => m.role === 'assistant')
-	const ctx = titleContext(runtime.messages)
+	const ctx = topicContext(runtime.messages)
 	if (!ctx || !hasAssistant) return
 
 	try {
@@ -519,16 +519,16 @@ async function maybeAutoTitle(sessionId: string): Promise<void> {
 		const provider = getProvider(providerForModel(compactModel))
 		await provider.refreshAuth()
 
-		const { text: title, error } = await provider.complete({
+		const { text: topic, error } = await provider.complete({
 			model: modelIdForModel(compactModel),
-			system: 'Generate a short title (3-6 words) for this conversation based on what the user is actually doing. Be specific and concrete. Reply with ONLY the title, no quotes, no punctuation at the end.',
+			system: 'Generate a short topic (3-6 words) for this conversation based on what the user is actually doing. Be specific and concrete. Reply with ONLY the topic, no quotes, no punctuation at the end.',
 			userMessage: ctx,
 			maxTokens: 30,
 		})
 
-		if (error || !title?.trim()) return
-		await setSessionTitle(sessionId, title.trim())
-		await appendConversation(sessionId, { type: 'title', to: title.trim(), auto: true, ts: new Date().toISOString() })
+		if (error || !topic?.trim()) return
+		await setSessionTopic(sessionId, topic.trim())
+		await appendConversation(sessionId, { type: 'topic', to: topic.trim(), auto: true, ts: new Date().toISOString() })
 	} catch {
 		// Non-critical — silently ignore
 	}

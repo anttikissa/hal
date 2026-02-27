@@ -17,7 +17,7 @@ export type CommandType =
 	| 'system'
 	| 'cd'
 	| 'fork'
-	| 'title'
+	| 'topic'
 
 export interface RuntimeSource {
 	kind: 'cli' | 'web'
