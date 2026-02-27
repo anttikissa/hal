@@ -1645,7 +1645,7 @@ function handleKey(key: string): void {
 		return
 	}
 
-	// PageUp / PageDown / Shift+Up / Shift+Down: scroll output
+	// PageUp / PageDown: scroll output
 	if (key === '\x1b[5~') {
 		scroll(Math.max(1, rows() - 3))
 		return
@@ -1654,12 +1654,47 @@ function handleKey(key: string): void {
 		scroll(-Math.max(1, rows() - 3))
 		return
 	}
-	if (key === '\x1b[1;2A') {
+
+	// Option+Up / Option+Down: scroll output
+	if (key === '\x1b[1;3A') {
 		scroll(3)
 		return
 	}
-	if (key === '\x1b[1;2B') {
+	if (key === '\x1b[1;3B') {
 		scroll(-3)
+		return
+	}
+
+	// Shift+Up / Shift+Down: extend selection by line
+	if (key === '\x1b[1;2A') {
+		const contentWidth = promptContentWidth()
+		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
+		if (row > 0) {
+			setInputCursor(wrappedRowColToCursor(inputBuf, row - 1, col, contentWidth), true)
+			render()
+		}
+		return
+	}
+	if (key === '\x1b[1;2B') {
+		const contentWidth = promptContentWidth()
+		const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
+		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
+		if (row < lines.length - 1) {
+			setInputCursor(wrappedRowColToCursor(inputBuf, row + 1, col, contentWidth), true)
+			render()
+		}
+		return
+	}
+
+	// Shift+Option+Up / Shift+Option+Down: extend selection to start / end
+	if (key === '\x1b[1;4A') {
+		setInputCursor(0, true)
+		render()
+		return
+	}
+	if (key === '\x1b[1;4B') {
+		setInputCursor(inputBuf.length, true)
+		render()
 		return
 	}
 
