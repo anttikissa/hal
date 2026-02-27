@@ -55,6 +55,7 @@ const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m'
 const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
+const ERASE_TO_EOL = '\x1b[K'
 const TITLE_BG = '\x1b[48;5;238m'
 const TITLE_TOPIC = '\x1b[38;5;245m'
 const TITLE_SESSION = '\x1b[38;5;252m'
@@ -1065,7 +1066,7 @@ function render(): void {
 	const titleLine = session
 		? `${TITLE_BG}${TITLE_TOPIC}  ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
 		: `${TITLE_BG}${TITLE_TOPIC}  ${topic}`
-	const renderedTitleLine = truncateAnsi(titleLine, c) + '\x1b[K' + RESET
+	const renderedTitleLine = truncateAnsi(titleLine, c) + TITLE_BG + ERASE_TO_EOL + RESET
 	if (selRange?.surface === 'title') chunks.push(renderLineWithSelection(renderedTitleLine, 0, selRange))
 	else chunks.push(renderedTitleLine)
 	lastTitleLine = truncateAnsi(`  ${titleText}`, c).padEnd(c, ' ')
