@@ -4,12 +4,22 @@ set -e
 HAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="${HOME}/.local/bin"
 
+ask() {
+	read -rp "$1 [Y/n] " answer
+	[[ -z "$answer" || "$answer" =~ ^[Yy] ]]
+}
+
 # Install Bun if not present
 if ! command -v bun &>/dev/null; then
-	echo "Installing Bun..."
-	curl -fsSL https://bun.sh/install | bash
-	export BUN_INSTALL="$HOME/.bun"
-	export PATH="$BUN_INSTALL/bin:$PATH"
+	echo "Hal requires Bun (https://bun.sh)."
+	if ask "I'd like to install Bun. Proceed?"; then
+		curl -fsSL https://bun.sh/install | bash
+		export BUN_INSTALL="$HOME/.bun"
+		export PATH="$BUN_INSTALL/bin:$PATH"
+	else
+		echo "Bun is required. Install it manually and re-run this script."
+		exit 1
+	fi
 fi
 
 # Symlink hal into ~/.local/bin
@@ -22,9 +32,11 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
 	LINE='export PATH="$HOME/.local/bin:$PATH"'
 
 	for rc in "$HOME/.zshrc" "$HOME/.bash_profile"; do
-		echo "" >> "$rc"
-		echo "$LINE" >> "$rc"
-		echo "Added PATH entry to $rc"
+		if ask "I'd like to add $BIN_DIR to your \$PATH by appending to $rc. Ok?"; then
+			echo "" >> "$rc"
+			echo "$LINE" >> "$rc"
+			echo "  Added to $rc"
+		fi
 	done
 
 	echo ""
