@@ -12,7 +12,7 @@ import {
 	MODEL_ALIASES,
 } from '../config.ts'
 import { getProvider } from '../provider.ts'
-import { drainQueuedCommands } from './command-scheduler.ts'
+import { drainQueuedCommands, pauseSession } from './command-scheduler.ts'
 import {
 	publishLine,
 	publishCommandPhase,
@@ -150,9 +150,16 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	await appendConversation(newId, forkEvent)
 
 	markSessionAsActive(newId)
+	// If the parent was mid-generation, start the child paused so both
+	// sessions appear active but the child waits for the user.
+	if (busy) {
+		forkRuntime.pausedByUser = true
+		pauseSession(newId)
+	}
 	await persistRegistry()
 	await publishLine(`[fork] forked ${sessionId} -> ${newId}`, 'meta', sessionId)
-	await publishLine(`[fork] forked from ${sessionId}`, 'fork', newId)
+	const pauseNote = busy ? ' (paused)' : ''
+	await publishLine(`[fork] forked from ${sessionId}${pauseNote}`, 'fork', newId)
 	await emitStatus()
 }
 
