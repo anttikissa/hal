@@ -18,7 +18,7 @@ describe('debug log retention', () => {
 
 		const hal = await startHal({
 			config,
-			env: { HAL_WEB_PORT: '0' },
+			env: { HAL_WEB_PORT: String(20000 + Math.floor(Math.random() * 20000)) },
 			setup: ({ stateDir }) => {
 				const debugDir = join(stateDir, 'debug')
 				const bugsDir = join(stateDir, 'bugs')

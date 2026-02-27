@@ -1,5 +1,5 @@
 import { resolve } from 'path'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 
 const SOURCE_DIR = resolve(import.meta.dir, '../../..')
@@ -10,15 +10,17 @@ export class TestHal {
 
 	private proc: ReturnType<typeof Bun.spawn>
 	readonly halDir: string
+	private cleanupOnStop: boolean
 	private waiters: Array<{
 		match: (r: any) => boolean
 		resolve: (r: any) => void
 		reject: (e: Error) => void
 	}> = []
 
-	constructor(proc: ReturnType<typeof Bun.spawn>, halDir: string) {
+	constructor(proc: ReturnType<typeof Bun.spawn>, halDir: string, cleanupOnStop = true) {
 		this.proc = proc
 		this.halDir = halDir
+		this.cleanupOnStop = cleanupOnStop
 
 		// Read stdout lines in background, parse JSON, dispatch to waiters
 		void (async () => {
@@ -97,15 +99,17 @@ export class TestHal {
 	}
 
 	/** Stop the process and return exit code */
-	async stop(): Promise<{ exitCode: number }> {
+	async stop(options?: { keepDir?: boolean }): Promise<{ exitCode: number }> {
 		try {
 			this.proc.stdin.end()
 		} catch {}
 		const exitCode = await this.proc.exited
 		// Clean up entire isolated hal dir (includes state)
-		try {
-			rmSync(this.halDir, { recursive: true, force: true })
-		} catch {}
+		if (this.cleanupOnStop && !options?.keepDir) {
+			try {
+				rmSync(this.halDir, { recursive: true, force: true })
+			} catch {}
+		}
 		return { exitCode }
 	}
 }
@@ -114,24 +118,38 @@ export interface StartHalOptions {
 	env?: Record<string, string>
 	config?: string
 	setup?: (paths: { halDir: string; stateDir: string }) => Promise<void> | void
+	halDir?: string
+	cleanupOnStop?: boolean
 }
 
 export async function startHal(options?: StartHalOptions): Promise<TestHal> {
 	// Fully isolated: both HAL_DIR and HAL_STATE_DIR point to a temp dir
 	// so tests never read or write the real config, auth, or state files
-	const halDir = mkdtempSync(resolve(tmpdir(), 'hal-test-'))
+	const halDir = options?.halDir ?? mkdtempSync(resolve(tmpdir(), 'hal-test-'))
+	if (!existsSync(halDir)) mkdirSync(halDir, { recursive: true })
 	const stateDir = `${halDir}/state`
 	mkdirSync(stateDir, { recursive: true })
 
 	// Seed minimal config so tests don't inherit the user's real config
-	writeFileSync(`${halDir}/config.ason`, options?.config ?? "{ model: 'anthropic/claude-opus-4-6' }\n")
+	const configPath = `${halDir}/config.ason`
+	if (options?.config !== undefined) {
+		writeFileSync(configPath, options.config)
+	} else if (!existsSync(configPath)) {
+		writeFileSync(configPath, "{ model: 'anthropic/claude-opus-4-6' }\n")
+	}
 	if (options?.setup) await options.setup({ halDir, stateDir })
 
 	const baseEnv: Record<string, string> = { ...process.env } as Record<string, string>
 	if (options?.env) {
 		for (const [k, v] of Object.entries(options.env)) baseEnv[k] = v
 	}
-	const mergedEnv = { ...baseEnv, HAL_DIR: halDir, HAL_STATE_DIR: stateDir }
+	const randomPort = String(12000 + Math.floor(Math.random() * 40000))
+	const mergedEnv = {
+		...baseEnv,
+		HAL_DIR: halDir,
+		HAL_STATE_DIR: stateDir,
+		HAL_WEB_PORT: baseEnv.HAL_WEB_PORT ?? randomPort,
+	}
 	const proc = Bun.spawn(['bun', 'main.ts', '--test'], {
 		cwd: SOURCE_DIR,
 		stdin: 'pipe',
@@ -140,5 +158,5 @@ export async function startHal(options?: StartHalOptions): Promise<TestHal> {
 		env: mergedEnv,
 	})
 
-	return new TestHal(proc, halDir)
+	return new TestHal(proc, halDir, options?.cleanupOnStop ?? true)
 }

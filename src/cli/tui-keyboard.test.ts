@@ -264,8 +264,19 @@ describe('tui Kitty/Ghostty key interpretation (Ghostty fixture baseline)', () =
 		expect(normalized.join('')).toBe(KNOWN_CMD_V_CLIPBOARD)
 	})
 
-	it.todo('handle Cmd-Z semantics when a terminal forwards Cmd-Z as a key event (not only Super press/release)')
-	it.todo('handle Cmd-V shortcut semantics when a terminal forwards Cmd-V as a key event instead of paste text')
+	it('handles Cmd-Z when terminal forwards it as a key event', () => {
+		_testTuiKeys.resetState()
+		// Kitty CSI-u: codepoint z (122), Super modifier (8) + 1.
+		const normalized = _testTuiKeys.normalizeKittyKey('\x1b[122;9u')
+		expect(normalized).toBe('\x1b[122;9u')
+	})
+
+	it('handles Cmd-V shortcut when terminal forwards it as a key event', () => {
+		_testTuiKeys.resetState()
+		// Kitty CSI-u: codepoint v (118), Super modifier (8) + 1.
+		const normalized = _testTuiKeys.normalizeKittyKey('\x1b[118;9u')
+		expect(normalized).toBe('\x1b[118;9u')
+	})
 })
 
 // ── Cross-terminal parseKeys tokenization ──
