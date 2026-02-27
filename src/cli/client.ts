@@ -49,7 +49,7 @@ import {
 } from './keys.ts'
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
-import { loadInputHistory, saveDraft, loadDraft } from '../session.ts'
+import { loadInputHistory, saveDraft, loadDraft, loadSessionRegistry, saveSessionRegistry } from '../session.ts'
 import { countSourceStats } from '../utils/cloc.ts'
 
 import { loadConfig, MODEL_ALIASES, modelIdForModel, resolveModel } from '../config.ts'
@@ -300,11 +300,18 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 		// Persist active tab so it survives app restart
 		captureActiveOutput()
 		const exitSessionId = activeTab()?.sessionId ?? null
+		const exitTasks: Promise<unknown>[] = tabs.map((tab) => saveDraft(tab.sessionId, tab.inputDraft).catch(() => {}))
 		if (exitSessionId) {
-			updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {})
+			exitTasks.push(updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {}))
+			// Update the session registry so the runtime restores this tab on next start
+			exitTasks.push(
+				loadSessionRegistry().then((reg) => {
+					reg.activeSessionId = exitSessionId
+					return saveSessionRegistry(reg)
+				}).catch(() => {}),
+			)
 		}
-		// Save drafts for all tabs
-		await Promise.all(tabs.map((tab) => saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})))
+		await Promise.all(exitTasks)
 		setInputKeyHandler(null)
 		setEscHandler(null)
 		setDoubleEnterHandler(null)
