@@ -137,17 +137,16 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 
 		if (toolBlocks.length > 0) {
-			const toolResults = await Promise.all(
-				toolBlocks.map(async (block: any) => {
-					await publishActivity(`Running: ${block.name}`, sessionId)
-					const output = await runTool(block.name, block.input, {
-						logger: (line, level = 'tool') => publishLine(line, level, sessionId),
-						cwd: getSessionWorkingDir(sessionId),
-						signal: runtime.activeAbort?.signal,
-					})
-					return { id: block.id, output }
-				}),
-			)
+			const toolResults: { id: string; output: string }[] = []
+			for (const block of toolBlocks) {
+				await publishActivity(`Running: ${block.name}`, sessionId)
+				const output = await runTool(block.name, block.input, {
+					logger: (line, level = 'tool') => publishLine(line, level, sessionId),
+					cwd: getSessionWorkingDir(sessionId),
+					signal: runtime.activeAbort?.signal,
+				})
+				toolResults.push({ id: block.id, output })
+			}
 
 			let shouldRestart = false
 			for (const result of toolResults) {
