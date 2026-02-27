@@ -81,7 +81,7 @@ describe('fork', () => {
 		hal.sendLine('/model mock')
 		await hal.waitForLine(/\[model\] .*->.*mock/)
 
-		// Start generating a song (~5 seconds of streaming)
+		// Start generating a song (long stream so we can fork mid-generation)
 		hal.sendLine('song')
 
 		// Wait for a few chunks to confirm generation started
@@ -98,10 +98,12 @@ describe('fork', () => {
 			(r) => r.type === 'chunk' && r.channel === 'assistant',
 		).length
 
-		// Wait for the song to finish — "two.\n" is the last syllable
+		// Parent must keep streaming after fork (without waiting for full song)
 		await hal.waitFor(
-			(r) => r.type === 'chunk' && r.channel === 'assistant' && /two/.test(r.text ?? ''),
-			10000,
+			() =>
+				hal.records.filter((r) => r.type === 'chunk' && r.channel === 'assistant')
+					.length >= chunksAtFork + 2,
+			3000,
 		)
 
 		// Should have received more chunks after the fork
@@ -115,6 +117,10 @@ describe('fork', () => {
 			(r) => r.type === 'sessions' && r.sessions?.length >= 2,
 		)
 		expect(sessions.sessions.length).toBeGreaterThanOrEqual(2)
+
+		// Stop the long stream so test teardown is fast
+		hal.sendLine('/pause')
+		await hal.waitForLine(/\[pause\]/, 3000)
 	}, 15000)
 
 	test('/fork while generating marks child paused and emits paused fork line', async () => {
