@@ -134,6 +134,7 @@ export function setInputDraft(text: string, cursor?: number): void {
 	clearInputUndoHistory()
 	historyIndex = -1
 	historyDraft = ''
+	draftPreloaded = !!text
 }
 
 // ── Prompt config ──
@@ -172,6 +173,7 @@ let inputSelAnchor: number | null = null
 let inputSelFocus: number | null = null
 let inputSelActive = false
 let inputUndoStack: InputUndoSnapshot[] = []
+let draftPreloaded = false
 let waitingResolve: ((value: string | null) => void) | null = null
 let lastSubmitTime = 0
 
@@ -1062,11 +1064,14 @@ function render(): void {
 
 	// Row 1: title bar
 	chunks.push(`\x1b[1;1H\x1b[2K`)
-	const titleText = titleBarStr || 'New conversation'
-	const { topic, session } = splitTitleParts(titleText)
+	const { topic, session } = splitTitleParts(titleBarStr || '')
+	const PLACEHOLDER = 'Use /topic to set topic, or write a prompt to set it automatically'
+	const topicDisplay = topic
+		? `${TITLE_BG}${TITLE_TOPIC} Topic: ${TITLE_SESSION}${topic}`
+		: `${TITLE_BG}${TITLE_TOPIC} Topic: ${TITLE_TOPIC}${PLACEHOLDER}`
 	const titleLine = session
-		? `${TITLE_BG}${TITLE_TOPIC} ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
-		: `${TITLE_BG}${TITLE_TOPIC} ${topic}`
+		? `${topicDisplay}${RESET}${TITLE_BG}${TITLE_TOPIC} — ${session}`
+		: topicDisplay
 	const renderedTitleLine = truncateAnsi(titleLine, c) + TITLE_BG + ERASE_TO_EOL + RESET
 	if (selRange?.surface === 'title') chunks.push(renderLineWithSelection(renderedTitleLine, 0, selRange))
 	else chunks.push(renderedTitleLine)
@@ -1992,10 +1997,14 @@ export function input(promptStr: string): Promise<string | null> {
 		r(null)
 	}
 	inputPromptStr = promptStr
-	inputBuf = ''
-	inputCursor = 0
-	clearInputTextSelection()
-	clearInputUndoHistory()
+	if (draftPreloaded) {
+		draftPreloaded = false
+	} else {
+		inputBuf = ''
+		inputCursor = 0
+		clearInputTextSelection()
+		clearInputUndoHistory()
+	}
 	render()
 	if (ended) return Promise.resolve(null)
 	return new Promise((resolve) => {

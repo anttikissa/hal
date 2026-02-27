@@ -304,9 +304,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {})
 		}
 		// Save drafts for all tabs
-		for (const tab of tabs) {
-			saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
-		}
+		await Promise.all(tabs.map((tab) => saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})))
 		setInputKeyHandler(null)
 		setEscHandler(null)
 		setDoubleEnterHandler(null)
