@@ -252,6 +252,7 @@ if (testMode) {
 					type: 'status',
 					busy: event.busy,
 					busySessions: event.busySessionIds,
+					pausedSessions: event.pausedSessionIds,
 					session: event.sessionId,
 					...(event.context ? { context: event.context } : {}),
 				})

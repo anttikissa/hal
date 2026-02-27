@@ -28,20 +28,20 @@ Changed code: `src/runtime/handle-command.ts`, `src/runtime/sessions.ts`, `src/p
 
 Add to `src/tests/fork.test.ts`:
 
-- [ ] **Fork while busy marks child paused**
+- [x] **Fork while busy marks child paused**
 	- Start streaming (`/model mock`, prompt `song`), fork mid-stream.
 	- Assert status event includes child ID in `pausedSessionIds`.
 	- Assert child receives `[fork] forked from <parent> (paused)` (`level: fork`).
 
-- [ ] **Fork inserts tab/session next to parent**
+- [x] **Fork inserts tab/session next to parent**
 	- With >=2 sessions, fork middle session.
 	- Assert child index is `parentIndex + 1` in `sessions` payload order.
 
-- [ ] **Fork writes lineage events to conversation logs**
+- [x] **Fork writes lineage events to conversation logs**
 	- After fork, parse both sessions’ `conversation.ason`.
 	- Assert both contain `{ type: 'fork', parent, child, ts }`.
 
-- [ ] **Busy-parent fork snapshots partial assistant blocks**
+- [x] **Busy-parent fork snapshots partial assistant blocks**
 	- Fork mid-stream.
 	- Assert child `session.ason` contains assistant content (partial snapshot), not empty.
 
@@ -51,14 +51,14 @@ Changed code: `src/cli/commands.ts`, `src/runtime/handle-command.ts`, `src/sessi
 
 Add to `src/tests/commands.test.ts` (or new `src/tests/topic.test.ts`):
 
-- [ ] **`/topic <text>` persists and echoes**
+- [x] **`/topic <text>` persists and echoes**
 	- Assert `[topic] <text>` meta line.
 	- Assert later `/topic` returns that value.
 
-- [ ] **`/topic` with no existing topic returns `(none)`**
+- [x] **`/topic` with no existing topic returns `(none)`**
 	- Assert info line is `[topic] (none)`.
 
-- [ ] **`/title` no longer a command**
+- [x] **`/title` no longer a command**
 	- Assert unknown-command warning path for `/title ...`.
 
 ### 3) Queue/pause edge cases introduced by busy-state changes (e2e)
@@ -67,14 +67,14 @@ Changed code: `src/runtime/process-command.ts`, `src/cli/client.ts`, `src/cli/tu
 
 Add to `src/tests/queue.test.ts` (extend):
 
-- [ ] **Paused session accumulates queue; `/queue` lists entries in order**
+- [x] **Paused session accumulates queue; `/queue` lists entries in order**
 	- Pause session, send 2 prompts, assert numbered queue lines (`1.`, `2.`).
 
-- [ ] **`/drop` fails queued commands + unpauses**
+- [x] **`/drop` fails queued commands + unpauses**
 	- Assert `command phase=failed` for dropped IDs.
 	- Assert status no longer contains session in paused IDs.
 
-- [ ] **Prompt while paused auto-resumes**
+- [x] **Prompt while paused auto-resumes**
 	- Pause, send prompt, assert generation begins and pause cleared.
 
 ### 4) Tool safety + concurrency guarantees (unit)

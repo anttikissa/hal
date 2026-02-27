@@ -37,4 +37,43 @@ describe('commands', () => {
 		const event = await hal.waitForLine(/\[system\]/)
 		expect(event.level).toBe('info')
 	})
+
+	test('/topic persists and can be read back', async () => {
+		hal = await startHal()
+		await hal.waitForReady()
+
+		hal.sendLine('/topic Fix failing queue tests')
+		const setEvent = await hal.waitFor(
+			(r) =>
+				r.type === 'line' &&
+				r.level === 'meta' &&
+				r.text === '[topic] Fix failing queue tests',
+		)
+		expect(setEvent.level).toBe('meta')
+
+		hal.sendLine('/topic')
+		const readEvent = await hal.waitFor(
+			(r) =>
+				r.type === 'line' &&
+				r.level === 'info' &&
+				r.text === '[topic] Fix failing queue tests',
+		)
+		expect(readEvent.level).toBe('info')
+	})
+
+	test('/topic with no existing topic returns (none)', async () => {
+		hal = await startHal()
+		await hal.waitForReady()
+		hal.sendLine('/topic')
+		const event = await hal.waitForLine(/\[topic\] \(none\)/)
+		expect(event.level).toBe('info')
+	})
+
+	test('/title goes through unknown-command warning path', async () => {
+		hal = await startHal()
+		await hal.waitForReady()
+		hal.sendLine('/title new name')
+		const event = await hal.waitForLine(/\[command\] unknown: title/)
+		expect(event.level).toBe('warn')
+	})
 })
