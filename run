@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Resolve symlinks so this works when invoked via ~/.local/bin/hal
 SCRIPT="$0"
