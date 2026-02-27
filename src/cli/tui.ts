@@ -226,7 +226,7 @@ function rows(): number {
 function promptContentWidth(): number {
 	const c = cols()
 	if (c <= 0) return 1
-	return Math.max(1, c - inputPromptStr.length)
+	return Math.max(1, c - inputPromptStr.length - 1) // -1 for right padding column
 }
 
 function promptLineCount(): number {
