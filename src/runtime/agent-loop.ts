@@ -276,13 +276,14 @@ async function fetchWithRetry(
 	const MAX_RETRIES = 5
 
 	for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-		if (runtime.pausedByUser) return null
+		if (runtime.pausedByUser || runtime.activeAbort?.signal.aborted) return null
 
 		let res: Response
 		try {
 			res = await provider.fetch(body, runtime.activeAbort?.signal)
 		} catch (e: any) {
 			if (runtime.pausedByUser) return null
+			if (runtime.activeAbort?.signal.aborted) return null
 			if (attempt < MAX_RETRIES - 1) {
 				const delay = Math.min(2000 * Math.pow(2, attempt), 30000)
 				await publishActivity(`Retrying (${attempt + 1}/${MAX_RETRIES})...`, sessionId)
