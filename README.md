@@ -1,0 +1,79 @@
+# Hal
+
+A terminal-based coding agent. Multi-tab TUI, file-backed IPC, ~9k lines of TypeScript.
+
+Built on Bun. No build step, no frameworks.
+
+## Install
+
+Requires [Bun](https://bun.sh) (v1.1+).
+
+```bash
+git clone https://github.com/anttikissa/hal.git ~/.hal
+cd ~/.hal
+./install.sh
+```
+
+This symlinks `hal` into `~/.local/bin`. Make sure it's in your PATH:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+## Setup
+
+Create `~/.hal/auth.ason` with your API key:
+
+```
+{
+  anthropic: {
+    accessToken: 'sk-ant-...'
+  }
+}
+```
+
+## Usage
+
+```bash
+cd ~/my-project
+hal                # start working on a project
+hal -s             # work on hal itself
+hal -f             # fresh session (temp state dir)
+```
+
+### Keys
+
+| Key | Action |
+|-----|--------|
+| Enter | Send message (or resume when paused) |
+| Esc | Pause generation |
+| Ctrl-F | Fork session |
+| Tab 1-9 | Switch tabs |
+
+### Commands
+
+| Command | Action |
+|---------|--------|
+| `/model <name>` | Switch model |
+| `/topic <text>` | Set conversation topic |
+| `/queue` | Show queued messages |
+| `/drop [N]` | Drop all or specific queued messages |
+| `/handoff` | Rotate context, write handoff.md |
+| `/reset` | Clear conversation |
+| `/fork` | Fork session into new tab |
+| `/close` | Close current tab |
+| `/clear` | Clear screen |
+| `/help` | List commands |
+
+### Steering
+
+Type while the model is generating to queue messages. After 4 queued messages, generation pauses. Double-Enter steers: aborts the current generation and promotes your last message.
+
+## Providers
+
+- **Anthropic** — Claude models (default)
+- **OpenAI** — GPT/o-series models
+
+## License
+
+MIT
