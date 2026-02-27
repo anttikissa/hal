@@ -206,13 +206,13 @@ const STDIN_COALESCE_MS = 50
 
 function splitTitleParts(text: string): { topic: string; session: string } {
 	const trimmed = text.trim()
-	if (!trimmed) return { topic: 'New conversation', session: '' }
+	if (!trimmed) return { topic: '', session: '' }
 	const sep = ' — '
 	const idx = trimmed.lastIndexOf(sep)
-	if (idx <= 0) return { topic: trimmed, session: '' }
+	if (idx <= 0) return { topic: '', session: trimmed }
 	const topic = trimmed.slice(0, idx).trim()
 	const session = trimmed.slice(idx + sep.length).trim()
-	if (!topic || !session) return { topic: trimmed, session: '' }
+	if (!topic) return { topic: '', session: trimmed }
 	return { topic, session }
 }
 
@@ -1075,7 +1075,9 @@ function render(): void {
 	const renderedTitleLine = truncateAnsi(titleLine, c) + TITLE_BG + ERASE_TO_EOL + RESET
 	if (selRange?.surface === 'title') chunks.push(renderLineWithSelection(renderedTitleLine, 0, selRange))
 	else chunks.push(renderedTitleLine)
-	lastTitleLine = truncateAnsi(`  ${titleText}`, c).padEnd(c, ' ')
+	const plainTopic = topic || PLACEHOLDER
+	const plainTitle = session ? ` Topic: ${plainTopic} — ${session}` : ` Topic: ${plainTopic}`
+	lastTitleLine = truncateAnsi(plainTitle, c).padEnd(c, ' ')
 
 	// Rows 2..ob: output viewport
 	for (let row = 2; row <= ob; row++) {
