@@ -49,7 +49,7 @@ import {
 } from './keys.ts'
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
-import { loadInputHistory } from '../session.ts'
+import { loadInputHistory, saveDraft, loadDraft } from '../session.ts'
 import { countSourceStats } from '../utils/cloc.ts'
 
 import { loadConfig, MODEL_ALIASES, modelIdForModel, resolveModel } from '../config.ts'
@@ -291,7 +291,10 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			wasBusyOnLastSubmit = activeTab()?.busy ?? false
 			await handleCommand(input, client)
 			const tab = activeTab()
-			if (tab) tab.inputHistory = getInputHistory()
+			if (tab) {
+				tab.inputHistory = getInputHistory()
+				saveDraft(tab.sessionId, '').catch(() => {})
+			}
 		}
 	} finally {
 		// Persist active tab so it survives app restart
@@ -299,6 +302,10 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 		const exitSessionId = activeTab()?.sessionId ?? null
 		if (exitSessionId) {
 			updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {})
+		}
+		// Save drafts for all tabs
+		for (const tab of tabs) {
+			saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
 		}
 		setInputKeyHandler(null)
 		setEscHandler(null)
@@ -723,10 +730,11 @@ async function bootstrapState(): Promise<void> {
 			}
 		}
 
-		// Load persisted input history for each tab
+		// Load persisted input history and drafts for each tab
 		await Promise.all(
 			tabs.map(async (tab) => {
 				tab.inputHistory = await loadInputHistory(tab.sessionId)
+				tab.inputDraft = await loadDraft(tab.sessionId)
 			}),
 		)
 

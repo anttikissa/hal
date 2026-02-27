@@ -130,6 +130,32 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 		.slice(-200)
 }
 
+// Draft persistence (unsent prompt text)
+
+function draftPath(id: string): string {
+	return `${sessionDir(id)}/draft.txt`
+}
+
+export async function saveDraft(sessionId: string, text: string): Promise<void> {
+	if (!text) {
+		const path = draftPath(sessionId)
+		if (existsSync(path)) await unlink(path)
+		return
+	}
+	await ensureSessionDir(sessionId)
+	await writeFile(draftPath(sessionId), text)
+}
+
+export async function loadDraft(sessionId: string): Promise<string> {
+	const path = draftPath(sessionId)
+	if (!existsSync(path)) return ''
+	try {
+		return await readFile(path, 'utf-8')
+	} catch {
+		return ''
+	}
+}
+
 async function ensureSessionDir(id: string): Promise<void> {
 	const dir = sessionDir(id)
 	if (!existsSync(dir)) await mkdir(dir, { recursive: true })
