@@ -49,7 +49,7 @@ export function makeCommand(
 	}
 }
 
-export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta'
+export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta' | 'fork'
 
 export type RuntimeEvent =
 	| {

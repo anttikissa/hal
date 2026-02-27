@@ -9,6 +9,7 @@
   'line.error': 'fg203',                  // soft red — urgent but not harsh
   'line.tool': 'fg109',                   // muted teal — tools are infrastructure
   'line.status': 'fg243',                 // mid grey
+  'line.fork': 'fg177',                   // purple — magic
 
   // Prompt block
   'prompt.text': 'bold fg255',            // bright white — your words matter
