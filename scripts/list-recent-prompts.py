@@ -56,7 +56,7 @@ def parse_ts(value: str, fallback: float) -> datetime:
 def collect(session_root: str, hours: int):
 	cutoff = time.time() - hours * 3600
 	files = []
-	for p in glob.glob(os.path.join(session_root, 's-*', 'prompts.ason')):
+	for p in glob.glob(os.path.join(session_root, 's-*', 'conversation.ason')):
 		try:
 			st = os.stat(p)
 		except FileNotFoundError:
@@ -71,10 +71,12 @@ def collect(session_root: str, hours: int):
 			text = f.read()
 		records = parse_ason_records(text)
 		for r in records:
-			prompt = (r.get('prompt') or '').strip()
+			if r.get('type') != 'user':
+				continue
+			prompt = (r.get('text') or r.get('prompt') or '').strip()
 			if not prompt:
 				continue
-			dt = parse_ts(r.get('timestamp', ''), mtime)
+			dt = parse_ts(r.get('ts') or r.get('timestamp', ''), mtime)
 			model = family(r.get('model') or r.get('provider') or '')
 			cwd = tilde(r.get('cwd') or os.path.dirname(os.path.dirname(p)), home)
 			prompt_one_line = ' '.join(prompt.split())

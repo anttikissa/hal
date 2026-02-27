@@ -243,7 +243,8 @@ type ToolLogger = (line: string, level?: ToolLogLevel) => void | Promise<void>
 
 function resolveToolPath(cwd: string, maybePath?: string): string {
 	if (!maybePath || !maybePath.trim()) return cwd
-	return isAbsolute(maybePath) ? maybePath : resolve(cwd, maybePath)
+	const p = maybePath.startsWith('~/') ? HOME + maybePath.slice(1) : maybePath
+	return isAbsolute(p) ? p : resolve(cwd, p)
 }
 
 async function logToolCall(
@@ -281,7 +282,7 @@ export async function runTool(
 		return result
 	} catch (e: any) {
 		const msg = `error: ${e.message || e}`
-		await logger(msg, 'error')
+		await logger(`[${name}] ${msg}`, 'error')
 		await logToolCall(name, input, msg, Date.now() - start, false)
 		return msg
 	}

@@ -9,7 +9,6 @@ Sessions are stored per session id under `state/sessions/<sessionId>/`:
 - `handoff.md` -- handoff summary markdown (consumed on next session load)
 - `info.ason` -- per-session metadata (workingDir, model, title, lastPrompt)
 - `conversation.ason` -- append-only conversation event log (user/assistant/model/fork/title/handoff/reset/cd)
-- `prompts.ason` -- append-only user prompt log
 
 Registry metadata lives in `state/sessions/index.ason`.
 

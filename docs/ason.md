@@ -63,7 +63,7 @@ Given `const obj = { model: 'anthropic/claude-opus-4-6', theme: 'hal', debug: { 
 ## Streaming (JSONL-style)
 
 ASON files can contain multiple values, one per line — like JSONL.
-Used for append-only logs (`prompts.ason`, IPC files).
+Used for append-only logs (`conversation.ason`, IPC files).
 
 - `parseAll(str)` — parse all values from a string.
 - `parseStream(stream)` — async generator from a `ReadableStream<Uint8Array>`. Reading from mid-stream is supported (ignores parse errors on the first line).
