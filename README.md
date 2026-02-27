@@ -14,11 +14,7 @@ cd ~/.hal
 ./install.sh
 ```
 
-This symlinks `hal` into `~/.local/bin`. Make sure it's in your PATH:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
+This symlinks `hal` into `~/.local/bin` and adds it to your PATH in `~/.zshrc` and `~/.bash_profile` if needed.
 
 ## Setup
 
