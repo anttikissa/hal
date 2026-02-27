@@ -1,14 +1,20 @@
 #!/bin/bash
-# Symlink ~/.local/bin/hal -> this repo's run script
-
 set -e
 
 HAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="${HOME}/.local/bin"
 
+# Install Bun if not present
+if ! command -v bun &>/dev/null; then
+	echo "Installing Bun..."
+	curl -fsSL https://bun.sh/install | bash
+	export BUN_INSTALL="$HOME/.bun"
+	export PATH="$BUN_INSTALL/bin:$PATH"
+fi
+
+# Symlink hal into ~/.local/bin
 mkdir -p "$BIN_DIR"
 ln -sf "$HAL_DIR/run" "$BIN_DIR/hal"
-
 echo "Linked $BIN_DIR/hal -> $HAL_DIR/run"
 
 # Add ~/.local/bin to PATH in shell profiles if not already there
