@@ -1,10 +1,14 @@
 #!/bin/bash
 set -e
 
+ASSUME_YES=false
+[[ "${1:-}" == "-y" ]] && ASSUME_YES=true
+
 HAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="${HOME}/.local/bin"
 
 ask() {
+	if $ASSUME_YES; then return 0; fi
 	read -rp "$1 [Y/n] " answer
 	[[ -z "$answer" || "$answer" =~ ^[Yy] ]]
 }
