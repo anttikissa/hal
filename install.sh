@@ -11,12 +11,25 @@ ln -sf "$HAL_DIR/run" "$BIN_DIR/hal"
 
 echo "Linked $BIN_DIR/hal -> $HAL_DIR/run"
 
+# Add ~/.local/bin to PATH in shell profiles if not already there
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-	echo "NOTE: $BIN_DIR is not in your PATH. Add it to your shell profile, e.g.:"
-	echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+	LINE='export PATH="$HOME/.local/bin:$PATH"'
+
+	for rc in "$HOME/.zshrc" "$HOME/.bash_profile"; do
+		if grep -qF '.local/bin' "$rc" 2>/dev/null; then
+			continue
+		fi
+		echo "" >> "$rc"
+		echo "$LINE" >> "$rc"
+		echo "Added PATH entry to $rc"
+	done
+
+	echo ""
+	echo "Restart your shell or run:"
+	echo "  $LINE"
 fi
 
 echo ""
 echo "Try it now:"
-echo "  cd ~/project/my-project; hal   # work on a project"
-echo "  hal -s                         # work on hal itself"
+echo "  cd ~/my-project; hal   # work on a project"
+echo "  hal -s                 # work on hal itself"
