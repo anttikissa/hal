@@ -52,3 +52,29 @@ export function wrappedRowColToCursor(
 	const lineLen = lines[clampedRow]?.length ?? 0
 	return starts[clampedRow] + Math.max(0, Math.min(col, lineLen))
 }
+
+export interface VerticalMoveResult {
+	cursor: number
+	goalCol: number
+	atBoundary: boolean
+}
+
+export function verticalMove(
+	input: string,
+	width: number,
+	currentCursor: number,
+	goalCol: number | null,
+	direction: -1 | 1,
+): VerticalMoveResult {
+	const { lines } = getWrappedInputLayout(input, width)
+	const { row, col } = cursorToWrappedRowCol(input, currentCursor, width)
+	const effectiveGoalCol = goalCol ?? col
+
+	const targetRow = row + direction
+	if (targetRow < 0 || targetRow >= lines.length) {
+		return { cursor: currentCursor, goalCol: effectiveGoalCol, atBoundary: true }
+	}
+
+	const newCursor = wrappedRowColToCursor(input, targetRow, effectiveGoalCol, width)
+	return { cursor: newCursor, goalCol: effectiveGoalCol, atBoundary: false }
+}

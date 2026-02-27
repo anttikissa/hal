@@ -31,6 +31,7 @@ import {
 	cursorToWrappedRowCol,
 	getWrappedInputLayout,
 	wrappedRowColToCursor,
+	verticalMove,
 } from './tui-input-layout.ts'
 export { stripAnsi } from './format/index.ts'
 import { stripAnsi } from './format/index.ts'
@@ -168,6 +169,7 @@ let headerFlashTimer: ReturnType<typeof setTimeout> | null = null
 // Input
 let inputBuf = ''
 let inputCursor = 0
+let inputGoalCol: number | null = null
 let inputPromptStr = '> '
 let inputSelAnchor: number | null = null
 let inputSelFocus: number | null = null
@@ -1330,6 +1332,8 @@ export const _testTuiKeys = {
 // ── Key handler ──
 
 function handleKey(key: string): void {
+	const prevGoalCol = inputGoalCol
+	inputGoalCol = null
 	const normalizedKitty = normalizeKittyKey(key)
 	if (normalizedKitty === null) return
 	key = normalizedKitty
@@ -1603,10 +1607,10 @@ function handleKey(key: string): void {
 	// Arrow up
 	if (key === '\x1b[A' || key === '\x1bOA') {
 		clearInputTextSelection()
-		const contentWidth = promptContentWidth()
-		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-		if (row > 0) {
-			inputCursor = wrappedRowColToCursor(inputBuf, row - 1, col, contentWidth)
+		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, -1)
+		if (!r.atBoundary) {
+			inputCursor = r.cursor
+			inputGoalCol = r.goalCol
 			render()
 			return
 		}
@@ -1624,11 +1628,10 @@ function handleKey(key: string): void {
 	// Arrow down
 	if (key === '\x1b[B' || key === '\x1bOB') {
 		clearInputTextSelection()
-		const contentWidth = promptContentWidth()
-		const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
-		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-		if (row < lines.length - 1) {
-			inputCursor = wrappedRowColToCursor(inputBuf, row + 1, col, contentWidth)
+		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, 1)
+		if (!r.atBoundary) {
+			inputCursor = r.cursor
+			inputGoalCol = r.goalCol
 			render()
 			return
 		}
@@ -1667,20 +1670,19 @@ function handleKey(key: string): void {
 
 	// Shift+Up / Shift+Down: extend selection by line
 	if (key === '\x1b[1;2A') {
-		const contentWidth = promptContentWidth()
-		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-		if (row > 0) {
-			setInputCursor(wrappedRowColToCursor(inputBuf, row - 1, col, contentWidth), true)
+		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, -1)
+		if (!r.atBoundary) {
+			setInputCursor(r.cursor, true)
+			inputGoalCol = r.goalCol
 			render()
 		}
 		return
 	}
 	if (key === '\x1b[1;2B') {
-		const contentWidth = promptContentWidth()
-		const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
-		const { row, col } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-		if (row < lines.length - 1) {
-			setInputCursor(wrappedRowColToCursor(inputBuf, row + 1, col, contentWidth), true)
+		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, 1)
+		if (!r.atBoundary) {
+			setInputCursor(r.cursor, true)
+			inputGoalCol = r.goalCol
 			render()
 		}
 		return
