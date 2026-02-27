@@ -4,6 +4,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 
 ## Rules
 
+- Never restart the app unless the user explicitly asks. Restart kills all tabs — other tabs may have active generations that would be lost.
 - Use Bun, never node.js. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).
 - Secrets live in `auth.ason` (gitignored). Non-secrets in `config.ason`.
