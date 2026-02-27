@@ -1658,13 +1658,15 @@ function handleKey(key: string): void {
 		return
 	}
 
-	// Option+Up / Option+Down: scroll output
+	// Option+Up / Option+Down: move cursor to start / end
 	if (key === '\x1b[1;3A') {
-		scroll(3)
+		setInputCursor(0)
+		render()
 		return
 	}
 	if (key === '\x1b[1;3B') {
-		scroll(-3)
+		setInputCursor(inputBuf.length)
+		render()
 		return
 	}
 
