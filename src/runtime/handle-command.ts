@@ -110,7 +110,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
 	const workingDir = getSessionWorkingDir(sessionId)
-	const newSession = await ensureSession(newId, workingDir)
+	const newSession = await ensureSession(newId, workingDir, sessionId)
 
 	// Inherit parent's per-session model
 	const parentMeta = getSessionMeta(sessionId)

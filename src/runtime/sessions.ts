@@ -154,7 +154,7 @@ export async function saveAllSessions(): Promise<void> {
 	await saveSessionRegistry(registry)
 }
 
-export async function ensureSession(sessionId: string, workingDir: string): Promise<SessionInfo> {
+export async function ensureSession(sessionId: string, workingDir: string, afterSessionId?: string): Promise<SessionInfo> {
 	const cleanId = sanitizeSessionId(sessionId)
 	let session = getSessionMeta(cleanId)
 	if (session) return session
@@ -167,7 +167,12 @@ export async function ensureSession(sessionId: string, workingDir: string): Prom
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
 	}
-	registry.sessions.push(session)
+	if (afterSessionId) {
+		const idx = registry.sessions.findIndex((s) => s.id === afterSessionId)
+		registry.sessions.splice(idx + 1, 0, session)
+	} else {
+		registry.sessions.push(session)
+	}
 	if (!registry.activeSessionId) registry.activeSessionId = session.id
 	ensureSessionQueue(session.id)
 	await persistRegistry()
