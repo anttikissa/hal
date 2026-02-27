@@ -431,6 +431,11 @@ Main integration points from `src/cli/client.ts`:
 - “Key works in iTerm but not Kitty/Ghostty”:
   - inspect `supportsKittyKeyboard()` and Kitty `CSI u` parsing/normalization
 
+
+## Lessons / Pitfalls
+
+- `truncateAnsi()` appends `RESET` (`\x1b[0m`) internally. If you rely on the current background color after truncation (e.g. for `\x1b[K` erase-to-EOL), you must re-apply the background *after* the truncated string. Pattern: `truncateAnsi(line, c) + BG + ERASE_TO_EOL + RESET`.
+
 Related helpers:
 
 - `src/cli/tui-text.ts` -- ANSI-aware wrapping/truncation + key tokenization

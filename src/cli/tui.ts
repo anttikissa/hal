@@ -11,6 +11,7 @@
  *   Row  rows                     = Input bottom pad (dark-grey)
  *
  * Single render() redraws every row from state on each change.
+ * See docs/tui.md for the full mental model.
  */
 
 import { stringify } from '../utils/ason.ts'
