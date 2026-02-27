@@ -9,7 +9,7 @@ Built on Bun. No build step, no frameworks.
 Requires [Bun](https://bun.sh) (v1.1+).
 
 ```bash
-git clone https://github.com/anttikissa/hal.git ~/.hal
+git clone git@github.com:anttikissa/hal.git ~/.hal
 cd ~/.hal
 ./install.sh
 ```
