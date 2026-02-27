@@ -1,4 +1,5 @@
 import { resolve } from 'path'
+import { appendFile } from 'fs/promises'
 import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 
@@ -59,6 +60,14 @@ export class TestHal {
 		this.proc.stdin.write(text + '\n')
 	}
 
+	/** Send a raw command to the IPC bus (bypasses stdin/CLI parsing) */
+	async sendCommand(command: any): Promise<void> {
+		const { stringify } = await import('../../utils/ason.ts')
+		const ipcDir = `${this.halDir}/state/ipc`
+		const commandsFile = `${ipcDir}/commands.ason`
+		await appendFile(commandsFile, stringify(command, 'short') + '\n')
+	}
+
 	/** Wait for a record matching the predicate */
 	waitFor(match: (record: any) => boolean, timeoutMs = 5000): Promise<any> {
 		// Check already-received records first
@@ -91,6 +100,18 @@ export class TestHal {
 	waitForLine(pattern: string | RegExp, timeoutMs = 5000): Promise<any> {
 		const re = typeof pattern === 'string' ? new RegExp(pattern) : pattern
 		return this.waitFor((r) => r.type === 'line' && re.test(r.text ?? ''), timeoutMs)
+	}
+
+	/** Wait for a prompt event matching text pattern and optional label */
+	waitForPrompt(pattern: string | RegExp, label?: string, timeoutMs = 5000): Promise<any> {
+		const re = typeof pattern === 'string' ? new RegExp(pattern) : pattern
+		return this.waitFor(
+			(r) =>
+				r.type === 'prompt' &&
+				re.test(r.text ?? '') &&
+				(label === undefined || r.label === label),
+			timeoutMs,
+		)
 	}
 
 	/** Wait for the {type:'ready'} signal */

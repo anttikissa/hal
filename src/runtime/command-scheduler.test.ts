@@ -137,6 +137,10 @@ describe('promoteLastPrompt', () => {
 		expect(promoteLastPrompt('s1')).toBeNull()
 	})
 
+	test('returns null for unknown session', () => {
+		expect(promoteLastPrompt('nonexistent')).toBeNull()
+	})
+
 	test('skips non-prompt commands when finding last prompt', () => {
 		pauseSession('s1')
 		enqueueCommand('s1', makeCommand('prompt', source, 'msg'))
@@ -148,5 +152,43 @@ describe('promoteLastPrompt', () => {
 		const queued = sessionQueuedCommands('s1')
 		expect(queued[0].text).toBe('msg')
 		expect(queued[1].type).toBe('reset')
+	})
+
+	test('single prompt in queue — promote is a no-op but returns it', () => {
+		pauseSession('s1')
+		enqueueCommand('s1', makeCommand('prompt', source, 'only'))
+
+		const promoted = promoteLastPrompt('s1')
+		expect(promoted?.text).toBe('only')
+
+		const queued = sessionQueuedCommands('s1')
+		expect(queued.length).toBe(1)
+		expect(queued[0].text).toBe('only')
+	})
+
+	test('preserves relative order of non-promoted commands', () => {
+		pauseSession('s1')
+		enqueueCommand('s1', makeCommand('prompt', source, 'a'))
+		enqueueCommand('s1', makeCommand('reset', source))
+		enqueueCommand('s1', makeCommand('prompt', source, 'b'))
+		enqueueCommand('s1', makeCommand('handoff', source))
+		enqueueCommand('s1', makeCommand('prompt', source, 'c'))
+
+		promoteLastPrompt('s1')
+		const queued = sessionQueuedCommands('s1')
+		// 'c' promoted to front; rest keep order
+		expect(queued.map(c => c.text ?? c.type)).toEqual(['c', 'a', 'reset', 'b', 'handoff'])
+	})
+
+	test('promote returns the command object with correct id', () => {
+		pauseSession('s1')
+		const cmd1 = makeCommand('prompt', source, 'x')
+		const cmd2 = makeCommand('prompt', source, 'y')
+		enqueueCommand('s1', cmd1)
+		enqueueCommand('s1', cmd2)
+
+		const promoted = promoteLastPrompt('s1')
+		expect(promoted?.id).toBe(cmd2.id)
+		expect(promoted?.text).toBe('y')
 	})
 })

@@ -240,6 +240,7 @@ if (testMode) {
 					type: 'prompt',
 					session: event.sessionId,
 					text: event.text,
+					...(event.label ? { label: event.label } : {}),
 				})
 			} else if (event.type === 'sessions') {
 				writeLine({
