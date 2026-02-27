@@ -1065,8 +1065,8 @@ function render(): void {
 	const titleText = titleBarStr || 'New conversation'
 	const { topic, session } = splitTitleParts(titleText)
 	const titleLine = session
-		? `${TITLE_BG}${TITLE_TOPIC}  ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
-		: `${TITLE_BG}${TITLE_TOPIC}  ${topic}`
+		? `${TITLE_BG}${TITLE_TOPIC} ${topic}${RESET}${TITLE_BG}${TITLE_SESSION} — ${session}`
+		: `${TITLE_BG}${TITLE_TOPIC} ${topic}`
 	const renderedTitleLine = truncateAnsi(titleLine, c) + TITLE_BG + ERASE_TO_EOL + RESET
 	if (selRange?.surface === 'title') chunks.push(renderLineWithSelection(renderedTitleLine, 0, selRange))
 	else chunks.push(renderedTitleLine)
