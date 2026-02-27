@@ -10,6 +10,7 @@ import {
 	sessionQueueLength,
 	sessionQueuedCommands,
 	drainQueuedCommands as drainSchedulerQueue,
+	removeQueuedByIndices,
 	removeSessionQueue,
 	concurrencyStatus,
 	isSessionRunning,
@@ -35,6 +36,27 @@ import {
 	emitStatus,
 } from './sessions.ts'
 
+/** Parse "3", "1,3", "2-5", "1,3-5" → 1-based indices, or null for empty/invalid */
+function parseDropIndices(args: string): number[] | null {
+	if (!args) return null
+	const indices: number[] = []
+	for (const part of args.split(',')) {
+		const range = part.trim().match(/^(\d+)\s*-\s*(\d+)$/)
+		if (range) {
+			const a = parseInt(range[1], 10), b = parseInt(range[2], 10)
+			for (let i = Math.min(a, b); i <= Math.max(a, b); i++) indices.push(i)
+		} else {
+			const n = parseInt(part.trim(), 10)
+			if (isNaN(n)) return null
+			indices.push(n)
+		}
+	}
+	return indices.length > 0 ? indices : null
+}
+
+function truncate(s: string, max: number): string {
+	return s.length > max ? s.slice(0, max - 3) + '...' : s
+}
 function resolveSessionId(command: RuntimeCommand): string | null {
 	const explicit = typeof command.sessionId === 'string' ? command.sessionId.trim() : ''
 	if (explicit) return sanitizeSessionId(explicit)
@@ -114,7 +136,7 @@ async function runPause(sessionId: string | null): Promise<void> {
 	const queued = sessionQueueLength(sessionId)
 	if (queued > 0) {
 		await publishLine(
-			`[pause] paused — ${queued} queued message(s). Enter to resume, /drop to clear.`,
+			`[pause] paused — ${queued} queued message(s). Enter to resume, /queue to inspect, /drop to clear.`,
 			'warn',
 			sessionId,
 		)
@@ -211,28 +233,51 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		return
 	}
 
-	// Drop: clear queued commands
+	// Drop: clear queued commands (all, or specific by number)
 	if (command.type === 'drop') {
 		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
 		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		if (sessionId) {
-			const dropped = drainSchedulerQueue(sessionId)
-			for (const cmd of dropped) {
-				await publishCommandPhase(cmd.id, 'failed', 'dropped by user', sessionId)
-			}
-			if (dropped.length > 0) {
-				await publishLine(
-					`[drop] cleared ${dropped.length} queued message(s)`,
-					'warn',
-					sessionId,
-				)
+			const args = (command.text ?? '').trim()
+			const indices = parseDropIndices(args)
+			if (indices) {
+				// Drop specific items (1-based in user-facing, 0-based internally)
+				const dropped = removeQueuedByIndices(sessionId, indices.map(i => i - 1))
+				for (const cmd of dropped) {
+					await publishCommandPhase(cmd.id, 'failed', 'dropped by user', sessionId)
+				}
+				if (dropped.length > 0) {
+					const labels = dropped.map(c => c.text ?? c.type)
+					await publishLine(
+						`[drop] removed ${dropped.length}: ${labels.map(l => truncate(l, 40)).join(', ')}`,
+						'warn',
+						sessionId,
+					)
+				} else {
+					await publishLine('[drop] no matching items', 'meta', sessionId)
+				}
 			} else {
-				await publishLine('[drop] queue is empty', 'meta', sessionId)
+				// Drop all
+				const dropped = drainSchedulerQueue(sessionId)
+				for (const cmd of dropped) {
+					await publishCommandPhase(cmd.id, 'failed', 'dropped by user', sessionId)
+				}
+				if (dropped.length > 0) {
+					await publishLine(
+						`[drop] cleared ${dropped.length} queued message(s)`,
+						'warn',
+						sessionId,
+					)
+				} else {
+					await publishLine('[drop] queue is empty', 'meta', sessionId)
+				}
 			}
-			// Unpause since there's nothing to resume
-			const runtime = getCachedSessionRuntime(sessionId)
-			if (runtime) runtime.pausedByUser = false
-			resumeSession(sessionId)
+			// Unpause if queue is now empty
+			if (sessionQueueLength(sessionId) === 0) {
+				const runtime = getCachedSessionRuntime(sessionId)
+				if (runtime) runtime.pausedByUser = false
+				resumeSession(sessionId)
+			}
 		}
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
 		await emitStatus()

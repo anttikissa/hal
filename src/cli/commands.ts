@@ -32,8 +32,8 @@ async function pause(_args: string, client: Client): Promise<void> {
 	client.log('local.queue', 'pause')
 }
 
-async function drop(_args: string, client: Client): Promise<void> {
-	await client.command('drop')
+async function drop(args: string, client: Client): Promise<void> {
+	await client.command('drop', args || undefined)
 }
 
 async function queue(_args: string, client: Client): Promise<void> {

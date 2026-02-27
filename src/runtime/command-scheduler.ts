@@ -162,6 +162,18 @@ export function drainQueuedCommands(sessionId?: string | null): RuntimeCommand[]
 	return dropped
 }
 
+/** Remove specific items from a session's queue by 0-based indices. Returns removed commands. */
+export function removeQueuedByIndices(sessionId: string, indices: number[]): RuntimeCommand[] {
+	const q = getState().queues.get(sessionId)
+	if (!q || q.length === 0) return []
+	// Sort descending so splicing doesn't shift later indices
+	const sorted = [...new Set(indices)].filter(i => i >= 0 && i < q.length).sort((a, b) => b - a)
+	const removed: RuntimeCommand[] = []
+	for (const idx of sorted) removed.push(q.splice(idx, 1)[0])
+	removed.reverse()
+	return removed
+}
+
 /** Freeze a session's queue — queued commands stay but won't run. */
 export function pauseSession(sessionId: string): void {
 	getState().paused.add(sessionId)

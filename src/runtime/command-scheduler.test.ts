@@ -11,6 +11,7 @@ import {
 	pausedSessionIds,
 	totalQueuedCommands,
 	promoteLastPrompt,
+	removeQueuedByIndices,
 } from './command-scheduler.ts'
 import { makeCommand, type RuntimeCommand } from '../protocol.ts'
 
@@ -190,5 +191,27 @@ describe('promoteLastPrompt', () => {
 		const promoted = promoteLastPrompt('s1')
 		expect(promoted?.id).toBe(cmd2.id)
 		expect(promoted?.text).toBe('y')
+	})
+
+	test('removeQueuedByIndices removes specific items', () => {
+		pauseSession('s1')
+		enqueueCommand('s1', cmd('a'))
+		enqueueCommand('s1', cmd('b'))
+		enqueueCommand('s1', cmd('c'))
+		enqueueCommand('s1', cmd('d'))
+
+		const removed = removeQueuedByIndices('s1', [1, 3]) // 0-based: 'b' and 'd'
+		expect(removed.map(c => c.text)).toEqual(['b', 'd'])
+		expect(sessionQueuedCommands('s1').map(c => c.text)).toEqual(['a', 'c'])
+	})
+
+	test('removeQueuedByIndices handles out-of-range gracefully', () => {
+		pauseSession('s1')
+		enqueueCommand('s1', cmd('a'))
+		enqueueCommand('s1', cmd('b'))
+
+		const removed = removeQueuedByIndices('s1', [0, 5, 10])
+		expect(removed.map(c => c.text)).toEqual(['a'])
+		expect(sessionQueuedCommands('s1').map(c => c.text)).toEqual(['b'])
 	})
 })
