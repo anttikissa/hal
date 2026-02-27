@@ -10,6 +10,7 @@ import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts
 import {
 	loadSession,
 	loadHandoff,
+	loadConversation,
 	loadSessionRegistry,
 	makeSessionId,
 	saveSession,
@@ -30,7 +31,7 @@ import {
 } from './command-scheduler.ts'
 import { processCommand } from './process-command.ts'
 import { handleCommand } from './handle-command.ts'
-import { initPublisher, publishLine, publishStatus, publishContext } from './event-publisher.ts'
+import { initPublisher, publishLine, publishChunk, publishPrompt, publishStatus, publishContext } from './event-publisher.ts'
 
 // Runtime cache per session
 export interface SessionRuntimeCache {
@@ -312,6 +313,27 @@ export async function emitStatus(): Promise<void> {
 	})
 }
 
+const REPLAY_SOURCE = { kind: 'cli' as const, clientId: 'replay' }
+
+async function replayConversation(sessionId: string): Promise<void> {
+	const events = await loadConversation(sessionId)
+	// Only replay events after the last reset/handoff
+	let startIdx = 0
+	for (let i = events.length - 1; i >= 0; i--) {
+		if (events[i].type === 'reset' || events[i].type === 'handoff') {
+			startIdx = i + 1
+			break
+		}
+	}
+	const recent = events.slice(startIdx)
+	for (const evt of recent) {
+		if (evt.type === 'user') {
+			await publishPrompt(sessionId, evt.text, REPLAY_SOURCE)
+		} else if (evt.type === 'assistant') {
+			await publishChunk(evt.text + '\n', 'assistant', sessionId)
+		}
+	}
+}
 // Startup
 async function initialize(): Promise<void> {
 	ensureStateDir()
@@ -340,6 +362,7 @@ async function initialize(): Promise<void> {
 			'meta',
 			initialSessionId,
 		)
+		await replayConversation(initialSessionId)
 	} else {
 		await publishLine(
 			`[session] new session — ${sessionDir(initialSessionId)}`,

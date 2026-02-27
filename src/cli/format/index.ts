@@ -90,7 +90,8 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 
 	if (event.type === 'prompt') {
 		const local =
-			event.source.kind === localSource.kind && event.source.clientId === localSource.clientId
+			event.source.clientId === 'replay' ||
+			(event.source.kind === localSource.kind && event.source.clientId === localSource.clientId)
 		const text = local
 			? event.text
 			: `[prompt:${event.source.kind}:${event.source.clientId.slice(0, 6)}] ${event.text}`
