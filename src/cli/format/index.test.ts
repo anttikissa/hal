@@ -35,6 +35,45 @@ describe('cli format index', () => {
 	})
 })
 
+describe('chunk to prompt truncation marker', () => {
+	test('shows -- marker when chunk transitions to prompt', () => {
+		resetFormat('trunc1')
+		pushFragment('chunk.assistant', 'A daemon w', 'trunc1')
+		const out = pushFragment('prompt', 'in spanish', 'trunc1')
+		expect(stripAnsi(out)).toContain(' --')
+	})
+
+	test('shows -- marker when chunk transitions to steering prompt', () => {
+		resetFormat('trunc2')
+		pushFragment('chunk.assistant', 'The bits', 'trunc2')
+		const out = pushFragment('prompt.steering', '[steering] in spanish', 'trunc2')
+		expect(stripAnsi(out)).toContain(' --')
+	})
+
+	test('no -- marker when line transitions to prompt', () => {
+		resetFormat('trunc3')
+		pushFragment('line.info', 'some info', 'trunc3')
+		const out = pushFragment('prompt', 'hello', 'trunc3')
+		expect(stripAnsi(out)).not.toContain(' --')
+	})
+
+	test('no -- marker when chunk transitions to non-prompt', () => {
+		resetFormat('trunc4')
+		pushFragment('chunk.assistant', 'some output', 'trunc4')
+		const out = pushFragment('line.info', 'info line', 'trunc4')
+		expect(stripAnsi(out)).not.toContain(' --')
+	})
+
+	test('-- marker is styled in orange (warn color)', () => {
+		loadActiveTheme(process.cwd(), 'default')
+		resetFormat('trunc5')
+		pushFragment('chunk.assistant', 'text', 'trunc5')
+		const out = pushFragment('prompt', 'msg', 'trunc5')
+		// Should contain the warn style (yellow in default theme) before --
+		expect(out).toContain('\x1b[33m--')
+	})
+})
+
 describe('prompt label rendering', () => {
 	const localSource = { kind: 'cli' as const, clientId: 'test-client' }
 

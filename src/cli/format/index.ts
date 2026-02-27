@@ -66,8 +66,13 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 		return `${prefix}${applyStylePerLine(style, content)}`
 	}
 
-	// When previous output was a streaming chunk (no trailing newline), add one
-	const needsNewline = prev.startsWith('chunk.')
+	// When previous output was a streaming chunk (no trailing newline), add one.
+	// If transitioning to a prompt, show a truncation marker.
+	const wasChunk = prev.startsWith('chunk.')
+	const isPrompt = kind === 'prompt' || kind === 'prompt.steering'
+	const truncMarker = wasChunk && isPrompt
+		? ` ${getStyle('line.warn')}--\x1b[0m\n`
+		: wasChunk ? '\n' : ''
 
 	// Block decorations (e.g. prompt grey bars)
 	const cols = termCols()
@@ -75,7 +80,7 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
 
 	const styledContent = applyStylePerLine(style, content)
-	return `${needsNewline ? '\n' : ''}${blockStart}${styledContent}\n${blockEnd}`
+	return `${truncMarker}${blockStart}${styledContent}\n${blockEnd}`
 }
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {
