@@ -13,6 +13,8 @@
   // Prompt block
   'prompt.text': 'bold',
   'prompt.bar': 'bg236',
+  'prompt.steering.text': 'bold yellow',
+  'prompt.steering.bar': 'bg236',
 
   // Command results
   'command.failed': 'red',

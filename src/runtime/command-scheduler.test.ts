@@ -10,6 +10,7 @@ import {
 	drainQueuedCommands,
 	pausedSessionIds,
 	totalQueuedCommands,
+	promoteLastPrompt,
 } from './command-scheduler.ts'
 import { makeCommand, type RuntimeCommand } from '../protocol.ts'
 
@@ -105,5 +106,47 @@ describe('command-scheduler pause/resume', () => {
 		await new Promise((r) => setTimeout(r, 50))
 		expect(ran).toEqual(['free'])
 		expect(sessionQueueLength('s1')).toBe(1)
+	})
+})
+
+describe('promoteLastPrompt', () => {
+	beforeEach(() => {
+		createCommandScheduler(4, async () => {}, {})
+	})
+
+	test('promotes last prompt to front of queue', () => {
+		pauseSession('s1')
+		enqueueCommand('s1', makeCommand('prompt', source, 'first'))
+		enqueueCommand('s1', makeCommand('prompt', source, 'second'))
+		enqueueCommand('s1', makeCommand('prompt', source, 'third'))
+
+		const promoted = promoteLastPrompt('s1')
+		expect(promoted?.text).toBe('third')
+
+		const queued = sessionQueuedCommands('s1')
+		expect(queued.map(c => c.text)).toEqual(['third', 'first', 'second'])
+	})
+
+	test('returns null when queue is empty', () => {
+		expect(promoteLastPrompt('s1')).toBeNull()
+	})
+
+	test('returns null when no prompts in queue', () => {
+		pauseSession('s1')
+		enqueueCommand('s1', makeCommand('reset', source))
+		expect(promoteLastPrompt('s1')).toBeNull()
+	})
+
+	test('skips non-prompt commands when finding last prompt', () => {
+		pauseSession('s1')
+		enqueueCommand('s1', makeCommand('prompt', source, 'msg'))
+		enqueueCommand('s1', makeCommand('reset', source))
+
+		const promoted = promoteLastPrompt('s1')
+		expect(promoted?.text).toBe('msg')
+
+		const queued = sessionQueuedCommands('s1')
+		expect(queued[0].text).toBe('msg')
+		expect(queued[1].type).toBe('reset')
 	})
 })

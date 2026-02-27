@@ -12,9 +12,9 @@ export interface PromptBlockFormatter {
 	formatText(text: string): string
 }
 
-export function buildPromptBlockFormatter(cols: number): PromptBlockFormatter {
-	const bar = getStyle('prompt.bar')
-	const textStyle = getStyle('prompt.text')
+export function buildPromptBlockFormatter(cols: number, steering = false): PromptBlockFormatter {
+	const bar = getStyle(steering ? 'prompt.steering.bar' : 'prompt.bar')
+	const textStyle = getStyle(steering ? 'prompt.steering.text' : 'prompt.text')
 	return {
 		blockStart: `\n${bar}${CLEAR_EOL}${RESET}\n`,
 		blockEnd: `${bar}${CLEAR_EOL}${RESET}\n`,

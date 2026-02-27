@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'bun:test'
-import { pushFragment, resetFormat } from './index.ts'
+import { pushFragment, pushEvent, resetFormat } from './index.ts'
 import { loadActiveTheme } from './theme.ts'
+import { stripAnsi } from './index.ts'
 
 const RESET = '\x1b[0m'
 
@@ -31,5 +32,41 @@ describe('cli format index', () => {
 		resetFormat('s3')
 		const out = pushFragment('line.tool', '[tool] done', 's3')
 		expect(out).toContain('\x1b[0m\x1b[36mdone')
+	})
+})
+
+describe('prompt label rendering', () => {
+	const localSource = { kind: 'cli' as const, clientId: 'test-client' }
+
+	test('normal prompt has no prefix', () => {
+		resetFormat('s4')
+		const event = {
+			id: '1', type: 'prompt' as const, sessionId: 's4',
+			text: 'hello world', source: localSource, createdAt: '',
+		}
+		const out = pushEvent(event, localSource)
+		expect(stripAnsi(out)).toContain('hello world')
+		expect(stripAnsi(out)).not.toContain('[queued]')
+		expect(stripAnsi(out)).not.toContain('[steering]')
+	})
+
+	test('queued prompt has [queued] prefix', () => {
+		resetFormat('s5')
+		const event = {
+			id: '2', type: 'prompt' as const, sessionId: 's5',
+			text: 'queued msg', label: 'queued' as const, source: localSource, createdAt: '',
+		}
+		const out = pushEvent(event, localSource)
+		expect(stripAnsi(out)).toContain('[queued] queued msg')
+	})
+
+	test('steering prompt has [steering] prefix', () => {
+		resetFormat('s6')
+		const event = {
+			id: '3', type: 'prompt' as const, sessionId: 's6',
+			text: 'steer msg', label: 'steering' as const, source: localSource, createdAt: '',
+		}
+		const out = pushEvent(event, localSource)
+		expect(stripAnsi(out)).toContain('[steering] steer msg')
 	})
 })

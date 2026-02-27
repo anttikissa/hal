@@ -17,17 +17,18 @@ function termCols(): number {
 }
 
 function getFormatter(kind: string): Formatter {
-	if (kind === 'prompt') {
+	if (kind === 'prompt' || kind === 'prompt.steering') {
+		const steering = kind === 'prompt.steering'
 		return {
 			style: '',
 			blockStart(cols: number): string {
-				return buildPromptBlockFormatter(cols).blockStart
+				return buildPromptBlockFormatter(cols, steering).blockStart
 			},
 			blockEnd(cols: number): string {
-				return buildPromptBlockFormatter(cols).blockEnd
+				return buildPromptBlockFormatter(cols, steering).blockEnd
 			},
 			formatText(text: string): string {
-				return buildPromptBlockFormatter(termCols()).formatText(text)
+				return buildPromptBlockFormatter(termCols(), steering).formatText(text)
 			},
 		}
 	}
@@ -92,10 +93,12 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 		const local =
 			event.source.clientId === 'replay' ||
 			(event.source.kind === localSource.kind && event.source.clientId === localSource.clientId)
+		const prefix = event.label ? `[${event.label}] ` : ''
 		const text = local
-			? event.text
+			? `${prefix}${event.text}`
 			: `[prompt:${event.source.kind}:${event.source.clientId.slice(0, 6)}] ${event.text}`
-		return pushFragment('prompt', text, sessionId)
+		const kind = event.label === 'steering' ? 'prompt.steering' : 'prompt'
+		return pushFragment(kind, text, sessionId)
 	}
 
 	if (event.type === 'command' && event.phase === 'failed') {

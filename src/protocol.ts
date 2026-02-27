@@ -7,6 +7,7 @@ export type CommandType =
 	| 'prompt'
 	| 'pause'
 	| 'resume'
+	| 'steer'
 	| 'drop'
 	| 'queue'
 	| 'handoff'
@@ -110,6 +111,7 @@ export type RuntimeEvent =
 			type: 'prompt'
 			sessionId: string | null
 			text: string
+			label?: 'queued' | 'steering'
 			source: RuntimeSource
 			createdAt: string
 	  }

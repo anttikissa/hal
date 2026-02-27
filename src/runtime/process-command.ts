@@ -13,6 +13,7 @@ import {
 	removeSessionQueue,
 	concurrencyStatus,
 	isSessionRunning,
+	promoteLastPrompt,
 } from './command-scheduler.ts'
 import { publishLine, publishCommandPhase, publishPrompt } from './event-publisher.ts'
 import { dropQueuedCommands, runClose, runFork, runSystem, runCd } from './handle-command.ts'
@@ -141,6 +142,27 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
 		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
 		await runPause(sessionId)
+		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
+		await emitStatus()
+		return
+	}
+
+	// Steer: abort current generation, promote last queued prompt, resume — silently
+	if (command.type === 'steer') {
+		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
+		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)
+		if (sessionId) {
+			const runtime = getCachedSessionRuntime(sessionId)
+			if (runtime) {
+				runtime.activeAbort?.abort()
+				runtime.pausedByUser = false
+			}
+			const promoted = promoteLastPrompt(sessionId)
+			if (promoted) {
+				await publishPrompt(sessionId, promoted.text ?? '', command.source, 'steering')
+			}
+			resumeSession(sessionId)
+		}
 		await publishCommandPhase(command.id, 'done', undefined, sessionId ?? null)
 		await emitStatus()
 		return
@@ -293,14 +315,11 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		return
 	}
 
-	// Echo prompt immediately — label it [queued] if submitted while model is busy
+	// Echo prompt immediately — label it if submitted while model is busy
 	if (command.type === 'prompt') {
 		const text = command.text ?? ''
-		if (isSessionBusy(sessionId)) {
-			await publishPrompt(sessionId, `[queued] ${text}`, command.source)
-		} else {
-			await publishPrompt(sessionId, text, command.source)
-		}
+		const label = isSessionBusy(sessionId) ? 'queued' as const : undefined
+		await publishPrompt(sessionId, text, command.source, label)
 	}
 
 	enqueueCommand(sessionId, command)

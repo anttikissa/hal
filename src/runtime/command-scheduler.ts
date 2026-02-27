@@ -134,6 +134,20 @@ export function enqueueCommand(sessionId: string, command: RuntimeCommand): void
 	scheduleSession(s, sessionId)
 }
 
+/** Move the last `prompt` command in a session's queue to position 0. Returns it, or null. */
+export function promoteLastPrompt(sessionId: string): RuntimeCommand | null {
+	const q = getState().queues.get(sessionId)
+	if (!q || q.length === 0) return null
+	let lastIdx = -1
+	for (let i = q.length - 1; i >= 0; i--) {
+		if (q[i].type === 'prompt') { lastIdx = i; break }
+	}
+	if (lastIdx < 0) return null
+	const [cmd] = q.splice(lastIdx, 1)
+	q.unshift(cmd)
+	return cmd
+}
+
 export function drainQueuedCommands(sessionId?: string | null): RuntimeCommand[] {
 	const s = getState()
 	const dropped: RuntimeCommand[] = []

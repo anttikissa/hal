@@ -1410,7 +1410,7 @@ function handleKey(key: string): void {
 		const value = inputBuf
 		const now = Date.now()
 
-		if (!value.trim() && lastSubmitTime > 0 && now - lastSubmitTime < 500) {
+		if (!value.trim() && lastSubmitTime > 0 && now - lastSubmitTime < 1000) {
 			lastSubmitTime = 0
 			if (doubleEnterHandler) doubleEnterHandler()
 			return

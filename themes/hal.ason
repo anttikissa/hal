@@ -14,6 +14,8 @@
   // Prompt block
   'prompt.text': 'bold fg255',            // bright white — your words matter
   'prompt.bar': 'bg237',                  // slightly lighter separator
+  'prompt.steering.text': 'bold fg214',   // orange — steering is urgent
+  'prompt.steering.bar': 'bg237',         // same bar
 
   // Command results
   'command.failed': 'fg203',              // same soft red as errors

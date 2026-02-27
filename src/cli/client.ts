@@ -699,10 +699,7 @@ function handleEsc(): void {
 function handleDoubleEnter(): void {
 	const active = activeTab()
 	if (!active || !wasBusyOnLastSubmit) return
-	// Pause current generation, then immediately resume so queued messages run
-	appendBusCommand(makeCommand('pause', source, undefined, active.sessionId)).catch(() => {})
-	appendBusCommand(makeCommand('resume', source, undefined, active.sessionId)).catch(() => {})
-	pushLocal('local.warn', '⏎⏎ steering — pausing current generation')
+	appendBusCommand(makeCommand('steer', source, undefined, active.sessionId)).catch(() => {})
 }
 
 async function bootstrapState(): Promise<void> {
