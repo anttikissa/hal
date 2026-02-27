@@ -280,8 +280,39 @@ function showCursor(): void {
 
 // ── Output storage ──
 
+// Matches \x1b[NA\x1b[J (cursor-up N + erase-below) — used by prompt redraw
+const CURSOR_UP_ERASE_RE = /\x1b\[(\d+)A\x1b\[J/g
+
 function appendOutput(text: string): void {
 	if (!text) return
+
+	// Pre-process: handle all cursor-up + erase-below sequences by splitting
+	// text around them and deleting lines from the buffer at each occurrence.
+	let lastIdx = 0
+	CURSOR_UP_ERASE_RE.lastIndex = 0
+	let m: RegExpExecArray | null
+	while ((m = CURSOR_UP_ERASE_RE.exec(text)) !== null) {
+		// Append text before this sequence
+		if (m.index > lastIdx) appendRaw(text.slice(lastIdx, m.index))
+		// Delete last N lines from buffer
+		const deleteCount = parseInt(m[1], 10)
+		if (deleteCount > 0 && outputLines.length > 1) {
+			outputLines.length = Math.max(1, outputLines.length - deleteCount)
+			outputLines[outputLines.length - 1] = ''
+		}
+		lastIdx = m.index + m[0].length
+	}
+	// Append remaining text
+	if (lastIdx < text.length) appendRaw(text.slice(lastIdx))
+
+	if (outputLines.length > MAX_OUTPUT_LINES) {
+		outputLines = outputLines.slice(-MAX_OUTPUT_LINES)
+	}
+	// Invalidate wrapped line cache
+	lastWrapCols = 0
+}
+
+function appendRaw(text: string): void {
 	let i = 0
 	while (i < text.length) {
 		const ch = text[i]
@@ -300,11 +331,6 @@ function appendOutput(text: string): void {
 		outputLines[outputLines.length - 1] += text.slice(i, end)
 		i = end
 	}
-	if (outputLines.length > MAX_OUTPUT_LINES) {
-		outputLines = outputLines.slice(-MAX_OUTPUT_LINES)
-	}
-	// Invalidate wrapped line cache
-	lastWrapCols = 0
 }
 
 // ── Viewport ──
