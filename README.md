@@ -38,7 +38,6 @@ Create `~/.hal/auth.ason` with your API key:
 cd ~/my-project
 hal                # start working on a project
 hal -s             # work on hal itself
-hal -f             # fresh session (temp state dir)
 ```
 
 ### Keys
