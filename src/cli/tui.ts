@@ -1332,11 +1332,11 @@ export const _testTuiKeys = {
 // ── Key handler ──
 
 function handleKey(key: string): void {
-	const prevGoalCol = inputGoalCol
-	inputGoalCol = null
 	const normalizedKitty = normalizeKittyKey(key)
 	if (normalizedKitty === null) return
 	key = normalizedKitty
+	const prevGoalCol = inputGoalCol
+	inputGoalCol = null
 	if (inputKeyHandler && inputKeyHandler(key)) return
 
 	// Clipboard shortcuts that reference selection — handle before clearing
