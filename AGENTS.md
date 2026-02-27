@@ -25,6 +25,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Prefer one working mechanism over layered fallbacks/proof-of-concept additions; only add another path when the first is clearly insufficient.
 - Don't reimplement what the system already provides. For example, `open('wx')` is an atomic exclusive-create — no need to build a `mkdir`-based mutex on top of it.
 - Doing a big task? 1. Read files and thing. 2. Plan - write it to file (docs/plans). 3. Implement.
+- GitHub push always uses SSH (`git@github.com:...`), never HTTPS. HTTPS auth doesn't work.
 
 ## User interface guidelines
 
