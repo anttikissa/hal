@@ -183,6 +183,18 @@ export function parseKeys(data: string, pasteStart: string, pasteEnd: string): s
 				if (j < data.length) j++
 				keys.push(data.slice(i, j))
 				i = j
+			} else if (
+				i + 2 < data.length &&
+				data[i + 1] === '\x1b' &&
+				(data[i + 2] === '[' || data[i + 2] === 'O')
+			) {
+				// ESC-prefixed CSI/SS3 (e.g. iTerm2 Alt+Arrow: ESC ESC[D)
+				let j = i + 3
+				while (j < data.length && data.charCodeAt(j) >= 0x20 && data.charCodeAt(j) <= 0x3f)
+					j++
+				if (j < data.length) j++
+				keys.push(data.slice(i, j))
+				i = j
 			} else if (i + 1 < data.length) {
 				keys.push(data.slice(i, i + 2))
 				i += 2

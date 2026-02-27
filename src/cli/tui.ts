@@ -1280,6 +1280,11 @@ function normalizeKittyFunctionalKey(key: string): string | null | undefined {
 /** Parse CSI u (Kitty keyboard protocol) sequences. Returns the legacy key
  *  string for press events, or null to suppress the event (release/modifier-only). */
 function normalizeKittyKey(key: string): string | null {
+	// ESC-prefixed CSI arrow (iTerm2 Alt+Arrow: ESC ESC[D → \x1b[1;3D)
+	if (key.length === 4 && key[0] === '\x1b' && key[1] === '\x1b' && key[2] === '[') {
+		const arrow = key[3]
+		if (arrow >= 'A' && arrow <= 'D') return `\x1b[1;3${arrow}`
+	}
 	const csiU = parseKittyCsiUKey(key)
 	if (!csiU) {
 		const functional = normalizeKittyFunctionalKey(key)

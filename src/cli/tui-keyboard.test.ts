@@ -160,6 +160,45 @@ describe('Kitty functional key normalization regressions', () => {
 	})
 })
 
+// ── ESC-prefixed CSI parsing (iTerm2 Alt+Arrow) ──
+
+describe('ESC-prefixed CSI sequences (iTerm2 Alt+Arrow)', () => {
+	it('parseKeys tokenizes ESC ESC[D as a single token', () => {
+		const tokens = parseKeys('\x1b\x1b[D', PASTE_START, PASTE_END)
+		expect(tokens).toEqual(['\x1b\x1b[D'])
+	})
+
+	it('parseKeys tokenizes ESC ESC[C as a single token', () => {
+		const tokens = parseKeys('\x1b\x1b[C', PASTE_START, PASTE_END)
+		expect(tokens).toEqual(['\x1b\x1b[C'])
+	})
+
+	it('parseKeys tokenizes ESC ESC O P as a single token', () => {
+		const tokens = parseKeys('\x1b\x1bOP', PASTE_START, PASTE_END)
+		expect(tokens).toEqual(['\x1b\x1bOP'])
+	})
+
+	it('normalizeKittyKey converts ESC ESC[D to Alt+Left (ESC[1;3D)', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b\x1b[D')).toBe('\x1b[1;3D')
+	})
+
+	it('normalizeKittyKey converts ESC ESC[C to Alt+Right (ESC[1;3C)', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b\x1b[C')).toBe('\x1b[1;3C')
+	})
+
+	it('normalizeKittyKey converts ESC ESC[A to Alt+Up (ESC[1;3A)', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b\x1b[A')).toBe('\x1b[1;3A')
+	})
+
+	it('normalizeKittyKey converts ESC ESC[B to Alt+Down (ESC[1;3B)', () => {
+		_testTuiKeys.resetState()
+		expect(_testTuiKeys.normalizeKittyKey('\x1b\x1b[B')).toBe('\x1b[1;3B')
+	})
+})
+
 // ── Modifier-only key suppression ──
 
 describe('modifier-only keys are suppressed', () => {
@@ -421,27 +460,22 @@ describe('known terminal-specific divergences', () => {
 		if (apple) expect(normalizeStep(apple)).toEqual(['A'])
 	})
 
-	it('Alt+Left: Ghostty/Apple → ESCb, Kitty → ESC[1;3D, iTerm → mis-tokenized', () => {
+	it('Alt+Left: Ghostty/Apple → ESCb, Kitty/iTerm → ESC[1;3D', () => {
 		const ghostty = getCapturedStep('ghostty', 'alt_left')
 		if (ghostty) expect(normalizeStep(ghostty)).toEqual(['\x1bb'])
 
 		const apple = getCapturedStep('apple', 'alt_left')
 		if (apple) expect(normalizeStep(apple)).toEqual(['\x1bb'])
 
-		// Kitty sends standard CSI Alt+Left instead of ESCb
 		const kitty = getCapturedStep('kitty', 'alt_left')
 		if (kitty) expect(normalizeStep(kitty)).toEqual(['\x1b[1;3D'])
 
-		// iTerm sends ESC ESC[D which gets mis-tokenized
+		// iTerm sends ESC ESC[D which normalizes to ESC[1;3D (Alt+Left)
 		const iterm = getCapturedStep('iterm', 'alt_left')
-		if (iterm) {
-			const normalized = normalizeStep(iterm)
-			// Documents current (broken) behavior: ESC-ESC pair + orphaned [ and D
-			expect(normalized.length).toBeGreaterThan(1)
-		}
+		if (iterm) expect(normalizeStep(iterm)).toEqual(['\x1b[1;3D'])
 	})
 
-	it('Alt+Right: Ghostty/Apple → ESCf, Kitty → ESC[1;3C, iTerm → mis-tokenized', () => {
+	it('Alt+Right: Ghostty/Apple → ESCf, Kitty/iTerm → ESC[1;3C', () => {
 		const ghostty = getCapturedStep('ghostty', 'alt_right')
 		if (ghostty) expect(normalizeStep(ghostty)).toEqual(['\x1bf'])
 
@@ -451,11 +485,9 @@ describe('known terminal-specific divergences', () => {
 		const kitty = getCapturedStep('kitty', 'alt_right')
 		if (kitty) expect(normalizeStep(kitty)).toEqual(['\x1b[1;3C'])
 
+		// iTerm sends ESC ESC[C which normalizes to ESC[1;3C (Alt+Right)
 		const iterm = getCapturedStep('iterm', 'alt_right')
-		if (iterm) {
-			const normalized = normalizeStep(iterm)
-			expect(normalized.length).toBeGreaterThan(1)
-		}
+		if (iterm) expect(normalizeStep(iterm)).toEqual(['\x1b[1;3C'])
 	})
 
 	it('Cmd-A: Ghostty suppresses, Kitty sends CSI-u, iTerm/Apple → empty (OS intercept)', () => {

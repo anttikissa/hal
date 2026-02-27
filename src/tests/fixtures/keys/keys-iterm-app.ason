@@ -1610,22 +1610,10 @@
               kind: 'kitty-csi-u'
             },
             {
-              text: 'ESCESC',
-              display: 'ESCESC',
-              hex: '1b 1b',
-              kind: 'escape'
-            },
-            {
-              text: '[',
-              display: '[',
-              hex: '5b',
-              kind: 'char'
-            },
-            {
-              text: 'D',
-              display: 'D',
-              hex: '44',
-              kind: 'char'
+              text: 'ESCESC[D',
+              display: 'ESCESC[D',
+              hex: '1b 1b 5b 44',
+              kind: 'esc-csi'
             },
             {
               text: 'ESC[1;3:3D',
@@ -1642,8 +1630,7 @@
           ],
           tokenKinds: [
             'kitty-csi-u',
-            'escape',
-            'char',
+            'esc-csi',
             'csi'
           ]
         },
@@ -1703,22 +1690,10 @@
               kind: 'kitty-csi-u'
             },
             {
-              text: 'ESCESC',
-              display: 'ESCESC',
-              hex: '1b 1b',
-              kind: 'escape'
-            },
-            {
-              text: '[',
-              display: '[',
-              hex: '5b',
-              kind: 'char'
-            },
-            {
-              text: 'C',
-              display: 'C',
-              hex: '43',
-              kind: 'char'
+              text: 'ESCESC[C',
+              display: 'ESCESC[C',
+              hex: '1b 1b 5b 43',
+              kind: 'esc-csi'
             },
             {
               text: 'ESC[1;3:3C',
@@ -1735,8 +1710,7 @@
           ],
           tokenKinds: [
             'kitty-csi-u',
-            'escape',
-            'char',
+            'esc-csi',
             'csi'
           ]
         },
@@ -2443,8 +2417,7 @@
         display: 'ESC[57443;3uESCESC[DESC[1;3:3DESC[57443;1:3u',
         tokenKinds: [
           'kitty-csi-u',
-          'escape',
-          'char',
+          'esc-csi',
           'csi'
         ]
       }
@@ -2456,8 +2429,7 @@
         display: 'ESC[57443;3uESCESC[CESC[1;3:3CESC[57443;1:3u',
         tokenKinds: [
           'kitty-csi-u',
-          'escape',
-          'char',
+          'esc-csi',
           'csi'
         ]
       }
