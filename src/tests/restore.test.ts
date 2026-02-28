@@ -143,4 +143,87 @@ describe('restore/replay', () => {
 		await hal.waitForReady()
 		expect(readFileSync(draftPath, 'utf-8')).toBe('draft survives restart')
 	}, 20000)
+
+	test('conversation replay after handoff/restart excludes pre-handoff history', async () => {
+		hal = await startHal({ cleanupOnStop: false })
+		const sharedDir = hal.halDir
+		cleanupDirs.add(sharedDir)
+		await hal.waitForReady()
+
+		hal.sendLine('/model mock')
+		await hal.waitForLine(/\[model\] .*->.*mock/)
+
+		const known = new Set(
+			hal.records
+				.filter((r) => r.type === 'command' && typeof r.commandId === 'string')
+				.map((r) => r.commandId as string),
+		)
+
+		hal.sendLine('before handoff')
+		const beforeQueued = await hal.waitFor(
+			(r) =>
+				r.type === 'command' &&
+				typeof r.commandId === 'string' &&
+				r.phase === 'queued' &&
+				!known.has(r.commandId),
+			10000,
+		)
+		known.add(beforeQueued.commandId)
+		await hal.waitFor((r) => r.type === 'prompt' && r.text === 'before handoff', 10000)
+		await hal.waitFor(
+			(r) =>
+				r.type === 'command' &&
+				r.commandId === beforeQueued.commandId &&
+				r.phase === 'done',
+			15000,
+		)
+
+		hal.sendLine('/handoff')
+		const handoffQueued = await hal.waitFor(
+			(r) =>
+				r.type === 'command' &&
+				typeof r.commandId === 'string' &&
+				r.phase === 'queued' &&
+				!known.has(r.commandId),
+			10000,
+		)
+		known.add(handoffQueued.commandId)
+		await hal.waitFor(
+			(r) =>
+				r.type === 'command' &&
+				r.commandId === handoffQueued.commandId &&
+				r.phase === 'done',
+			30000,
+		)
+
+		hal.sendLine('after handoff')
+		const afterQueued = await hal.waitFor(
+			(r) =>
+				r.type === 'command' &&
+				typeof r.commandId === 'string' &&
+				r.phase === 'queued' &&
+				!known.has(r.commandId),
+			10000,
+		)
+		known.add(afterQueued.commandId)
+		await hal.waitFor((r) => r.type === 'prompt' && r.text === 'after handoff', 10000)
+		await hal.waitFor(
+			(r) =>
+				r.type === 'command' &&
+				r.commandId === afterQueued.commandId &&
+				r.phase === 'done',
+			15000,
+		)
+
+		await hal.stop({ keepDir: true })
+		hal = null
+
+		hal = await startHal({ halDir: sharedDir, cleanupOnStop: false })
+		await hal.waitForReady()
+		await hal.waitFor((r) => r.type === 'prompt' && r.text === 'after handoff', 10000)
+		const replayedBefore = hal.records.some(
+			(r) => r.type === 'prompt' && r.text === 'before handoff',
+		)
+		expect(replayedBefore).toBe(false)
+	}, 50000)
 })

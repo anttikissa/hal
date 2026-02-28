@@ -49,10 +49,18 @@ import {
 } from './keys.ts'
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
-import { loadInputHistory, saveDraft, loadDraft, loadSessionRegistry, saveSessionRegistry } from '../session.ts'
+import {
+	loadConversation,
+	loadInputHistory,
+	replayConversationEvents,
+	saveDraft,
+	loadDraft,
+	loadSessionRegistry,
+	saveSessionRegistry,
+} from '../session.ts'
 import { countSourceStats } from '../utils/cloc.ts'
 
-import { loadConfig, MODEL_ALIASES, modelIdForModel, resolveModel } from '../config.ts'
+import { loadConfig, mergedModelAliases, modelIdForModel, resolveModel } from '../config.ts'
 import { loadActiveTheme } from './format/theme.ts'
 import { selfMode } from '../args.ts'
 
@@ -107,7 +115,7 @@ export class Client {
 }
 
 
-const ALL_MODELS = [...Object.keys(MODEL_ALIASES), ...Object.values(MODEL_ALIASES)]
+const ALL_MODELS = Object.values(mergedModelAliases())
 const TAB_ACTIVE = '\x1b[97m'
 const TAB_INACTIVE = '\x1b[38;5;245m'
 const TAB_RESET = '\x1b[0m'
@@ -520,6 +528,9 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 	})
 
 	activeTabIndex = tabs.length - 1
+	const added = tabs[activeTabIndex]
+	const history = await loadConversation(sessionId)
+	added.output = renderConversationHistory(sessionId, history)
 	applyActiveTabSnapshot(true)
 	pushLocal('local.tab', `[restore] opened session ${sessionId} in tab ${activeTabIndex + 1}`)
 }
@@ -635,29 +646,27 @@ function syncTabsFromSessions(
 	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
 }
 
-function hydrateTabsFromRecentLines(events: RuntimeEvent[]): void {
-	const bySession = new Map<string, string[]>()
-	for (const event of events) {
-		if (!('sessionId' in event)) continue
-		const sessionId = event.sessionId
-		if (!sessionId) continue
-		const tab = findTabBySessionId(sessionId)
-		if (!tab) continue
-
-		if (event.type === 'line' && event.level === 'meta') continue
-
-		const formatted = pushEvent(event, source)
-		if (!formatted) continue
-		const parts = bySession.get(sessionId) ?? []
-		parts.push(formatted)
-		bySession.set(sessionId, parts)
+function renderConversationHistory(
+	sessionId: string,
+	events: Awaited<ReturnType<typeof loadConversation>>,
+): string {
+	resetFormat(sessionId)
+	let output = ''
+	for (const event of replayConversationEvents(events)) {
+		if (event.type === 'user') output += pushFragment('prompt', event.text, sessionId)
+		else output += pushFragment('chunk.assistant', event.text + '\n', sessionId)
 	}
+	return output
+}
 
-	for (const tab of tabs) {
-		if (tab.output.trim().length > 0) continue
-		const lines = bySession.get(tab.sessionId)
-		if (lines?.length) tab.output = lines.join('')
-	}
+async function hydrateTabsFromConversation(): Promise<void> {
+	await Promise.all(
+		tabs.map(async (tab) => {
+			if (tab.output.trim().length > 0) return
+			const events = await loadConversation(tab.sessionId)
+			tab.output = renderConversationHistory(tab.sessionId, events)
+		}),
+	)
 }
 
 function findTabBySessionId(sessionId: string): CliTab | null {
@@ -721,7 +730,7 @@ async function bootstrapState(): Promise<void> {
 		for (const tab of tabs) tab.busy = busySet.has(tab.sessionId)
 
 		const recent = await readRecentEvents(500)
-		hydrateTabsFromRecentLines(recent)
+		await hydrateTabsFromConversation()
 		for (const event of recent) {
 			if (event.type !== 'status' || !event.context) continue
 			const sessionId = event.sessionId ?? activeTab()?.sessionId ?? null

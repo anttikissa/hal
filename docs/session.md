@@ -18,7 +18,7 @@ Core logic: `src/session.ts`.
 - Startup loads/repairs `index.ason`; if missing/empty, creates `s-default`.
 - Runtime tracks session metadata in memory and persists registry updates.
 - Session content is saved after each turn in `runAgentLoop(...)`.
-- On restore, `conversation.ason` is replayed to the TUI so the user sees prior prompts and assistant responses. Only events after the last `/reset` or `/handoff` are replayed. See `replayConversation()` in `src/runtime/sessions.ts`.
+- Runtime replays `conversation.ason` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `conversation.ason` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session.ts`).
 - `/reset` clears `session.ason` for that session and drops in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.

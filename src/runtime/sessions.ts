@@ -11,11 +11,11 @@ import {
 	loadSession,
 	loadHandoff,
 	loadConversation,
+	replayConversationEvents,
 	loadSessionRegistry,
 	makeSessionId,
 	saveSession,
 	saveSessionRegistry,
-	timeSince,
 	type SessionRegistry,
 	type TokenTotals,
 	EMPTY_TOTALS,
@@ -322,20 +322,11 @@ const REPLAY_SOURCE = { kind: 'cli' as const, clientId: 'replay' }
 
 async function replayConversation(sessionId: string): Promise<void> {
 	const events = await loadConversation(sessionId)
-	// Only replay events after the last reset/handoff
-	let startIdx = 0
-	for (let i = events.length - 1; i >= 0; i--) {
-		if (events[i].type === 'reset' || events[i].type === 'handoff') {
-			startIdx = i + 1
-			break
-		}
-	}
-	const recent = events.slice(startIdx)
-	for (const evt of recent) {
-		if (evt.type === 'user') {
-			await publishPrompt(sessionId, evt.text, REPLAY_SOURCE)
-		} else if (evt.type === 'assistant') {
-			await publishChunk(evt.text + '\n', 'assistant', sessionId)
+	for (const event of replayConversationEvents(events)) {
+		if (event.type === 'user') {
+			await publishPrompt(sessionId, event.text, REPLAY_SOURCE)
+		} else {
+			await publishChunk(event.text + '\n', 'assistant', sessionId)
 		}
 	}
 }

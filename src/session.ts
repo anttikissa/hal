@@ -121,6 +121,23 @@ export async function loadConversation(sessionId: string): Promise<ConversationE
 	}
 }
 
+export type ReplayConversationEvent = Extract<ConversationEvent, { type: 'user' | 'assistant' }>
+
+export function replayConversationEvents(events: ConversationEvent[]): ReplayConversationEvent[] {
+	let startIdx = 0
+	for (let i = events.length - 1; i >= 0; i--) {
+		if (events[i].type === 'reset' || events[i].type === 'handoff') {
+			startIdx = i + 1
+			break
+		}
+	}
+	const replay: ReplayConversationEvent[] = []
+	for (const event of events.slice(startIdx)) {
+		if (event.type === 'user' || event.type === 'assistant') replay.push(event)
+	}
+	return replay
+}
+
 // Input history derived from conversation events
 export async function loadInputHistory(sessionId: string): Promise<string[]> {
 	const events = await loadConversation(sessionId)
