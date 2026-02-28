@@ -655,7 +655,7 @@ function renderConversationHistory(
 	let output = ''
 	for (const event of replayConversationEvents(events)) {
 		if (event.type === 'user') output += pushFragment('prompt', event.text, sessionId)
-		else output += pushFragment('chunk.assistant', event.text + '\n', sessionId)
+		else output += event.text + '\n'
 	}
 	return output
 }
