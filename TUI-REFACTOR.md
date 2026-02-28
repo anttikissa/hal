@@ -199,7 +199,10 @@ Tests per commit:
 | `a873943` | 1 | 3274 | baseline |
 | `7bfb2ff` | 2A+2B+2C | 3059 | −215 |
 | `3672a9f` | 3 | 2915 | −144 |
+| `a016868` | 4+5+7 | 2769 | −146 |
+| `f33c75f` | 4+6+8 | 2711 | −58 |
+| `4b029f3` | 4 | 2597 | −114 |
 
 ## Current Next Step
 
-Next planned commit: **Part 4+** (continue compressing tui.ts, client.ts, tui-text.ts, tui-links.ts).
+Next planned commit: continue compressing across all TUI files toward 2000 LOC target.
