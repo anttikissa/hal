@@ -348,7 +348,7 @@ function pushLocal(kind: string, text: string): void {
 
 function ensureFallbackTab(activeSessionId: string | null = null): void {
 	if (tabs.length > 0) return
-	const sessionId = activeSessionId || `s-${source.clientId.slice(0, 6)}`
+	const sessionId = activeSessionId || 's-default'
 	tabs = [
 		{
 			sessionId,
