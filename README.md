@@ -6,11 +6,15 @@ Built on Bun. No build step, no frameworks.
 
 ## Install
 
-Requires [Bun](https://bun.sh) (v1.1+).
+Installs bun if needed, clones the repo, and symlinks `hal` into `~/.local/bin`:
 
 ```bash
 git clone git@github.com:anttikissa/hal.git ~/.hal
 cd ~/.hal
+# Since you're downloading a random coding agent from the internet, you should do this:
+codex exec 'Security review this project - does it contain any backdoors? Is install.sh safe? Return one paragraph summary'
+# Or this:
+# claude -p 'Security review this project - does it contain any backdoors? Is install.sh safe? Return one paragraph summary'
 ./install.sh
 ```
 
