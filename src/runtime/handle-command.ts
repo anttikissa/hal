@@ -1,17 +1,14 @@
 import { resolve, isAbsolute } from 'path'
 import { rename } from 'fs/promises'
 import type { RuntimeCommand } from '../protocol.ts'
-import { clearSession, performHandoff, saveSession, saveSessionInfo, extractLastPrompt, appendConversation, makeSessionId } from '../session.ts'
+import { saveSession, saveSessionInfo, extractLastPrompt, appendConversation, makeSessionId, rotateSession, buildRotationContext } from '../session.ts'
 import { sessionDir } from '../state.ts'
 import {
 	loadConfig,
 	resolveModel,
-	resolveCompactModel,
-	providerForModel,
 	modelIdForModel,
 	mergedModelAliases,
 } from '../config.ts'
-import { getProvider } from '../provider.ts'
 import { drainQueuedCommands, pauseSession } from './command-scheduler.ts'
 import {
 	publishLine,
@@ -106,7 +103,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	// Save current runtime state to disk before copying
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (runtime) {
-		await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+		runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 	}
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
@@ -175,146 +172,48 @@ async function publishEstimatedContext(sessionId: string): Promise<void> {
 	await publishContext(sessionId, { used, max: ctxWindow, estimated: true })
 }
 
-/** Max chars per tool result in handoff text — full output isn't needed for summarization */
-const MAX_TOOL_RESULT_CHARS = 500
-/** Target max chars for the conversation text sent to the compact model */
-const MAX_CONVERSATION_CHARS = 300_000
-/** How many chars to keep from the start when windowing */
-const WINDOW_HEAD_CHARS = 30_000
-
-/**
- * Convert messages to a compact text representation for handoff summarization.
- * Strips thinking blocks and truncates large tool results.
- */
-export function formatMessagesForHandoff(messages: any[]): string {
-	return messages
-		.map((m: any) => {
-			const role = m.role
-			const content =
-				typeof m.content === 'string'
-					? m.content
-					: Array.isArray(m.content)
-						? m.content
-								.map((b: any) => {
-									if (b.type === 'text') return b.text
-									// Skip thinking blocks — not useful for summarization
-									if (b.type === 'thinking') return ''
-									if (b.type === 'tool_use')
-										return `[tool: ${b.name}] ${JSON.stringify(b.input)}`
-									if (b.type === 'tool_result') {
-										const raw =
-											typeof b.content === 'string'
-												? b.content
-												: JSON.stringify(b.content)
-										return raw.length > MAX_TOOL_RESULT_CHARS
-											? `[result] ${raw.slice(0, MAX_TOOL_RESULT_CHARS)}…`
-											: `[result] ${raw}`
-									}
-									return ''
-								})
-								.filter(Boolean)
-								.join('\n')
-						: ''
-			return `[${role}]\n${content}`
-		})
-		.join('\n\n---\n\n')
-}
-
-/**
- * If conversation text is too long, keep the beginning (project context)
- * and the end (recent work) with a gap marker.
- */
-export function windowConversationText(text: string): string {
-	if (text.length <= MAX_CONVERSATION_CHARS) return text
-	const tailChars = MAX_CONVERSATION_CHARS - WINDOW_HEAD_CHARS - 200 // 200 for marker
-	const head = text.slice(0, WINDOW_HEAD_CHARS)
-	const tail = text.slice(-tailChars)
-	const omitted = Math.round((text.length - WINDOW_HEAD_CHARS - tailChars) / 1000)
-	return `${head}\n\n[... ~${omitted}K chars of conversation omitted for brevity ...]\n\n${tail}`
-}
-
-async function runHandoff(sessionId: string, text?: string): Promise<void> {
+async function runHandoff(sessionId: string, _text?: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	if (runtime.messages.length === 0) {
 		await publishLine('[handoff] nothing to hand off — session is empty', 'warn', sessionId)
 		return
 	}
 
-	await publishActivity('Generating handoff summary...', sessionId)
-	await publishLine('[handoff] generating summary...', 'meta', sessionId)
+	// Save before rotating
+	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
-	// Use compact model for handoff summary (derived from session's model)
-	const sessionModel = getSessionModel(sessionId)
-	const compactModel = resolveCompactModel(sessionModel)
-	const provider = getProvider(providerForModel(compactModel))
-	await provider.refreshAuth()
+	// Build context injection from user prompts
+	const context = buildRotationContext(sessionId, runtime.messages)
 
-	const systemPrompt = `You are summarizing a coding session for handoff to a fresh session. Produce a concise markdown summary that captures:
-1. What was being worked on (goals, context)
-2. What was accomplished so far
-3. Current state (what files were changed, what's working/broken)
-4. What needs to be done next
-5. Any important decisions or context the next session should know
+	// Rotate session.asonl → session.N.asonl
+	const rotN = await rotateSession(sessionId)
 
-IMPORTANT: Do NOT reproduce the conversation. Synthesize and summarize. Be specific about file paths, function names, and technical details. Focus especially on the MOST RECENT work — that's what the next session needs to continue.`
-
-	const conversationText = windowConversationText(
-		formatMessagesForHandoff(runtime.messages),
-	)
-
-	const userMsg = text
-		? `${text}\n\n---\n\nHere is the conversation to summarize:\n\n${conversationText}`
-		: `Summarize this coding session for handoff:\n\n${conversationText}`
-
-	const { text: summary, error, truncated } = await provider.complete({
-		model: modelIdForModel(compactModel),
-		system: systemPrompt,
-		userMessage: userMsg,
-		maxTokens: 8192,
-	})
-
-	if (error) {
-		await publishActivity('', sessionId)
-		await publishLine(`[handoff] failed: ${error}`, 'error', sessionId)
-		return
-	}
-
-	const handoffSummary = summary.trim()
-	if (!handoffSummary || handoffSummary === 'No response.') {
-		await publishActivity('', sessionId)
-		await publishLine('[handoff] failed: summary model returned empty output', 'error', sessionId)
-		return
-	}
-
-	if (truncated) {
-		await publishLine('[handoff] warning: summary was truncated (output limit)', 'warn', sessionId)
-	}
-
-	await performHandoff(sessionId, handoffSummary)
 	await appendConversation(sessionId, { type: 'handoff', ts: new Date().toISOString() })
-	await publishActivity('', sessionId)
-	await publishLine(
-		'[handoff] summary saved to handoff.md, session rotated to session-previous.asonl',
-		'meta',
-		sessionId,
-	)
-	await publishLine('[handoff] new session started — handoff context loaded', 'meta', sessionId)
 
-	// Clear runtime cache so next prompt loads fresh, then publish updated context
+	// Reset runtime with context injection
 	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
+	const freshRuntime = await getOrLoadSessionRuntime(sessionId)
+	freshRuntime.messages = [{ role: 'user', content: context }]
+	freshRuntime.persistedCount = 0
+
+	await publishLine(`[handoff] rotated → session.${rotN}.asonl, context injected`, 'meta', sessionId)
 	await publishEstimatedContext(sessionId)
 }
 
 async function runReset(sessionId: string): Promise<void> {
-	// Pause if busy
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	if (busySessions.has(sessionId)) {
 		runtime.pausedByUser = true
 		runtime.activeAbort?.abort()
 	}
 
-	await clearSession(sessionId)
+	// Save before rotating (if there's anything to save)
+	if (runtime.messages.length > 0) {
+		runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+		await rotateSession(sessionId)
+	}
+
 	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
 
@@ -550,7 +449,7 @@ export async function runClose(sessionId: string): Promise<void> {
 		runtime.activeAbort?.abort()
 	}
 
-	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
 	// Rename session dir so the ID is freed (e.g. s-default can be fresh on restart)
 	if (runtime.messages.length > 0) {
@@ -580,5 +479,5 @@ export async function runClose(sessionId: string): Promise<void> {
 
 async function saveSessionBeforeExit(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 }

@@ -1,7 +1,7 @@
 // See docs/session.md — keep it in sync when changing this file.
 
-import { appendFile, mkdir, readFile, writeFile, unlink, rename, copyFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import { appendFile, mkdir, readFile, writeFile, rename, copyFile, readdir } from 'fs/promises'
+import { existsSync, readdirSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { stringify, parse, parseAll } from './utils/ason.ts'
 import { sessionDir, SESSIONS_DIR, SESSIONS_INDEX, ensureStateDir, LAUNCH_CWD } from './state.ts'
@@ -14,7 +14,7 @@ export interface SessionInfo {
 	id: string
 	name?: string
 	topic?: string
-	model?: string // per-session model override; falls back to global config
+	model?: string
 	workingDir: string
 	busy: boolean
 	messageCount: number
@@ -39,16 +39,10 @@ function sanitizeSessionId(id: string): string {
 	return id.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 's-default'
 }
 
+// Paths
+
 function sessionPath(id: string): string {
 	return `${sessionDir(id)}/session.asonl`
-}
-
-function sessionPreviousPath(id: string): string {
-	return `${sessionDir(id)}/session-previous.asonl`
-}
-
-function handoffPath(id: string): string {
-	return `${sessionDir(id)}/handoff.md`
 }
 
 function infoPath(id: string): string {
@@ -57,6 +51,190 @@ function infoPath(id: string): string {
 
 function conversationPath(id: string): string {
 	return `${sessionDir(id)}/conversation.asonl`
+}
+
+function blocksDir(id: string): string {
+	return `${sessionDir(id)}/blocks`
+}
+
+function draftPath(id: string): string {
+	return `${sessionDir(id)}/draft.txt`
+}
+
+async function ensureSessionDir(id: string): Promise<void> {
+	const dir = sessionDir(id)
+	if (!existsSync(dir)) await mkdir(dir, { recursive: true })
+}
+
+async function ensureBlocksDir(id: string): Promise<void> {
+	const dir = blocksDir(id)
+	if (!existsSync(dir)) await mkdir(dir, { recursive: true })
+}
+
+// Block storage
+
+function makeBlockRef(): string {
+	return `${Date.now()}-${randomBytes(3).toString('hex')}`
+}
+
+async function writeBlock(sessionId: string, ref: string, data: any): Promise<void> {
+	await ensureBlocksDir(sessionId)
+	await writeFile(`${blocksDir(sessionId)}/${ref}.ason`, stringify(data) + '\n')
+}
+
+async function readBlock(sessionId: string, ref: string): Promise<any | null> {
+	const path = `${blocksDir(sessionId)}/${ref}.ason`
+	if (!existsSync(path)) return null
+	try {
+		return parse(await readFile(path, 'utf-8'))
+	} catch {
+		return null
+	}
+}
+
+// Lean message serialization
+
+function countWords(text: string): number {
+	return text.split(/\s+/).filter(Boolean).length
+}
+
+/** Convert a batch of new runtime messages to lean format, writing block files. */
+async function toLeanMessages(sessionId: string, messages: any[]): Promise<any[]> {
+	const toolRefMap = new Map<string, string>()
+	const leanMessages: any[] = []
+	const ts = nowIso()
+
+	for (const msg of messages) {
+		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+			const lean: any = { role: 'assistant', ts }
+
+			// Extract thinking block (API sends at most one per response)
+			const thinkingBlock = msg.content.find((b: any) => b.type === 'thinking')
+			if (thinkingBlock?.thinking) {
+				const ref = makeBlockRef()
+				await writeBlock(sessionId, ref, {
+					thinking: thinkingBlock.thinking,
+					signature: thinkingBlock.signature,
+				})
+				lean.thinking = { ref, words: countWords(thinkingBlock.thinking) }
+			}
+
+			// Process remaining content
+			const otherBlocks = msg.content.filter((b: any) => b.type !== 'thinking')
+			const leanContent: any[] = []
+			for (const block of otherBlocks) {
+				if (block.type === 'tool_use') {
+					const ref = makeBlockRef()
+					toolRefMap.set(block.id, ref)
+					await writeBlock(sessionId, ref, { call: { name: block.name, input: block.input } })
+					leanContent.push({ type: 'tool_use', id: block.id, name: block.name, ref })
+				} else {
+					leanContent.push(block)
+				}
+			}
+
+			// Simplify text-only responses to a string
+			if (leanContent.length === 1 && leanContent[0].type === 'text' && !lean.thinking) {
+				lean.content = leanContent[0].text
+			} else {
+				lean.content = leanContent.length > 0 ? leanContent : ''
+			}
+
+			leanMessages.push(lean)
+		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
+			const leanContent: any[] = []
+			for (const block of msg.content) {
+				if (block.type === 'tool_result') {
+					const resultContent = typeof block.content === 'string'
+						? block.content
+						: JSON.stringify(block.content ?? '')
+					const ref = toolRefMap.get(block.tool_use_id)
+					if (ref) {
+						// Update the block file to include the result
+						const existing = await readBlock(sessionId, ref)
+						if (existing) {
+							existing.result = { content: resultContent }
+							await writeBlock(sessionId, ref, existing)
+						}
+						leanContent.push({ type: 'tool_result', tool_use_id: block.tool_use_id, ref })
+					} else {
+						// Orphaned tool result — write standalone block
+						const newRef = makeBlockRef()
+						await writeBlock(sessionId, newRef, { result: { content: resultContent } })
+						leanContent.push({ type: 'tool_result', tool_use_id: block.tool_use_id, ref: newRef })
+					}
+				} else {
+					leanContent.push(block)
+				}
+			}
+			leanMessages.push({ role: 'user', content: leanContent, ts })
+		} else {
+			leanMessages.push({ ...msg, ts })
+		}
+	}
+
+	return leanMessages
+}
+
+/** Resolve a lean message from disk back to full API format. */
+async function fromLeanMessage(lean: any, sessionId: string): Promise<any> {
+	if (lean.role === 'assistant') {
+		const content: any[] = []
+
+		// Restore thinking block
+		if (lean.thinking?.ref) {
+			const block = await readBlock(sessionId, lean.thinking.ref)
+			if (block) {
+				content.push({
+					type: 'thinking',
+					thinking: block.thinking,
+					signature: block.signature,
+				})
+			}
+		}
+
+		// Restore content blocks
+		if (typeof lean.content === 'string') {
+			if (lean.content) content.push({ type: 'text', text: lean.content })
+		} else if (Array.isArray(lean.content)) {
+			for (const block of lean.content) {
+				if (block.type === 'tool_use' && block.ref) {
+					const data = await readBlock(sessionId, block.ref)
+					content.push({
+						type: 'tool_use',
+						id: block.id,
+						name: block.name,
+						input: data?.call?.input ?? {},
+					})
+				} else {
+					content.push(block)
+				}
+			}
+		}
+
+		return { role: 'assistant', content }
+	}
+
+	if (lean.role === 'user' && Array.isArray(lean.content)) {
+		const content: any[] = []
+		for (const block of lean.content) {
+			if (block.type === 'tool_result' && block.ref) {
+				const data = await readBlock(sessionId, block.ref)
+				content.push({
+					type: 'tool_result',
+					tool_use_id: block.tool_use_id,
+					content: data?.result?.content ?? '',
+				})
+			} else {
+				content.push(block)
+			}
+		}
+		return { role: 'user', content }
+	}
+
+	// Simple text message — strip ts
+	const { ts, ...rest } = lean
+	return rest
 }
 
 // Session info (persisted per-session metadata)
@@ -76,7 +254,6 @@ export async function saveSessionInfo(id: string, meta: SessionMeta): Promise<vo
 }
 
 export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
-	// Try info.ason first, fall back to legacy meta.ason
 	for (const path of [infoPath(id), `${sessionDir(id)}/meta.ason`]) {
 		if (!existsSync(path)) continue
 		try {
@@ -143,14 +320,13 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 
 // Draft persistence (unsent prompt text)
 
-function draftPath(id: string): string {
-	return `${sessionDir(id)}/draft.txt`
-}
-
 export async function saveDraft(sessionId: string, text: string): Promise<void> {
 	if (!text) {
 		const path = draftPath(sessionId)
-		if (existsSync(path)) await unlink(path)
+		if (existsSync(path)) {
+			const { unlink } = await import('fs/promises')
+			await unlink(path)
+		}
 		return
 	}
 	await ensureSessionDir(sessionId)
@@ -165,11 +341,6 @@ export async function loadDraft(sessionId: string): Promise<string> {
 	} catch {
 		return ''
 	}
-}
-
-async function ensureSessionDir(id: string): Promise<void> {
-	const dir = sessionDir(id)
-	if (!existsSync(dir)) await mkdir(dir, { recursive: true })
 }
 
 function createSessionInfo(id: string, workingDir: string): SessionInfo {
@@ -230,19 +401,31 @@ export async function saveSessionRegistry(registry: SessionRegistry): Promise<vo
 	await writeFile(SESSIONS_INDEX, stringify(registry) + '\n')
 }
 
-// Session load/save
+// Session load/save (v2 — append-only with block refs)
 
 export async function loadSession(
 	sessionId: string,
-): Promise<{ messages: any[]; tokenTotals: TokenTotals } | null> {
+): Promise<{ messages: any[]; tokenTotals: TokenTotals; persistedCount: number } | null> {
 	const path = sessionPath(sessionId)
 	if (!existsSync(path)) return null
 	try {
 		const raw = await readFile(path, 'utf-8')
-		const messages = repairMessages(parseAll(raw) as any[])
-		if (messages.length === 0) return null
+		if (!raw.trim()) return null
+		const leanMessages = parseAll(raw) as any[]
+		if (leanMessages.length === 0) return null
+
+		const messages: any[] = []
+		for (const lean of leanMessages) {
+			messages.push(await fromLeanMessage(lean, sessionId))
+		}
+
+		const repaired = repairMessages(messages)
 		const meta = await loadSessionInfo(sessionId)
-		return { messages, tokenTotals: meta?.tokenTotals ?? { ...EMPTY_TOTALS } }
+		return {
+			messages: repaired,
+			tokenTotals: meta?.tokenTotals ?? { ...EMPTY_TOTALS },
+			persistedCount: repaired.length,
+		}
 	} catch {
 		return null
 	}
@@ -264,16 +447,26 @@ export function extractLastPrompt(messages: any[]): string {
 	return ''
 }
 
+/**
+ * Append new messages to session.asonl with block refs.
+ * Returns the new persisted count (= messages.length).
+ */
 export async function saveSession(
 	sessionId: string,
 	messages: any[],
+	persistedCount: number,
 	tokenTotals: TokenTotals,
 	meta?: Omit<SessionMeta, 'updatedAt' | 'lastPrompt' | 'tokenTotals'>,
-): Promise<void> {
+): Promise<number> {
 	await ensureSessionDir(sessionId)
-	const path = sessionPath(sessionId)
-	const lines = messages.map(m => stringify(m, 'short')).join('\n')
-	await writeFile(path, lines ? lines + '\n' : '')
+
+	if (persistedCount < messages.length) {
+		const newMessages = messages.slice(persistedCount)
+		const leanMessages = await toLeanMessages(sessionId, newMessages)
+		const lines = leanMessages.map(m => stringify(m, 'short')).join('\n') + '\n'
+		await appendFile(sessionPath(sessionId), lines)
+	}
+
 	if (meta) {
 		await saveSessionInfo(sessionId, {
 			...meta,
@@ -282,46 +475,66 @@ export async function saveSession(
 			tokenTotals,
 		})
 	}
+
+	return messages.length
 }
 
-export async function clearSession(sessionId: string): Promise<void> {
-	const path = sessionPath(sessionId)
-	if (existsSync(path)) await unlink(path)
-}
+// Rotation (replaces handoff and clear)
 
-// Handoff
-
-export async function performHandoff(sessionId: string, handoffContent: string): Promise<void> {
-	await ensureSessionDir(sessionId)
+/** Rotate session.asonl → session.N.asonl. Returns the rotation number. */
+export async function rotateSession(sessionId: string): Promise<number> {
+	const dir = sessionDir(sessionId)
 	const sessPath = sessionPath(sessionId)
-	const prevPath = sessionPreviousPath(sessionId)
-	const hPath = handoffPath(sessionId)
+	if (!existsSync(sessPath)) return 0
 
-	// Write handoff.md
-	await writeFile(hPath, handoffContent)
-
-	// Rotate session.asonl → session-previous.asonl
-	if (existsSync(sessPath)) {
-		if (existsSync(prevPath)) await unlink(prevPath)
-		await rename(sessPath, prevPath)
+	// Find highest existing rotation number
+	let maxN = 0
+	if (existsSync(dir)) {
+		for (const f of readdirSync(dir)) {
+			const match = f.match(/^session\.(\d+)\.asonl$/)
+			if (match) maxN = Math.max(maxN, parseInt(match[1], 10))
+		}
 	}
+
+	const newN = maxN + 1
+	await rename(sessPath, `${dir}/session.${newN}.asonl`)
+	return newN
 }
 
-export async function loadHandoff(sessionId: string): Promise<string | null> {
-	const hPath = handoffPath(sessionId)
-	if (!existsSync(hPath)) return null
-	try {
-		const content = await readFile(hPath, 'utf-8')
-		// Preserve for debugging, then remove
-		const prevPath = `${sessionDir(sessionId)}/handoff-previous.md`
-		await rename(hPath, prevPath)
-		return content
-	} catch {
-		return null
+/** Build deterministic context injection from user prompts for post-rotation. */
+export function buildRotationContext(sessionId: string, messages: any[]): string {
+	const userPrompts: string[] = []
+	for (const msg of messages) {
+		if (msg.role !== 'user') continue
+		const text = typeof msg.content === 'string' ? msg.content : ''
+		if (!text || text.startsWith('[')) continue
+		userPrompts.push(text.split('\n')[0].slice(0, 200))
 	}
+
+	if (userPrompts.length === 0) return 'Context was cleared. No user prompts in previous session.'
+
+	const lines: string[] = ['Context was cleared. Here is what happened before:', '']
+
+	if (userPrompts.length <= 20) {
+		lines.push('User messages:')
+		userPrompts.forEach((p, i) => lines.push(`${i + 1}. ${p}`))
+	} else {
+		lines.push('First 10 user messages:')
+		userPrompts.slice(0, 10).forEach((p, i) => lines.push(`${i + 1}. ${p}`))
+		lines.push('')
+		lines.push('Last 10 user messages:')
+		const start = userPrompts.length - 10
+		userPrompts.slice(-10).forEach((p, i) => lines.push(`${start + i + 1}. ${p}`))
+	}
+
+	lines.push('')
+	lines.push(`Previous session files: ${sessionDir(sessionId)}/session.*.asonl + blocks/`)
+
+	return lines.join('\n')
 }
 
 // Fork: copy session state to a new session
+
 export async function forkSession(sourceId: string): Promise<string> {
 	const newId = makeSessionId()
 	const srcDir = sessionDir(sourceId)
@@ -331,6 +544,17 @@ export async function forkSession(sourceId: string): Promise<string> {
 	for (const file of ['session.asonl', 'conversation.asonl']) {
 		const src = `${srcDir}/${file}`
 		if (existsSync(src)) await copyFile(src, `${dstDir}/${file}`)
+	}
+
+	// Copy blocks directory
+	const srcBlocks = `${srcDir}/blocks`
+	if (existsSync(srcBlocks)) {
+		const dstBlocks = `${dstDir}/blocks`
+		await mkdir(dstBlocks, { recursive: true })
+		const files = await readdir(srcBlocks)
+		for (const f of files) {
+			await copyFile(`${srcBlocks}/${f}`, `${dstBlocks}/${f}`)
+		}
 	}
 
 	return newId

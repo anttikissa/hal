@@ -1,6 +1,7 @@
 import { describe, test, expect, afterEach, beforeEach } from 'bun:test'
 import { readFile } from 'fs/promises'
-import { parseAll } from '../utils/ason.ts'
+import { existsSync } from 'fs'
+import { parseAll, parse } from '../utils/ason.ts'
 import { startHal, type TestHal } from './helpers/harness.ts'
 
 let hal: TestHal | null = null
@@ -34,13 +35,64 @@ async function readConversationLog(hal: TestHal, sessionId: string): Promise<any
 	throw new Error(`conversation log not found: ${path}`)
 }
 
+/** Read session messages and resolve block refs back to full content. */
 async function readSessionMessages(hal: TestHal, sessionId: string): Promise<any[]> {
-	const path = `${hal.halDir}/state/sessions/${sessionId}/session.asonl`
+	const sessDir = `${hal.halDir}/state/sessions/${sessionId}`
+	const path = `${sessDir}/session.asonl`
 	for (let i = 0; i < 60; i++) {
 		try {
 			const raw = await readFile(path, 'utf-8')
-			const messages = parseAll(raw) as any[]
-			if (messages.length > 0) return messages
+			const leanMessages = parseAll(raw) as any[]
+			if (leanMessages.length === 0) { await Bun.sleep(50); continue }
+
+			// Resolve refs
+			const messages: any[] = []
+			for (const lean of leanMessages) {
+				if (lean.role === 'assistant') {
+					const content: any[] = []
+					if (lean.thinking?.ref) {
+						const blockPath = `${sessDir}/blocks/${lean.thinking.ref}.ason`
+						if (existsSync(blockPath)) {
+							const block = parse(await readFile(blockPath, 'utf-8'))
+							content.push({ type: 'thinking', thinking: block.thinking, signature: block.signature })
+						}
+					}
+					if (typeof lean.content === 'string') {
+						if (lean.content) content.push({ type: 'text', text: lean.content })
+					} else if (Array.isArray(lean.content)) {
+						for (const b of lean.content) {
+							if (b.type === 'tool_use' && b.ref) {
+								const blockPath = `${sessDir}/blocks/${b.ref}.ason`
+								if (existsSync(blockPath)) {
+									const block = parse(await readFile(blockPath, 'utf-8'))
+									content.push({ type: 'tool_use', id: b.id, name: b.name, input: block?.call?.input ?? {} })
+								}
+							} else {
+								content.push(b)
+							}
+						}
+					}
+					messages.push({ role: 'assistant', content })
+				} else if (lean.role === 'user' && Array.isArray(lean.content)) {
+					const content: any[] = []
+					for (const b of lean.content) {
+						if (b.type === 'tool_result' && b.ref) {
+							const blockPath = `${sessDir}/blocks/${b.ref}.ason`
+							if (existsSync(blockPath)) {
+								const block = parse(await readFile(blockPath, 'utf-8'))
+								content.push({ type: 'tool_result', tool_use_id: b.tool_use_id, content: block?.result?.content ?? '' })
+							}
+						} else {
+							content.push(b)
+						}
+					}
+					messages.push({ role: 'user', content })
+				} else {
+					const { ts, ...rest } = lean
+					messages.push(rest)
+				}
+			}
+			return messages
 		} catch {}
 		await Bun.sleep(50)
 	}

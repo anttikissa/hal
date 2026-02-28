@@ -35,6 +35,7 @@ export interface Config {
 	compactModel?: string
 	ollamaBaseUrl?: string // deprecated: use providers.ollama.baseUrl
 	theme: string // theme name, resolved to themes/<name>.ason
+	timestamps?: boolean // show timestamps in TUI output
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number

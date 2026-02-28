@@ -8,10 +8,23 @@ import { applyStylePerLine } from '../tui/format/line-style.ts'
 
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
 
+let _showTimestamps = false
+
+export function setShowTimestamps(enabled: boolean): void {
+	_showTimestamps = enabled
+}
+
+function formatTimestamp(iso?: string): string {
+	if (!iso) return ''
+	const d = new Date(iso)
+	const h = String(d.getHours()).padStart(2, '0')
+	const m = String(d.getMinutes()).padStart(2, '0')
+	return `\x1b[2m${h}:${m}\x1b[22m  `
+}
+
 export function stripAnsi(text: string): string {
 	return text.replace(ANSI_RE, '')
 }
-
 function termCols(): number {
 	return process.stdout.columns || 80
 }
@@ -112,13 +125,14 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {
 	const sessionId = 'sessionId' in event ? event.sessionId : null
+	const ts = _showTimestamps ? formatTimestamp(event.createdAt) : ''
 
 	if (event.type === 'chunk') {
 		return pushFragment(`chunk.${event.channel}`, event.text, sessionId)
 	}
 
 	if (event.type === 'line') {
-		return pushFragment(`line.${event.level}`, event.text, sessionId)
+		return pushFragment(`line.${event.level}`, `${ts}${event.text}`, sessionId)
 	}
 
 	if (event.type === 'prompt') {
@@ -126,8 +140,8 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 			event.source.kind === localSource.kind && event.source.clientId === localSource.clientId
 		const prefix = event.label ? `[${event.label}] ` : ''
 		const text = local
-			? `${prefix}${event.text}`
-			: `[prompt:${event.source.kind}:${event.source.clientId.slice(0, 6)}] ${event.text}`
+			? `${ts}${prefix}${event.text}`
+			: `${ts}[prompt:${event.source.kind}:${event.source.clientId.slice(0, 6)}] ${event.text}`
 		const kind = event.label === 'steering' ? 'prompt.steering' : 'prompt'
 		return pushFragment(kind, text, sessionId)
 	}

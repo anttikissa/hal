@@ -10,7 +10,6 @@ import {
 import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
 	loadSession,
-	loadHandoff,
 	loadSessionRegistry,
 	makeSessionId,
 	saveSession,
@@ -35,6 +34,7 @@ import { initPublisher, publishLine, publishStatus, publishContext } from './eve
 // Runtime cache per session
 export interface SessionRuntimeCache {
 	messages: any[]
+	persistedCount: number
 	tokenTotals: TokenTotals
 	lastUsage: any
 	systemPrompt: any[]
@@ -148,7 +148,7 @@ export async function persistRegistry(): Promise<void> {
 /** Save all in-memory session state to disk. Called on shutdown. */
 export async function saveAllSessions(): Promise<void> {
 	for (const [id, runtime] of sessionCache) {
-		await saveSession(id, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(id))
+		runtime.persistedCount = await saveSession(id, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(id))
 	}
 	await saveSessionRegistry(registry)
 }
@@ -184,15 +184,9 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	if (existing) return existing
 
 	const restored = await loadSession(sessionId)
-	let messages = restored?.messages ?? []
-	if (messages.length === 0) {
-		const handoff = await loadHandoff(sessionId)
-		if (handoff) {
-			messages = [{ role: 'user', content: `[handoff]\n\n${handoff.trim()}` }]
-		}
-	}
 	const runtime: SessionRuntimeCache = {
-		messages,
+		messages: restored?.messages ?? [],
+		persistedCount: restored?.persistedCount ?? 0,
 		tokenTotals: { ...EMPTY_TOTALS, ...(restored?.tokenTotals ?? EMPTY_TOTALS) },
 		lastUsage: null,
 		systemPrompt: [],
@@ -211,7 +205,7 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	const cal = await getTokenCalibration(getSessionModel(sessionId))
 	const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 	let msgTokens = 0
-	for (const msg of messages) msgTokens += estimateMessageTokens(msg, cal)
+	for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
 	const used = sysTokenEst + msgTokens
 	const ctxWindow = contextWindowForModel(modelIdForModel(getSessionModel(sessionId)))
 	await publishContext(sessionId, { used, max: ctxWindow, estimated: true })

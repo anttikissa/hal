@@ -173,7 +173,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			}
 
 			if (shouldRestart) {
-				await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+				runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 				process.exit(100)
 			}
 		}
@@ -186,11 +186,11 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	busySessions.delete(sessionId)
 	await emitStatus()
 
-	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
 	if (runtime.lastUsage && shouldWarn(runtime.lastUsage, contextWindowForModel(modelId))) {
 		await publishLine(
-			'[context] >66% full. /handoff to produce handoff file and continue, or /reset to start afresh.',
+			'[context] >66% full. /handoff to rotate context, or /reset to start afresh.',
 			'notice',
 			sessionId,
 		)

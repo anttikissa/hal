@@ -37,7 +37,7 @@ import {
 	type RuntimeEvent,
 	type SessionInfo,
 } from '../protocol.ts'
-import { pushEvent, pushFragment, resetFormat, stripAnsi } from './format/index.ts'
+import { pushEvent, pushFragment, resetFormat, stripAnsi, setShowTimestamps } from './format/index.ts'
 import {
 	ALT_DIGIT_KEYS,
 	CTRL_DIGIT_KEYS,
@@ -131,6 +131,7 @@ export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src; isOwner = owner; launchCwd = resolve(LAUNCH_CWD)
 	const config = loadConfig()
 	setMaxPromptLines(config.maxPromptLines); loadActiveTheme(HAL_DIR, config.theme)
+	if (config.timestamps) setShowTimestamps(true)
 }
 
 export function promoteToOwner(): void {

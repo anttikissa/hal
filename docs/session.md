@@ -4,37 +4,59 @@
 
 Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
-- `session.asonl` -- full message history sent to the model (one message per line, ASONL format). Used for API context. Replaced on `/handoff`, cleared on `/reset`.
+- `session.asonl` -- lean message spine with block refs (append-only ASONL). Large content (thinking, tool calls) is replaced with refs to block files.
+- `session.N.asonl` -- rotated archives (N=1 oldest, higher=more recent). Created by `/handoff` or `/reset`.
+- `blocks/` -- external content blocks (thinking text + signatures, tool call inputs + results). One `.ason` file per block ref. Shared across all rotations.
 - `conversation.asonl` -- append-only human-readable event log (user text, assistant text, model changes, cd, topic, fork, handoff, reset). Used for TUI replay on restart and input history. Never truncated.
-- `session-previous.asonl` -- previous full history after `/handoff`
-- `handoff.md` -- handoff summary markdown (consumed on next session load)
 - `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt, tokenTotals)
+- `draft.txt` -- unsent prompt text
 
 Registry metadata lives in `state/sessions/index.ason`.
 
 Core logic: `src/session.ts`.
+
+## Block Storage (v2)
+
+Large content is stored in `blocks/` as individual `.ason` files:
+
+- **Thinking blocks**: `{ thinking: '...full text...', signature: '...base64...' }` — preserves cache hit on restore.
+- **Tool calls**: `{ call: { name, input }, result: { content } }` — call and result in one file.
+
+Block refs in `session.asonl` look like `1709123456789-a3b2c1` (timestamp + random hex).
+
+The session.asonl spine stays human-readable — you can see message roles, tool names, and text content inline. Only thinking and tool I/O moves to block files.
+
 ## Session Lifecycle
 
 - Startup loads/repairs `index.ason`; if missing/empty, creates `s-default`.
 - Runtime tracks session metadata in memory and persists registry updates.
-- Session content is saved after each turn in `runAgentLoop(...)`.
-- CLI hydrates each tab transcript directly from `conversation.asonl` on startup (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session.ts`).
-- `/reset` clears `session.asonl` for that session and drops in-memory cache.
+- Session content is **appended** after each turn in `runAgentLoop(...)`. The runtime tracks `persistedCount` to know which messages are already on disk.
+- Runtime replays `conversation.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `conversation.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session.ts`).
+- `/reset` rotates `session.asonl` → `session.N.asonl` (no deletion) and clears in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
-- `/fork` copies `session.asonl` and `conversation.asonl` to a new session.
+- `/fork` copies `session.asonl`, `conversation.asonl`, and `blocks/` directory to a new session.
 - Auto-topic: after the first assistant response, runtime generates a short topic.
-## Handoff Behavior
 
-`/handoff` currently:
+## Rotation (replaces handoff)
 
-1. generates summary with compact model
-2. writes `handoff.md`
-3. rotates `session.asonl` -> `session-previous.asonl`
-4. clears runtime cache for that session
-5. publishes estimated context for the fresh session
+`/handoff` and `/reset` both rotate the session — no LLM summarization.
 
-On next session load, `getOrLoadSessionRuntime(...)` calls `loadHandoff(...)` which reads `handoff.md`, injects it as a `[handoff]` user message, and renames the file to `handoff-previous.md`.
+**Rotation**:
+1. Save any unsaved messages to `session.asonl`
+2. Rename `session.asonl` → `session.N.asonl` (N = highest existing + 1)
+3. Clear runtime cache
+
+**Handoff** additionally injects a deterministic context message with the first 10 + last 10 user prompts from the previous session (`buildRotationContext()`).
+
+**Reset** rotates without context injection — clean slate.
+
+Properties:
+- **Instant** — no LLM call
+- **Free** — no API cost
+- **Deterministic** — same input always produces same rotation
+
+Naming: `session.1.asonl` (first archive), `session.2.asonl` (second), etc. Higher N = more recent. `session.asonl` is always current.
 
 ## Context Tracking
 
@@ -61,6 +83,10 @@ Calibration file: `state/calibration.ason`.
 
 - CLI client has tab/session management behavior.
 - Web UI is a simpler single-stream UI (no tab strip), though commands still carry `sessionId` and backend multiplexing remains session-aware.
+
+## Timestamps
+
+When `timestamps: true` is set in `config.ason`, line and prompt events display a `HH:MM` timestamp prefix in the TUI. Chunk events (streaming) do not get timestamps.
 
 ## State Directory Summary
 
