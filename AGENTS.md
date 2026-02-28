@@ -39,6 +39,12 @@ Good: "[system] reloaded SYSTEM.md (file changed)" or "(model changed)"
 Bad: "[promoted] this process is now the owner"
 Good: "[promoted] pid 12345 is now the owner"
 
+## TUI
+
+- Avoid prompt/status flicker: keep terminal redraws in a single full-frame write.
+- On kitty/ghostty-compatible TTYs, wrap frame writes with synchronized output (`\x1b[?2026h` ... `\x1b[?2026l`).
+- If adding another frame write path beyond `render()`, factor the sync wrapper into shared helper/constants and use it everywhere frames are emitted.
+
 ## Testing
 
 - Write tests for new features and bug fixes
