@@ -87,90 +87,24 @@ Tests:
 
 ---
 
-### [ ] Part 4 — Extract mouse/screen-selection engine
+### [X] Parts 4–8 DONE — Cross-file compression (in-place, not extraction)
 
-Goal: isolate screen selection and click mode handling (char/word/line) from core render logic.
+Status: complete (merged into compression passes rather than separate extraction steps)
 
-Planned steps:
+Commits:
+- `a016868` — **deduplicate resolve/output-dump/trim/wrapAnsi across TUI (2915 → 2769 LOC)**
+- `f33c75f` — **compress render/client/resolveInput/trimTrailing (2769 → 2711 LOC)**
+- `4b029f3` — **compress state/geometry/API/callbacks in tui.ts + client.ts (2711 → 2597 LOC)**
 
-- [ ] **4A: Extract selection state/types + pure transforms**
-- [ ] **4B: Keep `tui.ts` as orchestrator only for event wiring + render calls**
-- [ ] **4C: Keep link-open and Cmd-hover behavior unchanged**
+What changed:
+- **Part 4 (mouse/selection):** `updateInputSelFocus` dedup, `getSelectionRange` swap, `handleMouseEvent` compressed
+- **Part 5 (stdin/kitty):** `handleBracketedPaste` uses `cleanAndInsertPaste`, `resolveInput` dedup (7→1)
+- **Part 6 (render):** `pushRow` helper, title/activity/status/prompt rendering compressed
+- **Part 7 (ANSI helpers):** merged `trimUrlEnd`/`trimProsePunctuation` → `trimTrailing`, `stripAnsiMap` + `findUrlsInPlain` extracted in tui-links.ts, `wrapAnsi` break code consolidated via `emitBreak`
+- **Part 8 (client.ts):** `modelDisplayName` table-driven, `fmtContext` dedup, `handleInputKey`/`renderTabsForStatus`/`syncTabsFromSessions` compressed, dead code removed
 
-Tests per commit:
-- `bun test src/cli/tui-text.test.ts`
-- `bun test src/cli/tui-keyboard.test.ts`
-- then `bun test`
-
----
-
-### [ ] Part 5 — Extract stdin pipeline + terminal protocol normalization
-
-Goal: split raw input pipeline into modules with clean boundaries:
-- tokenization/parsing
-- kitty/xterm normalization
-- routing to handlers
-
-Planned steps:
-
-- [ ] **5A: Move kitty key normalization helpers out of `tui.ts`**
-- [ ] **5B: Move stdin chunk pipeline (paste, mouse, coalescing) out of `tui.ts`**
-- [ ] **5C: keep `onStdinData` orchestration minimal**
-
-Tests per commit:
-- `bun test src/cli/tui-keyboard.test.ts`
-- `bun test src/cli/tui-text.test.ts`
-- then `bun test`
-
----
-
-### [ ] Part 6 — Render pipeline decomposition
-
-Goal: keep one full-frame render write, but split row builders into focused helpers.
-
-Planned steps:
-
-- [ ] **6A: Extract title/activity/status row renderers**
-- [ ] **6B: Extract output viewport rendering helper**
-- [ ] **6C: Extract prompt area rendering helper**
-- [ ] **6D: Preserve synchronized output wrapper behavior exactly**
-
-Tests per commit:
-- `bun test src/cli/tui-format.test.ts`
-- `bun test src/cli/tui-keyboard.test.ts`
-- then `bun test`
-
----
-
-### [ ] Part 7 — Consolidate ANSI scanning helpers
-
-Goal: remove duplicate ANSI walk logic between `tui-text.ts` and `tui-links.ts` where safe.
-
-Planned steps:
-
-- [ ] **7A: Introduce shared low-level scan utility (minimal API)**
-- [ ] **7B: migrate one caller at a time**
-- [ ] **7C: ensure OSC-8 edge cases remain green**
-
-Tests per commit:
-- `bun test src/cli/tui-text.test.ts`
-- then `bun test`
-
----
-
-### [ ] Part 8 — `client.ts` decomposition (tabs/session sync)
-
-Goal: split heavy tab/session sync logic from `client.ts` into focused module(s).
-
-Planned steps:
-
-- [ ] **8A: Extract tab sync/reconcile helpers**
-- [ ] **8B: Extract replay/bootstrap helpers**
-- [ ] **8C: Keep command wiring in `client.ts`**
-
-Tests per commit:
-- `bun test src/tests/restore.test.ts src/tests/fork.test.ts src/tests/startup.test.ts`
-- then `bun test`
+Tests:
+- `bun test` — 433 pass, 0 fail at each step
 
 ---
 
