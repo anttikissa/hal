@@ -18,6 +18,18 @@ describe('tui formatter helpers', () => {
 		expect(stripAnsi(truncatedRight)).toBe('very-lon')
 	})
 
+	test('status bar preserves ANSI when truncating tabs from left', () => {
+		const ACTIVE = '\x1b[97m'
+		const INACTIVE = '\x1b[38;5;245m'
+		// Build a wide tab string where the active tab is in the middle
+		const tabs = `${INACTIVE} 1 t1 ${RESET}${INACTIVE} 2 t2 ${RESET}${ACTIVE}[3 t3]${RESET}${INACTIVE} 4 t4 ${RESET}`
+		// Use narrow cols so the left side must be truncated
+		const line = buildStatusBarLine(30, tabs, 'right', 0)
+		// The active tab ANSI code must survive truncation
+		expect(line).toContain(ACTIVE)
+		expect(line).toContain('[3 t3]')
+	})
+
 	test('status bar output always appends reset code', () => {
 		const line = buildStatusBarLine(20, 'tabs', 'right', 0)
 		expect(line.endsWith(RESET)).toBe(true)

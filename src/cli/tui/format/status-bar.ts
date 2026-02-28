@@ -1,9 +1,32 @@
 import { stripAnsi } from '../../format/index.ts'
 
 const RESET = '\x1b[0m'
+const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
 
 function visibleLength(text: string): number {
 	return stripAnsi(text).length
+}
+
+/** Truncate `text` from the left to at most `maxVisible` visible characters, preserving ANSI escapes. */
+function truncateLeftAnsi(text: string, maxVisible: number): string {
+	const totalVisible = visibleLength(text)
+	if (totalVisible <= maxVisible) return text
+	const dropCount = totalVisible - maxVisible
+	// Walk through the string, skipping ANSI sequences, counting visible chars to drop
+	let dropped = 0
+	let i = 0
+	while (i < text.length && dropped < dropCount) {
+		ANSI_RE.lastIndex = i
+		const m = ANSI_RE.exec(text)
+		if (m && m.index === i) {
+			// Skip over ANSI escape — don't count it as a visible character
+			i += m[0].length
+		} else {
+			dropped++
+			i++
+		}
+	}
+	return RESET + text.slice(i)
 }
 
 export function buildStatusBarLine(
@@ -31,8 +54,7 @@ export function buildStatusBarLine(
 	const leftLen = visibleLength(left)
 	let leftPart = left
 	if (leftLen > maxLeftLen) {
-		const plainLeft = stripAnsi(left)
-		leftPart = plainLeft.slice(Math.max(0, plainLeft.length - maxLeftLen))
+		leftPart = truncateLeftAnsi(left, maxLeftLen)
 	}
 	const gapLen = Math.max(2, cols - visibleLength(leftPart) - rightLen)
 	const line = `${leftPart}${' '.repeat(gapLen)}${cleanRight}`
