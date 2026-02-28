@@ -11,8 +11,6 @@ import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts
 import {
 	loadSession,
 	loadHandoff,
-	loadConversation,
-	replayConversationEvents,
 	loadSessionRegistry,
 	makeSessionId,
 	saveSession,
@@ -32,7 +30,7 @@ import {
 } from './command-scheduler.ts'
 import { processCommand } from './process-command.ts'
 import { handleCommand } from './handle-command.ts'
-import { initPublisher, publishLine, publishChunk, publishPrompt, publishStatus, publishContext } from './event-publisher.ts'
+import { initPublisher, publishLine, publishStatus, publishContext } from './event-publisher.ts'
 
 // Runtime cache per session
 export interface SessionRuntimeCache {
@@ -321,18 +319,6 @@ export async function emitStatus(): Promise<void> {
 	})
 }
 
-const REPLAY_SOURCE = { kind: 'cli' as const, clientId: 'replay' }
-
-async function replayConversation(sessionId: string): Promise<void> {
-	const events = await loadConversation(sessionId)
-	for (const event of replayConversationEvents(events)) {
-		if (event.type === 'user') {
-			await publishPrompt(sessionId, event.text, REPLAY_SOURCE)
-		} else {
-			await publishChunk(event.text + '\n', 'assistant', sessionId)
-		}
-	}
-}
 // Startup
 async function initialize(): Promise<void> {
 	ensureStateDir()
@@ -362,7 +348,6 @@ async function initialize(): Promise<void> {
 			'meta',
 			initialSessionId,
 		)
-		await replayConversation(initialSessionId)
 	} else {
 		await publishLine(
 			`[session] new session — ${sessionDir(initialSessionId)}`,

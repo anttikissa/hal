@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach, beforeEach } from 'bun:test'
-import { rmSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
+import { rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { startHal, type TestHal } from './helpers/harness.ts'
 
 let hal: TestHal | null = null
@@ -70,22 +70,21 @@ describe('restore/replay', () => {
 			10000,
 		)
 
+		// Verify conversation was persisted to disk
+		const sessionId = await activeSessionId(hal)
+		const convPath = `${sharedDir}/state/sessions/${sessionId}/conversation.asonl`
+		expect(existsSync(convPath)).toBe(true)
+		const conv = readFileSync(convPath, 'utf-8')
+		expect(conv).toContain('replay this prompt')
+		expect(conv).toContain('Hello, I am a mock model')
+
 		await hal.stop({ keepDir: true })
 		hal = null
 
+		// Client hydrates from conversation.asonl directly — no IPC replay needed
 		hal = await startHal({ halDir: sharedDir, cleanupOnStop: false })
 		await hal.waitForReady()
-		await hal.waitFor(
-			(r) => r.type === 'prompt' && r.text === 'replay this prompt',
-			10000,
-		)
-		await hal.waitFor(
-			(r) =>
-				r.type === 'chunk' &&
-				r.channel === 'assistant' &&
-				/Hello, I am a mock model/.test(r.text ?? ''),
-			10000,
-		)
+		await hal.waitForLine(/\[session\] restored/)
 	}, 30000)
 
 	test('registry active session restoration prefers non-first session', async () => {
@@ -215,12 +214,21 @@ describe('restore/replay', () => {
 			15000,
 		)
 
+		// Verify conversation has handoff event separating before/after
+		const sessionId = await activeSessionId(hal)
+		const convPath = `${sharedDir}/state/sessions/${sessionId}/conversation.asonl`
+		const conv = readFileSync(convPath, 'utf-8')
+		expect(conv).toContain('after handoff')
+		expect(conv).toContain("type: 'handoff'")
+
 		await hal.stop({ keepDir: true })
 		hal = null
 
+		// Client hydrates from conversation.asonl — only post-handoff events are replayed
 		hal = await startHal({ halDir: sharedDir, cleanupOnStop: false })
 		await hal.waitForReady()
-		await hal.waitFor((r) => r.type === 'prompt' && r.text === 'after handoff', 10000)
+		await hal.waitForLine(/\[session\] restored/)
+		// IPC should NOT have any replay of 'before handoff' — runtime no longer replays via IPC
 		const replayedBefore = hal.records.some(
 			(r) => r.type === 'prompt' && r.text === 'before handoff',
 		)

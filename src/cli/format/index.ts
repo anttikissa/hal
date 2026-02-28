@@ -123,8 +123,7 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 
 	if (event.type === 'prompt') {
 		const local =
-			event.source.clientId === 'replay' ||
-			(event.source.kind === localSource.kind && event.source.clientId === localSource.clientId)
+			event.source.kind === localSource.kind && event.source.clientId === localSource.clientId
 		const prefix = event.label ? `[${event.label}] ` : ''
 		const text = local
 			? `${prefix}${event.text}`
