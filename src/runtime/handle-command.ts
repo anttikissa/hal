@@ -41,6 +41,7 @@ import {
 	getHalDir,
 	sessionMetaSnapshot,
 } from './sessions.ts'
+import { generateAutoTopic, isGreetingText } from './topic.ts'
 
 export async function dropQueuedCommands(reason: string, sessionId: string): Promise<number> {
 	const dropped = drainQueuedCommands(sessionId)
@@ -490,23 +491,27 @@ function extractMessageText(m: any): string {
 	return ''
 }
 
-/** Build a summary of the first exchange for topic generation. */
-function topicContext(messages: any[]): string | null {
-	let userText: string | null = null
-	let assistantText: string | null = null
-	for (const m of messages) {
-		if (!userText && m.role === 'user') {
-			const t = extractMessageText(m)
-			if (t && !t.startsWith('[')) userText = t
-		} else if (userText && !assistantText && m.role === 'assistant') {
-			assistantText = extractMessageText(m)
+/** Build topic context from the latest meaningful exchange. */
+function topicContext(messages: any[]): { ctx: string; userText: string } | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const userMsg = messages[i]
+		if (userMsg.role !== 'user') continue
+		const userText = extractMessageText(userMsg)
+		if (!userText || userText.startsWith('[') || isGreetingText(userText)) continue
+		let assistantText: string | null = null
+		for (let j = i + 1; j < messages.length; j++) {
+			if (messages[j].role !== 'assistant') continue
+			const t = extractMessageText(messages[j])
+			if (t) {
+				assistantText = t
+				break
+			}
 		}
-		if (userText && assistantText) break
+		let ctx = `User: ${userText.slice(0, 400)}`
+		if (assistantText) ctx += `\n\nAssistant: ${assistantText.slice(0, 400)}`
+		return { ctx, userText }
 	}
-	if (!userText) return null
-	let ctx = `User: ${userText.slice(0, 400)}`
-	if (assistantText) ctx += `\n\nAssistant: ${assistantText.slice(0, 400)}`
-	return ctx
+	return null
 }
 
 /** Generate a topic for the conversation after the first real exchange. */
@@ -518,25 +523,19 @@ async function maybeAutoTopic(sessionId: string): Promise<void> {
 	if (!runtime) return
 
 	const hasAssistant = runtime.messages.some((m) => m.role === 'assistant')
-	const ctx = topicContext(runtime.messages)
-	if (!ctx || !hasAssistant) return
+	const context = topicContext(runtime.messages)
+	if (!context || !hasAssistant) return
 
 	try {
 		const sessionModel = getSessionModel(sessionId)
-		const compactModel = resolveCompactModel(sessionModel)
-		const provider = getProvider(providerForModel(compactModel))
-		await provider.refreshAuth()
-
-		const { text: topic, error } = await provider.complete({
-			model: modelIdForModel(compactModel),
-			system: 'Generate a short topic (3-6 words) for this conversation based on what the user is actually doing. Be specific and concrete. Reply with ONLY the topic, no quotes, no punctuation at the end.',
-			userMessage: ctx,
-			maxTokens: 30,
+		const topic = await generateAutoTopic({
+			sessionModel,
+			ctx: context.ctx,
+			firstUserText: context.userText,
 		})
-
-		if (error || !topic?.trim()) return
-		await setSessionTopic(sessionId, topic.trim())
-		await appendConversation(sessionId, { type: 'topic', to: topic.trim(), auto: true, ts: new Date().toISOString() })
+		if (!topic) return
+		await setSessionTopic(sessionId, topic)
+		await appendConversation(sessionId, { type: 'topic', to: topic, auto: true, ts: new Date().toISOString() })
 	} catch {
 		// Non-critical — silently ignore
 	}

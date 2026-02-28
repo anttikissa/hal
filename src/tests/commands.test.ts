@@ -69,6 +69,33 @@ describe('commands', () => {
 		expect(event.level).toBe('info')
 	})
 
+	test('/topic auto-generation ignores generic greeting', async () => {
+		hal = await startHal()
+		await hal.waitForReady()
+
+		hal.sendLine('/model mock')
+		await hal.waitForLine(/\[model\] .*->.*mock/)
+
+		hal.sendLine('hello there')
+		await hal.waitFor(
+			(r) =>
+				r.type === 'prompt' &&
+				r.text === 'hello there',
+			10000,
+		)
+		await hal.waitFor(
+			(r) =>
+				r.type === 'chunk' &&
+				r.channel === 'assistant' &&
+				/Hello, I am a mock model/.test(r.text ?? ''),
+			10000,
+		)
+
+		hal.sendLine('/topic')
+		const event = await hal.waitForLine(/\[topic\] \(none\)/)
+		expect(event.level).toBe('info')
+	})
+
 	test('/title goes through unknown-command warning path', async () => {
 		hal = await startHal()
 		await hal.waitForReady()
