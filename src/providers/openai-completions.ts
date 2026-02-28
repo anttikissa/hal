@@ -178,7 +178,8 @@ export class OpenAICompletionsProvider extends Provider {
 
 	private getToken(): string {
 		const authProvider = this.options.providerAuthName ?? this.name
-		return getProviderAuth(authProvider)?.accessToken ?? ''
+		const auth = getProviderAuth(authProvider)
+		return auth?.apiKey ?? auth?.accessToken ?? ''
 	}
 
 	private getStream(id: string): StreamState {

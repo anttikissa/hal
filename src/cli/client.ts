@@ -115,7 +115,7 @@ export class Client {
 }
 
 
-const ALL_MODELS = Object.values(mergedModelAliases())
+const ALL_MODELS = [...new Set([...Object.keys(mergedModelAliases()), ...Object.values(mergedModelAliases())]) ]
 const TAB_ACTIVE = '\x1b[97m'
 const TAB_INACTIVE = '\x1b[38;5;245m'
 const TAB_RESET = '\x1b[0m'
@@ -531,8 +531,9 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 	const added = tabs[activeTabIndex]
 	const history = await loadConversation(sessionId)
 	added.output = renderConversationHistory(sessionId, history)
+	const replayCount = replayConversationEvents(history).length
 	applyActiveTabSnapshot(true)
-	pushLocal('local.tab', `[restore] opened session ${sessionId} in tab ${activeTabIndex + 1}`)
+	pushLocal('local.tab', `[restore] opened session ${sessionId} in tab ${activeTabIndex + 1} (${replayCount} event${replayCount === 1 ? '' : 's'} replayed)`)
 }
 
 
@@ -659,14 +660,17 @@ function renderConversationHistory(
 	return output
 }
 
-async function hydrateTabsFromConversation(): Promise<void> {
+async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
+	const replayed = new Map<string, number>()
 	await Promise.all(
 		tabs.map(async (tab) => {
 			if (tab.output.trim().length > 0) return
 			const events = await loadConversation(tab.sessionId)
 			tab.output = renderConversationHistory(tab.sessionId, events)
+			replayed.set(tab.sessionId, replayConversationEvents(events).length)
 		}),
 	)
+	return replayed
 }
 
 function findTabBySessionId(sessionId: string): CliTab | null {
@@ -730,7 +734,15 @@ async function bootstrapState(): Promise<void> {
 		for (const tab of tabs) tab.busy = busySet.has(tab.sessionId)
 
 		const recent = await readRecentEvents(500)
-		await hydrateTabsFromConversation()
+		const replayCounts = await hydrateTabsFromConversation()
+		for (const [sessionId, count] of replayCounts) {
+			if (count > 0) {
+				pushLocal(
+					'local.status',
+					`[history] restored ${count} event${count === 1 ? '' : 's'} for ${sessionId}`,
+				)
+			}
+		}
 		for (const event of recent) {
 			if (event.type !== 'status' || !event.context) continue
 			const sessionId = event.sessionId ?? activeTab()?.sessionId ?? null

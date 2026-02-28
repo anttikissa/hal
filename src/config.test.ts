@@ -1,10 +1,15 @@
-import { describe, test, expect } from 'bun:test'
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
+import { readFileSync, writeFileSync } from 'fs'
 import {
 	parseModel,
 	resolveModel,
 	providerForModel,
 	modelIdForModel,
+	mergedModelAliases,
+	loadConfig,
 } from './config.ts'
+
+const CONFIG_PATH = `${process.cwd()}/config.ason`
 
 describe('config model helpers', () => {
 	test("parseModel('codex...') resolves provider openai", () => {
@@ -25,6 +30,10 @@ describe('config model helpers', () => {
 		expect(resolveModel('codex')).toBe('openai/gpt-5.3-codex')
 	})
 
+	test('resolveModel includes built-in ollama alias', () => {
+		expect(resolveModel('ollama')).toBe('ollama/llama3.2')
+	})
+
 	test('providerForModel and modelIdForModel handle bare + full IDs', () => {
 		expect(providerForModel('codex')).toBe('openai')
 		expect(modelIdForModel('codex')).toBe('gpt-5.3-codex')
@@ -34,5 +43,38 @@ describe('config model helpers', () => {
 
 		expect(providerForModel('openai/gpt-5.3-codex')).toBe('openai')
 		expect(modelIdForModel('openai/gpt-5.3-codex')).toBe('gpt-5.3-codex')
+	})
+
+	test('mergedModelAliases includes built-ins by default', () => {
+		const aliases = mergedModelAliases()
+		expect(aliases.ollama).toBe('ollama/llama3.2')
+		expect(aliases.codex).toBe('openai/gpt-5.3-codex')
+	})
+})
+
+describe('config migration for ollamaBaseUrl', () => {
+	const original = readFileSync(CONFIG_PATH, 'utf-8')
+
+	beforeEach(() => {
+		writeFileSync(
+			CONFIG_PATH,
+			"{ defaultModel: 'anthropic/claude-opus-4-6', ollamaBaseUrl: 'http://localhost:11434' }\n",
+		)
+	})
+
+	afterEach(() => {
+		writeFileSync(CONFIG_PATH, original)
+	})
+
+	test('loadConfig creates providers.ollama for deprecated ollamaBaseUrl', () => {
+		const cfg = loadConfig()
+		expect(cfg.providers?.ollama?.protocol).toBe('openai-completions')
+		expect(cfg.providers?.ollama?.baseUrl).toBe('http://localhost:11434/v1')
+		expect(cfg.providers?.ollama?.auth).toBe('none')
+	})
+
+	test('config can still resolve ollama alias after migration', () => {
+		void loadConfig()
+		expect(resolveModel('ollama')).toBe('ollama/llama3.2')
 	})
 })

@@ -6,14 +6,16 @@ const AUTH_PATH = `${HAL_DIR}/auth.ason`
 
 export interface ProviderAuth {
 	accessToken: string
-	refreshToken: string
-	expires: number
+	refreshToken?: string
+	expires?: number
 	accountId?: string
+	apiKey?: string
 }
 
 export interface AuthFile {
 	anthropic?: ProviderAuth
 	openai?: ProviderAuth
+	providers?: Record<string, ProviderAuth>
 }
 
 let _auth: AuthFile | null = null
@@ -36,6 +38,7 @@ export function saveAuth(auth: AuthFile): void {
 
 export function getProviderAuth(provider: string): ProviderAuth | undefined {
 	const auth = loadAuth()
+	if (auth.providers?.[provider]) return auth.providers[provider]
 	if (provider === 'anthropic') return auth.anthropic
 	if (provider === 'openai') return auth.openai
 	return undefined
@@ -43,8 +46,15 @@ export function getProviderAuth(provider: string): ProviderAuth | undefined {
 
 export function updateProviderAuth(provider: string, updates: Partial<ProviderAuth>): void {
 	const auth = loadAuth()
-	const key = provider as keyof AuthFile
-	const current = auth[key] ?? { accessToken: '', refreshToken: '', expires: 0 }
-	auth[key] = { ...current, ...updates }
+	if (provider === 'anthropic' || provider === 'openai') {
+		const key = provider as keyof AuthFile
+		const current = auth[key] ?? { accessToken: '', refreshToken: '', expires: 0 }
+		auth[key] = { ...current, ...updates }
+		saveAuth(auth)
+		return
+	}
+	auth.providers = auth.providers ?? {}
+	const current = auth.providers[provider] ?? { accessToken: '', refreshToken: '', expires: 0 }
+	auth.providers[provider] = { ...current, ...updates }
 	saveAuth(auth)
 }

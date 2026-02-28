@@ -20,14 +20,26 @@ export interface DebugConfig {
 	maxDiskBytes?: number // max bytes for state/debug + state/bugs (default: 2 GiB)
 }
 
+export type ProviderProtocol = 'openai-completions'
+
+export interface ProviderConfig {
+	protocol: ProviderProtocol
+	baseUrl: string
+	auth?: 'none' | 'apiKey'
+	headers?: Record<string, string>
+	maxTokensField?: 'max_tokens' | 'max_completion_tokens'
+	includeUsageInStream?: boolean
+}
 export interface Config {
 	defaultModel: string // "provider/model-id", e.g. "anthropic/claude-opus-4-6"
 	compactModel?: string
-	ollamaBaseUrl?: string
+	ollamaBaseUrl?: string // deprecated: use providers.ollama.baseUrl
 	theme: string // theme name, resolved to themes/<name>.ason
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
+	providers?: Record<string, ProviderConfig>
+	modelAliases?: Record<string, string>
 	debug: DebugConfig
 }
 
@@ -37,11 +49,19 @@ export const MODEL_ALIASES: Record<string, string> = {
 	claude: 'anthropic/claude-opus-4-6',
 	codex: 'openai/gpt-5.3-codex',
 	mock: 'mock/mock-1',
+	ollama: 'ollama/llama3.2',
 }
 
 export const COMPACT_MODEL_FOR: Record<string, string> = {
 	'anthropic/claude-opus-4-6': 'anthropic/claude-sonnet-4-20250514',
 	'openai/gpt-5.3-codex': 'openai/gpt-5.1-mini',
+}
+
+export function mergedModelAliases(): Record<string, string> {
+	const configured = loadConfig().modelAliases
+	return configured && typeof configured === 'object'
+		? { ...MODEL_ALIASES, ...configured }
+		: { ...MODEL_ALIASES }
 }
 
 /** Parse "provider/model-id" → { provider, modelId } */
@@ -66,7 +86,8 @@ export function parseModel(model: string): { provider: string; modelId: string }
 
 /** Resolve alias or pass through. Always returns "provider/model-id". */
 export function resolveModel(nameOrId: string): string {
-	if (MODEL_ALIASES[nameOrId]) return MODEL_ALIASES[nameOrId]
+	const aliases = mergedModelAliases()
+	if (aliases[nameOrId]) return aliases[nameOrId]
 	// Already has provider prefix
 	if (nameOrId.includes('/')) return nameOrId
 	// Bare model ID — add provider
@@ -86,7 +107,7 @@ export function modelIdForModel(nameOrId: string): string {
 
 /** Reverse lookup: "provider/model-id" → alias (or short display name) */
 export function modelAlias(fullModel: string): string {
-	for (const [alias, full] of Object.entries(MODEL_ALIASES)) {
+	for (const [alias, full] of Object.entries(mergedModelAliases())) {
 		if (full === fullModel) return alias
 	}
 	// Strip provider prefix for display
@@ -128,6 +149,16 @@ export function loadConfig(): Config {
 		} else if (parsed.defaultModel && !parsed.defaultModel.includes('/')) {
 			// Bare alias or model ID — resolve to full form
 			parsed.defaultModel = resolveModel(parsed.defaultModel)
+		}
+		if (parsed.ollamaBaseUrl && (!parsed.providers || typeof parsed.providers !== 'object')) {
+			const base = String(parsed.ollamaBaseUrl).trim().replace(/\/+$/, '')
+			parsed.providers = {
+				ollama: {
+					protocol: 'openai-completions',
+					baseUrl: base.endsWith('/v1') ? base : `${base}/v1`,
+					auth: 'none',
+				},
+			}
 		}
 		_config = { ...DEFAULTS, ...parsed }
 	} catch {
