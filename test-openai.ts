@@ -199,6 +199,8 @@ if (systemPrompt) history.push({ role: 'system', content: systemPrompt })
 console.log(`[test-openai] POST ${baseUrl}/chat/completions`)
 console.log(`[test-openai] model=${model} max_tokens=${maxTokens} tools=${tools.length}`)
 console.log(`[test-openai] auth=${token ? 'present' : 'missing'} (no login flow in this script)`)
+if (token.includes('.') && !token.startsWith('sk-'))
+	console.log('[test-openai] warning: JWT/OAuth token on /chat/completions often fails; prefer OPENAI_API_KEY=sk-...')
 console.log('Type a prompt. /exit to quit.')
 
 const rl = createInterface({ input: stdin, output: stdout })
