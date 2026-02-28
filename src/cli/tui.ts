@@ -218,6 +218,13 @@ function splitTitleParts(text: string): { topic: string; session: string } {
 	return { topic, session }
 }
 
+function resolveInput(value: string | null): void {
+	if (!waitingResolve) return
+	const r = waitingResolve
+	waitingResolve = null
+	r(value)
+}
+
 // ── Geometry helpers ──
 
 function cols(): number {
@@ -1033,29 +1040,21 @@ function render(): void {
 
 // ── Suspend/resume ──
 
-function suspendForegroundJob(): void {
-	suspended = true
-
-	// Dump visible output before leaving alt screen so it's readable while suspended
+function dumpAndLeaveAltScreen(): void {
 	const c = cols()
-	const oh = Math.max(0, outputBottom() - 1)
-	const visible = getVisibleWrapped(oh)
-
-	disableMouse()
-	showCursor()
+	const visible = getVisibleWrapped(Math.max(0, outputBottom() - 1))
+	disableMouse(); showCursor()
 	directWrite('\x1b[?1049l') // leave alt screen
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
-
 	directWrite(`\x1b[${rows()};1H\r\n`)
-	for (const line of visible) {
-		directWrite(truncateAnsi(line, c) + '\r\n')
-	}
+	for (const line of visible) directWrite(truncateAnsi(line, c) + '\r\n')
+}
 
-	try {
-		process.kill(0, 'SIGSTOP')
-	} catch {
-		process.kill(process.pid, 'SIGSTOP')
-	}
+function suspendForegroundJob(): void {
+	suspended = true
+	dumpAndLeaveAltScreen()
+	try { process.kill(0, 'SIGSTOP') }
+	catch { process.kill(process.pid, 'SIGSTOP') }
 }
 
 // ── Bracketed paste handler ──
@@ -1249,22 +1248,12 @@ function handleKey(key: string): void {
 	if (selAnchor) clearSelection()
 
 	if (key === CTRL_C) {
-		if (waitingResolve) {
-			const r = waitingResolve
-			waitingResolve = null
-			r(CTRL_C)
-		} else {
-			cleanup()
-			process.exit(100)
-		}
+		if (waitingResolve) resolveInput(CTRL_C)
+		else { cleanup(); process.exit(100) }
 		return
 	}
 	if (key === CTRL_D) {
-		if (inputBuf.length === 0 && waitingResolve) {
-			const r = waitingResolve
-			waitingResolve = null
-			r(null)
-		}
+		if (inputBuf.length === 0) resolveInput(null)
 		return
 	}
 	if (key === CTRL_Z) return suspendForegroundJob()
@@ -1296,7 +1285,7 @@ function handleKey(key: string): void {
 		inputBuf = ''; inputCursor = 0
 		clearInputTextSelection(); clearInputUndoHistory()
 		render()
-		if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(value) }
+		resolveInput(value)
 		return
 	}
 
@@ -1509,11 +1498,7 @@ const onStdinData = (chunk: Buffer | string) => {
 const onStdinEnd = () => {
 	if (suspended) return
 	ended = true
-	if (waitingResolve) {
-		const r = waitingResolve
-		waitingResolve = null
-		r(null)
-	}
+	resolveInput(null)
 }
 
 // ── Output write ──
@@ -1677,99 +1662,42 @@ export function setOutputSnapshot(snapshot: string): void {
 	appendOutput(snapshot)
 }
 
-export function clearOutput(): void {
-	outputLines = ['']
-	scrollOffset = 0
-	lastWrapCols = 0
-	wrappedLineCount = 1
-	if (initialized) render()
-}
+export function clearOutput(): void { replaceOutput('') }
 
 export function replaceOutput(snapshot: string): void {
-	outputLines = ['']
-	scrollOffset = 0
-	lastWrapCols = 0
-	wrappedLineCount = 1
+	outputLines = ['']; scrollOffset = 0; lastWrapCols = 0; wrappedLineCount = 1
 	if (snapshot) appendOutput(snapshot)
 	if (initialized) render()
 }
-
 export function input(promptStr: string): Promise<string | null> {
 	if (!initialized) init()
-	if (waitingResolve) {
-		const r = waitingResolve
-		waitingResolve = null
-		r(null)
-	}
+	resolveInput(null)
 	inputPromptStr = promptStr
-	if (draftPreloaded) {
-		draftPreloaded = false
-	} else {
-		inputBuf = ''
-		inputCursor = 0
-		clearInputTextSelection()
-		clearInputUndoHistory()
-	}
+	if (draftPreloaded) draftPreloaded = false
+	else { inputBuf = ''; inputCursor = 0; clearInputTextSelection(); clearInputUndoHistory() }
 	render()
 	if (ended) return Promise.resolve(null)
-	return new Promise((resolve) => {
-		waitingResolve = resolve
-	})
+	return new Promise((resolve) => { waitingResolve = resolve })
 }
 
-export function cancelInput(): void {
-	if (waitingResolve) {
-		const r = waitingResolve
-		waitingResolve = null
-		r(null)
-	}
-}
+export function cancelInput(): void { resolveInput(null) }
 
 export function prompt(message: string, promptStr: string): Promise<string | null> {
 	write(`${message}\n`)
 	return input(promptStr)
 }
-
 export function cleanup(): void {
 	if (!initialized) return
-	initialized = false
-	suspended = false
-	if (headerFlashTimer) {
-		clearTimeout(headerFlashTimer)
-		headerFlashTimer = null
-	}
+	initialized = false; suspended = false
+	if (headerFlashTimer) { clearTimeout(headerFlashTimer); headerFlashTimer = null }
 	headerFlash = ''
-
-	// Capture visible output before leaving alt screen
-	const c = cols()
-	const oh = Math.max(0, outputBottom() - 1)
-	const visible = getVisibleWrapped(oh)
-	const dumpLines = visible.map((line) => truncateAnsi(line, c))
-
-	showCursor()
-	disableMouse()
-	directWrite('\x1b[?1049l') // leave alt screen — restores pre-TUI screen + cursor
-	if (process.stdin.isTTY) process.stdin.setRawMode(false)
+	dumpAndLeaveAltScreen()
 	process.stdin.off('data', onStdinData)
 	process.stdin.off('end', onStdinEnd)
 	process.off('SIGCONT', onSigCont)
 	process.stdout.off('resize', onResize)
-
-	// Dump output to main screen so it persists in scrollback.
-	// Move to bottom row first so the dump scrolls naturally below existing content.
-	directWrite(`\x1b[${rows()};1H\r\n`)
-	for (const line of dumpLines) {
-		directWrite(line + '\r\n')
-	}
-	// Push shell prompt to bottom — match the footer height we had
-	const padding = footerHeight() - 1 // -1 because shell itself occupies a line
+	// Push shell prompt to bottom
+	const padding = footerHeight() - 1
 	for (let i = 0; i < padding; i++) directWrite('\r\n')
-
-
-
-	if (waitingResolve) {
-		const r = waitingResolve
-		waitingResolve = null
-		r(null)
-	}
+	resolveInput(null)
 }

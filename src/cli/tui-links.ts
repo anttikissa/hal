@@ -25,63 +25,21 @@ function countChar(s: string, ch: string, end: number): number {
 	return n
 }
 
-/** Trim trailing punctuation and unbalanced brackets from a URL */
-function trimUrlEnd(url: string): string {
+const PROSE_TRIM = '.,:;!?\'">'
+const MD_TRIM = '*`_~'
+
+function trimTrailing(url: string, includeMarkdown: boolean): string {
+	const chars = includeMarkdown ? PROSE_TRIM + MD_TRIM : PROSE_TRIM
 	let end = url.length
 	while (end > 0) {
 		const ch = url[end - 1]
-		if (ch === '.' || ch === ',' || ch === ';' || ch === ':' || ch === '!' || ch === '?' ||
-			ch === '*' || ch === '`' || ch === '_' || ch === '~') {
-			end--
-			continue
-		}
-		if (ch === ')' && countChar(url, ')', end) > countChar(url, '(', end)) {
-			end--
-			continue
-		}
-		if (ch === ']' && countChar(url, ']', end) > countChar(url, '[', end)) {
-			end--
-			continue
-		}
-		if (ch === "'" || ch === '"') {
-			end--
-			continue
-		}
-		if (ch === '>') {
-			end--
-			continue
-		}
+		if (chars.includes(ch)) { end--; continue }
+		if (ch === ')' && countChar(url, ')', end) > countChar(url, '(', end)) { end--; continue }
+		if (ch === ']' && countChar(url, ']', end) > countChar(url, '[', end)) { end--; continue }
 		break
 	}
 	return url.slice(0, end)
 }
-
-/** Trim trailing prose punctuation only (not markdown chars like * ` _ ~) */
-function trimProsePunctuation(url: string): string {
-	let end = url.length
-	while (end > 0) {
-		const ch = url[end - 1]
-		if (ch === '.' || ch === ',' || ch === ';' || ch === ':' || ch === '!' || ch === '?') {
-			end--
-			continue
-		}
-		if (ch === ')' && countChar(url, ')', end) > countChar(url, '(', end)) {
-			end--
-			continue
-		}
-		if (ch === ']' && countChar(url, ']', end) > countChar(url, '[', end)) {
-			end--
-			continue
-		}
-		if (ch === "'" || ch === '"' || ch === '>') {
-			end--
-			continue
-		}
-		break
-	}
-	return url.slice(0, end)
-}
-
 export function normalizeDetectedUrl(url: string): string {
 	let value = url.trim()
 	let changed = true
@@ -107,114 +65,82 @@ export function normalizeDetectedUrl(url: string): string {
 			continue
 		}
 		// Strip trailing prose punctuation (preserves markdown chars for pair matching)
-		const trimmed = trimProsePunctuation(value)
+		const trimmed = trimTrailing(value, false)
 		if (trimmed.length < value.length) {
 			value = trimmed
 			changed = true
 		}
 	}
 	// Final pass: strip any remaining trailing markdown chars (no leading match)
-	return trimUrlEnd(value)
+	return trimTrailing(value, true)
 }
 
+/** Strip ANSI from line, returning plain text and position map (posMap[plainIdx] = origIdx) */
+function stripAnsiMap(line: string): { plain: string; posMap: number[] } {
+	const chars: string[] = []
+	const posMap: number[] = []
+	let i = 0
+	while (i < line.length) {
+		if (line[i] === '\x1b') { i += readEscapeSequence(line, i); continue }
+		posMap.push(i)
+		chars.push(line[i])
+		i++
+	}
+	return { plain: chars.join(''), posMap }
+}
+
+function findUrlsInPlain(plain: string): { start: number; end: number; url: string }[] {
+	URL_RE.lastIndex = 0
+	const urls: { start: number; end: number; url: string }[] = []
+	let match
+	while ((match = URL_RE.exec(plain)) !== null) {
+		const trimmed = trimTrailing(match[0], true)
+		urls.push({ start: match.index, end: match.index + trimmed.length, url: trimmed })
+	}
+	return urls
+}
 
 /**
  * Wrap URLs in an ANSI-colored line with OSC 8 hyperlink sequences.
  * Skips lines that already contain OSC 8.
  */
 export function linkifyLine(line: string): string {
-	if (!line) return line
-	// Already has OSC 8 — don't double-linkify
-	if (line.includes('\x1b]8;')) return line
-
-	// Build plain text + position map
-	const plainChars: string[] = []
-	const posMap: number[] = [] // posMap[plainIndex] = index in original line
-	let i = 0
-	while (i < line.length) {
-		if (line[i] === '\x1b') {
-			const len = readEscapeSequence(line, i)
-			i += len
-			continue
-		}
-		posMap.push(i)
-		plainChars.push(line[i])
-		i++
-	}
-	const plainText = plainChars.join('')
-
-	// Find URLs in plain text
-	URL_RE.lastIndex = 0
-	const urls: { start: number; end: number; url: string }[] = []
-	let match
-	while ((match = URL_RE.exec(plainText)) !== null) {
-		const raw = match[0]
-		const trimmed = trimUrlEnd(raw)
-		urls.push({ start: match.index, end: match.index + trimmed.length, url: trimmed })
-	}
+	if (!line || line.includes('\x1b]8;')) return line
+	const { plain, posMap } = stripAnsiMap(line)
+	const urls = findUrlsInPlain(plain)
 	if (urls.length === 0) return line
 
-	// Insert OSC 8 sequences at mapped positions
 	let result = ''
 	let lastOrigEnd = 0
 	for (const u of urls) {
 		const origStart = posMap[u.start]
-		// origEnd: position after last char of the URL in original line
-		const origEnd =
-			u.end < posMap.length
-				? posMap[u.end]
-				: // URL extends to end of visible text; include remaining ANSI trailing sequences
-					line.length
+		const origEnd = u.end < posMap.length ? posMap[u.end] : line.length
 		result += line.slice(lastOrigEnd, origStart)
-		result += `\x1b]8;;${u.url}\x1b\\`
-		result += line.slice(origStart, origEnd)
-		result += OSC8_CLOSE
+		result += `\x1b]8;;${u.url}\x1b\\` + line.slice(origStart, origEnd) + OSC8_CLOSE
 		lastOrigEnd = origEnd
 	}
-	result += line.slice(lastOrigEnd)
-	return result
+	return result + line.slice(lastOrigEnd)
 }
 
 /** Find the URL at a given visible column in an ANSI-colored line, or null */
 export function urlAtCol(line: string, col: number): string | null {
 	if (!line) return null
-	// First check for OSC 8 hyperlinks already in the line
-	let i = 0
-	let visCol = 0
-	let currentUri = ''
+	// Check for OSC 8 hyperlinks already in the line
+	let i = 0, visCol = 0, currentUri = ''
 	while (i < line.length) {
 		if (line[i] === '\x1b') {
 			const len = readEscapeSequence(line, i)
-			const seq = line.slice(i, i + len)
-			const uri = parseOsc8Uri(seq)
+			const uri = parseOsc8Uri(line.slice(i, i + len))
 			if (uri !== null) currentUri = uri
-			i += len
-			continue
+			i += len; continue
 		}
 		if (visCol === col && currentUri) return currentUri
-		visCol++
-		i++
+		visCol++; i++
 	}
-
 	// Fall back to regex URL detection on plain text
-	const plainChars: string[] = []
-	i = 0
-	while (i < line.length) {
-		if (line[i] === '\x1b') {
-			i += readEscapeSequence(line, i)
-			continue
-		}
-		plainChars.push(line[i])
-		i++
-	}
-	const plainText = plainChars.join('')
-	URL_RE.lastIndex = 0
-	let match
-	while ((match = URL_RE.exec(plainText)) !== null) {
-		const trimmed = trimUrlEnd(match[0])
-		const start = match.index
-		const end = start + trimmed.length
-		if (col >= start && col < end) return trimmed
+	const { plain } = stripAnsiMap(line)
+	for (const u of findUrlsInPlain(plain)) {
+		if (col >= u.start && col < u.end) return u.url
 	}
 	return null
 }

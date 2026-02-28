@@ -76,22 +76,25 @@ export function truncateAnsi(line: string, maxCols: number): string {
  * Preserves ANSI + OSC 8 hyperlink state across wraps.
  */
 export function wrapAnsi(line: string, maxCols: number): string[] {
-	if (maxCols <= 0) return ['']
-	if (!line) return ['']
+	if (maxCols <= 0 || !line) return ['']
 
 	const result: string[] = []
-	let current = ''
-	let visCols = 0
-	let i = 0
-	let activeAnsi = ''
-	let activeLink = '' // OSC 8 hyperlink URI (empty = no link)
+	let current = '', visCols = 0, i = 0
+	let activeAnsi = '', activeLink = ''
+	let lastSpaceI = -1, lastSpaceCols = -1, lastSpaceCurrent = ''
+	let lastSpaceAnsi = '', lastSpaceLink = ''
 
-	// Word-wrap break point tracking
-	let lastSpaceI = -1
-	let lastSpaceCols = -1
-	let lastSpaceCurrent = ''
-	let lastSpaceAnsi = ''
-	let lastSpaceLink = ''
+	const emitBreak = (text: string, link: string, ansi: string, nextI?: number) => {
+		if (link) text += OSC8_CLOSE
+		result.push(text + RESET)
+		activeAnsi = ansi; activeLink = link
+		current = activeAnsi
+		if (activeLink) current += `\x1b]8;;${activeLink}\x1b\\`
+		visCols = 0
+		if (nextI !== undefined) i = nextI
+		lastSpaceI = -1; lastSpaceCols = -1
+		lastSpaceCurrent = ''; lastSpaceAnsi = ''; lastSpaceLink = ''
+	}
 
 	while (i < line.length) {
 		if (line[i] === '\x1b') {
@@ -99,58 +102,29 @@ export function wrapAnsi(line: string, maxCols: number): string[] {
 			const seq = line.slice(i, i + seqLen)
 			current += seq
 			if (seq.startsWith('\x1b[') && seq.endsWith('m')) {
-				if (seq === '\x1b[0m') activeAnsi = ''
-				else activeAnsi += seq
+				activeAnsi = seq === '\x1b[0m' ? '' : activeAnsi + seq
 			}
 			const uri = parseOsc8Uri(seq)
 			if (uri !== null) activeLink = uri
-			i += seqLen
-			continue
+			i += seqLen; continue
 		}
 
 		if (line[i] === ' ') {
-			lastSpaceI = i + 1
-			lastSpaceCols = visCols + 1
+			lastSpaceI = i + 1; lastSpaceCols = visCols + 1
 			lastSpaceCurrent = current + ' '
-			lastSpaceAnsi = activeAnsi
-			lastSpaceLink = activeLink
+			lastSpaceAnsi = activeAnsi; lastSpaceLink = activeLink
 		}
 
 		if (visCols >= maxCols) {
-			// Try word break
 			if (lastSpaceCols > 0 && lastSpaceCols > maxCols * 0.3) {
-				if (lastSpaceLink) lastSpaceCurrent += OSC8_CLOSE
-				result.push(lastSpaceCurrent + RESET)
-				activeAnsi = lastSpaceAnsi
-				activeLink = lastSpaceLink
-				current = activeAnsi
-				if (activeLink) current += `\x1b]8;;${activeLink}\x1b\\`
-				visCols = 0
-				i = lastSpaceI
-				lastSpaceI = -1
-				lastSpaceCols = -1
-				lastSpaceCurrent = ''
-				lastSpaceAnsi = ''
-				lastSpaceLink = ''
-				continue
+				emitBreak(lastSpaceCurrent, lastSpaceLink, lastSpaceAnsi, lastSpaceI)
+			} else {
+				emitBreak(current, activeLink, activeAnsi)
 			}
-			// Hard break
-			if (activeLink) current += OSC8_CLOSE
-			result.push(current + RESET)
-			current = activeAnsi
-			if (activeLink) current += `\x1b]8;;${activeLink}\x1b\\`
-			visCols = 0
-			lastSpaceI = -1
-			lastSpaceCols = -1
-			lastSpaceCurrent = ''
-			lastSpaceAnsi = ''
-			lastSpaceLink = ''
 			continue
 		}
 
-		current += line[i]
-		visCols++
-		i++
+		current += line[i]; visCols++; i++
 	}
 
 	result.push(current)
