@@ -265,12 +265,6 @@ function scroll(lines: number): void {
 	render()
 }
 
-// ── Status line builder ──
-
-function buildStatusLine(): string {
-	return buildStatusBarLine(cols(), statusTabsStr, headerFlash || statusRightStr, scrollOffset)
-}
-
 // ── Input selection/edit helpers ──
 
 function clampInputPos(pos: number): number { return Math.max(0, Math.min(pos, inputBuf.length)) }
@@ -646,41 +640,27 @@ function disableMouse(): void {
 // ── Render ──
 
 let renderScheduled = false
-// Cached from last render for resize scroll preservation
-let lastRenderedOutputHeight = 0
-let lastRenderedTotalVisual = 0
+let lastRenderedOutputHeight = 0, lastRenderedTotalVisual = 0
 
 function scheduleRender(): void {
-	if (renderScheduled) return
-	renderScheduled = true
-	queueMicrotask(render)
+	if (renderScheduled) return; renderScheduled = true; queueMicrotask(render)
 }
 
 function render(): void {
 	renderScheduled = false
 	if (!initialized || ended || suspended) return
+	const r = rows(), c = cols(), fh = footerHeight()
+	const ob = Math.max(1, r - fh), outputHeight = Math.max(0, ob - 1)
 
-	const r = rows()
-	const c = cols()
-	const fh = footerHeight()
-	const ob = Math.max(1, r - fh) // last row of output viewport
-	const outputHeight = Math.max(0, ob - 1) // rows 2..ob
-
-	// Clamp scroll offset
 	if (scrollOffset > 0) {
-		const totalVisual = getTotalVisualLines()
-		const maxScroll = Math.max(0, totalVisual - outputHeight)
+		const maxScroll = Math.max(0, getTotalVisualLines() - outputHeight)
 		if (scrollOffset > maxScroll) scrollOffset = maxScroll
 	}
-
 	const visibleOutput = getVisibleWrapped(outputHeight)
 	lastVisibleOutput = visibleOutput
-	lastRenderedOutputHeight = outputHeight
-	lastRenderedTotalVisual = getTotalVisualLines()
-
+	lastRenderedOutputHeight = outputHeight; lastRenderedTotalVisual = getTotalVisualLines()
 	const selRange = getSelectionRange()
-
-	const chunks: string[] = ['\x1b[?25l'] // hide cursor
+	const chunks: string[] = ['\x1b[?25l']
 
 	const pushRow = (row: number, text: string, surface?: SelectionSurface, selRow = 0) => {
 		chunks.push(`\x1b[${row};1H\x1b[2K`)
@@ -689,19 +669,18 @@ function render(): void {
 		else chunks.push(text)
 	}
 
-	// Row 1: title bar
+	// Title bar
 	const { topic, session } = splitTitleParts(titleBarStr || '')
 	const PLACEHOLDER = 'Use /topic to set topic, or write a prompt to set it automatically'
 	const topicDisplay = topic
 		? `${TITLE_BG}${TITLE_TOPIC} Topic: ${TITLE_SESSION}${topic}`
 		: `${TITLE_BG}${TITLE_TOPIC} Topic: ${TITLE_TOPIC}${PLACEHOLDER}`
 	const titleLine = session ? `${topicDisplay}${RESET}${TITLE_BG}${TITLE_TOPIC} — ${session}` : topicDisplay
-	const renderedTitleLine = truncateAnsi(titleLine, c) + TITLE_BG + ERASE_TO_EOL + RESET
-	pushRow(1, renderedTitleLine, 'title')
+	pushRow(1, truncateAnsi(titleLine, c) + TITLE_BG + ERASE_TO_EOL + RESET, 'title')
 	const plainTopic = topic || PLACEHOLDER
 	lastTitleLine = truncateAnsi(session ? ` Topic: ${plainTopic} — ${session}` : ` Topic: ${plainTopic}`, c).padEnd(c, ' ')
 
-	// Rows 2..ob: output viewport
+	// Output viewport
 	for (let row = 2; row <= ob; row++) {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
@@ -711,13 +690,11 @@ function render(): void {
 		else { chunks.push(`\x1b[${row};1H\x1b[2K`); chunks.push(truncateAnsi(lineText, c)) }
 	}
 
-	// Activity + status lines
-	const activityLine = truncateAnsi(`${DIM}${activityStr ? `  Model: ${activityStr}` : '  Model: Done.'}`, c)
-	lastActivityLine = activityLine
-	pushRow(activityRow(), activityLine, 'activity')
-	const statusLine = buildStatusLine()
-	lastStatusLine = statusLine
-	pushRow(statusRow(), statusLine, 'status')
+	// Activity + status
+	lastActivityLine = truncateAnsi(`${DIM}${activityStr ? `  Model: ${activityStr}` : '  Model: Done.'}`, c)
+	pushRow(activityRow(), lastActivityLine, 'activity')
+	lastStatusLine = buildStatusBarLine(cols(), statusTabsStr, headerFlash || statusRightStr, scrollOffset)
+	pushRow(statusRow(), lastStatusLine, 'status')
 
 	// Prompt area
 	const bgPad = `${BG_DARK}${' '.repeat(c)}${RESET}`
@@ -725,15 +702,14 @@ function render(): void {
 	const contentWidth = promptContentWidth()
 	const wrappedInput = getWrappedInputLayout(inputBuf, contentWidth)
 	const inputSelRange = getInputTextSelectionRange()
-	const pLines = Math.min(wrappedInput.lines.length, maxPromptLines)
-	const firstRow = promptFirstRow()
+	const pLines = Math.min(wrappedInput.lines.length, maxPromptLines), firstRow = promptFirstRow()
 	for (let i = 0; i < pLines; i++) {
 		chunks.push(`\x1b[${firstRow + i};1H\x1b[2K`)
 		chunks.push(renderPromptLineWithInputSelection(wrappedInput.lines[i], wrappedInput.starts[i] ?? 0, c, inputSelRange))
 	}
 	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
 
-	// Position cursor at input
+	// Cursor
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
 	chunks.push(`\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 
@@ -777,156 +753,84 @@ function parseKittyCsiUKey(key: string): KittyCsiUKey | null {
 	const fields = body.split(';')
 	if (fields.length < 1) return null
 	const codepoint = Number((fields[0] || '').split(':', 1)[0])
-	let rawModifier = 1
-	let eventType = 1 // 1=press, 2=repeat, 3=release
+	let rawModifier = 1, eventType = 1
 	if (fields.length >= 2) {
 		const [rawModifierStr, eventTypeStr] = (fields[1] ?? '').split(':', 2)
 		if (rawModifierStr) rawModifier = Number(rawModifierStr)
 		if (eventTypeStr) eventType = Number(eventTypeStr)
 	}
-	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier) || !Number.isFinite(eventType))
-		return null
-	// Parse associated text (third field): colon-separated codepoints
+	if (!Number.isFinite(codepoint) || !Number.isFinite(rawModifier) || !Number.isFinite(eventType)) return null
 	let text: string | undefined
 	if (fields.length >= 3 && fields[2]) {
 		const cps = fields[2].split(':').map(Number)
-		if (cps.length > 0 && cps.every((n) => Number.isFinite(n) && n > 0)) {
-			text = String.fromCodePoint(...cps)
-		}
+		if (cps.length > 0 && cps.every((n) => Number.isFinite(n) && n > 0)) text = String.fromCodePoint(...cps)
 	}
 	return { codepoint, rawModifier, eventType, text }
 }
 
-/** Strip Kitty event-type from functional key CSI sequences (arrows, home, end, F-keys, etc).
- *  E.g. \x1b[1;1:2A (repeat arrow-up) → \x1b[A, \x1b[1;3:2D (repeat opt-left) → \x1b[1;3D.
- *  Returns undefined if not a Kitty-enhanced sequence, null to suppress (release), or the
- *  normalized legacy sequence for press/repeat. */
 function normalizeKittyFunctionalKey(key: string): string | null | undefined {
 	if (!key.startsWith('\x1b[')) return undefined
-	// Functional keys end with ~ A-D H F P-S
 	const terminator = key[key.length - 1]
 	if (!/^[~A-DHFP-S]$/.test(terminator)) return undefined
 	const body = key.slice(2, -1)
-	// Must contain : (event type) in the modifier field to be a Kitty-enhanced sequence
 	if (!body.includes(':')) return undefined
 	const fields = body.split(';')
 	let eventType = 1
-	// Event type is in the last field after ':'
-	const lastField = fields[fields.length - 1]
-	const colonIdx = lastField.indexOf(':')
+	const lastField = fields[fields.length - 1], colonIdx = lastField.indexOf(':')
 	if (colonIdx !== -1) {
 		eventType = Number(lastField.slice(colonIdx + 1))
 		fields[fields.length - 1] = lastField.slice(0, colonIdx)
 	}
-	if (eventType === 3) return null // release
-	// Reconstruct legacy sequence, stripping default modifiers
-	// Remove trailing fields that are just "1" (default modifier)
+	if (eventType === 3) return null
 	while (fields.length > 1 && fields[fields.length - 1] === '1') fields.pop()
 	if (fields.length === 1 && fields[0] === '1' && terminator !== '~') fields[0] = ''
-	const newBody = fields.join(';')
-	return `\x1b[${newBody}${terminator}`
+	return `\x1b[${fields.join(';')}${terminator}`
 }
 
-/** Parse CSI u (Kitty keyboard protocol) sequences. Returns the legacy key
- *  string for press events, or null to suppress the event (release/modifier-only). */
 function normalizeKittyKey(key: string): string | null {
-	// ESC-prefixed CSI arrow (iTerm2 Alt+Arrow: ESC ESC[D → \x1b[1;3D)
 	if (key.length === 4 && key[0] === '\x1b' && key[1] === '\x1b' && key[2] === '[') {
-		const arrow = key[3]
-		if (arrow >= 'A' && arrow <= 'D') return `\x1b[1;3${arrow}`
+		const arrow = key[3]; if (arrow >= 'A' && arrow <= 'D') return `\x1b[1;3${arrow}`
 	}
 	const csiU = parseKittyCsiUKey(key)
-	if (!csiU) {
-		const functional = normalizeKittyFunctionalKey(key)
-		return functional !== undefined ? functional : key
-	}
+	if (!csiU) { const f = normalizeKittyFunctionalKey(key); return f !== undefined ? f : key }
 	const { codepoint, rawModifier, eventType, text } = csiU
 
-	// Track Super/Cmd key state for Cmd+hover
 	if (codepoint === SUPER_L || codepoint === SUPER_R) {
-		const wasHeld = superHeld
-		superHeld = eventType !== 3
-		if (wasHeld !== superHeld) updateHoverLink()
-		return null
+		const wasHeld = superHeld; superHeld = eventType !== 3
+		if (wasHeld !== superHeld) updateHoverLink(); return null
 	}
-
-	// Only process press and repeat events (ignore release)
 	if (eventType === 3) return null
-
-	// Modifier-only keys (Shift, Ctrl, Alt, etc.) — suppress even with other modifiers held
 	if (codepoint >= 0xE000 && codepoint <= 0xF8FF) return null
 
 	const mods = Math.max(0, rawModifier - 1)
-
-	// Super combos: keep as CSI u for handlers that want them
 	if ((mods & 8) !== 0) return key
-
-	// Ctrl combos: normalize to legacy control codes
 	if ((mods & 4) !== 0 && codepoint >= 0 && codepoint <= 0x7f) {
 		const ctrl = String.fromCharCode(codepoint & 0x1f)
-		if ((mods & 2) !== 0) return `\x1b${ctrl}` // Alt+Ctrl
-		if ((mods & 1) !== 0) return ctrl // Shift+Ctrl (shift doesn't change ctrl code)
-		return ctrl
+		return (mods & 2) !== 0 ? `\x1b${ctrl}` : ctrl
 	}
-
-	// Alt combos: ESC prefix
-	if ((mods & 2) !== 0 && !(mods & 4) && codepoint >= 0x20 && codepoint <= 0x7e) {
+	if ((mods & 2) !== 0 && !(mods & 4) && codepoint >= 0x20 && codepoint <= 0x7e)
 		return `\x1b${String.fromCharCode(codepoint)}`
-	}
-
-	// Unmodified special keys → legacy bytes
 	if (mods === 0) {
-		if (codepoint === 13) return '\r'
-		if (codepoint === 9) return '\t'
-		if (codepoint === 27) return '\x1b'
-		if (codepoint === 127) return '\x7f'
+		if (codepoint === 13) return '\r'; if (codepoint === 9) return '\t'
+		if (codepoint === 27) return '\x1b'; if (codepoint === 127) return '\x7f'
 	}
-
-	// Shift-only: Esc and Backspace behave as unmodified; Enter/Tab preserve CSI u
-	// so handlers can distinguish Shift+Enter from Enter
-	if (mods === 1) {
-		if (codepoint === 27) return '\x1b'
-		if (codepoint === 127) return '\x7f'
-	}
-
-	// Plain or Shift-only printable: prefer associated text (accounts for shift/layout)
-	if ((mods === 0 || mods === 1) && (text || codepoint >= 0x20)) {
-		return text ?? String.fromCodePoint(codepoint)
-	}
-
+	if (mods === 1) { if (codepoint === 27) return '\x1b'; if (codepoint === 127) return '\x7f' }
+	if ((mods === 0 || mods === 1) && (text || codepoint >= 0x20)) return text ?? String.fromCodePoint(codepoint)
 	return key
 }
 
 export const _testTuiKeys = {
-	parseKittyCsiUKey,
-	normalizeKittyFunctionalKey,
-	normalizeKittyKey,
-	supportsSynchronizedOutput,
+	parseKittyCsiUKey, normalizeKittyFunctionalKey, normalizeKittyKey, supportsSynchronizedOutput,
 	resetState(): void {
-		hoverOutputRow = -1
-		hoverUrl = null
-		superHeld = false
-		lastMouseX = -1
-		lastMouseY = -1
+		hoverOutputRow = -1; hoverUrl = null; superHeld = false; lastMouseX = -1; lastMouseY = -1
 	},
 }
 
 // ── Key action helpers ──
 
-function moveCursor(pos: number, extend = false): void {
-	setInputCursor(pos, extend)
-	render()
-}
-
-function moveOrCollapse(edge: 'start' | 'end', pos: number): void {
-	if (!collapseInputSelection(edge)) setInputCursor(pos)
-	render()
-}
-
-function deleteOrSel(fallback: () => void): void {
-	if (!deleteInputTextSelection()) fallback()
-	render()
-}
+function moveCursor(pos: number, extend = false): void { setInputCursor(pos, extend); render() }
+function moveOrCollapse(edge: 'start' | 'end', pos: number): void { if (!collapseInputSelection(edge)) setInputCursor(pos); render() }
+function deleteOrSel(fallback: () => void): void { if (!deleteInputTextSelection()) fallback(); render() }
 
 // ── Key handler ──
 
@@ -1116,13 +1020,8 @@ function handleKey(key: string): void {
 // ── Stdin processing ──
 
 function flushStdinBuffer(): void {
-	const data = stdinBuffer
-	stdinBuffer = ''
-	stdinTimer = null
+	const data = stdinBuffer; stdinBuffer = ''; stdinTimer = null
 	logKeypress(data)
-
-	// Selection clearing moved into handleKey (per-key, after modifier/clipboard filtering)
-
 	for (const key of parseKeys(data, PASTE_START, PASTE_END)) handleKey(key)
 }
 
@@ -1130,19 +1029,13 @@ const onStdinData = (chunk: Buffer | string) => {
 	const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
 	if (!text) return
 
-	// Bracketed paste: accumulate between start/end markers
 	if (bracketedPasteBuffer !== null) {
 		const endIdx = text.indexOf(PASTE_END)
 		if (endIdx >= 0) {
 			bracketedPasteBuffer += text.slice(0, endIdx)
-			handleBracketedPaste(bracketedPasteBuffer)
-			bracketedPasteBuffer = null
-			// Process any remaining data after the paste end
-			const rest = text.slice(endIdx + PASTE_END.length)
-			if (rest) onStdinData(rest)
-		} else {
-			bracketedPasteBuffer += text
-		}
+			handleBracketedPaste(bracketedPasteBuffer); bracketedPasteBuffer = null
+			const rest = text.slice(endIdx + PASTE_END.length); if (rest) onStdinData(rest)
+		} else bracketedPasteBuffer += text
 		return
 	}
 	if (text.includes(PASTE_START)) {
@@ -1150,34 +1043,23 @@ const onStdinData = (chunk: Buffer | string) => {
 		const endIdx = text.indexOf(PASTE_END, startIdx)
 		if (endIdx >= 0) {
 			handleBracketedPaste(text.slice(startIdx, endIdx))
-			const rest = text.slice(endIdx + PASTE_END.length)
-			if (rest) onStdinData(rest)
-		} else {
-			bracketedPasteBuffer = text.slice(startIdx)
-		}
+			const rest = text.slice(endIdx + PASTE_END.length); if (rest) onStdinData(rest)
+		} else bracketedPasteBuffer = text.slice(startIdx)
 		return
 	}
 
-	// Mouse events: process immediately without coalescing
 	const mouseRe = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g
 	let mouseMatch = mouseRe.exec(text)
 	if (mouseMatch) {
 		let scrollDelta = 0
 		do {
 			const button = parseInt(mouseMatch[1], 10)
-			const x = parseInt(mouseMatch[2], 10) // 1-based
-			const y = parseInt(mouseMatch[3], 10) // 1-based
-			const isRelease = mouseMatch[4] === 'm'
-			const isMove = (button & 32) !== 0
-			const baseButton = button & ~32
-
-			if (baseButton === 64) scrollDelta += 1
-			else if (baseButton === 65) scrollDelta -= 1
-			else if (baseButton === 0) {
-				handleMouseEvent(x - 1, y - 1, isRelease ? 'release' : isMove ? 'move' : 'press')
-			} else if (baseButton === 3 && isMove) {
-				handleMouseEvent(x - 1, y - 1, 'move')
-			}
+			const x = parseInt(mouseMatch[2], 10), y = parseInt(mouseMatch[3], 10)
+			const isRelease = mouseMatch[4] === 'm', baseButton = button & ~32
+			if (baseButton === 64) scrollDelta++
+			else if (baseButton === 65) scrollDelta--
+			else if (baseButton === 0) handleMouseEvent(x - 1, y - 1, isRelease ? 'release' : (button & 32) ? 'move' : 'press')
+			else if (baseButton === 3 && (button & 32)) handleMouseEvent(x - 1, y - 1, 'move')
 			mouseMatch = mouseRe.exec(text)
 		} while (mouseMatch)
 		if (scrollDelta !== 0) scroll(scrollDelta)
@@ -1186,18 +1068,12 @@ const onStdinData = (chunk: Buffer | string) => {
 
 	stdinBuffer += text
 	if (stdinTimer) clearTimeout(stdinTimer)
-	if (stdinBuffer.includes(PASTE_START) && !stdinBuffer.includes(PASTE_END)) {
+	if (stdinBuffer.includes(PASTE_START) && !stdinBuffer.includes(PASTE_END))
 		stdinTimer = setTimeout(flushStdinBuffer, STDIN_COALESCE_MS)
-	} else {
-		flushStdinBuffer()
-	}
+	else flushStdinBuffer()
 }
 
-const onStdinEnd = () => {
-	if (suspended) return
-	ended = true
-	resolveInput(null)
-}
+const onStdinEnd = () => { if (!suspended) { ended = true; resolveInput(null) } }
 
 // ── Output write ──
 
@@ -1206,65 +1082,36 @@ function writeToOutput(text: string): void {
 	const wasAtBottom = scrollOffset === 0
 	const prevTotalVisual = getTotalVisualLines()
 	appendOutput(text)
-	const nextTotalVisual = getTotalVisualLines()
-	const addedLines = nextTotalVisual - prevTotalVisual
+	const addedLines = getTotalVisualLines() - prevTotalVisual
 	if (wasAtBottom) {
-		scrollOffset = 0 // stay at bottom
-		// Viewport shifts down — adjust selection rows up
+		scrollOffset = 0
 		if (selAnchor && selAnchor.surface === 'output') {
 			selAnchor = { ...selAnchor, row: selAnchor.row - addedLines }
 			if (selCurrent) selCurrent = { ...selCurrent, row: selCurrent.row - addedLines }
-			// Clear if selection scrolled out of view
-			if ((selCurrent && selCurrent.row < 0) || selAnchor.row < 0) {
-				selAnchor = null
-				selCurrent = null
-				selActive = false
-			}
+			if ((selCurrent && selCurrent.row < 0) || selAnchor.row < 0)
+				{ selAnchor = null; selCurrent = null; selActive = false }
 		}
-	} else {
-		// Scrolled up — scroll offset compensates, viewport unchanged, selection stays valid
-		scrollOffset = Math.max(0, scrollOffset + addedLines)
-	}
+	} else scrollOffset = Math.max(0, scrollOffset + addedLines)
 	render()
 }
-
-// ── Resize ──
 
 function onResize(): void {
 	if (!initialized || suspended) return
-
 	if (scrollOffset > 0 && lastRenderedTotalVisual > 0) {
-		// Preserve viewport center position across re-wrap
-		const centerFromBottom = scrollOffset + lastRenderedOutputHeight / 2
-		const fraction = centerFromBottom / lastRenderedTotalVisual
-
-		lastWrapCols = 0 // invalidate before recomputing
+		const fraction = (scrollOffset + lastRenderedOutputHeight / 2) / lastRenderedTotalVisual
+		lastWrapCols = 0
 		const newTotal = getTotalVisualLines()
 		const newOutputHeight = Math.max(0, Math.max(1, rows() - footerHeight()) - 1)
 		scrollOffset = Math.max(0, Math.round(fraction * newTotal - newOutputHeight / 2))
-	} else {
-		lastWrapCols = 0
-	}
-
+	} else lastWrapCols = 0
 	render()
 }
 
-// ── SIGCONT ──
-
 function onSigCont(): void {
 	if (!initialized) return
-	suspended = false
-	ended = false
-	try {
-		enterRawMode()
-	} catch {
-		// Terminal gone (e.g. kill %), just exit
-		initialized = false
-		process.exit(0)
-	}
-	directWrite('\x1b[?1049h') // re-enter alt screen
-	enableMouse()
-	render()
+	suspended = false; ended = false
+	try { enterRawMode() } catch { initialized = false; process.exit(0) }
+	directWrite('\x1b[?1049h'); enableMouse(); render()
 }
 
 function enterRawMode(): void {
@@ -1273,17 +1120,10 @@ function enterRawMode(): void {
 	process.stdin.resume()
 }
 
-// ── Flash header ──
-
 export function flashHeader(text: string, durationMs = 1500): void {
 	if (headerFlashTimer) clearTimeout(headerFlashTimer)
-	headerFlash = text
-	if (initialized) scheduleRender()
-	headerFlashTimer = setTimeout(() => {
-		headerFlash = ''
-		headerFlashTimer = null
-		if (initialized) scheduleRender()
-	}, durationMs)
+	headerFlash = text; if (initialized) scheduleRender()
+	headerFlashTimer = setTimeout(() => { headerFlash = ''; headerFlashTimer = null; if (initialized) scheduleRender() }, durationMs)
 }
 
 // ── Serialization helpers ──
