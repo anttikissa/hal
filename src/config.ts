@@ -132,6 +132,10 @@ const DEFAULTS: Config = {
 
 let _config: Config | null = null
 
+export function resetConfigCache(): void {
+	_config = null
+}
+
 export function loadConfig(): Config {
 	if (_config) return _config
 	try {

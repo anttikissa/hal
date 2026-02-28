@@ -7,6 +7,7 @@ import {
 	modelIdForModel,
 	mergedModelAliases,
 	loadConfig,
+	resetConfigCache,
 } from './config.ts'
 
 const CONFIG_PATH = `${process.cwd()}/config.ason`
@@ -60,12 +61,13 @@ describe('config migration for ollamaBaseUrl', () => {
 			CONFIG_PATH,
 			"{ defaultModel: 'anthropic/claude-opus-4-6', ollamaBaseUrl: 'http://localhost:11434' }\n",
 		)
+		resetConfigCache()
 	})
 
 	afterEach(() => {
 		writeFileSync(CONFIG_PATH, original)
+		resetConfigCache()
 	})
-
 	test('loadConfig creates providers.ollama for deprecated ollamaBaseUrl', () => {
 		const cfg = loadConfig()
 		expect(cfg.providers?.ollama?.protocol).toBe('openai-completions')
