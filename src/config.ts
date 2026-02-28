@@ -23,6 +23,7 @@ export interface DebugConfig {
 export interface Config {
 	defaultModel: string // "provider/model-id", e.g. "anthropic/claude-opus-4-6"
 	compactModel?: string
+	ollamaBaseUrl?: string
 	theme: string // theme name, resolved to themes/<name>.ason
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
@@ -59,6 +60,7 @@ export function parseModel(model: string): { provider: string; modelId: string }
 		model.startsWith('codex')
 	)
 		return { provider: 'openai', modelId: model }
+	if (model.startsWith('ollama')) return { provider: 'ollama', modelId: model }
 	return { provider: 'anthropic', modelId: model }
 }
 

@@ -23,16 +23,21 @@ import { registerProvider } from './src/provider.ts'
 import { anthropicProvider } from './src/providers/anthropic.ts'
 import { openaiProvider } from './src/providers/openai.ts'
 import { mockProvider } from './src/providers/mock.ts'
+import { ollamaProvider } from './src/providers/ollama.ts'
 import { STATE_DIR } from './src/state.ts'
 import { initDebugLog } from './src/debug-log.ts'
 
 if (testMode) {
-	const { testAnthropicProvider, testOpenaiProvider } = await import('./src/providers/test.ts')
+	const { testAnthropicProvider, testOpenaiProvider, testOllamaProvider } = await import(
+		'./src/providers/test.ts',
+	)
 	registerProvider(testAnthropicProvider)
 	registerProvider(testOpenaiProvider)
+	registerProvider(testOllamaProvider)
 } else {
 	registerProvider(anthropicProvider)
 	registerProvider(openaiProvider)
+	registerProvider(ollamaProvider)
 }
 registerProvider(mockProvider)
 

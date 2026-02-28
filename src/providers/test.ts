@@ -1,6 +1,6 @@
 /**
  * Test provider — returns canned responses, no network calls.
- * Registered under both 'anthropic' and 'openai' to intercept all models in --test mode.
+ * Registered under anthropic/openai/ollama in --test mode to intercept live API calls.
  */
 import { Provider } from '../provider.ts'
 
@@ -28,3 +28,4 @@ class TestProvider extends Provider {
 
 export const testAnthropicProvider = new TestProvider('anthropic')
 export const testOpenaiProvider = new TestProvider('openai')
+export const testOllamaProvider = new TestProvider('ollama')

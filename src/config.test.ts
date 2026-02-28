@@ -16,6 +16,11 @@ describe('config model helpers', () => {
 		})
 	})
 
+	test("parseModel('ollama/...') resolves provider ollama", () => {
+		expect(parseModel('ollama/llama3.2')).toEqual({ provider: 'ollama', modelId: 'llama3.2' })
+		expect(parseModel('ollama:local')).toEqual({ provider: 'ollama', modelId: 'ollama:local' })
+	})
+
 	test("resolveModel('codex') maps to alias full model", () => {
 		expect(resolveModel('codex')).toBe('openai/gpt-5.3-codex')
 	})
