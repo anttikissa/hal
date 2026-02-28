@@ -149,21 +149,13 @@ function promptFirstRow(): number { return promptTopPadRow() + 1 }
 
 function directWrite(text: string): void { process.stdout.write(text) }
 
+function isKittyEnv(): boolean { return !!process.env.KITTY_PID || process.env.TERM === 'xterm-kitty' }
 function supportsSynchronizedOutput(): boolean {
-	if (!process.stdout.isTTY) return false
-	const tp = process.env.TERM_PROGRAM
-	return !!process.env.KITTY_PID || tp === 'kitty' || tp === 'ghostty' || process.env.TERM === 'xterm-kitty'
+	return process.stdout.isTTY && (isKittyEnv() || /^(kitty|ghostty)$/.test(process.env.TERM_PROGRAM ?? ''))
 }
-
 function supportsKittyKeyboard(): boolean {
-	const tp = process.env.TERM_PROGRAM
-	return !!process.env.KITTY_PID || tp === 'kitty' || tp === 'ghostty' || tp === 'iTerm.app' || process.env.TERM === 'xterm-kitty'
+	return isKittyEnv() || /^(kitty|ghostty|iTerm\.app)$/.test(process.env.TERM_PROGRAM ?? '')
 }
-
-function showCursor(): void {
-	directWrite(`\x1b[?25h`)
-}
-
 // ── Output storage ──
 
 // Matches \x1b[NA\x1b[J (cursor-up N + erase-below) — used by prompt redraw
@@ -281,21 +273,15 @@ function buildStatusLine(): string {
 
 // ── Input selection/edit helpers ──
 
-function clampInputPos(pos: number): number {
-	return Math.max(0, Math.min(pos, inputBuf.length))
-}
+function clampInputPos(pos: number): number { return Math.max(0, Math.min(pos, inputBuf.length)) }
 
 function getInputTextSelectionRange(): { start: number; end: number } | null {
 	if (inputSelAnchor === null || inputSelFocus === null) return null
-	const a = clampInputPos(inputSelAnchor)
-	const b = clampInputPos(inputSelFocus)
-	if (a === b) return null
-	return a < b ? { start: a, end: b } : { start: b, end: a }
+	const a = clampInputPos(inputSelAnchor), b = clampInputPos(inputSelFocus)
+	return a === b ? null : a < b ? { start: a, end: b } : { start: b, end: a }
 }
 
-function clearInputUndoHistory(): void {
-	inputUndoStack = []
-}
+function clearInputUndoHistory(): void { inputUndoStack = [] }
 
 function pushInputUndoSnapshot(): void {
 	const prev = inputUndoStack[inputUndoStack.length - 1]
@@ -308,163 +294,101 @@ function pushInputUndoSnapshot(): void {
 function undoInputEdit(): boolean {
 	const snap = inputUndoStack.pop()
 	if (!snap) return false
-	inputBuf = snap.text
-	inputCursor = clampInputPos(snap.cursor)
+	inputBuf = snap.text; inputCursor = clampInputPos(snap.cursor)
 	inputSelAnchor = snap.selAnchor === null ? null : clampInputPos(snap.selAnchor)
 	inputSelFocus = snap.selFocus === null ? null : clampInputPos(snap.selFocus)
-	inputSelActive = false
-	return true
+	inputSelActive = false; return true
 }
 
-function clearInputTextSelection(): void {
-	inputSelAnchor = null
-	inputSelFocus = null
-	inputSelActive = false
-}
+function clearInputTextSelection(): void { inputSelAnchor = null; inputSelFocus = null; inputSelActive = false }
 
 function setInputCursor(pos: number, extendSelection = false): void {
 	const next = clampInputPos(pos)
-	if (extendSelection) {
-		if (inputSelAnchor === null) inputSelAnchor = inputCursor
-		inputSelFocus = next
-	} else {
-		clearInputTextSelection()
-	}
+	if (extendSelection) { if (inputSelAnchor === null) inputSelAnchor = inputCursor; inputSelFocus = next }
+	else clearInputTextSelection()
 	inputCursor = next
 }
 
 function replaceInputRange(start: number, end: number, text: string): void {
 	pushInputUndoSnapshot()
-	const a = clampInputPos(start)
-	const b = clampInputPos(end)
-	const lo = Math.min(a, b)
-	const hi = Math.max(a, b)
+	const a = clampInputPos(start), b = clampInputPos(end), lo = Math.min(a, b), hi = Math.max(a, b)
 	inputBuf = inputBuf.slice(0, lo) + text + inputBuf.slice(hi)
-	inputCursor = lo + text.length
-	clearInputTextSelection()
+	inputCursor = lo + text.length; clearInputTextSelection()
 }
 
 function deleteInputTextSelection(): boolean {
-	const sel = getInputTextSelectionRange()
-	if (!sel) return false
-	replaceInputRange(sel.start, sel.end, '')
-	return true
+	const sel = getInputTextSelectionRange(); if (!sel) return false
+	replaceInputRange(sel.start, sel.end, ''); return true
 }
 
 function insertIntoInput(text: string): void {
 	const sel = getInputTextSelectionRange()
-	if (sel) {
-		replaceInputRange(sel.start, sel.end, text)
-		return
-	}
+	if (sel) { replaceInputRange(sel.start, sel.end, text); return }
 	pushInputUndoSnapshot()
-	inputBuf = inputBuf.slice(0, inputCursor) + text + inputBuf.slice(inputCursor)
-	inputCursor += text.length
+	inputBuf = inputBuf.slice(0, inputCursor) + text + inputBuf.slice(inputCursor); inputCursor += text.length
 }
 
 function collapseInputSelection(edge: 'start' | 'end'): boolean {
-	const sel = getInputTextSelectionRange()
-	if (!sel) return false
-	inputCursor = edge === 'start' ? sel.start : sel.end
-	clearInputTextSelection()
-	return true
+	const sel = getInputTextSelectionRange(); if (!sel) return false
+	inputCursor = edge === 'start' ? sel.start : sel.end; clearInputTextSelection(); return true
 }
 
-function lineBoundaryLeft(buf: string, cursor: number): number {
-	return buf.lastIndexOf('\n', Math.max(0, cursor) - 1) + 1
-}
-
-function lineBoundaryRight(buf: string, cursor: number): number {
-	const i = buf.indexOf('\n', Math.max(0, cursor))
-	return i >= 0 ? i : buf.length
-}
+function lineBoundaryLeft(buf: string, cursor: number): number { return buf.lastIndexOf('\n', Math.max(0, cursor) - 1) + 1 }
+function lineBoundaryRight(buf: string, cursor: number): number { const i = buf.indexOf('\n', Math.max(0, cursor)); return i >= 0 ? i : buf.length }
 
 function inputWordRangeAt(pos: number): { start: number; end: number } {
 	const clamped = clampInputPos(pos)
 	if (inputBuf.length === 0) return { start: 0, end: 0 }
-	let start = clamped
-	let end = clamped
 	if (clamped < inputBuf.length && /\s/.test(inputBuf[clamped])) {
+		let start = clamped, end = clamped
 		while (start > 0 && /\s/.test(inputBuf[start - 1])) start--
 		while (end < inputBuf.length && /\s/.test(inputBuf[end])) end++
 		return { start, end }
 	}
-	start = wordBoundaryLeft(inputBuf, clamped)
-	end = wordBoundaryRight(inputBuf, clamped)
-	return { start, end }
+	return { start: wordBoundaryLeft(inputBuf, clamped), end: wordBoundaryRight(inputBuf, clamped) }
 }
 
 function inputLineRangeAt(pos: number): { start: number; end: number } {
-	const clamped = clampInputPos(pos)
-	return {
-		start: lineBoundaryLeft(inputBuf, clamped),
-		end: lineBoundaryRight(inputBuf, clamped),
-	}
+	const c = clampInputPos(pos)
+	return { start: lineBoundaryLeft(inputBuf, c), end: lineBoundaryRight(inputBuf, c) }
 }
 
 function writeClipboardText(text: string): void {
 	if (!text) return
-	try {
-		const proc = Bun.spawn(['pbcopy'], { stdin: 'pipe' })
-		proc.stdin.write(text)
-		proc.stdin.end()
-	} catch {
-		// Ignore clipboard failures
-	}
+	try { const p = Bun.spawn(['pbcopy'], { stdin: 'pipe' }); p.stdin.write(text); p.stdin.end() } catch {}
 }
 
-function copyInputTextSelectionToClipboard(): boolean {
-	const sel = getInputTextSelectionRange()
-	if (!sel) return false
+function clipInputSel(cut: boolean): boolean {
+	const sel = getInputTextSelectionRange(); if (!sel) return false
 	writeClipboardText(inputBuf.slice(sel.start, sel.end))
-	return true
+	if (cut) replaceInputRange(sel.start, sel.end, ''); return true
 }
 
-function copyCurrentSelectionToClipboard(): boolean {
-	if (copyInputTextSelectionToClipboard()) return true
-	const sel = getSelectionRange()
-	if (!sel) return false
-	const text = screenSelectionText(sel)
-	if (!text) return false
-	writeClipboardText(text)
-	return true
-}
-
-function cutInputTextSelectionToClipboard(): boolean {
-	const sel = getInputTextSelectionRange()
-	if (!sel) return false
-	writeClipboardText(inputBuf.slice(sel.start, sel.end))
-	replaceInputRange(sel.start, sel.end, '')
-	return true
+function copyToClipboard(): boolean {
+	if (clipInputSel(false)) return true
+	const sel = getSelectionRange(); if (!sel) return false
+	const text = screenSelectionText(sel); if (!text) return false
+	writeClipboardText(text); return true
 }
 
 function cutCurrentInputLineToClipboard(): boolean {
 	const start = inputBuf.lastIndexOf('\n', Math.max(0, inputCursor - 1)) + 1
-	const nextNewline = inputBuf.indexOf('\n', inputCursor)
-	const end = nextNewline === -1 ? inputBuf.length : nextNewline + 1
+	const next = inputBuf.indexOf('\n', inputCursor)
+	const end = next === -1 ? inputBuf.length : next + 1
 	if (start >= end) return false
-	writeClipboardText(inputBuf.slice(start, end))
-	replaceInputRange(start, end, '')
-	return true
+	writeClipboardText(inputBuf.slice(start, end)); replaceInputRange(start, end, ''); return true
 }
 
 function cleanAndInsertPaste(text: string): void {
 	const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
-	if (!clean) return
-	insertIntoInput(clean.includes('\n') ? saveMultilinePaste(clean) : clean)
-	render()
+	if (clean) { insertIntoInput(clean.includes('\n') ? saveMultilinePaste(clean) : clean); render() }
 }
 
-function pasteClipboardIntoInput(): void {
-	pasteFromClipboard().then((content) => { if (content) cleanAndInsertPaste(content) })
-}
+function pasteClipboardIntoInput(): void { pasteFromClipboard().then((c) => { if (c) cleanAndInsertPaste(c) }) }
 
 function setInputTextWithUndo(text: string, cursor = text.length): void {
 	if (text === inputBuf && cursor === inputCursor) return
-	pushInputUndoSnapshot()
-	inputBuf = text
-	inputCursor = clampInputPos(cursor)
-	clearInputTextSelection()
+	pushInputUndoSnapshot(); inputBuf = text; inputCursor = clampInputPos(cursor); clearInputTextSelection()
 }
 
 function handleInputClipboardShortcutKey(key: string): boolean {
@@ -475,168 +399,110 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 	const codepoint = Number(modOther?.[2] ?? csiU?.codepoint ?? NaN)
 	if (!Number.isFinite(modifier) || !Number.isFinite(codepoint) || modifier < 9) return false
 	const ch = String.fromCharCode(codepoint).toLowerCase()
-	if (ch === 'c') { if (copyCurrentSelectionToClipboard()) render(); return true }
-	if (ch === 'x') { if (cutInputTextSelectionToClipboard() || cutCurrentInputLineToClipboard()) render(); return true }
+	if (ch === 'c') { if (copyToClipboard()) render(); return true }
+	if (ch === 'x') { if (clipInputSel(true) || cutCurrentInputLineToClipboard()) render(); return true }
 	if (ch === 'v') { pasteClipboardIntoInput(); return true }
 	if (ch === 'a') {
 		inputSelAnchor = 0; inputSelFocus = inputBuf.length
-		inputCursor = inputBuf.length; inputSelActive = false
-		render(); return true
+		inputCursor = inputBuf.length; inputSelActive = false; render(); return true
 	}
 	if (ch === 'z') { if (undoInputEdit()) render(); return true }
 	return false
 }
-function inputPosFromWrappedPoint(row: number, col: number): number {
-	return wrappedRowColToCursor(inputBuf, row, Math.max(0, col), promptContentWidth())
-}
+
+function inputPosFromWrappedPoint(row: number, col: number): number { return wrappedRowColToCursor(inputBuf, row, Math.max(0, col), promptContentWidth()) }
 
 function inputWrappedPointFromScreen(x: number, y: number): { row: number; col: number } | null {
-	const contentWidth = promptContentWidth()
-	const { lines } = getWrappedInputLayout(inputBuf, contentWidth)
-	const pLines = Math.min(lines.length, maxPromptLines)
-	const firstRow = promptFirstRow()
-	const row = y - (firstRow - 1)
-	if (row < 0 || row >= pLines) return null
-	const col = Math.max(0, x - inputPromptStr.length)
-	return { row, col }
+	const { lines } = getWrappedInputLayout(inputBuf, promptContentWidth())
+	const row = y - (promptFirstRow() - 1)
+	if (row < 0 || row >= Math.min(lines.length, maxPromptLines)) return null
+	return { row, col: Math.max(0, x - inputPromptStr.length) }
 }
 
 function renderPromptLineWithInputSelection(
-	lineText: string,
-	lineStart: number,
-	screenCols: number,
+	lineText: string, lineStart: number, screenCols: number,
 	inputSel: { start: number; end: number } | null,
 ): string {
-	const baseLen = inputPromptStr.length + lineText.length
-	const pad = ' '.repeat(Math.max(0, screenCols - baseLen))
+	const pad = ' '.repeat(Math.max(0, screenCols - inputPromptStr.length - lineText.length))
 	if (!inputSel) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-
 	const selStart = Math.max(0, Math.min(lineText.length, inputSel.start - lineStart))
 	const selEnd = Math.max(0, Math.min(lineText.length, inputSel.end - lineStart))
 	if (selStart >= selEnd) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-
-	const before = lineText.slice(0, selStart)
-	const selected = lineText.slice(selStart, selEnd)
-	const after = lineText.slice(selEnd)
-	return `${BG_DARK}${inputPromptStr}${before}\x1b[7m${selected}\x1b[27m${after}${pad}${RESET}`
+	return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
 }
 
 // ── Mouse selection ──
 
 function screenSelectionLine(surface: SelectionSurface, row: number): string {
-	if (surface === 'title') return row === 0 ? lastTitleLine : ''
-	if (surface === 'activity') return row === 0 ? lastActivityLine : ''
-	if (surface === 'status') return row === 0 ? lastStatusLine : ''
 	if (surface === 'output') return lastVisibleOutput[row] ?? ''
-	return ''
+	if (row !== 0) return ''
+	return { title: lastTitleLine, activity: lastActivityLine, status: lastStatusLine }[surface] ?? ''
 }
 
 function screenSelectionText(sel: SelectionRange): string {
 	const lines: string[] = []
 	for (let row = sel.startRow; row <= sel.endRow; row++) {
 		const plain = stripAnsi(screenSelectionLine(sel.surface, row))
-		const start = row === sel.startRow ? sel.startCol : 0
-		const end = row === sel.endRow ? sel.endCol : plain.length
-		lines.push(plain.slice(start, end))
+		lines.push(plain.slice(row === sel.startRow ? sel.startCol : 0, row === sel.endRow ? sel.endCol : plain.length))
 	}
 	return lines.join('\n')
 }
 
 function getSelectionRange(): SelectionRange | null {
-	if (!selAnchor || !selCurrent) return null
-	if (selAnchor.surface !== selCurrent.surface) return null
+	if (!selAnchor || !selCurrent || selAnchor.surface !== selCurrent.surface) return null
 	let a = selAnchor, b = selCurrent
-	if (selMode === 'word') {
-		a = expandToWordBoundary(a, 'start'); b = expandToWordBoundary(b, 'end')
-	} else if (selMode === 'line') {
-		a = { ...a, col: 0 }; b = { ...b, col: cols() }
-	}
-	// If a is after b, swap — for word mode, re-expand from swapped anchors
+	if (selMode === 'word') { a = expandToWordBoundary(a, 'start'); b = expandToWordBoundary(b, 'end') }
+	else if (selMode === 'line') { a = { ...a, col: 0 }; b = { ...b, col: cols() } }
 	if (a.row > b.row || (a.row === b.row && a.col > b.col)) {
-		if (selMode === 'word') {
-			a = expandToWordBoundary(selCurrent, 'start')
-			b = expandToWordBoundary(selAnchor, 'end')
-		} else { [a, b] = [b, a] }
+		if (selMode === 'word') { a = expandToWordBoundary(selCurrent, 'start'); b = expandToWordBoundary(selAnchor, 'end') }
+		else [a, b] = [b, a]
 	}
 	return { surface: a.surface, startRow: a.row, startCol: a.col, endRow: b.row, endCol: b.col }
 }
 
 function selectionLine(pt: SelectionPoint): string {
-	if (pt.surface === 'input') {
-		const width = promptContentWidth()
-		return getWrappedInputLayout(inputBuf, width).lines[pt.row] ?? ''
-	}
+	if (pt.surface === 'input') return getWrappedInputLayout(inputBuf, promptContentWidth()).lines[pt.row] ?? ''
 	return screenSelectionLine(pt.surface, pt.row)
 }
 
 function expandToWordBoundary(pt: SelectionPoint, side: 'start' | 'end'): SelectionPoint {
-	const line = selectionLine(pt)
-	const plain = stripAnsi(line)
+	const plain = stripAnsi(selectionLine(pt))
 	const col = Math.min(pt.col, plain.length)
-
 	if (side === 'start') {
 		let i = Math.min(col, plain.length - 1)
 		if (i < 0) return { ...pt, col: 0 }
 		while (i > 0 && /\s/.test(plain[i])) i--
 		while (i > 0 && !/\s/.test(plain[i - 1])) i--
 		return { ...pt, col: i }
-	} else {
-		let i = col
-		while (i < plain.length && /\s/.test(plain[i])) i++
-		while (i < plain.length && !/\s/.test(plain[i])) i++
-		return { ...pt, col: i }
 	}
+	let i = col
+	while (i < plain.length && /\s/.test(plain[i])) i++
+	while (i < plain.length && !/\s/.test(plain[i])) i++
+	return { ...pt, col: i }
 }
 
-function renderLineWithSelection(
-	line: string,
-	row: number,
-	sel: SelectionRange,
-): string {
-	const plain = stripAnsi(line)
-	const truncated = plain.slice(0, cols())
-
-	let selStart = 0
-	let selEnd = truncated.length
+function renderLineWithSelection(line: string, row: number, sel: SelectionRange): string {
+	const plain = stripAnsi(line), c = cols(), truncated = plain.slice(0, c)
+	let selStart = 0, selEnd = truncated.length
 	if (row === sel.startRow) selStart = Math.max(0, sel.startCol)
 	if (row === sel.endRow) selEnd = Math.min(truncated.length, sel.endCol)
-
-	if (selStart >= selEnd) {
-		return truncateAnsi(line, cols())
-	}
+	if (selStart >= selEnd) return truncateAnsi(line, c)
 
 	const result: string[] = []
-	let visCol = 0
-	let inSel = false
-	let i = 0
-	const c = cols()
-
+	let visCol = 0, inSel = false, i = 0
 	while (i < line.length && visCol < c) {
 		if (line[i] === '\x1b') {
 			const seqLen = readEscapeSequence(line, i)
 			const seq = line.slice(i, i + seqLen)
 			result.push(seq)
-			// Embedded SGR (especially \x1b[0m) can cancel inverse-video mid-selection.
-			// Re-apply selection highlight so dragging stays visually continuous.
+			// Re-apply inverse after embedded SGR resets
 			if (inSel && seq.startsWith('\x1b[') && seq.endsWith('m')) result.push('\x1b[7m')
-			i += seqLen
-			continue
+			i += seqLen; continue
 		}
-
-		if (visCol === selStart && !inSel) {
-			result.push('\x1b[7m')
-			inSel = true
-		}
-		if (visCol === selEnd && inSel) {
-			result.push('\x1b[27m')
-			inSel = false
-		}
-
-		result.push(line[i])
-		visCol++
-		i++
+		if (visCol === selStart && !inSel) { result.push('\x1b[7m'); inSel = true }
+		if (visCol === selEnd && inSel) { result.push('\x1b[27m'); inSel = false }
+		result.push(line[i]); visCol++; i++
 	}
-
 	if (inSel) result.push('\x1b[27m')
 	result.push(RESET)
 	return result.join('')
@@ -646,36 +512,24 @@ function pointFromScreenCoords(x: number, y: number): SelectionPoint | null {
 	const inputPt = inputWrappedPointFromScreen(x, y)
 	if (inputPt) return { surface: 'input', row: inputPt.row, col: inputPt.col }
 	if (y === 0) return { surface: 'title', row: 0, col: x }
-
-	// y is 0-based row on screen. Output starts at row 2 (index 1).
-	const oh = Math.max(0, outputBottom() - 1)
 	const outputRow = y - 1
-	if (outputRow >= 0 && outputRow < oh) {
-		return { surface: 'output', row: outputRow, col: x }
-	}
-	if (y === activityRow() - 1) {
-		return { surface: 'activity', row: 0, col: x }
-	}
-	if (y === statusRow() - 1) {
-		return { surface: 'status', row: 0, col: x }
-	}
+	if (outputRow >= 0 && outputRow < Math.max(0, outputBottom() - 1)) return { surface: 'output', row: outputRow, col: x }
+	if (y === activityRow() - 1) return { surface: 'activity', row: 0, col: x }
+	if (y === statusRow() - 1) return { surface: 'status', row: 0, col: x }
 	return null
 }
 
 function updateHoverLink(): void {
-	let newRow = -1
-	let newUrl: string | null = null
+	let newRow = -1, newUrl: string | null = null
 	if (superHeld && lastMouseX >= 0) {
 		const pt = pointFromScreenCoords(lastMouseX, lastMouseY)
 		if (pt?.surface === 'output') {
-			const line = lastVisibleOutput[pt.row] ?? ''
-			newUrl = urlAtCol(line, pt.col)
+			newUrl = urlAtCol(lastVisibleOutput[pt.row] ?? '', pt.col)
 			if (newUrl) newRow = pt.row
 		}
 	}
 	if (newRow !== hoverOutputRow || newUrl !== hoverUrl) {
-		hoverOutputRow = newRow
-		hoverUrl = newUrl
+		hoverOutputRow = newRow; hoverUrl = newUrl
 		render()
 	}
 }
@@ -891,9 +745,8 @@ function render(): void {
 // ── Suspend/resume ──
 
 function dumpAndLeaveAltScreen(): void {
-	const c = cols()
-	const visible = getVisibleWrapped(Math.max(0, outputBottom() - 1))
-	disableMouse(); showCursor()
+	const c = cols(), visible = getVisibleWrapped(Math.max(0, outputBottom() - 1))
+	disableMouse(); directWrite('\x1b[?25h') // show cursor
 	directWrite('\x1b[?1049l') // leave alt screen
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 	directWrite(`\x1b[${rows()};1H\r\n`)
@@ -901,17 +754,12 @@ function dumpAndLeaveAltScreen(): void {
 }
 
 function suspendForegroundJob(): void {
-	suspended = true
-	dumpAndLeaveAltScreen()
-	try { process.kill(0, 'SIGSTOP') }
-	catch { process.kill(process.pid, 'SIGSTOP') }
+	suspended = true; dumpAndLeaveAltScreen()
+	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
 }
 
-// ── Bracketed paste handler ──
-
 function handleBracketedPaste(text: string): void {
-	if (!waitingResolve) return
-	cleanAndInsertPaste(text)
+	if (waitingResolve) cleanAndInsertPaste(text)
 }
 const SUPER_L = 57444
 const SUPER_R = 57450
@@ -1092,7 +940,7 @@ function handleKey(key: string): void {
 
 	// Clipboard shortcuts — handle before clearing output selection
 	if (handleInputClipboardShortcutKey(key)) return
-	if (key === '\x1bw') { if (copyCurrentSelectionToClipboard()) render(); return }
+	if (key === '\x1bw') { if (copyToClipboard()) render(); return }
 
 	// Any real keypress clears output selection
 	if (selAnchor) clearSelection()
@@ -1108,7 +956,7 @@ function handleKey(key: string): void {
 	}
 	if (key === CTRL_Z) return suspendForegroundJob()
 	if (key === '\x1bz') { if (undoInputEdit()) render(); return }
-	if (key === CTRL_X) { if (cutInputTextSelectionToClipboard()) render(); return }
+	if (key === CTRL_X) { if (clipInputSel(true)) render(); return }
 	if (key === CTRL_Y || key === CTRL_V) return pasteClipboardIntoInput()
 	if (key === '\x1ba' || key === '\x1bA') {
 		inputSelAnchor = 0; inputSelFocus = inputBuf.length
@@ -1442,11 +1290,7 @@ export function flashHeader(text: string, durationMs = 1500): void {
 
 function safeStringify(value: unknown): string {
 	if (typeof value === 'string') return value
-	try {
-		return stringify(value)
-	} catch {
-		return String(value)
-	}
+	try { return stringify(value) } catch { return String(value) }
 }
 
 // ── Public API ──
@@ -1464,13 +1308,8 @@ export function init(): void {
 	process.on('SIGCONT', onSigCont); process.stdout.on('resize', onResize)
 	render()
 }
-export function write(text: string): void {
-	writeToOutput(text)
-}
-
-export function log(...args: any[]): void {
-	write(args.map((a) => safeStringify(a)).join(' ') + '\n')
-}
+export function write(text: string): void { writeToOutput(text) }
+export function log(...args: any[]): void { write(args.map((a) => safeStringify(a)).join(' ') + '\n') }
 
 export function setActivityLine(text: string): void {
 	if (activityStr === text) return; activityStr = text; if (initialized) scheduleRender()
@@ -1482,11 +1321,8 @@ export function setStatusLine(tabsStr: string, rightStr: string): void {
 	statusTabsStr = tabsStr; statusRightStr = rightStr; if (initialized) scheduleRender()
 }
 export function getOutputSnapshot(): string { return outputLines.join('\n') }
-export function setOutputSnapshot(snapshot: string): void {
-	outputLines = ['']; lastWrapCols = 0; appendOutput(snapshot)
-}
+export function setOutputSnapshot(snapshot: string): void { outputLines = ['']; lastWrapCols = 0; appendOutput(snapshot) }
 export function clearOutput(): void { replaceOutput('') }
-
 export function replaceOutput(snapshot: string): void {
 	outputLines = ['']; scrollOffset = 0; lastWrapCols = 0; wrappedLineCount = 1
 	if (snapshot) appendOutput(snapshot)
@@ -1494,33 +1330,24 @@ export function replaceOutput(snapshot: string): void {
 }
 export function input(promptStr: string): Promise<string | null> {
 	if (!initialized) init()
-	resolveInput(null)
-	inputPromptStr = promptStr
+	resolveInput(null); inputPromptStr = promptStr
 	if (draftPreloaded) draftPreloaded = false
 	else { inputBuf = ''; inputCursor = 0; clearInputTextSelection(); clearInputUndoHistory() }
 	render()
 	if (ended) return Promise.resolve(null)
 	return new Promise((resolve) => { waitingResolve = resolve })
 }
-
 export function cancelInput(): void { resolveInput(null) }
-
 export function prompt(message: string, promptStr: string): Promise<string | null> {
-	write(`${message}\n`)
-	return input(promptStr)
+	write(`${message}\n`); return input(promptStr)
 }
 export function cleanup(): void {
 	if (!initialized) return
 	initialized = false; suspended = false
 	if (headerFlashTimer) { clearTimeout(headerFlashTimer); headerFlashTimer = null }
-	headerFlash = ''
-	dumpAndLeaveAltScreen()
-	process.stdin.off('data', onStdinData)
-	process.stdin.off('end', onStdinEnd)
-	process.off('SIGCONT', onSigCont)
-	process.stdout.off('resize', onResize)
-	// Push shell prompt to bottom
-	const padding = footerHeight() - 1
-	for (let i = 0; i < padding; i++) directWrite('\r\n')
+	headerFlash = ''; dumpAndLeaveAltScreen()
+	process.stdin.off('data', onStdinData); process.stdin.off('end', onStdinEnd)
+	process.off('SIGCONT', onSigCont); process.stdout.off('resize', onResize)
+	for (let i = 0; i < footerHeight() - 1; i++) directWrite('\r\n')
 	resolveInput(null)
 }

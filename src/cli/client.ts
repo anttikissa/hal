@@ -93,93 +93,54 @@ function modelDisplayName(model: string): string {
 }
 
 export class Client {
-	async command(type: CommandType, text?: string): Promise<void> {
-		await appendCommand(type, text)
-	}
-	log(kind: string, text: string): void {
-		pushLocal(kind, text)
-	}
-	async prompt(message: string, promptStr: string): Promise<string | null> {
-		return tui.prompt(message, promptStr)
-	}
-	getTranscript(): string {
-		return tui.getOutputSnapshot()
-	}
-	clear(): void {
-		tui.clearOutput()
-	}
-	async closeTab(): Promise<void> {
-		await closeActiveTab()
-	}
-	async openSession(sessionId: string, workingDir: string): Promise<void> {
-		await openSessionTab(sessionId, workingDir)
-	}
-	getActiveSessionIds(): string[] {
-		return tabs.map((t) => t.sessionId)
-	}
+	async command(type: CommandType, text?: string): Promise<void> { await appendCommand(type, text) }
+	log(kind: string, text: string): void { pushLocal(kind, text) }
+	async prompt(message: string, promptStr: string): Promise<string | null> { return tui.prompt(message, promptStr) }
+	getTranscript(): string { return tui.getOutputSnapshot() }
+	clear(): void { tui.clearOutput() }
+	async closeTab(): Promise<void> { await closeActiveTab() }
+	async openSession(sessionId: string, workingDir: string): Promise<void> { await openSessionTab(sessionId, workingDir) }
+	getActiveSessionIds(): string[] { return tabs.map((t) => t.sessionId) }
 }
 
-
 const ALL_MODELS = [...new Set([...Object.keys(mergedModelAliases()), ...Object.values(mergedModelAliases())]) ]
-const TAB_ACTIVE = '\x1b[97m'
-const TAB_INACTIVE = '\x1b[38;5;245m'
-const TAB_RESET = '\x1b[0m'
+const TAB_ACTIVE = '\x1b[97m', TAB_INACTIVE = '\x1b[38;5;245m', TAB_RESET = '\x1b[0m'
 
 function normalizeCommandInput(input: string): string {
-	return stripAnsi(input)
-		.replace(/[\u0000-\u001f\u007f]/g, '')
-		.trim()
-		.toLowerCase()
+	return stripAnsi(input).replace(/[\u0000-\u001f\u007f]/g, '').trim().toLowerCase()
 }
 
 function completeInput(prefix: string): string[] {
-	if (prefix.startsWith('/') && !prefix.includes(' ')) {
+	if (prefix.startsWith('/') && !prefix.includes(' '))
 		return COMMAND_NAMES.map((c) => '/' + c).filter((c) => c.startsWith(prefix))
-	}
-	if (prefix.startsWith('/model ')) {
-		const partial = prefix.slice(7)
-		return ALL_MODELS.filter((m) => m.startsWith(partial)).map((m) => `/model ${m}`)
-	}
+	if (prefix.startsWith('/model '))
+		return ALL_MODELS.filter((m) => m.startsWith(prefix.slice(7))).map((m) => `/model ${m}`)
 	return []
 }
 
 // Module state
 let source: RuntimeCommand['source']
-let isOwner = false
-let stopped = false
-let lastContextStatus: string | null = null
-let roleLabel = ''
-let wasBusyOnLastSubmit = false
-
+let isOwner = false, stopped = false, lastContextStatus: string | null = null
+let roleLabel = '', wasBusyOnLastSubmit = false
 const client = new Client()
-let tabs: CliTab[] = []
-let activeTabIndex = 0
-let launchCwd = ''
-let pendingForkOutput: string | null = null
-let pendingForkSwitch = false
+let tabs: CliTab[] = [], activeTabIndex = 0, launchCwd = ''
+let pendingForkOutput: string | null = null, pendingForkSwitch = false
 let tabHasActivity = new Set<string>()
 
 export function init(src: RuntimeCommand['source'], owner: boolean): void {
-	source = src
-	isOwner = owner
-	launchCwd = resolve(LAUNCH_CWD)
+	source = src; isOwner = owner; launchCwd = resolve(LAUNCH_CWD)
 	const config = loadConfig()
-	setMaxPromptLines(config.maxPromptLines)
-	loadActiveTheme(HAL_DIR, config.theme)
+	setMaxPromptLines(config.maxPromptLines); loadActiveTheme(HAL_DIR, config.theme)
 }
 
-
 export function promoteToOwner(): void {
-	isOwner = true
-	roleLabel = 'owner'
+	isOwner = true; roleLabel = 'owner'
 	pushLocal('local.status', `[promoted] this process (pid ${process.pid}) is now the owner`)
 	renderBusyStatus()
 }
 
 let onOwnerReleased: (() => void) | null = null
-export function setOwnerReleaseHandler(handler: (() => void) | null): void {
-	onOwnerReleased = handler
-}
+export function setOwnerReleaseHandler(handler: (() => void) | null): void { onOwnerReleased = handler }
 
 export async function start(options?: { startupEpoch?: number | null }): Promise<number> {
 	tui.init()
@@ -192,12 +153,8 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 
 	const config = loadConfig()
 	pushLocal('local.info', `HAL ${roleLabel} (pid ${process.pid})`)
-	if (config.debug?.recordEverything) {
-		pushLocal(
-			'local.info',
-			'debug.recordEverything is active — use /bug <report> to report and fix immediately',
-		)
-	}
+	if (config.debug?.recordEverything)
+		pushLocal('local.info', 'debug.recordEverything is active — use /bug <report> to report and fix immediately')
 	pushLocal('local.info', '/q or Ctrl-D to quit · Ctrl-V to paste images · /help for more')
 
 	await bootstrapState()
@@ -205,7 +162,6 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 	if (options?.startupEpoch) {
 		const elapsed = Date.now() - options.startupEpoch
 		const level = elapsed > 100 ? 'local.warn' : 'local.status'
-		// Count modules/loc in background, then show perf line
 		void countSourceStats(HAL_DIR).then(({ files, lines }) => {
 			pushLocal(level, `[perf] startup: ${elapsed}ms (${files} modules, ${lines} loc)`)
 		})
@@ -213,130 +169,76 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 
 	void (async () => {
 		try {
-			for await (const event of tailEvents()) {
-				if (stopped) break
-				render(event)
-			}
-		} catch (e: any) {
-			if (!stopped) pushLocal('local.error', `[event-tail] ${e.message || e}`)
-		}
+			for await (const event of tailEvents()) { if (stopped) break; render(event) }
+		} catch (e: any) { if (!stopped) pushLocal('local.error', `[event-tail] ${e.message || e}`) }
 	})()
 
 	let restart = false
 	try {
 		while (!stopped) {
 			const input = await tui.input(' ')
-			if (input === CTRL_C) {
-				restart = true
-				break
-			}
-
+			if (input === CTRL_C) { restart = true; break }
 			if (input === null) break
-			const trimmed = input.trim()
-			const normalized = normalizeCommandInput(input)
-			// Empty Enter while paused = resume queue
-			if (!trimmed) {
-				const tab = activeTab()
-				if (tab?.paused) {
-					await client.command('resume')
-				}
-				continue
-			}
+			const trimmed = input.trim(), normalized = normalizeCommandInput(input)
+			if (!trimmed) { if (activeTab()?.paused) await client.command('resume'); continue }
 			if (isExit(normalized)) break
 			wasBusyOnLastSubmit = activeTab()?.busy ?? false
 			await handleCommand(input, client)
 			const tab = activeTab()
-			if (tab) {
-				tab.inputHistory = getInputHistory()
-				saveDraft(tab.sessionId, '').catch(() => {})
-			}
+			if (tab) { tab.inputHistory = getInputHistory(); saveDraft(tab.sessionId, '').catch(() => {}) }
 		}
 	} finally {
-		// Persist active tab so it survives app restart
 		captureActiveOutput()
 		const exitSessionId = activeTab()?.sessionId ?? null
 		const exitTasks: Promise<unknown>[] = tabs.map((tab) => saveDraft(tab.sessionId, tab.inputDraft).catch(() => {}))
 		if (exitSessionId) {
 			exitTasks.push(updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {}))
-			// Update the session registry so the runtime restores this tab on next start
-			exitTasks.push(
-				loadSessionRegistry().then((reg) => {
-					reg.activeSessionId = exitSessionId
-					return saveSessionRegistry(reg)
-				}).catch(() => {}),
-			)
+			exitTasks.push(loadSessionRegistry().then((reg) => {
+				reg.activeSessionId = exitSessionId; return saveSessionRegistry(reg)
+			}).catch(() => {}))
 		}
 		await Promise.all(exitTasks)
-		setInputKeyHandler(null)
-		setEscHandler(null)
-		setDoubleEnterHandler(null)
-		setInputEchoFilter(null)
+		setInputKeyHandler(null); setEscHandler(null); setDoubleEnterHandler(null); setInputEchoFilter(null)
 		stopped = true
-		try {
-			tui.cleanup()
-		} catch {}
+		try { tui.cleanup() } catch {}
 	}
-
-
 	return restart ? 100 : 0
 }
 
 // Internal helpers
 
-function activeTab(): CliTab | null {
-	return tabs[activeTabIndex] ?? null
-}
+function activeTab(): CliTab | null { return tabs[activeTabIndex] ?? null }
+function pushLocal(kind: string, text: string): void { tui.write(pushFragment(kind, text)) }
 
-function pushLocal(kind: string, text: string): void {
-	tui.write(pushFragment(kind, text))
+function newTabState(sessionId: string, workingDir: string): CliTab {
+	return createTabState({
+		sessionId, workingDir,
+		name: sessionName({ id: sessionId, name: undefined, workingDir }),
+		modelLabel: modelDisplayName(loadConfig().defaultModel),
+	})
 }
 
 function ensureFallbackTab(activeSessionId: string | null = null): void {
 	if (tabs.length > 0) return
-	const sessionId = activeSessionId || 's-default'
-	tabs = [
-		createTabState({
-			sessionId,
-			workingDir: launchCwd,
-			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-			modelLabel: modelDisplayName(loadConfig().defaultModel),
-		}),
-	]
-
-	activeTabIndex = 0
-	tabHasActivity = new Set()
+	tabs = [newTabState(activeSessionId || 's-default', launchCwd)]
+	activeTabIndex = 0; tabHasActivity = new Set()
 	applyActiveTabSnapshot(false)
 }
 
 function captureActiveOutput(): void {
-	const active = activeTab()
-	if (!active) return
-	active.output = getOutputSnapshot()
-	active.inputHistory = getInputHistory()
-	const draft = getInputDraft()
-	active.inputDraft = draft.text
-	active.inputCursor = draft.cursor
+	const active = activeTab(); if (!active) return
+	active.output = getOutputSnapshot(); active.inputHistory = getInputHistory()
+	const draft = getInputDraft(); active.inputDraft = draft.text; active.inputCursor = draft.cursor
 }
 
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
-	const active = activeTab()
-	if (!active) return
-	resetFormat()
-	lastContextStatus = active.contextStatus
-	setActivityLine(activityBarText(active))
-	setTitleBar(titleBarText(active))
-	setInputHistory(active.inputHistory)
-	setInputDraft(active.inputDraft, active.inputCursor)
-	if (clearWhenEmpty) {
-		// Full redraw: clear screen and rewrite content (tab switch / initial load)
-		if (active.output.length > 0) tui.replaceOutput(active.output)
-		else tui.clearOutput()
-	} else {
-		// Just update transcript, no visual change
-		if (active.output.length > 0) setOutputSnapshot(active.output)
-	}
-	ensureTabBootstrap(active)
-	renderBusyStatus()
+	const active = activeTab(); if (!active) return
+	resetFormat(); lastContextStatus = active.contextStatus
+	setActivityLine(activityBarText(active)); setTitleBar(titleBarText(active))
+	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
+	if (clearWhenEmpty) { active.output.length > 0 ? tui.replaceOutput(active.output) : tui.clearOutput() }
+	else if (active.output.length > 0) setOutputSnapshot(active.output)
+	ensureTabBootstrap(active); renderBusyStatus()
 }
 
 function ensureTabBootstrap(tab: CliTab): void {
@@ -347,9 +249,7 @@ function ensureTabBootstrap(tab: CliTab): void {
 
 function switchToTab(index: number): void {
 	if (index < 0 || index >= tabs.length || index === activeTabIndex) return
-	captureActiveOutput()
-	activeTabIndex = index
-	applyActiveTabSnapshot(true)
+	captureActiveOutput(); activeTabIndex = index; applyActiveTabSnapshot(true)
 }
 
 function handleInputKey(key: string): boolean {
@@ -362,71 +262,35 @@ function handleInputKey(key: string): boolean {
 	if (CTRL_NEXT_TAB.has(key)) { switchToTab(activeTabIndex < tabs.length - 1 ? activeTabIndex + 1 : 0); return true }
 	return false
 }
+
 function makeLocalSessionId(): string {
-	let id = ''
-	do {
-		id = `s-${randomBytes(3).toString('hex')}`
-	} while (tabs.some((t) => t.sessionId === id))
+	let id = ''; do { id = `s-${randomBytes(3).toString('hex')}` } while (tabs.some((t) => t.sessionId === id))
 	return id
 }
 
 async function createTab(): Promise<void> {
-	if (tabs.length >= 9) {
-		pushLocal('local.warn', '[tabs] max 9 tabs')
-		return
-	}
+	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
 	captureActiveOutput()
 	const sessionId = makeLocalSessionId()
-	tabs.push(
-		createTabState({
-			sessionId,
-			workingDir: launchCwd,
-			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-			modelLabel: modelDisplayName(loadConfig().defaultModel),
-		}),
-	)
-
-	activeTabIndex = tabs.length - 1
-	applyActiveTabSnapshot(true)
+	tabs.push(newTabState(sessionId, launchCwd))
+	activeTabIndex = tabs.length - 1; applyActiveTabSnapshot(true)
 	pushLocal('local.tab', `[tab] opened ${activeTabIndex + 1}: ${launchCwd}`)
 	let hint = '[tabs] Switch: Alt-1..9 | Cycle: Ctrl-P/N | Fork: Ctrl-F | Close: Ctrl-W'
 	if (process.platform === 'darwin') {
 		const term = process.env.TERM_PROGRAM ?? ''
-		if (term === 'iTerm.app')
-			hint += " | iTerm2: set Preferences > Profiles > Keys > Option Key to 'Esc+'"
-		else if (term === 'Apple_Terminal')
-			hint +=
-				" | Terminal.app: enable Preferences > Profiles > Keyboard > 'Use Option as Meta key'"
+		if (term === 'iTerm.app') hint += " | iTerm2: set Preferences > Profiles > Keys > Option Key to 'Esc+'"
+		else if (term === 'Apple_Terminal') hint += " | Terminal.app: enable Preferences > Profiles > Keyboard > 'Use Option as Meta key'"
 	}
 	pushLocal('local.tabs', hint)
 }
 
 async function openSessionTab(sessionId: string, workingDir: string): Promise<void> {
-	if (tabs.length >= 9) {
-		pushLocal('local.warn', '[tabs] max 9 tabs')
-		return
-	}
-	// If already open, just switch to it
+	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
 	const existing = tabs.findIndex((t) => t.sessionId === sessionId)
-	if (existing >= 0) {
-		switchToTab(existing)
-		pushLocal('local.tab', `[restore] switched to existing tab ${existing + 1}`)
-		return
-	}
+	if (existing >= 0) { switchToTab(existing); pushLocal('local.tab', `[restore] switched to existing tab ${existing + 1}`); return }
 	captureActiveOutput()
 	const inputHistory = await loadInputHistory(sessionId)
-	tabs.push(
-		{
-			...createTabState({
-				sessionId,
-				workingDir,
-				name: sessionName({ id: sessionId, name: undefined, workingDir }),
-				modelLabel: modelDisplayName(loadConfig().defaultModel),
-			}),
-			inputHistory,
-		},
-	)
-
+	tabs.push({ ...newTabState(sessionId, workingDir), inputHistory })
 	activeTabIndex = tabs.length - 1
 	const added = tabs[activeTabIndex]
 	const history = await loadConversation(sessionId)
@@ -436,83 +300,58 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 	pushLocal('local.tab', `[restore] opened session ${sessionId} in tab ${activeTabIndex + 1} (${replayCount} event${replayCount === 1 ? '' : 's'} replayed)`)
 }
 
-
 async function closeActiveTab(): Promise<void> {
-	const active = activeTab()
-	if (!active) return
+	const active = activeTab(); if (!active) return
 	await appendBusCommand(makeCommand('close', source, undefined, active.sessionId))
 	if (tabs.length <= 1) {
-		// Tell all clients (including self) there are no sessions left
 		await appendEvent({
-			id: `${Date.now()}-${process.pid}-close-last`,
-			type: 'sessions',
-			activeSessionId: null,
-			sessions: [],
-			createdAt: new Date().toISOString(),
+			id: `${Date.now()}-${process.pid}-close-last`, type: 'sessions',
+			activeSessionId: null, sessions: [], createdAt: new Date().toISOString(),
 		})
-		stopped = true
-		tui.cancelInput()
-		return
+		stopped = true; tui.cancelInput(); return
 	}
 	pushLocal('local.queue', `close tab ${active.sessionId.slice(0, 8)}`)
 }
 
 async function forkTab(): Promise<void> {
-	const active = activeTab()
-	if (!active) return
-	if (tabs.length >= 9) {
-		pushLocal('local.warn', '[tabs] max 9 tabs')
-		return
-	}
+	const active = activeTab(); if (!active) return
+	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
 	captureActiveOutput()
-	pendingForkOutput = active.output
-	pendingForkSwitch = true
+	pendingForkOutput = active.output; pendingForkSwitch = true
 	await appendBusCommand(makeCommand('fork', source, undefined, active.sessionId))
 	pushLocal('local.queue', 'fork')
 }
 
 function syncTabsFromSessions(
-	sessions: SessionInfo[],
-	preferredActiveSessionId: string | null,
+	sessions: SessionInfo[], preferredActiveSessionId: string | null,
 	options: { preserveActiveOutput?: boolean; render?: boolean; bootstrap?: boolean } = {},
 ): void {
-	if (!Array.isArray(sessions) || sessions.length === 0) {
-		stopped = true
-		tui.cancelInput()
-		return
-	}
-	const preserveActiveOutput = options.preserveActiveOutput ?? true
-	if (preserveActiveOutput) captureActiveOutput()
-
+	if (!Array.isArray(sessions) || sessions.length === 0) { stopped = true; tui.cancelInput(); return }
+	const preserve = options.preserveActiveOutput ?? true
+	if (preserve) captureActiveOutput()
 	const previousById = new Map(tabs.map((t) => [t.sessionId, t]))
 	const previousActive = activeTab()?.sessionId ?? null
 	const previousActiveIndex = activeTabIndex
-
-
-	const forkOutput = pendingForkOutput
-	const switchToFork = pendingForkSwitch
-	pendingForkOutput = null
-	pendingForkSwitch = false
+	const forkOutput = pendingForkOutput, switchToFork = pendingForkSwitch
+	pendingForkOutput = null; pendingForkSwitch = false
 	let forkedSessionId: string | null = null
 
 	tabs = sessions.slice(0, 9).map((session) => {
 		const existing = previousById.get(session.id)
-		// New tab from fork: seed with the source tab's output
 		const isNewFromFork = !existing && forkOutput !== null
 		if (isNewFromFork) forkedSessionId = session.id
 		return {
 			...createTabState({
-				sessionId: session.id,
-				workingDir: session.workingDir,
+				sessionId: session.id, workingDir: session.workingDir,
 				name: sessionName(session),
 				modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().defaultModel),
 			}),
 			topic: session.topic ?? existing?.topic ?? '',
-			output: preserveActiveOutput ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
-			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
-			activity: preserveActiveOutput ? (existing?.activity ?? '') : '',
-			busy: preserveActiveOutput ? (existing?.busy ?? false) : false,
-			paused: preserveActiveOutput ? (existing?.paused ?? false) : false,
+			output: preserve ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
+			contextStatus: preserve ? (existing?.contextStatus ?? null) : null,
+			activity: preserve ? (existing?.activity ?? '') : '',
+			busy: preserve ? (existing?.busy ?? false) : false,
+			paused: preserve ? (existing?.paused ?? false) : false,
 			inputHistory: existing?.inputHistory ?? [],
 			inputDraft: existing?.inputDraft ?? '',
 			inputCursor: existing?.inputCursor ?? 0,
@@ -521,7 +360,6 @@ function syncTabsFromSessions(
 	})
 	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id)))
 
-	// Pick which tab to focus next
 	const previousStillExists = previousActive && tabs.some((t) => t.sessionId === previousActive)
 	let targetSessionId: string
 	if (switchToFork && forkedSessionId) targetSessionId = forkedSessionId
@@ -534,54 +372,38 @@ function syncTabsFromSessions(
 			? preferredActiveSessionId : tabs[0].sessionId
 	}
 	activeTabIndex = Math.max(0, tabs.findIndex((t) => t.sessionId === targetSessionId))
-	const activeChanged = targetSessionId !== previousActive
-	if (options.render ?? true) applyActiveTabSnapshot(activeChanged)
+	if (options.render ?? true) applyActiveTabSnapshot(targetSessionId !== previousActive)
 	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
 }
 
-function renderConversationHistory(
-	sessionId: string,
-	events: Awaited<ReturnType<typeof loadConversation>>,
-): string {
+function renderConversationHistory(sessionId: string, events: Awaited<ReturnType<typeof loadConversation>>): string {
 	resetFormat(sessionId)
 	let output = ''
 	for (const event of replayConversationEvents(events)) {
-		if (event.type === 'user') output += pushFragment('prompt', event.text, sessionId)
-		else output += event.text + '\n'
+		output += event.type === 'user' ? pushFragment('prompt', event.text, sessionId) : event.text + '\n'
 	}
 	return output
 }
 
 async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
 	const replayed = new Map<string, number>()
-	await Promise.all(
-		tabs.map(async (tab) => {
-			if (tab.output.trim().length > 0) return
-			const events = await loadConversation(tab.sessionId)
-			tab.output = renderConversationHistory(tab.sessionId, events)
-			replayed.set(tab.sessionId, replayConversationEvents(events).length)
-		}),
-	)
+	await Promise.all(tabs.map(async (tab) => {
+		if (tab.output.trim().length > 0) return
+		const events = await loadConversation(tab.sessionId)
+		tab.output = renderConversationHistory(tab.sessionId, events)
+		replayed.set(tab.sessionId, replayConversationEvents(events).length)
+	}))
 	return replayed
 }
 
-function findTabBySessionId(sessionId: string): CliTab | null {
-	return tabs.find((t) => t.sessionId === sessionId) ?? null
-}
+function findTabBySessionId(sessionId: string): CliTab | null { return tabs.find((t) => t.sessionId === sessionId) ?? null }
 
 function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 	const existing = findTabBySessionId(sessionId)
 	if (existing) return existing
 	if (tabs.length >= 9) return null
-	const tab = createTabState({
-		sessionId,
-		workingDir: launchCwd,
-		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-		modelLabel: modelDisplayName(loadConfig().defaultModel),
-	})
-
-	tabs.push(tab)
-	renderBusyStatus()
+	const tab = newTabState(sessionId, launchCwd)
+	tabs.push(tab); renderBusyStatus()
 	return tab
 }
 
@@ -603,28 +425,15 @@ async function bootstrapState(): Promise<void> {
 	try {
 		const state = await readState()
 		const busySet = new Set(state.busySessionIds ?? [])
-
-		if (Array.isArray(state.sessions) && state.sessions.length > 0) {
-			syncTabsFromSessions(state.sessions, state.activeSessionId ?? null, {
-				preserveActiveOutput: false,
-				render: false,
-				bootstrap: false,
-			})
-		} else {
-			ensureFallbackTab(state.activeSessionId ?? null)
-		}
+		if (Array.isArray(state.sessions) && state.sessions.length > 0)
+			syncTabsFromSessions(state.sessions, state.activeSessionId ?? null, { preserveActiveOutput: false, render: false, bootstrap: false })
+		else ensureFallbackTab(state.activeSessionId ?? null)
 		for (const tab of tabs) tab.busy = busySet.has(tab.sessionId)
 
 		const recent = await readRecentEvents(500)
 		const replayCounts = await hydrateTabsFromConversation()
-		for (const [sessionId, count] of replayCounts) {
-			if (count > 0) {
-				pushLocal(
-					'local.status',
-					`[history] restored ${count} event${count === 1 ? '' : 's'} for ${sessionId}`,
-				)
-			}
-		}
+		for (const [sessionId, count] of replayCounts)
+			if (count > 0) pushLocal('local.status', `[history] restored ${count} event${count === 1 ? '' : 's'} for ${sessionId}`)
 		for (const event of recent) {
 			if (event.type !== 'status' || !event.context) continue
 			const sessionId = event.sessionId ?? activeTab()?.sessionId ?? null
@@ -632,22 +441,16 @@ async function bootstrapState(): Promise<void> {
 			const tab = findTabBySessionId(sessionId)
 			if (tab) tab.contextStatus = fmtContext(event.context)
 		}
-
-		// Load persisted input history and drafts for each tab
-		await Promise.all(
-			tabs.map(async (tab) => {
-				tab.inputHistory = await loadInputHistory(tab.sessionId)
-				tab.inputDraft = await loadDraft(tab.sessionId)
-			}),
-		)
-
+		await Promise.all(tabs.map(async (tab) => {
+			tab.inputHistory = await loadInputHistory(tab.sessionId)
+			tab.inputDraft = await loadDraft(tab.sessionId)
+		}))
 		applyActiveTabSnapshot(true)
 		for (const tab of tabs) ensureTabBootstrap(tab)
 		renderBusyStatus()
 	} catch (e: any) {
 		pushLocal('local.status', `bootstrap failed: ${e.message || e}`)
-		ensureFallbackTab(null)
-		renderBusyStatus()
+		ensureFallbackTab(null); renderBusyStatus()
 	}
 }
 
@@ -658,106 +461,59 @@ export function parseContextPct(status: string | null): number | null {
 	return m ? parseFloat(m[1]) : null
 }
 
-/** Self mode: find an idle session with <10% context usage, or create a new tab. */
 function applySelfMode(): void {
-	const candidate = tabs.findIndex((t) => {
-		if (t.busy) return false
-		const pct = parseContextPct(t.contextStatus)
-		return pct === null || pct < 10
-	})
+	const candidate = tabs.findIndex((t) => !t.busy && (parseContextPct(t.contextStatus) ?? 0) < 10)
 	if (candidate >= 0 && candidate !== activeTabIndex) {
-		switchToTab(candidate)
-		pushLocal('local.status', `[self] switched to tab ${candidate + 1} (idle, low context)`)
+		switchToTab(candidate); pushLocal('local.status', `[self] switched to tab ${candidate + 1} (idle, low context)`)
 	} else if (candidate < 0) {
-		void createTab().then(() => {
-			pushLocal('local.status', '[self] opened new tab (no idle low-context session found)')
-		})
+		void createTab().then(() => pushLocal('local.status', '[self] opened new tab (no idle low-context session found)'))
 	}
 }
 
-function activeSessionId(): string | null {
-	return activeTab()?.sessionId ?? null
-}
+function activeSessionId(): string | null { return activeTab()?.sessionId ?? null }
 
 async function appendCommand(type: RuntimeCommand['type'], text?: string): Promise<void> {
 	await appendBusCommand(makeCommand(type, source, text, activeSessionId()))
 }
 
 function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: boolean): void {
-	if (event.type === 'line' && event.level === 'meta') {
-		if (renderToScreen && tab === activeTab()) renderBusyStatus()
-	}
-
-	const text = pushEvent(event, source)
-	if (!text) return
-	if (renderToScreen) {
-		tui.write(text)
-		tabHasActivity.delete(tab.sessionId)
-	} else {
-		tab.output += text
-		tabHasActivity.add(tab.sessionId)
-	}
+	if (event.type === 'line' && event.level === 'meta' && renderToScreen && tab === activeTab()) renderBusyStatus()
+	const text = pushEvent(event, source); if (!text) return
+	if (renderToScreen) { tui.write(text); tabHasActivity.delete(tab.sessionId) }
+	else { tab.output += text; tabHasActivity.add(tab.sessionId) }
 }
 
 function render(event: RuntimeEvent): void {
-	// Owner released — try to promote
-	if (event.type === 'line' && event.text === '[owner-released]') {
-		if (onOwnerReleased) onOwnerReleased()
-		return
-	}
-
-	if (event.type === 'sessions') {
-		syncTabsFromSessions(event.sessions, event.activeSessionId ?? null)
-		return
-	}
+	if (event.type === 'line' && event.text === '[owner-released]') { if (onOwnerReleased) onOwnerReleased(); return }
+	if (event.type === 'sessions') { syncTabsFromSessions(event.sessions, event.activeSessionId ?? null); return }
 
 	if (event.type === 'status') {
-		// Partial updates (activity-only, context-only) don't carry authoritative busy state
-		const isPartial =
-			('activity' in event && event.activity !== undefined) ||
+		const isPartial = ('activity' in event && event.activity !== undefined) ||
 			('context' in event && event.context !== undefined)
-
 		if (isPartial) {
-			// Route activity text to the correct tab
 			if ('activity' in event && event.activity !== undefined) {
 				const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
 				if (tab) tab.activity = event.activity!
 			}
 		} else {
-			// Full status update — sync per-tab busy and paused state
-			const busySet = new Set(event.busySessionIds ?? [])
-			const pausedSet = new Set(event.pausedSessionIds ?? [])
+			const busySet = new Set(event.busySessionIds ?? []), pausedSet = new Set(event.pausedSessionIds ?? [])
 			for (const tab of tabs) {
 				const wasBusy = tab.busy
-				tab.busy = busySet.has(tab.sessionId)
-				tab.paused = pausedSet.has(tab.sessionId)
+				tab.busy = busySet.has(tab.sessionId); tab.paused = pausedSet.has(tab.sessionId)
 				if (!tab.busy && wasBusy) tab.activity = ''
 			}
 		}
-
-		// Only update the displayed activity line based on the active tab
 		const active = activeTab()
 		if (active) setActivityLine(activityBarText(active))
-
-		// Update context percentage from structured context data
 		if (event.context) {
 			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : activeTab()
-			if (tab) {
-				tab.contextStatus = fmtContext(event.context)
-				if (tab === activeTab()) lastContextStatus = tab.contextStatus
-			}
+			if (tab) { tab.contextStatus = fmtContext(event.context); if (tab === activeTab()) lastContextStatus = tab.contextStatus }
 		}
-
-		renderBusyStatus()
-		return
+		renderBusyStatus(); return
 	}
 
 	const sessionId = 'sessionId' in event ? event.sessionId : null
-	if (!sessionId) {
-		const active = activeTab()
-		if (active) renderEventToTab(active, event, true)
-		return
-	}
+	if (!sessionId) { const active = activeTab(); if (active) renderEventToTab(active, event, true); return }
 	const tab = (event.type === 'line' || event.type === 'chunk' || event.type === 'prompt')
 		? findOrCreateTabBySessionId(sessionId) : findTabBySessionId(sessionId)
 	if (!tab) return
@@ -778,7 +534,5 @@ function renderTabsForStatus(): string {
 }
 
 function renderBusyStatus(): void {
-	const tabStr = renderTabsForStatus()
-	const parts = [roleLabel, lastContextStatus ?? ''].filter(Boolean)
-	setStatusLine(tabStr, parts.join(' · '))
+	setStatusLine(renderTabsForStatus(), [roleLabel, lastContextStatus ?? ''].filter(Boolean).join(' · '))
 }
