@@ -75,25 +75,22 @@ import {
 function fmtK(tokens: number): string {
 	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens)
 }
-
+function fmtContext(ctx: { used: number; max: number; estimated?: boolean }): string {
+	const pct = ctx.max > 0 ? ((ctx.used / ctx.max) * 100).toFixed(1) : '0'
+	return `${ctx.estimated ? '~' : ''}${pct}%/${fmtK(ctx.max)}`
+}
+const MODEL_NAMES: [RegExp, string][] = [
+	[/^claude-opus-4-6/, 'Opus 4.6'], [/^claude-opus-4-5/, 'Opus 4.5'],
+	[/^claude-sonnet-4-6/, 'Sonnet 4.6'], [/^claude-sonnet-4-5/, 'Sonnet 4.5'],
+	[/^claude-sonnet-4/, 'Sonnet 4'],
+	[/^gpt-5\.3-codex/, 'Codex 5.3'], [/^gpt-5\.2-codex/, 'Codex 5.2'], [/^gpt-5\.1-codex/, 'Codex 5.1'],
+	[/^gpt-5(?:[.-]|$)/, 'GPT-5'], [/^gpt-4\.1(?:[.-]|$)/, 'GPT-4.1'], [/^gpt-4o(?:[.-]|$)/, 'GPT-4o'],
+	[/^o1(?:[.-]|$)/, 'o1'], [/^o3(?:[.-]|$)/, 'o3'],
+]
 function modelDisplayName(model: string): string {
 	const id = modelIdForModel(resolveModel(model))
-	if (/^claude-opus-4-6/.test(id)) return 'Opus 4.6'
-	if (/^claude-opus-4-5/.test(id)) return 'Opus 4.5'
-	if (/^claude-sonnet-4-6/.test(id)) return 'Sonnet 4.6'
-	if (/^claude-sonnet-4-5/.test(id)) return 'Sonnet 4.5'
-	if (/^claude-sonnet-4/.test(id)) return 'Sonnet 4'
-	if (/^gpt-5\.3-codex/.test(id)) return 'Codex 5.3'
-	if (/^gpt-5\.2-codex/.test(id)) return 'Codex 5.2'
-	if (/^gpt-5\.1-codex/.test(id)) return 'Codex 5.1'
-	if (/^gpt-5(?:[.-]|$)/.test(id)) return 'GPT-5'
-	if (/^gpt-4\.1(?:[.-]|$)/.test(id)) return 'GPT-4.1'
-	if (/^gpt-4o(?:[.-]|$)/.test(id)) return 'GPT-4o'
-	if (/^o1(?:[.-]|$)/.test(id)) return 'o1'
-	if (/^o3(?:[.-]|$)/.test(id)) return 'o3'
-	return id
+	return MODEL_NAMES.find(([re]) => re.test(id))?.[1] ?? id
 }
-
 
 export class Client {
 	async command(type: CommandType, text?: string): Promise<void> {
@@ -356,37 +353,15 @@ function switchToTab(index: number): void {
 }
 
 function handleInputKey(key: string): boolean {
-	if (CTRL_T_KEYS.has(key)) {
-		void createTab()
-		return true
-	}
-	if (CTRL_W_KEYS.has(key)) {
-		void closeActiveTab()
-		return true
-	}
-	// Ctrl-F: fork current tab
-	if (CTRL_F_KEYS.has(key)) {
-		void forkTab()
-		return true
-	}
-
+	if (CTRL_T_KEYS.has(key)) { void createTab(); return true }
+	if (CTRL_W_KEYS.has(key)) { void closeActiveTab(); return true }
+	if (CTRL_F_KEYS.has(key)) { void forkTab(); return true }
 	const digit = CTRL_DIGIT_KEYS[key] ?? ALT_DIGIT_KEYS[key]
-	if (digit) {
-		switchToTab(digit - 1)
-		return true
-	}
-	if (CTRL_PREV_TAB.has(key)) {
-		switchToTab(activeTabIndex > 0 ? activeTabIndex - 1 : tabs.length - 1)
-		return true
-	}
-	if (CTRL_NEXT_TAB.has(key)) {
-		switchToTab(activeTabIndex < tabs.length - 1 ? activeTabIndex + 1 : 0)
-		return true
-	}
-
+	if (digit) { switchToTab(digit - 1); return true }
+	if (CTRL_PREV_TAB.has(key)) { switchToTab(activeTabIndex > 0 ? activeTabIndex - 1 : tabs.length - 1); return true }
+	if (CTRL_NEXT_TAB.has(key)) { switchToTab(activeTabIndex < tabs.length - 1 ? activeTabIndex + 1 : 0); return true }
 	return false
 }
-
 function makeLocalSessionId(): string {
 	let id = ''
 	do {
@@ -547,28 +522,18 @@ function syncTabsFromSessions(
 	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id)))
 
 	// Pick which tab to focus next
-	let targetSessionId: string
 	const previousStillExists = previousActive && tabs.some((t) => t.sessionId === previousActive)
-
-	if (switchToFork && forkedSessionId) {
-		targetSessionId = forkedSessionId
-	} else if (previousStillExists) {
-		targetSessionId = previousActive!
-	} else if (previousActive) {
-		// Closed tab — pick left neighbor (or right if it was first)
+	let targetSessionId: string
+	if (switchToFork && forkedSessionId) targetSessionId = forkedSessionId
+	else if (previousStillExists) targetSessionId = previousActive!
+	else if (previousActive) {
 		const idx = previousActiveIndex > 0 ? previousActiveIndex - 1 : 0
 		targetSessionId = tabs[Math.min(idx, tabs.length - 1)]?.sessionId ?? tabs[0].sessionId
 	} else {
-		targetSessionId = preferredActiveSessionId
-			&& tabs.some((t) => t.sessionId === preferredActiveSessionId)
-			? preferredActiveSessionId
-			: tabs[0].sessionId
+		targetSessionId = preferredActiveSessionId && tabs.some((t) => t.sessionId === preferredActiveSessionId)
+			? preferredActiveSessionId : tabs[0].sessionId
 	}
-
-	const nextIndex = tabs.findIndex((t) => t.sessionId === targetSessionId)
-
-	activeTabIndex = nextIndex >= 0 ? nextIndex : 0
-
+	activeTabIndex = Math.max(0, tabs.findIndex((t) => t.sessionId === targetSessionId))
 	const activeChanged = targetSessionId !== previousActive
 	if (options.render ?? true) applyActiveTabSnapshot(activeChanged)
 	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
@@ -665,11 +630,7 @@ async function bootstrapState(): Promise<void> {
 			const sessionId = event.sessionId ?? activeTab()?.sessionId ?? null
 			if (!sessionId) continue
 			const tab = findTabBySessionId(sessionId)
-			if (tab) {
-				const { used, max, estimated } = event.context
-				const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
-				tab.contextStatus = `${estimated ? '~' : ''}${pct}%/${fmtK(max)}`
-			}
+			if (tab) tab.contextStatus = fmtContext(event.context)
 		}
 
 		// Load persisted input history and drafts for each tab
@@ -782,9 +743,7 @@ function render(event: RuntimeEvent): void {
 		if (event.context) {
 			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : activeTab()
 			if (tab) {
-				const { used, max, estimated } = event.context
-				const pct = max > 0 ? ((used / max) * 100).toFixed(1) : '0'
-				tab.contextStatus = `${estimated ? '~' : ''}${pct}%/${fmtK(max)}`
+				tab.contextStatus = fmtContext(event.context)
 				if (tab === activeTab()) lastContextStatus = tab.contextStatus
 			}
 		}
@@ -799,38 +758,23 @@ function render(event: RuntimeEvent): void {
 		if (active) renderEventToTab(active, event, true)
 		return
 	}
-
-	const tab =
-		event.type === 'line' || event.type === 'chunk' || event.type === 'prompt'
-			? findOrCreateTabBySessionId(sessionId)
-			: findTabBySessionId(sessionId)
+	const tab = (event.type === 'line' || event.type === 'chunk' || event.type === 'prompt')
+		? findOrCreateTabBySessionId(sessionId) : findTabBySessionId(sessionId)
 	if (!tab) return
-
-	if (tab === activeTab()) {
-	tabHasActivity.delete(tab.sessionId)
-		renderEventToTab(tab, event, true)
-		renderBusyStatus()
-		return
-	}
-
-	renderEventToTab(tab, event, false)
+	const isActive = tab === activeTab()
+	if (isActive) tabHasActivity.delete(tab.sessionId)
+	renderEventToTab(tab, event, isActive)
+	if (isActive) renderBusyStatus()
 }
 
-/** Build tab bar: [1 .hal] 2 .config  3* project.2 */
 function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ''
-	const visibleTabs = tabs.slice(0, 9)
-	const labels = tabDisplayNames(visibleTabs)
-	return visibleTabs
-		.map((tab, i) => {
-			const number = String(i + 1)
-			const active = i === activeTabIndex
-			const activity = !active && tabHasActivity.has(tab.sessionId) ? '*' : ' '
-			const text = `${number}${activity}${labels[i]}`
-			if (active) return `${TAB_ACTIVE}[${text}]${TAB_RESET}`
-			return `${TAB_INACTIVE} ${text} ${TAB_RESET}`
-		})
-		.join('')
+	const labels = tabDisplayNames(tabs.slice(0, 9))
+	return tabs.slice(0, 9).map((tab, i) => {
+		const act = i !== activeTabIndex && tabHasActivity.has(tab.sessionId) ? '*' : ' '
+		const text = `${i + 1}${act}${labels[i]}`
+		return i === activeTabIndex ? `${TAB_ACTIVE}[${text}]${TAB_RESET}` : `${TAB_INACTIVE} ${text} ${TAB_RESET}`
+	}).join('')
 }
 
 function renderBusyStatus(): void {

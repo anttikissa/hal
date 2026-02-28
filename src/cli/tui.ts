@@ -954,84 +954,62 @@ function render(): void {
 
 	const selRange = getSelectionRange()
 
-	const chunks: string[] = []
-	chunks.push('\x1b[?25l') // hide cursor
+	const chunks: string[] = ['\x1b[?25l'] // hide cursor
+
+	const pushRow = (row: number, text: string, surface?: SelectionSurface, selRow = 0) => {
+		chunks.push(`\x1b[${row};1H\x1b[2K`)
+		if (selRange?.surface === surface && selRow >= (selRange.startRow ?? 0) && selRow <= (selRange.endRow ?? 0))
+			chunks.push(renderLineWithSelection(text, selRow, selRange))
+		else chunks.push(text)
+	}
 
 	// Row 1: title bar
-	chunks.push(`\x1b[1;1H\x1b[2K`)
 	const { topic, session } = splitTitleParts(titleBarStr || '')
 	const PLACEHOLDER = 'Use /topic to set topic, or write a prompt to set it automatically'
 	const topicDisplay = topic
 		? `${TITLE_BG}${TITLE_TOPIC} Topic: ${TITLE_SESSION}${topic}`
 		: `${TITLE_BG}${TITLE_TOPIC} Topic: ${TITLE_TOPIC}${PLACEHOLDER}`
-	const titleLine = session
-		? `${topicDisplay}${RESET}${TITLE_BG}${TITLE_TOPIC} — ${session}`
-		: topicDisplay
+	const titleLine = session ? `${topicDisplay}${RESET}${TITLE_BG}${TITLE_TOPIC} — ${session}` : topicDisplay
 	const renderedTitleLine = truncateAnsi(titleLine, c) + TITLE_BG + ERASE_TO_EOL + RESET
-	if (selRange?.surface === 'title') chunks.push(renderLineWithSelection(renderedTitleLine, 0, selRange))
-	else chunks.push(renderedTitleLine)
+	pushRow(1, renderedTitleLine, 'title')
 	const plainTopic = topic || PLACEHOLDER
-	const plainTitle = session ? ` Topic: ${plainTopic} — ${session}` : ` Topic: ${plainTopic}`
-	lastTitleLine = truncateAnsi(plainTitle, c).padEnd(c, ' ')
+	lastTitleLine = truncateAnsi(session ? ` Topic: ${plainTopic} — ${session}` : ` Topic: ${plainTopic}`, c).padEnd(c, ' ')
 
 	// Rows 2..ob: output viewport
 	for (let row = 2; row <= ob; row++) {
-		chunks.push(`\x1b[${row};1H\x1b[2K`)
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
-		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow) {
-			chunks.push(renderLineWithSelection(lineText, idx, selRange))
-		} else {
-			chunks.push(truncateAnsi(lineText, c))
-		}
+		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow)
+			pushRow(row, lineText, 'output', idx)
+		else { chunks.push(`\x1b[${row};1H\x1b[2K`); chunks.push(truncateAnsi(lineText, c)) }
 	}
 
-	// Activity line
-	const aRow = activityRow()
+	// Activity + status lines
 	const activityLine = truncateAnsi(`${DIM}${activityStr ? `  Model: ${activityStr}` : '  Model: Done.'}`, c)
 	lastActivityLine = activityLine
-	chunks.push(`\x1b[${aRow};1H\x1b[2K`)
-	if (selRange?.surface === 'activity') chunks.push(renderLineWithSelection(activityLine, 0, selRange))
-	else chunks.push(activityLine)
-
-	// Status line
-	const sRow = statusRow()
+	pushRow(activityRow(), activityLine, 'activity')
 	const statusLine = buildStatusLine()
 	lastStatusLine = statusLine
-	chunks.push(`\x1b[${sRow};1H\x1b[2K`)
-	if (selRange?.surface === 'status') chunks.push(renderLineWithSelection(statusLine, 0, selRange))
-	else chunks.push(statusLine)
+	pushRow(statusRow(), statusLine, 'status')
 
-	// Prompt top pad
-	const ptRow = promptTopPadRow()
-	chunks.push(`\x1b[${ptRow};1H\x1b[2K`)
-	chunks.push(`${BG_DARK}${' '.repeat(c)}${RESET}`)
-
-	// Prompt lines
+	// Prompt area
+	const bgPad = `${BG_DARK}${' '.repeat(c)}${RESET}`
+	chunks.push(`\x1b[${promptTopPadRow()};1H\x1b[2K${bgPad}`)
 	const contentWidth = promptContentWidth()
 	const wrappedInput = getWrappedInputLayout(inputBuf, contentWidth)
-	const wrapped = wrappedInput.lines
 	const inputSelRange = getInputTextSelectionRange()
-	const pLines = Math.min(wrapped.length, maxPromptLines)
+	const pLines = Math.min(wrappedInput.lines.length, maxPromptLines)
 	const firstRow = promptFirstRow()
 	for (let i = 0; i < pLines; i++) {
 		chunks.push(`\x1b[${firstRow + i};1H\x1b[2K`)
-		chunks.push(
-			renderPromptLineWithInputSelection(wrapped[i], wrappedInput.starts[i] ?? 0, c, inputSelRange),
-		)
+		chunks.push(renderPromptLineWithInputSelection(wrappedInput.lines[i], wrappedInput.starts[i] ?? 0, c, inputSelRange))
 	}
-
-	// Prompt bottom pad
-	chunks.push(`\x1b[${r};1H\x1b[2K`)
-	chunks.push(`${BG_DARK}${' '.repeat(c)}${RESET}`)
+	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
 
 	// Position cursor at input
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-	const cursorScreenRow = firstRow + curRow
-	const cursorScreenCol = curCol + 1 + inputPromptStr.length
-	chunks.push(`\x1b[${cursorScreenRow};${cursorScreenCol}H`)
-	chunks.push('\x1b[?25h') // show cursor
+	chunks.push(`\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 
 	const frame = chunks.join('')
 	if (supportsSynchronizedOutput()) directWrite(`\x1b[?2026h${frame}\x1b[?2026l`)
