@@ -26,6 +26,8 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Don't reimplement what the system already provides. For example, `open('wx')` is an atomic exclusive-create — no need to build a `mkdir`-based mutex on top of it.
 - Doing a big task? 1. Read files and thing. 2. Plan - write it to file (docs/plans). 3. Implement.
 - GitHub push always uses SSH (`git@github.com:...`), never HTTPS. HTTPS auth doesn't work.
+- Non-test runtime code budget: max 10k LOC. Keep payload code tight and prefer minimal fixes.
+- `bun run cloc` is the authoritative budget check (uses `src/utils/cloc.ts` and excludes tests).
 
 ## User interface guidelines
 
