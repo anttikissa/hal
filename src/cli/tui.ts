@@ -418,42 +418,22 @@ function clearInputUndoHistory(): void {
 	inputUndoStack = []
 }
 
-function currentInputUndoSnapshot(): InputUndoSnapshot {
-	return {
-		text: inputBuf,
-		cursor: inputCursor,
-		selAnchor: inputSelAnchor,
-		selFocus: inputSelFocus,
-	}
-}
-
 function pushInputUndoSnapshot(): void {
 	const prev = inputUndoStack[inputUndoStack.length - 1]
-	if (
-		prev &&
-		prev.text === inputBuf &&
-		prev.cursor === inputCursor &&
-		prev.selAnchor === inputSelAnchor &&
-		prev.selFocus === inputSelFocus
-	) {
-		return
-	}
-	inputUndoStack.push(currentInputUndoSnapshot())
+	if (prev && prev.text === inputBuf && prev.cursor === inputCursor &&
+		prev.selAnchor === inputSelAnchor && prev.selFocus === inputSelFocus) return
+	inputUndoStack.push({ text: inputBuf, cursor: inputCursor, selAnchor: inputSelAnchor, selFocus: inputSelFocus })
 	if (inputUndoStack.length > 200) inputUndoStack.splice(0, inputUndoStack.length - 200)
-}
-
-function restoreInputUndoSnapshot(snap: InputUndoSnapshot): void {
-	inputBuf = snap.text
-	inputCursor = clampInputPos(snap.cursor)
-	inputSelAnchor = snap.selAnchor === null ? null : clampInputPos(snap.selAnchor)
-	inputSelFocus = snap.selFocus === null ? null : clampInputPos(snap.selFocus)
-	inputSelActive = false
 }
 
 function undoInputEdit(): boolean {
 	const snap = inputUndoStack.pop()
 	if (!snap) return false
-	restoreInputUndoSnapshot(snap)
+	inputBuf = snap.text
+	inputCursor = clampInputPos(snap.cursor)
+	inputSelAnchor = snap.selAnchor === null ? null : clampInputPos(snap.selAnchor)
+	inputSelFocus = snap.selFocus === null ? null : clampInputPos(snap.selFocus)
+	inputSelActive = false
 	return true
 }
 
@@ -589,19 +569,15 @@ function cutCurrentInputLineToClipboard(): boolean {
 	return true
 }
 
+function cleanAndInsertPaste(text: string): void {
+	const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
+	if (!clean) return
+	insertIntoInput(clean.includes('\n') ? saveMultilinePaste(clean) : clean)
+	render()
+}
 
 function pasteClipboardIntoInput(): void {
-	pasteFromClipboard().then((content) => {
-		if (!content) return
-		const clean = content
-			.replace(/\r\n/g, '\n')
-			.replace(/\r/g, '\n')
-			.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
-		if (!clean) return
-		const insert = clean.includes('\n') ? saveMultilinePaste(clean) : clean
-		insertIntoInput(insert)
-		render()
-	})
+	pasteFromClipboard().then((content) => { if (content) cleanAndInsertPaste(content) })
 }
 
 function setInputTextWithUndo(text: string, cursor = text.length): void {
@@ -620,33 +596,17 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 	const codepoint = Number(modOther?.[2] ?? csiU?.codepoint ?? NaN)
 	if (!Number.isFinite(modifier) || !Number.isFinite(codepoint) || modifier < 9) return false
 	const ch = String.fromCharCode(codepoint).toLowerCase()
-	if (ch === 'c') {
-		if (copyCurrentSelectionToClipboard()) render()
-		return true
-	}
-	if (ch === 'x') {
-		if (cutInputTextSelectionToClipboard() || cutCurrentInputLineToClipboard()) render()
-		return true
-	}
-	if (ch === 'v') {
-		pasteClipboardIntoInput()
-		return true
-	}
+	if (ch === 'c') { if (copyCurrentSelectionToClipboard()) render(); return true }
+	if (ch === 'x') { if (cutInputTextSelectionToClipboard() || cutCurrentInputLineToClipboard()) render(); return true }
+	if (ch === 'v') { pasteClipboardIntoInput(); return true }
 	if (ch === 'a') {
-		inputSelAnchor = 0
-		inputSelFocus = inputBuf.length
-		inputCursor = inputBuf.length
-		inputSelActive = false
-		render()
-		return true
+		inputSelAnchor = 0; inputSelFocus = inputBuf.length
+		inputCursor = inputBuf.length; inputSelActive = false
+		render(); return true
 	}
-	if (ch === 'z') {
-		if (undoInputEdit()) render()
-		return true
-	}
+	if (ch === 'z') { if (undoInputEdit()) render(); return true }
 	return false
 }
-
 function inputPosFromWrappedPoint(row: number, col: number): number {
 	return wrappedRowColToCursor(inputBuf, row, Math.max(0, col), promptContentWidth())
 }
@@ -703,53 +663,23 @@ function screenSelectionText(sel: SelectionRange): string {
 	return lines.join('\n')
 }
 
-function getSelectionRange(): {
-	surface: SelectionSurface
-	startRow: number
-	startCol: number
-	endRow: number
-	endCol: number
-} | null {
+function getSelectionRange(): SelectionRange | null {
 	if (!selAnchor || !selCurrent) return null
 	if (selAnchor.surface !== selCurrent.surface) return null
-	let a = selAnchor
-	let b = selCurrent
-
+	let a = selAnchor, b = selCurrent
 	if (selMode === 'word') {
-		a = expandToWordBoundary(a, 'start')
-		b = expandToWordBoundary(b, 'end')
+		a = expandToWordBoundary(a, 'start'); b = expandToWordBoundary(b, 'end')
 	} else if (selMode === 'line') {
-		a = { ...a, col: 0 }
-		b = { ...b, col: cols() }
+		a = { ...a, col: 0 }; b = { ...b, col: cols() }
 	}
-
+	// If a is after b, swap — for word mode, re-expand from swapped anchors
 	if (a.row > b.row || (a.row === b.row && a.col > b.col)) {
 		if (selMode === 'word') {
-			const aSwap = expandToWordBoundary(selCurrent, 'start')
-			const bSwap = expandToWordBoundary(selAnchor, 'end')
-			return {
-				surface: aSwap.surface,
-				startRow: aSwap.row,
-				startCol: aSwap.col,
-				endRow: bSwap.row,
-				endCol: bSwap.col,
-			}
-		}
-		return {
-			surface: b.surface,
-			startRow: b.row,
-			startCol: b.col,
-			endRow: a.row,
-			endCol: a.col,
-		}
+			a = expandToWordBoundary(selCurrent, 'start')
+			b = expandToWordBoundary(selAnchor, 'end')
+		} else { [a, b] = [b, a] }
 	}
-	return {
-		surface: a.surface,
-		startRow: a.row,
-		startCol: a.col,
-		endRow: b.row,
-		endCol: b.col,
-	}
+	return { surface: a.surface, startRow: a.row, startCol: a.col, endRow: b.row, endCol: b.col }
 }
 
 function selectionLine(pt: SelectionPoint): string {
@@ -871,6 +801,16 @@ function updateHoverLink(): void {
 	}
 }
 
+function updateInputSelFocus(pos: number): void {
+	const range = selMode === 'word' ? inputWordRangeAt(pos)
+		: selMode === 'line' ? inputLineRangeAt(pos) : null
+	if (range) {
+		inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor ? range.start : range.end
+	} else {
+		inputSelFocus = pos
+	}
+	inputCursor = inputSelFocus
+}
 
 function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'release'): void {
 	if (kind === 'press') {
@@ -883,90 +823,45 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 			return
 		}
 		const now = Date.now()
-		const samePos =
-			lastClickPos &&
-			lastClickPos.surface === pt.surface &&
-			lastClickPos.row === pt.row &&
-			Math.abs(lastClickPos.col - x) <= 1
-
-		if (samePos && now - lastClickTime < 400) {
-			clickCount = Math.min(clickCount + 1, 3)
-		} else {
-			clickCount = 1
-		}
+		const samePos = lastClickPos && lastClickPos.surface === pt.surface &&
+			lastClickPos.row === pt.row && Math.abs(lastClickPos.col - x) <= 1
+		clickCount = (samePos && now - lastClickTime < 400) ? Math.min(clickCount + 1, 3) : 1
 		lastClickTime = now
 		lastClickPos = pt
-
-		if (clickCount === 1) selMode = 'char'
-		else if (clickCount === 2) selMode = 'word'
-		else selMode = 'line'
+		selMode = clickCount === 1 ? 'char' : clickCount === 2 ? 'word' : 'line'
 
 		if (pt.surface === 'input') {
 			if (selAnchor) clearSelection(false)
 			const pos = inputPosFromWrappedPoint(pt.row, pt.col)
-			if (clickCount === 2) {
-				const range = inputWordRangeAt(pos)
-				inputSelAnchor = range.start
-				inputSelFocus = range.end
-				inputCursor = range.end
-			} else if (clickCount >= 3) {
-				const range = inputLineRangeAt(pos)
-				inputSelAnchor = range.start
-				inputSelFocus = range.end
-				inputCursor = range.end
+			if (clickCount >= 2) {
+				const range = clickCount === 2 ? inputWordRangeAt(pos) : inputLineRangeAt(pos)
+				inputSelAnchor = range.start; inputSelFocus = range.end; inputCursor = range.end
 			} else {
-				inputSelAnchor = pos
-				inputSelFocus = pos
-				inputCursor = pos
+				inputSelAnchor = pos; inputSelFocus = pos; inputCursor = pos
 			}
-			inputSelActive = true
-			render()
-			return
+			inputSelActive = true; render(); return
 		}
 
 		clearInputTextSelection()
-
-		selAnchor = pt
-		selCurrent = pt
-		selActive = true
-		render()
-		return
+		selAnchor = pt; selCurrent = pt; selActive = true; render(); return
 	}
 
 	if (kind === 'move' && selActive) {
 		const pt = pointFromScreenCoords(x, y)
 		if (!pt || !selAnchor || pt.surface !== selAnchor.surface) return
-		selCurrent = pt
-		render()
-		return
+		selCurrent = pt; render(); return
 	}
 
 	if (kind === 'move' && inputSelActive) {
 		const pt = pointFromScreenCoords(x, y)
 		if (!pt || pt.surface !== 'input') return
-		const pos = inputPosFromWrappedPoint(pt.row, pt.col)
-		if (selMode === 'word') {
-			const range = inputWordRangeAt(pos)
-			inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
-				? range.start : range.end
-		} else if (selMode === 'line') {
-			const range = inputLineRangeAt(pos)
-			inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
-				? range.start : range.end
-		} else {
-			inputSelFocus = pos
-		}
-		inputCursor = inputSelFocus
-		render()
-		return
+		updateInputSelFocus(inputPosFromWrappedPoint(pt.row, pt.col))
+		render(); return
 	}
 
 	// Cmd+hover detection for link underline
 	if (kind === 'move' && !selActive && !inputSelActive) {
-		lastMouseX = x
-		lastMouseY = y
-		updateHoverLink()
-		return
+		lastMouseX = x; lastMouseY = y; updateHoverLink(); return
 	}
 
 	if (kind === 'release' && selActive) {
@@ -974,67 +869,25 @@ function handleMouseEvent(x: number, y: number, kind: 'press' | 'move' | 'releas
 		if (pt && selAnchor && pt.surface === selAnchor.surface) selCurrent = pt
 		selActive = false
 		// Single click (no drag) on output — check for URL
-		if (
-			clickCount === 1 &&
-			pt &&
-			selAnchor &&
-			pt.surface === 'output' &&
-			pt.row === selAnchor.row &&
-			pt.col === selAnchor.col
-		) {
-			const line = lastVisibleOutput[pt.row] ?? ''
-			const url = urlAtCol(line, pt.col)
+		if (clickCount === 1 && pt && selAnchor &&
+			pt.surface === 'output' && pt.row === selAnchor.row && pt.col === selAnchor.col) {
+			const url = urlAtCol(lastVisibleOutput[pt.row] ?? '', pt.col)
 			if (url) {
-				selAnchor = null
-				selCurrent = null
-				render()
+				selAnchor = null; selCurrent = null; render()
 				const normalized = normalizeDetectedUrl(url)
-				if (!normalized) {
-					render()
-					return
-				}
-				Bun.spawn(['open', normalized])
+				if (normalized) Bun.spawn(['open', normalized])
 				return
 			}
 		}
-		render()
-		return
+		render(); return
 	}
 
 	if (kind === 'release' && inputSelActive) {
 		const pt = pointFromScreenCoords(x, y)
-		if (pt && pt.surface === 'input') {
-			const pos = inputPosFromWrappedPoint(pt.row, pt.col)
-			if (selMode === 'word') {
-				const range = inputWordRangeAt(pos)
-				// Extend toward whichever side is farther from anchor
-				inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
-					? range.start : range.end
-				inputCursor = inputSelFocus
-			} else if (selMode === 'line') {
-				const range = inputLineRangeAt(pos)
-				inputSelFocus = inputSelAnchor !== null && range.start < inputSelAnchor
-					? range.start : range.end
-				inputCursor = inputSelFocus
-			} else {
-				inputSelFocus = pos
-				inputCursor = pos
-			}
-		}
-		inputSelActive = false
-		render()
+		if (pt && pt.surface === 'input') updateInputSelFocus(inputPosFromWrappedPoint(pt.row, pt.col))
+		inputSelActive = false; render()
 	}
 }
-
-function copySelectionToClipboard(): void {
-	const sel = getSelectionRange()
-	if (!sel) return
-	const text = screenSelectionText(sel)
-	if (!text) return
-
-	writeClipboardText(text)
-}
-
 function clearSelection(renderNow = true): void {
 	if (!selAnchor) return
 	selAnchor = null
@@ -1209,17 +1062,8 @@ function suspendForegroundJob(): void {
 
 function handleBracketedPaste(text: string): void {
 	if (!waitingResolve) return
-	const clean = text
-		.replace(/\r\n/g, '\n')
-		.replace(/\r/g, '\n')
-		.replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, '')
-	if (!clean) return
-	const isMultiline = clean.includes('\n')
-	const insert = isMultiline ? saveMultilinePaste(clean) : clean
-	insertIntoInput(insert)
-	render()
+	cleanAndInsertPaste(text)
 }
-
 const SUPER_L = 57444
 const SUPER_R = 57450
 
