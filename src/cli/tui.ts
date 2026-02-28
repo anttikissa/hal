@@ -87,8 +87,6 @@ function resolveInput(value: string | null): void {
 	r(value)
 }
 
-// ── Geometry helpers ──
-
 function cols(): number { return process.stdout.columns || 80 }
 function rows(): number { return process.stdout.rows || 24 }
 function promptContentWidth(): number { return Math.max(1, cols() - inputPromptStr.length - 1) }
@@ -531,18 +529,13 @@ function clearSelection(renderNow = true): void {
 	if (renderNow) render()
 }
 
-// ── Mouse/paste terminal modes ──
-
 function enableMouse(): void {
 	if (supportsKittyKeyboard()) directWrite(KITTY_KEYBOARD_ENABLE)
-	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h')
-	directWrite('\x1b[?2004h')
+	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h\x1b[?2004h')
 }
-
 function disableMouse(): void {
 	if (supportsKittyKeyboard()) directWrite(KITTY_KEYBOARD_DISABLE)
-	directWrite('\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l')
-	directWrite('\x1b[?2004l')
+	directWrite('\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?2004l')
 }
 
 // ── Render ──

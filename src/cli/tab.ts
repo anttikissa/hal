@@ -19,26 +19,11 @@ export interface CliTab {
 }
 
 export function createTabState(params: {
-	sessionId: string
-	workingDir: string
-	name: string
-	modelLabel: string
+	sessionId: string; workingDir: string; name: string; modelLabel: string
 }): CliTab {
 	return {
-		sessionId: params.sessionId,
-		workingDir: params.workingDir,
-		name: params.name,
-		topic: '',
-		modelLabel: params.modelLabel,
-		output: '',
-		contextStatus: null,
-		activity: '',
-		busy: false,
-		paused: false,
-		inputHistory: [],
-		inputDraft: '',
-		inputCursor: 0,
-		bootstrapSent: false,
+		...params, topic: '', output: '', contextStatus: null, activity: '',
+		busy: false, paused: false, inputHistory: [], inputDraft: '', inputCursor: 0, bootstrapSent: false,
 	}
 }
 
