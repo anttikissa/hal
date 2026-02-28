@@ -8,7 +8,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Use Bun, never node.js. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).
 - Secrets live in `auth.ason` (gitignored). Non-secrets in `config.ason`.
-- Conversation events are append-only: `state/sessions/<id>/conversation.ason`.
+- Conversation events are append-only: `state/sessions/<id>/conversation.asonl`.
 - Tabs are real sessions; `/handoff` rotates session history and writes `handoff.md`.
 - Prefer tabs for indentation (width 4).
 - When editing, collapse consecutive blank lines to one. Files should end with a newline.
@@ -59,7 +59,7 @@ Good: "[promoted] pid 12345 is now the owner"
 - `::: if model="glob"` ... `:::` fenced blocks conditionally include content by model name.
 - HTML comments are stripped.
 - Consecutive blank lines are collapsed.
-- `conversation.ason` files use ASON format — parse with `ason.parseAll()`, not line-by-line JSON.
+- `.asonl` files (conversation, session, IPC logs) use ASONL format — parse with `ason.parseAll()`, not line-by-line JSON.
 
 ## TODOs
 

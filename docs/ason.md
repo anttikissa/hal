@@ -1,7 +1,7 @@
 # ASON — A Saner Object Notation
 
-ASON is a superset of JSON designed for human-readable config and log files.
-Any valid JSON or JSONL file is valid ASON.
+ASON is a superset of JSON designed for human-readable config and state files.
+Any valid JSON file is valid ASON.
 
 ## Format
 
@@ -60,10 +60,17 @@ Given `const obj = { model: 'anthropic/claude-opus-4-6', theme: 'hal', debug: { 
 }
 ```
 
-## Streaming (JSONL-style)
+## ASON vs ASONL
 
-ASON files can contain multiple values, one per line — like JSONL.
-Used for append-only logs (`conversation.ason`, IPC files).
+**ASON** (`.ason`) — a single value per file. Used for config, state, and metadata. Written with `stringify(value)` (any mode) + `'\n'`.
+
+Examples: `config.ason`, `auth.ason`, `index.ason`, `info.ason`, `state.ason`, `calibration.ason`, `themes/*.ason`.
+
+**ASONL** (`.asonl`) — multiple values, one per line (like JSONL). Used for append-only logs and message streams. Each record **must** be produced with `stringify(value, 'short') + '\n'` — multi-line records would break line-oriented parsing.
+
+Examples: `conversation.asonl`, `session.asonl`, `commands.asonl`, `events.asonl`, `tool-calls.asonl`, `responses.asonl`, debug logs.
+
+### ASONL API
 
 - `parseAll(str)` — parse all values from a string.
 - `parseStream(stream)` — async generator from a `ReadableStream<Uint8Array>`. Reading from mid-stream is supported (ignores parse errors on the first line).

@@ -4,11 +4,11 @@
 
 Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
-- `session.ason` -- full message history sent to the model (user, assistant, tool_use, tool_result blocks). Used for API context. Replaced on `/handoff`, cleared on `/reset`.
-- `conversation.ason` -- append-only human-readable event log (user text, assistant text, model changes, cd, topic, fork, handoff, reset). Used for TUI replay on restart and input history. Never truncated.
-- `session-previous.ason` -- previous full history after `/handoff`
+- `session.asonl` -- full message history sent to the model (one message per line, ASONL format). Used for API context. Replaced on `/handoff`, cleared on `/reset`.
+- `conversation.asonl` -- append-only human-readable event log (user text, assistant text, model changes, cd, topic, fork, handoff, reset). Used for TUI replay on restart and input history. Never truncated.
+- `session-previous.asonl` -- previous full history after `/handoff`
 - `handoff.md` -- handoff summary markdown (consumed on next session load)
-- `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt)
+- `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt, tokenTotals)
 
 Registry metadata lives in `state/sessions/index.ason`.
 
@@ -18,11 +18,11 @@ Core logic: `src/session.ts`.
 - Startup loads/repairs `index.ason`; if missing/empty, creates `s-default`.
 - Runtime tracks session metadata in memory and persists registry updates.
 - Session content is saved after each turn in `runAgentLoop(...)`.
-- Runtime replays `conversation.ason` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `conversation.ason` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session.ts`).
-- `/reset` clears `session.ason` for that session and drops in-memory cache.
+- Runtime replays `conversation.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `conversation.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session.ts`).
+- `/reset` clears `session.asonl` for that session and drops in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
-- `/fork` copies `session.ason` and `conversation.ason` to a new session.
+- `/fork` copies `session.asonl` and `conversation.asonl` to a new session.
 - Auto-topic: after the first assistant response, runtime generates a short topic.
 ## Handoff Behavior
 
@@ -30,7 +30,7 @@ Core logic: `src/session.ts`.
 
 1. generates summary with compact model
 2. writes `handoff.md`
-3. rotates `session.ason` -> `session-previous.ason`
+3. rotates `session.asonl` -> `session-previous.asonl`
 4. clears runtime cache for that session
 5. publishes estimated context for the fresh session
 
@@ -72,6 +72,6 @@ Typical files:
 - `state/sessions/index.ason` -- registry
 - `state/sessions/<sessionId>/*` -- per-session files listed above
 - `state/calibration.ason` -- token calibration
-- `state/tool-calls.ason` -- optional tool-call log (when `config.debug.toolCalls = true`)
+- `state/tool-calls.asonl` -- optional tool-call log (when `config.debug.toolCalls = true`)
 
 Path constants are defined in `src/state.ts`.

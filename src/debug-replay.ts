@@ -1,7 +1,7 @@
 /**
  * Replay a debug/bug log into a fresh state directory.
  *
- * Usage: bun src/debug-replay.ts <bug-log.ason> [--dir <output-dir>]
+ * Usage: bun src/debug-replay.ts <bug-log.asonl> [--dir <output-dir>]
  *
  * Reads the log, extracts initial state (config + files), and writes them
  * to a fresh directory. Also prints a summary of keypresses and events.
@@ -14,7 +14,7 @@ import { parseAll } from './utils/ason.ts'
 async function main() {
 	const args = process.argv.slice(2)
 	if (args.length === 0) {
-		console.log('Usage: bun src/debug-replay.ts <bug-log.ason> [--dir <output-dir>]')
+		console.log('Usage: bun src/debug-replay.ts <bug-log.asonl> [--dir <output-dir>]')
 		process.exit(1)
 	}
 

@@ -21,8 +21,8 @@ function assertInit(): void {
 
 export function initBus(dir = IPC_DIR): void {
 	rootDir = dir
-	commandsFile = `${dir}/commands.ason`
-	eventsFile = `${dir}/events.ason`
+	commandsFile = `${dir}/commands.asonl`
+	eventsFile = `${dir}/events.asonl`
 	stateFile = `${dir}/state.ason`
 	ownerFile = `${dir}/owner.lock`
 	stateWriteLock = Promise.resolve()

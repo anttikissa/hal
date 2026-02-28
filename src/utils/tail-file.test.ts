@@ -8,7 +8,7 @@ import { parseStream, stringify } from './ason'
 describe('tailFile', () => {
 	test('does not duplicate or drop records under burst appends', async () => {
 		const dir = await mkdtemp(join(tmpdir(), 'hal-tail-'))
-		const file = join(dir, 'events.ason')
+		const file = join(dir, 'events.asonl')
 		await writeFile(file, '')
 
 		const stream = tailFile(file)

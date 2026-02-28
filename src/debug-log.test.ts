@@ -25,8 +25,8 @@ describe('debug log retention', () => {
 				mkdirSync(debugDir, { recursive: true })
 				mkdirSync(bugsDir, { recursive: true })
 				for (let i = 0; i < 2; i++) {
-					writeFileSync(join(debugDir, `old-${i}.ason`), chunk)
-					writeFileSync(join(bugsDir, `old-${i}.ason`), chunk)
+					writeFileSync(join(debugDir, `old-${i}.asonl`), chunk)
+					writeFileSync(join(bugsDir, `old-${i}.asonl`), chunk)
 				}
 			}
 		})
@@ -39,7 +39,7 @@ describe('debug log retention', () => {
 			const bugsDir = join(hal.halDir, 'state', 'bugs')
 			let total = 0
 			for (const dir of [debugDir, bugsDir]) {
-				const entries = [...new Bun.Glob('*.ason').scanSync({ cwd: dir })]
+				const entries = [...new Bun.Glob('*.asonl').scanSync({ cwd: dir })]
 				for (const entry of entries) total += statSync(join(dir, entry)).size
 			}
 			expect(total).toBeLessThanOrEqual(6 * 1024 * 1024)

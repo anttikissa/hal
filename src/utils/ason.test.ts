@@ -446,7 +446,7 @@ describe('parseStream e2e', () => {
 	test('tail -f a file, parse objects as they are appended', async () => {
 		const { tailFile } = await import('./tail-file')
 		const { appendFile } = await import('fs/promises')
-		const path = '/tmp/hal-ason-e2e-test.ason'
+		const path = '/tmp/hal-ason-e2e-test.asonl'
 		await Bun.write(path, '')
 
 		const stream = tailFile(path)

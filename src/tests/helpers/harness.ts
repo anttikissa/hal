@@ -64,7 +64,7 @@ export class TestHal {
 	async sendCommand(command: any): Promise<void> {
 		const { stringify } = await import('../../utils/ason.ts')
 		const ipcDir = `${this.halDir}/state/ipc`
-		const commandsFile = `${ipcDir}/commands.ason`
+		const commandsFile = `${ipcDir}/commands.asonl`
 		await appendFile(commandsFile, stringify(command, 'short') + '\n')
 	}
 

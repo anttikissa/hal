@@ -2,7 +2,7 @@
  * Streaming debug log for reproducing UI bugs.
  *
  * Gated on config.debug.recordEverything.
- * Writes append-only to state/debug/process.<pid>.ason.
+ * Writes append-only to state/debug/process.<pid>.asonl.
  * Starts with snapshots of all state files + config, then streams keypresses.
  * /snapshot (or the snapshot tool) appends a terminal content capture.
  * /bug <desc> appends a bug record with terminal snapshot and saves a copy.
@@ -124,7 +124,7 @@ export async function saveBugReport(description: string, terminal: string): Prom
 	// Copy the debug log to bugs dir without blocking the event loop
 	await mkdir(BUGS_DIR, { recursive: true })
 	const id = `bug-${Date.now()}`
-	const bugPath = resolve(BUGS_DIR, `${id}.ason`)
+	const bugPath = resolve(BUGS_DIR, `${id}.asonl`)
 	await Bun.write(bugPath, Bun.file(logPath))
 	schedulePrune()
 	return bugPath
@@ -153,7 +153,7 @@ async function walkFiles(dir: string, fn: (path: string) => Promise<void>): Prom
 
 export async function initDebugLog(pid: number): Promise<void> {
 	await mkdir(DEBUG_DIR, { recursive: true })
-	logPath = resolve(DEBUG_DIR, `process.${pid}.ason`)
+	logPath = resolve(DEBUG_DIR, `process.${pid}.asonl`)
 	enabled = loadConfig().debug?.recordEverything === true
 	schedulePrune()
 

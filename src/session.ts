@@ -27,13 +27,6 @@ export interface SessionRegistry {
 	sessions: SessionInfo[]
 }
 
-interface SessionFile {
-	messages: any[]
-	tokenTotals: TokenTotals
-	createdAt: string
-	updatedAt: string
-}
-
 export function makeSessionId(): string {
 	return `s-${randomBytes(3).toString('hex')}`
 }
@@ -47,11 +40,11 @@ function sanitizeSessionId(id: string): string {
 }
 
 function sessionPath(id: string): string {
-	return `${sessionDir(id)}/session.ason`
+	return `${sessionDir(id)}/session.asonl`
 }
 
 function sessionPreviousPath(id: string): string {
-	return `${sessionDir(id)}/session-previous.ason`
+	return `${sessionDir(id)}/session-previous.asonl`
 }
 
 function handoffPath(id: string): string {
@@ -63,7 +56,7 @@ function infoPath(id: string): string {
 }
 
 function conversationPath(id: string): string {
-	return `${sessionDir(id)}/conversation.ason`
+	return `${sessionDir(id)}/conversation.asonl`
 }
 
 // Session info (persisted per-session metadata)
@@ -74,6 +67,7 @@ export interface SessionMeta {
 	topic?: string
 	updatedAt: string
 	lastPrompt?: string
+	tokenTotals?: TokenTotals
 }
 
 export async function saveSessionInfo(id: string, meta: SessionMeta): Promise<void> {
@@ -245,10 +239,10 @@ export async function loadSession(
 	if (!existsSync(path)) return null
 	try {
 		const raw = await readFile(path, 'utf-8')
-		const session: SessionFile = parse(raw)
-		if (!Array.isArray(session.messages) || session.messages.length === 0) return null
-		const messages = repairMessages(session.messages)
-		return { messages, tokenTotals: session.tokenTotals ?? { ...EMPTY_TOTALS } }
+		const messages = repairMessages(parseAll(raw) as any[])
+		if (messages.length === 0) return null
+		const meta = await loadSessionInfo(sessionId)
+		return { messages, tokenTotals: meta?.tokenTotals ?? { ...EMPTY_TOTALS } }
 	} catch {
 		return null
 	}
@@ -274,27 +268,18 @@ export async function saveSession(
 	sessionId: string,
 	messages: any[],
 	tokenTotals: TokenTotals,
-	meta?: Omit<SessionMeta, 'updatedAt' | 'lastPrompt'>,
+	meta?: Omit<SessionMeta, 'updatedAt' | 'lastPrompt' | 'tokenTotals'>,
 ): Promise<void> {
 	await ensureSessionDir(sessionId)
 	const path = sessionPath(sessionId)
-	const now = nowIso()
-	let createdAt = now
-	try {
-		if (existsSync(path)) {
-			const existing = parse(await readFile(path, 'utf-8'))
-			if (existing.createdAt) createdAt = existing.createdAt
-		}
-	} catch {
-		/* use now */
-	}
-	const session: SessionFile = { messages, tokenTotals, createdAt, updatedAt: now }
-	await writeFile(path, stringify(session) + '\n')
+	const lines = messages.map(m => stringify(m, 'short')).join('\n')
+	await writeFile(path, lines ? lines + '\n' : '')
 	if (meta) {
 		await saveSessionInfo(sessionId, {
 			...meta,
-			updatedAt: now,
+			updatedAt: nowIso(),
 			lastPrompt: extractLastPrompt(messages),
+			tokenTotals,
 		})
 	}
 }
@@ -315,7 +300,7 @@ export async function performHandoff(sessionId: string, handoffContent: string):
 	// Write handoff.md
 	await writeFile(hPath, handoffContent)
 
-	// Rotate session.ason → session-previous.ason
+	// Rotate session.asonl → session-previous.asonl
 	if (existsSync(sessPath)) {
 		if (existsSync(prevPath)) await unlink(prevPath)
 		await rename(sessPath, prevPath)
@@ -343,7 +328,7 @@ export async function forkSession(sourceId: string): Promise<string> {
 	const dstDir = sessionDir(newId)
 	await mkdir(dstDir, { recursive: true })
 
-	for (const file of ['session.ason', 'conversation.ason']) {
+	for (const file of ['session.asonl', 'conversation.asonl']) {
 		const src = `${srcDir}/${file}`
 		if (existsSync(src)) await copyFile(src, `${dstDir}/${file}`)
 	}

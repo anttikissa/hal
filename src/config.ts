@@ -11,8 +11,8 @@ export interface DebugTokensConfig {
 }
 
 export interface DebugConfig {
-	toolCalls?: boolean // log tool calls to state/tool-calls.ason
-	responseLogging?: boolean // log API responses to state/responses.ason
+	toolCalls?: boolean // log tool calls to state/tool-calls.asonl
+	responseLogging?: boolean // log API responses to state/responses.asonl
 	ipc?: boolean // log IPC commands/events
 	streaming?: boolean // log raw SSE events
 	tokens?: DebugTokensConfig // token logging

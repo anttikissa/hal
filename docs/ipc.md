@@ -17,8 +17,8 @@ Exactly one process is elected **owner** via `state/ipc/owner.lock` (or `${HAL_S
 ```
 state/ipc/
   owner.lock       -- lockfile: { ownerId, pid, createdAt }
-  commands.ason    -- append-only command log (all clients write)
-  events.ason      -- append-only event log (owner writes)
+  commands.asonl   -- append-only command log (all clients write)
+  events.asonl     -- append-only event log (owner writes)
   state.ason       -- latest runtime snapshot
 ```
 
@@ -32,7 +32,7 @@ Definitions are in `src/protocol.ts`.
 
 `prompt`, `pause`, `resume`, `drop`, `queue`, `handoff`, `reset`, `close`, `restart`, `model`, `system`, `cd`, `fork`, `topic`
 
-Commands are created with `makeCommand(...)` and appended to `commands.ason`.
+Commands are created with `makeCommand(...)` and appended to `commands.asonl`.
 
 ### Event Types
 
@@ -71,6 +71,6 @@ Owner updates this via `publishStatus(...)` in `src/runtime/event-publisher.ts`.
 
 ## Notes
 
-- Owner startup trims `events.ason` (`resetBusEvents`) — keeps last 500 events so clients can hydrate scroll history.
+- Owner startup trims `events.asonl` (`resetBusEvents`) — keeps last 500 events so clients can hydrate scroll history.
 - Event tailing uses `parseStream(..., { recover: true })` to tolerate partial writes.
 - `status` events used for transient model activity are emitted with `activity` text and are not a separate `activity` event type.

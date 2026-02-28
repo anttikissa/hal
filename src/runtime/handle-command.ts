@@ -293,7 +293,7 @@ IMPORTANT: Do NOT reproduce the conversation. Synthesize and summarize. Be speci
 	await appendConversation(sessionId, { type: 'handoff', ts: new Date().toISOString() })
 	await publishActivity('', sessionId)
 	await publishLine(
-		'[handoff] summary saved to handoff.md, session rotated to session-previous.ason',
+		'[handoff] summary saved to handoff.md, session rotated to session-previous.asonl',
 		'meta',
 		sessionId,
 	)

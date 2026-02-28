@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach, beforeEach } from 'bun:test'
 import { readFile } from 'fs/promises'
-import { parse, parseAll } from '../utils/ason.ts'
+import { parseAll } from '../utils/ason.ts'
 import { startHal, type TestHal } from './helpers/harness.ts'
 
 let hal: TestHal | null = null
@@ -23,7 +23,7 @@ function parseForkIds(text: string): { parent: string; child: string } {
 }
 
 async function readConversationLog(hal: TestHal, sessionId: string): Promise<any[]> {
-	const path = `${hal.halDir}/state/sessions/${sessionId}/conversation.ason`
+	const path = `${hal.halDir}/state/sessions/${sessionId}/conversation.asonl`
 	for (let i = 0; i < 40; i++) {
 		try {
 			const raw = await readFile(path, 'utf-8')
@@ -35,12 +35,12 @@ async function readConversationLog(hal: TestHal, sessionId: string): Promise<any
 }
 
 async function readSessionMessages(hal: TestHal, sessionId: string): Promise<any[]> {
-	const path = `${hal.halDir}/state/sessions/${sessionId}/session.ason`
+	const path = `${hal.halDir}/state/sessions/${sessionId}/session.asonl`
 	for (let i = 0; i < 60; i++) {
 		try {
 			const raw = await readFile(path, 'utf-8')
-			const session = parse(raw) as any
-			if (Array.isArray(session?.messages)) return session.messages
+			const messages = parseAll(raw) as any[]
+			if (messages.length > 0) return messages
 		} catch {}
 		await Bun.sleep(50)
 	}

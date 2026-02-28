@@ -596,7 +596,7 @@ async function _runTool(
 		await logger('[snapshot] capturing debug snapshot', 'tool')
 		// Read the tail of the events log — this is what's been rendered on screen
 		const { IPC_DIR } = await import('./state.ts')
-		const eventsPath = `${IPC_DIR}/events.ason`
+		const eventsPath = `${IPC_DIR}/events.asonl`
 		try {
 			const content = await readFile(eventsPath, 'utf-8')
 			const lines = content.trim().split('\n')
