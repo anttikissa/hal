@@ -379,6 +379,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	if (loaded.length > 0) {
 		await publishLine(`[system] reloaded ${loaded.join(', ')} (model changed)`, 'meta', sessionId)
 	}
+	await publishEstimatedContext(sessionId)
 }
 
 export async function runSystem(sessionId: string): Promise<void> {
