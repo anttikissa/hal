@@ -82,12 +82,8 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 		: wasChunk ? '\n' : ''
 
 	// Block decorations (e.g. prompt grey bars).
-	// Skip leading blank line if previous output was also a block (avoid double spacing).
 	const cols = termCols()
-	let blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
-	if (blockStart && isBlockKind(prev)) {
-		blockStart = blockStart.replace(/^\n/, '')
-	}
+	const blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
 	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
 
 	// In-place redraw: if steering immediately follows a queued prompt block
@@ -97,8 +93,6 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 		const prevRows = lastBlockRows.get(key) ?? 0
 		if (prevRows > 0) {
 			redraw = `\x1b[${prevRows}A\x1b[J`
-			// Restore the leading blank line since we're replacing from scratch
-			blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
 		}
 	}
 

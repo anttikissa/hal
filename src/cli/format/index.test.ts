@@ -36,20 +36,22 @@ describe('cli format index', () => {
 })
 
 describe('consecutive block spacing', () => {
-	test('no blank line between consecutive prompt blocks', () => {
+	test('one blank line between consecutive prompt blocks', () => {
 		resetFormat('blk1')
-		pushFragment('prompt', 'first message', 'blk1')
+		const first = pushFragment('prompt', 'first message', 'blk1')
 		const second = pushFragment('prompt', 'second message', 'blk1')
 
-		// Second block should not start with \n (blank separator is suppressed)
-		expect(second).not.toMatch(/^\n/)
+		// blockEnd \n + blockStart \n = 1 blank line
+		// Bar ANSI codes separate newlines, so no raw triple-\n exists
+		expect(first + second).not.toMatch(/\n{3,}/)
 	})
 
-	test('no blank line between queued and steering prompt', () => {
+	test('no double blank between queued and steering prompt', () => {
 		resetFormat('blk2')
 		pushFragment('prompt', '[queued] msg', 'blk2')
 		const steering = pushFragment('prompt.steering', '[steering] msg', 'blk2')
 
+		// Redraw fires — starts with escape, not bare \n
 		expect(steering).not.toMatch(/^\n/)
 	})
 
@@ -58,8 +60,19 @@ describe('consecutive block spacing', () => {
 		pushFragment('line.info', 'some info', 'blk3')
 		const prompt = pushFragment('prompt', 'my message', 'blk3')
 
-		// Should start with \n (blank separator)
 		expect(prompt).toMatch(/^\n/)
+	})
+
+	test('one blank line before steering even with events between', () => {
+		resetFormat('blk4')
+		pushFragment('prompt', 'you can push changes', 'blk4')
+		pushFragment('chunk.assistant', 'model output', 'blk4')
+		pushFragment('line.warn', '[context] warning', 'blk4')
+		const steering = pushFragment('prompt.steering', '[steering] steer', 'blk4')
+
+		// blockStart always has single leading \n — never double
+		expect(steering).toMatch(/^\n/)
+		expect(steering).not.toMatch(/^\n\n/)
 	})
 })
 
