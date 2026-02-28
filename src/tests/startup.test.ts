@@ -49,6 +49,20 @@ describe('startup', () => {
 		expect(event.sessions[0].id).toBeTruthy()
 	})
 
+	test('fresh start creates exactly one session', async () => {
+		hal = await startHal()
+		await hal.waitForReady()
+		// Wait for the sessions list to stabilize (runtime + client bootstrap both done)
+		await Bun.sleep(500)
+		// Find the last sessions event
+		const sessionsEvents = hal.records.filter(
+			(r) => r.type === 'sessions' && Array.isArray(r.sessions),
+		)
+		const last = sessionsEvents[sessionsEvents.length - 1]
+		expect(last.sessions).toHaveLength(1)
+		expect(last.sessions[0].id).toBe('s-default')
+	})
+
 	test('exits cleanly on EOF', async () => {
 		hal = await startHal()
 		await hal.waitForReady()
