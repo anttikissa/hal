@@ -68,6 +68,33 @@ Type while the model is generating to queue messages. After 4 queued messages, g
 
 - **Anthropic** — Claude models (default)
 - **OpenAI** — GPT/o-series models
+- **Ollama** — local models via `ollama/<model>`
+
+### Ollama
+
+1. Start Ollama locally:
+
+```bash
+ollama serve
+```
+
+2. Pull a model:
+
+```bash
+ollama pull llama3.2
+```
+
+3. In HAL, switch to it:
+
+```text
+/model ollama/llama3.2
+```
+
+You can also use tags like:
+
+```text
+/model ollama/qwen2.5-coder:14b
+```
 
 ## License
 
