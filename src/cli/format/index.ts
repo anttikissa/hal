@@ -2,7 +2,7 @@ import type { RuntimeCommand, RuntimeEvent } from '../../protocol.ts'
 import type { Formatter } from './types.ts'
 import { getStyle } from './theme.ts'
 import { styleLinePrefix } from '../tui/format/line-prefix.ts'
-import { buildPromptBlockFormatter } from '../tui/format/prompt.ts'
+import { buildPromptBlockFormatter, buildBlockFormatter } from '../tui/format/prompt.ts'
 import { chunkPrefixForStability } from '../tui/format/chunk-stability.ts'
 import { applyStylePerLine } from '../tui/format/line-style.ts'
 
@@ -17,24 +17,25 @@ function termCols(): number {
 }
 
 function isBlockKind(kind: string): boolean {
-	return kind === 'prompt' || kind === 'prompt.steering'
+	return kind === 'prompt' || kind === 'prompt.steering' || kind === 'line.notice'
+}
+
+function blockFormatter(build: (cols: number) => { blockStart: string; blockEnd: string; formatText(t: string): string }): Formatter {
+	return {
+		style: '',
+		blockStart(cols: number): string { return build(cols).blockStart },
+		blockEnd(cols: number): string { return build(cols).blockEnd },
+		formatText(text: string): string { return build(termCols()).formatText(text) },
+	}
 }
 
 function getFormatter(kind: string): Formatter {
-	if (isBlockKind(kind)) {
+	if (kind === 'prompt' || kind === 'prompt.steering') {
 		const steering = kind === 'prompt.steering'
-		return {
-			style: '',
-			blockStart(cols: number): string {
-				return buildPromptBlockFormatter(cols, steering).blockStart
-			},
-			blockEnd(cols: number): string {
-				return buildPromptBlockFormatter(cols, steering).blockEnd
-			},
-			formatText(text: string): string {
-				return buildPromptBlockFormatter(termCols(), steering).formatText(text)
-			},
-		}
+		return blockFormatter(cols => buildPromptBlockFormatter(cols, steering))
+	}
+	if (kind === 'line.notice') {
+		return blockFormatter(cols => buildBlockFormatter(cols, getStyle('prompt.bar'), getStyle('line.warn')))
 	}
 	return { style: getStyle(kind) }
 }
