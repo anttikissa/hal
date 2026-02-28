@@ -1370,6 +1370,23 @@ export const _testTuiKeys = {
 	},
 }
 
+// ── Key action helpers ──
+
+function moveCursor(pos: number, extend = false): void {
+	setInputCursor(pos, extend)
+	render()
+}
+
+function moveOrCollapse(edge: 'start' | 'end', pos: number): void {
+	if (!collapseInputSelection(edge)) setInputCursor(pos)
+	render()
+}
+
+function deleteOrSel(fallback: () => void): void {
+	if (!deleteInputTextSelection()) fallback()
+	render()
+}
+
 // ── Key handler ──
 
 function handleKey(key: string): void {
@@ -1380,14 +1397,11 @@ function handleKey(key: string): void {
 	inputGoalCol = null
 	if (inputKeyHandler && inputKeyHandler(key)) return
 
-	// Clipboard shortcuts that reference selection — handle before clearing
+	// Clipboard shortcuts — handle before clearing output selection
 	if (handleInputClipboardShortcutKey(key)) return
-	if (key === '\x1bw') {
-		if (copyCurrentSelectionToClipboard()) render()
-		return
-	}
+	if (key === '\x1bw') { if (copyCurrentSelectionToClipboard()) render(); return }
 
-	// Any real (non-modifier, non-clipboard) keypress clears output selection
+	// Any real keypress clears output selection
 	if (selAnchor) clearSelection()
 
 	if (key === CTRL_C) {
@@ -1409,369 +1423,140 @@ function handleKey(key: string): void {
 		}
 		return
 	}
-	if (key === CTRL_Z) {
-		suspendForegroundJob()
-		return
-	}
-	if (key === '\x1bz') {
-		if (undoInputEdit()) render()
-		return
-	}
-
-	if (key === CTRL_X) {
-		if (cutInputTextSelectionToClipboard()) render()
-		return
-	}
-	if (key === CTRL_Y) {
-		pasteClipboardIntoInput()
-		return
-	}
+	if (key === CTRL_Z) return suspendForegroundJob()
+	if (key === '\x1bz') { if (undoInputEdit()) render(); return }
+	if (key === CTRL_X) { if (cutInputTextSelectionToClipboard()) render(); return }
+	if (key === CTRL_Y || key === CTRL_V) return pasteClipboardIntoInput()
 	if (key === '\x1ba' || key === '\x1bA') {
-		inputSelAnchor = 0
-		inputSelFocus = inputBuf.length
-		inputCursor = inputBuf.length
-		inputSelActive = false
-		render()
-		return
-	}
-
-	if (key === CTRL_V) {
-		pasteClipboardIntoInput()
-		return
+		inputSelAnchor = 0; inputSelFocus = inputBuf.length
+		inputCursor = inputBuf.length; inputSelActive = false
+		render(); return
 	}
 
 	// Shift+Enter / Option+Enter: insert newline
 	if (key === '\x1b\r' || key === '\x1b\n' || key === '\x1b[13;2u' || key === '\x1b[27;2;13~') {
-		insertIntoInput('\n')
-		render()
-		return
+		insertIntoInput('\n'); render(); return
 	}
 
+	// Enter / Return
 	if (key === '\r' || key === '\n') {
 		const value = inputBuf
 		const now = Date.now()
-
 		if (!value.trim() && lastSubmitTime > 0 && now - lastSubmitTime < 1000) {
 			lastSubmitTime = 0
 			if (doubleEnterHandler) doubleEnterHandler()
 			return
 		}
+		if (value.trim()) { inputHistory.push(value); lastSubmitTime = now }
+		historyIndex = -1; historyDraft = ''
+		inputBuf = ''; inputCursor = 0
+		clearInputTextSelection(); clearInputUndoHistory()
+		render()
+		if (waitingResolve) { const r = waitingResolve; waitingResolve = null; r(value) }
+		return
+	}
 
-		if (value.trim()) {
-			inputHistory.push(value)
-			lastSubmitTime = now
-		}
-		historyIndex = -1
-		historyDraft = ''
-		inputBuf = ''
-		inputCursor = 0
+	// Delete keys (selection takes precedence)
+	if (key === '\x1b\x7f') return deleteOrSel(() => {
+		if (inputCursor > 0) replaceInputRange(wordBoundaryLeft(inputBuf, inputCursor), inputCursor, '')
+	})
+	if (key === '\x7f' || key === '\b') return deleteOrSel(() => {
+		if (inputCursor > 0) replaceInputRange(inputCursor - 1, inputCursor, '')
+	})
+	if (key === '\x1b[3~') return deleteOrSel(() => {
+		if (inputCursor < inputBuf.length) replaceInputRange(inputCursor, inputCursor + 1, '')
+	})
+	if (key === CTRL_U) return deleteOrSel(() => replaceInputRange(0, inputCursor, ''))
+	if (key === CTRL_K) return deleteOrSel(() => replaceInputRange(inputCursor, inputBuf.length, ''))
+
+	// Shift+Arrow: extend selection
+	if (key === '\x1b[1;2D') return moveCursor(inputCursor - 1, true)
+	if (key === '\x1b[1;2C') return moveCursor(inputCursor + 1, true)
+	if (key === '\x1b[1;4D') return moveCursor(wordBoundaryLeft(inputBuf, inputCursor), true)
+	if (key === '\x1b[1;4C') return moveCursor(wordBoundaryRight(inputBuf, inputCursor), true)
+
+	// Arrow keys with selection collapse
+	if (key === '\x1b[D' || key === '\x1bOD') return moveOrCollapse('start', inputCursor - 1)
+	if (key === '\x1b[C' || key === '\x1bOC') return moveOrCollapse('end', inputCursor + 1)
+	if (key === '\x1b[1;3D' || key === '\x1bb') return moveOrCollapse('start', wordBoundaryLeft(inputBuf, inputCursor))
+	if (key === '\x1b[1;3C' || key === '\x1bf') return moveOrCollapse('end', wordBoundaryRight(inputBuf, inputCursor))
+
+	// Shift+Home/End, Shift+Cmd+Left/Right
+	if (key === '\x1b[1;2H' || key === '\x1b[1;10D') return moveCursor(0, true)
+	if (key === '\x1b[1;2F' || key === '\x1b[1;10C') return moveCursor(inputBuf.length, true)
+
+	// Home / Ctrl-A / Cmd+Left
+	if (key === '\x1b[H' || key === '\x1bOH' || key === '\x01' || key === '\x1b[1;9D') return moveCursor(0)
+	// End / Ctrl-E / Cmd+Right
+	if (key === '\x1b[F' || key === '\x1bOF' || key === '\x05' || key === '\x1b[1;9C') return moveCursor(inputBuf.length)
+
+	// Arrow Up/Down with vertical move + history
+	if (key === '\x1b[A' || key === '\x1bOA' || key === '\x1b[B' || key === '\x1bOB') {
+		const dir = (key === '\x1b[A' || key === '\x1bOA') ? -1 : 1
 		clearInputTextSelection()
-		clearInputUndoHistory()
-		render()
-		if (waitingResolve) {
-			const r = waitingResolve
-			waitingResolve = null
-			r(value)
-		}
-		return
-	}
-
-	// Option+Backspace: delete word left
-	if (key === '\x1b\x7f') {
-		if (deleteInputTextSelection()) {
-			render()
-			return
-		}
-		if (inputCursor > 0) {
-			const b = wordBoundaryLeft(inputBuf, inputCursor)
-			replaceInputRange(b, inputCursor, '')
-			render()
-		}
-		return
-	}
-
-	// Backspace
-	if (key === '\x7f' || key === '\b') {
-		if (deleteInputTextSelection()) {
-			render()
-			return
-		}
-		if (inputCursor > 0) {
-			replaceInputRange(inputCursor - 1, inputCursor, '')
-			render()
-		}
-		return
-	}
-
-	// Delete
-	if (key === '\x1b[3~') {
-		if (deleteInputTextSelection()) {
-			render()
-			return
-		}
-		if (inputCursor < inputBuf.length) {
-			replaceInputRange(inputCursor, inputCursor + 1, '')
-			render()
-		}
-		return
-	}
-
-	// Arrow left / right
-	if (key === '\x1b[1;2D') {
-		setInputCursor(inputCursor - 1, true)
-		render()
-		return
-	}
-	if (key === '\x1b[1;2C') {
-		setInputCursor(inputCursor + 1, true)
-		render()
-		return
-	}
-	if (key === '\x1b[1;4D') {
-		setInputCursor(wordBoundaryLeft(inputBuf, inputCursor), true)
-		render()
-		return
-	}
-	if (key === '\x1b[1;4C') {
-		setInputCursor(wordBoundaryRight(inputBuf, inputCursor), true)
-		render()
-		return
-	}
-	if (key === '\x1b[D' || key === '\x1bOD') {
-		if (collapseInputSelection('start')) {
-			render()
-			return
-		}
-		if (inputCursor > 0) {
-			setInputCursor(inputCursor - 1)
-			render()
-		}
-		return
-	}
-	if (key === '\x1b[C' || key === '\x1bOC') {
-		if (collapseInputSelection('end')) {
-			render()
-			return
-		}
-		if (inputCursor < inputBuf.length) {
-			setInputCursor(inputCursor + 1)
-			render()
-		}
-		return
-	}
-
-	// Opt-left / Opt-right (word jump)
-	if (key === '\x1b[1;3D' || key === '\x1bb') {
-		if (collapseInputSelection('start')) {
-			render()
-			return
-		}
-		setInputCursor(wordBoundaryLeft(inputBuf, inputCursor))
-		render()
-		return
-	}
-	if (key === '\x1b[1;3C' || key === '\x1bf') {
-		if (collapseInputSelection('end')) {
-			render()
-			return
-		}
-		setInputCursor(wordBoundaryRight(inputBuf, inputCursor))
-		render()
-		return
-	}
-
-	// Shift+Home / Shift+End
-	if (key === '\x1b[1;2H') {
-		setInputCursor(0, true)
-		render()
-		return
-	}
-	if (key === '\x1b[1;2F') {
-		setInputCursor(inputBuf.length, true)
-		render()
-		return
-	}
-	if (key === '\x1b[1;10D') {
-		setInputCursor(0, true)
-		render()
-		return
-	}
-	if (key === '\x1b[1;10C') {
-		setInputCursor(inputBuf.length, true)
-		render()
-		return
-	}
-
-	// Home / Ctrl-A
-	if (
-		key === '\x1b[H' ||
-		key === '\x1bOH' ||
-		key === '\x01' ||
-		key === '\x1b[1;9D'
-	) {
-		setInputCursor(0)
-		render()
-		return
-	}
-	// End / Ctrl-E
-	if (
-		key === '\x1b[F' ||
-		key === '\x1bOF' ||
-		key === '\x05' ||
-		key === '\x1b[1;9C'
-	) {
-		setInputCursor(inputBuf.length)
-		render()
-		return
-	}
-
-	// Ctrl-U / Ctrl-K
-	if (key === CTRL_U) {
-		if (deleteInputTextSelection()) {
-			render()
-			return
-		}
-		replaceInputRange(0, inputCursor, '')
-		render()
-		return
-	}
-	if (key === CTRL_K) {
-		if (deleteInputTextSelection()) {
-			render()
-			return
-		}
-		replaceInputRange(inputCursor, inputBuf.length, '')
-		render()
-		return
-	}
-
-	// Arrow up
-	if (key === '\x1b[A' || key === '\x1bOA') {
-		clearInputTextSelection()
-		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, -1)
+		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, dir)
 		if (!r.atBoundary) {
-			inputCursor = r.cursor
-			inputGoalCol = r.goalCol
-			render()
-			return
+			inputCursor = r.cursor; inputGoalCol = r.goalCol; render(); return
 		}
-		if (inputHistory.length === 0) return
-		if (historyIndex < 0) {
-			historyDraft = inputBuf
-			historyIndex = inputHistory.length - 1
-		} else if (historyIndex > 0) historyIndex--
-		else return
-		setInputTextWithUndo(inputHistory[historyIndex])
-		render()
-		return
-	}
-
-	// Arrow down
-	if (key === '\x1b[B' || key === '\x1bOB') {
-		clearInputTextSelection()
-		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, 1)
-		if (!r.atBoundary) {
-			inputCursor = r.cursor
-			inputGoalCol = r.goalCol
-			render()
-			return
-		}
-		if (historyIndex < 0) return
-		if (historyIndex < inputHistory.length - 1) {
-			historyIndex++
+		if (dir === -1) {
+			if (inputHistory.length === 0) return
+			if (historyIndex < 0) { historyDraft = inputBuf; historyIndex = inputHistory.length - 1 }
+			else if (historyIndex > 0) historyIndex--
+			else return
 			setInputTextWithUndo(inputHistory[historyIndex])
 		} else {
-			historyIndex = -1
-			setInputTextWithUndo(historyDraft)
-			historyDraft = ''
+			if (historyIndex < 0) return
+			if (historyIndex < inputHistory.length - 1) {
+				historyIndex++; setInputTextWithUndo(inputHistory[historyIndex])
+			} else {
+				historyIndex = -1; setInputTextWithUndo(historyDraft); historyDraft = ''
+			}
 		}
-		render()
-		return
+		render(); return
 	}
 
-	// PageUp / PageDown: scroll output
-	if (key === '\x1b[5~') {
-		scroll(Math.max(1, rows() - 3))
-		return
-	}
-	if (key === '\x1b[6~') {
-		scroll(-Math.max(1, rows() - 3))
-		return
-	}
+	// PageUp / PageDown
+	if (key === '\x1b[5~') return scroll(Math.max(1, rows() - 3))
+	if (key === '\x1b[6~') return scroll(-Math.max(1, rows() - 3))
 
-	// Option+Up / Option+Down: move cursor to start / end
-	if (key === '\x1b[1;3A') {
-		setInputCursor(0)
-		render()
-		return
-	}
-	if (key === '\x1b[1;3B') {
-		setInputCursor(inputBuf.length)
-		render()
-		return
-	}
+	// Option+Up/Down: jump to start/end
+	if (key === '\x1b[1;3A') return moveCursor(0)
+	if (key === '\x1b[1;3B') return moveCursor(inputBuf.length)
 
-	// Shift+Up / Shift+Down: extend selection by line
-	if (key === '\x1b[1;2A') {
-		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, -1)
+	// Shift+Up/Down: extend selection vertically
+	if (key === '\x1b[1;2A' || key === '\x1b[1;2B') {
+		const dir = key === '\x1b[1;2A' ? -1 : 1
+		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, dir)
 		if (!r.atBoundary) {
-			setInputCursor(r.cursor, true)
-			inputGoalCol = r.goalCol
-			render()
-		}
-		return
-	}
-	if (key === '\x1b[1;2B') {
-		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, 1)
-		if (!r.atBoundary) {
-			setInputCursor(r.cursor, true)
-			inputGoalCol = r.goalCol
-			render()
+			setInputCursor(r.cursor, true); inputGoalCol = r.goalCol; render()
 		}
 		return
 	}
 
-	// Shift+Option+Up / Shift+Option+Down: extend selection to start / end
-	if (key === '\x1b[1;4A') {
-		setInputCursor(0, true)
-		render()
-		return
-	}
-	if (key === '\x1b[1;4B') {
-		setInputCursor(inputBuf.length, true)
-		render()
-		return
-	}
+	// Shift+Option+Up/Down: extend selection to start/end
+	if (key === '\x1b[1;4A') return moveCursor(0, true)
+	if (key === '\x1b[1;4B') return moveCursor(inputBuf.length, true)
 
 	// Tab completion
 	if (key === '\t') {
 		if (tabCompleter) {
 			const matches = tabCompleter(inputBuf)
 			if (matches.length === 1) {
-				setInputTextWithUndo(matches[0])
-				render()
+				setInputTextWithUndo(matches[0]); render()
 			} else if (matches.length > 1) {
 				let common = matches[0]
 				for (let i = 1; i < matches.length; i++) {
-					while (common.length > 0 && !matches[i].startsWith(common)) {
-						common = common.slice(0, -1)
-					}
+					while (common.length > 0 && !matches[i].startsWith(common)) common = common.slice(0, -1)
 				}
-				if (common.length > inputBuf.length) {
-					setInputTextWithUndo(common)
-				}
-				writeToOutput(`\x1b[2m${matches.join('  ')}\x1b[0m\n`)
-				render()
+				if (common.length > inputBuf.length) setInputTextWithUndo(common)
+				writeToOutput(`\x1b[2m${matches.join('  ')}\x1b[0m\n`); render()
 			}
 		}
 		return
 	}
 
 	// Esc
-	if (key === '\x1b') {
-		if (escHandler) escHandler()
-		return
-	}
+	if (key === '\x1b') { if (escHandler) escHandler(); return }
 
 	// Ignore other control characters
 	if (key.length === 1 && key.charCodeAt(0) < 0x20) return
@@ -1780,22 +1565,16 @@ function handleKey(key: string): void {
 	const modifyOtherKeys = key.match(/^\x1b\[27;\d+;(\d+)~$/)
 	if (modifyOtherKeys) {
 		const ch = String.fromCharCode(Number(modifyOtherKeys[1]))
-		if (ch) {
-			insertIntoInput(ch)
-			render()
-		}
+		if (ch) { insertIntoInput(ch); render() }
 		return
 	}
 
 	// Skip unknown escape sequences
 	if (key.startsWith('\x1b')) return
 
-	// Multi-character paste (outside bracketed paste)
-	const isMultiline = key.length > 1 && key.includes('\n')
-	if (isMultiline) {
-		const ref = saveMultilinePaste(key)
-		insertIntoInput(ref)
-	} else {
+	// Multi-character paste or printable input
+	if (key.length > 1 && key.includes('\n')) insertIntoInput(saveMultilinePaste(key))
+	else {
 		const clean = key.replace(/[\x00-\x1f]/g, '')
 		if (!clean) return
 		insertIntoInput(clean)
