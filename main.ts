@@ -8,6 +8,7 @@ import {
 	ensureBus,
 	releaseOwner,
 	resetBusEvents,
+	verifyOwnership,
 } from './src/ipc.ts'
 import { startRuntime, saveAllSessions } from './src/runtime/sessions.ts'
 import {
@@ -203,6 +204,17 @@ if (isOwner) {
 		await releaseOwner(ownerId)
 		process.exit(1)
 	})
+
+	// Heartbeat: verify we still hold the lock. If lost (e.g. we were suspended
+	// and another process took over), exit and let the restart loop re-launch us.
+	setInterval(async () => {
+		if (!(await verifyOwnership(ownerId))) {
+			await emitBootstrap(`[owner] lock lost (pid ${process.pid}), stepping down`, 'warn')
+			await saveAllSessions()
+			if (webServer) webServer.stop()
+			process.exit(100)
+		}
+	}, 3000)
 }
 
 if (testMode) {
@@ -347,9 +359,8 @@ if (testMode) {
 				break
 			} catch (e: any) {
 				if (isAddrInUse(e)) {
-					// If another HAL owner took over during retry, stop trying in this process.
-					const current = await claimOwner(ownerId)
-					if (!current.owner) {
+				// If another HAL owner took over during retry, stop trying in this process.
+					if (!(await verifyOwnership(ownerId))) {
 						await emitBootstrap('[web] skipped: another owner is active', 'status')
 						break
 					}
@@ -370,6 +381,16 @@ if (testMode) {
 			await emitBootstrap(`[engine] crashed: ${e.message || e}`, 'error')
 			await releaseOwner(ownerId)
 		})
+
+		// Heartbeat for promoted owner — same as initial owner
+		setInterval(async () => {
+			if (!(await verifyOwnership(ownerId))) {
+				await emitBootstrap(`[owner] lock lost (pid ${process.pid}), stepping down`, 'warn')
+				await saveAllSessions()
+				if (webServer) webServer.stop()
+				process.exit(100)
+			}
+		}, 3000)
 	}
 
 	// If we're a client, watch for owner release event + poll as fallback

@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
-import { initBus, claimOwner, releaseOwner, ensureBus } from '../ipc.ts'
+import { initBus, claimOwner, releaseOwner, verifyOwnership, ensureBus } from '../ipc.ts'
 
 let dir: string
 
@@ -23,10 +23,17 @@ describe('claimOwner', () => {
 		expect(result.currentOwnerPid).toBe(process.pid)
 	})
 
-	test('second caller with same pid is rejected', async () => {
+	test('second caller with different ownerId is rejected', async () => {
 		await claimOwner('a')
 		const result = await claimOwner('b')
 		expect(result.owner).toBe(false)
+		expect(result.currentOwnerPid).toBe(process.pid)
+	})
+
+	test('calling claimOwner again with same ownerId recognizes own lock', async () => {
+		await claimOwner('a')
+		const result = await claimOwner('a')
+		expect(result.owner).toBe(true)
 		expect(result.currentOwnerPid).toBe(process.pid)
 	})
 
@@ -63,5 +70,27 @@ describe('claimOwner', () => {
 		expect(existsSync(`${dir}/owner-claim`)).toBe(false)
 		await releaseOwner('a')
 		expect(existsSync(`${dir}/owner-claim`)).toBe(false)
+	})
+})
+
+describe('verifyOwnership', () => {
+	test('returns true when lock matches ownerId', async () => {
+		await claimOwner('a')
+		expect(await verifyOwnership('a')).toBe(true)
+	})
+
+	test('returns false when lock has different ownerId', async () => {
+		await claimOwner('a')
+		expect(await verifyOwnership('b')).toBe(false)
+	})
+
+	test('returns false when lock file is missing', async () => {
+		expect(await verifyOwnership('a')).toBe(false)
+	})
+
+	test('returns false after release', async () => {
+		await claimOwner('a')
+		await releaseOwner('a')
+		expect(await verifyOwnership('a')).toBe(false)
 	})
 })

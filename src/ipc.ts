@@ -129,23 +129,38 @@ export async function claimOwner(
 		return { owner: true, currentOwnerPid: process.pid }
 	}
 
+	// Lock exists — read it
+	let lockOwnerId: string | null = null
 	let ownerPid: number | null = null
 	try {
 		const lockRaw = await readFile(ownerFile, 'utf-8')
 		const lock = parse(lockRaw) as any
+		lockOwnerId = lock?.ownerId ?? null
 		ownerPid = Number.isInteger(lock?.pid) ? lock.pid : null
 	} catch {
 		ownerPid = null
+	}
+
+	// Already ours (e.g. called twice by same process)
+	if (lockOwnerId === ownerId) {
+		return { owner: true, currentOwnerPid: process.pid }
 	}
 
 	if (ownerPid !== null && isPidAlive(ownerPid)) {
 		return { owner: false, currentOwnerPid: ownerPid }
 	}
 
-	// Owner is dead — remove stale lock and retry
+	// Owner is dead — atomically move stale lock out of the way, then retry.
+	// rename() is atomic: only one racing process can succeed; others get ENOENT.
+	const staleFile = `${ownerFile}.stale.${process.pid}`
 	try {
-		await rm(ownerFile)
-	} catch {}
+		await rename(ownerFile, staleFile)
+	} catch {
+		// Another process already moved it — let them win
+		const currentState = await readState()
+		return { owner: false, currentOwnerPid: currentState.ownerPid }
+	}
+	try { await rm(staleFile) } catch {}
 
 	if (await tryClaim()) {
 		await updateState((s) => {
@@ -157,6 +172,17 @@ export async function claimOwner(
 
 	const currentState = await readState()
 	return { owner: false, currentOwnerPid: currentState.ownerPid }
+}
+
+export async function verifyOwnership(ownerId: string): Promise<boolean> {
+	assertInit()
+	try {
+		const raw = await readFile(ownerFile, 'utf-8')
+		const lock = parse(raw) as any
+		return lock?.ownerId === ownerId
+	} catch {
+		return false
+	}
 }
 
 export async function releaseOwner(ownerId: string): Promise<void> {
