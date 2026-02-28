@@ -1,38 +1,11 @@
-/**
- * State-driven terminal UI with alternate screen buffer.
- *
- * Layout:
- *   Row  1                        = Title bar
- *   Rows 2..(rows - footerH)     = Output (word-wrapped, scrollable)
- *   Row  (rows - footerH + 1)    = Activity bar
- *   Row  (rows - footerH + 2)    = Tab bar / status bar
- *   Row  (rows - footerH + 3)    = Input top pad (dark-grey)
- *   Rows ...                      = Input (dark-grey background)
- *   Row  rows                     = Input bottom pad (dark-grey)
- *
- * Single render() redraws every row from state on each change.
- * See docs/tui.md for the full mental model.
- */
+// State-driven terminal UI with alternate screen buffer. See docs/tui.md.
 
 import { stringify } from '../utils/ason.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
 import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
-import {
-	parseKeys,
-	readEscapeSequence,
-	truncateAnsi,
-	wrapAnsi,
-	wordBoundaryLeft,
-	wordBoundaryRight,
-	wordWrapLines,
-} from './tui-text.ts'
-import {
-	cursorToWrappedRowCol,
-	getWrappedInputLayout,
-	wrappedRowColToCursor,
-	verticalMove,
-} from './tui-input-layout.ts'
+import { parseKeys, readEscapeSequence, truncateAnsi, wrapAnsi, wordBoundaryLeft, wordBoundaryRight, wordWrapLines } from './tui-text.ts'
+import { cursorToWrappedRowCol, getWrappedInputLayout, wrappedRowColToCursor, verticalMove } from './tui-input-layout.ts'
 export { stripAnsi } from './format/index.ts'
 import { stripAnsi } from './format/index.ts'
 import { buildStatusBarLine } from './tui/format/status-bar.ts'
@@ -47,7 +20,6 @@ const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_EOL = '\x1b[K'
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
-
 // ── Types ──
 
 type TabCompleter = (prefix: string) => string[]
@@ -58,39 +30,25 @@ type SelectionPoint = { surface: SelectionSurface; row: number; col: number }
 type SelectionRange = { surface: SelectionSurface; startRow: number; startCol: number; endRow: number; endCol: number }
 type SelectionMode = 'char' | 'word' | 'line'
 type InputUndoSnapshot = { text: string; cursor: number; selAnchor: number | null; selFocus: number | null }
-// ── Callbacks ──
 
-let tabCompleter: TabCompleter | null = null
-let inputKeyHandler: InputKeyHandler | null = null
-let inputEchoFilter: InputEchoFilter | null = null
-let escHandler: (() => void) | null = null
+let tabCompleter: TabCompleter | null = null, inputKeyHandler: InputKeyHandler | null = null
+let inputEchoFilter: InputEchoFilter | null = null, escHandler: (() => void) | null = null
 let doubleEnterHandler: (() => void) | null = null
-
 export function setTabCompleter(fn: TabCompleter): void { tabCompleter = fn }
 export function setInputKeyHandler(handler: InputKeyHandler | null): void { inputKeyHandler = handler }
 export function setInputEchoFilter(handler: InputEchoFilter | null): void { inputEchoFilter = handler }
 export function setEscHandler(handler: (() => void) | null): void { escHandler = handler }
 export function setDoubleEnterHandler(handler: (() => void) | null): void { doubleEnterHandler = handler }
 
-// ── Input history ──
-
-let inputHistory: string[] = []
-let historyIndex = -1
-let historyDraft = ''
-
+let inputHistory: string[] = [], historyIndex = -1, historyDraft = ''
 export function getInputHistory(): string[] { return inputHistory }
-export function setInputHistory(history: string[]): void {
-	inputHistory = history; historyIndex = -1; historyDraft = ''
-}
-export function getInputDraft(): { text: string; cursor: number } {
-	return { text: inputBuf, cursor: inputCursor }
-}
+export function setInputHistory(history: string[]): void { inputHistory = history; historyIndex = -1; historyDraft = '' }
+export function getInputDraft(): { text: string; cursor: number } { return { text: inputBuf, cursor: inputCursor } }
 export function setInputDraft(text: string, cursor?: number): void {
 	inputBuf = text; inputCursor = cursor ?? text.length
 	clearInputTextSelection(); clearInputUndoHistory()
 	historyIndex = -1; historyDraft = ''; draftPreloaded = !!text
 }
-
 let maxPromptLines = 15
 export function setMaxPromptLines(n: number): void { maxPromptLines = Math.max(1, Math.min(n, 50)) }
 
@@ -113,16 +71,13 @@ let superHeld = false, lastMouseX = -1, lastMouseY = -1
 let bracketedPasteBuffer: string | null = null
 let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
+
 function splitTitleParts(text: string): { topic: string; session: string } {
-	const trimmed = text.trim()
-	if (!trimmed) return { topic: '', session: '' }
-	const sep = ' — '
-	const idx = trimmed.lastIndexOf(sep)
+	const trimmed = text.trim(); if (!trimmed) return { topic: '', session: '' }
+	const idx = trimmed.lastIndexOf(' — ')
 	if (idx <= 0) return { topic: '', session: trimmed }
-	const topic = trimmed.slice(0, idx).trim()
-	const session = trimmed.slice(idx + sep.length).trim()
-	if (!topic) return { topic: '', session: trimmed }
-	return { topic, session }
+	const topic = trimmed.slice(0, idx).trim(), session = trimmed.slice(idx + 3).trim()
+	return topic ? { topic, session } : { topic: '', session: trimmed }
 }
 
 function resolveInput(value: string | null): void {
@@ -158,21 +113,15 @@ function supportsKittyKeyboard(): boolean {
 }
 // ── Output storage ──
 
-// Matches \x1b[NA\x1b[J (cursor-up N + erase-below) — used by prompt redraw
 const CURSOR_UP_ERASE_RE = /\x1b\[(\d+)A\x1b\[J/g
 
 function appendOutput(text: string): void {
 	if (!text) return
-
-	// Pre-process: handle all cursor-up + erase-below sequences by splitting
-	// text around them and deleting lines from the buffer at each occurrence.
-	let lastIdx = 0
-	CURSOR_UP_ERASE_RE.lastIndex = 0
+	// Handle cursor-up + erase-below sequences
+	let lastIdx = 0; CURSOR_UP_ERASE_RE.lastIndex = 0
 	let m: RegExpExecArray | null
 	while ((m = CURSOR_UP_ERASE_RE.exec(text)) !== null) {
-		// Append text before this sequence
 		if (m.index > lastIdx) appendRaw(text.slice(lastIdx, m.index))
-		// Delete last N lines from buffer
 		const deleteCount = parseInt(m[1], 10)
 		if (deleteCount > 0 && outputLines.length > 1) {
 			outputLines.length = Math.max(1, outputLines.length - deleteCount)
@@ -180,102 +129,65 @@ function appendOutput(text: string): void {
 		}
 		lastIdx = m.index + m[0].length
 	}
-	// Append remaining text
 	if (lastIdx < text.length) appendRaw(text.slice(lastIdx))
-
-	if (outputLines.length > MAX_OUTPUT_LINES) {
-		outputLines = outputLines.slice(-MAX_OUTPUT_LINES)
-	}
-	// Invalidate wrapped line cache
+	if (outputLines.length > MAX_OUTPUT_LINES) outputLines = outputLines.slice(-MAX_OUTPUT_LINES)
 	lastWrapCols = 0
 }
 
 function appendRaw(text: string): void {
 	let i = 0
 	while (i < text.length) {
-		const ch = text[i]
-		if (ch === '\n') {
-			outputLines.push('')
-			i++
-			continue
-		}
-		if (ch === '\r') {
-			outputLines[outputLines.length - 1] = ''
-			i++
-			continue
-		}
-		let end = i
-		while (end < text.length && text[end] !== '\n' && text[end] !== '\r') end++
-		outputLines[outputLines.length - 1] += text.slice(i, end)
-		i = end
+		if (text[i] === '\n') { outputLines.push(''); i++; continue }
+		if (text[i] === '\r') { outputLines[outputLines.length - 1] = ''; i++; continue }
+		let end = i; while (end < text.length && text[end] !== '\n' && text[end] !== '\r') end++
+		outputLines[outputLines.length - 1] += text.slice(i, end); i = end
 	}
 }
 
 // ── Viewport ──
 
 function getTotalVisualLines(): number {
-	const c = cols()
-	if (lastWrapCols === c) return wrappedLineCount
-	let total = 0
-	for (const line of outputLines) {
-		total += wrapAnsi(line, c).length
-	}
-	wrappedLineCount = total
-	lastWrapCols = c
-	return total
+	const c = cols(); if (lastWrapCols === c) return wrappedLineCount
+	let total = 0; for (const line of outputLines) total += wrapAnsi(line, c).length
+	wrappedLineCount = total; lastWrapCols = c; return total
 }
 
 function getVisibleWrapped(outputHeight: number): string[] {
-	const c = cols()
-	const need = outputHeight + scrollOffset
-	const allWrapped: string[] = []
-
+	const c = cols(), need = outputHeight + scrollOffset, allWrapped: string[] = []
 	for (let li = outputLines.length - 1; li >= 0; li--) {
 		const wrapped = wrapAnsi(linkifyLine(outputLines[li]), c)
-		for (let wi = wrapped.length - 1; wi >= 0; wi--) {
-			allWrapped.push(wrapped[wi])
-		}
+		for (let wi = wrapped.length - 1; wi >= 0; wi--) allWrapped.push(wrapped[wi])
 		if (allWrapped.length >= need) break
 	}
-
 	allWrapped.reverse()
-	const totalCollected = allWrapped.length
-	const end = totalCollected - Math.min(scrollOffset, totalCollected)
-	const start = Math.max(0, end - outputHeight)
-	return allWrapped.slice(start, end)
+	const end = allWrapped.length - Math.min(scrollOffset, allWrapped.length)
+	return allWrapped.slice(Math.max(0, end - outputHeight), end)
 }
-
-// ── Scroll ──
 
 function scroll(lines: number): void {
 	if (!initialized || suspended) return
-	const oh = Math.max(0, outputBottom() - 1)
-	const totalVisual = getTotalVisualLines()
-	const maxScroll = Math.max(0, totalVisual - oh)
+	const oh = Math.max(0, outputBottom() - 1), maxScroll = Math.max(0, getTotalVisualLines() - oh)
 	const prev = scrollOffset
 	scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset + lines))
 	const delta = scrollOffset - prev
-	// Shift output selection so it tracks the same content
 	if (delta !== 0 && selAnchor?.surface === 'output') {
 		selAnchor = { ...selAnchor, row: selAnchor.row + delta }
 		if (selCurrent) selCurrent = { ...selCurrent, row: selCurrent.row + delta }
 	}
-	hoverOutputRow = -1
-	hoverUrl = null
-	render()
+	hoverOutputRow = -1; hoverUrl = null; render()
 }
 
 // ── Input selection/edit helpers ──
 
 function clampInputPos(pos: number): number { return Math.max(0, Math.min(pos, inputBuf.length)) }
+function clearInputUndoHistory(): void { inputUndoStack = [] }
+function clearInputTextSelection(): void { inputSelAnchor = null; inputSelFocus = null; inputSelActive = false }
 
 function getInputTextSelectionRange(): { start: number; end: number } | null {
 	if (inputSelAnchor === null || inputSelFocus === null) return null
 	const a = clampInputPos(inputSelAnchor), b = clampInputPos(inputSelFocus)
 	return a === b ? null : a < b ? { start: a, end: b } : { start: b, end: a }
 }
-
-function clearInputUndoHistory(): void { inputUndoStack = [] }
 
 function pushInputUndoSnapshot(): void {
 	const prev = inputUndoStack[inputUndoStack.length - 1]
@@ -286,16 +198,12 @@ function pushInputUndoSnapshot(): void {
 }
 
 function undoInputEdit(): boolean {
-	const snap = inputUndoStack.pop()
-	if (!snap) return false
+	const snap = inputUndoStack.pop(); if (!snap) return false
 	inputBuf = snap.text; inputCursor = clampInputPos(snap.cursor)
 	inputSelAnchor = snap.selAnchor === null ? null : clampInputPos(snap.selAnchor)
 	inputSelFocus = snap.selFocus === null ? null : clampInputPos(snap.selFocus)
 	inputSelActive = false; return true
 }
-
-function clearInputTextSelection(): void { inputSelAnchor = null; inputSelFocus = null; inputSelActive = false }
-
 function setInputCursor(pos: number, extendSelection = false): void {
 	const next = clampInputPos(pos)
 	if (extendSelection) { if (inputSelAnchor === null) inputSelAnchor = inputCursor; inputSelFocus = next }
