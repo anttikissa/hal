@@ -64,6 +64,8 @@ const TITLE_SESSION = '\x1b[38;5;252m'
 // Flags: 1=disambiguate, 2=report events, 8=report all (Super key), 16=report associated text
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u'
 const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
+const SYNC_OUTPUT_ENABLE = '\x1b[?2026h'
+const SYNC_OUTPUT_DISABLE = '\x1b[?2026l'
 
 // ── Types ──
 
@@ -267,6 +269,20 @@ function promptFirstRow(): number {
 
 function directWrite(text: string): void {
 	process.stdout.write(text)
+}
+
+function supportsSynchronizedOutput(): boolean {
+	if (!process.stdout.isTTY) return false
+	const tp = process.env.TERM_PROGRAM
+	return !!process.env.KITTY_PID || tp === 'kitty' || tp === 'ghostty' || process.env.TERM === 'xterm-kitty'
+}
+
+function writeFrame(text: string): void {
+	if (!supportsSynchronizedOutput()) {
+		directWrite(text)
+		return
+	}
+	directWrite(`${SYNC_OUTPUT_ENABLE}${text}${SYNC_OUTPUT_DISABLE}`)
 }
 
 function supportsKittyKeyboard(): boolean {
@@ -1166,7 +1182,7 @@ function render(): void {
 	chunks.push(`\x1b[${cursorScreenRow};${cursorScreenCol}H`)
 	chunks.push('\x1b[?25h') // show cursor
 
-	directWrite(chunks.join(''))
+	writeFrame(chunks.join(''))
 }
 
 // ── Suspend/resume ──
@@ -1351,6 +1367,7 @@ export const _testTuiKeys = {
 	parseKittyCsiUKey,
 	normalizeKittyFunctionalKey,
 	normalizeKittyKey,
+	supportsSynchronizedOutput,
 	resetState(): void {
 		hoverOutputRow = -1
 		hoverUrl = null

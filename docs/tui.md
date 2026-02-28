@@ -122,6 +122,7 @@ The **Output** region is therefore:
 - clamps scroll offset
 - renders title/output/activity/tab/input rows into a string chunk array
 - writes one combined ANSI frame to stdout
+- on kitty/ghostty-compatible TTYs, wraps each frame in synchronized output mode (`\x1b[?2026h` ... `\x1b[?2026l`) to avoid mid-frame flicker
 - positions cursor for input editing
 
 `scheduleRender()` is used for microtask-batched redraws when immediate redraw is not necessary.

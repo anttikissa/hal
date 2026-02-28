@@ -160,6 +160,46 @@ describe('Kitty functional key normalization regressions', () => {
 	})
 })
 
+describe('synchronized output support detection', () => {
+	it('enables synchronized output on kitty/ghostty-like TTYs', () => {
+		const oldIsTTY = process.stdout.isTTY
+		const oldTermProgram = process.env.TERM_PROGRAM
+		const oldKittyPid = process.env.KITTY_PID
+		const oldTerm = process.env.TERM
+
+		Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+		process.env.KITTY_PID = ''
+		process.env.TERM = 'xterm-256color'
+		process.env.TERM_PROGRAM = 'ghostty'
+		expect(_testTuiKeys.supportsSynchronizedOutput()).toBe(true)
+
+		process.env.TERM_PROGRAM = 'iTerm.app'
+		expect(_testTuiKeys.supportsSynchronizedOutput()).toBe(false)
+
+		process.env.TERM_PROGRAM = ''
+		process.env.TERM = 'xterm-kitty'
+		expect(_testTuiKeys.supportsSynchronizedOutput()).toBe(true)
+
+		Object.defineProperty(process.stdout, 'isTTY', { value: oldIsTTY, configurable: true })
+		if (oldTermProgram === undefined) delete process.env.TERM_PROGRAM
+		else process.env.TERM_PROGRAM = oldTermProgram
+		if (oldKittyPid === undefined) delete process.env.KITTY_PID
+		else process.env.KITTY_PID = oldKittyPid
+		if (oldTerm === undefined) delete process.env.TERM
+		else process.env.TERM = oldTerm
+	})
+
+	it('disables synchronized output when stdout is not a TTY', () => {
+		const oldIsTTY = process.stdout.isTTY
+		const oldTermProgram = process.env.TERM_PROGRAM
+		Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true })
+		process.env.TERM_PROGRAM = 'ghostty'
+		expect(_testTuiKeys.supportsSynchronizedOutput()).toBe(false)
+		Object.defineProperty(process.stdout, 'isTTY', { value: oldIsTTY, configurable: true })
+		if (oldTermProgram === undefined) delete process.env.TERM_PROGRAM
+		else process.env.TERM_PROGRAM = oldTermProgram
+	})
+})
 // ── ESC-prefixed CSI parsing (iTerm2 Alt+Arrow) ──
 
 describe('ESC-prefixed CSI sequences (iTerm2 Alt+Arrow)', () => {
