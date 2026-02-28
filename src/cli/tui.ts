@@ -40,30 +40,13 @@ import { buildStatusBarLine } from './tui/format/status-bar.ts'
 // ── Constants ──
 
 export const CTRL_C = '\x03'
-
-const CTRL_D = '\x04'
-const CTRL_K = '\x0b'
-const CTRL_U = '\x15'
-const CTRL_V = '\x16'
-const CTRL_X = '\x18'
-const CTRL_Y = '\x19'
-const CTRL_Z = '\x1a'
-
-const PASTE_START = '\x1b[200~'
-const PASTE_END = '\x1b[201~'
-
+const CTRL_D = '\x04', CTRL_K = '\x0b', CTRL_U = '\x15'
+const CTRL_V = '\x16', CTRL_X = '\x18', CTRL_Y = '\x19', CTRL_Z = '\x1a'
+const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~'
 const MAX_OUTPUT_LINES = 10_000
-
-const BG_DARK = '\x1b[48;5;236m'
-const RESET = '\x1b[0m'
-const DIM = '\x1b[2m'
-const ERASE_TO_EOL = '\x1b[K'
-const TITLE_BG = '\x1b[48;5;238m'
-const TITLE_TOPIC = '\x1b[38;5;245m'
-const TITLE_SESSION = '\x1b[38;5;252m'
-// Flags: 1=disambiguate, 2=report events, 8=report all (Super key), 16=report associated text
-const KITTY_KEYBOARD_ENABLE = '\x1b[>27u'
-const KITTY_KEYBOARD_DISABLE = '\x1b[<u'
+const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_EOL = '\x1b[K'
+const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
+const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 
 // ── Types ──
 
@@ -72,21 +55,9 @@ type InputKeyHandler = (key: string) => boolean | void
 type InputEchoFilter = (value: string) => boolean
 type SelectionSurface = 'title' | 'output' | 'activity' | 'status' | 'input'
 type SelectionPoint = { surface: SelectionSurface; row: number; col: number }
-type SelectionRange = {
-	surface: SelectionSurface
-	startRow: number
-	startCol: number
-	endRow: number
-	endCol: number
-}
+type SelectionRange = { surface: SelectionSurface; startRow: number; startCol: number; endRow: number; endCol: number }
 type SelectionMode = 'char' | 'word' | 'line'
-type InputUndoSnapshot = {
-	text: string
-	cursor: number
-	selAnchor: number | null
-	selFocus: number | null
-}
-
+type InputUndoSnapshot = { text: string; cursor: number; selAnchor: number | null; selFocus: number | null }
 // ── Callbacks ──
 
 let tabCompleter: TabCompleter | null = null
@@ -95,21 +66,11 @@ let inputEchoFilter: InputEchoFilter | null = null
 let escHandler: (() => void) | null = null
 let doubleEnterHandler: (() => void) | null = null
 
-export function setTabCompleter(fn: TabCompleter): void {
-	tabCompleter = fn
-}
-export function setInputKeyHandler(handler: InputKeyHandler | null): void {
-	inputKeyHandler = handler
-}
-export function setInputEchoFilter(handler: InputEchoFilter | null): void {
-	inputEchoFilter = handler
-}
-export function setEscHandler(handler: (() => void) | null): void {
-	escHandler = handler
-}
-export function setDoubleEnterHandler(handler: (() => void) | null): void {
-	doubleEnterHandler = handler
-}
+export function setTabCompleter(fn: TabCompleter): void { tabCompleter = fn }
+export function setInputKeyHandler(handler: InputKeyHandler | null): void { inputKeyHandler = handler }
+export function setInputEchoFilter(handler: InputEchoFilter | null): void { inputEchoFilter = handler }
+export function setEscHandler(handler: (() => void) | null): void { escHandler = handler }
+export function setDoubleEnterHandler(handler: (() => void) | null): void { doubleEnterHandler = handler }
 
 // ── Input history ──
 
@@ -117,95 +78,41 @@ let inputHistory: string[] = []
 let historyIndex = -1
 let historyDraft = ''
 
-export function getInputHistory(): string[] {
-	return inputHistory
-}
+export function getInputHistory(): string[] { return inputHistory }
 export function setInputHistory(history: string[]): void {
-	inputHistory = history
-	historyIndex = -1
-	historyDraft = ''
+	inputHistory = history; historyIndex = -1; historyDraft = ''
 }
 export function getInputDraft(): { text: string; cursor: number } {
 	return { text: inputBuf, cursor: inputCursor }
 }
 export function setInputDraft(text: string, cursor?: number): void {
-	inputBuf = text
-	inputCursor = cursor ?? text.length
-	clearInputTextSelection()
-	clearInputUndoHistory()
-	historyIndex = -1
-	historyDraft = ''
-	draftPreloaded = !!text
+	inputBuf = text; inputCursor = cursor ?? text.length
+	clearInputTextSelection(); clearInputUndoHistory()
+	historyIndex = -1; historyDraft = ''; draftPreloaded = !!text
 }
-
-// ── Prompt config ──
 
 let maxPromptLines = 15
-
-export function setMaxPromptLines(n: number): void {
-	maxPromptLines = Math.max(1, Math.min(n, 50))
-}
+export function setMaxPromptLines(n: number): void { maxPromptLines = Math.max(1, Math.min(n, 50)) }
 
 // ── Core state ──
 
-let initialized = false
-let ended = false
-let suspended = false
-
-// Output: array of logical lines (unwrapped, with ANSI)
-let outputLines: string[] = ['']
-let scrollOffset = 0
-let wrappedLineCount = 1
-let lastWrapCols = 0
-
-// Title, activity, status
-let titleBarStr = ''
-let activityStr = ''
-let statusTabsStr = ''
-let statusRightStr = ''
-let headerFlash = ''
-let headerFlashTimer: ReturnType<typeof setTimeout> | null = null
-
-// Input
-let inputBuf = ''
-let inputCursor = 0
-let inputGoalCol: number | null = null
-let inputPromptStr = '> '
-let inputSelAnchor: number | null = null
-let inputSelFocus: number | null = null
-let inputSelActive = false
-let inputUndoStack: InputUndoSnapshot[] = []
-let draftPreloaded = false
-let waitingResolve: ((value: string | null) => void) | null = null
-let lastSubmitTime = 0
-
-// Mouse selection
-let selAnchor: SelectionPoint | null = null
-let selCurrent: SelectionPoint | null = null
-let selMode: SelectionMode = 'char'
-let selActive = false
-let lastClickTime = 0
-let lastClickPos: SelectionPoint | null = null
-let clickCount = 0
-let lastVisibleOutput: string[] = []
-let lastActivityLine = ''
-let lastStatusLine = ''
-let lastTitleLine = ''
-// Link hover (Cmd+hover)
-let hoverOutputRow = -1
-let hoverUrl: string | null = null
-let superHeld = false
-let lastMouseX = -1
-let lastMouseY = -1
-
-// Bracketed paste
+let initialized = false, ended = false, suspended = false
+let outputLines: string[] = [''], scrollOffset = 0, wrappedLineCount = 1, lastWrapCols = 0
+let titleBarStr = '', activityStr = '', statusTabsStr = '', statusRightStr = ''
+let headerFlash = '', headerFlashTimer: ReturnType<typeof setTimeout> | null = null
+let inputBuf = '', inputCursor = 0, inputGoalCol: number | null = null, inputPromptStr = '> '
+let inputSelAnchor: number | null = null, inputSelFocus: number | null = null, inputSelActive = false
+let inputUndoStack: InputUndoSnapshot[] = [], draftPreloaded = false
+let waitingResolve: ((value: string | null) => void) | null = null, lastSubmitTime = 0
+let selAnchor: SelectionPoint | null = null, selCurrent: SelectionPoint | null = null
+let selMode: SelectionMode = 'char', selActive = false
+let lastClickTime = 0, lastClickPos: SelectionPoint | null = null, clickCount = 0
+let lastVisibleOutput: string[] = [], lastActivityLine = '', lastStatusLine = '', lastTitleLine = ''
+let hoverOutputRow = -1, hoverUrl: string | null = null
+let superHeld = false, lastMouseX = -1, lastMouseY = -1
 let bracketedPasteBuffer: string | null = null
-
-// Stdin coalescing
-let stdinBuffer = ''
-let stdinTimer: ReturnType<typeof setTimeout> | null = null
+let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
-
 function splitTitleParts(text: string): { topic: string; session: string } {
 	const trimmed = text.trim()
 	if (!trimmed) return { topic: '', session: '' }
@@ -227,61 +134,26 @@ function resolveInput(value: string | null): void {
 
 // ── Geometry helpers ──
 
-function cols(): number {
-	return process.stdout.columns || 80
-}
-function rows(): number {
-	return process.stdout.rows || 24
-}
-
-function promptContentWidth(): number {
-	const c = cols()
-	if (c <= 0) return 1
-	return Math.max(1, c - inputPromptStr.length - 1) // -1 for right padding column
-}
-
-function promptLineCount(): number {
-	const lines = wordWrapLines(inputBuf, promptContentWidth())
-	return Math.max(1, Math.min(lines.length, maxPromptLines))
-}
-
-/** Footer: activity(1) + status(1) + padTop(1) + promptLines + padBottom(1) */
-function footerHeight(): number {
-	return 4 + promptLineCount()
-}
-
-function outputBottom(): number {
-	return Math.max(1, rows() - footerHeight())
-}
-
-function activityRow(): number {
-	return rows() - footerHeight() + 1
-}
-
-function statusRow(): number {
-	return activityRow() + 1
-}
-
-function promptTopPadRow(): number {
-	return statusRow() + 1
-}
-
-function promptFirstRow(): number {
-	return promptTopPadRow() + 1
-}
+function cols(): number { return process.stdout.columns || 80 }
+function rows(): number { return process.stdout.rows || 24 }
+function promptContentWidth(): number { return Math.max(1, cols() - inputPromptStr.length - 1) }
+function promptLineCount(): number { return Math.max(1, Math.min(wordWrapLines(inputBuf, promptContentWidth()).length, maxPromptLines)) }
+function footerHeight(): number { return 4 + promptLineCount() }
+function outputBottom(): number { return Math.max(1, rows() - footerHeight()) }
+function activityRow(): number { return rows() - footerHeight() + 1 }
+function statusRow(): number { return activityRow() + 1 }
+function promptTopPadRow(): number { return statusRow() + 1 }
+function promptFirstRow(): number { return promptTopPadRow() + 1 }
 
 // ── Low-level terminal writes ──
 
-function directWrite(text: string): void {
-	process.stdout.write(text)
-}
+function directWrite(text: string): void { process.stdout.write(text) }
 
 function supportsSynchronizedOutput(): boolean {
 	if (!process.stdout.isTTY) return false
 	const tp = process.env.TERM_PROGRAM
 	return !!process.env.KITTY_PID || tp === 'kitty' || tp === 'ghostty' || process.env.TERM === 'xterm-kitty'
 }
-
 
 function supportsKittyKeyboard(): boolean {
 	const tp = process.env.TERM_PROGRAM
@@ -1581,29 +1453,17 @@ function safeStringify(value: unknown): string {
 
 export function init(): void {
 	if (initialized) return
-	initialized = true
-	ended = false
-	suspended = false
-	inputBuf = ''
-	inputCursor = 0
-	clearInputTextSelection()
-	clearInputUndoHistory()
-	outputLines = ['']
-	scrollOffset = 0
-	lastWrapCols = 0
-	wrappedLineCount = 1
-
+	initialized = true; ended = false; suspended = false
+	inputBuf = ''; inputCursor = 0
+	clearInputTextSelection(); clearInputUndoHistory()
+	outputLines = ['']; scrollOffset = 0; lastWrapCols = 0; wrappedLineCount = 1
 	enterRawMode()
 	directWrite('\x1b[?1049h') // enter alt screen
 	enableMouse()
-	process.stdin.on('data', onStdinData)
-	process.stdin.on('end', onStdinEnd)
-	process.on('SIGCONT', onSigCont)
-	process.stdout.on('resize', onResize)
-
+	process.stdin.on('data', onStdinData); process.stdin.on('end', onStdinEnd)
+	process.on('SIGCONT', onSigCont); process.stdout.on('resize', onResize)
 	render()
 }
-
 export function write(text: string): void {
 	writeToOutput(text)
 }
@@ -1613,33 +1473,18 @@ export function log(...args: any[]): void {
 }
 
 export function setActivityLine(text: string): void {
-	if (activityStr === text) return
-	activityStr = text
-	if (initialized) scheduleRender()
+	if (activityStr === text) return; activityStr = text; if (initialized) scheduleRender()
 }
-
 export function setTitleBar(text: string): void {
-	if (titleBarStr === text) return
-	titleBarStr = text
-	if (initialized) scheduleRender()
+	if (titleBarStr === text) return; titleBarStr = text; if (initialized) scheduleRender()
 }
-
 export function setStatusLine(tabsStr: string, rightStr: string): void {
-	statusTabsStr = tabsStr
-	statusRightStr = rightStr
-	if (initialized) scheduleRender()
+	statusTabsStr = tabsStr; statusRightStr = rightStr; if (initialized) scheduleRender()
 }
-
-export function getOutputSnapshot(): string {
-	return outputLines.join('\n')
-}
-
+export function getOutputSnapshot(): string { return outputLines.join('\n') }
 export function setOutputSnapshot(snapshot: string): void {
-	outputLines = ['']
-	lastWrapCols = 0
-	appendOutput(snapshot)
+	outputLines = ['']; lastWrapCols = 0; appendOutput(snapshot)
 }
-
 export function clearOutput(): void { replaceOutput('') }
 
 export function replaceOutput(snapshot: string): void {
