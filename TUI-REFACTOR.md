@@ -4,8 +4,8 @@ This file tracks the TUI refactor so work can continue even after context resets
 
 ## Ground Rules
 
-- Refactor only. No feature cuts.
-- Keep behavior and UX parity.
+- Goal: reduce TUI code from ~3000 LOC to ~2000 LOC.
+- No feature cuts. Keep behavior and UX parity.
 - One small commit at a time.
 - Add/update tests for each refactor slice.
 - Run relevant tests per slice, then full `bun test` before commit.
@@ -14,7 +14,7 @@ This file tracks the TUI refactor so work can continue even after context resets
 ## Baseline (2026-02-28)
 
 Non-test TUI-related code (current): **3274 LOC**
-
+Target: **~2000 LOC** (cut ~1000 lines through deduplication, dead code removal, and consolidation).
 - `src/cli/tui.ts`: 1767
 - `src/cli/client.ts`: 730
 - `src/cli/tab.ts`: 79
@@ -45,33 +45,23 @@ Tests:
 
 ---
 
-### [ ] Part 2 — Make key handling in `tui.ts` table-driven (no behavior change)
+### [X] Part 2A+2B+2C DONE — Compress handleKey with action helpers
 
-Goal: shrink and simplify the giant `handleKey()` branch chain while preserving exact key precedence.
+Status: complete (combined 2A-2C into one step since all three reduced LOC together)
 
-Planned steps:
+Commit:
+- `7bfb2ff` — **Refactor: compress handleKey with action helpers (3274 → 3059 LOC)**
 
-- [ ] **2A: Extract small action helpers**
-	- Move repeated edit actions into named local functions (delete left/right, move cursor, selection collapse, etc.)
-	- Keep them in `tui.ts` first (mechanical refactor)
-	- Add focused tests if needed
+What changed:
+- Added 3 key action helpers: `moveCursor`, `moveOrCollapse`, `deleteOrSel`
+- Compressed ~430-line handleKey to ~210 lines using one-liner key bindings
+- Combined Arrow Up/Down handlers, Shift+Up/Down handlers
+- No behavior change — all key precedence preserved
 
-- [ ] **2B: Introduce declarative key bindings for exact-match keys**
-	- Build ordered binding table for exact sequences (`'\x1b[D'`, `'\x1b[1;2D'`, etc.)
-	- Keep fallback logic untouched
-	- Verify behavior with `src/cli/tui-keyboard.test.ts`
-
-- [ ] **2C: Introduce small predicate bindings for grouped cases**
-	- Handle grouped forms (e.g. Home variants, End variants) via explicit predicate list
-	- Preserve original ordering and early returns
-
-Commit strategy:
-- 2A, 2B, 2C as separate commits if diff is large
-
-Tests per commit:
-- `bun test src/cli/tui-keyboard.test.ts`
-- `bun test src/cli/tui-input-layout.test.ts`
-- then `bun test`
+Tests:
+- `bun test src/cli/tui-keyboard.test.ts` — 72 pass
+- `bun test src/cli/tui-input-layout.test.ts` — 9 pass
+- `bun test` — 433 pass, 0 fail
 
 ---
 
@@ -189,7 +179,7 @@ Tests per commit:
 
 ### [ ] Part 9 — Final pass
 
-- [ ] run `bun run cloc` and compare before/after
+- [ ] run `bun run cloc` and verify TUI code is ≤ 2000 LOC
 - [ ] run full `bun test`
 - [ ] update this file with final numbers and commit list
 
@@ -198,11 +188,20 @@ Tests per commit:
 1. Make one narrow refactor slice.
 2. Run targeted tests for that slice.
 3. Run `bun test`.
-4. Commit only touched files for that slice.
-5. Update this file:
+4. Run `bun run cloc` and record non-test LOC. It must be ≤ previous checkpoint (tests may grow).
+5. Commit only touched files for that slice.
+	- Commit message must include LOC change, e.g.: `Refactor: extract key actions (3274 → 3180 LOC)`
+6. Update this file:
 	- mark checkbox(es)
-	- add commit hash under relevant part.
+	- add commit hash + LOC number under relevant part.
+
+## LOC Checkpoint Log
+
+| Commit | Part | LOC (non-test) | Δ |
+|--------|------|-----------------|---|
+| `a873943` | 1 | 3274 | baseline |
+| `7bfb2ff` | 2A+2B+2C | 3059 | −215 |
 
 ## Current Next Step
 
-Next planned commit: **Part 2A** (extract repeated key action helpers inside `tui.ts`, still no behavior change).
+Next planned commit: **Part 3A** (extract input state type + pure helpers from `tui.ts`).
