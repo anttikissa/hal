@@ -8,7 +8,7 @@ import {
 import { RESPONSE_LOG } from '../state.ts'
 import { getProvider, type Provider } from '../provider.ts'
 import { tools, runTool, RESTART_SIGNAL } from '../tools.ts'
-import { totalInputTokens, MAX_CONTEXT, shouldWarn } from '../context.ts'
+import { totalInputTokens, contextWindowForModel, shouldWarn } from '../context.ts'
 import {
 	isModelCalibrated,
 	markModelCalibrated,
@@ -188,7 +188,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 	await saveSession(sessionId, runtime.messages, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
-	if (runtime.lastUsage && shouldWarn(runtime.lastUsage)) {
+	if (runtime.lastUsage && shouldWarn(runtime.lastUsage, contextWindowForModel(modelId))) {
 		await publishLine(
 			'[context] >66% full. /handoff to produce handoff file and continue, or /reset to start afresh.',
 			'notice',
@@ -626,9 +626,10 @@ async function logTokenUsage(
 		await publishLine(`[debug.tokens.spam] ${parts.join(' | ')}`, 'meta', sessionId)
 	}
 	const used = totalInputTokens(usage)
-	await publishContext(sessionId, { used, max: MAX_CONTEXT })
+	const ctxWindow = contextWindowForModel(modelIdForModel(modelKey))
+	await publishContext(sessionId, { used, max: ctxWindow })
 	if (debugTokens('context')) {
-		const pct = ((used / MAX_CONTEXT) * 100).toFixed(1)
-		await publishLine(`[debug.tokens.context] ${pct}%/${MAX_CONTEXT}`, 'meta', sessionId)
+		const pct = ((used / ctxWindow) * 100).toFixed(1)
+		await publishLine(`[debug.tokens.context] ${pct}%/${ctxWindow}`, 'meta', sessionId)
 	}
 }

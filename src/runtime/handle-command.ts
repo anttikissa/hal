@@ -22,7 +22,7 @@ import {
 import { processPrompt } from './process-prompt.ts'
 import {
 	estimateMessageTokens,
-	MAX_CONTEXT,
+	contextWindowForModel,
 } from '../context.ts'
 import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
@@ -171,7 +171,8 @@ async function publishEstimatedContext(sessionId: string): Promise<void> {
 	const systemTokens = estimateTokensSync(runtime.systemBytes, cal)
 	const msgTokens = runtime.messages.reduce((sum, m) => sum + estimateMessageTokens(m, cal), 0)
 	const used = systemTokens + msgTokens
-	await publishContext(sessionId, { used, max: MAX_CONTEXT, estimated: true })
+	const ctxWindow = contextWindowForModel(modelIdForModel(getSessionModel(sessionId)))
+	await publishContext(sessionId, { used, max: ctxWindow, estimated: true })
 }
 
 /** Max chars per tool result in handoff text — full output isn't needed for summarization */

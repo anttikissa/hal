@@ -1,6 +1,32 @@
 import { estimateTokensSync, type TokenCalibration } from './token-calibration.ts'
 
-export const MAX_CONTEXT = 200_000
+// Context windows by model ID prefix (longest prefix wins)
+const CONTEXT_WINDOWS: [string, number][] = [
+	['gpt-5', 400_000],
+	['gpt-4.1', 1_000_000],
+	['gpt-4o', 128_000],
+	['gpt-4', 128_000],
+	['o3', 200_000],
+	['o4', 200_000],
+	['o1', 200_000],
+	['claude', 200_000],
+]
+
+const DEFAULT_CONTEXT = 200_000
+
+/** Get context window size for a model ID (without provider prefix). */
+export function contextWindowForModel(modelId: string): number {
+	// Try longest prefix match
+	let bestLen = 0
+	let bestSize = DEFAULT_CONTEXT
+	for (const [prefix, size] of CONTEXT_WINDOWS) {
+		if (modelId.startsWith(prefix) && prefix.length > bestLen) {
+			bestLen = prefix.length
+			bestSize = size
+		}
+	}
+	return bestSize
+}
 
 export function totalInputTokens(usage: any): number {
 	return (
@@ -10,8 +36,8 @@ export function totalInputTokens(usage: any): number {
 	)
 }
 
-export function shouldWarn(usage: any): boolean {
-	return totalInputTokens(usage) / MAX_CONTEXT >= 0.666
+export function shouldWarn(usage: any, contextWindow: number): boolean {
+	return totalInputTokens(usage) / contextWindow >= 0.666
 }
 
 export function estimateMessageTokens(msg: any, calibration?: TokenCalibration | null): number {

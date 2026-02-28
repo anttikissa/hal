@@ -4,7 +4,7 @@ import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../system-prompt.ts'
 import {
 	estimateMessageTokens,
-	MAX_CONTEXT,
+	contextWindowForModel,
 } from '../context.ts'
 import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
@@ -214,7 +214,8 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	let msgTokens = 0
 	for (const msg of messages) msgTokens += estimateMessageTokens(msg, cal)
 	const used = sysTokenEst + msgTokens
-	await publishContext(sessionId, { used, max: MAX_CONTEXT, estimated: true })
+	const ctxWindow = contextWindowForModel(modelIdForModel(getSessionModel(sessionId)))
+	await publishContext(sessionId, { used, max: ctxWindow, estimated: true })
 
 	return runtime
 }
@@ -262,7 +263,8 @@ function watchSystemPromptFiles(): void {
 				const sysTokenEst = estimateTokensSync(runtime.systemBytes, cal)
 				let msgTokens = 0
 				for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
-				await publishContext(sid, { used: sysTokenEst + msgTokens, max: MAX_CONTEXT, estimated: true })
+				const ctxW = contextWindowForModel(modelIdForModel(getSessionModel(sid)))
+				await publishContext(sid, { used: sysTokenEst + msgTokens, max: ctxW, estimated: true })
 			}
 		}
 	}
@@ -352,7 +354,8 @@ async function initialize(): Promise<void> {
 		let msgTokens = 0
 		for (const msg of runtime.messages) msgTokens += estimateMessageTokens(msg, cal)
 		const totalTokens = sysTokenEst + msgTokens
-		const pct = ((totalTokens / MAX_CONTEXT) * 100).toFixed(0)
+		const ctxWindow = contextWindowForModel(modelIdForModel(getSessionModel(initialSessionId)))
+		const pct = ((totalTokens / ctxWindow) * 100).toFixed(0)
 		await publishLine(
 			`[session] restored ${runtime.messages.length} messages (~${pct}% context) — ${sessionDir(initialSessionId)}`,
 			'meta',
