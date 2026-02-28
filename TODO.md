@@ -41,6 +41,7 @@ Still open:
 - Add a tiny markdown parser for parsing llm output
 - Add mouse movements on input line, selecting - multicursor maybe? - cmd-a, etc. QoL improvements
 - The steering / enqueue system does not really work. Figure out how to make it to work.
+- [fork] should have a break before — " --" plus empty line plus block, like [queued/steering]
 
 ## Old TODO items:
 
