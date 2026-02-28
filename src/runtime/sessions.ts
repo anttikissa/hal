@@ -90,7 +90,7 @@ export function getSessionWorkingDir(sessionId: string | null): string {
 /** Resolve which model a session should use: per-session override or global default. */
 export function getSessionModel(sessionId: string | null): string {
 	const meta = getSessionMeta(sessionId)
-	return resolveModel(meta?.model ?? loadConfig().model)
+	return resolveModel(meta?.model ?? loadConfig().defaultModel)
 }
 
 /** Build meta snapshot for persisting alongside session data. */

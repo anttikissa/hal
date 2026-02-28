@@ -17,6 +17,7 @@ for arg in "$@"; do
 		export HAL_STATE_DIR="$_hal_fresh_dir"
 	elif [[ "$arg" == "-s" || "$arg" == "--self" ]]; then
 		export LAUNCH_CWD="$HAL_DIR"
+		export HAL_SELF_MODE=1
 	else
 		pass_args+=("$arg")
 	fi

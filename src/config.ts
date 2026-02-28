@@ -21,7 +21,7 @@ export interface DebugConfig {
 }
 
 export interface Config {
-	model: string // "provider/model-id", e.g. "anthropic/claude-opus-4-6"
+	defaultModel: string // "provider/model-id", e.g. "anthropic/claude-opus-4-6"
 	compactModel?: string
 	theme: string // theme name, resolved to themes/<name>.ason
 	contextWarnThreshold: number
@@ -98,7 +98,7 @@ export function resolveCompactModel(model: string): string {
 }
 
 const DEFAULTS: Config = {
-	model: 'anthropic/claude-opus-4-6',
+	defaultModel: 'anthropic/claude-opus-4-6',
 	theme: 'default',
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 4,
@@ -114,13 +114,18 @@ export function loadConfig(): Config {
 	try {
 		const raw = readFileSync(CONFIG_PATH, 'utf-8')
 		const parsed = parse(raw, { comments: true }) as any
-		// Migrate old format: if provider field exists and model has no slash, combine them
-		if (parsed.provider && parsed.model && !parsed.model.includes('/')) {
-			parsed.model = `${parsed.provider}/${resolveModel(parsed.model).split('/').pop()}`
+		// Migrate: 'model' → 'defaultModel'
+		if (parsed.model && !parsed.defaultModel) {
+			parsed.defaultModel = parsed.model
+			delete parsed.model
+		}
+		// Migrate old format: if provider field exists and defaultModel has no slash, combine them
+		if (parsed.provider && parsed.defaultModel && !parsed.defaultModel.includes('/')) {
+			parsed.defaultModel = `${parsed.provider}/${resolveModel(parsed.defaultModel).split('/').pop()}`
 			delete parsed.provider
-		} else if (parsed.model && !parsed.model.includes('/')) {
+		} else if (parsed.defaultModel && !parsed.defaultModel.includes('/')) {
 			// Bare alias or model ID — resolve to full form
-			parsed.model = resolveModel(parsed.model)
+			parsed.defaultModel = resolveModel(parsed.defaultModel)
 		}
 		_config = { ...DEFAULTS, ...parsed }
 	} catch {

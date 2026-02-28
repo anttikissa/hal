@@ -334,7 +334,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	if (!name) {
 		const current = getSessionModel(sessionId)
 		const meta = getSessionMeta(sessionId)
-		const globalDefault = resolveModel(loadConfig().model)
+		const globalDefault = resolveModel(loadConfig().defaultModel)
 		const suffix = meta?.model ? ` (global default: ${globalDefault})` : ' (global default)'
 		await publishLine(`[model] current: ${current}${suffix}`, 'info', sessionId)
 		const aliases = Object.entries(MODEL_ALIASES).map(([alias, full]) => {

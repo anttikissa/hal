@@ -54,6 +54,7 @@ import { countSourceStats } from '../utils/cloc.ts'
 
 import { loadConfig, MODEL_ALIASES, modelIdForModel, resolveModel } from '../config.ts'
 import { loadActiveTheme } from './format/theme.ts'
+import { selfMode } from '../args.ts'
 
 function fmtK(tokens: number): string {
 	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens)
@@ -247,6 +248,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 	pushLocal('local.info', '/q or Ctrl-D to quit · Ctrl-V to paste images · /help for more')
 
 	await bootstrapState()
+	if (selfMode) applySelfMode()
 	if (options?.startupEpoch) {
 		const elapsed = Date.now() - options.startupEpoch
 		const level = elapsed > 100 ? 'local.warn' : 'local.status'
@@ -345,7 +347,7 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 			workingDir: launchCwd,
 			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 			topic: '',
-			modelLabel: modelDisplayName(loadConfig().model),
+			modelLabel: modelDisplayName(loadConfig().defaultModel),
 			output: '',
 			contextStatus: null,
 			activity: '',
@@ -459,7 +461,7 @@ async function createTab(): Promise<void> {
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 		topic: '',
-		modelLabel: modelDisplayName(loadConfig().model),
+		modelLabel: modelDisplayName(loadConfig().defaultModel),
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -505,7 +507,7 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 		workingDir,
 		name: sessionName({ id: sessionId, name: undefined, workingDir }),
 		topic: '',
-		modelLabel: modelDisplayName(loadConfig().model),
+		modelLabel: modelDisplayName(loadConfig().defaultModel),
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -591,7 +593,7 @@ function syncTabsFromSessions(
 			workingDir: session.workingDir,
 			name: sessionName(session),
 			topic: session.topic ?? existing?.topic ?? '',
-			modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().model),
+			modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().defaultModel),
 			output: preserveActiveOutput ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
 			activity: preserveActiveOutput ? (existing?.activity ?? '') : '',
@@ -671,7 +673,7 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
 		topic: '',
-		modelLabel: modelDisplayName(loadConfig().model),
+		modelLabel: modelDisplayName(loadConfig().defaultModel),
 		output: '',
 		contextStatus: null,
 		activity: '',
@@ -747,6 +749,30 @@ async function bootstrapState(): Promise<void> {
 		pushLocal('local.status', `bootstrap failed: ${e.message || e}`)
 		ensureFallbackTab(null)
 		renderBusyStatus()
+	}
+}
+
+/** Parse context percentage from contextStatus string (e.g. "~5.2%/200k" → 5.2, null → null) */
+export function parseContextPct(status: string | null): number | null {
+	if (!status) return null
+	const m = status.match(/~?(\d+(?:\.\d+)?)%/)
+	return m ? parseFloat(m[1]) : null
+}
+
+/** Self mode: find an idle session with <10% context usage, or create a new tab. */
+function applySelfMode(): void {
+	const candidate = tabs.findIndex((t) => {
+		if (t.busy) return false
+		const pct = parseContextPct(t.contextStatus)
+		return pct === null || pct < 10
+	})
+	if (candidate >= 0 && candidate !== activeTabIndex) {
+		switchToTab(candidate)
+		pushLocal('local.status', `[self] switched to tab ${candidate + 1} (idle, low context)`)
+	} else if (candidate < 0) {
+		void createTab().then(() => {
+			pushLocal('local.status', '[self] opened new tab (no idle low-context session found)')
+		})
 	}
 }
 
