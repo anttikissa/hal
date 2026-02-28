@@ -24,10 +24,8 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Don't ask the user to do trivial local setup steps the script can do itself (for example clearing clipboard before a capture step). Automate it if needed, otherwise omit the instruction.
 - Prefer one working mechanism over layered fallbacks/proof-of-concept additions; only add another path when the first is clearly insufficient.
 - Don't reimplement what the system already provides. For example, `open('wx')` is an atomic exclusive-create — no need to build a `mkdir`-based mutex on top of it.
-- Doing a big task? 1. Read files and thing. 2. Plan - write it to file (docs/plans). 3. Implement.
-- GitHub push always uses SSH (`git@github.com:...`), never HTTPS. HTTPS auth doesn't work.
-- Non-test runtime code budget: max 10k LOC. Keep payload code tight and prefer minimal fixes.
-- `bun run cloc` is the authoritative budget check (CLI `cloc` on `src/` + `main.ts`, excluding tests). Runtime startup counting uses `src/utils/cloc.ts`.
+- Doing a big task? 1. Read files and think. 2. Plan - write it to file (docs/plans). 3. Implement.
+- Non-test runtime code budget: max 10k LOC. `bun run cloc` to check.
 
 ## User interface guidelines
 
