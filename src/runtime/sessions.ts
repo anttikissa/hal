@@ -5,6 +5,7 @@ import { loadSystemPrompt } from '../system-prompt.ts'
 import {
 	estimateMessageTokens,
 	contextWindowForModel,
+	refreshModels,
 } from '../context.ts'
 import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
@@ -419,6 +420,7 @@ export async function startRuntime(
 
 	await initialize()
 	watchSystemPromptFiles()
+	refreshModels().catch(() => {})
 
 	for await (const command of commands) {
 		await processCommand(command)

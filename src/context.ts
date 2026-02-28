@@ -1,31 +1,45 @@
+import { readFileSync, writeFileSync } from 'fs'
 import { estimateTokensSync, type TokenCalibration } from './token-calibration.ts'
-
-// Context windows by model ID prefix (longest prefix wins)
-const CONTEXT_WINDOWS: [string, number][] = [
-	['gpt-5', 400_000],
-	['gpt-4.1', 1_000_000],
-	['gpt-4o', 128_000],
-	['gpt-4', 128_000],
-	['o3', 200_000],
-	['o4', 200_000],
-	['o1', 200_000],
-	['claude', 200_000],
-]
+import { parse, stringify } from './utils/ason.ts'
+import { MODELS_FILE } from './state.ts'
 
 const DEFAULT_CONTEXT = 200_000
 
-/** Get context window size for a model ID (without provider prefix). */
-export function contextWindowForModel(modelId: string): number {
-	// Try longest prefix match
-	let bestLen = 0
-	let bestSize = DEFAULT_CONTEXT
-	for (const [prefix, size] of CONTEXT_WINDOWS) {
-		if (modelId.startsWith(prefix) && prefix.length > bestLen) {
-			bestLen = prefix.length
-			bestSize = size
+// Lazy-loaded context window map from models.dev (state/models.ason)
+let _contextWindows: Record<string, number> | null = null
+
+function loadContextWindows(): Record<string, number> {
+	if (_contextWindows) return _contextWindows
+	try {
+		_contextWindows = parse(readFileSync(MODELS_FILE, 'utf-8')) as Record<string, number>
+	} catch {
+		_contextWindows = {}
+	}
+	return _contextWindows
+}
+
+/** Reset cached data (e.g. after refresh). */
+export function resetModelCache(): void {
+	_contextWindows = null
+}
+
+/** Fetch context windows from models.dev and save to state/models.ason. */
+export async function refreshModels(): Promise<void> {
+	const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(10_000) })
+	const data = (await res.json()) as Record<string, { models?: Record<string, any> }>
+	const ctx: Record<string, number> = {}
+	for (const provider of Object.values(data)) {
+		for (const [id, model] of Object.entries(provider.models ?? {})) {
+			if (model.limit?.context) ctx[id] = model.limit.context
 		}
 	}
-	return bestSize
+	writeFileSync(MODELS_FILE, stringify(ctx) + '\n')
+	_contextWindows = ctx
+}
+
+/** Get context window size for a model ID (without provider prefix). */
+export function contextWindowForModel(modelId: string): number {
+	return loadContextWindows()[modelId] ?? DEFAULT_CONTEXT
 }
 
 export function totalInputTokens(usage: any): number {
