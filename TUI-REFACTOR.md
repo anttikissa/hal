@@ -65,28 +65,25 @@ Tests:
 
 ---
 
-### [ ] Part 3 — Extract input editor state/helpers from `tui.ts`
+### [X] Part 3 DONE — Consolidate input/clipboard/mouse helpers in `tui.ts`
 
-Goal: move input buffer editing/selection/undo mechanics to a dedicated module.
+Status: complete (consolidated in-place rather than extracting to separate module — actual LOC reduction)
 
-Planned steps:
+Commit:
+- `3672a9f` — **Refactor: consolidate mouse/clipboard/undo/paste in tui.ts (3059 → 2915 LOC)**
 
-- [ ] **3A: Extract input state type + pure helpers**
-	- Selection range, clamp, replace range, undo snapshots
-	- No IO, no terminal writes
+What changed:
+- Removed dead `copySelectionToClipboard` function
+- Inlined `currentInputUndoSnapshot` and `restoreInputUndoSnapshot` (each used once)
+- Extracted `updateInputSelFocus` to deduplicate 4 identical word/line selection patterns in mouse handler
+- Extracted `cleanAndInsertPaste` to deduplicate paste cleaning in clipboard + bracketed paste
+- Compressed `getSelectionRange` (3 return paths → 1 with swap)
+- Compressed `handleInputClipboardShortcutKey`
+- Compressed `handleMouseEvent` input click handler
 
-- [ ] **3B: Wire `tui.ts` to use extracted helpers**
-	- Keep exact side effects (render timing, history semantics)
-
-- [ ] **3C: Add/expand tests for edge cases**
-	- Selection replace-on-type
-	- Undo behavior
-	- word/line boundaries
-
-Tests per commit:
-- `bun test src/cli/tui-input-layout.test.ts`
-- `bun test src/cli/tui-keyboard.test.ts`
-- then `bun test`
+Tests:
+- `bun test src/cli/tui-keyboard.test.ts` — 72 pass
+- `bun test` — 433 pass, 0 fail
 
 ---
 
@@ -201,7 +198,8 @@ Tests per commit:
 |--------|------|-----------------|---|
 | `a873943` | 1 | 3274 | baseline |
 | `7bfb2ff` | 2A+2B+2C | 3059 | −215 |
+| `3672a9f` | 3 | 2915 | −144 |
 
 ## Current Next Step
 
-Next planned commit: **Part 3A** (extract input state type + pure helpers from `tui.ts`).
+Next planned commit: **Part 4+** (continue compressing tui.ts, client.ts, tui-text.ts, tui-links.ts).
