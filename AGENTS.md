@@ -67,6 +67,7 @@ See `TODO.md`.
 
 ## Architecture (high level)
 
+- `run` — bash entry point. Restart loop (exit 100 = restart), env setup, `-f`/`-s` flag handling.
 - `main.ts` — owner election + CLI/web startup.
 - `src/ipc.ts` — file-backed IPC bus (`state/ipc/`). See `docs/ipc.md`.
 - `src/runtime/*` — owner runtime (scheduling, commands, agent loop).
