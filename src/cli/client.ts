@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto'
-import { basename, resolve } from 'path'
+import { resolve } from 'path'
 import {
 	appendCommand as appendBusCommand,
 	appendEvent,
@@ -63,6 +63,14 @@ import { countSourceStats } from '../utils/cloc.ts'
 import { loadConfig, mergedModelAliases, modelIdForModel, resolveModel } from '../config.ts'
 import { loadActiveTheme } from './format/theme.ts'
 import { selfMode } from '../args.ts'
+import {
+	activityBarText,
+	tabDisplayNames,
+	titleBarText,
+	sessionName,
+	createTabState,
+	type CliTab,
+} from './tab.ts'
 
 function fmtK(tokens: number): string {
 	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens)
@@ -127,23 +135,6 @@ function normalizeCommandInput(input: string): string {
 		.toLowerCase()
 }
 
-interface CliTab {
-	sessionId: string
-	workingDir: string
-	name: string
-	topic: string
-	modelLabel: string
-	output: string
-	contextStatus: string | null
-	activity: string
-	busy: boolean
-	paused: boolean
-	inputHistory: string[]
-	inputDraft: string
-	inputCursor: number
-	bootstrapSent: boolean
-}
-
 function completeInput(prefix: string): string[] {
 	if (prefix.startsWith('/') && !prefix.includes(' ')) {
 		return COMMAND_NAMES.map((c) => '/' + c).filter((c) => c.startsWith(prefix))
@@ -153,49 +144,6 @@ function completeInput(prefix: string): string[] {
 		return ALL_MODELS.filter((m) => m.startsWith(partial)).map((m) => `/model ${m}`)
 	}
 	return []
-}
-
-function activityBarText(tab: CliTab): string {
-	if (tab.paused) return `Paused • ${tab.modelLabel} — Enter to resume, /queue to inspect, /drop to clear`
-	if (tab.busy) return `${tab.modelLabel} • ${tab.activity || 'Working...'}`
-	return `Done. • ${tab.modelLabel}`
-}
-
-function sessionName(session: Pick<SessionInfo, 'name' | 'workingDir' | 'id'>): string {
-	const explicit = typeof session.name === 'string' ? session.name.trim() : ''
-	if (explicit) return explicit
-	const dirName = basename(session.workingDir || '')
-	const shortId = session.id.replace(/^s-/, '').slice(0, 6)
-	if (dirName) return `${dirName}:${shortId}`
-	return session.id.slice(0, 8)
-}
-
-function tabNameBase(tab: Pick<CliTab, 'workingDir' | 'name'>): string {
-	const dir = basename(tab.workingDir || '')
-	if (dir) return dir
-	const fallback = tab.name.split(':', 1)[0].trim()
-	return fallback || 'tab'
-}
-
-function tabDisplayNames(items: CliTab[]): string[] {
-	const counts = new Map<string, number>()
-	for (const tab of items) {
-		const base = tabNameBase(tab)
-		counts.set(base, (counts.get(base) ?? 0) + 1)
-	}
-	const seen = new Map<string, number>()
-	return items.map((tab) => {
-		const base = tabNameBase(tab)
-		if ((counts.get(base) ?? 0) <= 1) return base
-		const idx = (seen.get(base) ?? 0) + 1
-		seen.set(base, idx)
-		return `${base}.${idx}`
-	})
-}
-
-function titleBarText(tab: Pick<CliTab, 'topic' | 'name' | 'workingDir' | 'sessionId'>): string {
-	const sessionLabel = tab.name || basename(tab.workingDir || '') || tab.sessionId.slice(0, 8)
-	return tab.topic ? `${tab.topic} — ${sessionLabel}` : sessionLabel
 }
 
 // Module state
@@ -350,22 +298,12 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 	if (tabs.length > 0) return
 	const sessionId = activeSessionId || 's-default'
 	tabs = [
-		{
+		createTabState({
 			sessionId,
 			workingDir: launchCwd,
 			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-			topic: '',
 			modelLabel: modelDisplayName(loadConfig().defaultModel),
-			output: '',
-			contextStatus: null,
-			activity: '',
-			busy: false,
-			paused: false,
-			inputHistory: [],
-			inputDraft: '',
-			inputCursor: 0,
-			bootstrapSent: false,
-		},
+		}),
 	]
 
 	activeTabIndex = 0
@@ -464,22 +402,14 @@ async function createTab(): Promise<void> {
 	}
 	captureActiveOutput()
 	const sessionId = makeLocalSessionId()
-	tabs.push({
-		sessionId,
-		workingDir: launchCwd,
-		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-		topic: '',
-		modelLabel: modelDisplayName(loadConfig().defaultModel),
-		output: '',
-		contextStatus: null,
-		activity: '',
-		busy: false,
-		paused: false,
-		inputHistory: [],
-		inputDraft: '',
-		inputCursor: 0,
-		bootstrapSent: false,
-	})
+	tabs.push(
+		createTabState({
+			sessionId,
+			workingDir: launchCwd,
+			name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
+			modelLabel: modelDisplayName(loadConfig().defaultModel),
+		}),
+	)
 
 	activeTabIndex = tabs.length - 1
 	applyActiveTabSnapshot(true)
@@ -510,22 +440,17 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 	}
 	captureActiveOutput()
 	const inputHistory = await loadInputHistory(sessionId)
-	tabs.push({
-		sessionId,
-		workingDir,
-		name: sessionName({ id: sessionId, name: undefined, workingDir }),
-		topic: '',
-		modelLabel: modelDisplayName(loadConfig().defaultModel),
-		output: '',
-		contextStatus: null,
-		activity: '',
-		busy: false,
-		paused: false,
-		inputHistory,
-		inputDraft: '',
-		inputCursor: 0,
-		bootstrapSent: false,
-	})
+	tabs.push(
+		{
+			...createTabState({
+				sessionId,
+				workingDir,
+				name: sessionName({ id: sessionId, name: undefined, workingDir }),
+				modelLabel: modelDisplayName(loadConfig().defaultModel),
+			}),
+			inputHistory,
+		},
+	)
 
 	activeTabIndex = tabs.length - 1
 	const added = tabs[activeTabIndex]
@@ -601,11 +526,13 @@ function syncTabsFromSessions(
 		const isNewFromFork = !existing && forkOutput !== null
 		if (isNewFromFork) forkedSessionId = session.id
 		return {
-			sessionId: session.id,
-			workingDir: session.workingDir,
-			name: sessionName(session),
+			...createTabState({
+				sessionId: session.id,
+				workingDir: session.workingDir,
+				name: sessionName(session),
+				modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().defaultModel),
+			}),
 			topic: session.topic ?? existing?.topic ?? '',
-			modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().defaultModel),
 			output: preserveActiveOutput ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
 			contextStatus: preserveActiveOutput ? (existing?.contextStatus ?? null) : null,
 			activity: preserveActiveOutput ? (existing?.activity ?? '') : '',
@@ -681,22 +608,12 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 	const existing = findTabBySessionId(sessionId)
 	if (existing) return existing
 	if (tabs.length >= 9) return null
-	const tab: CliTab = {
+	const tab = createTabState({
 		sessionId,
 		workingDir: launchCwd,
 		name: sessionName({ id: sessionId, name: undefined, workingDir: launchCwd }),
-		topic: '',
 		modelLabel: modelDisplayName(loadConfig().defaultModel),
-		output: '',
-		contextStatus: null,
-		activity: '',
-		busy: false,
-		paused: false,
-		inputHistory: [],
-		inputDraft: '',
-		inputCursor: 0,
-		bootstrapSent: false,
-	}
+	})
 
 	tabs.push(tab)
 	renderBusyStatus()
