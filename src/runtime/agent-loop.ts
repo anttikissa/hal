@@ -77,13 +77,15 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 
 		if (runtime.pausedByUser || parsed.aborted) {
-			const cleanBlocks = parsed.contentBlocks.filter((b: any) => {
-				if (!b) return false
-				if (b.type === 'tool_use' && typeof b.input === 'string') return false
-				// Drop thinking blocks without signatures (incomplete due to pause/abort)
-				if (b.type === 'thinking' && !b.signature) return false
-				return true
-			})
+			const cleanBlocks = filterUnpairedWebSearchBlocks(
+				parsed.contentBlocks.filter((b: any) => {
+					if (!b) return false
+					if (b.type === 'tool_use' && typeof b.input === 'string') return false
+					// Drop thinking blocks without signatures (incomplete due to pause/abort)
+					if (b.type === 'thinking' && !b.signature) return false
+					return true
+				}),
+			)
 			if (cleanBlocks.length > 0) {
 				runtime.messages.push({ role: 'assistant', content: cleanBlocks })
 				const toolBlocks = cleanBlocks.filter((b: any) => b.type === 'tool_use')
@@ -195,37 +197,66 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	}
 }
 
+function filterUnpairedWebSearchBlocks(blocks: any[]): any[] {
+	if (!Array.isArray(blocks) || blocks.length === 0) return blocks
+	const webSearchUseIds = new Set<string>()
+	const webSearchResultIds = new Set<string>()
+	for (const block of blocks) {
+		if (
+			block?.type === 'server_tool_use' &&
+			block?.name === 'web_search' &&
+			typeof block?.id === 'string'
+		) {
+			webSearchUseIds.add(block.id)
+		}
+		if (block?.type === 'web_search_tool_result' && typeof block?.tool_use_id === 'string') {
+			webSearchResultIds.add(block.tool_use_id)
+		}
+	}
+	return blocks.filter((block: any) => {
+		if (block?.type === 'server_tool_use' && block?.name === 'web_search') {
+			return typeof block.id === 'string' && webSearchResultIds.has(block.id)
+		}
+		if (block?.type === 'web_search_tool_result') {
+			return typeof block.tool_use_id === 'string' && webSearchUseIds.has(block.tool_use_id)
+		}
+		return true
+	})
+}
+
 // Sanitize: drop empty blocks, fix orphaned tool_use, strip server_tool_use artifacts
-function sanitizeMessages(provider: Provider, messages: any[]): any[] {
+export function sanitizeMessages(provider: Provider, messages: any[]): any[] {
 	const sanitized = messages
 		.map((m) => {
 			if (!Array.isArray(m.content)) return m
-			const filtered = m.content
-				.filter((b: any) => {
-					if (!b) return false
-					if (b.type === 'text' && !b.text?.trim()) return false
-					if (b.type === 'thinking' && !b.thinking?.trim()) return false
-					if (
-						provider.name === 'anthropic' &&
-						b.type === 'thinking' &&
-						!String(b.signature ?? '').trim()
-					)
-						return false
-					if (
-						b.type === 'tool_result' &&
-						typeof b.tool_use_id === 'string' &&
-						b.tool_use_id.startsWith('srvtoolu_')
-					)
-						return false
-					return true
-				})
-				.map((b: any) => {
-					if (b.type === 'server_tool_use' && '__inputJson' in b) {
-						const { __inputJson, ...clean } = b
-						return clean
-					}
-					return b
-				})
+			const filtered = filterUnpairedWebSearchBlocks(
+				m.content
+					.filter((b: any) => {
+						if (!b) return false
+						if (b.type === 'text' && !b.text?.trim()) return false
+						if (b.type === 'thinking' && !b.thinking?.trim()) return false
+						if (
+							provider.name === 'anthropic' &&
+							b.type === 'thinking' &&
+							!String(b.signature ?? '').trim()
+						)
+							return false
+						if (
+							b.type === 'tool_result' &&
+							typeof b.tool_use_id === 'string' &&
+							b.tool_use_id.startsWith('srvtoolu_')
+						)
+							return false
+						return true
+					})
+					.map((b: any) => {
+						if (b.type === 'server_tool_use' && '__inputJson' in b) {
+							const { __inputJson, ...clean } = b
+							return clean
+						}
+						return b
+					}),
+			)
 			return { ...m, content: filtered }
 		})
 		.filter((m) => !Array.isArray(m.content) || m.content.length > 0)
