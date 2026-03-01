@@ -349,13 +349,14 @@ function renderPromptLineWithCursor(
 			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
 	}
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
+	const uc = `${lerpCh(85, cursorT, 48)};${lerpCh(136, cursorT, 48)};${lerpCh(255, cursorT, 48)}`
 	if (cursorCol >= lineText.length) {
-		// End of line: block cursor — bg interpolated from BG_DARK (48,48,48) to blue
-		const bg = `\x1b[48;2;${lerpCh(85, cursorT, 48)};${lerpCh(136, cursorT, 48)};${lerpCh(255, cursorT, 48)}m`
-		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}${bg} ${RESET}${BG_DARK}${pad}${RESET}`
+		// End of line: block cursor — bg interpolated from BG_DARK to blue
+		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[48;2;${uc}m ${RESET}${BG_DARK}${pad}${RESET}`
 	}
-	// Mid-line: no fake cursor; hardware bar cursor will be shown
-	return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
+	// Mid-line: colored underline on char at cursor
+	const before = lineText.slice(0, cursorCol), ch = lineText[cursorCol], after = lineText.slice(cursorCol + 1)
+	return `${BG_DARK}${inputPromptStr}${before}\x1b[4m\x1b[58;2;${uc}m${ch}\x1b[24m\x1b[59m${after}${pad}${RESET}`
 }
 // ── Mouse selection ──
 
@@ -644,12 +645,9 @@ function render(): void {
 	}
 	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
 
-	// Hardware cursor: native mode always, block mode for mid-line bar
-	const curLineLen = wrappedInput.lines[curRow]?.length ?? 0
-	const needHwCursor = userCursorMode === 'native' || (userCursorMode === 'block' && curCol < curLineLen)
-	if (needHwCursor) {
-		const style = userCursorMode === 'native' ? '\x1b[0 q' : '\x1b[5 q'
-		chunks.push(`${CURSOR_BLUE_OSC}${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+	// Hardware cursor only for native mode
+	if (userCursorMode === 'native') {
+		chunks.push(`${CURSOR_BLUE_OSC}\x1b[0 q\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 	}
 
 	const frame = chunks.join('')
