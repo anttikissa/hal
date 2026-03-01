@@ -20,8 +20,7 @@ const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_EOL = '\x1b[K'
 const CURSOR_RESET = '\x1b]112\x07\x1b[0 q'
 const CURSOR_BLUE_OSC = '\x1b]12;rgb:55/88/ff\x07'
-const HAL_CURSOR = '\x1b[38;2;255;165;0m\u2588\x1b[0m' // orange █
-const HAL_CURSOR_DIM = '\x1b[2m\x1b[38;2;255;165;0m\u2588\x1b[0m' // dim orange █
+const ANIM_MS = 50
 const BLINK_MS = 530
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
@@ -78,23 +77,18 @@ let superHeld = false, lastMouseX = -1, lastMouseY = -1
 let bracketedPasteBuffer: string | null = null
 let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
-let userBlink = true, userBlinkTimer: ReturnType<typeof setInterval> | null = null
-let halBlink = true, halBlinkTimer: ReturnType<typeof setInterval> | null = null
-function makeBlinkTimer(cb: () => void, ms = BLINK_MS): ReturnType<typeof setInterval> {
-	return setInterval(() => { cb(); if (initialized && !suspended) scheduleRender() }, ms)
+let userPhase = 0, halPhase = 0 // 0..1 cyclic
+let animTimer: ReturnType<typeof setInterval> | null = null
+function brightness(phase: number): number { return (1 + Math.cos(phase * 2 * Math.PI)) / 2 }
+function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
+function halPeriod(): number { return activityStr ? BLINK_MS * 2 : BLINK_MS * 4 }
+function animTick(): void {
+	userPhase = (userPhase + ANIM_MS / (BLINK_MS * 2)) % 1
+	halPhase = (halPhase + ANIM_MS / halPeriod()) % 1
+	if (initialized && !suspended) scheduleRender()
 }
-function resetUserBlink(): void {
-	userBlink = true
-	if (userBlinkTimer) { clearInterval(userBlinkTimer); userBlinkTimer = makeBlinkTimer(() => { userBlink = !userBlink }) }
-}
-function halBlinkMs(): number { return activityStr ? BLINK_MS : BLINK_MS * 2 }
-function restartHalBlinkTimer(): void {
-	if (halBlinkTimer) clearInterval(halBlinkTimer)
-	halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink }, halBlinkMs())
-}
-function resetHalBlink(): void {
-	halBlink = true; restartHalBlinkTimer()
-}
+function resetUserBlink(): void { userPhase = 0 }
+function resetHalBlink(): void { halPhase = 0 }
 
 function splitTitleParts(text: string): { topic: string; session: string } {
 	const trimmed = text.trim(); if (!trimmed) return { topic: '', session: '' }
@@ -345,10 +339,9 @@ function inputWrappedPointFromScreen(x: number, y: number): { row: number; col: 
 
 function renderPromptLineWithCursor(
 	lineText: string, lineStart: number, screenCols: number,
-	inputSel: { start: number; end: number } | null, cursorCol: number,
+	inputSel: { start: number; end: number } | null, cursorCol: number, cursorT: number,
 ): string {
 	const pad = ' '.repeat(Math.max(0, screenCols - inputPromptStr.length - lineText.length))
-	// Selection overrides block cursor display
 	if (inputSel) {
 		const selStart = Math.max(0, Math.min(lineText.length, inputSel.start - lineStart))
 		const selEnd = Math.max(0, Math.min(lineText.length, inputSel.end - lineStart))
@@ -357,8 +350,9 @@ function renderPromptLineWithCursor(
 	}
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
 	if (cursorCol >= lineText.length) {
-		// End of line: block cursor (inverse space)
-		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[38;2;30;60;230;7m \x1b[27m${RESET}${BG_DARK}${pad}${RESET}`
+		// End of line: block cursor — bg interpolated from BG_DARK (48,48,48) to blue
+		const bg = `\x1b[48;2;${lerpCh(85, cursorT, 48)};${lerpCh(136, cursorT, 48)};${lerpCh(255, cursorT, 48)}m`
+		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}${bg} ${RESET}${BG_DARK}${pad}${RESET}`
 	}
 	// Mid-line: no fake cursor; hardware bar cursor will be shown
 	return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
@@ -618,7 +612,10 @@ function render(): void {
 	for (let row = 2; row <= ob; row++) {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
-		if (halBlink && idx === halCursorIdx) lineText = truncateAnsi(lineText, c - 1) + (activityStr ? HAL_CURSOR : HAL_CURSOR_DIM)
+		if (idx === halCursorIdx) {
+			const ht = brightness(halPhase) * (activityStr ? 1.0 : 0.4)
+			lineText = truncateAnsi(lineText, c - 1) + `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m\u2588${RESET}`
+		}
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
 		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow)
 			pushRow(row, lineText, 'output', idx)
@@ -639,18 +636,19 @@ function render(): void {
 	const inputSelRange = getInputTextSelectionRange()
 	const pLines = Math.min(wrappedInput.lines.length, maxPromptLines), firstRow = promptFirstRow()
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
+	const ut = brightness(userPhase)
 	for (let i = 0; i < pLines; i++) {
 		chunks.push(`\x1b[${firstRow + i};1H\x1b[2K`)
-		const showBlockCursor = userCursorMode === 'block' && userBlink && i === curRow
-		chunks.push(renderPromptLineWithCursor(wrappedInput.lines[i], wrappedInput.starts[i] ?? 0, c, inputSelRange, showBlockCursor ? curCol : -1))
+		const onCursorRow = userCursorMode === 'block' && i === curRow
+		chunks.push(renderPromptLineWithCursor(wrappedInput.lines[i], wrappedInput.starts[i] ?? 0, c, inputSelRange, onCursorRow ? curCol : -1, ut))
 	}
 	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
 
-	// Hardware cursor: native mode always, block mode only for mid-line bar
+	// Hardware cursor: native mode always, block mode for mid-line bar
 	const curLineLen = wrappedInput.lines[curRow]?.length ?? 0
-	const needHwCursor = userCursorMode === 'native' || (userCursorMode === 'block' && userBlink && curCol < curLineLen)
+	const needHwCursor = userCursorMode === 'native' || (userCursorMode === 'block' && curCol < curLineLen)
 	if (needHwCursor) {
-		const style = userCursorMode === 'native' ? '\x1b[0 q' : '\x1b[5 q' // default or blinking bar
+		const style = userCursorMode === 'native' ? '\x1b[0 q' : '\x1b[5 q'
 		chunks.push(`${CURSOR_BLUE_OSC}${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 	}
 
@@ -1087,8 +1085,7 @@ export function init(): void {
 	enterRawMode()
 	directWrite('\x1b[?1049h') // enter alt screen
 	enableMouse()
-	userBlinkTimer = makeBlinkTimer(() => { userBlink = !userBlink })
-	halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink }, halBlinkMs())
+	animTimer = setInterval(animTick, ANIM_MS)
 	process.stdin.on('data', onStdinData); process.stdin.on('end', onStdinEnd)
 	process.on('SIGCONT', onSigCont); process.stdout.on('resize', onResize)
 	render()
@@ -1097,10 +1094,7 @@ export function write(text: string): void { writeToOutput(text) }
 export function log(...args: any[]): void { write(args.map((a) => safeStringify(a)).join(' ') + '\n') }
 
 export function setActivityLine(text: string): void {
-	const wasActive = !!activityStr, nowActive = !!text
-	if (activityStr === text) return; activityStr = text
-	if (wasActive !== nowActive) restartHalBlinkTimer()
-	if (initialized) scheduleRender()
+	if (activityStr === text) return; activityStr = text; if (initialized) scheduleRender()
 }
 export function setTitleBar(text: string): void {
 	if (titleBarStr === text) return; titleBarStr = text; if (initialized) scheduleRender()
@@ -1132,8 +1126,7 @@ export function prompt(message: string, promptStr: string): Promise<string | nul
 export function cleanup(): void {
 	if (!initialized) return
 	initialized = false; suspended = false
-	if (userBlinkTimer) { clearInterval(userBlinkTimer); userBlinkTimer = null }
-	if (halBlinkTimer) { clearInterval(halBlinkTimer); halBlinkTimer = null }
+	if (animTimer) { clearInterval(animTimer); animTimer = null }
 	if (headerFlashTimer) { clearTimeout(headerFlashTimer); headerFlashTimer = null }
 	headerFlash = ''; dumpAndLeaveAltScreen()
 	process.stdin.off('data', onStdinData); process.stdin.off('end', onStdinEnd)
