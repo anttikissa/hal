@@ -351,16 +351,13 @@ function renderPromptLineWithCursor(
 			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
 	}
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-	const before = lineText.slice(0, cursorCol)
 	if (cursorCol >= lineText.length) {
 		// End of line: block cursor (inverse space)
-		return `${BG_DARK}${inputPromptStr}${before}\x1b[38;2;85;136;255;7m \x1b[27m${RESET}${BG_DARK}${pad}${RESET}`
+		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[38;2;85;136;255;7m \x1b[27m${RESET}${BG_DARK}${pad}${RESET}`
 	}
-	// Mid-line: bar cursor (thin line before char)
-	const after = lineText.slice(cursorCol)
-	return `${BG_DARK}${inputPromptStr}${before}\x1b[38;2;85;136;255m\u2502${RESET}${BG_DARK}${after}${pad}${RESET}`
+	// Mid-line: no fake cursor; hardware bar cursor will be shown
+	return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
 }
-
 // ── Mouse selection ──
 
 function screenSelectionLine(surface: SelectionSurface, row: number): string {
@@ -644,9 +641,12 @@ function render(): void {
 	}
 	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
 
-	// Cursor
-	if (userCursorMode === 'native') {
-		chunks.push(`${CURSOR_BLUE_OSC}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+	// Hardware cursor: native mode always, block mode only for mid-line bar
+	const curLineLen = wrappedInput.lines[curRow]?.length ?? 0
+	const needHwCursor = userCursorMode === 'native' || (userCursorMode === 'block' && userBlink && curCol < curLineLen)
+	if (needHwCursor) {
+		const style = userCursorMode === 'native' ? '' : '\x1b[5 q' // blinking bar for block mid-line
+		chunks.push(`${CURSOR_BLUE_OSC}${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 	}
 
 	const frame = chunks.join('')
