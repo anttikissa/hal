@@ -77,14 +77,31 @@ let superHeld = false, lastMouseX = -1, lastMouseY = -1
 let bracketedPasteBuffer: string | null = null
 let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
-let userPhase = 0, halPhase = 0 // 0..1 cyclic
-let halPeriodCurrent = 1000
+type CursorAnim = { phase: number; period: number; shrinkStart: number | null; brightSince: number | null }
+function makeCursorAnim(period: number): CursorAnim { return { phase: 0, period, shrinkStart: null, brightSince: null } }
+function resetShrink(c: CursorAnim): void { c.shrinkStart = null; c.brightSince = null }
+function tickCursorAnim(c: CursorAnim, target: number): void {
+	c.period += (target - c.period) * (1 - RAMP_RATE)
+	c.phase = (c.phase + ANIM_MS / c.period) % 1
+}
+function tickShrink(c: CursorAnim, delay: number, idleMs: number, now: number): void {
+	if (c.shrinkStart !== null) return
+	if (idleMs < delay) return
+	if (brightness(c.phase) === 1) {
+		if (c.brightSince === null) c.brightSince = now
+		else if (now - c.brightSince >= IDLE_SHRINK_BRIGHT_HOLD) c.shrinkStart = now
+	} else {
+		c.brightSince = null
+	}
+}
+const hal = makeCursorAnim(1000)
+const user = makeCursorAnim(500)
 let halIntensity = 0.5 // 1.0 when busy, 0.5 when idle
 let halIdleSince = Date.now()
 let animTimer: ReturnType<typeof setInterval> | null = null
 const SHRINK_BLOCKS = '\u2588\u2587\u2586\u2585\u2584\u2583\u2582\u2581' // █▇▆▅▄▃▂▁
-const IDLE_SHRINK_DELAY = 10_000 // ms before cursor shrinks
 const IDLE_SHRINK_DURATION = 250 // ms for shrink animation
+const IDLE_SHRINK_BRIGHT_HOLD = 100 // ms cursor must be fully bright before shrink starts
 function brightness(phase: number): number {
 	// ~43% on, 7% fade out, ~43% off, 7% fade in
 	if (phase < 0.43) return 1
@@ -92,35 +109,49 @@ function brightness(phase: number): number {
 	if (phase < 0.93) return 0
 	return (phase - 0.93) / 0.07
 }
-function halCursorChar(): string {
-	if (halState !== 'idle') return SHRINK_BLOCKS[0]
-	const elapsed = Date.now() - halIdleSince - IDLE_SHRINK_DELAY
-	if (elapsed < 0) return SHRINK_BLOCKS[0]
-	const t = Math.min(elapsed / IDLE_SHRINK_DURATION, 1)
+function shrinkChar(c: CursorAnim): string {
+	if (c.shrinkStart === null) return SHRINK_BLOCKS[0]
+	const t = Math.min((Date.now() - c.shrinkStart) / IDLE_SHRINK_DURATION, 1)
 	return SHRINK_BLOCKS[Math.round(t * (SHRINK_BLOCKS.length - 1))]
 }
+function isDormant(c: CursorAnim): boolean { return c.shrinkStart !== null && Date.now() - c.shrinkStart >= IDLE_SHRINK_DURATION }
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 let halState: HalState = 'idle'
 export function setHalState(state: HalState): void {
-	if (state !== 'idle' && halState === 'idle') halIdleSince = Infinity
-	else if (state === 'idle' && halState !== 'idle') halIdleSince = Date.now()
+	const wasIdle = halState === 'idle'
 	halState = state
+	if (state !== 'idle') {
+		halIdleSince = Infinity
+	} else if (!wasIdle) {
+		halIdleSince = Date.now()
+	} else return
+	resetShrink(hal); resetShrink(user)
+}
+export function resetHalIdleTimer(): void {
+	halIdleSince = Date.now()
+	resetShrink(hal); resetShrink(user)
 }
 const RAMP_RATE = 0.98
 function animTick(): void {
 	const cfg = loadConfig()
 	const isIdle = halState === 'idle'
-	const halTarget = isIdle ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
+	const now = Date.now()
+	const idleMs = now - halIdleSince
+	const halTarget = isDormant(hal) ? cfg.cursorBlinkDormant : isIdle ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
+	const userTarget = isDormant(user) ? cfg.cursorBlinkUserDormant : cfg.cursorBlinkUser
 	const intensityTarget = isIdle ? 0.5 : 1.0
-	halPeriodCurrent += (halTarget - halPeriodCurrent) * (1 - RAMP_RATE)
+	tickCursorAnim(hal, halTarget)
+	tickCursorAnim(user, userTarget)
 	halIntensity += (intensityTarget - halIntensity) * (1 - RAMP_RATE)
-	userPhase = (userPhase + ANIM_MS / cfg.cursorBlinkUser) % 1
-	halPhase = (halPhase + ANIM_MS / halPeriodCurrent) % 1
+	if (isIdle) {
+		tickShrink(hal, cfg.cursorDormantDelay, idleMs, now)
+		tickShrink(user, cfg.userDormantDelay, idleMs, now)
+	}
 	if (initialized && !suspended) scheduleRender()
 }
-function resetUserBlink(): void { userPhase = 0 }
-function resetHalBlink(): void { halPhase = 0 }
+function resetUserBlink(): void { user.phase = 0; resetShrink(user) }
+function resetHalBlink(): void { hal.phase = 0 }
 
 function splitTitleParts(text: string): { topic: string; session: string } {
 	const trimmed = text.trim(); if (!trimmed) return { topic: '', session: '' }
@@ -383,8 +414,13 @@ function renderPromptLineWithCursor(
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
 	const uc = `${lerpCh(102, cursorT, 48)};${lerpCh(187, cursorT, 48)};${lerpCh(255, cursorT, 48)}`
 	if (cursorCol >= lineText.length) {
-		// End of line: block cursor — bg interpolated from BG_DARK to blue
-		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[48;2;${uc}m ${RESET}${BG_DARK}${pad}${RESET}`
+		const ch = shrinkChar(user)
+		if (ch === SHRINK_BLOCKS[0]) {
+			// Full block: use bg color
+			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[48;2;${uc}m ${RESET}${BG_DARK}${pad}${RESET}`
+		}
+		// Shrinking/underscore: use fg color on dark bg
+		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[38;2;${uc}m${ch}${RESET}${BG_DARK}${pad}${RESET}`
 	}
 	// Mid-line: hardware bar cursor will be positioned here
 	return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
@@ -645,8 +681,8 @@ function render(): void {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
 		if (idx === halCursorIdx) {
-			const ht = brightness(halPhase) * halIntensity
-			const cursor = `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m${halCursorChar()}${RESET}`
+			const ht = brightness(hal.phase) * halIntensity
+			const cursor = `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m${shrinkChar(hal)}${RESET}`
 			lineText = truncateAnsi(lineText, c - 1) + cursor
 		}
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
@@ -669,7 +705,7 @@ function render(): void {
 	const inputSelRange = getInputTextSelectionRange()
 	const pLines = Math.min(wrappedInput.lines.length, maxPromptLines), firstRow = promptFirstRow()
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-	const ut = brightness(userPhase)
+	const ut = brightness(user.phase)
 	for (let i = 0; i < pLines; i++) {
 		chunks.push(`\x1b[${firstRow + i};1H\x1b[2K`)
 		const onCursorRow = userCursorMode === 'block' && i === curRow
