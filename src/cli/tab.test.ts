@@ -22,6 +22,7 @@ describe('tab helpers', () => {
 			topic: '',
 			modelLabel: 'Codex 5.3',
 			output: '',
+			fmtState: { prevKind: '', trailingNL: 0, blockRows: 0 },
 			contextStatus: null,
 			activity: '',
 			busy: false,

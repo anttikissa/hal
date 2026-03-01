@@ -309,7 +309,8 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 	activeTabIndex = tabs.length - 1
 	const added = tabs[activeTabIndex]
 	const history = await loadConversation(sessionId)
-	added.output = renderConversationHistory(sessionId, history)
+	const replay = renderConversationHistory(history)
+	added.output = replay.output; added.fmtState = replay.fmtState
 	const replayCount = replayConversationEvents(history).length
 	applyActiveTabSnapshot(true)
 	pushLocal('local.tab', `[restore] opened session ${sessionId} in tab ${activeTabIndex + 1} (${replayCount} event${replayCount === 1 ? '' : 's'} replayed)`)
@@ -404,7 +405,8 @@ async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
 	await Promise.all(tabs.map(async (tab) => {
 		if (tab.output.trim().length > 0) return
 		const events = await loadConversation(tab.sessionId)
-		tab.output = renderConversationHistory(tab.sessionId, events)
+		const replay = renderConversationHistory(events)
+		tab.output = replay.output; tab.fmtState = replay.fmtState
 		replayed.set(tab.sessionId, replayConversationEvents(events).length)
 	}))
 	return replayed
@@ -499,7 +501,8 @@ async function appendCommand(type: RuntimeCommand['type'], text?: string): Promi
 
 function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: boolean): void {
 	if (event.type === 'line' && event.level === 'meta' && renderToScreen && tab === activeTab()) renderBusyStatus()
-	const text = pushEvent(event, source); if (!text) return
+	const st = renderToScreen ? screenFmt : tab.fmtState
+	const text = pushEvent(event, source, st); if (!text) return
 	if (renderToScreen) { tui.write(text); tabHasActivity.delete(tab.sessionId) }
 	else { tab.output += text; tabHasActivity.add(tab.sessionId) }
 }

@@ -17,6 +17,11 @@ afterEach(async () => {
 	}
 })
 
+function parseForkIds(text: string): { parent: string; child: string } {
+	const match = text.match(/\[fork\] forked (s-[a-zA-Z0-9_-]+) -> (s-[a-zA-Z0-9_-]+)/)
+	if (!match) throw new Error(`could not parse fork ids from line: ${text}`)
+	return { parent: match[1], child: match[2] }
+}
 async function readConversationLog(hal: TestHal, sessionId: string): Promise<any[]> {
 	const path = `${hal.halDir}/state/sessions/${sessionId}/conversation.asonl`
 	for (let i = 0; i < 40; i++) {
@@ -244,11 +249,9 @@ describe('fork', () => {
 		const sourceId = sessions.sessions[0].id
 
 		hal.sendLine('/fork')
-		const afterFork = await hal.waitFor(
-			(r) => r.type === 'sessions' && r.sessions?.length >= 2,
-		)
-		const parent = sourceId
-		const child = afterFork.sessions.find((s: any) => s.id !== sourceId)!.id
+		const line = await hal.waitForLine(/\[fork\] forked s-[a-zA-Z0-9_-]+ -> s-[a-zA-Z0-9_-]+/)
+		const { parent, child } = parseForkIds(line.text)
+		expect(parent).toBe(sourceId)
 
 		const parentLog = await readConversationLog(hal, parent)
 		const childLog = await readConversationLog(hal, child)

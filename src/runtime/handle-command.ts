@@ -155,11 +155,11 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 		pauseSession(newId)
 	}
 	await persistRegistry()
+	await publishLine(`[fork] forked ${sessionId} -> ${newId}`, 'meta', sessionId)
 	const pauseNote = busy ? ' (paused)' : ''
 	await publishLine(`[fork] forked from ${sessionId}${pauseNote}`, 'fork', newId)
 	await emitStatus()
 }
-
 /** Emit an estimated context so the statusline stays up-to-date after session changes */
 async function publishEstimatedContext(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)

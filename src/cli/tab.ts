@@ -1,5 +1,6 @@
 import { basename } from 'path'
 import type { SessionInfo } from '../protocol.ts'
+import { type FormatState, createFormatState } from './format/index.ts'
 
 export interface CliTab {
 	sessionId: string
@@ -8,6 +9,7 @@ export interface CliTab {
 	topic: string
 	modelLabel: string
 	output: string
+	fmtState: FormatState
 	contextStatus: string | null
 	activity: string
 	busy: boolean
@@ -22,7 +24,7 @@ export function createTabState(params: {
 	sessionId: string; workingDir: string; name: string; modelLabel: string
 }): CliTab {
 	return {
-		...params, topic: '', output: '', contextStatus: null, activity: '',
+		...params, topic: '', output: '', fmtState: createFormatState(), contextStatus: null, activity: '',
 		busy: false, paused: false, inputHistory: [], inputDraft: '', inputCursor: 0, bootstrapSent: false,
 	}
 }

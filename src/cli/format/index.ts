@@ -53,15 +53,8 @@ function getFormatter(kind: string): Formatter {
 	return { style: getStyle(kind) }
 }
 
-interface FormatState { prevKind: string; trailingNL: number; blockRows: number }
-const fmtState = new Map<string, FormatState>()
-const LOCAL_KEY = '__local__'
-
-function getState(key: string): FormatState {
-	let s = fmtState.get(key)
-	if (!s) { s = { prevKind: '', trailingNL: 0, blockRows: 0 }; fmtState.set(key, s) }
-	return s
-}
+export interface FormatState { prevKind: string; trailingNL: number; blockRows: number }
+export function createFormatState(): FormatState { return { prevKind: '', trailingNL: 0, blockRows: 0 } }
 
 function trailingNL(s: string): number {
 	let n = 0
@@ -69,14 +62,7 @@ function trailingNL(s: string): number {
 	return n
 }
 
-export function resetFormat(sessionId?: string): void {
-	if (sessionId) fmtState.delete(sessionId)
-	else fmtState.clear()
-}
-
-export function pushFragment(kind: string, text: string, sessionId?: string | null): string {
-	const key = sessionId ?? LOCAL_KEY
-	const st = getState(key)
+export function pushFragment(kind: string, text: string, st: FormatState): string {
 	const prev = st.prevKind
 	st.prevKind = kind
 
@@ -90,10 +76,9 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	const isChunk = kind.startsWith('chunk.')
 	const wasChunk = prev.startsWith('chunk.')
 	const isPrompt = kind === 'prompt' || kind === 'prompt.steering'
-	const newSection = (prev !== '' && (kind !== prev || isBlockKind(kind))) || (prev === '' && isBlockKind(kind))
+	const newSection = prev !== '' && (kind !== prev || isBlockKind(kind))
 
 	// Section separator: ensure exactly one blank line between sections.
-	// Track trailing newlines already in the output to avoid doubling.
 	let sep = ''
 	if (newSection) {
 		if (wasChunk && isPrompt) sep = ` ${getStyle('line.warn')}--${RESET}`
@@ -129,16 +114,15 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	return out
 }
 
-export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {
-	const sessionId = 'sessionId' in event ? event.sessionId : null
+export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source'], st: FormatState): string {
 	const ts = _showTimestamps ? formatTimestamp(event.createdAt) : ''
 
 	if (event.type === 'chunk') {
-		return pushFragment(`chunk.${event.channel}`, event.text, sessionId)
+		return pushFragment(`chunk.${event.channel}`, event.text, st)
 	}
 
 	if (event.type === 'line') {
-		return pushFragment(`line.${event.level}`, `${ts}${event.text}`, sessionId)
+		return pushFragment(`line.${event.level}`, `${ts}${event.text}`, st)
 	}
 
 	if (event.type === 'prompt') {
@@ -149,14 +133,14 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 			? `${ts}${prefix}${event.text}`
 			: `${ts}[prompt:${event.source.kind}:${event.source.clientId.slice(0, 6)}] ${event.text}`
 		const kind = event.label === 'steering' ? 'prompt.steering' : 'prompt'
-		return pushFragment(kind, text, sessionId)
+		return pushFragment(kind, text, st)
 	}
 
 	if (event.type === 'command' && event.phase === 'failed') {
 		return pushFragment(
 			'command.failed',
 			`[command:${event.commandId}] ${event.message ?? 'unknown'}`,
-			sessionId,
+			st,
 		)
 	}
 
