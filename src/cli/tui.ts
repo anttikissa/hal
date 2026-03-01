@@ -80,16 +80,20 @@ let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
 let userBlink = true, userBlinkTimer: ReturnType<typeof setInterval> | null = null
 let halBlink = true, halBlinkTimer: ReturnType<typeof setInterval> | null = null
-function makeBlinkTimer(cb: () => void): ReturnType<typeof setInterval> {
-	return setInterval(() => { cb(); if (initialized && !suspended) scheduleRender() }, BLINK_MS)
+function makeBlinkTimer(cb: () => void, ms = BLINK_MS): ReturnType<typeof setInterval> {
+	return setInterval(() => { cb(); if (initialized && !suspended) scheduleRender() }, ms)
 }
 function resetUserBlink(): void {
 	userBlink = true
 	if (userBlinkTimer) { clearInterval(userBlinkTimer); userBlinkTimer = makeBlinkTimer(() => { userBlink = !userBlink }) }
 }
+function halBlinkMs(): number { return activityStr ? BLINK_MS : BLINK_MS * 2 }
+function restartHalBlinkTimer(): void {
+	if (halBlinkTimer) clearInterval(halBlinkTimer)
+	halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink }, halBlinkMs())
+}
 function resetHalBlink(): void {
-	halBlink = true
-	if (halBlinkTimer) { clearInterval(halBlinkTimer); halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink }) }
+	halBlink = true; restartHalBlinkTimer()
 }
 
 function splitTitleParts(text: string): { topic: string; session: string } {
@@ -1084,7 +1088,7 @@ export function init(): void {
 	directWrite('\x1b[?1049h') // enter alt screen
 	enableMouse()
 	userBlinkTimer = makeBlinkTimer(() => { userBlink = !userBlink })
-	halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink })
+	halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink }, halBlinkMs())
 	process.stdin.on('data', onStdinData); process.stdin.on('end', onStdinEnd)
 	process.on('SIGCONT', onSigCont); process.stdout.on('resize', onResize)
 	render()
@@ -1093,7 +1097,10 @@ export function write(text: string): void { writeToOutput(text) }
 export function log(...args: any[]): void { write(args.map((a) => safeStringify(a)).join(' ') + '\n') }
 
 export function setActivityLine(text: string): void {
-	if (activityStr === text) return; activityStr = text; if (initialized) scheduleRender()
+	const wasActive = !!activityStr, nowActive = !!text
+	if (activityStr === text) return; activityStr = text
+	if (wasActive !== nowActive) restartHalBlinkTimer()
+	if (initialized) scheduleRender()
 }
 export function setTitleBar(text: string): void {
 	if (titleBarStr === text) return; titleBarStr = text; if (initialized) scheduleRender()
