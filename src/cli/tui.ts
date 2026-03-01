@@ -351,10 +351,14 @@ function renderPromptLineWithCursor(
 			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
 	}
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-	// Blue block cursor: inverse the char under cursor
-	const ch = cursorCol < lineText.length ? lineText[cursorCol] : ' '
-	const before = lineText.slice(0, cursorCol), after = lineText.slice(cursorCol + (cursorCol < lineText.length ? 1 : 0))
-	return `${BG_DARK}${inputPromptStr}${before}\x1b[38;2;85;136;255;7m${ch}\x1b[27m${RESET}${BG_DARK}${after}${pad}${RESET}`
+	const before = lineText.slice(0, cursorCol)
+	if (cursorCol >= lineText.length) {
+		// End of line: block cursor (inverse space)
+		return `${BG_DARK}${inputPromptStr}${before}\x1b[38;2;85;136;255;7m \x1b[27m${RESET}${BG_DARK}${pad}${RESET}`
+	}
+	// Mid-line: bar cursor (thin line before char)
+	const after = lineText.slice(cursorCol)
+	return `${BG_DARK}${inputPromptStr}${before}\x1b[38;2;85;136;255m\u2502${RESET}${BG_DARK}${after}${pad}${RESET}`
 }
 
 // ── Mouse selection ──
