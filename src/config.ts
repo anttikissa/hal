@@ -36,6 +36,7 @@ export interface Config {
 	ollamaBaseUrl?: string // deprecated: use providers.ollama.baseUrl
 	theme: string // theme name, resolved to themes/<name>.ason
 	timestamps?: boolean // show timestamps in TUI output
+	userCursor: 'native' | 'block' // 'block' = fake blinking block, 'native' = hardware cursor
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
@@ -124,6 +125,7 @@ export function resolveCompactModel(model: string): string {
 const DEFAULTS: Config = {
 	defaultModel: 'anthropic/claude-opus-4-6',
 	theme: 'default',
+	userCursor: 'block',
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 4,
 	maxPromptLines: 15,

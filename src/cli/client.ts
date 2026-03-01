@@ -23,6 +23,7 @@ import {
 	setInputHistory,
 	setInputKeyHandler,
 	setMaxPromptLines,
+	setUserCursorMode,
 	setOutputSnapshot,
 	setStatusLine,
 	setTitleBar,
@@ -130,7 +131,7 @@ let tabHasActivity = new Set<string>()
 export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src; isOwner = owner; launchCwd = resolve(LAUNCH_CWD)
 	const config = loadConfig()
-	setMaxPromptLines(config.maxPromptLines); loadActiveTheme(HAL_DIR, config.theme)
+	setMaxPromptLines(config.maxPromptLines); setUserCursorMode(config.userCursor); loadActiveTheme(HAL_DIR, config.theme)
 	if (config.timestamps) setShowTimestamps(true)
 }
 

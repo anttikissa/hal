@@ -18,9 +18,10 @@ const CTRL_V = '\x16', CTRL_X = '\x18', CTRL_Y = '\x19', CTRL_Z = '\x1a'
 const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~'
 const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_EOL = '\x1b[K'
-const CURSOR_ORANGE = '\x1b]12;rgb:ff/a5/00\x07\x1b[5 q' // blinking bar
-const CURSOR_BLUE = '\x1b]12;rgb:55/88/ff\x07\x1b[6 q'   // steady bar
 const CURSOR_RESET = '\x1b]112\x07\x1b[0 q'
+const CURSOR_BLUE_OSC = '\x1b]12;rgb:55/88/ff\x07'
+const HAL_CURSOR = '\x1b[38;2;255;165;0m\u2588\x1b[0m' // orange █
+const BLINK_MS = 530
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 // ── Types ──
@@ -54,6 +55,8 @@ export function setInputDraft(text: string, cursor?: number): void {
 }
 let maxPromptLines = 15
 export function setMaxPromptLines(n: number): void { maxPromptLines = Math.max(1, Math.min(n, 50)) }
+let userCursorMode: 'native' | 'block' = 'block'
+export function setUserCursorMode(mode: 'native' | 'block'): void { userCursorMode = mode }
 
 // ── Core state ──
 
@@ -74,6 +77,11 @@ let superHeld = false, lastMouseX = -1, lastMouseY = -1
 let bracketedPasteBuffer: string | null = null
 let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
+let cursorBlink = true, blinkTimer: ReturnType<typeof setInterval> | null = null
+function resetBlink(): void {
+	cursorBlink = true
+	if (blinkTimer) { clearInterval(blinkTimer); blinkTimer = setInterval(() => { cursorBlink = !cursorBlink; if (initialized && !suspended) scheduleRender() }, BLINK_MS) }
+}
 
 function splitTitleParts(text: string): { topic: string; session: string } {
 	const trimmed = text.trim(); if (!trimmed) return { topic: '', session: '' }
@@ -322,16 +330,23 @@ function inputWrappedPointFromScreen(x: number, y: number): { row: number; col: 
 	return { row, col: Math.max(0, x - inputPromptStr.length) }
 }
 
-function renderPromptLineWithInputSelection(
+function renderPromptLineWithCursor(
 	lineText: string, lineStart: number, screenCols: number,
-	inputSel: { start: number; end: number } | null,
+	inputSel: { start: number; end: number } | null, cursorCol: number,
 ): string {
 	const pad = ' '.repeat(Math.max(0, screenCols - inputPromptStr.length - lineText.length))
-	if (!inputSel) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-	const selStart = Math.max(0, Math.min(lineText.length, inputSel.start - lineStart))
-	const selEnd = Math.max(0, Math.min(lineText.length, inputSel.end - lineStart))
-	if (selStart >= selEnd) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-	return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
+	// Selection overrides block cursor display
+	if (inputSel) {
+		const selStart = Math.max(0, Math.min(lineText.length, inputSel.start - lineStart))
+		const selEnd = Math.max(0, Math.min(lineText.length, inputSel.end - lineStart))
+		if (selStart < selEnd)
+			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
+	}
+	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
+	// Blue block cursor: inverse the char under cursor
+	const ch = cursorCol < lineText.length ? lineText[cursorCol] : ' '
+	const before = lineText.slice(0, cursorCol), after = lineText.slice(cursorCol + (cursorCol < lineText.length ? 1 : 0))
+	return `${BG_DARK}${inputPromptStr}${before}\x1b[38;2;85;136;255;7m${ch}\x1b[27m${RESET}${BG_DARK}${after}${pad}${RESET}`
 }
 
 // ── Mouse selection ──
@@ -585,9 +600,11 @@ function render(): void {
 	lastTitleLine = truncateAnsi(session ? ` Topic: ${plainTopic} — ${session}` : ` Topic: ${plainTopic}`, c).padEnd(c, ' ')
 
 	// Output viewport
+	const halCursorIdx = scrollOffset === 0 ? visibleOutput.length - 1 : -1
 	for (let row = 2; row <= ob; row++) {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
+		if (cursorBlink && idx === halCursorIdx) lineText = truncateAnsi(lineText, c - 1) + HAL_CURSOR
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
 		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow)
 			pushRow(row, lineText, 'output', idx)
@@ -607,16 +624,18 @@ function render(): void {
 	const wrappedInput = getWrappedInputLayout(inputBuf, contentWidth)
 	const inputSelRange = getInputTextSelectionRange()
 	const pLines = Math.min(wrappedInput.lines.length, maxPromptLines), firstRow = promptFirstRow()
+	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
 	for (let i = 0; i < pLines; i++) {
 		chunks.push(`\x1b[${firstRow + i};1H\x1b[2K`)
-		chunks.push(renderPromptLineWithInputSelection(wrappedInput.lines[i], wrappedInput.starts[i] ?? 0, c, inputSelRange))
+		const showBlockCursor = userCursorMode === 'block' && cursorBlink && i === curRow
+		chunks.push(renderPromptLineWithCursor(wrappedInput.lines[i], wrappedInput.starts[i] ?? 0, c, inputSelRange, showBlockCursor ? curCol : -1))
 	}
 	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
 
 	// Cursor
-	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-	const cursorStyle = waitingResolve ? CURSOR_BLUE : CURSOR_ORANGE
-	chunks.push(`${cursorStyle}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+	if (userCursorMode === 'native') {
+		chunks.push(`${CURSOR_BLUE_OSC}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+	}
 
 	const frame = chunks.join('')
 	if (supportsSynchronizedOutput()) directWrite(`\x1b[?2026h${frame}\x1b[?2026l`)
@@ -743,6 +762,7 @@ function handleKey(key: string): void {
 	const normalizedKitty = normalizeKittyKey(key)
 	if (normalizedKitty === null) return
 	key = normalizedKitty
+	resetBlink()
 	const prevGoalCol = inputGoalCol
 	inputGoalCol = null
 	if (inputKeyHandler && inputKeyHandler(key)) return
@@ -1049,6 +1069,7 @@ export function init(): void {
 	enterRawMode()
 	directWrite('\x1b[?1049h') // enter alt screen
 	enableMouse()
+	blinkTimer = setInterval(() => { cursorBlink = !cursorBlink; if (initialized && !suspended) scheduleRender() }, BLINK_MS)
 	process.stdin.on('data', onStdinData); process.stdin.on('end', onStdinEnd)
 	process.on('SIGCONT', onSigCont); process.stdout.on('resize', onResize)
 	render()
@@ -1089,6 +1110,7 @@ export function prompt(message: string, promptStr: string): Promise<string | nul
 export function cleanup(): void {
 	if (!initialized) return
 	initialized = false; suspended = false
+	if (blinkTimer) { clearInterval(blinkTimer); blinkTimer = null }
 	if (headerFlashTimer) { clearTimeout(headerFlashTimer); headerFlashTimer = null }
 	headerFlash = ''; dumpAndLeaveAltScreen()
 	process.stdin.off('data', onStdinData); process.stdin.off('end', onStdinEnd)
