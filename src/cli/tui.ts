@@ -18,6 +18,9 @@ const CTRL_V = '\x16', CTRL_X = '\x18', CTRL_Y = '\x19', CTRL_Z = '\x1a'
 const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~'
 const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_EOL = '\x1b[K'
+const CURSOR_ORANGE = '\x1b]12;rgb:ff/a5/00\x07\x1b[5 q' // blinking bar
+const CURSOR_BLUE = '\x1b]12;rgb:55/88/ff\x07\x1b[6 q'   // steady bar
+const CURSOR_RESET = '\x1b]112\x07\x1b[0 q'
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 // ── Types ──
@@ -612,7 +615,8 @@ function render(): void {
 
 	// Cursor
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
-	chunks.push(`\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+	const cursorStyle = waitingResolve ? CURSOR_BLUE : CURSOR_ORANGE
+	chunks.push(`${cursorStyle}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 
 	const frame = chunks.join('')
 	if (supportsSynchronizedOutput()) directWrite(`\x1b[?2026h${frame}\x1b[?2026l`)
@@ -623,7 +627,7 @@ function render(): void {
 
 function dumpAndLeaveAltScreen(): void {
 	const c = cols(), visible = getVisibleWrapped(Math.max(0, outputBottom() - 1))
-	disableMouse(); directWrite('\x1b[?25h') // show cursor
+	disableMouse(); directWrite(CURSOR_RESET + '\x1b[?25h') // reset cursor style + show
 	directWrite('\x1b[?1049l') // leave alt screen
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 	directWrite(`\x1b[${rows()};1H\r\n`)
