@@ -393,6 +393,21 @@ function syncTabsFromSessions(
 function renderConversationHistory(events: Awaited<ReturnType<typeof loadConversation>>): { output: string; fmtState: FormatState } {
 	const fmtState = createFormatState()
 	let output = ''
+	// Find relevant start index (after last reset/handoff)
+	let startIdx = 0
+	for (let i = events.length - 1; i >= 0; i--) {
+		if (events[i].type === 'reset' || events[i].type === 'handoff') { startIdx = i + 1; break }
+	}
+	// Render start event if present in the relevant slice
+	for (const event of events.slice(startIdx)) {
+		if (event.type === 'start') {
+			const d = new Date(event.ts)
+			const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+			const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+			output += pushFragment('line.info', `[session] started ${dateStr} ${timeStr} — ${event.workingDir}`, fmtState)
+			break
+		}
+	}
 	for (const event of replayConversationEvents(events)) {
 		const kind = event.type === 'user' ? 'prompt' : 'assistant'
 		output += pushFragment(kind, event.text, fmtState)

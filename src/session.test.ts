@@ -14,7 +14,9 @@ import {
 	rotateSession,
 	buildRotationContext,
 	forkSession,
+	replayConversationEvents,
 	EMPTY_TOTALS,
+	type ConversationEvent,
 } from './session.ts'
 import { sessionDir } from './state.ts'
 
@@ -271,5 +273,31 @@ describe('fork with blocks', () => {
 		// Verify forked session loads correctly
 		const result = await loadSession(newId)
 		expect(result!.messages[1].content[0].thinking).toBe('Deep thoughts')
+	})
+})
+
+describe('replayConversationEvents', () => {
+	test('start event is excluded from replay (not user/assistant)', () => {
+		const events: ConversationEvent[] = [
+			{ type: 'start', workingDir: '/tmp/project', ts: '2026-03-01T12:00:00.000Z' },
+			{ type: 'user', text: 'hello', ts: '2026-03-01T12:01:00.000Z' },
+			{ type: 'assistant', text: 'hi', ts: '2026-03-01T12:01:01.000Z' },
+		]
+		const replay = replayConversationEvents(events)
+		expect(replay).toHaveLength(2)
+		expect(replay[0].type).toBe('user')
+		expect(replay[1].type).toBe('assistant')
+	})
+
+	test('start event after reset is not replayed', () => {
+		const events: ConversationEvent[] = [
+			{ type: 'start', workingDir: '/tmp', ts: '2026-03-01T12:00:00.000Z' },
+			{ type: 'user', text: 'old', ts: '2026-03-01T12:01:00.000Z' },
+			{ type: 'reset', ts: '2026-03-01T12:02:00.000Z' },
+			{ type: 'user', text: 'new', ts: '2026-03-01T12:03:00.000Z' },
+		]
+		const replay = replayConversationEvents(events)
+		expect(replay).toHaveLength(1)
+		expect(replay[0].text).toBe('new')
 	})
 })

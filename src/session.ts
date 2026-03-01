@@ -276,6 +276,7 @@ export type ConversationEvent =
 	| { type: 'handoff'; ts: string }
 	| { type: 'reset'; ts: string }
 	| { type: 'cd'; from: string; to: string; ts: string }
+	| { type: 'start'; workingDir: string; ts: string }
 
 export async function appendConversation(sessionId: string, event: ConversationEvent): Promise<void> {
 	await ensureSessionDir(sessionId)

@@ -1,5 +1,5 @@
 import { basename, resolve } from 'path'
-import { watch, type FSWatcher } from 'fs'
+import { existsSync, watch, type FSWatcher } from 'fs'
 import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../system-prompt.ts'
 import {
@@ -9,6 +9,7 @@ import {
 } from '../context.ts'
 import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
+	appendConversation,
 	loadSession,
 	loadSessionRegistry,
 	makeSessionId,
@@ -174,6 +175,9 @@ export async function ensureSession(sessionId: string, workingDir: string, after
 	}
 	if (!registry.activeSessionId) registry.activeSessionId = session.id
 	ensureSessionQueue(session.id)
+	// Only write start event for genuinely new sessions (not forks which already have conversation history)
+	if (!existsSync(`${sessionDir(cleanId)}/conversation.asonl`))
+		await appendConversation(cleanId, { type: 'start', workingDir: session.workingDir, ts: session.createdAt })
 	await persistRegistry()
 	await emitStatus()
 	return session
