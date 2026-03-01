@@ -77,10 +77,18 @@ let superHeld = false, lastMouseX = -1, lastMouseY = -1
 let bracketedPasteBuffer: string | null = null
 let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
-let cursorBlink = true, blinkTimer: ReturnType<typeof setInterval> | null = null
-function resetBlink(): void {
-	cursorBlink = true
-	if (blinkTimer) { clearInterval(blinkTimer); blinkTimer = setInterval(() => { cursorBlink = !cursorBlink; if (initialized && !suspended) scheduleRender() }, BLINK_MS) }
+let userBlink = true, userBlinkTimer: ReturnType<typeof setInterval> | null = null
+let halBlink = true, halBlinkTimer: ReturnType<typeof setInterval> | null = null
+function makeBlinkTimer(cb: () => void): ReturnType<typeof setInterval> {
+	return setInterval(() => { cb(); if (initialized && !suspended) scheduleRender() }, BLINK_MS)
+}
+function resetUserBlink(): void {
+	userBlink = true
+	if (userBlinkTimer) { clearInterval(userBlinkTimer); userBlinkTimer = makeBlinkTimer(() => { userBlink = !userBlink }) }
+}
+function resetHalBlink(): void {
+	halBlink = true
+	if (halBlinkTimer) { clearInterval(halBlinkTimer); halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink }) }
 }
 
 function splitTitleParts(text: string): { topic: string; session: string } {
@@ -604,7 +612,7 @@ function render(): void {
 	for (let row = 2; row <= ob; row++) {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
-		if (cursorBlink && idx === halCursorIdx) lineText = truncateAnsi(lineText, c - 1) + HAL_CURSOR
+		if (halBlink && idx === halCursorIdx) lineText = truncateAnsi(lineText, c - 1) + HAL_CURSOR
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
 		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow)
 			pushRow(row, lineText, 'output', idx)
@@ -627,7 +635,7 @@ function render(): void {
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, contentWidth)
 	for (let i = 0; i < pLines; i++) {
 		chunks.push(`\x1b[${firstRow + i};1H\x1b[2K`)
-		const showBlockCursor = userCursorMode === 'block' && cursorBlink && i === curRow
+		const showBlockCursor = userCursorMode === 'block' && userBlink && i === curRow
 		chunks.push(renderPromptLineWithCursor(wrappedInput.lines[i], wrappedInput.starts[i] ?? 0, c, inputSelRange, showBlockCursor ? curCol : -1))
 	}
 	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
@@ -762,7 +770,7 @@ function handleKey(key: string): void {
 	const normalizedKitty = normalizeKittyKey(key)
 	if (normalizedKitty === null) return
 	key = normalizedKitty
-	resetBlink()
+	resetUserBlink()
 	const prevGoalCol = inputGoalCol
 	inputGoalCol = null
 	if (inputKeyHandler && inputKeyHandler(key)) return
@@ -1004,6 +1012,7 @@ const onStdinEnd = () => { if (!suspended) { ended = true; resolveInput(null) } 
 
 function writeToOutput(text: string): void {
 	if (!text) return
+	resetHalBlink()
 	const wasAtBottom = scrollOffset === 0
 	const prevTotalVisual = getTotalVisualLines()
 	appendOutput(text)
@@ -1069,7 +1078,8 @@ export function init(): void {
 	enterRawMode()
 	directWrite('\x1b[?1049h') // enter alt screen
 	enableMouse()
-	blinkTimer = setInterval(() => { cursorBlink = !cursorBlink; if (initialized && !suspended) scheduleRender() }, BLINK_MS)
+	userBlinkTimer = makeBlinkTimer(() => { userBlink = !userBlink })
+	halBlinkTimer = makeBlinkTimer(() => { halBlink = !halBlink })
 	process.stdin.on('data', onStdinData); process.stdin.on('end', onStdinEnd)
 	process.on('SIGCONT', onSigCont); process.stdout.on('resize', onResize)
 	render()
@@ -1110,7 +1120,8 @@ export function prompt(message: string, promptStr: string): Promise<string | nul
 export function cleanup(): void {
 	if (!initialized) return
 	initialized = false; suspended = false
-	if (blinkTimer) { clearInterval(blinkTimer); blinkTimer = null }
+	if (userBlinkTimer) { clearInterval(userBlinkTimer); userBlinkTimer = null }
+	if (halBlinkTimer) { clearInterval(halBlinkTimer); halBlinkTimer = null }
 	if (headerFlashTimer) { clearTimeout(headerFlashTimer); headerFlashTimer = null }
 	headerFlash = ''; dumpAndLeaveAltScreen()
 	process.stdin.off('data', onStdinData); process.stdin.off('end', onStdinEnd)
