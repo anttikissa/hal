@@ -41,9 +41,7 @@ export interface Config {
 	cursorBlinkBusy: number // HAL cursor blink period when busy (ms)
 	cursorBlinkUser: number // user cursor blink period (ms)
 	cursorBlinkDormant: number // HAL cursor blink period when dormant (ms)
-	cursorBlinkUserDormant: number // user cursor blink period when dormant (ms)
 	cursorDormantDelay: number // ms idle before HAL cursor shrinks to underscore
-	userDormantDelay: number // ms idle before user cursor goes dormant
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
@@ -137,9 +135,7 @@ const DEFAULTS: Config = {
 	cursorBlinkBusy: 500,
 	cursorBlinkUser: 500,
 	cursorBlinkDormant: 2000,
-	cursorBlinkUserDormant: 4000,
 	cursorDormantDelay: 10_000,
-	userDormantDelay: 30_000,
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 4,
 	maxPromptLines: 15,
