@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, watch } from 'fs'
 import { stringify, parse } from './utils/ason.ts'
 import { HAL_DIR } from './state.ts'
 
@@ -140,6 +140,7 @@ const DEFAULTS: Config = {
 
 
 let _config: Config | null = null
+try { watch(CONFIG_PATH, () => { _config = null }) } catch {}
 
 export function resetConfigCache(): void {
 	_config = null

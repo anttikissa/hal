@@ -1,6 +1,7 @@
 // State-driven terminal UI with alternate screen buffer. See docs/tui.md.
 
 import { stringify } from '../utils/ason.ts'
+import { loadConfig } from '../config.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
 import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
@@ -77,12 +78,7 @@ let bracketedPasteBuffer: string | null = null
 let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
 let userPhase = 0, halPhase = 0 // 0..1 cyclic
-let halPeriodCurrent = 1000 // smoothly ramps toward target
-let halPeriodTarget = 1000
-let cursorBlinkIdle = 1000, cursorBlinkBusy = 500, cursorBlinkUser = 500
-export function setCursorBlink(idle: number, busy: number, user: number): void {
-	cursorBlinkIdle = idle; cursorBlinkBusy = busy; cursorBlinkUser = user
-}
+let halPeriodCurrent = 1000
 let animTimer: ReturnType<typeof setInterval> | null = null
 function brightness(phase: number): number {
 	// ~43% on, 7% fade out, ~43% off, 7% fade in
@@ -95,11 +91,12 @@ function lerpCh(to: number, t: number, from = 0): number { return Math.round(fro
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 let halState: HalState = 'idle'
 export function setHalState(state: HalState): void { halState = state }
-const RAMP_RATE = 0.98 // per tick exponential smoothing
+const RAMP_RATE = 0.98
 function animTick(): void {
-	halPeriodTarget = halState === 'idle' ? cursorBlinkIdle : cursorBlinkBusy
-	halPeriodCurrent += (halPeriodTarget - halPeriodCurrent) * (1 - RAMP_RATE)
-	userPhase = (userPhase + ANIM_MS / cursorBlinkUser) % 1
+	const cfg = loadConfig()
+	const halTarget = halState === 'idle' ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
+	halPeriodCurrent += (halTarget - halPeriodCurrent) * (1 - RAMP_RATE)
+	userPhase = (userPhase + ANIM_MS / cfg.cursorBlinkUser) % 1
 	halPhase = (halPhase + ANIM_MS / halPeriodCurrent) % 1
 	if (initialized && !suspended) scheduleRender()
 }
