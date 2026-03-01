@@ -19,7 +19,7 @@ const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~'
 const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_EOL = '\x1b[K'
 const CURSOR_RESET = '\x1b]112\x07\x1b[0 q'
-const CURSOR_BLUE_OSC = '\x1b]12;rgb:55/88/ff\x07'
+const CURSOR_BLUE_OSC = '\x1b]12;rgb:66/bb/ff\x07'
 const ANIM_MS = 50
 const BLINK_MS = 530
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
@@ -87,7 +87,9 @@ function brightness(phase: number): number {
 	return (phase - 0.93) / 0.07
 }
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
-function halPeriod(): number { return activityStr ? BLINK_MS * 2 : BLINK_MS * 4 }
+let halActive = false
+export function setHalActive(active: boolean): void { halActive = active }
+function halPeriod(): number { return halActive ? BLINK_MS * 0.8 : BLINK_MS * 5 }
 function animTick(): void {
 	userPhase = (userPhase + ANIM_MS / (BLINK_MS * 2)) % 1
 	halPhase = (halPhase + ANIM_MS / halPeriod()) % 1
@@ -355,7 +357,7 @@ function renderPromptLineWithCursor(
 			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
 	}
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-	const uc = `${lerpCh(30, cursorT, 48)};${lerpCh(60, cursorT, 48)};${lerpCh(230, cursorT, 48)}`
+	const uc = `${lerpCh(102, cursorT, 48)};${lerpCh(187, cursorT, 48)};${lerpCh(255, cursorT, 48)}`
 	if (cursorCol >= lineText.length) {
 		// End of line: block cursor — bg interpolated from BG_DARK to blue
 		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[48;2;${uc}m ${RESET}${BG_DARK}${pad}${RESET}`
@@ -619,7 +621,7 @@ function render(): void {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
 		if (idx === halCursorIdx) {
-			const ht = brightness(halPhase) * (activityStr ? 1.0 : 0.15)
+			const ht = brightness(halPhase)
 			lineText = truncateAnsi(lineText, c - 1) + `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m\u2588${RESET}`
 		}
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)

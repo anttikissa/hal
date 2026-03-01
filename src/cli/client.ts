@@ -24,6 +24,7 @@ import {
 	setInputKeyHandler,
 	setMaxPromptLines,
 	setUserCursorMode,
+	setHalActive,
 	setOutputSnapshot,
 	setStatusLine,
 	setTitleBar,
@@ -236,7 +237,7 @@ function captureActiveOutput(): void {
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	const active = activeTab(); if (!active) return
 	resetFormat(); lastContextStatus = active.contextStatus
-	setActivityLine(activityBarText(active)); setTitleBar(titleBarText(active))
+	setActivityLine(activityBarText(active)); setHalActive(active.busy); setTitleBar(titleBarText(active))
 	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) { active.output.length > 0 ? tui.replaceOutput(active.output) : tui.clearOutput() }
 	else if (active.output.length > 0) setOutputSnapshot(active.output)
@@ -514,7 +515,7 @@ function render(event: RuntimeEvent): void {
 			}
 		}
 		const active = activeTab()
-		if (active) setActivityLine(activityBarText(active))
+		if (active) { setActivityLine(activityBarText(active)); setHalActive(active.busy) }
 		if (event.context) {
 			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : activeTab()
 			if (tab) { tab.contextStatus = fmtContext(event.context); if (tab === activeTab()) lastContextStatus = tab.contextStatus }
