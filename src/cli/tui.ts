@@ -654,7 +654,7 @@ function render(): void {
 	const curLineLen = wrappedInput.lines[curRow]?.length ?? 0
 	if (userCursorMode === 'native' || (userCursorMode === 'block' && curCol < curLineLen)) {
 		const style = userCursorMode === 'native' ? '\x1b[0 q' : '\x1b[5 q' // default or blinking bar
-		chunks.push(`${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+		chunks.push(`${CURSOR_BLUE_OSC}${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 	}
 
 	const frame = chunks.join('')
