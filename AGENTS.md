@@ -5,7 +5,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 ## Rules
 
 - Never restart the app unless the user explicitly asks. Restart kills all tabs — other tabs may have active generations that would be lost.
-- Use Bun, never node.js. No build step.
+- Use Bun, never node.js. `bunx` - no `npx`. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).
 - Secrets live in `auth.ason` (gitignored). Non-secrets in `config.ason`.
 - Conversation events are append-only: `state/sessions/<id>/conversation.asonl`.
@@ -47,6 +47,7 @@ Good: "[promoted] pid 12345 is now the owner"
 
 ## Testing
 
+- **NEVER use `bun --eval` or `bun -e` to check syntax** — it executes the code and hangs forever on TUI/server modules. Use `bunx tsgo --noEmit` for syntax/type checks.
 - Write tests for new features and bug fixes
 - Command for TDD loop: `bun test --test-name-pattern='<feature>'`
 - Before committing, run tests: `bun test`
