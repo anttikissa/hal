@@ -613,7 +613,7 @@ function render(): void {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
 		if (idx === halCursorIdx) {
-			const ht = brightness(halPhase) * (activityStr ? 1.0 : 0.4)
+			const ht = brightness(halPhase) * (activityStr ? 1.0 : 0.15)
 			lineText = truncateAnsi(lineText, c - 1) + `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m\u2588${RESET}`
 		}
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
