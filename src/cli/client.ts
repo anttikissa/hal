@@ -429,10 +429,16 @@ function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
 
 function handleEsc(): void {
 	const active = activeTab()
-	if (!active || !active.busy) return
-	appendBusCommand(makeCommand('pause', source, undefined, active.sessionId)).catch(() => {})
-	flashHeader('\x1b[33mpausing...\x1b[0m')
-	setActivityLine(`Paused • ${active.modelLabel} — Enter to resume, /queue to inspect, /drop to clear`)
+	if (!active) return
+	if (active.busy) {
+		appendBusCommand(makeCommand('pause', source, undefined, active.sessionId)).catch(() => {})
+		flashHeader('\x1b[33mpausing...\x1b[0m')
+		setActivityLine(`Paused • ${active.modelLabel} — Enter to resume, /queue to inspect, /drop to clear`)
+		return
+	}
+	// Not busy: clear input text if any
+	const { text } = getInputDraft()
+	if (text) { setInputDraft(''); tui.render(); return }
 }
 
 function handleDoubleEnter(): void {

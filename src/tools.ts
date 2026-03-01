@@ -315,12 +315,11 @@ async function _runTool(
 		await logger(shortenHome(`[bash] ${command}`), 'tool')
 		const proc = Bun.spawn(['bash', '-lc', command], { cwd, stdout: 'pipe', stderr: 'pipe' })
 
-		// Kill subprocess when paused/aborted
+		// Kill subprocess when paused/aborted (SIGTERM, then SIGKILL after 2s)
 		if (signal) {
 			const onAbort = () => {
-				try {
-					proc.kill('SIGTERM')
-				} catch {}
+				try { proc.kill('SIGTERM') } catch {}
+				setTimeout(() => { try { proc.kill('SIGKILL') } catch {} }, 2000)
 			}
 			if (signal.aborted) onAbort()
 			else signal.addEventListener('abort', onAbort, { once: true })
