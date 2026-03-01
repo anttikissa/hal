@@ -326,6 +326,10 @@ async function initialize(): Promise<void> {
 	}
 	markSessionAsActive(initialSessionId)
 	const runtime = await getOrLoadSessionRuntime(initialSessionId)
+	// Eagerly load all other sessions so their context estimates are published
+	for (const s of registry.sessions) {
+		if (s.id !== initialSessionId) await getOrLoadSessionRuntime(s.id)
+	}
 	await persistRegistry()
 	await emitStatus()
 
