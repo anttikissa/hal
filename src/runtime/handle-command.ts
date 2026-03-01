@@ -155,7 +155,6 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 		pauseSession(newId)
 	}
 	await persistRegistry()
-	await publishLine(`[fork] forked ${sessionId} -> ${newId}`, 'meta', sessionId)
 	const pauseNote = busy ? ' (paused)' : ''
 	await publishLine(`[fork] forked from ${sessionId}${pauseNote}`, 'fork', newId)
 	await emitStatus()

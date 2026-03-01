@@ -25,6 +25,7 @@ import {
 	setMaxPromptLines,
 	setUserCursorMode,
 	setHalState,
+	resetHalIdleTimer,
 	type HalState,
 	setOutputSnapshot,
 	setStatusLine,
@@ -40,7 +41,7 @@ import {
 	type RuntimeEvent,
 	type SessionInfo,
 } from '../protocol.ts'
-import { pushEvent, pushFragment, resetFormat, stripAnsi, setShowTimestamps } from './format/index.ts'
+import { pushEvent, pushFragment, createFormatState, type FormatState, stripAnsi, setShowTimestamps } from './format/index.ts'
 import {
 	ALT_DIGIT_KEYS,
 	CTRL_DIGIT_KEYS,
@@ -137,6 +138,7 @@ const client = new Client()
 let tabs: CliTab[] = [], activeTabIndex = 0, launchCwd = ''
 let pendingForkOutput: string | null = null, pendingForkSwitch = false
 let tabHasActivity = new Set<string>()
+let screenFmt: FormatState = createFormatState()
 
 export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src; isOwner = owner; launchCwd = resolve(LAUNCH_CWD)
@@ -220,7 +222,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 // Internal helpers
 
 function activeTab(): CliTab | null { return tabs[activeTabIndex] ?? null }
-function pushLocal(kind: string, text: string): void { tui.write(pushFragment(kind, text)) }
+function pushLocal(kind: string, text: string): void { tui.write(pushFragment(kind, text, screenFmt)) }
 
 function newTabState(sessionId: string, workingDir: string): CliTab {
 	return createTabState({
@@ -240,13 +242,14 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 function captureActiveOutput(): void {
 	const active = activeTab(); if (!active) return
 	active.output = getOutputSnapshot(); active.inputHistory = getInputHistory()
+	active.fmtState = { ...screenFmt }
 	const draft = getInputDraft(); active.inputDraft = draft.text; active.inputCursor = draft.cursor
 }
 
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	const active = activeTab(); if (!active) return
-	resetFormat(); lastContextStatus = active.contextStatus
-	setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)); setTitleBar(titleBarText(active))
+	screenFmt = { ...active.fmtState }; lastContextStatus = active.contextStatus
+	resetHalIdleTimer(); setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)); setTitleBar(titleBarText(active))
 	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) { active.output.length > 0 ? tui.replaceOutput(active.output) : tui.clearOutput() }
 	else if (active.output.length > 0) setOutputSnapshot(active.output)
@@ -322,7 +325,6 @@ async function closeActiveTab(): Promise<void> {
 		})
 		stopped = true; tui.cancelInput(); return
 	}
-	pushLocal('local.queue', `close tab ${active.sessionId.slice(0, 8)}`)
 }
 
 async function forkTab(): Promise<void> {
@@ -331,7 +333,6 @@ async function forkTab(): Promise<void> {
 	captureActiveOutput()
 	pendingForkOutput = active.output; pendingForkSwitch = true
 	await appendBusCommand(makeCommand('fork', source, undefined, active.sessionId))
-	pushLocal('local.queue', 'fork')
 }
 
 function syncTabsFromSessions(
@@ -388,14 +389,14 @@ function syncTabsFromSessions(
 	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
 }
 
-function renderConversationHistory(sessionId: string, events: Awaited<ReturnType<typeof loadConversation>>): string {
-	resetFormat(sessionId)
+function renderConversationHistory(events: Awaited<ReturnType<typeof loadConversation>>): { output: string; fmtState: FormatState } {
+	const fmtState = createFormatState()
 	let output = ''
 	for (const event of replayConversationEvents(events)) {
 		const kind = event.type === 'user' ? 'prompt' : 'assistant'
-		output += pushFragment(kind, event.text, sessionId)
+		output += pushFragment(kind, event.text, fmtState)
 	}
-	return output
+	return { output, fmtState }
 }
 
 async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
