@@ -47,9 +47,8 @@ export function getProviderAuth(provider: string): ProviderAuth | undefined {
 export function updateProviderAuth(provider: string, updates: Partial<ProviderAuth>): void {
 	const auth = loadAuth()
 	if (provider === 'anthropic' || provider === 'openai') {
-		const key = provider as keyof AuthFile
-		const current = auth[key] ?? { accessToken: '', refreshToken: '', expires: 0 }
-		auth[key] = { ...current, ...updates }
+		const current = auth[provider] ?? { accessToken: '', refreshToken: '', expires: 0 }
+		auth[provider] = { ...current, ...updates }
 		saveAuth(auth)
 		return
 	}

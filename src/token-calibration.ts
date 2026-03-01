@@ -23,7 +23,7 @@ async function readCalibrationStore(): Promise<TokenCalibrationStore> {
 	try {
 		const raw = parse(await readFile(CALIBRATION_FILE, 'utf-8'))
 		return raw && typeof raw === 'object' && !Array.isArray(raw)
-			? (raw as TokenCalibrationStore)
+			? (raw as unknown as TokenCalibrationStore)
 			: {}
 	} catch {
 		return {}

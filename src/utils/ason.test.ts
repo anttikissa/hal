@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { stringify, parse, parseAll, parseStream, COMMENTS } from './ason'
+import { stringify, parse, parseAll, parseStream, COMMENTS, type AsonObject, type AsonArray } from './ason'
 
 describe('stringify', () => {
 	describe('primitives', () => {
@@ -485,51 +485,51 @@ describe('parseStream e2e', () => {
 describe('comments', () => {
 	describe('parse with comments', () => {
 		test('block comment before object key', () => {
-			const r = parse('{ /* greeting */ a: 1 }', { comments: true })
+			const r = parse('{ /* greeting */ a: 1 }', { comments: true }) as AsonObject
 			expect(r.a).toBe(1)
 			expect(r[COMMENTS]).toEqual({ a: '/* greeting */' })
 		})
 
 		test('line comment before object key', () => {
-			const r = parse('{\n// hello\na: 1\n}', { comments: true })
+			const r = parse('{\n// hello\na: 1\n}', { comments: true }) as AsonObject
 			expect(r.a).toBe(1)
 			expect(r[COMMENTS]).toEqual({ a: '// hello\n' })
 		})
 
 		test('multiple comments before key are concatenated', () => {
-			const r = parse('{\n// first\n// second\na: 1\n}', { comments: true })
+			const r = parse('{\n// first\n// second\na: 1\n}', { comments: true }) as AsonObject
 			expect(r.a).toBe(1)
 			expect(r[COMMENTS]).toEqual({ a: '// first\n// second\n' })
 		})
 
 		test('comments on different keys', () => {
-			const r = parse('{ /* a */ a: 1, /* b */ b: 2 }', { comments: true })
+			const r = parse('{ /* a */ a: 1, /* b */ b: 2 }', { comments: true }) as AsonObject
 			expect(r.a).toBe(1)
 			expect(r.b).toBe(2)
 			expect(r[COMMENTS]).toEqual({ a: '/* a */', b: '/* b */' })
 		})
 
 		test('comment after value attaches to next key', () => {
-			const r = parse('{ a: 1, // between\nb: 2 }', { comments: true })
+			const r = parse('{ a: 1, // between\nb: 2 }', { comments: true }) as AsonObject
 			expect(r.a).toBe(1)
 			expect(r.b).toBe(2)
 			expect(r[COMMENTS]).toEqual({ b: '// between\n' })
 		})
 
 		test('no COMMENTS symbol without option', () => {
-			const r = parse('{ /* greeting */ a: 1 }')
+			const r = parse('{ /* greeting */ a: 1 }') as AsonObject
 			expect(r[COMMENTS]).toBeUndefined()
 		})
 
 		test('no COMMENTS symbol when no comments present', () => {
-			const r = parse('{ a: 1 }', { comments: true })
+			const r = parse('{ a: 1 }', { comments: true }) as AsonObject
 			expect(r[COMMENTS]).toBeUndefined()
 		})
 
 		test('array with comments — sparse array', () => {
-			const r = parse('[/* first */ 1, 2, /* third */ 3]', { comments: true })
+			const r = parse('[/* first */ 1, 2, /* third */ 3]', { comments: true }) as AsonArray
 			expect([...r]).toEqual([1, 2, 3])
-			const c = r[COMMENTS]
+			const c = r[COMMENTS]!
 			expect(c[0]).toBe('/* first */')
 			expect(c[1]).toBeUndefined()
 			expect(c[2]).toBe('/* third */')
@@ -567,14 +567,14 @@ describe('comments', () => {
 
 		test('blank line before comment survives roundtrip', () => {
 			const src = '{\n  a: 1,\n\n  // section two\n  b: 2\n}'
-			const parsed = parse(src, { comments: true })
+			const parsed = parse(src, { comments: true }) as AsonObject
 			expect(parsed[COMMENTS]).toEqual({ b: '\n// section two\n' })
 			expect(stringify(parsed)).toBe(src)
 		})
 
 		test('no blank line before first comment', () => {
 			const src = '{\n  // first key\n  a: 1,\n  b: 2\n}'
-			const parsed = parse(src, { comments: true })
+			const parsed = parse(src, { comments: true }) as AsonObject
 			expect(parsed[COMMENTS]).toEqual({ a: '// first key\n' })
 			expect(stringify(parsed)).toBe(src)
 		})

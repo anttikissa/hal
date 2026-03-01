@@ -37,7 +37,7 @@ async function main() {
 	const snapshots: any[] = []
 	const bugs: any[] = []
 
-	for (const r of records) {
+	for (const r of records as any[]) {
 		switch (r.type) {
 			case 'config':
 				configs.push(r)

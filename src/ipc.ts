@@ -74,7 +74,7 @@ export async function readState(): Promise<RuntimeState> {
 	assertInit()
 	try {
 		const raw = await readFile(stateFile, 'utf-8')
-		return { ...defaultState(), ...parse(raw) }
+		return { ...defaultState(), ...(parse(raw) as Record<string, unknown>) }
 	} catch {
 		const fallback = defaultState()
 		await writeState(fallback)
@@ -232,10 +232,10 @@ export async function readRecentEvents(limit: number): Promise<RuntimeEvent[]> {
 
 export function tailCommands(): AsyncGenerator<RuntimeCommand> {
 	assertInit()
-	return parseStream(tailFile(commandsFile))
+	return parseStream(tailFile(commandsFile)) as AsyncGenerator<RuntimeCommand>
 }
 
 export function tailEvents(): AsyncGenerator<RuntimeEvent> {
 	assertInit()
-	return parseStream(tailFile(eventsFile))
+	return parseStream(tailFile(eventsFile)) as AsyncGenerator<RuntimeEvent>
 }

@@ -25,7 +25,7 @@ export class TestHal {
 
 		// Read stdout lines in background, parse JSON, dispatch to waiters
 		void (async () => {
-			const reader = proc.stdout.getReader()
+			const reader = (proc.stdout as ReadableStream<Uint8Array>).getReader()
 			const decoder = new TextDecoder()
 			let buffer = ''
 			while (true) {
@@ -57,7 +57,7 @@ export class TestHal {
 
 	/** Send a line to stdin (prompt or /command) */
 	sendLine(text: string): void {
-		this.proc.stdin.write(text + '\n')
+		;(this.proc.stdin as any).write(text + '\n')
 	}
 
 	/** Send a raw command to the IPC bus (bypasses stdin/CLI parsing) */
@@ -122,7 +122,7 @@ export class TestHal {
 	/** Stop the process and return exit code */
 	async stop(options?: { keepDir?: boolean }): Promise<{ exitCode: number }> {
 		try {
-			this.proc.stdin.end()
+			;(this.proc.stdin as any).end()
 		} catch {}
 		const exitCode = await this.proc.exited
 		// Clean up entire isolated hal dir (includes state)

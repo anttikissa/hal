@@ -6,7 +6,7 @@ const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 async function doRefresh(): Promise<void> {
 	const auth = getProviderAuth('anthropic')
 	if (!auth?.refreshToken) return
-	if (Date.now() < auth.expires) return
+	if (Date.now() < (auth.expires ?? 0)) return
 
 	const res = await fetch('https://console.anthropic.com/v1/oauth/token', {
 		method: 'POST',

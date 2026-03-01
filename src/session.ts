@@ -257,7 +257,7 @@ export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
 	for (const path of [infoPath(id), `${sessionDir(id)}/meta.ason`]) {
 		if (!existsSync(path)) continue
 		try {
-			return parse(await readFile(path, 'utf-8')) as SessionMeta
+			return parse(await readFile(path, 'utf-8')) as unknown as SessionMeta
 		} catch {
 			continue
 		}

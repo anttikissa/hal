@@ -52,7 +52,7 @@ async function readSessionMessages(hal: TestHal, sessionId: string): Promise<any
 					if (lean.thinking?.ref) {
 						const blockPath = `${sessDir}/blocks/${lean.thinking.ref}.ason`
 						if (existsSync(blockPath)) {
-							const block = parse(await readFile(blockPath, 'utf-8'))
+							const block = parse(await readFile(blockPath, 'utf-8')) as any
 							content.push({ type: 'thinking', thinking: block.thinking, signature: block.signature })
 						}
 					}
@@ -63,7 +63,7 @@ async function readSessionMessages(hal: TestHal, sessionId: string): Promise<any
 							if (b.type === 'tool_use' && b.ref) {
 								const blockPath = `${sessDir}/blocks/${b.ref}.ason`
 								if (existsSync(blockPath)) {
-									const block = parse(await readFile(blockPath, 'utf-8'))
+									const block = parse(await readFile(blockPath, 'utf-8')) as any
 									content.push({ type: 'tool_use', id: b.id, name: b.name, input: block?.call?.input ?? {} })
 								}
 							} else {
@@ -78,7 +78,7 @@ async function readSessionMessages(hal: TestHal, sessionId: string): Promise<any
 						if (b.type === 'tool_result' && b.ref) {
 							const blockPath = `${sessDir}/blocks/${b.ref}.ason`
 							if (existsSync(blockPath)) {
-								const block = parse(await readFile(blockPath, 'utf-8'))
+								const block = parse(await readFile(blockPath, 'utf-8')) as any
 								content.push({ type: 'tool_result', tool_use_id: b.tool_use_id, content: block?.result?.content ?? '' })
 							}
 						} else {
@@ -152,7 +152,7 @@ describe('fork', () => {
 		// Parent must keep streaming after fork (without waiting for full song)
 		await hal.waitFor(
 			() =>
-				hal.records.filter((r) => r.type === 'chunk' && r.channel === 'assistant')
+				hal!.records.filter((r) => r.type === 'chunk' && r.channel === 'assistant')
 					.length >= chunksAtFork + 2,
 			3000,
 		)

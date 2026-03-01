@@ -40,7 +40,7 @@ function indentComment(comment: string, pad: string): string {
 	return lines.map(l => l ? pad + l : '').join('\n')
 }
 
-function stringifyValue(obj: AsonValue | undefined, col: number, depth: number, maxWidth: number): string {
+function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
@@ -96,7 +96,7 @@ function stringifyValue(obj: AsonValue | undefined, col: number, depth: number, 
 export type StringifyMode = 'short' | 'smart' | 'long'
 
 /** Convert a value to an ASON string. Mode: 'smart' (default, 80-col wrap), 'short' (single line), 'long' (always expanded). */
-export function stringify(obj: AsonValue, mode: StringifyMode = 'smart'): string {
+export function stringify(obj: unknown, mode: StringifyMode = 'smart'): string {
 	const maxWidth = mode === 'short' ? Infinity : mode === 'long' ? 0 : 80
 	return stringifyValue(obj, 0, 0, maxWidth)
 }

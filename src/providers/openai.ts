@@ -54,7 +54,7 @@ async function doRefresh(): Promise<void> {
 	const auth = getProviderAuth('openai')
 	if (!auth?.refreshToken) return
 	if (isApiKey(auth.accessToken)) return
-	if (Date.now() < auth.expires - 60_000) return
+	if (Date.now() < (auth.expires ?? 0) - 60_000) return
 
 	const res = await fetch(TOKEN_URL, {
 		method: 'POST',

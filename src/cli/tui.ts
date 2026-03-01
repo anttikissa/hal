@@ -429,6 +429,7 @@ function renderPromptLineWithCursor(
 
 function screenSelectionLine(surface: SelectionSurface, row: number): string {
 	if (surface === 'output') return lastVisibleOutput[row] ?? ''
+	if (surface === 'input') return inputBuf
 	if (row !== 0) return ''
 	return { title: lastTitleLine, activity: lastActivityLine, status: lastStatusLine }[surface] ?? ''
 }
@@ -659,7 +660,7 @@ function render(): void {
 
 	const pushRow = (row: number, text: string, surface?: SelectionSurface, selRow = 0) => {
 		chunks.push(`\x1b[${row};1H\x1b[2K`)
-		if (selRange?.surface === surface && selRow >= (selRange.startRow ?? 0) && selRow <= (selRange.endRow ?? 0))
+		if (selRange && selRange.surface === surface && selRow >= selRange.startRow && selRow <= selRange.endRow)
 			chunks.push(renderLineWithSelection(text, selRow, selRange))
 		else chunks.push(text)
 	}
@@ -1191,6 +1192,7 @@ export function cancelInput(): void { resolveInput(null) }
 export function prompt(message: string, promptStr: string): Promise<string | null> {
 	write(`${message}\n`); return input(promptStr)
 }
+export { scheduleRender as render }
 export function cleanup(): void {
 	if (!initialized) return
 	initialized = false; suspended = false

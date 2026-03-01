@@ -15,7 +15,7 @@ describe('tailFile', () => {
 		const received: number[] = []
 
 		const readerTask = (async () => {
-			for await (const event of parseStream(stream)) {
+			for await (const event of parseStream(stream) as AsyncGenerator<any>) {
 				if (event && typeof event.n === 'number') {
 					received.push(event.n)
 					if (received.length >= 200) break
