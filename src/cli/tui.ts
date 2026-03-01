@@ -360,9 +360,8 @@ function renderPromptLineWithCursor(
 		// End of line: block cursor — bg interpolated from BG_DARK to blue
 		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[48;2;${uc}m ${RESET}${BG_DARK}${pad}${RESET}`
 	}
-	// Mid-line: colored underline on char at cursor
-	const before = lineText.slice(0, cursorCol), ch = lineText[cursorCol], after = lineText.slice(cursorCol + 1)
-	return `${BG_DARK}${inputPromptStr}${before}\x1b[4m\x1b[58;2;${uc}m${ch}\x1b[24m\x1b[59m${after}${pad}${RESET}`
+	// Mid-line: hardware bar cursor will be positioned here
+	return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
 }
 // ── Mouse selection ──
 
@@ -651,9 +650,11 @@ function render(): void {
 	}
 	chunks.push(`\x1b[${r};1H\x1b[2K${bgPad}`)
 
-	// Hardware cursor only for native mode
-	if (userCursorMode === 'native') {
-		chunks.push(`${CURSOR_BLUE_OSC}\x1b[0 q\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+	// Hardware cursor: native mode always, block mode for mid-line bar
+	const curLineLen = wrappedInput.lines[curRow]?.length ?? 0
+	if (userCursorMode === 'native' || (userCursorMode === 'block' && curCol < curLineLen)) {
+		const style = userCursorMode === 'native' ? '\x1b[0 q' : '\x1b[5 q' // default or blinking bar
+		chunks.push(`${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 	}
 
 	const frame = chunks.join('')
