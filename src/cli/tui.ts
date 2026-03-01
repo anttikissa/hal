@@ -353,7 +353,7 @@ function renderPromptLineWithCursor(
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
 	if (cursorCol >= lineText.length) {
 		// End of line: block cursor (inverse space)
-		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[38;2;50;100;255;7m \x1b[27m${RESET}${BG_DARK}${pad}${RESET}`
+		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[38;2;30;60;230;7m \x1b[27m${RESET}${BG_DARK}${pad}${RESET}`
 	}
 	// Mid-line: no fake cursor; hardware bar cursor will be shown
 	return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
