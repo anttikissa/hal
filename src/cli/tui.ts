@@ -87,9 +87,10 @@ function brightness(phase: number): number {
 	return (phase - 0.93) / 0.07
 }
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
-let halActive = false
-export function setHalActive(active: boolean): void { halActive = active }
-function halPeriod(): number { return halActive ? BLINK_MS * 0.8 : BLINK_MS * 5 }
+export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
+let halState: HalState = 'idle'
+export function setHalState(state: HalState): void { halState = state }
+function halPeriod(): number { return halState === 'idle' ? BLINK_MS * 5 : BLINK_MS * 0.8 }
 function animTick(): void {
 	userPhase = (userPhase + ANIM_MS / (BLINK_MS * 2)) % 1
 	halPhase = (halPhase + ANIM_MS / halPeriod()) % 1

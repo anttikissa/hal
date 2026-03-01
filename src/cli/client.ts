@@ -24,7 +24,8 @@ import {
 	setInputKeyHandler,
 	setMaxPromptLines,
 	setUserCursorMode,
-	setHalActive,
+	setHalState,
+	type HalState,
 	setOutputSnapshot,
 	setStatusLine,
 	setTitleBar,
@@ -80,6 +81,14 @@ function fmtK(tokens: number): string {
 function fmtContext(ctx: { used: number; max: number; estimated?: boolean }): string {
 	const pct = ctx.max > 0 ? ((ctx.used / ctx.max) * 100).toFixed(1) : '0'
 	return `${ctx.estimated ? '~' : ''}${pct}%/${fmtK(ctx.max)}`
+}
+function deriveHalState(tab: CliTab): HalState {
+	if (!tab.busy) return 'idle'
+	const a = tab.activity
+	if (a.startsWith('Thinking')) return 'thinking'
+	if (a.startsWith('Calling tool') || a.startsWith('Running')) return 'tool_call'
+	if (a.startsWith('Error') || a.startsWith('Retrying')) return 'error'
+	return 'writing'
 }
 const MODEL_NAMES: [RegExp, string][] = [
 	[/^claude-opus-4-6/, 'Opus 4.6'], [/^claude-opus-4-5/, 'Opus 4.5'],
@@ -237,7 +246,7 @@ function captureActiveOutput(): void {
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	const active = activeTab(); if (!active) return
 	resetFormat(); lastContextStatus = active.contextStatus
-	setActivityLine(activityBarText(active)); setHalActive(active.busy); setTitleBar(titleBarText(active))
+	setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)); setTitleBar(titleBarText(active))
 	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) { active.output.length > 0 ? tui.replaceOutput(active.output) : tui.clearOutput() }
 	else if (active.output.length > 0) setOutputSnapshot(active.output)
@@ -515,7 +524,7 @@ function render(event: RuntimeEvent): void {
 			}
 		}
 		const active = activeTab()
-		if (active) { setActivityLine(activityBarText(active)); setHalActive(active.busy) }
+		if (active) { setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)) }
 		if (event.context) {
 			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : activeTab()
 			if (tab) { tab.contextStatus = fmtContext(event.context); if (tab === activeTab()) lastContextStatus = tab.contextStatus }
