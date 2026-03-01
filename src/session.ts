@@ -304,7 +304,13 @@ export function replayConversationEvents(events: ConversationEvent[]): ReplayCon
 	}
 	const replay: ReplayConversationEvent[] = []
 	for (const event of events.slice(startIdx)) {
-		if (event.type === 'user' || event.type === 'assistant') replay.push(event)
+		if (event.type !== 'user' && event.type !== 'assistant') continue
+		const last = replay[replay.length - 1]
+		if (event.type === 'assistant' && last?.type === 'assistant') {
+			last.text += '\n\n' + event.text
+		} else {
+			replay.push(event)
+		}
 	}
 	return replay
 }
