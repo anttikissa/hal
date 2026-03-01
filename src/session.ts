@@ -511,9 +511,16 @@ export function buildRotationContext(sessionId: string, messages: any[]): string
 		userPrompts.push(text.split('\n')[0].slice(0, 200))
 	}
 
-	if (userPrompts.length === 0) return 'Context was cleared. No user prompts in previous session.'
+	const dir = sessionDir(sessionId)
 
-	const lines: string[] = ['Context was cleared. Here is what happened before:', '']
+	if (userPrompts.length === 0) return `Session context was purged to avoid exceeding the token limit. No user prompts in previous session. Complete session history is at ${dir}/session.*.asonl + blocks/`
+
+	const lines: string[] = [
+		'Session context was purged to avoid exceeding the token limit. Be nice to the user — they might remember the context better than you do.',
+		'',
+		"Here's some message history from the previous session:",
+		'',
+	]
 
 	if (userPrompts.length <= 20) {
 		lines.push('User messages:')
@@ -528,7 +535,7 @@ export function buildRotationContext(sessionId: string, messages: any[]): string
 	}
 
 	lines.push('')
-	lines.push(`Previous session files: ${sessionDir(sessionId)}/session.*.asonl + blocks/`)
+	lines.push(`If these are enough to remember what you were doing, feel free to continue after verifying with the user. If needed, the complete session history is at ${dir}/session.*.asonl + blocks/`)
 
 	return lines.join('\n')
 }

@@ -74,6 +74,23 @@ describe('consecutive block spacing', () => {
 		expect(steering).toMatch(/^\n/)
 		expect(steering).not.toMatch(/^\n\n/)
 	})
+
+	test('blank line before first chunk after prompt', () => {
+		resetFormat('blk5')
+		pushFragment('prompt', 'user question', 'blk5')
+		const thinking = pushFragment('chunk.thinking', 'Let me think...', 'blk5')
+
+		// One blank line between prompt block and thinking chunk
+		expect(thinking).toMatch(/^\n/)
+	})
+
+	test('blank line before assistant chunk after prompt', () => {
+		resetFormat('blk6')
+		pushFragment('prompt', 'user question', 'blk6')
+		const assistant = pushFragment('chunk.assistant', 'Sure!', 'blk6')
+
+		expect(assistant).toMatch(/^\n/)
+	})
 })
 
 describe('in-place redraw for steering', () => {

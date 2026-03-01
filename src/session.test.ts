@@ -212,7 +212,7 @@ describe('buildRotationContext', () => {
 		const context = buildRotationContext('test-ctx', messages)
 		expect(context).toContain('implement feature X')
 		expect(context).toContain('now test it')
-		expect(context).toContain('Context was cleared')
+		expect(context).toContain('Session context was purged')
 	})
 
 	test('skips internal markers', () => {

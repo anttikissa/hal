@@ -3,10 +3,10 @@ import type { Formatter } from './types.ts'
 import { getStyle } from './theme.ts'
 import { styleLinePrefix } from '../tui/format/line-prefix.ts'
 import { buildPromptBlockFormatter, buildBlockFormatter } from '../tui/format/prompt.ts'
-import { chunkPrefixForStability } from '../tui/format/chunk-stability.ts'
 import { applyStylePerLine } from '../tui/format/line-style.ts'
 
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
+const RESET = '\x1b[0m'
 
 let _showTimestamps = false
 
@@ -81,19 +81,22 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 		content = styleLinePrefix(kind, content)
 	}
 
-	if (kind === 'chunk.assistant' || kind === 'chunk.thinking') {
-		// Keep ANSI state stable when switching channel/style so wrapped lines don't get brightness seams.
-		const prefix = chunkPrefixForStability(kind, prev)
-		return `${prefix}${applyStylePerLine(style, content)}`
-	}
-
-	// When previous output was a streaming chunk (no trailing newline), add one.
-	// If transitioning to a prompt, show a truncation marker.
+	const isChunk = kind.startsWith('chunk.')
 	const wasChunk = prev.startsWith('chunk.')
 	const isPrompt = kind === 'prompt' || kind === 'prompt.steering'
-	const truncMarker = wasChunk && isPrompt
-		? ` ${getStyle('line.warn')}--\x1b[0m\n`
-		: wasChunk ? '\n' : ''
+
+	// Section separator — one code path for all transitions.
+	// Blank line before blocks and first chunks; newline to end unterminated chunk lines.
+	let sep = ''
+	if (prev && (kind !== prev || isBlockKind(kind))) {
+		if (wasChunk) sep = isPrompt ? ` ${getStyle('line.warn')}--${RESET}\n` : '\n'
+		if (isBlockKind(kind) || (isChunk && !wasChunk)) sep += '\n'
+	}
+
+	if (isChunk) {
+		const reset = kind !== prev ? RESET : ''
+		return `${sep}${reset}${applyStylePerLine(style, content)}`
+	}
 
 	// Block decorations (e.g. prompt grey bars).
 	const cols = termCols()
@@ -111,7 +114,7 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	}
 
 	const styledContent = applyStylePerLine(style, content)
-	const output = `${truncMarker}${redraw}${blockStart}${styledContent}\n${blockEnd}`
+	const output = `${redraw}${sep}${blockStart}${styledContent}\n${blockEnd}`
 
 	// Track row count for block kinds (for potential future redraw)
 	if (isBlockKind(kind)) {

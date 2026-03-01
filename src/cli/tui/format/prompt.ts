@@ -14,7 +14,7 @@ export interface BlockFormatter {
 
 export function buildBlockFormatter(cols: number, bar: string, textStyle: string): BlockFormatter {
 	return {
-		blockStart: `\n${bar}${CLEAR_EOL}${RESET}\n`,
+		blockStart: `${bar}${CLEAR_EOL}${RESET}\n`,
 		blockEnd: `${bar}${CLEAR_EOL}${RESET}\n`,
 		formatText(text: string): string {
 			return wrapPlainTextWithPadding(text, cols, BLOCK_SIDE_PADDING)
