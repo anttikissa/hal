@@ -21,6 +21,7 @@ const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_E
 const CURSOR_RESET = '\x1b]112\x07\x1b[0 q'
 const CURSOR_BLUE_OSC = '\x1b]12;rgb:55/88/ff\x07'
 const HAL_CURSOR = '\x1b[38;2;255;165;0m\u2588\x1b[0m' // orange █
+const HAL_CURSOR_DIM = '\x1b[2m\x1b[38;2;255;165;0m\u2588\x1b[0m' // dim orange █
 const BLINK_MS = 530
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
@@ -613,7 +614,7 @@ function render(): void {
 	for (let row = 2; row <= ob; row++) {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
-		if (halBlink && idx === halCursorIdx) lineText = truncateAnsi(lineText, c - 1) + HAL_CURSOR
+		if (halBlink && idx === halCursorIdx) lineText = truncateAnsi(lineText, c - 1) + (activityStr ? HAL_CURSOR : HAL_CURSOR_DIM)
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
 		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow)
 			pushRow(row, lineText, 'output', idx)
