@@ -53,26 +53,32 @@ function getFormatter(kind: string): Formatter {
 	return { style: getStyle(kind) }
 }
 
-// Track prevKind and last block row count per session so interleaved events
-// from different sessions don't inject spurious newlines into each other's output.
-const prevKindBySession = new Map<string, string>()
-const lastBlockRows = new Map<string, number>()
+interface FormatState { prevKind: string; trailingNL: number; blockRows: number }
+const fmtState = new Map<string, FormatState>()
 const LOCAL_KEY = '__local__'
 
+function getState(key: string): FormatState {
+	let s = fmtState.get(key)
+	if (!s) { s = { prevKind: '', trailingNL: 0, blockRows: 0 }; fmtState.set(key, s) }
+	return s
+}
+
+function trailingNL(s: string): number {
+	let n = 0
+	for (let i = s.length - 1; i >= 0 && s[i] === '\n'; i--) n++
+	return n
+}
+
 export function resetFormat(sessionId?: string): void {
-	if (sessionId) {
-		prevKindBySession.delete(sessionId)
-		lastBlockRows.delete(sessionId)
-	} else {
-		prevKindBySession.clear()
-		lastBlockRows.clear()
-	}
+	if (sessionId) fmtState.delete(sessionId)
+	else fmtState.clear()
 }
 
 export function pushFragment(kind: string, text: string, sessionId?: string | null): string {
 	const key = sessionId ?? LOCAL_KEY
-	const prev = prevKindBySession.get(key) ?? ''
-	prevKindBySession.set(key, kind)
+	const st = getState(key)
+	const prev = st.prevKind
+	st.prevKind = kind
 
 	const fmt = getFormatter(kind)
 	const style = fmt.style
@@ -84,46 +90,43 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	const isChunk = kind.startsWith('chunk.')
 	const wasChunk = prev.startsWith('chunk.')
 	const isPrompt = kind === 'prompt' || kind === 'prompt.steering'
+	const newSection = prev !== '' && (kind !== prev || isBlockKind(kind))
 
-	// Section separator — one code path for all transitions.
-	// Blank line before blocks and first chunks; newline to end unterminated chunk lines.
+	// Section separator: ensure exactly one blank line between sections.
+	// Track trailing newlines already in the output to avoid doubling.
 	let sep = ''
-	if (prev && (kind !== prev || isBlockKind(kind))) {
-		if (wasChunk) sep = isPrompt ? ` ${getStyle('line.warn')}--${RESET}\n` : '\n'
-		if (isBlockKind(kind) || (isChunk && !wasChunk)) sep += '\n'
+	if (newSection) {
+		if (wasChunk && isPrompt) sep = ` ${getStyle('line.warn')}--${RESET}`
+		const nlSoFar = sep ? trailingNL(sep) : st.trailingNL
+		sep += '\n'.repeat(Math.max(0, 2 - nlSoFar))
 	}
 
 	if (isChunk) {
 		const reset = kind !== prev ? RESET : ''
-		return `${sep}${reset}${applyStylePerLine(style, content)}`
+		const out = `${sep}${reset}${applyStylePerLine(style, content)}`
+		st.trailingNL = trailingNL(out)
+		return out
 	}
 
-	// Block decorations (e.g. prompt grey bars).
+	// Strip trailing newlines from content — the template adds exactly one.
+	content = content.replace(/\n+$/, '')
+
 	const cols = termCols()
 	const blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
 	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
 
-	// In-place redraw: if steering immediately follows a queued prompt block
-	// (nothing in between), cursor-up over the previous block and overwrite.
+	// In-place redraw: steering immediately follows a queued prompt block.
 	let redraw = ''
-	if (kind === 'prompt.steering' && prev === 'prompt') {
-		const prevRows = lastBlockRows.get(key) ?? 0
-		if (prevRows > 0) {
-			redraw = `\x1b[${prevRows}A\x1b[J`
-		}
+	if (kind === 'prompt.steering' && prev === 'prompt' && st.blockRows > 0) {
+		redraw = `\x1b[${st.blockRows}A\x1b[J`
 	}
 
 	const styledContent = applyStylePerLine(style, content)
-	const output = `${redraw}${sep}${blockStart}${styledContent}\n${blockEnd}`
+	const out = `${redraw}${sep}${blockStart}${styledContent}\n${blockEnd}`
 
-	// Track row count for block kinds (for potential future redraw)
-	if (isBlockKind(kind)) {
-		lastBlockRows.set(key, (output.match(/\n/g) ?? []).length)
-	} else {
-		lastBlockRows.delete(key)
-	}
-
-	return output
+	st.blockRows = isBlockKind(kind) ? (out.match(/\n/g) ?? []).length : 0
+	st.trailingNL = trailingNL(out)
+	return out
 }
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source']): string {

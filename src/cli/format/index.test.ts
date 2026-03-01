@@ -93,6 +93,70 @@ describe('consecutive block spacing', () => {
 	})
 })
 
+describe('trailing-newline-aware spacing', () => {
+	test('notice block + prompt block: exactly one blank line', () => {
+		resetFormat('tnl1')
+		pushFragment('chunk.assistant', 'some response\n', 'tnl1')
+		const notice = pushFragment('line.notice', '[context] >66% full', 'tnl1')
+		const prompt = pushFragment('prompt', 'user message', 'tnl1')
+		// Between notice bottom bar and prompt top bar: exactly one blank line
+		const combined = notice + prompt
+		const plain = stripAnsi(combined)
+		const lines = plain.split('\n')
+		// Find the gap between notice and prompt content
+		const noticeEnd = lines.findIndex(l => l.includes('>66%'))
+		const promptStart = lines.findIndex((l, i) => i > noticeEnd && l.includes('user message'))
+		// Should have exactly 3 lines between: bar, blank, bar
+		expect(promptStart - noticeEnd).toBeLessThanOrEqual(4)
+		expect(promptStart - noticeEnd).toBeGreaterThanOrEqual(3)
+	})
+
+	test('tool output with trailing newline: one blank line before next section', () => {
+		resetFormat('tnl2')
+		pushFragment('line.tool', '[bash] echo hi', 'tnl2')
+		const tool = pushFragment('line.tool', 'hi\n', 'tnl2')
+		const chunk = pushFragment('chunk.assistant', 'Done.', 'tnl2')
+		// Combined: tool ends with \n, sep adds \n → exactly \n\n = one blank line
+		const combined = stripAnsi(tool + chunk)
+		expect(combined).toMatch(/hi\n\n.*Done\./)
+		expect(combined).not.toMatch(/hi\n\n\n/)
+	})
+
+	test('chunk ending with newline (block_stop): one blank line before block', () => {
+		resetFormat('tnl3')
+		pushFragment('chunk.assistant', 'text content', 'tnl3')
+		pushFragment('chunk.assistant', '\n', 'tnl3')
+		const notice = pushFragment('line.notice', '[context] warning', 'tnl3')
+		// Should start with exactly 1 blank line gap, not 2
+		expect(notice).toMatch(/^\n[^\n]/)
+	})
+
+	test('tool output without trailing newline: still one blank line', () => {
+		resetFormat('tnl4')
+		pushFragment('line.tool', '[bash] echo hi', 'tnl4')
+		const tool = pushFragment('line.tool', 'hi', 'tnl4')
+		const chunk = pushFragment('chunk.assistant', 'Done.', 'tnl4')
+		// Combined: tool ends with \n, sep adds \n → exactly \n\n
+		const combined = stripAnsi(tool + chunk)
+		expect(combined).toMatch(/hi\n\n.*Done\./)
+		expect(combined).not.toMatch(/hi\n\n\n/)
+	})
+
+	test('assistant text in history replay: one blank line after prompt', () => {
+		resetFormat('tnl5')
+		const prompt = pushFragment('prompt', 'question', 'tnl5')
+		const reply = pushFragment('assistant', 'answer text', 'tnl5')
+		const combined = prompt + reply
+		const plain = stripAnsi(combined)
+		// Count blank lines between prompt block end and answer
+		const lines = plain.split('\n')
+		const promptEnd = lines.findLastIndex(l => l.includes('question'))
+		const answerStart = lines.findIndex((l, i) => i > promptEnd && l.includes('answer'))
+		// Exactly: bar line, blank line, answer
+		expect(answerStart - promptEnd).toBe(3)
+	})
+})
+
 describe('in-place redraw for steering', () => {
 	test('steering after queued prompt includes cursor-up escape', () => {
 		resetFormat('rdr1')

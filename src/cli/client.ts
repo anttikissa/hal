@@ -391,16 +391,9 @@ function syncTabsFromSessions(
 function renderConversationHistory(sessionId: string, events: Awaited<ReturnType<typeof loadConversation>>): string {
 	resetFormat(sessionId)
 	let output = ''
-	let prevType = ''
 	for (const event of replayConversationEvents(events)) {
-		if (event.type === 'user') {
-			output += pushFragment('prompt', event.text, sessionId)
-		} else {
-			// Blank line after prompt block for breathing room
-			if (prevType === 'user') output += '\n'
-			output += event.text + '\n'
-		}
-		prevType = event.type
+		const kind = event.type === 'user' ? 'prompt' : 'assistant'
+		output += pushFragment(kind, event.text, sessionId)
 	}
 	return output
 }
