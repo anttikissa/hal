@@ -432,6 +432,7 @@ function handleEsc(): void {
 	if (!active) return
 	if (active.busy) {
 		appendBusCommand(makeCommand('pause', source, undefined, active.sessionId)).catch(() => {})
+		active.paused = true
 		flashHeader('\x1b[33mpausing...\x1b[0m')
 		setActivityLine(`Paused • ${active.modelLabel} — Enter to resume, /queue to inspect, /drop to clear`)
 		return
