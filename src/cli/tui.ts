@@ -645,7 +645,7 @@ function render(): void {
 	const curLineLen = wrappedInput.lines[curRow]?.length ?? 0
 	const needHwCursor = userCursorMode === 'native' || (userCursorMode === 'block' && userBlink && curCol < curLineLen)
 	if (needHwCursor) {
-		const style = userCursorMode === 'native' ? '' : '\x1b[5 q' // blinking bar for block mid-line
+		const style = userCursorMode === 'native' ? '\x1b[0 q' : '\x1b[5 q' // default or blinking bar
 		chunks.push(`${CURSOR_BLUE_OSC}${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 	}
 
