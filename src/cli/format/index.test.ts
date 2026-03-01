@@ -16,7 +16,7 @@ describe('cli format index', () => {
 		expect(secondSameKind.startsWith(RESET)).toBe(false)
 
 		const thirdDifferentKind = pushFragment('chunk.thinking', 'hmm', s)
-		expect(thirdDifferentKind.startsWith('\n')).toBe(true)
+		expect(stripAnsi(thirdDifferentKind)).toMatch(/^ --/)
 	})
 
 	test('line styles are applied per line including multi-line content', () => {
@@ -203,11 +203,11 @@ describe('chunk to prompt truncation marker', () => {
 		expect(stripAnsi(out)).not.toContain(' --')
 	})
 
-	test('no -- marker when chunk transitions to non-prompt', () => {
+	test('-- marker when chunk transitions to non-prompt mid-line', () => {
 		const s = st()
 		pushFragment('chunk.assistant', 'some output', s)
 		const out = pushFragment('line.info', 'info line', s)
-		expect(stripAnsi(out)).not.toContain(' --')
+		expect(stripAnsi(out)).toContain(' --')
 	})
 
 	test('-- marker is styled in orange (warn color)', () => {

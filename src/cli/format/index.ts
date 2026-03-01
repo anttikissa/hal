@@ -74,16 +74,13 @@ export function pushFragment(kind: string, text: string, st: FormatState): strin
 	}
 
 	const isChunk = kind.startsWith('chunk.')
-	const wasChunk = prev.startsWith('chunk.')
-	const isPrompt = kind === 'prompt' || kind === 'prompt.steering'
 	const newSection = prev !== '' && (kind !== prev || isBlockKind(kind))
 
 	// Section separator: ensure exactly one blank line between sections.
 	let sep = ''
 	if (newSection) {
-		if (wasChunk && isPrompt) sep = ` ${getStyle('line.warn')}--${RESET}`
-		const nlSoFar = sep ? trailingNL(sep) : st.trailingNL
-		sep += '\n'.repeat(Math.max(0, 2 - nlSoFar))
+		if (st.trailingNL === 0) sep = ` ${getStyle('line.warn')}--${RESET}`
+		sep += '\n'.repeat(Math.max(0, 2 - (sep ? 0 : st.trailingNL)))
 	}
 
 	if (isChunk) {
