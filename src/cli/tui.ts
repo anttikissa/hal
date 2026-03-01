@@ -79,7 +79,12 @@ let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
 let userPhase = 0, halPhase = 0 // 0..1 cyclic
 let halPeriodCurrent = 1000
+let halIntensity = 0.5 // 1.0 when busy, 0.5 when idle
+let halIdleSince = Date.now()
 let animTimer: ReturnType<typeof setInterval> | null = null
+const SHRINK_BLOCKS = '\u2588\u2587\u2586\u2585\u2584\u2583\u2582\u2581' // █▇▆▅▄▃▂▁
+const IDLE_SHRINK_DELAY = 10_000 // ms before cursor shrinks
+const IDLE_SHRINK_DURATION = 250 // ms for shrink animation
 function brightness(phase: number): number {
 	// ~43% on, 7% fade out, ~43% off, 7% fade in
 	if (phase < 0.43) return 1
@@ -87,15 +92,29 @@ function brightness(phase: number): number {
 	if (phase < 0.93) return 0
 	return (phase - 0.93) / 0.07
 }
+function halCursorChar(): string {
+	if (halState !== 'idle') return SHRINK_BLOCKS[0]
+	const elapsed = Date.now() - halIdleSince - IDLE_SHRINK_DELAY
+	if (elapsed < 0) return SHRINK_BLOCKS[0]
+	const t = Math.min(elapsed / IDLE_SHRINK_DURATION, 1)
+	return SHRINK_BLOCKS[Math.round(t * (SHRINK_BLOCKS.length - 1))]
+}
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 let halState: HalState = 'idle'
-export function setHalState(state: HalState): void { halState = state }
+export function setHalState(state: HalState): void {
+	if (state !== 'idle' && halState === 'idle') halIdleSince = Infinity
+	else if (state === 'idle' && halState !== 'idle') halIdleSince = Date.now()
+	halState = state
+}
 const RAMP_RATE = 0.98
 function animTick(): void {
 	const cfg = loadConfig()
-	const halTarget = halState === 'idle' ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
+	const isIdle = halState === 'idle'
+	const halTarget = isIdle ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
+	const intensityTarget = isIdle ? 0.5 : 1.0
 	halPeriodCurrent += (halTarget - halPeriodCurrent) * (1 - RAMP_RATE)
+	halIntensity += (intensityTarget - halIntensity) * (1 - RAMP_RATE)
 	userPhase = (userPhase + ANIM_MS / cfg.cursorBlinkUser) % 1
 	halPhase = (halPhase + ANIM_MS / halPeriodCurrent) % 1
 	if (initialized && !suspended) scheduleRender()
@@ -626,8 +645,8 @@ function render(): void {
 		const idx = row - 2
 		let lineText = visibleOutput[idx] ?? ''
 		if (idx === halCursorIdx) {
-			const ht = brightness(halPhase)
-			const cursor = `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m\u2588${RESET}`
+			const ht = brightness(halPhase) * halIntensity
+			const cursor = `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m${halCursorChar()}${RESET}`
 			lineText = truncateAnsi(lineText, c - 1) + cursor
 		}
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
