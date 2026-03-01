@@ -21,7 +21,6 @@ const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_E
 const CURSOR_RESET = '\x1b]112\x07\x1b[0 q'
 const CURSOR_BLUE_OSC = '\x1b]12;rgb:66/bb/ff\x07'
 const ANIM_MS = 50
-const BLINK_MS = 530
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
 // ── Types ──
@@ -78,9 +77,15 @@ let bracketedPasteBuffer: string | null = null
 let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
 let userPhase = 0, halPhase = 0 // 0..1 cyclic
+let halPeriodCurrent = 1000 // smoothly ramps toward target
+let halPeriodTarget = 1000
+let cursorBlinkIdle = 1000, cursorBlinkBusy = 500, cursorBlinkUser = 500
+export function setCursorBlink(idle: number, busy: number, user: number): void {
+	cursorBlinkIdle = idle; cursorBlinkBusy = busy; cursorBlinkUser = user
+}
 let animTimer: ReturnType<typeof setInterval> | null = null
 function brightness(phase: number): number {
-	// ~300ms on, 50ms fade out, ~300ms off, 50ms fade in (at BLINK_MS*2 period)
+	// ~43% on, 7% fade out, ~43% off, 7% fade in
 	if (phase < 0.43) return 1
 	if (phase < 0.50) return 1 - (phase - 0.43) / 0.07
 	if (phase < 0.93) return 0
@@ -90,10 +95,12 @@ function lerpCh(to: number, t: number, from = 0): number { return Math.round(fro
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 let halState: HalState = 'idle'
 export function setHalState(state: HalState): void { halState = state }
-function halPeriod(): number { return halState === 'idle' ? BLINK_MS * 5 : BLINK_MS * 0.8 }
+const RAMP_RATE = 0.98 // per tick exponential smoothing
 function animTick(): void {
-	userPhase = (userPhase + ANIM_MS / (BLINK_MS * 2)) % 1
-	halPhase = (halPhase + ANIM_MS / halPeriod()) % 1
+	halPeriodTarget = halState === 'idle' ? cursorBlinkIdle : cursorBlinkBusy
+	halPeriodCurrent += (halPeriodTarget - halPeriodCurrent) * (1 - RAMP_RATE)
+	userPhase = (userPhase + ANIM_MS / cursorBlinkUser) % 1
+	halPhase = (halPhase + ANIM_MS / halPeriodCurrent) % 1
 	if (initialized && !suspended) scheduleRender()
 }
 function resetUserBlink(): void { userPhase = 0 }
@@ -623,7 +630,8 @@ function render(): void {
 		let lineText = visibleOutput[idx] ?? ''
 		if (idx === halCursorIdx) {
 			const ht = brightness(halPhase)
-			lineText = truncateAnsi(lineText, c - 1) + `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m\u2588${RESET}`
+			const cursor = `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m\u2588${RESET}`
+			lineText = truncateAnsi(lineText, c - 1) + cursor
 		}
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
 		if (selRange?.surface === 'output' && idx >= selRange.startRow && idx <= selRange.endRow)

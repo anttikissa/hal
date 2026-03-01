@@ -37,6 +37,9 @@ export interface Config {
 	theme: string // theme name, resolved to themes/<name>.ason
 	timestamps?: boolean // show timestamps in TUI output
 	userCursor: 'native' | 'block' // 'block' = fake blinking block, 'native' = hardware cursor
+	cursorBlinkIdle: number // HAL cursor blink period when idle (ms)
+	cursorBlinkBusy: number // HAL cursor blink period when busy (ms)
+	cursorBlinkUser: number // user cursor blink period (ms)
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
@@ -126,6 +129,9 @@ const DEFAULTS: Config = {
 	defaultModel: 'anthropic/claude-opus-4-6',
 	theme: 'default',
 	userCursor: 'block',
+	cursorBlinkIdle: 1000,
+	cursorBlinkBusy: 500,
+	cursorBlinkUser: 500,
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 4,
 	maxPromptLines: 15,

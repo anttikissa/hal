@@ -25,6 +25,8 @@ import {
 	setMaxPromptLines,
 	setUserCursorMode,
 	setHalState,
+	setCursorBlink,
+	type HalState,
 	type HalState,
 	setOutputSnapshot,
 	setStatusLine,
@@ -142,6 +144,7 @@ export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src; isOwner = owner; launchCwd = resolve(LAUNCH_CWD)
 	const config = loadConfig()
 	setMaxPromptLines(config.maxPromptLines); setUserCursorMode(config.userCursor); loadActiveTheme(HAL_DIR, config.theme)
+	setCursorBlink(config.cursorBlinkIdle, config.cursorBlinkBusy, config.cursorBlinkUser)
 	if (config.timestamps) setShowTimestamps(true)
 }
 
