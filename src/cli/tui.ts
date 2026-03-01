@@ -79,7 +79,13 @@ let stdinBuffer = '', stdinTimer: ReturnType<typeof setTimeout> | null = null
 const STDIN_COALESCE_MS = 50
 let userPhase = 0, halPhase = 0 // 0..1 cyclic
 let animTimer: ReturnType<typeof setInterval> | null = null
-function brightness(phase: number): number { return (1 + Math.cos(phase * 2 * Math.PI)) / 2 }
+function brightness(phase: number): number {
+	// ~300ms on, 50ms fade out, ~300ms off, 50ms fade in (at BLINK_MS*2 period)
+	if (phase < 0.43) return 1
+	if (phase < 0.50) return 1 - (phase - 0.43) / 0.07
+	if (phase < 0.93) return 0
+	return (phase - 0.93) / 0.07
+}
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
 function halPeriod(): number { return activityStr ? BLINK_MS * 2 : BLINK_MS * 4 }
 function animTick(): void {
@@ -349,7 +355,7 @@ function renderPromptLineWithCursor(
 			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
 	}
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-	const uc = `${lerpCh(85, cursorT, 48)};${lerpCh(136, cursorT, 48)};${lerpCh(255, cursorT, 48)}`
+	const uc = `${lerpCh(30, cursorT, 48)};${lerpCh(60, cursorT, 48)};${lerpCh(230, cursorT, 48)}`
 	if (cursorCol >= lineText.length) {
 		// End of line: block cursor — bg interpolated from BG_DARK to blue
 		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[48;2;${uc}m ${RESET}${BG_DARK}${pad}${RESET}`
