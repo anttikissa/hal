@@ -516,7 +516,7 @@ export function buildRotationContext(sessionId: string, messages: any[]): string
 	if (userPrompts.length === 0) return `Session context was purged to avoid exceeding the token limit. No user prompts in previous session. Complete session history is at ${dir}/session.*.asonl + blocks/`
 
 	const lines: string[] = [
-		'Session context was purged to avoid exceeding the token limit. Be nice to the user — they might remember the context better than you do.',
+		'Session context was purged to avoid exceeding the token limit. Be nice to the user — they might remember the context better than you do. On the other hand, they may have moved on to something else entirely and forgotten the details. Either way, verify before assuming.',
 		'',
 		"Here's some message history from the previous session:",
 		'',
