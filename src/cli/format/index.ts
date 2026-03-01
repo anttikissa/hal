@@ -90,7 +90,7 @@ export function pushFragment(kind: string, text: string, sessionId?: string | nu
 	const isChunk = kind.startsWith('chunk.')
 	const wasChunk = prev.startsWith('chunk.')
 	const isPrompt = kind === 'prompt' || kind === 'prompt.steering'
-	const newSection = prev !== '' && (kind !== prev || isBlockKind(kind))
+	const newSection = (prev !== '' && (kind !== prev || isBlockKind(kind))) || (prev === '' && isBlockKind(kind))
 
 	// Section separator: ensure exactly one blank line between sections.
 	// Track trailing newlines already in the output to avoid doubling.
