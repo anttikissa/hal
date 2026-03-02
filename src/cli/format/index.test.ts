@@ -1,59 +1,43 @@
 import { describe, test, expect } from 'bun:test'
 import { pushFragment, pushEvent, createFormatState, stripAnsi } from './index.ts'
-import { loadActiveTheme } from './theme.ts'
 
 const st = () => createFormatState()
 
 describe('fragment tags', () => {
 	test('first fragment gets <kind> tag, no leading newline', () => {
 		const out = pushFragment('chunk.assistant', 'hello', st())
-		expect(stripAnsi(out)).toMatch(/^<assistant> hello/)
+		expect(stripAnsi(out)).toBe('<assistant> hello')
 	})
 
 	test('same chunk kind gets <more> tag', () => {
 		const s = st()
 		pushFragment('chunk.assistant', 'hello', s)
 		const out = pushFragment('chunk.assistant', ' world', s)
-		expect(stripAnsi(out)).toMatch(/^<more>  world/)
+		expect(stripAnsi(out)).toBe('<more>  world')
 	})
 
 	test('different chunk kind gets newline + <kind> tag', () => {
 		const s = st()
 		pushFragment('chunk.thinking', 'hmm', s)
 		const out = pushFragment('chunk.assistant', 'Sure!', s)
-		expect(stripAnsi(out)).toMatch(/^\n<assistant> Sure!/)
+		expect(stripAnsi(out)).toBe('\n<assistant> Sure!')
 	})
 
 	test('non-chunk after chunk gets newline + <kind> tag', () => {
 		const s = st()
 		pushFragment('chunk.assistant', 'text', s)
 		const out = pushFragment('line.info', 'info here', s)
-		expect(stripAnsi(out)).toMatch(/^\n<info> /)
+		expect(stripAnsi(out)).toBe('\n<info> info here\n')
 	})
 
 	test('prompt gets <prompt> tag', () => {
 		const out = pushFragment('prompt', 'user question', st())
-		expect(stripAnsi(out)).toMatch(/^<prompt> /)
+		expect(stripAnsi(out)).toBe('<prompt> user question\n')
 	})
 
 	test('line kinds use suffix as label', () => {
-		const s = st()
-		const out = pushFragment('line.tool', '[bash] echo hi', s)
-		expect(stripAnsi(out)).toMatch(/^<tool> /)
-	})
-})
-
-describe('styling', () => {
-	test('line styles are applied per line including multi-line content', () => {
-		loadActiveTheme(process.cwd(), 'default')
-		const out = pushFragment('line.warn', 'one\ntwo', st())
-		expect(out).toContain('\x1b[33mone\x1b[0m\n\x1b[33mtwo\x1b[0m')
-	})
-
-	test('prefix styling keeps remainder styled after prefix reset', () => {
-		loadActiveTheme(process.cwd(), 'default')
-		const out = pushFragment('line.tool', '[tool] done', st())
-		expect(out).toContain('\x1b[0m\x1b[36mdone')
+		const out = pushFragment('line.tool', '[bash] echo hi', st())
+		expect(stripAnsi(out)).toBe('<tool> [bash] echo hi\n')
 	})
 })
 
@@ -87,22 +71,6 @@ describe('prompt label rendering', () => {
 		}
 		const out = pushEvent(event, localSource, st())
 		expect(stripAnsi(out)).toContain('[steering] steer msg')
-	})
-
-	test('steering prompt uses different fragment kind than normal/queued', () => {
-		const normalOut = pushEvent({
-			id: '4', type: 'prompt' as const, sessionId: 's7',
-			text: 'same text', source: localSource, createdAt: '',
-		}, localSource, st())
-
-		const steeringOut = pushEvent({
-			id: '5', type: 'prompt' as const, sessionId: 's8',
-			text: 'same text', label: 'steering' as const, source: localSource, createdAt: '',
-		}, localSource, st())
-
-		expect(stripAnsi(normalOut)).toContain('same text')
-		expect(stripAnsi(steeringOut)).toContain('[steering] same text')
-		expect(steeringOut).not.toBe(normalOut)
 	})
 
 	test('remote prompt uses source prefix', () => {

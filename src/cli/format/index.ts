@@ -1,12 +1,6 @@
 import type { RuntimeCommand, RuntimeEvent } from '../../protocol.ts'
-import type { Formatter } from './types.ts'
-import { getStyle } from './theme.ts'
-import { styleLinePrefix } from '../tui/format/line-prefix.ts'
-import { buildPromptBlockFormatter, buildBlockFormatter } from '../tui/format/prompt.ts'
-import { applyStylePerLine } from '../tui/format/line-style.ts'
 
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g
-const RESET = '\x1b[0m'
 
 let _showTimestamps = false
 
@@ -25,29 +19,6 @@ function formatTimestamp(iso?: string): string {
 export function stripAnsi(text: string): string {
 	return text.replace(ANSI_RE, '')
 }
-function termCols(): number {
-	return process.stdout.columns || 80
-}
-
-function blockFormatter(build: (cols: number) => { blockStart: string; blockEnd: string; formatText(t: string): string }): Formatter {
-	return {
-		style: '',
-		blockStart(cols: number): string { return build(cols).blockStart },
-		blockEnd(cols: number): string { return build(cols).blockEnd },
-		formatText(text: string): string { return build(termCols()).formatText(text) },
-	}
-}
-
-function getFormatter(kind: string): Formatter {
-	if (kind === 'prompt' || kind === 'prompt.steering') {
-		const steering = kind === 'prompt.steering'
-		return blockFormatter(cols => buildPromptBlockFormatter(cols, steering))
-	}
-	if (kind === 'line.notice') {
-		return blockFormatter(cols => buildBlockFormatter(cols, getStyle('prompt.bar'), getStyle('line.warn')))
-	}
-	return { style: getStyle(kind) }
-}
 
 function kindLabel(kind: string): string {
 	const dot = kind.indexOf('.')
@@ -61,32 +32,14 @@ export function pushFragment(kind: string, text: string, st: FormatState): strin
 	const prev = st.prevKind
 	st.prevKind = kind
 
-	const fmt = getFormatter(kind)
-	const style = fmt.style
-	let content = fmt.formatText ? fmt.formatText(text) : text
-	if (kind === 'line.tool' || kind === 'local.queue' || kind === 'local.tab' || kind === 'local.tabs') {
-		content = styleLinePrefix(kind, content)
-	}
-
 	const isChunk = kind.startsWith('chunk.')
 	const continuation = kind === prev && isChunk
-
-	// Tag: <label> for new kind, <more> for continuation of same chunk kind
 	const tag = continuation ? '<more> ' : (prev ? '\n' : '') + `<${kindLabel(kind)}> `
 
-	if (isChunk) {
-		const reset = kind !== prev ? RESET : ''
-		return `${tag}${reset}${applyStylePerLine(style, content)}`
-	}
+	if (isChunk) return `${tag}${text}`
 
-	content = content.replace(/\n+$/, '')
-
-	const cols = termCols()
-	const blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
-	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
-
-	const styledContent = applyStylePerLine(style, content)
-	return `${tag}${blockStart}${styledContent}\n${blockEnd}`
+	const content = text.replace(/\n+$/, '')
+	return `${tag}${content}\n`
 }
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source'], st: FormatState): string {
