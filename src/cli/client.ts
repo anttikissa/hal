@@ -402,9 +402,9 @@ function renderConversationHistory(events: Awaited<ReturnType<typeof loadConvers
 	for (const event of events.slice(startIdx)) {
 		if (event.type === 'start') {
 			const d = new Date(event.ts)
-			const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-			const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-			output += pushFragment('line.info', `[session] started ${dateStr} ${timeStr} — ${event.workingDir}`, fmtState)
+			const pad = (n: number) => String(n).padStart(2, '0')
+			const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+			output += pushFragment('line.info', `[session] started ${dateStr} — ${event.workingDir}`, fmtState)
 			break
 		}
 	}

@@ -29,10 +29,6 @@ function termCols(): number {
 	return process.stdout.columns || 80
 }
 
-function isBlockKind(kind: string): boolean {
-	return kind === 'prompt' || kind === 'prompt.steering' || kind === 'line.notice'
-}
-
 function blockFormatter(build: (cols: number) => { blockStart: string; blockEnd: string; formatText(t: string): string }): Formatter {
 	return {
 		style: '',
@@ -53,14 +49,13 @@ function getFormatter(kind: string): Formatter {
 	return { style: getStyle(kind) }
 }
 
-export interface FormatState { prevKind: string; trailingNL: number; blockRows: number }
-export function createFormatState(): FormatState { return { prevKind: '', trailingNL: 0, blockRows: 0 } }
-
-function trailingNL(s: string): number {
-	let n = 0
-	for (let i = s.length - 1; i >= 0 && s[i] === '\n'; i--) n++
-	return n
+function kindLabel(kind: string): string {
+	const dot = kind.indexOf('.')
+	return dot >= 0 ? kind.slice(dot + 1) : kind
 }
+
+export interface FormatState { prevKind: string }
+export function createFormatState(): FormatState { return { prevKind: '' } }
 
 export function pushFragment(kind: string, text: string, st: FormatState): string {
 	const prev = st.prevKind
@@ -74,41 +69,24 @@ export function pushFragment(kind: string, text: string, st: FormatState): strin
 	}
 
 	const isChunk = kind.startsWith('chunk.')
-	const newSection = prev !== '' && (kind !== prev || isBlockKind(kind))
+	const continuation = kind === prev && isChunk
 
-	// Section separator: ensure exactly one blank line between sections.
-	let sep = ''
-	if (newSection) {
-		if (st.trailingNL === 0) sep = ` ${getStyle('line.warn')}--${RESET}`
-		sep += '\n'.repeat(Math.max(0, 2 - (sep ? 0 : st.trailingNL)))
-	}
+	// Tag: <label> for new kind, <more> for continuation of same chunk kind
+	const tag = continuation ? '<more> ' : (prev ? '\n' : '') + `<${kindLabel(kind)}> `
 
 	if (isChunk) {
 		const reset = kind !== prev ? RESET : ''
-		const out = `${sep}${reset}${applyStylePerLine(style, content)}`
-		st.trailingNL = trailingNL(out)
-		return out
+		return `${tag}${reset}${applyStylePerLine(style, content)}`
 	}
 
-	// Strip trailing newlines from content — the template adds exactly one.
 	content = content.replace(/\n+$/, '')
 
 	const cols = termCols()
 	const blockStart = fmt.blockStart ? fmt.blockStart(cols) : ''
 	const blockEnd = fmt.blockEnd ? fmt.blockEnd(cols) : ''
 
-	// In-place redraw: steering immediately follows a queued prompt block.
-	let redraw = ''
-	if (kind === 'prompt.steering' && prev === 'prompt' && st.blockRows > 0) {
-		redraw = `\x1b[${st.blockRows}A\x1b[J`
-	}
-
 	const styledContent = applyStylePerLine(style, content)
-	const out = `${redraw}${sep}${blockStart}${styledContent}\n${blockEnd}`
-
-	st.blockRows = isBlockKind(kind) ? (out.match(/\n/g) ?? []).length : 0
-	st.trailingNL = trailingNL(out)
-	return out
+	return `${tag}${blockStart}${styledContent}\n${blockEnd}`
 }
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source'], st: FormatState): string {
