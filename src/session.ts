@@ -87,12 +87,16 @@ async function ensureBlocksDir(id: string): Promise<void> {
 
 // Block storage
 
-export function makeBlockRef(): string {
-	const ts = Date.now().toString(36)
+const sessionStartTimes = new Map<string, number>()
+
+export function makeBlockRef(sessionId: string): string {
+	let start = sessionStartTimes.get(sessionId)
+	if (start === undefined) { start = Date.now(); sessionStartTimes.set(sessionId, start) }
+	const offset = Math.max(0, Date.now() - start).toString(36).padStart(6, '0')
 	const bytes = randomBytes(4)
 	let suffix = ''
 	for (let i = 0; i < 4; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
-	return `${ts}-${suffix}`
+	return `${offset}-${suffix}`
 }
 
 export async function writeBlock(sessionId: string, ref: string, data: any): Promise<void> {
@@ -159,7 +163,7 @@ export async function writeAssistantEntry(
 
 	const thinking = contentBlocks.find((b: any) => b.type === 'thinking')
 	if (thinking?.thinking) {
-		const ref = makeBlockRef()
+		const ref = makeBlockRef(sessionId)
 		await writeBlock(sessionId, ref, { thinking: thinking.thinking, signature: thinking.signature })
 		entry.thinking = { ref, words: countWords(thinking.thinking) }
 	}
@@ -168,7 +172,7 @@ export async function writeAssistantEntry(
 	if (tools.length > 0) {
 		entry.tools = []
 		for (const t of tools) {
-			const ref = makeBlockRef()
+			const ref = makeBlockRef(sessionId)
 			toolRefMap.set(t.id, ref)
 			await writeBlock(sessionId, ref, { call: { name: t.name, input: t.input } })
 			entry.tools.push({ id: t.id, name: t.name, ref })
@@ -204,7 +208,7 @@ export async function userContentToLog(sessionId: string, content: any): Promise
 	const logContent: any[] = []
 	for (const block of content) {
 		if (block.type === 'image' && block.source?.type === 'base64') {
-			const ref = makeBlockRef()
+			const ref = makeBlockRef(sessionId)
 			await writeBlock(sessionId, ref, { media_type: block.source.media_type, data: block.source.data })
 			logContent.push({ type: 'image', ref })
 		} else {
