@@ -62,15 +62,6 @@ describe('prompt label rendering', () => {
 		expect(stripAnsi(out)).not.toContain('[steering]')
 	})
 
-	test('queued prompt has [queued] prefix', () => {
-		const event = {
-			id: '2', type: 'prompt' as const, sessionId: 's5',
-			text: 'queued msg', label: 'queued' as const, source: localSource, createdAt: '',
-		}
-		const out = pushEvent(event, localSource, st())
-		expect(stripAnsi(out)).toContain('[queued] queued msg')
-	})
-
 	test('steering prompt has [steering] prefix', () => {
 		const event = {
 			id: '3', type: 'prompt' as const, sessionId: 's6',
@@ -84,7 +75,7 @@ describe('prompt label rendering', () => {
 		const remoteSource = { kind: 'web' as const, clientId: 'remote-123456' }
 		const out = pushEvent({
 			id: '8', type: 'prompt' as const, sessionId: 's11',
-			text: 'remote msg', label: 'queued' as const, source: remoteSource, createdAt: '',
+			text: 'remote msg', source: remoteSource, createdAt: '',
 		}, localSource, st())
 		expect(stripAnsi(out)).toContain('[prompt:web:remote]')
 		expect(stripAnsi(out)).toContain('remote msg')

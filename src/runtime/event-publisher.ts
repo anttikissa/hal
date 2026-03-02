@@ -67,7 +67,7 @@ export async function publishPrompt(
 	sessionId: string | null,
 	text: string,
 	source: RuntimeSource,
-	label?: 'queued' | 'steering',
+	label?: 'steering',
 ): Promise<void> {
 	await emit({ type: 'prompt', sessionId, text, source, label })
 }

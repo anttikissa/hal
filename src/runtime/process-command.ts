@@ -378,11 +378,8 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		return
 	}
 
-	// Echo prompt immediately — label it if submitted while model is busy
 	if (command.type === 'prompt') {
-		const text = command.text ?? ''
-		const label = isSessionBusy(sessionId) ? 'queued' as const : undefined
-		await publishPrompt(sessionId, text, command.source, label)
+		await publishPrompt(sessionId, command.text ?? '', command.source)
 	}
 
 	enqueueCommand(sessionId, command)

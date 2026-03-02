@@ -52,7 +52,7 @@ describe('steer', () => {
 		expect(prompt.label).toBeUndefined()
 	})
 
-	test('prompt while busy gets queued label', async () => {
+	test('prompt while busy has no label', async () => {
 		hal = await startHal()
 		await hal.waitForReady()
 		const sessionId = await activeSessionId(hal)
@@ -64,10 +64,10 @@ describe('steer', () => {
 		hal.sendLine('song')
 		await waitUntilBusy(hal, sessionId)
 
-		// Send another prompt while busy — should get queued label
+		// Send another prompt while busy — should render like a normal prompt
 		hal.sendLine('queued message')
-		const prompt = await hal.waitForPrompt(/queued message/, 'queued')
-		expect(prompt.label).toBe('queued')
+		const prompt = await hal.waitForPrompt(/queued message/)
+		expect(prompt.label).toBeUndefined()
 	}, 15000)
 
 	test('steer command aborts generation and publishes steering prompt', async () => {
@@ -84,7 +84,7 @@ describe('steer', () => {
 
 		// Queue a message while busy
 		hal.sendLine('steered message')
-		await hal.waitForPrompt(/steered message/, 'queued')
+		await hal.waitForPrompt(/steered message/)
 
 		// Send steer command via IPC
 		await hal.sendCommand(makeCommand('steer', testSource, undefined, sessionId))
@@ -112,7 +112,7 @@ describe('steer', () => {
 
 		// Queue + steer
 		hal.sendLine('steer test')
-		await hal.waitForPrompt(/steer test/, 'queued')
+		await hal.waitForPrompt(/steer test/)
 
 		await hal.sendCommand(makeCommand('steer', testSource, undefined, sessionId))
 
@@ -141,10 +141,10 @@ describe('steer', () => {
 
 		// Queue multiple messages while busy
 		hal.sendLine('first queued')
-		await hal.waitForPrompt(/first queued/, 'queued')
+		await hal.waitForPrompt(/first queued/)
 
 		hal.sendLine('second queued')
-		await hal.waitForPrompt(/second queued/, 'queued')
+		await hal.waitForPrompt(/second queued/)
 
 		// Steer — should promote 'second queued' to front
 		await hal.sendCommand(makeCommand('steer', testSource, undefined, sessionId))
@@ -192,7 +192,7 @@ describe('steer', () => {
 
 		// Queue + steer
 		hal.sendLine('check done phase')
-		await hal.waitForPrompt(/check done phase/, 'queued')
+		await hal.waitForPrompt(/check done phase/)
 
 		const steerCmd = makeCommand('steer', testSource, undefined, sessionId)
 		await hal.sendCommand(steerCmd)

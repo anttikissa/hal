@@ -112,7 +112,7 @@ export type RuntimeEvent =
 			type: 'prompt'
 			sessionId: string | null
 			text: string
-			label?: 'queued' | 'steering'
+			label?: 'steering'
 			source: RuntimeSource
 			createdAt: string
 	  }
