@@ -947,9 +947,9 @@ function handleKey(key: string): void {
 		render(); return
 	}
 
-	// PageUp / PageDown
-	if (key === '\x1b[5~') return scroll(Math.max(1, rows() - 3))
-	if (key === '\x1b[6~') return scroll(-Math.max(1, rows() - 3))
+	// PageUp / PageDown / Option+P / Option+N
+	if (key === '\x1b[5~' || key === '\x1bp') return scroll(Math.max(1, rows() - 3))
+	if (key === '\x1b[6~' || key === '\x1bn') return scroll(-Math.max(1, rows() - 3))
 
 	// Option+Up/Down: jump to start/end
 	if (key === '\x1b[1;3A') return moveCursor(0)
