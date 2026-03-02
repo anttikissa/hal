@@ -39,6 +39,13 @@ describe('fragment tags', () => {
 		const out = pushFragment('line.tool', '[bash] echo hi', st())
 		expect(stripAnsi(out)).toBe('<tool> [bash] echo hi\n')
 	})
+
+	test('non-chunk after non-chunk: no extra newline', () => {
+		const s = st()
+		pushFragment('line.tool', '[grep] stuff', s)
+		const out = pushFragment('line.tool', '5 matches', s)
+		expect(stripAnsi(out)).toBe('<tool> 5 matches\n')
+	})
 })
 
 describe('prompt label rendering', () => {
