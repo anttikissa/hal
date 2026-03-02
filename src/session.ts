@@ -1,6 +1,6 @@
 // See docs/session.md — keep it in sync when changing this file.
 
-import { appendFile, copyFile, mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises'
+import { appendFile, mkdir, readFile, unlink, writeFile } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { stringify, parse, parseAll } from './utils/ason.ts'
@@ -106,14 +106,41 @@ export async function writeBlock(sessionId: string, ref: string, data: any): Pro
 
 export async function readBlock(sessionId: string, ref: string): Promise<any | null> {
 	const path = `${blocksDir(sessionId)}/${ref}.ason`
-	if (!existsSync(path)) return null
-	try {
-		return parse(await readFile(path, 'utf-8'))
-	} catch {
-		return null
+	if (existsSync(path)) {
+		try {
+			return parse(await readFile(path, 'utf-8'))
+		} catch {
+			return null
+		}
 	}
+	// Walk fork chain — block may live in parent's blocks/
+	const parent = getParentSessionId(sessionId)
+	if (parent) return readBlock(parent, ref)
+	return null
 }
 
+// Fork chain resolution
+
+const parentCache = new Map<string, string | null>()
+
+function getParentSessionId(sessionId: string): string | null {
+	const cached = parentCache.get(sessionId)
+	if (cached !== undefined) return cached
+	const path = `${sessionDir(sessionId)}/messages.asonl`
+	if (!existsSync(path)) { parentCache.set(sessionId, null); return null }
+	try {
+		const raw = readFileSync(path, 'utf-8')
+		const firstLine = raw.split('\n', 1)[0]
+		if (!firstLine?.trim()) { parentCache.set(sessionId, null); return null }
+		const entry = parse(firstLine) as any
+		if (entry?.type === 'forked_from' && entry.parent) {
+			parentCache.set(sessionId, entry.parent)
+			return entry.parent
+		}
+	} catch {}
+	parentCache.set(sessionId, null)
+	return null
+}
 // Log I/O
 
 function countWords(text: string): number {
@@ -248,19 +275,32 @@ export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
 
 // Session load (API messages)
 
-/** Load all log entries from all log files of a session. */
+/** Load all log entries from all log files of a session, following fork references. */
 async function loadAllEntries(sessionId: string): Promise<any[]> {
 	const dir = sessionDir(sessionId)
 	const allEntries: any[] = []
 
-	// Read messages.asonl, messages2.asonl, etc. in order
+	// Read messages.asonl
+	let firstEntries: any[] = []
 	const first = `${dir}/messages.asonl`
 	if (existsSync(first)) {
 		try {
 			const raw = await readFile(first, 'utf-8')
-			if (raw.trim()) allEntries.push(...(parseAll(raw) as any[]))
+			if (raw.trim()) firstEntries = parseAll(raw) as any[]
 		} catch {}
 	}
+
+	// Follow fork reference: load parent history, skip the forked_from entry
+	if (firstEntries.length > 0 && firstEntries[0].type === 'forked_from') {
+		const { parent, ts: forkTs } = firstEntries[0]
+		const parentEntries = await loadAllEntries(parent)
+		allEntries.push(...parentEntries.filter((e: any) => !e.ts || e.ts <= forkTs))
+		allEntries.push(...firstEntries.slice(1))
+	} else {
+		allEntries.push(...firstEntries)
+	}
+
+	// Read messages2.asonl, messages3.asonl, etc.
 	for (let n = 2; ; n++) {
 		const path = `${dir}/messages${n}.asonl`
 		if (!existsSync(path)) break
@@ -587,32 +627,12 @@ export function buildRotationContext(sessionId: string, messages: any[]): string
 	return lines.join('\n')
 }
 
-// Fork: copy messages log to new session
+// Fork: reference parent session instead of copying
 
 export async function forkSession(sourceId: string): Promise<string> {
 	const newId = await makeSessionId()
-	const srcDir = sessionDir(sourceId)
-	const dstDir = sessionDir(newId)
-	await mkdir(dstDir, { recursive: true })
-
-	// Copy current messages log
-	const logName = currentLogName(sourceId)
-	const srcLog = `${srcDir}/${logName}`
-	if (existsSync(srcLog)) {
-		await copyFile(srcLog, `${dstDir}/messages.asonl`)
-	}
-
-	// Copy blocks directory
-	const srcBlocks = `${srcDir}/blocks`
-	if (existsSync(srcBlocks)) {
-		const dstBlocks = `${dstDir}/blocks`
-		await mkdir(dstBlocks, { recursive: true })
-		const files = await readdir(srcBlocks)
-		for (const f of files) {
-			await copyFile(`${srcBlocks}/${f}`, `${dstBlocks}/${f}`)
-		}
-	}
-
+	await mkdir(sessionDir(newId), { recursive: true })
+	await appendToLog(newId, [{ type: 'forked_from', parent: sourceId, ts: new Date().toISOString() }])
 	return newId
 }
 

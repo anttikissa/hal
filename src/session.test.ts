@@ -9,6 +9,7 @@ import {
 	writeAssistantEntry,
 	writeToolResultEntry,
 	loadSession,
+	readBlock,
 	rotateSession,
 	buildRotationContext,
 	forkSession,
@@ -216,8 +217,8 @@ describe('buildRotationContext', () => {
 	})
 })
 
-describe('fork with blocks', () => {
-	test('copies blocks directory', async () => {
+describe('fork by reference', () => {
+	test('does not copy files, resolves blocks via parent', async () => {
 		const srcId = uniqueId()
 		await appendToLog(srcId, [
 			{ role: 'user', content: 'think', ts: new Date().toISOString() },
@@ -230,14 +231,69 @@ describe('fork with blocks', () => {
 
 		const newId = await forkSession(srcId)
 
-		// Verify blocks were copied
-		const srcBlocks = readdirSync(join(sessionDir(srcId), 'blocks'))
-		const dstBlocks = readdirSync(join(sessionDir(newId), 'blocks'))
-		expect(dstBlocks).toEqual(srcBlocks)
+		// No blocks copied — child has no blocks dir
+		expect(existsSync(join(sessionDir(newId), 'blocks'))).toBe(false)
 
-		// Verify forked session loads correctly
+		// But readBlock resolves via parent chain
+		const block = await readBlock(newId, entry.thinking.ref)
+		expect(block).not.toBeNull()
+		expect(block.thinking).toBe('Deep thoughts')
+	})
+
+	test('loads parent messages via fork reference', async () => {
+		const srcId = uniqueId()
+		const ts = new Date().toISOString()
+		await appendToLog(srcId, [{ role: 'user', content: 'hello', ts }])
+		const { entry } = await writeAssistantEntry(srcId, [
+			{ type: 'text', text: 'hi there' },
+		])
+		await appendToLog(srcId, [entry])
+
+		const newId = await forkSession(srcId)
+		await appendToLog(newId, [{ role: 'user', content: 'follow-up', ts: new Date().toISOString() }])
+
 		const result = await loadSession(newId)
-		expect(result!.messages[1].content[0].thinking).toBe('Deep thoughts')
+		expect(result).not.toBeNull()
+		expect(result!.messages).toHaveLength(3)
+		expect(result!.messages[0].content).toBe('hello')
+		expect(result!.messages[2].content).toBe('follow-up')
+	})
+
+	test('excludes parent entries written after fork', async () => {
+		const srcId = uniqueId()
+		const ts = new Date().toISOString()
+		await appendToLog(srcId, [{ role: 'user', content: 'before fork', ts }])
+
+		const newId = await forkSession(srcId)
+
+		// Parent gets new messages after the fork
+		await Bun.sleep(2)
+		await appendToLog(srcId, [{ role: 'user', content: 'after fork', ts: new Date().toISOString() }])
+
+		const result = await loadSession(newId)
+		expect(result).not.toBeNull()
+		const texts = result!.messages.map((m: any) => m.content)
+		expect(texts).toContain('before fork')
+		expect(texts).not.toContain('after fork')
+	})
+
+	test('chained forks resolve recursively', async () => {
+		const ts = new Date().toISOString()
+		const grandparent = uniqueId()
+		await appendToLog(grandparent, [{ role: 'user', content: 'gen1', ts }])
+
+		const parent = await forkSession(grandparent)
+		await appendToLog(parent, [{ role: 'user', content: 'gen2', ts: new Date().toISOString() }])
+
+		const child = await forkSession(parent)
+		await appendToLog(child, [{ role: 'user', content: 'gen3', ts: new Date().toISOString() }])
+
+		const result = await loadSession(child)
+		expect(result).not.toBeNull()
+		const texts = result!.messages.map((m: any) => m.content)
+		expect(texts).toContain('gen1')
+		expect(texts).toContain('gen2')
+		expect(texts).toContain('gen3')
 	})
 })
 
