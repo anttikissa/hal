@@ -452,7 +452,7 @@ async function bootstrapState(): Promise<void> {
 		const state = await readState()
 		const busySet = new Set(state.busySessionIds ?? [])
 		if (Array.isArray(state.sessions) && state.sessions.length > 0)
-			syncTabsFromSessions(state.sessions, state.activeSessionId ?? null, { preserveActiveOutput: false, render: false, bootstrap: false })
+			syncTabsFromSessions(state.sessions, state.activeSessionId ?? null, { preserveActiveOutput: false, render: false })
 		else ensureFallbackTab(state.activeSessionId ?? null)
 		for (const tab of tabs) tab.busy = busySet.has(tab.sessionId)
 
@@ -472,7 +472,6 @@ async function bootstrapState(): Promise<void> {
 			tab.inputDraft = await loadDraft(tab.sessionId)
 		}))
 		applyActiveTabSnapshot(true)
-		for (const tab of tabs) ensureTabBootstrap(tab)
 		renderBusyStatus()
 	} catch (e: any) {
 		pushLocal('local.status', `bootstrap failed: ${e.message || e}`)

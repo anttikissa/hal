@@ -124,7 +124,7 @@ function countWords(text: string): number {
 async function toLeanMessages(sessionId: string, messages: any[]): Promise<any[]> {
 	const toolRefMap = new Map<string, string>()
 	const leanMessages: any[] = []
-	const ts = nowIso()
+	const ts = new Date().toISOString()
 
 	for (const msg of messages) {
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
@@ -373,7 +373,7 @@ export async function loadDraft(sessionId: string): Promise<string> {
 }
 
 function createSessionInfo(id: string, workingDir: string): SessionInfo {
-	const ts = nowIso()
+	const ts = new Date().toISOString()
 	return {
 		id,
 		workingDir: resolve(workingDir),
@@ -494,7 +494,7 @@ export async function saveSession(
 	if (meta) {
 		await saveSessionInfo(sessionId, {
 			...meta,
-			updatedAt: nowIso(),
+			updatedAt: new Date().toISOString(),
 			lastPrompt: extractLastPrompt(messages),
 			tokenTotals,
 		})

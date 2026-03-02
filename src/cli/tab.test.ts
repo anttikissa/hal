@@ -30,7 +30,6 @@ describe('tab helpers', () => {
 			inputHistory: [],
 			inputDraft: '',
 			inputCursor: 0,
-			bootstrapSent: false,
 		})
 	})
 

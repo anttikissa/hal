@@ -128,7 +128,7 @@ async function listClosedSessions(activeIds: Set<string>): Promise<RestorableSes
 	const results: RestorableSession[] = []
 
 	for (const entry of entries) {
-		if (!entry.isDirectory() || !entry.name.startsWith('s-')) continue
+		if (!entry.isDirectory()) continue
 		if (activeIds.has(entry.name)) continue
 		const meta = await loadSessionInfo(entry.name)
 		if (!meta) continue
@@ -167,11 +167,16 @@ async function restore(args: string, client: Client): Promise<void> {
 	if (!isNaN(num) && num >= 1 && num <= lastRestoreList.length) {
 		target = lastRestoreList[num - 1]
 	} else {
-		const id = arg.startsWith('s-') ? arg : `s-${arg}`
-		target = lastRestoreList.find((s) => s.id === id)
+		// Try exact match first, then with s- prefix for old sessions
+		target = lastRestoreList.find((s) => s.id === arg)
 		if (!target) {
-			const meta = await loadSessionInfo(id)
-			if (meta) target = { id, meta }
+			const meta = await loadSessionInfo(arg)
+			if (meta) target = { id: arg, meta }
+		}
+		if (!target && !arg.includes('-')) {
+			const oldId = `s-${arg}`
+			const meta = await loadSessionInfo(oldId)
+			if (meta) target = { id: oldId, meta }
 		}
 	}
 
