@@ -397,6 +397,12 @@ function renderConversationHistory(events: Awaited<ReturnType<typeof loadConvers
 		}
 	}
 	for (const event of replayConversationEvents(events)) {
+		if (event.type === 'tool') {
+			for (const line of event.text.split('\n')) {
+				output += pushFragment('line.tool', line, fmtState)
+			}
+			continue
+		}
 		if (event.type === 'assistant' && event.thinking) {
 			const t = event.thinking.endsWith('\n') ? event.thinking : event.thinking + '\n'
 			output += pushFragment('chunk.thinking', t, fmtState)

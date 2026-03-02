@@ -7,13 +7,30 @@ Sessions are stored per session id under `state/sessions/<sessionId>/`:
 - `session.asonl` -- lean message spine with block refs (append-only ASONL). Large content (thinking, tool calls) is replaced with refs to block files.
 - `session.N.asonl` -- rotated archives (N=1 oldest, higher=more recent). Created by `/handoff` or `/reset`.
 - `blocks/` -- external content blocks (thinking text + signatures, tool call inputs + results). One `.ason` file per block ref. Shared across all rotations.
-- `conversation.asonl` -- append-only human-readable event log (user text, assistant text, model changes, cd, topic, fork, handoff, reset). Used for TUI replay on restart and input history. Never truncated.
+- `conversation.asonl` -- append-only event log for TUI replay on restart and input history. Never truncated.
 - `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt, tokenTotals)
 - `draft.txt` -- unsent prompt text
 
 Registry metadata lives in `state/sessions/index.ason`.
 
 Core logic: `src/session.ts`.
+
+### conversation.asonl event types
+
+| type | fields | description |
+|------|--------|-------------|
+| `user` | `text`, `ts` | User prompt |
+| `assistant` | `text`, `thinking?`, `ts` | Assistant text response (one per agent-loop turn; tool-only turns are skipped) |
+| `tool` | `text`, `ts` | Tool execution output (one event per tool-loop iteration, lines joined with `\n`) |
+| `model` | `from`, `to`, `ts` | Model change (`/model`) |
+| `cd` | `from`, `to`, `ts` | Working directory change (`/cd`) |
+| `topic` | `from?`, `to`, `auto?`, `ts` | Topic change (manual or auto-generated) |
+| `fork` | `parent`, `child`, `ts` | Fork event (written to both parent and child) |
+| `handoff` | `ts` | Context rotation with prompt injection |
+| `reset` | `ts` | Clean slate rotation |
+| `start` | `workingDir`, `ts` | Session creation |
+
+On restart, `replayConversationEvents()` replays `user`, `assistant`, and `tool` events after the last `reset`/`handoff`. Consecutive `assistant` events (from multi-turn tool loops) are merged. `tool` events are rendered as `<tool>` lines in the TUI.
 
 ## Block Storage (v2)
 

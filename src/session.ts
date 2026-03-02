@@ -292,6 +292,7 @@ export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
 export type ConversationEvent =
 	| { type: 'user'; text: string; ts: string }
 	| { type: 'assistant'; text: string; thinking?: string; ts: string }
+	| { type: 'tool'; text: string; ts: string }
 	| { type: 'model'; from: string; to: string; ts: string }
 	| { type: 'fork'; parent: string; child: string; ts: string }
 	| { type: 'topic'; from?: string; to: string; auto?: boolean; ts: string }
@@ -315,7 +316,7 @@ export async function loadConversation(sessionId: string): Promise<ConversationE
 	}
 }
 
-export type ReplayConversationEvent = Extract<ConversationEvent, { type: 'user' | 'assistant' }>
+export type ReplayConversationEvent = Extract<ConversationEvent, { type: 'user' | 'assistant' | 'tool' }>
 
 export function replayConversationEvents(events: ConversationEvent[]): ReplayConversationEvent[] {
 	let startIdx = 0
@@ -327,7 +328,7 @@ export function replayConversationEvents(events: ConversationEvent[]): ReplayCon
 	}
 	const replay: ReplayConversationEvent[] = []
 	for (const event of events.slice(startIdx)) {
-		if (event.type !== 'user' && event.type !== 'assistant') continue
+		if (event.type !== 'user' && event.type !== 'assistant' && event.type !== 'tool') continue
 		const last = replay[replay.length - 1]
 		if (event.type === 'assistant' && last?.type === 'assistant') {
 			last.text += '\n\n' + event.text

@@ -323,4 +323,19 @@ describe('replayConversationEvents', () => {
 		expect(replay[1].text).toBe('part1\n\npart2')
 		expect((replay[1] as any).thinking).toBe('initial thought')
 	})
+
+	test('tool events are included in replay between assistant turns', () => {
+		const events: ConversationEvent[] = [
+			{ type: 'user', text: 'do it', ts: '2026-03-01T12:01:00.000Z' },
+			{ type: 'assistant', text: 'calling tool', ts: '2026-03-01T12:01:01.000Z' },
+			{ type: 'tool', text: '[bash] ls\nfile.ts', ts: '2026-03-01T12:01:02.000Z' },
+			{ type: 'assistant', text: 'done', ts: '2026-03-01T12:01:03.000Z' },
+		]
+		const replay = replayConversationEvents(events)
+		expect(replay).toHaveLength(4)
+		expect(replay[0]).toMatchObject({ type: 'user', text: 'do it' })
+		expect(replay[1]).toMatchObject({ type: 'assistant', text: 'calling tool' })
+		expect(replay[2]).toMatchObject({ type: 'tool', text: '[bash] ls\nfile.ts' })
+		expect(replay[3]).toMatchObject({ type: 'assistant', text: 'done' })
+	})
 })

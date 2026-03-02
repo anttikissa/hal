@@ -142,17 +142,27 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 
 		if (toolBlocks.length > 0) {
+			const toolLines: string[] = []
 			const toolResults = await Promise.all(
 				toolBlocks.map(async (block: any) => {
 					await publishActivity(`Running: ${block.name}`, sessionId)
 					const output = await runTool(block.name, block.input, {
-						logger: (line, level = 'tool') => publishLine(line, level, sessionId),
+						logger: (line, level = 'tool') => {
+							if (level === 'tool') toolLines.push(line)
+							return publishLine(line, level, sessionId)
+						},
 						cwd: getSessionWorkingDir(sessionId),
 						signal: runtime.activeAbort?.signal,
 					})
 					return { id: block.id, output }
 				}),
 			)
+
+			if (toolLines.length > 0) {
+				await appendConversation(sessionId, {
+					type: 'tool', text: toolLines.join('\n'), ts: new Date().toISOString(),
+				})
+			}
 
 			let shouldRestart = false
 			for (const result of toolResults) {
