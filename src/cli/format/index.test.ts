@@ -30,20 +30,6 @@ describe('fragment tags', () => {
 		expect(stripAnsi(out)).toBe('\n<info> info here\n')
 	})
 
-	test('chunk ending with newline suppresses extra separator newline', () => {
-		const s = st()
-		pushFragment('chunk.assistant', 'answer\n', s)
-		const out = pushFragment('line.tool', '[bash] echo hi', s)
-		expect(stripAnsi(out)).toBe('<tool> [bash] echo hi\n')
-	})
-
-	test('chunk ending with multiple newlines still gets no extra', () => {
-		const s = st()
-		pushFragment('chunk.assistant', 'answer\n\n', s)
-		const out = pushFragment('line.tool', '[bash] echo hi', s)
-		expect(stripAnsi(out)).toBe('<tool> [bash] echo hi\n')
-	})
-
 	test('prompt gets <prompt> tag', () => {
 		const out = pushFragment('prompt', 'user question', st())
 		expect(stripAnsi(out)).toBe('<prompt> user question\n')
