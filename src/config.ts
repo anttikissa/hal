@@ -47,6 +47,7 @@ export interface Config {
 	maxPromptLines: number
 	providers?: Record<string, ProviderConfig>
 	modelAliases?: Record<string, string>
+	recentToolResults: number // how many recent tool results to send in full (older → placeholder)
 	debug: DebugConfig
 }
 
@@ -139,6 +140,7 @@ const DEFAULTS: Config = {
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 4,
 	maxPromptLines: 15,
+	recentToolResults: 3,
 	debug: {},
 }
 
