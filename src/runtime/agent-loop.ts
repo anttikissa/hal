@@ -502,18 +502,16 @@ async function parseResponseStream(
 								sessionId,
 							)
 						}
-						if (
-							block?.type === 'thinking' &&
-							block.thinking?.trim() &&
-							!block.thinking.endsWith('\n')
-						)
-							await publishChunk('\n', 'thinking', sessionId)
-						if (
-							block?.type === 'text' &&
-							block.text?.trim() &&
-							!block.text.endsWith('\n')
-						)
-							await publishChunk('\n', 'assistant', sessionId)
+						if (block?.type === 'thinking' && block.thinking?.trim()) {
+							if (!block.thinking.endsWith('\n'))
+								await publishChunk('\n', 'thinking', sessionId)
+							await publishLine('', 'thinking-end' as EventLevel, sessionId)
+						}
+						if (block?.type === 'text' && block.text?.trim()) {
+							if (!block.text.endsWith('\n'))
+								await publishChunk('\n', 'assistant', sessionId)
+							await publishLine('', 'assistant-end' as EventLevel, sessionId)
+						}
 
 						break
 					}
