@@ -50,7 +50,7 @@ Good: "[promoted] pid 12345 is now the owner"
 - **NEVER** use `bun --eval` or `bun -e` — Use `bunx tsgo --noEmit` for syntax/type checks.
 - Write tests for new features and bug fixes
 - Command for TDD loop: `bun test --test-name-pattern='<feature>'`
-- Before committing, run tests: `bun run test` (parallel runner; `bun test` is sequential and slow)
+- Before committing, run tests: `./test` (parallel runner; `bun test` is sequential and slow)
 - Unit tests live alongside code, e2e tests in `src/tests/`
 
 ## SYSTEM.md preprocessor
