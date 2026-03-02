@@ -56,16 +56,10 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 		await publishActivity('Sending request...', sessionId)
 		const res = await fetchWithRetry(sessionId, runtime, provider, body)
-		if (!res || runtime.pausedByUser) {
-			await publishLine(`[debug:loop] exit: res=${!!res} paused=${runtime.pausedByUser}`, 'warn', sessionId)
-			break
-		}
+		if (!res || runtime.pausedByUser) break
 
 		const parsed = await parseResponseStream(sessionId, runtime, provider, res)
-		if (!parsed) {
-			await publishLine('[debug:loop] exit: parsed=null', 'warn', sessionId)
-			break
-		}
+		if (!parsed) break
 
 		if (debugEnabled('responseLogging')) {
 			const entry = {
@@ -132,8 +126,6 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 		const hasToolUse = parsed.contentBlocks.some((b: any) => b?.type === 'tool_use')
 		done = parsed.stopReason === 'end_turn' || (!hasToolUse && parsed.stopReason !== 'tool_use')
-		const blockTypes = parsed.contentBlocks.map((b: any) => b?.type).join(',')
-		await publishLine(`[debug:loop] stop=${parsed.stopReason} tools=${hasToolUse} done=${done} blocks=[${blockTypes}]`, 'warn', sessionId)
 
 		const toolBlocks = parsed.contentBlocks.filter((b: any) => b?.type === 'tool_use')
 		if (runtime.pausedByUser) {
@@ -185,7 +177,6 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				process.exit(100)
 			}
 		}
-		await publishLine(`[debug:loop] iter-end done=${done} paused=${runtime.pausedByUser}`, 'warn', sessionId)
 	}
 
 	await publishActivity('', sessionId)
