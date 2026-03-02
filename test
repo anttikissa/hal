@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec bun scripts/test-parallel.ts "$@"
+bun scripts/test-parallel.ts "$@"
