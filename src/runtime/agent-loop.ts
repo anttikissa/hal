@@ -56,10 +56,16 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 		await publishActivity('Sending request...', sessionId)
 		const res = await fetchWithRetry(sessionId, runtime, provider, body)
-		if (!res || runtime.pausedByUser) break
+		if (!res || runtime.pausedByUser) {
+			await publishLine(`[debug:loop] exit: res=${!!res} paused=${runtime.pausedByUser}`, 'warn', sessionId)
+			break
+		}
 
 		const parsed = await parseResponseStream(sessionId, runtime, provider, res)
-		if (!parsed) break
+		if (!parsed) {
+			await publishLine('[debug:loop] exit: parsed=null', 'warn', sessionId)
+			break
+		}
 
 		if (debugEnabled('responseLogging')) {
 			const entry = {

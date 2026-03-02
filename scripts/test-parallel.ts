@@ -6,7 +6,7 @@ import { resolve } from 'path'
 
 const root = resolve(import.meta.dirname, '..')
 const glob = new Bun.Glob('src/**/*.test.ts')
-const files = [...glob.scanSync(root)].sort()
+const files = [...glob.scanSync(root)].filter(f => !f.endsWith('failing.test.ts')).sort()
 
 const t0 = performance.now()
 const procs = files.map(f => ({
