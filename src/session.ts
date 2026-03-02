@@ -478,7 +478,7 @@ export function extractLastPrompt(messages: any[]): string {
  * Append new messages to session.asonl with block refs.
  * Returns the new persisted count (= messages.length).
  */
-export async function saveSession(
+export async function persistMessages(
 	sessionId: string,
 	messages: any[],
 	persistedCount: number,

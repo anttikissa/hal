@@ -14,7 +14,7 @@ import {
 	markModelCalibrated,
 	saveTokenCalibration,
 } from '../token-calibration.ts'
-import { saveSession, appendConversation } from '../session.ts'
+import { persistMessages, appendConversation } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
 	getSessionWorkingDir,
@@ -186,7 +186,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			}
 
 			if (shouldRestart) {
-				runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+				runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 				process.exit(100)
 			}
 		}
@@ -199,7 +199,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	busySessions.delete(sessionId)
 	await emitStatus()
 
-	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
 	if (runtime.lastUsage && shouldWarn(runtime.lastUsage, contextWindowForModel(modelId))) {
 		await publishLine(

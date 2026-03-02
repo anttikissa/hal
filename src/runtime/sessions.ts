@@ -14,7 +14,7 @@ import {
 	loadSession,
 	loadSessionRegistry,
 	makeSessionId,
-	saveSession,
+	persistMessages,
 	saveSessionRegistry,
 	type SessionRegistry,
 	type TokenTotals,
@@ -145,7 +145,7 @@ export async function persistRegistry(): Promise<void> {
 /** Save all in-memory session state to disk. Called on shutdown. */
 export async function saveAllSessions(): Promise<void> {
 	for (const [id, runtime] of sessionCache) {
-		runtime.persistedCount = await saveSession(id, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(id))
+		runtime.persistedCount = await persistMessages(id, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(id))
 	}
 	await saveSessionRegistry(registry)
 }

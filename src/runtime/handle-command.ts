@@ -1,6 +1,6 @@
 import { resolve, isAbsolute } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { saveSession, saveSessionInfo, extractLastPrompt, appendConversation, rotateSession, buildRotationContext } from '../session.ts'
+import { persistMessages, saveSessionInfo, extractLastPrompt, appendConversation, rotateSession, buildRotationContext } from '../session.ts'
 import { sessionDir } from '../state.ts'
 import {
 	loadConfig,
@@ -102,7 +102,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	// Save current runtime state to disk before copying
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (runtime) {
-		runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+		runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 	}
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
@@ -178,7 +178,7 @@ async function runHandoff(sessionId: string, _text?: string): Promise<void> {
 	}
 
 	// Save before rotating
-	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
 	// Build context injection from user prompts
 	const context = buildRotationContext(sessionId, runtime.messages)
@@ -208,7 +208,7 @@ async function runReset(sessionId: string): Promise<void> {
 
 	// Save before rotating (if there's anything to save)
 	if (runtime.messages.length > 0) {
-		runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+		runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 		await rotateSession(sessionId)
 	}
 
@@ -447,7 +447,7 @@ export async function runClose(sessionId: string): Promise<void> {
 		runtime.activeAbort?.abort()
 	}
 
-	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 
 	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } =
 		await import('./sessions.ts')
@@ -469,5 +469,5 @@ export async function runClose(sessionId: string): Promise<void> {
 
 async function saveSessionBeforeExit(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	runtime.persistedCount = await saveSession(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
 }

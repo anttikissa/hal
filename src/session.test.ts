@@ -9,7 +9,7 @@ import { stringify, parse, parseAll } from './utils/ason.ts'
 // For isolation, we use unique session IDs per test.
 
 import {
-	saveSession,
+	persistMessages,
 	loadSession,
 	rotateSession,
 	buildRotationContext,
@@ -36,7 +36,7 @@ describe('block storage', () => {
 			{ role: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
 		]
 
-		await saveSession(id, messages, 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
 		const result = await loadSession(id)
 
 		expect(result).not.toBeNull()
@@ -59,7 +59,7 @@ describe('block storage', () => {
 			},
 		]
 
-		await saveSession(id, messages, 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
 
 		// Verify block file was created
 		const blocks = readdirSync(join(sessionDir(id), 'blocks'))
@@ -93,7 +93,7 @@ describe('block storage', () => {
 			},
 		]
 
-		await saveSession(id, messages, 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
 
 		// Verify block files were created (1 for tool call+result)
 		const blocks = readdirSync(join(sessionDir(id), 'blocks'))
@@ -119,7 +119,7 @@ describe('block storage', () => {
 			},
 		]
 
-		await saveSession(id, messages, 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
 
 		const raw = readFileSync(join(sessionDir(id), 'session.asonl'), 'utf-8')
 		// Should contain ref, not the actual thinking content
@@ -134,11 +134,11 @@ describe('append-only save', () => {
 		const id = uniqueId()
 		const messages: any[] = [{ role: 'user', content: 'first' }]
 
-		const count1 = await saveSession(id, messages, 0, { ...EMPTY_TOTALS })
+		const count1 = await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
 		expect(count1).toBe(1)
 
 		messages.push({ role: 'assistant', content: [{ type: 'text', text: 'reply' }] })
-		const count2 = await saveSession(id, messages, count1, { ...EMPTY_TOTALS })
+		const count2 = await persistMessages(id, messages, count1, { ...EMPTY_TOTALS })
 		expect(count2).toBe(2)
 
 		// Verify file has exactly 2 lines
@@ -156,10 +156,10 @@ describe('append-only save', () => {
 		const id = uniqueId()
 		const messages = [{ role: 'user', content: 'hello' }]
 
-		await saveSession(id, messages, 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
 		const stat1 = Bun.file(join(sessionDir(id), 'session.asonl')).size
 
-		await saveSession(id, messages, 1, { ...EMPTY_TOTALS })
+		await persistMessages(id, messages, 1, { ...EMPTY_TOTALS })
 		const stat2 = Bun.file(join(sessionDir(id), 'session.asonl')).size
 
 		expect(stat1).toBe(stat2)
@@ -169,7 +169,7 @@ describe('append-only save', () => {
 describe('rotation', () => {
 	test('rotates session.asonl to session.1.asonl', async () => {
 		const id = uniqueId()
-		await saveSession(id, [{ role: 'user', content: 'hello' }], 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, [{ role: 'user', content: 'hello' }], 0, { ...EMPTY_TOTALS })
 
 		const rotN = await rotateSession(id)
 		expect(rotN).toBe(1)
@@ -182,15 +182,15 @@ describe('rotation', () => {
 		const id = uniqueId()
 
 		// First rotation
-		await saveSession(id, [{ role: 'user', content: 'r1' }], 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, [{ role: 'user', content: 'r1' }], 0, { ...EMPTY_TOTALS })
 		expect(await rotateSession(id)).toBe(1)
 
 		// Second rotation
-		await saveSession(id, [{ role: 'user', content: 'r2' }], 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, [{ role: 'user', content: 'r2' }], 0, { ...EMPTY_TOTALS })
 		expect(await rotateSession(id)).toBe(2)
 
 		// Third rotation
-		await saveSession(id, [{ role: 'user', content: 'r3' }], 0, { ...EMPTY_TOTALS })
+		await persistMessages(id, [{ role: 'user', content: 'r3' }], 0, { ...EMPTY_TOTALS })
 		expect(await rotateSession(id)).toBe(3)
 
 		expect(existsSync(join(sessionDir(id), 'session.1.asonl'))).toBe(true)
@@ -261,7 +261,7 @@ describe('fork with blocks', () => {
 			},
 		]
 
-		await saveSession(srcId, messages, 0, { ...EMPTY_TOTALS })
+		await persistMessages(srcId, messages, 0, { ...EMPTY_TOTALS })
 
 		const newId = await forkSession(srcId)
 
