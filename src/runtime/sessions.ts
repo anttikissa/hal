@@ -177,7 +177,7 @@ export async function ensureSession(sessionId: string, workingDir: string, after
 	ensureSessionQueue(session.id)
 	setSessionStartTime(sessionId, session.createdAt)
 	// Only write start event for genuinely new sessions (not forks which already have log)
-	if (!existsSync(`${sessionDir(sessionId)}/messages.asonl`) && !existsSync(`${sessionDir(sessionId)}/conversation.asonl`))
+	if (!existsSync(`${sessionDir(sessionId)}/messages.asonl`))
 		await appendToLog(sessionId, [{ type: 'start', workingDir: session.workingDir, ts: session.createdAt }])
 	await persistRegistry()
 	await emitStatus()

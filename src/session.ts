@@ -1,10 +1,10 @@
 // See docs/session.md — keep it in sync when changing this file.
 
 import { appendFile, mkdir, readFile, writeFile } from 'fs/promises'
-import { existsSync, readdirSync, readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { stringify, parse, parseAll } from './utils/ason.ts'
-import { sessionDir, SESSIONS_DIR, SESSIONS_INDEX, EPOCH_PATH, ensureStateDir, LAUNCH_CWD } from './state.ts'
+import { sessionDir, SESSIONS_INDEX, EPOCH_PATH, ensureStateDir, LAUNCH_CWD } from './state.ts'
 import { resolve } from 'path'
 
 export type TokenTotals = { input: number; output: number; cacheCreate: number; cacheRead: number }
@@ -316,8 +316,7 @@ export async function loadSession(
 		}
 	}
 
-	// Fall back to legacy session.asonl
-	return loadSessionLegacy(sessionId)
+	return null
 }
 
 /** Convert log entries to API messages with context trimming. */
@@ -433,10 +432,7 @@ async function resolveToolResult(sessionId: string, ref: string): Promise<string
 export async function loadReplayEntries(sessionId: string): Promise<any[]> {
 	const allEntries = await loadAllEntries(sessionId)
 
-	if (allEntries.length === 0) {
-		// Fall back to legacy conversation.asonl
-		return loadReplayEntriesLegacy(sessionId)
-	}
+	if (allEntries.length === 0) return []
 
 	const startIdx = findReplayStart(allEntries)
 	const entries = allEntries.slice(startIdx)
@@ -456,20 +452,7 @@ export async function loadReplayEntries(sessionId: string): Promise<any[]> {
 
 export async function loadInputHistory(sessionId: string): Promise<string[]> {
 	const entries = await loadAllEntries(sessionId)
-	if (entries.length === 0) {
-		// Legacy fallback
-		const convPath = `${sessionDir(sessionId)}/conversation.asonl`
-		if (existsSync(convPath)) {
-			try {
-				const events = parseAll(await readFile(convPath, 'utf-8')) as any[]
-				return events
-					.filter((e: any) => e.type === 'user')
-					.map((e: any) => e.text)
-					.slice(-200)
-			} catch { return [] }
-		}
-		return []
-	}
+	if (entries.length === 0) return []
 	return entries
 		.filter((e: any) => e.role === 'user')
 		.map((e: any) => {
@@ -635,13 +618,6 @@ export async function forkSession(sourceId: string): Promise<string> {
 	if (existsSync(srcLog)) {
 		const { copyFile } = await import('fs/promises')
 		await copyFile(srcLog, `${dstDir}/messages.asonl`)
-	} else {
-		// Legacy: copy session.asonl if it exists
-		const legacyPath = `${srcDir}/session.asonl`
-		if (existsSync(legacyPath)) {
-			const { copyFile } = await import('fs/promises')
-			await copyFile(legacyPath, `${dstDir}/session.asonl`)
-		}
 	}
 
 	// Copy blocks directory
@@ -717,122 +693,4 @@ export function timeSince(iso: string): string {
 	const hours = Math.floor(minutes / 60)
 	if (hours < 24) return `${hours}h ago`
 	return `${Math.floor(hours / 24)}d ago`
-}
-
-// Legacy format support (migration)
-
-async function loadSessionLegacy(
-	sessionId: string,
-): Promise<{ messages: any[]; tokenTotals: TokenTotals } | null> {
-	const path = `${sessionDir(sessionId)}/session.asonl`
-	if (!existsSync(path)) return null
-	try {
-		const raw = await readFile(path, 'utf-8')
-		if (!raw.trim()) return null
-		const leanMessages = parseAll(raw) as any[]
-		if (leanMessages.length === 0) return null
-
-		const messages: any[] = []
-		for (const lean of leanMessages) {
-			messages.push(await fromLeanMessageLegacy(lean, sessionId))
-		}
-
-		const repaired = repairMessages(messages)
-		const meta = await loadSessionInfo(sessionId)
-		return {
-			messages: repaired,
-			tokenTotals: meta?.tokenTotals ?? { ...EMPTY_TOTALS },
-		}
-	} catch {
-		return null
-	}
-}
-
-async function fromLeanMessageLegacy(lean: any, sessionId: string): Promise<any> {
-	if (lean.role === 'assistant') {
-		const content: any[] = []
-
-		if (lean.thinking?.ref) {
-			const block = await readBlock(sessionId, lean.thinking.ref)
-			if (block) {
-				content.push({ type: 'thinking', thinking: block.thinking, signature: block.signature })
-			}
-		}
-
-		if (typeof lean.content === 'string') {
-			if (lean.content) content.push({ type: 'text', text: lean.content })
-		} else if (Array.isArray(lean.content)) {
-			for (const block of lean.content) {
-				if (block.type === 'tool_use' && block.ref) {
-					const data = await readBlock(sessionId, block.ref)
-					content.push({
-						type: 'tool_use',
-						id: block.id,
-						name: block.name,
-						input: data?.call?.input ?? {},
-					})
-				} else {
-					content.push(block)
-				}
-			}
-		}
-
-		return { role: 'assistant', content }
-	}
-
-	if (lean.role === 'user' && Array.isArray(lean.content)) {
-		const content: any[] = []
-		for (const block of lean.content) {
-			if (block.type === 'tool_result' && block.ref) {
-				const data = await readBlock(sessionId, block.ref)
-				content.push({
-					type: 'tool_result',
-					tool_use_id: block.tool_use_id,
-					content: data?.result?.content ?? '',
-				})
-			} else {
-				content.push(block)
-			}
-		}
-		return { role: 'user', content }
-	}
-
-	const { ts, ...rest } = lean
-	return rest
-}
-
-async function loadReplayEntriesLegacy(sessionId: string): Promise<any[]> {
-	const convPath = `${sessionDir(sessionId)}/conversation.asonl`
-	if (!existsSync(convPath)) return []
-	try {
-		const events = parseAll(await readFile(convPath, 'utf-8')) as any[]
-
-		// Find last handoff/reset
-		let startIdx = 0
-		for (let i = events.length - 1; i >= 0; i--) {
-			if (events[i].type === 'reset' || events[i].type === 'handoff') {
-				startIdx = i + 1
-				break
-			}
-		}
-
-		// Convert legacy conversation events to new-format entries
-		const result: any[] = []
-		for (const event of events.slice(startIdx)) {
-			if (event.type === 'start') {
-				result.push(event)
-			} else if (event.type === 'user') {
-				result.push({ role: 'user', content: event.text, ts: event.ts })
-			} else if (event.type === 'assistant') {
-				const entry: any = { role: 'assistant', text: event.text, ts: event.ts }
-				if (event.thinking) entry._thinkingText = event.thinking
-				result.push(entry)
-			} else if (event.type === 'tool') {
-				result.push({ type: 'tool_log', text: event.text, ts: event.ts })
-			}
-		}
-		return result
-	} catch {
-		return []
-	}
 }

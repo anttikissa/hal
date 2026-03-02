@@ -37,20 +37,14 @@ describe('topic restart regression', () => {
 `,
 				)
 				writeFileSync(
-					`${sessionDir}/session.asonl`,
-					`{ role: 'user', content: 'Need help fixing topic persistence' }
-{ role: 'assistant', content: [{ type: 'text', text: 'Sure, let us debug it.' }] }
+					`${sessionDir}/messages.asonl`,
+					`{ role: 'user', content: 'Need help fixing topic persistence', ts: '2026-02-28T00:00:00.000Z' }
+{ role: 'assistant', text: 'Sure, let us debug it.', ts: '2026-02-28T00:00:01.000Z' }
 `,
 				)
 				writeFileSync(
 					`${sessionDir}/info.ason`,
 					`{ workingDir: '/tmp', updatedAt: '2026-02-28T00:00:00.000Z', tokenTotals: { input: 0, output: 0, cacheCreate: 0, cacheRead: 0 } }
-`,
-				)
-				writeFileSync(
-					`${sessionDir}/conversation.asonl`,
-					`{ type: 'user', text: 'Need help fixing topic persistence', ts: '2026-02-28T00:00:00.000Z' }
-{ type: 'assistant', text: 'Sure, let us debug it.', ts: '2026-02-28T00:00:01.000Z' }
 `,
 				)
 			},
