@@ -499,14 +499,14 @@ async function hydrateHistory(): Promise<void> {
 			tab.inputHistory = await loadInputHistory(tab.sessionId)
 			tab.inputDraft = await loadDraft(tab.sessionId)
 		}))
-		// Re-render active tab with hydrated content; preserve any input the user typed
+		// Re-render: prepend hydrated history before any content rendered since bootstrap
 		const active = activeTab()
 		if (active) {
 			screenFmt = { ...active.fmtState }; lastContextStatus = active.contextStatus
 			setInputHistory(active.inputHistory)
 			const { text: currentInput } = getInputDraft()
 			if (!currentInput && active.inputDraft) setInputDraft(active.inputDraft, active.inputCursor)
-			if (active.output.length > 0) tui.replaceOutput(active.output)
+			if (active.output.length > 0) applyHydratedOutput(active.output)
 		}
 		renderBusyStatus()
 		const elapsed = Date.now() - t0
@@ -518,6 +518,11 @@ async function hydrateHistory(): Promise<void> {
 	}
 }
 
+/** Apply hydrated history to TUI, preserving any content rendered since bootstrap. */
+export function applyHydratedOutput(hydrated: string): void {
+	const live = getOutputSnapshot()
+	tui.replaceOutput(live ? hydrated + '\n' + live : hydrated)
+}
 /** Parse context percentage from contextStatus string (e.g. "~5.2%/200k" → 5.2, null → null) */
 export function parseContextPct(status: string | null): number | null {
 	if (!status) return null

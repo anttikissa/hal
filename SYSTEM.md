@@ -1,6 +1,5 @@
 # SYSTEM.md
 
-
 <agent>Hal</agent>
 <model>${model}</model>
 <cwd>${cwd}</cwd>
