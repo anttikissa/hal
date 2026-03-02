@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { providerForModel } from '../config.ts'
 import { getProvider } from '../provider.ts'
-import { appendConversation } from '../session.ts'
+import { appendToLog, userContentToLog } from '../session.ts'
 import { getOrLoadSessionRuntime, getSessionModel } from './sessions.ts'
 import { runAgentLoop } from './agent-loop.ts'
 
@@ -64,9 +64,12 @@ export async function processPrompt(sessionId: string, input: string): Promise<v
 	const fullModel = getSessionModel(sessionId)
 	const providerName = providerForModel(fullModel)
 
-	await appendConversation(sessionId, { type: 'user', text: input, ts: new Date().toISOString() })
+	const content = parseInputContent(input)
+	runtime.messages.push({ role: 'user', content })
 
-	runtime.messages.push({ role: 'user', content: parseInputContent(input) })
+	// Write to log (images → block refs)
+	const logContent = await userContentToLog(sessionId, content)
+	await appendToLog(sessionId, [{ role: 'user', content: logContent, ts: new Date().toISOString() }])
 
 	const provider = getProvider(providerName)
 	await provider.refreshAuth()

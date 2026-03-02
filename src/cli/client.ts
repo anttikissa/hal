@@ -53,9 +53,8 @@ import {
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import {
-	loadConversation,
+	loadReplayEntries,
 	loadInputHistory,
-	replayConversationEvents,
 	saveDraft,
 	loadDraft,
 	loadSessionRegistry,
@@ -287,9 +286,9 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 
 	// Pre-load conversation for display
 	const inputHistory = await loadInputHistory(sessionId)
-	const history = await loadConversation(sessionId)
-	const replay = renderConversationHistory(history)
-	const replayCount = replayConversationEvents(history).length
+	const entries = await loadReplayEntries(sessionId)
+	const replay = renderConversationHistory(entries)
+	const replayCount = entries.filter((e: any) => e.role === 'user' || e.role === 'assistant' || e.type === 'tool_log').length
 
 	captureActiveOutput()
 	pendingOpenSwitch = true
@@ -378,38 +377,41 @@ function syncTabsFromSessions(
 	if (options.render ?? true) applyActiveTabSnapshot(targetSessionId !== previousActive)
 }
 
-function renderConversationHistory(events: Awaited<ReturnType<typeof loadConversation>>): { output: string; fmtState: FormatState } {
+function renderConversationHistory(entries: any[]): { output: string; fmtState: FormatState } {
 	const fmtState = createFormatState()
 	let output = ''
-	// Find relevant start index (after last reset/handoff)
-	let startIdx = 0
-	for (let i = events.length - 1; i >= 0; i--) {
-		if (events[i].type === 'reset' || events[i].type === 'handoff') { startIdx = i + 1; break }
-	}
-	// Render start event if present in the relevant slice
-	for (const event of events.slice(startIdx)) {
-		if (event.type === 'start') {
-			const d = new Date(event.ts)
+	for (const entry of entries) {
+		if (entry.type === 'start') {
+			const d = new Date(entry.ts)
 			const pad = (n: number) => String(n).padStart(2, '0')
 			const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-			output += pushFragment('line.info', `[session] started ${dateStr} — ${event.workingDir}`, fmtState)
-			break
+			output += pushFragment('line.info', `[session] started ${dateStr} — ${entry.workingDir}`, fmtState)
+			continue
 		}
-	}
-	for (const event of replayConversationEvents(events)) {
-		if (event.type === 'tool') {
-			for (const line of event.text.split('\n')) {
+		if (entry.type === 'tool_log') {
+			for (const line of entry.text.split('\n')) {
 				output += pushFragment('line.tool', line, fmtState)
 			}
 			continue
 		}
-		if (event.type === 'assistant' && event.thinking) {
-			const t = event.thinking.endsWith('\n') ? event.thinking : event.thinking + '\n'
-			output += pushFragment('chunk.thinking', t, fmtState)
-			output += pushFragment('line.thinking-end' as any, '', fmtState)
+		if (entry.role === 'user') {
+			const text = typeof entry.content === 'string' ? entry.content : entry.content?.find?.((b: any) => b.type === 'text')?.text ?? ''
+			if (!text || text.startsWith('[')) continue
+			output += pushFragment('prompt', text, fmtState)
+			continue
 		}
-		const kind = event.type === 'user' ? 'prompt' : 'assistant'
-		output += pushFragment(kind, event.text, fmtState)
+		if (entry.role === 'assistant') {
+			const thinkingText = entry._thinkingText
+			if (thinkingText) {
+				const t = thinkingText.endsWith('\n') ? thinkingText : thinkingText + '\n'
+				output += pushFragment('chunk.thinking', t, fmtState)
+				output += pushFragment('line.thinking-end' as any, '', fmtState)
+			}
+			if (entry.text) {
+				output += pushFragment('assistant', entry.text, fmtState)
+			}
+			continue
+		}
 	}
 	return { output, fmtState }
 }
@@ -418,10 +420,10 @@ async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
 	const replayed = new Map<string, number>()
 	await Promise.all(tabs.map(async (tab) => {
 		if (tab.output.trim().length > 0) return
-		const events = await loadConversation(tab.sessionId)
-		const replay = renderConversationHistory(events)
+		const entries = await loadReplayEntries(tab.sessionId)
+		const replay = renderConversationHistory(entries)
 		tab.output = replay.output; tab.fmtState = replay.fmtState
-		replayed.set(tab.sessionId, replayConversationEvents(events).length)
+		replayed.set(tab.sessionId, entries.filter((e: any) => e.role === 'user' || e.role === 'assistant' || e.type === 'tool_log').length)
 	}))
 	return replayed
 }

@@ -1,6 +1,6 @@
 import { resolve, isAbsolute } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { persistMessages, saveSessionInfo, extractLastPrompt, appendConversation, rotateSession, buildRotationContext } from '../session.ts'
+import { saveSessionInfo, extractLastPrompt, appendToLog, rotateSession, buildRotationContext, writeAssistantEntry } from '../session.ts'
 import { sessionDir } from '../state.ts'
 import {
 	loadConfig,
@@ -74,8 +74,6 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 				await runSystem(sessionId)
 				break
 
-
-
 			case 'topic':
 				await runTopic(sessionId, command.text ?? '')
 				break
@@ -99,10 +97,15 @@ export async function handleCommand(command: RuntimeCommand, sessionId: string):
 export async function runFork(sessionId: string, _command: RuntimeCommand): Promise<void> {
 	const busy = busySessions.has(sessionId)
 
-	// Save current runtime state to disk before copying
+	// Save current metadata before forking
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (runtime) {
-		runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+		await saveSessionInfo(sessionId, {
+			...sessionMetaSnapshot(sessionId),
+			updatedAt: new Date().toISOString(),
+			lastPrompt: extractLastPrompt(runtime.messages),
+			tokenTotals: runtime.tokenTotals,
+		})
 	}
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
@@ -116,11 +119,12 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 		await persistRegistry()
 	}
 
-	// Record fork in conversation histories.
+	// Record fork in message logs
 	// Skip the marker on the original if busy — inserting a user message
 	// mid-response would corrupt the alternating user/assistant pattern.
 	if (runtime && !busy) {
 		runtime.messages.push({ role: 'user', content: `[forked to ${newId}]` })
+		await appendToLog(sessionId, [{ role: 'user', content: `[forked to ${newId}]`, ts: new Date().toISOString() }])
 	}
 	const forkRuntime = await getOrLoadSessionRuntime(newId)
 
@@ -136,15 +140,18 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 		})
 		if (blocks.length > 0) {
 			forkRuntime.messages.push({ role: 'assistant', content: structuredClone(blocks) })
+			const { entry } = await writeAssistantEntry(newId, blocks)
+			await appendToLog(newId, [entry])
 		}
 	}
 
 	forkRuntime.messages.push({ role: 'user', content: `[forked from ${sessionId}]` })
+	await appendToLog(newId, [{ role: 'user', content: `[forked from ${sessionId}]`, ts: new Date().toISOString() }])
 
 	const ts = new Date().toISOString()
 	const forkEvent = { type: 'fork' as const, parent: sessionId, child: newId, ts }
-	await appendConversation(sessionId, forkEvent)
-	await appendConversation(newId, forkEvent)
+	await appendToLog(sessionId, [forkEvent])
+	await appendToLog(newId, [forkEvent])
 
 	markSessionAsActive(newId)
 	// If the parent was mid-generation, start the child paused so both
@@ -177,25 +184,25 @@ async function runHandoff(sessionId: string, _text?: string): Promise<void> {
 		return
 	}
 
-	// Save before rotating
-	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	// Append handoff event to current log before rotating
+	await appendToLog(sessionId, [{ type: 'handoff', ts: new Date().toISOString() }])
 
 	// Build context injection from user prompts
 	const context = buildRotationContext(sessionId, runtime.messages)
 
-	// Rotate session.asonl → session.N.asonl
+	// Rotate: point currentLog to a new file
 	const rotN = await rotateSession(sessionId)
-
-	await appendConversation(sessionId, { type: 'handoff', ts: new Date().toISOString() })
 
 	// Reset runtime with context injection
 	const { getSessionCache } = await import('./sessions.ts')
 	getSessionCache().delete(sessionId)
 	const freshRuntime = await getOrLoadSessionRuntime(sessionId)
 	freshRuntime.messages = [{ role: 'user', content: context }]
-	freshRuntime.persistedCount = 0
 
-	await publishLine(`[handoff] rotated → session.${rotN}.asonl, context injected`, 'meta', sessionId)
+	// Write context to new log
+	await appendToLog(sessionId, [{ role: 'user', content: context, ts: new Date().toISOString() }])
+
+	await publishLine(`[handoff] rotated → messages${rotN > 1 ? rotN : ''}.asonl, context injected`, 'meta', sessionId)
 	await publishEstimatedContext(sessionId)
 }
 
@@ -206,9 +213,8 @@ async function runReset(sessionId: string): Promise<void> {
 		runtime.activeAbort?.abort()
 	}
 
-	// Save before rotating (if there's anything to save)
 	if (runtime.messages.length > 0) {
-		runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+		await appendToLog(sessionId, [{ type: 'reset', ts: new Date().toISOString() }])
 		await rotateSession(sessionId)
 	}
 
@@ -222,7 +228,6 @@ async function runReset(sessionId: string): Promise<void> {
 		await persistRegistry()
 	}
 
-	await appendConversation(sessionId, { type: 'reset', ts: new Date().toISOString() })
 	await publishLine('[reset] session cleared', 'meta', sessionId)
 	await publishEstimatedContext(sessionId)
 	await emitStatus()
@@ -255,7 +260,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 		await persistRegistry()
 	}
 
-	// Record model change in conversation history so handoff summaries capture it
+	// Record model change in messages so handoff summaries capture it
 	const runtime = await getOrLoadSessionRuntime(sessionId)
 	runtime.messages.push({
 		role: 'user',
@@ -268,7 +273,11 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 		lastPrompt: extractLastPrompt(runtime.messages),
 	})
 
-	await appendConversation(sessionId, { type: 'model', from: prevModel, to: fullModel, ts: new Date().toISOString() })
+	const ts = new Date().toISOString()
+	await appendToLog(sessionId, [
+		{ role: 'user', content: `[model changed from ${prevModel} to ${fullModel}]`, ts },
+		{ type: 'model', from: prevModel, to: fullModel, ts },
+	])
 
 	// Reload system prompt for new model
 	const loaded = await reloadSystemPromptForSession(sessionId)
@@ -344,7 +353,7 @@ export async function runCd(sessionId: string, text: string): Promise<void> {
 	})
 
 	if (previous !== next) {
-		await appendConversation(sessionId, { type: 'cd', from: previous, to: next, ts: new Date().toISOString() })
+		await appendToLog(sessionId, [{ type: 'cd', from: previous, to: next, ts: new Date().toISOString() }])
 	}
 
 	const loaded = await reloadSystemPromptForSession(sessionId)
@@ -369,7 +378,7 @@ async function runTopic(sessionId: string, text: string): Promise<void> {
 
 	const prev = meta?.topic
 	await setSessionTopic(sessionId, topic)
-	await appendConversation(sessionId, { type: 'topic', from: prev, to: topic, ts: new Date().toISOString() })
+	await appendToLog(sessionId, [{ type: 'topic', from: prev, to: topic, ts: new Date().toISOString() }])
 	await publishLine(`[topic] ${topic}`, 'meta', sessionId)
 }
 
@@ -434,7 +443,7 @@ async function maybeAutoTopic(sessionId: string): Promise<void> {
 		})
 		if (!topic) return
 		await setSessionTopic(sessionId, topic)
-		await appendConversation(sessionId, { type: 'topic', to: topic, auto: true, ts: new Date().toISOString() })
+		await appendToLog(sessionId, [{ type: 'topic', to: topic, auto: true, ts: new Date().toISOString() }])
 	} catch {
 		// Non-critical — silently ignore
 	}
@@ -447,7 +456,12 @@ export async function runClose(sessionId: string): Promise<void> {
 		runtime.activeAbort?.abort()
 	}
 
-	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	await saveSessionInfo(sessionId, {
+		...sessionMetaSnapshot(sessionId),
+		updatedAt: new Date().toISOString(),
+		lastPrompt: extractLastPrompt(runtime.messages),
+		tokenTotals: runtime.tokenTotals,
+	})
 
 	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } =
 		await import('./sessions.ts')
@@ -469,5 +483,10 @@ export async function runClose(sessionId: string): Promise<void> {
 
 async function saveSessionBeforeExit(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	await saveSessionInfo(sessionId, {
+		...sessionMetaSnapshot(sessionId),
+		updatedAt: new Date().toISOString(),
+		lastPrompt: extractLastPrompt(runtime.messages),
+		tokenTotals: runtime.tokenTotals,
+	})
 }

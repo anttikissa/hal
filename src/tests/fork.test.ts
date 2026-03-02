@@ -22,8 +22,8 @@ function parseForkIds(text: string): { parent: string; child: string } {
 	if (!match) throw new Error(`could not parse fork ids from line: ${text}`)
 	return { parent: match[1], child: match[2] }
 }
-async function readConversationLog(hal: TestHal, sessionId: string): Promise<any[]> {
-	const path = `${hal.halDir}/state/sessions/${sessionId}/conversation.asonl`
+async function readMessagesLog(hal: TestHal, sessionId: string): Promise<any[]> {
+	const path = `${hal.halDir}/state/sessions/${sessionId}/messages.asonl`
 	for (let i = 0; i < 40; i++) {
 		try {
 			const raw = await readFile(path, 'utf-8')
@@ -31,63 +31,58 @@ async function readConversationLog(hal: TestHal, sessionId: string): Promise<any
 		} catch {}
 		await Bun.sleep(25)
 	}
-	throw new Error(`conversation log not found: ${path}`)
+	throw new Error(`messages log not found: ${path}`)
 }
 
 /** Read session messages and resolve block refs back to full content. */
 async function readSessionMessages(hal: TestHal, sessionId: string): Promise<any[]> {
 	const sessDir = `${hal.halDir}/state/sessions/${sessionId}`
-	const path = `${sessDir}/session.asonl`
+	const path = `${sessDir}/messages.asonl`
 	for (let i = 0; i < 60; i++) {
 		try {
 			const raw = await readFile(path, 'utf-8')
-			const leanMessages = parseAll(raw) as any[]
-			if (leanMessages.length === 0) { await Bun.sleep(50); continue }
+			const entries = parseAll(raw) as any[]
+			const roleEntries = entries.filter((e: any) => e.role)
+			if (roleEntries.length === 0) { await Bun.sleep(50); continue }
 
-			// Resolve refs
 			const messages: any[] = []
-			for (const lean of leanMessages) {
-				if (lean.role === 'assistant') {
+			for (const entry of roleEntries) {
+				if (entry.role === 'assistant') {
 					const content: any[] = []
-					if (lean.thinking?.ref) {
-						const blockPath = `${sessDir}/blocks/${lean.thinking.ref}.ason`
+					if (entry.thinking?.ref) {
+						const blockPath = `${sessDir}/blocks/${entry.thinking.ref}.ason`
 						if (existsSync(blockPath)) {
 							const block = parse(await readFile(blockPath, 'utf-8')) as any
 							content.push({ type: 'thinking', thinking: block.thinking, signature: block.signature })
 						}
 					}
-					if (typeof lean.content === 'string') {
-						if (lean.content) content.push({ type: 'text', text: lean.content })
-					} else if (Array.isArray(lean.content)) {
-						for (const b of lean.content) {
-							if (b.type === 'tool_use' && b.ref) {
-								const blockPath = `${sessDir}/blocks/${b.ref}.ason`
-								if (existsSync(blockPath)) {
-									const block = parse(await readFile(blockPath, 'utf-8')) as any
-									content.push({ type: 'tool_use', id: b.id, name: b.name, input: block?.call?.input ?? {} })
-								}
-							} else {
-								content.push(b)
+					if (entry.text) content.push({ type: 'text', text: entry.text })
+					if (entry.tools) {
+						for (const t of entry.tools) {
+							const blockPath = `${sessDir}/blocks/${t.ref}.ason`
+							if (existsSync(blockPath)) {
+								const block = parse(await readFile(blockPath, 'utf-8')) as any
+								content.push({ type: 'tool_use', id: t.id, name: t.name, input: block?.call?.input ?? {} })
 							}
 						}
 					}
 					messages.push({ role: 'assistant', content })
-				} else if (lean.role === 'user' && Array.isArray(lean.content)) {
-					const content: any[] = []
-					for (const b of lean.content) {
-						if (b.type === 'tool_result' && b.ref) {
-							const blockPath = `${sessDir}/blocks/${b.ref}.ason`
-							if (existsSync(blockPath)) {
-								const block = parse(await readFile(blockPath, 'utf-8')) as any
-								content.push({ type: 'tool_result', tool_use_id: b.tool_use_id, content: block?.result?.content ?? '' })
+				} else if (entry.role === 'tool_result') {
+					if (entry.ref) {
+						const blockPath = `${sessDir}/blocks/${entry.ref}.ason`
+						if (existsSync(blockPath)) {
+							const block = parse(await readFile(blockPath, 'utf-8')) as any
+							const resultBlock = { type: 'tool_result', tool_use_id: entry.tool_use_id, content: block?.result?.content ?? '' }
+							const lastMsg = messages[messages.length - 1]
+							if (lastMsg?.role === 'user' && Array.isArray(lastMsg.content) && lastMsg.content[0]?.type === 'tool_result') {
+								lastMsg.content.push(resultBlock)
+							} else {
+								messages.push({ role: 'user', content: [resultBlock] })
 							}
-						} else {
-							content.push(b)
 						}
 					}
-					messages.push({ role: 'user', content })
 				} else {
-					const { ts, ...rest } = lean
+					const { ts, ...rest } = entry
 					messages.push(rest)
 				}
 			}
@@ -95,7 +90,7 @@ async function readSessionMessages(hal: TestHal, sessionId: string): Promise<any
 		} catch {}
 		await Bun.sleep(50)
 	}
-	throw new Error(`session file not found: ${path}`)
+	throw new Error(`messages log not found: ${path}`)
 }
 
 describe('fork', () => {
@@ -253,8 +248,8 @@ describe('fork', () => {
 		const { parent, child } = parseForkIds(line.text)
 		expect(parent).toBe(sourceId)
 
-		const parentLog = await readConversationLog(hal, parent)
-		const childLog = await readConversationLog(hal, child)
+		const parentLog = await readMessagesLog(hal, parent)
+		const childLog = await readMessagesLog(hal, child)
 
 		const parentForkEvent = parentLog.find(
 			(evt) => evt.type === 'fork' && evt.parent === parent && evt.child === child,

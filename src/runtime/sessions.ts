@@ -9,13 +9,14 @@ import {
 } from '../context.ts'
 import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
-	appendConversation,
+	appendToLog,
 	ensureEpoch,
 	loadSession,
 	loadSessionRegistry,
 	makeSessionId,
-	persistMessages,
+	saveSessionInfo,
 	saveSessionRegistry,
+	setSessionStartTime,
 	type SessionRegistry,
 	type TokenTotals,
 	EMPTY_TOTALS,
@@ -36,7 +37,6 @@ import { initPublisher, publishLine, publishStatus, publishContext } from './eve
 // Runtime cache per session
 export interface SessionRuntimeCache {
 	messages: any[]
-	persistedCount: number
 	tokenTotals: TokenTotals
 	lastUsage: any
 	systemPrompt: any[]
@@ -95,12 +95,13 @@ export function getSessionModel(sessionId: string | null): string {
 }
 
 /** Build meta snapshot for persisting alongside session data. */
-export function sessionMetaSnapshot(sessionId: string): { workingDir: string; model?: string; topic?: string } {
+export function sessionMetaSnapshot(sessionId: string): { workingDir: string; model?: string; topic?: string; createdAt?: string } {
 	const meta = getSessionMeta(sessionId)
 	return {
 		workingDir: getSessionWorkingDir(sessionId),
 		model: getSessionModel(sessionId),
 		topic: meta?.topic,
+		createdAt: meta?.createdAt,
 	}
 }
 
@@ -142,10 +143,14 @@ export async function persistRegistry(): Promise<void> {
 	await saveSessionRegistry(registry)
 }
 
-/** Save all in-memory session state to disk. Called on shutdown. */
+/** Save all in-memory session metadata to disk. Called on shutdown. */
 export async function saveAllSessions(): Promise<void> {
 	for (const [id, runtime] of sessionCache) {
-		runtime.persistedCount = await persistMessages(id, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(id))
+		await saveSessionInfo(id, {
+			...sessionMetaSnapshot(id),
+			updatedAt: new Date().toISOString(),
+			tokenTotals: runtime.tokenTotals,
+		})
 	}
 	await saveSessionRegistry(registry)
 }
@@ -170,9 +175,10 @@ export async function ensureSession(sessionId: string, workingDir: string, after
 	}
 	if (!registry.activeSessionId) registry.activeSessionId = session.id
 	ensureSessionQueue(session.id)
-	// Only write start event for genuinely new sessions (not forks which already have conversation history)
-	if (!existsSync(`${sessionDir(sessionId)}/conversation.asonl`))
-		await appendConversation(sessionId, { type: 'start', workingDir: session.workingDir, ts: session.createdAt })
+	setSessionStartTime(sessionId, session.createdAt)
+	// Only write start event for genuinely new sessions (not forks which already have log)
+	if (!existsSync(`${sessionDir(sessionId)}/messages.asonl`) && !existsSync(`${sessionDir(sessionId)}/conversation.asonl`))
+		await appendToLog(sessionId, [{ type: 'start', workingDir: session.workingDir, ts: session.createdAt }])
 	await persistRegistry()
 	await emitStatus()
 	return session
@@ -185,7 +191,6 @@ export async function getOrLoadSessionRuntime(sessionId: string): Promise<Sessio
 	const restored = await loadSession(sessionId)
 	const runtime: SessionRuntimeCache = {
 		messages: restored?.messages ?? [],
-		persistedCount: restored?.persistedCount ?? 0,
 		tokenTotals: { ...EMPTY_TOTALS, ...(restored?.tokenTotals ?? EMPTY_TOTALS) },
 		lastUsage: null,
 		systemPrompt: [],

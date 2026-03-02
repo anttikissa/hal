@@ -1,22 +1,19 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdirSync, rmSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { describe, test, expect, afterEach } from 'bun:test'
+import { readdirSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
-import { stringify, parse, parseAll } from './utils/ason.ts'
-
-// We can't change STATE_DIR after import, so instead we test the core logic
-// directly by writing to a temp dir and using the public API with its configured state dir.
-// For isolation, we use unique session IDs per test.
+import { stringify, parseAll } from './utils/ason.ts'
 
 import {
-	persistMessages,
+	appendToLog,
+	writeAssistantEntry,
+	writeToolResultEntry,
 	loadSession,
 	rotateSession,
 	buildRotationContext,
 	forkSession,
-	replayConversationEvents,
+	loadReplayEntries,
 	EMPTY_TOTALS,
-	type ConversationEvent,
 } from './session.ts'
 import { sessionDir } from './state.ts'
 
@@ -28,17 +25,16 @@ afterEach(() => {
 	// Clean up test sessions
 })
 
-describe('block storage', () => {
+describe('unified log — block storage', () => {
 	test('saves and loads simple text messages', async () => {
 		const id = uniqueId()
-		const messages = [
-			{ role: 'user', content: 'hello' },
-			{ role: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
-		]
+		await appendToLog(id, [
+			{ role: 'user', content: 'hello', ts: new Date().toISOString() },
+		])
+		const { entry } = await writeAssistantEntry(id, [{ type: 'text', text: 'hi there' }])
+		await appendToLog(id, [entry])
 
-		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
 		const result = await loadSession(id)
-
 		expect(result).not.toBeNull()
 		expect(result!.messages).toHaveLength(2)
 		expect(result!.messages[0]).toEqual({ role: 'user', content: 'hello' })
@@ -48,18 +44,14 @@ describe('block storage', () => {
 
 	test('saves thinking blocks to block files', async () => {
 		const id = uniqueId()
-		const messages = [
-			{ role: 'user', content: 'think about this' },
-			{
-				role: 'assistant',
-				content: [
-					{ type: 'thinking', thinking: 'Let me think carefully...', signature: 'sig123' },
-					{ type: 'text', text: 'Here is my answer' },
-				],
-			},
-		]
-
-		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
+		await appendToLog(id, [
+			{ role: 'user', content: 'think about this', ts: new Date().toISOString() },
+		])
+		const { entry } = await writeAssistantEntry(id, [
+			{ type: 'thinking', thinking: 'Let me think carefully...', signature: 'sig123' },
+			{ type: 'text', text: 'Here is my answer' },
+		])
+		await appendToLog(id, [entry])
 
 		// Verify block file was created
 		const blocks = readdirSync(join(sessionDir(id), 'blocks'))
@@ -76,24 +68,18 @@ describe('block storage', () => {
 
 	test('saves tool calls to block files', async () => {
 		const id = uniqueId()
-		const messages = [
-			{ role: 'user', content: 'list files' },
-			{
-				role: 'assistant',
-				content: [
-					{ type: 'text', text: 'Let me check.' },
-					{ type: 'tool_use', id: 'toolu_01', name: 'bash', input: { command: 'ls' } },
-				],
-			},
-			{
-				role: 'user',
-				content: [
-					{ type: 'tool_result', tool_use_id: 'toolu_01', content: 'file1.ts\nfile2.ts' },
-				],
-			},
-		]
+		await appendToLog(id, [
+			{ role: 'user', content: 'list files', ts: new Date().toISOString() },
+		])
+		const { entry, toolRefMap } = await writeAssistantEntry(id, [
+			{ type: 'text', text: 'Let me check.' },
+			{ type: 'tool_use', id: 'toolu_01', name: 'bash', input: { command: 'ls' } },
+		])
+		await appendToLog(id, [entry])
 
-		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
+		// Write tool result
+		const trEntry = await writeToolResultEntry(id, 'toolu_01', 'file1.ts\nfile2.ts', toolRefMap)
+		await appendToLog(id, [trEntry])
 
 		// Verify block files were created (1 for tool call+result)
 		const blocks = readdirSync(join(sessionDir(id), 'blocks'))
@@ -107,21 +93,15 @@ describe('block storage', () => {
 		expect(result!.messages[2].content[0].content).toBe('file1.ts\nfile2.ts')
 	})
 
-	test('session.asonl contains refs not content', async () => {
+	test('messages.asonl contains refs not content', async () => {
 		const id = uniqueId()
-		const messages = [
-			{
-				role: 'assistant',
-				content: [
-					{ type: 'thinking', thinking: 'Deep thoughts here', signature: 'sig' },
-					{ type: 'tool_use', id: 'toolu_01', name: 'read', input: { path: '/foo' } },
-				],
-			},
-		]
+		const { entry } = await writeAssistantEntry(id, [
+			{ type: 'thinking', thinking: 'Deep thoughts here', signature: 'sig' },
+			{ type: 'tool_use', id: 'toolu_01', name: 'read', input: { path: '/foo' } },
+		])
+		await appendToLog(id, [entry])
 
-		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
-
-		const raw = readFileSync(join(sessionDir(id), 'session.asonl'), 'utf-8')
+		const raw = readFileSync(join(sessionDir(id), 'messages.asonl'), 'utf-8')
 		// Should contain ref, not the actual thinking content
 		expect(raw).toContain('ref')
 		expect(raw).not.toContain('Deep thoughts here')
@@ -129,77 +109,66 @@ describe('block storage', () => {
 	})
 })
 
-describe('append-only save', () => {
-	test('appends only new messages', async () => {
+describe('unified log — append-only', () => {
+	test('appends only new entries', async () => {
 		const id = uniqueId()
-		const messages: any[] = [{ role: 'user', content: 'first' }]
+		await appendToLog(id, [{ role: 'user', content: 'first', ts: new Date().toISOString() }])
 
-		const count1 = await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
-		expect(count1).toBe(1)
+		const raw1 = readFileSync(join(sessionDir(id), 'messages.asonl'), 'utf-8')
+		expect(raw1.trim().split('\n').length).toBe(1)
 
-		messages.push({ role: 'assistant', content: [{ type: 'text', text: 'reply' }] })
-		const count2 = await persistMessages(id, messages, count1, { ...EMPTY_TOTALS })
-		expect(count2).toBe(2)
+		const { entry } = await writeAssistantEntry(id, [{ type: 'text', text: 'reply' }])
+		await appendToLog(id, [entry])
 
-		// Verify file has exactly 2 lines
-		const raw = readFileSync(join(sessionDir(id), 'session.asonl'), 'utf-8')
-		const lines = raw.trim().split('\n')
-		expect(lines.length).toBe(2)
+		const raw2 = readFileSync(join(sessionDir(id), 'messages.asonl'), 'utf-8')
+		expect(raw2.trim().split('\n').length).toBe(2)
 
 		// Verify round-trip
 		const result = await loadSession(id)
 		expect(result!.messages).toHaveLength(2)
-		expect(result!.persistedCount).toBe(2)
-	})
-
-	test('does not write when nothing new', async () => {
-		const id = uniqueId()
-		const messages = [{ role: 'user', content: 'hello' }]
-
-		await persistMessages(id, messages, 0, { ...EMPTY_TOTALS })
-		const stat1 = Bun.file(join(sessionDir(id), 'session.asonl')).size
-
-		await persistMessages(id, messages, 1, { ...EMPTY_TOTALS })
-		const stat2 = Bun.file(join(sessionDir(id), 'session.asonl')).size
-
-		expect(stat1).toBe(stat2)
 	})
 })
 
 describe('rotation', () => {
-	test('rotates session.asonl to session.1.asonl', async () => {
+	test('rotates to messages2.asonl', async () => {
 		const id = uniqueId()
-		await persistMessages(id, [{ role: 'user', content: 'hello' }], 0, { ...EMPTY_TOTALS })
+		await appendToLog(id, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
 
 		const rotN = await rotateSession(id)
-		expect(rotN).toBe(1)
+		expect(rotN).toBe(2)
 
-		expect(existsSync(join(sessionDir(id), 'session.asonl'))).toBe(false)
-		expect(existsSync(join(sessionDir(id), 'session.1.asonl'))).toBe(true)
+		// Old file stays, new file doesn't exist yet (until something writes to it)
+		expect(existsSync(join(sessionDir(id), 'messages.asonl'))).toBe(true)
 	})
 
 	test('increments rotation number', async () => {
 		const id = uniqueId()
-
-		// First rotation
-		await persistMessages(id, [{ role: 'user', content: 'r1' }], 0, { ...EMPTY_TOTALS })
-		expect(await rotateSession(id)).toBe(1)
-
-		// Second rotation
-		await persistMessages(id, [{ role: 'user', content: 'r2' }], 0, { ...EMPTY_TOTALS })
+		await appendToLog(id, [{ role: 'user', content: 'r1', ts: new Date().toISOString() }])
 		expect(await rotateSession(id)).toBe(2)
 
-		// Third rotation
-		await persistMessages(id, [{ role: 'user', content: 'r3' }], 0, { ...EMPTY_TOTALS })
+		// Write to new log file
+		await appendToLog(id, [{ role: 'user', content: 'r2', ts: new Date().toISOString() }])
 		expect(await rotateSession(id)).toBe(3)
 
-		expect(existsSync(join(sessionDir(id), 'session.1.asonl'))).toBe(true)
-		expect(existsSync(join(sessionDir(id), 'session.2.asonl'))).toBe(true)
-		expect(existsSync(join(sessionDir(id), 'session.3.asonl'))).toBe(true)
+		await appendToLog(id, [{ role: 'user', content: 'r3', ts: new Date().toISOString() }])
+		expect(await rotateSession(id)).toBe(4)
 	})
 
-	test('returns 0 when no session file exists', async () => {
+	test('returns 0 when no messages file exists', async () => {
 		expect(await rotateSession(uniqueId())).toBe(0)
+	})
+
+	test('loadSession reads from current log after rotation', async () => {
+		const id = uniqueId()
+		await appendToLog(id, [{ role: 'user', content: 'old', ts: new Date().toISOString() }])
+		await appendToLog(id, [{ type: 'handoff', ts: new Date().toISOString() }])
+		await rotateSession(id)
+		await appendToLog(id, [{ role: 'user', content: 'new context', ts: new Date().toISOString() }])
+
+		const result = await loadSession(id)
+		expect(result).not.toBeNull()
+		expect(result!.messages).toHaveLength(1)
+		expect(result!.messages[0].content).toBe('new context')
 	})
 })
 
@@ -250,18 +219,14 @@ describe('buildRotationContext', () => {
 describe('fork with blocks', () => {
 	test('copies blocks directory', async () => {
 		const srcId = uniqueId()
-		const messages = [
-			{ role: 'user', content: 'think' },
-			{
-				role: 'assistant',
-				content: [
-					{ type: 'thinking', thinking: 'Deep thoughts', signature: 'sig' },
-					{ type: 'text', text: 'answer' },
-				],
-			},
-		]
-
-		await persistMessages(srcId, messages, 0, { ...EMPTY_TOTALS })
+		await appendToLog(srcId, [
+			{ role: 'user', content: 'think', ts: new Date().toISOString() },
+		])
+		const { entry } = await writeAssistantEntry(srcId, [
+			{ type: 'thinking', thinking: 'Deep thoughts', signature: 'sig' },
+			{ type: 'text', text: 'answer' },
+		])
+		await appendToLog(srcId, [entry])
 
 		const newId = await forkSession(srcId)
 
@@ -276,66 +241,108 @@ describe('fork with blocks', () => {
 	})
 })
 
-describe('replayConversationEvents', () => {
-	test('start event is excluded from replay (not user/assistant)', () => {
-		const events: ConversationEvent[] = [
-			{ type: 'start', workingDir: '/tmp/project', ts: '2026-03-01T12:00:00.000Z' },
-			{ type: 'user', text: 'hello', ts: '2026-03-01T12:01:00.000Z' },
-			{ type: 'assistant', text: 'hi', ts: '2026-03-01T12:01:01.000Z' },
-		]
-		const replay = replayConversationEvents(events)
-		expect(replay).toHaveLength(2)
-		expect(replay[0].type).toBe('user')
-		expect(replay[1].type).toBe('assistant')
+describe('replay entries', () => {
+	test('start event is included, tool_result is skipped', async () => {
+		const id = uniqueId()
+		const ts = new Date().toISOString()
+		await appendToLog(id, [
+			{ type: 'start', workingDir: '/tmp/project', ts },
+			{ role: 'user', content: 'hello', ts },
+			{ role: 'assistant', text: 'hi', ts },
+		])
+
+		const entries = await loadReplayEntries(id)
+		expect(entries).toHaveLength(3)
+		expect(entries[0].type).toBe('start')
+		expect(entries[1].role).toBe('user')
+		expect(entries[2].role).toBe('assistant')
 	})
 
-	test('start event after reset is not replayed', () => {
-		const events: ConversationEvent[] = [
-			{ type: 'start', workingDir: '/tmp', ts: '2026-03-01T12:00:00.000Z' },
-			{ type: 'user', text: 'old', ts: '2026-03-01T12:01:00.000Z' },
-			{ type: 'reset', ts: '2026-03-01T12:02:00.000Z' },
-			{ type: 'user', text: 'new', ts: '2026-03-01T12:03:00.000Z' },
-		]
-		const replay = replayConversationEvents(events)
-		expect(replay).toHaveLength(1)
-		expect(replay[0].text).toBe('new')
+	test('truncates at reset', async () => {
+		const id = uniqueId()
+		const ts = new Date().toISOString()
+		await appendToLog(id, [
+			{ type: 'start', workingDir: '/tmp', ts },
+			{ role: 'user', content: 'old', ts },
+			{ type: 'reset', ts },
+			{ role: 'user', content: 'new', ts },
+		])
+
+		const entries = await loadReplayEntries(id)
+		expect(entries).toHaveLength(1)
+		expect(entries[0].content).toBe('new')
 	})
 
-	test('thinking field is preserved in replay', () => {
-		const events: ConversationEvent[] = [
-			{ type: 'user', text: 'think hard', ts: '2026-03-01T12:01:00.000Z' },
-			{ type: 'assistant', text: 'answer', thinking: 'deep thoughts', ts: '2026-03-01T12:01:01.000Z' },
-		]
-		const replay = replayConversationEvents(events)
-		expect(replay).toHaveLength(2)
-		expect(replay[1].type).toBe('assistant')
-		expect((replay[1] as any).thinking).toBe('deep thoughts')
+	test('tool_log entries are included', async () => {
+		const id = uniqueId()
+		const ts = new Date().toISOString()
+		await appendToLog(id, [
+			{ role: 'user', content: 'do it', ts },
+			{ role: 'assistant', text: 'calling tool', ts },
+			{ type: 'tool_log', text: '[bash] ls\nfile.ts', ts },
+			{ role: 'assistant', text: 'done', ts },
+		])
+
+		const entries = await loadReplayEntries(id)
+		expect(entries).toHaveLength(4)
+		expect(entries[0].role).toBe('user')
+		expect(entries[1].role).toBe('assistant')
+		expect(entries[2].type).toBe('tool_log')
+		expect(entries[3].role).toBe('assistant')
 	})
 
-	test('merged assistant events keep first thinking', () => {
-		const events: ConversationEvent[] = [
-			{ type: 'user', text: 'go', ts: '2026-03-01T12:01:00.000Z' },
-			{ type: 'assistant', text: 'part1', thinking: 'initial thought', ts: '2026-03-01T12:01:01.000Z' },
-			{ type: 'assistant', text: 'part2', ts: '2026-03-01T12:01:02.000Z' },
-		]
-		const replay = replayConversationEvents(events)
-		expect(replay).toHaveLength(2)
-		expect(replay[1].text).toBe('part1\n\npart2')
-		expect((replay[1] as any).thinking).toBe('initial thought')
-	})
+	test('thinking text is resolved from blocks', async () => {
+		const id = uniqueId()
+		const { entry } = await writeAssistantEntry(id, [
+			{ type: 'thinking', thinking: 'deep thoughts', signature: 'sig' },
+			{ type: 'text', text: 'answer' },
+		])
+		await appendToLog(id, [
+			{ role: 'user', content: 'think hard', ts: new Date().toISOString() },
+			entry,
+		])
 
-	test('tool events are included in replay between assistant turns', () => {
-		const events: ConversationEvent[] = [
-			{ type: 'user', text: 'do it', ts: '2026-03-01T12:01:00.000Z' },
-			{ type: 'assistant', text: 'calling tool', ts: '2026-03-01T12:01:01.000Z' },
-			{ type: 'tool', text: '[bash] ls\nfile.ts', ts: '2026-03-01T12:01:02.000Z' },
-			{ type: 'assistant', text: 'done', ts: '2026-03-01T12:01:03.000Z' },
-		]
-		const replay = replayConversationEvents(events)
-		expect(replay).toHaveLength(4)
-		expect(replay[0]).toMatchObject({ type: 'user', text: 'do it' })
-		expect(replay[1]).toMatchObject({ type: 'assistant', text: 'calling tool' })
-		expect(replay[2]).toMatchObject({ type: 'tool', text: '[bash] ls\nfile.ts' })
-		expect(replay[3]).toMatchObject({ type: 'assistant', text: 'done' })
+		const entries = await loadReplayEntries(id)
+		const assistant = entries.find((e: any) => e.role === 'assistant')
+		expect(assistant._thinkingText).toBe('deep thoughts')
+	})
+})
+
+describe('context trimming', () => {
+	test('old tool results are replaced with placeholder', async () => {
+		const id = uniqueId()
+		const ts = new Date().toISOString()
+
+		// Write 5 tool call cycles
+		for (let i = 0; i < 5; i++) {
+			await appendToLog(id, [{ role: 'user', content: `query ${i}`, ts }])
+			const { entry, toolRefMap } = await writeAssistantEntry(id, [
+				{ type: 'text', text: `checking ${i}` },
+				{ type: 'tool_use', id: `toolu_${i}`, name: 'bash', input: { command: `cmd${i}` } },
+			])
+			await appendToLog(id, [entry])
+			const trEntry = await writeToolResultEntry(id, `toolu_${i}`, `result ${i}`, toolRefMap)
+			await appendToLog(id, [trEntry])
+		}
+
+		const result = await loadSession(id)
+		expect(result).not.toBeNull()
+
+		// Find tool results — first 2 should be trimmed, last 3 should be full
+		const toolResults: string[] = []
+		for (const msg of result!.messages) {
+			if (Array.isArray(msg.content)) {
+				for (const b of msg.content) {
+					if (b.type === 'tool_result') toolResults.push(b.content)
+				}
+			}
+		}
+
+		expect(toolResults).toHaveLength(5)
+		expect(toolResults[0]).toBe('[tool result omitted — run the tool again if needed]')
+		expect(toolResults[1]).toBe('[tool result omitted — run the tool again if needed]')
+		expect(toolResults[2]).toBe('result 2')
+		expect(toolResults[3]).toBe('result 3')
+		expect(toolResults[4]).toBe('result 4')
 	})
 })

@@ -14,7 +14,7 @@ import {
 	markModelCalibrated,
 	saveTokenCalibration,
 } from '../token-calibration.ts'
-import { persistMessages, appendConversation } from '../session.ts'
+import { appendToLog, writeAssistantEntry, writeToolResultEntry, saveSessionInfo, extractLastPrompt } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
 	getSessionWorkingDir,
@@ -81,13 +81,15 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				parsed.contentBlocks.filter((b: any) => {
 					if (!b) return false
 					if (b.type === 'tool_use' && typeof b.input === 'string') return false
-					// Drop thinking blocks without signatures (incomplete due to pause/abort)
 					if (b.type === 'thinking' && !b.signature) return false
 					return true
 				}),
 			)
 			if (cleanBlocks.length > 0) {
 				runtime.messages.push({ role: 'assistant', content: cleanBlocks })
+				const { entry: assistantEntry, toolRefMap } = await writeAssistantEntry(sessionId, cleanBlocks)
+				const logEntries: any[] = [assistantEntry]
+
 				const toolBlocks = cleanBlocks.filter((b: any) => b.type === 'tool_use')
 				if (toolBlocks.length > 0) {
 					runtime.messages.push({
@@ -98,12 +100,17 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 							content: '[interrupted by user pause]',
 						})),
 					})
+					for (const b of toolBlocks) {
+						logEntries.push(await writeToolResultEntry(sessionId, b.id, '[interrupted by user pause]', toolRefMap))
+					}
 				}
+				await appendToLog(sessionId, logEntries)
 			}
 			runtime.messages.push({
 				role: 'user',
 				content: '[User paused generation. Waiting for next direction.]',
 			})
+			await appendToLog(sessionId, [{ role: 'user', content: '[User paused generation. Waiting for next direction.]', ts: new Date().toISOString() }])
 			break
 		}
 
@@ -115,28 +122,23 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		)
 		runtime.messages.push({ role: 'assistant', content: validBlocks })
 
-		// Log assistant text to conversation (skip tool-only responses)
-		const textContent = validBlocks
-			.filter((b: any) => b.type === 'text')
-			.map((b: any) => b.text)
-			.join('\n')
-		if (textContent.trim()) {
-			const thinkingText = validBlocks.find((b: any) => b.type === 'thinking')?.thinking?.trim()
-			const event: any = { type: 'assistant', text: textContent.trim(), ts: new Date().toISOString() }
-			if (thinkingText) event.thinking = thinkingText
-			await appendConversation(sessionId, event)
-		}
+		// Write assistant entry to log
+		const { entry: assistantEntry, toolRefMap: currentToolRefMap } = await writeAssistantEntry(sessionId, validBlocks)
+		await appendToLog(sessionId, [assistantEntry])
 
 		const hasToolUse = parsed.contentBlocks.some((b: any) => b?.type === 'tool_use')
 		done = parsed.stopReason === 'end_turn' || (!hasToolUse && parsed.stopReason !== 'tool_use')
 
 		const toolBlocks = parsed.contentBlocks.filter((b: any) => b?.type === 'tool_use')
 		if (runtime.pausedByUser) {
+			const logEntries: any[] = []
 			for (const block of toolBlocks) {
 				runtime.messages.push(
 					provider.toolResultMessage(block.id, '[interrupted by user pause]'),
 				)
+				logEntries.push(await writeToolResultEntry(sessionId, block.id, '[interrupted by user pause]', currentToolRefMap))
 			}
+			if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
 			done = true
 			break
 		}
@@ -158,12 +160,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				}),
 			)
 
-			if (toolLines.length > 0) {
-				await appendConversation(sessionId, {
-					type: 'tool', text: toolLines.join('\n'), ts: new Date().toISOString(),
-				})
-			}
-
+			const logEntries: any[] = []
 			let shouldRestart = false
 			for (const result of toolResults) {
 				if (result.output === RESTART_SIGNAL) {
@@ -178,15 +175,22 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 							`${result.output}\n[interrupted by user pause]`,
 						),
 					)
+					logEntries.push(await writeToolResultEntry(sessionId, result.id, `${result.output}\n[interrupted by user pause]`, currentToolRefMap))
 					done = true
 				} else {
 					runtime.messages.push(provider.toolResultMessage(result.id, result.output))
+					logEntries.push(await writeToolResultEntry(sessionId, result.id, result.output, currentToolRefMap))
 					done = false
 				}
 			}
 
+			if (toolLines.length > 0) {
+				logEntries.push({ type: 'tool_log', text: toolLines.join('\n'), ts: new Date().toISOString() })
+			}
+			if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
+
 			if (shouldRestart) {
-				runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+				await saveSessionMeta(sessionId, runtime)
 				process.exit(100)
 			}
 		}
@@ -199,7 +203,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	busySessions.delete(sessionId)
 	await emitStatus()
 
-	runtime.persistedCount = await persistMessages(sessionId, runtime.messages, runtime.persistedCount, runtime.tokenTotals, sessionMetaSnapshot(sessionId))
+	await saveSessionMeta(sessionId, runtime)
 
 	if (runtime.lastUsage && shouldWarn(runtime.lastUsage, contextWindowForModel(modelId))) {
 		await publishLine(
@@ -208,6 +212,15 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			sessionId,
 		)
 	}
+}
+
+async function saveSessionMeta(sessionId: string, runtime: SessionRuntimeCache): Promise<void> {
+	await saveSessionInfo(sessionId, {
+		...sessionMetaSnapshot(sessionId),
+		updatedAt: new Date().toISOString(),
+		lastPrompt: extractLastPrompt(runtime.messages),
+		tokenTotals: runtime.tokenTotals,
+	})
 }
 
 function filterUnpairedWebSearchBlocks(blocks: any[]): any[] {
@@ -644,3 +657,5 @@ async function logTokenUsage(
 		await publishLine(`[debug.tokens.context] ${pct}%/${ctxWindow}`, 'meta', sessionId)
 	}
 }
+
+type EventLevel = string
