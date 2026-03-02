@@ -42,6 +42,7 @@ Still open:
 - Add mouse movements on input line, selecting - multicursor maybe? - cmd-a, etc. QoL improvements
 - The steering / enqueue system does not really work. Figure out how to make it to work.
 - [fork] should have a break before — " --" plus empty line plus block, like [queued/steering]
+- Check .hal:00-6zp handoff if had last thinking aikeet
 
 ## Old TODO items:
 
