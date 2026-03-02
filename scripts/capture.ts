@@ -186,6 +186,8 @@ const TUI_STEPS: CaptureStep[] = [
 	}),
 	step('cmd_x', 'Cmd-X', 'cmd', { note: 'macOS: terminal/OS may intercept cut.' }),
 	step('cmd_z', 'Cmd-Z', 'cmd', { note: 'macOS: terminal/OS may intercept undo.' }),
+	step('cmd_f', 'Cmd-F', 'cmd', { note: 'macOS: terminal/OS may intercept find.' }),
+	step('cmd_shift_t', 'Cmd-Shift-T', 'cmd', { note: 'macOS: terminal/OS may intercept reopen tab.' }),
 ]
 
 const FULL_STEPS: CaptureStep[] = [
@@ -790,7 +792,7 @@ async function main(): Promise<void> {
 	})
 	try {
 		line(`Key capture: ${terminalLabel}, ${steps.length} steps → ${outPath}`)
-		if (selected) line(`(single step: ${selected.step.id})`)
+		if (opts.steps) line(`(steps: ${opts.steps.join(', ')})`)
 		stdin.resume()
 		if (stdin.isTTY) {
 			stdin.setRawMode(true)
@@ -869,7 +871,7 @@ async function main(): Promise<void> {
 				profiles: profileRuns,
 				matrix: buildMatrix(allSteps, profileRuns),
 			}
-			if (selected) {
+			if (opts.steps) {
 				const existing = await loadExistingCapture(outPath)
 				document = mergeCaptureDocument(existing, document, allSteps)
 			}
