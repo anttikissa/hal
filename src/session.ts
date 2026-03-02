@@ -261,8 +261,9 @@ export interface SessionMeta {
 
 export async function saveSessionInfo(id: string, meta: Partial<SessionMeta>): Promise<void> {
 	await ensureSessionDir(id)
-	const existing = await loadSessionInfo(id)
-	const merged = { ...existing, ...meta }
+	const logName = currentLogName(id)
+	const merged = { ...await loadSessionInfo(id), ...meta }
+	if (logName !== 'messages.asonl') merged.currentLog = logName
 	await writeFile(infoPath(id), stringify(merged) + '\n')
 }
 
