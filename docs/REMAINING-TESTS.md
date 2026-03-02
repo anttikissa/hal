@@ -38,12 +38,12 @@ Add to `src/tests/fork.test.ts`:
 	- Assert child index is `parentIndex + 1` in `sessions` payload order.
 
 - [x] **Fork writes lineage events to conversation logs**
-	- After fork, parse both sessions' `conversation.asonl`.
+	- After fork, parse both sessions' `messages.asonl`.
 	- Assert both contain `{ type: 'fork', parent, child, ts }`.
 
 - [x] **Busy-parent fork snapshots partial assistant blocks**
 	- Fork mid-stream.
-	- Assert child `session.asonl` contains assistant content (partial snapshot), not empty.
+	- Assert child `messages.asonl` contains assistant content (partial snapshot), not empty.
 
 ### 2) `/topic` + `/title` rename behavior (e2e)
 

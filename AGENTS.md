@@ -8,7 +8,7 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - Use Bun, never node.js. `bunx` - no `npx`. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).
 - Secrets live in `auth.ason` (gitignored). Non-secrets in `config.ason`.
-- Conversation events are append-only: `state/sessions/<id>/conversation.asonl`.
+- Conversation events are append-only: `state/sessions/<id>/messages.asonl`.
 - Tabs are real sessions; `/handoff` rotates session history and writes `handoff.md`.
 - Prefer tabs for indentation (width 4).
 - When editing, collapse consecutive blank lines to one. Files should end with a newline.

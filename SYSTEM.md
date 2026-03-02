@@ -42,13 +42,13 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 
 `/fork` (or Ctrl-F) creates a new session from the current one:
 
-1. Current runtime state (`session.asonl`, `conversation.asonl`) is saved to disk.
+1. Current runtime state (`messages.asonl`, `blocks/`) is saved to disk.
 2. Both files are copied to a new session directory (`forkSession()` in `src/session.ts`).
 3. If the source session is mid-generation, in-progress content blocks are snapshot into the fork's message history so it sees the partial response.
 4. `[forked to <newId>]` is appended to the source's messages (skipped if busy, to preserve alternating user/assistant pattern).
 5. `[forked from <sourceId>]` is appended to the fork's messages.
-6. A `{ type: 'fork', parent, child, ts }` event is written to both conversation logs.
+6. A `{ type: 'fork', parent, child, ts }` event is written to both message logs.
 
-Because history is copied, a forked session shares all prior conversation with its parent. Both sessions then diverge independently. Multiple forks from the same parent share the same prefix of conversation history. When debugging, check `conversation.asonl` for `type: 'fork'` events to trace lineage.
+Because history is copied, a forked session shares all prior conversation with its parent. Both sessions then diverge independently. Multiple forks from the same parent share the same prefix of conversation history. When debugging, check `messages.asonl` for `type: 'fork'` events to trace lineage.
 
 # SYSTEM.md ends here.

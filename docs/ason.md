@@ -68,7 +68,7 @@ Examples: `config.ason`, `auth.ason`, `index.ason`, `info.ason`, `state.ason`, `
 
 **ASONL** (`.asonl`) — multiple values, one per line (like JSONL). Used for append-only logs and message streams. Each record **must** be produced with `stringify(value, 'short') + '\n'` — multi-line records would break line-oriented parsing.
 
-Examples: `conversation.asonl`, `session.asonl`, `commands.asonl`, `events.asonl`, `tool-calls.asonl`, `responses.asonl`, debug logs.
+Examples: `messages.asonl`, `commands.asonl`, `events.asonl`, `tool-calls.asonl`, `responses.asonl`, debug logs.
 
 ### ASONL API
 
