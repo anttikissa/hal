@@ -10,6 +10,7 @@ import {
 import { estimateTokensSync, getTokenCalibration } from '../token-calibration.ts'
 import {
 	appendConversation,
+	ensureEpoch,
 	loadSession,
 	loadSessionRegistry,
 	makeSessionId,
@@ -155,12 +156,11 @@ export async function saveAllSessions(): Promise<void> {
 }
 
 export async function ensureSession(sessionId: string, workingDir: string, afterSessionId?: string): Promise<SessionInfo> {
-	const cleanId = sanitizeSessionId(sessionId)
-	let session = getSessionMeta(cleanId)
+	let session = getSessionMeta(sessionId)
 	if (session) return session
 
 	session = {
-		id: cleanId,
+		id: sessionId,
 		workingDir: resolve(workingDir || _defaultWorkingDir),
 		busy: false,
 		messageCount: 0,
@@ -176,8 +176,8 @@ export async function ensureSession(sessionId: string, workingDir: string, after
 	if (!registry.activeSessionId) registry.activeSessionId = session.id
 	ensureSessionQueue(session.id)
 	// Only write start event for genuinely new sessions (not forks which already have conversation history)
-	if (!existsSync(`${sessionDir(cleanId)}/conversation.asonl`))
-		await appendConversation(cleanId, { type: 'start', workingDir: session.workingDir, ts: session.createdAt })
+	if (!existsSync(`${sessionDir(sessionId)}/conversation.asonl`))
+		await appendConversation(sessionId, { type: 'start', workingDir: session.workingDir, ts: session.createdAt })
 	await persistRegistry()
 	await emitStatus()
 	return session
@@ -320,12 +320,12 @@ export async function emitStatus(): Promise<void> {
 // Startup
 async function initialize(): Promise<void> {
 	ensureStateDir()
-
+	await ensureEpoch()
 	registry = await loadSessionRegistry({ defaultWorkingDir: _defaultWorkingDir })
 
 	let initialSessionId = registry.activeSessionId ?? registry.sessions[0]?.id ?? null
 	if (!initialSessionId) {
-		const created = await ensureSession(makeSessionId(), _defaultWorkingDir)
+		const created = await ensureSession(await makeSessionId(), _defaultWorkingDir)
 		initialSessionId = created.id
 	}
 	markSessionAsActive(initialSessionId)

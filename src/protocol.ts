@@ -12,6 +12,7 @@ export type CommandType =
 	| 'queue'
 	| 'handoff'
 	| 'reset'
+	| 'open'
 	| 'close'
 	| 'restart'
 	| 'model'

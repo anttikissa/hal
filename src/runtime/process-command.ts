@@ -1,7 +1,7 @@
-import { stat } from 'fs/promises'
-import { resolve } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { makeSessionId } from '../session.ts'
+import { loadSessionInfo, makeSessionId } from '../session.ts'
+import { sessionDir } from '../state.ts'
+import { existsSync } from 'fs'
 import {
 	enqueueCommand,
 	pauseSession,
@@ -20,7 +20,6 @@ import { publishLine, publishCommandPhase, publishPrompt } from './event-publish
 import { dropQueuedCommands, runClose, runFork, runSystem, runCd } from './handle-command.ts'
 
 import {
-	sanitizeSessionId,
 	getActiveSessionId,
 	getRegistryActiveSessionId,
 	getFirstSessionId,
@@ -34,6 +33,7 @@ import {
 	markSessionAsActive,
 	sortedBusySessionIds,
 	emitStatus,
+	persistRegistry,
 } from './sessions.ts'
 
 /** Parse "3", "1,3", "2-5", "1,3-5" → 1-based indices, or null for empty/invalid */
@@ -59,7 +59,7 @@ function truncate(s: string, max: number): string {
 }
 function resolveSessionId(command: RuntimeCommand): string | null {
 	const explicit = typeof command.sessionId === 'string' ? command.sessionId.trim() : ''
-	if (explicit) return sanitizeSessionId(explicit)
+	if (explicit) return explicit
 	if (getActiveSessionId()) return getActiveSessionId()
 	if (getRegistryActiveSessionId()) return getRegistryActiveSessionId()
 	return getFirstSessionId()
@@ -68,8 +68,7 @@ function resolveSessionId(command: RuntimeCommand): string | null {
 async function normalizeCommandSession(command: RuntimeCommand): Promise<string | null> {
 	// Pause: prefer currently busy session
 	if (command.type === 'pause') {
-		const explicitRaw = typeof command.sessionId === 'string' ? command.sessionId.trim() : ''
-		const explicit = explicitRaw ? sanitizeSessionId(explicitRaw) : null
+		const explicit = typeof command.sessionId === 'string' ? command.sessionId.trim() : ''
 		if (explicit) {
 			command.sessionId = explicit
 			return explicit
@@ -93,39 +92,29 @@ async function normalizeCommandSession(command: RuntimeCommand): Promise<string 
 		return sessionId
 	}
 
-	// cd: ensure session exists
+	// cd: session must already exist
 	if (command.type === 'cd') {
-		let sessionId = resolveSessionId(command)
-		if (!sessionId) sessionId = makeSessionId()
-		const active = getActiveSessionId()
-		const fallbackDir = active ? getSessionWorkingDir(active) : getDefaultWorkingDir()
-		if (!hasSession(sessionId)) {
-			const target = command.text?.trim()
-			let initialDir = fallbackDir
-			if (target) {
-				const desired = resolve(fallbackDir, target)
-				const s = await stat(desired).catch(() => null)
-				if (s?.isDirectory()) initialDir = desired
-			}
-			await ensureSession(sessionId, initialDir)
+		const sessionId = resolveSessionId(command)
+		if (!sessionId || !hasSession(sessionId)) {
+			await publishLine(`[cd] unknown session: ${sessionId ?? '(none)'}`, 'error', null)
+			return null
 		}
 		markSessionAsActive(sessionId)
 		command.sessionId = sessionId
 		return sessionId
 	}
 
-	// Default: ensure session loaded
-	let sessionId = resolveSessionId(command)
-	if (!sessionId) sessionId = makeSessionId()
-	const active = getActiveSessionId()
-	const fallbackDir = active ? getSessionWorkingDir(active) : getDefaultWorkingDir()
-	await ensureSession(sessionId, fallbackDir)
+	// Default: session must already exist
+	const sessionId = resolveSessionId(command)
+	if (!sessionId || !hasSession(sessionId)) {
+		await publishLine(`[error] unknown session: ${sessionId ?? '(none)'}`, 'error', null)
+		return null
+	}
 	await getOrLoadSessionRuntime(sessionId)
 	markSessionAsActive(sessionId)
 	command.sessionId = sessionId
 	return sessionId
 }
-
 async function runPause(sessionId: string | null): Promise<void> {
 	if (!sessionId) return
 	const runtime = getCachedSessionRuntime(sessionId)

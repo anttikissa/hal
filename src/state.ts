@@ -14,6 +14,7 @@ export const CALIBRATION_FILE = `${STATE_DIR}/calibration.ason`
 export const MODELS_FILE = `${STATE_DIR}/models.ason`
 export const TOOL_LOG = `${STATE_DIR}/tool-calls.asonl`
 export const RESPONSE_LOG = `${STATE_DIR}/responses.asonl`
+export const EPOCH_PATH = `${STATE_DIR}/epoch.txt`
 
 export function sessionDir(id: string): string {
 	return `${SESSIONS_DIR}/${id}`

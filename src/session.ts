@@ -4,7 +4,7 @@ import { appendFile, mkdir, readFile, writeFile, rename, copyFile, readdir } fro
 import { existsSync, readdirSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { stringify, parse, parseAll } from './utils/ason.ts'
-import { sessionDir, SESSIONS_DIR, SESSIONS_INDEX, ensureStateDir, LAUNCH_CWD } from './state.ts'
+import { sessionDir, SESSIONS_DIR, SESSIONS_INDEX, EPOCH_PATH, ensureStateDir, LAUNCH_CWD } from './state.ts'
 import { resolve } from 'path'
 
 export type TokenTotals = { input: number; output: number; cacheCreate: number; cacheRead: number }
@@ -27,16 +27,38 @@ export interface SessionRegistry {
 	sessions: SessionInfo[]
 }
 
-export function makeSessionId(): string {
-	return `s-${randomBytes(3).toString('hex')}`
+// Epoch: written once on first run, used for DD-xxx session IDs
+let _epoch: Date | null = null
+
+export async function ensureEpoch(): Promise<Date> {
+	if (_epoch) return _epoch
+	ensureStateDir()
+	if (existsSync(EPOCH_PATH)) {
+		_epoch = new Date((await readFile(EPOCH_PATH, 'utf-8')).trim())
+	} else {
+		_epoch = new Date()
+		await writeFile(EPOCH_PATH, _epoch.toISOString() + '\n')
+	}
+	return _epoch
 }
 
-function nowIso(): string {
-	return new Date().toISOString()
+const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
+
+function generateId(epoch: Date, suffixLen: number): string {
+	const dd = String(Math.max(0, Math.floor((Date.now() - epoch.getTime()) / 86_400_000))).padStart(2, '0')
+	const bytes = randomBytes(suffixLen)
+	let suffix = ''
+	for (let i = 0; i < suffixLen; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
+	return `${dd}-${suffix}`
 }
 
-function sanitizeSessionId(id: string): string {
-	return id.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 's-default'
+export async function makeSessionId(): Promise<string> {
+	const epoch = await ensureEpoch()
+	for (let i = 0; i < 10; i++) {
+		const id = generateId(epoch, 3)
+		if (!existsSync(sessionDir(id))) return id
+	}
+	return generateId(epoch, 4)
 }
 
 // Paths
@@ -353,7 +375,7 @@ export async function loadDraft(sessionId: string): Promise<string> {
 function createSessionInfo(id: string, workingDir: string): SessionInfo {
 	const ts = nowIso()
 	return {
-		id: sanitizeSessionId(id),
+		id,
 		workingDir: resolve(workingDir),
 		busy: false,
 		messageCount: 0,
@@ -370,12 +392,15 @@ export async function loadSessionRegistry(
 	const defaultWorkingDir = resolve(options.defaultWorkingDir ?? LAUNCH_CWD)
 	ensureStateDir()
 
-	if (!existsSync(SESSIONS_INDEX)) {
-		const session = createSessionInfo('s-default', defaultWorkingDir)
+	async function defaultRegistry(): Promise<SessionRegistry> {
+		const id = await makeSessionId()
+		const session = createSessionInfo(id, defaultWorkingDir)
 		const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
 		await saveSessionRegistry(registry)
 		return registry
 	}
+
+	if (!existsSync(SESSIONS_INDEX)) return defaultRegistry()
 
 	try {
 		const raw = await readFile(SESSIONS_INDEX, 'utf-8')
@@ -383,12 +408,7 @@ export async function loadSessionRegistry(
 		const sessions = Array.isArray(parsed.sessions)
 			? parsed.sessions.filter((s: any) => s?.id).map((s: any) => ({ ...s, busy: false }))
 			: []
-		if (sessions.length === 0) {
-			const session = createSessionInfo('s-default', defaultWorkingDir)
-			const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
-			await saveSessionRegistry(registry)
-			return registry
-		}
+		if (sessions.length === 0) return defaultRegistry()
 		const activeSessionId =
 			typeof parsed.activeSessionId === 'string' &&
 			sessions.some((s: any) => s.id === parsed.activeSessionId)
@@ -396,10 +416,7 @@ export async function loadSessionRegistry(
 				: sessions[0].id
 		return { activeSessionId, sessions }
 	} catch {
-		const session = createSessionInfo('s-default', defaultWorkingDir)
-		const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
-		await saveSessionRegistry(registry)
-		return registry
+		return defaultRegistry()
 	}
 }
 
@@ -550,7 +567,7 @@ export function buildRotationContext(sessionId: string, messages: any[]): string
 // Fork: copy session state to a new session
 
 export async function forkSession(sourceId: string): Promise<string> {
-	const newId = makeSessionId()
+	const newId = await makeSessionId()
 	const srcDir = sessionDir(sourceId)
 	const dstDir = sessionDir(newId)
 	await mkdir(dstDir, { recursive: true })
