@@ -131,7 +131,7 @@ function completeInput(prefix: string): string[] {
 // Module state
 let source: RuntimeCommand['source']
 let isOwner = false, stopped = false, lastContextStatus: string | null = null
-let roleLabel = '', wasBusyOnLastSubmit = false
+let roleLabel = '', wasBusyOnLastSubmit = false, reconstructing = false
 const client = new Client()
 let tabs: CliTab[] = [], activeTabIndex = 0, launchCwd = ''
 let pendingForkOutput: string | null = null, pendingForkSwitch = false
@@ -171,7 +171,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 		pushLocal('local.info', 'debug.recordEverything is active — use /bug <report> to report and fix immediately')
 	pushLocal('local.info', '/q or Ctrl-D to quit · Ctrl-V to paste images · /help for more')
 
-	await bootstrapState()
+	await bootstrapTabs()
 	if (selfMode) applySelfMode()
 	if (options?.startupEpoch) {
 		const elapsed = Date.now() - options.startupEpoch
@@ -180,6 +180,10 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			pushLocal(level, `[perf] startup: ${elapsed}ms (${files} modules, ${lines} loc)`)
 		})
 	}
+
+	// Hydrate session history in the background
+	reconstructing = true
+	void hydrateHistory().finally(() => { reconstructing = false })
 
 	void (async () => {
 		try {
@@ -196,6 +200,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 			const trimmed = input.trim(), normalized = normalizeCommandInput(input)
 			if (!trimmed) { if (activeTab()?.paused) await client.command('resume'); continue }
 			if (isExit(normalized)) break
+			if (reconstructing && !trimmed.startsWith('/')) { pushLocal('local.warn', 'Session loading...'); continue }
 			wasBusyOnLastSubmit = activeTab()?.busy ?? false
 			await handleCommand(input, client)
 			const tab = activeTab()
@@ -460,7 +465,8 @@ function handleDoubleEnter(): void {
 	appendBusCommand(makeCommand('steer', source, undefined, active.sessionId)).catch(() => {})
 }
 
-async function bootstrapState(): Promise<void> {
+/** Fast bootstrap: create tabs from IPC state, render immediately. */
+async function bootstrapTabs(): Promise<void> {
 	try {
 		const state = await readState()
 		const busySet = new Set(state.busySessionIds ?? [])
@@ -468,11 +474,7 @@ async function bootstrapState(): Promise<void> {
 			syncTabsFromSessions(state.sessions, state.activeSessionId ?? null, { preserveActiveOutput: false, render: false })
 		else ensureFallbackTab(state.activeSessionId ?? null)
 		for (const tab of tabs) tab.busy = busySet.has(tab.sessionId)
-
 		const recent = await readRecentEvents(500)
-		const replayCounts = await hydrateTabsFromConversation()
-		for (const [sessionId, count] of replayCounts)
-			if (count > 0) pushLocal('local.status', `[history] restored ${count} event${count === 1 ? '' : 's'} for ${sessionId}`)
 		for (const event of recent) {
 			if (event.type !== 'status' || !event.context) continue
 			const sessionId = event.sessionId ?? activeTab()?.sessionId ?? null
@@ -480,15 +482,39 @@ async function bootstrapState(): Promise<void> {
 			const tab = findTabBySessionId(sessionId)
 			if (tab) tab.contextStatus = fmtContext(event.context)
 		}
-		await Promise.all(tabs.map(async (tab) => {
-			tab.inputHistory = await loadInputHistory(tab.sessionId)
-			tab.inputDraft = await loadDraft(tab.sessionId)
-		}))
 		applyActiveTabSnapshot(true)
 		renderBusyStatus()
 	} catch (e: any) {
 		pushLocal('local.status', `bootstrap failed: ${e.message || e}`)
 		ensureFallbackTab(null); renderBusyStatus()
+	}
+}
+
+/** Async hydration: load conversation history, input history, drafts. */
+async function hydrateHistory(): Promise<void> {
+	try {
+		const t0 = Date.now()
+		const replayCounts = await hydrateTabsFromConversation()
+		await Promise.all(tabs.map(async (tab) => {
+			tab.inputHistory = await loadInputHistory(tab.sessionId)
+			tab.inputDraft = await loadDraft(tab.sessionId)
+		}))
+		// Re-render active tab with hydrated content; preserve any input the user typed
+		const active = activeTab()
+		if (active) {
+			screenFmt = { ...active.fmtState }; lastContextStatus = active.contextStatus
+			setInputHistory(active.inputHistory)
+			const { text: currentInput } = getInputDraft()
+			if (!currentInput && active.inputDraft) setInputDraft(active.inputDraft, active.inputCursor)
+			if (active.output.length > 0) tui.replaceOutput(active.output)
+		}
+		renderBusyStatus()
+		const elapsed = Date.now() - t0
+		for (const [sessionId, count] of replayCounts)
+			if (count > 0) pushLocal('local.status', `[history] restored ${count} event${count === 1 ? '' : 's'} for ${sessionId}`)
+		pushLocal('local.status', `[perf] history: ${elapsed}ms`)
+	} catch (e: any) {
+		pushLocal('local.error', `history hydration failed: ${e.message || e}`)
 	}
 }
 
