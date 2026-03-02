@@ -24,7 +24,7 @@ import {
 	setMaxPromptLines,
 	setUserCursorMode,
 	setHalState,
-	resetHalIdleTimer,
+	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer,
 	type HalState,
 	setOutputSnapshot,
 	setStatusLine,
@@ -242,14 +242,14 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 function captureActiveOutput(): void {
 	const active = activeTab(); if (!active) return
 	active.output = getOutputSnapshot(); active.inputHistory = getInputHistory()
-	active.fmtState = { ...screenFmt }
+	active.fmtState = { ...screenFmt }; active.halIdleSince = getHalIdleSince()
 	const draft = getInputDraft(); active.inputDraft = draft.text; active.inputCursor = draft.cursor
 }
 
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	const active = activeTab(); if (!active) return
 	screenFmt = { ...active.fmtState }; lastContextStatus = active.contextStatus
-	resetHalIdleTimer(); setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)); setTitleBar(titleBarText(active))
+	restoreHalIdleTimer(active.halIdleSince); setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)); setTitleBar(titleBarText(active))
 	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) { active.output.length > 0 ? tui.replaceOutput(active.output) : tui.clearOutput() }
 	else if (active.output.length > 0) setOutputSnapshot(active.output)

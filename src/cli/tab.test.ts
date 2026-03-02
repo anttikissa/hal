@@ -30,6 +30,7 @@ describe('tab helpers', () => {
 			inputHistory: [],
 			inputDraft: '',
 			inputCursor: 0,
+			halIdleSince: expect.any(Number),
 		})
 	})
 

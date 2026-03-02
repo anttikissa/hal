@@ -125,6 +125,15 @@ export function setHalState(state: HalState): void {
 	} else return
 	resetShrink(hal)
 }
+export function getHalIdleSince(): number { return halIdleSince }
+export function restoreHalIdleTimer(ts: number): void {
+	halIdleSince = ts
+	if (Date.now() - ts >= loadConfig().cursorDormantDelay) {
+		hal.shrinkStart = ts; hal.brightSince = null
+	} else {
+		resetShrink(hal)
+	}
+}
 export function resetHalIdleTimer(): void {
 	halIdleSince = Date.now()
 	resetShrink(hal)
