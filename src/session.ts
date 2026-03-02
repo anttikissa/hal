@@ -259,9 +259,11 @@ export interface SessionMeta {
 	currentLog?: string
 }
 
-export async function saveSessionInfo(id: string, meta: SessionMeta): Promise<void> {
+export async function saveSessionInfo(id: string, meta: Partial<SessionMeta>): Promise<void> {
 	await ensureSessionDir(id)
-	await writeFile(infoPath(id), stringify(meta) + '\n')
+	const existing = await loadSessionInfo(id)
+	const merged = { ...existing, ...meta }
+	await writeFile(infoPath(id), stringify(merged) + '\n')
 }
 
 export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
