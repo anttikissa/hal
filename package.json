@@ -5,7 +5,8 @@
 	"scripts": {
 		"start": "./run",
 		"dev": "bun main.ts",
-		"test": "bun test",
+		"test": "bun scripts/test-parallel.ts",
+		"test:seq": "bun test",
 		"test:quick": "bun test src/hashline.test.ts src/session.test.ts src/utils/",
 		"test:e2e": "bun test src/tests/",
 		"capture": "bun run scripts/capture",

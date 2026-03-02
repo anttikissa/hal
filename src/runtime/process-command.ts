@@ -34,6 +34,7 @@ import {
 	sortedBusySessionIds,
 	emitStatus,
 	persistRegistry,
+	getSessionMeta,
 } from './sessions.ts'
 
 /** Parse "3", "1,3", "2-5", "1,3-5" → 1-based indices, or null for empty/invalid */
