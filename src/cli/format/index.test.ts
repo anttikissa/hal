@@ -9,12 +9,11 @@ describe('fragment tags', () => {
 		expect(stripAnsi(out)).toBe('<assistant> hello')
 	})
 
-	test('same chunk kind gets ⏵ continuation marker', () => {
+	test('same chunk kind produces no tag', () => {
 		const s = st()
 		pushFragment('chunk.assistant', 'hello', s)
 		const out = pushFragment('chunk.assistant', ' world', s)
-		expect(stripAnsi(out)).toBe('⏵ world')
-		expect(out).toContain('\x1b[31m⏵')
+		expect(stripAnsi(out)).toBe(' world')
 	})
 
 	test('different chunk kind gets newline + <kind> tag', () => {
