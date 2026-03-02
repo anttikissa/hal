@@ -21,6 +21,9 @@ export interface SessionInfo {
 	messageCount: number
 	createdAt: string
 	updatedAt: string
+	lastPrompt?: string
+	tokenTotals?: TokenTotals
+	currentLog?: string
 }
 
 export interface SessionRegistry {
@@ -148,30 +151,12 @@ function countWords(text: string): number {
 	return text.split(/\s+/).filter(Boolean).length
 }
 
-const logNameCache = new Map<string, string>()
-
-function currentLogName(sessionId: string): string {
-	const cached = logNameCache.get(sessionId)
-	if (cached) return cached
-	const path = infoPath(sessionId)
-	if (!existsSync(path)) return 'messages.asonl'
-	try {
-		const info = parse(readFileSync(path, 'utf-8')) as any
-		const name = info?.currentLog ?? 'messages.asonl'
-		logNameCache.set(sessionId, name)
-		return name
-	} catch {
-		return 'messages.asonl'
-	}
-}
-
-export async function appendToLog(sessionId: string, entries: any[]): Promise<void> {
-	if (entries.length === 0) return
-	await ensureSessionDir(sessionId)
-	const logName = currentLogName(sessionId)
+export function appendToLog(sessionId: string, entries: any[]): Promise<void> {
+	if (entries.length === 0) return Promise.resolve()
+	const logName = sessionInfoMap.get(sessionId)?.currentLog ?? 'messages.asonl'
 	const path = `${sessionDir(sessionId)}/${logName}`
 	const lines = entries.map((e: any) => stringify(e, 'short')).join('\n') + '\n'
-	await appendFile(path, lines)
+	return ensureSessionDir(sessionId).then(() => appendFile(path, lines))
 }
 
 /** Convert API-format assistant content blocks to a log entry, writing block files. */
@@ -246,37 +231,33 @@ export async function userContentToLog(sessionId: string, content: any): Promise
 	return logContent
 }
 
-// Session info (persisted per-session metadata)
+// Canonical in-memory store — the one source of truth for session info
+// Canonical in-memory store — the one source of truth for session info
+export const sessionInfoMap = new Map<string, SessionInfo>()
 
-export interface SessionMeta {
-	workingDir: string
-	model?: string
-	topic?: string
-	createdAt?: string
-	updatedAt: string
-	lastPrompt?: string
-	tokenTotals?: TokenTotals
-	currentLog?: string
+export function getSessionInfo(id: string): SessionInfo | null {
+	return sessionInfoMap.get(id) ?? null
 }
 
-export async function saveSessionInfo(id: string, meta: Partial<SessionMeta>): Promise<void> {
+/** Persist in-memory SessionInfo to disk. Strips transient fields (busy, messageCount). */
+export async function saveSessionInfo(id: string): Promise<void> {
+	const session = sessionInfoMap.get(id)
+	if (!session) return
 	await ensureSessionDir(id)
-	const logName = currentLogName(id)
-	const merged = { ...await loadSessionInfo(id), ...meta }
-	if (logName !== 'messages.asonl') merged.currentLog = logName
-	await writeFile(infoPath(id), stringify(merged) + '\n')
+	const { busy, messageCount, ...disk } = session
+	await writeFile(infoPath(id), stringify(disk) + '\n')
 }
 
-export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
+/** Read info.ason from disk (for startup hydration). */
+export async function loadSessionInfo(id: string): Promise<Partial<SessionInfo> | null> {
 	const path = infoPath(id)
 	if (!existsSync(path)) return null
 	try {
-		return parse(await readFile(path, 'utf-8')) as unknown as SessionMeta
+		return parse(await readFile(path, 'utf-8')) as Partial<SessionInfo>
 	} catch {
 		return null
 	}
 }
-
 // Session load (API messages)
 
 /** Load all log entries from all log files of a session, following fork references. */
@@ -325,20 +306,28 @@ function findReplayStart(entries: any[]): number {
 	return 0
 }
 
-/** Load session as API messages, applying context trimming. */
+/** Load session as API messages, applying context trimming. Also hydrates sessionInfoMap from info.ason. */
 export async function loadSession(
 	sessionId: string,
 ): Promise<{ messages: any[]; tokenTotals: TokenTotals } | null> {
+	// Hydrate in-memory session info from disk
+	const diskInfo = await loadSessionInfo(sessionId)
+	const session = sessionInfoMap.get(sessionId)
+	if (diskInfo && session) {
+		if (diskInfo.tokenTotals) session.tokenTotals = diskInfo.tokenTotals
+		if (diskInfo.lastPrompt) session.lastPrompt = diskInfo.lastPrompt
+		if (diskInfo.currentLog) session.currentLog = diskInfo.currentLog
+	}
+
 	const allEntries = await loadAllEntries(sessionId)
 
 	if (allEntries.length > 0) {
 		const startIdx = findReplayStart(allEntries)
 		const entries = allEntries.slice(startIdx)
 		const messages = await entriesToApiMessages(sessionId, entries)
-		const meta = await loadSessionInfo(sessionId)
 		return {
 			messages: repairMessages(messages),
-			tokenTotals: meta?.tokenTotals ?? { ...EMPTY_TOTALS },
+			tokenTotals: session?.tokenTotals ?? { ...EMPTY_TOTALS },
 		}
 	}
 
@@ -537,6 +526,7 @@ export async function loadSessionRegistry(
 	async function defaultRegistry(): Promise<SessionRegistry> {
 		const id = await makeSessionId()
 		const session = createSessionInfo(id, defaultWorkingDir)
+		sessionInfoMap.set(id, session)
 		const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
 		await saveSessionRegistry(registry)
 		return registry
@@ -548,9 +538,14 @@ export async function loadSessionRegistry(
 		const raw = await readFile(SESSIONS_INDEX, 'utf-8')
 		const parsed = parse(raw) as Partial<SessionRegistry>
 		const sessions = Array.isArray(parsed.sessions)
-			? parsed.sessions.filter((s: any) => s?.id).map((s: any) => ({ ...s, busy: false }))
+			? parsed.sessions.filter((s: any) => s?.id).map((s: any) => ({
+				...s,
+				busy: false,
+				messageCount: s.messageCount ?? 0,
+			} as SessionInfo))
 			: []
 		if (sessions.length === 0) return defaultRegistry()
+		for (const s of sessions) sessionInfoMap.set(s.id, s)
 		const activeSessionId =
 			typeof parsed.activeSessionId === 'string' &&
 			sessions.some((s: any) => s.id === parsed.activeSessionId)
@@ -562,17 +557,31 @@ export async function loadSessionRegistry(
 	}
 }
 
+// Fields to include in the registry index (UI-relevant only)
+const REGISTRY_FIELDS = new Set(['id', 'name', 'topic', 'model', 'workingDir', 'createdAt', 'updatedAt', 'messageCount'])
+
 export async function saveSessionRegistry(registry: SessionRegistry): Promise<void> {
 	ensureStateDir()
-	await writeFile(SESSIONS_INDEX, stringify(registry) + '\n')
+	const slim = {
+		activeSessionId: registry.activeSessionId,
+		sessions: registry.sessions.map(s => {
+			const entry: Record<string, any> = {}
+			for (const key of REGISTRY_FIELDS) {
+				const val = (s as any)[key]
+				if (val !== undefined) entry[key] = val
+			}
+			return entry
+		}),
+	}
+	await writeFile(SESSIONS_INDEX, stringify(slim) + '\n')
 }
 
 // Rotation
 
-/** Rotate: update currentLog in info.ason so new entries go to a fresh file. */
+/** Rotate: update currentLog so new entries go to a fresh file. */
 export async function rotateSession(sessionId: string): Promise<number> {
-	const info = await loadSessionInfo(sessionId)
-	const currentLog = info?.currentLog ?? 'messages.asonl'
+	const session = sessionInfoMap.get(sessionId)
+	const currentLog = session?.currentLog ?? 'messages.asonl'
 	const currentPath = `${sessionDir(sessionId)}/${currentLog}`
 	if (!existsSync(currentPath)) return 0
 
@@ -582,12 +591,8 @@ export async function rotateSession(sessionId: string): Promise<number> {
 		if (match) nextN = parseInt(match[1], 10) + 1
 	}
 
-	const nextLog = `messages${nextN}.asonl`
-	logNameCache.set(sessionId, nextLog)
-	await saveSessionInfo(sessionId, {
-		...(info ?? { workingDir: '', updatedAt: new Date().toISOString() }),
-		currentLog: nextLog,
-	})
+	if (session) session.currentLog = `messages${nextN}.asonl`
+	await saveSessionInfo(sessionId)
 
 	return nextN
 }

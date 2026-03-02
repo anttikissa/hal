@@ -16,12 +16,13 @@ import {
 	makeSessionId,
 	saveSessionInfo,
 	saveSessionRegistry,
+	sessionInfoMap,
+	type SessionInfo,
 	type SessionRegistry,
 	type TokenTotals,
 	EMPTY_TOTALS,
 } from '../session.ts'
 import { tailCommands } from '../ipc.ts'
-import type { SessionInfo } from '../protocol.ts'
 import { HAL_DIR, LAUNCH_CWD, ensureStateDir, sessionDir } from '../state.ts'
 import {
 	createCommandScheduler,
@@ -93,17 +94,6 @@ export function getSessionModel(sessionId: string | null): string {
 	return resolveModel(meta?.model ?? loadConfig().defaultModel)
 }
 
-/** Build meta snapshot for persisting alongside session data. */
-export function sessionMetaSnapshot(sessionId: string): { workingDir: string; model?: string; topic?: string; createdAt?: string } {
-	const meta = getSessionMeta(sessionId)
-	return {
-		workingDir: getSessionWorkingDir(sessionId),
-		model: getSessionModel(sessionId),
-		topic: meta?.topic,
-		createdAt: meta?.createdAt,
-	}
-}
-
 export function hasSession(sessionId: string): boolean {
 	return Boolean(getSessionMeta(sessionId))
 }
@@ -131,7 +121,7 @@ export function markSessionAsActive(sessionId: string): void {
 // Session management
 export function getSessionMeta(sessionId: string | null): SessionInfo | null {
 	if (!sessionId) return null
-	return registry.sessions.find((s) => s.id === sessionId) ?? null
+	return sessionInfoMap.get(sessionId) ?? null
 }
 
 export function getRegistry(): SessionRegistry {
@@ -145,11 +135,12 @@ export async function persistRegistry(): Promise<void> {
 /** Save all in-memory session metadata to disk. Called on shutdown. */
 export async function saveAllSessions(): Promise<void> {
 	for (const [id, runtime] of sessionCache) {
-		await saveSessionInfo(id, {
-			...sessionMetaSnapshot(id),
-			updatedAt: new Date().toISOString(),
-			tokenTotals: runtime.tokenTotals,
-		})
+		const session = sessionInfoMap.get(id)
+		if (session) {
+			session.updatedAt = new Date().toISOString()
+			session.tokenTotals = runtime.tokenTotals
+		}
+		await saveSessionInfo(id)
 	}
 	await saveSessionRegistry(registry)
 }
@@ -166,6 +157,7 @@ export async function ensureSession(sessionId: string, workingDir: string, after
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
 	}
+	sessionInfoMap.set(sessionId, session)
 	if (afterSessionId) {
 		const idx = registry.sessions.findIndex((s) => s.id === afterSessionId)
 		registry.sessions.splice(idx + 1, 0, session)

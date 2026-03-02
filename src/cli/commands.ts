@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 import type { Client } from './client.ts'
 import { logSnapshot, getDebugLogPath, saveBugReport } from '../debug-log.ts'
 import { SESSIONS_DIR } from '../state.ts'
-import { loadSessionInfo, timeSince, type SessionMeta } from '../session.ts'
+import { loadSessionInfo, timeSince, type SessionInfo } from '../session.ts'
 
 
 type Handler = (args: string, client: Client) => Promise<void> | void
@@ -116,7 +116,7 @@ async function fork(_args: string, client: Client): Promise<void> {
 
 interface RestorableSession {
 	id: string
-	meta: SessionMeta
+	meta: Partial<SessionInfo>
 }
 
 // Remembered from last /restore listing
@@ -135,7 +135,7 @@ async function listClosedSessions(activeIds: Set<string>): Promise<RestorableSes
 		results.push({ id: entry.name, meta })
 	}
 
-	results.sort((a, b) => new Date(b.meta.updatedAt).getTime() - new Date(a.meta.updatedAt).getTime())
+	results.sort((a, b) => new Date(b.meta.updatedAt ?? 0).getTime() - new Date(a.meta.updatedAt ?? 0).getTime())
 	return results.slice(0, 8)
 }
 
@@ -152,7 +152,7 @@ async function restore(args: string, client: Client): Promise<void> {
 		lastRestoreList = sessions
 		const lines = sessions.map((s, i) => {
 			const num = `${i + 1}.`
-			const age = timeSince(s.meta.updatedAt)
+			const age = s.meta.updatedAt ? timeSince(s.meta.updatedAt) : '?'
 			const model = s.meta.model ? `  ${s.meta.model}` : ''
 			const preview = s.meta.lastPrompt ? ` — ${s.meta.lastPrompt}` : ''
 			return `  ${num} ${s.id}  ${age}${model}${preview}`
@@ -185,7 +185,7 @@ async function restore(args: string, client: Client): Promise<void> {
 		return
 	}
 
-	await client.openSession(target.id, target.meta.workingDir)
+	await client.openSession(target.id, target.meta.workingDir!)
 }
 
 

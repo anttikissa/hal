@@ -14,12 +14,18 @@ import {
 	buildRotationContext,
 	forkSession,
 	loadReplayEntries,
+	sessionInfoMap,
 	EMPTY_TOTALS,
 } from './session.ts'
 import { sessionDir } from './state.ts'
 
 function uniqueId(): string {
-	return `t-${randomBytes(4).toString('hex')}`
+	const id = `t-${randomBytes(4).toString('hex')}`
+	sessionInfoMap.set(id, {
+		id, workingDir: '/tmp', busy: false, messageCount: 0,
+		createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+	})
+	return id
 }
 
 afterEach(() => {

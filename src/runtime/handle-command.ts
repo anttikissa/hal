@@ -1,6 +1,6 @@
 import { resolve, isAbsolute } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { saveSessionInfo, extractLastPrompt, appendToLog, rotateSession, buildRotationContext, writeAssistantEntry } from '../session.ts'
+import { saveSessionInfo, extractLastPrompt, appendToLog, rotateSession, buildRotationContext, writeAssistantEntry, getSessionInfo } from '../session.ts'
 import { sessionDir } from '../state.ts'
 import {
 	loadConfig,
@@ -35,7 +35,6 @@ import {
 	busySessions,
 	previousWorkingDirBySession,
 	getHalDir,
-	sessionMetaSnapshot,
 } from './sessions.ts'
 import { generateAutoTopic, isGreetingText } from './topic.ts'
 
@@ -100,12 +99,13 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 	// Save current metadata before forking
 	const runtime = getCachedSessionRuntime(sessionId)
 	if (runtime) {
-		await saveSessionInfo(sessionId, {
-			...sessionMetaSnapshot(sessionId),
-			updatedAt: new Date().toISOString(),
-			lastPrompt: extractLastPrompt(runtime.messages),
-			tokenTotals: runtime.tokenTotals,
-		})
+		const session = getSessionInfo(sessionId)
+		if (session) {
+			session.updatedAt = new Date().toISOString()
+			session.lastPrompt = extractLastPrompt(runtime.messages)
+			session.tokenTotals = runtime.tokenTotals
+		}
+		await saveSessionInfo(sessionId)
 	}
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
@@ -267,11 +267,12 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 		content: `[model changed from ${prevModel} to ${fullModel}]`,
 	})
 
-	await saveSessionInfo(sessionId, {
-		...sessionMetaSnapshot(sessionId),
-		updatedAt: new Date().toISOString(),
-		lastPrompt: extractLastPrompt(runtime.messages),
-	})
+	const session = getSessionInfo(sessionId)
+	if (session) {
+		session.updatedAt = new Date().toISOString()
+		session.lastPrompt = extractLastPrompt(runtime.messages)
+	}
+	await saveSessionInfo(sessionId)
 
 	const ts = new Date().toISOString()
 	await appendToLog(sessionId, [
@@ -346,11 +347,12 @@ export async function runCd(sessionId: string, text: string): Promise<void> {
 	}
 
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	await saveSessionInfo(sessionId, {
-		...sessionMetaSnapshot(sessionId),
-		updatedAt: new Date().toISOString(),
-		lastPrompt: extractLastPrompt(runtime.messages),
-	})
+	const cdSession = getSessionInfo(sessionId)
+	if (cdSession) {
+		cdSession.updatedAt = new Date().toISOString()
+		cdSession.lastPrompt = extractLastPrompt(runtime.messages)
+	}
+	await saveSessionInfo(sessionId)
 
 	if (previous !== next) {
 		await appendToLog(sessionId, [{ type: 'cd', from: previous, to: next, ts: new Date().toISOString() }])
@@ -456,16 +458,19 @@ export async function runClose(sessionId: string): Promise<void> {
 		runtime.activeAbort?.abort()
 	}
 
-	await saveSessionInfo(sessionId, {
-		...sessionMetaSnapshot(sessionId),
-		updatedAt: new Date().toISOString(),
-		lastPrompt: extractLastPrompt(runtime.messages),
-		tokenTotals: runtime.tokenTotals,
-	})
+	const closeSession = getSessionInfo(sessionId)
+	if (closeSession) {
+		closeSession.updatedAt = new Date().toISOString()
+		closeSession.lastPrompt = extractLastPrompt(runtime.messages)
+		closeSession.tokenTotals = runtime.tokenTotals
+	}
+	await saveSessionInfo(sessionId)
 
 	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } =
 		await import('./sessions.ts')
+	const { sessionInfoMap } = await import('../session.ts')
 	getSessionCache().delete(sessionId)
+	sessionInfoMap.delete(sessionId)
 	previousWorkingDirBySession.delete(sessionId)
 
 	const registry = getRegistry()
@@ -483,10 +488,11 @@ export async function runClose(sessionId: string): Promise<void> {
 
 async function saveSessionBeforeExit(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	await saveSessionInfo(sessionId, {
-		...sessionMetaSnapshot(sessionId),
-		updatedAt: new Date().toISOString(),
-		lastPrompt: extractLastPrompt(runtime.messages),
-		tokenTotals: runtime.tokenTotals,
-	})
+	const session = getSessionInfo(sessionId)
+	if (session) {
+		session.updatedAt = new Date().toISOString()
+		session.lastPrompt = extractLastPrompt(runtime.messages)
+		session.tokenTotals = runtime.tokenTotals
+	}
+	await saveSessionInfo(sessionId)
 }
