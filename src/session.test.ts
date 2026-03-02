@@ -300,4 +300,27 @@ describe('replayConversationEvents', () => {
 		expect(replay).toHaveLength(1)
 		expect(replay[0].text).toBe('new')
 	})
+
+	test('thinking field is preserved in replay', () => {
+		const events: ConversationEvent[] = [
+			{ type: 'user', text: 'think hard', ts: '2026-03-01T12:01:00.000Z' },
+			{ type: 'assistant', text: 'answer', thinking: 'deep thoughts', ts: '2026-03-01T12:01:01.000Z' },
+		]
+		const replay = replayConversationEvents(events)
+		expect(replay).toHaveLength(2)
+		expect(replay[1].type).toBe('assistant')
+		expect((replay[1] as any).thinking).toBe('deep thoughts')
+	})
+
+	test('merged assistant events keep first thinking', () => {
+		const events: ConversationEvent[] = [
+			{ type: 'user', text: 'go', ts: '2026-03-01T12:01:00.000Z' },
+			{ type: 'assistant', text: 'part1', thinking: 'initial thought', ts: '2026-03-01T12:01:01.000Z' },
+			{ type: 'assistant', text: 'part2', ts: '2026-03-01T12:01:02.000Z' },
+		]
+		const replay = replayConversationEvents(events)
+		expect(replay).toHaveLength(2)
+		expect(replay[1].text).toBe('part1\n\npart2')
+		expect((replay[1] as any).thinking).toBe('initial thought')
+	})
 })

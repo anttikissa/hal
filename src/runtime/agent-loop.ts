@@ -121,7 +121,10 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			.map((b: any) => b.text)
 			.join('\n')
 		if (textContent.trim()) {
-			await appendConversation(sessionId, { type: 'assistant', text: textContent.trim(), ts: new Date().toISOString() })
+			const thinkingText = validBlocks.find((b: any) => b.type === 'thinking')?.thinking?.trim()
+			const event: any = { type: 'assistant', text: textContent.trim(), ts: new Date().toISOString() }
+			if (thinkingText) event.thinking = thinkingText
+			await appendConversation(sessionId, event)
 		}
 
 		const hasToolUse = parsed.contentBlocks.some((b: any) => b?.type === 'tool_use')

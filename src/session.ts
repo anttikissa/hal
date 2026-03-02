@@ -291,7 +291,7 @@ export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
 
 export type ConversationEvent =
 	| { type: 'user'; text: string; ts: string }
-	| { type: 'assistant'; text: string; ts: string }
+	| { type: 'assistant'; text: string; thinking?: string; ts: string }
 	| { type: 'model'; from: string; to: string; ts: string }
 	| { type: 'fork'; parent: string; child: string; ts: string }
 	| { type: 'topic'; from?: string; to: string; auto?: boolean; ts: string }
@@ -331,8 +331,10 @@ export function replayConversationEvents(events: ConversationEvent[]): ReplayCon
 		const last = replay[replay.length - 1]
 		if (event.type === 'assistant' && last?.type === 'assistant') {
 			last.text += '\n\n' + event.text
+			// Keep first thinking; later tool-loop turns rarely have one
+			if (!last.thinking && event.thinking) last.thinking = event.thinking
 		} else {
-			replay.push(event)
+			replay.push({ ...event })
 		}
 	}
 	return replay
