@@ -132,6 +132,8 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 		const hasToolUse = parsed.contentBlocks.some((b: any) => b?.type === 'tool_use')
 		done = parsed.stopReason === 'end_turn' || (!hasToolUse && parsed.stopReason !== 'tool_use')
+		const blockTypes = parsed.contentBlocks.map((b: any) => b?.type).join(',')
+		await publishLine(`[debug:loop] stop=${parsed.stopReason} tools=${hasToolUse} done=${done} blocks=[${blockTypes}]`, 'warn', sessionId)
 
 		const toolBlocks = parsed.contentBlocks.filter((b: any) => b?.type === 'tool_use')
 		if (runtime.pausedByUser) {
@@ -183,6 +185,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				process.exit(100)
 			}
 		}
+		await publishLine(`[debug:loop] iter-end done=${done} paused=${runtime.pausedByUser}`, 'warn', sessionId)
 	}
 
 	await publishActivity('', sessionId)
