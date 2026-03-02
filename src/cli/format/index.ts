@@ -25,25 +25,20 @@ function kindLabel(kind: string): string {
 	return dot >= 0 ? kind.slice(dot + 1) : kind
 }
 
-export interface FormatState { prevKind: string; endsWithNewline: boolean }
-export function createFormatState(): FormatState { return { prevKind: '', endsWithNewline: false } }
+export interface FormatState { prevKind: string }
+export function createFormatState(): FormatState { return { prevKind: '' } }
 
 export function pushFragment(kind: string, text: string, st: FormatState): string {
 	const prev = st.prevKind
 	st.prevKind = kind
 
 	const isChunk = kind.startsWith('chunk.')
-	// Separate from previous chunk with newline, unless it already ended with one
-	const nl = prev !== '' && prev.startsWith('chunk.') && !st.endsWithNewline ? '\n' : ''
-	st.endsWithNewline = false
+	const nl = prev !== '' && prev.startsWith('chunk.') ? '\n' : ''
 	// const continuation = kind === prev && isChunk
 	// const tag = continuation ? '\x1b[31m⏵\x1b[0m' : `${nl}<${kindLabel(kind)}> `
 	const tag = (kind === prev && isChunk) ? '' : `${nl}<${kindLabel(kind)}> `
 
-	if (isChunk) {
-		st.endsWithNewline = text.endsWith('\n')
-		return `${tag}${text}`
-	}
+	if (isChunk) return `${tag}${text}`
 
 	const content = text.replace(/\n+$/, '')
 	return `${tag}${content}\n`

@@ -1,3 +1,2 @@
 [test]
 root = "src"
-bail = 1
