@@ -16,7 +16,6 @@ import {
 	makeSessionId,
 	saveSessionInfo,
 	saveSessionRegistry,
-	setSessionStartTime,
 	type SessionRegistry,
 	type TokenTotals,
 	EMPTY_TOTALS,
@@ -175,7 +174,6 @@ export async function ensureSession(sessionId: string, workingDir: string, after
 	}
 	if (!registry.activeSessionId) registry.activeSessionId = session.id
 	ensureSessionQueue(session.id)
-	setSessionStartTime(sessionId, session.createdAt)
 	// Only write start event for genuinely new sessions (not forks which already have log)
 	if (!existsSync(`${sessionDir(sessionId)}/messages.asonl`))
 		await appendToLog(sessionId, [{ type: 'start', workingDir: session.workingDir, ts: session.createdAt }])

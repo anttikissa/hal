@@ -1,6 +1,6 @@
 // See docs/session.md — keep it in sync when changing this file.
 
-import { appendFile, mkdir, readFile, writeFile } from 'fs/promises'
+import { appendFile, copyFile, mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { stringify, parse, parseAll } from './utils/ason.ts'
@@ -87,38 +87,12 @@ async function ensureBlocksDir(id: string): Promise<void> {
 
 // Block storage
 
-const sessionStartTimes = new Map<string, number>()
-
-export function setSessionStartTime(sessionId: string, ts: string): void {
-	sessionStartTimes.set(sessionId, new Date(ts).getTime())
-}
-
-function getSessionStartTime(sessionId: string): number {
-	let start = sessionStartTimes.get(sessionId)
-	if (start !== undefined) return start
-	const path = infoPath(sessionId)
-	if (existsSync(path)) {
-		try {
-			const info = parse(readFileSync(path, 'utf-8')) as any
-			if (info?.createdAt) {
-				start = new Date(info.createdAt).getTime()
-				sessionStartTimes.set(sessionId, start)
-				return start
-			}
-		} catch {}
-	}
-	start = Date.now()
-	sessionStartTimes.set(sessionId, start)
-	return start
-}
-
-export function makeBlockRef(sessionId: string): string {
-	const offset = Math.max(0, Date.now() - getSessionStartTime(sessionId))
-	const hex = offset.toString(16)
-	const bytes = randomBytes(5)
+export function makeBlockRef(): string {
+	const ts = Date.now().toString(36)
+	const bytes = randomBytes(4)
 	let suffix = ''
-	for (let i = 0; i < 5; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
-	return `${hex}-${suffix}`
+	for (let i = 0; i < 4; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
+	return `${ts}-${suffix}`
 }
 
 export async function writeBlock(sessionId: string, ref: string, data: any): Promise<void> {
@@ -142,12 +116,18 @@ function countWords(text: string): number {
 	return text.split(/\s+/).filter(Boolean).length
 }
 
+const logNameCache = new Map<string, string>()
+
 function currentLogName(sessionId: string): string {
+	const cached = logNameCache.get(sessionId)
+	if (cached) return cached
 	const path = infoPath(sessionId)
 	if (!existsSync(path)) return 'messages.asonl'
 	try {
 		const info = parse(readFileSync(path, 'utf-8')) as any
-		return info?.currentLog ?? 'messages.asonl'
+		const name = info?.currentLog ?? 'messages.asonl'
+		logNameCache.set(sessionId, name)
+		return name
 	} catch {
 		return 'messages.asonl'
 	}
@@ -179,7 +159,7 @@ export async function writeAssistantEntry(
 
 	const thinking = contentBlocks.find((b: any) => b.type === 'thinking')
 	if (thinking?.thinking) {
-		const ref = makeBlockRef(sessionId)
+		const ref = makeBlockRef()
 		await writeBlock(sessionId, ref, { thinking: thinking.thinking, signature: thinking.signature })
 		entry.thinking = { ref, words: countWords(thinking.thinking) }
 	}
@@ -188,7 +168,7 @@ export async function writeAssistantEntry(
 	if (tools.length > 0) {
 		entry.tools = []
 		for (const t of tools) {
-			const ref = makeBlockRef(sessionId)
+			const ref = makeBlockRef()
 			toolRefMap.set(t.id, ref)
 			await writeBlock(sessionId, ref, { call: { name: t.name, input: t.input } })
 			entry.tools.push({ id: t.id, name: t.name, ref })
@@ -224,7 +204,7 @@ export async function userContentToLog(sessionId: string, content: any): Promise
 	const logContent: any[] = []
 	for (const block of content) {
 		if (block.type === 'image' && block.source?.type === 'base64') {
-			const ref = makeBlockRef(sessionId)
+			const ref = makeBlockRef()
 			await writeBlock(sessionId, ref, { media_type: block.source.media_type, data: block.source.data })
 			logContent.push({ type: 'image', ref })
 		} else {
@@ -253,15 +233,13 @@ export async function saveSessionInfo(id: string, meta: SessionMeta): Promise<vo
 }
 
 export async function loadSessionInfo(id: string): Promise<SessionMeta | null> {
-	for (const path of [infoPath(id), `${sessionDir(id)}/meta.ason`]) {
-		if (!existsSync(path)) continue
-		try {
-			return parse(await readFile(path, 'utf-8')) as unknown as SessionMeta
-		} catch {
-			continue
-		}
+	const path = infoPath(id)
+	if (!existsSync(path)) return null
+	try {
+		return parse(await readFile(path, 'utf-8')) as unknown as SessionMeta
+	} catch {
+		return null
 	}
-	return null
 }
 
 // Session load (API messages)
@@ -470,7 +448,6 @@ export async function saveDraft(sessionId: string, text: string): Promise<void> 
 	if (!text) {
 		const path = draftPath(sessionId)
 		if (existsSync(path)) {
-			const { unlink } = await import('fs/promises')
 			await unlink(path)
 		}
 		return
@@ -557,9 +534,11 @@ export async function rotateSession(sessionId: string): Promise<number> {
 		if (match) nextN = parseInt(match[1], 10) + 1
 	}
 
+	const nextLog = `messages${nextN}.asonl`
+	logNameCache.set(sessionId, nextLog)
 	await saveSessionInfo(sessionId, {
 		...(info ?? { workingDir: '', updatedAt: new Date().toISOString() }),
-		currentLog: `messages${nextN}.asonl`,
+		currentLog: nextLog,
 	})
 
 	return nextN
@@ -616,14 +595,12 @@ export async function forkSession(sourceId: string): Promise<string> {
 	const logName = currentLogName(sourceId)
 	const srcLog = `${srcDir}/${logName}`
 	if (existsSync(srcLog)) {
-		const { copyFile } = await import('fs/promises')
 		await copyFile(srcLog, `${dstDir}/messages.asonl`)
 	}
 
 	// Copy blocks directory
 	const srcBlocks = `${srcDir}/blocks`
 	if (existsSync(srcBlocks)) {
-		const { copyFile, readdir } = await import('fs/promises')
 		const dstBlocks = `${dstDir}/blocks`
 		await mkdir(dstBlocks, { recursive: true })
 		const files = await readdir(srcBlocks)
