@@ -35,7 +35,7 @@ export function pushFragment(kind: string, text: string, st: FormatState): strin
 	const isChunk = kind.startsWith('chunk.')
 	const continuation = kind === prev && isChunk
 	const nl = prev !== '' && prev.startsWith('chunk.') ? '\n' : ''
-	const tag = continuation ? '<more> ' : `${nl}<${kindLabel(kind)}> `
+	const tag = continuation ? '\x1b[31m⏵\x1b[0m' : `${nl}<${kindLabel(kind)}> `
 
 	if (isChunk) return `${tag}${text}`
 

@@ -17,7 +17,6 @@ export interface CliTab {
 	inputHistory: string[]
 	inputDraft: string
 	inputCursor: number
-	bootstrapSent: boolean
 }
 
 export function createTabState(params: {
@@ -25,7 +24,7 @@ export function createTabState(params: {
 }): CliTab {
 	return {
 		...params, topic: '', output: '', fmtState: createFormatState(), contextStatus: null, activity: '',
-		busy: false, paused: false, inputHistory: [], inputDraft: '', inputCursor: 0, bootstrapSent: false,
+		busy: false, paused: false, inputHistory: [], inputDraft: '', inputCursor: 0,
 	}
 }
 

@@ -146,9 +146,37 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 		if (first) processedCommandIds.delete(first)
 	}
 
+	// Open: create or restore a session. Bypasses normalizeCommandSession.
+	if (command.type === 'open') {
+		await publishCommandPhase(command.id, 'queued', undefined, null)
+		await publishCommandPhase(command.id, 'started', undefined, null)
+		const workingDir = command.text?.trim() || getDefaultWorkingDir()
+		const activeId = getActiveSessionId()
+		let sessionId: string
+
+		if (command.sessionId && existsSync(sessionDir(command.sessionId))) {
+			// Restore: re-add existing session to registry
+			sessionId = command.sessionId
+			const saved = await loadSessionInfo(sessionId)
+			const session = await ensureSession(sessionId, saved?.workingDir ?? workingDir, activeId ?? undefined)
+			if (saved) {
+				if (saved.topic) session.topic = saved.topic
+				if (saved.model) session.model = saved.model
+			}
+		} else {
+			// New session
+			sessionId = await makeSessionId()
+			await ensureSession(sessionId, workingDir, activeId ?? undefined)
+		}
+		markSessionAsActive(sessionId)
+		await persistRegistry()
+		await publishCommandPhase(command.id, 'done', undefined, sessionId)
+		await emitStatus()
+		return
+	}
+
 	const sessionId = await normalizeCommandSession(command)
 	if (sessionId) markSessionAsActive(sessionId)
-
 	if (command.type === 'pause') {
 		await publishCommandPhase(command.id, 'queued', undefined, sessionId ?? null)
 		await publishCommandPhase(command.id, 'started', undefined, sessionId ?? null)

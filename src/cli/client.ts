@@ -1,4 +1,3 @@
-import { randomBytes } from 'crypto'
 import { resolve } from 'path'
 import {
 	appendCommand as appendBusCommand,
@@ -137,6 +136,8 @@ let roleLabel = '', wasBusyOnLastSubmit = false
 const client = new Client()
 let tabs: CliTab[] = [], activeTabIndex = 0, launchCwd = ''
 let pendingForkOutput: string | null = null, pendingForkSwitch = false
+let pendingOpenSwitch = false
+let pendingOpenData: { sessionId: string; output: string; fmtState: FormatState; inputHistory: string[] } | null = null
 let tabHasActivity = new Set<string>()
 let screenFmt: FormatState = createFormatState()
 
@@ -253,13 +254,7 @@ function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
 	if (clearWhenEmpty) { active.output.length > 0 ? tui.replaceOutput(active.output) : tui.clearOutput() }
 	else if (active.output.length > 0) setOutputSnapshot(active.output)
-	ensureTabBootstrap(active); renderBusyStatus()
-}
-
-function ensureTabBootstrap(tab: CliTab): void {
-	if (!tab || tab.bootstrapSent || tab.output.trim().length > 0) return
-	tab.bootstrapSent = true
-	appendBusCommand(makeCommand('cd', source, tab.workingDir, tab.sessionId)).catch(() => {})
+	renderBusyStatus()
 }
 
 function switchToTab(index: number): void {
@@ -278,42 +273,29 @@ function handleInputKey(key: string): boolean {
 	return false
 }
 
-function makeLocalSessionId(): string {
-	let id = ''; do { id = `s-${randomBytes(3).toString('hex')}` } while (tabs.some((t) => t.sessionId === id))
-	return id
-}
-
 async function createTab(): Promise<void> {
 	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
 	captureActiveOutput()
-	const sessionId = makeLocalSessionId()
-	tabs.push(newTabState(sessionId, launchCwd))
-	activeTabIndex = tabs.length - 1; applyActiveTabSnapshot(true)
-	pushLocal('local.tab', `[tab] opened ${activeTabIndex + 1}: ${launchCwd}`)
-	let hint = '[tabs] Switch: Alt-1..9 | Cycle: Ctrl-P/N | Fork: Ctrl-F | Close: Ctrl-W'
-	if (process.platform === 'darwin') {
-		const term = process.env.TERM_PROGRAM ?? ''
-		if (term === 'iTerm.app') hint += " | iTerm2: set Preferences > Profiles > Keys > Option Key to 'Esc+'"
-		else if (term === 'Apple_Terminal') hint += " | Terminal.app: enable Preferences > Profiles > Keyboard > 'Use Option as Meta key'"
-	}
-	pushLocal('local.tabs', hint)
+	pendingOpenSwitch = true
+	await appendBusCommand(makeCommand('open', source, launchCwd))
 }
 
 async function openSessionTab(sessionId: string, workingDir: string): Promise<void> {
 	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
 	const existing = tabs.findIndex((t) => t.sessionId === sessionId)
 	if (existing >= 0) { switchToTab(existing); pushLocal('local.tab', `[restore] switched to existing tab ${existing + 1}`); return }
-	captureActiveOutput()
+
+	// Pre-load conversation for display
 	const inputHistory = await loadInputHistory(sessionId)
-	tabs.push({ ...newTabState(sessionId, workingDir), inputHistory })
-	activeTabIndex = tabs.length - 1
-	const added = tabs[activeTabIndex]
 	const history = await loadConversation(sessionId)
 	const replay = renderConversationHistory(history)
-	added.output = replay.output; added.fmtState = replay.fmtState
 	const replayCount = replayConversationEvents(history).length
-	applyActiveTabSnapshot(true)
-	pushLocal('local.tab', `[restore] opened session ${sessionId} in tab ${activeTabIndex + 1} (${replayCount} event${replayCount === 1 ? '' : 's'} replayed)`)
+
+	captureActiveOutput()
+	pendingOpenSwitch = true
+	pendingOpenData = { sessionId, output: replay.output, fmtState: replay.fmtState, inputHistory }
+	await appendBusCommand(makeCommand('open', source, workingDir, sessionId))
+	pushLocal('local.tab', `[restore] opened session ${sessionId} (${replayCount} event${replayCount === 1 ? '' : 's'} replayed)`)
 }
 
 async function closeActiveTab(): Promise<void> {
@@ -338,7 +320,7 @@ async function forkTab(): Promise<void> {
 
 function syncTabsFromSessions(
 	sessions: SessionInfo[], preferredActiveSessionId: string | null,
-	options: { preserveActiveOutput?: boolean; render?: boolean; bootstrap?: boolean } = {},
+	options: { preserveActiveOutput?: boolean; render?: boolean } = {},
 ): void {
 	if (!Array.isArray(sessions) || sessions.length === 0) { stopped = true; tui.cancelInput(); return }
 	const preserve = options.preserveActiveOutput ?? true
@@ -348,12 +330,18 @@ function syncTabsFromSessions(
 	const previousActiveIndex = activeTabIndex
 	const forkOutput = pendingForkOutput, switchToFork = pendingForkSwitch
 	pendingForkOutput = null; pendingForkSwitch = false
+	const switchToOpen = pendingOpenSwitch, openData = pendingOpenData
+	pendingOpenSwitch = false; pendingOpenData = null
 	let forkedSessionId: string | null = null
+	let newOpenSessionId: string | null = null
 
 	tabs = sessions.slice(0, 9).map((session) => {
 		const existing = previousById.get(session.id)
 		const isNewFromFork = !existing && forkOutput !== null
+		const isRestore = !existing && openData?.sessionId === session.id
+		const isNewFromOpen = !existing && switchToOpen && !isNewFromFork
 		if (isNewFromFork) forkedSessionId = session.id
+		if (isNewFromOpen) newOpenSessionId = session.id
 		return {
 			...createTabState({
 				sessionId: session.id, workingDir: session.workingDir,
@@ -361,15 +349,15 @@ function syncTabsFromSessions(
 				modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().defaultModel),
 			}),
 			topic: session.topic ?? existing?.topic ?? '',
-			output: preserve ? (existing?.output ?? (isNewFromFork ? forkOutput : '')) : '',
+			output: preserve ? (existing?.output ?? (isNewFromFork ? forkOutput : (isRestore ? openData!.output : ''))) : '',
+			fmtState: existing?.fmtState ?? (isRestore ? openData!.fmtState : createFormatState()),
 			contextStatus: preserve ? (existing?.contextStatus ?? null) : null,
 			activity: preserve ? (existing?.activity ?? '') : '',
 			busy: preserve ? (existing?.busy ?? false) : false,
 			paused: preserve ? (existing?.paused ?? false) : false,
-			inputHistory: existing?.inputHistory ?? [],
+			inputHistory: existing?.inputHistory ?? (isRestore ? openData!.inputHistory : []),
 			inputDraft: existing?.inputDraft ?? '',
 			inputCursor: existing?.inputCursor ?? 0,
-			bootstrapSent: existing?.bootstrapSent ?? false,
 		}
 	})
 	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id)))
@@ -377,6 +365,7 @@ function syncTabsFromSessions(
 	const previousStillExists = previousActive && tabs.some((t) => t.sessionId === previousActive)
 	let targetSessionId: string
 	if (switchToFork && forkedSessionId) targetSessionId = forkedSessionId
+	else if (switchToOpen && newOpenSessionId) targetSessionId = newOpenSessionId
 	else if (previousStillExists) targetSessionId = previousActive!
 	else if (previousActive) {
 		const idx = previousActiveIndex > 0 ? previousActiveIndex - 1 : 0
@@ -387,7 +376,6 @@ function syncTabsFromSessions(
 	}
 	activeTabIndex = Math.max(0, tabs.findIndex((t) => t.sessionId === targetSessionId))
 	if (options.render ?? true) applyActiveTabSnapshot(targetSessionId !== previousActive)
-	if (options.bootstrap ?? true) for (const tab of tabs) ensureTabBootstrap(tab)
 }
 
 function renderConversationHistory(events: Awaited<ReturnType<typeof loadConversation>>): { output: string; fmtState: FormatState } {
