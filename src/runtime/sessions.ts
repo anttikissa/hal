@@ -128,11 +128,6 @@ export function markSessionAsActive(sessionId: string): void {
 	activeSessionId = sessionId
 	registry.activeSessionId = sessionId
 }
-
-export function sanitizeSessionId(sessionId: string): string {
-	return sessionId.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || makeSessionId()
-}
-
 // Session management
 export function getSessionMeta(sessionId: string | null): SessionInfo | null {
 	if (!sessionId) return null

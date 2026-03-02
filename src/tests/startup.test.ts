@@ -60,7 +60,8 @@ describe('startup', () => {
 		)
 		const last = sessionsEvents[sessionsEvents.length - 1]
 		expect(last.sessions).toHaveLength(1)
-		expect(last.sessions[0].id).toBe('s-default')
+		// New DD-xxx format: digits, dash, lowercase alphanumeric
+		expect(last.sessions[0].id).toMatch(/^\d+-[a-z0-9]+$/)
 	})
 
 	test('exits cleanly on EOF', async () => {

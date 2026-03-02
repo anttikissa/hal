@@ -18,7 +18,7 @@ afterEach(async () => {
 })
 
 function parseForkIds(text: string): { parent: string; child: string } {
-	const match = text.match(/\[fork\] forked (s-[a-zA-Z0-9_-]+) -> (s-[a-zA-Z0-9_-]+)/)
+	const match = text.match(/\[fork\] forked ([\w]+-[\w]+) -> ([\w]+-[\w]+)/)
 	if (!match) throw new Error(`could not parse fork ids from line: ${text}`)
 	return { parent: match[1], child: match[2] }
 }
@@ -192,7 +192,7 @@ describe('fork', () => {
 			(r) =>
 				r.type === 'line' &&
 				r.level === 'fork' &&
-				/\[fork\] forked from s-[a-zA-Z0-9_-]+ \(paused\)/.test(r.text ?? ''),
+				/\[fork\] forked from [\w]+-[\w]+ \(paused\)/.test(r.text ?? ''),
 			10000,
 		)
 		expect(childLine.level).toBe('fork')
@@ -249,7 +249,7 @@ describe('fork', () => {
 		const sourceId = sessions.sessions[0].id
 
 		hal.sendLine('/fork')
-		const line = await hal.waitForLine(/\[fork\] forked s-[a-zA-Z0-9_-]+ -> s-[a-zA-Z0-9_-]+/)
+		const line = await hal.waitForLine(/\[fork\] forked [\w]+-[\w]+ -> [\w]+-[\w]+/)
 		const { parent, child } = parseForkIds(line.text)
 		expect(parent).toBe(sourceId)
 

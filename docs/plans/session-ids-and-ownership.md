@@ -1,4 +1,4 @@
-# Plan: Server-owned sessions & new session ID format
+# Plan: Server-owned sessions & new session ID format ✅
 
 ## Problem
 
