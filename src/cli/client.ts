@@ -417,6 +417,11 @@ function renderConversationHistory(entries: any[]): { output: string; fmtState: 
 			if (entry.text) {
 				output += pushFragment('assistant', entry.text, fmtState)
 			}
+			if (entry.tools) {
+				for (const tool of entry.tools) {
+					output += pushFragment('line.tool', `[${tool.name}]`, fmtState)
+				}
+			}
 			continue
 		}
 	}
