@@ -168,13 +168,15 @@ export function setHalState(state: HalState): void {
 	}
 	const target = CURSOR_COLORS[state]
 	if (target[0] !== t.ccTo[0] || target[1] !== t.ccTo[1] || target[2] !== t.ccTo[2]) {
-		t.ccFrom = state === 'error' ? target : tabCursorRGB(t)
+		// snap instantly to non-idle colors; smooth 200ms transition back to idle
+		t.ccFrom = state === 'idle' ? tabCursorRGB(t) : target
 		t.ccTo = target; t.ccStart = Date.now()
+	}
 	}
 	// error → busy speed; idle → start decay; other → busy
 	if (state !== 'idle') {
 		t.idleSince = Infinity
-	} else if (!wasIdle) {
+	} else if (wasState !== 'idle') {
 		t.idleSince = Date.now()
 	} else return
 	resetShrink(hal)
