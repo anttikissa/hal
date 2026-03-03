@@ -11,6 +11,7 @@ const GREETING = [
 	'**read** [ filename ] — I will try to read a file and summarize it for you\n',
 	'**write** filename contents — I will try to write a file\n',
 	'**think** — I will demonstrate my thinking abilities\n',
+	'**error** — I will simulate a stream error\n',
 ]
 
 const DAISY_BELL = [
@@ -82,10 +83,13 @@ function lastUserText(messages: any[]): string {
 	return ''
 }
 
-function generateResponse(messages: any[]): { chunks: string[]; delayMs: number } {
+function generateResponse(messages: any[]): { chunks: string[]; delayMs: number; error?: boolean } {
 	const input = lastUserText(messages)
 	if (input.startsWith('song')) {
 		return { chunks: DAISY_BELL, delayMs: 120 }
+	}
+	if (input.startsWith('error')) {
+		return { chunks: [], delayMs: 0, error: true }
 	}
 	return { chunks: GREETING, delayMs: 30 }
 }
@@ -94,14 +98,19 @@ class MockProvider extends Provider {
 	name = 'mock'
 
 	async fetch(body: any, _signal?: AbortSignal) {
-		const { chunks, delayMs } = generateResponse(body.messages ?? [])
+		const { chunks, delayMs, error } = generateResponse(body.messages ?? [])
+		if (error) {
+			return new Response(JSON.stringify({ type: 'error', error: { type: 'overloaded_error', message: 'Mock overloaded error' } }), {
+				status: 529,
+				headers: { 'Content-Type': 'application/json' },
+			})
+		}
 		const stream = makeSSEStream(chunks, delayMs)
 		return new Response(stream, {
 			status: 200,
 			headers: { 'Content-Type': 'text/event-stream' },
 		})
 	}
-
 	buildRequestBody({ model, messages, system, tools, maxTokens }: any) {
 		return { model, messages, system, tools, max_tokens: maxTokens }
 	}
