@@ -198,10 +198,13 @@ function animTick(): void {
 	const cfg = loadConfig()
 	const t = tc()
 	const isIdle = t.state === 'idle'
+	const isError = t.state === 'error'
 	const now = Date.now()
 	const idleMs = now - t.idleSince
-	const halTarget = isDormant(hal) ? cfg.cursorBlinkDormant : isIdle ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
-	const intensityTarget = isIdle ? 0.5 : 1.0
+	// error: target idle speed (ramp down from busy snap), never go dormant
+	const halTarget = (!isError && isDormant(hal)) ? cfg.cursorBlinkDormant
+		: (isIdle || isError) ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
+	const intensityTarget = (isIdle || isError) ? 0.5 : 1.0
 	hal.period += (halTarget - hal.period) * (1 - RAMP_RATE)
 	hal.phase = (hal.phase + ANIM_MS / hal.period) % 1
 	halIntensity += (intensityTarget - halIntensity) * (1 - RAMP_RATE)
