@@ -160,7 +160,11 @@ export function setHalState(state: HalState): void {
 	}
 	const wasIdle = t.state === 'idle'
 	t.state = state
-	if (state === 'error') t.errorSince = Date.now()
+	if (state === 'error') {
+		t.errorSince = Date.now()
+		hal.period = loadConfig().cursorBlinkBusy // snap to busy speed immediately
+		halIntensity = 1.0
+	}
 	const target = CURSOR_COLORS[state]
 	if (target[0] !== t.ccTo[0] || target[1] !== t.ccTo[1] || target[2] !== t.ccTo[2]) {
 		t.ccFrom = state === 'error' ? target : tabCursorRGB(t)
