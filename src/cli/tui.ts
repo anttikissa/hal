@@ -129,9 +129,16 @@ function cursorRGB(): RGB {
 }
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 let halState: HalState = 'idle'
+const ERROR_STICKY_MS = 2000
+let errorSince = 0
 export function setHalState(state: HalState): void {
+	if (halState === 'error' && state === 'idle' && Date.now() - errorSince < ERROR_STICKY_MS) {
+		setTimeout(() => setHalState('idle'), ERROR_STICKY_MS - (Date.now() - errorSince))
+		return
+	}
 	const wasIdle = halState === 'idle'
 	halState = state
+	if (state === 'error') errorSince = Date.now()
 	const target = CURSOR_COLORS[state]
 	if (target[0] !== ccTo[0] || target[1] !== ccTo[1] || target[2] !== ccTo[2]) {
 		ccFrom = cursorRGB(); ccTo = target; ccStart = Date.now()
