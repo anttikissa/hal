@@ -117,10 +117,11 @@ function makeToolStream(): ReadableStream<Uint8Array> {
 
 type MockResponse = { chunks: string[]; delayMs: number; error?: boolean; tool?: boolean }
 function generateResponse(messages: any[]): MockResponse {
+	const hasToolResult = messages.some((m: any) => m.role === 'user' && Array.isArray(m.content) && m.content.some((c: any) => c.type === 'tool_result'))
 	const input = lastUserText(messages)
 	if (input.startsWith('song')) return { chunks: DAISY_BELL, delayMs: 120 }
 	if (input.startsWith('error')) return { chunks: [], delayMs: 0, error: true }
-	if (input.startsWith('tool')) return { chunks: [], delayMs: 0, tool: true }
+	if (input.startsWith('tool') && !hasToolResult) return { chunks: [], delayMs: 0, tool: true }
 	return { chunks: GREETING, delayMs: 30 }
 }
 
