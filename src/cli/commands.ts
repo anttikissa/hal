@@ -8,32 +8,43 @@ import { loadSessionInfo, timeSince, type SessionInfo } from '../session.ts'
 
 type Handler = (args: string, client: Client) => Promise<void> | void
 
-const HELP: Record<string, string> = {
-	help:     'show this list',
-	model:    'show or change model — /model [name]',
-	system:   'show system prompt',
-	pause:    'pause current generation',
-	drop:     'drop last message pair — /drop [n]',
-	queue:    'show message queue',
-	handoff:  'rotate session history, write handoff.md',
-	cd:       'change working directory — /cd [path]',
-	close:    'close current tab',
-	reset:    'clear conversation history',
-	clear:    'clear screen output',
-	todo:     'add a TODO — /todo <text>',
-	restart:  'restart hal (kills all tabs)',
-	snapshot: 'capture terminal debug snapshot',
-	bug:      'file a bug — /bug <description>',
-	fork:     'fork session to a new tab',
-	restore:  'reopen a closed session — /restore [id]',
-	topic:    'set conversation topic — /topic <text>',
-	exit:     'quit hal',
-}
+const HELP = [
+	['Conversation', {
+		pause:    'pause current generation',
+		drop:     'drop last message pair — /drop [n]',
+		reset:    'clear conversation history',
+		todo:     'add a TODO — /todo <text>',
+		handoff:  'rotate session history, write handoff.md',
+	}],
+	['Tabs & sessions', {
+		close:    'close current tab',
+		fork:     'fork session to a new tab',
+		restore:  'reopen a closed session — /restore [id]',
+		topic:    'set conversation topic — /topic <text>',
+	}],
+	['Configuration', {
+		model:    'show or change model — /model [name]',
+		system:   'show system prompt',
+		cd:       'change working directory — /cd [path]',
+	}],
+	['Debug & system', {
+		clear:    'clear screen output',
+		snapshot: 'capture terminal debug snapshot',
+		bug:      'file a bug — /bug <description>',
+		queue:    'show message queue',
+		restart:  'restart hal (kills all tabs)',
+		exit:     'quit hal',
+	}],
+] as const
 
 async function help(_args: string, client: Client): Promise<void> {
-	const maxLen = Math.max(...Object.keys(HELP).map(k => k.length))
-	const lines = Object.entries(HELP).map(([cmd, desc]) => `  /${cmd.padEnd(maxLen)}  ${desc}`)
-	client.log('local.help', lines.join('\n'))
+	const allCmds = HELP.flatMap(([, cmds]) => Object.keys(cmds))
+	const maxLen = Math.max(...allCmds.map(k => k.length))
+	const sections = HELP.map(([title, cmds]) => {
+		const lines = Object.entries(cmds).map(([cmd, desc]) => `  /${cmd.padEnd(maxLen)}  ${desc}`)
+		return `${title}:\n${lines.join('\n')}`
+	})
+	client.log('local.help', sections.join('\n\n'))
 }
 
 async function model(args: string, client: Client): Promise<void> {
