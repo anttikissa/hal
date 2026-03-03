@@ -122,7 +122,7 @@ export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 type RGB = [number, number, number]
 const CURSOR_COLORS: Record<HalState, RGB> = {
 	idle: [255, 165, 0], thinking: [150, 150, 150], writing: [255, 165, 0],
-	tool_call: [150, 150, 150], error: [255, 50, 50],
+	tool_call: [180, 100, 255], error: [255, 50, 50],
 }
 const COLOR_MS = 200
 const ERROR_STICKY_MS = 30_000
@@ -158,11 +158,12 @@ export function setHalState(state: HalState): void {
 			ERROR_STICKY_MS - (Date.now() - t.errorSince))
 		return
 	}
-	const wasIdle = t.state === 'idle'
+	const wasState = t.state
 	t.state = state
-	if (state === 'error') {
+	// only snap speed on *new* error, not tab-switch re-apply
+	if (state === 'error' && wasState !== 'error') {
 		t.errorSince = Date.now()
-		hal.period = loadConfig().cursorBlinkBusy // snap to busy speed immediately
+		hal.period = loadConfig().cursorBlinkBusy
 		halIntensity = 1.0
 	}
 	const target = CURSOR_COLORS[state]
