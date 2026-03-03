@@ -100,8 +100,8 @@ class MockProvider extends Provider {
 	async fetch(body: any, _signal?: AbortSignal) {
 		const { chunks, delayMs, error } = generateResponse(body.messages ?? [])
 		if (error) {
-			return new Response(JSON.stringify({ type: 'error', error: { type: 'overloaded_error', message: 'Mock overloaded error' } }), {
-				status: 529,
+			return new Response(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'Mock error' } }), {
+				status: 400,
 				headers: { 'Content-Type': 'application/json' },
 			})
 		}
