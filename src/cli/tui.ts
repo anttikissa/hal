@@ -172,7 +172,6 @@ export function setHalState(state: HalState): void {
 		t.ccFrom = state === 'idle' ? tabCursorRGB(t) : target
 		t.ccTo = target; t.ccStart = Date.now()
 	}
-	}
 	// error → busy speed; idle → start decay; other → busy
 	if (state !== 'idle') {
 		t.idleSince = Infinity
