@@ -82,11 +82,12 @@ function fmtContext(ctx: { used: number; max: number; estimated?: boolean }): st
 	return `${ctx.estimated ? '~' : ''}${pct}%/${fmtK(ctx.max)}`
 }
 function deriveHalState(tab: CliTab): HalState {
-	if (!tab.busy) return 'idle'
 	const a = tab.activity
+	if (a.startsWith('Error')) return 'error'
+	if (!tab.busy) return 'idle'
 	if (a.startsWith('Thinking')) return 'thinking'
 	if (a.startsWith('Calling tool') || a.startsWith('Running')) return 'tool_call'
-	if (a.startsWith('Error') || a.startsWith('Retrying')) return 'error'
+	if (a.startsWith('Retrying')) return 'error'
 	return 'writing'
 }
 const MODEL_NAMES: [RegExp, string][] = [
@@ -570,7 +571,7 @@ function render(event: RuntimeEvent): void {
 			for (const tab of tabs) {
 				const wasBusy = tab.busy
 				tab.busy = busySet.has(tab.sessionId); tab.paused = pausedSet.has(tab.sessionId)
-				if (!tab.busy && wasBusy) tab.activity = ''
+				if (!tab.busy && wasBusy && !tab.activity.startsWith('Error')) tab.activity = ''
 			}
 		}
 		const active = activeTab()

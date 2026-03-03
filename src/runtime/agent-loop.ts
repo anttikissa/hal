@@ -119,6 +119,13 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				!(b.type === 'text' && !b.text?.trim()) &&
 				!(b.type === 'thinking' && !b.thinking?.trim()),
 		)
+
+		// If the stream produced no content (e.g. error event), don't push an empty assistant message
+		if (validBlocks.length === 0) {
+			done = true
+			break
+		}
+
 		runtime.messages.push({ role: 'assistant', content: validBlocks })
 
 		// Write assistant entry to log
@@ -362,6 +369,7 @@ async function fetchWithRetry(
 		const data = (await res.json().catch(() => ({}))) as any
 
 		if (!retryable || attempt >= MAX_RETRIES - 1) {
+			await publishActivity(`Error: ${status}`, sessionId)
 			await publishLine(
 				`[error] ${status}: ${data.error?.message ?? stringify(data)}`,
 				'error',
