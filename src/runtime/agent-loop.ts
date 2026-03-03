@@ -172,6 +172,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			for (const result of toolResults) {
 				if (result.output === RESTART_SIGNAL) {
 					runtime.messages.push(provider.toolResultMessage(result.id, 'Restarting now.'))
+					logEntries.push(await writeToolResultEntry(sessionId, result.id, 'Restarting now.', currentToolRefMap))
 					shouldRestart = true
 					continue
 				}
