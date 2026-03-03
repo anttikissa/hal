@@ -113,11 +113,29 @@ function shrinkChar(c: CursorAnim): string {
 }
 function isDormant(c: CursorAnim): boolean { return c.shrinkStart !== null && Date.now() - c.shrinkStart >= IDLE_SHRINK_DURATION }
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
+type RGB = [number, number, number]
+const CURSOR_COLORS: Record<HalState, RGB> = {
+	idle: [255, 165, 0],
+	thinking: [150, 150, 150],
+	writing: [255, 165, 0],
+	tool_call: [150, 150, 150],
+	error: [255, 50, 50],
+}
+const CURSOR_COLOR_MS = 200
+let ccFrom: RGB = [255, 165, 0], ccTo: RGB = [255, 165, 0], ccStart = 0
+function cursorRGB(): RGB {
+	const t = Math.min((Date.now() - ccStart) / CURSOR_COLOR_MS, 1)
+	return [lerpCh(ccTo[0], t, ccFrom[0]), lerpCh(ccTo[1], t, ccFrom[1]), lerpCh(ccTo[2], t, ccFrom[2])]
+}
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 let halState: HalState = 'idle'
 export function setHalState(state: HalState): void {
 	const wasIdle = halState === 'idle'
 	halState = state
+	const target = CURSOR_COLORS[state]
+	if (target[0] !== ccTo[0] || target[1] !== ccTo[1] || target[2] !== ccTo[2]) {
+		ccFrom = cursorRGB(); ccTo = target; ccStart = Date.now()
+	}
 	if (state !== 'idle') {
 		halIdleSince = Infinity
 	} else if (!wasIdle) {
@@ -680,7 +698,8 @@ function render(): void {
 		let lineText = visibleOutput[idx] ?? ''
 		if (idx === halCursorIdx) {
 			const ht = brightness(hal.phase) * halIntensity
-			const cursor = `\x1b[38;2;${lerpCh(255, ht)};${lerpCh(165, ht)};0m${shrinkChar(hal)}${RESET}`
+			const [cr, cg, cb] = cursorRGB()
+			const cursor = `\x1b[38;2;${lerpCh(cr, ht)};${lerpCh(cg, ht)};${lerpCh(cb, ht)}m${shrinkChar(hal)}${RESET}`
 			lineText = truncateAnsi(lineText, c - 1) + cursor
 		}
 		if (hoverUrl && idx === hoverOutputRow) lineText = underlineOsc8Link(lineText, hoverUrl)
