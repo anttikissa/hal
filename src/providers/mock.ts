@@ -79,6 +79,7 @@ function lastUserText(messages: any[]): string {
 		if (Array.isArray(msg.content)) {
 			const text = msg.content.find((b: any) => b.type === 'text')
 			if (text) return text.text.trim().toLowerCase()
+			continue // skip tool_result-only user messages
 		}
 	}
 	return ''
