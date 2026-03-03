@@ -129,7 +129,7 @@ function cursorRGB(): RGB {
 }
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 let halState: HalState = 'idle'
-const ERROR_STICKY_MS = 2000
+const ERROR_STICKY_MS = 30_000
 let errorSince = 0
 export function setHalState(state: HalState): void {
 	if (halState === 'error' && state === 'idle' && Date.now() - errorSince < ERROR_STICKY_MS) {
