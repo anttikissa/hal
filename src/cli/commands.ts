@@ -30,7 +30,7 @@ const HELP = [
 	['Debug & system', {
 		clear:    'clear screen output',
 		snapshot: 'capture terminal debug snapshot',
-		bug:      'file a bug — /bug <description>',
+		bug:      'capture terminal snapshot + send to model — /bug <description>',
 		queue:    'show message queue',
 		restart:  'restart hal (kills all tabs)',
 		exit:     'quit hal',
