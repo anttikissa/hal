@@ -124,6 +124,7 @@ function generateResponse(messages: any[]): MockResponse {
 	if (input.startsWith('song')) return { chunks: DAISY_BELL, delayMs: 120 }
 	if (input.startsWith('error')) return { chunks: [], delayMs: 0, error: true }
 	if (input.startsWith('tool') && !isToolResult) return { chunks: [], delayMs: 0, tool: true }
+	if (isToolResult) return { chunks: ['Done! ', 'The command ', 'finished ', 'successfully.'], delayMs: 30 }
 	return { chunks: GREETING, delayMs: 30 }
 }
 
