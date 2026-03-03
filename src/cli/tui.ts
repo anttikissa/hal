@@ -94,7 +94,6 @@ const hal = makeCursorAnim(1000)
 let userPhase = 0
 let userPeriodCurrent = 500
 let halIntensity = 0.5 // 1.0 when busy, 0.5 when idle
-let halIdleSince = Date.now()
 let animTimer: ReturnType<typeof setInterval> | null = null
 const SHRINK_BLOCKS = '\u2588\u2587\u2586\u2585\u2584\u2583\u2582\u2581' // █▇▆▅▄▃▂▁
 const IDLE_SHRINK_DURATION = 250 // ms for shrink animation
@@ -113,47 +112,72 @@ function shrinkChar(c: CursorAnim): string {
 }
 function isDormant(c: CursorAnim): boolean { return c.shrinkStart !== null && Date.now() - c.shrinkStart >= IDLE_SHRINK_DURATION }
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
+
+// --- Per-tab cursor state ---
+// Tracks agent state per session so tab switches show the correct cursor.
+// States: idle/writing → orange, thinking/tool_call → grey, error → red (instant, sticky 30s).
+// Color transitions: 200ms linear interpolation, except error which snaps instantly.
+// Error also triggers busy animation speed, which decays naturally to idle.
+export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
 type RGB = [number, number, number]
 const CURSOR_COLORS: Record<HalState, RGB> = {
-	idle: [255, 165, 0],
-	thinking: [150, 150, 150],
-	writing: [255, 165, 0],
-	tool_call: [150, 150, 150],
-	error: [255, 50, 50],
+	idle: [255, 165, 0], thinking: [150, 150, 150], writing: [255, 165, 0],
+	tool_call: [150, 150, 150], error: [255, 50, 50],
 }
-const CURSOR_COLOR_MS = 200
-let ccFrom: RGB = [255, 165, 0], ccTo: RGB = [255, 165, 0], ccStart = 0
-function cursorRGB(): RGB {
-	const t = Math.min((Date.now() - ccStart) / CURSOR_COLOR_MS, 1)
-	return [lerpCh(ccTo[0], t, ccFrom[0]), lerpCh(ccTo[1], t, ccFrom[1]), lerpCh(ccTo[2], t, ccFrom[2])]
-}
-export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
-let halState: HalState = 'idle'
+const COLOR_MS = 200
 const ERROR_STICKY_MS = 30_000
-let errorSince = 0
+
+interface TabCursor {
+	state: HalState; errorSince: number; idleSince: number
+	ccFrom: RGB; ccTo: RGB; ccStart: number
+}
+const tabCursors = new Map<string, TabCursor>()
+let activeTabCursorId = ''
+
+function makeTabCursor(): TabCursor {
+	return { state: 'idle', errorSince: 0, idleSince: Date.now(), ccFrom: [255, 165, 0], ccTo: [255, 165, 0], ccStart: 0 }
+}
+function tc(): TabCursor {
+	let t = tabCursors.get(activeTabCursorId)
+	if (!t) { t = makeTabCursor(); tabCursors.set(activeTabCursorId, t) }
+	return t
+}
+
+export function setActiveTabCursor(id: string): void { activeTabCursorId = id }
+
+function tabCursorRGB(t: TabCursor): RGB {
+	const p = Math.min((Date.now() - t.ccStart) / COLOR_MS, 1)
+	return [lerpCh(t.ccTo[0], p, t.ccFrom[0]), lerpCh(t.ccTo[1], p, t.ccFrom[1]), lerpCh(t.ccTo[2], p, t.ccFrom[2])]
+}
+function cursorRGB(): RGB { return tabCursorRGB(tc()) }
+
 export function setHalState(state: HalState): void {
-	if (halState === 'error' && state === 'idle' && Date.now() - errorSince < ERROR_STICKY_MS) {
-		setTimeout(() => setHalState('idle'), ERROR_STICKY_MS - (Date.now() - errorSince))
+	const t = tc()
+	if (t.state === 'error' && state === 'idle' && Date.now() - t.errorSince < ERROR_STICKY_MS) {
+		setTimeout(() => { if (tc() === t && t.state === 'error') setHalState('idle') },
+			ERROR_STICKY_MS - (Date.now() - t.errorSince))
 		return
 	}
-	const wasIdle = halState === 'idle'
-	halState = state
-	if (state === 'error') errorSince = Date.now()
+	const wasIdle = t.state === 'idle'
+	t.state = state
+	if (state === 'error') t.errorSince = Date.now()
 	const target = CURSOR_COLORS[state]
-	if (target[0] !== ccTo[0] || target[1] !== ccTo[1] || target[2] !== ccTo[2]) {
-		ccFrom = state === 'error' ? target : cursorRGB()
-		ccTo = target; ccStart = Date.now()
+	if (target[0] !== t.ccTo[0] || target[1] !== t.ccTo[1] || target[2] !== t.ccTo[2]) {
+		t.ccFrom = state === 'error' ? target : tabCursorRGB(t)
+		t.ccTo = target; t.ccStart = Date.now()
 	}
+	// error → busy speed; idle → start decay; other → busy
 	if (state !== 'idle') {
-		halIdleSince = Infinity
+		t.idleSince = Infinity
 	} else if (!wasIdle) {
-		halIdleSince = Date.now()
+		t.idleSince = Date.now()
 	} else return
 	resetShrink(hal)
 }
-export function getHalIdleSince(): number { return halIdleSince }
+
+export function getHalIdleSince(): number { return tc().idleSince }
 export function restoreHalIdleTimer(ts: number): void {
-	halIdleSince = ts
+	tc().idleSince = ts
 	if (Date.now() - ts >= loadConfig().cursorDormantDelay) {
 		hal.shrinkStart = ts; hal.brightSince = null
 	} else {
@@ -161,15 +185,17 @@ export function restoreHalIdleTimer(ts: number): void {
 	}
 }
 export function resetHalIdleTimer(): void {
-	halIdleSince = Date.now()
+	tc().idleSince = Date.now()
 	resetShrink(hal)
 }
+
 const RAMP_RATE = 0.98
 function animTick(): void {
 	const cfg = loadConfig()
-	const isIdle = halState === 'idle'
+	const t = tc()
+	const isIdle = t.state === 'idle'
 	const now = Date.now()
-	const idleMs = now - halIdleSince
+	const idleMs = now - t.idleSince
 	const halTarget = isDormant(hal) ? cfg.cursorBlinkDormant : isIdle ? cfg.cursorBlinkIdle : cfg.cursorBlinkBusy
 	const intensityTarget = isIdle ? 0.5 : 1.0
 	hal.period += (halTarget - hal.period) * (1 - RAMP_RATE)

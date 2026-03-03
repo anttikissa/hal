@@ -24,7 +24,7 @@ import {
 	setMaxPromptLines,
 	setUserCursorMode,
 	setHalState,
-	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer,
+	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor,
 	type HalState,
 	setOutputSnapshot,
 	setStatusLine,
@@ -254,6 +254,7 @@ function captureActiveOutput(): void {
 
 function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
 	const active = activeTab(); if (!active) return
+	setActiveTabCursor(active.sessionId)
 	screenFmt = { ...active.fmtState }; lastContextStatus = active.contextStatus
 	restoreHalIdleTimer(active.halIdleSince); setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)); setTitleBar(titleBarText(active))
 	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
@@ -564,7 +565,10 @@ function render(event: RuntimeEvent): void {
 		if (isPartial) {
 			if ('activity' in event && event.activity !== undefined) {
 				const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
-				if (tab) tab.activity = event.activity!
+				if (tab) {
+					tab.activity = event.activity!
+					setActiveTabCursor(tab.sessionId); setHalState(deriveHalState(tab))
+				}
 			}
 		} else {
 			const busySet = new Set(event.busySessionIds ?? []), pausedSet = new Set(event.pausedSessionIds ?? [])
@@ -572,10 +576,12 @@ function render(event: RuntimeEvent): void {
 				const wasBusy = tab.busy
 				tab.busy = busySet.has(tab.sessionId); tab.paused = pausedSet.has(tab.sessionId)
 				if (!tab.busy && wasBusy && !tab.activity.startsWith('Error')) tab.activity = ''
+				// update per-tab cursor state for background tabs
+				setActiveTabCursor(tab.sessionId); setHalState(deriveHalState(tab))
 			}
 		}
 		const active = activeTab()
-		if (active) { setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)) }
+		if (active) { setActiveTabCursor(active.sessionId); setActivityLine(activityBarText(active)) }
 		if (event.context) {
 			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : activeTab()
 			if (tab) { tab.contextStatus = fmtContext(event.context); if (tab === activeTab()) lastContextStatus = tab.contextStatus }
