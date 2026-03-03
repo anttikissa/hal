@@ -37,7 +37,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	const modelId = modelIdForModel(fullModel)
 	const provider = getProvider(providerForModel(fullModel))
 
-	let done = false
+	let done = false, endedWithError = false
 	while (!done && !runtime.pausedByUser) {
 		runtime.activeAbort = new AbortController()
 
@@ -55,7 +55,8 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 		await publishActivity('Sending request...', sessionId)
 		const res = await fetchWithRetry(sessionId, runtime, provider, body)
-		if (!res || runtime.pausedByUser) break
+		if (!res) { endedWithError = true; break }
+		if (runtime.pausedByUser) break
 
 		const parsed = await parseResponseStream(sessionId, runtime, provider, res)
 		if (!parsed) break
@@ -202,7 +203,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 	}
 
-	await publishActivity('', sessionId)
+	if (!endedWithError) await publishActivity('', sessionId)
 
 	runtime.activeAbort = null
 
