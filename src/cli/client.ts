@@ -23,7 +23,7 @@ import {
 	setInputKeyHandler,
 	setMaxPromptLines,
 	setUserCursorMode,
-	setHalState, setTabState,
+	setHalState,
 	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, getTabTier, getTabColor,
 	type HalState,
 	setOutputSnapshot,
@@ -576,7 +576,7 @@ function render(event: RuntimeEvent): void {
 				const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
 				if (tab) {
 					tab.activity = event.activity!
-					setTabState(tab.sessionId, deriveHalState(tab))
+					setHalState(deriveHalState(tab), tab.sessionId)
 				}
 			}
 		} else {
@@ -585,7 +585,7 @@ function render(event: RuntimeEvent): void {
 				const wasBusy = tab.busy
 				tab.busy = busySet.has(tab.sessionId); tab.paused = pausedSet.has(tab.sessionId)
 				if (!tab.busy && wasBusy && !tab.activity.startsWith('Error')) tab.activity = ''
-				setTabState(tab.sessionId, deriveHalState(tab))
+				setHalState(deriveHalState(tab), tab.sessionId)
 			}
 		}
 		const active = activeTab()

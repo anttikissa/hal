@@ -169,15 +169,12 @@ function tabCursorRGB(t: TabCursor): RGB {
 }
 function cursorRGB(): RGB { return tabCursorRGB(tc()) }
 
-export function setHalState(state: HalState): void {
-	setTabState(activeTabCursorId, state)
-}
-export function setTabState(tabId: string, state: HalState): void {
+export function setHalState(state: HalState, tabId = activeTabCursorId): void {
 	let t = tabCursors.get(tabId)
 	if (!t) { t = makeTabCursor(); tabCursors.set(tabId, t) }
 	const isActiveTab = tabId === activeTabCursorId
 	if (t.state === 'error' && state === 'idle' && Date.now() - t.errorSince < ERROR_STICKY_MS) {
-		setTimeout(() => { if (tabCursors.get(tabId) === t && t.state === 'error') setTabState(tabId, 'idle') },
+		setTimeout(() => { if (tabCursors.get(tabId) === t && t.state === 'error') setHalState('idle', tabId) },
 			ERROR_STICKY_MS - (Date.now() - t.errorSince))
 		return
 	}
