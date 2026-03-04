@@ -617,7 +617,7 @@ function renderTabsForStatus(): string {
 		const period = tier === 'busy' ? blinkIdle / 2 : tier === 'idle' ? blinkIdle : blinkIdle * 2
 		const on = (now % period) < period / 2
 		const tabColor = i === activeTabIndex ? TAB_ACTIVE : TAB_INACTIVE
-		const char = tier === 'dormant' ? '□' : '■'
+		const char = tier === 'dormant' ? '▫' : '▪'
 		const [r, g, b] = getTabColor(tab.sessionId)
 		const act = on ? `\x1b[38;2;${r|0};${g|0};${b|0}m${char}${tabColor}` : ' '
 		const text = `${i + 1}${act}${labels[i]}`
