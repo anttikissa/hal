@@ -146,6 +146,8 @@ export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	const config = loadConfig()
 	setMaxPromptLines(config.maxPromptLines); setUserCursorMode(config.userCursor); loadActiveTheme(HAL_DIR, config.theme)
 	if (config.timestamps) setShowTimestamps(true)
+	// periodic tab bar refresh for blink tier changes (idle→dormant)
+	setInterval(renderBusyStatus, config.cursorBlinkIdle / 4)
 }
 
 export function promoteToOwner(): void {
