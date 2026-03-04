@@ -56,7 +56,7 @@ export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta' | 'fork' | 
 export interface ToolProgressEntry {
 	name: string
 	inputSummary: string
-	status: 'running' | 'done' | 'error'
+	status: 'running' | 'done'
 	elapsed: number
 	bytes: number
 	totalLines: number

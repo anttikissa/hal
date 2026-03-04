@@ -85,7 +85,7 @@ describe('prompt label rendering', () => {
 describe('tool progress', () => {
 	const localSource = { kind: 'cli' as const, clientId: 'test-client' }
 	const makeTool = (overrides: Partial<{
-		name: string; inputSummary: string; status: 'running' | 'done' | 'error'
+		name: string; inputSummary: string; status: 'running' | 'done'
 		elapsed: number; bytes: number; totalLines: number; lastLines: string[]
 	}> = {}) => ({
 		name: 'bash', inputSummary: 'echo hi', status: 'running' as const,
@@ -107,7 +107,7 @@ describe('tool progress', () => {
 		const plain = stripAnsi(out)
 		// 2 tools × 4 lines = 8 lines
 		expect(out.split('\n').length - 1).toBe(8)
-		expect(s.toolDashboardLines).toBe(8)
+		expect(s.toolProgressLines).toBe(8)
 		expect(plain).toContain('<tool.grep>')
 		expect(plain).toContain('<tool.read>')
 		expect(plain).toContain('--- pattern src/ ---')
@@ -139,21 +139,21 @@ describe('tool progress', () => {
 
 	test('cursor-up-erase on update', () => {
 		const s = st()
-		s.toolDashboardLines = 8
+		s.toolProgressLines = 8
 		const event = makeEvent([
 			makeTool({ status: 'done' }),
 			makeTool({ status: 'running' }),
 		])
 		const out = pushEvent(event, localSource, s)
 		expect(out).toMatch(/^\x1b\[8A\x1b\[J/)
-		expect(s.toolDashboardLines).toBe(8)
+		expect(s.toolProgressLines).toBe(8)
 	})
 
-	test('all done sets toolDashboardLines to 0', () => {
+	test('all done sets toolProgressLines to 0', () => {
 		const s = st()
-		s.toolDashboardLines = 4
+		s.toolProgressLines = 4
 		const event = makeEvent([makeTool({ status: 'done' })])
 		pushEvent(event, localSource, s)
-		expect(s.toolDashboardLines).toBe(0)
+		expect(s.toolProgressLines).toBe(0)
 	})
 })

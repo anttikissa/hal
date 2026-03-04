@@ -28,18 +28,27 @@ import { publishLine, publishChunk, publishActivity, publishContext, publishTool
 
 const REQ_LOG = '/tmp/hal-req.ason'
 
+function oneLineSummary(value: unknown, fallback: string): string {
+	const raw = typeof value === 'string' ? value : value == null ? '' : stringify(value, 'short')
+	const compact = raw.replace(/\s+/g, ' ').trim()
+	if (!compact) return fallback
+	return compact.length > 140 ? `${compact.slice(0, 139)}…` : compact
+}
+
 function toolInputSummary(name: string, input: any): string {
+	let summary: unknown
 	switch (name) {
-		case 'bash': return input.command ?? ''
-		case 'grep': return `${input.pattern}${input.path ? ' ' + input.path : ''}`
-		case 'read': return input.path + (input.start != null ? `:${input.start}-${input.end}` : '')
-		case 'write': return input.path
-		case 'edit': return input.path
-		case 'glob': return input.pattern
-		case 'ls': return input.path ?? '.'
-		case 'web_search': return input.query
-		default: return name
+		case 'bash': summary = input.command; break
+		case 'grep': summary = `${input.pattern}${input.path ? ' ' + input.path : ''}`; break
+		case 'read': summary = input.path + (input.start != null ? `:${input.start}-${input.end}` : ''); break
+		case 'write':
+		case 'edit': summary = input.path; break
+		case 'glob': summary = input.pattern; break
+		case 'ls': summary = input.path ?? '.'; break
+		case 'web_search': summary = input.query; break
+		default: summary = name; break
 	}
+	return oneLineSummary(summary, name)
 }
 export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCache): Promise<void> {
 	busySessions.add(sessionId)
@@ -169,77 +178,72 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 
 		if (toolBlocks.length > 0) {
-			const toolLines: string[] = []
-			const isParallel = toolBlocks.length >= 2
+			const LAST_LINES = 3
 
 			interface ToolState {
 				name: string
 				inputSummary: string
-				status: 'running' | 'done' | 'error'
+				status: 'running' | 'done'
 				startTime: number
 				bytes: number
 				totalLines: number
 				lastLines: string[]
 			}
-			let toolState: ToolState[] | null = null
-			let lastEmitTime = 0
 
-			if (isParallel) {
-				const now = Date.now()
-				toolState = toolBlocks.map((block: any) => ({
-					name: block.name,
-					inputSummary: toolInputSummary(block.name, block.input),
-					status: 'running' as const,
-					startTime: now,
-					bytes: 0,
-					totalLines: 0,
-					lastLines: [] as string[],
-				}))
-				await publishActivity(`Running ${toolBlocks.length} tools`, sessionId)
-				await publishToolProgress(sessionId, toolState.map(ts => ({
-					name: ts.name, inputSummary: ts.inputSummary, status: ts.status,
-					elapsed: 0, bytes: 0, totalLines: 0, lastLines: [],
-				})))
-				lastEmitTime = now
-			}
+			const startTime = Date.now()
+			const toolState: ToolState[] = toolBlocks.map((block: any) => ({
+				name: block.name,
+				inputSummary: toolInputSummary(block.name, block.input),
+				status: 'running',
+				startTime,
+				bytes: 0,
+				totalLines: 0,
+				lastLines: [],
+			}))
 
-			const LAST_LINES = 3
-			const emitProgress = async (force = false) => {
-				if (!toolState) return
-				const t = Date.now()
-				if (!force && t - lastEmitTime < 100) return
-				lastEmitTime = t
-				await publishToolProgress(sessionId, toolState.map(ts => ({
-					name: ts.name, inputSummary: ts.inputSummary, status: ts.status,
-					elapsed: t - ts.startTime, bytes: ts.bytes,
+			await publishActivity(
+				toolState.length === 1 ? `Running: ${toolState[0].name}` : `Running ${toolState.length} tools`,
+				sessionId,
+			)
+
+			const buildProgress = (now: number) =>
+				toolState.map((ts) => ({
+					name: ts.name,
+					inputSummary: ts.inputSummary,
+					status: ts.status,
+					elapsed: now - ts.startTime,
+					bytes: ts.bytes,
 					totalLines: ts.totalLines,
 					lastLines: ts.lastLines.slice(-LAST_LINES),
-				})))
+				}))
+
+			let lastEmit = 0
+			const emitProgress = async (force = false) => {
+				const now = Date.now()
+				if (!force && now - lastEmit < 100) return
+				lastEmit = now
+				await publishToolProgress(sessionId, buildProgress(now))
 			}
+
+			await emitProgress(true)
 
 			const toolResults = await Promise.all(
 				toolBlocks.map(async (block: any, i: number) => {
-					if (!isParallel) await publishActivity(`Running: ${block.name}`, sessionId)
 					const output = await runTool(block.name, block.input, {
-						logger: (line, level = 'tool') => {
-							if (level === 'tool') toolLines.push(line)
-							if (toolState) {
-								toolState[i].bytes += line.length
-								toolState[i].totalLines++
-								toolState[i].lastLines.push(line)
-								if (toolState[i].lastLines.length > LAST_LINES)
-									toolState[i].lastLines = toolState[i].lastLines.slice(-LAST_LINES)
-								return emitProgress()
-							}
-							return publishLine(line, level, sessionId)
+						logger: (line) => {
+							const state = toolState[i]
+							state.bytes += line.length
+							state.totalLines += 1
+							state.lastLines.push(line)
+							if (state.lastLines.length > LAST_LINES)
+								state.lastLines = state.lastLines.slice(-LAST_LINES)
+							return emitProgress()
 						},
 						cwd: getSessionWorkingDir(sessionId),
 						signal: runtime.activeAbort?.signal,
 					})
-					if (toolState) {
-						toolState[i].status = 'done'
-						await emitProgress(true)
-					}
+					toolState[i].status = 'done'
+					await emitProgress(true)
 					return { id: block.id, output }
 				}),
 			)
@@ -262,9 +266,6 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				}
 			}
 
-			if (toolLines.length > 0) {
-				logEntries.push({ type: 'tool_log', text: toolLines.join('\n'), ts: new Date().toISOString() })
-			}
 			if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
 		}
 	}

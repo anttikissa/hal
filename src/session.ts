@@ -452,11 +452,30 @@ export async function loadReplayEntries(sessionId: string): Promise<any[]> {
 	const startIdx = findReplayStart(allEntries)
 	const entries = allEntries.slice(startIdx)
 
-	// Resolve thinking text for display
+	const toolResults = new Map<string, string>()
 	for (const entry of entries) {
-		if (entry.role === 'assistant' && entry.thinking?.ref) {
+		if (entry.role !== 'tool_result' || typeof entry.tool_use_id !== 'string') continue
+		toolResults.set(entry.tool_use_id, await resolveToolResult(sessionId, entry.ref))
+	}
+
+	for (const entry of entries) {
+		if (entry.role !== 'assistant') continue
+		if (entry.thinking?.ref) {
 			const block = await readBlock(sessionId, entry.thinking.ref)
 			if (block) entry._thinkingText = block.thinking
+		}
+		if (Array.isArray(entry.tools) && entry.tools.length > 0) {
+			const calls: any[] = []
+			for (const tool of entry.tools) {
+				const block = await readBlock(sessionId, tool.ref)
+				calls.push({
+					id: tool.id,
+					name: tool.name,
+					input: block?.call?.input ?? {},
+					result: toolResults.get(tool.id) ?? '',
+				})
+			}
+			entry._toolCalls = calls
 		}
 	}
 

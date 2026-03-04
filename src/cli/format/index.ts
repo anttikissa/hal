@@ -27,11 +27,11 @@ function kindLabel(kind: string): string {
 
 export interface FormatState {
 	prevKind: string
-	toolDashboardLines: number
+	toolProgressLines: number
 	termWidth: number
 }
 export function createFormatState(): FormatState {
-	return { prevKind: '', toolDashboardLines: 0, termWidth: 80 }
+	return { prevKind: '', toolProgressLines: 0, termWidth: 80 }
 }
 
 export function pushFragment(kind: string, text: string, st: FormatState): string {
@@ -162,8 +162,8 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 		let prefix = ''
 
 		// Erase previous tool blocks if this is an update
-		if (st.toolDashboardLines > 0) {
-			prefix = `\x1b[${st.toolDashboardLines}A\x1b[J`
+		if (st.toolProgressLines > 0) {
+			prefix = `\x1b[${st.toolProgressLines}A\x1b[J`
 		} else {
 			// First render — add separator from previous chunk content
 			const prev = st.prevKind
@@ -177,7 +177,7 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 		}
 
 		const lineCount = event.tools.length * linesPerTool
-		st.toolDashboardLines = allDone ? 0 : lineCount
+		st.toolProgressLines = allDone ? 0 : lineCount
 		st.prevKind = 'tool_progress'
 		return prefix + body
 	}

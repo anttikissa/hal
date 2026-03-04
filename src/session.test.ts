@@ -368,6 +368,25 @@ describe('replay entries', () => {
 		const assistant = entries.find((e: any) => e.role === 'assistant')
 		expect(assistant._thinkingText).toBe('deep thoughts')
 	})
+
+	test('assistant tool calls are resolved with input and result for replay', async () => {
+		const id = uniqueId()
+		const ts = new Date().toISOString()
+		await appendToLog(id, [{ role: 'user', content: 'run a command', ts }])
+		const { entry, toolRefMap } = await writeAssistantEntry(id, [
+			{ type: 'tool_use', id: 'toolu_1', name: 'bash', input: { command: 'echo hi' } },
+		])
+		await appendToLog(id, [entry])
+		const resultEntry = await writeToolResultEntry(id, 'toolu_1', 'hi', toolRefMap)
+		await appendToLog(id, [resultEntry])
+
+		const entries = await loadReplayEntries(id)
+		const assistant = entries.find((e: any) => e.role === 'assistant')
+		expect(assistant).toBeTruthy()
+		expect(assistant._toolCalls).toEqual([
+			{ id: 'toolu_1', name: 'bash', input: { command: 'echo hi' }, result: 'hi' },
+		])
+	})
 })
 
 describe('context trimming', () => {

@@ -298,7 +298,7 @@ async function openSessionTab(sessionId: string, workingDir: string): Promise<vo
 	const inputHistory = await loadInputHistory(sessionId)
 	const entries = await loadReplayEntries(sessionId)
 	const replay = renderConversationHistory(entries)
-	const replayCount = entries.filter((e: any) => e.role === 'user' || e.role === 'assistant' || e.type === 'tool_log').length
+	const replayCount = entries.filter((e: any) => e.role === 'user' || e.role === 'assistant').length
 
 	captureActiveOutput()
 	pendingOpenSwitch = true
@@ -388,6 +388,54 @@ function syncTabsFromSessions(
 	if (options.render ?? true) applyActiveTabSnapshot(targetSessionId !== previousActive)
 }
 
+function oneLineSummary(value: unknown, fallback: string): string {
+	let raw = ''
+	if (typeof value === 'string') raw = value
+	else if (value != null) {
+		try { raw = JSON.stringify(value) }
+		catch { raw = String(value) }
+	}
+	const compact = raw.replace(/\s+/g, ' ').trim()
+	if (!compact) return fallback
+	return compact.length > 140 ? `${compact.slice(0, 139)}…` : compact
+}
+
+function replayToolInputSummary(name: string, input: any): string {
+	let summary: unknown
+	switch (name) {
+		case 'bash': summary = input.command; break
+		case 'grep': summary = `${input.pattern}${input.path ? ' ' + input.path : ''}`; break
+		case 'read': summary = input.path + (input.start != null ? `:${input.start}-${input.end}` : ''); break
+		case 'write':
+		case 'edit': summary = input.path; break
+		case 'glob': summary = input.pattern; break
+		case 'ls': summary = input.path ?? '.'; break
+		case 'web_search': summary = input.query; break
+		default: summary = input; break
+	}
+	return oneLineSummary(summary, name)
+}
+
+function replayToolProgressEvent(tool: any): RuntimeEvent {
+	const result = typeof tool?.result === 'string' ? tool.result : ''
+	const lines = result ? result.split('\n') : []
+	return {
+		id: `replay-tool-${tool?.id ?? 'unknown'}`,
+		type: 'tool_progress',
+		sessionId: null,
+		tools: [{
+			name: tool?.name ?? 'tool',
+			inputSummary: replayToolInputSummary(tool?.name ?? 'tool', tool?.input ?? {}),
+			status: 'done',
+			elapsed: 0,
+			bytes: Buffer.byteLength(result),
+			totalLines: lines.length,
+			lastLines: lines.slice(-3),
+		}],
+		createdAt: tool?.ts ?? '',
+	}
+}
+
 function renderConversationHistory(entries: any[]): { output: string; fmtState: FormatState } {
 	const fmtState = createFormatState()
 	let output = ''
@@ -397,12 +445,6 @@ function renderConversationHistory(entries: any[]): { output: string; fmtState: 
 			const pad = (n: number) => String(n).padStart(2, '0')
 			const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 			output += pushFragment('line.info', `[session] started ${dateStr} — ${entry.workingDir}`, fmtState)
-			continue
-		}
-		if (entry.type === 'tool_log') {
-			for (const line of entry.text.split('\n')) {
-				output += pushFragment('line.tool', line, fmtState)
-			}
 			continue
 		}
 		if (entry.role === 'user') {
@@ -421,9 +463,9 @@ function renderConversationHistory(entries: any[]): { output: string; fmtState: 
 			if (entry.text) {
 				output += pushFragment('assistant', entry.text, fmtState)
 			}
-			if (entry.tools) {
-				for (const tool of entry.tools) {
-					output += pushFragment('line.tool', `[${tool.name}]`, fmtState)
+			if (Array.isArray(entry._toolCalls)) {
+				for (const tool of entry._toolCalls) {
+					output += pushEvent(replayToolProgressEvent(tool), source, fmtState)
 				}
 			}
 			continue
@@ -439,7 +481,7 @@ async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
 		const entries = await loadReplayEntries(tab.sessionId)
 		const replay = renderConversationHistory(entries)
 		tab.output = replay.output; tab.fmtState = replay.fmtState
-		replayed.set(tab.sessionId, entries.filter((e: any) => e.role === 'user' || e.role === 'assistant' || e.type === 'tool_log').length)
+		replayed.set(tab.sessionId, entries.filter((e: any) => e.role === 'user' || e.role === 'assistant').length)
 	}))
 	return replayed
 }
