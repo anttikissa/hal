@@ -610,9 +610,13 @@ function render(event: RuntimeEvent): void {
 function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ''
 	const labels = tabDisplayNames(tabs.slice(0, 9))
+	const blinkIdle = loadConfig().cursorBlinkIdle
+	const now = Date.now()
 	return tabs.slice(0, 9).map((tab, i) => {
 		const tier = getTabTier(tab.sessionId)
-		const act = tier === 'busy' ? '1' : tier === 'idle' ? '2' : '3'
+		const period = tier === 'busy' ? blinkIdle / 2 : tier === 'idle' ? blinkIdle : blinkIdle * 2
+		const on = (now % period) < period / 2
+		const act = on ? (tier === 'dormant' ? '□' : '■') : ' '
 		const text = `${i + 1}${act}${labels[i]}`
 		return i === activeTabIndex ? `${TAB_ACTIVE}[${text}]${TAB_RESET}` : `${TAB_INACTIVE} ${text} ${TAB_RESET}`
 	}).join('')
