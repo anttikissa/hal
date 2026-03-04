@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { SessionInfo } from '../session.ts'
-import { _testClient } from './client.ts'
+import { buildTabFromSession } from './client.ts'
 import { createTabState } from './tab.ts'
-import { _testCursor, restoreHalIdleTimer, setActiveTabCursor, setHalState } from './tui.ts'
+import { getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, setHalState } from './tui.ts'
 
 const TEST_TS = '2026-01-01T00:00:00.000Z'
 
@@ -10,44 +10,61 @@ function mkSession(id: string, workingDir: string, busy: boolean): SessionInfo {
 	return { id, workingDir, busy, messageCount: 0, createdAt: TEST_TS, updatedAt: TEST_TS }
 }
 
-describe('client cursor state', () => {
+function mkExistingTab(sessionId: string, workingDir: string, halIdleSince: number) {
+	return {
+		...createTabState({
+			sessionId,
+			workingDir,
+			name: sessionId,
+			modelLabel: 'Codex 5.3',
+		}),
+		halIdleSince,
+	}
+}
+
+describe('buildTabFromSession', () => {
 	beforeEach(() => {
-		_testClient.resetState()
-		_testCursor.resetAll()
+		setActiveTabCursor('test-reset')
+		setHalState('writing', 'test-reset')
+		setHalState('idle', 'test-reset')
+		restoreHalIdleTimer(Date.now())
 	})
 
-	test('sessions sync preserves dormant active cursor while another tab becomes busy', () => {
-		const tab1 = createTabState({
-			sessionId: 'tab1',
-			workingDir: '/tmp/tab1',
-			name: 'tab1',
-			modelLabel: 'Codex 5.3',
-		})
-		const tab2 = createTabState({
-			sessionId: 'tab2',
-			workingDir: '/tmp/tab2',
-			name: 'tab2',
-			modelLabel: 'Codex 5.3',
-		})
-		_testClient.setTabs([tab1, tab2], 1)
-
-		setActiveTabCursor('tab2')
-		setHalState('idle', 'tab2')
-		const idleSince = Date.now() - 60_000
-		restoreHalIdleTimer(idleSince)
-		expect(_testCursor.isDormant()).toBe(true)
-
-		_testClient.syncTabsFromSessions(
-			[
-				mkSession('tab1', '/tmp/tab1', true),
-				mkSession('tab2', '/tmp/tab2', false),
-			],
-			'tab2',
+	test('preserves existing halIdleSince', () => {
+		const oldIdleSince = Date.now() - 60_000
+		const existing = mkExistingTab('tab2', '/tmp/tab2', oldIdleSince)
+		const next = buildTabFromSession(
+			mkSession('tab2', '/tmp/tab2', false),
+			existing,
+			{ preserve: true, forkOutput: null, isRestore: false, restoreData: null },
 		)
 
-		expect(_testCursor.isDormant()).toBe(true)
-		const active = _testClient.getActiveTab()
-		expect(active?.sessionId).toBe('tab2')
-		expect(active?.halIdleSince ?? Infinity).toBeLessThan(Date.now() - 30_000)
+		expect(next.halIdleSince).toBe(oldIdleSince)
+	})
+
+	test('preserved halIdleSince keeps cursor dormant after restore', () => {
+		const oldIdleSince = Date.now() - 60_000
+		const existing = mkExistingTab('tab2', '/tmp/tab2', oldIdleSince)
+		const next = buildTabFromSession(
+			mkSession('tab2', '/tmp/tab2', false),
+			existing,
+			{ preserve: true, forkOutput: null, isRestore: false, restoreData: null },
+		)
+
+		restoreHalIdleTimer(next.halIdleSince)
+
+		expect(getHalIdleSince()).toBeLessThan(Date.now() - 30_000)
+	})
+
+	test('sets halIdleSince for brand-new tabs', () => {
+		const start = Date.now()
+		const next = buildTabFromSession(
+			mkSession('tab-new', '/tmp/tab-new', false),
+			undefined,
+			{ preserve: true, forkOutput: null, isRestore: false, restoreData: null },
+		)
+
+		expect(next.halIdleSince).toBeGreaterThanOrEqual(start)
+		expect(next.halIdleSince).toBeLessThanOrEqual(Date.now())
 	})
 })
