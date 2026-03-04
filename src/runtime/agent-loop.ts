@@ -37,6 +37,9 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	const modelId = modelIdForModel(fullModel)
 	const provider = getProvider(providerForModel(fullModel))
 
+	// endedWithError: when true, the post-loop cleanup preserves the "Error: ..." activity
+	// so the cursor stays red. Set on HTTP errors (fetchWithRetry→null) and stream errors
+	// (parseResponseStream returns with stopReason=null, not aborted).
 	let done = false, endedWithError = false
 	while (!done && !runtime.pausedByUser) {
 		runtime.activeAbort = new AbortController()
@@ -60,6 +63,8 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 		const parsed = await parseResponseStream(sessionId, runtime, provider, res)
 		if (!parsed) break
+		// Stream error: no stop event and not user-aborted → preserve error activity
+		if (!parsed.stopReason && !parsed.aborted) { endedWithError = true; break }
 
 		if (debugEnabled('responseLogging')) {
 			const entry = {
@@ -204,6 +209,8 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 		}
 	}
 
+	// Clear activity unless we errored — error activity must stay so the client
+	// keeps deriveHalState() → 'error' and the cursor remains red.
 	if (!endedWithError) await publishActivity('', sessionId)
 
 	runtime.activeAbort = null
