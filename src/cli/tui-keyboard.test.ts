@@ -291,6 +291,16 @@ describe('modifier-only keys are suppressed', () => {
 	})
 })
 
+// ── Alt+Backspace normalization ──
+
+describe('alt+backspace produces ESC DEL', () => {
+	it('normalizes kitty CSI-u alt+backspace to \\x1b\\x7f', () => {
+		_testTuiKeys.resetState()
+		// codepoint 127 = DEL/backspace, rawModifier = Alt(2) + 1 = 3
+		expect(_testTuiKeys.normalizeKittyKey('\x1b[127;3u')).toBe('\x1b\x7f')
+	})
+})
+
 // ── Ghostty-specific normalization (original tests) ──
 
 describe('tui Kitty/Ghostty key interpretation (Ghostty fixture baseline)', () => {

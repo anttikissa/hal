@@ -897,7 +897,7 @@ function normalizeKittyKey(key: string): string | null {
 		const ctrl = String.fromCharCode(codepoint & 0x1f)
 		return (mods & 2) !== 0 ? `\x1b${ctrl}` : ctrl
 	}
-	if ((mods & 2) !== 0 && !(mods & 4) && codepoint >= 0x20 && codepoint <= 0x7e)
+	if ((mods & 2) !== 0 && !(mods & 4) && codepoint >= 0x20 && codepoint <= 0x7f)
 		return `\x1b${String.fromCharCode(codepoint)}`
 	if (mods === 0) {
 		if (codepoint === 13) return '\r'; if (codepoint === 9) return '\t'
