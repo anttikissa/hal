@@ -119,6 +119,7 @@ function lerpCh(to: number, t: number, from = 0): number { return Math.round(fro
 // Color transitions: 200ms linear interpolation, except error which snaps instantly.
 // Error also triggers busy animation speed, which decays naturally to idle.
 export type HalState = 'idle' | 'thinking' | 'writing' | 'tool_call' | 'error'
+export type BlinkTier = 'busy' | 'idle' | 'dormant'
 type RGB = [number, number, number]
 const CURSOR_COLORS: Record<HalState, RGB> = {
 	idle: [255, 165, 0], thinking: [150, 150, 150], writing: [255, 165, 0],
@@ -144,6 +145,12 @@ function tc(): TabCursor {
 }
 
 export function setActiveTabCursor(id: string): void { activeTabCursorId = id }
+export function getTabTier(id: string): BlinkTier {
+	const t = tabCursors.get(id)
+	if (!t) return 'idle'
+	if (t.state !== 'idle' && t.state !== 'error') return 'busy'
+	return (Date.now() - t.idleSince >= loadConfig().cursorDormantDelay) ? 'dormant' : 'idle'
+}
 
 function tabCursorRGB(t: TabCursor): RGB {
 	const p = Math.min((Date.now() - t.ccStart) / COLOR_MS, 1)

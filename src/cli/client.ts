@@ -24,7 +24,7 @@ import {
 	setMaxPromptLines,
 	setUserCursorMode,
 	setHalState,
-	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor,
+	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, getTabTier,
 	type HalState,
 	setOutputSnapshot,
 	setStatusLine,
@@ -609,7 +609,8 @@ function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ''
 	const labels = tabDisplayNames(tabs.slice(0, 9))
 	return tabs.slice(0, 9).map((tab, i) => {
-		const act = i !== activeTabIndex && tabHasActivity.has(tab.sessionId) ? '▪' : '▫'
+		const tier = getTabTier(tab.sessionId)
+		const act = tier === 'busy' ? '1' : tier === 'idle' ? '2' : '3'
 		const text = `${i + 1}${act}${labels[i]}`
 		return i === activeTabIndex ? `${TAB_ACTIVE}[${text}]${TAB_RESET}` : `${TAB_INACTIVE} ${text} ${TAB_RESET}`
 	}).join('')
