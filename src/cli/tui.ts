@@ -134,6 +134,8 @@ const CURSOR_COLORS: Record<HalState, RGB> = {
 }
 const COLOR_MS = 200
 const ERROR_STICKY_MS = 30_000
+const TAB_GREY_MS = 20_000 // idle→grey transition for tab dot
+const TAB_GREY: RGB = [100, 100, 100]
 
 interface TabCursor {
 	state: HalState; errorSince: number; idleSince: number
@@ -160,7 +162,15 @@ export function getTabTier(id: string): BlinkTier {
 }
 export function getTabColor(id: string): RGB {
 	const t = tabCursors.get(id)
-	return t ? tabCursorRGB(t) : CURSOR_COLORS.idle
+	if (!t) return CURSOR_COLORS.idle
+	const rgb = tabCursorRGB(t)
+	const idle = t.state === 'idle' || t.state === 'error'
+	if (!idle) return rgb
+	const fadeStart = t.idleSince + TAB_GREY_MS
+	const elapsed = Date.now() - fadeStart
+	if (elapsed <= 0) return rgb
+	const p = Math.min(elapsed / COLOR_MS, 1)
+	return [lerpCh(TAB_GREY[0], p, rgb[0]), lerpCh(TAB_GREY[1], p, rgb[1]), lerpCh(TAB_GREY[2], p, rgb[2])]
 }
 
 function tabCursorRGB(t: TabCursor): RGB {
@@ -909,6 +919,14 @@ function normalizeKittyKey(key: string): string | null {
 	return key
 }
 
+export const _testCursor = {
+	get hal() { return hal },
+	isDormant(): boolean { return isDormant(hal) },
+	resetAll(): void {
+		tabCursors.clear(); activeTabCursorId = ''
+		resetShrink(hal); hal.phase = 0; hal.period = 1000; halIntensity = 0.5
+	},
+}
 export const _testTuiKeys = {
 	parseKittyCsiUKey, normalizeKittyFunctionalKey, normalizeKittyKey, supportsSynchronizedOutput,
 	resetState(): void {
