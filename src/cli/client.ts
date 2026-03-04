@@ -24,7 +24,7 @@ import {
 	setMaxPromptLines,
 	setUserCursorMode,
 	setHalState,
-	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, getTabTier, getTabColor,
+	getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, getTabTier, getTabColor,
 	type HalState,
 	setOutputSnapshot,
 	setStatusLine,
@@ -368,6 +368,7 @@ function syncTabsFromSessions(
 			inputHistory: existing?.inputHistory ?? (isRestore ? openData!.inputHistory : []),
 			inputDraft: existing?.inputDraft ?? '',
 			inputCursor: existing?.inputCursor ?? 0,
+			halIdleSince: existing?.halIdleSince ?? Date.now(),
 		}
 	})
 	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id)))
@@ -581,9 +582,12 @@ function render(event: RuntimeEvent): void {
 			}
 		} else {
 			const busySet = new Set(event.busySessionIds ?? []), pausedSet = new Set(event.pausedSessionIds ?? [])
+			const now = Date.now()
 			for (const tab of tabs) {
 				const wasBusy = tab.busy
 				tab.busy = busySet.has(tab.sessionId); tab.paused = pausedSet.has(tab.sessionId)
+				if (tab.busy) tab.halIdleSince = Infinity
+				else if (wasBusy || !Number.isFinite(tab.halIdleSince)) tab.halIdleSince = now
 				if (!tab.busy && wasBusy && !tab.activity.startsWith('Error')) tab.activity = ''
 				setHalState(deriveHalState(tab), tab.sessionId)
 			}
@@ -628,4 +632,25 @@ function renderTabsForStatus(): string {
 
 function renderBusyStatus(): void {
 	setStatusLine(renderTabsForStatus(), [roleLabel, lastContextStatus ?? ''].filter(Boolean).join(' · '))
+}
+
+export const _testClient = {
+	resetState(): void {
+		source = { kind: 'cli', clientId: 'test' }
+		isOwner = false; stopped = false; lastContextStatus = null
+		roleLabel = ''; wasBusyOnLastSubmit = false; reconstructing = false
+		tabs = []; activeTabIndex = 0; launchCwd = ''
+		pendingForkOutput = null; pendingForkSwitch = false
+		pendingOpenSwitch = false; pendingOpenData = null
+		tabHasActivity = new Set<string>()
+		screenFmt = createFormatState()
+	},
+	setTabs(nextTabs: CliTab[], activeIndex = 0): void {
+		tabs = nextTabs
+		activeTabIndex = Math.max(0, Math.min(activeIndex, tabs.length - 1))
+		tabHasActivity = new Set<string>()
+	},
+	getTabs(): CliTab[] { return tabs },
+	getActiveTab(): CliTab | null { return activeTab() },
+	syncTabsFromSessions,
 }
