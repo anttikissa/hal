@@ -113,6 +113,13 @@ function shrinkChar(c: CursorAnim): string {
 function isDormant(c: CursorAnim): boolean { return c.shrinkStart !== null && Date.now() - c.shrinkStart >= IDLE_SHRINK_DURATION }
 function lerpCh(to: number, t: number, from = 0): number { return Math.round(from + (to - from) * t) }
 
+// Nudge a phase toward the global clock (Date.now() % period). Shortest-path on circular [0,1).
+const DRIFT_RATE = 0.02 // fraction of error corrected per 50ms tick (~2.5s to fully sync)
+function driftToGlobalClock(phase: number, period: number, now: number): number {
+	let d = (now % period) / period - phase
+	if (d > 0.5) d -= 1; if (d < -0.5) d += 1
+	return (phase + d * DRIFT_RATE + 1) % 1
+}
 // --- Per-tab cursor state ---
 // Tracks agent state per session so tab switches show the correct cursor.
 // States: idle/writing → orange, thinking/tool_call → grey, error → red (instant, sticky 30s).
@@ -222,6 +229,9 @@ function animTick(): void {
 	hal.phase = (hal.phase + ANIM_MS / hal.period) % 1
 	halIntensity += (intensityTarget - halIntensity) * (1 - RAMP_RATE)
 	userPhase = (userPhase + ANIM_MS / cfg.cursorBlinkUser) % 1
+	// slowly drift both cursors toward Date.now()-based clock (syncs with tab indicators)
+	hal.phase = driftToGlobalClock(hal.phase, hal.period, now)
+	userPhase = driftToGlobalClock(userPhase, cfg.cursorBlinkUser, now)
 	if (isIdle) tickShrink(hal, cfg.cursorDormantDelay, idleMs, now)
 	if (initialized && !suspended) scheduleRender()
 }
