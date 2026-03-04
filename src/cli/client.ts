@@ -609,7 +609,7 @@ function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ''
 	const labels = tabDisplayNames(tabs.slice(0, 9))
 	return tabs.slice(0, 9).map((tab, i) => {
-		const act = i !== activeTabIndex && tabHasActivity.has(tab.sessionId) ? '■' : '□'
+		const act = i !== activeTabIndex && tabHasActivity.has(tab.sessionId) ? '▪' : '▫'
 		const text = `${i + 1}${act}${labels[i]}`
 		return i === activeTabIndex ? `${TAB_ACTIVE}[${text}]${TAB_RESET}` : `${TAB_INACTIVE} ${text} ${TAB_RESET}`
 	}).join('')
