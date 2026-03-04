@@ -145,7 +145,7 @@ const tabCursors = new Map<string, TabCursor>()
 let activeTabCursorId = ''
 
 function makeTabCursor(): TabCursor {
-	return { state: 'idle', errorSince: 0, idleSince: Date.now(), ccFrom: [255, 165, 0], ccTo: [255, 165, 0], ccStart: 0 }
+	return { state: 'idle', errorSince: 0, idleSince: 0, ccFrom: [255, 165, 0], ccTo: [255, 165, 0], ccStart: 0 }
 }
 function tc(): TabCursor {
 	let t = tabCursors.get(activeTabCursorId)
