@@ -7,7 +7,7 @@ import {
 } from '../config.ts'
 import { RESPONSE_LOG } from '../state.ts'
 import { getProvider, type Provider } from '../provider.ts'
-import { tools, runTool, RESTART_SIGNAL } from '../tools.ts'
+import { tools, runTool } from '../tools.ts'
 import { totalInputTokens, contextWindowForModel, shouldWarn } from '../context.ts'
 import {
 	isModelCalibrated,
@@ -245,14 +245,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			)
 
 			const logEntries: any[] = []
-			let shouldRestart = false
 			for (const result of toolResults) {
-				if (result.output === RESTART_SIGNAL) {
-					runtime.messages.push(provider.toolResultMessage(result.id, 'Restarting now.'))
-					logEntries.push(await writeToolResultEntry(sessionId, result.id, 'Restarting now.', currentToolRefMap))
-					shouldRestart = true
-					continue
-				}
 				if (runtime.pausedByUser) {
 					runtime.messages.push(
 						provider.toolResultMessage(
@@ -273,11 +266,6 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				logEntries.push({ type: 'tool_log', text: toolLines.join('\n'), ts: new Date().toISOString() })
 			}
 			if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
-
-			if (shouldRestart) {
-				await saveSessionMeta(sessionId, runtime)
-				process.exit(100)
-			}
 		}
 	}
 

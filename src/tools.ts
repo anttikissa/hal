@@ -240,9 +240,6 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 		input_schema: { type: 'object', properties: {} },
 	},
 ]
-
-export const RESTART_SIGNAL = '__HAL_RESTART__'
-
 type ToolLogLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta'
 type ToolLogger = (line: string, level?: ToolLogLevel) => void | Promise<void>
 
