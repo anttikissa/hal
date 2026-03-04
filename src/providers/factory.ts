@@ -1,4 +1,4 @@
-import { loadConfig, type ProviderConfig } from '../config.ts'
+import { getConfig, type ProviderConfig } from '../config.ts'
 import { registerProvider } from '../provider.ts'
 import { OpenAICompletionsProvider } from './openai-completions.ts'
 
@@ -29,7 +29,7 @@ function createProvider(name: string, config: ProviderConfig): OpenAICompletions
 }
 
 export function registerConfigProviders(): void {
-	const providers = loadConfig().providers
+	const providers = getConfig().providers
 	if (!providers || typeof providers !== 'object') return
 	for (const [name, config] of Object.entries(providers)) {
 		if (!name || typeof config !== 'object' || !config) continue

@@ -6,7 +6,7 @@ import {
 	providerForModel,
 	modelIdForModel,
 	mergedModelAliases,
-	loadConfig,
+	getConfig,
 	resetConfigCache,
 } from './config.ts'
 
@@ -68,15 +68,15 @@ describe('config migration for ollamaBaseUrl', () => {
 		writeFileSync(CONFIG_PATH, original)
 		resetConfigCache()
 	})
-	test('loadConfig creates providers.ollama for deprecated ollamaBaseUrl', () => {
-		const cfg = loadConfig()
+	test('getConfig creates providers.ollama for deprecated ollamaBaseUrl', () => {
+		const cfg = getConfig()
 		expect(cfg.providers?.ollama?.protocol).toBe('openai-completions')
 		expect(cfg.providers?.ollama?.baseUrl).toBe('http://localhost:11434/v1')
 		expect(cfg.providers?.ollama?.auth).toBe('none')
 	})
 
 	test('config can still resolve ollama alias after migration', () => {
-		void loadConfig()
+		void getConfig()
 		expect(resolveModel('ollama')).toBe('ollama/llama3.2')
 	})
 })

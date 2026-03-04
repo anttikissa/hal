@@ -13,7 +13,7 @@ import { appendFile, mkdir, readFile, readdir, rm, stat } from 'fs/promises'
 import { resolve, relative } from 'path'
 import { stringify } from './utils/ason.ts'
 import { STATE_DIR, HAL_DIR } from './state.ts'
-import { loadConfig, debugMaxDiskBytes } from './config.ts'
+import { getConfig, debugMaxDiskBytes } from './config.ts'
 
 const DEBUG_DIR = `${STATE_DIR}/debug`
 const BUGS_DIR = `${STATE_DIR}/bugs`
@@ -154,7 +154,7 @@ async function walkFiles(dir: string, fn: (path: string) => Promise<void>): Prom
 export async function initDebugLog(pid: number): Promise<void> {
 	await mkdir(DEBUG_DIR, { recursive: true })
 	logPath = resolve(DEBUG_DIR, `process.${pid}.asonl`)
-	enabled = loadConfig().debug?.recordEverything === true
+	enabled = getConfig().debug?.recordEverything === true
 	schedulePrune()
 
 	if (!enabled) return

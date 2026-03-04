@@ -3,7 +3,7 @@ import type { RuntimeCommand } from '../protocol.ts'
 import { saveSessionInfo, extractLastPrompt, appendToLog, rotateSession, buildRotationContext, writeAssistantEntry, getSessionInfo } from '../session.ts'
 import { sessionDir } from '../state.ts'
 import {
-	loadConfig,
+	getConfig,
 	resolveModel,
 	modelIdForModel,
 	mergedModelAliases,
@@ -238,7 +238,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 	if (!name) {
 		const current = getSessionModel(sessionId)
 		const meta = getSessionMeta(sessionId)
-		const globalDefault = resolveModel(loadConfig().defaultModel)
+		const globalDefault = resolveModel(getConfig().defaultModel)
 		const suffix = meta?.model ? ` (global default: ${globalDefault})` : ' (global default)'
 		await publishLine(`[model] current: ${current}${suffix}`, 'info', sessionId)
 		const aliases = Object.entries(mergedModelAliases()).map(([alias, full]) => {

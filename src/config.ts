@@ -66,7 +66,7 @@ export const COMPACT_MODEL_FOR: Record<string, string> = {
 }
 
 export function mergedModelAliases(): Record<string, string> {
-	const configured = loadConfig().modelAliases
+	const configured = getConfig().modelAliases
 	return configured && typeof configured === 'object'
 		? { ...MODEL_ALIASES, ...configured }
 		: { ...MODEL_ALIASES }
@@ -152,7 +152,7 @@ export function resetConfigCache(): void {
 	_config = null
 }
 
-export function loadConfig(): Config {
+export function getConfig(): Config {
 	if (_config) return _config
 	try {
 		const raw = readFileSync(CONFIG_PATH, 'utf-8')
@@ -193,18 +193,18 @@ export function saveConfig(config: Config): void {
 }
 
 export function updateConfig(updates: Partial<Config>): Config {
-	const config = { ...loadConfig(), ...updates }
+	const config = { ...getConfig(), ...updates }
 	saveConfig(config)
 	return config
 }
 
 export function debugEnabled(flag: keyof DebugConfig): boolean {
-	const val = loadConfig().debug?.[flag]
+	const val = getConfig().debug?.[flag]
 	return val === true || (typeof val === 'object' && val !== null)
 }
 
 export function debugTokens(flag: keyof DebugTokensConfig): boolean {
-	const tokens = loadConfig().debug?.tokens
+	const tokens = getConfig().debug?.tokens
 	if (!tokens || typeof tokens !== 'object') return false
 	return tokens[flag] === true
 }
@@ -212,7 +212,7 @@ export function debugTokens(flag: keyof DebugTokensConfig): boolean {
 const DEFAULT_DEBUG_MAX_DISK_BYTES = 2 * 1024 * 1024 * 1024
 
 export function debugMaxDiskBytes(): number {
-	const raw = loadConfig().debug?.maxDiskBytes
+	const raw = getConfig().debug?.maxDiskBytes
 	if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return DEFAULT_DEBUG_MAX_DISK_BYTES
 	return Math.floor(raw)
 }

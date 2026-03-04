@@ -1,6 +1,6 @@
 import { basename, resolve } from 'path'
 import { existsSync, watch, type FSWatcher } from 'fs'
-import { loadConfig, resolveModel, modelIdForModel } from '../config.ts'
+import { getConfig, resolveModel, modelIdForModel } from '../config.ts'
 import { loadSystemPrompt } from '../system-prompt.ts'
 import {
 	estimateMessageTokens,
@@ -91,7 +91,7 @@ export function getSessionWorkingDir(sessionId: string | null): string {
 /** Resolve which model a session should use: per-session override or global default. */
 export function getSessionModel(sessionId: string | null): string {
 	const meta = getSessionMeta(sessionId)
-	return resolveModel(meta?.model ?? loadConfig().defaultModel)
+	return resolveModel(meta?.model ?? getConfig().defaultModel)
 }
 
 export function hasSession(sessionId: string): boolean {
@@ -367,7 +367,7 @@ export async function startRuntime(
 	halDir = resolve(options.halDir ?? HAL_DIR)
 	initPublisher(ownerId)
 
-	const config = loadConfig()
+	const config = getConfig()
 
 	createCommandScheduler(
 		config.maxConcurrentSessions,

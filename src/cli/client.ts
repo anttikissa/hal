@@ -62,7 +62,7 @@ import {
 } from '../session.ts'
 import { countSourceStats } from '../utils/cloc.ts'
 
-import { loadConfig, mergedModelAliases, modelIdForModel, resolveModel } from '../config.ts'
+import { getConfig, mergedModelAliases, modelIdForModel, resolveModel } from '../config.ts'
 import { loadActiveTheme } from './format/theme.ts'
 import { selfMode } from '../args.ts'
 import {
@@ -143,7 +143,7 @@ let screenFmt: FormatState = createFormatState()
 
 export function init(src: RuntimeCommand['source'], owner: boolean): void {
 	source = src; isOwner = owner; launchCwd = resolve(LAUNCH_CWD)
-	const config = loadConfig()
+	const config = getConfig()
 	setMaxPromptLines(config.maxPromptLines); setUserCursorMode(config.userCursor); loadActiveTheme(HAL_DIR, config.theme)
 	if (config.timestamps) setShowTimestamps(true)
 	// periodic tab bar refresh for blink tier changes (idle→dormant)
@@ -168,7 +168,7 @@ export async function start(options?: { startupEpoch?: number | null }): Promise
 	setInputEchoFilter((value) => !isExit(normalizeCommandInput(value)))
 	roleLabel = isOwner ? 'owner' : 'client'
 
-	const config = loadConfig()
+	const config = getConfig()
 	pushLocal('local.info', `HAL ${roleLabel} (pid ${process.pid})`)
 	if (config.debug?.recordEverything)
 		pushLocal('local.info', 'debug.recordEverything is active — use /bug <report> to report and fix immediately')
@@ -236,7 +236,7 @@ function newTabState(sessionId: string, workingDir: string): CliTab {
 	return createTabState({
 		sessionId, workingDir,
 		name: sessionName({ id: sessionId, name: undefined, workingDir }),
-		modelLabel: modelDisplayName(loadConfig().defaultModel),
+		modelLabel: modelDisplayName(getConfig().defaultModel),
 	})
 }
 
@@ -354,7 +354,7 @@ function syncTabsFromSessions(
 			...createTabState({
 				sessionId: session.id, workingDir: session.workingDir,
 				name: sessionName(session),
-				modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? loadConfig().defaultModel),
+				modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? getConfig().defaultModel),
 			}),
 			topic: session.topic ?? existing?.topic ?? '',
 			output: preserve ? (existing?.output ?? (isNewFromFork ? forkOutput : (isRestore ? openData!.output : ''))) : '',
@@ -610,7 +610,7 @@ function render(event: RuntimeEvent): void {
 function renderTabsForStatus(): string {
 	if (tabs.length === 0) return ''
 	const labels = tabDisplayNames(tabs.slice(0, 9))
-	const blinkIdle = loadConfig().cursorBlinkIdle
+	const blinkIdle = getConfig().cursorBlinkIdle
 	const now = Date.now()
 	return tabs.slice(0, 9).map((tab, i) => {
 		const tier = getTabTier(tab.sessionId)

@@ -6,7 +6,7 @@ import { randomBytes } from 'crypto'
 import { stringify, parse, parseAll } from './utils/ason.ts'
 import { sessionDir, SESSIONS_INDEX, EPOCH_PATH, ensureStateDir, LAUNCH_CWD } from './state.ts'
 import { resolve } from 'path'
-import { loadConfig } from './config.ts'
+import { getConfig } from './config.ts'
 
 export type TokenTotals = { input: number; output: number; cacheCreate: number; cacheRead: number }
 export const EMPTY_TOTALS: TokenTotals = { input: 0, output: 0, cacheCreate: 0, cacheRead: 0 }
@@ -337,7 +337,7 @@ export async function loadSession(
 /** Convert log entries to API messages with context trimming. */
 async function entriesToApiMessages(sessionId: string, entries: any[]): Promise<any[]> {
 	const messages: any[] = []
-	const recentToolResults = loadConfig().recentToolResults
+	const recentToolResults = getConfig().recentToolResults
 
 	// Count tool results for trimming
 	const roleEntries = entries.filter((e: any) => e.role)

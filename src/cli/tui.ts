@@ -1,7 +1,7 @@
 // State-driven terminal UI with alternate screen buffer. See docs/tui.md.
 
 import { stringify } from '../utils/ason.ts'
-import { loadConfig } from '../config.ts'
+import { getConfig } from '../config.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
 import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
@@ -149,7 +149,7 @@ export function getTabTier(id: string): BlinkTier {
 	const t = tabCursors.get(id)
 	if (!t) return 'idle'
 	if (t.state !== 'idle' && t.state !== 'error') return 'busy'
-	return (Date.now() - t.idleSince >= loadConfig().cursorDormantDelay) ? 'dormant' : 'idle'
+	return (Date.now() - t.idleSince >= getConfig().cursorDormantDelay) ? 'dormant' : 'idle'
 }
 
 function tabCursorRGB(t: TabCursor): RGB {
@@ -170,7 +170,7 @@ export function setHalState(state: HalState): void {
 	// only snap speed on *new* error, not tab-switch re-apply
 	if (state === 'error' && wasState !== 'error') {
 		t.errorSince = Date.now()
-		hal.period = loadConfig().cursorBlinkBusy
+		hal.period = getConfig().cursorBlinkBusy
 		halIntensity = 1.0
 	}
 	const target = CURSOR_COLORS[state]
@@ -191,7 +191,7 @@ export function setHalState(state: HalState): void {
 export function getHalIdleSince(): number { return tc().idleSince }
 export function restoreHalIdleTimer(ts: number): void {
 	tc().idleSince = ts
-	if (Date.now() - ts >= loadConfig().cursorDormantDelay) {
+	if (Date.now() - ts >= getConfig().cursorDormantDelay) {
 		hal.shrinkStart = ts; hal.brightSince = null
 	} else {
 		resetShrink(hal)
@@ -204,7 +204,7 @@ export function resetHalIdleTimer(): void {
 
 const RAMP_RATE = 0.98
 function animTick(): void {
-	const cfg = loadConfig()
+	const cfg = getConfig()
 	const t = tc()
 	const isIdle = t.state === 'idle'
 	const isError = t.state === 'error'
