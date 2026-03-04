@@ -151,6 +151,10 @@ export function getTabTier(id: string): BlinkTier {
 	if (t.state !== 'idle' && t.state !== 'error') return 'busy'
 	return (Date.now() - t.idleSince >= getConfig().cursorDormantDelay) ? 'dormant' : 'idle'
 }
+export function getTabColor(id: string): RGB {
+	const t = tabCursors.get(id)
+	return t ? tabCursorRGB(t) : CURSOR_COLORS.idle
+}
 
 function tabCursorRGB(t: TabCursor): RGB {
 	const p = Math.min((Date.now() - t.ccStart) / COLOR_MS, 1)
