@@ -241,37 +241,6 @@ function newTabState(sessionId: string, workingDir: string): CliTab {
 		modelLabel: modelDisplayName(getConfig().defaultModel),
 	})
 }
-
-export function buildTabFromSession(
-	session: SessionInfo,
-	existing: CliTab | undefined,
-	options: {
-		preserve: boolean
-		forkOutput: string | null
-		isRestore: boolean
-		restoreData: { output: string; fmtState: FormatState; inputHistory: string[] } | null
-	}
-): CliTab {
-	return {
-		...createTabState({
-			sessionId: session.id, workingDir: session.workingDir,
-			name: sessionName(session),
-			modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? getConfig().defaultModel),
-		}),
-		topic: session.topic ?? existing?.topic ?? '',
-		output: options.preserve ? (existing?.output ?? (options.forkOutput ?? (options.isRestore ? options.restoreData!.output : ''))) : '',
-		fmtState: existing?.fmtState ?? (options.isRestore ? options.restoreData!.fmtState : createFormatState()),
-		contextStatus: options.preserve ? (existing?.contextStatus ?? null) : null,
-		activity: options.preserve ? (existing?.activity ?? '') : '',
-		busy: options.preserve ? (existing?.busy ?? false) : false,
-		paused: options.preserve ? (existing?.paused ?? false) : false,
-		inputHistory: existing?.inputHistory ?? (options.isRestore ? options.restoreData!.inputHistory : []),
-		inputDraft: existing?.inputDraft ?? '',
-		inputCursor: existing?.inputCursor ?? 0,
-		halIdleSince: existing?.halIdleSince ?? Date.now(),
-	}
-}
-
 function ensureFallbackTab(activeSessionId: string | null = null): void {
 	if (tabs.length > 0) return
 	tabs = [newTabState(activeSessionId || 's-default', launchCwd)]
@@ -382,12 +351,24 @@ function syncTabsFromSessions(
 		const isNewFromOpen = !existing && switchToOpen && !isNewFromFork
 		if (isNewFromFork) forkedSessionId = session.id
 		if (isNewFromOpen) newOpenSessionId = session.id
-		return buildTabFromSession(session, existing, {
-			preserve,
-			forkOutput: isNewFromFork ? forkOutput : null,
-			isRestore,
-			restoreData: isRestore ? openData : null,
-		})
+		return {
+			...createTabState({
+				sessionId: session.id, workingDir: session.workingDir,
+				name: sessionName(session),
+				modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? getConfig().defaultModel),
+			}),
+			topic: session.topic ?? existing?.topic ?? '',
+			output: preserve ? (existing?.output ?? (isNewFromFork ? forkOutput : (isRestore ? openData!.output : ''))) : '',
+			fmtState: existing?.fmtState ?? (isRestore ? openData!.fmtState : createFormatState()),
+			contextStatus: preserve ? (existing?.contextStatus ?? null) : null,
+			activity: preserve ? (existing?.activity ?? '') : '',
+			busy: preserve ? (existing?.busy ?? false) : false,
+			paused: preserve ? (existing?.paused ?? false) : false,
+			inputHistory: existing?.inputHistory ?? (isRestore ? openData!.inputHistory : []),
+			inputDraft: existing?.inputDraft ?? '',
+			inputCursor: existing?.inputCursor ?? 0,
+			halIdleSince: existing?.halIdleSince ?? Date.now(),
+		}
 	})
 	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id)))
 
