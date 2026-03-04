@@ -1,16 +1,16 @@
 {
   type: 'terminal-key-capture',
   version: 1,
-  createdAt: '2026-03-02T16:07:50.955Z',
+  createdAt: '2026-03-04T20:46:12.932Z',
   terminalLabel: 'xterm-kitty',
   env: {
     platform: 'darwin',
     arch: 'arm64',
-    pid: 42542,
+    pid: 11916,
     term: 'xterm-kitty',
     termProgram: '',
     termProgramVersion: '',
-    kittyPid: '84077',
+    kittyPid: '11793',
     lang: 'en_US.UTF-8'
   },
   config: {
@@ -280,6 +280,14 @@
       escTwice: false
     },
     {
+      id: 'cmd_u',
+      label: 'Cmd-U',
+      category: 'cmd',
+      note: 'macOS: terminal/OS may intercept.',
+      timeoutMs: undefined,
+      escTwice: false
+    },
+    {
       id: 'cmd_shift_t',
       label: 'Cmd-Shift-T',
       category: 'cmd',
@@ -296,7 +304,7 @@
       disable: 'ESC[<u',
       calibration: {
         status: 'captured',
-        durationMs: 2450,
+        durationMs: 1880,
         idleMs: 600,
         bytes: [
           27,
@@ -3654,6 +3662,90 @@
           tokenKinds: [
             'kitty-csi-u'
           ]
+        },
+        {
+          stepId: 'cmd_u',
+          label: 'Cmd-U',
+          category: 'cmd',
+          status: 'captured',
+          note: 'macOS: terminal/OS may intercept.',
+          timeoutMs: 8000,
+          durationMs: 3004,
+          delimiterHex: '1b 5b 32 37 75 1b 5b 32 37 3b 31 3a 33 75',
+          bytes: [
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            57,
+            117,
+            27,
+            91,
+            49,
+            49,
+            55,
+            59,
+            57,
+            117,
+            27,
+            91,
+            49,
+            49,
+            55,
+            59,
+            57,
+            58,
+            51,
+            117,
+            27,
+            91,
+            53,
+            55,
+            52,
+            52,
+            52,
+            59,
+            49,
+            58,
+            51,
+            117
+          ],
+          hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 31 31 37 3b 39 75 1b 5b 31 31 37 3b 39 3a 33 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+          text: 'ESC[57444;9uESC[117;9uESC[117;9:3uESC[57444;1:3u',
+          display: 'ESC[57444;9uESC[117;9uESC[117;9:3uESC[57444;1:3u',
+          tokens: [
+            {
+              text: 'ESC[57444;9u',
+              display: 'ESC[57444;9u',
+              hex: '1b 5b 35 37 34 34 34 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[117;9u',
+              display: 'ESC[117;9u',
+              hex: '1b 5b 31 31 37 3b 39 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[117;9:3u',
+              display: 'ESC[117;9:3u',
+              hex: '1b 5b 31 31 37 3b 39 3a 33 75',
+              kind: 'kitty-csi-u'
+            },
+            {
+              text: 'ESC[57444;1:3u',
+              display: 'ESC[57444;1:3u',
+              hex: '1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+              kind: 'kitty-csi-u'
+            }
+          ],
+          tokenKinds: [
+            'kitty-csi-u'
+          ]
         }
       ]
     }
@@ -3983,6 +4075,16 @@
         hex: '',
         display: '',
         tokenKinds: []
+      }
+    },
+    cmd_u: {
+      kitty11: {
+        status: 'captured',
+        hex: '1b 5b 35 37 34 34 34 3b 39 75 1b 5b 31 31 37 3b 39 75 1b 5b 31 31 37 3b 39 3a 33 75 1b 5b 35 37 34 34 34 3b 31 3a 33 75',
+        display: 'ESC[57444;9uESC[117;9uESC[117;9:3uESC[57444;1:3u',
+        tokenKinds: [
+          'kitty-csi-u'
+        ]
       }
     },
     cmd_shift_t: {

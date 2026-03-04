@@ -23,7 +23,7 @@ import {
 	setInputKeyHandler,
 	setMaxPromptLines,
 	setUserCursorMode,
-	setHalState,
+	setHalState, setTabState,
 	resetHalIdleTimer, getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, getTabTier, getTabColor,
 	type HalState,
 	setOutputSnapshot,
@@ -161,6 +161,8 @@ export function setOwnerReleaseHandler(handler: (() => void) | null): void { onO
 
 export async function start(options?: { startupEpoch?: number | null }): Promise<number> {
 	tui.init()
+	screenFmt.termWidth = process.stdout.columns || 80
+	process.stdout.on('resize', () => { screenFmt.termWidth = process.stdout.columns || 80 })
 	setTabCompleter(completeInput)
 	setEscHandler(() => handleEsc())
 	setDoubleEnterHandler(() => handleDoubleEnter())
@@ -574,7 +576,7 @@ function render(event: RuntimeEvent): void {
 				const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
 				if (tab) {
 					tab.activity = event.activity!
-					setActiveTabCursor(tab.sessionId); setHalState(deriveHalState(tab))
+					setTabState(tab.sessionId, deriveHalState(tab))
 				}
 			}
 		} else {
@@ -583,8 +585,7 @@ function render(event: RuntimeEvent): void {
 				const wasBusy = tab.busy
 				tab.busy = busySet.has(tab.sessionId); tab.paused = pausedSet.has(tab.sessionId)
 				if (!tab.busy && wasBusy && !tab.activity.startsWith('Error')) tab.activity = ''
-				// update per-tab cursor state for background tabs
-				setActiveTabCursor(tab.sessionId); setHalState(deriveHalState(tab))
+				setTabState(tab.sessionId, deriveHalState(tab))
 			}
 		}
 		const active = activeTab()

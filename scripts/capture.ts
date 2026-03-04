@@ -187,6 +187,7 @@ const TUI_STEPS: CaptureStep[] = [
 	step('cmd_x', 'Cmd-X', 'cmd', { note: 'macOS: terminal/OS may intercept cut.' }),
 	step('cmd_z', 'Cmd-Z', 'cmd', { note: 'macOS: terminal/OS may intercept undo.' }),
 	step('cmd_f', 'Cmd-F', 'cmd', { note: 'macOS: terminal/OS may intercept find.' }),
+	step('cmd_u', 'Cmd-U', 'cmd', { note: 'macOS: terminal/OS may intercept.' }),
 	step('cmd_shift_t', 'Cmd-Shift-T', 'cmd', { note: 'macOS: terminal/OS may intercept reopen tab.' }),
 ]
 

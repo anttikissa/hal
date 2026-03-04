@@ -170,9 +170,14 @@ function tabCursorRGB(t: TabCursor): RGB {
 function cursorRGB(): RGB { return tabCursorRGB(tc()) }
 
 export function setHalState(state: HalState): void {
-	const t = tc()
+	setTabState(activeTabCursorId, state)
+}
+export function setTabState(tabId: string, state: HalState): void {
+	let t = tabCursors.get(tabId)
+	if (!t) { t = makeTabCursor(); tabCursors.set(tabId, t) }
+	const isActiveTab = tabId === activeTabCursorId
 	if (t.state === 'error' && state === 'idle' && Date.now() - t.errorSince < ERROR_STICKY_MS) {
-		setTimeout(() => { if (tc() === t && t.state === 'error') setHalState('idle') },
+		setTimeout(() => { if (tabCursors.get(tabId) === t && t.state === 'error') setTabState(tabId, 'idle') },
 			ERROR_STICKY_MS - (Date.now() - t.errorSince))
 		return
 	}
@@ -181,8 +186,7 @@ export function setHalState(state: HalState): void {
 	// only snap speed on *new* error, not tab-switch re-apply
 	if (state === 'error' && wasState !== 'error') {
 		t.errorSince = Date.now()
-		hal.period = getConfig().cursorBlinkBusy
-		halIntensity = 1.0
+		if (isActiveTab) { hal.period = getConfig().cursorBlinkBusy; halIntensity = 1.0 }
 	}
 	const target = CURSOR_COLORS[state]
 	if (target[0] !== t.ccTo[0] || target[1] !== t.ccTo[1] || target[2] !== t.ccTo[2]) {
@@ -197,7 +201,7 @@ export function setHalState(state: HalState): void {
 		t.idleSince = Date.now()
 	} else return
 	// only reset the global cursor animation when updating the active tab
-	if (t === tabCursors.get(activeTabCursorId)) resetShrink(hal)
+	if (isActiveTab) resetShrink(hal)
 }
 
 export function getHalIdleSince(): number { return tc().idleSince }
@@ -473,7 +477,7 @@ function handleInputClipboardShortcutKey(key: string): boolean {
 		inputSelAnchor = 0; inputSelFocus = inputBuf.length
 		inputCursor = inputBuf.length; inputSelActive = false; render(); return true
 	}
-	if (ch === 'z') { if (undoInputEdit()) render(); return true }
+	if (ch === 'z' || ch === 'u') { if (undoInputEdit()) render(); return true }
 	return false
 }
 

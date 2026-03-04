@@ -28,6 +28,19 @@ import { publishLine, publishChunk, publishActivity, publishContext, publishTool
 
 const REQ_LOG = '/tmp/hal-req.ason'
 
+function toolInputSummary(name: string, input: any): string {
+	switch (name) {
+		case 'bash': return input.command ?? ''
+		case 'grep': return `${input.pattern}${input.path ? ' ' + input.path : ''}`
+		case 'read': return input.path + (input.start != null ? `:${input.start}-${input.end}` : '')
+		case 'write': return input.path
+		case 'edit': return input.path
+		case 'glob': return input.pattern
+		case 'ls': return input.path ?? '.'
+		case 'web_search': return input.query
+		default: return name
+	}
+}
 export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCache): Promise<void> {
 	busySessions.add(sessionId)
 	runtime.pausedByUser = false
@@ -159,12 +172,13 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			const toolLines: string[] = []
 			const isParallel = toolBlocks.length >= 2
 
-			// Per-tool state for dashboard (parallel only)
 			interface ToolState {
 				name: string
+				inputSummary: string
 				status: 'running' | 'done' | 'error'
 				startTime: number
 				bytes: number
+				totalLines: number
 				lastLines: string[]
 			}
 			let toolState: ToolState[] | null = null
@@ -174,29 +188,32 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 				const now = Date.now()
 				toolState = toolBlocks.map((block: any) => ({
 					name: block.name,
+					inputSummary: toolInputSummary(block.name, block.input),
 					status: 'running' as const,
 					startTime: now,
 					bytes: 0,
+					totalLines: 0,
 					lastLines: [] as string[],
 				}))
 				await publishActivity(`Running ${toolBlocks.length} tools`, sessionId)
 				await publishToolProgress(sessionId, toolState.map(ts => ({
-					name: ts.name, status: ts.status,
-					elapsed: 0, bytes: 0, lastLines: [],
+					name: ts.name, inputSummary: ts.inputSummary, status: ts.status,
+					elapsed: 0, bytes: 0, totalLines: 0, lastLines: [],
 				})))
 				lastEmitTime = now
 			}
 
+			const LAST_LINES = 3
 			const emitProgress = async (force = false) => {
 				if (!toolState) return
 				const t = Date.now()
 				if (!force && t - lastEmitTime < 100) return
 				lastEmitTime = t
 				await publishToolProgress(sessionId, toolState.map(ts => ({
-					name: ts.name, status: ts.status,
-					elapsed: t - ts.startTime,
-					bytes: ts.bytes,
-					lastLines: ts.lastLines.slice(-2),
+					name: ts.name, inputSummary: ts.inputSummary, status: ts.status,
+					elapsed: t - ts.startTime, bytes: ts.bytes,
+					totalLines: ts.totalLines,
+					lastLines: ts.lastLines.slice(-LAST_LINES),
 				})))
 			}
 
@@ -208,9 +225,10 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 							if (level === 'tool') toolLines.push(line)
 							if (toolState) {
 								toolState[i].bytes += line.length
+								toolState[i].totalLines++
 								toolState[i].lastLines.push(line)
-								if (toolState[i].lastLines.length > 2)
-									toolState[i].lastLines = toolState[i].lastLines.slice(-2)
+								if (toolState[i].lastLines.length > LAST_LINES)
+									toolState[i].lastLines = toolState[i].lastLines.slice(-LAST_LINES)
 								return emitProgress()
 							}
 							return publishLine(line, level, sessionId)

@@ -28,8 +28,11 @@ function kindLabel(kind: string): string {
 export interface FormatState {
 	prevKind: string
 	toolDashboardLines: number
+	termWidth: number
 }
-export function createFormatState(): FormatState { return { prevKind: '', toolDashboardLines: 0 } }
+export function createFormatState(): FormatState {
+	return { prevKind: '', toolDashboardLines: 0, termWidth: 80 }
+}
 
 export function pushFragment(kind: string, text: string, st: FormatState): string {
 	const prev = st.prevKind
@@ -47,43 +50,78 @@ export function pushFragment(kind: string, text: string, st: FormatState): strin
 	return `${tag}${content}\n`
 }
 
-// ── Tool dashboard rendering ──
-
-function fmtElapsed(ms: number): string {
-	if (ms < 1000) return `${ms}ms`
-	if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
-	return `${(ms / 60_000).toFixed(1)}m`
-}
-
-function fmtBytes(bytes: number): string {
-	if (bytes < 1024) return `${bytes}B`
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-	return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
-}
+// ── Tool progress rendering ──
 
 const DIM = '\x1b[2m'
 const RESET = '\x1b[22m'
-const GREEN = '\x1b[32m'
-const RED = '\x1b[31m'
-const RST = '\x1b[0m'
 
-function renderToolDashboard(tools: ToolProgressEntry[]): string {
-	const maxName = Math.max(...tools.map(t => t.name.length))
-	const lines: string[] = []
+function fmtElapsed(ms: number): string {
+	if (ms < 1000) return `${ms} ms`
+	if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
+	return `${(ms / 60_000).toFixed(1)} m`
+}
 
-	for (const tool of tools) {
-		const name = tool.name.padEnd(maxName)
-		const icon = tool.status === 'done' ? `${GREEN}✓${RST}`
-			: tool.status === 'error' ? `${RED}✗${RST}`
-			: `${DIM}…${RESET}`
-		const elapsed = fmtElapsed(tool.elapsed)
-		const bytes = fmtBytes(tool.bytes)
-		lines.push(`${DIM}  ${name}  ${icon}${DIM} ${elapsed}  ${bytes}${RESET}`)
+function fmtBytes(bytes: number): string {
+	if (bytes < 1000) return `${bytes} bytes`
+	if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} kB`
+	return `${(bytes / 1_000_000).toFixed(1)} MB`
+}
 
-		for (let i = 0; i < 2; i++) {
-			const line = tool.lastLines[i] ?? ''
-			lines.push(`${DIM}  │${RESET} ${line}`)
+function truncLine(text: string, maxWidth: number): string {
+	// Strip ANSI to measure visible length, truncate if needed
+	const visible = stripAnsi(text)
+	if (visible.length <= maxWidth) return text
+	// Walk the raw string, tracking visible chars
+	let vis = 0, i = 0
+	while (i < text.length && vis < maxWidth - 1) {
+		if (text[i] === '\x1b') {
+			const m = text.slice(i).match(/^\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/)
+			if (m) { i += m[0].length; continue }
 		}
+		vis++; i++
+	}
+	// Include any trailing ANSI sequences (resets)
+	let tail = i
+	while (tail < text.length && text[tail] === '\x1b') {
+		const m = text.slice(tail).match(/^\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/)
+		if (m) { tail += m[0].length } else break
+	}
+	return text.slice(0, i) + '…' + text.slice(i, tail)
+}
+
+function renderToolBlock(tool: ToolProgressEntry, termWidth: number): string {
+	const CONTENT_LINES = 3
+	const tag = `<tool.${tool.name}> `
+	const statusLabel = tool.status === 'running' ? 'pending' : tool.status
+	const stats = `(${fmtElapsed(tool.elapsed)}, ${fmtBytes(tool.bytes)}; ${statusLabel})`
+
+	// Header: <tool.name> --- inputSummary --- (stats) ----...
+	const headerCore = `${tag}${DIM}--- ${RESET}${tool.inputSummary}${DIM} --- ${stats} `
+	const headerVisLen = stripAnsi(headerCore).length
+	const padLen = Math.max(0, termWidth - headerVisLen)
+	const header = headerCore + '-'.repeat(padLen) + RESET
+
+	const lines: string[] = [truncLine(header, termWidth)]
+
+	// Content lines: last CONTENT_LINES lines, or fewer + "[N more lines]"
+	const total = tool.totalLines
+	const last = tool.lastLines
+
+	if (total <= CONTENT_LINES) {
+		// Show all available lines, pad with empty
+		for (let i = 0; i < CONTENT_LINES; i++) {
+			const content = last[i] ?? ''
+			lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
+		}
+	} else {
+		// Show last (CONTENT_LINES-1) lines + "[N more lines]"
+		const shown = CONTENT_LINES - 1
+		for (let i = 0; i < shown; i++) {
+			const content = last[i] ?? ''
+			lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
+		}
+		const more = total - shown
+		lines.push(`${DIM}${tag}[${more} more lines]${RESET}`)
 	}
 
 	return lines.map(l => l + '\n').join('')
@@ -123,21 +161,25 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 		const allDone = event.tools.every(t => t.status !== 'running')
 		let prefix = ''
 
-		// Erase previous dashboard if this is an update
+		// Erase previous tool blocks if this is an update
 		if (st.toolDashboardLines > 0) {
 			prefix = `\x1b[${st.toolDashboardLines}A\x1b[J`
 		} else {
-			// First dashboard — add separator from previous content
+			// First render — add separator from previous chunk content
 			const prev = st.prevKind
 			if (prev !== '' && prev.startsWith('chunk.')) prefix = '\n'
 		}
 
-		const dashboard = renderToolDashboard(event.tools)
-		// Count lines: each tool produces 3 lines
-		const lineCount = event.tools.length * 3
+		const linesPerTool = 4 // 1 header + 3 content
+		let body = ''
+		for (const tool of event.tools) {
+			body += renderToolBlock(tool, st.termWidth)
+		}
+
+		const lineCount = event.tools.length * linesPerTool
 		st.toolDashboardLines = allDone ? 0 : lineCount
 		st.prevKind = 'tool_progress'
-		return prefix + dashboard
+		return prefix + body
 	}
 
 	return ''

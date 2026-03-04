@@ -82,65 +82,78 @@ describe('prompt label rendering', () => {
 	})
 })
 
-describe('tool dashboard', () => {
+describe('tool progress', () => {
 	const localSource = { kind: 'cli' as const, clientId: 'test-client' }
-	const makeProgress = (tools: { name: string; status: 'running' | 'done' | 'error'; elapsed: number; bytes: number; lastLines: string[] }[]) => ({
+	const makeTool = (overrides: Partial<{
+		name: string; inputSummary: string; status: 'running' | 'done' | 'error'
+		elapsed: number; bytes: number; totalLines: number; lastLines: string[]
+	}> = {}) => ({
+		name: 'bash', inputSummary: 'echo hi', status: 'running' as const,
+		elapsed: 0, bytes: 0, totalLines: 0, lastLines: [] as string[],
+		...overrides,
+	})
+	const makeEvent = (tools: ReturnType<typeof makeTool>[]) => ({
 		id: '1', type: 'tool_progress' as const, sessionId: 's1',
 		tools, createdAt: '',
 	})
 
-	test('first event renders dashboard without erase', () => {
+	test('renders 4 lines per tool (1 header + 3 content)', () => {
 		const s = st()
-		const event = makeProgress([
-			{ name: 'grep', status: 'running', elapsed: 1200, bytes: 500, lastLines: ['line 1', 'line 2'] },
-			{ name: 'read', status: 'running', elapsed: 100, bytes: 0, lastLines: [] },
+		const event = makeEvent([
+			makeTool({ name: 'grep', inputSummary: 'pattern src/', elapsed: 1200, bytes: 500, totalLines: 2, lastLines: ['line 1', 'line 2'] }),
+			makeTool({ name: 'read', inputSummary: '/tmp/foo.ts', elapsed: 100 }),
 		])
 		const out = pushEvent(event, localSource, s)
 		const plain = stripAnsi(out)
-		expect(plain).toContain('grep')
-		expect(plain).toContain('read')
-		expect(plain).toContain('1.2s')
-		expect(plain).toContain('500B')
+		// 2 tools × 4 lines = 8 lines
+		expect(out.split('\n').length - 1).toBe(8)
+		expect(s.toolDashboardLines).toBe(8)
+		expect(plain).toContain('<tool.grep>')
+		expect(plain).toContain('<tool.read>')
+		expect(plain).toContain('--- pattern src/ ---')
+		expect(plain).toContain('1.2 s')
+		expect(plain).toContain('500 bytes')
 		expect(plain).toContain('line 1')
 		expect(plain).toContain('line 2')
-		// 2 tools × 3 lines = 6 lines
-		expect(out.split('\n').length - 1).toBe(6)
-		expect(s.toolDashboardLines).toBe(6)
 	})
 
-	test('subsequent event includes cursor-up-erase', () => {
+	test('header shows pending/done status labels', () => {
 		const s = st()
-		s.toolDashboardLines = 6
-		const event = makeProgress([
-			{ name: 'grep', status: 'done', elapsed: 2000, bytes: 1200, lastLines: ['match 1'] },
-			{ name: 'read', status: 'running', elapsed: 200, bytes: 340, lastLines: ['reading...'] },
+		const event = makeEvent([
+			makeTool({ status: 'running', elapsed: 500 }),
+			makeTool({ name: 'read', inputSummary: 'foo.ts', status: 'done', elapsed: 100, bytes: 340 }),
+		])
+		const plain = stripAnsi(pushEvent(event, localSource, s))
+		expect(plain).toContain('pending')
+		expect(plain).toContain('done')
+	})
+
+	test('overflow shows [N more lines]', () => {
+		const s = st()
+		const event = makeEvent([
+			makeTool({ totalLines: 10, lastLines: ['a', 'b', 'c'] }),
+		])
+		const plain = stripAnsi(pushEvent(event, localSource, s))
+		expect(plain).toContain('[8 more lines]')
+	})
+
+	test('cursor-up-erase on update', () => {
+		const s = st()
+		s.toolDashboardLines = 8
+		const event = makeEvent([
+			makeTool({ status: 'done' }),
+			makeTool({ status: 'running' }),
 		])
 		const out = pushEvent(event, localSource, s)
-		// Should start with cursor-up-erase
-		expect(out).toMatch(/^\x1b\[6A\x1b\[J/)
-		expect(stripAnsi(out)).toContain('✓')
-		expect(stripAnsi(out)).toContain('…')
-		expect(s.toolDashboardLines).toBe(6)
+		expect(out).toMatch(/^\x1b\[8A\x1b\[J/)
+		expect(s.toolDashboardLines).toBe(8)
 	})
 
 	test('all done sets toolDashboardLines to 0', () => {
 		const s = st()
-		s.toolDashboardLines = 6
-		const event = makeProgress([
-			{ name: 'grep', status: 'done', elapsed: 2000, bytes: 1200, lastLines: [] },
-			{ name: 'read', status: 'done', elapsed: 300, bytes: 340, lastLines: [] },
-		])
+		s.toolDashboardLines = 4
+		const event = makeEvent([makeTool({ status: 'done' })])
 		pushEvent(event, localSource, s)
 		expect(s.toolDashboardLines).toBe(0)
-	})
-
-	test('prevKind is set to tool_progress', () => {
-		const s = st()
-		const event = makeProgress([
-			{ name: 'bash', status: 'running', elapsed: 0, bytes: 0, lastLines: [] },
-			{ name: 'grep', status: 'running', elapsed: 0, bytes: 0, lastLines: [] },
-		])
-		pushEvent(event, localSource, s)
-		expect(s.prevKind).toBe('tool_progress')
 	})
 })
