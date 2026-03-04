@@ -1,8 +1,6 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
-import { readFileSync, rmSync, writeFileSync } from 'fs'
-import { resolve } from 'path'
-import { pathToFileURL } from 'url'
+import { beforeEach, describe, expect, test } from 'bun:test'
 import type { SessionInfo } from '../session.ts'
+import { clientState } from './client.ts'
 import { createTabState } from './tab.ts'
 import { getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, setHalState } from './tui.ts'
 
@@ -12,50 +10,9 @@ function mkSession(id: string, workingDir: string, busy: boolean): SessionInfo {
 	return { id, workingDir, busy, messageCount: 0, createdAt: TEST_TS, updatedAt: TEST_TS }
 }
 
-const clientPath = resolve(import.meta.dir, 'client.ts')
-let tempClientPath = ''
-let hooks: {
-	reset(): void
-	setTabs(nextTabs: any[], activeIndex?: number): void
-	getActiveTab(): any
-	syncTabsFromSessions(sessions: SessionInfo[], preferredActiveSessionId: string | null): void
-}
-
-beforeAll(async () => {
-	const src = readFileSync(clientPath, 'utf-8')
-	const patched = `${src}
-export const __testClientHooks = {
-	reset(): void {
-		source = { kind: 'cli', clientId: 'test' }
-		isOwner = false; stopped = false; lastContextStatus = null
-		roleLabel = ''; wasBusyOnLastSubmit = false; reconstructing = false
-		tabs = []; activeTabIndex = 0; launchCwd = ''
-		pendingForkOutput = null; pendingForkSwitch = false
-		pendingOpenSwitch = false; pendingOpenData = null
-		tabHasActivity = new Set<string>()
-		screenFmt = createFormatState()
-	},
-	setTabs(nextTabs: CliTab[], activeIndex = 0): void {
-		tabs = nextTabs
-		activeTabIndex = Math.max(0, Math.min(activeIndex, tabs.length - 1))
-		tabHasActivity = new Set<string>()
-	},
-	getActiveTab(): CliTab | null { return activeTab() },
-	syncTabsFromSessions,
-}
-`
-	tempClientPath = resolve(import.meta.dir, `client.__cursor_test__.${process.pid}.${Date.now()}.ts`)
-	writeFileSync(tempClientPath, patched)
-	hooks = (await import(pathToFileURL(tempClientPath).href)).__testClientHooks
-})
-
-afterAll(() => {
-	if (tempClientPath) rmSync(tempClientPath, { force: true })
-})
-
 describe('client cursor state', () => {
 	beforeEach(() => {
-		hooks.reset()
+		clientState.resetForTest()
 		setActiveTabCursor('test-reset')
 		setHalState('writing', 'test-reset')
 		setHalState('idle', 'test-reset')
@@ -75,7 +32,7 @@ describe('client cursor state', () => {
 			name: 'tab2',
 			modelLabel: 'Codex 5.3',
 		})
-		hooks.setTabs([tab1, tab2], 1)
+		clientState.setTabsForTest([tab1, tab2], 1)
 
 		setActiveTabCursor('tab2')
 		setHalState('idle', 'tab2')
@@ -83,7 +40,7 @@ describe('client cursor state', () => {
 		restoreHalIdleTimer(idleSince)
 		expect(getHalIdleSince()).toBeLessThan(Date.now() - 30_000)
 
-		hooks.syncTabsFromSessions(
+		clientState.syncTabsFromSessionsForTest(
 			[
 				mkSession('tab1', '/tmp/tab1', true),
 				mkSession('tab2', '/tmp/tab2', false),
@@ -91,7 +48,7 @@ describe('client cursor state', () => {
 			'tab2',
 		)
 
-		const active = hooks.getActiveTab()
+		const active = clientState.getActiveTabForTest()
 		expect(active?.sessionId).toBe('tab2')
 		expect(active?.halIdleSince ?? Infinity).toBeLessThan(Date.now() - 30_000)
 		expect(getHalIdleSince()).toBeLessThan(Date.now() - 30_000)

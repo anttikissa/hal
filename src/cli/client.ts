@@ -633,3 +633,22 @@ function renderBusyStatus(): void {
 	setStatusLine(renderTabsForStatus(), [roleLabel, lastContextStatus ?? ''].filter(Boolean).join(' · '))
 }
 
+export let clientState = {
+	resetForTest(): void {
+		source = { kind: 'cli', clientId: 'test' }
+		isOwner = false; stopped = false; lastContextStatus = null
+		roleLabel = ''; wasBusyOnLastSubmit = false; reconstructing = false
+		tabs = []; activeTabIndex = 0; launchCwd = ''
+		pendingForkOutput = null; pendingForkSwitch = false
+		pendingOpenSwitch = false; pendingOpenData = null
+		tabHasActivity = new Set<string>()
+		screenFmt = createFormatState()
+	},
+	setTabsForTest(nextTabs: CliTab[], activeIndex = 0): void {
+		tabs = nextTabs
+		activeTabIndex = Math.max(0, Math.min(activeIndex, tabs.length - 1))
+		tabHasActivity = new Set<string>()
+	},
+	getActiveTabForTest(): CliTab | null { return activeTab() },
+	syncTabsFromSessionsForTest: syncTabsFromSessions,
+}
