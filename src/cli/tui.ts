@@ -196,7 +196,8 @@ export function setHalState(state: HalState): void {
 	} else if (wasState !== 'idle') {
 		t.idleSince = Date.now()
 	} else return
-	resetShrink(hal)
+	// only reset the global cursor animation when updating the active tab
+	if (t === tabCursors.get(activeTabCursorId)) resetShrink(hal)
 }
 
 export function getHalIdleSince(): number { return tc().idleSince }
