@@ -239,11 +239,6 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 			'Capture a debug snapshot of the terminal output. Returns the current terminal transcript for self-debugging UI issues.',
 		input_schema: { type: 'object', properties: {} },
 	},
-	{
-		name: 'restart',
-		description: 'Restart the HAL process. Session is saved and restored on restart.',
-		input_schema: { type: 'object', properties: {} },
-	},
 ]
 
 export const RESTART_SIGNAL = '__HAL_RESTART__'
@@ -607,11 +602,6 @@ async function _runTool(
 		} catch (e: any) {
 			return `error: ${e.message}`
 		}
-	}
-
-	if (name === 'restart') {
-		await logger('[restart] restarting...', 'warn')
-		return RESTART_SIGNAL
 	}
 
 	return 'unknown tool'

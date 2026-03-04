@@ -1,4 +1,4 @@
-# HAL (New)
+# HAL
 
 Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 
@@ -18,10 +18,9 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 - If learning requires editing new code, edit the code and ask user to restart. 
 - `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.
 - `/bug <description>` — captures terminal snapshot + debug log. You can paste images and text. Use it to self-debug UI issues.
-- Keep code MINIMAL. Don't take measures to maintain backwards compatibility unless explicitly required.
-- For one-off/throwaway helper scripts (debugging, calibration, capture) and rare new-test scaffolding/generators, prefer the shortest thing that works. Start with a zero-argument happy path and sensible defaults (infer from env/project context when possible). Don't front-load flags/presets/options unless explicitly requested, and don't add lots of optional flags the user won't use.
-- For interactive key-capture/test prompts, assume a laptop keyboard by default (no dedicated Home/End/PageUp/PageDown keys) unless the user says otherwise. Start with a minimal key set and add more only as needed.
-- Don't ask the user to do trivial local setup steps the script can do itself (for example clearing clipboard before a capture step). Automate it if needed, otherwise omit the instruction.
+- Keep code MINIMAL. No migration code unless asked! Screw backwards compatibility. But warn when stuff is going to break.
+- Don't invent flags/presets/options that nobody will use.
+- I'm on a laptop. It doesn't have Home and End keys for example.
 - Prefer one working mechanism over layered fallbacks/proof-of-concept additions; only add another path when the first is clearly insufficient.
 - Don't reimplement what the system already provides. For example, `open('wx')` is an atomic exclusive-create — no need to build a `mkdir`-based mutex on top of it.
 - Doing a big task? 1. Read files and think. 2. Plan - write it to file (docs/plans). 3. Implement.
