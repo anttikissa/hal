@@ -1,6 +1,6 @@
 import { shortenHome } from '../tools.ts'
 import { appendEvent, updateState } from '../ipc.ts'
-import type { EventLevel, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
+import type { EventLevel, RuntimeEvent, RuntimeSource, SessionInfo, ToolProgressEntry } from '../protocol.ts'
 
 const ANSI_PATTERN = /\x1b\[[0-9;]*m/g
 
@@ -23,6 +23,7 @@ type EventPayload =
 	| Omit<Extract<RuntimeEvent, { type: 'sessions' }>, 'id' | 'createdAt'>
 	| Omit<Extract<RuntimeEvent, { type: 'command' }>, 'id' | 'createdAt'>
 	| Omit<Extract<RuntimeEvent, { type: 'prompt' }>, 'id' | 'createdAt'>
+	| Omit<Extract<RuntimeEvent, { type: 'tool_progress' }>, 'id' | 'createdAt'>
 
 async function emit(payload: EventPayload): Promise<void> {
 	const event = {
@@ -46,6 +47,12 @@ export async function publishLine(
 	})
 }
 
+export async function publishToolProgress(
+	sessionId: string | null,
+	tools: ToolProgressEntry[],
+): Promise<void> {
+	await emit({ type: 'tool_progress', sessionId, tools })
+}
 export async function publishChunk(
 	text: string,
 	channel: 'assistant' | 'thinking',

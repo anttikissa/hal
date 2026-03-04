@@ -24,7 +24,7 @@ import {
 	type SessionRuntimeCache,
 } from './sessions.ts'
 
-import { publishLine, publishChunk, publishActivity, publishContext } from './event-publisher.ts'
+import { publishLine, publishChunk, publishActivity, publishContext, publishToolProgress } from './event-publisher.ts'
 
 const REQ_LOG = '/tmp/hal-req.ason'
 
@@ -157,17 +157,71 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 		if (toolBlocks.length > 0) {
 			const toolLines: string[] = []
+			const isParallel = toolBlocks.length >= 2
+
+			// Per-tool state for dashboard (parallel only)
+			interface ToolState {
+				name: string
+				status: 'running' | 'done' | 'error'
+				startTime: number
+				bytes: number
+				lastLines: string[]
+			}
+			let toolState: ToolState[] | null = null
+			let lastEmitTime = 0
+
+			if (isParallel) {
+				const now = Date.now()
+				toolState = toolBlocks.map((block: any) => ({
+					name: block.name,
+					status: 'running' as const,
+					startTime: now,
+					bytes: 0,
+					lastLines: [] as string[],
+				}))
+				await publishActivity(`Running ${toolBlocks.length} tools`, sessionId)
+				await publishToolProgress(sessionId, toolState.map(ts => ({
+					name: ts.name, status: ts.status,
+					elapsed: 0, bytes: 0, lastLines: [],
+				})))
+				lastEmitTime = now
+			}
+
+			const emitProgress = async (force = false) => {
+				if (!toolState) return
+				const t = Date.now()
+				if (!force && t - lastEmitTime < 100) return
+				lastEmitTime = t
+				await publishToolProgress(sessionId, toolState.map(ts => ({
+					name: ts.name, status: ts.status,
+					elapsed: t - ts.startTime,
+					bytes: ts.bytes,
+					lastLines: ts.lastLines.slice(-2),
+				})))
+			}
+
 			const toolResults = await Promise.all(
-				toolBlocks.map(async (block: any) => {
-					await publishActivity(`Running: ${block.name}`, sessionId)
+				toolBlocks.map(async (block: any, i: number) => {
+					if (!isParallel) await publishActivity(`Running: ${block.name}`, sessionId)
 					const output = await runTool(block.name, block.input, {
 						logger: (line, level = 'tool') => {
 							if (level === 'tool') toolLines.push(line)
+							if (toolState) {
+								toolState[i].bytes += line.length
+								toolState[i].lastLines.push(line)
+								if (toolState[i].lastLines.length > 2)
+									toolState[i].lastLines = toolState[i].lastLines.slice(-2)
+								return emitProgress()
+							}
 							return publishLine(line, level, sessionId)
 						},
 						cwd: getSessionWorkingDir(sessionId),
 						signal: runtime.activeAbort?.signal,
 					})
+					if (toolState) {
+						toolState[i].status = 'done'
+						await emitProgress(true)
+					}
 					return { id: block.id, output }
 				}),
 			)

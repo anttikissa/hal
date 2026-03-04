@@ -598,7 +598,7 @@ function render(event: RuntimeEvent): void {
 
 	const sessionId = 'sessionId' in event ? event.sessionId : null
 	if (!sessionId) { const active = activeTab(); if (active) renderEventToTab(active, event, true); return }
-	const tab = (event.type === 'line' || event.type === 'chunk' || event.type === 'prompt')
+	const tab = (event.type === 'line' || event.type === 'chunk' || event.type === 'prompt' || event.type === 'tool_progress')
 		? findOrCreateTabBySessionId(sessionId) : findTabBySessionId(sessionId)
 	if (!tab) return
 	const isActive = tab === activeTab()

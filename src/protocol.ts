@@ -53,6 +53,14 @@ export function makeCommand(
 
 export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta' | 'fork' | 'notice' | 'status'
 
+export interface ToolProgressEntry {
+	name: string
+	status: 'running' | 'done' | 'error'
+	elapsed: number
+	bytes: number
+	lastLines: string[]
+}
+
 export type RuntimeEvent =
 	| {
 			id: string
@@ -114,6 +122,13 @@ export type RuntimeEvent =
 			text: string
 			label?: 'steering'
 			source: RuntimeSource
+			createdAt: string
+	  }
+	| {
+			id: string
+			type: 'tool_progress'
+			sessionId: string | null
+			tools: ToolProgressEntry[]
 			createdAt: string
 	  }
 

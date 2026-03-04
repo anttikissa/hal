@@ -81,3 +81,66 @@ describe('prompt label rendering', () => {
 		expect(stripAnsi(out)).toContain('remote msg')
 	})
 })
+
+describe('tool dashboard', () => {
+	const localSource = { kind: 'cli' as const, clientId: 'test-client' }
+	const makeProgress = (tools: { name: string; status: 'running' | 'done' | 'error'; elapsed: number; bytes: number; lastLines: string[] }[]) => ({
+		id: '1', type: 'tool_progress' as const, sessionId: 's1',
+		tools, createdAt: '',
+	})
+
+	test('first event renders dashboard without erase', () => {
+		const s = st()
+		const event = makeProgress([
+			{ name: 'grep', status: 'running', elapsed: 1200, bytes: 500, lastLines: ['line 1', 'line 2'] },
+			{ name: 'read', status: 'running', elapsed: 100, bytes: 0, lastLines: [] },
+		])
+		const out = pushEvent(event, localSource, s)
+		const plain = stripAnsi(out)
+		expect(plain).toContain('grep')
+		expect(plain).toContain('read')
+		expect(plain).toContain('1.2s')
+		expect(plain).toContain('500B')
+		expect(plain).toContain('line 1')
+		expect(plain).toContain('line 2')
+		// 2 tools × 3 lines = 6 lines
+		expect(out.split('\n').length - 1).toBe(6)
+		expect(s.toolDashboardLines).toBe(6)
+	})
+
+	test('subsequent event includes cursor-up-erase', () => {
+		const s = st()
+		s.toolDashboardLines = 6
+		const event = makeProgress([
+			{ name: 'grep', status: 'done', elapsed: 2000, bytes: 1200, lastLines: ['match 1'] },
+			{ name: 'read', status: 'running', elapsed: 200, bytes: 340, lastLines: ['reading...'] },
+		])
+		const out = pushEvent(event, localSource, s)
+		// Should start with cursor-up-erase
+		expect(out).toMatch(/^\x1b\[6A\x1b\[J/)
+		expect(stripAnsi(out)).toContain('✓')
+		expect(stripAnsi(out)).toContain('…')
+		expect(s.toolDashboardLines).toBe(6)
+	})
+
+	test('all done sets toolDashboardLines to 0', () => {
+		const s = st()
+		s.toolDashboardLines = 6
+		const event = makeProgress([
+			{ name: 'grep', status: 'done', elapsed: 2000, bytes: 1200, lastLines: [] },
+			{ name: 'read', status: 'done', elapsed: 300, bytes: 340, lastLines: [] },
+		])
+		pushEvent(event, localSource, s)
+		expect(s.toolDashboardLines).toBe(0)
+	})
+
+	test('prevKind is set to tool_progress', () => {
+		const s = st()
+		const event = makeProgress([
+			{ name: 'bash', status: 'running', elapsed: 0, bytes: 0, lastLines: [] },
+			{ name: 'grep', status: 'running', elapsed: 0, bytes: 0, lastLines: [] },
+		])
+		pushEvent(event, localSource, s)
+		expect(s.prevKind).toBe('tool_progress')
+	})
+})
