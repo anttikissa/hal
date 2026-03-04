@@ -330,10 +330,11 @@ export class OpenAICompletionsProvider extends Provider {
 					state.toolBlockByKey.delete(key)
 					state.startedToolByKey.delete(key)
 				}
-				events.push({
-					type: 'stop',
-					stopReason: stopReasonFromFinishReason(choice.finish_reason),
-				})
+				const stopReason = stopReasonFromFinishReason(choice.finish_reason)
+				if (stopReason === 'error') {
+					events.push({ type: 'error', message: `finish_reason: ${choice.finish_reason}` })
+				}
+				events.push({ type: 'stop', stopReason })
 				this.streams.delete(streamId)
 			}
 		}

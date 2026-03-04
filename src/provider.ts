@@ -109,6 +109,11 @@ export abstract class Provider {
 			return events
 		}
 
+		if (event.type === 'error') {
+			const msg = event.error?.message ?? JSON.stringify(event.error ?? event)
+			return [{ type: 'error', message: msg }]
+		}
+
 		return []
 	}
 

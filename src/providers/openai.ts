@@ -413,6 +413,12 @@ class OpenAIProvider extends Provider {
 				(item: any) => item.type === 'function_call',
 			)
 			if (hasToolCalls && stopReason === 'end_turn') stopReason = 'tool_use'
+			if (stopReason === 'error') {
+				const detail = response?.status_details?.error?.message
+					?? response?.status_details?.message
+					?? status
+				events.push({ type: 'error', message: `response ${status}: ${detail}` })
+			}
 			events.push({ type: 'stop', stopReason })
 			return events
 		}
