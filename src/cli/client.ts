@@ -26,7 +26,7 @@ import {
 	setHalState,
 	getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, getTabTier, getTabColor,
 	type HalState,
-	setOutputSnapshot,
+	setOutputSnapshot, getOutputLineCount, updateOutputLines,
 	setStatusLine,
 	setTitleBar,
 	setDoubleEnterHandler,
@@ -40,7 +40,7 @@ import {
 	type RuntimeEvent,
 	type SessionInfo,
 } from '../protocol.ts'
-import { pushEvent, pushFragment, createFormatState, type FormatState, stripAnsi, setShowTimestamps } from './format/index.ts'
+import { pushEvent, pushFragment, createFormatState, renderToolProgressLines, type FormatState, stripAnsi, setShowTimestamps } from './format/index.ts'
 import {
 	ALT_DIGIT_KEYS,
 	CTRL_DIGIT_KEYS,
@@ -607,6 +607,45 @@ async function appendCommand(type: RuntimeCommand['type'], text?: string): Promi
 
 function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: boolean): void {
 	if (event.type === 'line' && event.level === 'meta' && renderToScreen && tab === activeTab()) renderBusyStatus()
+
+	// Tool progress: use direct outputLines mutation instead of cursor-up-erase
+	if (event.type === 'tool_progress' && renderToScreen) {
+		const st = screenFmt
+		const allDone = event.tools.every(t => t.status !== 'running')
+		const renderedLines = renderToolProgressLines(event.tools, st.termWidth)
+
+		if (tab.toolBlockStart != null) {
+			// Update in place
+			updateOutputLines(tab.toolBlockStart, renderedLines)
+		} else {
+			// First render: add separator from previous content, then append
+			let prefix = ''
+			if (st.prevKind !== '' && st.prevKind.startsWith('chunk.')) prefix = '\n'
+			tui.write(prefix + renderedLines.map(l => l + '\n').join(''))
+			tab.toolBlockStart = getOutputLineCount() - renderedLines.length - 1
+		}
+
+		st.toolProgressLines = allDone ? 0 : event.tools.length * 4
+		st.prevKind = 'tool_progress'
+		if (allDone) tab.toolBlockStart = null
+		tab.fmtState = { ...st }
+		tabHasActivity.delete(tab.sessionId)
+		return
+	}
+
+	// Tool progress for background tab: append text (will replay on switch)
+	if (event.type === 'tool_progress' && !renderToScreen) {
+		const st = tab.fmtState
+		const allDone = event.tools.every(t => t.status !== 'running')
+		const text = pushEvent(event, source, st)
+		if (text) { tab.output += text; tabHasActivity.add(tab.sessionId) }
+		if (allDone) tab.toolBlockStart = null
+		return
+	}
+
+	// Clear tool block tracking when non-progress event arrives
+	if (tab.toolBlockStart != null) tab.toolBlockStart = null
+
 	const st = renderToScreen ? screenFmt : tab.fmtState
 	const text = pushEvent(event, source, st)
 	if (!text) return

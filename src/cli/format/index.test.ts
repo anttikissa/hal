@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { pushFragment, pushEvent, createFormatState, stripAnsi } from './index.ts'
+import { pushFragment, pushEvent, createFormatState, stripAnsi, renderToolProgressLines } from './index.ts'
 
 const st = () => createFormatState()
 
@@ -134,10 +134,10 @@ describe('tool progress', () => {
 			makeTool({ totalLines: 10, lastLines: ['a', 'b', 'c'] }),
 		])
 		const plain = stripAnsi(pushEvent(event, localSource, s))
-		expect(plain).toContain('[+ 7 more lines]')
+		expect(plain).toContain('[+ 8 more lines]')
 	})
 
-	test('cursor-up-erase on update', () => {
+	test('subsequent events do not include cursor-up-erase (client handles mutation)', () => {
 		const s = st()
 		s.toolProgressLines = 8
 		const event = makeEvent([
@@ -145,7 +145,9 @@ describe('tool progress', () => {
 			makeTool({ status: 'running' }),
 		])
 		const out = pushEvent(event, localSource, s)
-		expect(out).toMatch(/^\x1b\[8A\x1b\[J/)
+		// No cursor-up-erase sequences — client uses direct outputLines mutation
+		expect(out).not.toMatch(/\x1b\[\d+A\x1b\[J/)
+		expect(stripAnsi(out)).toContain('<tool.bash>')
 		expect(s.toolProgressLines).toBe(8)
 	})
 
@@ -155,5 +157,17 @@ describe('tool progress', () => {
 		const event = makeEvent([makeTool({ status: 'done' })])
 		pushEvent(event, localSource, s)
 		expect(s.toolProgressLines).toBe(0)
+	})
+
+	test('renderToolProgressLines returns flat string array for mutation', () => {
+		const lines = renderToolProgressLines([
+			makeTool({ name: 'bash', inputSummary: 'echo hi', status: 'done', totalLines: 5, lastLines: ['a', 'b', 'c'] }),
+		], 80)
+		// 1 header + 3 content = 4 lines
+		expect(lines.length).toBe(4)
+		expect(stripAnsi(lines[0])).toContain('<tool.bash>')
+		expect(stripAnsi(lines[0])).toContain('echo hi')
+		// No newlines within individual lines
+		for (const line of lines) expect(line).not.toContain('\n')
 	})
 })

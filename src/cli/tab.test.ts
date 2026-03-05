@@ -31,6 +31,7 @@ describe('tab helpers', () => {
 			inputDraft: '',
 			inputCursor: 0,
 			halIdleSince: expect.any(Number),
+			toolBlockStart: null,
 		})
 	})
 

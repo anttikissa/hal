@@ -118,9 +118,10 @@ function renderToolBlock(tool: ToolProgressEntry, termWidth: number): string {
 			lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
 		}
 	} else {
-		const hidden = total - CONTENT_LINES
+		const shown = CONTENT_LINES - 1
+		const hidden = total - shown
 		lines.push(`${DIM}${tag}[+ ${hidden} more lines]${RESET}`)
-		for (const content of last) lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
+		for (const content of last.slice(-shown)) lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
 	}
 
 	return lines.map((l) => l + '\n').join('')
@@ -158,13 +159,10 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 
 	if (event.type === 'tool_progress') {
 		const allDone = event.tools.every(t => t.status !== 'running')
-		let prefix = ''
 
-		// Erase previous tool blocks if this is an update
-		if (st.toolProgressLines > 0) {
-			prefix = `\x1b[${st.toolProgressLines}A\x1b[J`
-		} else {
-			// First render — add separator from previous chunk content
+		// On first render, add separator from previous chunk content
+		let prefix = ''
+		if (st.toolProgressLines === 0) {
 			const prev = st.prevKind
 			if (prev !== '' && prev.startsWith('chunk.')) prefix = '\n'
 		}
@@ -175,11 +173,24 @@ export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['sour
 			body += renderToolBlock(tool, st.termWidth)
 		}
 
-		const lineCount = event.tools.length * linesPerTool
-		st.toolProgressLines = allDone ? 0 : lineCount
+		st.toolProgressLines = allDone ? 0 : event.tools.length * linesPerTool
 		st.prevKind = 'tool_progress'
 		return prefix + body
 	}
 
 	return ''
+}
+
+
+export function renderToolProgressLines(tools: ToolProgressEntry[], termWidth: number): string[] {
+	const lines: string[] = []
+	for (const tool of tools) {
+		const block = renderToolBlock(tool, termWidth)
+		for (const line of block.split('\n')) {
+			if (line !== '' || lines.length > 0) lines.push(line)
+		}
+	}
+	// Remove trailing empty line from last \n
+	while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+	return lines
 }

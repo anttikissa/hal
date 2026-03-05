@@ -1279,6 +1279,15 @@ export function replaceOutput(snapshot: string): void {
 	if (snapshot) appendOutput(snapshot)
 	if (initialized) render()
 }
+export function getOutputLineCount(): number { return outputLines.length }
+export function updateOutputLines(startIndex: number, newLines: string[]): void {
+	for (let i = 0; i < newLines.length; i++) {
+		const idx = startIndex + i
+		if (idx < outputLines.length) outputLines[idx] = newLines[i]
+	}
+	lastWrapCols = 0
+	if (initialized) render()
+}
 export function input(promptStr: string): Promise<string | null> {
 	if (!initialized) init()
 	resolveInput(null); inputPromptStr = promptStr
