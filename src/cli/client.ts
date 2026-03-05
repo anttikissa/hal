@@ -250,7 +250,10 @@ function ensureFallbackTab(activeSessionId: string | null = null): void {
 
 function captureActiveOutput(): void {
 	const active = activeTab(); if (!active) return
-	active.output = getOutputSnapshot(); active.inputHistory = getInputHistory()
+	// During reconstruction, don't capture screen output (just status messages) —
+	// the real history is being loaded from disk and will be applied when done.
+	if (!reconstructing) active.output = getOutputSnapshot()
+	active.inputHistory = getInputHistory()
 	active.fmtState = { ...screenFmt }; active.halIdleSince = getHalIdleSince()
 	const draft = getInputDraft(); active.inputDraft = draft.text; active.inputCursor = draft.cursor
 }
@@ -483,13 +486,23 @@ function renderConversationHistory(entries: any[]): { output: string; fmtState: 
 
 async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
 	const replayed = new Map<string, number>()
-	await Promise.all(tabs.map(async (tab) => {
-		if (tab.output.trim().length > 0) return
-		const entries = await loadReplayEntries(tab.sessionId)
+	// Snapshot session IDs to hydrate — but collect results by ID, not by tab reference,
+	// because syncTabsFromSessions may replace the tabs array during async loading.
+	const toHydrate = tabs.filter(t => t.output.trim().length === 0).map(t => t.sessionId)
+	const results = new Map<string, { output: string; fmtState: FormatState }>()
+	await Promise.all(toHydrate.map(async (sessionId) => {
+		const entries = await loadReplayEntries(sessionId)
 		const replay = renderConversationHistory(entries)
-		tab.output = replay.output; tab.fmtState = replay.fmtState
-		replayed.set(tab.sessionId, entries.filter((e: any) => e.role === 'user' || e.role === 'assistant').length)
+		results.set(sessionId, replay)
+		replayed.set(sessionId, entries.filter((e: any) => e.role === 'user' || e.role === 'assistant').length)
 	}))
+	// Apply to current tabs (may be different objects if syncTabsFromSessions ran during loading)
+	for (const tab of tabs) {
+		const result = results.get(tab.sessionId)
+		if (result && tab.output.trim().length === 0) {
+			tab.output = result.output; tab.fmtState = result.fmtState
+		}
+	}
 	return replayed
 }
 
