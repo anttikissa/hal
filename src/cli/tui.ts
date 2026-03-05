@@ -717,11 +717,11 @@ function clearSelection(renderNow = true): void {
 
 function enableMouse(): void {
 	if (supportsKittyKeyboard()) directWrite(KITTY_KEYBOARD_ENABLE)
-	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h\x1b[?2004h')
+	directWrite('\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h\x1b[?2004h\x1b[?1004h')
 }
 function disableMouse(): void {
 	if (supportsKittyKeyboard()) directWrite(KITTY_KEYBOARD_DISABLE)
-	directWrite('\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?2004l')
+	directWrite('\x1b[?1004l\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?2004l')
 }
 
 // ── Render ──
@@ -965,6 +965,9 @@ function handleKey(key: string): void {
 	}
 	if (key === CTRL_D) {
 		if (inputBuf.length === 0) resolveInput(null)
+		else return deleteOrSel(() => {
+			if (inputCursor < inputBuf.length) replaceInputRange(inputCursor, inputCursor + 1, '')
+		})
 		return
 	}
 	if (key === CTRL_Z) return suspendForegroundJob()
@@ -1156,6 +1159,9 @@ const onStdinData = (chunk: Buffer | string) => {
 		return
 	}
 
+	// Focus reporting
+	if (text === '\x1b[I') { writeToOutput('[focus] gained\n'); return }
+	if (text === '\x1b[O') { writeToOutput('[focus] lost\n'); return }
 	const mouseRe = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g
 	let mouseMatch = mouseRe.exec(text)
 	if (mouseMatch) {
