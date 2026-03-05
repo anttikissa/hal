@@ -686,11 +686,6 @@ export let clientState = {
 	setTabsForTest(nextTabs: CliTab[], activeIndex = 0): void {
 		tabs = nextTabs
 		activeTabIndex = Math.max(0, Math.min(activeIndex, tabs.length - 1))
-		pendingForkOutput = null; pendingForkSwitch = false
-		pendingOpenSwitch = false; pendingOpenData = null
-		tabHasActivity = new Set<string>()
-		roleLabel = ''; lastContextStatus = null
-		wasBusyOnLastSubmit = false; reconstructing = false; stopped = false
 	},
 	getActiveTabForTest(): CliTab | null { return activeTab() },
 	syncTabsFromSessionsForTest: syncTabsFromSessions,
