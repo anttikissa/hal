@@ -101,12 +101,12 @@ function renderToolBlock(tool: ToolProgressEntry, termWidth: number): string {
 	const stats = `(${fmtElapsed(tool.elapsed)}, ${fmtBytes(tool.bytes)}; ${statusLabel})`
 
 	const headerPrefix = `${tag}${DIM}--- ${RESET}`
-	const headerSuffix = `${DIM} --- ${stats} ${RESET}`
-	const minGap = `${DIM} --- ${RESET}`
-	const fixedVis = stripAnsi(headerPrefix).length + stripAnsi(minGap).length + stripAnsi(headerSuffix).length
+	const headerSuffix = `${stats}`
+	const between = `${DIM} --- ${RESET}`
+	const fixedVis = stripAnsi(headerPrefix).length + stripAnsi(between).length + stripAnsi(headerSuffix).length
 	const availableForSummary = Math.max(0, termWidth - fixedVis)
 	const summary = truncPlain(tool.inputSummary, availableForSummary)
-	const header = truncLine(`${headerPrefix}${summary}${minGap}${headerSuffix}`, termWidth)
+	const header = truncLine(`${headerPrefix}${summary}${between}${headerSuffix}`, termWidth)
 
 	const lines: string[] = [header]
 	const total = tool.totalLines

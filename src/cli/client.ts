@@ -608,9 +608,16 @@ async function appendCommand(type: RuntimeCommand['type'], text?: string): Promi
 function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: boolean): void {
 	if (event.type === 'line' && event.level === 'meta' && renderToScreen && tab === activeTab()) renderBusyStatus()
 	const st = renderToScreen ? screenFmt : tab.fmtState
-	const text = pushEvent(event, source, st); if (!text) return
-	if (renderToScreen) { tui.write(text); tabHasActivity.delete(tab.sessionId) }
-	else { tab.output += text; tabHasActivity.add(tab.sessionId) }
+	const text = pushEvent(event, source, st)
+	if (!text) return
+	if (renderToScreen) {
+		tab.fmtState = { ...screenFmt }
+		tui.write(text)
+		tabHasActivity.delete(tab.sessionId)
+	} else {
+		tab.output += text
+		tabHasActivity.add(tab.sessionId)
+	}
 }
 
 function render(event: RuntimeEvent): void {
