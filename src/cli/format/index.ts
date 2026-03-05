@@ -56,9 +56,7 @@ const DIM = '\x1b[2m'
 const RESET = '\x1b[22m'
 
 function fmtElapsed(ms: number): string {
-	if (ms < 1000) return `${ms} ms`
-	if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
-	return `${(ms / 60_000).toFixed(1)} m`
+	return `${(ms / 1000).toFixed(1)}s`
 }
 
 function fmtBytes(bytes: number): string {

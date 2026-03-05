@@ -234,49 +234,55 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 
 			await emitProgress(true)
 
-			const toolResults = await Promise.all(
-				toolBlocks.map(async (block: any, i: number) => {
-					const output = await runTool(block.name, block.input, {
-						logger: (line) => {
-							const state = toolState[i]
-							for (const progressLine of splitToolProgressLines(String(line))) {
-								if (progressLine.startsWith(`[${block.name}] `)) continue
-								state.bytes += Buffer.byteLength(progressLine)
-								state.totalLines += 1
-								state.lastLines.push(progressLine)
-							}
-							if (state.lastLines.length > LAST_LINES)
-								state.lastLines = state.lastLines.slice(-LAST_LINES)
-							return emitProgress()
-						},
-						cwd: getSessionWorkingDir(sessionId),
-						signal: runtime.activeAbort?.signal,
-					})
-					toolState[i].status = 'done'
-					await emitProgress(true)
-					return { id: block.id, output }
-				}),
-			)
+			const progressTimer = setInterval(() => { void emitProgress() }, 100)
+			;(progressTimer as any).unref?.()
+			try {
+				const toolResults = await Promise.all(
+					toolBlocks.map(async (block: any, i: number) => {
+						const output = await runTool(block.name, block.input, {
+							logger: (line) => {
+								const state = toolState[i]
+								for (const progressLine of splitToolProgressLines(String(line))) {
+									if (progressLine.startsWith(`[${block.name}] `)) continue
+									state.bytes += Buffer.byteLength(progressLine)
+									state.totalLines += 1
+									state.lastLines.push(progressLine)
+								}
+								if (state.lastLines.length > LAST_LINES)
+									state.lastLines = state.lastLines.slice(-LAST_LINES)
+								return emitProgress()
+							},
+							cwd: getSessionWorkingDir(sessionId),
+							signal: runtime.activeAbort?.signal,
+						})
+						toolState[i].status = 'done'
+						await emitProgress(true)
+						return { id: block.id, output }
+					}),
+				)
 
-			const logEntries: any[] = []
-			for (const result of toolResults) {
-				if (runtime.pausedByUser) {
-					runtime.messages.push(
-						provider.toolResultMessage(
-							result.id,
-							`${result.output}\n[interrupted by user pause]`,
-						),
-					)
-					logEntries.push(await writeToolResultEntry(sessionId, result.id, `${result.output}\n[interrupted by user pause]`, currentToolRefMap))
-					done = true
-				} else {
-					runtime.messages.push(provider.toolResultMessage(result.id, result.output))
-					logEntries.push(await writeToolResultEntry(sessionId, result.id, result.output, currentToolRefMap))
-					done = false
+				const logEntries: any[] = []
+				for (const result of toolResults) {
+					if (runtime.pausedByUser) {
+						runtime.messages.push(
+							provider.toolResultMessage(
+								result.id,
+								`${result.output}\n[interrupted by user pause]`,
+							),
+						)
+						logEntries.push(await writeToolResultEntry(sessionId, result.id, `${result.output}\n[interrupted by user pause]`, currentToolRefMap))
+						done = true
+					} else {
+						runtime.messages.push(provider.toolResultMessage(result.id, result.output))
+						logEntries.push(await writeToolResultEntry(sessionId, result.id, result.output, currentToolRefMap))
+						done = false
+					}
 				}
-			}
 
-			if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
+				if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
+			} finally {
+				clearInterval(progressTimer)
+			}
 		}
 	}
 

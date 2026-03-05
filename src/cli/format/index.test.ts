@@ -111,7 +111,7 @@ describe('tool progress', () => {
 		expect(plain).toContain('<tool.grep>')
 		expect(plain).toContain('<tool.read>')
 		expect(plain).toContain('--- pattern src/ ---')
-		expect(plain).toContain('1.2 s')
+		expect(plain).toContain('1.2s')
 		expect(plain).toContain('500 bytes')
 		expect(plain).toContain('line 1')
 		expect(plain).toContain('line 2')
