@@ -25,37 +25,10 @@ export function shortenHome(text: string): string {
 	return text.replaceAll(HOME, '~')
 }
 
-/** Preview content: show up to 3 lines, omit rest with (+N lines) */
-function contentPreview(text: string): string {
-	const lines = text.split('\n')
-	const show = lines.slice(0, 3)
-	const rest = lines.length - show.length
-	const suffix = rest > 0 ? `\n(+${rest} lines)` : ''
-	return show.join('\n') + suffix
-}
-
-/** Cap output for TUI display: show head + tail with omission note */
-function displayPreview(text: string, maxLines = MAX_DISPLAY_LINES): string {
-	const lines = text
-		.split('\n')
-		.map((line) =>
-			line.length > MAX_LINE_LEN ? line.slice(0, MAX_LINE_LEN) + '… [line truncated]' : line,
-		)
-	if (lines.length <= maxLines) return lines.join('\n')
-	const headCount = Math.ceil(maxLines / 2)
-	const tailCount = maxLines - headCount
-	const omitted = lines.length - headCount - tailCount
-	return [
-		...lines.slice(0, headCount),
-		`[${omitted} lines omitted]`,
-		...lines.slice(-tailCount),
-	].join('\n')
-}
 
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
 const MAX_LINE_LEN = 2000
-const MAX_DISPLAY_LINES = 15 // max lines shown in TUI scroll buffer
 const TOOL_OUTPUT_DIR = '/tmp/hal/tool-output'
 
 async function truncateOutput(
@@ -304,7 +277,6 @@ async function _runTool(
 			const cdTarget = resolve(cwd, cdMatch[1])
 			if (cdTarget === cwd) command = command.slice(cdMatch[0].length)
 		}
-		await logger(shortenHome(`[bash] ${command}`), 'tool')
 		const proc = Bun.spawn(['bash', '-lc', command], { cwd, stdout: 'pipe', stderr: 'pipe' })
 
 		// Kill subprocess when paused/aborted (SIGTERM, then SIGKILL after 2s)
@@ -317,16 +289,10 @@ async function _runTool(
 			else signal.addEventListener('abort', onAbort, { once: true })
 		}
 
-		// Stream stdout with progress heartbeats for long-running commands
+		// Stream stdout line-by-line so progress updates on each emitted line
 		const stdoutChunks: string[] = []
-		let lineCount = 0
-		let lastHeartbeatLines = 0
-		let lastHeartbeatTime = Date.now()
-		const HEARTBEAT_MS = 2000 // emit progress at most every 2s
-		const HEARTBEAT_MIN_LINES = 10 // only emit if meaningful output accumulated
 		const decoder = new TextDecoder()
 		let partial = ''
-		let firstLine: string | null = null
 
 		const reader = proc.stdout.getReader()
 		while (true) {
@@ -337,21 +303,9 @@ async function _runTool(
 			partial += chunk
 			const lines = partial.split('\n')
 			partial = lines.pop()! // keep incomplete last line
-			if (!firstLine && lines.length > 0) firstLine = lines[0]
-			lineCount += lines.length
-
-			const now = Date.now()
-			const newLines = lineCount - lastHeartbeatLines
-			if (newLines >= HEARTBEAT_MIN_LINES && now - lastHeartbeatTime >= HEARTBEAT_MS) {
-				if (lastHeartbeatLines === 0 && firstLine) {
-					await logger(firstLine, 'tool')
-				}
-				await logger(`[+ ${newLines} lines, total ${lineCount}]`, 'tool')
-				lastHeartbeatLines = lineCount
-				lastHeartbeatTime = now
-			}
+			for (const line of lines) await logger(line, 'tool')
 		}
-		if (partial) lineCount += 1 // count trailing partial line
+		if (partial) await logger(partial, 'tool')
 
 		const stdout = stdoutChunks.join('')
 		const stderr = await new Response(proc.stderr).text()
@@ -367,13 +321,7 @@ async function _runTool(
 		const raw = stdout + stderr + exitNote
 		const output = stderrWarn + raw
 		const { text, truncated, fullPath } = await truncateOutput(output, 'tail')
-		if (truncated) {
-			await logger(shortenHome(`[truncated -> ${fullPath}]`), 'warn')
-			const preview = displayPreview(raw.split('\n').slice(-50).join('\n'))
-			if (preview) await logger(preview, 'tool')
-		} else {
-			if (raw) await logger(displayPreview(raw), 'tool')
-		}
+		if (truncated) await logger(shortenHome(`[truncated -> ${fullPath}]`), 'warn')
 		return text || '(empty)'
 	}
 
