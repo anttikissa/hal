@@ -557,13 +557,13 @@ function expandToWordBoundary(pt: SelectionPoint, side: 'start' | 'end'): Select
 	if (side === 'start') {
 		let i = Math.min(col, plain.length - 1)
 		if (i < 0) return { ...pt, col: 0 }
-		while (i > 0 && /\s/.test(plain[i])) i--
-		while (i > 0 && !/\s/.test(plain[i - 1])) i--
+		while (i > 0 && /\W/.test(plain[i])) i--
+		while (i > 0 && /\w/.test(plain[i - 1])) i--
 		return { ...pt, col: i }
 	}
 	let i = col
-	while (i < plain.length && /\s/.test(plain[i])) i++
-	while (i < plain.length && !/\s/.test(plain[i])) i++
+	while (i < plain.length && /\W/.test(plain[i])) i++
+	while (i < plain.length && /\w/.test(plain[i])) i++
 	return { ...pt, col: i }
 }
 
