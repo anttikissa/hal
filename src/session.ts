@@ -566,7 +566,8 @@ export async function loadSessionRegistry(
 		if (sessions.length === 0) return defaultRegistry()
 		for (const s of sessions) {
 			const disk = await loadSessionInfo(s.id)
-			if (disk) Object.assign(s, { ...disk, busy: false, messageCount: s.messageCount })
+			if (disk) Object.assign(s, disk)
+			s.busy = false
 			sessionInfoMap.set(s.id, s)
 		}
 		const activeSessionId =
