@@ -152,6 +152,7 @@ export async function ensureSession(sessionId: string, workingDir: string, after
 	session = {
 		id: sessionId,
 		workingDir: resolve(workingDir || _defaultWorkingDir),
+		currentLog: 'messages.asonl',
 		busy: false,
 		messageCount: 0,
 		createdAt: new Date().toISOString(),

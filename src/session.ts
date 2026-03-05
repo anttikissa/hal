@@ -23,7 +23,7 @@ export interface SessionInfo {
 	updatedAt: string
 	lastPrompt?: string
 	tokenTotals?: TokenTotals
-	currentLog?: string
+	currentLog: string
 }
 
 export interface SessionRegistry {
@@ -527,6 +527,7 @@ function createSessionInfo(id: string, workingDir: string): SessionInfo {
 	return {
 		id,
 		workingDir: resolve(workingDir),
+		currentLog: 'messages.asonl',
 		busy: false,
 		messageCount: 0,
 		createdAt: ts,

@@ -7,7 +7,7 @@ import { getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, setHalState }
 const TEST_TS = '2026-01-01T00:00:00.000Z'
 
 function mkSession(id: string, workingDir: string, busy: boolean): SessionInfo {
-	return { id, workingDir, busy, messageCount: 0, createdAt: TEST_TS, updatedAt: TEST_TS }
+	return { id, workingDir, busy, currentLog: 'messages.asonl', messageCount: 0, createdAt: TEST_TS, updatedAt: TEST_TS }
 }
 
 describe('client cursor state', () => {

@@ -25,7 +25,7 @@ import { sessionDir } from './state.ts'
 function uniqueId(): string {
 	const id = `t-${randomBytes(4).toString('hex')}`
 	sessionInfoMap.set(id, {
-		id, workingDir: '/tmp', busy: false, messageCount: 0,
+		id, workingDir: '/tmp', currentLog: 'messages.asonl', busy: false, messageCount: 0,
 		createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
 	})
 	return id
