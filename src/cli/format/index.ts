@@ -187,10 +187,8 @@ export function renderToolProgressLines(tools: ToolProgressEntry[], termWidth: n
 	for (const tool of tools) {
 		const block = renderToolBlock(tool, termWidth)
 		for (const line of block.split('\n')) {
-			if (line !== '' || lines.length > 0) lines.push(line)
+			if (line !== '') lines.push(line)
 		}
 	}
-	// Remove trailing empty line from last \n
-	while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
 	return lines
 }
