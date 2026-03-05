@@ -91,10 +91,10 @@ async function ensureBlocksDir(id: string): Promise<void> {
 
 // Block storage
 
-const EPOCH = 1740000000000 // 2025-02-20, keeps IDs short
-
-export function makeBlockRef(_sessionId: string): string {
-	const offset = Math.max(0, Date.now() - EPOCH).toString(36).padStart(6, '0')
+export function makeBlockRef(sessionId: string): string {
+	const session = sessionInfoMap.get(sessionId)
+	const start = session ? new Date(session.createdAt).getTime() : Date.now()
+	const offset = Math.max(0, Date.now() - start).toString(36).padStart(6, '0')
 	const bytes = randomBytes(4)
 	let suffix = ''
 	for (let i = 0; i < 4; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
