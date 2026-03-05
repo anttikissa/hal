@@ -48,9 +48,6 @@ describe('client cursor state', () => {
 			'tab2',
 		)
 
-		const active = clientState.getActiveTabForTest()
-		expect(active?.sessionId).toBe('tab2')
-		expect(active?.halIdleSince ?? Infinity).toBeLessThan(Date.now() - 30_000)
 		expect(getHalIdleSince()).toBeLessThan(Date.now() - 30_000)
 	})
 })

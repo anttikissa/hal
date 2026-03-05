@@ -687,6 +687,5 @@ export let clientState = {
 		tabs = nextTabs
 		activeTabIndex = Math.max(0, Math.min(activeIndex, tabs.length - 1))
 	},
-	getActiveTabForTest(): CliTab | null { return activeTab() },
 	syncTabsFromSessionsForTest: syncTabsFromSessions,
 }
