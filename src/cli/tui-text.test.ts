@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
-import { truncateAnsi, wrapAnsi } from './tui-text.ts'
+import { truncateAnsi, wrapAnsi, wordBoundaryLeft, wordBoundaryRight } from './tui-text.ts'
 
 const osc8 = (url: string, text: string) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`
 
@@ -288,3 +288,40 @@ describe('normalizeDetectedUrl', () => {
 	})
 })
 
+
+describe('wordBoundaryLeft / wordBoundaryRight symmetry', () => {
+	const buf = 'hello world foo'
+	//           0123456789...
+
+	it('wordBoundaryLeft from mid-word goes to start of that word', () => {
+		expect(wordBoundaryLeft(buf, 3)).toBe(0)   // mid "hello" → start
+		expect(wordBoundaryLeft(buf, 8)).toBe(6)   // mid "world" → start
+	})
+
+	it('wordBoundaryLeft from start of word goes to start of previous word', () => {
+		expect(wordBoundaryLeft(buf, 6)).toBe(0)   // start "world" → start "hello"
+		expect(wordBoundaryLeft(buf, 12)).toBe(6)  // start "foo" → start "world"
+	})
+
+	it('wordBoundaryRight from mid-word goes to end of that word', () => {
+		expect(wordBoundaryRight(buf, 3)).toBe(5)  // mid "hello" → end
+		expect(wordBoundaryRight(buf, 8)).toBe(11) // mid "world" → end
+	})
+
+	it('wordBoundaryRight from end of word goes to end of next word', () => {
+		expect(wordBoundaryRight(buf, 5)).toBe(11)  // end "hello" → end "world"
+		expect(wordBoundaryRight(buf, 11)).toBe(15) // end "world" → end "foo"
+	})
+
+	it('left then right from mid-word returns to end of same word', () => {
+		const left = wordBoundaryLeft(buf, 3)   // 0 (start of "hello")
+		const right = wordBoundaryRight(buf, left) // should be 5 (end of "hello")
+		expect(right).toBe(5)
+	})
+
+	it('right then left from mid-word returns to start of same word', () => {
+		const right = wordBoundaryRight(buf, 3)  // 5 (end of "hello")
+		const left = wordBoundaryLeft(buf, right) // should be 0 (start of "hello")
+		expect(left).toBe(0) // NOT 6 (start of "world")
+	})
+})

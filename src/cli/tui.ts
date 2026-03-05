@@ -1071,9 +1071,8 @@ function handleKey(key: string): void {
 	if (key === '\x1b[1;2A' || key === '\x1b[1;2B') {
 		const dir = key === '\x1b[1;2A' ? -1 : 1
 		const r = verticalMove(inputBuf, promptContentWidth(), inputCursor, prevGoalCol, dir)
-		if (!r.atBoundary) {
-			setInputCursor(r.cursor, true); inputGoalCol = r.goalCol; render()
-		}
+		const pos = r.atBoundary ? (dir === -1 ? 0 : inputBuf.length) : r.cursor
+		setInputCursor(pos, true); inputGoalCol = r.goalCol; render()
 		return
 	}
 

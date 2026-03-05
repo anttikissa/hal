@@ -136,5 +136,5 @@ export function wordBoundaryLeft(buf: string, cursor: number): number {
 }
 
 export function wordBoundaryRight(buf: string, cursor: number): number {
-	let i = cursor; while (i < buf.length && buf[i] !== ' ') i++; while (i < buf.length && buf[i] === ' ') i++; return i
+	let i = cursor; while (i < buf.length && buf[i] === ' ') i++; while (i < buf.length && buf[i] !== ' ') i++; return i
 }
