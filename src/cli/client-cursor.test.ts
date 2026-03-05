@@ -12,7 +12,7 @@ function mkSession(id: string, workingDir: string, busy: boolean): SessionInfo {
 
 describe('client cursor state', () => {
 	beforeEach(() => {
-		clientState.resetForTest()
+		clientState.setTabsForTest([], 0)
 		setActiveTabCursor('test-reset')
 		setHalState('writing', 'test-reset')
 		setHalState('idle', 'test-reset')
