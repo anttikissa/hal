@@ -392,6 +392,15 @@ class OpenAIProvider extends Provider {
 
 		if (type === 'response.completed') {
 			const response = event.response
+			// Debug: log the completion details
+			const { appendFile: af, mkdir: mk } = require('fs/promises')
+			const dir = `/tmp/hal/debug/${currentSessionId}`
+			mk(dir, { recursive: true }).then(() =>
+				af(`${dir}/sse.log`,
+					`[${new Date().toISOString()}] response.completed: status=${response?.status} incomplete_details=${JSON.stringify(response?.incomplete_details)} status_details=${JSON.stringify(response?.status_details)} output_count=${response?.output?.length} usage=${JSON.stringify(response?.usage)}\n`
+				)
+			).catch(() => {})
+
 			const events: StreamEvent[] = []
 			if (response?.usage) {
 				const cached = response.usage.input_tokens_details?.cached_tokens ?? 0

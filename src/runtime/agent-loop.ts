@@ -1,4 +1,4 @@
-import { writeFile, appendFile } from 'fs/promises'
+import { writeFile, appendFile, mkdir } from 'fs/promises'
 import {
 	providerForModel,
 	modelIdForModel,
@@ -504,6 +504,10 @@ async function parseResponseStream(
 	let stopReason: string | null = null
 	const usage: any = {}
 	let aborted = false
+	const sseDebugDir = `/tmp/hal/debug/${sessionId}`
+	const sseDebugFile = `${sseDebugDir}/sse.log`
+	await mkdir(sseDebugDir, { recursive: true }).catch(() => {})
+	const sseLog = (msg: string) => appendFile(sseDebugFile, `[${new Date().toISOString()}] ${msg}\n`).catch(() => {})
 
 	const reader = res.body!.getReader()
 	const decoder = new TextDecoder()
@@ -521,7 +525,8 @@ async function parseResponseStream(
 		let readResult: any
 		try {
 			readResult = await reader.read()
-		} catch {
+		} catch (e: any) {
+			await sseLog(`reader.read() error: ${e?.message ?? e}`)
 			aborted = runtime.pausedByUser
 			break
 		}
@@ -543,6 +548,7 @@ async function parseResponseStream(
 			}
 			if (!eventData) continue
 
+			await sseLog(`SSE type=${eventType} data=${eventData.slice(0, 300)}`)
 			const events = provider.parseSSE({ type: eventType, data: eventData })
 			for (const evt of events) {
 				switch (evt.type) {
@@ -655,6 +661,8 @@ async function parseResponseStream(
 			}
 		}
 	}
+
+	await sseLog(`stream ended: stopReason=${stopReason} aborted=${aborted} buffer.length=${buffer.length} buffer=${JSON.stringify(buffer.slice(0, 500))} blocks=${contentBlocks.length}`)
 
 	provider.finalizeBlocks(contentBlocks)
 	runtime.streamingBlocks = null
