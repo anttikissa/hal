@@ -400,6 +400,13 @@ function oneLineSummary(value: unknown, fallback: string): string {
 	return compact.length > 140 ? `${compact.slice(0, 139)}…` : compact
 }
 
+function splitProgressLines(text: string): string[] {
+	const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+	const lines = normalized.split('\n')
+	while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+	return lines
+}
+
 function replayToolInputSummary(name: string, input: any): string {
 	let summary: unknown
 	switch (name) {
@@ -418,7 +425,7 @@ function replayToolInputSummary(name: string, input: any): string {
 
 function replayToolProgressEvent(tool: any): RuntimeEvent {
 	const result = typeof tool?.result === 'string' ? tool.result : ''
-	const lines = result ? result.split('\n') : []
+	const lines = splitProgressLines(result)
 	return {
 		id: `replay-tool-${tool?.id ?? 'unknown'}`,
 		type: 'tool_progress',

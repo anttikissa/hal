@@ -50,6 +50,13 @@ function toolInputSummary(name: string, input: any): string {
 	}
 	return oneLineSummary(summary, name)
 }
+
+function splitToolProgressLines(text: string): string[] {
+	const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+	const lines = normalized.split('\n')
+	while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+	return lines.length > 0 ? lines : ['']
+}
 export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCache): Promise<void> {
 	busySessions.add(sessionId)
 	runtime.pausedByUser = false
@@ -232,9 +239,12 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 					const output = await runTool(block.name, block.input, {
 						logger: (line) => {
 							const state = toolState[i]
-							state.bytes += line.length
-							state.totalLines += 1
-							state.lastLines.push(line)
+							for (const progressLine of splitToolProgressLines(String(line))) {
+								if (progressLine.startsWith(`[${block.name}] `)) continue
+								state.bytes += Buffer.byteLength(progressLine)
+								state.totalLines += 1
+								state.lastLines.push(progressLine)
+							}
 							if (state.lastLines.length > LAST_LINES)
 								state.lastLines = state.lastLines.slice(-LAST_LINES)
 							return emitProgress()
