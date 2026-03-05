@@ -88,7 +88,7 @@ describe('tools', () => {
 			{ cwd: tmpRoot, logger: NOOP_LOGGER },
 		)
 
-		expect(result).toBe('ok')
+		expect(result).toContain('--- before')
 		expect(readFileSync(filePath, 'utf-8')).toBe('a\nB\nc')
 	})
 
@@ -136,7 +136,7 @@ describe('tools', () => {
 			])
 
 			expect(writeResult).toBe('ok')
-			expect(editResult).toBe('ok')
+			expect(editResult).toContain('--- before')
 
 			const finalContent = readFileSync(filePath, 'utf-8')
 			expect(

@@ -22,12 +22,16 @@ describe('hashline', () => {
 		expect(lines[1]).toBe(`2:${hashLine('b')} b`)
 	})
 
-	test('applyEdit replaces a single line', () => {
+	test('applyEdit replaces a single line and returns context', () => {
 		const content = 'alpha\nbeta\ngamma'
 		const ref = `2:${hashLine('beta')}`
 		const res = applyEdit(content, ref, ref, 'BETA')
 		expect(res.error).toBeUndefined()
 		expect(res.result).toBe('alpha\nBETA\ngamma')
+		expect(res.context).toContain('--- before')
+		expect(res.context).toContain('+++ after')
+		expect(res.context).toContain('beta')
+		expect(res.context).toContain('BETA')
 	})
 
 	test('applyEdit replaces a range and can delete with empty content', () => {

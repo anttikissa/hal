@@ -1,7 +1,7 @@
 import { $ } from 'bun'
 import { readFile, writeFile, appendFile, mkdir, stat } from 'fs/promises'
 import { isAbsolute, resolve } from 'path'
-import { hashLine, applyEdit, applyInsert } from './hashline.ts'
+import { hashLine, applyEdit, applyInsert, type EditResult } from './hashline.ts'
 import { randomBytes } from 'crypto'
 import { homedir } from 'os'
 import { stringify } from './utils/ason.ts'
@@ -387,7 +387,7 @@ async function _runTool(
 		const path = resolveToolPath(cwd, input.path)
 		return withFileLock(path, async () => {
 			const content = await readFile(path, 'utf-8')
-			let result: { result?: string; error?: string }
+			let result: EditResult
 			if (input.operation === 'replace') {
 				if (!input.start_ref || !input.end_ref)
 					return 'error: replace requires start_ref and end_ref'
@@ -404,7 +404,7 @@ async function _runTool(
 			if (result.error)
 				return `error: ${result.error}\n\nRe-read the file to get updated LINE:HASH references.`
 			await writeFile(path, result.result!)
-			return 'ok'
+			return result.context ?? 'ok'
 		})
 	}
 
