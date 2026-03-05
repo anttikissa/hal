@@ -135,12 +135,7 @@ export async function persistRegistry(): Promise<void> {
 /** Save all in-memory session metadata to disk. Called on shutdown. */
 export async function saveAllSessions(): Promise<void> {
 	for (const [id, runtime] of sessionCache) {
-		const session = sessionInfoMap.get(id)
-		if (session) {
-			session.updatedAt = new Date().toISOString()
-			session.tokenTotals = runtime.tokenTotals
-		}
-		await saveSessionInfo(id)
+		await saveSessionInfo(id, runtime)
 	}
 	await saveSessionRegistry(registry)
 }

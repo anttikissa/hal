@@ -238,9 +238,14 @@ export function getSessionInfo(id: string): SessionInfo | null {
 }
 
 /** Persist in-memory SessionInfo to disk. Strips transient fields (busy, messageCount). */
-export async function saveSessionInfo(id: string): Promise<void> {
+export async function saveSessionInfo(id: string, runtime?: { messages: any[]; tokenTotals?: TokenTotals }): Promise<void> {
 	const session = sessionInfoMap.get(id)
 	if (!session) return
+	session.updatedAt = new Date().toISOString()
+	if (runtime) {
+		session.lastPrompt = extractLastPrompt(runtime.messages)
+		if (runtime.tokenTotals) session.tokenTotals = runtime.tokenTotals
+	}
 	await ensureSessionDir(id)
 	const { busy, messageCount, ...disk } = session
 	await writeFile(infoPath(id), stringify(disk) + '\n')
@@ -702,7 +707,7 @@ function repairMessages(messages: any[]): any[] {
 }
 
 /** Extract the last user prompt text from messages (skipping internal markers). */
-export function extractLastPrompt(messages: any[]): string {
+function extractLastPrompt(messages: any[]): string {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const msg = messages[i]
 		if (msg.role !== 'user') continue

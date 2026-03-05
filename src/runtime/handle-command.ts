@@ -1,6 +1,6 @@
 import { resolve, isAbsolute } from 'path'
 import type { RuntimeCommand } from '../protocol.ts'
-import { saveSessionInfo, extractLastPrompt, appendToLog, rotateSession, buildRotationContext, writeAssistantEntry, getSessionInfo } from '../session.ts'
+import { saveSessionInfo, appendToLog, rotateSession, buildRotationContext, writeAssistantEntry } from '../session.ts'
 import { sessionDir } from '../state.ts'
 import {
 	getConfig,
@@ -98,15 +98,7 @@ export async function runFork(sessionId: string, _command: RuntimeCommand): Prom
 
 	// Save current metadata before forking
 	const runtime = getCachedSessionRuntime(sessionId)
-	if (runtime) {
-		const session = getSessionInfo(sessionId)
-		if (session) {
-			session.updatedAt = new Date().toISOString()
-			session.lastPrompt = extractLastPrompt(runtime.messages)
-			session.tokenTotals = runtime.tokenTotals
-		}
-		await saveSessionInfo(sessionId)
-	}
+	if (runtime) await saveSessionInfo(sessionId, runtime)
 	const { forkSession } = await import('../session.ts')
 	const newId = await forkSession(sessionId)
 	const workingDir = getSessionWorkingDir(sessionId)
@@ -267,12 +259,7 @@ async function runModel(sessionId: string, text: string): Promise<void> {
 		content: `[model changed from ${prevModel} to ${fullModel}]`,
 	})
 
-	const session = getSessionInfo(sessionId)
-	if (session) {
-		session.updatedAt = new Date().toISOString()
-		session.lastPrompt = extractLastPrompt(runtime.messages)
-	}
-	await saveSessionInfo(sessionId)
+	await saveSessionInfo(sessionId, runtime)
 
 	const ts = new Date().toISOString()
 	await appendToLog(sessionId, [
@@ -347,12 +334,7 @@ export async function runCd(sessionId: string, text: string): Promise<void> {
 	}
 
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	const cdSession = getSessionInfo(sessionId)
-	if (cdSession) {
-		cdSession.updatedAt = new Date().toISOString()
-		cdSession.lastPrompt = extractLastPrompt(runtime.messages)
-	}
-	await saveSessionInfo(sessionId)
+	await saveSessionInfo(sessionId, runtime)
 
 	if (previous !== next) {
 		await appendToLog(sessionId, [{ type: 'cd', from: previous, to: next, ts: new Date().toISOString() }])
@@ -458,13 +440,7 @@ export async function runClose(sessionId: string): Promise<void> {
 		runtime.activeAbort?.abort()
 	}
 
-	const closeSession = getSessionInfo(sessionId)
-	if (closeSession) {
-		closeSession.updatedAt = new Date().toISOString()
-		closeSession.lastPrompt = extractLastPrompt(runtime.messages)
-		closeSession.tokenTotals = runtime.tokenTotals
-	}
-	await saveSessionInfo(sessionId)
+	await saveSessionInfo(sessionId, runtime)
 
 	const { getSessionCache, getRegistry, getActiveSessionId, setActiveSessionId } =
 		await import('./sessions.ts')
@@ -488,11 +464,5 @@ export async function runClose(sessionId: string): Promise<void> {
 
 async function saveSessionBeforeExit(sessionId: string): Promise<void> {
 	const runtime = await getOrLoadSessionRuntime(sessionId)
-	const session = getSessionInfo(sessionId)
-	if (session) {
-		session.updatedAt = new Date().toISOString()
-		session.lastPrompt = extractLastPrompt(runtime.messages)
-		session.tokenTotals = runtime.tokenTotals
-	}
-	await saveSessionInfo(sessionId)
+	await saveSessionInfo(sessionId, runtime)
 }

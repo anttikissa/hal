@@ -14,7 +14,7 @@ import {
 	markModelCalibrated,
 	saveTokenCalibration,
 } from '../token-calibration.ts'
-import { appendToLog, writeAssistantEntry, writeToolResultEntry, saveSessionInfo, extractLastPrompt, getSessionInfo } from '../session.ts'
+import { appendToLog, writeAssistantEntry, writeToolResultEntry, saveSessionInfo } from '../session.ts'
 import { stringify } from '../utils/ason.ts'
 import {
 	getSessionWorkingDir,
@@ -295,7 +295,7 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 	busySessions.delete(sessionId)
 	await emitStatus()
 
-	await saveSessionMeta(sessionId, runtime)
+	await saveSessionInfo(sessionId, runtime)
 
 	if (runtime.lastUsage && shouldWarn(runtime.lastUsage, contextWindowForModel(modelId))) {
 		await publishLine(
@@ -304,16 +304,6 @@ export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCac
 			sessionId,
 		)
 	}
-}
-
-async function saveSessionMeta(sessionId: string, runtime: SessionRuntimeCache): Promise<void> {
-	const session = getSessionInfo(sessionId)
-	if (session) {
-		session.updatedAt = new Date().toISOString()
-		session.lastPrompt = extractLastPrompt(runtime.messages)
-		session.tokenTotals = runtime.tokenTotals
-	}
-	await saveSessionInfo(sessionId)
 }
 
 function filterUnpairedWebSearchBlocks(blocks: any[]): any[] {
