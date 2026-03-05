@@ -15,7 +15,8 @@ describe('stringify', () => {
 		test('-Infinity', () => expect(stringify(-Infinity)).toBe('-Infinity'))
 		test('simple string', () => expect(stringify('hello')).toBe("'hello'"))
 		test('empty string', () => expect(stringify('')).toBe("''"))
-		test('string with newline', () => expect(stringify('a\nb')).toBe("'a\\nb'"))
+		test('string with newline (smart)', () => expect(stringify('a\nb')).toBe('`a\nb`'))
+		test('string with newline (short)', () => expect(stringify('a\nb', 'short')).toBe("'a\\nb'"))
 		test('string with tab', () => expect(stringify('a\tb')).toBe("'a\\tb'"))
 		test('string with backslash', () => expect(stringify('a\\b')).toBe("'a\\\\b'"))
 	})
@@ -27,6 +28,19 @@ describe('stringify', () => {
 			expect(stringify('she said "hi"')).toBe('\'she said "hi"\''))
 		test('both quotes → single quotes, escape single', () =>
 			expect(stringify(`she said "it's fine"`)).toBe("'she said \"it\\'s fine\"'"))
+	})
+
+	describe('backtick multiline strings', () => {
+		test('multiline string uses backticks in smart mode', () =>
+			expect(stringify('line1\nline2\nline3')).toBe('`line1\nline2\nline3`'))
+		test('escapes backticks in content', () =>
+			expect(stringify('a `b` c\nd')).toBe('`a \\`b\\` c\nd`'))
+		test('escapes ${ in content', () =>
+			expect(stringify('cost: ${x}\ndone')).toBe('`cost: \\${x}\ndone`'))
+		test('escapes backslashes in content', () =>
+			expect(stringify('a\\b\nc')).toBe('`a\\\\b\nc`'))
+		test('no backticks without newline', () =>
+			expect(stringify('no newline')).toBe("'no newline'"))
 	})
 
 	describe('objects', () => {
@@ -178,6 +192,11 @@ describe('parse', () => {
 		test('string with unicode CJK', () => expect(parse("'\\u4e16'")).toBe('世'))
 		test('invalid unicode escape: too short', () => expect(() => parse("'\\u00'")).toThrow(/Invalid unicode escape/))
 		test('invalid unicode escape: bad hex', () => expect(() => parse("'\\uXXXX'")).toThrow(/Invalid unicode escape/))
+		test('backtick string', () => expect(parse('`hello`')).toBe('hello'))
+		test('backtick multiline', () => expect(parse('`a\nb\nc`')).toBe('a\nb\nc'))
+		test('backtick escaped backtick', () => expect(parse('`a \\`b\\` c`')).toBe('a `b` c'))
+		test('backtick escaped ${', () => expect(parse('`cost: \\${x}`')).toBe('cost: ${x}'))
+		test('backtick rejects unescaped ${', () => expect(() => parse('`${x}`')).toThrow(/interpolation/))
 	})
 
 	describe('objects', () => {
@@ -244,6 +263,13 @@ describe('parse', () => {
 	version: 1,
 }`),
 			).toEqual({ name: 'hal', version: 1 })
+		})
+	})
+
+	describe('backtick round-trip', () => {
+		test('multiline string round-trips through stringify/parse', () => {
+			const s = 'line1\nline2\n`backtick`\n${interp}\nend'
+			expect(parse(stringify(s))).toBe(s)
 		})
 	})
 

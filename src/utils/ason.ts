@@ -17,7 +17,14 @@ export type AsonObject = { [key: string]: AsonValue; [COMMENTS]?: Record<string,
 
 // --- Stringify ---
 
-function quoteString(s: string): string {
+function quoteString(s: string, multiline = false): string {
+	if (multiline && s.includes('\n')) {
+		const escaped = s
+			.replace(/\\/g, '\\\\')
+			.replace(/`/g, '\\`')
+			.replace(/\$\{/g, '\\${')
+		return `\`${escaped}\``
+	}
 	const escaped = s
 		.replace(/\\/g, '\\\\')
 		.replace(/\n/g, '\\n')
@@ -50,7 +57,7 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		if (obj === -Infinity) return '-Infinity'
 		return String(obj)
 	}
-	if (typeof obj === 'string') return quoteString(obj)
+	if (typeof obj === 'string') return quoteString(obj, maxWidth < Infinity)
 
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
@@ -208,6 +215,7 @@ function parseString(ctx: Ctx, quote: string): string {
 			continue
 		}
 		if (ch === quote) { ctx.pos++; return result }
+		if (quote === '`' && ch === '$' && peek2(ctx) === '{') fail(ctx, 'Template interpolation is not supported')
 		result += ch
 		ctx.pos++
 	}
@@ -279,7 +287,7 @@ function parseAny(ctx: Ctx): AsonValue {
 	const ch = peek(ctx)
 	if (ch === '{') return parseObject(ctx)
 	if (ch === '[') return parseArray(ctx)
-	if (ch === "'" || ch === '"') return parseString(ctx, ch)
+	if (ch === "'" || ch === '"' || ch === '`') return parseString(ctx, ch)
 	if (ch === '-') {
 		if (peek2(ctx) === 'I') { eatWord(ctx, '-Infinity'); return -Infinity }
 		return parseNumber(ctx)

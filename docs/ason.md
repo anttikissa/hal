@@ -9,7 +9,8 @@ Any valid JSON file is valid ASON.
 
 All JSON types, plus:
 - Unquoted keys: `{ name: 'hal', version: 1 }` — alphanumeric keys don't need quotes
-- Single-quoted strings: `'hello'` — prefers double quotes in cases like "it's"
+- Single-quoted strings: `'hello'` — prefers double quotes when string contains single quotes
+- Backtick strings: `` `line1\nline2` `` — multiline, like JS template literals (no interpolation; unescaped `${` is an error). Used in `smart`/`long` modes for strings containing newlines; `short` mode always uses escaped single-line strings.
 - `undefined` literal
 - Number literals `NaN`, `Infinity`, `-Infinity` supported
 - Comments: `// line` and `/* block */` — survive parse/stringify roundtrip with `{ comments: true }`
