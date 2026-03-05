@@ -14,6 +14,9 @@ import {
 	buildRotationContext,
 	forkSession,
 	loadReplayEntries,
+	loadSessionRegistry,
+	saveSessionInfo,
+	saveSessionRegistry,
 	sessionInfoMap,
 	EMPTY_TOTALS,
 } from './session.ts'
@@ -425,5 +428,37 @@ describe('context trimming', () => {
 		expect(toolResults[2]).toBe('result 2')
 		expect(toolResults[3]).toBe('result 3')
 		expect(toolResults[4]).toBe('result 4')
+	})
+})
+
+describe('loadSessionRegistry merges info.ason', () => {
+	test('preserves currentLog and lastPrompt after restart', async () => {
+		const id = uniqueId()
+		await appendToLog(id, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+
+		// Simulate rotation: sets currentLog in info.ason
+		await rotateSession(id)
+		const session = sessionInfoMap.get(id)!
+		session.lastPrompt = 'hello'
+		await saveSessionInfo(id)
+
+		// Verify info.ason has both fields
+		const infoRaw = readFileSync(join(sessionDir(id), 'info.ason'), 'utf-8')
+		expect(infoRaw).toContain('messages2.asonl')
+		expect(infoRaw).toContain('hello')
+
+		// Save a slim registry (like shutdown does — no currentLog/lastPrompt)
+		const registry = { activeSessionId: id, sessions: [session] }
+		await saveSessionRegistry(registry)
+
+		// Clear in-memory state
+		sessionInfoMap.delete(id)
+
+		// Reload — should merge info.ason fields back
+		const loaded = await loadSessionRegistry()
+		const restored = sessionInfoMap.get(id)
+		expect(restored).toBeDefined()
+		expect(restored!.currentLog).toBe('messages2.asonl')
+		expect(restored!.lastPrompt).toBe('hello')
 	})
 })
