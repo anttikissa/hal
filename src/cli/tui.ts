@@ -21,6 +21,7 @@ const MAX_OUTPUT_LINES = 10_000
 const BG_DARK = '\x1b[48;5;236m', RESET = '\x1b[0m', DIM = '\x1b[2m', ERASE_TO_EOL = '\x1b[K'
 const CURSOR_RESET = '\x1b]112\x07\x1b[0 q'
 const CURSOR_BLUE_OSC = '\x1b]12;rgb:66/bb/ff\x07'
+const CURSOR_GREY_OSC = '\x1b]12;rgb:88/88/88\x07'
 const ANIM_MS = 50
 const TITLE_BG = '\x1b[48;5;238m', TITLE_TOPIC = '\x1b[38;5;245m', TITLE_SESSION = '\x1b[38;5;252m'
 const KITTY_KEYBOARD_ENABLE = '\x1b[>27u', KITTY_KEYBOARD_DISABLE = '\x1b[<u'
@@ -95,6 +96,7 @@ let userPhase = 0
 let userPeriodCurrent = 500
 let halIntensity = 0.5 // 1.0 when busy, 0.5 when idle
 let animTimer: ReturnType<typeof setInterval> | null = null
+let windowFocused = true
 const SHRINK_BLOCKS = '\u2588\u2587\u2586\u2585\u2584\u2583\u2582\u2581' // █▇▆▅▄▃▂▁
 const IDLE_SHRINK_DURATION = 250 // ms for shrink animation
 const IDLE_SHRINK_BRIGHT_HOLD = 100 // ms cursor must be fully bright before shrink starts
@@ -240,10 +242,11 @@ function animTick(): void {
 	hal.period += (halTarget - hal.period) * (1 - RAMP_RATE)
 	hal.phase = (hal.phase + ANIM_MS / hal.period) % 1
 	halIntensity += (intensityTarget - halIntensity) * (1 - RAMP_RATE)
-	userPhase = (userPhase + ANIM_MS / cfg.cursorBlinkUser) % 1
+	const userPeriod = windowFocused ? cfg.cursorBlinkUser : cfg.cursorBlinkUser * 2
+	userPhase = (userPhase + ANIM_MS / userPeriod) % 1
 	// slowly drift both cursors toward Date.now()-based clock (syncs with tab indicators)
 	hal.phase = driftToGlobalClock(hal.phase, hal.period, now)
-	userPhase = driftToGlobalClock(userPhase, cfg.cursorBlinkUser, now)
+	userPhase = driftToGlobalClock(userPhase, userPeriod, now)
 	if (isIdle) tickShrink(hal, cfg.cursorDormantDelay, idleMs, now)
 	if (initialized && !suspended) scheduleRender()
 }
@@ -509,7 +512,9 @@ function renderPromptLineWithCursor(
 			return `${BG_DARK}${inputPromptStr}${lineText.slice(0, selStart)}\x1b[7m${lineText.slice(selStart, selEnd)}\x1b[27m${lineText.slice(selEnd)}${pad}${RESET}`
 	}
 	if (cursorCol < 0) return `${BG_DARK}${inputPromptStr}${lineText}${pad}${RESET}`
-	const uc = `${lerpCh(102, cursorT, 48)};${lerpCh(187, cursorT, 48)};${lerpCh(255, cursorT, 48)}`
+	const uc = windowFocused
+		? `${lerpCh(102, cursorT, 48)};${lerpCh(187, cursorT, 48)};${lerpCh(255, cursorT, 48)}`
+		: `${lerpCh(100, cursorT, 48)};${lerpCh(100, cursorT, 48)};${lerpCh(100, cursorT, 48)}`
 	if (cursorCol >= lineText.length) {
 		return `${BG_DARK}${inputPromptStr}${lineText.slice(0, cursorCol)}\x1b[48;2;${uc}m ${RESET}${BG_DARK}${pad}${RESET}`
 	}
@@ -810,7 +815,8 @@ function render(): void {
 	const curLineLen = wrappedInput.lines[curRow]?.length ?? 0
 	if (userCursorMode === 'native' || (userCursorMode === 'block' && curCol < curLineLen)) {
 		const style = userCursorMode === 'native' ? '\x1b[0 q' : '\x1b[5 q' // default or blinking bar
-		chunks.push(`${CURSOR_BLUE_OSC}${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
+		const cursorOsc = windowFocused ? CURSOR_BLUE_OSC : CURSOR_GREY_OSC
+		chunks.push(`${cursorOsc}${style}\x1b[${firstRow + curRow};${curCol + 1 + inputPromptStr.length}H\x1b[?25h`)
 	}
 
 	const frame = chunks.join('')
@@ -1160,8 +1166,8 @@ const onStdinData = (chunk: Buffer | string) => {
 	}
 
 	// Focus reporting
-	if (text === '\x1b[I') { writeToOutput('[focus] gained\n'); return }
-	if (text === '\x1b[O') { writeToOutput('[focus] lost\n'); return }
+	if (text === '\x1b[I') { windowFocused = true; scheduleRender(); return }
+	if (text === '\x1b[O') { windowFocused = false; scheduleRender(); return }
 	const mouseRe = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g
 	let mouseMatch = mouseRe.exec(text)
 	if (mouseMatch) {
