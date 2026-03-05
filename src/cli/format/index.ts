@@ -89,42 +89,43 @@ function truncLine(text: string, maxWidth: number): string {
 	return text.slice(0, i) + '…' + text.slice(i, tail)
 }
 
+function truncPlain(text: string, maxWidth: number): string {
+	if (maxWidth <= 0) return ''
+	if (text.length <= maxWidth) return text
+	if (maxWidth === 1) return '…'
+	return `${text.slice(0, maxWidth - 1)}…`
+}
+
 function renderToolBlock(tool: ToolProgressEntry, termWidth: number): string {
 	const CONTENT_LINES = 3
 	const tag = `<tool.${tool.name}> `
 	const statusLabel = tool.status === 'running' ? 'pending' : tool.status
 	const stats = `(${fmtElapsed(tool.elapsed)}, ${fmtBytes(tool.bytes)}; ${statusLabel})`
 
-	// Header: <tool.name> --- inputSummary --- (stats) ----...
-	const headerCore = `${tag}${DIM}--- ${RESET}${tool.inputSummary}${DIM} --- ${stats} `
-	const headerVisLen = stripAnsi(headerCore).length
-	const padLen = Math.max(0, termWidth - headerVisLen)
-	const header = headerCore + '-'.repeat(padLen) + RESET
+	const headerPrefix = `${tag}${DIM}--- ${RESET}`
+	const headerSuffix = `${DIM} --- ${stats} ${RESET}`
+	const minGap = `${DIM} --- ${RESET}`
+	const fixedVis = stripAnsi(headerPrefix).length + stripAnsi(minGap).length + stripAnsi(headerSuffix).length
+	const availableForSummary = Math.max(0, termWidth - fixedVis)
+	const summary = truncPlain(tool.inputSummary, availableForSummary)
+	const header = truncLine(`${headerPrefix}${summary}${minGap}${headerSuffix}`, termWidth)
 
-	const lines: string[] = [truncLine(header, termWidth)]
-
-	// Content lines: last CONTENT_LINES lines, or fewer + "[N more lines]"
+	const lines: string[] = [header]
 	const total = tool.totalLines
-	const last = tool.lastLines
+	const last = tool.lastLines.slice(-CONTENT_LINES)
 
 	if (total <= CONTENT_LINES) {
-		// Show all available lines, pad with empty
 		for (let i = 0; i < CONTENT_LINES; i++) {
 			const content = last[i] ?? ''
 			lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
 		}
 	} else {
-		// Show last (CONTENT_LINES-1) lines + "[N more lines]"
-		const shown = CONTENT_LINES - 1
-		for (let i = 0; i < shown; i++) {
-			const content = last[i] ?? ''
-			lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
-		}
-		const more = total - shown
-		lines.push(`${DIM}${tag}[${more} more lines]${RESET}`)
+		const hidden = total - CONTENT_LINES
+		lines.push(`${DIM}${tag}[+ ${hidden} more lines]${RESET}`)
+		for (const content of last) lines.push(truncLine(`${DIM}${tag}${RESET}${content}`, termWidth))
 	}
 
-	return lines.map(l => l + '\n').join('')
+	return lines.map((l) => l + '\n').join('')
 }
 
 export function pushEvent(event: RuntimeEvent, localSource: RuntimeCommand['source'], st: FormatState): string {

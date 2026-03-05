@@ -134,7 +134,7 @@ describe('tool progress', () => {
 			makeTool({ totalLines: 10, lastLines: ['a', 'b', 'c'] }),
 		])
 		const plain = stripAnsi(pushEvent(event, localSource, s))
-		expect(plain).toContain('[8 more lines]')
+		expect(plain).toContain('[+ 7 more lines]')
 	})
 
 	test('cursor-up-erase on update', () => {
