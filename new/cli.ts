@@ -109,6 +109,20 @@ function simulateResponse(tab: Tab, text: string): void {
 	}, 30)
 }
 
+function quit(): void {
+	const delta = renderState.lines.length - 1 - renderState.cursorRow
+	if (delta > 0) stdout.write(`\x1b[${delta}B`)
+	stdout.write(`${KITTY_KBD_OFF}\r\n\x1b[?25h`)
+	process.exit(0)
+}
+
+function closeTab(): void {
+	if (tabs.length <= 1) { quit(); return }
+	tabs.splice(activeIdx, 1)
+	if (activeIdx >= tabs.length) activeIdx = tabs.length - 1
+	prompt.reset()
+	doRender()
+}
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
@@ -116,11 +130,13 @@ stdin.on('data', (data: string) => {
 	if (!k) return
 
 	// Ctrl-C: quit
-	if (k.key === 'c' && k.ctrl) {
-		const delta = renderState.lines.length - 1 - renderState.cursorRow
-		if (delta > 0) stdout.write(`\x1b[${delta}B`)
-		stdout.write(`${KITTY_KBD_OFF}\r\n\x1b[?25h`)
-		process.exit(0)
+	if (k.key === 'c' && k.ctrl) { quit(); return }
+
+	// Ctrl-W: close tab (or quit if last)
+	// Ctrl-D: close tab when prompt empty (handled as delete by prompt otherwise)
+	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && prompt.text().length === 0)) {
+		closeTab()
+		return
 	}
 
 	// Ctrl-T: new tab

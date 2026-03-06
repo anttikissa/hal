@@ -116,7 +116,13 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor)
 		return true
 	}
-	if (k.key === 'delete' || (k.key === 'd' && k.ctrl)) {
+	if (k.key === 'delete') {
+		if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
+		return true
+	}
+	// Ctrl+D: delete forward, but return false when empty (cli.ts closes tab)
+	if (k.key === 'd' && k.ctrl) {
+		if (buf.length === 0) return false
 		if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
 		return true
 	}
@@ -134,13 +140,6 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		if (!deleteSel()) { buf = buf.slice(cursor); cursor = 0; goalCol = null; selAnchor = null }
 		return true
 	}
-
-	// Ctrl+W: delete word back
-	if (k.key === 'w' && k.ctrl) {
-		if (!deleteSel() && cursor > 0) deleteRange(wordBoundaryLeft(buf, cursor), cursor)
-		return true
-	}
-
 	// Left / Right
 	if (k.key === 'left') {
 		if (k.alt) { move(k.shift ? wordBoundaryLeft(buf, cursor) : wordBoundaryLeft(buf, cursor), k.shift); return true }
