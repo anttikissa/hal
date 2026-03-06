@@ -178,6 +178,7 @@ export interface PromptRender {
 	separator: string
 	lines: string[]
 	cursor: { rowOffset: number; col: number }
+	scrollInfo?: string
 }
 
 /** Build prompt lines. Returns separator, content lines, and cursor offset within them. */
@@ -196,17 +197,17 @@ export function buildPrompt(width: number, contentWidth: number): PromptRender {
 	const aboveCount = scrollTop
 	const belowCount = Math.max(0, layout.lines.length - scrollTop - promptLines)
 
-	// Separator with scroll indicators
-	let sep: string
+	// Scroll indicators (for caller to embed in separator)
+	let scrollInfo: string | undefined
 	if (aboveCount > 0 || belowCount > 0) {
 		const parts: string[] = []
 		if (aboveCount > 0) parts.push(`↑${aboveCount}`)
 		if (belowCount > 0) parts.push(`↓${belowCount}`)
-		const label = ` ${parts.join(' ')} `
-		sep = `${DIM}${'─'.repeat(Math.max(0, width - label.length))}${label}${RESET}`
-	} else {
-		sep = `${DIM}${'─'.repeat(width)}${RESET}`
+		scrollInfo = parts.join(' ')
 	}
+
+	// Plain separator (caller may override with status info)
+	const sep = `${DIM}${'─'.repeat(width)}${RESET}`
 
 	// Prompt lines with 1-char padding and selection highlight
 	const lines: string[] = []
@@ -224,6 +225,7 @@ export function buildPrompt(width: number, contentWidth: number): PromptRender {
 		separator: sep,
 		lines,
 		cursor: { rowOffset: curRow - scrollTop, col: curCol + 2 },
+		scrollInfo,
 	}
 }
 

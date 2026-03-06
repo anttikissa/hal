@@ -30,6 +30,12 @@ process.on('exit', () => {
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
 
+// ── Host info ──
+
+const halInfo = (globalThis as any).__hal as { isHost: boolean; hostPid: number | null } | undefined
+const isHost = halInfo?.isHost ?? false
+const hostPid = halInfo?.hostPid ?? null
+
 // ── Client ──
 
 const transport = new LocalTransport()
@@ -84,9 +90,15 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	})
 	lines.push(`tabs: ${parts.join('')}`)
 
-	// Prompt
+	// Prompt — separator with host/client role
 	const p = prompt.buildPrompt(w, cw)
-	lines.push(p.separator)
+	const role = isHost ? `host pid ${hostPid}` : `client → pid ${hostPid}`
+	const rightParts: string[] = []
+	if (p.scrollInfo) rightParts.push(p.scrollInfo)
+	const left = ` ${role} `
+	const right = rightParts.length > 0 ? ` ${rightParts.join(' ')} ` : ''
+	const fill = Math.max(0, w - left.length - right.length)
+	lines.push(`${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`)
 	lines.push(...p.lines)
 	const cursorPos: CursorPos = {
 		row: lines.length - pLines + p.cursor.rowOffset,

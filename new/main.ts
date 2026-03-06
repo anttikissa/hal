@@ -10,7 +10,10 @@ ensureStateDir()
 await ensureBus()
 
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
-const { host } = await claimHost(hostId)
+const { host, currentPid } = await claimHost(hostId)
+
+// Expose to cli.ts
+;(globalThis as any).__hal = { isHost: host, hostPid: currentPid }
 
 if (host) {
 	const runtime = await startRuntime()
