@@ -24,6 +24,8 @@ function oklch(L: number, C: number, H: number): [number, number, number] {
 function fg256([r, g, b]: [number, number, number]): string { return `\x1b[38;2;${r};${g};${b}m` }
 function bg256([r, g, b]: [number, number, number]): string { return `\x1b[48;2;${r};${g};${b}m` }
 
+const CURSOR_COLOR = fg256(oklch(0.75, 0.15, 70)) // orange
+
 // Tool colors: matched lightness in OKLCH
 // Foreground (bright text): L=0.75, C=0.15
 // Background (dark bg):     L=0.25, C=0.05
@@ -168,7 +170,7 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 	// Append blinking cursor to last streaming block
 	const lastBlock = blocks[blocks.length - 1]
 	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
-		result[result.length - 1] += cursorVisible ? '█' : ' '
+		result[result.length - 1] += cursorVisible ? `${CURSOR_COLOR}█${RESET}` : ' '
 	}
 	return result
 }
