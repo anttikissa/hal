@@ -16,6 +16,7 @@ let tabCounter = 1
 let inputBuf = ''
 let inputCursor = 0
 let inputGoalCol: number | null = null
+let halCursorVisible = true
 
 function active(): Tab { return tabs[activeIdx] }
 
@@ -79,7 +80,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const tab = active()
 	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
-	lines[lines.length - 1] += '█'
+	lines[lines.length - 1] += halCursorVisible ? '█' : ' '
 	// Pad to match tallest tab, capped at screen height minus chrome
 	const w = cols()
 	const cw = contentWidth()
@@ -258,4 +259,5 @@ stdout.on('resize', () => {
 	doRender()
 })
 
+setInterval(() => { halCursorVisible = !halCursorVisible; doRender() }, 530)
 doRender()
