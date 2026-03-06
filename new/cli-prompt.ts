@@ -207,6 +207,14 @@ export function handleKey(data: string, contentWidth: number): boolean {
 		return true
 	}
 
+	// Alt-Up / Alt-Down: jump to start / end
+	if (data === '\x1b[1;3A') { move(0, false); return true }
+	if (data === '\x1b[1;3B') { move(buf.length, false); return true }
+
+	// Shift+Alt-Up / Shift+Alt-Down: select to start / end
+	if (data === '\x1b[1;4A') { move(0, true); return true }
+	if (data === '\x1b[1;4B') { move(buf.length, true); return true }
+
 	// Printable characters: replace selection
 	if (data >= ' ' && !data.startsWith('\x1b')) { replaceSelection(data); return true }
 
