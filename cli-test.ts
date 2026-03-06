@@ -178,21 +178,10 @@ function handleMessage(tab: Tab, text: string): void {
 function switchToTab(idx: number): void {
 	if (idx === activeIdx) return
 	activeIdx = idx
-	// Clear and re-render (tab switch = full redraw)
+	// Clear screen and re-render from scratch
 	const newLines = buildLines()
 	let buf = '\x1b[?2026h'
-	// Move to top of our rendered area
-	if (hardwareCursorRow > 0) buf += `\x1b[${hardwareCursorRow}A`
-	buf += '\r'
-	// Clear all previously rendered lines
-	for (let i = 0; i < previousLines.length; i++) {
-		if (i > 0) buf += '\r\n'
-		buf += '\x1b[2K'
-	}
-	// Move back to top
-	if (previousLines.length > 1) buf += `\x1b[${previousLines.length - 1}A`
-	buf += '\r'
-	// Write new content (may need more lines — emit \r\n for growth)
+	buf += '\x1b[2J\x1b[H' // clear screen + home cursor
 	for (let i = 0; i < newLines.length; i++) {
 		if (i > 0) buf += '\r\n'
 		buf += newLines[i]
