@@ -88,7 +88,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	}
 
 	// Help bar
-	const help = ' ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-r restart │ ctrl-c quit '
+	const help = ' ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-z suspend │ ctrl-c quit '
 	const pad = w - help.length
 	const left = Math.max(0, Math.floor(pad / 2))
 	const right = Math.max(0, pad - left)
@@ -281,6 +281,27 @@ function closeTab(): void {
 	doRender()
 }
 
+let suspended = false
+
+function suspend(): void {
+	suspended = true
+	if (blinkTimer) clearTimeout(blinkTimer)
+	stdout.write('\x1b[?25h') // show real cursor
+	if (stdin.isTTY) stdin.setRawMode(false)
+	stdin.pause()
+	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
+}
+
+process.on('SIGCONT', () => {
+	if (!suspended) return
+	suspended = false
+	stdin.setRawMode(true)
+	stdin.resume()
+	renderState = emptyState
+	scheduleBlink()
+	doRender()
+})
+
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
@@ -304,6 +325,7 @@ stdin.on('data', (data: string) => {
 
 	if (k.key === 'n' && k.ctrl) { tabs.next(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { tabs.prev(); doRender(); return }
+	if (k.key === 'z' && k.ctrl) { suspend(); return }
 	if (k.key === 'r' && k.ctrl) {
 		eraseTui()
 		process.exit(100)
