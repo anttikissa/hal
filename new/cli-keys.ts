@@ -5,9 +5,9 @@ export interface KeyEvent {
 	key: string       // 'a', 'left', 'up', 'enter', 'backspace', 'tab', 'escape', etc.
 	char?: string     // printable character to insert (may be multi-byte from paste)
 	shift: boolean
-	alt: boolean
+	alt: boolean      // Option key on macOS
 	ctrl: boolean
-	cmd: boolean
+	cmd: boolean      // Super/Meta key; Command (⌘) on macOS
 }
 
 function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
