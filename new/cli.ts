@@ -39,8 +39,12 @@ stdin.resume()
 
 // Kitty keyboard protocol — enables Cmd+key detection
 const KITTY_KBD_ON = '\x1b[>27u', KITTY_KBD_OFF = '\x1b[<u'
+const TERM_RESET = `${KITTY_KBD_OFF}\x1b[?25h` // disable protocol + show cursor
 const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
 if (kittyTerms.test(process.env.TERM_PROGRAM ?? '')) stdout.write(KITTY_KBD_ON)
+
+// Always restore terminal on exit, even on crash
+process.on('exit', () => stdout.write(TERM_RESET))
 
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
@@ -112,7 +116,7 @@ function simulateResponse(tab: Tab, text: string): void {
 function quit(): void {
 	const delta = renderState.lines.length - 1 - renderState.cursorRow
 	if (delta > 0) stdout.write(`\x1b[${delta}B`)
-	stdout.write(`${KITTY_KBD_OFF}\r\n\x1b[?25h`)
+	stdout.write('\r\n')
 	process.exit(0)
 }
 
