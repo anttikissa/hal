@@ -294,8 +294,9 @@ function suspend(): void {
 process.on('SIGCONT', () => {
 	if (!suspended) return
 	suspended = false
-	stdin.setEncoding('utf8')
+	stdin.setRawMode(false) // force tcsetattr re-apply
 	stdin.setRawMode(true)
+	stdin.setEncoding('utf8')
 	stdin.resume()
 	if (useKitty) stdout.write(KITTY_KBD_ON)
 	renderState = emptyState
