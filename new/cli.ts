@@ -36,6 +36,11 @@ stdin.setRawMode(true)
 stdin.setEncoding('utf8')
 stdin.resume()
 
+// Kitty keyboard protocol — enables Cmd+key detection
+const KITTY_KBD_ON = '\x1b[>27u', KITTY_KBD_OFF = '\x1b[<u'
+const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
+if (kittyTerms.test(process.env.TERM_PROGRAM ?? '')) stdout.write(KITTY_KBD_ON)
+
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
 
@@ -110,7 +115,7 @@ stdin.on('data', (data: string) => {
 	if (data === '\x03') {
 		const delta = renderState.lines.length - 1 - renderState.cursorRow
 		if (delta > 0) stdout.write(`\x1b[${delta}B`)
-		stdout.write('\r\n\x1b[?25h')
+		stdout.write(`${KITTY_KBD_OFF}\r\n\x1b[?25h`)
 		process.exit(0)
 	}
 

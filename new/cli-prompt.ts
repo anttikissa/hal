@@ -75,10 +75,63 @@ function collapseSelectionOrMove(pos: number, edge: 'start' | 'end'): void {
 	}
 }
 
+// ── Cmd key (Kitty keyboard protocol) ──
+
+/** Parse CSI u key. Returns cmd char if super modifier held, null otherwise. */
+function parseCmdKey(data: string): string | null {
+	// CSI u format: \x1b[codepoint;modifier[;text]u
+	if (!data.startsWith('\x1b[') || !data.endsWith('u')) return null
+	const body = data.slice(2, -1)
+	const fields = body.split(';')
+	const codepoint = Number((fields[0] || '').split(':', 1)[0])
+	const modPart = fields[1] ?? ''
+	const [rawModStr, eventTypeStr] = modPart.split(':', 2)
+	const modifier = Number(rawModStr || '1')
+	const eventType = Number(eventTypeStr || '1')
+	if (!Number.isFinite(codepoint) || !Number.isFinite(modifier)) return null
+	if (eventType !== 1) return null // ignore key-up events
+	if (modifier < 9) return null // super (Cmd) = modifier bit 8 → raw ≥ 9
+	return String.fromCharCode(codepoint).toLowerCase()
+}
+
+function writeClipboard(text: string): void {
+	if (!text) return
+	try { const p = Bun.spawn(['pbcopy'], { stdin: 'pipe' }); p.stdin.write(text); p.stdin.end() } catch {}
+}
+
+function readClipboard(): string {
+	try { return Bun.spawnSync(['pbpaste']).stdout.toString() } catch { return '' }
+}
+
 // ── Key handling ──
 // Returns true if the key was handled.
 
 export function handleKey(data: string, contentWidth: number): boolean {
+	// Cmd+key (Kitty keyboard protocol)
+	const cmdKey = parseCmdKey(data)
+	if (cmdKey) {
+		if (cmdKey === 'c') {
+			const sel = selRange()
+			if (sel) writeClipboard(buf.slice(sel.start, sel.end))
+			return true
+		}
+		if (cmdKey === 'x') {
+			const sel = selRange()
+			if (sel) { writeClipboard(buf.slice(sel.start, sel.end)); deleteRange(sel.start, sel.end) }
+			return true
+		}
+		if (cmdKey === 'v') {
+			const text = readClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+			if (text) replaceSelection(text)
+			return true
+		}
+		if (cmdKey === 'a') {
+			selAnchor = 0; cursor = buf.length
+			return true
+		}
+		return false
+	}
+
 	// Alt-Enter: insert newline
 	if (data === '\x1b\r' || data === '\x1b\n') { replaceSelection('\n'); return true }
 
