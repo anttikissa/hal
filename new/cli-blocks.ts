@@ -189,17 +189,20 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 		if (result.length > 0) result.push('')
 		result.push(...lines)
 	}
-	// Append blinking cursor to last streaming block
+	// Append blinking cursor
 	const lastBlock = blocks[blocks.length - 1]
+	const c = cursorVisible ? `${CURSOR_COLOR}█${RESET}` : ' '
 	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
 		const last = result[result.length - 1]
-		const c = cursorVisible ? `${CURSOR_COLOR}█` : ' '
 		if (lastBlock.type === 'assistant') {
-			// Padded line: replace last space before RESET
 			result[result.length - 1] = last.slice(0, -(RESET.length + 1)) + c + RESET
 		} else {
-			result[result.length - 1] = last + c + RESET
+			result[result.length - 1] = last + c
 		}
+	} else if (result.length > 0) {
+		// Idle cursor on its own line after completed content
+		result.push('')
+		result.push(` ${c}`)
 	}
 	return result
 }

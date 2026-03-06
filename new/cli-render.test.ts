@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { render, emptyState, setPatchLines, type RenderState } from './cli-diff-engine.ts'
+import { render, emptyState, type RenderState } from './cli-diff-engine.ts'
 
 const cursor = { row: 0, col: 1 }
 const screen = 24
@@ -111,7 +111,6 @@ describe('patchLine', () => {
 	const long = (mid: string) => `this is a very long line that has very little changing (${mid}) and then there's a lot of text after this too`
 
 	test('same-length line patches only the changed bytes', () => {
-		setPatchLines(true)
 		const old = [long('1.0s')]
 		const nw = [long('1.1s')]
 		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
@@ -123,11 +122,9 @@ describe('patchLine', () => {
 		expect(s).toMatch(/\x1b\[\d+G/)
 		// Should be much shorter than a full rewrite
 		expect(buf.length).toBeLessThan(old[0].length)
-		setPatchLines(false)
 	})
 
 	test('patches with SGR replay when color is active at diff point', () => {
-		setPatchLines(true)
 		const old = ['\x1b[31m' + 'x'.repeat(30) + 'AAA' + 'y'.repeat(30) + '\x1b[0m']
 		const nw = ['\x1b[31m' + 'x'.repeat(30) + 'BBB' + 'y'.repeat(30) + '\x1b[0m']
 		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
@@ -138,11 +135,9 @@ describe('patchLine', () => {
 		// Should replay the SGR before the changed bytes
 		expect(buf).toContain('\x1b[31m')
 		expect(s).toContain('BBB')
-		setPatchLines(false)
 	})
 
 	test('patches when SGR was reset before diff point', () => {
-		setPatchLines(true)
 		const prefix = '\x1b[31mred\x1b[0m ' + 'x'.repeat(30)
 		const old = [prefix + 'AAA' + 'y'.repeat(30)]
 		const nw = [prefix + 'BBB' + 'y'.repeat(30)]
@@ -151,20 +146,16 @@ describe('patchLine', () => {
 		const s = strip(buf)
 		expect(s).not.toContain('\x1b[2K')
 		expect(s).toContain('BBB')
-		setPatchLines(false)
 	})
 
 	test('short lines patch when it saves bytes', () => {
-		setPatchLines(true)
 		const prev: RenderState = { lines: ['hello world'], cursorRow: 0, cursorCol: 1 }
 		const { buf } = render(['hello WORLD'], prev, cursor, screen)
 		// 'hello ' is common prefix (6 vis cols), patch is \x1b[7GWORLD (10b) vs full rewrite (15b)
 		expect(strip(buf)).not.toContain('\x1b[2K')
-		setPatchLines(false)
 	})
 
 	test('different-length lines rewrite from diff point', () => {
-		setPatchLines(true)
 		const old = ['prefix ' + 'a'.repeat(40) + ' short']
 		const nw = ['prefix ' + 'a'.repeat(40) + ' much longer suffix here']
 		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
@@ -172,6 +163,5 @@ describe('patchLine', () => {
 		const s = strip(buf)
 		expect(s).not.toContain('\x1b[2K')
 		expect(s).toContain('much longer')
-		setPatchLines(false)
 	})
 })

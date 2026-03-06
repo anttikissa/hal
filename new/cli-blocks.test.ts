@@ -12,7 +12,8 @@ describe('renderBlocks', () => {
 	test('single input block', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'hello' }]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.length).toBe(2)
+		// header + body + blank + idle cursor
+		expect(lines.length).toBe(4)
 		expect(strip(lines[0])).toMatch(/^── You ─+$/)
 		expect(lines[1]).toContain('hello')
 	})
@@ -26,7 +27,7 @@ describe('renderBlocks', () => {
 	test('queued input renders compact', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'fix bug', status: 'queued' }]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.length).toBe(1)
+		expect(lines.length).toBe(3) // compact + blank + idle cursor
 		expect(lines[0]).toContain('(queued)')
 		expect(lines[0]).toContain('fix bug')
 	})
@@ -37,8 +38,8 @@ describe('renderBlocks', () => {
 			{ type: 'assistant', text: 'hello', done: true },
 		]
 		const lines = renderBlocks(blocks, 80)
-		// input header, input body, blank, assistant header, assistant body
-		expect(lines.length).toBe(5)
+		// input header, input body, blank, assistant header, assistant body, blank, idle cursor
+		expect(lines.length).toBe(7)
 		expect(lines[2]).toBe('')
 	})
 
@@ -47,7 +48,7 @@ describe('renderBlocks', () => {
 			{ type: 'thinking', text: 'long thought\n\nmore thought', done: true },
 		]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.length).toBe(3)
+		expect(lines.length).toBe(5) // 3 content + blank + idle cursor
 		expect(lines.some(l => l.includes('long thought'))).toBe(true)
 		expect(lines.some(l => l.includes('more thought'))).toBe(true)
 	})
@@ -65,7 +66,7 @@ describe('renderBlocks', () => {
 			{ type: 'assistant', text: 'para1\n\n\n\npara2', done: true },
 		]
 		const lines = renderBlocks(blocks, 80)
-		const plain = lines.map(l => strip(l).trim())
+		const plain = lines.slice(0, -2).map(l => strip(l).trim())
 		// header, para1, blank, para2 (not para1, blank, blank, blank, para2)
 		expect(plain.length).toBe(4)
 		expect(plain[1]).toBe('para1')
@@ -89,8 +90,9 @@ describe('renderBlocks', () => {
 			{ type: 'tool', name: 'bash', status: 'running', args: longCmd, output: '', startTime: Date.now() },
 		]
 		const lines = renderBlocks(blocks, 40)
-		expect(lines.length).toBeGreaterThan(1)
-		const lastPlain = strip(lines[lines.length - 1])
+		expect(lines.length).toBeGreaterThan(3) // header lines + blank + idle cursor
+		const contentLines = lines.slice(0, -2)
+		const lastPlain = strip(contentLines[contentLines.length - 1])
 		expect(lastPlain).toMatch(/─+\s*$/)
 	})
 
@@ -130,7 +132,7 @@ describe('renderBlocks', () => {
 			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: 'hi', startTime: Date.now() },
 		]
 		const lines = renderBlocks(blocks, 40)
-		for (const line of lines) {
+		for (const line of lines.slice(0, -2)) {
 			expect(strip(line).length).toBe(40)
 		}
 	})

@@ -20,8 +20,6 @@ export const emptyState: RenderState = { lines: [], cursorRow: 0, cursorCol: 0 }
 const SYNC_START = '\x1b[?2026h'
 const SYNC_END = '\x1b[?2026l'
 
-let patchLines = false
-export function setPatchLines(on: boolean): void { patchLines = on }
 
 // ── Debug log ──
 
@@ -121,7 +119,7 @@ export function render(
 	const renderEnd = Math.min(lastChanged, newLines.length - 1)
 	for (let i = firstChanged; i <= renderEnd; i++) {
 		if (i > firstChanged) buf += '\r\n'
-		const patch = patchLines ? patchLine(prev.lines[i] ?? '', newLines[i]) : null
+		const patch = patchLine(prev.lines[i] ?? '', newLines[i])
 		const lineCmd = patch ?? `\x1b[2K${newLines[i]}`
 		log(`${patch ? 'patc' : 'full'}:${i} (${lineCmd.length}b)  ${lineCmd}`)
 		buf += lineCmd

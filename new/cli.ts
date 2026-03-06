@@ -1,6 +1,6 @@
 // Terminal client — reference implementation.
 
-import { render, emptyState, enableLog, setPatchLines, type RenderState, type CursorPos } from './cli-diff-engine.ts'
+import { render, emptyState, enableLog, type RenderState, type CursorPos } from './cli-diff-engine.ts'
 import { parseKey } from './cli-keys.ts'
 import * as tabs from './cli-tabs.ts'
 import * as prompt from './cli-prompt.ts'
@@ -382,7 +382,6 @@ stdout.on('resize', () => {
 })
 
 enableLog()
-if (process.env.PATCH || 1) setPatchLines(true)
 
 tabs.active().blocks.push({ type: 'assistant', done: true, model: 'codex-5.3', text: `Say 'help' to see what I can do.` })
 scheduleBlink()
