@@ -145,6 +145,7 @@ function simulateResponse(tab: Tab, text: string): void {
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
+	cursor.bump()
 	// Ctrl-C: quit
 	if (data === '\x03') {
 		cursor.stop()
