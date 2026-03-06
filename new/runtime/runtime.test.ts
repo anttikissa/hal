@@ -130,3 +130,22 @@ test('multiple prompts build conversation history', async () => {
 	expect(users[0].content).toBe('First message')
 	expect(users[1].content).toBe('Second message')
 })
+
+test('sessions survive restart', async () => {
+	// Send a prompt so the session has content
+	await sendAndWait('Remember me')
+	const sid = runtime.activeSessionId!
+
+	// Stop runtime (simulates quit)
+	runtime.stop()
+	await releaseHost(hostId)
+
+	// Re-claim and start fresh runtime (simulates relaunch)
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	// Same session should be restored
+	expect(runtime.activeSessionId).toBe(sid)
+	expect(runtime.sessions.has(sid)).toBe(true)
+})

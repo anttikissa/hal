@@ -1,7 +1,7 @@
 // Host runtime — tails commands, dispatches, manages sessions.
 
-import { ensureBus, tailCommandsFrom, appendEvent, updateState, writeState, trimEvents } from '../ipc.ts'
-import { createSession, loadMeta, saveMeta } from '../session/session.ts'
+import { ensureBus, tailCommandsFrom, appendEvent, updateState, readState, trimEvents } from '../ipc.ts'
+import { createSession, loadMeta, saveMeta, listSessionIds } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { eventId, defaultState, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
@@ -23,16 +23,21 @@ export async function startRuntime(): Promise<Runtime> {
 	let activeSessionId: string | null = null
 	let stopped = false
 
-	// Load or create initial session
-	const config = getConfig()
-	if (config.activeSessionId) {
-		const meta = await loadMeta(config.activeSessionId)
+	// Restore sessions from state.ason (preserves tab order across restarts)
+	const prevState = await readState()
+	for (const id of prevState.sessions) {
+		const meta = await loadMeta(id)
 		if (meta) {
 			sessions.set(meta.id, meta)
-			activeSessionId = meta.id
+			if (!activeSessionId) activeSessionId = meta.id
 		}
 	}
-	if (!activeSessionId) {
+	// Prefer the previously active session
+	if (prevState.activeSessionId && sessions.has(prevState.activeSessionId)) {
+		activeSessionId = prevState.activeSessionId
+	}
+	// If nothing restored, create a fresh session
+	if (sessions.size === 0) {
 		const info = await createSession()
 		sessions.set(info.id, info)
 		activeSessionId = info.id
