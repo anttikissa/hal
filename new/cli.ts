@@ -1,6 +1,6 @@
 // Terminal client — reference implementation.
 
-import { render, emptyState, enableLog, setPatchLines, type RenderState, type CursorPos } from './cli-diff.ts'
+import { render, emptyState, enableLog, setPatchLines, type RenderState, type CursorPos } from './cli-diff-engine.ts'
 import { parseKey } from './cli-keys.ts'
 import * as tabs from './cli-tabs.ts'
 import * as prompt from './cli-prompt.ts'

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { render, emptyState, setPatchLines, type RenderState } from './cli-diff.ts'
+import { render, emptyState, setPatchLines, type RenderState } from './cli-diff-engine.ts'
 
 const cursor = { row: 0, col: 1 }
 const screen = 24
