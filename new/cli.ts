@@ -10,12 +10,23 @@ interface Tab {
 	lines: string[]
 }
 
-let tabs: Tab[] = [{ id: 1, lines: [] }]
+let tabs: Tab[] = [{ id: 1, lines: [''] }]
 let activeIdx = 0
 let tabCounter = 1
 let inputBuf = ''
 
 function active(): Tab { return tabs[activeIdx] }
+
+/** Append text to a tab's content, like a terminal receiving characters. */
+function appendText(tab: Tab, text: string): void {
+	for (const ch of text) {
+		if (ch === '\n') {
+			tab.lines.push('')
+		} else {
+			tab.lines[tab.lines.length - 1] += ch
+		}
+	}
+}
 
 // ── Terminal setup ──
 
@@ -38,8 +49,7 @@ function buildLines(): string[] {
 	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
 
-	// Blinking cursor at end of last content line
-	if (lines.length === 0) lines.push('')
+	// Cursor at end of content — like a text editor caret
 	lines[lines.length - 1] += cursor.char()
 
 	while (lines.length < maxContentLines) lines.push('')
@@ -74,6 +84,18 @@ function doRender(): void {
 	if (buf) stdout.write(buf)
 }
 
+// ── Streaming simulator ──
+
+function simulateResponse(tab: Tab, text: string): void {
+	let i = 0
+	const tick = setInterval(() => {
+		if (i >= text.length) { clearInterval(tick); return }
+		appendText(tab, text[i])
+		i++
+		doRender()
+	}, 30)
+}
+
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
@@ -87,7 +109,7 @@ stdin.on('data', (data: string) => {
 
 	if (data === '\x14') {
 		tabCounter++
-		tabs.push({ id: tabCounter, lines: [] })
+		tabs.push({ id: tabCounter, lines: [''] })
 		activeIdx = tabs.length - 1
 		inputBuf = ''
 		doRender()
@@ -106,9 +128,12 @@ stdin.on('data', (data: string) => {
 			if (spamMatch) {
 				const count = spamMatch[1].length * 30
 				for (let i = 0; i < count; i++)
-					tab.lines.push(`[tab ${tab.id}] line ${tab.lines.length}: THIS IS TAB NUMBER ${tab.id} - LOTS AND LOTS OF TEXT BLAH BLAH BLAH`)
+					tab.lines.push(`[tab ${tab.id}] line ${tab.lines.length}: LOTS OF TEXT BLAH BLAH`)
 			} else {
-				tab.lines.push(`You said: ${text}`)
+				appendText(tab, `> ${text}\n`)
+				const words = text.split(' ').length
+				const response = `Message: "${text}"\n${text.length} chars, ${words} word${words === 1 ? '' : 's'}\n`
+				simulateResponse(tab, response)
 			}
 		}
 		doRender()
