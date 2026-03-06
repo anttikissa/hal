@@ -13,6 +13,7 @@ if (!stdin.isTTY) { console.error('Need a TTY'); process.exit(1) }
 stdin.setRawMode(true)
 stdin.setEncoding('utf8')
 stdin.resume()
+stdin.on('end', () => { if (!suspended) process.exit(0) })
 
 // Kitty keyboard protocol — enables Cmd+key detection
 const KITTY_KBD_ON = '\x1b[>27u', KITTY_KBD_OFF = '\x1b[<u'
@@ -296,6 +297,7 @@ function suspend(): void {
 process.on('SIGCONT', () => {
 	if (!suspended) return
 	suspended = false
+	stdin.setEncoding('utf8')
 	stdin.setRawMode(true)
 	stdin.resume()
 	if (useKitty) stdout.write(KITTY_KBD_ON)
