@@ -46,13 +46,10 @@ let renderState: RenderState = emptyState
 
 function buildLines(): string[] {
 	const tab = active()
-	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
 
 	// Cursor at end of content — like a text editor caret
 	lines[lines.length - 1] += cursor.char()
-
-	while (lines.length < maxContentLines) lines.push('')
 
 	const parts = tabs.map((t, i) => {
 		const label = ` ${t.id} `
