@@ -1,7 +1,6 @@
 // Terminal client — reference implementation.
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli-render.ts'
-import * as cursor from './cli-cursor.ts'
 import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './cli-input.ts'
 
 // ── State ──
@@ -81,8 +80,6 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
 
-	// Cursor at end of content
-	lines[lines.length - 1] += cursor.char()
 
 	// Pad to match tallest tab, capped at screen height minus chrome
 	const w = cols()
@@ -145,10 +142,8 @@ function simulateResponse(tab: Tab, text: string): void {
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
-	cursor.bump()
 	// Ctrl-C: quit
 	if (data === '\x03') {
-		cursor.stop()
 		const delta = renderState.lines.length - 1 - renderState.cursorRow
 		if (delta > 0) stdout.write(`\x1b[${delta}B`)
 		stdout.write('\r\n\x1b[?25h')
@@ -264,5 +259,4 @@ stdout.on('resize', () => {
 	doRender()
 })
 
-cursor.start(doRender)
 doRender()
