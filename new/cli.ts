@@ -53,8 +53,8 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const w = cols()
 	const cw = contentWidth()
 
-	// Content from blocks
-	const contentLines = renderBlocks(tab.blocks, cw, halCursorVisible)
+	// Content from blocks (full width; prompt uses cw for its own padding)
+	const contentLines = renderBlocks(tab.blocks, w, halCursorVisible)
 
 	// Pad to fill screen (stable layout)
 	const pLines = prompt.lineCount(cw)
