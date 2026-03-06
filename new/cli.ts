@@ -21,15 +21,7 @@ const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
 if (kittyTerms.test(process.env.TERM_PROGRAM ?? '')) stdout.write(KITTY_KBD_ON)
 
 // Always restore terminal on exit, even on crash
-process.on('exit', () => {
-	// Move below TUI area so stacktraces/shell prompt don't overwrite content
-	if (renderState.lines.length > 0) {
-		const down = renderState.lines.length - 1 - renderState.cursorRow
-		if (down > 0) stdout.write(`\x1b[${down}B`)
-		stdout.write('\r\n')
-	}
-	stdout.write(TERM_RESET)
-})
+process.on('exit', () => stdout.write(`\x1b[${stdout.rows || 24}B\r\n${TERM_RESET}`))
 
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
@@ -261,7 +253,6 @@ function eraseTui(): void {
 	const up = renderState.cursorRow
 	if (up > 0) stdout.write(`\x1b[${up}A`)
 	stdout.write('\r\x1b[J')
-	renderState = emptyState
 }
 
 function quit(): void {
@@ -276,7 +267,6 @@ function quit(): void {
 	if (!prompt.text()) {
 		stdout.write(`\x1b[2A\r\x1b[J`)
 	}
-	renderState = emptyState
 	process.exit(0)
 }
 
