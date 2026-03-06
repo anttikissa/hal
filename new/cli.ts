@@ -150,6 +150,58 @@ function simulateToolCall(tab: ReturnType<typeof tabs.active>, name: string, cmd
 	}, 300)
 }
 
+const SPAM_TEXT = `The configuration system uses a layered approach where project-level settings override global defaults, and environment variables take highest priority over everything else in the chain.
+
+Here's what we need to handle:
+
+- **Token limits** need careful tracking across \`streaming\` and \`batch\` modes
+- The \`**retry logic**\` should respect both rate limits and \`backoff\` timers
+- Lists with **bold items** and \`code spans\` mixed together freely
+
+
+When the context window fills up, compaction kicks in automatically. It summarizes older messages while preserving the most recent exchanges, tool results, and any pinned context the user marked as important.
+
+## Implementation notes
+
+1. **First pass**: scan all blocks for token counts using \`tiktoken\` estimation
+2. **Second pass**: merge adjacent assistant blocks that share the same \`role\`
+3. Run the \`**compaction prompt**\` against the oldest N messages
+4. Replace originals with the summary, preserving \`tool_call\` and \`tool_result\` pairs
+
+The streaming renderer operates on a simple principle — each block knows how to render itself into terminal lines, and the container joins them with consistent spacing. This avoids the classic problem where different parts of the UI fight over whitespace.
+
+
+Error handling follows a similar pattern. Rather than wrapping everything in try-catch blocks scattered throughout the codebase, we use a central error boundary that catches unhandled rejections and formats them into error blocks visible in the conversation stream.`
+
+function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): void {
+	const block: Block = { type: 'assistant', text: '', done: false }
+	tab.blocks.push(block)
+
+	// Build text by repeating/slicing the corpus to roughly hit the line target
+	// ~80 chars per line, so target chars ≈ lineTarget * 80
+	const targetChars = lineTarget * 80
+	let corpus = ''
+	while (corpus.length < targetChars) corpus += SPAM_TEXT + '\n\n'
+	corpus = corpus.slice(0, targetChars)
+
+	// Stream one line (~80 chars) every 100ms, cutting at random word/sentence/paragraph boundaries
+	let pos = 0
+	const tick = setInterval(() => {
+		if (pos >= corpus.length) {
+			block.done = true
+			clearInterval(tick)
+			doRender()
+			return
+		}
+		// Chunk size: ~60-100 chars, vary it
+		const chunkSize = 60 + Math.floor(Math.random() * 40)
+		const end = Math.min(pos + chunkSize, corpus.length)
+		block.text += corpus.slice(pos, end)
+		pos = end
+		doRender()
+	}, 100)
+}
+
 // ── Quit / Close ──
 
 function quit(): void {
@@ -201,9 +253,15 @@ stdin.on('data', (data: string) => {
 				const cmd = text.slice(5) || 'ls -la'
 				simulateToolCall(tab, 'bash', cmd)
 			} else {
-				const words = text.split(' ').length
-				const response = `Message: "${text}"\n${text.length} chars, ${words} word${words === 1 ? '' : 's'}\n`
-				simulateResponse(tab, response)
+				const spamMatch = text.match(/^spa(m+)$/)
+				const count = spamMatch ? spamMatch[1].length * 10 : 0
+				if (count > 0) {
+					simulateSpam(tab, count)
+				} else {
+					const words = text.split(' ').length
+					const response = `Message: "${text}"\n${text.length} chars, ${words} word${words === 1 ? '' : 's'}\n`
+					simulateResponse(tab, response)
+				}
 			}
 		}
 		doRender()
