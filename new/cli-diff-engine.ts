@@ -41,7 +41,7 @@ function log(msg: string): void {
 // ── Intra-line patching ──
 
 function patchLine(old: string, nw: string): string | null {
-	let i = 0, vis = 0, sgr = false, esc = 0, escStart = 0
+	let i = 0, vis = 0, sgrState = '', esc = 0, escStart = 0
 	while (i < old.length && i < nw.length && old[i] === nw[i]) {
 		if (esc === 0) {
 			if (old[i] === '\x1b') { esc = 1; escStart = i } else vis++
@@ -50,15 +50,16 @@ function patchLine(old: string, nw: string): string | null {
 		} else if (old.charCodeAt(i) >= 0x40 && old.charCodeAt(i) <= 0x7e) {
 			if (old[i] === 'm') {
 				const seq = old.slice(escStart, i + 1)
-				sgr = seq !== '\x1b[0m' && seq !== '\x1b[m'
+				if (seq === '\x1b[0m' || seq === '\x1b[m') sgrState = ''
+				else sgrState += seq
 			}
 			esc = 0
 		}
 		i++
 	}
 	if (i >= old.length && i >= nw.length) return null
-	if (sgr || esc !== 0 || vis < 4) return null
-	const col = `\x1b[${vis + 1}G`
+	if (esc !== 0 || vis < 4) return null
+	const col = `\x1b[${vis + 1}G${sgrState}`
 	if (old.length === nw.length) {
 		let j = old.length - 1
 		while (j > i && old[j] === nw[j]) j--

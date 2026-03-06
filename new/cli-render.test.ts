@@ -126,15 +126,18 @@ describe('patchLine', () => {
 		setPatchLines(false)
 	})
 
-	test('falls back to full rewrite when SGR is active at diff point', () => {
+	test('patches with SGR replay when color is active at diff point', () => {
 		setPatchLines(true)
 		const old = ['\x1b[31m' + 'x'.repeat(30) + 'AAA' + 'y'.repeat(30) + '\x1b[0m']
 		const nw = ['\x1b[31m' + 'x'.repeat(30) + 'BBB' + 'y'.repeat(30) + '\x1b[0m']
 		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
 		const { buf } = render(nw, prev, cursor, screen)
 		const s = strip(buf)
-		// Should do full rewrite because SGR is active
-		expect(s).toContain('\x1b[2K')
+		// Should patch, not full rewrite
+		expect(s).not.toContain('\x1b[2K')
+		// Should replay the SGR before the changed bytes
+		expect(buf).toContain('\x1b[31m')
+		expect(s).toContain('BBB')
 		setPatchLines(false)
 	})
 
