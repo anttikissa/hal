@@ -6,7 +6,6 @@ import { ensureStateDir } from './state.ts'
 import { ensureBus, claimHost, releaseHost, appendEvent } from './ipc.ts'
 import { startRuntime, type Runtime } from './runtime/runtime.ts'
 import { eventId } from './protocol.ts'
-import { isPidAlive } from './utils/is-pid-alive.ts'
 
 ensureStateDir()
 await ensureBus()
@@ -32,21 +31,19 @@ async function becomeHost(): Promise<void> {
 	await emitLine(`[host] pid ${process.pid}`)
 }
 
-async function shutdown(): Promise<void> {
+export async function shutdown(): Promise<void> {
 	if (runtime) runtime.stop()
 	if (halStatus.isHost) await releaseHost(hostId)
+	process.exit(0)
 }
+
+process.on('SIGTERM', () => void shutdown())
 
 if (host) {
 	await becomeHost()
 }
 
-// Synchronous fallback — exit handler can't await but at least tries
-process.on('exit', () => { try { releaseHost(hostId) } catch {} })
-process.on('SIGINT', () => { shutdown().then(() => process.exit(0)) })
-process.on('SIGTERM', () => { shutdown().then(() => process.exit(0)) })
-
-// If client, poll for dead host and try to promote
+// If client, fast-poll host PID then promote when dead
 if (!host) {
 	let promoting = false
 	const tryPromote = async () => {
@@ -58,12 +55,20 @@ if (!host) {
 			halStatus.isHost = true
 			halStatus.hostPid = process.pid
 			await becomeHost()
-			if (promotionTimer) { clearInterval(promotionTimer); promotionTimer = null }
+			if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 		} finally {
 			promoting = false
 		}
 	}
-	let promotionTimer: ReturnType<typeof setInterval> | null = setInterval(tryPromote, 3000)
+	// kill(pid,0) is a single syscall — essentially free at 100ms
+	let watchPid = currentPid
+	let pollTimer: ReturnType<typeof setInterval> | null = setInterval(() => {
+		if (halStatus.isHost || promoting) return
+		if (watchPid !== null) {
+			try { process.kill(watchPid, 0) } catch { watchPid = null }
+		}
+		if (watchPid === null) tryPromote()
+	}, 100)
 
 	// Also expose for event-driven promotion (client calls this on [owner-released])
 	;(globalThis as any).__halTryPromote = tryPromote
