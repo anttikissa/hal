@@ -248,10 +248,16 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 
 // ── Quit / Close ──
 
+function eraseTui(): void {
+	if (renderState.lines.length === 0) return
+	// Move cursor to top of TUI area, clear from there to end of screen
+	const up = renderState.cursorRow
+	if (up > 0) stdout.write(`\x1b[${up}A`)
+	stdout.write('\r\x1b[J')
+}
+
 function quit(): void {
-	const delta = renderState.lines.length - 1 - renderState.cursorRow
-	if (delta > 0) stdout.write(`\x1b[${delta}B`)
-	stdout.write('\r\n')
+	eraseTui()
 	process.exit(0)
 }
 
@@ -284,9 +290,7 @@ stdin.on('data', (data: string) => {
 	if (k.key === 'n' && k.ctrl) { tabs.next(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { tabs.prev(); doRender(); return }
 	if (k.key === 'r' && k.ctrl) {
-		const delta = renderState.lines.length - 1 - renderState.cursorRow
-		if (delta > 0) stdout.write(`\x1b[${delta}B`)
-		stdout.write('\r\n')
+		eraseTui()
 		process.exit(100)
 	}
 
