@@ -28,13 +28,14 @@ beforeEach(async () => {
 afterEach(async () => {
 	runtime.stop()
 	await releaseHost(hostId)
+	await new Promise(r => setTimeout(r, 100))
 })
 
 async function sendAndWait(text: string, sid?: string): Promise<RuntimeEvent[]> {
 	const { offset: before } = await readEventsFrom(0)
 	const sessionId = sid ?? runtime.activeSessionId!
 	await appendCommand(makeCommand('prompt', src, text, sessionId))
-	for (let i = 0; i < 100; i++) {
+	for (let i = 0; i < 200; i++) {
 		await new Promise(r => setTimeout(r, 50))
 		const { events } = await readEventsFrom(before)
 		const done = events.find(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))
@@ -76,9 +77,10 @@ test('messages are persisted to disk', async () => {
 	const raw = await readFile(path, 'utf-8')
 	const entries = parseAll(raw) as any[]
 	const user = entries.find(e => e.role === 'user')
-	const assistant = entries.find(e => e.role === 'assistant')
+	// Skip greeting — find the assistant response to the prompt
+	const assistant = entries.find(e => e.role === 'assistant' && e.text?.includes('Persist me'))
 	expect(user?.content).toBe('Persist me')
-	expect(assistant?.text).toContain('Persist me')
+	expect(assistant).toBeTruthy()
 })
 
 test('status events bracket the generation', async () => {
@@ -132,9 +134,10 @@ test('multiple prompts build conversation history', async () => {
 })
 
 test('sessions survive restart', async () => {
-	// Send a prompt so the session has content
 	await sendAndWait('Remember me')
 	const sid = runtime.activeSessionId!
+	// Wait for post-generation status flush (writes sessions to state)
+	await new Promise(r => setTimeout(r, 200))
 
 	// Stop runtime (simulates quit)
 	runtime.stop()

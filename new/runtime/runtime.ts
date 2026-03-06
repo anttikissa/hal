@@ -7,6 +7,17 @@ import { runAgentLoop } from './agent-loop.ts'
 import { eventId, defaultState, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
 
+const GREETINGS = [
+	'Hello! What shall we build today?',
+	'Hey there! What are we working on?',
+	'Hi! Ready when you are.',
+	'Good to see you. What\'s the plan?',
+]
+
+function pick<T>(arr: T[]): T {
+	return arr[Math.floor(Math.random() * arr.length)]
+}
+
 export interface Runtime {
 	sessions: Map<string, SessionInfo>
 	activeSessionId: string | null
@@ -36,11 +47,12 @@ export async function startRuntime(): Promise<Runtime> {
 	if (prevState.activeSessionId && sessions.has(prevState.activeSessionId)) {
 		activeSessionId = prevState.activeSessionId
 	}
-	// If nothing restored, create a fresh session
+	// If nothing restored, create a fresh session with greeting
 	if (sessions.size === 0) {
 		const info = await createSession()
 		sessions.set(info.id, info)
 		activeSessionId = info.id
+		await greetSession(info.id)
 	}
 
 	// Publish initial state
@@ -48,7 +60,7 @@ export async function startRuntime(): Promise<Runtime> {
 	await publishSessions()
 
 	// Tail commands
-	const { commands } = await tailCommandsFrom()
+	const { commands, cancel: cancelTail } = await tailCommandsFrom()
 	;(async () => {
 		for await (const cmd of commands) {
 			if (stopped) break
@@ -56,6 +68,18 @@ export async function startRuntime(): Promise<Runtime> {
 		}
 	})()
 
+	async function greetSession(sessionId: string): Promise<void> {
+		const text = pick(GREETINGS)
+		await appendMessages(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
+		await appendEvent({
+			id: eventId(), type: 'chunk', sessionId,
+			text, channel: 'assistant', createdAt: new Date().toISOString(),
+		} as RuntimeEvent)
+		await appendEvent({
+			id: eventId(), type: 'command', sessionId,
+			commandId: '', phase: 'done', createdAt: new Date().toISOString(),
+		} as RuntimeEvent)
+	}
 	async function publishStatus(activity?: string): Promise<void> {
 		await appendEvent({
 			id: eventId(),
@@ -134,6 +158,7 @@ export async function startRuntime(): Promise<Runtime> {
 				const info = await createSession()
 				sessions.set(info.id, info)
 				activeSessionId = info.id
+				await greetSession(info.id)
 				await publishSessions()
 				await publishStatus()
 				break
@@ -190,6 +215,6 @@ export async function startRuntime(): Promise<Runtime> {
 		sessions,
 		activeSessionId,
 		busySessionIds,
-		stop() { stopped = true },
+		stop() { stopped = true; cancelTail() },
 	}
 }

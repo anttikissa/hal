@@ -140,15 +140,28 @@ export async function appendCommand(cmd: RuntimeCommand): Promise<void> {
 	await appendFile(COMMANDS_FILE, stringify(cmd, 'short') + '\n')
 }
 
-/** Tail commands from a byte offset. Returns current offset + async generator. */
+/** Tail commands from a byte offset. Returns current offset, generator, and cancel function. */
 export async function tailCommandsFrom(fromOffset?: number): Promise<{
 	offset: number
 	commands: AsyncGenerator<RuntimeCommand>
+	cancel(): void
 }> {
 	const offset = fromOffset ?? await fileSize(COMMANDS_FILE)
+	const stream = tailFile(COMMANDS_FILE, offset)
+	const reader = stream.getReader()
+	let cancelled = false
+	const cancel = () => { cancelled = true; reader.cancel() }
+	const wrapped = new ReadableStream<Uint8Array>({
+		async pull(controller) {
+			if (cancelled) { controller.close(); return }
+			const { done, value } = await reader.read().catch(() => ({ done: true as const, value: undefined }))
+			done ? controller.close() : controller.enqueue(value)
+		},
+	})
 	return {
 		offset,
-		commands: parseStream(tailFile(COMMANDS_FILE, offset)) as AsyncGenerator<RuntimeCommand>,
+		commands: parseStream(wrapped) as AsyncGenerator<RuntimeCommand>,
+		cancel,
 	}
 }
 
@@ -166,8 +179,18 @@ export async function readEventsFrom(fromOffset: number): Promise<{
 	const buf = await readFile(EVENTS_FILE)
 	if (fromOffset >= buf.length) return { events: [], offset: buf.length }
 	const slice = buf.subarray(fromOffset).toString('utf-8')
-	const events = parseAll(slice) as RuntimeEvent[]
-	return { events, offset: buf.length }
+	// Only parse complete lines — skip partial trailing data
+	const lastNewline = slice.lastIndexOf('\n')
+	if (lastNewline < 0) return { events: [], offset: fromOffset }
+	const complete = slice.slice(0, lastNewline + 1)
+	const events: RuntimeEvent[] = []
+	for (const line of complete.split('\n')) {
+		if (!line.trim()) continue
+		try { events.push(parse(line) as RuntimeEvent) }
+		catch { /* skip corrupt/partial lines */ }
+	}
+	const bytesConsumed = Buffer.byteLength(complete, 'utf-8')
+	return { events, offset: fromOffset + bytesConsumed }
 }
 
 /** Tail events from a byte offset. Gap-free: pass the offset from readEventsFrom or bootstrap. */
