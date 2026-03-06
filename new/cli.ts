@@ -189,30 +189,53 @@ The streaming renderer operates on a simple principle — each block knows how t
 Error handling follows a similar pattern. Rather than wrapping everything in try-catch blocks scattered throughout the codebase, we use a central error boundary that catches unhandled rejections and formats them into error blocks visible in the conversation stream.`
 
 function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): void {
-	const block: Block = { type: 'assistant', text: '', done: false }
-	tab.blocks.push(block)
-
-	// Build text by repeating/slicing the corpus to roughly hit the line target
-	// ~80 chars per line, so target chars ≈ lineTarget * 80
+	// Build corpus
 	const targetChars = lineTarget * 80
 	let corpus = ''
 	while (corpus.length < targetChars) corpus += SPAM_TEXT + '\n\n'
 	corpus = corpus.slice(0, targetChars)
 
-	// Stream one line (~80 chars) every 100ms, cutting at random word/sentence/paragraph boundaries
-	let pos = 0
-	const tick = setInterval(() => {
-		if (pos >= corpus.length) {
-			block.done = true
-			clearInterval(tick)
-			doRender()
-			return
+	// Split into segments: thinking → assistant, maybe repeat
+	type Segment = { type: 'thinking' | 'assistant'; text: string }
+	const segments: Segment[] = []
+	let remaining = corpus
+	while (remaining.length > 0) {
+		// ~30% chance of a thinking block before assistant text
+		if (segments.length === 0 || Math.random() < 0.3) {
+			const tLen = 80 + Math.floor(Math.random() * 200)
+			segments.push({ type: 'thinking', text: remaining.slice(0, tLen) })
+			remaining = remaining.slice(tLen)
+			if (remaining.length <= 0) break
 		}
-		// Chunk size: ~60-100 chars, vary it
+		const aLen = 200 + Math.floor(Math.random() * 400)
+		segments.push({ type: 'assistant', text: remaining.slice(0, aLen) })
+		remaining = remaining.slice(aLen)
+	}
+
+	// Stream segments sequentially
+	let segIdx = 0
+	let pos = 0
+	let block: Block = { type: segments[0].type, text: '', done: false }
+	tab.blocks.push(block)
+
+	const tick = setInterval(() => {
+		const seg = segments[segIdx]
+		if (!seg) { clearInterval(tick); return }
+
 		const chunkSize = 60 + Math.floor(Math.random() * 40)
-		const end = Math.min(pos + chunkSize, corpus.length)
-		block.text += corpus.slice(pos, end)
+		const end = Math.min(pos + chunkSize, seg.text.length)
+		block.text += seg.text.slice(pos, end)
 		pos = end
+
+		if (pos >= seg.text.length) {
+			block.done = true
+			segIdx++
+			pos = 0
+			if (segIdx < segments.length) {
+				block = { type: segments[segIdx].type, text: '', done: false }
+				tab.blocks.push(block)
+			}
+		}
 		bumpCursor(); doRender()
 	}, 100)
 }
