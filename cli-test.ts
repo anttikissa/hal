@@ -3,6 +3,11 @@
 // No alternate screen, no scroll regions, no absolute positioning.
 // Everything is one flat array of lines, diff-rendered with relative cursor moves.
 
+import { appendFileSync } from 'fs'
+const LOG = '/tmp/cli-test.log'
+function log(...args: any[]): void {
+	appendFileSync(LOG, args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ') + '\n')
+}
 // ── State ──
 
 interface Tab {
@@ -37,7 +42,10 @@ let hardwareCursorRow = 0
 // Build the full screen as a flat array: content lines + bar + prompt
 function buildLines(): string[] {
 	const tab = active()
+	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
+	// Pad to tallest tab so prompt stays in place when switching
+	while (lines.length < maxContentLines) lines.push('')
 
 	// Tab bar
 	const parts = tabs.map((t, i) => {
@@ -46,22 +54,32 @@ function buildLines(): string[] {
 	})
 	lines.push(`tabs: ${parts.join('')}`)
 
-	// Border + prompt + border
+	// Border + prompt + border with help text
 	const hline = `${DIM}${'─'.repeat(width())}${RESET}`
 	lines.push(hline)
 	lines.push(`> ${inputBuf}`)
-	lines.push(hline)
+	const help = ' ctrl-t new tab │ ctrl-n/ctrl-p switch │ ctrl-c quit '
+	const w = width()
+	const lineChars = w - help.length
+	const left = Math.max(0, Math.floor(lineChars / 2))
+	const right = Math.max(0, lineChars - left)
+	lines.push(`${DIM}${'─'.repeat(left)}${help}${'─'.repeat(right)}${RESET}`)
 
 	return lines
 }
 
 function doRender(): void {
 	const newLines = buildLines()
-	const w = width()
+	const h = stdout.rows || 24
 
-	// First render — just write everything
-	if (previousLines.length === 0) {
+	log(`\n--- doRender ---`)
+	log(`previousLines.length=${previousLines.length} newLines.length=${newLines.length} hardwareCursorRow=${hardwareCursorRow} screenHeight=${h}`)
+
+	// Full render: clear screen, write all lines from scratch
+	const fullRender = (clear: boolean): void => {
+		log(`fullRender clear=${clear} lines=${newLines.length}`)
 		let buf = '\x1b[?2026h'
+		if (clear) buf += '\x1b[3J\x1b[2J\x1b[H' // clear scrollback + screen + home
 		for (let i = 0; i < newLines.length; i++) {
 			if (i > 0) buf += '\r\n'
 			buf += newLines[i]
@@ -71,6 +89,11 @@ function doRender(): void {
 		hardwareCursorRow = newLines.length - 1
 		previousLines = newLines
 		positionCursor(newLines)
+	}
+
+	// First render — just write everything without clearing
+	if (previousLines.length === 0) {
+		fullRender(false)
 		return
 	}
 
@@ -87,12 +110,22 @@ function doRender(): void {
 		}
 	}
 
+	log(`firstChanged=${firstChanged} lastChanged=${lastChanged}`)
+
 	// No changes
 	if (firstChanged === -1) {
 		positionCursor(newLines)
 		return
 	}
 
+	// If first change is above the visible viewport, relative moves can't reach it.
+	// Fall back to full clear + render (like Pi does).
+	const viewportTop = Math.max(0, previousLines.length - h)
+	if (firstChanged < viewportTop) {
+		log(`firstChanged ${firstChanged} < viewportTop ${viewportTop} — full render`)
+		fullRender(true)
+		return
+	}
 	let buf = '\x1b[?2026h'
 
 	// If new lines were appended and first change is at the append boundary,
@@ -105,6 +138,8 @@ function doRender(): void {
 
 	// Move cursor from hardwareCursorRow to moveTarget using relative moves
 	const delta = moveTarget - hardwareCursorRow
+	log(`moveTarget=${moveTarget} delta=${delta} appendStart=${appendStart}`)
+
 	if (delta > 0) buf += `\x1b[${delta}B`
 	else if (delta < 0) buf += `\x1b[${-delta}A`
 
@@ -112,6 +147,7 @@ function doRender(): void {
 
 	// Render changed lines
 	const renderEnd = Math.min(lastChanged, newLines.length - 1)
+	log(`rendering lines ${firstChanged}..${renderEnd}`)
 	for (let i = firstChanged; i <= renderEnd; i++) {
 		if (i > firstChanged) buf += '\r\n'
 		buf += `\x1b[2K${newLines[i]}`
@@ -122,6 +158,7 @@ function doRender(): void {
 	// If old content was longer, clear extra lines
 	if (previousLines.length > newLines.length) {
 		const extra = previousLines.length - newLines.length
+		log(`clearing ${extra} extra lines`)
 		// Move to end of new content if not already there
 		if (renderEnd < newLines.length - 1) {
 			const moveDown = newLines.length - 1 - renderEnd
@@ -140,6 +177,7 @@ function doRender(): void {
 
 	hardwareCursorRow = cursorRow
 	previousLines = newLines
+	log(`after render: hardwareCursorRow=${hardwareCursorRow}`)
 
 	positionCursor(newLines)
 }
@@ -178,19 +216,7 @@ function handleMessage(tab: Tab, text: string): void {
 function switchToTab(idx: number): void {
 	if (idx === activeIdx) return
 	activeIdx = idx
-	// Clear screen and re-render from scratch
-	const newLines = buildLines()
-	let buf = '\x1b[?2026h'
-	buf += '\x1b[2J\x1b[H' // clear screen + home cursor
-	for (let i = 0; i < newLines.length; i++) {
-		if (i > 0) buf += '\r\n'
-		buf += newLines[i]
-	}
-	buf += '\x1b[?2026l'
-	stdout.write(buf)
-	hardwareCursorRow = newLines.length - 1
-	previousLines = newLines
-	positionCursor(newLines)
+	doRender()
 }
 
 // ── Resize ──
@@ -248,5 +274,4 @@ stdin.on('data', (data: string) => {
 
 // ── Init ──
 
-active().lines.push(`${DIM}ctrl-t new tab | ctrl-n/ctrl-p switch | type + enter | ctrl-c quit${RESET}`)
 doRender()
