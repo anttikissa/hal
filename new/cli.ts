@@ -30,7 +30,22 @@ function contentWidth(): number { return cols() - 2 }
 
 const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
 let halCursorVisible = true
+let blinkTimer: ReturnType<typeof setTimeout> | null = null
 let renderState: RenderState = emptyState
+
+function scheduleBlink(): void {
+	if (blinkTimer) clearTimeout(blinkTimer)
+	blinkTimer = setTimeout(() => {
+		halCursorVisible = !halCursorVisible
+		doRender()
+		scheduleBlink()
+	}, 530)
+}
+
+function bumpCursor(): void {
+	halCursorVisible = true
+	scheduleBlink()
+}
 
 function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const tab = tabs.active()
@@ -115,7 +130,7 @@ function simulateResponse(tab: ReturnType<typeof tabs.active>, text: string): vo
 				j++
 			}
 		}
-		doRender()
+		bumpCursor(); doRender()
 	}, 30)
 }
 
@@ -146,7 +161,7 @@ function simulateToolCall(tab: ReturnType<typeof tabs.active>, name: string, cmd
 			block.output += (block.output ? '\n' : '') + outputLines[line]
 			line++
 		}
-		doRender()
+		bumpCursor(); doRender()
 	}, 300)
 }
 
@@ -198,7 +213,7 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 		const end = Math.min(pos + chunkSize, corpus.length)
 		block.text += corpus.slice(pos, end)
 		pos = end
-		doRender()
+		bumpCursor(); doRender()
 	}, 100)
 }
 
@@ -281,5 +296,5 @@ stdout.on('resize', () => {
 	doRender()
 })
 
-setInterval(() => { halCursorVisible = !halCursorVisible; doRender() }, 530)
+scheduleBlink()
 doRender()
