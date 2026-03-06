@@ -127,19 +127,9 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		return true
 	}
 
-	// Ctrl+A: select all, Ctrl+E: end
+	// Ctrl+A: select all
 	if (k.key === 'a' && k.ctrl) { selAnchor = 0; cursor = buf.length; return true }
-	if (k.key === 'e' && k.ctrl) { move(buf.length, false); return true }
 
-	// Ctrl+K: kill to end, Ctrl+U: kill to start
-	if (k.key === 'k' && k.ctrl) {
-		if (!deleteSel()) { buf = buf.slice(0, cursor); goalCol = null; selAnchor = null }
-		return true
-	}
-	if (k.key === 'u' && k.ctrl) {
-		if (!deleteSel()) { buf = buf.slice(cursor); cursor = 0; goalCol = null; selAnchor = null }
-		return true
-	}
 	// Left / Right
 	if (k.key === 'left') {
 		if (k.alt) { move(k.shift ? wordBoundaryLeft(buf, cursor) : wordBoundaryLeft(buf, cursor), k.shift); return true }
