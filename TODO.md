@@ -1,5 +1,27 @@
 # TODO
 
+## REAL TODO
+
+- Restore -> resume (same terminology as codex cli)
+- Style tool blocks and all other blocks well
+- Esc and Ctrl-C and Ctrl-D should work better - maybe a debug thing to restart?
+- Add stuff here
+
+
+
+## NICE TO HAVE
+
+- Copy from output inserts fake newlines at word-wrap boundaries (visual rows joined with \n instead of recognizing they belong to the same logical line)
+- Copy from output loses original tabs (expanded to spaces at storage time for correct mouse click mapping; could preserve originals via visual→logical line mapping)
+- 
+
+
+## BELOW THIS - OLD STUFF
+
+
+
+
+
 ## Do next:
 
 ### UI has:
