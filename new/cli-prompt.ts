@@ -131,6 +131,10 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		return true
 	}
 
+	// Ctrl+U: delete to start of line, Ctrl+K: delete to end
+	if (k.key === 'u' && k.ctrl) { if (cursor > 0) deleteRange(0, cursor); return true }
+	if (k.key === 'k' && k.ctrl) { if (cursor < buf.length) deleteRange(cursor, buf.length); return true }
+
 	// Ctrl+A: select all
 	if (k.key === 'a' && k.ctrl) { selAnchor = 0; cursor = buf.length; return true }
 
