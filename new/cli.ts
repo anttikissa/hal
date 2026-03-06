@@ -21,7 +21,15 @@ const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
 if (kittyTerms.test(process.env.TERM_PROGRAM ?? '')) stdout.write(KITTY_KBD_ON)
 
 // Always restore terminal on exit, even on crash
-process.on('exit', () => stdout.write(TERM_RESET))
+process.on('exit', () => {
+	// Move below TUI area so stacktraces/shell prompt don't overwrite content
+	if (renderState.lines.length > 0) {
+		const down = renderState.lines.length - 1 - renderState.cursorRow
+		if (down > 0) stdout.write(`\x1b[${down}B`)
+		stdout.write('\r\n')
+	}
+	stdout.write(TERM_RESET)
+})
 
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
@@ -250,10 +258,10 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 
 function eraseTui(): void {
 	if (renderState.lines.length === 0) return
-	// Move cursor to top of TUI area, clear from there to end of screen
 	const up = renderState.cursorRow
 	if (up > 0) stdout.write(`\x1b[${up}A`)
 	stdout.write('\r\x1b[J')
+	renderState = emptyState
 }
 
 function quit(): void {
@@ -261,16 +269,14 @@ function quit(): void {
 	// Keep blocks + tab bar + prompt text; erase only the help bar
 	const total = renderState.lines.length
 	const helpBarRow = total - 1
-	// Move cursor to help bar, clear it and anything below
 	const delta = renderState.cursorRow - helpBarRow
 	if (delta > 0) stdout.write(`\x1b[${delta}A`)
 	else if (delta < 0) stdout.write(`\x1b[${-delta}B`)
 	stdout.write('\r\x1b[J')
-	// If prompt was empty, also erase separator + empty prompt line
 	if (!prompt.text()) {
-		// separator + prompt = 2 lines above help bar
 		stdout.write(`\x1b[2A\r\x1b[J`)
 	}
+	renderState = emptyState
 	process.exit(0)
 }
 
