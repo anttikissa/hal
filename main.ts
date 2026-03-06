@@ -399,11 +399,20 @@ if (testMode) {
 		}, 3000)
 	}
 
-	// If we're a client, watch for owner release event + poll as fallback
+	// If we're a client, watch for owner release event + fast PID poll as fallback
 	let ownerWatchTimer: ReturnType<typeof setInterval> | null = null
 	if (!isOwner) {
 		setOwnerReleaseHandler(() => tryPromote())
-		ownerWatchTimer = setInterval(() => tryPromote(), 5000)
+		// Fast poll: bare kill(pid,0) syscall every 100ms — essentially free
+		let watchPid = claim.currentOwnerPid
+		let promoting = false
+		ownerWatchTimer = setInterval(() => {
+			if (promoted || promoting) return
+			if (watchPid !== null) {
+				try { process.kill(watchPid, 0) } catch { watchPid = null }
+			}
+			if (watchPid === null) { promoting = true; tryPromote().finally(() => { promoting = false }) }
+		}, 100)
 	}
 
 	const shutdown = async (code: number) => {
