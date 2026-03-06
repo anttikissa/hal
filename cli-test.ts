@@ -3,11 +3,6 @@
 // No alternate screen, no scroll regions, no absolute positioning.
 // Everything is one flat array of lines, diff-rendered with relative cursor moves.
 
-import { appendFileSync } from 'fs'
-const LOG = '/tmp/cli-test.log'
-function log(...args: any[]): void {
-	appendFileSync(LOG, args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ') + '\n')
-}
 // ── State ──
 
 interface Tab {
@@ -39,65 +34,70 @@ const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
 let previousLines: string[] = []
 let hardwareCursorRow = 0
 
-// Build the full screen as a flat array: content lines + bar + prompt
 function buildLines(): string[] {
 	const tab = active()
 	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
-	// Pad to tallest tab so prompt stays in place when switching
 	while (lines.length < maxContentLines) lines.push('')
 
-	// Tab bar
 	const parts = tabs.map((t, i) => {
 		const label = ` ${t.id} `
 		return i === activeIdx ? `${BOLD}[${label}]${RESET}` : `${DIM} ${label} ${RESET}`
 	})
 	lines.push(`tabs: ${parts.join('')}`)
 
-	// Border + prompt + border with help text
 	const hline = `${DIM}${'─'.repeat(width())}${RESET}`
 	lines.push(hline)
 	lines.push(`> ${inputBuf}`)
 	const help = ' ctrl-t new tab │ ctrl-n/ctrl-p switch │ ctrl-c quit '
 	const w = width()
-	const lineChars = w - help.length
-	const left = Math.max(0, Math.floor(lineChars / 2))
-	const right = Math.max(0, lineChars - left)
+	const pad = w - help.length
+	const left = Math.max(0, Math.floor(pad / 2))
+	const right = Math.max(0, pad - left)
 	lines.push(`${DIM}${'─'.repeat(left)}${help}${'─'.repeat(right)}${RESET}`)
 
 	return lines
+}
+
+// Append cursor-positioning escapes to buf, return final cursor row
+function appendCursorPosition(buf: string, cursorRow: number, lines: string[]): string {
+	const promptRow = lines.length - 2
+	const promptCol = 3 + inputBuf.length
+	const delta = promptRow - cursorRow
+	if (delta > 0) buf += `\x1b[${delta}B`
+	else if (delta < 0) buf += `\x1b[${-delta}A`
+	buf += `\x1b[${promptCol}G\x1b[?25h`
+	hardwareCursorRow = promptRow
+	return buf
+}
+
+function writeBuf(lines: string[]): string {
+	let buf = ''
+	for (let i = 0; i < lines.length; i++) {
+		if (i > 0) buf += '\r\n'
+		buf += lines[i]
+	}
+	return buf
 }
 
 function doRender(): void {
 	const newLines = buildLines()
 	const h = stdout.rows || 24
 
-	log(`\n--- doRender ---`)
-	log(`previousLines.length=${previousLines.length} newLines.length=${newLines.length} hardwareCursorRow=${hardwareCursorRow} screenHeight=${h}`)
-
-	// Full render: clear screen, write all lines from scratch
+	// Full render: write all lines, optionally clearing screen first
 	const fullRender = (clear: boolean): void => {
-		log(`fullRender clear=${clear} lines=${newLines.length}`)
 		let buf = '\x1b[?2026h'
-		if (clear) buf += '\x1b[3J\x1b[2J\x1b[H' // clear scrollback + screen + home
-		for (let i = 0; i < newLines.length; i++) {
-			if (i > 0) buf += '\r\n'
-			buf += newLines[i]
-		}
+		if (clear) buf += '\x1b[3J\x1b[2J\x1b[H'
+		buf += writeBuf(newLines)
+		buf = appendCursorPosition(buf, newLines.length - 1, newLines)
 		buf += '\x1b[?2026l'
 		stdout.write(buf)
-		hardwareCursorRow = newLines.length - 1
 		previousLines = newLines
-		positionCursor(newLines)
 	}
 
-	// First render — just write everything without clearing
-	if (previousLines.length === 0) {
-		fullRender(false)
-		return
-	}
+	if (previousLines.length === 0) { fullRender(false); return }
 
-	// Find first and last changed lines
+	// Find changed range
 	let firstChanged = -1
 	let lastChanged = -1
 	const maxLen = Math.max(newLines.length, previousLines.length)
@@ -110,44 +110,24 @@ function doRender(): void {
 		}
 	}
 
-	log(`firstChanged=${firstChanged} lastChanged=${lastChanged}`)
+	if (firstChanged === -1) return // no changes
 
-	// No changes
-	if (firstChanged === -1) {
-		positionCursor(newLines)
-		return
-	}
-
-	// If first change is above the visible viewport, relative moves can't reach it.
-	// Fall back to full clear + render (like Pi does).
+	// Changes above visible viewport — can't reach with relative moves
 	const viewportTop = Math.max(0, previousLines.length - h)
-	if (firstChanged < viewportTop) {
-		log(`firstChanged ${firstChanged} < viewportTop ${viewportTop} — full render`)
-		fullRender(true)
-		return
-	}
+	if (firstChanged < viewportTop) { fullRender(true); return }
+
 	let buf = '\x1b[?2026h'
 
-	// If new lines were appended and first change is at the append boundary,
-	// move to end of old content and start with \r\n
 	const appendStart = newLines.length > previousLines.length
 		&& firstChanged === previousLines.length
 		&& firstChanged > 0
-
 	const moveTarget = appendStart ? firstChanged - 1 : firstChanged
-
-	// Move cursor from hardwareCursorRow to moveTarget using relative moves
 	const delta = moveTarget - hardwareCursorRow
-	log(`moveTarget=${moveTarget} delta=${delta} appendStart=${appendStart}`)
-
 	if (delta > 0) buf += `\x1b[${delta}B`
 	else if (delta < 0) buf += `\x1b[${-delta}A`
-
 	buf += appendStart ? '\r\n' : '\r'
 
-	// Render changed lines
 	const renderEnd = Math.min(lastChanged, newLines.length - 1)
-	log(`rendering lines ${firstChanged}..${renderEnd}`)
 	for (let i = firstChanged; i <= renderEnd; i++) {
 		if (i > firstChanged) buf += '\r\n'
 		buf += `\x1b[2K${newLines[i]}`
@@ -155,85 +135,27 @@ function doRender(): void {
 
 	let cursorRow = renderEnd
 
-	// If old content was longer, clear extra lines
+	// Clear extra lines if content shrunk
 	if (previousLines.length > newLines.length) {
 		const extra = previousLines.length - newLines.length
-		log(`clearing ${extra} extra lines`)
-		// Move to end of new content if not already there
 		if (renderEnd < newLines.length - 1) {
-			const moveDown = newLines.length - 1 - renderEnd
-			buf += `\x1b[${moveDown}B`
+			buf += `\x1b[${newLines.length - 1 - renderEnd}B`
 			cursorRow = newLines.length - 1
 		}
-		for (let i = 0; i < extra; i++) {
-			buf += '\r\n\x1b[2K'
-		}
-		// Move back up
+		for (let i = 0; i < extra; i++) buf += '\r\n\x1b[2K'
 		buf += `\x1b[${extra}A`
 	}
 
+	buf = appendCursorPosition(buf, cursorRow, newLines)
 	buf += '\x1b[?2026l'
 	stdout.write(buf)
-
-	hardwareCursorRow = cursorRow
 	previousLines = newLines
-	log(`after render: hardwareCursorRow=${hardwareCursorRow}`)
-
-	positionCursor(newLines)
 }
-
-// Position cursor on the prompt line, after input text
-function positionCursor(lines: string[]): void {
-	// Prompt is the second-to-last line (before bottom border)
-	const promptRow = lines.length - 2
-	const promptCol = 3 + inputBuf.length // "> " = 2 chars + 1-based
-
-	const rowDelta = promptRow - hardwareCursorRow
-	let buf = ''
-	if (rowDelta > 0) buf += `\x1b[${rowDelta}B`
-	else if (rowDelta < 0) buf += `\x1b[${-rowDelta}A`
-	buf += `\x1b[${promptCol}G` // absolute column (this is fine, not row)
-	buf += '\x1b[?25h' // show cursor
-	stdout.write(buf)
-	hardwareCursorRow = promptRow
-}
-
-// ── Commands ──
-
-function handleMessage(tab: Tab, text: string): void {
-	const spamMatch = text.match(/^spa(m+)$/)
-	if (spamMatch) {
-		const count = spamMatch[1].length * 30
-		for (let i = 0; i < count; i++) {
-			tab.lines.push(`[tab ${tab.id}] line ${tab.lines.length}: THIS IS TAB NUMBER ${tab.id} - LOTS AND LOTS OF TEXT BLAH BLAH BLAH`)
-		}
-	} else {
-		tab.lines.push(`You said: ${text}`)
-	}
-	doRender()
-}
-
-function switchToTab(idx: number): void {
-	if (idx === activeIdx) return
-	activeIdx = idx
-	doRender()
-}
-
-// ── Resize ──
-
-stdout.on('resize', () => {
-	// Force full re-render by clearing previousLines
-	previousLines = []
-	hardwareCursorRow = 0
-	// TODO: this is a bit rough — for now just re-render
-	doRender()
-})
 
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
 	if (data === '\x03') {
-		// Move below our rendered area before exiting
 		const delta = previousLines.length - 1 - hardwareCursorRow
 		if (delta > 0) stdout.write(`\x1b[${delta}B`)
 		stdout.write('\r\n\x1b[?25h')
@@ -249,14 +171,24 @@ stdin.on('data', (data: string) => {
 		return
 	}
 
-	if (data === '\x0e') { switchToTab((activeIdx + 1) % tabs.length); return }
-	if (data === '\x10') { switchToTab((activeIdx - 1 + tabs.length) % tabs.length); return }
+	if (data === '\x0e') { activeIdx = (activeIdx + 1) % tabs.length; doRender(); return }
+	if (data === '\x10') { activeIdx = (activeIdx - 1 + tabs.length) % tabs.length; doRender(); return }
 
 	if (data === '\r' || data === '\n') {
 		const text = inputBuf.trim()
 		inputBuf = ''
-		if (text) handleMessage(active(), text)
-		else doRender()
+		if (text) {
+			const tab = active()
+			const spamMatch = text.match(/^spa(m+)$/)
+			if (spamMatch) {
+				const count = spamMatch[1].length * 30
+				for (let i = 0; i < count; i++)
+					tab.lines.push(`[tab ${tab.id}] line ${tab.lines.length}: THIS IS TAB NUMBER ${tab.id} - LOTS AND LOTS OF TEXT BLAH BLAH BLAH`)
+			} else {
+				tab.lines.push(`You said: ${text}`)
+			}
+		}
+		doRender()
 		return
 	}
 
@@ -272,6 +204,10 @@ stdin.on('data', (data: string) => {
 	}
 })
 
-// ── Init ──
+stdout.on('resize', () => {
+	previousLines = []
+	hardwareCursorRow = 0
+	doRender()
+})
 
 doRender()
