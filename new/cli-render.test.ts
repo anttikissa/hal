@@ -58,7 +58,7 @@ describe('cli-render', () => {
 		expect(state.lines).toEqual(next)
 	})
 
-	test('full clear when changes above viewport', () => {
+	test('skips changes entirely above viewport', () => {
 		// 100 lines, screen is 24 — viewport top is ~76
 		const prev: RenderState = {
 			lines: Array.from({ length: 100 }, (_, i) => `line ${i}`),
@@ -66,6 +66,18 @@ describe('cli-render', () => {
 		}
 		const next = [...prev.lines]
 		next[0] = 'CHANGED' // above viewport
+		const { buf } = render(next, prev, { row: 99, col: 1 }, screen)
+		expect(buf).toBe('')
+	})
+
+	test('full clear when changes span viewport boundary', () => {
+		const prev: RenderState = {
+			lines: Array.from({ length: 100 }, (_, i) => `line ${i}`),
+			cursorRow: 99,
+		}
+		const next = [...prev.lines]
+		next[0] = 'CHANGED'  // above viewport
+		next[99] = 'CHANGED' // inside viewport
 		const { buf } = render(next, prev, { row: 99, col: 1 }, screen)
 		const s = strip(buf)
 		expect(s).toContain('\x1b[2J') // full clear
