@@ -1,9 +1,7 @@
 #!/usr/bin/env bun
-// Prototype: non-alternate-screen TUI with tabs
-// ctrl-t: add tab, ctrl-n/ctrl-p: switch tabs, ctrl-c: exit
-// Type and press Enter to send a message
-
-const BOTTOM_ROWS = 4 // tabs + border + prompt + border
+// Prototype: Pi-style diff-rendered TUI
+// No alternate screen, no scroll regions, no absolute positioning.
+// Everything is one flat array of lines, diff-rendered with relative cursor moves.
 
 // ── State ──
 
@@ -27,112 +25,203 @@ stdin.setRawMode(true)
 stdin.setEncoding('utf8')
 stdin.resume()
 
-function height(): number { return stdout.rows || 24 }
 function width(): number { return stdout.columns || 80 }
 
-function setScrollRegion(): void {
-	stdout.write(`\x1b[1;${height() - BOTTOM_ROWS}r`)
-}
-
-function resetScrollRegion(): void {
-	stdout.write('\x1b[r')
-}
-
-// ── Rendering ──
-//
-// \x1b7 / \x1b8 (DECSC/DECRC) tracks the content cursor position.
-// Before writing content: \x1b8 (restore). After writing: \x1b7 (save).
-// paintBar() uses absolute moves, ends with cursor on prompt line.
+// ── Diff renderer ──
 
 const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
 
-function renderTabsLine(): string {
+let previousLines: string[] = []
+let hardwareCursorRow = 0
+
+// Build the full screen as a flat array: content lines + bar + prompt
+function buildLines(): string[] {
+	const tab = active()
+	const lines: string[] = [...tab.lines]
+
+	// Tab bar
 	const parts = tabs.map((t, i) => {
 		const label = ` ${t.id} `
 		return i === activeIdx ? `${BOLD}[${label}]${RESET}` : `${DIM} ${label} ${RESET}`
 	})
-	return `tabs: ${parts.join('')}`
+	lines.push(`tabs: ${parts.join('')}`)
+
+	// Border + prompt + border
+	const hline = `${DIM}${'─'.repeat(width())}${RESET}`
+	lines.push(hline)
+	lines.push(`> ${inputBuf}`)
+	lines.push(hline)
+
+	return lines
 }
 
-function hline(): string {
-	return '─'.repeat(width())
-}
+function doRender(): void {
+	const newLines = buildLines()
+	const w = width()
 
-function paintBar(): void {
-	const h = height()
-	const prefix = '> '
-	const cursorCol = prefix.length + inputBuf.length + 1
-
-	stdout.write('\x1b[?2026h')
-	stdout.write(`\x1b[${h - 3};1H\x1b[2K${renderTabsLine()}`)
-	stdout.write(`\x1b[${h - 2};1H\x1b[2K${DIM}${hline()}${RESET}`)
-	stdout.write(`\x1b[${h - 1};1H\x1b[2K${prefix}${inputBuf}`)
-	stdout.write(`\x1b[${h};1H\x1b[2K${DIM}${hline()}${RESET}`)
-	stdout.write(`\x1b[${h - 1};${cursorCol}H\x1b[?25h`)
-	stdout.write('\x1b[?2026l')
-}
-
-function writeContent(lines: string[]): void {
-	if (lines.length === 0) return
-	stdout.write('\x1b8')
-	stdout.write(lines.join('\r\n') + '\r\n')
-	stdout.write('\x1b7')
-	paintBar()
-}
-
-function switchToTab(idx: number): void {
-	if (idx === activeIdx) return
-	activeIdx = idx
-	repaint()
-}
-
-function repaint(): void {
-	const tab = active()
-	const replay = height() * 2
-
-	resetScrollRegion()
-	stdout.write('\x1b[3J\x1b[2J\x1b[H')
-	setScrollRegion()
-
-	const start = Math.max(0, tab.lines.length - replay)
-	const toReplay = tab.lines.slice(start)
-	if (toReplay.length > 0) {
-		stdout.write(toReplay.join('\r\n') + '\r\n')
+	// First render — just write everything
+	if (previousLines.length === 0) {
+		let buf = '\x1b[?2026h'
+		for (let i = 0; i < newLines.length; i++) {
+			if (i > 0) buf += '\r\n'
+			buf += newLines[i]
+		}
+		buf += '\x1b[?2026l'
+		stdout.write(buf)
+		hardwareCursorRow = newLines.length - 1
+		previousLines = newLines
+		positionCursor(newLines)
+		return
 	}
-	stdout.write('\x1b7')
-	paintBar()
+
+	// Find first and last changed lines
+	let firstChanged = -1
+	let lastChanged = -1
+	const maxLen = Math.max(newLines.length, previousLines.length)
+	for (let i = 0; i < maxLen; i++) {
+		const oldLine = i < previousLines.length ? previousLines[i] : ''
+		const newLine = i < newLines.length ? newLines[i] : ''
+		if (oldLine !== newLine) {
+			if (firstChanged === -1) firstChanged = i
+			lastChanged = i
+		}
+	}
+
+	// No changes
+	if (firstChanged === -1) {
+		positionCursor(newLines)
+		return
+	}
+
+	let buf = '\x1b[?2026h'
+
+	// If new lines were appended and first change is at the append boundary,
+	// move to end of old content and start with \r\n
+	const appendStart = newLines.length > previousLines.length
+		&& firstChanged === previousLines.length
+		&& firstChanged > 0
+
+	const moveTarget = appendStart ? firstChanged - 1 : firstChanged
+
+	// Move cursor from hardwareCursorRow to moveTarget using relative moves
+	const delta = moveTarget - hardwareCursorRow
+	if (delta > 0) buf += `\x1b[${delta}B`
+	else if (delta < 0) buf += `\x1b[${-delta}A`
+
+	buf += appendStart ? '\r\n' : '\r'
+
+	// Render changed lines
+	const renderEnd = Math.min(lastChanged, newLines.length - 1)
+	for (let i = firstChanged; i <= renderEnd; i++) {
+		if (i > firstChanged) buf += '\r\n'
+		buf += `\x1b[2K${newLines[i]}`
+	}
+
+	let cursorRow = renderEnd
+
+	// If old content was longer, clear extra lines
+	if (previousLines.length > newLines.length) {
+		const extra = previousLines.length - newLines.length
+		// Move to end of new content if not already there
+		if (renderEnd < newLines.length - 1) {
+			const moveDown = newLines.length - 1 - renderEnd
+			buf += `\x1b[${moveDown}B`
+			cursorRow = newLines.length - 1
+		}
+		for (let i = 0; i < extra; i++) {
+			buf += '\r\n\x1b[2K'
+		}
+		// Move back up
+		buf += `\x1b[${extra}A`
+	}
+
+	buf += '\x1b[?2026l'
+	stdout.write(buf)
+
+	hardwareCursorRow = cursorRow
+	previousLines = newLines
+
+	positionCursor(newLines)
 }
+
+// Position cursor on the prompt line, after input text
+function positionCursor(lines: string[]): void {
+	// Prompt is the second-to-last line (before bottom border)
+	const promptRow = lines.length - 2
+	const promptCol = 3 + inputBuf.length // "> " = 2 chars + 1-based
+
+	const rowDelta = promptRow - hardwareCursorRow
+	let buf = ''
+	if (rowDelta > 0) buf += `\x1b[${rowDelta}B`
+	else if (rowDelta < 0) buf += `\x1b[${-rowDelta}A`
+	buf += `\x1b[${promptCol}G` // absolute column (this is fine, not row)
+	buf += '\x1b[?25h' // show cursor
+	stdout.write(buf)
+	hardwareCursorRow = promptRow
+}
+
+// ── Commands ──
 
 function handleMessage(tab: Tab, text: string): void {
 	const spamMatch = text.match(/^spa(m+)$/)
 	if (spamMatch) {
 		const count = spamMatch[1].length * 30
-		const lines: string[] = []
 		for (let i = 0; i < count; i++) {
-			lines.push(`[tab ${tab.id}] line ${tab.lines.length + i}: THIS IS TAB NUMBER ${tab.id} - LOTS AND LOTS OF TEXT BLAH BLAH BLAH`)
+			tab.lines.push(`[tab ${tab.id}] line ${tab.lines.length}: THIS IS TAB NUMBER ${tab.id} - LOTS AND LOTS OF TEXT BLAH BLAH BLAH`)
 		}
-		for (const line of lines) tab.lines.push(line)
-		writeContent(lines)
 	} else {
-		const line = `You said: ${text}`
-		tab.lines.push(line)
-		writeContent([line])
+		tab.lines.push(`You said: ${text}`)
 	}
+	doRender()
+}
+
+function switchToTab(idx: number): void {
+	if (idx === activeIdx) return
+	activeIdx = idx
+	// Clear and re-render (tab switch = full redraw)
+	const newLines = buildLines()
+	let buf = '\x1b[?2026h'
+	// Move to top of our rendered area
+	if (hardwareCursorRow > 0) buf += `\x1b[${hardwareCursorRow}A`
+	buf += '\r'
+	// Clear all previously rendered lines
+	for (let i = 0; i < previousLines.length; i++) {
+		if (i > 0) buf += '\r\n'
+		buf += '\x1b[2K'
+	}
+	// Move back to top
+	if (previousLines.length > 1) buf += `\x1b[${previousLines.length - 1}A`
+	buf += '\r'
+	// Write new content (may need more lines — emit \r\n for growth)
+	for (let i = 0; i < newLines.length; i++) {
+		if (i > 0) buf += '\r\n'
+		buf += newLines[i]
+	}
+	buf += '\x1b[?2026l'
+	stdout.write(buf)
+	hardwareCursorRow = newLines.length - 1
+	previousLines = newLines
+	positionCursor(newLines)
 }
 
 // ── Resize ──
 
 stdout.on('resize', () => {
-	setScrollRegion()
-	paintBar()
+	// Force full re-render by clearing previousLines
+	previousLines = []
+	hardwareCursorRow = 0
+	// TODO: this is a bit rough — for now just re-render
+	doRender()
 })
 
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
 	if (data === '\x03') {
-		resetScrollRegion()
-		stdout.write(`\x1b[${height()};1H\r\n\x1b[?25h`)
+		// Move below our rendered area before exiting
+		const delta = previousLines.length - 1 - hardwareCursorRow
+		if (delta > 0) stdout.write(`\x1b[${delta}B`)
+		stdout.write('\r\n\x1b[?25h')
 		process.exit(0)
 	}
 
@@ -141,7 +230,7 @@ stdin.on('data', (data: string) => {
 		tabs.push({ id: tabCounter, lines: [] })
 		activeIdx = tabs.length - 1
 		inputBuf = ''
-		repaint()
+		doRender()
 		return
 	}
 
@@ -152,26 +241,23 @@ stdin.on('data', (data: string) => {
 		const text = inputBuf.trim()
 		inputBuf = ''
 		if (text) handleMessage(active(), text)
-		else paintBar()
+		else doRender()
 		return
 	}
 
 	if (data === '\x7f' || data === '\x08') {
-		if (inputBuf.length > 0) { inputBuf = inputBuf.slice(0, -1); paintBar() }
+		if (inputBuf.length > 0) { inputBuf = inputBuf.slice(0, -1); doRender() }
 		return
 	}
 
 	if (data >= ' ' && !data.startsWith('\x1b')) {
 		inputBuf += data
-		paintBar()
+		doRender()
 		return
 	}
 })
 
 // ── Init ──
 
-stdout.write('\x1b[2J\x1b[H') // clear screen + home
-setScrollRegion()
-stdout.write(`${DIM}ctrl-t new tab | ctrl-n/ctrl-p switch | type + enter | ctrl-c quit${RESET}\r\n`)
-stdout.write('\x1b7')
-paintBar()
+active().lines.push(`${DIM}ctrl-t new tab | ctrl-n/ctrl-p switch | type + enter | ctrl-c quit${RESET}`)
+doRender()
