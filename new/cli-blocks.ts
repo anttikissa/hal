@@ -35,9 +35,9 @@ const TOOL_COLORS: Record<string, { fg: string; bg: string }> = {
 	default: { fg: fg256(oklch(0.75, 0.15, 260)), bg: bg256(oklch(0.25, 0.05, 260)) },
 }
 
-// Input/prompt block colors: grey (achromatic, same lightness)
-const INPUT_FG = fg256(oklch(0.75, 0.01, 0))
-const INPUT_BG = bg256(oklch(0.25, 0.01, 0))
+// Input/prompt block colors: grey (achromatic, brighter than tool blocks)
+const INPUT_FG = fg256(oklch(0.90, 0.01, 0))
+const INPUT_BG = bg256(oklch(0.30, 0.01, 0))
 
 function toolColors(name: string): { fg: string; bg: string } {
 	return TOOL_COLORS[name] ?? TOOL_COLORS.default
