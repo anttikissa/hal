@@ -98,6 +98,27 @@ function looksLikeError(stderr: string): boolean {
 	return ERROR_PATTERNS.some((p) => p.test(stderr))
 }
 
+function childPids(parentPid: number): number[] {
+	const result = Bun.spawnSync(['pgrep', '-P', String(parentPid)], {
+		stdout: 'pipe',
+		stderr: 'ignore',
+	})
+	if (result.exitCode !== 0) return []
+	const text = new TextDecoder().decode(result.stdout).trim()
+	if (!text) return []
+	return text
+		.split(/\s+/)
+		.map((value) => Number(value))
+		.filter((pid) => Number.isInteger(pid) && pid > 0)
+}
+
+function killProcessTree(rootPid: number, signal: 'SIGTERM' | 'SIGKILL'): void {
+	for (const pid of childPids(rootPid)) killProcessTree(pid, signal)
+	try {
+		process.kill(rootPid, signal)
+	} catch {}
+}
+
 export const tools = [
 	{
 		name: 'bash',
@@ -279,11 +300,12 @@ async function _runTool(
 		}
 		const proc = Bun.spawn(['bash', '-lc', command], { cwd, stdout: 'pipe', stderr: 'pipe' })
 
-		// Kill subprocess when paused/aborted (SIGTERM, then SIGKILL after 2s)
+		// Kill full process tree when paused/aborted (SIGTERM, then SIGKILL after 2s)
 		if (signal) {
 			const onAbort = () => {
-				try { proc.kill('SIGTERM') } catch {}
-				setTimeout(() => { try { proc.kill('SIGKILL') } catch {} }, 2000)
+				killProcessTree(proc.pid, 'SIGTERM')
+				const timer = setTimeout(() => { killProcessTree(proc.pid, 'SIGKILL') }, 2000)
+				;(timer as any).unref?.()
 			}
 			if (signal.aborted) onAbort()
 			else signal.addEventListener('abort', onAbort, { once: true })
