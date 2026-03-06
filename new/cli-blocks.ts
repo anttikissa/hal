@@ -111,22 +111,25 @@ function toolLine(text: string, width: number, fg: string, bg: string): string {
 	return `${bg}${fg}${padded.padEnd(width)}${RESET}`
 }
 
+function headerLine(text: string, width: number, fg: string, bg: string): string {
+	return `${bg}${fg}${text.padEnd(width)}${RESET}`
+}
+
 function toolHeader(label: string, width: number, fg: string, bg: string): string[] {
-	const inner_w = width - BLOCK_PAD
 	const prefix = '── '
 	const inner = prefix + label + ' '
-	if (inner.length >= inner_w) {
+	if (inner.length >= width) {
 		const full = prefix + label + ' '
 		const lines: string[] = []
-		for (let i = 0; i < full.length; i += inner_w) {
-			lines.push(full.slice(i, i + inner_w))
+		for (let i = 0; i < full.length; i += width) {
+			lines.push(full.slice(i, i + width))
 		}
 		const last = lines[lines.length - 1]
-		lines[lines.length - 1] = last + '─'.repeat(Math.max(0, inner_w - last.length))
-		return lines.map(l => toolLine(l, width, fg, bg))
+		lines[lines.length - 1] = last + '─'.repeat(Math.max(0, width - last.length))
+		return lines.map(l => headerLine(l, width, fg, bg))
 	}
-	const fill = '─'.repeat(Math.max(0, inner_w - inner.length))
-	return [toolLine(inner + fill, width, fg, bg)]
+	const fill = '─'.repeat(Math.max(0, width - inner.length))
+	return [headerLine(inner + fill, width, fg, bg)]
 }
 
 function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): string[] {
