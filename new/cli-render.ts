@@ -5,6 +5,7 @@
 export interface RenderState {
 	lines: string[]
 	cursorRow: number
+	cursorCol: number
 }
 
 export interface CursorPos {
@@ -12,7 +13,7 @@ export interface CursorPos {
 	col: number
 }
 
-export const emptyState: RenderState = { lines: [], cursorRow: 0 }
+export const emptyState: RenderState = { lines: [], cursorRow: 0, cursorCol: 0 }
 
 // Synchronized output: terminal buffers everything between these, avoids flicker
 const SYNC_START = '\x1b[?2026h'
@@ -40,7 +41,12 @@ export function render(
 		}
 	}
 
-	if (firstChanged === -1) return { buf: '', state: prev }
+	if (firstChanged === -1) {
+		if (cursor.row === prev.cursorRow && cursor.col === prev.cursorCol) return { buf: '', state: prev }
+		// Lines unchanged but cursor moved
+		const buf = SYNC_START + positionCursor(prev.cursorRow, cursor) + SYNC_END
+		return { buf, state: { lines: prev.lines, cursorRow: cursor.row, cursorCol: cursor.col } }
+	}
 
 	// Changes above visible viewport — can't reach with relative moves
 	const viewportTop = Math.max(0, prev.lines.length - screenRows)
@@ -82,7 +88,7 @@ export function render(
 	buf += positionCursor(cursorRow, cursor)
 	buf += SYNC_END
 
-	return { buf, state: { lines: newLines, cursorRow: cursor.row } }
+	return { buf, state: { lines: newLines, cursorRow: cursor.row, cursorCol: cursor.col } }
 }
 
 function fullRender(
@@ -98,7 +104,7 @@ function fullRender(
 	}
 	buf += positionCursor(lines.length - 1, cursor)
 	buf += SYNC_END
-	return { buf, state: { lines, cursorRow: cursor.row } }
+	return { buf, state: { lines, cursorRow: cursor.row, cursorCol: cursor.col } }
 }
 
 function moveCursor(from: number, to: number): string {

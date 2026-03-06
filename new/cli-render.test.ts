@@ -19,11 +19,19 @@ describe('cli-render', () => {
 		expect(state.lines).toEqual(lines)
 	})
 
-	test('no-op when lines unchanged', () => {
+	test('no-op when lines and cursor unchanged', () => {
 		const lines = ['hello', 'world']
-		const prev: RenderState = { lines: [...lines], cursorRow: 1 }
+		const prev: RenderState = { lines: [...lines], cursorRow: 1, cursorCol: 3 }
 		const { buf } = render(lines, prev, { row: 1, col: 3 }, screen)
 		expect(buf).toBe('')
+	})
+
+	test('repositions cursor when only cursor moved', () => {
+		const lines = ['hello', 'world']
+		const prev: RenderState = { lines: [...lines], cursorRow: 1, cursorCol: 3 }
+		const { buf } = render(lines, prev, { row: 1, col: 5 }, screen)
+		expect(buf).not.toBe('')
+		expect(buf).toContain('\x1b[5G')
 	})
 
 	test('diffs single changed line', () => {
