@@ -101,9 +101,14 @@ export class Client {
 				break
 			}
 			case 'line': {
+				// Fast-path host promotion
+				if (event.text === '[owner-released]') {
+					const tryPromote = (globalThis as any).__halTryPromote
+					if (typeof tryPromote === 'function') tryPromote()
+					return
+				}
 				const tab = this.findTab(event.sessionId)
 				if (!tab) return
-				// Meta messages as info blocks
 				if (event.level === 'meta' || event.level === 'notice') {
 					tab.blocks.push({ type: 'assistant', text: event.text, done: true })
 				} else if (event.level === 'error') {

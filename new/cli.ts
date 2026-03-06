@@ -30,11 +30,9 @@ process.on('exit', () => {
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
 
-// ── Host info ──
+// ── Host info (mutable — updated on promotion) ──
 
-const halInfo = (globalThis as any).__hal as { isHost: boolean; hostPid: number | null } | undefined
-const isHost = halInfo?.isHost ?? false
-const hostPid = halInfo?.hostPid ?? null
+const hal = (globalThis as any).__hal as { isHost: boolean; hostPid: number | null }
 
 // ── Client ──
 
@@ -92,7 +90,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	// Prompt — separator with host/client role
 	const p = prompt.buildPrompt(w, cw)
-	const role = isHost ? `host pid ${hostPid}` : `client → pid ${hostPid}`
+	const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
 	const rightParts: string[] = []
 	if (p.scrollInfo) rightParts.push(p.scrollInfo)
 	const left = ` ${role} `
