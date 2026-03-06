@@ -289,7 +289,7 @@ class OpenAIProvider extends Provider {
 			body.parallel_tool_calls = true
 		}
 
-		if (model.startsWith('o')) {
+		if (model.startsWith('o') || model.startsWith('gpt-5.4')) {
 			body.reasoning = { effort: 'high', summary: 'auto' }
 		} else if (codex && model.includes('codex')) {
 			body.reasoning = { effort: 'xhigh', summary: 'auto' }

@@ -25,9 +25,9 @@ describe('commands', () => {
 		hal = await startHal()
 		await hal.waitForReady()
 		hal.sendLine('/model codex')
-		const event = await hal.waitForLine(/\[model\] .*->.*codex/)
+		const event = await hal.waitForLine(/\[model\] .*->.*gpt-5\.4/)
 		expect(event.level).toBe('meta')
-		expect(event.text).toContain('codex')
+		expect(event.text).toContain('gpt-5.4')
 	})
 
 	test('/system shows prompt info', async () => {

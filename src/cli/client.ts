@@ -94,6 +94,7 @@ const MODEL_NAMES: [RegExp, string][] = [
 	[/^claude-opus-4-6/, 'Opus 4.6'], [/^claude-opus-4-5/, 'Opus 4.5'],
 	[/^claude-sonnet-4-6/, 'Sonnet 4.6'], [/^claude-sonnet-4-5/, 'Sonnet 4.5'],
 	[/^claude-sonnet-4/, 'Sonnet 4'],
+	[/^gpt-5\.4-pro/, 'GPT-5.4 Pro'], [/^gpt-5\.4/, 'GPT-5.4'],
 	[/^gpt-5\.3-codex/, 'Codex 5.3'], [/^gpt-5\.2-codex/, 'Codex 5.2'], [/^gpt-5\.1-codex/, 'Codex 5.1'],
 	[/^gpt-5(?:[.-]|$)/, 'GPT-5'], [/^gpt-4\.1(?:[.-]|$)/, 'GPT-4.1'], [/^gpt-4o(?:[.-]|$)/, 'GPT-4o'],
 	[/^o1(?:[.-]|$)/, 'o1'], [/^o3(?:[.-]|$)/, 'o3'],

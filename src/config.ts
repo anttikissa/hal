@@ -56,13 +56,14 @@ export interface Config {
 // User-facing aliases → full provider/model strings
 export const MODEL_ALIASES: Record<string, string> = {
 	claude: 'anthropic/claude-opus-4-6',
-	codex: 'openai/gpt-5.3-codex',
+	codex: 'openai/gpt-5.4',
 	mock: 'mock/mock-1',
 	ollama: 'ollama/llama3.2',
 }
 
 export const COMPACT_MODEL_FOR: Record<string, string> = {
 	'anthropic/claude-opus-4-6': 'anthropic/claude-sonnet-4-20250514',
+	'openai/gpt-5.4': 'openai/gpt-5.1-mini',
 	'openai/gpt-5.3-codex': 'openai/gpt-5.1-mini',
 }
 

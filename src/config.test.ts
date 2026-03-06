@@ -28,7 +28,7 @@ describe('config model helpers', () => {
 	})
 
 	test("resolveModel('codex') maps to alias full model", () => {
-		expect(resolveModel('codex')).toBe('openai/gpt-5.3-codex')
+		expect(resolveModel('codex')).toBe('openai/gpt-5.4')
 	})
 
 	test('resolveModel includes built-in ollama alias', () => {
@@ -37,19 +37,19 @@ describe('config model helpers', () => {
 
 	test('providerForModel and modelIdForModel handle bare + full IDs', () => {
 		expect(providerForModel('codex')).toBe('openai')
-		expect(modelIdForModel('codex')).toBe('gpt-5.3-codex')
+		expect(modelIdForModel('codex')).toBe('gpt-5.4')
 
-		expect(providerForModel('gpt-5.3-codex')).toBe('openai')
-		expect(modelIdForModel('gpt-5.3-codex')).toBe('gpt-5.3-codex')
+		expect(providerForModel('gpt-5.4')).toBe('openai')
+		expect(modelIdForModel('gpt-5.4')).toBe('gpt-5.4')
 
-		expect(providerForModel('openai/gpt-5.3-codex')).toBe('openai')
-		expect(modelIdForModel('openai/gpt-5.3-codex')).toBe('gpt-5.3-codex')
+		expect(providerForModel('openai/gpt-5.4')).toBe('openai')
+		expect(modelIdForModel('openai/gpt-5.4')).toBe('gpt-5.4')
 	})
 
 	test('mergedModelAliases includes built-ins by default', () => {
 		const aliases = mergedModelAliases()
 		expect(aliases.ollama).toBe('ollama/llama3.2')
-		expect(aliases.codex).toBe('openai/gpt-5.3-codex')
+		expect(aliases.codex).toBe('openai/gpt-5.4')
 	})
 })
 
