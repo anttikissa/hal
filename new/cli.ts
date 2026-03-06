@@ -100,13 +100,20 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	// Separator
 	lines.push(`${DIM}${'─'.repeat(w)}${RESET}`)
 
-	// Prompt lines with 1-char padding
+	// Prompt lines with 1-char padding, scrolled to follow cursor
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, cw)
-	for (let i = 0; i < promptLines; i++) {
+	const totalWrapped = wrappedInput.lines.length
+	let scrollTop = 0
+	if (totalWrapped > promptLines) {
+		// Keep cursor visible within the window
+		scrollTop = Math.min(curRow, totalWrapped - promptLines)
+		scrollTop = Math.max(scrollTop, curRow - promptLines + 1)
+	}
+	for (let i = scrollTop; i < scrollTop + promptLines; i++) {
 		lines.push(` ${wrappedInput.lines[i] ?? ''}`)
 	}
 	const cursorPos: CursorPos = {
-		row: lines.length - promptLines + Math.min(curRow, promptLines - 1),
+		row: lines.length - promptLines + (curRow - scrollTop),
 		col: curCol + 2, // 1 padding + 1-based terminal column
 	}
 
