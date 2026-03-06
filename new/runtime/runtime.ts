@@ -1,7 +1,7 @@
 // Host runtime — tails commands, dispatches, manages sessions.
 
 import { ensureBus, tailCommandsFrom, appendEvent, updateState, readState, trimEvents } from '../ipc.ts'
-import { createSession, loadMeta, saveMeta, listSessionIds } from '../session/session.ts'
+import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { eventId, defaultState, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
@@ -105,10 +105,9 @@ export async function startRuntime(): Promise<Runtime> {
 				const userMsg: UserMessage = { role: 'user', content: cmd.text, ts: new Date().toISOString() }
 				await appendMessages(sid, [userMsg])
 
-				// Update session info
+				// Update session info (auto-saves via liveFile)
 				const info = sessions.get(sid)!
 				info.lastPrompt = cmd.text.split('\n')[0].slice(0, 120)
-				await saveMeta(info)
 
 				// Load full history and run
 				const apiMessages = await loadApiMessages(sid)
@@ -167,7 +166,6 @@ export async function startRuntime(): Promise<Runtime> {
 				const info = sessions.get(sid)
 				if (info && cmd.text) {
 					info.topic = cmd.text
-					await saveMeta(info)
 					await publishSessions()
 				}
 				break
@@ -176,7 +174,6 @@ export async function startRuntime(): Promise<Runtime> {
 				const info = sessions.get(sid)
 				if (info && cmd.text) {
 					info.model = cmd.text
-					await saveMeta(info)
 					await publishSessions()
 					await appendEvent({
 						id: eventId(), type: 'line', sessionId: sid,

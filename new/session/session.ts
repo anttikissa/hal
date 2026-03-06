@@ -1,12 +1,12 @@
-// Session CRUD — create, load, list, persist.
-// SessionInfo is the canonical type; meta.ason is the disk format.
+// Session CRUD — create, load, list.
+// Sessions use liveFile: mutate the object, it auto-saves to meta.ason.
 
-import { readFile, writeFile, rename, mkdir } from 'fs/promises'
-import { existsSync, readFileSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { resolve } from 'path'
-import { stringify, parse } from '../utils/ason.ts'
 import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, ensureDir, sessionDir } from '../state.ts'
+import { liveFile } from '../live-file.ts'
 import type { SessionInfo } from '../protocol.ts'
 
 export type { SessionInfo }
@@ -45,47 +45,42 @@ export async function makeSessionId(): Promise<string> {
 	return generateId(epoch, 4)
 }
 
-// ── Meta persistence ──
+// ── Meta (liveFile-backed) ──
 
 function metaPath(id: string): string {
 	return `${sessionDir(id)}/meta.ason`
 }
 
-export async function saveMeta(info: SessionInfo): Promise<void> {
-	const dir = sessionDir(info.id)
-	ensureDir(dir)
-	info.updatedAt = new Date().toISOString()
-	const tmp = `${metaPath(info.id)}.tmp.${process.pid}`
-	await writeFile(tmp, stringify(info) + '\n')
-	await rename(tmp, metaPath(info.id))
+const META_DEFAULTS: SessionInfo = {
+	id: '', workingDir: '', createdAt: '', updatedAt: '',
 }
 
-export async function loadMeta(id: string): Promise<SessionInfo | null> {
+/** Load a session's meta as a live proxy. Mutations auto-save to disk. */
+export function loadMeta(id: string): SessionInfo | null {
 	const path = metaPath(id)
 	if (!existsSync(path)) return null
-	try {
-		return parse(await readFile(path, 'utf-8')) as SessionInfo
-	} catch {
-		return null
-	}
+	return liveFile<SessionInfo>(path, { defaults: { ...META_DEFAULTS, id } })
 }
 
-// ── Create ──
-
+/** Create a new session. Returns a live proxy — mutate it, it saves. */
 export async function createSession(workingDir?: string): Promise<SessionInfo> {
 	const id = await makeSessionId()
+	ensureDir(sessionDir(id))
 	const ts = new Date().toISOString()
-	const info: SessionInfo = {
-		id,
-		workingDir: resolve(workingDir ?? LAUNCH_CWD),
-		createdAt: ts,
-		updatedAt: ts,
-	}
-	await saveMeta(info)
+	const info = liveFile<SessionInfo>(metaPath(id), {
+		defaults: {
+			id,
+			workingDir: resolve(workingDir ?? LAUNCH_CWD),
+			createdAt: ts,
+			updatedAt: ts,
+		},
+	})
+	// Force initial save
+	info.updatedAt = ts
 	return info
 }
 
-// ── List (scan directories) ──
+// ── List ──
 
 export async function listSessionIds(): Promise<string[]> {
 	if (!existsSync(SESSIONS_DIR)) return []
