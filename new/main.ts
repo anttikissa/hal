@@ -60,7 +60,7 @@ if (!host) {
 			promoting = false
 		}
 	}
-	// kill(pid,0) is a single syscall — essentially free at 100ms
+	// Fallback for ungraceful death (SIGKILL/crash) — 1s is plenty
 	let watchPid = currentPid
 	let pollTimer: ReturnType<typeof setInterval> | null = setInterval(() => {
 		if (halStatus.isHost || promoting) return
@@ -68,7 +68,7 @@ if (!host) {
 			try { process.kill(watchPid, 0) } catch { watchPid = null }
 		}
 		if (watchPid === null) tryPromote()
-	}, 100)
+	}, 1000)
 
 	// Also expose for event-driven promotion (client calls this on [owner-released])
 	;(globalThis as any).__halTryPromote = tryPromote
