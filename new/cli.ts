@@ -210,13 +210,12 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 	const paragraphs = corpus.split(/\n\n+/)
 	let pi = 0
 	while (pi < paragraphs.length) {
-		// Thinking: 1-2 paragraphs
-		const tc = Math.min(1 + Math.floor(Math.random() * 2), paragraphs.length - pi)
-		segments.push({ type: 'thinking', text: paragraphs.slice(pi, pi + tc).join('\n\n') })
-		pi += tc
+		// Thinking: always 1 paragraph
+		segments.push({ type: 'thinking', text: paragraphs[pi] })
+		pi++
 		if (pi >= paragraphs.length) break
-		// Assistant: 1-4 paragraphs (consumes remaining)
-		const ac = Math.min(1 + Math.floor(Math.random() * 4), paragraphs.length - pi)
+		// Assistant: 2-5 paragraphs (bulk of the content)
+		const ac = Math.min(2 + Math.floor(Math.random() * 4), paragraphs.length - pi)
 		segments.push({ type: 'assistant', text: paragraphs.slice(pi, pi + ac).join('\n\n'), model: 'codex-5.3' })
 		pi += ac
 	}
