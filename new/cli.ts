@@ -269,6 +269,15 @@ stdin.on('data', (data: string) => {
 				const name = rest.startsWith('read') ? 'read' : 'bash'
 				const cmd = rest.replace(/^(bash|read)\s*/, '') || 'ls -la'
 				simulateToolCall(tab, name, cmd)
+			} else if (text === 'help') {
+				tab.blocks.push({ type: 'assistant', done: true, text:
+					`Commands:\n` +
+					`  help              this message\n` +
+					`  tool bash <cmd>   simulate a bash tool call\n` +
+					`  tool read <path>  simulate a read tool call\n` +
+					`  spam              10 lines of streaming text\n` +
+					`  spamm             20 lines (more m's = more lines)\n` +
+					`  <anything else>   echo response with thinking phase` })
 			} else {
 				const spamMatch = text.match(/^spa(m+)$/)
 				const count = spamMatch ? spamMatch[1].length * 10 : 0
@@ -296,5 +305,6 @@ stdout.on('resize', () => {
 	doRender()
 })
 
+tabs.active().blocks.push({ type: 'assistant', done: true, text: `Say 'help' to see what I can do.` })
 scheduleBlink()
 doRender()
