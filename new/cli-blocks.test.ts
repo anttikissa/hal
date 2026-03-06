@@ -37,8 +37,8 @@ describe('renderBlocks', () => {
 			{ type: 'assistant', text: 'hello', done: true },
 		]
 		const lines = renderBlocks(blocks, 80)
-		// input header, input body, blank, assistant line
-		expect(lines.length).toBe(4)
+		// input header, input body, blank, assistant header, assistant body
+		expect(lines.length).toBe(5)
 		expect(lines[2]).toBe('')
 	})
 
@@ -65,8 +65,12 @@ describe('renderBlocks', () => {
 			{ type: 'assistant', text: 'para1\n\n\n\npara2', done: true },
 		]
 		const lines = renderBlocks(blocks, 80)
-		// Should be: para1, blank, para2 (not para1, blank, blank, blank, para2)
-		expect(lines).toEqual(['para1', '', 'para2'])
+		const plain = lines.map(l => strip(l).trim())
+		// header, para1, blank, para2 (not para1, blank, blank, blank, para2)
+		expect(plain.length).toBe(4)
+		expect(plain[1]).toBe('para1')
+		expect(plain[2]).toBe('')
+		expect(plain[3]).toBe('para2')
 	})
 
 	test('tool header with ─ fill', () => {

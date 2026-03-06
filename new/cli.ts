@@ -113,7 +113,7 @@ function simulateResponse(tab: ReturnType<typeof tabs.active>, text: string): vo
 	const thinkingText = 'Let me think about this...\n\nAnalyzing the input...'
 
 	// Add assistant block (will start after thinking)
-	const assistantBlock: Block = { type: 'assistant', text: '', done: false }
+	const assistantBlock: Block = { type: 'assistant', text: '', done: false, model: 'codex-5.3' }
 
 	let phase: 'thinking' | 'assistant' = 'thinking'
 	let i = 0
@@ -220,14 +220,14 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 		}
 		const count = 1 + Math.floor(Math.random() * 3)
 		const text = paragraphs.slice(pi, pi + count).join('\n\n')
-		segments.push({ type: 'assistant', text })
+		segments.push({ type: 'assistant', text, model: 'codex-5.3' })
 		pi += count
 	}
 
 	// Stream segments sequentially
 	let segIdx = 0
 	let pos = 0
-	let block: Block = { type: segments[0].type, text: '', done: false }
+	let block: Block = { ...segments[0], text: '', done: false }
 	tab.blocks.push(block)
 
 	const tick = setInterval(() => {
@@ -244,7 +244,7 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 			segIdx++
 			pos = 0
 			if (segIdx < segments.length) {
-				block = { type: segments[segIdx].type, text: '', done: false }
+				block = { ...segments[segIdx], text: '', done: false }
 				tab.blocks.push(block)
 			}
 		}
@@ -327,7 +327,7 @@ stdin.on('data', (data: string) => {
 				const cmd = rest.replace(/^(bash|read)\s*/, '') || 'ls -la'
 				simulateToolCall(tab, name, cmd)
 			} else if (text === 'help') {
-				tab.blocks.push({ type: 'assistant', done: true, text:
+				tab.blocks.push({ type: 'assistant', done: true, model: 'codex-5.3', text:
 					`Commands:\n` +
 					`  help              this message\n` +
 					`  tool bash <cmd>   simulate a bash tool call\n` +
@@ -362,6 +362,6 @@ stdout.on('resize', () => {
 	doRender()
 })
 
-tabs.active().blocks.push({ type: 'assistant', done: true, text: `Say 'help' to see what I can do.` })
+tabs.active().blocks.push({ type: 'assistant', done: true, model: 'codex-5.3', text: `Say 'help' to see what I can do.` })
 scheduleBlink()
 doRender()

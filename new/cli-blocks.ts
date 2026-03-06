@@ -26,6 +26,8 @@ function fg256([r, g, b]: [number, number, number]): string { return `\x1b[38;2;
 function bg256([r, g, b]: [number, number, number]): string { return `\x1b[48;2;${r};${g};${b}m` }
 
 const CURSOR_COLOR = fg256(oklch(0.75, 0.15, 70)) // orange
+const ASST_FG = fg256(oklch(0.75, 0.15, 70))
+const ASST_BG = bg256(oklch(0.25, 0.05, 70))
 
 // Tool colors: matched lightness in OKLCH
 // Foreground (bright text): L=0.75, C=0.15
@@ -46,7 +48,7 @@ function toolColors(name: string): { fg: string; bg: string } {
 
 export type Block =
 	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
-	| { type: 'assistant'; text: string; done: boolean }
+	| { type: 'assistant'; text: string; done: boolean; model?: string }
 	| { type: 'thinking'; text: string; done: boolean }
 	| { type: 'tool'; name: string; status: 'streaming' | 'running' | 'done' | 'error';
 		args: string; output: string; startTime: number }
@@ -70,26 +72,25 @@ function wrapLines(text: string, width: number): string[] {
 	return lines
 }
 
-function inputLine(text: string, width: number): string {
-	const padded = ' '.repeat(BLOCK_PAD) + text
-	return `${INPUT_BG}${INPUT_FG}${padded.padEnd(width)}${RESET}`
-}
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
-	const who = block.source && block.source !== 'user' ? block.source : 'you'
+	const who = block.source && block.source !== 'user' ? block.source : 'Uou'
 	const status = block.status ? ` (${block.status})` : ''
 	const model = block.model ? ` (to ${block.model})` : ''
 	const label = `${who}${status}${model}`
-	if (block.status) return [inputLine(label + ': ' + block.text, width)]
+	if (block.status) return [toolLine(label + ': ' + block.text, width, INPUT_FG, INPUT_BG)]
 	const header = toolHeader(label, width, INPUT_FG, INPUT_BG)
-	const body = wrapLines(block.text, width - BLOCK_PAD).map(l => inputLine(l, width))
+	const body = wrapLines(block.text, width - BLOCK_PAD).map(l => toolLine(l, width, INPUT_FG, INPUT_BG))
 	return [...header, ...body]
 }
 
 function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: number): string[] {
 	const text = collapseBlankLines(block.text.trimEnd())
 	if (!text) return []
-	return wrapLines(text, width)
+	const label = block.model ? `Hal (${block.model})` : 'Hal'
+	const header = toolHeader(label, width, ASST_FG, ASST_BG)
+	const body = wrapLines(text, width - BLOCK_PAD).map(l => toolLine(l, width, ASST_FG, ASST_BG))
+	return [...header, ...body]
 }
 
 function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: number): string[] {
