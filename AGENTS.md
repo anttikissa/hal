@@ -4,6 +4,8 @@ Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 
 ## Rules
 
+- After every code change to `new/`, run `bun scripts/cloc.ts` and include the output.
+
 - Never restart the app unless the user explicitly asks. Restart kills all tabs — other tabs may have active generations that would be lost.
 - Use Bun, never node.js. `bunx` - no `npx`. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).

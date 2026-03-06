@@ -1,3 +1,2 @@
 #!/bin/bash
-
-bun run cli-test.ts
+exec bun new/main.ts "$@"
