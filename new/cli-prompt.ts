@@ -1,6 +1,7 @@
 // Prompt area: state, key handling, and line building.
 
 import type { CursorPos } from './cli-render.ts'
+import type { KeyEvent } from './cli-keys.ts'
 import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './cli-input.ts'
 
 const DIM = '\x1b[2m', RESET = '\x1b[0m'
@@ -64,7 +65,7 @@ function move(pos: number, selecting: boolean): void {
 	goalCol = null
 }
 
-function collapseSelectionOrMove(pos: number, edge: 'start' | 'end'): void {
+function collapseOrMove(pos: number, edge: 'start' | 'end'): void {
 	const sel = selRange()
 	if (sel) {
 		cursor = edge === 'start' ? sel.start : sel.end
@@ -75,24 +76,14 @@ function collapseSelectionOrMove(pos: number, edge: 'start' | 'end'): void {
 	}
 }
 
-// ── Cmd key (Kitty keyboard protocol) ──
-
-/** Parse CSI u key. Returns cmd char if super modifier held, null otherwise. */
-function parseCmdKey(data: string): string | null {
-	// CSI u format: \x1b[codepoint;modifier[;text]u
-	if (!data.startsWith('\x1b[') || !data.endsWith('u')) return null
-	const body = data.slice(2, -1)
-	const fields = body.split(';')
-	const codepoint = Number((fields[0] || '').split(':', 1)[0])
-	const modPart = fields[1] ?? ''
-	const [rawModStr, eventTypeStr] = modPart.split(':', 2)
-	const modifier = Number(rawModStr || '1')
-	const eventType = Number(eventTypeStr || '1')
-	if (!Number.isFinite(codepoint) || !Number.isFinite(modifier)) return null
-	if (eventType !== 1) return null // ignore key-up events
-	if (modifier < 9) return null // super (Cmd) = modifier bit 8 → raw ≥ 9
-	return String.fromCharCode(codepoint).toLowerCase()
+function deleteSel(): boolean {
+	const sel = selRange()
+	if (!sel) return false
+	deleteRange(sel.start, sel.end)
+	return true
 }
+
+// ── Clipboard ──
 
 function writeClipboard(text: string): void {
 	if (!text) return
@@ -106,117 +97,78 @@ function readClipboard(): string {
 // ── Key handling ──
 // Returns true if the key was handled.
 
-export function handleKey(data: string, contentWidth: number): boolean {
-	// Cmd+key (Kitty keyboard protocol)
-	const cmdKey = parseCmdKey(data)
-	if (cmdKey) {
-		if (cmdKey === 'c') {
-			const sel = selRange()
-			if (sel) writeClipboard(buf.slice(sel.start, sel.end))
-			return true
-		}
-		if (cmdKey === 'x') {
-			const sel = selRange()
-			if (sel) { writeClipboard(buf.slice(sel.start, sel.end)); deleteRange(sel.start, sel.end) }
-			return true
-		}
-		if (cmdKey === 'v') {
-			const text = readClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-			if (text) replaceSelection(text)
-			return true
-		}
-		if (cmdKey === 'a') {
-			selAnchor = 0; cursor = buf.length
-			return true
-		}
+export function handleKey(k: KeyEvent, contentWidth: number): boolean {
+	// Cmd shortcuts
+	if (k.cmd) {
+		if (k.key === 'c') { const s = selRange(); if (s) writeClipboard(buf.slice(s.start, s.end)); return true }
+		if (k.key === 'x') { const s = selRange(); if (s) { writeClipboard(buf.slice(s.start, s.end)); deleteRange(s.start, s.end) }; return true }
+		if (k.key === 'v') { const t = readClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
+		if (k.key === 'a') { selAnchor = 0; cursor = buf.length; return true }
 		return false
 	}
 
-	// Alt-Enter: insert newline
-	if (data === '\x1b\r' || data === '\x1b\n') { replaceSelection('\n'); return true }
+	// Enter
+	if (k.key === 'enter' && k.alt) { replaceSelection('\n'); return true }
+	if (k.key === 'enter') return false // let cli.ts handle submit
 
-	// Backspace
-	if (data === '\x7f' || data === '\x08') {
-		const sel = selRange()
-		if (sel) deleteRange(sel.start, sel.end)
-		else if (cursor > 0) deleteRange(cursor - 1, cursor)
+	// Backspace / Delete
+	if (k.key === 'backspace') {
+		if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor)
+		return true
+	}
+	if (k.key === 'delete' || (k.key === 'd' && k.ctrl)) {
+		if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
 		return true
 	}
 
-	// Ctrl-D: delete forward
-	if (data === '\x04') {
-		const sel = selRange()
-		if (sel) deleteRange(sel.start, sel.end)
-		else if (cursor < buf.length) deleteRange(cursor, cursor + 1)
+	// Ctrl+A: select all, Ctrl+E: end
+	if (k.key === 'a' && k.ctrl) { selAnchor = 0; cursor = buf.length; return true }
+	if (k.key === 'e' && k.ctrl) { move(buf.length, false); return true }
+
+	// Ctrl+K: kill to end
+	if (k.key === 'k' && k.ctrl) {
+		if (!deleteSel()) { buf = buf.slice(0, cursor); goalCol = null; selAnchor = null }
 		return true
 	}
 
-	// Ctrl-A: select all
-	if (data === '\x01') { selAnchor = 0; cursor = buf.length; return true }
-
-	// Ctrl-E: end of line
-	if (data === '\x05') { move(buf.length, false); return true }
-
-	// Ctrl-K: kill to end
-	if (data === '\x0b') {
-		const sel = selRange()
-		if (sel) deleteRange(sel.start, sel.end)
-		else { buf = buf.slice(0, cursor); goalCol = null; selAnchor = null }
+	// Ctrl+W: delete word back
+	if (k.key === 'w' && k.ctrl) {
+		if (!deleteSel() && cursor > 0) deleteRange(wordBoundaryLeft(buf, cursor), cursor)
 		return true
 	}
 
-	// Ctrl-W: delete word back
-	if (data === '\x17') {
-		const sel = selRange()
-		if (sel) deleteRange(sel.start, sel.end)
-		else if (cursor > 0) deleteRange(wordBoundaryLeft(buf, cursor), cursor)
-		return true
+	// Left / Right
+	if (k.key === 'left') {
+		if (k.alt) { move(k.shift ? wordBoundaryLeft(buf, cursor) : wordBoundaryLeft(buf, cursor), k.shift); return true }
+		if (k.shift) { move(cursor - 1, true); return true }
+		collapseOrMove(cursor - 1, 'start'); return true
 	}
-
-	// Arrow left / right
-	if (data === '\x1b[D') { collapseSelectionOrMove(cursor - 1, 'start'); return true }
-	if (data === '\x1b[C') { collapseSelectionOrMove(cursor + 1, 'end'); return true }
-
-	// Shift+Arrow left / right
-	if (data === '\x1b[1;2D') { move(cursor - 1, true); return true }
-	if (data === '\x1b[1;2C') { move(cursor + 1, true); return true }
-
-	// Alt-Left / Alt-Right: word boundaries
-	if (data === '\x1b[1;3D' || data === '\x1bb') { move(wordBoundaryLeft(buf, cursor), false); return true }
-	if (data === '\x1b[1;3C' || data === '\x1bf') { move(wordBoundaryRight(buf, cursor), false); return true }
-
-	// Shift+Alt-Left / Shift+Alt-Right: word select
-	if (data === '\x1b[1;4D') { move(wordBoundaryLeft(buf, cursor), true); return true }
-	if (data === '\x1b[1;4C') { move(wordBoundaryRight(buf, cursor), true); return true }
+	if (k.key === 'right') {
+		if (k.alt) { move(wordBoundaryRight(buf, cursor), k.shift); return true }
+		if (k.shift) { move(cursor + 1, true); return true }
+		collapseOrMove(cursor + 1, 'end'); return true
+	}
 
 	// Up / Down
-	if (data === '\x1b[A' || data === '\x1b[B') {
-		selAnchor = null
-		const dir = data === '\x1b[A' ? -1 : 1
+	if (k.key === 'up' || k.key === 'down') {
+		const dir = k.key === 'up' ? -1 : 1
+		if (k.alt) { move(dir === -1 ? 0 : buf.length, k.shift); return true }
+		if (k.shift) {
+			if (selAnchor === null) selAnchor = cursor
+		} else {
+			selAnchor = null
+		}
 		const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
 		if (!r.atBoundary) { cursor = r.cursor; goalCol = r.goalCol }
 		return true
 	}
 
-	// Shift+Up / Shift+Down
-	if (data === '\x1b[1;2A' || data === '\x1b[1;2B') {
-		if (selAnchor === null) selAnchor = cursor
-		const dir = data === '\x1b[1;2A' ? -1 : 1
-		const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
-		if (!r.atBoundary) { cursor = r.cursor; goalCol = r.goalCol }
-		return true
-	}
+	// Home / End
+	if (k.key === 'home') { move(0, k.shift); return true }
+	if (k.key === 'end') { move(buf.length, k.shift); return true }
 
-	// Alt-Up / Alt-Down: jump to start / end
-	if (data === '\x1b[1;3A') { move(0, false); return true }
-	if (data === '\x1b[1;3B') { move(buf.length, false); return true }
-
-	// Shift+Alt-Up / Shift+Alt-Down: select to start / end
-	if (data === '\x1b[1;4A') { move(0, true); return true }
-	if (data === '\x1b[1;4B') { move(buf.length, true); return true }
-
-	// Printable characters: replace selection
-	if (data >= ' ' && !data.startsWith('\x1b')) { replaceSelection(data); return true }
+	// Printable characters
+	if (k.char) { replaceSelection(k.char); return true }
 
 	return false
 }

@@ -1,6 +1,7 @@
 // Terminal client — reference implementation.
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli-render.ts'
+import { parseKey } from './cli-keys.ts'
 import * as prompt from './cli-prompt.ts'
 
 // ── State ──
@@ -111,8 +112,11 @@ function simulateResponse(tab: Tab, text: string): void {
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
+	const k = parseKey(data)
+	if (!k) return
+
 	// Ctrl-C: quit
-	if (data === '\x03') {
+	if (k.key === 'c' && k.ctrl) {
 		const delta = renderState.lines.length - 1 - renderState.cursorRow
 		if (delta > 0) stdout.write(`\x1b[${delta}B`)
 		stdout.write(`${KITTY_KBD_OFF}\r\n\x1b[?25h`)
@@ -120,7 +124,7 @@ stdin.on('data', (data: string) => {
 	}
 
 	// Ctrl-T: new tab
-	if (data === '\x14') {
+	if (k.key === 't' && k.ctrl) {
 		tabCounter++
 		tabs.push({ id: tabCounter, lines: [''] })
 		activeIdx = tabs.length - 1
@@ -130,11 +134,11 @@ stdin.on('data', (data: string) => {
 	}
 
 	// Ctrl-N / Ctrl-P: switch tabs
-	if (data === '\x0e') { activeIdx = (activeIdx + 1) % tabs.length; doRender(); return }
-	if (data === '\x10') { activeIdx = (activeIdx - 1 + tabs.length) % tabs.length; doRender(); return }
+	if (k.key === 'n' && k.ctrl) { activeIdx = (activeIdx + 1) % tabs.length; doRender(); return }
+	if (k.key === 'p' && k.ctrl) { activeIdx = (activeIdx - 1 + tabs.length) % tabs.length; doRender(); return }
 
-	// Enter: submit
-	if (data === '\r' || data === '\n') {
+	// Enter: submit (prompt returns false for plain enter)
+	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
 		const text = prompt.text().trim()
 		prompt.reset()
 		if (text) {
@@ -156,7 +160,7 @@ stdin.on('data', (data: string) => {
 	}
 
 	// Delegate to prompt key handler
-	if (prompt.handleKey(data, contentWidth())) {
+	if (prompt.handleKey(k, contentWidth())) {
 		doRender()
 		return
 	}
