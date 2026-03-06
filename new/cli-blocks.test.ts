@@ -12,10 +12,17 @@ describe('renderBlocks', () => {
 	test('single input block', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'hello' }]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.length).toBe(1)
-		expect(lines[0]).toContain('you: hello')
+		expect(lines.length).toBe(2)
+		expect(strip(lines[0])).toMatch(/^── you ─+$/)
+		expect(lines[1]).toContain('hello')
 	})
 
+	test('input block shows model name', () => {
+		const blocks: Block[] = [{ type: 'input', text: 'fix it', model: 'codex-5.3' }]
+		const lines = renderBlocks(blocks, 80)
+		expect(strip(lines[0])).toMatch(/^── you \(to codex-5\.3\) ─+$/)
+		expect(lines[1]).toContain('fix it')
+	})
 	test('queued input renders compact', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'fix bug', status: 'queued' }]
 		const lines = renderBlocks(blocks, 80)
@@ -30,9 +37,9 @@ describe('renderBlocks', () => {
 			{ type: 'assistant', text: 'hello', done: true },
 		]
 		const lines = renderBlocks(blocks, 80)
-		// input line, blank, assistant line
-		expect(lines.length).toBe(3)
-		expect(lines[1]).toBe('')
+		// input header, input body, blank, assistant line
+		expect(lines.length).toBe(4)
+		expect(lines[2]).toBe('')
 	})
 
 	test('thinking collapses when done', () => {
@@ -130,7 +137,8 @@ describe('renderBlocks', () => {
 			{ type: 'assistant', text: '', done: false },
 		]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.length).toBe(1)
-		expect(lines[0]).toContain('you: hi')
+		expect(lines.length).toBe(2)
+		expect(strip(lines[0])).toMatch(/^── you ─+$/)
+		expect(lines[1]).toContain('hi')
 	})
 })

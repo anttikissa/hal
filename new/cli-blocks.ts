@@ -44,7 +44,7 @@ function toolColors(name: string): { fg: string; bg: string } {
 }
 
 export type Block =
-	| { type: 'input'; text: string; source?: string; status?: 'queued' | 'steering' }
+	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
 	| { type: 'assistant'; text: string; done: boolean }
 	| { type: 'thinking'; text: string; done: boolean }
 	| { type: 'tool'; name: string; status: 'streaming' | 'running' | 'done' | 'error';
@@ -76,9 +76,12 @@ function inputLine(text: string, width: number): string {
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
 	const who = block.source && block.source !== 'user' ? block.source : 'you'
 	const status = block.status ? ` (${block.status})` : ''
-	const label = `${who}${status}: ${block.text}`
-	if (block.status) return [inputLine(label, width)]
-	return toolHeader(label, width, INPUT_FG, INPUT_BG)
+	const model = block.model ? ` (to ${block.model})` : ''
+	const label = `${who}${status}${model}`
+	if (block.status) return [inputLine(label + ': ' + block.text, width)]
+	const header = toolHeader(label, width, INPUT_FG, INPUT_BG)
+	const body = wrapLines(block.text, width).map(l => inputLine(l, width))
+	return [...header, ...body]
 }
 
 function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: number): string[] {

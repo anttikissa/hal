@@ -319,7 +319,7 @@ stdin.on('data', (data: string) => {
 		if (text) {
 			const tab = tabs.active()
 			// Add user input block
-			tab.blocks.push({ type: 'input', text })
+			tab.blocks.push({ type: 'input', text, model: 'codex-5.3' })
 
 			if (text.startsWith('tool ')) {
 				const rest = text.slice(5)
