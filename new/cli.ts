@@ -20,8 +20,12 @@ const TERM_RESET = `${KITTY_KBD_OFF}\x1b[?25h` // disable protocol + show cursor
 const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
 if (kittyTerms.test(process.env.TERM_PROGRAM ?? '')) stdout.write(KITTY_KBD_ON)
 
-// Always restore terminal on exit, even on crash
-process.on('exit', () => stdout.write(`\x1b[${stdout.rows || 24}B\r\n${TERM_RESET}`))
+// On crash: move cursor below TUI so stacktrace doesn't overwrite content
+let cleanExit = false
+process.on('exit', () => {
+	if (!cleanExit) stdout.write(`\x1b[${stdout.rows || 24}B\r\n`)
+	stdout.write(TERM_RESET)
+})
 
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
@@ -249,6 +253,7 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 // ── Quit / Close ──
 
 function eraseTui(): void {
+	cleanExit = true
 	if (renderState.lines.length === 0) return
 	const up = renderState.cursorRow
 	if (up > 0) stdout.write(`\x1b[${up}A`)
@@ -256,6 +261,7 @@ function eraseTui(): void {
 }
 
 function quit(): void {
+	cleanExit = true
 	if (renderState.lines.length === 0) { process.exit(0) }
 	// Keep blocks + tab bar + prompt text; erase only the help bar
 	const total = renderState.lines.length
