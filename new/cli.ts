@@ -257,7 +257,16 @@ function eraseTui(): void {
 }
 
 function quit(): void {
-	eraseTui()
+	if (renderState.lines.length === 0) { process.exit(0) }
+	// Keep content blocks, erase chrome (tab bar, prompt, help bar) + padding
+	const contentLines = renderBlocks(tabs.active().blocks, cols(), false).length
+	const chromeStart = Math.max(contentLines, 0)
+	// Move cursor to where chrome begins, clear from there down
+	const target = chromeStart
+	const delta = renderState.cursorRow - target
+	if (delta > 0) stdout.write(`\x1b[${delta}A`)
+	else if (delta < 0) stdout.write(`\x1b[${-delta}B`)
+	stdout.write('\r\x1b[J')
 	process.exit(0)
 }
 
