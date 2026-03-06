@@ -286,6 +286,7 @@ stdin.on('data', (data: string) => {
 	const k = parseKey(data)
 	if (!k) return
 
+	if (k.key === 'k' && k.ctrl) { throw new Error('simulated crash (ctrl-k)') }
 	if (k.key === 'c' && k.ctrl) { quit(); return }
 
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && prompt.text().length === 0)) {
