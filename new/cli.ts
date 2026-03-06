@@ -204,24 +204,21 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 	const cut = corpus.indexOf('\n\n', targetChars)
 	corpus = cut === -1 ? corpus : corpus.slice(0, cut)
 
-	// Split into segments: thinking → assistant, maybe repeat
-	// Always split at paragraph boundaries (\n\n)
-	type Segment = { type: 'thinking' | 'assistant'; text: string }
+	// Split into segments: always alternate thinking → assistant
+	type Segment = { type: 'thinking' | 'assistant'; text: string; model?: string }
 	const segments: Segment[] = []
 	const paragraphs = corpus.split(/\n\n+/)
 	let pi = 0
 	while (pi < paragraphs.length) {
-		if (segments.length === 0 || Math.random() < 0.3) {
-			const count = 1 + Math.floor(Math.random() * 2)
-			const text = paragraphs.slice(pi, pi + count).join('\n\n')
-			segments.push({ type: 'thinking', text })
-			pi += count
-			if (pi >= paragraphs.length) break
-		}
-		const count = 1 + Math.floor(Math.random() * 3)
-		const text = paragraphs.slice(pi, pi + count).join('\n\n')
-		segments.push({ type: 'assistant', text, model: 'codex-5.3' })
-		pi += count
+		// Thinking: 1-2 paragraphs
+		const tc = Math.min(1 + Math.floor(Math.random() * 2), paragraphs.length - pi)
+		segments.push({ type: 'thinking', text: paragraphs.slice(pi, pi + tc).join('\n\n') })
+		pi += tc
+		if (pi >= paragraphs.length) break
+		// Assistant: 1-4 paragraphs (consumes remaining)
+		const ac = Math.min(1 + Math.floor(Math.random() * 4), paragraphs.length - pi)
+		segments.push({ type: 'assistant', text: paragraphs.slice(pi, pi + ac).join('\n\n'), model: 'codex-5.3' })
+		pi += ac
 	}
 
 	// Stream segments sequentially
