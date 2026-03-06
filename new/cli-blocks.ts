@@ -152,14 +152,23 @@ function renderBlock(block: Block, width: number): string[] {
 	}
 }
 
+function isStreaming(block: Block): boolean {
+	return (block.type === 'assistant' || block.type === 'thinking') && !block.done
+}
+
 /** Render all blocks with one blank line between them. */
-export function renderBlocks(blocks: Block[], width: number): string[] {
+export function renderBlocks(blocks: Block[], width: number, cursorVisible = false): string[] {
 	const result: string[] = []
 	for (const block of blocks) {
 		const lines = renderBlock(block, width)
 		if (lines.length === 0) continue
 		if (result.length > 0) result.push('')
 		result.push(...lines)
+	}
+	// Append blinking cursor to last streaming block
+	const lastBlock = blocks[blocks.length - 1]
+	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
+		result[result.length - 1] += cursorVisible ? '█' : ' '
 	}
 	return result
 }

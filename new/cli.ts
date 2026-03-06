@@ -39,7 +39,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cw = contentWidth()
 
 	// Content from blocks
-	const contentLines = renderBlocks(tab.blocks, cw)
+	const contentLines = renderBlocks(tab.blocks, cw, halCursorVisible)
 
 	// Pad to fill screen (stable layout)
 	const pLines = prompt.lineCount(cw)
