@@ -6,7 +6,7 @@ const result = '/tmp/new-cloc.txt'
 
 const counts: [string, number][] = []
 let total = 0
-const glob = new Bun.Glob('*.ts')
+const glob = new Bun.Glob('**/*.ts')
 for await (const path of glob.scan({ cwd: dir, onlyFiles: true })) {
 	if (path.endsWith('.test.ts')) continue
 	const content = await Bun.file(`${dir}/${path}`).text()

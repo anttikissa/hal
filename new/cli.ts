@@ -1,10 +1,10 @@
 // Terminal client — reference implementation.
 
-import { render, emptyState, type RenderState, type CursorPos } from './cli-diff-engine.ts'
-import { parseKey } from './cli-keys.ts'
-import * as tabs from './cli-tabs.ts'
-import * as prompt from './cli-prompt.ts'
-import { renderBlocks, type Block } from './cli-blocks.ts'
+import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
+import { parseKey } from './cli/keys.ts'
+import * as tabs from './cli/tabs.ts'
+import * as prompt from './cli/prompt.ts'
+import { renderBlocks, type Block } from './cli/blocks.ts'
 
 // ── Terminal setup ──
 

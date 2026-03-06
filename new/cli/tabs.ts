@@ -1,6 +1,6 @@
 // Tab state and management.
 
-import type { Block } from './cli-blocks.ts'
+import type { Block } from './blocks.ts'
 
 export interface Tab {
 	id: number

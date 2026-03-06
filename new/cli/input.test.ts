@@ -5,7 +5,7 @@ import {
 	cursorToWrappedRowCol,
 	wrappedRowColToCursor,
 	verticalMove,
-} from './cli-input.ts'
+} from './input.ts'
 
 describe('wordWrapLines', () => {
 	test('no wrap needed', () => {

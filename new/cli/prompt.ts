@@ -1,8 +1,8 @@
 // Prompt area: state, key handling, and line building.
 
-import type { CursorPos } from './cli-diff-engine.ts'
-import type { KeyEvent } from './cli-keys.ts'
-import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './cli-input.ts'
+import type { CursorPos } from './diff-engine.ts'
+import type { KeyEvent } from './keys.ts'
+import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './input.ts'
 
 const DIM = '\x1b[2m', RESET = '\x1b[0m'
 const SEL_ON = '\x1b[7m', SEL_OFF = '\x1b[27m' // reverse video

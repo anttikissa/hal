@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { renderBlocks, type Block } from './cli-blocks.ts'
+import { renderBlocks, type Block } from './blocks.ts'
 
 // eslint-disable-next-line no-control-regex
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')

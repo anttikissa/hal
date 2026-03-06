@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { parseKey } from './cli-keys.ts'
+import { parseKey } from './keys.ts'
 
 describe('parseKey', () => {
 	test('printable characters', () => {
