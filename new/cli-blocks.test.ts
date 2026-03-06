@@ -1,6 +1,9 @@
 import { describe, test, expect } from 'bun:test'
 import { renderBlocks, type Block } from './cli-blocks.ts'
 
+// eslint-disable-next-line no-control-regex
+const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+
 describe('renderBlocks', () => {
 	test('empty blocks → empty', () => {
 		expect(renderBlocks([], 80)).toEqual([])
@@ -58,22 +61,67 @@ describe('renderBlocks', () => {
 		expect(lines).toEqual(['para1', '', 'para2'])
 	})
 
-	test('tool done shows checkmark', () => {
+	test('tool header with ─ fill', () => {
 		const blocks: Block[] = [
-			{ type: 'tool', name: 'bash', status: 'done', args: '', output: 'ok', startTime: Date.now() - 2000 },
+			{ type: 'tool', name: 'bash', status: 'running', args: 'ls', output: '', startTime: Date.now() },
+		]
+		const lines = renderBlocks(blocks, 40)
+		const plain = strip(lines[0])
+		expect(plain).toMatch(/^── bash: ls .+─+$/)
+		expect(plain.length).toBe(40)
+	})
+
+	test('tool header wraps long commands', () => {
+		const longCmd = 'a'.repeat(100)
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'bash', status: 'running', args: longCmd, output: '', startTime: Date.now() },
+		]
+		const lines = renderBlocks(blocks, 40)
+		expect(lines.length).toBeGreaterThan(1)
+		// Last header line ends with ─ fill
+		const lastPlain = strip(lines[lines.length - 1])
+		expect(lastPlain).toMatch(/─+$/)
+	})
+
+	test('tool output collapses after 5 lines', () => {
+		const output = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n')
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'bash', status: 'done', args: 'cmd', output, startTime: Date.now() - 2000 },
 		]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines[0]).toContain('bash')
+		const plain = lines.map(l => strip(l))
+		expect(plain.some(l => l.includes('[+ 5 lines]'))).toBe(true)
+		// Shows last 5 lines
+		expect(plain.some(l => l.includes('line 9'))).toBe(true)
+		expect(plain.some(l => l.includes('line 5'))).toBe(true)
+		// Does NOT show early lines
+		expect(plain.some(l => l.includes('line 0'))).toBe(false)
+	})
+
+	test('tool done shows checkmark in header', () => {
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: 'ok', startTime: Date.now() - 2000 },
+		]
+		const lines = renderBlocks(blocks, 80)
 		expect(lines[0]).toContain('✓')
 	})
 
-	test('tool error shows cross', () => {
+	test('tool error shows cross in header', () => {
 		const blocks: Block[] = [
-			{ type: 'tool', name: 'read', status: 'error', args: '', output: 'not found', startTime: Date.now() - 1000 },
+			{ type: 'tool', name: 'read', status: 'error', args: 'foo.txt', output: 'not found', startTime: Date.now() - 1000 },
 		]
 		const lines = renderBlocks(blocks, 80)
 		expect(lines[0]).toContain('✗')
-		expect(lines[0]).toContain('not found')
+	})
+
+	test('tool block lines are full width', () => {
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: 'hi', startTime: Date.now() },
+		]
+		const lines = renderBlocks(blocks, 40)
+		for (const line of lines) {
+			expect(strip(line).length).toBe(40)
+		}
 	})
 
 	test('empty assistant block produces no lines', () => {
@@ -82,7 +130,6 @@ describe('renderBlocks', () => {
 			{ type: 'assistant', text: '', done: false },
 		]
 		const lines = renderBlocks(blocks, 80)
-		// Empty assistant block should be skipped, no trailing blank line
 		expect(lines.length).toBe(1)
 		expect(lines[0]).toContain('> hi')
 	})

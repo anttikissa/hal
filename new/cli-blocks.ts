@@ -2,6 +2,9 @@
 
 const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
 const ITALIC = '\x1b[3m'
+const TOOL_FG = '\x1b[95m' // bright magenta
+const TOOL_BG = '\x1b[48;5;53m' // dark magenta background
+const TOOL_MAX_OUTPUT = 5
 
 export type Block =
 	| { type: 'input'; text: string; source?: string; status?: 'queued' | 'steering' }
@@ -61,23 +64,53 @@ function elapsed(startTime: number): string {
 	return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
 }
 
+function toolLine(text: string, width: number): string {
+	return `${TOOL_BG}${TOOL_FG}${text.padEnd(width)}${RESET}`
+}
+
+function toolHeader(label: string, width: number): string[] {
+	const prefix = '── '
+	const inner = prefix + label + ' '
+	if (inner.length >= width) {
+		// Wraps: hard-wrap the full text, put ─ fill on last line
+		const full = prefix + label + ' '
+		const lines: string[] = []
+		for (let i = 0; i < full.length; i += width) {
+			lines.push(full.slice(i, i + width))
+		}
+		// Fill remainder of last line with ─
+		const last = lines[lines.length - 1]
+		lines[lines.length - 1] = last + '─'.repeat(Math.max(0, width - last.length))
+		return lines.map(l => toolLine(l, width))
+	}
+	const fill = '─'.repeat(Math.max(0, width - inner.length))
+	return [toolLine(inner + fill, width)]
+}
+
 function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): string[] {
 	const time = elapsed(block.startTime)
-	switch (block.status) {
-		case 'streaming':
-			return [`${BOLD}${block.name}${RESET} ${DIM}streaming...${RESET}`]
-		case 'running':
-			return [`${BOLD}${block.name}${RESET} ${DIM}(${time})${RESET}`]
-		case 'done': {
-			const summary = block.output.split('\n')[0]?.slice(0, width - block.name.length - time.length - 10) ?? ''
-			const suffx = summary ? ` ${DIM}${summary}${RESET}` : ''
-			return [`${BOLD}${block.name}${RESET} ${DIM}(${time})${RESET} ✓${suffx}`]
+	const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
+	const label = `${block.name}: ${block.args} (${time})${statusSuffix}`
+	const header = toolHeader(label, width)
+
+	const outputText = block.output.trimEnd()
+	if (!outputText) return header
+
+	const outputLines = outputText.split('\n')
+	const lines = [...header]
+
+	if (outputLines.length > TOOL_MAX_OUTPUT) {
+		const hidden = outputLines.length - TOOL_MAX_OUTPUT
+		lines.push(toolLine(`[+ ${hidden} lines]`, width))
+		for (const l of outputLines.slice(-TOOL_MAX_OUTPUT)) {
+			lines.push(toolLine(l, width))
 		}
-		case 'error': {
-			const msg = block.output.split('\n')[0]?.slice(0, width - block.name.length - time.length - 10) ?? ''
-			return [`${BOLD}${block.name}${RESET} ${DIM}(${time})${RESET} ✗ ${msg}`]
+	} else {
+		for (const l of outputLines) {
+			lines.push(toolLine(l, width))
 		}
 	}
+	return lines
 }
 
 function renderBlock(block: Block, width: number): string[] {

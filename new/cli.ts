@@ -119,15 +119,35 @@ function simulateResponse(tab: ReturnType<typeof tabs.active>, text: string): vo
 	}, 30)
 }
 
-function simulateToolCall(tab: ReturnType<typeof tabs.active>, name: string): void {
+function simulateToolCall(tab: ReturnType<typeof tabs.active>, name: string, cmd: string): void {
 	const block: Block = {
-		type: 'tool', name, status: 'streaming',
-		args: '', output: '', startTime: Date.now(),
+		type: 'tool', name, status: 'running',
+		args: cmd, output: '', startTime: Date.now(),
 	}
 	tab.blocks.push(block)
 
-	setTimeout(() => { block.status = 'running'; doRender() }, 500)
-	setTimeout(() => { block.status = 'done'; block.output = 'ok'; doRender() }, 2000)
+	// Simulate streaming output
+	let line = 0
+	const outputLines = [
+		'drwxr-xr-x  5 user  staff  160 Mar  1 09:00 cache',
+		'-rw-r--r--  1 user  staff  842 Mar  2 14:23 debug.log',
+		'drwxr-xr-x  3 user  staff   96 Mar  3 11:45 sessions',
+		'-rw-r--r--  1 user  staff  128 Mar  4 08:12 config.json',
+		'-rw-r--r--  1 user  staff  256 Mar  5 16:30 auth.json',
+		'drwxr-xr-x  8 user  staff  256 Mar  5 17:00 node_modules',
+		'-rw-r--r--  1 user  staff  512 Mar  6 09:15 package.json',
+		'-rw-r--r--  1 user  staff 1024 Mar  6 09:15 bun.lockb',
+	]
+	const tick = setInterval(() => {
+		if (line >= outputLines.length) {
+			block.status = 'done'
+			clearInterval(tick)
+		} else {
+			block.output += (block.output ? '\n' : '') + outputLines[line]
+			line++
+		}
+		doRender()
+	}, 300)
 }
 
 // ── Quit / Close ──
@@ -178,7 +198,8 @@ stdin.on('data', (data: string) => {
 			tab.blocks.push({ type: 'input', text })
 
 			if (text.startsWith('tool ')) {
-				simulateToolCall(tab, text.slice(5) || 'bash')
+				const cmd = text.slice(5) || 'ls -la'
+				simulateToolCall(tab, 'bash', cmd)
 			} else {
 				const words = text.split(' ').length
 				const response = `Message: "${text}"\n${text.length} chars, ${words} word${words === 1 ? '' : 's'}\n`
