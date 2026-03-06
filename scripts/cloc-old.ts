@@ -1,16 +1,14 @@
 #!/usr/bin/env bun
-// Count non-comment, non-test, non-blank lines per module under new/
+// Count non-comment, non-test, non-blank lines under new/
 
 const dir = import.meta.dir + '/../new'
 const result = '/tmp/new-cloc.txt'
 
-const counts: [string, number][] = []
-let total = 0
+let lines = 0
 const glob = new Bun.Glob('*.ts')
 for await (const path of glob.scan({ cwd: dir, onlyFiles: true })) {
 	if (path.endsWith('.test.ts')) continue
 	const content = await Bun.file(`${dir}/${path}`).text()
-	let lines = 0
 	let inBlock = false
 	for (const line of content.split('\n')) {
 		const t = line.trim()
@@ -19,27 +17,18 @@ for await (const path of glob.scan({ cwd: dir, onlyFiles: true })) {
 		if (t.startsWith('/*')) { if (!t.includes('*/')) inBlock = true; continue }
 		lines++
 	}
-	counts.push([path, lines])
-	total += lines
 }
-
-counts.sort((a, b) => b[1] - a[1])
 
 let prev: number | null = null
 try { prev = parseInt(await Bun.file(result).text(), 10) } catch {}
 
-await Bun.write(result, String(total))
+await Bun.write(result, String(lines))
 
-const pad = Math.max(...counts.map(([, n]) => String(n).length))
-for (const [name, n] of counts) {
-	console.log(`  ${String(n).padStart(pad)}  ${name}`)
-}
-
-if (prev !== null && prev !== total) {
-	const delta = total - prev
+if (prev !== null && prev !== lines) {
+	const delta = lines - prev
 	const sign = delta > 0 ? '+' : ''
 	const msg = delta < 0 ? `${sign}${delta} lines! Nice!` : `${sign}${delta} lines`
-	console.log(`  ${String(total).padStart(pad)}  total (${msg})`)
+	console.log(`new/ ${lines} LOC (${msg})`)
 } else {
-	console.log(`  ${String(total).padStart(pad)}  total`)
+	console.log(`new/ ${lines} LOC`)
 }

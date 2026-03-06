@@ -10,7 +10,8 @@
 		"test:quick": "bun test src/hashline.test.ts src/session.test.ts src/utils/",
 		"test:e2e": "bun test src/tests/",
 		"capture": "bun run scripts/capture",
-		"cloc": "cloc src/ main.ts --exclude-dir=tests --not-match-f=\\.test\\.ts$"
+		"cloc": "bun scripts/cloc.ts",
+		"cloc-old": "cloc src/ main.ts --exclude-dir=tests --not-match-f=\\.test\\.ts$"
 	},
 	"devDependencies": {
 		"@typescript/native-preview": "^7.0.0-dev.20260301.1",
