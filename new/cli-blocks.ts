@@ -3,6 +3,7 @@
 const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
 const ITALIC = '\x1b[3m'
 const TOOL_MAX_OUTPUT = 5
+const BLOCK_PAD = 1
 
 // ── OKLCH color system ──
 
@@ -36,8 +37,8 @@ const TOOL_COLORS: Record<string, { fg: string; bg: string }> = {
 }
 
 // Input/prompt block colors: cool grey with slight blue tint
-const INPUT_FG = fg256(oklch(0.90, 0.01, 250))
-const INPUT_BG = bg256(oklch(0.30, 0.01, 250))
+const INPUT_FG = fg256(oklch(0.80, 0.008, 250))
+const INPUT_BG = bg256(oklch(0.29, 0.008, 250))
 
 function toolColors(name: string): { fg: string; bg: string } {
 	return TOOL_COLORS[name] ?? TOOL_COLORS.default
@@ -70,7 +71,8 @@ function wrapLines(text: string, width: number): string[] {
 }
 
 function inputLine(text: string, width: number): string {
-	return `${INPUT_BG}${INPUT_FG}${text.padEnd(width)}${RESET}`
+	const padded = ' '.repeat(BLOCK_PAD) + text
+	return `${INPUT_BG}${INPUT_FG}${padded.padEnd(width)}${RESET}`
 }
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
@@ -80,7 +82,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 	const label = `${who}${status}${model}`
 	if (block.status) return [inputLine(label + ': ' + block.text, width)]
 	const header = toolHeader(label, width, INPUT_FG, INPUT_BG)
-	const body = wrapLines(block.text, width).map(l => inputLine(l, width))
+	const body = wrapLines(block.text, width - BLOCK_PAD).map(l => inputLine(l, width))
 	return [...header, ...body]
 }
 
@@ -105,23 +107,25 @@ function elapsed(startTime: number): string {
 }
 
 function toolLine(text: string, width: number, fg: string, bg: string): string {
-	return `${bg}${fg}${text.padEnd(width)}${RESET}`
+	const padded = ' '.repeat(BLOCK_PAD) + text
+	return `${bg}${fg}${padded.padEnd(width)}${RESET}`
 }
 
 function toolHeader(label: string, width: number, fg: string, bg: string): string[] {
+	const inner_w = width - BLOCK_PAD
 	const prefix = '── '
 	const inner = prefix + label + ' '
-	if (inner.length >= width) {
+	if (inner.length >= inner_w) {
 		const full = prefix + label + ' '
 		const lines: string[] = []
-		for (let i = 0; i < full.length; i += width) {
-			lines.push(full.slice(i, i + width))
+		for (let i = 0; i < full.length; i += inner_w) {
+			lines.push(full.slice(i, i + inner_w))
 		}
 		const last = lines[lines.length - 1]
-		lines[lines.length - 1] = last + '─'.repeat(Math.max(0, width - last.length))
+		lines[lines.length - 1] = last + '─'.repeat(Math.max(0, inner_w - last.length))
 		return lines.map(l => toolLine(l, width, fg, bg))
 	}
-	const fill = '─'.repeat(Math.max(0, width - inner.length))
+	const fill = '─'.repeat(Math.max(0, inner_w - inner.length))
 	return [toolLine(inner + fill, width, fg, bg)]
 }
 

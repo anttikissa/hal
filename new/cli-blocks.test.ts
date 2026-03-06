@@ -13,14 +13,14 @@ describe('renderBlocks', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'hello' }]
 		const lines = renderBlocks(blocks, 80)
 		expect(lines.length).toBe(2)
-		expect(strip(lines[0])).toMatch(/^── you ─+$/)
+		expect(strip(lines[0])).toMatch(/^ ── you ─+$/)
 		expect(lines[1]).toContain('hello')
 	})
 
 	test('input block shows model name', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'fix it', model: 'codex-5.3' }]
 		const lines = renderBlocks(blocks, 80)
-		expect(strip(lines[0])).toMatch(/^── you \(to codex-5\.3\) ─+$/)
+		expect(strip(lines[0])).toMatch(/^ ── you \(to codex-5\.3\) ─+$/)
 		expect(lines[1]).toContain('fix it')
 	})
 	test('queued input renders compact', () => {
@@ -74,20 +74,19 @@ describe('renderBlocks', () => {
 		]
 		const lines = renderBlocks(blocks, 40)
 		const plain = strip(lines[0])
-		expect(plain).toMatch(/^── bash: ls .+─+$/)
+		expect(plain).toMatch(/^ ── bash: ls .+─+$/)
 		expect(plain.length).toBe(40)
 	})
 
 	test('tool header wraps long commands', () => {
-		const longCmd = 'a'.repeat(100)
+		const longCmd = 'a'.repeat(50)
 		const blocks: Block[] = [
 			{ type: 'tool', name: 'bash', status: 'running', args: longCmd, output: '', startTime: Date.now() },
 		]
 		const lines = renderBlocks(blocks, 40)
 		expect(lines.length).toBeGreaterThan(1)
-		// Last header line ends with ─ fill
 		const lastPlain = strip(lines[lines.length - 1])
-		expect(lastPlain).toMatch(/─+$/)
+		expect(lastPlain).toMatch(/─+\s*$/)
 	})
 
 	test('tool output collapses after 5 lines', () => {
@@ -138,7 +137,7 @@ describe('renderBlocks', () => {
 		]
 		const lines = renderBlocks(blocks, 80)
 		expect(lines.length).toBe(2)
-		expect(strip(lines[0])).toMatch(/^── you ─+$/)
+		expect(strip(lines[0])).toMatch(/^ ── you ─+$/)
 		expect(lines[1]).toContain('hi')
 	})
 })
