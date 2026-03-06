@@ -146,6 +146,23 @@ describe('parseKey', () => {
 		expect(parseKey('\x1b[97;1:3u')).toBeNull()
 	})
 
+	test('kitty: CSI functional key-up ignored', () => {
+		// shift+option+left release: \x1b[1;4:3D
+		expect(parseKey('\x1b[1;4:3D')).toBeNull()
+	})
+
+	test('kitty: CSI functional key press works', () => {
+		const k = parseKey('\x1b[1;4:1D')!
+		expect(k.key).toBe('left')
+		expect(k.shift).toBe(true)
+		expect(k.alt).toBe(true)
+	})
+
+	test('kitty: tilde key-up ignored', () => {
+		// delete release: \x1b[3;1:3~
+		expect(parseKey('\x1b[3;1:3~')).toBeNull()
+	})
+
 	test('multi-byte paste', () => {
 		const k = parseKey('hello')!
 		expect(k.char).toBe('hello')

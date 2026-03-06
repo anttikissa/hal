@@ -35,10 +35,14 @@ const CSI_TILDE_KEYS: Record<number, string> = {
 
 function parseCsi(body: string, terminator: string): KeyEvent | null {
 	// Modified keys: \x1b[1;MOD+suffix  e.g. \x1b[1;2D = shift+left
+	// Kitty adds :eventType to modifier (1=press, 2=repeat, 3=release)
 	const parts = body.split(';')
 	const keyName = CSI_SUFFIX_KEYS[terminator]
 	if (keyName) {
-		const mod = parts.length >= 2 ? Number(parts[1]?.split(':')[0]) : 1
+		const modField = parts[1] ?? ''
+		const [rawModStr, eventTypeStr] = modField.split(':', 2)
+		if (eventTypeStr === '3') return null // key release
+		const mod = parts.length >= 2 ? Number(rawModStr || '1') : 1
 		return ke(keyName, parseMods(mod))
 	}
 	// Tilde keys: \x1b[NUM~ or \x1b[NUM;MOD~
@@ -46,7 +50,10 @@ function parseCsi(body: string, terminator: string): KeyEvent | null {
 		const num = Number(parts[0])
 		const name = CSI_TILDE_KEYS[num]
 		if (!name) return null
-		const mod = parts.length >= 2 ? Number(parts[1]?.split(':')[0]) : 1
+		const modField = parts[1] ?? ''
+		const [rawModStr, eventTypeStr] = modField.split(':', 2)
+		if (eventTypeStr === '3') return null // key release
+		const mod = parts.length >= 2 ? Number(rawModStr || '1') : 1
 		return ke(name, parseMods(mod))
 	}
 	return null
