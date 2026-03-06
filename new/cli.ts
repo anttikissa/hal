@@ -250,8 +250,10 @@ stdin.on('data', (data: string) => {
 			tab.blocks.push({ type: 'input', text })
 
 			if (text.startsWith('tool ')) {
-				const cmd = text.slice(5) || 'ls -la'
-				simulateToolCall(tab, 'bash', cmd)
+				const rest = text.slice(5)
+				const name = rest.startsWith('read') ? 'read' : 'bash'
+				const cmd = rest.replace(/^(bash|read)\s*/, '') || 'ls -la'
+				simulateToolCall(tab, name, cmd)
 			} else {
 				const spamMatch = text.match(/^spa(m+)$/)
 				const count = spamMatch ? spamMatch[1].length * 10 : 0
