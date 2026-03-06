@@ -5,6 +5,7 @@ import type { Transport } from './transport.ts'
 import type { Block } from './blocks.ts'
 import type { RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
 import { makeCommand } from '../protocol.ts'
+import { replayToBlocks } from '../session/replay.ts'
 import { randomBytes } from 'crypto'
 
 export interface TabState {
@@ -73,22 +74,7 @@ export class Client {
 
 	private async replayHistory(tab: TabState): Promise<void> {
 		const messages = await this.transport.replaySession(tab.sessionId)
-		for (const msg of messages) {
-			if ((msg as any).role === 'user') {
-				const text = typeof (msg as any).content === 'string' ? (msg as any).content : ''
-				if (text) {
-					tab.blocks.push({ type: 'input', text, model: tab.info.model })
-				}
-			} else if ((msg as any).role === 'assistant') {
-				const m = msg as any
-				if (m.thinkingText) {
-					tab.blocks.push({ type: 'thinking', text: m.thinkingText, done: true })
-				}
-				if (m.text) {
-					tab.blocks.push({ type: 'assistant', text: m.text, done: true, model: tab.info.model })
-				}
-			}
-		}
+		tab.blocks.push(...replayToBlocks(messages, tab.info.model))
 	}
 
 	private async tailEvents(fromOffset: number): Promise<void> {
