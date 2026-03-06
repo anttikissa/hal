@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from 'bun:test'
-import { readdirSync, readFileSync, existsSync } from 'fs'
+import { readdirSync, readFileSync, existsSync, rmSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
 import { stringify, parseAll } from './utils/ason.ts'
@@ -22,8 +22,11 @@ import {
 } from './session.ts'
 import { sessionDir } from './state.ts'
 
+const createdIds: string[] = []
+
 function uniqueId(): string {
 	const id = `t-${randomBytes(4).toString('hex')}`
+	createdIds.push(id)
 	sessionInfoMap.set(id, {
 		id, workingDir: '/tmp', currentLog: 'messages.asonl', busy: false, messageCount: 0,
 		createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -31,8 +34,19 @@ function uniqueId(): string {
 	return id
 }
 
+async function fork(srcId: string): Promise<string> {
+	const id = await forkSession(srcId)
+	createdIds.push(id)
+	return id
+}
+
 afterEach(() => {
-	// Clean up test sessions
+	for (const id of createdIds) {
+		sessionInfoMap.delete(id)
+		const dir = sessionDir(id)
+		if (existsSync(dir)) rmSync(dir, { recursive: true })
+	}
+	createdIds.length = 0
 })
 
 describe('unified log — block storage', () => {
@@ -238,7 +252,7 @@ describe('fork by reference', () => {
 		])
 		await appendToLog(srcId, [entry])
 
-		const newId = await forkSession(srcId)
+		const newId = await fork(srcId)
 
 		// No blocks copied — child has no blocks dir
 		expect(existsSync(join(sessionDir(newId), 'blocks'))).toBe(false)
@@ -258,7 +272,7 @@ describe('fork by reference', () => {
 		])
 		await appendToLog(srcId, [entry])
 
-		const newId = await forkSession(srcId)
+		const newId = await fork(srcId)
 		await appendToLog(newId, [{ role: 'user', content: 'follow-up', ts: new Date().toISOString() }])
 
 		const result = await loadSession(newId)
@@ -273,7 +287,7 @@ describe('fork by reference', () => {
 		const ts = new Date().toISOString()
 		await appendToLog(srcId, [{ role: 'user', content: 'before fork', ts }])
 
-		const newId = await forkSession(srcId)
+		const newId = await fork(srcId)
 
 		// Parent gets new messages after the fork
 		await Bun.sleep(2)
@@ -291,10 +305,10 @@ describe('fork by reference', () => {
 		const grandparent = uniqueId()
 		await appendToLog(grandparent, [{ role: 'user', content: 'gen1', ts }])
 
-		const parent = await forkSession(grandparent)
+		const parent = await fork(grandparent)
 		await appendToLog(parent, [{ role: 'user', content: 'gen2', ts: new Date().toISOString() }])
 
-		const child = await forkSession(parent)
+		const child = await fork(parent)
 		await appendToLog(child, [{ role: 'user', content: 'gen3', ts: new Date().toISOString() }])
 
 		const result = await loadSession(child)
