@@ -18,7 +18,8 @@ stdin.resume()
 const KITTY_KBD_ON = '\x1b[>27u', KITTY_KBD_OFF = '\x1b[<u'
 const TERM_RESET = `${KITTY_KBD_OFF}\x1b[?25h` // disable protocol + show cursor
 const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
-if (kittyTerms.test(process.env.TERM_PROGRAM ?? '')) stdout.write(KITTY_KBD_ON)
+const useKitty = kittyTerms.test(process.env.TERM_PROGRAM ?? '')
+if (useKitty) stdout.write(KITTY_KBD_ON)
 
 // On crash: move cursor below TUI so stacktrace doesn't overwrite content
 let cleanExit = false
@@ -286,7 +287,7 @@ let suspended = false
 function suspend(): void {
 	suspended = true
 	if (blinkTimer) clearTimeout(blinkTimer)
-	stdout.write('\x1b[?25h') // show real cursor
+	stdout.write(`${useKitty ? KITTY_KBD_OFF : ''}\x1b[?25h`)
 	if (stdin.isTTY) stdin.setRawMode(false)
 	stdin.pause()
 	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
@@ -297,6 +298,7 @@ process.on('SIGCONT', () => {
 	suspended = false
 	stdin.setRawMode(true)
 	stdin.resume()
+	if (useKitty) stdout.write(KITTY_KBD_ON)
 	renderState = emptyState
 	scheduleBlink()
 	doRender()
