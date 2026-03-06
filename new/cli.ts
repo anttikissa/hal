@@ -332,6 +332,7 @@ stdout.on('resize', () => {
 	doRender()
 })
 
+stdout.write('\x1b[2J\x1b[H') // clear screen on startup
 tabs.active().blocks.push({ type: 'assistant', done: true, text: `Say 'help' to see what I can do.` })
 scheduleBlink()
 doRender()
