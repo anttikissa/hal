@@ -287,10 +287,7 @@ let suspended = false
 
 function suspend(): void {
 	suspended = true
-	if (blinkTimer) clearTimeout(blinkTimer)
 	stdout.write(`${useKitty ? KITTY_KBD_OFF : ''}\x1b[?25h`)
-	if (stdin.isTTY) stdin.setRawMode(false)
-	stdin.pause()
 	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
 }
 
@@ -302,7 +299,6 @@ process.on('SIGCONT', () => {
 	stdin.resume()
 	if (useKitty) stdout.write(KITTY_KBD_ON)
 	renderState = emptyState
-	scheduleBlink()
 	doRender()
 })
 
