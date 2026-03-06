@@ -145,4 +145,31 @@ describe('renderBlocks', () => {
 		expect(strip(lines[0])).toMatch(/^── You ─+$/)
 		expect(lines[1]).toContain('hi')
 	})
+
+	test('word wraps long text at word boundaries', () => {
+		const text = 'the quick brown fox jumps over the lazy dog and keeps running'
+		const blocks: Block[] = [{ type: 'assistant', text, done: true }]
+		// width 30, BLOCK_PAD=1 each side → content width 28
+		const lines = renderBlocks(blocks, 30)
+		const body = lines.slice(1).map(l => strip(l).trim()).filter(Boolean)
+		// Each line should be <= 28 visible chars (content width)
+		for (const b of body) expect(b.length).toBeLessThanOrEqual(28)
+		// All words should appear across the lines
+		for (const word of text.split(' ')) {
+			expect(body.some(l => l.includes(word))).toBe(true)
+		}
+		// Lines should break at spaces, not mid-word
+		expect(body.length).toBeGreaterThan(1)
+	})
+
+	test('right padding on assistant blocks', () => {
+		const blocks: Block[] = [{ type: 'assistant', text: 'hi', done: true }]
+		const lines = renderBlocks(blocks, 40)
+		// Body line: BLOCK_PAD(1) left + "hi" + padding to fill 40 cols
+		const bodyPlain = strip(lines[1])
+		expect(bodyPlain.length).toBe(40)
+		// Should start with space (left pad) and end with spaces (right pad)
+		expect(bodyPlain[0]).toBe(' ')
+		expect(bodyPlain[bodyPlain.length - 1]).toBe(' ')
+	})
 })

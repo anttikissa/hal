@@ -60,20 +60,27 @@ function collapseBlankLines(text: string): string {
 	return text.replace(/\n{3,}/g, '\n\n')
 }
 
-function wrapLines(text: string, width: number): string[] {
+function wordWrap(text: string, width: number): string[] {
 	const lines: string[] = []
 	for (const raw of text.split('\n')) {
 		if (raw.length <= width || width <= 0) {
 			lines.push(raw)
 		} else {
-			for (let i = 0; i < raw.length; i += width) {
-				lines.push(raw.slice(i, i + width))
+			let remaining = raw
+			while (remaining.length > width) {
+				let breakAt = remaining.lastIndexOf(' ', width)
+				if (breakAt <= 0) breakAt = width
+				lines.push(remaining.slice(0, breakAt))
+				remaining = remaining[breakAt] === ' ' ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
 			}
+			lines.push(remaining)
 		}
 	}
 	return lines
 }
 
+
+const CONTENT_W = (width: number) => width - 2 * BLOCK_PAD
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
 	const who = block.source && block.source !== 'user' ? block.source : 'You'
@@ -82,7 +89,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 	const label = `${who}${status}${model}`
 	if (block.status) return [toolLine(label + ': ' + block.text, width, INPUT_FG, INPUT_BG)]
 	const header = toolHeader(label, width, INPUT_FG, INPUT_BG)
-	const body = wrapLines(block.text, width - BLOCK_PAD).map(l => toolLine(l, width, INPUT_FG, INPUT_BG))
+	const body = wordWrap(block.text, CONTENT_W(width)).map(l => toolLine(l, width, INPUT_FG, INPUT_BG))
 	return [...header, ...body]
 }
 
@@ -91,7 +98,7 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 	if (!text) return []
 	const label = block.model ? `Hal (${block.model})` : 'Hal'
 	const header = toolHeader(label, width, ASST_FG, ASST_BG)
-	const body = wrapLines(text, width - BLOCK_PAD).map(l => toolLine(l, width, ASST_FG, ASST_BG))
+	const body = wordWrap(text, CONTENT_W(width)).map(l => toolLine(l, width, ASST_FG, ASST_BG))
 	return [...header, ...body]
 }
 
@@ -99,7 +106,7 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	const pad = ' '.repeat(BLOCK_PAD)
 	const text = collapseBlankLines(block.text.trimEnd())
 	if (!text) return [`${THINK_FG}${pad}Thinking...${RESET}`]
-	return wrapLines(text, width - BLOCK_PAD).map(l => `${THINK_FG}${pad}${l}${RESET}`)
+	return wordWrap(text, CONTENT_W(width)).map(l => `${THINK_FG}${pad}${l}${RESET}`)
 }
 
 function elapsed(startTime: number): string {
