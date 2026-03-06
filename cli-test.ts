@@ -8,14 +8,21 @@
 interface Tab {
 	id: number
 	lines: string[]
+	generating: boolean
+	streamQueue: string[] // lines left to stream
 }
 
-let tabs: Tab[] = [{ id: 1, lines: [] }]
+let tabs: Tab[] = [{ id: 1, lines: [], generating: false, streamQueue: [] }]
 let activeIdx = 0
 let tabCounter = 1
 let inputBuf = ''
+let cursorVisible = true
+let blinkTimer: ReturnType<typeof setInterval> | null = null
 
 function active(): Tab { return tabs[activeIdx] }
+
+const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+let spinnerFrame = 0
 
 // ── Terminal setup ──
 
@@ -27,9 +34,41 @@ stdin.resume()
 
 function width(): number { return stdout.columns || 80 }
 
+// ── Cursor blink + stream tick ──
+
+function startBlink(): void {
+	if (blinkTimer) return
+	blinkTimer = setInterval(() => {
+		cursorVisible = !cursorVisible
+		spinnerFrame = (spinnerFrame + 1) % SPINNER.length
+		// Stream one chunk per tick for any generating tab
+		for (const tab of tabs) {
+			if (tab.generating && tab.streamQueue.length > 0) {
+				const chunk = tab.streamQueue.shift()!
+				if (chunk === '\n') {
+					tab.lines.push('')
+				} else {
+					if (tab.lines.length === 0) tab.lines.push('')
+					tab.lines[tab.lines.length - 1] += chunk
+				}
+				if (tab.streamQueue.length === 0) tab.generating = false
+			}
+		}
+		doRender()
+		if (!tabs.some(t => t.generating)) stopBlink()
+	}, 80)
+}
+
+function stopBlink(): void {
+	if (blinkTimer) { clearInterval(blinkTimer); blinkTimer = null }
+	cursorVisible = true
+	doRender()
+}
+
 // ── Diff renderer ──
 
 const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
+const CYAN = '\x1b[36m', YELLOW = '\x1b[33m'
 
 let previousLines: string[] = []
 let hardwareCursorRow = 0
@@ -38,10 +77,20 @@ function buildLines(): string[] {
 	const tab = active()
 	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
+
+	// Append HAL cursor to last content line if generating
+	if (tab.generating) {
+		const cursor = cursorVisible ? `${CYAN}█${RESET}` : ' '
+		if (lines.length === 0) lines.push(cursor)
+		else lines[lines.length - 1] += cursor
+	}
+
 	while (lines.length < maxContentLines) lines.push('')
 
+	// Tab bar with spinners for generating tabs
 	const parts = tabs.map((t, i) => {
-		const label = ` ${t.id} `
+		const spinner = t.generating ? ` ${YELLOW}${SPINNER[spinnerFrame]}${RESET}` : ''
+		const label = ` ${t.id}${spinner} `
 		return i === activeIdx ? `${BOLD}[${label}]${RESET}` : `${DIM} ${label} ${RESET}`
 	})
 	lines.push(`tabs: ${parts.join('')}`)
@@ -152,10 +201,22 @@ function doRender(): void {
 	previousLines = newLines
 }
 
+// ── Simulated streaming ──
+
+function simulateStream(tab: Tab, text: string): void {
+	// Break text into character-level chunks with occasional newlines
+	const queue: string[] = []
+	for (const ch of text) queue.push(ch)
+	tab.streamQueue = queue
+	tab.generating = true
+	startBlink()
+}
+
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
 	if (data === '\x03') {
+		if (blinkTimer) clearInterval(blinkTimer)
 		const delta = previousLines.length - 1 - hardwareCursorRow
 		if (delta > 0) stdout.write(`\x1b[${delta}B`)
 		stdout.write('\r\n\x1b[?25h')
@@ -164,7 +225,7 @@ stdin.on('data', (data: string) => {
 
 	if (data === '\x14') {
 		tabCounter++
-		tabs.push({ id: tabCounter, lines: [] })
+		tabs.push({ id: tabCounter, lines: [], generating: false, streamQueue: [] })
 		activeIdx = tabs.length - 1
 		inputBuf = ''
 		doRender()
@@ -185,7 +246,10 @@ stdin.on('data', (data: string) => {
 				for (let i = 0; i < count; i++)
 					tab.lines.push(`[tab ${tab.id}] line ${tab.lines.length}: THIS IS TAB NUMBER ${tab.id} - LOTS AND LOTS OF TEXT BLAH BLAH BLAH`)
 			} else {
-				tab.lines.push(`You said: ${text}`)
+				// Simulate a streaming response
+				tab.lines.push(`${DIM}> ${text}${RESET}`)
+				const response = `I received your message: "${text}". Let me think about that for a moment...\nHere's what I think:\n- The input was ${text.length} characters long\n- It contained ${text.split(' ').length} word(s)\n- Processing complete ✓`
+				simulateStream(tab, response)
 			}
 		}
 		doRender()
