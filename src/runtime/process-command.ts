@@ -165,9 +165,9 @@ export async function processCommand(command: RuntimeCommand): Promise<void> {
 				if (saved.model) session.model = saved.model
 			}
 		} else {
-			// New session
+			// New session — append at end (rightmost tab, like Chrome)
 			sessionId = await makeSessionId()
-			await ensureSession(sessionId, workingDir, activeId ?? undefined)
+			await ensureSession(sessionId, workingDir)
 		}
 		markSessionAsActive(sessionId)
 		await persistRegistry()
