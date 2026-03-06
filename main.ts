@@ -281,6 +281,12 @@ if (testMode) {
 					readySent = true
 					writeLine({ type: 'ready' })
 				}
+			} else if (event.type === 'tool_progress') {
+				writeLine({
+					type: 'tool_progress',
+					session: event.sessionId,
+					tools: event.tools,
+				})
 			} else if (event.type === 'command') {
 				writeLine({
 					type: 'command',
