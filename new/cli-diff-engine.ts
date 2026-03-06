@@ -58,7 +58,7 @@ function patchLine(old: string, nw: string): string | null {
 		i++
 	}
 	if (i >= old.length && i >= nw.length) return null
-	if (esc !== 0 || vis < 4) return null
+	if (esc !== 0 || i < 6) return null
 	const col = `\x1b[${vis + 1}G${sgrState}`
 	if (old.length === nw.length) {
 		let j = old.length - 1
