@@ -157,12 +157,11 @@ export async function readEventsFrom(fromOffset: number): Promise<{
 	events: RuntimeEvent[]
 	offset: number
 }> {
-	const raw = await readFile(EVENTS_FILE, 'utf-8')
-	const bytes = Buffer.byteLength(raw, 'utf-8')
-	if (fromOffset >= bytes) return { events: [], offset: bytes }
-	const slice = raw.slice(fromOffset)
+	const buf = await readFile(EVENTS_FILE)
+	if (fromOffset >= buf.length) return { events: [], offset: buf.length }
+	const slice = buf.subarray(fromOffset).toString('utf-8')
 	const events = parseAll(slice) as RuntimeEvent[]
-	return { events, offset: bytes }
+	return { events, offset: buf.length }
 }
 
 /** Tail events from a byte offset. Gap-free: pass the offset from readEventsFrom or bootstrap. */

@@ -1,11 +1,13 @@
 import { mkdirSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
-export const HAL_DIR = process.env.HAL_DIR ? resolve(process.env.HAL_DIR) : resolve(import.meta.dir, '..')
+export const NEW_DIR = resolve(import.meta.dir)
+export const HAL_DIR = process.env.HAL_DIR ? resolve(process.env.HAL_DIR) : resolve(NEW_DIR, '..')
 export const LAUNCH_CWD = process.env.LAUNCH_CWD ? resolve(process.env.LAUNCH_CWD) : process.cwd()
 
-export const STATE_DIR = process.env.HAL_STATE_DIR
-	? resolve(process.env.HAL_STATE_DIR)
+// New runtime uses its own state dir, ignoring HAL_STATE_DIR
+export const STATE_DIR = process.env.NEW_STATE_DIR
+	? resolve(process.env.NEW_STATE_DIR)
 	: `${HAL_DIR}/new-state`
 export const IPC_DIR = `${STATE_DIR}/ipc`
 export const SESSIONS_DIR = `${STATE_DIR}/sessions`

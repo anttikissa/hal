@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 cd "$(dirname "$0")" || exit 1
+export LAUNCH_CWD="${LAUNCH_CWD:-$(pwd)}"
+export HAL_DIR="${HAL_DIR:-$(cd .. && pwd)}"
 while true; do
-	bun cli.ts
+	bun main.ts "$@"
 	code=$?
 	[ "$code" -ne 100 ] && exit "$code"
 done
