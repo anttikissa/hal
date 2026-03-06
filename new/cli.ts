@@ -280,7 +280,12 @@ stdin.on('data', (data: string) => {
 
 	if (k.key === 'n' && k.ctrl) { tabs.next(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { tabs.prev(); doRender(); return }
-	if (k.key === 'r' && k.ctrl) { process.exit(100) }
+	if (k.key === 'r' && k.ctrl) {
+		const delta = renderState.lines.length - 1 - renderState.cursorRow
+		if (delta > 0) stdout.write(`\x1b[${delta}B`)
+		stdout.write('\r\n')
+		process.exit(100)
+	}
 
 	// Enter: submit
 	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
@@ -332,7 +337,6 @@ stdout.on('resize', () => {
 	doRender()
 })
 
-stdout.write('\x1b[2J\x1b[H') // clear screen on startup
 tabs.active().blocks.push({ type: 'assistant', done: true, text: `Say 'help' to see what I can do.` })
 scheduleBlink()
 doRender()
