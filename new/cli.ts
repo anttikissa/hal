@@ -97,18 +97,31 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	})
 	lines.push(`tabs: ${parts.join('')}`)
 
-	// Separator
-	lines.push(`${DIM}${'─'.repeat(w)}${RESET}`)
-
-	// Prompt lines with 1-char padding, scrolled to follow cursor
+	// Compute prompt scroll window
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, cw)
 	const totalWrapped = wrappedInput.lines.length
 	let scrollTop = 0
 	if (totalWrapped > promptLines) {
-		// Keep cursor visible within the window
 		scrollTop = Math.min(curRow, totalWrapped - promptLines)
 		scrollTop = Math.max(scrollTop, curRow - promptLines + 1)
 	}
+	const aboveCount = scrollTop
+	const belowCount = Math.max(0, totalWrapped - scrollTop - promptLines)
+
+	// Separator with scroll indicators
+	let sep = ''
+	if (aboveCount > 0 || belowCount > 0) {
+		const parts: string[] = []
+		if (aboveCount > 0) parts.push(`↑${aboveCount}`)
+		if (belowCount > 0) parts.push(`↓${belowCount}`)
+		const label = ` ${parts.join(' ')} `
+		sep = `${DIM}${'─'.repeat(Math.max(0, w - label.length))}${RESET}${DIM}${label}${RESET}`
+	} else {
+		sep = `${DIM}${'─'.repeat(w)}${RESET}`
+	}
+	lines.push(sep)
+
+	// Prompt lines with 1-char padding
 	for (let i = scrollTop; i < scrollTop + promptLines; i++) {
 		lines.push(` ${wrappedInput.lines[i] ?? ''}`)
 	}
