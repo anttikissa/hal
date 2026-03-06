@@ -6,6 +6,7 @@
 - Style tool blocks and all other blocks well
 - Esc and Ctrl-C and Ctrl-D should work better - maybe a debug thing to restart?
 - Add stuff here
+- Config option `greet: false` to disable session greeting
 
 
 
