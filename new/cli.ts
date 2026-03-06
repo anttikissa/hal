@@ -4,6 +4,7 @@ import { render, emptyState, type RenderState, type CursorPos } from './cli-rend
 import { parseKey } from './cli-keys.ts'
 import * as tabs from './cli-tabs.ts'
 import * as prompt from './cli-prompt.ts'
+import { renderBlocks, type Block } from './cli-blocks.ts'
 
 // ── Terminal setup ──
 
@@ -34,16 +35,18 @@ let renderState: RenderState = emptyState
 function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const tab = tabs.active()
 	const allTabs = tabs.all()
-	const maxContentLines = Math.max(...allTabs.map(t => t.lines.length))
-	const lines: string[] = [...tab.lines]
-	lines[lines.length - 1] += halCursorVisible ? '█' : ' '
-
 	const w = cols()
 	const cw = contentWidth()
+
+	// Content from blocks
+	const contentLines = renderBlocks(tab.blocks, cw)
+
+	// Pad to fill screen (stable layout)
 	const pLines = prompt.lineCount(cw)
 	const chromeLines = 3 + pLines
-	const maxPad = Math.min(maxContentLines, Math.max(0, (stdout.rows || 24) - chromeLines))
-	while (lines.length < maxPad) lines.push('')
+	const available = Math.max(0, (stdout.rows || 24) - chromeLines)
+	const lines = [...contentLines]
+	while (lines.length < available) lines.push('')
 
 	// Tab bar
 	const idx = tabs.activeIndex()
@@ -82,13 +85,49 @@ function doRender(): void {
 // ── Streaming simulator ──
 
 function simulateResponse(tab: ReturnType<typeof tabs.active>, text: string): void {
+	// Add thinking block
+	const thinkingBlock: Block = { type: 'thinking', text: '', done: false }
+	tab.blocks.push(thinkingBlock)
+	const thinkingText = 'Let me think about this...\n\nAnalyzing the input...'
+
+	// Add assistant block (will start after thinking)
+	const assistantBlock: Block = { type: 'assistant', text: '', done: false }
+
+	let phase: 'thinking' | 'assistant' = 'thinking'
 	let i = 0
+	let j = 0
 	const tick = setInterval(() => {
-		if (i >= text.length) { clearInterval(tick); return }
-		tabs.appendText(tab, text[i])
-		i++
+		if (phase === 'thinking') {
+			if (i >= thinkingText.length) {
+				thinkingBlock.done = true
+				tab.blocks.push(assistantBlock)
+				phase = 'assistant'
+			} else {
+				thinkingBlock.text += thinkingText[i]
+				i++
+			}
+		} else {
+			if (j >= text.length) {
+				assistantBlock.done = true
+				clearInterval(tick)
+			} else {
+				assistantBlock.text += text[j]
+				j++
+			}
+		}
 		doRender()
 	}, 30)
+}
+
+function simulateToolCall(tab: ReturnType<typeof tabs.active>, name: string): void {
+	const block: Block = {
+		type: 'tool', name, status: 'streaming',
+		args: '', output: '', startTime: Date.now(),
+	}
+	tab.blocks.push(block)
+
+	setTimeout(() => { block.status = 'running'; doRender() }, 500)
+	setTimeout(() => { block.status = 'done'; block.output = 'ok'; doRender() }, 2000)
 }
 
 // ── Quit / Close ──
@@ -135,13 +174,12 @@ stdin.on('data', (data: string) => {
 		prompt.reset()
 		if (text) {
 			const tab = tabs.active()
-			const spamMatch = text.match(/^spa(m+)$/)
-			if (spamMatch) {
-				const count = spamMatch[1].length * 30
-				for (let i = 0; i < count; i++)
-					tab.lines.push(`[tab ${tab.id}] line ${tab.lines.length}: LOTS OF TEXT BLAH BLAH`)
+			// Add user input block
+			tab.blocks.push({ type: 'input', text })
+
+			if (text.startsWith('tool ')) {
+				simulateToolCall(tab, text.slice(5) || 'bash')
 			} else {
-				tabs.appendText(tab, `> ${text}\n`)
 				const words = text.split(' ').length
 				const response = `Message: "${text}"\n${text.length} chars, ${words} word${words === 1 ? '' : 's'}\n`
 				simulateResponse(tab, response)
