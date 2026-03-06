@@ -57,19 +57,16 @@ function patchLine(old: string, nw: string): string | null {
 		i++
 	}
 	if (i >= old.length && i >= nw.length) return null
-	if (sgr || esc !== 0) return null
-	// Patch: \x1b[{col}G (4-6b) + changed + maybe \x1b[K (3b). Skip if not shorter than full rewrite.
-	const colSeq = `\x1b[${vis + 1}G`
+	if (sgr || esc !== 0 || vis < 4) return null
+	const col = `\x1b[${vis + 1}G`
 	if (old.length === nw.length) {
 		let j = old.length - 1
 		while (j > i && old[j] === nw[j]) j--
 		if (nw.slice(i, j + 1).includes('\x1b'))
-			return `${colSeq}${nw.slice(i)}\x1b[K`
-		const patch = `${colSeq}${nw.slice(i, j + 1)}`
-		return patch.length < nw.length + 4 ? patch : null
+			return `${col}${nw.slice(i)}\x1b[K`
+		return `${col}${nw.slice(i, j + 1)}`
 	}
-	const patch = `${colSeq}${nw.slice(i)}\x1b[K`
-	return patch.length < nw.length + 4 ? patch : null
+	return `${col}${nw.slice(i)}\x1b[K`
 }
 
 // ── Diff renderer ──
@@ -125,7 +122,7 @@ export function render(
 		if (i > firstChanged) buf += '\r\n'
 		const patch = patchLines ? patchLine(prev.lines[i] ?? '', newLines[i]) : null
 		const lineCmd = patch ?? `\x1b[2K${newLines[i]}`
-		log(`${patch ? 'patch' : 'full'}:${i} (${lineCmd.length}b)  ${lineCmd}`)
+		log(`${patch ? 'patc' : 'full'}:${i} (${lineCmd.length}b)  ${lineCmd}`)
 		buf += lineCmd
 	}
 
