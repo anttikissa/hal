@@ -46,11 +46,15 @@ let renderState: RenderState = emptyState
 
 function buildLines(): string[] {
 	const tab = active()
+	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
 
 	// Cursor at end of content — like a text editor caret
 	lines[lines.length - 1] += cursor.char()
 
+	// Pad to match tallest tab so prompt stays stable on tab switch, capped at screen height
+	const maxPad = Math.min(maxContentLines, Math.max(0, (stdout.rows || 24) - 4))
+	while (lines.length < maxPad) lines.push('')
 	const parts = tabs.map((t, i) => {
 		const label = ` ${t.id} `
 		return i === activeIdx ? `${BOLD}[${label}]${RESET}` : `${DIM} ${label} ${RESET}`
