@@ -200,7 +200,9 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 	const targetChars = lineTarget * 80
 	let corpus = ''
 	while (corpus.length < targetChars) corpus += SPAM_TEXT + '\n\n'
-	corpus = corpus.slice(0, targetChars)
+	// Extend to next paragraph boundary
+	const cut = corpus.indexOf('\n\n', targetChars)
+	corpus = cut === -1 ? corpus : corpus.slice(0, cut)
 
 	// Split into segments: thinking → assistant, maybe repeat
 	// Always split at paragraph boundaries (\n\n)
