@@ -74,14 +74,10 @@ function inputLine(text: string, width: number): string {
 }
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
-	const src = block.source && block.source !== 'user' ? `${block.source} ` : ''
-	if (block.status === 'queued') {
-		return [inputLine(`${src}(queued): ${block.text}`, width)]
-	}
-	if (block.status === 'steering') {
-		return [inputLine(`${src}(steering): ${block.text}`, width)]
-	}
-	const label = src ? `${src}> ${block.text}` : `> ${block.text}`
+	const who = block.source && block.source !== 'user' ? block.source : 'you'
+	const status = block.status ? ` (${block.status})` : ''
+	const label = `${who}${status}: ${block.text}`
+	if (block.status) return [inputLine(label, width)]
 	return toolHeader(label, width, INPUT_FG, INPUT_BG)
 }
 

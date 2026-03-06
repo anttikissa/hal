@@ -13,7 +13,7 @@ describe('renderBlocks', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'hello' }]
 		const lines = renderBlocks(blocks, 80)
 		expect(lines.length).toBe(1)
-		expect(lines[0]).toContain('> hello')
+		expect(lines[0]).toContain('you: hello')
 	})
 
 	test('queued input renders compact', () => {
@@ -131,6 +131,6 @@ describe('renderBlocks', () => {
 		]
 		const lines = renderBlocks(blocks, 80)
 		expect(lines.length).toBe(1)
-		expect(lines[0]).toContain('> hi')
+		expect(lines[0]).toContain('you: hi')
 	})
 })
