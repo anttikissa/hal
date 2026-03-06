@@ -48,15 +48,21 @@ process.on('SIGTERM', () => { shutdown().then(() => process.exit(0)) })
 
 // If client, poll for dead host and try to promote
 if (!host) {
+	let promoting = false
 	const tryPromote = async () => {
-		const result = await claimHost(hostId)
-		if (!result.host) return
-		halStatus.isHost = true
-		halStatus.hostPid = process.pid
-		await becomeHost()
-		if (promotionTimer) clearInterval(promotionTimer)
+		if (promoting || halStatus.isHost) return
+		promoting = true
+		try {
+			const result = await claimHost(hostId)
+			if (!result.host) return
+			halStatus.isHost = true
+			halStatus.hostPid = process.pid
+			await becomeHost()
+			if (promotionTimer) { clearInterval(promotionTimer); promotionTimer = null }
+		} finally {
+			promoting = false
+		}
 	}
-	// Watch for host death via polling
 	let promotionTimer: ReturnType<typeof setInterval> | null = setInterval(tryPromote, 3000)
 
 	// Also expose for event-driven promotion (client calls this on [owner-released])
