@@ -1,4 +1,7 @@
-// Line-level diff engine for terminal output.
+// Diff engine for terminal output. Compares old/new screen lines and emits
+// minimal escape sequences — both line-level (skip unchanged, clear removed)
+// and intra-line (rewrite only the changed substring). Optimized for the
+// common cases; doesn't try to handle every corner case.
 
 
 export interface RenderState {
