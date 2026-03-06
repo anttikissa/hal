@@ -35,6 +35,10 @@ const TOOL_COLORS: Record<string, { fg: string; bg: string }> = {
 	default: { fg: fg256(oklch(0.75, 0.15, 260)), bg: bg256(oklch(0.25, 0.05, 260)) },
 }
 
+// Input/prompt block colors: grey (achromatic, same lightness)
+const INPUT_FG = fg256(oklch(0.75, 0.01, 0))
+const INPUT_BG = bg256(oklch(0.25, 0.01, 0))
+
 function toolColors(name: string): { fg: string; bg: string } {
 	return TOOL_COLORS[name] ?? TOOL_COLORS.default
 }
@@ -65,16 +69,20 @@ function wrapLines(text: string, width: number): string[] {
 	return lines
 }
 
+function inputLine(text: string, width: number): string {
+	return `${INPUT_BG}${INPUT_FG}${text.padEnd(width)}${RESET}`
+}
+
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
 	const src = block.source && block.source !== 'user' ? `${block.source} ` : ''
 	if (block.status === 'queued') {
-		return [`${DIM}${src}(queued): ${block.text}${RESET}`]
+		return [inputLine(`${src}(queued): ${block.text}`, width)]
 	}
 	if (block.status === 'steering') {
-		return [`${DIM}${src}(steering): ${block.text}${RESET}`]
+		return [inputLine(`${src}(steering): ${block.text}`, width)]
 	}
-	const prefix = src ? `${DIM}${src}${RESET}` : ''
-	return wrapLines(`${prefix}> ${block.text}`, width)
+	const label = src ? `${src}> ${block.text}` : `> ${block.text}`
+	return toolHeader(label, width, INPUT_FG, INPUT_BG)
 }
 
 function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: number): string[] {
