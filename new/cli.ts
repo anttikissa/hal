@@ -1,6 +1,6 @@
 // Terminal client — reference implementation.
 
-import { render, emptyState, enableLog, type RenderState, type CursorPos } from './cli-diff-engine.ts'
+import { render, emptyState, type RenderState, type CursorPos } from './cli-diff-engine.ts'
 import { parseKey } from './cli-keys.ts'
 import * as tabs from './cli-tabs.ts'
 import * as prompt from './cli-prompt.ts'
@@ -380,9 +380,6 @@ stdout.on('resize', () => {
 	renderState = emptyState
 	doRender()
 })
-
-enableLog()
-
 tabs.active().blocks.push({ type: 'assistant', done: true, model: 'codex-5.3', text: `Say 'help' to see what I can do.` })
 scheduleBlink()
 doRender()

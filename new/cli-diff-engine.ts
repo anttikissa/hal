@@ -1,7 +1,6 @@
 // Line-level diff engine for terminal output.
 // Takes old/new lines → minimal ANSI escape sequence.
 
-import { appendFileSync, writeFileSync } from 'fs'
 
 export interface RenderState {
 	lines: string[]
@@ -19,23 +18,6 @@ export const emptyState: RenderState = { lines: [], cursorRow: 0, cursorCol: 0 }
 // Synchronized output: terminal buffers everything between these, avoids flicker
 const SYNC_START = '\x1b[?2026h'
 const SYNC_END = '\x1b[?2026l'
-
-
-// ── Debug log ──
-
-const LOG_PATH = '/tmp/cli-raw.log'
-let logEnabled = false
-
-export function enableLog(): void {
-	logEnabled = true
-	writeFileSync(LOG_PATH, '')
-}
-
-function log(msg: string): void {
-	if (!logEnabled) return
-	appendFileSync(LOG_PATH, msg.replace(/\x1b/g, '\\e').replace(/\r/g, '\\r').replace(/\n/g, '\\n') + '\n')
-}
-
 // ── Intra-line patching ──
 
 function patchLine(old: string, nw: string): string | null {
@@ -120,9 +102,7 @@ export function render(
 	for (let i = firstChanged; i <= renderEnd; i++) {
 		if (i > firstChanged) buf += '\r\n'
 		const patch = patchLine(prev.lines[i] ?? '', newLines[i])
-		const lineCmd = patch ?? `\x1b[2K${newLines[i]}`
-		log(`${patch ? 'patc' : 'full'}:${i} (${lineCmd.length}b)  ${lineCmd}`)
-		buf += lineCmd
+		buf += patch ?? `\x1b[2K${newLines[i]}`
 	}
 
 	let cursorRow = renderEnd
