@@ -1,7 +1,6 @@
 // Block-based content model for tab output.
 
-const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
-const ITALIC = '\x1b[3m'
+const RESET = '\x1b[0m'
 const TOOL_MAX_OUTPUT = 5
 const BLOCK_PAD = 1
 
@@ -42,6 +41,9 @@ const TOOL_COLORS: Record<string, { fg: string; bg: string }> = {
 const INPUT_FG = fg256(oklch(0.80, 0.008, 250))
 const INPUT_BG = bg256(oklch(0.29, 0.008, 250))
 
+// Thinking block color: dim, no background
+const THINK_FG = fg256(oklch(0.55, 0.02, 250))
+
 function toolColors(name: string): { fg: string; bg: string } {
 	return TOOL_COLORS[name] ?? TOOL_COLORS.default
 }
@@ -74,7 +76,7 @@ function wrapLines(text: string, width: number): string[] {
 
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
-	const who = block.source && block.source !== 'user' ? block.source : 'Uou'
+	const who = block.source && block.source !== 'user' ? block.source : 'You'
 	const status = block.status ? ` (${block.status})` : ''
 	const model = block.model ? ` (to ${block.model})` : ''
 	const label = `${who}${status}${model}`
@@ -96,8 +98,8 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: number): string[] {
 	const pad = ' '.repeat(BLOCK_PAD)
 	const text = collapseBlankLines(block.text.trimEnd())
-	if (!text) return [`${DIM}${ITALIC}${pad}Thinking...${RESET}`]
-	return wrapLines(text, width - BLOCK_PAD).map(l => `${DIM}${ITALIC}${pad}${l}${RESET}`)
+	if (!text) return [`${THINK_FG}${pad}Thinking...${RESET}`]
+	return wrapLines(text, width - BLOCK_PAD).map(l => `${THINK_FG}${pad}${l}${RESET}`)
 }
 
 function elapsed(startTime: number): string {
