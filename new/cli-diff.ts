@@ -1,6 +1,7 @@
-// Pure diff renderer for terminal output.
-// No state, no side effects. Takes old/new lines → escape sequence.
-// Diff rendering approach inspired by pi-mono (https://github.com/badlogic/pi-mono).
+// Line-level diff engine for terminal output.
+// Takes old/new lines → minimal ANSI escape sequence.
+
+import { appendFileSync, writeFileSync } from 'fs'
 
 export interface RenderState {
 	lines: string[]
@@ -18,6 +19,57 @@ export const emptyState: RenderState = { lines: [], cursorRow: 0, cursorCol: 0 }
 // Synchronized output: terminal buffers everything between these, avoids flicker
 const SYNC_START = '\x1b[?2026h'
 const SYNC_END = '\x1b[?2026l'
+
+let patchLines = false
+export function setPatchLines(on: boolean): void { patchLines = on }
+
+// ── Debug log ──
+
+const LOG_PATH = '/tmp/cli-raw.log'
+let logEnabled = false
+
+export function enableLog(): void {
+	logEnabled = true
+	writeFileSync(LOG_PATH, '')
+}
+
+function log(msg: string): void {
+	if (!logEnabled) return
+	appendFileSync(LOG_PATH, msg.replace(/\x1b/g, '\\e').replace(/\r/g, '\\r').replace(/\n/g, '\\n') + '\n')
+}
+
+// ── Intra-line patching ──
+
+function patchLine(old: string, nw: string): string | null {
+	if (nw.length < 20) return null
+	let i = 0, vis = 0, sgr = false, esc = 0, escStart = 0
+	while (i < old.length && i < nw.length && old[i] === nw[i]) {
+		if (esc === 0) {
+			if (old[i] === '\x1b') { esc = 1; escStart = i } else vis++
+		} else if (esc === 1) {
+			esc = old[i] === '[' ? 2 : 0
+		} else if (old.charCodeAt(i) >= 0x40 && old.charCodeAt(i) <= 0x7e) {
+			if (old[i] === 'm') {
+				const seq = old.slice(escStart, i + 1)
+				sgr = seq !== '\x1b[0m' && seq !== '\x1b[m'
+			}
+			esc = 0
+		}
+		i++
+	}
+	if (i >= old.length && i >= nw.length) return null
+	if (sgr || esc !== 0 || vis < 10) return null
+	if (old.length === nw.length) {
+		let j = old.length - 1
+		while (j > i && old[j] === nw[j]) j--
+		if (nw.slice(i, j + 1).includes('\x1b'))
+			return `\x1b[${vis + 1}G${nw.slice(i)}\x1b[K`
+		return `\x1b[${vis + 1}G${nw.slice(i, j + 1)}`
+	}
+	return `\x1b[${vis + 1}G${nw.slice(i)}\x1b[K`
+}
+
+// ── Diff renderer ──
 
 /** Diff-render newLines against prev. Returns escape buf + new state. */
 export function render(
@@ -43,7 +95,6 @@ export function render(
 
 	if (firstChanged === -1) {
 		if (cursor.row === prev.cursorRow && cursor.col === prev.cursorCol) return { buf: '', state: prev }
-		// Lines unchanged but cursor moved
 		const buf = SYNC_START + positionCursor(prev.cursorRow, cursor) + SYNC_END
 		return { buf, state: { lines: prev.lines, cursorRow: cursor.row, cursorCol: cursor.col } }
 	}
@@ -69,7 +120,10 @@ export function render(
 	const renderEnd = Math.min(lastChanged, newLines.length - 1)
 	for (let i = firstChanged; i <= renderEnd; i++) {
 		if (i > firstChanged) buf += '\r\n'
-		buf += `\x1b[2K${newLines[i]}`
+		const patch = patchLines ? patchLine(prev.lines[i] ?? '', newLines[i]) : null
+		const lineCmd = patch ?? `\x1b[2K${newLines[i]}`
+		log(`${patch ? 'patch' : 'full'}:${i} (${lineCmd.length}b)  ${lineCmd}`)
+		buf += lineCmd
 	}
 
 	let cursorRow = renderEnd

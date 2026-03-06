@@ -1,6 +1,6 @@
 // Prompt area: state, key handling, and line building.
 
-import type { CursorPos } from './cli-render.ts'
+import type { CursorPos } from './cli-diff.ts'
 import type { KeyEvent } from './cli-keys.ts'
 import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './cli-input.ts'
 
