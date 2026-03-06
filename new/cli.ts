@@ -108,10 +108,10 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	// Help bar
 	const statusText = tab?.busy ? ' busy' : ''
 	const help = ` ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-c quit${statusText} `
-	const pad = w - help.length
-	const left = Math.max(0, Math.floor(pad / 2))
-	const right = Math.max(0, pad - left)
-	lines.push(`${DIM}${'─'.repeat(left)}${help}${'─'.repeat(right)}${RESET}`)
+	const hPad = w - help.length
+	const hLeft = Math.max(0, Math.floor(hPad / 2))
+	const hRight = Math.max(0, hPad - hLeft)
+	lines.push(`${DIM}${'─'.repeat(hLeft)}${help}${'─'.repeat(hRight)}${RESET}`)
 
 	return { lines, cursor: cursorPos }
 }
