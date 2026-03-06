@@ -42,13 +42,14 @@ describe('renderBlocks', () => {
 		expect(lines[2]).toBe('')
 	})
 
-	test('thinking collapses when done', () => {
+	test('thinking shows full text when done', () => {
 		const blocks: Block[] = [
 			{ type: 'thinking', text: 'long thought\n\nmore thought', done: true },
 		]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.length).toBe(1)
-		expect(lines[0]).toContain('Thinking...')
+		expect(lines.length).toBe(3)
+		expect(lines.some(l => l.includes('long thought'))).toBe(true)
+		expect(lines.some(l => l.includes('more thought'))).toBe(true)
 	})
 
 	test('thinking shows content while streaming', () => {

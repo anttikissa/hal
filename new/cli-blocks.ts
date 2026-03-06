@@ -93,12 +93,10 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 }
 
 function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: number): string[] {
-	if (block.done) {
-		return [`${DIM}${ITALIC}Thinking...${RESET}`]
-	}
+	const pad = ' '.repeat(BLOCK_PAD)
 	const text = collapseBlankLines(block.text.trimEnd())
-	if (!text) return [`${DIM}${ITALIC}Thinking...${RESET}`]
-	return wrapLines(text, width).map(l => `${DIM}${ITALIC}${l}${RESET}`)
+	if (!text) return [`${DIM}${ITALIC}${pad}Thinking...${RESET}`]
+	return wrapLines(text, width - BLOCK_PAD).map(l => `${DIM}${ITALIC}${pad}${l}${RESET}`)
 }
 
 function elapsed(startTime: number): string {
