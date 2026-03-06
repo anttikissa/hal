@@ -1,7 +1,7 @@
 // Terminal client — reference implementation.
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli-render.ts'
-import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './cli-input.ts'
+import * as prompt from './cli-prompt.ts'
 
 // ── State ──
 
@@ -13,9 +13,6 @@ interface Tab {
 let tabs: Tab[] = [{ id: 1, lines: [''] }]
 let activeIdx = 0
 let tabCounter = 1
-let inputBuf = ''
-let inputCursor = 0
-let inputGoalCol: number | null = null
 let halCursorVisible = true
 
 function active(): Tab { return tabs[activeIdx] }
@@ -42,37 +39,9 @@ stdin.resume()
 function cols(): number { return stdout.columns || 80 }
 function contentWidth(): number { return cols() - 2 }
 
-// ── Input helpers ──
-
-function clampCursor(pos: number): number { return Math.max(0, Math.min(pos, inputBuf.length)) }
-
-function insertAtCursor(text: string): void {
-	inputBuf = inputBuf.slice(0, inputCursor) + text + inputBuf.slice(inputCursor)
-	inputCursor += text.length
-	inputGoalCol = null
-}
-
-function deleteRange(start: number, end: number): void {
-	inputBuf = inputBuf.slice(0, start) + inputBuf.slice(end)
-	inputCursor = start
-	inputGoalCol = null
-}
-
-function moveCursor(pos: number): void {
-	inputCursor = clampCursor(pos)
-	inputGoalCol = null
-}
-
-function resetInput(): void {
-	inputBuf = ''
-	inputCursor = 0
-	inputGoalCol = null
-}
-
 // ── Renderer ──
 
 const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
-const MAX_PROMPT_LINES = 12
 
 let renderState: RenderState = emptyState
 
@@ -81,12 +50,11 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
 	lines[lines.length - 1] += halCursorVisible ? '█' : ' '
-	// Pad to match tallest tab, capped at screen height minus chrome
+
 	const w = cols()
 	const cw = contentWidth()
-	const wrappedInput = getWrappedInputLayout(inputBuf, cw)
-	const promptLines = Math.min(wrappedInput.lines.length, MAX_PROMPT_LINES)
-	const chromeLines = 3 + promptLines // tab bar + separator + prompt lines + help bar
+	const pLines = prompt.lineCount(cw)
+	const chromeLines = 3 + pLines // tab bar + separator + prompt lines + help bar
 	const maxPad = Math.min(maxContentLines, Math.max(0, (stdout.rows || 24) - chromeLines))
 	while (lines.length < maxPad) lines.push('')
 
@@ -97,37 +65,13 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	})
 	lines.push(`tabs: ${parts.join('')}`)
 
-	// Compute prompt scroll window
-	const { row: curRow, col: curCol } = cursorToWrappedRowCol(inputBuf, inputCursor, cw)
-	const totalWrapped = wrappedInput.lines.length
-	let scrollTop = 0
-	if (totalWrapped > promptLines) {
-		scrollTop = Math.min(curRow, totalWrapped - promptLines)
-		scrollTop = Math.max(scrollTop, curRow - promptLines + 1)
-	}
-	const aboveCount = scrollTop
-	const belowCount = Math.max(0, totalWrapped - scrollTop - promptLines)
-
-	// Separator with scroll indicators
-	let sep = ''
-	if (aboveCount > 0 || belowCount > 0) {
-		const parts: string[] = []
-		if (aboveCount > 0) parts.push(`↑${aboveCount}`)
-		if (belowCount > 0) parts.push(`↓${belowCount}`)
-		const label = ` ${parts.join(' ')} `
-		sep = `${DIM}${'─'.repeat(Math.max(0, w - label.length))}${RESET}${DIM}${label}${RESET}`
-	} else {
-		sep = `${DIM}${'─'.repeat(w)}${RESET}`
-	}
-	lines.push(sep)
-
-	// Prompt lines with 1-char padding
-	for (let i = scrollTop; i < scrollTop + promptLines; i++) {
-		lines.push(` ${wrappedInput.lines[i] ?? ''}`)
-	}
+	// Prompt
+	const p = prompt.buildPrompt(w, cw)
+	lines.push(p.separator)
+	lines.push(...p.lines)
 	const cursorPos: CursorPos = {
-		row: lines.length - promptLines + (curRow - scrollTop),
-		col: curCol + 2, // 1 padding + 1-based terminal column
+		row: lines.length - pLines + p.cursor.rowOffset,
+		col: p.cursor.col,
 	}
 
 	// Help bar
@@ -175,7 +119,7 @@ stdin.on('data', (data: string) => {
 		tabCounter++
 		tabs.push({ id: tabCounter, lines: [''] })
 		activeIdx = tabs.length - 1
-		resetInput()
+		prompt.reset()
 		doRender()
 		return
 	}
@@ -186,8 +130,8 @@ stdin.on('data', (data: string) => {
 
 	// Enter: submit
 	if (data === '\r' || data === '\n') {
-		const text = inputBuf.trim()
-		resetInput()
+		const text = prompt.text().trim()
+		prompt.reset()
 		if (text) {
 			const tab = active()
 			const spamMatch = text.match(/^spa(m+)$/)
@@ -206,69 +150,8 @@ stdin.on('data', (data: string) => {
 		return
 	}
 
-	// Alt-Enter: insert newline
-	if (data === '\x1b\r' || data === '\x1b\n') {
-		insertAtCursor('\n')
-		doRender()
-		return
-	}
-
-	// Backspace
-	if (data === '\x7f' || data === '\x08') {
-		if (inputCursor > 0) deleteRange(inputCursor - 1, inputCursor)
-		doRender()
-		return
-	}
-
-	// Ctrl-D: delete forward (or no-op if empty)
-	if (data === '\x04') {
-		if (inputCursor < inputBuf.length) deleteRange(inputCursor, inputCursor + 1)
-		doRender()
-		return
-	}
-
-	// Ctrl-A: start of line, Ctrl-E: end of line
-	if (data === '\x01') { moveCursor(0); doRender(); return }
-	if (data === '\x05') { moveCursor(inputBuf.length); doRender(); return }
-
-	// Ctrl-K: kill to end
-	if (data === '\x0b') {
-		inputBuf = inputBuf.slice(0, inputCursor)
-		inputGoalCol = null
-		doRender()
-		return
-	}
-
-	// Ctrl-W: delete word back
-	if (data === '\x17') {
-		if (inputCursor > 0) deleteRange(wordBoundaryLeft(inputBuf, inputCursor), inputCursor)
-		doRender()
-		return
-	}
-
-	// Arrow keys
-	if (data === '\x1b[D') { moveCursor(inputCursor - 1); doRender(); return } // left
-	if (data === '\x1b[C') { moveCursor(inputCursor + 1); doRender(); return } // right
-
-	// Alt-Left / Alt-Right: word boundaries
-	if (data === '\x1b[1;3D' || data === '\x1bb') { moveCursor(wordBoundaryLeft(inputBuf, inputCursor)); doRender(); return }
-	if (data === '\x1b[1;3C' || data === '\x1bf') { moveCursor(wordBoundaryRight(inputBuf, inputCursor)); doRender(); return }
-
-	// Up / Down: vertical movement in wrapped input
-	if (data === '\x1b[A' || data === '\x1b[B') {
-		const dir = data === '\x1b[A' ? -1 : 1
-		const r = verticalMove(inputBuf, contentWidth(), inputCursor, inputGoalCol, dir)
-		if (!r.atBoundary) {
-			inputCursor = r.cursor
-			inputGoalCol = r.goalCol
-		}
-		doRender()
-		return
-	}
-
-	// Printable characters
-	if (data >= ' ' && !data.startsWith('\x1b')) {
-		insertAtCursor(data)
+	// Delegate to prompt key handler
+	if (prompt.handleKey(data, contentWidth())) {
 		doRender()
 		return
 	}
