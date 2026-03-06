@@ -65,7 +65,7 @@ function patchLine(old: string, nw: string): string | null {
 		while (j > i && old[j] === nw[j]) j--
 		if (nw.slice(i, j + 1).includes('\x1b'))
 			return `${col}${nw.slice(i)}\x1b[K`
-		return `${col}${nw.slice(i, j + 1)}`
+		return `${col}${nw.slice(i, j + 1)}${sgrState ? '\x1b[0m' : ''}`
 	}
 	return `${col}${nw.slice(i)}\x1b[K`
 }
