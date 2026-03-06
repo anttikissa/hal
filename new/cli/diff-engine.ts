@@ -1,5 +1,4 @@
 // Line-level diff engine for terminal output.
-// Takes old/new lines → minimal ANSI escape sequence.
 
 
 export interface RenderState {
