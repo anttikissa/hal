@@ -131,11 +131,20 @@ export function parseKey(data: string): KeyEvent | null {
 		const ch = data[1]
 		if (ch === '\r' || ch === '\n') return ke('enter', { alt: true })
 		if (ch === '\x7f') return ke('backspace', { alt: true })
+		// Some terminals send \x1bb/\x1bf for Alt+Left/Right
+		if (ch === 'b') return ke('left', { alt: true })
+		if (ch === 'f') return ke('right', { alt: true })
 		if (ch >= ' ') return ke(ch.toLowerCase(), { alt: true })
 		// Alt+Ctrl combo
 		const code = ch.charCodeAt(0)
 		const name = CTRL_KEYS[code]
 		if (name) return ke(name, { alt: true, ctrl: true })
+	}
+
+	// Alt+arrow: \x1b\x1b[X (some terminals)
+	if (data.length === 4 && data[0] === '\x1b' && data[1] === '\x1b' && data[2] === '[') {
+		const arrow = CSI_SUFFIX_KEYS[data[3]]
+		if (arrow) return ke(arrow, { alt: true })
 	}
 
 	// Single escape

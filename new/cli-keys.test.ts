@@ -81,9 +81,16 @@ describe('parseKey', () => {
 		expect(k.alt).toBe(true)
 	})
 
+	test('alt+b/f normalize to alt+left/right', () => {
+		expect(parseKey('\x1bb')!.key).toBe('left')
+		expect(parseKey('\x1bb')!.alt).toBe(true)
+		expect(parseKey('\x1bf')!.key).toBe('right')
+		expect(parseKey('\x1bf')!.alt).toBe(true)
+	})
+
 	test('alt+letter', () => {
-		const k = parseKey('\x1bb')!
-		expect(k.key).toBe('b')
+		const k = parseKey('\x1bg')!
+		expect(k.key).toBe('g')
 		expect(k.alt).toBe(true)
 	})
 
