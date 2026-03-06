@@ -5,7 +5,7 @@ import { getConfig } from '../config.ts'
 import { pasteFromClipboard, saveMultilinePaste } from './clipboard.ts'
 import { logKeypress } from '../debug-log.ts'
 import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
-import { parseKeys, readEscapeSequence, truncateAnsi, wrapAnsi, wordBoundaryLeft, wordBoundaryRight, wordWrapLines } from './tui-text.ts'
+import { expandTabs, parseKeys, readEscapeSequence, truncateAnsi, wrapAnsi, wordBoundaryLeft, wordBoundaryRight, wordWrapLines } from './tui-text.ts'
 import { cursorToWrappedRowCol, getWrappedInputLayout, wrappedRowColToCursor, verticalMove } from './tui-input-layout.ts'
 export { stripAnsi } from './format/index.ts'
 import { stripAnsi } from './format/index.ts'
@@ -314,12 +314,18 @@ function appendOutput(text: string): void {
 }
 
 function appendRaw(text: string): void {
+	const tw = getConfig().tabWidth
 	let i = 0
 	while (i < text.length) {
 		if (text[i] === '\n') { outputLines.push(''); i++; continue }
 		if (text[i] === '\r') { outputLines[outputLines.length - 1] = ''; i++; continue }
 		let end = i; while (end < text.length && text[end] !== '\n' && text[end] !== '\r') end++
-		outputLines[outputLines.length - 1] += text.slice(i, end); i = end
+		let chunk = text.slice(i, end)
+		if (chunk.includes('\t')) {
+			const startCol = stripAnsi(outputLines[outputLines.length - 1]).length
+			chunk = expandTabs(chunk, startCol, tw)
+		}
+		outputLines[outputLines.length - 1] += chunk; i = end
 	}
 }
 

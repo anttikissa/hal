@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { linkifyLine, normalizeDetectedUrl, underlineOsc8Link, urlAtCol } from './tui-links.ts'
-import { truncateAnsi, wrapAnsi, wordBoundaryLeft, wordBoundaryRight } from './tui-text.ts'
+import { expandTabs, truncateAnsi, wrapAnsi, wordBoundaryLeft, wordBoundaryRight } from './tui-text.ts'
 
 const osc8 = (url: string, text: string) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`
 
@@ -323,5 +323,50 @@ describe('wordBoundaryLeft / wordBoundaryRight symmetry', () => {
 		const right = wordBoundaryRight(buf, 3)  // 5 (end of "hello")
 		const left = wordBoundaryLeft(buf, right) // should be 0 (start of "hello")
 		expect(left).toBe(0) // NOT 6 (start of "world")
+	})
+})
+
+describe('expandTabs', () => {
+	it('expands tab at column 0 to tabWidth spaces', () => {
+		expect(expandTabs('\thello', 0, 4)).toBe('    hello')
+	})
+
+	it('expands tab mid-line to next tab stop', () => {
+		// "ab" is 2 chars, tab at col 2 → next stop is col 4, so 2 spaces
+		expect(expandTabs('ab\tx', 0, 4)).toBe('ab  x')
+	})
+
+	it('respects startCol for continuation', () => {
+		// startCol=2, tab at col 2 → 2 spaces to reach col 4
+		expect(expandTabs('\tx', 2, 4)).toBe('  x')
+	})
+
+	it('handles multiple tabs', () => {
+		expect(expandTabs('\t\tx', 0, 4)).toBe('        x')
+	})
+
+	it('handles tab at exact tab stop', () => {
+		// "abcd" is 4 chars at col 0, tab at col 4 → full 4 spaces
+		expect(expandTabs('abcd\tx', 0, 4)).toBe('abcd    x')
+	})
+
+	it('skips ANSI escapes for column counting', () => {
+		const ansi = '\x1b[31m'
+		expect(expandTabs(`${ansi}ab\tx`, 0, 4)).toBe(`${ansi}ab  x`)
+	})
+
+	it('returns input unchanged when no tabs', () => {
+		const input = 'hello world'
+		expect(expandTabs(input, 0, 4)).toBe(input)
+	})
+
+	it('works with tab width 8', () => {
+		expect(expandTabs('\thello', 0, 8)).toBe('        hello')
+		expect(expandTabs('abc\tx', 0, 8)).toBe('abc     x')
+	})
+
+	it('works with tab width 2', () => {
+		expect(expandTabs('\thello', 0, 2)).toBe('  hello')
+		expect(expandTabs('a\tx', 0, 2)).toBe('a x')
 	})
 })

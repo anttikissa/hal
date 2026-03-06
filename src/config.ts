@@ -45,6 +45,7 @@ export interface Config {
 	contextWarnThreshold: number
 	maxConcurrentSessions: number
 	maxPromptLines: number
+	tabWidth: number // tab display width in output (default 4)
 	providers?: Record<string, ProviderConfig>
 	modelAliases?: Record<string, string>
 	recentToolResults: number // how many recent tool results to send in full (older → placeholder)
@@ -140,6 +141,7 @@ const DEFAULTS: Config = {
 	contextWarnThreshold: 0.8,
 	maxConcurrentSessions: 4,
 	maxPromptLines: 15,
+	tabWidth: 4,
 	recentToolResults: 3,
 	debug: {},
 }

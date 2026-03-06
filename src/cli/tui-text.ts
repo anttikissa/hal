@@ -33,6 +33,23 @@ export function readEscapeSequence(line: string, start: number): number {
 	return 2
 }
 
+export function expandTabs(text: string, startCol: number, tw: number): string {
+	if (!text.includes('\t')) return text
+	let result = '', col = startCol
+	for (let i = 0; i < text.length; i++) {
+		if (text[i] === '\t') {
+			const spaces = tw - (col % tw)
+			result += ' '.repeat(spaces); col += spaces
+		} else if (text[i] === '\x1b') {
+			const len = readEscapeSequence(text, i)
+			result += text.slice(i, i + len); i += len - 1
+		} else {
+			result += text[i]; col++
+		}
+	}
+	return result
+}
+
 export function truncateAnsi(line: string, maxCols: number): string {
 	if (maxCols <= 0 || !line) return ''
 	let out = '', visCols = 0, i = 0, sawAnsi = false, inLink = false
