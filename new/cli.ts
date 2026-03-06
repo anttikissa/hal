@@ -81,7 +81,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	}
 
 	// Help bar
-	const help = ' ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-c quit '
+	const help = ' ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-r restart │ ctrl-c quit '
 	const pad = w - help.length
 	const left = Math.max(0, Math.floor(pad / 2))
 	const right = Math.max(0, pad - left)
@@ -254,6 +254,7 @@ stdin.on('data', (data: string) => {
 
 	if (k.key === 'n' && k.ctrl) { tabs.next(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { tabs.prev(); doRender(); return }
+	if (k.key === 'r' && k.ctrl) { process.exit(100) }
 
 	// Enter: submit
 	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {

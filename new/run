@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+cd "$(dirname "$0")" || exit 1
+while true; do
+	bun cli.ts
+	code=$?
+	[ "$code" -ne 100 ] && exit "$code"
+done
