@@ -79,8 +79,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const tab = active()
 	const maxContentLines = Math.max(...tabs.map(t => t.lines.length))
 	const lines: string[] = [...tab.lines]
-
-
+	lines[lines.length - 1] += '█'
 	// Pad to match tallest tab, capped at screen height minus chrome
 	const w = cols()
 	const cw = contentWidth()
