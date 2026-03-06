@@ -2,13 +2,6 @@
 // No state, no side effects. Takes old/new lines → escape sequence.
 // Diff rendering approach inspired by pi-mono (https://github.com/badlogic/pi-mono).
 
-import { appendFileSync } from 'fs'
-
-const LOG = '/tmp/hal-cli-debug.log'
-function trace(msg: string): void {
-	appendFileSync(LOG, `${Date.now()} ${msg}\n`)
-}
-
 export interface RenderState {
 	lines: string[]
 	cursorRow: number
@@ -32,10 +25,7 @@ export function render(
 	cursor: CursorPos,
 	screenRows: number,
 ): { buf: string; state: RenderState } {
-	trace(`render: prev=${prev.lines.length} new=${newLines.length} cursorRow=${prev.cursorRow} screen=${screenRows}`)
-	// First render: write everything inline from current position
 	if (prev.lines.length === 0) {
-		trace('  → fullRender (first)')
 		return fullRender(newLines, cursor, false)
 	}
 
@@ -50,18 +40,12 @@ export function render(
 		}
 	}
 
-	// Nothing changed
-	if (firstChanged === -1) { trace('  → no changes'); return { buf: '', state: prev } }
+	if (firstChanged === -1) return { buf: '', state: prev }
 
 	// Changes above visible viewport — can't reach with relative moves
 	const viewportTop = Math.max(0, prev.lines.length - screenRows)
-	trace(`  changed=${firstChanged}..${lastChanged} viewportTop=${viewportTop}`)
 	if (firstChanged < viewportTop) {
-		if (lastChanged < viewportTop) {
-			trace('  → skip (all changes above viewport)')
-			return { buf: '', state: prev }
-		}
-		trace('  → fullRender (changes span viewport boundary)')
+		if (lastChanged < viewportTop) return { buf: '', state: prev }
 		return fullRender(newLines, cursor, true)
 	}
 
@@ -72,7 +56,6 @@ export function render(
 		&& firstChanged === prev.lines.length
 		&& firstChanged > 0
 	const moveTarget = isAppend ? firstChanged - 1 : firstChanged
-	trace(`  diff: isAppend=${isAppend} moveTarget=${moveTarget} cursorRow=${prev.cursorRow}`)
 	buf += moveCursor(prev.cursorRow, moveTarget)
 	buf += isAppend ? '\r\n' : '\r'
 
@@ -88,7 +71,6 @@ export function render(
 	// Clear leftover lines if content shrunk
 	if (prev.lines.length > newLines.length) {
 		const extra = prev.lines.length - newLines.length
-		trace(`  shrink: clearing ${extra} lines`)
 		if (renderEnd < newLines.length - 1) {
 			buf += moveCursor(cursorRow, newLines.length - 1)
 			cursorRow = newLines.length - 1
