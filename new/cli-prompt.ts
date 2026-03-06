@@ -111,9 +111,13 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.key === 'enter' && k.alt) { replaceSelection('\n'); return true }
 	if (k.key === 'enter') return false // let cli.ts handle submit
 
-	// Backspace / Delete
+	// Backspace
 	if (k.key === 'backspace') {
-		if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor)
+		if (k.alt) {
+			if (!deleteSel() && cursor > 0) deleteRange(wordBoundaryLeft(buf, cursor), cursor)
+		} else {
+			if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor)
+		}
 		return true
 	}
 	if (k.key === 'delete') {

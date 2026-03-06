@@ -96,6 +96,13 @@ describe('parseKey', () => {
 		expect(parseKey('\x1b[F')!.key).toBe('end')
 	})
 
+	test('alt+backspace', () => {
+		const k = parseKey('\x1b\x7f')!
+		expect(k.key).toBe('backspace')
+		expect(k.alt).toBe(true)
+		expect(k.ctrl).toBe(false)
+	})
+
 	// Kitty CSI u format
 	test('kitty: plain a', () => {
 		const k = parseKey('\x1b[97;1u')!

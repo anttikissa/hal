@@ -130,6 +130,7 @@ export function parseKey(data: string): KeyEvent | null {
 	if (data.length === 2 && data[0] === '\x1b') {
 		const ch = data[1]
 		if (ch === '\r' || ch === '\n') return ke('enter', { alt: true })
+		if (ch === '\x7f') return ke('backspace', { alt: true })
 		if (ch >= ' ') return ke(ch.toLowerCase(), { alt: true })
 		// Alt+Ctrl combo
 		const code = ch.charCodeAt(0)
