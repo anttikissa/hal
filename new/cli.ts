@@ -258,15 +258,19 @@ function eraseTui(): void {
 
 function quit(): void {
 	if (renderState.lines.length === 0) { process.exit(0) }
-	// Keep content blocks, erase chrome (tab bar, prompt, help bar) + padding
-	const contentLines = renderBlocks(tabs.active().blocks, cols(), false).length
-	const chromeStart = Math.max(contentLines, 0)
-	// Move cursor to where chrome begins, clear from there down
-	const target = chromeStart
-	const delta = renderState.cursorRow - target
+	// Keep blocks + tab bar + prompt text; erase only the help bar
+	const total = renderState.lines.length
+	const helpBarRow = total - 1
+	// Move cursor to help bar, clear it and anything below
+	const delta = renderState.cursorRow - helpBarRow
 	if (delta > 0) stdout.write(`\x1b[${delta}A`)
 	else if (delta < 0) stdout.write(`\x1b[${-delta}B`)
 	stdout.write('\r\x1b[J')
+	// If prompt was empty, also erase separator + empty prompt line
+	if (!prompt.text()) {
+		// separator + prompt = 2 lines above help bar
+		stdout.write(`\x1b[2A\r\x1b[J`)
+	}
 	process.exit(0)
 }
 
