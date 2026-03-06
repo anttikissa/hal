@@ -70,19 +70,24 @@ function makeSSEStream(chunks: string[], delayMs: number): ReadableStream<Uint8A
 	})
 }
 
-/** Extract the last user message text */
-function lastUserText(messages: any[]): string {
+/** Extract the last user message text (raw, preserving case) */
+function lastUserTextRaw(messages: any[]): string {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const msg = messages[i]
 		if (msg.role !== 'user') continue
-		if (typeof msg.content === 'string') return msg.content.trim().toLowerCase()
+		if (typeof msg.content === 'string') return msg.content.trim()
 		if (Array.isArray(msg.content)) {
 			const text = msg.content.find((b: any) => b.type === 'text')
-			if (text) return text.text.trim().toLowerCase()
+			if (text) return text.text.trim()
 			continue // skip tool_result-only user messages
 		}
 	}
 	return ''
+}
+
+/** Extract the last user message text (lowercased for keyword matching) */
+function lastUserText(messages: any[]): string {
+	return lastUserTextRaw(messages).toLowerCase()
 }
 
 function makeToolStream(): ReadableStream<Uint8Array> {
@@ -155,7 +160,7 @@ function generateResponse(messages: any[]): MockResponse {
 	if (input.startsWith('song')) return { chunks: DAISY_BELL, delayMs: 120 }
 	if (input.startsWith('error')) return { chunks: [], delayMs: 0, error: true }
 	if (isToolResult) return { chunks: ['Done! ', 'The command ', 'finished ', 'successfully.'], delayMs: 30 }
-	if (input.startsWith('bash ')) return { chunks: [], delayMs: 0, sleepCommand: input.slice(5) }
+	if (input.startsWith('bash ')) return { chunks: [], delayMs: 0, sleepCommand: lastUserTextRaw(messages).slice(5) }
 	if (input.startsWith('tool')) return { chunks: [], delayMs: 0, tool: true }
 	return { chunks: GREETING, delayMs: 30 }
 }

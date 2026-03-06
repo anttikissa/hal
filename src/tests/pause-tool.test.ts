@@ -22,8 +22,11 @@ async function activeSessionId(h: TestHal): Promise<string> {
 }
 
 describe('pause kills running tool subprocess', () => {
-	test('pause during bash tool kills the subprocess', async () => {
-		const pidFile = `/tmp/hal-test-sleep-${Date.now()}.pid`
+	// Compound commands make bash fork a child process. Killing only
+	// the top bash leaves the child alive with stdout open, so the
+	// tool runner hangs in reader.read() forever.
+	test('pause kills child process tree, not just top bash', async () => {
+		const pidFile = `/tmp/hal-test-child-${Date.now()}.pid`
 		try { unlinkSync(pidFile) } catch {}
 
 		hal = await startHal()
@@ -33,8 +36,11 @@ describe('pause kills running tool subprocess', () => {
 		hal.sendLine('/model mock')
 		await hal.waitForLine(/\[model\]/)
 
-		// "bash <cmd>" triggers mock provider to call bash tool with <cmd>
-		hal.sendLine(`bash echo $$ > ${pidFile} && sleep 1000`)
+		// Use sh -c to create a child process with its own PID.
+		// The child writes its PID then sleeps. Killing only the
+		// outer bash won't kill this child.
+		const cmd = `sh -c 'echo $$ > ${pidFile} && sleep 1000'`
+		hal.sendLine(`bash ${cmd}`)
 
 		// Wait until tool is running
 		await hal.waitFor(
@@ -42,34 +48,43 @@ describe('pause kills running tool subprocess', () => {
 			5000,
 		)
 
-		// Wait for PID file
+		// Wait for child PID file
 		for (let i = 0; i < 50; i++) {
 			if (existsSync(pidFile)) break
 			await Bun.sleep(50)
 		}
 		expect(existsSync(pidFile)).toBe(true)
-		const pid = parseInt(await Bun.file(pidFile).text(), 10)
-		expect(pid).toBeGreaterThan(0)
+		const childPid = parseInt(await Bun.file(pidFile).text(), 10)
+		expect(childPid).toBeGreaterThan(0)
 
-		const isAlive = () => { try { process.kill(pid, 0); return true } catch { return false } }
-		expect(isAlive()).toBe(true)
+		const isAlive = (pid: number) => { try { process.kill(pid, 0); return true } catch { return false } }
+		expect(isAlive(childPid)).toBe(true)
+
+		// Record position — only look at new status events after pause
+		const recordsBefore = hal.records.length
 
 		// Send pause command (same as Esc in TUI)
 		const pauseCmd = makeCommand('pause', testSource, undefined, sessionId)
 		await hal.sendCommand(pauseCmd)
 
-		// Pause command should complete
+		// Session should become idle (tool must finish, not hang on stdout)
 		await hal.waitFor(
-			(r) => r.type === 'command' && r.commandId === pauseCmd.id && r.phase === 'done',
+			(r) => {
+				const idx = hal!.records.indexOf(r)
+				if (idx < recordsBefore) return false
+				return r.type === 'status' &&
+					Array.isArray(r.busySessions) &&
+					!r.busySessions.includes(sessionId)
+			},
 			10000,
 		)
 
-		// The sleep subprocess should be dead
+		// The child subprocess should also be dead
 		for (let i = 0; i < 30; i++) {
-			if (!isAlive()) break
+			if (!isAlive(childPid)) break
 			await Bun.sleep(100)
 		}
-		expect(isAlive()).toBe(false)
+		expect(isAlive(childPid)).toBe(false)
 
 		try { unlinkSync(pidFile) } catch {}
 	}, 20000)
