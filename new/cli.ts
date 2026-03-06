@@ -210,8 +210,9 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 	const paragraphs = corpus.split(/\n\n+/)
 	let pi = 0
 	while (pi < paragraphs.length) {
-		// Thinking: always 1 paragraph
-		segments.push({ type: 'thinking', text: paragraphs[pi] })
+		// Thinking: 1 paragraph, strip markdown to look like internal reasoning
+		const think = paragraphs[pi].replace(/[#*`\-\d.]/g, '').replace(/  +/g, ' ').trim()
+		segments.push({ type: 'thinking', text: think || 'Let me think about this...' })
 		pi++
 		if (pi >= paragraphs.length) break
 		// Assistant: 2-5 paragraphs (bulk of the content)
