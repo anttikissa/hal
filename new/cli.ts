@@ -196,20 +196,23 @@ function simulateSpam(tab: ReturnType<typeof tabs.active>, lineTarget: number): 
 	corpus = corpus.slice(0, targetChars)
 
 	// Split into segments: thinking → assistant, maybe repeat
+	// Always split at paragraph boundaries (\n\n)
 	type Segment = { type: 'thinking' | 'assistant'; text: string }
 	const segments: Segment[] = []
-	let remaining = corpus
-	while (remaining.length > 0) {
-		// ~30% chance of a thinking block before assistant text
+	const paragraphs = corpus.split(/\n\n+/)
+	let pi = 0
+	while (pi < paragraphs.length) {
 		if (segments.length === 0 || Math.random() < 0.3) {
-			const tLen = 80 + Math.floor(Math.random() * 200)
-			segments.push({ type: 'thinking', text: remaining.slice(0, tLen) })
-			remaining = remaining.slice(tLen)
-			if (remaining.length <= 0) break
+			const count = 1 + Math.floor(Math.random() * 2)
+			const text = paragraphs.slice(pi, pi + count).join('\n\n')
+			segments.push({ type: 'thinking', text })
+			pi += count
+			if (pi >= paragraphs.length) break
 		}
-		const aLen = 200 + Math.floor(Math.random() * 400)
-		segments.push({ type: 'assistant', text: remaining.slice(0, aLen) })
-		remaining = remaining.slice(aLen)
+		const count = 1 + Math.floor(Math.random() * 3)
+		const text = paragraphs.slice(pi, pi + count).join('\n\n')
+		segments.push({ type: 'assistant', text })
+		pi += count
 	}
 
 	// Stream segments sequentially
