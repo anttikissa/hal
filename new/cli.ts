@@ -32,6 +32,7 @@ const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
 let halCursorVisible = true
 let blinkTimer: ReturnType<typeof setTimeout> | null = null
 let renderState: RenderState = emptyState
+let contentHighWater = 0
 
 function scheduleBlink(): void {
 	if (blinkTimer) clearTimeout(blinkTimer)
@@ -55,13 +56,15 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	// Content from blocks (full width; prompt uses cw for its own padding)
 	const contentLines = renderBlocks(tab.blocks, w, halCursorVisible)
+	contentHighWater = Math.max(contentHighWater, contentLines.length)
 
-	// Pad to fill screen (stable layout)
+	// Pad to content high-water mark (grows with content, never full-screen on startup)
 	const pLines = prompt.lineCount(cw)
 	const chromeLines = 3 + pLines
 	const available = Math.max(0, (stdout.rows || 24) - chromeLines)
+	const padTarget = Math.min(contentHighWater, available)
 	const lines = [...contentLines]
-	while (lines.length < available) lines.push('')
+	while (lines.length < padTarget) lines.push('')
 
 	// Tab bar
 	const idx = tabs.activeIndex()
