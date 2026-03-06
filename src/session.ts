@@ -541,9 +541,10 @@ function createSessionInfo(id: string, workingDir: string): SessionInfo {
 // Registry
 
 export async function loadSessionRegistry(
-	options: { defaultWorkingDir?: string } = {},
+	options: { defaultWorkingDir?: string; path?: string } = {},
 ): Promise<SessionRegistry> {
 	const defaultWorkingDir = resolve(options.defaultWorkingDir ?? LAUNCH_CWD)
+	const indexPath = options.path ?? SESSIONS_INDEX
 	ensureStateDir()
 
 	async function defaultRegistry(): Promise<SessionRegistry> {
@@ -551,14 +552,14 @@ export async function loadSessionRegistry(
 		const session = createSessionInfo(id, defaultWorkingDir)
 		sessionInfoMap.set(id, session)
 		const registry: SessionRegistry = { activeSessionId: session.id, sessions: [session] }
-		await saveSessionRegistry(registry)
+		await saveSessionRegistry(registry, indexPath)
 		return registry
 	}
 
-	if (!existsSync(SESSIONS_INDEX)) return defaultRegistry()
+	if (!existsSync(indexPath)) return defaultRegistry()
 
 	try {
-		const raw = await readFile(SESSIONS_INDEX, 'utf-8')
+		const raw = await readFile(indexPath, 'utf-8')
 		const parsed = parse(raw) as Partial<SessionRegistry>
 		const sessions = Array.isArray(parsed.sessions)
 			? parsed.sessions.filter((s: any) => s?.id).map((s: any) => ({
@@ -588,7 +589,7 @@ export async function loadSessionRegistry(
 // Fields to include in the registry index (UI-relevant only)
 const REGISTRY_FIELDS = new Set(['id', 'name', 'topic', 'model', 'workingDir', 'createdAt', 'updatedAt', 'messageCount'])
 
-export async function saveSessionRegistry(registry: SessionRegistry): Promise<void> {
+export async function saveSessionRegistry(registry: SessionRegistry, path = SESSIONS_INDEX): Promise<void> {
 	ensureStateDir()
 	const slim = {
 		activeSessionId: registry.activeSessionId,
@@ -601,7 +602,7 @@ export async function saveSessionRegistry(registry: SessionRegistry): Promise<vo
 			return entry
 		}),
 	}
-	await writeFile(SESSIONS_INDEX, stringify(slim) + '\n')
+	await writeFile(path, stringify(slim) + '\n')
 }
 
 // Rotation

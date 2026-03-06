@@ -448,6 +448,7 @@ describe('context trimming', () => {
 describe('loadSessionRegistry merges info.ason', () => {
 	test('preserves currentLog and lastPrompt after restart', async () => {
 		const id = uniqueId()
+		const indexPath = join(sessionDir(id), 'test-index.ason')
 		await appendToLog(id, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
 
 		// Simulate rotation: sets currentLog in info.ason
@@ -463,13 +464,13 @@ describe('loadSessionRegistry merges info.ason', () => {
 
 		// Save a slim registry (like shutdown does — no currentLog/lastPrompt)
 		const registry = { activeSessionId: id, sessions: [session] }
-		await saveSessionRegistry(registry)
+		await saveSessionRegistry(registry, indexPath)
 
 		// Clear in-memory state
 		sessionInfoMap.delete(id)
 
 		// Reload — should merge info.ason fields back
-		const loaded = await loadSessionRegistry()
+		const loaded = await loadSessionRegistry({ path: indexPath })
 		const restored = sessionInfoMap.get(id)
 		expect(restored).toBeDefined()
 		expect(restored!.currentLog).toBe('messages2.asonl')
