@@ -151,11 +151,12 @@ describe('patchLine', () => {
 		setPatchLines(false)
 	})
 
-	test('short lines always get full rewrite', () => {
+	test('short lines patch when it saves bytes', () => {
 		setPatchLines(true)
 		const prev: RenderState = { lines: ['hello world'], cursorRow: 0, cursorCol: 1 }
 		const { buf } = render(['hello WORLD'], prev, cursor, screen)
-		expect(strip(buf)).toContain('\x1b[2K')
+		// 'hello ' is common prefix (6 vis cols), patch is \x1b[7GWORLD (10b) vs full rewrite (15b)
+		expect(strip(buf)).not.toContain('\x1b[2K')
 		setPatchLines(false)
 	})
 

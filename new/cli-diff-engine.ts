@@ -41,7 +41,6 @@ function log(msg: string): void {
 // ── Intra-line patching ──
 
 function patchLine(old: string, nw: string): string | null {
-	if (nw.length < 20) return null
 	let i = 0, vis = 0, sgr = false, esc = 0, escStart = 0
 	while (i < old.length && i < nw.length && old[i] === nw[i]) {
 		if (esc === 0) {
@@ -58,15 +57,19 @@ function patchLine(old: string, nw: string): string | null {
 		i++
 	}
 	if (i >= old.length && i >= nw.length) return null
-	if (sgr || esc !== 0 || vis < 10) return null
+	if (sgr || esc !== 0) return null
+	// Patch: \x1b[{col}G (4-6b) + changed + maybe \x1b[K (3b). Skip if not shorter than full rewrite.
+	const colSeq = `\x1b[${vis + 1}G`
 	if (old.length === nw.length) {
 		let j = old.length - 1
 		while (j > i && old[j] === nw[j]) j--
 		if (nw.slice(i, j + 1).includes('\x1b'))
-			return `\x1b[${vis + 1}G${nw.slice(i)}\x1b[K`
-		return `\x1b[${vis + 1}G${nw.slice(i, j + 1)}`
+			return `${colSeq}${nw.slice(i)}\x1b[K`
+		const patch = `${colSeq}${nw.slice(i, j + 1)}`
+		return patch.length < nw.length + 4 ? patch : null
 	}
-	return `\x1b[${vis + 1}G${nw.slice(i)}\x1b[K`
+	const patch = `${colSeq}${nw.slice(i)}\x1b[K`
+	return patch.length < nw.length + 4 ? patch : null
 }
 
 // ── Diff renderer ──
