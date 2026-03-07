@@ -7,6 +7,27 @@ function sleep(ms: number): Promise<void> {
 	return new Promise(r => setTimeout(r, ms))
 }
 
+const SPAM_TEXT = `The configuration system uses a layered approach where project-level settings override global defaults, and environment variables take highest priority over everything else in the chain.
+
+Here's what we need to handle:
+
+- **Token limits** need careful tracking across \`streaming\` and \`batch\` modes
+- The \`**retry logic**\` should respect both rate limits and \`backoff\` timers
+- Lists with **bold items** and \`code spans\` mixed together freely
+
+When the context window fills up, compaction kicks in automatically. It summarizes older messages while preserving the most recent exchanges, tool results, and any pinned context the user marked as important.
+
+## Implementation notes
+
+1. **First pass**: scan all blocks for token counts using \`tiktoken\` estimation
+2. **Second pass**: merge adjacent assistant blocks that share the same \`role\`
+3. Run the \`**compaction prompt**\` against the oldest N messages
+4. Replace originals with the summary, preserving \`tool_call\` and \`tool_result\` pairs
+
+The streaming renderer operates on a simple principle — each block knows how to render itself into terminal lines, and the container joins them with consistent spacing. This avoids the classic problem where different parts of the UI fight over whitespace.
+
+Error handling follows a similar pattern. Rather than wrapping everything in try-catch blocks scattered throughout the codebase, we use a central error boundary that catches unhandled rejections and formats them into error blocks visible in the conversation stream.`
+
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
 	'Hey there! What are we working on? Say **help** for help.',
@@ -163,16 +184,30 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 
 	const spamMatch = lower.match(/^spa(m+)$/)
 	if (spamMatch) {
-		// More m's = more lines (each m = 30 lines)
-		const count = spamMatch[1].length * 30
-		yield { type: 'thinking', text: 'Generating a wall of text...' }
-		await sleep(100)
-		const lines: string[] = []
-		for (let i = 1; i <= count; i++) {
-			lines.push(`Line ${i}: ${'lorem ipsum dolor sit amet '.repeat(3).trim()}\n`)
+		// More m's = more text (each m ≈ 10 lines of paragraphs)
+		const targetChars = spamMatch[1].length * 10 * 80
+		let corpus = ''
+		while (corpus.length < targetChars) corpus += SPAM_TEXT + '\n\n'
+		const cut = corpus.indexOf('\n\n', targetChars)
+		corpus = cut === -1 ? corpus : corpus.slice(0, cut)
+
+		// Alternate thinking → text segments
+		const paragraphs = corpus.split(/\n\n+/)
+		let pi = 0
+		while (pi < paragraphs.length) {
+			// Thinking: 1 paragraph, strip markdown to look like reasoning
+			const think = paragraphs[pi].replace(/[#*`\-\d.]/g, '').replace(/  +/g, ' ').trim()
+			yield { type: 'thinking', text: think || 'Let me think about this...' }
+			await sleep(50)
+			pi++
+			if (pi >= paragraphs.length) break
+			// Text: 2-5 paragraphs
+			const ac = Math.min(2 + Math.floor(Math.random() * 4), paragraphs.length - pi)
+			const text = paragraphs.slice(pi, pi + ac).join('\n\n')
+			yield* streamChunks(text.match(/.{1,60}/gs) ?? [text], 30)
+			pi += ac
 		}
-		yield* streamChunks(lines, 10)
-		yield { type: 'done', usage: { input: tokenCount, output: count * 10 } }
+		yield { type: 'done', usage: { input: tokenCount, output: corpus.length } }
 		return
 	}
 
