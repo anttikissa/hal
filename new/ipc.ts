@@ -57,28 +57,23 @@ let lockFd: number | null = null
 
 export function claimHost(hostId: string): { host: boolean; currentPid: number | null } {
 	ensureDir(IPC_DIR)
-	const me = `pid=${process.pid}`
 
 	// Open or create lock file, then try non-blocking exclusive flock
 	const fd = openSync(HOST_LOCK, 'a+')
 	if (libc.symbols.flock(fd, LOCK_EX | LOCK_NB) !== 0) {
 		closeSync(fd)
-		// Lock held by another process — read to get their PID
 		let currentPid: number | null = null
 		try {
 			const raw = Bun.file(HOST_LOCK).textSync()
 			const lock = parse(raw) as any
 			currentPid = Number.isInteger(lock?.pid) ? lock.pid : null
 		} catch {}
-		console.error(`[lock] ${me} → host=false (flock held by pid=${currentPid})`)
 		return { host: false, currentPid }
 	}
 
-	// We hold the flock — write our info
 	lockFd = fd
 	writeFileSync(HOST_LOCK, stringify({ hostId, pid: process.pid, createdAt: new Date().toISOString() }))
 	updateState(s => { s.hostPid = process.pid; s.hostId = hostId })
-	console.error(`[lock] ${me} → host=true (flock acquired)`)
 	return { host: true, currentPid: process.pid }
 }
 

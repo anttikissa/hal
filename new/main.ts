@@ -11,9 +11,7 @@ ensureStateDir()
 await ensureBus()
 
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
-console.error(`[election] pid=${process.pid} hostId=${hostId} claiming...`)
 const { host, currentPid } = claimHost(hostId)
-console.error(`[election] pid=${process.pid} host=${host} currentPid=${currentPid}`)
 
 // Shared mutable state — cli.ts reads this for the separator
 export const halStatus = { isHost: host, hostPid: currentPid }
@@ -51,14 +49,9 @@ if (!host) {
 	const tryPromote = async () => {
 		if (promoting || halStatus.isHost) return
 		promoting = true
-		console.error(`[promote] pid=${process.pid} attempting promotion...`)
 		try {
 			const result = claimHost(hostId)
-			if (!result.host) {
-				console.error(`[promote] pid=${process.pid} promotion failed, host=${result.currentPid}`)
-				return
-			}
-			console.error(`[promote] pid=${process.pid} PROMOTED to host!`)
+			if (!result.host) return
 			halStatus.isHost = true
 			halStatus.hostPid = process.pid
 			await becomeHost()
@@ -69,14 +62,10 @@ if (!host) {
 	}
 	// Fallback for ungraceful death (SIGKILL/crash) — 1s is plenty
 	let watchPid = currentPid
-	console.error(`[promote] pid=${process.pid} watching hostPid=${watchPid}`)
 	let pollTimer: ReturnType<typeof setInterval> | null = setInterval(() => {
 		if (halStatus.isHost || promoting) return
 		if (watchPid !== null) {
-			try { process.kill(watchPid, 0) } catch {
-				console.error(`[promote] pid=${process.pid} watchPid=${watchPid} is dead`)
-				watchPid = null
-			}
+			try { process.kill(watchPid, 0) } catch { watchPid = null }
 		}
 		if (watchPid === null) tryPromote()
 	}, 1000)
