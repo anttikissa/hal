@@ -33,7 +33,9 @@ function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeE
 interface ToolCall { id: string; name: string; input: unknown }
 interface ToolResult { id: string; name: string; input: unknown; result: string }
 
-async function executeTool(call: ToolCall): Promise<string> {
+type OnChunk = (text: string) => Promise<void>
+
+async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {
 	const inp = call.input as any
 	switch (call.name) {
 		case 'bash': {
@@ -43,12 +45,18 @@ async function executeTool(call: ToolCall): Promise<string> {
 				stdout: 'pipe', stderr: 'pipe',
 				env: { ...process.env, TERM: 'dumb' },
 			})
-			const [stdout, stderr] = await Promise.all([
-				new Response(proc.stdout).text(),
-				new Response(proc.stderr).text(),
-			])
+			let out = ''
+			const reader = proc.stdout.getReader()
+			const decoder = new TextDecoder()
+			while (true) {
+				const { done, value } = await reader.read()
+				if (done) break
+				const chunk = decoder.decode(value, { stream: true })
+				out += chunk
+				if (onChunk) await onChunk(chunk)
+			}
+			const stderr = await new Response(proc.stderr).text()
 			const code = await proc.exited
-			let out = stdout
 			if (stderr) out += (out ? '\n' : '') + stderr
 			if (code !== 0) out += `\n[exit ${code}]`
 			return out.slice(0, 10000) || '(no output)'
@@ -149,7 +157,11 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								args, phase: 'running',
 							})
 
-							const result = await executeTool(call)
+							const onChunk = (text: string) => emit(sessionId, {
+								type: 'tool', toolId: call.id, name: call.name,
+								args, phase: 'streaming', output: text,
+							})
+							const result = await executeTool(call, onChunk)
 							toolResults.push({ ...call, result })
 
 							await emit(sessionId, {

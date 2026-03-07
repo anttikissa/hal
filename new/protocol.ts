@@ -100,7 +100,7 @@ export type RuntimeEvent =
 	| {
 		id: string; type: 'tool'; sessionId: string | null
 		toolId: string; name: string; args: string
-		phase: 'running' | 'done' | 'error'
+		phase: 'running' | 'streaming' | 'done' | 'error'
 		output?: string; createdAt: string
 	}
 

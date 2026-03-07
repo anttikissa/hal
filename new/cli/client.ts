@@ -121,6 +121,14 @@ export class Client {
 				closeStreaming(t)
 				if (event.phase === 'running') {
 					t.blocks.push({ type: 'tool', name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now() })
+				} else if (event.phase === 'streaming') {
+					for (let i = t.blocks.length - 1; i >= 0; i--) {
+						const b = t.blocks[i]
+						if (b.type === 'tool' && b.status === 'running') {
+							b.output += event.output ?? ''
+							break
+						}
+					}
 				} else {
 					for (let i = t.blocks.length - 1; i >= 0; i--) {
 						const b = t.blocks[i]
