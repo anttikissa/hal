@@ -60,7 +60,6 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			out.push({ role: 'user', content: msg.content })
 		} else if (msg.role === 'assistant') {
 			const content: any[] = []
-			if (msg.thinkingText) content.push({ type: 'thinking', thinking: msg.thinkingText })
 			if (msg.text) content.push({ type: 'text', text: msg.text })
 			if (msg.tools) {
 				for (const t of msg.tools) {

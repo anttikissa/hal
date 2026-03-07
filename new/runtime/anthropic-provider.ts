@@ -7,7 +7,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	await refreshAnthropicAuth()
 	const { accessToken } = getAuth('anthropic')
 	const maxTokens = 16384
-	const isAdaptive = /^claude-(opus|sonnet)-4/.test(params.model)
+	const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(params.model)
 
 	const system = [{ type: 'text', text: params.systemPrompt, cache_control: { type: 'ephemeral' } }]
 
