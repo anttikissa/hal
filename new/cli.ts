@@ -7,6 +7,7 @@ import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
 import { Client } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
+import { getState } from './ipc.ts'
 import { shutdown } from './main.ts'
 // ── Terminal setup ──
 
@@ -145,6 +146,7 @@ export function restart(): void {
 	// client promotes during the brief restart gap. The restarted process
 	// reclaims its own lock.
 	cleanExit = true
+	;(getState() as any).save?.()
 	if (renderState.lines.length > 0) {
 		const up = renderState.cursorRow
 		if (up > 0) stdout.write(`\x1b[${up}A`)
