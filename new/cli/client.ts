@@ -29,6 +29,7 @@ export class Client {
 	private source: RuntimeSource
 	private state: ClientState
 	private onUpdate: () => void
+	private pendingOpen = false // true after this client sends 'open'
 
 	constructor(transport: Transport, onUpdate: () => void) {
 		this.transport = transport
@@ -141,7 +142,7 @@ export class Client {
 				break
 			}
 			case 'sessions': {
-				this.syncTabs(event.sessions, event.activeSessionId)
+				this.syncTabs(event.sessions)
 				break
 			}
 			case 'tool': {
@@ -206,10 +207,10 @@ export class Client {
 		}
 	}
 
-	private syncTabs(sessions: SessionInfo[], activeSessionId: string | null): void {
+	private syncTabs(sessions: SessionInfo[]): void {
 		const current = new Map(this.state.tabs.map(t => [t.sessionId, t]))
 		const newTabs: TabState[] = []
-		let hasNewTab = false
+		let newTabId: string | null = null
 
 		for (const info of sessions) {
 			const existing = current.get(info.id)
@@ -217,27 +218,23 @@ export class Client {
 				existing.info = info
 				newTabs.push(existing)
 			} else {
-				// New tab — don't replay history here; the event tail
-				// is already delivering events in real-time.
 				newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' })
-				hasNewTab = true
+				newTabId = info.id
 			}
 		}
 
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
 
-		// Follow server's activeSessionId when a new tab was added (e.g. Ctrl-T)
-		// or current tab was removed. Otherwise preserve the user's choice.
-		const kept = newTabs.findIndex(t => t.sessionId === prevId)
-		if (kept >= 0 && !hasNewTab) {
-			this.state.activeTabIndex = kept
-		} else if (activeSessionId) {
-			const idx = newTabs.findIndex(t => t.sessionId === activeSessionId)
+		// Switch to new tab only if THIS client requested it
+		if (newTabId && this.pendingOpen) {
+			this.pendingOpen = false
+			const idx = newTabs.findIndex(t => t.sessionId === newTabId)
 			if (idx >= 0) this.state.activeTabIndex = idx
-		}
-		if (this.state.activeTabIndex >= this.state.tabs.length) {
-			this.state.activeTabIndex = Math.max(0, this.state.tabs.length - 1)
+		} else {
+			// Preserve current tab, or clamp if it was removed
+			const kept = newTabs.findIndex(t => t.sessionId === prevId)
+			this.state.activeTabIndex = kept >= 0 ? kept : Math.max(0, newTabs.length - 1)
 		}
 	}
 
@@ -268,6 +265,7 @@ export class Client {
 	// ── Commands ──
 
 	async send(type: CommandType, text?: string): Promise<void> {
+		if (type === 'open') this.pendingOpen = true
 		const tab = this.activeTab()
 		const sessionId = tab?.sessionId
 		if (!sessionId && type !== 'open') return
