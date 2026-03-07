@@ -12,7 +12,7 @@ await ensureBus()
 
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 console.error(`[election] pid=${process.pid} hostId=${hostId} claiming...`)
-const { host, currentPid } = await claimHost(hostId)
+const { host, currentPid } = claimHost(hostId)
 console.error(`[election] pid=${process.pid} host=${host} currentPid=${currentPid}`)
 
 // Shared mutable state — cli.ts reads this for the separator
@@ -53,7 +53,7 @@ if (!host) {
 		promoting = true
 		console.error(`[promote] pid=${process.pid} attempting promotion...`)
 		try {
-			const result = await claimHost(hostId)
+			const result = claimHost(hostId)
 			if (!result.host) {
 				console.error(`[promote] pid=${process.pid} promotion failed, host=${result.currentPid}`)
 				return

@@ -46,7 +46,7 @@ describe('host release', () => {
 
 			ensureStateDir()
 			await ensureBus()
-			await claimHost('h1')
+			claimHost('h1')
 			await releaseHost('h1')
 
 			const events = await readFile(process.env.NEW_STATE_DIR + '/ipc/events.asonl', 'utf-8')
@@ -56,18 +56,19 @@ describe('host release', () => {
 		expect(out).toBe('PASS')
 	})
 
-	test('host lock removed after releaseHost', async () => {
+	test('lock released after releaseHost', async () => {
 		const { out, err } = await runAndRead(`
 			import { ensureStateDir } from '${NEW_DIR}/state.ts'
 			import { ensureBus, claimHost, releaseHost } from '${NEW_DIR}/ipc.ts'
-			import { existsSync } from 'fs'
 
 			ensureStateDir()
 			await ensureBus()
-			await claimHost('h2')
+			claimHost('h2')
 			await releaseHost('h2')
 
-			console.log(existsSync(process.env.NEW_STATE_DIR + '/ipc/host.lock') ? 'FAIL' : 'PASS')
+			// Another claim should succeed (lock is released)
+			const result = claimHost('h3')
+			console.log(result.host ? 'PASS' : 'FAIL')
 		`)
 		if (err) console.error(err)
 		expect(out).toBe('PASS')
@@ -80,7 +81,7 @@ describe('host release', () => {
 
 			ensureStateDir()
 			await ensureBus()
-			const claim = await claimHost('h3')
+			const claim = claimHost('h3')
 			if (!claim.host) process.exit(1)
 			console.log('READY')
 
@@ -113,7 +114,7 @@ describe('host release', () => {
 
 			ensureStateDir()
 			await ensureBus()
-			const claim = await claimHost('h4')
+			const claim = claimHost('h4')
 			if (!claim.host) process.exit(1)
 			console.log('READY')
 			await new Promise(() => {})
