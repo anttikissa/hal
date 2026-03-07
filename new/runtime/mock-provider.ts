@@ -95,7 +95,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 			'- **read <file>** — mock reading a file\n' +
 			'- **write <file> <text>** — mock writing a file\n' +
 			'- **think** — extended thinking demo\n' +
-			'- **spam** — wall of text\n' +
+			'- **spam** / **spammm** — wall of text (more m\'s = more lines)\n' +
 			'- **error** — trigger an error'
 		yield* streamChunks(help.split(/(?<=\n)/), 20)
 		yield { type: 'done', usage: { input: tokenCount, output: help.length } }
@@ -161,15 +161,16 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		return
 	}
 
-	if (lower.startsWith('spam')) {
-		yield { type: 'thinking', text: 'Generating a wall of text...' }
-		await sleep(100)
+	const spamMatch = lower.match(/^spa(m+)$/)
+	if (spamMatch) {
+		// More m's = more lines (each m = 30 lines, like the original cli-test.ts)
+		const count = spamMatch[1].length * 30
 		const lines: string[] = []
-		for (let i = 1; i <= 50; i++) {
-			lines.push(`Line ${i}: ${'lorem ipsum dolor sit amet '.repeat(3).trim()}\n`)
+		for (let i = 1; i <= count; i++) {
+			lines.push(`Line ${i}: THIS IS SPAM - LOTS AND LOTS OF TEXT BLAH BLAH BLAH\n`)
 		}
-		yield* streamChunks(lines, 10)
-		yield { type: 'done', usage: { input: tokenCount, output: 500 } }
+		yield { type: 'text', text: lines.join('') }
+		yield { type: 'done', usage: { input: tokenCount, output: count * 20 } }
 		return
 	}
 
