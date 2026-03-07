@@ -70,7 +70,7 @@ if (!host) {
 		if (watchPid === null) tryPromote()
 	}, 1000)
 
-	// Also expose for event-driven promotion (client calls this on [owner-released])
+	// Also expose for event-driven promotion (client calls this on [host-released])
 	;(globalThis as any).__halTryPromote = tryPromote
 }
 

@@ -128,7 +128,7 @@ export async function releaseHost(hostId: string): Promise<void> {
 		await appendEvent({
 			id: `${Date.now()}-${process.pid}-release`,
 			type: 'line', sessionId: null,
-			text: '[owner-released]', level: 'meta',
+			text: '[host-released]', level: 'meta',
 			createdAt: new Date().toISOString(),
 		} as RuntimeEvent)
 	} catch {}

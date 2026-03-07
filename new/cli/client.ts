@@ -102,7 +102,7 @@ export class Client {
 			}
 			case 'line': {
 				// Fast-path host promotion
-				if (event.text === '[owner-released]') {
+				if (event.text === '[host-released]') {
 					const tryPromote = (globalThis as any).__halTryPromote
 					if (typeof tryPromote === 'function') tryPromote()
 					return

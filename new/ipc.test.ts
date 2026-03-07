@@ -37,7 +37,7 @@ async function runAndRead(code: string): Promise<{ out: string; err: string; exi
 }
 
 describe('host release', () => {
-	test('releaseHost writes [owner-released] to events.asonl', async () => {
+	test('releaseHost writes [host-released] to events.asonl', async () => {
 		const { out, err } = await runAndRead(`
 			import { ensureStateDir } from '${NEW_DIR}/state.ts'
 			import { ensureBus, claimHost, releaseHost } from '${NEW_DIR}/ipc.ts'
@@ -49,7 +49,7 @@ describe('host release', () => {
 			await releaseHost('h1')
 
 			const events = await readFile(process.env.NEW_STATE_DIR + '/ipc/events.asonl', 'utf-8')
-			console.log(events.includes('[owner-released]') ? 'PASS' : 'FAIL')
+			console.log(events.includes('[host-released]') ? 'PASS' : 'FAIL')
 		`)
 		if (err) console.error(err)
 		expect(out).toBe('PASS')
@@ -102,7 +102,7 @@ describe('host release', () => {
 		await hostProc.exited
 
 		const events = await readFile(join(stateDir, 'ipc/events.asonl'), 'utf-8')
-		expect(events).toContain('[owner-released]')
+		expect(events).toContain('[host-released]')
 	})
 
 	test('client promotes after host SIGKILL within 200ms', async () => {
