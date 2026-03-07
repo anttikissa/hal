@@ -9,7 +9,7 @@ export interface Config {
 }
 
 const config = liveFile<Config>(CONFIG_PATH, {
-	defaults: { defaultModel: 'mock/mock-1' },
+	defaults: { defaultModel: 'anthropic/claude-sonnet-4-20250514' },
 })
 
 export function getConfig(): Config { return config }

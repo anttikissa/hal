@@ -8,6 +8,12 @@ import { appendMessages, type AssistantMessage } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 
+const TOOLS = [
+	{ name: 'bash', description: 'Run a bash command', input_schema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } },
+	{ name: 'read', description: 'Read a file', input_schema: { type: 'object', properties: { path: { type: 'string' }, start: { type: 'integer' }, end: { type: 'integer' } }, required: ['path'] } },
+	{ name: 'write', description: 'Create or overwrite a file', input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
+]
+
 export interface AgentContext {
 	sessionId: string
 	model: string
@@ -97,7 +103,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		const provider = await loadProvider(providerName)
 
 		for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-			const gen = provider.generate({ messages, model: modelId, systemPrompt })
+			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS })
 
 			let thinkingText = ''
 			let assistantText = ''

@@ -11,6 +11,7 @@ export interface GenerateParams {
 	messages: any[]
 	model: string
 	systemPrompt: string
+	tools?: any[]
 }
 
 export interface Provider {
