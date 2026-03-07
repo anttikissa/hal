@@ -75,7 +75,7 @@ describe('renderBlocks', () => {
 
 	test('tool header with ─ fill', () => {
 		const blocks: Block[] = [
-			{ type: 'tool', name: 'bash', status: 'running', args: 'ls', output: '', startTime: Date.now() },
+			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: '', startTime: Date.now(), endTime: Date.now() },
 		]
 		const lines = renderBlocks(blocks, 40)
 		const plain = strip(lines[0])
@@ -86,13 +86,24 @@ describe('renderBlocks', () => {
 	test('tool header wraps long commands', () => {
 		const longCmd = 'a'.repeat(50)
 		const blocks: Block[] = [
-			{ type: 'tool', name: 'bash', status: 'running', args: longCmd, output: '', startTime: Date.now() },
+			{ type: 'tool', name: 'bash', status: 'done', args: longCmd, output: '', startTime: Date.now(), endTime: Date.now() },
 		]
 		const lines = renderBlocks(blocks, 40)
 		expect(lines.length).toBeGreaterThan(3) // header lines + blank + idle cursor
 		const contentLines = lines.slice(0, -2)
 		const lastPlain = strip(contentLines[contentLines.length - 1])
 		expect(lastPlain).toMatch(/─+\s*$/)
+	})
+
+	test('running tool shows inline cursor', () => {
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'bash', status: 'running', args: 'ls', output: 'file.txt', startTime: Date.now() },
+		]
+		const lines = renderBlocks(blocks, 40, true)
+		// Cursor should be on the last output line, not a separate line
+		const lastContentLine = strip(lines[lines.length - 1])
+		expect(lastContentLine).toContain('file.txt')
+		expect(lastContentLine).toContain('█')
 	})
 
 	test('tool output collapses after 5 lines', () => {

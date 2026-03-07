@@ -151,7 +151,15 @@ function renderBlock(block: Block, width: number): string[] {
 }
 
 function isStreaming(block: Block): boolean {
-	return (block.type === 'assistant' || block.type === 'thinking') && !block.done
+	if ((block.type === 'assistant' || block.type === 'thinking') && !block.done) return true
+	if (block.type === 'tool' && (block.status === 'streaming' || block.status === 'running')) return true
+	return false
+}
+
+/** Cursor color: matches the last active block's color scheme. */
+function cursorColor(block: Block): string {
+	if (block.type === 'tool') return colors.tool(block.name).fg
+	return colors.cursor.fg
 }
 
 /** Render all blocks with one blank line between them. */
@@ -165,16 +173,21 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 	}
 	// Append blinking cursor
 	const lastBlock = blocks[blocks.length - 1]
-	const c = cursorVisible ? `${colors.cursor.fg}█${colors.RESET}` : ' '
 	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
+		const cc = cursorColor(lastBlock)
+		const c = cursorVisible ? `${cc}█${colors.RESET}` : ' '
 		const last = result[result.length - 1]
-		if (lastBlock.type === 'assistant') {
-			result[result.length - 1] = last.slice(0, -(colors.RESET.length + 1)) + c + colors.RESET
+		if (last.endsWith(colors.RESET)) {
+			// Strip RESET, trim trailing spaces (from padEnd), add cursor, re-close
+			const inner = last.slice(0, -colors.RESET.length).replace(/ +$/, '')
+			result[result.length - 1] = inner + c + colors.RESET
 		} else {
 			result[result.length - 1] = last + c
 		}
 	} else if (result.length > 0) {
 		// Idle cursor on its own line after completed content
+		const cc = lastBlock ? cursorColor(lastBlock) : colors.cursor.fg
+		const c = cursorVisible ? `${cc}█${colors.RESET}` : ' '
 		result.push('')
 		result.push(` ${c}`)
 	}

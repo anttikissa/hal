@@ -99,7 +99,7 @@ export class Client {
 				}
 				const t = tab(event.sessionId); if (!t) return
 				if (event.level === 'error') t.blocks.push({ type: 'assistant', text: `⚠ ${event.text}`, done: true })
-				else if (event.level === 'meta' || event.level === 'notice') t.blocks.push({ type: 'assistant', text: event.text, done: true })
+				else t.blocks.push({ type: 'assistant', text: event.text, done: true })
 				break
 			}
 			case 'prompt': {
