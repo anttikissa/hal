@@ -114,6 +114,7 @@ export async function startRuntime(): Promise<Runtime> {
 			case 'prompt': {
 				if (!cmd.text) { await warn('Empty prompt'); return }
 				if (!sessions.has(sid)) { await error(`Session ${sid} not found`); return }
+				if (busySessionIds.has(sid)) { await warn('Session is busy'); return }
 
 				await emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
 
@@ -127,7 +128,8 @@ export async function startRuntime(): Promise<Runtime> {
 				busySessionIds.add(sid)
 				await publish('generating...')
 
-				await runAgentLoop({
+				// Fire off — don't block the command loop
+				runAgentLoop({
 					sessionId: sid,
 					model: info.model ?? getConfig().defaultModel,
 					systemPrompt: 'You are a helpful assistant.',
@@ -137,10 +139,10 @@ export async function startRuntime(): Promise<Runtime> {
 						else busySessionIds.delete(sid)
 						await publish(activity)
 					},
+				}).finally(async () => {
+					busySessionIds.delete(sid)
+					await publish()
 				})
-
-				busySessionIds.delete(sid)
-				await publish()
 				break
 			}
 			case 'open': {
