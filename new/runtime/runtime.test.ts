@@ -1,5 +1,10 @@
 // Integration test — runtime + IPC end-to-end.
 
+import { writeFileSync } from 'fs'
+const TEST_CONFIG = `/tmp/hal-test-config-${process.pid}.ason`
+writeFileSync(TEST_CONFIG, '{ defaultModel: "mock/mock-1" }\n')
+process.env.HAL_CONFIG = TEST_CONFIG
+
 import { test, expect, beforeEach, afterEach } from 'bun:test'
 import { rmSync, existsSync } from 'fs'
 import { readFile } from 'fs/promises'

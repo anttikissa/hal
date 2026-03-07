@@ -8,8 +8,13 @@ export interface Config {
 	activeSessionId?: string
 }
 
-const config = liveFile<Config>(CONFIG_PATH, {
-	defaults: { defaultModel: 'anthropic/claude-sonnet-4-20250514' },
-})
+let _config: Config | null = null
 
-export function getConfig(): Config { return config }
+export function getConfig(): Config {
+	if (!_config) {
+		_config = liveFile<Config>(process.env.HAL_CONFIG ?? CONFIG_PATH, {
+			defaults: { defaultModel: 'anthropic/claude-sonnet-4-20250514' },
+		})
+	}
+	return _config
+}

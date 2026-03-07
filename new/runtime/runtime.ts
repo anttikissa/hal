@@ -128,7 +128,7 @@ export async function startRuntime(): Promise<Runtime> {
 					sessionId: sid,
 					model: info.model ?? getConfig().defaultModel,
 					systemPrompt: 'You are a helpful assistant.',
-					messages: apiMessages.filter((m: any) => m.role),
+					messages: apiMessages,
 					onStatus: async (busy, activity) => {
 						if (busy) busySessionIds.add(sid)
 						else busySessionIds.delete(sid)

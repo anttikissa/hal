@@ -171,6 +171,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						messages.push({
 							role: 'assistant',
 							content: [
+								...(thinkingText ? [{ type: 'thinking', thinking: thinkingText }] : []),
 								...(assistantText ? [{ type: 'text', text: assistantText }] : []),
 								...toolCalls.map(t => ({
 									type: 'tool_use', id: t.id, name: t.name, input: t.input,

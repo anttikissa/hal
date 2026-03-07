@@ -48,11 +48,37 @@ export async function readMessages(sessionId: string): Promise<Message[]> {
 	return messagesLog(sessionId).readAll()
 }
 
-/** Load messages for API replay: skip before last reset/handoff, follow fork chain. */
-export async function loadApiMessages(sessionId: string): Promise<Message[]> {
+/** Load messages for API replay: converts stored format → Anthropic API format. */
+export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	const all = await loadAllMessages(sessionId)
 	const start = findReplayStart(all)
-	return all.slice(start)
+	const out: any[] = []
+	for (const m of all.slice(start)) {
+		const msg = m as any
+		if (!msg.role) continue
+		if (msg.role === 'user') {
+			out.push({ role: 'user', content: msg.content })
+		} else if (msg.role === 'assistant') {
+			const content: any[] = []
+			if (msg.thinkingText) content.push({ type: 'thinking', thinking: msg.thinkingText })
+			if (msg.text) content.push({ type: 'text', text: msg.text })
+			if (msg.tools) {
+				for (const t of msg.tools) {
+					content.push({ type: 'tool_use', id: t.id, name: t.name, input: t.input })
+				}
+			}
+			if (content.length) out.push({ role: 'assistant', content })
+			// Emit tool results as separate user messages
+			if (msg.tools) {
+				for (const t of msg.tools) {
+					if (t.result !== undefined) {
+						out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: t.id, content: t.result }] })
+					}
+				}
+			}
+		}
+	}
+	return out
 }
 
 /** Follow fork chain to load full history. */
