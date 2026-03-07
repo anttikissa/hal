@@ -106,12 +106,14 @@ export async function startRuntime(): Promise<Runtime> {
 
 	async function handleCommand(cmd: RuntimeCommand): Promise<void> {
 		const sid = cmd.sessionId ?? activeSessionId
-		if (!sid) return
+		const warn = (text: string) => emit({ type: 'line', sessionId: sid, text, level: 'warn' })
+		const error = (text: string) => emit({ type: 'line', sessionId: sid, text, level: 'error' })
+		if (!sid) { await error('No active session'); return }
 
 		switch (cmd.type) {
 			case 'prompt': {
-				if (!cmd.text) return
-				if (!sessions.has(sid)) return
+				if (!cmd.text) { await warn('Empty prompt'); return }
+				if (!sessions.has(sid)) { await error(`Session ${sid} not found`); return }
 
 				await emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
 
@@ -150,7 +152,7 @@ export async function startRuntime(): Promise<Runtime> {
 				break
 			}
 			case 'close': {
-				if (!sessions.has(sid)) return
+				if (!sessions.has(sid)) { await warn(`Session ${sid} not open`); return }
 				sessions.delete(sid)
 				if (activeSessionId === sid) {
 					activeSessionId = sessions.keys().next().value ?? null
@@ -169,48 +171,41 @@ export async function startRuntime(): Promise<Runtime> {
 				break
 			}
 			case 'topic': {
+				if (!cmd.text) { await warn('/topic <name>'); return }
 				const info = sessions.get(sid)
-				if (info && cmd.text) {
-					info.topic = cmd.text
-					await publish()
-				}
+				if (!info) { await error(`Session ${sid} not found`); return }
+				info.topic = cmd.text
+				await publish()
 				break
 			}
 			case 'model': {
+				if (!cmd.text) { await warn('/model <provider/model-id>'); return }
 				const info = sessions.get(sid)
-				if (info && cmd.text) {
-					info.model = cmd.text
-					await emit({ type: 'line', sessionId: sid, text: `[model] switched to ${cmd.text}`, level: 'meta' })
-					await publish()
-				}
+				if (!info) { await error(`Session ${sid} not found`); return }
+				info.model = cmd.text
+				await emit({ type: 'line', sessionId: sid, text: `[model] ${cmd.text}`, level: 'meta' })
+				await publish()
 				break
 			}
 			case 'resume': {
 				const id = cmd.text?.trim()
 				if (!id) {
-					// List available sessions
 					const all = await listSessionIds()
 					const closed = all.filter(s => !sessions.has(s))
 					const text = closed.length ? `Sessions: ${closed.join(', ')}` : 'No closed sessions'
 					await emit({ type: 'line', sessionId: sid, text, level: 'info' })
 					break
 				}
-				if (sessions.has(id)) {
-					await emit({ type: 'line', sessionId: sid, text: `Session ${id} is already open`, level: 'warn' })
-					break
-				}
+				if (sessions.has(id)) { await warn(`Session ${id} is already open`); break }
 				const meta = await loadMeta(id)
-				if (!meta) {
-					await emit({ type: 'line', sessionId: sid, text: `Session ${id} not found`, level: 'error' })
-					break
-				}
+				if (!meta) { await error(`Session ${id} not found`); break }
 				sessions.set(id, meta)
 				activeSessionId = id
 				await publish()
 				break
 			}
 			default:
-				await emit({ type: 'line', sessionId: sid, text: `Unknown command: /${cmd.type}`, level: 'error' })
+				await error(`Unknown command: /${cmd.type}`)
 		}
 	}
 
