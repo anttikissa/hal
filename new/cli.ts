@@ -2,7 +2,7 @@
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
 import { parseKey } from './cli/keys.ts'
-import { handleInput } from './cli/input-handler.ts'
+import { handleInput } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
 import { Client } from './cli/client.ts'
