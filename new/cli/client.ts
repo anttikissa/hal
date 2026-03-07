@@ -216,12 +216,9 @@ export class Client {
 				existing.info = info
 				newTabs.push(existing)
 			} else {
-				const tab: TabState = { sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' }
-				newTabs.push(tab)
-				// Async: load history for new tab
-				this.replayHistory(tab).then(() => {
-					loadInputHistory(info.id).then(h => { tab.inputHistory = h; this.onUpdate() })
-				})
+				// New tab — don't replay history here; the event tail
+				// is already delivering events in real-time.
+				newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' })
 			}
 		}
 
