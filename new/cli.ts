@@ -181,6 +181,10 @@ stdin.on('data', (data: string) => {
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); contentHighWater = 0; doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
 	if (k.key === 'r' && k.ctrl) {
+		// Restart: exit 100 triggers restart loop in `run` script.
+		// Intentionally does NOT call releaseHost() — the lock stays so no
+		// client promotes during the brief restart gap. The restarted process
+		// reclaims its own lock.
 		cleanExit = true
 		if (renderState.lines.length > 0) {
 			const up = renderState.cursorRow
