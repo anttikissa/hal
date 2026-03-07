@@ -2,7 +2,7 @@
 // Drives the provider, emits IPC events, persists to messages.asonl.
 
 import { loadProvider, type ProviderEvent } from './provider.ts'
-import { appendEvent } from '../ipc.ts'
+import { events } from '../ipc.ts'
 import { appendMessages, type AssistantMessage } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
@@ -16,11 +16,8 @@ export interface AgentContext {
 }
 
 function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeEvent['type'] }): Promise<void> {
-	return appendEvent({
-		id: eventId(),
-		sessionId,
-		createdAt: new Date().toISOString(),
-		...event,
+	return events.append({
+		id: eventId(), sessionId, createdAt: new Date().toISOString(), ...event,
 	} as RuntimeEvent)
 }
 

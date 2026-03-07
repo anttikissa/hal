@@ -1,12 +1,10 @@
 // Conversation log — append-only ASONL per session.
 
-import { appendFile, readFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import { stringify, parseAll } from '../utils/ason.ts'
+import { asonlLog } from '../utils/asonl-log.ts'
 import { sessionDir, ensureDir } from '../state.ts'
 
-function messagesPath(sessionId: string): string {
-	return `${sessionDir(sessionId)}/messages.asonl`
+function messagesLog(sessionId: string) {
+	return asonlLog<Message>(`${sessionDir(sessionId)}/messages.asonl`)
 }
 
 // ── Message types ──
@@ -41,19 +39,11 @@ export type Message = UserMessage | AssistantMessage | ToolResultMessage
 export async function appendMessages(sessionId: string, entries: Message[]): Promise<void> {
 	if (entries.length === 0) return
 	ensureDir(sessionDir(sessionId))
-	const lines = entries.map(e => stringify(e, 'short')).join('\n') + '\n'
-	await appendFile(messagesPath(sessionId), lines)
+	await messagesLog(sessionId).append(...entries)
 }
 
 export async function readMessages(sessionId: string): Promise<Message[]> {
-	const path = messagesPath(sessionId)
-	if (!existsSync(path)) return []
-	try {
-		const raw = await readFile(path, 'utf-8')
-		return parseAll(raw) as Message[]
-	} catch {
-		return []
-	}
+	return messagesLog(sessionId).readAll()
 }
 
 /** Load messages for API replay: skip before last reset/handoff, follow fork chain. */

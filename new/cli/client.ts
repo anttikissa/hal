@@ -78,8 +78,8 @@ export class Client {
 	}
 
 	private async tailEvents(fromOffset: number): Promise<void> {
-		const events = this.transport.tailEvents(fromOffset)
-		for await (const event of events) {
+		const { items } = this.transport.tailEvents(fromOffset)
+		for await (const event of items) {
 			this.handleEvent(event)
 			this.onUpdate()
 		}

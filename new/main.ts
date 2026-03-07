@@ -3,7 +3,7 @@
 
 import { randomBytes } from 'crypto'
 import { ensureStateDir } from './state.ts'
-import { ensureBus, claimHost, releaseHost, appendEvent } from './ipc.ts'
+import { ensureBus, claimHost, releaseHost, events } from './ipc.ts'
 import { startRuntime, type Runtime } from './runtime/runtime.ts'
 import { eventId } from './protocol.ts'
 
@@ -20,10 +20,10 @@ export const halStatus = { isHost: host, hostPid: currentPid }
 let runtime: Runtime | null = null
 
 async function emitLine(text: string): Promise<void> {
-	await appendEvent({
+	await events.append({
 		id: eventId(), type: 'line', sessionId: null,
 		text, level: 'meta', createdAt: new Date().toISOString(),
-	})
+	} as any)
 }
 
 async function becomeHost(): Promise<void> {
