@@ -168,7 +168,13 @@ export class Client {
 			if (idx >= 0) this.state.activeTabIndex = idx
 		} else {
 			const kept = newTabs.findIndex(t => t.sessionId === prevId)
-			this.state.activeTabIndex = kept >= 0 ? kept : Math.max(0, newTabs.length - 1)
+			if (kept >= 0) {
+				this.state.activeTabIndex = kept
+			} else {
+				// Tab was closed — stay at same index (tab to the right slides in)
+				const prevIdx = this.state.activeTabIndex
+				this.state.activeTabIndex = Math.min(prevIdx, newTabs.length - 1)
+			}
 		}
 	}
 
