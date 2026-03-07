@@ -9,7 +9,7 @@ export type Block =
 	| { type: 'assistant'; text: string; done: boolean; model?: string }
 	| { type: 'thinking'; text: string; done: boolean }
 	| { type: 'tool'; name: string; status: 'streaming' | 'running' | 'done' | 'error';
-		args: string; output: string; startTime: number }
+		args: string; output: string; startTime: number; endTime?: number }
 
 /** Collapse runs of 3+ newlines to 2 (preserving paragraph breaks). */
 function collapseBlankLines(text: string): string {
@@ -83,8 +83,8 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	return wordWrap(text, CONTENT_W(width)).map(l => `${colors.thinking.fg}${pad}${l}${colors.RESET}`)
 }
 
-function elapsed(startTime: number): string {
-	const s = (Date.now() - startTime) / 1000
+function elapsed(startTime: number, endTime?: number): string {
+	const s = ((endTime ?? Date.now()) - startTime) / 1000
 	return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
 }
 
@@ -116,7 +116,7 @@ function toolHeader(label: string, width: number, fg: string, bg: string): strin
 
 function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): string[] {
 	const { fg, bg } = colors.tool(block.name)
-	const time = elapsed(block.startTime)
+	const time = elapsed(block.startTime, block.endTime)
 	const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
 	const label = `${block.name}: ${block.args} (${time})${statusSuffix}`
 	const header = toolHeader(label, width, fg, bg)

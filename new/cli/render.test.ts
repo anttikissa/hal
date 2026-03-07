@@ -107,4 +107,55 @@ describe('cli-render', () => {
 	})
 })
 
-// patchLine tests disabled — intra-line patching is off while investigating rendering corruption
+describe('patchLine', () => {
+	const long = (mid: string) => `this is a very long line that has very little changing (${mid}) and then there's a lot of text after this too`
+
+	test('same-length line patches only the changed bytes', () => {
+		const old = [long('1.0s')]
+		const nw = [long('1.1s')]
+		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
+		const { buf } = render(nw, prev, cursor, screen)
+		const s = strip(buf)
+		expect(s).not.toContain('\x1b[2K')
+		expect(s).toMatch(/\x1b\[\d+G/)
+		expect(buf.length).toBeLessThan(old[0].length)
+	})
+
+	test('patches with SGR replay when color is active at diff point', () => {
+		const old = ['\x1b[31m' + 'x'.repeat(30) + 'AAA' + 'y'.repeat(30) + '\x1b[0m']
+		const nw = ['\x1b[31m' + 'x'.repeat(30) + 'BBB' + 'y'.repeat(30) + '\x1b[0m']
+		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
+		const { buf } = render(nw, prev, cursor, screen)
+		const s = strip(buf)
+		expect(s).not.toContain('\x1b[2K')
+		expect(buf).toContain('\x1b[31m')
+		expect(s).toContain('BBB')
+	})
+
+	test('patches when SGR was reset before diff point', () => {
+		const prefix = '\x1b[31mred\x1b[0m ' + 'x'.repeat(30)
+		const old = [prefix + 'AAA' + 'y'.repeat(30)]
+		const nw = [prefix + 'BBB' + 'y'.repeat(30)]
+		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
+		const { buf } = render(nw, prev, cursor, screen)
+		const s = strip(buf)
+		expect(s).not.toContain('\x1b[2K')
+		expect(s).toContain('BBB')
+	})
+
+	test('short lines patch when it saves bytes', () => {
+		const prev: RenderState = { lines: ['hello world'], cursorRow: 0, cursorCol: 1 }
+		const { buf } = render(['hello WORLD'], prev, cursor, screen)
+		expect(strip(buf)).not.toContain('\x1b[2K')
+	})
+
+	test('different-length lines rewrite from diff point', () => {
+		const old = ['prefix ' + 'a'.repeat(40) + ' short']
+		const nw = ['prefix ' + 'a'.repeat(40) + ' much longer suffix here']
+		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
+		const { buf } = render(nw, prev, cursor, screen)
+		const s = strip(buf)
+		expect(s).not.toContain('\x1b[2K')
+		expect(s).toContain('much longer')
+	})
+})

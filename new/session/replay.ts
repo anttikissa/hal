@@ -23,13 +23,14 @@ export function replayToBlocks(messages: Message[], model?: string): Block[] {
 			}
 			if (Array.isArray(m.tools)) {
 				for (const tool of m.tools) {
+					const now = Date.now()
 					blocks.push({
 						type: 'tool',
 						name: tool.name,
 						args: typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input ?? {}),
 						output: tool.result ?? '',
 						status: 'done',
-						startTime: Date.now(),
+						startTime: now, endTime: now,
 					})
 				}
 			}

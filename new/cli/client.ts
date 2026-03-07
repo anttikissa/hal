@@ -153,6 +153,7 @@ export class Client {
 						if (b.type === 'tool' && b.name === event.name && b.status === 'running') {
 							b.status = event.phase === 'error' ? 'error' : 'done'
 							b.output = event.output ?? ''
+							b.endTime = Date.now()
 							break
 						}
 					}

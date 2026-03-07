@@ -22,8 +22,34 @@ const SYNC_START = '\x1b[?2026h'
 const SYNC_END = '\x1b[?2026l'
 // ── Intra-line patching ──
 
-function patchLine(_old: string, _nw: string): string | null {
-	return null // disabled — suspected rendering corruption
+function patchLine(old: string, nw: string): string | null {
+	let i = 0, vis = 0, sgrState = '', esc = 0, escStart = 0
+	while (i < old.length && i < nw.length && old[i] === nw[i]) {
+		if (esc === 0) {
+			if (old[i] === '\x1b') { esc = 1; escStart = i } else vis++
+		} else if (esc === 1) {
+			esc = old[i] === '[' ? 2 : 0
+		} else if (old.charCodeAt(i) >= 0x40 && old.charCodeAt(i) <= 0x7e) {
+			if (old[i] === 'm') {
+				const seq = old.slice(escStart, i + 1)
+				if (seq === '\x1b[0m' || seq === '\x1b[m') sgrState = ''
+				else sgrState += seq
+			}
+			esc = 0
+		}
+		i++
+	}
+	if (i >= old.length && i >= nw.length) return null
+	if (esc !== 0 || i < 6) return null
+	const col = `\x1b[${vis + 1}G${sgrState}`
+	if (old.length === nw.length) {
+		let j = old.length - 1
+		while (j > i && old[j] === nw[j]) j--
+		if (nw.slice(i, j + 1).includes('\x1b'))
+			return `${col}${nw.slice(i)}\x1b[K`
+		return `${col}${nw.slice(i, j + 1)}${sgrState ? '\x1b[0m' : ''}`
+	}
+	return `${col}${nw.slice(i)}\x1b[K`
 }
 
 // ── Diff renderer ──
