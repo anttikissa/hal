@@ -5,7 +5,7 @@ import { rmSync, existsSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { randomBytes } from 'crypto'
 import { ensureStateDir, STATE_DIR, SESSIONS_DIR } from '../state.ts'
-import { ensureBus, claimHost, releaseHost, appendCommand, readEventsFrom } from '../ipc.ts'
+import { ensureBus, claimHost, releaseHost, commands, events } from '../ipc.ts'
 import { startRuntime, type Runtime } from './runtime.ts'
 import { makeCommand, type RuntimeEvent } from '../protocol.ts'
 import { parseAll } from '../utils/ason.ts'
@@ -32,14 +32,15 @@ afterEach(async () => {
 })
 
 async function sendAndWait(text: string, sid?: string): Promise<RuntimeEvent[]> {
-	const { offset: before } = await readEventsFrom(0)
+	const before = await events.offset()
 	const sessionId = sid ?? runtime.activeSessionId!
-	await appendCommand(makeCommand('prompt', src, text, sessionId))
+	await commands.append(makeCommand('prompt', src, text, sessionId))
 	for (let i = 0; i < 200; i++) {
 		await new Promise(r => setTimeout(r, 50))
-		const { events } = await readEventsFrom(before)
-		const done = events.find(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))
-		if (done) return events
+		const all = await events.readAll()
+		const recent = all.slice(-20)
+		const done = recent.find(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))
+		if (done) return recent
 	}
 	throw new Error('Timed out waiting for response')
 }
@@ -94,7 +95,7 @@ test('status events bracket the generation', async () => {
 
 test('open command creates a new session', async () => {
 	const before = runtime.sessions.size
-	await appendCommand(makeCommand('open', src))
+	await commands.append(makeCommand('open', src))
 	for (let i = 0; i < 50; i++) {
 		await new Promise(r => setTimeout(r, 50))
 		if (runtime.sessions.size > before) break
@@ -104,7 +105,7 @@ test('open command creates a new session', async () => {
 
 test('close command removes session and creates replacement', async () => {
 	const sid = runtime.activeSessionId!
-	await appendCommand(makeCommand('close', src, undefined, sid))
+	await commands.append(makeCommand('close', src, undefined, sid))
 	await new Promise(r => setTimeout(r, 500))
 	expect(runtime.sessions.has(sid)).toBe(false)
 	expect(runtime.sessions.size).toBe(1)
@@ -112,7 +113,7 @@ test('close command removes session and creates replacement', async () => {
 
 test('reset command is persisted', async () => {
 	const sid = runtime.activeSessionId!
-	await appendCommand(makeCommand('reset', src, undefined, sid))
+	await commands.append(makeCommand('reset', src, undefined, sid))
 	await new Promise(r => setTimeout(r, 500))
 	const path = `${sessionDir(sid)}/messages.asonl`
 	expect(existsSync(path)).toBe(true)
