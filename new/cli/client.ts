@@ -203,7 +203,7 @@ export class Client {
 		if (type === 'open') this.pendingOpen = true
 		const tab = this.activeTab()
 		const sessionId = tab?.sessionId
-		if (!sessionId && type !== 'open') return
+		if (!sessionId && type !== 'open') throw new Error('no active session')
 		await this.transport.sendCommand(makeCommand(type, this.source, text, sessionId))
 	}
 

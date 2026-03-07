@@ -117,6 +117,12 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	return { lines, cursor: cursorPos }
 }
 
+export function showError(msg: string): void {
+	const tab = client.activeTab()
+	if (tab) tab.blocks.push({ type: 'assistant', text: `⚠ ${msg}`, done: true })
+	doRender()
+}
+
 export function doRender(): void {
 	const { lines, cursor: cursorPos } = buildLines()
 	const { buf, state } = render(lines, renderState, cursorPos, stdout.rows || 24)

@@ -2,26 +2,20 @@
 
 import type { KeyEvent } from './keys.ts'
 import * as prompt from './prompt.ts'
-import { client, quit, restart, suspend, doRender, contentWidth } from '../cli.ts'
-import { updateState } from '../ipc.ts'
+import { client, quit, restart, suspend, doRender, contentWidth, showError } from '../cli.ts'
 
 export function handleInput(k: KeyEvent): void {
 	if (k.key === 'k' && k.ctrl) throw new Error('simulated crash (ctrl-k)')
 	if (k.key === 'c' && k.ctrl) { quit(); return }
 
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && !prompt.text())) {
-		if (client.getState().tabs.length <= 1) {
-			updateState(s => { s.sessions = []; s.activeSessionId = null })
-			quit()
-			return
-		}
-		client.send('close')
+		send('close')
 		prompt.reset()
 		doRender()
 		return
 	}
 
-	if (k.key === 't' && k.ctrl) { client.send('open'); prompt.reset(); return }
+	if (k.key === 't' && k.ctrl) { send('open'); prompt.reset(); return }
 	if (k.key === 'n' && k.ctrl) { client.nextTab(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
@@ -34,10 +28,10 @@ export function handleInput(k: KeyEvent): void {
 			const slash = text.match(/^\/(\w+)\s*(.*)/)
 			if (slash) {
 				const [, cmd, arg] = slash
-				client.send(cmd as any, arg || undefined)
+				send(cmd as any, arg || undefined)
 			} else {
 				client.onSubmit(text)
-				client.send('prompt', text)
+				send('prompt', text)
 			}
 		}
 		doRender()
@@ -47,4 +41,8 @@ export function handleInput(k: KeyEvent): void {
 	if (prompt.handleKey(k, contentWidth())) {
 		doRender()
 	}
+}
+
+function send(type: Parameters<typeof client.send>[0], text?: string): void {
+	client.send(type, text).catch((e: Error) => showError(`send ${type}: ${e.message}`))
 }
