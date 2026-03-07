@@ -1,6 +1,6 @@
 // Host runtime — tails commands, dispatches, manages sessions.
 
-import { ensureBus, tailCommandsFrom, appendEvent, updateState, getState, trimEvents } from '../ipc.ts'
+import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
@@ -8,10 +8,10 @@ import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } fro
 import { getConfig } from '../config.ts'
 
 const GREETINGS = [
-	'Hello! What shall we build today?',
-	'Hey there! What are we working on?',
-	'Hi! Ready when you are.',
-	'Good to see you. What\'s the plan?',
+	'Hello! What shall we build today? Say **help** for help.',
+	'Hey there! What are we working on? Say **help** for help.',
+	'Hi! Ready when you are. Say **help** for help.',
+	'Good to see you. What\'s the plan? Say **help** for help.',
 ]
 
 function pick<T>(arr: T[]): T {
@@ -27,12 +27,12 @@ export interface Runtime {
 
 // Helper: emit an event with auto-filled id + createdAt
 function emit(fields: Omit<RuntimeEvent, 'id' | 'createdAt'>): Promise<void> {
-	return appendEvent({ ...fields, id: eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
+	return events.append({ ...fields, id: eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
 }
 
 export async function startRuntime(): Promise<Runtime> {
 	await ensureBus()
-	await trimEvents()
+	await events.trim(500)
 
 	const sessions = new Map<string, SessionInfo>()
 	const busySessionIds = new Set<string>()
@@ -53,20 +53,26 @@ export async function startRuntime(): Promise<Runtime> {
 		activeSessionId = prevState.activeSessionId
 	}
 	// If nothing restored, create a fresh session with greeting
+	let needsGreeting: string | null = null
 	if (sessions.size === 0) {
 		const info = await createSession()
 		sessions.set(info.id, info)
 		activeSessionId = info.id
-		await greetSession(info.id)
+		needsGreeting = info.id
 	}
 
-	// Publish initial state
+	// Publish initial state (must come before greeting so client has the tab)
 	await publish()
 
+	// Greet new session after publish so the client can receive the chunks
+	if (needsGreeting) {
+		await greetSession(needsGreeting)
+	}
+
 	// Tail commands
-	const { commands, cancel: cancelTail } = await tailCommandsFrom()
+	const cmdTail = commands.tail()
 	;(async () => {
-		for await (const cmd of commands) {
+		for await (const cmd of cmdTail.items) {
 			if (stopped) break
 			await handleCommand(cmd)
 		}
@@ -138,8 +144,8 @@ export async function startRuntime(): Promise<Runtime> {
 				const info = await createSession()
 				sessions.set(info.id, info)
 				activeSessionId = info.id
-				await greetSession(info.id)
 				await publish()
+				await greetSession(info.id)
 				break
 			}
 			case 'close': {
@@ -185,6 +191,6 @@ export async function startRuntime(): Promise<Runtime> {
 		sessions,
 		activeSessionId,
 		busySessionIds,
-		stop() { stopped = true; cancelTail() },
+		stop() { stopped = true; cmdTail.cancel() },
 	}
 }

@@ -8,10 +8,10 @@ function sleep(ms: number): Promise<void> {
 }
 
 const GREETINGS = [
-	'Hello! What shall we build today?',
-	'Hey there! What are we working on?',
-	'Hi! Ready when you are.',
-	'Good to see you. What\'s the plan?',
+	'Hello! What shall we build today? Say **help** for help.',
+	'Hey there! What are we working on? Say **help** for help.',
+	'Hi! Ready when you are. Say **help** for help.',
+	'Good to see you. What\'s the plan? Say **help** for help.',
 ]
 
 const THINKING_PHRASES = [
