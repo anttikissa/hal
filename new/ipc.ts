@@ -9,14 +9,11 @@ import { defaultState } from './protocol.ts'
 import { liveFile } from './live-file.ts'
 import { IPC_DIR, ensureDir } from './state.ts'
 
-// ── Logs ──
-
 export const commands = new Log<RuntimeCommand>(`${IPC_DIR}/commands.asonl`)
 export const events = new Log<RuntimeEvent>(`${IPC_DIR}/events.asonl`)
-
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 
-// ── Init ──
+let _state: RuntimeState | null = null
 
 export async function ensureBus(): Promise<void> {
 	ensureDir(IPC_DIR)
@@ -24,10 +21,6 @@ export async function ensureBus(): Promise<void> {
 	await events.ensure()
 	getState()
 }
-
-// ── State (liveFile-backed) ──
-
-let _state: RuntimeState | null = null
 
 export function getState(): RuntimeState {
 	if (!_state) {
@@ -43,20 +36,13 @@ export function updateState(fn: (s: RuntimeState) => void): void {
 	s.updatedAt = new Date().toISOString()
 }
 
-// ── Host lock ──
-
-async function readLockPid(): Promise<{ hostId: string | null; pid: number | null } | null> {
+async function readLock(): Promise<{ hostId: string | null; pid: number | null } | null> {
+	// Retry once on parse failure (file may be mid-write)
 	for (let i = 0; i < 2; i++) {
 		try {
-			const raw = await readFile(HOST_LOCK, 'utf-8')
-			const lock = parse(raw) as any
-			return {
-				hostId: lock?.hostId ?? null,
-				pid: Number.isInteger(lock?.pid) ? lock.pid : null,
-			}
-		} catch {
-			if (i === 0) await Bun.sleep(100)
-		}
+			const lock = parse(await readFile(HOST_LOCK, 'utf-8')) as any
+			return { hostId: lock?.hostId ?? null, pid: Number.isInteger(lock?.pid) ? lock.pid : null }
+		} catch { if (i === 0) await Bun.sleep(100) }
 	}
 	return null
 }
@@ -64,61 +50,33 @@ async function readLockPid(): Promise<{ hostId: string | null; pid: number | nul
 export async function claimHost(hostId: string): Promise<{ host: boolean; currentPid: number | null }> {
 	ensureDir(IPC_DIR)
 	const payload = stringify({ hostId, pid: process.pid, createdAt: new Date().toISOString() })
+	const won = () => { updateState(s => { s.hostPid = process.pid; s.hostId = hostId }); return { host: true, currentPid: process.pid } as const }
+	const lost = (pid?: number | null) => ({ host: false, currentPid: pid ?? getState().hostPid } as const)
 
-	const tryClaim = async (): Promise<boolean> => {
-		try {
-			const fh = await open(HOST_LOCK, 'wx')
-			await fh.writeFile(payload)
-			await fh.close()
-			return true
-		} catch (e: any) {
-			if (e?.code === 'EEXIST') return false
-			throw e
-		}
+	const tryClaim = async () => {
+		try { const fh = await open(HOST_LOCK, 'wx'); await fh.writeFile(payload); await fh.close(); return true }
+		catch (e: any) { if (e?.code === 'EEXIST') return false; throw e }
 	}
 
-	if (await tryClaim()) {
-		updateState(s => { s.hostPid = process.pid; s.hostId = hostId })
-		return { host: true, currentPid: process.pid }
-	}
+	if (await tryClaim()) return won()
+	const lock = await readLock()
+	if (!lock) return lost()
+	if (lock.hostId === hostId) return won()
+	if (lock.pid !== null && isPidAlive(lock.pid)) return lost(lock.pid)
 
-	const lock = await readLockPid()
-	if (!lock) return { host: false, currentPid: getState().hostPid }
-	if (lock.hostId === hostId) return { host: true, currentPid: process.pid }
-	if (lock.pid !== null && isPidAlive(lock.pid)) return { host: false, currentPid: lock.pid }
-
+	// Dead host — rename stale lock aside, retry
 	const stale = `${HOST_LOCK}.stale.${process.pid}`
-	try {
-		await rename(HOST_LOCK, stale)
-	} catch {
-		return { host: false, currentPid: getState().hostPid }
-	}
+	try { await rename(HOST_LOCK, stale) } catch { return lost() }
 	try { await rm(stale) } catch {}
-
-	if (await tryClaim()) {
-		updateState(s => { s.hostPid = process.pid; s.hostId = hostId })
-		return { host: true, currentPid: process.pid }
-	}
-	return { host: false, currentPid: getState().hostPid }
+	return (await tryClaim()) ? won() : lost()
 }
 
 export async function releaseHost(hostId: string): Promise<void> {
 	try {
-		const lock = await readLockPid()
+		const lock = await readLock()
 		if (lock?.hostId !== hostId) return
 		await rm(HOST_LOCK)
-		updateState(s => {
-			if (s.hostId === hostId) {
-				s.hostPid = null
-				s.hostId = null
-				s.busySessionIds = []
-			}
-		})
-		await events.append({
-			id: `${Date.now()}-${process.pid}-release`,
-			type: 'line', sessionId: null,
-			text: '[host-released]', level: 'meta',
-			createdAt: new Date().toISOString(),
-		} as RuntimeEvent)
+		updateState(s => { if (s.hostId === hostId) { s.hostPid = null; s.hostId = null; s.busySessionIds = [] } })
+		await events.append({ id: `${Date.now()}-${process.pid}-release`, type: 'line', sessionId: null, text: '[host-released]', level: 'meta', createdAt: new Date().toISOString() } as RuntimeEvent)
 	} catch {}
 }
