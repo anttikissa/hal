@@ -209,6 +209,8 @@ export async function startRuntime(): Promise<Runtime> {
 				await publish()
 				break
 			}
+			default:
+				await emit({ type: 'line', sessionId: sid, text: `Unknown command: /${cmd.type}`, level: 'error' })
 		}
 	}
 
