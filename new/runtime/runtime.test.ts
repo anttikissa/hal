@@ -1,11 +1,18 @@
 // Integration test — runtime + IPC end-to-end.
 
-import { writeFileSync } from 'fs'
+import { mkdtempSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+
+// Isolate state dir BEFORE any state.ts import
+const testStateDir = mkdtempSync(join(tmpdir(), 'hal-runtime-test-'))
+process.env.NEW_STATE_DIR = testStateDir
+
 const TEST_CONFIG = `/tmp/hal-test-config-${process.pid}.ason`
 writeFileSync(TEST_CONFIG, '{ defaultModel: "mock/mock-1" }\n')
 process.env.HAL_CONFIG = TEST_CONFIG
 
-import { test, expect, beforeEach, afterEach } from 'bun:test'
+import { test, expect, beforeEach, afterEach, afterAll } from 'bun:test'
 import { rmSync, existsSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { randomBytes } from 'crypto'
@@ -38,6 +45,11 @@ afterEach(async () => {
 	runtime.stop()
 	await releaseHost(hostId)
 	await new Promise(r => setTimeout(r, 100))
+})
+
+afterAll(() => {
+	rmSync(testStateDir, { recursive: true, force: true })
+	rmSync(TEST_CONFIG, { force: true })
 })
 
 async function sendAndWait(text: string, sid?: string): Promise<RuntimeEvent[]> {
