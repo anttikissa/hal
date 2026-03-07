@@ -225,8 +225,14 @@ export class Client {
 			}
 		}
 
+		// Preserve current tab if it still exists; only follow server's
+		// activeSessionId when our current tab was removed.
+		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
-		if (activeSessionId) {
+		const kept = newTabs.findIndex(t => t.sessionId === prevId)
+		if (kept >= 0) {
+			this.state.activeTabIndex = kept
+		} else if (activeSessionId) {
 			const idx = newTabs.findIndex(t => t.sessionId === activeSessionId)
 			if (idx >= 0) this.state.activeTabIndex = idx
 		}
