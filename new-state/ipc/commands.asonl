@@ -1,0 +1,5 @@
+{ id: '73de3fcc746b3c55', type: 'prompt', sessionId: '00-tdq', text: 'Remember me', source: { kind: 'cli', clientId: 'test' }, createdAt: '2026-03-07T06:24:55.304Z' }
+{ id: '8b1b791baa606fca', type: 'prompt', sessionId: '00-8uv', text: 'hello', source: { kind: 'cli', clientId: '3980ebaf' }, createdAt: '2026-03-07T06:36:14.719Z' }
+{ id: '7f151d93891ec422', type: 'prompt', sessionId: '00-8uv', text: 'tool', source: { kind: 'cli', clientId: '3980ebaf' }, createdAt: '2026-03-07T06:36:18.053Z' }
+{ id: 'eff91ff5319f65c5', type: 'prompt', sessionId: '00-8uv', text: 'tool read', source: { kind: 'cli', clientId: '3980ebaf' }, createdAt: '2026-03-07T06:36:19.688Z' }
+{ id: '7a7d5a62860bc191', type: 'prompt', sessionId: '00-8uv', text: 'tool ls', source: { kind: 'cli', clientId: '3980ebaf' }, createdAt: '2026-03-07T06:36:21.949Z' }

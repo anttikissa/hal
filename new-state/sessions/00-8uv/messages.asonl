@@ -1,0 +1,8 @@
+{ role: 'assistant', text: "Good to see you. What's the plan? Say **help** for help.", ts: '2026-03-07T06:24:55.562Z' }
+{ role: 'user', content: 'hello', ts: '2026-03-07T06:36:14.723Z' }
+{ role: 'assistant', ts: '2026-03-07T06:36:15.384Z', text: 'Hey there! What are we working on? Say **help** for help.\n\nTry: **tool**, **bash <cmd>**, **read <file>**, **write <file> <text>**, **think**, **spam**, **error**' }
+{ role: 'user', content: 'tool', ts: '2026-03-07T06:36:18.055Z' }
+{ role: 'assistant', ts: '2026-03-07T06:36:18.243Z', text: 'Let me run that command.\n', thinkingText: 'I need to run a command for this.' }
+{ role: 'user', content: 'tool read', ts: '2026-03-07T06:36:19.691Z' }
+{ role: 'assistant', ts: '2026-03-07T06:36:19.882Z', text: 'Let me run that command.\n', thinkingText: 'I need to run a command for this.' }
+{ role: 'user', content: 'tool ls', ts: '2026-03-07T06:36:21.951Z' }

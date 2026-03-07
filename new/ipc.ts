@@ -4,7 +4,7 @@
 import { open, readFile, rename, rm } from 'fs/promises'
 import { stringify, parse } from './utils/ason.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
-import { Log } from './utils/asonl-log.ts'
+import { Log } from './utils/log.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState } from './protocol.ts'
 import { defaultState } from './protocol.ts'
 import { liveFile } from './live-file.ts'

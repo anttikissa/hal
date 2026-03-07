@@ -1,6 +1,6 @@
 // Conversation log — append-only ASONL per session.
 
-import { Log } from '../utils/asonl-log.ts'
+import { Log } from '../utils/log.ts'
 import { sessionDir, ensureDir } from '../state.ts'
 
 function messagesLog(sessionId: string) {

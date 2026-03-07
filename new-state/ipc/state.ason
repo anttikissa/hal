@@ -1,0 +1,9 @@
+{
+  hostPid: 77474,
+  hostId: '77474-cf0a7fa2',
+  sessions: ['00-8uv'],
+  activeSessionId: '00-8uv',
+  busySessionIds: ['00-8uv'],
+  eventsOffset: 0,
+  updatedAt: '2026-03-07T06:36:21.954Z'
+}
