@@ -11,7 +11,7 @@ ensureStateDir()
 await ensureBus()
 
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
-const { host, currentPid } = claimHost(hostId)
+const { host, currentPid } = await claimHost(hostId)
 
 // Shared mutable state — cli.ts reads this for the separator
 export const halStatus = { isHost: host, hostPid: currentPid }
@@ -50,7 +50,7 @@ if (!host) {
 		if (promoting || halStatus.isHost) return
 		promoting = true
 		try {
-			const result = claimHost(hostId)
+			const result = await claimHost(hostId)
 			if (!result.host) return
 			halStatus.isHost = true
 			halStatus.hostPid = process.pid
