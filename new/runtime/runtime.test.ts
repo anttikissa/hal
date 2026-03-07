@@ -23,6 +23,8 @@ beforeEach(async () => {
 	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 	await claimHost(hostId)
 	runtime = await startRuntime()
+	// Wait for greeting generation to finish
+	await new Promise(r => setTimeout(r, 300))
 })
 
 afterEach(async () => {
@@ -32,13 +34,13 @@ afterEach(async () => {
 })
 
 async function sendAndWait(text: string, sid?: string): Promise<RuntimeEvent[]> {
-	const before = await events.offset()
+	const snapshot = (await events.readAll()).length
 	const sessionId = sid ?? runtime.activeSessionId!
 	await commands.append(makeCommand('prompt', src, text, sessionId))
 	for (let i = 0; i < 200; i++) {
 		await new Promise(r => setTimeout(r, 50))
 		const all = await events.readAll()
-		const recent = all.slice(-20)
+		const recent = all.slice(snapshot)
 		const done = recent.find(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))
 		if (done) return recent
 	}

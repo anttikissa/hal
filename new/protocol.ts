@@ -97,6 +97,12 @@ export type RuntimeEvent =
 		text: string; label?: 'steering'
 		source: RuntimeSource; createdAt: string
 	}
+	| {
+		id: string; type: 'tool'; sessionId: string | null
+		toolId: string; name: string; args: string
+		phase: 'running' | 'done' | 'error'
+		output?: string; createdAt: string
+	}
 
 // ── Snapshot state (for bootstrap) ──
 

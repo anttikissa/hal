@@ -111,10 +111,10 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	if (lower === 'help') {
 		const help =
 			'**Commands:**\n' +
-			'- **tool** — trigger a mock tool call\n' +
-			'- **bash <cmd>** — mock running a shell command\n' +
-			'- **read <file>** — mock reading a file\n' +
-			'- **write <file> <text>** — mock writing a file\n' +
+			'- **tool** — run bash + read + write in one go\n' +
+			'- **bash <cmd>** — run a shell command\n' +
+			'- **read [file]** — read a file (default: package.json)\n' +
+			'- **write [file] [text]** — write to a file (default: /tmp/hal-mock-test.txt)\n' +
 			'- **think** — extended thinking demo\n' +
 			'- **spam** / **spammm** — wall of text (more m\'s = more lines)\n' +
 			'- **error** — trigger an error'
@@ -123,19 +123,30 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		return
 	}
 
-	if (lower.startsWith('tool') || lower.startsWith('bash ')) {
-		const cmd = lower.startsWith('bash ') ? input.slice(5) : 'echo "hello from mock tool"'
-		yield { type: 'thinking', text: 'I need to run a command for this.' }
-		await sleep(150)
-		yield* streamChunks(['Let me run that command.\n'])
-		yield { type: 'tool_call', id: 'mock_tool_1', name: 'bash', input: { command: cmd } }
+	if (lower === 'tool') {
+		yield { type: 'thinking', text: 'I\'ll run a few commands to demonstrate tool use.' }
+		await sleep(100)
+		yield* streamChunks(['Let me run some commands.\n'])
+		yield { type: 'tool_call', id: 'mock_1', name: 'bash', input: { command: 'for i in 1 2 3; do echo "step $i"; sleep 0.3; done' } }
+		yield { type: 'tool_call', id: 'mock_2', name: 'read', input: { path: 'package.json' } }
+		yield { type: 'tool_call', id: 'mock_3', name: 'write', input: { path: '/tmp/hal-mock-test.txt', content: 'Hello from mock tool!\nWritten at ' + new Date().toISOString() } }
 		yield { type: 'done', usage: { input: tokenCount, output: 30 } }
 		return
 	}
 
-	if (lower.startsWith('read ')) {
-		const filename = input.slice(5).trim() || 'README.md'
-		yield { type: 'thinking', text: `I'll read ${filename} for you.` }
+	if (lower.startsWith('bash ')) {
+		const cmd = input.slice(5)
+		yield { type: 'thinking', text: 'I need to run a command.' }
+		await sleep(100)
+		yield* streamChunks([`Running \`${cmd}\`.\n`])
+		yield { type: 'tool_call', id: 'mock_bash_1', name: 'bash', input: { command: cmd } }
+		yield { type: 'done', usage: { input: tokenCount, output: 20 } }
+		return
+	}
+
+	if (lower.startsWith('read')) {
+		const filename = input.slice(4).trim() || 'package.json'
+		yield { type: 'thinking', text: `Reading ${filename}.` }
 		await sleep(100)
 		yield* streamChunks([`Let me read \`${filename}\`.\n`])
 		yield { type: 'tool_call', id: 'mock_read_1', name: 'read', input: { path: filename } }
@@ -143,15 +154,15 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		return
 	}
 
-	if (lower.startsWith('write ')) {
-		const parts = input.slice(6).trim().split(/\s+/)
-		const filename = parts[0] || 'test.txt'
-		const content = parts.slice(1).join(' ') || 'Hello from mock provider!'
+	if (lower.startsWith('write')) {
+		const parts = input.slice(5).trim().split(/\s+/)
+		const filename = parts[0] || '/tmp/hal-mock-test.txt'
+		const content = parts.slice(1).join(' ') || 'Hello from mock provider!\nWritten at ' + new Date().toISOString()
 		yield { type: 'thinking', text: `Writing to ${filename}.` }
 		await sleep(100)
-		yield* streamChunks([`I'll create \`${filename}\` for you.\n`])
+		yield* streamChunks([`Creating \`${filename}\`.\n`])
 		yield { type: 'tool_call', id: 'mock_write_1', name: 'write', input: { path: filename, content } }
-		yield { type: 'done', usage: { input: tokenCount, output: 25 } }
+		yield { type: 'done', usage: { input: tokenCount, output: 20 } }
 		return
 	}
 

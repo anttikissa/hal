@@ -2,13 +2,12 @@
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
 import { parseKey } from './cli/keys.ts'
+import { handleInput } from './cli/input-handler.ts'
 import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
 import { Client } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
-import { updateState } from './ipc.ts'
-
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -30,7 +29,7 @@ process.on('exit', () => {
 })
 
 function cols(): number { return stdout.columns || 80 }
-function contentWidth(): number { return cols() - 2 }
+export function contentWidth(): number { return cols() - 2 }
 
 // ── Host info (mutable — updated on promotion) ──
 
@@ -39,7 +38,7 @@ const hal = (globalThis as any).__hal as { isHost: boolean; hostPid: number | nu
 // ── Client ──
 
 const transport = new LocalTransport()
-const client = new Client(transport, () => { bumpCursor(); doRender() })
+export const client = new Client(transport, () => { bumpCursor(); doRender() })
 
 // ── Renderer ──
 
@@ -116,16 +115,18 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	return { lines, cursor: cursorPos }
 }
 
-function doRender(): void {
+export function doRender(): void {
 	const { lines, cursor: cursorPos } = buildLines()
 	const { buf, state } = render(lines, renderState, cursorPos, stdout.rows || 24)
 	renderState = state
 	if (buf) stdout.write(buf)
 }
 
-// ── Quit / Close ──
+export function resetContentHighWater(): void { contentHighWater = 0 }
 
-function quit(): void {
+// ── Quit / Restart / Suspend ──
+
+export function quit(): void {
 	cleanExit = true
 	if (renderState.lines.length > 0) {
 		const total = renderState.lines.length
@@ -139,13 +140,26 @@ function quit(): void {
 	void shutdown()
 }
 
-let suspended = false
+export function restart(): void {
+	// Intentionally does NOT call releaseHost() — the lock stays so no
+	// client promotes during the brief restart gap. The restarted process
+	// reclaims its own lock.
+	cleanExit = true
+	if (renderState.lines.length > 0) {
+		const up = renderState.cursorRow
+		if (up > 0) stdout.write(`\x1b[${up}A`)
+		stdout.write('\r\x1b[J')
+	}
+	process.exit(100)
+}
 
-function suspend(): void {
+export function suspend(): void {
 	suspended = true
 	stdout.write(`${useKitty ? KITTY_KBD_OFF : ''}\x1b[?25h`)
 	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
 }
+
+let suspended = false
 
 process.on('SIGCONT', () => {
 	if (!suspended) return
@@ -163,56 +177,7 @@ process.on('SIGCONT', () => {
 
 stdin.on('data', (data: string) => {
 	const k = parseKey(data)
-	if (!k) return
-
-	if (k.key === 'k' && k.ctrl) throw new Error('simulated crash (ctrl-k)')
-	if (k.key === 'c' && k.ctrl) { quit(); return }
-
-	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && prompt.text().length === 0)) {
-		const tabs = client.getState().tabs
-		if (tabs.length <= 1) {
-			// Last tab: clear sessions from state so next startup is fresh, then quit
-			updateState(s => { s.sessions = []; s.activeSessionId = null })
-			quit()
-			return
-		}
-		client.send('close')
-		prompt.reset()
-		contentHighWater = 0
-		doRender()
-		return
-	}
-
-	if (k.key === 't' && k.ctrl) { client.send('open'); prompt.reset(); return }
-	if (k.key === 'n' && k.ctrl) { client.nextTab(); contentHighWater = 0; doRender(); return }
-	if (k.key === 'p' && k.ctrl) { client.prevTab(); contentHighWater = 0; doRender(); return }
-	if (k.key === 'z' && k.ctrl) { suspend(); return }
-	if (k.key === 'r' && k.ctrl) {
-		// Restart: exit 100 triggers restart loop in `run` script.
-		// Intentionally does NOT call releaseHost() — the lock stays so no
-		// client promotes during the brief restart gap. The restarted process
-		// reclaims its own lock.
-		cleanExit = true
-		if (renderState.lines.length > 0) {
-			const up = renderState.cursorRow
-			if (up > 0) stdout.write(`\x1b[${up}A`)
-			stdout.write('\r\x1b[J')
-		}
-		process.exit(100)
-	}
-
-	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
-		const text = prompt.text().trim()
-		prompt.reset()
-		if (text) client.send('prompt', text)
-		doRender()
-		return
-	}
-
-	if (prompt.handleKey(k, contentWidth())) {
-		doRender()
-		return
-	}
+	if (k) handleInput(k)
 })
 
 stdout.on('resize', () => {

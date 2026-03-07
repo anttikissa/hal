@@ -133,6 +133,32 @@ export class Client {
 				this.syncTabs(event.sessions, event.activeSessionId)
 				break
 			}
+			case 'tool': {
+				const tab = this.findTab(event.sessionId)
+				if (!tab) return
+				// Close any open streaming block before tool
+				const prev = tab.blocks[tab.blocks.length - 1]
+				if (prev && (prev.type === 'assistant' || prev.type === 'thinking') && !prev.done) {
+					prev.done = true
+				}
+				if (event.phase === 'running') {
+					tab.blocks.push({
+						type: 'tool', name: event.name, args: event.args,
+						output: '', status: 'running', startTime: Date.now(),
+					})
+				} else {
+					// Find matching tool block and update it
+					for (let i = tab.blocks.length - 1; i >= 0; i--) {
+						const b = tab.blocks[i]
+						if (b.type === 'tool' && b.name === event.name && b.status === 'running') {
+							b.status = event.phase === 'error' ? 'error' : 'done'
+							b.output = event.output ?? ''
+							break
+						}
+					}
+				}
+				break
+			}
 			case 'command': {
 				if (event.phase === 'done' || event.phase === 'failed') {
 					const tab = this.findTab(event.sessionId)
