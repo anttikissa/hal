@@ -1,13 +1,14 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 // Fixes from old impl: offset-based tailing (no gaps), atomic host lock.
 
-import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'fs/promises'
-import { existsSync, statSync } from 'fs'
+import { appendFile, open, readFile, rename, rm, stat, writeFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import { stringify, parse, parseAll, parseStream } from './utils/ason.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { tailFile } from './utils/tail-file.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState } from './protocol.ts'
 import { defaultState } from './protocol.ts'
+import { liveFile } from './live-file.ts'
 import { IPC_DIR, ensureDir } from './state.ts'
 
 // ── Paths ──
@@ -24,40 +25,25 @@ export async function ensureBus(): Promise<void> {
 	for (const f of [COMMANDS_FILE, EVENTS_FILE]) {
 		if (!existsSync(f)) await writeFile(f, '')
 	}
-	if (!existsSync(STATE_FILE)) await writeState(defaultState())
+	getState() // ensure state.ason exists
 }
 
-// ── State ──
+// ── State (liveFile-backed) ──
 
-let stateWriteLock = Promise.resolve()
+let _state: RuntimeState | null = null
 
-export async function readState(): Promise<RuntimeState> {
-	try {
-		const raw = await readFile(STATE_FILE, 'utf-8')
-		return { ...defaultState(), ...(parse(raw) as Record<string, unknown>) }
-	} catch {
-		const s = defaultState()
-		await writeState(s)
-		return s
+export function getState(): RuntimeState {
+	if (!_state) {
+		ensureDir(IPC_DIR)
+		_state = liveFile<RuntimeState>(STATE_FILE, { defaults: defaultState() })
 	}
+	return _state
 }
 
-export async function writeState(s: RuntimeState): Promise<void> {
-	const doWrite = async () => {
-		s.updatedAt = new Date().toISOString()
-		const tmp = `${STATE_FILE}.tmp.${process.pid}`
-		await writeFile(tmp, stringify(s) + '\n')
-		await rename(tmp, STATE_FILE)
-	}
-	stateWriteLock = stateWriteLock.then(doWrite, doWrite)
-	await stateWriteLock
-}
-
-export async function updateState(fn: (s: RuntimeState) => void): Promise<RuntimeState> {
-	const s = await readState()
+export function updateState(fn: (s: RuntimeState) => void): void {
+	const s = getState()
 	fn(s)
-	await writeState(s)
-	return s
+	s.updatedAt = new Date().toISOString()
 }
 
 // ── Host lock ──
@@ -79,7 +65,7 @@ export async function claimHost(hostId: string): Promise<{ host: boolean; curren
 	}
 
 	if (await tryClaim()) {
-		await updateState(s => { s.hostPid = process.pid; s.hostId = hostId })
+		updateState(s => { s.hostPid = process.pid; s.hostId = hostId })
 		return { host: true, currentPid: process.pid }
 	}
 
@@ -101,15 +87,15 @@ export async function claimHost(hostId: string): Promise<{ host: boolean; curren
 	// Dead host — steal lock atomically
 	const stale = `${HOST_LOCK}.stale.${process.pid}`
 	try { await rename(HOST_LOCK, stale) } catch {
-		return { host: false, currentPid: (await readState()).hostPid }
+		return { host: false, currentPid: getState().hostPid }
 	}
 	try { await rm(stale) } catch {}
 
 	if (await tryClaim()) {
-		await updateState(s => { s.hostPid = process.pid; s.hostId = hostId })
+		updateState(s => { s.hostPid = process.pid; s.hostId = hostId })
 		return { host: true, currentPid: process.pid }
 	}
-	return { host: false, currentPid: (await readState()).hostPid }
+	return { host: false, currentPid: getState().hostPid }
 }
 
 export async function releaseHost(hostId: string): Promise<void> {
@@ -118,7 +104,7 @@ export async function releaseHost(hostId: string): Promise<void> {
 		const lock = parse(raw) as any
 		if (lock?.hostId !== hostId) return
 		await rm(HOST_LOCK)
-		await updateState(s => {
+		updateState(s => {
 			if (s.hostId === hostId) {
 				s.hostPid = null
 				s.hostId = null

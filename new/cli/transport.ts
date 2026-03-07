@@ -30,7 +30,7 @@ export class LocalTransport implements Transport {
 	}
 
 	async bootstrap(): Promise<BootstrapState> {
-		const state = await ipc.readState()
+		const state = ipc.getState()
 		const sessions: SessionInfo[] = []
 		for (const id of state.sessions) {
 			const meta = await loadMeta(id)

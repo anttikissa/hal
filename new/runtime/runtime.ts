@@ -1,6 +1,6 @@
 // Host runtime — tails commands, dispatches, manages sessions.
 
-import { ensureBus, tailCommandsFrom, appendEvent, updateState, readState, trimEvents } from '../ipc.ts'
+import { ensureBus, tailCommandsFrom, appendEvent, updateState, getState, trimEvents } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
@@ -40,7 +40,7 @@ export async function startRuntime(): Promise<Runtime> {
 	let stopped = false
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
-	const prevState = await readState()
+	const prevState = getState()
 	for (const id of prevState.sessions) {
 		const meta = await loadMeta(id)
 		if (meta) {
@@ -90,7 +90,7 @@ export async function startRuntime(): Promise<Runtime> {
 			type: 'sessions',
 			activeSessionId, sessions: [...sessions.values()],
 		})
-		await updateState(s => {
+		updateState(s => {
 			s.sessions = [...sessions.keys()]
 			s.activeSessionId = activeSessionId
 			s.busySessionIds = [...busySessionIds]
