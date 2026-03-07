@@ -2,7 +2,7 @@
 
 import type { KeyEvent } from './keys.ts'
 import * as prompt from './prompt.ts'
-import { client, quit, restart, suspend, doRender, contentWidth, resetContentHighWater } from '../cli.ts'
+import { client, quit, restart, suspend, doRender, contentWidth } from '../cli.ts'
 import { updateState } from '../ipc.ts'
 
 export function handleInput(k: KeyEvent): void {
@@ -17,7 +17,6 @@ export function handleInput(k: KeyEvent): void {
 		}
 		client.send('close')
 		prompt.reset()
-		resetContentHighWater()
 		doRender()
 		return
 	}

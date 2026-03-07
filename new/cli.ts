@@ -47,7 +47,6 @@ const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
 let halCursorVisible = true
 let blinkTimer: ReturnType<typeof setTimeout> | null = null
 let renderState: RenderState = emptyState
-let contentHighWater = 0
 
 function scheduleBlink(): void {
 	if (blinkTimer) clearTimeout(blinkTimer)
@@ -71,12 +70,14 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	const blocks = tab?.blocks ?? []
 	const contentLines = renderBlocks(blocks, w, halCursorVisible)
-	contentHighWater = Math.max(contentHighWater, contentLines.length)
+	if (tab) tab.contentHeight = Math.max(tab.contentHeight, contentLines.length)
 
+	// Pad to tallest tab's content height (keeps prompt position stable)
+	const maxHeight = Math.max(0, ...cState.tabs.map(t => t.contentHeight))
 	const pLines = prompt.lineCount(cw)
 	const chromeLines = 3 + pLines
 	const available = Math.max(0, (stdout.rows || 24) - chromeLines)
-	const padTarget = Math.min(contentHighWater, available)
+	const padTarget = Math.min(maxHeight, available)
 	const lines = [...contentLines]
 	while (lines.length < padTarget) lines.push('')
 
@@ -122,8 +123,6 @@ export function doRender(): void {
 	renderState = state
 	if (buf) stdout.write(buf)
 }
-
-export function resetContentHighWater(): void { contentHighWater = 0 }
 
 // ── Quit / Restart / Suspend ──
 

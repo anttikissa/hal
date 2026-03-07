@@ -16,6 +16,7 @@ export interface TabState {
 	busy: boolean
 	inputHistory: string[]
 	inputDraft: string
+	contentHeight: number
 }
 
 export interface ClientState {
@@ -44,7 +45,7 @@ export class Client {
 	async start(): Promise<void> {
 		const { state: rtState, sessions } = await this.transport.bootstrap()
 		for (const info of sessions) {
-			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), inputHistory: [], inputDraft: '' })
+			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), inputHistory: [], inputDraft: '', contentHeight: 0 })
 		}
 		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === rtState.activeSessionId))
 		this.state.connected = true
@@ -158,7 +159,7 @@ export class Client {
 		for (const info of sessions) {
 			const existing = current.get(info.id)
 			if (existing) { existing.info = info; newTabs.push(existing) }
-			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' }); newTabId = info.id }
+			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '', contentHeight: 0 }); newTabId = info.id }
 		}
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
