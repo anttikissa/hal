@@ -28,6 +28,7 @@ export type CommandType =
 	| 'model'
 	| 'fork'
 	| 'topic'
+	| 'respond'
 
 export interface RuntimeSource {
 	kind: 'cli' | 'web'
@@ -102,6 +103,10 @@ export type RuntimeEvent =
 		toolId: string; name: string; args: string
 		phase: 'running' | 'streaming' | 'done' | 'error'
 		output?: string; createdAt: string
+	}
+	| {
+		id: string; type: 'question'; sessionId: string
+		questionId: string; text: string; createdAt: string
 	}
 
 // ── Snapshot state (for bootstrap) ──

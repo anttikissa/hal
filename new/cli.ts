@@ -74,7 +74,10 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const activeSessionId = tab?.sessionId ?? null
 	const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
 	const pLines = prompt.lineCount(cw)
-	const chromeLines = 3 + pLines
+	const frozen = prompt.frozenText()
+	const frozenLines = frozen ? Math.min(frozen.split('\n').length, 3) : 0
+	// tab bar(1) + help bar(1) + prompt sep(1) + prompt lines + question area if active
+	const chromeLines = 3 + pLines + (prompt.hasQuestion() ? 1 + frozenLines + 1 : 0)
 	const available = Math.max(0, (stdout.rows || 24) - chromeLines)
 	const padTarget = Math.min(maxHeight, available)
 	const lines = [...contentLines]
@@ -90,19 +93,48 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	})
 	lines.push(`tabs: ${parts.join('')}`)
 
-	// Prompt — separator with host/client role
-	const p = prompt.buildPrompt(w, cw)
-	const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
-	const rightParts: string[] = []
-	if (p.scrollInfo) rightParts.push(p.scrollInfo)
-	const left = ` ${role} `
-	const right = rightParts.length > 0 ? ` ${rightParts.join(' ')} ` : ''
-	const fill = Math.max(0, w - left.length - right.length)
-	lines.push(`${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`)
-	lines.push(...p.lines)
-	const cursorPos: CursorPos = {
-		row: lines.length - pLines + p.cursor.rowOffset,
-		col: p.cursor.col,
+	// Question area (when active, shown above the regular prompt)
+	const hasQ = prompt.hasQuestion()
+	let cursorPos: CursorPos
+
+	if (hasQ) {
+		const qLabel = prompt.getQuestionLabel()!
+		const qLeft = ` ${qLabel} `
+		const qFill = Math.max(0, w - qLeft.length)
+		lines.push(`${DIM}${qLeft}${'─'.repeat(qFill)}${RESET}`)
+
+		// Answer input (buf is the question answer in question mode)
+		const p = prompt.buildPrompt(w, cw)
+		const answerStartRow = lines.length
+		lines.push(...p.lines)
+		cursorPos = { row: answerStartRow + p.cursor.rowOffset, col: p.cursor.col }
+
+		// Grayed-out main prompt
+		const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
+		const left = ` ${role} `
+		const fill = Math.max(0, w - left.length)
+		lines.push(`${DIM}${left}${'─'.repeat(fill)}${RESET}`)
+		const frozen = prompt.frozenText()
+		if (frozen) {
+			for (const l of frozen.split('\n').slice(0, 3)) {
+				lines.push(`${DIM} ${l}${RESET}`)
+			}
+		}
+	} else {
+		// Normal prompt
+		const p = prompt.buildPrompt(w, cw)
+		const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
+		const rightParts: string[] = []
+		if (p.scrollInfo) rightParts.push(p.scrollInfo)
+		const left = ` ${role} `
+		const right = rightParts.length > 0 ? ` ${rightParts.join(' ')} ` : ''
+		const fill = Math.max(0, w - left.length - right.length)
+		lines.push(`${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`)
+		lines.push(...p.lines)
+		cursorPos = {
+			row: lines.length - pLines + p.cursor.rowOffset,
+			col: p.cursor.col,
+		}
 	}
 
 	// Help bar

@@ -4,7 +4,7 @@
 
 import { loadProvider, type ProviderEvent } from './provider.ts'
 import { events } from '../ipc.ts'
-import { appendMessages, type AssistantMessage } from '../session/messages.ts'
+import { appendMessages, writeAssistantEntry, writeToolResultEntry, readBlock } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 
@@ -31,7 +31,6 @@ function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeE
 // ── Tool execution ──
 
 interface ToolCall { id: string; name: string; input: unknown }
-interface ToolResult { id: string; name: string; input: unknown; result: string }
 
 type OnChunk = (text: string) => Promise<void>
 
@@ -136,10 +135,9 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					case 'done': {
 						if (toolCalls.length === 0) {
 							// No tools — persist and finish
-							const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
-							if (assistantText) entry.text = assistantText
-							if (thinkingText) entry.thinkingText = thinkingText
-							await appendMessages(sessionId, [entry])
+							await appendMessages(sessionId, [
+								{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, ts: new Date().toISOString() },
+							])
 							await emit(sessionId, {
 								type: 'command', commandId: '', phase: 'done',
 								message: event.usage ? `${event.usage.input}→${event.usage.output} tokens` : undefined,
@@ -147,11 +145,17 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							return
 						}
 
-						// Execute tools
-						const toolResults: ToolResult[] = []
+						// Write assistant entry BEFORE executing tools
+						const { entry: assistantEntry, toolRefMap } = await writeAssistantEntry(sessionId, {
+							text: assistantText || undefined,
+							thinkingText: thinkingText || undefined,
+							toolCalls,
+						})
+						await appendMessages(sessionId, [assistantEntry])
+
+						// Execute tools, writing each result individually
 						for (const call of toolCalls) {
 							const args = argsPreview(call)
-							const startTime = Date.now()
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
 								args, phase: 'running',
@@ -162,7 +166,10 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								args, phase: 'streaming', output: text,
 							})
 							const result = await executeTool(call, onChunk)
-							toolResults.push({ ...call, result })
+
+							// Persist tool result immediately
+							const toolResultEntry = await writeToolResultEntry(sessionId, call.id, result, toolRefMap)
+							await appendMessages(sessionId, [toolResultEntry])
 
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
@@ -170,16 +177,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							})
 						}
 
-						// Persist assistant message with tools
-						const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
-						if (assistantText) entry.text = assistantText
-						if (thinkingText) entry.thinkingText = thinkingText
-						entry.tools = toolResults.map(t => ({
-							id: t.id, name: t.name, input: t.input, result: t.result,
-						}))
-						await appendMessages(sessionId, [entry])
-
-						// Add tool results to messages for next round
+						// Add to messages for next round
 						messages.push({
 							role: 'assistant',
 							content: [
@@ -189,10 +187,12 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								})),
 							],
 						})
-						for (const tr of toolResults) {
+						for (const call of toolCalls) {
+							const ref = toolRefMap.get(call.id)!
+							const block = await readBlock(sessionId, ref)
 							messages.push({
 								role: 'user',
-								content: [{ type: 'tool_result', tool_use_id: tr.id, content: tr.result }],
+								content: [{ type: 'tool_result', tool_use_id: call.id, content: block?.result?.content ?? '' }],
 							})
 						}
 

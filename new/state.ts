@@ -18,6 +18,10 @@ export function sessionDir(id: string): string {
 	return `${SESSIONS_DIR}/${id}`
 }
 
+export function blocksDir(id: string): string {
+	return `${SESSIONS_DIR}/${id}/blocks`
+}
+
 export function ensureDir(dir: string): void {
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
 }

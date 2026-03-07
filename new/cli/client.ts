@@ -17,6 +17,7 @@ export interface TabState {
 	inputHistory: string[]
 	inputDraft: string
 	contentHeight: number
+	question?: { id: string; text: string }
 }
 
 export interface ClientState {
@@ -55,7 +56,7 @@ export class Client {
 
 		for (const tab of this.state.tabs) {
 			const messages = await this.transport.replaySession(tab.sessionId)
-			tab.blocks.push(...replayToBlocks(messages, tab.info.model))
+			tab.blocks.push(...await replayToBlocks(tab.sessionId, messages, tab.info.model))
 			tab.inputHistory = await loadInputHistory(tab.sessionId)
 			tab.inputDraft = await loadDraft(tab.sessionId)
 		}
@@ -150,6 +151,12 @@ export class Client {
 				}
 				break
 			}
+			case 'question': {
+				const t = tab(event.sessionId); if (!t) return
+				t.question = { id: event.questionId, text: event.text }
+				if (t === this.activeTab()) prompt.setQuestion(event.text)
+				break
+			}
 		}
 	}
 
@@ -183,13 +190,20 @@ export class Client {
 	private applyTabToPrompt(tab: TabState): void {
 		prompt.setHistory(tab.inputHistory)
 		if (tab.inputDraft) prompt.setText(tab.inputDraft)
+		if (tab.question) prompt.setQuestion(tab.question.text)
 	}
 
 	saveDraft(): void {
 		const tab = this.activeTab()
 		if (!tab) return
+		if (prompt.hasQuestion()) return // don't overwrite draft with answer text
 		tab.inputDraft = prompt.text()
 		saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
+	}
+
+	clearQuestion(): void {
+		const tab = this.activeTab()
+		if (tab) tab.question = undefined
 	}
 
 	onSubmit(text: string): void {

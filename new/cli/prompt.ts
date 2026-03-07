@@ -19,6 +19,46 @@ let history: string[] = []
 let historyIndex = -1 // -1 = editing draft, 0..n = browsing history (0 = newest)
 let historyDraft = '' // saved draft when entering history mode
 
+// ── Question mode ──
+// When a question is active, the main prompt state is saved and buf/cursor
+// are used for the question answer. On clearQuestion(), main state is restored.
+
+let questionLabel: string | null = null
+let savedMain: { buf: string; cursor: number; goalCol: number | null; selAnchor: number | null; history: string[]; historyIndex: number; historyDraft: string } | null = null
+
+export function setQuestion(label: string): void {
+	savedMain = { buf, cursor, goalCol, selAnchor, history, historyIndex, historyDraft }
+	questionLabel = label
+	buf = ''
+	cursor = 0
+	goalCol = null
+	selAnchor = null
+	history = []
+	historyIndex = -1
+	historyDraft = ''
+}
+
+export function clearQuestion(): string {
+	const answer = buf
+	if (savedMain) {
+		buf = savedMain.buf
+		cursor = savedMain.cursor
+		goalCol = savedMain.goalCol
+		selAnchor = savedMain.selAnchor
+		history = savedMain.history
+		historyIndex = savedMain.historyIndex
+		historyDraft = savedMain.historyDraft
+		savedMain = null
+	}
+	questionLabel = null
+	return answer
+}
+
+export function hasQuestion(): boolean { return questionLabel !== null }
+export function getQuestionLabel(): string | null { return questionLabel }
+/** The frozen main prompt text (shown grayed out during question mode). */
+export function frozenText(): string | null { return savedMain?.buf ?? null }
+
 export function setHistory(h: string[]): void { history = h; historyIndex = -1; historyDraft = '' }
 export function pushHistory(text: string): void { history.push(text) }
 
@@ -40,6 +80,8 @@ export function reset(): void {
 	selAnchor = null
 	historyIndex = -1
 	historyDraft = ''
+	questionLabel = null
+	savedMain = null
 }
 
 function selRange(): { start: number; end: number } | null {

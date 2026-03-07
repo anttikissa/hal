@@ -21,6 +21,25 @@ export function handleInput(k: KeyEvent): void {
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
 	if (k.key === 'r' && k.ctrl) { client.saveDraft(); restart(); return }
 
+	// Question mode: Enter submits answer, Escape dismisses
+	if (prompt.hasQuestion()) {
+		if (k.key === 'escape') {
+			prompt.clearQuestion()
+			client.clearQuestion()
+			send('respond', '')
+			doRender()
+			return
+		}
+		if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
+			const answer = prompt.clearQuestion()
+			client.clearQuestion()
+			if (answer.trim()) send('respond', answer.trim())
+			else send('respond', '')
+			doRender()
+			return
+		}
+	}
+
 	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
 		const text = prompt.text().trim()
 		prompt.reset()

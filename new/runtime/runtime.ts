@@ -2,10 +2,11 @@
 
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
-import { appendMessages, loadApiMessages, readMessages, type UserMessage } from '../session/messages.ts'
+import { appendMessages, loadApiMessages, readMessages, readBlock, writeToolResultEntry, detectInterruptedTools, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
+import { randomBytes } from 'crypto'
 
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
@@ -39,6 +40,9 @@ export async function startRuntime(): Promise<Runtime> {
 	const busySessionIds = new Set<string>()
 	let activeSessionId: string | null = null
 	let stopped = false
+
+	// Pending questions: sessionId → resolve callback
+	const pendingQuestions = new Map<string, (answer: string) => void>()
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = getState()
@@ -151,22 +155,58 @@ export async function startRuntime(): Promise<Runtime> {
 		})
 	}
 
+	// ── Ask user ──
+
+	async function askUser(sessionId: string, text: string): Promise<string> {
+		const questionId = randomBytes(4).toString('hex')
+		return new Promise(resolve => {
+			pendingQuestions.set(sessionId, resolve)
+			emit({ type: 'question', sessionId, questionId, text })
+		})
+	}
+
+	// ── Resume detection ──
+
 	async function resumeInterruptedSession(sessionId: string): Promise<void> {
 		const info = sessions.get(sessionId)
 		if (!info) return
+
+		const messages = await readMessages(sessionId)
+		const interrupted = detectInterruptedTools(messages)
+
+		if (interrupted.length > 0) {
+			// Has unfinished tools — ask user
+			const toolList = interrupted.map(t => t.name).join(', ')
+			const answer = await askUser(
+				sessionId,
+				`${interrupted.length} tool(s) interrupted (${toolList}). Rerun? (yes/skip)`,
+			)
+
+			if (answer.toLowerCase().startsWith('y')) {
+				// Let the model handle it — it will see the tool_use without results
+				// and can decide to retry
+			} else {
+				// Mark interrupted tools as skipped
+				const toolRefMap = new Map(interrupted.map(t => [t.id, t.ref]))
+				for (const t of interrupted) {
+					const entry = await writeToolResultEntry(sessionId, t.id, '[interrupted — skipped by user]', toolRefMap)
+					await appendMessages(sessionId, [entry])
+				}
+			}
+		}
+
+		// Check for pending user turn and resume generation
 		const apiMessages = await loadApiMessages(sessionId)
 		if (!hasPendingUserTurn(apiMessages)) return
 		await emit({
-			type: 'line',
-			sessionId,
+			type: 'line', sessionId,
 			text: '[resume] continuing interrupted response after restart',
 			level: 'meta',
 		})
 		const pendingText = apiMessages[apiMessages.length - 1]?.content
 		if (typeof pendingText === 'string' && pendingText.trim()) {
 			await emit({
-				type: 'prompt',
-				sessionId,
+				type: 'prompt', sessionId,
 				text: pendingText,
 				source: { kind: 'cli', clientId: 'auto-resume' },
 			})
@@ -196,6 +236,16 @@ export async function startRuntime(): Promise<Runtime> {
 
 				const apiMessages = await loadApiMessages(sid)
 				await startGeneration(sid, info, apiMessages)
+				break
+			}
+			case 'respond': {
+				const resolve = pendingQuestions.get(sid)
+				if (resolve) {
+					pendingQuestions.delete(sid)
+					resolve(cmd.text ?? '')
+				} else {
+					await warn('No pending question')
+				}
 				break
 			}
 			case 'open': {

@@ -2,10 +2,18 @@
 
 import type { Block } from '../cli/blocks.ts'
 import type { Message } from './messages.ts'
+import { readBlock } from './messages.ts'
 
 /** Convert a message log to display blocks (for tab history). */
-export function replayToBlocks(messages: Message[], model?: string): Block[] {
+export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
 	const blocks: Block[] = []
+
+	// Collect tool_result entries for matching
+	const toolResults = new Map<string, string>()
+	for (const msg of messages) {
+		const m = msg as any
+		if (m.role === 'tool_result') toolResults.set(m.tool_use_id, m.ref)
+	}
 
 	for (const msg of messages) {
 		const m = msg as any
@@ -23,13 +31,18 @@ export function replayToBlocks(messages: Message[], model?: string): Block[] {
 			}
 			if (Array.isArray(m.tools)) {
 				for (const tool of m.tools) {
+					const resultRef = toolResults.get(tool.id)
+					const block = resultRef ? await readBlock(sessionId, resultRef) : await readBlock(sessionId, tool.ref)
+					const callData = block?.call ?? {}
+					const output = block?.result?.content ?? ''
+					const isDone = !!block?.result
 					const now = Date.now()
 					blocks.push({
 						type: 'tool',
 						name: tool.name,
-						args: typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input ?? {}),
-						output: tool.result ?? '',
-						status: 'done',
+						args: typeof callData.input === 'string' ? callData.input : argsPreview(tool.name, callData.input),
+						output,
+						status: isDone ? 'done' : 'error',
 						startTime: now, endTime: now,
 					})
 				}
@@ -38,4 +51,14 @@ export function replayToBlocks(messages: Message[], model?: string): Block[] {
 	}
 
 	return blocks
+}
+
+function argsPreview(name: string, input: unknown): string {
+	const inp = input as any
+	switch (name) {
+		case 'bash': return String(inp?.command ?? '')
+		case 'read': return String(inp?.path ?? '')
+		case 'write': return String(inp?.path ?? '')
+		default: return JSON.stringify(input ?? {})
+	}
 }
