@@ -3,7 +3,6 @@ import { renderBlocks, type Block } from './blocks.ts'
 
 // eslint-disable-next-line no-control-regex
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
-
 describe('renderBlocks', () => {
 	test('empty blocks → empty', () => {
 		expect(renderBlocks([], 80)).toEqual([])
@@ -135,6 +134,21 @@ describe('renderBlocks', () => {
 		for (const line of lines.slice(0, -2)) {
 			expect(strip(line).length).toBe(40)
 		}
+	})
+
+	test('tool output with tabs expands to spaces at correct width', () => {
+		const output = '\t"key": "value"'
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'read', status: 'done', args: 'f.json', output, startTime: Date.now() },
+		]
+		const lines = renderBlocks(blocks, 40)
+		const outputLine = lines.find(l => l.includes('"key"'))!
+		// Tabs expanded to spaces — no literal tabs
+		expect(outputLine).not.toContain('\t')
+		// 4 spaces for tab + BLOCK_PAD(1) = 5 spaces before "key"
+		expect(strip(outputLine)).toMatch(/^ {5}"key"/)
+		// Full width padded correctly
+		expect(strip(outputLine).length).toBe(40)
 	})
 
 	test('empty assistant block produces no lines', () => {

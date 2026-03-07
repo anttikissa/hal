@@ -16,6 +16,24 @@ function collapseBlankLines(text: string): string {
 	return text.replace(/\n{3,}/g, '\n\n')
 }
 
+const TAB_WIDTH = 4
+
+/** Expand tabs to spaces (tab stops at TAB_WIDTH columns). */
+function expandTabs(s: string): string {
+	let col = 0, out = ''
+	for (const ch of s) {
+		if (ch === '\t') {
+			const spaces = TAB_WIDTH - (col % TAB_WIDTH)
+			out += ' '.repeat(spaces)
+			col += spaces
+		} else {
+			out += ch
+			col++
+		}
+	}
+	return out
+}
+
 function wordWrap(text: string, width: number): string[] {
 	const lines: string[] = []
 	for (const raw of text.split('\n')) {
@@ -71,7 +89,7 @@ function elapsed(startTime: number): string {
 }
 
 function toolLine(text: string, width: number, fg: string, bg: string): string {
-	const padded = ' '.repeat(BLOCK_PAD) + text
+	const padded = ' '.repeat(BLOCK_PAD) + expandTabs(text)
 	return `${bg}${fg}${padded.padEnd(width)}${colors.RESET}`
 }
 
