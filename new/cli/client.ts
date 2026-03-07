@@ -209,6 +209,7 @@ export class Client {
 	private syncTabs(sessions: SessionInfo[], activeSessionId: string | null): void {
 		const current = new Map(this.state.tabs.map(t => [t.sessionId, t]))
 		const newTabs: TabState[] = []
+		let hasNewTab = false
 
 		for (const info of sessions) {
 			const existing = current.get(info.id)
@@ -219,15 +220,17 @@ export class Client {
 				// New tab — don't replay history here; the event tail
 				// is already delivering events in real-time.
 				newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' })
+				hasNewTab = true
 			}
 		}
 
-		// Preserve current tab if it still exists; only follow server's
-		// activeSessionId when our current tab was removed.
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
+
+		// Follow server's activeSessionId when a new tab was added (e.g. Ctrl-T)
+		// or current tab was removed. Otherwise preserve the user's choice.
 		const kept = newTabs.findIndex(t => t.sessionId === prevId)
-		if (kept >= 0) {
+		if (kept >= 0 && !hasNewTab) {
 			this.state.activeTabIndex = kept
 		} else if (activeSessionId) {
 			const idx = newTabs.findIndex(t => t.sessionId === activeSessionId)
