@@ -163,14 +163,16 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 
 	const spamMatch = lower.match(/^spa(m+)$/)
 	if (spamMatch) {
-		// More m's = more lines (each m = 30 lines, like the original cli-test.ts)
+		// More m's = more lines (each m = 30 lines)
 		const count = spamMatch[1].length * 30
+		yield { type: 'thinking', text: 'Generating a wall of text...' }
+		await sleep(100)
 		const lines: string[] = []
 		for (let i = 1; i <= count; i++) {
-			lines.push(`Line ${i}: THIS IS SPAM - LOTS AND LOTS OF TEXT BLAH BLAH BLAH\n`)
+			lines.push(`Line ${i}: ${'lorem ipsum dolor sit amet '.repeat(3).trim()}\n`)
 		}
-		yield { type: 'text', text: lines.join('') }
-		yield { type: 'done', usage: { input: tokenCount, output: count * 20 } }
+		yield* streamChunks(lines, 10)
+		yield { type: 'done', usage: { input: tokenCount, output: count * 10 } }
 		return
 	}
 
