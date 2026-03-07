@@ -6,6 +6,7 @@ import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
 import { Client } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
+import { shutdown } from './main.ts'
 
 // ── Terminal setup ──
 
@@ -125,15 +126,16 @@ function doRender(): void {
 
 function quit(): void {
 	cleanExit = true
-	if (renderState.lines.length === 0) { process.exit(0) }
-	const total = renderState.lines.length
-	const helpBarRow = total - 1
-	const delta = renderState.cursorRow - helpBarRow
-	if (delta > 0) stdout.write(`\x1b[${delta}A`)
-	else if (delta < 0) stdout.write(`\x1b[${-delta}B`)
-	stdout.write('\r\x1b[J')
-	if (!prompt.text()) stdout.write(`\x1b[2A\r\x1b[J`)
-	process.exit(0)
+	if (renderState.lines.length > 0) {
+		const total = renderState.lines.length
+		const helpBarRow = total - 1
+		const delta = renderState.cursorRow - helpBarRow
+		if (delta > 0) stdout.write(`\x1b[${delta}A`)
+		else if (delta < 0) stdout.write(`\x1b[${-delta}B`)
+		stdout.write('\r\x1b[J')
+		if (!prompt.text()) stdout.write(`\x1b[2A\r\x1b[J`)
+	}
+	void shutdown()
 }
 
 let suspended = false
