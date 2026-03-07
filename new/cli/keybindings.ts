@@ -23,8 +23,8 @@ export function handleInput(k: KeyEvent): void {
 	}
 
 	if (k.key === 't' && k.ctrl) { client.send('open'); prompt.reset(); return }
-	if (k.key === 'n' && k.ctrl) { client.nextTab(); resetContentHighWater(); doRender(); return }
-	if (k.key === 'p' && k.ctrl) { client.prevTab(); resetContentHighWater(); doRender(); return }
+	if (k.key === 'n' && k.ctrl) { client.nextTab(); doRender(); return }
+	if (k.key === 'p' && k.ctrl) { client.prevTab(); doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
 	if (k.key === 'r' && k.ctrl) { client.saveDraft(); restart(); return }
 
