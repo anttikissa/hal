@@ -87,6 +87,21 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	}
 
 	// Keyword-triggered responses
+	if (lower === 'help') {
+		const help =
+			'**Commands:**\n' +
+			'- **tool** — trigger a mock tool call\n' +
+			'- **bash <cmd>** — mock running a shell command\n' +
+			'- **read <file>** — mock reading a file\n' +
+			'- **write <file> <text>** — mock writing a file\n' +
+			'- **think** — extended thinking demo\n' +
+			'- **spam** — wall of text\n' +
+			'- **error** — trigger an error'
+		yield* streamChunks(help.split(/(?<=\n)/), 20)
+		yield { type: 'done', usage: { input: tokenCount, output: help.length } }
+		return
+	}
+
 	if (lower.startsWith('tool') || lower.startsWith('bash ')) {
 		const cmd = lower.startsWith('bash ') ? input.slice(5) : 'echo "hello from mock tool"'
 		yield { type: 'thinking', text: 'I need to run a command for this.' }
