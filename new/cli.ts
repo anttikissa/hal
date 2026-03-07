@@ -168,10 +168,9 @@ stdin.on('data', (data: string) => {
 	if (k.key === 'c' && k.ctrl) { quit(); return }
 
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && prompt.text().length === 0)) {
-		const tabs = client.getState().tabs
-		if (tabs.length <= 1) { quit(); return }
 		client.send('close')
 		prompt.reset()
+		contentHighWater = 0
 		doRender()
 		return
 	}
