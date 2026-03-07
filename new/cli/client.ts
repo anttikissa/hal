@@ -51,6 +51,8 @@ export class Client {
 		this.state.connected = true
 		this.onUpdate()
 
+		const offset = await this.transport.eventsOffset()
+
 		for (const tab of this.state.tabs) {
 			const messages = await this.transport.replaySession(tab.sessionId)
 			tab.blocks.push(...replayToBlocks(messages, tab.info.model))
@@ -61,7 +63,6 @@ export class Client {
 		if (active) this.applyTabToPrompt(active)
 		this.onUpdate()
 
-		const offset = await this.transport.eventsOffset()
 		for await (const event of this.transport.tailEvents(offset).items) {
 			this.handleEvent(event)
 			this.onUpdate()

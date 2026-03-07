@@ -86,6 +86,12 @@ export async function startRuntime(): Promise<Runtime> {
 		await emit({ type: 'command', sessionId, commandId: '', phase: 'done' })
 	}
 
+	function flushSessionMeta(): void {
+		for (const info of sessions.values()) {
+			;(info as SessionInfo & { save?: () => void }).save?.()
+		}
+	}
+
 	async function publish(activity?: string): Promise<void> {
 		await emit({
 			type: 'status', sessionId: null,
@@ -97,6 +103,7 @@ export async function startRuntime(): Promise<Runtime> {
 			type: 'sessions',
 			activeSessionId, sessions: [...sessions.values()],
 		})
+		flushSessionMeta()
 		updateState(s => {
 			s.sessions = [...sessions.keys()]
 			s.activeSessionId = activeSessionId

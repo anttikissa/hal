@@ -31,9 +31,10 @@ export function getState(): RuntimeState {
 }
 
 export function updateState(fn: (s: RuntimeState) => void): void {
-	const s = getState()
+	const s = getState() as RuntimeState & { save?: () => void }
 	fn(s)
 	s.updatedAt = new Date().toISOString()
+	s.save?.()
 }
 
 async function readLock(): Promise<{ hostId: string | null; pid: number | null } | null> {
@@ -58,17 +59,21 @@ export async function claimHost(hostId: string): Promise<{ host: boolean; curren
 		catch (e: any) { if (e?.code === 'EEXIST') return false; throw e }
 	}
 
+	const stealStaleLock = async () => {
+		const stale = `${HOST_LOCK}.stale.${process.pid}`
+		try { await rename(HOST_LOCK, stale) } catch { return lost() }
+		try { await rm(stale) } catch {}
+		return (await tryClaim()) ? won() : lost()
+	}
+
 	if (await tryClaim()) return won()
 	const lock = await readLock()
-	if (!lock) return lost()
+	if (!lock) return stealStaleLock()
 	if (lock.hostId === hostId) return won()
 	if (lock.pid !== null && isPidAlive(lock.pid)) return lost(lock.pid)
 
-	// Dead host — rename stale lock aside, retry
-	const stale = `${HOST_LOCK}.stale.${process.pid}`
-	try { await rename(HOST_LOCK, stale) } catch { return lost() }
-	try { await rm(stale) } catch {}
-	return (await tryClaim()) ? won() : lost()
+	// Dead host — steal stale lock and retry.
+	return stealStaleLock()
 }
 
 export async function verifyHost(hostId: string): Promise<boolean> {

@@ -37,7 +37,7 @@ async function runAndRead(code: string): Promise<{ out: string; err: string; exi
 	return { out: out.trim(), err: err.trim(), exitCode }
 }
 
-describe('host release', () => {
+describe('ipc host lifecycle', () => {
 	test('releaseHost writes [host-released] to events.asonl', async () => {
 		const { out, err } = await runAndRead(`
 			import { ensureStateDir } from '${NEW_DIR}/state.ts'
@@ -66,7 +66,6 @@ describe('host release', () => {
 			await claimHost('h2')
 			await releaseHost('h2')
 
-			// Another claim should succeed (lock is released)
 			const result = await claimHost('h3')
 			console.log(result.host ? 'PASS' : 'FAIL')
 		`)
@@ -107,40 +106,55 @@ describe('host release', () => {
 		expect(events).toContain('[host-released]')
 	})
 
-	test('client promotes after host SIGKILL', { timeout: 10000 }, async () => {
-		const hostProc = runScript(`
+	test('stale lock from dead pid can be reclaimed', async () => {
+		const { out, err } = await runAndRead(`
 			import { ensureStateDir } from '${NEW_DIR}/state.ts'
 			import { ensureBus, claimHost } from '${NEW_DIR}/ipc.ts'
+			import { writeFileSync } from 'fs'
 
 			ensureStateDir()
 			await ensureBus()
-			const claim = await claimHost('h4')
-			if (!claim.host) process.exit(1)
-			console.log('READY')
-			await new Promise(() => {})
+			writeFileSync(process.env.NEW_STATE_DIR + '/ipc/host.lock', "{ hostId: 'ghost', pid: 2147483647, createdAt: '2020-01-01T00:00:00.000Z' }\\n")
+			const result = await claimHost('h5')
+			console.log(result.host ? 'PASS' : 'FAIL')
 		`)
+		if (err) console.error(err)
+		expect(out).toBe('PASS')
+	})
 
-		const reader = (hostProc.stdout as ReadableStream<Uint8Array>).getReader()
-		const dec = new TextDecoder()
-		let buf = ''
-		while (!buf.includes('READY')) {
-			const { value } = await reader.read()
-			buf += dec.decode(value, { stream: true })
-		}
+	test('invalid lock file can be reclaimed', async () => {
+		const { out, err } = await runAndRead(`
+			import { ensureStateDir } from '${NEW_DIR}/state.ts'
+			import { ensureBus, claimHost } from '${NEW_DIR}/ipc.ts'
+			import { writeFileSync } from 'fs'
 
-		reader.cancel()
-		hostProc.kill('SIGKILL')
-		await hostProc.exited
+			ensureStateDir()
+			await ensureBus()
+			writeFileSync(process.env.NEW_STATE_DIR + '/ipc/host.lock', '{ hostId:')
+			const result = await claimHost('h6')
+			console.log(result.host ? 'PASS' : 'FAIL')
+		`)
+		if (err) console.error(err)
+		expect(out).toBe('PASS')
+	})
+})
 
-		// Claim directly in this process — no subprocess
-		const { ensureBus: ensureBus2, claimHost: claimHost2 } = await import('./ipc.ts')
-		// Re-init bus for this stateDir (already set via env in beforeEach... but
-		// ipc.ts caches IPC_DIR from first init). Force re-import won't work.
-		// Instead, just check that the lock file has a dead PID by reading it.
-		const lockData = await readFile(join(stateDir, 'ipc/host.lock'), 'utf-8')
-		expect(lockData).toContain('h4')
-		// The lock exists with a dead PID — claimHost from a subprocess should steal it
-		// We already proved this works in the shell test above.
-		// Just verify the lock file is there with correct content.
+describe('ipc state persistence', () => {
+	test('updateState persists immediately to state.ason', async () => {
+		const { out, err } = await runAndRead(`
+			import { ensureStateDir } from '${NEW_DIR}/state.ts'
+			import { ensureBus, updateState } from '${NEW_DIR}/ipc.ts'
+			import { readFile } from 'fs/promises'
+			import { parse } from '${NEW_DIR}/utils/ason.ts'
+
+			ensureStateDir()
+			await ensureBus()
+			updateState((s) => { s.sessions = ['s-a', 's-b']; s.activeSessionId = 's-b' })
+			const raw = await readFile(process.env.NEW_STATE_DIR + '/ipc/state.ason', 'utf-8')
+			const disk = parse(raw) as any
+			console.log(disk.activeSessionId === 's-b' && disk.sessions?.length === 2 ? 'PASS' : 'FAIL')
+		`)
+		if (err) console.error(err)
+		expect(out).toBe('PASS')
 	})
 })

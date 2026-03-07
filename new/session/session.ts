@@ -77,6 +77,7 @@ export async function createSession(workingDir?: string): Promise<SessionInfo> {
 	})
 	// Force initial save
 	info.updatedAt = ts
+	;(info as SessionInfo & { save?: () => void }).save?.()
 	return info
 }
 

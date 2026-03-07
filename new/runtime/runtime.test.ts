@@ -160,3 +160,32 @@ test('sessions survive restart', async () => {
 	expect(runtime.activeSessionId).toBe(sid)
 	expect(runtime.sessions.has(sid)).toBe(true)
 })
+
+
+test('multiple sessions survive restart in order', async () => {
+	const first = runtime.activeSessionId!
+
+	await commands.append(makeCommand('open', src))
+	await commands.append(makeCommand('open', src))
+
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		if (runtime.sessions.size >= 3) break
+	}
+
+	const beforeOrder = [...runtime.sessions.keys()]
+	expect(beforeOrder.length).toBe(3)
+	expect(beforeOrder[0]).toBe(first)
+
+	await new Promise(r => setTimeout(r, 200))
+	runtime.stop()
+	await releaseHost(hostId)
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	const afterOrder = [...runtime.sessions.keys()]
+	expect(afterOrder).toEqual(beforeOrder)
+	expect(runtime.activeSessionId).toBe(beforeOrder[beforeOrder.length - 1])
+})

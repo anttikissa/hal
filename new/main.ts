@@ -63,7 +63,11 @@ if (!host) {
 		promoting = true
 		try {
 			const result = await claimHost(hostId)
-			if (!result.host) return
+			if (!result.host) {
+				watchPid = result.currentPid
+				if (watchPid !== null) halStatus.hostPid = watchPid
+				return
+			}
 			halStatus.isHost = true
 			halStatus.hostPid = process.pid
 			await becomeHost()
