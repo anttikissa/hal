@@ -14,7 +14,6 @@ export interface Transport {
 	sendCommand(cmd: RuntimeCommand): Promise<void>
 	bootstrap(): Promise<BootstrapState>
 	tailEvents(fromOffset: number): AsyncGenerator<RuntimeEvent>
-	readEventsFrom(offset: number): Promise<{ events: RuntimeEvent[]; offset: number }>
 	replaySession(id: string): Promise<Message[]>
 	eventsOffset(): Promise<number>
 }
@@ -42,10 +41,6 @@ export class LocalTransport implements Transport {
 
 	tailEvents(fromOffset: number): AsyncGenerator<RuntimeEvent> {
 		return ipc.tailEventsFrom(fromOffset)
-	}
-
-	async readEventsFrom(offset: number): Promise<{ events: RuntimeEvent[]; offset: number }> {
-		return ipc.readEventsFrom(offset)
 	}
 
 	async replaySession(id: string): Promise<Message[]> {

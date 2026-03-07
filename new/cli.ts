@@ -170,13 +170,13 @@ stdin.on('data', (data: string) => {
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && prompt.text().length === 0)) {
 		const tabs = client.getState().tabs
 		if (tabs.length <= 1) { quit(); return }
-		client.closeTab()
+		client.send('close')
 		prompt.reset()
 		doRender()
 		return
 	}
 
-	if (k.key === 't' && k.ctrl) { client.openTab(); prompt.reset(); return }
+	if (k.key === 't' && k.ctrl) { client.send('open'); prompt.reset(); return }
 	if (k.key === 'n' && k.ctrl) { client.nextTab(); contentHighWater = 0; doRender(); return }
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); contentHighWater = 0; doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
@@ -197,7 +197,7 @@ stdin.on('data', (data: string) => {
 	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
 		const text = prompt.text().trim()
 		prompt.reset()
-		if (text) client.sendPrompt(text)
+		if (text) client.send('prompt', text)
 		doRender()
 		return
 	}

@@ -171,29 +171,7 @@ export async function appendEvent(event: RuntimeEvent): Promise<void> {
 	await appendFile(EVENTS_FILE, stringify(event, 'short') + '\n')
 }
 
-/** Read events from a byte offset. Returns events + new offset (for gap-free tailing). */
-export async function readEventsFrom(fromOffset: number): Promise<{
-	events: RuntimeEvent[]
-	offset: number
-}> {
-	const buf = await readFile(EVENTS_FILE)
-	if (fromOffset >= buf.length) return { events: [], offset: buf.length }
-	const slice = buf.subarray(fromOffset).toString('utf-8')
-	// Only parse complete lines — skip partial trailing data
-	const lastNewline = slice.lastIndexOf('\n')
-	if (lastNewline < 0) return { events: [], offset: fromOffset }
-	const complete = slice.slice(0, lastNewline + 1)
-	const events: RuntimeEvent[] = []
-	for (const line of complete.split('\n')) {
-		if (!line.trim()) continue
-		try { events.push(parse(line) as RuntimeEvent) }
-		catch { /* skip corrupt/partial lines */ }
-	}
-	const bytesConsumed = Buffer.byteLength(complete, 'utf-8')
-	return { events, offset: fromOffset + bytesConsumed }
-}
-
-/** Tail events from a byte offset. Gap-free: pass the offset from readEventsFrom or bootstrap. */
+/** Tail events from a byte offset. Gap-free: pass the offset from bootstrap. */
 export function tailEventsFrom(fromOffset: number): AsyncGenerator<RuntimeEvent> {
 	return parseStream(tailFile(EVENTS_FILE, fromOffset)) as AsyncGenerator<RuntimeEvent>
 }

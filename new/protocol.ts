@@ -63,16 +63,6 @@ export function makeCommand(
 
 export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta' | 'notice'
 
-export interface ToolProgressEntry {
-	name: string
-	inputSummary: string
-	status: 'running' | 'done'
-	elapsed: number
-	bytes: number
-	totalLines: number
-	lastLines: string[]
-}
-
 export type RuntimeEvent =
 	| {
 		id: string; type: 'line'; sessionId: string | null
@@ -106,10 +96,6 @@ export type RuntimeEvent =
 		id: string; type: 'prompt'; sessionId: string | null
 		text: string; label?: 'steering'
 		source: RuntimeSource; createdAt: string
-	}
-	| {
-		id: string; type: 'tool_progress'; sessionId: string | null
-		tools: ToolProgressEntry[]; createdAt: string
 	}
 
 // ── Snapshot state (for bootstrap) ──

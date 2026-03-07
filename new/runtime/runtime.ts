@@ -4,7 +4,7 @@ import { ensureBus, tailCommandsFrom, appendEvent, updateState, readState, trimE
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
-import { eventId, defaultState, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
+import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
 
 const GREETINGS = [
@@ -23,6 +23,11 @@ export interface Runtime {
 	activeSessionId: string | null
 	busySessionIds: Set<string>
 	stop(): void
+}
+
+// Helper: emit an event with auto-filled id + createdAt
+function emit(fields: Omit<RuntimeEvent, 'id' | 'createdAt'>): Promise<void> {
+	return appendEvent({ ...fields, id: eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
 }
 
 export async function startRuntime(): Promise<Runtime> {
@@ -56,8 +61,7 @@ export async function startRuntime(): Promise<Runtime> {
 	}
 
 	// Publish initial state
-	await publishStatus()
-	await publishSessions()
+	await publish()
 
 	// Tail commands
 	const { commands, cancel: cancelTail } = await tailCommandsFrom()
@@ -71,42 +75,25 @@ export async function startRuntime(): Promise<Runtime> {
 	async function greetSession(sessionId: string): Promise<void> {
 		const text = pick(GREETINGS)
 		await appendMessages(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
-		await appendEvent({
-			id: eventId(), type: 'chunk', sessionId,
-			text, channel: 'assistant', createdAt: new Date().toISOString(),
-		} as RuntimeEvent)
-		await appendEvent({
-			id: eventId(), type: 'command', sessionId,
-			commandId: '', phase: 'done', createdAt: new Date().toISOString(),
-		} as RuntimeEvent)
+		await emit({ type: 'chunk', sessionId, text, channel: 'assistant' })
+		await emit({ type: 'command', sessionId, commandId: '', phase: 'done' })
 	}
-	async function publishStatus(activity?: string): Promise<void> {
-		await appendEvent({
-			id: eventId(),
-			type: 'status',
-			sessionId: null,
-			busySessionIds: [...busySessionIds],
-			pausedSessionIds: [],
-			activeSessionId,
-			busy: busySessionIds.size > 0,
-			queueLength: 0,
-			activity,
-			createdAt: new Date().toISOString(),
+
+	async function publish(activity?: string): Promise<void> {
+		await emit({
+			type: 'status', sessionId: null,
+			busySessionIds: [...busySessionIds], pausedSessionIds: [],
+			activeSessionId, busy: busySessionIds.size > 0,
+			queueLength: 0, activity,
+		})
+		await emit({
+			type: 'sessions',
+			activeSessionId, sessions: [...sessions.values()],
 		})
 		await updateState(s => {
 			s.sessions = [...sessions.keys()]
 			s.activeSessionId = activeSessionId
 			s.busySessionIds = [...busySessionIds]
-		})
-	}
-
-	async function publishSessions(): Promise<void> {
-		await appendEvent({
-			id: eventId(),
-			type: 'sessions',
-			activeSessionId,
-			sessions: [...sessions.values()],
-			createdAt: new Date().toISOString(),
 		})
 	}
 
@@ -119,24 +106,17 @@ export async function startRuntime(): Promise<Runtime> {
 				if (!cmd.text) return
 				if (!sessions.has(sid)) return
 
-				// Acknowledge
-				await appendEvent({
-					id: eventId(), type: 'prompt', sessionId: sid,
-					text: cmd.text, source: cmd.source, createdAt: new Date().toISOString(),
-				})
+				await emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
 
-				// Persist user message
 				const userMsg: UserMessage = { role: 'user', content: cmd.text, ts: new Date().toISOString() }
 				await appendMessages(sid, [userMsg])
 
-				// Update session info (auto-saves via liveFile)
 				const info = sessions.get(sid)!
 				info.lastPrompt = cmd.text.split('\n')[0].slice(0, 120)
 
-				// Load full history and run
 				const apiMessages = await loadApiMessages(sid)
 				busySessionIds.add(sid)
-				await publishStatus('generating...')
+				await publish('generating...')
 
 				await runAgentLoop({
 					sessionId: sid,
@@ -146,12 +126,12 @@ export async function startRuntime(): Promise<Runtime> {
 					onStatus: async (busy, activity) => {
 						if (busy) busySessionIds.add(sid)
 						else busySessionIds.delete(sid)
-						await publishStatus(activity)
+						await publish(activity)
 					},
 				})
 
 				busySessionIds.delete(sid)
-				await publishStatus()
+				await publish()
 				break
 			}
 			case 'open': {
@@ -159,8 +139,7 @@ export async function startRuntime(): Promise<Runtime> {
 				sessions.set(info.id, info)
 				activeSessionId = info.id
 				await greetSession(info.id)
-				await publishSessions()
-				await publishStatus()
+				await publish()
 				break
 			}
 			case 'close': {
@@ -174,24 +153,19 @@ export async function startRuntime(): Promise<Runtime> {
 					sessions.set(info.id, info)
 					activeSessionId = info.id
 				}
-				await publishSessions()
-				await publishStatus()
+				await publish()
 				break
 			}
 			case 'reset': {
 				await appendMessages(sid, [{ type: 'reset', ts: new Date().toISOString() }])
-				await appendEvent({
-					id: eventId(), type: 'line', sessionId: sid,
-					text: '[reset] conversation cleared', level: 'meta',
-					createdAt: new Date().toISOString(),
-				})
+				await emit({ type: 'line', sessionId: sid, text: '[reset] conversation cleared', level: 'meta' })
 				break
 			}
 			case 'topic': {
 				const info = sessions.get(sid)
 				if (info && cmd.text) {
 					info.topic = cmd.text
-					await publishSessions()
+					await publish()
 				}
 				break
 			}
@@ -199,12 +173,8 @@ export async function startRuntime(): Promise<Runtime> {
 				const info = sessions.get(sid)
 				if (info && cmd.text) {
 					info.model = cmd.text
-					await publishSessions()
-					await appendEvent({
-						id: eventId(), type: 'line', sessionId: sid,
-						text: `[model] switched to ${cmd.text}`, level: 'meta',
-						createdAt: new Date().toISOString(),
-					})
+					await emit({ type: 'line', sessionId: sid, text: `[model] switched to ${cmd.text}`, level: 'meta' })
+					await publish()
 				}
 				break
 			}

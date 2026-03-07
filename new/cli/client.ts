@@ -3,7 +3,7 @@
 
 import type { Transport } from './transport.ts'
 import type { Block } from './blocks.ts'
-import type { RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
+import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
 import { makeCommand } from '../protocol.ts'
 import { replayToBlocks } from '../session/replay.ts'
 import { randomBytes } from 'crypto'
@@ -194,32 +194,11 @@ export class Client {
 
 	// ── Commands ──
 
-	async sendPrompt(text: string): Promise<void> {
+	async send(type: CommandType, text?: string): Promise<void> {
 		const tab = this.activeTab()
-		if (!tab) return
-		await this.transport.sendCommand(
-			makeCommand('prompt', this.source, text, tab.sessionId),
-		)
-	}
-
-	async openTab(): Promise<void> {
-		await this.transport.sendCommand(makeCommand('open', this.source))
-	}
-
-	async closeTab(): Promise<void> {
-		const tab = this.activeTab()
-		if (!tab) return
-		await this.transport.sendCommand(
-			makeCommand('close', this.source, undefined, tab.sessionId),
-		)
-	}
-
-	async sendReset(): Promise<void> {
-		const tab = this.activeTab()
-		if (!tab) return
-		await this.transport.sendCommand(
-			makeCommand('reset', this.source, undefined, tab.sessionId),
-		)
+		const sessionId = tab?.sessionId
+		if (!sessionId && type !== 'open') return
+		await this.transport.sendCommand(makeCommand(type, this.source, text, sessionId))
 	}
 
 	nextTab(): void {
