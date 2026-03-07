@@ -8,3 +8,5 @@ node_modules/
 
 .idea/
 examples/
+new-state/
+test_tail.txt

@@ -1,7 +1,0 @@
-{
-  id: '00-8uv',
-  workingDir: '/Users/antti/.hal',
-  createdAt: '2026-03-07T06:24:55.560Z',
-  updatedAt: '2026-03-07T06:24:55.560Z',
-  lastPrompt: 'tool ls'
-}
