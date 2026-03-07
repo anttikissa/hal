@@ -3,7 +3,7 @@
 
 import { randomBytes } from 'crypto'
 import { ensureStateDir } from './state.ts'
-import { ensureBus, claimHost, releaseHost, events } from './ipc.ts'
+import { ensureBus, claimHost, releaseHost, verifyHost, events } from './ipc.ts'
 import { startRuntime, type Runtime } from './runtime/runtime.ts'
 import { eventId } from './protocol.ts'
 
@@ -29,6 +29,18 @@ async function emitLine(text: string): Promise<void> {
 async function becomeHost(): Promise<void> {
 	runtime = await startRuntime()
 	await emitLine(`[host] pid ${process.pid}`)
+	// Heartbeat: verify lock is still ours every 3s. If lost (e.g. suspended
+	// and another process took over), step down and let restart loop re-launch.
+	setInterval(async () => {
+		if (!halStatus.isHost) return
+		if (!(await verifyHost(hostId))) {
+			await emitLine(`[host] lock lost (pid ${process.pid}), stepping down`)
+			if (runtime) runtime.stop()
+			runtime = null
+			halStatus.isHost = false
+			process.exit(100)
+		}
+	}, 3000)
 }
 
 export async function shutdown(): Promise<void> {
@@ -60,7 +72,6 @@ if (!host) {
 			promoting = false
 		}
 	}
-	// Fallback for ungraceful death (SIGKILL/crash) — 1s is plenty
 	let watchPid = currentPid
 	let pollTimer: ReturnType<typeof setInterval> | null = setInterval(() => {
 		if (halStatus.isHost || promoting) return
@@ -68,7 +79,7 @@ if (!host) {
 			try { process.kill(watchPid, 0) } catch { watchPid = null }
 		}
 		if (watchPid === null) tryPromote()
-	}, 1000)
+	}, 100)
 
 	// Also expose for event-driven promotion (client calls this on [host-released])
 	;(globalThis as any).__halTryPromote = tryPromote

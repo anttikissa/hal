@@ -71,6 +71,13 @@ export async function claimHost(hostId: string): Promise<{ host: boolean; curren
 	return (await tryClaim()) ? won() : lost()
 }
 
+export async function verifyHost(hostId: string): Promise<boolean> {
+	try {
+		const lock = await readLock()
+		return lock?.hostId === hostId
+	} catch { return false }
+}
+
 export async function releaseHost(hostId: string): Promise<void> {
 	try {
 		const lock = await readLock()
