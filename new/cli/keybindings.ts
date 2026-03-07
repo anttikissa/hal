@@ -26,12 +26,15 @@ export function handleInput(k: KeyEvent): void {
 	if (k.key === 'n' && k.ctrl) { client.nextTab(); resetContentHighWater(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); resetContentHighWater(); doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
-	if (k.key === 'r' && k.ctrl) { restart(); return }
+	if (k.key === 'r' && k.ctrl) { client.saveDraft(); restart(); return }
 
 	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
 		const text = prompt.text().trim()
 		prompt.reset()
-		if (text) client.send('prompt', text)
+		if (text) {
+			client.onSubmit(text)
+			client.send('prompt', text)
+		}
 		doRender()
 		return
 	}

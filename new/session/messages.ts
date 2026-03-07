@@ -1,5 +1,7 @@
 // Conversation log — append-only ASONL per session.
 
+import { writeFile, readFile, unlink } from 'fs/promises'
+import { existsSync } from 'fs'
 import { Log } from '../utils/log.ts'
 import { sessionDir, ensureDir } from '../state.ts'
 
@@ -72,4 +74,40 @@ function findReplayStart(entries: Message[]): number {
 		if (e.type === 'reset' || e.type === 'handoff') return i + 1
 	}
 	return 0
+}
+
+/** Extract user input texts for prompt history. */
+export async function loadInputHistory(sessionId: string): Promise<string[]> {
+	const entries = await readMessages(sessionId)
+	return entries
+		.filter((e: any) => e.role === 'user')
+		.map((e: any) => {
+			if (typeof e.content === 'string') return e.content
+			if (Array.isArray(e.content)) return e.content.find((b: any) => b.type === 'text')?.text ?? ''
+			return ''
+		})
+		.filter((text: string) => text && !text.startsWith('['))
+		.slice(-200)
+}
+
+// ── Draft persistence ──
+
+function draftPath(sessionId: string): string {
+	return `${sessionDir(sessionId)}/draft.txt`
+}
+
+export async function saveDraft(sessionId: string, text: string): Promise<void> {
+	if (!text) {
+		const p = draftPath(sessionId)
+		if (existsSync(p)) await unlink(p).catch(() => {})
+		return
+	}
+	ensureDir(sessionDir(sessionId))
+	await writeFile(draftPath(sessionId), text)
+}
+
+export async function loadDraft(sessionId: string): Promise<string> {
+	const p = draftPath(sessionId)
+	if (!existsSync(p)) return ''
+	try { return await readFile(p, 'utf-8') } catch { return '' }
 }

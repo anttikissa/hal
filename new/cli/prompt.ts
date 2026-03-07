@@ -13,13 +13,33 @@ let cursor = 0
 let goalCol: number | null = null
 let selAnchor: number | null = null // null = no selection
 
+// ── History ──
+
+let history: string[] = []
+let historyIndex = -1 // -1 = editing draft, 0..n = browsing history (0 = newest)
+let historyDraft = '' // saved draft when entering history mode
+
+export function setHistory(h: string[]): void { history = h; historyIndex = -1; historyDraft = '' }
+export function pushHistory(text: string): void { history.push(text) }
+
 export function text(): string { return buf }
+
+export function setText(t: string, c?: number): void {
+	buf = t
+	cursor = c ?? t.length
+	goalCol = null
+	selAnchor = null
+	historyIndex = -1
+	historyDraft = ''
+}
 
 export function reset(): void {
 	buf = ''
 	cursor = 0
 	goalCol = null
 	selAnchor = null
+	historyIndex = -1
+	historyDraft = ''
 }
 
 function selRange(): { start: number; end: number } | null {
@@ -148,17 +168,51 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		collapseOrMove(cursor + 1, 'end'); return true
 	}
 
-	// Up / Down
+	// Up / Down — vertical move within text, history at boundaries
 	if (k.key === 'up' || k.key === 'down') {
 		const dir = k.key === 'up' ? -1 : 1
 		if (k.alt) { move(dir === -1 ? 0 : buf.length, k.shift); return true }
-		if (k.shift) {
-			if (selAnchor === null) selAnchor = cursor
+
+		// Try vertical move first (multi-line input)
+		if (!k.shift) {
+			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
+			if (!r.atBoundary) {
+				selAnchor = null
+				cursor = r.cursor; goalCol = r.goalCol
+				return true
+			}
+
+			// At boundary → cycle history
+			if (history.length > 0) {
+				if (dir === -1) {
+					if (historyIndex < 0) {
+						historyDraft = buf
+						historyIndex = history.length - 1
+					} else if (historyIndex > 0) {
+						historyIndex--
+					} else {
+						return true
+					}
+					buf = history[historyIndex]
+					cursor = buf.length; goalCol = null; selAnchor = null
+				} else {
+					if (historyIndex < 0) return true
+					if (historyIndex < history.length - 1) {
+						historyIndex++
+						buf = history[historyIndex]
+					} else {
+						historyIndex = -1
+						buf = historyDraft; historyDraft = ''
+					}
+					cursor = buf.length; goalCol = null; selAnchor = null
+				}
+				return true
+			}
 		} else {
-			selAnchor = null
+			if (selAnchor === null) selAnchor = cursor
+			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
+			if (!r.atBoundary) { cursor = r.cursor; goalCol = r.goalCol }
 		}
-		const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
-		if (!r.atBoundary) { cursor = r.cursor; goalCol = r.goalCol }
 		return true
 	}
 

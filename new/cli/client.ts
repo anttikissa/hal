@@ -6,6 +6,8 @@ import type { Block } from './blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
 import { makeCommand } from '../protocol.ts'
 import { replayToBlocks } from '../session/replay.ts'
+import { loadInputHistory, saveDraft, loadDraft } from '../session/messages.ts'
+import * as prompt from './prompt.ts'
 import { randomBytes } from 'crypto'
 
 export interface TabState {
@@ -13,8 +15,9 @@ export interface TabState {
 	blocks: Block[]
 	info: SessionInfo
 	busy: boolean
+	inputHistory: string[]
+	inputDraft: string
 }
-
 export interface ClientState {
 	tabs: TabState[]
 	activeTabIndex: number
@@ -52,6 +55,8 @@ export class Client {
 				blocks: [],
 				info,
 				busy: rtState.busySessionIds.includes(info.id),
+				inputHistory: [],
+				inputDraft: '',
 			})
 		}
 
@@ -61,10 +66,16 @@ export class Client {
 		this.state.connected = true
 		this.onUpdate()
 
-		// Replay history for each tab
+		// Replay history + load input history/drafts for each tab
 		for (const tab of this.state.tabs) {
 			await this.replayHistory(tab)
+			tab.inputHistory = await loadInputHistory(tab.sessionId)
+			tab.inputDraft = await loadDraft(tab.sessionId)
 		}
+
+		// Apply active tab's history/draft to prompt
+		const active = this.activeTab()
+		if (active) this.applyTabToPrompt(active)
 		this.onUpdate()
 
 		// Tail events from current offset (gap-free: we read state, now tail from there)
@@ -205,7 +216,12 @@ export class Client {
 				existing.info = info
 				newTabs.push(existing)
 			} else {
-				newTabs.push({ sessionId: info.id, blocks: [], info, busy: false })
+				const tab: TabState = { sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' }
+				newTabs.push(tab)
+				// Async: load history for new tab
+				this.replayHistory(tab).then(() => {
+					loadInputHistory(info.id).then(h => { tab.inputHistory = h; this.onUpdate() })
+				})
 			}
 		}
 
@@ -219,6 +235,30 @@ export class Client {
 		}
 	}
 
+	// ── Prompt ↔ Tab state ──
+
+	private applyTabToPrompt(tab: TabState): void {
+		prompt.setHistory(tab.inputHistory)
+		if (tab.inputDraft) prompt.setText(tab.inputDraft)
+	}
+
+	/** Save current prompt text as draft for the active tab. */
+	saveDraft(): void {
+		const tab = this.activeTab()
+		if (!tab) return
+		tab.inputDraft = prompt.text()
+		saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
+	}
+
+	/** Call after submitting a prompt — pushes to history, clears draft. */
+	onSubmit(text: string): void {
+		const tab = this.activeTab()
+		if (!tab) return
+		tab.inputHistory.push(text)
+		tab.inputDraft = ''
+		saveDraft(tab.sessionId, '').catch(() => {})
+	}
+
 	// ── Commands ──
 
 	async send(type: CommandType, text?: string): Promise<void> {
@@ -230,12 +270,22 @@ export class Client {
 
 	nextTab(): void {
 		if (this.state.tabs.length <= 1) return
+		this.saveDraft()
 		this.state.activeTabIndex = (this.state.activeTabIndex + 1) % this.state.tabs.length
+		this.switchToActiveTab()
 	}
 
 	prevTab(): void {
 		if (this.state.tabs.length <= 1) return
+		this.saveDraft()
 		const len = this.state.tabs.length
 		this.state.activeTabIndex = (this.state.activeTabIndex - 1 + len) % len
+		this.switchToActiveTab()
+	}
+
+	private switchToActiveTab(): void {
+		prompt.reset()
+		const tab = this.activeTab()
+		if (tab) this.applyTabToPrompt(tab)
 	}
 }
