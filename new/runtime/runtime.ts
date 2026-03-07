@@ -70,6 +70,17 @@ export async function startRuntime(): Promise<Runtime> {
 		await greetSession(needsGreeting)
 	}
 
+	const interruptedSessionIds = new Set<string>()
+	for (const id of prevState.busySessionIds ?? []) {
+		if (sessions.has(id)) interruptedSessionIds.add(id)
+	}
+	if (interruptedSessionIds.size === 0) {
+		for (const [id] of sessions) interruptedSessionIds.add(id)
+	}
+	for (const id of interruptedSessionIds) {
+		await resumeInterruptedSession(id)
+	}
+
 	// Tail from offset captured at startup (no race window)
 	const cmdTail = commands.tail(cmdOffset)
 	;(async () => {
@@ -111,6 +122,58 @@ export async function startRuntime(): Promise<Runtime> {
 		})
 	}
 
+	function hasPendingUserTurn(messages: any[]): boolean {
+		if (messages.length === 0) return false
+		return messages[messages.length - 1]?.role === 'user'
+	}
+
+	async function startGeneration(
+		sid: string,
+		info: SessionInfo,
+		apiMessages: any[],
+		activity = 'generating...',
+	): Promise<void> {
+		busySessionIds.add(sid)
+		await publish(activity)
+		runAgentLoop({
+			sessionId: sid,
+			model: info.model ?? getConfig().defaultModel,
+			systemPrompt: 'You are a helpful assistant.',
+			messages: apiMessages,
+			onStatus: async (busy, nextActivity) => {
+				if (busy) busySessionIds.add(sid)
+				else busySessionIds.delete(sid)
+				await publish(nextActivity)
+			},
+		}).finally(async () => {
+			busySessionIds.delete(sid)
+			await publish()
+		})
+	}
+
+	async function resumeInterruptedSession(sessionId: string): Promise<void> {
+		const info = sessions.get(sessionId)
+		if (!info) return
+		const apiMessages = await loadApiMessages(sessionId)
+		if (!hasPendingUserTurn(apiMessages)) return
+		await emit({
+			type: 'line',
+			sessionId,
+			text: '[resume] continuing interrupted response after restart',
+			level: 'meta',
+		})
+		const pendingText = apiMessages[apiMessages.length - 1]?.content
+		if (typeof pendingText === 'string' && pendingText.trim()) {
+			await emit({
+				type: 'prompt',
+				sessionId,
+				text: pendingText,
+				source: { kind: 'cli', clientId: 'auto-resume' },
+			})
+		}
+		await startGeneration(sessionId, info, apiMessages, 'continuing after restart...')
+	}
+
 	async function handleCommand(cmd: RuntimeCommand): Promise<void> {
 		const sid = cmd.sessionId ?? activeSessionId
 		const warn = (text: string) => emit({ type: 'line', sessionId: sid, text, level: 'warn' })
@@ -132,24 +195,7 @@ export async function startRuntime(): Promise<Runtime> {
 				info.lastPrompt = cmd.text.split('\n')[0].slice(0, 120)
 
 				const apiMessages = await loadApiMessages(sid)
-				busySessionIds.add(sid)
-				await publish('generating...')
-
-				// Fire off — don't block the command loop
-				runAgentLoop({
-					sessionId: sid,
-					model: info.model ?? getConfig().defaultModel,
-					systemPrompt: 'You are a helpful assistant.',
-					messages: apiMessages,
-					onStatus: async (busy, activity) => {
-						if (busy) busySessionIds.add(sid)
-						else busySessionIds.delete(sid)
-						await publish(activity)
-					},
-				}).finally(async () => {
-					busySessionIds.delete(sid)
-					await publish()
-				})
+				await startGeneration(sid, info, apiMessages)
 				break
 			}
 			case 'open': {

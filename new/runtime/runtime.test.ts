@@ -10,11 +10,13 @@ import { rmSync, existsSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { randomBytes } from 'crypto'
 import { ensureStateDir, STATE_DIR, SESSIONS_DIR } from '../state.ts'
-import { ensureBus, claimHost, releaseHost, commands, events } from '../ipc.ts'
+import { ensureBus, claimHost, releaseHost, commands, events, updateState } from '../ipc.ts'
 import { startRuntime, type Runtime } from './runtime.ts'
 import { makeCommand, type RuntimeEvent } from '../protocol.ts'
 import { parseAll } from '../utils/ason.ts'
 import { sessionDir } from '../state.ts'
+import { appendMessages } from '../session/messages.ts'
+import { createSession } from '../session/session.ts'
 
 const src = { kind: 'cli' as const, clientId: 'test' }
 
@@ -188,4 +190,40 @@ test('multiple sessions survive restart in order', async () => {
 	const afterOrder = [...runtime.sessions.keys()]
 	expect(afterOrder).toEqual(beforeOrder)
 	expect(runtime.activeSessionId).toBe(beforeOrder[beforeOrder.length - 1])
+})
+
+
+test('restart auto-continues interrupted user turn', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	await appendMessages(sid, [{ role: 'user', content: 'Please continue this after restart', ts } as any])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+		s.busySessionIds = [sid]
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	for (let i = 0; i < 120; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		const all = await events.readAll()
+		const sawNotice = all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('continuing interrupted response after restart'))
+		const sawPromptEcho = all.some((e) => e.type === 'prompt' && e.sessionId === sid && e.text === 'Please continue this after restart')
+		const sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+		if (sawNotice && sawPromptEcho && sawDone) {
+			expect(sawNotice).toBe(true)
+			expect(sawPromptEcho).toBe(true)
+			expect(sawDone).toBe(true)
+			return
+		}
+	}
+
+	throw new Error('auto-continue events not observed')
 })
