@@ -5,6 +5,7 @@ import { parseKey } from './cli/keys.ts'
 import { handleInput } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
+import { maxTabHeight } from './cli/heights.ts'
 import { Client } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
@@ -69,10 +70,9 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	const blocks = tab?.blocks ?? []
 	const contentLines = renderBlocks(blocks, w, halCursorVisible)
-	if (tab) tab.contentHeight = Math.max(tab.contentHeight, contentLines.length)
-
 	// Pad to tallest tab's content height (keeps prompt position stable)
-	const maxHeight = Math.max(0, ...cState.tabs.map(t => t.contentHeight))
+	const activeSessionId = tab?.sessionId ?? null
+	const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
 	const pLines = prompt.lineCount(cw)
 	const chromeLines = 3 + pLines
 	const available = Math.max(0, (stdout.rows || 24) - chromeLines)
