@@ -1,5 +1,4 @@
 // Client — connects transport to TUI blocks.
-// Handles bootstrap, event tailing, and block translation.
 
 import type { Transport } from './transport.ts'
 import type { Block } from './blocks.ts'
@@ -18,6 +17,7 @@ export interface TabState {
 	inputHistory: string[]
 	inputDraft: string
 }
+
 export interface ClientState {
 	tabs: TabState[]
 	activeTabIndex: number
@@ -29,7 +29,7 @@ export class Client {
 	private source: RuntimeSource
 	private state: ClientState
 	private onUpdate: () => void
-	private pendingOpen = false // true after this client sends 'open'
+	private pendingOpen = false
 
 	constructor(transport: Transport, onUpdate: () => void) {
 		this.transport = transport
@@ -39,106 +39,77 @@ export class Client {
 	}
 
 	getState(): ClientState { return this.state }
-
-	activeTab(): TabState | null {
-		return this.state.tabs[this.state.activeTabIndex] ?? null
-	}
-
-	// ── Bootstrap + event loop ──
+	activeTab(): TabState | null { return this.state.tabs[this.state.activeTabIndex] ?? null }
 
 	async start(): Promise<void> {
 		const { state: rtState, sessions } = await this.transport.bootstrap()
-
-		// Create tabs from sessions
 		for (const info of sessions) {
-			this.state.tabs.push({
-				sessionId: info.id,
-				blocks: [],
-				info,
-				busy: rtState.busySessionIds.includes(info.id),
-				inputHistory: [],
-				inputDraft: '',
-			})
+			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), inputHistory: [], inputDraft: '' })
 		}
-
-		// Set active tab
-		const activeIdx = this.state.tabs.findIndex(t => t.sessionId === rtState.activeSessionId)
-		this.state.activeTabIndex = Math.max(0, activeIdx)
+		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === rtState.activeSessionId))
 		this.state.connected = true
 		this.onUpdate()
 
-		// Replay history + load input history/drafts for each tab
 		for (const tab of this.state.tabs) {
-			await this.replayHistory(tab)
+			const messages = await this.transport.replaySession(tab.sessionId)
+			tab.blocks.push(...replayToBlocks(messages, tab.info.model))
 			tab.inputHistory = await loadInputHistory(tab.sessionId)
 			tab.inputDraft = await loadDraft(tab.sessionId)
 		}
-
-		// Apply active tab's history/draft to prompt
 		const active = this.activeTab()
 		if (active) this.applyTabToPrompt(active)
 		this.onUpdate()
 
-		// Tail events from current offset (gap-free: we read state, now tail from there)
 		const offset = await this.transport.eventsOffset()
-		this.tailEvents(offset)
-	}
-
-	private async replayHistory(tab: TabState): Promise<void> {
-		const messages = await this.transport.replaySession(tab.sessionId)
-		tab.blocks.push(...replayToBlocks(messages, tab.info.model))
-	}
-
-	private async tailEvents(fromOffset: number): Promise<void> {
-		const { items } = this.transport.tailEvents(fromOffset)
-		for await (const event of items) {
+		for await (const event of this.transport.tailEvents(offset).items) {
 			this.handleEvent(event)
 			this.onUpdate()
 		}
 	}
 
-	// ── Event handling ──
-
-	private findTab(sessionId: string | null): TabState | null {
-		if (!sessionId) return this.activeTab()
-		return this.state.tabs.find(t => t.sessionId === sessionId) ?? null
-	}
-
 	private handleEvent(event: RuntimeEvent): void {
+		const tab = (sid: string | null) => sid ? this.state.tabs.find(t => t.sessionId === sid) ?? null : this.activeTab()
+		const lastBlock = (t: TabState) => t.blocks[t.blocks.length - 1]
+		const closeStreaming = (t: TabState) => {
+			const b = lastBlock(t)
+			if (b && (b.type === 'assistant' || b.type === 'thinking') && !b.done) b.done = true
+		}
+
 		switch (event.type) {
 			case 'chunk': {
-				const tab = this.findTab(event.sessionId)
-				if (!tab) return
-				this.appendChunk(tab, event.channel, event.text)
+				const t = tab(event.sessionId); if (!t) return
+				const last = lastBlock(t)
+				if (event.channel === 'thinking') {
+					if (last?.type === 'thinking' && !last.done) last.text += event.text
+					else t.blocks.push({ type: 'thinking', text: event.text, done: false })
+				} else {
+					if (last?.type === 'assistant' && !last.done) last.text += event.text
+					else {
+						if (last?.type === 'thinking' && !last.done) last.done = true
+						t.blocks.push({ type: 'assistant', text: event.text, done: false, model: t.info.model })
+					}
+				}
 				break
 			}
 			case 'line': {
-				// Fast-path host promotion
 				if (event.text === '[host-released]') {
-					const tryPromote = (globalThis as any).__halTryPromote
-					if (typeof tryPromote === 'function') tryPromote()
+					const fn = (globalThis as any).__halTryPromote
+					if (typeof fn === 'function') fn()
 					return
 				}
-				const tab = this.findTab(event.sessionId)
-				if (!tab) return
-				if (event.level === 'meta' || event.level === 'notice') {
-					tab.blocks.push({ type: 'assistant', text: event.text, done: true })
-				} else if (event.level === 'error') {
-					tab.blocks.push({ type: 'assistant', text: `⚠ ${event.text}`, done: true })
-				}
+				const t = tab(event.sessionId); if (!t) return
+				if (event.level === 'error') t.blocks.push({ type: 'assistant', text: `⚠ ${event.text}`, done: true })
+				else if (event.level === 'meta' || event.level === 'notice') t.blocks.push({ type: 'assistant', text: event.text, done: true })
 				break
 			}
 			case 'prompt': {
-				const tab = this.findTab(event.sessionId)
-				if (!tab) return
-				tab.blocks.push({ type: 'input', text: event.text, model: tab.info.model })
+				const t = tab(event.sessionId); if (!t) return
+				t.blocks.push({ type: 'input', text: event.text, model: t.info.model })
 				break
 			}
 			case 'status': {
 				const busy = new Set(event.busySessionIds ?? [])
-				for (const tab of this.state.tabs) {
-					tab.busy = busy.has(tab.sessionId)
-				}
+				for (const t of this.state.tabs) t.busy = busy.has(t.sessionId)
 				break
 			}
 			case 'sessions': {
@@ -146,22 +117,13 @@ export class Client {
 				break
 			}
 			case 'tool': {
-				const tab = this.findTab(event.sessionId)
-				if (!tab) return
-				// Close any open streaming block before tool
-				const prev = tab.blocks[tab.blocks.length - 1]
-				if (prev && (prev.type === 'assistant' || prev.type === 'thinking') && !prev.done) {
-					prev.done = true
-				}
+				const t = tab(event.sessionId); if (!t) return
+				closeStreaming(t)
 				if (event.phase === 'running') {
-					tab.blocks.push({
-						type: 'tool', name: event.name, args: event.args,
-						output: '', status: 'running', startTime: Date.now(),
-					})
+					t.blocks.push({ type: 'tool', name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now() })
 				} else {
-					// Find matching tool block and update it
-					for (let i = tab.blocks.length - 1; i >= 0; i--) {
-						const b = tab.blocks[i]
+					for (let i = t.blocks.length - 1; i >= 0; i--) {
+						const b = t.blocks[i]
 						if (b.type === 'tool' && b.name === event.name && b.status === 'running') {
 							b.status = event.phase === 'error' ? 'error' : 'done'
 							b.output = event.output ?? ''
@@ -174,35 +136,9 @@ export class Client {
 			}
 			case 'command': {
 				if (event.phase === 'done' || event.phase === 'failed') {
-					const tab = this.findTab(event.sessionId)
-					if (!tab) return
-					// Mark last streaming block as done
-					const last = tab.blocks[tab.blocks.length - 1]
-					if (last && (last.type === 'assistant' || last.type === 'thinking') && !last.done) {
-						last.done = true
-					}
+					const t = tab(event.sessionId); if (t) closeStreaming(t)
 				}
 				break
-			}
-		}
-	}
-
-	private appendChunk(tab: TabState, channel: 'assistant' | 'thinking', text: string): void {
-		const last = tab.blocks[tab.blocks.length - 1]
-
-		if (channel === 'thinking') {
-			if (last?.type === 'thinking' && !last.done) {
-				last.text += text
-			} else {
-				tab.blocks.push({ type: 'thinking', text, done: false })
-			}
-		} else {
-			if (last?.type === 'assistant' && !last.done) {
-				last.text += text
-			} else {
-				// Close any open thinking block
-				if (last?.type === 'thinking' && !last.done) last.done = true
-				tab.blocks.push({ type: 'assistant', text, done: false, model: tab.info.model })
 			}
 		}
 	}
@@ -211,41 +147,28 @@ export class Client {
 		const current = new Map(this.state.tabs.map(t => [t.sessionId, t]))
 		const newTabs: TabState[] = []
 		let newTabId: string | null = null
-
 		for (const info of sessions) {
 			const existing = current.get(info.id)
-			if (existing) {
-				existing.info = info
-				newTabs.push(existing)
-			} else {
-				newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' })
-				newTabId = info.id
-			}
+			if (existing) { existing.info = info; newTabs.push(existing) }
+			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '' }); newTabId = info.id }
 		}
-
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
-
-		// Switch to new tab only if THIS client requested it
 		if (newTabId && this.pendingOpen) {
 			this.pendingOpen = false
 			const idx = newTabs.findIndex(t => t.sessionId === newTabId)
 			if (idx >= 0) this.state.activeTabIndex = idx
 		} else {
-			// Preserve current tab, or clamp if it was removed
 			const kept = newTabs.findIndex(t => t.sessionId === prevId)
 			this.state.activeTabIndex = kept >= 0 ? kept : Math.max(0, newTabs.length - 1)
 		}
 	}
-
-	// ── Prompt ↔ Tab state ──
 
 	private applyTabToPrompt(tab: TabState): void {
 		prompt.setHistory(tab.inputHistory)
 		if (tab.inputDraft) prompt.setText(tab.inputDraft)
 	}
 
-	/** Save current prompt text as draft for the active tab. */
 	saveDraft(): void {
 		const tab = this.activeTab()
 		if (!tab) return
@@ -253,7 +176,6 @@ export class Client {
 		saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
 	}
 
-	/** Call after submitting a prompt — pushes to history, clears draft. */
 	onSubmit(text: string): void {
 		const tab = this.activeTab()
 		if (!tab) return
@@ -261,8 +183,6 @@ export class Client {
 		tab.inputDraft = ''
 		saveDraft(tab.sessionId, '').catch(() => {})
 	}
-
-	// ── Commands ──
 
 	async send(type: CommandType, text?: string): Promise<void> {
 		if (type === 'open') this.pendingOpen = true
