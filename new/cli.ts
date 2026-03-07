@@ -7,6 +7,7 @@ import { renderBlocks } from './cli/blocks.ts'
 import { Client } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
+import { updateState } from './ipc.ts'
 
 // ── Terminal setup ──
 
@@ -168,6 +169,13 @@ stdin.on('data', (data: string) => {
 	if (k.key === 'c' && k.ctrl) { quit(); return }
 
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && prompt.text().length === 0)) {
+		const tabs = client.getState().tabs
+		if (tabs.length <= 1) {
+			// Last tab: clear sessions from state so next startup is fresh, then quit
+			updateState(s => { s.sessions = []; s.activeSessionId = null })
+			quit()
+			return
+		}
 		client.send('close')
 		prompt.reset()
 		contentHighWater = 0
