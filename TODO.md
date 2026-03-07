@@ -7,6 +7,7 @@
 - Esc and Ctrl-C and Ctrl-D should work better - maybe a debug thing to restart?
 - Add stuff here
 - Config option `greet: false` to disable session greeting
+- Restore active tab across client restarts. The `run` shell script survives restarts and could pass the last active session ID back to the new process. Server-side tracking is needed since clients don't persist state.
 
 
 
