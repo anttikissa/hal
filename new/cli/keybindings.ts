@@ -32,8 +32,14 @@ export function handleInput(k: KeyEvent): void {
 		const text = prompt.text().trim()
 		prompt.reset()
 		if (text) {
-			client.onSubmit(text)
-			client.send('prompt', text)
+			const slash = text.match(/^\/(\w+)\s*(.*)/)
+			if (slash) {
+				const [, cmd, arg] = slash
+				client.send(cmd as any, arg || undefined)
+			} else {
+				client.onSubmit(text)
+				client.send('prompt', text)
+			}
 		}
 		doRender()
 		return

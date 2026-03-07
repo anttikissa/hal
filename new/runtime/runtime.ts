@@ -184,6 +184,30 @@ export async function startRuntime(): Promise<Runtime> {
 				}
 				break
 			}
+			case 'resume': {
+				const id = cmd.text?.trim()
+				if (!id) {
+					// List available sessions
+					const all = await listSessionIds()
+					const closed = all.filter(s => !sessions.has(s))
+					const text = closed.length ? `Sessions: ${closed.join(', ')}` : 'No closed sessions'
+					await emit({ type: 'line', sessionId: sid, text, level: 'info' })
+					break
+				}
+				if (sessions.has(id)) {
+					await emit({ type: 'line', sessionId: sid, text: `Session ${id} is already open`, level: 'warn' })
+					break
+				}
+				const meta = await loadMeta(id)
+				if (!meta) {
+					await emit({ type: 'line', sessionId: sid, text: `Session ${id} not found`, level: 'error' })
+					break
+				}
+				sessions.set(id, meta)
+				activeSessionId = id
+				await publish()
+				break
+			}
 		}
 	}
 
