@@ -32,6 +32,7 @@ function emit(fields: Omit<RuntimeEvent, 'id' | 'createdAt'>): Promise<void> {
 
 export async function startRuntime(): Promise<Runtime> {
 	await ensureBus()
+	const cmdOffset = await commands.offset()
 	await events.trim(500)
 
 	const sessions = new Map<string, SessionInfo>()
@@ -69,8 +70,8 @@ export async function startRuntime(): Promise<Runtime> {
 		await greetSession(needsGreeting)
 	}
 
-	// Tail commands
-	const cmdTail = commands.tail()
+	// Tail from offset captured at startup (no race window)
+	const cmdTail = commands.tail(cmdOffset)
 	;(async () => {
 		for await (const cmd of cmdTail.items) {
 			if (stopped) break
