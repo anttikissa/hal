@@ -1,12 +1,15 @@
-// Append-only ASONL log with tail support.
-// Used for commands, events, and message logs.
+// Append-only log backed by an ASONL file (one JSON value per line, see ason.ts).
+// Each append serializes items with `stringify(item, 'short')` and writes them as
+// newline-delimited text. Supports tail-following via byte offset for live streaming.
+//
+// Used for IPC commands, events, and conversation message logs.
 
 import { appendFile, readFile, stat, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { stringify, parseAll, parseStream } from './ason.ts'
 import { tailFile } from './tail-file.ts'
 
-export class AsonlLog<T> {
+export class Log<T> {
 	constructor(public readonly path: string) {}
 
 	async append(...items: T[]): Promise<void> {

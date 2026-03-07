@@ -4,7 +4,7 @@
 import { open, readFile, rename, rm } from 'fs/promises'
 import { stringify, parse } from './utils/ason.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
-import { AsonlLog } from './utils/asonl-log.ts'
+import { Log } from './utils/asonl-log.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState } from './protocol.ts'
 import { defaultState } from './protocol.ts'
 import { liveFile } from './live-file.ts'
@@ -12,8 +12,8 @@ import { IPC_DIR, ensureDir } from './state.ts'
 
 // ── Logs ──
 
-export const commands = new AsonlLog<RuntimeCommand>(`${IPC_DIR}/commands.asonl`)
-export const events = new AsonlLog<RuntimeEvent>(`${IPC_DIR}/events.asonl`)
+export const commands = new Log<RuntimeCommand>(`${IPC_DIR}/commands.asonl`)
+export const events = new Log<RuntimeEvent>(`${IPC_DIR}/events.asonl`)
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 
