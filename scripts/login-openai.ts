@@ -1,14 +1,9 @@
 #!/usr/bin/env bun
 import { randomBytes, createHash } from "crypto"
 import { createServer } from "http"
-import { readFileSync, writeFileSync } from "fs"
-import { parse, stringify } from "../src/utils/ason.ts"
+import { liveFile } from "../src/live-file.ts"
 
-const HAL_DIR = import.meta.dir + "/.."
-const AUTH_PATH = `${HAL_DIR}/auth.ason`
-function loadAuth(): any { try { return parse(readFileSync(AUTH_PATH, "utf-8")) } catch { return {} } }
-function saveAuth(auth: any) { writeFileSync(AUTH_PATH, stringify(auth) + "\n") }
-
+const auth = liveFile(import.meta.dir + "/../auth.ason", { defaults: {} as any })
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 const AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize"
 const TOKEN_URL = "https://auth.openai.com/oauth/token"
@@ -128,13 +123,11 @@ if (!accountId) {
 	console.error("Failed to extract chatgpt_account_id from token"); process.exit(1)
 }
 
-const auth = loadAuth()
 auth.openai = {
 	accessToken: access_token,
 	refreshToken: refresh_token,
 	expires: Date.now() + expires_in * 1000,
 	accountId,
 }
-saveAuth(auth)
 console.log(`\nSaved to auth.ason (expires in ${Math.round(expires_in / 60)}min)`)
 console.log("Run `./run` to start HAL with OpenAI.\n")

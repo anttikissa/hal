@@ -1,12 +1,7 @@
 #!/usr/bin/env bun
-import { readFileSync, writeFileSync } from "fs"
-import { parse, stringify } from "../src/utils/ason.ts"
+import { liveFile } from "../src/live-file.ts"
 
-const HAL_DIR = import.meta.dir + "/.."
-const AUTH_PATH = `${HAL_DIR}/auth.ason`
-function loadAuth(): any { try { return parse(readFileSync(AUTH_PATH, "utf-8")) } catch { return {} } }
-function saveAuth(auth: any) { writeFileSync(AUTH_PATH, stringify(auth) + "\n") }
-
+const auth = liveFile(import.meta.dir + "/../auth.ason", { defaults: {} as any })
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 
 async function generatePKCE() {
@@ -49,12 +44,10 @@ const res = await fetch("https://console.anthropic.com/v1/oauth/token", {
 if (!res.ok) { console.log("Auth failed:", await res.text()); process.exit(1) }
 const { access_token, refresh_token, expires_in } = await res.json() as any
 
-const auth = loadAuth()
 auth.anthropic = {
 	accessToken: access_token,
 	refreshToken: refresh_token,
 	expires: Date.now() + expires_in * 1000,
 }
-saveAuth(auth)
 console.log(`\nSaved to auth.ason (expires in ${Math.round(expires_in / 60)}min)`)
 console.log("Run `./run` to start HAL with Anthropic.\n")
