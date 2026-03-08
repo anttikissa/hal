@@ -2,6 +2,7 @@
 
 import * as colors from './colors.ts'
 import { mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
+import { displayModel } from '../models.ts'
 
 const TOOL_MAX_OUTPUT = 5
 const BLOCK_PAD = 1
@@ -40,7 +41,7 @@ const CONTENT_W = (width: number) => width - 2 * BLOCK_PAD
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
 	const who = block.source && block.source !== 'user' ? block.source : 'You'
 	const status = block.status ? ` (${block.status})` : ''
-	const model = block.model ? ` (to ${block.model})` : ''
+	const model = block.model ? ` (to ${displayModel(block.model)})` : ''
 	const label = `${who}${status}${model}`
 	if (block.status) return [toolLine(label + ': ' + block.text, width, colors.input.fg, colors.input.bg)]
 	const header = toolHeader(label, width, colors.input.fg, colors.input.bg)
@@ -51,7 +52,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: number): string[] {
 	const text = collapseBlankLines(block.text.trimEnd())
 	if (!text) return []
-	const label = block.model ? `Hal (${block.model})` : 'Hal'
+	const label = block.model ? `Hal (${displayModel(block.model)})` : 'Hal'
 	const { fg, bg } = colors.assistant
 	const header = toolHeader(label, width, fg, bg)
 	const cw = CONTENT_W(width)

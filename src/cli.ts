@@ -10,6 +10,7 @@ import { Client, type TabState } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
 import { getConfig } from './config.ts'
+import { displayModel } from './models.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -64,8 +65,7 @@ function bumpCursor(): void {
 }
 
 function shortModel(model?: string): string {
-	const m = model || getConfig().defaultModel
-	return m.includes('/') ? m.slice(m.indexOf('/') + 1) : m
+	return displayModel(model || getConfig().defaultModel)
 }
 
 function deriveState(tab: TabState | null): string {

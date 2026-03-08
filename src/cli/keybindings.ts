@@ -81,7 +81,7 @@ function showHelp(): void {
 			'**Commands**',
 			'  /help — show this help',
 			'  /reset — clear conversation',
-			'  /model <provider/model> — switch model',
+			'  /model <name> — switch model (e.g. opus, sonnet-4-6, anthropic/...)',
 			'  /topic <name> — set tab topic',
 			'  /continue — resume interrupted response',
 			'  /resume [id] — reopen a closed session',
