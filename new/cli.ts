@@ -62,6 +62,11 @@ function bumpCursor(): void {
 	scheduleBlink()
 }
 
+function shortModel(model?: string): string {
+	if (!model) return ''
+	return model.includes('/') ? model.slice(model.indexOf('/') + 1) : model
+}
+
 function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cState = client.getState()
 	const tab = client.activeTab()
@@ -111,9 +116,11 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 		// Grayed-out main prompt
 		const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
+		const model = shortModel(tab?.info.model)
 		const left = ` ${role} `
-		const fill = Math.max(0, w - left.length)
-		lines.push(`${DIM}${left}${'─'.repeat(fill)}${RESET}`)
+		const right = model ? ` ${model} ` : ''
+		const fill = Math.max(0, w - left.length - right.length)
+		lines.push(`${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`)
 		const frozen = prompt.frozenText()
 		if (frozen) {
 			for (const l of frozen.split('\n').slice(0, 3)) {
@@ -124,10 +131,12 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		// Normal prompt
 		const p = prompt.buildPrompt(w, cw)
 		const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
+		const model = shortModel(tab?.info.model)
 		const rightParts: string[] = []
+		if (model) rightParts.push(model)
 		if (p.scrollInfo) rightParts.push(p.scrollInfo)
 		const left = ` ${role} `
-		const right = rightParts.length > 0 ? ` ${rightParts.join(' ')} ` : ''
+		const right = rightParts.length > 0 ? ` ${rightParts.join(' · ')} ` : ''
 		const fill = Math.max(0, w - left.length - right.length)
 		lines.push(`${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`)
 		lines.push(...p.lines)

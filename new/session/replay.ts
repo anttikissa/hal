@@ -18,6 +18,11 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 	for (const msg of messages) {
 		const m = msg as any
 		if (m.type === 'reset' || m.type === 'forked_from' || m.type === 'handoff') continue
+		if (m.type === 'info') {
+			const prefix = m.level === 'error' ? '⚠ ' : ''
+			blocks.push({ type: 'info', text: `${prefix}${m.text}` })
+			continue
+		}
 
 		if (m.role === 'user') {
 			const text = typeof m.content === 'string' ? m.content : ''
