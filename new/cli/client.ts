@@ -157,6 +157,12 @@ export class Client {
 				if (t === this.activeTab()) prompt.setQuestion(event.text)
 				break
 			}
+			case 'answer': {
+				const t = tab(event.sessionId); if (!t) return
+				closeStreaming(t)
+				t.blocks.push({ type: 'input', text: event.text || '[no answer]', source: `Hal asked: ${event.question}` })
+				break
+			}
 		}
 	}
 

@@ -47,7 +47,7 @@ export async function startRuntime(): Promise<Runtime> {
 	const abortControllers = new Map<string, AbortController>()
 	let activeSessionId: string | null = null
 	let stopped = false
-	const pendingQuestions = new Map<string, (answer: string) => void>()
+	const pendingQuestions = new Map<string, { resolve: (answer: string) => void; question: string }>()
 	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
@@ -133,7 +133,7 @@ export async function startRuntime(): Promise<Runtime> {
 	async function askUser(sessionId: string, question: string): Promise<string> {
 		const questionId = eventId()
 		return new Promise(resolve => {
-			pendingQuestions.set(sessionId, resolve)
+			pendingQuestions.set(sessionId, { resolve, question })
 			void emit({ type: 'question', sessionId, questionId, text: question })
 		})
 	}
@@ -321,10 +321,12 @@ export async function startRuntime(): Promise<Runtime> {
 				break
 			}
 			case 'respond': {
-				const resolve = pendingQuestions.get(sid)
-				if (resolve) {
+				const pending = pendingQuestions.get(sid)
+				if (pending) {
 					pendingQuestions.delete(sid)
-					resolve(cmd.text ?? '')
+					const answer = cmd.text ?? ''
+					await emit({ type: 'answer', sessionId: sid, question: pending.question, text: answer })
+					pending.resolve(answer)
 					break
 				}
 				const answer = (cmd.text ?? '').trim().toLowerCase()

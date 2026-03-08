@@ -391,6 +391,7 @@ test('ask tool sends question event and waits for respond', { timeout: 10000 }, 
 	expect(questionEvent.text).toBe('Do you prefer tabs or spaces?')
 	expect(runtime.busySessionIds.has(sid)).toBe(true)
 
+	const answerSnapshot = (await events.readAll()).length
 	await commands.append(makeCommand('respond', src, 'tabs obviously', sid))
 
 	for (let i = 0; i < 200; i++) {
@@ -400,5 +401,9 @@ test('ask tool sends question event and waits for respond', { timeout: 10000 }, 
 		if (recent.some(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))) break
 	}
 
+	const answerEvent = (await events.readAll()).slice(answerSnapshot).find((e: any) => e.type === 'answer')
+	expect(answerEvent).toBeTruthy()
+	expect((answerEvent as any).question).toBe('Do you prefer tabs or spaces?')
+	expect((answerEvent as any).text).toBe('tabs obviously')
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
 })

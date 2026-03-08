@@ -197,8 +197,8 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.key === 'a' && k.ctrl) { move(0, k.shift); return true }
 	if (k.key === 'e' && k.ctrl) { move(buf.length, k.shift); return true }
 
-	// Ctrl+V: paste (same as Cmd+V)
-	if (k.key === 'v' && k.ctrl) { const t = pasteFromClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
+	// Ctrl+V / Ctrl+Y: paste (same as Cmd+V)
+	if ((k.key === 'v' || k.key === 'y') && k.ctrl) { const t = pasteFromClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
 
 	// Left / Right
 	if (k.key === 'left') {
