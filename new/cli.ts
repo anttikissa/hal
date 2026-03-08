@@ -70,6 +70,7 @@ function shortModel(model?: string): string {
 
 function deriveState(tab: TabState | null): string {
 	if (!tab) return 'idle'
+	if (tab.pausing) return 'pausing'
 	if (!tab.busy) return 'idle'
 	const last = tab.blocks[tab.blocks.length - 1]
 	if (!last) return 'idle'

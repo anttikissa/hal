@@ -1,4 +1,4 @@
-import { test, expect, mock, beforeEach } from 'bun:test'
+import { test, expect } from 'bun:test'
 import { randomBytes } from 'crypto'
 import { Client } from './client.ts'
 import type { Transport, BootstrapState } from './transport.ts'
@@ -80,38 +80,90 @@ function makeBootstrap(busy: boolean): BootstrapState {
 	return { state, sessions }
 }
 
-test('pressing pause does not optimistically clear busy — tab stays busy until runtime responds', async () => {
-	const transport = new FakeTransport(makeBootstrap(true))
+async function startClient(busy: boolean) {
+	const transport = new FakeTransport(makeBootstrap(busy))
 	let updates = 0
 	const client = new Client(transport, () => { updates++ })
-
-	// Start the client (don't await — it blocks on tailEvents)
 	const startPromise = client.start()
-	await Bun.sleep(50) // let startup complete
+	await Bun.sleep(50)
+	return { client, transport, updates: () => updates }
+}
 
-	// Tab should be busy
-	const tab = client.activeTab()
-	expect(tab).toBeTruthy()
-	expect(tab!.busy).toBe(true)
+test('pressing pause optimistically adds [pausing...] block and sets pausing flag', async () => {
+	const { client, transport } = await startClient(true)
+	const tab = client.activeTab()!
 
-	// Simulate pressing Esc — client sends pause command
+	// Simulate Esc: client sends pause + marks tab as pausing
 	await client.send('pause')
-	expect(transport.sentCommands.length).toBe(1)
-	expect(transport.sentCommands[0].type).toBe('pause')
+	client.markPausing()
 
-	// Immediately after sending pause, tab is STILL busy (no optimistic update)
-	expect(tab!.busy).toBe(true)
+	expect(tab.pausing).toBe(true)
+	const pausingBlock = tab.blocks.find(b => b.type === 'info' && b.text === '[pausing...]')
+	expect(pausingBlock).toBeTruthy()
+})
 
-	// Now simulate the runtime responding: [paused] line + status with busy=false
+test('[paused] line event removes [pausing...] block and clears pausing flag', async () => {
+	const { client, transport } = await startClient(true)
+	const tab = client.activeTab()!
+
+	client.markPausing()
+	expect(tab.blocks.some(b => b.type === 'info' && b.text === '[pausing...]')).toBe(true)
+
+	// Runtime sends [paused] line
 	transport.pushEvent({
 		id: eventId(), type: 'line', sessionId, text: '[paused]', level: 'meta', createdAt: ts,
 	})
 	await Bun.sleep(10)
 
-	// After [paused] line, tab is still busy (line events don't change busy state)
-	expect(tab!.busy).toBe(true)
+	// [pausing...] should be gone, [paused] should be present
+	expect(tab.blocks.some(b => b.type === 'info' && b.text === '[pausing...]')).toBe(false)
+	expect(tab.blocks.some(b => b.type === 'info' && b.text === '[paused]')).toBe(true)
+	expect(tab.pausing).toBe(false)
+})
 
-	// Status event clears busy
+test('chunks arriving between [pausing...] and [paused] appear in output', async () => {
+	const { client, transport } = await startClient(true)
+	const tab = client.activeTab()!
+
+	// Simulate some assistant content already streaming
+	transport.pushEvent({
+		id: eventId(), type: 'chunk', sessionId, text: 'hello ', channel: 'assistant', createdAt: ts,
+	})
+	await Bun.sleep(10)
+
+	client.markPausing()
+
+	// More chunks arrive while pausing
+	transport.pushEvent({
+		id: eventId(), type: 'chunk', sessionId, text: 'world', channel: 'assistant', createdAt: ts,
+	})
+	await Bun.sleep(10)
+
+	// [paused] arrives
+	transport.pushEvent({
+		id: eventId(), type: 'line', sessionId, text: '[paused]', level: 'meta', createdAt: ts,
+	})
+	await Bun.sleep(10)
+
+	// Should have assistant content + [paused], no [pausing...]
+	const texts = tab.blocks.map(b => {
+		if (b.type === 'assistant') return `assistant:${b.text}`
+		if (b.type === 'info') return `info:${b.text}`
+		return b.type
+	})
+	expect(texts.some(t => t.startsWith('assistant:') && t.includes('hello '))).toBe(true)
+	expect(texts.some(t => t === 'info:[paused]')).toBe(true)
+	expect(texts.some(t => t === 'info:[pausing...]')).toBe(false)
+})
+
+test('status event clears pausing when session is no longer busy', async () => {
+	const { client, transport } = await startClient(true)
+	const tab = client.activeTab()!
+
+	client.markPausing()
+	expect(tab.pausing).toBe(true)
+
+	// Status with busy=false
 	transport.pushEvent({
 		id: eventId(), type: 'status', sessionId: null,
 		busySessionIds: [], pausedSessionIds: [],
@@ -120,6 +172,6 @@ test('pressing pause does not optimistically clear busy — tab stays busy until
 	})
 	await Bun.sleep(10)
 
-	// NOW tab should not be busy
-	expect(tab!.busy).toBe(false)
+	expect(tab.busy).toBe(false)
+	expect(tab.pausing).toBe(false)
 })

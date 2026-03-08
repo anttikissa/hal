@@ -44,7 +44,7 @@ export function handleInput(k: KeyEvent): void {
 
 	if (k.key === 'escape') {
 		const tab = client.activeTab()
-		if (tab?.busy) { send('pause'); doRender() }
+		if (tab?.busy) { send('pause'); client.markPausing(); doRender() }
 		return
 	}
 

@@ -14,6 +14,7 @@ export interface TabState {
 	blocks: Block[]
 	info: SessionInfo
 	busy: boolean
+	pausing: boolean
 	inputHistory: string[]
 	inputDraft: string
 	contentHeight: number
@@ -47,7 +48,7 @@ export class Client {
 	async start(): Promise<void> {
 		const { state: rtState, sessions } = await this.transport.bootstrap()
 		for (const info of sessions) {
-			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), inputHistory: [], inputDraft: '', contentHeight: 0 })
+			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 })
 		}
 		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === rtState.activeSessionId))
 		this.state.connected = true
@@ -102,6 +103,11 @@ export class Client {
 					return
 				}
 				const t = tab(event.sessionId); if (!t) return
+				if (event.text === '[paused]' && t.pausing) {
+					t.pausing = false
+					const idx = t.blocks.findIndex(b => b.type === 'info' && b.text === '[pausing...]')
+					if (idx >= 0) t.blocks.splice(idx, 1)
+				}
 				const prefix = event.level === 'error' ? '⚠ ' : ''
 				t.blocks.push({ type: 'info', text: `${prefix}${event.text}` })
 				break
@@ -115,6 +121,7 @@ export class Client {
 				const busy = new Set(event.busySessionIds ?? [])
 				for (const t of this.state.tabs) {
 					t.busy = busy.has(t.sessionId)
+					if (!t.busy) t.pausing = false
 					if (event.contexts?.[t.sessionId]) t.context = event.contexts[t.sessionId]
 				}
 				break
@@ -177,7 +184,7 @@ export class Client {
 		for (const info of sessions) {
 			const existing = current.get(info.id)
 			if (existing) { existing.info = info; newTabs.push(existing) }
-			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, inputHistory: [], inputDraft: '', contentHeight: 0 }); newTabId = info.id }
+			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 }); newTabId = info.id }
 		}
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
@@ -232,6 +239,13 @@ export class Client {
 		const sessionId = tab?.sessionId
 		if (!sessionId && type !== 'open') throw new Error('no active session')
 		await this.transport.sendCommand(makeCommand(type, this.source, text, sessionId))
+	}
+
+	markPausing(): void {
+		const tab = this.activeTab()
+		if (!tab || !tab.busy) return
+		tab.pausing = true
+		tab.blocks.push({ type: 'info', text: '[pausing...]' })
 	}
 
 	nextTab(): void {

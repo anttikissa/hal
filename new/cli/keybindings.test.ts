@@ -7,7 +7,8 @@ const pushBlocks: any[] = []
 const mockClient = {
 	send: mock(async (type: string, text?: string) => { sentCommands.push({ type, text }) }),
 	onSubmit: mock((_t: string) => {}),
-	activeTab: mock(() => ({ blocks: pushBlocks, sessionId: 'test', info: {}, busy: false, inputHistory: [], inputDraft: '', contentHeight: 0 })),
+	activeTab: mock(() => ({ blocks: pushBlocks, sessionId: 'test', info: {}, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 })),
+	markPausing: mock(() => {}),
 }
 
 mock.module('../cli.ts', () => ({
@@ -32,6 +33,7 @@ beforeEach(() => {
 	pushBlocks.length = 0
 	promptMod.reset()
 	mockClient.send.mockClear()
+	mockClient.markPausing.mockClear()
 })
 
 test('/help adds a local help block without sending a command', () => {
@@ -61,10 +63,11 @@ test('option+digit does not switch on non-digit', () => {
 	expect(switchToTab).not.toHaveBeenCalled()
 })
 
-test('escape sends pause when active tab is busy', () => {
-	mockClient.activeTab.mockReturnValueOnce({ blocks: pushBlocks, sessionId: 'test', info: {}, busy: true, inputHistory: [], inputDraft: '', contentHeight: 0 })
+test('escape sends pause and calls markPausing when active tab is busy', () => {
+	mockClient.activeTab.mockReturnValueOnce({ blocks: pushBlocks, sessionId: 'test', info: {}, busy: true, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 })
 	handleInput({ key: 'escape', ctrl: false, alt: false, shift: false, cmd: false })
 	expect(sentCommands).toEqual([{ type: 'pause', text: undefined }])
+	expect(mockClient.markPausing).toHaveBeenCalledTimes(1)
 })
 
 test('escape does nothing when active tab is not busy', () => {
