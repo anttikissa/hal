@@ -274,8 +274,9 @@ export async function runTool(
 	const start = Date.now()
 	try {
 		const result = await _runTool(name, input, logger, cwd, options.signal)
-		await logToolCall(name, input, result, Date.now() - start, true)
-		return result
+		const output = shortenHome(result)
+		await logToolCall(name, input, output, Date.now() - start, true)
+		return output
 	} catch (e: any) {
 		const msg = `error: ${e.message || e}`
 		await logger(`[${name}] ${msg}`, 'error')

@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
-import { runTool } from './tools.ts'
+import { runTool, shortenHome } from './tools.ts'
 import { hashLine } from './hashline.ts'
 
 const NOOP_LOGGER = () => {}
@@ -143,5 +143,32 @@ describe('tools', () => {
 				finalContent === writeContent || finalContent === `HEADER\n${writeContent}`,
 			).toBe(true)
 		}
+	})
+})
+
+describe('shortenHome', () => {
+	test('replaces $HOME with ~', () => {
+		const home = require('os').homedir()
+		expect(shortenHome(`${home}/foo/bar`)).toBe('~/foo/bar')
+		expect(shortenHome(`found in ${home}/src/tools.ts:10`)).toBe('found in ~/src/tools.ts:10')
+	})
+
+	test('leaves strings without $HOME unchanged', () => {
+		expect(shortenHome('/tmp/foo')).toBe('/tmp/foo')
+		expect(shortenHome('hello world')).toBe('hello world')
+	})
+})
+
+describe('tool output shortens home', () => {
+	test('grep output replaces $HOME with ~', async () => {
+		const home = require('os').homedir()
+		// grep in a directory under $HOME should produce shortened paths
+		const result = await runTool(
+			'grep',
+			{ pattern: 'shortenHome', path: `${home}/.hal/src/tools.ts` },
+			{ cwd: tmpRoot, logger: NOOP_LOGGER },
+		)
+		expect(result).not.toContain(home)
+		expect(result).toContain('~/')
 	})
 })
