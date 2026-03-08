@@ -4,6 +4,7 @@ import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
+import { loadSystemPrompt } from './system-prompt.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
 
@@ -136,7 +137,7 @@ export async function startRuntime(): Promise<Runtime> {
 		runAgentLoop({
 			sessionId: sid,
 			model: info.model ?? getConfig().defaultModel,
-			systemPrompt: 'You are a helpful assistant.',
+			systemPrompt: loadSystemPrompt({ model: info.model ?? getConfig().defaultModel, sessionDir: sid }),
 			messages: apiMessages,
 			onStatus: async (busy, nextActivity) => {
 				if (busy) busySessionIds.add(sid)
