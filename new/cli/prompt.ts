@@ -74,14 +74,20 @@ export function setText(t: string, c?: number): void {
 	historyDraft = ''
 }
 
-export function reset(): void {
+/** Clear input buffer only, preserving history. */
+export function clear(): void {
 	buf = ''
 	cursor = 0
 	goalCol = null
 	selAnchor = null
-	history = []
 	historyIndex = -1
 	historyDraft = ''
+}
+
+/** Full reset — clears buffer, history, and question state. */
+export function reset(): void {
+	clear()
+	history = []
 	questionLabel = null
 	savedMain = null
 }

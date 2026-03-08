@@ -94,15 +94,14 @@ describe('prompt history', () => {
 		expect(prompt.text()).toBe('hello')
 	})
 
-	test('submit flow: type, reset, pushHistory, then up recalls it', () => {
+	test('submit flow: type, clear, pushHistory, then up recalls it', () => {
 		prompt.reset()
-		// Simulate typing "hello"
 		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
 		expect(prompt.text()).toBe('hello')
 
-		// Simulate submit: reset() then onSubmit pushes to history
+		// Simulate submit: clear() then onSubmit pushes to history
 		const submitted = prompt.text()
-		prompt.reset()
+		prompt.clear()
 		prompt.pushHistory(submitted)
 
 		// Now up arrow should recall "hello"
@@ -110,16 +109,34 @@ describe('prompt history', () => {
 		expect(prompt.text()).toBe('hello')
 	})
 
-	test('submit flow: reset then pushHistory makes up arrow work', () => {
+	test('submit flow: clear then pushHistory makes up arrow work', () => {
 		prompt.reset()
 		prompt.setHistory([])
 		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
 
 		// Simulate keybindings.ts submit flow
 		const text = prompt.text().trim()
-		prompt.reset()
+		prompt.clear()
 		prompt.pushHistory(text)
 
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('hello')
+	})
+
+	test('history survives slash commands (clear preserves history)', () => {
+		prompt.reset()
+		prompt.setHistory([])
+
+		// Submit a regular prompt
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.clear()
+		prompt.pushHistory('hello')
+
+		// Submit a slash command (clear without pushHistory)
+		for (const ch of '/model x') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.clear()
+
+		// History should still have "hello"
 		prompt.handleKey(key('up'), W)
 		expect(prompt.text()).toBe('hello')
 	})

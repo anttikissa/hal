@@ -50,7 +50,7 @@ export function handleInput(k: KeyEvent): void {
 
 	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
 		const text = prompt.text().trim()
-		prompt.reset()
+		prompt.clear()
 		if (text) {
 			const slash = text.match(/^\/(\w+)\s*(.*)/)
 			if (slash) {
