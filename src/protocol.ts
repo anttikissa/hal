@@ -25,6 +25,7 @@ export type CommandType =
 	| 'resume'
 	| 'steer'
 	| 'reset'
+	| 'compact'
 	| 'open'
 	| 'close'
 	| 'model'

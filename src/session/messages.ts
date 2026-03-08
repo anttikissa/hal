@@ -39,6 +39,7 @@ export interface ToolResultMessage {
 export type Message = UserMessage | AssistantMessage | ToolResultMessage
 	| { type: 'info'; text: string; level?: string; ts: string }
 	| { type: 'reset'; ts: string }
+	| { type: 'handoff'; ts: string }
 	| { type: 'forked_from'; parent: string; ts: string }
 
 // ── Block I/O ──
@@ -308,6 +309,45 @@ export function detectInterruptedTools(messages: Message[]): { name: string; id:
 		}
 	}
 	return []
+}
+
+/** Build a context summary from user prompts for context compaction. */
+export function buildCompactionContext(sessionId: string, messages: Message[]): string {
+	const userPrompts: string[] = []
+	for (const msg of messages) {
+		if ((msg as any).role !== 'user') continue
+		const m = msg as any
+		const text = typeof m.content === 'string' ? m.content : ''
+		if (!text || text.startsWith('[')) continue
+		userPrompts.push(text.split('\n')[0].slice(0, 200))
+	}
+
+	const dir = sessionDir(sessionId)
+
+	if (userPrompts.length === 0) return `Context was compacted. No user prompts in previous conversation. Full history: ${dir}/messages*.asonl + blocks/`
+
+	const lines: string[] = [
+		'Context was compacted to avoid exceeding the token limit. Verify before assuming.',
+		'',
+		'User messages from previous conversation:',
+		'',
+	]
+
+	if (userPrompts.length <= 20) {
+		userPrompts.forEach((p, i) => lines.push(`${i + 1}. ${p}`))
+	} else {
+		lines.push('First 10:')
+		userPrompts.slice(0, 10).forEach((p, i) => lines.push(`${i + 1}. ${p}`))
+		lines.push('')
+		lines.push('Last 10:')
+		const start = userPrompts.length - 10
+		userPrompts.slice(-10).forEach((p, i) => lines.push(`${start + i + 1}. ${p}`))
+	}
+
+	lines.push('')
+	lines.push(`Full history: ${dir}/messages*.asonl + blocks/`)
+
+	return lines.join('\n')
 }
 
 /** Extract user input texts for prompt history. */

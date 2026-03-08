@@ -81,6 +81,7 @@ function showHelp(): void {
 			'**Commands**',
 			'  /help — show this help',
 			'  /reset — clear conversation',
+			'  /compact — compact context (keeps user prompt summary)',
 			'  /model <name> — switch model (e.g. opus, sonnet-4-6, anthropic/...)',
 			'  /topic <name> — set tab topic',
 			'  /continue — resume interrupted response',

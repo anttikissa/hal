@@ -3,7 +3,7 @@
 import { watch, type FSWatcher } from 'fs'
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
-import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, type UserMessage } from '../session/messages.ts'
+import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, buildCompactionContext, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { loadSystemPrompt } from './system-prompt.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
@@ -297,6 +297,19 @@ export async function startRuntime(): Promise<Runtime> {
 			case 'reset': {
 				await appendMessages(sid, [{ type: 'reset', ts: new Date().toISOString() }])
 				await emitInfo(sid, '[reset] conversation cleared', 'meta')
+				break
+			}
+			case 'compact': {
+				if (busySessionIds.has(sid)) { await warn('Session is busy'); break }
+				const msgs = await readMessages(sid)
+				const userMsgs = msgs.filter((m: any) => m.role === 'user')
+				if (userMsgs.length === 0) { await warn('[compact] nothing to compact'); break }
+				const context = buildCompactionContext(sid, msgs)
+				await appendMessages(sid, [
+					{ type: 'handoff', ts: new Date().toISOString() },
+					{ role: 'user', content: context, ts: new Date().toISOString() },
+				])
+				await emitInfo(sid, `[compact] context compacted (${userMsgs.length} user messages summarized)`, 'meta')
 				break
 			}
 			case 'topic': {
