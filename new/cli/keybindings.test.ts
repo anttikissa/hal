@@ -46,3 +46,17 @@ test('/help adds a local help block without sending a command', () => {
 	expect(pushBlocks[0].text).toContain('/topic')
 	expect(pushBlocks[0].text).toContain('ctrl-t')
 })
+
+test('option+digit switches to tab N (1-indexed)', () => {
+	const switchToTab = mock(() => {})
+	;(mockClient as any).switchToTab = switchToTab
+	handleInput({ key: '3', ctrl: false, alt: true, shift: false, cmd: false })
+	expect(switchToTab).toHaveBeenCalledWith(2) // 0-indexed
+})
+
+test('option+digit does not switch on non-digit', () => {
+	const switchToTab = mock(() => {})
+	;(mockClient as any).switchToTab = switchToTab
+	handleInput({ key: 'g', ctrl: false, alt: true, shift: false, cmd: false })
+	expect(switchToTab).not.toHaveBeenCalled()
+})

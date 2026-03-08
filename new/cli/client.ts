@@ -237,6 +237,13 @@ export class Client {
 		this.switchToActiveTab()
 	}
 
+	switchToTab(idx: number): void {
+		if (idx < 0 || idx >= this.state.tabs.length || idx === this.state.activeTabIndex) return
+		this.saveDraft()
+		this.state.activeTabIndex = idx
+		this.switchToActiveTab()
+	}
+
 	private switchToActiveTab(): void {
 		prompt.reset()
 		const tab = this.activeTab()

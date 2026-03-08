@@ -20,6 +20,7 @@ export function handleInput(k: KeyEvent): void {
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
 	if (k.key === 'r' && k.ctrl) { client.saveDraft(); restart(); return }
+	if (k.alt && !k.ctrl && !k.cmd && k.key >= '1' && k.key <= '9') { client.switchToTab(Number(k.key) - 1); doRender(); return }
 
 	// Question mode: Enter submits answer, Escape dismisses
 	if (prompt.hasQuestion()) {
