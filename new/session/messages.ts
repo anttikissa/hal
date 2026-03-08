@@ -202,6 +202,8 @@ export async function readMessages(sessionId: string): Promise<Message[]> {
 	return messagesLog(sessionId).readAll()
 }
 
+const MAX_API_OUTPUT = 50_000
+
 /** Load messages for API replay: converts stored format → Anthropic API format. */
 export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	const all = await loadAllMessages(sessionId)
@@ -239,7 +241,9 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			if (content.length) out.push({ role: 'assistant', content })
 		} else if (msg.role === 'tool_result') {
 			const block = await readBlock(sessionId, msg.ref)
-			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content: block?.result?.content ?? '[interrupted]' }] })
+			let content = block?.result?.content ?? '[interrupted]'
+			if (content.length > MAX_API_OUTPUT) content = content.slice(0, MAX_API_OUTPUT) + `\n[truncated ${content.length - MAX_API_OUTPUT} chars]`
+			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content }] })
 		}
 	}
 	return out

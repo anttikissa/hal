@@ -18,7 +18,7 @@ function resolvePath(p?: string): string {
 	return isAbsolute(p) ? p : resolve(CWD, p)
 }
 
-function truncate(s: string, max = MAX_OUTPUT): string {
+export function truncate(s: string, max = MAX_OUTPUT): string {
 	if (s.length <= max) return s
 	return s.slice(0, max) + `\n[truncated ${s.length - max} chars]`
 }
@@ -207,7 +207,7 @@ export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<st
 			const code = await proc.exited
 			if (stderr) out += (out ? '\n' : '') + stderr
 			if (code !== 0) out += `\n[exit ${code}]`
-			return truncate(out) || '(no output)'
+			return out || '(no output)'
 		}
 		case 'read': {
 			const path = resolvePath(inp?.path)
@@ -216,7 +216,7 @@ export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<st
 				if (s.isDirectory()) return `error: ${path} is a directory, use ls`
 			} catch (e: any) { return `error: ${e.message}` }
 			const content = readFileSync(path, 'utf-8')
-			return truncate(formatHashlines(content, inp?.start, inp?.end))
+			return formatHashlines(content, inp?.start, inp?.end)
 		}
 		case 'write': {
 			const path = resolvePath(inp?.path)
@@ -268,7 +268,7 @@ export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<st
 			const result = await $`${args}`.quiet().nothrow()
 			const raw = result.stdout.toString().trim()
 			if (!raw) return 'No matches found.'
-			return truncate(raw)
+			return raw
 		}
 		case 'glob': {
 			const searchPath = resolvePath(inp?.path)
@@ -276,7 +276,7 @@ export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<st
 			const result = await $`${args}`.quiet().nothrow()
 			const raw = result.stdout.toString().trim()
 			if (!raw) return 'No files found.'
-			return truncate(raw)
+			return raw
 		}
 		case 'ls': {
 			const dir = resolvePath(inp?.path)

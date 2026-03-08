@@ -7,7 +7,7 @@ import { events } from '../ipc.ts'
 import { appendMessages, writeAssistantEntry, writeToolResultEntry, readBlock } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
-import { TOOLS, executeTool, argsPreview, type ToolCall } from './tools.ts'
+import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
 import { contextWindowForModel } from './context.ts'
 
 export interface AgentContext {
@@ -137,7 +137,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							const block = await readBlock(sessionId, ref)
 							messages.push({
 								role: 'user',
-								content: [{ type: 'tool_result', tool_use_id: call.id, content: block?.result?.content ?? '' }],
+								content: [{ type: 'tool_result', tool_use_id: call.id, content: truncate(block?.result?.content ?? '') }],
 							})
 						}
 
