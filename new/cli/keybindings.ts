@@ -47,7 +47,8 @@ export function handleInput(k: KeyEvent): void {
 			const slash = text.match(/^\/(\w+)\s*(.*)/)
 			if (slash) {
 				const [, cmd, arg] = slash
-				send(cmd as any, arg || undefined)
+				if (cmd === 'help') { showHelp(); }
+				else send(cmd as any, arg || undefined)
 			} else {
 				client.onSubmit(text)
 				send('prompt', text)
@@ -60,6 +61,28 @@ export function handleInput(k: KeyEvent): void {
 	if (prompt.handleKey(k, contentWidth())) {
 		doRender()
 	}
+}
+
+function showHelp(): void {
+	const tab = client.activeTab()
+	if (!tab) return
+	tab.blocks.push({
+		type: 'assistant', done: true,
+		text: [
+			'**Commands**',
+			'  /help — show this help',
+			'  /reset — clear conversation',
+			'  /model <provider/model> — switch model',
+			'  /topic <name> — set tab topic',
+			'  /continue — resume interrupted response',
+			'  /resume [id] — reopen a closed session',
+			'  /fork — fork session',
+			'',
+			'**Keys**',
+			'  ctrl-t new tab │ ctrl-w close │ ctrl-n/p switch tabs',
+			'  ctrl-c quit │ ctrl-z suspend │ ctrl-r restart',
+		].join('\n'),
+	})
 }
 
 function send(type: Parameters<typeof client.send>[0], text?: string): void {
