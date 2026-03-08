@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, renameSync, watch, existsSync } from 'fs'
 import { stringify, parse } from './utils/ason.ts'
 import { ensureDir } from './state.ts'
-import { dirname } from 'path'
+import { dirname, basename } from 'path'
 
 interface LiveFileOptions<T> {
 	defaults: T
@@ -43,11 +43,23 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 		})
 	}
 
-	// Watch for external edits
+	// Watch directory (not file) so atomic tmp+rename doesn't kill the watcher
 	if (opts.watch !== false) {
 		let debounce: ReturnType<typeof setTimeout> | null = null
+		let ownWrite = false
+		const origFlush = flush
+		flush = function () {
+			ownWrite = true
+			origFlush()
+			// Reset after microtask so the fs.watch callback can check
+			queueMicrotask(() => { ownWrite = false })
+		}
+		const dir = dirname(path)
+		const base = basename(path)
 		try {
-			watch(path, () => {
+			watch(dir, { persistent: false }, (_, filename) => {
+				if (filename && filename !== base) return
+				if (ownWrite) return
 				if (debounce) clearTimeout(debounce)
 				debounce = setTimeout(() => {
 					try {
