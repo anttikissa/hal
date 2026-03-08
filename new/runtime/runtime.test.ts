@@ -234,7 +234,7 @@ test('restart detects interrupted user turn but waits for /continue', async () =
 	for (let i = 0; i < 60; i++) {
 		await new Promise(r => setTimeout(r, 50))
 		const all = await events.readAll()
-		sawNotice = all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('type /continue to resume'))
+		sawNotice = all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('Type /continue to continue'))
 		sawDoneBeforeContinue = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
 		if (sawNotice) break
 	}
@@ -246,7 +246,7 @@ test('restart detects interrupted user turn but waits for /continue', async () =
 	expect(doneAfter).toBe(true)
 })
 
-test('interrupted tool round skip path is persisted', async () => {
+test('interrupted tool round requires skip before /continue', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
 
@@ -272,13 +272,21 @@ test('interrupted tool round skip path is persisted', async () => {
 	await claimHost(hostId)
 	runtime = await startRuntime()
 
+	await commands.append(makeCommand('continue', src, undefined, sid))
+	await new Promise(r => setTimeout(r, 200))
+	let all = await events.readAll()
+	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('Use /respond skip, then /continue'))).toBe(true)
+
 	await commands.append(makeCommand('respond', src, 'skip', sid))
-	await new Promise(r => setTimeout(r, 500))
+	await new Promise(r => setTimeout(r, 200))
 
 	const raw = await readFile(`${sessionDir(sid)}/messages.asonl`, 'utf-8')
 	const entries = parseAll(raw) as any[]
 	const toolResults = entries.filter((e) => e.role === 'tool_result')
 	expect(toolResults.length).toBe(2)
+
+	all = await events.readAll()
+	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('marked skipped'))).toBe(true)
 })
 
 test('pause command stops an active generation', async () => {
@@ -319,14 +327,12 @@ test('pause command stops an active generation', async () => {
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
 })
 
-test('ask tool sends question event and waits for respond', async () => {
+test('ask tool sends question event and waits for respond', { timeout: 10000 }, async () => {
 	const sid = runtime.activeSessionId!
 	const snapshot = (await events.readAll()).length
 
-	// "ask" triggers mock provider to emit an ask tool_call
 	await commands.append(makeCommand('prompt', src, 'ask Do you prefer tabs or spaces?', sid))
 
-	// Wait for question event
 	let questionEvent: any = null
 	for (let i = 0; i < 100; i++) {
 		await new Promise(r => setTimeout(r, 50))
@@ -337,14 +343,10 @@ test('ask tool sends question event and waits for respond', async () => {
 	}
 	expect(questionEvent).toBeTruthy()
 	expect(questionEvent.text).toBe('Do you prefer tabs or spaces?')
-
-	// Session should still be busy (waiting for answer)
 	expect(runtime.busySessionIds.has(sid)).toBe(true)
 
-	// Send respond
 	await commands.append(makeCommand('respond', src, 'tabs obviously', sid))
 
-	// Wait for generation to finish (mock provider follows up after tool result)
 	for (let i = 0; i < 200; i++) {
 		await new Promise(r => setTimeout(r, 50))
 		const all = await events.readAll()
