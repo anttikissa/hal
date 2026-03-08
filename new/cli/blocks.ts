@@ -89,7 +89,18 @@ function elapsed(startTime: number, endTime?: number): string {
 
 function toolLine(text: string, width: number, fg: string, bg: string): string {
 	const padded = ' '.repeat(BLOCK_PAD) + expandTabs(text)
-	const pad = Math.max(0, width - visLen(padded))
+	const vl = visLen(padded)
+	if (vl > width) {
+		// Truncate to width (ANSI-aware)
+		let vis = 0, esc = false, cut = padded.length
+		for (let i = 0; i < padded.length; i++) {
+			if (padded[i] === '\x1b') { esc = true; continue }
+			if (esc) { if (padded[i] === 'm') esc = false; continue }
+			if (++vis >= width) { cut = i + 1; break }
+		}
+		return `${bg}${fg}${padded.slice(0, cut)}${colors.RESET}`
+	}
+	const pad = width - vl
 	return `${bg}${fg}${padded}${' '.repeat(pad)}${colors.RESET}`
 }
 
