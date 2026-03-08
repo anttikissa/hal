@@ -246,6 +246,32 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content }] })
 		}
 	}
+	// Ensure every tool_use has a matching tool_result — synthesize missing ones
+	const resultIds = new Set<string>()
+	for (const m of out) {
+		if (m.role !== 'user' || !Array.isArray(m.content)) continue
+		for (const b of m.content) {
+			if (b.type === 'tool_result') resultIds.add(b.tool_use_id)
+		}
+	}
+	for (let i = 0; i < out.length; i++) {
+		if (out[i].role !== 'assistant' || !Array.isArray(out[i].content)) continue
+		const toolUses = out[i].content.filter((b: any) => b.type === 'tool_use')
+		const missing = toolUses.filter((b: any) => !resultIds.has(b.id))
+		if (missing.length > 0 && missing.length === toolUses.length && toolUses.length === out[i].content.length) {
+			// All content is unresolved tool_use — drop the entire assistant message
+			out.splice(i, 1)
+			i--
+		} else if (missing.length > 0) {
+			// Inject synthetic tool_results after this assistant message
+			const synthetic = {
+				role: 'user',
+				content: missing.map((b: any) => ({ type: 'tool_result', tool_use_id: b.id, content: '[interrupted]' })),
+			}
+			out.splice(i + 1, 0, synthetic)
+			i++ // skip the one we just inserted
+		}
+	}
 	return out
 }
 

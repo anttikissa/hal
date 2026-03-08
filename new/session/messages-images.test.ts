@@ -64,3 +64,54 @@ test('image blocks round-trip through loadApiMessages', async () => {
 	expect(imgBlock.source.media_type).toBe('image/png')
 	expect(imgBlock.source.data).toBeTruthy()
 })
+
+test('loadApiMessages synthesizes results for orphaned tool_use blocks', async () => {
+	const { writeAssistantEntry, writeToolResultEntry } = await import('./messages.ts')
+	const SID = TEST_SESSION
+
+	// User message
+	await appendMessages(SID, [{ role: 'user', content: 'do stuff', ts: new Date().toISOString() }])
+
+	// Assistant with 2 tool calls, only 1 gets a result
+	const { entry, toolRefMap } = await writeAssistantEntry(SID, {
+		text: 'ok',
+		toolCalls: [
+			{ id: 't1', name: 'bash', input: { command: 'ls' } },
+			{ id: 't2', name: 'read', input: { path: 'x' } },
+		],
+	})
+	await appendMessages(SID, [entry])
+
+	// Only write result for t1
+	const r1 = await writeToolResultEntry(SID, 't1', 'file.txt', toolRefMap)
+	await appendMessages(SID, [r1])
+
+	// Another assistant with tool call, no result at all
+	const { entry: entry2 } = await writeAssistantEntry(SID, {
+		toolCalls: [{ id: 't3', name: 'bash', input: { command: 'pwd' } }],
+	})
+	await appendMessages(SID, [entry2])
+
+	// User message after the mess
+	await appendMessages(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+
+	const msgs = await loadApiMessages(SID)
+
+	// Every tool_use must have a matching tool_result
+	const allToolUseIds = new Set<string>()
+	const allToolResultIds = new Set<string>()
+	for (const m of msgs) {
+		if (!Array.isArray(m.content)) continue
+		for (const b of m.content) {
+			if (b.type === 'tool_use') allToolUseIds.add(b.id)
+			if (b.type === 'tool_result') allToolResultIds.add(b.tool_use_id)
+		}
+	}
+	for (const id of allToolUseIds) {
+		expect(allToolResultIds.has(id)).toBe(true)
+	}
+
+	// Last message should be the user 'hello'
+	expect(msgs[msgs.length - 1].role).toBe('user')
+	expect(msgs[msgs.length - 1].content).toBe('hello')
+})

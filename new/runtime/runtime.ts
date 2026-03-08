@@ -41,7 +41,6 @@ export async function startRuntime(): Promise<Runtime> {
 	await ensureBus()
 	const cmdOffset = await commands.offset()
 	await events.trim(500)
-
 	const sessions = new Map<string, SessionInfo>()
 	const busySessionIds = new Set<string>()
 	const abortControllers = new Map<string, AbortController>()
