@@ -12,9 +12,12 @@ const CONTEXT_WINDOWS: Record<string, number> = {
 	'claude-opus-4-5': 200_000,
 	'claude-sonnet-4-5': 200_000,
 	'claude-sonnet-4-20250514': 200_000,
-	'gpt-5.4': 1_050_000,
+	'gpt-5.4': 1_000_000,
 	'gpt-5.3': 400_000,
+	'gpt-5.3-codex': 400_000,
+	'gpt-5.3-codex-spark': 128_000,
 	'gpt-5.2': 256_000,
+	'gpt-5.2-codex': 400_000,
 }
 
 const DEFAULT_CONTEXT = 200_000

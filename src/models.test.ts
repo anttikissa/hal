@@ -45,6 +45,15 @@ test('resolveModel: gpt-X.Y pattern', () => {
 	expect(resolveModel('gpt5.3')).toBe('openai/gpt-5.3')
 })
 
+test('resolveModel: codex aliases', () => {
+	expect(resolveModel('codex')).toBe('openai/gpt-5.3-codex')
+	expect(resolveModel('codex-spark')).toBe('openai/gpt-5.3-codex-spark')
+})
+
+test('resolveModel: codex-X.Y pattern', () => {
+	expect(resolveModel('codex-5.2')).toBe('openai/gpt-5.2-codex')
+})
+
 // ── displayModel ──
 
 test('displayModel: claude-opus-4-6 → Opus 4.6', () => {
@@ -67,6 +76,12 @@ test('displayModel: gpt-5.4 → GPT 5.4', () => {
 	expect(displayModel('openai/gpt-5.4')).toBe('GPT 5.4')
 	expect(displayModel('openai/gpt-5.3')).toBe('GPT 5.3')
 	expect(displayModel('openai/gpt-5.2')).toBe('GPT 5.2')
+})
+
+test('displayModel: codex models', () => {
+	expect(displayModel('openai/gpt-5.3-codex')).toBe('Codex 5.3')
+	expect(displayModel('openai/gpt-5.3-codex-spark')).toBe('Codex Spark 5.3')
+	expect(displayModel('openai/gpt-5.2-codex')).toBe('Codex 5.2')
 })
 
 test('displayModel: no provider prefix passes through', () => {

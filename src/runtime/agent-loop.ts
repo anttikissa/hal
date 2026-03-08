@@ -49,7 +49,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 		while (!signal?.aborted) {
 
-			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS, signal })
+			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS, signal, sessionId })
 
 			let thinkingText = ''
 			let assistantText = ''

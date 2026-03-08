@@ -13,6 +13,7 @@ export interface GenerateParams {
 	systemPrompt: string
 	tools?: any[]
 	signal?: AbortSignal
+	sessionId?: string
 }
 
 export interface Provider {

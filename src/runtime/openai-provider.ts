@@ -186,10 +186,11 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	if (instructions) body.instructions = instructions
 
 	if (!codex) {
-		body.max_output_tokens = 16384
+		body.max_output_tokens = params.model.includes('codex') ? 128_000 : 16_384
 	} else {
 		body.text = { verbosity: 'high' }
 		body.include = ['reasoning.encrypted_content']
+		if (params.sessionId) body.prompt_cache_key = params.sessionId
 	}
 
 	if (openaiTools.length > 0) {
@@ -198,8 +199,10 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		body.parallel_tool_calls = true
 	}
 
-	// Reasoning for capable models
-	if (params.model.startsWith('o') || params.model.startsWith('gpt-5.4')) {
+	// Reasoning: xhigh for codex, high for other capable models
+	if (params.model.includes('codex')) {
+		body.reasoning = { effort: 'xhigh', summary: 'auto' }
+	} else if (params.model.startsWith('o') || params.model.startsWith('gpt-5.4')) {
 		body.reasoning = { effort: 'high', summary: 'auto' }
 	}
 

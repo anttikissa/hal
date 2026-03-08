@@ -9,6 +9,8 @@ const ALIASES: Record<string, string> = {
 	'gpt54': 'openai/gpt-5.4',
 	'gpt53': 'openai/gpt-5.3',
 	'gpt52': 'openai/gpt-5.2',
+	codex: 'openai/gpt-5.3-codex',
+	'codex-spark': 'openai/gpt-5.3-codex-spark',
 	mock: 'mock/mock-1',
 }
 
@@ -17,6 +19,7 @@ const PATTERNS: [RegExp, string][] = [
 	[/^opus-(.+)$/, 'anthropic/claude-opus-$1'],
 	[/^sonnet-(.+)$/, 'anthropic/claude-sonnet-$1'],
 	[/^gpt-?(\d+\.\d+)$/, 'openai/gpt-$1'],
+	[/^codex-(.+)$/, 'openai/gpt-$1-codex'],
 ]
 
 export function resolveModel(input: string): string {
@@ -41,6 +44,9 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 		const tier = m[1][0].toUpperCase() + m[1].slice(1)
 		return `${tier} ${m[2]}`
 	}],
+	// gpt-5.3-codex-spark → Codex Spark 5.3, gpt-5.3-codex → Codex 5.3
+	[/^gpt-(\d+\.\d+)-codex-spark$/, m => `Codex Spark ${m[1]}`],
+	[/^gpt-(\d+\.\d+)-codex$/, m => `Codex ${m[1]}`],
 	// gpt-5.4 → GPT 5.4
 	[/^gpt-(\d+\.\d+)$/, m => `GPT ${m[1]}`],
 ]
