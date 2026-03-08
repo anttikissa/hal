@@ -59,6 +59,7 @@ export async function startRuntime(): Promise<Runtime> {
 		const meta = await loadMeta(id)
 		if (meta) {
 			sessions.set(meta.id, meta)
+			if (meta.context) sessionContext.set(meta.id, meta.context)
 			if (!activeSessionId) activeSessionId = meta.id
 		}
 	}
@@ -182,7 +183,10 @@ export async function startRuntime(): Promise<Runtime> {
 			onStatus: async (busy, nextActivity, context) => {
 				if (busy) busySessionIds.add(sid)
 				else busySessionIds.delete(sid)
-				if (context) sessionContext.set(sid, context)
+				if (context) {
+					sessionContext.set(sid, context)
+					if (!context.estimated) info.context = { used: context.used, max: context.max }
+				}
 				await publish(nextActivity)
 			},
 			askUser: (question) => askUser(sid, question),

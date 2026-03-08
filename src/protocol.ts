@@ -13,6 +13,7 @@ export interface SessionInfo {
 	createdAt: string
 	updatedAt: string
 	lastPrompt?: string
+	context?: { used: number; max: number }
 }
 
 // ── Commands (client → host) ──
