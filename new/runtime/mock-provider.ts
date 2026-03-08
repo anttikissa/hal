@@ -101,7 +101,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	if (userMessages.length <= 1 && (!input || lower === 'hi' || lower === 'hello')) {
 		const help = pick(GREETINGS) + '\n\n' +
 			'Try: **tool**, **ask**, **bash <cmd>**, **read <file>**, **write <file> <text>**, ' +
-			'**think**, **spam**, **error**'
+			'**think**, **table**, **spam**, **error**'
 		yield* streamChunks(help.split(/(?<=\s)/), 25)
 		yield { type: 'done', usage: { input: tokenCount, output: help.length } }
 		return
@@ -117,6 +117,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 			'- **read [file]** — read a file (default: package.json)\n' +
 			'- **write [file] [text]** — write to a file (default: /tmp/hal-mock-test.txt)\n' +
 			'- **think** — extended thinking demo\n' +
+			'- **table** — markdown table rendering test\n' +
 			'- **spam** / **spammm** — wall of text (more m\'s = more lines)\n' +
 			'- **error** — trigger an error'
 		yield* streamChunks(help.split(/(?<=\n)/), 20)
@@ -201,6 +202,22 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		await sleep(100)
 		yield { type: 'error', message: 'Mock error: something went wrong (as requested)' }
 		yield { type: 'done', usage: { input: tokenCount, output: 0 } }
+		return
+	}
+
+	if (lower === 'table') {
+		yield { type: 'thinking', text: 'Generating a table to test markdown rendering.' }
+		await sleep(100)
+		const table = `Here's a comparison:\n\n` +
+			`| Level | Persisted | Transient | Description |\n` +
+			`|-------|-----------|-----------|-------------|\n` +
+			`| error | ✅ | ✅ | Provider and runtime errors |\n` +
+			`| warn  | ✅ | ✅ | Interrupted tools, limits |\n` +
+			`| meta  | ✅ | ✅ | State changes: pause, reset |\n` +
+			`| info  | ❌ | ✅ | Session listing |\n\n` +
+			`Tables should render with aligned columns and visible borders.`
+		yield* streamChunks(table.split(/(?<=\n)/), 25)
+		yield { type: 'done', usage: { input: tokenCount, output: table.length } }
 		return
 	}
 
