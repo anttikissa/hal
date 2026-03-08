@@ -1,31 +1,15 @@
 #!/usr/bin/env bash
 
 # Resolve symlinks so this works when invoked via ~/.local/bin/hal
-SCRIPT="$0"
-[[ -L "$SCRIPT" ]] && SCRIPT="$(readlink "$SCRIPT")"
-export HAL_DIR="${HAL_DIR:-$(cd "$(dirname "$SCRIPT")" && pwd)}"
+SCRIPT_PATH="$0"
+[[ -L "$SCRIPT_PATH" ]] && SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+export HAL_DIR="${HAL_DIR:-$(cd "$(dirname "$SCRIPT_PATH")" && pwd)}"
 export LAUNCH_CWD="${LAUNCH_CWD:-$(pwd)}"
 export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
 cd "$HAL_DIR" || exit 1
 
-# If -f/--fresh, create a 4-char alphanumeric temp state dir once
-# and reuse it across restarts. Strip -f so args.ts doesn't re-create.
-pass_args=()
-for arg in "$@"; do
-	if [[ "$arg" == "-f" || "$arg" == "--fresh" ]]; then
-		[[ -z "$_hal_fresh_dir" ]] && _hal_fresh_dir=$(bun src/fresh-dir.ts)
-		export HAL_STATE_DIR="$_hal_fresh_dir"
-	elif [[ "$arg" == "-s" || "$arg" == "--self" ]]; then
-		export LAUNCH_CWD="$HAL_DIR"
-		export HAL_SELF_MODE=1
-	else
-		pass_args+=("$arg")
-	fi
-done
-
 while true; do
-	perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000' > "/tmp/hal-startup-$$.txt"
-	bun main.ts "${pass_args[@]}"
+	bun src/main.ts "$@"
 	code=$?
 	[ "$code" -ne 100 ] && exit "$code"
 done

@@ -11,8 +11,8 @@ function runScript(code: string, extraEnv: Record<string, string> = {}) {
 	const file = join(scratch, `_state_test_${scriptCounter++}.ts`)
 	writeFileSync(file, code)
 	const env = { ...process.env, ...extraEnv } as Record<string, string>
-	delete env.NEW_STATE_DIR
-	if (extraEnv.NEW_STATE_DIR) env.NEW_STATE_DIR = extraEnv.NEW_STATE_DIR
+	delete env.HAL_STATE_DIR
+	if (extraEnv.HAL_STATE_DIR) env.HAL_STATE_DIR = extraEnv.HAL_STATE_DIR
 	return Bun.spawn(['bun', file], {
 		cwd: NEW_DIR,
 		env,
@@ -31,7 +31,7 @@ async function runAndRead(code: string, extraEnv: Record<string, string> = {}) {
 	return { out: out.trim(), err: err.trim(), code: codeNum }
 }
 
-test('test mode without NEW_STATE_DIR uses isolated temp state dir', async () => {
+test('test mode without HAL_STATE_DIR uses isolated temp state dir', async () => {
 	const { out, err, code } = await runAndRead(`
 		import { STATE_DIR, ensureStateDir } from '${NEW_DIR}/state.ts'
 		ensureStateDir()
@@ -39,16 +39,16 @@ test('test mode without NEW_STATE_DIR uses isolated temp state dir', async () =>
 	`, { NODE_ENV: 'test' })
 	if (err) console.error(err)
 	expect(code).toBe(0)
-	expect(out).toContain('/hal-new-test-')
+	expect(out).toContain('/hal-test-')
 	rmSync(out, { recursive: true, force: true })
 })
 
-test('NEW_STATE_DIR is respected when provided', async () => {
+test('HAL_STATE_DIR is respected when provided', async () => {
 	const custom = mkdtempSync(join(tmpdir(), 'hal-state-custom-'))
 	const { out, err, code } = await runAndRead(`
 		import { STATE_DIR } from '${NEW_DIR}/state.ts'
 		console.log(STATE_DIR)
-	`, { NODE_ENV: 'test', NEW_STATE_DIR: custom })
+	`, { NODE_ENV: 'test', HAL_STATE_DIR: custom })
 	if (err) console.error(err)
 	expect(code).toBe(0)
 	expect(out).toBe(custom)

@@ -1,7 +1,0 @@
-#!/bin/bash
-cd "$(dirname "$0")" || exit 1
-while true; do
-	bun new/main.ts "$@"
-	code=$?
-	[ "$code" -ne 100 ] && exit "$code"
-done

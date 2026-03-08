@@ -1,0 +1,752 @@
+import { resolve } from 'path'
+import {
+	appendCommand as appendBusCommand,
+	appendEvent,
+	readRecentEvents,
+	readState,
+	tailEvents,
+	updateState,
+} from '../ipc.ts'
+
+import * as tui from './tui.ts'
+import {
+	CTRL_C,
+	flashHeader,
+	getInputDraft,
+	getInputHistory,
+	getOutputSnapshot,
+	setActivityLine,
+	setEscHandler,
+	setInputDraft,
+	setInputEchoFilter,
+	setInputHistory,
+	setInputKeyHandler,
+	setMaxPromptLines,
+	setUserCursorMode,
+	setHalState,
+	getHalIdleSince, restoreHalIdleTimer, setActiveTabCursor, getTabTier, getTabColor,
+	type HalState,
+	setOutputSnapshot, getOutputLineCount, updateOutputLines,
+	setStatusLine,
+	setTitleBar,
+	setDoubleEnterHandler,
+	setTabCompleter,
+} from './tui.ts'
+
+import {
+	makeCommand,
+	type CommandType,
+	type RuntimeCommand,
+	type RuntimeEvent,
+	type SessionInfo,
+} from '../protocol.ts'
+import { pushEvent, pushFragment, createFormatState, renderToolProgressLines, type FormatState, stripAnsi, setShowTimestamps } from './format/index.ts'
+import {
+	ALT_DIGIT_KEYS,
+	CTRL_DIGIT_KEYS,
+	CTRL_F_KEYS,
+	CTRL_NEXT_TAB,
+	CTRL_PREV_TAB,
+	CTRL_T_KEYS,
+	CTRL_W_KEYS,
+} from './keys.ts'
+import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
+import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
+import {
+	loadReplayEntries,
+	loadInputHistory,
+	saveDraft,
+	loadDraft,
+	loadSessionRegistry,
+	saveSessionRegistry,
+} from '../session.ts'
+import { countSourceStats } from '../utils/cloc.ts'
+
+import { getConfig, mergedModelAliases, modelIdForModel, resolveModel } from '../config.ts'
+import { loadActiveTheme } from './format/theme.ts'
+import { selfMode } from '../args.ts'
+import {
+	activityBarText,
+	tabDisplayNames,
+	titleBarText,
+	sessionName,
+	createTabState,
+	type CliTab,
+} from './tab.ts'
+
+function fmtK(tokens: number): string {
+	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens)
+}
+function fmtContext(ctx: { used: number; max: number; estimated?: boolean }): string {
+	const pct = ctx.max > 0 ? ((ctx.used / ctx.max) * 100).toFixed(1) : '0'
+	return `${ctx.estimated ? '~' : ''}${pct}%/${fmtK(ctx.max)}`
+}
+function deriveHalState(tab: CliTab): HalState {
+	const a = tab.activity
+	if (a.startsWith('Error')) return 'error'
+	if (!tab.busy) return 'idle'
+	if (a.startsWith('Thinking')) return 'thinking'
+	if (a.startsWith('Calling tool') || a.startsWith('Running')) return 'tool_call'
+	if (a.startsWith('Retrying')) return 'error'
+	return 'writing'
+}
+const MODEL_NAMES: [RegExp, string][] = [
+	[/^claude-opus-4-6/, 'Opus 4.6'], [/^claude-opus-4-5/, 'Opus 4.5'],
+	[/^claude-sonnet-4-6/, 'Sonnet 4.6'], [/^claude-sonnet-4-5/, 'Sonnet 4.5'],
+	[/^claude-sonnet-4/, 'Sonnet 4'],
+	[/^gpt-5\.4-pro/, 'GPT-5.4 Pro'], [/^gpt-5\.4/, 'GPT-5.4'],
+	[/^gpt-5\.3-codex/, 'Codex 5.3'], [/^gpt-5\.2-codex/, 'Codex 5.2'], [/^gpt-5\.1-codex/, 'Codex 5.1'],
+	[/^gpt-5(?:[.-]|$)/, 'GPT-5'], [/^gpt-4\.1(?:[.-]|$)/, 'GPT-4.1'], [/^gpt-4o(?:[.-]|$)/, 'GPT-4o'],
+	[/^o1(?:[.-]|$)/, 'o1'], [/^o3(?:[.-]|$)/, 'o3'],
+]
+function modelDisplayName(model: string): string {
+	const id = modelIdForModel(resolveModel(model))
+	return MODEL_NAMES.find(([re]) => re.test(id))?.[1] ?? id
+}
+
+export class Client {
+	async command(type: CommandType, text?: string): Promise<void> { await appendCommand(type, text) }
+	log(kind: string, text: string): void { pushLocal(kind, text) }
+	async prompt(message: string, promptStr: string): Promise<string | null> { return tui.prompt(message, promptStr) }
+	getTranscript(): string { return tui.getOutputSnapshot() }
+	clear(): void { tui.clearOutput() }
+	async closeTab(): Promise<void> { await closeActiveTab() }
+	async openSession(sessionId: string, workingDir: string): Promise<void> { await openSessionTab(sessionId, workingDir) }
+	getActiveSessionIds(): string[] { return tabs.map((t) => t.sessionId) }
+}
+
+const ALL_MODELS = [...new Set([...Object.keys(mergedModelAliases()), ...Object.values(mergedModelAliases())]) ]
+const TAB_ACTIVE = '\x1b[97m', TAB_INACTIVE = '\x1b[38;5;245m', TAB_RESET = '\x1b[0m'
+
+function normalizeCommandInput(input: string): string {
+	return stripAnsi(input).replace(/[\u0000-\u001f\u007f]/g, '').trim().toLowerCase()
+}
+
+function completeInput(prefix: string): string[] {
+	if (prefix.startsWith('/') && !prefix.includes(' '))
+		return COMMAND_NAMES.map((c) => '/' + c).filter((c) => c.startsWith(prefix))
+	if (prefix.startsWith('/model '))
+		return ALL_MODELS.filter((m) => m.startsWith(prefix.slice(7))).map((m) => `/model ${m}`)
+	return []
+}
+
+// Module state
+let source: RuntimeCommand['source']
+let isOwner = false, stopped = false, lastContextStatus: string | null = null
+let roleLabel = '', wasBusyOnLastSubmit = false, reconstructing = false
+const client = new Client()
+let tabs: CliTab[] = [], activeTabIndex = 0, launchCwd = ''
+let pendingForkOutput: string | null = null, pendingForkSwitch = false
+let pendingOpenSwitch = false
+let pendingOpenData: { sessionId: string; output: string; fmtState: FormatState; inputHistory: string[] } | null = null
+let tabHasActivity = new Set<string>()
+let screenFmt: FormatState = createFormatState()
+
+export function init(src: RuntimeCommand['source'], owner: boolean): void {
+	source = src; isOwner = owner; launchCwd = resolve(LAUNCH_CWD)
+	const config = getConfig()
+	setMaxPromptLines(config.maxPromptLines); setUserCursorMode(config.userCursor); loadActiveTheme(HAL_DIR, config.theme)
+	if (config.timestamps) setShowTimestamps(true)
+	// periodic tab bar refresh for blink tier changes (idle→dormant)
+	setInterval(renderBusyStatus, config.cursorBlinkIdle / 4)
+}
+
+export function promoteToOwner(): void {
+	isOwner = true; roleLabel = 'owner'
+	pushLocal('local.status', `[promoted] this process (pid ${process.pid}) is now the owner`)
+	renderBusyStatus()
+}
+
+let onOwnerReleased: (() => void) | null = null
+export function setOwnerReleaseHandler(handler: (() => void) | null): void { onOwnerReleased = handler }
+
+export async function start(options?: { startupEpoch?: number | null }): Promise<number> {
+	tui.init()
+	screenFmt.termWidth = process.stdout.columns || 80
+	process.stdout.on('resize', () => { screenFmt.termWidth = process.stdout.columns || 80 })
+	setTabCompleter(completeInput)
+	setEscHandler(() => handleEsc())
+	setDoubleEnterHandler(() => handleDoubleEnter())
+	setInputKeyHandler((key) => handleInputKey(key))
+	setInputEchoFilter((value) => !isExit(normalizeCommandInput(value)))
+	roleLabel = isOwner ? 'owner' : 'client'
+
+	const config = getConfig()
+	pushLocal('local.info', `HAL ${roleLabel} (pid ${process.pid})`)
+	if (config.debug?.recordEverything)
+		pushLocal('local.info', 'debug.recordEverything is active — use /bug <report> to report and fix immediately')
+	pushLocal('local.info', '/q or Ctrl-D to quit · Ctrl-V to paste images · /help for more')
+
+	await bootstrapTabs()
+	if (selfMode) applySelfMode()
+	if (options?.startupEpoch) {
+		const elapsed = Date.now() - options.startupEpoch
+		const level = elapsed > 100 ? 'local.warn' : 'local.status'
+		void countSourceStats(HAL_DIR).then(({ files, lines }) => {
+			pushLocal(level, `[perf] startup: ${elapsed}ms (${files} modules, ${lines} loc)`)
+		})
+	}
+
+	// Hydrate session history in the background
+	reconstructing = true
+	void hydrateHistory().finally(() => { reconstructing = false })
+
+	void (async () => {
+		try {
+			for await (const event of tailEvents()) { if (stopped) break; render(event) }
+		} catch (e: any) { if (!stopped) pushLocal('local.error', `[event-tail] ${e.message || e}`) }
+	})()
+
+	let restart = false
+	try {
+		while (!stopped) {
+			const input = await tui.input(' ')
+			if (input === CTRL_C) { restart = true; break }
+			if (input === null) break
+			const trimmed = input.trim(), normalized = normalizeCommandInput(input)
+			if (!trimmed) { if (activeTab()?.paused) await client.command('resume'); continue }
+			if (isExit(normalized)) break
+			if (reconstructing && !trimmed.startsWith('/')) { pushLocal('local.warn', 'Session loading...'); continue }
+			wasBusyOnLastSubmit = activeTab()?.busy ?? false
+			await handleCommand(input, client)
+			const tab = activeTab()
+			if (tab) { tab.inputHistory = getInputHistory(); saveDraft(tab.sessionId, '').catch(() => {}) }
+		}
+	} finally {
+		captureActiveOutput()
+		const exitSessionId = activeTab()?.sessionId ?? null
+		const exitTasks: Promise<unknown>[] = tabs.map((tab) => saveDraft(tab.sessionId, tab.inputDraft).catch(() => {}))
+		if (exitSessionId) {
+			exitTasks.push(updateState((s) => { s.activeSessionId = exitSessionId }).catch(() => {}))
+			exitTasks.push(loadSessionRegistry().then((reg) => {
+				reg.activeSessionId = exitSessionId; return saveSessionRegistry(reg)
+			}).catch(() => {}))
+		}
+		await Promise.all(exitTasks)
+		setInputKeyHandler(null); setEscHandler(null); setDoubleEnterHandler(null); setInputEchoFilter(null)
+		stopped = true
+		try { tui.cleanup() } catch {}
+	}
+	return restart ? 100 : 0
+}
+
+// Internal helpers
+
+function activeTab(): CliTab | null { return tabs[activeTabIndex] ?? null }
+function pushLocal(kind: string, text: string): void { tui.write(pushFragment(kind, text, screenFmt)) }
+
+function newTabState(sessionId: string, workingDir: string): CliTab {
+	return createTabState({
+		sessionId, workingDir,
+		name: sessionName({ id: sessionId, name: undefined, workingDir }),
+		modelLabel: modelDisplayName(getConfig().defaultModel),
+	})
+}
+function ensureFallbackTab(activeSessionId: string | null = null): void {
+	if (tabs.length > 0) return
+	tabs = [newTabState(activeSessionId || 's-default', launchCwd)]
+	activeTabIndex = 0; tabHasActivity = new Set()
+	applyActiveTabSnapshot(false)
+}
+
+function captureActiveOutput(): void {
+	const active = activeTab(); if (!active) return
+	// During reconstruction, don't capture screen output (just status messages) —
+	// the real history is being loaded from disk and will be applied when done.
+	if (!reconstructing) active.output = getOutputSnapshot()
+	active.inputHistory = getInputHistory()
+	active.fmtState = { ...screenFmt }; active.halIdleSince = getHalIdleSince()
+	const draft = getInputDraft(); active.inputDraft = draft.text; active.inputCursor = draft.cursor
+}
+
+function applyActiveTabSnapshot(clearWhenEmpty: boolean): void {
+	const active = activeTab(); if (!active) return
+	setActiveTabCursor(active.sessionId)
+	screenFmt = { ...active.fmtState }; lastContextStatus = active.contextStatus
+	restoreHalIdleTimer(active.halIdleSince); setActivityLine(activityBarText(active)); setHalState(deriveHalState(active)); setTitleBar(titleBarText(active))
+	setInputHistory(active.inputHistory); setInputDraft(active.inputDraft, active.inputCursor)
+	if (clearWhenEmpty) { active.output.length > 0 ? tui.replaceOutput(active.output) : tui.clearOutput() }
+	else if (active.output.length > 0) setOutputSnapshot(active.output)
+	renderBusyStatus()
+}
+
+function switchToTab(index: number): void {
+	if (index < 0 || index >= tabs.length || index === activeTabIndex) return
+	captureActiveOutput(); activeTabIndex = index; applyActiveTabSnapshot(true)
+}
+
+function handleInputKey(key: string): boolean {
+	if (CTRL_T_KEYS.has(key)) { void createTab(); return true }
+	if (CTRL_W_KEYS.has(key)) { void closeActiveTab(); return true }
+	if (CTRL_F_KEYS.has(key)) { void forkTab(); return true }
+	const digit = CTRL_DIGIT_KEYS[key] ?? ALT_DIGIT_KEYS[key]
+	if (digit) { switchToTab(digit - 1); return true }
+	if (CTRL_PREV_TAB.has(key)) { switchToTab(activeTabIndex > 0 ? activeTabIndex - 1 : tabs.length - 1); return true }
+	if (CTRL_NEXT_TAB.has(key)) { switchToTab(activeTabIndex < tabs.length - 1 ? activeTabIndex + 1 : 0); return true }
+	return false
+}
+
+async function createTab(): Promise<void> {
+	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
+	captureActiveOutput()
+	pendingOpenSwitch = true
+	await appendBusCommand(makeCommand('open', source, launchCwd))
+}
+
+async function openSessionTab(sessionId: string, workingDir: string): Promise<void> {
+	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
+	const existing = tabs.findIndex((t) => t.sessionId === sessionId)
+	if (existing >= 0) { switchToTab(existing); pushLocal('local.tab', `[restore] switched to existing tab ${existing + 1}`); return }
+
+	// Pre-load conversation for display
+	const inputHistory = await loadInputHistory(sessionId)
+	const entries = await loadReplayEntries(sessionId)
+	const replay = renderConversationHistory(entries)
+	const replayCount = entries.filter((e: any) => e.role === 'user' || e.role === 'assistant').length
+
+	captureActiveOutput()
+	pendingOpenSwitch = true
+	pendingOpenData = { sessionId, output: replay.output, fmtState: replay.fmtState, inputHistory }
+	await appendBusCommand(makeCommand('open', source, workingDir, sessionId))
+	pushLocal('local.tab', `[restore] opened session ${sessionId} (${replayCount} event${replayCount === 1 ? '' : 's'} replayed)`)
+}
+
+async function closeActiveTab(): Promise<void> {
+	const active = activeTab(); if (!active) return
+	await appendBusCommand(makeCommand('close', source, undefined, active.sessionId))
+	if (tabs.length <= 1) {
+		await appendEvent({
+			id: `${Date.now()}-${process.pid}-close-last`, type: 'sessions',
+			activeSessionId: null, sessions: [], createdAt: new Date().toISOString(),
+		})
+		stopped = true; tui.cancelInput(); return
+	}
+}
+
+async function forkTab(): Promise<void> {
+	const active = activeTab(); if (!active) return
+	if (tabs.length >= 9) { pushLocal('local.warn', '[tabs] max 9 tabs'); return }
+	captureActiveOutput()
+	pendingForkOutput = active.output; pendingForkSwitch = true
+	await appendBusCommand(makeCommand('fork', source, undefined, active.sessionId))
+}
+
+function syncTabsFromSessions(
+	sessions: SessionInfo[], preferredActiveSessionId: string | null,
+	options: { preserveActiveOutput?: boolean; render?: boolean } = {},
+): void {
+	if (!Array.isArray(sessions) || sessions.length === 0) { stopped = true; tui.cancelInput(); return }
+	const preserve = options.preserveActiveOutput ?? true
+	if (preserve) captureActiveOutput()
+	const previousById = new Map(tabs.map((t) => [t.sessionId, t]))
+	const previousActive = activeTab()?.sessionId ?? null
+	const previousActiveIndex = activeTabIndex
+	const forkOutput = pendingForkOutput, switchToFork = pendingForkSwitch
+	pendingForkOutput = null; pendingForkSwitch = false
+	const switchToOpen = pendingOpenSwitch, openData = pendingOpenData
+	pendingOpenSwitch = false; pendingOpenData = null
+	let forkedSessionId: string | null = null
+	let newOpenSessionId: string | null = null
+
+	tabs = sessions.slice(0, 9).map((session) => {
+		const existing = previousById.get(session.id)
+		const isNewFromFork = !existing && forkOutput !== null
+		const isRestore = !existing && openData?.sessionId === session.id
+		const isNewFromOpen = !existing && switchToOpen && !isNewFromFork
+		if (isNewFromFork) forkedSessionId = session.id
+		if (isNewFromOpen) newOpenSessionId = session.id
+		return {
+			...createTabState({
+				sessionId: session.id, workingDir: session.workingDir,
+				name: sessionName(session),
+				modelLabel: modelDisplayName(session.model ?? existing?.modelLabel ?? getConfig().defaultModel),
+			}),
+			topic: session.topic ?? existing?.topic ?? '',
+			output: preserve ? (existing?.output ?? (isNewFromFork ? forkOutput : (isRestore ? openData!.output : ''))) : '',
+			fmtState: existing?.fmtState ?? (isRestore ? openData!.fmtState : createFormatState()),
+			contextStatus: preserve ? (existing?.contextStatus ?? null) : null,
+			activity: preserve ? (existing?.activity ?? '') : '',
+			busy: preserve ? (existing?.busy ?? false) : false,
+			paused: preserve ? (existing?.paused ?? false) : false,
+			inputHistory: existing?.inputHistory ?? (isRestore ? openData!.inputHistory : []),
+			inputDraft: existing?.inputDraft ?? '',
+			inputCursor: existing?.inputCursor ?? 0,
+			halIdleSince: existing?.halIdleSince ?? Date.now(),
+		}
+	})
+	tabHasActivity = new Set([...tabHasActivity].filter((id) => tabs.some((t) => t.sessionId === id)))
+
+	const previousStillExists = previousActive && tabs.some((t) => t.sessionId === previousActive)
+	let targetSessionId: string
+	if (switchToFork && forkedSessionId) targetSessionId = forkedSessionId
+	else if (switchToOpen && newOpenSessionId) targetSessionId = newOpenSessionId
+	else if (previousStillExists) targetSessionId = previousActive!
+	else if (previousActive) {
+		const idx = previousActiveIndex > 0 ? previousActiveIndex - 1 : 0
+		targetSessionId = tabs[Math.min(idx, tabs.length - 1)]?.sessionId ?? tabs[0].sessionId
+	} else {
+		targetSessionId = preferredActiveSessionId && tabs.some((t) => t.sessionId === preferredActiveSessionId)
+			? preferredActiveSessionId : tabs[0].sessionId
+	}
+	activeTabIndex = Math.max(0, tabs.findIndex((t) => t.sessionId === targetSessionId))
+	if (options.render ?? true) applyActiveTabSnapshot(targetSessionId !== previousActive)
+}
+
+function oneLineSummary(value: unknown, fallback: string): string {
+	let raw = ''
+	if (typeof value === 'string') raw = value
+	else if (value != null) {
+		try { raw = JSON.stringify(value) }
+		catch { raw = String(value) }
+	}
+	const compact = raw.replace(/\s+/g, ' ').trim()
+	if (!compact) return fallback
+	return compact.length > 140 ? `${compact.slice(0, 139)}…` : compact
+}
+
+function splitProgressLines(text: string): string[] {
+	const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+	const lines = normalized.split('\n')
+	while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+	return lines
+}
+
+function replayToolInputSummary(name: string, input: any): string {
+	let summary: unknown
+	switch (name) {
+		case 'bash': summary = input.command; break
+		case 'grep': summary = `${input.pattern}${input.path ? ' ' + input.path : ''}`; break
+		case 'read': summary = input.path + (input.start != null ? `:${input.start}-${input.end}` : ''); break
+		case 'write':
+		case 'edit': summary = input.path; break
+		case 'glob': summary = input.pattern; break
+		case 'ls': summary = input.path ?? '.'; break
+		case 'web_search': summary = input.query; break
+		default: summary = input; break
+	}
+	return oneLineSummary(summary, name)
+}
+
+function replayToolProgressEvent(tool: any): RuntimeEvent {
+	const result = typeof tool?.result === 'string' ? tool.result : ''
+	const lines = splitProgressLines(result)
+	return {
+		id: `replay-tool-${tool?.id ?? 'unknown'}`,
+		type: 'tool_progress',
+		sessionId: null,
+		tools: [{
+			name: tool?.name ?? 'tool',
+			inputSummary: replayToolInputSummary(tool?.name ?? 'tool', tool?.input ?? {}),
+			status: 'done',
+			elapsed: 0,
+			bytes: Buffer.byteLength(result),
+			totalLines: lines.length,
+			lastLines: lines.slice(-3),
+		}],
+		createdAt: tool?.ts ?? '',
+	}
+}
+
+function renderConversationHistory(entries: any[]): { output: string; fmtState: FormatState } {
+	const fmtState = createFormatState()
+	let output = ''
+	for (const entry of entries) {
+		if (entry.type === 'start') {
+			const d = new Date(entry.ts)
+			const pad = (n: number) => String(n).padStart(2, '0')
+			const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+			output += pushFragment('line.info', `[session] started ${dateStr} — ${entry.workingDir}`, fmtState)
+			continue
+		}
+		if (entry.role === 'user') {
+			const text = typeof entry.content === 'string' ? entry.content : entry.content?.find?.((b: any) => b.type === 'text')?.text ?? ''
+			if (!text || text.startsWith('[')) continue
+			output += pushFragment('prompt', text, fmtState)
+			continue
+		}
+		if (entry.role === 'assistant') {
+			const thinkingText = entry._thinkingText
+			if (thinkingText) {
+				const t = thinkingText.endsWith('\n') ? thinkingText : thinkingText + '\n'
+				output += pushFragment('chunk.thinking', t, fmtState)
+				output += pushFragment('line.thinking-end' as any, '', fmtState)
+			}
+			if (entry.text) {
+				output += pushFragment('assistant', entry.text, fmtState)
+			}
+			if (Array.isArray(entry._toolCalls)) {
+				for (const tool of entry._toolCalls) {
+					output += pushEvent(replayToolProgressEvent(tool), source, fmtState)
+				}
+			}
+			continue
+		}
+	}
+	return { output, fmtState }
+}
+
+async function hydrateTabsFromConversation(): Promise<Map<string, number>> {
+	const replayed = new Map<string, number>()
+	// Snapshot session IDs to hydrate — but collect results by ID, not by tab reference,
+	// because syncTabsFromSessions may replace the tabs array during async loading.
+	const toHydrate = tabs.filter(t => t.output.trim().length === 0).map(t => t.sessionId)
+	const results = new Map<string, { output: string; fmtState: FormatState }>()
+	await Promise.all(toHydrate.map(async (sessionId) => {
+		const entries = await loadReplayEntries(sessionId)
+		const replay = renderConversationHistory(entries)
+		results.set(sessionId, replay)
+		replayed.set(sessionId, entries.filter((e: any) => e.role === 'user' || e.role === 'assistant').length)
+	}))
+	// Apply to current tabs (may be different objects if syncTabsFromSessions ran during loading)
+	for (const tab of tabs) {
+		const result = results.get(tab.sessionId)
+		if (result && tab.output.trim().length === 0) {
+			tab.output = result.output; tab.fmtState = result.fmtState
+		}
+	}
+	return replayed
+}
+
+function findTabBySessionId(sessionId: string): CliTab | null { return tabs.find((t) => t.sessionId === sessionId) ?? null }
+
+function findOrCreateTabBySessionId(sessionId: string): CliTab | null {
+	const existing = findTabBySessionId(sessionId)
+	if (existing) return existing
+	if (tabs.length >= 9) return null
+	const tab = newTabState(sessionId, launchCwd)
+	tabs.push(tab); renderBusyStatus()
+	return tab
+}
+
+function handleEsc(): void {
+	const active = activeTab()
+	if (!active) return
+	if (active.busy) {
+		appendBusCommand(makeCommand('pause', source, undefined, active.sessionId)).catch(() => {})
+		active.paused = true
+		flashHeader('\x1b[33mpausing...\x1b[0m')
+		setActivityLine(`Paused • ${active.modelLabel} — Enter to resume, /queue to inspect, /drop to clear`)
+		return
+	}
+	// Not busy: clear input text if any
+	const { text } = getInputDraft()
+	if (text) { setInputDraft(''); tui.render(); return }
+}
+
+function handleDoubleEnter(): void {
+	const active = activeTab()
+	if (!active || !wasBusyOnLastSubmit) return
+	appendBusCommand(makeCommand('steer', source, undefined, active.sessionId)).catch(() => {})
+}
+
+/** Fast bootstrap: create tabs from IPC state, render immediately. */
+async function bootstrapTabs(): Promise<void> {
+	try {
+		const state = await readState()
+		const busySet = new Set(state.busySessionIds ?? [])
+		if (Array.isArray(state.sessions) && state.sessions.length > 0)
+			syncTabsFromSessions(state.sessions, state.activeSessionId ?? null, { preserveActiveOutput: false, render: false })
+		else ensureFallbackTab(state.activeSessionId ?? null)
+		for (const tab of tabs) tab.busy = busySet.has(tab.sessionId)
+		const recent = await readRecentEvents(500)
+		for (const event of recent) {
+			if (event.type !== 'status' || !event.context) continue
+			const sessionId = event.sessionId ?? activeTab()?.sessionId ?? null
+			if (!sessionId) continue
+			const tab = findTabBySessionId(sessionId)
+			if (tab) tab.contextStatus = fmtContext(event.context)
+		}
+		applyActiveTabSnapshot(true)
+		renderBusyStatus()
+	} catch (e: any) {
+		pushLocal('local.status', `bootstrap failed: ${e.message || e}`)
+		ensureFallbackTab(null); renderBusyStatus()
+	}
+}
+
+/** Async hydration: load conversation history, input history, drafts. */
+async function hydrateHistory(): Promise<void> {
+	try {
+		const t0 = Date.now()
+		const replayCounts = await hydrateTabsFromConversation()
+		await Promise.all(tabs.map(async (tab) => {
+			tab.inputHistory = await loadInputHistory(tab.sessionId)
+			tab.inputDraft = await loadDraft(tab.sessionId)
+		}))
+		// Re-render: prepend hydrated history before any content rendered since bootstrap
+		const active = activeTab()
+		if (active) {
+			screenFmt = { ...active.fmtState }; lastContextStatus = active.contextStatus
+			setInputHistory(active.inputHistory)
+			const { text: currentInput } = getInputDraft()
+			if (!currentInput && active.inputDraft) setInputDraft(active.inputDraft, active.inputCursor)
+			if (active.output.length > 0) applyHydratedOutput(active.output)
+		}
+		renderBusyStatus()
+		const elapsed = Date.now() - t0
+		for (const [sessionId, count] of replayCounts)
+			if (count > 0) pushLocal('local.status', `[history] restored ${count} event${count === 1 ? '' : 's'} for ${sessionId}`)
+		pushLocal('local.status', `[perf] history: ${elapsed}ms`)
+	} catch (e: any) {
+		pushLocal('local.error', `history hydration failed: ${e.message || e}`)
+	}
+}
+
+/** Apply hydrated history to TUI, preserving any content rendered since bootstrap. */
+export function applyHydratedOutput(hydrated: string): void {
+	const live = getOutputSnapshot()
+	tui.replaceOutput(live ? hydrated + '\n' + live : hydrated)
+}
+/** Parse context percentage from contextStatus string (e.g. "~5.2%/200k" → 5.2, null → null) */
+export function parseContextPct(status: string | null): number | null {
+	if (!status) return null
+	const m = status.match(/~?(\d+(?:\.\d+)?)%/)
+	return m ? parseFloat(m[1]) : null
+}
+
+function applySelfMode(): void {
+	const candidate = tabs.findIndex((t) => !t.busy && (parseContextPct(t.contextStatus) ?? 0) < 10)
+	if (candidate >= 0 && candidate !== activeTabIndex) {
+		switchToTab(candidate); pushLocal('local.status', `[self] switched to tab ${candidate + 1} (idle, low context)`)
+	} else if (candidate < 0) {
+		void createTab().then(() => pushLocal('local.status', '[self] opened new tab (no idle low-context session found)'))
+	}
+}
+
+function activeSessionId(): string | null { return activeTab()?.sessionId ?? null }
+
+async function appendCommand(type: RuntimeCommand['type'], text?: string): Promise<void> {
+	await appendBusCommand(makeCommand(type, source, text, activeSessionId()))
+}
+
+function renderEventToTab(tab: CliTab, event: RuntimeEvent, renderToScreen: boolean): void {
+	if (event.type === 'line' && event.level === 'meta' && renderToScreen && tab === activeTab()) renderBusyStatus()
+
+	// Tool progress: use direct outputLines mutation instead of cursor-up-erase
+	if (event.type === 'tool_progress' && renderToScreen) {
+		const st = screenFmt
+		const allDone = event.tools.every(t => t.status !== 'running')
+		const renderedLines = renderToolProgressLines(event.tools, st.termWidth)
+
+		if (tab.toolBlockStart != null) {
+			// Update in place
+			updateOutputLines(tab.toolBlockStart, renderedLines)
+		} else {
+			// First render: add separator from previous content, then append
+			let prefix = ''
+			if (st.prevKind !== '' && st.prevKind.startsWith('chunk.')) prefix = '\n'
+			tui.write(prefix + renderedLines.map(l => l + '\n').join(''))
+			tab.toolBlockStart = getOutputLineCount() - renderedLines.length - 1
+		}
+
+		st.toolProgressLines = allDone ? 0 : event.tools.length * 4
+		st.prevKind = 'tool_progress'
+		if (allDone) tab.toolBlockStart = null
+		tab.fmtState = { ...st }
+		tabHasActivity.delete(tab.sessionId)
+		return
+	}
+
+	// Tool progress for background tab: append text (will replay on switch)
+	if (event.type === 'tool_progress' && !renderToScreen) {
+		const st = tab.fmtState
+		const allDone = event.tools.every(t => t.status !== 'running')
+		const text = pushEvent(event, source, st)
+		if (text) { tab.output += text; tabHasActivity.add(tab.sessionId) }
+		if (allDone) tab.toolBlockStart = null
+		return
+	}
+
+	// Clear tool block tracking when non-progress event arrives
+	if (tab.toolBlockStart != null) tab.toolBlockStart = null
+
+	const st = renderToScreen ? screenFmt : tab.fmtState
+	const text = pushEvent(event, source, st)
+	if (!text) return
+	if (renderToScreen) {
+		tab.fmtState = { ...screenFmt }
+		tui.write(text)
+		tabHasActivity.delete(tab.sessionId)
+	} else {
+		tab.output += text
+		tabHasActivity.add(tab.sessionId)
+	}
+}
+
+function render(event: RuntimeEvent): void {
+	if (event.type === 'line' && event.text === '[owner-released]') { if (onOwnerReleased) onOwnerReleased(); return }
+	if (event.type === 'sessions') { syncTabsFromSessions(event.sessions, event.activeSessionId ?? null); return }
+
+	if (event.type === 'status') {
+		const isPartial = ('activity' in event && event.activity !== undefined) ||
+			('context' in event && event.context !== undefined)
+		if (isPartial) {
+			if ('activity' in event && event.activity !== undefined) {
+				const tab = event.sessionId ? findTabBySessionId(event.sessionId) : null
+				if (tab) {
+					tab.activity = event.activity!
+					setHalState(deriveHalState(tab), tab.sessionId)
+				}
+			}
+		} else {
+			const busySet = new Set(event.busySessionIds ?? []), pausedSet = new Set(event.pausedSessionIds ?? [])
+			const now = Date.now()
+			for (const tab of tabs) {
+				const wasBusy = tab.busy
+				tab.busy = busySet.has(tab.sessionId); tab.paused = pausedSet.has(tab.sessionId)
+				if (tab.busy) tab.halIdleSince = Infinity
+				else if (wasBusy || !Number.isFinite(tab.halIdleSince)) tab.halIdleSince = now
+				if (!tab.busy && wasBusy && !tab.activity.startsWith('Error')) tab.activity = ''
+				setHalState(deriveHalState(tab), tab.sessionId)
+			}
+		}
+		const active = activeTab()
+		if (active) { setActiveTabCursor(active.sessionId); setActivityLine(activityBarText(active)) }
+		if (event.context) {
+			const tab = event.sessionId ? findTabBySessionId(event.sessionId) : activeTab()
+			if (tab) { tab.contextStatus = fmtContext(event.context); if (tab === activeTab()) lastContextStatus = tab.contextStatus }
+		}
+		renderBusyStatus(); return
+	}
+
+	const sessionId = 'sessionId' in event ? event.sessionId : null
+	if (!sessionId) { const active = activeTab(); if (active) renderEventToTab(active, event, true); return }
+	const tab = (event.type === 'line' || event.type === 'chunk' || event.type === 'prompt' || event.type === 'tool_progress')
+		? findOrCreateTabBySessionId(sessionId) : findTabBySessionId(sessionId)
+	if (!tab) return
+	const isActive = tab === activeTab()
+	if (isActive) tabHasActivity.delete(tab.sessionId)
+	renderEventToTab(tab, event, isActive)
+	if (isActive) renderBusyStatus()
+}
+
+function renderTabsForStatus(): string {
+	if (tabs.length === 0) return ''
+	const labels = tabDisplayNames(tabs.slice(0, 9))
+	const blinkIdle = getConfig().cursorBlinkIdle
+	const now = Date.now()
+	return tabs.slice(0, 9).map((tab, i) => {
+		const tier = getTabTier(tab.sessionId)
+		const period = tier === 'busy' ? blinkIdle / 2 : tier === 'idle' ? blinkIdle : blinkIdle * 2
+		const on = (now % period) < period / 2
+		const tabColor = i === activeTabIndex ? TAB_ACTIVE : TAB_INACTIVE
+		const char = tier === 'dormant' ? '·' : '▪'
+		const [r, g, b] = getTabColor(tab.sessionId)
+		const act = on ? `\x1b[38;2;${r|0};${g|0};${b|0}m${char}${tabColor}` : ' '
+		const text = `${i + 1}${act}${labels[i]}`
+		return i === activeTabIndex ? `${TAB_ACTIVE}[${text}]${TAB_RESET}` : `${TAB_INACTIVE} ${text} ${TAB_RESET}`
+	}).join('')
+}
+
+function renderBusyStatus(): void {
+	const model = activeTab()?.modelLabel
+	setStatusLine(renderTabsForStatus(), [roleLabel, model, lastContextStatus ?? ''].filter(Boolean).join(' · '))
+}
+
+export let clientState = {
+	setTabsForTest(nextTabs: CliTab[], activeIndex = 0): void {
+		tabs = nextTabs
+		activeTabIndex = Math.max(0, Math.min(activeIndex, tabs.length - 1))
+	},
+	syncTabsFromSessionsForTest: syncTabsFromSessions,
+}

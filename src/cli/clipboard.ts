@@ -1,12 +1,16 @@
-import { mkdirSync, existsSync, readdirSync, writeFileSync } from 'fs'
+// Clipboard access — sync, macOS only.
 
-const IMAGE_DIR = '/tmp/hal/images', PASTE_DIR = '/tmp/hal/paste'
+import { mkdirSync, existsSync } from 'fs'
+
+const IMAGE_DIR = '/tmp/hal/images'
+
 function ensureDir(dir: string): void { if (!existsSync(dir)) mkdirSync(dir, { recursive: true }) }
 
-async function getClipboardImage(): Promise<string | null> {
+/** Save clipboard image to temp file, return path or null. */
+export function getClipboardImage(): string | null {
 	if (process.platform !== 'darwin') return null
-	const path = `${IMAGE_DIR}/${Math.random().toString(36).slice(2, 8)}.png`
 	ensureDir(IMAGE_DIR)
+	const path = `${IMAGE_DIR}/${Math.random().toString(36).slice(2, 8)}.png`
 	const script = `set tempPath to "${path}"
 try
   set clipData to the clipboard as «class PNGf»
@@ -17,28 +21,18 @@ try
 on error
   return "no-image"
 end try`
-	const proc = Bun.spawn(['osascript', '-e', script], { stdout: 'pipe', stderr: 'pipe' })
-	const stdout = await new Response(proc.stdout).text()
-	await proc.exited
-	return stdout.trim() === 'no-image' ? null : stdout.trim()
+	const proc = Bun.spawnSync(['osascript', '-e', script])
+	const stdout = proc.stdout.toString().trim()
+	return stdout === 'no-image' ? null : stdout
 }
 
-async function getClipboardText(): Promise<string | null> {
-	if (process.platform !== 'darwin') return null
-	const proc = Bun.spawn(['pbpaste'], { stdout: 'pipe', stderr: 'pipe' })
-	const text = await new Response(proc.stdout).text()
-	await proc.exited; return text || null
+function readClipboardText(): string {
+	try { return Bun.spawnSync(['pbpaste']).stdout.toString() } catch { return '' }
 }
 
-export async function pasteFromClipboard(): Promise<string | null> {
-	const imagePath = await getClipboardImage()
-	return imagePath ? `[${imagePath}]` : getClipboardText()
-}
-
-export function saveMultilinePaste(text: string): string {
-	ensureDir(PASTE_DIR)
-	const existing = readdirSync(PASTE_DIR).filter((f) => /^\d{4}\.txt$/.test(f)).map((f) => parseInt(f.slice(0, 4), 10))
-	const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
-	const path = `${PASTE_DIR}/${String(next).padStart(4, '0')}.txt`
-	writeFileSync(path, text); return `[${path}]`
+/** Read clipboard: image path as `[path]`, or text. */
+export function pasteFromClipboard(): string {
+	const imagePath = getClipboardImage()
+	if (imagePath) return `[${imagePath}]`
+	return readClipboardText()
 }

@@ -27,7 +27,7 @@ const { parseAll } = aSonMod
 const { appendMessages, writeAssistantEntry } = messagesMod
 const { createSession } = sessionMod
 
-if (!STATE_DIR.includes('/hal-new-test-')) {
+if (!STATE_DIR.includes('/hal-test-')) {
 	throw new Error(`runtime.test state isolation failed: STATE_DIR=${STATE_DIR}`)
 }
 

@@ -21,7 +21,7 @@ function runScript(code: string) {
 	writeFileSync(file, code)
 	return Bun.spawn(['bun', file], {
 		cwd: NEW_DIR,
-		env: { ...process.env, NEW_STATE_DIR: stateDir },
+		env: { ...process.env, HAL_STATE_DIR: stateDir },
 		stdout: 'pipe',
 		stderr: 'pipe',
 	})
@@ -49,7 +49,7 @@ describe('ipc host lifecycle', () => {
 			await claimHost('h1')
 			await releaseHost('h1')
 
-			const events = await readFile(process.env.NEW_STATE_DIR + '/ipc/events.asonl', 'utf-8')
+			const events = await readFile(process.env.HAL_STATE_DIR + '/ipc/events.asonl', 'utf-8')
 			console.log(events.includes('[host-released]') ? 'PASS' : 'FAIL')
 		`)
 		if (err) console.error(err)
@@ -114,7 +114,7 @@ describe('ipc host lifecycle', () => {
 
 			ensureStateDir()
 			await ensureBus()
-			writeFileSync(process.env.NEW_STATE_DIR + '/ipc/host.lock', "{ hostId: 'ghost', pid: 2147483647, createdAt: '2020-01-01T00:00:00.000Z' }\\n")
+			writeFileSync(process.env.HAL_STATE_DIR + '/ipc/host.lock', "{ hostId: 'ghost', pid: 2147483647, createdAt: '2020-01-01T00:00:00.000Z' }\\n")
 			const result = await claimHost('h5')
 			console.log(result.host ? 'PASS' : 'FAIL')
 		`)
@@ -130,7 +130,7 @@ describe('ipc host lifecycle', () => {
 
 			ensureStateDir()
 			await ensureBus()
-			writeFileSync(process.env.NEW_STATE_DIR + '/ipc/host.lock', '{ hostId:')
+			writeFileSync(process.env.HAL_STATE_DIR + '/ipc/host.lock', '{ hostId:')
 			const result = await claimHost('h6')
 			console.log(result.host ? 'PASS' : 'FAIL')
 		`)
@@ -150,7 +150,7 @@ describe('ipc state persistence', () => {
 			ensureStateDir()
 			await ensureBus()
 			updateState((s) => { s.sessions = ['s-a', 's-b']; s.activeSessionId = 's-b' })
-			const raw = await readFile(process.env.NEW_STATE_DIR + '/ipc/state.ason', 'utf-8')
+			const raw = await readFile(process.env.HAL_STATE_DIR + '/ipc/state.ason', 'utf-8')
 			const disk = parse(raw) as any
 			console.log(disk.activeSessionId === 's-b' && disk.sessions?.length === 2 ? 'PASS' : 'FAIL')
 		`)

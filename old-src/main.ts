@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { headless, testMode } from './src/args.ts'
+import { headless, testMode } from './args.ts'
 import { randomBytes } from 'crypto'
 import {
 	appendEvent,
@@ -9,29 +9,29 @@ import {
 	releaseOwner,
 	resetBusEvents,
 	verifyOwnership,
-} from './src/ipc.ts'
-import { startRuntime, saveAllSessions } from './src/runtime/sessions.ts'
+} from './ipc.ts'
+import { startRuntime, saveAllSessions } from './runtime/sessions.ts'
 import {
 	init as initClient,
 	start as startClient,
 	promoteToOwner,
 	setOwnerReleaseHandler,
-} from './src/cli/client.ts'
+} from './cli/client.ts'
 
-import { startWebServer } from './src/web.ts'
-import type { EventLevel } from './src/protocol.ts'
-import { registerProvider } from './src/provider.ts'
-import { anthropicProvider } from './src/providers/anthropic.ts'
-import { openaiProvider } from './src/providers/openai.ts'
-import { mockProvider } from './src/providers/mock.ts'
-import { ollamaProvider } from './src/providers/ollama.ts'
-import { registerConfigProviders } from './src/providers/factory.ts'
-import { STATE_DIR } from './src/state.ts'
-import { initDebugLog } from './src/debug-log.ts'
+import { startWebServer } from './web.ts'
+import type { EventLevel } from './protocol.ts'
+import { registerProvider } from './provider.ts'
+import { anthropicProvider } from './providers/anthropic.ts'
+import { openaiProvider } from './providers/openai.ts'
+import { mockProvider } from './providers/mock.ts'
+import { ollamaProvider } from './providers/ollama.ts'
+import { registerConfigProviders } from './providers/factory.ts'
+import { STATE_DIR } from './state.ts'
+import { initDebugLog } from './debug-log.ts'
 
 if (testMode) {
 	const { testAnthropicProvider, testOpenaiProvider, testOllamaProvider } = await import(
-		'./src/providers/test.ts',
+		'./providers/test.ts',
 	)
 	registerProvider(testAnthropicProvider)
 	registerProvider(testOpenaiProvider)
@@ -219,9 +219,9 @@ if (isOwner) {
 
 if (testMode) {
 	// Test mode: structured JSON output, line-based stdin, no TUI
-	const { tailEvents, appendCommand } = await import('./src/ipc.ts')
-	const { makeCommand } = await import('./src/protocol.ts')
-	const { isExit } = await import('./src/cli/commands.ts')
+	const { tailEvents, appendCommand } = await import('./ipc.ts')
+	const { makeCommand } = await import('./protocol.ts')
+	const { isExit } = await import('./cli/commands.ts')
 
 	const testSource = { kind: 'cli' as const, clientId }
 

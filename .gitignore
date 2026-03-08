@@ -1,4 +1,5 @@
 state/
+old-state/
 config.ason
 auth.ason
 node_modules/

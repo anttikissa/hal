@@ -1,0 +1,753 @@
+import { writeFile, appendFile, mkdir } from 'fs/promises'
+import {
+	providerForModel,
+	modelIdForModel,
+	debugEnabled,
+	debugTokens,
+} from '../config.ts'
+import { RESPONSE_LOG } from '../state.ts'
+import { getProvider, type Provider } from '../provider.ts'
+import { tools, runTool } from '../tools.ts'
+import { totalInputTokens, contextWindowForModel, shouldWarn } from '../context.ts'
+import {
+	isModelCalibrated,
+	markModelCalibrated,
+	saveTokenCalibration,
+} from '../token-calibration.ts'
+import { appendToLog, writeAssistantEntry, writeToolResultEntry, saveSessionInfo } from '../session.ts'
+import { stringify } from '../utils/ason.ts'
+import {
+	getSessionWorkingDir,
+	getSessionModel,
+	busySessions,
+	emitStatus,
+	type SessionRuntimeCache,
+} from './sessions.ts'
+
+import { publishLine, publishChunk, publishActivity, publishContext, publishToolProgress } from './event-publisher.ts'
+
+const REQ_LOG = '/tmp/hal-req.ason'
+
+function oneLineSummary(value: unknown, fallback: string): string {
+	const raw = typeof value === 'string' ? value : value == null ? '' : stringify(value, 'short')
+	const compact = raw.replace(/\s+/g, ' ').trim()
+	if (!compact) return fallback
+	return compact.length > 140 ? `${compact.slice(0, 139)}…` : compact
+}
+
+function toolInputSummary(name: string, input: any): string {
+	let summary: unknown
+	switch (name) {
+		case 'bash': summary = input.command; break
+		case 'grep': summary = `${input.pattern}${input.path ? ' ' + input.path : ''}`; break
+		case 'read': summary = input.path + (input.start != null ? `:${input.start}-${input.end}` : ''); break
+		case 'write':
+		case 'edit': summary = input.path; break
+		case 'glob': summary = input.pattern; break
+		case 'ls': summary = input.path ?? '.'; break
+		case 'web_search': summary = input.query; break
+		default: summary = name; break
+	}
+	return oneLineSummary(summary, name)
+}
+
+function splitToolProgressLines(text: string): string[] {
+	const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+	const lines = normalized.split('\n')
+	while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+	return lines.length > 0 ? lines : ['']
+}
+export async function runAgentLoop(sessionId: string, runtime: SessionRuntimeCache): Promise<void> {
+	busySessions.add(sessionId)
+	runtime.pausedByUser = false
+	await emitStatus()
+
+	const fullModel = getSessionModel(sessionId)
+	const modelId = modelIdForModel(fullModel)
+	const provider = getProvider(providerForModel(fullModel))
+
+	// endedWithError: when true, the post-loop cleanup preserves the "Error: ..." activity
+	// so the cursor stays red. Set on HTTP errors (fetchWithRetry→null) and stream errors
+	// (parseResponseStream returns with stopReason=null, not aborted).
+	let done = false, endedWithError = false
+	while (!done && !runtime.pausedByUser) {
+		runtime.activeAbort = new AbortController()
+
+		const messages = sanitizeMessages(provider, runtime.messages)
+		const cachedMessages = provider.addCacheBreakpoints(messages)
+		const body = provider.buildRequestBody({
+			model: modelId,
+			messages: cachedMessages,
+			system: runtime.systemPrompt,
+			tools,
+			maxTokens: 16000,
+			sessionId,
+		})
+		await writeFile(REQ_LOG, stringify(body) + '\n').catch(() => {})
+
+		await publishActivity('Sending request...', sessionId)
+		const res = await fetchWithRetry(sessionId, runtime, provider, body)
+		if (!res) { endedWithError = true; break }
+		if (runtime.pausedByUser) break
+
+		const parsed = await parseResponseStream(sessionId, runtime, provider, res)
+		if (!parsed) break
+		// Stream error: no stop event and not user-aborted → preserve error activity
+		if (!parsed.stopReason && !parsed.aborted) { endedWithError = true; break }
+
+		if (debugEnabled('responseLogging')) {
+			const entry = {
+				ts: new Date().toISOString(),
+				sessionId,
+				stopReason: parsed.stopReason,
+				usage: parsed.usage,
+				blocks: parsed.contentBlocks.length,
+			}
+			await appendFile(RESPONSE_LOG, stringify(entry, 'short') + '\n').catch(() => {})
+		}
+
+		if (Object.keys(parsed.usage).length > 0) {
+			await logTokenUsage(sessionId, runtime, provider, fullModel, parsed.usage)
+		}
+
+		if (runtime.pausedByUser || parsed.aborted) {
+			const cleanBlocks = filterUnpairedWebSearchBlocks(
+				parsed.contentBlocks.filter((b: any) => {
+					if (!b) return false
+					if (b.type === 'tool_use' && typeof b.input === 'string') return false
+					if (b.type === 'thinking' && !b.signature) return false
+					return true
+				}),
+			)
+			if (cleanBlocks.length > 0) {
+				runtime.messages.push({ role: 'assistant', content: cleanBlocks })
+				const { entry: assistantEntry, toolRefMap } = await writeAssistantEntry(sessionId, cleanBlocks)
+				const logEntries: any[] = [assistantEntry]
+
+				const toolBlocks = cleanBlocks.filter((b: any) => b.type === 'tool_use')
+				if (toolBlocks.length > 0) {
+					runtime.messages.push({
+						role: 'user',
+						content: toolBlocks.map((b: any) => ({
+							type: 'tool_result',
+							tool_use_id: b.id,
+							content: '[interrupted by user pause]',
+						})),
+					})
+					for (const b of toolBlocks) {
+						logEntries.push(await writeToolResultEntry(sessionId, b.id, '[interrupted by user pause]', toolRefMap))
+					}
+				}
+				await appendToLog(sessionId, logEntries)
+			}
+			runtime.messages.push({
+				role: 'user',
+				content: '[User paused generation. Waiting for next direction.]',
+			})
+			await appendToLog(sessionId, [{ role: 'user', content: '[User paused generation. Waiting for next direction.]', ts: new Date().toISOString() }])
+			break
+		}
+
+		const validBlocks = parsed.contentBlocks.filter(
+			(b: any) =>
+				b &&
+				!(b.type === 'text' && !b.text?.trim()) &&
+				!(b.type === 'thinking' && !b.thinking?.trim()),
+		)
+
+		// If the stream produced no content (e.g. error event), don't push an empty assistant message
+		if (validBlocks.length === 0) {
+			done = true
+			break
+		}
+
+		runtime.messages.push({ role: 'assistant', content: validBlocks })
+
+		// Write assistant entry to log
+		const { entry: assistantEntry, toolRefMap: currentToolRefMap } = await writeAssistantEntry(sessionId, validBlocks)
+		await appendToLog(sessionId, [assistantEntry])
+
+		const hasToolUse = parsed.contentBlocks.some((b: any) => b?.type === 'tool_use')
+		done = parsed.stopReason === 'end_turn' || (!hasToolUse && parsed.stopReason !== 'tool_use')
+
+		const toolBlocks = parsed.contentBlocks.filter((b: any) => b?.type === 'tool_use')
+		if (runtime.pausedByUser) {
+			const logEntries: any[] = []
+			for (const block of toolBlocks) {
+				runtime.messages.push(
+					provider.toolResultMessage(block.id, '[interrupted by user pause]'),
+				)
+				logEntries.push(await writeToolResultEntry(sessionId, block.id, '[interrupted by user pause]', currentToolRefMap))
+			}
+			if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
+			done = true
+			break
+		}
+
+		if (toolBlocks.length > 0) {
+			const LAST_LINES = 3
+
+			interface ToolState {
+				name: string
+				inputSummary: string
+				status: 'running' | 'done'
+				startTime: number
+				bytes: number
+				totalLines: number
+				lastLines: string[]
+			}
+
+			const startTime = Date.now()
+			const toolState: ToolState[] = toolBlocks.map((block: any) => ({
+				name: block.name,
+				inputSummary: toolInputSummary(block.name, block.input),
+				status: 'running',
+				startTime,
+				bytes: 0,
+				totalLines: 0,
+				lastLines: [],
+			}))
+
+			await publishActivity(
+				toolState.length === 1 ? `Running: ${toolState[0].name}` : `Running ${toolState.length} tools`,
+				sessionId,
+			)
+
+			const buildProgress = (now: number) =>
+				toolState.map((ts) => ({
+					name: ts.name,
+					inputSummary: ts.inputSummary,
+					status: ts.status,
+					elapsed: now - ts.startTime,
+					bytes: ts.bytes,
+					totalLines: ts.totalLines,
+					lastLines: ts.lastLines.slice(-LAST_LINES),
+				}))
+
+			let lastEmit = 0
+			const emitProgress = async (force = false) => {
+				const now = Date.now()
+				if (!force && now - lastEmit < 100) return
+				lastEmit = now
+				await publishToolProgress(sessionId, buildProgress(now))
+			}
+
+			await emitProgress(true)
+
+			const progressTimer = setInterval(() => { void emitProgress() }, 100)
+			;(progressTimer as any).unref?.()
+			try {
+				const toolResults = await Promise.all(
+					toolBlocks.map(async (block: any, i: number) => {
+						const output = await runTool(block.name, block.input, {
+							logger: (line) => {
+								const state = toolState[i]
+								for (const progressLine of splitToolProgressLines(String(line))) {
+									if (progressLine.startsWith(`[${block.name}] `)) continue
+									state.bytes += Buffer.byteLength(progressLine)
+									state.totalLines += 1
+									state.lastLines.push(progressLine)
+								}
+								if (state.lastLines.length > LAST_LINES)
+									state.lastLines = state.lastLines.slice(-LAST_LINES)
+								return emitProgress()
+							},
+							cwd: getSessionWorkingDir(sessionId),
+							signal: runtime.activeAbort?.signal,
+						})
+						toolState[i].status = 'done'
+						await emitProgress(true)
+						return { id: block.id, output }
+					}),
+				)
+
+				const logEntries: any[] = []
+				for (const result of toolResults) {
+					if (runtime.pausedByUser) {
+						runtime.messages.push(
+							provider.toolResultMessage(
+								result.id,
+								`${result.output}\n[interrupted by user pause]`,
+							),
+						)
+						logEntries.push(await writeToolResultEntry(sessionId, result.id, `${result.output}\n[interrupted by user pause]`, currentToolRefMap))
+						done = true
+					} else {
+						runtime.messages.push(provider.toolResultMessage(result.id, result.output))
+						logEntries.push(await writeToolResultEntry(sessionId, result.id, result.output, currentToolRefMap))
+						done = false
+					}
+				}
+
+				if (logEntries.length > 0) await appendToLog(sessionId, logEntries)
+			} finally {
+				clearInterval(progressTimer)
+			}
+		}
+	}
+
+	// Clear activity unless we errored — error activity must stay so the client
+	// keeps deriveHalState() → 'error' and the cursor remains red.
+	if (!endedWithError) await publishActivity('', sessionId)
+
+	runtime.activeAbort = null
+
+	busySessions.delete(sessionId)
+	await emitStatus()
+
+	await saveSessionInfo(sessionId, runtime)
+
+	if (runtime.lastUsage && shouldWarn(runtime.lastUsage, contextWindowForModel(modelId))) {
+		await publishLine(
+			'[context] >66% full. /handoff to rotate context, or /reset to start afresh.',
+			'notice',
+			sessionId,
+		)
+	}
+}
+
+function filterUnpairedWebSearchBlocks(blocks: any[]): any[] {
+	if (!Array.isArray(blocks) || blocks.length === 0) return blocks
+	const webSearchUseIds = new Set<string>()
+	const webSearchResultIds = new Set<string>()
+	for (const block of blocks) {
+		if (
+			block?.type === 'server_tool_use' &&
+			block?.name === 'web_search' &&
+			typeof block?.id === 'string'
+		) {
+			webSearchUseIds.add(block.id)
+		}
+		if (block?.type === 'web_search_tool_result' && typeof block?.tool_use_id === 'string') {
+			webSearchResultIds.add(block.tool_use_id)
+		}
+	}
+	return blocks.filter((block: any) => {
+		if (block?.type === 'server_tool_use' && block?.name === 'web_search') {
+			return typeof block.id === 'string' && webSearchResultIds.has(block.id)
+		}
+		if (block?.type === 'web_search_tool_result') {
+			return typeof block.tool_use_id === 'string' && webSearchUseIds.has(block.tool_use_id)
+		}
+		return true
+	})
+}
+
+// Sanitize: drop empty blocks, fix orphaned tool_use, strip server_tool_use artifacts
+export function sanitizeMessages(provider: Provider, messages: any[]): any[] {
+	const sanitized = messages
+		.map((m) => {
+			if (!Array.isArray(m.content)) return m
+			const filtered = filterUnpairedWebSearchBlocks(
+				m.content
+					.filter((b: any) => {
+						if (!b) return false
+						if (b.type === 'text' && !b.text?.trim()) return false
+						if (b.type === 'thinking' && !b.thinking?.trim()) return false
+						if (
+							provider.name === 'anthropic' &&
+							b.type === 'thinking' &&
+							!String(b.signature ?? '').trim()
+						)
+							return false
+						if (
+							b.type === 'tool_result' &&
+							typeof b.tool_use_id === 'string' &&
+							b.tool_use_id.startsWith('srvtoolu_')
+						)
+							return false
+						return true
+					})
+					.map((b: any) => {
+						if (b.type === 'server_tool_use' && '__inputJson' in b) {
+							const { __inputJson, ...clean } = b
+							return clean
+						}
+						return b
+					}),
+			)
+			return { ...m, content: filtered }
+		})
+		.filter((m) => !Array.isArray(m.content) || m.content.length > 0)
+
+	// Fix orphaned tool_use: ensure every tool_use has a matching tool_result
+	const fixed: typeof sanitized = []
+	for (let i = 0; i < sanitized.length; i++) {
+		fixed.push(sanitized[i])
+		const msg = sanitized[i]
+		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
+
+		const toolUseIds = msg.content
+			.filter((b: any) => b.type === 'tool_use')
+			.map((b: any) => b.id)
+		if (toolUseIds.length === 0) continue
+
+		const resultIds = new Set<string>()
+		for (let j = i + 1; j < sanitized.length; j++) {
+			if (sanitized[j].role !== 'user') break
+			if (Array.isArray(sanitized[j].content)) {
+				for (const b of sanitized[j].content) {
+					if (b.type === 'tool_result') resultIds.add(b.tool_use_id)
+				}
+			}
+		}
+
+		const missing = toolUseIds.filter((id: string) => !resultIds.has(id))
+		if (missing.length > 0) {
+			fixed.push({
+				role: 'user',
+				content: missing.map((id: string) => ({
+					type: 'tool_result',
+					tool_use_id: id,
+					content: '[interrupted — no result available]',
+				})),
+			})
+		}
+	}
+	return fixed
+}
+
+async function fetchWithRetry(
+	sessionId: string,
+	runtime: SessionRuntimeCache,
+	provider: Provider,
+	body: any,
+): Promise<Response | null> {
+	const MAX_RETRIES = 5
+
+	for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+		if (runtime.pausedByUser || runtime.activeAbort?.signal.aborted) return null
+
+		let res: Response
+		try {
+			res = await provider.fetch(body, runtime.activeAbort?.signal)
+		} catch (e: any) {
+			if (runtime.pausedByUser) return null
+			if (runtime.activeAbort?.signal.aborted) return null
+			if (attempt < MAX_RETRIES - 1) {
+				const delay = Math.min(2000 * Math.pow(2, attempt), 30000)
+				await publishActivity(`Retrying (${attempt + 1}/${MAX_RETRIES})...`, sessionId)
+				await publishLine(
+					`[retry] network error: ${e.message}. retrying in ${(delay / 1000).toFixed(0)}s... (${attempt + 1}/${MAX_RETRIES})`,
+					'warn',
+					sessionId,
+				)
+				await Bun.sleep(delay)
+				continue
+			}
+			throw e
+		}
+
+		if (res.ok && res.body) return res
+
+		const status = res.status
+		const retryable = status === 429 || status === 529 || status === 503 || status >= 500
+		const data = (await res.json().catch(() => ({}))) as any
+
+		if (!retryable || attempt >= MAX_RETRIES - 1) {
+			await publishActivity(`Error: ${status}`, sessionId)
+			await publishLine(
+				`[error] ${status}: ${data.error?.message ?? stringify(data)}`,
+				'error',
+				sessionId,
+			)
+			await publishLine(
+				'hint: you can re-send your message, or use /reset to start fresh',
+				'warn',
+				sessionId,
+			)
+			return null
+		}
+
+		const retryAfterMs = res.headers.get('retry-after-ms')
+		const retryAfter = res.headers.get('retry-after')
+		let delay: number
+		if (retryAfterMs) delay = parseInt(retryAfterMs, 10)
+		else if (retryAfter) delay = parseInt(retryAfter, 10) * 1000
+		else delay = Math.min(2000 * Math.pow(2, attempt), 30000)
+		delay = Math.max(delay, 500)
+
+		await publishLine(
+			`[retry] ${status}: ${data.error?.message ?? 'server error'}. retrying in ${(delay / 1000).toFixed(1)}s... (${attempt + 1}/${MAX_RETRIES})`,
+			'warn',
+			sessionId,
+		)
+		await Bun.sleep(delay)
+	}
+
+	return null
+}
+
+async function parseResponseStream(
+	sessionId: string,
+	runtime: SessionRuntimeCache,
+	provider: Provider,
+	res: Response,
+): Promise<{
+	contentBlocks: any[]
+	stopReason: string | null
+	usage: any
+	aborted: boolean
+} | null> {
+	const contentBlocks: any[] = []
+	runtime.streamingBlocks = contentBlocks
+	let stopReason: string | null = null
+	const usage: any = {}
+	let aborted = false
+	const sseDebugDir = `/tmp/hal/debug/${sessionId}`
+	const sseDebugFile = `${sseDebugDir}/sse.log`
+	await mkdir(sseDebugDir, { recursive: true }).catch(() => {})
+	const sseLog = (msg: string) => appendFile(sseDebugFile, `[${new Date().toISOString()}] ${msg}\n`).catch(() => {})
+
+	const reader = res.body!.getReader()
+	const decoder = new TextDecoder()
+	let buffer = ''
+
+	while (true) {
+		if (runtime.pausedByUser) {
+			aborted = true
+			try {
+				await reader.cancel()
+			} catch {}
+			break
+		}
+
+		let readResult: any
+		try {
+			readResult = await reader.read()
+		} catch (e: any) {
+			await sseLog(`reader.read() error: ${e?.message ?? e}`)
+			aborted = runtime.pausedByUser
+			break
+		}
+
+		const { done, value } = readResult
+		if (done) break
+		buffer += decoder.decode(value, { stream: true })
+
+		let boundary: number
+		while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+			const chunk = buffer.slice(0, boundary)
+			buffer = buffer.slice(boundary + 2)
+
+			let eventType = ''
+			let eventData = ''
+			for (const line of chunk.split('\n')) {
+				if (line.startsWith('event: ')) eventType = line.slice(7).trim()
+				if (line.startsWith('data: ')) eventData += line.slice(6)
+			}
+			if (!eventData) continue
+
+			await sseLog(`SSE type=${eventType} data=${eventData.slice(0, 300)}`)
+			const events = provider.parseSSE({ type: eventType, data: eventData })
+			for (const evt of events) {
+				switch (evt.type) {
+					case 'activity':
+						if (evt.text.trim()) await publishActivity(evt.text, sessionId)
+						break
+					case 'text_start':
+						contentBlocks[evt.index] = { type: 'text', text: '' }
+						await publishActivity('Writing...', sessionId)
+						break
+					case 'text_delta':
+						if (evt.text && contentBlocks[evt.index]) {
+							contentBlocks[evt.index].text += evt.text
+							await publishChunk(evt.text, 'assistant', sessionId)
+						}
+						break
+					case 'thinking_start':
+						contentBlocks[evt.index] = { type: 'thinking', thinking: '' }
+						await publishActivity('Thinking...', sessionId)
+						break
+					case 'thinking_delta':
+						if (evt.text && contentBlocks[evt.index]) {
+							contentBlocks[evt.index].thinking += evt.text
+							await publishChunk(evt.text, 'thinking', sessionId)
+						}
+						break
+					case 'signature_delta':
+						if (contentBlocks[evt.index]?.type === 'thinking') {
+							contentBlocks[evt.index].signature =
+								(contentBlocks[evt.index].signature ?? '') + evt.signature
+						}
+						break
+					case 'tool_use_start':
+						contentBlocks[evt.index] = {
+							type: 'tool_use',
+							id: evt.id,
+							name: evt.name,
+							input: '',
+						}
+						await publishActivity(`Calling tool: ${evt.name}`, sessionId)
+						break
+					case 'tool_input_delta':
+						if (contentBlocks[evt.index]?.type === 'tool_use') {
+							contentBlocks[evt.index].input += evt.json
+						} else if (contentBlocks[evt.index]?.type === 'server_tool_use') {
+							const block = contentBlocks[evt.index] as any
+							block.__inputJson = (block.__inputJson ?? '') + evt.json
+							try {
+								block.input = JSON.parse(block.__inputJson)
+							} catch {}
+						}
+						break
+					case 'raw_block':
+						contentBlocks[evt.index] = evt.block
+						break
+					case 'block_stop': {
+						const block = contentBlocks[evt.index]
+						if (
+							block?.type === 'server_tool_use' &&
+							typeof block.__inputJson === 'string'
+						) {
+							try {
+								block.input = JSON.parse(block.__inputJson)
+							} catch {}
+							delete block.__inputJson
+						}
+						if (block?.type === 'server_tool_use' && block?.name === 'web_search') {
+							await publishLine(
+								`[web_search] ${stringify(block.input ?? {})}`,
+								'tool',
+								sessionId,
+							)
+						}
+						if (block?.type === 'thinking' && block.thinking?.trim()) {
+							if (!block.thinking.endsWith('\n'))
+								await publishChunk('\n', 'thinking', sessionId)
+							await publishLine('', 'thinking-end' as EventLevel, sessionId)
+						}
+						if (block?.type === 'text' && block.text?.trim()) {
+							if (!block.text.endsWith('\n'))
+								await publishChunk('\n', 'assistant', sessionId)
+							await publishLine('', 'assistant-end' as EventLevel, sessionId)
+						}
+
+						break
+					}
+					case 'web_search':
+						await publishLine(`[web_search] "${evt.query}"`, 'tool', sessionId)
+						break
+					case 'web_search_results':
+						if (evt.results) await publishLine(evt.results, 'tool', sessionId)
+						break
+					case 'usage':
+						Object.assign(usage, evt.usage)
+						break
+					case 'stop':
+						stopReason = evt.stopReason
+						await publishActivity('', sessionId)
+						break
+					case 'error':
+						await publishActivity(`Error: ${evt.message}`, sessionId)
+						await publishLine(`[stream error] ${evt.message}`, 'error', sessionId)
+						await publishLine(
+							'hint: you can re-send your message, or use /reset to start fresh',
+							'warn',
+							sessionId,
+						)
+						break
+				}
+			}
+		}
+	}
+
+	await sseLog(`stream ended: stopReason=${stopReason} aborted=${aborted} buffer.length=${buffer.length} buffer=${JSON.stringify(buffer.slice(0, 500))} blocks=${contentBlocks.length}`)
+
+	provider.finalizeBlocks(contentBlocks)
+	runtime.streamingBlocks = null
+	return { contentBlocks, stopReason, usage, aborted }
+}
+
+function messageBytes(msg: any): number {
+	if (typeof msg.content === 'string') return msg.content.length
+	if (Array.isArray(msg.content)) {
+		let bytes = 0
+		for (const block of msg.content) {
+			if (block.type === 'text') bytes += block.text?.length ?? 0
+			else if (block.type === 'thinking') bytes += block.thinking?.length ?? 0
+			else if (block.type === 'tool_use') bytes += JSON.stringify(block.input ?? {}).length
+			else if (block.type === 'tool_result')
+				bytes +=
+					typeof block.content === 'string'
+						? block.content.length
+						: JSON.stringify(block.content ?? '').length
+		}
+		return bytes
+	}
+	return 0
+}
+
+async function logTokenUsage(
+	sessionId: string,
+	runtime: SessionRuntimeCache,
+	provider: Provider,
+	modelKey: string,
+	usage: any,
+): Promise<void> {
+	runtime.lastUsage = usage
+	const normalized = provider.normalizeUsage(usage)
+	const { input, output, cacheCreate, cacheRead } = normalized
+
+	runtime.tokenTotals.input += input
+	runtime.tokenTotals.output += output
+	runtime.tokenTotals.cacheCreate += cacheCreate
+	runtime.tokenTotals.cacheRead += cacheRead
+
+	// Calibrate bytes->tokens ratio on first API response
+	const totalInput = input + cacheCreate + cacheRead
+	if (!isModelCalibrated(modelKey)) {
+		markModelCalibrated(modelKey)
+		if (totalInput > 0 && runtime.systemBytes > 0) {
+			let msgBytes = 0
+			for (const msg of runtime.messages) msgBytes += messageBytes(msg)
+			const totalBytes = runtime.systemBytes + msgBytes
+			await saveTokenCalibration(totalBytes, totalInput, modelKey)
+		}
+	}
+	if (debugTokens('sys') && totalInput > 0 && !runtime.tokenLogShown) {
+		runtime.tokenLogShown = true
+		const msgCount = runtime.messages.length
+		const msgs = msgCount === 1 ? '1 message' : `${msgCount} messages`
+		await publishLine(
+			`[debug.tokens.sys] SYSTEM.md + AGENTS.md + tools + ${msgs} = ${totalInput} tokens`,
+			'meta',
+			sessionId,
+		)
+	}
+
+	const parts = [`in: ${totalInput}`]
+	if (cacheRead || cacheCreate) {
+		parts[0] += ` (${input} new`
+		if (cacheCreate) parts[0] += ` + ${cacheCreate} cache_write`
+		if (cacheRead) parts[0] += ` + ${cacheRead} cached`
+		parts[0] += ')'
+	}
+	parts.push(`out: ${output}`)
+
+	const totalAllInput =
+		runtime.tokenTotals.input + runtime.tokenTotals.cacheCreate + runtime.tokenTotals.cacheRead
+	const effectiveCost =
+		runtime.tokenTotals.input +
+		runtime.tokenTotals.cacheCreate * 1.25 +
+		runtime.tokenTotals.cacheRead * 0.1
+	const savings = totalAllInput > 0 ? ((1 - effectiveCost / totalAllInput) * 100).toFixed(0) : '0'
+
+	let totalPart = `total in: ${totalAllInput}`
+	if (runtime.tokenTotals.cacheRead > 0) totalPart += ` (${savings}% saved by cache)`
+	totalPart += ` out: ${runtime.tokenTotals.output}`
+	parts.push(totalPart)
+
+	if (debugTokens('spam')) {
+		await publishLine(`[debug.tokens.spam] ${parts.join(' | ')}`, 'meta', sessionId)
+	}
+	const used = totalInputTokens(usage)
+	const ctxWindow = contextWindowForModel(modelIdForModel(modelKey))
+	await publishContext(sessionId, { used, max: ctxWindow })
+	if (debugTokens('context')) {
+		const pct = ((used / ctxWindow) * 100).toFixed(1)
+		await publishLine(`[debug.tokens.context] ${pct}%/${ctxWindow}`, 'meta', sessionId)
+	}
+}
+
+type EventLevel = string

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-// Count non-comment, non-test, non-blank lines per module under new/
+// Count non-comment, non-test, non-blank lines per module under src/
 
-const dir = import.meta.dir + '/../new'
+const dir = import.meta.dir + '/../src'
 const result = '/tmp/new-cloc.txt'
 
 const counts: [string, number][] = []
