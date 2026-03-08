@@ -256,20 +256,14 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	}
 	for (let i = 0; i < out.length; i++) {
 		if (out[i].role !== 'assistant' || !Array.isArray(out[i].content)) continue
-		const toolUses = out[i].content.filter((b: any) => b.type === 'tool_use')
-		const missing = toolUses.filter((b: any) => !resultIds.has(b.id))
-		if (missing.length > 0 && missing.length === toolUses.length && toolUses.length === out[i].content.length) {
-			// All content is unresolved tool_use — drop the entire assistant message
-			out.splice(i, 1)
-			i--
-		} else if (missing.length > 0) {
-			// Inject synthetic tool_results after this assistant message
+		const missing = out[i].content.filter((b: any) => b.type === 'tool_use' && !resultIds.has(b.id))
+		if (missing.length > 0) {
 			const synthetic = {
 				role: 'user',
 				content: missing.map((b: any) => ({ type: 'tool_result', tool_use_id: b.id, content: '[interrupted]' })),
 			}
 			out.splice(i + 1, 0, synthetic)
-			i++ // skip the one we just inserted
+			i++
 		}
 	}
 	return out
