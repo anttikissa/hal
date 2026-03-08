@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { parseKey } from './keys.ts'
+import { parseKey, parseKeys } from './keys.ts'
 
 describe('parseKey', () => {
 	test('printable characters', () => {
@@ -172,5 +172,40 @@ describe('parseKey', () => {
 	test('multi-byte paste', () => {
 		const k = parseKey('hello')!
 		expect(k.char).toBe('hello')
+	})
+})
+
+
+describe('parseKeys (concatenated sequences)', () => {
+	test('splits concatenated CSI sequences', () => {
+		// Two arrow keys in one chunk
+		const events = parseKeys('\x1b[A\x1b[B')
+		expect(events.length).toBe(2)
+		expect(events[0].key).toBe('up')
+		expect(events[1].key).toBe('down')
+	})
+
+	test('Ghostty shift+enter: press + release tokens', () => {
+		// Ghostty sends: shift-press, enter-press, enter-release, shift-release
+		const raw = '\x1b[57441;2u\x1b[13;2u\x1b[13;2:3u\x1b[57441;1:3u'
+		const events = parseKeys(raw)
+		// shift key (private-use) and releases are filtered out
+		// only the enter press should survive
+		expect(events.length).toBe(1)
+		expect(events[0].key).toBe('enter')
+		expect(events[0].shift).toBe(true)
+	})
+
+	test('single key passes through', () => {
+		const events = parseKeys('a')
+		expect(events.length).toBe(1)
+		expect(events[0].key).toBe('a')
+	})
+
+	test('plain enter not affected', () => {
+		const events = parseKeys('\r')
+		expect(events.length).toBe(1)
+		expect(events[0].key).toBe('enter')
+		expect(events[0].shift).toBe(false)
 	})
 })

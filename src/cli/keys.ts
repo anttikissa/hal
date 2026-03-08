@@ -118,6 +118,37 @@ const CTRL_KEYS: Record<number, string> = {
 	127: 'backspace',
 }
 
+// ── Tokenizer: split raw stdin data into individual key sequences ──
+
+function splitKeys(data: string): string[] {
+	const keys: string[] = []
+	let i = 0
+	while (i < data.length) {
+		if (data[i] === '\x1b') {
+			if (i + 1 < data.length && (data[i + 1] === '[' || data[i + 1] === 'O')) {
+				// CSI or SS3: scan parameter bytes (0x20-0x3f) then final byte
+				let j = i + 2
+				while (j < data.length && data.charCodeAt(j) >= 0x20 && data.charCodeAt(j) <= 0x3f) j++
+				if (j < data.length) j++ // final byte
+				keys.push(data.slice(i, j)); i = j
+			} else if (i + 2 < data.length && data[i + 1] === '\x1b' && (data[i + 2] === '[' || data[i + 2] === 'O')) {
+				// Alt+arrow: ESC ESC [ X
+				let j = i + 3
+				while (j < data.length && data.charCodeAt(j) >= 0x20 && data.charCodeAt(j) <= 0x3f) j++
+				if (j < data.length) j++
+				keys.push(data.slice(i, j)); i = j
+			} else if (i + 1 < data.length) {
+				keys.push(data.slice(i, i + 2)); i += 2
+			} else {
+				keys.push('\x1b'); i++
+			}
+		} else {
+			keys.push(data[i]); i++
+		}
+	}
+	return keys
+}
+
 // ── Main entry point ──
 
 export function parseKey(data: string): KeyEvent | null {
@@ -177,4 +208,15 @@ export function parseKey(data: string): KeyEvent | null {
 	if (!data.startsWith('\x1b')) return ke(data, { char: data })
 
 	return null
+}
+
+/** Parse raw stdin data into key events (handles concatenated sequences). */
+export function parseKeys(data: string): KeyEvent[] {
+	const tokens = splitKeys(data)
+	const events: KeyEvent[] = []
+	for (const token of tokens) {
+		const k = parseKey(token)
+		if (k) events.push(k)
+	}
+	return events
 }

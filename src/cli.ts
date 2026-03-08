@@ -1,7 +1,7 @@
 // Terminal client — wired to IPC via Client + Transport.
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
-import { parseKey } from './cli/keys.ts'
+import { parseKeys } from './cli/keys.ts'
 import { handleInput } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
@@ -242,8 +242,7 @@ process.on('SIGCONT', () => {
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
-	const k = parseKey(data)
-	if (k) handleInput(k)
+	for (const k of parseKeys(data)) handleInput(k)
 })
 
 stdout.on('resize', () => {
