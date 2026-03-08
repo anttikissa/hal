@@ -1,5 +1,28 @@
 import { test, expect } from 'bun:test'
-import { mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
+import { mdSpans, mdInline, mdTable, visLen, wordWrap, charWidth } from './md.ts'
+
+// ── charWidth ──
+
+test('charWidth: ASCII', () => {
+	expect(charWidth(0x41)).toBe(1) // A
+	expect(charWidth(0x20)).toBe(1) // space
+})
+
+test('charWidth: wide emoji', () => {
+	expect(charWidth(0x2705)).toBe(2) // ✅
+	expect(charWidth(0x274C)).toBe(2) // ❌
+	expect(charWidth(0x2764)).toBe(2) // ❤
+})
+
+test('charWidth: CJK', () => {
+	expect(charWidth(0x4E2D)).toBe(2) // 中
+	expect(charWidth(0x3042)).toBe(2) // あ
+})
+
+test('charWidth: zero-width', () => {
+	expect(charWidth(0x0300)).toBe(0) // combining grave
+	expect(charWidth(0x200D)).toBe(0) // ZWJ
+})
 
 // ── visLen ──
 
@@ -10,6 +33,15 @@ test('visLen: plain string', () => {
 test('visLen: with ANSI escapes', () => {
 	expect(visLen('\x1b[1mbold\x1b[22m')).toBe(4)
 	expect(visLen('\x1b[2m\x1b[3mhi\x1b[23m\x1b[22m')).toBe(2)
+})
+
+test('visLen: wide emoji counts as 2', () => {
+	expect(visLen('- ✅ Hello')).toBe(10) // ✅ takes 2 columns
+	expect(visLen('a✅b')).toBe(4)
+})
+
+test('visLen: non-BMP emoji (surrogate pair)', () => {
+	expect(visLen('🔴')).toBe(2)
 })
 
 // ── mdInline ──

@@ -105,7 +105,6 @@ describe('renderBlocks', () => {
 		expect(lastContentLine).toContain('file.txt')
 		expect(lastContentLine).toContain('█')
 	})
-
 	test('tool output collapses after 5 lines', () => {
 		const output = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n')
 		const blocks: Block[] = [

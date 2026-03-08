@@ -158,4 +158,14 @@ describe('patchLine', () => {
 		expect(s).not.toContain('\x1b[2K')
 		expect(s).toContain('much longer')
 	})
+
+	test('bails to full rewrite when wide chars in common prefix', () => {
+		const old = ['prefix ✅ AAA' + ' '.repeat(30)]
+		const nw  = ['prefix ✅ BBB' + ' '.repeat(30)]
+		const prev: RenderState = { lines: old, cursorRow: 0, cursorCol: 1 }
+		const { buf } = render(nw, prev, cursor, screen)
+		const s = strip(buf)
+		// Should do a full line erase+rewrite, not an intra-line patch
+		expect(s).toContain('\x1b[2K')
+	})
 })

@@ -26,7 +26,8 @@ function patchLine(old: string, nw: string): string | null {
 	let i = 0, vis = 0, sgrState = '', esc = 0, escStart = 0
 	while (i < old.length && i < nw.length && old[i] === nw[i]) {
 		if (esc === 0) {
-			if (old[i] === '\x1b') { esc = 1; escStart = i } else vis++
+			if (old[i] === '\x1b') { esc = 1; escStart = i }
+			else { if (old.charCodeAt(i) > 0x7F) return null; vis++ }
 		} else if (esc === 1) {
 			esc = old[i] === '[' ? 2 : 0
 		} else if (old.charCodeAt(i) >= 0x40 && old.charCodeAt(i) <= 0x7e) {
