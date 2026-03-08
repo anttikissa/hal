@@ -8,6 +8,7 @@ import { appendMessages, writeAssistantEntry, writeToolResultEntry, readBlock } 
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
+import { runHooks } from './hooks.ts'
 import { contextWindowForModel, isCalibrated, saveCalibration, estimateTokens, messageBytes } from './context.ts'
 
 export interface AgentContext {
@@ -102,8 +103,9 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
 						// Execute tools, writing each result individually
-						for (const call of toolCalls) {
+						for (let call of toolCalls) {
 							if (signal?.aborted) { aborted = true; break }
+							call = runHooks(call)
 							const args = argsPreview(call)
 
 							let result: string

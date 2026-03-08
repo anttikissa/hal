@@ -173,6 +173,7 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 export interface ToolCall { id: string; name: string; input: unknown }
 type OnChunk = (text: string) => Promise<void>
 
+
 export function argsPreview(call: ToolCall): string {
 	const inp = call.input as any
 	switch (call.name) {
@@ -196,14 +197,8 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> 
 	const inp = call.input as any
 	switch (call.name) {
 		case 'bash': {
-			let cmd = String(inp?.command ?? '')
+			const cmd = String(inp?.command ?? '')
 			if (!cmd) return '(empty command)'
-			// Strip redundant "cd $CWD && " prefix — we already run in CWD
-			const cdMatch = cmd.match(/^cd\s+(\S+)\s*&&\s*/)
-			if (cdMatch) {
-				const target = resolvePath(cdMatch[1])
-				if (target === CWD) cmd = cmd.slice(cdMatch[0].length)
-			}
 			const proc = Bun.spawn(['bash', '-lc', cmd], {
 				cwd: CWD, stdout: 'pipe', stderr: 'pipe',
 				env: { ...process.env, TERM: 'dumb' },

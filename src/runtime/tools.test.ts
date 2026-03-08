@@ -1,5 +1,6 @@
 import { test, expect, afterEach } from 'bun:test'
 import { executeTool, argsPreview, type ToolCall } from './tools.ts'
+import { runHooks } from './hooks.ts'
 import { writeFileSync, unlinkSync, mkdirSync } from 'fs'
 
 const TMP = `/tmp/hal-tools-test-${process.pid}`
@@ -136,30 +137,33 @@ test('argsPreview: edit', () => {
 	expect(argsPreview(call('edit', { path: 'foo.ts' }))).toBe('foo.ts')
 })
 
-// ── cd stripping ──
+// ── hooks ──
 
-test('bash: strips redundant cd $CWD prefix', async () => {
+test('runHooks: strips redundant cd $CWD prefix', () => {
 	const cwd = process.env.LAUNCH_CWD ?? process.cwd()
-	const result = await executeTool(call('bash', { command: `cd ${cwd} && echo stripped` }))
-	expect(result.trim()).toBe('stripped')
+	const result = runHooks(call('bash', { command: `cd ${cwd} && echo hello` }))
+	expect((result.input as any).command).toBe('echo hello')
 })
 
-test('bash: strips cd with ~ when it resolves to CWD', async () => {
+test('runHooks: strips cd with ~ when it resolves to CWD', () => {
 	const home = require('os').homedir()
 	const cwd = process.env.LAUNCH_CWD ?? process.cwd()
-	// Only works if CWD is under HOME
 	if (cwd.startsWith(home)) {
 		const tilded = '~' + cwd.slice(home.length)
-		const result = await executeTool(call('bash', { command: `cd ${tilded} && echo stripped` }))
-		expect(result.trim()).toBe('stripped')
+		const result = runHooks(call('bash', { command: `cd ${tilded} && echo hello` }))
+		expect((result.input as any).command).toBe('echo hello')
 	}
 })
 
-test('bash: keeps cd to different directory', async () => {
-	const result = await executeTool(call('bash', { command: 'cd /tmp && pwd' }))
-	expect(result.trim()).toBe('/tmp')
+test('runHooks: keeps cd to different directory', () => {
+	const result = runHooks(call('bash', { command: 'cd /tmp && pwd' }))
+	expect((result.input as any).command).toBe('cd /tmp && pwd')
 })
 
+test('runHooks: no-op for non-bash tools', () => {
+	const result = runHooks(call('read', { path: '/tmp/foo' }))
+	expect((result.input as any).path).toBe('/tmp/foo')
+})
 // ── shortenHome ──
 
 test('output replaces $HOME with ~', async () => {
