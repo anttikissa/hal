@@ -7,12 +7,7 @@ import { events } from '../ipc.ts'
 import { appendMessages, writeAssistantEntry, writeToolResultEntry, readBlock } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
-
-const TOOLS = [
-	{ name: 'bash', description: 'Run a bash command', input_schema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } },
-	{ name: 'read', description: 'Read a file', input_schema: { type: 'object', properties: { path: { type: 'string' }, start: { type: 'integer' }, end: { type: 'integer' } }, required: ['path'] } },
-	{ name: 'write', description: 'Create or overwrite a file', input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
-]
+import { TOOLS, executeTool, argsPreview, type ToolCall } from './tools.ts'
 
 export interface AgentContext {
 	sessionId: string
@@ -28,78 +23,7 @@ function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeE
 	} as RuntimeEvent)
 }
 
-// ── Tool execution ──
-
-interface ToolCall { id: string; name: string; input: unknown }
-
-type OnChunk = (text: string) => Promise<void>
-
-async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {
-	const inp = call.input as any
-	switch (call.name) {
-		case 'bash': {
-			const cmd = String(inp?.command ?? '')
-			if (!cmd) return '(empty command)'
-			const proc = Bun.spawn(['sh', '-c', cmd], {
-				stdout: 'pipe', stderr: 'pipe',
-				env: { ...process.env, TERM: 'dumb' },
-			})
-			let out = ''
-			const reader = proc.stdout.getReader()
-			const decoder = new TextDecoder()
-			while (true) {
-				const { done, value } = await reader.read()
-				if (done) break
-				const chunk = decoder.decode(value, { stream: true })
-				out += chunk
-				if (onChunk) await onChunk(chunk)
-			}
-			const stderr = await new Response(proc.stderr).text()
-			const code = await proc.exited
-			if (stderr) out += (out ? '\n' : '') + stderr
-			if (code !== 0) out += `\n[exit ${code}]`
-			return out.slice(0, 10000) || '(no output)'
-		}
-		case 'read': {
-			const path = String(inp?.path ?? '')
-			if (!path) return '(no path)'
-			try {
-				const text = await Bun.file(path).text()
-				return text.slice(0, 10000)
-			} catch (e: any) {
-				return `Error: ${e.message}`
-			}
-		}
-		case 'write': {
-			const path = String(inp?.path ?? '')
-			const content = String(inp?.content ?? '')
-			if (!path) return '(no path)'
-			try {
-				await Bun.write(path, content)
-				return `Wrote ${content.length} bytes to ${path}`
-			} catch (e: any) {
-				return `Error: ${e.message}`
-			}
-		}
-		default:
-			return `Unknown tool: ${call.name}`
-	}
-}
-
-function argsPreview(call: ToolCall): string {
-	const inp = call.input as any
-	switch (call.name) {
-		case 'bash': return String(inp?.command ?? '')
-		case 'read': return String(inp?.path ?? '')
-		case 'write': return String(inp?.path ?? '')
-		default: return JSON.stringify(call.input)
-	}
-}
-
-// ── Agent loop ──
-
 const MAX_TOOL_ROUNDS = 10
-
 export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const { sessionId, model, systemPrompt, messages } = ctx
 	const [providerName, modelId] = model.includes('/') ? model.split('/', 2) : ['mock', model]
