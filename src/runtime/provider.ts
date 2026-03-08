@@ -12,6 +12,7 @@ export interface GenerateParams {
 	model: string
 	systemPrompt: string
 	tools?: any[]
+	signal?: AbortSignal
 }
 
 export interface Provider {

@@ -49,7 +49,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 		while (!signal?.aborted) {
 
-			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS })
+			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS, signal })
 
 			let thinkingText = ''
 			let assistantText = ''
@@ -171,6 +171,11 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 		}
 	} catch (err: any) {
+		if (signal?.aborted) {
+			await emitInfo(sessionId, '[paused]', 'meta')
+			await emit(sessionId, { type: 'command', commandId: '', phase: 'done' })
+			return
+		}
 		await emitInfo(sessionId, `Error: ${err.message}`, 'error')
 		await emit(sessionId, { type: 'command', commandId: '', phase: 'failed', message: err.message })
 	} finally {

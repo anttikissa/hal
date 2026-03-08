@@ -27,6 +27,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 			'anthropic-beta': 'oauth-2025-04-20',
 		},
 		body: JSON.stringify(body),
+		signal: params.signal,
 	})
 
 	if (!res.ok) {
