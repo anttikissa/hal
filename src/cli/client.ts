@@ -739,7 +739,8 @@ function renderTabsForStatus(): string {
 }
 
 function renderBusyStatus(): void {
-	setStatusLine(renderTabsForStatus(), [roleLabel, lastContextStatus ?? ''].filter(Boolean).join(' · '))
+	const model = activeTab()?.modelLabel
+	setStatusLine(renderTabsForStatus(), [roleLabel, model, lastContextStatus ?? ''].filter(Boolean).join(' · '))
 }
 
 export let clientState = {

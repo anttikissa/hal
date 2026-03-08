@@ -163,16 +163,24 @@ function cursorColor(block: Block): string {
 	return colors.cursor.fg
 }
 
-function appendInlineCursor(line: string, cursor: string, width: number): string[] {
-	const body = line.endsWith(colors.RESET) ? line.slice(0, -colors.RESET.length) : line
-	const reset = line.endsWith(colors.RESET) ? colors.RESET : ''
-	const pad = body.match(/ +$/)?.[0] ?? ''
-	const content = pad ? body.slice(0, -pad.length) : body
-	if (pad.length > 0) {
-		return [content + cursor + pad.slice(1) + reset]
+/** Insert cursor into last rendered line without breaking bg color or exceeding width. */
+function inlineCursor(line: string, cc: string, visible: boolean, width: number): string[] {
+	const hasReset = line.endsWith(colors.RESET)
+	const body = hasReset ? line.slice(0, -colors.RESET.length) : line
+	const trail = body.match(/ +$/)?.[0] ?? ''
+	if (trail.length > 0) {
+		// Replace one trailing pad space with cursor char, keep bg active
+		const before = body.slice(0, -trail.length)
+		const cursorChar = visible ? `${cc}█` : ' '
+		return [before + cursorChar + trail.slice(1) + (hasReset ? colors.RESET : '')]
 	}
-	if (visLen(body) < width) return [body + cursor + reset]
-	return [line, cursor]
+	if (visLen(body) >= width) {
+		// Full-width line (e.g. header with ─ fill) — cursor on next line
+		return [line, visible ? `${cc}█${colors.RESET}` : ' ']
+	}
+	// Short unpadded line — append cursor
+	const cursorChar = visible ? `${cc}█` : ' '
+	return [body + cursorChar + (hasReset ? colors.RESET : '')]
 }
 
 /** Render all blocks with one blank line between them. */
@@ -188,8 +196,7 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 	const lastBlock = blocks[blocks.length - 1]
 	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
 		const cc = cursorColor(lastBlock)
-		const c = cursorVisible ? `${cc}█${colors.RESET}` : ' '
-		const extra = appendInlineCursor(result[result.length - 1], c, width)
+		const extra = inlineCursor(result[result.length - 1], cc, cursorVisible, width)
 		result.splice(result.length - 1, 1, ...extra)
 	} else if (result.length > 0) {
 		// Idle cursor on its own line after completed content
