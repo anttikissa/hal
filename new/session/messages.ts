@@ -17,7 +17,7 @@ function messagesLog(sessionId: string) {
 
 export interface UserMessage {
 	role: 'user'
-	content: string
+	content: string | { type: 'text'; text: string }[] | { type: 'image'; ref: string }[]
 	ts: string
 }
 
@@ -133,6 +133,63 @@ export async function writeToolResultEntry(
 	return { role: 'tool_result', tool_use_id: toolUseId, ref, ts: new Date().toISOString() }
 }
 
+const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+
+const MEDIA_TYPES: Record<string, string> = {
+	jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+	webp: 'image/webp', png: 'image/png',
+}
+
+/** Parse inline `[path.png]` refs → UserMessage with image blocks stored in blocks/. */
+export async function parseUserContent(
+	sessionId: string,
+	input: string,
+): Promise<{ apiContent: any; logContent: UserMessage['content'] }> {
+	const pattern = /\[([^\]]+\.(png|jpg|jpeg|gif|webp))\]/gi
+	const matches = [...input.matchAll(pattern)]
+	if (matches.length === 0) return { apiContent: input, logContent: input }
+
+	const apiBlocks: any[] = []
+	const logBlocks: any[] = []
+	let lastIndex = 0
+
+	for (const match of matches) {
+		const filePath = match[1]
+		const ext = match[2].toLowerCase()
+		const before = input.slice(lastIndex, match.index)
+		if (before.trim()) {
+			apiBlocks.push({ type: 'text', text: before })
+			logBlocks.push({ type: 'text', text: before })
+		}
+
+		if (existsSync(filePath) && IMAGE_EXTS.includes(ext)) {
+			try {
+				const data = readFileSync(filePath)
+				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
+				const ref = makeBlockRef()
+				await writeBlock(sessionId, ref, { media_type: mediaType, data: data.toString('base64') })
+				apiBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: data.toString('base64') } })
+				logBlocks.push({ type: 'image', ref })
+			} catch {
+				apiBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
+				logBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
+			}
+		} else {
+			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
+			logBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
+		}
+		lastIndex = match.index! + match[0].length
+	}
+
+	const after = input.slice(lastIndex)
+	if (after.trim()) {
+		apiBlocks.push({ type: 'text', text: after })
+		logBlocks.push({ type: 'text', text: after })
+	}
+
+	return { apiContent: apiBlocks, logContent: logBlocks as UserMessage['content'] }
+}
+
 // ── I/O ──
 
 export async function appendMessages(sessionId: string, entries: Message[]): Promise<void> {
@@ -154,7 +211,22 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 		const msg = m as any
 		if (!msg.role) continue
 		if (msg.role === 'user') {
-			out.push({ role: 'user', content: msg.content })
+			if (typeof msg.content === 'string') {
+				out.push({ role: 'user', content: msg.content })
+			} else if (Array.isArray(msg.content)) {
+				const blocks: any[] = []
+				for (const b of msg.content) {
+					if (b.type === 'image' && b.ref) {
+						const data = await readBlock(sessionId, b.ref)
+						if (data?.media_type && data?.data) {
+							blocks.push({ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data } })
+						}
+					} else {
+						blocks.push(b)
+					}
+				}
+				out.push({ role: 'user', content: blocks })
+			}
 		} else if (msg.role === 'assistant') {
 			const content: any[] = []
 			if (msg.text) content.push({ type: 'text', text: msg.text })

@@ -1,6 +1,7 @@
 // Prompt area: state, key handling, and line building.
 
 import { DIM, RESET, SEL_ON, SEL_OFF } from './colors.ts'
+import { pasteFromClipboard } from './clipboard.ts'
 import type { CursorPos } from './diff-engine.ts'
 import type { KeyEvent } from './keys.ts'
 import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './input.ts'
@@ -151,10 +152,6 @@ function writeClipboard(text: string): void {
 	try { const p = Bun.spawn(['pbcopy'], { stdin: 'pipe' }); p.stdin.write(text); p.stdin.end() } catch {}
 }
 
-function readClipboard(): string {
-	try { return Bun.spawnSync(['pbpaste']).stdout.toString() } catch { return '' }
-}
-
 // ── Key handling ──
 // Returns true if the key was handled.
 
@@ -163,7 +160,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.cmd) {
 		if (k.key === 'c') { const s = selRange(); if (s) writeClipboard(buf.slice(s.start, s.end)); return true }
 		if (k.key === 'x') { const s = selRange(); if (s) { writeClipboard(buf.slice(s.start, s.end)); deleteRange(s.start, s.end) }; return true }
-		if (k.key === 'v') { const t = readClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
+		if (k.key === 'v') { const t = pasteFromClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
 		if (k.key === 'a') { selAnchor = 0; cursor = buf.length; return true }
 		return false
 	}

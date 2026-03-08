@@ -2,7 +2,7 @@
 
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
-import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, type UserMessage } from '../session/messages.ts'
+import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { loadSystemPrompt } from './system-prompt.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
@@ -215,13 +215,18 @@ export async function startRuntime(): Promise<Runtime> {
 
 				await emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
 
-				const userMsg: UserMessage = { role: 'user', content: cmd.text, ts: new Date().toISOString() }
+				const { apiContent, logContent } = await parseUserContent(sid, cmd.text)
+				const userMsg: UserMessage = { role: 'user', content: logContent, ts: new Date().toISOString() }
 				await appendMessages(sid, [userMsg])
 
 				const info = sessions.get(sid)!
 				info.lastPrompt = cmd.text.split('\n')[0].slice(0, 120)
 
 				const apiMessages = await loadApiMessages(sid)
+				// Replace the last user message's content with parsed apiContent (includes base64 images)
+				if (apiMessages.length > 0 && apiMessages[apiMessages.length - 1].role === 'user') {
+					apiMessages[apiMessages.length - 1].content = apiContent
+				}
 				await startGeneration(sid, info, apiMessages)
 				break
 			}
