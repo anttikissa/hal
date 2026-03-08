@@ -150,6 +150,15 @@ export async function writeToolResultEntry(
 	return { role: 'tool_result', tool_use_id: toolUseId, ref, ts: new Date().toISOString() }
 }
 
+/** Update a block's call.input after hook transforms; stash original if different. */
+export async function updateBlockInput(sessionId: string, ref: string, input: unknown, originalInput: unknown): Promise<void> {
+	const block = await readBlock(sessionId, ref)
+	if (!block?.call) return
+	block.call.originalInput = originalInput
+	block.call.input = input
+	await writeBlock(sessionId, ref, block)
+}
+
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
 
 const MEDIA_TYPES: Record<string, string> = {

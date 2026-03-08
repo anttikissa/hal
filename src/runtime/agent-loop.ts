@@ -4,7 +4,7 @@
 
 import { loadProvider, type ProviderEvent } from './provider.ts'
 import { events } from '../ipc.ts'
-import { appendMessages, writeAssistantEntry, writeToolResultEntry, readBlock } from '../session/messages.ts'
+import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
@@ -105,7 +105,12 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						// Execute tools, writing each result individually
 						for (let call of toolCalls) {
 							if (signal?.aborted) { aborted = true; break }
+							const original = call
 							call = runHooks(call)
+							if (call.input !== original.input) {
+								const ref = toolRefMap.get(call.id)
+								if (ref) await updateBlockInput(sessionId, ref, call.input, original.input)
+							}
 							const args = argsPreview(call)
 
 							let result: string
