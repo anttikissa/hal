@@ -46,11 +46,27 @@ export type Message = UserMessage | AssistantMessage | ToolResultMessage
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
-function makeBlockRef(): string {
-	const bytes = randomBytes(6)
-	let s = ''
-	for (let i = 0; i < 6; i++) s += ID_CHARS[bytes[i] % ID_CHARS.length]
-	return s
+const sessionStartCache = new Map<string, number>()
+
+function sessionStart(sessionId: string): number {
+	let ts = sessionStartCache.get(sessionId)
+	if (ts !== undefined) return ts
+	try {
+		const meta = parse(readFileSync(`${sessionDir(sessionId)}/meta.ason`, 'utf-8')) as any
+		ts = new Date(meta.createdAt).getTime()
+	} catch {
+		ts = Date.now()
+	}
+	sessionStartCache.set(sessionId, ts)
+	return ts
+}
+
+function makeBlockRef(sessionId: string): string {
+	const offset = Math.max(0, Date.now() - sessionStart(sessionId)).toString(36).padStart(6, '0')
+	const bytes = randomBytes(3)
+	let suffix = ''
+	for (let i = 0; i < 3; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
+	return `${offset}-${suffix}`
 }
 
 export async function writeBlock(sessionId: string, ref: string, data: unknown): Promise<void> {
@@ -108,7 +124,7 @@ export async function writeAssistantEntry(
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []
 		for (const t of opts.toolCalls) {
-			const ref = makeBlockRef()
+			const ref = makeBlockRef(sessionId)
 			toolRefMap.set(t.id, ref)
 			await writeBlock(sessionId, ref, { call: { name: t.name, input: t.input } })
 			entry.tools.push({ id: t.id, name: t.name, ref })
@@ -167,7 +183,7 @@ export async function parseUserContent(
 			try {
 				const data = readFileSync(filePath)
 				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
-				const ref = makeBlockRef()
+				const ref = makeBlockRef(sessionId)
 				await writeBlock(sessionId, ref, { media_type: mediaType, data: data.toString('base64') })
 				apiBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: data.toString('base64') } })
 				logBlocks.push({ type: 'image', ref })
