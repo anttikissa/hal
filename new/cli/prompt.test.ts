@@ -124,3 +124,26 @@ describe('prompt history', () => {
 		expect(prompt.text()).toBe('hello')
 	})
 })
+
+describe('ctrl+a / ctrl+e (home/end)', () => {
+	beforeEach(() => prompt.reset())
+
+	test('ctrl+a moves cursor to start', () => {
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+		// Cursor is at end (pos 5)
+		prompt.handleKey(key('a', { ctrl: true }), W)
+		// Type a char — should insert at position 0
+		prompt.handleKey(key('X', { char: 'X' }), W)
+		expect(prompt.text()).toBe('Xhello')
+	})
+
+	test('ctrl+e moves cursor to end', () => {
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+		// Move to start first
+		prompt.handleKey(key('a', { ctrl: true }), W)
+		// Now ctrl+e to end
+		prompt.handleKey(key('e', { ctrl: true }), W)
+		prompt.handleKey(key('!', { char: '!' }), W)
+		expect(prompt.text()).toBe('hello!')
+	})
+})

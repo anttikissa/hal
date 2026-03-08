@@ -193,8 +193,12 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.key === 'u' && k.ctrl) { if (cursor > 0) deleteRange(0, cursor); return true }
 	if (k.key === 'k' && k.ctrl) { if (cursor < buf.length) deleteRange(cursor, buf.length); return true }
 
-	// Ctrl+A: select all
-	if (k.key === 'a' && k.ctrl) { selAnchor = 0; cursor = buf.length; return true }
+	// Ctrl+A/E: Home/End (Emacs)
+	if (k.key === 'a' && k.ctrl) { move(0, k.shift); return true }
+	if (k.key === 'e' && k.ctrl) { move(buf.length, k.shift); return true }
+
+	// Ctrl+V: paste (same as Cmd+V)
+	if (k.key === 'v' && k.ctrl) { const t = pasteFromClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
 
 	// Left / Right
 	if (k.key === 'left') {
