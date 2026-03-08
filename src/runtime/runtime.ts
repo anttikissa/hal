@@ -173,8 +173,6 @@ export async function startRuntime(): Promise<Runtime> {
 		busySessionIds.add(sid)
 		await publish(activity)
 		const sysPrompt = loadSystemPrompt({ model: info.model ?? getConfig().defaultModel, sessionDir: sid })
-		const kb = (sysPrompt.bytes / 1024).toFixed(1)
-		await emit({ type: 'line', sessionId: sid, text: `[system] loaded ${sysPrompt.loaded.join(', ')} (${kb} kB)`, level: 'meta' })
 		runAgentLoop({
 			sessionId: sid,
 			model: info.model ?? getConfig().defaultModel,
