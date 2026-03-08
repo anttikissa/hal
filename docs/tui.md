@@ -244,7 +244,7 @@ Responsibility:
 
 Examples:
 
-- `src/cli/client.ts`: tab shortcuts (`Ctrl-W`, `Ctrl-T`, `Ctrl-F`, `Ctrl/Alt/Option-1…9` tab switching)
+- `src/cli/client.ts`: tab shortcuts (`Ctrl-W`, `Ctrl-T`, `Ctrl-F`, tab switching)
 - `src/cli/tui.ts`: input editing, history, submit, scrolling, clipboard shortcuts
 
 ## Key Sequence Families (Reference)

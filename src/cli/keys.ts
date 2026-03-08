@@ -39,18 +39,5 @@ export const ALT_DIGIT_KEYS: Record<string, number> = {
 	'\x1b[57;3u': 9,
 }
 
-// macOS Option+digit when terminal doesn't remap Option to Alt
-export const OPT_DIGIT_KEYS: Record<string, number> = {
-	'¡': 1,
-	'™': 2,
-	'£': 3,
-	'¢': 4,
-	'∞': 5,
-	'§': 6,
-	'¶': 7,
-	'•': 8,
-	'ª': 9,
-}
-
 export const CTRL_PREV_TAB = new Set(['\x10', '\x1b[112;5u'])
 export const CTRL_NEXT_TAB = new Set(['\x0e', '\x1b[110;5u'])
