@@ -135,3 +135,36 @@ test('argsPreview: bash', () => {
 test('argsPreview: edit', () => {
 	expect(argsPreview(call('edit', { path: 'foo.ts' }))).toBe('foo.ts')
 })
+
+// ── cd stripping ──
+
+test('bash: strips redundant cd $CWD prefix', async () => {
+	const cwd = process.env.LAUNCH_CWD ?? process.cwd()
+	const result = await executeTool(call('bash', { command: `cd ${cwd} && echo stripped` }))
+	expect(result.trim()).toBe('stripped')
+})
+
+test('bash: strips cd with ~ when it resolves to CWD', async () => {
+	const home = require('os').homedir()
+	const cwd = process.env.LAUNCH_CWD ?? process.cwd()
+	// Only works if CWD is under HOME
+	if (cwd.startsWith(home)) {
+		const tilded = '~' + cwd.slice(home.length)
+		const result = await executeTool(call('bash', { command: `cd ${tilded} && echo stripped` }))
+		expect(result.trim()).toBe('stripped')
+	}
+})
+
+test('bash: keeps cd to different directory', async () => {
+	const result = await executeTool(call('bash', { command: 'cd /tmp && pwd' }))
+	expect(result.trim()).toBe('/tmp')
+})
+
+// ── shortenHome ──
+
+test('output replaces $HOME with ~', async () => {
+	const home = require('os').homedir()
+	const result = await executeTool(call('bash', { command: `echo ${home}/foo` }))
+	expect(result).toContain('~/foo')
+	expect(result).not.toContain(home)
+})

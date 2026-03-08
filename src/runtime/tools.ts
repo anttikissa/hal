@@ -12,6 +12,11 @@ const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
 const MAX_OUTPUT = 50_000
 
+function shortenHome(text: string): string {
+	if (!HOME) return text
+	return text.replaceAll(HOME, '~')
+}
+
 function resolvePath(p?: string): string {
 	if (!p?.trim()) return CWD
 	if (p.startsWith('~/')) p = HOME + p.slice(1)
@@ -184,11 +189,21 @@ export function argsPreview(call: ToolCall): string {
 }
 
 export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {
+	return shortenHome(await _executeTool(call, onChunk))
+}
+
+async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {
 	const inp = call.input as any
 	switch (call.name) {
 		case 'bash': {
-			const cmd = String(inp?.command ?? '')
+			let cmd = String(inp?.command ?? '')
 			if (!cmd) return '(empty command)'
+			// Strip redundant "cd $CWD && " prefix — we already run in CWD
+			const cdMatch = cmd.match(/^cd\s+(\S+)\s*&&\s*/)
+			if (cdMatch) {
+				const target = resolvePath(cdMatch[1])
+				if (target === CWD) cmd = cmd.slice(cdMatch[0].length)
+			}
 			const proc = Bun.spawn(['bash', '-lc', cmd], {
 				cwd: CWD, stdout: 'pipe', stderr: 'pipe',
 				env: { ...process.env, TERM: 'dumb' },
