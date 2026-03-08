@@ -48,7 +48,7 @@ export function handleInput(k: KeyEvent): void {
 		return
 	}
 
-	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
+	if (k.key === 'enter' && !k.shift && !k.alt && !k.ctrl && !k.cmd) {
 		const text = prompt.text().trim()
 		prompt.clear()
 		if (text) {
