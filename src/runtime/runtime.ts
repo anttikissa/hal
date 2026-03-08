@@ -9,6 +9,7 @@ import { loadSystemPrompt } from './system-prompt.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
+import { resolveModel } from '../models.ts'
 
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
@@ -170,10 +171,13 @@ export async function startRuntime(): Promise<Runtime> {
 		abortControllers.set(sid, ac)
 		busySessionIds.add(sid)
 		await publish(activity)
+		const sysPrompt = loadSystemPrompt({ model: info.model ?? getConfig().defaultModel, sessionDir: sid })
+		const kb = (sysPrompt.bytes / 1024).toFixed(1)
+		await emit({ type: 'line', sessionId: sid, text: `[system] loaded ${sysPrompt.loaded.join(', ')} (${kb} kB)`, level: 'meta' })
 		runAgentLoop({
 			sessionId: sid,
 			model: info.model ?? getConfig().defaultModel,
-			systemPrompt: loadSystemPrompt({ model: info.model ?? getConfig().defaultModel, sessionDir: sid }),
+			systemPrompt: sysPrompt.text,
 			messages: apiMessages,
 			onStatus: async (busy, nextActivity, context) => {
 				if (busy) busySessionIds.add(sid)
@@ -303,8 +307,8 @@ export async function startRuntime(): Promise<Runtime> {
 				if (!cmd.text) { await warn('/model <provider/model-id>'); return }
 				const info = sessions.get(sid)
 				if (!info) { await error(`Session ${sid} not found`); return }
-				info.model = cmd.text
-				await emitInfo(sid, `[model] ${cmd.text}`, 'meta')
+				info.model = resolveModel(cmd.text)
+				await emitInfo(sid, `[model] ${info.model}`, 'meta')
 				await publish()
 				break
 			}

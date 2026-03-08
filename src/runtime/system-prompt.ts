@@ -22,7 +22,13 @@ function directives(text: string, vars: Record<string, string>): string {
 	return out.join('\n')
 }
 
-export function loadSystemPrompt(opts: { model?: string; sessionDir?: string } = {}): string {
+export interface SystemPromptResult {
+	text: string
+	loaded: string[]  // file names loaded
+	bytes: number     // total byte size of result
+}
+
+export function loadSystemPrompt(opts: { model?: string; sessionDir?: string } = {}): SystemPromptResult {
 	const model = opts.model ?? ''
 	const d = new Date()
 	const date = `${d.toISOString().slice(0, 10)}, ${d.toLocaleDateString('en-US', { weekday: 'long' })}`
@@ -36,18 +42,24 @@ export function loadSystemPrompt(opts: { model?: string; sessionDir?: string } =
 		.replace(/\$\{session_dir\}/g, opts.sessionDir ?? '')
 
 	const parts: string[] = []
+	const loaded: string[] = []
 	try {
 		let text = readFileSync(`${HAL_DIR}/SYSTEM.md`, 'utf-8')
 		text = text.replace(/<!--[\s\S]*?-->/g, '')
 		parts.push(text)
+		loaded.push('SYSTEM.md')
 	} catch {
 		parts.push('You are a helpful coding assistant.')
 	}
-	try { parts.push(readFileSync(`${LAUNCH_CWD}/AGENTS.md`, 'utf-8')) } catch {}
+	try {
+		parts.push(readFileSync(`${LAUNCH_CWD}/AGENTS.md`, 'utf-8'))
+		loaded.push('AGENTS.md')
+	} catch {}
 
-	return parts
+	const text = parts
 		.map(p => directives(p, vars))
 		.map(sub)
 		.join('\n\n')
 		.replace(/\n{3,}/g, '\n\n')
+	return { text, loaded, bytes: Buffer.byteLength(text) }
 }
