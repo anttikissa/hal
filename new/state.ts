@@ -5,7 +5,6 @@ export const NEW_DIR = resolve(import.meta.dir)
 export const HAL_DIR = process.env.HAL_DIR ? resolve(process.env.HAL_DIR) : resolve(NEW_DIR, '..')
 export const LAUNCH_CWD = process.env.LAUNCH_CWD ? resolve(process.env.LAUNCH_CWD) : process.cwd()
 
-// New runtime uses its own state dir, ignoring HAL_STATE_DIR
 export const STATE_DIR = process.env.NEW_STATE_DIR
 	? resolve(process.env.NEW_STATE_DIR)
 	: `${HAL_DIR}/new-state`
@@ -27,5 +26,8 @@ export function ensureDir(dir: string): void {
 }
 
 export function ensureStateDir(): void {
+	if (process.env.NODE_ENV === 'test' && !process.env.NEW_STATE_DIR) {
+		throw new Error('NEW_STATE_DIR must be set in tests — refusing to touch real state')
+	}
 	for (const dir of [STATE_DIR, IPC_DIR, SESSIONS_DIR]) ensureDir(dir)
 }
