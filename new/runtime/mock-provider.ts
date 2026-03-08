@@ -59,10 +59,23 @@ function lastUserText(messages: any[]): string {
 	return ''
 }
 
-function isToolResult(messages: any[]): boolean {
+function getToolResults(messages: any[]): { name: string; content: string }[] | null {
 	const last = messages[messages.length - 1]
-	return last?.role === 'user' && Array.isArray(last.content) &&
-		last.content.some((c: any) => c.type === 'tool_result')
+	if (last?.role !== 'user' || !Array.isArray(last.content)) return null
+	const results = last.content.filter((c: any) => c.type === 'tool_result')
+	if (results.length === 0) return null
+	// Find the preceding assistant message to get tool names
+	const assistant = [...messages].reverse().find((m: any) => m.role === 'assistant' && Array.isArray(m.content))
+	const toolUses = new Map<string, string>()
+	if (assistant) {
+		for (const b of assistant.content) {
+			if (b.type === 'tool_use') toolUses.set(b.id, b.name)
+		}
+	}
+	return results.map((r: any) => ({
+		name: toolUses.get(r.tool_use_id) ?? 'unknown',
+		content: typeof r.content === 'string' ? r.content : JSON.stringify(r.content),
+	}))
 }
 
 async function* streamText(text: string, delayMs = 15): AsyncGenerator<ProviderEvent> {
@@ -85,13 +98,24 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	const tokenCount = input.split(/\s+/).length
 
 	// Tool result follow-up
-	if (isToolResult(params.messages)) {
-		yield { type: 'thinking', text: 'Looking at the tool output...' }
-		await sleep(100)
-		yield* streamChunks([
-			'Done! ', 'The command ', 'finished ', 'successfully. ',
-			'Here\'s what I observed from the output.',
-		])
+	const toolResults = getToolResults(params.messages)
+	if (toolResults) {
+		const askResult = toolResults.find(r => r.name === 'ask')
+		if (askResult) {
+			yield { type: 'thinking', text: 'The user answered my question...' }
+			await sleep(100)
+			yield* streamChunks([
+				`Got it! `, `You said: "${askResult.content}". `,
+				`I'll keep that in mind going forward.`,
+			])
+		} else {
+			yield { type: 'thinking', text: 'Looking at the tool output...' }
+			await sleep(100)
+			yield* streamChunks([
+				'Done! ', 'The command ', 'finished ', 'successfully. ',
+				'Here\'s what I observed from the output.',
+			])
+		}
 		yield { type: 'done', usage: { input: tokenCount, output: 20 } }
 		return
 	}
