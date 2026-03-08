@@ -86,4 +86,41 @@ describe('prompt history', () => {
 		prompt.handleKey(key('up'), W)
 		expect(prompt.text()).toBe('')
 	})
+
+	test('pushHistory after reset makes item available via up arrow', () => {
+		prompt.reset()
+		prompt.pushHistory('hello')
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('hello')
+	})
+
+	test('submit flow: type, reset, pushHistory, then up recalls it', () => {
+		prompt.reset()
+		// Simulate typing "hello"
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+		expect(prompt.text()).toBe('hello')
+
+		// Simulate submit: reset() then onSubmit pushes to history
+		const submitted = prompt.text()
+		prompt.reset()
+		prompt.pushHistory(submitted)
+
+		// Now up arrow should recall "hello"
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('hello')
+	})
+
+	test('submit flow: reset then pushHistory makes up arrow work', () => {
+		prompt.reset()
+		prompt.setHistory([])
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+
+		// Simulate keybindings.ts submit flow
+		const text = prompt.text().trim()
+		prompt.reset()
+		prompt.pushHistory(text)
+
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('hello')
+	})
 })

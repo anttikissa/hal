@@ -59,6 +59,7 @@ export function handleInput(k: KeyEvent): void {
 				else send(cmd as any, arg || undefined)
 			} else {
 				client.onSubmit(text)
+				prompt.pushHistory(text)
 				send('prompt', text)
 			}
 		}
