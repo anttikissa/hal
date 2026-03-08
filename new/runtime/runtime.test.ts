@@ -280,3 +280,41 @@ test('interrupted tool round skip path is persisted', async () => {
 	const toolResults = entries.filter((e) => e.role === 'tool_result')
 	expect(toolResults.length).toBe(2)
 })
+
+test('pause command stops an active generation', async () => {
+	const sid = runtime.activeSessionId!
+	const snapshot = (await events.readAll()).length
+
+	// Start a slow generation (spam = streaming wall of text)
+	await commands.append(makeCommand('prompt', src, 'spam', sid))
+
+	// Wait until we see at least one chunk (generation started)
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 30))
+		const all = await events.readAll()
+		const recent = all.slice(snapshot)
+		if (recent.some(e => e.type === 'chunk')) break
+	}
+
+	// Send pause
+	await commands.append(makeCommand('pause', src, undefined, sid))
+
+	// Wait for generation to end
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		const all = await events.readAll()
+		const recent = all.slice(snapshot)
+		const done = recent.find(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))
+		if (done) break
+	}
+
+	const all = await events.readAll()
+	const recent = all.slice(snapshot)
+
+	// Should see [paused] meta line
+	const paused = recent.find(e => e.type === 'line' && e.text === '[paused]')
+	expect(paused).toBeTruthy()
+
+	// Session should no longer be busy
+	expect(runtime.busySessionIds.has(sid)).toBe(false)
+})

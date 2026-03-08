@@ -38,11 +38,11 @@ export async function startRuntime(): Promise<Runtime> {
 
 	const sessions = new Map<string, SessionInfo>()
 	const busySessionIds = new Set<string>()
+	const abortControllers = new Map<string, AbortController>()
 	let activeSessionId: string | null = null
 	let stopped = false
 
 	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
-
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = getState()
@@ -132,6 +132,8 @@ export async function startRuntime(): Promise<Runtime> {
 		apiMessages: any[],
 		activity = 'generating...',
 	): Promise<void> {
+		const ac = new AbortController()
+		abortControllers.set(sid, ac)
 		busySessionIds.add(sid)
 		await publish(activity)
 		runAgentLoop({
@@ -144,7 +146,9 @@ export async function startRuntime(): Promise<Runtime> {
 				else busySessionIds.delete(sid)
 				await publish(nextActivity)
 			},
+			signal: ac.signal,
 		}).finally(async () => {
+			abortControllers.delete(sid)
 			busySessionIds.delete(sid)
 			await publish()
 		})
@@ -188,6 +192,12 @@ export async function startRuntime(): Promise<Runtime> {
 		if (!sid) { await error('No active session'); return }
 
 		switch (cmd.type) {
+			case 'pause': {
+				const ac = abortControllers.get(sid)
+				if (ac) ac.abort()
+				else await warn('Session is not busy')
+				break
+			}
 			case 'prompt': {
 				if (!cmd.text) { await warn('Empty prompt'); return }
 				if (!sessions.has(sid)) { await error(`Session ${sid} not found`); return }

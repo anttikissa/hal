@@ -41,6 +41,12 @@ export function handleInput(k: KeyEvent): void {
 		}
 	}
 
+	if (k.key === 'escape') {
+		const tab = client.activeTab()
+		if (tab?.busy) { send('pause'); doRender() }
+		return
+	}
+
 	if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
 		const text = prompt.text().trim()
 		prompt.reset()
@@ -80,7 +86,7 @@ function showHelp(): void {
 			'  /fork — fork session',
 			'',
 			'**Keys**',
-			'  ctrl-t new tab │ ctrl-w close │ ctrl-n/p switch tabs',
+			'  esc pause │ ctrl-t new tab │ ctrl-w close │ ctrl-n/p switch tabs',
 			'  ctrl-c quit │ ctrl-z suspend │ ctrl-r restart',
 		].join('\n'),
 	})

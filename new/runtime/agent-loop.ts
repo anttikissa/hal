@@ -15,6 +15,7 @@ export interface AgentContext {
 	systemPrompt: string
 	messages: any[]
 	onStatus: (busy: boolean, activity?: string) => void
+	signal?: AbortSignal
 }
 
 function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeEvent['type'] }): Promise<void> {
@@ -25,7 +26,7 @@ function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeE
 
 const MAX_TOOL_ROUNDS = 10
 export async function runAgentLoop(ctx: AgentContext): Promise<void> {
-	const { sessionId, model, systemPrompt, messages } = ctx
+	const { sessionId, model, systemPrompt, messages, signal } = ctx
 	const [providerName, modelId] = model.includes('/') ? model.split('/', 2) : ['mock', model]
 
 	ctx.onStatus(true, 'generating...')
@@ -34,13 +35,17 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		const provider = await loadProvider(providerName)
 
 		for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+			if (signal?.aborted) break
+
 			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS })
 
 			let thinkingText = ''
 			let assistantText = ''
 			const toolCalls: ToolCall[] = []
+			let aborted = false
 
 			for await (const event of gen) {
+				if (signal?.aborted) { aborted = true; break }
 				switch (event.type) {
 					case 'thinking':
 						thinkingText += event.text
@@ -79,6 +84,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						// Execute tools, writing each result individually
 						for (const call of toolCalls) {
+							if (signal?.aborted) { aborted = true; break }
 							const args = argsPreview(call)
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
@@ -100,6 +106,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								args, phase: 'done', output: result,
 							})
 						}
+
+						if (aborted) break
 
 						// Add to messages for next round
 						messages.push({
@@ -123,6 +131,18 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						break
 					}
 				}
+			}
+
+			if (aborted) {
+				// Persist partial output before exiting
+				if (assistantText || thinkingText) {
+					await appendMessages(sessionId, [
+						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, ts: new Date().toISOString() },
+					])
+				}
+				await emit(sessionId, { type: 'line', sessionId, text: '[paused]', level: 'meta' })
+				await emit(sessionId, { type: 'command', commandId: '', phase: 'done' })
+				return
 			}
 
 			// If we get here, there were tool calls — loop for next round

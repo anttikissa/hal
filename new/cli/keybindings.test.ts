@@ -60,3 +60,14 @@ test('option+digit does not switch on non-digit', () => {
 	handleInput({ key: 'g', ctrl: false, alt: true, shift: false, cmd: false })
 	expect(switchToTab).not.toHaveBeenCalled()
 })
+
+test('escape sends pause when active tab is busy', () => {
+	mockClient.activeTab.mockReturnValueOnce({ blocks: pushBlocks, sessionId: 'test', info: {}, busy: true, inputHistory: [], inputDraft: '', contentHeight: 0 })
+	handleInput({ key: 'escape', ctrl: false, alt: false, shift: false, cmd: false })
+	expect(sentCommands).toEqual([{ type: 'pause', text: undefined }])
+})
+
+test('escape does nothing when active tab is not busy', () => {
+	handleInput({ key: 'escape', ctrl: false, alt: false, shift: false, cmd: false })
+	expect(sentCommands).toEqual([])
+})
