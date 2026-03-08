@@ -318,3 +318,39 @@ test('pause command stops an active generation', async () => {
 	// Session should no longer be busy
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
 })
+
+test('ask tool sends question event and waits for respond', async () => {
+	const sid = runtime.activeSessionId!
+	const snapshot = (await events.readAll()).length
+
+	// "ask" triggers mock provider to emit an ask tool_call
+	await commands.append(makeCommand('prompt', src, 'ask Do you prefer tabs or spaces?', sid))
+
+	// Wait for question event
+	let questionEvent: any = null
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		const all = await events.readAll()
+		const recent = all.slice(snapshot)
+		questionEvent = recent.find(e => e.type === 'question')
+		if (questionEvent) break
+	}
+	expect(questionEvent).toBeTruthy()
+	expect(questionEvent.text).toBe('Do you prefer tabs or spaces?')
+
+	// Session should still be busy (waiting for answer)
+	expect(runtime.busySessionIds.has(sid)).toBe(true)
+
+	// Send respond
+	await commands.append(makeCommand('respond', src, 'tabs obviously', sid))
+
+	// Wait for generation to finish (mock provider follows up after tool result)
+	for (let i = 0; i < 200; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		const all = await events.readAll()
+		const recent = all.slice(snapshot)
+		if (recent.some(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))) break
+	}
+
+	expect(runtime.busySessionIds.has(sid)).toBe(false)
+})

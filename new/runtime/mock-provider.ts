@@ -100,7 +100,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	const userMessages = params.messages.filter((m: any) => m.role === 'user')
 	if (userMessages.length <= 1 && (!input || lower === 'hi' || lower === 'hello')) {
 		const help = pick(GREETINGS) + '\n\n' +
-			'Try: **tool**, **bash <cmd>**, **read <file>**, **write <file> <text>**, ' +
+			'Try: **tool**, **ask**, **bash <cmd>**, **read <file>**, **write <file> <text>**, ' +
 			'**think**, **spam**, **error**'
 		yield* streamChunks(help.split(/(?<=\s)/), 25)
 		yield { type: 'done', usage: { input: tokenCount, output: help.length } }
@@ -112,6 +112,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		const help =
 			'**Commands:**\n' +
 			'- **tool** — run bash + read + write in one go\n' +
+			'- **ask [question]** — ask the user a question\n' +
 			'- **bash <cmd>** — run a shell command\n' +
 			'- **read [file]** — read a file (default: package.json)\n' +
 			'- **write [file] [text]** — write to a file (default: /tmp/hal-mock-test.txt)\n' +
@@ -131,6 +132,16 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		yield { type: 'tool_call', id: 'mock_2', name: 'read', input: { path: 'package.json' } }
 		yield { type: 'tool_call', id: 'mock_3', name: 'write', input: { path: '/tmp/hal-mock-test.txt', content: 'Hello from mock tool!\nWritten at ' + new Date().toISOString() } }
 		yield { type: 'done', usage: { input: tokenCount, output: 30 } }
+		return
+	}
+
+	if (lower.startsWith('ask')) {
+		const question = input.slice(3).trim() || 'What would you like me to do next?'
+		yield { type: 'thinking', text: 'I need to check with the user before proceeding.' }
+		await sleep(100)
+		yield* streamChunks(['Let me ask you something.\n'])
+		yield { type: 'tool_call', id: 'mock_ask_1', name: 'ask', input: { question } }
+		yield { type: 'done', usage: { input: tokenCount, output: 20 } }
 		return
 	}
 

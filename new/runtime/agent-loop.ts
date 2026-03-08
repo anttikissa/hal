@@ -15,6 +15,7 @@ export interface AgentContext {
 	systemPrompt: string
 	messages: any[]
 	onStatus: (busy: boolean, activity?: string) => void
+	askUser: (question: string) => Promise<string>
 	signal?: AbortSignal
 }
 
@@ -22,6 +23,12 @@ function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeE
 	return events.append({
 		id: eventId(), sessionId, createdAt: new Date().toISOString(), ...event,
 	} as RuntimeEvent)
+}
+
+/** Emit IPC line event AND persist as info message. */
+async function emitInfo(sessionId: string, text: string, level: string): Promise<void> {
+	await appendMessages(sessionId, [{ type: 'info', text, level, ts: new Date().toISOString() }])
+	await emit(sessionId, { type: 'line', text, level })
 }
 
 const MAX_TOOL_ROUNDS = 10
@@ -59,7 +66,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						toolCalls.push({ id: event.id, name: event.name, input: event.input })
 						break
 					case 'error':
-						await emit(sessionId, { type: 'line', text: event.message, level: 'error' })
+						await emitInfo(sessionId, event.message, 'error')
 						break
 					case 'done': {
 						if (toolCalls.length === 0) {
@@ -86,25 +93,30 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						for (const call of toolCalls) {
 							if (signal?.aborted) { aborted = true; break }
 							const args = argsPreview(call)
-							await emit(sessionId, {
-								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: 'running',
-							})
 
-							const onChunk = (text: string) => emit(sessionId, {
-								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: 'streaming', output: text,
-							})
-							const result = await executeTool(call, onChunk)
+							let result: string
+							if (call.name === 'ask') {
+								const question = (call.input as any)?.question ?? ''
+								result = await ctx.askUser(question) || '[no answer]'
+							} else {
+								await emit(sessionId, {
+									type: 'tool', toolId: call.id, name: call.name,
+									args, phase: 'running',
+								})
+								const onChunk = (text: string) => emit(sessionId, {
+									type: 'tool', toolId: call.id, name: call.name,
+									args, phase: 'streaming', output: text,
+								})
+								result = await executeTool(call, onChunk)
+								await emit(sessionId, {
+									type: 'tool', toolId: call.id, name: call.name,
+									args, phase: 'done', output: result,
+								})
+							}
 
 							// Persist tool result immediately
 							const toolResultEntry = await writeToolResultEntry(sessionId, call.id, result, toolRefMap)
 							await appendMessages(sessionId, [toolResultEntry])
-
-							await emit(sessionId, {
-								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: 'done', output: result,
-							})
 						}
 
 						if (aborted) break

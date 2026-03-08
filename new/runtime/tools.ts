@@ -157,6 +157,10 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 			depth: { type: 'integer', description: 'Max depth (default: 3)' },
 		} } },
 	{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+	{ name: 'ask', description: 'Ask the user a question and wait for their response. Use this to clarify ambiguous instructions, gather preferences, or get decisions on implementation choices.',
+		input_schema: { type: 'object', properties: {
+			question: { type: 'string', description: 'The question to ask the user' },
+		}, required: ['question'] } },
 ]
 
 // ── Tool execution ──
@@ -174,6 +178,7 @@ export function argsPreview(call: ToolCall): string {
 		case 'grep': return String(inp?.pattern ?? '')
 		case 'glob': return String(inp?.pattern ?? '')
 		case 'ls': return String(inp?.path ?? '.')
+		case 'ask': return String(inp?.question ?? '').slice(0, 80)
 		default: return call.name
 	}
 }

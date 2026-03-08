@@ -41,7 +41,7 @@ export async function startRuntime(): Promise<Runtime> {
 	const abortControllers = new Map<string, AbortController>()
 	let activeSessionId: string | null = null
 	let stopped = false
-
+	const pendingQuestions = new Map<string, (answer: string) => void>()
 	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
@@ -126,6 +126,14 @@ export async function startRuntime(): Promise<Runtime> {
 		return messages[messages.length - 1]?.role === 'user'
 	}
 
+	async function askUser(sessionId: string, question: string): Promise<string> {
+		const questionId = eventId()
+		return new Promise(resolve => {
+			pendingQuestions.set(sessionId, resolve)
+			void emit({ type: 'question', sessionId, questionId, text: question })
+		})
+	}
+
 	async function startGeneration(
 		sid: string,
 		info: SessionInfo,
@@ -146,6 +154,7 @@ export async function startRuntime(): Promise<Runtime> {
 				else busySessionIds.delete(sid)
 				await publish(nextActivity)
 			},
+			askUser: (question) => askUser(sid, question),
 			signal: ac.signal,
 		}).finally(async () => {
 			abortControllers.delete(sid)
@@ -290,6 +299,13 @@ export async function startRuntime(): Promise<Runtime> {
 				break
 			}
 			case 'respond': {
+				const resolve = pendingQuestions.get(sid)
+				if (resolve) {
+					pendingQuestions.delete(sid)
+					resolve(cmd.text ?? '')
+					break
+				}
+				// Legacy: interrupted tools respond handler
 				const answer = (cmd.text ?? '').trim().toLowerCase()
 				if (answer && answer !== 'skip') {
 					await warn('Reply with "skip" or leave blank to continue without rerunning interrupted tools')
