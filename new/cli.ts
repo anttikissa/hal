@@ -9,6 +9,7 @@ import { maxTabHeight } from './cli/heights.ts'
 import { Client } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
+import { getConfig } from './config.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -63,8 +64,8 @@ function bumpCursor(): void {
 }
 
 function shortModel(model?: string): string {
-	if (!model) return ''
-	return model.includes('/') ? model.slice(model.indexOf('/') + 1) : model
+	const m = model || getConfig().defaultModel
+	return m.includes('/') ? m.slice(m.indexOf('/') + 1) : m
 }
 
 function buildLines(): { lines: string[]; cursor: CursorPos } {
