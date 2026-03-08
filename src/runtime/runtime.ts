@@ -182,8 +182,11 @@ export async function startRuntime(): Promise<Runtime> {
 				if (busy) busySessionIds.add(sid)
 				else busySessionIds.delete(sid)
 				if (context) {
-					sessionContext.set(sid, context)
-					info.context = { used: context.used, max: context.max }
+					const existing = sessionContext.get(sid)
+					if (!context.estimated || !existing || existing.estimated) {
+						sessionContext.set(sid, context)
+						info.context = { used: context.used, max: context.max }
+					}
 				}
 				await publish(nextActivity)
 			},
