@@ -213,6 +213,17 @@ export async function startRuntime(): Promise<Runtime> {
 				if (!sessions.has(sid)) { await error(`Session ${sid} not found`); return }
 				if (busySessionIds.has(sid)) { await warn('Session is busy'); return }
 
+				// Auto-resolve interrupted tools before building API messages
+				const interrupted = pendingInterruptedTools.get(sid) ?? detectInterruptedTools(await readMessages(sid))
+				if (interrupted.length > 0) {
+					const toolRefMap = new Map(interrupted.map(t => [t.id, t.ref]))
+					for (const t of interrupted) {
+						const entry = await writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolRefMap)
+						await appendMessages(sid, [entry])
+					}
+					pendingInterruptedTools.delete(sid)
+				}
+
 				await emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
 
 				const { apiContent, logContent } = await parseUserContent(sid, cmd.text)

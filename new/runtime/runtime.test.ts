@@ -289,6 +289,52 @@ test('interrupted tool round requires skip before /continue', async () => {
 	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('marked skipped'))).toBe(true)
 })
 
+test('prompt auto-resolves interrupted tools instead of 400 error', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	await appendMessages(sid, [{ role: 'user', content: 'Trigger tools', ts } as any])
+	const { entry } = await writeAssistantEntry(sid, {
+		text: 'Running tools',
+		toolCalls: [
+			{ id: 't1', name: 'write', input: { path: '/tmp/a', content: 'x' } },
+			{ id: 't2', name: 'read', input: { path: 'package.json' } },
+		],
+	})
+	await appendMessages(sid, [entry])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+		s.busySessionIds = [sid]
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+	await new Promise(r => setTimeout(r, 300))
+
+	// Send a new prompt — should auto-resolve interrupted tools and succeed
+	await commands.append(makeCommand('prompt', src, 'hello after interrupt', sid))
+	await new Promise(r => setTimeout(r, 500))
+
+	const raw = await readFile(`${sessionDir(sid)}/messages.asonl`, 'utf-8')
+	const entries = parseAll(raw) as any[]
+	const toolResults = entries.filter((e: any) => e.role === 'tool_result')
+	expect(toolResults.length).toBe(2)
+	expect(toolResults[0].tool_use_id).toBe('t1')
+	expect(toolResults[1].tool_use_id).toBe('t2')
+
+	// Should have generated a response (done event, no 400 error)
+	const all = await events.readAll()
+	const errors = all.filter((e: any) => e.type === 'line' && e.level === 'error' && e.sessionId === sid)
+	expect(errors.length).toBe(0)
+	const done = all.some((e: any) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	expect(done).toBe(true)
+})
+
 test('pause command stops an active generation', async () => {
 	const sid = runtime.activeSessionId!
 	const snapshot = (await events.readAll()).length
