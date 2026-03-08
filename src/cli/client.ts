@@ -48,7 +48,7 @@ export class Client {
 	async start(): Promise<void> {
 		const { state: rtState, sessions } = await this.transport.bootstrap()
 		for (const info of sessions) {
-			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 })
+			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context })
 		}
 		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === rtState.activeSessionId))
 		this.state.connected = true
