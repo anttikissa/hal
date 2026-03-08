@@ -183,7 +183,7 @@ export async function startRuntime(): Promise<Runtime> {
 				else busySessionIds.delete(sid)
 				if (context) {
 					sessionContext.set(sid, context)
-					if (!context.estimated) info.context = { used: context.used, max: context.max }
+					info.context = { used: context.used, max: context.max }
 				}
 				await publish(nextActivity)
 			},
