@@ -9,13 +9,14 @@ export function handleInput(k: KeyEvent): void {
 	if (k.key === 'c' && k.ctrl) { quit(); return }
 
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && !prompt.text())) {
+		client.saveDraft()
 		send('close')
 		prompt.reset()
 		doRender()
 		return
 	}
 
-	if (k.key === 't' && k.ctrl) { send('open'); prompt.reset(); return }
+	if (k.key === 't' && k.ctrl) { client.saveDraft(); send('open'); prompt.reset(); return }
 	if (k.key === 'n' && k.ctrl) { client.nextTab(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }

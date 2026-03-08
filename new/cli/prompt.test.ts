@@ -77,4 +77,13 @@ describe('prompt history', () => {
 		prompt.handleKey(key('up'), W)
 		expect(prompt.text()).toBe('b')
 	})
+
+	test('reset clears history array', () => {
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('third')
+		prompt.reset()
+		// After reset, up should be a no-op (no history)
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('')
+	})
 })

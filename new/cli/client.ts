@@ -185,6 +185,8 @@ export class Client {
 				this.state.activeTabIndex = Math.min(prevIdx, newTabs.length - 1)
 			}
 		}
+		const newId = this.state.tabs[this.state.activeTabIndex]?.sessionId
+		if (newId !== prevId) this.switchToActiveTab()
 	}
 
 	private applyTabToPrompt(tab: TabState): void {

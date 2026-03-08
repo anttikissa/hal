@@ -78,6 +78,7 @@ export function reset(): void {
 	cursor = 0
 	goalCol = null
 	selAnchor = null
+	history = []
 	historyIndex = -1
 	historyDraft = ''
 	questionLabel = null
