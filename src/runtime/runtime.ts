@@ -1,5 +1,6 @@
 // Host runtime — tails commands, dispatches, manages sessions.
 
+import { watch, type FSWatcher } from 'fs'
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, type UserMessage } from '../session/messages.ts'
@@ -7,6 +8,7 @@ import { runAgentLoop } from './agent-loop.ts'
 import { loadSystemPrompt } from './system-prompt.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
+import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
@@ -92,6 +94,23 @@ export async function startRuntime(): Promise<Runtime> {
 			await handleCommand(cmd)
 		}
 	})()
+
+	// Watch SYSTEM.md + AGENTS.md for changes → notify active session
+	const watchers: FSWatcher[] = []
+	let watchDebounce: ReturnType<typeof setTimeout> | null = null
+	const changedNames = new Set<string>()
+	const onPromptFileChange = (name: string) => {
+		changedNames.add(name)
+		if (watchDebounce) clearTimeout(watchDebounce)
+		watchDebounce = setTimeout(async () => {
+			const label = [...changedNames].join(', ')
+			changedNames.clear()
+			if (activeSessionId) await emitInfo(activeSessionId, `[system] reloaded ${label} (file changed)`, 'meta')
+		}, 150)
+	}
+	for (const [path, name] of [[`${HAL_DIR}/SYSTEM.md`, 'SYSTEM.md'], [`${LAUNCH_CWD}/AGENTS.md`, 'AGENTS.md']] as const) {
+		try { watchers.push(watch(path, { persistent: false }, () => onPromptFileChange(name))) } catch {}
+	}
 
 	async function greetSession(sessionId: string): Promise<void> {
 		const text = pick(GREETINGS)
@@ -359,6 +378,6 @@ export async function startRuntime(): Promise<Runtime> {
 		sessions,
 		activeSessionId,
 		busySessionIds,
-		stop() { stopped = true; cmdTail.cancel() },
+		stop() { stopped = true; cmdTail.cancel(); watchers.forEach(w => w.close()) },
 	}
 }
