@@ -2,6 +2,7 @@
 
 Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
 
+New version of the app is being developed in `new/`; old/current code lives in `src/`.
 ## Rules
 
 - After every code change to `new/`, run `bun scripts/cloc.ts` and include the output.
