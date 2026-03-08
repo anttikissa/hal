@@ -1,6 +1,32 @@
 # TODO
 
+## 8.3. TODO
+
+First: add openai support
+
+aliases too
+
+When closes and restarts, tab should be the same that was before. Client server thing - client should save
+(it its filesystem) which tab it was looking (maybe even, which pid) - and server should also store the latest tab.
+Client uses the latest saved in filesystem tab, but if not available (eg if its the web client) use the one from server.
+
+tab sizes must not be >line width - compress
+
+tabs show 1 2 3 4.. and directories. session name should be visible on some other line
+
+make the ask question appear before bottom area and fix what goes to log too
+
+shift enter needs to work
+
+lazy loading of mock provider
+
+
+
 ## REAL TODO
+
+
+- E2e test infrastructure is horrible boilerplate (subprocess spawn + env vars to isolate state). Figure out a proper testing approach — maybe a shared harness, or make state.ts support late init, or use dynamic imports.
+
 
 In the new/ client:
 
