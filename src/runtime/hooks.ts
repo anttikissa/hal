@@ -6,7 +6,8 @@ import { resolve, isAbsolute } from 'path'
 import { homedir } from 'os'
 
 const HOME = homedir()
-const CWD = process.env.LAUNCH_CWD ?? process.cwd()
+const RAW_CWD = process.env.LAUNCH_CWD ?? process.cwd()
+const CWD = RAW_CWD.startsWith('~/') ? HOME + RAW_CWD.slice(1) : resolve(RAW_CWD)
 
 function resolvePath(p: string): string {
 	if (p.startsWith('~/')) p = HOME + p.slice(1)
