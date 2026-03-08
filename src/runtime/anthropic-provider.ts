@@ -79,7 +79,8 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 					tools.delete(ev.index)
 				}
 			} else if (ev.type === 'message_start' && ev.message?.usage) {
-				usage.input += ev.message.usage.input_tokens ?? 0
+				const u = ev.message.usage
+				usage.input += (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
 			} else if (ev.type === 'message_delta' && ev.usage) {
 				usage.output += ev.usage.output_tokens ?? 0
 			} else if (ev.type === 'error') {
