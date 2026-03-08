@@ -1,5 +1,11 @@
 #!/usr/bin/env bun
-import { saveAuth, loadAuth } from "../src/auth.ts"
+import { readFileSync, writeFileSync } from "fs"
+import { parse, stringify } from "../src/utils/ason.ts"
+
+const HAL_DIR = import.meta.dir + "/.."
+const AUTH_PATH = `${HAL_DIR}/auth.ason`
+function loadAuth(): any { try { return parse(readFileSync(AUTH_PATH, "utf-8")) } catch { return {} } }
+function saveAuth(auth: any) { writeFileSync(AUTH_PATH, stringify(auth) + "\n") }
 
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 

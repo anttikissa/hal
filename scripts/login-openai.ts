@@ -1,7 +1,13 @@
 #!/usr/bin/env bun
 import { randomBytes, createHash } from "crypto"
 import { createServer } from "http"
-import { saveAuth, loadAuth } from "../src/auth.ts"
+import { readFileSync, writeFileSync } from "fs"
+import { parse, stringify } from "../src/utils/ason.ts"
+
+const HAL_DIR = import.meta.dir + "/.."
+const AUTH_PATH = `${HAL_DIR}/auth.ason`
+function loadAuth(): any { try { return parse(readFileSync(AUTH_PATH, "utf-8")) } catch { return {} } }
+function saveAuth(auth: any) { writeFileSync(AUTH_PATH, stringify(auth) + "\n") }
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 const AUTHORIZE_URL = "https://auth.openai.com/oauth/authorize"
