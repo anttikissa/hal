@@ -49,6 +49,7 @@ import {
 	CTRL_PREV_TAB,
 	CTRL_T_KEYS,
 	CTRL_W_KEYS,
+	OPT_DIGIT_KEYS,
 } from './keys.ts'
 import { COMMAND_NAMES, handleCommand, isExit } from './commands.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
@@ -279,7 +280,7 @@ function handleInputKey(key: string): boolean {
 	if (CTRL_T_KEYS.has(key)) { void createTab(); return true }
 	if (CTRL_W_KEYS.has(key)) { void closeActiveTab(); return true }
 	if (CTRL_F_KEYS.has(key)) { void forkTab(); return true }
-	const digit = CTRL_DIGIT_KEYS[key] ?? ALT_DIGIT_KEYS[key]
+	const digit = CTRL_DIGIT_KEYS[key] ?? ALT_DIGIT_KEYS[key] ?? OPT_DIGIT_KEYS[key]
 	if (digit) { switchToTab(digit - 1); return true }
 	if (CTRL_PREV_TAB.has(key)) { switchToTab(activeTabIndex > 0 ? activeTabIndex - 1 : tabs.length - 1); return true }
 	if (CTRL_NEXT_TAB.has(key)) { switchToTab(activeTabIndex < tabs.length - 1 ? activeTabIndex + 1 : 0); return true }

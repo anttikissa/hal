@@ -2,6 +2,10 @@
 
 ## REAL TODO
 
+In the new/ client:
+
+- Refresh ason 
+- 
 - Restore -> resume (same terminology as codex cli)
 - Style tool blocks and all other blocks well
 - Esc and Ctrl-C and Ctrl-D should work better - maybe a debug thing to restart?
