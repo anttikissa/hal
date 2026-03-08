@@ -91,14 +91,15 @@ function toolLine(text: string, width: number, fg: string, bg: string): string {
 	const padded = ' '.repeat(BLOCK_PAD) + expandTabs(text)
 	const vl = visLen(padded)
 	if (vl > width) {
-		// Truncate to width (ANSI-aware)
+		// Truncate to width-2, then ellipsis + space
+		const limit = width - 2
 		let vis = 0, esc = false, cut = padded.length
 		for (let i = 0; i < padded.length; i++) {
 			if (padded[i] === '\x1b') { esc = true; continue }
 			if (esc) { if (padded[i] === 'm') esc = false; continue }
-			if (++vis >= width) { cut = i + 1; break }
+			if (++vis >= limit) { cut = i + 1; break }
 		}
-		return `${bg}${fg}${padded.slice(0, cut)}${colors.RESET}`
+		return `${bg}${fg}${padded.slice(0, cut)}… ${colors.RESET}`
 	}
 	const pad = width - vl
 	return `${bg}${fg}${padded}${' '.repeat(pad)}${colors.RESET}`
