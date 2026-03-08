@@ -56,6 +56,8 @@ The TUI is a **state-driven full redraw renderer**.
 
 This is the core model to keep in mind: mutate module state -> call `render()` (or `scheduleRender()` for batched cosmetic updates).
 
+For the `new/` diff-rendered CLI, a streaming inline cursor may only stay on the same rendered line if that line still has spare visible width. If the last rendered line already fills the target width, the cursor must be rendered on a following line instead of overflowing into an implicit terminal wrap row.
+
 ## Core State Buckets
 
 `src/cli/tui.ts` keeps several independent state groups:
