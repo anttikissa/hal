@@ -4,8 +4,8 @@ import { open, readFile, rename, rm } from 'fs/promises'
 import { stringify, parse } from './utils/ason.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { Log } from './utils/log.ts'
-import type { RuntimeCommand, RuntimeEvent, RuntimeState } from './protocol.ts'
-import { defaultState } from './protocol.ts'
+import type { RuntimeCommand, RuntimeEvent, RuntimeState, EventLevel } from './protocol.ts'
+import { defaultState, eventId } from './protocol.ts'
 import { liveFile } from './live-file.ts'
 import { IPC_DIR, ensureDir } from './state.ts'
 
@@ -91,4 +91,9 @@ export async function releaseHost(hostId: string): Promise<void> {
 		updateState(s => { if (s.hostId === hostId) { s.hostPid = null; s.hostId = null; s.busySessionIds = [] } })
 		await events.append({ id: `${Date.now()}-${process.pid}-release`, type: 'line', sessionId: null, text: '[host-released]', level: 'meta', createdAt: new Date().toISOString() } as RuntimeEvent)
 	} catch {}
+}
+
+/** Emit a line to the TUI without persisting to session history. */
+export function log(text: string, sessionId?: string | null, level: EventLevel = 'info'): Promise<void> {
+	return events.append({ id: eventId(), type: 'line', sessionId: sessionId ?? null, text, level, createdAt: new Date().toISOString() } as RuntimeEvent)
 }
