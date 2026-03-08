@@ -2,11 +2,10 @@
 
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
-import { appendMessages, loadApiMessages, readMessages, readBlock, writeToolResultEntry, detectInterruptedTools, type UserMessage } from '../session/messages.ts'
+import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
-import { randomBytes } from 'crypto'
 
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
@@ -41,11 +40,12 @@ export async function startRuntime(): Promise<Runtime> {
 	let activeSessionId: string | null = null
 	let stopped = false
 
-	// Pending questions: sessionId → resolve callback
-	const pendingQuestions = new Map<string, (answer: string) => void>()
+	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
+
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = getState()
+	const prevBusySessionIds = [...(prevState.busySessionIds ?? [])]
 	for (const id of prevState.sessions) {
 		const meta = await loadMeta(id)
 		if (meta) {
@@ -74,14 +74,8 @@ export async function startRuntime(): Promise<Runtime> {
 		await greetSession(needsGreeting)
 	}
 
-	const interruptedSessionIds = new Set<string>()
-	for (const id of prevState.busySessionIds ?? []) {
-		if (sessions.has(id)) interruptedSessionIds.add(id)
-	}
-	if (interruptedSessionIds.size === 0) {
-		for (const [id] of sessions) interruptedSessionIds.add(id)
-	}
-	for (const id of interruptedSessionIds) {
+	for (const id of prevBusySessionIds) {
+		if (!sessions.has(id)) continue
 		await resumeInterruptedSession(id)
 	}
 
@@ -155,15 +149,7 @@ export async function startRuntime(): Promise<Runtime> {
 		})
 	}
 
-	// ── Ask user ──
 
-	async function askUser(sessionId: string, text: string): Promise<string> {
-		const questionId = randomBytes(4).toString('hex')
-		return new Promise(resolve => {
-			pendingQuestions.set(sessionId, resolve)
-			emit({ type: 'question', sessionId, questionId, text })
-		})
-	}
 
 	// ── Resume detection ──
 
@@ -173,45 +159,25 @@ export async function startRuntime(): Promise<Runtime> {
 
 		const messages = await readMessages(sessionId)
 		const interrupted = detectInterruptedTools(messages)
-
 		if (interrupted.length > 0) {
-			// Has unfinished tools — ask user
+			pendingInterruptedTools.set(sessionId, interrupted)
 			const toolList = interrupted.map(t => t.name).join(', ')
-			const answer = await askUser(
+			await emit({
+				type: 'line',
 				sessionId,
-				`${interrupted.length} tool(s) interrupted (${toolList}). Rerun? (yes/skip)`,
-			)
-
-			if (answer.toLowerCase().startsWith('y')) {
-				// Let the model handle it — it will see the tool_use without results
-				// and can decide to retry
-			} else {
-				// Mark interrupted tools as skipped
-				const toolRefMap = new Map(interrupted.map(t => [t.id, t.ref]))
-				for (const t of interrupted) {
-					const entry = await writeToolResultEntry(sessionId, t.id, '[interrupted — skipped by user]', toolRefMap)
-					await appendMessages(sessionId, [entry])
-				}
-			}
+				text: `[resume] interrupted during tools (${toolList}). Type /continue to proceed`,
+				level: 'warn',
+			})
 		}
 
-		// Check for pending user turn and resume generation
 		const apiMessages = await loadApiMessages(sessionId)
 		if (!hasPendingUserTurn(apiMessages)) return
 		await emit({
-			type: 'line', sessionId,
-			text: '[resume] continuing interrupted response after restart',
+			type: 'line',
+			sessionId,
+			text: '[resume] interrupted response detected after restart (type /continue to resume)',
 			level: 'meta',
 		})
-		const pendingText = apiMessages[apiMessages.length - 1]?.content
-		if (typeof pendingText === 'string' && pendingText.trim()) {
-			await emit({
-				type: 'prompt', sessionId,
-				text: pendingText,
-				source: { kind: 'cli', clientId: 'auto-resume' },
-			})
-		}
-		await startGeneration(sessionId, info, apiMessages, 'continuing after restart...')
 	}
 
 	async function handleCommand(cmd: RuntimeCommand): Promise<void> {
@@ -236,16 +202,6 @@ export async function startRuntime(): Promise<Runtime> {
 
 				const apiMessages = await loadApiMessages(sid)
 				await startGeneration(sid, info, apiMessages)
-				break
-			}
-			case 'respond': {
-				const resolve = pendingQuestions.get(sid)
-				if (resolve) {
-					pendingQuestions.delete(sid)
-					resolve(cmd.text ?? '')
-				} else {
-					await warn('No pending question')
-				}
 				break
 			}
 			case 'open': {
@@ -292,6 +248,19 @@ export async function startRuntime(): Promise<Runtime> {
 				await publish()
 				break
 			}
+			case 'continue': {
+				if (busySessionIds.has(sid)) { await warn('Session is busy'); break }
+				const info = sessions.get(sid)
+				if (!info) { await error(`Session ${sid} not found`); break }
+				const apiMessages = await loadApiMessages(sid)
+				if (!hasPendingUserTurn(apiMessages)) {
+					await warn('No interrupted user turn to continue')
+					break
+				}
+				await emit({ type: 'line', sessionId: sid, text: '[resume] continuing interrupted response', level: 'meta' })
+				await startGeneration(sid, info, apiMessages, 'continuing...')
+				break
+			}
 			case 'resume': {
 				const id = cmd.text?.trim()
 				if (!id) {
@@ -307,6 +276,29 @@ export async function startRuntime(): Promise<Runtime> {
 				sessions.set(id, meta)
 				activeSessionId = id
 				await publish()
+				break
+			}
+			case 'respond': {
+				const answer = (cmd.text ?? '').trim().toLowerCase()
+				if (answer && answer !== 'skip') {
+					await warn('Reply with "skip" or leave blank to continue without rerunning interrupted tools')
+					break
+				}
+				const interrupted = pendingInterruptedTools.get(sid) ?? []
+				if (interrupted.length > 0) {
+					const toolRefMap = new Map(interrupted.map(t => [t.id, t.ref]))
+					for (const t of interrupted) {
+						const entry = await writeToolResultEntry(sid, t.id, '[interrupted — skipped by user]', toolRefMap)
+						await appendMessages(sid, [entry])
+					}
+					await emit({
+						type: 'line',
+						sessionId: sid,
+						text: `[resume] ${interrupted.length} interrupted tool(s) marked skipped`,
+						level: 'warn',
+					})
+				}
+				pendingInterruptedTools.delete(sid)
 				break
 			}
 			default:

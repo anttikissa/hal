@@ -20,6 +20,7 @@ export interface SessionInfo {
 export type CommandType =
 	| 'prompt'
 	| 'pause'
+	| 'continue'
 	| 'resume'
 	| 'steer'
 	| 'reset'

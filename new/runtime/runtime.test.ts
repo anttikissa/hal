@@ -24,7 +24,7 @@ const { ensureBus, claimHost, releaseHost, commands, events, updateState } = ipc
 const { startRuntime } = runtimeMod
 const { makeCommand } = protocolMod
 const { parseAll } = aSonMod
-const { appendMessages } = messagesMod
+const { appendMessages, writeAssistantEntry } = messagesMod
 const { createSession } = sessionMod
 
 if (!STATE_DIR.includes('/hal-new-test-')) {
@@ -211,7 +211,7 @@ test('multiple sessions survive restart in order', async () => {
 })
 
 
-test('restart auto-continues interrupted user turn', async () => {
+test('restart detects interrupted user turn but waits for /continue', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
 
@@ -229,19 +229,54 @@ test('restart auto-continues interrupted user turn', async () => {
 	await claimHost(hostId)
 	runtime = await startRuntime()
 
-	for (let i = 0; i < 120; i++) {
+	let sawNotice = false
+	let sawDoneBeforeContinue = false
+	for (let i = 0; i < 60; i++) {
 		await new Promise(r => setTimeout(r, 50))
 		const all = await events.readAll()
-		const sawNotice = all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('continuing interrupted response after restart'))
-		const sawPromptEcho = all.some((e) => e.type === 'prompt' && e.sessionId === sid && e.text === 'Please continue this after restart')
-		const sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
-		if (sawNotice && sawPromptEcho && sawDone) {
-			expect(sawNotice).toBe(true)
-			expect(sawPromptEcho).toBe(true)
-			expect(sawDone).toBe(true)
-			return
-		}
+		sawNotice = all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('type /continue to resume'))
+		sawDoneBeforeContinue = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+		if (sawNotice) break
 	}
+	expect(sawNotice).toBe(true)
+	expect(sawDoneBeforeContinue).toBe(false)
 
-	throw new Error('auto-continue events not observed')
+	const resumed = await sendAndWait('/continue', sid)
+	const doneAfter = resumed.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	expect(doneAfter).toBe(true)
+})
+
+test('interrupted tool round skip path is persisted', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	await appendMessages(sid, [{ role: 'user', content: 'Trigger tools', ts } as any])
+	const { entry } = await writeAssistantEntry(sid, {
+		text: 'Running tools',
+		toolCalls: [
+			{ id: 't1', name: 'write', input: { path: '/tmp/a', content: 'x' } },
+			{ id: 't2', name: 'read', input: { path: 'package.json' } },
+		],
+	})
+	await appendMessages(sid, [entry])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+		s.busySessionIds = [sid]
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	await commands.append(makeCommand('respond', src, 'skip', sid))
+	await new Promise(r => setTimeout(r, 500))
+
+	const raw = await readFile(`${sessionDir(sid)}/messages.asonl`, 'utf-8')
+	const entries = parseAll(raw) as any[]
+	const toolResults = entries.filter((e) => e.role === 'tool_result')
+	expect(toolResults.length).toBe(2)
 })
