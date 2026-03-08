@@ -8,7 +8,7 @@ const counts: [string, number][] = []
 let total = 0
 const glob = new Bun.Glob('**/*.ts')
 for await (const path of glob.scan({ cwd: dir, onlyFiles: true })) {
-	if (path.endsWith('.test.ts')) continue
+	if (path.endsWith('.test.ts') || path.startsWith('test') || path.startsWith('tests/')) continue
 	const content = await Bun.file(`${dir}/${path}`).text()
 	let lines = 0
 	let inBlock = false
