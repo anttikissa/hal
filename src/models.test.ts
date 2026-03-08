@@ -34,6 +34,17 @@ test('resolveModel: unknown name passes through as-is', () => {
 	expect(resolveModel('some-random-thing')).toBe('some-random-thing')
 })
 
+test('resolveModel: gpt aliases', () => {
+	expect(resolveModel('gpt54')).toBe('openai/gpt-5.4')
+	expect(resolveModel('gpt53')).toBe('openai/gpt-5.3')
+	expect(resolveModel('gpt52')).toBe('openai/gpt-5.2')
+})
+
+test('resolveModel: gpt-X.Y pattern', () => {
+	expect(resolveModel('gpt-5.4')).toBe('openai/gpt-5.4')
+	expect(resolveModel('gpt5.3')).toBe('openai/gpt-5.3')
+})
+
 // ── displayModel ──
 
 test('displayModel: claude-opus-4-6 → Opus 4.6', () => {
@@ -52,8 +63,10 @@ test('displayModel: claude-sonnet-4-20250514 → Sonnet 4', () => {
 	expect(displayModel('anthropic/claude-sonnet-4-20250514')).toBe('Sonnet 4')
 })
 
-test('displayModel: strips provider prefix for unknown models', () => {
-	expect(displayModel('openai/gpt-5.4')).toBe('gpt-5.4')
+test('displayModel: gpt-5.4 → GPT 5.4', () => {
+	expect(displayModel('openai/gpt-5.4')).toBe('GPT 5.4')
+	expect(displayModel('openai/gpt-5.3')).toBe('GPT 5.3')
+	expect(displayModel('openai/gpt-5.2')).toBe('GPT 5.2')
 })
 
 test('displayModel: no provider prefix passes through', () => {

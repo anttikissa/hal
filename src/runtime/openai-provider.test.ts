@@ -1,0 +1,160 @@
+import { test, expect } from 'bun:test'
+
+function makeSSE(events: any[]): string {
+	return events.map(e => `data: ${JSON.stringify(e)}\n\n`).join('')
+}
+
+function mockFetch(sseEvents: any[]) {
+	const sse = makeSSE(sseEvents)
+	const origFetch = globalThis.fetch
+	globalThis.fetch = async (input: any) => {
+		const url = typeof input === 'string' ? input : input.url
+		// Let auth refresh "succeed" with no-op
+		if (url.includes('auth.openai.com')) {
+			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
+		}
+		// API call returns SSE stream
+		return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	}
+	return origFetch
+}
+
+function mockFetchError(status: number, body: string) {
+	const origFetch = globalThis.fetch
+	globalThis.fetch = async (input: any) => {
+		const url = typeof input === 'string' ? input : input.url
+		if (url.includes('auth.openai.com')) {
+			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
+		}
+		return new Response(body, { status }) as any
+	}
+	return origFetch
+}
+
+test('openai provider: parses text response', async () => {
+	const events = [
+		{ type: 'response.output_item.added', output_index: 0, item: { type: 'message' } },
+		{ type: 'response.output_text.delta', output_index: 0, delta: 'Hello ' },
+		{ type: 'response.output_text.delta', output_index: 0, delta: 'world' },
+		{ type: 'response.output_item.done', output_index: 0 },
+		{ type: 'response.completed', response: { status: 'completed', usage: { input_tokens: 100, output_tokens: 20 } } },
+	]
+
+	const origFetch = mockFetch(events)
+	try {
+		const mod = await import('./openai-provider.ts')
+		const provider = mod.default
+		const collected: any[] = []
+		for await (const event of provider.generate({
+			messages: [{ role: 'user', content: 'hi' }],
+			model: 'gpt-5.4',
+			systemPrompt: 'You are helpful.',
+			tools: [],
+		})) {
+			collected.push(event)
+		}
+
+		const texts = collected.filter(e => e.type === 'text')
+		expect(texts.map(t => t.text).join('')).toBe('Hello world')
+
+		const done = collected.find(e => e.type === 'done')
+		expect(done).toBeTruthy()
+		expect(done.usage.input).toBe(100)
+		expect(done.usage.output).toBe(20)
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})
+
+test('openai provider: parses tool call', async () => {
+	const events = [
+		{ type: 'response.output_item.added', output_index: 0, item: { type: 'function_call', call_id: 'call_1', name: 'bash' } },
+		{ type: 'response.function_call_arguments.delta', output_index: 0, delta: '{"comma' },
+		{ type: 'response.function_call_arguments.delta', output_index: 0, delta: 'nd":"ls"}' },
+		{ type: 'response.output_item.done', output_index: 0 },
+		{ type: 'response.completed', response: { status: 'completed', usage: { input_tokens: 50, output_tokens: 10 } } },
+	]
+
+	const origFetch = mockFetch(events)
+	try {
+		const mod = await import('./openai-provider.ts')
+		const provider = mod.default
+		const collected: any[] = []
+		for await (const event of provider.generate({
+			messages: [],
+			model: 'gpt-5.3',
+			systemPrompt: 'test',
+			tools: [{ name: 'bash', description: 'Run bash', input_schema: { type: 'object', properties: { command: { type: 'string' } } } }],
+		})) {
+			collected.push(event)
+		}
+
+		const toolCall = collected.find(e => e.type === 'tool_call')
+		expect(toolCall).toBeTruthy()
+		expect(toolCall.id).toBe('call_1')
+		expect(toolCall.name).toBe('bash')
+		expect(toolCall.input).toEqual({ command: 'ls' })
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})
+
+test('openai provider: parses reasoning as thinking', async () => {
+	const events = [
+		{ type: 'response.output_item.added', output_index: 0, item: { type: 'reasoning' } },
+		{ type: 'response.reasoning_summary_text.delta', output_index: 0, delta: 'Let me think...' },
+		{ type: 'response.reasoning_summary_part.done', output_index: 0 },
+		{ type: 'response.output_item.done', output_index: 0 },
+		{ type: 'response.output_item.added', output_index: 1, item: { type: 'message' } },
+		{ type: 'response.output_text.delta', output_index: 1, delta: 'Answer' },
+		{ type: 'response.output_item.done', output_index: 1 },
+		{ type: 'response.completed', response: { status: 'completed' } },
+	]
+
+	const origFetch = mockFetch(events)
+	try {
+		const mod = await import('./openai-provider.ts')
+		const provider = mod.default
+		const collected: any[] = []
+		for await (const event of provider.generate({
+			messages: [],
+			model: 'gpt-5.4',
+			systemPrompt: 'test',
+		})) {
+			collected.push(event)
+		}
+
+		const thinkingTexts = collected.filter(e => e.type === 'thinking').map(e => e.text)
+		expect(thinkingTexts.join('')).toContain('Let me think...')
+
+		const textEvents = collected.filter(e => e.type === 'text')
+		expect(textEvents.map(e => e.text).join('')).toBe('Answer')
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})
+
+test('openai provider: handles API error', async () => {
+	const origFetch = mockFetchError(429, '{"error": "rate limited"}')
+	try {
+		const mod = await import('./openai-provider.ts')
+		const provider = mod.default
+		const collected: any[] = []
+		for await (const event of provider.generate({
+			messages: [],
+			model: 'gpt-5.2',
+			systemPrompt: 'test',
+		})) {
+			collected.push(event)
+		}
+
+		const error = collected.find(e => e.type === 'error')
+		expect(error).toBeTruthy()
+		expect(error.message).toContain('429')
+
+		const done = collected.find(e => e.type === 'done')
+		expect(done).toBeTruthy()
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})

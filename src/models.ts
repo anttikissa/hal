@@ -6,6 +6,9 @@
 const ALIASES: Record<string, string> = {
 	opus: 'anthropic/claude-opus-4-6',
 	sonnet: 'anthropic/claude-sonnet-4-20250514',
+	'gpt54': 'openai/gpt-5.4',
+	'gpt53': 'openai/gpt-5.3',
+	'gpt52': 'openai/gpt-5.2',
 	mock: 'mock/mock-1',
 }
 
@@ -13,6 +16,7 @@ const ALIASES: Record<string, string> = {
 const PATTERNS: [RegExp, string][] = [
 	[/^opus-(.+)$/, 'anthropic/claude-opus-$1'],
 	[/^sonnet-(.+)$/, 'anthropic/claude-sonnet-$1'],
+	[/^gpt-?(\d+\.\d+)$/, 'openai/gpt-$1'],
 ]
 
 export function resolveModel(input: string): string {
@@ -37,6 +41,8 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 		const tier = m[1][0].toUpperCase() + m[1].slice(1)
 		return `${tier} ${m[2]}`
 	}],
+	// gpt-5.4 → GPT 5.4
+	[/^gpt-(\d+\.\d+)$/, m => `GPT ${m[1]}`],
 ]
 
 export function displayModel(fullId: string | undefined): string {
