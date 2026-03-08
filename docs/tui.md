@@ -184,7 +184,7 @@ If not intercepted, `handleKey(...)` processes:
 
 - `Ctrl-C`, `Ctrl-D`, `Ctrl-Z`
 - clipboard shortcuts (including Kitty/xterm modifier encodings)
-- Enter / double-enter
+- Enter (submit) / double-enter / Shift+Enter or Alt+Enter (newline)
 - cursor movement, word movement, history navigation
 - selection-aware editing (cut/copy/paste/delete)
 - scrolling shortcuts

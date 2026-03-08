@@ -142,6 +142,12 @@ describe('parseKey', () => {
 		expect(k.key).toBe('enter')
 	})
 
+	test('kitty: shift+enter', () => {
+		const k = parseKey('\x1b[13;2u')!
+		expect(k.key).toBe('enter')
+		expect(k.shift).toBe(true)
+	})
+
 	test('kitty: key-up ignored', () => {
 		expect(parseKey('\x1b[97;1:3u')).toBeNull()
 	})

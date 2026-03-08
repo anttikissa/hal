@@ -142,6 +142,24 @@ describe('prompt history', () => {
 	})
 })
 
+describe('shift+enter / alt+enter inserts newline', () => {
+	beforeEach(() => prompt.reset())
+
+	test('shift+enter inserts newline', () => {
+		for (const ch of 'ab') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.handleKey(key('enter', { shift: true }), W)
+		for (const ch of 'cd') prompt.handleKey(key(ch, { char: ch }), W)
+		expect(prompt.text()).toBe('ab\ncd')
+	})
+
+	test('alt+enter inserts newline', () => {
+		for (const ch of 'ab') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.handleKey(key('enter', { alt: true }), W)
+		for (const ch of 'cd') prompt.handleKey(key(ch, { char: ch }), W)
+		expect(prompt.text()).toBe('ab\ncd')
+	})
+})
+
 describe('ctrl+a / ctrl+e (home/end)', () => {
 	beforeEach(() => prompt.reset())
 

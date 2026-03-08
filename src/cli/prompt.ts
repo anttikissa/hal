@@ -172,7 +172,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	}
 
 	// Enter
-	if (k.key === 'enter' && k.alt) { replaceSelection('\n'); return true }
+	if (k.key === 'enter' && (k.alt || k.shift)) { replaceSelection('\n'); return true }
 	if (k.key === 'enter') return false // let cli.ts handle submit
 
 	// Backspace
