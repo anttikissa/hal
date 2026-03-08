@@ -1,0 +1,110 @@
+import { test, expect } from 'bun:test'
+import { mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
+
+// ── visLen ──
+
+test('visLen: plain string', () => {
+	expect(visLen('hello')).toBe(5)
+})
+
+test('visLen: with ANSI escapes', () => {
+	expect(visLen('\x1b[1mbold\x1b[22m')).toBe(4)
+	expect(visLen('\x1b[2m\x1b[3mhi\x1b[23m\x1b[22m')).toBe(2)
+})
+
+// ── mdInline ──
+
+test('mdInline: bold', () => {
+	expect(mdInline('hello **world**')).toBe('hello \x1b[1mworld\x1b[22m')
+})
+
+test('mdInline: italic', () => {
+	expect(mdInline('hello *world*')).toBe('hello \x1b[3mworld\x1b[23m')
+})
+
+test('mdInline: inline code', () => {
+	expect(mdInline('run `npm install`')).toBe('run \x1b[2mnpm install\x1b[22m')
+})
+
+test('mdInline: bold code strips both markers', () => {
+	expect(mdInline('see **`file.ts`**')).toBe('see \x1b[1mfile.ts\x1b[22m')
+})
+
+test('mdInline: header', () => {
+	expect(mdInline('## Hello **world**')).toBe('\x1b[1mHello \x1b[1mworld\x1b[22m\x1b[22m')
+})
+
+test('mdInline: no false italic on **bold**', () => {
+	const r = mdInline('**bold**')
+	expect(r).toBe('\x1b[1mbold\x1b[22m')
+	expect(r).not.toContain('\x1b[3m')
+})
+
+// ── mdSpans ──
+
+test('mdSpans: text only', () => {
+	const spans = mdSpans('hello\nworld')
+	expect(spans).toEqual([{ type: 'text', lines: ['hello', 'world'] }])
+})
+
+test('mdSpans: code fence', () => {
+	const spans = mdSpans('before\n```ts\nconst x = 1\n```\nafter')
+	expect(spans).toEqual([
+		{ type: 'text', lines: ['before'] },
+		{ type: 'code', lines: ['const x = 1'] },
+		{ type: 'text', lines: ['after'] },
+	])
+})
+
+test('mdSpans: unclosed code fence', () => {
+	const spans = mdSpans('```\ncode here')
+	expect(spans).toEqual([{ type: 'code', lines: ['code here'] }])
+})
+
+test('mdSpans: table', () => {
+	const spans = mdSpans('text\n| a | b |\n| c | d |\nmore')
+	expect(spans.length).toBe(3)
+	expect(spans[0]).toEqual({ type: 'text', lines: ['text'] })
+	expect(spans[1]).toEqual({ type: 'table', lines: ['| a | b |', '| c | d |'] })
+	expect(spans[2]).toEqual({ type: 'text', lines: ['more'] })
+})
+
+// ── mdTable ──
+
+test('mdTable: aligns columns', () => {
+	const lines = ['| name | age |', '|------|-----|', '| Alice | 30 |', '| Bob | 7 |']
+	const result = mdTable(lines)
+	expect(result).toEqual([
+		'  name   age',
+		'  Alice  30 ',
+		'  Bob    7  ',
+	])
+})
+
+test('mdTable: skips separator row', () => {
+	const lines = ['| a | b |', '| --- | --- |', '| x | y |']
+	const result = mdTable(lines)
+	expect(result.length).toBe(2)
+})
+
+// ── wordWrap ──
+
+test('wordWrap: plain short line unchanged', () => {
+	expect(wordWrap('hello world', 80)).toEqual(['hello world'])
+})
+
+test('wordWrap: breaks at word boundary', () => {
+	expect(wordWrap('hello world foo', 11)).toEqual(['hello world', 'foo'])
+})
+
+test('wordWrap: handles ANSI escapes', () => {
+	const bold = '\x1b[1mvery long bold text here\x1b[22m'
+	const lines = wordWrap(bold, 15)
+	expect(lines.length).toBe(2)
+	// visual content of first line should be ≤ 15
+	expect(visLen(lines[0])).toBeLessThanOrEqual(15)
+})
+
+test('wordWrap: preserves existing newlines', () => {
+	expect(wordWrap('a\nb\nc', 80)).toEqual(['a', 'b', 'c'])
+})

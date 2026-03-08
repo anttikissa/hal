@@ -1,6 +1,7 @@
 // Block-based content model for tab output.
 
 import * as colors from './colors.ts'
+import { mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
 
 const TOOL_MAX_OUTPUT = 5
 const BLOCK_PAD = 1
@@ -33,27 +34,6 @@ function expandTabs(s: string): string {
 	}
 	return out
 }
-
-function wordWrap(text: string, width: number): string[] {
-	const lines: string[] = []
-	for (const raw of text.split('\n')) {
-		if (raw.length <= width || width <= 0) {
-			lines.push(raw)
-		} else {
-			let remaining = raw
-			while (remaining.length > width) {
-				let breakAt = remaining.lastIndexOf(' ', width)
-				if (breakAt <= 0) breakAt = width
-				lines.push(remaining.slice(0, breakAt))
-				remaining = remaining[breakAt] === ' ' ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
-			}
-			lines.push(remaining)
-		}
-	}
-	return lines
-}
-
-
 const CONTENT_W = (width: number) => width - 2 * BLOCK_PAD
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
@@ -71,8 +51,21 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 	const text = collapseBlankLines(block.text.trimEnd())
 	if (!text) return []
 	const label = block.model ? `Hal (${block.model})` : 'Hal'
-	const header = toolHeader(label, width, colors.assistant.fg, colors.assistant.bg)
-	const body = wordWrap(text, CONTENT_W(width)).map(l => toolLine(l, width, colors.assistant.fg, colors.assistant.bg))
+	const { fg, bg } = colors.assistant
+	const header = toolHeader(label, width, fg, bg)
+	const cw = CONTENT_W(width)
+	const line = (s: string) => toolLine(s, width, fg, bg)
+	const body: string[] = []
+	for (const span of mdSpans(text)) {
+		if (span.type === 'code') {
+			for (const l of span.lines) body.push(line(`\x1b[2m${l}\x1b[22m`))
+		} else if (span.type === 'table') {
+			for (const l of mdTable(span.lines)) body.push(line(mdInline(l)))
+		} else {
+			for (const l of span.lines)
+				for (const wl of wordWrap(mdInline(l), cw)) body.push(line(wl))
+		}
+	}
 	return [...header, ...body]
 }
 
@@ -90,7 +83,8 @@ function elapsed(startTime: number, endTime?: number): string {
 
 function toolLine(text: string, width: number, fg: string, bg: string): string {
 	const padded = ' '.repeat(BLOCK_PAD) + expandTabs(text)
-	return `${bg}${fg}${padded.padEnd(width)}${colors.RESET}`
+	const pad = Math.max(0, width - visLen(padded))
+	return `${bg}${fg}${padded}${' '.repeat(pad)}${colors.RESET}`
 }
 
 function headerLine(text: string, width: number, fg: string, bg: string): string {
