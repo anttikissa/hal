@@ -1,29 +1,35 @@
 // Integration test — runtime + IPC end-to-end.
 
-import { mkdtempSync, writeFileSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
-
-// Isolate state dir BEFORE any state.ts import
-const testStateDir = mkdtempSync(join(tmpdir(), 'hal-runtime-test-'))
-process.env.NEW_STATE_DIR = testStateDir
+import { writeFileSync, rmSync, existsSync } from 'fs'
+import { readFile } from 'fs/promises'
+import { test, expect, beforeEach, afterEach, afterAll } from 'bun:test'
+import { randomBytes } from 'crypto'
+import type { Runtime } from './runtime.ts'
+import type { RuntimeEvent } from '../protocol.ts'
 
 const TEST_CONFIG = `/tmp/hal-test-config-${process.pid}.ason`
 writeFileSync(TEST_CONFIG, '{ defaultModel: "mock/mock-1" }\n')
 process.env.HAL_CONFIG = TEST_CONFIG
 
-import { test, expect, beforeEach, afterEach, afterAll } from 'bun:test'
-import { rmSync, existsSync } from 'fs'
-import { readFile } from 'fs/promises'
-import { randomBytes } from 'crypto'
-import { ensureStateDir, STATE_DIR, SESSIONS_DIR } from '../state.ts'
-import { ensureBus, claimHost, releaseHost, commands, events, updateState } from '../ipc.ts'
-import { startRuntime, type Runtime } from './runtime.ts'
-import { makeCommand, type RuntimeEvent } from '../protocol.ts'
-import { parseAll } from '../utils/ason.ts'
-import { sessionDir } from '../state.ts'
-import { appendMessages } from '../session/messages.ts'
-import { createSession } from '../session/session.ts'
+const stateMod = await import('../state.ts')
+const ipcMod = await import('../ipc.ts')
+const runtimeMod = await import('./runtime.ts')
+const protocolMod = await import('../protocol.ts')
+const aSonMod = await import('../utils/ason.ts')
+const messagesMod = await import('../session/messages.ts')
+const sessionMod = await import('../session/session.ts')
+
+const { ensureStateDir, STATE_DIR, sessionDir } = stateMod
+const { ensureBus, claimHost, releaseHost, commands, events, updateState } = ipcMod
+const { startRuntime } = runtimeMod
+const { makeCommand } = protocolMod
+const { parseAll } = aSonMod
+const { appendMessages } = messagesMod
+const { createSession } = sessionMod
+
+if (!STATE_DIR.includes('/hal-new-test-')) {
+	throw new Error(`runtime.test state isolation failed: STATE_DIR=${STATE_DIR}`)
+}
 
 const src = { kind: 'cli' as const, clientId: 'test' }
 
@@ -48,7 +54,7 @@ afterEach(async () => {
 })
 
 afterAll(() => {
-	rmSync(testStateDir, { recursive: true, force: true })
+	rmSync(STATE_DIR, { recursive: true, force: true })
 	rmSync(TEST_CONFIG, { force: true })
 })
 
