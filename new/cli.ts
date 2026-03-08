@@ -78,11 +78,11 @@ function deriveState(tab: TabState | null): string {
 	return 'writing'
 }
 
-function fmtContext(ctx?: { used: number; max: number }): string {
+function fmtContext(ctx?: { used: number; max: number; estimated?: boolean }): string {
 	if (!ctx || ctx.max <= 0) return ''
 	const pct = ((ctx.used / ctx.max) * 100).toFixed(1)
 	const max = ctx.max >= 1000 ? `${Math.round(ctx.max / 1000)}k` : String(ctx.max)
-	return `${pct}%/${max}`
+	return `${ctx.estimated ? '~' : ''}${pct}%/${max}`
 }
 
 function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): string {

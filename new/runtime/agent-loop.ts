@@ -8,14 +8,14 @@ import { appendMessages, writeAssistantEntry, writeToolResultEntry, readBlock } 
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
-import { contextWindowForModel } from './context.ts'
+import { contextWindowForModel, isCalibrated, saveCalibration, estimateTokens, messageBytes } from './context.ts'
 
 export interface AgentContext {
 	sessionId: string
 	model: string
 	systemPrompt: string
 	messages: any[]
-	onStatus: (busy: boolean, activity?: string, context?: { used: number; max: number }) => void
+	onStatus: (busy: boolean, activity?: string, context?: { used: number; max: number; estimated?: boolean }) => void
 	askUser: (question: string) => Promise<string>
 	signal?: AbortSignal
 }
@@ -36,7 +36,13 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const { sessionId, model, systemPrompt, messages, signal } = ctx
 	const [providerName, modelId] = model.includes('/') ? model.split('/', 2) : ['mock', model]
 	const ctxMax = contextWindowForModel(modelId)
-	ctx.onStatus(true, 'generating...')
+	let calibrated = isCalibrated(modelId)
+
+	// Emit estimated context before first API call
+	let totalBytes = systemPrompt.length
+	for (const m of messages) totalBytes += messageBytes(m)
+	const estimated = estimateTokens(totalBytes, modelId)
+	ctx.onStatus(true, 'generating...', { used: estimated, max: ctxMax, estimated: true })
 
 	try {
 		const provider = await loadProvider(providerName)
@@ -68,6 +74,11 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						await emitInfo(sessionId, event.message, 'error')
 						break
 					case 'done': {
+						// Calibrate bytes→tokens ratio on first API response
+						if (!calibrated && event.usage && event.usage.input > 0) {
+							calibrated = true
+							saveCalibration(modelId, totalBytes, event.usage.input)
+						}
 						if (toolCalls.length === 0) {
 							// No tools — persist and finish
 							await appendMessages(sessionId, [

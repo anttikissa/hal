@@ -80,7 +80,7 @@ export type RuntimeEvent =
 		activeSessionId: string | null
 		busy: boolean; queueLength: number
 		activity?: string
-		contexts?: Record<string, { used: number; max: number }>
+		contexts?: Record<string, { used: number; max: number; estimated?: boolean }>
 		createdAt: string
 	}
 	| {

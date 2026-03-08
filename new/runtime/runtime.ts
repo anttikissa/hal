@@ -48,7 +48,7 @@ export async function startRuntime(): Promise<Runtime> {
 	let activeSessionId: string | null = null
 	let stopped = false
 	const pendingQuestions = new Map<string, { resolve: (answer: string) => void; question: string }>()
-	const sessionContext = new Map<string, { used: number; max: number }>()
+	const sessionContext = new Map<string, { used: number; max: number; estimated?: boolean }>()
 	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
 	// Restore sessions from state.ason (preserves tab order across restarts)

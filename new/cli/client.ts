@@ -17,7 +17,7 @@ export interface TabState {
 	inputHistory: string[]
 	inputDraft: string
 	contentHeight: number
-	context?: { used: number; max: number }
+	context?: { used: number; max: number; estimated?: boolean }
 	question?: { id: string; text: string }
 }
 
