@@ -222,11 +222,11 @@ describe('renderBlocks', () => {
 	})
 
 	test('info block renders with neutral styling', () => {
-		const blocks: Block[] = [{ type: 'info', text: 'Stopped after 10 tool rounds' }]
+		const blocks: Block[] = [{ type: 'info', text: 'Context window >66% full' }]
 		const lines = renderBlocks(blocks, 80)
 		// body + blank + idle cursor
 		expect(lines.length).toBe(3)
-		expect(lines[0]).toContain('Stopped after 10 tool rounds')
+		expect(lines[0]).toContain('Context window >66% full')
 	})
 
 	test('info block is full width', () => {

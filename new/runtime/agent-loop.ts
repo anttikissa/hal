@@ -31,7 +31,6 @@ async function emitInfo(sessionId: string, text: string, level: string): Promise
 	await emit(sessionId, { type: 'line', text, level })
 }
 
-const MAX_TOOL_ROUNDS = 10
 export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const { sessionId, model, systemPrompt, messages, signal } = ctx
 	const [providerName, modelId] = model.includes('/') ? model.split('/', 2) : ['mock', model]
@@ -41,8 +40,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	try {
 		const provider = await loadProvider(providerName)
 
-		for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-			if (signal?.aborted) break
+		while (!signal?.aborted) {
 
 			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS })
 
@@ -152,19 +150,14 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, ts: new Date().toISOString() },
 					])
 				}
-				await emit(sessionId, { type: 'line', sessionId, text: '[paused]', level: 'meta' })
+				await emitInfo(sessionId, '[paused]', 'meta')
 				await emit(sessionId, { type: 'command', commandId: '', phase: 'done' })
 				return
 			}
 
-			// If we get here, there were tool calls — loop for next round
 		}
-
-		// Exceeded max rounds
-		await emit(sessionId, { type: 'line', text: `Stopped after ${MAX_TOOL_ROUNDS} tool rounds`, level: 'warn' })
-		await emit(sessionId, { type: 'command', commandId: '', phase: 'done' })
 	} catch (err: any) {
-		await emit(sessionId, { type: 'line', text: `Error: ${err.message}`, level: 'error' })
+		await emitInfo(sessionId, `Error: ${err.message}`, 'error')
 		await emit(sessionId, { type: 'command', commandId: '', phase: 'failed', message: err.message })
 	} finally {
 		ctx.onStatus(false)
