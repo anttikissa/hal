@@ -17,6 +17,7 @@ export interface TabState {
 	inputHistory: string[]
 	inputDraft: string
 	contentHeight: number
+	context?: { used: number; max: number }
 	question?: { id: string; text: string }
 }
 
@@ -112,7 +113,10 @@ export class Client {
 			}
 			case 'status': {
 				const busy = new Set(event.busySessionIds ?? [])
-				for (const t of this.state.tabs) t.busy = busy.has(t.sessionId)
+				for (const t of this.state.tabs) {
+					t.busy = busy.has(t.sessionId)
+					if (event.contexts?.[t.sessionId]) t.context = event.contexts[t.sessionId]
+				}
 				break
 			}
 			case 'sessions': {

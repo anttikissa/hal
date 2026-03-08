@@ -6,7 +6,7 @@ import { handleInput } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
 import { maxTabHeight } from './cli/heights.ts'
-import { Client } from './cli/client.ts'
+import { Client, type TabState } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
 import { getConfig } from './config.ts'
@@ -68,6 +68,37 @@ function shortModel(model?: string): string {
 	return m.includes('/') ? m.slice(m.indexOf('/') + 1) : m
 }
 
+function deriveState(tab: TabState | null): string {
+	if (!tab) return 'idle'
+	if (!tab.busy) return 'idle'
+	const last = tab.blocks[tab.blocks.length - 1]
+	if (!last) return 'idle'
+	if (last.type === 'thinking' && !last.done) return 'thinking'
+	if (last.type === 'tool' && (last.status === 'running' || last.status === 'streaming')) return 'tool'
+	return 'writing'
+}
+
+function fmtContext(ctx?: { used: number; max: number }): string {
+	if (!ctx || ctx.max <= 0) return ''
+	const pct = ((ctx.used / ctx.max) * 100).toFixed(1)
+	const max = ctx.max >= 1000 ? `${Math.round(ctx.max / 1000)}k` : String(ctx.max)
+	return `${pct}%/${max}`
+}
+
+function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): string {
+	const model = shortModel(tab?.info.model)
+	const state = deriveState(tab)
+	const role = hal.isHost ? 'host' : 'client'
+	const ctx = fmtContext(tab?.context)
+	const rightParts = [role]
+	if (ctx) rightParts.push(ctx)
+	if (scrollInfo) rightParts.push(scrollInfo)
+	const left = ` ${model} (${state}) `
+	const right = ` ${rightParts.join(' · ')}`
+	const fill = Math.max(1, w - left.length - right.length)
+	return `${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`
+}
+
 function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cState = client.getState()
 	const tab = client.activeTab()
@@ -116,12 +147,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		cursorPos = { row: answerStartRow + p.cursor.rowOffset, col: p.cursor.col }
 
 		// Grayed-out main prompt
-		const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
-		const model = shortModel(tab?.info.model)
-		const left = ` ${role} `
-		const right = model ? ` ${model} ` : ''
-		const fill = Math.max(0, w - left.length - right.length)
-		lines.push(`${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`)
+		lines.push(buildSeparator(tab, w))
 		const frozen = prompt.frozenText()
 		if (frozen) {
 			for (const l of frozen.split('\n').slice(0, 3)) {
@@ -131,15 +157,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	} else {
 		// Normal prompt
 		const p = prompt.buildPrompt(w, cw)
-		const role = hal.isHost ? `host pid ${hal.hostPid}` : `client → pid ${hal.hostPid}`
-		const model = shortModel(tab?.info.model)
-		const rightParts: string[] = []
-		if (model) rightParts.push(model)
-		if (p.scrollInfo) rightParts.push(p.scrollInfo)
-		const left = ` ${role} `
-		const right = rightParts.length > 0 ? ` ${rightParts.join(' · ')} ` : ''
-		const fill = Math.max(0, w - left.length - right.length)
-		lines.push(`${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`)
+		lines.push(buildSeparator(tab, w, p.scrollInfo))
 		lines.push(...p.lines)
 		cursorPos = {
 			row: lines.length - pLines + p.cursor.rowOffset,

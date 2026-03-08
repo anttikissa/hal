@@ -48,6 +48,7 @@ export async function startRuntime(): Promise<Runtime> {
 	let activeSessionId: string | null = null
 	let stopped = false
 	const pendingQuestions = new Map<string, { resolve: (answer: string) => void; question: string }>()
+	const sessionContext = new Map<string, { used: number; max: number }>()
 	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
@@ -107,11 +108,14 @@ export async function startRuntime(): Promise<Runtime> {
 	}
 
 	async function publish(activity?: string): Promise<void> {
+		const contexts: Record<string, { used: number; max: number }> = {}
+		for (const [id, ctx] of sessionContext) contexts[id] = ctx
 		await emit({
 			type: 'status', sessionId: null,
 			busySessionIds: [...busySessionIds], pausedSessionIds: [],
 			activeSessionId, busy: busySessionIds.size > 0,
 			queueLength: 0, activity,
+			contexts: Object.keys(contexts).length > 0 ? contexts : undefined,
 		})
 		await emit({
 			type: 'sessions',
@@ -153,9 +157,10 @@ export async function startRuntime(): Promise<Runtime> {
 			model: info.model ?? getConfig().defaultModel,
 			systemPrompt: loadSystemPrompt({ model: info.model ?? getConfig().defaultModel, sessionDir: sid }),
 			messages: apiMessages,
-			onStatus: async (busy, nextActivity) => {
+			onStatus: async (busy, nextActivity, context) => {
 				if (busy) busySessionIds.add(sid)
 				else busySessionIds.delete(sid)
+				if (context) sessionContext.set(sid, context)
 				await publish(nextActivity)
 			},
 			askUser: (question) => askUser(sid, question),

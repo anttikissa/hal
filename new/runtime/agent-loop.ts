@@ -8,13 +8,14 @@ import { appendMessages, writeAssistantEntry, writeToolResultEntry, readBlock } 
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, type ToolCall } from './tools.ts'
+import { contextWindowForModel } from './context.ts'
 
 export interface AgentContext {
 	sessionId: string
 	model: string
 	systemPrompt: string
 	messages: any[]
-	onStatus: (busy: boolean, activity?: string) => void
+	onStatus: (busy: boolean, activity?: string, context?: { used: number; max: number }) => void
 	askUser: (question: string) => Promise<string>
 	signal?: AbortSignal
 }
@@ -34,7 +35,7 @@ async function emitInfo(sessionId: string, text: string, level: string): Promise
 export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const { sessionId, model, systemPrompt, messages, signal } = ctx
 	const [providerName, modelId] = model.includes('/') ? model.split('/', 2) : ['mock', model]
-
+	const ctxMax = contextWindowForModel(modelId)
 	ctx.onStatus(true, 'generating...')
 
 	try {
@@ -72,6 +73,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							await appendMessages(sessionId, [
 								{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, ts: new Date().toISOString() },
 							])
+							if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 							await emit(sessionId, {
 								type: 'command', commandId: '', phase: 'done',
 								message: event.usage ? `${event.usage.input}→${event.usage.output} tokens` : undefined,
@@ -86,6 +88,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							toolCalls,
 						})
 						await appendMessages(sessionId, [assistantEntry])
+						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
 						// Execute tools, writing each result individually
 						for (const call of toolCalls) {
