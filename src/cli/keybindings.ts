@@ -32,7 +32,7 @@ export function handleInput(k: KeyEvent): void {
 			doRender()
 			return
 		}
-		if (k.key === 'enter' && !k.alt && !k.ctrl && !k.cmd) {
+		if (k.key === 'enter' && !k.shift && !k.alt && !k.ctrl && !k.cmd) {
 			const answer = prompt.clearQuestion()
 			client.clearQuestion()
 			if (answer.trim()) send('respond', answer.trim())
