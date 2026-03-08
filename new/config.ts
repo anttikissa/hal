@@ -13,7 +13,7 @@ let _config: Config | null = null
 export function getConfig(): Config {
 	if (!_config) {
 		_config = liveFile<Config>(process.env.HAL_CONFIG ?? CONFIG_PATH, {
-			defaults: { defaultModel: 'anthropic/claude-sonnet-4-20250514' },
+			defaults: { defaultModel: 'anthropic/claude-opus-4-6' },
 		})
 	}
 	return _config
