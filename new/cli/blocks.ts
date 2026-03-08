@@ -9,6 +9,7 @@ export type Block =
 	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
 	| { type: 'assistant'; text: string; done: boolean; model?: string }
 	| { type: 'thinking'; text: string; done: boolean }
+	| { type: 'info'; text: string }
 	| { type: 'tool'; name: string; status: 'streaming' | 'running' | 'done' | 'error';
 		args: string; output: string; startTime: number; endTime?: number }
 
@@ -76,6 +77,11 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	return wordWrap(text, CONTENT_W(width)).map(l => `${colors.thinking.fg}${pad}${l}${colors.RESET}`)
 }
 
+function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): string[] {
+	const { fg, bg } = colors.info
+	return [toolLine(block.text, width, fg, bg)]
+}
+
 function elapsed(startTime: number, endTime?: number): string {
 	const s = ((endTime ?? Date.now()) - startTime) / 1000
 	return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
@@ -140,6 +146,7 @@ function renderBlock(block: Block, width: number): string[] {
 		case 'input': return renderInput(block, width)
 		case 'assistant': return renderAssistant(block, width)
 		case 'thinking': return renderThinking(block, width)
+		case 'info': return renderInfo(block, width)
 		case 'tool': return renderTool(block, width)
 	}
 }
@@ -156,6 +163,18 @@ function cursorColor(block: Block): string {
 	return colors.cursor.fg
 }
 
+function appendInlineCursor(line: string, cursor: string, width: number): string[] {
+	const body = line.endsWith(colors.RESET) ? line.slice(0, -colors.RESET.length) : line
+	const reset = line.endsWith(colors.RESET) ? colors.RESET : ''
+	const pad = body.match(/ +$/)?.[0] ?? ''
+	const content = pad ? body.slice(0, -pad.length) : body
+	if (pad.length > 0) {
+		return [content + cursor + pad.slice(1) + reset]
+	}
+	if (visLen(body) < width) return [body + cursor + reset]
+	return [line, cursor]
+}
+
 /** Render all blocks with one blank line between them. */
 export function renderBlocks(blocks: Block[], width: number, cursorVisible = false): string[] {
 	const result: string[] = []
@@ -170,14 +189,8 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
 		const cc = cursorColor(lastBlock)
 		const c = cursorVisible ? `${cc}█${colors.RESET}` : ' '
-		const last = result[result.length - 1]
-		if (last.endsWith(colors.RESET)) {
-			// Strip RESET, trim trailing spaces (from padEnd), add cursor, re-close
-			const inner = last.slice(0, -colors.RESET.length).replace(/ +$/, '')
-			result[result.length - 1] = inner + c + colors.RESET
-		} else {
-			result[result.length - 1] = last + c
-		}
+		const extra = appendInlineCursor(result[result.length - 1], c, width)
+		result.splice(result.length - 1, 1, ...extra)
 	} else if (result.length > 0) {
 		// Idle cursor on its own line after completed content
 		const cc = lastBlock ? cursorColor(lastBlock) : colors.cursor.fg

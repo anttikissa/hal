@@ -33,6 +33,7 @@ function bg([r, g, b]: [number, number, number]): string { return `\x1b[48;2;${r
 const assistant = { fg: fg(oklch(0.75, 0.15, 70)), bg: bg(oklch(0.25, 0.05, 70)) }
 const input     = { fg: fg(oklch(0.80, 0.008, 250)), bg: bg(oklch(0.29, 0.008, 250)) }
 const thinking  = { fg: fg(oklch(0.55, 0.02, 250)) }
+const info      = { fg: fg(oklch(0.65, 0.01, 250)), bg: bg(oklch(0.22, 0.01, 250)) }
 const cursor    = { fg: fg(oklch(0.75, 0.15, 70)) }
 
 const tools: Record<string, { fg: string; bg: string }> = {
@@ -45,4 +46,4 @@ function tool(name: string): { fg: string; bg: string } {
 	return tools[name] ?? tools.default
 }
 
-export { RESET, DIM, SEL_ON, SEL_OFF, assistant, input, thinking, cursor, tool }
+export { RESET, DIM, SEL_ON, SEL_OFF, assistant, input, thinking, info, cursor, tool }

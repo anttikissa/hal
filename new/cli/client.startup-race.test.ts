@@ -117,5 +117,5 @@ test('client does not miss events emitted during startup replay', async () => {
 
 	const tab = client.activeTab()
 	expect(tab).toBeTruthy()
-	expect(tab!.blocks.some((b) => b.type === 'assistant' && b.text === 'event during replay window')).toBe(true)
+	expect(tab!.blocks.some((b) => b.type === 'info' && b.text === 'event during replay window')).toBe(true)
 })

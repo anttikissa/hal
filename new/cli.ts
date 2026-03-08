@@ -150,7 +150,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 export function showError(msg: string): void {
 	const tab = client.activeTab()
-	if (tab) tab.blocks.push({ type: 'assistant', text: `⚠ ${msg}`, done: true })
+	if (tab) tab.blocks.push({ type: 'info', text: `⚠ ${msg}` })
 	doRender()
 }
 

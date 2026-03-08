@@ -104,6 +104,28 @@ describe('renderBlocks', () => {
 		const lastContentLine = strip(lines[lines.length - 1])
 		expect(lastContentLine).toContain('file.txt')
 		expect(lastContentLine).toContain('█')
+		expect(lastContentLine.length).toBe(40)
+	})
+
+	test('streaming assistant line keeps full width with inline cursor', () => {
+		const blocks: Block[] = [
+			{ type: 'assistant', text: 'Done!', done: false, model: 'mock' },
+		]
+		const lines = renderBlocks(blocks, 40, true)
+		const bodyLine = strip(lines[1])
+		expect(bodyLine).toContain('Done!')
+		expect(bodyLine).toContain('█')
+		expect(bodyLine.length).toBe(40)
+	})
+
+	test('running tool header with inline cursor moves to next line when header is full width', () => {
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'read', status: 'running', args: 'package.json', output: '', startTime: Date.now() },
+		]
+		const lines = renderBlocks(blocks, 40, true)
+		expect(strip(lines[0])).not.toContain('█')
+		expect(strip(lines[0]).length).toBe(40)
+		expect(strip(lines[1])).toContain('█')
 	})
 	test('tool output collapses after 5 lines', () => {
 		const output = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n')
@@ -197,5 +219,19 @@ describe('renderBlocks', () => {
 		// Should start with space (left pad) and end with spaces (right pad)
 		expect(bodyPlain[0]).toBe(' ')
 		expect(bodyPlain[bodyPlain.length - 1]).toBe(' ')
+	})
+
+	test('info block renders with neutral styling', () => {
+		const blocks: Block[] = [{ type: 'info', text: 'Stopped after 10 tool rounds' }]
+		const lines = renderBlocks(blocks, 80)
+		// body + blank + idle cursor
+		expect(lines.length).toBe(3)
+		expect(lines[0]).toContain('Stopped after 10 tool rounds')
+	})
+
+	test('info block is full width', () => {
+		const blocks: Block[] = [{ type: 'info', text: 'paused' }]
+		const lines = renderBlocks(blocks, 40)
+		expect(strip(lines[0]).length).toBe(40)
 	})
 })
