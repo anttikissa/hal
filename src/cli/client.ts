@@ -108,8 +108,11 @@ export class Client {
 					const idx = t.blocks.findIndex(b => b.type === 'info' && b.text === '[pausing...]')
 					if (idx >= 0) t.blocks.splice(idx, 1)
 				}
-				const prefix = event.level === 'error' ? '⚠ ' : ''
-				t.blocks.push({ type: 'info', text: `${prefix}${event.text}` })
+				if (event.level === 'error') {
+					t.blocks.push({ type: 'error', text: event.text, detail: event.detail })
+				} else {
+					t.blocks.push({ type: 'info', text: event.text })
+				}
 				break
 			}
 			case 'prompt': {

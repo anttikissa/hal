@@ -242,4 +242,28 @@ describe('renderBlocks', () => {
 		const lines = renderBlocks(blocks, 40)
 		expect(strip(lines[0]).length).toBe(40)
 	})
+
+	test('error block renders with header and body', () => {
+		const blocks: Block[] = [{ type: 'error', text: 'API request failed', detail: 'status 400: invalid content' }]
+		const lines = renderBlocks(blocks, 80)
+		// header + body line + blank + idle cursor = 4
+		expect(lines.length).toBe(4)
+		expect(strip(lines[0])).toContain('Error')
+		expect(strip(lines[1])).toContain('status 400: invalid content')
+	})
+
+	test('error block without detail renders header + message', () => {
+		const blocks: Block[] = [{ type: 'error', text: 'Something went wrong' }]
+		const lines = renderBlocks(blocks, 80)
+		// header + body + blank + cursor = 4
+		expect(lines.length).toBe(4)
+		expect(strip(lines[0])).toContain('Error')
+		expect(strip(lines[1])).toContain('Something went wrong')
+	})
+
+	test('error block is full width', () => {
+		const blocks: Block[] = [{ type: 'error', text: 'fail' }]
+		const lines = renderBlocks(blocks, 40)
+		expect(strip(lines[0]).length).toBe(40)
+	})
 })

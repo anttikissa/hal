@@ -71,7 +71,7 @@ export type EventLevel = 'info' | 'warn' | 'error' | 'tool' | 'meta' | 'notice'
 export type RuntimeEvent =
 	| {
 		id: string; type: 'line'; sessionId: string | null
-		text: string; level: EventLevel; createdAt: string
+		text: string; level: EventLevel; detail?: string; createdAt: string
 	}
 	| {
 		id: string; type: 'chunk'; sessionId: string | null

@@ -55,7 +55,7 @@ export interface ToolResultMessage {
 }
 
 export type Message = UserMessage | AssistantMessage | ToolResultMessage
-	| { type: 'info'; text: string; level?: string; ts: string }
+	| { type: 'info'; text: string; level?: string; detail?: string; ts: string }
 	| { type: 'reset'; ts: string }
 	| { type: 'handoff'; ts: string }
 	| { type: 'forked_from'; parent: string; ts: string }

@@ -11,6 +11,7 @@ export type Block =
 	| { type: 'assistant'; text: string; done: boolean; model?: string }
 	| { type: 'thinking'; text: string; done: boolean }
 	| { type: 'info'; text: string }
+	| { type: 'error'; text: string; detail?: string }
 	| { type: 'tool'; name: string; status: 'streaming' | 'running' | 'done' | 'error';
 		args: string; output: string; startTime: number; endTime?: number }
 
@@ -91,6 +92,15 @@ function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): str
 	return [toolLine(block.text, width, fg, bg)]
 }
 
+function renderError(block: Extract<Block, { type: 'error' }>, width: number): string[] {
+	const { fg, bg } = colors.error
+	const header = toolHeader('Error', width, fg, bg)
+	const body = block.detail
+		? wordWrap(block.detail, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
+		: wordWrap(block.text, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
+	return [...header, ...body]
+}
+
 function elapsed(startTime: number, endTime?: number): string {
 	const s = ((endTime ?? Date.now()) - startTime) / 1000
 	return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
@@ -168,6 +178,7 @@ function renderBlock(block: Block, width: number): string[] {
 		case 'assistant': return renderAssistant(block, width)
 		case 'thinking': return renderThinking(block, width)
 		case 'info': return renderInfo(block, width)
+		case 'error': return renderError(block, width)
 		case 'tool': return renderTool(block, width)
 	}
 }

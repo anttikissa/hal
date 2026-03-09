@@ -1,9 +1,11 @@
 // Replay — convert messages to Block[] for TUI history display.
 
+import { homedir } from 'os'
 import type { Block } from '../cli/blocks.ts'
 import type { Message } from './messages.ts'
 import { readBlock } from './messages.ts'
 
+const HOME = homedir()
 /** Convert a message log to display blocks (for tab history). */
 export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
 	const blocks: Block[] = []
@@ -19,8 +21,11 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 		const m = msg as any
 		if (m.type === 'reset' || m.type === 'forked_from' || m.type === 'handoff') continue
 		if (m.type === 'info') {
-			const prefix = m.level === 'error' ? '⚠ ' : ''
-			blocks.push({ type: 'info', text: `${prefix}${m.text}` })
+			if (m.level === 'error') {
+				blocks.push({ type: 'error', text: m.text, detail: m.detail })
+			} else {
+				blocks.push({ type: 'info', text: m.text })
+			}
 			continue
 		}
 
@@ -60,10 +65,13 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 
 function argsPreview(name: string, input: unknown): string {
 	const inp = input as any
+	let s: string
 	switch (name) {
-		case 'bash': return String(inp?.command ?? '')
-		case 'read': return String(inp?.path ?? '')
-		case 'write': return String(inp?.path ?? '')
-		default: return JSON.stringify(input ?? {})
+		case 'bash': s = String(inp?.command ?? ''); break
+		case 'read': s = String(inp?.path ?? ''); break
+		case 'write': s = String(inp?.path ?? ''); break
+		default: s = JSON.stringify(input ?? {})
 	}
+	if (HOME) s = s.replaceAll(HOME, '~')
+	return s
 }

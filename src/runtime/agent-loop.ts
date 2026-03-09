@@ -6,7 +6,7 @@ import { loadProvider, type ProviderEvent } from './provider.ts'
 import { events } from '../ipc.ts'
 import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
-import type { RuntimeEvent } from '../protocol.ts'
+import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
 import { runHooks } from './hooks.ts'
 import { contextWindowForModel, isCalibrated, saveCalibration, estimateTokens, messageBytes } from './context.ts'
@@ -28,9 +28,9 @@ function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeE
 }
 
 /** Emit IPC line event AND persist as info message. */
-async function emitInfo(sessionId: string, text: string, level: string): Promise<void> {
-	await appendMessages(sessionId, [{ type: 'info', text, level, ts: new Date().toISOString() }])
-	await emit(sessionId, { type: 'line', text, level })
+async function emitInfo(sessionId: string, text: string, level: EventLevel, detail?: string): Promise<void> {
+	await appendMessages(sessionId, [{ type: 'info', text, level, detail, ts: new Date().toISOString() }])
+	await emit(sessionId, { type: 'line', text, level, detail })
 }
 
 export async function runAgentLoop(ctx: AgentContext): Promise<void> {
@@ -72,7 +72,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						toolCalls.push({ id: event.id, name: event.name, input: event.input })
 						break
 					case 'error':
-						await emitInfo(sessionId, event.message, 'error')
+						await emitInfo(sessionId, event.message, 'error', event.message)
 						break
 					case 'done': {
 						// Calibrate bytes→tokens ratio on first API response
@@ -183,7 +183,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			await emit(sessionId, { type: 'command', commandId: '', phase: 'done' })
 			return
 		}
-		await emitInfo(sessionId, `Error: ${err.message}`, 'error')
+		const detail = err.status ? `${err.status}: ${err.message}` : err.stack ?? err.message
+		await emitInfo(sessionId, err.message, 'error', detail)
 		await emit(sessionId, { type: 'command', commandId: '', phase: 'failed', message: err.message })
 	} finally {
 		ctx.onStatus(false)
