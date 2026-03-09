@@ -168,12 +168,23 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 		}, required: ['question'] } },
 ]
 
-// ── Tool execution ──
+const TOOL_MAP = new Map(TOOLS.map(t => [t.name, t]))
+
+function validateRequired(call: ToolCall): string | null {
+	const tool = TOOL_MAP.get(call.name)
+	if (!tool) return null
+	const schema = (tool as any).input_schema
+	const required: string[] = schema?.required ?? []
+	const inp = call.input as any
+	const missing = required.filter(k => inp?.[k] == null || inp[k] === '')
+	if (missing.length) return `error: ${call.name} requires ${missing.join(', ')}`
+	return null
+}
 
 export interface ToolCall { id: string; name: string; input: unknown }
 type OnChunk = (text: string) => Promise<void>
 
-
+// ── Tool execution ──
 export function argsPreview(call: ToolCall): string {
 	const inp = call.input as any
 	let s: string
@@ -196,11 +207,12 @@ export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<st
 }
 
 async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {
+	const err = validateRequired(call)
+	if (err) return err
 	const inp = call.input as any
 	switch (call.name) {
 		case 'bash': {
-			const cmd = String(inp?.command ?? '')
-			if (!cmd) return '(empty command)'
+			const cmd = String(inp.command)
 			const proc = Bun.spawn(['bash', '-lc', cmd], {
 				cwd: CWD, stdout: 'pipe', stderr: 'pipe',
 				env: { ...process.env, TERM: 'dumb' },
@@ -222,7 +234,7 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> 
 			return out || '(no output)'
 		}
 		case 'read': {
-			const path = resolvePath(inp?.path)
+			const path = resolvePath(inp.path)
 			try {
 				const s = statSync(path)
 				if (s.isDirectory()) return `error: ${path} is a directory, use ls`
@@ -231,17 +243,14 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> 
 			return formatHashlines(content, inp?.start, inp?.end)
 		}
 		case 'write': {
-			const path = resolvePath(inp?.path)
-			if (!inp?.path) return 'error: write requires path'
-			const content = String(inp?.content ?? '')
+			const path = resolvePath(inp.path)
 			return withLock(path, async () => {
-				await Bun.write(path, content)
+				await Bun.write(path, String(inp.content))
 				return 'ok'
 			})
 		}
 		case 'edit': {
-			const path = resolvePath(inp?.path)
-			if (!inp?.path) return 'error: edit requires path'
+			const path = resolvePath(inp.path)
 			if (inp.operation !== 'replace' && inp.operation !== 'insert')
 				return `error: unknown operation "${inp.operation}"`
 			return withLock(path, async () => {

@@ -180,3 +180,41 @@ test('output replaces $HOME with ~', async () => {
 	expect(result).toContain('~/foo')
 	expect(result).not.toContain(home)
 })
+
+// ── required parameter validation ──
+
+test('missing required params: read without path', async () => {
+	const result = await executeTool(call('read', {}))
+	expect(result).toContain('error:')
+	expect(result).toContain('path')
+})
+
+test('missing required params: write without content', async () => {
+	const result = await executeTool(call('write', { path: `${TMP}.txt` }))
+	expect(result).toContain('error:')
+	expect(result).toContain('content')
+})
+
+test('missing required params: bash without command', async () => {
+	const result = await executeTool(call('bash', {}))
+	expect(result).toContain('error:')
+	expect(result).toContain('command')
+})
+
+test('missing required params: edit without path', async () => {
+	const result = await executeTool(call('edit', { operation: 'replace', new_content: 'x' }))
+	expect(result).toContain('error:')
+	expect(result).toContain('path')
+})
+
+test('missing required params: grep without pattern', async () => {
+	const result = await executeTool(call('grep', {}))
+	expect(result).toContain('error:')
+	expect(result).toContain('pattern')
+})
+
+test('missing required params: glob without pattern', async () => {
+	const result = await executeTool(call('glob', {}))
+	expect(result).toContain('error:')
+	expect(result).toContain('pattern')
+})
