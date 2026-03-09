@@ -330,7 +330,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	for (const msg of compacted) {
 		if (msg.role === 'user' && Array.isArray(msg.content)) {
 			for (const b of msg.content) {
-				if (b.type === 'tool_result') delete b._ref
+				if (b._ref) delete b._ref
 			}
 		}
 	}
