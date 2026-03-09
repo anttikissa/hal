@@ -129,11 +129,13 @@ new-state/config.ason  — { defaultModel, activeSessionId, ... }
 ## liveFile utility
 
 Proxy-backed object with auto-persist and optional fs.watch:
-- Shallow property assignment → marks dirty → flushes on next microtask
+- Deep property writes → marks dirty → flushes on next microtask
 - Atomic writes (tmp + rename) to prevent corrupt reads
 - `save()` for synchronous persist (exit paths)
 - fs.watch with debounce for external edits
-- ~40 LOC
+- ~50 LOC
+
+⚠ Don't stash nested objects (`const x = f.foo`) — after a file reload, `x` points to the old object and writes through it are silently lost. Always access through the root proxy: `f.foo.bar = 2`.
 
 Used for: config.ason, session meta.ason.
 Not used for: .asonl files (append-only), state.ason (host-only, explicit writes).
