@@ -58,7 +58,7 @@ export function handleInput(k: KeyEvent): void {
 				if (cmd === 'help') { showHelp(); }
 				else send(cmd as any, arg || undefined)
 			} else {
-				client.onSubmit(text)
+				client.onSubmit()
 				prompt.pushHistory(text)
 				send('prompt', text)
 			}

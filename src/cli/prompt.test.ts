@@ -140,6 +140,57 @@ describe('prompt history', () => {
 		prompt.handleKey(key('up'), W)
 		expect(prompt.text()).toBe('hello')
 	})
+
+	test('two submits then up up recalls both', () => {
+		prompt.reset()
+		prompt.setHistory([])
+
+		// Type "hello", submit
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+		const t1 = prompt.text().trim()
+		prompt.clear()
+		prompt.pushHistory(t1)
+
+		// Type "world", submit
+		for (const ch of 'world') prompt.handleKey(key(ch, { char: ch }), W)
+		const t2 = prompt.text().trim()
+		prompt.clear()
+		prompt.pushHistory(t2)
+
+		// Press up - should see "world"
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('world')
+
+		// Press up again - should see "hello"
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('hello')
+	})
+
+	test('shared array: pushHistory is the only push site', () => {
+		prompt.reset()
+		// Simulate client.ts flow: setHistory shares the tab's array
+		const tabHistory: string[] = []
+		prompt.setHistory(tabHistory)
+
+		// Submit "hello" — only pushHistory, NOT tabHistory.push
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.clear()
+		prompt.pushHistory('hello')
+
+		// Submit "world"
+		for (const ch of 'world') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.clear()
+		prompt.pushHistory('world')
+
+		// tabHistory should have exactly 2 entries (shared reference)
+		expect(tabHistory).toEqual(['hello', 'world'])
+
+		// Up should cycle correctly
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('world')
+		prompt.handleKey(key('up'), W)
+		expect(prompt.text()).toBe('hello')
+	})
 })
 
 describe('shift+enter / alt+enter inserts newline', () => {

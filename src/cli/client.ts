@@ -229,10 +229,10 @@ export class Client {
 		if (tab) tab.question = undefined
 	}
 
-	onSubmit(text: string): void {
+	onSubmit(): void {
 		const tab = this.activeTab()
 		if (!tab) return
-		tab.inputHistory.push(text)
+		// History push happens in prompt.pushHistory (shared array via setHistory)
 		tab.inputDraft = ''
 		saveDraft(tab.sessionId, '').catch(() => {})
 	}
