@@ -181,7 +181,7 @@ export class Client {
 		}
 	}
 
-	private syncTabs(sessions: SessionInfo[]): void {
+	private async syncTabs(sessions: SessionInfo[]): Promise<void> {
 		const current = new Map(this.state.tabs.map(t => [t.sessionId, t]))
 		const newTabs: TabState[] = []
 		let newTabId: string | null = null
@@ -204,6 +204,15 @@ export class Client {
 				// Tab was closed — stay at same index (tab to the right slides in)
 				const prevIdx = this.state.activeTabIndex
 				this.state.activeTabIndex = Math.min(prevIdx, newTabs.length - 1)
+			}
+		}
+		// Replay new tabs
+		for (const tab of newTabs) {
+			if (!current.has(tab.sessionId)) {
+				const messages = await this.transport.replaySession(tab.sessionId)
+				tab.blocks.push(...await replayToBlocks(tab.sessionId, messages, tab.info.model))
+				tab.inputHistory = await loadInputHistory(tab.sessionId)
+				tab.inputDraft = await loadDraft(tab.sessionId)
 			}
 		}
 		const newId = this.state.tabs[this.state.activeTabIndex]?.sessionId
