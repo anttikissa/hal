@@ -86,7 +86,7 @@ export class Client {
 				const last = lastBlock(t)
 				if (event.channel === 'thinking') {
 					if (last?.type === 'thinking' && !last.done) last.text += event.text
-					else t.blocks.push({ type: 'thinking', text: event.text, done: false })
+					else t.blocks.push({ type: 'thinking', text: event.text, done: false, ref: event.id })
 				} else {
 					if (last?.type === 'assistant' && !last.done) last.text += event.text
 					else {

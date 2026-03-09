@@ -144,11 +144,14 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	// Tab bar
 	const tabs = cState.tabs
 	const idx = cState.activeTabIndex
-	const parts = tabs.map((t, i) => ({
-		label: String(t.info.topic ?? t.info.workingDir ?? t.sessionId),
-		busy: !!t.busy,
-		active: i === idx,
-	}))
+	const parts = tabs.map((t, i) => {
+		const title = t.info.topic ?? t.info.workingDir?.split('/').pop() ?? 'tab'
+		return {
+			label: `${i + 1} ${title}`,
+			busy: !!t.busy,
+			active: i === idx,
+		}
+	})
 	const tabBar = renderTabline(parts, w)
 	lines.push(clipForWidth(oneLine(tabBar), w))
 
