@@ -270,4 +270,50 @@ describe('compactApiMessages', () => {
 		expect(toolResult.content[0]).toEqual({ type: 'text', text: 'here' })
 		expect(toolResult.content[1]).toEqual({ type: 'text', text: '[image cleared]' })
 	})
+
+	test('drops thinking blocks older than 10 user turns', () => {
+		const thinkingBlock = { type: 'thinking', thinking: 'deep thoughts...', signature: 'sig-abc' }
+
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			{ role: 'assistant', content: [thinkingBlock, { type: 'text', text: 'answer' }] },
+		]
+		// Add 11 more user turns to push the thinking block past threshold
+		for (let i = 0; i < 11; i++) {
+			msgs.push({ role: 'user', content: `q${i}` })
+			msgs.push({ role: 'assistant', content: [
+				{ type: 'thinking', thinking: `thought ${i}`, signature: `sig-${i}` },
+				{ type: 'text', text: `a${i}` },
+			] })
+		}
+
+		const out = compactApiMessages(msgs)
+
+		// First assistant (12 user turns ago) — thinking dropped, text kept
+		expect(out[1].content).toEqual([{ type: 'text', text: 'answer' }])
+
+		// Last assistant (1 user turn ago) — thinking kept
+		const last = out[out.length - 1]
+		expect(last.content[0].type).toBe('thinking')
+		expect(last.content[1].type).toBe('text')
+	})
+
+	test('keeps thinking blocks within 10 user turns', () => {
+		const thinkingBlock = { type: 'thinking', thinking: 'deep thoughts...', signature: 'sig-abc' }
+
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			{ role: 'assistant', content: [thinkingBlock, { type: 'text', text: 'answer' }] },
+		]
+		// Add 10 more user turns — exactly at the boundary
+		for (let i = 0; i < 10; i++) {
+			msgs.push({ role: 'user', content: `q${i}` })
+			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `a${i}` }] })
+		}
+
+		const out = compactApiMessages(msgs)
+
+		// First assistant (10 user turns ago) — thinking should still be there
+		expect(out[1].content[0].type).toBe('thinking')
+	})
 })

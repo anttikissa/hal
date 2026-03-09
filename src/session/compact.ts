@@ -13,7 +13,7 @@ export function compactApiMessages(msgs: any[]): any[] {
 			break
 		}
 	}
-	if (lastToolIdx === -1) return stripOldImages(msgs)
+	if (lastToolIdx === -1) return stripOldThinking(stripOldImages(msgs))
 
 	// 2. Collect tool IDs from last batch
 	const keepIds = new Set<string>()
@@ -55,7 +55,7 @@ export function compactApiMessages(msgs: any[]): any[] {
 		}
 	}
 
-	return stripOldImages(out)
+	return stripOldThinking(stripOldImages(out))
 }
 
 function hasToolUse(msg: any): boolean {
@@ -91,6 +91,32 @@ function stripOldImages(msgs: any[]): any[] {
 					}
 					return b
 				})
+				out.push({ ...msg, content })
+				continue
+			}
+		}
+		out.push(msg)
+	}
+	return out
+}
+
+const THINKING_THRESHOLD = 10
+
+/** Drop thinking blocks from assistant messages older than N user turns. */
+function stripOldThinking(msgs: any[]): any[] {
+	let userCount = 0
+	for (const msg of msgs) {
+		if (msg.role === 'user') userCount++
+	}
+
+	const out: any[] = []
+	let userIdx = 0
+	for (const msg of msgs) {
+		if (msg.role === 'user') userIdx++
+		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+			const turnsAgo = userCount - userIdx
+			if (turnsAgo > THINKING_THRESHOLD) {
+				const content = msg.content.filter((b: any) => b.type !== 'thinking')
 				out.push({ ...msg, content })
 				continue
 			}
