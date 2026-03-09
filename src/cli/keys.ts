@@ -122,9 +122,28 @@ const CTRL_KEYS: Record<number, string> = {
 
 const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~'
 
+// Buffer for paste content that spans multiple data events
+let pasteBuffer: string | null = null
+
 function splitKeys(data: string): string[] {
 	const keys: string[] = []
 	let i = 0
+
+	// If we're mid-paste from a previous chunk, accumulate
+	if (pasteBuffer !== null) {
+		const endIdx = data.indexOf(PASTE_END)
+		if (endIdx >= 0) {
+			const pasted = pasteBuffer + data.slice(0, endIdx)
+			pasteBuffer = null
+			if (pasted) keys.push(pasted)
+			i = endIdx + PASTE_END.length
+		} else {
+			// Still no end delimiter — buffer everything
+			pasteBuffer += data
+			return keys
+		}
+	}
+
 	while (i < data.length) {
 		// Bracketed paste: extract content between delimiters as single token
 		if (data.startsWith(PASTE_START, i)) {
@@ -135,10 +154,9 @@ function splitKeys(data: string): string[] {
 				if (pasted) keys.push(pasted)
 				i = endIdx + PASTE_END.length
 			} else {
-				// Unterminated — treat rest as paste content
-				const pasted = data.slice(contentStart)
-				if (pasted) keys.push(pasted)
-				i = data.length
+				// Start buffering — end delimiter will come in a later chunk
+				pasteBuffer = data.slice(contentStart)
+				return keys
 			}
 			continue
 		}

@@ -233,4 +233,33 @@ describe('parseKeys (concatenated sequences)', () => {
 		const events = parseKeys('\x1b[200~\x1b[201~')
 		expect(events.length).toBe(0)
 	})
+
+	test('bracketed paste split across two chunks', () => {
+		// Chunk 1: just the opening delimiter
+		const events1 = parseKeys('\x1b[200~')
+		expect(events1.length).toBe(0)
+		// Chunk 2: content + closing delimiter
+		const events2 = parseKeys('hello\nworld\x1b[201~')
+		expect(events2.length).toBe(1)
+		expect(events2[0].char).toBe('hello\nworld')
+	})
+
+	test('bracketed paste split across three chunks', () => {
+		const e1 = parseKeys('\x1b[200~hello')
+		expect(e1.length).toBe(0)
+		const e2 = parseKeys('\nworld')
+		expect(e2.length).toBe(0)
+		const e3 = parseKeys('\x1b[201~')
+		expect(e3.length).toBe(1)
+		expect(e3[0].char).toBe('hello\nworld')
+	})
+
+	test('bracketed paste split: keys after closing delimiter', () => {
+		const e1 = parseKeys('\x1b[200~')
+		expect(e1.length).toBe(0)
+		const e2 = parseKeys('pasted\x1b[201~x')
+		expect(e2.length).toBe(2)
+		expect(e2[0].char).toBe('pasted')
+		expect(e2[1].char).toBe('x')
+	})
 })
