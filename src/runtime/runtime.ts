@@ -2,7 +2,7 @@
 
 import { watch, type FSWatcher } from 'fs'
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
-import { createSession, loadMeta, listSessionIds } from '../session/session.ts'
+import { createSession, loadMeta, listSessionIds, rotateLog } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, buildCompactionContext, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { loadSystemPrompt } from './system-prompt.ts'
@@ -296,7 +296,13 @@ export async function startRuntime(): Promise<Runtime> {
 				break
 			}
 			case 'reset': {
-				await appendMessages(sid, [{ type: 'reset', ts: new Date().toISOString() }])
+				const oldLog = sessions.get(sid)?.log ?? 'messages.asonl'
+				const newLog = await rotateLog(sid)
+				const info = sessions.get(sid)
+				if (info) info.log = newLog
+				await appendMessages(sid, [
+					{ role: 'user', content: `[system] Session was reset. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
+				])
 				await emitInfo(sid, '[reset] conversation cleared', 'meta')
 				break
 			}
@@ -306,9 +312,13 @@ export async function startRuntime(): Promise<Runtime> {
 				const userMsgs = msgs.filter((m: any) => m.role === 'user')
 				if (userMsgs.length === 0) { await warn('[compact] nothing to compact'); break }
 				const context = buildCompactionContext(sid, msgs)
+				const oldLog = sessions.get(sid)?.log ?? 'messages.asonl'
+				const newLog = await rotateLog(sid)
+				const info = sessions.get(sid)
+				if (info) info.log = newLog
 				await appendMessages(sid, [
-					{ type: 'handoff', ts: new Date().toISOString() },
-					{ role: 'user', content: context, ts: new Date().toISOString() },
+					{ role: 'user', content: `[system] Session was manually compacted. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
+					{ role: 'user', content: context, ts: new Date().toISOString() } as UserMessage,
 				])
 				await emitInfo(sid, `[compact] context compacted (${userMsgs.length} user messages summarized)`, 'meta')
 				break

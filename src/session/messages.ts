@@ -9,6 +9,7 @@ import { Log } from '../utils/log.ts'
 import { sessionDir, blocksDir, ensureDir } from '../state.ts'
 import { stringify, parse } from '../utils/ason.ts'
 import { logNameCache } from './session.ts'
+import { compactApiMessages } from './compact.ts'
 
 function resolveLogName(sessionId: string): string {
 	const cached = logNameCache.get(sessionId)
@@ -286,7 +287,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			const block = await readBlock(sessionId, msg.ref)
 			let content = block?.result?.content ?? '[interrupted]'
 			if (content.length > MAX_API_OUTPUT) content = content.slice(0, MAX_API_OUTPUT) + `\n[truncated ${content.length - MAX_API_OUTPUT} chars]`
-			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content }] })
+			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content, _ref: msg.ref }] })
 		}
 	}
 	// Ensure every tool_use has a matching tool_result — synthesize missing ones
@@ -309,7 +310,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			i++
 		}
 	}
-	return out
+	return compactApiMessages(out)
 }
 
 /** Follow fork chain to load full history. */
