@@ -12,7 +12,7 @@ Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
 Registry metadata lives in `state/sessions/index.ason`.
 
-Core logic: `src/session.ts`.
+Core logic: `src/session/session.ts`.
 
 ### messages.asonl event types
 
@@ -51,7 +51,7 @@ API messages are compacted before sending to strip old heavy content (tool resul
 - Startup loads/repairs `index.ason`; if missing/empty, creates `s-default`.
 - Runtime tracks session metadata in memory and persists registry updates.
 - Session content is **appended** after each turn in `runAgentLoop(...)`. The runtime tracks `persistedCount` to know which messages are already on disk.
-- Runtime replays `messages.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `messages.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session.ts`).
+- Runtime replays `messages.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `messages.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session/session.ts`).
 - `/reset` rotates `messages.asonl` → `messages.N.asonl` (no deletion) and clears in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
@@ -80,7 +80,7 @@ Naming: `messages.1.asonl` (first archive), `messages.2.asonl` (second), etc. Hi
 
 ## Context Tracking
 
-- Max context is fixed at `200_000` tokens in `src/context.ts` (`MAX_CONTEXT`).
+- Max context is defined per model in `src/runtime/context.ts` (typically `200_000` tokens).
 - Usage from provider responses is reported after turns.
 - Runtime warns when context exceeds ~66% (`shouldWarn(...)`).
 - Estimated context at startup uses calibrated bytes->tokens ratio.

@@ -43,7 +43,7 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 `/fork` (or Ctrl-F) creates a new session from the current one:
 
 1. Current runtime state (`messages.asonl`, `blocks/`) is saved to disk.
-2. Both files are copied to a new session directory (`forkSession()` in `src/session.ts`).
+2. Both files are copied to a new session directory (`forkSession()` in `src/session/session.ts`).
 3. If the source session is mid-generation, in-progress content blocks are snapshot into the fork's message history so it sees the partial response.
 4. `[forked to <newId>]` is appended to the source's messages (skipped if busy, to preserve alternating user/assistant pattern).
 5. `[forked from <sourceId>]` is appended to the fork's messages.

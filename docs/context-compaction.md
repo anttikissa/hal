@@ -2,7 +2,7 @@
 
 API messages are compacted before sending to reduce token cost. Without compaction, every past tool result, image, and thinking block would be re-sent on every turn — quadratic cost growth.
 
-Core logic: `src/compact.ts`, called from `loadApiMessages()` in `src/messages.ts`.
+Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/session/messages.ts`.
 
 ## How It Works
 

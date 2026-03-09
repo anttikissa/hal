@@ -129,4 +129,4 @@ stringify(value, 'long')            → string (always expanded)
 
 ## Implementation
 
-Source: `src/utils/ason.ts` (~350 lines). Tests: `src/utils/ason.test.ts`.
+Source: `src/utils/ason.ts` (~360 lines).

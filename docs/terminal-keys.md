@@ -1,7 +1,7 @@
 # Terminal Key Sequences
 
 Captured key behavior across 4 macOS terminals with the `kitty11` profile
-(kitty keyboard protocol `>11u`). Data from `src/tests/fixtures/keys/`.
+(kitty keyboard protocol `>11u`).
 
 ## Terminals tested
 

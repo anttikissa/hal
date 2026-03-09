@@ -58,7 +58,7 @@ Good: "[promoted] pid 12345 is now the owner"
 
 ## SYSTEM.md preprocessor
 
-`SYSTEM.md` is preprocessed before being sent to the model (`src/system-prompt.ts`):
+`SYSTEM.md` is preprocessed before being sent to the model (`src/runtime/system-prompt.ts`):
 - `${model}`, `${cwd}`, `${date}`, `${session_dir}` are replaced with runtime values.
 - `::: if model="glob"` ... `:::` fenced blocks conditionally include content by model name.
 - HTML comments are stripped.
@@ -72,11 +72,10 @@ See `TODO.md`.
 ## Architecture (high level)
 
 - `run` — bash entry point. Restart loop (exit 100 = restart), env setup, `-f`/`-s` flag handling.
-- `main.ts` — owner election + CLI/web startup.
+- `main.ts` — owner election + CLI startup.
 - `src/ipc.ts` — file-backed IPC bus (`state/ipc/`). See `docs/ipc.md`.
 - `src/runtime/*` — owner runtime (scheduling, commands, agent loop).
 - `src/cli/*` — TUI + CLI client. See `docs/tui.md`.
-- `src/web.ts` — web UI + SSE.
 - `src/session/*` — session persistence, messages, compaction, rotation. See `docs/session.md`.
 - `src/session/compact.ts` — context compaction (strip old tool results, images, thinking). See `docs/context-compaction.md`.
 - `src/providers/*` — provider adapters (Anthropic, OpenAI).
