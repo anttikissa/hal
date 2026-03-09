@@ -1,6 +1,6 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
 import { saveMultilinePaste, cleanPaste, resetPasteCounter } from './clipboard.ts'
-import { rmSync, readFileSync, existsSync } from 'fs'
+import { rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
 
 const PASTE_DIR = '/tmp/hal/paste'
 
@@ -42,4 +42,35 @@ test('cleanPaste saves to file for >5 newlines', () => {
 	expect(result).toMatch(/^\[\/tmp\/hal\/paste\/\d{4}\.txt\]$/)
 	const path = result.slice(1, -1)
 	expect(readFileSync(path, 'utf8')).toBe(text)
+})
+
+test('cleanPaste wraps dragged image path in brackets', () => {
+	// Use a file we know exists
+	const result = cleanPaste('/bin/ls.png')
+	// Doesn't exist with .png, so no wrapping
+	expect(result).toBe('/bin/ls.png')
+})
+
+test('cleanPaste wraps existing image path in brackets', async () => {
+	const dir = '/tmp/hal/test-drag'
+	mkdirSync(dir, { recursive: true })
+	writeFileSync(`${dir}/photo.png`, 'fake png')
+	try {
+		expect(cleanPaste(`${dir}/photo.png`)).toBe(`[${dir}/photo.png]`)
+		expect(cleanPaste(`${dir}/photo.png\n`)).toBe(`[${dir}/photo.png]`)
+		// With spaces around it — still just a path
+		expect(cleanPaste(`  ${dir}/photo.png  `)).toBe(`[${dir}/photo.png]`)
+	} finally {
+		rmSync(dir, { recursive: true })
+	}
+})
+
+test('cleanPaste wraps jpg/jpeg/gif/webp paths too', () => {
+	const dir = '/tmp/hal/test-drag2'
+	mkdirSync(dir, { recursive: true })
+	for (const ext of ['jpg', 'jpeg', 'gif', 'webp']) {
+		writeFileSync(`${dir}/img.${ext}`, 'fake')
+		expect(cleanPaste(`${dir}/img.${ext}`)).toBe(`[${dir}/img.${ext}]`)
+	}
+	rmSync(dir, { recursive: true })
 })

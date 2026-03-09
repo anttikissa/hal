@@ -12,6 +12,11 @@ Question block looks like ass
 
 change how tabs look
 
+-- grep:  (0.0s) ✓ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── [06sqgy-sb1] ──
+error: grep requires pattern
+
+& Should erroneous tool uses be formatted such? not "done"?
+
 why runtime test ts has state isolation issue
 
 newlines break bash blocks... bash title needs to be printed in the block itself if it's multiline

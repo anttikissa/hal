@@ -79,11 +79,19 @@ export function saveMultilinePaste(text: string): string {
 	return `[${path}]`
 }
 
+const IMAGE_EXTS = /\.(png|jpg|jpeg|gif|webp)$/i
+
 /** Normalize pasted text: fix line endings, strip control chars.
+ *  Single-line image path → wrap in [brackets].
  *  If >5 newlines, save to file and return `[path]` instead. */
 export function cleanPaste(raw: string): string {
 	const text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
 	if (!text) return ''
+	// Dragged image file — single path, wrap in brackets
+	const trimmed = text.trim()
+	if (trimmed.startsWith('/') && !trimmed.includes('\n') && IMAGE_EXTS.test(trimmed) && existsSync(trimmed)) {
+		return `[${trimmed}]`
+	}
 	const newlineCount = (text.match(/\n/g) || []).length
 	if (newlineCount > MAX_INLINE_NEWLINES) return saveMultilinePaste(text)
 	return text
