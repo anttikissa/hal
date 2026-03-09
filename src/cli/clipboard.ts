@@ -16,8 +16,8 @@ let pendingPastes = 0
 
 export function resetPasteCounter(): void { pasteCounter = 0; pendingPastes = 0 }
 
-/** Allocate a [paste:N] placeholder for async image resolution. */
-function allocPlaceholder(): string { return `[paste:${++pasteCounter}]` }
+/** Allocate a [image:N] placeholder for async image resolution. */
+function allocPlaceholder(): string { return `[image:${++pasteCounter}]` }
 
 function getClipboardImageAsync(): Promise<string | null> {
 	if (process.platform !== 'darwin') return Promise.resolve(null)
@@ -52,7 +52,7 @@ type PasteResolve = (placeholder: string, replacement: string) => void
 
 /**
  * Read clipboard. Returns immediate text to insert.
- * If clipboard text is empty, inserts a [paste:N] placeholder and probes
+ * If clipboard text is empty, inserts an [image:N] placeholder and probes
  * for an image asynchronously. Calls onResolve(placeholder, result) when done.
  */
 export function pasteFromClipboard(onResolve?: PasteResolve): string {
