@@ -1,6 +1,7 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
 import { saveMultilinePaste, cleanPaste, resetPasteCounter } from './clipboard.ts'
 import { rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
+import { homedir } from 'os'
 
 const PASTE_DIR = '/tmp/hal/paste'
 
@@ -73,4 +74,16 @@ test('cleanPaste wraps jpg/jpeg/gif/webp paths too', () => {
 		expect(cleanPaste(`${dir}/img.${ext}`)).toBe(`[${dir}/img.${ext}]`)
 	}
 	rmSync(dir, { recursive: true })
+})
+
+test('cleanPaste shortens $HOME to ~ in image paths', () => {
+	const home = homedir()
+	const dir = `${home}/.hal/test-drag-home`
+	mkdirSync(dir, { recursive: true })
+	writeFileSync(`${dir}/photo.png`, 'fake png')
+	try {
+		expect(cleanPaste(`${dir}/photo.png`)).toBe(`[~/.hal/test-drag-home/photo.png]`)
+	} finally {
+		rmSync(dir, { recursive: true })
+	}
 })

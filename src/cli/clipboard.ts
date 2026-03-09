@@ -1,6 +1,7 @@
 // Clipboard access — macOS only.
 
 import { mkdirSync, existsSync, readdirSync, writeFileSync } from 'fs'
+import { homedir } from 'os'
 
 const IMAGE_DIR = '/tmp/hal/images'
 const PASTE_DIR = '/tmp/hal/paste'
@@ -90,7 +91,7 @@ export function cleanPaste(raw: string): string {
 	// Dragged image file — single path, wrap in brackets
 	const trimmed = text.trim()
 	if (trimmed.startsWith('/') && !trimmed.includes('\n') && IMAGE_EXTS.test(trimmed) && existsSync(trimmed)) {
-		return `[${trimmed}]`
+		return `[${trimmed.replace(homedir(), '~')}]`
 	}
 	const newlineCount = (text.match(/\n/g) || []).length
 	if (newlineCount > MAX_INLINE_NEWLINES) return saveMultilinePaste(text)

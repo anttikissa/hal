@@ -5,6 +5,7 @@
 import { writeFile, readFile, unlink } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
+import { homedir } from 'os'
 import { Log } from '../utils/log.ts'
 import { sessionDir, blocksDir, ensureDir } from '../state.ts'
 import { stringify, parse } from '../utils/ason.ts'
@@ -203,7 +204,7 @@ export async function parseUserContent(
 	let lastIndex = 0
 
 	for (const match of matches) {
-		const filePath = match[1]
+		const filePath = match[1].startsWith('~') ? match[1].replace('~', homedir()) : match[1]
 		const ext = match[2].toLowerCase()
 		const before = input.slice(lastIndex, match.index)
 		if (before.trim()) {
