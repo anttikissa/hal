@@ -79,7 +79,10 @@ function stripOldImages(msgs: any[]): any[] {
 			userIdx++
 			if (Array.isArray(msg.content) && turnsAgo > 2) {
 				const content = msg.content.map((b: any) => {
-					if (b.type === 'image') return { type: 'text', text: '[image cleared]' }
+					if (b.type === 'image') {
+						const placeholder = b._ref ? `[image cleared — ref: ${b._ref}]` : '[image cleared]'
+						return { type: 'text', text: placeholder }
+					}
 					return b
 				})
 				out.push({ ...msg, content })

@@ -280,7 +280,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 					if (b.type === 'image' && b.ref) {
 						const data = await readBlock(sessionId, b.ref)
 						if (data?.media_type && data?.data) {
-							blocks.push({ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data } })
+							blocks.push({ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data }, _ref: b.ref })
 						}
 					} else {
 						blocks.push(b)

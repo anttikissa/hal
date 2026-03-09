@@ -103,21 +103,21 @@ describe('compactApiMessages', () => {
 	})
 
 	test('clears images except in last 2 user turns', () => {
-		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }
+		const imageBlock = (ref: string) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: ref })
 
 		const msgs = [
-			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock] },
+			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock('ref-img-0')] },
 			{ role: 'assistant', content: [{ type: 'text', text: 'nice image' }] },
-			{ role: 'user', content: [{ type: 'text', text: 'another' }, { ...imageBlock }] },
+			{ role: 'user', content: [{ type: 'text', text: 'another' }, imageBlock('ref-img-1')] },
 			{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
-			{ role: 'user', content: [{ type: 'text', text: 'and this' }, { ...imageBlock }] },
+			{ role: 'user', content: [{ type: 'text', text: 'and this' }, imageBlock('ref-img-2')] },
 			{ role: 'assistant', content: [{ type: 'text', text: 'got it' }] },
 		]
 
 		const out = compactApiMessages(msgs)
 
-		// First image (3 user turns ago) should be cleared
-		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared]' })
+		// First image (3 user turns ago) should be cleared with ref
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared — ref: ref-img-0]' })
 		// Second image (2 user turns ago) should be kept
 		expect(out[2].content[1].type).toBe('image')
 		// Third image (1 user turn ago = last) should be kept
@@ -125,7 +125,7 @@ describe('compactApiMessages', () => {
 	})
 
 	test('clears image when followed by plain string user turns', () => {
-		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }
+		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: 'ref-img-0' }
 
 		const msgs = [
 			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock] },
@@ -138,8 +138,8 @@ describe('compactApiMessages', () => {
 
 		const out = compactApiMessages(msgs)
 
-		// Image is 3 user turns ago (image, "hello", "stop") — should be cleared
-		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared]' })
+		// Image is 3 user turns ago (image, "hello", "stop") — should be cleared with ref
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared — ref: ref-img-0]' })
 	})
 	test('no tool calls → messages unchanged', () => {
 		const msgs = [
