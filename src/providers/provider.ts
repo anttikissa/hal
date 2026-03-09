@@ -2,6 +2,7 @@
 
 export type ProviderEvent =
 	| { type: 'thinking'; text: string }
+	| { type: 'thinking_signature'; signature: string }
 	| { type: 'text'; text: string }
 	| { type: 'tool_call'; id: string; name: string; input: unknown }
 	| { type: 'done'; usage?: { input: number; output: number } }

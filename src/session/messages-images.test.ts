@@ -138,3 +138,34 @@ test('loadApiMessages synthesizes results for orphaned tool_use blocks', async (
 	expect(msgs[msgs.length - 1].role).toBe('user')
 	expect(msgs[msgs.length - 1].content).toBe('hello')
 })
+
+test('loadApiMessages includes thinking blocks with signature', async () => {
+	const SID = TEST_SESSION
+	await appendMessages(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+	await appendMessages(SID, [{
+		role: 'assistant', text: 'hi', thinkingText: 'let me think...',
+		thinkingSignature: 'sig123', ts: new Date().toISOString(),
+	}])
+
+	const msgs = await loadApiMessages(SID)
+	expect(msgs).toHaveLength(2)
+	const assistant = msgs[1]
+	expect(assistant.role).toBe('assistant')
+	expect(assistant.content[0]).toEqual({ type: 'thinking', thinking: 'let me think...', signature: 'sig123' })
+	expect(assistant.content[1]).toEqual({ type: 'text', text: 'hi' })
+})
+
+test('loadApiMessages omits thinking blocks without signature', async () => {
+	const SID = TEST_SESSION
+	await appendMessages(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+	await appendMessages(SID, [{
+		role: 'assistant', text: 'hi', thinkingText: 'old thinking without sig',
+		ts: new Date().toISOString(),
+	}])
+
+	const msgs = await loadApiMessages(SID)
+	expect(msgs).toHaveLength(2)
+	const assistant = msgs[1]
+	expect(assistant.content).toHaveLength(1)
+	expect(assistant.content[0]).toEqual({ type: 'text', text: 'hi' })
+})

@@ -67,6 +67,7 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 			} else if (ev.type === 'content_block_delta') {
 				const d = ev.delta
 				if (d.type === 'thinking_delta') yield { type: 'thinking', text: d.thinking }
+				else if (d.type === 'signature_delta') yield { type: 'thinking_signature', signature: d.signature }
 				else if (d.type === 'text_delta') yield { type: 'text', text: d.text }
 				else if (d.type === 'input_json_delta') {
 					const t = tools.get(ev.index)

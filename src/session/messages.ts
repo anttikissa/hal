@@ -44,6 +44,7 @@ export interface AssistantMessage {
 	role: 'assistant'
 	text?: string
 	thinkingText?: string
+	thinkingSignature?: string
 	tools?: { id: string; name: string; ref: string }[]
 	ts: string
 }
@@ -132,13 +133,14 @@ function getParentSessionId(sessionId: string): string | null {
 /** Write assistant entry with block files for tools. Returns the log entry + tool ref map. */
 export async function writeAssistantEntry(
 	sessionId: string,
-	opts: { text?: string; thinkingText?: string; toolCalls?: { id: string; name: string; input: unknown }[] },
+	opts: { text?: string; thinkingText?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[] },
 ): Promise<{ entry: AssistantMessage; toolRefMap: Map<string, string> }> {
 	const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
 	const toolRefMap = new Map<string, string>()
 
 	if (opts.text) entry.text = opts.text
 	if (opts.thinkingText) entry.thinkingText = opts.thinkingText
+	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
 
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []
@@ -290,6 +292,10 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			}
 		} else if (msg.role === 'assistant') {
 			const content: any[] = []
+			// Only include thinking if we have a valid signature
+			if (msg.thinkingText && msg.thinkingSignature) {
+				content.push({ type: 'thinking', thinking: msg.thinkingText, signature: msg.thinkingSignature })
+			}
 			if (msg.text) content.push({ type: 'text', text: msg.text })
 			if (msg.tools) {
 				for (const t of msg.tools) {

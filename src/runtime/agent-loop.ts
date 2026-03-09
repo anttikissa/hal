@@ -54,6 +54,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS, signal, sessionId })
 
 			let thinkingText = ''
+			let thinkingSignature = ''
 			let assistantText = ''
 			const toolCalls: ToolCall[] = []
 			let aborted = false
@@ -64,6 +65,9 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					case 'thinking':
 						thinkingText += event.text
 						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking' })
+						break
+					case 'thinking_signature':
+						thinkingSignature = event.signature
 						break
 					case 'text':
 						assistantText += event.text
@@ -88,7 +92,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						if (toolCalls.length === 0) {
 							// No tools — persist and finish
 							await appendMessages(sessionId, [
-								{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, ts: new Date().toISOString() },
+								{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, thinkingSignature: thinkingSignature || undefined, ts: new Date().toISOString() },
 							])
 							if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 							await emit(sessionId, {
@@ -102,6 +106,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						const { entry: assistantEntry, toolRefMap } = await writeAssistantEntry(sessionId, {
 							text: assistantText || undefined,
 							thinkingText: thinkingText || undefined,
+							thinkingSignature: thinkingSignature || undefined,
 							toolCalls,
 						})
 						await appendMessages(sessionId, [assistantEntry])
@@ -152,6 +157,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						messages.push({
 							role: 'assistant',
 							content: [
+								...(thinkingText && thinkingSignature ? [{ type: 'thinking', thinking: thinkingText, signature: thinkingSignature }] : []),
 								...(assistantText ? [{ type: 'text', text: assistantText }] : []),
 								...toolCalls.map(t => ({
 									type: 'tool_use', id: t.id, name: t.name, input: t.input,
@@ -178,7 +184,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				// Persist partial output before exiting
 				if (assistantText || thinkingText) {
 					await appendMessages(sessionId, [
-						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, ts: new Date().toISOString() },
+						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, thinkingSignature: thinkingSignature || undefined, ts: new Date().toISOString() },
 					])
 				}
 				await emitInfo(sessionId, '[paused]', 'meta')
