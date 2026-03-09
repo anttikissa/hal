@@ -12,6 +12,8 @@ Question block looks like ass
 
 Cursor colors...
 
+HAL colors: bold needs to be brighter not dimmer
+
 NEWLINES break BASH blocks!!!
 
 When closes and restarts, tab should be the same that was before. Client server thing - client should save

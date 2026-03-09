@@ -9,6 +9,7 @@ export interface SessionInfo {
 	name?: string
 	topic?: string
 	model?: string
+	log?: string
 	workingDir: string
 	createdAt: string
 	updatedAt: string

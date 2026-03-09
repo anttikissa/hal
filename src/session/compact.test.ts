@@ -1,55 +1,224 @@
-import { test, expect } from 'bun:test'
-import { buildCompactionContext, type Message } from './messages.ts'
+import { describe, test, expect } from 'bun:test'
+import { compactApiMessages } from './compact.ts'
 
-test('buildCompactionContext lists user prompts', () => {
-	const msgs: Message[] = [
-		{ role: 'user', content: 'hello world', ts: '' },
-		{ role: 'assistant', text: 'hi', ts: '' },
-		{ role: 'user', content: 'fix the bug', ts: '' },
-		{ role: 'assistant', text: 'done', ts: '' },
-	]
-	const ctx = buildCompactionContext('test-sid', msgs)
-	expect(ctx).toContain('1. hello world')
-	expect(ctx).toContain('2. fix the bug')
-	expect(ctx).toContain('compacted')
-})
-
-test('buildCompactionContext skips [bracketed] messages', () => {
-	const msgs: Message[] = [
-		{ role: 'user', content: '[interrupted — skipped]', ts: '' },
-		{ role: 'user', content: 'real prompt', ts: '' },
-	]
-	const ctx = buildCompactionContext('test-sid', msgs)
-	expect(ctx).not.toContain('interrupted')
-	expect(ctx).toContain('1. real prompt')
-})
-
-test('buildCompactionContext truncates long lists to first/last 10', () => {
-	const msgs: Message[] = []
-	for (let i = 1; i <= 25; i++) {
-		msgs.push({ role: 'user', content: `prompt ${i}`, ts: '' })
+// Helper: build an API-format tool cycle (assistant with tool_use + user with tool_result)
+function toolCycle(id: string, name: string, input: any, result: string, ref: string) {
+	return {
+		assistant: {
+			role: 'assistant',
+			content: [
+				{ type: 'text', text: `calling ${name}` },
+				{ type: 'tool_use', id, name, input },
+			],
+		},
+		result: {
+			role: 'user',
+			content: [{ type: 'tool_result', tool_use_id: id, content: result, _ref: ref }],
+		},
 	}
-	const ctx = buildCompactionContext('test-sid', msgs)
-	expect(ctx).toContain('First 10:')
-	expect(ctx).toContain('Last 10:')
-	expect(ctx).toContain('1. prompt 1')
-	expect(ctx).toContain('10. prompt 10')
-	expect(ctx).toContain('16. prompt 16')
-	expect(ctx).toContain('25. prompt 25')
-	// Middle prompts should not appear
-	expect(ctx).not.toContain('11. prompt 11')
-})
+}
 
-test('buildCompactionContext handles empty session', () => {
-	const ctx = buildCompactionContext('test-sid', [])
-	expect(ctx).toContain('No user prompts')
-})
+describe('compactApiMessages', () => {
+	test('keeps last tool batch intact', () => {
+		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'file1.ts', 'ref-0')
+		const c1 = toolCycle('t1', 'bash', { command: 'cat f' }, 'contents...', 'ref-1')
 
-test('buildCompactionContext takes only first line of multi-line prompts', () => {
-	const msgs: Message[] = [
-		{ role: 'user', content: 'first line\nsecond line\nthird line', ts: '' },
-	]
-	const ctx = buildCompactionContext('test-sid', msgs)
-	expect(ctx).toContain('1. first line')
-	expect(ctx).not.toContain('second line')
+		const msgs = [
+			{ role: 'user', content: 'list files' },
+			c0.assistant, c0.result,
+			{ role: 'user', content: 'show file' },
+			c1.assistant, c1.result,
+		]
+
+		const out = compactApiMessages(msgs)
+
+		// Last batch (c1) kept intact
+		const lastResult = out[5].content[0]
+		expect(lastResult.content).toBe('contents...')
+
+		// Old batch (c0) cleared
+		const oldResult = out[2].content[0]
+		expect(oldResult.content).toBe('[cleared — ref: ref-0]')
+	})
+
+	test('clears old tool_use inputs', () => {
+		const c0 = toolCycle('t0', 'write', { path: 'f.ts', content: 'big file...' }, 'ok', 'ref-0')
+		const c1 = toolCycle('t1', 'bash', { command: 'ls' }, 'file.ts', 'ref-1')
+
+		const msgs = [
+			{ role: 'user', content: 'write file' },
+			c0.assistant, c0.result,
+			{ role: 'user', content: 'check' },
+			c1.assistant, c1.result,
+		]
+
+		const out = compactApiMessages(msgs)
+
+		// Old tool_use input cleared
+		const oldToolUse = out[1].content.find((b: any) => b.type === 'tool_use')
+		expect(oldToolUse.input).toEqual({})
+
+		// Last tool_use input kept
+		const lastToolUse = out[4].content.find((b: any) => b.type === 'tool_use')
+		expect(lastToolUse.input).toEqual({ command: 'ls' })
+	})
+
+	test('clears last batch too when >5 user turns follow', () => {
+		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'result', 'ref-0')
+
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			c0.assistant, c0.result,
+		]
+		// Add 6 user turns after the tool batch
+		for (let i = 0; i < 6; i++) {
+			msgs.push({ role: 'user', content: `question ${i}` })
+			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] })
+		}
+
+		const out = compactApiMessages(msgs)
+
+		// Even the "last" batch should be cleared since it's stale
+		const toolResult = out[2].content[0]
+		expect(toolResult.content).toBe('[cleared — ref: ref-0]')
+	})
+
+	test('keeps last batch when ≤5 user turns follow', () => {
+		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'result', 'ref-0')
+
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			c0.assistant, c0.result,
+		]
+		for (let i = 0; i < 5; i++) {
+			msgs.push({ role: 'user', content: `question ${i}` })
+			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] })
+		}
+
+		const out = compactApiMessages(msgs)
+
+		// Should still be kept — exactly 5 is the boundary
+		const toolResult = out[2].content[0]
+		expect(toolResult.content).toBe('result')
+	})
+
+	test('clears images except in last 2 user turns', () => {
+		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }
+
+		const msgs = [
+			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'nice image' }] },
+			{ role: 'user', content: [{ type: 'text', text: 'another' }, { ...imageBlock }] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+			{ role: 'user', content: [{ type: 'text', text: 'and this' }, { ...imageBlock }] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'got it' }] },
+		]
+
+		const out = compactApiMessages(msgs)
+
+		// First image (3 user turns ago) should be cleared
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared]' })
+		// Second image (2 user turns ago) should be kept
+		expect(out[2].content[1].type).toBe('image')
+		// Third image (1 user turn ago = last) should be kept
+		expect(out[4].content[1].type).toBe('image')
+	})
+
+	test('no tool calls → messages unchanged', () => {
+		const msgs = [
+			{ role: 'user', content: 'hello' },
+			{ role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+			{ role: 'user', content: 'bye' },
+		]
+
+		const out = compactApiMessages(msgs)
+		expect(out).toEqual(msgs)
+	})
+
+	test('handles multiple tool_results in one user message', () => {
+		const msgs = [
+			{ role: 'user', content: 'do stuff' },
+			{
+				role: 'assistant',
+				content: [
+					{ type: 'tool_use', id: 't0', name: 'bash', input: { command: 'a' } },
+					{ type: 'tool_use', id: 't1', name: 'bash', input: { command: 'b' } },
+				],
+			},
+			{
+				role: 'user',
+				content: [
+					{ type: 'tool_result', tool_use_id: 't0', content: 'result a', _ref: 'ref-a' },
+					{ type: 'tool_result', tool_use_id: 't1', content: 'result b', _ref: 'ref-b' },
+				],
+			},
+			{ role: 'user', content: 'next' },
+			{
+				role: 'assistant',
+				content: [
+					{ type: 'tool_use', id: 't2', name: 'read', input: { path: 'f.ts' } },
+				],
+			},
+			{
+				role: 'user',
+				content: [
+					{ type: 'tool_result', tool_use_id: 't2', content: 'file contents', _ref: 'ref-c' },
+				],
+			},
+		]
+
+		const out = compactApiMessages(msgs)
+
+		// Old batch (t0, t1) cleared
+		expect(out[2].content[0].content).toBe('[cleared — ref: ref-a]')
+		expect(out[2].content[1].content).toBe('[cleared — ref: ref-b]')
+
+		// Last batch (t2) kept
+		expect(out[5].content[0].content).toBe('file contents')
+	})
+
+	test('tool_result without _ref gets generic placeholder', () => {
+		const msgs = [
+			{ role: 'user', content: 'go' },
+			{
+				role: 'assistant',
+				content: [{ type: 'tool_use', id: 't0', name: 'bash', input: { command: 'ls' } }],
+			},
+			{
+				role: 'user',
+				content: [{ type: 'tool_result', tool_use_id: 't0', content: 'old stuff' }],
+			},
+			{ role: 'user', content: 'next' },
+			{
+				role: 'assistant',
+				content: [{ type: 'tool_use', id: 't1', name: 'bash', input: { command: 'pwd' } }],
+			},
+			{
+				role: 'user',
+				content: [{ type: 'tool_result', tool_use_id: 't1', content: '/home', _ref: 'ref-1' }],
+			},
+		]
+
+		const out = compactApiMessages(msgs)
+		expect(out[2].content[0].content).toBe('[cleared]')
+	})
+
+	test('preserves assistant text blocks in old messages', () => {
+		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'files', 'ref-0')
+		const c1 = toolCycle('t1', 'bash', { command: 'pwd' }, '/home', 'ref-1')
+
+		const msgs = [
+			{ role: 'user', content: 'start' },
+			c0.assistant, c0.result,
+			{ role: 'user', content: 'next' },
+			c1.assistant, c1.result,
+		]
+
+		const out = compactApiMessages(msgs)
+
+		// Text blocks in old assistant message should be preserved
+		const oldAssistant = out[1]
+		const textBlock = oldAssistant.content.find((b: any) => b.type === 'text')
+		expect(textBlock.text).toBe('calling bash')
+	})
 })

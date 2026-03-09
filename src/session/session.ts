@@ -1,8 +1,8 @@
-// Session CRUD — create, load, list.
+// Session CRUD — create, load, list, rotate.
 // Sessions use liveFile: mutate the object, it auto-saves to meta.ason.
 
 import { readFile, writeFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { resolve } from 'path'
 import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, ensureDir, sessionDir } from '../state.ts'
@@ -71,6 +71,7 @@ export async function createSession(workingDir?: string): Promise<SessionInfo> {
 		defaults: {
 			id,
 			workingDir: resolve(workingDir ?? LAUNCH_CWD),
+			log: 'messages.asonl',
 			createdAt: ts,
 			updatedAt: ts,
 		},
@@ -88,3 +89,34 @@ export async function listSessionIds(): Promise<string[]> {
 	const entries = await (await import('fs/promises')).readdir(SESSIONS_DIR)
 	return entries.filter(e => existsSync(metaPath(e))).sort()
 }
+
+// ── Log rotation ──
+
+/** Read the current log filename for a session from meta.ason. */
+export function currentLog(sessionId: string): string {
+	const meta = loadMeta(sessionId)
+	return meta?.log ?? 'messages.asonl'
+}
+
+/** Rotate: bump to next log file. Returns the new filename. */
+export async function rotateLog(sessionId: string): Promise<string> {
+	const cur = currentLog(sessionId)
+	let nextN = 2
+	if (cur !== 'messages.asonl') {
+		const match = cur.match(/^messages(\d+)\.asonl$/)
+		if (match) nextN = parseInt(match[1], 10) + 1
+	}
+
+	const newLog = `messages${nextN}.asonl`
+	const meta = loadMeta(sessionId)
+	if (meta) {
+		meta.log = newLog
+		;(meta as SessionInfo & { save?: () => void }).save?.()
+	}
+	// Invalidate messagesLog cache
+	logNameCache.delete(sessionId)
+	return newLog
+}
+
+// Cache for messagesLog — invalidated by rotateLog
+export const logNameCache = new Map<string, string>()

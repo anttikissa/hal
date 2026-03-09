@@ -8,9 +8,26 @@ import { randomBytes } from 'crypto'
 import { Log } from '../utils/log.ts'
 import { sessionDir, blocksDir, ensureDir } from '../state.ts'
 import { stringify, parse } from '../utils/ason.ts'
+import { logNameCache } from './session.ts'
+
+function resolveLogName(sessionId: string): string {
+	const cached = logNameCache.get(sessionId)
+	if (cached) return cached
+	// Read from meta.ason
+	const metaPath = `${sessionDir(sessionId)}/meta.ason`
+	if (existsSync(metaPath)) {
+		try {
+			const meta = parse(readFileSync(metaPath, 'utf-8')) as any
+			const name = meta?.log ?? 'messages.asonl'
+			logNameCache.set(sessionId, name)
+			return name
+		} catch {}
+	}
+	return 'messages.asonl'
+}
 
 function messagesLog(sessionId: string) {
-	return new Log<Message>(`${sessionDir(sessionId)}/messages.asonl`)
+	return new Log<Message>(`${sessionDir(sessionId)}/${resolveLogName(sessionId)}`)
 }
 
 // ── Message types ──
