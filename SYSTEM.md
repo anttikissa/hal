@@ -40,15 +40,14 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 
 ### Forking
 
-`/fork` (or Ctrl-F) creates a new session from the current one:
+`/fork` (or Ctrl-F) creates a new session that inherits the parent's history without copying it:
 
-1. Current runtime state (`messages.asonl`, `blocks/`) is saved to disk.
-2. Both files are copied to a new session directory (`forkSession()` in `src/session/session.ts`).
-3. If the source session is mid-generation, in-progress content blocks are snapshot into the fork's message history so it sees the partial response.
-4. `[forked to <newId>]` is appended to the source's messages (skipped if busy, to preserve alternating user/assistant pattern).
-5. `[forked from <sourceId>]` is appended to the fork's messages.
-6. A `{ type: 'fork', parent, child, ts }` event is written to both message logs.
+1. A new session directory is created with a fresh `meta.ason`.
+2. A `{ type: 'forked_from', parent, ts }` entry is written as the first line of the child's `messages.asonl`. No messages are copied — the child's log starts empty except for this pointer.
+3. `[forked to <newId>]` is appended to the source's messages (skipped if busy, to preserve alternating user/assistant pattern).
+4. At read time, `loadAllMessages()` follows the `forked_from` chain recursively, loading parent messages (filtered by fork timestamp) and prepending them. This means the child sees the full parent conversation without duplicating data.
+5. `readBlock()` also walks the fork chain — blocks referenced by parent messages are resolved from the parent's `blocks/` directory.
 
-Because history is copied, a forked session shares all prior conversation with its parent. Both sessions then diverge independently. Multiple forks from the same parent share the same prefix of conversation history. When debugging, check `messages.asonl` for `type: 'fork'` events to trace lineage.
+Multiple forks from the same parent share the same prefix of conversation history. Both sessions diverge independently after the fork point. When debugging, check `messages.asonl` for `forked_from` entries to trace lineage.
 
 # SYSTEM.md ends here.

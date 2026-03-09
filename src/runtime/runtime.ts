@@ -349,11 +349,15 @@ export async function startRuntime(): Promise<Runtime> {
 				break
 			}
 			case 'reset': {
+				const resetMsgs = await readMessages(sid)
 				const oldLog = sessions.get(sid)?.log ?? 'messages.asonl'
 				const newLog = await rotateLog(sid)
 				const info = sessions.get(sid)
 				if (info) info.log = newLog
+				// Preserve fork lineage across reset
+				const forkEntry = (resetMsgs[0] as any)?.type === 'forked_from' ? [resetMsgs[0]] : []
 				await appendMessages(sid, [
+					...forkEntry,
 					{ role: 'user', content: `[system] Session was reset. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
 				])
 				await emitInfo(sid, '[reset] conversation cleared', 'meta')
@@ -369,7 +373,10 @@ export async function startRuntime(): Promise<Runtime> {
 				const newLog = await rotateLog(sid)
 				const info = sessions.get(sid)
 				if (info) info.log = newLog
+				// Preserve fork lineage across compaction
+				const forkEntry = (msgs[0] as any)?.type === 'forked_from' ? [msgs[0]] : []
 				await appendMessages(sid, [
+					...forkEntry,
 					{ role: 'user', content: `[system] Session was manually compacted. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
 					{ role: 'user', content: context, ts: new Date().toISOString() } as UserMessage,
 				])
