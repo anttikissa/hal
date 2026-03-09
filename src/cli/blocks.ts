@@ -94,7 +94,7 @@ function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): str
 }
 
 function formatErrorDetail(detail: string): string {
-	// Try parsing as JSON directly, or extract JSON after a prefix like "API 404: {...}"
+	// Extract JSON body after optional prefix (e.g. "404: {...}")
 	const jsonStart = detail.indexOf('{')
 	if (jsonStart >= 0) {
 		try {

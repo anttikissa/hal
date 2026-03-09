@@ -31,7 +31,8 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	})
 
 	if (!res.ok) {
-		yield { type: 'error', message: `API ${res.status}: ${(await res.text()).slice(0, 500)}` }
+		const body = (await res.text()).slice(0, 2000)
+		yield { type: 'error', message: `API ${res.status}`, status: res.status, body }
 		yield { type: 'done' }
 		return
 	}
@@ -85,7 +86,8 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 			} else if (ev.type === 'message_delta' && ev.usage) {
 				usage.output += ev.usage.output_tokens ?? 0
 			} else if (ev.type === 'error') {
-				yield { type: 'error', message: ev.error?.message ?? JSON.stringify(ev.error) }
+				const body = ev.error?.message ?? JSON.stringify(ev.error)
+				yield { type: 'error', message: 'Stream error', body }
 			}
 		}
 	}

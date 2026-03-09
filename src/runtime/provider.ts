@@ -5,7 +5,7 @@ export type ProviderEvent =
 	| { type: 'text'; text: string }
 	| { type: 'tool_call'; id: string; name: string; input: unknown }
 	| { type: 'done'; usage?: { input: number; output: number } }
-	| { type: 'error'; message: string }
+	| { type: 'error'; message: string; status?: number; body?: string }
 
 export interface GenerateParams {
 	messages: any[]

@@ -139,7 +139,7 @@ function parseSSEEvents(state: StreamState, event: any): ProviderEvent[] {
 			const detail = response?.status_details?.error?.message
 				?? response?.status_details?.message
 				?? response?.status
-			events.push({ type: 'error', message: `response ${response.status}: ${detail}` })
+			events.push({ type: 'error', message: `Response ${response.status}`, body: String(detail) })
 		}
 		const usage = response?.usage
 		if (usage) {
@@ -152,12 +152,15 @@ function parseSSEEvents(state: StreamState, event: any): ProviderEvent[] {
 	}
 
 	if (type === 'error') {
-		const message = event.error?.message ?? event.message ?? JSON.stringify(event.error ?? event)
-		return [{ type: 'error', message }]
+		const message = event.error?.message ?? event.message ?? 'Unknown error'
+		const body = JSON.stringify(event.error ?? event)
+		return [{ type: 'error', message, body }]
 	}
 
 	if (type === 'response.failed') {
-		return [{ type: 'error', message: `response.failed: ${event.error?.message ?? JSON.stringify(event)}` }]
+		const message = event.error?.message ?? 'Response failed'
+		const body = JSON.stringify(event)
+		return [{ type: 'error', message, body }]
 	}
 
 	return []
@@ -230,7 +233,8 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	})
 
 	if (!res.ok) {
-		yield { type: 'error', message: `API ${res.status}: ${(await res.text()).slice(0, 500)}` }
+		const body = (await res.text()).slice(0, 2000)
+		yield { type: 'error', message: `API ${res.status}`, status: res.status, body }
 		yield { type: 'done' }
 		return
 	}

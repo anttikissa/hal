@@ -71,9 +71,13 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					case 'tool_call':
 						toolCalls.push({ id: event.id, name: event.name, input: event.input })
 						break
-					case 'error':
-						await emitInfo(sessionId, event.message, 'error', event.message)
+					case 'error': {
+						const detail = event.body
+							? (event.status ? `${event.status}: ${event.body}` : event.body)
+							: event.message
+						await emitInfo(sessionId, event.message, 'error', detail)
 						break
+					}
 					case 'done': {
 						// Calibrate bytes→tokens ratio on first API response
 						if (!calibrated && event.usage && event.usage.input > 0) {
