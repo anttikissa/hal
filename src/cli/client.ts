@@ -137,7 +137,7 @@ export class Client {
 				const t = tab(event.sessionId); if (!t) return
 				closeStreaming(t)
 				if (event.phase === 'running') {
-					t.blocks.push({ type: 'tool', name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now() })
+					t.blocks.push({ type: 'tool', name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now(), ref: event.ref })
 				} else if (event.phase === 'streaming') {
 					for (let i = t.blocks.length - 1; i >= 0; i--) {
 						const b = t.blocks[i]
@@ -153,6 +153,7 @@ export class Client {
 							b.status = event.phase === 'error' ? 'error' : 'done'
 							b.output = event.output ?? ''
 							b.endTime = Date.now()
+							if (event.ref) b.ref = event.ref
 							break
 						}
 					}

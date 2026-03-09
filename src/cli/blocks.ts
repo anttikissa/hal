@@ -3,6 +3,7 @@
 import * as colors from './colors.ts'
 import { mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
 import { displayModel } from '../models.ts'
+import { stringify as asonStringify } from '../utils/ason.ts'
 
 const TOOL_MAX_OUTPUT = 5
 const BLOCK_PAD = 1
@@ -11,9 +12,9 @@ export type Block =
 	| { type: 'assistant'; text: string; done: boolean; model?: string }
 	| { type: 'thinking'; text: string; done: boolean }
 	| { type: 'info'; text: string }
-	| { type: 'error'; text: string; detail?: string }
+	| { type: 'error'; text: string; detail?: string; ref?: string }
 	| { type: 'tool'; name: string; status: 'streaming' | 'running' | 'done' | 'error';
-		args: string; output: string; startTime: number; endTime?: number }
+		args: string; output: string; startTime: number; endTime?: number; ref?: string }
 
 /** Collapse runs of 3+ newlines to 2 (preserving paragraph breaks). */
 function collapseBlankLines(text: string): string {
@@ -92,12 +93,20 @@ function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): str
 	return [toolLine(block.text, width, fg, bg)]
 }
 
+function formatErrorDetail(detail: string): string {
+	try {
+		const parsed = JSON.parse(detail)
+		return asonStringify(parsed)
+	} catch {
+		return detail
+	}
+}
+
 function renderError(block: Extract<Block, { type: 'error' }>, width: number): string[] {
 	const { fg, bg } = colors.error
-	const header = toolHeader('Error', width, fg, bg)
-	const body = block.detail
-		? wordWrap(block.detail, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
-		: wordWrap(block.text, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
+	const header = toolHeader('Error', width, fg, bg, block.ref)
+	const raw = block.detail ? formatErrorDetail(block.detail) : block.text
+	const body = wordWrap(raw, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
 	return [...header, ...body]
 }
 
@@ -128,21 +137,29 @@ function headerLine(text: string, width: number, fg: string, bg: string): string
 	return `${bg}${fg}${text.padEnd(width)}${colors.RESET}`
 }
 
-function toolHeader(label: string, width: number, fg: string, bg: string): string[] {
+function toolHeader(label: string, width: number, fg: string, bg: string, ref?: string): string[] {
 	const prefix = '── '
+	const refTag = ref ? ` [${ref}]` : ''
 	const inner = prefix + label + ' '
-	if (inner.length >= width) {
+	const totalFixed = inner.length + refTag.length
+	if (totalFixed >= width) {
 		const full = prefix + label + ' '
 		const lines: string[] = []
 		for (let i = 0; i < full.length; i += width) {
 			lines.push(full.slice(i, i + width))
 		}
 		const last = lines[lines.length - 1]
-		lines[lines.length - 1] = last + '─'.repeat(Math.max(0, width - last.length))
+		const remaining = Math.max(0, width - last.length)
+		if (refTag.length > 0 && remaining > refTag.length + 1) {
+			const fill = '─'.repeat(remaining - refTag.length)
+			lines[lines.length - 1] = last + fill + refTag
+		} else {
+			lines[lines.length - 1] = last + '─'.repeat(remaining)
+		}
 		return lines.map(l => headerLine(l, width, fg, bg))
 	}
-	const fill = '─'.repeat(Math.max(0, width - inner.length))
-	return [headerLine(inner + fill, width, fg, bg)]
+	const fill = '─'.repeat(Math.max(0, width - totalFixed))
+	return [headerLine(inner + fill + refTag, width, fg, bg)]
 }
 
 function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): string[] {
@@ -150,7 +167,7 @@ function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): str
 	const time = elapsed(block.startTime, block.endTime)
 	const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
 	const label = `${block.name}: ${block.args} (${time})${statusSuffix}`
-	const header = toolHeader(label, width, fg, bg)
+	const header = toolHeader(label, width, fg, bg, block.ref)
 
 	const outputText = block.output.trimEnd()
 	if (!outputText) return header

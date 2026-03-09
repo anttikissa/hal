@@ -54,6 +54,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 						output,
 						status: isDone ? 'done' : 'error',
 						startTime: now, endTime: now,
+						ref: resultRef ?? tool.ref,
 					})
 				}
 			}

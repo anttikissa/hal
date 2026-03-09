@@ -10,7 +10,17 @@ Question block looks like ass
 
 /restore we need
 
-Cursor colors...
+Cursor colors... need to main assistant color (orange) when writing, grey when thinking
+
+Maybe green if done, minicursor a checkmark? Red if error, minicursor danger sign
+If the last block is not an assistant block - sometimes API does this - then cursor should be grey maybe?
+And minicursor should be a ?
+
+If question, should question block be yellow? To demand attention?
+
+make thinking text brighter (and actual blocks of max 10 lines)
+
+let's start counting tokens again!
 
 HAL colors: bold needs to be brighter not dimmer
 
@@ -20,6 +30,9 @@ live file deep changes
 
 error blocks NEED to contain the block id of that error - otherwise errors truncated
 
+error blocks need to be red
+
+and more prominent
 
 NEWLINES break BASH blocks!!!
 

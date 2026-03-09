@@ -118,9 +118,10 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								const question = (call.input as any)?.question ?? ''
 								result = await ctx.askUser(question) || '[no answer]'
 							} else {
+								const ref = toolRefMap.get(call.id)
 								await emit(sessionId, {
 									type: 'tool', toolId: call.id, name: call.name,
-									args, phase: 'running',
+									args, phase: 'running', ref,
 								})
 								const onChunk = (text: string) => emit(sessionId, {
 									type: 'tool', toolId: call.id, name: call.name,
@@ -129,7 +130,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								result = await executeTool(call, onChunk)
 								await emit(sessionId, {
 									type: 'tool', toolId: call.id, name: call.name,
-									args, phase: 'done', output: result,
+									args, phase: 'done', output: result, ref,
 								})
 							}
 

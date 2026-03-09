@@ -106,7 +106,7 @@ export type RuntimeEvent =
 		id: string; type: 'tool'; sessionId: string | null
 		toolId: string; name: string; args: string
 		phase: 'running' | 'streaming' | 'done' | 'error'
-		output?: string; createdAt: string
+		output?: string; ref?: string; createdAt: string
 	}
 	| {
 		id: string; type: 'question'; sessionId: string

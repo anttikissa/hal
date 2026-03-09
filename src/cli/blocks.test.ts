@@ -266,4 +266,45 @@ describe('renderBlocks', () => {
 		const lines = renderBlocks(blocks, 40)
 		expect(strip(lines[0]).length).toBe(40)
 	})
+
+	test('tool header shows ref at end', () => {
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: 'ok',
+				startTime: Date.now() - 1000, endTime: Date.now(), ref: '001abc-xyz' },
+		]
+		const lines = renderBlocks(blocks, 80)
+		const plain = strip(lines[0])
+		expect(plain).toContain('[001abc-xyz]')
+		// Ref should be at the very end of the header
+		expect(plain).toMatch(/─+ \[001abc-xyz\]$/)
+		expect(plain.length).toBe(80)
+	})
+
+	test('tool header without ref has no brackets', () => {
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: 'ok',
+				startTime: Date.now() - 1000, endTime: Date.now() },
+		]
+		const lines = renderBlocks(blocks, 80)
+		const plain = strip(lines[0])
+		expect(plain).not.toContain('[')
+	})
+
+	test('error block with ref shows ref in header', () => {
+		const blocks: Block[] = [
+			{ type: 'error', text: 'fail', detail: 'details', ref: '002def-abc' },
+		]
+		const lines = renderBlocks(blocks, 80)
+		const plain = strip(lines[0])
+		expect(plain).toContain('[002def-abc]')
+	})
+
+	test('error block formats JSON detail with ason.stringify', () => {
+		const detail = '{"error":{"type":"invalid_request","message":"bad input"}}'
+		const blocks: Block[] = [{ type: 'error', text: 'API error', detail }]
+		const lines = renderBlocks(blocks, 80)
+		const body = lines.slice(1, -2).map(l => strip(l).trim())
+		// Should be formatted, not raw JSON
+		expect(body.some(l => l.includes('error:'))).toBe(true)
+	})
 })
