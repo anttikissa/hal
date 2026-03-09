@@ -208,4 +208,29 @@ describe('parseKeys (concatenated sequences)', () => {
 		expect(events[0].key).toBe('enter')
 		expect(events[0].shift).toBe(false)
 	})
+
+	test('bracketed paste extracts content as single char event', () => {
+		const events = parseKeys('\x1b[200~hello world\x1b[201~')
+		expect(events.length).toBe(1)
+		expect(events[0].char).toBe('hello world')
+	})
+
+	test('bracketed paste with surrounding keys', () => {
+		const events = parseKeys('a\x1b[200~pasted\x1b[201~b')
+		expect(events.length).toBe(3)
+		expect(events[0].char).toBe('a')
+		expect(events[1].char).toBe('pasted')
+		expect(events[2].char).toBe('b')
+	})
+
+	test('bracketed paste with multiline content', () => {
+		const events = parseKeys('\x1b[200~line1\nline2\nline3\x1b[201~')
+		expect(events.length).toBe(1)
+		expect(events[0].char).toBe('line1\nline2\nline3')
+	})
+
+	test('empty bracketed paste produces no events', () => {
+		const events = parseKeys('\x1b[200~\x1b[201~')
+		expect(events.length).toBe(0)
+	})
 })

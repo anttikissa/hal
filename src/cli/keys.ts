@@ -120,10 +120,28 @@ const CTRL_KEYS: Record<number, string> = {
 
 // ── Tokenizer: split raw stdin data into individual key sequences ──
 
+const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~'
+
 function splitKeys(data: string): string[] {
 	const keys: string[] = []
 	let i = 0
 	while (i < data.length) {
+		// Bracketed paste: extract content between delimiters as single token
+		if (data.startsWith(PASTE_START, i)) {
+			const contentStart = i + PASTE_START.length
+			const endIdx = data.indexOf(PASTE_END, contentStart)
+			if (endIdx >= 0) {
+				const pasted = data.slice(contentStart, endIdx)
+				if (pasted) keys.push(pasted)
+				i = endIdx + PASTE_END.length
+			} else {
+				// Unterminated — treat rest as paste content
+				const pasted = data.slice(contentStart)
+				if (pasted) keys.push(pasted)
+				i = data.length
+			}
+			continue
+		}
 		if (data[i] === '\x1b') {
 			if (i + 1 < data.length && (data[i + 1] === '[' || data[i + 1] === 'O')) {
 				// CSI or SS3: scan parameter bytes (0x20-0x3f) then final byte

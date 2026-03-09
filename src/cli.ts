@@ -20,10 +20,12 @@ stdin.setEncoding('utf8')
 stdin.resume()
 
 const KITTY_KBD_ON = '\x1b[>27u', KITTY_KBD_OFF = '\x1b[<u'
-const TERM_RESET = `${KITTY_KBD_OFF}\x1b[?25h`
+const BRACKETED_PASTE_ON = '\x1b[?2004h', BRACKETED_PASTE_OFF = '\x1b[?2004l'
+const TERM_RESET = `${KITTY_KBD_OFF}${BRACKETED_PASTE_OFF}\x1b[?25h`
 const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
 const useKitty = kittyTerms.test(process.env.TERM_PROGRAM ?? '')
 if (useKitty) stdout.write(KITTY_KBD_ON)
+stdout.write(BRACKETED_PASTE_ON)
 
 let cleanExit = false
 process.on('exit', () => {
@@ -235,6 +237,7 @@ process.on('SIGCONT', () => {
 	stdin.setEncoding('utf8')
 	stdin.resume()
 	if (useKitty) stdout.write(KITTY_KBD_ON)
+	stdout.write(BRACKETED_PASTE_ON)
 	renderState = emptyState
 	doRender()
 })

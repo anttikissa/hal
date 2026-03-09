@@ -1,7 +1,7 @@
 // Prompt area: state, key handling, and line building.
 
 import { DIM, RESET, SEL_ON, SEL_OFF } from './colors.ts'
-import { pasteFromClipboard } from './clipboard.ts'
+import { pasteFromClipboard, cleanPaste } from './clipboard.ts'
 import type { CursorPos } from './diff-engine.ts'
 import type { KeyEvent } from './keys.ts'
 import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './input.ts'
@@ -166,7 +166,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.cmd) {
 		if (k.key === 'c') { const s = selRange(); if (s) writeClipboard(buf.slice(s.start, s.end)); return true }
 		if (k.key === 'x') { const s = selRange(); if (s) { writeClipboard(buf.slice(s.start, s.end)); deleteRange(s.start, s.end) }; return true }
-		if (k.key === 'v') { const t = pasteFromClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
+		if (k.key === 'v') { const t = cleanPaste(pasteFromClipboard()); if (t) replaceSelection(t); return true }
 		if (k.key === 'a') { selAnchor = 0; cursor = buf.length; return true }
 		return false
 	}
@@ -204,7 +204,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.key === 'e' && k.ctrl) { move(buf.length, k.shift); return true }
 
 	// Ctrl+V / Ctrl+Y: paste (same as Cmd+V)
-	if ((k.key === 'v' || k.key === 'y') && k.ctrl) { const t = pasteFromClipboard().replace(/\r\n/g, '\n').replace(/\r/g, '\n'); if (t) replaceSelection(t); return true }
+	if ((k.key === 'v' || k.key === 'y') && k.ctrl) { const t = cleanPaste(pasteFromClipboard()); if (t) replaceSelection(t); return true }
 
 	// Left / Right
 	if (k.key === 'left') {
@@ -270,8 +270,12 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.key === 'home') { move(0, k.shift); return true }
 	if (k.key === 'end') { move(buf.length, k.shift); return true }
 
-	// Printable characters
-	if (k.char) { replaceSelection(k.char); return true }
+	// Printable characters (multi-char from bracketed paste goes through cleanPaste)
+	if (k.char) {
+		const text = k.char.length > 1 ? cleanPaste(k.char) : k.char
+		if (text) replaceSelection(text)
+		return true
+	}
 
 	return false
 }
