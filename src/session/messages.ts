@@ -310,7 +310,16 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			i++
 		}
 	}
-	return compactApiMessages(out)
+	const compacted = compactApiMessages(out)
+	// Strip internal _ref before sending to API (providers reject extra fields)
+	for (const msg of compacted) {
+		if (msg.role === 'user' && Array.isArray(msg.content)) {
+			for (const b of msg.content) {
+				if (b.type === 'tool_result') delete b._ref
+			}
+		}
+	}
+	return compacted
 }
 
 /** Follow fork chain to load full history. */

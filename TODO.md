@@ -14,6 +14,13 @@ Cursor colors...
 
 HAL colors: bold needs to be brighter not dimmer
 
+what stuff in config.ason needs to stay (wipe others)
+
+live file deep changes
+
+error blocks NEED to contain the block id of that error - otherwise errors truncated
+
+
 NEWLINES break BASH blocks!!!
 
 When closes and restarts, tab should be the same that was before. Client server thing - client should save
