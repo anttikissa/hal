@@ -1,52 +1,68 @@
-// Key → action mapping. Imports directly from the modules that own each function.
+// Key → action mapping. Dependencies injected via InputContext.
 
 import type { KeyEvent } from './keys.ts'
 import { hasPendingPastes } from './clipboard.ts'
 import * as prompt from './prompt.ts'
-import { client, quit, restart, suspend, doRender, contentWidth, showError } from '../cli.ts'
 
-export function handleInput(k: KeyEvent): void {
+export interface InputContext {
+	send: (type: string, text?: string) => void
+	activeTab: () => { blocks: any[]; busy?: boolean; info?: any } | null
+	saveDraft: () => void
+	onSubmit: () => void
+	nextTab: () => void
+	prevTab: () => void
+	switchToTab: (i: number) => void
+	clearQuestion: () => void
+	markPausing: () => void
+	doRender: () => void
+	contentWidth: () => number
+	quit: () => void
+	restart: () => void
+	suspend: () => void
+}
+
+export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	if (k.key === 'k' && k.ctrl) throw new Error('simulated crash (ctrl-k)')
-	if (k.key === 'c' && k.ctrl) { quit(); return }
+	if (k.key === 'c' && k.ctrl) { ctx.quit(); return }
 
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && !prompt.text())) {
-		client.saveDraft()
-		send('close')
+		ctx.saveDraft()
+		ctx.send('close')
 		prompt.reset()
-		doRender()
+		ctx.doRender()
 		return
 	}
 
-	if (k.key === 't' && k.ctrl) { client.saveDraft(); send('open'); prompt.reset(); return }
-	if (k.key === 'f' && k.ctrl) { client.saveDraft(); send('fork'); prompt.reset(); return }
-	if (k.key === 'n' && k.ctrl) { client.nextTab(); doRender(); return }
-	if (k.key === 'p' && k.ctrl) { client.prevTab(); doRender(); return }
-	if (k.key === 'z' && k.ctrl) { suspend(); return }
-	if (k.key === 'r' && k.ctrl) { client.saveDraft(); restart(); return }
-	if (k.alt && !k.ctrl && !k.cmd && k.key >= '1' && k.key <= '9') { client.switchToTab(Number(k.key) - 1); doRender(); return }
+	if (k.key === 't' && k.ctrl) { ctx.saveDraft(); ctx.send('open'); prompt.reset(); return }
+	if (k.key === 'f' && k.ctrl) { ctx.saveDraft(); ctx.send('fork'); prompt.reset(); return }
+	if (k.key === 'n' && k.ctrl) { ctx.nextTab(); ctx.doRender(); return }
+	if (k.key === 'p' && k.ctrl) { ctx.prevTab(); ctx.doRender(); return }
+	if (k.key === 'z' && k.ctrl) { ctx.suspend(); return }
+	if (k.key === 'r' && k.ctrl) { ctx.saveDraft(); ctx.restart(); return }
+	if (k.alt && !k.ctrl && !k.cmd && k.key >= '1' && k.key <= '9') { ctx.switchToTab(Number(k.key) - 1); ctx.doRender(); return }
 
 	// Question mode: Enter submits answer, Escape dismisses
 	if (prompt.hasQuestion()) {
 		if (k.key === 'escape') {
 			prompt.clearQuestion()
-			client.clearQuestion()
-			send('respond', '')
-			doRender()
+			ctx.clearQuestion()
+			ctx.send('respond', '')
+			ctx.doRender()
 			return
 		}
 		if (k.key === 'enter' && !k.shift && !k.alt && !k.ctrl && !k.cmd) {
 			const answer = prompt.clearQuestion()
-			client.clearQuestion()
-			if (answer.trim()) send('respond', answer.trim())
-			else send('respond', '')
-			doRender()
+			ctx.clearQuestion()
+			if (answer.trim()) ctx.send('respond', answer.trim())
+			else ctx.send('respond', '')
+			ctx.doRender()
 			return
 		}
 	}
 
 	if (k.key === 'escape') {
-		const tab = client.activeTab()
-		if (tab?.busy) { send('pause'); client.markPausing(); doRender() }
+		const tab = ctx.activeTab()
+		if (tab?.busy) { ctx.send('pause'); ctx.markPausing(); ctx.doRender() }
 		return
 	}
 
@@ -58,26 +74,26 @@ export function handleInput(k: KeyEvent): void {
 			const slash = text.match(/^\/(\w+)\s*(.*)/)
 			if (slash) {
 				const [, cmd, arg] = slash
-				if (cmd === 'help') { showHelp(); }
-				else if (cmd === 'resume') send('open', arg || undefined)
-				else send(cmd as any, arg || undefined)
+				if (cmd === 'help') { showHelp(ctx); }
+				else if (cmd === 'resume') ctx.send('open', arg || undefined)
+				else ctx.send(cmd, arg || undefined)
 			} else {
-				client.onSubmit()
+				ctx.onSubmit()
 				prompt.pushHistory(text)
-				send('prompt', text)
+				ctx.send('prompt', text)
 			}
 		}
-		doRender()
+		ctx.doRender()
 		return
 	}
 
-	if (prompt.handleKey(k, contentWidth())) {
-		doRender()
+	if (prompt.handleKey(k, ctx.contentWidth())) {
+		ctx.doRender()
 	}
 }
 
-function showHelp(): void {
-	const tab = client.activeTab()
+function showHelp(ctx: InputContext): void {
+	const tab = ctx.activeTab()
 	if (!tab) return
 	tab.blocks.push({
 		type: 'assistant', done: true,
@@ -97,8 +113,4 @@ function showHelp(): void {
 			'  ctrl-c quit │ ctrl-z suspend │ ctrl-r restart',
 		].join('\n'),
 	})
-}
-
-function send(type: Parameters<typeof client.send>[0], text?: string): void {
-	client.send(type, text).catch((e: Error) => showError(`send ${type}: ${e.message}`))
 }

@@ -64,6 +64,7 @@ export function setHistory(h: string[]): void { history = h; historyIndex = -1; 
 export function pushHistory(text: string): void { history.push(text) }
 
 export function text(): string { return buf }
+export function cursorPos(): number { return cursor }
 
 export function setText(t: string, c?: number): void {
 	buf = t

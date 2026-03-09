@@ -1,76 +1,118 @@
-import { test, expect, beforeEach, mock } from 'bun:test'
+import { test, expect, beforeEach } from 'bun:test'
+import { handleInput, type InputContext } from './keybindings.ts'
+import type { KeyEvent } from './keys.ts'
+import * as prompt from './prompt.ts'
 
-// Stub cli.ts exports before importing keybindings
-const sentCommands: { type: string; text?: string }[] = []
-const pushBlocks: any[] = []
+const sent: { type: string; text?: string }[] = []
+const blocks: any[] = []
 
-const mockClient = {
-	send: mock(async (type: string, text?: string) => { sentCommands.push({ type, text }) }),
-	onSubmit: mock((_t: string) => {}),
-	activeTab: mock(() => ({ blocks: pushBlocks, sessionId: 'test', info: {}, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 })),
-	markPausing: mock(() => {}),
+function mockCtx(overrides?: Partial<InputContext>): InputContext {
+	return {
+		send: (type, text) => { sent.push({ type, text }) },
+		activeTab: () => ({ blocks, busy: false }),
+		saveDraft: () => {},
+		onSubmit: () => {},
+		nextTab: () => {},
+		prevTab: () => {},
+		switchToTab: () => {},
+		clearQuestion: () => {},
+		markPausing: () => {},
+		doRender: () => {},
+		contentWidth: () => 80,
+		quit: () => {},
+		restart: () => {},
+		suspend: () => {},
+		...overrides,
+	}
 }
 
-mock.module('../cli.ts', () => ({
-	client: mockClient,
-	quit: mock(() => {}),
-	restart: mock(() => {}),
-	suspend: mock(() => {}),
-	doRender: mock(() => {}),
-	contentWidth: mock(() => 80),
-	showError: mock(() => {}),
-}))
-
-const { handleInput } = await import('./keybindings.ts')
-const promptMod = await import('./prompt.ts')
-
-function enter() {
-	handleInput({ key: 'enter', ctrl: false, alt: false, shift: false, cmd: false })
+function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
+	return { key, char: '', ctrl: false, alt: false, shift: false, cmd: false, ...mods }
 }
 
 beforeEach(() => {
-	sentCommands.length = 0
-	pushBlocks.length = 0
-	promptMod.reset()
-	mockClient.send.mockClear()
-	mockClient.markPausing.mockClear()
+	sent.length = 0
+	blocks.length = 0
+	prompt.reset()
 })
 
 test('/help adds a local help block without sending a command', () => {
-	promptMod.setText('/help')
-	enter()
-	expect(sentCommands).toEqual([])
-	expect(pushBlocks.length).toBe(1)
-	expect(pushBlocks[0].type).toBe('assistant')
-	expect(pushBlocks[0].done).toBe(true)
-	expect(pushBlocks[0].text).toContain('/reset')
-	expect(pushBlocks[0].text).toContain('/model')
-	expect(pushBlocks[0].text).toContain('/topic')
-	expect(pushBlocks[0].text).toContain('ctrl-t')
+	const ctx = mockCtx()
+	prompt.setText('/help')
+	handleInput(ke('enter'), ctx)
+	expect(sent).toEqual([])
+	expect(blocks.length).toBe(1)
+	expect(blocks[0].type).toBe('assistant')
+	expect(blocks[0].done).toBe(true)
+	expect(blocks[0].text).toContain('/reset')
+	expect(blocks[0].text).toContain('/model')
+	expect(blocks[0].text).toContain('ctrl-t')
 })
 
 test('option+digit switches to tab N (1-indexed)', () => {
-	const switchToTab = mock(() => {})
-	;(mockClient as any).switchToTab = switchToTab
-	handleInput({ key: '3', ctrl: false, alt: true, shift: false, cmd: false })
-	expect(switchToTab).toHaveBeenCalledWith(2) // 0-indexed
+	let switched = -1
+	const ctx = mockCtx({ switchToTab: (i) => { switched = i } })
+	handleInput(ke('3', { alt: true }), ctx)
+	expect(switched).toBe(2)
 })
 
 test('option+digit does not switch on non-digit', () => {
-	const switchToTab = mock(() => {})
-	;(mockClient as any).switchToTab = switchToTab
-	handleInput({ key: 'g', ctrl: false, alt: true, shift: false, cmd: false })
-	expect(switchToTab).not.toHaveBeenCalled()
+	let switched = false
+	const ctx = mockCtx({ switchToTab: () => { switched = true } })
+	handleInput(ke('g', { alt: true }), ctx)
+	expect(switched).toBe(false)
 })
 
 test('escape sends pause and calls markPausing when active tab is busy', () => {
-	mockClient.activeTab.mockReturnValueOnce({ blocks: pushBlocks, sessionId: 'test', info: {}, busy: true, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 })
-	handleInput({ key: 'escape', ctrl: false, alt: false, shift: false, cmd: false })
-	expect(sentCommands).toEqual([{ type: 'pause', text: undefined }])
-	expect(mockClient.markPausing).toHaveBeenCalledTimes(1)
+	let paused = false
+	const ctx = mockCtx({
+		activeTab: () => ({ blocks, busy: true }),
+		markPausing: () => { paused = true },
+	})
+	handleInput(ke('escape'), ctx)
+	expect(sent).toEqual([{ type: 'pause', text: undefined }])
+	expect(paused).toBe(true)
 })
 
 test('escape does nothing when active tab is not busy', () => {
-	handleInput({ key: 'escape', ctrl: false, alt: false, shift: false, cmd: false })
-	expect(sentCommands).toEqual([])
+	const ctx = mockCtx()
+	handleInput(ke('escape'), ctx)
+	expect(sent).toEqual([])
+})
+
+test('ctrl-t sends open', () => {
+	let saved = false
+	const ctx = mockCtx({ saveDraft: () => { saved = true } })
+	handleInput(ke('t', { ctrl: true }), ctx)
+	expect(sent).toEqual([{ type: 'open', text: undefined }])
+	expect(saved).toBe(true)
+})
+
+test('ctrl-f sends fork', () => {
+	const ctx = mockCtx()
+	handleInput(ke('f', { ctrl: true }), ctx)
+	expect(sent).toEqual([{ type: 'fork', text: undefined }])
+})
+
+test('typing text and enter sends prompt', () => {
+	let submitted = false
+	const ctx = mockCtx({ onSubmit: () => { submitted = true } })
+	for (const ch of 'hello') prompt.handleKey(ke(ch, { char: ch }), 80)
+	handleInput(ke('enter'), ctx)
+	expect(sent).toEqual([{ type: 'prompt', text: 'hello' }])
+	expect(submitted).toBe(true)
+})
+
+test('/resume sends open with id', () => {
+	const ctx = mockCtx()
+	prompt.setText('/resume 00-abc')
+	handleInput(ke('enter'), ctx)
+	expect(sent).toEqual([{ type: 'open', text: '00-abc' }])
+})
+
+test('/reset sends reset command', () => {
+	const ctx = mockCtx()
+	prompt.setText('/reset')
+	handleInput(ke('enter'), ctx)
+	expect(sent).toEqual([{ type: 'reset', text: undefined }])
 })

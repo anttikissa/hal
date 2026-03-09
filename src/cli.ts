@@ -2,7 +2,7 @@
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
 import { parseKeys } from './cli/keys.ts'
-import { handleInput } from './cli/keybindings.ts'
+import { handleInput, type InputContext } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
 import { renderBlocks } from './cli/blocks.ts'
 import { maxTabHeight } from './cli/heights.ts'
@@ -247,10 +247,33 @@ process.on('SIGCONT', () => {
 	doRender()
 })
 
+// ── Input context ──
+
+function sendCmd(type: string, text?: string): void {
+	client.send(type as any, text).catch((e: Error) => showError(`send ${type}: ${e.message}`))
+}
+
+export const inputCtx: InputContext = {
+	send: sendCmd,
+	activeTab: () => client.activeTab(),
+	saveDraft: () => client.saveDraft(),
+	onSubmit: () => client.onSubmit(),
+	nextTab: () => client.nextTab(),
+	prevTab: () => client.prevTab(),
+	switchToTab: (i) => client.switchToTab(i),
+	clearQuestion: () => client.clearQuestion(),
+	markPausing: () => client.markPausing(),
+	doRender,
+	contentWidth,
+	quit,
+	restart,
+	suspend,
+}
+
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
-	for (const k of parseKeys(data)) handleInput(k)
+	for (const k of parseKeys(data)) handleInput(k, inputCtx)
 })
 
 stdout.on('resize', () => {
