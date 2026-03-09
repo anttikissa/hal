@@ -18,6 +18,7 @@ export function handleInput(k: KeyEvent): void {
 	}
 
 	if (k.key === 't' && k.ctrl) { client.saveDraft(); send('open'); prompt.reset(); return }
+	if (k.key === 'f' && k.ctrl) { client.saveDraft(); send('fork'); prompt.reset(); return }
 	if (k.key === 'n' && k.ctrl) { client.nextTab(); doRender(); return }
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); doRender(); return }
 	if (k.key === 'z' && k.ctrl) { suspend(); return }
@@ -91,7 +92,7 @@ function showHelp(): void {
 			'  /fork — fork session',
 			'',
 			'**Keys**',
-			'  esc pause │ ctrl-t new tab │ ctrl-w close │ ctrl-n/p switch tabs',
+			'  esc pause │ ctrl-t new tab │ ctrl-f fork │ ctrl-w close │ ctrl-n/p switch tabs',
 			'  ctrl-c quit │ ctrl-z suspend │ ctrl-r restart',
 		].join('\n'),
 	})

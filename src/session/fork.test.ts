@@ -67,7 +67,7 @@ describe('forkSession', () => {
 		const ts = new Date().toISOString()
 		await appendMessages(parentId, [
 			{ role: 'user', content: 'parent message', ts } as Message,
-			{ role: 'assistant', content: 'parent reply', ts } as Message,
+			{ role: 'assistant', text: 'parent reply', ts } as Message,
 		])
 
 		const childId = await forkSession(parentId)
@@ -79,7 +79,14 @@ describe('forkSession', () => {
 		])
 
 		const apiMsgs = await loadApiMessages(childId)
-		const texts = apiMsgs.map((m: any) => typeof m.content === 'string' ? m.content : '')
+		const texts = apiMsgs.map((m: any) => {
+			if (typeof m.content === 'string') return m.content
+			if (Array.isArray(m.content)) {
+				const t = m.content.find((b: any) => b.type === 'text')
+				return t?.text ?? ''
+			}
+			return ''
+		})
 
 		expect(texts).toContain('parent message')
 		expect(texts).toContain('parent reply')
@@ -88,21 +95,22 @@ describe('forkSession', () => {
 
 	test('child and parent diverge independently', async () => {
 		const parentId = tempSession()
-		const ts = new Date().toISOString()
+		const ts1 = new Date(Date.now() - 1000).toISOString()
 		await appendMessages(parentId, [
-			{ role: 'user', content: 'shared', ts } as Message,
-			{ role: 'assistant', content: 'shared reply', ts } as Message,
+			{ role: 'user', content: 'shared', ts: ts1 } as Message,
+			{ role: 'assistant', text: 'shared reply', ts: ts1 } as Message,
 		])
 
 		const childId = await forkSession(parentId)
 		createdIds.push(childId)
 
-		// Add different messages to parent and child
+		// Add different messages to parent and child — with later timestamps
+		const ts2 = new Date().toISOString()
 		await appendMessages(parentId, [
-			{ role: 'user', content: 'parent only', ts } as Message,
+			{ role: 'user', content: 'parent only', ts: ts2 } as Message,
 		])
 		await appendMessages(childId, [
-			{ role: 'user', content: 'child only', ts } as Message,
+			{ role: 'user', content: 'child only', ts: ts2 } as Message,
 		])
 
 		const parentMsgs = await loadApiMessages(parentId)

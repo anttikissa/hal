@@ -2,7 +2,7 @@
 
 import { watch, type FSWatcher } from 'fs'
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
-import { createSession, loadMeta, listSessionIds, rotateLog } from '../session/session.ts'
+import { createSession, loadMeta, listSessionIds, rotateLog, forkSession } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, buildCompactionContext, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
 import { contextWindowForModel, estimateTokens, messageBytes } from './context.ts'
@@ -308,6 +308,18 @@ export async function startRuntime(): Promise<Runtime> {
 				activeSessionId = info.id
 				await publish()
 				await greetSession(info.id)
+				break
+			}
+			case 'fork': {
+				const childId = await forkSession(sid)
+				const childMeta = loadMeta(childId)
+				if (!childMeta) { await error('Failed to create forked session'); break }
+				sessions.set(childId, childMeta)
+				activeSessionId = childId
+				await appendMessages(childId, [
+					{ role: 'user', content: `[system] Forked from session ${sid}.`, ts: new Date().toISOString() } as UserMessage,
+				])
+				await publish()
 				break
 			}
 			case 'close': {

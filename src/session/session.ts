@@ -1,12 +1,13 @@
 // Session CRUD — create, load, list, rotate.
 // Sessions use liveFile: mutate the object, it auto-saves to meta.ason.
 
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, writeFile, appendFile } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
-import { resolve } from 'path'
+import { resolve, join } from 'path'
 import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, ensureDir, sessionDir } from '../state.ts'
 import { liveFile } from '../live-file.ts'
+import { stringify } from '../utils/ason.ts'
 import type { SessionInfo } from '../protocol.ts'
 
 export type { SessionInfo }
@@ -88,6 +89,23 @@ export async function listSessionIds(): Promise<string[]> {
 	if (!existsSync(SESSIONS_DIR)) return []
 	const entries = await (await import('fs/promises')).readdir(SESSIONS_DIR)
 	return entries.filter(e => existsSync(metaPath(e))).sort()
+}
+
+// ── Fork ──
+
+/** Fork a session. Creates a new session with a forked_from pointer. */
+export async function forkSession(sourceId: string): Promise<string> {
+	const id = await makeSessionId()
+	const dir = sessionDir(id)
+	ensureDir(dir)
+	const ts = new Date().toISOString()
+	const meta = liveFile<SessionInfo>(metaPath(id), {
+		defaults: { id, workingDir: resolve(LAUNCH_CWD), log: 'messages.asonl', createdAt: ts, updatedAt: ts },
+	})
+	meta.updatedAt = ts
+	;(meta as SessionInfo & { save?: () => void }).save?.()
+	await appendFile(join(dir, 'messages.asonl'), stringify({ type: 'forked_from', parent: sourceId, ts }) + '\n')
+	return id
 }
 
 // ── Log rotation ──

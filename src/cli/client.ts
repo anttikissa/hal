@@ -238,7 +238,7 @@ export class Client {
 	}
 
 	async send(type: CommandType, text?: string): Promise<void> {
-		if (type === 'open') this.pendingOpen = true
+		if (type === 'open' || type === 'fork') this.pendingOpen = true
 		const tab = this.activeTab()
 		const sessionId = tab?.sessionId
 		if (!sessionId && type !== 'open') throw new Error('no active session')
