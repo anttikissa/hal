@@ -59,6 +59,7 @@ export function handleInput(k: KeyEvent): void {
 			if (slash) {
 				const [, cmd, arg] = slash
 				if (cmd === 'help') { showHelp(); }
+				else if (cmd === 'resume') send('open', arg || undefined)
 				else send(cmd as any, arg || undefined)
 			} else {
 				client.onSubmit()

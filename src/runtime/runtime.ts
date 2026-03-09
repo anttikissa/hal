@@ -303,11 +303,21 @@ export async function startRuntime(): Promise<Runtime> {
 				break
 			}
 			case 'open': {
-				const info = await createSession()
+				const resumeId = cmd.text?.trim()
+				let info: SessionInfo
+				if (resumeId) {
+					info = loadMeta(resumeId)
+					if (!info) {
+						emitInfo(sid, `[resume] session ${resumeId} not found`)
+						break
+					}
+				} else {
+					info = await createSession()
+				}
 				sessions.set(info.id, info)
 				activeSessionId = info.id
 				await publish()
-				await greetSession(info.id)
+				if (!resumeId) await greetSession(info.id)
 				break
 			}
 			case 'fork': {
