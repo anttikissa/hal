@@ -12,6 +12,10 @@ test('resolveModel: opus alias', () => {
 	expect(resolveModel('opus')).toBe('anthropic/claude-opus-4-6')
 })
 
+test('resolveModel: claude alias → default opus', () => {
+	expect(resolveModel('claude')).toBe('anthropic/claude-opus-4-6')
+})
+
 test('resolveModel: sonnet alias', () => {
 	expect(resolveModel('sonnet')).toBe('anthropic/claude-sonnet-4-20250514')
 })

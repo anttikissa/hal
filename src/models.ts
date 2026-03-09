@@ -4,6 +4,7 @@
 // Short name → full provider/model-id
 
 const ALIASES: Record<string, string> = {
+	claude: 'anthropic/claude-opus-4-6',
 	opus: 'anthropic/claude-opus-4-6',
 	sonnet: 'anthropic/claude-sonnet-4-20250514',
 	'gpt54': 'openai/gpt-5.4',
