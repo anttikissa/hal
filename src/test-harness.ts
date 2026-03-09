@@ -13,6 +13,8 @@ import { eventId, type RuntimeEvent } from './protocol.ts'
 ensureStateDir()
 await ensureBus()
 
+// Grab tail offset BEFORE runtime starts, so we don't miss initial publish
+const offset = await events.offset()
 const runtime = await startRuntime()
 
 function writeLine(record: any): void {
@@ -20,7 +22,6 @@ function writeLine(record: any): void {
 }
 
 // Tail events → JSON stdout
-const offset = await events.offset()
 const tail = events.tail(offset)
 ;(async () => {
 	for await (const event of tail.items) {
@@ -30,7 +31,11 @@ const tail = events.tail(offset)
 		} else if (e.type === 'status') {
 			writeLine({ type: 'status', busy: e.busy })
 		} else if (e.type === 'command') {
-			writeLine({ type: 'command', phase: e.phase })
+			writeLine({ type: 'command', phase: e.phase, commandId: (e as any).commandId })
+		} else if (e.type === 'line') {
+			writeLine({ type: 'line', sessionId: e.sessionId, text: e.text, level: e.level })
+		} else if (e.type === 'sessions') {
+			writeLine({ type: 'sessions', activeSessionId: e.activeSessionId, sessions: e.sessions.map(s => s.id) })
 		}
 	}
 })()
@@ -41,9 +46,9 @@ writeLine({ type: 'ready' })
 const { stdin } = process
 stdin.resume()
 
-function submitPrompt(text: string): void {
+function submitCommand(type: string, text?: string): void {
 	commands.append({
-		type: 'prompt', text, sessionId: runtime.activeSessionId,
+		type, text, sessionId: runtime.activeSessionId,
 		id: eventId(), createdAt: new Date().toISOString(),
 	} as any)
 }
@@ -54,7 +59,13 @@ stdin.on('data', (data: Buffer) => {
 		if (k.key === 'enter' && !k.alt && !k.shift && !k.ctrl && !k.cmd) {
 			const text = prompt.text()
 			prompt.clear()
-			if (text.trim()) submitPrompt(text)
+			if (!text.trim()) continue
+			const slash = text.match(/^\/(\w+)(.*)/)
+			if (slash) {
+				submitCommand(slash[1], slash[2]?.trim() || undefined)
+			} else {
+				submitCommand('prompt', text)
+			}
 			continue
 		}
 		if (k.key === 'enter' && (k.shift || k.alt)) {
