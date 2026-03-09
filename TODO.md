@@ -14,6 +14,10 @@ why runtime test ts has state isolation issue
 
 newlines break bash blocks... bash title needs to be printed in the block itself if it's multiline
 
+make queueing / steering work great
+
+assistant blocks - two extra lines in the beginning sometimes
+
 
 Cursor colors... need to main assistant color (orange) when writing, grey when thinking
 

@@ -299,7 +299,7 @@ describe('renderBlocks', () => {
 		expect(plain).toContain('[002def-abc]')
 	})
 
-	test('error block formats JSON detail with ason.stringify', () => {
+	test('error block formats object detail with ason.stringify', () => {
 		const detail = '{"error":{"type":"invalid_request","message":"bad input"}}'
 		const blocks: Block[] = [{ type: 'error', text: 'API error', detail }]
 		const lines = renderBlocks(blocks, 80)
