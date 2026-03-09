@@ -15,6 +15,12 @@ const ALIASES: Record<string, string> = {
 	mock: 'mock/mock-1',
 }
 
+export function modelCompletions(): string[] {
+	const values = new Set<string>(Object.keys(ALIASES))
+	for (const v of Object.values(ALIASES)) values.add(v)
+	return [...values].sort((a, b) => a.localeCompare(b))
+}
+
 // Pattern-based alias: opus-X → anthropic/claude-opus-X, sonnet-X → anthropic/claude-sonnet-X
 const PATTERNS: [RegExp, string][] = [
 	[/^opus-(.+)$/, 'anthropic/claude-opus-$1'],

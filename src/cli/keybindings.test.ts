@@ -10,6 +10,8 @@ function mockCtx(overrides?: Partial<InputContext>): InputContext {
 	return {
 		send: (type, text) => { sent.push({ type, text }) },
 		activeTab: () => ({ blocks, busy: false }),
+		tabs: () => [{ sessionId: '01-abc', info: { topic: '.hal', workingDir: '/Users/antti/.hal' } }],
+		activeTabIndex: () => 0,
 		saveDraft: () => {},
 		onSubmit: () => {},
 		nextTab: () => {},
@@ -115,4 +117,18 @@ test('/reset sends reset command', () => {
 	prompt.setText('/reset')
 	handleInput(ke('enter'), ctx)
 	expect(sent).toEqual([{ type: 'reset', text: undefined }])
+})
+
+test('tab completes /model argument', () => {
+	const ctx = mockCtx()
+	prompt.setText('/model codex-s')
+	handleInput(ke('tab'), ctx)
+	expect(prompt.text()).toBe('/model codex-spark ')
+})
+
+test('tab completion with multiple matches shows options in output', () => {
+	const ctx = mockCtx()
+	prompt.setText('/r')
+	handleInput(ke('tab'), ctx)
+	expect(blocks.some((b) => b.type === 'info' && typeof b.text === 'string' && b.text.includes('/reset') && b.text.includes('/respond') && b.text.includes('/resume'))).toBe(true)
 })

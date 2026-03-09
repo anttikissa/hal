@@ -256,6 +256,8 @@ function sendCmd(type: string, text?: string): void {
 export const inputCtx: InputContext = {
 	send: sendCmd,
 	activeTab: () => client.activeTab(),
+	tabs: () => client.getState().tabs,
+	activeTabIndex: () => client.getState().activeTabIndex,
 	saveDraft: () => client.saveDraft(),
 	onSubmit: () => client.onSubmit(),
 	nextTab: () => client.nextTab(),

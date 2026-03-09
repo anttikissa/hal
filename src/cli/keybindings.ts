@@ -2,11 +2,13 @@
 
 import type { KeyEvent } from './keys.ts'
 import { hasPendingPastes } from './clipboard.ts'
+import { completeInput } from './completion.ts'
 import * as prompt from './prompt.ts'
-
 export interface InputContext {
 	send: (type: string, text?: string) => void
 	activeTab: () => { blocks: any[]; busy?: boolean; info?: any } | null
+	tabs: () => { sessionId: string; info?: any }[]
+	activeTabIndex: () => number
 	saveDraft: () => void
 	onSubmit: () => void
 	nextTab: () => void
@@ -63,6 +65,22 @@ export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	if (k.key === 'escape') {
 		const tab = ctx.activeTab()
 		if (tab?.busy) { ctx.send('pause'); ctx.markPausing(); ctx.doRender() }
+		return
+	}
+
+	if (k.key === 'tab' && !k.ctrl && !k.alt && !k.cmd) {
+		const r = completeInput(prompt.text(), prompt.cursorPos(), {
+			tabs: ctx.tabs(),
+			activeTabIndex: ctx.activeTabIndex(),
+		})
+		if (r) {
+			prompt.setText(r.text, r.cursor)
+			if (r.options.length > 1) {
+				const tab = ctx.activeTab()
+				if (tab) tab.blocks.push({ type: 'info', text: r.options.join('  ') })
+			}
+			ctx.doRender()
+		}
 		return
 	}
 
