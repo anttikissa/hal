@@ -19,6 +19,11 @@ function collapseBlankLines(text: string): string {
 	return text.replace(/\n{3,}/g, '\n\n')
 }
 
+/** Strip all ANSI escape sequences (CSI, OSC, etc.) from text. */
+function stripAnsi(s: string): string {
+	return s.replace(/\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b[^[\]]/g, '')
+}
+
 const TAB_WIDTH = 4
 
 /** Expand tabs to spaces (tab stops at TAB_WIDTH columns). */
@@ -39,13 +44,16 @@ function expandTabs(s: string): string {
 const CONTENT_W = (width: number) => width - 2 * BLOCK_PAD
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
-	const who = block.source && block.source !== 'user' ? block.source : 'You'
+	const isSystem = block.text.startsWith('[system] ')
+	const text = isSystem ? block.text.slice(9) : block.text
+	const who = isSystem ? 'System' : (block.source && block.source !== 'user' ? block.source : 'You')
+	const { fg, bg } = isSystem ? colors.system : colors.input
 	const status = block.status ? ` (${block.status})` : ''
-	const model = block.model ? ` (to ${displayModel(block.model)})` : ''
+	const model = !isSystem && block.model ? ` (to ${displayModel(block.model)})` : ''
 	const label = `${who}${status}${model}`
-	if (block.status) return [toolLine(label + ': ' + block.text, width, colors.input.fg, colors.input.bg)]
-	const header = toolHeader(label, width, colors.input.fg, colors.input.bg)
-	const body = wordWrap(block.text, CONTENT_W(width)).map(l => toolLine(l, width, colors.input.fg, colors.input.bg))
+	if (block.status) return [toolLine(label + ': ' + text, width, fg, bg)]
+	const header = toolHeader(label, width, fg, bg)
+	const body = wordWrap(text, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
 	return [...header, ...body]
 }
 

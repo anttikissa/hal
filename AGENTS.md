@@ -1,6 +1,6 @@
 # HAL
 
-Minimal Bun + TypeScript agent with multi-tab TUI and file-backed IPC.
+Small but capable Bun + TypeScript coding agent with multi-tab TUI, persistent sessions, and file-backed IPC.
 
 Current code lives in `src/`; previous version is in `old-src/` for reference.
 

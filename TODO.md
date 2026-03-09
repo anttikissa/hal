@@ -6,6 +6,14 @@ First: add openai support
 
 aliases too
 
+Question block looks like ass
+
+/restore we need
+
+Cursor colors...
+
+NEWLINES break BASH blocks!!!
+
 When closes and restarts, tab should be the same that was before. Client server thing - client should save
 (it its filesystem) which tab it was looking (maybe even, which pid) - and server should also store the latest tab.
 Client uses the latest saved in filesystem tab, but if not available (eg if its the web client) use the one from server.

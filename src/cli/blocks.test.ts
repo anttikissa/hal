@@ -17,6 +17,14 @@ describe('renderBlocks', () => {
 		expect(lines[1]).toContain('hello')
 	})
 
+	test('[system] prefix renders as System header', () => {
+		const blocks: Block[] = [{ type: 'input', text: '[system] Session was reset.' }]
+		const lines = renderBlocks(blocks, 80)
+		expect(strip(lines[0])).toMatch(/^── System ─+$/)
+		expect(strip(lines[1])).toContain('Session was reset.')
+		expect(strip(lines[1])).not.toContain('[system]')
+	})
+
 	test('input block shows model name', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'fix it', model: 'codex-5.3' }]
 		const lines = renderBlocks(blocks, 80)
