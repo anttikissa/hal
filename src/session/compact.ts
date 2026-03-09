@@ -83,6 +83,12 @@ function stripOldImages(msgs: any[]): any[] {
 						const placeholder = b._ref ? `[image cleared — ref: ${b._ref}]` : '[image cleared]'
 						return { type: 'text', text: placeholder }
 					}
+					// Strip images inside tool_result content
+					if (b.type === 'tool_result' && Array.isArray(b.content)) {
+						return { ...b, content: b.content.map((c: any) =>
+							c.type === 'image' ? { type: 'text', text: '[image cleared]' } : c
+						)}
+					}
 					return b
 				})
 				out.push({ ...msg, content })

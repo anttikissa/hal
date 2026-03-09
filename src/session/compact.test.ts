@@ -238,4 +238,29 @@ describe('compactApiMessages', () => {
 		const textBlock = oldAssistant.content.find((b: any) => b.type === 'text')
 		expect(textBlock.text).toBe('calling bash')
 	})
+
+	test('clears images inside old tool_result content arrays', () => {
+		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }
+		const msgs = [
+			{ role: 'user', content: 'go' },
+			{
+				role: 'assistant',
+				content: [{ type: 'tool_use', id: 't0', name: 'ask', input: { question: 'show me' } }],
+			},
+			{
+				role: 'user',
+				content: [{ type: 'tool_result', tool_use_id: 't0', content: [{ type: 'text', text: 'here' }, imageBlock], _ref: 'ref-0' }],
+			},
+			{ role: 'user', content: 'next' },
+			{ role: 'user', content: 'more' },
+			{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+		]
+
+		const out = compactApiMessages(msgs)
+
+		// tool_result is 3 user turns ago — image inside should be cleared
+		const toolResult = out[2].content[0]
+		expect(toolResult.content[0]).toEqual({ type: 'text', text: 'here' })
+		expect(toolResult.content[1]).toEqual({ type: 'text', text: '[image cleared]' })
+	})
 })
