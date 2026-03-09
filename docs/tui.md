@@ -24,6 +24,8 @@ Keep this document up to date when changing TUI behavior in any of these files.
   - key → action mapping (imports from modules that own each function)
 - `src/cli/tabs.ts`
   - tab state and management
+- `src/cli/tabline.ts`
+  - tabline compaction/fallback rendering (`full` → `[1x]` → `1x` → `123...`)
 - `src/cli/md.ts`
   - mini markdown → ANSI for LLM output (fences, tables, inline formatting)
 - `src/cli/colors.ts`
@@ -47,6 +49,15 @@ The TUI uses a **diff-rendered** approach via `diff-engine.ts`.
   - **Activity bar**
   - **Tab bar / status bar**
   - **Input** lines
+
+Tabline behavior:
+- Preferred form: active tab as `[N topic]`, inactive as ` N topic `.
+- If width overflows, fallback modes are applied in order:
+  1. `[Nx] [N ] ...`
+  2. `Nx N ...`
+  3. `123...`
+- Tabline is hard-clipped to terminal width; it must never wrap.
+- Session ID moved to the status separator line (right side).
 
 Content is modeled as `Block[]` per tab (`src/cli/blocks.ts`). Blocks are rendered into screen lines by `renderBlocks()`.
 
@@ -82,6 +93,11 @@ Handles all terminal key families:
 
 Maps `KeyEvent` to actions. Client installs handlers for app-level keys (tab create/close/fork/switch). Remaining keys go to prompt editing.
 
+Tab completion behavior:
+- `Tab` completes slash commands and known arguments.
+- Includes command names, model aliases/full IDs, session IDs (`/resume`/`/open`), and `/respond skip`.
+- Multiple matches write one info line into output with candidate values.
+
 ### 4. Prompt editing (`src/cli/prompt.ts`)
 
 Handles:
@@ -98,6 +114,15 @@ Handles:
 ### Block-Based Output
 
 Output is stored as `Block[]` per tab. Block types include input prompts, assistant text, tool output, status lines, etc. `renderBlocks()` converts blocks to wrapped screen lines.
+
+Current block rendering rules:
+- Block lines are rendered inside a 1-column outer margin on both sides.
+- Thinking text under 5 wrapped lines is shown as plain dim lines.
+- Thinking text at 5+ lines renders as a block with header `── Hal (Codex 5.3, thinking) ...` and collapses after 10 lines with `[+ n lines]`.
+- Bash tool headers:
+  - short command: `bash: <cmd> (<time>) :ok|:err|:run:`
+  - long command (>60 chars): header omits command; command is shown on wrapped body lines using trailing `\` continuations.
+- Tool error status is rendered as error (`✗`) and persisted in block result metadata.
 
 ### Diff Rendering
 
