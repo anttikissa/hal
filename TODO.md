@@ -18,6 +18,7 @@ make queueing / steering work great
 
 assistant blocks - two extra lines in the beginning sometimes
 
+tabs need to be shrunk when they reach width
 
 Cursor colors... need to main assistant color (orange) when writing, grey when thinking
 

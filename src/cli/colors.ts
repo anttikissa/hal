@@ -34,7 +34,7 @@ const assistant = { fg: fg(oklch(0.75, 0.15, 70)), bg: bg(oklch(0.25, 0.05, 70))
 const input     = { fg: fg(oklch(0.80, 0.008, 250)), bg: bg(oklch(0.29, 0.008, 250)) }
 const thinking  = { fg: fg(oklch(0.55, 0.02, 250)) }
 const info      = { fg: fg(oklch(0.65, 0.01, 250)), bg: bg(oklch(0.22, 0.01, 250)) }
-const error     = { fg: fg(oklch(0.75, 0.15, 25)),  bg: bg(oklch(0.25, 0.05, 25)) }
+const error     = { fg: fg(oklch(0.60, 0.20, 35)),  bg: bg(oklch(0.25, 0.07, 35)) }
 const system    = { fg: fg(oklch(0.75, 0.15, 190)), bg: bg(oklch(0.25, 0.05, 190)) }
 const cursor    = { fg: fg(oklch(0.75, 0.15, 70)) }
 

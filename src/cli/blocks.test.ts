@@ -307,4 +307,13 @@ describe('renderBlocks', () => {
 		// Should be formatted, not raw JSON
 		expect(body.some(l => l.includes('error:'))).toBe(true)
 	})
+
+	test('error block formats JSON after prefix like "API 404: {...}"', () => {
+		const detail = 'API 404: {"type":"error","error":{"type":"not_found_error","message":"model: bad"}}'
+		const blocks: Block[] = [{ type: 'error', text: 'API error', detail }]
+		const lines = renderBlocks(blocks, 80)
+		const body = lines.slice(1, -2).map(l => strip(l).trim())
+		expect(body[0]).toBe('API 404:')
+		expect(body.some(l => l.includes("type: 'error'"))).toBe(true)
+	})
 })

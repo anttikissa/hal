@@ -94,12 +94,17 @@ function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): str
 }
 
 function formatErrorDetail(detail: string): string {
-	try {
-		const parsed = JSON.parse(detail)
-		return asonStringify(parsed)
-	} catch {
-		return detail
+	// Try parsing as JSON directly, or extract JSON after a prefix like "API 404: {...}"
+	const jsonStart = detail.indexOf('{')
+	if (jsonStart >= 0) {
+		try {
+			const parsed = JSON.parse(detail.slice(jsonStart))
+			const prefix = detail.slice(0, jsonStart).trim()
+			const formatted = asonStringify(parsed)
+			return prefix ? `${prefix}\n${formatted}` : formatted
+		} catch {}
 	}
+	return detail
 }
 
 function renderError(block: Extract<Block, { type: 'error' }>, width: number): string[] {
