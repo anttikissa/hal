@@ -319,6 +319,8 @@ export async function startRuntime(): Promise<Runtime> {
 				await appendMessages(childId, [
 					{ role: 'user', content: `[system] Forked from session ${sid}.`, ts: new Date().toISOString() } as UserMessage,
 				])
+				await emitInfo(sid, `[fork] forked ${sid} -> ${childId}`, 'meta')
+				await emitInfo(childId, `[fork] forked ${sid} -> ${childId}`, 'meta')
 				await publish()
 				break
 			}
