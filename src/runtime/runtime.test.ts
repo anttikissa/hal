@@ -1,12 +1,16 @@
 // Integration test — runtime + IPC end-to-end.
 
-import { writeFileSync, rmSync, existsSync } from 'fs'
+import { writeFileSync, rmSync, existsSync, mkdtempSync } from 'fs'
 import { readFile } from 'fs/promises'
+import { join } from 'path'
+import { tmpdir } from 'os'
 import { test, expect, beforeEach, afterEach, afterAll } from 'bun:test'
 import { randomBytes } from 'crypto'
 import type { Runtime } from './runtime.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 
+const TEST_STATE_DIR = mkdtempSync(join(tmpdir(), `hal-test-${process.pid}-`))
+process.env.HAL_STATE_DIR = TEST_STATE_DIR
 const TEST_CONFIG = `/tmp/hal-test-config-${process.pid}.ason`
 writeFileSync(TEST_CONFIG, '{ defaultModel: "mock/mock-1" }\n')
 process.env.HAL_CONFIG = TEST_CONFIG
@@ -138,15 +142,17 @@ test('close command removes session and creates replacement', async () => {
 	expect(runtime.sessions.size).toBe(1)
 })
 
-test('reset command is persisted', async () => {
+test('reset command rotates log and writes breadcrumb', async () => {
 	const sid = runtime.activeSessionId!
 	await commands.append(makeCommand('reset', src, undefined, sid))
 	await new Promise(r => setTimeout(r, 500))
-	const path = `${sessionDir(sid)}/messages.asonl`
-	expect(existsSync(path)).toBe(true)
-	const raw = await readFile(path, 'utf-8')
+	const oldPath = `${sessionDir(sid)}/messages.asonl`
+	const newPath = `${sessionDir(sid)}/messages2.asonl`
+	expect(existsSync(oldPath)).toBe(true)
+	expect(existsSync(newPath)).toBe(true)
+	const raw = await readFile(newPath, 'utf-8')
 	const entries = parseAll(raw) as any[]
-	expect(entries.some(e => e.type === 'reset')).toBe(true)
+	expect(entries.some(e => e.role === 'user' && typeof e.content === 'string' && e.content.includes('[system] Session was reset. Previous conversation: messages.asonl'))).toBe(true)
 })
 
 test('multiple prompts build conversation history', async () => {
