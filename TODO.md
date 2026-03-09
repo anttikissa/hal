@@ -10,6 +10,11 @@ Question block looks like ass
 
 /restore we need
 
+why runtime test ts has state isolation issue
+
+newlines break bash blocks... bash title needs to be printed in the block itself if it's multiline
+
+
 Cursor colors... need to main assistant color (orange) when writing, grey when thinking
 
 Maybe green if done, minicursor a checkmark? Red if error, minicursor danger sign

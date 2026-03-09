@@ -276,7 +276,7 @@ describe('renderBlocks', () => {
 		const plain = strip(lines[0])
 		expect(plain).toContain('[001abc-xyz]')
 		// Ref should be at the very end of the header
-		expect(plain).toMatch(/─+ \[001abc-xyz\]$/)
+		expect(plain).toMatch(/─+ \[001abc-xyz\] ──$/)
 		expect(plain.length).toBe(80)
 	})
 

@@ -139,9 +139,9 @@ function headerLine(text: string, width: number, fg: string, bg: string): string
 
 function toolHeader(label: string, width: number, fg: string, bg: string, ref?: string): string[] {
 	const prefix = '── '
-	const refTag = ref ? ` [${ref}]` : ''
+	const suffix = ref ? ` [${ref}] ──` : ''
 	const inner = prefix + label + ' '
-	const totalFixed = inner.length + refTag.length
+	const totalFixed = inner.length + suffix.length
 	if (totalFixed >= width) {
 		const full = prefix + label + ' '
 		const lines: string[] = []
@@ -150,16 +150,16 @@ function toolHeader(label: string, width: number, fg: string, bg: string, ref?: 
 		}
 		const last = lines[lines.length - 1]
 		const remaining = Math.max(0, width - last.length)
-		if (refTag.length > 0 && remaining > refTag.length + 1) {
-			const fill = '─'.repeat(remaining - refTag.length)
-			lines[lines.length - 1] = last + fill + refTag
+		if (suffix.length > 0 && remaining > suffix.length + 1) {
+			const fill = '─'.repeat(remaining - suffix.length)
+			lines[lines.length - 1] = last + fill + suffix
 		} else {
 			lines[lines.length - 1] = last + '─'.repeat(remaining)
 		}
 		return lines.map(l => headerLine(l, width, fg, bg))
 	}
 	const fill = '─'.repeat(Math.max(0, width - totalFixed))
-	return [headerLine(inner + fill + refTag, width, fg, bg)]
+	return [headerLine(inner + fill + suffix, width, fg, bg)]
 }
 
 function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): string[] {
