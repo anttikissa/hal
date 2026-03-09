@@ -190,7 +190,12 @@ export async function parseUserContent(
 	input: string,
 ): Promise<{ apiContent: any; logContent: UserMessage['content'] }> {
 	const pattern = /\[([^\]]+\.(png|jpg|jpeg|gif|webp|txt))\]/gi
-	const matches = [...input.matchAll(pattern)]
+	const allMatches = [...input.matchAll(pattern)]
+	// Only expand .txt from /tmp/hal/ (paste files) to avoid leaking arbitrary files
+	const matches = allMatches.filter(m => {
+		const ext = m[2].toLowerCase()
+		return ext !== 'txt' || m[1].startsWith('/tmp/hal/')
+	})
 	if (matches.length === 0) return { apiContent: input, logContent: input }
 
 	const apiBlocks: any[] = []

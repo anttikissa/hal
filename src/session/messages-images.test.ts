@@ -50,8 +50,9 @@ test('parseUserContent handles missing file', async () => {
 	expect(apiContent[0].text).toContain('file not found')
 })
 
-test('parseUserContent inlines [path.txt] as text', async () => {
-	const txtPath = '/tmp/hal-test-paste.txt'
+test('parseUserContent inlines [path.txt] from /tmp/hal/', async () => {
+	const txtPath = '/tmp/hal/test-paste.txt'
+	mkdirSync('/tmp/hal', { recursive: true })
 	writeFileSync(txtPath, 'line one\nline two\nline three')
 	try {
 		const { apiContent, logContent } = await parseUserContent(TEST_SESSION, `check this [${txtPath}]`)
@@ -65,6 +66,11 @@ test('parseUserContent inlines [path.txt] as text', async () => {
 	} finally {
 		rmSync(txtPath)
 	}
+})
+
+test('parseUserContent does not expand .txt outside /tmp/hal/', async () => {
+	const { apiContent } = await parseUserContent(TEST_SESSION, 'read [/etc/passwd.txt]')
+	expect(apiContent).toBe('read [/etc/passwd.txt]')
 })
 
 test('image blocks round-trip through loadApiMessages', async () => {
