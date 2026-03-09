@@ -191,6 +191,7 @@ export function doRender(): void {
 	renderState = state
 	if (buf) stdout.write(buf)
 }
+prompt.setRenderCallback(doRender)
 
 // ── Quit / Restart / Suspend ──
 

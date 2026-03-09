@@ -153,9 +153,29 @@ function deleteSel(): boolean {
 
 // ── Clipboard ──
 
+let renderCallback: (() => void) | null = null
+export function setRenderCallback(cb: () => void): void { renderCallback = cb }
+
 function writeClipboard(text: string): void {
 	if (!text) return
 	try { const p = Bun.spawn(['pbcopy'], { stdin: 'pipe' }); p.stdin.write(text); p.stdin.end() } catch {}
+}
+
+function resolvePlaceholder(placeholder: string, replacement: string): void {
+	const idx = buf.lastIndexOf(placeholder)
+	if (idx < 0) return
+	buf = buf.slice(0, idx) + replacement + buf.slice(idx + placeholder.length)
+	// Adjust cursor if it was after the placeholder
+	if (cursor > idx) cursor += replacement.length - placeholder.length
+	cursor = clamp(cursor)
+	renderCallback?.()
+}
+
+function doPaste(): void {
+	const t = cleanPaste(pasteFromClipboard((placeholder, result) => {
+		resolvePlaceholder(placeholder, result)
+	}))
+	if (t) replaceSelection(t)
 }
 
 // ── Key handling ──
@@ -166,7 +186,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.cmd) {
 		if (k.key === 'c') { const s = selRange(); if (s) writeClipboard(buf.slice(s.start, s.end)); return true }
 		if (k.key === 'x') { const s = selRange(); if (s) { writeClipboard(buf.slice(s.start, s.end)); deleteRange(s.start, s.end) }; return true }
-		if (k.key === 'v') { const t = cleanPaste(pasteFromClipboard()); if (t) replaceSelection(t); return true }
+		if (k.key === 'v') { doPaste(); return true }
 		if (k.key === 'a') { selAnchor = 0; cursor = buf.length; return true }
 		return false
 	}
@@ -204,7 +224,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.key === 'e' && k.ctrl) { move(buf.length, k.shift); return true }
 
 	// Ctrl+V / Ctrl+Y: paste (same as Cmd+V)
-	if ((k.key === 'v' || k.key === 'y') && k.ctrl) { const t = cleanPaste(pasteFromClipboard()); if (t) replaceSelection(t); return true }
+	if ((k.key === 'v' || k.key === 'y') && k.ctrl) { doPaste(); return true }
 
 	// Left / Right
 	if (k.key === 'left') {

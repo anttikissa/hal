@@ -1,4 +1,4 @@
-// Clipboard access — sync, macOS only.
+// Clipboard access — macOS only.
 
 import { mkdirSync, existsSync, readdirSync, writeFileSync } from 'fs'
 
@@ -8,9 +8,18 @@ const MAX_INLINE_NEWLINES = 5
 
 function ensureDir(dir: string): void { if (!existsSync(dir)) mkdirSync(dir, { recursive: true }) }
 
-/** Save clipboard image to temp file, return path or null. */
-export function getClipboardImage(): string | null {
-	if (process.platform !== 'darwin') return null
+// ── Async image probe ──
+
+let pasteCounter = 0
+let pendingPastes = 0
+
+export function resetPasteCounter(): void { pasteCounter = 0; pendingPastes = 0 }
+
+/** Allocate a [paste:N] placeholder for async image resolution. */
+function allocPlaceholder(): string { return `[paste:${++pasteCounter}]` }
+
+function getClipboardImageAsync(): Promise<string | null> {
+	if (process.platform !== 'darwin') return Promise.resolve(null)
 	ensureDir(IMAGE_DIR)
 	const path = `${IMAGE_DIR}/${Math.random().toString(36).slice(2, 8)}.png`
 	const script = `set tempPath to "${path}"
@@ -23,20 +32,41 @@ try
 on error
   return "no-image"
 end try`
-	const proc = Bun.spawnSync(['osascript', '-e', script])
-	const stdout = proc.stdout.toString().trim()
-	return stdout === 'no-image' ? null : stdout
+	const proc = Bun.spawn(['osascript', '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+	return new Response(proc.stdout).text().then(out => {
+		const s = out.trim()
+		return s === 'no-image' ? null : s
+	})
 }
+
+// ── Sync text ──
 
 function readClipboardText(): string {
 	try { return Bun.spawnSync(['pbpaste']).stdout.toString() } catch { return '' }
 }
 
-/** Read clipboard: image path as `[path]`, or text. */
-export function pasteFromClipboard(): string {
-	const imagePath = getClipboardImage()
-	if (imagePath) return `[${imagePath}]`
-	return readClipboardText()
+// ── Public API ──
+
+type PasteResolve = (placeholder: string, replacement: string) => void
+
+/**
+ * Read clipboard. Returns immediate text to insert.
+ * If clipboard text is empty, inserts a [paste:N] placeholder and probes
+ * for an image asynchronously. Calls onResolve(placeholder, result) when done.
+ */
+export function pasteFromClipboard(onResolve?: PasteResolve): string {
+	const text = readClipboardText()
+	if (text) return text
+
+	// No text — try async image probe
+	const placeholder = allocPlaceholder()
+	pendingPastes++
+	getClipboardImageAsync().then(imagePath => {
+		pendingPastes--
+		if (pendingPastes === 0) pasteCounter = 0
+		if (onResolve) onResolve(placeholder, imagePath ? `[${imagePath}]` : '')
+	})
+	return placeholder
 }
 
 /** Save text to /tmp/hal/paste/NNNN.txt, return `[path]`. */

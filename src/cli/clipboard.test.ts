@@ -1,10 +1,13 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
-import { saveMultilinePaste, cleanPaste } from './clipboard.ts'
+import { saveMultilinePaste, cleanPaste, resetPasteCounter } from './clipboard.ts'
 import { rmSync, readFileSync, existsSync } from 'fs'
 
 const PASTE_DIR = '/tmp/hal/paste'
 
-beforeEach(() => { if (existsSync(PASTE_DIR)) rmSync(PASTE_DIR, { recursive: true }) })
+beforeEach(() => {
+	if (existsSync(PASTE_DIR)) rmSync(PASTE_DIR, { recursive: true })
+	resetPasteCounter()
+})
 afterEach(() => { if (existsSync(PASTE_DIR)) rmSync(PASTE_DIR, { recursive: true }) })
 
 test('saveMultilinePaste writes file and returns [path]', () => {
