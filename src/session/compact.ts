@@ -64,30 +64,29 @@ function hasToolUse(msg: any): boolean {
 
 /** Clear image blocks except those in the last N user turns. */
 function stripOldImages(msgs: any[]): any[] {
-	const userIndices: number[] = []
-	for (let i = 0; i < msgs.length; i++) {
-		if (msgs[i].role === 'user' && Array.isArray(msgs[i].content)) {
-			userIndices.push(i)
-		}
+	// Count all user turns to determine recency
+	let userCount = 0
+	for (const msg of msgs) {
+		if (msg.role === 'user') userCount++
 	}
 
-	// Keep images in last 2 user turns with array content
-	const keepFrom = userIndices.length >= 2
-		? userIndices[userIndices.length - 2]
-		: userIndices[0] ?? msgs.length
-
+	// Walk messages, tracking which user turn we're on
 	const out: any[] = []
-	for (let i = 0; i < msgs.length; i++) {
-		const msg = msgs[i]
-		if (msg.role === 'user' && Array.isArray(msg.content) && i < keepFrom) {
-			const content = msg.content.map((b: any) => {
-				if (b.type === 'image') return { type: 'text', text: '[image cleared]' }
-				return b
-			})
-			out.push({ ...msg, content })
-		} else {
-			out.push(msg)
+	let userIdx = 0
+	for (const msg of msgs) {
+		if (msg.role === 'user') {
+			const turnsAgo = userCount - userIdx
+			userIdx++
+			if (Array.isArray(msg.content) && turnsAgo > 2) {
+				const content = msg.content.map((b: any) => {
+					if (b.type === 'image') return { type: 'text', text: '[image cleared]' }
+					return b
+				})
+				out.push({ ...msg, content })
+				continue
+			}
 		}
+		out.push(msg)
 	}
 	return out
 }

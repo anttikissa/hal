@@ -124,6 +124,23 @@ describe('compactApiMessages', () => {
 		expect(out[4].content[1].type).toBe('image')
 	})
 
+	test('clears image when followed by plain string user turns', () => {
+		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }
+
+		const msgs = [
+			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'nice image' }] },
+			{ role: 'user', content: 'hello' },
+			{ role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+			{ role: 'user', content: 'stop' },
+			{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+		]
+
+		const out = compactApiMessages(msgs)
+
+		// Image is 3 user turns ago (image, "hello", "stop") — should be cleared
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared]' })
+	})
 	test('no tool calls → messages unchanged', () => {
 		const msgs = [
 			{ role: 'user', content: 'hello' },
