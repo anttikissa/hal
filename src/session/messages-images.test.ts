@@ -169,3 +169,23 @@ test('loadApiMessages omits thinking blocks without signature', async () => {
 	expect(assistant.content).toHaveLength(1)
 	expect(assistant.content[0]).toEqual({ type: 'text', text: 'hi' })
 })
+
+test('replay marks tool with error status when stored result status is error', async () => {
+	const { writeAssistantEntry, writeToolResultEntry } = await import('./messages.ts')
+	const { replayToBlocks } = await import('./replay.ts')
+	const SID = TEST_SESSION
+
+	const { entry, toolRefMap } = await writeAssistantEntry(SID, {
+		text: 'run',
+		toolCalls: [{ id: 't1', name: 'read', input: { path: 'missing.txt' } }],
+	})
+	await appendMessages(SID, [entry])
+	const result = await writeToolResultEntry(SID, 't1', 'error: file not found', toolRefMap, 'error')
+	await appendMessages(SID, [result])
+
+	const messages = await readMessages(SID)
+	const blocks = await replayToBlocks(SID, messages)
+	const tool = blocks.find((b: any) => b.type === 'tool') as any
+	expect(tool).toBeTruthy()
+	expect(tool.status).toBe('error')
+})

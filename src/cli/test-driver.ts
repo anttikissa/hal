@@ -14,7 +14,9 @@ export class TestDriver {
 		prompt.reset()
 		this.ctx = {
 			send: (type, text) => { this.sent.push({ type, text }) },
-			activeTab: () => ({ blocks: this.blocks, busy: false }),
+			activeTab: () => ({ blocks: this.blocks, busy: false, info: { topic: '.hal', workingDir: '~/.hal' } }),
+			tabs: () => [{ sessionId: '01-test', info: { topic: '.hal', workingDir: '~/.hal' } }],
+			activeTabIndex: () => 0,
 			saveDraft: () => {},
 			onSubmit: () => {},
 			nextTab: () => {},

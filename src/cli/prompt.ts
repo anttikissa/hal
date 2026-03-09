@@ -1,8 +1,7 @@
 // Prompt area: state, key handling, and line building.
 
-import { DIM, RESET, SEL_ON, SEL_OFF } from './colors.ts'
+import { SEL_ON, SEL_OFF } from './colors.ts'
 import { pasteFromClipboard, cleanPaste } from './clipboard.ts'
-import type { CursorPos } from './diff-engine.ts'
 import type { KeyEvent } from './keys.ts'
 import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './input.ts'
 const MAX_PROMPT_LINES = 12
@@ -304,20 +303,18 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 // ── Rendering ──
 
 export interface PromptRender {
-	separator: string
 	lines: string[]
 	cursor: { rowOffset: number; col: number }
 	scrollInfo?: string
 }
 
-/** Build prompt lines. Returns separator, content lines, and cursor offset within them. */
-export function buildPrompt(width: number, contentWidth: number): PromptRender {
+/** Build prompt lines and cursor offset. */
+export function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getWrappedInputLayout(buf, contentWidth)
 	const promptLines = Math.min(layout.lines.length, MAX_PROMPT_LINES)
 	const { row: curRow, col: curCol } = cursorToWrappedRowCol(buf, cursor, contentWidth)
 	const sel = selRange()
 
-	// Scroll window
 	let scrollTop = 0
 	if (layout.lines.length > promptLines) {
 		scrollTop = Math.min(curRow, layout.lines.length - promptLines)
@@ -326,7 +323,6 @@ export function buildPrompt(width: number, contentWidth: number): PromptRender {
 	const aboveCount = scrollTop
 	const belowCount = Math.max(0, layout.lines.length - scrollTop - promptLines)
 
-	// Scroll indicators (for caller to embed in separator)
 	let scrollInfo: string | undefined
 	if (aboveCount > 0 || belowCount > 0) {
 		const parts: string[] = []
@@ -335,23 +331,15 @@ export function buildPrompt(width: number, contentWidth: number): PromptRender {
 		scrollInfo = parts.join(' ')
 	}
 
-	// Plain separator (caller may override with status info)
-	const sep = `${DIM}${'─'.repeat(width)}${RESET}`
-
-	// Prompt lines with 1-char padding and selection highlight
 	const lines: string[] = []
 	for (let i = scrollTop; i < scrollTop + promptLines; i++) {
 		const lineText = layout.lines[i] ?? ''
 		const lineStart = layout.starts[i] ?? 0
-		if (sel) {
-			lines.push(` ${highlightSel(lineText, lineStart, sel.start, sel.end)}`)
-		} else {
-			lines.push(` ${lineText}`)
-		}
+		if (sel) lines.push(` ${highlightSel(lineText, lineStart, sel.start, sel.end)}`)
+		else lines.push(` ${lineText}`)
 	}
 
 	return {
-		separator: sep,
 		lines,
 		cursor: { rowOffset: curRow - scrollTop, col: curCol + 2 },
 		scrollInfo,

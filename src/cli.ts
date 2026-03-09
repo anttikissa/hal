@@ -11,6 +11,7 @@ import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
 import { getConfig } from './config.ts'
 import { displayModel } from './models.ts'
+import { renderTabline } from './cli/tabline.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -47,7 +48,7 @@ export const client = new Client(transport, () => { bumpCursor(); doRender() })
 
 // ── Renderer ──
 
-const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m', YELLOW = '\x1b[33m', RED = '\x1b[31m'
+const DIM = '\x1b[38;5;245m', RESET = '\x1b[0m', YELLOW = '\x1b[33m', RED = '\x1b[31m'
 let halCursorVisible = true
 let blinkTimer: ReturnType<typeof setTimeout> | null = null
 let renderState: RenderState = emptyState
@@ -59,6 +60,17 @@ function scheduleBlink(): void {
 		doRender()
 		scheduleBlink()
 	}, 530)
+}
+
+function oneLine(s: string): string {
+	return s.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ')
+}
+
+function clipForWidth(s: string, max: number): string {
+	if (max <= 0) return ''
+	if (s.length <= max) return s
+	if (max === 1) return '…'
+	return s.slice(0, max - 1) + '…'
 }
 
 function bumpCursor(): void {
@@ -98,12 +110,14 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 	const role = hal.isHost ? 'host' : 'client'
 	const ctx = fmtContext(tab?.context)
 	const rightParts = [role]
+	if (tab?.sessionId) rightParts.push(tab.sessionId)
 	if (ctx) rightParts.push(ctx)
 	if (scrollInfo) rightParts.push(scrollInfo)
 	const left = ` ${model} (${state}) `
-	const right = ` ${rightParts.join(' · ')}`
-	const fill = Math.max(1, w - left.length - right.length)
-	return `${DIM}${left}${'─'.repeat(fill)}${right}${RESET}`
+	const right = oneLine(` ${rightParts.join(' · ')}`)
+	const safeRight = clipForWidth(right, Math.max(1, w - left.length - 1))
+	const fill = Math.max(1, w - left.length - safeRight.length)
+	return `${DIM}${left}${'─'.repeat(fill)}${safeRight}${RESET}`
 }
 
 function buildLines(): { lines: string[]; cursor: CursorPos } {
@@ -130,12 +144,13 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	// Tab bar
 	const tabs = cState.tabs
 	const idx = cState.activeTabIndex
-	const parts = tabs.map((t, i) => {
-		const label = ` ${t.info.topic ?? t.sessionId} `
-		const busy = t.busy ? '*' : ''
-		return i === idx ? `${BOLD}[${label}${busy}]${RESET}` : `${DIM} ${label}${busy} ${RESET}`
-	})
-	lines.push(`tabs: ${parts.join('')}`)
+	const parts = tabs.map((t, i) => ({
+		label: String(t.info.topic ?? t.info.workingDir ?? t.sessionId),
+		busy: !!t.busy,
+		active: i === idx,
+	}))
+	const tabBar = renderTabline(parts, w)
+	lines.push(clipForWidth(oneLine(tabBar), w))
 
 	// Question area (when active, shown above the regular prompt)
 	const hasQ = prompt.hasQuestion()
@@ -148,7 +163,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		lines.push(`${DIM}${qLeft}${'─'.repeat(qFill)}${RESET}`)
 
 		// Answer input (buf is the question answer in question mode)
-		const p = prompt.buildPrompt(w, cw)
+		const p = prompt.buildPrompt(cw)
 		const answerStartRow = lines.length
 		lines.push(...p.lines)
 		cursorPos = { row: answerStartRow + p.cursor.rowOffset, col: p.cursor.col }
@@ -163,7 +178,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		}
 	} else {
 		// Normal prompt
-		const p = prompt.buildPrompt(w, cw)
+		const p = prompt.buildPrompt(cw)
 		lines.push(buildSeparator(tab, w, p.scrollInfo))
 		lines.push(...p.lines)
 		cursorPos = {
@@ -175,10 +190,11 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	// Help bar
 	const statusText = tab?.busy ? ' busy' : ''
 	const help = ` ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-c quit${statusText} `
-	const hPad = w - help.length
+	const safeHelp = clipForWidth(oneLine(help), w)
+	const hPad = Math.max(0, w - safeHelp.length)
 	const hLeft = Math.max(0, Math.floor(hPad / 2))
 	const hRight = Math.max(0, hPad - hLeft)
-	lines.push(`${DIM}${'─'.repeat(hLeft)}${help}${'─'.repeat(hRight)}${RESET}`)
+	lines.push(`${DIM}${'─'.repeat(hLeft)}${safeHelp}${'─'.repeat(hRight)}${RESET}`)
 
 	return { lines, cursor: cursorPos }
 }

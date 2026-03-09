@@ -1,7 +1,7 @@
 // Centralized color definitions for the TUI.
 
 const RESET = '\x1b[0m'
-const DIM = '\x1b[2m'
+const DIM = '\x1b[38;5;245m'
 const SEL_ON = '\x1b[7m'   // reverse video
 const SEL_OFF = '\x1b[27m'
 
@@ -32,9 +32,9 @@ function bg([r, g, b]: [number, number, number]): string { return `\x1b[48;2;${r
 
 const assistant = { fg: fg(oklch(0.75, 0.15, 70)), bg: bg(oklch(0.25, 0.05, 70)) }
 const input     = { fg: fg(oklch(0.80, 0.008, 250)), bg: bg(oklch(0.29, 0.008, 250)) }
-const thinking  = { fg: fg(oklch(0.55, 0.02, 250)) }
-const info      = { fg: fg(oklch(0.65, 0.01, 250)), bg: bg(oklch(0.22, 0.01, 250)) }
-const error     = { fg: fg(oklch(0.60, 0.20, 35)),  bg: bg(oklch(0.25, 0.07, 35)) }
+const thinking  = { fg: fg(oklch(0.73, 0.03, 250)), bg: bg(oklch(0.28, 0.02, 250)) }
+const info      = { fg: fg(oklch(0.74, 0.02, 250)), bg: bg(oklch(0.25, 0.02, 250)) }
+const error     = { fg: fg(oklch(0.65, 0.20, 35)),  bg: bg(oklch(0.28, 0.08, 35)) }
 const system    = { fg: fg(oklch(0.75, 0.15, 190)), bg: bg(oklch(0.25, 0.05, 190)) }
 const cursor    = { fg: fg(oklch(0.75, 0.15, 70)) }
 

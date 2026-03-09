@@ -1,36 +1,48 @@
 // Block-based content model for tab output.
 
 import * as colors from './colors.ts'
-import { mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
+import { charWidth, mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
 import { displayModel } from '../models.ts'
 import { stringify as asonStringify } from '../utils/ason.ts'
 
 const TOOL_MAX_OUTPUT = 5
+const THINKING_BLOCK_MIN_LINES = 5
+const THINKING_BLOCK_MAX_LINES = 10
+const BASH_HEADER_INLINE_MAX = 60
+const BLOCK_MARGIN = 1
 const BLOCK_PAD = 1
+const TAB_WIDTH = 4
+
 export type Block =
 	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
 	| { type: 'assistant'; text: string; done: boolean; model?: string }
-	| { type: 'thinking'; text: string; done: boolean }
+	| { type: 'thinking'; text: string; done: boolean; ref?: string }
 	| { type: 'info'; text: string }
 	| { type: 'error'; text: string; detail?: string; ref?: string }
-	| { type: 'tool'; name: string; status: 'streaming' | 'running' | 'done' | 'error';
-		args: string; output: string; startTime: number; endTime?: number; ref?: string }
+	| {
+		type: 'tool'
+		name: string
+		status: 'streaming' | 'running' | 'done' | 'error'
+		args: string
+		output: string
+		startTime: number
+		endTime?: number
+		ref?: string
+	}
 
 /** Collapse runs of 3+ newlines to 2 (preserving paragraph breaks). */
 function collapseBlankLines(text: string): string {
 	return text.replace(/\n{3,}/g, '\n\n')
 }
 
-/** Strip all ANSI escape sequences (CSI, OSC, etc.) from text. */
-function stripAnsi(s: string): string {
-	return s.replace(/\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b[^[\]]/g, '')
+function oneLine(text: string): string {
+	return text.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ').trim()
 }
-
-const TAB_WIDTH = 4
 
 /** Expand tabs to spaces (tab stops at TAB_WIDTH columns). */
 function expandTabs(s: string): string {
-	let col = 0, out = ''
+	let col = 0
+	let out = ''
 	for (const ch of s) {
 		if (ch === '\t') {
 			const spaces = TAB_WIDTH - (col % TAB_WIDTH)
@@ -43,7 +55,91 @@ function expandTabs(s: string): string {
 	}
 	return out
 }
-const CONTENT_W = (width: number) => width - 2 * BLOCK_PAD
+
+function innerWidth(width: number): number {
+	return Math.max(1, width - 2 * BLOCK_MARGIN)
+}
+
+function contentWidth(width: number): number {
+	return Math.max(1, innerWidth(width) - 2 * BLOCK_PAD)
+}
+
+function clipAnsi(text: string, maxWidth: number): string {
+	if (maxWidth <= 0) return ''
+	if (visLen(text) <= maxWidth) return text
+	if (maxWidth === 1) return '…'
+	const limit = maxWidth - 1
+	let out = ''
+	let vis = 0
+	let esc = false
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i]
+		if (ch === '\x1b') {
+			esc = true
+			out += ch
+			continue
+		}
+		if (esc) {
+			out += ch
+			if (ch === 'm') esc = false
+			continue
+		}
+		const cp = text.codePointAt(i)!
+		const cl = cp > 0xffff ? 2 : 1
+		const w = charWidth(cp)
+		if (vis + w > limit) break
+		out += text.slice(i, i + cl)
+		vis += w
+		if (cl === 2) i++
+	}
+	return out + '…'
+}
+
+function clipPlain(text: string, maxWidth: number): string {
+	if (maxWidth <= 0) return ''
+	if (text.length <= maxWidth) return text
+	if (maxWidth === 1) return '…'
+	return text.slice(0, maxWidth - 1) + '…'
+}
+
+function boxLine(text: string, width: number, fg: string, bg: string): string {
+	const iw = innerWidth(width)
+	const raw = ' '.repeat(BLOCK_PAD) + expandTabs(text.replace(/\r/g, ''))
+	const clipped = clipAnsi(raw, iw)
+	const pad = Math.max(0, iw - visLen(clipped))
+	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${clipped}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
+}
+
+function plainLine(text: string, width: number, fg: string): string {
+	const iw = innerWidth(width)
+	const clipped = clipAnsi(expandTabs(text.replace(/\r/g, '')), iw)
+	const pad = Math.max(0, iw - visLen(clipped))
+	return `${' '.repeat(BLOCK_MARGIN)}${fg}${clipped}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
+}
+
+function headerLine(text: string, width: number, fg: string, bg: string): string {
+	const iw = innerWidth(width)
+	const clipped = clipPlain(oneLine(text), iw)
+	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${clipped.padEnd(iw)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
+}
+
+function toolHeader(label: string, width: number, fg: string, bg: string, ref?: string): string[] {
+	const iw = innerWidth(width)
+	const safeLabel = oneLine(label)
+	const safeRef = ref ? clipPlain(oneLine(ref), 18) : ''
+	const suffix = safeRef ? ` [${safeRef}] ──` : ''
+	const prefix = '── '
+	const maxLabel = Math.max(1, iw - prefix.length - suffix.length - 1)
+	const shown = clipPlain(safeLabel, maxLabel)
+	const lead = `${prefix}${shown} `
+	const fill = '─'.repeat(Math.max(1, iw - lead.length - suffix.length))
+	return [headerLine(lead + fill + suffix, width, fg, bg)]
+}
+
+function elapsed(startTime: number, endTime?: number): string {
+	const s = ((endTime ?? Date.now()) - startTime) / 1000
+	return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
+}
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
 	const isSystem = block.text.startsWith('[system] ')
@@ -53,20 +149,20 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 	const status = block.status ? ` (${block.status})` : ''
 	const model = !isSystem && block.model ? ` (to ${displayModel(block.model)})` : ''
 	const label = `${who}${status}${model}`
-	if (block.status) return [toolLine(label + ': ' + text, width, fg, bg)]
+	if (block.status) return [boxLine(`${label}: ${text}`, width, fg, bg)]
 	const header = toolHeader(label, width, fg, bg)
-	const body = wordWrap(text, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
+	const body = wordWrap(text, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
 }
 
 function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: number): string[] {
-	const text = collapseBlankLines(block.text.trimEnd())
+	const text = collapseBlankLines(block.text.replace(/^\s+/, '').trimEnd())
 	if (!text) return []
 	const label = block.model ? `Hal (${displayModel(block.model)})` : 'Hal'
 	const { fg, bg } = colors.assistant
 	const header = toolHeader(label, width, fg, bg)
-	const cw = CONTENT_W(width)
-	const line = (s: string) => toolLine(s, width, fg, bg)
+	const cw = contentWidth(width)
+	const line = (s: string) => boxLine(s, width, fg, bg)
 	const body: string[] = []
 	for (const span of mdSpans(text)) {
 		if (span.type === 'code') {
@@ -82,19 +178,32 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 }
 
 function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: number): string[] {
-	const pad = ' '.repeat(BLOCK_PAD)
 	const text = collapseBlankLines(block.text.trimEnd())
-	if (!text) return [`${colors.thinking.fg}${pad}Thinking...${colors.RESET}`]
-	return wordWrap(text, CONTENT_W(width)).map(l => `${colors.thinking.fg}${pad}${l}${colors.RESET}`)
+	if (!text) return [boxLine('Thinking...', width, colors.thinking.fg, colors.thinking.bg)]
+	const wrapped = wordWrap(text, contentWidth(width))
+	if (wrapped.length < THINKING_BLOCK_MIN_LINES) {
+		return wrapped.map(l => plainLine(l, width, colors.thinking.fg))
+	}
+	const header = toolHeader('Hal (Codex 5.3, thinking)', width, colors.thinking.fg, colors.thinking.bg, block.ref ?? 'thinking')
+	const lines = [...header]
+	if (wrapped.length > THINKING_BLOCK_MAX_LINES) {
+		const hidden = wrapped.length - THINKING_BLOCK_MAX_LINES
+		lines.push(boxLine(`[+ ${hidden} lines]`, width, colors.thinking.fg, colors.thinking.bg))
+		for (const l of wrapped.slice(-THINKING_BLOCK_MAX_LINES)) {
+			lines.push(boxLine(l, width, colors.thinking.fg, colors.thinking.bg))
+		}
+		return lines
+	}
+	for (const l of wrapped) lines.push(boxLine(l, width, colors.thinking.fg, colors.thinking.bg))
+	return lines
 }
 
 function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): string[] {
 	const { fg, bg } = colors.info
-	return [toolLine(block.text, width, fg, bg)]
+	return [boxLine(block.text, width, fg, bg)]
 }
 
 function formatErrorDetail(detail: string): string {
-	// Extract JSON body after optional prefix (e.g. "404: {...}")
 	const jsonStart = detail.indexOf('{')
 	if (jsonStart >= 0) {
 		try {
@@ -111,97 +220,82 @@ function renderError(block: Extract<Block, { type: 'error' }>, width: number): s
 	const { fg, bg } = colors.error
 	const header = toolHeader('Error', width, fg, bg, block.ref)
 	const raw = block.detail ? formatErrorDetail(block.detail) : block.text
-	const body = wordWrap(raw, CONTENT_W(width)).map(l => toolLine(l, width, fg, bg))
+	const body = wordWrap(raw, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
 }
 
-function elapsed(startTime: number, endTime?: number): string {
-	const s = ((endTime ?? Date.now()) - startTime) / 1000
-	return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
-}
-
-function toolLine(text: string, width: number, fg: string, bg: string): string {
-	const padded = ' '.repeat(BLOCK_PAD) + expandTabs(text)
-	const vl = visLen(padded)
-	if (vl > width) {
-		// Truncate to width-2, then ellipsis + space
-		const limit = width - 2
-		let vis = 0, esc = false, cut = padded.length
-		for (let i = 0; i < padded.length; i++) {
-			if (padded[i] === '\x1b') { esc = true; continue }
-			if (esc) { if (padded[i] === 'm') esc = false; continue }
-			if (++vis >= limit) { cut = i + 1; break }
-		}
-		return `${bg}${fg}${padded.slice(0, cut)}… ${colors.RESET}`
+function bashStatus(status: 'streaming' | 'running' | 'done' | 'error'): string {
+	switch (status) {
+		case 'done':
+			return ':ok:'
+		case 'error':
+			return ':err:'
+		default:
+			return ':run:'
 	}
-	const pad = width - vl
-	return `${bg}${fg}${padded}${' '.repeat(pad)}${colors.RESET}`
 }
 
-function headerLine(text: string, width: number, fg: string, bg: string): string {
-	return `${bg}${fg}${text.padEnd(width)}${colors.RESET}`
-}
-
-function toolHeader(label: string, width: number, fg: string, bg: string, ref?: string): string[] {
-	const prefix = '── '
-	const suffix = ref ? ` [${ref}] ──` : ''
-	const inner = prefix + label + ' '
-	const totalFixed = inner.length + suffix.length
-	if (totalFixed >= width) {
-		const full = prefix + label + ' '
-		const lines: string[] = []
-		for (let i = 0; i < full.length; i += width) {
-			lines.push(full.slice(i, i + width))
-		}
-		const last = lines[lines.length - 1]
-		const remaining = Math.max(0, width - last.length)
-		if (suffix.length > 0 && remaining > suffix.length + 1) {
-			const fill = '─'.repeat(remaining - suffix.length)
-			lines[lines.length - 1] = last + fill + suffix
-		} else {
-			lines[lines.length - 1] = last + '─'.repeat(remaining)
-		}
-		return lines.map(l => headerLine(l, width, fg, bg))
+function wrapBashCommand(cmd: string, width: number): string[] {
+	const max = Math.max(1, width)
+	if (cmd.length <= max) return [cmd]
+	const out: string[] = []
+	let rest = cmd
+	const suffix = ' \\'
+	const take = Math.max(1, max - suffix.length)
+	while (rest.length > max) {
+		out.push(rest.slice(0, take) + suffix)
+		rest = rest.slice(take)
 	}
-	const fill = '─'.repeat(Math.max(0, width - totalFixed))
-	return [headerLine(inner + fill + suffix, width, fg, bg)]
+	out.push(rest)
+	return out
 }
 
 function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): string[] {
 	const { fg, bg } = colors.tool(block.name)
 	const time = elapsed(block.startTime, block.endTime)
-	const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
-	const label = `${block.name}: ${block.args} (${time})${statusSuffix}`
-	const header = toolHeader(label, width, fg, bg, block.ref)
-
-	const outputText = block.output.trimEnd()
-	if (!outputText) return header
-
-	const outputLines = outputText.split('\n')
-	const lines = [...header]
-
-	if (outputLines.length > TOOL_MAX_OUTPUT) {
-		const hidden = outputLines.length - TOOL_MAX_OUTPUT
-		lines.push(toolLine(`[+ ${hidden} lines]`, width, fg, bg))
-		for (const l of outputLines.slice(-TOOL_MAX_OUTPUT)) {
-			lines.push(toolLine(l, width, fg, bg))
+	const args = oneLine(block.args)
+	let label = ''
+	const prelude: string[] = []
+	if (block.name === 'bash') {
+		if (args.length > BASH_HEADER_INLINE_MAX) {
+			label = `bash: (${time}) ${bashStatus(block.status)}`
+			prelude.push(...wrapBashCommand(args, contentWidth(width)))
+		} else {
+			label = `bash: ${args} (${time}) ${bashStatus(block.status)}`
 		}
 	} else {
-		for (const l of outputLines) {
-			lines.push(toolLine(l, width, fg, bg))
-		}
+		const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
+		label = `${block.name}: ${args} (${time})${statusSuffix}`
 	}
+	const lines = [...toolHeader(label, width, fg, bg, block.ref)]
+	for (const l of prelude) lines.push(boxLine(l, width, fg, bg))
+	const outputText = block.output.trimEnd()
+	if (!outputText) return lines
+	const outputLines = outputText.split('\n').map(l => l.replace(/\r/g, ''))
+	if (outputLines.length > TOOL_MAX_OUTPUT) {
+		const hidden = outputLines.length - TOOL_MAX_OUTPUT
+		lines.push(boxLine(`[+ ${hidden} lines]`, width, fg, bg))
+		for (const l of outputLines.slice(-TOOL_MAX_OUTPUT)) lines.push(boxLine(l, width, fg, bg))
+		return lines
+	}
+	for (const l of outputLines) lines.push(boxLine(l, width, fg, bg))
 	return lines
 }
 
 function renderBlock(block: Block, width: number): string[] {
 	switch (block.type) {
-		case 'input': return renderInput(block, width)
-		case 'assistant': return renderAssistant(block, width)
-		case 'thinking': return renderThinking(block, width)
-		case 'info': return renderInfo(block, width)
-		case 'error': return renderError(block, width)
-		case 'tool': return renderTool(block, width)
+		case 'input':
+			return renderInput(block, width)
+		case 'assistant':
+			return renderAssistant(block, width)
+		case 'thinking':
+			return renderThinking(block, width)
+		case 'info':
+			return renderInfo(block, width)
+		case 'error':
+			return renderError(block, width)
+		case 'tool':
+			return renderTool(block, width)
 	}
 }
 
@@ -223,16 +317,11 @@ function inlineCursor(line: string, cc: string, visible: boolean, width: number)
 	const body = hasReset ? line.slice(0, -colors.RESET.length) : line
 	const trail = body.match(/ +$/)?.[0] ?? ''
 	if (trail.length > 0) {
-		// Replace one trailing pad space with cursor char, keep bg active
 		const before = body.slice(0, -trail.length)
 		const cursorChar = visible ? `${cc}█` : ' '
 		return [before + cursorChar + trail.slice(1) + (hasReset ? colors.RESET : '')]
 	}
-	if (visLen(body) >= width) {
-		// Full-width line (e.g. header with ─ fill) — cursor on next line
-		return [line, visible ? `${cc}█${colors.RESET}` : ' ']
-	}
-	// Short unpadded line — append cursor
+	if (visLen(body) >= width) return [line, visible ? `${cc}█${colors.RESET}` : ' ']
 	const cursorChar = visible ? `${cc}█` : ' '
 	return [body + cursorChar + (hasReset ? colors.RESET : '')]
 }
@@ -246,18 +335,16 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 		if (result.length > 0) result.push('')
 		result.push(...lines)
 	}
-	// Append blinking cursor
 	const lastBlock = blocks[blocks.length - 1]
 	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
 		const cc = cursorColor(lastBlock)
 		const extra = inlineCursor(result[result.length - 1], cc, cursorVisible, width)
 		result.splice(result.length - 1, 1, ...extra)
 	} else if (result.length > 0) {
-		// Idle cursor on its own line after completed content
 		const cc = lastBlock ? cursorColor(lastBlock) : colors.cursor.fg
 		const c = cursorVisible ? `${cc}█${colors.RESET}` : ' '
 		result.push('')
-		result.push(` ${c}`)
+		result.push(`${' '.repeat(BLOCK_MARGIN)}${c}`)
 	}
 	return result
 }

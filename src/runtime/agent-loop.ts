@@ -123,32 +123,34 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							}
 							const args = argsPreview(call)
 
-							let result: string | any[]
-							if (call.name === 'ask') {
-								const question = (call.input as any)?.question ?? ''
-								const answer = await ctx.askUser(question) || '[no answer]'
-								const { apiContent } = await parseUserContent(sessionId, answer)
-								result = apiContent
-							} else {
-								const ref = toolRefMap.get(call.id)
-								await emit(sessionId, {
-									type: 'tool', toolId: call.id, name: call.name,
-									args, phase: 'running', ref,
-								})
-								const onChunk = (text: string) => emit(sessionId, {
-									type: 'tool', toolId: call.id, name: call.name,
-									args, phase: 'streaming', output: text,
-								})
-								result = await executeTool(call, onChunk)
-								await emit(sessionId, {
-									type: 'tool', toolId: call.id, name: call.name,
-									args, phase: 'done', output: result, ref,
-								})
-							}
+						let result: string | any[]
+						let toolStatus: 'done' | 'error' = 'done'
+						if (call.name === 'ask') {
+							const question = (call.input as any)?.question ?? ''
+							const answer = await ctx.askUser(question) || '[no answer]'
+							const { apiContent } = await parseUserContent(sessionId, answer)
+							result = apiContent
+						} else {
+							const ref = toolRefMap.get(call.id)
+							await emit(sessionId, {
+								type: 'tool', toolId: call.id, name: call.name,
+								args, phase: 'running', ref,
+							})
+							const onChunk = (text: string) => emit(sessionId, {
+								type: 'tool', toolId: call.id, name: call.name,
+								args, phase: 'streaming', output: text,
+							})
+							result = await executeTool(call, onChunk)
+							if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
+							await emit(sessionId, {
+								type: 'tool', toolId: call.id, name: call.name,
+								args, phase: toolStatus === 'error' ? 'error' : 'done', output: result, ref,
+							})
+						}
 
-							// Persist tool result immediately
-							const toolResultEntry = await writeToolResultEntry(sessionId, call.id, result, toolRefMap)
-							await appendMessages(sessionId, [toolResultEntry])
+						// Persist tool result immediately
+						const toolResultEntry = await writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
+						await appendMessages(sessionId, [toolResultEntry])
 						}
 
 						if (aborted) break

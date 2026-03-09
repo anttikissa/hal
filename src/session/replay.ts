@@ -44,14 +44,14 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 					const callData = block?.call ?? {}
 					const raw = block?.result?.content ?? ''
 					const output = typeof raw === 'string' ? raw : raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
-					const isDone = !!block?.result
+					const status = block?.result?.status === 'error' ? 'error' : (block?.result ? 'done' : 'error')
 					const now = Date.now()
 					blocks.push({
 						type: 'tool',
 						name: tool.name,
 						args: typeof callData.input === 'string' ? callData.input : argsPreview({ id: tool.ref, name: tool.name, input: callData.input }),
 						output,
-						status: isDone ? 'done' : 'error',
+						status,
 						startTime: now, endTime: now,
 						ref: resultRef ?? tool.ref,
 					})

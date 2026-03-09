@@ -161,11 +161,12 @@ export async function writeToolResultEntry(
 	toolUseId: string,
 	output: string | any[],
 	toolRefMap: Map<string, string>,
+	status: 'done' | 'error' = 'done',
 ): Promise<ToolResultMessage> {
 	const ref = toolRefMap.get(toolUseId)!
 	const existing = await readBlock(sessionId, ref)
 	if (existing) {
-		existing.result = { content: output }
+		existing.result = { content: output, status }
 		await writeBlock(sessionId, ref, existing)
 	}
 	return { role: 'tool_result', tool_use_id: toolUseId, ref, ts: new Date().toISOString() }
