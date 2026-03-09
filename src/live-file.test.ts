@@ -41,3 +41,12 @@ test('creates file if it does not exist', async () => {
 	await new Promise(r => queueMicrotask(r))
 	expect(existsSync(TEST_FILE)).toBe(true)
 })
+
+test('deep mutation triggers save', async () => {
+	const obj = liveFile(TEST_FILE, { defaults: { nested: { a: 1, b: 2 } }, watch: false })
+	obj.nested.a = 99
+	await new Promise(r => queueMicrotask(r))
+	const disk = parse(readFileSync(TEST_FILE, 'utf-8')) as any
+	expect(disk.nested.a).toBe(99)
+	expect(disk.nested.b).toBe(2)
+})

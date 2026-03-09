@@ -1,5 +1,5 @@
 // liveFile — proxy-backed auto-persist object.
-// Shallow property writes mark dirty → flush on next microtask.
+// Deep property writes mark dirty → flush on next microtask.
 // Atomic writes (tmp + rename). Optional fs.watch for external edits.
 
 import { readFileSync, writeFileSync, renameSync, watch, existsSync } from 'fs'
@@ -72,18 +72,22 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 		} catch {}
 	}
 
-	const proxy = new Proxy(data, {
+	const handler: ProxyHandler<any> = {
 		set(target, prop, value) {
-			(target as any)[prop] = value
+			target[prop] = value
 			dirty = true
 			scheduleFlush()
 			return true
 		},
 		get(target, prop) {
 			if (prop === 'save') return flush
-			return (target as any)[prop]
+			const val = target[prop]
+			if (val && typeof val === 'object') return new Proxy(val, handler)
+			return val
 		},
-	})
+	}
+
+	const proxy = new Proxy(data, handler)
 
 	return proxy as T & { save(): void }
 }
