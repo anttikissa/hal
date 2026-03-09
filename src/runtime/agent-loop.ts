@@ -2,7 +2,8 @@
 // Drives the provider, emits IPC events, persists to messages.asonl.
 // Supports tool execution with re-invoke loop.
 
-import { loadProvider, type ProviderEvent } from './provider.ts'
+import { loadProvider } from '../providers/loader.ts'
+import type { ProviderEvent } from '../providers/provider.ts'
 import { events } from '../ipc.ts'
 import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'

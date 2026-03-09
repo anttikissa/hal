@@ -1,7 +1,7 @@
 // Anthropic provider — streams Claude API responses as ProviderEvents.
 
 import type { Provider, ProviderEvent, GenerateParams } from './provider.ts'
-import { getAuth, refreshAnthropicAuth } from './auth.ts'
+import { getAuth, refreshAnthropicAuth } from '../runtime/auth.ts'
 
 async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> {
 	await refreshAnthropicAuth()

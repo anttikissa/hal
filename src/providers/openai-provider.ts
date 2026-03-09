@@ -1,7 +1,7 @@
 // OpenAI provider — streams Responses API as ProviderEvents.
 
 import type { Provider, ProviderEvent, GenerateParams } from './provider.ts'
-import { getAuth, refreshOpenAIAuth, extractOpenAIAccountId, isApiKey, openaiUsesCodex } from './auth.ts'
+import { getAuth, refreshOpenAIAuth, extractOpenAIAccountId, isApiKey, openaiUsesCodex } from '../runtime/auth.ts'
 
 const RESPONSES_API_URL = 'https://api.openai.com/v1/responses'
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api'
