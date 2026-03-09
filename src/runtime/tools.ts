@@ -176,17 +176,19 @@ type OnChunk = (text: string) => Promise<void>
 
 export function argsPreview(call: ToolCall): string {
 	const inp = call.input as any
+	let s: string
 	switch (call.name) {
-		case 'bash': return String(inp?.command ?? '')
-		case 'read': return String(inp?.path ?? '')
-		case 'write': return String(inp?.path ?? '')
-		case 'edit': return String(inp?.path ?? '')
-		case 'grep': return String(inp?.pattern ?? '')
-		case 'glob': return String(inp?.pattern ?? '')
-		case 'ls': return String(inp?.path ?? '.')
-		case 'ask': return String(inp?.question ?? '').slice(0, 80)
-		default: return call.name
+		case 'bash': s = String(inp?.command ?? ''); break
+		case 'read': s = String(inp?.path ?? ''); break
+		case 'write': s = String(inp?.path ?? ''); break
+		case 'edit': s = String(inp?.path ?? ''); break
+		case 'grep': s = String(inp?.pattern ?? ''); break
+		case 'glob': s = String(inp?.pattern ?? ''); break
+		case 'ls': s = String(inp?.path ?? '.'); break
+		case 'ask': s = String(inp?.question ?? '').slice(0, 80); break
+		default: s = call.name
 	}
+	return shortenHome(s)
 }
 
 export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {

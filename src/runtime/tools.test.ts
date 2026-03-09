@@ -137,6 +137,14 @@ test('argsPreview: edit', () => {
 	expect(argsPreview(call('edit', { path: 'foo.ts' }))).toBe('foo.ts')
 })
 
+test('argsPreview: replaces $HOME with ~', () => {
+	const home = require('os').homedir()
+	expect(argsPreview(call('read', { path: `${home}/.hal/foo.ts` }))).toBe('~/.hal/foo.ts')
+	expect(argsPreview(call('write', { path: `${home}/projects/bar.ts` }))).toBe('~/projects/bar.ts')
+	expect(argsPreview(call('edit', { path: `${home}/x.ts` }))).toBe('~/x.ts')
+	expect(argsPreview(call('ls', { path: `${home}/dir` }))).toBe('~/dir')
+})
+
 // ── hooks ──
 
 test('runHooks: strips redundant cd $CWD prefix', () => {
