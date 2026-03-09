@@ -22,7 +22,7 @@ export interface Transport {
 
 import { commands, events, getState } from '../ipc.ts'
 import { loadMeta } from '../session/session.ts'
-import { readMessages } from '../session/messages.ts'
+import { loadAllMessages } from '../session/messages.ts'
 
 export class LocalTransport implements Transport {
 	async sendCommand(cmd: RuntimeCommand): Promise<void> {
@@ -44,7 +44,7 @@ export class LocalTransport implements Transport {
 	}
 
 	async replaySession(id: string): Promise<Message[]> {
-		return readMessages(id)
+		return loadAllMessages(id)
 	}
 
 	async eventsOffset(): Promise<number> {

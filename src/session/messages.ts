@@ -345,13 +345,13 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 }
 
 /** Follow fork chain to load full history. */
-async function loadAllMessages(sessionId: string): Promise<Message[]> {
+export async function loadAllMessages(sessionId: string): Promise<Message[]> {
 	const entries = await readMessages(sessionId)
 	if (entries.length > 0 && (entries[0] as any).type === 'forked_from') {
 		const parent = (entries[0] as any).parent
 		const forkTs = (entries[0] as any).ts
 		const parentEntries = await loadAllMessages(parent)
-		const before = parentEntries.filter((e: any) => !e.ts || e.ts <= forkTs)
+		const before = parentEntries.filter((e: any) => !e.ts || e.ts < forkTs)
 		return [...before, ...entries.slice(1)]
 	}
 	return entries

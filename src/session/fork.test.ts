@@ -64,7 +64,7 @@ describe('forkSession', () => {
 
 	test('loadApiMessages on child includes parent history', async () => {
 		const parentId = tempSession()
-		const ts = new Date().toISOString()
+		const ts = new Date(Date.now() - 1000).toISOString()
 		await appendMessages(parentId, [
 			{ role: 'user', content: 'parent message', ts } as Message,
 			{ role: 'assistant', text: 'parent reply', ts } as Message,
