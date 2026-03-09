@@ -1,11 +1,9 @@
 // Replay — convert messages to Block[] for TUI history display.
 
-import { homedir } from 'os'
 import type { Block } from '../cli/blocks.ts'
 import type { Message } from './messages.ts'
 import { readBlock } from './messages.ts'
-
-const HOME = homedir()
+import { argsPreview } from '../runtime/tools.ts'
 /** Convert a message log to display blocks (for tab history). */
 export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
 	const blocks: Block[] = []
@@ -50,7 +48,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 					blocks.push({
 						type: 'tool',
 						name: tool.name,
-						args: typeof callData.input === 'string' ? callData.input : argsPreview(tool.name, callData.input),
+						args: typeof callData.input === 'string' ? callData.input : argsPreview({ id: tool.ref, name: tool.name, input: callData.input }),
 						output,
 						status: isDone ? 'done' : 'error',
 						startTime: now, endTime: now,
@@ -62,17 +60,4 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 	}
 
 	return blocks
-}
-
-function argsPreview(name: string, input: unknown): string {
-	const inp = input as any
-	let s: string
-	switch (name) {
-		case 'bash': s = String(inp?.command ?? ''); break
-		case 'read': s = String(inp?.path ?? ''); break
-		case 'write': s = String(inp?.path ?? ''); break
-		default: s = JSON.stringify(input ?? {})
-	}
-	if (HOME) s = s.replaceAll(HOME, '~')
-	return s
 }
