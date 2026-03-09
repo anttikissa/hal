@@ -16,6 +16,7 @@ let pendingPastes = 0
 
 export function resetPasteCounter(): void { pasteCounter = 0; pendingPastes = 0 }
 
+export function hasPendingPastes(): boolean { return pendingPastes > 0 }
 /** Allocate a [image:N] placeholder for async image resolution. */
 function allocPlaceholder(): string { return `[image:${++pasteCounter}]` }
 

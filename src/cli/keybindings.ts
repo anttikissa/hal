@@ -1,6 +1,7 @@
 // Key → action mapping. Imports directly from the modules that own each function.
 
 import type { KeyEvent } from './keys.ts'
+import { hasPendingPastes } from './clipboard.ts'
 import * as prompt from './prompt.ts'
 import { client, quit, restart, suspend, doRender, contentWidth, showError } from '../cli.ts'
 
@@ -49,6 +50,7 @@ export function handleInput(k: KeyEvent): void {
 	}
 
 	if (k.key === 'enter' && !k.shift && !k.alt && !k.ctrl && !k.cmd) {
+		if (hasPendingPastes()) return // wait for image resolution
 		const text = prompt.text().trim()
 		prompt.clear()
 		if (text) {

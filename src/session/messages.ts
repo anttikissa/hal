@@ -157,7 +157,7 @@ export async function writeAssistantEntry(
 export async function writeToolResultEntry(
 	sessionId: string,
 	toolUseId: string,
-	output: string,
+	output: string | any[],
 	toolRefMap: Map<string, string>,
 ): Promise<ToolResultMessage> {
 	const ref = toolRefMap.get(toolUseId)!
@@ -301,7 +301,8 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 		} else if (msg.role === 'tool_result') {
 			const block = await readBlock(sessionId, msg.ref)
 			let content = block?.result?.content ?? '[interrupted]'
-			if (content.length > MAX_API_OUTPUT) content = content.slice(0, MAX_API_OUTPUT) + `\n[truncated ${content.length - MAX_API_OUTPUT} chars]`
+			if (typeof content === 'string' && content.length > MAX_API_OUTPUT)
+				content = content.slice(0, MAX_API_OUTPUT) + `\n[truncated ${content.length - MAX_API_OUTPUT} chars]`
 			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content, _ref: msg.ref }] })
 		}
 	}

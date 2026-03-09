@@ -5,7 +5,7 @@
 import { loadProvider } from '../providers/loader.ts'
 import type { ProviderEvent } from '../providers/provider.ts'
 import { events } from '../ipc.ts'
-import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock } from '../session/messages.ts'
+import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock, parseUserContent } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
@@ -118,10 +118,12 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							}
 							const args = argsPreview(call)
 
-							let result: string
+							let result: string | any[]
 							if (call.name === 'ask') {
 								const question = (call.input as any)?.question ?? ''
-								result = await ctx.askUser(question) || '[no answer]'
+								const answer = await ctx.askUser(question) || '[no answer]'
+								const { apiContent } = await parseUserContent(sessionId, answer)
+								result = apiContent
 							} else {
 								const ref = toolRefMap.get(call.id)
 								await emit(sessionId, {
@@ -159,9 +161,11 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						for (const call of toolCalls) {
 							const ref = toolRefMap.get(call.id)!
 							const block = await readBlock(sessionId, ref)
+							const raw = block?.result?.content ?? ''
+							const content = typeof raw === 'string' ? truncate(raw) : raw
 							messages.push({
 								role: 'user',
-								content: [{ type: 'tool_result', tool_use_id: call.id, content: truncate(block?.result?.content ?? '') }],
+								content: [{ type: 'tool_result', tool_use_id: call.id, content }],
 							})
 						}
 
