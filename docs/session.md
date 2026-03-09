@@ -19,7 +19,7 @@ Core logic: `src/session.ts`.
 | type | fields | description |
 |------|--------|-------------|
 | `user` | `text`, `ts` | User prompt |
-| `assistant` | `text`, `thinking?`, `ts` | Assistant text response (one per agent-loop turn; tool-only turns are skipped) |
+| `assistant` | `text`, `thinking?`, `thinkingSignature?`, `ts` | Assistant text response (one per agent-loop turn; tool-only turns are skipped) |
 | `tool` | `text`, `ts` | Tool execution output (one event per tool-loop iteration, lines joined with `\n`) |
 | `model` | `from`, `to`, `ts` | Model change (`/model`) |
 | `cd` | `from`, `to`, `ts` | Working directory change (`/cd`) |
@@ -35,12 +35,16 @@ On restart, `replayConversationEvents()` replays `user`, `assistant`, and `tool`
 
 Large content is stored in `blocks/` as individual `.ason` files:
 
-- **Thinking blocks**: `{ thinking: '...full text...', signature: '...base64...' }` — preserves cache hit on restore.
+- **Thinking blocks**: `{ thinking: '...full text...', signature: '...base64...' }` — signature is required to send thinking back to the Anthropic API.
 - **Tool calls**: `{ call: { name, input }, result: { content } }` — call and result in one file.
 
 Block refs in `messages.asonl` look like `1709123456789-a3b2c1` (timestamp + random hex).
 
 The messages.asonl spine stays human-readable — you can see message roles, tool names, and text content inline. Only thinking and tool I/O moves to block files.
+
+## Context Compaction
+
+API messages are compacted before sending to strip old heavy content (tool results, images, thinking). This prevents quadratic token cost growth. See `docs/context-compaction.md` for details.
 
 ## Session Lifecycle
 

@@ -2,445 +2,161 @@
 
 ## Scope
 
-`src/cli/tui.ts` is the terminal UI engine used by the CLI client.
-This document is the umbrella mental-model doc for the TUI module family in `src/cli/tui*.ts`.
+The CLI TUI is spread across modules in `src/cli/`. This document is the umbrella mental-model doc.
 
-Core logic: `src/cli/tui.ts`.
-
-Keep this document up to date when changing TUI behavior in any of these files:
-
-- `src/cli/tui.ts`
-- `src/cli/tui-text.ts`
-- `src/cli/tui-input-layout.ts`
-- `src/cli/tui-links.ts`
-
-If a change affects rendering, input parsing/tokenization, key normalization, input layout mapping, link hit-testing, terminal modes, or the TUI public API, update this doc in the same commit as the code change.
-
-It is a single stateful module (module-level mutable state, no classes) that owns:
-
-- alternate-screen rendering
-- input line editing
-- output scrolling/wrapping
-- mouse selection + link hover/click support
-- terminal mode management (mouse, bracketed paste, Kitty keyboard protocol)
-
-It does **not** own app-level behavior like tabs/sessions/commands. `src/cli/client.ts` wires those in via callbacks (`setInputKeyHandler`, `setTabCompleter`, etc).
+Keep this document up to date when changing TUI behavior in any of these files.
 
 ## TUI Module Family (Who Owns What)
 
-- `src/cli/tui.ts`
-  - orchestration: state, render loop, key handling, mouse handling, lifecycle
-- `src/cli/tui-text.ts`
-  - ANSI-aware wrapping/truncation and key tokenization (`parseKeys`)
-- `src/cli/tui-input-layout.ts`
-  - wrapped input cursor/row/col mapping
-- `src/cli/tui-links.ts`
-  - OSC-8 parsing, URL linkification, hit-testing, hover underline helpers
-- `src/cli/tui-text.test.ts`
-  - tests for text/wrapping/tokenization helper behavior
+- `src/cli/client.ts`
+  - orchestration: transport wiring, event handling, tab lifecycle, command dispatch
+- `src/cli/blocks.ts`
+  - block-based content model for tab output (`Block` type, `renderBlocks`)
+- `src/cli/diff-engine.ts`
+  - diff-rendered terminal output: compares old/new screen lines, emits minimal escape sequences
+- `src/cli/prompt.ts`
+  - prompt area: state, key handling, line building
+- `src/cli/input.ts`
+  - input area model: word wrapping, cursor ↔ row/col mapping, vertical movement
+- `src/cli/keys.ts`
+  - terminal input normalizer: raw stdin bytes → structured `KeyEvent`
+- `src/cli/keybindings.ts`
+  - key → action mapping (imports from modules that own each function)
+- `src/cli/tabs.ts`
+  - tab state and management
+- `src/cli/md.ts`
+  - mini markdown → ANSI for LLM output (fences, tables, inline formatting)
+- `src/cli/colors.ts`
+  - centralized color definitions
+- `src/cli/cursor.ts`
+  - blinking block cursor at active output positions
+- `src/cli/heights.ts`
+  - tab height calculations
+- `src/cli/clipboard.ts`
+  - clipboard access (macOS only), paste handling
+- `src/cli/transport.ts`
+  - transport interface + local (file-backed) IPC implementation
 
 ## Layout (Mental Model)
 
-The TUI is a **state-driven full redraw renderer**.
+The TUI uses a **diff-rendered** approach via `diff-engine.ts`.
 
 - Row 1: **Title bar**
-- Rows `2..outputBottom()`: **Output** (scrollable, wrapped)
+- Rows `2..outputBottom`: **Output** (scrollable, block-based)
 - Footer:
   - **Activity bar**
   - **Tab bar / status bar**
-  - input top pad
-  - **Input** lines (1..`maxPromptLines`)
-  - input bottom pad
+  - **Input** lines
 
-`render()` redraws every row from current state. There is no diffing/patching layer.
+Content is modeled as `Block[]` per tab (`src/cli/blocks.ts`). Blocks are rendered into screen lines by `renderBlocks()`.
 
-This is the core model to keep in mind: mutate module state -> call `render()` (or `scheduleRender()` for batched cosmetic updates).
+## Core State
 
-For the `new/` diff-rendered CLI, a streaming inline cursor may only stay on the same rendered line if that line still has spare visible width. If the last rendered line already fills the target width, the cursor must be rendered on a following line instead of overflowing into an implicit terminal wrap row.
+- **Tabs** (`src/cli/tabs.ts`): per-tab blocks, drafts, history, scroll position
+- **Prompt** (`src/cli/prompt.ts`): input buffer, cursor, selection, undo stack
+- **Screen** (`src/cli/diff-engine.ts`): previous frame for diffing
 
-## Core State Buckets
+## Input Pipeline (Bytes → KeyEvent → Action)
 
-`src/cli/tui.ts` keeps several independent state groups:
+### 1. Raw stdin
 
-- Lifecycle:
-  - `initialized`, `ended`, `suspended`
-- Output buffer / viewport:
-  - `outputLines` (logical, unwrapped lines with ANSI)
-  - `scrollOffset`
-  - wrap cache (`wrappedLineCount`, `lastWrapCols`)
-- Header/footer display:
-  - `titleBarStr`, `activityStr`, `statusTabsStr`, `statusRightStr`
-  - transient `headerFlash`
-- Input editor:
-  - `inputBuf`, `inputCursor`, `inputPromptStr`
-  - input text selection (`inputSel*`)
-  - undo stack (`inputUndoStack`)
-  - pending `input()` resolver (`waitingResolve`)
-- Screen selection (mouse):
-  - `selAnchor`, `selCurrent`, `selMode`, `selActive`
-  - click-count tracking for char/word/line selection
-- Output/link hover:
-  - `lastVisibleOutput`, `lastActivityLine`, `lastStatusLine`
-  - `hoverUrl`, `hoverOutputRow`, `superHeld`
-- Stdin/paste buffering:
-  - `bracketedPasteBuffer`
-  - `stdinBuffer` + coalescing timer
+Raw bytes from `process.stdin` in raw mode.
 
-Important distinction:
+### 2. Parse to KeyEvent (`src/cli/keys.ts`)
 
-- `outputLines` is the source of truth for output text.
-- `lastVisibleOutput` is only the most recent rendered viewport snapshot (used for mouse selection/hit testing).
+`parseKey()` / `parseKeys()` splits raw bytes into structured `KeyEvent` objects with:
+- `key`: normalized key name (e.g. `'a'`, `'Enter'`, `'ArrowUp'`)
+- `ctrl`, `alt`, `shift`, `super`: modifier flags
+- `raw`: original bytes
+
+Handles all terminal key families:
+- Legacy single-byte controls (`Ctrl-C` = `\x03`)
+- Legacy CSI / SS3 functional keys (`\x1b[A`, `\x1b[H`)
+- xterm modified keys (`\x1b[1;3D`)
+- Kitty/Ghostty `CSI u` protocol (`\x1b[97u`, `\x1b[97;5u`)
+- Kitty release/repeat events (suppressed)
+- Bracketed paste
+- Mouse reports
+
+### 3. Key → Action (`src/cli/keybindings.ts`)
+
+Maps `KeyEvent` to actions. Client installs handlers for app-level keys (tab create/close/fork/switch). Remaining keys go to prompt editing.
+
+### 4. Prompt editing (`src/cli/prompt.ts`)
+
+Handles:
+- Text insertion
+- Cursor movement, word movement
+- Selection (shift+movement)
+- Clipboard (cut/copy/paste)
+- History navigation
+- Submit (Enter) / newline (Shift+Enter, Alt+Enter)
+- Undo
 
 ## Rendering Model
 
-### Output Storage
+### Block-Based Output
 
-Output is appended via `write()` -> `writeToOutput()` -> `appendOutput(...)`.
+Output is stored as `Block[]` per tab. Block types include input prompts, assistant text, tool output, status lines, etc. `renderBlocks()` converts blocks to wrapped screen lines.
 
-- `outputLines` stores **logical** lines, not wrapped rows.
-- ANSI escapes are preserved in storage.
-- `\r` resets the current logical line (used for streaming/progress updates).
-- Output is capped to `MAX_OUTPUT_LINES`.
+### Diff Rendering
 
-### Wrapping & Viewport
+`src/cli/diff-engine.ts` compares the previous frame with the new frame and emits minimal escape sequences — both line-level (skip unchanged, clear removed) and intra-line (rewrite only changed substrings).
 
-Wrapping is computed on demand:
-
-- `wrapAnsi(...)` preserves ANSI state and OSC-8 links across wraps
-- `getTotalVisualLines()` caches total wrapped rows by terminal width
-- `getVisibleWrapped(...)` builds only the visible window (plus scroll offset slack) by walking backward from the tail
-
-The **Output** region is therefore:
-
-- stored as logical lines
-- rendered as wrapped visual rows
-- recalculated when terminal width changes or output changes
-
-### Full Redraw
-
-`render()`:
-
-- recomputes viewport geometry
-- clamps scroll offset
-- renders title/output/activity/tab/input rows into a string chunk array
-- writes one combined ANSI frame to stdout
-- on kitty/ghostty-compatible TTYs, wraps each frame in synchronized output mode (`\x1b[?2026h` ... `\x1b[?2026l`) to avoid mid-frame flicker
-- positions cursor for input editing
-
-`scheduleRender()` is used for microtask-batched redraws when immediate redraw is not necessary.
-
-## Input Pipeline (Bytes -> Text/Edit)
-
-This is the most important mental model for keyboard bugs.
-
-### 1. Raw stdin event
-
-`onStdinData(...)` receives chunks from `process.stdin` in raw mode.
-
-It first handles special streams:
-
-- bracketed paste accumulation (`\x1b[200~` .. `\x1b[201~`)
-- mouse events (`CSI < ... M/m`) processed immediately
-
-Everything else is coalesced briefly (`STDIN_COALESCE_MS`) into `stdinBuffer`.
-
-### 2. Tokenize to key units
-
-`flushStdinBuffer()` calls:
-
-- `parseKeys(data, PASTE_START, PASTE_END)` from `src/cli/tui-text.ts`
-
-This splits the raw text into key/event tokens (single chars, CSI sequences, paste payloads, etc).
-
-### 3. Normalize terminal-specific key formats
-
-Each token goes through `handleKey(...)`, which first calls:
-
-- `normalizeKittyKey(...)`
-
-This handles Kitty/Ghostty keyboard protocol (`CSI u` and enhanced functional key forms):
-
-- strips/suppresses release events
-- normalizes many keys back to legacy forms
-- preserves Super/Cmd combos as `CSI u` for higher-level handlers that need them
-- tracks Super press/release for Cmd+hover link behavior
-
-This normalization layer is where terminal-specific regressions usually happen.
-
-### 4. App-level override hook (tabs, etc)
-
-After normalization, `handleKey(...)` calls optional `inputKeyHandler`.
-
-`src/cli/client.ts` installs this to intercept app commands such as:
-
-- tab create/close/fork
-- tab switching shortcuts
-
-If it returns truthy, TUI input editing stops for that key.
-
-### 5. TUI built-in editing/submit behavior
-
-If not intercepted, `handleKey(...)` processes:
-
-- `Ctrl-C`, `Ctrl-D`, `Ctrl-Z`
-- clipboard shortcuts (including Kitty/xterm modifier encodings)
-- Enter (submit) / double-enter / Shift+Enter or Alt+Enter (newline)
-- cursor movement, word movement, history navigation
-- selection-aware editing (cut/copy/paste/delete)
-- scrolling shortcuts
-- tab completion
-- text insertion fallback
-
-Unknown escape sequences are dropped intentionally.
-
-## Keyboard Model (What To Document, Where)
-
-Keyboard handling in HAL has three layers. Bugs usually come from changing the wrong one.
-
-### Layer A: Tokenization (`src/cli/tui-text.ts`)
-
-Responsibility:
-
-- split a raw stdin chunk into event/key tokens
-- preserve escape sequence boundaries
-- not interpret key meaning
-
-Examples of tokens emitted by `parseKeys(...)`:
-
-- plain character (`a`)
-- legacy escape sequence (`\x1b[A`)
-- xterm modified key (`\x1b[27;5;119~`)
-- Kitty `CSI u` (`\x1b[97u`, `\x1b[97;1:3u`, `\x1b[97;;97u`)
-- bracketed paste payload
-
-If tokenization is wrong:
-
-- keys may be split/merged incorrectly
-- downstream normalization cannot recover
-
-### Layer B: Normalization (`src/cli/tui.ts`)
-
-Responsibility:
-
-- convert terminal-specific encodings into HAL's internal key forms
-- suppress events HAL intentionally ignores (for example key release)
-- preserve encodings only when higher-level handlers need raw modifier detail
-
-Current normalization entrypoint:
-
-- `normalizeKittyKey(...)`
-
-Key invariant:
-
-- printable text should usually reach insertion path as plain characters
-- common navigation/edit keys should usually become legacy CSI/bytes
-- only special cases (for example Super/Cmd combos) should remain as raw `CSI u`
-
-### Layer C: Key Semantics (`src/cli/tui.ts` + `src/cli/client.ts`)
-
-Responsibility:
-
-- assign behavior to normalized keys
-- choose precedence/order of handlers
-- mutate TUI/app state
-
-Examples:
-
-- `src/cli/client.ts`: tab shortcuts (`Ctrl-W`, `Ctrl-T`, `Ctrl-F`, tab switching)
-- `src/cli/tui.ts`: input editing, history, submit, scrolling, clipboard shortcuts
-
-## Key Sequence Families (Reference)
-
-When documenting or debugging a key, always identify the sequence family first.
-
-- Legacy single-byte controls:
-  - `Ctrl-C` (`\x03`), `Ctrl-D` (`\x04`), `Tab` (`\t`), `Enter` (`\r`)
-- Legacy CSI / SS3 functional keys:
-  - arrows/home/end/page keys like `\x1b[A`, `\x1b[H`, `\x1b[5~`, `\x1bOA`
-- xterm `modifyOtherKeys` / modified functional keys:
-  - forms like `\x1b[27;...~`, `\x1b[1;3D`
-- Kitty/Ghostty keyboard protocol `CSI u`:
-  - text and modified keys like `\x1b[97u`, `\x1b[97;5u`
-  - release/repeat variants like `\x1b[97;1:3u`
-  - compact/extended variants like `\x1b[97;;97u`
-- Kitty-enhanced functional keys (non-`CSI u`):
-  - event type encoded in modifier field, e.g. `\x1b[1;1:2A`
-- Mouse reports:
-  - `\x1b[<...M` / `\x1b[<...m`
-- Bracketed paste:
-  - `\x1b[200~ ... \x1b[201~`
-
-This classification is more useful than terminal name (`kitty`, `ghostty`, `iterm`) when debugging.
-
-## Key Documentation Contract (For Future Changes)
-
-When adding or changing key support, document the change in terms of:
-
-1. Logical key/action
-   - Example: “normal text insertion”, “Cmd-V in Kitty”, “Shift+Enter newline”
-2. Raw encodings observed
-   - Include exact sequences from `test.ts` or debug logs
-3. Owning layer
-   - Tokenizer vs normalizer vs handler
-4. Normalized form used by HAL
-   - Example: plain `'a'`, `'\x1b[D'`, preserved `CSI u`
-5. Event policy
-   - press only vs press+repeat vs release ignored
-6. Test coverage
-   - where the regression should be locked down
-
-Practical rule:
-
-- If a fix only adds another ad hoc regex in a handler, it is probably in the wrong layer.
-
-## Key Debug Workflow (Repeatable)
-
-Use this sequence when a terminal-specific key bug appears:
-
-1. Capture raw sequence
-   - `bun test.ts` (or `/bug` with keypress logging enabled)
-2. Classify sequence family
-   - `CSI u`, legacy CSI, modifyOtherKeys, mouse, paste
-3. Check tokenizer boundary
-   - ensure `parseKeys(...)` emits one token for the event
-4. Check normalization
-   - verify terminal-specific sequence becomes HAL's expected internal form
-5. Check handler precedence
-   - app hook vs TUI handler vs insertion fallback
-6. Add/adjust docs and tests
-   - avoid “fix by memory” regressions
-
-## Input Editor Semantics
-
-### `input(promptStr)`
-
-`input()` is the main prompt primitive:
-
-- initializes TUI on first use
-- resets input buffer/cursor/selection/undo
-- renders prompt
-- returns a Promise resolved by Enter / Ctrl-C / Ctrl-D / cancel
-
-Resolution values:
-
-- normal submit -> `string`
-- EOF/cancel/end -> `null`
-- waiting `Ctrl-C` -> exported `CTRL_C` sentinel (`'\x03'`)
-
-### History & Drafts
-
-The module owns input history and current draft state, exposed via:
-
-- `getInputHistory()` / `setInputHistory(...)`
-- `getInputDraft()` / `setInputDraft(...)`
-
-This lets the CLI client preserve per-tab drafts/history while the TUI remains session-agnostic.
-
-### Input vs Screen Selection
-
-There are two separate selection systems:
-
-- **Input text selection**: operates on `inputBuf` indices
-- **Screen selection**: operates on rendered row/col positions across output/activity/status surfaces
-
-They are intentionally separate because one is text-model based and the other is screen-space based.
+On kitty/ghostty-compatible TTYs, frames are wrapped in synchronized output (`\x1b[?2026h` ... `\x1b[?2026l`) to avoid flicker.
 
 ## Mouse / Link Behavior
 
-Mouse mode is enabled in `enableMouse()` and disabled in `disableMouse()`.
-
-Features handled in `src/cli/tui.ts`:
-
-- output scrolling (wheel)
-- screen selection (single/double/triple click -> char/word/line)
-- input drag selection
-- click-to-open links (via `tui-links.ts`)
+Features:
+- Output scrolling (wheel)
+- Screen selection (single/double/triple click → char/word/line)
+- Click-to-open links
 - Cmd/Super-gated hover underline for links
-
-Selection is cleared on most non-mouse keypresses and on new output (positions become stale).
 
 ## Terminal Modes & Lifecycle
 
-### `init()`
+### Startup
 
-On startup:
-
-- enter raw mode
-- enter alternate screen (`?1049h`)
-- enable mouse + bracketed paste (+ Kitty keyboard mode on supported terminals)
-- attach stdin/end/resize/SIGCONT listeners
-- render
+- Enter raw mode
+- Enter alternate screen (`?1049h`)
+- Enable mouse + bracketed paste (+ Kitty keyboard mode on supported terminals)
+- Attach stdin/resize/SIGCONT listeners
 
 ### Suspend (`Ctrl-Z`)
 
-`suspendForegroundJob()`:
+- Disable terminal modes, leave alt screen
+- Dump visible output to main screen
+- Disable raw mode, send `SIGSTOP`
+- `SIGCONT` restores everything and re-renders
 
-- disables terminal modes
-- leaves alt screen
-- dumps visible output to main screen
-- disables raw mode
-- sends `SIGSTOP`
+### Cleanup
 
-`onSigCont()` restores raw mode, alt screen, terminal modes, and re-renders.
+- Stop timers, show cursor
+- Disable mouse/paste/Kitty keyboard modes
+- Leave alt screen, disable raw mode
+- Dump visible output to scrollback
 
-### `cleanup()`
+## Key Documentation Contract (For Future Changes)
 
-On exit:
+When adding or changing key support, document:
 
-- stop timers / clear transient state
-- capture visible output
-- show cursor
-- disable mouse/paste/Kitty keyboard modes
-- leave alt screen
-- disable raw mode and remove listeners
-- dump visible output to scrollback
-- resolve pending `input()` as `null`
+1. Logical key/action
+2. Raw encodings observed
+3. Owning layer (parser vs keybindings vs prompt)
+4. Normalized `KeyEvent` form
+5. Event policy (press only vs press+repeat vs release ignored)
+6. Test coverage
 
-This cleanup contract is important: callers can assume terminal state is restored even if a prompt is pending.
+## Key Debug Workflow
 
-## Public API (What Other Modules Use)
-
-Main integration points from `src/cli/client.ts`:
-
-- callback hooks:
-  - `setTabCompleter(...)`
-  - `setInputKeyHandler(...)`
-  - `setInputEchoFilter(...)`
-  - `setEscHandler(...)`
-  - `setDoubleEnterHandler(...)`
-- prompt/input:
-  - `input(...)`
-  - `prompt(...)`
-  - `cancelInput()`
-- output/header/footer:
-  - `write(...)`, `log(...)`
-  - `setTitleBar(...)`, `setActivityLine(...)`, `setStatusLine(...)`
-  - `flashHeader(...)`
-- snapshot/state transfer (used for tab switching):
-  - `getOutputSnapshot()`, `setOutputSnapshot(...)`, `replaceOutput(...)`, `clearOutput()`
-  - `getInputDraft()`, `setInputDraft(...)`
-  - `getInputHistory()`, `setInputHistory(...)`
-- lifecycle:
-  - `init()`, `cleanup()`
-
-## Debugging Notes (Useful Mental Shortcuts)
-
-- “Typed text does nothing, but some Ctrl keys work”:
-  - check Kitty/Ghostty key normalization (`normalizeKittyKey`, `parseKittyCsiUKey`)
-- “Selection highlight looks wrong after output arrived”:
-  - screen selection uses rendered coordinates and is cleared on new output
-- “Scroll jumps on resize”:
-  - see resize path; it preserves viewport center proportion, not exact row index
-- “Key works in iTerm but not Kitty/Ghostty”:
-  - inspect `supportsKittyKeyboard()` and Kitty `CSI u` parsing/normalization
-
+1. Capture raw sequence (`bun test.ts` or `/bug`)
+2. Classify sequence family (CSI u, legacy CSI, etc.)
+3. Check parser (`parseKey` in `keys.ts`)
+4. Check keybinding mapping
+5. Check prompt handler
+6. Add tests
 
 ## Lessons / Pitfalls
 
-- `truncateAnsi()` appends `RESET` (`\x1b[0m`) internally. If you rely on the current background color after truncation (e.g. for `\x1b[K` erase-to-EOL), you must re-apply the background *after* the truncated string. Pattern: `truncateAnsi(line, c) + BG + ERASE_TO_EOL + RESET`.
-
-Related helpers:
-
-- `src/cli/tui-text.ts` -- ANSI-aware wrapping/truncation + key tokenization
-- `src/cli/tui-input-layout.ts` -- wrapped input cursor mapping
-- `src/cli/tui-links.ts` -- OSC-8 link parsing/hit testing/underline
+- Diff engine assumes consistent column width — `charWidth()` in `md.ts` handles wide characters.
+- Synchronized output wrapping prevents mid-frame flicker. If adding another frame write path, use the same sync wrapper.

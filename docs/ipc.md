@@ -30,32 +30,28 @@ Definitions are in `src/protocol.ts`.
 
 ### Command Types
 
-`prompt`, `pause`, `resume`, `drop`, `queue`, `handoff`, `reset`, `close`, `restart`, `model`, `system`, `cd`, `fork`, `topic`
+`prompt`, `pause`, `continue`, `resume`, `steer`, `reset`, `compact`, `open`, `close`, `model`, `fork`, `topic`, `respond`
 
 Commands are created with `makeCommand(...)` and appended to `commands.asonl`.
 
 ### Event Types
 
-- `line`: leveled text (`info`, `warn`, `error`, `tool`, `meta`)
-- `chunk`: streamed assistant/thinking text
-- `status`: busy/queue/active session snapshot; may include `activity`
+- `line`: leveled text (`info`, `warn`, `error`, `tool`, `meta`, `notice`)
+- `chunk`: streamed assistant/thinking text (channel: `assistant` | `thinking`)
+- `status`: busy/queue/active session snapshot; may include `activity` and `contexts`
 - `sessions`: session list + active session id
 - `command`: lifecycle (`queued`, `started`, `done`, `failed`)
-- `prompt`: prompt echo (`text` + `source`)
-
+- `prompt`: prompt echo (`text` + `source`; optional `label: 'steering'`)
+- `tool`: tool execution events (`running`, `streaming`, `done`, `error`); includes `toolId`, `name`, `args`, optional `output` and `ref`
+- `question`: model asks user a question (`questionId`, `text`)
+- `answer`: user answers a question (`question`, `text`)
 ## Queue & Scheduling Behavior
 
-- Commands are queued per session (FIFO within a session).
-- Multiple sessions run concurrently up to `config.ason:maxConcurrentSessions` (default `4`).
-- Immediate commands (bypass the session queue): `pause`, `resume`, `drop`, `queue`, `close`, `fork`, `cd`.
-- `reset` drops queued commands for that same session before reset executes.
+- Commands are processed sequentially from `commands.asonl`.
+- One generation runs at a time per session.
 - Sending a prompt while paused auto-resumes the session.
 
-Runtime flow:
-
-- `src/runtime/process-command.ts`: normalize session, immediate commands, queue policy
-- `src/runtime/command-scheduler.ts`: per-session queues + bounded concurrency
-- `src/runtime/handle-command.ts`: command dispatch/handlers
+Runtime flow: `src/runtime/runtime.ts` tails `commands.asonl` and dispatches each command via `handleCommand()`.
 
 ## State Snapshot (`state.ason`)
 
@@ -63,14 +59,13 @@ Runtime flow:
 
 - `ownerPid`, `ownerId`
 - `busy`, `queueLength`
-- `busySessionIds`, `activeSessionId`
-- `sessions`
+- `busySessionIds`, `activeSessionId`, `pausedSessionIds`
+- `sessions`, `contexts`
 - `commandsOffset`, `updatedAt`
 
-Owner updates this via `publishStatus(...)` in `src/runtime/event-publisher.ts`.
+Owner updates this via `publish()` in `src/runtime/runtime.ts`.
 
 ## Notes
 
-- Owner startup trims `events.asonl` (`resetBusEvents`) — keeps last 500 events so clients can hydrate scroll history.
 - Event tailing uses `parseStream(..., { recover: true })` to tolerate partial writes.
 - `status` events used for transient model activity are emitted with `activity` text and are not a separate `activity` event type.

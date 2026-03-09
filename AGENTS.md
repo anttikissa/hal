@@ -75,8 +75,9 @@ See `TODO.md`.
 - `main.ts` — owner election + CLI/web startup.
 - `src/ipc.ts` — file-backed IPC bus (`state/ipc/`). See `docs/ipc.md`.
 - `src/runtime/*` — owner runtime (scheduling, commands, agent loop).
-- `src/cli/*` — TUI + CLI client.
+- `src/cli/*` — TUI + CLI client. See `docs/tui.md`.
 - `src/web.ts` — web UI + SSE.
-- `src/session.ts` — session persistence + handoff rotation. See `docs/session.md`.
-- `src/provider.ts` + `src/providers/*` — provider adapters.
+- `src/session/*` — session persistence, messages, compaction, rotation. See `docs/session.md`.
+- `src/session/compact.ts` — context compaction (strip old tool results, images, thinking). See `docs/context-compaction.md`.
+- `src/providers/*` — provider adapters (Anthropic, OpenAI).
 - `src/utils/ason.ts` — ASON serialization.
