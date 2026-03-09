@@ -47,7 +47,7 @@ export const client = new Client(transport, () => { bumpCursor(); doRender() })
 
 // ── Renderer ──
 
-const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m'
+const DIM = '\x1b[2m', RESET = '\x1b[0m', BOLD = '\x1b[1m', YELLOW = '\x1b[33m', RED = '\x1b[31m'
 let halCursorVisible = true
 let blinkTimer: ReturnType<typeof setTimeout> | null = null
 let renderState: RenderState = emptyState
@@ -83,9 +83,13 @@ function deriveState(tab: TabState | null): string {
 
 function fmtContext(ctx?: { used: number; max: number; estimated?: boolean }): string {
 	if (!ctx || ctx.max <= 0) return ''
-	const pct = ((ctx.used / ctx.max) * 100).toFixed(1)
+	const pctNum = ctx.used / ctx.max
+	const pct = (pctNum * 100).toFixed(1)
 	const max = ctx.max >= 1000 ? `${Math.round(ctx.max / 1000)}k` : String(ctx.max)
-	return `${ctx.estimated ? '~' : ''}${pct}%/${max}`
+	const text = `${ctx.estimated ? '~' : ''}${pct}%/${max}`
+	if (pctNum >= 0.70) return `${RED}${text}${DIM}`
+	if (pctNum >= 0.50) return `${YELLOW}${text}${DIM}`
+	return text
 }
 
 function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): string {
