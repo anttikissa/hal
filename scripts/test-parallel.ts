@@ -8,6 +8,8 @@ const root = resolve(import.meta.dirname, '..')
 const glob = new Bun.Glob('src/**/*.test.ts')
 const files = [...glob.scanSync(root)].filter(f => !f.endsWith('failing.test.ts')).sort()
 
+const TIMEOUT_MS = 30_000
+
 const t0 = performance.now()
 const procs = files.map(f => ({
 	file: f,
@@ -18,7 +20,10 @@ let failed = 0
 let totalPass = 0
 let totalFail = 0
 for (const { file, proc } of procs) {
+	const timeout = setTimeout(() => proc.kill(), TIMEOUT_MS)
 	const code = await proc.exited
+	clearTimeout(timeout)
+	const timedOut = proc.signalCode !== null
 	const stdout = await new Response(proc.stdout).text()
 	const stderr = await new Response(proc.stderr).text()
 	const all = stdout + stderr
@@ -26,7 +31,12 @@ for (const { file, proc } of procs) {
 	const failMatch = all.match(/(\d+) fail\b/)
 	if (passMatch) totalPass += parseInt(passMatch[1])
 	if (failMatch) totalFail += parseInt(failMatch[1])
-	if (code !== 0) {
+	if (timedOut) {
+		console.log(`⏰ ${file}  (killed after ${TIMEOUT_MS / 1000}s)`)
+		process.stdout.write(stdout)
+		process.stderr.write(stderr)
+		failed++
+	} else if (code !== 0) {
 		console.log(`❌ ${file}`)
 		process.stdout.write(stdout)
 		process.stderr.write(stderr)
