@@ -189,7 +189,7 @@ export async function parseUserContent(
 	sessionId: string,
 	input: string,
 ): Promise<{ apiContent: any; logContent: UserMessage['content'] }> {
-	const pattern = /\[([^\]]+\.(png|jpg|jpeg|gif|webp))\]/gi
+	const pattern = /\[([^\]]+\.(png|jpg|jpeg|gif|webp|txt))\]/gi
 	const matches = [...input.matchAll(pattern)]
 	if (matches.length === 0) return { apiContent: input, logContent: input }
 
@@ -206,7 +206,19 @@ export async function parseUserContent(
 			logBlocks.push({ type: 'text', text: before })
 		}
 
-		if (existsSync(filePath) && IMAGE_EXTS.includes(ext)) {
+		if (!existsSync(filePath)) {
+			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
+			logBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
+		} else if (ext === 'txt') {
+			try {
+				const text = readFileSync(filePath, 'utf8')
+				apiBlocks.push({ type: 'text', text })
+				logBlocks.push({ type: 'text', text: `[${filePath}]` })
+			} catch {
+				apiBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
+				logBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
+			}
+		} else if (IMAGE_EXTS.includes(ext)) {
 			try {
 				const data = readFileSync(filePath)
 				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
@@ -218,9 +230,6 @@ export async function parseUserContent(
 				apiBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
 				logBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
 			}
-		} else {
-			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
-			logBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
 		}
 		lastIndex = match.index! + match[0].length
 	}

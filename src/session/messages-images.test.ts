@@ -50,6 +50,23 @@ test('parseUserContent handles missing file', async () => {
 	expect(apiContent[0].text).toContain('file not found')
 })
 
+test('parseUserContent inlines [path.txt] as text', async () => {
+	const txtPath = '/tmp/hal-test-paste.txt'
+	writeFileSync(txtPath, 'line one\nline two\nline three')
+	try {
+		const { apiContent, logContent } = await parseUserContent(TEST_SESSION, `check this [${txtPath}]`)
+		expect(Array.isArray(apiContent)).toBe(true)
+		expect(apiContent).toHaveLength(2)
+		expect(apiContent[0]).toEqual({ type: 'text', text: 'check this ' })
+		expect(apiContent[1]).toEqual({ type: 'text', text: 'line one\nline two\nline three' })
+		// Log keeps the path reference
+		expect(Array.isArray(logContent)).toBe(true)
+		expect((logContent as any[])[1]).toEqual({ type: 'text', text: `[${txtPath}]` })
+	} finally {
+		rmSync(txtPath)
+	}
+})
+
 test('image blocks round-trip through loadApiMessages', async () => {
 	const { logContent } = await parseUserContent(TEST_SESSION, `look [${TEST_IMAGE}]`)
 	await appendMessages(TEST_SESSION, [{ role: 'user', content: logContent, ts: new Date().toISOString() }])
