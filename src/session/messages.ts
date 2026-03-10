@@ -47,6 +47,7 @@ export interface AssistantMessage {
 	thinkingSignature?: string
 	thinkingRef?: string
 	tools?: { id: string; name: string; ref: string }[]
+	usage?: { input: number; output: number }
 	ts: string
 }
 
@@ -129,6 +130,16 @@ function getParentSessionId(sessionId: string): string | null {
 	return null
 }
 
+/** Get the last known API usage from persisted messages. */
+export function getLastUsage(sessionId: string): { input: number; output: number } | null {
+	const msgs = readMessages(sessionId)
+	for (let i = msgs.length - 1; i >= 0; i--) {
+		const m = msgs[i]
+		if (m.role === 'assistant' && m.usage) return m.usage
+	}
+	return null
+}
+
 // ── Assistant/tool entry writers ──
 
 /** Write assistant entry with block files for tools/thinking. Returns the log entry + tool ref map. */
@@ -147,7 +158,7 @@ export async function writeAssistantEntry(
 		await writeBlock(sessionId, ref, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
 	}
 	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
-	if (opts.usage) (entry as any).usage = opts.usage
+	if (opts.usage) entry.usage = opts.usage
 
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []

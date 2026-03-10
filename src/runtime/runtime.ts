@@ -3,9 +3,9 @@
 import { watch, type FSWatcher } from 'fs'
 import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds, rotateLog, forkSession } from '../session/session.ts'
-import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, buildCompactionContext, type UserMessage } from '../session/messages.ts'
+import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, buildCompactionContext, getLastUsage, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
-import { contextWindowForModel, estimateTokens, messageBytes } from './context.ts'
+import { contextWindowForModel } from './context.ts'
 import { loadSystemPrompt } from './system-prompt.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
@@ -72,7 +72,17 @@ export async function startRuntime(): Promise<Runtime> {
 		const meta = await loadMeta(id)
 		if (meta) {
 			sessions.set(meta.id, meta)
-			if (meta.context) sessionContext.set(meta.id, meta.context)
+			// Restore context: prefer persisted meta, fall back to last API usage
+			if (meta.context) {
+				sessionContext.set(meta.id, meta.context)
+			} else {
+				const usage = getLastUsage(meta.id)
+				if (usage) {
+					const modelId = (meta.model ?? getConfig().defaultModel).split('/').pop()!
+					const max = contextWindowForModel(modelId)
+					sessionContext.set(meta.id, { used: usage.input, max })
+				}
+			}
 			if (!activeSessionId) activeSessionId = meta.id
 		}
 	}
@@ -192,17 +202,12 @@ export async function startRuntime(): Promise<Runtime> {
 			onStatus: async (busy, nextActivity, context) => {
 				if (busy) busySessionIds.add(sid)
 				else busySessionIds.delete(sid)
-				if (context) {
-					const existing = sessionContext.get(sid)
-					if (!context.estimated || !existing || existing.estimated) {
-						sessionContext.set(sid, context)
-						info.context = { used: context.used, max: context.max }
-					}
-					if (!context.estimated) {
-						const pct = context.used / context.max
-						if (pct >= 0.65 && pct < 0.70) {
-							await emitInfo(sid, `[context] ${Math.round(pct * 100)}% used — will autocompact at 70%`, 'warn')
-						}
+				if (context && !context.estimated) {
+					sessionContext.set(sid, context)
+					info.context = { used: context.used, max: context.max }
+					const pct = context.used / context.max
+					if (pct >= 0.65 && pct < 0.70) {
+						await emitInfo(sid, `[context] ${Math.round(pct * 100)}% used — will autocompact at 70%`, 'warn')
 					}
 				}
 				await publish(nextActivity)
@@ -268,13 +273,10 @@ export async function startRuntime(): Promise<Runtime> {
 
 				let apiMessages = await loadApiMessages(sid)
 
-				// Autocompact at 70% context usage
-				const modelId = (info.model ?? getConfig().defaultModel).split('/').pop()!
-				const ctxMax = contextWindowForModel(modelId)
-				let totalBytes = 0
-				for (const m of apiMessages) totalBytes += messageBytes(m)
-				const usedPct = estimateTokens(totalBytes, modelId) / ctxMax
-				if (usedPct >= 0.70) {
+				// Autocompact at 70% context usage (uses real API token counts)
+				const ctx = sessionContext.get(sid)
+				if (ctx && !ctx.estimated && ctx.used / ctx.max >= 0.70) {
+					const usedPct = ctx.used / ctx.max
 					const msgs = await readMessages(sid)
 					const userMsgs = msgs.filter(m => m.role === 'user')
 					const context = buildCompactionContext(sid, msgs)
@@ -284,9 +286,8 @@ export async function startRuntime(): Promise<Runtime> {
 						{ role: 'user', content: logContent, ts: new Date().toISOString() } as UserMessage,
 					])
 					apiMessages = await loadApiMessages(sid)
-					const newBytes = apiMessages.reduce((s, m) => s + messageBytes(m), 0)
-					const newPct = estimateTokens(newBytes, modelId) / ctxMax
-					await emitInfo(sid, `[autocompact] ${Math.round(usedPct * 100)}% → ${Math.round(newPct * 100)}% (${userMsgs.length} prompts summarized)`, 'meta')
+					await emitInfo(sid, `[autocompact] ${Math.round(usedPct * 100)}% → compacted (${userMsgs.length} prompts summarized)`, 'meta')
+					sessionContext.delete(sid) // will get fresh count from next API response
 				}
 
 				// Replace the last user message's content with parsed apiContent (includes base64 images)

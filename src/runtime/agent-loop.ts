@@ -10,7 +10,7 @@ import { eventId } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
 import { runHooks } from './hooks.ts'
-import { contextWindowForModel, isCalibrated, saveCalibration, estimateTokens, messageBytes } from './context.ts'
+import { contextWindowForModel, isCalibrated, saveCalibration, messageBytes } from './context.ts'
 import { getConfig, type PermissionLevel } from '../config.ts'
 
 const WRITE_TOOLS = new Set(['bash', 'write', 'edit'])
@@ -50,11 +50,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const ctxMax = contextWindowForModel(modelId)
 	let calibrated = isCalibrated(modelId)
 
-	// Emit estimated context before first API call
-	let totalBytes = systemPrompt.length
-	for (const m of messages) totalBytes += messageBytes(m)
-	const estimated = estimateTokens(totalBytes, modelId)
-	ctx.onStatus(true, 'generating...', { used: estimated, max: ctxMax, estimated: true })
+	ctx.onStatus(true, 'generating...')
 
 	try {
 		const provider = await loadProvider(providerName)
@@ -99,6 +95,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						// Calibrate bytes→tokens ratio on first API response
 						if (!calibrated && event.usage && event.usage.input > 0) {
 							calibrated = true
+							let totalBytes = systemPrompt.length
+							for (const m of messages) totalBytes += messageBytes(m)
 							saveCalibration(modelId, totalBytes, event.usage.input)
 						}
 						const usage = event.usage
