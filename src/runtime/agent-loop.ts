@@ -101,12 +101,14 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							calibrated = true
 							saveCalibration(modelId, totalBytes, event.usage.input)
 						}
+						const usage = event.usage
 						const assistantOpts = {
 							text: assistantText || undefined,
 							thinkingText: thinkingText || undefined,
 							thinkingRef: thinkingRef || undefined,
 							thinkingSignature: thinkingSignature || undefined,
 							toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+							usage,
 						}
 
 						if (toolCalls.length === 0) {

@@ -134,7 +134,7 @@ function getParentSessionId(sessionId: string): string | null {
 /** Write assistant entry with block files for tools/thinking. Returns the log entry + tool ref map. */
 export async function writeAssistantEntry(
 	sessionId: string,
-	opts: { text?: string; thinkingText?: string; thinkingRef?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[] },
+	opts: { text?: string; thinkingText?: string; thinkingRef?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[]; usage?: { input: number; output: number } },
 ): Promise<{ entry: AssistantMessage; toolRefMap: Map<string, string> }> {
 	const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
 	const toolRefMap = new Map<string, string>()
@@ -147,6 +147,7 @@ export async function writeAssistantEntry(
 		await writeBlock(sessionId, ref, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
 	}
 	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
+	if (opts.usage) (entry as any).usage = opts.usage
 
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []

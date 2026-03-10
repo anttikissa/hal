@@ -9,6 +9,7 @@ export interface Config {
 	defaultModel: string
 	permissions?: PermissionLevel
 	activeSessionId?: string
+	debug?: boolean
 }
 
 let _config: Config | null = null
