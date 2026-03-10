@@ -124,7 +124,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cw = contentWidth()
 
 	const blocks = tab?.blocks ?? []
-	const contentLines = renderBlocks(blocks, w, isVisible())
+	const { lines: contentLines } = renderBlocks(blocks, w, isVisible())
 	// Pad to tallest tab's content height (keeps prompt position stable)
 	const activeSessionId = tab?.sessionId ?? null
 	const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
