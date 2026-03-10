@@ -428,7 +428,7 @@ test('close writes closedAt to meta', async () => {
 	expect(new Date(meta!.closedAt!).getTime()).toBeGreaterThan(Date.now() - 5000)
 })
 
-test('resume without args lists closed sessions with details', async () => {
+test('resume without args lists closed sessions with details and message count', async () => {
 	// Create a second session, set a topic, then close it
 	await commands.append(makeCommand('open', src))
 	await new Promise(r => setTimeout(r, 500))
@@ -437,6 +437,14 @@ test('resume without args lists closed sessions with details', async () => {
 	const secondInfo = runtime.sessions.get(secondId!)!
 	secondInfo.topic = 'test-topic'
 	secondInfo.lastPrompt = 'hello world'
+
+	// Write some messages to the session so count is > 0
+	const { appendMessages } = await import('../session/messages.ts')
+	await appendMessages(secondId!, [
+		{ role: 'user', content: 'hello', ts: new Date().toISOString() },
+		{ role: 'assistant', text: 'hi', ts: new Date().toISOString() },
+		{ role: 'user', content: 'bye', ts: new Date().toISOString() },
+	])
 
 	// Close the second session
 	await commands.append(makeCommand('close', src, undefined, secondId!))
@@ -453,6 +461,8 @@ test('resume without args lists closed sessions with details', async () => {
 	const listEvent = recent.find(e => e.type === 'line' && e.text.includes(secondId!))
 	expect(listEvent).toBeTruthy()
 	expect((listEvent as any).text).toContain('test-topic')
+	// Should show message count (1 greeting + 3 appended = 4)
+	expect((listEvent as any).text).toContain('4 msgs')
 })
 
 test('resume with id opens a closed session as a new tab', async () => {

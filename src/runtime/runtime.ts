@@ -442,18 +442,22 @@ export async function startRuntime(): Promise<Runtime> {
 						await emit({ type: 'line', sessionId: sid, text: 'No closed sessions', level: 'info' })
 						break
 					}
-					const items: { id: string; topic?: string; lastPrompt?: string; sortTs?: string }[] = []
+					const items: { id: string; topic?: string; lastPrompt?: string; sortTs?: string; msgCount: number }[] = []
 					for (const cid of closed) {
 						const m = loadMeta(cid)
-						if (m) items.push({ id: cid, topic: m.topic, lastPrompt: m.lastPrompt, sortTs: m.closedAt ?? m.updatedAt })
-						else items.push({ id: cid })
+						const msgs = await readMessages(cid)
+						const msgCount = msgs.filter((e: any) => e.role).length
+						if (m) items.push({ id: cid, topic: m.topic, lastPrompt: m.lastPrompt, sortTs: m.closedAt ?? m.updatedAt, msgCount })
+						else items.push({ id: cid, msgCount })
 					}
 					items.sort((a, b) => (b.sortTs ?? '').localeCompare(a.sortTs ?? ''))
 					const lines = items.slice(0, 20).map(s => {
 						const label = s.topic || s.lastPrompt || ''
 						const age = s.sortTs ? timeAgo(s.sortTs) : ''
+						const count = s.msgCount > 0 ? `${s.msgCount} msgs` : ''
 						const parts = [s.id.padEnd(8)]
 						if (label) parts.push(label.slice(0, 50))
+						if (count) parts.push(count)
 						if (age) parts.push(age)
 						return parts.join('  ')
 					})
