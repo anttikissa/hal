@@ -144,8 +144,9 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const parts = tabs.map((t, i) => {
 		const title = t.info.topic ?? t.info.workingDir?.split('/').pop() ?? 'tab'
 		let indicator: string | undefined
+		const last = t.blocks[t.blocks.length - 1]
 		if (t.question) indicator = '?'
-		else if (!t.busy && t.blocks.some(b => b.type === 'info' && b.text === '[paused]'))
+		else if (!t.busy && last?.type === 'info' && last.text === '[paused]')
 			indicator = '!'
 		return {
 			label: `${i + 1} ${title}`,
