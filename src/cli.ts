@@ -149,7 +149,14 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		qPromptResult = prompt.buildPrompt(cw)
 		qAnswerStartRow = lines.length
 		lines.push(...qPromptResult.lines)
-		lines.push('') // spacing before tab bar
+		// Pad to push tab bar + chrome to bottom of screen
+		const frozenRaw = prompt.frozenText() ?? ''
+		const frozenSplit = frozenRaw.split('\n').slice(0, 3)
+		const frozenCount = (!frozenSplit.length || (frozenSplit.length === 1 && !frozenSplit[0])) ? 1 : frozenSplit.length
+		// chrome below: tab bar(1) + separator(1) + frozen prompt + help bar(1)
+		const chromeBelow = 1 + 1 + frozenCount + 1
+		const padTarget = Math.max(0, (stdout.rows || 24) - chromeBelow)
+		while (lines.length < padTarget) lines.push('')
 	} else {
 		lines.push(...contentLines)
 		// Pad to tallest tab's content height (keeps prompt position stable)
