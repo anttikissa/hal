@@ -361,10 +361,8 @@ export async function startRuntime(): Promise<Runtime> {
 					activeSessionId = sessions.keys().next().value ?? null
 				}
 				if (sessions.size === 0) {
-					const info = await createSession()
-					sessions.set(info.id, info)
-					activeSessionId = info.id
-					setFreshContext(info)
+					await publish()
+					process.exit(0)
 				}
 				await publish()
 				break
