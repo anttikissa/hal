@@ -232,6 +232,7 @@ export async function startRuntime(): Promise<Runtime> {
 				text: `[resume] interrupted during tools (${toolList}). Use /respond skip, then /continue`,
 				level: 'warn',
 			})
+			return
 		}
 
 		const apiMessages = await loadApiMessages(sessionId)

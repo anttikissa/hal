@@ -82,7 +82,7 @@ function sessionStart(sessionId: string): number {
 	return ts
 }
 
-function makeBlockRef(sessionId: string): string {
+export function makeBlockRef(sessionId: string): string {
 	const offset = Math.max(0, Date.now() - sessionStart(sessionId)).toString(36).padStart(6, '0')
 	const bytes = randomBytes(3)
 	let suffix = ''
@@ -131,10 +131,10 @@ function getParentSessionId(sessionId: string): string | null {
 
 // ── Assistant/tool entry writers ──
 
-/** Write assistant entry with block files for tools. Returns the log entry + tool ref map. */
+/** Write assistant entry with block files for tools/thinking. Returns the log entry + tool ref map. */
 export async function writeAssistantEntry(
 	sessionId: string,
-	opts: { text?: string; thinkingText?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[] },
+	opts: { text?: string; thinkingText?: string; thinkingRef?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[] },
 ): Promise<{ entry: AssistantMessage; toolRefMap: Map<string, string> }> {
 	const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
 	const toolRefMap = new Map<string, string>()
@@ -142,7 +142,7 @@ export async function writeAssistantEntry(
 	if (opts.text) entry.text = opts.text
 	if (opts.thinkingText) {
 		entry.thinkingText = opts.thinkingText
-		const ref = makeBlockRef(sessionId)
+		const ref = opts.thinkingRef || makeBlockRef(sessionId)
 		entry.thinkingRef = ref
 		await writeBlock(sessionId, ref, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
 	}

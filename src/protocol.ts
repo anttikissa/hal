@@ -76,7 +76,8 @@ export type RuntimeEvent =
 	}
 	| {
 		id: string; type: 'chunk'; sessionId: string | null
-		text: string; channel: 'assistant' | 'thinking'; createdAt: string
+		text: string; channel: 'assistant' | 'thinking'
+		ref?: string; createdAt: string
 	}
 	| {
 		id: string; type: 'status'; sessionId: string | null

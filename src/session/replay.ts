@@ -2,7 +2,7 @@
 
 import type { Block } from '../cli/blocks.ts'
 import type { Message } from './messages.ts'
-import { readBlock } from './messages.ts'
+import { readBlock, detectInterruptedTools } from './messages.ts'
 import { argsPreview } from '../runtime/tools.ts'
 /** Convert a message log to display blocks (for tab history). */
 export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
@@ -57,6 +57,25 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 						sessionId,
 					})
 				}
+			}
+		}
+	}
+
+	// Detect unfinished state
+	const interrupted = detectInterruptedTools(messages)
+	if (interrupted.length > 0) {
+		const toolList = interrupted.map(t => t.name).join(', ')
+		blocks.push({ type: 'info', text: `[resume] interrupted during tools (${toolList}). Use /respond skip, then /continue` })
+	} else if (messages.length > 0) {
+		// Check for pending user turn (last role-bearing message is 'user' and not a system message)
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const m = messages[i] as any
+			if (m.role) {
+				const text = typeof m.content === 'string' ? m.content : ''
+				if (m.role === 'user' && !text.startsWith('[system]')) {
+					blocks.push({ type: 'info', text: '[resume] Type /continue to continue the interrupted response' })
+				}
+				break
 			}
 		}
 	}

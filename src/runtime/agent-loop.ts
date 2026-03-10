@@ -5,7 +5,7 @@
 import { loadProvider } from '../providers/loader.ts'
 import type { ProviderEvent } from '../providers/provider.ts'
 import { events } from '../ipc.ts'
-import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock, parseUserContent } from '../session/messages.ts'
+import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock, parseUserContent, makeBlockRef } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
@@ -54,6 +54,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS, signal, sessionId })
 
 			let thinkingText = ''
+			let thinkingRef = ''
 			let thinkingSignature = ''
 			let assistantText = ''
 			const toolCalls: ToolCall[] = []
@@ -63,8 +64,9 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				if (signal?.aborted) { aborted = true; break }
 				switch (event.type) {
 					case 'thinking':
+						if (!thinkingRef) thinkingRef = makeBlockRef(sessionId)
 						thinkingText += event.text
-						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking' })
+						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', ref: thinkingRef })
 						break
 					case 'thinking_signature':
 						thinkingSignature = event.signature
@@ -89,11 +91,18 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							calibrated = true
 							saveCalibration(modelId, totalBytes, event.usage.input)
 						}
+						const assistantOpts = {
+							text: assistantText || undefined,
+							thinkingText: thinkingText || undefined,
+							thinkingRef: thinkingRef || undefined,
+							thinkingSignature: thinkingSignature || undefined,
+							toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+						}
+
 						if (toolCalls.length === 0) {
 							// No tools — persist and finish
-							await appendMessages(sessionId, [
-								{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, thinkingSignature: thinkingSignature || undefined, ts: new Date().toISOString() },
-							])
+							const { entry } = await writeAssistantEntry(sessionId, assistantOpts)
+							await appendMessages(sessionId, [entry])
 							if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 							await emit(sessionId, {
 								type: 'command', commandId: '', phase: 'done',
@@ -103,12 +112,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						}
 
 						// Write assistant entry BEFORE executing tools
-						const { entry: assistantEntry, toolRefMap } = await writeAssistantEntry(sessionId, {
-							text: assistantText || undefined,
-							thinkingText: thinkingText || undefined,
-							thinkingSignature: thinkingSignature || undefined,
-							toolCalls,
-						})
+						const { entry: assistantEntry, toolRefMap } = await writeAssistantEntry(sessionId, assistantOpts)
 						await appendMessages(sessionId, [assistantEntry])
 						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
