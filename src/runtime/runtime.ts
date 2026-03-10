@@ -225,24 +225,7 @@ export async function startRuntime(): Promise<Runtime> {
 		const interrupted = detectInterruptedTools(messages)
 		if (interrupted.length > 0) {
 			pendingInterruptedTools.set(sessionId, interrupted)
-			const toolList = interrupted.map(t => t.name).join(', ')
-			await emit({
-				type: 'line',
-				sessionId,
-				text: `[resume] interrupted during tools (${toolList}). Use /respond skip, then /continue`,
-				level: 'warn',
-			})
-			return
 		}
-
-		const apiMessages = await loadApiMessages(sessionId)
-		if (!hasPendingUserTurn(apiMessages)) return
-		await emit({
-			type: 'line',
-			sessionId,
-			text: '[resume] Type /continue to continue the interrupted response',
-			level: 'meta',
-		})
 	}
 
 	async function handleCommand(cmd: RuntimeCommand): Promise<void> {

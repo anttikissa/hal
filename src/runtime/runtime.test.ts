@@ -272,10 +272,11 @@ test('interrupted tool round requires skip before /continue', async () => {
 	await claimHost(hostId)
 	runtime = await startRuntime()
 
+	// /continue should be blocked until interrupted tools are resolved
 	await commands.append(makeCommand('continue', src, undefined, sid))
 	await new Promise(r => setTimeout(r, 200))
 	let all = await events.readAll()
-	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('Use /respond skip, then /continue'))).toBe(true)
+	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('Interrupted tools are present'))).toBe(true)
 
 	await commands.append(makeCommand('respond', src, 'skip', sid))
 	await new Promise(r => setTimeout(r, 200))
