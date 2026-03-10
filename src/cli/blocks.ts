@@ -395,7 +395,7 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 		return { lines: result, streamCursor: { row: cursorRow, col } }
 	} else {
 		// Idle: empty line, cursor line, empty line
-		const cc = lastBlock ? cursorColor(lastBlock) : colors.cursor.fg
+		const cc = colors.cursor.fg
 		const c = cursorVisible ? `${cc}█${colors.RESET}` : ' '
 		result.push('')
 		result.push(`${' '.repeat(BLOCK_MARGIN)}${c}`)

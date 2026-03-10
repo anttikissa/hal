@@ -117,10 +117,10 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 	return `${colored}${RESET}`
 }
 
-function minicursorColor(block: Block): string {
-	if (block.type === 'tool') return colors.tool(block.name).fg
-	if (block.type === 'thinking') return colors.thinking.fg
-	return colors.minicursor.fg
+function minicursorColor(block: Block): string | undefined {
+	if (block.type === 'tool' && (block.status === 'streaming' || block.status === 'running')) return colors.tool(block.name).fg
+	if (block.type === 'thinking' && !block.done) return colors.thinking.fg
+	return undefined
 }
 function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cState = client.getState()
