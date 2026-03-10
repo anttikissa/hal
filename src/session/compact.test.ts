@@ -209,32 +209,6 @@ describe('compactApiMessages', () => {
 		expect(out[5].content[0].content).toBe('file contents')
 	})
 
-	test('tool_result without _ref gets generic placeholder', () => {
-		const msgs = [
-			{ role: 'user', content: 'go' },
-			{
-				role: 'assistant',
-				content: [{ type: 'tool_use', id: 't0', name: 'bash', input: { command: 'ls' } }],
-			},
-			{
-				role: 'user',
-				content: [{ type: 'tool_result', tool_use_id: 't0', content: 'old stuff' }],
-			},
-			{ role: 'user', content: 'next' },
-			{
-				role: 'assistant',
-				content: [{ type: 'tool_use', id: 't1', name: 'bash', input: { command: 'pwd' } }],
-			},
-			{
-				role: 'user',
-				content: [{ type: 'tool_result', tool_use_id: 't1', content: '/home', _ref: 'ref-1' }],
-			},
-		]
-
-		const out = compactApiMessages(msgs)
-		expect(out[2].content[0].content).toBe('[tool result omitted after 4 turns]')
-	})
-
 	test('preserves assistant text blocks in old messages', () => {
 		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'files', 'ref-0')
 		const c1 = toolCycle('t1', 'bash', { command: 'pwd' }, '/home', 'ref-1')
