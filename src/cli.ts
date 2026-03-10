@@ -97,7 +97,7 @@ function fmtContextPlain(ctx?: { used: number; max: number; estimated?: boolean 
 }
 
 function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): string {
-	const { fg: iFg, bg: iBg } = colors.input
+	const { fg: iFg } = colors.input
 	const model = shortModel(tab?.info.model)
 	const state = deriveState(tab)
 	const role = hal.isHost ? 'host' : 'client'
@@ -119,7 +119,7 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 	const inner = lead + fill + suffix
 
 	// Apply context pct color inline if present
-	let colored = `${iBg}${iFg}${inner}`
+	let colored = `${iFg}${inner}`
 	if (ctxInfo) {
 		const pctSlash = ctxInfo.text
 		const idx = colored.lastIndexOf(pctSlash)
