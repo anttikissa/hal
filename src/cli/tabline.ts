@@ -10,6 +10,7 @@ export interface TablineTab {
 	label: string
 	busy: boolean
 	active: boolean
+	cursorColor?: string // ANSI fg escape — overrides default minicursor color when busy
 	indicator?: string // minicursor: '!' interrupted, '?' asking, red '✖' error — replaces busy dot; may contain ANSI
 }
 
@@ -34,7 +35,7 @@ function tabTitle(label: string): string {
 // ── Rendering modes (progressive degradation) ──
 
 function statusChar(t: TablineTab, busyChar: string): string {
-	return t.indicator ?? (t.busy ? `${minicursor.fg}${busyChar}` : ' ')
+	return t.indicator ?? (t.busy ? `${t.cursorColor ?? minicursor.fg}${busyChar}` : ' ')
 }
 
 /** Mode 0: Full titles, max 12 chars. `[1▪.hal]` / ` 2▪.hal ` */

@@ -4,7 +4,7 @@ import { render, emptyState, type RenderState, type CursorPos } from './cli/diff
 import { parseKeys } from './cli/keys.ts'
 import { handleInput, type InputContext } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
-import { renderBlocks, renderQuestion } from './cli/blocks.ts'
+import { renderBlocks, renderQuestion, type Block } from './cli/blocks.ts'
 import { maxTabHeight } from './cli/heights.ts'
 import { Client, type TabState } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
@@ -117,6 +117,11 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 	return `${colored}${RESET}`
 }
 
+function minicursorColor(block: Block): string {
+	if (block.type === 'tool') return colors.tool(block.name).fg
+	if (block.type === 'thinking') return colors.thinking.fg
+	return colors.minicursor.fg
+}
 function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cState = client.getState()
 	const tab = client.activeTab()
@@ -181,10 +186,12 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		else if (!t.busy && last?.type === 'error') indicator = '\x1b[31m✖\x1b[0m' // red minicursor
 		else if (!t.busy && last?.type === 'info' && (last.text === '[paused]' || last.text.startsWith('[interrupted]')))
 			indicator = '!'
+		const cc = t.busy && last ? minicursorColor(last) : undefined
 		return {
 			label: `${i + 1} ${title}`,
 			busy: !!t.busy,
 			active: i === idx,
+			cursorColor: cc,
 			indicator,
 		}
 	})

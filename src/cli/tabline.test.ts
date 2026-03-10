@@ -85,4 +85,14 @@ describe('renderTabline', () => {
 	test('empty tabs returns empty', () => {
 		expect(renderTabline([], 80)).toBe('')
 	})
+
+	test('cursorColor is used for busy dot when provided', () => {
+		const colored = [
+			{ label: '1 think', busy: true, active: false, cursorColor: '\x1b[38;2;1;2;3m' },
+			{ label: '2 tool', busy: true, active: true, cursorColor: '\x1b[38;2;4;5;6m' },
+		]
+		const line = renderTabline(colored, 80, true)
+		expect(line).toContain('\x1b[38;2;1;2;3m▪')
+		expect(line).toContain('\x1b[38;2;4;5;6m▪')
+	})
 })
