@@ -20,7 +20,8 @@ bash tool output color
 A lot of tool uses are now executed with invalid options - is that new or...
 
 
-There was lots of attempts to fill the cor
+There was lots of attempts to fill the corner - many commits that did not fix it
+
 
 Lots of 
 Those should be links (files for now)
@@ -39,7 +40,7 @@ Question block looks like ass
 
 change how tabs look
 
--- grep:  (0.0s) ✓ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── [06sqgy-sb1] ──
+-- grep:  (0.0s) ✓ ───────── ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── [06sqgy-sb1] ──
 error: grep requires pattern
 
 & Should erroneous tool uses be formatted such? not "done"?

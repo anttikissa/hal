@@ -111,7 +111,7 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 	const prefix = '── '
 	const label = `You (to ${model} · ${state})`
 	const suffix = ` ${rightParts.join(' · ')} ──`
-	const iw = Math.max(1, w - 2) // 1 margin each side
+	const iw = w
 	const maxLabel = Math.max(1, iw - prefix.length - suffix.length - 1)
 	const shown = label.length > maxLabel ? label.slice(0, maxLabel) : label
 	const lead = `${prefix}${shown} `
@@ -129,7 +129,7 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 		}
 	}
 
-	return ` ${colored}${RESET} `
+	return `${colored}${RESET}`
 }
 
 function buildLines(): { lines: string[]; cursor: CursorPos } {
