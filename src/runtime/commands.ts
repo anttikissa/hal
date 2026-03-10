@@ -94,7 +94,13 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const childId = await forkSession(sid)
 			const childMeta = loadMeta(childId)
 			if (!childMeta) { await error('Failed to create forked session'); break }
-			rt.sessions.set(childId, childMeta)
+			// Insert child right after parent in session order
+			const ordered = new Map<string, SessionInfo>()
+			for (const [id, info] of rt.sessions) {
+				ordered.set(id, info)
+				if (id === sid) ordered.set(childId, childMeta)
+			}
+			rt.sessions = ordered
 			rt.activeSessionId = childId
 			await appendMessages(childId, [
 				{ role: 'user', content: `[system] Forked from session ${sid}.`, ts: new Date().toISOString() } as UserMessage,
@@ -174,10 +180,16 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			if (rt.busySessionIds.has(sid)) { await warn('Session is busy'); break }
 			const info = rt.sessions.get(sid)
 			if (!info) { await error(`Session ${sid} not found`); break }
-			const pendingTools = rt.pendingInterruptedTools.get(sid) ?? []
+			// Auto-resolve interrupted tools
+			const pendingTools = rt.pendingInterruptedTools.get(sid) ?? detectInterruptedTools(await readMessages(sid))
 			if (pendingTools.length > 0) {
-				await warn('Interrupted tools are present. Use /respond skip before /continue')
-				break
+				const toolRefMap = new Map(pendingTools.map(t => [t.id, t.ref]))
+				for (const t of pendingTools) {
+					const entry = await writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolRefMap)
+					await appendMessages(sid, [entry])
+				}
+				rt.pendingInterruptedTools.delete(sid)
+				await rt.emitInfo(sid, `[interrupted] ${pendingTools.length} tool(s) skipped`, 'warn')
 			}
 			const apiMessages = await loadApiMessages(sid)
 			if (!rt.hasPendingUserTurn(apiMessages)) {
@@ -230,28 +242,14 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 		}
 		case 'respond': {
 			const pending = rt.pendingQuestions.get(sid)
-			if (pending) {
-				rt.pendingQuestions.delete(sid)
-				const answer = cmd.text ?? ''
-				await rt.emit({ type: 'answer', sessionId: sid, question: pending.question, text: answer })
-				pending.resolve(answer)
+			if (!pending) {
+				await warn('No pending question')
 				break
 			}
-			const answer = (cmd.text ?? '').trim().toLowerCase()
-			if (answer && answer !== 'skip') {
-				await warn('Reply with "skip" or leave blank to continue without rerunning interrupted tools')
-				break
-			}
-			const interruptedTools = rt.pendingInterruptedTools.get(sid) ?? []
-			if (interruptedTools.length > 0) {
-				const toolRefMap = new Map(interruptedTools.map(t => [t.id, t.ref]))
-				for (const t of interruptedTools) {
-					const entry = await writeToolResultEntry(sid, t.id, '[interrupted — skipped by user]', toolRefMap)
-					await appendMessages(sid, [entry])
-				}
-				await rt.emitInfo(sid, `[interrupted] ${interruptedTools.length} tool(s) marked skipped`, 'warn')
-			}
-			rt.pendingInterruptedTools.delete(sid)
+			rt.pendingQuestions.delete(sid)
+			const answer = cmd.text ?? ''
+			await rt.emit({ type: 'answer', sessionId: sid, question: pending.question, text: answer })
+			pending.resolve(answer)
 			break
 		}
 		default:
