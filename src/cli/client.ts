@@ -5,7 +5,7 @@ import type { Block } from './blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
 import { makeCommand } from '../protocol.ts'
 import { replay } from '../session/replay.ts'
-import { loadInputHistory, saveDraft, loadDraft } from '../session/messages.ts'
+import { messages } from '../session/messages.ts'
 import { prompt } from './prompt.ts'
 import { clientState } from './client-state.ts'
 import { randomBytes } from 'crypto'
@@ -61,10 +61,10 @@ export class Client {
 		const offset = await this.transport.eventsOffset()
 
 		for (const tab of this.state.tabs) {
-			const messages = await this.transport.replaySession(tab.sessionId)
-			tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, messages, tab.info.model))
-			tab.inputHistory = await loadInputHistory(tab.sessionId)
-			tab.inputDraft = await loadDraft(tab.sessionId)
+			const replayMessages = await this.transport.replaySession(tab.sessionId)
+			tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model))
+			tab.inputHistory = await messages.loadInputHistory(tab.sessionId)
+			tab.inputDraft = await messages.loadDraft(tab.sessionId)
 		}
 		const active = this.activeTab()
 		if (active) {
@@ -217,10 +217,10 @@ export class Client {
 		// Replay new tabs
 		for (const tab of newTabs) {
 			if (!current.has(tab.sessionId)) {
-				const messages = await this.transport.replaySession(tab.sessionId)
-				tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, messages, tab.info.model))
-				tab.inputHistory = await loadInputHistory(tab.sessionId)
-				tab.inputDraft = await loadDraft(tab.sessionId)
+				const replayMessages = await this.transport.replaySession(tab.sessionId)
+				tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model))
+				tab.inputHistory = await messages.loadInputHistory(tab.sessionId)
+				tab.inputDraft = await messages.loadDraft(tab.sessionId)
 			}
 		}
 		const newId = this.state.tabs[this.state.activeTabIndex]?.sessionId
@@ -238,7 +238,7 @@ export class Client {
 		if (!tab) return
 		if (prompt.hasQuestion()) return // don't overwrite draft with answer text
 		tab.inputDraft = prompt.text()
-		saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
+		messages.saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
 	}
 
 	clearQuestion(): void {
@@ -251,7 +251,7 @@ export class Client {
 		if (!tab) return
 		// History push happens in prompt.pushHistory (shared array via setHistory)
 		tab.inputDraft = ''
-		saveDraft(tab.sessionId, '').catch(() => {})
+		messages.saveDraft(tab.sessionId, '').catch(() => {})
 	}
 
 	async send(type: CommandType, text?: string): Promise<void> {
