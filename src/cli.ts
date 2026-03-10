@@ -124,19 +124,44 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cw = contentWidth()
 
 	const blocks = tab?.blocks ?? []
+	const hasQ = prompt.hasQuestion()
 	const { lines: contentLines, streamCursor } = renderBlocks(blocks, w, isVisible())
-	// Pad to tallest tab's content height (keeps prompt position stable)
-	const activeSessionId = tab?.sessionId ?? null
-	const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
-	const pLines = prompt.lineCount(cw)
-	const frozen = prompt.frozenText()
-	const frozenLines = frozen ? Math.min(frozen.split('\n').length, 3) : 0
-	// tab bar(1) + help bar(1) + prompt sep(1) + prompt lines + question area if active
-	const chromeLines = 3 + pLines + (prompt.hasQuestion() ? 1 + frozenLines + 1 : 0)
-	const available = Math.max(0, (stdout.rows || 24) - chromeLines)
-	const padTarget = Math.min(maxHeight, available)
-	const lines = [...contentLines]
-	while (lines.length < padTarget) lines.push('')
+
+	const lines: string[] = []
+	let qAnswerStartRow = -1
+	let qPromptResult: ReturnType<typeof prompt.buildPrompt> | null = null
+
+	if (hasQ) {
+		// Strip trailing idle cursor lines (empty/█/empty) from content
+		let trimmed = contentLines
+		if (trimmed.length >= 3 && !streamCursor) {
+			trimmed = trimmed.slice(0, -3)
+		}
+		lines.push(...trimmed)
+		if (lines.length > 0) lines.push('')
+
+		// Question block (tool-like box) — part of content area, above tab bar
+		const qLabel = prompt.getQuestionLabel()!
+		const qLines = renderQuestion(qLabel, w)
+		lines.push(...qLines)
+
+		// Answer input area
+		qPromptResult = prompt.buildPrompt(cw)
+		qAnswerStartRow = lines.length
+		lines.push(...qPromptResult.lines)
+		lines.push('') // spacing before tab bar
+	} else {
+		lines.push(...contentLines)
+		// Pad to tallest tab's content height (keeps prompt position stable)
+		const activeSessionId = tab?.sessionId ?? null
+		const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
+		const pLines = prompt.lineCount(cw)
+		// tab bar(1) + help bar(1) + prompt sep(1) + prompt lines
+		const chromeLines = 3 + pLines
+		const available = Math.max(0, (stdout.rows || 24) - chromeLines)
+		const padTarget = Math.min(maxHeight, available)
+		while (lines.length < padTarget) lines.push('')
+	}
 
 	// Tab bar
 	const tabs = cState.tabs
@@ -158,33 +183,10 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const tabBar = renderTabline(parts, w, isVisible())
 	lines.push(tabBar)
 
-	// Question area (when active, shown above the regular prompt)
-	const hasQ = prompt.hasQuestion()
 	let cursorPos: CursorPos
 
-	if (hasQ) {
-		const qLabel = prompt.getQuestionLabel()!
-		const qFg = colors.question.fg, qBg = colors.question.bg
-		const aFg = colors.assistant.fg
-
-		// Question box header (tool-like)
-		const headerText = '── Hal is asking you a question ──'
-		const headerPad = Math.max(0, w - 2 - headerText.length)
-		lines.push(` ${qBg}${qFg}${headerText}${' '.repeat(headerPad)}${RESET} `)
-
-		// Question body in HAL color
-		for (const ql of qLabel.split('\n')) {
-			const bodyPad = Math.max(0, w - 2 - ql.length - 1)
-			lines.push(` ${qBg}${aFg} ${ql}${' '.repeat(bodyPad)}${RESET} `)
-		}
-
-		// Answer input (buf is the question answer in question mode)
-		const p = prompt.buildPrompt(cw)
-		const answerStartRow = lines.length
-		lines.push(...p.lines)
-		cursorPos = { row: answerStartRow + p.cursor.rowOffset, col: p.cursor.col }
-
-		// Grayed-out main prompt
+	if (hasQ && qPromptResult) {
+		// Below tab bar: grayed-out separator + frozen prompt
 		lines.push(buildSeparator(tab, w))
 		const frozen = prompt.frozenText()
 		if (frozen) {
@@ -192,9 +194,12 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 				lines.push(`${DIM} ${l}${RESET}`)
 			}
 		}
+		// Cursor is in the answer prompt area above tab bar
+		cursorPos = { row: qAnswerStartRow + qPromptResult.cursor.rowOffset, col: qPromptResult.cursor.col }
 	} else {
 		// Normal prompt
 		const p = prompt.buildPrompt(cw)
+		const pLines = prompt.lineCount(cw)
 		lines.push(buildSeparator(tab, w, p.scrollInfo))
 		lines.push(...p.lines)
 		cursorPos = {
