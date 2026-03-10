@@ -1,6 +1,7 @@
 // OpenAI provider — streams Responses API as ProviderEvents.
 
 import type { Provider, ProviderEvent, GenerateParams } from './provider.ts'
+import { readWithTimeout } from './provider.ts'
 import { getAuth, refreshOpenAIAuth, extractOpenAIAccountId, isApiKey, openaiUsesCodex } from '../runtime/auth.ts'
 
 const RESPONSES_API_URL = 'https://api.openai.com/v1/responses'
@@ -250,7 +251,7 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 	const state: StreamState = { itemMap: new Map(), toolInputs: new Map() }
 
 	while (true) {
-		const { done, value } = await reader.read()
+		const { done, value } = await readWithTimeout(reader)
 		if (done) break
 		buf += decoder.decode(value, { stream: true })
 

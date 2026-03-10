@@ -21,3 +21,18 @@ export interface Provider {
 	name: string
 	generate(params: GenerateParams): AsyncGenerator<ProviderEvent>
 }
+
+const STREAM_TIMEOUT_MS = 30_000
+
+/** Race reader.read() against a timeout. Throws if no data arrives within 30s. */
+export async function readWithTimeout(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<ReadableStreamReadResult<Uint8Array>> {
+	let timer: Timer
+	const timeout = new Promise<never>((_, reject) => {
+		timer = setTimeout(() => reject(new Error('Stream read timed out (no data for 30s)')), STREAM_TIMEOUT_MS)
+	})
+	try {
+		return await Promise.race([reader.read(), timeout])
+	} finally {
+		clearTimeout(timer!)
+	}
+}
