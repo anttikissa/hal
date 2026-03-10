@@ -12,6 +12,7 @@ import { shutdown } from './main.ts'
 import { getConfig } from './config.ts'
 import { displayModel } from './models.ts'
 import { renderTabline } from './cli/tabline.ts'
+import { visLen } from './cli/md.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -68,7 +69,7 @@ function oneLine(s: string): string {
 
 function clipForWidth(s: string, max: number): string {
 	if (max <= 0) return ''
-	if (s.length <= max) return s
+	if (visLen(s) <= max) return s
 	if (max === 1) return '…'
 	return s.slice(0, max - 1) + '…'
 }
@@ -114,7 +115,7 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 	const left = ` ${model} (${state}) `
 	const right = oneLine(` ${rightParts.join(' · ')}`)
 	const safeRight = clipForWidth(right, Math.max(1, w - left.length - 1))
-	const fill = Math.max(1, w - left.length - safeRight.length)
+	const fill = Math.max(1, w - left.length - visLen(safeRight))
 	return `${DIM}${left}${'─'.repeat(fill)}${safeRight}${RESET}`
 }
 

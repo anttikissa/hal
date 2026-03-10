@@ -4,6 +4,8 @@
 
 Should have clock times in the tool line - right aligned, rightmost
 
+activity no longer visible in tab
+
 Those should be links (files for now)
 
 Make it run on linux / server
