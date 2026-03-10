@@ -197,8 +197,8 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	if (!text) return [boxLine('Thinking...', width, colors.thinking.fg, colors.thinking.bg)]
 	const md = colors.thinkingMd
 	const cw = contentWidth(width)
-	const wrapped = wordWrap(text, cw)
-	if (wrapped.length < THINKING_BLOCK_MIN_LINES) {
+	const rawWrapped = wordWrap(text, cw)
+	if (rawWrapped.length < THINKING_BLOCK_MIN_LINES) {
 		const lines: string[] = []
 		for (const l of text.split('\n'))
 			for (const wl of wordWrap(mdInline(l, md), cw)) lines.push(plainLine(wl, width, colors.thinking.fg))
@@ -206,17 +206,23 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	}
 	const label = `Hal (${displayModel(effectiveModel(block.model))}, thinking)`
 	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.ref, block.sessionId ?? '')
-	const lines = [...header]
-	if (wrapped.length > THINKING_BLOCK_MAX_LINES) {
-		const hidden = wrapped.length - THINKING_BLOCK_MAX_LINES
-		lines.push(boxLine(`[+ ${hidden} lines]`, width, colors.thinking.fg, colors.thinking.bg))
-		for (const l of wrapped.slice(-THINKING_BLOCK_MAX_LINES)) {
-			lines.push(boxLine(l, width, colors.thinking.fg, colors.thinking.bg))
+	const line = (s: string) => boxLine(s, width, colors.thinking.fg, colors.thinking.bg)
+	const body: string[] = []
+	for (const span of mdSpans(text)) {
+		if (span.type === 'code') {
+			for (const l of span.lines) body.push(line(`${md.code[0]}${l}${md.code[1]}`))
+		} else if (span.type === 'table') {
+			for (const l of mdTable(span.lines)) body.push(line(mdInline(l, md)))
+		} else {
+			for (const l of span.lines)
+				for (const wl of wordWrap(mdInline(l, md), cw)) body.push(line(wl))
 		}
-		return lines
 	}
-	for (const l of wrapped) lines.push(boxLine(l, width, colors.thinking.fg, colors.thinking.bg))
-	return lines
+	if (body.length > THINKING_BLOCK_MAX_LINES) {
+		const hidden = body.length - THINKING_BLOCK_MAX_LINES
+		return [...header, line(`[+ ${hidden} lines]`), ...body.slice(-THINKING_BLOCK_MAX_LINES)]
+	}
+	return [...header, ...body]
 }
 
 function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): string[] {
