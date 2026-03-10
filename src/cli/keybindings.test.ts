@@ -1,7 +1,7 @@
 import { test, expect, beforeEach } from 'bun:test'
-import { handleInput, type InputContext } from './keybindings.ts'
+import { keybindings, type InputContext } from './keybindings.ts'
 import type { KeyEvent } from './keys.ts'
-import * as prompt from './prompt.ts'
+import { prompt } from './prompt.ts'
 
 const sent: { type: string; text?: string }[] = []
 const blocks: any[] = []
@@ -41,7 +41,7 @@ beforeEach(() => {
 test('/help adds a local help block without sending a command', () => {
 	const ctx = mockCtx()
 	prompt.setText('/help')
-	handleInput(ke('enter'), ctx)
+	keybindings.handleInput(ke('enter'), ctx)
 	expect(sent).toEqual([])
 	expect(blocks.length).toBe(1)
 	expect(blocks[0].type).toBe('assistant')
@@ -54,14 +54,14 @@ test('/help adds a local help block without sending a command', () => {
 test('option+digit switches to tab N (1-indexed)', () => {
 	let switched = -1
 	const ctx = mockCtx({ switchToTab: (i) => { switched = i } })
-	handleInput(ke('3', { alt: true }), ctx)
+	keybindings.handleInput(ke('3', { alt: true }), ctx)
 	expect(switched).toBe(2)
 })
 
 test('option+digit does not switch on non-digit', () => {
 	let switched = false
 	const ctx = mockCtx({ switchToTab: () => { switched = true } })
-	handleInput(ke('g', { alt: true }), ctx)
+	keybindings.handleInput(ke('g', { alt: true }), ctx)
 	expect(switched).toBe(false)
 })
 
@@ -71,28 +71,28 @@ test('escape sends pause and calls markPausing when active tab is busy', () => {
 		activeTab: () => ({ blocks, busy: true }),
 		markPausing: () => { paused = true },
 	})
-	handleInput(ke('escape'), ctx)
+	keybindings.handleInput(ke('escape'), ctx)
 	expect(sent).toEqual([{ type: 'pause', text: undefined }])
 	expect(paused).toBe(true)
 })
 
 test('escape does nothing when active tab is not busy', () => {
 	const ctx = mockCtx()
-	handleInput(ke('escape'), ctx)
+	keybindings.handleInput(ke('escape'), ctx)
 	expect(sent).toEqual([])
 })
 
 test('ctrl-t sends open', () => {
 	let saved = false
 	const ctx = mockCtx({ saveDraft: () => { saved = true } })
-	handleInput(ke('t', { ctrl: true }), ctx)
+	keybindings.handleInput(ke('t', { ctrl: true }), ctx)
 	expect(sent).toEqual([{ type: 'open', text: undefined }])
 	expect(saved).toBe(true)
 })
 
 test('ctrl-f sends fork', () => {
 	const ctx = mockCtx()
-	handleInput(ke('f', { ctrl: true }), ctx)
+	keybindings.handleInput(ke('f', { ctrl: true }), ctx)
 	expect(sent).toEqual([{ type: 'fork', text: undefined }])
 })
 
@@ -100,7 +100,7 @@ test('typing text and enter sends prompt', () => {
 	let submitted = false
 	const ctx = mockCtx({ onSubmit: () => { submitted = true } })
 	for (const ch of 'hello') prompt.handleKey(ke(ch, { char: ch }), 80)
-	handleInput(ke('enter'), ctx)
+	keybindings.handleInput(ke('enter'), ctx)
 	expect(sent).toEqual([{ type: 'prompt', text: 'hello' }])
 	expect(submitted).toBe(true)
 })
@@ -108,27 +108,27 @@ test('typing text and enter sends prompt', () => {
 test('/resume sends resume with id', () => {
 	const ctx = mockCtx()
 	prompt.setText('/resume 00-abc')
-	handleInput(ke('enter'), ctx)
+	keybindings.handleInput(ke('enter'), ctx)
 	expect(sent).toEqual([{ type: 'resume', text: '00-abc' }])
 })
 
 test('/reset sends reset command', () => {
 	const ctx = mockCtx()
 	prompt.setText('/reset')
-	handleInput(ke('enter'), ctx)
+	keybindings.handleInput(ke('enter'), ctx)
 	expect(sent).toEqual([{ type: 'reset', text: undefined }])
 })
 
 test('tab completes /model argument', () => {
 	const ctx = mockCtx()
 	prompt.setText('/model codex-s')
-	handleInput(ke('tab'), ctx)
+	keybindings.handleInput(ke('tab'), ctx)
 	expect(prompt.text()).toBe('/model codex-spark ')
 })
 
 test('tab completion with multiple matches shows options in output', () => {
 	const ctx = mockCtx()
 	prompt.setText('/r')
-	handleInput(ke('tab'), ctx)
+	keybindings.handleInput(ke('tab'), ctx)
 	expect(blocks.some((b) => b.type === 'info' && typeof b.text === 'string' && b.text.includes('/reset') && b.text.includes('/respond') && b.text.includes('/resume'))).toBe(true)
 })

@@ -1,8 +1,8 @@
 // Headless TUI test driver. Drives keybindings + prompt without a terminal.
 
-import { handleInput, type InputContext } from './keybindings.ts'
+import { keybindings, type InputContext } from './keybindings.ts'
 import type { KeyEvent } from './keys.ts'
-import * as prompt from './prompt.ts'
+import { prompt } from './prompt.ts'
 
 export class TestDriver {
 	sent: { type: string; text?: string }[] = []
@@ -36,7 +36,7 @@ export class TestDriver {
 
 	press(key: string, mods?: Partial<KeyEvent>): void {
 		const k: KeyEvent = { key, char: '', ctrl: false, alt: false, shift: false, cmd: false, ...mods }
-		handleInput(k, this.ctx)
+		keybindings.handleInput(k, this.ctx)
 	}
 
 	type(text: string): void {

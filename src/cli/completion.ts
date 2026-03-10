@@ -128,3 +128,5 @@ export function completeInput(input: string, cursor: number, ctx: CompletionCont
 	const next = `/${command} ${completedArg}`
 	return { text: next + after, cursor: next.length, options }
 }
+
+export const completion = { completeInput }

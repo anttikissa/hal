@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
-import * as prompt from './prompt.ts'
+import { prompt } from './prompt.ts'
 import type { KeyEvent } from './keys.ts'
 
 function key(k: string, mods: Partial<KeyEvent> = {}): KeyEvent {

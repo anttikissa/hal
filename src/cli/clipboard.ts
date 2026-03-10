@@ -98,3 +98,11 @@ export function cleanPaste(raw: string): string {
 	if (newlineCount > MAX_INLINE_NEWLINES) return saveMultilinePaste(text)
 	return text
 }
+
+export const clipboard = {
+	resetPasteCounter,
+	hasPendingPastes,
+	pasteFromClipboard,
+	saveMultilinePaste,
+	cleanPaste,
+}

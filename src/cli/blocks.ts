@@ -2,7 +2,7 @@
 
 import * as colors from './colors.ts'
 import { strings } from '../utils/strings.ts'
-import { mdSpans, mdInline, mdTable } from './md.ts'
+import { md } from './md.ts'
 import { displayModel } from '../models.ts'
 import { getConfig } from '../config.ts'
 import { stringify as asonStringify } from '../utils/ason.ts'
@@ -74,7 +74,7 @@ function contentWidth(width: number): number {
 
 function clipAnsi(text: string, maxWidth: number): string {
 	if (maxWidth <= 0) return ''
-	if (visLen(text) <= maxWidth) return text
+	if (strings.visLen(text) <= maxWidth) return text
 	if (maxWidth === 1) return '…'
 	const limit = maxWidth - 1
 	let out = ''
@@ -94,7 +94,7 @@ function clipAnsi(text: string, maxWidth: number): string {
 		}
 		const cp = text.codePointAt(i)!
 		const cl = cp > 0xffff ? 2 : 1
-		const w = charWidth(cp)
+		const w = strings.charWidth(cp)
 		if (vis + w > limit) break
 		out += text.slice(i, i + cl)
 		vis += w
@@ -114,20 +114,20 @@ function boxLine(text: string, width: number, fg: string, bg: string): string {
 	const iw = innerWidth(width)
 	const raw = ' '.repeat(BLOCK_PAD) + expandTabs(text.replace(/\r/g, ''))
 	const clipped = clipAnsi(raw, iw)
-	const pad = Math.max(0, iw - visLen(clipped))
+	const pad = Math.max(0, iw - strings.visLen(clipped))
 	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${clipped}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
 }
 
 function plainLine(text: string, width: number, fg: string): string {
 	const iw = innerWidth(width)
 	const clipped = clipAnsi(expandTabs(text.replace(/\r/g, '')), iw)
-	const pad = Math.max(0, iw - visLen(clipped))
+	const pad = Math.max(0, iw - strings.visLen(clipped))
 	return `${' '.repeat(BLOCK_MARGIN)}${fg}${clipped}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
 }
 
 function headerLine(text: string, width: number, fg: string, bg: string): string {
 	const iw = innerWidth(width)
-	const vw = visLen(text)
+	const vw = strings.visLen(text)
 	const pad = Math.max(0, iw - vw)
 	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${text}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
 }
@@ -165,7 +165,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 	const label = `${who}${status}${model}`
 	if (block.status) return [boxLine(`${label}: ${text}`, width, fg, bg)]
 	const header = toolHeader(label, width, fg, bg)
-	const body = wordWrap(text, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
+	const body = strings.wordWrap(text, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
 }
 
@@ -174,19 +174,19 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 	if (!text) return []
 	const label = `Hal (${displayModel(effectiveModel(block.model))})`
 	const { fg, bg } = colors.assistant
-	const md = colors.assistantMd
+	const mdColors = colors.assistantMd
 	const header = toolHeader(label, width, fg, bg)
 	const cw = contentWidth(width)
 	const line = (s: string) => boxLine(s, width, fg, bg)
 	const body: string[] = []
-	for (const span of mdSpans(text)) {
+	for (const span of md.mdSpans(text)) {
 		if (span.type === 'code') {
-			for (const l of span.lines) body.push(line(`${md.code[0]}${l}${md.code[1]}`))
+			for (const l of span.lines) body.push(line(`${mdColors.code[0]}${l}${mdColors.code[1]}`))
 		} else if (span.type === 'table') {
-			for (const l of mdTable(span.lines)) body.push(line(mdInline(l, md)))
+			for (const l of md.mdTable(span.lines)) body.push(line(md.mdInline(l, mdColors)))
 		} else {
 			for (const l of span.lines)
-				for (const wl of wordWrap(mdInline(l, md), cw)) body.push(line(wl))
+				for (const wl of strings.wordWrap(md.mdInline(l, mdColors), cw)) body.push(line(wl))
 		}
 	}
 	return [...header, ...body]
@@ -195,27 +195,27 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: number): string[] {
 	const text = collapseBlankLines(block.text.trimEnd())
 	if (!text) return [boxLine('Thinking...', width, colors.thinking.fg, colors.thinking.bg)]
-	const md = colors.thinkingMd
+	const mdColors = colors.thinkingMd
 	const cw = contentWidth(width)
-	const rawWrapped = wordWrap(text, cw)
+	const rawWrapped = strings.wordWrap(text, cw)
 	if (rawWrapped.length < THINKING_BLOCK_MIN_LINES) {
 		const lines: string[] = []
 		for (const l of text.split('\n'))
-			for (const wl of wordWrap(mdInline(l, md), cw)) lines.push(plainLine(wl, width, colors.thinking.fg))
+			for (const wl of strings.wordWrap(md.mdInline(l, mdColors), cw)) lines.push(plainLine(wl, width, colors.thinking.fg))
 		return lines
 	}
 	const label = `Hal (${displayModel(effectiveModel(block.model))}, thinking)`
 	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.ref, block.sessionId ?? '')
 	const line = (s: string) => boxLine(s, width, colors.thinking.fg, colors.thinking.bg)
 	const body: string[] = []
-	for (const span of mdSpans(text)) {
+	for (const span of md.mdSpans(text)) {
 		if (span.type === 'code') {
-			for (const l of span.lines) body.push(line(`${md.code[0]}${l}${md.code[1]}`))
+			for (const l of span.lines) body.push(line(`${mdColors.code[0]}${l}${mdColors.code[1]}`))
 		} else if (span.type === 'table') {
-			for (const l of mdTable(span.lines)) body.push(line(mdInline(l, md)))
+			for (const l of md.mdTable(span.lines)) body.push(line(md.mdInline(l, mdColors)))
 		} else {
 			for (const l of span.lines)
-				for (const wl of wordWrap(mdInline(l, md), cw)) body.push(line(wl))
+				for (const wl of strings.wordWrap(md.mdInline(l, mdColors), cw)) body.push(line(wl))
 		}
 	}
 	if (body.length > THINKING_BLOCK_MAX_LINES) {
@@ -247,7 +247,7 @@ function renderError(block: Extract<Block, { type: 'error' }>, width: number): s
 	const { fg, bg } = colors.error
 	const header = toolHeader('Error', width, fg, bg, block.ref)
 	const raw = block.detail ? formatErrorDetail(block.detail) : block.text
-	const body = wordWrap(raw, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
+	const body = strings.wordWrap(raw, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
 }
 
@@ -351,7 +351,7 @@ function inlineCursor(line: string, cc: string, visible: boolean, width: number)
 			const pad = beforeReset.match(/ +$/)?.[0] ?? ''
 			if (pad.length > 0) {
 				const before = beforeReset.slice(0, -pad.length)
-				const col = visLen(before)
+				const col = strings.visLen(before)
 				return { lines: [before + cursorChar + pad.slice(1) + colors.RESET + afterReset], col }
 			}
 		}
@@ -361,13 +361,13 @@ function inlineCursor(line: string, cc: string, visible: boolean, width: number)
 	const trail = body.match(/ +$/)?.[0] ?? ''
 	if (trail.length > 0) {
 		const before = body.slice(0, -trail.length)
-		const col = visLen(before)
+		const col = strings.visLen(before)
 		return { lines: [before + cursorChar + trail.slice(1) + (hasReset ? colors.RESET : '')], col }
 	}
-	if (visLen(body) >= width) {
+	if (strings.visLen(body) >= width) {
 		return { lines: [line, visible ? `${cc}█${colors.RESET}` : ' '], col: 0 }
 	}
-	const col = visLen(body)
+	const col = strings.visLen(body)
 	return { lines: [body + cursorChar + (hasReset ? colors.RESET : '')], col }
 }
 
@@ -409,6 +409,6 @@ export function renderQuestion(question: string, width: number): string[] {
 	const { fg, bg } = colors.question
 	const aFg = colors.assistant.fg
 	const header = toolHeader('Hal is asking you a question', width, fg, bg, undefined, '')
-	const body = wordWrap(question, contentWidth(width)).map(l => boxLine(l, width, aFg, bg))
+	const body = strings.wordWrap(question, contentWidth(width)).map(l => boxLine(l, width, aFg, bg))
 	return [...header, ...body]
 }

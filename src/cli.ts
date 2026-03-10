@@ -2,8 +2,8 @@
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
 import { keys } from './cli/keys.ts'
-import { handleInput, type InputContext } from './cli/keybindings.ts'
-import * as prompt from './cli/prompt.ts'
+import { keybindings, type InputContext } from './cli/keybindings.ts'
+import { prompt } from './cli/prompt.ts'
 import { renderBlocks, renderQuestion, type Block } from './cli/blocks.ts'
 import { maxTabHeight } from './cli/heights.ts'
 import { Client, type TabState } from './cli/client.ts'
@@ -335,7 +335,7 @@ export const inputCtx: InputContext = {
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
-	for (const k of keys.parseKeys(data)) handleInput(k, inputCtx)
+	for (const k of keys.parseKeys(data)) keybindings.handleInput(k, inputCtx)
 })
 
 stdout.on('resize', () => {

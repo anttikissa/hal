@@ -1,9 +1,9 @@
 // Prompt area: state, key handling, and line building.
 
 import { SEL_ON, SEL_OFF } from './colors.ts'
-import { pasteFromClipboard, cleanPaste } from './clipboard.ts'
+import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
-import { getWrappedInputLayout, cursorToWrappedRowCol, verticalMove, wordBoundaryLeft, wordBoundaryRight } from './input.ts'
+import { input } from './input.ts'
 const MAX_PROMPT_LINES = 12
 
 // ── State ──
@@ -176,7 +176,7 @@ function resolvePlaceholder(placeholder: string, replacement: string): void {
 }
 
 function doPaste(): void {
-	const t = cleanPaste(pasteFromClipboard((placeholder, result) => {
+	const t = clipboard.cleanPaste(clipboard.pasteFromClipboard((placeholder, result) => {
 		resolvePlaceholder(placeholder, result)
 	}))
 	if (t) replaceSelection(t)
@@ -202,7 +202,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	// Backspace
 	if (k.key === 'backspace') {
 		if (k.alt) {
-			if (!deleteSel() && cursor > 0) deleteRange(wordBoundaryLeft(buf, cursor), cursor)
+			if (!deleteSel() && cursor > 0) deleteRange(input.wordBoundaryLeft(buf, cursor), cursor)
 		} else {
 			if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor)
 		}
@@ -232,12 +232,12 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 
 	// Left / Right
 	if (k.key === 'left') {
-		if (k.alt) { move(k.shift ? wordBoundaryLeft(buf, cursor) : wordBoundaryLeft(buf, cursor), k.shift); return true }
+		if (k.alt) { move(k.shift ? input.wordBoundaryLeft(buf, cursor) : input.wordBoundaryLeft(buf, cursor), k.shift); return true }
 		if (k.shift) { move(cursor - 1, true); return true }
 		collapseOrMove(cursor - 1, 'start'); return true
 	}
 	if (k.key === 'right') {
-		if (k.alt) { move(wordBoundaryRight(buf, cursor), k.shift); return true }
+		if (k.alt) { move(input.wordBoundaryRight(buf, cursor), k.shift); return true }
 		if (k.shift) { move(cursor + 1, true); return true }
 		collapseOrMove(cursor + 1, 'end'); return true
 	}
@@ -249,7 +249,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 
 		// Try vertical move first (multi-line input)
 		if (!k.shift) {
-			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
+			const r = input.verticalMove(buf, contentWidth, cursor, goalCol, dir)
 			if (!r.atBoundary) {
 				selAnchor = null
 				cursor = r.cursor; goalCol = r.goalCol
@@ -284,7 +284,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			}
 		} else {
 			if (selAnchor === null) selAnchor = cursor
-			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
+			const r = input.verticalMove(buf, contentWidth, cursor, goalCol, dir)
 			if (!r.atBoundary) { cursor = r.cursor; goalCol = r.goalCol }
 			else { cursor = dir === -1 ? 0 : buf.length; goalCol = null }
 		}
@@ -297,7 +297,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 
 	// Printable characters (multi-char from bracketed paste goes through cleanPaste)
 	if (k.char) {
-		const text = k.char.length > 1 ? cleanPaste(k.char) : k.char
+		const text = k.char.length > 1 ? clipboard.cleanPaste(k.char) : k.char
 		if (text) replaceSelection(text)
 		return true
 	}
@@ -315,9 +315,9 @@ export interface PromptRender {
 
 /** Build prompt lines and cursor offset. */
 export function buildPrompt(contentWidth: number): PromptRender {
-	const layout = getWrappedInputLayout(buf, contentWidth)
+	const layout = input.getWrappedInputLayout(buf, contentWidth)
 	const promptLines = Math.min(layout.lines.length, MAX_PROMPT_LINES)
-	const { row: curRow, col: curCol } = cursorToWrappedRowCol(buf, cursor, contentWidth)
+	const { row: curRow, col: curCol } = input.cursorToWrappedRowCol(buf, cursor, contentWidth)
 	const sel = selRange()
 
 	let scrollTop = 0
@@ -360,5 +360,25 @@ function highlightSel(line: string, lineStart: number, selStart: number, selEnd:
 
 /** Number of visible prompt lines for current input. */
 export function lineCount(contentWidth: number): number {
-	return Math.min(getWrappedInputLayout(buf, contentWidth).lines.length, MAX_PROMPT_LINES)
+	return Math.min(input.getWrappedInputLayout(buf, contentWidth).lines.length, MAX_PROMPT_LINES)
+}
+
+export const prompt = {
+	setQuestion,
+	clearQuestion,
+	hasQuestion,
+	getQuestionLabel,
+	frozenText,
+	setHistory,
+	pushHistory,
+	text,
+	cursorPos,
+	selection,
+	setText,
+	clear,
+	reset,
+	setRenderCallback,
+	handleKey,
+	buildPrompt,
+	lineCount,
 }

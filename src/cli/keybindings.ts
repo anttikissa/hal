@@ -1,9 +1,9 @@
 // Key → action mapping. Dependencies injected via InputContext.
 
 import type { KeyEvent } from './keys.ts'
-import { hasPendingPastes } from './clipboard.ts'
-import { completeInput } from './completion.ts'
-import * as prompt from './prompt.ts'
+import { clipboard } from './clipboard.ts'
+import { completion } from './completion.ts'
+import { prompt } from './prompt.ts'
 export interface InputContext {
 	send: (type: string, text?: string) => void
 	activeTab: () => { blocks: any[]; busy?: boolean; info?: any } | null
@@ -69,7 +69,7 @@ export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	}
 
 	if (k.key === 'tab' && !k.ctrl && !k.alt && !k.cmd) {
-		const r = completeInput(prompt.text(), prompt.cursorPos(), {
+		const r = completion.completeInput(prompt.text(), prompt.cursorPos(), {
 			tabs: ctx.tabs(),
 			activeTabIndex: ctx.activeTabIndex(),
 		})
@@ -85,7 +85,7 @@ export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	}
 
 	if (k.key === 'enter' && !k.shift && !k.alt && !k.ctrl && !k.cmd) {
-		if (hasPendingPastes()) return // wait for image resolution
+		if (clipboard.hasPendingPastes()) return // wait for image resolution
 		const text = prompt.text().trim()
 		prompt.clear()
 		if (text) {
@@ -134,3 +134,5 @@ function showHelp(ctx: InputContext): void {
 		].join('\n'),
 	})
 }
+
+export const keybindings = { handleInput }

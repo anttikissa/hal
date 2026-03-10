@@ -79,3 +79,5 @@ export function mdTable(lines: string[]): string[] {
 	return rows.map(row =>
 		'  ' + row.map((c, i) => c.padEnd(w[i] ?? 0)).join('  '))
 }
+
+export const md = { mdSpans, mdInline, mdTable }

@@ -6,7 +6,7 @@ import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../p
 import { makeCommand } from '../protocol.ts'
 import { replayToBlocks } from '../session/replay.ts'
 import { loadInputHistory, saveDraft, loadDraft } from '../session/messages.ts'
-import * as prompt from './prompt.ts'
+import { prompt } from './prompt.ts'
 import { getLastTab, saveLastTab } from './client-state.ts'
 import { randomBytes } from 'crypto'
 

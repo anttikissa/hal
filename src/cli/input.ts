@@ -108,3 +108,13 @@ export function wordBoundaryRight(text: string, pos: number): number {
 	while (i < text.length && !/\s/.test(text[i])) i++
 	return i
 }
+
+export const input = {
+	wordWrapLines,
+	getWrappedInputLayout,
+	cursorToWrappedRowCol,
+	wrappedRowColToCursor,
+	verticalMove,
+	wordBoundaryLeft,
+	wordBoundaryRight,
+}
