@@ -143,7 +143,7 @@ function toolHeader(label: string, width: number, fg: string, bg: string, ref: s
 		refDisplay = ` [\x1b]8;;${fileUrl}\x07${safeRef}\x1b]8;;\x07] ──`
 	}
 	const prefix = '── '
-	const maxLabel = Math.max(1, iw - prefix.length - (safeRef ? safeRef.length + 6 : 0) - 1)
+	const maxLabel = Math.max(1, iw - prefix.length - (safeRef ? safeRef.length + 6 : 0) - 2)
 	const shown = clipPlain(safeLabel, maxLabel)
 	const lead = `${prefix}${shown} `
 	const fill = '─'.repeat(Math.max(1, iw - lead.length - (safeRef ? safeRef.length + 6 : 0)))

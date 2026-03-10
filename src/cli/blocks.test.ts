@@ -73,4 +73,17 @@ describe('renderBlocks', () => {
 			expect(strip(line).length).toBeLessThanOrEqual(40)
 		}
 	})
+
+	test('long tool header stays within width', () => {
+		const longArgs = 'padTarget|pad.*target|lines\\.push|scroll|content.*height|visible.*lines (0.0s) ✓'
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'grep', status: 'done', args: longArgs, output: 'No matches found.', startTime: Date.now() - 500, endTime: Date.now(), ref: '008sp9-ybs', sessionId: '02-f17' },
+		]
+		for (const w of [80, 90, 100, 120]) {
+			const lines = renderBlocks(blocks, w)
+			for (const line of lines.filter(Boolean)) {
+				expect(strip(line).length).toBeLessThanOrEqual(w)
+			}
+		}
+	})
 })
