@@ -30,7 +30,7 @@ export type Block =
 		startTime: number
 		endTime?: number
 		ref?: string
-		sessionId?: string
+		sessionId: string
 	}
 
 /** Collapse runs of 3+ newlines to 2 (preserving paragraph breaks). */
@@ -127,18 +127,15 @@ function headerLine(text: string, width: number, fg: string, bg: string): string
 	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${text}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
 }
 
-function toolHeader(label: string, width: number, fg: string, bg: string, ref?: string, sessionId?: string): string[] {
+function toolHeader(label: string, width: number, fg: string, bg: string, ref: string | undefined, sessionId: string): string[] {
 	const iw = innerWidth(width)
 	const safeLabel = oneLine(label)
-	const displayRef = ref ? (sessionId ? `${sessionId}/${ref}` : ref) : ''
+	const displayRef = ref ? `${sessionId}/${ref}` : ''
 	const safeRef = displayRef ? clipPlain(oneLine(displayRef), 24) : ''
-	// OSC 8 hyperlink: zero visual width, wraps the ref text
 	let refDisplay = ''
-	if (safeRef) {
-		const filePath = ref && sessionId ? `${blocksDir(sessionId)}/${ref}.ason` : ''
-		const osc8Open = filePath ? `\x1b]8;;file://${filePath}\x07` : ''
-		const osc8Close = filePath ? `\x1b]8;;\x07` : ''
-		refDisplay = ` [${osc8Open}${safeRef}${osc8Close}] ──`
+	if (safeRef && ref) {
+		const fileUrl = `file://${blocksDir(sessionId)}/${ref}.ason`
+		refDisplay = ` [\x1b]8;;${fileUrl}\x07${safeRef}\x1b]8;;\x07] ──`
 	}
 	const prefix = '── '
 	const maxLabel = Math.max(1, iw - prefix.length - (safeRef ? safeRef.length + 6 : 0) - 1)

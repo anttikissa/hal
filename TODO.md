@@ -4,6 +4,10 @@
 
 make the question block stand out
 
+bug - sometimes when the cursor is on bottom row end, the cursor color leaks to the tab line
+
+active tab must be white, and add minicursor
+
 Should have clock times in the tool line - right aligned, rightmost
 
 there must be two empty lines after the last assistant block

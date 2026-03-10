@@ -130,8 +130,6 @@ export async function startRuntime(): Promise<Runtime> {
 	async function greetSession(sessionId: string): Promise<void> {
 		const text = pick(GREETINGS)
 		await appendMessages(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
-		await emit({ type: 'chunk', sessionId, text, channel: 'assistant' })
-		await emit({ type: 'command', sessionId, commandId: '', phase: 'done' })
 	}
 
 	function flushSessionMeta(): void {
