@@ -341,20 +341,32 @@ function cursorColor(block: Block): string {
 /** Insert cursor into last rendered line without breaking bg color or exceeding width.
  *  Returns the lines and the column where the cursor was placed. */
 function inlineCursor(line: string, cc: string, visible: boolean, width: number): { lines: string[]; col: number } {
+	const cursorChar = visible ? `${cc}█` : ' '
+	const resetAt = line.lastIndexOf(colors.RESET)
+	if (resetAt >= 0) {
+		const beforeReset = line.slice(0, resetAt)
+		const afterReset = line.slice(resetAt + colors.RESET.length)
+		if (/^ +$/.test(afterReset)) {
+			const pad = beforeReset.match(/ +$/)?.[0] ?? ''
+			if (pad.length > 0) {
+				const before = beforeReset.slice(0, -pad.length)
+				const col = visLen(before)
+				return { lines: [before + cursorChar + pad.slice(1) + colors.RESET + afterReset], col }
+			}
+		}
+	}
 	const hasReset = line.endsWith(colors.RESET)
 	const body = hasReset ? line.slice(0, -colors.RESET.length) : line
 	const trail = body.match(/ +$/)?.[0] ?? ''
 	if (trail.length > 0) {
 		const before = body.slice(0, -trail.length)
 		const col = visLen(before)
-		const cursorChar = visible ? `${cc}█` : ' '
 		return { lines: [before + cursorChar + trail.slice(1) + (hasReset ? colors.RESET : '')], col }
 	}
 	if (visLen(body) >= width) {
 		return { lines: [line, visible ? `${cc}█${colors.RESET}` : ' '], col: 0 }
 	}
 	const col = visLen(body)
-	const cursorChar = visible ? `${cc}█` : ' '
 	return { lines: [body + cursorChar + (hasReset ? colors.RESET : '')], col }
 }
 

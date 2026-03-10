@@ -297,11 +297,13 @@ function detectCompactOpts(msgs: Message[]): CompactOpts | undefined {
 		}
 	}
 	if (lastModelChangeIdx < 0) return undefined
-	let userTurnsAfter = 0
+	// Count completed turns (assistant final responses) after the model change
+	let turnsAfter = 0
 	for (let i = lastModelChangeIdx + 1; i < msgs.length; i++) {
-		if ((msgs[i] as any).role === 'user') userTurnsAfter++
+		const m = msgs[i] as any
+		if (m.role === 'assistant' && !m.tools) turnsAfter++
 	}
-	if (userTurnsAfter <= MODEL_CHANGE_THRESHOLD) return { heavyThreshold: MODEL_CHANGE_THRESHOLD }
+	if (turnsAfter <= MODEL_CHANGE_THRESHOLD) return { heavyThreshold: MODEL_CHANGE_THRESHOLD }
 	return undefined
 }
 

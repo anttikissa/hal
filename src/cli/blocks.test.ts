@@ -87,3 +87,25 @@ describe('renderBlocks', () => {
 		}
 	})
 })
+
+	test('streaming assistant cursor is after text, not at the right edge', () => {
+		const blocks: Block[] = [{ type: 'assistant', text: 'hello', done: false }]
+		const { lines } = renderBlocks(blocks, 80, true)
+		const plain = lines.map(strip)
+		const cursorLine = plain.find(l => l.includes('█'))
+		expect(cursorLine).toBeDefined()
+		const helloStart = cursorLine!.indexOf('hello')
+		expect(helloStart).toBeGreaterThanOrEqual(0)
+		expect(cursorLine!.indexOf('█')).toBe(helloStart + 'hello'.length)
+	})
+
+	test('streaming thinking cursor is after text, not at the right edge', () => {
+		const blocks: Block[] = [{ type: 'thinking', text: 'hello', done: false }]
+		const { lines } = renderBlocks(blocks, 80, true)
+		const plain = lines.map(strip)
+		const cursorLine = plain.find(l => l.includes('█'))
+		expect(cursorLine).toBeDefined()
+		const helloStart = cursorLine!.indexOf('hello')
+		expect(helloStart).toBeGreaterThanOrEqual(0)
+		expect(cursorLine!.indexOf('█')).toBe(helloStart + 'hello'.length)
+	})

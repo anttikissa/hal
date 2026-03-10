@@ -18,6 +18,14 @@ function toolCycle(id: string, name: string, input: any, result: string, ref: st
 	}
 }
 
+// Helper: a user+assistant text exchange (one completed turn)
+function turn(q: string, a: string) {
+	return [
+		{ role: 'user', content: q },
+		{ role: 'assistant', content: [{ type: 'text', text: a }] },
+	]
+}
+
 describe('compactApiMessages', () => {
 	test('keeps last tool batch intact', () => {
 		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'file1.ts', 'ref-0')
@@ -63,27 +71,26 @@ describe('compactApiMessages', () => {
 		expect(lastToolUse.input).toEqual({ command: 'ls' })
 	})
 
-	test('clears last batch too when >4 user turns follow', () => {
+	test('clears last batch too when >4 completed turns follow', () => {
 		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'result', 'ref-0')
 
 		const msgs: any[] = [
 			{ role: 'user', content: 'start' },
 			c0.assistant, c0.result,
 		]
-		// Add 6 user turns after the tool batch
-		for (let i = 0; i < 6; i++) {
-			msgs.push({ role: 'user', content: `question ${i}` })
-			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] })
+		// Add 5 completed turns after the tool batch
+		for (let i = 0; i < 5; i++) {
+			msgs.push(...turn(`question ${i}`, `answer ${i}`))
 		}
 
 		const out = compactApiMessages(msgs)
 
-		// Even the "last" batch should be cleared since it's stale
+		// Even the "last" batch should be cleared since it's stale (5 > 4)
 		const toolResult = out[2].content[0]
 		expect(toolResult.content).toBe('[cleared — ref: ref-0]')
 	})
 
-	test('keeps last batch when ≤4 user turns follow', () => {
+	test('keeps last batch when ≤4 completed turns follow', () => {
 		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'result', 'ref-0')
 
 		const msgs: any[] = [
@@ -91,8 +98,7 @@ describe('compactApiMessages', () => {
 			c0.assistant, c0.result,
 		]
 		for (let i = 0; i < 4; i++) {
-			msgs.push({ role: 'user', content: `question ${i}` })
-			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] })
+			msgs.push(...turn(`question ${i}`, `answer ${i}`))
 		}
 
 		const out = compactApiMessages(msgs)
@@ -102,7 +108,7 @@ describe('compactApiMessages', () => {
 		expect(toolResult.content).toBe('result')
 	})
 
-	test('clears images except in last 4 user turns', () => {
+	test('clears images except in last 4 completed turns', () => {
 		const imageBlock = (ref: string) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: ref })
 
 		const msgs = [
@@ -120,39 +126,36 @@ describe('compactApiMessages', () => {
 
 		const out = compactApiMessages(msgs)
 
-		// First image (5 user turns ago) should be cleared with ref
+		// First image (5 turns ago) should be cleared with ref
 		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared — ref: ref-img-0]' })
-		// Second image (4 user turns ago) should be kept
+		// Second image (4 turns ago) should be kept
 		expect(out[2].content[1].type).toBe('image')
-		// Third image (3 user turns ago) should be kept
+		// Third image (3 turns ago) should be kept
 		expect(out[4].content[1].type).toBe('image')
-		// Fourth image (2 user turns ago) should be kept
+		// Fourth image (2 turns ago) should be kept
 		expect(out[6].content[1].type).toBe('image')
-		// Fifth image (1 user turn ago = last) should be kept
+		// Fifth image (1 turn ago = last) should be kept
 		expect(out[8].content[1].type).toBe('image')
 	})
 
-	test('clears image when followed by plain string user turns', () => {
+	test('clears image when followed by completed turns', () => {
 		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: 'ref-img-0' }
 
-		const msgs = [
+		const msgs: any[] = [
 			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock] },
 			{ role: 'assistant', content: [{ type: 'text', text: 'nice image' }] },
-			{ role: 'user', content: 'hello' },
-			{ role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
-			{ role: 'user', content: 'stop' },
-			{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
-			{ role: 'user', content: 'goodbye' },
-			{ role: 'assistant', content: [{ type: 'text', text: 'bye' }] },
-			{ role: 'user', content: 'one more' },
-			{ role: 'assistant', content: [{ type: 'text', text: 'sure' }] },
 		]
+		// 4 more completed turns — image is 5 turns ago total
+		for (let i = 0; i < 4; i++) {
+			msgs.push(...turn(`q${i}`, `a${i}`))
+		}
 
 		const out = compactApiMessages(msgs)
 
-		// Image is 5 user turns ago (image, "hello", "stop", "goodbye", "one more") — should be cleared with ref
+		// Image is 5 completed turns ago — should be cleared
 		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image cleared — ref: ref-img-0]' })
 	})
+
 	test('no tool calls → messages unchanged', () => {
 		const msgs = [
 			{ role: 'user', content: 'hello' },
@@ -253,7 +256,7 @@ describe('compactApiMessages', () => {
 
 	test('clears images inside old tool_result content arrays', () => {
 		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }
-		const msgs = [
+		const msgs: any[] = [
 			{ role: 'user', content: 'go' },
 			{
 				role: 'assistant',
@@ -263,29 +266,27 @@ describe('compactApiMessages', () => {
 				role: 'user',
 				content: [{ type: 'tool_result', tool_use_id: 't0', content: [{ type: 'text', text: 'here' }, imageBlock], _ref: 'ref-0' }],
 			},
-			{ role: 'user', content: 'next' },
-			{ role: 'user', content: 'more' },
-			{ role: 'user', content: 'again' },
-			{ role: 'user', content: 'still going' },
-			{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
 		]
+		// 5 completed turns to push the image past threshold
+		for (let i = 0; i < 5; i++) {
+			msgs.push(...turn(`q${i}`, `a${i}`))
+		}
 
 		const out = compactApiMessages(msgs)
 
-		// tool_result is 5 user turns ago — image inside should be cleared
+		// tool_result is >4 turns ago — cleared entirely (not in keepIds)
 		const toolResult = out[2].content[0]
-		expect(toolResult.content[0]).toEqual({ type: 'text', text: 'here' })
-		expect(toolResult.content[1]).toEqual({ type: 'text', text: '[image cleared]' })
+		expect(toolResult.content).toBe('[cleared — ref: ref-0]')
 	})
 
-	test('drops thinking blocks older than 10 user turns', () => {
+	test('drops thinking blocks older than 10 completed turns', () => {
 		const thinkingBlock = { type: 'thinking', thinking: 'deep thoughts...', signature: 'sig-abc' }
 
 		const msgs: any[] = [
 			{ role: 'user', content: 'start' },
 			{ role: 'assistant', content: [thinkingBlock, { type: 'text', text: 'answer' }] },
 		]
-		// Add 11 more user turns to push the thinking block past threshold
+		// Add 11 completed turns to push the thinking block past threshold
 		for (let i = 0; i < 11; i++) {
 			msgs.push({ role: 'user', content: `q${i}` })
 			msgs.push({ role: 'assistant', content: [
@@ -296,31 +297,30 @@ describe('compactApiMessages', () => {
 
 		const out = compactApiMessages(msgs)
 
-		// First assistant (12 user turns ago) — thinking dropped, text kept
+		// First assistant (12 completed turns ago) — thinking dropped, text kept
 		expect(out[1].content).toEqual([{ type: 'text', text: 'answer' }])
 
-		// Last assistant (1 user turn ago) — thinking kept
+		// Last assistant (0 turns ago) — thinking kept
 		const last = out[out.length - 1]
 		expect(last.content[0].type).toBe('thinking')
 		expect(last.content[1].type).toBe('text')
 	})
 
-	test('keeps thinking blocks within 10 user turns', () => {
+	test('keeps thinking blocks within 10 completed turns', () => {
 		const thinkingBlock = { type: 'thinking', thinking: 'deep thoughts...', signature: 'sig-abc' }
 
 		const msgs: any[] = [
 			{ role: 'user', content: 'start' },
 			{ role: 'assistant', content: [thinkingBlock, { type: 'text', text: 'answer' }] },
 		]
-		// Add 10 more user turns — exactly at the boundary
+		// Add 10 completed turns — exactly at the boundary
 		for (let i = 0; i < 10; i++) {
-			msgs.push({ role: 'user', content: `q${i}` })
-			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `a${i}` }] })
+			msgs.push(...turn(`q${i}`, `a${i}`))
 		}
 
 		const out = compactApiMessages(msgs)
 
-		// First assistant (10 user turns ago) — thinking should still be there
+		// First assistant (10 turns ago) — thinking should still be there
 		expect(out[1].content[0].type).toBe('thinking')
 	})
 
@@ -331,10 +331,9 @@ describe('compactApiMessages', () => {
 			{ role: 'user', content: 'start' },
 			c0.assistant, c0.result,
 		]
-		// Add 6 user turns — beyond default threshold of 4, within custom threshold of 10
+		// 6 completed turns — beyond default (4), within custom (10)
 		for (let i = 0; i < 6; i++) {
-			msgs.push({ role: 'user', content: `question ${i}` })
-			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] })
+			msgs.push(...turn(`question ${i}`, `answer ${i}`))
 		}
 
 		const out = compactApiMessages(msgs, { heavyThreshold: 10 })
@@ -351,15 +350,35 @@ describe('compactApiMessages', () => {
 			{ role: 'user', content: [{ type: 'text', text: 'look' }, imageBlock('ref-img')] },
 			{ role: 'assistant', content: [{ type: 'text', text: 'nice' }] },
 		]
-		// Add 6 more user turns — image is 7 turns ago, beyond default 4 but within custom 10
+		// 6 more completed turns — image is 7 turns ago, beyond default 4 but within custom 10
 		for (let i = 0; i < 6; i++) {
-			msgs.push({ role: 'user', content: `q${i}` })
-			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `a${i}` }] })
+			msgs.push(...turn(`q${i}`, `a${i}`))
 		}
 
 		const out = compactApiMessages(msgs, { heavyThreshold: 10 })
 
 		// Image should be kept with threshold 10
 		expect(out[0].content[1].type).toBe('image')
+	})
+
+	test('tool_use without final response does not count as turn', () => {
+		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'old result', 'ref-0')
+
+		// After the tool batch: many tool cycles but no final assistant text
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			c0.assistant, c0.result,
+		]
+		// Add 6 tool cycles (no turn ends — all assistants have tool_use)
+		for (let i = 0; i < 6; i++) {
+			const c = toolCycle(`t${i + 1}`, 'bash', { command: `cmd${i}` }, `res${i}`, `ref-${i + 1}`)
+			msgs.push({ role: 'user', content: `next ${i}` }, c.assistant, c.result)
+		}
+
+		const out = compactApiMessages(msgs)
+
+		// No completed turns → last tool batch is the LAST tool_use (t7), c0 is old
+		// c0 is not in keepIds → cleared
+		expect(out[2].content[0].content).toBe('[cleared — ref: ref-0]')
 	})
 })
