@@ -58,3 +58,5 @@ export function createBlinkParser() {
 		},
 	}
 }
+
+export const blink = { createBlinkParser }

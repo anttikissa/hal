@@ -12,3 +12,5 @@ export async function loadProvider(name: string): Promise<Provider> {
 	cache.set(name, provider)
 	return provider
 }
+
+export const loader = { loadProvider }

@@ -97,3 +97,15 @@ export async function releaseHost(hostId: string): Promise<void> {
 export function log(text: string, sessionId?: string | null, level: EventLevel = 'info'): Promise<void> {
 	return events.append({ id: eventId(), type: 'line', sessionId: sessionId ?? null, text, level, createdAt: new Date().toISOString() } as RuntimeEvent)
 }
+
+export const ipc = {
+	ensureBus,
+	getState,
+	updateState,
+	claimHost,
+	verifyHost,
+	releaseHost,
+	log,
+	commands,
+	events,
+}

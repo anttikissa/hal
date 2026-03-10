@@ -1,12 +1,12 @@
 // Anthropic provider — streams Claude API responses as ProviderEvents.
 
 import type { Provider, ProviderEvent, GenerateParams } from './provider.ts'
-import { readWithTimeout } from './provider.ts'
-import { getAuth, refreshAnthropicAuth } from '../runtime/auth.ts'
+import { provider as providerUtils } from './provider.ts'
+import { auth } from '../runtime/auth.ts'
 
 async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> {
-	await refreshAnthropicAuth()
-	const { accessToken } = getAuth('anthropic')
+	await auth.refreshAnthropicAuth()
+	const { accessToken } = auth.getAuth('anthropic')
 	const maxTokens = 16384
 	const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(params.model)
 
@@ -49,7 +49,7 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 	const usage = { input: 0, output: 0 }
 
 	while (true) {
-		const { done, value } = await readWithTimeout(reader)
+		const { done, value } = await providerUtils.readWithTimeout(reader)
 		if (done) break
 		buf += decoder.decode(value, { stream: true })
 

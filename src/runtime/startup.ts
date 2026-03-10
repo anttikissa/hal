@@ -1,32 +1,31 @@
 // Startup orchestration — creates the Runtime, restores sessions, tails commands.
 
 import { watch, type FSWatcher } from 'fs'
-import { ensureBus, commands, getState } from '../ipc.ts'
-import { events } from '../ipc.ts'
+import { ipc } from '../ipc.ts'
 import { createSession, loadMeta } from '../session/session.ts'
 import { loadApiMessages } from '../session/messages.ts'
-import { contextWindowForModel } from './context.ts'
+import { context } from './context.ts'
 import { getLastUsage } from '../session/messages.ts'
-import { getConfig } from '../config.ts'
+import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { Runtime, setRuntime } from './runtime.ts'
-import { handleCommand } from './commands.ts'
+import { commandHandlers } from './commands.ts'
 
 export async function startRuntime(): Promise<Runtime> {
-	await ensureBus()
-	const cmdOffset = await commands.offset()
-	await events.trim(500)
+	await ipc.ensureBus()
+	const cmdOffset = await ipc.commands.offset()
+	await ipc.events.trim(500)
 
 	const rt = new Runtime()
 	setRuntime(rt)
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
-	const prevState = getState()
+	const prevState = ipc.getState()
 	for (const id of prevState.sessions) {
 		const meta = await loadMeta(id)
 		if (meta) {
 			rt.sessions.set(meta.id, meta)
-			const modelId = (meta.model ?? getConfig().defaultModel).split('/').pop()!
+			const modelId = (meta.model ?? config.getConfig().defaultModel).split('/').pop()!
 			// Restore context: prefer persisted real counts, then last API usage, then estimate
 			let ctx: { used: number; max: number; estimated?: boolean } | undefined
 			if (meta.context) {
@@ -34,7 +33,7 @@ export async function startRuntime(): Promise<Runtime> {
 			} else {
 				const usage = getLastUsage(meta.id)
 				if (usage) {
-					ctx = { used: usage.input, max: contextWindowForModel(modelId) }
+					ctx = { used: usage.input, max: context.contextWindowForModel(modelId) }
 				} else {
 					const apiMsgs = await loadApiMessages(meta.id)
 					ctx = rt.estimateSessionContext(meta, apiMsgs)
@@ -73,11 +72,11 @@ export async function startRuntime(): Promise<Runtime> {
 
 	// Tail from offset captured at startup (no race window)
 	let stopped = false
-	const cmdTail = commands.tail(cmdOffset)
+	const cmdTail = ipc.commands.tail(cmdOffset)
 	;(async () => {
 		for await (const cmd of cmdTail.items) {
 			if (stopped) break
-			await handleCommand(rt, cmd)
+			await commandHandlers.handleCommand(rt, cmd)
 		}
 	})()
 
@@ -101,3 +100,5 @@ export async function startRuntime(): Promise<Runtime> {
 	rt.stop = () => { stopped = true; cmdTail.cancel(); watchers.forEach(w => w.close()) }
 	return rt
 }
+
+export const startup = { startRuntime }

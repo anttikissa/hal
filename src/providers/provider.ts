@@ -37,3 +37,5 @@ export async function readWithTimeout(reader: ReadableStreamDefaultReader<Uint8A
 		clearTimeout(timer!)
 	}
 }
+
+export const provider = { readWithTimeout }

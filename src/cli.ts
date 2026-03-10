@@ -1,17 +1,17 @@
 // Terminal client — wired to IPC via Client + Transport.
 
-import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
+import { diffEngine, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
 import { keys } from './cli/keys.ts'
 import { keybindings, type InputContext } from './cli/keybindings.ts'
 import { prompt } from './cli/prompt.ts'
-import { renderBlocks, renderQuestion, type Block } from './cli/blocks.ts'
-import { maxTabHeight } from './cli/heights.ts'
+import { blocks as blockViews, type Block } from './cli/blocks.ts'
+import { heights } from './cli/heights.ts'
 import { Client, type TabState } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
 import { config } from './config.ts'
 import { models } from './models.ts'
-import { renderTabline } from './cli/tabline.ts'
+import { tabline } from './cli/tabline.ts'
 import * as colors from './cli/colors.ts'
 import { strings } from './utils/strings.ts'
 import { cursor } from './cli/cursor.ts'
@@ -130,7 +130,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	const blocks = tab?.blocks ?? []
 	const hasQ = prompt.hasQuestion()
-	const { lines: contentLines } = renderBlocks(blocks, w, cursor.isVisible())
+	const { lines: contentLines } = blockViews.renderBlocks(blocks, w, cursor.isVisible())
 
 	const lines: string[] = []
 	let qAnswerStartRow = -1
@@ -147,7 +147,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 		// Question block (tool-like box) — part of content area, above tab bar
 		const qLabel = prompt.getQuestionLabel()!
-		const qLines = renderQuestion(qLabel, w)
+		const qLines = blockViews.renderQuestion(qLabel, w)
 		lines.push(...qLines)
 
 		// Answer input area
@@ -173,7 +173,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		lines.push(...contentLines)
 		// Pad to tallest tab's content height (keeps prompt position stable)
 		const activeSessionId = tab?.sessionId ?? null
-		const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
+		const maxHeight = heights.maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
 		const pLines = prompt.lineCount(cw)
 		// tab bar(1) + help bar(1) + prompt sep(1) + prompt lines
 		const chromeLines = 3 + pLines
@@ -202,7 +202,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 			indicator,
 		}
 	})
-	const tabBar = renderTabline(parts, w, cursor.isVisible())
+	const tabBar = tabline.renderTabline(parts, w, cursor.isVisible())
 	lines.push(tabBar)
 
 	let cursorPos: CursorPos
@@ -251,7 +251,7 @@ export function showError(msg: string): void {
 
 export function doRender(): void {
 	const { lines, cursor: cursorPos } = buildLines()
-	const { buf, state } = render(lines, renderState, cursorPos, stdout.rows || 24)
+	const { buf, state } = diffEngine.render(lines, renderState, cursorPos, stdout.rows || 24)
 	renderState = state
 	if (buf) stdout.write(buf)
 }
@@ -350,3 +350,5 @@ client.start().catch(err => {
 	console.error('Client start failed:', err)
 	process.exit(1)
 })
+
+export const cli = { contentWidth, showError, doRender, quit, restart, suspend }

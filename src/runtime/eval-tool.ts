@@ -39,3 +39,5 @@ export async function executeEval(code: string, ctx: EvalContext): Promise<strin
 		return `${err.stack ?? err.message}`
 	}
 }
+
+export const evalTool = { executeEval }

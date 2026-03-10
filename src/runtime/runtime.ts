@@ -1,13 +1,13 @@
 // Runtime class — holds all session state and provides the API surface for commands and eval.
 
-import { events } from '../ipc.ts'
+import { ipc } from '../ipc.ts'
 import { appendMessages, readMessages, detectInterruptedTools } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
-import { estimateContext } from './context.ts'
-import { loadSystemPrompt } from './system-prompt.ts'
-import { getTools } from './tools.ts'
+import { context } from './context.ts'
+import { systemPrompt } from './system-prompt.ts'
+import { tools } from './tools.ts'
 import { eventId, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
-import { getConfig } from '../config.ts'
+import { config } from '../config.ts'
 
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
@@ -42,7 +42,7 @@ export class Runtime {
 	pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
 	async emit(fields: Omit<RuntimeEvent, 'id' | 'createdAt'>): Promise<void> {
-		await events.append({ ...fields, id: eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
+		await ipc.events.append({ ...fields, id: eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
 	}
 
 	async emitInfo(sessionId: string, text: string, level = 'info'): Promise<void> {
@@ -51,16 +51,16 @@ export class Runtime {
 	}
 
 	estimatedOverheadBytes(info: SessionInfo): number {
-		const model = info.model ?? getConfig().defaultModel
-		const system = loadSystemPrompt({ model, sessionDir: info.id })
-		const config = getConfig()
-		const toolBytes = JSON.stringify(getTools(config)).length
+		const model = info.model ?? config.getConfig().defaultModel
+		const system = systemPrompt.loadSystemPrompt({ model, sessionDir: info.id })
+		const cfg = config.getConfig()
+		const toolBytes = JSON.stringify(tools.getTools(cfg.eval === true)).length
 		return system.bytes + toolBytes
 	}
 
 	estimateSessionContext(info: SessionInfo, apiMessages: any[]): { used: number; max: number; estimated: true } {
-		const modelId = (info.model ?? getConfig().defaultModel).split('/').pop()!
-		return estimateContext(apiMessages, modelId, this.estimatedOverheadBytes(info))
+		const modelId = (info.model ?? config.getConfig().defaultModel).split('/').pop()!
+		return context.estimateContext(apiMessages, modelId, this.estimatedOverheadBytes(info))
 	}
 
 	setFreshContext(info: SessionInfo): void {
@@ -76,7 +76,6 @@ export class Runtime {
 	}
 
 	async publish(activity?: string): Promise<void> {
-		const { updateState } = await import('../ipc.ts')
 		const contexts: Record<string, { used: number; max: number; estimated?: boolean }> = {}
 		for (const [id, ctx] of this.sessionContext) contexts[id] = ctx
 		await this.emit({
@@ -91,7 +90,7 @@ export class Runtime {
 			activeSessionId: this.activeSessionId, sessions: [...this.sessions.values()],
 		})
 		this.flushSessionMeta()
-		updateState(s => {
+		ipc.updateState(s => {
 			s.sessions = [...this.sessions.keys()]
 			s.activeSessionId = this.activeSessionId
 			s.busySessionIds = [...this.busySessionIds]
@@ -126,10 +125,10 @@ export class Runtime {
 		this.abortControllers.set(sid, ac)
 		this.busySessionIds.add(sid)
 		await this.publish(activity)
-		const sysPrompt = loadSystemPrompt({ model: info.model ?? getConfig().defaultModel, sessionDir: sid })
+		const sysPrompt = systemPrompt.loadSystemPrompt({ model: info.model ?? config.getConfig().defaultModel, sessionDir: sid })
 		runAgentLoop({
 			sessionId: sid,
-			model: info.model ?? getConfig().defaultModel,
+			model: info.model ?? config.getConfig().defaultModel,
 			systemPrompt: sysPrompt.text,
 			messages: apiMessages,
 			onStatus: async (busy, nextActivity, context) => {

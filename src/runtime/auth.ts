@@ -11,13 +11,13 @@ const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 
 let _auth: Record<string, any> | null = null
 
-function auth(): Record<string, any> {
+function authStore(): Record<string, any> {
 	if (!_auth) _auth = liveFile(AUTH_PATH, { defaults: {} })
 	return _auth
 }
 
 export function getAuth(provider: string): { accessToken: string; refreshToken?: string; expires?: number; accountId?: string } {
-	return auth()[provider] ?? {}
+	return authStore()[provider] ?? {}
 }
 
 export async function refreshAnthropicAuth(): Promise<void> {
@@ -33,7 +33,7 @@ export async function refreshAnthropicAuth(): Promise<void> {
 	if (!data.access_token) throw new Error(`Token refresh failed: ${JSON.stringify(data)}`)
 
 	// Top-level property set triggers liveFile flush
-	auth().anthropic = { ...auth().anthropic, accessToken: data.access_token, refreshToken: data.refresh_token, expires: Date.now() + data.expires_in * 1000 }
+	authStore().anthropic = { ...authStore().anthropic, accessToken: data.access_token, refreshToken: data.refresh_token, expires: Date.now() + data.expires_in * 1000 }
 }
 
 // ── OpenAI ──
@@ -97,11 +97,20 @@ export async function refreshOpenAIAuth(): Promise<void> {
 	if (!data.access_token) throw new Error('OpenAI token refresh response missing access_token')
 
 	const accountId = extractOpenAIAccountId(data.access_token)
-	auth().openai = {
-		...auth().openai,
+	authStore().openai = {
+		...authStore().openai,
 		accessToken: data.access_token,
 		refreshToken: data.refresh_token,
 		expires: Date.now() + (data.expires_in ?? 3600) * 1000,
 		...(accountId ? { accountId } : {}),
 	}
+}
+
+export const auth = {
+	getAuth,
+	refreshAnthropicAuth,
+	extractOpenAIAccountId,
+	isApiKey,
+	openaiUsesCodex,
+	refreshOpenAIAuth,
 }

@@ -23,3 +23,5 @@ export function getConfig(): Config {
 	}
 	return _config
 }
+
+export const config = { getConfig }

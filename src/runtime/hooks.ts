@@ -26,11 +26,13 @@ function stripCdCwd(call: ToolCall): ToolCall {
 	return call
 }
 
-const hooks: Array<(call: ToolCall) => ToolCall> = [
+const hookChain: Array<(call: ToolCall) => ToolCall> = [
 	stripCdCwd,
 ]
 
 export function runHooks(call: ToolCall): ToolCall {
-	for (const hook of hooks) call = hook(call)
+	for (const hook of hookChain) call = hook(call)
 	return call
 }
+
+export const hooks = { runHooks }

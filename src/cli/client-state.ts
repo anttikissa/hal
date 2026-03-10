@@ -34,3 +34,5 @@ export function saveLastTab(sessionId: string): void {
 	else s.servers[serverKey].lastTab = sessionId
 	s.save?.()
 }
+
+export const clientState = { getLastTab, saveLastTab }

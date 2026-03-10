@@ -67,3 +67,5 @@ export function displayModel(fullId: string | undefined): string {
 	}
 	return modelId
 }
+
+export const models = { modelCompletions, resolveModel, displayModel }

@@ -3,16 +3,16 @@
 
 import { randomBytes } from 'crypto'
 import { ensureStateDir } from './state.ts'
-import { ensureBus, claimHost, releaseHost, verifyHost, events } from './ipc.ts'
-import { startRuntime } from './runtime/startup.ts'
+import { ipc } from './ipc.ts'
+import { startup } from './runtime/startup.ts'
 import { type Runtime } from './runtime/runtime.ts'
 import { eventId } from './protocol.ts'
 
 ensureStateDir()
-await ensureBus()
+await ipc.ensureBus()
 
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
-const { host, currentPid } = await claimHost(hostId)
+const { host, currentPid } = await ipc.claimHost(hostId)
 
 // Shared mutable state — cli.ts reads this for the separator
 export const halStatus = { isHost: host, hostPid: currentPid }
@@ -21,20 +21,20 @@ export const halStatus = { isHost: host, hostPid: currentPid }
 let runtime: Runtime | null = null
 
 async function emitLine(text: string): Promise<void> {
-	await events.append({
+	await ipc.events.append({
 		id: eventId(), type: 'line', sessionId: null,
 		text, level: 'meta', createdAt: new Date().toISOString(),
 	} as any)
 }
 
 async function becomeHost(): Promise<void> {
-	runtime = await startRuntime()
+	runtime = await startup.startRuntime()
 	await emitLine(`[host] pid ${process.pid}`)
 	// Heartbeat: verify lock is still ours every 3s. If lost (e.g. suspended
 	// and another process took over), step down and let restart loop re-launch.
 	setInterval(async () => {
 		if (!halStatus.isHost) return
-		if (!(await verifyHost(hostId))) {
+		if (!(await ipc.verifyHost(hostId))) {
 			await emitLine(`[host] lock lost (pid ${process.pid}), stepping down`)
 			if (runtime) runtime.stop()
 			runtime = null
@@ -46,7 +46,7 @@ async function becomeHost(): Promise<void> {
 
 export async function shutdown(): Promise<void> {
 	if (runtime) runtime.stop()
-	if (halStatus.isHost) await releaseHost(hostId)
+	if (halStatus.isHost) await ipc.releaseHost(hostId)
 	process.exit(0)
 }
 
@@ -63,7 +63,7 @@ if (!host) {
 		if (promoting || halStatus.isHost) return
 		promoting = true
 		try {
-			const result = await claimHost(hostId)
+			const result = await ipc.claimHost(hostId)
 			if (!result.host) {
 				watchPid = result.currentPid
 				if (watchPid !== null) halStatus.hostPid = watchPid

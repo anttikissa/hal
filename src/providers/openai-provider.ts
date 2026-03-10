@@ -1,14 +1,14 @@
 // OpenAI provider — streams Responses API as ProviderEvents.
 
 import type { Provider, ProviderEvent, GenerateParams } from './provider.ts'
-import { readWithTimeout } from './provider.ts'
-import { getAuth, refreshOpenAIAuth, extractOpenAIAccountId, isApiKey, openaiUsesCodex } from '../runtime/auth.ts'
+import { provider as providerUtils } from './provider.ts'
+import { auth } from '../runtime/auth.ts'
 
 const RESPONSES_API_URL = 'https://api.openai.com/v1/responses'
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api'
 
 function resolveApiUrl(token: string): string {
-	if (openaiUsesCodex(token)) return `${CODEX_BASE_URL}/codex/responses`
+	if (auth.openaiUsesCodex(token)) return `${CODEX_BASE_URL}/codex/responses`
 	return RESPONSES_API_URL
 }
 
@@ -198,8 +198,8 @@ function parseSSEEvents(state: StreamState, event: any): ProviderEvent[] {
 // ── Provider ──
 
 async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> {
-	await refreshOpenAIAuth()
-	const { accessToken, accountId: storedAccountId } = getAuth('openai')
+	await auth.refreshOpenAIAuth()
+	const { accessToken, accountId: storedAccountId } = auth.getAuth('openai')
 	if (!accessToken) {
 		yield { type: 'error', message: 'No OpenAI credentials. Add openai.accessToken to auth.ason.' }
 		yield { type: 'done' }
@@ -207,7 +207,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	}
 
 	const token = accessToken
-	const codex = openaiUsesCodex(token)
+	const codex = auth.openaiUsesCodex(token)
 	const apiUrl = resolveApiUrl(token)
 
 	const input = convertMessages(params.messages)
@@ -244,7 +244,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		accept: 'text/event-stream',
 	}
 	if (codex) {
-		const accountId = extractOpenAIAccountId(token) || storedAccountId || ''
+		const accountId = auth.extractOpenAIAccountId(token) || storedAccountId || ''
 		if (!accountId) {
 			yield { type: 'error', message: 'OpenAI token missing chatgpt_account_id' }
 			yield { type: 'done' }
@@ -279,7 +279,7 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 	const state: StreamState = { itemMap: new Map(), toolInputs: new Map() }
 
 	while (true) {
-		const { done, value } = await readWithTimeout(reader)
+		const { done, value } = await providerUtils.readWithTimeout(reader)
 		if (done) break
 		buf += decoder.decode(value, { stream: true })
 

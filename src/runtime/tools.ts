@@ -6,7 +6,7 @@ import { resolve, isAbsolute } from 'path'
 import { $ } from 'bun'
 import { homedir } from 'os'
 import { stringify } from '../utils/ason.ts'
-import { executeEval, type EvalContext } from './eval-tool.ts'
+import { evalTool, type EvalContext } from './eval-tool.ts'
 
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
@@ -347,9 +347,11 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalCon
 				const { getRuntime } = await import('./runtime.ts')
 				try { evalCtx.runtime = getRuntime() } catch {}
 			}
-			return await executeEval(String(inp.code), evalCtx)
+			return await evalTool.executeEval(String(inp.code), evalCtx)
 		}
 		default:
 			return `Unknown tool: ${call.name}`
 	}
 }
+
+export const tools = { truncate, getTools, argsPreview, executeTool }

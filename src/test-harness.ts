@@ -4,25 +4,25 @@
 // Expects HAL_STATE_DIR to be set by the caller (parent process).
 
 import { ensureStateDir } from './state.ts'
-import { ensureBus, events, commands } from './ipc.ts'
-import { startRuntime } from './runtime/startup.ts'
+import { ipc } from './ipc.ts'
+import { startup } from './runtime/startup.ts'
 import { keys } from './cli/keys.ts'
 import { prompt } from './cli/prompt.ts'
 import { eventId, type RuntimeEvent } from './protocol.ts'
 
 ensureStateDir()
-await ensureBus()
+await ipc.ensureBus()
 
 // Grab tail offset BEFORE runtime starts, so we don't miss initial publish
-const offset = await events.offset()
-const runtime = await startRuntime()
+const offset = await ipc.events.offset()
+const runtime = await startup.startRuntime()
 
 function writeLine(record: any): void {
 	process.stdout.write(JSON.stringify(record) + '\n')
 }
 
 // Tail events → JSON stdout
-const tail = events.tail(offset)
+const tail = ipc.events.tail(offset)
 ;(async () => {
 	for await (const event of tail.items) {
 		const e = event as RuntimeEvent
@@ -47,7 +47,7 @@ const { stdin } = process
 stdin.resume()
 
 function submitCommand(type: string, text?: string): void {
-	commands.append({
+	ipc.commands.append({
 		type, text, sessionId: runtime.activeSessionId,
 		id: eventId(), createdAt: new Date().toISOString(),
 	} as any)

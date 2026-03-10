@@ -8,11 +8,7 @@
 // - NEVER drive autocompact with estimates. Autocompact must use real API
 //   usage.input counts.
 
-import {
-	estimateTokensSync,
-	saveTokenCalibration,
-	isModelCalibrated,
-} from './token-calibration.ts'
+import { tokenCalibration } from './token-calibration.ts'
 
 // ── Context windows ──
 
@@ -42,16 +38,16 @@ export function contextWindowForModel(modelId: string): number {
 // ── Compatibility wrappers (moved to token-calibration.ts) ──
 
 export function saveCalibration(modelId: string, totalBytes: number, totalTokens: number): void {
-	saveTokenCalibration(modelId, totalBytes, totalTokens)
+	tokenCalibration.saveTokenCalibration(modelId, totalBytes, totalTokens)
 }
 
 export function isCalibrated(modelId: string): boolean {
-	return isModelCalibrated(modelId)
+	return tokenCalibration.isModelCalibrated(modelId)
 }
 
 // Estimate token count from byte count. Fresh-tab UI only.
 export function estimateTokens(bytes: number, modelId: string): number {
-	return estimateTokensSync(bytes, modelId)
+	return tokenCalibration.estimateTokensSync(bytes, modelId)
 }
 
 // ── Message byte counting (for estimation only) ──
@@ -84,5 +80,14 @@ export function estimateContext(
 	let totalBytes = Math.max(0, overheadBytes)
 	for (const msg of apiMessages) totalBytes += messageBytes(msg)
 	const max = contextWindowForModel(modelId)
-	return { used: estimateTokensSync(totalBytes, modelId), max, estimated: true as const }
+	return { used: tokenCalibration.estimateTokensSync(totalBytes, modelId), max, estimated: true as const }
+}
+
+export const context = {
+	contextWindowForModel,
+	saveCalibration,
+	isCalibrated,
+	estimateTokens,
+	messageBytes,
+	estimateContext,
 }

@@ -1,5 +1,5 @@
 import { basename } from 'path'
-import { modelCompletions } from '../models.ts'
+import { models } from '../models.ts'
 
 export interface CompletionTab {
 	sessionId: string
@@ -67,7 +67,7 @@ function commandArgValues(command: string, ctx: CompletionContext): string[] {
 	if (!spec?.arg) return []
 	switch (spec.arg) {
 		case 'model':
-			return modelCompletions()
+			return models.modelCompletions()
 		case 'session':
 			return uniqueSorted(ctx.tabs.map(t => t.sessionId))
 		case 'topic': {

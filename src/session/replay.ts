@@ -3,7 +3,7 @@
 import type { Block } from '../cli/blocks.ts'
 import type { Message } from './messages.ts'
 import { readBlock, detectInterruptedTools } from './messages.ts'
-import { argsPreview } from '../runtime/tools.ts'
+import { tools } from '../runtime/tools.ts'
 /** Convert a message log to display blocks (for tab history). */
 export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
 	const blocks: Block[] = []
@@ -49,7 +49,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 					blocks.push({
 						type: 'tool',
 						name: tool.name,
-						args: typeof callData.input === 'string' ? callData.input : argsPreview({ id: tool.ref, name: tool.name, input: callData.input }),
+						args: typeof callData.input === 'string' ? callData.input : tools.argsPreview({ id: tool.ref, name: tool.name, input: callData.input }),
 						output,
 						status,
 						startTime: now, endTime: now,
@@ -82,3 +82,5 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 
 	return blocks
 }
+
+export const replay = { replayToBlocks }

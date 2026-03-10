@@ -5,7 +5,7 @@ import { timeAgo } from './runtime.ts'
 import type { RuntimeCommand } from '../protocol.ts'
 import { createSession, loadMeta, listSessionIds, rotateLog, forkSession } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, buildCompactionContext, type UserMessage } from '../session/messages.ts'
-import { resolveModel } from '../models.ts'
+import { models } from '../models.ts'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
@@ -171,7 +171,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			if (!cmd.text) { await warn('/model <provider/model-id>'); return }
 			const info = rt.sessions.get(sid)
 			if (!info) { await error(`Session ${sid} not found`); return }
-			info.model = resolveModel(cmd.text)
+			info.model = models.resolveModel(cmd.text)
 			await rt.emitInfo(sid, `[model] ${info.model}`, 'meta')
 			await rt.publish()
 			break
@@ -256,3 +256,5 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			await error(`Unknown command: /${cmd.type}`)
 	}
 }
+
+export const commandHandlers = { handleCommand }

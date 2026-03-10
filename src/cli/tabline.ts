@@ -117,3 +117,5 @@ export function renderTabline(tabs: TablineTab[], width: number, busyVisible = t
 	}
 	return leftPad + out
 }
+
+export const tabline = { renderTabline }

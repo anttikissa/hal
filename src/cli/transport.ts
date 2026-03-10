@@ -20,17 +20,17 @@ export interface Transport {
 
 // ── Local transport (file-backed IPC) ──
 
-import { commands, events, getState } from '../ipc.ts'
+import { ipc } from '../ipc.ts'
 import { loadMeta } from '../session/session.ts'
 import { loadAllMessages } from '../session/messages.ts'
 
 export class LocalTransport implements Transport {
 	async sendCommand(cmd: RuntimeCommand): Promise<void> {
-		await commands.append(cmd)
+		await ipc.commands.append(cmd)
 	}
 
 	async bootstrap(): Promise<BootstrapState> {
-		const state = getState()
+		const state = ipc.getState()
 		const sessions: SessionInfo[] = []
 		for (const id of state.sessions) {
 			const meta = await loadMeta(id)
@@ -40,7 +40,7 @@ export class LocalTransport implements Transport {
 	}
 
 	tailEvents(fromOffset?: number) {
-		return events.tail(fromOffset)
+		return ipc.events.tail(fromOffset)
 	}
 
 	async replaySession(id: string): Promise<Message[]> {
@@ -48,6 +48,6 @@ export class LocalTransport implements Transport {
 	}
 
 	async eventsOffset(): Promise<number> {
-		return events.offset()
+		return ipc.events.offset()
 	}
 }

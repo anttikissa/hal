@@ -3,8 +3,8 @@
 import * as colors from './colors.ts'
 import { strings } from '../utils/strings.ts'
 import { md } from './md.ts'
-import { displayModel } from '../models.ts'
-import { getConfig } from '../config.ts'
+import { models } from '../models.ts'
+import { config } from '../config.ts'
 import { stringify as asonStringify } from '../utils/ason.ts'
 import { blocksDir } from '../state.ts'
 
@@ -44,7 +44,7 @@ function oneLine(text: string): string {
 }
 
 function effectiveModel(model?: string): string {
-	return model || getConfig().defaultModel
+	return model || config.getConfig().defaultModel
 }
 
 /** Expand tabs to spaces (tab stops at TAB_WIDTH columns). */
@@ -161,7 +161,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 	const who = isSystem ? 'System' : (block.source && block.source !== 'user' ? block.source : 'You')
 	const { fg, bg } = isSystem ? colors.system : colors.input
 	const status = block.status ? ` (${block.status})` : ''
-	const model = !isSystem && block.model ? ` (to ${displayModel(block.model)})` : ''
+	const model = !isSystem && block.model ? ` (to ${models.displayModel(block.model)})` : ''
 	const label = `${who}${status}${model}`
 	if (block.status) return [boxLine(`${label}: ${text}`, width, fg, bg)]
 	const header = toolHeader(label, width, fg, bg)
@@ -172,7 +172,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: number): string[] {
 	const text = collapseBlankLines(block.text.replace(/^\s+/, '').trimEnd())
 	if (!text) return []
-	const label = `Hal (${displayModel(effectiveModel(block.model))})`
+	const label = `Hal (${models.displayModel(effectiveModel(block.model))})`
 	const { fg, bg } = colors.assistant
 	const mdColors = colors.assistantMd
 	const header = toolHeader(label, width, fg, bg)
@@ -204,7 +204,7 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 			for (const wl of strings.wordWrap(md.mdInline(l, mdColors), cw)) lines.push(plainLine(wl, width, colors.thinking.fg))
 		return lines
 	}
-	const label = `Hal (${displayModel(effectiveModel(block.model))}, thinking)`
+	const label = `Hal (${models.displayModel(effectiveModel(block.model))}, thinking)`
 	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.ref, block.sessionId ?? '')
 	const line = (s: string) => boxLine(s, width, colors.thinking.fg, colors.thinking.bg)
 	const body: string[] = []
@@ -412,3 +412,5 @@ export function renderQuestion(question: string, width: number): string[] {
 	const body = strings.wordWrap(question, contentWidth(width)).map(l => boxLine(l, width, aFg, bg))
 	return [...header, ...body]
 }
+
+export const blocks = { renderBlocks, renderQuestion }

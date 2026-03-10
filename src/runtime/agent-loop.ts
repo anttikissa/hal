@@ -2,18 +2,18 @@
 // Drives the provider, emits IPC events, persists to messages.asonl.
 // Supports tool execution with re-invoke loop.
 
-import { loadProvider } from '../providers/loader.ts'
+import { loader } from '../providers/loader.ts'
 import type { ProviderEvent } from '../providers/provider.ts'
-import { events } from '../ipc.ts'
+import { ipc } from '../ipc.ts'
 import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock, parseUserContent, makeBlockRef } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
-import { getTools, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
+import { tools, type ToolCall } from './tools.ts'
 import type { EvalContext } from './eval-tool.ts'
-import { runHooks } from './hooks.ts'
-import { contextWindowForModel, isCalibrated, saveCalibration, messageBytes, estimateContext } from './context.ts'
-import { getConfig, type PermissionLevel } from '../config.ts'
-import { createBlinkParser } from './blink.ts'
+import { hooks } from './hooks.ts'
+import { context } from './context.ts'
+import { config, type PermissionLevel } from '../config.ts'
+import { blink } from './blink.ts'
 
 const WRITE_TOOLS = new Set(['bash', 'write', 'edit', 'eval'])
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'web_search'])
@@ -35,7 +35,7 @@ export interface AgentContext {
 }
 
 function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeEvent['type'] }): Promise<void> {
-	return events.append({
+	return ipc.events.append({
 		id: eventId(), sessionId, createdAt: new Date().toISOString(), ...event,
 	} as RuntimeEvent)
 }
@@ -49,12 +49,12 @@ async function emitInfo(sessionId: string, text: string, level: EventLevel, deta
 export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const { sessionId, model, systemPrompt, messages, signal } = ctx
 	const [providerName, modelId] = model.includes('/') ? model.split('/', 2) : ['mock', model]
-	const ctxMax = contextWindowForModel(modelId)
-	let calibrated = isCalibrated(modelId)
+	const ctxMax = context.contextWindowForModel(modelId)
+	let calibrated = context.isCalibrated(modelId)
 
-	const config = getConfig()
-	const evalEnabled = !!config.eval
-	const tools = getTools(evalEnabled)
+	const cfg = config.getConfig()
+	const evalEnabled = !!cfg.eval
+	const availableTools = tools.getTools(evalEnabled)
 	const evalCtx: EvalContext | undefined = evalEnabled ? {
 		sessionId,
 		halDir: process.env.HAL_DIR ?? process.cwd(),
@@ -63,15 +63,15 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		runtime: null, // set lazily below to avoid circular import at module load
 	} : undefined
 
-	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length
-	ctx.onStatus(true, 'generating...', estimateContext(messages, modelId, overheadBytes))
+	const overheadBytes = systemPrompt.length + JSON.stringify(availableTools).length
+	ctx.onStatus(true, 'generating...', context.estimateContext(messages, modelId, overheadBytes))
 
 	try {
-		const provider = await loadProvider(providerName)
+		const provider = await loader.loadProvider(providerName)
 
 		while (!signal?.aborted) {
 
-			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools, signal, sessionId })
+			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: availableTools, signal, sessionId })
 
 			let thinkingText = ''
 			let thinkingRef = ''
@@ -79,7 +79,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			let assistantText = ''
 			const toolCalls: ToolCall[] = []
 			let aborted = false
-			const blink = createBlinkParser()
+			const blinkParser = blink.createBlinkParser()
 
 			for await (const event of gen) {
 				if (signal?.aborted) { aborted = true; break }
@@ -93,7 +93,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						thinkingSignature = event.signature
 						break
 					case 'text':
-						for (const seg of blink.feed(event.text)) {
+						for (const seg of blinkParser.feed(event.text)) {
 							if (seg.type === 'text') {
 								assistantText += seg.text
 								await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
@@ -114,7 +114,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					}
 					case 'done': {
 						// Flush any buffered blink text
-						for (const seg of blink.flush()) {
+						for (const seg of blinkParser.flush()) {
 							if (seg.type === 'text') {
 								assistantText += seg.text
 								await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
@@ -123,9 +123,9 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						// Calibrate bytes→tokens ratio on first API response
 						if (!calibrated && event.usage && event.usage.input > 0) {
 							calibrated = true
-							let totalBytes = systemPrompt.length + JSON.stringify(tools).length
-							for (const m of messages) totalBytes += messageBytes(m)
-							saveCalibration(modelId, totalBytes, event.usage.input)
+							let totalBytes = systemPrompt.length + JSON.stringify(availableTools).length
+							for (const m of messages) totalBytes += context.messageBytes(m)
+							context.saveCalibration(modelId, totalBytes, event.usage.input)
 						}
 						const usage = event.usage
 						const assistantOpts = {
@@ -158,18 +158,18 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						for (let call of toolCalls) {
 							if (signal?.aborted) { aborted = true; break }
 							const original = call
-							call = runHooks(call)
+							call = hooks.runHooks(call)
 							if (call.input !== original.input) {
 								const ref = toolRefMap.get(call.id)
 								if (ref) await updateBlockInput(sessionId, ref, call.input, original.input)
 							}
-							const args = argsPreview(call)
+							const args = tools.argsPreview(call)
 
 						let result: string | any[]
 						let toolStatus: 'done' | 'error' = 'done'
 
 						// Permission gate
-						if (needsPermission(call.name, getConfig().permissions)) {
+						if (needsPermission(call.name, config.getConfig().permissions)) {
 							const answer = await ctx.askUser(`Allow ${call.name} ${args}? (y/n)`)
 							if (answer.trim().toLowerCase() !== 'y') {
 								result = 'error: user denied permission'
@@ -195,7 +195,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								type: 'tool', toolId: call.id, name: call.name,
 								args, phase: 'streaming', output: text,
 							})
-							result = await executeTool(call, onChunk, evalCtx)
+							result = await tools.executeTool(call, onChunk, evalCtx)
 							if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
@@ -225,7 +225,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							const ref = toolRefMap.get(call.id)!
 							const block = await readBlock(sessionId, ref)
 							const raw = block?.result?.content ?? ''
-							const content = typeof raw === 'string' ? truncate(raw) : raw
+							const content = typeof raw === 'string' ? tools.truncate(raw) : raw
 							messages.push({
 								role: 'user',
 								content: [{ type: 'tool_result', tool_use_id: call.id, content }],

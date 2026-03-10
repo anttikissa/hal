@@ -4,10 +4,10 @@ import type { Transport } from './transport.ts'
 import type { Block } from './blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
 import { makeCommand } from '../protocol.ts'
-import { replayToBlocks } from '../session/replay.ts'
+import { replay } from '../session/replay.ts'
 import { loadInputHistory, saveDraft, loadDraft } from '../session/messages.ts'
 import { prompt } from './prompt.ts'
-import { getLastTab, saveLastTab } from './client-state.ts'
+import { clientState } from './client-state.ts'
 import { randomBytes } from 'crypto'
 
 export interface TabState {
@@ -52,7 +52,7 @@ export class Client {
 			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context })
 		}
 		// Prefer client's last-viewed tab, fall back to server's active session
-		const lastTab = getLastTab()
+		const lastTab = clientState.getLastTab()
 		const preferredId = lastTab ?? rtState.activeSessionId
 		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === preferredId))
 		this.state.connected = true
@@ -62,14 +62,14 @@ export class Client {
 
 		for (const tab of this.state.tabs) {
 			const messages = await this.transport.replaySession(tab.sessionId)
-			tab.blocks.push(...await replayToBlocks(tab.sessionId, messages, tab.info.model))
+			tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, messages, tab.info.model))
 			tab.inputHistory = await loadInputHistory(tab.sessionId)
 			tab.inputDraft = await loadDraft(tab.sessionId)
 		}
 		const active = this.activeTab()
 		if (active) {
 			this.applyTabToPrompt(active)
-			saveLastTab(active.sessionId)
+			clientState.saveLastTab(active.sessionId)
 		}
 		this.onUpdate()
 
@@ -296,7 +296,7 @@ export class Client {
 		const tab = this.activeTab()
 		if (tab) {
 			this.applyTabToPrompt(tab)
-			saveLastTab(tab.sessionId)
+			clientState.saveLastTab(tab.sessionId)
 		}
 	}
 }

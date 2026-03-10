@@ -53,3 +53,9 @@ export function estimateTokensSync(bytes: number, modelId: string): number {
 	const ratio = loadStore()[modelId]?.bytesPerToken ?? DEFAULT_BYTES_PER_TOKEN
 	return Math.ceil(bytes / ratio)
 }
+
+export const tokenCalibration = {
+	saveTokenCalibration,
+	isModelCalibrated,
+	estimateTokensSync,
+}

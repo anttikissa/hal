@@ -1,4 +1,4 @@
-import { renderBlocks, type Block } from './blocks.ts'
+import { blocks, type Block } from './blocks.ts'
 
 export interface HeightTab {
 	sessionId: string
@@ -17,9 +17,11 @@ export function maxTabHeight(
 		if (tab.sessionId === activeSessionId) {
 			tab.contentHeight = Math.max(tab.contentHeight, activeHeight)
 		} else if (tab.contentHeight === 0 && tab.blocks.length > 0) {
-			tab.contentHeight = renderBlocks(tab.blocks, width, false).lines.length
+			tab.contentHeight = blocks.renderBlocks(tab.blocks, width, false).lines.length
 		}
 		if (tab.contentHeight > maxHeight) maxHeight = tab.contentHeight
 	}
 	return maxHeight
 }
+
+export const heights = { maxTabHeight }
