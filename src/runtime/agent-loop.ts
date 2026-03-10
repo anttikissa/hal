@@ -230,6 +230,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		}
 		const detail = err.status ? `${err.status}: ${err.message}` : err.stack ?? err.message
 		await emitInfo(sessionId, err.message, 'error', detail)
+		await emitInfo(sessionId, '/continue to retry', 'meta')
 		await emit(sessionId, { type: 'command', commandId: '', phase: 'failed', message: err.message })
 	} finally {
 		ctx.onStatus(false)
