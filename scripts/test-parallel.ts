@@ -38,26 +38,34 @@ export function buildSummaryLine(summary: Summary): string {
 	return `\n${summary.totalPass} pass, ${summary.totalFail} fail — ${status} in ${formatMs(summary.elapsedMs)}`
 }
 
+export async function awaitTimed<T>(promise: Promise<T>): Promise<{ value: T; elapsedMs: number }> {
+	const startedAt = performance.now()
+	const value = await promise
+	return { value, elapsedMs: performance.now() - startedAt }
+}
+
 async function run(): Promise<number> {
 	const files = listTestFiles(ROOT)
 	const t0 = performance.now()
-	const procs = files.map(file => ({
-		file,
-		startedAt: performance.now(),
-		proc: Bun.spawn(['bun', 'test', file], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' }),
-	}))
+	const procs = files.map(file => {
+		const proc = Bun.spawn(['bun', 'test', file], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+		const timeout = setTimeout(() => proc.kill(), TIMEOUT_MS)
+		return {
+			file,
+			proc,
+			timeout,
+			completion: awaitTimed(proc.exited),
+		}
+	})
 
 	let failedFiles = 0
 	let totalPass = 0
 	let totalFail = 0
 	const timings: FileTiming[] = []
 
-	for (const { file, startedAt, proc } of procs) {
-		const timeout = setTimeout(() => proc.kill(), TIMEOUT_MS)
-		const code = await proc.exited
+	for (const { file, proc, timeout, completion } of procs) {
+		const { value: code, elapsedMs } = await completion
 		clearTimeout(timeout)
-
-		const elapsedMs = performance.now() - startedAt
 		timings.push({ file, elapsedMs })
 
 		const timedOut = proc.signalCode !== null

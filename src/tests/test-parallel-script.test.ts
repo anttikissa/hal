@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildSummaryLine, formatMs, pickSlowest } from '../../scripts/test-parallel'
+import { awaitTimed, buildSummaryLine, formatMs, pickSlowest } from '../../scripts/test-parallel'
 
 describe('test-parallel helpers', () => {
 	test('pickSlowest sorts descending and limits results', () => {
@@ -29,5 +29,12 @@ describe('test-parallel helpers', () => {
 		expect(line).toContain('10 pass, 0 fail')
 		expect(line).toContain('all passed')
 		expect(line).toContain('1234ms')
+	})
+
+	test('awaitTimed measures actual completion time', async () => {
+		const delayed = new Promise<void>(resolve => setTimeout(resolve, 25))
+		const { elapsedMs } = await awaitTimed(delayed)
+		expect(elapsedMs).toBeGreaterThanOrEqual(20)
+		expect(elapsedMs).toBeLessThan(200)
 	})
 })
