@@ -323,4 +323,43 @@ describe('compactApiMessages', () => {
 		// First assistant (10 user turns ago) — thinking should still be there
 		expect(out[1].content[0].type).toBe('thinking')
 	})
+
+	test('custom heavyThreshold keeps tool results beyond default threshold', () => {
+		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'result', 'ref-0')
+
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			c0.assistant, c0.result,
+		]
+		// Add 6 user turns — beyond default threshold of 4, within custom threshold of 10
+		for (let i = 0; i < 6; i++) {
+			msgs.push({ role: 'user', content: `question ${i}` })
+			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] })
+		}
+
+		const out = compactApiMessages(msgs, { heavyThreshold: 10 })
+
+		// With threshold 10, the tool result should still be kept
+		const toolResult = out[2].content[0]
+		expect(toolResult.content).toBe('result')
+	})
+
+	test('custom heavyThreshold keeps images beyond default threshold', () => {
+		const imageBlock = (ref: string) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: ref })
+
+		const msgs: any[] = [
+			{ role: 'user', content: [{ type: 'text', text: 'look' }, imageBlock('ref-img')] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'nice' }] },
+		]
+		// Add 6 more user turns — image is 7 turns ago, beyond default 4 but within custom 10
+		for (let i = 0; i < 6; i++) {
+			msgs.push({ role: 'user', content: `q${i}` })
+			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `a${i}` }] })
+		}
+
+		const out = compactApiMessages(msgs, { heavyThreshold: 10 })
+
+		// Image should be kept with threshold 10
+		expect(out[0].content[1].type).toBe('image')
+	})
 })

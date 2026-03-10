@@ -189,3 +189,40 @@ test('replay marks tool with error status when stored result status is error', a
 	expect(tool).toBeTruthy()
 	expect(tool.status).toBe('error')
 })
+
+test('loadApiMessages boosts threshold after model change', async () => {
+	const { writeAssistantEntry, writeToolResultEntry } = await import('./messages.ts')
+	const SID = TEST_SESSION
+
+	// User + tool cycle
+	await appendMessages(SID, [{ role: 'user', content: 'go', ts: new Date().toISOString() }])
+	const { entry, toolRefMap } = await writeAssistantEntry(SID, {
+		text: 'ok',
+		toolCalls: [{ id: 't0', name: 'bash', input: { command: 'ls' } }],
+	})
+	await appendMessages(SID, [entry])
+	const result = await writeToolResultEntry(SID, 't0', 'file1.ts\nfile2.ts', toolRefMap)
+	await appendMessages(SID, [result])
+
+	// Model change
+	await appendMessages(SID, [{ type: 'info', text: '[model] anthropic/claude-opus-4-6', level: 'meta', ts: new Date().toISOString() }])
+
+	// 6 plain user turns after model change — beyond default threshold (4) but within boosted (10)
+	for (let i = 0; i < 6; i++) {
+		await appendMessages(SID, [
+			{ role: 'user', content: `question ${i}`, ts: new Date().toISOString() },
+			{ role: 'assistant', text: `answer ${i}`, ts: new Date().toISOString() },
+		])
+	}
+
+	const msgs = await loadApiMessages(SID)
+
+	// Tool result should be kept (threshold boosted to 10 due to model change)
+	const toolResultMsg = msgs.find((m: any) =>
+		m.role === 'user' && Array.isArray(m.content) &&
+		m.content.some((b: any) => b.type === 'tool_result')
+	)
+	expect(toolResultMsg).toBeTruthy()
+	const toolResult = toolResultMsg.content.find((b: any) => b.type === 'tool_result')
+	expect(toolResult.content).toBe('file1.ts\nfile2.ts')
+})

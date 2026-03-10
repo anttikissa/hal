@@ -10,7 +10,7 @@ import { Log } from '../utils/log.ts'
 import { sessionDir, blocksDir, ensureDir } from '../state.ts'
 import { stringify, parse } from '../utils/ason.ts'
 import { logNameCache } from './session.ts'
-import { compactApiMessages } from './compact.ts'
+import { compactApiMessages, type CompactOpts } from './compact.ts'
 
 function resolveLogName(sessionId: string): string {
 	const cached = logNameCache.get(sessionId)
@@ -284,12 +284,35 @@ export async function readMessages(sessionId: string): Promise<Message[]> {
 
 const MAX_API_OUTPUT = 50_000
 
+const MODEL_CHANGE_THRESHOLD = 10
+
+/** If a model change happened recently, boost heavy content threshold so the new model sees more history. */
+function detectCompactOpts(msgs: Message[]): CompactOpts | undefined {
+	let lastModelChangeIdx = -1
+	for (let i = msgs.length - 1; i >= 0; i--) {
+		const m = msgs[i] as any
+		if (m.type === 'info' && typeof m.text === 'string' && m.text.startsWith('[model]')) {
+			lastModelChangeIdx = i
+			break
+		}
+	}
+	if (lastModelChangeIdx < 0) return undefined
+	let userTurnsAfter = 0
+	for (let i = lastModelChangeIdx + 1; i < msgs.length; i++) {
+		if ((msgs[i] as any).role === 'user') userTurnsAfter++
+	}
+	if (userTurnsAfter <= MODEL_CHANGE_THRESHOLD) return { heavyThreshold: MODEL_CHANGE_THRESHOLD }
+	return undefined
+}
+
 /** Load messages for API replay: converts stored format → Anthropic API format. */
 export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	const all = await loadAllMessages(sessionId)
 	const start = findReplayStart(all)
+	const sliced = all.slice(start)
+	const compactOpts = detectCompactOpts(sliced)
 	const out: any[] = []
-	for (const m of all.slice(start)) {
+	for (const m of sliced) {
 		const msg = m as any
 		if (!msg.role) continue
 		if (msg.role === 'user') {
@@ -351,7 +374,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			i++
 		}
 	}
-	const compacted = compactApiMessages(out)
+	const compacted = compactApiMessages(out, compactOpts)
 	// Strip internal _ref before sending to API (providers reject extra fields)
 	for (const msg of compacted) {
 		if (msg.role === 'user' && Array.isArray(msg.content)) {

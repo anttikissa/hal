@@ -1,11 +1,17 @@
 // Context compaction — strip old heavy content (tool results, images, thinking) from API messages.
-// Images and tool results cleared after HEAVY_THRESHOLD turns; thinking after THINKING_THRESHOLD.
+// Images and tool results cleared after heavyThreshold turns; thinking after THINKING_THRESHOLD.
 
-const HEAVY_THRESHOLD = 4
+const DEFAULT_HEAVY_THRESHOLD = 4
 const THINKING_THRESHOLD = 10
 
+export interface CompactOpts {
+	heavyThreshold?: number
+}
+
 /** Strip old tool results, tool inputs, and images from API messages. */
-export function compactApiMessages(msgs: any[]): any[] {
+export function compactApiMessages(msgs: any[], opts?: CompactOpts): any[] {
+	const threshold = opts?.heavyThreshold ?? DEFAULT_HEAVY_THRESHOLD
+
 	// 1. Find last assistant message with tool_use blocks
 	let lastToolIdx = -1
 	for (let i = msgs.length - 1; i >= 0; i--) {
@@ -14,7 +20,7 @@ export function compactApiMessages(msgs: any[]): any[] {
 			break
 		}
 	}
-	if (lastToolIdx === -1) return stripOldThinking(stripOldImages(msgs))
+	if (lastToolIdx === -1) return stripOldThinking(stripOldImages(msgs, threshold))
 
 	// 2. Collect tool IDs from last batch
 	const keepIds = new Set<string>()
@@ -29,7 +35,7 @@ export function compactApiMessages(msgs: any[]): any[] {
 	}
 
 	// 4. If too many user turns, the batch is stale — clear it too
-	if (userTurns > HEAVY_THRESHOLD) keepIds.clear()
+	if (userTurns > threshold) keepIds.clear()
 
 	// 5. Walk all messages, clear heavy content not in keep set
 	const out: any[] = []
@@ -56,7 +62,7 @@ export function compactApiMessages(msgs: any[]): any[] {
 		}
 	}
 
-	return stripOldThinking(stripOldImages(out))
+	return stripOldThinking(stripOldImages(out, threshold))
 }
 
 function hasToolUse(msg: any): boolean {
@@ -64,7 +70,7 @@ function hasToolUse(msg: any): boolean {
 }
 
 /** Clear image blocks except those in the last N user turns. */
-function stripOldImages(msgs: any[]): any[] {
+function stripOldImages(msgs: any[], threshold: number): any[] {
 	// Count all user turns to determine recency
 	let userCount = 0
 	for (const msg of msgs) {
@@ -78,7 +84,7 @@ function stripOldImages(msgs: any[]): any[] {
 		if (msg.role === 'user') {
 			const turnsAgo = userCount - userIdx
 			userIdx++
-			if (Array.isArray(msg.content) && turnsAgo > HEAVY_THRESHOLD) {
+			if (Array.isArray(msg.content) && turnsAgo > threshold) {
 				const content = msg.content.map((b: any) => {
 					if (b.type === 'image') {
 						const placeholder = b._ref ? `[image cleared — ref: ${b._ref}]` : '[image cleared]'
@@ -100,6 +106,7 @@ function stripOldImages(msgs: any[]): any[] {
 	}
 	return out
 }
+
 /** Drop thinking blocks from assistant messages older than N user turns. */
 function stripOldThinking(msgs: any[]): any[] {
 	let userCount = 0
