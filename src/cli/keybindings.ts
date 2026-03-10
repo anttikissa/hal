@@ -26,7 +26,8 @@ export interface InputContext {
 export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	if (k.key === 'c' && k.ctrl) { ctx.quit(); return }
 
-	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && !prompt.text())) {
+	if (k.key === 'd' && k.ctrl && !prompt.text()) { ctx.quit(); return }
+	if (k.key === 'w' && k.ctrl) {
 		ctx.saveDraft()
 		ctx.send('close')
 		prompt.reset()
@@ -126,7 +127,7 @@ function showHelp(ctx: InputContext): void {
 			'',
 			'**Keys**',
 			'  esc pause │ ctrl-t new tab │ ctrl-f fork │ ctrl-w close │ ctrl-n/p switch tabs',
-			'  ctrl-c quit │ ctrl-z suspend │ ctrl-r restart',
+			'  ctrl-c/d quit │ ctrl-z suspend │ ctrl-r restart',
 		].join('\n'),
 	})
 }
