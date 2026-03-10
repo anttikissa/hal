@@ -195,9 +195,14 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: number): string[] {
 	const text = collapseBlankLines(block.text.trimEnd())
 	if (!text) return [boxLine('Thinking...', width, colors.thinking.fg, colors.thinking.bg)]
-	const wrapped = wordWrap(text, contentWidth(width))
+	const md = colors.thinkingMd
+	const cw = contentWidth(width)
+	const wrapped = wordWrap(text, cw)
 	if (wrapped.length < THINKING_BLOCK_MIN_LINES) {
-		return wrapped.map(l => plainLine(l, width, colors.thinking.fg))
+		const lines: string[] = []
+		for (const l of text.split('\n'))
+			for (const wl of wordWrap(mdInline(l, md), cw)) lines.push(plainLine(wl, width, colors.thinking.fg))
+		return lines
 	}
 	const label = `Hal (${displayModel(effectiveModel(block.model))}, thinking)`
 	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.ref, block.sessionId ?? '')
@@ -243,11 +248,11 @@ function renderError(block: Extract<Block, { type: 'error' }>, width: number): s
 function bashStatus(status: 'streaming' | 'running' | 'done' | 'error'): string {
 	switch (status) {
 		case 'done':
-			return ':ok:'
+			return '✓'
 		case 'error':
-			return ':err:'
+			return '✗'
 		default:
-			return ':run:'
+			return '…'
 	}
 }
 
