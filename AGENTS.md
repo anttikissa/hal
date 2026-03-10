@@ -8,12 +8,12 @@ Current code lives in `src/`; previous version is in `old-src/` for reference.
 
 - After every code change to `src/`, run `bun scripts/cloc.ts` and include the output.
 - Use red-green TDD.
-- Never restart the app unless the user explicitly asks. Restart kills all tabs — other tabs may have active generations that would be lost.
+- To test, run ./test, never `bun test`
 - Use Bun, never node.js. `bunx` - no `npx`. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).
 - Secrets live in `auth.ason` (gitignored). Non-secrets in `config.ason`.
 - Conversation events are append-only: `state/sessions/<id>/messages.asonl`.
-- Tabs are real sessions; `/handoff` rotates session history and writes `handoff.md`.
+- Tabs are real sessions; `/compact` rotates session history.
 - Prefer tabs for indentation (width 4).
 - When editing, collapse consecutive blank lines to one. Files should end with a newline.
 - After completing a task, commit to git.
@@ -55,6 +55,7 @@ Good: "[promoted] pid 12345 is now the owner"
 - Command for TDD loop: `bun test --test-name-pattern='<feature>'`
 - Before committing, run tests: `./test` (parallel runner; `bun test` is sequential and slow)
 - Unit tests live alongside code, e2e tests in `src/tests/`
+- `src/cli/test-driver.ts` — lightweight harness for testing prompt/keybinding behavior. Uses `TestDriver` class: type chars, send keys, assert text/cursor/selection. See existing tests in `test-driver.test.ts`.
 
 ## SYSTEM.md preprocessor
 
