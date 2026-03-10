@@ -1,7 +1,7 @@
 // Context compaction — strip old heavy content (tool results, images, thinking) from API messages.
 // Images and tool results cleared after HEAVY_THRESHOLD turns; thinking after THINKING_THRESHOLD.
 
-const HEAVY_THRESHOLD = 3
+const HEAVY_THRESHOLD = 4
 const THINKING_THRESHOLD = 10
 
 /** Strip old tool results, tool inputs, and images from API messages. */

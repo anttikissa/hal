@@ -12,13 +12,13 @@ Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/se
 
 - Finds the **last tool batch** (most recent assistant message with `tool_use` blocks + corresponding `tool_result` messages).
 - Keeps that batch in full; clears all older tool results and inputs.
-- If the last batch is **stale** (>3 user turns after it), clears it too.
+- If the last batch is **stale** (>4 user turns after it), clears it too.
 - Cleared tool results become `[cleared — ref: <block-ref>]` — the model can still read the block file if needed.
 - Cleared tool inputs become `{}` (API requires the field to exist).
 
 ### 2. Images (`stripOldImages`)
 
-- Keeps images in the **last 3 user turns**.
+- Keeps images in the **last 4 user turns**.
 - Older images become `{ type: 'text', text: '[image cleared — ref: <ref>]' }`.
 - Works for images in both regular user messages and `tool_result` messages.
 - The `_ref` field is threaded from block storage through `loadApiMessages` so the cleared placeholder can reference the original.
@@ -32,14 +32,14 @@ Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/se
 
 | Content | Threshold | Cleared form |
 |---------|-----------|-------------|
-| Tool results | Last batch only; stale after 3 user turns | `[cleared — ref: ...]` |
+| Tool results | Last batch only; stale after 4 user turns | `[cleared — ref: ...]` |
 | Tool inputs | Same as results | `{}` |
-| Images | 3 user turns | `[image cleared — ref: ...]` |
+| Images | 4 user turns | `[image cleared — ref: ...]` |
 | Thinking | 10 user turns | Silently dropped |
 
 ## Why These Numbers
 
-- **Images & tool results** (3 turns): Both are heavy (images ~2-3K tokens, tool results 1-10K tokens). Aligned at the same threshold so they get cleared together, causing one cache bust instead of staggered ones.
+- **Images & tool results** (4 turns): Both are heavy (images ~2-3K tokens, tool results 1-10K tokens). Aligned at the same threshold so they get cleared together, causing one cache bust instead of staggered ones.
 - **Thinking** (10 turns): Hardest to reconstruct. Carries reasoning chain. 200-700 tokens each on average, but compounds across many turns.
 
 ## Cost Model
