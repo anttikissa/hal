@@ -19,7 +19,16 @@ export async function executeEval(code: string, ctx: EvalContext): Promise<strin
 	mkdirSync(evalDir, { recursive: true })
 
 	const file = join(evalDir, `${Date.now()}-${counter++}.ts`)
-	const wrapped = `export default async (ctx: any) => {\n${code}\n}\n`
+
+	// Extract import lines to module top-level
+	const lines = code.split('\n')
+	const imports: string[] = []
+	const body: string[] = []
+	for (const line of lines) {
+		if (/^\s*import\s/.test(line)) imports.push(line)
+		else body.push(line)
+	}
+	const wrapped = `${imports.join('\n')}${imports.length ? '\n' : ''}export default async (ctx: any) => {\n${body.join('\n')}\n}\n`
 	await Bun.write(file, wrapped)
 
 	try {
