@@ -149,11 +149,18 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		const qLabel = prompt.getQuestionLabel()!
 		const qLines = renderQuestion(qLabel, w)
 		lines.push(...qLines)
+		lines.push('') // spacing after question box
 
 		// Answer input area
 		qPromptResult = prompt.buildPrompt(cw)
 		qAnswerStartRow = lines.length
 		lines.push(...qPromptResult.lines)
+		// Help bar below answer input
+		const qHelp = ' enter to submit '
+		const qhPad = Math.max(0, w - visLen(qHelp))
+		const qhLeft = Math.floor(qhPad / 2)
+		const qhRight = qhPad - qhLeft
+		lines.push(`${DIM}${'─'.repeat(qhLeft)}${qHelp}${'─'.repeat(qhRight)}${RESET}`)
 		// Pad to push tab bar + chrome to bottom of screen
 		const frozenRaw = prompt.frozenText() ?? ''
 		const frozenSplit = frozenRaw.split('\n').slice(0, 3)
