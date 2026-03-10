@@ -12,6 +12,7 @@ import { shutdown } from './main.ts'
 import { getConfig } from './config.ts'
 import { displayModel } from './models.ts'
 import { renderTabline } from './cli/tabline.ts'
+import * as colors from './cli/colors.ts'
 import { visLen } from './cli/md.ts'
 // ── Terminal setup ──
 
@@ -94,29 +95,49 @@ function deriveState(tab: TabState | null): string {
 	return 'writing'
 }
 
-function fmtContext(ctx?: { used: number; max: number; estimated?: boolean }): string {
-	if (!ctx || ctx.max <= 0) return ''
+function fmtContextPlain(ctx?: { used: number; max: number; estimated?: boolean }): { text: string; pctColor: string } | null {
+	if (!ctx || ctx.max <= 0) return null
 	const pctNum = ctx.used / ctx.max
 	const pct = `${ctx.estimated ? '~' : ''}${(pctNum * 100).toFixed(1)}%`
 	const max = ctx.max >= 1000 ? `${Math.round(ctx.max / 1000)}k` : String(ctx.max)
-	const color = pctNum >= 0.70 ? RED : pctNum >= 0.50 ? YELLOW : GREEN
-	return `${color}${pct}${DIM}/${max}`
+	const pctColor = pctNum >= 0.70 ? RED : pctNum >= 0.50 ? YELLOW : GREEN
+	return { text: `${pct}/${max}`, pctColor }
 }
 
 function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): string {
+	const { fg: iFg, bg: iBg } = colors.input
 	const model = shortModel(tab?.info.model)
 	const state = deriveState(tab)
 	const role = hal.isHost ? 'host' : 'client'
-	const ctx = fmtContext(tab?.context)
+	const ctxInfo = fmtContextPlain(tab?.context)
+
 	const rightParts = [role]
 	if (tab?.sessionId) rightParts.push(tab.sessionId)
-	if (ctx) rightParts.push(ctx)
+	if (ctxInfo) rightParts.push(ctxInfo.text)
 	if (scrollInfo) rightParts.push(scrollInfo)
-	const left = ` ${model} (${state}) `
-	const right = oneLine(` ${rightParts.join(' · ')}`)
-	const safeRight = clipForWidth(right, Math.max(1, w - left.length - 1))
-	const fill = Math.max(1, w - left.length - visLen(safeRight))
-	return `${DIM}${left}${'─'.repeat(fill)}${safeRight}${RESET}`
+
+	const prefix = '── '
+	const label = `You (to ${model} · ${state})`
+	const suffix = ` ${rightParts.join(' · ')} ──`
+	const iw = Math.max(1, w - 2) // 1 margin each side
+	const maxLabel = Math.max(1, iw - prefix.length - suffix.length - 1)
+	const shown = label.length > maxLabel ? label.slice(0, maxLabel) : label
+	const lead = `${prefix}${shown} `
+	const fill = '─'.repeat(Math.max(1, iw - lead.length - suffix.length))
+	const inner = lead + fill + suffix
+
+	// Apply context pct color inline if present
+	let colored = `${iBg}${iFg}${inner}`
+	if (ctxInfo) {
+		const pctSlash = ctxInfo.text
+		const idx = colored.lastIndexOf(pctSlash)
+		if (idx >= 0) {
+			const pctOnly = pctSlash.split('/')[0]
+			colored = colored.slice(0, idx) + ctxInfo.pctColor + pctOnly + iFg + '/' + pctSlash.split('/')[1] + colored.slice(idx + pctSlash.length)
+		}
+	}
+
+	return ` ${colored}${RESET} `
 }
 
 function buildLines(): { lines: string[]; cursor: CursorPos } {

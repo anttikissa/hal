@@ -6,6 +6,16 @@ Should have clock times in the tool line - right aligned, rightmost
 
 activity no longer visible in tab
 
+bash: ":ok: instead of checkmark
+
+You (to Codex 5.3) even though it's Opus
+
+Bash output having color is buggy (eg failing test) - should interpret ansi reset codes to restore
+bash tool output color
+
+There was lots of attempts to fill the cor
+
+Lots of 
 Those should be links (files for now)
 
 Make it run on linux / server
