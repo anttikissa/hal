@@ -175,3 +175,30 @@ test('status event clears pausing when session is no longer busy', async () => {
 	expect(tab.busy).toBe(false)
 	expect(tab.pausing).toBe(false)
 })
+test('thinking block uses fallback model from session update when session model is unset', async () => {
+	const { client, transport } = await startClient(true)
+	const tab = client.activeTab()!
+
+	transport.pushEvent({
+		id: eventId(),
+		type: 'sessions',
+		activeSessionId: sessionId,
+		sessions: [{ ...tab.info, model: 'openai/gpt-5.3-codex' }],
+		createdAt: ts,
+	})
+	await Bun.sleep(10)
+
+	transport.pushEvent({
+		id: eventId(),
+		type: 'chunk',
+		sessionId,
+		channel: 'thinking',
+		text: Array.from({ length: 14 }, (_, i) => `line ${i}`).join('\n'),
+		createdAt: ts,
+	})
+	await Bun.sleep(10)
+
+	const thinking = tab.blocks.find((b): b is Extract<typeof b, { type: 'thinking' }> => b.type === 'thinking')
+	expect(thinking).toBeTruthy()
+	expect(thinking?.model).toBe('openai/gpt-5.3-codex')
+})

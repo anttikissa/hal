@@ -4,6 +4,7 @@ import * as colors from './colors.ts'
 import { charWidth, visLen, wordWrap } from '../utils/strings.ts'
 import { mdSpans, mdInline, mdTable } from './md.ts'
 import { displayModel } from '../models.ts'
+import { getConfig } from '../config.ts'
 import { stringify as asonStringify } from '../utils/ason.ts'
 import { blocksDir } from '../state.ts'
 
@@ -40,6 +41,10 @@ function collapseBlankLines(text: string): string {
 
 function oneLine(text: string): string {
 	return text.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function effectiveModel(model?: string): string {
+	return model || getConfig().defaultModel
 }
 
 /** Expand tabs to spaces (tab stops at TAB_WIDTH columns). */
@@ -167,7 +172,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: number): string[] {
 	const text = collapseBlankLines(block.text.replace(/^\s+/, '').trimEnd())
 	if (!text) return []
-	const label = block.model ? `Hal (${displayModel(block.model)})` : 'Hal'
+	const label = `Hal (${displayModel(effectiveModel(block.model))})`
 	const { fg, bg } = colors.assistant
 	const md = colors.assistantMd
 	const header = toolHeader(label, width, fg, bg)
@@ -194,8 +199,7 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	if (wrapped.length < THINKING_BLOCK_MIN_LINES) {
 		return wrapped.map(l => plainLine(l, width, colors.thinking.fg))
 	}
-	const modelName = block.model ? displayModel(block.model) : 'thinking'
-	const label = block.model ? `Hal (${modelName}, thinking)` : 'Hal (thinking)'
+	const label = `Hal (${displayModel(effectiveModel(block.model))}, thinking)`
 	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.ref, block.sessionId ?? '')
 	const lines = [...header]
 	if (wrapped.length > THINKING_BLOCK_MAX_LINES) {
