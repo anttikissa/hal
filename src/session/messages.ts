@@ -45,6 +45,7 @@ export interface AssistantMessage {
 	text?: string
 	thinkingText?: string
 	thinkingSignature?: string
+	thinkingRef?: string
 	tools?: { id: string; name: string; ref: string }[]
 	ts: string
 }
@@ -139,7 +140,12 @@ export async function writeAssistantEntry(
 	const toolRefMap = new Map<string, string>()
 
 	if (opts.text) entry.text = opts.text
-	if (opts.thinkingText) entry.thinkingText = opts.thinkingText
+	if (opts.thinkingText) {
+		entry.thinkingText = opts.thinkingText
+		const ref = makeBlockRef(sessionId)
+		entry.thinkingRef = ref
+		await writeBlock(sessionId, ref, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
+	}
 	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
 
 	if (opts.toolCalls && opts.toolCalls.length > 0) {

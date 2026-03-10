@@ -32,7 +32,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			if (text) blocks.push({ type: 'input', text, model })
 		} else if (m.role === 'assistant') {
 			if (m.thinkingText) {
-				blocks.push({ type: 'thinking', text: m.thinkingText, done: true })
+				blocks.push({ type: 'thinking', text: m.thinkingText, done: true, model, sessionId, ref: m.thinkingRef })
 			}
 			if (m.text) {
 				blocks.push({ type: 'assistant', text: m.text, done: true, model })

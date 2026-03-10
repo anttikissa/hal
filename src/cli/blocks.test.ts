@@ -2,7 +2,7 @@ import { describe, test, expect } from 'bun:test'
 import { renderBlocks, type Block } from './blocks.ts'
 
 // eslint-disable-next-line no-control-regex
-const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\]8;;[^\x07]*\x07/g, '')
 
 function trimLine(s: string): string {
 	return strip(s).trim()
@@ -30,19 +30,19 @@ describe('renderBlocks', () => {
 	})
 
 	test('thinking short text stays plain (no header)', () => {
-		const blocks: Block[] = [{ type: 'thinking', text: 'short\nthought', done: false }]
+		const blocks: Block[] = [{ type: 'thinking', text: 'short\nthought', done: false, model: 'openai/gpt-5.3-codex' }]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.some(l => trimLine(l).startsWith('── Hal (Codex 5.3, thinking)'))).toBe(false)
+		expect(lines.some(l => trimLine(l).startsWith('── Hal ('))).toBe(false)
 		expect(lines.some(l => l.includes('short'))).toBe(true)
 	})
 
-	test('thinking long text becomes a block with collapse', () => {
+	test('thinking long text uses the block model in header', () => {
 		const text = Array.from({ length: 14 }, (_, i) => `line ${i}`).join('\n')
-		const blocks: Block[] = [{ type: 'thinking', text, done: false, ref: 'abc123' }]
+		const blocks: Block[] = [{ type: 'thinking', text, done: false, ref: 'abc123', model: 'anthropic/claude-sonnet-4-20250514', sessionId: '02-xyz' }]
 		const lines = renderBlocks(blocks, 80)
-		expect(lines.some(l => trimLine(l).includes('Hal (Codex 5.3, thinking)'))).toBe(true)
+		expect(lines.some(l => trimLine(l).includes('Hal (Sonnet 4, thinking)'))).toBe(true)
 		expect(lines.some(l => trimLine(l).includes('[+ 4 lines]'))).toBe(true)
-		expect(lines.some(l => trimLine(l).includes('[abc123]'))).toBe(true)
+		expect(lines.some(l => trimLine(l).includes('[02-xyz/abc123]'))).toBe(true)
 	})
 
 	test('bash long command is moved below header', () => {

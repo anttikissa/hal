@@ -18,7 +18,7 @@ const TAB_WIDTH = 4
 export type Block =
 	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
 	| { type: 'assistant'; text: string; done: boolean; model?: string }
-	| { type: 'thinking'; text: string; done: boolean; ref?: string }
+	| { type: 'thinking'; text: string; done: boolean; ref?: string; model?: string; sessionId?: string }
 	| { type: 'info'; text: string }
 	| { type: 'error'; text: string; detail?: string; ref?: string }
 	| {
@@ -130,7 +130,7 @@ function headerLine(text: string, width: number, fg: string, bg: string): string
 function toolHeader(label: string, width: number, fg: string, bg: string, ref: string | undefined, sessionId: string): string[] {
 	const iw = innerWidth(width)
 	const safeLabel = oneLine(label)
-	const displayRef = ref ? `${sessionId}/${ref}` : ''
+	const displayRef = ref ? (sessionId ? `${sessionId}/${ref}` : ref) : ''
 	const safeRef = displayRef ? clipPlain(oneLine(displayRef), 24) : ''
 	let refDisplay = ''
 	if (safeRef && ref) {
@@ -194,7 +194,9 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	if (wrapped.length < THINKING_BLOCK_MIN_LINES) {
 		return wrapped.map(l => plainLine(l, width, colors.thinking.fg))
 	}
-	const header = toolHeader('Hal (Codex 5.3, thinking)', width, colors.thinking.fg, colors.thinking.bg, block.ref ?? 'thinking')
+	const modelName = block.model ? displayModel(block.model) : 'thinking'
+	const label = block.model ? `Hal (${modelName}, thinking)` : 'Hal (thinking)'
+	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.ref, block.sessionId ?? '')
 	const lines = [...header]
 	if (wrapped.length > THINKING_BLOCK_MAX_LINES) {
 		const hidden = wrapped.length - THINKING_BLOCK_MAX_LINES
