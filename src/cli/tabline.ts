@@ -77,29 +77,32 @@ function totalLen(parts: string[]): number {
 
 export function renderTabline(tabs: TablineTab[], width: number, busyVisible = true): string {
 	if (width <= 0 || tabs.length === 0) return ''
+	const leftPad = ' '
+	const innerWidth = Math.max(0, width - plainLen(leftPad))
+	if (innerWidth <= 0) return leftPad.slice(0, width)
 	const busyChar = busyVisible ? '▪' : ' '
 
 	const m0 = mode0(tabs, busyChar, MAX_TITLE)
-	if (totalLen(m0) <= width) return m0.join('')
+	if (totalLen(m0) <= innerWidth) return leftPad + m0.join('')
 
 	// Try shorter titles (8 chars)
 	const m0s = mode0(tabs, busyChar, 8)
-	if (totalLen(m0s) <= width) return m0s.join('')
+	if (totalLen(m0s) <= innerWidth) return leftPad + m0s.join('')
 
 	const m1 = mode1(tabs, busyChar)
-	if (totalLen(m1) <= width) return m1.join('')
+	if (totalLen(m1) <= innerWidth) return leftPad + m1.join('')
 
 	const m2 = mode2(tabs, busyChar)
-	if (totalLen(m2) <= width) return m2.join('')
+	if (totalLen(m2) <= innerWidth) return leftPad + m2.join('')
 
 	const m3 = mode3(tabs)
-	if (totalLen(m3) <= width) return m3.join('')
+	if (totalLen(m3) <= innerWidth) return leftPad + m3.join('')
 
 	// Last resort: just as many numbers as fit
 	let out = ''
 	for (const p of m3) {
-		if (plainLen(out) + plainLen(p) > width) break
+		if (plainLen(out) + plainLen(p) > innerWidth) break
 		out += p
 	}
-	return out
+	return leftPad + out
 }

@@ -21,6 +21,11 @@ describe('renderTabline', () => {
 		expect(plain).toContain(' 3▪tmp ')
 	})
 
+	test('tabline has one-column left padding', () => {
+		const line = renderTabline(tabs, 80, true)
+		expect(strip(line).startsWith(' ')).toBe(true)
+	})
+
 	test('busy indicator hidden when busyVisible=false', () => {
 		const line = renderTabline(tabs, 80, false)
 		const plain = strip(line)

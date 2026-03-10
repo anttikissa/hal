@@ -5,7 +5,7 @@ import { ensureBus, commands, events, updateState, getState } from '../ipc.ts'
 import { createSession, loadMeta, listSessionIds, rotateLog, forkSession } from '../session/session.ts'
 import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, detectInterruptedTools, parseUserContent, buildCompactionContext, getLastUsage, type UserMessage } from '../session/messages.ts'
 import { runAgentLoop } from './agent-loop.ts'
-import { contextWindowForModel } from './context.ts'
+import { contextWindowForModel, estimateContext } from './context.ts'
 import { loadSystemPrompt } from './system-prompt.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
@@ -66,21 +66,30 @@ export async function startRuntime(): Promise<Runtime> {
 	const sessionContext = new Map<string, { used: number; max: number; estimated?: boolean }>()
 	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
+	function setFreshContext(info: SessionInfo): void {
+		const modelId = (info.model ?? getConfig().defaultModel).split('/').pop()!
+		sessionContext.set(info.id, { used: 0, max: contextWindowForModel(modelId), estimated: true })
+	}
+
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = getState()
 	for (const id of prevState.sessions) {
 		const meta = await loadMeta(id)
 		if (meta) {
 			sessions.set(meta.id, meta)
-			// Restore context: prefer persisted meta, fall back to last API usage
+			const modelId = (meta.model ?? getConfig().defaultModel).split('/').pop()!
+			// Restore context: prefer persisted real counts, then last API usage, then estimate
 			if (meta.context) {
 				sessionContext.set(meta.id, meta.context)
 			} else {
 				const usage = getLastUsage(meta.id)
 				if (usage) {
-					const modelId = (meta.model ?? getConfig().defaultModel).split('/').pop()!
-					const max = contextWindowForModel(modelId)
-					sessionContext.set(meta.id, { used: usage.input, max })
+					sessionContext.set(meta.id, { used: usage.input, max: contextWindowForModel(modelId) })
+				} else {
+					const apiMsgs = await loadApiMessages(meta.id, modelId)
+					if (apiMsgs.length > 0) {
+						sessionContext.set(meta.id, estimateContext(apiMsgs, modelId))
+					}
 				}
 			}
 			if (!activeSessionId) activeSessionId = meta.id
@@ -97,6 +106,7 @@ export async function startRuntime(): Promise<Runtime> {
 		sessions.set(info.id, info)
 		activeSessionId = info.id
 		needsGreeting = info.id
+		setFreshContext(info)
 	}
 
 	// Publish initial state (must come before greeting so client has the tab)
@@ -202,12 +212,15 @@ export async function startRuntime(): Promise<Runtime> {
 			onStatus: async (busy, nextActivity, context) => {
 				if (busy) busySessionIds.add(sid)
 				else busySessionIds.delete(sid)
-				if (context && !context.estimated) {
+				if (context) {
 					sessionContext.set(sid, context)
-					info.context = { used: context.used, max: context.max }
-					const pct = context.used / context.max
-					if (pct >= 0.65 && pct < 0.70) {
-						await emitInfo(sid, `[context] ${Math.round(pct * 100)}% used — will autocompact at 70%`, 'warn')
+					if (!context.estimated) {
+						// Real API counts — persist and check autocompact threshold
+						info.context = { used: context.used, max: context.max }
+						const pct = context.used / context.max
+						if (pct >= 0.65 && pct < 0.70) {
+							await emitInfo(sid, `[context] ${Math.round(pct * 100)}% used — will autocompact at 70%`, 'warn')
+						}
 					}
 				}
 				await publish(nextActivity)
@@ -308,6 +321,7 @@ export async function startRuntime(): Promise<Runtime> {
 					}
 				} else {
 					info = await createSession()
+					setFreshContext(info)
 				}
 				sessions.set(info.id, info)
 				activeSessionId = info.id
@@ -342,6 +356,7 @@ export async function startRuntime(): Promise<Runtime> {
 					const info = await createSession()
 					sessions.set(info.id, info)
 					activeSessionId = info.id
+					setFreshContext(info)
 				}
 				await publish()
 				break

@@ -51,6 +51,7 @@ The TUI uses a **diff-rendered** approach via `diff-engine.ts`.
   - **Input** lines
 
 Tabline behavior:
+- Tabline starts with one leading space for consistent horizontal padding.
 - Preferred form: active tab as `[N topic]`, inactive as ` N topic `.
 - If width overflows, fallback modes are applied in order:
   1. `[Nx] [N ] ...`

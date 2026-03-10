@@ -10,7 +10,7 @@ import { eventId } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
 import { runHooks } from './hooks.ts'
-import { contextWindowForModel, isCalibrated, saveCalibration, messageBytes } from './context.ts'
+import { contextWindowForModel, isCalibrated, saveCalibration, messageBytes, estimateContext } from './context.ts'
 import { getConfig, type PermissionLevel } from '../config.ts'
 
 const WRITE_TOOLS = new Set(['bash', 'write', 'edit'])
@@ -50,7 +50,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const ctxMax = contextWindowForModel(modelId)
 	let calibrated = isCalibrated(modelId)
 
-	ctx.onStatus(true, 'generating...')
+	ctx.onStatus(true, 'generating...', estimateContext(messages, modelId))
 
 	try {
 		const provider = await loadProvider(providerName)
