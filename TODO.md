@@ -2,6 +2,14 @@
 
 ## 8.3. TODO
 
+Should have clock times in the tool line - right aligned, rightmost
+
+Those should be links (files for now)
+
+Make it run on linux / server
+
+Optimize startup time
+
 First: add openai support
 
 aliases too

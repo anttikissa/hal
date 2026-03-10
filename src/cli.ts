@@ -48,7 +48,7 @@ export const client = new Client(transport, () => { bumpCursor(); doRender() })
 
 // ── Renderer ──
 
-const DIM = '\x1b[38;5;245m', RESET = '\x1b[0m', YELLOW = '\x1b[33m', RED = '\x1b[31m'
+const DIM = '\x1b[38;5;245m', RESET = '\x1b[0m', YELLOW = '\x1b[33m', RED = '\x1b[31m', GREEN = '\x1b[32m'
 let halCursorVisible = true
 let blinkTimer: ReturnType<typeof setTimeout> | null = null
 let renderState: RenderState = emptyState
@@ -96,12 +96,10 @@ function deriveState(tab: TabState | null): string {
 function fmtContext(ctx?: { used: number; max: number; estimated?: boolean }): string {
 	if (!ctx || ctx.max <= 0) return ''
 	const pctNum = ctx.used / ctx.max
-	const pct = (pctNum * 100).toFixed(1)
+	const pct = `${ctx.estimated ? '~' : ''}${(pctNum * 100).toFixed(1)}%`
 	const max = ctx.max >= 1000 ? `${Math.round(ctx.max / 1000)}k` : String(ctx.max)
-	const text = `${ctx.estimated ? '~' : ''}${pct}%/${max}`
-	if (pctNum >= 0.70) return `${RED}${text}${DIM}`
-	if (pctNum >= 0.50) return `${YELLOW}${text}${DIM}`
-	return text
+	const color = pctNum >= 0.70 ? RED : pctNum >= 0.50 ? YELLOW : GREEN
+	return `${color}${pct}${DIM}/${max}`
 }
 
 function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): string {
