@@ -38,10 +38,18 @@ const error     = { fg: fg(oklch(0.65, 0.20, 35)),  bg: bg(oklch(0.28, 0.08, 35)
 const system    = { fg: fg(oklch(0.75, 0.15, 190)), bg: bg(oklch(0.25, 0.05, 190)) }
 const cursor    = { fg: fg(oklch(0.75, 0.15, 70)) }
 
+const readColor = { fg: fg(oklch(0.75, 0.15, 145)), bg: bg(oklch(0.25, 0.05, 145)) }
+const editColor = { fg: fg(oklch(0.75, 0.15, 260)), bg: bg(oklch(0.25, 0.05, 260)) }
+
 const tools: Record<string, { fg: string; bg: string }> = {
 	bash:    { fg: fg(oklch(0.75, 0.15, 320)), bg: bg(oklch(0.25, 0.05, 320)) },
-	read:    { fg: fg(oklch(0.75, 0.15, 145)), bg: bg(oklch(0.25, 0.05, 145)) },
-	default: { fg: fg(oklch(0.75, 0.15, 260)), bg: bg(oklch(0.25, 0.05, 260)) },
+	read:    readColor,
+	grep:    readColor,
+	glob:    readColor,
+	ls:      readColor,
+	write:   editColor,
+	edit:    editColor,
+	default: editColor,
 }
 
 function tool(name: string): { fg: string; bg: string } {
