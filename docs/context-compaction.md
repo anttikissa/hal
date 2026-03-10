@@ -12,7 +12,7 @@ Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/se
 
 - Finds the **last tool batch** (most recent assistant message with `tool_use` blocks + corresponding `tool_result` messages).
 - Keeps that batch in full; clears all older tool results and inputs.
-- If the last batch is **stale** (>5 user turns after it), clears it too.
+- If the last batch is **stale** (>3 user turns after it), clears it too.
 - Cleared tool results become `[cleared — ref: <block-ref>]` — the model can still read the block file if needed.
 - Cleared tool inputs become `{}` (API requires the field to exist).
 
@@ -32,16 +32,15 @@ Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/se
 
 | Content | Threshold | Cleared form |
 |---------|-----------|-------------|
-| Tool results | Last batch only; stale after 5 user turns | `[cleared — ref: ...]` |
+| Tool results | Last batch only; stale after 3 user turns | `[cleared — ref: ...]` |
 | Tool inputs | Same as results | `{}` |
 | Images | 3 user turns | `[image cleared — ref: ...]` |
 | Thinking | 10 user turns | Silently dropped |
 
 ## Why These Numbers
 
-- **Images** (3 turns): Supplementary context. Typical use: paste screenshot, ask 2-3 questions. ~2-3K tokens each.
-- **Tool results** (5 turns / last batch): Working data the model needs for follow-up. Can be large (1-10K tokens each). Cleared aggressively because sessions typically have 150-280 tool calls.
-- **Thinking** (10 turns): Hardest to reconstruct. Carries reasoning chain. 200-700 tokens each on average, but compounds across many turns. On Opus 4.5+, thinking is retained in context (not auto-stripped like pre-4.5).
+- **Images & tool results** (3 turns): Both are heavy (images ~2-3K tokens, tool results 1-10K tokens). Aligned at the same threshold so they get cleared together, causing one cache bust instead of staggered ones.
+- **Thinking** (10 turns): Hardest to reconstruct. Carries reasoning chain. 200-700 tokens each on average, but compounds across many turns.
 
 ## Cost Model
 

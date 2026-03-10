@@ -2,6 +2,11 @@
 
 ## 8.3. TODO
 
+Make tab restore work
+Make small indicator to show tab activity
+MAke runtime.ts small
+
+
 make the question block stand out
 
 bug - sometimes when the cursor is on bottom row end, the cursor color leaks to the tab line

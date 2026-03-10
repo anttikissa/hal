@@ -1,7 +1,8 @@
-// Context compaction — strip old heavy content from API messages.
-// Keeps the last tool batch intact; clears everything older.
+// Context compaction — strip old heavy content (tool results, images, thinking) from API messages.
+// Images and tool results cleared after HEAVY_THRESHOLD turns; thinking after THINKING_THRESHOLD.
 
-const STALE_THRESHOLD = 5
+const HEAVY_THRESHOLD = 3
+const THINKING_THRESHOLD = 10
 
 /** Strip old tool results, tool inputs, and images from API messages. */
 export function compactApiMessages(msgs: any[]): any[] {
@@ -28,7 +29,7 @@ export function compactApiMessages(msgs: any[]): any[] {
 	}
 
 	// 4. If too many user turns, the batch is stale — clear it too
-	if (userTurns > STALE_THRESHOLD) keepIds.clear()
+	if (userTurns > HEAVY_THRESHOLD) keepIds.clear()
 
 	// 5. Walk all messages, clear heavy content not in keep set
 	const out: any[] = []
@@ -77,7 +78,7 @@ function stripOldImages(msgs: any[]): any[] {
 		if (msg.role === 'user') {
 			const turnsAgo = userCount - userIdx
 			userIdx++
-			if (Array.isArray(msg.content) && turnsAgo > 3) {
+			if (Array.isArray(msg.content) && turnsAgo > HEAVY_THRESHOLD) {
 				const content = msg.content.map((b: any) => {
 					if (b.type === 'image') {
 						const placeholder = b._ref ? `[image cleared — ref: ${b._ref}]` : '[image cleared]'
@@ -99,9 +100,6 @@ function stripOldImages(msgs: any[]): any[] {
 	}
 	return out
 }
-
-const THINKING_THRESHOLD = 10
-
 /** Drop thinking blocks from assistant messages older than N user turns. */
 function stripOldThinking(msgs: any[]): any[] {
 	let userCount = 0

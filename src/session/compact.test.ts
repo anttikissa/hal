@@ -83,21 +83,21 @@ describe('compactApiMessages', () => {
 		expect(toolResult.content).toBe('[cleared — ref: ref-0]')
 	})
 
-	test('keeps last batch when ≤5 user turns follow', () => {
+	test('keeps last batch when ≤3 user turns follow', () => {
 		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'result', 'ref-0')
 
 		const msgs: any[] = [
 			{ role: 'user', content: 'start' },
 			c0.assistant, c0.result,
 		]
-		for (let i = 0; i < 5; i++) {
+		for (let i = 0; i < 3; i++) {
 			msgs.push({ role: 'user', content: `question ${i}` })
 			msgs.push({ role: 'assistant', content: [{ type: 'text', text: `answer ${i}` }] })
 		}
 
 		const out = compactApiMessages(msgs)
 
-		// Should still be kept — exactly 5 is the boundary
+		// Should still be kept — exactly 3 is the boundary
 		const toolResult = out[2].content[0]
 		expect(toolResult.content).toBe('result')
 	})
