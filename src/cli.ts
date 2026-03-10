@@ -125,7 +125,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	const blocks = tab?.blocks ?? []
 	const hasQ = prompt.hasQuestion()
-	const { lines: contentLines, streamCursor } = renderBlocks(blocks, w, isVisible())
+	const { lines: contentLines } = renderBlocks(blocks, w, isVisible())
 
 	const lines: string[] = []
 	let qAnswerStartRow = -1
@@ -134,7 +134,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	if (hasQ) {
 		// Strip trailing idle cursor lines (empty/█/empty) from content
 		let trimmed = contentLines
-		if (trimmed.length >= 3 && !streamCursor) {
+		if (trimmed.length >= 3) {
 			trimmed = trimmed.slice(0, -3)
 		}
 		lines.push(...trimmed)
@@ -218,9 +218,6 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const hLeft = Math.max(0, Math.floor(hPad / 2))
 	const hRight = Math.max(0, hPad - hLeft)
 	lines.push(`${DIM}${'─'.repeat(hLeft)}${safeHelp}${'─'.repeat(hRight)}${RESET}`)
-
-	// During streaming, position terminal cursor at the inline █ cursor
-	if (streamCursor) cursorPos = streamCursor
 	return { lines, cursor: cursorPos }
 }
 
