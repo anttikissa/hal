@@ -2,6 +2,7 @@
 
 ## 8.3. TODO
 
+revisit all tool outputs and verify that all necessary stuff is visible!
 
 
 Make tab restore work

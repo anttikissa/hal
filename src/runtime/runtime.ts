@@ -7,6 +7,7 @@ import { appendMessages, loadApiMessages, readMessages, writeToolResultEntry, de
 import { runAgentLoop } from './agent-loop.ts'
 import { contextWindowForModel, estimateContext } from './context.ts'
 import { loadSystemPrompt } from './system-prompt.ts'
+import { TOOLS } from './tools.ts'
 import { eventId, type RuntimeCommand, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { getConfig } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
@@ -66,11 +67,22 @@ export async function startRuntime(): Promise<Runtime> {
 	const sessionContext = new Map<string, { used: number; max: number; estimated?: boolean }>()
 	const pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
-	function setFreshContext(info: SessionInfo): void {
+	function estimatedOverheadBytes(info: SessionInfo): number {
+		const model = info.model ?? getConfig().defaultModel
+		const system = loadSystemPrompt({ model, sessionDir: info.id })
+		const toolBytes = JSON.stringify(TOOLS).length
+		return system.bytes + toolBytes
+	}
+
+	function estimateSessionContext(info: SessionInfo, apiMessages: any[]): { used: number; max: number; estimated: true } {
 		const modelId = (info.model ?? getConfig().defaultModel).split('/').pop()!
-		const max = contextWindowForModel(modelId)
-		sessionContext.set(info.id, { used: 0, max, estimated: true })
-		info.context = { used: 0, max }
+		return estimateContext(apiMessages, modelId, estimatedOverheadBytes(info))
+	}
+
+	function setFreshContext(info: SessionInfo): void {
+		const ctx = estimateSessionContext(info, [])
+		sessionContext.set(info.id, ctx)
+		info.context = { used: ctx.used, max: ctx.max }
 	}
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
@@ -89,11 +101,11 @@ export async function startRuntime(): Promise<Runtime> {
 				if (usage) {
 					ctx = { used: usage.input, max: contextWindowForModel(modelId) }
 				} else {
-					const apiMsgs = await loadApiMessages(meta.id, modelId)
+					const apiMsgs = await loadApiMessages(meta.id)
 					if (apiMsgs.length > 0) {
-						ctx = estimateContext(apiMsgs, modelId)
+						ctx = estimateSessionContext(meta, apiMsgs)
 					} else {
-						ctx = { used: 0, max: contextWindowForModel(modelId), estimated: true }
+						ctx = estimateSessionContext(meta, [])
 					}
 				}
 			}

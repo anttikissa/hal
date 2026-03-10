@@ -196,7 +196,7 @@ export class Client {
 		for (const info of sessions) {
 			const existing = current.get(info.id)
 			if (existing) { existing.info = info; newTabs.push(existing) }
-			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0 }); newTabId = info.id }
+			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context }); newTabId = info.id }
 		}
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs

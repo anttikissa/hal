@@ -1,15 +1,18 @@
-// Context window sizes + token estimation with calibration.
+// Context window sizes + token estimation.
 //
-// ── Token estimation ──
-//
-// estimateTokens / messageBytes exist ONLY to give a rough context %
-// for fresh/idle tabs that have never made an API call. Once the API
-// responds, its usage.input is the ground truth and replaces any estimate.
-// Do NOT use estimates for autocompact decisions — those use real counts only.
+// Estimation purpose (important):
+// - Show a rough context % in the status line for fresh/idle tabs BEFORE
+//   we have real API usage.
+// - Include baseline overhead (system prompt + tool schema) so empty tabs are
+//   not shown as 0%.
+// - NEVER drive autocompact with estimates. Autocompact must use real API
+//   usage.input counts.
 
-import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { parse, stringify } from '../utils/ason.ts'
-import { STATE_DIR } from '../state.ts'
+import {
+	estimateTokensSync,
+	saveTokenCalibration,
+	isModelCalibrated,
+} from './token-calibration.ts'
 
 // ── Context windows ──
 
@@ -36,42 +39,19 @@ export function contextWindowForModel(modelId: string): number {
 	return DEFAULT_CONTEXT
 }
 
-// ── Calibration ──
-// Calibration learns the bytes→tokens ratio from real API responses.
-// This improves the accuracy of estimates for fresh tabs.
-
-const DEFAULT_BYTES_PER_TOKEN = 4
-
-interface Calibration { bytesPerToken: number; calibratedAt: string }
-
-const calibrationPath = () => `${STATE_DIR}/calibration.ason`
-let calibrationCache: Record<string, Calibration> | null = null
-
-function loadCalibration(): Record<string, Calibration> {
-	if (calibrationCache) return calibrationCache
-	const p = calibrationPath()
-	if (!existsSync(p)) { calibrationCache = {}; return calibrationCache }
-	try { calibrationCache = parse(readFileSync(p, 'utf-8')) as any } catch { calibrationCache = {} }
-	return calibrationCache!
-}
+// ── Compatibility wrappers (moved to token-calibration.ts) ──
 
 export function saveCalibration(modelId: string, totalBytes: number, totalTokens: number): void {
-	if (totalTokens <= 0 || totalBytes <= 0) return
-	const store = loadCalibration()
-	store[modelId] = { bytesPerToken: totalBytes / totalTokens, calibratedAt: new Date().toISOString() }
-	calibrationCache = store
-	writeFileSync(calibrationPath(), stringify(store) + '\n')
+	saveTokenCalibration(modelId, totalBytes, totalTokens)
 }
 
 export function isCalibrated(modelId: string): boolean {
-	return modelId in loadCalibration()
+	return isModelCalibrated(modelId)
 }
 
-// Estimate token count from byte count. Used ONLY for fresh-tab UI display.
+// Estimate token count from byte count. Fresh-tab UI only.
 export function estimateTokens(bytes: number, modelId: string): number {
-	const cal = loadCalibration()[modelId]
-	const ratio = cal?.bytesPerToken ?? DEFAULT_BYTES_PER_TOKEN
-	return Math.ceil(bytes / ratio)
+	return estimateTokensSync(bytes, modelId)
 }
 
 // ── Message byte counting (for estimation only) ──
@@ -94,14 +74,15 @@ export function messageBytes(msg: any): number {
 	return 0
 }
 
-// Estimate context for a set of API messages. Returns { used, max, estimated: true }.
-// Used ONLY for fresh-tab UI display before the first API response.
+// Estimate context for API messages with optional fixed overhead bytes
+// (e.g. system prompt + tools schema). Returns estimated usage only.
 export function estimateContext(
 	apiMessages: any[],
 	modelId: string,
+	overheadBytes = 0,
 ): { used: number; max: number; estimated: true } {
-	let totalBytes = 0
+	let totalBytes = Math.max(0, overheadBytes)
 	for (const msg of apiMessages) totalBytes += messageBytes(msg)
 	const max = contextWindowForModel(modelId)
-	return { used: estimateTokens(totalBytes, modelId), max, estimated: true as const }
+	return { used: estimateTokensSync(totalBytes, modelId), max, estimated: true as const }
 }

@@ -1,4 +1,4 @@
-/**
+	/**
  * Replay a debug/bug log into a fresh state directory.
  *
  * Usage: bun src/debug-replay.ts <bug-log.asonl> [--dir <output-dir>]

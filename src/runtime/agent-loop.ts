@@ -50,7 +50,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const ctxMax = contextWindowForModel(modelId)
 	let calibrated = isCalibrated(modelId)
 
-	ctx.onStatus(true, 'generating...', estimateContext(messages, modelId))
+	const overheadBytes = systemPrompt.length + JSON.stringify(TOOLS).length
+	ctx.onStatus(true, 'generating...', estimateContext(messages, modelId, overheadBytes))
 
 	try {
 		const provider = await loadProvider(providerName)
@@ -95,7 +96,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						// Calibrate bytes→tokens ratio on first API response
 						if (!calibrated && event.usage && event.usage.input > 0) {
 							calibrated = true
-							let totalBytes = systemPrompt.length
+							let totalBytes = systemPrompt.length + JSON.stringify(TOOLS).length
 							for (const m of messages) totalBytes += messageBytes(m)
 							saveCalibration(modelId, totalBytes, event.usage.input)
 						}

@@ -62,13 +62,13 @@ export function compactApiMessages(msgs: any[], opts?: CompactOpts): any[] {
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = msg.content.map((b: any) => {
-				if (b.type === 'tool_result' && !keepIds.has(b.tool_use_id)) {
-					const placeholder = b._ref ? `[cleared — ref: ${b._ref}]` : '[cleared]'
-					return { ...b, content: placeholder }
+			if (b.type === 'tool_result' && !keepIds.has(b.tool_use_id)) {
+					const tag = b._ref ? `, ref: ${b._ref}` : ''
+					return { ...b, content: `[tool result omitted after ${heavy} turns${tag}]` }
 				}
 				if (age[i] > heavy && b.type === 'image') {
-					const placeholder = b._ref ? `[image cleared — ref: ${b._ref}]` : '[image cleared]'
-					return { type: 'text', text: placeholder }
+					const tag = b._ref ? `, ref: ${b._ref}` : ''
+					return { type: 'text', text: `[image omitted after ${heavy} turns${tag}]` }
 				}
 				return b
 			})
