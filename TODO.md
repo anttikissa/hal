@@ -21,8 +21,7 @@ there's a bug where when I'm typing, sometimes colors bleed through the prompt l
 
 activity no longer visible in tab
 
-bash: ":ok: instead of checkmark
-
+Qkk
 You (to Codex 5.3) even though it's Opus
 
 Bash output having color is buggy (eg failing test) - should interpret ansi reset codes to restore
