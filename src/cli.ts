@@ -186,13 +186,15 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	let cursorPos: CursorPos
 
 	if (hasQ && qPromptResult) {
-		// Below tab bar: grayed-out separator + frozen prompt
+		// Below tab bar: grayed-out separator + frozen main prompt (not editable)
 		lines.push(buildSeparator(tab, w))
-		const frozen = prompt.frozenText()
-		if (frozen) {
-			for (const l of frozen.split('\n').slice(0, 3)) {
-				lines.push(`${DIM} ${l}${RESET}`)
-			}
+		const frozen = prompt.frozenText() ?? ''
+		const frozenLines = frozen.split('\n')
+		const shown = frozenLines.slice(0, 3)
+		if (shown.length === 0 || (shown.length === 1 && shown[0] === '')) {
+			lines.push(`${DIM} ${RESET}`)
+		} else {
+			for (const l of shown) lines.push(`${DIM} ${l}${RESET}`)
 		}
 		// Cursor is in the answer prompt area above tab bar
 		cursorPos = { row: qAnswerStartRow + qPromptResult.cursor.rowOffset, col: qPromptResult.cursor.col }
