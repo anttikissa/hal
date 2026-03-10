@@ -31,8 +31,8 @@
 //
 
 import { readFileSync, writeFileSync, renameSync, watch, existsSync } from 'fs'
-import { stringify, parse } from './ason.ts'
-import { ensureDir } from '../state.ts'
+import { ason } from './ason.ts'
+import { state } from '../state.ts'
 import { dirname, basename } from 'path'
 
 interface LiveFileOptions<T> {
@@ -49,16 +49,16 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 	if (existsSync(path)) {
 		try {
 			const raw = readFileSync(path, 'utf-8')
-			data = { ...opts.defaults, ...(parse(raw) as Record<string, unknown>) }
+			data = { ...opts.defaults, ...(ason.parse(raw) as Record<string, unknown>) }
 		} catch {}
 	}
 
 	function flush(): void {
 		if (!dirty) return
 		dirty = false
-		ensureDir(dirname(path))
+		state.ensureDir(dirname(path))
 		const tmp = `${path}.tmp.${process.pid}`
-		writeFileSync(tmp, stringify(data) + '\n')
+		writeFileSync(tmp, ason.stringify(data) + '\n')
 		renameSync(tmp, path)
 	}
 
@@ -92,7 +92,7 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 				debounce = setTimeout(() => {
 					try {
 						const raw = readFileSync(path, 'utf-8')
-						const disk = parse(raw) as Record<string, unknown>
+						const disk = ason.parse(raw) as Record<string, unknown>
 						Object.assign(data, disk)
 					} catch {}
 				}, 50)
@@ -119,3 +119,5 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 
 	return proxy as T & { save(): void }
 }
+
+export const liveFiles = { liveFile }

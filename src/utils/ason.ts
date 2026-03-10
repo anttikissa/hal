@@ -356,5 +356,6 @@ export async function* parseStream(
 	}
 }
 
-export default { stringify, parse, parseAll, parseStream, COMMENTS }
+export const ason = { stringify, parse, parseAll, parseStream, COMMENTS }
+export default ason
 export type { ParseError }

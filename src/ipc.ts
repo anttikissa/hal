@@ -1,13 +1,13 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
 import { open, readFile, rename, rm } from 'fs/promises'
-import { stringify, parse } from './utils/ason.ts'
-import { isPidAlive } from './utils/is-pid-alive.ts'
+import { ason } from './utils/ason.ts'
+import { processState } from './utils/is-pid-alive.ts'
 import { Log } from './utils/log.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, EventLevel } from './protocol.ts'
-import { defaultState, eventId } from './protocol.ts'
-import { liveFile } from './utils/live-file.ts'
-import { IPC_DIR, ensureDir } from './state.ts'
+import { protocol } from './protocol.ts'
+import { liveFiles } from './utils/live-file.ts'
+import { IPC_DIR, state } from './state.ts'
 
 export const commands = new Log<RuntimeCommand>(`${IPC_DIR}/commands.asonl`)
 export const events = new Log<RuntimeEvent>(`${IPC_DIR}/events.asonl`)
@@ -16,7 +16,7 @@ const HOST_LOCK = `${IPC_DIR}/host.lock`
 let _state: RuntimeState | null = null
 
 export async function ensureBus(): Promise<void> {
-	ensureDir(IPC_DIR)
+	state.ensureDir(IPC_DIR)
 	await commands.ensure()
 	await events.ensure()
 	getState()
@@ -24,8 +24,8 @@ export async function ensureBus(): Promise<void> {
 
 export function getState(): RuntimeState {
 	if (!_state) {
-		ensureDir(IPC_DIR)
-		_state = liveFile<RuntimeState>(`${IPC_DIR}/state.ason`, { defaults: defaultState() })
+		state.ensureDir(IPC_DIR)
+		_state = liveFiles.liveFile<RuntimeState>(`${IPC_DIR}/state.ason`, { defaults: protocol.defaultState() })
 	}
 	return _state
 }
@@ -41,7 +41,7 @@ async function readLock(): Promise<{ hostId: string | null; pid: number | null }
 	// Retry once on parse failure (file may be mid-write)
 	for (let i = 0; i < 2; i++) {
 		try {
-			const lock = parse(await readFile(HOST_LOCK, 'utf-8')) as any
+			const lock = ason.parse(await readFile(HOST_LOCK, 'utf-8')) as any
 			return { hostId: lock?.hostId ?? null, pid: Number.isInteger(lock?.pid) ? lock.pid : null }
 		} catch { if (i === 0) await Bun.sleep(100) }
 	}
@@ -49,8 +49,8 @@ async function readLock(): Promise<{ hostId: string | null; pid: number | null }
 }
 
 export async function claimHost(hostId: string): Promise<{ host: boolean; currentPid: number | null }> {
-	ensureDir(IPC_DIR)
-	const payload = stringify({ hostId, pid: process.pid, createdAt: new Date().toISOString() })
+	state.ensureDir(IPC_DIR)
+	const payload = ason.stringify({ hostId, pid: process.pid, createdAt: new Date().toISOString() })
 	const won = () => { updateState(s => { s.hostPid = process.pid; s.hostId = hostId }); return { host: true, currentPid: process.pid } as const }
 	const lost = (pid?: number | null) => ({ host: false, currentPid: pid ?? getState().hostPid } as const)
 
@@ -70,7 +70,7 @@ export async function claimHost(hostId: string): Promise<{ host: boolean; curren
 	const lock = await readLock()
 	if (!lock) return stealStaleLock()
 	if (lock.hostId === hostId) return won()
-	if (lock.pid !== null && isPidAlive(lock.pid)) return lost(lock.pid)
+	if (lock.pid !== null && processState.isPidAlive(lock.pid)) return lost(lock.pid)
 
 	// Dead host — steal stale lock and retry.
 	return stealStaleLock()
@@ -95,7 +95,7 @@ export async function releaseHost(hostId: string): Promise<void> {
 
 /** Emit a line to the TUI without persisting to session history. */
 export function log(text: string, sessionId?: string | null, level: EventLevel = 'info'): Promise<void> {
-	return events.append({ id: eventId(), type: 'line', sessionId: sessionId ?? null, text, level, createdAt: new Date().toISOString() } as RuntimeEvent)
+	return events.append({ id: protocol.eventId(), type: 'line', sessionId: sessionId ?? null, text, level, createdAt: new Date().toISOString() } as RuntimeEvent)
 }
 
 export const ipc = {

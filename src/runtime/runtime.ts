@@ -1,12 +1,12 @@
 // Runtime class — holds all session state and provides the API surface for commands and eval.
 
 import { ipc } from '../ipc.ts'
-import { appendMessages, readMessages, detectInterruptedTools } from '../session/messages.ts'
-import { runAgentLoop } from './agent-loop.ts'
+import { messages } from '../session/messages.ts'
+import { agentLoop } from './agent-loop.ts'
 import { context } from './context.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
-import { eventId, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
+import { protocol, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { config } from '../config.ts'
 
 const GREETINGS = [
@@ -42,11 +42,11 @@ export class Runtime {
 	pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
 
 	async emit(fields: Omit<RuntimeEvent, 'id' | 'createdAt'>): Promise<void> {
-		await ipc.events.append({ ...fields, id: eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
+		await ipc.events.append({ ...fields, id: protocol.eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
 	}
 
 	async emitInfo(sessionId: string, text: string, level = 'info'): Promise<void> {
-		await appendMessages(sessionId, [{ type: 'info', text, level, ts: new Date().toISOString() }])
+		await messages.appendMessages(sessionId, [{ type: 'info', text, level, ts: new Date().toISOString() }])
 		await this.emit({ type: 'line', sessionId, text, level })
 	}
 
@@ -103,7 +103,7 @@ export class Runtime {
 	}
 
 	async askUser(sessionId: string, question: string): Promise<string> {
-		const questionId = eventId()
+		const questionId = protocol.eventId()
 		return new Promise(resolve => {
 			this.pendingQuestions.set(sessionId, { resolve, question })
 			void this.emit({ type: 'question', sessionId, questionId, text: question })
@@ -112,7 +112,7 @@ export class Runtime {
 
 	async greetSession(sessionId: string): Promise<void> {
 		const text = pick(GREETINGS)
-		await appendMessages(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
+		await messages.appendMessages(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
 	}
 
 	async startGeneration(
@@ -126,7 +126,7 @@ export class Runtime {
 		this.busySessionIds.add(sid)
 		await this.publish(activity)
 		const sysPrompt = systemPrompt.loadSystemPrompt({ model: info.model ?? config.getConfig().defaultModel, sessionDir: sid })
-		runAgentLoop({
+		agentLoop.runAgentLoop({
 			sessionId: sid,
 			model: info.model ?? config.getConfig().defaultModel,
 			systemPrompt: sysPrompt.text,
@@ -156,8 +156,8 @@ export class Runtime {
 	}
 
 	async resumeInterruptedSession(sessionId: string): Promise<void> {
-		const messages = await readMessages(sessionId)
-		const interrupted = detectInterruptedTools(messages)
+		const entries = await messages.readMessages(sessionId)
+		const interrupted = messages.detectInterruptedTools(entries)
 		if (interrupted.length > 0) {
 			this.pendingInterruptedTools.set(sessionId, interrupted)
 		}
@@ -174,3 +174,5 @@ export function getRuntime(): Runtime {
 	if (!_instance) throw new Error('Runtime not initialized')
 	return _instance
 }
+
+export const runtimeCore = { timeAgo, setRuntime, getRuntime }

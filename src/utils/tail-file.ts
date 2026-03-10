@@ -25,3 +25,5 @@ export function tailFile(path: string, fromOffset?: number): ReadableStream<Uint
 		},
 	})
 }
+
+export const tails = { tailFile }

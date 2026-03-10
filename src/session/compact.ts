@@ -78,3 +78,5 @@ export function compactApiMessages(msgs: any[], opts?: CompactOpts): any[] {
 
 	return out
 }
+
+export const compact = { compactApiMessages }

@@ -1,6 +1,6 @@
 // Terminal client — wired to IPC via Client + Transport.
 
-import { diffEngine, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
+import { diffEngine, type RenderState, type CursorPos } from './cli/diff-engine.ts'
 import { keys } from './cli/keys.ts'
 import { keybindings, type InputContext } from './cli/keybindings.ts'
 import { prompt } from './cli/prompt.ts'
@@ -52,7 +52,7 @@ export const client = new Client(transport, () => { doRender() })
 // ── Renderer ──
 
 const DIM = '\x1b[38;5;245m', RESET = '\x1b[0m', YELLOW = '\x1b[33m', RED = '\x1b[31m', GREEN = '\x1b[32m'
-let renderState: RenderState = emptyState
+let renderState: RenderState = diffEngine.emptyState
 
 function oneLine(s: string): string {
 	return s.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ')
@@ -303,7 +303,7 @@ process.on('SIGCONT', () => {
 	stdin.resume()
 	if (useKitty) stdout.write(KITTY_KBD_ON)
 	stdout.write(BRACKETED_PASTE_ON)
-	renderState = emptyState
+	renderState = diffEngine.emptyState
 	doRender()
 })
 
@@ -339,7 +339,7 @@ stdin.on('data', (data: string) => {
 })
 
 stdout.on('resize', () => {
-	renderState = emptyState
+	renderState = diffEngine.emptyState
 	doRender()
 })
 

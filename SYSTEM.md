@@ -56,13 +56,22 @@ Multiple forks from the same parent share the same prefix of conversation histor
 
 The user has enabled the `eval` tool. It executes TypeScript **inside the Hal process** — use it to inspect/modify runtime state, call internal functions, or do anything `bash` can't (bash runs out-of-process).
 
-- **`code`** parameter: TypeScript function body. `ctx` is in scope with `{ sessionId, halDir, stateDir, cwd }`. Use `return` to return a value.
+- **`code`** parameter: TypeScript function body. `ctx` is in scope with `{ sessionId, halDir, stateDir, cwd, runtime }`. Use `return` to return a value.
 - **Imports**: use `~src/` prefix, e.g. `import { ipc } from '~src/ipc.ts'`
 - **Audit**: scripts persist in `state/sessions/<id>/eval/` — never deleted.
 
 ### Hot-patchable modules
 
-Most modules export a mutable namespace object (e.g. `ipc.ts` → `export const ipc = { ensureBus, getState, ... }`). Internal calls use the direct function name, but cross-module calls go through the namespace. This means you can hot-patch any function at runtime:
+Almost every non-test module exposes a mutable namespace object (for example `ipc.ts` exports `ipc`, `messages.ts` exports `messages`, `context.ts` exports `context`).
+
+Pattern:
+
+```ts
+function ensureBus() { ... }
+export const ipc = { ensureBus, ... }
+```
+
+Cross-module calls go through these namespace objects, so eval patches take effect immediately.
 
 ```ts
 import { ipc } from '~src/ipc.ts'
@@ -70,7 +79,15 @@ const orig = ipc.getState
 ipc.getState = () => { console.log('patched!'); return orig() }
 ```
 
-Skipped modules (not namespace-wrapped): `state.ts` (constants), `ason.ts` (already namespaced), `runtime.ts` (class — patch via prototype), single-function utils, provider files (already object exports), test files.
+Live runtime access:
+
+```ts
+import { runtimeCore } from '~src/runtime/runtime.ts'
+const rt = runtimeCore.getRuntime()
+return { active: rt.activeSessionId, busy: [...rt.busySessionIds] }
+```
+
+Notes: constants/types may still be direct exports. `runtime.ts` is a class module; patch methods via the runtime instance or `Runtime.prototype`.
 
 :::
 

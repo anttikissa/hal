@@ -3,14 +3,14 @@
 // Processes raw key input via parseKeys + prompt, emits JSON events on stdout.
 // Expects HAL_STATE_DIR to be set by the caller (parent process).
 
-import { ensureStateDir } from './state.ts'
+import { state } from './state.ts'
 import { ipc } from './ipc.ts'
 import { startup } from './runtime/startup.ts'
 import { keys } from './cli/keys.ts'
 import { prompt } from './cli/prompt.ts'
-import { eventId, type RuntimeEvent } from './protocol.ts'
+import { protocol, type RuntimeEvent } from './protocol.ts'
 
-ensureStateDir()
+state.ensureStateDir()
 await ipc.ensureBus()
 
 // Grab tail offset BEFORE runtime starts, so we don't miss initial publish
@@ -49,7 +49,7 @@ stdin.resume()
 function submitCommand(type: string, text?: string): void {
 	ipc.commands.append({
 		type, text, sessionId: runtime.activeSessionId,
-		id: eventId(), createdAt: new Date().toISOString(),
+		id: protocol.eventId(), createdAt: new Date().toISOString(),
 	} as any)
 }
 

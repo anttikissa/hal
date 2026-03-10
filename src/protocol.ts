@@ -149,3 +149,5 @@ let _counter = 0
 export function eventId(): string {
 	return `${Date.now().toString(36)}-${(++_counter).toString(36)}`
 }
+
+export const protocol = { makeCommand, defaultState, eventId }

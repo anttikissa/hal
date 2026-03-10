@@ -38,3 +38,5 @@ export function ensureDir(dir: string): void {
 export function ensureStateDir(): void {
 	for (const dir of [STATE_DIR, IPC_DIR, SESSIONS_DIR]) ensureDir(dir)
 }
+
+export const state = { sessionDir, blocksDir, ensureDir, ensureStateDir }

@@ -6,24 +6,24 @@
 
 import { appendFile, readFile, stat, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
-import { stringify, parseAll, parseStream } from './ason.ts'
-import { tailFile } from './tail-file.ts'
+import { ason } from './ason.ts'
+import { tails } from './tail-file.ts'
 
 export class Log<T> {
 	constructor(public readonly path: string) {}
 
 	async append(...items: T[]): Promise<void> {
-		await appendFile(this.path, items.map(i => stringify(i, 'short')).join('\n') + '\n')
+		await appendFile(this.path, items.map(i => ason.stringify(i, 'short')).join('\n') + '\n')
 	}
 
 	async readAll(): Promise<T[]> {
 		if (!existsSync(this.path)) return []
-		try { return parseAll(await readFile(this.path, 'utf-8')) as T[] }
+		try { return ason.parseAll(await readFile(this.path, 'utf-8')) as T[] }
 		catch { return [] }
 	}
 
 	tail(fromOffset?: number): { items: AsyncGenerator<T>; cancel(): void } {
-		const stream = tailFile(this.path, fromOffset)
+		const stream = tails.tailFile(this.path, fromOffset)
 		const reader = stream.getReader()
 		let cancelled = false
 		const wrapped = new ReadableStream<Uint8Array>({
@@ -34,7 +34,7 @@ export class Log<T> {
 			},
 		})
 		return {
-			items: parseStream(wrapped) as AsyncGenerator<T>,
+			items: ason.parseStream(wrapped) as AsyncGenerator<T>,
 			cancel() { cancelled = true; reader.cancel() },
 		}
 	}
@@ -46,7 +46,7 @@ export class Log<T> {
 	async trim(keep: number): Promise<void> {
 		const all = await this.readAll()
 		if (all.length <= keep) return
-		await writeFile(this.path, all.slice(-keep).map(e => stringify(e, 'short')).join('\n') + '\n')
+		await writeFile(this.path, all.slice(-keep).map(e => ason.stringify(e, 'short')).join('\n') + '\n')
 	}
 
 	async ensure(): Promise<void> {

@@ -5,8 +5,8 @@
 import { loader } from '../providers/loader.ts'
 import type { ProviderEvent } from '../providers/provider.ts'
 import { ipc } from '../ipc.ts'
-import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock, parseUserContent, makeBlockRef } from '../session/messages.ts'
-import { eventId } from '../protocol.ts'
+import { messages as sessionMessages } from '../session/messages.ts'
+import { protocol } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { tools, type ToolCall } from './tools.ts'
 import type { EvalContext } from './eval-tool.ts'
@@ -36,13 +36,13 @@ export interface AgentContext {
 
 function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeEvent['type'] }): Promise<void> {
 	return ipc.events.append({
-		id: eventId(), sessionId, createdAt: new Date().toISOString(), ...event,
+		id: protocol.eventId(), sessionId, createdAt: new Date().toISOString(), ...event,
 	} as RuntimeEvent)
 }
 
 /** Emit IPC line event AND persist as info message. */
 async function emitInfo(sessionId: string, text: string, level: EventLevel, detail?: string): Promise<void> {
-	await appendMessages(sessionId, [{ type: 'info', text, level, detail, ts: new Date().toISOString() }])
+	await sessionMessages.appendMessages(sessionId, [{ type: 'info', text, level, detail, ts: new Date().toISOString() }])
 	await emit(sessionId, { type: 'line', text, level, detail })
 }
 
@@ -85,7 +85,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				if (signal?.aborted) { aborted = true; break }
 				switch (event.type) {
 					case 'thinking':
-						if (!thinkingRef) thinkingRef = makeBlockRef(sessionId)
+						if (!thinkingRef) thinkingRef = sessionMessages.makeBlockRef(sessionId)
 						thinkingText += event.text
 						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', ref: thinkingRef })
 						break
@@ -139,8 +139,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						if (toolCalls.length === 0) {
 							// No tools — persist and finish
-							const { entry } = await writeAssistantEntry(sessionId, assistantOpts)
-							await appendMessages(sessionId, [entry])
+							const { entry } = await sessionMessages.writeAssistantEntry(sessionId, assistantOpts)
+							await sessionMessages.appendMessages(sessionId, [entry])
 							if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 							await emit(sessionId, {
 								type: 'command', commandId: '', phase: 'done',
@@ -150,8 +150,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						}
 
 						// Write assistant entry BEFORE executing tools
-						const { entry: assistantEntry, toolRefMap } = await writeAssistantEntry(sessionId, assistantOpts)
-						await appendMessages(sessionId, [assistantEntry])
+						const { entry: assistantEntry, toolRefMap } = await sessionMessages.writeAssistantEntry(sessionId, assistantOpts)
+						await sessionMessages.appendMessages(sessionId, [assistantEntry])
 						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
 						// Execute tools, writing each result individually
@@ -161,7 +161,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							call = hooks.runHooks(call)
 							if (call.input !== original.input) {
 								const ref = toolRefMap.get(call.id)
-								if (ref) await updateBlockInput(sessionId, ref, call.input, original.input)
+								if (ref) await sessionMessages.updateBlockInput(sessionId, ref, call.input, original.input)
 							}
 							const args = tools.argsPreview(call)
 
@@ -174,8 +174,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							if (answer.trim().toLowerCase() !== 'y') {
 								result = 'error: user denied permission'
 								toolStatus = 'error'
-								const toolResultEntry = await writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
-								await appendMessages(sessionId, [toolResultEntry])
+								const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
+								await sessionMessages.appendMessages(sessionId, [toolResultEntry])
 								continue
 							}
 						}
@@ -183,7 +183,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						if (call.name === 'ask') {
 							const question = (call.input as any)?.question ?? ''
 							const answer = await ctx.askUser(question) || '[no answer]'
-							const { apiContent } = await parseUserContent(sessionId, answer)
+							const { apiContent } = await sessionMessages.parseUserContent(sessionId, answer)
 							result = apiContent
 						} else {
 							const ref = toolRefMap.get(call.id)
@@ -204,8 +204,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						}
 
 						// Persist tool result immediately
-						const toolResultEntry = await writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
-						await appendMessages(sessionId, [toolResultEntry])
+						const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
+						await sessionMessages.appendMessages(sessionId, [toolResultEntry])
 						}
 
 						if (aborted) break
@@ -223,7 +223,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						})
 						for (const call of toolCalls) {
 							const ref = toolRefMap.get(call.id)!
-							const block = await readBlock(sessionId, ref)
+							const block = await sessionMessages.readBlock(sessionId, ref)
 							const raw = block?.result?.content ?? ''
 							const content = typeof raw === 'string' ? tools.truncate(raw) : raw
 							messages.push({
@@ -240,7 +240,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			if (aborted) {
 				// Persist partial output before exiting
 				if (assistantText || thinkingText) {
-					await appendMessages(sessionId, [
+					await sessionMessages.appendMessages(sessionId, [
 						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, thinkingSignature: thinkingSignature || undefined, ts: new Date().toISOString() },
 					])
 				}
@@ -264,3 +264,5 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		ctx.onStatus(false)
 	}
 }
+
+export const agentLoop = { runAgentLoop }

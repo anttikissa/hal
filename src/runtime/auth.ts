@@ -1,7 +1,7 @@
 // Auth — reads HAL_DIR/auth.ason (shared with old code), handles OAuth refresh.
 // Uses liveFile so external edits (e.g. scripts/login-*.ts) are picked up.
 
-import { liveFile } from '../utils/live-file.ts'
+import { liveFiles } from '../utils/live-file.ts'
 import { HAL_DIR } from '../state.ts'
 
 const AUTH_PATH = `${HAL_DIR}/auth.ason`
@@ -12,7 +12,7 @@ const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 let _auth: Record<string, any> | null = null
 
 function authStore(): Record<string, any> {
-	if (!_auth) _auth = liveFile(AUTH_PATH, { defaults: {} })
+	if (!_auth) _auth = liveFiles.liveFile(AUTH_PATH, { defaults: {} })
 	return _auth
 }
 

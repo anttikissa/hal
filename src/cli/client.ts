@@ -3,7 +3,7 @@
 import type { Transport } from './transport.ts'
 import type { Block } from './blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
-import { makeCommand } from '../protocol.ts'
+import { protocol } from '../protocol.ts'
 import { replay } from '../session/replay.ts'
 import { messages } from '../session/messages.ts'
 import { prompt } from './prompt.ts'
@@ -259,7 +259,7 @@ export class Client {
 		const tab = this.activeTab()
 		const sessionId = tab?.sessionId
 		if (!sessionId && type !== 'open') throw new Error('no active session')
-		await this.transport.sendCommand(makeCommand(type, this.source, text, sessionId))
+		await this.transport.sendCommand(protocol.makeCommand(type, this.source, text, sessionId))
 	}
 
 	markPausing(): void {

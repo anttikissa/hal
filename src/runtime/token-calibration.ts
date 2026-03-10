@@ -5,7 +5,7 @@
 // - Never replace real usage once the provider reports usage.input.
 
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { parse, stringify } from '../utils/ason.ts'
+import { ason } from '../utils/ason.ts'
 import { STATE_DIR } from '../state.ts'
 
 export interface TokenCalibration {
@@ -27,7 +27,7 @@ function loadStore(): CalibrationStore {
 		return calibrationCache
 	}
 	try {
-		calibrationCache = parse(readFileSync(path, 'utf-8')) as CalibrationStore
+		calibrationCache = ason.parse(readFileSync(path, 'utf-8')) as CalibrationStore
 	} catch {
 		calibrationCache = {}
 	}
@@ -42,7 +42,7 @@ export function saveTokenCalibration(modelId: string, totalBytes: number, totalT
 		calibratedAt: new Date().toISOString(),
 	}
 	calibrationCache = store
-	writeFileSync(calibrationPath(), stringify(store) + '\n')
+	writeFileSync(calibrationPath(), ason.stringify(store) + '\n')
 }
 
 export function isModelCalibrated(modelId: string): boolean {

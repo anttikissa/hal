@@ -2,13 +2,13 @@
 // Entry point — host election, promotion, then start runtime + CLI.
 
 import { randomBytes } from 'crypto'
-import { ensureStateDir } from './state.ts'
+import { state } from './state.ts'
 import { ipc } from './ipc.ts'
 import { startup } from './runtime/startup.ts'
 import { type Runtime } from './runtime/runtime.ts'
-import { eventId } from './protocol.ts'
+import { protocol } from './protocol.ts'
 
-ensureStateDir()
+state.ensureStateDir()
 await ipc.ensureBus()
 
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
@@ -22,7 +22,7 @@ let runtime: Runtime | null = null
 
 async function emitLine(text: string): Promise<void> {
 	await ipc.events.append({
-		id: eventId(), type: 'line', sessionId: null,
+		id: protocol.eventId(), type: 'line', sessionId: null,
 		text, level: 'meta', createdAt: new Date().toISOString(),
 	} as any)
 }

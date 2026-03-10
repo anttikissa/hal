@@ -68,6 +68,16 @@ Insert `<blink />` (50ms pause) or `<blink ms="400" />` (custom duration) in str
 - Consecutive blank lines are collapsed.
 - `.asonl` files (conversation, session, IPC logs) use ASONL format — parse with `ason.parseAll()`, not line-by-line JSON.
 
+## Hot patchability
+
+- Prefer this pattern for runtime modules:
+	- `function foo() { ... }`
+	- `export const moduleName = { foo, ... }`
+- Cross-module calls should go through namespace objects (`moduleName.foo(...)`), so eval-time monkey patches take effect immediately.
+- Keep direct exports for types and constants.
+- `runtime.ts` is class-based; patch via `runtimeCore.getRuntime()` or `Runtime.prototype`.
+- Eval scripts can import with `~src/` and receive `ctx.runtime`.
+
 ## TODOs
 
 See `TODO.md`.

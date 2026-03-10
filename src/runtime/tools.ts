@@ -5,7 +5,7 @@ import { readFileSync, statSync, readdirSync } from 'fs'
 import { resolve, isAbsolute } from 'path'
 import { $ } from 'bun'
 import { homedir } from 'os'
-import { stringify } from '../utils/ason.ts'
+import { ason } from '../utils/ason.ts'
 import { evalTool, type EvalContext } from './eval-tool.ts'
 
 const HOME = homedir()
@@ -59,7 +59,7 @@ function validateRef(ref: { line: number; hash: string }, lines: string[]): stri
 		return `Line ${ref.line} out of range (file has ${lines.length} lines)`
 	const actual = hashLine(lines[ref.line - 1])
 	if (actual !== ref.hash)
-		return `Hash mismatch at line ${ref.line}: expected ${ref.hash}, got ${actual} (content: ${stringify(lines[ref.line - 1].slice(0, 60))})`
+		return `Hash mismatch at line ${ref.line}: expected ${ref.hash}, got ${actual} (content: ${ason.stringify(lines[ref.line - 1].slice(0, 60))})`
 	return null
 }
 
@@ -344,8 +344,8 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalCon
 			if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
 			// Lazily resolve runtime to avoid circular imports
 			if (!evalCtx.runtime) {
-				const { getRuntime } = await import('./runtime.ts')
-				try { evalCtx.runtime = getRuntime() } catch {}
+				const { runtimeCore } = await import('./runtime.ts')
+				try { evalCtx.runtime = runtimeCore.getRuntime() } catch {}
 			}
 			return await evalTool.executeEval(String(inp.code), evalCtx)
 		}

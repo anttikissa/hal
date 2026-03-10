@@ -5,8 +5,8 @@ import { strings } from '../utils/strings.ts'
 import { md } from './md.ts'
 import { models } from '../models.ts'
 import { config } from '../config.ts'
-import { stringify as asonStringify } from '../utils/ason.ts'
-import { blocksDir } from '../state.ts'
+import { ason } from '../utils/ason.ts'
+import { state } from '../state.ts'
 
 const TOOL_MAX_OUTPUT = 5
 const THINKING_BLOCK_MIN_LINES = 5
@@ -139,7 +139,7 @@ function toolHeader(label: string, width: number, fg: string, bg: string, ref: s
 	const safeRef = displayRef ? clipPlain(oneLine(displayRef), 24) : ''
 	let refDisplay = ''
 	if (safeRef && ref) {
-		const fileUrl = `file://${blocksDir(sessionId)}/${ref}.ason`
+		const fileUrl = `file://${state.blocksDir(sessionId)}/${ref}.ason`
 		refDisplay = ` [\x1b]8;;${fileUrl}\x07${safeRef}\x1b]8;;\x07] ──`
 	}
 	const prefix = '── '
@@ -236,7 +236,7 @@ function formatErrorDetail(detail: string): string {
 		try {
 			const parsed = JSON.parse(detail.slice(jsonStart))
 			const prefix = detail.slice(0, jsonStart).trim()
-			const formatted = asonStringify(parsed)
+			const formatted = ason.stringify(parsed)
 			return prefix ? `${prefix}\n${formatted}` : formatted
 		} catch {}
 	}

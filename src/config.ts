@@ -1,6 +1,6 @@
 // Minimal config — liveFile-backed, auto-reloads on external edits.
 
-import { liveFile } from './utils/live-file.ts'
+import { liveFiles } from './utils/live-file.ts'
 import { CONFIG_PATH } from './state.ts'
 
 export type PermissionLevel = 'yolo' | 'ask-writes' | 'ask-all'
@@ -17,7 +17,7 @@ let _config: Config | null = null
 
 export function getConfig(): Config {
 	if (!_config) {
-		_config = liveFile<Config>(process.env.HAL_CONFIG ?? CONFIG_PATH, {
+		_config = liveFiles.liveFile<Config>(process.env.HAL_CONFIG ?? CONFIG_PATH, {
 			defaults: { defaultModel: 'anthropic/claude-opus-4-6' },
 		})
 	}

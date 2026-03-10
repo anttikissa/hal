@@ -154,4 +154,4 @@ function positionCursor(currentRow: number, target: CursorPos): string {
 	return moveCursor(currentRow, target.row) + `\x1b[${target.col}G\x1b[?25h`
 }
 
-export const diffEngine = { render }
+export const diffEngine = { render, emptyState }

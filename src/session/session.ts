@@ -5,9 +5,9 @@ import { readFile, writeFile, appendFile } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { resolve, join } from 'path'
-import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, ensureDir, sessionDir } from '../state.ts'
-import { liveFile } from '../utils/live-file.ts'
-import { stringify } from '../utils/ason.ts'
+import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, state } from '../state.ts'
+import { liveFiles } from '../utils/live-file.ts'
+import { ason } from '../utils/ason.ts'
 import type { SessionInfo } from '../protocol.ts'
 
 export type { SessionInfo }
@@ -41,7 +41,7 @@ export async function makeSessionId(): Promise<string> {
 	const epoch = await ensureEpoch()
 	for (let i = 0; i < 10; i++) {
 		const id = generateId(epoch, 3)
-		if (!existsSync(sessionDir(id))) return id
+		if (!existsSync(state.sessionDir(id))) return id
 	}
 	return generateId(epoch, 4)
 }
@@ -49,7 +49,7 @@ export async function makeSessionId(): Promise<string> {
 // ── Meta (liveFile-backed) ──
 
 function metaPath(id: string): string {
-	return `${sessionDir(id)}/meta.ason`
+	return `${state.sessionDir(id)}/meta.ason`
 }
 
 const META_DEFAULTS: SessionInfo = {
@@ -60,15 +60,15 @@ const META_DEFAULTS: SessionInfo = {
 export function loadMeta(id: string): SessionInfo | null {
 	const path = metaPath(id)
 	if (!existsSync(path)) return null
-	return liveFile<SessionInfo>(path, { defaults: { ...META_DEFAULTS, id } })
+	return liveFiles.liveFile<SessionInfo>(path, { defaults: { ...META_DEFAULTS, id } })
 }
 
 /** Create a new session. Returns a live proxy — mutate it, it saves. */
 export async function createSession(workingDir?: string): Promise<SessionInfo> {
 	const id = await makeSessionId()
-	ensureDir(sessionDir(id))
+	state.ensureDir(state.sessionDir(id))
 	const ts = new Date().toISOString()
-	const info = liveFile<SessionInfo>(metaPath(id), {
+	const info = liveFiles.liveFile<SessionInfo>(metaPath(id), {
 		defaults: {
 			id,
 			workingDir: resolve(workingDir ?? LAUNCH_CWD),
@@ -96,15 +96,15 @@ export async function listSessionIds(): Promise<string[]> {
 /** Fork a session. Creates a new session with a forked_from pointer. */
 export async function forkSession(sourceId: string): Promise<string> {
 	const id = await makeSessionId()
-	const dir = sessionDir(id)
-	ensureDir(dir)
+	const dir = state.sessionDir(id)
+	state.ensureDir(dir)
 	const ts = new Date().toISOString()
-	const meta = liveFile<SessionInfo>(metaPath(id), {
+	const meta = liveFiles.liveFile<SessionInfo>(metaPath(id), {
 		defaults: { id, workingDir: resolve(LAUNCH_CWD), log: 'messages.asonl', createdAt: ts, updatedAt: ts },
 	})
 	meta.updatedAt = ts
 	;(meta as SessionInfo & { save?: () => void }).save?.()
-	await appendFile(join(dir, 'messages.asonl'), stringify({ type: 'forked_from', parent: sourceId, ts }) + '\n')
+	await appendFile(join(dir, 'messages.asonl'), ason.stringify({ type: 'forked_from', parent: sourceId, ts }) + '\n')
 	return id
 }
 
@@ -138,3 +138,13 @@ export async function rotateLog(sessionId: string): Promise<string> {
 
 // Cache for messagesLog — invalidated by rotateLog
 export const logNameCache = new Map<string, string>()
+export const session = {
+	makeSessionId,
+	loadMeta,
+	createSession,
+	listSessionIds,
+	forkSession,
+	currentLog,
+	rotateLog,
+	logNameCache,
+}

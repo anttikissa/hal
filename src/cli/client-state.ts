@@ -1,6 +1,6 @@
 // Client-side persistent state — remembers last active tab per server.
 
-import { liveFile } from '../utils/live-file.ts'
+import { liveFiles } from '../utils/live-file.ts'
 import { CLIENT_STATE_PATH, STATE_DIR } from '../state.ts'
 
 interface ServerState {
@@ -17,7 +17,7 @@ let _state: ClientPersist | null = null
 
 function state(): ClientPersist {
 	if (!_state) {
-		_state = liveFile<ClientPersist>(CLIENT_STATE_PATH, {
+		_state = liveFiles.liveFile<ClientPersist>(CLIENT_STATE_PATH, {
 			defaults: { servers: {} },
 		})
 	}

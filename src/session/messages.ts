@@ -7,21 +7,21 @@ import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { homedir } from 'os'
 import { Log } from '../utils/log.ts'
-import { sessionDir, blocksDir, ensureDir } from '../state.ts'
-import { stringify, parse } from '../utils/ason.ts'
-import { logNameCache } from './session.ts'
-import { compactApiMessages, type CompactOpts } from './compact.ts'
+import { state } from '../state.ts'
+import { ason } from '../utils/ason.ts'
+import { session } from './session.ts'
+import { compact, type CompactOpts } from './compact.ts'
 
 function resolveLogName(sessionId: string): string {
-	const cached = logNameCache.get(sessionId)
+	const cached = session.logNameCache.get(sessionId)
 	if (cached) return cached
 	// Read from meta.ason
-	const metaPath = `${sessionDir(sessionId)}/meta.ason`
+	const metaPath = `${state.sessionDir(sessionId)}/meta.ason`
 	if (existsSync(metaPath)) {
 		try {
-			const meta = parse(readFileSync(metaPath, 'utf-8')) as any
+			const meta = ason.parse(readFileSync(metaPath, 'utf-8')) as any
 			const name = meta?.log ?? 'messages.asonl'
-			logNameCache.set(sessionId, name)
+			session.logNameCache.set(sessionId, name)
 			return name
 		} catch {}
 	}
@@ -29,7 +29,7 @@ function resolveLogName(sessionId: string): string {
 }
 
 function messagesLog(sessionId: string) {
-	return new Log<Message>(`${sessionDir(sessionId)}/${resolveLogName(sessionId)}`)
+	return new Log<Message>(`${state.sessionDir(sessionId)}/${resolveLogName(sessionId)}`)
 }
 
 // ── Message types ──
@@ -74,7 +74,7 @@ function sessionStart(sessionId: string): number {
 	let ts = sessionStartCache.get(sessionId)
 	if (ts !== undefined) return ts
 	try {
-		const meta = parse(readFileSync(`${sessionDir(sessionId)}/meta.ason`, 'utf-8')) as any
+		const meta = ason.parse(readFileSync(`${state.sessionDir(sessionId)}/meta.ason`, 'utf-8')) as any
 		ts = new Date(meta.createdAt).getTime()
 	} catch {
 		ts = Date.now()
@@ -92,15 +92,15 @@ export function makeBlockRef(sessionId: string): string {
 }
 
 export async function writeBlock(sessionId: string, ref: string, data: unknown): Promise<void> {
-	const dir = blocksDir(sessionId)
-	ensureDir(dir)
-	await writeFile(`${dir}/${ref}.ason`, stringify(data) + '\n')
+	const dir = state.blocksDir(sessionId)
+	state.ensureDir(dir)
+	await writeFile(`${dir}/${ref}.ason`, ason.stringify(data) + '\n')
 }
 
 export async function readBlock(sessionId: string, ref: string): Promise<any | null> {
-	const path = `${blocksDir(sessionId)}/${ref}.ason`
+	const path = `${state.blocksDir(sessionId)}/${ref}.ason`
 	if (existsSync(path)) {
-		try { return parse(await readFile(path, 'utf-8')) }
+		try { return ason.parse(await readFile(path, 'utf-8')) }
 		catch { return null }
 	}
 	// Walk fork chain — block may live in parent's blocks/
@@ -114,13 +114,13 @@ const parentCache = new Map<string, string | null>()
 function getParentSessionId(sessionId: string): string | null {
 	const cached = parentCache.get(sessionId)
 	if (cached !== undefined) return cached
-	const path = `${sessionDir(sessionId)}/messages.asonl`
+	const path = `${state.sessionDir(sessionId)}/messages.asonl`
 	if (!existsSync(path)) { parentCache.set(sessionId, null); return null }
 	try {
 		const raw = readFileSync(path, 'utf-8')
 		const firstLine = raw.split('\n', 1)[0]
 		if (!firstLine?.trim()) { parentCache.set(sessionId, null); return null }
-		const entry = parse(firstLine) as any
+		const entry = ason.parse(firstLine) as any
 		if (entry?.type === 'forked_from' && entry.parent) {
 			parentCache.set(sessionId, entry.parent)
 			return entry.parent
@@ -274,7 +274,7 @@ export async function parseUserContent(
 
 export async function appendMessages(sessionId: string, entries: Message[]): Promise<void> {
 	if (entries.length === 0) return
-	ensureDir(sessionDir(sessionId))
+	state.ensureDir(state.sessionDir(sessionId))
 	await messagesLog(sessionId).append(...entries)
 }
 
@@ -376,7 +376,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			i++
 		}
 	}
-	const compacted = compactApiMessages(out, compactOpts)
+	const compacted = compact.compactApiMessages(out, compactOpts)
 	// Strip internal _ref before sending to API (providers reject extra fields)
 	for (const msg of compacted) {
 		if (msg.role === 'user' && Array.isArray(msg.content)) {
@@ -440,7 +440,7 @@ export function buildCompactionContext(sessionId: string, messages: Message[]): 
 		userPrompts.push(text.split('\n')[0].slice(0, 200))
 	}
 
-	const dir = sessionDir(sessionId)
+	const dir = state.sessionDir(sessionId)
 
 	if (userPrompts.length === 0) return `Context was compacted. No user prompts in previous conversation. Full history: ${dir}/messages*.asonl + blocks/`
 
@@ -485,7 +485,7 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 // ── Draft persistence ──
 
 function draftPath(sessionId: string): string {
-	return `${sessionDir(sessionId)}/draft.txt`
+	return `${state.sessionDir(sessionId)}/draft.txt`
 }
 
 export async function saveDraft(sessionId: string, text: string): Promise<void> {
@@ -494,7 +494,7 @@ export async function saveDraft(sessionId: string, text: string): Promise<void> 
 		if (existsSync(p)) await unlink(p).catch(() => {})
 		return
 	}
-	ensureDir(sessionDir(sessionId))
+	state.ensureDir(state.sessionDir(sessionId))
 	await writeFile(draftPath(sessionId), text)
 }
 
@@ -502,4 +502,24 @@ export async function loadDraft(sessionId: string): Promise<string> {
 	const p = draftPath(sessionId)
 	if (!existsSync(p)) return ''
 	try { return await readFile(p, 'utf-8') } catch { return '' }
+}
+
+export const messages = {
+	makeBlockRef,
+	writeBlock,
+	readBlock,
+	getLastUsage,
+	writeAssistantEntry,
+	writeToolResultEntry,
+	updateBlockInput,
+	parseUserContent,
+	appendMessages,
+	readMessages,
+	loadApiMessages,
+	loadAllMessages,
+	detectInterruptedTools,
+	buildCompactionContext,
+	loadInputHistory,
+	saveDraft,
+	loadDraft,
 }

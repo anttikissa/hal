@@ -16,3 +16,5 @@ export function isPidAlive(pid: number): boolean {
 	}
 	return true
 }
+
+export const processState = { isPidAlive }
