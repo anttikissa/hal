@@ -182,7 +182,8 @@ export class Client {
 			case 'answer': {
 				const t = tab(event.sessionId); if (!t) return
 				closeStreaming(t)
-				t.blocks.push({ type: 'input', text: event.text || '[no answer]', source: `Hal asked: ${event.question}` })
+				t.blocks.push({ type: 'input', text: event.question, source: 'Hal asked' })
+				t.blocks.push({ type: 'input', text: event.text || '[no answer]', source: 'You replied' })
 				break
 			}
 		}
