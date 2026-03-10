@@ -22,7 +22,7 @@ If we add a **single always-present tool** (like `bash` or `read`), the tool lis
 
 ### Execution
 
-1. Write code to `state/eval/<id>.ts` (persisted indefinitely for audit trail)
+1. Write code to `state/sessions/<sessionId>/eval/<timestamp>.ts` (persisted for audit trail)
 2. Wrap it: export a default async function receiving `ctx`
 3. `await import(tempFile)` → call the default export
 4. Return the result (JSON.stringify or toString)
@@ -89,7 +89,7 @@ When disabled, the tool is simply not included in the tools list — invisible t
 
 ### Security
 
-Audit only — all executed code persists in `state/eval/`. This is a power-user tool for Hal development.
+Audit only — all executed code persists in `state/sessions/<sessionId>/eval/`. Scoped to the session that ran it. Natural cleanup with session cleanup.
 
 ## Implementation steps
 
@@ -104,4 +104,4 @@ Audit only — all executed code persists in `state/eval/`. This is a power-user
 
 - **Name**: `eval`, `run`, `hal`, `introspect`? → `eval` is clear
 - **Threading runtime**: `executeTool` doesn't currently receive runtime context. Need to add it as a parameter or use a global. A lazy global (set at startup) is simplest.
-- **Import paths**: temp file is in `state/eval/`, so relative imports to `src/` need `../../src/`. Alternative: use `HAL_DIR` env var + absolute imports.
+- **Import paths**: temp file is in `state/sessions/<id>/eval/`, so relative imports to `src/` need `../../../../src/`. Alternative: use `HAL_DIR` env var + absolute imports.

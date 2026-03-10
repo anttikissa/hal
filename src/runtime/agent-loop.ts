@@ -8,13 +8,14 @@ import { events } from '../ipc.ts'
 import { appendMessages, writeAssistantEntry, writeToolResultEntry, updateBlockInput, readBlock, parseUserContent, makeBlockRef } from '../session/messages.ts'
 import { eventId } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
-import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
+import { getTools, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
+import type { EvalContext } from './eval-tool.ts'
 import { runHooks } from './hooks.ts'
 import { contextWindowForModel, isCalibrated, saveCalibration, messageBytes, estimateContext } from './context.ts'
 import { getConfig, type PermissionLevel } from '../config.ts'
 import { createBlinkParser } from './blink.ts'
 
-const WRITE_TOOLS = new Set(['bash', 'write', 'edit'])
+const WRITE_TOOLS = new Set(['bash', 'write', 'edit', 'eval'])
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'web_search'])
 
 function needsPermission(toolName: string, level: PermissionLevel | undefined): boolean {
@@ -51,7 +52,17 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const ctxMax = contextWindowForModel(modelId)
 	let calibrated = isCalibrated(modelId)
 
-	const overheadBytes = systemPrompt.length + JSON.stringify(TOOLS).length
+	const config = getConfig()
+	const evalEnabled = !!config.eval
+	const tools = getTools(evalEnabled)
+	const evalCtx: EvalContext | undefined = evalEnabled ? {
+		sessionId,
+		halDir: process.env.HAL_DIR ?? process.cwd(),
+		stateDir: process.env.HAL_STATE_DIR ?? `${process.env.HAL_DIR ?? process.cwd()}/state`,
+		cwd: process.env.LAUNCH_CWD ?? process.cwd(),
+	} : undefined
+
+	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length
 	ctx.onStatus(true, 'generating...', estimateContext(messages, modelId, overheadBytes))
 
 	try {
@@ -59,7 +70,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 		while (!signal?.aborted) {
 
-			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: TOOLS, signal, sessionId })
+			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools, signal, sessionId })
 
 			let thinkingText = ''
 			let thinkingRef = ''
@@ -111,7 +122,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						// Calibrate bytes→tokens ratio on first API response
 						if (!calibrated && event.usage && event.usage.input > 0) {
 							calibrated = true
-							let totalBytes = systemPrompt.length + JSON.stringify(TOOLS).length
+							let totalBytes = systemPrompt.length + JSON.stringify(tools).length
 							for (const m of messages) totalBytes += messageBytes(m)
 							saveCalibration(modelId, totalBytes, event.usage.input)
 						}
@@ -183,7 +194,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								type: 'tool', toolId: call.id, name: call.name,
 								args, phase: 'streaming', output: text,
 							})
-							result = await executeTool(call, onChunk)
+							result = await executeTool(call, onChunk, evalCtx)
 							if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,

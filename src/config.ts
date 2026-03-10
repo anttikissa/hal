@@ -10,6 +10,7 @@ export interface Config {
 	permissions?: PermissionLevel
 	activeSessionId?: string
 	debug?: boolean
+	eval?: boolean
 }
 
 let _config: Config | null = null

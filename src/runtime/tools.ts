@@ -1,5 +1,4 @@
 // Tools — definitions + execution for the agent loop.
-// Hashline (read/edit), bash, write, grep, glob, ls, web_search.
 
 import { createHash } from 'crypto'
 import { readFileSync, statSync, readdirSync } from 'fs'
@@ -7,6 +6,7 @@ import { resolve, isAbsolute } from 'path'
 import { $ } from 'bun'
 import { homedir } from 'os'
 import { stringify } from '../utils/ason.ts'
+import { executeEval, type EvalContext } from './eval-tool.ts'
 
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
@@ -124,7 +124,15 @@ function withLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
 
 // ── Tool definitions ──
 
-export const TOOLS = [
+const EVAL_TOOL = {
+	name: 'eval',
+	description: 'Execute TypeScript in the Hal process. Has access to runtime internals via ctx object (sessionId, halDir, stateDir, cwd). Use `~src/` prefix in imports to reference Hal source.',
+	input_schema: { type: 'object', properties: {
+		code: { type: 'string', description: 'TypeScript function body. `ctx` is in scope. Use `return` to return a value.' },
+	}, required: ['code'] },
+}
+
+const BASE_TOOLS = [
 	{ name: 'bash', description: 'Run a bash command',
 		input_schema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } },
 	{ name: 'read', description: 'Read a file with hashline prefixes (LINE:HASH content). Use optional start/end to read a line range.',
@@ -168,10 +176,18 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 		}, required: ['question'] } },
 ]
 
-const TOOL_MAP = new Map(TOOLS.map(t => [t.name, t]))
+/** TOOLS is the static base set (used for backwards compat). Prefer getTools(). */
+export const TOOLS = BASE_TOOLS
+
+export function getTools(evalEnabled: boolean): any[] {
+	return evalEnabled ? [...BASE_TOOLS, EVAL_TOOL] : BASE_TOOLS
+}
+
+function toolMap(tools: any[]) { return new Map(tools.map(t => [t.name, t])) }
+const BASE_MAP = toolMap(BASE_TOOLS)
 
 function validateRequired(call: ToolCall): string | null {
-	const tool = TOOL_MAP.get(call.name)
+	const tool = BASE_MAP.get(call.name) ?? (call.name === 'eval' ? EVAL_TOOL : null)
 	if (!tool) return null
 	const schema = (tool as any).input_schema
 	const required: string[] = schema?.required ?? []
@@ -197,16 +213,17 @@ export function argsPreview(call: ToolCall): string {
 		case 'glob': s = String(inp?.pattern ?? ''); break
 		case 'ls': s = String(inp?.path ?? '.'); break
 		case 'ask': s = String(inp?.question ?? '').slice(0, 80); break
+		case 'eval': s = String(inp?.code ?? '').slice(0, 80); break
 		default: s = call.name
 	}
 	return shortenHome(s)
 }
 
-export async function executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {
-	return shortenHome(await _executeTool(call, onChunk))
+export async function executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalContext): Promise<string> {
+	return shortenHome(await _executeTool(call, onChunk, evalCtx))
 }
 
-async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> {
+async function _executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalContext): Promise<string> {
 	const err = validateRequired(call)
 	if (err) return err
 	const inp = call.input as any
@@ -322,6 +339,10 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> 
 			}
 			walk(dir, '', 0)
 			return lines.join('\n') || '(empty directory)'
+		}
+		case 'eval': {
+			if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
+			return await executeEval(String(inp.code), evalCtx)
 		}
 		default:
 			return `Unknown tool: ${call.name}`
