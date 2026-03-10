@@ -7,10 +7,11 @@ import type { Message } from '../session/messages.ts'
 
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
-	private readonly events: RuntimeEvent[] = []
+	private readonly events: RuntimeEvent[]
 
-	constructor(bootstrapState: BootstrapState) {
+	constructor(bootstrapState: BootstrapState, events: RuntimeEvent[] = []) {
 		this.bootstrapState = bootstrapState
+		this.events = events
 	}
 
 	async sendCommand(_cmd: RuntimeCommand): Promise<void> {}
@@ -24,7 +25,7 @@ class FakeTransport implements Transport {
 	}
 
 	async eventsOffset(): Promise<number> {
-		return this.events.length
+		return 0
 	}
 
 	tailEvents(fromOffset?: number): { items: AsyncGenerator<RuntimeEvent>; cancel(): void } {
@@ -64,4 +65,43 @@ test('new tabs created from sessions event keep context from SessionInfo', async
 	const tab = client.activeTab()
 	expect(tab).toBeTruthy()
 	expect(tab?.context).toEqual({ used: 2500, max: 200000 })
+})
+
+test('existing tabs adopt context from later sessions events', async () => {
+	const sid = `t-${randomBytes(4).toString('hex')}`
+	const ts = new Date().toISOString()
+	const state: RuntimeState = {
+		hostPid: 123,
+		hostId: 'host-test',
+		sessions: [sid],
+		activeSessionId: sid,
+		busySessionIds: [],
+		eventsOffset: 0,
+		updatedAt: ts,
+	}
+	const sessions: SessionInfo[] = [{
+		id: sid,
+		workingDir: process.cwd(),
+		createdAt: ts,
+		updatedAt: ts,
+	}]
+	const update: RuntimeEvent = {
+		type: 'sessions',
+		id: 'evt-1',
+		createdAt: ts,
+		activeSessionId: sid,
+		sessions: [{
+			id: sid,
+			workingDir: process.cwd(),
+			createdAt: ts,
+			updatedAt: ts,
+			context: { used: 1800, max: 200000 },
+		}],
+	}
+	const transport = new FakeTransport({ state, sessions }, [update])
+	const client = new Client(transport, () => {})
+	await client.start()
+	const tab = client.activeTab()
+	expect(tab).toBeTruthy()
+	expect(tab?.context).toEqual({ used: 1800, max: 200000 })
 })
