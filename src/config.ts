@@ -3,8 +3,11 @@
 import { liveFile } from './utils/live-file.ts'
 import { CONFIG_PATH } from './state.ts'
 
+export type PermissionLevel = 'yolo' | 'ask-writes' | 'ask-all'
+
 export interface Config {
 	defaultModel: string
+	permissions?: PermissionLevel
 	activeSessionId?: string
 }
 

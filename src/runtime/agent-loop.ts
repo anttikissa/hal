@@ -11,6 +11,16 @@ import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tools.ts'
 import { runHooks } from './hooks.ts'
 import { contextWindowForModel, isCalibrated, saveCalibration, estimateTokens, messageBytes } from './context.ts'
+import { getConfig, type PermissionLevel } from '../config.ts'
+
+const WRITE_TOOLS = new Set(['bash', 'write', 'edit'])
+const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'web_search'])
+
+function needsPermission(toolName: string, level: PermissionLevel | undefined): boolean {
+	if (!level || level === 'yolo') return false
+	if (level === 'ask-writes') return WRITE_TOOLS.has(toolName)
+	return WRITE_TOOLS.has(toolName) || READ_TOOLS.has(toolName)
+}
 
 export interface AgentContext {
 	sessionId: string
@@ -129,6 +139,19 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						let result: string | any[]
 						let toolStatus: 'done' | 'error' = 'done'
+
+						// Permission gate
+						if (needsPermission(call.name, getConfig().permissions)) {
+							const answer = await ctx.askUser(`Allow ${call.name} ${args}? (y/n)`)
+							if (answer.trim().toLowerCase() !== 'y') {
+								result = 'error: user denied permission'
+								toolStatus = 'error'
+								const toolResultEntry = await writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
+								await appendMessages(sessionId, [toolResultEntry])
+								continue
+							}
+						}
+
 						if (call.name === 'ask') {
 							const question = (call.input as any)?.question ?? ''
 							const answer = await ctx.askUser(question) || '[no answer]'

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Resolve symlinks
+SCRIPT_PATH="$0"
+[[ -L "$SCRIPT_PATH" ]] && SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+export HAL_DIR="${HAL_DIR:-$(cd "$(dirname "$SCRIPT_PATH")" && pwd)}"
+export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
+
+exec bun "$HAL_DIR/scripts/init.ts"

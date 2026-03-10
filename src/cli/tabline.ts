@@ -1,64 +1,105 @@
+// Tab line rendering with busy indicators and color.
+
+const BRIGHT_WHITE = '\x1b[97m'
+const DIM = '\x1b[38;5;245m'
+const RESET = '\x1b[0m'
+const MAX_TITLE = 12
+
 export interface TablineTab {
 	label: string
 	busy: boolean
 	active: boolean
 }
 
-function compactLabel(label: string): string {
-	const m = label.match(/^(\d+)/)
-	if (m) return m[1]
-	return label.trim()[0] ?? label
+function truncate(s: string, max: number): string {
+	if (s.length <= max) return s
+	if (max <= 1) return '…'
+	return s.slice(0, max - 1) + '…'
 }
 
-function mode1(tabs: TablineTab[]): string[] {
-	return tabs.map((t) => {
-		const core = compactLabel(t.label)
-		const busy = t.busy ? 'x' : ' '
-		return `[${core}${busy}] `
+/** Extract number prefix from label like "1 .hal" → "1" */
+function tabNumber(label: string): string {
+	const m = label.match(/^(\d+)\s/)
+	return m ? m[1] : ''
+}
+
+/** Extract title from label like "1 .hal" → ".hal" */
+function tabTitle(label: string): string {
+	const m = label.match(/^\d+\s+(.+)$/)
+	return m ? m[1] : label.trim()
+}
+
+// ── Rendering modes (progressive degradation) ──
+
+/** Mode 0: Full titles, max 12 chars. `[1▪.hal]` / ` 2▪.hal ` */
+function mode0(tabs: TablineTab[], busyChar: string, maxTitle: number): string[] {
+	return tabs.map(t => {
+		const num = tabNumber(t.label)
+		const title = truncate(tabTitle(t.label), maxTitle)
+		const busy = t.busy ? busyChar : ' '
+		if (t.active) return `${BRIGHT_WHITE}[${num}${busy}${title}]${RESET}`
+		return `${DIM} ${num}${busy}${title} ${RESET}`
 	})
 }
 
-function mode2(tabs: TablineTab[]): string[] {
-	return tabs.map((t) => {
-		const core = compactLabel(t.label)
-		return `${core}${t.busy ? 'x' : ''} `
+/** Mode 1: Short titles (4 chars). `[1▪.hal]` / ` 2▪.hal ` */
+function mode1(tabs: TablineTab[], busyChar: string): string[] {
+	return mode0(tabs, busyChar, 4)
+}
+
+/** Mode 2: Numbers + busy only. `[1▪]` / ` 2  ` */
+function mode2(tabs: TablineTab[], busyChar: string): string[] {
+	return tabs.map(t => {
+		const num = tabNumber(t.label)
+		const busy = t.busy ? busyChar : ' '
+		if (t.active) return `${BRIGHT_WHITE}[${num}${busy}]${RESET}`
+		return `${DIM} ${num}${busy} ${RESET}`
 	})
 }
 
+/** Mode 3: Just numbers. `1 2 3 4` */
 function mode3(tabs: TablineTab[]): string[] {
-	return tabs.map((t) => compactLabel(t.label))
+	return tabs.map(t => {
+		const num = tabNumber(t.label) || '?'
+		if (t.active) return `${BRIGHT_WHITE}[${num}]${RESET}`
+		return `${DIM} ${num} ${RESET}`
+	})
 }
 
-function fit(parts: string[], width: number): string {
+/** Visible width of a string (ignoring ANSI escape sequences). */
+function plainLen(s: string): number {
+	return s.replace(/\x1b\[[^m]*m/g, '').length
+}
+
+function totalLen(parts: string[]): number {
+	return parts.reduce((sum, p) => sum + plainLen(p), 0)
+}
+
+export function renderTabline(tabs: TablineTab[], width: number, busyVisible = true): string {
+	if (width <= 0 || tabs.length === 0) return ''
+	const busyChar = busyVisible ? '▪' : ' '
+
+	const m0 = mode0(tabs, busyChar, MAX_TITLE)
+	if (totalLen(m0) <= width) return m0.join('')
+
+	// Try shorter titles (8 chars)
+	const m0s = mode0(tabs, busyChar, 8)
+	if (totalLen(m0s) <= width) return m0s.join('')
+
+	const m1 = mode1(tabs, busyChar)
+	if (totalLen(m1) <= width) return m1.join('')
+
+	const m2 = mode2(tabs, busyChar)
+	if (totalLen(m2) <= width) return m2.join('')
+
+	const m3 = mode3(tabs)
+	if (totalLen(m3) <= width) return m3.join('')
+
+	// Last resort: just as many numbers as fit
 	let out = ''
-	for (const p of parts) {
-		if ((out + p).length > width) break
+	for (const p of m3) {
+		if (plainLen(out) + plainLen(p) > width) break
 		out += p
 	}
 	return out
-}
-
-export function renderTabline(tabs: TablineTab[], width: number): string {
-	if (width <= 0) return ''
-
-	const full = tabs.map((t) => (t.active ? `[${t.label}]` : ` ${t.label} `))
-	let line = fit(full, width)
-	if (line.length === full.join('').length) return line
-
-	const a = mode1(tabs)
-	line = fit(a, width)
-	if (line.length === a.join('').length) return line
-
-	const b = mode2(tabs)
-	line = fit(b, width)
-	if (line.length === b.join('').length) return line
-
-	const c = mode3(tabs)
-	line = fit(c, width)
-	if (line.length === c.join('').length) return line
-
-	const flat = c.join('')
-	if (flat.length <= width) return flat
-	if (width <= 3) return flat.slice(0, width)
-	return flat.slice(0, width - 3) + '...'
 }

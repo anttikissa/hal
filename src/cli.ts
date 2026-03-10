@@ -46,32 +46,16 @@ const hal = (globalThis as any).__hal as { isHost: boolean; hostPid: number | nu
 // ── Client ──
 
 const transport = new LocalTransport()
-export const client = new Client(transport, () => { bumpCursor(); doRender() })
+export const client = new Client(transport, () => { doRender() })
 
 // ── Renderer ──
 
 const DIM = '\x1b[38;5;245m', RESET = '\x1b[0m', YELLOW = '\x1b[33m', RED = '\x1b[31m', GREEN = '\x1b[32m'
-let halCursorVisible = true
-let blinkTimer: ReturnType<typeof setTimeout> | null = null
 let renderState: RenderState = emptyState
-
-function scheduleBlink(): void {
-	if (blinkTimer) clearTimeout(blinkTimer)
-	blinkTimer = setTimeout(() => {
-		halCursorVisible = !halCursorVisible
-		doRender()
-		scheduleBlink()
-	}, 530)
-}
 
 function oneLine(s: string): string {
 	return s.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ')
 }
-function bumpCursor(): void {
-	halCursorVisible = true
-	scheduleBlink()
-}
-
 function shortModel(model?: string): string {
 	return displayModel(model || getConfig().defaultModel)
 }
@@ -139,7 +123,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cw = contentWidth()
 
 	const blocks = tab?.blocks ?? []
-	const contentLines = renderBlocks(blocks, w, halCursorVisible)
+	const contentLines = renderBlocks(blocks, w, isVisible())
 	// Pad to tallest tab's content height (keeps prompt position stable)
 	const activeSessionId = tab?.sessionId ?? null
 	const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
@@ -164,8 +148,8 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 			active: i === idx,
 		}
 	})
-	const tabBar = renderTabline(parts, w)
-	lines.push(clipVisual(oneLine(tabBar), w))
+	const tabBar = renderTabline(parts, w, halCursorVisible)
+	lines.push(tabBar)
 
 	// Question area (when active, shown above the regular prompt)
 	const hasQ = prompt.hasQuestion()
@@ -173,9 +157,19 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	if (hasQ) {
 		const qLabel = prompt.getQuestionLabel()!
-		const qLeft = ` ${qLabel} `
-		const qFill = Math.max(0, w - qLeft.length)
-		lines.push(`${DIM}${qLeft}${'─'.repeat(qFill)}${RESET}`)
+		const qFg = colors.question.fg, qBg = colors.question.bg
+		const aFg = colors.assistant.fg
+
+		// Question box header (tool-like)
+		const headerText = '── Hal is asking you a question ──'
+		const headerPad = Math.max(0, w - 2 - headerText.length)
+		lines.push(` ${qBg}${qFg}${headerText}${' '.repeat(headerPad)}${RESET} `)
+
+		// Question body in HAL color
+		for (const ql of qLabel.split('\n')) {
+			const bodyPad = Math.max(0, w - 2 - ql.length - 1)
+			lines.push(` ${qBg}${aFg} ${ql}${' '.repeat(bodyPad)}${RESET} `)
+		}
 
 		// Answer input (buf is the question answer in question mode)
 		const p = prompt.buildPrompt(cw)

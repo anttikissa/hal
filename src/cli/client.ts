@@ -7,6 +7,7 @@ import { makeCommand } from '../protocol.ts'
 import { replayToBlocks } from '../session/replay.ts'
 import { loadInputHistory, saveDraft, loadDraft } from '../session/messages.ts'
 import * as prompt from './prompt.ts'
+import { getLastTab, saveLastTab } from './client-state.ts'
 import { randomBytes } from 'crypto'
 
 export interface TabState {
@@ -50,7 +51,10 @@ export class Client {
 		for (const info of sessions) {
 			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context })
 		}
-		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === rtState.activeSessionId))
+		// Prefer client's last-viewed tab, fall back to server's active session
+		const lastTab = getLastTab()
+		const preferredId = lastTab ?? rtState.activeSessionId
+		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === preferredId))
 		this.state.connected = true
 		this.onUpdate()
 
@@ -63,7 +67,10 @@ export class Client {
 			tab.inputDraft = await loadDraft(tab.sessionId)
 		}
 		const active = this.activeTab()
-		if (active) this.applyTabToPrompt(active)
+		if (active) {
+			this.applyTabToPrompt(active)
+			saveLastTab(active.sessionId)
+		}
 		this.onUpdate()
 
 		for await (const event of this.transport.tailEvents(offset).items) {
@@ -286,6 +293,9 @@ export class Client {
 	private switchToActiveTab(): void {
 		prompt.reset()
 		const tab = this.activeTab()
-		if (tab) this.applyTabToPrompt(tab)
+		if (tab) {
+			this.applyTabToPrompt(tab)
+			saveLastTab(tab.sessionId)
+		}
 	}
 }
