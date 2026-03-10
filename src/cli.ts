@@ -109,7 +109,7 @@ function buildSeparator(tab: TabState | null, w: number, scrollInfo?: string): s
 	if (scrollInfo) rightParts.push(scrollInfo)
 
 	const prefix = '── '
-	const label = `You to Hal (${model}, ${state})`
+	const label = `You ⏵ Hal (${model}, ${state})`
 	const suffix = ` ${rightParts.join(' · ')} ──`
 	const iw = w
 	const maxLabel = Math.max(1, iw - prefix.length - suffix.length - 1)
