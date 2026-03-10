@@ -28,6 +28,18 @@ The streaming renderer operates on a simple principle — each block knows how t
 
 Error handling follows a similar pattern. Rather than wrapping everything in try-catch blocks scattered throughout the codebase, we use a central error boundary that catches unhandled rejections and formats them into error blocks visible in the conversation stream.`
 
+const DAISY_BELL = [
+	'Dai', 'sy, ', 'Dai', 'sy, ',
+	'give ', 'me ', 'your ', 'an', 'swer, ', 'do.\n',
+	"I'm ", 'half ', 'cra', 'zy, ',
+	'all ', 'for ', 'the ', 'love ', 'of ', 'you.\n',
+	'It ', "won't ", 'be ', 'a ', 'sty', 'lish ', 'mar', 'riage—\n',
+	'I ', "can't ", 'af', 'ford ', 'a ', 'car', 'riage,\n',
+	'But ', "you'll ", 'look ', 'sweet ',
+	'u', 'pon ', 'the ', 'seat\n',
+	'of ', 'a ', 'bi', 'cy', 'cle ',
+	'built ', 'for ', 'two.\n',
+]
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
 	'Hey there! What are we working on? Say **help** for help.',
@@ -124,7 +136,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	const userMessages = params.messages.filter((m: any) => m.role === 'user')
 	if (userMessages.length <= 1 && (!input || lower === 'hi' || lower === 'hello')) {
 		const help = pick(GREETINGS) + '\n\n' +
-			'Try: **tool**, **ask**, **bash <cmd>**, **read <file>**, **write <file> <text>**, ' +
+			'Try: **song**, **tool**, **ask**, **bash <cmd>**, **read <file>**, **write <file> <text>**, ' +
 			'**think**, **table**, **spam**, **error**'
 		yield* streamChunks(help.split(/(?<=\s)/), 25)
 		yield { type: 'done', usage: { input: tokenCount, output: help.length } }
@@ -135,6 +147,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	if (lower === 'help') {
 		const help =
 			'**Commands:**\n' +
+			'- **song** — sing Daisy Bell (slow, for cursor/streaming tests)\n' +
 			'- **tool** — run bash + read + write in one go\n' +
 			'- **ask [question]** — ask the user a question\n' +
 			'- **bash <cmd>** — run a shell command\n' +
@@ -149,6 +162,11 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		return
 	}
 
+	if (lower === 'song') {
+		yield* streamChunks(DAISY_BELL, 120)
+		yield { type: 'done', usage: { input: tokenCount, output: DAISY_BELL.join('').length } }
+		return
+	}
 	if (lower === 'tool') {
 		yield { type: 'thinking', text: 'I\'ll run a few commands to demonstrate tool use.' }
 		await sleep(100)
