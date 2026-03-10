@@ -68,7 +68,9 @@ export async function startRuntime(): Promise<Runtime> {
 
 	function setFreshContext(info: SessionInfo): void {
 		const modelId = (info.model ?? getConfig().defaultModel).split('/').pop()!
-		sessionContext.set(info.id, { used: 0, max: contextWindowForModel(modelId), estimated: true })
+		const max = contextWindowForModel(modelId)
+		sessionContext.set(info.id, { used: 0, max, estimated: true })
+		info.context = { used: 0, max }
 	}
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
@@ -79,19 +81,25 @@ export async function startRuntime(): Promise<Runtime> {
 			sessions.set(meta.id, meta)
 			const modelId = (meta.model ?? getConfig().defaultModel).split('/').pop()!
 			// Restore context: prefer persisted real counts, then last API usage, then estimate
+			let ctx: { used: number; max: number; estimated?: boolean } | undefined
 			if (meta.context) {
-				sessionContext.set(meta.id, meta.context)
+				ctx = meta.context
 			} else {
 				const usage = getLastUsage(meta.id)
 				if (usage) {
-					sessionContext.set(meta.id, { used: usage.input, max: contextWindowForModel(modelId) })
+					ctx = { used: usage.input, max: contextWindowForModel(modelId) }
 				} else {
 					const apiMsgs = await loadApiMessages(meta.id, modelId)
 					if (apiMsgs.length > 0) {
-						sessionContext.set(meta.id, estimateContext(apiMsgs, modelId))
+						ctx = estimateContext(apiMsgs, modelId)
+					} else {
+						ctx = { used: 0, max: contextWindowForModel(modelId), estimated: true }
 					}
 				}
 			}
+			sessionContext.set(meta.id, ctx)
+			// Also set on info so clients get it when tabs are first created
+			meta.context = { used: ctx.used, max: ctx.max }
 			if (!activeSessionId) activeSessionId = meta.id
 		}
 	}
