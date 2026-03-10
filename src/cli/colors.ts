@@ -31,6 +31,11 @@ function bg([r, g, b]: [number, number, number]): string { return `\x1b[48;2;${r
 // Background (dark bg):     L=0.25, C=0.05
 
 const assistant = { fg: fg(oklch(0.75, 0.15, 70)), bg: bg(oklch(0.25, 0.05, 70)) }
+const assistantMd = {
+	bold: [fg(oklch(0.93, 0.04, 70)), assistant.fg] as [string, string],
+	italic: ['\x1b[3m', '\x1b[23m'] as [string, string],
+	code: [fg(oklch(0.83, 0.10, 70)), assistant.fg] as [string, string],
+}
 const input     = { fg: fg(oklch(0.80, 0.008, 250)), bg: bg(oklch(0.29, 0.008, 250)) }
 const thinking  = { fg: fg(oklch(0.73, 0.03, 250)), bg: bg(oklch(0.28, 0.02, 250)) }
 const info      = { fg: fg(oklch(0.74, 0.02, 250)), bg: bg(oklch(0.25, 0.02, 250)) }
@@ -56,4 +61,4 @@ function tool(name: string): { fg: string; bg: string } {
 	return tools[name] ?? tools.default
 }
 
-export { RESET, DIM, SEL_ON, SEL_OFF, assistant, input, system, thinking, info, error, cursor, tool }
+export { RESET, DIM, SEL_ON, SEL_OFF, assistant, assistantMd, input, system, thinking, info, error, cursor, tool }

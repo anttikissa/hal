@@ -7,13 +7,13 @@ export { charWidth, visLen, wordWrap, clipVisual } from '../utils/strings.ts'
 export interface MdColors {
 	bold: [on: string, off: string]
 	italic: [on: string, off: string]
-	dim: [on: string, off: string]
+	code: [on: string, off: string]
 }
 
 const DEFAULT_COLORS: MdColors = {
 	bold: ['\x1b[1m', '\x1b[22m'],
 	italic: ['\x1b[3m', '\x1b[23m'],
-	dim: ['\x1b[2m', '\x1b[22m'],
+	code: ['\x1b[2m', '\x1b[22m'],
 }
 
 export type MdSpan =
@@ -57,7 +57,7 @@ export function mdInline(line: string, colors?: MdColors): string {
 function inlineSpans(s: string, c: MdColors): string {
 	return s
 		.replace(/\*\*`([^`]+)`\*\*/g, `${c.bold[0]}$1${c.bold[1]}`)
-		.replace(/`([^`\n]+)`/g, `${c.dim[0]}$1${c.dim[1]}`)
+		.replace(/`([^`\n]+)`/g, `${c.code[0]}$1${c.code[1]}`)
 		.replace(/\*\*(.+?)\*\*/g, `${c.bold[0]}$1${c.bold[1]}`)
 		.replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, `${c.italic[0]}$1${c.italic[1]}`)
 }

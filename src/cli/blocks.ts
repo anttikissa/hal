@@ -169,18 +169,19 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 	if (!text) return []
 	const label = block.model ? `Hal (${displayModel(block.model)})` : 'Hal'
 	const { fg, bg } = colors.assistant
+	const md = colors.assistantMd
 	const header = toolHeader(label, width, fg, bg)
 	const cw = contentWidth(width)
 	const line = (s: string) => boxLine(s, width, fg, bg)
 	const body: string[] = []
 	for (const span of mdSpans(text)) {
 		if (span.type === 'code') {
-			for (const l of span.lines) body.push(line(`\x1b[2m${l}\x1b[22m`))
+			for (const l of span.lines) body.push(line(`${md.code[0]}${l}${md.code[1]}`))
 		} else if (span.type === 'table') {
-			for (const l of mdTable(span.lines)) body.push(line(mdInline(l)))
+			for (const l of mdTable(span.lines)) body.push(line(mdInline(l, md)))
 		} else {
 			for (const l of span.lines)
-				for (const wl of wordWrap(mdInline(l), cw)) body.push(line(wl))
+				for (const wl of wordWrap(mdInline(l, md), cw)) body.push(line(wl))
 		}
 	}
 	return [...header, ...body]
