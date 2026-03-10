@@ -54,12 +54,23 @@ Multiple forks from the same parent share the same prefix of conversation histor
 
 ## Eval tool
 
-When `eval: true` is set in `config.ason`, an `eval` tool is available that executes TypeScript **inside the Hal process**. Use it to inspect/modify runtime state, call internal functions, or do anything that `bash` can't (since bash runs out-of-process).
+The user has enabled the `eval` tool. It executes TypeScript **inside the Hal process** — use it to inspect/modify runtime state, call internal functions, or do anything `bash` can't (bash runs out-of-process).
 
 - **`code`** parameter: TypeScript function body. `ctx` is in scope with `{ sessionId, halDir, stateDir, cwd }`. Use `return` to return a value.
-- **Imports**: use `~src/` prefix to import from Hal source, e.g. `import { getConfig } from '~src/config.ts'`
-- **Audit**: executed scripts persist in `state/sessions/<id>/eval/` — never deleted.
-- **Permissions**: treated as a write tool — requires confirmation under `ask-writes` / `ask-all` permission levels.
+- **Imports**: use `~src/` prefix, e.g. `import { ipc } from '~src/ipc.ts'`
+- **Audit**: scripts persist in `state/sessions/<id>/eval/` — never deleted.
+
+### Hot-patchable modules
+
+Most modules export a mutable namespace object (e.g. `ipc.ts` → `export const ipc = { ensureBus, getState, ... }`). Internal calls use the direct function name, but cross-module calls go through the namespace. This means you can hot-patch any function at runtime:
+
+```ts
+import { ipc } from '~src/ipc.ts'
+const orig = ipc.getState
+ipc.getState = () => { console.log('patched!'); return orig() }
+```
+
+Skipped modules (not namespace-wrapped): `state.ts` (constants), `ason.ts` (already namespaced), `runtime.ts` (class — patch via prototype), single-function utils, provider files (already object exports), test files.
 
 :::
 
