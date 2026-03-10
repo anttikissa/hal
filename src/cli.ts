@@ -4,7 +4,7 @@ import { render, emptyState, type RenderState, type CursorPos } from './cli/diff
 import { parseKeys } from './cli/keys.ts'
 import { handleInput, type InputContext } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
-import { renderBlocks } from './cli/blocks.ts'
+import { renderBlocks, renderQuestion } from './cli/blocks.ts'
 import { maxTabHeight } from './cli/heights.ts'
 import { Client, type TabState } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
@@ -143,10 +143,15 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const idx = cState.activeTabIndex
 	const parts = tabs.map((t, i) => {
 		const title = t.info.topic ?? t.info.workingDir?.split('/').pop() ?? 'tab'
+		let indicator: string | undefined
+		if (t.question) indicator = '?'
+		else if (!t.busy && t.blocks.some(b => b.type === 'info' && b.text === '[paused]'))
+			indicator = '!'
 		return {
 			label: `${i + 1} ${title}`,
 			busy: !!t.busy,
 			active: i === idx,
+			indicator,
 		}
 	})
 	const tabBar = renderTabline(parts, w, isVisible())

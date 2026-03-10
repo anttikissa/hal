@@ -283,7 +283,7 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> 
 		case 'grep': {
 			const pattern = String(inp?.pattern ?? '')
 			const searchPath = resolvePath(inp?.path)
-			const args = ['rg', '-nH', '--no-heading', '--color=never', '--hidden', '--max-count=100', '--sort=modified']
+			const args = ['rg', '-nH', '--no-heading', '--color=never', '--hidden', '--no-ignore', '--max-count=100', '--sort=modified']
 			if (inp?.include) args.push('--glob', inp.include)
 			args.push('--', pattern, searchPath)
 			const result = await $`${args}`.quiet().nothrow()
@@ -293,7 +293,7 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk): Promise<string> 
 		}
 		case 'glob': {
 			const searchPath = resolvePath(inp?.path)
-			const args = ['rg', '--files', '--hidden', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
+			const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
 			const result = await $`${args}`.quiet().nothrow()
 			const raw = result.stdout.toString().trim()
 			if (!raw) return 'No files found.'

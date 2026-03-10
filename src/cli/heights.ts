@@ -17,7 +17,7 @@ export function maxTabHeight(
 		if (tab.sessionId === activeSessionId) {
 			tab.contentHeight = Math.max(tab.contentHeight, activeHeight)
 		} else if (tab.contentHeight === 0 && tab.blocks.length > 0) {
-			tab.contentHeight = renderBlocks(tab.blocks, width, false).length
+			tab.contentHeight = renderBlocks(tab.blocks, width, false).lines.length
 		}
 		if (tab.contentHeight > maxHeight) maxHeight = tab.contentHeight
 	}

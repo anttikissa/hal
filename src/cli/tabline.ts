@@ -9,6 +9,7 @@ export interface TablineTab {
 	label: string
 	busy: boolean
 	active: boolean
+	indicator?: string // '!' interrupted, '?' asking — replaces busy dot
 }
 
 function truncate(s: string, max: number): string {
@@ -31,14 +32,18 @@ function tabTitle(label: string): string {
 
 // ── Rendering modes (progressive degradation) ──
 
+function statusChar(t: TablineTab, busyChar: string): string {
+	return t.indicator ?? (t.busy ? busyChar : ' ')
+}
+
 /** Mode 0: Full titles, max 12 chars. `[1▪.hal]` / ` 2▪.hal ` */
 function mode0(tabs: TablineTab[], busyChar: string, maxTitle: number): string[] {
 	return tabs.map(t => {
 		const num = tabNumber(t.label)
 		const title = truncate(tabTitle(t.label), maxTitle)
-		const busy = t.busy ? busyChar : ' '
-		if (t.active) return `${BRIGHT_WHITE}[${num}${busy}${title}]${RESET}`
-		return `${DIM} ${num}${busy}${title} ${RESET}`
+		const ch = statusChar(t, busyChar)
+		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}${title}]${RESET}`
+		return `${DIM} ${num}${ch}${title} ${RESET}`
 	})
 }
 
@@ -51,18 +56,19 @@ function mode1(tabs: TablineTab[], busyChar: string): string[] {
 function mode2(tabs: TablineTab[], busyChar: string): string[] {
 	return tabs.map(t => {
 		const num = tabNumber(t.label)
-		const busy = t.busy ? busyChar : ' '
-		if (t.active) return `${BRIGHT_WHITE}[${num}${busy}]${RESET}`
-		return `${DIM} ${num}${busy} ${RESET}`
+		const ch = statusChar(t, busyChar)
+		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}]${RESET}`
+		return `${DIM} ${num}${ch} ${RESET}`
 	})
 }
 
-/** Mode 3: Just numbers. `1 2 3 4` */
+/** Mode 3: Numbers + indicator. `[1!]` / ` 2  ` */
 function mode3(tabs: TablineTab[]): string[] {
 	return tabs.map(t => {
 		const num = tabNumber(t.label) || '?'
-		if (t.active) return `${BRIGHT_WHITE}[${num}]${RESET}`
-		return `${DIM} ${num} ${RESET}`
+		const ch = t.indicator ?? ''
+		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}]${RESET}`
+		return `${DIM} ${num}${ch} ${RESET}`
 	})
 }
 

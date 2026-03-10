@@ -332,25 +332,31 @@ function cursorColor(block: Block): string {
 	return colors.cursor.fg
 }
 
-/** Insert cursor into last rendered line without breaking bg color or exceeding width. */
-function inlineCursor(line: string, cc: string, visible: boolean, width: number): string[] {
+/** Insert cursor into last rendered line without breaking bg color or exceeding width.
+ *  Returns the lines and the column where the cursor was placed. */
+function inlineCursor(line: string, cc: string, visible: boolean, width: number): { lines: string[]; col: number } {
 	const hasReset = line.endsWith(colors.RESET)
 	const body = hasReset ? line.slice(0, -colors.RESET.length) : line
 	const trail = body.match(/ +$/)?.[0] ?? ''
 	if (trail.length > 0) {
 		const before = body.slice(0, -trail.length)
+		const col = visLen(before)
 		const cursorChar = visible ? `${cc}█` : ' '
-		return [before + cursorChar + trail.slice(1) + (hasReset ? colors.RESET : '')]
+		return { lines: [before + cursorChar + trail.slice(1) + (hasReset ? colors.RESET : '')], col }
 	}
-	if (visLen(body) >= width) return [line, visible ? `${cc}█${colors.RESET}` : ' ']
+	if (visLen(body) >= width) {
+		return { lines: [line, visible ? `${cc}█${colors.RESET}` : ' '], col: 0 }
+	}
+	const col = visLen(body)
 	const cursorChar = visible ? `${cc}█` : ' '
-	return [body + cursorChar + (hasReset ? colors.RESET : '')]
+	return { lines: [body + cursorChar + (hasReset ? colors.RESET : '')], col }
 }
 
 /** Render all blocks with one blank line between them.
  *  After the last block: empty line, cursor line, empty line (always).
- *  During streaming: cursor inlined in last block line, then one empty line. */
-export function renderBlocks(blocks: Block[], width: number, cursorVisible = false): string[] {
+ *  During streaming: cursor inlined in last block line, then one empty line.
+ *  Returns lines and optional streamCursor (row/col of the inline cursor during streaming). */
+export function renderBlocks(blocks: Block[], width: number, cursorVisible = false): { lines: string[]; streamCursor?: { row: number; col: number } } {
 	const result: string[] = []
 	for (const block of blocks) {
 		const lines = renderBlock(block, width)
@@ -363,9 +369,11 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 	if (streaming && result.length > 0) {
 		// Cursor always visible (solid) during streaming
 		const cc = cursorColor(lastBlock)
-		const extra = inlineCursor(result[result.length - 1], cc, true, width)
+		const { lines: extra, col } = inlineCursor(result[result.length - 1], cc, true, width)
+		const cursorRow = result.length - 1 + (extra.length > 1 ? 1 : 0)
 		result.splice(result.length - 1, 1, ...extra)
 		result.push('')
+		return { lines: result, streamCursor: { row: cursorRow, col } }
 	} else {
 		// Idle: empty line, cursor line, empty line
 		const cc = lastBlock ? cursorColor(lastBlock) : colors.cursor.fg
@@ -374,5 +382,14 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 		result.push(`${' '.repeat(BLOCK_MARGIN)}${c}`)
 		result.push('')
 	}
-	return result
+	return { lines: result }
+}
+
+/** Render a question block (tool-like box above the tab bar). */
+export function renderQuestion(question: string, width: number): string[] {
+	const { fg, bg } = colors.question
+	const aFg = colors.assistant.fg
+	const header = toolHeader('Hal is asking you a question', width, fg, bg, undefined, '')
+	const body = wordWrap(question, contentWidth(width)).map(l => boxLine(l, width, aFg, bg))
+	return [...header, ...body]
 }
