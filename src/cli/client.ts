@@ -218,7 +218,7 @@ export class Client {
 		for (const tab of newTabs) {
 			if (!current.has(tab.sessionId)) {
 				const messages = await this.transport.replaySession(tab.sessionId)
-				tab.blocks.push(...await replayToBlocks(tab.sessionId, messages, tab.info.model))
+				tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, messages, tab.info.model))
 				tab.inputHistory = await loadInputHistory(tab.sessionId)
 				tab.inputDraft = await loadDraft(tab.sessionId)
 			}

@@ -8,10 +8,12 @@ import type { Message } from '../session/messages.ts'
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
 	private readonly events: RuntimeEvent[]
+	private readonly replays: Record<string, Message[]>
 
-	constructor(bootstrapState: BootstrapState, events: RuntimeEvent[] = []) {
+	constructor(bootstrapState: BootstrapState, events: RuntimeEvent[] = [], replays: Record<string, Message[]> = {}) {
 		this.bootstrapState = bootstrapState
 		this.events = events
+		this.replays = replays
 	}
 
 	async sendCommand(_cmd: RuntimeCommand): Promise<void> {}
@@ -21,7 +23,7 @@ class FakeTransport implements Transport {
 	}
 
 	async replaySession(_id: string): Promise<Message[]> {
-		return []
+		return this.replays[_id] ?? []
 	}
 
 	async eventsOffset(): Promise<number> {
@@ -104,4 +106,48 @@ test('existing tabs keep estimated flag from later sessions events', async () =>
 	const tab = client.activeTab()
 	expect(tab).toBeTruthy()
 	expect(tab?.context).toEqual({ used: 1800, max: 200000, estimated: true })
+})
+
+test('syncTabs replays history for newly added sessions', async () => {
+	const sidA = `t-${randomBytes(4).toString('hex')}`
+	const sidB = `t-${randomBytes(4).toString('hex')}`
+	const ts = new Date().toISOString()
+	const state: RuntimeState = {
+		hostPid: 123,
+		hostId: 'host-test',
+		sessions: [sidA],
+		activeSessionId: sidA,
+		busySessionIds: [],
+		eventsOffset: 0,
+		updatedAt: ts,
+	}
+	const sessionsA: SessionInfo[] = [{
+		id: sidA,
+		workingDir: process.cwd(),
+		createdAt: ts,
+		updatedAt: ts,
+	}]
+	const sessionsAB: SessionInfo[] = [
+		...sessionsA,
+		{
+			id: sidB,
+			workingDir: process.cwd(),
+			createdAt: ts,
+			updatedAt: ts,
+		},
+	]
+	const replayB: Message[] = [
+		{ role: 'user', content: 'hello', ts },
+		{ role: 'assistant', text: 'hi', ts },
+	] as Message[]
+	const transport = new FakeTransport({ state, sessions: sessionsA }, [], { [sidB]: replayB })
+	const client = new Client(transport, () => {})
+	await client.start()
+
+	await (client as any).syncTabs(sessionsAB)
+
+	const tabB = client.getState().tabs.find(t => t.sessionId === sidB)
+	expect(tabB).toBeTruthy()
+	expect(tabB?.blocks.some(b => b.type === 'input' && b.text === 'hello')).toBe(true)
+	expect(tabB?.blocks.some(b => b.type === 'assistant' && b.text === 'hi')).toBe(true)
 })
