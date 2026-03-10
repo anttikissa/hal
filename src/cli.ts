@@ -124,7 +124,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cw = contentWidth()
 
 	const blocks = tab?.blocks ?? []
-	const { lines: contentLines } = renderBlocks(blocks, w, isVisible())
+	const { lines: contentLines, streamCursor } = renderBlocks(blocks, w, isVisible())
 	// Pad to tallest tab's content height (keeps prompt position stable)
 	const activeSessionId = tab?.sessionId ?? null
 	const maxHeight = maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
@@ -212,6 +212,8 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const hRight = Math.max(0, hPad - hLeft)
 	lines.push(`${DIM}${'─'.repeat(hLeft)}${safeHelp}${'─'.repeat(hRight)}${RESET}`)
 
+	// During streaming, position terminal cursor at the inline █ cursor
+	if (streamCursor) cursorPos = streamCursor
 	return { lines, cursor: cursorPos }
 }
 
