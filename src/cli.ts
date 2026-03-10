@@ -13,7 +13,7 @@ import { getConfig } from './config.ts'
 import { displayModel } from './models.ts'
 import { renderTabline } from './cli/tabline.ts'
 import * as colors from './cli/colors.ts'
-import { visLen } from './cli/md.ts'
+import { visLen, clipVisual } from './utils/strings.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -67,14 +67,6 @@ function scheduleBlink(): void {
 function oneLine(s: string): string {
 	return s.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ')
 }
-
-function clipForWidth(s: string, max: number): string {
-	if (max <= 0) return ''
-	if (visLen(s) <= max) return s
-	if (max === 1) return '…'
-	return s.slice(0, max - 1) + '…'
-}
-
 function bumpCursor(): void {
 	halCursorVisible = true
 	scheduleBlink()
@@ -173,7 +165,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		}
 	})
 	const tabBar = renderTabline(parts, w)
-	lines.push(clipForWidth(oneLine(tabBar), w))
+	lines.push(clipVisual(oneLine(tabBar), w))
 
 	// Question area (when active, shown above the regular prompt)
 	const hasQ = prompt.hasQuestion()
@@ -213,7 +205,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	// Help bar
 	const statusText = tab?.busy ? ' busy' : ''
 	const help = ` ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-c quit${statusText} `
-	const safeHelp = clipForWidth(oneLine(help), w)
+	const safeHelp = clipVisual(oneLine(help), w)
 	const hPad = Math.max(0, w - safeHelp.length)
 	const hLeft = Math.max(0, Math.floor(hPad / 2))
 	const hRight = Math.max(0, hPad - hLeft)

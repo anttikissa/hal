@@ -4,6 +4,10 @@
 
 Should have clock times in the tool line - right aligned, rightmost
 
+there must be two empty lines after the last assistant block
+
+there's a bug where when I'm typing, sometimes colors bleed through the prompt line
+
 activity no longer visible in tab
 
 bash: ":ok: instead of checkmark
@@ -12,6 +16,9 @@ You (to Codex 5.3) even though it's Opus
 
 Bash output having color is buggy (eg failing test) - should interpret ansi reset codes to restore
 bash tool output color
+
+A lot of tool uses are now executed with invalid options - is that new or...
+
 
 There was lots of attempts to fill the cor
 

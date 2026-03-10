@@ -1,7 +1,8 @@
 // Block-based content model for tab output.
 
 import * as colors from './colors.ts'
-import { charWidth, mdSpans, mdInline, mdTable, visLen, wordWrap } from './md.ts'
+import { charWidth, visLen, wordWrap } from '../utils/strings.ts'
+import { mdSpans, mdInline, mdTable } from './md.ts'
 import { displayModel } from '../models.ts'
 import { stringify as asonStringify } from '../utils/ason.ts'
 
