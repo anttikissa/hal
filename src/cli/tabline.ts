@@ -1,4 +1,5 @@
 // Tab line rendering with busy indicators and color.
+import { minicursor } from './colors.ts'
 
 const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
@@ -33,7 +34,7 @@ function tabTitle(label: string): string {
 // ── Rendering modes (progressive degradation) ──
 
 function statusChar(t: TablineTab, busyChar: string): string {
-	return t.indicator ?? (t.busy ? busyChar : ' ')
+	return t.indicator ?? (t.busy ? `${minicursor.fg}${busyChar}` : ' ')
 }
 
 /** Mode 0: Full titles, max 12 chars. `[1▪.hal]` / ` 2▪.hal ` */

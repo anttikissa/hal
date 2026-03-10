@@ -47,6 +47,7 @@ const info      = { fg: fg(oklch(0.74, 0.02, 250)), bg: bg(oklch(0.25, 0.02, 250
 const error     = { fg: fg(oklch(0.65, 0.20, 35)),  bg: bg(oklch(0.28, 0.08, 35)) }
 const system    = { fg: fg(oklch(0.75, 0.15, 190)), bg: bg(oklch(0.25, 0.05, 190)) }
 const cursor    = { fg: fg(oklch(0.75, 0.15, 70)) }
+const minicursor = { fg: fg(oklch(0.75, 0.15, 70)) }
 const question  = { fg: '\x1b[93m', bg: bg(oklch(0.28, 0.06, 85)) } // bright yellow
 
 const readColor = { fg: fg(oklch(0.75, 0.15, 145)), bg: bg(oklch(0.25, 0.05, 145)) }
@@ -67,4 +68,4 @@ function tool(name: string): { fg: string; bg: string } {
 	return tools[name] ?? tools.default
 }
 
-export { RESET, DIM, SEL_ON, SEL_OFF, assistant, assistantMd, input, system, thinking, thinkingMd, info, error, cursor, question, tool }
+export { RESET, DIM, SEL_ON, SEL_OFF, assistant, assistantMd, input, system, thinking, thinkingMd, info, error, cursor, minicursor, question, tool }

@@ -335,6 +335,7 @@ function isStreaming(block: Block): boolean {
 /** Cursor color: matches the last active block's color scheme. */
 function cursorColor(block: Block): string {
 	if (block.type === 'tool') return colors.tool(block.name).fg
+	if (block.type === 'thinking') return colors.thinking.fg
 	return colors.cursor.fg
 }
 

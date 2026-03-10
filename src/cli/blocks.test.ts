@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'bun:test'
 import { renderBlocks, type Block } from './blocks.ts'
+import * as colors from './colors.ts'
 
 // eslint-disable-next-line no-control-regex
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\]8;;[^\x07]*\x07/g, '')
@@ -108,4 +109,19 @@ describe('renderBlocks', () => {
 		const helloStart = cursorLine!.indexOf('hello')
 		expect(helloStart).toBeGreaterThanOrEqual(0)
 		expect(cursorLine!.indexOf('█')).toBe(helloStart + 'hello'.length)
+	})
+
+	test('streaming thinking cursor uses grey (thinking) color, not default cursor color', () => {
+		const blocks: Block[] = [{ type: 'thinking', text: 'hi', done: false }]
+		const { lines } = renderBlocks(blocks, 80, true)
+		const raw = lines.find(l => l.includes('█'))!
+		expect(raw).toContain(colors.thinking.fg)
+		expect(raw).not.toContain(colors.cursor.fg)
+	})
+
+	test('streaming assistant cursor uses default cursor color, not thinking color', () => {
+		const blocks: Block[] = [{ type: 'assistant', text: 'hi', done: false }]
+		const { lines } = renderBlocks(blocks, 80, true)
+		const raw = lines.find(l => l.includes('█'))!
+		expect(raw).toContain(colors.cursor.fg)
 	})
