@@ -32,7 +32,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'model', arg: 'model' },
 	{ name: 'topic', arg: 'topic' },
 	{ name: 'continue' },
-	{ name: 'resume', arg: 'session' },
+	{ name: 'resume' },
 	{ name: 'open', arg: 'session' },
 	{ name: 'fork' },
 	{ name: 'pause' },

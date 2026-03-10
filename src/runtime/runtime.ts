@@ -23,6 +23,18 @@ function pick<T>(arr: T[]): T {
 	return arr[Math.floor(Math.random() * arr.length)]
 }
 
+function timeAgo(iso: string): string {
+	const ms = Date.now() - new Date(iso).getTime()
+	if (ms < 0) return ''
+	const mins = Math.floor(ms / 60_000)
+	if (mins < 1) return 'just now'
+	if (mins < 60) return `${mins}m ago`
+	const hrs = Math.floor(mins / 60)
+	if (hrs < 24) return `${hrs}h ago`
+	const days = Math.floor(hrs / 24)
+	return `${days}d ago`
+}
+
 export interface Runtime {
 	sessions: Map<string, SessionInfo>
 	activeSessionId: string | null
@@ -423,7 +435,26 @@ export async function startRuntime(): Promise<Runtime> {
 				if (!id) {
 					const all = await listSessionIds()
 					const closed = all.filter(s => !sessions.has(s))
-					const text = closed.length ? `Sessions: ${closed.join(', ')}` : 'No closed sessions'
+					if (closed.length === 0) {
+						await emit({ type: 'line', sessionId: sid, text: 'No closed sessions', level: 'info' })
+						break
+					}
+					const items: { id: string; topic?: string; lastPrompt?: string; updatedAt?: string }[] = []
+					for (const cid of closed) {
+						const m = loadMeta(cid)
+						if (m) items.push({ id: cid, topic: m.topic, lastPrompt: m.lastPrompt, updatedAt: m.updatedAt })
+						else items.push({ id: cid })
+					}
+					items.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+					const lines = items.slice(0, 20).map(s => {
+						const label = s.topic || s.lastPrompt || ''
+						const age = s.updatedAt ? timeAgo(s.updatedAt) : ''
+						const parts = [s.id.padEnd(8)]
+						if (label) parts.push(label.slice(0, 50))
+						if (age) parts.push(age)
+						return parts.join('  ')
+					})
+					const text = ['[resume] /resume <id> to reopen', ...lines].join('\n')
 					await emit({ type: 'line', sessionId: sid, text, level: 'info' })
 					break
 				}
@@ -468,7 +499,7 @@ export async function startRuntime(): Promise<Runtime> {
 
 	return {
 		sessions,
-		activeSessionId,
+		get activeSessionId() { return activeSessionId },
 		busySessionIds,
 		stop() { stopped = true; cmdTail.cancel(); watchers.forEach(w => w.close()) },
 	}

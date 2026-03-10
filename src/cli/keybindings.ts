@@ -91,8 +91,7 @@ export function handleInput(k: KeyEvent, ctx: InputContext): void {
 			const slash = text.match(/^\/(\w+)\s*(.*)/)
 			if (slash) {
 				const [, cmd, arg] = slash
-				if (cmd === 'help') { showHelp(ctx); }
-				else if (cmd === 'resume') ctx.send('open', arg || undefined)
+				if (cmd === 'help') showHelp(ctx)
 				else ctx.send(cmd, arg || undefined)
 			} else {
 				ctx.onSubmit()

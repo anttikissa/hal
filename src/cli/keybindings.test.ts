@@ -105,11 +105,11 @@ test('typing text and enter sends prompt', () => {
 	expect(submitted).toBe(true)
 })
 
-test('/resume sends open with id', () => {
+test('/resume sends resume with id', () => {
 	const ctx = mockCtx()
 	prompt.setText('/resume 00-abc')
 	handleInput(ke('enter'), ctx)
-	expect(sent).toEqual([{ type: 'open', text: '00-abc' }])
+	expect(sent).toEqual([{ type: 'resume', text: '00-abc' }])
 })
 
 test('/reset sends reset command', () => {

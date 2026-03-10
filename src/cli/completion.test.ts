@@ -30,10 +30,10 @@ describe('completeInput', () => {
 		expect(r?.text).toBe('/model codex-spark ')
 	})
 
-	test('completes session id argument', () => {
-		const r = completeInput('/resume 01', '/resume 01'.length, ctx)
+	test('completes session id argument for /open', () => {
+		const r = completeInput('/open 01', '/open 01'.length, ctx)
 		expect(r).toBeTruthy()
-		expect(r?.text).toBe('/resume 01-abc ')
+		expect(r?.text).toBe('/open 01-abc ')
 	})
 
 	test('completes respond argument', () => {

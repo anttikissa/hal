@@ -413,3 +413,49 @@ test('ask tool sends question event and waits for respond', { timeout: 10000 }, 
 	expect((answerEvent as any).text).toBe('tabs obviously')
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
 })
+
+test('resume without args lists closed sessions with details', async () => {
+	// Create a second session, set a topic, then close it
+	await commands.append(makeCommand('open', src))
+	await new Promise(r => setTimeout(r, 500))
+	const secondId = [...runtime.sessions.keys()].find(id => id !== runtime.activeSessionId)
+	expect(secondId).toBeTruthy()
+	const secondInfo = runtime.sessions.get(secondId!)!
+	secondInfo.topic = 'test-topic'
+	secondInfo.lastPrompt = 'hello world'
+
+	// Close the second session
+	await commands.append(makeCommand('close', src, undefined, secondId!))
+	await new Promise(r => setTimeout(r, 300))
+	expect(runtime.sessions.has(secondId!)).toBe(false)
+
+	// Now send /resume (no args)
+	const snapshot = (await events.readAll()).length
+	await commands.append(makeCommand('resume', src, undefined, runtime.activeSessionId!))
+	await new Promise(r => setTimeout(r, 300))
+
+	const all = await events.readAll()
+	const recent = all.slice(snapshot)
+	const listEvent = recent.find(e => e.type === 'line' && e.text.includes(secondId!))
+	expect(listEvent).toBeTruthy()
+	expect((listEvent as any).text).toContain('test-topic')
+})
+
+test('resume with id opens a closed session as a new tab', async () => {
+	// Create and close a session
+	await commands.append(makeCommand('open', src))
+	await new Promise(r => setTimeout(r, 500))
+	expect(runtime.sessions.size).toBe(2)
+	const allIds = [...runtime.sessions.keys()]
+	const toClose = allIds[allIds.length - 1]
+
+	await commands.append(makeCommand('close', src, undefined, toClose))
+	await new Promise(r => setTimeout(r, 300))
+	expect(runtime.sessions.has(toClose)).toBe(false)
+
+	// Resume it
+	await commands.append(makeCommand('resume', src, toClose, runtime.activeSessionId!))
+	await new Promise(r => setTimeout(r, 300))
+	expect(runtime.sessions.has(toClose)).toBe(true)
+	expect(runtime.activeSessionId).toBe(toClose)
+})

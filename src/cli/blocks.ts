@@ -212,7 +212,7 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 
 function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): string[] {
 	const { fg, bg } = colors.info
-	return [boxLine(block.text, width, fg, bg)]
+	return block.text.split('\n').map(l => boxLine(l, width, fg, bg))
 }
 
 function formatErrorDetail(detail: string): string {
