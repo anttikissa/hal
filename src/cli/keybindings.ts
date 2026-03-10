@@ -24,7 +24,6 @@ export interface InputContext {
 }
 
 export function handleInput(k: KeyEvent, ctx: InputContext): void {
-	if (k.key === 'k' && k.ctrl) throw new Error('simulated crash (ctrl-k)')
 	if (k.key === 'c' && k.ctrl) { ctx.quit(); return }
 
 	if ((k.key === 'w' && k.ctrl) || (k.key === 'd' && k.ctrl && !prompt.text())) {

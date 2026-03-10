@@ -150,3 +150,39 @@ describe('history navigation', () => {
 		expect(d.selection).toEqual([0, 17]) // 'line one\nline two' = 17 chars, anchor at 17
 	})
 })
+
+describe('ctrl-k (kill to end of line)', () => {
+	test('deletes from cursor to end of line', () => {
+		d.type('hello world')
+		d.press('a', { ctrl: true }) // move to start
+		d.press('right') // pos 1
+		d.press('right') // pos 2
+		d.press('right') // pos 3
+		d.press('right') // pos 4
+		d.press('right') // pos 5
+		expect(d.cursor).toBe(5)
+		d.press('k', { ctrl: true })
+		expect(d.promptText).toBe('hello')
+		expect(d.cursor).toBe(5)
+	})
+
+	test('at end of line does nothing', () => {
+		d.type('hello')
+		expect(d.cursor).toBe(5)
+		d.press('k', { ctrl: true })
+		expect(d.promptText).toBe('hello')
+	})
+
+	test('at beginning kills entire line', () => {
+		d.type('hello')
+		d.press('a', { ctrl: true })
+		d.press('k', { ctrl: true })
+		expect(d.promptText).toBe('')
+		expect(d.cursor).toBe(0)
+	})
+
+	test('does not crash', () => {
+		d.type('hello')
+		expect(() => d.press('k', { ctrl: true })).not.toThrow()
+	})
+})

@@ -227,6 +227,15 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.key === 'a' && k.ctrl) { move(0, k.shift); return true }
 	if (k.key === 'e' && k.ctrl) { move(buf.length, k.shift); return true }
 
+	// Ctrl+K: kill to end of line
+	if (k.key === 'k' && k.ctrl) {
+		if (cursor < buf.length) {
+			buf = buf.slice(0, cursor)
+			clearSel()
+		}
+		return true
+	}
+
 	// Ctrl+V / Ctrl+Y: paste (same as Cmd+V)
 	if ((k.key === 'v' || k.key === 'y') && k.ctrl) { doPaste(); return true }
 
