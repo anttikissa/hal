@@ -348,6 +348,9 @@ export async function startRuntime(): Promise<Runtime> {
 			}
 			case 'close': {
 				if (!sessions.has(sid)) { await warn(`Session ${sid} not open`); return }
+				const closing = sessions.get(sid)!
+				closing.closedAt = new Date().toISOString()
+				;(closing as SessionInfo & { save?: () => void }).save?.()
 				sessions.delete(sid)
 				if (activeSessionId === sid) {
 					activeSessionId = sessions.keys().next().value ?? null
@@ -439,16 +442,16 @@ export async function startRuntime(): Promise<Runtime> {
 						await emit({ type: 'line', sessionId: sid, text: 'No closed sessions', level: 'info' })
 						break
 					}
-					const items: { id: string; topic?: string; lastPrompt?: string; updatedAt?: string }[] = []
+					const items: { id: string; topic?: string; lastPrompt?: string; sortTs?: string }[] = []
 					for (const cid of closed) {
 						const m = loadMeta(cid)
-						if (m) items.push({ id: cid, topic: m.topic, lastPrompt: m.lastPrompt, updatedAt: m.updatedAt })
+						if (m) items.push({ id: cid, topic: m.topic, lastPrompt: m.lastPrompt, sortTs: m.closedAt ?? m.updatedAt })
 						else items.push({ id: cid })
 					}
-					items.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+					items.sort((a, b) => (b.sortTs ?? '').localeCompare(a.sortTs ?? ''))
 					const lines = items.slice(0, 20).map(s => {
 						const label = s.topic || s.lastPrompt || ''
-						const age = s.updatedAt ? timeAgo(s.updatedAt) : ''
+						const age = s.sortTs ? timeAgo(s.sortTs) : ''
 						const parts = [s.id.padEnd(8)]
 						if (label) parts.push(label.slice(0, 50))
 						if (age) parts.push(age)

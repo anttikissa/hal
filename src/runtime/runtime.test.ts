@@ -29,7 +29,7 @@ const { startRuntime } = runtimeMod
 const { makeCommand } = protocolMod
 const { parseAll } = aSonMod
 const { appendMessages, writeAssistantEntry } = messagesMod
-const { createSession } = sessionMod
+const { createSession, loadMeta } = sessionMod
 
 if (!STATE_DIR.includes('/hal-test-')) {
 	throw new Error(`runtime.test state isolation failed: STATE_DIR=${STATE_DIR}`)
@@ -412,6 +412,20 @@ test('ask tool sends question event and waits for respond', { timeout: 10000 }, 
 	expect((answerEvent as any).question).toBe('Do you prefer tabs or spaces?')
 	expect((answerEvent as any).text).toBe('tabs obviously')
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
+})
+
+test('close writes closedAt to meta', async () => {
+	await commands.append(makeCommand('open', src))
+	await new Promise(r => setTimeout(r, 500))
+	const secondId = [...runtime.sessions.keys()].find(id => id !== runtime.activeSessionId)!
+	expect(secondId).toBeTruthy()
+
+	await commands.append(makeCommand('close', src, undefined, secondId))
+	await new Promise(r => setTimeout(r, 300))
+
+	const meta = loadMeta(secondId)
+	expect(meta?.closedAt).toBeTruthy()
+	expect(new Date(meta!.closedAt!).getTime()).toBeGreaterThan(Date.now() - 5000)
 })
 
 test('resume without args lists closed sessions with details', async () => {

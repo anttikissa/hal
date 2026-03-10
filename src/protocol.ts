@@ -13,6 +13,7 @@ export interface SessionInfo {
 	workingDir: string
 	createdAt: string
 	updatedAt: string
+	closedAt?: string
 	lastPrompt?: string
 	context?: { used: number; max: number }
 }
