@@ -427,7 +427,7 @@ export async function startRuntime(): Promise<Runtime> {
 					await warn('No interrupted user turn to continue')
 					break
 				}
-				await emitInfo(sid, '[resume] continuing interrupted response', 'meta')
+				await emitInfo(sid, '[continuing] interrupted response', 'meta')
 				await startGeneration(sid, info, apiMessages, 'continuing...')
 				break
 			}
@@ -492,7 +492,7 @@ export async function startRuntime(): Promise<Runtime> {
 						const entry = await writeToolResultEntry(sid, t.id, '[interrupted — skipped by user]', toolRefMap)
 						await appendMessages(sid, [entry])
 					}
-					await emitInfo(sid, `[resume] ${interrupted.length} interrupted tool(s) marked skipped`, 'warn')
+					await emitInfo(sid, `[interrupted] ${interrupted.length} tool(s) marked skipped`, 'warn')
 				}
 				pendingInterruptedTools.delete(sid)
 				break

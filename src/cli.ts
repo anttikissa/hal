@@ -171,7 +171,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		let indicator: string | undefined
 		const last = t.blocks[t.blocks.length - 1]
 		if (t.question) indicator = '?'
-		else if (!t.busy && last?.type === 'info' && (last.text === '[paused]' || last.text.startsWith('[resume]')))
+		else if (!t.busy && last?.type === 'info' && (last.text === '[paused]' || last.text.startsWith('[interrupted]')))
 			indicator = '!'
 		return {
 			label: `${i + 1} ${title}`,

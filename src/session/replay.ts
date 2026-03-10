@@ -65,7 +65,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 	const interrupted = detectInterruptedTools(messages)
 	if (interrupted.length > 0) {
 		const toolList = interrupted.map(t => t.name).join(', ')
-		blocks.push({ type: 'info', text: `[resume] interrupted during tools (${toolList}). Use /respond skip, then /continue` })
+		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Use /respond skip, then /continue` })
 	} else if (messages.length > 0) {
 		// Check for pending turn: last role-bearing message is 'user' or 'tool_result' (not a [system] prefix)
 		for (let i = messages.length - 1; i >= 0; i--) {
@@ -73,7 +73,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			if (m.role) {
 				const text = typeof m.content === 'string' ? m.content : ''
 				if ((m.role === 'user' && !text.startsWith('[system]')) || m.role === 'tool_result') {
-					blocks.push({ type: 'info', text: '[resume] Type /continue to continue the interrupted response' })
+					blocks.push({ type: 'info', text: '[interrupted] Type /continue to continue' })
 				}
 				break
 			}
