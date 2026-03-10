@@ -52,6 +52,9 @@ function convertMessages(messages: any[]): any[] {
 						type: 'message', role: 'assistant', status: 'completed',
 						content: [{ type: 'output_text', text: block.text, annotations: [] }],
 					})
+				} else if (block.type === 'thinking') {
+					const signature = parseReasoningSignature(block.signature ?? block.thinkingSignature)
+					if (signature) input.push(signature)
 				} else if (block.type === 'tool_use') {
 					input.push({
 						type: 'function_call',
@@ -64,6 +67,18 @@ function convertMessages(messages: any[]): any[] {
 		}
 	}
 	return input
+}
+
+function parseReasoningSignature(signature: unknown): any | null {
+	if (typeof signature !== 'string' || !signature.trim()) return null
+	try {
+		const parsed = JSON.parse(signature)
+		if (parsed?.type !== 'reasoning') return null
+		if (typeof parsed.encrypted_content !== 'string' || !parsed.encrypted_content) return null
+		return parsed
+	} catch {
+		return null
+	}
 }
 
 function convertTools(tools: any[]): any[] {
@@ -121,11 +136,24 @@ function parseSSEEvents(state: StreamState, event: any): ProviderEvent[] {
 		return []
 	}
 
+	if (type === 'response.function_call_arguments.done') {
+		const oi = event.output_index ?? 0
+		if (typeof event.arguments === 'string') state.toolInputs.set(oi, event.arguments)
+		return []
+	}
+
 	if (type === 'response.output_item.done') {
 		const oi = event.output_index ?? 0
 		const info = state.itemMap.get(oi)
+		if (info?.type === 'reasoning') {
+			const item = event.item
+			if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string' && item.encrypted_content) {
+				return [{ type: 'thinking_signature', signature: JSON.stringify(item) }]
+			}
+			return []
+		}
 		if (info?.type === 'function_call') {
-			const json = state.toolInputs.get(oi) ?? '{}'
+			const json = state.toolInputs.get(oi) ?? event.item?.arguments ?? '{}'
 			let input: unknown = {}
 			try { input = JSON.parse(json) } catch {}
 			return [{ type: 'tool_call', id: info.id ?? `call_${oi}`, name: info.name ?? '', input }]

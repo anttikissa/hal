@@ -134,6 +134,76 @@ test('openai provider: parses reasoning as thinking', async () => {
 	}
 })
 
+test('openai provider: captures reasoning signature from output item', async () => {
+	const events = [
+		{ type: 'response.output_item.added', output_index: 0, item: { type: 'reasoning' } },
+		{ type: 'response.reasoning_summary_text.delta', output_index: 0, delta: 'Planning...' },
+		{
+			type: 'response.output_item.done',
+			output_index: 0,
+			item: { type: 'reasoning', id: 'rs_123', encrypted_content: 'enc_abc' },
+		},
+		{ type: 'response.completed', response: { status: 'completed' } },
+	]
+
+	const origFetch = mockFetch(events)
+	try {
+		const mod = await import('./openai-provider.ts')
+		const provider = mod.default
+		const collected: any[] = []
+		for await (const event of provider.generate({
+			messages: [],
+			model: 'gpt-5.4',
+			systemPrompt: 'test',
+		})) {
+			collected.push(event)
+		}
+
+		const signature = collected.find(e => e.type === 'thinking_signature')
+		expect(signature).toBeTruthy()
+		const parsed = JSON.parse(signature.signature)
+		expect(parsed.type).toBe('reasoning')
+		expect(parsed.encrypted_content).toBe('enc_abc')
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})
+
+test('openai provider: replays reasoning signature in input', async () => {
+	const sse = makeSSE([{ type: 'response.completed', response: { status: 'completed' } }])
+	let requestBody: any = null
+	const origFetch = globalThis.fetch
+	globalThis.fetch = async (input: any, init?: any) => {
+		const url = typeof input === 'string' ? input : input.url
+		if (url.includes('auth.openai.com')) {
+			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
+		}
+		requestBody = JSON.parse(String(init?.body ?? '{}'))
+		return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	}
+
+	try {
+		const mod = await import('./openai-provider.ts')
+		const provider = mod.default
+		const reasoning = { type: 'reasoning', id: 'rs_prev', encrypted_content: 'enc_prev' }
+		for await (const _event of provider.generate({
+			messages: [{
+				role: 'assistant',
+				content: [{ type: 'thinking', thinking: 'previous thought', signature: JSON.stringify(reasoning) }],
+			}],
+			model: 'gpt-5.4',
+			systemPrompt: 'test',
+		})) {
+			// drain stream
+		}
+
+		expect(requestBody).toBeTruthy()
+		expect(requestBody.input).toContainEqual(reasoning)
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})
+
 test('openai provider: handles API error', async () => {
 	const origFetch = mockFetchError(429, '{"error": "rate limited"}')
 	try {
