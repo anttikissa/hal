@@ -55,6 +55,7 @@ const editColor = { fg: fg(oklch(0.75, 0.15, 260)), bg: bg(oklch(0.25, 0.05, 260
 
 const tools: Record<string, { fg: string; bg: string }> = {
 	bash:    { fg: fg(oklch(0.75, 0.15, 320)), bg: bg(oklch(0.25, 0.05, 320)) },
+	eval:    { fg: fg(oklch(0.75, 0.18, 300)), bg: bg(oklch(0.25, 0.08, 300)) },
 	read:    readColor,
 	grep:    readColor,
 	glob:    readColor,

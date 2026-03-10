@@ -50,4 +50,17 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 
 Multiple forks from the same parent share the same prefix of conversation history. Both sessions diverge independently after the fork point. When debugging, check `messages.asonl` for `forked_from` entries to trace lineage.
 
+::: if eval="true"
+
+## Eval tool
+
+When `eval: true` is set in `config.ason`, an `eval` tool is available that executes TypeScript **inside the Hal process**. Use it to inspect/modify runtime state, call internal functions, or do anything that `bash` can't (since bash runs out-of-process).
+
+- **`code`** parameter: TypeScript function body. `ctx` is in scope with `{ sessionId, halDir, stateDir, cwd }`. Use `return` to return a value.
+- **Imports**: use `~src/` prefix to import from Hal source, e.g. `import { getConfig } from '~src/config.ts'`
+- **Audit**: executed scripts persist in `state/sessions/<id>/eval/` — never deleted.
+- **Permissions**: treated as a write tool — requires confirmation under `ask-writes` / `ask-all` permission levels.
+
+:::
+
 # SYSTEM.md ends here.

@@ -6,7 +6,7 @@
 import { ensureStateDir } from './state.ts'
 import { ensureBus, events, commands } from './ipc.ts'
 import { startRuntime } from './runtime/startup.ts'
-import { parseKeys } from './cli/keys.ts'
+import { keys } from './cli/keys.ts'
 import * as prompt from './cli/prompt.ts'
 import { eventId, type RuntimeEvent } from './protocol.ts'
 
@@ -55,7 +55,7 @@ function submitCommand(type: string, text?: string): void {
 
 stdin.on('data', (data: Buffer) => {
 	const str = data.toString('utf8')
-	for (const k of parseKeys(str)) {
+	for (const k of keys.parseKeys(str)) {
 		if (k.key === 'enter' && !k.alt && !k.shift && !k.ctrl && !k.cmd) {
 			const text = prompt.text()
 			prompt.clear()

@@ -128,3 +128,5 @@ export function clipVisual(s: string, max: number): string {
 	}
 	return s.slice(0, cut) + '…'
 }
+
+export const strings = { charWidth, visLen, wordWrap, clipVisual }

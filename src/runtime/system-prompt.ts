@@ -1,6 +1,7 @@
 // System prompt — loads SYSTEM.md + AGENTS.md, substitutes variables, processes directives.
 
 import { readFileSync } from 'fs'
+import { getConfig } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 
 /** ::: if key="glob" ... ::: conditional blocks. */
@@ -30,11 +31,13 @@ export interface SystemPromptResult {
 
 export function loadSystemPrompt(opts: { model?: string; sessionDir?: string } = {}): SystemPromptResult {
 	const model = opts.model ?? ''
+	const config = getConfig()
 	const d = new Date()
 	const date = `${d.toISOString().slice(0, 10)}, ${d.toLocaleDateString('en-US', { weekday: 'long' })}`
 
 	const vars: Record<string, string> = {
 		model, date, cwd: LAUNCH_CWD, hal_dir: HAL_DIR, session_dir: opts.sessionDir ?? '',
+		eval: config.eval ? 'true' : 'false',
 	}
 	const sub = (s: string) => s
 		.replace(/\$\{model\}/g, model).replace(/\$\{cwd\}/g, LAUNCH_CWD)

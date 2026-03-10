@@ -256,3 +256,5 @@ export function parseKeys(data: string): KeyEvent[] {
 	}
 	return events
 }
+
+export const keys = { parseKey, parseKeys }

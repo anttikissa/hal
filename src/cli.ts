@@ -1,7 +1,7 @@
 // Terminal client — wired to IPC via Client + Transport.
 
 import { render, emptyState, type RenderState, type CursorPos } from './cli/diff-engine.ts'
-import { parseKeys } from './cli/keys.ts'
+import { keys } from './cli/keys.ts'
 import { handleInput, type InputContext } from './cli/keybindings.ts'
 import * as prompt from './cli/prompt.ts'
 import { renderBlocks, renderQuestion, type Block } from './cli/blocks.ts'
@@ -13,8 +13,8 @@ import { getConfig } from './config.ts'
 import { displayModel } from './models.ts'
 import { renderTabline } from './cli/tabline.ts'
 import * as colors from './cli/colors.ts'
-import { visLen, clipVisual } from './utils/strings.ts'
-import { isVisible, start } from './cli/cursor.ts'
+import { strings } from './utils/strings.ts'
+import { cursor } from './cli/cursor.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -130,7 +130,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	const blocks = tab?.blocks ?? []
 	const hasQ = prompt.hasQuestion()
-	const { lines: contentLines } = renderBlocks(blocks, w, isVisible())
+	const { lines: contentLines } = renderBlocks(blocks, w, cursor.isVisible())
 
 	const lines: string[] = []
 	let qAnswerStartRow = -1
@@ -157,7 +157,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		lines.push('') // spacing after answer input
 		// Help bar below answer input
 		const qHelp = ' enter to submit '
-		const qhPad = Math.max(0, w - visLen(qHelp))
+		const qhPad = Math.max(0, w - strings.visLen(qHelp))
 		const qhLeft = Math.floor(qhPad / 2)
 		const qhRight = qhPad - qhLeft
 		lines.push(`${DIM}${'─'.repeat(qhLeft)}${qHelp}${'─'.repeat(qhRight)}${RESET}`)
@@ -202,7 +202,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 			indicator,
 		}
 	})
-	const tabBar = renderTabline(parts, w, isVisible())
+	const tabBar = renderTabline(parts, w, cursor.isVisible())
 	lines.push(tabBar)
 
 	let cursorPos: CursorPos
@@ -235,7 +235,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	// Help bar
 	const statusText = tab?.busy ? ' busy' : ''
 	const help = ` ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-c quit${statusText} `
-	const safeHelp = clipVisual(oneLine(help), w)
+	const safeHelp = strings.clipVisual(oneLine(help), w)
 	const hPad = Math.max(0, w - safeHelp.length)
 	const hLeft = Math.max(0, Math.floor(hPad / 2))
 	const hRight = Math.max(0, hPad - hLeft)
@@ -335,7 +335,7 @@ export const inputCtx: InputContext = {
 // ── Input handling ──
 
 stdin.on('data', (data: string) => {
-	for (const k of parseKeys(data)) handleInput(k, inputCtx)
+	for (const k of keys.parseKeys(data)) handleInput(k, inputCtx)
 })
 
 stdout.on('resize', () => {
@@ -344,7 +344,7 @@ stdout.on('resize', () => {
 })
 
 // Start
-start(doRender)
+cursor.start(doRender)
 doRender()
 client.start().catch(err => {
 	console.error('Client start failed:', err)

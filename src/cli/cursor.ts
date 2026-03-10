@@ -28,3 +28,5 @@ export function stop(): void {
 	timer = null
 	onChange = null
 }
+
+export const cursor = { isVisible, start, stop }

@@ -62,7 +62,7 @@ Insert `<blink />` (50ms pause) or `<blink ms="400" />` (custom duration) in str
 ## SYSTEM.md preprocessor
 
 `SYSTEM.md` is preprocessed before being sent to the model (`src/runtime/system-prompt.ts`):
-- `${model}`, `${cwd}`, `${date}`, `${session_dir}` are replaced with runtime values.
+- `${model}`, `${cwd}`, `${date}`, `${session_dir}`, `${eval}` are replaced with runtime values.
 - `::: if model="glob"` ... `:::` fenced blocks conditionally include content by model name.
 - HTML comments are stripped.
 - Consecutive blank lines are collapsed.
@@ -71,15 +71,6 @@ Insert `<blink />` (50ms pause) or `<blink ms="400" />` (custom duration) in str
 ## TODOs
 
 See `TODO.md`.
-
-## Eval tool
-
-When `eval: true` is set in `config.ason`, an `eval` tool is available that executes TypeScript **inside the Hal process**. Use it to inspect/modify runtime state, call internal functions, or do anything that `bash` can't (since bash runs out-of-process).
-
-- **`code`** parameter: TypeScript function body. `ctx` is in scope with `{ sessionId, halDir, stateDir, cwd }`. Use `return` to return a value.
-- **Imports**: use `~src/` prefix to import from Hal source, e.g. `import { getConfig } from '~src/config.ts'`
-- **Audit**: executed scripts persist in `state/sessions/<id>/eval/` — never deleted.
-- **Permissions**: treated as a write tool — requires confirmation under `ask-writes` / `ask-all` permission levels.
 
 ## Architecture (high level)
 
