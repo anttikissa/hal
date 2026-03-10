@@ -7,11 +7,13 @@ import * as prompt from './prompt.ts'
 export class TestDriver {
 	sent: { type: string; text?: string }[] = []
 	blocks: any[] = []
+	inputHistory: string[] = []
 	renders = 0
 	private ctx: InputContext
 
 	constructor() {
 		prompt.reset()
+		prompt.setHistory(this.inputHistory)
 		this.ctx = {
 			send: (type, text) => { this.sent.push({ type, text }) },
 			activeTab: () => ({ blocks: this.blocks, busy: false, info: { topic: '.hal', workingDir: '~/.hal' } }),
@@ -55,7 +57,9 @@ export class TestDriver {
 	reset(): void {
 		this.sent.length = 0
 		this.blocks.length = 0
+		this.inputHistory.length = 0
 		this.renders = 0
 		prompt.reset()
+		prompt.setHistory(this.inputHistory)
 	}
 }

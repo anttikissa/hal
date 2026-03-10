@@ -67,3 +67,56 @@ describe('TestDriver', () => {
 		expect(d.cursor).toBe(2)
 	})
 })
+
+describe('history navigation', () => {
+	test('up arrow recalls submitted messages in reverse order', () => {
+		d.submit('foo')
+		d.submit('bar')
+		d.submit('zot')
+
+		d.press('up')
+		expect(d.promptText).toBe('zot')
+		d.press('up')
+		expect(d.promptText).toBe('bar')
+		d.press('up')
+		expect(d.promptText).toBe('foo')
+	})
+
+	test('each message appears exactly once (no duplicates)', () => {
+		d.submit('foo')
+		d.submit('bar')
+		d.submit('zot')
+
+		// Walk all the way up: zot, bar, foo
+		d.press('up')
+		expect(d.promptText).toBe('zot')
+		d.press('up')
+		expect(d.promptText).toBe('bar')
+		d.press('up')
+		expect(d.promptText).toBe('foo')
+		// One more up stays at oldest
+		d.press('up')
+		expect(d.promptText).toBe('foo')
+	})
+
+	test('down arrow walks back toward newest, then to empty', () => {
+		d.submit('foo')
+		d.submit('bar')
+
+		d.press('up')
+		d.press('up')
+		expect(d.promptText).toBe('foo')
+
+		d.press('down')
+		expect(d.promptText).toBe('bar')
+		d.press('down')
+		expect(d.promptText).toBe('')
+	})
+
+	test('shared array has exactly one entry per submit', () => {
+		d.submit('foo')
+		d.submit('bar')
+		d.submit('zot')
+		expect(d.inputHistory).toEqual(['foo', 'bar', 'zot'])
+	})
+})
