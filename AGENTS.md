@@ -40,6 +40,8 @@ Good: "[system] reloaded SYSTEM.md (file changed)" or "(model changed)"
 Bad: "[promoted] this process is now the owner"
 Good: "[promoted] pid 12345 is now the owner"
 
+Insert `<blink />` (50ms pause) or `<blink ms="400" />` (custom duration) in streamed text for comedic timing, dramatic pauses, or musical phrasing. The tag is stripped from output and converted to a delay.
+
 ## TUI
 
 - Canonical TUI behavior doc: `docs/tui.md` (update it with any TUI rendering/input behavior change).

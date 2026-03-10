@@ -12,6 +12,7 @@ import { TOOLS, executeTool, argsPreview, truncate, type ToolCall } from './tool
 import { runHooks } from './hooks.ts'
 import { contextWindowForModel, isCalibrated, saveCalibration, messageBytes, estimateContext } from './context.ts'
 import { getConfig, type PermissionLevel } from '../config.ts'
+import { createBlinkParser } from './blink.ts'
 
 const WRITE_TOOLS = new Set(['bash', 'write', 'edit'])
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'web_search'])
@@ -66,6 +67,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			let assistantText = ''
 			const toolCalls: ToolCall[] = []
 			let aborted = false
+			const blink = createBlinkParser()
 
 			for await (const event of gen) {
 				if (signal?.aborted) { aborted = true; break }
@@ -79,8 +81,14 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						thinkingSignature = event.signature
 						break
 					case 'text':
-						assistantText += event.text
-						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'assistant' })
+						for (const seg of blink.feed(event.text)) {
+							if (seg.type === 'text') {
+								assistantText += seg.text
+								await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
+							} else {
+								await new Promise(r => setTimeout(r, seg.ms!))
+							}
+						}
 						break
 					case 'tool_call':
 						toolCalls.push({ id: event.id, name: event.name, input: event.input })
@@ -93,6 +101,13 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						break
 					}
 					case 'done': {
+						// Flush any buffered blink text
+						for (const seg of blink.flush()) {
+							if (seg.type === 'text') {
+								assistantText += seg.text
+								await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
+							}
+						}
 						// Calibrate bytes→tokens ratio on first API response
 						if (!calibrated && event.usage && event.usage.input > 0) {
 							calibrated = true

@@ -30,14 +30,14 @@ Error handling follows a similar pattern. Rather than wrapping everything in try
 
 const DAISY_BELL = [
 	'Dai', 'sy, ', 'Dai', 'sy, ',
-	'give ', 'me ', 'your ', 'an', 'swer, ', 'do.\n',
+	'give ', 'me ', 'your ', 'an', 'swer, ', 'do.\n', '<blink ms="400" />',
 	"I'm ", 'half ', 'cra', 'zy, ',
-	'all ', 'for ', 'the ', 'love ', 'of ', 'you.\n',
-	'It ', "won't ", 'be ', 'a ', 'sty', 'lish ', 'mar', 'riage—\n',
-	'I ', "can't ", 'af', 'ford ', 'a ', 'car', 'riage,\n',
-	'But ', "you'll ", 'look ', 'sweet ',
-	'u', 'pon ', 'the ', 'seat\n',
-	'of ', 'a ', 'bi', 'cy', 'cle ',
+	'all ', 'for ', 'the ', 'love ', 'of ', 'you.\n', '<blink ms="400" />',
+	'It ', "won't ", 'be ', 'a ', 'sty', 'lish ', 'mar', 'riage—\n', '<blink ms="300" />',
+	'I ', "can't ", 'af', 'ford ', 'a ', 'car', 'riage,\n', '<blink ms="300" />',
+	'But ', "you'll ", 'look ', 'sweet ', '<blink ms="200" />',
+	'u', 'pon ', 'the ', 'seat\n', '<blink ms="300" />',
+	'of ', 'a ', 'bi', 'cy', 'cle ', '<blink ms="200" />',
 	'built ', 'for ', 'two.\n',
 ]
 const GREETINGS = [
