@@ -64,6 +64,10 @@ export function pushHistory(text: string): void { history.push(text) }
 
 export function text(): string { return buf }
 export function cursorPos(): number { return cursor }
+export function selection(): [number, number] | null {
+	if (selAnchor === null) return null
+	return selAnchor < cursor ? [selAnchor, cursor] : [cursor, selAnchor]
+}
 
 export function setText(t: string, c?: number): void {
 	buf = t
@@ -282,6 +286,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			if (selAnchor === null) selAnchor = cursor
 			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
 			if (!r.atBoundary) { cursor = r.cursor; goalCol = r.goalCol }
+			else { cursor = dir === -1 ? 0 : buf.length; goalCol = null }
 		}
 		return true
 	}

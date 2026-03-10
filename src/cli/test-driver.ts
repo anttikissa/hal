@@ -53,6 +53,7 @@ export class TestDriver {
 
 	get promptText(): string { return prompt.text() }
 	get cursor(): number { return prompt.cursorPos() }
+	get selection(): [number, number] | null { return prompt.selection() }
 
 	reset(): void {
 		this.sent.length = 0

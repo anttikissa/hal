@@ -119,4 +119,34 @@ describe('history navigation', () => {
 		d.submit('zot')
 		expect(d.inputHistory).toEqual(['foo', 'bar', 'zot'])
 	})
+
+	test('shift+up at first line selects to beginning', () => {
+		d.type('hello world')
+		// Cursor is at end (pos 11). Single line, so up is already at boundary.
+		d.press('up', { shift: true })
+		expect(d.selection).toEqual([0, 11])
+		expect(d.cursor).toBe(0)
+	})
+
+	test('shift+down at last line selects to end', () => {
+		d.type('hello world')
+		// Move cursor to beginning first
+		d.press('a', { ctrl: true })
+		expect(d.cursor).toBe(0)
+		d.press('down', { shift: true })
+		expect(d.selection).toEqual([0, 11])
+		expect(d.cursor).toBe(11)
+	})
+
+	test('shift+up in multiline selects to beginning from first line', () => {
+		d.type('line one')
+		d.press('enter', { shift: true }) // newline
+		d.type('line two')
+		// Cursor at end of line 2. shift+up should move up one line first.
+		d.press('up', { shift: true })
+		// Now on first line — shift+up again should select to pos 0
+		d.press('up', { shift: true })
+		expect(d.cursor).toBe(0)
+		expect(d.selection).toEqual([0, 17]) // 'line one\nline two' = 17 chars, anchor at 17
+	})
 })
