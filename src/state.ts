@@ -19,7 +19,7 @@ function resolveStateDir(): string {
 export const STATE_DIR = resolveStateDir()
 export const IPC_DIR = `${STATE_DIR}/ipc`
 export const SESSIONS_DIR = `${STATE_DIR}/sessions`
-export const CONFIG_PATH = `${STATE_DIR}/config.ason`
+export const CONFIG_PATH = `${HAL_DIR}/config.ason`
 export const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 export const EPOCH_PATH = `${STATE_DIR}/epoch.txt`
 

@@ -6,7 +6,7 @@ import { liveFile } from '../src/utils/live-file.ts'
 
 const HAL_DIR = process.env.HAL_DIR ?? import.meta.dir + '/..'
 const STATE_DIR = process.env.HAL_STATE_DIR ?? `${HAL_DIR}/state`
-const CONFIG_PATH = `${STATE_DIR}/config.ason`
+const CONFIG_PATH = `${HAL_DIR}/config.ason`
 const AUTH_PATH = `${HAL_DIR}/auth.ason`
 
 import { mkdirSync, existsSync } from 'fs'
@@ -148,5 +148,8 @@ if (!config.defaultModel || configuredProviders.length > 0) {
 ;(config as any).save?.()
 ;(auth as any).save?.()
 
-console.log('\n✓ Setup complete! Run ./run to start HAL.\n')
+console.log(`\n✓ Setup complete!`)
+console.log(`  config: ${CONFIG_PATH}`)
+console.log(`  auth:   ${AUTH_PATH}`)
+console.log(`\nRun ./run to start HAL.\n`)
 rl.close()
