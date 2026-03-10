@@ -9,7 +9,7 @@ export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
 cd "$HAL_DIR" || exit 1
 
 # First-run setup if no config exists
-if [ ! -f "$HAL_STATE_DIR/config.ason" ]; then
+if [ ! -f "$HAL_DIR/config.ason" ]; then
 	./init || exit 1
 fi
 
