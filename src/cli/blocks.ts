@@ -347,7 +347,9 @@ function inlineCursor(line: string, cc: string, visible: boolean, width: number)
 	return [body + cursorChar + (hasReset ? colors.RESET : '')]
 }
 
-/** Render all blocks with one blank line between them. */
+/** Render all blocks with one blank line between them.
+ *  After the last block: empty line, cursor line, empty line (always).
+ *  During streaming: cursor inlined in last block line, then one empty line. */
 export function renderBlocks(blocks: Block[], width: number, cursorVisible = false): string[] {
 	const result: string[] = []
 	for (const block of blocks) {
@@ -357,15 +359,20 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 		result.push(...lines)
 	}
 	const lastBlock = blocks[blocks.length - 1]
-	if (lastBlock && isStreaming(lastBlock) && result.length > 0) {
+	const streaming = lastBlock && isStreaming(lastBlock)
+	if (streaming && result.length > 0) {
+		// Cursor always visible (solid) during streaming
 		const cc = cursorColor(lastBlock)
-		const extra = inlineCursor(result[result.length - 1], cc, cursorVisible, width)
+		const extra = inlineCursor(result[result.length - 1], cc, true, width)
 		result.splice(result.length - 1, 1, ...extra)
-	} else if (result.length > 0) {
+		result.push('')
+	} else {
+		// Idle: empty line, cursor line, empty line
 		const cc = lastBlock ? cursorColor(lastBlock) : colors.cursor.fg
 		const c = cursorVisible ? `${cc}█${colors.RESET}` : ' '
 		result.push('')
 		result.push(`${' '.repeat(BLOCK_MARGIN)}${c}`)
+		result.push('')
 	}
 	return result
 }
