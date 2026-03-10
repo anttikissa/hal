@@ -1,6 +1,6 @@
 // Minimal config — liveFile-backed, auto-reloads on external edits.
 
-import { liveFile } from './live-file.ts'
+import { liveFile } from './utils/live-file.ts'
 import { CONFIG_PATH } from './state.ts'
 
 export interface Config {

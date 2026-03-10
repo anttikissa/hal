@@ -1,7 +1,7 @@
 // Auth — reads HAL_DIR/auth.ason (shared with old code), handles OAuth refresh.
 // Uses liveFile so external edits (e.g. scripts/login-*.ts) are picked up.
 
-import { liveFile } from '../live-file.ts'
+import { liveFile } from '../utils/live-file.ts'
 import { HAL_DIR } from '../state.ts'
 
 const AUTH_PATH = `${HAL_DIR}/auth.ason`

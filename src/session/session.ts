@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { resolve, join } from 'path'
 import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, ensureDir, sessionDir } from '../state.ts'
-import { liveFile } from '../live-file.ts'
+import { liveFile } from '../utils/live-file.ts'
 import { stringify } from '../utils/ason.ts'
 import type { SessionInfo } from '../protocol.ts'
 

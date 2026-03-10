@@ -1,7 +1,7 @@
 import { test, expect, afterEach } from 'bun:test'
 import { rmSync, readFileSync, existsSync, writeFileSync } from 'fs'
 import { liveFile } from './live-file.ts'
-import { parse } from './utils/ason.ts'
+import { parse } from './ason.ts'
 
 const TEST_FILE = `/tmp/hal-livefile-test-${process.pid}.ason`
 

@@ -16,8 +16,8 @@
 //   f.foo.bar = 2           // ✅ f.foo re-fetches data.foo each time
 
 import { readFileSync, writeFileSync, renameSync, watch, existsSync } from 'fs'
-import { stringify, parse } from './utils/ason.ts'
-import { ensureDir } from './state.ts'
+import { stringify, parse } from './ason.ts'
+import { ensureDir } from '../state.ts'
 import { dirname, basename } from 'path'
 
 interface LiveFileOptions<T> {

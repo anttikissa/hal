@@ -6,7 +6,7 @@ import { isPidAlive } from './utils/is-pid-alive.ts'
 import { Log } from './utils/log.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, EventLevel } from './protocol.ts'
 import { defaultState, eventId } from './protocol.ts'
-import { liveFile } from './live-file.ts'
+import { liveFile } from './utils/live-file.ts'
 import { IPC_DIR, ensureDir } from './state.ts'
 
 export const commands = new Log<RuntimeCommand>(`${IPC_DIR}/commands.asonl`)
