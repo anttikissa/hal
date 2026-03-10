@@ -22,7 +22,7 @@ export interface CompletionResult {
 
 interface CommandSpec {
 	name: string
-	arg?: 'model' | 'session' | 'respond' | 'topic'
+	arg?: 'model' | 'session' | 'topic'
 }
 
 const COMMANDS: CommandSpec[] = [
@@ -37,7 +37,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'fork' },
 	{ name: 'pause' },
 	{ name: 'close' },
-	{ name: 'respond', arg: 'respond' },
+	{ name: 'respond' },
 ]
 
 function uniqueSorted(values: string[]): string[] {
@@ -70,8 +70,6 @@ function commandArgValues(command: string, ctx: CompletionContext): string[] {
 			return modelCompletions()
 		case 'session':
 			return uniqueSorted(ctx.tabs.map(t => t.sessionId))
-		case 'respond':
-			return ['skip']
 		case 'topic': {
 			const active = ctx.tabs[ctx.activeTabIndex]
 			const topic = active?.info?.topic?.trim()

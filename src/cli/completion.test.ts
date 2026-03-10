@@ -36,10 +36,10 @@ describe('completeInput', () => {
 		expect(r?.text).toBe('/open 01-abc ')
 	})
 
-	test('completes respond argument', () => {
-		const r = completeInput('/respond s', '/respond s'.length, ctx)
+	test('completes /respond command', () => {
+		const r = completeInput('/resp', '/resp'.length, ctx)
 		expect(r).toBeTruthy()
-		expect(r?.text).toBe('/respond skip ')
+		expect(r?.text).toBe('/respond ')
 	})
 
 	test('returns null for non-slash text', () => {

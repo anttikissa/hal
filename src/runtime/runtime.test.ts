@@ -264,7 +264,7 @@ test('restart detects interrupted user turn but waits for /continue', async () =
 	expect(doneAfter).toBe(true)
 })
 
-test('interrupted tool round requires skip before /continue', async () => {
+test('/continue auto-resolves interrupted tools', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
 
@@ -290,22 +290,17 @@ test('interrupted tool round requires skip before /continue', async () => {
 	await claimHost(hostId)
 	runtime = await startRuntime()
 
-	// /continue should be blocked until interrupted tools are resolved
+	// /continue should auto-skip interrupted tools
 	await commands.append(makeCommand('continue', src, undefined, sid))
-	await new Promise(r => setTimeout(r, 200))
-	let all = await events.readAll()
-	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('Interrupted tools are present'))).toBe(true)
-
-	await commands.append(makeCommand('respond', src, 'skip', sid))
-	await new Promise(r => setTimeout(r, 200))
+	await new Promise(r => setTimeout(r, 300))
 
 	const raw = await readFile(`${sessionDir(sid)}/messages.asonl`, 'utf-8')
 	const entries = parseAll(raw) as any[]
 	const toolResults = entries.filter((e) => e.role === 'tool_result')
 	expect(toolResults.length).toBe(2)
 
-	all = await events.readAll()
-	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('marked skipped'))).toBe(true)
+	const all = await events.readAll()
+	expect(all.some((e) => e.type === 'line' && e.sessionId === sid && e.text.includes('tool(s) skipped'))).toBe(true)
 })
 
 test('prompt auto-resolves interrupted tools instead of 400 error', async () => {

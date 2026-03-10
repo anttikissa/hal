@@ -65,7 +65,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 	const interrupted = detectInterruptedTools(messages)
 	if (interrupted.length > 0) {
 		const toolList = interrupted.map(t => t.name).join(', ')
-		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Use /respond skip, then /continue` })
+		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Press Enter to continue` })
 	} else if (messages.length > 0) {
 		// Check for pending turn: last role-bearing message is 'user' or 'tool_result' (not a [system] prefix)
 		for (let i = messages.length - 1; i >= 0; i--) {

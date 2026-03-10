@@ -108,6 +108,7 @@ Handles:
 - Clipboard (cut/copy/paste)
 - History navigation
 - Submit (Enter) / newline (Shift+Enter, Alt+Enter)
+- Empty Enter sends `/continue` (resumes interrupted response, auto-skips interrupted tools)
 - Undo
 
 ## Rendering Model
