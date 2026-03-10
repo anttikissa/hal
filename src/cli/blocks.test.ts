@@ -51,7 +51,7 @@ describe('renderBlocks', () => {
 			{ type: 'tool', name: 'bash', status: 'done', args: longCmd, output: '', startTime: Date.now(), endTime: Date.now() },
 		]
 		const lines = renderBlocks(blocks, 80)
-		expect(trimLine(lines[0])).toMatch(/^── bash: \(0\.0s\) :ok: /)
+		expect(trimLine(lines[0])).toMatch(/^── bash: \(0\.0s\) ✓ /)
 		expect(lines[1]).toContain('echo')
 	})
 

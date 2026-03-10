@@ -120,7 +120,7 @@ Current block rendering rules:
 - Thinking text under 5 wrapped lines is shown as plain dim lines.
 - Thinking text at 5+ lines renders as a block with header `── Hal (<model>, thinking) ...` and collapses after 10 lines with `[+ n lines]`.
 - Bash tool headers:
-  - short command: `bash: <cmd> (<time>) :ok|:err|:run:`
+  - short command: `bash: <cmd> (<time>) ✓|✗|…`
   - long command (>60 chars): header omits command; command is shown on wrapped body lines using trailing `\` continuations.
 - Tool error status is rendered as error (`✗`) and persisted in block result metadata.
 
