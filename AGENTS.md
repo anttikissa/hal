@@ -17,7 +17,7 @@ Current code lives in `src/`; previous version is in `old-src/` for reference.
 - Prefer tabs for indentation (width 4).
 - When editing, collapse consecutive blank lines to one. Files should end with a newline.
 - After completing a task, commit to git.
-- Commit messages: follow Linux kernel style. Use `subsystem: imperative summary` (no headline prose), keep subject concise (~50 chars), no trailing period. `subsystem` may be lowercase.
+- Commit messages: use imperative sentence case (capitalized), e.g. `Add feature X`, `Don't do Y when Z`, `Rename zot to bar`. Keep subject concise (~50 chars), no trailing period. Skip `subsystem:` prefixes unless they add real clarity.
 - If asked to learn something, write it to `AGENTS.md` so I can remember it the next time.
 - If learning requires editing new code, edit the code and ask user to restart. 
 - `[todo] <text>` — append the text as a bullet to `TODO.md` and commit. No questions, no hesitation.
