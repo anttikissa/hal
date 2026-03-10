@@ -171,6 +171,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		let indicator: string | undefined
 		const last = t.blocks[t.blocks.length - 1]
 		if (t.question) indicator = '?'
+		else if (!t.busy && last?.type === 'error') indicator = '\x1b[31m✖\x1b[0m' // red minicursor
 		else if (!t.busy && last?.type === 'info' && (last.text === '[paused]' || last.text.startsWith('[interrupted]')))
 			indicator = '!'
 		return {

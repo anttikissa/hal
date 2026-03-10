@@ -9,7 +9,7 @@ export interface TablineTab {
 	label: string
 	busy: boolean
 	active: boolean
-	indicator?: string // '!' interrupted, '?' asking — replaces busy dot
+	indicator?: string // minicursor: '!' interrupted, '?' asking, red '✖' error — replaces busy dot; may contain ANSI
 }
 
 function truncate(s: string, max: number): string {
@@ -42,8 +42,9 @@ function mode0(tabs: TablineTab[], busyChar: string, maxTitle: number): string[]
 		const num = tabNumber(t.label)
 		const title = truncate(tabTitle(t.label), maxTitle)
 		const ch = statusChar(t, busyChar)
-		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}${title}]${RESET}`
-		return `${DIM} ${num}${ch}${title} ${RESET}`
+		const base = t.active ? BRIGHT_WHITE : DIM // restore after minicursor indicator
+		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}${base}${title}]${RESET}`
+		return `${DIM} ${num}${ch}${base}${title} ${RESET}`
 	})
 }
 
@@ -57,8 +58,9 @@ function mode2(tabs: TablineTab[], busyChar: string): string[] {
 	return tabs.map(t => {
 		const num = tabNumber(t.label)
 		const ch = statusChar(t, busyChar)
-		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}]${RESET}`
-		return `${DIM} ${num}${ch} ${RESET}`
+		const base = t.active ? BRIGHT_WHITE : DIM // restore after minicursor indicator
+		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}${base}]${RESET}`
+		return `${DIM} ${num}${ch}${base} ${RESET}`
 	})
 }
 
@@ -67,8 +69,9 @@ function mode3(tabs: TablineTab[]): string[] {
 	return tabs.map(t => {
 		const num = tabNumber(t.label) || '?'
 		const ch = t.indicator ?? ''
-		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}]${RESET}`
-		return `${DIM} ${num}${ch} ${RESET}`
+		const base = t.active ? BRIGHT_WHITE : DIM // restore after minicursor indicator
+		if (t.active) return `${BRIGHT_WHITE}[${num}${ch}${base}]${RESET}`
+		return `${DIM} ${num}${ch}${base} ${RESET}`
 	})
 }
 
