@@ -44,6 +44,11 @@ test('visLen: non-BMP emoji (surrogate pair)', () => {
 	expect(visLen('🔴')).toBe(2)
 })
 
+test('visLen: OSC 8 hyperlinks have zero width', () => {
+	const link = '\x1b]8;;file:///tmp/test.ason\x07visible\x1b]8;;\x07'
+	expect(visLen(link)).toBe(7) // only "visible" counts
+})
+
 // ── mdInline ──
 
 test('mdInline: bold', () => {

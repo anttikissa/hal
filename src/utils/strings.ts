@@ -61,11 +61,16 @@ function isWide(cp: number): boolean {
 
 /** Visible length of string (ignoring ANSI escapes, respecting wide chars). */
 export function visLen(s: string): number {
-	let n = 0, esc = false
+	let n = 0, esc = false, osc = false
 	for (const ch of s) {
 		const cp = ch.codePointAt(0)!
 		if (cp === 0x1B) { esc = true; continue }
-		if (esc) { if (cp === 0x6D) esc = false; continue }
+		if (esc) {
+			if (cp === 0x5D) { osc = true; esc = false; continue } // ESC ] = OSC
+			if (cp === 0x6D) esc = false // ESC [ ... m = CSI
+			continue
+		}
+		if (osc) { if (cp === 0x07) osc = false; continue } // BEL terminates OSC
 		n += charWidth(cp)
 	}
 	return n
@@ -104,13 +109,18 @@ export function clipVisual(s: string, max: number): string {
 	if (max <= 0) return ''
 	if (visLen(s) <= max) return s
 	if (max === 1) return '…'
-	// Walk codepoints, counting visual width, preserving ANSI escapes
-	let vis = 0, esc = false, cut = 0
+	// Walk codepoints, counting visual width, preserving ANSI/OSC escapes
+	let vis = 0, esc = false, osc = false, cut = 0
 	for (let i = 0; i < s.length;) {
 		const cp = s.codePointAt(i)!
 		const cl = cp > 0xFFFF ? 2 : 1
 		if (cp === 0x1B) { esc = true; i += cl; continue }
-		if (esc) { if (cp === 0x6D) esc = false; i += cl; continue }
+		if (esc) {
+			if (cp === 0x5D) { osc = true; esc = false; i += cl; continue }
+			if (cp === 0x6D) esc = false
+			i += cl; continue
+		}
+		if (osc) { if (cp === 0x07) osc = false; i += cl; continue }
 		const w = charWidth(cp)
 		if (vis + w > max - 1) { cut = i; break }
 		vis += w

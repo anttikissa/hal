@@ -1,10 +1,21 @@
 // liveFile — proxy-backed auto-persist object.
-// Deep property writes mark dirty → flush on next microtask.
-// Atomic writes (tmp + rename). Optional fs.watch for external edits.
 //
-// ⚠ CAVEATS — read before using:
+// Quick, dirty and dangerous.
+//
+// Usage:
+//
+// let config = liveFile('config.ason', {})
+// config.foo = 1                // saved on next microtask
+// config.bar.zot = 2            // (only one atomic write)
+//
+// (external change to config.ason changes bar.zot to 3):
+//
+// console.log(config.bar.zot)   // 3
+//
+// CAVEATS:
 //
 // Don't stash nested objects:
+//
 //   const f = liveFile('file.ason', { defaults: { foo: { bar: 1 } } })
 //   const bad = f.foo       // proxy around current data.foo
 //   // ...time passes, file reloads from disk (fs.watch / external edit)...
@@ -13,7 +24,11 @@
 //                           // dirty flag fires, but flush writes data (with new foo).
 //
 // Safe pattern: always access through the root proxy.
+//
 //   f.foo.bar = 2           // ✅ f.foo re-fetches data.foo each time
+//
+// If file is written with parse errors, all bets are off
+//
 
 import { readFileSync, writeFileSync, renameSync, watch, existsSync } from 'fs'
 import { stringify, parse } from './ason.ts'

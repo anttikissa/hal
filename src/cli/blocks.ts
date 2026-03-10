@@ -5,6 +5,7 @@ import { charWidth, visLen, wordWrap } from '../utils/strings.ts'
 import { mdSpans, mdInline, mdTable } from './md.ts'
 import { displayModel } from '../models.ts'
 import { stringify as asonStringify } from '../utils/ason.ts'
+import { blocksDir } from '../state.ts'
 
 const TOOL_MAX_OUTPUT = 5
 const THINKING_BLOCK_MIN_LINES = 5
@@ -29,6 +30,7 @@ export type Block =
 		startTime: number
 		endTime?: number
 		ref?: string
+		sessionId?: string
 	}
 
 /** Collapse runs of 3+ newlines to 2 (preserving paragraph breaks). */
@@ -120,21 +122,30 @@ function plainLine(text: string, width: number, fg: string): string {
 
 function headerLine(text: string, width: number, fg: string, bg: string): string {
 	const iw = innerWidth(width)
-	const clipped = clipPlain(oneLine(text), iw)
-	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${clipped.padEnd(iw)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
+	const vw = visLen(text)
+	const pad = Math.max(0, iw - vw)
+	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${text}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
 }
 
-function toolHeader(label: string, width: number, fg: string, bg: string, ref?: string): string[] {
+function toolHeader(label: string, width: number, fg: string, bg: string, ref?: string, sessionId?: string): string[] {
 	const iw = innerWidth(width)
 	const safeLabel = oneLine(label)
-	const safeRef = ref ? clipPlain(oneLine(ref), 18) : ''
-	const suffix = safeRef ? ` [${safeRef}] ──` : ''
+	const displayRef = ref ? (sessionId ? `${sessionId}/${ref}` : ref) : ''
+	const safeRef = displayRef ? clipPlain(oneLine(displayRef), 24) : ''
+	// OSC 8 hyperlink: zero visual width, wraps the ref text
+	let refDisplay = ''
+	if (safeRef) {
+		const filePath = ref && sessionId ? `${blocksDir(sessionId)}/${ref}.ason` : ''
+		const osc8Open = filePath ? `\x1b]8;;file://${filePath}\x07` : ''
+		const osc8Close = filePath ? `\x1b]8;;\x07` : ''
+		refDisplay = ` [${osc8Open}${safeRef}${osc8Close}] ──`
+	}
 	const prefix = '── '
-	const maxLabel = Math.max(1, iw - prefix.length - suffix.length - 1)
+	const maxLabel = Math.max(1, iw - prefix.length - (safeRef ? safeRef.length + 6 : 0) - 1)
 	const shown = clipPlain(safeLabel, maxLabel)
 	const lead = `${prefix}${shown} `
-	const fill = '─'.repeat(Math.max(1, iw - lead.length - suffix.length))
-	return [headerLine(lead + fill + suffix, width, fg, bg)]
+	const fill = '─'.repeat(Math.max(1, iw - lead.length - (safeRef ? safeRef.length + 6 : 0)))
+	return [headerLine(lead + fill + refDisplay, width, fg, bg)]
 }
 
 function elapsed(startTime: number, endTime?: number): string {
@@ -268,7 +279,7 @@ function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): str
 		const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
 		label = `${block.name}: ${args} (${time})${statusSuffix}`
 	}
-	const lines = [...toolHeader(label, width, fg, bg, block.ref)]
+	const lines = [...toolHeader(label, width, fg, bg, block.ref, block.sessionId)]
 	for (const l of prelude) lines.push(boxLine(l, width, fg, bg))
 	const outputText = block.output.trimEnd()
 	if (!outputText) return lines
