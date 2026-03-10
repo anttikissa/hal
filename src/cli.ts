@@ -14,6 +14,7 @@ import { displayModel } from './models.ts'
 import { renderTabline } from './cli/tabline.ts'
 import * as colors from './cli/colors.ts'
 import { visLen, clipVisual } from './utils/strings.ts'
+import { isVisible, start } from './cli/cursor.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -148,7 +149,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 			active: i === idx,
 		}
 	})
-	const tabBar = renderTabline(parts, w, halCursorVisible)
+	const tabBar = renderTabline(parts, w, isVisible())
 	lines.push(tabBar)
 
 	// Question area (when active, shown above the regular prompt)
@@ -309,7 +310,7 @@ stdout.on('resize', () => {
 })
 
 // Start
-scheduleBlink()
+start(doRender)
 doRender()
 client.start().catch(err => {
 	console.error('Client start failed:', err)
