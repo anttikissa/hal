@@ -40,7 +40,7 @@ class FakeTransport implements Transport {
 	}
 }
 
-test('new tabs created from sessions event keep context from SessionInfo', async () => {
+test('new tabs created from sessions event keep estimated context from SessionInfo', async () => {
 	const sid = `t-${randomBytes(4).toString('hex')}`
 	const ts = new Date().toISOString()
 	const state: RuntimeState = {
@@ -57,17 +57,17 @@ test('new tabs created from sessions event keep context from SessionInfo', async
 		workingDir: process.cwd(),
 		createdAt: ts,
 		updatedAt: ts,
-		context: { used: 2500, max: 200000 },
+		context: { used: 2500, max: 200000, estimated: true },
 	}]
 	const transport = new FakeTransport({ state, sessions })
 	const client = new Client(transport, () => {})
 	await client.start()
 	const tab = client.activeTab()
 	expect(tab).toBeTruthy()
-	expect(tab?.context).toEqual({ used: 2500, max: 200000 })
+	expect(tab?.context).toEqual({ used: 2500, max: 200000, estimated: true })
 })
 
-test('existing tabs adopt context from later sessions events', async () => {
+test('existing tabs keep estimated flag from later sessions events', async () => {
 	const sid = `t-${randomBytes(4).toString('hex')}`
 	const ts = new Date().toISOString()
 	const state: RuntimeState = {
@@ -95,7 +95,7 @@ test('existing tabs adopt context from later sessions events', async () => {
 			workingDir: process.cwd(),
 			createdAt: ts,
 			updatedAt: ts,
-			context: { used: 1800, max: 200000 },
+			context: { used: 1800, max: 200000, estimated: true },
 		}],
 	}
 	const transport = new FakeTransport({ state, sessions }, [update])
@@ -103,5 +103,5 @@ test('existing tabs adopt context from later sessions events', async () => {
 	await client.start()
 	const tab = client.activeTab()
 	expect(tab).toBeTruthy()
-	expect(tab?.context).toEqual({ used: 1800, max: 200000 })
+	expect(tab?.context).toEqual({ used: 1800, max: 200000, estimated: true })
 })

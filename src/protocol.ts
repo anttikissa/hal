@@ -15,7 +15,7 @@ export interface SessionInfo {
 	updatedAt: string
 	closedAt?: string
 	lastPrompt?: string
-	context?: { used: number; max: number }
+	context?: { used: number; max: number; estimated?: boolean }
 }
 
 // ── Commands (client → host) ──

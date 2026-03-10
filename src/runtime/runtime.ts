@@ -82,7 +82,7 @@ export async function startRuntime(): Promise<Runtime> {
 	function setFreshContext(info: SessionInfo): void {
 		const ctx = estimateSessionContext(info, [])
 		sessionContext.set(info.id, ctx)
-		info.context = { used: ctx.used, max: ctx.max }
+		info.context = ctx
 	}
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
@@ -111,7 +111,7 @@ export async function startRuntime(): Promise<Runtime> {
 			}
 			sessionContext.set(meta.id, ctx)
 			// Also set on info so clients get it when tabs are first created
-			meta.context = { used: ctx.used, max: ctx.max }
+			meta.context = ctx
 			if (!activeSessionId) activeSessionId = meta.id
 		}
 	}
@@ -179,7 +179,7 @@ export async function startRuntime(): Promise<Runtime> {
 	}
 
 	async function publish(activity?: string): Promise<void> {
-		const contexts: Record<string, { used: number; max: number }> = {}
+		const contexts: Record<string, { used: number; max: number; estimated?: boolean }> = {}
 		for (const [id, ctx] of sessionContext) contexts[id] = ctx
 		await emit({
 			type: 'status', sessionId: null,

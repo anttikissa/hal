@@ -88,6 +88,7 @@ test('fresh session starts with estimated context overhead', async () => {
 	expect(info?.context).toBeTruthy()
 	expect(info?.context?.used ?? 0).toBeGreaterThan(0)
 	expect(info?.context?.max ?? 0).toBeGreaterThan(0)
+	expect(info?.context?.estimated).toBe(true)
 
 	const all = await events.readAll()
 	const sessionsEvent = [...all].reverse().find((e) => e.type === 'sessions') as Extract<RuntimeEvent, { type: 'sessions' }> | undefined
@@ -95,6 +96,7 @@ test('fresh session starts with estimated context overhead', async () => {
 	const active = sessionsEvent?.sessions.find((s) => s.id === sid)
 	expect(active?.context).toBeTruthy()
 	expect(active?.context?.used ?? 0).toBeGreaterThan(0)
+	expect(active?.context?.estimated).toBe(true)
 })
 
 test('prompt produces thinking + assistant chunks + done', async () => {
