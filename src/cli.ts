@@ -9,8 +9,8 @@ import { maxTabHeight } from './cli/heights.ts'
 import { Client, type TabState } from './cli/client.ts'
 import { LocalTransport } from './cli/transport.ts'
 import { shutdown } from './main.ts'
-import { getConfig } from './config.ts'
-import { displayModel } from './models.ts'
+import { config } from './config.ts'
+import { models } from './models.ts'
 import { renderTabline } from './cli/tabline.ts'
 import * as colors from './cli/colors.ts'
 import { strings } from './utils/strings.ts'
@@ -58,7 +58,7 @@ function oneLine(s: string): string {
 	return s.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ')
 }
 function shortModel(model?: string): string {
-	return displayModel(model || getConfig().defaultModel)
+	return models.displayModel(model || config.getConfig().defaultModel)
 }
 
 function deriveState(tab: TabState | null): string {
@@ -189,8 +189,8 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		const title = t.info.topic ?? t.info.workingDir?.split('/').pop() ?? 'tab'
 		let indicator: string | undefined
 		const last = t.blocks[t.blocks.length - 1]
-		if (t.question) indicator = '?'
-		else if (!t.busy && last?.type === 'error') indicator = '\x1b[31m✖\x1b[0m' // red minicursor
+		if (t.question) indicator = `${colors.question.fg}?`
+		else if (!t.busy && last?.type === 'error') indicator = `${colors.error.fg}✖`
 		else if (!t.busy && last?.type === 'info' && (last.text === '[paused]' || last.text.startsWith('[interrupted]')))
 			indicator = '!'
 		const cc = t.busy && last ? minicursorColor(last) : undefined
