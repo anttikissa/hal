@@ -9,6 +9,7 @@ export interface EvalContext {
 	halDir: string
 	stateDir: string
 	cwd: string
+	runtime: unknown // Runtime instance — typed as unknown to avoid circular imports
 }
 
 let counter = 0

@@ -5,7 +5,7 @@
 
 import { ensureStateDir } from './state.ts'
 import { ensureBus, events, commands } from './ipc.ts'
-import { startRuntime } from './runtime/runtime.ts'
+import { startRuntime } from './runtime/startup.ts'
 import { parseKeys } from './cli/keys.ts'
 import * as prompt from './cli/prompt.ts'
 import { eventId, type RuntimeEvent } from './protocol.ts'

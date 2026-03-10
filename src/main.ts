@@ -4,7 +4,8 @@
 import { randomBytes } from 'crypto'
 import { ensureStateDir } from './state.ts'
 import { ensureBus, claimHost, releaseHost, verifyHost, events } from './ipc.ts'
-import { startRuntime, type Runtime } from './runtime/runtime.ts'
+import { startRuntime } from './runtime/startup.ts'
+import { type Runtime } from './runtime/runtime.ts'
 import { eventId } from './protocol.ts'
 
 ensureStateDir()

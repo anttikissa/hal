@@ -60,6 +60,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		halDir: process.env.HAL_DIR ?? process.cwd(),
 		stateDir: process.env.HAL_STATE_DIR ?? `${process.env.HAL_DIR ?? process.cwd()}/state`,
 		cwd: process.env.LAUNCH_CWD ?? process.cwd(),
+		runtime: null, // set lazily below to avoid circular import at module load
 	} : undefined
 
 	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length

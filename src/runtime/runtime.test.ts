@@ -6,7 +6,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { test, expect, beforeEach, afterEach, afterAll } from 'bun:test'
 import { randomBytes } from 'crypto'
-import type { Runtime } from './runtime.ts'
+import { type Runtime } from './runtime.ts'
 import type { RuntimeEvent } from '../protocol.ts'
 
 const TEST_STATE_DIR = mkdtempSync(join(tmpdir(), `hal-test-${process.pid}-`))
@@ -17,7 +17,7 @@ process.env.HAL_CONFIG = TEST_CONFIG
 
 const stateMod = await import('../state.ts')
 const ipcMod = await import('../ipc.ts')
-const runtimeMod = await import('./runtime.ts')
+const runtimeMod = await import('./startup.ts')
 const protocolMod = await import('../protocol.ts')
 const aSonMod = await import('../utils/ason.ts')
 const messagesMod = await import('../session/messages.ts')

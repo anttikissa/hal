@@ -342,6 +342,11 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalCon
 		}
 		case 'eval': {
 			if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
+			// Lazily resolve runtime to avoid circular imports
+			if (!evalCtx.runtime) {
+				const { getRuntime } = await import('./runtime.ts')
+				try { evalCtx.runtime = getRuntime() } catch {}
+			}
 			return await executeEval(String(inp.code), evalCtx)
 		}
 		default:

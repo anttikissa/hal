@@ -11,6 +11,7 @@ function makeCtx(sessionId = 'test-session'): EvalContext {
 		halDir: TEST_DIR,
 		stateDir: join(TEST_DIR, 'state'),
 		cwd: process.cwd(),
+		runtime: null,
 	}
 }
 
