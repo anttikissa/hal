@@ -47,14 +47,11 @@ beforeEach(async () => {
 	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 	await claimHost(hostId)
 	runtime = await startRuntime()
-	// Wait for greeting generation to finish
-	await new Promise(r => setTimeout(r, 300))
 })
 
 afterEach(async () => {
 	runtime.stop()
 	await releaseHost(hostId)
-	await new Promise(r => setTimeout(r, 100))
 })
 
 afterAll(() => {
@@ -62,18 +59,52 @@ afterAll(() => {
 	rmSync(TEST_CONFIG, { force: true })
 })
 
+function sleep(ms: number): Promise<void> {
+	return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function waitFor(
+	predicate: () => boolean | Promise<boolean>,
+	timeoutMs = 1500,
+	intervalMs = 20,
+	message = 'Timed out waiting for condition',
+): Promise<void> {
+	const deadline = Date.now() + timeoutMs
+	while (Date.now() < deadline) {
+		if (await predicate()) return
+		await sleep(intervalMs)
+	}
+	throw new Error(message)
+}
+
+async function waitForEvents(
+	snapshot: number,
+	predicate: (recent: RuntimeEvent[]) => boolean,
+	timeoutMs = 3000,
+	intervalMs = 20,
+	message = 'Timed out waiting for events',
+): Promise<RuntimeEvent[]> {
+	const deadline = Date.now() + timeoutMs
+	while (Date.now() < deadline) {
+		const all = await events.readAll()
+		const recent = all.slice(snapshot)
+		if (predicate(recent)) return recent
+		await sleep(intervalMs)
+	}
+	throw new Error(message)
+}
+
 async function sendAndWait(text: string, sid?: string): Promise<RuntimeEvent[]> {
 	const snapshot = (await events.readAll()).length
 	const sessionId = sid ?? runtime.activeSessionId!
 	await commands.append(makeCommand('prompt', src, text, sessionId))
-	for (let i = 0; i < 200; i++) {
-		await new Promise(r => setTimeout(r, 50))
-		const all = await events.readAll()
-		const recent = all.slice(snapshot)
-		const done = recent.find(e => e.type === 'command' && (e.phase === 'done' || e.phase === 'failed'))
-		if (done) return recent
-	}
-	throw new Error('Timed out waiting for response')
+	return await waitForEvents(
+		snapshot,
+		recent => recent.some(e => e.type === 'command' && e.sessionId === sessionId && (e.phase === 'done' || e.phase === 'failed')),
+		4000,
+		20,
+		'Timed out waiting for prompt response',
+	)
 }
 
 test('runtime creates a session on startup', () => {
