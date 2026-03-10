@@ -57,7 +57,7 @@ hal -s             # work on hal itself
 | `/topic <text>` | Set conversation topic |
 | `/queue` | Show queued messages |
 | `/drop [N]` | Drop all or specific queued messages |
-| `/handoff` | Rotate context, write handoff.md |
+| `/compact` | Compact context (auto at 70% usage) |
 | `/reset` | Clear conversation |
 | `/fork` | Fork session into new tab |
 | `/close` | Close current tab |

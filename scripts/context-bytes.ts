@@ -88,7 +88,7 @@ function mapLineNumbers(raw: string, valueCount: number): number[] {
 function findReplayStart(entries: SourceEntry[]): number {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const m = entries[i].msg
-		if (m?.type === 'reset' || m?.type === 'handoff') return i + 1
+		if (m?.type === 'reset' || m?.type === 'compact') return i + 1
 	}
 	return 0
 }

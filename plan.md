@@ -24,7 +24,7 @@ as long as the snapshot eventually lands before the first keypress log.
 
 **Problem:** Three independent reads happen sequentially:
 1. `loadSessionRegistry()` — reads `index.ason`
-2. `getOrLoadSessionRuntime()` — reads `session.ason` (+ maybe handoff)
+2. `getOrLoadSessionRuntime()` — reads `session.ason`
 3. `getCalibration()` — reads calibration file
 
 Then `reloadSystemPromptForSession()` reads `SYSTEM.md` + `AGENTS.md`.

@@ -279,7 +279,7 @@ export async function startRuntime(): Promise<Runtime> {
 					const userMsgs = msgs.filter(m => m.role === 'user')
 					const context = buildCompactionContext(sid, msgs)
 					await appendMessages(sid, [
-						{ type: 'handoff', ts: new Date().toISOString() },
+						{ type: 'compact', ts: new Date().toISOString() },
 						{ role: 'user', content: context, ts: new Date().toISOString() } as UserMessage,
 						{ role: 'user', content: logContent, ts: new Date().toISOString() } as UserMessage,
 					])

@@ -60,7 +60,7 @@ export interface ToolResultMessage {
 export type Message = UserMessage | AssistantMessage | ToolResultMessage
 	| { type: 'info'; text: string; level?: string; detail?: string; ts: string }
 	| { type: 'reset'; ts: string }
-	| { type: 'handoff'; ts: string }
+	| { type: 'compact'; ts: string }
 	| { type: 'forked_from'; parent: string; ts: string }
 
 // ── Block I/O ──
@@ -367,7 +367,7 @@ export async function loadAllMessages(sessionId: string): Promise<Message[]> {
 function findReplayStart(entries: Message[]): number {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const e = entries[i] as any
-		if (e.type === 'reset' || e.type === 'handoff') return i + 1
+		if (e.type === 'reset' || e.type === 'compact') return i + 1
 	}
 	return 0
 }

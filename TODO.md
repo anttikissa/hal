@@ -175,19 +175,19 @@ Still open:
 - I liked hal9001's exact estimate of how many tokens SYSTEM + AGENTS + tools had
 - How about - HAL should have its own cursor - blinking orange one, and user would have blinking blue one
 - File lease broadcasting via IPC — tabs announce which files they're editing so other tabs can avoid conflicts. Lightweight alternative to worktrees for concurrent multi-tab editing.
-- Owner->client handoff should not pause the activity - or if that's not possible, it should resume it immediately - a bit like steering messages do
+- Owner->client transition should not pause the activity - or if that's not possible, it should resume it immediately - a bit like steering messages do
 - Revisit theme system for paddings etc.
 - Check that editing other projects than hal works - separate hal-dir and cwd?
 - Add a tiny markdown parser for parsing llm output
 - Add mouse movements on input line, selecting - multicursor maybe? - cmd-a, etc. QoL improvements
 - The steering / enqueue system does not really work. Figure out how to make it to work.
 - [fork] should have a break before — " --" plus empty line plus block, like [queued/steering]
-- Check .hal:00-6zp handoff if had last thinking aikeet
+- Check .hal:00-6zp compaction if had last thinking aikeet
 - Error does not go to red
 
 ## Old TODO items:
 
-- Consider doing this: richer /handoff template (Goal / Progress / Next steps / Files touched).
+- Consider doing this: richer /compact template (Goal / Progress / Next steps / Files touched).
 - Codex model is really passive — double checks everything. Add system prompt instruction to not do that.
 - cmd-z should undo edits to prompt — e.g. accidental ctrl-K deleting too much.
 - Do we support tool call streaming? We should, in case bash script produces slow output.

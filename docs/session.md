@@ -4,7 +4,7 @@
 
 Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
-- `messages.N.asonl` -- rotated archives (N=1 oldest, higher=more recent). Created by `/handoff` or `/reset`.
+- `messages.N.asonl` -- rotated archives (N=1 oldest, higher=more recent). Created by `/compact` or `/reset`.
 - `blocks/` -- external content blocks (thinking text + signatures, tool call inputs + results). One `.ason` file per block ref. Shared across all rotations.
 - `messages.asonl` -- unified append-only message log (API messages + conversation events). Never truncated.
 - `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt, tokenTotals)
@@ -25,11 +25,11 @@ Core logic: `src/session/session.ts`.
 | `cd` | `from`, `to`, `ts` | Working directory change (`/cd`) |
 | `topic` | `from?`, `to`, `auto?`, `ts` | Topic change (manual or auto-generated) |
 | `fork` | `parent`, `child`, `ts` | Fork event (written to both parent and child) |
-| `handoff` | `ts` | Context rotation with prompt injection |
+| `compact` | `ts` | Context compaction with prompt injection |
 | `reset` | `ts` | Clean slate rotation |
 | `start` | `workingDir`, `ts` | Session creation |
 
-On restart, `replayConversationEvents()` replays `user`, `assistant`, and `tool` events after the last `reset`/`handoff`. Consecutive `assistant` events (from multi-turn tool loops) are merged. `tool` events are rendered as `<tool>` lines in the TUI.
+On restart, `replayConversationEvents()` replays `user`, `assistant`, and `tool` events after the last `reset`/`compact`. Consecutive `assistant` events (from multi-turn tool loops) are merged. `tool` events are rendered as `<tool>` lines in the TUI.
 
 ## Block Storage (v2)
 
@@ -51,23 +51,23 @@ API messages are compacted before sending to strip old heavy content (tool resul
 - Startup loads/repairs `index.ason`; if missing/empty, creates `s-default`.
 - Runtime tracks session metadata in memory and persists registry updates.
 - Session content is **appended** after each turn in `runAgentLoop(...)`. The runtime tracks `persistedCount` to know which messages are already on disk.
-- Runtime replays `messages.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `messages.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/handoff` are replayed (`replayConversationEvents()` in `src/session/session.ts`).
+- Runtime replays `messages.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `messages.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/compact` are replayed (`replayConversationEvents()` in `src/session/session.ts`).
 - `/reset` rotates `messages.asonl` → `messages.N.asonl` (no deletion) and clears in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
 - `/fork` copies `messages.asonl` and `blocks/` directory to a new session.
 - Auto-topic: after the first assistant response, runtime generates a short topic.
 
-## Rotation (replaces handoff)
+## Rotation
 
-`/handoff` and `/reset` both rotate the session — no LLM summarization.
+`/compact` and `/reset` both rotate the session.
 
 **Rotation**:
 1. Save any unsaved messages to `messages.asonl`
 2. Rename `messages.asonl` → `messages.N.asonl` (N = highest existing + 1)
 3. Clear runtime cache
 
-**Handoff** additionally injects a deterministic context message with the first 10 + last 10 user prompts from the previous session (`buildRotationContext()`).
+**Compact** additionally injects a deterministic context message with the first 10 + last 10 user prompts from the previous session (`buildRotationContext()`). Triggers automatically when context reaches 70% of model limit.
 
 **Reset** rotates without context injection — clean slate.
 
