@@ -55,11 +55,16 @@ export function mdInline(line: string, colors?: MdColors): string {
 }
 
 function inlineSpans(s: string, c: MdColors): string {
-	return s
-		.replace(/\*\*`([^`]+)`\*\*/g, `${c.bold[0]}$1${c.bold[1]}`)
-		.replace(/`([^`\n]+)`/g, `${c.code[0]}$1${c.code[1]}`)
+	// Extract code spans into placeholders so bold/italic regexes can't see their contents
+	const codes: string[] = []
+	const ph = (i: number) => `\x00C${i}\x00`
+	s = s.replace(/\*\*`([^`]+)`\*\*/g, (_, g) => { const i = codes.length; codes.push(`${c.bold[0]}${g}${c.bold[1]}`); return ph(i) })
+	s = s.replace(/`([^`\n]+)`/g, (_, g) => { const i = codes.length; codes.push(`${c.code[0]}${g}${c.code[1]}`); return ph(i) })
+	s = s
 		.replace(/\*\*(.+?)\*\*/g, `${c.bold[0]}$1${c.bold[1]}`)
 		.replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, `${c.italic[0]}$1${c.italic[1]}`)
+	// Restore code spans
+	return s.replace(/\x00C(\d+)\x00/g, (_, i) => codes[+i])
 }
 
 /** Format table: align columns, skip separator rows. */
