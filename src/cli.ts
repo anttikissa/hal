@@ -149,12 +149,12 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		const qLabel = prompt.getQuestionLabel()!
 		const qLines = renderQuestion(qLabel, w)
 		lines.push(...qLines)
-		lines.push('') // spacing after question box
 
 		// Answer input area
 		qPromptResult = prompt.buildPrompt(cw)
 		qAnswerStartRow = lines.length
 		lines.push(...qPromptResult.lines)
+		lines.push('') // spacing after answer input
 		// Help bar below answer input
 		const qHelp = ' enter to submit '
 		const qhPad = Math.max(0, w - visLen(qHelp))
