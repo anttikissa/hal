@@ -22,13 +22,14 @@ export interface Provider {
 	generate(params: GenerateParams): AsyncGenerator<ProviderEvent>
 }
 
-const STREAM_TIMEOUT_MS = 30_000
+// Generous: chunks normally arrive every ~100ms, but allows for slow starts
+const STREAM_TIMEOUT_MS = 120_000
 
-/** Race reader.read() against a timeout. Throws if no data arrives within 30s. */
+/** Race reader.read() against a timeout — minicursor shows error on network drop. */
 export async function readWithTimeout(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<ReadableStreamReadResult<Uint8Array>> {
 	let timer: Timer
 	const timeout = new Promise<never>((_, reject) => {
-		timer = setTimeout(() => reject(new Error('Stream read timed out (no data for 30s)')), STREAM_TIMEOUT_MS)
+		timer = setTimeout(() => reject(new Error('Stream read timed out (no data for 120s)')), STREAM_TIMEOUT_MS)
 	})
 	try {
 		return await Promise.race([reader.read(), timeout])
