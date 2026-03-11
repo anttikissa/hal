@@ -1,7 +1,7 @@
 // Transport interface + local (file-backed) implementation.
 
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from '../protocol.ts'
-import type { Message } from '../session/messages.ts'
+import type { Message } from '../session/history.ts'
 
 // ── Interface ──
 
@@ -22,7 +22,7 @@ export interface Transport {
 
 import { ipc } from '../ipc.ts'
 import { session } from '../session/session.ts'
-import { messages } from '../session/messages.ts'
+import { history } from '../session/history.ts'
 
 export class LocalTransport implements Transport {
 	async sendCommand(cmd: RuntimeCommand): Promise<void> {
@@ -44,7 +44,7 @@ export class LocalTransport implements Transport {
 	}
 
 	async replaySession(id: string): Promise<Message[]> {
-		return messages.loadAllMessages(id)
+		return history.loadAllHistory(id)
 	}
 
 	async eventsOffset(): Promise<number> {

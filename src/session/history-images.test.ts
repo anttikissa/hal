@@ -1,6 +1,6 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
-import { parseUserContent, readMessages, appendMessages, loadApiMessages } from './messages.ts'
+import { parseUserContent, readHistory, appendHistory, loadApiMessages } from './history.ts'
 
 const TEST_SESSION = '__test_img_session'
 const TEST_IMAGE = '/tmp/hal-test-img.png'
@@ -75,7 +75,7 @@ test('parseUserContent does not expand .txt outside /tmp/hal/', async () => {
 
 test('image blocks round-trip through loadApiMessages', async () => {
 	const { logContent } = await parseUserContent(TEST_SESSION, `look [${TEST_IMAGE}]`)
-	await appendMessages(TEST_SESSION, [{ role: 'user', content: logContent, ts: new Date().toISOString() }])
+	await appendHistory(TEST_SESSION, [{ role: 'user', content: logContent, ts: new Date().toISOString() }])
 
 	const apiMessages = await loadApiMessages(TEST_SESSION)
 	expect(apiMessages).toHaveLength(1)
@@ -89,11 +89,11 @@ test('image blocks round-trip through loadApiMessages', async () => {
 })
 
 test('loadApiMessages synthesizes results for orphaned tool_use blocks', async () => {
-	const { writeAssistantEntry, writeToolResultEntry } = await import('./messages.ts')
+	const { writeAssistantEntry, writeToolResultEntry } = await import('./history.ts')
 	const SID = TEST_SESSION
 
 	// User message
-	await appendMessages(SID, [{ role: 'user', content: 'do stuff', ts: new Date().toISOString() }])
+	await appendHistory(SID, [{ role: 'user', content: 'do stuff', ts: new Date().toISOString() }])
 
 	// Assistant with 2 tool calls, only 1 gets a result
 	const { entry, toolBlobMap } = await writeAssistantEntry(SID, {
@@ -103,20 +103,20 @@ test('loadApiMessages synthesizes results for orphaned tool_use blocks', async (
 			{ id: 't2', name: 'read', input: { path: 'x' } },
 		],
 	})
-	await appendMessages(SID, [entry])
+	await appendHistory(SID, [entry])
 
 	// Only write result for t1
 	const r1 = await writeToolResultEntry(SID, 't1', 'file.txt', toolBlobMap)
-	await appendMessages(SID, [r1])
+	await appendHistory(SID, [r1])
 
 	// Another assistant with tool call, no result at all
 	const { entry: entry2 } = await writeAssistantEntry(SID, {
 		toolCalls: [{ id: 't3', name: 'bash', input: { command: 'pwd' } }],
 	})
-	await appendMessages(SID, [entry2])
+	await appendHistory(SID, [entry2])
 
 	// User message after the mess
-	await appendMessages(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+	await appendHistory(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
 
 	const msgs = await loadApiMessages(SID)
 
@@ -141,8 +141,8 @@ test('loadApiMessages synthesizes results for orphaned tool_use blocks', async (
 
 test('loadApiMessages includes thinking blocks with signature', async () => {
 	const SID = TEST_SESSION
-	await appendMessages(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
-	await appendMessages(SID, [{
+	await appendHistory(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+	await appendHistory(SID, [{
 		role: 'assistant', text: 'hi', thinkingText: 'let me think...',
 		thinkingSignature: 'sig123', ts: new Date().toISOString(),
 	}])
@@ -157,8 +157,8 @@ test('loadApiMessages includes thinking blocks with signature', async () => {
 
 test('loadApiMessages omits thinking blocks without signature', async () => {
 	const SID = TEST_SESSION
-	await appendMessages(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
-	await appendMessages(SID, [{
+	await appendHistory(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+	await appendHistory(SID, [{
 		role: 'assistant', text: 'hi', thinkingText: 'old thinking without sig',
 		ts: new Date().toISOString(),
 	}])
@@ -171,7 +171,7 @@ test('loadApiMessages omits thinking blocks without signature', async () => {
 })
 
 test('replay marks tool with error status when stored result status is error', async () => {
-	const { writeAssistantEntry, writeToolResultEntry } = await import('./messages.ts')
+	const { writeAssistantEntry, writeToolResultEntry } = await import('./history.ts')
 	const { replayToBlocks } = await import('./replay.ts')
 	const SID = TEST_SESSION
 
@@ -179,11 +179,11 @@ test('replay marks tool with error status when stored result status is error', a
 		text: 'run',
 		toolCalls: [{ id: 't1', name: 'read', input: { path: 'missing.txt' } }],
 	})
-	await appendMessages(SID, [entry])
+	await appendHistory(SID, [entry])
 	const result = await writeToolResultEntry(SID, 't1', 'error: file not found', toolBlobMap, 'error')
-	await appendMessages(SID, [result])
+	await appendHistory(SID, [result])
 
-	const messages = await readMessages(SID)
+	const messages = await readHistory(SID)
 	const blocks = await replayToBlocks(SID, messages)
 	const tool = blocks.find((b: any) => b.type === 'tool') as any
 	expect(tool).toBeTruthy()
@@ -191,25 +191,25 @@ test('replay marks tool with error status when stored result status is error', a
 })
 
 test('loadApiMessages boosts threshold after model change', async () => {
-	const { writeAssistantEntry, writeToolResultEntry } = await import('./messages.ts')
+	const { writeAssistantEntry, writeToolResultEntry } = await import('./history.ts')
 	const SID = TEST_SESSION
 
 	// User + tool cycle
-	await appendMessages(SID, [{ role: 'user', content: 'go', ts: new Date().toISOString() }])
+	await appendHistory(SID, [{ role: 'user', content: 'go', ts: new Date().toISOString() }])
 	const { entry, toolBlobMap } = await writeAssistantEntry(SID, {
 		text: 'ok',
 		toolCalls: [{ id: 't0', name: 'bash', input: { command: 'ls' } }],
 	})
-	await appendMessages(SID, [entry])
+	await appendHistory(SID, [entry])
 	const result = await writeToolResultEntry(SID, 't0', 'file1.ts\nfile2.ts', toolBlobMap)
-	await appendMessages(SID, [result])
+	await appendHistory(SID, [result])
 
 	// Model change
-	await appendMessages(SID, [{ type: 'info', text: '[model] anthropic/claude-opus-4-6', level: 'meta', ts: new Date().toISOString() }])
+	await appendHistory(SID, [{ type: 'info', text: '[model] anthropic/claude-opus-4-6', level: 'meta', ts: new Date().toISOString() }])
 
 	// 6 plain user turns after model change — beyond default threshold (4) but within boosted (10)
 	for (let i = 0; i < 6; i++) {
-		await appendMessages(SID, [
+		await appendHistory(SID, [
 			{ role: 'user', content: `question ${i}`, ts: new Date().toISOString() },
 			{ role: 'assistant', text: `answer ${i}`, ts: new Date().toISOString() },
 		])

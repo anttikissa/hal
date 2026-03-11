@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
 import { sessionDir, ensureDir } from '../state.ts'
-import { appendMessages, readMessages, loadApiMessages, loadAllMessages, buildCompactionContext, type Message } from './messages.ts'
+import { appendHistory, readHistory, loadApiMessages, loadAllHistory, buildCompactionContext, type Message } from './history.ts'
 import { forkSession, rotateLog } from './session.ts'
 import { stringify, parseAll } from '../utils/ason.ts'
 
@@ -14,7 +14,7 @@ function tempSession(): string {
 	createdIds.push(id)
 	const dir = sessionDir(id)
 	ensureDir(dir)
-	writeFileSync(join(dir, 'meta.ason'), stringify({ id, workingDir: '/tmp', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), log: 'messages.asonl' }) + '\n')
+	writeFileSync(join(dir, 'session.ason'), stringify({ id, workingDir: '/tmp', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), log: 'history.asonl' }) + '\n')
 	return id
 }
 
@@ -30,7 +30,7 @@ describe('forkSession', () => {
 	test('creates new session with forked_from entry', async () => {
 		const parentId = tempSession()
 		const ts = new Date().toISOString()
-		await appendMessages(parentId, [
+		await appendHistory(parentId, [
 			{ role: 'user', content: 'hello', ts } as Message,
 			{ role: 'assistant', content: 'hi there', ts } as Message,
 		])
@@ -42,30 +42,30 @@ describe('forkSession', () => {
 		expect(existsSync(sessionDir(childId))).toBe(true)
 
 		// Child has forked_from as first entry
-		const raw = readFileSync(join(sessionDir(childId), 'messages.asonl'), 'utf-8')
+		const raw = readFileSync(join(sessionDir(childId), 'history.asonl'), 'utf-8')
 		const entries = parseAll(raw)
 		expect(entries[0]).toMatchObject({ type: 'forked_from', parent: parentId })
 	})
 
-	test('child has meta.ason with log field', async () => {
+	test('child has session.ason with log field', async () => {
 		const parentId = tempSession()
-		await appendMessages(parentId, [
+		await appendHistory(parentId, [
 			{ role: 'user', content: 'hello', ts: new Date().toISOString() } as Message,
 		])
 
 		const childId = await forkSession(parentId)
 		createdIds.push(childId)
 
-		const metaRaw = readFileSync(join(sessionDir(childId), 'meta.ason'), 'utf-8')
+		const metaRaw = readFileSync(join(sessionDir(childId), 'session.ason'), 'utf-8')
 		const meta = parseAll(metaRaw)[0] as any
-		expect(meta.log).toBe('messages.asonl')
+		expect(meta.log).toBe('history.asonl')
 		expect(meta.id).toBe(childId)
 	})
 
 	test('loadApiMessages on child includes parent history', async () => {
 		const parentId = tempSession()
 		const ts = new Date(Date.now() - 1000).toISOString()
-		await appendMessages(parentId, [
+		await appendHistory(parentId, [
 			{ role: 'user', content: 'parent message', ts } as Message,
 			{ role: 'assistant', text: 'parent reply', ts } as Message,
 		])
@@ -74,7 +74,7 @@ describe('forkSession', () => {
 		createdIds.push(childId)
 
 		// Add a message in the child
-		await appendMessages(childId, [
+		await appendHistory(childId, [
 			{ role: 'user', content: 'child message', ts } as Message,
 		])
 
@@ -96,7 +96,7 @@ describe('forkSession', () => {
 	test('child and parent diverge independently', async () => {
 		const parentId = tempSession()
 		const ts1 = new Date(Date.now() - 1000).toISOString()
-		await appendMessages(parentId, [
+		await appendHistory(parentId, [
 			{ role: 'user', content: 'shared', ts: ts1 } as Message,
 			{ role: 'assistant', text: 'shared reply', ts: ts1 } as Message,
 		])
@@ -106,10 +106,10 @@ describe('forkSession', () => {
 
 		// Add different messages to parent and child — with later timestamps
 		const ts2 = new Date().toISOString()
-		await appendMessages(parentId, [
+		await appendHistory(parentId, [
 			{ role: 'user', content: 'parent only', ts: ts2 } as Message,
 		])
-		await appendMessages(childId, [
+		await appendHistory(childId, [
 			{ role: 'user', content: 'child only', ts: ts2 } as Message,
 		])
 
@@ -134,7 +134,7 @@ describe('forkSession', () => {
 	test('compaction preserves forked_from entry', async () => {
 		const parentId = tempSession()
 		const ts = new Date(Date.now() - 1000).toISOString()
-		await appendMessages(parentId, [
+		await appendHistory(parentId, [
 			{ role: 'user', content: 'parent msg', ts } as Message,
 			{ role: 'assistant', text: 'parent reply', ts } as Message,
 		])
@@ -142,49 +142,49 @@ describe('forkSession', () => {
 		const childId = await forkSession(parentId)
 		createdIds.push(childId)
 
-		await appendMessages(childId, [
+		await appendHistory(childId, [
 			{ role: 'user', content: 'child msg', ts: new Date().toISOString() } as Message,
 			{ role: 'assistant', text: 'child reply', ts: new Date().toISOString() } as Message,
 		])
 
 		// Simulate what runtime compact does
-		const msgs = await readMessages(childId)
+		const msgs = await readHistory(childId)
 		const context = buildCompactionContext(childId, msgs)
 		await rotateLog(childId)
 		const forkEntry = (msgs[0] as any)?.type === 'forked_from' ? [msgs[0]] : []
-		await appendMessages(childId, [
+		await appendHistory(childId, [
 			...forkEntry,
 			{ role: 'user', content: '[system] compacted', ts: new Date().toISOString() } as Message,
 			{ role: 'user', content: context, ts: new Date().toISOString() } as Message,
 		])
 
 		// After compaction, forked_from should still be the first entry
-		const newMsgs = await readMessages(childId)
+		const newMsgs = await readHistory(childId)
 		expect((newMsgs[0] as any).type).toBe('forked_from')
 		expect((newMsgs[0] as any).parent).toBe(parentId)
 
-		// And loadAllMessages should still resolve parent history
-		const allMsgs = await loadAllMessages(childId)
+		// And loadAllHistory should still resolve parent history
+		const allMsgs = await loadAllHistory(childId)
 		const texts = allMsgs.map((m: any) => m.content ?? m.text ?? '').filter(Boolean)
 		expect(texts.some(t => t.includes('parent msg'))).toBe(true)
 	})
 
 	test('compaction of non-fork session has no forked_from', async () => {
 		const id = tempSession()
-		await appendMessages(id, [
+		await appendHistory(id, [
 			{ role: 'user', content: 'hello', ts: new Date().toISOString() } as Message,
 			{ role: 'assistant', text: 'hi', ts: new Date().toISOString() } as Message,
 		])
 
-		const msgs = await readMessages(id)
+		const msgs = await readHistory(id)
 		await rotateLog(id)
 		const forkEntry = (msgs[0] as any)?.type === 'forked_from' ? [msgs[0]] : []
-		await appendMessages(id, [
+		await appendHistory(id, [
 			...forkEntry,
 			{ role: 'user', content: '[system] compacted', ts: new Date().toISOString() } as Message,
 		])
 
-		const newMsgs = await readMessages(id)
+		const newMsgs = await readHistory(id)
 		expect((newMsgs[0] as any).role).toBe('user')
 		expect((newMsgs[0] as any).content).toBe('[system] compacted')
 	})

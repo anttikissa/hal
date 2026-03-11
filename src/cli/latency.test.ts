@@ -3,7 +3,7 @@ import { spawn } from 'bun'
 
 describe('cli input latency', () => {
 	test('keypress to render < 50ms', async () => {
-		const proc = spawn(['bun', 'new/cli.ts'], {
+		const proc = spawn(['bun', 'src/cli/cli.ts'], {
 			stdin: 'pipe',
 			stdout: 'pipe',
 			stderr: 'pipe',

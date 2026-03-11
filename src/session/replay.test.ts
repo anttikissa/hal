@@ -1,17 +1,17 @@
 import { describe, test, expect } from 'bun:test'
 import { replayToBlocks } from './replay.ts'
-import type { Message } from './messages.ts'
+import type { Message } from './history.ts'
 
 describe('replayToBlocks', () => {
 	test('[system] prefix passes through as raw text', async () => {
 		const messages: Message[] = [
-			{ role: 'user', content: '[system] Session was reset. Previous log: messages.asonl', ts: '2026-01-01T00:00:00Z' },
+			{ role: 'user', content: '[system] Session was reset. Previous log: history.asonl', ts: '2026-01-01T00:00:00Z' },
 			{ role: 'assistant', text: 'ok', ts: '2026-01-01T00:00:01Z' },
 		]
 		const blocks = await replayToBlocks('test-session', messages)
 		expect(blocks[0]).toMatchObject({
 			type: 'input',
-			text: '[system] Session was reset. Previous log: messages.asonl',
+			text: '[system] Session was reset. Previous log: history.asonl',
 		})
 	})
 

@@ -55,7 +55,7 @@ The code can `import` anything from `src/` using relative paths from the temp fi
 
 ```typescript
 // Restart
-const { restart } = await import('../../src/cli.ts')
+const { restart } = await import('../../src/cli/cli.ts')
 restart()
 ```
 

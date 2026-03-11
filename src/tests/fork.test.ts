@@ -88,9 +88,9 @@ test('/fork creates a new session with parent history', async () => {
 		expect(newSessions.sessions).toContain(childId)
 		expect(newSessions.sessions).toContain(parentId)
 
-		// Verify the child session's messages.asonl has forked_from
+		// Verify the child session's history.asonl has forked_from
 		const childDir = resolve(stateDir, 'sessions', childId)
-		const childLog = readFileSync(resolve(childDir, 'messages.asonl'), 'utf-8')
+		const childLog = readFileSync(resolve(childDir, 'history.asonl'), 'utf-8')
 		expect(childLog).toContain('forked_from')
 		expect(childLog).toContain(parentId)
 		expect(childLog).toContain('[system]')
@@ -120,16 +120,16 @@ test('/reset rotates the log file', async () => {
 		)
 		await Bun.sleep(200)
 
-		// Verify the session dir has both messages.asonl and messages2.asonl
+		// Verify the session dir has both history.asonl and history2.asonl
 		const sessionDir = resolve(stateDir, 'sessions', sessionId)
 		const files = readdirSync(sessionDir)
-		expect(files).toContain('messages.asonl')
-		expect(files).toContain('messages2.asonl')
+		expect(files).toContain('history.asonl')
+		expect(files).toContain('history2.asonl')
 
 		// The new log should have the [system] breadcrumb
-		const newLog = readFileSync(resolve(sessionDir, 'messages2.asonl'), 'utf-8')
+		const newLog = readFileSync(resolve(sessionDir, 'history2.asonl'), 'utf-8')
 		expect(newLog).toContain('[system]')
-		expect(newLog).toContain('messages.asonl')
+		expect(newLog).toContain('history.asonl')
 	} finally {
 		await h.cleanup()
 	}

@@ -47,7 +47,7 @@
 **Files to edit**:
 - `src/cli/tabline.ts` — rewrite rendering with colors + busy indicators
 - `src/cli/tabline.test.ts` — update tests
-- `src/cli.ts` — pass `halCursorVisible` to tabline, apply colors
+- `src/cli/cli.ts` — pass `halCursorVisible` to tabline, apply colors
 
 ## 3. ./init script
 
@@ -111,7 +111,7 @@
 - Show question text in assistant color inside the box
 
 **Files to edit**:
-- `src/cli.ts` — update question area rendering in `buildLines()`
+- `src/cli/cli.ts` — update question area rendering in `buildLines()`
 - `src/cli/colors.ts` — add question color scheme
 
 ## 6. Help bar (last)
@@ -134,7 +134,7 @@
 - `src/cli/help.ts` — context-sensitive help text generation
 - `src/state.ts` — add KEY_USAGE_PATH
 - `src/cli/keybindings.ts` — track key usage
-- `src/cli.ts` — use help.ts for bottom bar
+- `src/cli/cli.ts` — use help.ts for bottom bar
 
 ## Order of implementation
 

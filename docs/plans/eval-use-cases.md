@@ -15,7 +15,7 @@ One line. The `run` script sees exit code 100 and restarts. No other tool can do
 
 ## 2. Inspect live session state
 
-**Problem:** Session data on disk (messages.asonl) is the persisted view. But the runtime holds ephemeral state that never hits disk: which sessions are busy, abort controllers, pending questions, context window estimates, in-flight tool calls.
+**Problem:** Session data on disk (history.asonl) is the persisted view. But the runtime holds ephemeral state that never hits disk: which sessions are busy, abort controllers, pending questions, context window estimates, in-flight tool calls.
 
 **With eval:**
 ```ts

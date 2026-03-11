@@ -67,7 +67,7 @@ interface Transport {
 ```
 
 Local (file-backed): reads state.ason, tails events.asonl, appends to
-commands.asonl, reads session messages.asonl.
+commands.asonl, reads session history.asonl.
 
 Remote (HTTP, future): POST /command, GET /events (SSE), GET /state,
 GET /sessions/:id/messages.
@@ -81,14 +81,14 @@ Client code uses Transport — doesn't know or care which.
 user types → tui.ts → client.ts → transport.sendCommand('prompt')
   → commands.asonl → runtime.ts dispatches → agent-loop.ts calls provider
   → provider yields ProviderEvents
-  → agent-loop emits RuntimeEvents to events.asonl + writes messages.asonl
+  → agent-loop emits RuntimeEvents to events.asonl + writes history.asonl
   → transport.events() → client.ts translates to Block mutations
   → tui.ts re-renders via diff engine
 ```
 
 ### History replay (on startup / tab restore)
 ```
-transport.replaySession(id) → reads messages.asonl
+transport.replaySession(id) → reads history.asonl
   → replay.ts converts to Block[] → client.ts sets tab.blocks
   → tui.ts renders
 ```
@@ -96,7 +96,7 @@ transport.replaySession(id) → reads messages.asonl
 ### Bootstrap (fast, <50ms)
 ```
 transport.bootstrap() → reads state.ason (session IDs + active)
-  → for each open session: read meta.ason (liveFile, cached)
+  → for each open session: read session.ason (liveFile, cached)
   → client.ts creates tabs with session info
   → tail events from known offset (no gap)
   → replay history in background (async)
@@ -117,8 +117,8 @@ new-state/ipc/
 ```
 new-state/sessions/
   <id>/
-    messages.asonl     — conversation: user, assistant, thinking, tool calls
-    meta.ason          — { id, name, workingDir, model, createdAt }
+    history.asonl     — conversation: user, assistant, thinking, tool calls
+    session.ason          — { id, name, workingDir, model, createdAt }
 ```
 
 ### Config (user-editable, watched)
@@ -137,7 +137,7 @@ Proxy-backed object with auto-persist and optional fs.watch:
 
 ⚠ Don't stash nested objects (`const x = f.foo`) — after a file reload, `x` points to the old object and writes through it are silently lost. Always access through the root proxy: `f.foo.bar = 2`.
 
-Used for: config.ason, session meta.ason.
+Used for: config.ason, session session.ason.
 Not used for: .asonl files (append-only), state.ason (host-only, explicit writes).
 
 ## Provider interface
@@ -177,7 +177,7 @@ Minimal — just enough for fast client bootstrap:
 ```
 
 activeSessionId lives in config.ason (user preference).
-Activity text, context %, model — all in meta.ason or events.
+Activity text, context %, model — all in session.ason or events.
 Host is the sole writer. Clients read once + tail events.
 
 ## Build sequence
@@ -192,7 +192,7 @@ Host is the sole writer. Clients read once + tail events.
 
 ### Phase 2: Runtime
 7. `session/session.ts` — CRUD
-8. `session/messages.ts` — append/read
+8. `session/history.ts` — append/read
 9. `runtime/provider.ts` — interface + loader
 10. `runtime/mock-provider.ts` — simulator as provider
 11. `runtime/agent-loop.ts` — drive provider, emit events, persist
@@ -227,7 +227,7 @@ Host is the sole writer. Clients read once + tail events.
 | runtime/provider.ts | ~30 |
 | runtime/mock-provider.ts | ~60 |
 | session/session.ts | ~50 |
-| session/messages.ts | ~40 |
+| session/history.ts | ~40 |
 | session/replay.ts | ~60 |
 | cli/transport.ts | ~80 |
 | cli/client.ts | ~180 |

@@ -6,7 +6,7 @@ import { getConfig } from '../src/config.ts'
 import { contextWindowForModel } from '../src/runtime/context.ts'
 import { loadSystemPrompt } from '../src/runtime/system-prompt.ts'
 import { compactApiMessages } from '../src/session/compact.ts'
-import { readBlock } from '../src/session/messages.ts'
+import { readBlob } from '../src/session/history.ts'
 import { STATE_DIR, sessionDir } from '../src/state.ts'
 import { parse, parseAll } from '../src/utils/ason.ts'
 
@@ -66,13 +66,13 @@ async function resolveSessionId(arg?: string): Promise<string> {
 }
 
 async function resolveLogName(sessionId: string): Promise<string> {
-	const metaPath = `${sessionDir(sessionId)}/meta.ason`
-	if (!existsSync(metaPath)) return 'messages.asonl'
+	const metaPath = `${sessionDir(sessionId)}/session.ason`
+	if (!existsSync(metaPath)) return 'history.asonl'
 	try {
 		const meta = parse(await readFile(metaPath, 'utf8')) as any
 		if (typeof meta?.log === 'string' && meta.log) return meta.log
 	} catch {}
-	return 'messages.asonl'
+	return 'history.asonl'
 }
 
 function mapLineNumbers(raw: string, valueCount: number): number[] {
@@ -110,7 +110,7 @@ function userDetail(msg: any): string {
 	const parts: string[] = []
 	for (const b of msg.content) {
 		if (b?.type === 'text' && typeof b.text === 'string') parts.push(`'${clip(oneLine(b.text), PREVIEW)}'`)
-		if (b?.type === 'image' && typeof b.ref === 'string') parts.push(`[image ${b.ref}]`)
+		if (b?.type === 'image' && typeof b.blobId === 'string') parts.push(`[image ${b.blobId}]`)
 	}
 	if (parts.length === 0) return 'user [blocks]'
 	return `user ${parts.join(' + ')}`
@@ -148,10 +148,10 @@ function pickTriggerIndex(entries: SourceEntry[], start: number, end: number): n
 	return infoIdx
 }
 
-async function readBlockCached(sessionId: string, ref: string, cache: Map<string, any | null>): Promise<any | null> {
+async function readBlobCached(sessionId: string, ref: string, cache: Map<string, any | null>): Promise<any | null> {
 	const key = `${sessionId}:${ref}`
 	if (cache.has(key)) return cache.get(key) ?? null
-	const block = await readBlock(sessionId, ref)
+	const block = await readBlob(sessionId, ref)
 	cache.set(key, block)
 	return block
 }
@@ -168,13 +168,13 @@ async function buildApiMessages(sessionId: string, entries: SourceEntry[], block
 			} else if (Array.isArray(msg.content)) {
 				const blocks: any[] = []
 				for (const b of msg.content) {
-					if (b?.type === 'image' && b.ref) {
-						const data = await readBlockCached(sessionId, b.ref, blockCache)
+					if (b?.type === 'image' && b.blobId) {
+						const data = await readBlobCached(sessionId, b.blobId, blockCache)
 						if (data?.media_type && data?.data) {
 							blocks.push({
 								type: 'image',
 								source: { type: 'base64', media_type: data.media_type, data: data.data },
-								_ref: b.ref,
+								_blobId: b.blobId,
 							})
 						}
 					} else {
@@ -194,7 +194,7 @@ async function buildApiMessages(sessionId: string, entries: SourceEntry[], block
 			if (msg.text) content.push({ type: 'text', text: msg.text })
 			if (Array.isArray(msg.tools)) {
 				for (const t of msg.tools) {
-					const block = await readBlockCached(sessionId, t.ref, blockCache)
+					const block = await readBlobCached(sessionId, t.blobId, blockCache)
 					const input = block?.call?.input ?? {}
 					const command = resolveCommand(t.name, input)
 					toolMeta.set(t.id, { name: t.name, command })
@@ -206,7 +206,7 @@ async function buildApiMessages(sessionId: string, entries: SourceEntry[], block
 		}
 
 		if (msg?.role === 'tool_result') {
-			const block = await readBlockCached(sessionId, msg.ref, blockCache)
+			const block = await readBlobCached(sessionId, msg.blobId, blockCache)
 			let content = block?.result?.content ?? '[interrupted]'
 			if (typeof content === 'string' && content.length > MAX_API_OUTPUT) {
 				content = `${content.slice(0, MAX_API_OUTPUT)}\n[truncated ${content.length - MAX_API_OUTPUT} chars]`
@@ -215,7 +215,7 @@ async function buildApiMessages(sessionId: string, entries: SourceEntry[], block
 			const command = resolveCommand(tName, block?.call?.input) ?? toolMeta.get(msg.tool_use_id)?.command
 			out.push({
 				role: 'user',
-				content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content, _ref: msg.ref, _toolName: tName, _command: command }],
+				content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content, _blobId: msg.blobId, _toolName: tName, _command: command }],
 			})
 		}
 	}
@@ -250,7 +250,7 @@ async function buildApiMessages(sessionId: string, entries: SourceEntry[], block
 	for (const msg of compacted) {
 		if (msg.role !== 'user' || !Array.isArray(msg.content)) continue
 		for (const block of msg.content) {
-			if (block._ref) delete block._ref
+			if (block._blobId) delete block._blobId
 			if (block._toolName) delete block._toolName
 			if (block._command) delete block._command
 		}
@@ -261,7 +261,7 @@ async function buildApiMessages(sessionId: string, entries: SourceEntry[], block
 async function triggerDetail(sessionId: string, msg: any, blockCache: Map<string, any | null>): Promise<string> {
 	if (msg?.role === 'user') return userDetail(msg)
 	if (msg?.role === 'tool_result') {
-		const block = await readBlockCached(sessionId, msg.ref, blockCache)
+		const block = await readBlobCached(sessionId, msg.blobId, blockCache)
 		const tName = block?.call?.name ?? 'tool'
 		const command = resolveCommand(tName, block?.call?.input)
 		const content = block?.result?.content ?? '[interrupted]'
@@ -283,7 +283,7 @@ function formatDelta(n: number): string {
 async function main(): Promise<void> {
 	const sessionId = await resolveSessionId(process.argv[2])
 	const dir = sessionDir(sessionId)
-	const metaPath = `${dir}/meta.ason`
+	const metaPath = `${dir}/session.ason`
 	const meta = existsSync(metaPath) ? (parse(await readFile(metaPath, 'utf8')) as any) : {}
 	const model = modelForContext(meta)
 	const modelId = model.includes('/') ? model.split('/', 2)[1] : model
@@ -367,7 +367,7 @@ async function main(): Promise<void> {
 	console.log('Notes:')
 	console.log('- context_bytes = JSON(messages after compactApiMessages) + system prompt bytes for that call')
 	console.log('- delta compares this call to previous call (negative delta = context shrank)')
-	console.log('- src_lines shows cumulative messages.asonl source line range considered before that call')
+	console.log('- src_lines shows cumulative history.asonl source line range considered before that call')
 }
 
 main().catch(err => {

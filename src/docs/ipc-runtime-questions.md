@@ -5,7 +5,7 @@ Questions that came up while building. None are blockers — everything works en
 ## Architecture
 
 1. **Session registry**: The old code has `index.ason` listing all sessions. The new code
-   derives the session list from `state.ason` (host-written) + individual `meta.ason` files.
+   derives the session list from `state.ason` (host-written) + individual `session.ason` files.
    This avoids the dual-source-of-truth bug. But it means the host must persist session order
    to `state.ason` — is that OK, or do you want a separate `index.ason`?
 
@@ -16,7 +16,7 @@ Questions that came up while building. None are blockers — everything works en
 3. **Pause/resume**: Not yet implemented. The old code had `pausedSessionIds`. Do you want
    pause to cancel the running generation, or just suppress output until resume?
 
-4. **Fork**: Not yet implemented. The old session fork (forked_from in messages.asonl) is
+4. **Fork**: Not yet implemented. The old session fork (forked_from in history.asonl) is
    supported in message loading, but there's no `fork` command handler yet. Should fork
    create a new session + copy blocks, or use the reference-based approach from old code?
 

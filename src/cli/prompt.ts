@@ -197,7 +197,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 
 	// Enter
 	if (k.key === 'enter' && (k.alt || k.shift)) { replaceSelection('\n'); return true }
-	if (k.key === 'enter') return false // let cli.ts handle submit
+	if (k.key === 'enter') return false // let cli/cli.ts handle submit
 
 	// Backspace
 	if (k.key === 'backspace') {
@@ -212,7 +212,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
 		return true
 	}
-	// Ctrl+D: delete forward, but return false when empty (cli.ts closes tab)
+	// Ctrl+D: delete forward, but return false when empty (cli/cli.ts closes tab)
 	if (k.key === 'd' && k.ctrl) {
 		if (buf.length === 0) return false
 		if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)

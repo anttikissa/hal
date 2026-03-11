@@ -62,7 +62,7 @@ Keep as direct exports:
 
 Callers:
 - `src/main.ts`: `import { ensureBus, claimHost, ... } from './ipc.ts'`
-- `src/cli.ts`: `import { events, commands, ... } from './ipc.ts'`
+- `src/cli/cli.ts`: `import { events, commands, ... } from './ipc.ts'`
 - `src/runtime/startup.ts`: `import { commands, events, getState, updateState, log } from '../ipc.ts'`
 - `src/runtime/commands.ts`: `import { log, updateState, getState } from '../ipc.ts'`
 - `src/runtime/runtime.ts`: `import { events, updateState, log } from '../ipc.ts'`
@@ -84,7 +84,7 @@ Exports to wrap:
 - `modelCompletions`, `resolveModel`, `displayModel`
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 - `src/runtime/commands.ts`
 - `src/runtime/runtime.ts`
 - `src/session/replay.ts`
@@ -97,7 +97,7 @@ All exports are constants (`STATE_DIR`, `HAL_DIR`, etc.) and tiny helper functio
 
 Entry point, not imported by much.
 
-### `src/cli.ts` → `export const cli = { ... }`
+### `src/cli/cli.ts` → `export const cli = { ... }`
 
 Exports to wrap:
 - `contentWidth`, `showError`, `doRender`, `quit`, `restart`, `suspend`
@@ -119,7 +119,7 @@ Keep as direct exports:
 - `Block` (type)
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 - `src/session/replay.ts`
 
 ### `src/cli/client-state.ts` → `export const clientState = { ... }`
@@ -128,7 +128,7 @@ Exports to wrap:
 - `getLastTab`, `saveLastTab`
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/clipboard.ts` → `export const clipboard = { ... }`
 
@@ -160,7 +160,7 @@ Exports to wrap:
 - `isVisible`, `start`, `stop`
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/diff-engine.ts` → `export const diffEngine = { ... }`
 
@@ -171,7 +171,7 @@ Keep as direct exports:
 - `RenderState`, `CursorPos`, `emptyState` (types/constants)
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/heights.ts` → `export const heights = { ... }`
 
@@ -182,7 +182,7 @@ Keep as direct exports:
 - `HeightTab` (type)
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/input.ts` → `export const input = { ... }`
 
@@ -195,7 +195,7 @@ Keep as direct exports:
 Callers:
 - `src/cli/prompt.ts`
 - `src/cli/keybindings.ts`
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/keybindings.ts` → `export const keybindings = { ... }`
 
@@ -206,7 +206,7 @@ Keep as direct exports:
 - `InputContext` (type)
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/keys.ts` → `export const keys = { ... }`
 
@@ -217,7 +217,7 @@ Keep as direct exports:
 - `KeyEvent` (type)
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 - `src/cli/test-driver.ts`
 
 ### `src/cli/md.ts` → `export const md = { ... }`
@@ -232,7 +232,7 @@ Keep as direct exports:
 Callers:
 - `src/cli/blocks.ts`
 - `src/cli/tabline.ts`
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/prompt.ts` → `export const prompt = { ... }`
 
@@ -240,7 +240,7 @@ Exports to wrap:
 - `setQuestion`, `clearQuestion`, `hasQuestion`, `getQuestionLabel`, `frozenText`, `setHistory`, `pushHistory`, `text`, `cursorPos`, `selection`, `setText`, `clear`, `reset`, `setRenderCallback`, `handleKey`, `buildPrompt`, `lineCount`
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 - `src/cli/keybindings.ts`
 
 ### `src/cli/tabline.ts` → `export const tabline = { ... }`
@@ -252,7 +252,7 @@ Keep as direct exports:
 - `TablineTab` (type)
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 
 ### `src/cli/tabs.ts` → `export const tabs = { ... }`
 
@@ -263,7 +263,7 @@ Keep as direct exports:
 - `Tab` (type)
 
 Callers:
-- `src/cli.ts`
+- `src/cli/cli.ts`
 - `src/cli/keybindings.ts`
 
 ### `src/cli/transport.ts` — SKIP
@@ -419,7 +419,7 @@ Keep as direct exports:
 Callers:
 - `src/runtime/commands.ts`
 
-### `src/session/messages.ts` → `export const messages = { ... }`
+### `src/session/history.ts` → `export const messages = { ... }`
 
 Exports to wrap:
 - `makeBlobId`, `writeBlob`, `readBlob`, `getLastUsage`, `writeAssistantEntry`, `writeToolResultEntry`, `updateBlobInput`, `parseUserContent`, `appendMessages`, `readMessages`, `loadApiMessages`, `loadAllMessages`, `detectInterruptedTools`, `buildCompactionContext`, `loadInputHistory`, `saveDraft`

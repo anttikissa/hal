@@ -65,11 +65,11 @@ Given `const obj = { model: 'anthropic/claude-opus-4-6', theme: 'hal', debug: { 
 
 **ASON** (`.ason`) — a single value per file. Used for config, state, and metadata. Written with `stringify(value)` (any mode) + `'\n'`.
 
-Examples: `config.ason`, `auth.ason`, `index.ason`, `info.ason`, `state.ason`, `calibration.ason`, `themes/*.ason`.
+Examples: `config.ason`, `auth.ason`, `index.ason`, `session.ason`, `state.ason`, `calibration.ason`, `themes/*.ason`.
 
 **ASONL** (`.asonl`) — multiple values, one per line (like JSONL). Used for append-only logs and message streams. Each record **must** be produced with `stringify(value, 'short') + '\n'` — multi-line records would break line-oriented parsing.
 
-Examples: `messages.asonl`, `commands.asonl`, `events.asonl`, `tool-calls.asonl`, `responses.asonl`, debug logs.
+Examples: `history.asonl`, `commands.asonl`, `events.asonl`, `tool-calls.asonl`, `responses.asonl`, debug logs.
 
 ### ASONL API
 

@@ -1,7 +1,7 @@
 // Runtime class — holds all session state and provides the API surface for commands and eval.
 
 import { ipc } from '../ipc.ts'
-import { messages } from '../session/messages.ts'
+import { history } from '../session/history.ts'
 import { agentLoop } from './agent-loop.ts'
 import { context } from './context.ts'
 import { systemPrompt } from './system-prompt.ts'
@@ -46,7 +46,7 @@ export class Runtime {
 	}
 
 	async emitInfo(sessionId: string, text: string, level = 'info'): Promise<void> {
-		await messages.appendMessages(sessionId, [{ type: 'info', text, level, ts: new Date().toISOString() }])
+		await history.appendHistory(sessionId, [{ type: 'info', text, level, ts: new Date().toISOString() }])
 		await this.emit({ type: 'line', sessionId, text, level })
 	}
 
@@ -112,7 +112,7 @@ export class Runtime {
 
 	async greetSession(sessionId: string): Promise<void> {
 		const text = pick(GREETINGS)
-		await messages.appendMessages(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
+		await history.appendHistory(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
 	}
 
 	async startGeneration(
@@ -156,8 +156,8 @@ export class Runtime {
 	}
 
 	async resumeInterruptedSession(sessionId: string): Promise<void> {
-		const entries = await messages.readMessages(sessionId)
-		const interrupted = messages.detectInterruptedTools(entries)
+		const entries = await history.readHistory(sessionId)
+		const interrupted = history.detectInterruptedTools(entries)
 		if (interrupted.length > 0) {
 			this.pendingInterruptedTools.set(sessionId, interrupted)
 		}

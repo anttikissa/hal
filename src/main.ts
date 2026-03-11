@@ -14,7 +14,7 @@ await ipc.ensureBus()
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 const { host, currentPid } = await ipc.claimHost(hostId)
 
-// Shared mutable state — cli.ts reads this for the separator
+// Shared mutable state — cli/cli.ts reads this for the separator
 export const halStatus = { isHost: host, hostPid: currentPid }
 ;(globalThis as any).__hal = halStatus
 
@@ -91,4 +91,4 @@ if (!host) {
 }
 
 // Start CLI
-await import('./cli.ts')
+await import('./cli/cli.ts')

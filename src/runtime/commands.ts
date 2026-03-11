@@ -4,7 +4,7 @@ import type { Runtime } from './runtime.ts'
 import { runtimeCore } from './runtime.ts'
 import type { RuntimeCommand, SessionInfo } from '../protocol.ts'
 import { session } from '../session/session.ts'
-import { messages, type UserMessage } from '../session/messages.ts'
+import { history, type UserMessage } from '../session/history.ts'
 import { models } from '../models.ts'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
@@ -26,40 +26,40 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			if (rt.busySessionIds.has(sid)) { await warn('Session is busy'); return }
 
 			// Auto-resolve interrupted tools before building API messages
-			const interrupted = rt.pendingInterruptedTools.get(sid) ?? messages.detectInterruptedTools(await messages.readMessages(sid))
+			const interrupted = rt.pendingInterruptedTools.get(sid) ?? history.detectInterruptedTools(await history.readHistory(sid))
 			if (interrupted.length > 0) {
 				const toolBlobMap = new Map(interrupted.map(t => [t.id, t.blobId]))
 				for (const t of interrupted) {
-					const entry = await messages.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolBlobMap)
-					await messages.appendMessages(sid, [entry])
+					const entry = await history.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolBlobMap)
+					await history.appendHistory(sid, [entry])
 				}
 				rt.pendingInterruptedTools.delete(sid)
 			}
 
 			await rt.emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
 
-			const { apiContent, logContent } = await messages.parseUserContent(sid, cmd.text)
+			const { apiContent, logContent } = await history.parseUserContent(sid, cmd.text)
 			const userMsg: UserMessage = { role: 'user', content: logContent, ts: new Date().toISOString() }
-			await messages.appendMessages(sid, [userMsg])
+			await history.appendHistory(sid, [userMsg])
 
 			const info = rt.sessions.get(sid)!
 			info.lastPrompt = cmd.text.split('\n')[0].slice(0, 120)
 
-			let apiMessages = await messages.loadApiMessages(sid)
+			let apiMessages = await history.loadApiMessages(sid)
 
 			// Autocompact at 70% context usage (uses real API token counts)
 			const ctx = rt.sessionContext.get(sid)
 			if (ctx && !ctx.estimated && ctx.used / ctx.max >= 0.70) {
 				const usedPct = ctx.used / ctx.max
-				const msgs = await messages.readMessages(sid)
+				const msgs = await history.readHistory(sid)
 				const userMsgs = msgs.filter(m => m.role === 'user')
-				const context = messages.buildCompactionContext(sid, msgs)
-				await messages.appendMessages(sid, [
+				const context = history.buildCompactionContext(sid, msgs)
+				await history.appendHistory(sid, [
 					{ type: 'compact', ts: new Date().toISOString() },
 					{ role: 'user', content: context, ts: new Date().toISOString() } as UserMessage,
 					{ role: 'user', content: logContent, ts: new Date().toISOString() } as UserMessage,
 				])
-				apiMessages = await messages.loadApiMessages(sid)
+				apiMessages = await history.loadApiMessages(sid)
 				await rt.emitInfo(sid, `[autocompact] ${Math.round(usedPct * 100)}% → compacted (${userMsgs.length} prompts summarized)`, 'meta')
 				rt.sessionContext.delete(sid) // will get fresh count from next API response
 			}
@@ -102,7 +102,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			}
 			rt.sessions = ordered
 			rt.activeSessionId = childId
-			await messages.appendMessages(childId, [
+			await history.appendHistory(childId, [
 				{ role: 'user', content: `[system] Forked from session ${sid}.`, ts: new Date().toISOString() } as UserMessage,
 			])
 			await rt.emitInfo(sid, `[fork] forked ${sid} -> ${childId}`, 'meta')
@@ -127,13 +127,13 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			break
 		}
 		case 'reset': {
-			const resetMsgs = await messages.readMessages(sid)
-			const oldLog = rt.sessions.get(sid)?.log ?? 'messages.asonl'
+			const resetMsgs = await history.readHistory(sid)
+			const oldLog = rt.sessions.get(sid)?.log ?? 'history.asonl'
 			const newLog = await session.rotateLog(sid)
 			const info = rt.sessions.get(sid)
 			if (info) info.log = newLog
 			const forkEntry = (resetMsgs[0] as any)?.type === 'forked_from' ? [resetMsgs[0]] : []
-			await messages.appendMessages(sid, [
+			await history.appendHistory(sid, [
 				...forkEntry,
 				{ role: 'user', content: `[system] Session was reset. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
 			])
@@ -142,16 +142,16 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 		}
 		case 'compact': {
 			if (rt.busySessionIds.has(sid)) { await warn('Session is busy'); break }
-			const msgs = await messages.readMessages(sid)
+			const msgs = await history.readHistory(sid)
 			const userMsgs = msgs.filter((m: any) => m.role === 'user')
 			if (userMsgs.length === 0) { await warn('[compact] nothing to compact'); break }
-			const context = messages.buildCompactionContext(sid, msgs)
-			const oldLog = rt.sessions.get(sid)?.log ?? 'messages.asonl'
+			const context = history.buildCompactionContext(sid, msgs)
+			const oldLog = rt.sessions.get(sid)?.log ?? 'history.asonl'
 			const newLog = await session.rotateLog(sid)
 			const info = rt.sessions.get(sid)
 			if (info) info.log = newLog
 			const forkEntry = (msgs[0] as any)?.type === 'forked_from' ? [msgs[0]] : []
-			await messages.appendMessages(sid, [
+			await history.appendHistory(sid, [
 				...forkEntry,
 				{ role: 'user', content: `[system] Session was manually compacted. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
 				{ role: 'user', content: context, ts: new Date().toISOString() } as UserMessage,
@@ -181,17 +181,17 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const info = rt.sessions.get(sid)
 			if (!info) { await error(`Session ${sid} not found`); break }
 			// Auto-resolve interrupted tools
-			const pendingTools = rt.pendingInterruptedTools.get(sid) ?? messages.detectInterruptedTools(await messages.readMessages(sid))
+			const pendingTools = rt.pendingInterruptedTools.get(sid) ?? history.detectInterruptedTools(await history.readHistory(sid))
 			if (pendingTools.length > 0) {
 				const toolBlobMap = new Map(pendingTools.map(t => [t.id, t.blobId]))
 				for (const t of pendingTools) {
-					const entry = await messages.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolBlobMap)
-					await messages.appendMessages(sid, [entry])
+					const entry = await history.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolBlobMap)
+					await history.appendHistory(sid, [entry])
 				}
 				rt.pendingInterruptedTools.delete(sid)
 				await rt.emitInfo(sid, `[interrupted] ${pendingTools.length} tool(s) skipped`, 'warn')
 			}
-			const apiMessages = await messages.loadApiMessages(sid)
+			const apiMessages = await history.loadApiMessages(sid)
 			if (!rt.hasPendingUserTurn(apiMessages)) {
 				await warn('No interrupted user turn to continue')
 				break
@@ -212,7 +212,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				const items: { id: string; topic?: string; lastPrompt?: string; sortTs?: string; msgCount: number }[] = []
 				for (const cid of closed) {
 					const m = session.loadMeta(cid)
-					const msgs = await messages.readMessages(cid)
+					const msgs = await history.readHistory(cid)
 					const msgCount = msgs.filter((e: any) => e.role).length
 					if (m) items.push({ id: cid, topic: m.topic, lastPrompt: m.lastPrompt, sortTs: m.closedAt ?? m.updatedAt, msgCount })
 					else items.push({ id: cid, msgCount })

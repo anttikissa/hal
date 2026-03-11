@@ -5,7 +5,7 @@ import type { Block } from './blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
 import { protocol } from '../protocol.ts'
 import { replay } from '../session/replay.ts'
-import { messages } from '../session/messages.ts'
+import { history } from '../session/history.ts'
 import { prompt } from './prompt.ts'
 import { clientState } from './client-state.ts'
 import { randomBytes } from 'crypto'
@@ -63,8 +63,8 @@ export class Client {
 		for (const tab of this.state.tabs) {
 			const replayMessages = await this.transport.replaySession(tab.sessionId)
 			tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model))
-			tab.inputHistory = await messages.loadInputHistory(tab.sessionId)
-			tab.inputDraft = await messages.loadDraft(tab.sessionId)
+			tab.inputHistory = await history.loadInputHistory(tab.sessionId)
+			tab.inputDraft = await history.loadDraft(tab.sessionId)
 		}
 		const active = this.activeTab()
 		if (active) {
@@ -220,8 +220,8 @@ export class Client {
 			if (!current.has(tab.sessionId)) {
 				const replayMessages = await this.transport.replaySession(tab.sessionId)
 				tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model))
-				tab.inputHistory = await messages.loadInputHistory(tab.sessionId)
-				tab.inputDraft = await messages.loadDraft(tab.sessionId)
+				tab.inputHistory = await history.loadInputHistory(tab.sessionId)
+				tab.inputDraft = await history.loadDraft(tab.sessionId)
 			}
 		}
 		const newId = this.state.tabs[this.state.activeTabIndex]?.sessionId
@@ -239,7 +239,7 @@ export class Client {
 		if (!tab) return
 		if (prompt.hasQuestion()) return // don't overwrite draft with answer text
 		tab.inputDraft = prompt.text()
-		messages.saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
+		history.saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
 	}
 
 	clearQuestion(): void {
@@ -252,7 +252,7 @@ export class Client {
 		if (!tab) return
 		// History push happens in prompt.pushHistory (shared array via setHistory)
 		tab.inputDraft = ''
-		messages.saveDraft(tab.sessionId, '').catch(() => {})
+		history.saveDraft(tab.sessionId, '').catch(() => {})
 	}
 
 	async send(type: CommandType, text?: string): Promise<void> {

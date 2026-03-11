@@ -3,7 +3,7 @@
 import { watch, type FSWatcher } from 'fs'
 import { ipc } from '../ipc.ts'
 import { session } from '../session/session.ts'
-import { messages } from '../session/messages.ts'
+import { history } from '../session/history.ts'
 import { context } from './context.ts'
 import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
@@ -30,11 +30,11 @@ export async function startRuntime(): Promise<Runtime> {
 			if (meta.context) {
 				ctx = meta.context
 			} else {
-				const usage = await messages.getLastUsage(meta.id)
+				const usage = await history.getLastUsage(meta.id)
 				if (usage) {
 					ctx = { used: usage.input, max: context.contextWindowForModel(modelId) }
 				} else {
-					const apiMsgs = await messages.loadApiMessages(meta.id)
+					const apiMsgs = await history.loadApiMessages(meta.id)
 					ctx = rt.estimateSessionContext(meta, apiMsgs)
 				}
 			}

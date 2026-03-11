@@ -1,8 +1,8 @@
 // Session CRUD — create, load, list, rotate.
-// Sessions use liveFile: mutate the object, it auto-saves to meta.ason.
+// Sessions use liveFile: mutate the object, it auto-saves to session.ason.
 
 import { readFile, writeFile, appendFile } from 'fs/promises'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { resolve, join } from 'path'
 import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, state } from '../state.ts'
@@ -11,8 +11,6 @@ import { ason } from '../utils/ason.ts'
 import type { SessionInfo } from '../protocol.ts'
 
 export type { SessionInfo }
-
-// ── Epoch (for DD-xxx session IDs) ──
 
 let _epoch: Date | null = null
 
@@ -46,98 +44,85 @@ export async function makeSessionId(): Promise<string> {
 	return generateId(epoch, 4)
 }
 
-// ── Meta (liveFile-backed) ──
-
-function metaPath(id: string): string {
-	return `${state.sessionDir(id)}/meta.ason`
+function sessionPath(id: string): string {
+	return `${state.sessionDir(id)}/session.ason`
 }
 
-const META_DEFAULTS: SessionInfo = {
-	id: '', workingDir: '', createdAt: '', updatedAt: '',
+const SESSION_DEFAULTS: SessionInfo = {
+	id: '',
+	workingDir: '',
+	createdAt: '',
+	updatedAt: '',
 }
 
-/** Load a session's meta as a live proxy. Mutations auto-save to disk. */
 export function loadMeta(id: string): SessionInfo | null {
-	const path = metaPath(id)
+	const path = sessionPath(id)
 	if (!existsSync(path)) return null
-	return liveFiles.liveFile<SessionInfo>(path, { defaults: { ...META_DEFAULTS, id } })
+	return liveFiles.liveFile<SessionInfo>(path, { defaults: { ...SESSION_DEFAULTS, id } })
 }
 
-/** Create a new session. Returns a live proxy — mutate it, it saves. */
 export async function createSession(workingDir?: string): Promise<SessionInfo> {
 	const id = await makeSessionId()
 	state.ensureDir(state.sessionDir(id))
 	const ts = new Date().toISOString()
-	const info = liveFiles.liveFile<SessionInfo>(metaPath(id), {
+	const info = liveFiles.liveFile<SessionInfo>(sessionPath(id), {
 		defaults: {
 			id,
 			workingDir: resolve(workingDir ?? LAUNCH_CWD),
-			log: 'messages.asonl',
+			log: 'history.asonl',
 			createdAt: ts,
 			updatedAt: ts,
 		},
 	})
-	// Force initial save
 	info.updatedAt = ts
 	;(info as SessionInfo & { save?: () => void }).save?.()
 	return info
 }
 
-// ── List ──
-
 export async function listSessionIds(): Promise<string[]> {
 	if (!existsSync(SESSIONS_DIR)) return []
 	const entries = await (await import('fs/promises')).readdir(SESSIONS_DIR)
-	return entries.filter(e => existsSync(metaPath(e))).sort()
+	return entries.filter(e => existsSync(sessionPath(e))).sort()
 }
 
-// ── Fork ──
-
-/** Fork a session. Creates a new session with a forked_from pointer. */
 export async function forkSession(sourceId: string): Promise<string> {
 	const id = await makeSessionId()
 	const dir = state.sessionDir(id)
 	state.ensureDir(dir)
 	const ts = new Date().toISOString()
-	const meta = liveFiles.liveFile<SessionInfo>(metaPath(id), {
-		defaults: { id, workingDir: resolve(LAUNCH_CWD), log: 'messages.asonl', createdAt: ts, updatedAt: ts },
+	const meta = liveFiles.liveFile<SessionInfo>(sessionPath(id), {
+		defaults: { id, workingDir: resolve(LAUNCH_CWD), log: 'history.asonl', createdAt: ts, updatedAt: ts },
 	})
 	meta.updatedAt = ts
 	;(meta as SessionInfo & { save?: () => void }).save?.()
-	await appendFile(join(dir, 'messages.asonl'), ason.stringify({ type: 'forked_from', parent: sourceId, ts }) + '\n')
+	await appendFile(join(dir, 'history.asonl'), ason.stringify({ type: 'forked_from', parent: sourceId, ts }) + '\n')
 	return id
 }
 
-// ── Log rotation ──
-
-/** Read the current log filename for a session from meta.ason. */
 export function currentLog(sessionId: string): string {
 	const meta = loadMeta(sessionId)
-	return meta?.log ?? 'messages.asonl'
+	return meta?.log ?? 'history.asonl'
 }
 
-/** Rotate: bump to next log file. Returns the new filename. */
 export async function rotateLog(sessionId: string): Promise<string> {
 	const cur = currentLog(sessionId)
 	let nextN = 2
-	if (cur !== 'messages.asonl') {
-		const match = cur.match(/^messages(\d+)\.asonl$/)
+	if (cur !== 'history.asonl') {
+		const match = cur.match(/^history(\d+)\.asonl$/)
 		if (match) nextN = parseInt(match[1], 10) + 1
 	}
-
-	const newLog = `messages${nextN}.asonl`
+	const newLog = `history${nextN}.asonl`
 	const meta = loadMeta(sessionId)
 	if (meta) {
 		meta.log = newLog
 		;(meta as SessionInfo & { save?: () => void }).save?.()
 	}
-	// Invalidate messagesLog cache
 	logNameCache.delete(sessionId)
 	return newLog
 }
 
-// Cache for messagesLog — invalidated by rotateLog
 export const logNameCache = new Map<string, string>()
+
 export const session = {
 	makeSessionId,
 	loadMeta,

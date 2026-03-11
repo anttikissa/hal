@@ -20,7 +20,7 @@ const ipcMod = await import('../ipc.ts')
 const runtimeMod = await import('./startup.ts')
 const protocolMod = await import('../protocol.ts')
 const aSonMod = await import('../utils/ason.ts')
-const messagesMod = await import('../session/messages.ts')
+const messagesMod = await import('../session/history.ts')
 const sessionMod = await import('../session/session.ts')
 
 const { ensureStateDir, STATE_DIR, sessionDir } = stateMod
@@ -28,7 +28,7 @@ const { ensureBus, claimHost, releaseHost, commands, events, updateState } = ipc
 const { startRuntime } = runtimeMod
 const { makeCommand } = protocolMod
 const { parseAll } = aSonMod
-const { appendMessages, writeAssistantEntry } = messagesMod
+const { appendHistory, writeAssistantEntry } = messagesMod
 const { createSession, loadMeta } = sessionMod
 
 if (!STATE_DIR.includes('/hal-test-')) {
@@ -153,7 +153,7 @@ test('prompt is echoed back as a prompt event', async () => {
 test('messages are persisted to disk', async () => {
 	await sendAndWait('Persist me')
 	const sid = runtime.activeSessionId!
-	const path = `${sessionDir(sid)}/messages.asonl`
+	const path = `${sessionDir(sid)}/history.asonl`
 	expect(existsSync(path)).toBe(true)
 	const raw = await readFile(path, 'utf-8')
 	const entries = parseAll(raw) as any[]
@@ -195,20 +195,20 @@ test('reset command rotates log and writes breadcrumb', async () => {
 	const sid = runtime.activeSessionId!
 	await commands.append(makeCommand('reset', src, undefined, sid))
 	await new Promise(r => setTimeout(r, 500))
-	const oldPath = `${sessionDir(sid)}/messages.asonl`
-	const newPath = `${sessionDir(sid)}/messages2.asonl`
+	const oldPath = `${sessionDir(sid)}/history.asonl`
+	const newPath = `${sessionDir(sid)}/history2.asonl`
 	expect(existsSync(oldPath)).toBe(true)
 	expect(existsSync(newPath)).toBe(true)
 	const raw = await readFile(newPath, 'utf-8')
 	const entries = parseAll(raw) as any[]
-	expect(entries.some(e => e.role === 'user' && typeof e.content === 'string' && e.content.includes('[system] Session was reset. Previous conversation: messages.asonl'))).toBe(true)
+	expect(entries.some(e => e.role === 'user' && typeof e.content === 'string' && e.content.includes('[system] Session was reset. Previous conversation: history.asonl'))).toBe(true)
 })
 
 test('multiple prompts build conversation history', async () => {
 	await sendAndWait('First message')
 	await sendAndWait('Second message')
 	const sid = runtime.activeSessionId!
-	const raw = await readFile(`${sessionDir(sid)}/messages.asonl`, 'utf-8')
+	const raw = await readFile(`${sessionDir(sid)}/history.asonl`, 'utf-8')
 	const entries = parseAll(raw) as any[]
 	const users = entries.filter(e => e.role === 'user')
 	expect(users.length).toBe(2)
@@ -273,7 +273,7 @@ test('restart detects interrupted user turn but waits for /continue', async () =
 	const info = await createSession()
 	const sid = info.id
 	const ts = new Date().toISOString()
-	await appendMessages(sid, [{ role: 'user', content: 'Please continue this after restart', ts } as any])
+	await appendHistory(sid, [{ role: 'user', content: 'Please continue this after restart', ts } as any])
 	updateState((s) => {
 		s.sessions = [sid]
 		s.activeSessionId = sid
@@ -302,7 +302,7 @@ test('/continue auto-resolves interrupted tools', async () => {
 	const info = await createSession()
 	const sid = info.id
 	const ts = new Date().toISOString()
-	await appendMessages(sid, [{ role: 'user', content: 'Trigger tools', ts } as any])
+	await appendHistory(sid, [{ role: 'user', content: 'Trigger tools', ts } as any])
 	const { entry } = await writeAssistantEntry(sid, {
 		text: 'Running tools',
 		toolCalls: [
@@ -310,7 +310,7 @@ test('/continue auto-resolves interrupted tools', async () => {
 			{ id: 't2', name: 'read', input: { path: 'package.json' } },
 		],
 	})
-	await appendMessages(sid, [entry])
+	await appendHistory(sid, [entry])
 	updateState((s) => {
 		s.sessions = [sid]
 		s.activeSessionId = sid
@@ -325,7 +325,7 @@ test('/continue auto-resolves interrupted tools', async () => {
 	await commands.append(makeCommand('continue', src, undefined, sid))
 	await new Promise(r => setTimeout(r, 300))
 
-	const raw = await readFile(`${sessionDir(sid)}/messages.asonl`, 'utf-8')
+	const raw = await readFile(`${sessionDir(sid)}/history.asonl`, 'utf-8')
 	const entries = parseAll(raw) as any[]
 	const toolResults = entries.filter((e) => e.role === 'tool_result')
 	expect(toolResults.length).toBe(2)
@@ -341,7 +341,7 @@ test('prompt auto-resolves interrupted tools instead of 400 error', async () => 
 	const info = await createSession()
 	const sid = info.id
 	const ts = new Date().toISOString()
-	await appendMessages(sid, [{ role: 'user', content: 'Trigger tools', ts } as any])
+	await appendHistory(sid, [{ role: 'user', content: 'Trigger tools', ts } as any])
 	const { entry } = await writeAssistantEntry(sid, {
 		text: 'Running tools',
 		toolCalls: [
@@ -349,7 +349,7 @@ test('prompt auto-resolves interrupted tools instead of 400 error', async () => 
 			{ id: 't2', name: 'read', input: { path: 'package.json' } },
 		],
 	})
-	await appendMessages(sid, [entry])
+	await appendHistory(sid, [entry])
 	updateState((s) => {
 		s.sessions = [sid]
 		s.activeSessionId = sid
@@ -365,7 +365,7 @@ test('prompt auto-resolves interrupted tools instead of 400 error', async () => 
 	await commands.append(makeCommand('prompt', src, 'hello after interrupt', sid))
 	await new Promise(r => setTimeout(r, 500))
 
-	const raw = await readFile(`${sessionDir(sid)}/messages.asonl`, 'utf-8')
+	const raw = await readFile(`${sessionDir(sid)}/history.asonl`, 'utf-8')
 	const entries = parseAll(raw) as any[]
 	const toolResults = entries.filter((e: any) => e.role === 'tool_result')
 	expect(toolResults.length).toBe(2)
@@ -478,8 +478,8 @@ test('resume without args lists closed sessions with details and message count',
 	secondInfo.lastPrompt = 'hello world'
 
 	// Write some messages to the session so count is > 0
-	const { appendMessages } = await import('../session/messages.ts')
-	await appendMessages(secondId!, [
+	const { appendHistory } = await import('../session/history.ts')
+	await appendHistory(secondId!, [
 		{ role: 'user', content: 'hello', ts: new Date().toISOString() },
 		{ role: 'assistant', text: 'hi', ts: new Date().toISOString() },
 		{ role: 'user', content: 'bye', ts: new Date().toISOString() },

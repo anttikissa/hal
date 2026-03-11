@@ -4,17 +4,17 @@
 
 Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
-- `messages.N.asonl` -- rotated archives (N=1 oldest, higher=more recent). Created by `/compact` or `/reset`.
+- `historyN.asonl` -- rotated archives (N=1 oldest, higher=more recent). Created by `/compact` or `/reset`.
 - `blobs/` -- external payload blobs (thinking text + signatures, tool call inputs + results, pasted images). One `.ason` file per blob id. Shared across all rotations and resolved across fork ancestry.
-- `messages.asonl` -- unified append-only message log (API messages + conversation events). Never truncated.
-- `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt, tokenTotals)
+- `history.asonl` -- unified append-only message log (API messages + conversation events). Never truncated.
+- `session.ason` -- per-session metadata (workingDir, model, topic, lastPrompt, tokenTotals)
 - `draft.txt` -- unsent prompt text
 
 Registry metadata lives in `state/sessions/index.ason`.
 
 Core logic: `src/session/session.ts`.
 
-### messages.asonl event types
+### history.asonl event types
 
 | type | fields | description |
 |------|--------|-------------|
@@ -39,9 +39,9 @@ Large payloads are stored in `blobs/` as individual `.ason` files:
 - **Tool blobs**: `{ call: { name, input }, result: { content, status? } }` — call and result in one file.
 - **Image blobs**: `{ media_type, data }` — pasted or attached images stored out of line from the message log.
 
-Blob ids in `messages.asonl` are short stable ids like `1709123456789-a3b2c1` (timestamp + random suffix).
+Blob ids in `history.asonl` are short stable ids like `1709123456789-a3b2c1` (timestamp + random suffix).
 
-The `messages.asonl` spine stays human-readable — you can see message roles, tool names, text content, and blob ids inline. Only heavy payloads move into blob files.
+The `history.asonl` spine stays human-readable — you can see message roles, tool names, text content, and blob ids inline. Only heavy payloads move into blob files.
 
 ## Context Compaction
 
@@ -52,8 +52,8 @@ API messages are compacted before sending to strip old heavy content (tool resul
 - Startup loads/repairs `index.ason`; if missing/empty, creates `s-default`.
 - Runtime tracks session metadata in memory and persists registry updates.
 - Session content is **appended** after each turn in `runAgentLoop(...)`. The runtime tracks `persistedCount` to know which messages are already on disk.
-- Runtime replays `messages.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `messages.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/compact` are replayed (`replayConversationEvents()` in `src/session/session.ts`).
-- `/reset` rotates `messages.asonl` → `messages.N.asonl` (no deletion) and clears in-memory cache.
+- Runtime replays `history.asonl` for the active startup session as prompt/chunk events. CLI also hydrates each tab transcript directly from `history.asonl` (including `/restore`), so history survives owner changes and full app restarts. Only events after the last `/reset` or `/compact` are replayed (`replayConversationEvents()` in `src/session/session.ts`).
+- `/reset` rotates `history.asonl` → `historyN.asonl` (no deletion) and clears in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
 - `/fork` keeps using the parent session's blob ids through ancestry-aware lookup. New blobs created in the child go to the child's `blobs/` directory.
@@ -64,8 +64,8 @@ API messages are compacted before sending to strip old heavy content (tool resul
 `/compact` and `/reset` both rotate the session.
 
 **Rotation**:
-1. Save any unsaved messages to `messages.asonl`
-2. Rename `messages.asonl` → `messages.N.asonl` (N = highest existing + 1)
+1. Save any unsaved messages to `history.asonl`
+2. Rename `history.asonl` → `historyN.asonl` (N = highest existing + 1)
 3. Clear runtime cache
 
 **Compact** additionally injects a deterministic context message with the first 10 + last 10 user prompts from the previous session (`buildRotationContext()`). Triggers automatically when context reaches 70% of model limit.
@@ -77,7 +77,7 @@ Properties:
 - **Free** — no API cost
 - **Deterministic** — same input always produces same rotation
 
-Naming: `messages.1.asonl` (first archive), `messages.2.asonl` (second), etc. Higher N = more recent. `messages.asonl` is always current.
+Naming: `history1.asonl` (first archive), `history2.asonl` (second), etc. Higher N = more recent. `history.asonl` is always current.
 
 ## Context Tracking
 

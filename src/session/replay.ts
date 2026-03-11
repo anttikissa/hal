@@ -1,8 +1,8 @@
 // Replay — convert messages to Block[] for TUI history display.
 
 import type { Block } from '../cli/blocks.ts'
-import type { Message } from './messages.ts'
-import { messages as sessionMessages } from './messages.ts'
+import type { Message } from './history.ts'
+import { history as sessionHistory } from './history.ts'
 import { tools } from '../runtime/tools.ts'
 /** Convert a message log to display blocks (for tab history). */
 export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
@@ -40,7 +40,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			if (Array.isArray(m.tools)) {
 				for (const tool of m.tools) {
 					const resultBlobId = toolResults.get(tool.id)
-					const blob = resultBlobId ? await sessionMessages.readBlob(sessionId, resultBlobId) : await sessionMessages.readBlob(sessionId, tool.blobId)
+					const blob = resultBlobId ? await sessionHistory.readBlob(sessionId, resultBlobId) : await sessionHistory.readBlob(sessionId, tool.blobId)
 					const callData = blob?.call ?? {}
 					const raw = blob?.result?.content ?? ''
 					const output = typeof raw === 'string' ? raw : raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
@@ -63,7 +63,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 	}
 
 	// Detect unfinished state
-	const interrupted = sessionMessages.detectInterruptedTools(messages)
+	const interrupted = sessionHistory.detectInterruptedTools(messages)
 	if (interrupted.length > 0) {
 		const toolList = interrupted.map(t => t.name).join(', ')
 		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Press Enter to continue` })

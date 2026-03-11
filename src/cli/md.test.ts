@@ -78,10 +78,10 @@ test('mdInline: no false italic on **bold**', () => {
 })
 
 test('mdInline: star inside backtick code is not italic', () => {
-	const r = mdInline('matching `state/sessions/*/meta.ason` and the `*` only')
+	const r = mdInline('matching `state/sessions/*/session.ason` and the `*` only')
 	expect(r).not.toContain('\x1b[3m') // no italic
 	// both code spans should be present
-	expect(r).toContain('\x1b[2mstate/sessions/*/meta.ason\x1b[22m')
+	expect(r).toContain('\x1b[2mstate/sessions/*/session.ason\x1b[22m')
 	expect(r).toContain('\x1b[2m*\x1b[22m')
 })
 

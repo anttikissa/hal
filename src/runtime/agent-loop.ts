@@ -1,11 +1,11 @@
 // Agent loop — runs a single generation for a session.
-// Drives the provider, emits IPC events, persists to messages.asonl.
+// Drives the provider, emits IPC events, persists to history.asonl.
 // Supports tool execution with re-invoke loop.
 
 import { loader } from '../providers/loader.ts'
 import type { ProviderEvent } from '../providers/provider.ts'
 import { ipc } from '../ipc.ts'
-import { messages as sessionMessages } from '../session/messages.ts'
+import { history as sessionHistory } from '../session/history.ts'
 import { protocol } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { tools, type ToolCall } from './tools.ts'
@@ -42,7 +42,7 @@ function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeE
 
 /** Emit IPC line event AND persist as info message. */
 async function emitInfo(sessionId: string, text: string, level: EventLevel, detail?: string): Promise<void> {
-	await sessionMessages.appendMessages(sessionId, [{ type: 'info', text, level, detail, ts: new Date().toISOString() }])
+	await sessionHistory.appendHistory(sessionId, [{ type: 'info', text, level, detail, ts: new Date().toISOString() }])
 	await emit(sessionId, { type: 'line', text, level, detail })
 }
 
@@ -86,7 +86,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				if (signal?.aborted) { aborted = true; break }
 				switch (event.type) {
 					case 'thinking':
-						if (!thinkingBlobId) thinkingBlobId = sessionMessages.makeBlobId(sessionId)
+						if (!thinkingBlobId) thinkingBlobId = sessionHistory.makeBlobId(sessionId)
 						thinkingText += event.text
 						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', blobId: thinkingBlobId })
 						break
@@ -140,8 +140,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						if (toolCalls.length === 0) {
 							// No tools — persist and finish
-							const { entry } = await sessionMessages.writeAssistantEntry(sessionId, assistantOpts)
-							await sessionMessages.appendMessages(sessionId, [entry])
+							const { entry } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
+							await sessionHistory.appendHistory(sessionId, [entry])
 							if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 							await emit(sessionId, {
 								type: 'command', commandId: '', phase: 'done',
@@ -151,8 +151,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						}
 
 						// Write assistant entry BEFORE executing tools
-						const { entry: assistantEntry, toolBlobMap } = await sessionMessages.writeAssistantEntry(sessionId, assistantOpts)
-						await sessionMessages.appendMessages(sessionId, [assistantEntry])
+						const { entry: assistantEntry, toolBlobMap } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
+						await sessionHistory.appendHistory(sessionId, [assistantEntry])
 						persisted = true
 						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
@@ -163,7 +163,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							call = hooks.runHooks(call)
 							if (call.input !== original.input) {
 								const blobId = toolBlobMap.get(call.id)
-								if (blobId) await sessionMessages.updateBlobInput(sessionId, blobId, call.input, original.input)
+								if (blobId) await sessionHistory.updateBlobInput(sessionId, blobId, call.input, original.input)
 							}
 							const args = tools.argsPreview(call)
 
@@ -176,8 +176,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							if (answer.trim().toLowerCase() !== 'y') {
 								result = 'error: user denied permission'
 								toolStatus = 'error'
-								const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
-								await sessionMessages.appendMessages(sessionId, [toolResultEntry])
+								const toolResultEntry = await sessionHistory.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
+								await sessionHistory.appendHistory(sessionId, [toolResultEntry])
 								continue
 							}
 						}
@@ -185,7 +185,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						if (call.name === 'ask') {
 							const question = (call.input as any)?.question ?? ''
 							const answer = await ctx.askUser(question) || '[no answer]'
-							const { apiContent } = await sessionMessages.parseUserContent(sessionId, answer)
+							const { apiContent } = await sessionHistory.parseUserContent(sessionId, answer)
 							result = apiContent
 						} else {
 							const blobId = toolBlobMap.get(call.id)
@@ -209,8 +209,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						}
 
 						// Persist tool result immediately
-						const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
-						await sessionMessages.appendMessages(sessionId, [toolResultEntry])
+						const toolResultEntry = await sessionHistory.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
+						await sessionHistory.appendHistory(sessionId, [toolResultEntry])
 						}
 
 						if (aborted) break
@@ -228,7 +228,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						})
 						for (const call of toolCalls) {
 							const blobId = toolBlobMap.get(call.id)!
-							const block = await sessionMessages.readBlob(sessionId, blobId)
+							const block = await sessionHistory.readBlob(sessionId, blobId)
 							const raw = block?.result?.content ?? ''
 							const content = typeof raw === 'string' ? tools.truncate(raw) : raw
 							messages.push({
@@ -245,7 +245,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			if (aborted) {
 				// Persist partial output before exiting (skip if already written in tool path)
 				if (!persisted && (assistantText || thinkingText)) {
-					await sessionMessages.appendMessages(sessionId, [
+					await sessionHistory.appendHistory(sessionId, [
 						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, thinkingSignature: thinkingSignature || undefined, ts: new Date().toISOString() },
 					])
 				}

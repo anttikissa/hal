@@ -6,7 +6,7 @@ import { resolve, isAbsolute } from 'path'
 import { $ } from 'bun'
 import { homedir } from 'os'
 import { ason } from '../utils/ason.ts'
-import { messages as sessionMessages } from '../session/messages.ts'
+import { history as sessionHistory } from '../session/history.ts'
 import { evalTool, type EvalContext } from './eval-tool.ts'
 
 const HOME = homedir()
@@ -361,7 +361,7 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 		case 'read_blob': {
 			if (!ctx?.sessionId) return 'error: read_blob requires a session context'
 			const blobId = String(inp?.blobId ?? '')
-			const blob = await sessionMessages.readBlob(ctx.sessionId, blobId)
+			const blob = await sessionHistory.readBlob(ctx.sessionId, blobId)
 			if (!blob) return `error: blob not found: ${blobId}`
 			return blobPreview(blobId, blob)
 		}

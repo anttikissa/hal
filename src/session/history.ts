@@ -1,4 +1,4 @@
-// Conversation log — append-only ASONL per session.
+// Session history log — append-only ASONL per session.
 // Tool call data lives in blobs/ as separate .ason files for compactness
 // and fork sharing. The log only stores blob ids (pointers) to blobs.
 
@@ -11,28 +11,26 @@ import { state } from '../state.ts'
 import { ason } from '../utils/ason.ts'
 import { session } from './session.ts'
 import { compact, type CompactOpts } from './compact.ts'
+import { historyFork } from './history-fork.ts'
 
 function resolveLogName(sessionId: string): string {
 	const cached = session.logNameCache.get(sessionId)
 	if (cached) return cached
-	// Read from meta.ason
-	const metaPath = `${state.sessionDir(sessionId)}/meta.ason`
+	const metaPath = `${state.sessionDir(sessionId)}/session.ason`
 	if (existsSync(metaPath)) {
 		try {
 			const meta = ason.parse(readFileSync(metaPath, 'utf-8')) as any
-			const name = meta?.log ?? 'messages.asonl'
+			const name = meta?.log ?? 'history.asonl'
 			session.logNameCache.set(sessionId, name)
 			return name
 		} catch {}
 	}
-	return 'messages.asonl'
+	return 'history.asonl'
 }
 
-function messagesLog(sessionId: string) {
+function historyLog(sessionId: string) {
 	return new Log<Message>(`${state.sessionDir(sessionId)}/${resolveLogName(sessionId)}`)
 }
-
-// ── Message types ──
 
 export interface UserMessage {
 	role: 'user'
@@ -64,8 +62,6 @@ export type Message = UserMessage | AssistantMessage | ToolResultMessage
 	| { type: 'compact'; ts: string }
 	| { type: 'forked_from'; parent: string; ts: string }
 
-// ── Blob I/O ──
-
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
 const sessionStartCache = new Map<string, number>()
@@ -74,7 +70,7 @@ function sessionStart(sessionId: string): number {
 	let ts = sessionStartCache.get(sessionId)
 	if (ts !== undefined) return ts
 	try {
-		const meta = ason.parse(readFileSync(`${state.sessionDir(sessionId)}/meta.ason`, 'utf-8')) as any
+		const meta = ason.parse(readFileSync(`${state.sessionDir(sessionId)}/session.ason`, 'utf-8')) as any
 		ts = new Date(meta.createdAt).getTime()
 	} catch {
 		ts = Date.now()
@@ -97,58 +93,35 @@ export async function writeBlob(sessionId: string, blobId: string, data: unknown
 	await writeFile(`${dir}/${blobId}.ason`, ason.stringify(data) + '\n')
 }
 
-export async function readBlob(sessionId: string, blobId: string): Promise<any | null> {
+async function readLocalBlob(sessionId: string, blobId: string): Promise<any | null> {
 	const path = `${state.blobsDir(sessionId)}/${blobId}.ason`
-	if (existsSync(path)) {
-		try { return ason.parse(await readFile(path, 'utf-8')) }
-		catch { return null }
-	}
-	const parent = getParentSessionId(sessionId)
-	if (parent) return readBlob(parent, blobId)
-	return null
-}
-
-const parentCache = new Map<string, string | null>()
-
-function getParentSessionId(sessionId: string): string | null {
-	const cached = parentCache.get(sessionId)
-	if (cached !== undefined) return cached
-	const path = `${state.sessionDir(sessionId)}/messages.asonl`
-	if (!existsSync(path)) { parentCache.set(sessionId, null); return null }
+	if (!existsSync(path)) return null
 	try {
-		const raw = readFileSync(path, 'utf-8')
-		const firstLine = raw.split('\n', 1)[0]
-		if (!firstLine?.trim()) { parentCache.set(sessionId, null); return null }
-		const entry = ason.parse(firstLine) as any
-		if (entry?.type === 'forked_from' && entry.parent) {
-			parentCache.set(sessionId, entry.parent)
-			return entry.parent
-		}
-	} catch {}
-	parentCache.set(sessionId, null)
-	return null
+		return ason.parse(await readFile(path, 'utf-8'))
+	} catch {
+		return null
+	}
 }
 
-/** Get the last known API usage from persisted messages. */
+export async function readBlob(sessionId: string, blobId: string): Promise<any | null> {
+	return historyFork.readBlobFromForkChain(sessionId, blobId, readLocalBlob)
+}
+
 export async function getLastUsage(sessionId: string): Promise<{ input: number; output: number } | null> {
-	const msgs = await readMessages(sessionId)
-	for (let i = msgs.length - 1; i >= 0; i--) {
-		const m = msgs[i]
+	const entries = await readHistory(sessionId)
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const m = entries[i]
 		if (m.role === 'assistant' && m.usage) return m.usage
 	}
 	return null
 }
 
-// ── Assistant/tool entry writers ──
-
-/** Write assistant entry with blob files for tools/thinking. Returns the log entry + tool blob map. */
 export async function writeAssistantEntry(
 	sessionId: string,
 	opts: { text?: string; thinkingText?: string; thinkingBlobId?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[]; usage?: { input: number; output: number } },
 ): Promise<{ entry: AssistantMessage; toolBlobMap: Map<string, string> }> {
 	const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
 	const toolBlobMap = new Map<string, string>()
-
 	if (opts.text) entry.text = opts.text
 	if (opts.thinkingText) {
 		entry.thinkingText = opts.thinkingText
@@ -158,7 +131,6 @@ export async function writeAssistantEntry(
 	}
 	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
 	if (opts.usage) entry.usage = opts.usage
-
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []
 		for (const t of opts.toolCalls) {
@@ -168,11 +140,9 @@ export async function writeAssistantEntry(
 			entry.tools.push({ id: t.id, name: t.name, blobId })
 		}
 	}
-
 	return { entry, toolBlobMap }
 }
 
-/** Write tool result to blob file and return log entry. */
 export async function writeToolResultEntry(
 	sessionId: string,
 	toolUseId: string,
@@ -189,7 +159,6 @@ export async function writeToolResultEntry(
 	return { role: 'tool_result', tool_use_id: toolUseId, blobId, ts: new Date().toISOString() }
 }
 
-/** Update a blob's call.input after hook transforms; stash original if different. */
 export async function updateBlobInput(sessionId: string, blobId: string, input: unknown, originalInput: unknown): Promise<void> {
 	const blob = await readBlob(sessionId, blobId)
 	if (!blob?.call) return
@@ -201,28 +170,27 @@ export async function updateBlobInput(sessionId: string, blobId: string, input: 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
 
 const MEDIA_TYPES: Record<string, string> = {
-	jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
-	webp: 'image/webp', png: 'image/png',
+	jpg: 'image/jpeg',
+	jpeg: 'image/jpeg',
+	gif: 'image/gif',
+	webp: 'image/webp',
+	png: 'image/png',
 }
 
-/** Parse inline `[path.png]` refs → UserMessage with image blobs stored in blobs/. */
 export async function parseUserContent(
 	sessionId: string,
 	input: string,
 ): Promise<{ apiContent: any; logContent: UserMessage['content'] }> {
 	const pattern = /\[([^\]]+\.(png|jpg|jpeg|gif|webp|txt))\]/gi
 	const allMatches = [...input.matchAll(pattern)]
-	// Only expand .txt from /tmp/hal/ (paste files) to avoid leaking arbitrary files
 	const matches = allMatches.filter(m => {
 		const ext = m[2].toLowerCase()
 		return ext !== 'txt' || m[1].startsWith('/tmp/hal/')
 	})
 	if (matches.length === 0) return { apiContent: input, logContent: input }
-
 	const apiBlocks: any[] = []
 	const logBlocks: any[] = []
 	let lastIndex = 0
-
 	for (const match of matches) {
 		const filePath = match[1].startsWith('~') ? match[1].replace('~', homedir()) : match[1]
 		const ext = match[2].toLowerCase()
@@ -231,7 +199,6 @@ export async function parseUserContent(
 			apiBlocks.push({ type: 'text', text: before })
 			logBlocks.push({ type: 'text', text: before })
 		}
-
 		if (!existsSync(filePath)) {
 			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
 			logBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
@@ -259,56 +226,49 @@ export async function parseUserContent(
 		}
 		lastIndex = match.index! + match[0].length
 	}
-
 	const after = input.slice(lastIndex)
 	if (after.trim()) {
 		apiBlocks.push({ type: 'text', text: after })
 		logBlocks.push({ type: 'text', text: after })
 	}
-
 	return { apiContent: apiBlocks, logContent: logBlocks as UserMessage['content'] }
 }
 
-// ── I/O ──
-
-export async function appendMessages(sessionId: string, entries: Message[]): Promise<void> {
+export async function appendHistory(sessionId: string, entries: Message[]): Promise<void> {
 	if (entries.length === 0) return
 	state.ensureDir(state.sessionDir(sessionId))
-	await messagesLog(sessionId).append(...entries)
+	await historyLog(sessionId).append(...entries)
 }
 
-export async function readMessages(sessionId: string): Promise<Message[]> {
-	return messagesLog(sessionId).readAll()
+export async function readHistory(sessionId: string): Promise<Message[]> {
+	return historyLog(sessionId).readAll()
 }
 
 const MAX_API_OUTPUT = 50_000
 
 const MODEL_CHANGE_THRESHOLD = 10
 
-/** If a model change happened recently, boost heavy content threshold so the new model sees more history. */
-function detectCompactOpts(msgs: Message[]): CompactOpts | undefined {
+function detectCompactOpts(entries: Message[]): CompactOpts | undefined {
 	let lastModelChangeIdx = -1
-	for (let i = msgs.length - 1; i >= 0; i--) {
-		const m = msgs[i] as any
-		if (m.type === 'info' && typeof m.text === 'string' && m.text.startsWith('[model]')) {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const e = entries[i] as any
+		if (e.type === 'info' && typeof e.text === 'string' && e.text.startsWith('[model]')) {
 			lastModelChangeIdx = i
 			break
 		}
 	}
 	if (lastModelChangeIdx < 0) return undefined
-	// Count completed turns (assistant final responses) after the model change
 	let turnsAfter = 0
-	for (let i = lastModelChangeIdx + 1; i < msgs.length; i++) {
-		const m = msgs[i] as any
-		if (m.role === 'assistant' && !m.tools) turnsAfter++
+	for (let i = lastModelChangeIdx + 1; i < entries.length; i++) {
+		const e = entries[i] as any
+		if (e.role === 'assistant' && !e.tools) turnsAfter++
 	}
 	if (turnsAfter <= MODEL_CHANGE_THRESHOLD) return { heavyThreshold: MODEL_CHANGE_THRESHOLD }
 	return undefined
 }
 
-/** Load messages for API replay: converts stored format → Anthropic API format. */
 export async function loadApiMessages(sessionId: string): Promise<any[]> {
-	const all = await loadAllMessages(sessionId)
+	const all = await loadAllHistory(sessionId)
 	const start = findReplayStart(all)
 	const sliced = all.slice(start)
 	const compactOpts = detectCompactOpts(sliced)
@@ -383,17 +343,8 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	return compacted
 }
 
-/** Follow fork chain to load full history. */
-export async function loadAllMessages(sessionId: string): Promise<Message[]> {
-	const entries = await readMessages(sessionId)
-	if (entries.length > 0 && (entries[0] as any).type === 'forked_from') {
-		const parent = (entries[0] as any).parent
-		const forkTs = (entries[0] as any).ts
-		const parentEntries = await loadAllMessages(parent)
-		const before = parentEntries.filter((e: any) => !e.ts || e.ts < forkTs)
-		return [...before, ...entries.slice(1)]
-	}
-	return entries
+export async function loadAllHistory(sessionId: string): Promise<Message[]> {
+	return historyFork.loadAllHistory(sessionId, readHistory)
 }
 
 function findReplayStart(entries: Message[]): number {
@@ -404,14 +355,13 @@ function findReplayStart(entries: Message[]): number {
 	return 0
 }
 
-/** Detect interrupted tools: assistant entry has tool blob ids without matching tool_result entries. */
-export function detectInterruptedTools(messages: Message[]): { name: string; id: string; blobId: string }[] {
+export function detectInterruptedTools(entries: Message[]): { name: string; id: string; blobId: string }[] {
 	const completedToolIds = new Set<string>()
-	for (const m of messages) {
+	for (const m of entries) {
 		if ((m as any).role === 'tool_result') completedToolIds.add((m as any).tool_use_id)
 	}
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const m = messages[i] as any
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const m = entries[i] as any
 		if (m.role === 'assistant' && m.tools) {
 			const interrupted: { name: string; id: string; blobId: string }[] = []
 			for (const t of m.tools) {
@@ -423,28 +373,23 @@ export function detectInterruptedTools(messages: Message[]): { name: string; id:
 	return []
 }
 
-/** Build a context summary from user prompts for context compaction. */
-export function buildCompactionContext(sessionId: string, messages: Message[]): string {
+export function buildCompactionContext(sessionId: string, entries: Message[]): string {
 	const userPrompts: string[] = []
-	for (const msg of messages) {
-		if ((msg as any).role !== 'user') continue
-		const m = msg as any
+	for (const entry of entries) {
+		if ((entry as any).role !== 'user') continue
+		const m = entry as any
 		const text = typeof m.content === 'string' ? m.content : ''
 		if (!text || text.startsWith('[')) continue
 		userPrompts.push(text.split('\n')[0].slice(0, 200))
 	}
-
 	const dir = state.sessionDir(sessionId)
-
-	if (userPrompts.length === 0) return `Context was compacted. No user prompts in previous conversation. Full history: ${dir}/messages*.asonl + blobs/`
-
+	if (userPrompts.length === 0) return `Context was compacted. No user prompts in previous conversation. Full history: ${dir}/history*.asonl + blobs/`
 	const lines: string[] = [
 		'Context was compacted to avoid exceeding the token limit. Verify before assuming.',
 		'',
 		'User messages from previous conversation:',
 		'',
 	]
-
 	if (userPrompts.length <= 20) {
 		userPrompts.forEach((p, i) => lines.push(`${i + 1}. ${p}`))
 	} else {
@@ -455,16 +400,13 @@ export function buildCompactionContext(sessionId: string, messages: Message[]): 
 		const start = userPrompts.length - 10
 		userPrompts.slice(-10).forEach((p, i) => lines.push(`${start + i + 1}. ${p}`))
 	}
-
 	lines.push('')
-	lines.push(`Full history: ${dir}/messages*.asonl + blobs/`)
-
+	lines.push(`Full history: ${dir}/history*.asonl + blobs/`)
 	return lines.join('\n')
 }
 
-/** Extract user input texts for prompt history. */
 export async function loadInputHistory(sessionId: string): Promise<string[]> {
-	const entries = await readMessages(sessionId)
+	const entries = await readHistory(sessionId)
 	return entries
 		.filter((e: any) => e.role === 'user')
 		.map((e: any) => {
@@ -476,16 +418,14 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 		.slice(-200)
 }
 
-// ── Draft persistence ──
-
 function draftPath(sessionId: string): string {
 	return `${state.sessionDir(sessionId)}/draft.txt`
 }
 
 export async function saveDraft(sessionId: string, text: string): Promise<void> {
 	if (!text) {
-		const p = draftPath(sessionId)
-		if (existsSync(p)) await unlink(p).catch(() => {})
+		const path = draftPath(sessionId)
+		if (existsSync(path)) await unlink(path).catch(() => {})
 		return
 	}
 	state.ensureDir(state.sessionDir(sessionId))
@@ -493,12 +433,16 @@ export async function saveDraft(sessionId: string, text: string): Promise<void> 
 }
 
 export async function loadDraft(sessionId: string): Promise<string> {
-	const p = draftPath(sessionId)
-	if (!existsSync(p)) return ''
-	try { return await readFile(p, 'utf-8') } catch { return '' }
+	const path = draftPath(sessionId)
+	if (!existsSync(path)) return ''
+	try {
+		return await readFile(path, 'utf-8')
+	} catch {
+		return ''
+	}
 }
 
-export const messages = {
+export const history = {
 	makeBlobId,
 	writeBlob,
 	readBlob,
@@ -507,10 +451,10 @@ export const messages = {
 	writeToolResultEntry,
 	updateBlobInput,
 	parseUserContent,
-	appendMessages,
-	readMessages,
+	appendHistory,
+	readHistory,
 	loadApiMessages,
-	loadAllMessages,
+	loadAllHistory,
 	detectInterruptedTools,
 	buildCompactionContext,
 	loadInputHistory,

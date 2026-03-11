@@ -12,7 +12,7 @@ Current code lives in `src/`; previous version is in `old-src/` for reference.
 - Use Bun, never node.js. `bunx` - no `npx`. No build step.
 - State is stored under `HAL_STATE_DIR` (default: `$HAL_DIR/state`).
 - Secrets live in `$HAL_DIR/auth.ason` (gitignored). Non-secrets in `$HAL_DIR/config.ason`.
-- Conversation events are append-only: `state/sessions/<id>/messages.asonl`.
+- Conversation events are append-only: `state/sessions/<id>/history.asonl`.
 - Tabs are real sessions; `/compact` rotates session history.
 - Prefer tabs for indentation (width 4).
 - When editing, collapse consecutive blank lines to one. Files should end with a newline.
