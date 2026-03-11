@@ -234,7 +234,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	// Help bar
 	const statusText = tab?.busy ? ' busy' : ''
-	const help = ` ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-c quit${statusText} `
+	const help = ` ctrl-t new │ ctrl-w close │ ctrl-n/p switch │ ctrl-l redraw │ ctrl-c quit${statusText} `
 	const safeHelp = strings.clipVisual(oneLine(help), w)
 	const hPad = Math.max(0, w - safeHelp.length)
 	const hLeft = Math.max(0, Math.floor(hPad / 2))
@@ -249,11 +249,16 @@ export function showError(msg: string): void {
 	doRender()
 }
 
-export function doRender(): void {
+export function doRender(forceClear = false): void {
 	const { lines, cursor: cursorPos } = buildLines()
-	const { buf, state } = diffEngine.render(lines, renderState, cursorPos, stdout.rows || 24)
+	const { buf, state } = diffEngine.render(lines, renderState, cursorPos, stdout.rows || 24, forceClear)
 	renderState = state
 	if (buf) stdout.write(buf)
+}
+
+export function redraw(): void {
+	renderState = diffEngine.emptyState
+	doRender(true)
 }
 prompt.setRenderCallback(doRender)
 
@@ -326,6 +331,7 @@ export const inputCtx: InputContext = {
 	clearQuestion: () => client.clearQuestion(),
 	markPausing: () => client.markPausing(),
 	doRender,
+	redraw,
 	contentWidth,
 	quit,
 	restart,
@@ -351,4 +357,4 @@ client.start().catch(err => {
 	process.exit(1)
 })
 
-export const cli = { contentWidth, showError, doRender, quit, restart, suspend }
+export const cli = { contentWidth, showError, doRender, redraw, quit, restart, suspend }

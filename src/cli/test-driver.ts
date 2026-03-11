@@ -27,6 +27,7 @@ export class TestDriver {
 			clearQuestion: () => {},
 			markPausing: () => {},
 			doRender: () => { this.renders++ },
+			redraw: () => { this.renders++ },
 			contentWidth: () => 80,
 			quit: () => {},
 			restart: () => {},

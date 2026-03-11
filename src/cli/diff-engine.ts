@@ -61,7 +61,11 @@ export function render(
 	prev: RenderState,
 	cursor: CursorPos,
 	screenRows: number,
+	forceClear = false,
 ): { buf: string; state: RenderState } {
+	if (forceClear) {
+		return fullRender(newLines, cursor, true)
+	}
 	if (prev.lines.length === 0) {
 		return fullRender(newLines, cursor, false)
 	}

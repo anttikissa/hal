@@ -93,6 +93,7 @@ Handles all terminal key families:
 ### 3. Key → Action (`src/cli/keybindings.ts`)
 
 Maps `KeyEvent` to actions. Client installs handlers for app-level keys (tab create/close/fork/switch). Remaining keys go to prompt editing.
+- `Ctrl+L` forces a full redraw of the screen frame.
 
 Tab completion behavior:
 - `Tab` completes slash commands and known arguments.

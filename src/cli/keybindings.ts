@@ -17,6 +17,7 @@ export interface InputContext {
 	clearQuestion: () => void
 	markPausing: () => void
 	doRender: () => void
+	redraw: () => void
 	contentWidth: () => number
 	quit: () => void
 	restart: () => void
@@ -41,6 +42,7 @@ export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	if (k.key === 'p' && k.ctrl) { ctx.prevTab(); ctx.doRender(); return }
 	if (k.key === 'z' && k.ctrl) { ctx.suspend(); return }
 	if (k.key === 'r' && k.ctrl) { ctx.saveDraft(); ctx.restart(); return }
+	if (k.key === 'l' && k.ctrl) { ctx.redraw(); return }
 	if (k.alt && !k.ctrl && !k.cmd && k.key >= '1' && k.key <= '9') { ctx.switchToTab(Number(k.key) - 1); ctx.doRender(); return }
 
 	// Question mode: Enter submits answer, Escape dismisses
@@ -130,7 +132,7 @@ function showHelp(ctx: InputContext): void {
 			'',
 			'**Keys**',
 			'  esc pause │ ctrl-t new tab │ ctrl-f fork │ ctrl-w close │ ctrl-n/p switch tabs',
-			'  ctrl-c/d quit │ ctrl-z suspend │ ctrl-r restart',
+			'  ctrl-c/d quit │ ctrl-z suspend │ ctrl-r restart │ ctrl-l redraw'
 		].join('\n'),
 	})
 }

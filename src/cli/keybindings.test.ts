@@ -20,6 +20,7 @@ function mockCtx(overrides?: Partial<InputContext>): InputContext {
 		clearQuestion: () => {},
 		markPausing: () => {},
 		doRender: () => {},
+		redraw: () => {},
 		contentWidth: () => 80,
 		quit: () => {},
 		restart: () => {},
@@ -94,6 +95,14 @@ test('ctrl-f sends fork', () => {
 	const ctx = mockCtx()
 	keybindings.handleInput(ke('f', { ctrl: true }), ctx)
 	expect(sent).toEqual([{ type: 'fork', text: undefined }])
+})
+
+test('ctrl-l redraws', () => {
+	let redrawn = false
+	const ctx = mockCtx({ redraw: () => { redrawn = true } })
+	keybindings.handleInput(ke('l', { ctrl: true }), ctx)
+	expect(redrawn).toBe(true)
+	expect(sent).toEqual([])
 })
 
 test('typing text and enter sends prompt', () => {
