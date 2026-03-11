@@ -218,3 +218,11 @@ test('missing required params: glob without pattern', async () => {
 	expect(result).toContain('error:')
 	expect(result).toContain('pattern')
 })
+
+test('edit with empty new_content is allowed (deletion)', async () => {
+	writeFileSync(`${TMP}.txt`, 'aaa\nbbb\nccc\n')
+	const lines = (await executeTool(call('read', { path: `${TMP}.txt` }))).trim().split('\n')
+	const ref2 = lines[1].split(' ')[0] // "2:HASH"
+	const result = await executeTool(call('edit', { path: `${TMP}.txt`, operation: 'replace', new_content: '', start_ref: ref2, end_ref: ref2 }))
+	expect(result).not.toContain('requires new_content')
+})

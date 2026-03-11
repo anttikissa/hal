@@ -93,7 +93,7 @@ export class Client {
 				const last = lastBlock(t)
 				if (event.channel === 'thinking') {
 					if (last?.type === 'thinking' && !last.done) last.text += event.text
-					else t.blocks.push({ type: 'thinking', text: event.text, done: false, ref: event.ref, model: t.info.model, sessionId: t.sessionId })
+					else t.blocks.push({ type: 'thinking', text: event.text, done: false, blobId: event.blobId, model: t.info.model, sessionId: t.sessionId })
 				} else {
 					if (last?.type === 'assistant' && !last.done) last.text += event.text
 					else {
@@ -144,7 +144,7 @@ export class Client {
 				const t = tab(event.sessionId); if (!t) return
 				closeStreaming(t)
 				if (event.phase === 'running') {
-					t.blocks.push({ type: 'tool', name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now(), ref: event.ref, sessionId: event.sessionId })
+					t.blocks.push({ type: 'tool', name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now(), blobId: event.blobId, sessionId: event.sessionId })
 				} else if (event.phase === 'streaming') {
 					for (let i = t.blocks.length - 1; i >= 0; i--) {
 						const b = t.blocks[i]
@@ -160,7 +160,7 @@ export class Client {
 							b.status = event.phase === 'error' ? 'error' : 'done'
 							b.output = event.output ?? ''
 							b.endTime = Date.now()
-							if (event.ref) b.ref = event.ref
+							if (event.blobId) b.blobId = event.blobId
 							break
 						}
 					}

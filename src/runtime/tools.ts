@@ -192,7 +192,7 @@ function validateRequired(call: ToolCall): string | null {
 	const schema = (tool as any).input_schema
 	const required: string[] = schema?.required ?? []
 	const inp = call.input as any
-	const missing = required.filter(k => inp?.[k] == null || inp[k] === '')
+	const missing = required.filter(k => inp?.[k] == null)
 	if (missing.length) return `error: ${call.name} requires ${missing.join(', ')}`
 	return null
 }

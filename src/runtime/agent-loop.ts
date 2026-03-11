@@ -74,7 +74,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: availableTools, signal, sessionId })
 
 			let thinkingText = ''
-			let thinkingRef = ''
+			let thinkingBlobId = ''
 			let thinkingSignature = ''
 			let assistantText = ''
 			const toolCalls: ToolCall[] = []
@@ -86,9 +86,9 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				if (signal?.aborted) { aborted = true; break }
 				switch (event.type) {
 					case 'thinking':
-						if (!thinkingRef) thinkingRef = sessionMessages.makeBlockRef(sessionId)
+						if (!thinkingBlobId) thinkingBlobId = sessionMessages.makeBlobId(sessionId)
 						thinkingText += event.text
-						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', ref: thinkingRef })
+						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', blobId: thinkingBlobId })
 						break
 					case 'thinking_signature':
 						thinkingSignature = event.signature
@@ -132,7 +132,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						const assistantOpts = {
 							text: assistantText || undefined,
 							thinkingText: thinkingText || undefined,
-							thinkingRef: thinkingRef || undefined,
+							thinkingBlobId: thinkingBlobId || undefined,
 							thinkingSignature: thinkingSignature || undefined,
 							toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
 							usage,
@@ -151,7 +151,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						}
 
 						// Write assistant entry BEFORE executing tools
-						const { entry: assistantEntry, toolRefMap } = await sessionMessages.writeAssistantEntry(sessionId, assistantOpts)
+						const { entry: assistantEntry, toolBlobMap } = await sessionMessages.writeAssistantEntry(sessionId, assistantOpts)
 						await sessionMessages.appendMessages(sessionId, [assistantEntry])
 						persisted = true
 						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
@@ -162,8 +162,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							const original = call
 							call = hooks.runHooks(call)
 							if (call.input !== original.input) {
-								const ref = toolRefMap.get(call.id)
-								if (ref) await sessionMessages.updateBlockInput(sessionId, ref, call.input, original.input)
+								const blobId = toolBlobMap.get(call.id)
+								if (blobId) await sessionMessages.updateBlobInput(sessionId, blobId, call.input, original.input)
 							}
 							const args = tools.argsPreview(call)
 
@@ -176,7 +176,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							if (answer.trim().toLowerCase() !== 'y') {
 								result = 'error: user denied permission'
 								toolStatus = 'error'
-								const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
+								const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
 								await sessionMessages.appendMessages(sessionId, [toolResultEntry])
 								continue
 							}
@@ -188,10 +188,10 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							const { apiContent } = await sessionMessages.parseUserContent(sessionId, answer)
 							result = apiContent
 						} else {
-							const ref = toolRefMap.get(call.id)
+							const blobId = toolBlobMap.get(call.id)
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: 'running', ref,
+								args, phase: 'running', blobId,
 							})
 							const onChunk = (text: string) => emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
@@ -201,12 +201,12 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: toolStatus === 'error' ? 'error' : 'done', output: result, ref,
+								args, phase: toolStatus === 'error' ? 'error' : 'done', output: result, blobId,
 							})
 						}
 
 						// Persist tool result immediately
-						const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolRefMap, toolStatus)
+						const toolResultEntry = await sessionMessages.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
 						await sessionMessages.appendMessages(sessionId, [toolResultEntry])
 						}
 
@@ -224,8 +224,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							],
 						})
 						for (const call of toolCalls) {
-							const ref = toolRefMap.get(call.id)!
-							const block = await sessionMessages.readBlock(sessionId, ref)
+							const blobId = toolBlobMap.get(call.id)!
+							const block = await sessionMessages.readBlob(sessionId, blobId)
 							const raw = block?.result?.content ?? ''
 							const content = typeof raw === 'string' ? tools.truncate(raw) : raw
 							messages.push({

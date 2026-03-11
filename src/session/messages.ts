@@ -1,6 +1,6 @@
 // Conversation log — append-only ASONL per session.
-// Tool call data lives in blocks/ as separate .ason files for compactness
-// and fork sharing. The log only stores refs (pointers) to blocks.
+// Tool call data lives in blobs/ as separate .ason files for compactness
+// and fork sharing. The log only stores blob ids (pointers) to blobs.
 
 import { writeFile, readFile, unlink } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
@@ -36,7 +36,7 @@ function messagesLog(sessionId: string) {
 
 export interface UserMessage {
 	role: 'user'
-	content: string | { type: 'text'; text: string }[] | { type: 'image'; ref: string }[]
+	content: string | { type: 'text'; text: string }[] | { type: 'image'; blobId: string }[]
 	ts: string
 }
 
@@ -45,8 +45,8 @@ export interface AssistantMessage {
 	text?: string
 	thinkingText?: string
 	thinkingSignature?: string
-	thinkingRef?: string
-	tools?: { id: string; name: string; ref: string }[]
+	thinkingBlobId?: string
+	tools?: { id: string; name: string; blobId: string }[]
 	usage?: { input: number; output: number }
 	ts: string
 }
@@ -54,7 +54,7 @@ export interface AssistantMessage {
 export interface ToolResultMessage {
 	role: 'tool_result'
 	tool_use_id: string
-	ref: string
+	blobId: string
 	ts: string
 }
 
@@ -64,7 +64,7 @@ export type Message = UserMessage | AssistantMessage | ToolResultMessage
 	| { type: 'compact'; ts: string }
 	| { type: 'forked_from'; parent: string; ts: string }
 
-// ── Block I/O ──
+// ── Blob I/O ──
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -83,7 +83,7 @@ function sessionStart(sessionId: string): number {
 	return ts
 }
 
-export function makeBlockRef(sessionId: string): string {
+export function makeBlobId(sessionId: string): string {
 	const offset = Math.max(0, Date.now() - sessionStart(sessionId)).toString(36).padStart(6, '0')
 	const bytes = randomBytes(3)
 	let suffix = ''
@@ -91,21 +91,20 @@ export function makeBlockRef(sessionId: string): string {
 	return `${offset}-${suffix}`
 }
 
-export async function writeBlock(sessionId: string, ref: string, data: unknown): Promise<void> {
-	const dir = state.blocksDir(sessionId)
+export async function writeBlob(sessionId: string, blobId: string, data: unknown): Promise<void> {
+	const dir = state.blobsDir(sessionId)
 	state.ensureDir(dir)
-	await writeFile(`${dir}/${ref}.ason`, ason.stringify(data) + '\n')
+	await writeFile(`${dir}/${blobId}.ason`, ason.stringify(data) + '\n')
 }
 
-export async function readBlock(sessionId: string, ref: string): Promise<any | null> {
-	const path = `${state.blocksDir(sessionId)}/${ref}.ason`
+export async function readBlob(sessionId: string, blobId: string): Promise<any | null> {
+	const path = `${state.blobsDir(sessionId)}/${blobId}.ason`
 	if (existsSync(path)) {
 		try { return ason.parse(await readFile(path, 'utf-8')) }
 		catch { return null }
 	}
-	// Walk fork chain — block may live in parent's blocks/
 	const parent = getParentSessionId(sessionId)
-	if (parent) return readBlock(parent, ref)
+	if (parent) return readBlob(parent, blobId)
 	return null
 }
 
@@ -142,20 +141,20 @@ export function getLastUsage(sessionId: string): { input: number; output: number
 
 // ── Assistant/tool entry writers ──
 
-/** Write assistant entry with block files for tools/thinking. Returns the log entry + tool ref map. */
+/** Write assistant entry with blob files for tools/thinking. Returns the log entry + tool blob map. */
 export async function writeAssistantEntry(
 	sessionId: string,
-	opts: { text?: string; thinkingText?: string; thinkingRef?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[]; usage?: { input: number; output: number } },
-): Promise<{ entry: AssistantMessage; toolRefMap: Map<string, string> }> {
+	opts: { text?: string; thinkingText?: string; thinkingBlobId?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[]; usage?: { input: number; output: number } },
+): Promise<{ entry: AssistantMessage; toolBlobMap: Map<string, string> }> {
 	const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
-	const toolRefMap = new Map<string, string>()
+	const toolBlobMap = new Map<string, string>()
 
 	if (opts.text) entry.text = opts.text
 	if (opts.thinkingText) {
 		entry.thinkingText = opts.thinkingText
-		const ref = opts.thinkingRef || makeBlockRef(sessionId)
-		entry.thinkingRef = ref
-		await writeBlock(sessionId, ref, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
+		const blobId = opts.thinkingBlobId || makeBlobId(sessionId)
+		entry.thinkingBlobId = blobId
+		await writeBlob(sessionId, blobId, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
 	}
 	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
 	if (opts.usage) entry.usage = opts.usage
@@ -163,40 +162,40 @@ export async function writeAssistantEntry(
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []
 		for (const t of opts.toolCalls) {
-			const ref = makeBlockRef(sessionId)
-			toolRefMap.set(t.id, ref)
-			await writeBlock(sessionId, ref, { call: { name: t.name, input: t.input } })
-			entry.tools.push({ id: t.id, name: t.name, ref })
+			const blobId = makeBlobId(sessionId)
+			toolBlobMap.set(t.id, blobId)
+			await writeBlob(sessionId, blobId, { call: { name: t.name, input: t.input } })
+			entry.tools.push({ id: t.id, name: t.name, blobId })
 		}
 	}
 
-	return { entry, toolRefMap }
+	return { entry, toolBlobMap }
 }
 
-/** Write tool result to block file and return log entry. */
+/** Write tool result to blob file and return log entry. */
 export async function writeToolResultEntry(
 	sessionId: string,
 	toolUseId: string,
 	output: string | any[],
-	toolRefMap: Map<string, string>,
+	toolBlobMap: Map<string, string>,
 	status: 'done' | 'error' = 'done',
 ): Promise<ToolResultMessage> {
-	const ref = toolRefMap.get(toolUseId)!
-	const existing = await readBlock(sessionId, ref)
+	const blobId = toolBlobMap.get(toolUseId)!
+	const existing = await readBlob(sessionId, blobId)
 	if (existing) {
 		existing.result = { content: output, status }
-		await writeBlock(sessionId, ref, existing)
+		await writeBlob(sessionId, blobId, existing)
 	}
-	return { role: 'tool_result', tool_use_id: toolUseId, ref, ts: new Date().toISOString() }
+	return { role: 'tool_result', tool_use_id: toolUseId, blobId, ts: new Date().toISOString() }
 }
 
-/** Update a block's call.input after hook transforms; stash original if different. */
-export async function updateBlockInput(sessionId: string, ref: string, input: unknown, originalInput: unknown): Promise<void> {
-	const block = await readBlock(sessionId, ref)
-	if (!block?.call) return
-	block.call.originalInput = originalInput
-	block.call.input = input
-	await writeBlock(sessionId, ref, block)
+/** Update a blob's call.input after hook transforms; stash original if different. */
+export async function updateBlobInput(sessionId: string, blobId: string, input: unknown, originalInput: unknown): Promise<void> {
+	const blob = await readBlob(sessionId, blobId)
+	if (!blob?.call) return
+	blob.call.originalInput = originalInput
+	blob.call.input = input
+	await writeBlob(sessionId, blobId, blob)
 }
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
@@ -206,7 +205,7 @@ const MEDIA_TYPES: Record<string, string> = {
 	webp: 'image/webp', png: 'image/png',
 }
 
-/** Parse inline `[path.png]` refs → UserMessage with image blocks stored in blocks/. */
+/** Parse inline `[path.png]` refs → UserMessage with image blobs stored in blobs/. */
 export async function parseUserContent(
 	sessionId: string,
 	input: string,
@@ -249,10 +248,10 @@ export async function parseUserContent(
 			try {
 				const data = readFileSync(filePath)
 				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
-				const ref = makeBlockRef(sessionId)
-				await writeBlock(sessionId, ref, { media_type: mediaType, data: data.toString('base64') })
+				const blobId = makeBlobId(sessionId)
+				await writeBlob(sessionId, blobId, { media_type: mediaType, data: data.toString('base64') })
 				apiBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: data.toString('base64') } })
-				logBlocks.push({ type: 'image', ref })
+				logBlocks.push({ type: 'image', blobId })
 			} catch {
 				apiBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
 				logBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
@@ -323,10 +322,10 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			} else if (Array.isArray(msg.content)) {
 				const blocks: any[] = []
 				for (const b of msg.content) {
-					if (b.type === 'image' && b.ref) {
-						const data = await readBlock(sessionId, b.ref)
+					if (b.type === 'image' && b.blobId) {
+						const data = await readBlob(sessionId, b.blobId)
 						if (data?.media_type && data?.data) {
-							blocks.push({ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data }, _ref: b.ref })
+							blocks.push({ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data }, _blobId: b.blobId })
 						}
 					} else {
 						blocks.push(b)
@@ -336,27 +335,24 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			}
 		} else if (msg.role === 'assistant') {
 			const content: any[] = []
-			// Only include thinking if we have a valid signature
-			if (msg.thinkingText && msg.thinkingSignature) {
+			if (msg.thinkingText && msg.thinkingSignature)
 				content.push({ type: 'thinking', thinking: msg.thinkingText, signature: msg.thinkingSignature })
-			}
 			if (msg.text) content.push({ type: 'text', text: msg.text })
 			if (msg.tools) {
 				for (const t of msg.tools) {
-					const block = await readBlock(sessionId, t.ref)
-					content.push({ type: 'tool_use', id: t.id, name: t.name, input: block?.call?.input ?? {} })
+					const blob = await readBlob(sessionId, t.blobId)
+					content.push({ type: 'tool_use', id: t.id, name: t.name, input: blob?.call?.input ?? {} })
 				}
 			}
 			if (content.length) out.push({ role: 'assistant', content })
 		} else if (msg.role === 'tool_result') {
-			const block = await readBlock(sessionId, msg.ref)
-			let content = block?.result?.content ?? '[interrupted]'
+			const blob = await readBlob(sessionId, msg.blobId)
+			let content = blob?.result?.content ?? '[interrupted]'
 			if (typeof content === 'string' && content.length > MAX_API_OUTPUT)
 				content = content.slice(0, MAX_API_OUTPUT) + `\n[truncated ${content.length - MAX_API_OUTPUT} chars]`
-			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content, _ref: msg.ref }] })
+			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content, _blobId: msg.blobId }] })
 		}
 	}
-	// Ensure every tool_use has a matching tool_result — synthesize missing ones
 	const resultIds = new Set<string>()
 	for (const m of out) {
 		if (m.role !== 'user' || !Array.isArray(m.content)) continue
@@ -377,11 +373,10 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 		}
 	}
 	const compacted = compact.compactApiMessages(out, compactOpts)
-	// Strip internal _ref before sending to API (providers reject extra fields)
 	for (const msg of compacted) {
 		if (msg.role === 'user' && Array.isArray(msg.content)) {
 			for (const b of msg.content) {
-				if (b._ref) delete b._ref
+				if (b._blobId) delete b._blobId
 			}
 		}
 	}
@@ -409,17 +404,16 @@ function findReplayStart(entries: Message[]): number {
 	return 0
 }
 
-/** Detect interrupted tools: assistant entry has tool refs without matching tool_result entries. */
-export function detectInterruptedTools(messages: Message[]): { name: string; id: string; ref: string }[] {
+/** Detect interrupted tools: assistant entry has tool blob ids without matching tool_result entries. */
+export function detectInterruptedTools(messages: Message[]): { name: string; id: string; blobId: string }[] {
 	const completedToolIds = new Set<string>()
 	for (const m of messages) {
 		if ((m as any).role === 'tool_result') completedToolIds.add((m as any).tool_use_id)
 	}
-	// Check the last assistant message with tools
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const m = messages[i] as any
 		if (m.role === 'assistant' && m.tools) {
-			const interrupted: { name: string; id: string; ref: string }[] = []
+			const interrupted: { name: string; id: string; blobId: string }[] = []
 			for (const t of m.tools) {
 				if (!completedToolIds.has(t.id)) interrupted.push(t)
 			}
@@ -442,7 +436,7 @@ export function buildCompactionContext(sessionId: string, messages: Message[]): 
 
 	const dir = state.sessionDir(sessionId)
 
-	if (userPrompts.length === 0) return `Context was compacted. No user prompts in previous conversation. Full history: ${dir}/messages*.asonl + blocks/`
+	if (userPrompts.length === 0) return `Context was compacted. No user prompts in previous conversation. Full history: ${dir}/messages*.asonl + blobs/`
 
 	const lines: string[] = [
 		'Context was compacted to avoid exceeding the token limit. Verify before assuming.',
@@ -463,7 +457,7 @@ export function buildCompactionContext(sessionId: string, messages: Message[]): 
 	}
 
 	lines.push('')
-	lines.push(`Full history: ${dir}/messages*.asonl + blocks/`)
+	lines.push(`Full history: ${dir}/messages*.asonl + blobs/`)
 
 	return lines.join('\n')
 }
@@ -505,13 +499,13 @@ export async function loadDraft(sessionId: string): Promise<string> {
 }
 
 export const messages = {
-	makeBlockRef,
-	writeBlock,
-	readBlock,
+	makeBlobId,
+	writeBlob,
+	readBlob,
 	getLastUsage,
 	writeAssistantEntry,
 	writeToolResultEntry,
-	updateBlockInput,
+	updateBlobInput,
 	parseUserContent,
 	appendMessages,
 	readMessages,

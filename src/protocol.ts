@@ -77,7 +77,7 @@ export type RuntimeEvent =
 	| {
 		id: string; type: 'chunk'; sessionId: string | null
 		text: string; channel: 'assistant' | 'thinking'
-		ref?: string; createdAt: string
+		blobId?: string; createdAt: string
 	}
 	| {
 		id: string; type: 'status'; sessionId: string | null
@@ -108,7 +108,7 @@ export type RuntimeEvent =
 		id: string; type: 'tool'; sessionId: string | null
 		toolId: string; name: string; args: string
 		phase: 'running' | 'streaming' | 'done' | 'error'
-		output?: string; ref?: string; createdAt: string
+		output?: string; blobId?: string; createdAt: string
 	}
 	| {
 		id: string; type: 'question'; sessionId: string

@@ -19,9 +19,9 @@ const TAB_WIDTH = 4
 export type Block =
 	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
 	| { type: 'assistant'; text: string; done: boolean; model?: string }
-	| { type: 'thinking'; text: string; done: boolean; ref?: string; model?: string; sessionId?: string }
+	| { type: 'thinking'; text: string; done: boolean; blobId?: string; model?: string; sessionId?: string }
 	| { type: 'info'; text: string }
-	| { type: 'error'; text: string; detail?: string; ref?: string }
+	| { type: 'error'; text: string; detail?: string; blobId?: string }
 	| {
 		type: 'tool'
 		name: string
@@ -30,7 +30,7 @@ export type Block =
 		output: string
 		startTime: number
 		endTime?: number
-		ref?: string
+		blobId?: string
 		sessionId: string
 	}
 
@@ -132,22 +132,22 @@ function headerLine(text: string, width: number, fg: string, bg: string): string
 	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${text}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
 }
 
-function toolHeader(label: string, width: number, fg: string, bg: string, ref: string | undefined, sessionId: string): string[] {
+function toolHeader(label: string, width: number, fg: string, bg: string, blobId: string | undefined, sessionId = ''): string[] {
 	const iw = innerWidth(width)
 	const safeLabel = oneLine(label)
-	const displayRef = ref ? (sessionId ? `${sessionId}/${ref}` : ref) : ''
-	const safeRef = displayRef ? clipPlain(oneLine(displayRef), 24) : ''
-	let refDisplay = ''
-	if (safeRef && ref) {
-		const fileUrl = `file://${state.blocksDir(sessionId)}/${ref}.ason`
-		refDisplay = ` [\x1b]8;;${fileUrl}\x07${safeRef}\x1b]8;;\x07] ──`
+	const displayBlobId = blobId ? (sessionId ? `${sessionId}/${blobId}` : blobId) : ''
+	const safeBlobId = displayBlobId ? clipPlain(oneLine(displayBlobId), 24) : ''
+	let blobDisplay = ''
+	if (safeBlobId && blobId) {
+		const fileUrl = `file://${state.blobsDir(sessionId)}/${blobId}.ason`
+		blobDisplay = ` [\x1b]8;;${fileUrl}\x07${safeBlobId}\x1b]8;;\x07] ──`
 	}
 	const prefix = '── '
-	const maxLabel = Math.max(1, iw - prefix.length - (safeRef ? safeRef.length + 6 : 0) - 2)
+	const maxLabel = Math.max(1, iw - prefix.length - (safeBlobId ? safeBlobId.length + 6 : 0) - 2)
 	const shown = clipPlain(safeLabel, maxLabel)
 	const lead = `${prefix}${shown} `
-	const fill = '─'.repeat(Math.max(1, iw - lead.length - (safeRef ? safeRef.length + 6 : 0)))
-	return [headerLine(lead + fill + refDisplay, width, fg, bg)]
+	const fill = '─'.repeat(Math.max(1, iw - lead.length - (safeBlobId ? safeBlobId.length + 6 : 0)))
+	return [headerLine(lead + fill + blobDisplay, width, fg, bg)]
 }
 
 function elapsed(startTime: number, endTime?: number): string {
@@ -205,7 +205,7 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 		return lines
 	}
 	const label = `Hal (${models.displayModel(effectiveModel(block.model))}, thinking)`
-	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.ref, block.sessionId ?? '')
+	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.blobId, block.sessionId ?? '')
 	const line = (s: string) => boxLine(s, width, colors.thinking.fg, colors.thinking.bg)
 	const body: string[] = []
 	for (const span of md.mdSpans(text)) {
@@ -245,7 +245,7 @@ function formatErrorDetail(detail: string): string {
 
 function renderError(block: Extract<Block, { type: 'error' }>, width: number): string[] {
 	const { fg, bg } = colors.error
-	const header = toolHeader('Error', width, fg, bg, block.ref)
+	const header = toolHeader('Error', width, fg, bg, block.blobId)
 	const raw = block.detail ? formatErrorDetail(block.detail) : block.text
 	const body = strings.wordWrap(raw, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
@@ -294,7 +294,7 @@ function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): str
 		const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
 		label = `${block.name}: ${args} (${time})${statusSuffix}`
 	}
-	const lines = [...toolHeader(label, width, fg, bg, block.ref, block.sessionId)]
+	const lines = [...toolHeader(label, width, fg, bg, block.blobId, block.sessionId)]
 	for (const l of prelude) lines.push(boxLine(l, width, fg, bg))
 	const outputText = block.output.trimEnd()
 	if (!outputText) return lines

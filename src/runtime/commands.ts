@@ -28,9 +28,9 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			// Auto-resolve interrupted tools before building API messages
 			const interrupted = rt.pendingInterruptedTools.get(sid) ?? messages.detectInterruptedTools(await messages.readMessages(sid))
 			if (interrupted.length > 0) {
-				const toolRefMap = new Map(interrupted.map(t => [t.id, t.ref]))
+				const toolBlobMap = new Map(interrupted.map(t => [t.id, t.blobId]))
 				for (const t of interrupted) {
-					const entry = await messages.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolRefMap)
+					const entry = await messages.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolBlobMap)
 					await messages.appendMessages(sid, [entry])
 				}
 				rt.pendingInterruptedTools.delete(sid)
@@ -183,9 +183,9 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			// Auto-resolve interrupted tools
 			const pendingTools = rt.pendingInterruptedTools.get(sid) ?? messages.detectInterruptedTools(await messages.readMessages(sid))
 			if (pendingTools.length > 0) {
-				const toolRefMap = new Map(pendingTools.map(t => [t.id, t.ref]))
+				const toolBlobMap = new Map(pendingTools.map(t => [t.id, t.blobId]))
 				for (const t of pendingTools) {
-					const entry = await messages.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolRefMap)
+					const entry = await messages.writeToolResultEntry(sid, t.id, '[interrupted — skipped]', toolBlobMap)
 					await messages.appendMessages(sid, [entry])
 				}
 				rt.pendingInterruptedTools.delete(sid)

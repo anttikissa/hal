@@ -27,8 +27,8 @@ export function sessionDir(id: string): string {
 	return `${SESSIONS_DIR}/${id}`
 }
 
-export function blocksDir(id: string): string {
-	return `${SESSIONS_DIR}/${id}/blocks`
+export function blobsDir(id: string): string {
+	return `${SESSIONS_DIR}/${id}/blobs`
 }
 
 export function ensureDir(dir: string): void {
@@ -39,4 +39,4 @@ export function ensureStateDir(): void {
 	for (const dir of [STATE_DIR, IPC_DIR, SESSIONS_DIR]) ensureDir(dir)
 }
 
-export const state = { sessionDir, blocksDir, ensureDir, ensureStateDir }
+export const state = { sessionDir, blobsDir, ensureDir, ensureStateDir }
