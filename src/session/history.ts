@@ -1,6 +1,6 @@
 // Session history log — append-only ASONL per session.
 
-import { writeFile, readFile, unlink } from 'fs/promises'
+import { writeFile, readFile } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { Log } from '../utils/log.ts'
@@ -9,7 +9,7 @@ import { ason } from '../utils/ason.ts'
 import { session } from './session.ts'
 import { prune, type PruneOpts } from './prune.ts'
 import { historyFork } from './history-fork.ts'
-import { makeBlobId, writeBlob, readBlob } from './blob.ts'
+import { blob } from './blob.ts'
 
 function resolveLogName(sessionId: string): string {
 	const cached = session.logNameCache.get(sessionId)
@@ -78,18 +78,18 @@ export async function writeAssistantEntry(
 	if (opts.text) entry.text = opts.text
 	if (opts.thinkingText) {
 		entry.thinkingText = opts.thinkingText
-		const blobId = opts.thinkingBlobId || makeBlobId(sessionId)
+		const blobId = opts.thinkingBlobId || blob.makeId(sessionId)
 		entry.thinkingBlobId = blobId
-		await writeBlob(sessionId, blobId, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
+		await blob.write(sessionId, blobId, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
 	}
 	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
 	if (opts.usage) entry.usage = opts.usage
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []
 		for (const t of opts.toolCalls) {
-			const blobId = makeBlobId(sessionId)
+			const blobId = blob.makeId(sessionId)
 			toolBlobMap.set(t.id, blobId)
-			await writeBlob(sessionId, blobId, { call: { name: t.name, input: t.input } })
+			await blob.write(sessionId, blobId, { call: { name: t.name, input: t.input } })
 			entry.tools.push({ id: t.id, name: t.name, blobId })
 		}
 	}
@@ -104,20 +104,20 @@ export async function writeToolResultEntry(
 	status: 'done' | 'error' = 'done',
 ): Promise<ToolResultMessage> {
 	const blobId = toolBlobMap.get(toolUseId)!
-	const existing = await readBlob(sessionId, blobId)
+	const existing = await blob.read(sessionId, blobId)
 	if (existing) {
 		existing.result = { content: output, status }
-		await writeBlob(sessionId, blobId, existing)
+		await blob.write(sessionId, blobId, existing)
 	}
 	return { role: 'tool_result', tool_use_id: toolUseId, blobId, ts: new Date().toISOString() }
 }
 
 export async function updateBlobInput(sessionId: string, blobId: string, input: unknown, originalInput: unknown): Promise<void> {
-	const blob = await readBlob(sessionId, blobId)
-	if (!blob?.call) return
-	blob.call.originalInput = originalInput
-	blob.call.input = input
-	await writeBlob(sessionId, blobId, blob)
+	const blobData = await blob.read(sessionId, blobId)
+	if (!blobData?.call) return
+	blobData.call.originalInput = originalInput
+	blobData.call.input = input
+	await blob.write(sessionId, blobId, blobData)
 }
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
@@ -168,8 +168,8 @@ export async function parseUserContent(
 			try {
 				const data = readFileSync(filePath)
 				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
-				const blobId = makeBlobId(sessionId)
-				await writeBlob(sessionId, blobId, { media_type: mediaType, data: data.toString('base64') })
+				const blobId = blob.makeId(sessionId)
+				await blob.write(sessionId, blobId, { media_type: mediaType, data: data.toString('base64') })
 				apiBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: data.toString('base64') } })
 				logBlocks.push({ type: 'image', blobId })
 			} catch {
@@ -236,7 +236,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 				const blocks: any[] = []
 				for (const b of msg.content) {
 					if (b.type === 'image' && b.blobId) {
-						const data = await readBlob(sessionId, b.blobId)
+						const data = await blob.read(sessionId, b.blobId)
 						if (data?.media_type && data?.data) {
 							blocks.push({ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data }, _blobId: b.blobId })
 						}
@@ -253,14 +253,14 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			if (msg.text) content.push({ type: 'text', text: msg.text })
 			if (msg.tools) {
 				for (const t of msg.tools) {
-					const blob = await readBlob(sessionId, t.blobId)
-					content.push({ type: 'tool_use', id: t.id, name: t.name, input: blob?.call?.input ?? {} })
+					const blobData = await blob.read(sessionId, t.blobId)
+					content.push({ type: 'tool_use', id: t.id, name: t.name, input: blobData?.call?.input ?? {} })
 				}
 			}
 			if (content.length) out.push({ role: 'assistant', content })
 		} else if (msg.role === 'tool_result') {
-			const blob = await readBlob(sessionId, msg.blobId)
-			let content = blob?.result?.content ?? '[interrupted]'
+			const blobData = await blob.read(sessionId, msg.blobId)
+			let content = blobData?.result?.content ?? '[interrupted]'
 			if (typeof content === 'string' && content.length > MAX_API_OUTPUT)
 				content = content.slice(0, MAX_API_OUTPUT) + `\n[truncated ${content.length - MAX_API_OUTPUT} chars]`
 			out.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: msg.tool_use_id, content, _blobId: msg.blobId }] })
@@ -371,34 +371,10 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 		.slice(-200)
 }
 
-function draftPath(sessionId: string): string {
-	return `${state.sessionDir(sessionId)}/draft.txt`
-}
-
-export async function saveDraft(sessionId: string, text: string): Promise<void> {
-	if (!text) {
-		const path = draftPath(sessionId)
-		if (existsSync(path)) await unlink(path).catch(() => {})
-		return
-	}
-	state.ensureDir(state.sessionDir(sessionId))
-	await writeFile(draftPath(sessionId), text)
-}
-
-export async function loadDraft(sessionId: string): Promise<string> {
-	const path = draftPath(sessionId)
-	if (!existsSync(path)) return ''
-	try {
-		return await readFile(path, 'utf-8')
-	} catch {
-		return ''
-	}
-}
-
 export const history = {
-	makeBlobId,
-	writeBlob,
-	readBlob,
+	makeBlobId: blob.makeId,
+	writeBlob: blob.write,
+	readBlob: blob.read,
 	getLastUsage,
 	writeAssistantEntry,
 	writeToolResultEntry,
@@ -411,6 +387,4 @@ export const history = {
 	detectInterruptedTools,
 	buildCompactionContext,
 	loadInputHistory,
-	saveDraft,
-	loadDraft,
 }

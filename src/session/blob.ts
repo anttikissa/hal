@@ -24,7 +24,7 @@ function sessionStart(sessionId: string): number {
 	return ts
 }
 
-export function makeBlobId(sessionId: string): string {
+function makeId(sessionId: string): string {
 	const offset = Math.max(0, Date.now() - sessionStart(sessionId)).toString(36).padStart(6, '0')
 	const bytes = randomBytes(3)
 	let suffix = ''
@@ -32,13 +32,13 @@ export function makeBlobId(sessionId: string): string {
 	return `${offset}-${suffix}`
 }
 
-export async function writeBlob(sessionId: string, blobId: string, data: unknown): Promise<void> {
+async function write(sessionId: string, blobId: string, data: unknown): Promise<void> {
 	const dir = state.blobsDir(sessionId)
 	state.ensureDir(dir)
 	await writeFile(`${dir}/${blobId}.ason`, ason.stringify(data) + '\n')
 }
 
-async function readLocalBlob(sessionId: string, blobId: string): Promise<any | null> {
+async function readLocal(sessionId: string, blobId: string): Promise<any | null> {
 	const path = `${state.blobsDir(sessionId)}/${blobId}.ason`
 	if (!existsSync(path)) return null
 	try {
@@ -48,12 +48,12 @@ async function readLocalBlob(sessionId: string, blobId: string): Promise<any | n
 	}
 }
 
-export async function readBlob(sessionId: string, blobId: string): Promise<any | null> {
-	return historyFork.readBlobFromForkChain(sessionId, blobId, readLocalBlob)
+async function read(sessionId: string, blobId: string): Promise<any | null> {
+	return historyFork.readBlobFromForkChain(sessionId, blobId, readLocal)
 }
 
 export const blob = {
-	makeBlobId,
-	writeBlob,
-	readBlob,
+	makeId,
+	write,
+	read,
 }
