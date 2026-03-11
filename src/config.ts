@@ -8,8 +8,6 @@ export type PermissionLevel = 'yolo' | 'ask-writes' | 'ask-all'
 export interface Config {
 	defaultModel: string
 	permissions?: PermissionLevel
-	activeSessionId?: string
-	debug?: boolean
 	eval?: boolean
 }
 
