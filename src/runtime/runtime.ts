@@ -44,6 +44,8 @@ export class Runtime {
 	pendingQuestions = new Map<string, { resolve: (answer: string) => void; question: string }>()
 	sessionContext = new Map<string, { used: number; max: number; estimated?: boolean }>()
 	pendingInterruptedTools = new Map<string, { name: string; id: string; blobId: string }[]>()
+	// Tracks running destructive tools (bash, write, edit) as "sessionId:toolId"
+	activeDestructiveTools = new Set<string>()
 
 	async emit(fields: RuntimeEventInput): Promise<void> {
 		await ipc.events.append({ ...fields, id: protocol.eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
@@ -152,6 +154,8 @@ export class Runtime {
 			},
 			askUser: (question) => this.askUser(sid, question),
 			signal: ac.signal,
+			onDestructiveToolStart: (toolId) => { this.activeDestructiveTools.add(`${sid}:${toolId}`) },
+			onDestructiveToolEnd: (toolId) => { this.activeDestructiveTools.delete(`${sid}:${toolId}`) },
 		}).finally(async () => {
 			this.abortControllers.delete(sid)
 			this.busySessionIds.delete(sid)

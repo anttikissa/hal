@@ -34,6 +34,8 @@ export interface AgentContext {
 	onStatus: (busy: boolean, activity?: string, context?: { used: number; max: number; estimated?: boolean }) => void
 	askUser: (question: string) => Promise<string>
 	signal?: AbortSignal
+	onDestructiveToolStart?: (toolId: string, toolName: string) => void
+	onDestructiveToolEnd?: (toolId: string, toolName: string) => void
 }
 
 function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeEvent['type'] }): Promise<void> {
@@ -196,7 +198,13 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 									type: 'tool', toolId: call.id, name: call.name,
 									args, phase: 'streaming', output: text,
 								})
-								result = await tools.executeTool(call, onChunk, { evalCtx, sessionId, signal })
+								const destructive = call.name === 'bash' || call.name === 'write' || call.name === 'edit'
+								if (destructive) ctx.onDestructiveToolStart?.(call.id, call.name)
+								try {
+									result = await tools.executeTool(call, onChunk, { evalCtx, sessionId, signal })
+								} finally {
+									if (destructive) ctx.onDestructiveToolEnd?.(call.id, call.name)
+								}
 								if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
 								await emit(sessionId, {
 									type: 'tool', toolId: call.id, name: call.name,

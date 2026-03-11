@@ -264,7 +264,60 @@ prompt.setRenderCallback(doRender)
 
 // ── Quit / Restart / Suspend ──
 
+import { halStatus } from '../main.ts'
+
+function hasDestructiveTools(): boolean {
+	if (!halStatus.isHost) return false
+	try {
+		const { getRuntime } = require('../runtime/runtime.ts') as typeof import('../runtime/runtime.ts')
+		return getRuntime().activeDestructiveTools.size > 0
+	} catch { return false }
+}
+
+function hasActiveSessions(): boolean {
+	const tabs = client.getState().tabs
+	return tabs.some(t => t.busy || t.question)
+}
+
+function findOtherHalPids(): number[] {
+	try {
+		const result = Bun.spawnSync(['pgrep', '-f', 'bun src/main.ts'])
+		const out = result.stdout.toString().trim()
+		if (!out) return []
+		return out.split('\n').map(Number).filter(p => p !== process.pid && !isNaN(p))
+	} catch { return [] }
+}
+
+function printHandoffMessage(): void {
+	if (!halStatus.isHost || !hasActiveSessions()) return
+	const pids = findOtherHalPids()
+	if (pids.length === 0) return
+	if (pids.length === 1) {
+		console.log(`pid ${pids[0]} will continue from here`)
+	} else {
+		console.log(`one of pids ${pids.join(', ')} will continue from here`)
+	}
+}
+
+let pendingAction: 'quit' | 'restart' | null = null
+let pendingTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearPendingAction(): void {
+	pendingAction = null
+	if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null }
+}
+
 export function quit(): void {
+	if (hasDestructiveTools() && pendingAction !== 'quit') {
+		pendingAction = 'quit'
+		if (pendingTimer) clearTimeout(pendingTimer)
+		pendingTimer = setTimeout(clearPendingAction, 5000)
+		const tab = client.activeTab()
+		if (tab) tab.blocks.push({ type: 'info', text: 'waiting for tool calls to finish; ctrl-c again to force' })
+		doRender()
+		return
+	}
+	clearPendingAction()
 	cleanExit = true
 	if (renderState.lines.length > 0) {
 		const total = renderState.lines.length
@@ -275,10 +328,21 @@ export function quit(): void {
 		stdout.write('\r\x1b[J')
 		if (!prompt.text()) stdout.write(`\x1b[2A\r\x1b[J`)
 	}
+	printHandoffMessage()
 	void shutdown()
 }
 
 export function restart(): void {
+	if (hasDestructiveTools() && pendingAction !== 'restart') {
+		pendingAction = 'restart'
+		if (pendingTimer) clearTimeout(pendingTimer)
+		pendingTimer = setTimeout(clearPendingAction, 5000)
+		const tab = client.activeTab()
+		if (tab) tab.blocks.push({ type: 'info', text: 'waiting for tool calls to finish; ctrl-r again to force' })
+		doRender()
+		return
+	}
+	clearPendingAction()
 	// Intentionally does NOT call releaseHost() — the lock stays so no
 	// client promotes during the brief restart gap. The restarted process
 	// reclaims its own lock.
@@ -288,6 +352,7 @@ export function restart(): void {
 		if (up > 0) stdout.write(`\x1b[${up}A`)
 		stdout.write('\r\x1b[J')
 	}
+	printHandoffMessage()
 	process.exit(100)
 }
 
