@@ -1,6 +1,15 @@
 # TODO
 
+test:
+
+image loading from blobs
+
+s-compact.ts misnomer
+
 ## 8.3. TODO
+
+hal -s / --self
+hal -f / --fresh
 
 revisit all tool outputs and verify that all necessary stuff is visible!
 
