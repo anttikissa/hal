@@ -30,6 +30,8 @@ export interface ClientState {
 	connected: boolean
 }
 
+function selfModeEnabled(): boolean { return process.env.HAL_SELF_MODE === '1' }
+
 export class Client {
 	private transport: Transport
 	private source: RuntimeSource
@@ -46,6 +48,25 @@ export class Client {
 
 	getState(): ClientState { return this.state }
 	activeTab(): TabState | null { return this.state.tabs[this.state.activeTabIndex] ?? null }
+
+	private contextRatio(tab: TabState): number {
+		const max = tab.context?.max ?? 0
+		if (max <= 0) return 0
+		return (tab.context?.used ?? 0) / max
+	}
+
+	private applySelfMode(): void {
+		const candidate = this.state.tabs.findIndex(tab => !tab.busy && !tab.pausing && !tab.question && this.contextRatio(tab) < 0.10)
+		if (candidate >= 0) {
+			this.state.activeTabIndex = candidate
+			this.switchToActiveTab()
+			return
+		}
+		if (!this.pendingOpen) {
+			this.pendingOpen = true
+			void this.send('open')
+		}
+	}
 
 	async start(): Promise<void> {
 		const { state: rtState, sessions } = await this.transport.bootstrap()
@@ -72,6 +93,8 @@ export class Client {
 			this.applyTabToPrompt(active)
 			clientState.saveLastTab(active.sessionId)
 		}
+
+		if (selfModeEnabled()) this.applySelfMode()
 		this.onUpdate()
 
 		for await (const event of this.transport.tailEvents(offset).items) {

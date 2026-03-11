@@ -5,7 +5,61 @@ SCRIPT_PATH="$0"
 [[ -L "$SCRIPT_PATH" ]] && SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
 export HAL_DIR="${HAL_DIR:-$(cd "$(dirname "$SCRIPT_PATH")" && pwd)}"
 export LAUNCH_CWD="${LAUNCH_CWD:-$(pwd)}"
-export HAL_STATE_DIR="${HAL_STATE_DIR:-$HAL_DIR/state}"
+
+show_help() {
+	cat <<'EOF'
+Usage: hal [flags]
+
+Flags:
+	-s, --self	Work on hal itself (cwd=hal_dir, prefer idle low-context tab)
+	-f, --fresh	Start with a fresh temp state directory
+	-h, --help	Show this help
+EOF
+}
+
+fresh=0
+self=0
+args=()
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		-f|--fresh)
+			fresh=1
+			;;
+		-s|--self)
+			self=1
+			;;
+		-h|--help)
+			show_help
+			exit 0
+			;;
+		--)
+			shift
+			while [ "$#" -gt 0 ]; do
+				args+=("$1")
+				shift
+			done
+			break
+			;;
+		*)
+			args+=("$1")
+			;;
+	esac
+	shift
+done
+
+if [ "$self" -eq 1 ]; then
+	export HAL_SELF_MODE=1
+	export LAUNCH_CWD="$HAL_DIR"
+fi
+
+if [ -z "${HAL_STATE_DIR:-}" ]; then
+	if [ "$fresh" -eq 1 ]; then
+		export HAL_STATE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/hal-fresh-XXXXXX")"
+	else
+		export HAL_STATE_DIR="$HAL_DIR/state"
+	fi
+fi
+
 cd "$HAL_DIR" || exit 1
 
 # First-run setup if no config exists
@@ -14,7 +68,7 @@ if [ ! -f "$HAL_DIR/config.ason" ]; then
 fi
 
 while true; do
-	bun src/main.ts "$@"
+	bun src/main.ts "${args[@]}"
 	code=$?
 	[ "$code" -ne 100 ] && exit "$code"
 done

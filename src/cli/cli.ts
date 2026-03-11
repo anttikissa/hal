@@ -299,15 +299,32 @@ function busySessionIds(): string[] {
 	return client.getState().tabs.filter(t => t.busy).map(t => t.sessionId)
 }
 
+function commandForPid(pid: number): string {
+	const result = Bun.spawnSync(['ps', '-o', 'command=', '-p', String(pid)], { stdout: 'pipe', stderr: 'ignore' })
+	if (result.exitCode !== 0) return ''
+	return result.stdout.toString().trim()
+}
+
+function isHalProcessCommand(command: string): boolean {
+	if (!command) return false
+	if (/\bbun\s+(?:\.\/)?src\/main\.ts\b/.test(command)) return true
+	const halDir = process.env.HAL_DIR
+	if (halDir && command.includes(`${halDir}/src/main.ts`)) return true
+	return false
+}
+
 function findOtherHalPids(): number[] {
-	try {
-		const result = Bun.spawnSync(['pgrep', '-f', 'bun src/main.ts'])
-		const out = result.stdout.toString().trim()
-		if (!out) return []
-		return out.split('\n').map(Number).filter(p => p !== process.pid && !isNaN(p))
-	} catch {
-		return []
+	const result = Bun.spawnSync(['pgrep', '-f', 'src/main.ts'], { stdout: 'pipe', stderr: 'ignore' })
+	if (result.exitCode !== 0) return []
+	const out = result.stdout.toString().trim()
+	if (!out) return []
+	const uniq = new Set<number>()
+	for (const raw of out.split(/\s+/)) {
+		const pid = Number(raw)
+		if (!Number.isInteger(pid) || pid === process.pid) continue
+		if (isHalProcessCommand(commandForPid(pid))) uniq.add(pid)
 	}
+	return [...uniq]
 }
 
 function writeHandoff(reason: 'quit' | 'restart', otherClientPids: number[]): RuntimeHandoffState | null {
