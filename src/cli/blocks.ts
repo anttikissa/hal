@@ -6,15 +6,12 @@ import { md } from './md.ts'
 import { models } from '../models.ts'
 import { config } from '../config.ts'
 import { ason } from '../utils/ason.ts'
-import { state } from '../state.ts'
-
-const TOOL_MAX_OUTPUT = 5
-const THINKING_BLOCK_MIN_LINES = 5
-const THINKING_BLOCK_MAX_LINES = 10
-const BASH_HEADER_INLINE_MAX = 60
-const BLOCK_MARGIN = 1
-const BLOCK_PAD = 1
-const TAB_WIDTH = 4
+import {
+	TOOL_MAX_OUTPUT, THINKING_BLOCK_MIN_LINES, THINKING_BLOCK_MAX_LINES,
+	BASH_HEADER_INLINE_MAX, BLOCK_MARGIN,
+	collapseBlankLines, oneLine, contentWidth, boxLine, plainLine,
+	toolHeader, elapsed, clipPlain,
+} from './block-layout.ts'
 
 export type Block =
 	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
@@ -34,125 +31,8 @@ export type Block =
 		sessionId: string
 	}
 
-/** Collapse runs of 3+ newlines to 2 (preserving paragraph breaks). */
-function collapseBlankLines(text: string): string {
-	return text.replace(/\n{3,}/g, '\n\n')
-}
-
-function oneLine(text: string): string {
-	return text.replace(/\s*\r?\n+\s*/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
 function effectiveModel(model?: string): string {
 	return model || config.getConfig().defaultModel
-}
-
-/** Expand tabs to spaces (tab stops at TAB_WIDTH columns). */
-function expandTabs(s: string): string {
-	let col = 0
-	let out = ''
-	for (const ch of s) {
-		if (ch === '\t') {
-			const spaces = TAB_WIDTH - (col % TAB_WIDTH)
-			out += ' '.repeat(spaces)
-			col += spaces
-		} else {
-			out += ch
-			col++
-		}
-	}
-	return out
-}
-
-function innerWidth(width: number): number {
-	return Math.max(1, width - 2 * BLOCK_MARGIN)
-}
-
-function contentWidth(width: number): number {
-	return Math.max(1, innerWidth(width) - 2 * BLOCK_PAD)
-}
-
-function clipAnsi(text: string, maxWidth: number): string {
-	if (maxWidth <= 0) return ''
-	if (strings.visLen(text) <= maxWidth) return text
-	if (maxWidth === 1) return '…'
-	const limit = maxWidth - 1
-	let out = ''
-	let vis = 0
-	let esc = false
-	for (let i = 0; i < text.length; i++) {
-		const ch = text[i]
-		if (ch === '\x1b') {
-			esc = true
-			out += ch
-			continue
-		}
-		if (esc) {
-			out += ch
-			if (ch === 'm') esc = false
-			continue
-		}
-		const cp = text.codePointAt(i)!
-		const cl = cp > 0xffff ? 2 : 1
-		const w = strings.charWidth(cp)
-		if (vis + w > limit) break
-		out += text.slice(i, i + cl)
-		vis += w
-		if (cl === 2) i++
-	}
-	return out + '…'
-}
-
-function clipPlain(text: string, maxWidth: number): string {
-	if (maxWidth <= 0) return ''
-	if (text.length <= maxWidth) return text
-	if (maxWidth === 1) return '…'
-	return text.slice(0, maxWidth - 1) + '…'
-}
-
-function boxLine(text: string, width: number, fg: string, bg: string): string {
-	const iw = innerWidth(width)
-	const raw = ' '.repeat(BLOCK_PAD) + expandTabs(text.replace(/\r/g, ''))
-	const clipped = clipAnsi(raw, iw)
-	const pad = Math.max(0, iw - strings.visLen(clipped))
-	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${clipped}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
-}
-
-function plainLine(text: string, width: number, fg: string): string {
-	const iw = innerWidth(width)
-	const clipped = clipAnsi(expandTabs(text.replace(/\r/g, '')), iw)
-	const pad = Math.max(0, iw - strings.visLen(clipped))
-	return `${' '.repeat(BLOCK_MARGIN)}${fg}${clipped}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
-}
-
-function headerLine(text: string, width: number, fg: string, bg: string): string {
-	const iw = innerWidth(width)
-	const vw = strings.visLen(text)
-	const pad = Math.max(0, iw - vw)
-	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${text}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
-}
-
-function toolHeader(label: string, width: number, fg: string, bg: string, blobId: string | undefined, sessionId = ''): string[] {
-	const iw = innerWidth(width)
-	const safeLabel = oneLine(label)
-	const displayBlobId = blobId ? (sessionId ? `${sessionId}/${blobId}` : blobId) : ''
-	const safeBlobId = displayBlobId ? clipPlain(oneLine(displayBlobId), 24) : ''
-	let blobDisplay = ''
-	if (safeBlobId && blobId) {
-		const fileUrl = `file://${state.blobsDir(sessionId)}/${blobId}.ason`
-		blobDisplay = ` [\x1b]8;;${fileUrl}\x07${safeBlobId}\x1b]8;;\x07] ──`
-	}
-	const prefix = '── '
-	const maxLabel = Math.max(1, iw - prefix.length - (safeBlobId ? safeBlobId.length + 6 : 0) - 2)
-	const shown = clipPlain(safeLabel, maxLabel)
-	const lead = `${prefix}${shown} `
-	const fill = '─'.repeat(Math.max(1, iw - lead.length - (safeBlobId ? safeBlobId.length + 6 : 0)))
-	return [headerLine(lead + fill + blobDisplay, width, fg, bg)]
-}
-
-function elapsed(startTime: number, endTime?: number): string {
-	const s = ((endTime ?? Date.now()) - startTime) / 1000
-	return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
 }
 
 function renderInput(block: Extract<Block, { type: 'input' }>, width: number): string[] {
