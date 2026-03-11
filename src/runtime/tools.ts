@@ -6,9 +6,9 @@ import { resolve, isAbsolute } from 'path'
 import { $ } from 'bun'
 import { homedir } from 'os'
 import { ason } from '../utils/ason.ts'
-import { history as sessionHistory } from '../session/history.ts'
 import { blob } from '../session/blob.ts'
 import { evalTool, type EvalContext } from './eval-tool.ts'
+import { bash } from '../tools/bash.ts'
 
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
@@ -146,8 +146,7 @@ const EVAL_TOOL = {
 }
 
 const BASE_TOOLS = [
-	{ name: 'bash', description: 'Run a bash command',
-		input_schema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } },
+	bash.definition,
 	{ name: 'read', description: 'Read a file with hashline prefixes (LINE:HASH content). Use optional start/end to read a line range.',
 		input_schema: { type: 'object', properties: {
 			path: { type: 'string' }, start: { description: 'First line number (1-based, inclusive)', type: 'integer' },
@@ -226,7 +225,7 @@ export function argsPreview(call: ToolCall): string {
 	const inp = call.input as any
 	let s: string
 	switch (call.name) {
-		case 'bash': s = String(inp?.command ?? ''); break
+		case 'bash': s = bash.argsPreview(inp); break
 		case 'read': s = String(inp?.path ?? ''); break
 		case 'write': s = String(inp?.path ?? ''); break
 		case 'edit': s = String(inp?.path ?? ''); break
@@ -251,28 +250,8 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 	if (err) return err
 	const inp = call.input as any
 	switch (call.name) {
-		case 'bash': {
-			const cmd = String(inp.command)
-			const proc = Bun.spawn(['bash', '-lc', cmd], {
-				cwd: CWD, stdout: 'pipe', stderr: 'pipe',
-				env: { ...process.env, TERM: 'dumb' },
-			})
-			let out = ''
-			const reader = proc.stdout.getReader()
-			const decoder = new TextDecoder()
-			while (true) {
-				const { done, value } = await reader.read()
-				if (done) break
-				const chunk = decoder.decode(value, { stream: true })
-				out += chunk
-				if (onChunk) await onChunk(chunk)
-			}
-			const stderr = await new Response(proc.stderr).text()
-			const code = await proc.exited
-			if (stderr) out += (out ? '\n' : '') + stderr
-			if (code !== 0) out += `\n[exit ${code}]`
-			return out || '(no output)'
-		}
+		case 'bash':
+			return bash.execute(inp, { cwd: CWD }, onChunk)
 		case 'read': {
 			const path = resolvePath(inp.path)
 			try {

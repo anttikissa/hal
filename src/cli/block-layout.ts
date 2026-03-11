@@ -7,7 +7,6 @@ import { state } from '../state.ts'
 export const TOOL_MAX_OUTPUT = 5
 export const THINKING_BLOCK_MIN_LINES = 5
 export const THINKING_BLOCK_MAX_LINES = 10
-export const BASH_HEADER_INLINE_MAX = 60
 export const BLOCK_MARGIN = 1
 export const BLOCK_PAD = 1
 const TAB_WIDTH = 4

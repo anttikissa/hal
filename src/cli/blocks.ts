@@ -8,10 +8,10 @@ import { config } from '../config.ts'
 import { ason } from '../utils/ason.ts'
 import {
 	TOOL_MAX_OUTPUT, THINKING_BLOCK_MIN_LINES, THINKING_BLOCK_MAX_LINES,
-	BASH_HEADER_INLINE_MAX, BLOCK_MARGIN,
-	collapseBlankLines, oneLine, contentWidth, boxLine, plainLine,
-	toolHeader, elapsed, clipPlain,
+	BLOCK_MARGIN, collapseBlankLines, oneLine, contentWidth, boxLine,
+	plainLine, toolHeader, elapsed, clipPlain,
 } from './block-layout.ts'
+import { bash } from '../tools/bash.ts'
 
 export type Block =
 	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
@@ -131,61 +131,41 @@ function renderError(block: Extract<Block, { type: 'error' }>, width: number): s
 	return [...header, ...body]
 }
 
-function bashStatus(status: 'streaming' | 'running' | 'done' | 'error'): string {
-	switch (status) {
-		case 'done':
-			return '✓'
-		case 'error':
-			return '✗'
-		default:
-			return '…'
-	}
-}
-
-function wrapBashCommand(cmd: string, width: number): string[] {
-	const max = Math.max(1, width)
-	if (cmd.length <= max) return [cmd]
-	const out: string[] = []
-	let rest = cmd
-	const suffix = ' \\'
-	const take = Math.max(1, max - suffix.length)
-	while (rest.length > max) {
-		out.push(rest.slice(0, take) + suffix)
-		rest = rest.slice(take)
-	}
-	out.push(rest)
-	return out
-}
-
 function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): string[] {
 	const { fg, bg } = colors.tool(block.name)
 	const time = elapsed(block.startTime, block.endTime)
 	const args = oneLine(block.args)
 	let label = ''
-	const prelude: string[] = []
+	let prelude: string[] = []
+	let outputLines: string[] = []
+	let hiddenOutputLines = 0
 	if (block.name === 'bash') {
-		if (args.length > BASH_HEADER_INLINE_MAX) {
-			label = `bash: (${time}) ${bashStatus(block.status)}`
-			prelude.push(...wrapBashCommand(args, contentWidth(width)))
-		} else {
-			label = `bash: ${args} (${time}) ${bashStatus(block.status)}`
-		}
+		const view = bash.formatBlock({
+			command: args,
+			status: block.status,
+			elapsed: time,
+			output: block.output,
+			commandWidth: contentWidth(width),
+			maxOutputLines: TOOL_MAX_OUTPUT,
+		})
+		label = view.label
+		prelude = view.commandLines
+		outputLines = view.outputLines
+		hiddenOutputLines = view.hiddenOutputLines
 	} else {
 		const statusSuffix = block.status === 'error' ? ' ✗' : block.status === 'done' ? ' ✓' : ''
 		label = `${block.name}: ${args} (${time})${statusSuffix}`
+		const outputText = block.output.trimEnd()
+		if (outputText) outputLines = outputText.split('\n').map((line) => line.replace(/\r/g, ''))
+		if (outputLines.length > TOOL_MAX_OUTPUT) {
+			hiddenOutputLines = outputLines.length - TOOL_MAX_OUTPUT
+			outputLines = outputLines.slice(-TOOL_MAX_OUTPUT)
+		}
 	}
 	const lines = [...toolHeader(label, width, fg, bg, block.blobId, block.sessionId)]
-	for (const l of prelude) lines.push(boxLine(l, width, fg, bg))
-	const outputText = block.output.trimEnd()
-	if (!outputText) return lines
-	const outputLines = outputText.split('\n').map(l => l.replace(/\r/g, ''))
-	if (outputLines.length > TOOL_MAX_OUTPUT) {
-		const hidden = outputLines.length - TOOL_MAX_OUTPUT
-		lines.push(boxLine(`[+ ${hidden} lines]`, width, fg, bg))
-		for (const l of outputLines.slice(-TOOL_MAX_OUTPUT)) lines.push(boxLine(l, width, fg, bg))
-		return lines
-	}
-	for (const l of outputLines) lines.push(boxLine(l, width, fg, bg))
+	for (const line of prelude) lines.push(boxLine(line, width, fg, bg))
+	if (hiddenOutputLines > 0) lines.push(boxLine(`[+ ${hiddenOutputLines} lines]`, width, fg, bg))
+	for (const line of outputLines) lines.push(boxLine(line, width, fg, bg))
 	return lines
 }
 
