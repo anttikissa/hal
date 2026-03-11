@@ -24,7 +24,7 @@ const messagesMod = await import('../session/history.ts')
 const sessionMod = await import('../session/session.ts')
 
 const { ensureStateDir, STATE_DIR, sessionDir } = stateMod
-const { ensureBus, claimHost, releaseHost, commands, events, updateState } = ipcMod
+const { ensureBus, claimHost, releaseHost, commands, events, updateState, getState } = ipcMod
 const { startRuntime } = runtimeMod
 const { makeCommand } = protocolMod
 const { parseAll } = aSonMod
@@ -293,6 +293,40 @@ test('restart detects interrupted user turn but waits for /continue', async () =
 	const resumed = await sendAndWait('/continue', sid)
 	const doneAfter = resumed.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
 	expect(doneAfter).toBe(true)
+})
+
+test('handoff continue auto-resumes interrupted user turn on restart', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	await appendHistory(sid, [{ role: 'user', content: 'Resume me after restart', ts } as any])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+		s.busySessionIds = [sid]
+		s.handoff = {
+			mode: 'continue',
+			reason: 'restart',
+			fromPid: process.pid,
+			createdAt: ts,
+			activeSessionIds: [sid],
+			busySessionIds: [sid],
+		}
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	await waitFor(async () => {
+		const all = await events.readAll()
+		return all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	}, 4000, 20, 'Timed out waiting for handoff auto-continue')
+
+	expect(getState().handoff).toBeNull()
 })
 
 test('/continue auto-resolves interrupted tools', async () => {

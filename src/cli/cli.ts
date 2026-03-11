@@ -265,18 +265,38 @@ prompt.setRenderCallback(doRender)
 // ── Quit / Restart / Suspend ──
 
 import { halStatus } from '../main.ts'
+import { ipc } from '../ipc.ts'
+import type { RuntimeHandoffState } from '../protocol.ts'
 
-function hasDestructiveTools(): boolean {
-	if (!halStatus.isHost) return false
+function runtimeOrNull(): any {
+	if (!halStatus.isHost) return null
 	try {
 		const { getRuntime } = require('../runtime/runtime.ts') as typeof import('../runtime/runtime.ts')
-		return getRuntime().activeDestructiveTools.size > 0
-	} catch { return false }
+		return getRuntime()
+	} catch {
+		return null
+	}
 }
 
-function hasActiveSessions(): boolean {
-	const tabs = client.getState().tabs
-	return tabs.some(t => t.busy || t.question)
+function hasDestructiveTools(): boolean {
+	const rt = runtimeOrNull()
+	return !!rt && rt.activeDestructiveTools.size > 0
+}
+
+function isActiveTab(tab: TabState): boolean {
+	if (tab.busy || tab.pausing || tab.question) return true
+	const last = tab.blocks[tab.blocks.length - 1]
+	return !!last && last.type === 'error'
+}
+
+function activeSessionIds(): string[] {
+	return client.getState().tabs.filter(isActiveTab).map(t => t.sessionId)
+}
+
+function busySessionIds(): string[] {
+	const rt = runtimeOrNull()
+	if (rt) return [...rt.busySessionIds]
+	return client.getState().tabs.filter(t => t.busy).map(t => t.sessionId)
 }
 
 function findOtherHalPids(): number[] {
@@ -285,17 +305,45 @@ function findOtherHalPids(): number[] {
 		const out = result.stdout.toString().trim()
 		if (!out) return []
 		return out.split('\n').map(Number).filter(p => p !== process.pid && !isNaN(p))
-	} catch { return [] }
+	} catch {
+		return []
+	}
 }
 
-function printHandoffMessage(): void {
-	if (!halStatus.isHost || !hasActiveSessions()) return
-	const pids = findOtherHalPids()
-	if (pids.length === 0) return
+function writeHandoff(reason: 'quit' | 'restart', otherClientPids: number[]): RuntimeHandoffState | null {
+	if (!halStatus.isHost) return null
+	const activeIds = activeSessionIds()
+	if (activeIds.length === 0) {
+		ipc.updateState(s => { s.handoff = null })
+		return null
+	}
+	const busySet = new Set(busySessionIds())
+	const busyIds = activeIds.filter(id => busySet.has(id))
+	const mode = reason === 'restart' || otherClientPids.length > 0 ? 'continue' : 'suspend'
+	const handoff: RuntimeHandoffState = {
+		mode,
+		reason,
+		fromPid: process.pid,
+		createdAt: new Date().toISOString(),
+		activeSessionIds: activeIds,
+		busySessionIds: busyIds,
+	}
+	ipc.updateState(s => { s.handoff = handoff })
+	return handoff
+}
+
+function printHandoffMessage(handoff: RuntimeHandoffState | null, pids: number[]): void {
+	if (!handoff || handoff.mode !== 'continue') return
 	if (pids.length === 1) {
-		console.log(`pid ${pids[0]} will continue from here`)
-	} else {
-		console.log(`one of pids ${pids.join(', ')} will continue from here`)
+		console.log(`Client pid ${pids[0]} will continue from here`)
+		return
+	}
+	if (pids.length > 1) {
+		console.log(`One of these clients will continue from here: ${pids.map(pid => `pid ${pid}`).join(', ')}`)
+		return
+	}
+	if (handoff.reason === 'restart') {
+		console.log('Restarting: this process will continue from here')
 	}
 }
 
@@ -328,7 +376,9 @@ export function quit(): void {
 		stdout.write('\r\x1b[J')
 		if (!prompt.text()) stdout.write(`\x1b[2A\r\x1b[J`)
 	}
-	printHandoffMessage()
+	const handoffPids = findOtherHalPids()
+	const handoff = writeHandoff('quit', handoffPids)
+	printHandoffMessage(handoff, handoffPids)
 	void shutdown()
 }
 
@@ -343,16 +393,17 @@ export function restart(): void {
 		return
 	}
 	clearPendingAction()
-	// Intentionally does NOT call releaseHost() — the lock stays so no
-	// client promotes during the brief restart gap. The restarted process
-	// reclaims its own lock.
+	// Intentionally does NOT call releaseHost(). We write handoff state first,
+	// then exit so either a promoted client or the restarted process can resume.
 	cleanExit = true
 	if (renderState.lines.length > 0) {
 		const up = renderState.cursorRow
 		if (up > 0) stdout.write(`\x1b[${up}A`)
 		stdout.write('\r\x1b[J')
 	}
-	printHandoffMessage()
+	const handoffPids = findOtherHalPids()
+	const handoff = writeHandoff('restart', handoffPids)
+	printHandoffMessage(handoff, handoffPids)
 	process.exit(100)
 }
 

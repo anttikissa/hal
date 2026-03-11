@@ -10,6 +10,28 @@ import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { Runtime, runtimeCore } from './runtime.ts'
 import { commandHandlers } from './commands.ts'
 
+async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Promise<void> {
+	if (rt.busySessionIds.has(sessionId)) return
+	const info = rt.sessions.get(sessionId)
+	if (!info) return
+
+	const pendingTools = rt.pendingInterruptedTools.get(sessionId)
+		?? history.detectInterruptedTools(await history.readHistory(sessionId))
+	if (pendingTools.length > 0) {
+		const toolBlobMap = new Map(pendingTools.map(t => [t.id, t.blobId]))
+		const entries = []
+		for (const t of pendingTools) {
+			entries.push(await history.writeToolResultEntry(sessionId, t.id, '[interrupted — skipped]', toolBlobMap))
+		}
+		await history.appendHistory(sessionId, entries)
+		rt.pendingInterruptedTools.delete(sessionId)
+	}
+
+	const apiMessages = await history.loadApiMessages(sessionId)
+	if (!rt.hasPendingUserTurn(apiMessages)) return
+	await rt.startGeneration(sessionId, info, apiMessages, 'continuing...')
+}
+
 export async function startRuntime(): Promise<Runtime> {
 	await ipc.ensureBus()
 	const cmdOffset = await ipc.commands.offset()
@@ -20,6 +42,10 @@ export async function startRuntime(): Promise<Runtime> {
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = ipc.getState()
+	const handoff = prevState.handoff ?? null
+	if (handoff) {
+		ipc.updateState(s => { s.handoff = null })
+	}
 	for (const id of prevState.sessions) {
 		const meta = await session.loadSessionInfo(id)
 		if (meta) {
@@ -67,6 +93,12 @@ export async function startRuntime(): Promise<Runtime> {
 
 	for (const [id] of rt.sessions) {
 		await rt.resumeInterruptedSession(id)
+	}
+
+	if (handoff?.mode === 'continue') {
+		for (const id of handoff.busySessionIds) {
+			await continueSessionAfterHandoff(rt, id)
+		}
 	}
 
 	// Tail from offset captured at startup (no race window)

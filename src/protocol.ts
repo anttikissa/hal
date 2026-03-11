@@ -120,6 +120,14 @@ export type RuntimeEvent =
 	}
 
 // ── Snapshot state (for bootstrap) ──
+export interface RuntimeHandoffState {
+	mode: 'continue' | 'suspend'
+	reason: 'quit' | 'restart'
+	fromPid: number
+	createdAt: string
+	activeSessionIds: string[]
+	busySessionIds: string[]
+}
 
 export interface RuntimeState {
 	hostPid: number | null
@@ -129,6 +137,7 @@ export interface RuntimeState {
 	busySessionIds: string[]
 	eventsOffset: number
 	updatedAt: string
+	handoff?: RuntimeHandoffState | null
 }
 
 export function defaultState(): RuntimeState {
@@ -140,6 +149,7 @@ export function defaultState(): RuntimeState {
 		busySessionIds: [],
 		eventsOffset: 0,
 		updatedAt: new Date().toISOString(),
+		handoff: null,
 	}
 }
 
