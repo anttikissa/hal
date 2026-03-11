@@ -79,6 +79,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			let assistantText = ''
 			const toolCalls: ToolCall[] = []
 			let aborted = false
+			let persisted = false
 			const blinkParser = blink.createBlinkParser()
 
 			for await (const event of gen) {
@@ -152,6 +153,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						// Write assistant entry BEFORE executing tools
 						const { entry: assistantEntry, toolRefMap } = await sessionMessages.writeAssistantEntry(sessionId, assistantOpts)
 						await sessionMessages.appendMessages(sessionId, [assistantEntry])
+						persisted = true
 						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
 						// Execute tools, writing each result individually
@@ -238,8 +240,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			}
 
 			if (aborted) {
-				// Persist partial output before exiting
-				if (assistantText || thinkingText) {
+				// Persist partial output before exiting (skip if already written in tool path)
+				if (!persisted && (assistantText || thinkingText)) {
 					await sessionMessages.appendMessages(sessionId, [
 						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, thinkingSignature: thinkingSignature || undefined, ts: new Date().toISOString() },
 					])
