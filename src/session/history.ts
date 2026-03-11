@@ -7,7 +7,7 @@ import { Log } from '../utils/log.ts'
 import { state } from '../state.ts'
 import { ason } from '../utils/ason.ts'
 import { session } from './session.ts'
-import { prune, type PruneOpts } from './prune.ts'
+import { prune } from './prune.ts'
 import { historyFork } from './history-fork.ts'
 import { blob } from './blob.ts'
 
@@ -190,32 +190,11 @@ export async function readHistory(sessionId: string): Promise<Message[]> {
 
 const MAX_API_OUTPUT = 50_000
 
-const MODEL_CHANGE_THRESHOLD = 10
-
-function detectPruneOpts(entries: Message[]): PruneOpts | undefined {
-	let lastModelChangeIdx = -1
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const e = entries[i] as any
-		if (e.type === 'info' && typeof e.text === 'string' && e.text.startsWith('[model]')) {
-			lastModelChangeIdx = i
-			break
-		}
-	}
-	if (lastModelChangeIdx < 0) return undefined
-	let turnsAfter = 0
-	for (let i = lastModelChangeIdx + 1; i < entries.length; i++) {
-		const e = entries[i] as any
-		if (e.role === 'assistant' && !e.tools) turnsAfter++
-	}
-	if (turnsAfter <= MODEL_CHANGE_THRESHOLD) return { heavyThreshold: MODEL_CHANGE_THRESHOLD }
-	return undefined
-}
-
 export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	const all = await loadAllHistory(sessionId)
 	const start = findReplayStart(all)
 	const sliced = all.slice(start)
-	const pruneOpts = detectPruneOpts(sliced)
+	const pruneOpts = prune.detectPruneOpts(sliced)
 	const out: any[] = []
 	for (const m of sliced) {
 		const msg = m as any
