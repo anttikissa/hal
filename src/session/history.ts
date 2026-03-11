@@ -10,7 +10,7 @@ import { Log } from '../utils/log.ts'
 import { state } from '../state.ts'
 import { ason } from '../utils/ason.ts'
 import { session } from './session.ts'
-import { compact, type CompactOpts } from './compact.ts'
+import { prune, type PruneOpts } from './prune.ts'
 import { historyFork } from './history-fork.ts'
 
 function resolveLogName(sessionId: string): string {
@@ -248,7 +248,7 @@ const MAX_API_OUTPUT = 50_000
 
 const MODEL_CHANGE_THRESHOLD = 10
 
-function detectCompactOpts(entries: Message[]): CompactOpts | undefined {
+function detectPruneOpts(entries: Message[]): PruneOpts | undefined {
 	let lastModelChangeIdx = -1
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const e = entries[i] as any
@@ -271,7 +271,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	const all = await loadAllHistory(sessionId)
 	const start = findReplayStart(all)
 	const sliced = all.slice(start)
-	const compactOpts = detectCompactOpts(sliced)
+	const pruneOpts = detectPruneOpts(sliced)
 	const out: any[] = []
 	for (const m of sliced) {
 		const msg = m as any
@@ -332,15 +332,15 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			i++
 		}
 	}
-	const compacted = compact.compactApiMessages(out, compactOpts)
-	for (const msg of compacted) {
+	const pruned = prune.pruneApiMessages(out, pruneOpts)
+	for (const msg of pruned) {
 		if (msg.role === 'user' && Array.isArray(msg.content)) {
 			for (const b of msg.content) {
 				if (b._blobId) delete b._blobId
 			}
 		}
 	}
-	return compacted
+	return pruned
 }
 
 export async function loadAllHistory(sessionId: string): Promise<Message[]> {

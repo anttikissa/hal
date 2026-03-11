@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { compactApiMessages } from './compact.ts'
+import { pruneApiMessages } from './prune.ts'
 
 // Helper: build an API-format tool cycle (assistant with tool_use + user with tool_result)
 function toolCycle(id: string, name: string, input: any, result: string, blobId: string) {
@@ -26,7 +26,7 @@ function turn(q: string, a: string) {
 	]
 }
 
-describe('compactApiMessages', () => {
+describe('pruneApiMessages', () => {
 	test('keeps last tool batch intact', () => {
 		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'file1.ts', 'ref-0')
 		const c1 = toolCycle('t1', 'bash', { command: 'cat f' }, 'contents...', 'ref-1')
@@ -38,7 +38,7 @@ describe('compactApiMessages', () => {
 			c1.assistant, c1.result,
 		]
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// Last batch (c1) kept intact
 		const lastResult = out[5].content[0]
@@ -60,7 +60,7 @@ describe('compactApiMessages', () => {
 			c1.assistant, c1.result,
 		]
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// Old tool_use input cleared
 		const oldToolUse = out[1].content.find((b: any) => b.type === 'tool_use')
@@ -83,7 +83,7 @@ describe('compactApiMessages', () => {
 			msgs.push(...turn(`question ${i}`, `answer ${i}`))
 		}
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// Even the "last" batch should be cleared since it's stale (5 > 4)
 		const toolResult = out[2].content[0]
@@ -101,7 +101,7 @@ describe('compactApiMessages', () => {
 			msgs.push(...turn(`question ${i}`, `answer ${i}`))
 		}
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// Should still be kept — exactly 4 is the boundary
 		const toolResult = out[2].content[0]
@@ -124,7 +124,7 @@ describe('compactApiMessages', () => {
 			{ role: 'assistant', content: [{ type: 'text', text: 'done' }] },
 		]
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// First image (5 turns ago) should be cleared with a blob placeholder
 		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted from context — blob ref-img-0; use read_blob if needed]' })
@@ -150,7 +150,7 @@ describe('compactApiMessages', () => {
 			msgs.push(...turn(`q${i}`, `a${i}`))
 		}
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// Image is 5 completed turns ago — should be cleared
 		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted from context — blob ref-img-0; use read_blob if needed]' })
@@ -163,7 +163,7 @@ describe('compactApiMessages', () => {
 			{ role: 'user', content: 'bye' },
 		]
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 		expect(out).toEqual(msgs)
 	})
 
@@ -199,7 +199,7 @@ describe('compactApiMessages', () => {
 			},
 		]
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// Old batch (t0, t1) cleared
 		expect(out[2].content[0].content).toBe('[tool result omitted from context — blob ref-a; use read_blob if needed]')
@@ -220,7 +220,7 @@ describe('compactApiMessages', () => {
 			c1.assistant, c1.result,
 		]
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// Text blocks in old assistant message should be preserved
 		const oldAssistant = out[1]
@@ -246,7 +246,7 @@ describe('compactApiMessages', () => {
 			msgs.push(...turn(`q${i}`, `a${i}`))
 		}
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// tool_result is >4 turns ago — cleared entirely (not in keepIds)
 		const toolResult = out[2].content[0]
@@ -269,7 +269,7 @@ describe('compactApiMessages', () => {
 			] })
 		}
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// First assistant (12 completed turns ago) — thinking dropped, text kept
 		expect(out[1].content).toEqual([{ type: 'text', text: 'answer' }])
@@ -292,7 +292,7 @@ describe('compactApiMessages', () => {
 			msgs.push(...turn(`q${i}`, `a${i}`))
 		}
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// First assistant (10 turns ago) — thinking should still be there
 		expect(out[1].content[0].type).toBe('thinking')
@@ -310,7 +310,7 @@ describe('compactApiMessages', () => {
 			msgs.push(...turn(`question ${i}`, `answer ${i}`))
 		}
 
-		const out = compactApiMessages(msgs, { heavyThreshold: 10 })
+		const out = pruneApiMessages(msgs, { heavyThreshold: 10 })
 
 		// With threshold 10, the tool result should still be kept
 		const toolResult = out[2].content[0]
@@ -329,7 +329,7 @@ describe('compactApiMessages', () => {
 			msgs.push(...turn(`q${i}`, `a${i}`))
 		}
 
-		const out = compactApiMessages(msgs, { heavyThreshold: 10 })
+		const out = pruneApiMessages(msgs, { heavyThreshold: 10 })
 
 		// Image should be kept with threshold 10
 		expect(out[0].content[1].type).toBe('image')
@@ -349,7 +349,7 @@ describe('compactApiMessages', () => {
 			msgs.push({ role: 'user', content: `next ${i}` }, c.assistant, c.result)
 		}
 
-		const out = compactApiMessages(msgs)
+		const out = pruneApiMessages(msgs)
 
 		// No completed turns → last tool batch is the LAST tool_use (t7), c0 is old
 		// c0 is not in keepIds → cleared

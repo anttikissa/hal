@@ -1,14 +1,14 @@
-# Context Compaction
+# Context Pruning
 
-API messages are compacted before sending to reduce token cost. Without compaction, every past tool result, image, and thinking block would be re-sent on every turn — quadratic cost growth.
+API messages are pruned before sending to reduce token cost. Without pruning, every past tool result, image, and thinking block would be re-sent on every turn — quadratic cost growth.
 
-Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/session/history.ts`.
+Core logic: `src/session/prune.ts`, called from `loadApiMessages()` in `src/session/history.ts`.
 
 ## How It Works
 
-`compactApiMessages()` processes the message array after `loadApiMessages()` builds it. Three independent passes strip old heavy content:
+`pruneApiMessages()` processes the message array after `loadApiMessages()` builds it. Three independent passes strip old heavy content:
 
-### 1. Tool results & inputs (`compactApiMessages`)
+### 1. Tool results & inputs (`pruneApiMessages`)
 
 - Finds the **last tool batch** (most recent assistant message with `tool_use` blocks + corresponding `tool_result` messages).
 - Keeps that batch in full; clears all older tool results and inputs.

@@ -1,4 +1,4 @@
-// Context compaction — strip old heavy content (tool results, images, thinking) from API messages.
+// Context pruning — strip old heavy content (tool results, images, thinking) from API messages.
 //
 // A "turn" = a completed agent response (assistant message without tool_use).
 // Tool results and images are cleared after HEAVY_THRESHOLD completed turns;
@@ -8,7 +8,7 @@
 const HEAVY_THRESHOLD = 4
 const THINKING_THRESHOLD = 10
 
-export interface CompactOpts {
+export interface PruneOpts {
 	heavyThreshold?: number
 }
 
@@ -20,7 +20,7 @@ function isTurnEnd(msg: any): boolean {
 }
 
 /** Strip old tool results, tool inputs, images, and thinking from API messages. */
-export function compactApiMessages(msgs: any[], opts?: CompactOpts): any[] {
+export function pruneApiMessages(msgs: any[], opts?: PruneOpts): any[] {
 	const heavy = opts?.heavyThreshold ?? HEAVY_THRESHOLD
 
 	// Precompute: completed turns strictly after each position
@@ -79,4 +79,4 @@ export function compactApiMessages(msgs: any[], opts?: CompactOpts): any[] {
 	return out
 }
 
-export const compact = { compactApiMessages }
+export const prune = { pruneApiMessages }
