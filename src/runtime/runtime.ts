@@ -39,7 +39,7 @@ export class Runtime {
 	abortControllers = new Map<string, AbortController>()
 	pendingQuestions = new Map<string, { resolve: (answer: string) => void; question: string }>()
 	sessionContext = new Map<string, { used: number; max: number; estimated?: boolean }>()
-	pendingInterruptedTools = new Map<string, { name: string; id: string; ref: string }[]>()
+	pendingInterruptedTools = new Map<string, { name: string; id: string; blobId: string }[]>()
 
 	async emit(fields: Omit<RuntimeEvent, 'id' | 'createdAt'>): Promise<void> {
 		await ipc.events.append({ ...fields, id: protocol.eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)

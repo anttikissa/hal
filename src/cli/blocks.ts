@@ -164,7 +164,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 	const model = !isSystem && block.model ? ` (to ${models.displayModel(block.model)})` : ''
 	const label = `${who}${status}${model}`
 	if (block.status) return [boxLine(`${label}: ${text}`, width, fg, bg)]
-	const header = toolHeader(label, width, fg, bg)
+	const header = toolHeader(label, width, fg, bg, undefined)
 	const body = strings.wordWrap(text, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
 }
@@ -175,7 +175,7 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 	const label = `Hal (${models.displayModel(effectiveModel(block.model))})`
 	const { fg, bg } = colors.assistant
 	const mdColors = colors.assistantMd
-	const header = toolHeader(label, width, fg, bg)
+	const header = toolHeader(label, width, fg, bg, undefined)
 	const cw = contentWidth(width)
 	const line = (s: string) => boxLine(s, width, fg, bg)
 	const body: string[] = []

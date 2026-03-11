@@ -2,7 +2,7 @@ import { describe, test, expect } from 'bun:test'
 import { compactApiMessages } from './compact.ts'
 
 // Helper: build an API-format tool cycle (assistant with tool_use + user with tool_result)
-function toolCycle(id: string, name: string, input: any, result: string, ref: string) {
+function toolCycle(id: string, name: string, input: any, result: string, blobId: string) {
 	return {
 		assistant: {
 			role: 'assistant',
@@ -13,7 +13,7 @@ function toolCycle(id: string, name: string, input: any, result: string, ref: st
 		},
 		result: {
 			role: 'user',
-			content: [{ type: 'tool_result', tool_use_id: id, content: result, _ref: ref }],
+			content: [{ type: 'tool_result', tool_use_id: id, content: result, _blobId: blobId }],
 		},
 	}
 }
@@ -46,7 +46,7 @@ describe('compactApiMessages', () => {
 
 		// Old batch (c0) cleared
 		const oldResult = out[2].content[0]
-		expect(oldResult.content).toBe('[tool result omitted after 4 turns, ref: ref-0]')
+		expect(oldResult.content).toBe('[tool result omitted after 4 turns, blob ref-0]')
 	})
 
 	test('clears old tool_use inputs', () => {
@@ -87,7 +87,7 @@ describe('compactApiMessages', () => {
 
 		// Even the "last" batch should be cleared since it's stale (5 > 4)
 		const toolResult = out[2].content[0]
-		expect(toolResult.content).toBe('[tool result omitted after 4 turns, ref: ref-0]')
+		expect(toolResult.content).toBe('[tool result omitted after 4 turns, blob ref-0]')
 	})
 
 	test('keeps last batch when ≤4 completed turns follow', () => {
@@ -109,7 +109,7 @@ describe('compactApiMessages', () => {
 	})
 
 	test('clears images except in last 4 completed turns', () => {
-		const imageBlock = (ref: string) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: ref })
+		const imageBlock = (ref: string) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _blobId: ref })
 
 		const msgs = [
 			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock('ref-img-0')] },
@@ -127,7 +127,7 @@ describe('compactApiMessages', () => {
 		const out = compactApiMessages(msgs)
 
 		// First image (5 turns ago) should be cleared with ref
-		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted after 4 turns, ref: ref-img-0]' })
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted after 4 turns, blob ref-img-0]' })
 		// Second image (4 turns ago) should be kept
 		expect(out[2].content[1].type).toBe('image')
 		// Third image (3 turns ago) should be kept
@@ -139,7 +139,7 @@ describe('compactApiMessages', () => {
 	})
 
 	test('clears image when followed by completed turns', () => {
-		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: 'ref-img-0' }
+		const imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _blobId: 'ref-img-0' }
 
 		const msgs: any[] = [
 			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock] },
@@ -153,7 +153,7 @@ describe('compactApiMessages', () => {
 		const out = compactApiMessages(msgs)
 
 		// Image is 5 completed turns ago — should be cleared
-		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted after 4 turns, ref: ref-img-0]' })
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted after 4 turns, blob ref-img-0]' })
 	})
 
 	test('no tool calls → messages unchanged', () => {
@@ -180,8 +180,8 @@ describe('compactApiMessages', () => {
 			{
 				role: 'user',
 				content: [
-					{ type: 'tool_result', tool_use_id: 't0', content: 'result a', _ref: 'ref-a' },
-					{ type: 'tool_result', tool_use_id: 't1', content: 'result b', _ref: 'ref-b' },
+					{ type: 'tool_result', tool_use_id: 't0', content: 'result a', _blobId: 'ref-a' },
+					{ type: 'tool_result', tool_use_id: 't1', content: 'result b', _blobId: 'ref-b' },
 				],
 			},
 			{ role: 'user', content: 'next' },
@@ -194,7 +194,7 @@ describe('compactApiMessages', () => {
 			{
 				role: 'user',
 				content: [
-					{ type: 'tool_result', tool_use_id: 't2', content: 'file contents', _ref: 'ref-c' },
+					{ type: 'tool_result', tool_use_id: 't2', content: 'file contents', _blobId: 'ref-c' },
 				],
 			},
 		]
@@ -202,8 +202,8 @@ describe('compactApiMessages', () => {
 		const out = compactApiMessages(msgs)
 
 		// Old batch (t0, t1) cleared
-		expect(out[2].content[0].content).toBe('[tool result omitted after 4 turns, ref: ref-a]')
-		expect(out[2].content[1].content).toBe('[tool result omitted after 4 turns, ref: ref-b]')
+		expect(out[2].content[0].content).toBe('[tool result omitted after 4 turns, blob ref-a]')
+		expect(out[2].content[1].content).toBe('[tool result omitted after 4 turns, blob ref-b]')
 
 		// Last batch (t2) kept
 		expect(out[5].content[0].content).toBe('file contents')
@@ -238,7 +238,7 @@ describe('compactApiMessages', () => {
 			},
 			{
 				role: 'user',
-				content: [{ type: 'tool_result', tool_use_id: 't0', content: [{ type: 'text', text: 'here' }, imageBlock], _ref: 'ref-0' }],
+				content: [{ type: 'tool_result', tool_use_id: 't0', content: [{ type: 'text', text: 'here' }, imageBlock], _blobId: 'ref-0' }],
 			},
 		]
 		// 5 completed turns to push the image past threshold
@@ -250,7 +250,7 @@ describe('compactApiMessages', () => {
 
 		// tool_result is >4 turns ago — cleared entirely (not in keepIds)
 		const toolResult = out[2].content[0]
-		expect(toolResult.content).toBe('[tool result omitted after 4 turns, ref: ref-0]')
+		expect(toolResult.content).toBe('[tool result omitted after 4 turns, blob ref-0]')
 	})
 
 	test('drops thinking blocks older than 10 completed turns', () => {
@@ -318,7 +318,7 @@ describe('compactApiMessages', () => {
 	})
 
 	test('custom heavyThreshold keeps images beyond default threshold', () => {
-		const imageBlock = (ref: string) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _ref: ref })
+		const imageBlock = (ref: string) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' }, _blobId: ref })
 
 		const msgs: any[] = [
 			{ role: 'user', content: [{ type: 'text', text: 'look' }, imageBlock('ref-img')] },
@@ -353,6 +353,6 @@ describe('compactApiMessages', () => {
 
 		// No completed turns → last tool batch is the LAST tool_use (t7), c0 is old
 		// c0 is not in keepIds → cleared
-		expect(out[2].content[0].content).toBe('[tool result omitted after 4 turns, ref: ref-0]')
+		expect(out[2].content[0].content).toBe('[tool result omitted after 4 turns, blob ref-0]')
 	})
 })

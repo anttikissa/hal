@@ -63,10 +63,10 @@ export function compactApiMessages(msgs: any[], opts?: CompactOpts): any[] {
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = msg.content.map((b: any) => {
 				if (b.type === 'tool_result' && !keepIds.has(b.tool_use_id)) {
-					return { ...b, content: `[tool result omitted after ${heavy} turns, ref: ${b._ref}]` }
+					return { ...b, content: `[tool result omitted after ${heavy} turns, blob ${b._blobId}]` }
 				}
 				if (age[i] > heavy && b.type === 'image') {
-					return { type: 'text', text: `[image omitted after ${heavy} turns, ref: ${b._ref}]` }
+					return { type: 'text', text: `[image omitted after ${heavy} turns, blob ${b._blobId}]` }
 				}
 				return b
 			})

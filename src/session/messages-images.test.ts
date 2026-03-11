@@ -36,10 +36,10 @@ test('parseUserContent parses [path.png] into image blocks', async () => {
 	expect(apiContent[1].source.type).toBe('base64')
 	expect(apiContent[1].source.media_type).toBe('image/png')
 
-	// Log content should have ref instead of base64
+	// Log content should have blob id instead of base64
 	expect(Array.isArray(logContent)).toBe(true)
 	const imgBlock = (logContent as any[]).find((b: any) => b.type === 'image')
-	expect(imgBlock.ref).toBeDefined()
+	expect(imgBlock.blobId).toBeDefined()
 	expect(imgBlock.source).toBeUndefined()
 })
 
@@ -96,7 +96,7 @@ test('loadApiMessages synthesizes results for orphaned tool_use blocks', async (
 	await appendMessages(SID, [{ role: 'user', content: 'do stuff', ts: new Date().toISOString() }])
 
 	// Assistant with 2 tool calls, only 1 gets a result
-	const { entry, toolRefMap } = await writeAssistantEntry(SID, {
+	const { entry, toolBlobMap } = await writeAssistantEntry(SID, {
 		text: 'ok',
 		toolCalls: [
 			{ id: 't1', name: 'bash', input: { command: 'ls' } },
@@ -106,7 +106,7 @@ test('loadApiMessages synthesizes results for orphaned tool_use blocks', async (
 	await appendMessages(SID, [entry])
 
 	// Only write result for t1
-	const r1 = await writeToolResultEntry(SID, 't1', 'file.txt', toolRefMap)
+	const r1 = await writeToolResultEntry(SID, 't1', 'file.txt', toolBlobMap)
 	await appendMessages(SID, [r1])
 
 	// Another assistant with tool call, no result at all
@@ -175,12 +175,12 @@ test('replay marks tool with error status when stored result status is error', a
 	const { replayToBlocks } = await import('./replay.ts')
 	const SID = TEST_SESSION
 
-	const { entry, toolRefMap } = await writeAssistantEntry(SID, {
+	const { entry, toolBlobMap } = await writeAssistantEntry(SID, {
 		text: 'run',
 		toolCalls: [{ id: 't1', name: 'read', input: { path: 'missing.txt' } }],
 	})
 	await appendMessages(SID, [entry])
-	const result = await writeToolResultEntry(SID, 't1', 'error: file not found', toolRefMap, 'error')
+	const result = await writeToolResultEntry(SID, 't1', 'error: file not found', toolBlobMap, 'error')
 	await appendMessages(SID, [result])
 
 	const messages = await readMessages(SID)
@@ -196,12 +196,12 @@ test('loadApiMessages boosts threshold after model change', async () => {
 
 	// User + tool cycle
 	await appendMessages(SID, [{ role: 'user', content: 'go', ts: new Date().toISOString() }])
-	const { entry, toolRefMap } = await writeAssistantEntry(SID, {
+	const { entry, toolBlobMap } = await writeAssistantEntry(SID, {
 		text: 'ok',
 		toolCalls: [{ id: 't0', name: 'bash', input: { command: 'ls' } }],
 	})
 	await appendMessages(SID, [entry])
-	const result = await writeToolResultEntry(SID, 't0', 'file1.ts\nfile2.ts', toolRefMap)
+	const result = await writeToolResultEntry(SID, 't0', 'file1.ts\nfile2.ts', toolBlobMap)
 	await appendMessages(SID, [result])
 
 	// Model change

@@ -30,7 +30,7 @@ export async function startRuntime(): Promise<Runtime> {
 			if (meta.context) {
 				ctx = meta.context
 			} else {
-				const usage = messages.getLastUsage(meta.id)
+				const usage = await messages.getLastUsage(meta.id)
 				if (usage) {
 					ctx = { used: usage.input, max: context.contextWindowForModel(modelId) }
 				} else {

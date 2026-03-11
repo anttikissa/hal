@@ -39,7 +39,7 @@ describe('renderBlocks', () => {
 
 	test('thinking long text uses the block model in header', () => {
 		const text = Array.from({ length: 14 }, (_, i) => `line ${i}`).join('\n')
-		const blocks: Block[] = [{ type: 'thinking', text, done: false, ref: 'abc123', model: 'anthropic/claude-sonnet-4-20250514', sessionId: '02-xyz' }]
+		const blocks: Block[] = [{ type: 'thinking', text, done: false, blobId: 'abc123', model: 'anthropic/claude-sonnet-4-20250514', sessionId: '02-xyz' }]
 		const { lines } = renderBlocks(blocks, 80)
 		expect(lines.some(l => trimLine(l).includes('Hal (Sonnet 4, thinking)'))).toBe(true)
 		expect(lines.some(l => trimLine(l).includes('[+ 4 lines]'))).toBe(true)
@@ -49,7 +49,7 @@ describe('renderBlocks', () => {
 	test('bash long command is moved below header', () => {
 		const longCmd = 'echo ' + 'x'.repeat(80)
 		const blocks: Block[] = [
-			{ type: 'tool', name: 'bash', status: 'done', args: longCmd, output: '', startTime: Date.now(), endTime: Date.now() },
+			{ type: 'tool', name: 'bash', status: 'done', args: longCmd, output: '', startTime: Date.now(), endTime: Date.now(), sessionId: '' },
 		]
 		const { lines } = renderBlocks(blocks, 80)
 		expect(trimLine(lines[0])).toMatch(/^── bash: \(0\.0s\) ✓ /)
@@ -58,7 +58,7 @@ describe('renderBlocks', () => {
 
 	test('tool error in header uses cross', () => {
 		const blocks: Block[] = [
-			{ type: 'tool', name: 'read', status: 'error', args: 'foo.txt', output: 'error: not found', startTime: Date.now() - 1000 },
+			{ type: 'tool', name: 'read', status: 'error', args: 'foo.txt', output: 'error: not found', startTime: Date.now() - 1000, sessionId: '' },
 		]
 		const { lines } = renderBlocks(blocks, 80)
 		expect(lines[0]).toContain('✗')
@@ -67,7 +67,7 @@ describe('renderBlocks', () => {
 	test('all block lines keep width', () => {
 		const blocks: Block[] = [
 			{ type: 'assistant', text: 'hello', done: true },
-			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: 'ok', startTime: Date.now() - 1000, endTime: Date.now() },
+			{ type: 'tool', name: 'bash', status: 'done', args: 'ls', output: 'ok', startTime: Date.now() - 1000, endTime: Date.now(), sessionId: '' },
 		]
 		const { lines } = renderBlocks(blocks, 40)
 		for (const line of lines.filter(Boolean)) {
@@ -78,7 +78,7 @@ describe('renderBlocks', () => {
 	test('long tool header stays within width', () => {
 		const longArgs = 'padTarget|pad.*target|lines\\.push|scroll|content.*height|visible.*lines (0.0s) ✓'
 		const blocks: Block[] = [
-			{ type: 'tool', name: 'grep', status: 'done', args: longArgs, output: 'No matches found.', startTime: Date.now() - 500, endTime: Date.now(), ref: '008sp9-ybs', sessionId: '02-f17' },
+			{ type: 'tool', name: 'grep', status: 'done', args: longArgs, output: 'No matches found.', startTime: Date.now() - 500, endTime: Date.now(), blobId: '008sp9-ybs', sessionId: '02-f17' },
 		]
 		for (const w of [80, 90, 100, 120]) {
 			const { lines } = renderBlocks(blocks, w)

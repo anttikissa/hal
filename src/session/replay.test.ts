@@ -27,7 +27,7 @@ describe('replayToBlocks', () => {
 	test('shows resume info for interrupted tools', async () => {
 		const messages: Message[] = [
 			{ role: 'user', content: 'do something', ts: '2026-01-01T00:00:00Z' },
-			{ role: 'assistant', text: '', tools: [{ name: 'bash', id: 'tool1', ref: 'ref1' }], ts: '2026-01-01T00:00:01Z' },
+			{ role: 'assistant', text: '', tools: [{ name: 'bash', id: 'tool1', blobId: 'ref1' }], ts: '2026-01-01T00:00:01Z' },
 		]
 		const blocks = await replayToBlocks('test-session', messages)
 		const last = blocks[blocks.length - 1] as any
@@ -39,8 +39,8 @@ describe('replayToBlocks', () => {
 	test('shows resume info when last message is tool_result (interrupted re-generation)', async () => {
 		const messages: Message[] = [
 			{ role: 'user', content: 'do something', ts: '2026-01-01T00:00:00Z' },
-			{ role: 'assistant', text: '', tools: [{ name: 'bash', id: 'tool1', ref: 'ref1' }], ts: '2026-01-01T00:00:01Z' },
-			{ role: 'tool_result', tool_use_id: 'tool1', ref: 'ref1', ts: '2026-01-01T00:00:02Z' },
+			{ role: 'assistant', text: '', tools: [{ name: 'bash', id: 'tool1', blobId: 'ref1' }], ts: '2026-01-01T00:00:01Z' },
+			{ role: 'tool_result', tool_use_id: 'tool1', blobId: 'ref1', ts: '2026-01-01T00:00:02Z' },
 		]
 		const blocks = await replayToBlocks('test-session', messages)
 		const last = blocks[blocks.length - 1]

@@ -5,7 +5,7 @@
 Sessions are stored per session id under `state/sessions/<sessionId>/`:
 
 - `messages.N.asonl` -- rotated archives (N=1 oldest, higher=more recent). Created by `/compact` or `/reset`.
-- `blocks/` -- external content blocks (thinking text + signatures, tool call inputs + results). One `.ason` file per block ref. Shared across all rotations.
+- `blobs/` -- external payload blobs (thinking text + signatures, tool call inputs + results, pasted images). One `.ason` file per blob id. Shared across all rotations and resolved across fork ancestry.
 - `messages.asonl` -- unified append-only message log (API messages + conversation events). Never truncated.
 - `info.ason` -- per-session metadata (workingDir, model, topic, lastPrompt, tokenTotals)
 - `draft.txt` -- unsent prompt text
@@ -31,16 +31,17 @@ Core logic: `src/session/session.ts`.
 
 On restart, `replayConversationEvents()` replays `user`, `assistant`, and `tool` events after the last `reset`/`compact`. Consecutive `assistant` events (from multi-turn tool loops) are merged. `tool` events are rendered as `<tool>` lines in the TUI.
 
-## Block Storage (v2)
+## Blob Storage
 
-Large content is stored in `blocks/` as individual `.ason` files:
+Large payloads are stored in `blobs/` as individual `.ason` files:
 
-- **Thinking blocks**: `{ thinking: '...full text...', signature: '...base64...' }` — signature is required to send thinking back to the Anthropic API.
-- **Tool calls**: `{ call: { name, input }, result: { content } }` — call and result in one file.
+- **Thinking blobs**: `{ thinking: '...full text...', signature: '...base64...' }` — signature is required to send thinking back to the Anthropic API.
+- **Tool blobs**: `{ call: { name, input }, result: { content, status? } }` — call and result in one file.
+- **Image blobs**: `{ media_type, data }` — pasted or attached images stored out of line from the message log.
 
-Block refs in `messages.asonl` look like `1709123456789-a3b2c1` (timestamp + random hex).
+Blob ids in `messages.asonl` are short stable ids like `1709123456789-a3b2c1` (timestamp + random suffix).
 
-The messages.asonl spine stays human-readable — you can see message roles, tool names, and text content inline. Only thinking and tool I/O moves to block files.
+The `messages.asonl` spine stays human-readable — you can see message roles, tool names, text content, and blob ids inline. Only heavy payloads move into blob files.
 
 ## Context Compaction
 
@@ -55,7 +56,7 @@ API messages are compacted before sending to strip old heavy content (tool resul
 - `/reset` rotates `messages.asonl` → `messages.N.asonl` (no deletion) and clears in-memory cache.
 - `/close` removes session from registry/cache and emits updated session snapshot.
 - `/cd` updates `workingDir` for the session and reloads system prompt context.
-- `/fork` copies `messages.asonl` and `blocks/` directory to a new session.
+- `/fork` keeps using the parent session's blob ids through ancestry-aware lookup. New blobs created in the child go to the child's `blobs/` directory.
 - Auto-topic: after the first assistant response, runtime generates a short topic.
 
 ## Rotation

@@ -6,6 +6,7 @@ import { resolve, isAbsolute } from 'path'
 import { $ } from 'bun'
 import { homedir } from 'os'
 import { ason } from '../utils/ason.ts'
+import { messages as sessionMessages } from '../session/messages.ts'
 import { evalTool, type EvalContext } from './eval-tool.ts'
 
 const HOME = homedir()
@@ -122,6 +123,13 @@ function withLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
 	return result
 }
 
+function blobPreview(blobId: string, blob: any): string {
+	if (blob && typeof blob === 'object' && typeof blob.media_type === 'string' && typeof blob.data === 'string') {
+		return `blob ${blobId}\nkind: image\nmedia_type: ${blob.media_type}\ndata: [base64 ${blob.data.length} chars]`
+	}
+	return truncate(ason.stringify(blob))
+}
+
 // ── Tool definitions ──
 
 const EVAL_TOOL = {
@@ -169,6 +177,10 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 			path: { type: 'string', description: 'Directory to list (default: cwd)' },
 			depth: { type: 'integer', description: 'Max depth (default: 3)' },
 		} } },
+	{ name: 'read_blob', description: 'Read a stored session blob by id. Works for images, tool payloads, tool results, and thinking blobs.',
+		input_schema: { type: 'object', properties: {
+			blobId: { type: 'string', description: 'Stable blob id, for example from an omitted image or tool result' },
+		}, required: ['blobId'] } },
 	{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
 	{ name: 'ask', description: 'Ask the user a question and wait for their response. Use this to clarify ambiguous instructions, gather preferences, or get decisions on implementation choices.',
 		input_schema: { type: 'object', properties: {
@@ -199,6 +211,10 @@ function validateRequired(call: ToolCall): string | null {
 
 export interface ToolCall { id: string; name: string; input: unknown }
 type OnChunk = (text: string) => Promise<void>
+export interface ToolExecContext {
+	evalCtx?: EvalContext
+	sessionId?: string
+}
 
 // ── Tool execution ──
 export function argsPreview(call: ToolCall): string {
@@ -212,6 +228,7 @@ export function argsPreview(call: ToolCall): string {
 		case 'grep': s = String(inp?.pattern ?? ''); break
 		case 'glob': s = String(inp?.pattern ?? ''); break
 		case 'ls': s = String(inp?.path ?? '.'); break
+		case 'read_blob': s = String(inp?.blobId ?? ''); break
 		case 'ask': s = String(inp?.question ?? '').slice(0, 80); break
 		case 'eval': s = String(inp?.code ?? '').slice(0, 80); break
 		default: s = call.name
@@ -219,11 +236,12 @@ export function argsPreview(call: ToolCall): string {
 	return shortenHome(s)
 }
 
-export async function executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalContext): Promise<string> {
-	return shortenHome(await _executeTool(call, onChunk, evalCtx))
+export async function executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
+	const result = await _executeTool(call, onChunk, ctx)
+	return typeof result === 'string' ? shortenHome(result) : result
 }
 
-async function _executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalContext): Promise<string> {
+async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
 	const err = validateRequired(call)
 	if (err) return err
 	const inp = call.input as any
@@ -340,7 +358,15 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, evalCtx?: EvalCon
 			walk(dir, '', 0)
 			return lines.join('\n') || '(empty directory)'
 		}
+		case 'read_blob': {
+			if (!ctx?.sessionId) return 'error: read_blob requires a session context'
+			const blobId = String(inp?.blobId ?? '')
+			const blob = await sessionMessages.readBlob(ctx.sessionId, blobId)
+			if (!blob) return `error: blob not found: ${blobId}`
+			return blobPreview(blobId, blob)
+		}
 		case 'eval': {
+			const evalCtx = ctx?.evalCtx
 			if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
 			// Lazily resolve runtime to avoid circular imports
 			if (!evalCtx.runtime) {

@@ -422,7 +422,7 @@ Callers:
 ### `src/session/messages.ts` → `export const messages = { ... }`
 
 Exports to wrap:
-- `makeBlockRef`, `writeBlock`, `readBlock`, `getLastUsage`, `writeAssistantEntry`, `writeToolResultEntry`, `updateBlockInput`, `parseUserContent`, `appendMessages`, `readMessages`, `loadApiMessages`, `loadAllMessages`, `detectInterruptedTools`, `buildCompactionContext`, `loadInputHistory`, `saveDraft`
+- `makeBlobId`, `writeBlob`, `readBlob`, `getLastUsage`, `writeAssistantEntry`, `writeToolResultEntry`, `updateBlobInput`, `parseUserContent`, `appendMessages`, `readMessages`, `loadApiMessages`, `loadAllMessages`, `detectInterruptedTools`, `buildCompactionContext`, `loadInputHistory`, `saveDraft`
 
 Keep as direct exports:
 - `UserMessage`, `AssistantMessage`, `ToolResultMessage`, `Message` (types)

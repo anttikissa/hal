@@ -12,16 +12,16 @@ Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/se
 
 - Finds the **last tool batch** (most recent assistant message with `tool_use` blocks + corresponding `tool_result` messages).
 - Keeps that batch in full; clears all older tool results and inputs.
-- If the last batch is **stale** (>4 user turns after it), clears it too.
-- Cleared tool results become `[cleared — ref: <block-ref>]` — the model can still read the block file if needed.
+- If the last batch is **stale** (>4 completed turns after it), clears it too.
+- Cleared tool results become `[tool result omitted after 4 turns, blob <blob-id>]`.
 - Cleared tool inputs become `{}` (API requires the field to exist).
 
 ### 2. Images (`stripOldImages`)
 
-- Keeps images in the **last 4 user turns**.
-- Older images become `{ type: 'text', text: '[image cleared — ref: <ref>]' }`.
+- Keeps images in the **last 4 completed turns**.
+- Older images become `{ type: 'text', text: '[image omitted after 4 turns, blob <blob-id>]' }`.
 - Works for images in both regular user messages and `tool_result` messages.
-- The `_ref` field is threaded from block storage through `loadApiMessages` so the cleared placeholder can reference the original.
+- The `_blobId` field is threaded from blob storage through `loadApiMessages()` so the cleared placeholder can reference the original payload.
 
 ### 3. Thinking blocks (`stripOldThinking`)
 
@@ -32,10 +32,10 @@ Core logic: `src/session/compact.ts`, called from `loadApiMessages()` in `src/se
 
 | Content | Threshold | Cleared form |
 |---------|-----------|-------------|
-| Tool results | Last batch only; stale after 4 user turns | `[cleared — ref: ...]` |
+| Tool results | Last batch only; stale after 4 completed turns | `[tool result omitted after 4 turns, blob ...]` |
 | Tool inputs | Same as results | `{}` |
-| Images | 4 user turns | `[image cleared — ref: ...]` |
-| Thinking | 10 user turns | Silently dropped |
+| Images | 4 completed turns | `[image omitted after 4 turns, blob ...]` |
+| Thinking | 10 completed turns | Silently dropped |
 
 ## Why These Numbers
 

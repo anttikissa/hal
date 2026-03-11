@@ -42,7 +42,7 @@ Commands are created with `makeCommand(...)` and appended to `commands.asonl`.
 - `sessions`: session list + active session id
 - `command`: lifecycle (`queued`, `started`, `done`, `failed`)
 - `prompt`: prompt echo (`text` + `source`; optional `label: 'steering'`)
-- `tool`: tool execution events (`running`, `streaming`, `done`, `error`); includes `toolId`, `name`, `args`, optional `output` and `ref`
+- `tool`: tool execution events (`running`, `streaming`, `done`, `error`); includes `toolId`, `name`, `args`, optional `output` and `blobId`
 - `question`: model asks user a question (`questionId`, `text`)
 - `answer`: user answers a question (`question`, `text`)
 ## Queue & Scheduling Behavior

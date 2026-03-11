@@ -141,6 +141,7 @@ export class Client {
 				break
 			}
 			case 'tool': {
+				if (!event.sessionId) return
 				const t = tab(event.sessionId); if (!t) return
 				closeStreaming(t)
 				if (event.phase === 'running') {

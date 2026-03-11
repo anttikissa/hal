@@ -130,8 +130,8 @@ function getParentSessionId(sessionId: string): string | null {
 }
 
 /** Get the last known API usage from persisted messages. */
-export function getLastUsage(sessionId: string): { input: number; output: number } | null {
-	const msgs = readMessages(sessionId)
+export async function getLastUsage(sessionId: string): Promise<{ input: number; output: number } | null> {
+	const msgs = await readMessages(sessionId)
 	for (let i = msgs.length - 1; i >= 0; i--) {
 		const m = msgs[i]
 		if (m.role === 'assistant' && m.usage) return m.usage

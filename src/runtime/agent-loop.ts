@@ -197,11 +197,14 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								type: 'tool', toolId: call.id, name: call.name,
 								args, phase: 'streaming', output: text,
 							})
-							result = await tools.executeTool(call, onChunk, evalCtx)
+							result = await tools.executeTool(call, onChunk, { evalCtx, sessionId })
 							if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
 							await emit(sessionId, {
 								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: toolStatus === 'error' ? 'error' : 'done', output: result, blobId,
+								args,
+								phase: toolStatus === 'error' ? 'error' : 'done',
+								output: typeof result === 'string' ? result : '[non-text output]',
+								blobId,
 							})
 						}
 

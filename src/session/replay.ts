@@ -12,7 +12,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 	const toolResults = new Map<string, string>()
 	for (const msg of messages) {
 		const m = msg as any
-		if (m.role === 'tool_result') toolResults.set(m.tool_use_id, m.ref)
+		if (m.role === 'tool_result') toolResults.set(m.tool_use_id, m.blobId)
 	}
 
 	for (const msg of messages) {
@@ -32,28 +32,29 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			if (text) blocks.push({ type: 'input', text, model })
 		} else if (m.role === 'assistant') {
 			if (m.thinkingText) {
-				blocks.push({ type: 'thinking', text: m.thinkingText, done: true, model, sessionId, ref: m.thinkingRef })
+				blocks.push({ type: 'thinking', text: m.thinkingText, done: true, model, sessionId, blobId: m.thinkingBlobId })
 			}
 			if (m.text) {
 				blocks.push({ type: 'assistant', text: m.text, done: true, model })
 			}
 			if (Array.isArray(m.tools)) {
 				for (const tool of m.tools) {
-					const resultRef = toolResults.get(tool.id)
-					const block = resultRef ? await sessionMessages.readBlob(sessionId, resultRef) : await sessionMessages.readBlob(sessionId, tool.ref)
-					const callData = block?.call ?? {}
-					const raw = block?.result?.content ?? ''
+					const resultBlobId = toolResults.get(tool.id)
+					const blob = resultBlobId ? await sessionMessages.readBlob(sessionId, resultBlobId) : await sessionMessages.readBlob(sessionId, tool.blobId)
+					const callData = blob?.call ?? {}
+					const raw = blob?.result?.content ?? ''
 					const output = typeof raw === 'string' ? raw : raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
-					const status = block?.result?.status === 'error' ? 'error' : (block?.result ? 'done' : 'error')
+					const status = blob?.result?.status === 'error' ? 'error' : (blob?.result ? 'done' : 'error')
 					const now = Date.now()
 					blocks.push({
 						type: 'tool',
 						name: tool.name,
-						args: typeof callData.input === 'string' ? callData.input : tools.argsPreview({ id: tool.ref, name: tool.name, input: callData.input }),
+						args: typeof callData.input === 'string' ? callData.input : tools.argsPreview({ id: tool.blobId, name: tool.name, input: callData.input }),
 						output,
 						status,
-						startTime: now, endTime: now,
-						ref: resultRef ?? tool.ref,
+						startTime: now,
+						endTime: now,
+						blobId: resultBlobId ?? tool.blobId,
 						sessionId,
 					})
 				}
