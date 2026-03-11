@@ -79,4 +79,26 @@ export function pruneApiMessages(msgs: any[], opts?: PruneOpts): any[] {
 	return out
 }
 
-export const prune = { pruneApiMessages }
+// After a model change, keep more context un-pruned so the new model sees recent history
+const MODEL_CHANGE_THRESHOLD = 10
+
+export function detectPruneOpts(entries: any[]): PruneOpts | undefined {
+	let lastModelChangeIdx = -1
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const e = entries[i] as any
+		if (e.type === 'info' && typeof e.text === 'string' && e.text.startsWith('[model]')) {
+			lastModelChangeIdx = i
+			break
+		}
+	}
+	if (lastModelChangeIdx < 0) return undefined
+	let turnsAfter = 0
+	for (let i = lastModelChangeIdx + 1; i < entries.length; i++) {
+		const e = entries[i] as any
+		if (e.role === 'assistant' && !e.tools) turnsAfter++
+	}
+	if (turnsAfter <= MODEL_CHANGE_THRESHOLD) return { heavyThreshold: MODEL_CHANGE_THRESHOLD }
+	return undefined
+}
+
+export const prune = { pruneApiMessages, detectPruneOpts }
