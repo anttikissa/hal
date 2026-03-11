@@ -11,3 +11,4 @@ node_modules/
 examples/
 new-state/
 test_tail.txt
+config.ason.bak
