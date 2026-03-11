@@ -110,6 +110,12 @@ export async function writeToolResultEntry(
 	return { role: 'tool_result', tool_use_id: toolUseId, blobId, ts: new Date().toISOString() }
 }
 
+export async function writeUserEntry(sessionId: string, content: UserMessage['content']): Promise<UserMessage> {
+	const entry: UserMessage = { role: 'user', content, ts: new Date().toISOString() }
+	await appendHistory(sessionId, [entry])
+	return entry
+}
+
 export async function appendHistory(sessionId: string, entries: Message[]): Promise<void> {
 	if (entries.length === 0) return
 	state.ensureDir(state.sessionDir(sessionId))
@@ -279,6 +285,7 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 export const history = {
 	config: historyConfig,
 	getLastUsage,
+	writeUserEntry,
 	writeAssistantEntry,
 	writeToolResultEntry,
 	appendHistory,

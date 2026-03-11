@@ -1,2 +1,3 @@
 #!/usr/bin/env bash
+tsgo --noEmit
 bun scripts/test-parallel.ts "$@"
