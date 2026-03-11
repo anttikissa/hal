@@ -2,6 +2,8 @@
 
 Goal: move tool behavior toward `src/tools/*` so execution + formatting can be shared by CLI and a future web client.
 
+Status: bash-first slice is implemented. See `docs/tools.md` for current architecture and streaming/formatting behavior.
+
 ## Why
 
 - `src/runtime/tools.ts` currently mixes schemas, execution, and formatting-adjacent previews.
