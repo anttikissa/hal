@@ -204,6 +204,45 @@ test('openai provider: replays reasoning signature in input', async () => {
 	}
 })
 
+test('openai provider: deduplicates reasoning items by id', async () => {
+	const sse = makeSSE([{ type: 'response.completed', response: { status: 'completed' } }])
+	let requestBody: any = null
+	const origFetch = globalThis.fetch
+	globalThis.fetch = async (input: any, init?: any) => {
+		const url = typeof input === 'string' ? input : input.url
+		if (url.includes('auth.openai.com')) {
+			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
+		}
+		requestBody = JSON.parse(String(init?.body ?? '{}'))
+		return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	}
+
+	try {
+		const mod = await import('./openai-provider.ts')
+		const provider = mod.default
+		const reasoning = { type: 'reasoning', id: 'rs_dup', encrypted_content: 'enc_dup' }
+		// Two assistant messages with the same reasoning signature (e.g. after fork)
+		for await (const _event of provider.generate({
+			messages: [
+				{ role: 'assistant', content: [{ type: 'thinking', thinking: 'thought 1', signature: JSON.stringify(reasoning) }, { type: 'text', text: 'reply 1' }] },
+				{ role: 'user', content: 'follow-up' },
+				{ role: 'assistant', content: [{ type: 'thinking', thinking: 'thought 2', signature: JSON.stringify(reasoning) }, { type: 'text', text: 'reply 2' }] },
+			],
+			model: 'gpt-5.4',
+			systemPrompt: 'test',
+		})) {
+			// drain
+		}
+
+		expect(requestBody).toBeTruthy()
+		const reasoningItems = requestBody.input.filter((i: any) => i.type === 'reasoning')
+		expect(reasoningItems).toHaveLength(1)
+		expect(reasoningItems[0].id).toBe('rs_dup')
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})
+
 test('openai provider: handles API error', async () => {
 	const origFetch = mockFetchError(429, '{"error": "rate limited"}')
 	try {

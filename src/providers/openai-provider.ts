@@ -16,6 +16,7 @@ function resolveApiUrl(token: string): string {
 
 function convertMessages(messages: any[]): any[] {
 	const input: any[] = []
+	const seenReasoningIds = new Set<string>()
 	for (const msg of messages) {
 		if (msg.role === 'user') {
 			if (Array.isArray(msg.content)) {
@@ -54,7 +55,10 @@ function convertMessages(messages: any[]): any[] {
 					})
 				} else if (block.type === 'thinking') {
 					const signature = parseReasoningSignature(block.signature ?? block.thinkingSignature)
-					if (signature) input.push(signature)
+					if (signature && !seenReasoningIds.has(signature.id)) {
+						seenReasoningIds.add(signature.id)
+						input.push(signature)
+					}
 				} else if (block.type === 'tool_use') {
 					input.push({
 						type: 'function_call',

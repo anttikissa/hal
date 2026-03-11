@@ -4,6 +4,23 @@
 
 revisit all tool outputs and verify that all necessary stuff is visible!
 
+colors must be colors.ason:
+
+need ctrl-l to redraw (and eval() can use the same function eg after changing colors)
+
+{
+  // defaults
+  vars: {
+    fgLightness: 0.75
+    bgLightness: 0.25
+  },
+
+  colors: {
+    // ...
+    // some way to specify oklch() using vars like $fgLightness
+  }
+
+}
 
 Make tab restore work
 Make small indicator to show tab activity
