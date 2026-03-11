@@ -7,6 +7,7 @@ export type BashStatus = 'streaming' | 'running' | 'done' | 'error'
 export interface BashExecuteContext {
 	cwd: string
 	env?: Record<string, string | undefined>
+	signal?: AbortSignal
 }
 
 export interface BashFormatBlockInput {
@@ -93,6 +94,22 @@ function formatBlock(input: BashFormatBlockInput): BashFormatBlock {
 	return { label, commandLines, outputLines, hiddenOutputLines }
 }
 
+function childPids(parentPid: number): number[] {
+	const result = Bun.spawnSync(['pgrep', '-P', String(parentPid)], {
+		stdout: 'pipe',
+		stderr: 'ignore',
+	})
+	if (result.exitCode !== 0) return []
+	const text = new TextDecoder().decode(result.stdout).trim()
+	if (!text) return []
+	return text.split(/\s+/).map(Number).filter((pid) => Number.isInteger(pid) && pid > 0)
+}
+
+function killProcessTree(rootPid: number, signal: 'SIGTERM' | 'SIGKILL'): void {
+	for (const pid of childPids(rootPid)) killProcessTree(pid, signal)
+	try { process.kill(rootPid, signal) } catch {}
+}
+
 async function execute(input: unknown, ctx: BashExecuteContext, onChunk?: OnChunk): Promise<string> {
 	const cmd = argsPreview(input)
 	const proc = Bun.spawn(['bash', '-lc', cmd], {
@@ -101,6 +118,18 @@ async function execute(input: unknown, ctx: BashExecuteContext, onChunk?: OnChun
 		stderr: 'pipe',
 		env: { ...process.env, ...ctx.env, TERM: 'dumb' },
 	})
+
+	// Kill full process tree on abort (SIGTERM, then SIGKILL after 2s)
+	if (ctx.signal) {
+		const onAbort = () => {
+			killProcessTree(proc.pid, 'SIGTERM')
+			const timer = setTimeout(() => killProcessTree(proc.pid, 'SIGKILL'), 2000)
+			;(timer as any).unref?.()
+		}
+		if (ctx.signal.aborted) onAbort()
+		else ctx.signal.addEventListener('abort', onAbort, { once: true })
+	}
+
 	let out = ''
 	const reader = proc.stdout.getReader()
 	const decoder = new TextDecoder()
@@ -113,9 +142,10 @@ async function execute(input: unknown, ctx: BashExecuteContext, onChunk?: OnChun
 	}
 	const stderr = await new Response(proc.stderr).text()
 	const code = await proc.exited
+	if (ctx.signal?.aborted) return out + (stderr ? '\n' + stderr : '') + '\n[interrupted]'
 	if (stderr) out += (out ? '\n' : '') + stderr
 	if (code !== 0) out += `\n[exit ${code}]`
 	return out || '(no output)'
 }
 
-export const bash = { config: bashConfig, definition, argsPreview, formatBlock, execute }
+export const bash = { config: bashConfig, definition, argsPreview, formatBlock, execute, killProcessTree }

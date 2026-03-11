@@ -218,6 +218,7 @@ type OnChunk = (text: string) => Promise<void>
 export interface ToolExecContext {
 	evalCtx?: EvalContext
 	sessionId?: string
+	signal?: AbortSignal
 }
 
 // ── Tool execution ──
@@ -251,7 +252,7 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 	const inp = call.input as any
 	switch (call.name) {
 		case 'bash':
-			return bash.execute(inp, { cwd: CWD }, onChunk)
+			return bash.execute(inp, { cwd: CWD, signal: ctx?.signal }, onChunk)
 		case 'read': {
 			const path = resolvePath(inp.path)
 			try {

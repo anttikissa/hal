@@ -158,61 +158,67 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						persisted = true
 						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
-						// Execute tools, writing each result individually
-						for (let call of toolCalls) {
-							if (signal?.aborted) { aborted = true; break }
-							const original = call
-							call = hooks.runHooks(call)
-							if (call.input !== original.input) {
+						// Execute tools in parallel
+						const toolResults = await Promise.all(toolCalls.map(async (originalCall) => {
+							if (signal?.aborted) return { call: originalCall, result: '[interrupted]' as string | any[], toolStatus: 'done' as const }
+							let call = hooks.runHooks(originalCall)
+							if (call.input !== originalCall.input) {
 								const blobId = toolBlobMap.get(call.id)
-								if (blobId) await blob.updateInput(sessionId, blobId, call.input, original.input)
+								if (blobId) await blob.updateInput(sessionId, blobId, call.input, originalCall.input)
 							}
 							const args = tools.argsPreview(call)
 
-						let result: string | any[]
-						let toolStatus: 'done' | 'error' = 'done'
+							let result: string | any[]
+							let toolStatus: 'done' | 'error' = 'done'
 
-						// Permission gate
-						if (needsPermission(call.name, config.getConfig().permissions)) {
-							const answer = await ctx.askUser(`Allow ${call.name} ${args}? (y/n)`)
-							if (answer.trim().toLowerCase() !== 'y') {
-								result = 'error: user denied permission'
-								toolStatus = 'error'
-								const toolResultEntry = await sessionHistory.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
-								await sessionHistory.appendHistory(sessionId, [toolResultEntry])
-								continue
+							// Permission gate
+							if (needsPermission(call.name, config.getConfig().permissions)) {
+								const answer = await ctx.askUser(`Allow ${call.name} ${args}? (y/n)`)
+								if (answer.trim().toLowerCase() !== 'y') {
+									result = 'error: user denied permission'
+									toolStatus = 'error'
+									return { call, result, toolStatus }
+								}
 							}
-						}
 
-						if (call.name === 'ask') {
-							const question = (call.input as any)?.question ?? ''
-							const answer = await ctx.askUser(question) || '[no answer]'
-							const { apiContent } = await attachments.resolve(sessionId, answer)
-							result = apiContent
+							if (call.name === 'ask') {
+								const question = (call.input as any)?.question ?? ''
+								const answer = await ctx.askUser(question) || '[no answer]'
+								const { apiContent } = await attachments.resolve(sessionId, answer)
+								result = apiContent
+							} else {
+								const blobId = toolBlobMap.get(call.id)
+								await emit(sessionId, {
+									type: 'tool', toolId: call.id, name: call.name,
+									args, phase: 'running', blobId,
+								})
+								const onChunk = (text: string) => emit(sessionId, {
+									type: 'tool', toolId: call.id, name: call.name,
+									args, phase: 'streaming', output: text,
+								})
+								result = await tools.executeTool(call, onChunk, { evalCtx, sessionId, signal })
+								if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
+								await emit(sessionId, {
+									type: 'tool', toolId: call.id, name: call.name,
+									args,
+									phase: toolStatus === 'error' ? 'error' : 'done',
+									output: typeof result === 'string' ? result : '[non-text output]',
+									blobId,
+								})
+							}
+
+							return { call, result, toolStatus }
+						}))
+
+						// Persist all tool results
+						if (!signal?.aborted) {
+							const entries = []
+							for (const { call, result, toolStatus } of toolResults) {
+								entries.push(await sessionHistory.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus))
+							}
+							await sessionHistory.appendHistory(sessionId, entries)
 						} else {
-							const blobId = toolBlobMap.get(call.id)
-							await emit(sessionId, {
-								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: 'running', blobId,
-							})
-							const onChunk = (text: string) => emit(sessionId, {
-								type: 'tool', toolId: call.id, name: call.name,
-								args, phase: 'streaming', output: text,
-							})
-							result = await tools.executeTool(call, onChunk, { evalCtx, sessionId })
-							if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
-							await emit(sessionId, {
-								type: 'tool', toolId: call.id, name: call.name,
-								args,
-								phase: toolStatus === 'error' ? 'error' : 'done',
-								output: typeof result === 'string' ? result : '[non-text output]',
-								blobId,
-							})
-						}
-
-						// Persist tool result immediately
-						const toolResultEntry = await sessionHistory.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus)
-						await sessionHistory.appendHistory(sessionId, [toolResultEntry])
+							aborted = true
 						}
 
 						if (aborted) break
