@@ -3,10 +3,13 @@
 // A "turn" = a completed agent response (assistant message without tool_use).
 // Tool results and images are cleared after config.heavyThreshold completed turns;
 // thinking blocks after config.thinkingThreshold completed turns.
+// After a model change, detectPruneOpts temporarily uses config.modelChangeThreshold
+// as the heavy-content threshold so the new model gets a slightly longer recent window.
 
 export const pruneConfig = {
 	heavyThreshold: 4,
 	thinkingThreshold: 10,
+	// Used by detectPruneOpts after a [model] event to keep heavy content longer.
 	modelChangeThreshold: 10,
 }
 
