@@ -1,10 +1,7 @@
 // Session history log — append-only ASONL per session.
-// Tool call data lives in blobs/ as separate .ason files for compactness
-// and fork sharing. The log only stores blob ids (pointers) to blobs.
 
 import { writeFile, readFile, unlink } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
-import { randomBytes } from 'crypto'
 import { homedir } from 'os'
 import { Log } from '../utils/log.ts'
 import { state } from '../state.ts'
@@ -12,6 +9,7 @@ import { ason } from '../utils/ason.ts'
 import { session } from './session.ts'
 import { prune, type PruneOpts } from './prune.ts'
 import { historyFork } from './history-fork.ts'
+import { makeBlobId, writeBlob, readBlob } from './blob.ts'
 
 function resolveLogName(sessionId: string): string {
 	const cached = session.logNameCache.get(sessionId)
@@ -61,51 +59,6 @@ export type Message = UserMessage | AssistantMessage | ToolResultMessage
 	| { type: 'reset'; ts: string }
 	| { type: 'compact'; ts: string }
 	| { type: 'forked_from'; parent: string; ts: string }
-
-const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
-
-const sessionStartCache = new Map<string, number>()
-
-function sessionStart(sessionId: string): number {
-	let ts = sessionStartCache.get(sessionId)
-	if (ts !== undefined) return ts
-	try {
-		const meta = ason.parse(readFileSync(`${state.sessionDir(sessionId)}/session.ason`, 'utf-8')) as any
-		ts = new Date(meta.createdAt).getTime()
-	} catch {
-		ts = Date.now()
-	}
-	sessionStartCache.set(sessionId, ts)
-	return ts
-}
-
-export function makeBlobId(sessionId: string): string {
-	const offset = Math.max(0, Date.now() - sessionStart(sessionId)).toString(36).padStart(6, '0')
-	const bytes = randomBytes(3)
-	let suffix = ''
-	for (let i = 0; i < 3; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
-	return `${offset}-${suffix}`
-}
-
-export async function writeBlob(sessionId: string, blobId: string, data: unknown): Promise<void> {
-	const dir = state.blobsDir(sessionId)
-	state.ensureDir(dir)
-	await writeFile(`${dir}/${blobId}.ason`, ason.stringify(data) + '\n')
-}
-
-async function readLocalBlob(sessionId: string, blobId: string): Promise<any | null> {
-	const path = `${state.blobsDir(sessionId)}/${blobId}.ason`
-	if (!existsSync(path)) return null
-	try {
-		return ason.parse(await readFile(path, 'utf-8'))
-	} catch {
-		return null
-	}
-}
-
-export async function readBlob(sessionId: string, blobId: string): Promise<any | null> {
-	return historyFork.readBlobFromForkChain(sessionId, blobId, readLocalBlob)
-}
 
 export async function getLastUsage(sessionId: string): Promise<{ input: number; output: number } | null> {
 	const entries = await readHistory(sessionId)
