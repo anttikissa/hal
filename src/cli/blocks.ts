@@ -21,6 +21,7 @@ export type Block =
 	| { type: 'error'; text: string; detail?: string; blobId?: string }
 	| {
 		type: 'tool'
+		toolId?: string
 		name: string
 		status: 'streaming' | 'running' | 'done' | 'error'
 		args: string

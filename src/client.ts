@@ -146,11 +146,11 @@ export class Client {
 				const t = tab(event.sessionId); if (!t) return
 				closeStreaming(t)
 				if (event.phase === 'running') {
-					t.blocks.push({ type: 'tool', name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now(), blobId: event.blobId, sessionId: event.sessionId })
+					t.blocks.push({ type: 'tool', toolId: event.toolId, name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now(), blobId: event.blobId, sessionId: event.sessionId })
 				} else if (event.phase === 'streaming') {
 					for (let i = t.blocks.length - 1; i >= 0; i--) {
 						const b = t.blocks[i]
-						if (b.type === 'tool' && b.status === 'running') {
+						if (b.type === 'tool' && b.toolId === event.toolId && b.status === 'running') {
 							b.output += event.output ?? ''
 							break
 						}
@@ -158,7 +158,7 @@ export class Client {
 				} else {
 					for (let i = t.blocks.length - 1; i >= 0; i--) {
 						const b = t.blocks[i]
-						if (b.type === 'tool' && b.name === event.name && b.status === 'running') {
+						if (b.type === 'tool' && b.toolId === event.toolId && b.status === 'running') {
 							b.status = event.phase === 'error' ? 'error' : 'done'
 							b.output = event.output ?? ''
 							b.endTime = Date.now()
