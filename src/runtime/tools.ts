@@ -177,9 +177,9 @@ new_content is raw file content \u2014 no hashline prefixes. A trailing newline 
 			path: { type: 'string', description: 'Directory to list (default: cwd)' },
 			depth: { type: 'integer', description: 'Max depth (default: 3)' },
 		} } },
-	{ name: 'read_blob', description: 'Read a stored session blob by id. Works for images, tool payloads, tool results, and thinking blobs.',
+	{ name: 'read_blob', description: 'Read a stored session blob by id. Use this when history mentions `blob <id>` or an omitted image/tool result points at a blob.',
 		input_schema: { type: 'object', properties: {
-			blobId: { type: 'string', description: 'Stable blob id, for example from an omitted image or tool result' },
+			blobId: { type: 'string', description: 'Stable blob id, for example from an omitted image, tool result, or thinking blob' },
 		}, required: ['blobId'] } },
 	{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
 	{ name: 'ask', description: 'Ask the user a question and wait for their response. Use this to clarify ambiguous instructions, gather preferences, or get decisions on implementation choices.',

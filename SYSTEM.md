@@ -46,9 +46,11 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 2. A `{ type: 'forked_from', parent, ts }` entry is written as the first line of the child's `messages.asonl`. No messages are copied — the child's log starts empty except for this pointer.
 3. `[forked to <newId>]` is appended to the source's messages (skipped if busy, to preserve alternating user/assistant pattern).
 4. At read time, `loadAllMessages()` follows the `forked_from` chain recursively, loading parent messages (filtered by fork timestamp) and prepending them. This means the child sees the full parent conversation without duplicating data.
-5. `readBlock()` also walks the fork chain — blocks referenced by parent messages are resolved from the parent's `blocks/` directory.
+5. `readBlob()` also walks the fork chain — blobs referenced by parent messages are resolved from the parent's `blobs/` directory.
 
 Multiple forks from the same parent share the same prefix of conversation history. Both sessions diverge independently after the fork point. When debugging, check `messages.asonl` for `forked_from` entries to trace lineage.
+
+- If history mentions `blob <id>` or placeholders like `[image omitted after 4 turns, blob <id>]`, use the `read_blob` tool to inspect the stored payload.
 
 ::: if eval="true"
 

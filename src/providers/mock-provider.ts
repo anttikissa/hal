@@ -137,7 +137,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	if (userMessages.length <= 1 && (!input || lower === 'hi' || lower === 'hello')) {
 		const help = pick(GREETINGS) + '\n\n' +
 			'Try: **song**, **tool**, **ask**, **bash <cmd>**, **read <file>**, **write <file> <text>**, ' +
-			'**think**, **table**, **spam**, **error**'
+			'**think**, **table**, **spam**, **error**. If history mentions **blob <id>**, use **read_blob**.'
 		yield* streamChunks(help.split(/(?<=\s)/), 25)
 		yield { type: 'done', usage: { input: tokenCount, output: help.length } }
 		return
@@ -153,6 +153,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 			'- **bash <cmd>** — run a shell command\n' +
 			'- **read [file]** — read a file (default: package.json)\n' +
 			'- **write [file] [text]** — write to a file (default: /tmp/hal-mock-test.txt)\n' +
+			'- **read_blob [id]** — inspect a stored blob from omitted history\n' +
 			'- **think** — extended thinking demo\n' +
 			'- **table** — markdown table rendering test\n' +
 			'- **spam** / **spammm** — wall of text (more m\'s = more lines)\n' +

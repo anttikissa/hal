@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'bun:test'
-import { executeTool, argsPreview, type ToolCall } from './tools.ts'
+import { executeTool, argsPreview, getTools, type ToolCall } from './tools.ts'
 import { runHooks } from './hooks.ts'
 import { writeFileSync, unlinkSync, mkdirSync, rmSync, existsSync } from 'fs'
 import { messages as sessionMessages } from '../session/messages.ts'
@@ -155,6 +155,14 @@ test('read_blob: summarizes image blobs', async () => {
 	const result = await textResult('read_blob', { blobId }, { sessionId })
 	expect(result).toContain(`blob ${blobId}`)
 	expect(result).toContain('kind: image')
+})
+
+
+test('tool schema: read_blob explains blob placeholders', () => {
+	const tool = getTools(false).find(t => t.name === 'read_blob')
+	expect(tool).toBeTruthy()
+	expect(tool.description).toContain('blob <id>')
+	expect(tool.input_schema.properties.blobId.description).toContain('thinking blob')
 })
 
 // ── argsPreview ──

@@ -26,3 +26,10 @@ test('processes ::: if directives', () => {
 	const { text } = loadSystemPrompt({ model: 'claude-sonnet-4-20250514' })
 	expect(text).not.toMatch(/^:{3,}\s+if/m)
 })
+
+
+test('teaches blob placeholders and read_blob', () => {
+	const { text } = loadSystemPrompt()
+	expect(text).toContain('blob <id>')
+	expect(text).toContain('read_blob')
+})
