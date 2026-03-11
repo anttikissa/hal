@@ -46,7 +46,7 @@ describe('compactApiMessages', () => {
 
 		// Old batch (c0) cleared
 		const oldResult = out[2].content[0]
-		expect(oldResult.content).toBe('[tool result omitted after 4 turns, blob ref-0]')
+		expect(oldResult.content).toBe('[tool result omitted from context — blob ref-0; use read_blob if needed]')
 	})
 
 	test('clears old tool_use inputs', () => {
@@ -87,7 +87,7 @@ describe('compactApiMessages', () => {
 
 		// Even the "last" batch should be cleared since it's stale (5 > 4)
 		const toolResult = out[2].content[0]
-		expect(toolResult.content).toBe('[tool result omitted after 4 turns, blob ref-0]')
+		expect(toolResult.content).toBe('[tool result omitted from context — blob ref-0; use read_blob if needed]')
 	})
 
 	test('keeps last batch when ≤4 completed turns follow', () => {
@@ -126,8 +126,8 @@ describe('compactApiMessages', () => {
 
 		const out = compactApiMessages(msgs)
 
-		// First image (5 turns ago) should be cleared with ref
-		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted after 4 turns, blob ref-img-0]' })
+		// First image (5 turns ago) should be cleared with a blob placeholder
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted from context — blob ref-img-0; use read_blob if needed]' })
 		// Second image (4 turns ago) should be kept
 		expect(out[2].content[1].type).toBe('image')
 		// Third image (3 turns ago) should be kept
@@ -153,7 +153,7 @@ describe('compactApiMessages', () => {
 		const out = compactApiMessages(msgs)
 
 		// Image is 5 completed turns ago — should be cleared
-		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted after 4 turns, blob ref-img-0]' })
+		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted from context — blob ref-img-0; use read_blob if needed]' })
 	})
 
 	test('no tool calls → messages unchanged', () => {
@@ -202,8 +202,8 @@ describe('compactApiMessages', () => {
 		const out = compactApiMessages(msgs)
 
 		// Old batch (t0, t1) cleared
-		expect(out[2].content[0].content).toBe('[tool result omitted after 4 turns, blob ref-a]')
-		expect(out[2].content[1].content).toBe('[tool result omitted after 4 turns, blob ref-b]')
+		expect(out[2].content[0].content).toBe('[tool result omitted from context — blob ref-a; use read_blob if needed]')
+		expect(out[2].content[1].content).toBe('[tool result omitted from context — blob ref-b; use read_blob if needed]')
 
 		// Last batch (t2) kept
 		expect(out[5].content[0].content).toBe('file contents')
@@ -250,7 +250,7 @@ describe('compactApiMessages', () => {
 
 		// tool_result is >4 turns ago — cleared entirely (not in keepIds)
 		const toolResult = out[2].content[0]
-		expect(toolResult.content).toBe('[tool result omitted after 4 turns, blob ref-0]')
+		expect(toolResult.content).toBe('[tool result omitted from context — blob ref-0; use read_blob if needed]')
 	})
 
 	test('drops thinking blocks older than 10 completed turns', () => {
@@ -353,6 +353,6 @@ describe('compactApiMessages', () => {
 
 		// No completed turns → last tool batch is the LAST tool_use (t7), c0 is old
 		// c0 is not in keepIds → cleared
-		expect(out[2].content[0].content).toBe('[tool result omitted after 4 turns, blob ref-0]')
+		expect(out[2].content[0].content).toBe('[tool result omitted from context — blob ref-0; use read_blob if needed]')
 	})
 })
