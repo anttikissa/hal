@@ -3,6 +3,7 @@
 import type { Block } from '../cli/blocks.ts'
 import type { Message } from './history.ts'
 import { history as sessionHistory } from './history.ts'
+import { blob } from './blob.ts'
 import { tools } from '../runtime/tools.ts'
 /** Convert a message log to display blocks (for tab history). */
 export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
@@ -40,11 +41,11 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			if (Array.isArray(m.tools)) {
 				for (const tool of m.tools) {
 					const resultBlobId = toolResults.get(tool.id)
-					const blob = resultBlobId ? await sessionHistory.readBlob(sessionId, resultBlobId) : await sessionHistory.readBlob(sessionId, tool.blobId)
-					const callData = blob?.call ?? {}
-					const raw = blob?.result?.content ?? ''
+					const blobData = resultBlobId ? await blob.read(sessionId, resultBlobId) : await blob.read(sessionId, tool.blobId)
+					const callData = blobData?.call ?? {}
+					const raw = blobData?.result?.content ?? ''
 					const output = typeof raw === 'string' ? raw : raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
-					const status = blob?.result?.status === 'error' ? 'error' : (blob?.result ? 'done' : 'error')
+					const status = blobData?.result?.status === 'error' ? 'error' : (blobData?.result ? 'done' : 'error')
 					const now = Date.now()
 					blocks.push({
 						type: 'tool',

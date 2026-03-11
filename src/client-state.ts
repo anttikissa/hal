@@ -1,7 +1,7 @@
 // Client-side persistent state — remembers last active tab per server.
 
-import { liveFiles } from '../utils/live-file.ts'
-import { CLIENT_STATE_PATH, STATE_DIR } from '../state.ts'
+import { liveFiles } from './utils/live-file.ts'
+import { CLIENT_STATE_PATH, STATE_DIR } from './state.ts'
 
 interface ServerState {
 	lastTab: string

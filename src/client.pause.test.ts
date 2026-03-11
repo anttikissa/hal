@@ -1,10 +1,10 @@
 import { test, expect } from 'bun:test'
 import { randomBytes } from 'crypto'
 import { Client } from './client.ts'
-import type { Transport, BootstrapState } from './transport.ts'
-import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from '../protocol.ts'
-import type { Message } from '../session/history.ts'
-import { eventId } from '../protocol.ts'
+import type { Transport, BootstrapState } from './cli/transport.ts'
+import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
+import type { Message } from './session/history.ts'
+import { eventId } from './protocol.ts'
 
 // Controllable transport: events are pushed manually, tail yields them via a promise queue.
 class FakeTransport implements Transport {

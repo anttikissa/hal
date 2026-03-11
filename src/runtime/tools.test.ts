@@ -2,7 +2,7 @@ import { test, expect, afterEach } from 'bun:test'
 import { executeTool, argsPreview, getTools, type ToolCall } from './tools.ts'
 import { runHooks } from './hooks.ts'
 import { writeFileSync, unlinkSync, mkdirSync, rmSync, existsSync } from 'fs'
-import { history as sessionHistory } from '../session/history.ts'
+import { blob } from '../session/blob.ts'
 
 const TMP = `/tmp/hal-tools-test-${process.pid}`
 const call = (name: string, input: any): ToolCall => ({ id: 'test', name, input })
@@ -141,8 +141,8 @@ test('ls: lists directory', async () => {
 
 test('read_blob: reads tool blobs by id', async () => {
 	const sessionId = '__tools_blob_read__'
-	const blobId = sessionHistory.makeBlobId(sessionId)
-	await sessionHistory.writeBlob(sessionId, blobId, { call: { name: 'bash', input: { command: 'pwd' } } })
+	const blobId = blob.makeId(sessionId)
+	await blob.write(sessionId, blobId, { call: { name: 'bash', input: { command: 'pwd' } } })
 	const result = await textResult('read_blob', { blobId }, { sessionId })
 	expect(result).toContain('bash')
 	expect(result).toContain('pwd')
@@ -150,8 +150,8 @@ test('read_blob: reads tool blobs by id', async () => {
 
 test('read_blob: summarizes image blobs', async () => {
 	const sessionId = '__tools_blob_image__'
-	const blobId = sessionHistory.makeBlobId(sessionId)
-	await sessionHistory.writeBlob(sessionId, blobId, { media_type: 'image/png', data: 'AAAA' })
+	const blobId = blob.makeId(sessionId)
+	await blob.write(sessionId, blobId, { media_type: 'image/png', data: 'AAAA' })
 	const result = await textResult('read_blob', { blobId }, { sessionId })
 	expect(result).toContain(`blob ${blobId}`)
 	expect(result).toContain('kind: image')

@@ -52,8 +52,17 @@ async function read(sessionId: string, blobId: string): Promise<any | null> {
 	return historyFork.readBlobFromForkChain(sessionId, blobId, readLocal)
 }
 
+async function updateInput(sessionId: string, blobId: string, input: unknown, originalInput: unknown): Promise<void> {
+	const data = await read(sessionId, blobId)
+	if (!data?.call) return
+	data.call.originalInput = originalInput
+	data.call.input = input
+	await write(sessionId, blobId, data)
+}
+
 export const blob = {
 	makeId,
 	write,
 	read,
+	updateInput,
 }

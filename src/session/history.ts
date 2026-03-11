@@ -111,15 +111,6 @@ export async function writeToolResultEntry(
 	}
 	return { role: 'tool_result', tool_use_id: toolUseId, blobId, ts: new Date().toISOString() }
 }
-
-export async function updateBlobInput(sessionId: string, blobId: string, input: unknown, originalInput: unknown): Promise<void> {
-	const blobData = await blob.read(sessionId, blobId)
-	if (!blobData?.call) return
-	blobData.call.originalInput = originalInput
-	blobData.call.input = input
-	await blob.write(sessionId, blobId, blobData)
-}
-
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
 
 const MEDIA_TYPES: Record<string, string> = {
@@ -372,13 +363,9 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 }
 
 export const history = {
-	makeBlobId: blob.makeId,
-	writeBlob: blob.write,
-	readBlob: blob.read,
 	getLastUsage,
 	writeAssistantEntry,
 	writeToolResultEntry,
-	updateBlobInput,
 	parseUserContent,
 	appendHistory,
 	readHistory,

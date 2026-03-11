@@ -6,6 +6,7 @@ import { loader } from '../providers/loader.ts'
 import type { ProviderEvent } from '../providers/provider.ts'
 import { ipc } from '../ipc.ts'
 import { history as sessionHistory } from '../session/history.ts'
+import { blob } from '../session/blob.ts'
 import { protocol } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { tools, type ToolCall } from './tools.ts'
@@ -86,7 +87,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				if (signal?.aborted) { aborted = true; break }
 				switch (event.type) {
 					case 'thinking':
-						if (!thinkingBlobId) thinkingBlobId = sessionHistory.makeBlobId(sessionId)
+						if (!thinkingBlobId) thinkingBlobId = blob.makeId(sessionId)
 						thinkingText += event.text
 						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', blobId: thinkingBlobId })
 						break
@@ -163,7 +164,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							call = hooks.runHooks(call)
 							if (call.input !== original.input) {
 								const blobId = toolBlobMap.get(call.id)
-								if (blobId) await sessionHistory.updateBlobInput(sessionId, blobId, call.input, original.input)
+								if (blobId) await blob.updateInput(sessionId, blobId, call.input, original.input)
 							}
 							const args = tools.argsPreview(call)
 
@@ -228,7 +229,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						})
 						for (const call of toolCalls) {
 							const blobId = toolBlobMap.get(call.id)!
-							const block = await sessionHistory.readBlob(sessionId, blobId)
+							const block = await blob.read(sessionId, blobId)
 							const raw = block?.result?.content ?? ''
 							const content = typeof raw === 'string' ? tools.truncate(raw) : raw
 							messages.push({

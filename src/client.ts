@@ -1,13 +1,13 @@
 // Client — connects transport to TUI blocks.
 
-import type { Transport } from './transport.ts'
-import type { Block } from './blocks.ts'
-import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from '../protocol.ts'
-import { protocol } from '../protocol.ts'
-import { replay } from '../session/replay.ts'
-import { history } from '../session/history.ts'
-import { draft } from './draft.ts'
-import { prompt } from './prompt.ts'
+import type { Transport } from './cli/transport.ts'
+import type { Block } from './cli/blocks.ts'
+import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from './protocol.ts'
+import { protocol } from './protocol.ts'
+import { replay } from './session/replay.ts'
+import { history } from './session/history.ts'
+import { draft } from './cli/draft.ts'
+import { prompt } from './cli/prompt.ts'
 import { clientState } from './client-state.ts'
 import { randomBytes } from 'crypto'
 
