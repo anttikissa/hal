@@ -29,7 +29,7 @@ const { startRuntime } = runtimeMod
 const { makeCommand } = protocolMod
 const { parseAll } = aSonMod
 const { appendHistory, writeAssistantEntry } = messagesMod
-const { createSession, loadMeta } = sessionMod
+const { createSession, loadSessionInfo } = sessionMod
 
 if (!STATE_DIR.includes('/hal-test-')) {
 	throw new Error(`runtime.test state isolation failed: STATE_DIR=${STATE_DIR}`)
@@ -462,7 +462,7 @@ test('close writes closedAt to meta', async () => {
 	await commands.append(makeCommand('close', src, undefined, secondId))
 	await new Promise(r => setTimeout(r, 300))
 
-	const meta = loadMeta(secondId)
+	const meta = loadSessionInfo(secondId)
 	expect(meta?.closedAt).toBeTruthy()
 	expect(new Date(meta!.closedAt!).getTime()).toBeGreaterThan(Date.now() - 5000)
 })

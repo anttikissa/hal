@@ -33,7 +33,7 @@ export class LocalTransport implements Transport {
 		const state = ipc.getState()
 		const sessions: SessionInfo[] = []
 		for (const id of state.sessions) {
-			const meta = await session.loadMeta(id)
+			const meta = await session.loadSessionInfo(id)
 			if (meta) sessions.push(meta)
 		}
 		return { state, sessions }

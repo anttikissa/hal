@@ -21,7 +21,7 @@ export async function startRuntime(): Promise<Runtime> {
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = ipc.getState()
 	for (const id of prevState.sessions) {
-		const meta = await session.loadMeta(id)
+		const meta = await session.loadSessionInfo(id)
 		if (meta) {
 			rt.sessions.set(meta.id, meta)
 			const modelId = (meta.model ?? config.getConfig().defaultModel).split('/').pop()!

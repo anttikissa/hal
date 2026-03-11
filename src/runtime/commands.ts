@@ -75,7 +75,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const resumeId = cmd.text?.trim()
 			let info
 			if (resumeId) {
-				info = session.loadMeta(resumeId)
+				info = session.loadSessionInfo(resumeId)
 				if (!info) {
 					rt.emitInfo(sid, `[resume] session ${resumeId} not found`)
 					break
@@ -92,7 +92,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 		}
 		case 'fork': {
 			const childId = await session.forkSession(sid)
-			const childMeta = session.loadMeta(childId)
+			const childMeta = session.loadSessionInfo(childId)
 			if (!childMeta) { await error('Failed to create forked session'); break }
 			// Insert child right after parent in session order
 			const ordered = new Map<string, SessionInfo>()
@@ -211,7 +211,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				}
 				const items: { id: string; topic?: string; lastPrompt?: string; sortTs?: string; msgCount: number }[] = []
 				for (const cid of closed) {
-					const m = session.loadMeta(cid)
+					const m = session.loadSessionInfo(cid)
 					const msgs = await history.readHistory(cid)
 					const msgCount = msgs.filter((e: any) => e.role).length
 					if (m) items.push({ id: cid, topic: m.topic, lastPrompt: m.lastPrompt, sortTs: m.closedAt ?? m.updatedAt, msgCount })
@@ -233,7 +233,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				break
 			}
 			if (rt.sessions.has(id)) { await warn(`Session ${id} is already open`); break }
-			const meta = await session.loadMeta(id)
+			const meta = await session.loadSessionInfo(id)
 			if (!meta) { await error(`Session ${id} not found`); break }
 			rt.sessions.set(id, meta)
 			rt.activeSessionId = id

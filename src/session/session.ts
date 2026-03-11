@@ -55,7 +55,7 @@ const SESSION_DEFAULTS: SessionInfo = {
 	updatedAt: '',
 }
 
-export function loadMeta(id: string): SessionInfo | null {
+export function loadSessionInfo(id: string): SessionInfo | null {
 	const path = sessionPath(id)
 	if (!existsSync(path)) return null
 	return liveFiles.liveFile<SessionInfo>(path, { defaults: { ...SESSION_DEFAULTS, id } })
@@ -100,7 +100,7 @@ export async function forkSession(sourceId: string): Promise<string> {
 }
 
 export function currentLog(sessionId: string): string {
-	const meta = loadMeta(sessionId)
+	const meta = loadSessionInfo(sessionId)
 	return meta?.log ?? 'history.asonl'
 }
 
@@ -112,7 +112,7 @@ export async function rotateLog(sessionId: string): Promise<string> {
 		if (match) nextN = parseInt(match[1], 10) + 1
 	}
 	const newLog = `history${nextN}.asonl`
-	const meta = loadMeta(sessionId)
+	const meta = loadSessionInfo(sessionId)
 	if (meta) {
 		meta.log = newLog
 		;(meta as SessionInfo & { save?: () => void }).save?.()
@@ -125,7 +125,7 @@ export const logNameCache = new Map<string, string>()
 
 export const session = {
 	makeSessionId,
-	loadMeta,
+	loadSessionInfo,
 	createSession,
 	listSessionIds,
 	forkSession,
