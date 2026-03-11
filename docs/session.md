@@ -43,9 +43,9 @@ Blob ids in `history.asonl` are short stable ids like `1709123456789-a3b2c1` (ti
 
 The `history.asonl` spine stays human-readable — you can see message roles, tool names, text content, and blob ids inline. Only heavy payloads move into blob files.
 
-## Context Compaction
+## Context Pruning
 
-API messages are compacted before sending to strip old heavy content (tool results, images, thinking). This prevents quadratic token cost growth. See `docs/context-compaction.md` for details.
+API messages are pruned before sending to strip old heavy content (tool results, images, thinking). This prevents quadratic token cost growth. See `docs/context-pruning.md` for details.
 
 ## Session Lifecycle
 
