@@ -40,7 +40,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			if (Array.isArray(m.tools)) {
 				for (const tool of m.tools) {
 					const resultRef = toolResults.get(tool.id)
-					const block = resultRef ? await sessionMessages.readBlock(sessionId, resultRef) : await sessionMessages.readBlock(sessionId, tool.ref)
+					const block = resultRef ? await sessionMessages.readBlob(sessionId, resultRef) : await sessionMessages.readBlob(sessionId, tool.ref)
 					const callData = block?.call ?? {}
 					const raw = block?.result?.content ?? ''
 					const output = typeof raw === 'string' ? raw : raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
