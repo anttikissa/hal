@@ -91,6 +91,6 @@ See `TODO.md`.
 - `src/runtime/*` — owner runtime (scheduling, commands, agent loop).
 - `src/cli/*` — TUI + CLI client. See `docs/tui.md`.
 - `src/session/*` — session persistence, messages, compaction, rotation. See `docs/session.md`.
-- `src/session/prune.ts` — context pruning (strip old tool results, images, thinking). See `docs/context-pruning.md`.
+- `src/session/prune.ts` — context pruning (strip old tool results, images, thinking). See `docs/context-management.md`.
 - `src/providers/*` — provider adapters (Anthropic, OpenAI).
 - `src/utils/ason.ts` — ASON serialization.
