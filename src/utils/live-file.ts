@@ -53,7 +53,7 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 		} catch {}
 	}
 
-	function flush(): void {
+	let flush = (): void => {
 		if (!dirty) return
 		dirty = false
 		state.ensureDir(dirname(path))

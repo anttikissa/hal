@@ -52,12 +52,12 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			if (ctx && !ctx.estimated && ctx.used / ctx.max >= 0.70) {
 				const usedPct = ctx.used / ctx.max
 				const msgs = await history.readHistory(sid)
-				const userMsgs = msgs.filter(m => m.role === 'user')
+				const userMsgs = msgs.filter((m: any) => m.role === 'user')
 				const context = history.buildCompactionContext(sid, msgs)
 				await history.appendHistory(sid, [
 					{ type: 'compact', ts: new Date().toISOString() },
-					{ role: 'user', content: context, ts: new Date().toISOString() } as UserMessage,
-					{ role: 'user', content: logContent, ts: new Date().toISOString() } as UserMessage,
+					{ role: 'user', content: context, ts: new Date().toISOString() },
+					{ role: 'user', content: logContent, ts: new Date().toISOString() },
 				])
 				apiMessages = await history.loadApiMessages(sid)
 				await rt.emitInfo(sid, `[autocompact] ${Math.round(usedPct * 100)}% → compacted (${userMsgs.length} prompts summarized)`, 'meta')
@@ -103,7 +103,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			rt.sessions = ordered
 			rt.activeSessionId = childId
 			await history.appendHistory(childId, [
-				{ role: 'user', content: `[system] Forked from session ${sid}.`, ts: new Date().toISOString() } as UserMessage,
+				{ role: 'user', content: `[system] Forked from session ${sid}.`, ts: new Date().toISOString() },
 			])
 			await rt.emitInfo(sid, `[fork] forked ${sid} -> ${childId}`, 'meta')
 			await rt.emitInfo(childId, `[fork] forked ${sid} -> ${childId}`, 'meta')
@@ -135,7 +135,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const forkEntry = (resetMsgs[0] as any)?.type === 'forked_from' ? [resetMsgs[0]] : []
 			await history.appendHistory(sid, [
 				...forkEntry,
-				{ role: 'user', content: `[system] Session was reset. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
+				{ role: 'user', content: `[system] Session was reset. Previous conversation: ${oldLog}`, ts: new Date().toISOString() },
 			])
 			await rt.emitInfo(sid, '[reset] conversation cleared', 'meta')
 			break
@@ -153,8 +153,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const forkEntry = (msgs[0] as any)?.type === 'forked_from' ? [msgs[0]] : []
 			await history.appendHistory(sid, [
 				...forkEntry,
-				{ role: 'user', content: `[system] Session was manually compacted. Previous conversation: ${oldLog}`, ts: new Date().toISOString() } as UserMessage,
-				{ role: 'user', content: context, ts: new Date().toISOString() } as UserMessage,
+				{ role: 'user', content: `[system] Session was manually compacted. Previous conversation: ${oldLog}`, ts: new Date().toISOString() },
+				{ role: 'user', content: context, ts: new Date().toISOString() },
 			])
 			await rt.emitInfo(sid, `[compact] context compacted (${userMsgs.length} user messages summarized)`, 'meta')
 			break

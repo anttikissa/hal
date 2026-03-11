@@ -62,7 +62,7 @@ export async function getLastUsage(sessionId: string): Promise<{ input: number; 
 	const entries = await readHistory(sessionId)
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const m = entries[i]
-		if (m.role === 'assistant' && m.usage) return m.usage
+		if ('role' in m && m.role === 'assistant' && m.usage) return m.usage
 	}
 	return null
 }

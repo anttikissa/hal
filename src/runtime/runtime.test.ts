@@ -418,7 +418,7 @@ test('pause command stops an active generation', async () => {
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
 })
 
-test('ask tool sends question event and waits for respond', { timeout: 10000 }, async () => {
+test('ask tool sends question event and waits for respond', async () => {
 	const sid = runtime.activeSessionId!
 	const snapshot = (await events.readAll()).length
 

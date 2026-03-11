@@ -6,7 +6,7 @@ import { agentLoop } from './agent-loop.ts'
 import { context } from './context.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
-import { protocol, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
+import { protocol, type EventLevel, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { config } from '../config.ts'
 
 const GREETINGS = [
@@ -32,6 +32,10 @@ export function timeAgo(iso: string): string {
 	return `${days}d ago`
 }
 
+type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never
+
+type RuntimeEventInput = DistributiveOmit<RuntimeEvent, 'id' | 'createdAt'>
+
 export class Runtime {
 	sessions = new Map<string, SessionInfo>()
 	activeSessionId: string | null = null
@@ -41,11 +45,11 @@ export class Runtime {
 	sessionContext = new Map<string, { used: number; max: number; estimated?: boolean }>()
 	pendingInterruptedTools = new Map<string, { name: string; id: string; blobId: string }[]>()
 
-	async emit(fields: Omit<RuntimeEvent, 'id' | 'createdAt'>): Promise<void> {
+	async emit(fields: RuntimeEventInput): Promise<void> {
 		await ipc.events.append({ ...fields, id: protocol.eventId(), createdAt: new Date().toISOString() } as RuntimeEvent)
 	}
 
-	async emitInfo(sessionId: string, text: string, level = 'info'): Promise<void> {
+	async emitInfo(sessionId: string, text: string, level: EventLevel = 'info'): Promise<void> {
 		await history.appendHistory(sessionId, [{ type: 'info', text, level, ts: new Date().toISOString() }])
 		await this.emit({ type: 'line', sessionId, text, level })
 	}

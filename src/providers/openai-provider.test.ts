@@ -4,10 +4,15 @@ function makeSSE(events: any[]): string {
 	return events.map(e => `data: ${JSON.stringify(e)}\n\n`).join('')
 }
 
+function installFetchMock(fn: (input: any, init?: any) => Promise<Response>): typeof fetch {
+	const origFetch = globalThis.fetch
+	globalThis.fetch = Object.assign(fn, { preconnect: () => {} }) as typeof fetch
+	return origFetch
+}
+
 function mockFetch(sseEvents: any[]) {
 	const sse = makeSSE(sseEvents)
-	const origFetch = globalThis.fetch
-	globalThis.fetch = async (input: any) => {
+	const origFetch = installFetchMock(async (input: any) => {
 		const url = typeof input === 'string' ? input : input.url
 		// Let auth refresh "succeed" with no-op
 		if (url.includes('auth.openai.com')) {
@@ -15,19 +20,18 @@ function mockFetch(sseEvents: any[]) {
 		}
 		// API call returns SSE stream
 		return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
-	}
+	})
 	return origFetch
 }
 
 function mockFetchError(status: number, body: string) {
-	const origFetch = globalThis.fetch
-	globalThis.fetch = async (input: any) => {
+	const origFetch = installFetchMock(async (input: any) => {
 		const url = typeof input === 'string' ? input : input.url
 		if (url.includes('auth.openai.com')) {
 			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
 		}
 		return new Response(body, { status }) as any
-	}
+	})
 	return origFetch
 }
 
@@ -172,15 +176,14 @@ test('openai provider: captures reasoning signature from output item', async () 
 test('openai provider: replays reasoning signature in input', async () => {
 	const sse = makeSSE([{ type: 'response.completed', response: { status: 'completed' } }])
 	let requestBody: any = null
-	const origFetch = globalThis.fetch
-	globalThis.fetch = async (input: any, init?: any) => {
+	const origFetch = installFetchMock(async (input: any, init?: any) => {
 		const url = typeof input === 'string' ? input : input.url
 		if (url.includes('auth.openai.com')) {
 			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
 		}
 		requestBody = JSON.parse(String(init?.body ?? '{}'))
 		return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
-	}
+	})
 
 	try {
 		const mod = await import('./openai-provider.ts')
@@ -207,15 +210,14 @@ test('openai provider: replays reasoning signature in input', async () => {
 test('openai provider: deduplicates reasoning items by id', async () => {
 	const sse = makeSSE([{ type: 'response.completed', response: { status: 'completed' } }])
 	let requestBody: any = null
-	const origFetch = globalThis.fetch
-	globalThis.fetch = async (input: any, init?: any) => {
+	const origFetch = installFetchMock(async (input: any, init?: any) => {
 		const url = typeof input === 'string' ? input : input.url
 		if (url.includes('auth.openai.com')) {
 			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
 		}
 		requestBody = JSON.parse(String(init?.body ?? '{}'))
 		return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
-	}
+	})
 
 	try {
 		const mod = await import('./openai-provider.ts')

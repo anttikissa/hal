@@ -35,7 +35,7 @@ describe('cli-render', () => {
 	})
 
 	test('diffs single changed line', () => {
-		const prev: RenderState = { lines: ['aaa', 'bbb', 'ccc'], cursorRow: 2 }
+		const prev: RenderState = { lines: ['aaa', 'bbb', 'ccc'], cursorRow: 2, cursorCol: 1 }
 		const next = ['aaa', 'BBB', 'ccc']
 		const { buf, state } = render(next, prev, { row: 2, col: 1 }, screen)
 		const s = strip(buf)
@@ -47,7 +47,7 @@ describe('cli-render', () => {
 	})
 
 	test('appends new lines', () => {
-		const prev: RenderState = { lines: ['aaa', 'bbb'], cursorRow: 1 }
+		const prev: RenderState = { lines: ['aaa', 'bbb'], cursorRow: 1, cursorCol: 1 }
 		const next = ['aaa', 'bbb', 'ccc']
 		const { buf } = render(next, prev, { row: 2, col: 1 }, screen)
 		const s = strip(buf)
@@ -56,7 +56,7 @@ describe('cli-render', () => {
 	})
 
 	test('clears leftover lines when content shrinks', () => {
-		const prev: RenderState = { lines: ['a', 'b', 'c', 'd'], cursorRow: 3 }
+		const prev: RenderState = { lines: ['a', 'b', 'c', 'd'], cursorRow: 3, cursorCol: 1 }
 		const next = ['a', 'b']
 		const { buf, state } = render(next, prev, { row: 1, col: 1 }, screen)
 		const s = strip(buf)
@@ -71,6 +71,7 @@ describe('cli-render', () => {
 		const prev: RenderState = {
 			lines: Array.from({ length: 100 }, (_, i) => `line ${i}`),
 			cursorRow: 99,
+			cursorCol: 1,
 		}
 		const next = [...prev.lines]
 		next[0] = 'CHANGED' // above viewport
@@ -82,6 +83,7 @@ describe('cli-render', () => {
 		const prev: RenderState = {
 			lines: Array.from({ length: 100 }, (_, i) => `line ${i}`),
 			cursorRow: 99,
+			cursorCol: 1,
 		}
 		const next = [...prev.lines]
 		next[0] = 'CHANGED'  // above viewport

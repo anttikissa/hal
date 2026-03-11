@@ -12,5 +12,6 @@
 			"~src/*": ["./src/*"]
 		}
 	},
-	"include": ["src/**/*.ts", "main.ts", "state/sessions/*/eval/*.ts"]
+	"include": ["src/**/*.ts", "main.ts"],
+	"exclude": ["state/**"]
 }

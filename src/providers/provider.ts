@@ -28,7 +28,7 @@ export const providerConfig = {
 }
 
 /** Race reader.read() against a timeout — minicursor shows error on network drop. */
-export async function readWithTimeout(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<ReadableStreamReadResult<Uint8Array>> {
+export async function readWithTimeout(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<Awaited<ReturnType<ReadableStreamDefaultReader<Uint8Array>['read']>>> {
 	let timer: Timer
 	const timeout = new Promise<never>((_, reject) => {
 		const ms = providerConfig.streamTimeoutMs

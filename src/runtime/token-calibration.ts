@@ -19,6 +19,17 @@ const DEFAULT_BYTES_PER_TOKEN = 4
 const calibrationPath = () => `${STATE_DIR}/calibration.ason`
 let calibrationCache: CalibrationStore | null = null
 
+function isCalibrationStore(value: unknown): value is CalibrationStore {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+	for (const item of Object.values(value as Record<string, unknown>)) {
+		if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+		const calibration = item as Record<string, unknown>
+		if (typeof calibration.bytesPerToken !== 'number') return false
+		if (typeof calibration.calibratedAt !== 'string') return false
+	}
+	return true
+}
+
 function loadStore(): CalibrationStore {
 	if (calibrationCache) return calibrationCache
 	const path = calibrationPath()
@@ -27,7 +38,8 @@ function loadStore(): CalibrationStore {
 		return calibrationCache
 	}
 	try {
-		calibrationCache = ason.parse(readFileSync(path, 'utf-8')) as CalibrationStore
+		const parsed = ason.parse(readFileSync(path, 'utf-8'))
+		calibrationCache = isCalibrationStore(parsed) ? parsed : {}
 	} catch {
 		calibrationCache = {}
 	}
