@@ -40,12 +40,12 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 
 ### Forking
 
-`/fork` (or Ctrl-F) creates a new session that inherits the parent's history without copying it:
+`/fork` (or Ctrl-F) creates a new session that inherits the parent's history:
 
 1. A new session directory is created with a fresh `session.ason`.
-2. A `{ type: 'forked_from', parent, ts }` entry is written as the first line of the child's `history.asonl`. No messages are copied — the child's log starts empty except for this pointer.
+2. A `{ type: 'forked_from', parent, ts }` entry is written as the first line of the child's `history.asonl`.
 3. `[forked to <newId>]` is appended to the source's messages (skipped if busy, to preserve alternating user/assistant pattern).
-4. At read time, `loadAllMessages()` follows the `forked_from` chain recursively, loading parent messages (filtered by fork timestamp) and prepending them. This means the child sees the full parent conversation without duplicating data.
+4. At read time, `loadAllMessages()` follows the `forked_from` chain recursively.
 5. `readBlob()` also walks the fork chain — blobs referenced by parent messages are resolved from the parent's `blobs/` directory.
 
 Multiple forks from the same parent share the same prefix of conversation history. Both sessions diverge independently after the fork point. When debugging, check `history.asonl` for `forked_from` entries to trace lineage.
