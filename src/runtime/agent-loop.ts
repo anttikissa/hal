@@ -7,6 +7,7 @@ import type { ProviderEvent } from '../providers/provider.ts'
 import { ipc } from '../ipc.ts'
 import { history as sessionHistory } from '../session/history.ts'
 import { blob } from '../session/blob.ts'
+import { attachments } from '../session/attachments.ts'
 import { protocol } from '../protocol.ts'
 import type { RuntimeEvent, EventLevel } from '../protocol.ts'
 import { tools, type ToolCall } from './tools.ts'
@@ -186,7 +187,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						if (call.name === 'ask') {
 							const question = (call.input as any)?.question ?? ''
 							const answer = await ctx.askUser(question) || '[no answer]'
-							const { apiContent } = await sessionHistory.parseUserContent(sessionId, answer)
+							const { apiContent } = await attachments.resolve(sessionId, answer)
 							result = apiContent
 						} else {
 							const blobId = toolBlobMap.get(call.id)

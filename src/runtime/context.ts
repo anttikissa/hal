@@ -10,29 +10,28 @@
 
 import { tokenCalibration } from './token-calibration.ts'
 
-// ── Context windows ──
-
-const CONTEXT_WINDOWS: Record<string, number> = {
-	'claude-opus-4-6': 200_000,
-	'claude-sonnet-4-6': 200_000,
-	'claude-opus-4-5': 200_000,
-	'claude-sonnet-4-5': 200_000,
-	'claude-sonnet-4-20250514': 200_000,
-	'gpt-5.4': 1_000_000,
-	'gpt-5.3': 400_000,
-	'gpt-5.3-codex': 400_000,
-	'gpt-5.3-codex-spark': 128_000,
-	'gpt-5.2': 256_000,
-	'gpt-5.2-codex': 400_000,
+export const contextConfig = {
+	windows: {
+		'claude-opus-4-6': 200_000,
+		'claude-sonnet-4-6': 200_000,
+		'claude-opus-4-5': 200_000,
+		'claude-sonnet-4-5': 200_000,
+		'claude-sonnet-4-20250514': 200_000,
+		'gpt-5.4': 1_000_000,
+		'gpt-5.3': 400_000,
+		'gpt-5.3-codex': 400_000,
+		'gpt-5.3-codex-spark': 128_000,
+		'gpt-5.2': 256_000,
+		'gpt-5.2-codex': 400_000,
+	} as Record<string, number>,
+	defaultWindow: 200_000,
 }
 
-const DEFAULT_CONTEXT = 200_000
-
 export function contextWindowForModel(modelId: string): number {
-	for (const [prefix, size] of Object.entries(CONTEXT_WINDOWS)) {
+	for (const [prefix, size] of Object.entries(contextConfig.windows)) {
 		if (modelId.startsWith(prefix)) return size
 	}
-	return DEFAULT_CONTEXT
+	return contextConfig.defaultWindow
 }
 
 // ── Compatibility wrappers (moved to token-calibration.ts) ──
@@ -84,6 +83,7 @@ export function estimateContext(
 }
 
 export const context = {
+	config: contextConfig,
 	contextWindowForModel,
 	saveCalibration,
 	isCalibrated,

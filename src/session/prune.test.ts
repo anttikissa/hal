@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'bun:test'
-import { pruneApiMessages } from './prune.ts'
+import { describe, test, expect, afterEach } from 'bun:test'
+import { pruneApiMessages, prune } from './prune.ts'
 
 // Helper: build an API-format tool cycle (assistant with tool_use + user with tool_result)
 function toolCycle(id: string, name: string, input: any, result: string, blobId: string) {
@@ -17,6 +17,12 @@ function toolCycle(id: string, name: string, input: any, result: string, blobId:
 		},
 	}
 }
+
+const defaultConfig = { ...prune.config }
+
+afterEach(() => {
+	Object.assign(prune.config, defaultConfig)
+})
 
 // Helper: a user+assistant text exchange (one completed turn)
 function turn(q: string, a: string) {
@@ -354,5 +360,40 @@ describe('pruneApiMessages', () => {
 		// No completed turns → last tool batch is the LAST tool_use (t7), c0 is old
 		// c0 is not in keepIds → cleared
 		expect(out[2].content[0].content).toBe('[tool result omitted from context — blob ref-0; use read_blob if needed]')
+	})
+
+	test('module config changes heavy threshold live', () => {
+		const c0 = toolCycle('t0', 'bash', { command: 'ls' }, 'result', 'ref-0')
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			c0.assistant, c0.result,
+		]
+		for (let i = 0; i < 6; i++) msgs.push(...turn(`question ${i}`, `answer ${i}`))
+		prune.config.heavyThreshold = 10
+		const out = pruneApiMessages(msgs)
+		expect(out[2].content[0].content).toBe('result')
+	})
+
+	test('module config changes thinking threshold live', () => {
+		const msgs: any[] = [
+			{ role: 'user', content: 'start' },
+			{ role: 'assistant', content: [{ type: 'thinking', thinking: 'deep thoughts...', signature: 'sig-abc' }, { type: 'text', text: 'answer' }] },
+		]
+		for (let i = 0; i < 6; i++) msgs.push(...turn(`q${i}`, `a${i}`))
+		prune.config.thinkingThreshold = 5
+		const out = pruneApiMessages(msgs)
+		expect(out[1].content).toEqual([{ type: 'text', text: 'answer' }])
+	})
+
+	test('module config changes model-change threshold live', () => {
+		prune.config.modelChangeThreshold = 3
+		const entries = [
+			{ role: 'user', content: 'go' },
+			{ type: 'info', text: '[model] openai/gpt-5.4' },
+			...turn('q0', 'a0'),
+			...turn('q1', 'a1'),
+			...turn('q2', 'a2'),
+		]
+		expect(prune.detectPruneOpts(entries)).toEqual({ heavyThreshold: 3 })
 	})
 })

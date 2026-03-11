@@ -5,6 +5,7 @@ import { runtimeCore } from './runtime.ts'
 import type { RuntimeCommand, SessionInfo } from '../protocol.ts'
 import { session } from '../session/session.ts'
 import { history, type UserMessage } from '../session/history.ts'
+import { attachments } from '../session/attachments.ts'
 import { models } from '../models.ts'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
@@ -38,7 +39,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 
 			await rt.emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
 
-			const { apiContent, logContent } = await history.parseUserContent(sid, cmd.text)
+			const { apiContent, logContent } = await attachments.resolve(sid, cmd.text)
 			const userMsg: UserMessage = { role: 'user', content: logContent, ts: new Date().toISOString() }
 			await history.appendHistory(sid, [userMsg])
 

@@ -1,15 +1,18 @@
 // Context pruning — strip old heavy content (tool results, images, thinking) from API messages.
 //
 // A "turn" = a completed agent response (assistant message without tool_use).
-// Tool results and images are cleared after HEAVY_THRESHOLD completed turns;
-// thinking blocks after THINKING_THRESHOLD completed turns.
+// Tool results and images are cleared after config.heavyThreshold completed turns;
+// thinking blocks after config.thinkingThreshold completed turns.
 
-// Completed turns (assistant final responses) before content is stripped
-const HEAVY_THRESHOLD = 4
-const THINKING_THRESHOLD = 10
+export const pruneConfig = {
+	heavyThreshold: 4,
+	thinkingThreshold: 10,
+	modelChangeThreshold: 10,
+}
 
 export interface PruneOpts {
 	heavyThreshold?: number
+	thinkingThreshold?: number
 }
 
 /** True if this message ends a turn (final assistant response, no tool_use). */
@@ -21,7 +24,8 @@ function isTurnEnd(msg: any): boolean {
 
 /** Strip old tool results, tool inputs, images, and thinking from API messages. */
 export function pruneApiMessages(msgs: any[], opts?: PruneOpts): any[] {
-	const heavy = opts?.heavyThreshold ?? HEAVY_THRESHOLD
+	const heavy = opts?.heavyThreshold ?? pruneConfig.heavyThreshold
+	const thinking = opts?.thinkingThreshold ?? pruneConfig.thinkingThreshold
 
 	// Precompute: completed turns strictly after each position
 	const age = new Array(msgs.length).fill(0)
@@ -56,7 +60,7 @@ export function pruneApiMessages(msgs: any[], opts?: PruneOpts): any[] {
 				if (b.type === 'tool_use' && !keepIds.has(b.id)) return { ...b, input: {} }
 				return b
 			})
-			if (age[i] > THINKING_THRESHOLD) {
+			if (age[i] > thinking) {
 				content = content.filter((b: any) => b.type !== 'thinking')
 			}
 			out.push({ ...msg, content })
@@ -80,8 +84,6 @@ export function pruneApiMessages(msgs: any[], opts?: PruneOpts): any[] {
 }
 
 // After a model change, keep more context un-pruned so the new model sees recent history
-const MODEL_CHANGE_THRESHOLD = 10
-
 export function detectPruneOpts(entries: any[]): PruneOpts | undefined {
 	let lastModelChangeIdx = -1
 	for (let i = entries.length - 1; i >= 0; i--) {
@@ -97,8 +99,9 @@ export function detectPruneOpts(entries: any[]): PruneOpts | undefined {
 		const e = entries[i] as any
 		if (e.role === 'assistant' && !e.tools) turnsAfter++
 	}
-	if (turnsAfter <= MODEL_CHANGE_THRESHOLD) return { heavyThreshold: MODEL_CHANGE_THRESHOLD }
+	const threshold = pruneConfig.modelChangeThreshold
+	if (turnsAfter <= threshold) return { heavyThreshold: threshold }
 	return undefined
 }
 
-export const prune = { pruneApiMessages, detectPruneOpts }
+export const prune = { config: pruneConfig, pruneApiMessages, detectPruneOpts }

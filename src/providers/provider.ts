@@ -22,14 +22,17 @@ export interface Provider {
 	generate(params: GenerateParams): AsyncGenerator<ProviderEvent>
 }
 
-// Generous: chunks normally arrive every ~100ms, but allows for slow starts
-const STREAM_TIMEOUT_MS = 120_000
+export const providerConfig = {
+	// Generous: chunks normally arrive every ~100ms, but allows for slow starts
+	streamTimeoutMs: 120_000,
+}
 
 /** Race reader.read() against a timeout — minicursor shows error on network drop. */
 export async function readWithTimeout(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<ReadableStreamReadResult<Uint8Array>> {
 	let timer: Timer
 	const timeout = new Promise<never>((_, reject) => {
-		timer = setTimeout(() => reject(new Error('Stream read timed out (no data for 120s)')), STREAM_TIMEOUT_MS)
+		const ms = providerConfig.streamTimeoutMs
+		timer = setTimeout(() => reject(new Error(`Stream read timed out (no data for ${ms}ms)`)), ms)
 	})
 	try {
 		return await Promise.race([reader.read(), timeout])
@@ -38,4 +41,4 @@ export async function readWithTimeout(reader: ReadableStreamDefaultReader<Uint8A
 	}
 }
 
-export const provider = { readWithTimeout }
+export const provider = { config: providerConfig, readWithTimeout }

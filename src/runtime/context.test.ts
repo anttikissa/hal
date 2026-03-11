@@ -1,5 +1,15 @@
-import { test, expect, beforeEach, afterEach } from 'bun:test'
-import { contextWindowForModel, estimateTokens, saveCalibration, isCalibrated, messageBytes } from './context.ts'
+import { test, expect, afterEach } from 'bun:test'
+import { contextWindowForModel, estimateTokens, saveCalibration, isCalibrated, messageBytes, context } from './context.ts'
+
+const defaultConfig = {
+	defaultWindow: context.config.defaultWindow,
+	windows: { ...context.config.windows },
+}
+
+afterEach(() => {
+	context.config.defaultWindow = defaultConfig.defaultWindow
+	context.config.windows = { ...defaultConfig.windows }
+})
 
 test('contextWindowForModel returns known sizes', () => {
 	expect(contextWindowForModel('claude-opus-4-6')).toBe(200_000)
@@ -8,6 +18,17 @@ test('contextWindowForModel returns known sizes', () => {
 
 test('contextWindowForModel returns default for unknown models', () => {
 	expect(contextWindowForModel('gpt-5')).toBe(200_000)
+})
+
+
+test('contextWindowForModel uses live config for unknown models', () => {
+	context.config.defaultWindow = 123_456
+	expect(contextWindowForModel('gpt-5')).toBe(123_456)
+})
+
+test('contextWindowForModel uses live config for known model prefixes', () => {
+	context.config.windows['gpt-5.4'] = 654_321
+	expect(contextWindowForModel('gpt-5.4-mini')).toBe(654_321)
 })
 
 test('estimateTokens uses default 4 bytes/token before calibration', () => {

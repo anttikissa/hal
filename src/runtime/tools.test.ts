@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'bun:test'
-import { executeTool, argsPreview, getTools, type ToolCall } from './tools.ts'
+import { executeTool, argsPreview, getTools, type ToolCall, tools } from './tools.ts'
 import { runHooks } from './hooks.ts'
 import { writeFileSync, unlinkSync, mkdirSync, rmSync, existsSync } from 'fs'
 import { blob } from '../session/blob.ts'
@@ -12,9 +12,22 @@ const textResult = async (name: string, input: any, ctx?: any) => {
 	return result as string
 }
 
+const defaultConfig = {
+	maxOutput: tools.config.maxOutput,
+	contextLines: tools.config.contextLines,
+}
+
 afterEach(() => {
+	tools.config.maxOutput = defaultConfig.maxOutput
+	tools.config.contextLines = defaultConfig.contextLines
 	try { unlinkSync(`${TMP}.txt`) } catch {}
 	try { rmSync(`${TMP}-dir`, { recursive: true, force: true }) } catch {}
+})
+
+
+test('truncate uses live config by default', () => {
+	tools.config.maxOutput = 3
+	expect(tools.truncate('abcdef')).toBe('abc\n[truncated 3 chars]')
 })
 
 // ── bash ──

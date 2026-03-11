@@ -12,7 +12,11 @@ import { evalTool, type EvalContext } from './eval-tool.ts'
 
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
-const MAX_OUTPUT = 50_000
+
+export const toolsConfig = {
+	maxOutput: 50_000,
+	contextLines: 3,
+}
 
 function shortenHome(text: string): string {
 	if (!HOME) return text
@@ -25,7 +29,7 @@ function resolvePath(p?: string): string {
 	return isAbsolute(p) ? p : resolve(CWD, p)
 }
 
-export function truncate(s: string, max = MAX_OUTPUT): string {
+export function truncate(s: string, max = toolsConfig.maxOutput): string {
 	if (s.length <= max) return s
 	return s.slice(0, max) + `\n[truncated ${s.length - max} chars]`
 }
@@ -65,9 +69,9 @@ function validateRef(ref: { line: number; hash: string }, lines: string[]): stri
 	return null
 }
 
-const CTX = 3
 function contextLines(lines: string[], start: number, end: number): string {
-	const from = Math.max(0, start - CTX), to = Math.min(lines.length, end + CTX)
+	const ctx = toolsConfig.contextLines
+	const from = Math.max(0, start - ctx), to = Math.min(lines.length, end + ctx)
 	const w = String(to).length
 	return lines.slice(from, to).map((line, i) =>
 		`${String(from + i + 1).padStart(w)}:${hashLine(line)} ${line}`
@@ -153,7 +157,7 @@ const BASE_TOOLS = [
 	{ name: 'edit', description: `Edit a file using hashline refs from read. Hashes are verified; mismatch = re-read needed.
 - replace: replace start_ref..end_ref (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
 - insert: insert new_content after after_ref. Use "0:000" for beginning of file.
-new_content is raw file content \u2014 no hashline prefixes. A trailing newline in new_content is stripped (each line in the file already has one).`,
+new_content is raw file content — no hashline prefixes. A trailing newline in new_content is stripped (each line in the file already has one).`,
 		input_schema: { type: 'object', properties: {
 			path: { type: 'string' }, operation: { type: 'string', enum: ['replace', 'insert'] },
 			start_ref: { type: 'string', description: 'LINE:HASH of first line to replace' },
@@ -381,4 +385,4 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 	}
 }
 
-export const tools = { truncate, getTools, argsPreview, executeTool }
+export const tools = { config: toolsConfig, truncate, getTools, argsPreview, executeTool }

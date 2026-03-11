@@ -1,10 +1,13 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
-import { parseUserContent, readHistory, appendHistory, loadApiMessages } from './history.ts'
+import { readHistory, appendHistory, loadApiMessages, history } from './history.ts'
+import { attachments } from './attachments.ts'
 
 const TEST_SESSION = '__test_img_session'
 const TEST_IMAGE = '/tmp/hal-test-img.png'
 const STATE_DIR = process.env.HAL_STATE_DIR || `${process.env.HAL_DIR || process.env.HOME + '/.hal'}/state`
+
+const defaultConfig = { ...history.config }
 
 beforeEach(() => {
 	// Create a tiny valid PNG (1x1 red pixel)
@@ -16,19 +19,20 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	Object.assign(history.config, defaultConfig)
 	if (existsSync(TEST_IMAGE)) rmSync(TEST_IMAGE)
 	const dir = `${STATE_DIR}/sessions/${TEST_SESSION}`
 	if (existsSync(dir)) rmSync(dir, { recursive: true })
 })
 
-test('parseUserContent returns plain string when no images', async () => {
-	const { apiContent, logContent } = await parseUserContent(TEST_SESSION, 'hello world')
+test('attachments.resolve returns plain string when no images', async () => {
+	const { apiContent, logContent } = await attachments.resolve(TEST_SESSION, 'hello world')
 	expect(apiContent).toBe('hello world')
 	expect(logContent).toBe('hello world')
 })
 
-test('parseUserContent parses [path.png] into image blocks', async () => {
-	const { apiContent, logContent } = await parseUserContent(TEST_SESSION, `describe this [${TEST_IMAGE}]`)
+test('attachments.resolve parses [path.png] into image blocks', async () => {
+	const { apiContent, logContent } = await attachments.resolve(TEST_SESSION, `describe this [${TEST_IMAGE}]`)
 	expect(Array.isArray(apiContent)).toBe(true)
 	expect(apiContent).toHaveLength(2)
 	expect(apiContent[0]).toEqual({ type: 'text', text: 'describe this ' })
@@ -43,19 +47,19 @@ test('parseUserContent parses [path.png] into image blocks', async () => {
 	expect(imgBlock.source).toBeUndefined()
 })
 
-test('parseUserContent handles missing file', async () => {
-	const { apiContent } = await parseUserContent(TEST_SESSION, '[/nonexistent/image.png]')
+test('attachments.resolve handles missing file', async () => {
+	const { apiContent } = await attachments.resolve(TEST_SESSION, '[/nonexistent/image.png]')
 	expect(Array.isArray(apiContent)).toBe(true)
 	expect(apiContent[0].type).toBe('text')
 	expect(apiContent[0].text).toContain('file not found')
 })
 
-test('parseUserContent inlines [path.txt] from /tmp/hal/', async () => {
+test('attachments.resolve inlines [path.txt] from /tmp/hal/', async () => {
 	const txtPath = '/tmp/hal/test-paste.txt'
 	mkdirSync('/tmp/hal', { recursive: true })
 	writeFileSync(txtPath, 'line one\nline two\nline three')
 	try {
-		const { apiContent, logContent } = await parseUserContent(TEST_SESSION, `check this [${txtPath}]`)
+		const { apiContent, logContent } = await attachments.resolve(TEST_SESSION, `check this [${txtPath}]`)
 		expect(Array.isArray(apiContent)).toBe(true)
 		expect(apiContent).toHaveLength(2)
 		expect(apiContent[0]).toEqual({ type: 'text', text: 'check this ' })
@@ -68,13 +72,13 @@ test('parseUserContent inlines [path.txt] from /tmp/hal/', async () => {
 	}
 })
 
-test('parseUserContent does not expand .txt outside /tmp/hal/', async () => {
-	const { apiContent } = await parseUserContent(TEST_SESSION, 'read [/etc/passwd.txt]')
+test('attachments.resolve does not expand .txt outside /tmp/hal/', async () => {
+	const { apiContent } = await attachments.resolve(TEST_SESSION, 'read [/etc/passwd.txt]')
 	expect(apiContent).toBe('read [/etc/passwd.txt]')
 })
 
 test('image blocks round-trip through loadApiMessages', async () => {
-	const { logContent } = await parseUserContent(TEST_SESSION, `look [${TEST_IMAGE}]`)
+	const { logContent } = await attachments.resolve(TEST_SESSION, `look [${TEST_IMAGE}]`)
 	await appendHistory(TEST_SESSION, [{ role: 'user', content: logContent, ts: new Date().toISOString() }])
 
 	const apiMessages = await loadApiMessages(TEST_SESSION)
@@ -225,4 +229,27 @@ test('loadApiMessages boosts threshold after model change', async () => {
 	expect(toolResultMsg).toBeTruthy()
 	const toolResult = toolResultMsg.content.find((b: any) => b.type === 'tool_result')
 	expect(toolResult.content).toBe('file1.ts\nfile2.ts')
+})
+
+
+test('loadApiMessages uses live maxApiOutput config', async () => {
+	const { writeAssistantEntry, writeToolResultEntry } = await import('./history.ts')
+	const SID = TEST_SESSION
+
+	await appendHistory(SID, [{ role: 'user', content: 'go', ts: new Date().toISOString() }])
+	const { entry, toolBlobMap } = await writeAssistantEntry(SID, {
+		text: 'ok',
+		toolCalls: [{ id: 't0', name: 'bash', input: { command: 'cat huge.txt' } }],
+	})
+	await appendHistory(SID, [entry])
+	await appendHistory(SID, [await writeToolResultEntry(SID, 't0', 'abcdefghij', toolBlobMap)])
+
+	history.config.maxApiOutput = 4
+	const msgs = await loadApiMessages(SID)
+	const toolResultMsg = msgs.find((m: any) =>
+		m.role === 'user' && Array.isArray(m.content) &&
+		m.content.some((b: any) => b.type === 'tool_result')
+	)
+	const toolResult = toolResultMsg.content.find((b: any) => b.type === 'tool_result')
+	expect(toolResult.content).toBe('abcd\n[truncated 6 chars]')
 })
