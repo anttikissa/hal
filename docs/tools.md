@@ -7,16 +7,17 @@ This doc explains where tool code lives, how tool streaming works, and how to ke
 - `src/runtime/tools.ts`
 	- Tool registry exposed to providers (`getTools`)
 	- Generic execution entrypoint (`executeTool`)
-	- Most built-in tool implementations (for now)
+	- Remaining built-in implementations (`grep`, `glob`, `ls`, `read_blob`, `ask`, `eval`)
 - `src/tools/*`
-	- Per-tool modules that can be shared by multiple frontends
-	- First migrated module: `src/tools/bash.ts`
+	- Per-tool modules shared across frontends/runtime
+	- Migrated tools: `bash`, `read`, `write`, `edit`
+	- Shared file helpers: `src/tools/file-utils.ts`
 
-Goal: move tool-specific behavior into `src/tools/*` one tool at a time.
+Goal: keep moving tool-specific behavior into `src/tools/*` one tool at a time.
 
 ## Bash module (`src/tools/bash.ts`)
 
-`bash.ts` currently owns bash-specific behavior:
+`bash.ts` owns bash-specific behavior:
 
 - `bash.definition`
 	- Tool schema (name, description, input schema)
@@ -52,6 +53,19 @@ Inside `bash.ts`, `formatBlock` uses an internal helper `formatOutput`.
 - `formatBlock` is the public API and formats the full block (header + command + output)
 
 If another frontend needs output-only formatting directly, export `formatOutput` later. For now, prefer `formatBlock` as the stable entrypoint.
+
+## File tools modules (`src/tools/read.ts`, `write.ts`, `edit.ts`)
+
+- Each module owns:
+	- `definition`
+	- `argsPreview`
+	- `execute`
+- Shared file behavior is in `src/tools/file-utils.ts`:
+	- path resolution (`~/`, relative to cwd)
+	- hashline formatting and ref validation
+	- per-path async lock used by `write` and `edit`
+
+`edit.execute` still uses runtime-controlled context size (from `tools.config.contextLines`), passed in by `src/runtime/tools.ts`.
 
 ## Streaming lifecycle (bash)
 
@@ -89,9 +103,9 @@ In short:
 - `src/tools/*` decides **what** gets shown
 - frontend layer decides **how** it is drawn
 
-## Migration checklist for next tools
+## Migration checklist for remaining tools
 
-For each tool (`read`, `write`, `edit`, ...):
+For each tool (`read_blob`, `grep`, `glob`, `ls`, `ask`, `eval`, ...):
 
 1. Add `src/tools/<name>.ts` with:
 	- `definition`
@@ -99,7 +113,7 @@ For each tool (`read`, `write`, `edit`, ...):
 	- `execute`
 	- `formatBlock` (if tool has custom formatting semantics)
 2. Wire `src/runtime/tools.ts` to delegate schema/preview/execute
-3. Update frontend block rendering to consume shared formatting
+3. Update frontend block rendering to consume shared formatting when needed
 4. Add focused tests under `src/tools/`
 
 This keeps migration incremental and lowers risk while improving reuse.
