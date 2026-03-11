@@ -50,7 +50,7 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 
 Multiple forks from the same parent share the same prefix of conversation history. Both sessions diverge independently after the fork point. When debugging, check `history.asonl` for `forked_from` entries to trace lineage.
 
-- If history mentions `blob <id>` or placeholders like `[image omitted from context — blob <id>; use read_blob if needed]`, use the `read_blob` tool to inspect the stored payload.
+- If history mentions `blob <id>` or placeholders like `[image omitted from context — blob <id>; use read_blob if needed]`, use the `read_blob` tool to inspect the stored payload. Blobs are immutable snapshots — old file reads survive even if the file has since changed on disk. Use them to diff against current state or recover context after another session edits the same files.
 
 ::: if eval="true"
 
