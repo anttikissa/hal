@@ -9,13 +9,15 @@ import { eventId } from './protocol.ts'
 // Controllable transport: events are pushed manually, tail yields them via a promise queue.
 class FakeTransport implements Transport {
 	private bootstrapState: BootstrapState
+	private replayMessages: Message[]
 	private allEvents: RuntimeEvent[] = []
 	private waiters: ((event: RuntimeEvent) => void)[] = []
 	private pendingEvents: RuntimeEvent[] = []
 	public sentCommands: RuntimeCommand[] = []
 
-	constructor(bootstrapState: BootstrapState) {
+	constructor(bootstrapState: BootstrapState, replayMessages: Message[] = []) {
 		this.bootstrapState = bootstrapState
+		this.replayMessages = replayMessages
 	}
 
 	async sendCommand(cmd: RuntimeCommand): Promise<void> {
@@ -27,7 +29,7 @@ class FakeTransport implements Transport {
 	}
 
 	async replaySession(_id: string): Promise<Message[]> {
-		return []
+		return this.replayMessages
 	}
 
 	async eventsOffset(): Promise<number> {
@@ -80,11 +82,11 @@ function makeBootstrap(busy: boolean): BootstrapState {
 	return { state, sessions }
 }
 
-async function startClient(busy: boolean) {
-	const transport = new FakeTransport(makeBootstrap(busy))
+async function startClient(busy: boolean, replayMessages: Message[] = []) {
+	const transport = new FakeTransport(makeBootstrap(busy), replayMessages)
 	let updates = 0
 	const client = new Client(transport, () => { updates++ })
-	const startPromise = client.start()
+	void client.start()
 	await Bun.sleep(50)
 	return { client, transport, updates: () => updates }
 }
@@ -174,6 +176,24 @@ test('status event clears pausing when session is no longer busy', async () => {
 
 	expect(tab.busy).toBe(false)
 	expect(tab.pausing).toBe(false)
+})
+test('status busy clears stale /continue interrupt hint', async () => {
+	const replayMessages: Message[] = [
+		{ role: 'user', content: 'Resume me', ts } as any,
+	]
+	const { client, transport } = await startClient(false, replayMessages)
+	const tab = client.activeTab()!
+	expect(tab.blocks.some((b) => b.type === 'info' && b.text === '[interrupted] Type /continue to continue')).toBe(true)
+
+	transport.pushEvent({
+		id: eventId(), type: 'status', sessionId: null,
+		busySessionIds: [sessionId], pausedSessionIds: [],
+		activeSessionId: sessionId, busy: true, queueLength: 0,
+		createdAt: ts,
+	})
+	await Bun.sleep(10)
+
+	expect(tab.blocks.some((b) => b.type === 'info' && b.text === '[interrupted] Type /continue to continue')).toBe(false)
 })
 test('thinking block uses fallback model from session update when session model is unset', async () => {
 	const { client, transport } = await startClient(true)

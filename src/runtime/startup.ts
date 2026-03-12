@@ -20,10 +20,11 @@ function shouldContinueAfterHandoff(handoff: RuntimeHandoffState | null): boolea
 }
 
 async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Promise<void> {
-	if (rt.busySessionIds.has(sessionId)) return
 	const info = rt.sessions.get(sessionId)
-	if (!info) return
-
+	if (!info) {
+		rt.busySessionIds.delete(sessionId)
+		return
+	}
 	const pendingTools = rt.pendingInterruptedTools.get(sessionId)
 		?? history.detectInterruptedTools(await history.readHistory(sessionId))
 	if (pendingTools.length > 0) {
@@ -39,7 +40,10 @@ async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Prom
 	const model = info.model ?? config.getConfig().defaultModel
 	await history.ensureModelEvent(sessionId, model)
 	const apiMessages = await history.loadApiMessages(sessionId)
-	if (!rt.hasPendingUserTurn(apiMessages)) return
+	if (!rt.hasPendingUserTurn(apiMessages)) {
+		rt.busySessionIds.delete(sessionId)
+		return
+	}
 	await rt.startGeneration(sessionId, info, apiMessages, 'continuing...')
 }
 
@@ -54,6 +58,8 @@ export async function startRuntime(): Promise<Runtime> {
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = ipc.getState()
 	const handoff = prevState.handoff ?? null
+	const continueAfterHandoff = shouldContinueAfterHandoff(handoff)
+	const handoffBusyIds = continueAfterHandoff ? handoff?.busySessionIds ?? [] : []
 	if (handoff) {
 		ipc.updateState(s => { s.handoff = null })
 	}
@@ -94,6 +100,10 @@ export async function startRuntime(): Promise<Runtime> {
 		rt.setFreshContext(info)
 	}
 
+	for (const id of handoffBusyIds) {
+		if (rt.sessions.has(id)) rt.busySessionIds.add(id)
+	}
+
 	// Publish initial state (must come before greeting so client has the tab)
 	await rt.publish()
 
@@ -106,11 +116,11 @@ export async function startRuntime(): Promise<Runtime> {
 		await rt.resumeInterruptedSession(id)
 	}
 
-	if (shouldContinueAfterHandoff(handoff)) {
-		const busyIds = handoff?.busySessionIds ?? []
-		for (const id of busyIds) {
+	if (continueAfterHandoff) {
+		for (const id of handoffBusyIds) {
 			await continueSessionAfterHandoff(rt, id)
 		}
+		await rt.publish()
 	}
 
 	// Tail from offset captured at startup (no race window)

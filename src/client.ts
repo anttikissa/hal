@@ -152,10 +152,14 @@ export class Client {
 
 	private async hydrateTab(tab: TabState): Promise<number> {
 		const startedAt = Date.now()
-		const replayMessages = await this.transport.replaySession(tab.sessionId)
-		tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy))
-		tab.inputHistory = await history.loadInputHistory(tab.sessionId)
-		tab.inputDraft = await draft.loadDraft(tab.sessionId)
+		const replayMessagesPromise = this.transport.replaySession(tab.sessionId)
+		const inputHistoryPromise = history.loadInputHistory(tab.sessionId)
+		const inputDraftPromise = draft.loadDraft(tab.sessionId)
+		const replayMessages = await replayMessagesPromise
+		const blocks = await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy)
+		tab.blocks.push(...blocks)
+		tab.inputHistory = await inputHistoryPromise
+		tab.inputDraft = await inputDraftPromise
 		return Date.now() - startedAt
 	}
 
@@ -263,6 +267,13 @@ export class Client {
 				for (const t of this.state.tabs) {
 					const wasBusy = t.busy
 					t.busy = busy.has(t.sessionId)
+					if (t.busy) {
+						t.blocks = t.blocks.filter((b) => {
+							if (b.type !== 'info') return true
+							if (b.text === '[interrupted] Type /continue to continue') return false
+							return !b.text.endsWith('. Press Enter to continue')
+						})
+					}
 					if (!t.busy) {
 						t.pausing = false
 						if (t.question) {
