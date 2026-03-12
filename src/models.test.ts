@@ -30,6 +30,11 @@ test('resolveModel: sonnet-X pattern', () => {
 	expect(resolveModel('sonnet-4-20250514')).toBe('anthropic/claude-sonnet-4-20250514')
 })
 
+test('resolveModel: haiku alias and pattern', () => {
+	expect(resolveModel('haiku')).toBe('anthropic/claude-haiku-4-5-20251001')
+	expect(resolveModel('haiku-4-5-20251001')).toBe('anthropic/claude-haiku-4-5-20251001')
+})
+
 test('resolveModel: mock alias', () => {
 	expect(resolveModel('mock')).toBe('mock/mock-1')
 })
@@ -98,6 +103,10 @@ test('displayModel: codex models', () => {
 	expect(displayModel('openai/gpt-5.3-codex')).toBe('Codex 5.3')
 	expect(displayModel('openai/gpt-5.3-codex-spark')).toBe('Codex Spark 5.3')
 	expect(displayModel('openai/gpt-5.2-codex')).toBe('Codex 5.2')
+})
+
+test('displayModel: haiku', () => {
+	expect(displayModel('anthropic/claude-haiku-4-5-20251001')).toBe('Haiku 4.5')
 })
 
 test('displayModel: no provider prefix passes through', () => {
@@ -213,6 +222,7 @@ describe('listModels', () => {
 		const text = listModels(() => false).join('\n')
 		expect(text).toContain('opus')
 		expect(text).toContain('sonnet')
+		expect(text).toContain('haiku')
 		expect(text).toContain('codex')
 	})
 })

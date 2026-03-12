@@ -8,6 +8,7 @@ const ALIASES: Record<string, string> = {
 	claude: 'anthropic/claude-opus-4-6',
 	opus: 'anthropic/claude-opus-4-6',
 	sonnet: 'anthropic/claude-sonnet-4-20250514',
+	haiku: 'anthropic/claude-haiku-4-5-20251001',
 	openai: 'openai/gpt-5.3-codex',
 	gpt: 'openai/gpt-5.4',
 	'gpt54': 'openai/gpt-5.4',
@@ -24,10 +25,11 @@ export function modelCompletions(): string[] {
 	return [...values].sort((a, b) => a.localeCompare(b))
 }
 
-// Pattern-based alias: opus-X → anthropic/claude-opus-X, sonnet-X → anthropic/claude-sonnet-X
+// Pattern-based alias: opus-X → anthropic/claude-opus-X, sonnet-X, haiku-X similarly
 const PATTERNS: [RegExp, string][] = [
 	[/^opus-(.+)$/, 'anthropic/claude-opus-$1'],
 	[/^sonnet-(.+)$/, 'anthropic/claude-sonnet-$1'],
+	[/^haiku-(.+)$/, 'anthropic/claude-haiku-$1'],
 	[/^gpt-?(\d+\.\d+)$/, 'openai/gpt-$1'],
 	[/^codex-(.+)$/, 'openai/gpt-$1-codex'],
 ]
@@ -45,12 +47,18 @@ export function resolveModel(input: string): string {
 // Full model ID → human-readable short name
 
 const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
-	[/^claude-(opus|sonnet)-(\d+)-(\d{1,2})$/, m => {
+	// claude-haiku-4-5-20251001 → Haiku 4.5
+	[/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)-\d{8,}$/, m => {
+		const tier = m[1][0].toUpperCase() + m[1].slice(1)
+		return `${tier} ${m[2]}.${m[3]}`
+	}],
+	// claude-opus-4-6 → Opus 4.6
+	[/^claude-(opus|sonnet|haiku)-(\d+)-(\d{1,2})$/, m => {
 		const tier = m[1][0].toUpperCase() + m[1].slice(1)
 		return `${tier} ${m[2]}.${m[3]}`
 	}],
 	// claude-sonnet-4-20250514 → Sonnet 4
-	[/^claude-(opus|sonnet)-(\d+)-\d{8,}$/, m => {
+	[/^claude-(opus|sonnet|haiku)-(\d+)-\d{8,}$/, m => {
 		const tier = m[1][0].toUpperCase() + m[1].slice(1)
 		return `${tier} ${m[2]}`
 	}],
@@ -102,6 +110,7 @@ const PROVIDERS: { key: string; label: string; models: ModelEntry[] }[] = [
 		models: [
 			{ alias: 'opus', fullId: 'anthropic/claude-opus-4-6', display: 'Opus 4.6' },
 			{ alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-20250514', display: 'Sonnet 4' },
+			{ alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5-20251001', display: 'Haiku 4.5' },
 		],
 	},
 	{
@@ -133,7 +142,7 @@ export function listModels(hasAuth: (provider: string) => boolean): string[] {
 		lines.push('')
 	}
 	// Also list pattern aliases
-	lines.push('Patterns: opus-X, sonnet-X, gpt-X.Y, codex-X.Y')
+	lines.push('Patterns: opus-X, sonnet-X, haiku-X, gpt-X.Y, codex-X.Y')
 	return lines
 }
 
