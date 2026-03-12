@@ -9,6 +9,20 @@ import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { Runtime, runtimeCore } from './runtime.ts'
 import { commandHandlers } from './commands.ts'
+import { handoffConfig, type RuntimeHandoffState } from '../protocol.ts'
+
+interface StartRuntimeOptions {
+	promoted?: boolean
+}
+
+function shouldContinueAfterHandoff(handoff: RuntimeHandoffState | null, opts: StartRuntimeOptions): boolean {
+	if (!handoff || handoff.mode !== 'continue') return false
+	const createdAt = Date.parse(handoff.createdAt)
+	if (!Number.isFinite(createdAt)) return false
+	if (Date.now() - createdAt > handoffConfig.continueWindowMs) return false
+	if (handoff.reason === 'restart') return true
+	return !!opts.promoted
+}
 
 async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Promise<void> {
 	if (rt.busySessionIds.has(sessionId)) return
@@ -32,7 +46,7 @@ async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Prom
 	await rt.startGeneration(sessionId, info, apiMessages, 'continuing...')
 }
 
-export async function startRuntime(): Promise<Runtime> {
+export async function startRuntime(opts: StartRuntimeOptions = {}): Promise<Runtime> {
 	await ipc.ensureBus()
 	const cmdOffset = await ipc.commands.offset()
 	await ipc.events.trim(500)
@@ -95,8 +109,9 @@ export async function startRuntime(): Promise<Runtime> {
 		await rt.resumeInterruptedSession(id)
 	}
 
-	if (handoff?.mode === 'continue') {
-		for (const id of handoff.busySessionIds) {
+	if (shouldContinueAfterHandoff(handoff, opts)) {
+		const busyIds = handoff?.busySessionIds ?? []
+		for (const id of busyIds) {
 			await continueSessionAfterHandoff(rt, id)
 		}
 	}

@@ -129,6 +129,10 @@ export interface RuntimeHandoffState {
 	busySessionIds: string[]
 }
 
+export const handoffConfig = {
+	continueWindowMs: 10_000,
+}
+
 export interface RuntimeState {
 	hostPid: number | null
 	hostId: string | null

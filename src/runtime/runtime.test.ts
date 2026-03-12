@@ -26,7 +26,7 @@ const sessionMod = await import('../session/session.ts')
 const { ensureStateDir, STATE_DIR, sessionDir } = stateMod
 const { ensureBus, claimHost, releaseHost, commands, events, updateState, getState } = ipcMod
 const { startRuntime } = runtimeMod
-const { makeCommand } = protocolMod
+const { makeCommand, handoffConfig } = protocolMod
 const { parseAll } = aSonMod
 const { appendHistory, writeAssistantEntry } = messagesMod
 const { createSession, loadSessionInfo } = sessionMod
@@ -326,6 +326,91 @@ test('handoff continue auto-resumes interrupted user turn on restart', async () 
 		return all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
 	}, 4000, 20, 'Timed out waiting for handoff auto-continue')
 
+	expect(getState().handoff).toBeNull()
+})
+test('quit handoff auto-resumes only when promoted', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	await appendHistory(sid, [{ role: 'user', content: 'Resume me after promotion', ts } as any])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+		s.busySessionIds = [sid]
+		s.handoff = {
+			mode: 'continue',
+			reason: 'quit',
+			fromPid: process.pid,
+			createdAt: ts,
+			activeSessionIds: [sid],
+			busySessionIds: [sid],
+		}
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+	await new Promise(r => setTimeout(r, 250))
+	let all = await events.readAll()
+	let sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	expect(sawDone).toBe(false)
+	expect(getState().handoff).toBeNull()
+
+	runtime.stop()
+	await releaseHost(hostId)
+	updateState((s) => {
+		s.handoff = {
+			mode: 'continue',
+			reason: 'quit',
+			fromPid: process.pid,
+			createdAt: new Date().toISOString(),
+			activeSessionIds: [sid],
+			busySessionIds: [sid],
+		}
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime({ promoted: true })
+	await waitFor(async () => {
+		all = await events.readAll()
+		sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+		return sawDone
+	}, 4000, 20, 'Timed out waiting for promoted quit handoff auto-continue')
+	expect(getState().handoff).toBeNull()
+})
+test('handoff continue expires after window', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const staleTs = new Date(Date.now() - handoffConfig.continueWindowMs - 1000).toISOString()
+	await appendHistory(sid, [{ role: 'user', content: 'Do not resume stale handoff', ts: staleTs } as any])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+		s.busySessionIds = [sid]
+		s.handoff = {
+			mode: 'continue',
+			reason: 'restart',
+			fromPid: process.pid,
+			createdAt: staleTs,
+			activeSessionIds: [sid],
+			busySessionIds: [sid],
+		}
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+	await new Promise(r => setTimeout(r, 250))
+	const all = await events.readAll()
+	const sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	expect(sawDone).toBe(false)
 	expect(getState().handoff).toBeNull()
 })
 
