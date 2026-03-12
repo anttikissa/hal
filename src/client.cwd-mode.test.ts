@@ -81,7 +81,7 @@ test('cwd mode switches to tab matching LAUNCH_CWD', async () => {
 	}
 })
 
-test('cwd mode opens new tab when no match exists', async () => {
+test('cwd mode opens new tab with matching workingDir when no match exists', async () => {
 	const origCwd = process.env.LAUNCH_CWD
 	const origSelf = process.env.HAL_SELF_MODE
 	process.env.LAUNCH_CWD = '/tmp/no-such-project'
@@ -96,7 +96,9 @@ test('cwd mode opens new tab when no match exists', async () => {
 		const client = new Client(transport, () => {})
 		await client.start()
 		await Bun.sleep(10)
-		expect(transport.sentCommands.some(c => c.type === 'open')).toBe(true)
+		const openCmd = transport.sentCommands.find(c => c.type === 'open')
+		expect(openCmd).toBeTruthy()
+		expect(openCmd!.workingDir).toBe('/tmp/no-such-project')
 	} finally {
 		if (origCwd == null) delete process.env.LAUNCH_CWD
 		else process.env.LAUNCH_CWD = origCwd

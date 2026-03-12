@@ -46,6 +46,7 @@ export interface RuntimeCommand {
 	type: CommandType
 	sessionId?: string | null
 	text?: string
+	workingDir?: string
 	source: RuntimeSource
 	createdAt: string
 }

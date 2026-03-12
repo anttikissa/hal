@@ -142,7 +142,9 @@ export class Client {
 		}
 		if (!this.pendingOpen) {
 			this.pendingOpen = true
-			void this.send('open')
+			const cmd = protocol.makeCommand('open', this.source, undefined, undefined)
+			cmd.workingDir = target
+			void this.transport.sendCommand(cmd)
 		}
 	}
 

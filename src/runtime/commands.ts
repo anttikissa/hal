@@ -103,8 +103,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 					rt.emitInfo(sid, `[resume] session ${resumeId} not found`)
 					break
 				}
-			} else {
-				info = await session.createSession()
+		} else {
+				info = await session.createSession(cmd.workingDir)
 				rt.setFreshContext(info)
 			}
 			rt.sessions.set(info.id, info)
