@@ -150,9 +150,13 @@ function sanitizeMessagesForAnthropic(msgs: any[]): any[] {
 		}
 		const content: any[] = []
 		for (const block of msg.content) {
-			if (block.type === 'thinking' && isOpenAIReasoningSignature(block.signature)) {
-				const replayed = formatForeignThinkingForAnthropic(block.thinking, block._model)
-				if (replayed) content.push({ type: 'text', text: replayed })
+			if (block.type === 'thinking') {
+				if (isOpenAIReasoningSignature(block.signature)) {
+					const replayed = formatForeignThinkingForAnthropic(block.thinking, block._model)
+					if (replayed) content.push({ type: 'text', text: replayed })
+					continue
+				}
+				content.push({ type: 'thinking', thinking: block.thinking, signature: block.signature })
 				continue
 			}
 			content.push(block)

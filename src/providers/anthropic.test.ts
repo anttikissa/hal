@@ -79,7 +79,7 @@ test('anthropic provider: keeps native thinking signatures', async () => {
 			messages: [{
 				role: 'assistant',
 				content: [
-					{ type: 'thinking', thinking: 'native thought', signature },
+					{ type: 'thinking', thinking: 'native thought', signature, _model: 'anthropic/claude-opus-4-6' },
 					{ type: 'text', text: 'hello' },
 				],
 			}],
@@ -94,6 +94,7 @@ test('anthropic provider: keeps native thinking signatures', async () => {
 		expect(requestBody).toBeTruthy()
 		const blocks = requestBody.messages[0].content
 		expect(blocks[0]).toMatchObject({ type: 'thinking', thinking: 'native thought', signature })
+		expect(blocks[0]._model).toBeUndefined()
 	} finally {
 		globalThis.fetch = origFetch
 	}
