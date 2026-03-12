@@ -293,4 +293,4 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 	}
 }
 
-export const tools = { config: toolsConfig, truncate, getTools, argsPreview, executeTool }
+export const tools = { config: toolsConfig, truncate, shortenHome, getTools, argsPreview, executeTool }

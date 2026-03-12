@@ -41,7 +41,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 		const m = msg as any
 		if (m.type === 'reset' || m.type === 'forked_from' || m.type === 'compact') continue
 		if (m.type === 'session') {
-			if (m.action === 'init') blocks.push({ type: 'info', text: `[session] ${m.model} in ${m.cwd}` })
+			if (m.action === 'init') blocks.push({ type: 'info', text: `[session ${sessionId}] model: ${m.model}, cwd: ${tools.shortenHome(m.cwd)}` })
 			else if (m.action === 'cd') blocks.push({ type: 'info', text: `[cd] ${m.old} → ${m.new}` })
 			continue
 		}
