@@ -78,9 +78,19 @@ export function clipAnsi(text: string, maxWidth: number): string {
 
 export function clipPlain(text: string, maxWidth: number): string {
 	if (maxWidth <= 0) return ''
-	if (text.length <= maxWidth) return text
+	if (strings.visLen(text) <= maxWidth) return text
 	if (maxWidth === 1) return '…'
-	return text.slice(0, maxWidth - 1) + '…'
+	// Walk codepoints, counting visual width
+	let vis = 0, cut = 0
+	for (let i = 0; i < text.length;) {
+		const cp = text.codePointAt(i)!
+		const cl = cp > 0xFFFF ? 2 : 1
+		const w = strings.charWidth(cp)
+		if (vis + w > maxWidth - 1) { cut = i; break }
+		vis += w
+		i += cl
+	}
+	return text.slice(0, cut) + '…'
 }
 
 export function boxLine(text: string, width: number, fg: string, bg: string): string {
@@ -119,7 +129,7 @@ export function toolHeader(label: string, width: number, fg: string, bg: string,
 	const maxLabel = Math.max(1, iw - prefix.length - (safeBlobId ? safeBlobId.length + 6 : 0) - 2)
 	const shown = clipPlain(safeLabel, maxLabel)
 	const lead = `${prefix}${shown} `
-	const fill = '─'.repeat(Math.max(1, iw - lead.length - (safeBlobId ? safeBlobId.length + 6 : 0)))
+	const fill = '─'.repeat(Math.max(1, iw - strings.visLen(lead) - (safeBlobId ? safeBlobId.length + 6 : 0)))
 	return [headerLine(lead + fill + blobDisplay, width, fg, bg)]
 }
 

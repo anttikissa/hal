@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'bun:test'
 import { renderBlocks, type Block } from './blocks.ts'
 import * as colors from './colors.ts'
+import { strings } from '../utils/strings.ts'
 
 // eslint-disable-next-line no-control-regex
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\]8;;[^\x07]*\x07/g, '')
@@ -84,6 +85,18 @@ describe('renderBlocks', () => {
 			const { lines } = renderBlocks(blocks, w)
 			for (const line of lines.filter(Boolean)) {
 				expect(strip(line).length).toBeLessThanOrEqual(w)
+			}
+		}
+	})
+
+	test('wide chars in tool label do not overflow width', () => {
+		const blocks: Block[] = [
+			{ type: 'tool', name: 'grep', status: 'done', args: '❌', output: 'No matches found.', startTime: Date.now() - 500, endTime: Date.now(), sessionId: '' },
+		]
+		for (const w of [80, 90, 100]) {
+			const { lines } = renderBlocks(blocks, w)
+			for (const line of lines.filter(Boolean)) {
+				expect(strings.visLen(strip(line))).toBeLessThanOrEqual(w)
 			}
 		}
 	})
