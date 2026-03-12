@@ -113,6 +113,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 		}
 		case 'close': {
 			if (!rt.sessions.has(sid)) { await warn(`Session ${sid} not open`); return }
+			const ac = rt.abortControllers.get(sid)
+			if (ac) ac.abort()
 			const closing = rt.sessions.get(sid)!
 			closing.closedAt = new Date().toISOString()
 			;(closing as any).save?.()
