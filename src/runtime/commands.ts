@@ -19,9 +19,15 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 
 	switch (cmd.type) {
 		case 'pause': {
+			const pending = rt.pendingQuestions.get(sid)
+			if (pending) {
+				rt.pendingQuestions.delete(sid)
+				rt.syncState()
+				pending.resolve('')
+			}
 			const ac = rt.abortControllers.get(sid)
 			if (ac) ac.abort()
-			else await warn('Session is not busy')
+			else if (!pending) await warn('Session is not busy')
 			break
 		}
 		case 'prompt': {

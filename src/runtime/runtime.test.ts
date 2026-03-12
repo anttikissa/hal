@@ -553,6 +553,36 @@ test('ask tool sends question event and waits for respond', async () => {
 	expect(getState().pendingQuestions?.[sid]).toBeUndefined()
 })
 
+
+test('pause command cancels a pending ask question', async () => {
+	const sid = runtime.activeSessionId!
+	const snapshot = (await events.readAll()).length
+
+	await commands.append(makeCommand('prompt', src, 'ask Should I keep waiting?', sid))
+
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		if (runtime.pendingQuestions.has(sid)) break
+	}
+
+	expect(runtime.pendingQuestions.has(sid)).toBe(true)
+	expect(runtime.busySessionIds.has(sid)).toBe(true)
+	expect(getState().pendingQuestions?.[sid]?.text).toBe('Should I keep waiting?')
+
+	await commands.append(makeCommand('pause', src, undefined, sid))
+
+	for (let i = 0; i < 120; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		if (!runtime.busySessionIds.has(sid)) break
+	}
+
+	const recent = (await events.readAll()).slice(snapshot)
+	expect(recent.some(e => e.type === 'line' && e.text === '[paused]')).toBe(true)
+	expect(runtime.busySessionIds.has(sid)).toBe(false)
+	expect(runtime.pendingQuestions.has(sid)).toBe(false)
+	expect(getState().pendingQuestions?.[sid]).toBeUndefined()
+})
+
 test('close writes closedAt to meta', async () => {
 	await commands.append(makeCommand('open', src))
 	await new Promise(r => setTimeout(r, 500))
