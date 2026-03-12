@@ -14,7 +14,7 @@ function anthropicSse(): string {
 	].join('\n')
 }
 
-test('anthropic provider: drops OpenAI reasoning signatures from thinking blocks', async () => {
+test('anthropic provider: converts OpenAI reasoning signatures into assistant text context', async () => {
 	let requestBody: any = null
 	const origFetch = installFetchMock(async (input: any, init?: any) => {
 		const url = typeof input === 'string' ? input : input.url
@@ -51,6 +51,7 @@ test('anthropic provider: drops OpenAI reasoning signatures from thinking blocks
 		const blocks = requestBody.messages[0].content
 		expect(blocks.some((b: any) => b.type === 'thinking')).toBe(false)
 		expect(blocks.some((b: any) => b.type === 'text' && b.text === 'hello')).toBe(true)
+		expect(blocks.some((b: any) => b.type === 'text' && String(b.text).includes('old thought'))).toBe(true)
 	} finally {
 		globalThis.fetch = origFetch
 	}

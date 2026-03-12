@@ -245,6 +245,45 @@ test('openai provider: deduplicates reasoning items by id', async () => {
 	}
 })
 
+
+test('openai provider: converts non-OpenAI thinking blocks into assistant text context', async () => {
+	const sse = makeSSE([{ type: 'response.completed', response: { status: 'completed' } }])
+	let requestBody: any = null
+	const origFetch = installFetchMock(async (input: any, init?: any) => {
+		const url = typeof input === 'string' ? input : input.url
+		if (url.includes('auth.openai.com')) {
+			return new Response(JSON.stringify({ access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 3600 }), { status: 200 }) as any
+		}
+		requestBody = JSON.parse(String(init?.body ?? '{}'))
+		return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	})
+
+	try {
+		const mod = await import('./openai.ts')
+		const provider = mod.default
+		for await (const _event of provider.generate({
+			messages: [{
+				role: 'assistant',
+				content: [{ type: 'thinking', thinking: 'anthropic thought', signature: 'EuwDCkYICxgCKkD/rBpHfOrn+vbNPIjqR4hG5D7cRe8=' }],
+			}],
+			model: 'gpt-5.4',
+			systemPrompt: 'test',
+		})) {
+			// drain stream
+		}
+
+		expect(requestBody).toBeTruthy()
+		const assistantMessages = requestBody.input.filter((i: any) => i.type === 'message' && i.role === 'assistant')
+		expect(assistantMessages.length).toBeGreaterThan(0)
+		const replayedText = assistantMessages
+			.flatMap((m: any) => m.content ?? [])
+			.find((c: any) => c.type === 'output_text' && String(c.text).includes('anthropic thought'))
+		expect(replayedText).toBeTruthy()
+	} finally {
+		globalThis.fetch = origFetch
+	}
+})
+
 test('openai provider: handles API error', async () => {
 	const origFetch = mockFetchError(429, '{"error": "rate limited"}')
 	try {
