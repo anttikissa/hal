@@ -90,9 +90,11 @@ export async function forkSession(sourceId: string): Promise<string> {
 	const dir = state.sessionDir(id)
 	state.ensureDir(dir)
 	const ts = new Date().toISOString()
+	const sourceMeta = loadSessionInfo(sourceId)
 	const meta = liveFiles.liveFile<SessionInfo>(sessionPath(id), {
 		defaults: { id, workingDir: resolve(LAUNCH_CWD), log: 'history.asonl', createdAt: ts, updatedAt: ts },
 	})
+	if (sourceMeta?.model) meta.model = sourceMeta.model
 	meta.updatedAt = ts
 	;(meta as SessionInfo & { save?: () => void }).save?.()
 	await appendFile(join(dir, 'history.asonl'), ason.stringify({ type: 'forked_from', parent: sourceId, ts }) + '\n')

@@ -189,3 +189,34 @@ describe('forkSession', () => {
 		expect((newMsgs[0] as any).content).toBe('[system] compacted')
 	})
 })
+
+	test('fork inherits model from parent session', async () => {
+		const parentId = tempSession()
+		// Set model on parent
+		const parentMeta = parseAll(readFileSync(join(sessionDir(parentId), 'session.ason'), 'utf-8'))[0] as any
+		parentMeta.model = 'openai/gpt-5.3-codex'
+		writeFileSync(join(sessionDir(parentId), 'session.ason'), stringify(parentMeta) + '\n')
+
+		await appendHistory(parentId, [
+			{ role: 'user', content: 'hello', ts: new Date().toISOString() } as Message,
+		])
+
+		const childId = await forkSession(parentId)
+		createdIds.push(childId)
+
+		const childMeta = parseAll(readFileSync(join(sessionDir(childId), 'session.ason'), 'utf-8'))[0] as any
+		expect(childMeta.model).toBe('openai/gpt-5.3-codex')
+	})
+
+	test('fork without parent model leaves model unset', async () => {
+		const parentId = tempSession()
+		await appendHistory(parentId, [
+			{ role: 'user', content: 'hello', ts: new Date().toISOString() } as Message,
+		])
+
+		const childId = await forkSession(parentId)
+		createdIds.push(childId)
+
+		const childMeta = parseAll(readFileSync(join(sessionDir(childId), 'session.ason'), 'utf-8'))[0] as any
+		expect(childMeta.model).toBeUndefined()
+	})
