@@ -184,11 +184,12 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	for (const m of sliced) {
 		const msg = m as any
 		currentModel = applyModelEvent(currentModel, msg)
-		// Collect error/warn infos for injection into the next user message
-		if (msg.type === 'info' && (msg.level === 'error' || msg.level === 'warn')) {
+		// Collect error/warn/meta infos for injection into the next user message
+		if (msg.type === 'info' && (msg.level === 'error' || msg.level === 'warn' || msg.level === 'meta')) {
 			const turnsRemaining = totalUserTurns - userTurnsSeen
 			if (turnsRemaining <= historyConfig.errorTurnTtl) {
-				pendingErrors.push(msg.text)
+				const prefix = msg.level === 'error' ? '[Error] ' : msg.level === 'warn' ? '[Warning] ' : ''
+				pendingErrors.push(prefix + msg.text)
 			}
 			continue
 		}
@@ -197,16 +198,16 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			userTurnsSeen++
 			if (typeof msg.content === 'string') {
 				if (pendingErrors.length > 0) {
-					const prefix = pendingErrors.map(e => `[Error] ${e}`).join('\n')
+					const infoText = pendingErrors.join('\n')
 					pendingErrors = []
-					out.push({ role: 'user', content: prefix + '\n' + msg.content })
+					out.push({ role: 'user', content: infoText + '\n' + msg.content })
 				} else {
 					out.push({ role: 'user', content: msg.content })
 				}
 			} else if (Array.isArray(msg.content)) {
 				const blocks: any[] = []
 				if (pendingErrors.length > 0) {
-					blocks.push({ type: 'text', text: pendingErrors.map(e => `[Error] ${e}`).join('\n') })
+					blocks.push({ type: 'text', text: pendingErrors.join('\n') })
 					pendingErrors = []
 				}
 				for (const b of msg.content) {

@@ -126,7 +126,7 @@ test('error before array content user message is injected as text block', async 
 	expect(texts.some((t: string) => t.includes('look at this'))).toBe(true)
 })
 
-test('meta-level info entries are NOT injected into user messages', async () => {
+test('meta-level info entries ARE injected into user messages', async () => {
 	const SID = TEST_SESSION
 	const ts = () => new Date().toISOString()
 
@@ -136,6 +136,21 @@ test('meta-level info entries are NOT injected into user messages', async () => 
 	await appendHistory(SID, [{ role: 'user', content: 'next question', ts: ts() }])
 
 	const msgs = await loadApiMessages(SID)
+	const lastUser = msgs[msgs.length - 1]
+	expect(lastUser.content).toContain('[cd] /old → /new')
+	expect(lastUser.content).toContain('next question')
+})
+
+test('analysis-level info entries are NOT injected into user messages', async () => {
+	const SID = TEST_SESSION
+	const ts = () => new Date().toISOString()
+
+	await appendHistory(SID, [{ role: 'user', content: 'hi', ts: ts() }])
+	await appendHistory(SID, [{ role: 'assistant', text: 'hello', ts: ts() }])
+	await appendHistory(SID, [{ type: 'info', text: '[analysis] neutral topic=...', level: 'info', ts: ts() }])
+	await appendHistory(SID, [{ role: 'user', content: 'next question', ts: ts() }])
+
+	const msgs = await loadApiMessages(SID)
 	const allText = msgs.map((m: any) => JSON.stringify(m.content)).join(' ')
-	expect(allText).not.toContain('/old → /new')
+	expect(allText).not.toContain('[analysis]')
 })
