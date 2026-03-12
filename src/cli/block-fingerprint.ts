@@ -11,12 +11,9 @@ function mix(hash: number, value: number): number {
 }
 
 function textFingerprint(text: string): number {
-	const len = text.length
-	if (len === 0) return 0
-	let hash = len >>> 0
-	hash = mix(hash, text.charCodeAt(0))
-	hash = mix(hash, text.charCodeAt(len - 1))
-	hash = mix(hash, text.charCodeAt(Math.floor(len / 2)))
+	let hash = 2166136261
+	hash = mix(hash, text.length)
+	for (let i = 0; i < text.length; i++) hash = mix(hash, text.charCodeAt(i))
 	return hash
 }
 

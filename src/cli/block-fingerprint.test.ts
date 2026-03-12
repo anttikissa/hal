@@ -21,6 +21,12 @@ describe('blocksFingerprint', () => {
 		expect(fingerprint(a)).not.toBe(fingerprint(b))
 	})
 
+	test('changes when assistant text changes away from first/middle/last', () => {
+		const a: Block[] = [{ type: 'assistant', text: 'aXcdefgh', done: true }]
+		const b: Block[] = [{ type: 'assistant', text: 'aYcdefgh', done: true }]
+		expect(fingerprint(a)).not.toBe(fingerprint(b))
+	})
+
 	test('changes when tool output changes with same length', () => {
 		const base = {
 			type: 'tool' as const,
