@@ -3,6 +3,7 @@
 
 import { auth } from './auth.ts'
 import { models } from '../models.ts'
+import { history, type Message, type UserMessage, type AssistantMessage } from '../session/history.ts'
 
 export interface PromptAnalysis {
 	mood: string
@@ -12,9 +13,29 @@ export interface PromptAnalysis {
 	durationMs: number
 }
 
-const ANALYSIS_PROMPT = `Classify this prompt. Return ONLY JSON: {"mood":"neutral|frustrated|happy|curious|urgent|playful","isHalChange":false,"needsContext":false,"topic":"2-5 words"}`
+const ANALYSIS_PROMPT = `Classify this user prompt in context. Return ONLY JSON: {"mood":"neutral|frustrated|happy|curious|urgent|playful","isHalChange":false,"needsContext":false,"topic":"2-5 words"}`
 
-async function analyzePrompt(text: string): Promise<PromptAnalysis | null> {
+function extractRecentContext(entries: Message[], maxPairs: number): Array<{ role: string; content: string }> {
+	const msgs: Array<{ role: string; content: string }> = []
+	// Walk backwards to find the last N user/assistant pairs
+	for (let i = entries.length - 1; i >= 0 && msgs.length < maxPairs * 2; i--) {
+		const e = entries[i] as any
+		if (e.role === 'user') {
+			const text = typeof e.content === 'string' ? e.content
+				: Array.isArray(e.content)
+					? e.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join(' ') || '[image]'
+					: '[unknown]'
+			msgs.unshift({ role: 'user', content: text })
+		} else if (e.role === 'assistant' && e.text) {
+			// Skip thinking, just the reply text — truncate long responses
+			const text = e.text.length > 200 ? e.text.slice(0, 200) + '…' : e.text
+			msgs.unshift({ role: 'assistant', content: text })
+		}
+	}
+	return msgs
+}
+
+async function analyzePrompt(text: string, sessionId?: string): Promise<PromptAnalysis | null> {
 	const fastModel = models.resolveFastModel()
 	if (!fastModel) return null
 
@@ -23,6 +44,21 @@ async function analyzePrompt(text: string): Promise<PromptAnalysis | null> {
 
 	const { accessToken } = auth.getAuth('anthropic')
 	if (!accessToken) return null
+
+	// Build context from recent history
+	let contextMsgs: Array<{ role: string; content: string }> = []
+	if (sessionId) {
+		try {
+			const entries = await history.readHistory(sessionId)
+			contextMsgs = extractRecentContext(entries, 3)
+		} catch {}
+	}
+
+	// Build the messages array: context + current prompt
+	const messages = [
+		...contextMsgs,
+		{ role: 'user', content: `[ANALYZE THIS PROMPT]: ${text}` },
+	]
 
 	const start = performance.now()
 
@@ -38,7 +74,7 @@ async function analyzePrompt(text: string): Promise<PromptAnalysis | null> {
 				model: modelId,
 				max_tokens: 100,
 				system: ANALYSIS_PROMPT,
-				messages: [{ role: 'user', content: text }],
+				messages,
 			}),
 		})
 
@@ -68,4 +104,4 @@ function formatAnalysis(text: string, analysis: PromptAnalysis): string {
 	return `[analysis] "${preview}" → ${analysis.mood}${hal} topic="${analysis.topic}" ${analysis.durationMs}ms`
 }
 
-export const promptAnalysis = { analyzePrompt, formatAnalysis }
+export const promptAnalysis = { analyzePrompt, formatAnalysis, extractRecentContext }
