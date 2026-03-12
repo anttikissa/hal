@@ -1,5 +1,5 @@
-import { test, expect } from 'bun:test'
-import { resolveModel, displayModel } from './models.ts'
+import { test, expect, describe, beforeEach } from 'bun:test'
+import { resolveModel, displayModel, resolveFastModel, listModels } from './models.ts'
 
 // ── resolveModel ──
 
@@ -95,4 +95,112 @@ test('displayModel: no provider prefix passes through', () => {
 test('displayModel: works with undefined/empty', () => {
 	expect(displayModel('')).toBe('')
 	expect(displayModel(undefined)).toBe('')
+})
+
+// ── resolveFastModel ──
+
+import { config } from './config.ts'
+import { auth } from './runtime/auth.ts'
+
+describe('resolveFastModel', () => {
+	let origGetConfig: typeof config.getConfig
+	let origGetAuth: typeof auth.getAuth
+
+	beforeEach(() => {
+		origGetConfig = config.getConfig
+		origGetAuth = auth.getAuth
+	})
+
+	function mockConfig(overrides: Record<string, any>) {
+		config.getConfig = () => ({ defaultModel: 'anthropic/claude-opus-4-6', ...overrides }) as any
+	}
+
+	function mockAuth(providers: Record<string, { accessToken?: string }>) {
+		auth.getAuth = (p: string) => providers[p] ?? {}
+	}
+
+	test('explicit fastModel in config', () => {
+		mockConfig({ fastModel: 'openai/gpt-4o-mini' })
+		mockAuth({ anthropic: { accessToken: 'sk-ant-xxx' } })
+		expect(resolveFastModel()).toBe('openai/gpt-4o-mini')
+		config.getConfig = origGetConfig
+		auth.getAuth = origGetAuth
+	})
+
+	test('auto with anthropic auth → haiku', () => {
+		mockConfig({})
+		mockAuth({ anthropic: { accessToken: 'sk-ant-xxx' } })
+		expect(resolveFastModel()).toBe('anthropic/claude-3-5-haiku-20241022')
+		config.getConfig = origGetConfig
+		auth.getAuth = origGetAuth
+	})
+
+	test('auto with only openai auth → gpt-4o-mini', () => {
+		mockConfig({})
+		mockAuth({ openai: { accessToken: 'sk-xxx' } })
+		expect(resolveFastModel()).toBe('openai/gpt-4o-mini')
+		config.getConfig = origGetConfig
+		auth.getAuth = origGetAuth
+	})
+
+	test('auto with both → prefers anthropic', () => {
+		mockConfig({})
+		mockAuth({ anthropic: { accessToken: 'a' }, openai: { accessToken: 'b' } })
+		expect(resolveFastModel()).toBe('anthropic/claude-3-5-haiku-20241022')
+		config.getConfig = origGetConfig
+		auth.getAuth = origGetAuth
+	})
+
+	test('auto with no auth → empty string', () => {
+		mockConfig({})
+		mockAuth({})
+		expect(resolveFastModel()).toBe('')
+		config.getConfig = origGetConfig
+		auth.getAuth = origGetAuth
+	})
+
+	test('alias in fastModel gets resolved', () => {
+		mockConfig({ fastModel: 'sonnet' })
+		mockAuth({})
+		expect(resolveFastModel()).toBe('anthropic/claude-sonnet-4-20250514')
+		config.getConfig = origGetConfig
+		auth.getAuth = origGetAuth
+	})
+})
+
+// ── listModels ──
+
+describe('listModels', () => {
+	test('shows anthropic models first when anthropic has auth', () => {
+		const lines = listModels(p => p === 'anthropic')
+		const anthropicIdx = lines.indexOf(lines.find(l => l.includes('Anthropic'))!)
+		const openaiIdx = lines.indexOf(lines.find(l => l.includes('OpenAI'))!)
+		expect(anthropicIdx).toBeLessThan(openaiIdx)
+	})
+
+	test('shows openai models first when only openai has auth', () => {
+		const lines = listModels(p => p === 'openai')
+		const anthropicIdx = lines.indexOf(lines.find(l => l.includes('Anthropic'))!)
+		const openaiIdx = lines.indexOf(lines.find(l => l.includes('OpenAI'))!)
+		expect(openaiIdx).toBeLessThan(anthropicIdx)
+	})
+
+	test('includes alias and full model id', () => {
+		const lines = listModels(() => false)
+		const opusLine = lines.find(l => l.includes('opus'))
+		expect(opusLine).toContain('anthropic/claude-opus-4-6')
+	})
+
+	test('marks authenticated providers', () => {
+		const lines = listModels(p => p === 'anthropic')
+		const header = lines.find(l => l.includes('Anthropic'))!
+		expect(header).toMatch(/✓|authenticated/)
+	})
+
+	test('includes all aliases', () => {
+		const text = listModels(() => false).join('\n')
+		expect(text).toContain('opus')
+		expect(text).toContain('sonnet')
+		expect(text).toContain('codex')
+	})
 })

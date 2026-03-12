@@ -7,6 +7,7 @@ export type PermissionLevel = 'yolo' | 'ask-writes' | 'ask-all'
 
 export interface Config {
 	defaultModel: string
+	fastModel?: string // 'auto' (default) or explicit provider/model-id
 	permissions?: PermissionLevel
 	eval?: boolean
 }

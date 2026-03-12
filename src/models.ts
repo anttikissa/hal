@@ -68,4 +68,25 @@ export function displayModel(fullId: string | undefined): string {
 	return modelId
 }
 
-export const models = { modelCompletions, resolveModel, displayModel }
+// ── Fast model resolution ──
+
+import { config } from './config.ts'
+import { auth } from './runtime/auth.ts'
+
+const FAST_DEFAULTS: [string, string][] = [
+	['anthropic', 'anthropic/claude-3-5-haiku-20241022'],
+	['openai', 'openai/gpt-4o-mini'],
+]
+
+export function resolveFastModel(): string {
+	const cfg = config.getConfig()
+	const fast = cfg.fastModel
+	if (fast && fast !== 'auto') return resolveModel(fast)
+
+	for (const [provider, model] of FAST_DEFAULTS) {
+		if (auth.getAuth(provider).accessToken) return model
+	}
+	return ''
+}
+
+export const models = { modelCompletions, resolveModel, displayModel, resolveFastModel }
