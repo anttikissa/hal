@@ -56,7 +56,7 @@ async function resolve(
 				const blobId = blob.makeId(sessionId)
 				await blob.write(sessionId, blobId, { media_type: mediaType, data: data.toString('base64') })
 				apiBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: data.toString('base64') } })
-				logBlocks.push({ type: 'image', blobId })
+				logBlocks.push({ type: 'image', blobId, originalFile: filePath })
 			} catch {
 				apiBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
 				logBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })

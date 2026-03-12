@@ -162,6 +162,22 @@ describe('pruneApiMessages', () => {
 		expect(out[0].content[1]).toEqual({ type: 'text', text: '[image omitted from context — blob ref-img-0; use read_blob if needed]' })
 	})
 
+	test('clears image blocks that only have blobId and preserves original file path', () => {
+		const imageBlock = { type: 'image', blobId: 'ref-img-fallback', originalFile: '/tmp/hal/images/fallback.png' }
+
+		const msgs: any[] = [
+			{ role: 'user', content: [{ type: 'text', text: 'look at this' }, imageBlock] },
+			{ role: 'assistant', content: [{ type: 'text', text: 'nice image' }] },
+		]
+		for (let i = 0; i < 4; i++) msgs.push(...turn(`q${i}`, `a${i}`))
+
+		const out = pruneApiMessages(msgs)
+		expect(out[0].content[1]).toEqual({
+			type: 'text',
+			text: '[image omitted from context — blob ref-img-fallback; file /tmp/hal/images/fallback.png; use read_blob if needed]',
+		})
+	})
+
 	test('no tool calls → messages unchanged', () => {
 		const msgs = [
 			{ role: 'user', content: 'hello' },

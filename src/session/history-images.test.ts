@@ -44,6 +44,7 @@ test('attachments.resolve parses [path.png] into image blocks', async () => {
 	expect(Array.isArray(logContent)).toBe(true)
 	const imgBlock = (logContent as any[]).find((b: any) => b.type === 'image')
 	expect(imgBlock.blobId).toBeDefined()
+	expect(imgBlock.originalFile).toBe(TEST_IMAGE)
 	expect(imgBlock.source).toBeUndefined()
 })
 
@@ -90,6 +91,28 @@ test('image blocks round-trip through loadApiMessages', async () => {
 	expect(imgBlock.source.type).toBe('base64')
 	expect(imgBlock.source.media_type).toBe('image/png')
 	expect(imgBlock.source.data).toBeTruthy()
+})
+
+test('loadApiMessages keeps blob and file refs when old images are pruned', async () => {
+	const { logContent } = await attachments.resolve(TEST_SESSION, `look [${TEST_IMAGE}]`)
+	const image = (logContent as any[]).find((b: any) => b.type === 'image')
+	await appendHistory(TEST_SESSION, [{ role: 'user', content: logContent, ts: new Date().toISOString() }])
+	await appendHistory(TEST_SESSION, [{ role: 'assistant', text: 'nice', ts: new Date().toISOString() }])
+	for (let i = 0; i < 4; i++) {
+		await appendHistory(TEST_SESSION, [
+			{ role: 'user', content: `q${i}`, ts: new Date().toISOString() },
+			{ role: 'assistant', text: `a${i}`, ts: new Date().toISOString() },
+		])
+	}
+
+	const apiMessages = await loadApiMessages(TEST_SESSION)
+	const firstUser = apiMessages[0] as any
+	expect(firstUser.role).toBe('user')
+	expect(Array.isArray(firstUser.content)).toBe(true)
+	expect(firstUser.content[1]).toEqual({
+		type: 'text',
+		text: `[image omitted from context — blob ${image.blobId}; file ${TEST_IMAGE}; use read_blob if needed]`,
+	})
 })
 
 test('loadApiMessages synthesizes results for orphaned tool_use blocks', async () => {

@@ -25,6 +25,23 @@ function isTurnEnd(msg: any): boolean {
 	return !msg.content.some((b: any) => b.type === 'tool_use')
 }
 
+function blobRef(block: any): string {
+	if (typeof block?._blobId === 'string' && block._blobId) return block._blobId
+	if (typeof block?.blobId === 'string' && block.blobId) return block.blobId
+	return ''
+}
+
+function imageOmittedText(block: any): string {
+	const ref = blobRef(block)
+	const file = typeof block?._originalFile === 'string' && block._originalFile
+		? block._originalFile
+		: typeof block?.originalFile === 'string' && block.originalFile
+			? block.originalFile
+			: ''
+	if (ref && file) return `[image omitted from context — blob ${ref}; file ${file}; use read_blob if needed]`
+	if (ref) return `[image omitted from context — blob ${ref}; use read_blob if needed]`
+	return '[image omitted from context]'
+}
 /** Strip old tool results, tool inputs, images, and thinking from API messages. */
 export function pruneApiMessages(msgs: any[], opts?: PruneOpts): any[] {
 	const heavy = opts?.heavyThreshold ?? pruneConfig.heavyThreshold
@@ -70,10 +87,14 @@ export function pruneApiMessages(msgs: any[], opts?: PruneOpts): any[] {
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = msg.content.map((b: any) => {
 				if (b.type === 'tool_result' && !keepIds.has(b.tool_use_id)) {
-					return { ...b, content: `[tool result omitted from context — blob ${b._blobId}; use read_blob if needed]` }
+					const ref = blobRef(b)
+					const content = ref
+						? `[tool result omitted from context — blob ${ref}; use read_blob if needed]`
+						: '[tool result omitted from context]'
+					return { ...b, content }
 				}
 				if (age[i] > heavy && b.type === 'image') {
-					return { type: 'text', text: `[image omitted from context — blob ${b._blobId}; use read_blob if needed]` }
+					return { type: 'text', text: imageOmittedText(b) }
 				}
 				return b
 			})

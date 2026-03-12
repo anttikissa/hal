@@ -30,7 +30,7 @@ function historyLog(sessionId: string) {
 
 export interface UserMessage {
 	role: 'user'
-	content: string | { type: 'text'; text: string }[] | { type: 'image'; blobId: string }[]
+	content: string | ({ type: 'text'; text: string } | { type: 'image'; blobId: string; originalFile?: string })[]
 	ts: string
 }
 
@@ -215,8 +215,14 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 				for (const b of msg.content) {
 					if (b.type === 'image' && b.blobId) {
 						const data = await blob.read(sessionId, b.blobId)
+						const originalFile = typeof b.originalFile === 'string' ? b.originalFile : ''
 						if (data?.media_type && data?.data) {
-							blocks.push({ type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data }, _blobId: b.blobId })
+							const imageBlock: any = { type: 'image', source: { type: 'base64', media_type: data.media_type, data: data.data }, _blobId: b.blobId }
+							if (originalFile) imageBlock._originalFile = originalFile
+							blocks.push(imageBlock)
+						} else {
+							const fileHint = originalFile ? `; file ${originalFile}` : ''
+							blocks.push({ type: 'text', text: `[image unavailable — blob ${b.blobId}${fileHint}; use read_blob if needed]` })
 						}
 					} else {
 						blocks.push(b)
@@ -280,6 +286,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 		if (msg.role === 'user' && Array.isArray(msg.content)) {
 			for (const b of msg.content) {
 				if (b._blobId) delete b._blobId
+				if (b._originalFile) delete b._originalFile
 			}
 		}
 	}
