@@ -153,7 +153,7 @@ export class Client {
 	private async hydrateTab(tab: TabState): Promise<number> {
 		const startedAt = Date.now()
 		const replayMessages = await this.transport.replaySession(tab.sessionId)
-		tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model))
+		tab.blocks.push(...await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy))
 		tab.inputHistory = await history.loadInputHistory(tab.sessionId)
 		tab.inputDraft = await draft.loadDraft(tab.sessionId)
 		return Date.now() - startedAt

@@ -328,14 +328,14 @@ test('handoff continue auto-resumes interrupted user turn on restart', async () 
 
 	expect(getState().handoff).toBeNull()
 })
-test('quit handoff auto-resumes only when promoted', async () => {
+test('quit handoff auto-resumes within window', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
 
 	const info = await createSession()
 	const sid = info.id
 	const ts = new Date().toISOString()
-	await appendHistory(sid, [{ role: 'user', content: 'Resume me after promotion', ts } as any])
+	await appendHistory(sid, [{ role: 'user', content: 'Resume me after quit handoff', ts } as any])
 	updateState((s) => {
 		s.sessions = [sid]
 		s.activeSessionId = sid
@@ -353,33 +353,10 @@ test('quit handoff auto-resumes only when promoted', async () => {
 	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 	await claimHost(hostId)
 	runtime = await startRuntime()
-	await new Promise(r => setTimeout(r, 250))
-	let all = await events.readAll()
-	let sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
-	expect(sawDone).toBe(false)
-	expect(getState().handoff).toBeNull()
-
-	runtime.stop()
-	await releaseHost(hostId)
-	updateState((s) => {
-		s.handoff = {
-			mode: 'continue',
-			reason: 'quit',
-			fromPid: process.pid,
-			createdAt: new Date().toISOString(),
-			activeSessionIds: [sid],
-			busySessionIds: [sid],
-		}
-	})
-
-	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
-	await claimHost(hostId)
-	runtime = await startRuntime({ promoted: true })
 	await waitFor(async () => {
-		all = await events.readAll()
-		sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
-		return sawDone
-	}, 4000, 20, 'Timed out waiting for promoted quit handoff auto-continue')
+		const all = await events.readAll()
+		return all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	}, 4000, 20, 'Timed out waiting for quit handoff auto-continue')
 	expect(getState().handoff).toBeNull()
 })
 test('handoff continue expires after window', async () => {

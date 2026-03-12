@@ -24,6 +24,14 @@ describe('replayToBlocks', () => {
 		expect(last).toMatchObject({ type: 'info', text: expect.stringContaining('/continue') })
 	})
 
+	test('suppresses /continue info when tab is already busy', async () => {
+		const messages: Message[] = [
+			{ role: 'user', content: 'hello', ts: '2026-01-01T00:00:00Z' },
+		]
+		const blocks = await replayToBlocks('test-session', messages, undefined, true)
+		expect(blocks.every(b => b.type !== 'info' || !(b as any).text?.includes('/continue'))).toBe(true)
+	})
+
 	test('shows resume info for interrupted tools', async () => {
 		const messages: Message[] = [
 			{ role: 'user', content: 'do something', ts: '2026-01-01T00:00:00Z' },

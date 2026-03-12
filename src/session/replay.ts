@@ -5,8 +5,9 @@ import type { Message } from './history.ts'
 import { history as sessionHistory } from './history.ts'
 import { blob } from './blob.ts'
 import { tools } from '../runtime/tools.ts'
+
 /** Convert a message log to display blocks (for tab history). */
-export async function replayToBlocks(sessionId: string, messages: Message[], model?: string): Promise<Block[]> {
+export async function replayToBlocks(sessionId: string, messages: Message[], model?: string, busy = false): Promise<Block[]> {
 	const blocks: Block[] = []
 
 	// Collect tool_result entries for matching
@@ -62,6 +63,8 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			}
 		}
 	}
+
+	if (busy) return blocks
 
 	// Detect unfinished state
 	const interrupted = sessionHistory.detectInterruptedTools(messages)

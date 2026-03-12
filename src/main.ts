@@ -31,8 +31,8 @@ async function emitLine(text: string): Promise<void> {
 	} as any)
 }
 
-async function becomeHost(promoted = false): Promise<void> {
-	runtime = await startup.startRuntime({ promoted })
+async function becomeHost(): Promise<void> {
+	runtime = await startup.startRuntime()
 	await emitLine(`[host] pid ${process.pid}`)
 	// Heartbeat: verify lock is still ours every 3s. If lost (e.g. suspended
 	// and another process took over), step down and let restart loop re-launch.
@@ -57,7 +57,7 @@ export async function shutdown(): Promise<void> {
 process.on('SIGTERM', () => void shutdown())
 
 if (host) {
-	await becomeHost(false)
+	await becomeHost()
 }
 
 // If client, fast-poll host PID then promote when dead
@@ -75,7 +75,7 @@ if (!host) {
 			}
 			halStatus.isHost = true
 			halStatus.hostPid = process.pid
-			await becomeHost(true)
+			await becomeHost()
 			if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 		} finally {
 			promoting = false
