@@ -10,6 +10,8 @@ import { models } from '../models.ts'
 import { auth } from './auth.ts'
 import { config } from '../config.ts'
 import { promptAnalysis } from './prompt-analysis.ts'
+import { resolve } from 'path'
+import { existsSync } from 'fs'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
@@ -284,6 +286,24 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const answer = cmd.text ?? ''
 			await rt.emit({ type: 'answer', sessionId: sid, question: pending.question, text: answer })
 			pending.resolve(answer)
+			break
+		}
+		case 'cd': {
+			const info = rt.sessions.get(sid)
+			if (!info) { await error(`Session ${sid} not found`); break }
+			if (!cmd.text?.trim()) {
+				await rt.emitInfo(sid, `[cd] ${info.workingDir}`, 'info')
+				break
+			}
+			const target = resolve(info.workingDir, cmd.text.trim())
+			if (!existsSync(target)) { await error(`[cd] ${target}: not found`); break }
+			const old = info.workingDir
+			info.workingDir = target
+			await history.appendHistory(sid, [
+				{ type: 'session', action: 'cd', old, new: target, ts: new Date().toISOString() },
+			])
+			await rt.emitInfo(sid, `[cd] ${old} → ${target}`, 'meta')
+			await rt.publish()
 			break
 		}
 		default:

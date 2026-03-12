@@ -54,8 +54,9 @@ export interface ToolResultMessage {
 
 export interface SessionEventMessage {
 	type: 'session'
-	action: 'model-set' | 'model-change'
+	action: 'model-set' | 'model-change' | 'init' | 'cd'
 	model?: string
+	cwd?: string
 	old?: string
 	new?: string
 	ts: string

@@ -25,9 +25,6 @@ function shortenHome(text: string): string {
 	return text.replaceAll(HOME, '~')
 }
 
-function resolvePath(path?: string): string {
-	return resolveToolPath(path, CWD)
-}
 
 export function truncate(s: string, max = toolsConfig.maxOutput): string {
 	if (s.length <= max) return s
@@ -155,6 +152,7 @@ export interface ToolExecContext {
 	evalCtx?: EvalContext
 	sessionId?: string
 	signal?: AbortSignal
+	cwd?: string
 }
 
 export function argsPreview(call: ToolCall): string {
@@ -206,19 +204,21 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 	const err = validateRequired(call)
 	if (err) return err
 	const inp = call.input as any
+	const cwd = ctx?.cwd ?? CWD
+	const resolve = (p?: string) => resolveToolPath(p, cwd)
 
 	switch (call.name) {
 		case 'bash':
-			return bash.execute(inp, { cwd: CWD, signal: ctx?.signal }, onChunk)
+			return bash.execute(inp, { cwd, signal: ctx?.signal }, onChunk)
 		case 'read':
-			return read.execute(inp, { cwd: CWD })
+			return read.execute(inp, { cwd })
 		case 'write':
-			return write.execute(inp, { cwd: CWD })
+			return write.execute(inp, { cwd })
 		case 'edit':
-			return edit.execute(inp, { cwd: CWD, contextLines: toolsConfig.contextLines })
+			return edit.execute(inp, { cwd, contextLines: toolsConfig.contextLines })
 		case 'grep': {
 			const pattern = String(inp?.pattern ?? '')
-			const searchPath = resolvePath(inp?.path)
+			const searchPath = resolve(inp?.path)
 			const args = ['rg', '-nH', '--no-heading', '--color=never', '--hidden', '--no-ignore', '--max-count=100', '--sort=modified']
 			if (inp?.include) args.push('--glob', inp.include)
 			args.push('--', pattern, searchPath)
@@ -228,7 +228,7 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 			return raw
 		}
 		case 'glob': {
-			const searchPath = resolvePath(inp?.path)
+			const searchPath = resolve(inp?.path)
 			const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
 			const result = await $`${args}`.quiet().nothrow()
 			const raw = result.stdout.toString().trim()
@@ -236,7 +236,7 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 			return raw
 		}
 		case 'ls': {
-			const dir = resolvePath(inp?.path)
+			const dir = resolve(inp?.path)
 			const maxDepth = inp?.depth ?? 3
 			const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', '.cache', 'coverage', 'target'])
 			const lines: string[] = []

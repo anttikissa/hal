@@ -29,18 +29,19 @@ export interface SystemPromptResult {
 	bytes: number     // total byte size of result
 }
 
-export function loadSystemPrompt(opts: { model?: string; sessionDir?: string } = {}): SystemPromptResult {
+export function loadSystemPrompt(opts: { model?: string; sessionDir?: string; cwd?: string } = {}): SystemPromptResult {
 	const model = opts.model ?? ''
+	const cwd = opts.cwd ?? LAUNCH_CWD
 	const cfg = config.getConfig()
 	const d = new Date()
 	const date = `${d.toISOString().slice(0, 10)}, ${d.toLocaleDateString('en-US', { weekday: 'long' })}`
 
 	const vars: Record<string, string> = {
-		model, date, cwd: LAUNCH_CWD, hal_dir: HAL_DIR, session_dir: opts.sessionDir ?? '',
+		model, date, cwd, hal_dir: HAL_DIR, session_dir: opts.sessionDir ?? '',
 		eval: cfg.eval ? 'true' : 'false',
 	}
 	const sub = (s: string) => s
-		.replace(/\$\{model\}/g, model).replace(/\$\{cwd\}/g, LAUNCH_CWD)
+		.replace(/\$\{model\}/g, model).replace(/\$\{cwd\}/g, cwd)
 		.replace(/\$\{date\}/g, date).replace(/\$\{hal_dir\}/g, HAL_DIR)
 		.replace(/\$\{session_dir\}/g, opts.sessionDir ?? '')
 
@@ -55,7 +56,7 @@ export function loadSystemPrompt(opts: { model?: string; sessionDir?: string } =
 		parts.push('You are a helpful coding assistant.')
 	}
 	try {
-		parts.push(readFileSync(`${LAUNCH_CWD}/AGENTS.md`, 'utf-8'))
+		parts.push(readFileSync(`${cwd}/AGENTS.md`, 'utf-8'))
 		loaded.push('AGENTS.md')
 	} catch {}
 

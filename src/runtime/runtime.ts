@@ -131,8 +131,14 @@ export class Runtime {
 	}
 
 	async greetSession(sessionId: string): Promise<void> {
+		const info = this.sessions.get(sessionId)
+		const model = info?.model ?? config.getConfig().defaultModel
+		const cwd = info?.workingDir ?? ''
 		const text = pick(GREETINGS)
-		await history.appendHistory(sessionId, [{ role: 'assistant', text, ts: new Date().toISOString() }])
+		await history.appendHistory(sessionId, [
+			{ type: 'session', action: 'init', model, cwd, ts: new Date().toISOString() },
+			{ role: 'assistant', text, ts: new Date().toISOString() },
+		])
 	}
 
 	async startGeneration(
@@ -145,12 +151,13 @@ export class Runtime {
 		this.abortControllers.set(sid, ac)
 		this.busySessionIds.add(sid)
 		await this.publish(activity)
-		const sysPrompt = systemPrompt.loadSystemPrompt({ model: info.model ?? config.getConfig().defaultModel, sessionDir: sid })
+		const sysPrompt = systemPrompt.loadSystemPrompt({ model: info.model ?? config.getConfig().defaultModel, sessionDir: sid, cwd: info.workingDir })
 		agentLoop.runAgentLoop({
 			sessionId: sid,
 			model: info.model ?? config.getConfig().defaultModel,
 			systemPrompt: sysPrompt.text,
 			messages: apiMessages,
+			cwd: info.workingDir,
 			onStatus: async (busy, nextActivity, context) => {
 				if (busy) this.busySessionIds.add(sid)
 				else this.busySessionIds.delete(sid)

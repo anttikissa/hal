@@ -31,6 +31,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'compact' },
 	{ name: 'model', arg: 'model' },
 	{ name: 'topic', arg: 'topic' },
+	{ name: 'cd' },
 	{ name: 'continue' },
 	{ name: 'resume' },
 	{ name: 'open', arg: 'session' },

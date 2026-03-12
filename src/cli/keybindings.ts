@@ -126,6 +126,7 @@ function showHelp(ctx: InputContext): void {
 			'  /compact — compact context (keeps user prompt summary)',
 			'  /model <name> — switch model (e.g. opus, sonnet-4-6, anthropic/...)',
 			'  /topic <name> — set tab topic',
+			'  /cd <path> — change working directory',
 			'  Enter (empty) — continue interrupted response',
 			'  /continue — same as above',
 			'  /resume [id] — reopen a closed session',

@@ -33,6 +33,7 @@ export type CommandType =
 	| 'model'
 	| 'fork'
 	| 'topic'
+	| 'cd'
 	| 'respond'
 
 export interface RuntimeSource {

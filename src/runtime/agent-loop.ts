@@ -31,6 +31,7 @@ export interface AgentContext {
 	model: string
 	systemPrompt: string
 	messages: any[]
+	cwd?: string
 	onStatus: (busy: boolean, activity?: string, context?: { used: number; max: number; estimated?: boolean }) => void
 	askUser: (question: string) => Promise<string>
 	signal?: AbortSignal
@@ -201,7 +202,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								const destructive = call.name === 'bash' || call.name === 'write' || call.name === 'edit'
 								if (destructive) ctx.onDestructiveToolStart?.(call.id, call.name)
 								try {
-									result = await tools.executeTool(call, onChunk, { evalCtx, sessionId, signal })
+									result = await tools.executeTool(call, onChunk, { evalCtx, sessionId, signal, cwd: ctx.cwd })
 								} finally {
 									if (destructive) ctx.onDestructiveToolEnd?.(call.id, call.name)
 								}
