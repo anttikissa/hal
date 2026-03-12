@@ -1,8 +1,9 @@
-import { test, expect, afterEach } from 'bun:test'
+import { test, expect, afterEach, afterAll } from 'bun:test'
 import { executeTool, argsPreview, getTools, type ToolCall, tools } from './tools.ts'
 import { runHooks } from './hooks.ts'
 import { writeFileSync, unlinkSync, mkdirSync, rmSync, existsSync } from 'fs'
 import { blob } from '../session/blob.ts'
+import { state } from '../state.ts'
 
 const TMP = `/tmp/hal-tools-test-${process.pid}`
 const call = (name: string, input: any): ToolCall => ({ id: 'test', name, input })
@@ -24,6 +25,12 @@ afterEach(() => {
 	try { rmSync(`${TMP}-dir`, { recursive: true, force: true }) } catch {}
 })
 
+const BLOB_TEST_SESSIONS = ['__tools_blob_read__', '__tools_blob_image__']
+afterAll(() => {
+	for (const id of BLOB_TEST_SESSIONS) {
+		rmSync(state.sessionDir(id), { recursive: true, force: true })
+	}
+})
 
 test('truncate uses live config by default', () => {
 	tools.config.maxOutput = 3
