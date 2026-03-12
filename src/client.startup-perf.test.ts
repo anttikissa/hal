@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { Client } from './client.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
-import type { Message } from './session/history.ts'
+import type { Message, HydrationData } from './session/history.ts'
 import { history } from './session/history.ts'
 import { draft } from './cli/draft.ts'
 
@@ -70,6 +70,26 @@ class FakeTransport implements Transport {
 	}
 }
 
+class HydrationTransport extends FakeTransport {
+	private readonly hydrationBySession: Record<string, HydrationData>
+
+	constructor(
+		bootstrapState: BootstrapState,
+		hydrationBySession: Record<string, HydrationData>,
+		events: RuntimeEvent[] = [],
+		replays: Record<string, Message[]> = {},
+	) {
+		super(bootstrapState, events, replays)
+		this.hydrationBySession = hydrationBySession
+	}
+
+	async hydrateSession(sessionId: string): Promise<HydrationData> {
+		const hydrated = this.hydrationBySession[sessionId]
+		if (hydrated) return hydrated
+		return { replayMessages: await this.replaySession(sessionId), inputHistory: [] }
+	}
+}
+
 function bootstrapStateFor(sessionId: string): BootstrapState {
 	const ts = new Date().toISOString()
 	const state: RuntimeState = {
@@ -114,6 +134,26 @@ test('client shows startup perf breakdown with tab target', async () => {
 		expect(text).toMatch(/tab \d+ms/)
 		expect(text).toContain('hydrate ')
 		expect(text).toContain('(target <100ms tab)')
+	} finally {
+		if (originalHal === undefined) delete (globalThis as any).__hal
+		else (globalThis as any).__hal = originalHal
+	}
+})
+
+
+test('client shows startup-ready runtime and cli split when host timing is available', async () => {
+	const sessionId = `t-${randomBytes(4).toString('hex')}`
+	const originalHal = (globalThis as any).__hal
+	;(globalThis as any).__hal = {
+		startupEpochMs: Date.now() - 100,
+		startupReadyElapsedMs: 90,
+		startupHostRuntimeElapsedMs: 55,
+	}
+	try {
+		const client = new Client(new FakeTransport(bootstrapStateFor(sessionId)), () => {})
+		await client.start()
+		const text = startupPerfText(client)
+		expect(text).toContain('ready 90ms (runtime 55ms + cli 35ms)')
 	} finally {
 		if (originalHal === undefined) delete (globalThis as any).__hal
 		else (globalThis as any).__hal = originalHal
@@ -273,5 +313,29 @@ test('client loads input history and draft while replay is in flight', async () 
 	} finally {
 		history.loadInputHistory = originalLoadInputHistory
 		draft.loadDraft = originalLoadDraft
+	}
+})
+
+
+test('client uses transport hydration payload for replay and input history', async () => {
+	const sessionId = `t-${randomBytes(4).toString('hex')}`
+	const ts = new Date().toISOString()
+	const hydration: HydrationData = {
+		replayMessages: [{ role: 'user', content: 'hydrated replay', ts } as Message],
+		inputHistory: ['hydrated input history'],
+	}
+	const transport = new HydrationTransport(bootstrapStateFor(sessionId), { [sessionId]: hydration })
+	const originalLoadInputHistory = history.loadInputHistory
+	history.loadInputHistory = async () => {
+		throw new Error('loadInputHistory should not run when hydrateSession is available')
+	}
+	try {
+		const client = new Client(transport, () => {})
+		await client.start()
+		const tab = client.activeTab()
+		expect(tab?.blocks.some((b) => b.type === 'input' && b.text === 'hydrated replay')).toBe(true)
+		expect(tab?.inputHistory).toEqual(['hydrated input history'])
+	} finally {
+		history.loadInputHistory = originalLoadInputHistory
 	}
 })

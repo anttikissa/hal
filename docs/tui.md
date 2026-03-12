@@ -151,6 +151,7 @@ Features:
 - Attach stdin/resize/SIGCONT listeners
 - First frame samples startup-ready elapsed from process launch (`HAL_STARTUP_EPOCH_MS`) to “screen is visible and prompt can accept input”.
 - When the active tab is restored and rendered, that tab gets a local perf line: `[perf] startup: ready <readyMs>ms · tab <tabMs>ms (hydrate <x>ms + render <y>ms) (target <100ms tab)`.
+	- If host timing is available, `ready` includes split detail: `ready <readyMs>ms (runtime <r>ms + cli <c>ms)`.
 - If tab restore startup exceeds target, the line is prefixed with `⚠`.
 
 ### Suspend (`Ctrl-Z`)

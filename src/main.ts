@@ -19,7 +19,13 @@ const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 const { host, currentPid } = await ipc.claimHost(hostId)
 
 // Shared mutable state — cli/cli.ts reads this for the separator
-export const halStatus = { isHost: host, hostPid: currentPid, startupEpochMs: startupEpoch, startupReadyElapsedMs: null as number | null }
+export const halStatus = {
+	isHost: host,
+	hostPid: currentPid,
+	startupEpochMs: startupEpoch,
+	startupReadyElapsedMs: null as number | null,
+	startupHostRuntimeElapsedMs: null as number | null,
+}
 ;(globalThis as any).__hal = halStatus
 
 let runtime: Runtime | null = null
@@ -33,6 +39,7 @@ async function emitLine(text: string): Promise<void> {
 
 async function becomeHost(): Promise<void> {
 	runtime = await startup.startRuntime()
+	if (startupEpoch) halStatus.startupHostRuntimeElapsedMs = Math.max(0, Date.now() - startupEpoch)
 	await emitLine(`[host] pid ${process.pid}`)
 	// Heartbeat: verify lock is still ours every 3s. If lost (e.g. suspended
 	// and another process took over), step down and let restart loop re-launch.

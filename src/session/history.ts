@@ -355,8 +355,7 @@ export function buildCompactionContext(sessionId: string, entries: Message[]): s
 	return lines.join('\n')
 }
 
-export async function loadInputHistory(sessionId: string): Promise<string[]> {
-	const entries = await readHistory(sessionId)
+function inputHistoryFromEntries(entries: Message[]): string[] {
 	return entries
 		.filter((e: any) => e.role === 'user')
 		.map((e: any) => {
@@ -366,6 +365,28 @@ export async function loadInputHistory(sessionId: string): Promise<string[]> {
 		})
 		.filter((text: string) => text && !text.startsWith('['))
 		.slice(-200)
+}
+
+export interface HydrationData {
+	replayMessages: Message[]
+	inputHistory: string[]
+}
+
+export async function loadHydrationData(sessionId: string): Promise<HydrationData> {
+	const localEntries = await readHistory(sessionId)
+	const replayMessages = await historyFork.loadAllHistory(sessionId, async (id) => {
+		if (id === sessionId) return localEntries
+		return readHistory(id)
+	})
+	return {
+		replayMessages,
+		inputHistory: inputHistoryFromEntries(localEntries),
+	}
+}
+
+export async function loadInputHistory(sessionId: string): Promise<string[]> {
+	const entries = await readHistory(sessionId)
+	return inputHistoryFromEntries(entries)
 }
 
 export const history = {
@@ -381,5 +402,6 @@ export const history = {
 	loadAllHistory,
 	detectInterruptedTools,
 	buildCompactionContext,
+	loadHydrationData,
 	loadInputHistory,
 }

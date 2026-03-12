@@ -47,6 +47,7 @@ const hal = (globalThis as any).__hal as {
 	hostPid: number | null
 	startupEpochMs?: number | null
 	startupReadyElapsedMs?: number | null
+	startupHostRuntimeElapsedMs?: number | null
 }
 
 function markStartupReady(): void {

@@ -1,7 +1,7 @@
 // Transport interface + local (file-backed) implementation.
 
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from '../protocol.ts'
-import type { Message } from '../session/history.ts'
+import type { Message, HydrationData } from '../session/history.ts'
 
 // ── Interface ──
 
@@ -15,6 +15,7 @@ export interface Transport {
 	bootstrap(): Promise<BootstrapState>
 	tailEvents(fromOffset?: number): { items: AsyncGenerator<RuntimeEvent>; cancel(): void }
 	replaySession(id: string): Promise<Message[]>
+	hydrateSession?(id: string): Promise<HydrationData>
 	eventsOffset(): Promise<number>
 }
 
@@ -45,6 +46,10 @@ export class LocalTransport implements Transport {
 
 	async replaySession(id: string): Promise<Message[]> {
 		return history.loadAllHistory(id)
+	}
+
+	async hydrateSession(id: string): Promise<HydrationData> {
+		return history.loadHydrationData(id)
 	}
 
 	async eventsOffset(): Promise<number> {

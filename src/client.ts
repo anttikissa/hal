@@ -34,6 +34,8 @@ function selfModeEnabled(): boolean { return process.env.HAL_SELF_MODE === '1' }
 
 interface StartupPerfState {
 	readyMs: number | null
+	hostRuntimeMs: number | null
+	cliReadyMs: number | null
 	epochMs: number | null
 	tabMs: number | null
 	hydrateMs: number | null
@@ -42,15 +44,45 @@ interface StartupPerfState {
 }
 
 function startupPerfSample(): StartupPerfState | null {
-	const meta = (globalThis as any).__hal as { startupEpochMs?: number | null; startupReadyElapsedMs?: number | null } | undefined
+	const meta = (globalThis as any).__hal as {
+		startupEpochMs?: number | null
+		startupReadyElapsedMs?: number | null
+		startupHostRuntimeElapsedMs?: number | null
+	} | undefined
 	const epochRaw = meta?.startupEpochMs
 	const epochMs = typeof epochRaw === 'number' && Number.isFinite(epochRaw) && epochRaw > 0 ? epochRaw : null
+	const hostRuntimeRaw = meta?.startupHostRuntimeElapsedMs
+	const hostRuntimeMs = typeof hostRuntimeRaw === 'number' && Number.isFinite(hostRuntimeRaw) && hostRuntimeRaw >= 0
+		? Math.round(hostRuntimeRaw)
+		: null
 	const readyRaw = meta?.startupReadyElapsedMs
 	if (typeof readyRaw === 'number' && Number.isFinite(readyRaw) && readyRaw >= 0) {
-		return { readyMs: Math.round(readyRaw), epochMs, tabMs: null, hydrateMs: null, renderMs: null, targetMs: 100 }
+		const readyMs = Math.round(readyRaw)
+		const cliReadyMs = hostRuntimeMs === null ? null : Math.max(0, readyMs - hostRuntimeMs)
+		return {
+			readyMs,
+			hostRuntimeMs,
+			cliReadyMs,
+			epochMs,
+			tabMs: null,
+			hydrateMs: null,
+			renderMs: null,
+			targetMs: 100,
+		}
 	}
 	if (!epochMs) return null
-	return { readyMs: Math.max(0, Date.now() - epochMs), epochMs, tabMs: null, hydrateMs: null, renderMs: null, targetMs: 100 }
+	const readyMs = Math.max(0, Date.now() - epochMs)
+	const cliReadyMs = hostRuntimeMs === null ? null : Math.max(0, readyMs - hostRuntimeMs)
+	return {
+		readyMs,
+		hostRuntimeMs,
+		cliReadyMs,
+		epochMs,
+		tabMs: null,
+		hydrateMs: null,
+		renderMs: null,
+		targetMs: 100,
+	}
 }
 
 export class Client {
@@ -100,7 +132,11 @@ export class Client {
 		const targetMs = startupPerf.targetMs
 		if (startupPerf.tabMs !== null) {
 			const warn = startupPerf.tabMs > targetMs
-			const readyPart = startupPerf.readyMs !== null ? `ready ${startupPerf.readyMs}ms · ` : ''
+			const readyPart = startupPerf.readyMs !== null
+				? startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
+					? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms) · `
+					: `ready ${startupPerf.readyMs}ms · `
+				: ''
 			const detail = startupPerf.hydrateMs !== null && startupPerf.renderMs !== null
 				? ` (hydrate ${startupPerf.hydrateMs}ms + render ${startupPerf.renderMs}ms)`
 				: ''
@@ -111,9 +147,12 @@ export class Client {
 			return
 		}
 		if (startupPerf.readyMs === null) return
+		const readyLabel = startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
+			? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms)`
+			: `ready ${startupPerf.readyMs}ms`
 		tab.blocks.push({
 			type: 'info',
-			text: `${startupPerf.readyMs > targetMs ? '⚠ ' : ''}[perf] startup: ready ${startupPerf.readyMs}ms (target <${targetMs}ms)`,
+			text: `${startupPerf.readyMs > targetMs ? '⚠ ' : ''}[perf] startup: ${readyLabel} (target <${targetMs}ms)`,
 		})
 	}
 
@@ -151,9 +190,17 @@ export class Client {
 
 	private async hydrateTab(tab: TabState): Promise<number> {
 		const startedAt = Date.now()
+		const inputDraftPromise = draft.loadDraft(tab.sessionId)
+		if (this.transport.hydrateSession) {
+			const hydration = await this.transport.hydrateSession(tab.sessionId)
+			const blocks = await replay.replayToBlocks(tab.sessionId, hydration.replayMessages, tab.info.model, tab.busy)
+			tab.blocks.push(...blocks)
+			tab.inputHistory = hydration.inputHistory
+			tab.inputDraft = await inputDraftPromise
+			return Date.now() - startedAt
+		}
 		const replayMessagesPromise = this.transport.replaySession(tab.sessionId)
 		const inputHistoryPromise = history.loadInputHistory(tab.sessionId)
-		const inputDraftPromise = draft.loadDraft(tab.sessionId)
 		const replayMessages = await replayMessagesPromise
 		const blocks = await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy)
 		tab.blocks.push(...blocks)
