@@ -51,6 +51,8 @@ async function loadAllHistory<T extends { ts?: string }>(
 		const forkTs = (entries[0] as any).ts
 		const parentEntries = await loadAllHistory(parent, readHistory)
 		const before = parentEntries.filter((e: any) => !e.ts || e.ts < forkTs)
+		// Thinking signatures are bound to the original conversation — invalid in forks
+		for (const e of before) delete (e as any).thinkingSignature
 		return [...before, ...entries.slice(1)]
 	}
 	return entries
