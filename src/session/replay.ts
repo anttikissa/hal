@@ -54,6 +54,26 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 		if (m.role === 'tool_result') toolResults.set(m.tool_use_id, m.blobId)
 	}
 
+	const toolBlobData = new Map<string, any>()
+	const toolBlobIds = new Set<string>()
+	for (const msg of messages) {
+		const m = msg as any
+		if (m.role !== 'assistant' || !Array.isArray(m.tools)) continue
+		for (const tool of m.tools as { id: string; blobId: string }[]) {
+			const resultBlobId = toolResults.get(tool.id)
+			const blobId = resultBlobId ?? tool.blobId
+			toolBlobIds.add(blobId)
+		}
+	}
+	if (toolBlobIds.size > 0) {
+		const blobIds = [...toolBlobIds]
+		const loaded = await mapLimit(blobIds, replayConfig.blobReadConcurrency, async (blobId) => {
+			const data = await blob.read(sessionId, blobId)
+			return [blobId, data] as const
+		})
+		for (const [blobId, data] of loaded) toolBlobData.set(blobId, data)
+	}
+
 	for (const msg of messages) {
 		const m = msg as any
 		if (m.type === 'reset' || m.type === 'forked_from' || m.type === 'compact') continue
@@ -87,16 +107,16 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			}
 			if (Array.isArray(m.tools)) {
 				const assistantTools = m.tools as { id: string; blobId: string; name: string }[]
-				const toolBlocks = await mapLimit(assistantTools, replayConfig.blobReadConcurrency, async (tool): Promise<Block> => {
+				for (const tool of assistantTools) {
 					const resultBlobId = toolResults.get(tool.id)
 					const blobId = resultBlobId ?? tool.blobId
-					const blobData = await blob.read(sessionId, blobId)
+					const blobData = toolBlobData.get(blobId)
 					const callData = blobData?.call ?? {}
 					const raw = blobData?.result?.content ?? ''
 					const output = typeof raw === 'string' ? raw : raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
 					const status = blobData?.result?.status === 'error' ? 'error' : (blobData?.result ? 'done' : 'error')
 					const now = Date.now()
-					return {
+					blocks.push({
 						type: 'tool',
 						name: tool.name,
 						args: typeof callData.input === 'string' ? callData.input : tools.argsPreview({ id: tool.blobId, name: tool.name, input: callData.input }),
@@ -106,9 +126,8 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 						endTime: now,
 						blobId,
 						sessionId,
-					}
-				})
-				blocks.push(...toolBlocks)
+					})
+				}
 			}
 		}
 	}

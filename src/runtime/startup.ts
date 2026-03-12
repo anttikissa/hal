@@ -106,11 +106,6 @@ export async function startRuntime(): Promise<Runtime> {
 	}
 
 	await rt.publish()
-
-	for (const [id] of rt.sessions) {
-		await rt.resumeInterruptedSession(id)
-	}
-
 	if (continueAfterHandoff) {
 		for (const id of handoffBusyIds) {
 			await continueSessionAfterHandoff(rt, id)

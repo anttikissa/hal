@@ -189,14 +189,6 @@ export class Runtime {
 		})
 	}
 
-	async resumeInterruptedSession(sessionId: string): Promise<void> {
-		const entries = await history.readHistory(sessionId)
-		const interrupted = history.detectInterruptedTools(entries)
-		if (interrupted.length > 0) {
-			this.pendingInterruptedTools.set(sessionId, interrupted)
-		}
-	}
-
 	// Set by startup.ts after wiring up command tail + watchers
 	stop: () => void = () => {}
 }
