@@ -134,6 +134,11 @@ export class Runtime {
 		const info = this.sessions.get(sessionId)
 		const model = info?.model ?? config.getConfig().defaultModel
 		const cwd = info?.workingDir ?? ''
+		const sp = systemPrompt.loadSystemPrompt({ model, sessionDir: sessionId, cwd })
+		if (sp.loaded.length > 0) {
+			const parts = sp.loaded.map(f => `${f.name} (${systemPrompt.formatBytes(f.bytes)})`)
+			await this.emitInfo(sessionId, parts.join(', '), 'meta')
+		}
 		const text = pick(GREETINGS)
 		await history.appendHistory(sessionId, [
 			{ type: 'session', action: 'init', model, cwd, ts: new Date().toISOString() },

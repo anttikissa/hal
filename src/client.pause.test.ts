@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { Client } from './client.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
-import type { Message } from './session/history.ts'
+import type { Message, HydrationData } from './session/history.ts'
 import { eventId } from './protocol.ts'
 
 // Controllable transport: events are pushed manually, tail yields them via a promise queue.
@@ -28,8 +28,8 @@ class FakeTransport implements Transport {
 		return this.bootstrapState
 	}
 
-	async replaySession(_id: string): Promise<Message[]> {
-		return this.replayMessages
+	async hydrateSession(_id: string): Promise<HydrationData> {
+		return { replayMessages: this.replayMessages, inputHistory: [] }
 	}
 
 	async eventsOffset(): Promise<number> {

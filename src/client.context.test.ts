@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { Client } from './client.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
-import type { Message } from './session/history.ts'
+import type { Message, HydrationData } from './session/history.ts'
 
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
@@ -22,8 +22,8 @@ class FakeTransport implements Transport {
 		return this.bootstrapState
 	}
 
-	async replaySession(_id: string): Promise<Message[]> {
-		return this.replays[_id] ?? []
+	async hydrateSession(id: string): Promise<HydrationData> {
+		return { replayMessages: this.replays[id] ?? [], inputHistory: [] }
 	}
 
 	async eventsOffset(): Promise<number> {

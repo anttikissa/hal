@@ -304,7 +304,15 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			await history.appendHistory(sid, [
 				{ type: 'session', action: 'cd', old, new: target, ts: new Date().toISOString() },
 			])
-			await rt.emitInfo(sid, `[cd] ${old} → ${target}`, 'meta')
+			if (!rt.busySessionIds.has(sid)) {
+				await rt.emitInfo(sid, `[cd] ${old} → ${target}`, 'meta')
+				const { systemPrompt } = await import('./system-prompt.ts')
+				const agents = systemPrompt.collectAgentFiles(target)
+				if (agents.length > 0) {
+					const parts = agents.map(f => `${f.name} (${systemPrompt.formatBytes(f.bytes)})`)
+					await rt.emitInfo(sid, `[agents] ${parts.join(', ')}`, 'meta')
+				}
+			}
 			await rt.publish()
 			break
 		}

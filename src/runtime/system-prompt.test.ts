@@ -5,7 +5,7 @@ test('loads SYSTEM.md with variable substitution', () => {
 	const result = loadSystemPrompt({ model: 'claude-sonnet-4-20250514', sessionDir: 'test-session' })
 	expect(result.text.length).toBeGreaterThan(100)
 	expect(result.bytes).toBeGreaterThan(100)
-	expect(result.loaded).toContain('SYSTEM.md')
+	expect(result.loaded.some(f => f.name === 'SYSTEM.md')).toBe(true)
 	expect(result.text).not.toContain('${model}')
 	expect(result.text).not.toContain('${date}')
 	expect(result.text).not.toContain('${hal_dir}')
