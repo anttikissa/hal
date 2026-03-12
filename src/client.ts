@@ -22,6 +22,7 @@ export interface TabState {
 	contentHeight: number
 	context?: { used: number; max: number; estimated?: boolean }
 	question?: { id: string; text: string }
+	doneUnseen?: boolean
 }
 
 export interface ClientState {
@@ -180,9 +181,12 @@ export class Client {
 			}
 			case 'status': {
 				const busy = new Set(event.busySessionIds ?? [])
+				const active = this.activeTab()
 				for (const t of this.state.tabs) {
+					const wasBusy = t.busy
 					t.busy = busy.has(t.sessionId)
 					if (!t.busy) t.pausing = false
+					if (wasBusy && !t.busy && t !== active) t.doneUnseen = true
 					if (event.contexts?.[t.sessionId]) t.context = event.contexts[t.sessionId]
 				}
 				break
@@ -349,6 +353,7 @@ export class Client {
 		prompt.reset()
 		const tab = this.activeTab()
 		if (tab) {
+			tab.doneUnseen = false
 			this.applyTabToPrompt(tab)
 			clientState.saveLastTab(tab.sessionId)
 		}

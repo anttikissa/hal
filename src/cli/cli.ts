@@ -204,6 +204,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		else if (!t.busy && last?.type === 'error') indicator = `${colors.error.fg}✖`
 		else if (!t.busy && last?.type === 'info' && (last.text === '[paused]' || last.text.startsWith('[interrupted]')))
 			indicator = '!'
+		else if (t.doneUnseen) indicator = '\x1b[32m✓'
 		const cc = t.busy && last ? minicursorColor(last) : undefined
 		return {
 			label: `${i + 1} ${title}`,
