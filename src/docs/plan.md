@@ -39,7 +39,7 @@ new/
 
   session/
     session.ts           — create/load/list sessions, SessionInfo type
-    messages.ts          — append/read conversation messages (per-session)
+    history.ts           — append/read conversation history (per-session)
     replay.ts            — messages → Block[] for history display
 
   cli/

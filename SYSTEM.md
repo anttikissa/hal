@@ -64,7 +64,7 @@ The user has enabled the `eval` tool. It executes TypeScript **inside the Hal pr
 
 ### Hot-patchable modules
 
-Almost every non-test module exposes a mutable namespace object (for example `ipc.ts` exports `ipc`, `messages.ts` exports `messages`, `context.ts` exports `context`).
+Almost every non-test module exposes a mutable namespace object (for example `ipc.ts` exports `ipc`, `history.ts` exports `history`, `context.ts` exports `context`).
 
 Pattern:
 
