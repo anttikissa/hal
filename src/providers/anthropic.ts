@@ -10,13 +10,16 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	const { accessToken } = auth.getAuth('anthropic')
 	const maxTokens = 16384
 	const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(params.model)
+	const supportsThinking = /^claude-(opus|sonnet)/.test(params.model)
 
 	const system = [{ type: 'text', text: params.systemPrompt, cache_control: { type: 'ephemeral' } }]
 
 	const body: any = {
 		model: params.model, max_tokens: maxTokens, stream: true,
 		system, messages: cacheBreakpoints(sanitizeMessagesForAnthropic(params.messages)),
-		thinking: isAdaptive ? { type: 'adaptive' } : { type: 'enabled', budget_tokens: Math.min(10000, maxTokens - 1) },
+	}
+	if (supportsThinking) {
+		body.thinking = isAdaptive ? { type: 'adaptive' } : { type: 'enabled', budget_tokens: Math.min(10000, maxTokens - 1) }
 	}
 	// DEBUG: log outgoing thinking blocks with per-session files
 	const _msgs = body.messages as any[]

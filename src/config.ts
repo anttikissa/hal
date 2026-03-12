@@ -10,6 +10,7 @@ export interface Config {
 	fastModel?: string // 'auto' (default) or explicit provider/model-id
 	permissions?: PermissionLevel
 	eval?: boolean
+	debug?: boolean
 }
 
 let _config: Config | null = null

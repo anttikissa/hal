@@ -8,6 +8,8 @@ import { history } from '../session/history.ts'
 import { attachments } from '../session/attachments.ts'
 import { models } from '../models.ts'
 import { auth } from './auth.ts'
+import { promptAnalysis } from './prompt-analysis.ts'
+import { config } from '../config.ts'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
@@ -23,7 +25,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			break
 		}
 		case 'prompt': {
-			if (!cmd.text) { await warn('Empty prompt'); return }
+			const promptText = cmd.text ?? ''
+			if (!promptText) { await warn('Empty prompt'); return }
 			if (!rt.sessions.has(sid)) { await error(`Session ${sid} not found`); return }
 			if (rt.busySessionIds.has(sid)) { await warn('Session is busy'); return }
 
@@ -38,13 +41,13 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				rt.pendingInterruptedTools.delete(sid)
 			}
 
-			await rt.emit({ type: 'prompt', sessionId: sid, text: cmd.text, source: cmd.source })
+			await rt.emit({ type: 'prompt', sessionId: sid, text: promptText, source: cmd.source })
 
-			const { apiContent, logContent } = await attachments.resolve(sid, cmd.text)
+			const { apiContent, logContent } = await attachments.resolve(sid, promptText)
 			await history.writeUserEntry(sid, logContent)
 
 			const info = rt.sessions.get(sid)!
-			info.lastPrompt = cmd.text.split('\n')[0].slice(0, 120)
+			info.lastPrompt = promptText.split('\n')[0].slice(0, 120)
 
 			let apiMessages = await history.loadApiMessages(sid)
 
@@ -68,6 +71,12 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			// Replace the last user message's content with parsed apiContent (includes base64 images)
 			if (apiMessages.length > 0 && apiMessages[apiMessages.length - 1].role === 'user') {
 				apiMessages[apiMessages.length - 1].content = apiContent
+			}
+			// Fire prompt analysis in parallel (non-blocking)
+			if (config.getConfig().debug) {
+				promptAnalysis.analyzePrompt(promptText).then(result => {
+					if (result) rt.emitInfo(sid, promptAnalysis.formatAnalysis(promptText, result), 'info')
+				}).catch(() => {})
 			}
 			await rt.startGeneration(sid, info, apiMessages)
 			break
