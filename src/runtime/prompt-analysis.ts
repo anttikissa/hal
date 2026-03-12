@@ -1,7 +1,7 @@
 // Prompt analysis — fires a fast model call to classify user prompts.
-// Returns mood, hal-modification intent, topic, etc.
+// Uses a direct fetch to avoid the streaming provider overhead.
 
-import { loader } from '../providers/loader.ts'
+import { auth } from './auth.ts'
 import { models } from '../models.ts'
 
 export interface PromptAnalysis {
@@ -12,40 +12,44 @@ export interface PromptAnalysis {
 	durationMs: number
 }
 
-const ANALYSIS_PROMPT = `You are a prompt classifier. Analyze the user's message and return JSON only.
+const ANALYSIS_PROMPT = `Classify this prompt. Return ONLY JSON: {"mood":"neutral|frustrated|happy|curious|urgent|playful","isHalChange":false,"needsContext":false,"topic":"2-5 words"}`
 
-Fields:
-- mood: one of "neutral", "frustrated", "happy", "curious", "urgent", "playful"
-- isHalChange: true if the user wants to modify Hal itself (the AI assistant's code, config, behavior, system prompt, TUI, etc). false for general coding tasks.
-- needsContext: true if the change seems to require conversation context (e.g. "do that thing we discussed"), false if it's a fresh standalone request
-- topic: 2-5 word summary of what the message is about
-
-Return ONLY valid JSON, no markdown fences.`
-
-export async function analyzePrompt(text: string): Promise<PromptAnalysis | null> {
+async function analyzePrompt(text: string): Promise<PromptAnalysis | null> {
 	const fastModel = models.resolveFastModel()
 	if (!fastModel) return null
 
 	const [providerName, modelId] = fastModel.split('/', 2)
+	if (providerName !== 'anthropic') return null
+
+	const { accessToken } = auth.getAuth('anthropic')
+	if (!accessToken) return null
+
 	const start = performance.now()
 
 	try {
-		const provider = await loader.loadProvider(providerName)
-		const gen = provider.generate({
-			messages: [{ role: 'user', content: text }],
-			model: modelId,
-			systemPrompt: ANALYSIS_PROMPT,
+		const res = await fetch('https://api.anthropic.com/v1/messages', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'x-api-key': accessToken,
+				'anthropic-version': '2023-06-01',
+			},
+			body: JSON.stringify({
+				model: modelId,
+				max_tokens: 100,
+				system: ANALYSIS_PROMPT,
+				messages: [{ role: 'user', content: text }],
+			}),
 		})
 
-		let response = ''
-		for await (const event of gen) {
-			if (event.type === 'text') response += event.text
-			if (event.type === 'error') return null
-		}
+		if (!res.ok) return null
 
-		const durationMs = Math.round(performance.now() - start)
-		const json = response.replace(/^```(?:json)?\n?|\n?```$/g, '').trim()
+		const data = await res.json() as any
+		const raw = data.content?.[0]?.text ?? ''
+		const json = raw.replace(/^```(?:json)?\n?|\n?```$/g, '').trim()
 		const parsed = JSON.parse(json)
+		const durationMs = Math.round(performance.now() - start)
+
 		return {
 			mood: parsed.mood ?? 'neutral',
 			isHalChange: !!parsed.isHalChange,
@@ -58,7 +62,7 @@ export async function analyzePrompt(text: string): Promise<PromptAnalysis | null
 	}
 }
 
-export function formatAnalysis(text: string, analysis: PromptAnalysis): string {
+function formatAnalysis(text: string, analysis: PromptAnalysis): string {
 	const preview = text.length > 24 ? text.slice(0, 24) + '…' : text
 	const hal = analysis.isHalChange ? ` hal-change(ctx=${analysis.needsContext})` : ''
 	return `[analysis] "${preview}" → ${analysis.mood}${hal} topic="${analysis.topic}" ${analysis.durationMs}ms`
