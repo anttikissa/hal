@@ -77,7 +77,7 @@ Insert `<blink />` (50ms pause) or `<blink ms="400" />` (custom duration) in str
 - Keep direct exports for types and constants.
 - `runtime.ts` is class-based; patch via `runtimeCore.getRuntime()` or `Runtime.prototype`.
 - Eval scripts can import with `~src/` and receive `ctx.runtime`.
-- If a module-level value is a runtime tuning knob (threshold, timeout, size limit, default window), put it in a mutable exported config object and read it at call time; keep plain `const` only for true constants like regexes, paths, URLs, and schemas.
+- If a module-level value is a runtime tuning knob (threshold, timeout, size limit, default window), put it in a mutable exported config object and read it at call time; keep plain `const` only for true constants like regexes, paths, URLs, and schemas. See `src/session/prune.ts` `pruneConfig` for an example.
 
 ## TODOs
 
