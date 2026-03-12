@@ -94,3 +94,7 @@ See `TODO.md`.
 - `src/session/prune.ts` — context pruning (strip old tool results, images, thinking). See `docs/context-management.md`.
 - `src/providers/*` — provider adapters (Anthropic, OpenAI).
 - `src/utils/ason.ts` — ASON serialization.
+
+## Tips
+
+- To find open tabs and their order, read `state/ipc/state.ason` — the `sessions` array is the source of truth. Don't scan session directories.
