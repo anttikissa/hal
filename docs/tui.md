@@ -149,9 +149,9 @@ Features:
 - Enter alternate screen (`?1049h`)
 - Enable mouse + bracketed paste (+ Kitty keyboard mode on supported terminals)
 - Attach stdin/resize/SIGCONT listeners
-- First frame render samples startup elapsed from process launch (`HAL_STARTUP_EPOCH_MS`) to “screen is visible and prompt can accept input”.
-- Once a tab is available, the active tab gets a local perf line: `[perf] startup: <ms> (target <100ms)`.
-- If startup exceeds target, the line is prefixed with `⚠`.
+- First frame samples startup-ready elapsed from process launch (`HAL_STARTUP_EPOCH_MS`) to “screen is visible and prompt can accept input”.
+- When the active tab is restored and rendered, that tab gets a local perf line: `[perf] startup: ready <readyMs>ms · tab <tabMs>ms (hydrate <x>ms + render <y>ms) (target <100ms tab)`.
+- If tab restore startup exceeds target, the line is prefixed with `⚠`.
 
 ### Suspend (`Ctrl-Z`)
 
