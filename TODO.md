@@ -143,6 +143,7 @@ lazy loading of mock provider
 - Sentiment analysis for every prompt
 - Restore fast-blinking cursor effect
 - cd command
+- Fix handoff: host→client promotion doesn't auto-continue active sessions. 4 commits (7cd5367, 947d683, 4bf5f54, 8a771f5) added ~260 LOC but still broken. The promoted client shows sessions as paused/idle instead of continuing. The model even wrote a poem about it. Need to actually debug the promotion flow before writing more code. Screenshot: blob 0u08pk-rbs
 
 
 In the new/ client:
