@@ -100,7 +100,6 @@ const PROVIDERS: { key: string; label: string; models: ModelEntry[] }[] = [
 	{
 		key: 'anthropic', label: 'Anthropic',
 		models: [
-			{ alias: 'anthropic', fullId: 'anthropic/claude-opus-4-6', display: 'Opus 4.6 (default)' },
 			{ alias: 'opus', fullId: 'anthropic/claude-opus-4-6', display: 'Opus 4.6' },
 			{ alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-20250514', display: 'Sonnet 4' },
 		],
@@ -108,7 +107,6 @@ const PROVIDERS: { key: string; label: string; models: ModelEntry[] }[] = [
 	{
 		key: 'openai', label: 'OpenAI',
 		models: [
-			{ alias: 'openai', fullId: 'openai/gpt-5.3-codex', display: 'Codex 5.3 (default)' },
 			{ alias: 'gpt', fullId: 'openai/gpt-5.4', display: 'GPT 5.4' },
 			{ alias: 'gpt54', fullId: 'openai/gpt-5.4', display: 'GPT 5.4' },
 			{ alias: 'gpt53', fullId: 'openai/gpt-5.3', display: 'GPT 5.3' },
