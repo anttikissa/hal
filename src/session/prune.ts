@@ -6,7 +6,7 @@
 // After a model change, detectPruneOpts temporarily uses config.modelChangeThreshold
 // as the heavy-content threshold so the new model gets a slightly longer recent window.
 
-const pruneConfig = {
+export const pruneConfig = {
 	heavyThreshold: 4,
 	thinkingThreshold: 10,
 	// Used by detectPruneOpts after a [model] event to keep heavy content longer.

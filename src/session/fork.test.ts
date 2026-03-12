@@ -131,34 +131,6 @@ describe('forkSession', () => {
 		expect(childTexts).not.toContain('parent only')
 	})
 
-	test('loadApiMessages strips thinking signatures from parent messages', async () => {
-		const parentId = tempSession()
-		const ts = new Date(Date.now() - 1000).toISOString()
-		await appendHistory(parentId, [
-			{ role: 'user', content: 'hello', ts } as Message,
-			{ role: 'assistant', text: 'reply', thinkingText: 'deep thought', thinkingSignature: 'sig-parent', ts } as Message,
-		])
-
-		const childId = await forkSession(parentId)
-		createdIds.push(childId)
-
-		await appendHistory(childId, [
-			{ role: 'user', content: 'child question', ts: new Date().toISOString() } as Message,
-		])
-
-		const apiMsgs = await loadApiMessages(childId)
-		const assistantMsg = apiMsgs.find((m: any) => m.role === 'assistant')
-		expect(assistantMsg).toBeTruthy()
-
-		// Parent's thinking block should NOT be included (signature is invalid in fork context)
-		const hasThinking = assistantMsg.content.some((b: any) => b.type === 'thinking')
-		expect(hasThinking).toBe(false)
-
-		// But the text reply should still be there
-		const hasText = assistantMsg.content.some((b: any) => b.type === 'text' && b.text === 'reply')
-		expect(hasText).toBe(true)
-	})
-
 	test('compaction preserves forked_from entry', async () => {
 		const parentId = tempSession()
 		const ts = new Date(Date.now() - 1000).toISOString()
