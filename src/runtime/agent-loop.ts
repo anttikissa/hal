@@ -32,7 +32,7 @@ export interface AgentContext {
 	systemPrompt: string
 	messages: any[]
 	cwd?: string
-	onStatus: (busy: boolean, activity?: string, context?: { used: number; max: number; estimated?: boolean }) => void
+	onStatus: (busy: boolean, activity?: string, context?: { used: number; max: number; estimated?: boolean }) => void | Promise<void>
 	askUser: (question: string) => Promise<string>
 	signal?: AbortSignal
 	onDestructiveToolStart?: (toolId: string, toolName: string) => void
@@ -69,7 +69,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	} : undefined
 
 	const overheadBytes = systemPrompt.length + JSON.stringify(availableTools).length
-	ctx.onStatus(true, 'generating...', context.estimateContext(messages, modelId, overheadBytes))
+	await ctx.onStatus(true, 'generating...', context.estimateContext(messages, modelId, overheadBytes))
 
 	try {
 		const provider = await loader.loadProvider(providerName)
@@ -147,7 +147,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							// No tools — persist and finish
 							const { entry } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
 							await sessionHistory.appendHistory(sessionId, [entry])
-							if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
+							if (event.usage) await ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 							await emit(sessionId, {
 								type: 'command', commandId: '', phase: 'done',
 								message: event.usage ? `${event.usage.input}→${event.usage.output} tokens` : undefined,
@@ -159,7 +159,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						const { entry: assistantEntry, toolBlobMap } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
 						await sessionHistory.appendHistory(sessionId, [assistantEntry])
 						persisted = true
-						if (event.usage) ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
+						if (event.usage) await ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
 
 						// Execute tools in parallel
 						const toolResults = await Promise.all(toolCalls.map(async (originalCall) => {
@@ -286,8 +286,6 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		await emitInfo(sessionId, err.message, 'error', detail)
 		await emitInfo(sessionId, '/continue to retry', 'meta')
 		await emit(sessionId, { type: 'command', commandId: '', phase: 'failed', message: err.message })
-	} finally {
-		ctx.onStatus(false)
 	}
 }
 

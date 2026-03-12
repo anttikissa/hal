@@ -183,6 +183,8 @@ export class Runtime {
 			onDestructiveToolStart: (toolId) => { this.activeDestructiveTools.add(`${sid}:${toolId}`) },
 			onDestructiveToolEnd: (toolId) => { this.activeDestructiveTools.delete(`${sid}:${toolId}`) },
 		}).finally(async () => {
+			// Guard: skip cleanup if a new generation already started for this session
+			if (this.abortControllers.get(sid) !== ac) return
 			this.abortControllers.delete(sid)
 			this.busySessionIds.delete(sid)
 			await this.publish()
