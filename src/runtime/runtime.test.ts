@@ -548,6 +548,64 @@ test('pause command stops an active generation', async () => {
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
 })
 
+test('continue after pause resumes generation', async () => {
+	const sid = runtime.activeSessionId!
+
+	// Start a generation
+	let snapshot = (await events.readAll()).length
+	await commands.append(makeCommand('prompt', src, 'Hello after pause test', sid))
+
+	// Wait for some output
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		const recent = (await events.readAll()).slice(snapshot)
+		if (recent.some(e => e.type === 'chunk')) break
+	}
+
+	// Pause
+	await commands.append(makeCommand('pause', src, undefined, sid))
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		if (!runtime.busySessionIds.has(sid)) break
+	}
+	expect(runtime.busySessionIds.has(sid)).toBe(false)
+
+	// Send continue — should resume generation (not silently ignored)
+	snapshot = (await events.readAll()).length
+	await commands.append(makeCommand('continue', src, undefined, sid))
+
+	// Wait for generation to start
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		const recent = (await events.readAll()).slice(snapshot)
+		if (recent.some(e => e.type === 'line' && e.text === '[continuing] interrupted response')) break
+	}
+
+	const recent = (await events.readAll()).slice(snapshot)
+	expect(recent.some(e => e.type === 'line' && e.text === '[continuing] interrupted response')).toBe(true)
+
+	// Wait for it to finish
+	for (let i = 0; i < 100; i++) {
+		await new Promise(r => setTimeout(r, 50))
+		if (!runtime.busySessionIds.has(sid)) break
+	}
+	expect(runtime.busySessionIds.has(sid)).toBe(false)
+})
+
+test('continue on idle session is silently ignored', async () => {
+	const sid = runtime.activeSessionId!
+	const snapshot = (await events.readAll()).length
+
+	// Send continue on an idle, non-paused session
+	await commands.append(makeCommand('continue', src, undefined, sid))
+	await new Promise(r => setTimeout(r, 200))
+
+	// Should NOT emit any warning
+	const recent = (await events.readAll()).slice(snapshot)
+	const warnings = recent.filter(e => e.type === 'line' && e.text?.includes('No interrupted'))
+	expect(warnings.length).toBe(0)
+})
+
 test('ask tool sends question event and waits for respond', async () => {
 	const sid = runtime.activeSessionId!
 	const snapshot = (await events.readAll()).length

@@ -211,11 +211,12 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			break
 		}
 		case 'continue': {
-			if (rt.busySessionIds.has(sid)) { await warn('Session is busy'); break }
+			if (rt.busySessionIds.has(sid)) break // silently ignore — tab is already running
 			const info = rt.sessions.get(sid)
 			if (!info) { await error(`Session ${sid} not found`); break }
+			const rawHistory = await history.readHistory(sid)
 			// Auto-resolve interrupted tools
-			const pendingTools = rt.pendingInterruptedTools.get(sid) ?? history.detectInterruptedTools(await history.readHistory(sid))
+			const pendingTools = rt.pendingInterruptedTools.get(sid) ?? history.detectInterruptedTools(rawHistory)
 			if (pendingTools.length > 0) {
 				const toolBlobMap = new Map(pendingTools.map(t => [t.id, t.blobId]))
 				for (const t of pendingTools) {
@@ -228,10 +229,9 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const model = info.model ?? config.getConfig().defaultModel
 			await history.ensureModelEvent(sid, model)
 			const apiMessages = await history.loadApiMessages(sid)
-			if (!rt.hasPendingUserTurn(apiMessages)) {
-				await warn('No interrupted user turn to continue')
-				break
-			}
+			const wasPaused = rawHistory.length > 0 && (rawHistory[rawHistory.length - 1] as any)?.type === 'info'
+				&& (rawHistory[rawHistory.length - 1] as any)?.text === '[paused]'
+			if (!rt.hasPendingUserTurn(apiMessages) && !wasPaused) break // nothing to continue
 			await rt.emitInfo(sid, '[continuing] interrupted response', 'meta')
 			await rt.startGeneration(sid, info, apiMessages, 'continuing...')
 			break
