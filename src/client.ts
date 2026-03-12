@@ -10,6 +10,7 @@ import { draft } from './cli/draft.ts'
 import { prompt } from './cli/prompt.ts'
 import { clientState } from './client-state.ts'
 import { randomBytes } from 'crypto'
+import { resolve } from 'path'
 
 export interface TabState {
 	sessionId: string
@@ -32,6 +33,15 @@ export interface ClientState {
 }
 
 function selfModeEnabled(): boolean { return process.env.HAL_SELF_MODE === '1' }
+
+function cwdModeTarget(): string | null {
+	if (selfModeEnabled()) return null
+	const cwd = process.env.LAUNCH_CWD
+	if (!cwd) return null
+	const halDir = process.env.HAL_DIR ?? resolve(import.meta.dir, '..')
+	if (resolve(cwd) === resolve(halDir)) return null
+	return resolve(cwd)
+}
 
 interface StartupPerfState {
 	readyMs: number | null
@@ -112,6 +122,19 @@ export class Client {
 
 	private applySelfMode(): void {
 		const candidate = this.state.tabs.findIndex(tab => !tab.busy && !tab.pausing && !tab.question && this.contextRatio(tab) < 0.10)
+		if (candidate >= 0) {
+			this.state.activeTabIndex = candidate
+			this.switchToActiveTab()
+			return
+		}
+		if (!this.pendingOpen) {
+			this.pendingOpen = true
+			void this.send('open')
+		}
+	}
+
+	private applyCwdMode(target: string): void {
+		const candidate = this.state.tabs.findIndex(t => t.info.workingDir === target)
 		if (candidate >= 0) {
 			this.state.activeTabIndex = candidate
 			this.switchToActiveTab()
@@ -252,6 +275,12 @@ export class Client {
 		if (selfModeEnabled()) {
 			this.applySelfMode()
 			this.renderAndCaptureStartup(null)
+		} else {
+			const cwdTarget = cwdModeTarget()
+			if (cwdTarget) {
+				this.applyCwdMode(cwdTarget)
+				this.renderAndCaptureStartup(null)
+			}
 		}
 
 		for await (const event of this.transport.tailEvents(offset).items) {
