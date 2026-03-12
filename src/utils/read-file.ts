@@ -16,9 +16,9 @@ export interface FileReadSample {
 }
 
 export const readFileConfig = {
-	enabled: true,
+	enabled: process.env.HAL_PROFILE_FILE_READS === '1',
 	maxSamples: 10_000,
-	asyncTextMethod: 'bun-file' as AsyncReadMethod,
+	asyncTextMethod: 'fs-readFile' as AsyncReadMethod,
 }
 
 const samples: FileReadSample[] = []

@@ -278,3 +278,44 @@ So the main immediate issue is not module loading itself; it is heavy startup wo
 4. After startup is stable, evaluate progressive replay UX (`[Loading more messages]`) for very long tabs.
 
 5. Keep all runtime file reads in `src/utils/read-file.ts` so we can profile by source.
+
+## Latest measurements after runtime trim fix
+
+User sample:
+
+`⚠ [perf] startup: ready 82ms (runtime 71ms + cli 11ms) · tab 362ms (hydrate 129ms + render 145ms)`
+
+Interpretation:
+
+- Runtime/ready is now much better (82ms total ready).
+- Remaining startup pain is active-tab restore (`tab`), now split between:
+	- hydrate (~129ms)
+	- first render (~145ms)
+
+In-process profiling on active tab (`03-d2f`) showed:
+
+- active blocks: ~1586
+- rendered content lines: ~8203
+- `doRender(true)` median around ~91ms
+- `doRender(false)` still around ~38ms because we still compute/diff very large content arrays.
+
+This means render cost is not only terminal write time; it is also full-content layout+diff work each frame.
+
+### Immediate actions taken in this pass
+
+1. Render path now only emits the visible tail of content lines in normal mode (`src/cli/cli.ts`), instead of writing all historical lines every frame.
+2. File-read instrumentation remains available but is disabled by default (`HAL_PROFILE_FILE_READS=1` enables it), and async reads now default to `fs/promises.readFile` (`src/utils/read-file.ts`).
+
+Expected effect:
+
+- lower startup `render` (fewer lines written + smaller diff input)
+- lower steady-state render latency
+- lower `hydrate` overhead from disabled read-sample bookkeeping
+
+## Next plan from here
+
+1. Re-run restart samples on heavy tabs and compare new `render` and `hydrate` medians.
+2. If hydrate is still >100ms on heavy tabs, do progressive active-tab replay:
+	- render only latest blocks first + `[Loading more messages]`
+	- then backfill older history in background.
+3. If needed, add replay snapshot cache keyed by history fingerprint (mtime+size) for unchanged-session fast restore.

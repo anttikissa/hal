@@ -182,14 +182,15 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		const padTarget = Math.max(0, (stdout.rows || 24) - chromeBelow)
 		while (lines.length < padTarget) lines.push('')
 	} else {
-		lines.push(...contentLines)
-		// Pad to tallest tab's content height (keeps prompt position stable)
-		const activeSessionId = tab?.sessionId ?? null
-		const maxHeight = heights.maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
 		const pLines = prompt.lineCount(cw)
 		// tab bar(1) + help bar(1) + prompt sep(1) + prompt lines
 		const chromeLines = 3 + pLines
 		const available = Math.max(0, (stdout.rows || 24) - chromeLines)
+		const visibleContentLines = available > 0 ? contentLines.slice(-available) : []
+		lines.push(...visibleContentLines)
+		// Pad to tallest tab's content height (keeps prompt position stable)
+		const activeSessionId = tab?.sessionId ?? null
+		const maxHeight = heights.maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
 		const padTarget = Math.min(maxHeight, available)
 		while (lines.length < padTarget) lines.push('')
 	}
