@@ -4,29 +4,28 @@ import { Client } from './client.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
 import type { Message, HydrationData } from './session/history.ts'
-import { history } from './session/history.ts'
 import { draft } from './cli/draft.ts'
 
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
 	private readonly events: RuntimeEvent[]
-	private readonly replays: Record<string, Message[]>
-	private readonly replayGates = new Map<string, Promise<void>>()
-	private readonly releaseReplayBySession = new Map<string, () => void>()
-	private readonly replayStarted = new Set<string>()
+	private readonly hydrationBySession: Record<string, HydrationData>
+	private readonly hydrationGates = new Map<string, Promise<void>>()
+	private readonly releaseHydrationBySession = new Map<string, () => void>()
+	private readonly hydrationStarted = new Set<string>()
 
 	constructor(
 		bootstrapState: BootstrapState,
 		events: RuntimeEvent[] = [],
-		replays: Record<string, Message[]> = {},
-		blockedReplaySessions: string[] = [],
+		hydrationBySession: Record<string, HydrationData> = {},
+		blockedHydrationSessions: string[] = [],
 	) {
 		this.bootstrapState = bootstrapState
 		this.events = events
-		this.replays = replays
-		for (const sessionId of blockedReplaySessions) {
-			this.replayGates.set(sessionId, new Promise<void>((resolve) => {
-				this.releaseReplayBySession.set(sessionId, resolve)
+		this.hydrationBySession = hydrationBySession
+		for (const sessionId of blockedHydrationSessions) {
+			this.hydrationGates.set(sessionId, new Promise<void>((resolve) => {
+				this.releaseHydrationBySession.set(sessionId, resolve)
 			}))
 		}
 	}
@@ -37,11 +36,11 @@ class FakeTransport implements Transport {
 		return this.bootstrapState
 	}
 
-	async replaySession(sessionId: string): Promise<Message[]> {
-		this.replayStarted.add(sessionId)
-		const gate = this.replayGates.get(sessionId)
+	async hydrateSession(sessionId: string): Promise<HydrationData> {
+		this.hydrationStarted.add(sessionId)
+		const gate = this.hydrationGates.get(sessionId)
 		if (gate) await gate
-		return this.replays[sessionId] ?? []
+		return this.hydrationBySession[sessionId] ?? { replayMessages: [], inputHistory: [] }
 	}
 
 	async eventsOffset(): Promise<number> {
@@ -60,33 +59,13 @@ class FakeTransport implements Transport {
 	}
 
 	hasReplayStarted(sessionId: string): boolean {
-		return this.replayStarted.has(sessionId)
+		return this.hydrationStarted.has(sessionId)
 	}
 
 	releaseReplay(sessionId: string): void {
-		this.releaseReplayBySession.get(sessionId)?.()
-		this.releaseReplayBySession.delete(sessionId)
-		this.replayGates.delete(sessionId)
-	}
-}
-
-class HydrationTransport extends FakeTransport {
-	private readonly hydrationBySession: Record<string, HydrationData>
-
-	constructor(
-		bootstrapState: BootstrapState,
-		hydrationBySession: Record<string, HydrationData>,
-		events: RuntimeEvent[] = [],
-		replays: Record<string, Message[]> = {},
-	) {
-		super(bootstrapState, events, replays)
-		this.hydrationBySession = hydrationBySession
-	}
-
-	async hydrateSession(sessionId: string): Promise<HydrationData> {
-		const hydrated = this.hydrationBySession[sessionId]
-		if (hydrated) return hydrated
-		return { replayMessages: await this.replaySession(sessionId), inputHistory: [] }
+		this.releaseHydrationBySession.get(sessionId)?.()
+		this.releaseHydrationBySession.delete(sessionId)
+		this.hydrationGates.delete(sessionId)
 	}
 }
 
@@ -248,11 +227,11 @@ test('client renders active tab before replaying non-active tabs', async () => {
 		{ id: sidA, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
 		{ id: sidB, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
 	]
-	const replays: Record<string, Message[]> = {
-		[sidA]: [{ role: 'user', content: 'active tab', ts } as Message],
-		[sidB]: [{ role: 'user', content: 'other tab', ts } as Message],
+	const hydrationBySession: Record<string, HydrationData> = {
+		[sidA]: { replayMessages: [{ role: 'user', content: 'active tab', ts } as Message], inputHistory: [] },
+		[sidB]: { replayMessages: [{ role: 'user', content: 'other tab', ts } as Message], inputHistory: [] },
 	}
-	const transport = new FakeTransport({ state, sessions }, [], replays, [sidB])
+	const transport = new FakeTransport({ state, sessions }, [], hydrationBySession, [sidB])
 	const originalHal = (globalThis as any).__hal
 	;(globalThis as any).__hal = { startupEpochMs: Date.now() - 40, startupReadyElapsedMs: 20 }
 	let updates = 0
@@ -277,7 +256,7 @@ test('client renders active tab before replaying non-active tabs', async () => {
 	}
 })
 
-test('client loads input history and draft while replay is in flight', async () => {
+test('client loads draft while hydration is in flight', async () => {
 	const sessionId = `t-${randomBytes(4).toString('hex')}`
 	const ts = new Date().toISOString()
 	const state: RuntimeState = {
@@ -290,15 +269,14 @@ test('client loads input history and draft while replay is in flight', async () 
 		updatedAt: ts,
 	}
 	const sessions: SessionInfo[] = [{ id: sessionId, workingDir: process.cwd(), createdAt: ts, updatedAt: ts }]
-	const transport = new FakeTransport({ state, sessions }, [], { [sessionId]: [] }, [sessionId])
-	const originalLoadInputHistory = history.loadInputHistory
+	const transport = new FakeTransport(
+		{ state, sessions },
+		[],
+		{ [sessionId]: { replayMessages: [], inputHistory: [] } },
+		[sessionId],
+	)
 	const originalLoadDraft = draft.loadDraft
-	let historyStarted = false
 	let draftStarted = false
-	history.loadInputHistory = async (id: string) => {
-		if (id === sessionId) historyStarted = true
-		return []
-	}
 	draft.loadDraft = async (id: string) => {
 		if (id === sessionId) draftStarted = true
 		return ''
@@ -307,11 +285,10 @@ test('client loads input history and draft while replay is in flight', async () 
 		const client = new Client(transport, () => {})
 		const startPromise = client.start()
 		await waitFor(() => transport.hasReplayStarted(sessionId), 600)
-		await waitFor(() => historyStarted && draftStarted, 600)
+		await waitFor(() => draftStarted, 600)
 		transport.releaseReplay(sessionId)
 		await startPromise
 	} finally {
-		history.loadInputHistory = originalLoadInputHistory
 		draft.loadDraft = originalLoadDraft
 	}
 })
@@ -324,18 +301,10 @@ test('client uses transport hydration payload for replay and input history', asy
 		replayMessages: [{ role: 'user', content: 'hydrated replay', ts } as Message],
 		inputHistory: ['hydrated input history'],
 	}
-	const transport = new HydrationTransport(bootstrapStateFor(sessionId), { [sessionId]: hydration })
-	const originalLoadInputHistory = history.loadInputHistory
-	history.loadInputHistory = async () => {
-		throw new Error('loadInputHistory should not run when hydrateSession is available')
-	}
-	try {
-		const client = new Client(transport, () => {})
-		await client.start()
-		const tab = client.activeTab()
-		expect(tab?.blocks.some((b) => b.type === 'input' && b.text === 'hydrated replay')).toBe(true)
-		expect(tab?.inputHistory).toEqual(['hydrated input history'])
-	} finally {
-		history.loadInputHistory = originalLoadInputHistory
-	}
+	const transport = new FakeTransport(bootstrapStateFor(sessionId), [], { [sessionId]: hydration })
+	const client = new Client(transport, () => {})
+	await client.start()
+	const tab = client.activeTab()
+	expect(tab?.blocks.some((b) => b.type === 'input' && b.text === 'hydrated replay')).toBe(true)
+	expect(tab?.inputHistory).toEqual(['hydrated input history'])
 })
