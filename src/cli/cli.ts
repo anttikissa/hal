@@ -23,7 +23,7 @@ stdin.setRawMode(true)
 stdin.setEncoding('utf8')
 stdin.resume()
 
-const KITTY_KBD_ON = '\x1b[>27u', KITTY_KBD_OFF = '\x1b[<u'
+const KITTY_KBD_ON = '\x1b[>19u', KITTY_KBD_OFF = '\x1b[<u'
 const BRACKETED_PASTE_ON = '\x1b[?2004h', BRACKETED_PASTE_OFF = '\x1b[?2004l'
 const TERM_RESET = `${KITTY_KBD_OFF}${BRACKETED_PASTE_OFF}\x1b[?25h`
 const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/

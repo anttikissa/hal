@@ -44,6 +44,7 @@ export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	if (k.key === 'r' && k.ctrl) { ctx.saveDraft(); ctx.restart(); return }
 	if (k.key === 'l' && k.ctrl) { ctx.redraw(); return }
 	if (k.alt && !k.ctrl && !k.cmd && k.key >= '1' && k.key <= '9') { ctx.switchToTab(Number(k.key) - 1); ctx.doRender(); return }
+	if (k.alt && !k.ctrl && !k.cmd && k.key === '0') { ctx.switchToTab(9); ctx.doRender(); return }
 
 	// Question mode: Enter submits answer, Escape dismisses
 	if (prompt.hasQuestion()) {

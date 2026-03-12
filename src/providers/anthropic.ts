@@ -2,6 +2,7 @@
 
 import type { Provider, ProviderEvent, GenerateParams } from './provider.ts'
 import { provider as providerUtils } from './provider.ts'
+import { appendFile } from 'node:fs/promises'
 import { auth } from '../runtime/auth.ts'
 
 async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> {
@@ -17,21 +18,27 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		system, messages: cacheBreakpoints(params.messages),
 		thinking: isAdaptive ? { type: 'adaptive' } : { type: 'enabled', budget_tokens: Math.min(10000, maxTokens - 1) },
 	}
-	// DEBUG: log all thinking blocks before sending
+	// DEBUG: log outgoing thinking blocks with per-session files
 	const _msgs = body.messages as any[]
-	const _lines: string[] = [`total messages: ${_msgs.length}`]
+	const _session = params.sessionId ?? 'unknown'
+	const _lines: string[] = [`=== ${new Date().toISOString()} session=${_session} model=${params.model} total=${_msgs.length} ===`]
 	for (let mi = 0; mi < _msgs.length; mi++) {
-		const c = _msgs[mi].content
+		const msg = _msgs[mi]
+		const c = msg.content
 		if (!Array.isArray(c)) continue
 		for (let ci = 0; ci < c.length; ci++) {
-			if (c[ci].type === 'thinking') {
-				const sig = c[ci].signature ?? '(none)'
-				const thinkLen = (c[ci].thinking ?? '').length
-				_lines.push(`msg[${mi}].content[${ci}] sig=${sig.slice(0, 20)}... thinkLen=${thinkLen}`)
-			}
+			const block = c[ci]
+			if (block.type !== 'thinking') continue
+			const sig = block.signature ?? '(none)'
+			const thinkLen = (block.thinking ?? '').length
+			_lines.push(`msg[${mi}] role=${msg.role} content[${ci}] sigLen=${sig.length} sig=${sig.slice(0, 24)}... thinkLen=${thinkLen}`)
 		}
 	}
-	await Bun.write('/tmp/hal-thinking-debug.log', _lines.join('\n') + '\n')
+	try {
+		const _log = `${_lines.join('\n')}\n`
+		await appendFile('/tmp/hal-thinking-debug.all.log', _log)
+		await appendFile(`/tmp/hal-thinking-debug.${_session}.log`, _log)
+	} catch {}
 	if (params.tools?.length) body.tools = params.tools
 
 	const res = await fetch('https://api.anthropic.com/v1/messages?beta=true', {

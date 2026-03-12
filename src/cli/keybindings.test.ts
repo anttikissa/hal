@@ -59,6 +59,13 @@ test('option+digit switches to tab N (1-indexed)', () => {
 	expect(switched).toBe(2)
 })
 
+test('option+0 switches to tab 10 (index 9)', () => {
+	let switched = -1
+	const ctx = mockCtx({ switchToTab: (i) => { switched = i } })
+	keybindings.handleInput(ke('0', { alt: true }), ctx)
+	expect(switched).toBe(9)
+})
+
 test('option+digit does not switch on non-digit', () => {
 	let switched = false
 	const ctx = mockCtx({ switchToTab: () => { switched = true } })
