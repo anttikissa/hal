@@ -7,7 +7,7 @@ import { prompt } from './prompt.ts'
 import { blocks as blockViews, type Block } from './blocks.ts'
 import { heights } from './heights.ts'
 import { Client, type TabState } from '../client.ts'
-import { blocksSignature } from './block-signature.ts'
+import { blocksFingerprint } from './block-fingerprint.ts'
 import { LocalTransport } from './transport.ts'
 import { shutdown } from '../main.ts'
 import { config } from '../config.ts'
@@ -140,7 +140,7 @@ interface ContentRenderCacheEntry {
 	sessionId: string | null
 	width: number
 	cursorVisible: boolean
-	signature: number
+	fingerprint: number
 	lines: string[]
 }
 
@@ -149,19 +149,19 @@ let contentRenderCache: ContentRenderCacheEntry | null = null
 function renderContentLines(tab: TabState | null, width: number, cursorVisible: boolean): string[] {
 	const blocks = tab?.blocks ?? []
 	const sessionId = tab?.sessionId ?? null
-	const signature = blocksSignature(blocks)
+	const fingerprint = blocksFingerprint(blocks)
 	const cached = contentRenderCache
 	if (
 		cached
 		&& cached.sessionId === sessionId
 		&& cached.width === width
 		&& cached.cursorVisible === cursorVisible
-		&& cached.signature === signature
+		&& cached.fingerprint === fingerprint
 	) {
 		return cached.lines
 	}
 	const lines = blockViews.renderBlocks(blocks, width, cursorVisible).lines
-	contentRenderCache = { sessionId, width, cursorVisible, signature, lines }
+	contentRenderCache = { sessionId, width, cursorVisible, fingerprint, lines }
 	return lines
 }
 function buildLines(): { lines: string[]; cursor: CursorPos } {
