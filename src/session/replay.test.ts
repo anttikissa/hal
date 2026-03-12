@@ -107,13 +107,45 @@ describe('replayToBlocks', () => {
 		}
 	})
 
-	test('replays user messages with array content (images)', async () => {
+	test('reads tool blobs in parallel across assistant messages', async () => {
+		const originalRead = blob.read
+		const originalConcurrency = replayConfig.blobReadConcurrency
+		let activeReads = 0
+		let peakReads = 0
+		replayConfig.blobReadConcurrency = 4
+		blob.read = async () => {
+			activeReads += 1
+			peakReads = Math.max(peakReads, activeReads)
+			await Bun.sleep(5)
+			activeReads -= 1
+			return {
+				call: { input: '' },
+				result: { content: 'ok', status: 'success' },
+			}
+		}
+		try {
+			const messages: Message[] = Array.from({ length: 8 }, (_, idx) => ({
+				role: 'assistant',
+				text: '',
+				tools: [{ name: 'bash', id: `tool-${idx}`, blobId: `blob-${idx}` }],
+				ts: '2026-01-01T00:00:00Z',
+			} as Message))
+			const blocks = await replayToBlocks('test-session', messages)
+			expect(blocks.filter((block) => block.type === 'tool')).toHaveLength(8)
+			expect(peakReads).toBe(4)
+		} finally {
+			blob.read = originalRead
+			replayConfig.blobReadConcurrency = originalConcurrency
+		}
+	})
+
+	test('replays user messages with image path and blob refs', async () => {
 		const messages: Message[] = [
 			{
 				role: 'user',
 				content: [
 					{ type: 'text', text: 'client - host bug: ' },
-					{ type: 'image', blobId: '000uwp-0tg' },
+					{ type: 'image', blobId: '000uwp-0tg', originalFile: '/tmp/hal/images/scs2ey.png' },
 					{ type: 'text', text: ' prompt is not printed to client' },
 				],
 				ts: '2026-01-01T00:00:00Z',
@@ -124,6 +156,23 @@ describe('replayToBlocks', () => {
 		expect(input).toBeDefined()
 		expect(input.text).toContain('client - host bug:')
 		expect(input.text).toContain('prompt is not printed')
-		expect(input.text).toContain('[image]')
+		expect(input.text).toContain('[image /tmp/hal/images/scs2ey.png (blob 000uwp-0tg)]')
+	})
+
+	test('replays user messages with image blob refs when original file is unknown', async () => {
+		const messages: Message[] = [
+			{
+				role: 'user',
+				content: [
+					{ type: 'text', text: 'look at this ' },
+					{ type: 'image', blobId: 'img-123' },
+				],
+				ts: '2026-01-01T00:00:00Z',
+			} as any,
+		]
+		const blocks = await replayToBlocks('test-session', messages)
+		const input = blocks.find(b => b.type === 'input') as any
+		expect(input).toBeDefined()
+		expect(input.text).toContain('[image blob img-123]')
 	})
 })

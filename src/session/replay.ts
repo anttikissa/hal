@@ -26,6 +26,23 @@ async function mapLimit<T, R>(items: T[], limit: number, worker: (item: T, index
 	return out
 }
 
+function imageMarker(block: any): string {
+	const blobId = typeof block?.blobId === 'string' ? block.blobId : ''
+	const originalFile = typeof block?.originalFile === 'string' ? block.originalFile : ''
+	if (originalFile && blobId) return `[image ${originalFile} (blob ${blobId})]`
+	if (originalFile) return `[image ${originalFile}]`
+	if (blobId) return `[image blob ${blobId}]`
+	return '[image]'
+}
+
+function userContentText(content: any[]): string {
+	return content.map((part: any) => {
+		if (part?.type === 'text') return typeof part.text === 'string' ? part.text : ''
+		if (part?.type === 'image') return imageMarker(part)
+		return ''
+	}).join('')
+}
+
 /** Convert a message log to display blocks (for tab history). */
 export async function replayToBlocks(sessionId: string, messages: Message[], model?: string, busy = false): Promise<Block[]> {
 	const blocks: Block[] = []
@@ -58,7 +75,7 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 			const text = typeof m.content === 'string'
 				? m.content
 				: Array.isArray(m.content)
-					? m.content.map((p: any) => p.type === 'text' ? p.text : '[image]').join('')
+					? userContentText(m.content)
 					: ''
 			if (text) blocks.push({ type: 'input', text, model })
 		} else if (m.role === 'assistant') {
