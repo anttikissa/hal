@@ -89,4 +89,48 @@ export function resolveFastModel(): string {
 	return ''
 }
 
-export const models = { modelCompletions, resolveModel, displayModel, resolveFastModel }
+// ── Model listing ──
+
+interface ModelEntry { alias: string; fullId: string; display: string }
+
+const PROVIDERS: { key: string; label: string; models: ModelEntry[] }[] = [
+	{
+		key: 'anthropic', label: 'Anthropic',
+		models: [
+			{ alias: 'opus', fullId: 'anthropic/claude-opus-4-6', display: 'Opus 4.6' },
+			{ alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-20250514', display: 'Sonnet 4' },
+		],
+	},
+	{
+		key: 'openai', label: 'OpenAI',
+		models: [
+			{ alias: 'gpt54', fullId: 'openai/gpt-5.4', display: 'GPT 5.4' },
+			{ alias: 'gpt53', fullId: 'openai/gpt-5.3', display: 'GPT 5.3' },
+			{ alias: 'gpt52', fullId: 'openai/gpt-5.2', display: 'GPT 5.2' },
+			{ alias: 'codex', fullId: 'openai/gpt-5.3-codex', display: 'Codex 5.3' },
+			{ alias: 'codex-spark', fullId: 'openai/gpt-5.3-codex-spark', display: 'Codex Spark 5.3' },
+		],
+	},
+]
+
+export function listModels(hasAuth: (provider: string) => boolean): string[] {
+	const sorted = [...PROVIDERS].sort((a, b) => {
+		const aAuth = hasAuth(a.key) ? 0 : 1
+		const bAuth = hasAuth(b.key) ? 0 : 1
+		return aAuth - bAuth
+	})
+	const lines: string[] = []
+	for (const provider of sorted) {
+		const authed = hasAuth(provider.key)
+		lines.push(`${provider.label}${authed ? ' ✓' : ''}`)
+		for (const m of provider.models) {
+			lines.push(`  ${m.alias.padEnd(14)} ${m.fullId}`)
+		}
+		lines.push('')
+	}
+	// Also list pattern aliases
+	lines.push('Patterns: opus-X, sonnet-X, gpt-X.Y, codex-X.Y')
+	return lines
+}
+
+export const models = { modelCompletions, resolveModel, displayModel, resolveFastModel, listModels }

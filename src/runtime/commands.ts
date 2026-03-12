@@ -7,6 +7,7 @@ import { session } from '../session/session.ts'
 import { history } from '../session/history.ts'
 import { attachments } from '../session/attachments.ts'
 import { models } from '../models.ts'
+import { auth } from './auth.ts'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
@@ -168,7 +169,11 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			break
 		}
 		case 'model': {
-			if (!cmd.text) { await warn('/model <provider/model-id>'); return }
+			if (!cmd.text) {
+				const lines = models.listModels(p => !!auth.getAuth(p).accessToken)
+				await rt.emitInfo(sid, lines.join('\n'), 'info')
+				return
+			}
 			const info = rt.sessions.get(sid)
 			if (!info) { await error(`Session ${sid} not found`); return }
 			info.model = models.resolveModel(cmd.text)
