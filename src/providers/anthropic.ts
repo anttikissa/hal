@@ -15,7 +15,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 
 	const body: any = {
 		model: params.model, max_tokens: maxTokens, stream: true,
-		system, messages: cacheBreakpoints(params.messages),
+		system, messages: cacheBreakpoints(sanitizeMessagesForAnthropic(params.messages)),
 		thinking: isAdaptive ? { type: 'adaptive' } : { type: 'enabled', budget_tokens: Math.min(10000, maxTokens - 1) },
 	}
 	// DEBUG: log outgoing thinking blocks with per-session files
@@ -117,6 +117,30 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 	}
 
 	yield { type: 'done', usage }
+}
+
+function isOpenAIReasoningSignature(signature: unknown): boolean {
+	if (typeof signature !== 'string' || !signature.trim().startsWith('{')) return false
+	try {
+		const parsed = JSON.parse(signature)
+		return parsed?.type === 'reasoning' && typeof parsed.encrypted_content === 'string' && parsed.encrypted_content.length > 0
+	} catch {
+		return false
+	}
+}
+
+function sanitizeMessagesForAnthropic(msgs: any[]): any[] {
+	if (!msgs.length) return msgs
+	const out: any[] = []
+	for (const msg of msgs) {
+		if (!Array.isArray(msg.content)) {
+			out.push(msg)
+			continue
+		}
+		const content = msg.content.filter((b: any) => b.type !== 'thinking' || !isOpenAIReasoningSignature(b.signature))
+		if (content.length > 0) out.push({ ...msg, content })
+	}
+	return out
 }
 
 function cacheBreakpoints(msgs: any[]): any[] {
