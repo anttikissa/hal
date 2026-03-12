@@ -42,8 +42,19 @@ export function contentWidth(): number { return cols() - 2 }
 
 // ── Host info (mutable — updated on promotion) ──
 
-const hal = (globalThis as any).__hal as { isHost: boolean; hostPid: number | null }
+const hal = (globalThis as any).__hal as {
+	isHost: boolean
+	hostPid: number | null
+	startupEpochMs?: number | null
+	startupReadyElapsedMs?: number | null
+}
 
+function markStartupReady(): void {
+	if (typeof hal.startupReadyElapsedMs === 'number' && Number.isFinite(hal.startupReadyElapsedMs) && hal.startupReadyElapsedMs >= 0) return
+	const epoch = hal.startupEpochMs
+	if (typeof epoch !== 'number' || !Number.isFinite(epoch) || epoch <= 0) return
+	hal.startupReadyElapsedMs = Math.max(0, Date.now() - epoch)
+}
 // ── Client ──
 
 const transport = new LocalTransport()
@@ -449,6 +460,7 @@ stdout.on('resize', () => {
 // Start
 cursor.start(doRender)
 doRender()
+markStartupReady()
 client.start().catch(err => {
 	console.error('Client start failed:', err)
 	process.exit(1)

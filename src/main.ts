@@ -19,7 +19,7 @@ const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 const { host, currentPid } = await ipc.claimHost(hostId)
 
 // Shared mutable state — cli/cli.ts reads this for the separator
-export const halStatus = { isHost: host, hostPid: currentPid, startupEpochMs: startupEpoch }
+export const halStatus = { isHost: host, hostPid: currentPid, startupEpochMs: startupEpoch, startupReadyElapsedMs: null as number | null }
 ;(globalThis as any).__hal = halStatus
 
 let runtime: Runtime | null = null

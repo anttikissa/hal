@@ -33,7 +33,11 @@ export interface ClientState {
 function selfModeEnabled(): boolean { return process.env.HAL_SELF_MODE === '1' }
 
 function startupPerfSample(): { elapsedMs: number; targetMs: number } | null {
-	const meta = (globalThis as any).__hal as { startupEpochMs?: number | null } | undefined
+	const meta = (globalThis as any).__hal as { startupEpochMs?: number | null; startupReadyElapsedMs?: number | null } | undefined
+	const readyElapsed = meta?.startupReadyElapsedMs
+	if (typeof readyElapsed === 'number' && Number.isFinite(readyElapsed) && readyElapsed >= 0) {
+		return { elapsedMs: Math.round(readyElapsed), targetMs: 100 }
+	}
 	const epoch = meta?.startupEpochMs
 	if (typeof epoch !== 'number' || !Number.isFinite(epoch) || epoch <= 0) return null
 	return { elapsedMs: Math.max(0, Date.now() - epoch), targetMs: 100 }
@@ -45,6 +49,7 @@ export class Client {
 	private state: ClientState
 	private onUpdate: () => void
 	private pendingOpen = false
+	private pendingStartupPerf: { elapsedMs: number; targetMs: number } | null = null
 
 	constructor(transport: Transport, onUpdate: () => void) {
 		this.transport = transport
@@ -75,6 +80,19 @@ export class Client {
 		}
 	}
 
+	private appendStartupPerfIfPossible(): void {
+		if (!this.pendingStartupPerf) return
+		const tab = this.activeTab()
+		if (!tab) return
+		const startupPerf = this.pendingStartupPerf
+		this.pendingStartupPerf = null
+		const prefix = startupPerf.elapsedMs > startupPerf.targetMs ? '⚠ ' : ''
+		tab.blocks.push({
+			type: 'info',
+			text: `${prefix}[perf] startup: ${startupPerf.elapsedMs}ms (target <${startupPerf.targetMs}ms)`,
+		})
+	}
+
 	async start(): Promise<void> {
 		const { state: rtState, sessions } = await this.transport.bootstrap()
 		for (const info of sessions) {
@@ -85,7 +103,7 @@ export class Client {
 		const preferredId = lastTab ?? rtState.activeSessionId
 		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === preferredId))
 		this.state.connected = true
-		const startupPerf = startupPerfSample()
+		this.pendingStartupPerf = startupPerfSample()
 		this.onUpdate()
 
 		const offset = await this.transport.eventsOffset()
@@ -103,16 +121,7 @@ export class Client {
 		}
 
 		if (selfModeEnabled()) this.applySelfMode()
-		if (startupPerf) {
-			const tab = this.activeTab()
-			if (tab) {
-				const prefix = startupPerf.elapsedMs > startupPerf.targetMs ? '⚠ ' : ''
-				tab.blocks.push({
-					type: 'info',
-					text: `${prefix}[perf] startup: ${startupPerf.elapsedMs}ms (target <${startupPerf.targetMs}ms)`,
-				})
-			}
-		}
+		this.appendStartupPerfIfPossible()
 		this.onUpdate()
 
 		for await (const event of this.transport.tailEvents(offset).items) {
@@ -266,8 +275,10 @@ export class Client {
 				tab.inputDraft = await draft.loadDraft(tab.sessionId)
 			}
 		}
+		this.appendStartupPerfIfPossible()
 		const newId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		if (newId !== prevId) this.switchToActiveTab()
+		this.onUpdate()
 	}
 
 	private applyTabToPrompt(tab: TabState): void {
