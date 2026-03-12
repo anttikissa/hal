@@ -1,7 +1,7 @@
 // System prompt — loads SYSTEM.md + AGENTS.md chain, substitutes variables, processes directives.
 
 import { existsSync, readFileSync } from 'fs'
-import { dirname, relative } from 'path'
+import { dirname } from 'path'
 import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 
@@ -36,44 +36,38 @@ export interface SystemPromptResult {
 	bytes: number  // total byte size of processed result
 }
 
+type AgentFileName = 'AGENTS.md' | 'CLAUDE.md'
+type AgentFile = { path: string; name: AgentFileName; content: string; bytes: number }
+
 /** Walk up from `from` to find the nearest .git directory. */
 function findGitRoot(from: string): string | null {
-	let dir = from
-	for (;;) {
-		if (existsSync(`${dir}/.git`)) return dir
-		const parent = dirname(dir)
-		if (parent === dir) return null
-		dir = parent
+	return existsSync(`${from}/.git`) ? from : dirname(from) === from ? null : findGitRoot(dirname(from))
+}
+
+function directoryChain(cwd: string, root: string): string[] {
+	const dirs = [cwd]
+	for (let dir = cwd; dir !== root;) dirs.unshift(dir = dirname(dir))
+	return dirs
+}
+
+function readAgentFile(dir: string): AgentFile | null {
+	for (const name of ['AGENTS.md', 'CLAUDE.md'] as const) {
+		try {
+			const path = `${dir}/${name}`
+			const content = readFileSync(path, 'utf-8')
+			return { path, name, content, bytes: Buffer.byteLength(content) }
+		} catch {}
 	}
+	return null
 }
 
 /** Collect all AGENTS.md (or CLAUDE.md fallback) files from git root down to cwd. */
-function collectAgentFiles(cwd: string): { path: string; name: string; content: string; bytes: number }[] {
-	const root = findGitRoot(cwd)
-	const start = root ?? cwd
-	// Build dir list from start → cwd
-	const dirs: string[] = [start]
-	if (start !== cwd) {
-		const parts = relative(start, cwd).split('/').filter(Boolean)
-		let cur = start
-		for (const part of parts) {
-			cur = `${cur}/${part}`
-			dirs.push(cur)
-		}
-	}
-	const results: { path: string; name: string; content: string; bytes: number }[] = []
-	for (const dir of dirs) {
-		// Prefer AGENTS.md; fall back to CLAUDE.md
-		for (const name of ['AGENTS.md', 'CLAUDE.md']) {
-			try {
-				const p = `${dir}/${name}`
-				const content = readFileSync(p, 'utf-8')
-				results.push({ path: p, name, content, bytes: Buffer.byteLength(content) })
-				break
-			} catch {}
-		}
-	}
-	return results
+function collectAgentFiles(cwd: string): AgentFile[] {
+	const root = findGitRoot(cwd) ?? cwd
+	return directoryChain(cwd, root).flatMap(dir => {
+		const file = readAgentFile(dir)
+		return file ? [file] : []
+	})
 }
 
 export function formatBytes(n: number): string {
