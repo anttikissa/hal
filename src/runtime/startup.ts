@@ -59,7 +59,9 @@ export async function startRuntime(): Promise<Runtime> {
 	const prevState = ipc.getState()
 	const handoff = prevState.handoff ?? null
 	const continueAfterHandoff = shouldContinueAfterHandoff(handoff)
-	const handoffBusyIds = continueAfterHandoff ? handoff?.busySessionIds ?? [] : []
+	const handoffBusyIds = continueAfterHandoff
+		? [...new Set((handoff?.busySessionIds?.length ? handoff.busySessionIds : prevState.busySessionIds) ?? [])]
+		: []
 	if (handoff) {
 		ipc.updateState(s => { s.handoff = null })
 	}

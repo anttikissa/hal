@@ -319,7 +319,7 @@ function writeHandoff(reason: 'quit' | 'restart'): RuntimeHandoffState | null {
 		return null
 	}
 	const busySet = new Set(busySessionIds())
-	const busyIds = activeIds.filter(id => busySet.has(id))
+	const busyIds = [...busySet]
 	const handoff: RuntimeHandoffState = {
 		mode: 'continue',
 		reason,
@@ -339,7 +339,7 @@ function printHandoffMessage(handoff: RuntimeHandoffState | null): void {
 		return
 	}
 	const seconds = Math.ceil(handoffConfig.continueWindowMs / 1000)
-	console.log(`If a client is promoted within ${seconds}s, it will continue from here`)
+	console.log(`If Hal starts within ${seconds}s, it will continue from here`)
 }
 
 let pendingAction: 'quit' | 'restart' | null = null

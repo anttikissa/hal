@@ -328,6 +328,40 @@ test('handoff continue auto-resumes interrupted user turn on restart', async () 
 
 	expect(getState().handoff).toBeNull()
 })
+
+test('handoff continue falls back to state busy sessions when handoff busy list is empty', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	await appendHistory(sid, [{ role: 'user', content: 'Resume me when handoff busy list is empty', ts } as any])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+		s.busySessionIds = [sid]
+		s.handoff = {
+			mode: 'continue',
+			reason: 'quit',
+			fromPid: process.pid,
+			createdAt: ts,
+			activeSessionIds: [sid],
+			busySessionIds: [],
+		}
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	await waitFor(async () => {
+		const all = await events.readAll()
+		return all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	}, 4000, 20, 'Timed out waiting for fallback busy-session handoff auto-continue')
+
+	expect(getState().handoff).toBeNull()
+})
 test('quit handoff auto-resumes within window', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
