@@ -4,10 +4,11 @@
 //
 // Used for IPC commands, events, and conversation message logs.
 
-import { appendFile, readFile, stat, writeFile } from 'fs/promises'
+import { appendFile, stat, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { ason } from './ason.ts'
 import { tails } from './tail-file.ts'
+import { readFiles } from './read-file.ts'
 
 export class Log<T> {
 	constructor(public readonly path: string) {}
@@ -18,7 +19,7 @@ export class Log<T> {
 
 	async readAll(): Promise<T[]> {
 		if (!existsSync(this.path)) return []
-		try { return ason.parseAll(await readFile(this.path, 'utf-8')) as T[] }
+		try { return ason.parseAll(await readFiles.readText(this.path, 'Log.readAll')) as T[] }
 		catch { return [] }
 	}
 
@@ -44,9 +45,18 @@ export class Log<T> {
 	}
 
 	async trim(keep: number): Promise<void> {
-		const all = await this.readAll()
-		if (all.length <= keep) return
-		await writeFile(this.path, all.slice(-keep).map(e => ason.stringify(e, 'short')).join('\n') + '\n')
+		if (!existsSync(this.path)) return
+		if (keep <= 0) {
+			await writeFile(this.path, '')
+			return
+		}
+		const raw = await readFiles.readText(this.path, 'Log.trim')
+		if (!raw) return
+		const withoutTrailingNewline = raw.endsWith('\n') ? raw.slice(0, -1) : raw
+		if (!withoutTrailingNewline) return
+		const lines = withoutTrailingNewline.split('\n')
+		if (lines.length <= keep) return
+		await writeFile(this.path, lines.slice(-keep).join('\n') + '\n')
 	}
 
 	async ensure(): Promise<void> {

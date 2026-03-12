@@ -233,3 +233,48 @@ With those numbers we can pick Phase A vs B order precisely per real workload.
 - Keep behavior the same unless explicitly called out.
 - Prefer deleting duplicate paths over adding fallback layers.
 - Keep code minimal; remove dead startup/hydration branches as we optimize.
+
+## New benchmark data (tabs 6 and 7)
+
+From parallel focused runs:
+
+- **Module-load benchmark (tab 6)**
+	- 67 non-test src modules
+	- ~9.3k LOC equivalent
+	- import/load median around **27–30ms**
+- **State-file benchmark (tab 7)**
+	- largest single session + IPC files (878 files, ~9.9MB)
+	- `fs/promises.readFile` median around **10ms** (unbounded/batched)
+	- `readFileSync` median around **27.6ms**
+
+Takeaway:
+
+- Raw code import + raw file I/O alone are not the full startup bottleneck.
+- We still need to remove startup **waterfalls / expensive parse paths** on the critical path.
+
+---
+
+## Root-cause found for `ready/runtime` regression
+
+Targeted in-process timing of `startup.startRuntime()` substeps on current state:
+
+- `ipc.getState`: ~0ms
+- session metadata loads: ~4–5ms total
+- context fallback: ~0ms in this run
+- **`ipc.events.trim(500)`: ~254ms**
+- total measured startup step: ~259ms
+
+This aligns with observed high `runtime` values.
+
+So the main immediate issue is not module loading itself; it is heavy startup work in event-log trim.
+
+---
+
+## Updated near-term plan
+
+1. Keep file-read instrumentation centralized (single wrapper path).
+2. Remove parse-heavy trim work from startup critical path.
+3. Keep active-tab-first hydration and continue reducing hydrate CPU/I/O.
+4. After startup is stable, evaluate progressive replay UX (`[Loading more messages]`) for very long tabs.
+
+5. Keep all runtime file reads in `src/utils/read-file.ts` so we can profile by source.

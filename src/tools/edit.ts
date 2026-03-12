@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { readFiles } from '../utils/read-file.ts'
 import { formatContext, parseRef, resolvePath, validateRef, withLock } from './file-utils.ts'
 
 export interface EditExecuteContext {
@@ -86,7 +86,7 @@ async function execute(input: unknown, ctx: EditExecuteContext): Promise<string>
 	if (inp?.operation !== 'replace' && inp?.operation !== 'insert') return `error: unknown operation "${inp?.operation}"`
 
 	return withLock(path, async () => {
-		const content = readFileSync(path, 'utf-8')
+		const content = readFiles.readTextSync(path, 'tool.edit')
 		const newContent = String(inp?.new_content ?? '')
 
 		let applied: EditApplyResult | string

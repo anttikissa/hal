@@ -1,11 +1,12 @@
 // Session blob store — content-addressed .ason files under sessions/<id>/blobs/.
 
-import { writeFile, readFile } from 'fs/promises'
-import { existsSync, readFileSync } from 'fs'
+import { writeFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { state } from '../state.ts'
 import { ason } from '../utils/ason.ts'
 import { historyFork } from './history-fork.ts'
+import { readFiles } from '../utils/read-file.ts'
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -15,7 +16,7 @@ function sessionStart(sessionId: string): number {
 	let ts = sessionStartCache.get(sessionId)
 	if (ts !== undefined) return ts
 	try {
-		const meta = ason.parse(readFileSync(`${state.sessionDir(sessionId)}/session.ason`, 'utf-8')) as any
+		const meta = ason.parse(readFiles.readTextSync(`${state.sessionDir(sessionId)}/session.ason`, 'blob.sessionStart')) as any
 		ts = new Date(meta.createdAt).getTime()
 	} catch {
 		ts = Date.now()
@@ -42,7 +43,7 @@ async function readLocal(sessionId: string, blobId: string): Promise<any | null>
 	const path = `${state.blobsDir(sessionId)}/${blobId}.ason`
 	if (!existsSync(path)) return null
 	try {
-		return ason.parse(await readFile(path, 'utf-8'))
+		return ason.parse(await readFiles.readText(path, 'blob.readLocal'))
 	} catch {
 		return null
 	}

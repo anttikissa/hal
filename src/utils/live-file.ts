@@ -30,8 +30,9 @@
 // If file is written with parse errors, all bets are off
 //
 
-import { readFileSync, writeFileSync, renameSync, watch, existsSync } from 'fs'
+import { writeFileSync, renameSync, watch, existsSync } from 'fs'
 import { ason } from './ason.ts'
+import { readFiles } from './read-file.ts'
 import { state } from '../state.ts'
 import { dirname, basename } from 'path'
 
@@ -48,7 +49,7 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 	// Load from disk
 	if (existsSync(path)) {
 		try {
-			const raw = readFileSync(path, 'utf-8')
+			const raw = readFiles.readTextSync(path, 'liveFile.load')
 			data = { ...opts.defaults, ...(ason.parse(raw) as Record<string, unknown>) }
 		} catch {}
 	}
@@ -91,7 +92,7 @@ export function liveFile<T extends Record<string, any>>(path: string, opts: Live
 				if (debounce) clearTimeout(debounce)
 				debounce = setTimeout(() => {
 					try {
-						const raw = readFileSync(path, 'utf-8')
+						const raw = readFiles.readTextSync(path, 'liveFile.watchReload')
 						const disk = ason.parse(raw) as Record<string, unknown>
 						Object.assign(data, disk)
 					} catch {}

@@ -1,6 +1,7 @@
-import { writeFile, readFile, unlink } from 'fs/promises'
+import { writeFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import { state } from '../state.ts'
+import { readFiles } from '../utils/read-file.ts'
 
 function draftPath(sessionId: string): string {
 	return `${state.sessionDir(sessionId)}/draft.txt`
@@ -20,7 +21,7 @@ export async function loadDraft(sessionId: string): Promise<string> {
 	const path = draftPath(sessionId)
 	if (!existsSync(path)) return ''
 	try {
-		return await readFile(path, 'utf-8')
+		return await readFiles.readText(path, 'draft.loadDraft')
 	} catch {
 		return ''
 	}

@@ -1,6 +1,6 @@
 // Session history log — append-only ASONL per session.
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { Log } from '../utils/log.ts'
 import { state } from '../state.ts'
 import { ason } from '../utils/ason.ts'
@@ -8,6 +8,7 @@ import { session } from './session.ts'
 import { prune } from './prune.ts'
 import { historyFork } from './history-fork.ts'
 import { blob } from './blob.ts'
+import { readFiles } from '../utils/read-file.ts'
 
 function resolveLogName(sessionId: string): string {
 	const cached = session.logNameCache.get(sessionId)
@@ -15,7 +16,7 @@ function resolveLogName(sessionId: string): string {
 	const metaPath = `${state.sessionDir(sessionId)}/session.ason`
 	if (existsSync(metaPath)) {
 		try {
-			const meta = ason.parse(readFileSync(metaPath, 'utf-8')) as any
+			const meta = ason.parse(readFiles.readTextSync(metaPath, 'history.resolveLogName')) as any
 			const name = meta?.log ?? 'history.asonl'
 			session.logNameCache.set(sessionId, name)
 			return name

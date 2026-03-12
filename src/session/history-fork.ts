@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { state } from '../state.ts'
 import { ason } from '../utils/ason.ts'
+import { readFiles } from '../utils/read-file.ts'
 
 const parentCache = new Map<string, string | null>()
 
@@ -13,7 +14,7 @@ function getParentSessionId(sessionId: string): string | null {
 		return null
 	}
 	try {
-		const raw = readFileSync(path, 'utf-8')
+		const raw = readFiles.readTextSync(path, 'historyFork.getParentSessionId')
 		const firstLine = raw.split('\n', 1)[0]
 		if (!firstLine?.trim()) {
 			parentCache.set(sessionId, null)

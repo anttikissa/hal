@@ -1,9 +1,10 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
-import { open, readFile, rename, rm } from 'fs/promises'
+import { open, rename, rm } from 'fs/promises'
 import { ason } from './utils/ason.ts'
 import { processState } from './utils/is-pid-alive.ts'
 import { Log } from './utils/log.ts'
+import { readFiles } from './utils/read-file.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, EventLevel } from './protocol.ts'
 import { protocol } from './protocol.ts'
 import { liveFiles } from './utils/live-file.ts'
@@ -41,7 +42,7 @@ async function readLock(): Promise<{ hostId: string | null; pid: number | null }
 	// Retry once on parse failure (file may be mid-write)
 	for (let i = 0; i < 2; i++) {
 		try {
-			const lock = ason.parse(await readFile(HOST_LOCK, 'utf-8')) as any
+			const lock = ason.parse(await readFiles.readText(HOST_LOCK, 'ipc.readLock')) as any
 			return { hostId: lock?.hostId ?? null, pid: Number.isInteger(lock?.pid) ? lock.pid : null }
 		} catch { if (i === 0) await Bun.sleep(100) }
 	}

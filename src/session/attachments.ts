@@ -1,8 +1,9 @@
 // Resolve [file.png] and [file.txt] references in user input into content blocks.
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { homedir } from 'os'
 import { blob } from './blob.ts'
+import { readFiles } from '../utils/read-file.ts'
 import type { UserMessage } from './history.ts'
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
@@ -42,7 +43,7 @@ async function resolve(
 			logBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
 		} else if (ext === 'txt') {
 			try {
-				const text = readFileSync(filePath, 'utf8')
+				const text = readFiles.readTextSync(filePath, 'attachments.text')
 				apiBlocks.push({ type: 'text', text })
 				logBlocks.push({ type: 'text', text: `[${filePath}]` })
 			} catch {
@@ -51,7 +52,7 @@ async function resolve(
 			}
 		} else if (IMAGE_EXTS.includes(ext)) {
 			try {
-				const data = readFileSync(filePath)
+				const data = readFiles.readBytesSync(filePath, 'attachments.image')
 				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
 				const blobId = blob.makeId(sessionId)
 				await blob.write(sessionId, blobId, { media_type: mediaType, data: data.toString('base64') })

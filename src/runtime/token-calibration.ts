@@ -4,9 +4,10 @@
 // - Improve pre-API context estimates shown in the status line.
 // - Never replace real usage once the provider reports usage.input.
 
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, writeFileSync } from 'fs'
 import { ason } from '../utils/ason.ts'
 import { STATE_DIR } from '../state.ts'
+import { readFiles } from '../utils/read-file.ts'
 
 export interface TokenCalibration {
 	bytesPerToken: number
@@ -38,7 +39,7 @@ function loadStore(): CalibrationStore {
 		return calibrationCache
 	}
 	try {
-		const parsed = ason.parse(readFileSync(path, 'utf-8'))
+		const parsed = ason.parse(readFiles.readTextSync(path, 'tokenCalibration.loadStore'))
 		calibrationCache = isCalibrationStore(parsed) ? parsed : {}
 	} catch {
 		calibrationCache = {}

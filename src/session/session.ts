@@ -1,13 +1,14 @@
 // Session CRUD — create, load, list, rotate.
 // Sessions use liveFile: mutate the object, it auto-saves to session.ason.
 
-import { readFile, writeFile, appendFile } from 'fs/promises'
+import { writeFile, appendFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { resolve, join } from 'path'
 import { SESSIONS_DIR, EPOCH_PATH, LAUNCH_CWD, state } from '../state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { ason } from '../utils/ason.ts'
+import { readFiles } from '../utils/read-file.ts'
 import type { SessionInfo } from '../protocol.ts'
 
 export type { SessionInfo }
@@ -17,7 +18,7 @@ let _epoch: Date | null = null
 async function ensureEpoch(): Promise<Date> {
 	if (_epoch) return _epoch
 	if (existsSync(EPOCH_PATH)) {
-		_epoch = new Date((await readFile(EPOCH_PATH, 'utf-8')).trim())
+		_epoch = new Date((await readFiles.readText(EPOCH_PATH, 'session.ensureEpoch')).trim())
 	} else {
 		_epoch = new Date()
 		await writeFile(EPOCH_PATH, _epoch.toISOString() + '\n')

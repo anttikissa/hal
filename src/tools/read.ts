@@ -1,5 +1,6 @@
-import { readFileSync, statSync } from 'fs'
+import { statSync } from 'fs'
 import { formatHashlines, resolvePath } from './file-utils.ts'
+import { readFiles } from '../utils/read-file.ts'
 
 export interface ReadExecuteContext {
 	cwd: string
@@ -33,7 +34,7 @@ function execute(input: unknown, ctx: ReadExecuteContext): string {
 	} catch (e: any) {
 		return `error: ${e.message}`
 	}
-	const content = readFileSync(path, 'utf-8')
+	const content = readFiles.readTextSync(path, 'tool.read')
 	return formatHashlines(content, inp?.start, inp?.end)
 }
 

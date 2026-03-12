@@ -1,9 +1,10 @@
 // System prompt — loads SYSTEM.md + AGENTS.md chain, substitutes variables, processes directives.
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { dirname } from 'path'
 import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
+import { readFiles } from '../utils/read-file.ts'
 
 /** ::: if key="glob" ... ::: conditional blocks. */
 function directives(text: string, vars: Record<string, string>): string {
@@ -54,7 +55,7 @@ function readAgentFile(dir: string): AgentFile | null {
 	for (const name of ['AGENTS.md', 'CLAUDE.md'] as const) {
 		try {
 			const path = `${dir}/${name}`
-			const content = readFileSync(path, 'utf-8')
+			const content = readFiles.readTextSync(path, 'systemPrompt.readAgentFile')
 			return { path, name, content, bytes: Buffer.byteLength(content) }
 		} catch {}
 	}
@@ -93,7 +94,7 @@ export function loadSystemPrompt(opts: { model?: string; sessionDir?: string; cw
 	const parts: string[] = []
 	const loaded: LoadedFile[] = []
 	try {
-		let text = readFileSync(`${HAL_DIR}/SYSTEM.md`, 'utf-8')
+		let text = readFiles.readTextSync(`${HAL_DIR}/SYSTEM.md`, 'systemPrompt.loadSystemPrompt')
 		const bytes = Buffer.byteLength(text)
 		text = text.replace(/<!--[\s\S]*?-->/g, '')
 		parts.push(text)
