@@ -54,6 +54,18 @@ test('resolveModel: codex aliases', () => {
 	expect(resolveModel('codex-spark')).toBe('openai/gpt-5.3-codex-spark')
 })
 
+test('resolveModel: gpt alias → newest GPT', () => {
+	expect(resolveModel('gpt')).toBe('openai/gpt-5.4')
+})
+
+test('resolveModel: openai alias → codex', () => {
+	expect(resolveModel('openai')).toBe('openai/gpt-5.3-codex')
+})
+
+test('resolveModel: anthropic alias → opus', () => {
+	expect(resolveModel('anthropic')).toBe('anthropic/claude-opus-4-6')
+})
+
 test('resolveModel: codex-X.Y pattern', () => {
 	expect(resolveModel('codex-5.2')).toBe('openai/gpt-5.2-codex')
 })
@@ -116,7 +128,7 @@ describe('resolveFastModel', () => {
 	}
 
 	function mockAuth(providers: Record<string, { accessToken?: string }>) {
-		auth.getAuth = (p: string) => providers[p] ?? {}
+		auth.getAuth = (p: string) => (providers[p] ?? {}) as any
 	}
 
 	test('explicit fastModel in config', () => {
