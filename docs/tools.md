@@ -7,10 +7,10 @@ This doc explains where tool code lives, how tool streaming works, and how to ke
 - `src/runtime/tools.ts`
 	- Tool registry exposed to providers (`getTools`)
 	- Generic execution entrypoint (`executeTool`)
-	- Remaining built-in implementations (`grep`, `glob`, `ls`, `read_blob`, `ask`, `eval`)
+	- Remaining built-in implementations (`glob`, `ls`, `ask`, `eval`)
 - `src/tools/*`
 	- Per-tool modules shared across frontends/runtime
-	- Migrated tools: `bash`, `read`, `write`, `edit`
+	- Migrated tools: `bash`, `read`, `write`, `edit`, `read_blob`, `grep`
 	- Shared file helpers: `src/tools/file-utils.ts`
 
 Goal: keep moving tool-specific behavior into `src/tools/*` one tool at a time.
@@ -105,7 +105,7 @@ In short:
 
 ## Migration checklist for remaining tools
 
-For each tool (`read_blob`, `grep`, `glob`, `ls`, `ask`, `eval`, ...):
+For each tool (`glob`, `ls`, `ask`, `eval`, ...):
 
 1. Add `src/tools/<name>.ts` with:
 	- `definition`

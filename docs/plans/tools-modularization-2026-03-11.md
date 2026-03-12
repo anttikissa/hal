@@ -5,6 +5,8 @@ Goal: move tool behavior toward `src/tools/*` so execution + formatting can be s
 Status:
 - bash-first slice is implemented.
 - file-tools slice (`read`, `write`, `edit`) is implemented.
+- `read_blob` slice is implemented.
+- `grep` slice is implemented.
 - architecture summary lives in `docs/tools.md`.
 
 ## Why
@@ -26,7 +28,6 @@ Status:
 
 ## Remaining follow-up
 
-- Migrate `read_blob` next (small, self-contained).
-- Migrate `grep`, `glob`, and `ls`.
+- Migrate `glob` and `ls`.
 - Migrate `ask` and `eval` last.
 - Add a shared registry in `src/tools/` once enough tools are migrated.

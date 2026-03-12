@@ -1,5 +1,4 @@
 import { blob } from '../session/blob.ts'
-import type { ToolDefinition } from '../runtime/tools.ts'
 import { ason } from '../utils/ason.ts'
 
 interface ReadBlobInput {
@@ -24,7 +23,7 @@ function formatPreview(blobId: string, blobData: unknown, truncate: (text: strin
 	return truncate(`[blob ${blobId}] ${text}`)
 }
 
-const definition: ToolDefinition = {
+const definition = {
 	name: 'read_blob',
 	description: 'Read a stored session blob by id. Use this when history mentions `blob <id>` or an omitted image/tool result points at a blob.',
 	input_schema: {

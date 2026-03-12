@@ -9,7 +9,9 @@ import { read } from '../tools/read.ts'
 import { write } from '../tools/write.ts'
 import { edit } from '../tools/edit.ts'
 import { readBlob } from '../tools/read-blob.ts'
+import { grep } from '../tools/grep.ts'
 import { resolvePath as resolveToolPath } from '../tools/file-utils.ts'
+
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
 
@@ -45,19 +47,7 @@ const BASE_TOOLS = [
 	read.definition,
 	write.definition,
 	edit.definition,
-	{
-		name: 'grep',
-		description: 'Search file contents using ripgrep. Returns matching lines with file paths and line numbers.',
-		input_schema: {
-			type: 'object',
-			properties: {
-				pattern: { type: 'string', description: 'Search pattern (regex)' },
-				path: { type: 'string', description: 'Directory or file to search (default: cwd)' },
-				include: { type: 'string', description: "Glob pattern to filter files, e.g. '*.ts'" },
-			},
-			required: ['pattern'],
-		},
-	},
+	grep.definition,
 	{
 		name: 'glob',
 		description: 'Find files by glob pattern. Returns matching file paths sorted by modification time.',
@@ -152,7 +142,7 @@ export function argsPreview(call: ToolCall): string {
 			s = edit.argsPreview(inp)
 			break
 		case 'grep':
-			s = String(inp?.pattern ?? '')
+			s = grep.argsPreview(inp)
 			break
 		case 'glob':
 			s = String(inp?.pattern ?? '')
@@ -196,17 +186,8 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 			return write.execute(inp, { cwd })
 		case 'edit':
 			return edit.execute(inp, { cwd, contextLines: toolsConfig.contextLines })
-		case 'grep': {
-			const pattern = String(inp?.pattern ?? '')
-			const searchPath = resolve(inp?.path)
-			const args = ['rg', '-nH', '--no-heading', '--color=never', '--hidden', '--no-ignore', '--max-count=100', '--sort=modified']
-			if (inp?.include) args.push('--glob', inp.include)
-			args.push('--', pattern, searchPath)
-			const result = await $`${args}`.quiet().nothrow()
-			const raw = result.stdout.toString().trim()
-			if (!raw) return 'No matches found.'
-			return raw
-		}
+		case 'grep':
+			return grep.execute(inp, { cwd })
 		case 'glob': {
 			const searchPath = resolve(inp?.path)
 			const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
