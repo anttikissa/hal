@@ -106,4 +106,24 @@ describe('replayToBlocks', () => {
 			replayConfig.blobReadConcurrency = originalConcurrency
 		}
 	})
+
+	test('replays user messages with array content (images)', async () => {
+		const messages: Message[] = [
+			{
+				role: 'user',
+				content: [
+					{ type: 'text', text: 'client - host bug: ' },
+					{ type: 'image', blobId: '000uwp-0tg' },
+					{ type: 'text', text: ' prompt is not printed to client' },
+				],
+				ts: '2026-01-01T00:00:00Z',
+			} as any,
+		]
+		const blocks = await replayToBlocks('test-session', messages)
+		const input = blocks.find(b => b.type === 'input') as any
+		expect(input).toBeDefined()
+		expect(input.text).toContain('client - host bug:')
+		expect(input.text).toContain('prompt is not printed')
+		expect(input.text).toContain('[image]')
+	})
 })

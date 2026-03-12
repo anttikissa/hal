@@ -55,7 +55,11 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 		}
 
 		if (m.role === 'user') {
-			const text = typeof m.content === 'string' ? m.content : ''
+			const text = typeof m.content === 'string'
+				? m.content
+				: Array.isArray(m.content)
+					? m.content.map((p: any) => p.type === 'text' ? p.text : '[image]').join('')
+					: ''
 			if (text) blocks.push({ type: 'input', text, model })
 		} else if (m.role === 'assistant') {
 			if (m.thinkingText) {
