@@ -43,13 +43,26 @@ function userContentText(content: any[]): string {
 	}).join('')
 }
 
+export interface ReplayToBlocksOptions {
+	toolResultSourceMessages?: Message[]
+	appendInterruptedHint?: boolean
+}
+
 /** Convert a message log to display blocks (for tab history). */
-export async function replayToBlocks(sessionId: string, messages: Message[], model?: string, busy = false): Promise<Block[]> {
+export async function replayToBlocks(
+	sessionId: string,
+	messages: Message[],
+	model?: string,
+	busy = false,
+	opts?: ReplayToBlocksOptions,
+): Promise<Block[]> {
 	const blocks: Block[] = []
+	const toolResultSourceMessages = opts?.toolResultSourceMessages ?? messages
+	const appendInterruptedHint = opts?.appendInterruptedHint ?? true
 
 	// Collect tool_result entries for matching
 	const toolResults = new Map<string, string>()
-	for (const msg of messages) {
+	for (const msg of toolResultSourceMessages) {
 		const m = msg as any
 		if (m.role === 'tool_result') toolResults.set(m.tool_use_id, m.blobId)
 	}
@@ -132,17 +145,18 @@ export async function replayToBlocks(sessionId: string, messages: Message[], mod
 		}
 	}
 
-	if (busy) return blocks
+	if (busy || !appendInterruptedHint) return blocks
 
+	const hintSourceMessages = toolResultSourceMessages
 	// Detect unfinished state
-	const interrupted = sessionHistory.detectInterruptedTools(messages)
+	const interrupted = sessionHistory.detectInterruptedTools(hintSourceMessages)
 	if (interrupted.length > 0) {
 		const toolList = interrupted.map(t => t.name).join(', ')
 		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Press Enter to continue` })
-	} else if (messages.length > 0) {
+	} else if (hintSourceMessages.length > 0) {
 		// Check for pending turn: last role-bearing message is 'user' or 'tool_result' (not a [system] prefix)
-		for (let i = messages.length - 1; i >= 0; i--) {
-			const m = messages[i] as any
+		for (let i = hintSourceMessages.length - 1; i >= 0; i--) {
+			const m = hintSourceMessages[i] as any
 			if (m.role) {
 				const text = typeof m.content === 'string' ? m.content : ''
 				if ((m.role === 'user' && !text.startsWith('[system]')) || m.role === 'tool_result') {

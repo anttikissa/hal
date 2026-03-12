@@ -1,10 +1,11 @@
 import { test, expect } from 'bun:test'
 import { randomBytes } from 'crypto'
-import { Client } from './client.ts'
+import { Client, clientConfig } from './client.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
 import type { Message, HydrationData } from './session/history.ts'
 import { draft } from './cli/draft.ts'
+import { replay } from './session/replay.ts'
 
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
@@ -118,8 +119,6 @@ test('client shows startup perf breakdown with tab target', async () => {
 		else (globalThis as any).__hal = originalHal
 	}
 })
-
-
 test('client shows startup-ready runtime and cli split when host timing is available', async () => {
 	const sessionId = `t-${randomBytes(4).toString('hex')}`
 	const originalHal = (globalThis as any).__hal
@@ -292,8 +291,6 @@ test('client loads draft while hydration is in flight', async () => {
 		draft.loadDraft = originalLoadDraft
 	}
 })
-
-
 test('client uses transport hydration payload for replay and input history', async () => {
 	const sessionId = `t-${randomBytes(4).toString('hex')}`
 	const ts = new Date().toISOString()
@@ -307,4 +304,47 @@ test('client uses transport hydration payload for replay and input history', asy
 	const tab = client.activeTab()
 	expect(tab?.blocks.some((b) => b.type === 'input' && b.text === 'hydrated replay')).toBe(true)
 	expect(tab?.inputHistory).toEqual(['hydrated input history'])
+})
+test('client can render tail first and backfill older history in background', async () => {
+	const sessionId = `t-${randomBytes(4).toString('hex')}`
+	const ts = new Date().toISOString()
+	const replayMessages: Message[] = [
+		{ role: 'user', content: 'old-1', ts },
+		{ role: 'user', content: 'old-2', ts },
+		{ role: 'user', content: 'old-3', ts },
+		{ role: 'user', content: 'newest', ts },
+	]
+	const transport = new FakeTransport(bootstrapStateFor(sessionId), [], {
+		[sessionId]: {
+			replayMessages,
+			inputHistory: ['old-1', 'old-2', 'old-3', 'newest'],
+		},
+	})
+	const originalMin = clientConfig.startupProgressiveMinMessages
+	const originalTail = clientConfig.startupTailMessageCount
+	const originalChunk = clientConfig.startupBackgroundChunkMessages
+	const originalWorker = clientConfig.startupUseWorkerForHistory
+	const originalReplay = replay.replayToBlocks
+	clientConfig.startupProgressiveMinMessages = 2
+	clientConfig.startupTailMessageCount = 1
+	clientConfig.startupBackgroundChunkMessages = 1
+	clientConfig.startupUseWorkerForHistory = false
+	replay.replayToBlocks = async (sid, messages, model, busy, opts) => {
+		if (messages.some((m: any) => m.role === 'user' && m.content === 'old-1')) await Bun.sleep(25)
+		return originalReplay(sid, messages, model, busy, opts)
+	}
+	try {
+		const client = new Client(transport, () => {})
+		await client.start()
+		const tab = client.activeTab()
+		expect(tab?.blocks.some((b) => b.type === 'input' && b.text === 'newest')).toBe(true)
+		expect(tab?.blocks.some((b) => b.type === 'input' && b.text === 'old-1')).toBe(false)
+		await waitFor(() => (tab?.blocks.some((b) => b.type === 'input' && b.text === 'old-1') ?? false), 1200)
+	} finally {
+		replay.replayToBlocks = originalReplay
+		clientConfig.startupProgressiveMinMessages = originalMin
+		clientConfig.startupTailMessageCount = originalTail
+		clientConfig.startupBackgroundChunkMessages = originalChunk
+		clientConfig.startupUseWorkerForHistory = originalWorker
+	}
 })

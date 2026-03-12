@@ -212,15 +212,14 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		const padTarget = Math.max(0, (stdout.rows || 24) - chromeBelow)
 		while (lines.length < padTarget) lines.push('')
 	} else {
+		lines.push(...contentLines)
+		// Pad to tallest tab's content height (keeps prompt position stable)
+		const activeSessionId = tab?.sessionId ?? null
+		const maxHeight = heights.maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
 		const pLines = prompt.lineCount(cw)
 		// tab bar(1) + help bar(1) + prompt sep(1) + prompt lines
 		const chromeLines = 3 + pLines
 		const available = Math.max(0, (stdout.rows || 24) - chromeLines)
-		const visibleContentLines = available > 0 ? contentLines.slice(-available) : []
-		lines.push(...visibleContentLines)
-		// Pad to tallest tab's content height (keeps prompt position stable)
-		const activeSessionId = tab?.sessionId ?? null
-		const maxHeight = heights.maxTabHeight(cState.tabs, activeSessionId, w, contentLines.length)
 		const padTarget = Math.min(maxHeight, available)
 		while (lines.length < padTarget) lines.push('')
 	}
@@ -253,7 +252,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 
 	if (hasQ && qPromptResult) {
 		// Below tab bar: grayed-out separator + frozen main prompt (not editable)
-		lines.push(buildSeparator(tab, w))
+		lines.push(buildSeparator(tab, w, tab?.loadingHistory ? 'loading history' : undefined))
 		const frozen = prompt.frozenText() ?? ''
 		const frozenLines = frozen.split('\n')
 		const shown = frozenLines.slice(0, 3)
@@ -268,7 +267,10 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 		// Normal prompt
 		const p = prompt.buildPrompt(cw)
 		const pLines = prompt.lineCount(cw)
-		lines.push(buildSeparator(tab, w, p.scrollInfo))
+		const sepParts: string[] = []
+		if (tab?.loadingHistory) sepParts.push('loading history')
+		if (p.scrollInfo) sepParts.push(p.scrollInfo)
+		lines.push(buildSeparator(tab, w, sepParts.length > 0 ? sepParts.join(' · ') : undefined))
 		lines.push(...p.lines)
 		cursorPos = {
 			row: lines.length - pLines + p.cursor.rowOffset,

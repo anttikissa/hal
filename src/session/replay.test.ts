@@ -33,6 +33,50 @@ describe('replayToBlocks', () => {
 		expect(blocks.every(b => b.type !== 'info' || !(b as any).text?.includes('/continue'))).toBe(true)
 	})
 
+	test('can replay a chunk using tool results from the full message set', async () => {
+		const originalRead = blob.read
+		const seenBlobIds: string[] = []
+		blob.read = async (_sessionId: string, blobId: string) => {
+			seenBlobIds.push(blobId)
+			if (blobId === 'result-blob') {
+				return {
+					call: { input: 'echo ok' },
+					result: { content: 'ok', status: 'success' },
+				}
+			}
+			return {
+				call: { input: '' },
+				result: { content: '', status: 'error' },
+			}
+		}
+		try {
+			const allMessages: Message[] = [
+				{ role: 'assistant', text: '', tools: [{ name: 'bash', id: 'tool-1', blobId: 'call-blob' }], ts: '2026-01-01T00:00:00Z' },
+				{ role: 'tool_result', tool_use_id: 'tool-1', blobId: 'result-blob', ts: '2026-01-01T00:00:01Z' },
+			]
+			const olderChunk = allMessages.slice(0, 1)
+			const blocks = await replayToBlocks('test-session', olderChunk, undefined, true, {
+				toolResultSourceMessages: allMessages,
+				appendInterruptedHint: false,
+			})
+			const tool = blocks.find((block) => block.type === 'tool')
+			expect(tool).toBeDefined()
+			expect(tool && tool.type === 'tool' ? tool.output : '').toBe('ok')
+			expect(seenBlobIds).toEqual(['result-blob'])
+		} finally {
+			blob.read = originalRead
+		}
+	})
+
+	test('can suppress interrupted/pending resume hints for non-tail chunks', async () => {
+		const blocks = await replayToBlocks('test-session', [
+			{ role: 'user', content: 'hello', ts: '2026-01-01T00:00:00Z' },
+		], undefined, false, {
+			appendInterruptedHint: false,
+		})
+		expect(blocks.some((block) => block.type === 'info' && (block as any).text?.includes('/continue'))).toBe(false)
+	})
+
 	test('shows resume info for interrupted tools', async () => {
 		const messages: Message[] = [
 			{ role: 'user', content: 'do something', ts: '2026-01-01T00:00:00Z' },

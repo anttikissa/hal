@@ -14,7 +14,7 @@ export interface Transport {
 	sendCommand(cmd: RuntimeCommand): Promise<void>
 	bootstrap(): Promise<BootstrapState>
 	tailEvents(fromOffset?: number): { items: AsyncGenerator<RuntimeEvent>; cancel(): void }
-	replaySession(id: string): Promise<Message[]>
+	replaySession?(id: string): Promise<Message[]>
 	hydrateSession?(id: string): Promise<HydrationData>
 	eventsOffset(): Promise<number>
 }

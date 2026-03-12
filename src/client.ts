@@ -5,7 +5,7 @@ import type { Block } from './cli/blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from './protocol.ts'
 import { protocol } from './protocol.ts'
 import { replay } from './session/replay.ts'
-import { history } from './session/history.ts'
+import { history, type Message } from './session/history.ts'
 import { draft } from './cli/draft.ts'
 import { prompt } from './cli/prompt.ts'
 import { clientState } from './client-state.ts'
@@ -22,6 +22,7 @@ export interface TabState {
 	inputDraft: string
 	contentHeight: number
 	context?: { used: number; max: number; estimated?: boolean }
+	loadingHistory: boolean
 	question?: { id: string; text: string }
 	doneUnseen?: boolean
 }
@@ -52,6 +53,13 @@ interface StartupPerfState {
 	hydrateMs: number | null
 	renderMs: number | null
 	targetMs: number
+}
+
+export const clientConfig = {
+	startupProgressiveMinMessages: 400,
+	startupTailMessageCount: 120,
+	startupBackgroundChunkMessages: 120,
+	startupUseWorkerForHistory: true,
 }
 
 function startupPerfSample(): StartupPerfState | null {
@@ -103,6 +111,7 @@ export class Client {
 	private onUpdate: () => void
 	private pendingOpen = false
 	private pendingStartupPerf: StartupPerfState | null = null
+	private startupBackgroundHydration = new Map<string, Promise<void>>()
 
 	constructor(transport: Transport, onUpdate: () => void) {
 		this.transport = transport
@@ -214,23 +223,122 @@ export class Client {
 		this.onUpdate()
 	}
 
-	private async hydrateTab(tab: TabState): Promise<number> {
+	private async loadHydrationPayload(sessionId: string): Promise<{ replayMessages: Message[]; inputHistory: string[] }> {
+		if (this.transport.hydrateSession) return this.transport.hydrateSession(sessionId)
+		if (!this.transport.replaySession) throw new Error('transport.replaySession is required when hydrateSession is unavailable')
+		const replayMessagesPromise = this.transport.replaySession(sessionId)
+		const inputHistoryPromise = history.loadInputHistory(sessionId)
+		const [replayMessages, inputHistory] = await Promise.all([replayMessagesPromise, inputHistoryPromise])
+		return { replayMessages, inputHistory }
+	}
+
+	private async hydrateOlderHistoryInProcess(tab: TabState, olderMessages: Message[], allMessages: Message[]): Promise<void> {
+		let end = olderMessages.length
+		while (end > 0) {
+			const chunkSize = Math.max(1, clientConfig.startupBackgroundChunkMessages)
+			const start = Math.max(0, end - chunkSize)
+			const chunk = olderMessages.slice(start, end)
+			const chunkBlocks = await replay.replayToBlocks(tab.sessionId, chunk, tab.info.model, true, {
+				toolResultSourceMessages: allMessages,
+				appendInterruptedHint: false,
+			})
+			if (chunkBlocks.length > 0) tab.blocks.unshift(...chunkBlocks)
+			end = start
+			this.onUpdate()
+			await Bun.sleep(0)
+		}
+	}
+
+	private async hydrateOlderHistoryInWorker(tab: TabState, olderMessages: Message[], allMessages: Message[]): Promise<void> {
+		const worker = new Worker(new URL('./session/replay-worker.ts', import.meta.url).href, { type: 'module' })
+		const requestId = randomBytes(8).toString('hex')
+		try {
+			await new Promise<void>((resolve, reject) => {
+				let done = false
+				const finish = (fn: () => void) => {
+					if (done) return
+					done = true
+					fn()
+				}
+				worker.onmessage = (event: any) => {
+					const msg = event?.data as any
+					if (!msg || msg.requestId !== requestId) return
+					if (msg.type === 'chunk') {
+						const chunkBlocks = Array.isArray(msg.blocks) ? msg.blocks : []
+						if (chunkBlocks.length > 0) tab.blocks.unshift(...chunkBlocks)
+						this.onUpdate()
+						return
+					}
+					if (msg.type === 'done') {
+						finish(resolve)
+						return
+					}
+					if (msg.type === 'error') {
+						finish(() => reject(new Error(typeof msg.message === 'string' ? msg.message : 'history worker failed')))
+					}
+				}
+				worker.onerror = (event: any) => {
+					finish(() => reject(new Error(event?.message || 'history worker failed')))
+				}
+				worker.postMessage({
+					type: 'hydrate-older',
+					requestId,
+					sessionId: tab.sessionId,
+					model: tab.info.model,
+					olderMessages,
+					allMessages,
+					chunkSize: Math.max(1, clientConfig.startupBackgroundChunkMessages),
+				})
+			})
+		} finally {
+			worker.terminate()
+		}
+	}
+
+	private hydrateOlderHistoryInBackground(tab: TabState, olderMessages: Message[], allMessages: Message[]): void {
+		if (olderMessages.length === 0) return
+		if (this.startupBackgroundHydration.has(tab.sessionId)) return
+		tab.loadingHistory = true
+		const sessionId = tab.sessionId
+		const task = (async () => {
+			if (clientConfig.startupUseWorkerForHistory && typeof Worker !== 'undefined') {
+				try {
+					await this.hydrateOlderHistoryInWorker(tab, olderMessages, allMessages)
+					return
+				} catch {}
+			}
+			await this.hydrateOlderHistoryInProcess(tab, olderMessages, allMessages)
+		})()
+		this.startupBackgroundHydration.set(sessionId, task)
+		void task.finally(() => {
+			this.startupBackgroundHydration.delete(sessionId)
+			tab.loadingHistory = false
+			this.onUpdate()
+		})
+	}
+
+	private async hydrateTab(tab: TabState, opts?: { progressiveStartup?: boolean }): Promise<number> {
 		const startedAt = Date.now()
 		const inputDraftPromise = draft.loadDraft(tab.sessionId)
-		if (this.transport.hydrateSession) {
-			const hydration = await this.transport.hydrateSession(tab.sessionId)
-			const blocks = await replay.replayToBlocks(tab.sessionId, hydration.replayMessages, tab.info.model, tab.busy)
+		const hydration = await this.loadHydrationPayload(tab.sessionId)
+		const replayMessages = hydration.replayMessages
+		const shouldProgressive = !!opts?.progressiveStartup && replayMessages.length >= clientConfig.startupProgressiveMinMessages
+		if (shouldProgressive) {
+			const tailCount = Math.max(1, clientConfig.startupTailMessageCount)
+			const tailStart = Math.max(0, replayMessages.length - tailCount)
+			const olderMessages = replayMessages.slice(0, tailStart)
+			const tailMessages = replayMessages.slice(tailStart)
+			const tailBlocks = await replay.replayToBlocks(tab.sessionId, tailMessages, tab.info.model, tab.busy, {
+				toolResultSourceMessages: replayMessages,
+			})
+			tab.blocks.push(...tailBlocks)
+			this.hydrateOlderHistoryInBackground(tab, olderMessages, replayMessages)
+		} else {
+			const blocks = await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy)
 			tab.blocks.push(...blocks)
-			tab.inputHistory = hydration.inputHistory
-			tab.inputDraft = await inputDraftPromise
-			return Date.now() - startedAt
+			tab.loadingHistory = false
 		}
-		const replayMessagesPromise = this.transport.replaySession(tab.sessionId)
-		const inputHistoryPromise = history.loadInputHistory(tab.sessionId)
-		const replayMessages = await replayMessagesPromise
-		const blocks = await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy)
-		tab.blocks.push(...blocks)
-		tab.inputHistory = await inputHistoryPromise
+		tab.inputHistory = hydration.inputHistory
 		tab.inputDraft = await inputDraftPromise
 		return Date.now() - startedAt
 	}
@@ -249,6 +357,7 @@ export class Client {
 				inputDraft: '',
 				contentHeight: 0,
 				context: info.context,
+				loadingHistory: false,
 				question: pendingQuestion ? { id: pendingQuestion.id, text: pendingQuestion.text } : undefined,
 			})
 		}
@@ -264,7 +373,7 @@ export class Client {
 
 		const activeBeforeHydration = this.activeTab()
 		if (activeBeforeHydration) {
-			const activeHydrateMs = await this.hydrateTab(activeBeforeHydration)
+			const activeHydrateMs = await this.hydrateTab(activeBeforeHydration, { progressiveStartup: true })
 			this.applyTabToPrompt(activeBeforeHydration)
 			clientState.saveLastTab(activeBeforeHydration.sessionId)
 			this.renderAndCaptureStartup(activeHydrateMs)
@@ -427,7 +536,7 @@ export class Client {
 		for (const info of sessions) {
 			const existing = current.get(info.id)
 			if (existing) { existing.info = info; existing.context = info.context ?? existing.context; newTabs.push(existing) }
-			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context }); newTabId = info.id }
+			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context, loadingHistory: false }); newTabId = info.id }
 		}
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
@@ -505,7 +614,6 @@ export class Client {
 		tab.pausing = true
 		tab.blocks.push({ type: 'info', text: '[pausing...]' })
 	}
-
 	nextTab(): void {
 		if (this.state.tabs.length <= 1) return
 		this.saveDraft()
