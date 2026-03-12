@@ -9,7 +9,7 @@ import { ason } from '../utils/ason.ts'
 import {
 	TOOL_MAX_OUTPUT, THINKING_BLOCK_MIN_LINES, THINKING_BLOCK_MAX_LINES,
 	BLOCK_MARGIN, collapseBlankLines, oneLine, contentWidth, boxLine,
-	plainLine, toolHeader, elapsed, clipPlain,
+	plainLine, toolHeader, elapsed,
 } from './block-layout.ts'
 import { bash } from '../tools/bash.ts'
 
