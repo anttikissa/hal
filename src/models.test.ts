@@ -142,7 +142,7 @@ describe('resolveFastModel', () => {
 	test('auto with anthropic auth → haiku', () => {
 		mockConfig({})
 		mockAuth({ anthropic: { accessToken: 'sk-ant-xxx' } })
-		expect(resolveFastModel()).toBe('anthropic/claude-3-5-haiku-20241022')
+		expect(resolveFastModel()).toBe('anthropic/claude-haiku-4-5-20251001')
 		config.getConfig = origGetConfig
 		auth.getAuth = origGetAuth
 	})
@@ -158,7 +158,7 @@ describe('resolveFastModel', () => {
 	test('auto with both → prefers anthropic', () => {
 		mockConfig({})
 		mockAuth({ anthropic: { accessToken: 'a' }, openai: { accessToken: 'b' } })
-		expect(resolveFastModel()).toBe('anthropic/claude-3-5-haiku-20241022')
+		expect(resolveFastModel()).toBe('anthropic/claude-haiku-4-5-20251001')
 		config.getConfig = origGetConfig
 		auth.getAuth = origGetAuth
 	})

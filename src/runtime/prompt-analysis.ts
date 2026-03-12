@@ -44,7 +44,8 @@ export async function analyzePrompt(text: string): Promise<PromptAnalysis | null
 		}
 
 		const durationMs = Math.round(performance.now() - start)
-		const parsed = JSON.parse(response.trim())
+		const json = response.replace(/^```(?:json)?\n?|\n?```$/g, '').trim()
+		const parsed = JSON.parse(json)
 		return {
 			mood: parsed.mood ?? 'neutral',
 			isHalChange: !!parsed.isHalChange,

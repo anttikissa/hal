@@ -77,7 +77,7 @@ import { config } from './config.ts'
 import { auth } from './runtime/auth.ts'
 
 const FAST_DEFAULTS: [string, string][] = [
-	['anthropic', 'anthropic/claude-3-5-haiku-20241022'],
+	['anthropic', 'anthropic/claude-haiku-4-5-20251001'],
 	['openai', 'openai/gpt-4o-mini'],
 ]
 
