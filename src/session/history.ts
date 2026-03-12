@@ -138,6 +138,7 @@ export async function readHistory(sessionId: string): Promise<Message[]> {
 
 export const historyConfig = {
 	maxApiOutput: 50_000,
+	errorTurnTtl: 3, // expire injected errors after this many user turns
 }
 
 function applyModelEvent(currentModel: string | undefined, entry: any): string | undefined {
@@ -177,15 +178,37 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	const pruneOpts = prune.detectPruneOpts(sliced)
 	const out: any[] = []
 	let currentModel = initialModelFromEntries(sliced)
+	const totalUserTurns = sliced.filter(m => (m as any).role === 'user').length
+	let userTurnsSeen = 0
+	let pendingErrors: string[] = []
 	for (const m of sliced) {
 		const msg = m as any
 		currentModel = applyModelEvent(currentModel, msg)
+		// Collect error/warn infos for injection into the next user message
+		if (msg.type === 'info' && (msg.level === 'error' || msg.level === 'warn')) {
+			const turnsRemaining = totalUserTurns - userTurnsSeen
+			if (turnsRemaining <= historyConfig.errorTurnTtl) {
+				pendingErrors.push(msg.text)
+			}
+			continue
+		}
 		if (!msg.role) continue
 		if (msg.role === 'user') {
+			userTurnsSeen++
 			if (typeof msg.content === 'string') {
-				out.push({ role: 'user', content: msg.content })
+				if (pendingErrors.length > 0) {
+					const prefix = pendingErrors.map(e => `[Error] ${e}`).join('\n')
+					pendingErrors = []
+					out.push({ role: 'user', content: prefix + '\n' + msg.content })
+				} else {
+					out.push({ role: 'user', content: msg.content })
+				}
 			} else if (Array.isArray(msg.content)) {
 				const blocks: any[] = []
+				if (pendingErrors.length > 0) {
+					blocks.push({ type: 'text', text: pendingErrors.map(e => `[Error] ${e}`).join('\n') })
+					pendingErrors = []
+				}
 				for (const b of msg.content) {
 					if (b.type === 'image' && b.blobId) {
 						const data = await blob.read(sessionId, b.blobId)
@@ -199,6 +222,7 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 				out.push({ role: 'user', content: blocks })
 			}
 		} else if (msg.role === 'assistant') {
+			pendingErrors = [] // discard errors not followed by a user message
 			const content: any[] = []
 			let thinkingText = msg.thinkingText
 			let thinkingSignature = msg.thinkingSignature

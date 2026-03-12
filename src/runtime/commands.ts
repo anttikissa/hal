@@ -16,8 +16,8 @@ import { homedir } from 'os'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
-	const warn = (text: string) => rt.emit({ type: 'line', sessionId: sid, text, level: 'warn' })
-	const error = (text: string) => rt.emit({ type: 'line', sessionId: sid, text, level: 'error' })
+	const warn = (text: string) => rt.emitInfo(sid, text, 'warn')
+	const error = (text: string) => rt.emitInfo(sid, text, 'error')
 	if (!sid) { await error('No active session'); return }
 
 	switch (cmd.type) {
