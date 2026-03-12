@@ -149,6 +149,8 @@ Features:
 - Enter alternate screen (`?1049h`)
 - Enable mouse + bracketed paste (+ Kitty keyboard mode on supported terminals)
 - Attach stdin/resize/SIGCONT listeners
+- After initial tab bootstrap, the active tab gets a local perf line: `[perf] startup: <ms> (target <100ms)`.
+- If startup exceeds target, the line is prefixed with `⚠`.
 
 ### Suspend (`Ctrl-Z`)
 

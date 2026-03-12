@@ -11,11 +11,15 @@ import { protocol } from './protocol.ts'
 state.ensureStateDir()
 await ipc.ensureBus()
 
+const startupEpochRaw = process.env.HAL_STARTUP_EPOCH_MS
+const startupEpochMs = startupEpochRaw ? Number.parseInt(startupEpochRaw, 10) : NaN
+const startupEpoch = Number.isFinite(startupEpochMs) && startupEpochMs > 0 ? startupEpochMs : null
+
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 const { host, currentPid } = await ipc.claimHost(hostId)
 
 // Shared mutable state — cli/cli.ts reads this for the separator
-export const halStatus = { isHost: host, hostPid: currentPid }
+export const halStatus = { isHost: host, hostPid: currentPid, startupEpochMs: startupEpoch }
 ;(globalThis as any).__hal = halStatus
 
 let runtime: Runtime | null = null

@@ -68,7 +68,8 @@ if [ ! -f "$HAL_DIR/config.ason" ]; then
 fi
 
 while true; do
-	bun src/main.ts "${args[@]}"
+	startup_epoch_ms="$(perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000')"
+	HAL_STARTUP_EPOCH_MS="$startup_epoch_ms" bun src/main.ts "${args[@]}"
 	code=$?
 	[ "$code" -ne 100 ] && exit "$code"
 done

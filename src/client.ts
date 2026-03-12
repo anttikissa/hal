@@ -32,6 +32,13 @@ export interface ClientState {
 
 function selfModeEnabled(): boolean { return process.env.HAL_SELF_MODE === '1' }
 
+function startupPerfSample(): { elapsedMs: number; targetMs: number } | null {
+	const meta = (globalThis as any).__hal as { startupEpochMs?: number | null } | undefined
+	const epoch = meta?.startupEpochMs
+	if (typeof epoch !== 'number' || !Number.isFinite(epoch) || epoch <= 0) return null
+	return { elapsedMs: Math.max(0, Date.now() - epoch), targetMs: 100 }
+}
+
 export class Client {
 	private transport: Transport
 	private source: RuntimeSource
@@ -78,6 +85,7 @@ export class Client {
 		const preferredId = lastTab ?? rtState.activeSessionId
 		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === preferredId))
 		this.state.connected = true
+		const startupPerf = startupPerfSample()
 		this.onUpdate()
 
 		const offset = await this.transport.eventsOffset()
@@ -95,6 +103,16 @@ export class Client {
 		}
 
 		if (selfModeEnabled()) this.applySelfMode()
+		if (startupPerf) {
+			const tab = this.activeTab()
+			if (tab) {
+				const prefix = startupPerf.elapsedMs > startupPerf.targetMs ? '⚠ ' : ''
+				tab.blocks.push({
+					type: 'info',
+					text: `${prefix}[perf] startup: ${startupPerf.elapsedMs}ms (target <${startupPerf.targetMs}ms)`,
+				})
+			}
+		}
 		this.onUpdate()
 
 		for await (const event of this.transport.tailEvents(offset).items) {
