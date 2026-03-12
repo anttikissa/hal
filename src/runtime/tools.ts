@@ -3,15 +3,13 @@
 import { statSync, readdirSync } from 'fs'
 import { $ } from 'bun'
 import { homedir } from 'os'
-import { ason } from '../utils/ason.ts'
-import { blob } from '../session/blob.ts'
 import { evalTool, type EvalContext } from './eval-tool.ts'
 import { bash } from '../tools/bash.ts'
 import { read } from '../tools/read.ts'
 import { write } from '../tools/write.ts'
 import { edit } from '../tools/edit.ts'
+import { readBlob } from '../tools/read-blob.ts'
 import { resolvePath as resolveToolPath } from '../tools/file-utils.ts'
-
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
 
@@ -25,17 +23,9 @@ function shortenHome(text: string): string {
 	return text.replaceAll(HOME, '~')
 }
 
-
 export function truncate(s: string, max = toolsConfig.maxOutput): string {
 	if (s.length <= max) return s
 	return s.slice(0, max) + `\n[truncated ${s.length - max} chars]`
-}
-
-function blobPreview(blobId: string, blobData: any): string {
-	if (blobData && typeof blobData === 'object' && typeof blobData.media_type === 'string' && typeof blobData.data === 'string') {
-		return `blob ${blobId}\nkind: image\nmedia_type: ${blobData.media_type}\ndata: [base64 ${blobData.data.length} chars]`
-	}
-	return truncate(ason.stringify(blobData))
 }
 
 const EVAL_TOOL = {
@@ -91,17 +81,7 @@ const BASE_TOOLS = [
 			},
 		},
 	},
-	{
-		name: 'read_blob',
-		description: 'Read a stored session blob by id. Use this when history mentions `blob <id>` or an omitted image/tool result points at a blob.',
-		input_schema: {
-			type: 'object',
-			properties: {
-				blobId: { type: 'string', description: 'Stable blob id, for example from an omitted image, tool result, or thinking blob' },
-			},
-			required: ['blobId'],
-		},
-	},
+	readBlob.definition,
 	{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
 	{
 		name: 'ask',
@@ -181,7 +161,7 @@ export function argsPreview(call: ToolCall): string {
 			s = String(inp?.path ?? '.')
 			break
 		case 'read_blob':
-			s = String(inp?.blobId ?? '')
+			s = readBlob.argsPreview(inp)
 			break
 		case 'ask':
 			s = String(inp?.question ?? '').slice(0, 80)
@@ -270,13 +250,8 @@ async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecCon
 			walk(dir, '', 0)
 			return lines.join('\n') || '(empty directory)'
 		}
-		case 'read_blob': {
-			if (!ctx?.sessionId) return 'error: read_blob requires a session context'
-			const blobId = String(inp?.blobId ?? '')
-			const blobData = await blob.read(ctx.sessionId, blobId)
-			if (!blobData) return `error: blob not found: ${blobId}`
-			return blobPreview(blobId, blobData)
-		}
+		case 'read_blob':
+			return readBlob.execute(inp, { sessionId: ctx?.sessionId, truncate })
 		case 'eval': {
 			const evalCtx = ctx?.evalCtx
 			if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'

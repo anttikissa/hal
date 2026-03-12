@@ -81,7 +81,13 @@ function collapseTilde(p: string): string {
 function listDirs(dir: string): string[] {
 	try {
 		return readdirSync(dir, { withFileTypes: true })
-			.filter(e => e.isDirectory() && !e.name.startsWith('.'))
+			.filter(e => {
+				if (e.name.startsWith('.')) return false
+				if (e.isDirectory()) return true
+				// Follow symlinks to check if target is a directory
+				if (e.isSymbolicLink()) try { return statSync(resolve(dir, e.name)).isDirectory() } catch { return false }
+				return false
+			})
 			.map(e => e.name)
 			.sort()
 	} catch { return [] }
