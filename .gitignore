@@ -12,3 +12,4 @@ examples/
 new-state/
 test_tail.txt
 config.ason.bak
+misc/ason/**/build/
