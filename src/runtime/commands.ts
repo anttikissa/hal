@@ -8,8 +8,8 @@ import { history } from '../session/history.ts'
 import { attachments } from '../session/attachments.ts'
 import { models } from '../models.ts'
 import { auth } from './auth.ts'
-import { promptAnalysis } from './prompt-analysis.ts'
 import { config } from '../config.ts'
+import { promptAnalysis } from './prompt-analysis.ts'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
@@ -48,6 +48,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 
 			const info = rt.sessions.get(sid)!
 			info.lastPrompt = promptText.split('\n')[0].slice(0, 120)
+			const model = info.model ?? config.getConfig().defaultModel
+			await history.ensureModelEvent(sid, model)
 
 			let apiMessages = await history.loadApiMessages(sid)
 
@@ -74,8 +76,9 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			}
 			// Fire prompt analysis in parallel (non-blocking)
 			if (config.getConfig().debug) {
+				const sessionId = sid
 				promptAnalysis.analyzePrompt(promptText).then(result => {
-					if (result) rt.emitInfo(sid, promptAnalysis.formatAnalysis(promptText, result), 'info')
+					if (result) rt.emitInfo(sessionId, promptAnalysis.formatAnalysis(promptText, result), 'info')
 				}).catch(() => {})
 			}
 			await rt.startGeneration(sid, info, apiMessages)
@@ -187,7 +190,12 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			}
 			const info = rt.sessions.get(sid)
 			if (!info) { await error(`Session ${sid} not found`); return }
-			info.model = models.resolveModel(cmd.text)
+			const oldModel = info.model ?? config.getConfig().defaultModel
+			const newModel = models.resolveModel(cmd.text)
+			info.model = newModel
+			if (newModel !== oldModel) {
+				await history.appendHistory(sid, [{ type: 'session', action: 'model-change', old: oldModel, new: newModel, ts: new Date().toISOString() }])
+			}
 			await rt.emitInfo(sid, `[model] ${info.model}`, 'meta')
 			await rt.publish()
 			break
@@ -207,6 +215,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				rt.pendingInterruptedTools.delete(sid)
 				await rt.emitInfo(sid, `[interrupted] ${pendingTools.length} tool(s) skipped`, 'warn')
 			}
+			const model = info.model ?? config.getConfig().defaultModel
+			await history.ensureModelEvent(sid, model)
 			const apiMessages = await history.loadApiMessages(sid)
 			if (!rt.hasPendingUserTurn(apiMessages)) {
 				await warn('No interrupted user turn to continue')

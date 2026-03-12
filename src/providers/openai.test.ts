@@ -264,7 +264,7 @@ test('openai provider: converts non-OpenAI thinking blocks into assistant text c
 		for await (const _event of provider.generate({
 			messages: [{
 				role: 'assistant',
-				content: [{ type: 'thinking', thinking: 'anthropic thought', signature: 'EuwDCkYICxgCKkD/rBpHfOrn+vbNPIjqR4hG5D7cRe8=' }],
+				content: [{ type: 'thinking', thinking: 'anthropic thought', signature: 'EuwDCkYICxgCKkD/rBpHfOrn+vbNPIjqR4hG5D7cRe8=', _model: 'anthropic/claude-opus-4-6' }],
 			}],
 			model: 'gpt-5.4',
 			systemPrompt: 'test',
@@ -279,6 +279,7 @@ test('openai provider: converts non-OpenAI thinking blocks into assistant text c
 			.flatMap((m: any) => m.content ?? [])
 			.find((c: any) => c.type === 'output_text' && String(c.text).includes('anthropic thought'))
 		expect(replayedText).toBeTruthy()
+		expect(String(replayedText.text)).toContain('[model anthropic/claude-opus-4-6 thinking]')
 	} finally {
 		globalThis.fetch = origFetch
 	}

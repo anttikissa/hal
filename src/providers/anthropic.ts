@@ -132,11 +132,12 @@ function isOpenAIReasoningSignature(signature: unknown): boolean {
 	}
 }
 
-function formatForeignThinkingForAnthropic(thinking: unknown): string | null {
+function formatForeignThinkingForAnthropic(thinking: unknown, sourceModel: unknown): string | null {
 	if (typeof thinking !== 'string') return null
 	const text = thinking.trim()
 	if (!text) return null
-	return `[thinking from a previous model; not a native Claude signature]\n${text}`
+	const model = typeof sourceModel === 'string' && sourceModel ? sourceModel : 'unknown'
+	return `[model ${model} thinking]\n${text}`
 }
 
 function sanitizeMessagesForAnthropic(msgs: any[]): any[] {
@@ -150,7 +151,7 @@ function sanitizeMessagesForAnthropic(msgs: any[]): any[] {
 		const content: any[] = []
 		for (const block of msg.content) {
 			if (block.type === 'thinking' && isOpenAIReasoningSignature(block.signature)) {
-				const replayed = formatForeignThinkingForAnthropic(block.thinking)
+				const replayed = formatForeignThinkingForAnthropic(block.thinking, block._model)
 				if (replayed) content.push({ type: 'text', text: replayed })
 				continue
 			}

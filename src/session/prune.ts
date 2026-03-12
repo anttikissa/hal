@@ -9,7 +9,7 @@
 export const pruneConfig = {
 	heavyThreshold: 4,
 	thinkingThreshold: 10,
-	// Used by detectPruneOpts after a [model] event to keep heavy content longer.
+	// Used by detectPruneOpts after a session model-change event to keep heavy content longer.
 	modelChangeThreshold: 10,
 }
 
@@ -91,7 +91,7 @@ export function detectPruneOpts(entries: any[]): PruneOpts | undefined {
 	let lastModelChangeIdx = -1
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const e = entries[i] as any
-		if (e.type === 'info' && typeof e.text === 'string' && e.text.startsWith('[model]')) {
+		if (e.type === 'session' && e.action === 'model-change') {
 			lastModelChangeIdx = i
 			break
 		}

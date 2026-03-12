@@ -52,11 +52,21 @@ export interface ToolResultMessage {
 	ts: string
 }
 
+export interface SessionEventMessage {
+	type: 'session'
+	action: 'model-set' | 'model-change'
+	model?: string
+	old?: string
+	new?: string
+	ts: string
+}
+
 export type Message = UserMessage | AssistantMessage | ToolResultMessage
 	| { type: 'info'; text: string; level?: string; detail?: string; ts: string }
 	| { type: 'reset'; ts: string }
 	| { type: 'compact'; ts: string }
 	| { type: 'forked_from'; parent: string; ts: string }
+	| SessionEventMessage
 
 export async function getLastUsage(sessionId: string): Promise<{ input: number; output: number } | null> {
 	const entries = await readHistory(sessionId)
@@ -129,14 +139,46 @@ export const historyConfig = {
 	maxApiOutput: 50_000,
 }
 
+function applyModelEvent(currentModel: string | undefined, entry: any): string | undefined {
+	if (entry?.type !== 'session') return currentModel
+	if (entry.action === 'model-set' && typeof entry.model === 'string' && entry.model) return entry.model
+	if (entry.action === 'model-change' && typeof entry.new === 'string' && entry.new) return entry.new
+	return currentModel
+}
+
+function initialModelFromEntries(entries: Message[]): string | undefined {
+	for (const entry of entries) {
+		const e = entry as any
+		if (e.type !== 'session') continue
+		if (e.action === 'model-set' && typeof e.model === 'string' && e.model) return e.model
+		if (e.action === 'model-change' && typeof e.old === 'string' && e.old) return e.old
+	}
+	return undefined
+}
+
+export async function ensureModelEvent(sessionId: string, model: string): Promise<void> {
+	const entries = await loadAllHistory(sessionId)
+	let known: string | undefined
+	for (const entry of entries) known = applyModelEvent(known, entry)
+	const ts = new Date().toISOString()
+	if (!known) {
+		await appendHistory(sessionId, [{ type: 'session', action: 'model-set', model, ts }])
+		return
+	}
+	if (known !== model)
+		await appendHistory(sessionId, [{ type: 'session', action: 'model-change', old: known, new: model, ts }])
+}
+
 export async function loadApiMessages(sessionId: string): Promise<any[]> {
 	const all = await loadAllHistory(sessionId)
 	const start = findReplayStart(all)
 	const sliced = all.slice(start)
 	const pruneOpts = prune.detectPruneOpts(sliced)
 	const out: any[] = []
+	let currentModel = initialModelFromEntries(sliced)
 	for (const m of sliced) {
 		const msg = m as any
+		currentModel = applyModelEvent(currentModel, msg)
 		if (!msg.role) continue
 		if (msg.role === 'user') {
 			if (typeof msg.content === 'string') {
@@ -164,8 +206,11 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 				if (!thinkingText) thinkingText = thinkingData?.thinking
 				if (!thinkingSignature) thinkingSignature = thinkingData?.signature
 			}
-			if (thinkingText && thinkingSignature)
-				content.push({ type: 'thinking', thinking: thinkingText, signature: thinkingSignature })
+			if (thinkingText && thinkingSignature) {
+				const thinkingBlock: any = { type: 'thinking', thinking: thinkingText, signature: thinkingSignature }
+				if (currentModel) thinkingBlock._model = currentModel
+				content.push(thinkingBlock)
+			}
 			if (msg.text) content.push({ type: 'text', text: msg.text })
 			if (msg.tools) {
 				for (const t of msg.tools) {
@@ -296,6 +341,7 @@ export const history = {
 	writeToolResultEntry,
 	appendHistory,
 	readHistory,
+	ensureModelEvent,
 	loadApiMessages,
 	loadAllHistory,
 	detectInterruptedTools,

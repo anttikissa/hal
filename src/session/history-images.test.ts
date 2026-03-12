@@ -187,6 +187,43 @@ test('loadApiMessages omits thinking blocks without signature', async () => {
 	expect(assistant.content[0]).toEqual({ type: 'text', text: 'hi' })
 })
 
+
+test('loadApiMessages annotates thinking with model timeline from session events', async () => {
+	const { writeAssistantEntry } = await import('./history.ts')
+	const SID = TEST_SESSION
+	await appendHistory(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
+
+	const first = await writeAssistantEntry(SID, {
+		text: 'first',
+		thinkingText: 'first thought',
+		thinkingSignature: 'sig-first',
+	})
+	await appendHistory(SID, [first.entry])
+	await appendHistory(SID, [{
+		type: 'session',
+		action: 'model-change',
+		old: 'openai/gpt-5.4',
+		new: 'anthropic/claude-opus-4-6',
+		ts: new Date().toISOString(),
+	}])
+	const second = await writeAssistantEntry(SID, {
+		text: 'second',
+		thinkingText: 'second thought',
+		thinkingSignature: 'sig-second',
+	})
+	await appendHistory(SID, [second.entry])
+
+	const msgs = await loadApiMessages(SID)
+	const assistants = msgs.filter((m: any) => m.role === 'assistant')
+	expect(assistants).toHaveLength(2)
+
+	const firstThinking = assistants[0].content.find((b: any) => b.type === 'thinking')
+	expect(firstThinking._model).toBe('openai/gpt-5.4')
+
+	const secondThinking = assistants[1].content.find((b: any) => b.type === 'thinking')
+	expect(secondThinking._model).toBe('anthropic/claude-opus-4-6')
+})
+
 test('replay marks tool with error status when stored result status is error', async () => {
 	const { writeAssistantEntry, writeToolResultEntry } = await import('./history.ts')
 	const { replayToBlocks } = await import('./replay.ts')
@@ -222,7 +259,7 @@ test('loadApiMessages boosts threshold after model change', async () => {
 	await appendHistory(SID, [result])
 
 	// Model change
-	await appendHistory(SID, [{ type: 'info', text: '[model] anthropic/claude-opus-4-6', level: 'meta', ts: new Date().toISOString() }])
+	await appendHistory(SID, [{ type: 'session', action: 'model-change', old: 'openai/gpt-5.4', new: 'anthropic/claude-opus-4-6', ts: new Date().toISOString() }])
 
 	// 6 plain user turns after model change — beyond default threshold (4) but within boosted (10)
 	for (let i = 0; i < 6; i++) {

@@ -389,11 +389,20 @@ describe('pruneApiMessages', () => {
 		prune.config.modelChangeThreshold = 3
 		const entries = [
 			{ role: 'user', content: 'go' },
-			{ type: 'info', text: '[model] openai/gpt-5.4' },
+			{ type: 'session', action: 'model-change', old: 'openai/gpt-5.4', new: 'anthropic/claude-opus-4-6', ts: new Date().toISOString() },
 			...turn('q0', 'a0'),
 			...turn('q1', 'a1'),
 			...turn('q2', 'a2'),
 		]
 		expect(prune.detectPruneOpts(entries)).toEqual({ heavyThreshold: 3 })
+	})
+
+	test('detectPruneOpts ignores legacy [model] info entries', () => {
+		const entries = [
+			{ role: 'user', content: 'go' },
+			{ type: 'info', text: '[model] openai/gpt-5.4' },
+			...turn('q0', 'a0'),
+		]
+		expect(prune.detectPruneOpts(entries)).toBeUndefined()
 	})
 })

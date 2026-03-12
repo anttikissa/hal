@@ -35,7 +35,7 @@ test('anthropic provider: converts OpenAI reasoning signatures into assistant te
 			messages: [{
 				role: 'assistant',
 				content: [
-					{ type: 'thinking', thinking: 'old thought', signature },
+					{ type: 'thinking', thinking: 'old thought', signature, _model: 'openai/gpt-5.4' },
 					{ type: 'text', text: 'hello' },
 				],
 			}],
@@ -51,6 +51,7 @@ test('anthropic provider: converts OpenAI reasoning signatures into assistant te
 		const blocks = requestBody.messages[0].content
 		expect(blocks.some((b: any) => b.type === 'thinking')).toBe(false)
 		expect(blocks.some((b: any) => b.type === 'text' && b.text === 'hello')).toBe(true)
+		expect(blocks.some((b: any) => b.type === 'text' && String(b.text).includes('[model openai/gpt-5.4 thinking]'))).toBe(true)
 		expect(blocks.some((b: any) => b.type === 'text' && String(b.text).includes('old thought'))).toBe(true)
 	} finally {
 		globalThis.fetch = origFetch

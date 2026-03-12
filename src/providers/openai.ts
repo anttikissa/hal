@@ -14,11 +14,12 @@ function resolveApiUrl(token: string): string {
 
 // ── Message conversion (Anthropic → OpenAI Responses API) ──
 
-function formatForeignThinkingForOpenAI(thinking: unknown): string | null {
+function formatForeignThinkingForOpenAI(thinking: unknown, sourceModel: unknown): string | null {
 	if (typeof thinking !== 'string') return null
 	const text = thinking.trim()
 	if (!text) return null
-	return `[thinking from a previous model; not an OpenAI reasoning signature]\n${text}`
+	const model = typeof sourceModel === 'string' && sourceModel ? sourceModel : 'unknown'
+	return `[model ${model} thinking]\n${text}`
 }
 
 function convertMessages(messages: any[]): any[] {
@@ -66,7 +67,7 @@ function convertMessages(messages: any[]): any[] {
 						seenReasoningIds.add(signature.id)
 						input.push(signature)
 					} else {
-						const replayed = formatForeignThinkingForOpenAI(block.thinking)
+						const replayed = formatForeignThinkingForOpenAI(block.thinking, block._model)
 						if (replayed) {
 							input.push({
 								type: 'message', role: 'assistant', status: 'completed',

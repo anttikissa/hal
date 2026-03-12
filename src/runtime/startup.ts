@@ -41,6 +41,8 @@ async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Prom
 		rt.pendingInterruptedTools.delete(sessionId)
 	}
 
+	const model = info.model ?? config.getConfig().defaultModel
+	await history.ensureModelEvent(sessionId, model)
 	const apiMessages = await history.loadApiMessages(sessionId)
 	if (!rt.hasPendingUserTurn(apiMessages)) return
 	await rt.startGeneration(sessionId, info, apiMessages, 'continuing...')
