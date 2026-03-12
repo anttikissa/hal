@@ -254,6 +254,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				break
 			}
 			rt.pendingQuestions.delete(sid)
+			rt.syncState()
 			const answer = cmd.text ?? ''
 			await rt.emit({ type: 'answer', sessionId: sid, question: pending.question, text: answer })
 			pending.resolve(answer)

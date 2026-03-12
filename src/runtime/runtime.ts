@@ -41,7 +41,7 @@ export class Runtime {
 	activeSessionId: string | null = null
 	busySessionIds = new Set<string>()
 	abortControllers = new Map<string, AbortController>()
-	pendingQuestions = new Map<string, { resolve: (answer: string) => void; question: string }>()
+	pendingQuestions = new Map<string, { resolve: (answer: string) => void; question: string; questionId: string }>()
 	sessionContext = new Map<string, { used: number; max: number; estimated?: boolean }>()
 	pendingInterruptedTools = new Map<string, { name: string; id: string; blobId: string }[]>()
 	// Tracks running destructive tools (bash, write, edit) as "sessionId:toolId"
@@ -81,6 +81,23 @@ export class Runtime {
 		}
 	}
 
+	private pendingQuestionsForState(): Record<string, { id: string; text: string }> {
+		const pending: Record<string, { id: string; text: string }> = {}
+		for (const [sessionId, q] of this.pendingQuestions) {
+			pending[sessionId] = { id: q.questionId, text: q.question }
+		}
+		return pending
+	}
+
+	syncState(): void {
+		ipc.updateState(s => {
+			s.sessions = [...this.sessions.keys()]
+			s.activeSessionId = this.activeSessionId
+			s.busySessionIds = [...this.busySessionIds]
+			s.pendingQuestions = this.pendingQuestionsForState()
+		})
+	}
+
 	async publish(activity?: string): Promise<void> {
 		const contexts: Record<string, { used: number; max: number; estimated?: boolean }> = {}
 		for (const [id, ctx] of this.sessionContext) contexts[id] = ctx
@@ -96,11 +113,7 @@ export class Runtime {
 			activeSessionId: this.activeSessionId, sessions: [...this.sessions.values()],
 		})
 		this.flushSessionMeta()
-		ipc.updateState(s => {
-			s.sessions = [...this.sessions.keys()]
-			s.activeSessionId = this.activeSessionId
-			s.busySessionIds = [...this.busySessionIds]
-		})
+		this.syncState()
 	}
 
 	hasPendingUserTurn(messages: any[]): boolean {
@@ -111,7 +124,8 @@ export class Runtime {
 	async askUser(sessionId: string, question: string): Promise<string> {
 		const questionId = protocol.eventId()
 		return new Promise(resolve => {
-			this.pendingQuestions.set(sessionId, { resolve, question })
+			this.pendingQuestions.set(sessionId, { resolve, question, questionId })
+			this.syncState()
 			void this.emit({ type: 'question', sessionId, questionId, text: question })
 		})
 	}

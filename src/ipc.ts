@@ -88,7 +88,14 @@ export async function releaseHost(hostId: string): Promise<void> {
 		const lock = await readLock()
 		if (lock?.hostId !== hostId) return
 		await rm(HOST_LOCK)
-		updateState(s => { if (s.hostId === hostId) { s.hostPid = null; s.hostId = null; s.busySessionIds = [] } })
+		updateState(s => {
+			if (s.hostId === hostId) {
+				s.hostPid = null
+				s.hostId = null
+				s.busySessionIds = []
+				s.pendingQuestions = {}
+			}
+		})
 		await events.append({ id: `${Date.now()}-${process.pid}-release`, type: 'line', sessionId: null, text: '[host-released]', level: 'meta', createdAt: new Date().toISOString() } as RuntimeEvent)
 	} catch {}
 }

@@ -142,6 +142,7 @@ export interface RuntimeState {
 	eventsOffset: number
 	updatedAt: string
 	handoff?: RuntimeHandoffState | null
+	pendingQuestions?: Record<string, { id: string; text: string }>
 }
 
 export function defaultState(): RuntimeState {
@@ -154,6 +155,7 @@ export function defaultState(): RuntimeState {
 		eventsOffset: 0,
 		updatedAt: new Date().toISOString(),
 		handoff: null,
+		pendingQuestions: {},
 	}
 }
 

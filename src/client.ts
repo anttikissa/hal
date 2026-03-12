@@ -162,7 +162,19 @@ export class Client {
 	async start(): Promise<void> {
 		const { state: rtState, sessions } = await this.transport.bootstrap()
 		for (const info of sessions) {
-			this.state.tabs.push({ sessionId: info.id, blocks: [], info, busy: rtState.busySessionIds.includes(info.id), pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context })
+			const pendingQuestion = rtState.pendingQuestions?.[info.id]
+			this.state.tabs.push({
+				sessionId: info.id,
+				blocks: [],
+				info,
+				busy: rtState.busySessionIds.includes(info.id),
+				pausing: false,
+				inputHistory: [],
+				inputDraft: '',
+				contentHeight: 0,
+				context: info.context,
+				question: pendingQuestion ? { id: pendingQuestion.id, text: pendingQuestion.text } : undefined,
+			})
 		}
 		// Prefer client's last-viewed tab, fall back to server's active session
 		const lastTab = clientState.getLastTab()
@@ -251,7 +263,13 @@ export class Client {
 				for (const t of this.state.tabs) {
 					const wasBusy = t.busy
 					t.busy = busy.has(t.sessionId)
-					if (!t.busy) t.pausing = false
+					if (!t.busy) {
+						t.pausing = false
+						if (t.question) {
+							t.question = undefined
+							if (t === active && prompt.hasQuestion()) prompt.clearQuestion()
+						}
+					}
 					if (wasBusy && !t.busy && t !== active) t.doneUnseen = true
 					if (event.contexts?.[t.sessionId]) t.context = event.contexts[t.sessionId]
 				}
@@ -304,6 +322,8 @@ export class Client {
 			case 'answer': {
 				const t = tab(event.sessionId); if (!t) return
 				closeStreaming(t)
+				t.question = undefined
+				if (t === this.activeTab() && prompt.hasQuestion()) prompt.clearQuestion()
 				t.blocks.push({ type: 'input', text: event.question, source: 'Hal asked' })
 				t.blocks.push({ type: 'input', text: event.text || '[no answer]', source: 'You replied' })
 				break

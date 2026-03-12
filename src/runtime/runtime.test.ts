@@ -554,6 +554,9 @@ test('ask tool sends question event and waits for respond', async () => {
 	expect(questionEvent).toBeTruthy()
 	expect(questionEvent.text).toBe('Do you prefer tabs or spaces?')
 	expect(runtime.busySessionIds.has(sid)).toBe(true)
+	const pendingInState = getState().pendingQuestions?.[sid]
+	expect(pendingInState?.id).toBe((questionEvent as any).questionId)
+	expect(pendingInState?.text).toBe('Do you prefer tabs or spaces?')
 
 	const answerSnapshot = (await events.readAll()).length
 	await commands.append(makeCommand('respond', src, 'tabs obviously', sid))
@@ -570,6 +573,7 @@ test('ask tool sends question event and waits for respond', async () => {
 	expect((answerEvent as any).question).toBe('Do you prefer tabs or spaces?')
 	expect((answerEvent as any).text).toBe('tabs obviously')
 	expect(runtime.busySessionIds.has(sid)).toBe(false)
+	expect(getState().pendingQuestions?.[sid]).toBeUndefined()
 })
 
 test('close writes closedAt to meta', async () => {
