@@ -106,8 +106,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			}
 			rt.sessions.set(info.id, info)
 			rt.activeSessionId = info.id
-			await rt.publish()
 			if (!resumeId) await rt.greetSession(info.id)
+			await rt.publish()
 			break
 		}
 		case 'fork': {

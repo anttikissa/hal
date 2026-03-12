@@ -93,26 +93,19 @@ export async function startRuntime(): Promise<Runtime> {
 		rt.activeSessionId = prevState.activeSessionId
 	}
 	// If nothing restored, create a fresh session with greeting
-	let needsGreeting: string | null = null
 	if (rt.sessions.size === 0) {
 		const info = await session.createSession()
 		rt.sessions.set(info.id, info)
 		rt.activeSessionId = info.id
-		needsGreeting = info.id
 		rt.setFreshContext(info)
+		await rt.greetSession(info.id)
 	}
 
 	for (const id of handoffBusyIds) {
 		if (rt.sessions.has(id)) rt.busySessionIds.add(id)
 	}
 
-	// Publish initial state (must come before greeting so client has the tab)
 	await rt.publish()
-
-	// Greet new session after publish so the client can receive the chunks
-	if (needsGreeting) {
-		await rt.greetSession(needsGreeting)
-	}
 
 	for (const [id] of rt.sessions) {
 		await rt.resumeInterruptedSession(id)
