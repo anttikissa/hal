@@ -7,6 +7,7 @@ import { prompt } from './prompt.ts'
 import { blocks as blockViews, type Block } from './blocks.ts'
 import { heights } from './heights.ts'
 import { Client, type TabState } from '../client.ts'
+import { blocksSignature } from './block-signature.ts'
 import { LocalTransport } from './transport.ts'
 import { shutdown } from '../main.ts'
 import { config } from '../config.ts'
@@ -134,15 +135,44 @@ function minicursorColor(block: Block): string | undefined {
 	if (block.type === 'thinking' && !block.done) return colors.thinking.fg
 	return undefined
 }
+
+interface ContentRenderCacheEntry {
+	sessionId: string | null
+	width: number
+	cursorVisible: boolean
+	signature: number
+	lines: string[]
+}
+
+let contentRenderCache: ContentRenderCacheEntry | null = null
+
+function renderContentLines(tab: TabState | null, width: number, cursorVisible: boolean): string[] {
+	const blocks = tab?.blocks ?? []
+	const sessionId = tab?.sessionId ?? null
+	const signature = blocksSignature(blocks)
+	const cached = contentRenderCache
+	if (
+		cached
+		&& cached.sessionId === sessionId
+		&& cached.width === width
+		&& cached.cursorVisible === cursorVisible
+		&& cached.signature === signature
+	) {
+		return cached.lines
+	}
+	const lines = blockViews.renderBlocks(blocks, width, cursorVisible).lines
+	contentRenderCache = { sessionId, width, cursorVisible, signature, lines }
+	return lines
+}
 function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const cState = client.getState()
 	const tab = client.activeTab()
 	const w = cols()
 	const cw = contentWidth()
 
-	const blocks = tab?.blocks ?? []
+	const cursorVisible = cursor.isVisible()
 	const hasQ = prompt.hasQuestion()
-	const { lines: contentLines } = blockViews.renderBlocks(blocks, w, cursor.isVisible())
+	const contentLines = renderContentLines(tab, w, cursorVisible)
 
 	const lines: string[] = []
 	let qAnswerStartRow = -1
@@ -216,7 +246,7 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 			indicator,
 		}
 	})
-	const tabBar = tabline.renderTabline(parts, w, cursor.isVisible())
+	const tabBar = tabline.renderTabline(parts, w, cursorVisible)
 	lines.push(tabBar)
 
 	let cursorPos: CursorPos
