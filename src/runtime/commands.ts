@@ -12,6 +12,7 @@ import { config } from '../config.ts'
 import { promptAnalysis } from './prompt-analysis.ts'
 import { resolve } from 'path'
 import { existsSync } from 'fs'
+import { homedir } from 'os'
 
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
@@ -295,7 +296,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				await rt.emitInfo(sid, `[cd] ${info.workingDir}`, 'info')
 				break
 			}
-			const target = resolve(info.workingDir, cmd.text.trim())
+			const raw = cmd.text.trim().replace(/^~(?=$|\/)/, homedir())
+			const target = resolve(info.workingDir, raw)
 			if (!existsSync(target)) { await error(`[cd] ${target}: not found`); break }
 			const old = info.workingDir
 			info.workingDir = target
