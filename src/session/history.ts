@@ -143,6 +143,7 @@ export const historyConfig = {
 
 function applyModelEvent(currentModel: string | undefined, entry: any): string | undefined {
 	if (entry?.type !== 'session') return currentModel
+	if (entry.action === 'init' && typeof entry.model === 'string' && entry.model) return entry.model
 	if (entry.action === 'model-set' && typeof entry.model === 'string' && entry.model) return entry.model
 	if (entry.action === 'model-change' && typeof entry.new === 'string' && entry.new) return entry.new
 	return currentModel
@@ -152,6 +153,7 @@ function initialModelFromEntries(entries: Message[]): string | undefined {
 	for (const entry of entries) {
 		const e = entry as any
 		if (e.type !== 'session') continue
+		if (e.action === 'init' && typeof e.model === 'string' && e.model) return e.model
 		if (e.action === 'model-set' && typeof e.model === 'string' && e.model) return e.model
 		if (e.action === 'model-change' && typeof e.old === 'string' && e.old) return e.old
 	}
