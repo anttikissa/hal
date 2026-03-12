@@ -64,10 +64,9 @@ function readAgentFile(dir: string): AgentFile | null {
 /** Collect all AGENTS.md (or CLAUDE.md fallback) files from git root down to cwd. */
 function collectAgentFiles(cwd: string): AgentFile[] {
 	const root = findGitRoot(cwd) ?? cwd
-	return directoryChain(cwd, root).flatMap(dir => {
-		const file = readAgentFile(dir)
-		return file ? [file] : []
-	})
+	return directoryChain(cwd, root)
+		.map(readAgentFile)
+		.filter((file): file is AgentFile => file !== null)
 }
 
 export function formatBytes(n: number): string {
