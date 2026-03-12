@@ -140,6 +140,7 @@ lazy loading of mock provider
 
 
 - E2e test infrastructure is horrible boilerplate (subprocess spawn + env vars to isolate state). Figure out a proper testing approach — maybe a shared harness, or make state.ts support late init, or use dynamic imports.
+- Sentiment analysis for every prompt
 
 
 In the new/ client:
