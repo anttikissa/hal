@@ -46,7 +46,7 @@ test('openai provider: parses text response', async () => {
 
 	const origFetch = mockFetch(events)
 	try {
-		const mod = await import('./openai-provider.ts')
+		const mod = await import('./openai.ts')
 		const provider = mod.default
 		const collected: any[] = []
 		for await (const event of provider.generate({
@@ -81,7 +81,7 @@ test('openai provider: parses tool call', async () => {
 
 	const origFetch = mockFetch(events)
 	try {
-		const mod = await import('./openai-provider.ts')
+		const mod = await import('./openai.ts')
 		const provider = mod.default
 		const collected: any[] = []
 		for await (const event of provider.generate({
@@ -117,7 +117,7 @@ test('openai provider: parses reasoning as thinking', async () => {
 
 	const origFetch = mockFetch(events)
 	try {
-		const mod = await import('./openai-provider.ts')
+		const mod = await import('./openai.ts')
 		const provider = mod.default
 		const collected: any[] = []
 		for await (const event of provider.generate({
@@ -152,7 +152,7 @@ test('openai provider: captures reasoning signature from output item', async () 
 
 	const origFetch = mockFetch(events)
 	try {
-		const mod = await import('./openai-provider.ts')
+		const mod = await import('./openai.ts')
 		const provider = mod.default
 		const collected: any[] = []
 		for await (const event of provider.generate({
@@ -186,7 +186,7 @@ test('openai provider: replays reasoning signature in input', async () => {
 	})
 
 	try {
-		const mod = await import('./openai-provider.ts')
+		const mod = await import('./openai.ts')
 		const provider = mod.default
 		const reasoning = { type: 'reasoning', id: 'rs_prev', encrypted_content: 'enc_prev' }
 		for await (const _event of provider.generate({
@@ -220,7 +220,7 @@ test('openai provider: deduplicates reasoning items by id', async () => {
 	})
 
 	try {
-		const mod = await import('./openai-provider.ts')
+		const mod = await import('./openai.ts')
 		const provider = mod.default
 		const reasoning = { type: 'reasoning', id: 'rs_dup', encrypted_content: 'enc_dup' }
 		// Two assistant messages with the same reasoning signature (e.g. after fork)
@@ -248,7 +248,7 @@ test('openai provider: deduplicates reasoning items by id', async () => {
 test('openai provider: handles API error', async () => {
 	const origFetch = mockFetchError(429, '{"error": "rate limited"}')
 	try {
-		const mod = await import('./openai-provider.ts')
+		const mod = await import('./openai.ts')
 		const provider = mod.default
 		const collected: any[] = []
 		for await (const event of provider.generate({

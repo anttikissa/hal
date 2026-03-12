@@ -17,6 +17,21 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		system, messages: cacheBreakpoints(params.messages),
 		thinking: isAdaptive ? { type: 'adaptive' } : { type: 'enabled', budget_tokens: Math.min(10000, maxTokens - 1) },
 	}
+	// DEBUG: log all thinking blocks before sending
+	const _msgs = body.messages as any[]
+	const _lines: string[] = [`total messages: ${_msgs.length}`]
+	for (let mi = 0; mi < _msgs.length; mi++) {
+		const c = _msgs[mi].content
+		if (!Array.isArray(c)) continue
+		for (let ci = 0; ci < c.length; ci++) {
+			if (c[ci].type === 'thinking') {
+				const sig = c[ci].signature ?? '(none)'
+				const thinkLen = (c[ci].thinking ?? '').length
+				_lines.push(`msg[${mi}].content[${ci}] sig=${sig.slice(0, 20)}... thinkLen=${thinkLen}`)
+			}
+		}
+	}
+	await Bun.write('/tmp/hal-thinking-debug.log', _lines.join('\n') + '\n')
 	if (params.tools?.length) body.tools = params.tools
 
 	const res = await fetch('https://api.anthropic.com/v1/messages?beta=true', {
