@@ -4,6 +4,8 @@ import { Client } from './client.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
 import type { Message } from './session/history.ts'
+import { history } from './session/history.ts'
+import { draft } from './cli/draft.ts'
 
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
@@ -232,5 +234,44 @@ test('client renders active tab before replaying non-active tabs', async () => {
 	} finally {
 		if (originalHal === undefined) delete (globalThis as any).__hal
 		else (globalThis as any).__hal = originalHal
+	}
+})
+
+test('client loads input history and draft while replay is in flight', async () => {
+	const sessionId = `t-${randomBytes(4).toString('hex')}`
+	const ts = new Date().toISOString()
+	const state: RuntimeState = {
+		hostPid: 123,
+		hostId: 'host-test',
+		sessions: [sessionId],
+		activeSessionId: sessionId,
+		busySessionIds: [],
+		eventsOffset: 0,
+		updatedAt: ts,
+	}
+	const sessions: SessionInfo[] = [{ id: sessionId, workingDir: process.cwd(), createdAt: ts, updatedAt: ts }]
+	const transport = new FakeTransport({ state, sessions }, [], { [sessionId]: [] }, [sessionId])
+	const originalLoadInputHistory = history.loadInputHistory
+	const originalLoadDraft = draft.loadDraft
+	let historyStarted = false
+	let draftStarted = false
+	history.loadInputHistory = async (id: string) => {
+		if (id === sessionId) historyStarted = true
+		return []
+	}
+	draft.loadDraft = async (id: string) => {
+		if (id === sessionId) draftStarted = true
+		return ''
+	}
+	try {
+		const client = new Client(transport, () => {})
+		const startPromise = client.start()
+		await waitFor(() => transport.hasReplayStarted(sessionId), 600)
+		await waitFor(() => historyStarted && draftStarted, 600)
+		transport.releaseReplay(sessionId)
+		await startPromise
+	} finally {
+		history.loadInputHistory = originalLoadInputHistory
+		draft.loadDraft = originalLoadDraft
 	}
 })

@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'bun:test'
-import { replayToBlocks } from './replay.ts'
+import { replayToBlocks, replayConfig } from './replay.ts'
 import type { Message } from './history.ts'
+import { blob } from './blob.ts'
 
 describe('replayToBlocks', () => {
 	test('[system] prefix passes through as raw text', async () => {
@@ -68,5 +69,41 @@ describe('replayToBlocks', () => {
 		const messages: Message[] = []
 		const blocks = await replayToBlocks('test-session', messages)
 		expect(blocks).toHaveLength(0)
+	})
+
+	test('reads tool blobs in parallel with a concurrency cap', async () => {
+		const originalRead = blob.read
+		const originalConcurrency = replayConfig.blobReadConcurrency
+		let activeReads = 0
+		let peakReads = 0
+		replayConfig.blobReadConcurrency = 3
+		blob.read = async () => {
+			activeReads += 1
+			peakReads = Math.max(peakReads, activeReads)
+			await Bun.sleep(5)
+			activeReads -= 1
+			return {
+				call: { input: '' },
+				result: { content: 'ok', status: 'success' },
+			}
+		}
+		try {
+			const messages: Message[] = [{
+				role: 'assistant',
+				text: '',
+				tools: Array.from({ length: 8 }, (_, idx) => ({
+					name: 'bash',
+					id: `tool-${idx}`,
+					blobId: `blob-${idx}`,
+				})),
+				ts: '2026-01-01T00:00:00Z',
+			} as Message]
+			const blocks = await replayToBlocks('test-session', messages)
+			expect(blocks.filter((block) => block.type === 'tool')).toHaveLength(8)
+			expect(peakReads).toBe(3)
+		} finally {
+			blob.read = originalRead
+			replayConfig.blobReadConcurrency = originalConcurrency
+		}
 	})
 })

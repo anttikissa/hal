@@ -1,5 +1,14 @@
 # TODO
 
+## REAL TODO
+
+
+- E2e test infrastructure is horrible boilerplate (subprocess spawn + env vars to isolate state). Figure out a proper testing approach — maybe a shared harness, or make state.ts support late init, or use dynamic imports.
+- Sentiment analysis for every prompt
+- Restore fast-blinking cursor effect
+- cd command
+- Fix handoff: host→client promotion doesn't auto-continue active sessions. 4 commits (7cd5367, 947d683, 4bf5f54, 8a771f5) added ~260 LOC but still broken. The promoted client shows sessions as paused/idle instead of continuing. The model even wrote a poem about it. Need to actually debug the promotion flow before writing more code. Screenshot: blob 03-r5i/0u08pk-rbs. Also commit 572e0ad
+
 test:
 
 image loading from blobs
@@ -136,14 +145,6 @@ lazy loading of mock provider
 
 
 
-## REAL TODO
-
-
-- E2e test infrastructure is horrible boilerplate (subprocess spawn + env vars to isolate state). Figure out a proper testing approach — maybe a shared harness, or make state.ts support late init, or use dynamic imports.
-- Sentiment analysis for every prompt
-- Restore fast-blinking cursor effect
-- cd command
-- Fix handoff: host→client promotion doesn't auto-continue active sessions. 4 commits (7cd5367, 947d683, 4bf5f54, 8a771f5) added ~260 LOC but still broken. The promoted client shows sessions as paused/idle instead of continuing. The model even wrote a poem about it. Need to actually debug the promotion flow before writing more code. Screenshot: blob 0u08pk-rbs
 
 
 In the new/ client:

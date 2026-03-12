@@ -83,7 +83,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			// Fire prompt analysis in parallel (non-blocking)
 			if (config.getConfig().debug) {
 				const sessionId = sid
-				promptAnalysis.analyzePrompt(promptText, sessionId).then(result => {
+				const info_ = session.loadSessionInfo(sid)
+				promptAnalysis.analyzePrompt(promptText, sessionId, info_?.workingDir).then(result => {
 					if (result) rt.emitInfo(sessionId, promptAnalysis.formatAnalysis(promptText, result), 'info')
 				}).catch(() => {})
 			}

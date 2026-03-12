@@ -13,7 +13,7 @@ export interface PromptAnalysis {
 	durationMs: number
 }
 
-const ANALYSIS_PROMPT = `Classify this user prompt in context. Return ONLY JSON: {"mood":"neutral|frustrated|happy|curious|urgent|playful","isHalChange":false,"needsContext":false,"topic":"2-5 words"}`
+const ANALYSIS_PROMPT = `Classify this user prompt in context. The user's working directory is: {cwd}. Hal's own source code lives in ~/.hal. "isHalChange" means the user wants to modify Hal itself (not just use it). Return ONLY JSON: {"mood":"neutral|frustrated|happy|curious|urgent|playful","isHalChange":false,"needsContext":false,"topic":"2-5 words"}`
 
 function extractRecentContext(entries: Message[], maxPairs: number): Array<{ role: string; content: string }> {
 	const msgs: Array<{ role: string; content: string }> = []
@@ -35,7 +35,7 @@ function extractRecentContext(entries: Message[], maxPairs: number): Array<{ rol
 	return msgs
 }
 
-async function analyzePrompt(text: string, sessionId?: string): Promise<PromptAnalysis | null> {
+async function analyzePrompt(text: string, sessionId?: string, cwd?: string): Promise<PromptAnalysis | null> {
 	const fastModel = models.resolveFastModel()
 	if (!fastModel) return null
 
@@ -73,7 +73,7 @@ async function analyzePrompt(text: string, sessionId?: string): Promise<PromptAn
 			body: JSON.stringify({
 				model: modelId,
 				max_tokens: 100,
-				system: ANALYSIS_PROMPT,
+				system: ANALYSIS_PROMPT.replace('{cwd}', cwd ?? 'unknown'),
 				messages,
 			}),
 		})
