@@ -261,9 +261,13 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			if (aborted) {
 				// Persist partial output before exiting (skip if already written in tool path)
 				if (!persisted && (assistantText || thinkingText)) {
-					await sessionHistory.appendHistory(sessionId, [
-						{ role: 'assistant', text: assistantText || undefined, thinkingText: thinkingText || undefined, thinkingSignature: thinkingSignature || undefined, ts: new Date().toISOString() },
-					])
+					const { entry } = await sessionHistory.writeAssistantEntry(sessionId, {
+						text: assistantText || undefined,
+						thinkingText: thinkingText || undefined,
+						thinkingBlobId: thinkingBlobId || undefined,
+						thinkingSignature: thinkingSignature || undefined,
+					})
+					await sessionHistory.appendHistory(sessionId, [entry])
 				}
 				await emitInfo(sessionId, '[paused]', 'meta')
 				await emit(sessionId, { type: 'command', commandId: '', phase: 'done' })

@@ -143,13 +143,26 @@ test('loadApiMessages synthesizes results for orphaned tool_use blocks', async (
 	expect(msgs[msgs.length - 1].content).toBe('hello')
 })
 
-test('loadApiMessages includes thinking blocks with signature', async () => {
+test('writeAssistantEntry keeps thinking signature in blob, not history entry', async () => {
+	const { writeAssistantEntry } = await import('./history.ts')
+	const { blob } = await import('./blob.ts')
 	const SID = TEST_SESSION
 	await appendHistory(SID, [{ role: 'user', content: 'hello', ts: new Date().toISOString() }])
-	await appendHistory(SID, [{
-		role: 'assistant', text: 'hi', thinkingText: 'let me think...',
-		thinkingSignature: 'sig123', ts: new Date().toISOString(),
-	}])
+	const { entry } = await writeAssistantEntry(SID, {
+		text: 'hi',
+		thinkingText: 'let me think...',
+		thinkingSignature: 'sig123',
+	})
+	expect(entry.thinkingSignature).toBeUndefined()
+	expect(entry.thinkingBlobId).toBeTruthy()
+	await appendHistory(SID, [entry])
+
+	const stored = await readHistory(SID)
+	const assistantEntry = stored.find((m: any) => m.role === 'assistant') as any
+	expect(assistantEntry.thinkingSignature).toBeUndefined()
+
+	const thinkingData = await blob.read(SID, assistantEntry.thinkingBlobId)
+	expect(thinkingData).toEqual({ thinking: 'let me think...', signature: 'sig123' })
 
 	const msgs = await loadApiMessages(SID)
 	expect(msgs).toHaveLength(2)

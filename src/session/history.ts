@@ -80,7 +80,6 @@ export async function writeAssistantEntry(
 		entry.thinkingBlobId = blobId
 		await blob.write(sessionId, blobId, { thinking: opts.thinkingText, signature: opts.thinkingSignature })
 	}
-	if (opts.thinkingSignature) entry.thinkingSignature = opts.thinkingSignature
 	if (opts.usage) entry.usage = opts.usage
 	if (opts.toolCalls && opts.toolCalls.length > 0) {
 		entry.tools = []
@@ -158,8 +157,15 @@ export async function loadApiMessages(sessionId: string): Promise<any[]> {
 			}
 		} else if (msg.role === 'assistant') {
 			const content: any[] = []
-			if (msg.thinkingText && msg.thinkingSignature)
-				content.push({ type: 'thinking', thinking: msg.thinkingText, signature: msg.thinkingSignature })
+			let thinkingText = msg.thinkingText
+			let thinkingSignature = msg.thinkingSignature
+			if (msg.thinkingBlobId && (!thinkingText || !thinkingSignature)) {
+				const thinkingData = await blob.read(sessionId, msg.thinkingBlobId)
+				if (!thinkingText) thinkingText = thinkingData?.thinking
+				if (!thinkingSignature) thinkingSignature = thinkingData?.signature
+			}
+			if (thinkingText && thinkingSignature)
+				content.push({ type: 'thinking', thinking: thinkingText, signature: thinkingSignature })
 			if (msg.text) content.push({ type: 'text', text: msg.text })
 			if (msg.tools) {
 				for (const t of msg.tools) {
