@@ -1,4 +1,6 @@
-import { basename } from 'path'
+import { basename, resolve, dirname } from 'path'
+import { readdirSync, statSync } from 'fs'
+import { homedir } from 'os'
 import { models } from '../models.ts'
 
 export interface CompletionTab {
@@ -22,7 +24,7 @@ export interface CompletionResult {
 
 interface CommandSpec {
 	name: string
-	arg?: 'model' | 'session' | 'topic'
+	arg?: 'model' | 'session' | 'topic' | 'dir'
 }
 
 const COMMANDS: CommandSpec[] = [
@@ -31,7 +33,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'compact' },
 	{ name: 'model', arg: 'model' },
 	{ name: 'topic', arg: 'topic' },
-	{ name: 'cd' },
+	{ name: 'cd', arg: 'dir' },
 	{ name: 'continue' },
 	{ name: 'resume' },
 	{ name: 'open', arg: 'session' },
@@ -63,7 +65,29 @@ function commandNames(): string[] {
 	return uniqueSorted(COMMANDS.map(c => c.name))
 }
 
-function commandArgValues(command: string, ctx: CompletionContext): string[] {
+function expandTilde(p: string): string {
+	if (p === '~') return homedir()
+	if (p.startsWith('~/')) return homedir() + p.slice(1)
+	return p
+}
+
+function collapseTilde(p: string): string {
+	const home = homedir()
+	if (p === home) return '~'
+	if (p.startsWith(home + '/')) return '~' + p.slice(home.length)
+	return p
+}
+
+function listDirs(dir: string): string[] {
+	try {
+		return readdirSync(dir, { withFileTypes: true })
+			.filter(e => e.isDirectory() && !e.name.startsWith('.'))
+			.map(e => e.name)
+			.sort()
+	} catch { return [] }
+}
+
+function commandArgValues(command: string, ctx: CompletionContext, argPrefix = ''): string[] {
 	const spec = commandSpec(command)
 	if (!spec?.arg) return []
 	switch (spec.arg) {
@@ -78,6 +102,38 @@ function commandArgValues(command: string, ctx: CompletionContext): string[] {
 			const wd = active?.info?.workingDir?.trim()
 			if (wd) return [basename(wd)]
 			return []
+		}
+		case 'dir': {
+			const active = ctx.tabs[ctx.activeTabIndex]
+			const cwd = active?.info?.workingDir ?? process.cwd()
+			const expanded = expandTilde(argPrefix)
+			const useTilde = argPrefix.startsWith('~')
+
+			// If prefix ends with '/', list that directory
+			// Otherwise, list parent and filter by basename prefix
+			let searchDir: string
+			let prefix: string
+			if (expanded.endsWith('/') || expanded === '') {
+				searchDir = expanded === '' ? cwd : resolve(cwd, expanded)
+				prefix = ''
+			} else {
+				searchDir = resolve(cwd, dirname(expanded))
+				prefix = basename(expanded)
+			}
+
+			const dirs = listDirs(searchDir)
+			const matching = prefix ? dirs.filter(d => d.startsWith(prefix)) : dirs
+
+			// Build full paths relative to what the user typed
+			const base = expanded.endsWith('/') ? argPrefix
+				: argPrefix === '' ? ''
+				: argPrefix.includes('/') ? argPrefix.slice(0, argPrefix.lastIndexOf('/') + 1)
+				: ''
+
+			return matching.map(d => {
+				const full = base + d + '/'
+				return useTilde ? full : full
+			})
 		}
 	}
 }
@@ -118,11 +174,16 @@ export function completeInput(input: string, cursor: number, ctx: CompletionCont
 	if (!argPrefix && parts.length > 1 && !hasTrailingSpace) return null
 	if (parts.length > 2) return null
 
-	const values = commandArgValues(command, ctx)
+	const values = commandArgValues(command, ctx, argPrefix)
 	const matches = values.filter(v => v.startsWith(argPrefix))
 	const options = matches.map(v => `/${command} ${v}`)
 	if (options.length === 0) return null
-	if (options.length === 1) return applyUnique(options[0])
+	if (options.length === 1) {
+		const value = options[0]
+		// For dir completion, don't add trailing space — let user keep tabbing deeper
+		if (spec.arg === 'dir') return { text: value + after, cursor: value.length, options }
+		return applyUnique(options[0])
+	}
 
 	const common = longestCommonPrefix(matches)
 	const completedArg = common.length > argPrefix.length ? common : argPrefix
