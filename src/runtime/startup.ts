@@ -117,11 +117,14 @@ export async function startRuntime(): Promise<Runtime> {
 
 	await rt.publish()
 	startupTrace.mark('rt-published')
-	if (continueAfterHandoff) {
-		for (const id of handoffBusyIds) {
-			await continueSessionAfterHandoff(rt, id)
-		}
-		await rt.publish()
+	if (continueAfterHandoff && handoffBusyIds.length > 0) {
+		// Don't block startup — sessions are already marked busy
+		void (async () => {
+			for (const id of handoffBusyIds) {
+				await continueSessionAfterHandoff(rt, id)
+			}
+			await rt.publish()
+		})()
 	}
 	startupTrace.mark('rt-handoff-done')
 
