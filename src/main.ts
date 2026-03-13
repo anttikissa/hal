@@ -7,13 +7,15 @@ import { ipc } from './ipc.ts'
 import { startup } from './runtime/startup.ts'
 import { type Runtime } from './runtime/runtime.ts'
 import { protocol } from './protocol.ts'
-
-state.ensureStateDir()
-await ipc.ensureBus()
+import { startupTrace } from './perf/startup-trace.ts'
 
 const startupEpochRaw = process.env.HAL_STARTUP_EPOCH_MS
 const startupEpochMs = startupEpochRaw ? Number.parseInt(startupEpochRaw, 10) : NaN
 const startupEpoch = Number.isFinite(startupEpochMs) && startupEpochMs > 0 ? startupEpochMs : null
+const startupFirstCodeElapsedMs = startupEpoch ? Math.max(0, Date.now() - startupEpoch) : null
+
+state.ensureStateDir()
+await ipc.ensureBus()
 
 const mainConfig = {
 	promotionPollMs: 20,
@@ -31,7 +33,9 @@ export const halStatus = {
 	startupHostRuntimeElapsedMs: null as number | null,
 }
 ;(globalThis as any).__hal = halStatus
-
+if (startupFirstCodeElapsedMs !== null) {
+	startupTrace.markAt('first-code', startupFirstCodeElapsedMs, 'post-import lower bound')
+}
 let runtime: Runtime | null = null
 
 async function emitLine(text: string): Promise<void> {
@@ -43,7 +47,10 @@ async function emitLine(text: string): Promise<void> {
 
 async function becomeHost(): Promise<void> {
 	runtime = await startup.startRuntime()
-	if (startupEpoch) halStatus.startupHostRuntimeElapsedMs = Math.max(0, Date.now() - startupEpoch)
+	if (startupEpoch) {
+		halStatus.startupHostRuntimeElapsedMs = Math.max(0, Date.now() - startupEpoch)
+		startupTrace.markAt('runtime-ready', halStatus.startupHostRuntimeElapsedMs, 'host runtime ready')
+	}
 	await emitLine(`[host] pid ${process.pid}`)
 	// Heartbeat: verify lock is still ours every 3s. If lost (e.g. suspended
 	// and another process took over), step down and let restart loop re-launch.

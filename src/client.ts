@@ -11,6 +11,7 @@ import { prompt } from './cli/prompt.ts'
 import { clientState } from './client-state.ts'
 import { randomBytes } from 'crypto'
 import { resolve } from 'path'
+import { startupTrace } from './perf/startup-trace.ts'
 
 export interface TabState {
 	sessionId: string
@@ -156,6 +157,12 @@ export class Client {
 		}
 	}
 
+	private appendStartupTraceIfPossible(tab: TabState): void {
+		for (const line of startupTrace.drainLines()) {
+			tab.blocks.push({ type: 'info', text: line })
+		}
+	}
+
 	private appendStartupPerfIfPossible(): void {
 		const tab = this.activeTab()
 		if (!tab) return
@@ -189,6 +196,7 @@ export class Client {
 				}
 			}
 		}
+		this.appendStartupTraceIfPossible(tab)
 	}
 
 	private captureStartupTabPerf(hydrateMs: number | null, renderMs: number): void {
@@ -220,6 +228,10 @@ export class Client {
 		this.onUpdate()
 		const renderMs = Date.now() - renderStartedAt
 		this.captureStartupTabPerf(hydrateMs, renderMs)
+		if (active) {
+			startupTrace.mark('active-tail-rendered', `${Math.max(0, Math.round(renderMs))}ms (${active.sessionId})`)
+			startupTrace.mark('interactive-ready', active.sessionId)
+		}
 		this.appendStartupPerfIfPossible()
 		this.onUpdate()
 	}
@@ -290,6 +302,7 @@ export class Client {
 		tab: TabState,
 		olderMessages: Message[],
 		allMessages: Message[],
+		opts?: { startupTraceMessageCount?: number },
 	): void {
 		if (olderMessages.length === 0) return
 		if (this.startupBackgroundHydration.has(tab.sessionId)) return
@@ -308,30 +321,53 @@ export class Client {
 		void task.finally(() => {
 			this.startupBackgroundHydration.delete(sessionId)
 			tab.loadingHistory = false
+			if (opts?.startupTraceMessageCount !== undefined) {
+				startupTrace.mark('active-all-hydrated', `${opts.startupTraceMessageCount} messages (${tab.sessionId})`)
+			}
 			this.appendStartupPerfIfPossible()
 			this.onUpdate()
 		})
 	}
 
-	private async hydrateTab(tab: TabState, opts?: { progressiveStartup?: boolean }): Promise<number> {
+	private async hydrateTab(tab: TabState, opts?: { progressiveStartup?: boolean; startupTrace?: boolean }): Promise<number> {
 		const startedAt = Date.now()
 		const inputDraftPromise = draft.loadDraft(tab.sessionId)
+		const loadStartedAt = Date.now()
 		const hydration = await this.transport.hydrateSession(tab.sessionId)
 		const replayMessages = hydration.replayMessages
+		const loadMs = Date.now() - loadStartedAt
+		if (opts?.startupTrace) {
+			startupTrace.mark('active-messages-loaded', `${startupTrace.summarizeMessages(replayMessages)} in ${Math.max(0, Math.round(loadMs))}ms (${tab.sessionId})`)
+		}
 		const shouldProgressive = !!opts?.progressiveStartup && replayMessages.length >= clientConfig.startupProgressiveMinMessages
 		if (shouldProgressive) {
 			const tailCount = Math.max(1, clientConfig.startupTailMessageCount)
 			const tailStart = Math.max(0, replayMessages.length - tailCount)
 			const olderMessages = replayMessages.slice(0, tailStart)
 			const tailMessages = replayMessages.slice(tailStart)
+			const hydrateStartedAt = Date.now()
 			const tailBlocks = await replay.replayToBlocks(tab.sessionId, tailMessages, tab.info.model, tab.busy, {
 				toolResultSourceMessages: replayMessages,
 			})
+			const hydrateMs = Date.now() - hydrateStartedAt
 			tab.blocks.push(...tailBlocks)
-			this.hydrateOlderHistoryInBackground(tab, olderMessages, replayMessages)
+			if (opts?.startupTrace) {
+				startupTrace.mark('active-tail-hydrated', `last ${tailMessages.length} messages in ${Math.max(0, Math.round(hydrateMs))}ms (${tab.sessionId})`)
+			}
+			this.hydrateOlderHistoryInBackground(
+				tab,
+				olderMessages,
+				replayMessages,
+				opts?.startupTrace ? { startupTraceMessageCount: replayMessages.length } : undefined,
+			)
 		} else {
+			const hydrateStartedAt = Date.now()
 			const blocks = await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy)
+			const hydrateMs = Date.now() - hydrateStartedAt
 			tab.blocks.push(...blocks)
+			if (opts?.startupTrace) {
+				startupTrace.mark('active-tail-hydrated', `${replayMessages.length} messages in ${Math.max(0, Math.round(hydrateMs))}ms (${tab.sessionId})`)
+			}
 			tab.loadingHistory = false
 		}
 		tab.inputHistory = hydration.inputHistory
@@ -340,12 +376,19 @@ export class Client {
 	}
 
 	private async hydrateNonActiveTabs(activeSessionId: string | null): Promise<void> {
+		let hydratedTabs = 0
 		for (const tab of this.state.tabs) {
 			if (tab.sessionId === activeSessionId) continue
 			await Bun.sleep(0)
 			try {
 				await this.hydrateTab(tab)
+				hydratedTabs += 1
 			} catch {}
+		}
+		if (hydratedTabs > 0) {
+			startupTrace.mark('other-tabs-hydrated', `${hydratedTabs} tabs`)
+			this.appendStartupPerfIfPossible()
+			this.onUpdate()
 		}
 	}
 
@@ -389,7 +432,7 @@ export class Client {
 
 		const activeBeforeHydration = this.activeTab()
 		if (activeBeforeHydration) {
-			const activeHydration = await this.hydrateTab(activeBeforeHydration, { progressiveStartup: true })
+			const activeHydration = await this.hydrateTab(activeBeforeHydration, { progressiveStartup: true, startupTrace: true })
 			this.applyTabToPrompt(activeBeforeHydration)
 			clientState.saveLastTab(activeBeforeHydration.sessionId)
 			this.renderAndCaptureStartup(activeHydration)

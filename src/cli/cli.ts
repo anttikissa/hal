@@ -17,6 +17,7 @@ import * as colors from './colors.ts'
 import { strings } from '../utils/strings.ts'
 import { cursor } from './cursor.ts'
 import { terminal } from './terminal.ts'
+import { startupTrace } from '../perf/startup-trace.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -54,6 +55,7 @@ function markStartupReady(): void {
 	const epoch = hal.startupEpochMs
 	if (typeof epoch !== 'number' || !Number.isFinite(epoch) || epoch <= 0) return
 	hal.startupReadyElapsedMs = Math.max(0, Date.now() - epoch)
+	startupTrace.markAt('cli-ready', hal.startupReadyElapsedMs, 'first frame visible + prompt ready')
 }
 // ── Client ──
 
