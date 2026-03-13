@@ -4,6 +4,7 @@ import { Client } from './client.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
 import type { HydrationData } from './session/history.ts'
+import { clientState } from './client-state.ts'
 
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
@@ -81,6 +82,37 @@ test('cwd mode switches to tab matching LAUNCH_CWD', async () => {
 	}
 })
 
+test('cwd mode does not override restored last tab', async () => {
+	const origCwd = process.env.LAUNCH_CWD
+	const origSelf = process.env.HAL_SELF_MODE
+	const origGetLastTab = clientState.getLastTab
+	const origSaveLastTab = clientState.saveLastTab
+	process.env.LAUNCH_CWD = '/tmp/my-project'
+	delete process.env.HAL_SELF_MODE
+	try {
+		const ts = new Date().toISOString()
+		const sidA = `t-${randomBytes(4).toString('hex')}`
+		const sidB = `t-${randomBytes(4).toString('hex')}`
+		const sessions: SessionInfo[] = [
+			{ id: sidA, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
+			{ id: sidB, workingDir: '/tmp/my-project', createdAt: ts, updatedAt: ts },
+		]
+		;(clientState as { getLastTab: () => string | null; saveLastTab: (sessionId: string) => void }).getLastTab = () => sidA
+		;(clientState as { getLastTab: () => string | null; saveLastTab: (sessionId: string) => void }).saveLastTab = () => {}
+		const transport = new FakeTransport(bootstrapWith(sessions, sidB))
+		const client = new Client(transport, () => {})
+		await client.start()
+		expect(client.activeTab()?.sessionId).toBe(sidA)
+		expect(transport.sentCommands.some(c => c.type === 'open')).toBe(false)
+	} finally {
+		if (origCwd == null) delete process.env.LAUNCH_CWD
+		else process.env.LAUNCH_CWD = origCwd
+		if (origSelf == null) delete process.env.HAL_SELF_MODE
+		else process.env.HAL_SELF_MODE = origSelf
+		;(clientState as { getLastTab: () => string | null; saveLastTab: (sessionId: string) => void }).getLastTab = origGetLastTab
+		;(clientState as { getLastTab: () => string | null; saveLastTab: (sessionId: string) => void }).saveLastTab = origSaveLastTab
+	}
+})
 test('cwd mode opens new tab with matching workingDir when no match exists', async () => {
 	const origCwd = process.env.LAUNCH_CWD
 	const origSelf = process.env.HAL_SELF_MODE

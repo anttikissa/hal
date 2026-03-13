@@ -364,7 +364,17 @@ export class Client {
 		// Prefer client's last-viewed tab, fall back to server's active session
 		const lastTab = clientState.getLastTab()
 		const preferredId = lastTab ?? rtState.activeSessionId
-		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === preferredId))
+		const preferredIdx = this.state.tabs.findIndex(t => t.sessionId === preferredId)
+		this.state.activeTabIndex = Math.max(0, preferredIdx)
+		const restoredLastTab = !!lastTab && preferredIdx >= 0
+		if (!restoredLastTab) {
+			if (selfModeEnabled()) {
+				this.applySelfMode()
+			} else {
+				const cwdTarget = cwdModeTarget()
+				if (cwdTarget) this.applyCwdMode(cwdTarget)
+			}
+		}
 		this.state.connected = true
 		this.pendingStartupPerf = startupPerfSample()
 		this.onUpdate()
@@ -381,17 +391,6 @@ export class Client {
 		for (const tab of this.state.tabs) {
 			if (tab === activeBeforeHydration) continue
 			await this.hydrateTab(tab)
-		}
-
-		if (selfModeEnabled()) {
-			this.applySelfMode()
-			this.renderAndCaptureStartup(null)
-		} else {
-			const cwdTarget = cwdModeTarget()
-			if (cwdTarget) {
-				this.applyCwdMode(cwdTarget)
-				this.renderAndCaptureStartup(null)
-			}
 		}
 
 		for await (const event of this.transport.tailEvents(offset).items) {
