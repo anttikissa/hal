@@ -20,9 +20,13 @@ type Summary = {
 	elapsedMs: number
 }
 
+const ISOLATED_TESTS = ['src/cli/latency.test.ts']
+
 function listTestFiles(root: string): string[] {
 	const glob = new Bun.Glob('src/**/*.test.ts')
-	return [...glob.scanSync(root)].filter(f => !f.endsWith('failing.test.ts')).sort()
+	return [...glob.scanSync(root)]
+		.filter(f => !f.endsWith('failing.test.ts') && !ISOLATED_TESTS.includes(f))
+		.sort()
 }
 
 export function formatMs(ms: number): string {
@@ -44,29 +48,20 @@ export async function awaitTimed<T>(promise: Promise<T>): Promise<{ value: T; el
 	return { value, elapsedMs: performance.now() - startedAt }
 }
 
-async function run(): Promise<number> {
-	const files = listTestFiles(ROOT)
-	const t0 = performance.now()
-	const procs = files.map(file => {
-		const proc = Bun.spawn(['bun', 'test', file], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
-		const timeout = setTimeout(() => proc.kill(), TIMEOUT_MS)
-		return {
-			file,
-			proc,
-			timeout,
-			completion: awaitTimed(proc.exited),
-		}
-	})
+function spawnTest(file: string) {
+	const proc = Bun.spawn(['bun', 'test', file], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+	const timeout = setTimeout(() => proc.kill(), TIMEOUT_MS)
+	return { file, proc, timeout, completion: awaitTimed(proc.exited) }
+}
 
-	let failedFiles = 0
-	let totalPass = 0
-	let totalFail = 0
-	const timings: FileTiming[] = []
-
+async function collectResults(
+	procs: ReturnType<typeof spawnTest>[],
+	acc: { failedFiles: number; totalPass: number; totalFail: number; timings: FileTiming[] },
+) {
 	for (const { file, proc, timeout, completion } of procs) {
 		const { value: code, elapsedMs } = await completion
 		clearTimeout(timeout)
-		timings.push({ file, elapsedMs })
+		acc.timings.push({ file, elapsedMs })
 
 		const timedOut = proc.signalCode !== null
 		const stdout = await new Response(proc.stdout).text()
@@ -75,40 +70,50 @@ async function run(): Promise<number> {
 
 		const passMatch = all.match(/(\d+) pass/)
 		const failMatch = all.match(/(\d+) fail\b/)
-		if (passMatch) totalPass += parseInt(passMatch[1])
-		if (failMatch) totalFail += parseInt(failMatch[1])
+		if (passMatch) acc.totalPass += parseInt(passMatch[1])
+		if (failMatch) acc.totalFail += parseInt(failMatch[1])
 
 		if (timedOut) {
 			console.log(`⏰ ${file} (${formatMs(elapsedMs)})  (killed after ${TIMEOUT_MS / 1000}s)`)
 			process.stdout.write(stdout)
 			process.stderr.write(stderr)
-			failedFiles++
-			continue
-		}
-
-		if (code !== 0) {
+			acc.failedFiles++
+		} else if (code !== 0) {
 			console.log(`❌ ${file} (${formatMs(elapsedMs)})`)
 			process.stdout.write(stdout)
 			process.stderr.write(stderr)
-			failedFiles++
-			continue
+			acc.failedFiles++
+		} else {
+			const summary = stdout.match(/(\d+ pass.*)/m)
+			console.log(`✅ ${file} (${formatMs(elapsedMs)})${summary ? `  (${summary[1].trim()})` : ''}`)
 		}
+	}
+}
 
-		const summary = stdout.match(/(\d+ pass.*)/m)
-		console.log(`✅ ${file} (${formatMs(elapsedMs)})${summary ? `  (${summary[1].trim()})` : ''}`)
+async function run(): Promise<number> {
+	const files = listTestFiles(ROOT)
+	const t0 = performance.now()
+	const acc = { failedFiles: 0, totalPass: 0, totalFail: 0, timings: [] as FileTiming[] }
+
+	// Run main tests in parallel
+	await collectResults(files.map(spawnTest), acc)
+
+	// Run timing-sensitive tests in isolation (sequentially, after parallel batch)
+	for (const file of ISOLATED_TESTS) {
+		await collectResults([spawnTest(file)], acc)
 	}
 
 	const elapsedMs = performance.now() - t0
 	console.log(
 		buildSummaryLine({
-			totalPass,
-			totalFail,
-			failedFiles,
+			totalPass: acc.totalPass,
+			totalFail: acc.totalFail,
+			failedFiles: acc.failedFiles,
 			elapsedMs,
 		}),
 	)
 
-	const slowest = pickSlowest(timings)
+	const slowest = pickSlowest(acc.timings)
 	if (slowest.length > 0) {
 		console.log('slowest files:')
 		for (const item of slowest) {
@@ -116,7 +121,7 @@ async function run(): Promise<number> {
 		}
 	}
 
-	return failedFiles ? 1 : 0
+	return acc.failedFiles ? 1 : 0
 }
 
 if (import.meta.main) {
