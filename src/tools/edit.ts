@@ -1,11 +1,6 @@
 import { readFiles } from '../utils/read-file.ts'
 import { formatContext, parseRef, resolvePath, validateRef, withLock } from './file-utils.ts'
-import { defineTool, previewField } from './tool.ts'
-
-export interface EditExecuteContext {
-	cwd: string
-	contextLines: number
-}
+import { defineTool, previewField, type ToolContext } from './tool.ts'
 
 interface EditApplyResult {
 	result: string
@@ -32,8 +27,6 @@ new_content is raw file content — no hashline prefixes. A trailing newline in 
 	},
 	cache_control: { type: 'ephemeral' },
 }
-
-const pathPreview = previewField('path')
 
 function applyReplace(content: string, startRef: string, endRef: string, newContent: string, contextLines: number): EditApplyResult | string {
 	const start = parseRef(startRef)
@@ -78,7 +71,7 @@ function applyInsert(content: string, afterRef: string, newContent: string, cont
 	return { result: `--- before\n${before}\n\n+++ after\n${after}`, resultLines }
 }
 
-async function execute(input: unknown, ctx: EditExecuteContext): Promise<string> {
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const inp = input as any
 	const path = resolvePath(inp?.path, ctx.cwd)
 	if (inp?.operation !== 'replace' && inp?.operation !== 'insert') return `error: unknown operation "${inp?.operation}"`
@@ -86,14 +79,15 @@ async function execute(input: unknown, ctx: EditExecuteContext): Promise<string>
 	return withLock(path, async () => {
 		const content = readFiles.readTextSync(path, 'tool.edit')
 		const newContent = String(inp?.new_content ?? '')
+		const contextLines = ctx.contextLines ?? 3
 
 		let applied: EditApplyResult | string
 		if (inp.operation === 'replace') {
 			if (!inp?.start_ref || !inp?.end_ref) return 'error: replace requires start_ref and end_ref'
-			applied = applyReplace(content, inp.start_ref, inp.end_ref, newContent, ctx.contextLines)
+			applied = applyReplace(content, inp.start_ref, inp.end_ref, newContent, contextLines)
 		} else {
 			if (!inp?.after_ref) return 'error: insert requires after_ref'
-			applied = applyInsert(content, inp.after_ref, newContent, ctx.contextLines)
+			applied = applyInsert(content, inp.after_ref, newContent, contextLines)
 		}
 
 		if (typeof applied === 'string') return applied
@@ -102,8 +96,8 @@ async function execute(input: unknown, ctx: EditExecuteContext): Promise<string>
 	})
 }
 
-export const edit = defineTool<EditExecuteContext, string>({
+export const edit = defineTool({
 	definition,
-	argsPreview: pathPreview,
+	argsPreview: previewField('path'),
 	execute,
 })

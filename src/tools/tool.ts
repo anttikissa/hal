@@ -14,21 +14,30 @@ export type ToolResult = string | any[]
 
 export type ToolChunkHandler = (text: string) => Promise<void>
 
-export interface ToolModule<Context = unknown, Result = ToolResult> {
-	definition: ToolDefinition
-	argsPreview(input: unknown): string
-	execute(input: unknown, context: Context, onChunk?: ToolChunkHandler): Result | Promise<Result>
+export interface ToolContext {
+	cwd: string
+	sessionId?: string
+	signal?: AbortSignal
+	env?: Record<string, string | undefined>
+	contextLines?: number
+	truncate?: (text: string) => string
 }
 
-const baseTool: Pick<ToolModule<unknown>, 'argsPreview'> = {
+export interface ToolModule {
+	definition: ToolDefinition
+	argsPreview(input: unknown): string
+	execute(input: unknown, ctx: ToolContext, onChunk?: ToolChunkHandler): ToolResult | Promise<ToolResult>
+}
+
+const baseTool: Pick<ToolModule, 'argsPreview'> = {
 	argsPreview() {
 		return ''
 	},
 }
 
-export function defineTool<Context, Result = ToolResult, Extra extends object = {}>(
-	spec: Omit<ToolModule<Context, Result>, 'argsPreview'> & { argsPreview?: ToolModule<Context, Result>['argsPreview'] } & Extra,
-): ToolModule<Context, Result> & Extra {
+export function defineTool<Extra extends object = {}>(
+	spec: Omit<ToolModule, 'argsPreview'> & { argsPreview?: ToolModule['argsPreview'] } & Extra,
+): ToolModule & Extra {
 	return Object.assign(Object.create(baseTool), spec)
 }
 

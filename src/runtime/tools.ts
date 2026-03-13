@@ -11,11 +11,13 @@ import { edit } from '../tools/edit.ts'
 import { readBlob } from '../tools/read-blob.ts'
 import { grep } from '../tools/grep.ts'
 import { resolvePath as resolveToolPath } from '../tools/file-utils.ts'
+import type { ToolContext, ToolModule } from '../tools/tool.ts'
 
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
 
-const CORE_TOOLS = [bash, read, write, edit, grep, readBlob] as const
+const CORE_TOOLS: ToolModule[] = [bash, read, write, edit, grep, readBlob]
+const TOOL_BY_NAME = new Map(CORE_TOOLS.map(t => [t.definition.name, t]))
 
 export const toolsConfig = {
 	maxOutput: 50_000,
@@ -84,35 +86,19 @@ const ASK_TOOL = {
 const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search', max_uses: 5 }
 
 const BASE_TOOLS = [
-	...CORE_TOOLS.map((tool) => tool.definition),
+	...CORE_TOOLS.map(t => t.definition),
 	GLOB_TOOL,
 	LS_TOOL,
 	WEB_SEARCH_TOOL,
 	ASK_TOOL,
 ]
+const DEF_BY_NAME = new Map([...BASE_TOOLS, EVAL_TOOL].map((d: any) => [d.name, d]))
 
 /** TOOLS is the static base set (used for backwards compat). Prefer getTools(). */
 export const TOOLS = BASE_TOOLS
 
 export function getTools(evalEnabled: boolean): any[] {
 	return evalEnabled ? [...BASE_TOOLS, EVAL_TOOL] : BASE_TOOLS
-}
-
-function toolMap(tools: any[]) {
-	return new Map(tools.map((tool) => [tool.name, tool]))
-}
-
-const BASE_MAP = toolMap(BASE_TOOLS)
-
-function validateRequired(call: ToolCall): string | null {
-	const tool = BASE_MAP.get(call.name) ?? (call.name === 'eval' ? EVAL_TOOL : null)
-	if (!tool) return null
-	const schema = (tool as any).input_schema
-	const required: string[] = schema?.required ?? []
-	const inp = call.input as any
-	const missing = required.filter((key) => inp?.[key] == null)
-	if (missing.length) return `error: ${call.name} requires ${missing.join(', ')}`
-	return null
 }
 
 export interface ToolCall {
@@ -130,41 +116,18 @@ export interface ToolExecContext {
 	cwd?: string
 }
 
-interface ResolvedToolExecContext extends ToolExecContext {
-	cwd: string
+const NON_CORE_PREVIEW: Record<string, (input: unknown) => string> = {
+	glob: (input) => String((input as any)?.pattern ?? ''),
+	ls: (input) => String((input as any)?.path ?? '.'),
+	ask: (input) => String((input as any)?.question ?? '').slice(0, 80),
+	eval: (input) => String((input as any)?.code ?? '').slice(0, 80),
 }
 
-type ExecuteHandler = (input: unknown, onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext) => Promise<string | any[]> | string | any[]
-
-const CORE_PREVIEW_HANDLERS: Array<[string, (input: unknown) => string]> = CORE_TOOLS.map((tool) => [
-	tool.definition.name,
-	(input: unknown) => tool.argsPreview(input),
-])
-
-const PREVIEW_HANDLERS = new Map<string, (input: unknown) => string>([
-	...CORE_PREVIEW_HANDLERS,
-	['glob', (input) => String((input as any)?.pattern ?? '')],
-	['ls', (input) => String((input as any)?.path ?? '.')],
-	['ask', (input) => String((input as any)?.question ?? '').slice(0, 80)],
-	['eval', (input) => String((input as any)?.code ?? '').slice(0, 80)],
-])
-
-const EXEC_HANDLERS = new Map<string, ExecuteHandler>([
-	['bash', (input, onChunk, ctx) => bash.execute(input, { cwd: ctx.cwd, signal: ctx.signal }, onChunk)],
-	['read', (input, _onChunk, ctx) => read.execute(input, { cwd: ctx.cwd })],
-	['write', (input, _onChunk, ctx) => write.execute(input, { cwd: ctx.cwd })],
-	['edit', (input, _onChunk, ctx) => edit.execute(input, { cwd: ctx.cwd, contextLines: toolsConfig.contextLines })],
-	['grep', (input, _onChunk, ctx) => grep.execute(input, { cwd: ctx.cwd })],
-	['glob', executeGlob],
-	['ls', executeLs],
-	['read_blob', (input, _onChunk, ctx) => readBlob.execute(input, { sessionId: ctx.sessionId, truncate })],
-	['eval', executeEval],
-])
-
 export function argsPreview(call: ToolCall): string {
-	const preview = PREVIEW_HANDLERS.get(call.name)
-	const text = preview ? preview(call.input) : call.name
-	return shortenHome(text)
+	const tool = TOOL_BY_NAME.get(call.name)
+	if (tool) return shortenHome(tool.argsPreview(call.input))
+	const preview = NON_CORE_PREVIEW[call.name]
+	return shortenHome(preview ? preview(call.input) : call.name)
 }
 
 export async function executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
@@ -172,17 +135,45 @@ export async function executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolE
 	return typeof result === 'string' ? shortenHome(result) : result
 }
 
+function buildToolContext(ctx?: ToolExecContext): ToolContext {
+	return {
+		cwd: ctx?.cwd ?? CWD,
+		sessionId: ctx?.sessionId,
+		signal: ctx?.signal,
+		contextLines: toolsConfig.contextLines,
+		truncate,
+	}
+}
+
+function validateRequired(call: ToolCall): string | null {
+	const def = DEF_BY_NAME.get(call.name)
+	if (!def) return null
+	const required: string[] = def.input_schema?.required ?? []
+	const inp = call.input as any
+	const missing = required.filter((key: string) => inp?.[key] == null)
+	if (missing.length) return `error: ${call.name} requires ${missing.join(', ')}`
+	return null
+}
+
 async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
 	const err = validateRequired(call)
 	if (err) return err
-	const execute = EXEC_HANDLERS.get(call.name)
-	if (!execute) return `Unknown tool: ${call.name}`
-	return execute(call.input, onChunk, { ...ctx, cwd: ctx?.cwd ?? CWD })
+
+	const tool = TOOL_BY_NAME.get(call.name)
+	if (tool) return tool.execute(call.input, buildToolContext(ctx), onChunk)
+
+	const resolvedCwd = ctx?.cwd ?? CWD
+	switch (call.name) {
+		case 'glob': return executeGlob(call.input, resolvedCwd)
+		case 'ls': return executeLs(call.input, resolvedCwd)
+		case 'eval': return executeEval(call.input, ctx)
+		default: return `Unknown tool: ${call.name}`
+	}
 }
 
-async function executeGlob(input: unknown, _onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext): Promise<string> {
+async function executeGlob(input: unknown, cwd: string): Promise<string> {
 	const inp = input as any
-	const searchPath = resolveToolPath(inp?.path, ctx.cwd)
+	const searchPath = resolveToolPath(inp?.path, cwd)
 	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
 	const result = await $`${args}`.quiet().nothrow()
 	const raw = result.stdout.toString().trim()
@@ -190,9 +181,9 @@ async function executeGlob(input: unknown, _onChunk: OnChunk | undefined, ctx: R
 	return raw
 }
 
-function executeLs(input: unknown, _onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext): string {
+function executeLs(input: unknown, cwd: string): string {
 	const inp = input as any
-	const dir = resolveToolPath(inp?.path, ctx.cwd)
+	const dir = resolveToolPath(inp?.path, cwd)
 	const maxDepth = inp?.depth ?? 3
 	const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', '.cache', 'coverage', 'target'])
 	const lines: string[] = []
@@ -227,8 +218,8 @@ function executeLs(input: unknown, _onChunk: OnChunk | undefined, ctx: ResolvedT
 	return lines.join('\n') || '(empty directory)'
 }
 
-async function executeEval(input: unknown, _onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext): Promise<string | any[]> {
-	const evalCtx = ctx.evalCtx
+async function executeEval(input: unknown, ctx?: ToolExecContext): Promise<string | any[]> {
+	const evalCtx = ctx?.evalCtx
 	if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
 	if (!evalCtx.runtime) {
 		const { runtimeCore } = await import('./runtime.ts')

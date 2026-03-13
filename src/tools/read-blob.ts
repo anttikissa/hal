@@ -1,11 +1,6 @@
 import { blob } from '../session/blob.ts'
 import { ason } from '../utils/ason.ts'
-import { defineTool, previewField } from './tool.ts'
-
-export interface ReadBlobExecuteContext {
-	sessionId?: string
-	truncate(text: string): string
-}
+import { defineTool, previewField, type ToolContext } from './tool.ts'
 
 function formatPreview(blobId: string, blobData: unknown, truncate: (text: string) => string): string {
 	if (blobData && typeof blobData === 'object') {
@@ -37,15 +32,16 @@ const definition = {
 
 const blobIdPreview = previewField('blobId')
 
-async function execute(input: unknown, context: ReadBlobExecuteContext): Promise<string> {
-	if (!context.sessionId) throw new Error('read_blob requires sessionId context')
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+	if (!ctx.sessionId) throw new Error('read_blob requires sessionId context')
+	if (!ctx.truncate) throw new Error('read_blob requires truncate in context')
 	const blobId = blobIdPreview(input).trim()
-	const blobData = await blob.read(context.sessionId, blobId)
-	return formatPreview(blobId, blobData, context.truncate)
+	const blobData = await blob.read(ctx.sessionId, blobId)
+	return formatPreview(blobId, blobData, ctx.truncate)
 }
 
 export const readBlob = Object.assign(
-	defineTool<ReadBlobExecuteContext, string>({
+	defineTool({
 		definition,
 		argsPreview: blobIdPreview,
 		execute,

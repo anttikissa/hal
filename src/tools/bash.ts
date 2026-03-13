@@ -1,16 +1,10 @@
-import { defineTool, previewField, type ToolChunkHandler } from './tool.ts'
+import { defineTool, previewField, type ToolChunkHandler, type ToolContext } from './tool.ts'
 
 export const bashConfig = {
 	inlineHeaderMax: 60,
 }
 
 export type BashStatus = 'streaming' | 'running' | 'done' | 'error'
-
-export interface BashExecuteContext {
-	cwd: string
-	env?: Record<string, string | undefined>
-	signal?: AbortSignal
-}
 
 export interface BashFormatBlockInput {
 	command: string
@@ -107,7 +101,7 @@ function killProcessTree(rootPid: number, signal: 'SIGTERM' | 'SIGKILL'): void {
 	try { process.kill(rootPid, signal) } catch {}
 }
 
-async function execute(input: unknown, ctx: BashExecuteContext, onChunk?: ToolChunkHandler): Promise<string> {
+async function execute(input: unknown, ctx: ToolContext, onChunk?: ToolChunkHandler): Promise<string> {
 	const cmd = commandPreview(input)
 	const proc = Bun.spawn(['bash', '-lc', cmd], {
 		cwd: ctx.cwd,
@@ -146,7 +140,7 @@ async function execute(input: unknown, ctx: BashExecuteContext, onChunk?: ToolCh
 }
 
 export const bash = Object.assign(
-	defineTool<BashExecuteContext, string>({
+	defineTool({
 		definition,
 		argsPreview: commandPreview,
 		execute,

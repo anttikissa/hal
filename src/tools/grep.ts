@@ -1,16 +1,6 @@
 import { $ } from 'bun'
 import { resolvePath } from './file-utils.ts'
-import { defineTool, previewField } from './tool.ts'
-
-interface GrepInput {
-	pattern?: string
-	path?: string
-	include?: string
-}
-
-export interface GrepExecuteContext {
-	cwd: string
-}
+import { defineTool, previewField, type ToolContext } from './tool.ts'
 
 const definition = {
 	name: 'grep',
@@ -28,10 +18,10 @@ const definition = {
 
 const patternPreview = previewField('pattern')
 
-async function execute(input: unknown, context: GrepExecuteContext): Promise<string> {
-	const inp = input as GrepInput
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+	const inp = input as any
 	const pattern = patternPreview(inp)
-	const searchPath = resolvePath(inp?.path, context.cwd)
+	const searchPath = resolvePath(inp?.path, ctx.cwd)
 	const args = ['rg', '-nH', '--no-heading', '--color=never', '--hidden', '--no-ignore', '--max-count=100', '--sort=modified']
 	if (inp?.include) args.push('--glob', String(inp.include))
 	args.push('--', pattern, searchPath)
@@ -41,7 +31,7 @@ async function execute(input: unknown, context: GrepExecuteContext): Promise<str
 	return raw
 }
 
-export const grep = defineTool<GrepExecuteContext, string>({
+export const grep = defineTool({
 	definition,
 	argsPreview: patternPreview,
 	execute,
