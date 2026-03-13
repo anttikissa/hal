@@ -20,7 +20,7 @@ export interface InputContext {
 	redraw: () => void
 	contentWidth: () => number
 	quit: () => void
-	restart: () => void
+	restart: () => void | Promise<void>
 	suspend: () => void
 }
 
@@ -41,7 +41,7 @@ export function handleInput(k: KeyEvent, ctx: InputContext): void {
 	if (k.key === 'n' && k.ctrl) { ctx.nextTab(); ctx.doRender(); return }
 	if (k.key === 'p' && k.ctrl) { ctx.prevTab(); ctx.doRender(); return }
 	if (k.key === 'z' && k.ctrl) { ctx.suspend(); return }
-	if (k.key === 'r' && k.ctrl) { ctx.saveDraft(); ctx.restart(); return }
+	if (k.key === 'r' && k.ctrl) { void ctx.restart(); return }
 	if (k.key === 'l' && k.ctrl) { ctx.redraw(); return }
 	if (k.alt && !k.ctrl && !k.cmd && k.key >= '1' && k.key <= '9') { ctx.switchToTab(Number(k.key) - 1); ctx.doRender(); return }
 	if (k.alt && !k.ctrl && !k.cmd && k.key === '0') { ctx.switchToTab(9); ctx.doRender(); return }

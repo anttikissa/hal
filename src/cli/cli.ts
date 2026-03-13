@@ -409,7 +409,7 @@ export function quit(): void {
 	void shutdown()
 }
 
-export function restart(): void {
+export async function restart(): Promise<void> {
 	if (hasDestructiveTools() && pendingAction !== 'restart') {
 		pendingAction = 'restart'
 		if (pendingTimer) clearTimeout(pendingTimer)
@@ -420,7 +420,7 @@ export function restart(): void {
 		return
 	}
 	clearPendingAction()
-	client.saveDraftSync()
+	await client.saveDraft()
 	terminal.disableTerminalInput(stdout, stdin)
 	// Intentionally does NOT call releaseHost(). We write handoff state first,
 	// then exit so either a promoted client or the restarted process can resume.

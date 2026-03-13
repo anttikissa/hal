@@ -1,5 +1,5 @@
 import { writeFile, unlink, copyFile } from 'fs/promises'
-import { existsSync, writeFileSync, unlinkSync, copyFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { basename } from 'path'
 import { state } from '../state.ts'
 import { readFiles } from '../utils/read-file.ts'
@@ -24,21 +24,6 @@ async function persistTempImages(sessionId: string, text: string): Promise<strin
 	}
 	return result
 }
-
-function persistTempImagesSync(sessionId: string, text: string): string {
-	let result = text
-	for (const match of text.matchAll(IMAGE_PATTERN)) {
-		const src = match[1]
-		if (!src.startsWith('/tmp/') || !existsSync(src)) continue
-		const dir = `${state.sessionDir(sessionId)}/images`
-		state.ensureDir(dir)
-		const dest = `${dir}/${basename(src)}`
-		if (!existsSync(dest)) copyFileSync(src, dest)
-		result = result.replaceAll(match[0], `[${dest}]`)
-	}
-	return result
-}
-
 export async function saveDraft(sessionId: string, text: string): Promise<void> {
 	if (!text) {
 		const path = draftPath(sessionId)
@@ -49,19 +34,6 @@ export async function saveDraft(sessionId: string, text: string): Promise<void> 
 	const saved = await persistTempImages(sessionId, text)
 	await writeFile(draftPath(sessionId), saved)
 }
-
-export function saveDraftSync(sessionId: string, text: string): void {
-	if (!text) {
-		const path = draftPath(sessionId)
-		if (!existsSync(path)) return
-		try { unlinkSync(path) } catch {}
-		return
-	}
-	state.ensureDir(state.sessionDir(sessionId))
-	const saved = persistTempImagesSync(sessionId, text)
-	writeFileSync(draftPath(sessionId), saved)
-}
-
 export async function loadDraft(sessionId: string): Promise<string> {
 	const path = draftPath(sessionId)
 	if (!existsSync(path)) return ''
@@ -72,4 +44,4 @@ export async function loadDraft(sessionId: string): Promise<string> {
 	}
 }
 
-export const draft = { saveDraft, saveDraftSync, loadDraft }
+export const draft = { saveDraft, loadDraft }
