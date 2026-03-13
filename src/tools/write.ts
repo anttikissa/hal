@@ -1,4 +1,5 @@
 import { resolvePath, withLock } from './file-utils.ts'
+import { defineTool, previewField } from './tool.ts'
 
 export interface WriteExecuteContext {
 	cwd: string
@@ -17,10 +18,7 @@ const definition = {
 	},
 }
 
-function argsPreview(input: unknown): string {
-	const inp = input as any
-	return String(inp?.path ?? '')
-}
+const pathPreview = previewField('path')
 
 async function execute(input: unknown, ctx: WriteExecuteContext): Promise<string> {
 	const inp = input as any
@@ -31,4 +29,8 @@ async function execute(input: unknown, ctx: WriteExecuteContext): Promise<string
 	})
 }
 
-export const write = { definition, argsPreview, execute }
+export const write = defineTool<WriteExecuteContext, string>({
+	definition,
+	argsPreview: pathPreview,
+	execute,
+})

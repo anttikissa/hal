@@ -15,6 +15,8 @@ import { resolvePath as resolveToolPath } from '../tools/file-utils.ts'
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
 
+const CORE_TOOLS = [bash, read, write, edit, grep, readBlob] as const
+
 export const toolsConfig = {
 	maxOutput: 50_000,
 	contextLines: 3,
@@ -42,48 +44,51 @@ const EVAL_TOOL = {
 	},
 }
 
+const GLOB_TOOL = {
+	name: 'glob',
+	description: 'Find files by glob pattern. Returns matching file paths sorted by modification time.',
+	input_schema: {
+		type: 'object',
+		properties: {
+			pattern: { type: 'string', description: "Glob pattern, e.g. '*.ts', 'src/**/*.tsx'" },
+			path: { type: 'string', description: 'Directory to search in (default: cwd)' },
+		},
+		required: ['pattern'],
+	},
+}
+
+const LS_TOOL = {
+	name: 'ls',
+	description: 'List directory contents as a tree. Ignores node_modules, .git, dist, etc.',
+	input_schema: {
+		type: 'object',
+		properties: {
+			path: { type: 'string', description: 'Directory to list (default: cwd)' },
+			depth: { type: 'integer', description: 'Max depth (default: 3)' },
+		},
+	},
+}
+
+const ASK_TOOL = {
+	name: 'ask',
+	description: 'Ask the user a question and wait for their response. Use this to clarify ambiguous instructions, gather preferences, or get decisions on implementation choices.',
+	input_schema: {
+		type: 'object',
+		properties: {
+			question: { type: 'string', description: 'The question to ask the user' },
+		},
+		required: ['question'],
+	},
+}
+
+const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search', max_uses: 5 }
+
 const BASE_TOOLS = [
-	bash.definition,
-	read.definition,
-	write.definition,
-	edit.definition,
-	grep.definition,
-	{
-		name: 'glob',
-		description: 'Find files by glob pattern. Returns matching file paths sorted by modification time.',
-		input_schema: {
-			type: 'object',
-			properties: {
-				pattern: { type: 'string', description: "Glob pattern, e.g. '*.ts', 'src/**/*.tsx'" },
-				path: { type: 'string', description: 'Directory to search in (default: cwd)' },
-			},
-			required: ['pattern'],
-		},
-	},
-	{
-		name: 'ls',
-		description: 'List directory contents as a tree. Ignores node_modules, .git, dist, etc.',
-		input_schema: {
-			type: 'object',
-			properties: {
-				path: { type: 'string', description: 'Directory to list (default: cwd)' },
-				depth: { type: 'integer', description: 'Max depth (default: 3)' },
-			},
-		},
-	},
-	readBlob.definition,
-	{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
-	{
-		name: 'ask',
-		description: 'Ask the user a question and wait for their response. Use this to clarify ambiguous instructions, gather preferences, or get decisions on implementation choices.',
-		input_schema: {
-			type: 'object',
-			properties: {
-				question: { type: 'string', description: 'The question to ask the user' },
-			},
-			required: ['question'],
-		},
-	},
+	...CORE_TOOLS.map((tool) => tool.definition),
+	GLOB_TOOL,
+	LS_TOOL,
+	WEB_SEARCH_TOOL,
+	ASK_TOOL,
 ]
 
 /** TOOLS is the static base set (used for backwards compat). Prefer getTools(). */
@@ -125,44 +130,41 @@ export interface ToolExecContext {
 	cwd?: string
 }
 
+interface ResolvedToolExecContext extends ToolExecContext {
+	cwd: string
+}
+
+type ExecuteHandler = (input: unknown, onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext) => Promise<string | any[]> | string | any[]
+
+const CORE_PREVIEW_HANDLERS: Array<[string, (input: unknown) => string]> = CORE_TOOLS.map((tool) => [
+	tool.definition.name,
+	(input: unknown) => tool.argsPreview(input),
+])
+
+const PREVIEW_HANDLERS = new Map<string, (input: unknown) => string>([
+	...CORE_PREVIEW_HANDLERS,
+	['glob', (input) => String((input as any)?.pattern ?? '')],
+	['ls', (input) => String((input as any)?.path ?? '.')],
+	['ask', (input) => String((input as any)?.question ?? '').slice(0, 80)],
+	['eval', (input) => String((input as any)?.code ?? '').slice(0, 80)],
+])
+
+const EXEC_HANDLERS = new Map<string, ExecuteHandler>([
+	['bash', (input, onChunk, ctx) => bash.execute(input, { cwd: ctx.cwd, signal: ctx.signal }, onChunk)],
+	['read', (input, _onChunk, ctx) => read.execute(input, { cwd: ctx.cwd })],
+	['write', (input, _onChunk, ctx) => write.execute(input, { cwd: ctx.cwd })],
+	['edit', (input, _onChunk, ctx) => edit.execute(input, { cwd: ctx.cwd, contextLines: toolsConfig.contextLines })],
+	['grep', (input, _onChunk, ctx) => grep.execute(input, { cwd: ctx.cwd })],
+	['glob', executeGlob],
+	['ls', executeLs],
+	['read_blob', (input, _onChunk, ctx) => readBlob.execute(input, { sessionId: ctx.sessionId, truncate })],
+	['eval', executeEval],
+])
+
 export function argsPreview(call: ToolCall): string {
-	const inp = call.input as any
-	let s: string
-	switch (call.name) {
-		case 'bash':
-			s = bash.argsPreview(inp)
-			break
-		case 'read':
-			s = read.argsPreview(inp)
-			break
-		case 'write':
-			s = write.argsPreview(inp)
-			break
-		case 'edit':
-			s = edit.argsPreview(inp)
-			break
-		case 'grep':
-			s = grep.argsPreview(inp)
-			break
-		case 'glob':
-			s = String(inp?.pattern ?? '')
-			break
-		case 'ls':
-			s = String(inp?.path ?? '.')
-			break
-		case 'read_blob':
-			s = readBlob.argsPreview(inp)
-			break
-		case 'ask':
-			s = String(inp?.question ?? '').slice(0, 80)
-			break
-		case 'eval':
-			s = String(inp?.code ?? '').slice(0, 80)
-			break
-		default:
-			s = call.name
-	}
-	return shortenHome(s)
+	const preview = PREVIEW_HANDLERS.get(call.name)
+	const text = preview ? preview(call.input) : call.name
+	return shortenHome(text)
 }
 
 export async function executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
@@ -173,80 +175,68 @@ export async function executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolE
 async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
 	const err = validateRequired(call)
 	if (err) return err
-	const inp = call.input as any
-	const cwd = ctx?.cwd ?? CWD
-	const resolve = (p?: string) => resolveToolPath(p, cwd)
+	const execute = EXEC_HANDLERS.get(call.name)
+	if (!execute) return `Unknown tool: ${call.name}`
+	return execute(call.input, onChunk, { ...ctx, cwd: ctx?.cwd ?? CWD })
+}
 
-	switch (call.name) {
-		case 'bash':
-			return bash.execute(inp, { cwd, signal: ctx?.signal }, onChunk)
-		case 'read':
-			return read.execute(inp, { cwd })
-		case 'write':
-			return write.execute(inp, { cwd })
-		case 'edit':
-			return edit.execute(inp, { cwd, contextLines: toolsConfig.contextLines })
-		case 'grep':
-			return grep.execute(inp, { cwd })
-		case 'glob': {
-			const searchPath = resolve(inp?.path)
-			const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
-			const result = await $`${args}`.quiet().nothrow()
-			const raw = result.stdout.toString().trim()
-			if (!raw) return 'No files found.'
-			return raw
+async function executeGlob(input: unknown, _onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext): Promise<string> {
+	const inp = input as any
+	const searchPath = resolveToolPath(inp?.path, ctx.cwd)
+	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
+	const result = await $`${args}`.quiet().nothrow()
+	const raw = result.stdout.toString().trim()
+	if (!raw) return 'No files found.'
+	return raw
+}
+
+function executeLs(input: unknown, _onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext): string {
+	const inp = input as any
+	const dir = resolveToolPath(inp?.path, ctx.cwd)
+	const maxDepth = inp?.depth ?? 3
+	const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', '.cache', 'coverage', 'target'])
+	const lines: string[] = []
+
+	function walk(d: string, prefix: string, depth: number) {
+		if (depth > maxDepth || lines.length > 500) return
+		let entries: string[]
+		try {
+			entries = readdirSync(d).sort()
+		} catch {
+			return
 		}
-		case 'ls': {
-			const dir = resolve(inp?.path)
-			const maxDepth = inp?.depth ?? 3
-			const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', '.cache', 'coverage', 'target'])
-			const lines: string[] = []
-
-			function walk(d: string, prefix: string, depth: number) {
-				if (depth > maxDepth || lines.length > 500) return
-				let entries: string[]
-				try {
-					entries = readdirSync(d).sort()
-				} catch {
-					return
-				}
-				for (const entry of entries) {
-					if (IGNORE.has(entry)) continue
-					if (lines.length > 500) {
-						lines.push(`${prefix}... (truncated)`)
-						return
-					}
-					try {
-						const full = `${d}/${entry}`
-						if (statSync(full).isDirectory()) {
-							lines.push(`${prefix}${entry}/`)
-							walk(full, prefix + '  ', depth + 1)
-						} else {
-							lines.push(`${prefix}${entry}`)
-						}
-					} catch {}
-				}
+		for (const entry of entries) {
+			if (IGNORE.has(entry)) continue
+			if (lines.length > 500) {
+				lines.push(`${prefix}... (truncated)`)
+				return
 			}
-
-			walk(dir, '', 0)
-			return lines.join('\n') || '(empty directory)'
+			try {
+				const full = `${d}/${entry}`
+				if (statSync(full).isDirectory()) {
+					lines.push(`${prefix}${entry}/`)
+					walk(full, prefix + '  ', depth + 1)
+				} else {
+					lines.push(`${prefix}${entry}`)
+				}
+			} catch {}
 		}
-		case 'read_blob':
-			return readBlob.execute(inp, { sessionId: ctx?.sessionId, truncate })
-		case 'eval': {
-			const evalCtx = ctx?.evalCtx
-			if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
-			if (!evalCtx.runtime) {
-				const { runtimeCore } = await import('./runtime.ts')
-				try {
-					evalCtx.runtime = runtimeCore.getRuntime()
-				} catch {}
-			}
-			return await evalTool.executeEval(String(inp.code), evalCtx)
-		}
-		default:
-			return `Unknown tool: ${call.name}`
 	}
+
+	walk(dir, '', 0)
+	return lines.join('\n') || '(empty directory)'
+}
+
+async function executeEval(input: unknown, _onChunk: OnChunk | undefined, ctx: ResolvedToolExecContext): Promise<string | any[]> {
+	const evalCtx = ctx.evalCtx
+	if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
+	if (!evalCtx.runtime) {
+		const { runtimeCore } = await import('./runtime.ts')
+		try {
+			evalCtx.runtime = runtimeCore.getRuntime()
+		} catch {}
+	}
+	return await evalTool.executeEval(String((input as any).code), evalCtx)
 }
 
 export const tools = { config: toolsConfig, truncate, shortenHome, getTools, argsPreview, executeTool }

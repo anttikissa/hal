@@ -1,11 +1,8 @@
 import { blob } from '../session/blob.ts'
 import { ason } from '../utils/ason.ts'
+import { defineTool, previewField } from './tool.ts'
 
-interface ReadBlobInput {
-	blobId?: string
-}
-
-interface ReadBlobContext {
+export interface ReadBlobExecuteContext {
 	sessionId?: string
 	truncate(text: string): string
 }
@@ -38,20 +35,20 @@ const definition = {
 	},
 }
 
-function argsPreview(input: unknown): string {
-	return String((input as ReadBlobInput).blobId ?? '')
-}
+const blobIdPreview = previewField('blobId')
 
-async function execute(input: unknown, context: ReadBlobContext): Promise<string> {
+async function execute(input: unknown, context: ReadBlobExecuteContext): Promise<string> {
 	if (!context.sessionId) throw new Error('read_blob requires sessionId context')
-	const blobId = String((input as ReadBlobInput).blobId ?? '').trim()
+	const blobId = blobIdPreview(input).trim()
 	const blobData = await blob.read(context.sessionId, blobId)
 	return formatPreview(blobId, blobData, context.truncate)
 }
 
-export const readBlob = {
-	definition,
-	argsPreview,
-	execute,
-	formatPreview,
-}
+export const readBlob = Object.assign(
+	defineTool<ReadBlobExecuteContext, string>({
+		definition,
+		argsPreview: blobIdPreview,
+		execute,
+	}),
+	{ formatPreview },
+)

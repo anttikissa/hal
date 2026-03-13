@@ -1,5 +1,6 @@
 import { statSync } from 'fs'
 import { formatHashlines, resolvePath } from './file-utils.ts'
+import { defineTool, previewField } from './tool.ts'
 import { readFiles } from '../utils/read-file.ts'
 
 export interface ReadExecuteContext {
@@ -20,10 +21,7 @@ const definition = {
 	},
 }
 
-function argsPreview(input: unknown): string {
-	const inp = input as any
-	return String(inp?.path ?? '')
-}
+const pathPreview = previewField('path')
 
 function execute(input: unknown, ctx: ReadExecuteContext): string {
 	const inp = input as any
@@ -38,4 +36,8 @@ function execute(input: unknown, ctx: ReadExecuteContext): string {
 	return formatHashlines(content, inp?.start, inp?.end)
 }
 
-export const read = { definition, argsPreview, execute }
+export const read = defineTool<ReadExecuteContext, string>({
+	definition,
+	argsPreview: pathPreview,
+	execute,
+})

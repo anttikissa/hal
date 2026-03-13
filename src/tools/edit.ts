@@ -1,5 +1,6 @@
 import { readFiles } from '../utils/read-file.ts'
 import { formatContext, parseRef, resolvePath, validateRef, withLock } from './file-utils.ts'
+import { defineTool, previewField } from './tool.ts'
 
 export interface EditExecuteContext {
 	cwd: string
@@ -32,10 +33,7 @@ new_content is raw file content — no hashline prefixes. A trailing newline in 
 	cache_control: { type: 'ephemeral' },
 }
 
-function argsPreview(input: unknown): string {
-	const inp = input as any
-	return String(inp?.path ?? '')
-}
+const pathPreview = previewField('path')
 
 function applyReplace(content: string, startRef: string, endRef: string, newContent: string, contextLines: number): EditApplyResult | string {
 	const start = parseRef(startRef)
@@ -104,4 +102,8 @@ async function execute(input: unknown, ctx: EditExecuteContext): Promise<string>
 	})
 }
 
-export const edit = { definition, argsPreview, execute }
+export const edit = defineTool<EditExecuteContext, string>({
+	definition,
+	argsPreview: pathPreview,
+	execute,
+})
