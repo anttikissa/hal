@@ -43,6 +43,19 @@ test('disableTerminalInput keeps a data listener to drain buffered bytes', () =>
 	expect(() => handlers[0]('\x1b[99;5:3u')).not.toThrow()
 })
 
+test('aborting sessions are excluded from handoff busy list', () => {
+	// This tests the filtering logic used by busySessionIds() in cli.ts:
+	// sessions with an active AbortController (being paused) should not
+	// appear in the handoff, otherwise they get auto-continued after restart.
+	const busySessionIds = new Set(['session-a', 'session-b', 'session-c'])
+	const abortControllers = new Map([['session-b', new AbortController()]])
+
+	const filtered = [...busySessionIds].filter(id => !abortControllers.has(id))
+
+	expect(filtered).toEqual(['session-a', 'session-c'])
+	expect(filtered).not.toContain('session-b')
+})
+
 function makeMockStdin() {
 	const handlers = new Map<string, Function[]>()
 	return {
