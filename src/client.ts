@@ -143,6 +143,8 @@ export class Client {
 	}
 
 	private applyCwdMode(target: string): void {
+		const current = this.activeTab()
+		if (current?.info.workingDir === target) return
 		const candidate = this.state.tabs.findIndex(t => t.info.workingDir === target)
 		if (candidate >= 0) {
 			this.state.activeTabIndex = candidate

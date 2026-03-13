@@ -1,10 +1,10 @@
 import { test, expect } from 'bun:test'
 import { randomBytes } from 'crypto'
 import { Client } from './client.ts'
+import { clientState } from './client-state.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
 import type { HydrationData } from './session/history.ts'
-
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
 	readonly sentCommands: RuntimeCommand[] = []
@@ -135,5 +135,40 @@ test('cwd mode does not activate when LAUNCH_CWD equals HAL_DIR', async () => {
 		else process.env.HAL_SELF_MODE = origSelf
 		if (origHalDir == null) delete process.env.HAL_DIR
 		else process.env.HAL_DIR = origHalDir
+	}
+})
+
+test('cwd mode stays on current tab if it already matches LAUNCH_CWD', async () => {
+	const origCwd = process.env.LAUNCH_CWD
+	const origSelf = process.env.HAL_SELF_MODE
+	const origGetLastTab = clientState.getLastTab
+	process.env.LAUNCH_CWD = '/tmp/my-project'
+	delete process.env.HAL_SELF_MODE
+	try {
+		const ts = new Date().toISOString()
+		const sidA = `t-${randomBytes(4).toString('hex')}`
+		const sidB = `t-${randomBytes(4).toString('hex')}`
+		const sidC = `t-${randomBytes(4).toString('hex')}`
+		const sidD = `t-${randomBytes(4).toString('hex')}`
+		const sessions: SessionInfo[] = [
+			{ id: sidA, workingDir: '/tmp/other', createdAt: ts, updatedAt: ts },
+			{ id: sidB, workingDir: '/tmp/other2', createdAt: ts, updatedAt: ts },
+			{ id: sidC, workingDir: '/tmp/my-project', createdAt: ts, updatedAt: ts },  // tab 3
+			{ id: sidD, workingDir: '/tmp/my-project', createdAt: ts, updatedAt: ts },  // tab 4 — user was here
+		]
+		// Simulate user was on tab 4 before restart
+		clientState.getLastTab = () => sidD
+		const transport = new FakeTransport(bootstrapWith(sessions, sidD))
+		const client = new Client(transport, () => {})
+		await client.start()
+		// Should stay on sidD (tab 4), not jump to sidC (tab 3)
+		expect(client.activeTab()?.sessionId).toBe(sidD)
+		expect(transport.sentCommands.some(c => c.type === 'open')).toBe(false)
+	} finally {
+		if (origCwd == null) delete process.env.LAUNCH_CWD
+		else process.env.LAUNCH_CWD = origCwd
+		if (origSelf == null) delete process.env.HAL_SELF_MODE
+		else process.env.HAL_SELF_MODE = origSelf
+		clientState.getLastTab = origGetLastTab
 	}
 })
