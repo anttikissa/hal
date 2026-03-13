@@ -262,6 +262,54 @@ test('client tails active tab events even while non-active hydration is blocked'
 	}
 })
 
+test('switching to unhydrated tab triggers on-demand hydration', async () => {
+	const sidA = `t-${randomBytes(4).toString('hex')}`
+	const sidB = `t-${randomBytes(4).toString('hex')}`
+	const ts = new Date().toISOString()
+	const state: RuntimeState = {
+		hostPid: 123,
+		hostId: 'host-test',
+		sessions: [sidA, sidB],
+		activeSessionId: sidA,
+		busySessionIds: [],
+		eventsOffset: 0,
+		updatedAt: ts,
+	}
+	const sessions: SessionInfo[] = [
+		{ id: sidA, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
+		{ id: sidB, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
+	]
+	const hydrationBySession: Record<string, HydrationData> = {
+		[sidA]: { replayMessages: [{ role: 'user', content: 'active tab', ts } as Message], inputHistory: [] },
+		[sidB]: { replayMessages: [{ role: 'user', content: 'other tab', ts } as Message], inputHistory: ['past input'] },
+	}
+	// Block hydration for sidB so background hydration can't complete before tab switch
+	const transport = new FakeTransport({ state, sessions }, [], hydrationBySession, [sidB])
+	const originalHal = (globalThis as any).__hal
+	;(globalThis as any).__hal = { startupEpochMs: Date.now() - 40, startupReadyElapsedMs: 20 }
+	let updates = 0
+	try {
+		const client = new Client(transport, () => { updates++ })
+		void client.start()
+		await waitFor(() => client.activeTab()?.hydrated === true, 600)
+		// Tab B should not be hydrated yet (blocked)
+		const tabB = client.getState().tabs.find(t => t.sessionId === sidB)
+		expect(tabB?.hydrated).toBe(false)
+		expect(tabB?.blocks.length).toBe(0)
+		// Switch to tab B — triggers on-demand hydration
+		client.switchToTab(1)
+		expect(client.activeTab()?.sessionId).toBe(sidB)
+		// Release the hydration gate so on-demand hydration can complete
+		transport.releaseReplay(sidB)
+		await waitFor(() => tabB?.hydrated === true, 600)
+		expect(tabB?.blocks.some((b) => b.type === 'input' && b.text === 'other tab')).toBe(true)
+		expect(tabB?.inputHistory).toEqual(['past input'])
+	} finally {
+		if (originalHal === undefined) delete (globalThis as any).__hal
+		else (globalThis as any).__hal = originalHal
+	}
+})
+
 test('client loads draft while hydration is in flight', async () => {
 	const sessionId = `t-${randomBytes(4).toString('hex')}`
 	const ts = new Date().toISOString()

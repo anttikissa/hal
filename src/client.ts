@@ -26,6 +26,7 @@ export interface TabState {
 	loadingHistory: boolean
 	question?: { id: string; text: string }
 	doneUnseen?: boolean
+	hydrated: boolean
 }
 
 export interface ClientState {
@@ -376,14 +377,14 @@ export class Client {
 		}
 		tab.inputHistory = hydration.inputHistory
 		tab.inputDraft = await inputDraftPromise
+		tab.hydrated = true
 		return Date.now() - startedAt
 	}
 
 	private async hydrateNonActiveTabs(activeSessionId: string | null): Promise<void> {
 		let hydratedTabs = 0
 		for (const tab of this.state.tabs) {
-			if (tab.sessionId === activeSessionId) continue
-			await Bun.sleep(0)
+			if (tab.sessionId === activeSessionId || tab.hydrated) continue
 			try {
 				await this.hydrateTab(tab)
 				hydratedTabs += 1
@@ -412,6 +413,7 @@ export class Client {
 				context: info.context,
 				loadingHistory: false,
 				question: pendingQuestion ? { id: pendingQuestion.id, text: pendingQuestion.text } : undefined,
+				hydrated: false,
 			})
 		}
 		// Prefer client's last-viewed tab, fall back to server's active session
@@ -586,7 +588,7 @@ export class Client {
 		for (const info of sessions) {
 			const existing = current.get(info.id)
 			if (existing) { existing.info = info; existing.context = info.context ?? existing.context; newTabs.push(existing) }
-			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context, loadingHistory: false }); newTabId = info.id }
+			else { newTabs.push({ sessionId: info.id, blocks: [], info, busy: false, pausing: false, inputHistory: [], inputDraft: '', contentHeight: 0, context: info.context, loadingHistory: false, hydrated: false }); newTabId = info.id }
 		}
 		const prevId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		this.state.tabs = newTabs
@@ -691,6 +693,12 @@ export class Client {
 		const tab = this.activeTab()
 		if (tab) {
 			tab.doneUnseen = false
+			if (!tab.hydrated) {
+				void this.hydrateTab(tab).then(() => {
+					this.applyTabToPrompt(tab)
+					this.onUpdate()
+				}).catch(() => {})
+			}
 			this.applyTabToPrompt(tab)
 			clientState.saveLastTab(tab.sessionId)
 		}
