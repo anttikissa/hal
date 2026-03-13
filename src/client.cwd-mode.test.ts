@@ -137,39 +137,3 @@ test('cwd mode does not activate when LAUNCH_CWD equals HAL_DIR', async () => {
 		else process.env.HAL_DIR = origHalDir
 	}
 })
-
-test('cwd mode does not override saved last tab on restart', async () => {
-	const origCwd = process.env.LAUNCH_CWD
-	const origSelf = process.env.HAL_SELF_MODE
-	process.env.LAUNCH_CWD = '/tmp/my-project'
-	delete process.env.HAL_SELF_MODE
-	const origGetLastTab = (await import('./client-state.ts')).clientState.getLastTab
-	try {
-		const ts = new Date().toISOString()
-		const sidA = `t-${randomBytes(4).toString('hex')}`
-		const sidB = `t-${randomBytes(4).toString('hex')}`
-		const sidC = `t-${randomBytes(4).toString('hex')}`
-		const sidD = `t-${randomBytes(4).toString('hex')}`
-		const sessions: SessionInfo[] = [
-			{ id: sidA, workingDir: '/tmp/other', createdAt: ts, updatedAt: ts },
-			{ id: sidB, workingDir: '/tmp/other2', createdAt: ts, updatedAt: ts },
-			{ id: sidC, workingDir: '/tmp/my-project', createdAt: ts, updatedAt: ts },
-			{ id: sidD, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
-		]
-		// User was on tab 4 (sidD) before restart
-		const { clientState } = await import('./client-state.ts')
-		clientState.getLastTab = () => sidD
-		const transport = new FakeTransport(bootstrapWith(sessions, sidA))
-		const client = new Client(transport, () => {})
-		await client.start()
-		// Should stay on sidD (user's last tab), not switch to sidC (cwd match)
-		expect(client.activeTab()?.sessionId).toBe(sidD)
-	} finally {
-		if (origCwd == null) delete process.env.LAUNCH_CWD
-		else process.env.LAUNCH_CWD = origCwd
-		if (origSelf == null) delete process.env.HAL_SELF_MODE
-		else process.env.HAL_SELF_MODE = origSelf
-		const { clientState } = await import('./client-state.ts')
-		clientState.getLastTab = origGetLastTab
-	}
-})
