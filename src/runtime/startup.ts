@@ -9,7 +9,7 @@ import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { Runtime, runtimeCore } from './runtime.ts'
 import { handoffConfig, type RuntimeHandoffState, type RuntimeCommand } from '../protocol.ts'
-
+import { startupTrace } from '../perf/startup-trace.ts'
 
 function shouldContinueAfterHandoff(handoff: RuntimeHandoffState | null): boolean {
 	if (!handoff || handoff.mode !== 'continue') return false
@@ -62,11 +62,13 @@ async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Prom
 export async function startRuntime(): Promise<Runtime> {
 	await ipc.ensureBus()
 	const cmdOffset = await ipc.commands.offset()
+	startupTrace.mark('rt-ipc-ready')
 	const rt = new Runtime()
 	runtimeCore.setRuntime(rt)
 
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = ipc.getState()
+	startupTrace.mark('rt-state-loaded', `${prevState.sessions.length} sessions`)
 	const handoff = prevState.handoff ?? null
 	const continueAfterHandoff = shouldContinueAfterHandoff(handoff)
 	const handoffBusyIds = continueAfterHandoff
@@ -107,18 +109,21 @@ export async function startRuntime(): Promise<Runtime> {
 		rt.setFreshContext(info)
 		await rt.greetSession(info.id)
 	}
+	startupTrace.mark('rt-sessions-restored', `${rt.sessions.size} sessions`)
 
 	for (const id of handoffBusyIds) {
 		if (rt.sessions.has(id)) rt.busySessionIds.add(id)
 	}
 
 	await rt.publish()
+	startupTrace.mark('rt-published')
 	if (continueAfterHandoff) {
 		for (const id of handoffBusyIds) {
 			await continueSessionAfterHandoff(rt, id)
 		}
 		await rt.publish()
 	}
+	startupTrace.mark('rt-handoff-done')
 
 	// Tail from offset captured at startup (no race window)
 	let stopped = false
@@ -131,6 +136,7 @@ export async function startRuntime(): Promise<Runtime> {
 			await handleCommand(rt, cmd)
 		}
 	})()
+	startupTrace.mark('rt-tail-started')
 
 	// Watch SYSTEM.md + AGENTS.md for changes → notify active session
 	const watchers: FSWatcher[] = []

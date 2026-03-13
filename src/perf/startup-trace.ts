@@ -2,6 +2,12 @@ import type { Message } from '../session/history.ts'
 
 type StartupTraceKey =
 	| 'first-code'
+	| 'rt-ipc-ready'
+	| 'rt-state-loaded'
+	| 'rt-sessions-restored'
+	| 'rt-published'
+	| 'rt-handoff-done'
+	| 'rt-tail-started'
 	| 'runtime-ready'
 	| 'cli-ready'
 	| 'active-messages-loaded'
@@ -25,18 +31,30 @@ interface StartupTraceState {
 
 const startupTraceOrder: Record<StartupTraceKey, number> = {
 	'first-code': 0,
-	'runtime-ready': 1,
-	'cli-ready': 2,
-	'active-messages-loaded': 3,
-	'active-tail-hydrated': 4,
-	'active-tail-rendered': 5,
-	'interactive-ready': 6,
-	'active-all-hydrated': 7,
-	'other-tabs-hydrated': 8,
+	'rt-ipc-ready': 1,
+	'rt-state-loaded': 2,
+	'rt-sessions-restored': 3,
+	'rt-published': 4,
+	'rt-handoff-done': 5,
+	'rt-tail-started': 6,
+	'runtime-ready': 7,
+	'cli-ready': 8,
+	'active-messages-loaded': 9,
+	'active-tail-hydrated': 10,
+	'active-tail-rendered': 11,
+	'interactive-ready': 12,
+	'active-all-hydrated': 13,
+	'other-tabs-hydrated': 14,
 }
 
 const startupTraceLabel: Record<StartupTraceKey, string> = {
 	'first-code': 'first line of code executed',
+	'rt-ipc-ready': 'ipc bus ready',
+	'rt-state-loaded': 'state loaded',
+	'rt-sessions-restored': 'sessions restored',
+	'rt-published': 'state published',
+	'rt-handoff-done': 'handoff done',
+	'rt-tail-started': 'command tail started',
 	'runtime-ready': 'runtime initialized',
 	'cli-ready': 'cli initialized',
 	'active-messages-loaded': 'current tab messages loaded',
