@@ -6,6 +6,7 @@ import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './
 import type { Message, HydrationData } from './session/history.ts'
 import { draft } from './cli/draft.ts'
 import { replay } from './session/replay.ts'
+import { progressiveHydrateConfig } from './session/progressive-hydrate.ts'
 
 class FakeTransport implements Transport {
 	private readonly bootstrapState: BootstrapState
@@ -377,13 +378,13 @@ test('client can render tail first and backfill older history in background', as
 	})
 	const originalMin = clientConfig.startupProgressiveMinMessages
 	const originalTail = clientConfig.startupTailMessageCount
-	const originalChunk = clientConfig.startupBackgroundChunkMessages
-	const originalWorker = clientConfig.startupUseWorkerForHistory
+	const originalChunk = progressiveHydrateConfig.chunkMessages
+	const originalWorker = progressiveHydrateConfig.useWorker
 	const originalReplay = replay.replayToBlocks
 	clientConfig.startupProgressiveMinMessages = 2
 	clientConfig.startupTailMessageCount = 1
-	clientConfig.startupBackgroundChunkMessages = 1
-	clientConfig.startupUseWorkerForHistory = false
+	progressiveHydrateConfig.chunkMessages = 1
+	progressiveHydrateConfig.useWorker = false
 	replay.replayToBlocks = async (sid, messages, model, busy, opts) => {
 		if (messages.some((m: any) => m.role === 'user' && m.content === 'old-1')) await Bun.sleep(25)
 		return originalReplay(sid, messages, model, busy, opts)
@@ -399,7 +400,7 @@ test('client can render tail first and backfill older history in background', as
 		replay.replayToBlocks = originalReplay
 		clientConfig.startupProgressiveMinMessages = originalMin
 		clientConfig.startupTailMessageCount = originalTail
-		clientConfig.startupBackgroundChunkMessages = originalChunk
-		clientConfig.startupUseWorkerForHistory = originalWorker
+		progressiveHydrateConfig.chunkMessages = originalChunk
+		progressiveHydrateConfig.useWorker = originalWorker
 	}
 })

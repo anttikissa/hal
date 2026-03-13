@@ -5,13 +5,14 @@ import type { Block } from './cli/blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from './protocol.ts'
 import { protocol } from './protocol.ts'
 import { replay } from './session/replay.ts'
-import type { Message } from './session/history.ts'
 import { draft } from './cli/draft.ts'
 import { prompt } from './cli/prompt.ts'
 import { clientState } from './client-state.ts'
 import { randomBytes } from 'crypto'
 import { resolve } from 'path'
 import { startupTrace } from './perf/startup-trace.ts'
+import { startupClientPerf, type StartupPerfHolder } from './perf/startup-client-perf.ts'
+import { progressiveHydrate } from './session/progressive-hydrate.ts'
 
 export interface TabState {
 	sessionId: string
@@ -46,63 +47,9 @@ function cwdModeTarget(): string | null {
 	return resolve(cwd)
 }
 
-interface StartupPerfState {
-	readyMs: number | null
-	hostRuntimeMs: number | null
-	cliReadyMs: number | null
-	epochMs: number | null
-	tabMs: number | null
-	hydrateMs: number | null
-	renderMs: number | null
-	targetMs: number
-}
 export const clientConfig = {
 	startupProgressiveMinMessages: 400,
 	startupTailMessageCount: 120,
-	startupBackgroundChunkMessages: 120,
-	startupUseWorkerForHistory: true,
-}
-
-function startupPerfSample(): StartupPerfState | null {
-	const meta = (globalThis as any).__hal as {
-		startupEpochMs?: number | null
-		startupReadyElapsedMs?: number | null
-		startupHostRuntimeElapsedMs?: number | null
-	} | undefined
-	const epochRaw = meta?.startupEpochMs
-	const epochMs = typeof epochRaw === 'number' && Number.isFinite(epochRaw) && epochRaw > 0 ? epochRaw : null
-	const hostRuntimeRaw = meta?.startupHostRuntimeElapsedMs
-	const hostRuntimeMs = typeof hostRuntimeRaw === 'number' && Number.isFinite(hostRuntimeRaw) && hostRuntimeRaw >= 0
-		? Math.round(hostRuntimeRaw)
-		: null
-	const readyRaw = meta?.startupReadyElapsedMs
-	if (typeof readyRaw === 'number' && Number.isFinite(readyRaw) && readyRaw >= 0) {
-		const readyMs = Math.round(readyRaw)
-		const cliReadyMs = hostRuntimeMs === null ? null : Math.max(0, readyMs - hostRuntimeMs)
-		return {
-			readyMs,
-			hostRuntimeMs,
-			cliReadyMs,
-			epochMs,
-			tabMs: null,
-			hydrateMs: null,
-			renderMs: null,
-			targetMs: 200,
-		}
-	}
-	if (!epochMs) return null
-	const readyMs = Math.max(0, Date.now() - epochMs)
-	const cliReadyMs = hostRuntimeMs === null ? null : Math.max(0, readyMs - hostRuntimeMs)
-	return {
-		readyMs,
-		hostRuntimeMs,
-		cliReadyMs,
-		epochMs,
-		tabMs: null,
-		hydrateMs: null,
-		renderMs: null,
-		targetMs: 200,
-	}
 }
 
 export class Client {
@@ -111,8 +58,7 @@ export class Client {
 	private state: ClientState
 	private onUpdate: () => void
 	private pendingOpen = false
-	private pendingStartupPerf: StartupPerfState | null = null
-	private startupBackgroundHydration = new Map<string, Promise<void>>()
+	private startupPerf: StartupPerfHolder = { state: null }
 
 	constructor(transport: Transport, onUpdate: () => void) {
 		this.transport = transport
@@ -158,178 +104,6 @@ export class Client {
 		}
 	}
 
-	private appendStartupTraceIfPossible(tab: TabState): void {
-		for (const line of startupTrace.drainLines()) {
-			tab.blocks.push({ type: 'info', text: line })
-		}
-	}
-
-	private appendStartupPerfIfPossible(): void {
-		const tab = this.activeTab()
-		if (!tab) return
-		const startupPerf = this.pendingStartupPerf
-		if (startupPerf) {
-			const targetMs = startupPerf.targetMs
-			if (startupPerf.tabMs !== null || startupPerf.epochMs === null) {
-				this.pendingStartupPerf = null
-				if (startupPerf.tabMs !== null) {
-					const warn = startupPerf.tabMs > targetMs
-					const readyPart = startupPerf.readyMs !== null
-						? startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
-							? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms) · `
-							: `ready ${startupPerf.readyMs}ms · `
-						: ''
-					const detail = startupPerf.hydrateMs !== null && startupPerf.renderMs !== null
-						? ` (hydrate ${startupPerf.hydrateMs}ms + render ${startupPerf.renderMs}ms)`
-						: ''
-					tab.blocks.push({
-						type: 'info',
-						text: `${warn ? '⚠ ' : ''}[perf] startup: ${readyPart}tab ${startupPerf.tabMs}ms${detail} (target <${targetMs}ms tab)`,
-					})
-				} else if (startupPerf.readyMs !== null) {
-					const readyLabel = startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
-						? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms)`
-						: `ready ${startupPerf.readyMs}ms`
-					tab.blocks.push({
-						type: 'info',
-						text: `${startupPerf.readyMs > targetMs ? '⚠ ' : ''}[perf] startup: ${readyLabel} (target <${targetMs}ms)`,
-					})
-				}
-			}
-		}
-		this.appendStartupTraceIfPossible(tab)
-	}
-
-	private captureStartupTabPerf(hydrateMs: number | null, renderMs: number): void {
-		if (!this.pendingStartupPerf) return
-		const startupPerf = this.pendingStartupPerf
-		if (startupPerf.tabMs !== null) return
-		const roundedHydrate = hydrateMs === null ? null : Math.max(0, Math.round(hydrateMs))
-		const roundedRender = Math.max(0, Math.round(renderMs))
-		startupPerf.hydrateMs = roundedHydrate
-		startupPerf.renderMs = roundedRender
-		if (startupPerf.epochMs !== null) {
-			startupPerf.tabMs = Math.max(0, Date.now() - startupPerf.epochMs)
-			return
-		}
-		if (startupPerf.readyMs !== null && roundedHydrate !== null) {
-			startupPerf.tabMs = startupPerf.readyMs + roundedHydrate + roundedRender
-		}
-	}
-
-	private renderAndCaptureStartup(hydrateMs: number | null): void {
-		const active = this.activeTab()
-		const shouldCapture = !!this.pendingStartupPerf && this.pendingStartupPerf.tabMs === null && !!active
-		if (!shouldCapture) {
-			this.appendStartupPerfIfPossible()
-			this.onUpdate()
-			return
-		}
-		const renderStartedAt = Date.now()
-		this.onUpdate()
-		const renderMs = Date.now() - renderStartedAt
-		this.captureStartupTabPerf(hydrateMs, renderMs)
-		if (active) {
-			startupTrace.mark('active-tail-rendered', `${Math.max(0, Math.round(renderMs))}ms (${active.sessionId})`)
-			startupTrace.mark('interactive-ready', active.sessionId)
-		}
-		this.appendStartupPerfIfPossible()
-		this.onUpdate()
-	}
-
-
-	private async hydrateOlderHistoryInProcess(tab: TabState, olderMessages: Message[], allMessages: Message[]): Promise<void> {
-		let end = olderMessages.length
-		while (end > 0) {
-			const chunkSize = Math.max(1, clientConfig.startupBackgroundChunkMessages)
-			const start = Math.max(0, end - chunkSize)
-			const chunk = olderMessages.slice(start, end)
-			const chunkBlocks = await replay.replayToBlocks(tab.sessionId, chunk, tab.info.model, true, {
-				toolResultSourceMessages: allMessages,
-				appendInterruptedHint: false,
-			})
-			if (chunkBlocks.length > 0) tab.blocks.unshift(...chunkBlocks)
-			end = start
-			await Bun.sleep(0)
-		}
-	}
-
-	private async hydrateOlderHistoryInWorker(tab: TabState, olderMessages: Message[], allMessages: Message[]): Promise<void> {
-		const worker = new Worker(new URL('./session/replay-worker.ts', import.meta.url).href, { type: 'module' })
-		const requestId = randomBytes(8).toString('hex')
-		try {
-			await new Promise<void>((resolve, reject) => {
-				let done = false
-				const finish = (fn: () => void) => {
-					if (done) return
-					done = true
-					fn()
-				}
-				worker.onmessage = (event: any) => {
-					const msg = event?.data as any
-					if (!msg || msg.requestId !== requestId) return
-					if (msg.type === 'chunk') {
-						const chunkBlocks = Array.isArray(msg.blocks) ? msg.blocks : []
-						if (chunkBlocks.length > 0) tab.blocks.unshift(...chunkBlocks)
-						return
-					}
-					if (msg.type === 'done') {
-						finish(resolve)
-						return
-					}
-					if (msg.type === 'error') {
-						finish(() => reject(new Error(typeof msg.message === 'string' ? msg.message : 'history worker failed')))
-					}
-				}
-				worker.onerror = (event: any) => {
-					finish(() => reject(new Error(event?.message || 'history worker failed')))
-				}
-				worker.postMessage({
-					type: 'hydrate-older',
-					requestId,
-					sessionId: tab.sessionId,
-					model: tab.info.model,
-					olderMessages,
-					allMessages,
-					chunkSize: Math.max(1, clientConfig.startupBackgroundChunkMessages),
-				})
-			})
-		} finally {
-			worker.terminate()
-		}
-	}
-
-	private hydrateOlderHistoryInBackground(
-		tab: TabState,
-		olderMessages: Message[],
-		allMessages: Message[],
-		opts?: { startupTraceMessageCount?: number },
-	): void {
-		if (olderMessages.length === 0) return
-		if (this.startupBackgroundHydration.has(tab.sessionId)) return
-		tab.loadingHistory = true
-		const sessionId = tab.sessionId
-		const task = (async () => {
-			if (clientConfig.startupUseWorkerForHistory && typeof Worker !== 'undefined') {
-				try {
-					await this.hydrateOlderHistoryInWorker(tab, olderMessages, allMessages)
-					return
-				} catch {}
-			}
-			await this.hydrateOlderHistoryInProcess(tab, olderMessages, allMessages)
-		})()
-		this.startupBackgroundHydration.set(sessionId, task)
-		void task.finally(() => {
-			this.startupBackgroundHydration.delete(sessionId)
-			tab.loadingHistory = false
-			if (opts?.startupTraceMessageCount !== undefined) {
-				startupTrace.mark('active-all-hydrated', `${opts.startupTraceMessageCount} messages (${tab.sessionId})`)
-			}
-			this.appendStartupPerfIfPossible()
-			this.onUpdate()
-		})
-	}
-
 	private async hydrateTab(tab: TabState, opts?: { progressiveStartup?: boolean; startupTrace?: boolean }): Promise<number> {
 		const startedAt = Date.now()
 		const inputDraftPromise = draft.loadDraft(tab.sessionId)
@@ -359,12 +133,13 @@ export class Client {
 			if (opts?.startupTrace) {
 				startupTrace.mark('active-tail-hydrated', `last ${tailMessages.length} messages in ${Math.max(0, Math.round(hydrateMs))}ms (${tab.sessionId})`)
 			}
-			this.hydrateOlderHistoryInBackground(
-				tab,
-				olderMessages,
-				replayMessages,
-				opts?.startupTrace ? { startupTraceMessageCount: replayMessages.length } : undefined,
-			)
+			progressiveHydrate.hydrateInBackground(tab, olderMessages, replayMessages, {
+				startupTraceMessageCount: opts?.startupTrace ? replayMessages.length : undefined,
+				onDone: () => {
+					startupClientPerf.appendIfReady(this.startupPerf, this.activeTab()?.blocks ?? null)
+					this.onUpdate()
+				},
+			})
 		} else {
 			const hydrateStartedAt = Date.now()
 			const blocks = await replay.replayToBlocks(tab.sessionId, replayMessages, tab.info.model, tab.busy)
@@ -392,7 +167,7 @@ export class Client {
 		}
 		if (hydratedTabs > 0) {
 			startupTrace.mark('other-tabs-hydrated', `${hydratedTabs} tabs`)
-			this.appendStartupPerfIfPossible()
+			startupClientPerf.appendIfReady(this.startupPerf, this.activeTab()?.blocks ?? null)
 			this.onUpdate()
 		}
 	}
@@ -431,7 +206,7 @@ export class Client {
 			}
 		}
 		this.state.connected = true
-		this.pendingStartupPerf = startupPerfSample()
+		this.startupPerf = { state: startupClientPerf.sample() }
 		this.onUpdate()
 
 		const offset = await this.transport.eventsOffset()
@@ -441,7 +216,7 @@ export class Client {
 			const activeHydration = await this.hydrateTab(activeBeforeHydration, { progressiveStartup: true, startupTrace: true })
 			this.applyTabToPrompt(activeBeforeHydration)
 			clientState.saveLastTab(activeBeforeHydration.sessionId)
-			this.renderAndCaptureStartup(activeHydration)
+			startupClientPerf.renderAndCapture(this.startupPerf, activeBeforeHydration.blocks, activeBeforeHydration.sessionId, this.onUpdate, activeHydration)
 		}
 		const nonActiveHydration = this.hydrateNonActiveTabs(activeBeforeHydration?.sessionId ?? null)
 		const eventTail = this.transport.tailEvents(offset)
@@ -617,12 +392,12 @@ export class Client {
 		const newId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		if (newId !== prevId) this.switchToActiveTab()
 		const active = this.activeTab()
-		if (active && this.pendingStartupPerf && this.pendingStartupPerf.tabMs === null) {
+		if (active && this.startupPerf.state && this.startupPerf.state.tabMs === null) {
 			const hydrate = hydrateBySession.get(active.sessionId) ?? null
-			this.renderAndCaptureStartup(hydrate)
+			startupClientPerf.renderAndCapture(this.startupPerf, active.blocks, active.sessionId, this.onUpdate, hydrate)
 			return
 		}
-		this.appendStartupPerfIfPossible()
+		startupClientPerf.appendIfReady(this.startupPerf, this.activeTab()?.blocks ?? null)
 		this.onUpdate()
 	}
 
