@@ -337,7 +337,11 @@ export class Client {
 		const replayMessages = hydration.replayMessages
 		const loadMs = Date.now() - loadStartedAt
 		if (opts?.startupTrace) {
-			startupTrace.mark('active-messages-loaded', `${startupTrace.summarizeMessages(replayMessages)} in ${Math.max(0, Math.round(loadMs))}ms (${tab.sessionId})`)
+			const t = hydration.timing
+			const timingDetail = t
+				? `read ${Math.round(t.readMs)}ms + parse ${Math.round(t.parseMs)}ms + fork ${Math.round(t.forkMs)}ms`
+				: `${Math.round(loadMs)}ms`
+			startupTrace.mark('active-messages-loaded', `${startupTrace.summarizeMessages(replayMessages)}; ${timingDetail} (${tab.sessionId})`)
 		}
 		const shouldProgressive = !!opts?.progressiveStartup && replayMessages.length >= clientConfig.startupProgressiveMinMessages
 		if (shouldProgressive) {

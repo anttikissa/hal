@@ -371,17 +371,31 @@ function inputHistoryFromEntries(entries: Message[]): string[] {
 export interface HydrationData {
 	replayMessages: Message[]
 	inputHistory: string[]
+	timing?: { readMs: number; parseMs: number; forkMs: number; totalMs: number }
 }
 
 export async function loadHydrationData(sessionId: string): Promise<HydrationData> {
-	const localEntries = await readHistory(sessionId)
+	const t0 = performance.now()
+	const raw = await readFiles.readText(historyLog(sessionId).path, 'hydration.read')
+	const tRead = performance.now()
+	let localEntries: Message[]
+	try { localEntries = ason.parseAll(raw) as Message[] }
+	catch { localEntries = [] }
+	const tParse = performance.now()
 	const replayMessages = await historyFork.loadAllHistory(sessionId, async (id) => {
 		if (id === sessionId) return localEntries
 		return readHistory(id)
 	})
+	const tFork = performance.now()
 	return {
 		replayMessages,
 		inputHistory: inputHistoryFromEntries(localEntries),
+		timing: {
+			readMs: tRead - t0,
+			parseMs: tParse - tRead,
+			forkMs: tFork - tParse,
+			totalMs: tFork - t0,
+		},
 	}
 }
 
