@@ -420,6 +420,7 @@ export function restart(): void {
 		return
 	}
 	clearPendingAction()
+	client.saveDraftSync()
 	terminal.disableTerminalInput(stdout, stdin)
 	// Intentionally does NOT call releaseHost(). We write handoff state first,
 	// then exit so either a promoted client or the restarted process can resume.

@@ -17,6 +17,21 @@ test('saveDraft + loadDraft round-trip', async () => {
 	expect(await draft.loadDraft(SESSION)).toBe('hello world')
 })
 
+
+test('saveDraftSync + loadDraft round-trip', async () => {
+	setup()
+	draft.saveDraftSync(SESSION, 'hello sync')
+	expect(await draft.loadDraft(SESSION)).toBe('hello sync')
+})
+
+
+test('saveDraftSync empty clears draft', async () => {
+	setup()
+	draft.saveDraftSync(SESSION, 'something sync')
+	draft.saveDraftSync(SESSION, '')
+	expect(await draft.loadDraft(SESSION)).toBe('')
+})
+
 test('saveDraft empty clears draft', async () => {
 	setup()
 	await draft.saveDraft(SESSION, 'something')

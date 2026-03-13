@@ -586,6 +586,14 @@ export class Client {
 		draft.saveDraft(tab.sessionId, tab.inputDraft).catch(() => {})
 	}
 
+	saveDraftSync(): void {
+		const tab = this.activeTab()
+		if (!tab) return
+		if (prompt.hasQuestion()) return // don't overwrite draft with answer text
+		tab.inputDraft = prompt.text()
+		try { draft.saveDraftSync(tab.sessionId, tab.inputDraft) } catch {}
+	}
+
 	clearQuestion(): void {
 		const tab = this.activeTab()
 		if (tab) tab.question = undefined
