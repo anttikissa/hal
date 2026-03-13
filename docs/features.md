@@ -763,7 +763,48 @@ On terminal resize (`stdout.on('resize')`):
 
 ## 9. Phase 6: Provider Adapters
 
-### 9.1 Anthropic Provider
+### 9.1 Architecture
+
+Two adapters cover all providers:
+
+```
+Internal message types (provider-agnostic)
+    ├── anthropic.ts       — first-class native adapter
+    │                        cache_control, thinking, structured streaming
+    │                        used for: Claude models (always go direct)
+    │
+    └── openai-compat.ts   — one adapter, configurable base URL
+                             covers all OpenAI Chat Completions API-compatible services:
+                             • OpenAI      (api.openai.com)
+                             • Gemini      (generativelanguage.googleapis.com/v1beta/openai/)
+                             • Grok / xAI  (api.x.ai/v1)
+                             • OpenRouter  (openrouter.ai/api/v1) — access to any model
+                             • Ollama      (localhost:11434/v1) — local models
+                             • Any compatible endpoint
+```
+
+**Why Anthropic stays native:** Anthropic's API has features with no OpenAI equivalent:
+- **`cache_control` breakpoints** — mark system prompt, tool defs, and conversation prefixes as cacheable. Saves ~90% on input tokens for long sessions. This is the dealbreaker.
+- **Thinking blocks** with explicit `budget_tokens` and `thinking` content blocks in the response, with signatures for verification.
+- **`is_error` on tool results** — tells the model the tool failed.
+- **Structured streaming** — `content_block_start/delta/stop` events (vs OpenAI's flat `choices[0].delta`).
+
+OpenRouter can proxy Claude, but without `cache_control` passthrough you pay full price every call. For Claude, always go direct to Anthropic.
+
+**Provider selection:** Model IDs are prefixed (`anthropic/`, `openai/`, `gemini/`, `grok/`, `openrouter/`). The prefix determines which adapter and base URL to use. Auth keys are stored per-provider in `auth.ason`.
+
+```typescript
+// auth.ason
+{
+    anthropic: { accessToken: "sk-ant-..." },
+    openai: { accessToken: "sk-..." },
+    gemini: { accessToken: "..." },
+    xai: { accessToken: "..." },
+    openrouter: { accessToken: "sk-or-..." },
+}
+```
+
+### 9.2 Anthropic Provider
 
 **Streaming via SSE** to `https://api.anthropic.com/v1/messages`:
 
@@ -787,16 +828,18 @@ On terminal resize (`stdout.on('resize')`):
 - Tool use blocks → collected, emitted after streaming completes
 - Usage stats → captured for context tracking
 
-### 9.2 OpenAI Provider
+### 9.3 OpenAI-Compatible Provider
 
-**Streaming via SSE** to `https://api.openai.com/v1/chat/completions` (or `responses` endpoint):
+**Streaming via SSE** to a configurable base URL (default: `https://api.openai.com/v1/chat/completions`):
 
 - Request format: OpenAI Chat Completions API
-- Message conversion: Anthropic content blocks → OpenAI messages
+- Message conversion: Internal content blocks → OpenAI messages
 - Tool definitions: Converted to OpenAI function format
-- Thinking support: `reasoning_effort` parameter for o-series models
+- Thinking support: `reasoning_effort` parameter for models that support it (OpenAI o-series, Gemini via thinking levels)
 
-### 9.3 Model Registry
+The same adapter code handles OpenAI, Gemini, Grok, OpenRouter, and local endpoints. The only differences are base URL and API key.
+
+### 9.4 Model Registry
 
 Maps model IDs to display names and provider details:
 
@@ -805,10 +848,11 @@ Maps model IDs to display names and provider details:
 "anthropic/claude-sonnet-4-20250514" → "sonnet"
 "openai/o3"                         → "o3"
 "openai/gpt-4.1"                    → "gpt-4.1"
+"gemini/gemini-2.5-pro"             → "gemini-pro"
+"grok/grok-3"                       → "grok-3"
 ```
 
 `displayModel(id)` returns a short human-readable name for the separator bar and block headers.
-
 ---
 
 ## 10. Phase 7: Runtime & Agent Loop
