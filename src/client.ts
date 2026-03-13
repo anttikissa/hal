@@ -87,7 +87,7 @@ function startupPerfSample(): StartupPerfState | null {
 			tabMs: null,
 			hydrateMs: null,
 			renderMs: null,
-			targetMs: 100,
+			targetMs: 200,
 		}
 	}
 	if (!epochMs) return null
@@ -101,7 +101,7 @@ function startupPerfSample(): StartupPerfState | null {
 		tabMs: null,
 		hydrateMs: null,
 		renderMs: null,
-		targetMs: 100,
+		targetMs: 200,
 	}
 }
 
