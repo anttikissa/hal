@@ -228,13 +228,20 @@ function buildLines(): { lines: string[]; cursor: CursorPos } {
 	const parts = tabs.map((t, i) => {
 		const title = t.info.topic ?? t.info.workingDir?.split('/').pop() ?? 'tab'
 		let indicator: string | undefined
-		const last = t.blocks[t.blocks.length - 1]
+		// Look past trailing info blocks (e.g. '/continue to retry') to find status-determining block
+		let last: Block | undefined
+		for (let j = t.blocks.length - 1; j >= 0; j--) {
+			if (t.blocks[j].type !== 'info') { last = t.blocks[j]; break }
+			// Stop at status-significant info blocks
+			if (t.blocks[j].text === '[paused]' || t.blocks[j].text.startsWith('[interrupted]')) { last = t.blocks[j]; break }
+		}
 		if (t.question) indicator = `${colors.question.fg}?`
 		else if (!t.busy && last?.type === 'error') indicator = `${colors.error.fg}✖`
 		else if (!t.busy && last?.type === 'info' && (last.text === '[paused]' || last.text.startsWith('[interrupted]')))
 			indicator = '!'
 		else if (t.doneUnseen) indicator = '\x1b[32m✓'
-		const cc = t.busy && last ? minicursorColor(last) : undefined
+		const actualLast = t.blocks[t.blocks.length - 1]
+		const cc = t.busy && actualLast ? minicursorColor(actualLast) : undefined
 		return {
 			label: `${i + 1} ${title}`,
 			busy: !!t.busy,
