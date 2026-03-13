@@ -385,10 +385,6 @@ export async function loadHydrationData(sessionId: string): Promise<HydrationDat
 	}
 }
 
-export async function loadInputHistory(sessionId: string): Promise<string[]> {
-	const entries = await readHistory(sessionId)
-	return inputHistoryFromEntries(entries)
-}
 
 export const history = {
 	config: historyConfig,
@@ -404,5 +400,4 @@ export const history = {
 	detectInterruptedTools,
 	buildCompactionContext,
 	loadHydrationData,
-	loadInputHistory,
 }

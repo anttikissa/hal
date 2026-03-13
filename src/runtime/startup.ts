@@ -62,8 +62,6 @@ async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Prom
 export async function startRuntime(): Promise<Runtime> {
 	await ipc.ensureBus()
 	const cmdOffset = await ipc.commands.offset()
-	await ipc.events.trim(500)
-
 	const rt = new Runtime()
 	runtimeCore.setRuntime(rt)
 
@@ -82,18 +80,15 @@ export async function startRuntime(): Promise<Runtime> {
 		if (meta) {
 			rt.sessions.set(meta.id, meta)
 			const modelId = (meta.model ?? config.getConfig().defaultModel).split('/').pop()!
-			// Restore context: prefer persisted real counts, then last API usage, then estimate
-			let ctx: { used: number; max: number; estimated?: boolean } | undefined
+			// Restore context from persisted counts or last API usage.
+			let ctx: { used: number; max: number; estimated?: boolean }
 			if (meta.context) {
 				ctx = meta.context
 			} else {
 				const usage = await history.getLastUsage(meta.id)
-				if (usage) {
-					ctx = { used: usage.input, max: context.contextWindowForModel(modelId) }
-				} else {
-					const apiMsgs = await history.loadApiMessages(meta.id)
-					ctx = rt.estimateSessionContext(meta, apiMsgs)
-				}
+				ctx = usage
+					? { used: usage.input, max: context.contextWindowForModel(modelId) }
+					: { used: 0, max: context.contextWindowForModel(modelId), estimated: true }
 			}
 			rt.sessionContext.set(meta.id, ctx)
 			meta.context = ctx

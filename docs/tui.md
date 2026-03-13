@@ -153,8 +153,10 @@ Features:
 - When the active tab is restored and rendered, that tab gets a local perf line: `[perf] startup: ready <readyMs>ms · tab <tabMs>ms (hydrate <x>ms + render <y>ms) (target <100ms tab)`.
 	- If host timing is available, `ready` includes split detail: `ready <readyMs>ms (runtime <r>ms + cli <c>ms)`.
 - If tab restore startup exceeds target, the line is prefixed with `⚠`.
+- Startup also appends milestone timeline lines to the active tab as stages complete, for example: `[perf] t+70ms runtime initialized (+35ms); …`.
 - On large sessions, startup hydrates the active tab progressively: newest messages render first, older history is backfilled in chunks.
 - While backfill is running, the prompt separator shows `loading history` for the active tab.
+- Live event tailing starts right after active-tab restore; non-active tabs hydrate in the background so active-tab updates are not blocked by their startup replay.
 
 ### Suspend (`Ctrl-Z`)
 

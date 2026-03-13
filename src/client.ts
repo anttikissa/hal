@@ -5,7 +5,7 @@ import type { Block } from './cli/blocks.ts'
 import type { CommandType, RuntimeEvent, RuntimeSource, SessionInfo } from './protocol.ts'
 import { protocol } from './protocol.ts'
 import { replay } from './session/replay.ts'
-import { history, type Message } from './session/history.ts'
+import type { Message } from './session/history.ts'
 import { draft } from './cli/draft.ts'
 import { prompt } from './cli/prompt.ts'
 import { clientState } from './client-state.ts'
@@ -54,7 +54,6 @@ interface StartupPerfState {
 	renderMs: number | null
 	targetMs: number
 }
-
 export const clientConfig = {
 	startupProgressiveMinMessages: 400,
 	startupTailMessageCount: 120,
@@ -158,37 +157,38 @@ export class Client {
 	}
 
 	private appendStartupPerfIfPossible(): void {
-		if (!this.pendingStartupPerf) return
 		const tab = this.activeTab()
 		if (!tab) return
 		const startupPerf = this.pendingStartupPerf
-		if (startupPerf.epochMs !== null && startupPerf.tabMs === null) return
-		this.pendingStartupPerf = null
-		const targetMs = startupPerf.targetMs
-		if (startupPerf.tabMs !== null) {
-			const warn = startupPerf.tabMs > targetMs
-			const readyPart = startupPerf.readyMs !== null
-				? startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
-					? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms) · `
-					: `ready ${startupPerf.readyMs}ms · `
-				: ''
-			const detail = startupPerf.hydrateMs !== null && startupPerf.renderMs !== null
-				? ` (hydrate ${startupPerf.hydrateMs}ms + render ${startupPerf.renderMs}ms)`
-				: ''
-			tab.blocks.push({
-				type: 'info',
-				text: `${warn ? '⚠ ' : ''}[perf] startup: ${readyPart}tab ${startupPerf.tabMs}ms${detail} (target <${targetMs}ms tab)`,
-			})
-			return
+		if (startupPerf) {
+			const targetMs = startupPerf.targetMs
+			if (startupPerf.tabMs !== null || startupPerf.epochMs === null) {
+				this.pendingStartupPerf = null
+				if (startupPerf.tabMs !== null) {
+					const warn = startupPerf.tabMs > targetMs
+					const readyPart = startupPerf.readyMs !== null
+						? startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
+							? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms) · `
+							: `ready ${startupPerf.readyMs}ms · `
+						: ''
+					const detail = startupPerf.hydrateMs !== null && startupPerf.renderMs !== null
+						? ` (hydrate ${startupPerf.hydrateMs}ms + render ${startupPerf.renderMs}ms)`
+						: ''
+					tab.blocks.push({
+						type: 'info',
+						text: `${warn ? '⚠ ' : ''}[perf] startup: ${readyPart}tab ${startupPerf.tabMs}ms${detail} (target <${targetMs}ms tab)`,
+					})
+				} else if (startupPerf.readyMs !== null) {
+					const readyLabel = startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
+						? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms)`
+						: `ready ${startupPerf.readyMs}ms`
+					tab.blocks.push({
+						type: 'info',
+						text: `${startupPerf.readyMs > targetMs ? '⚠ ' : ''}[perf] startup: ${readyLabel} (target <${targetMs}ms)`,
+					})
+				}
+			}
 		}
-		if (startupPerf.readyMs === null) return
-		const readyLabel = startupPerf.hostRuntimeMs !== null && startupPerf.cliReadyMs !== null
-			? `ready ${startupPerf.readyMs}ms (runtime ${startupPerf.hostRuntimeMs}ms + cli ${startupPerf.cliReadyMs}ms)`
-			: `ready ${startupPerf.readyMs}ms`
-		tab.blocks.push({
-			type: 'info',
-			text: `${startupPerf.readyMs > targetMs ? '⚠ ' : ''}[perf] startup: ${readyLabel} (target <${targetMs}ms)`,
-		})
 	}
 
 	private captureStartupTabPerf(hydrateMs: number | null, renderMs: number): void {
@@ -209,7 +209,8 @@ export class Client {
 	}
 
 	private renderAndCaptureStartup(hydrateMs: number | null): void {
-		const shouldCapture = !!this.pendingStartupPerf && this.pendingStartupPerf.tabMs === null && !!this.activeTab()
+		const active = this.activeTab()
+		const shouldCapture = !!this.pendingStartupPerf && this.pendingStartupPerf.tabMs === null && !!active
 		if (!shouldCapture) {
 			this.appendStartupPerfIfPossible()
 			this.onUpdate()
@@ -223,14 +224,6 @@ export class Client {
 		this.onUpdate()
 	}
 
-	private async loadHydrationPayload(sessionId: string): Promise<{ replayMessages: Message[]; inputHistory: string[] }> {
-		if (this.transport.hydrateSession) return this.transport.hydrateSession(sessionId)
-		if (!this.transport.replaySession) throw new Error('transport.replaySession is required when hydrateSession is unavailable')
-		const replayMessagesPromise = this.transport.replaySession(sessionId)
-		const inputHistoryPromise = history.loadInputHistory(sessionId)
-		const [replayMessages, inputHistory] = await Promise.all([replayMessagesPromise, inputHistoryPromise])
-		return { replayMessages, inputHistory }
-	}
 
 	private async hydrateOlderHistoryInProcess(tab: TabState, olderMessages: Message[], allMessages: Message[]): Promise<void> {
 		let end = olderMessages.length
@@ -244,7 +237,6 @@ export class Client {
 			})
 			if (chunkBlocks.length > 0) tab.blocks.unshift(...chunkBlocks)
 			end = start
-			this.onUpdate()
 			await Bun.sleep(0)
 		}
 	}
@@ -266,7 +258,6 @@ export class Client {
 					if (msg.type === 'chunk') {
 						const chunkBlocks = Array.isArray(msg.blocks) ? msg.blocks : []
 						if (chunkBlocks.length > 0) tab.blocks.unshift(...chunkBlocks)
-						this.onUpdate()
 						return
 					}
 					if (msg.type === 'done') {
@@ -295,7 +286,11 @@ export class Client {
 		}
 	}
 
-	private hydrateOlderHistoryInBackground(tab: TabState, olderMessages: Message[], allMessages: Message[]): void {
+	private hydrateOlderHistoryInBackground(
+		tab: TabState,
+		olderMessages: Message[],
+		allMessages: Message[],
+	): void {
 		if (olderMessages.length === 0) return
 		if (this.startupBackgroundHydration.has(tab.sessionId)) return
 		tab.loadingHistory = true
@@ -313,6 +308,7 @@ export class Client {
 		void task.finally(() => {
 			this.startupBackgroundHydration.delete(sessionId)
 			tab.loadingHistory = false
+			this.appendStartupPerfIfPossible()
 			this.onUpdate()
 		})
 	}
@@ -320,7 +316,7 @@ export class Client {
 	private async hydrateTab(tab: TabState, opts?: { progressiveStartup?: boolean }): Promise<number> {
 		const startedAt = Date.now()
 		const inputDraftPromise = draft.loadDraft(tab.sessionId)
-		const hydration = await this.loadHydrationPayload(tab.sessionId)
+		const hydration = await this.transport.hydrateSession(tab.sessionId)
 		const replayMessages = hydration.replayMessages
 		const shouldProgressive = !!opts?.progressiveStartup && replayMessages.length >= clientConfig.startupProgressiveMinMessages
 		if (shouldProgressive) {
@@ -341,6 +337,16 @@ export class Client {
 		tab.inputHistory = hydration.inputHistory
 		tab.inputDraft = await inputDraftPromise
 		return Date.now() - startedAt
+	}
+
+	private async hydrateNonActiveTabs(activeSessionId: string | null): Promise<void> {
+		for (const tab of this.state.tabs) {
+			if (tab.sessionId === activeSessionId) continue
+			await Bun.sleep(0)
+			try {
+				await this.hydrateTab(tab)
+			} catch {}
+		}
 	}
 
 	async start(): Promise<void> {
@@ -383,20 +389,18 @@ export class Client {
 
 		const activeBeforeHydration = this.activeTab()
 		if (activeBeforeHydration) {
-			const activeHydrateMs = await this.hydrateTab(activeBeforeHydration, { progressiveStartup: true })
+			const activeHydration = await this.hydrateTab(activeBeforeHydration, { progressiveStartup: true })
 			this.applyTabToPrompt(activeBeforeHydration)
 			clientState.saveLastTab(activeBeforeHydration.sessionId)
-			this.renderAndCaptureStartup(activeHydrateMs)
+			this.renderAndCaptureStartup(activeHydration)
 		}
-		for (const tab of this.state.tabs) {
-			if (tab === activeBeforeHydration) continue
-			await this.hydrateTab(tab)
-		}
-
-		for await (const event of this.transport.tailEvents(offset).items) {
+		const nonActiveHydration = this.hydrateNonActiveTabs(activeBeforeHydration?.sessionId ?? null)
+		const eventTail = this.transport.tailEvents(offset)
+		for await (const event of eventTail.items) {
 			this.handleEvent(event)
 			this.onUpdate()
 		}
+		await nonActiveHydration
 	}
 
 	private handleEvent(event: RuntimeEvent): void {
@@ -553,19 +557,19 @@ export class Client {
 				this.state.activeTabIndex = Math.min(prevIdx, newTabs.length - 1)
 			}
 		}
-		const hydrateMsBySession = new Map<string, number>()
+		const hydrateBySession = new Map<string, number>()
 		for (const tab of newTabs) {
 			if (!current.has(tab.sessionId)) {
-				const hydrateMs = await this.hydrateTab(tab)
-				hydrateMsBySession.set(tab.sessionId, hydrateMs)
+				const hydrate = await this.hydrateTab(tab)
+				hydrateBySession.set(tab.sessionId, hydrate)
 			}
 		}
 		const newId = this.state.tabs[this.state.activeTabIndex]?.sessionId
 		if (newId !== prevId) this.switchToActiveTab()
 		const active = this.activeTab()
 		if (active && this.pendingStartupPerf && this.pendingStartupPerf.tabMs === null) {
-			const hydrateMs = hydrateMsBySession.get(active.sessionId) ?? null
-			this.renderAndCaptureStartup(hydrateMs)
+			const hydrate = hydrateBySession.get(active.sessionId) ?? null
+			this.renderAndCaptureStartup(hydrate)
 			return
 		}
 		this.appendStartupPerfIfPossible()

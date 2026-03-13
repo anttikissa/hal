@@ -91,7 +91,6 @@ function startupPerfText(client: Client): string | null {
 	const perf = tab.blocks.find((block) => block.type === 'info' && block.text.includes('[perf] startup:'))
 	return perf && perf.type === 'info' ? perf.text : null
 }
-
 async function waitFor(check: () => boolean, timeoutMs = 400): Promise<void> {
 	const deadline = Date.now() + timeoutMs
 	while (Date.now() < deadline) {
@@ -100,7 +99,6 @@ async function waitFor(check: () => boolean, timeoutMs = 400): Promise<void> {
 	}
 	throw new Error('timed out waiting for condition')
 }
-
 test('client shows startup perf breakdown with tab target', async () => {
 	const sessionId = `t-${randomBytes(4).toString('hex')}`
 	const originalHal = (globalThis as any).__hal
@@ -209,7 +207,7 @@ test('client prints startup perf when first tab arrives from sessions event', as
 	}
 })
 
-test('client renders active tab before replaying non-active tabs', async () => {
+test('client tails active tab events even while non-active hydration is blocked', async () => {
 	const sidA = `t-${randomBytes(4).toString('hex')}`
 	const sidB = `t-${randomBytes(4).toString('hex')}`
 	const ts = new Date().toISOString()
@@ -226,11 +224,19 @@ test('client renders active tab before replaying non-active tabs', async () => {
 		{ id: sidA, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
 		{ id: sidB, workingDir: process.cwd(), createdAt: ts, updatedAt: ts },
 	]
+	const events: RuntimeEvent[] = [{
+		id: 'ev-chunk-1',
+		type: 'chunk',
+		sessionId: sidA,
+		text: 'live chunk',
+		channel: 'assistant',
+		createdAt: ts,
+	}]
 	const hydrationBySession: Record<string, HydrationData> = {
 		[sidA]: { replayMessages: [{ role: 'user', content: 'active tab', ts } as Message], inputHistory: [] },
 		[sidB]: { replayMessages: [{ role: 'user', content: 'other tab', ts } as Message], inputHistory: [] },
 	}
-	const transport = new FakeTransport({ state, sessions }, [], hydrationBySession, [sidB])
+	const transport = new FakeTransport({ state, sessions }, events, hydrationBySession, [sidB])
 	const originalHal = (globalThis as any).__hal
 	;(globalThis as any).__hal = { startupEpochMs: Date.now() - 40, startupReadyElapsedMs: 20 }
 	let updates = 0
@@ -243,6 +249,7 @@ test('client renders active tab before replaying non-active tabs', async () => {
 		expect(active?.sessionId).toBe(sidA)
 		expect(active?.blocks.some((b) => b.type === 'input' && b.text === 'active tab')).toBe(true)
 		expect(startupPerfText(client)).toContain('[perf] startup:')
+		expect(active?.blocks.some((b) => b.type === 'assistant' && b.text.includes('live chunk'))).toBe(true)
 		const tabB = client.getState().tabs.find((tab) => tab.sessionId === sidB)
 		expect(tabB).toBeTruthy()
 		expect(tabB?.blocks.length).toBe(0)
