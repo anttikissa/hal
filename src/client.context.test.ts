@@ -1,6 +1,7 @@
 import { test, expect } from 'bun:test'
 import { randomBytes } from 'crypto'
 import { Client } from './client.ts'
+import { tabs } from './cli/tabs.ts'
 import type { Transport, BootstrapState } from './cli/transport.ts'
 import type { RuntimeCommand, RuntimeEvent, RuntimeState, SessionInfo } from './protocol.ts'
 import type { Message, HydrationData } from './session/history.ts'
@@ -144,7 +145,7 @@ test('syncTabs replays history for newly added sessions', async () => {
 	const client = new Client(transport, () => {})
 	await client.start()
 
-	await (client as any).syncTabs(sessionsAB)
+	await tabs.syncTabs(client as any, sessionsAB)
 
 	const tabB = client.getState().tabs.find(t => t.sessionId === sidB)
 	expect(tabB).toBeTruthy()
