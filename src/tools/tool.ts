@@ -21,6 +21,7 @@ export interface ToolContext {
 	env?: Record<string, string | undefined>
 	contextLines?: number
 	truncate?: (text: string) => string
+	evalCtx?: unknown
 }
 
 export interface ToolModule {

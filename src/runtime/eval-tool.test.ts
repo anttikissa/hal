@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { executeEval, type EvalContext } from './eval-tool.ts'
+import { executeEval, type EvalContext } from '../tools/eval.ts'
 import { mkdirSync, rmSync, existsSync } from 'fs'
 import { join } from 'path'
 

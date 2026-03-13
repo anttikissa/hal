@@ -1,23 +1,26 @@
-// Tools — definitions + execution for the agent loop.
+// Tools — registry + execution facade for the agent loop.
 
-import { statSync, readdirSync } from 'fs'
-import { $ } from 'bun'
 import { homedir } from 'os'
-import { evalTool, type EvalContext } from './eval-tool.ts'
 import { bash } from '../tools/bash.ts'
 import { read } from '../tools/read.ts'
 import { write } from '../tools/write.ts'
 import { edit } from '../tools/edit.ts'
 import { readBlob } from '../tools/read-blob.ts'
 import { grep } from '../tools/grep.ts'
-import { resolvePath as resolveToolPath } from '../tools/file-utils.ts'
-import type { ToolContext, ToolModule } from '../tools/tool.ts'
+import { glob } from '../tools/glob.ts'
+import { ls } from '../tools/ls.ts'
+import { evalModule } from '../tools/eval.ts'
+import { ask } from '../tools/ask.ts'
+import type { ToolModule, ToolContext } from '../tools/tool.ts'
 
 const HOME = homedir()
 const CWD = process.env.LAUNCH_CWD ?? process.cwd()
 
-const CORE_TOOLS: ToolModule[] = [bash, read, write, edit, grep, readBlob]
-const TOOL_BY_NAME = new Map(CORE_TOOLS.map(t => [t.definition.name, t]))
+const ALWAYS_TOOLS: ToolModule[] = [bash, read, write, edit, grep, readBlob, glob, ls, ask]
+const ALL_TOOLS: ToolModule[] = [...ALWAYS_TOOLS, evalModule]
+const TOOL_BY_NAME = new Map(ALL_TOOLS.map(t => [t.definition.name, t]))
+
+const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search', max_uses: 5 }
 
 export const toolsConfig = {
 	maxOutput: 50_000,
@@ -34,72 +37,14 @@ export function truncate(s: string, max = toolsConfig.maxOutput): string {
 	return s.slice(0, max) + `\n[truncated ${s.length - max} chars]`
 }
 
-const EVAL_TOOL = {
-	name: 'eval',
-	description: 'Execute TypeScript in the Hal process. Has access to runtime internals via ctx object (sessionId, halDir, stateDir, cwd). Use `~src/` prefix in imports to reference Hal source.',
-	input_schema: {
-		type: 'object',
-		properties: {
-			code: { type: 'string', description: 'TypeScript function body. `ctx` is in scope. Use `return` to return a value.' },
-		},
-		required: ['code'],
-	},
+export function getTools(evalEnabled: boolean): any[] {
+	const defs = ALWAYS_TOOLS.map(t => t.definition)
+	if (evalEnabled) defs.push(evalModule.definition)
+	return [...defs, WEB_SEARCH_TOOL]
 }
-
-const GLOB_TOOL = {
-	name: 'glob',
-	description: 'Find files by glob pattern. Returns matching file paths sorted by modification time.',
-	input_schema: {
-		type: 'object',
-		properties: {
-			pattern: { type: 'string', description: "Glob pattern, e.g. '*.ts', 'src/**/*.tsx'" },
-			path: { type: 'string', description: 'Directory to search in (default: cwd)' },
-		},
-		required: ['pattern'],
-	},
-}
-
-const LS_TOOL = {
-	name: 'ls',
-	description: 'List directory contents as a tree. Ignores node_modules, .git, dist, etc.',
-	input_schema: {
-		type: 'object',
-		properties: {
-			path: { type: 'string', description: 'Directory to list (default: cwd)' },
-			depth: { type: 'integer', description: 'Max depth (default: 3)' },
-		},
-	},
-}
-
-const ASK_TOOL = {
-	name: 'ask',
-	description: 'Ask the user a question and wait for their response. Use this to clarify ambiguous instructions, gather preferences, or get decisions on implementation choices.',
-	input_schema: {
-		type: 'object',
-		properties: {
-			question: { type: 'string', description: 'The question to ask the user' },
-		},
-		required: ['question'],
-	},
-}
-
-const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search', max_uses: 5 }
-
-const BASE_TOOLS = [
-	...CORE_TOOLS.map(t => t.definition),
-	GLOB_TOOL,
-	LS_TOOL,
-	WEB_SEARCH_TOOL,
-	ASK_TOOL,
-]
-const DEF_BY_NAME = new Map([...BASE_TOOLS, EVAL_TOOL].map((d: any) => [d.name, d]))
 
 /** TOOLS is the static base set (used for backwards compat). Prefer getTools(). */
-export const TOOLS = BASE_TOOLS
-
-export function getTools(evalEnabled: boolean): any[] {
-	return evalEnabled ? [...BASE_TOOLS, EVAL_TOOL] : BASE_TOOLS
-}
+export const TOOLS = ALWAYS_TOOLS.map(t => t.definition)
 
 export interface ToolCall {
 	id: string
@@ -110,24 +55,15 @@ export interface ToolCall {
 type OnChunk = (text: string) => Promise<void>
 
 export interface ToolExecContext {
-	evalCtx?: EvalContext
+	evalCtx?: unknown
 	sessionId?: string
 	signal?: AbortSignal
 	cwd?: string
 }
 
-const NON_CORE_PREVIEW: Record<string, (input: unknown) => string> = {
-	glob: (input) => String((input as any)?.pattern ?? ''),
-	ls: (input) => String((input as any)?.path ?? '.'),
-	ask: (input) => String((input as any)?.question ?? '').slice(0, 80),
-	eval: (input) => String((input as any)?.code ?? '').slice(0, 80),
-}
-
 export function argsPreview(call: ToolCall): string {
 	const tool = TOOL_BY_NAME.get(call.name)
-	if (tool) return shortenHome(tool.argsPreview(call.input))
-	const preview = NON_CORE_PREVIEW[call.name]
-	return shortenHome(preview ? preview(call.input) : call.name)
+	return shortenHome(tool ? tool.argsPreview(call.input) : call.name)
 }
 
 export async function executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
@@ -142,13 +78,14 @@ function buildToolContext(ctx?: ToolExecContext): ToolContext {
 		signal: ctx?.signal,
 		contextLines: toolsConfig.contextLines,
 		truncate,
+		evalCtx: ctx?.evalCtx,
 	}
 }
 
 function validateRequired(call: ToolCall): string | null {
-	const def = DEF_BY_NAME.get(call.name)
+	const def = TOOL_BY_NAME.get(call.name)?.definition
 	if (!def) return null
-	const required: string[] = def.input_schema?.required ?? []
+	const required: string[] = (def.input_schema?.required as string[]) ?? []
 	const inp = call.input as any
 	const missing = required.filter((key: string) => inp?.[key] == null)
 	if (missing.length) return `error: ${call.name} requires ${missing.join(', ')}`
@@ -158,76 +95,9 @@ function validateRequired(call: ToolCall): string | null {
 async function _executeTool(call: ToolCall, onChunk?: OnChunk, ctx?: ToolExecContext): Promise<string | any[]> {
 	const err = validateRequired(call)
 	if (err) return err
-
 	const tool = TOOL_BY_NAME.get(call.name)
 	if (tool) return tool.execute(call.input, buildToolContext(ctx), onChunk)
-
-	const resolvedCwd = ctx?.cwd ?? CWD
-	switch (call.name) {
-		case 'glob': return executeGlob(call.input, resolvedCwd)
-		case 'ls': return executeLs(call.input, resolvedCwd)
-		case 'eval': return executeEval(call.input, ctx)
-		default: return `Unknown tool: ${call.name}`
-	}
-}
-
-async function executeGlob(input: unknown, cwd: string): Promise<string> {
-	const inp = input as any
-	const searchPath = resolveToolPath(inp?.path, cwd)
-	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', String(inp?.pattern ?? ''), searchPath]
-	const result = await $`${args}`.quiet().nothrow()
-	const raw = result.stdout.toString().trim()
-	if (!raw) return 'No files found.'
-	return raw
-}
-
-function executeLs(input: unknown, cwd: string): string {
-	const inp = input as any
-	const dir = resolveToolPath(inp?.path, cwd)
-	const maxDepth = inp?.depth ?? 3
-	const IGNORE = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', '.cache', 'coverage', 'target'])
-	const lines: string[] = []
-
-	function walk(d: string, prefix: string, depth: number) {
-		if (depth > maxDepth || lines.length > 500) return
-		let entries: string[]
-		try {
-			entries = readdirSync(d).sort()
-		} catch {
-			return
-		}
-		for (const entry of entries) {
-			if (IGNORE.has(entry)) continue
-			if (lines.length > 500) {
-				lines.push(`${prefix}... (truncated)`)
-				return
-			}
-			try {
-				const full = `${d}/${entry}`
-				if (statSync(full).isDirectory()) {
-					lines.push(`${prefix}${entry}/`)
-					walk(full, prefix + '  ', depth + 1)
-				} else {
-					lines.push(`${prefix}${entry}`)
-				}
-			} catch {}
-		}
-	}
-
-	walk(dir, '', 0)
-	return lines.join('\n') || '(empty directory)'
-}
-
-async function executeEval(input: unknown, ctx?: ToolExecContext): Promise<string | any[]> {
-	const evalCtx = ctx?.evalCtx
-	if (!evalCtx) return 'error: eval tool is not enabled (set eval: true in config.ason)'
-	if (!evalCtx.runtime) {
-		const { runtimeCore } = await import('./runtime.ts')
-		try {
-			evalCtx.runtime = runtimeCore.getRuntime()
-		} catch {}
-	}
-	return await evalTool.executeEval(String((input as any).code), evalCtx)
+	return `Unknown tool: ${call.name}`
 }
 
 export const tools = { config: toolsConfig, truncate, shortenHome, getTools, argsPreview, executeTool }

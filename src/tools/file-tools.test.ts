@@ -33,7 +33,7 @@ test('edit replace verifies refs and writes content', async () => {
 	const path = join(TMP_DIR, 'edit.txt')
 	writeFileSync(path, 'aaa\nbbb\nccc\n')
 	const readResult = await read.execute({ path }, { cwd: TMP_DIR })
-	const lines = readResult.split('\n')
+	const lines = (readResult as string).split('\n')
 	const ref2 = lines[1].split(' ')[0]
 	const result = await edit.execute(
 		{
