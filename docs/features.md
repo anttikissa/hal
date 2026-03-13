@@ -1,6 +1,6 @@
 # Hal — Complete Feature Specification
 
-A terminal-native AI coding agent with multi-tab TUI, persistent sessions, and file-backed IPC. Built with Bun + TypeScript, no build step. ~3.5K LOC non-test runtime code.
+A terminal-native AI coding agent with multi-tab TUI, persistent sessions, and file-backed IPC. Built with Bun + TypeScript, no build step. ~8.3K LOC non-test runtime code.
 
 This document is a blueprint: with it, a coding agent could rebuild a similarly-featured system from scratch in a well-thought-out order.
 
