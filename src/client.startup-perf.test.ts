@@ -111,7 +111,7 @@ test('client shows startup perf breakdown with tab target', async () => {
 		expect(text).toContain('ready 42ms')
 		expect(text).toMatch(/tab \d+ms/)
 		expect(text).toContain('hydrate ')
-		expect(text).toContain('(target <100ms tab)')
+		expect(text).toContain('(target <200ms tab)')
 	} finally {
 		if (originalHal === undefined) delete (globalThis as any).__hal
 		else (globalThis as any).__hal = originalHal
@@ -145,7 +145,7 @@ test('client warns when startup tab restore exceeds target', async () => {
 		await client.start()
 		const text = startupPerfText(client)
 		expect(text?.startsWith('⚠ [perf] startup:')).toBe(true)
-		expect(text).toContain('(target <100ms tab)')
+		expect(text).toContain('(target <200ms tab)')
 	} finally {
 		if (originalHal === undefined) delete (globalThis as any).__hal
 		else (globalThis as any).__hal = originalHal

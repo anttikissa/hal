@@ -9,16 +9,16 @@ import { ason } from '../utils/ason.ts'
 import {
 	TOOL_MAX_OUTPUT, THINKING_BLOCK_MIN_LINES, THINKING_BLOCK_MAX_LINES,
 	BLOCK_MARGIN, collapseBlankLines, oneLine, contentWidth, boxLine,
-	plainLine, toolHeader, elapsed,
+	plainLine, toolHeader, elapsed, formatBlockTime, innerWidth, clipAnsi, expandTabs,
 } from './block-layout.ts'
 import { bash } from '../tools/bash.ts'
 
 export type Block =
-	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering' }
-	| { type: 'assistant'; text: string; done: boolean; model?: string }
-	| { type: 'thinking'; text: string; done: boolean; blobId?: string; model?: string; sessionId?: string }
-	| { type: 'info'; text: string }
-	| { type: 'error'; text: string; detail?: string; blobId?: string }
+	| { type: 'input'; text: string; model?: string; source?: string; status?: 'queued' | 'steering'; ts?: number }
+	| { type: 'assistant'; text: string; done: boolean; model?: string; ts?: number }
+	| { type: 'thinking'; text: string; done: boolean; blobId?: string; model?: string; sessionId?: string; ts?: number }
+	| { type: 'info'; text: string; ts?: number }
+	| { type: 'error'; text: string; detail?: string; blobId?: string; ts?: number }
 	| {
 		type: 'tool'
 		toolId?: string
@@ -30,6 +30,7 @@ export type Block =
 		endTime?: number
 		blobId?: string
 		sessionId: string
+		ts?: number
 	}
 
 function effectiveModel(model?: string): string {
@@ -45,7 +46,7 @@ function renderInput(block: Extract<Block, { type: 'input' }>, width: number): s
 	const model = !isSystem && block.model ? ` (to ${models.displayModel(block.model)})` : ''
 	const label = `${who}${status}${model}`
 	if (block.status) return [boxLine(`${label}: ${text}`, width, fg, bg)]
-	const header = toolHeader(label, width, fg, bg, undefined)
+	const header = toolHeader(label, width, fg, bg, undefined, '', block.ts)
 	const body = strings.wordWrap(text, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
 }
@@ -56,7 +57,7 @@ function renderAssistant(block: Extract<Block, { type: 'assistant' }>, width: nu
 	const label = `Hal (${models.displayModel(effectiveModel(block.model))})`
 	const { fg, bg } = colors.assistant
 	const mdColors = colors.assistantMd
-	const header = toolHeader(label, width, fg, bg, undefined)
+	const header = toolHeader(label, width, fg, bg, undefined, '', block.ts)
 	const cw = contentWidth(width)
 	const line = (s: string) => boxLine(s, width, fg, bg)
 	const body: string[] = []
@@ -86,7 +87,7 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 		return lines
 	}
 	const label = `Hal (${models.displayModel(effectiveModel(block.model))}, thinking)`
-	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.blobId, block.sessionId ?? '')
+	const header = toolHeader(label, width, colors.thinking.fg, colors.thinking.bg, block.blobId, block.sessionId ?? '', block.ts)
 	const line = (s: string) => boxLine(s, width, colors.thinking.fg, colors.thinking.bg)
 	const body: string[] = []
 	for (const span of md.mdSpans(text)) {
@@ -106,9 +107,24 @@ function renderThinking(block: Extract<Block, { type: 'thinking' }>, width: numb
 	return [...header, ...body]
 }
 
+function boxLineWithTime(text: string, width: number, fg: string, bg: string, ts?: number): string {
+	const iw = innerWidth(width)
+	const timeStr = ` ${formatBlockTime(ts)} `
+	const maxContent = iw - timeStr.length
+	const raw = ' '.repeat(BLOCK_MARGIN) + expandTabs(text.replace(/\r/g, ''))
+	const clipped = clipAnsi(raw, maxContent)
+	const pad = Math.max(0, maxContent - strings.visLen(clipped))
+	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${clipped}${' '.repeat(pad)}${timeStr}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
+}
+
 function renderInfo(block: Extract<Block, { type: 'info' }>, width: number): string[] {
 	const { fg, bg } = colors.info
-	return block.text.split('\n').map(l => boxLine(l, width, fg, bg))
+	const lines = block.text.split('\n')
+	if (lines.length === 1) return [boxLineWithTime(lines[0], width, fg, bg, block.ts)]
+	return [
+		boxLineWithTime(lines[0], width, fg, bg, block.ts),
+		...lines.slice(1).map(l => boxLine(l, width, fg, bg)),
+	]
 }
 
 function formatErrorDetail(detail: string): string {
@@ -126,7 +142,7 @@ function formatErrorDetail(detail: string): string {
 
 function renderError(block: Extract<Block, { type: 'error' }>, width: number): string[] {
 	const { fg, bg } = colors.error
-	const header = toolHeader('Error', width, fg, bg, block.blobId)
+	const header = toolHeader('Error', width, fg, bg, block.blobId, '', block.ts)
 	const raw = block.detail ? formatErrorDetail(block.detail) : block.text
 	const body = strings.wordWrap(raw, contentWidth(width)).map(l => boxLine(l, width, fg, bg))
 	return [...header, ...body]
@@ -163,7 +179,7 @@ function renderTool(block: Extract<Block, { type: 'tool' }>, width: number): str
 			outputLines = outputLines.slice(-TOOL_MAX_OUTPUT)
 		}
 	}
-	const lines = [...toolHeader(label, width, fg, bg, block.blobId, block.sessionId)]
+	const lines = [...toolHeader(label, width, fg, bg, block.blobId, block.sessionId, block.ts)]
 	for (const line of prelude) lines.push(boxLine(line, width, fg, bg))
 	if (hiddenOutputLines > 0) lines.push(boxLine(`[+ ${hiddenOutputLines} lines]`, width, fg, bg))
 	for (const line of outputLines) lines.push(boxLine(line, width, fg, bg))
@@ -269,7 +285,7 @@ export function renderBlocks(blocks: Block[], width: number, cursorVisible = fal
 export function renderQuestion(question: string, width: number): string[] {
 	const { fg, bg } = colors.question
 	const aFg = colors.assistant.fg
-	const header = toolHeader('Hal is asking you a question', width, fg, bg, undefined, '')
+	const header = toolHeader('Hal is asking you a question', width, fg, bg, undefined, '', Date.now())
 	const body = strings.wordWrap(question, contentWidth(width)).map(l => boxLine(l, width, aFg, bg))
 	return [...header, ...body]
 }

@@ -3,6 +3,9 @@
 ## REAL TODO
 
 
+- "waiting for tool calls to finish; ctrl-r again to force" this doesn't quite work
+- 
+
 - E2e test infrastructure is horrible boilerplate (subprocess spawn + env vars to isolate state). Figure out a proper testing approach — maybe a shared harness, or make state.ts support late init, or use dynamic imports.
 - Sentiment analysis for every prompt
 - Restore fast-blinking cursor effect

@@ -89,17 +89,18 @@ export async function replayToBlocks(
 
 	for (const msg of messages) {
 		const m = msg as any
+		const msgTs = m.ts ? Date.parse(m.ts) : undefined
 		if (m.type === 'reset' || m.type === 'forked_from' || m.type === 'compact') continue
 		if (m.type === 'session') {
-			if (m.action === 'init') blocks.push({ type: 'info', text: `[session ${sessionId}] model: ${m.model}, cwd: ${tools.shortenHome(m.cwd)}` })
-			else if (m.action === 'cd') blocks.push({ type: 'info', text: `[cd] ${m.old} → ${m.new}` })
+			if (m.action === 'init') blocks.push({ type: 'info', text: `[session ${sessionId}] model: ${m.model}, cwd: ${tools.shortenHome(m.cwd)}`, ts: msgTs })
+			else if (m.action === 'cd') blocks.push({ type: 'info', text: `[cd] ${m.old} → ${m.new}`, ts: msgTs })
 			continue
 		}
 		if (m.type === 'info') {
 			if (m.level === 'error') {
-				blocks.push({ type: 'error', text: m.text, detail: m.detail })
+				blocks.push({ type: 'error', text: m.text, detail: m.detail, ts: msgTs })
 			} else {
-				blocks.push({ type: 'info', text: m.text })
+				blocks.push({ type: 'info', text: m.text, ts: msgTs })
 			}
 			continue
 		}
@@ -110,13 +111,13 @@ export async function replayToBlocks(
 				: Array.isArray(m.content)
 					? userContentText(m.content)
 					: ''
-			if (text) blocks.push({ type: 'input', text, model })
+			if (text) blocks.push({ type: 'input', text, model, ts: msgTs })
 		} else if (m.role === 'assistant') {
 			if (m.thinkingText) {
-				blocks.push({ type: 'thinking', text: m.thinkingText, done: true, model, sessionId, blobId: m.thinkingBlobId })
+				blocks.push({ type: 'thinking', text: m.thinkingText, done: true, model, sessionId, blobId: m.thinkingBlobId, ts: msgTs })
 			}
 			if (m.text) {
-				blocks.push({ type: 'assistant', text: m.text, done: true, model })
+				blocks.push({ type: 'assistant', text: m.text, done: true, model, ts: msgTs })
 			}
 			if (Array.isArray(m.tools)) {
 				const assistantTools = m.tools as { id: string; blobId: string; name: string }[]
@@ -139,6 +140,7 @@ export async function replayToBlocks(
 						endTime: now,
 						blobId,
 						sessionId,
+						ts: msgTs,
 					})
 				}
 			}

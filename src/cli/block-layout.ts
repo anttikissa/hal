@@ -98,7 +98,12 @@ function headerLine(text: string, width: number, fg: string, bg: string): string
 	return `${' '.repeat(BLOCK_MARGIN)}${bg}${fg}${text}${' '.repeat(pad)}${colors.RESET}${' '.repeat(BLOCK_MARGIN)}`
 }
 
-export function toolHeader(label: string, width: number, fg: string, bg: string, blobId: string | undefined, sessionId = ''): string[] {
+export function formatBlockTime(ts?: number): string {
+	const d = new Date(ts ?? Date.now())
+	return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+export function toolHeader(label: string, width: number, fg: string, bg: string, blobId: string | undefined, sessionId = '', ts?: number): string[] {
 	const iw = innerWidth(width)
 	const safeLabel = oneLine(label)
 	const displayBlobId = blobId ? (sessionId ? `${sessionId}/${blobId}` : blobId) : ''
@@ -108,12 +113,16 @@ export function toolHeader(label: string, width: number, fg: string, bg: string,
 		const fileUrl = `file://${state.blobsDir(sessionId)}/${blobId}.ason`
 		blobDisplay = ` [\x1b]8;;${fileUrl}\x07${safeBlobId}\x1b]8;;\x07] ──`
 	}
+	const timeStr = formatBlockTime(ts)
+	const timeSuffix = ` ${timeStr} ──`
+	const blobVisLen = safeBlobId ? safeBlobId.length + 6 : 0
+	const timeVisLen = timeSuffix.length
 	const prefix = '── '
-	const maxLabel = Math.max(1, iw - prefix.length - (safeBlobId ? safeBlobId.length + 6 : 0) - 2)
+	const maxLabel = Math.max(1, iw - prefix.length - blobVisLen - timeVisLen - 2)
 	const shown = strings.clipVisual(safeLabel, maxLabel)
 	const lead = `${prefix}${shown} `
-	const fill = '─'.repeat(Math.max(1, iw - strings.visLen(lead) - (safeBlobId ? safeBlobId.length + 6 : 0)))
-	return [headerLine(lead + fill + blobDisplay, width, fg, bg)]
+	const fill = '─'.repeat(Math.max(1, iw - strings.visLen(lead) - blobVisLen - timeVisLen))
+	return [headerLine(lead + fill + blobDisplay + timeSuffix, width, fg, bg)]
 }
 
 export function elapsed(startTime: number, endTime?: number): string {
@@ -123,5 +132,5 @@ export function elapsed(startTime: number, endTime?: number): string {
 
 export const blockLayout = {
 	collapseBlankLines, oneLine, expandTabs, innerWidth, contentWidth,
-	clipAnsi, boxLine, plainLine, toolHeader, elapsed,
+	clipAnsi, boxLine, plainLine, toolHeader, elapsed, formatBlockTime,
 }

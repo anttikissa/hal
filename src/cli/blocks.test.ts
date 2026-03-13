@@ -14,14 +14,14 @@ describe('renderBlocks', () => {
 	test('single input block', () => {
 		const blocks: Block[] = [{ type: 'input', text: 'hello' }]
 		const { lines } = renderBlocks(blocks, 80)
-		expect(trimLine(lines[0])).toMatch(/^── You ─+$/)
+		expect(trimLine(lines[0])).toMatch(/^── You ─+ \d{2}:\d{2} ──$/)
 		expect(lines[1]).toContain('hello')
 	})
 
 	test('[system] prefix renders as System header', () => {
 		const blocks: Block[] = [{ type: 'input', text: '[system] Session was reset.' }]
 		const { lines } = renderBlocks(blocks, 80)
-		expect(trimLine(lines[0])).toMatch(/^── System ─+$/)
+		expect(trimLine(lines[0])).toMatch(/^── System ─+ \d{2}:\d{2} ──$/)
 		expect(trimLine(lines[1])).toContain('Session was reset.')
 	})
 

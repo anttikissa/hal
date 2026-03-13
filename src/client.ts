@@ -466,12 +466,12 @@ export class Client {
 				const last = lastBlock(t)
 				if (event.channel === 'thinking') {
 					if (last?.type === 'thinking' && !last.done) last.text += event.text
-					else t.blocks.push({ type: 'thinking', text: event.text, done: false, blobId: event.blobId, model: t.info.model, sessionId: t.sessionId })
+					else t.blocks.push({ type: 'thinking', text: event.text, done: false, blobId: event.blobId, model: t.info.model, sessionId: t.sessionId, ts: Date.parse(event.createdAt) })
 				} else {
 					if (last?.type === 'assistant' && !last.done) last.text += event.text
 					else {
 						if (last?.type === 'thinking' && !last.done) last.done = true
-						t.blocks.push({ type: 'assistant', text: event.text, done: false, model: t.info.model })
+						t.blocks.push({ type: 'assistant', text: event.text, done: false, model: t.info.model, ts: Date.parse(event.createdAt) })
 					}
 				}
 				break
@@ -489,15 +489,15 @@ export class Client {
 					if (idx >= 0) t.blocks.splice(idx, 1)
 				}
 				if (event.level === 'error') {
-					t.blocks.push({ type: 'error', text: event.text, detail: event.detail })
+					t.blocks.push({ type: 'error', text: event.text, detail: event.detail, ts: Date.parse(event.createdAt) })
 				} else {
-					t.blocks.push({ type: 'info', text: event.text })
+					t.blocks.push({ type: 'info', text: event.text, ts: Date.parse(event.createdAt) })
 				}
 				break
 			}
 			case 'prompt': {
 				const t = tab(event.sessionId); if (!t) return
-				t.blocks.push({ type: 'input', text: event.text, model: t.info.model })
+				t.blocks.push({ type: 'input', text: event.text, model: t.info.model, ts: Date.parse(event.createdAt) })
 				break
 			}
 			case 'status': {
@@ -534,7 +534,7 @@ export class Client {
 				const t = tab(event.sessionId); if (!t) return
 				closeStreaming(t)
 				if (event.phase === 'running') {
-					t.blocks.push({ type: 'tool', toolId: event.toolId, name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now(), blobId: event.blobId, sessionId: event.sessionId })
+					t.blocks.push({ type: 'tool', toolId: event.toolId, name: event.name, args: event.args, output: '', status: 'running', startTime: Date.now(), blobId: event.blobId, sessionId: event.sessionId, ts: Date.parse(event.createdAt) })
 				} else if (event.phase === 'streaming') {
 					for (let i = t.blocks.length - 1; i >= 0; i--) {
 						const b = t.blocks[i]
@@ -574,8 +574,9 @@ export class Client {
 				closeStreaming(t)
 				t.question = undefined
 				if (t === this.activeTab() && prompt.hasQuestion()) prompt.clearQuestion()
-				t.blocks.push({ type: 'input', text: event.question, source: 'Hal asked' })
-				t.blocks.push({ type: 'input', text: event.text || '[no answer]', source: 'You replied' })
+				const answerTs = Date.parse(event.createdAt)
+				t.blocks.push({ type: 'input', text: event.question, source: 'Hal asked', ts: answerTs })
+				t.blocks.push({ type: 'input', text: event.text || '[no answer]', source: 'You replied', ts: answerTs })
 				break
 			}
 		}
