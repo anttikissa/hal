@@ -8,8 +8,7 @@ import { context } from './context.ts'
 import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { Runtime, runtimeCore } from './runtime.ts'
-import { commandHandlers } from './commands.ts'
-import { handoffConfig, type RuntimeHandoffState } from '../protocol.ts'
+import { handoffConfig, type RuntimeHandoffState, type RuntimeCommand } from '../protocol.ts'
 
 
 function shouldContinueAfterHandoff(handoff: RuntimeHandoffState | null): boolean {
@@ -17,6 +16,19 @@ function shouldContinueAfterHandoff(handoff: RuntimeHandoffState | null): boolea
 	const createdAt = Date.parse(handoff.createdAt)
 	if (!Number.isFinite(createdAt)) return false
 	return Date.now() - createdAt <= handoffConfig.continueWindowMs
+}
+let _handleCommand: ((rt: Runtime, cmd: RuntimeCommand) => Promise<void>) | null = null
+let _handleCommandPromise: Promise<((rt: Runtime, cmd: RuntimeCommand) => Promise<void>)> | null = null
+
+async function getHandleCommand(): Promise<(rt: Runtime, cmd: RuntimeCommand) => Promise<void>> {
+	if (_handleCommand) return _handleCommand
+	if (!_handleCommandPromise) {
+		_handleCommandPromise = import('./commands.ts').then(mod => {
+			_handleCommand = mod.commandHandlers.handleCommand
+			return mod.commandHandlers.handleCommand
+		})
+	}
+	return _handleCommandPromise
 }
 
 async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Promise<void> {
@@ -117,9 +129,11 @@ export async function startRuntime(): Promise<Runtime> {
 	let stopped = false
 	const cmdTail = ipc.commands.tail(cmdOffset)
 	;(async () => {
+		let handleCommand: ((rt: Runtime, cmd: RuntimeCommand) => Promise<void>) | null = null
 		for await (const cmd of cmdTail.items) {
 			if (stopped) break
-			await commandHandlers.handleCommand(rt, cmd)
+			if (!handleCommand) handleCommand = await getHandleCommand()
+			await handleCommand(rt, cmd)
 		}
 	})()
 

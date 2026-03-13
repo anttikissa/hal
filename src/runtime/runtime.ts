@@ -2,7 +2,6 @@
 
 import { ipc } from '../ipc.ts'
 import { history } from '../session/history.ts'
-import { agentLoop } from './agent-loop.ts'
 import { context } from './context.ts'
 import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
@@ -35,6 +34,33 @@ export function timeAgo(iso: string): string {
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never
 
 type RuntimeEventInput = DistributiveOmit<RuntimeEvent, 'id' | 'createdAt'>
+
+type RunAgentLoopFn = (ctx: {
+	sessionId: string
+	model: string
+	systemPrompt: string
+	messages: any[]
+	cwd?: string
+	onStatus: (busy: boolean, nextActivity?: string, context?: { used: number; max: number; estimated?: boolean }) => void | Promise<void>
+	askUser: (question: string) => Promise<string>
+	signal?: AbortSignal
+	onDestructiveToolStart?: (toolId: string, toolName: string) => void
+	onDestructiveToolEnd?: (toolId: string, toolName: string) => void
+}) => Promise<void>
+
+let _runAgentLoop: RunAgentLoopFn | null = null
+let _runAgentLoopPromise: Promise<RunAgentLoopFn> | null = null
+
+async function getRunAgentLoop(): Promise<RunAgentLoopFn> {
+	if (_runAgentLoop) return _runAgentLoop
+	if (!_runAgentLoopPromise) {
+		_runAgentLoopPromise = import('./agent-loop.ts').then(mod => {
+			_runAgentLoop = mod.runAgentLoop
+			return mod.runAgentLoop
+		})
+	}
+	return _runAgentLoopPromise
+}
 
 export class Runtime {
 	sessions = new Map<string, SessionInfo>()
@@ -157,7 +183,8 @@ export class Runtime {
 		this.busySessionIds.add(sid)
 		await this.publish(activity)
 		const sysPrompt = systemPrompt.loadSystemPrompt({ model: info.model ?? config.getConfig().defaultModel, sessionDir: sid, cwd: info.workingDir })
-		agentLoop.runAgentLoop({
+		const runAgentLoop = await getRunAgentLoop()
+		runAgentLoop({
 			sessionId: sid,
 			model: info.model ?? config.getConfig().defaultModel,
 			systemPrompt: sysPrompt.text,
