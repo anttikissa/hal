@@ -363,6 +363,7 @@ export class Client {
 		}
 		// Prefer client's last-viewed tab, fall back to server's active session
 		const lastTab = clientState.getLastTab()
+		const hadSavedTab = lastTab !== null && this.state.tabs.some(t => t.sessionId === lastTab)
 		const preferredId = lastTab ?? rtState.activeSessionId
 		this.state.activeTabIndex = Math.max(0, this.state.tabs.findIndex(t => t.sessionId === preferredId))
 		this.state.connected = true
@@ -386,7 +387,7 @@ export class Client {
 		if (selfModeEnabled()) {
 			this.applySelfMode()
 			this.renderAndCaptureStartup(null)
-		} else {
+		} else if (!hadSavedTab) {
 			const cwdTarget = cwdModeTarget()
 			if (cwdTarget) {
 				this.applyCwdMode(cwdTarget)
