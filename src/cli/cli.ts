@@ -16,6 +16,7 @@ import { tabline } from './tabline.ts'
 import * as colors from './colors.ts'
 import { strings } from '../utils/strings.ts'
 import { cursor } from './cursor.ts'
+import { terminal } from './terminal.ts'
 // ── Terminal setup ──
 
 const { stdin, stdout } = process
@@ -24,18 +25,15 @@ stdin.setRawMode(true)
 stdin.setEncoding('utf8')
 stdin.resume()
 
-const KITTY_KBD_ON = '\x1b[>19u', KITTY_KBD_OFF = '\x1b[<u'
-const BRACKETED_PASTE_ON = '\x1b[?2004h', BRACKETED_PASTE_OFF = '\x1b[?2004l'
-const TERM_RESET = `${KITTY_KBD_OFF}${BRACKETED_PASTE_OFF}\x1b[?25h`
 const kittyTerms = /^(kitty|ghostty|iTerm\.app)$/
 const useKitty = kittyTerms.test(process.env.TERM_PROGRAM ?? '')
-if (useKitty) stdout.write(KITTY_KBD_ON)
-stdout.write(BRACKETED_PASTE_ON)
+if (useKitty) stdout.write(terminal.KITTY_KBD_ON)
+stdout.write(terminal.BRACKETED_PASTE_ON)
 
 let cleanExit = false
 process.on('exit', () => {
 	if (!cleanExit) stdout.write(`\x1b[${stdout.rows || 24}B\r\n`)
-	stdout.write(TERM_RESET)
+	stdout.write(terminal.TERM_RESET)
 })
 
 function cols(): number { return stdout.columns || 80 }
@@ -395,6 +393,7 @@ export function quit(): void {
 		return
 	}
 	clearPendingAction()
+	terminal.disableTerminalInput(stdout, stdin)
 	cleanExit = true
 	if (renderState.lines.length > 0) {
 		const total = renderState.lines.length
@@ -421,6 +420,7 @@ export function restart(): void {
 		return
 	}
 	clearPendingAction()
+	terminal.disableTerminalInput(stdout, stdin)
 	// Intentionally does NOT call releaseHost(). We write handoff state first,
 	// then exit so either a promoted client or the restarted process can resume.
 	cleanExit = true
@@ -436,7 +436,7 @@ export function restart(): void {
 
 export function suspend(): void {
 	suspended = true
-	stdout.write(`${useKitty ? KITTY_KBD_OFF : ''}\x1b[?25h`)
+	stdout.write(`${useKitty ? terminal.KITTY_KBD_OFF : ''}\x1b[?25h`)
 	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
 }
 
@@ -449,8 +449,8 @@ process.on('SIGCONT', () => {
 	stdin.setRawMode(true)
 	stdin.setEncoding('utf8')
 	stdin.resume()
-	if (useKitty) stdout.write(KITTY_KBD_ON)
-	stdout.write(BRACKETED_PASTE_ON)
+	if (useKitty) stdout.write(terminal.KITTY_KBD_ON)
+	stdout.write(terminal.BRACKETED_PASTE_ON)
 	renderState = diffEngine.emptyState
 	doRender()
 })
