@@ -15,6 +15,10 @@ const startupEpochRaw = process.env.HAL_STARTUP_EPOCH_MS
 const startupEpochMs = startupEpochRaw ? Number.parseInt(startupEpochRaw, 10) : NaN
 const startupEpoch = Number.isFinite(startupEpochMs) && startupEpochMs > 0 ? startupEpochMs : null
 
+const mainConfig = {
+	promotionPollMs: 20,
+}
+
 const hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 const { host, currentPid } = await ipc.claimHost(hostId)
 
@@ -95,7 +99,7 @@ if (!host) {
 			try { process.kill(watchPid, 0) } catch { watchPid = null }
 		}
 		if (watchPid === null) tryPromote()
-	}, 100)
+	}, mainConfig.promotionPollMs)
 
 	// Also expose for event-driven promotion (client calls this on [host-released])
 	;(globalThis as any).__halTryPromote = tryPromote
