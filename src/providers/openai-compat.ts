@@ -13,8 +13,9 @@ const ENDPOINTS: Record<string, string> = {
 
 function getApiKey(providerName: string): string {
 	const a = auth.getAuth(providerName)
-	if (!a.accessToken) throw new Error(`No API key for '${providerName}'. Set ${providerName}: { accessToken: "..." } in auth.ason`)
-	return a.accessToken
+	const key = a.apiKey ?? a.accessToken
+	if (!key) throw new Error(`No API key for '${providerName}'. Set ${providerName}: { apiKey: "..." } in auth.ason`)
+	return key
 }
 
 // Convert Anthropic-format messages (from api-messages.ts) to Chat Completions format

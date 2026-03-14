@@ -21,26 +21,38 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 	if (supportsThinking) {
 		body.thinking = isAdaptive ? { type: 'adaptive' } : { type: 'enabled', budget_tokens: Math.min(10000, maxTokens - 1) }
 	}
-	// DEBUG: log outgoing thinking blocks with per-session files
+	// DEBUG: log outgoing messages with per-session files
 	const _msgs = body.messages as any[]
 	const _session = params.sessionId ?? 'unknown'
 	const _lines: string[] = [`=== ${new Date().toISOString()} session=${_session} model=${params.model} total=${_msgs.length} ===`]
 	for (let mi = 0; mi < _msgs.length; mi++) {
 		const msg = _msgs[mi]
 		const c = msg.content
-		if (!Array.isArray(c)) continue
+		if (!Array.isArray(c)) {
+			// Log text-only messages (e.g. continuation instruction)
+			if (typeof c === 'string' && mi >= _msgs.length - 3) {
+				_lines.push(`msg[${mi}] role=${msg.role} text="${c.slice(0, 120)}..."`)
+			}
+			continue
+		}
 		for (let ci = 0; ci < c.length; ci++) {
 			const block = c[ci]
-			if (block.type !== 'thinking') continue
-			const sig = block.signature ?? '(none)'
-			const thinkLen = (block.thinking ?? '').length
-			_lines.push(`msg[${mi}] role=${msg.role} content[${ci}] sigLen=${sig.length} sig=${sig.slice(0, 24)}... thinkLen=${thinkLen}`)
+			if (block.type === 'thinking') {
+				const sig = block.signature ?? '(none)'
+				const thinkLen = (block.thinking ?? '').length
+				_lines.push(`msg[${mi}] role=${msg.role} content[${ci}] type=thinking sigLen=${sig.length} sig=${sig.slice(0, 24)}... thinkLen=${thinkLen}`)
+			} else if (mi >= _msgs.length - 3) {
+				// Log last 3 messages' blocks for continuation debugging
+				const preview = block.type === 'text' ? `text="${(block.text ?? '').slice(0, 80)}..."` : `type=${block.type}`
+				_lines.push(`msg[${mi}] role=${msg.role} content[${ci}] ${preview}`)
+			}
 		}
 	}
 	try {
 		const _log = `${_lines.join('\n')}\n`
 		await appendFile('/tmp/hal-thinking-debug.all.log', _log)
 		await appendFile(`/tmp/hal-thinking-debug.${_session}.log`, _log)
+		await appendFile('/tmp/hal-continuation-debug.log', _log)
 	} catch {}
 	if (params.tools?.length) body.tools = params.tools
 
@@ -58,6 +70,7 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 
 	if (!res.ok) {
 		const body = (await res.text()).slice(0, 2000)
+		try { await appendFile('/tmp/hal-continuation-debug.log', `${new Date().toISOString()} [${_session}] [API ERROR] status=${res.status} body=${body.slice(0, 500)}\n`) } catch {}
 		yield { type: 'error', message: `API ${res.status}`, status: res.status, body }
 		yield { type: 'done' }
 		return

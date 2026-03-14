@@ -14,6 +14,12 @@ import { queue } from '../cli/queue.ts'
 import { resolve } from 'path'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
+import { appendFileSync } from 'node:fs'
+
+function debugCont(sid: string, msg: string) {
+	const line = `${new Date().toISOString()} [${sid}] [commands] ${msg}\n`
+	try { appendFileSync('/tmp/hal-continuation-debug.log', line) } catch {}
+}
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
 	if (!sid) return
@@ -277,6 +283,8 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const apiMessages = await history.loadApiMessages(sid)
 			const wasPaused = rawHistory.length > 0 && (rawHistory[rawHistory.length - 1] as any)?.type === 'info'
 				&& (rawHistory[rawHistory.length - 1] as any)?.text === '[paused]'
+			debugCont(sid, `hasPendingUserTurn=${rt.hasPendingUserTurn(apiMessages)}, wasPaused=${wasPaused}, apiMessages=${apiMessages.length}`)
+			debugCont(sid, `last 3 roles: ${apiMessages.slice(-3).map((m: any) => m.role).join(', ')}`)
 			if (!rt.hasPendingUserTurn(apiMessages) && !wasPaused) break // nothing to continue
 			// Detect text continuation: last API message is assistant with text, no tool calls
 			let continuation: { prefixText: string } | undefined
@@ -285,8 +293,10 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				if (lastMsg?.role === 'assistant') {
 					const textBlock = lastMsg.content?.find((b: any) => b.type === 'text')
 					if (textBlock?.text) continuation = { prefixText: textBlock.text }
+					debugCont(sid, `detected continuation: textLen=${textBlock?.text?.length ?? 0}, hasToolUse=${lastMsg.content?.some((b: any) => b.type === 'tool_use')}`)
 				}
 			}
+			debugCont(sid, `continuation=${continuation ? `prefixText(${continuation.prefixText.length} chars)` : 'none'}`)
 			await rt.emitInfo(sid, '[continuing] interrupted response', 'meta')
 			await rt.startGeneration(sid, info, apiMessages, 'continuing...', { continuation })
 			break

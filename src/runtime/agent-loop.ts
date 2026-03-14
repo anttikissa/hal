@@ -16,6 +16,12 @@ import { hooks } from './hooks.ts'
 import { context } from './context.ts'
 import { config, type PermissionLevel } from '../config.ts'
 import { blink } from './blink.ts'
+import { appendFileSync } from 'node:fs'
+
+function debugLog(sessionId: string, tag: string, msg: string) {
+	const line = `${new Date().toISOString()} [${sessionId}] [${tag}] ${msg}\n`
+	try { appendFileSync('/tmp/hal-continuation-debug.log', line) } catch {}
+}
 
 const WRITE_TOOLS = new Set(['bash', 'write', 'edit', 'eval'])
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'web_search'])
@@ -77,6 +83,17 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 		while (!signal?.aborted) {
 
+			// Inject continuation instruction as user message (prefill not supported on Claude 4.6)
+			if (ctx.continuation) {
+				const tail = ctx.continuation.prefixText.slice(-200)
+				messages.push({
+					role: 'user',
+					content: `[Your previous response was interrupted. The text ended with: "...${tail}"\nContinue from the exact cutoff point. Output ONLY the continuation — it will be appended directly. Do not repeat anything already written.]`,
+				})
+				debugLog(sessionId, 'continuation', `injected user message, prefixText length=${ctx.continuation.prefixText.length}, tail="${tail.slice(-60)}"`)
+				debugLog(sessionId, 'continuation', `messages count=${messages.length}, last roles: ${messages.slice(-3).map((m: any) => m.role).join(', ')}`)
+			}
+
 			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: availableTools, signal, sessionId })
 
 			let thinkingText = ''
@@ -130,6 +147,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						// Prepend continuation prefix (first round only)
 						const isContinuation = !!ctx.continuation
 						if (ctx.continuation) {
+							debugLog(sessionId, 'done', `prepending prefix (${ctx.continuation.prefixText.length} chars) to assistantText (${assistantText.length} chars)`)
 							assistantText = ctx.continuation.prefixText + assistantText
 							ctx.continuation = undefined
 						}
@@ -240,10 +258,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						if (aborted) break
 
-						// Add to messages for next round (replace prefill if continuing)
-						if (isContinuation && messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
-							messages.pop()
-						}
+						// Add to messages for next round
 						messages.push({
 							role: 'assistant',
 							content: [
@@ -274,8 +289,10 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				// Persist partial output before exiting (skip if already written in tool path)
 				if (!persisted && (assistantText || thinkingText)) {
 					if (ctx.continuation) {
+						debugLog(sessionId, 'aborted', `prepending prefix (${ctx.continuation.prefixText.length} chars) to partial assistantText (${assistantText.length} chars)`)
 						assistantText = ctx.continuation.prefixText + assistantText
 					}
+					debugLog(sessionId, 'aborted', `saving partial: text=${(assistantText || '').length}, continuation=${!!ctx.continuation}`)
 					const { entry } = await sessionHistory.writeAssistantEntry(sessionId, {
 						text: assistantText || undefined,
 						thinkingText: thinkingText || undefined,
