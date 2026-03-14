@@ -122,6 +122,10 @@ export type RuntimeEvent =
 		id: string; type: 'answer'; sessionId: string
 		question: string; text: string; createdAt: string
 	}
+	| {
+		id: string; type: 'draft_saved'; sessionId: string
+		createdAt: string
+	}
 
 // ── Snapshot state (for bootstrap) ──
 export interface RuntimeHandoffState {

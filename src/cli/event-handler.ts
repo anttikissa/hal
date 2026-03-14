@@ -3,6 +3,7 @@
 import type { RuntimeEvent } from '../protocol.ts'
 import type { TabState, ClientState } from './tabs.ts'
 import { prompt } from './prompt.ts'
+import { draft } from './draft.ts'
 
 function handleEvent(event: RuntimeEvent, state: ClientState): void {
 	const active = () => state.tabs[state.activeTabIndex] ?? null
@@ -127,6 +128,15 @@ function handleEvent(event: RuntimeEvent, state: ClientState): void {
 			const answerTs = Date.parse(event.createdAt)
 			t.blocks.push({ type: 'input', text: event.question, source: 'Hal asked', ts: answerTs })
 			t.blocks.push({ type: 'input', text: event.text || '[no answer]', source: 'You replied', ts: answerTs })
+			break
+		}
+		case 'draft_saved': {
+			const a = active()
+			if (a?.sessionId === event.sessionId && !prompt.text()) {
+				void draft.loadDraft(event.sessionId).then(text => {
+					if (text && !prompt.text()) prompt.setText(text)
+				})
+			}
 			break
 		}
 	}

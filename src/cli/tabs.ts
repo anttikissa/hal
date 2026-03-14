@@ -216,7 +216,7 @@ function onSubmitTab(host: TabHost): void {
 	const tab = host.activeTab()
 	if (!tab) return
 	tab.inputDraft = ''
-	draft.saveDraft(tab.sessionId, '').catch(() => {})
+	draft.clearDraft(tab.sessionId).catch(() => {})
 }
 
 function clearQuestion(host: TabHost): void {
