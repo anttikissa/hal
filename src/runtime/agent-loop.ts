@@ -16,12 +16,6 @@ import { hooks } from './hooks.ts'
 import { context } from './context.ts'
 import { config, type PermissionLevel } from '../config.ts'
 import { blink } from './blink.ts'
-import { appendFileSync } from 'node:fs'
-
-function debugLog(sessionId: string, tag: string, msg: string) {
-	const line = `${new Date().toISOString()} [${sessionId}] [${tag}] ${msg}\n`
-	try { appendFileSync('/tmp/hal-continuation-debug.log', line) } catch {}
-}
 
 const WRITE_TOOLS = new Set(['bash', 'write', 'edit', 'eval'])
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'web_search'])
@@ -90,8 +84,6 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					role: 'user',
 					content: `[Your previous response was interrupted. The text ended with: "...${tail}"\nContinue from the exact cutoff point. Output ONLY the continuation — it will be appended directly. Do not repeat anything already written.]`,
 				})
-				debugLog(sessionId, 'continuation', `injected user message, prefixText length=${ctx.continuation.prefixText.length}, tail="${tail.slice(-60)}"`)
-				debugLog(sessionId, 'continuation', `messages count=${messages.length}, last roles: ${messages.slice(-3).map((m: any) => m.role).join(', ')}`)
 			}
 
 			const gen = provider.generate({ messages, model: modelId, systemPrompt, tools: availableTools, signal, sessionId })
@@ -105,183 +97,193 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			let persisted = false
 			const blinkParser = blink.createBlinkParser()
 
-			for await (const event of gen) {
-				if (signal?.aborted) { aborted = true; break }
-				switch (event.type) {
-					case 'thinking':
-						if (!thinkingBlobId) thinkingBlobId = blob.makeId(sessionId)
-						thinkingText += event.text
-						await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', blobId: thinkingBlobId })
-						break
-					case 'thinking_signature':
-						thinkingSignature = event.signature
-						break
-					case 'text':
-						for (const seg of blinkParser.feed(event.text)) {
-							if (seg.type === 'text') {
-								assistantText += seg.text
-								await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
-							} else {
-								await new Promise(r => setTimeout(r, seg.ms!))
+			// Inner try-catch: convert provider abort errors into the `aborted` flag
+			// so the abort handler below can save partial text
+			try {
+				for await (const event of gen) {
+					if (signal?.aborted) { aborted = true; break }
+					switch (event.type) {
+						case 'thinking':
+							if (!thinkingBlobId) thinkingBlobId = blob.makeId(sessionId)
+							thinkingText += event.text
+							await emit(sessionId, { type: 'chunk', text: event.text, channel: 'thinking', blobId: thinkingBlobId })
+							break
+						case 'thinking_signature':
+							thinkingSignature = event.signature
+							break
+						case 'text':
+							for (const seg of blinkParser.feed(event.text)) {
+								if (seg.type === 'text') {
+									assistantText += seg.text
+									await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
+								} else {
+									await new Promise(r => setTimeout(r, seg.ms!))
+								}
 							}
+							break
+						case 'tool_call':
+							toolCalls.push({ id: event.id, name: event.name, input: event.input })
+							break
+						case 'error': {
+							const detail = event.body
+								? (event.status ? `${event.status}: ${event.body}` : event.body)
+								: event.message
+							await emitInfo(sessionId, event.message, 'error', detail)
+							break
 						}
-						break
-					case 'tool_call':
-						toolCalls.push({ id: event.id, name: event.name, input: event.input })
-						break
-					case 'error': {
-						const detail = event.body
-							? (event.status ? `${event.status}: ${event.body}` : event.body)
-							: event.message
-						await emitInfo(sessionId, event.message, 'error', detail)
-						break
-					}
-					case 'done': {
-						// Flush any buffered blink text
-						for (const seg of blinkParser.flush()) {
-							if (seg.type === 'text') {
-								assistantText += seg.text
-								await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
+						case 'done': {
+							// Flush any buffered blink text
+							for (const seg of blinkParser.flush()) {
+								if (seg.type === 'text') {
+									assistantText += seg.text
+									await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
+								}
 							}
-						}
-						// Prepend continuation prefix (first round only)
-						const isContinuation = !!ctx.continuation
-						if (ctx.continuation) {
-							debugLog(sessionId, 'done', `prepending prefix (${ctx.continuation.prefixText.length} chars) to assistantText (${assistantText.length} chars)`)
-							assistantText = ctx.continuation.prefixText + assistantText
-							ctx.continuation = undefined
-						}
-						// Calibrate bytes→tokens ratio on first API response
-						if (!calibrated && event.usage && event.usage.input > 0) {
-							calibrated = true
-							let totalBytes = systemPrompt.length + JSON.stringify(availableTools).length
-							for (const m of messages) totalBytes += context.messageBytes(m)
-							context.saveCalibration(modelId, totalBytes, event.usage.input)
-						}
-						const usage = event.usage
-						const assistantOpts = {
-							text: assistantText || undefined,
-							thinkingText: thinkingText || undefined,
-							thinkingBlobId: thinkingBlobId || undefined,
-							thinkingSignature: thinkingSignature || undefined,
-							toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-							usage,
-							continuation: isContinuation || undefined,
-						}
+							// Prepend continuation prefix (first round only)
+							const isContinuation = !!ctx.continuation
+							if (ctx.continuation) {
+								assistantText = ctx.continuation.prefixText + assistantText
+								ctx.continuation = undefined
+							}
+							// Calibrate bytes→tokens ratio on first API response
+							if (!calibrated && event.usage && event.usage.input > 0) {
+								calibrated = true
+								let totalBytes = systemPrompt.length + JSON.stringify(availableTools).length
+								for (const m of messages) totalBytes += context.messageBytes(m)
+								context.saveCalibration(modelId, totalBytes, event.usage.input)
+							}
+							const usage = event.usage
+							const assistantOpts = {
+								text: assistantText || undefined,
+								thinkingText: thinkingText || undefined,
+								thinkingBlobId: thinkingBlobId || undefined,
+								thinkingSignature: thinkingSignature || undefined,
+								toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+								usage,
+								continuation: isContinuation || undefined,
+							}
 
-						if (toolCalls.length === 0) {
-							// No tools — persist and finish
-							const { entry } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
-							await sessionHistory.appendHistory(sessionId, [entry])
+							if (toolCalls.length === 0) {
+								// No tools — persist and finish
+								const { entry } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
+								await sessionHistory.appendHistory(sessionId, [entry])
+								if (event.usage) await ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
+								await emit(sessionId, {
+									type: 'command', commandId: '', phase: 'done',
+									message: event.usage ? `${event.usage.input}→${event.usage.output} tokens` : undefined,
+								})
+								return
+							}
+
+							// Write assistant entry BEFORE executing tools
+							const { entry: assistantEntry, toolBlobMap } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
+							await sessionHistory.appendHistory(sessionId, [assistantEntry])
+							persisted = true
 							if (event.usage) await ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
-							await emit(sessionId, {
-								type: 'command', commandId: '', phase: 'done',
-								message: event.usage ? `${event.usage.input}→${event.usage.output} tokens` : undefined,
-							})
-							return
-						}
 
-						// Write assistant entry BEFORE executing tools
-						const { entry: assistantEntry, toolBlobMap } = await sessionHistory.writeAssistantEntry(sessionId, assistantOpts)
-						await sessionHistory.appendHistory(sessionId, [assistantEntry])
-						persisted = true
-						if (event.usage) await ctx.onStatus(true, undefined, { used: event.usage.input, max: ctxMax })
-
-						// Execute tools in parallel
-						const toolResults = await Promise.all(toolCalls.map(async (originalCall) => {
-							if (signal?.aborted) return { call: originalCall, result: '[interrupted]' as string | any[], toolStatus: 'done' as const }
-							let call = hooks.runHooks(originalCall)
-							if (call.input !== originalCall.input) {
-								const blobId = toolBlobMap.get(call.id)
-								if (blobId) await blob.updateInput(sessionId, blobId, call.input, originalCall.input)
-							}
-							const args = tools.argsPreview(call)
-
-							let result: string | any[]
-							let toolStatus: 'done' | 'error' = 'done'
-
-							// Permission gate
-							if (needsPermission(call.name, config.getConfig().permissions)) {
-								const answer = await ctx.askUser(`Allow ${call.name} ${args}? (y/n)`)
-								if (answer.trim().toLowerCase() !== 'y') {
-									result = 'error: user denied permission'
-									toolStatus = 'error'
-									return { call, result, toolStatus }
+							// Execute tools in parallel
+							const toolResults = await Promise.all(toolCalls.map(async (originalCall) => {
+								if (signal?.aborted) return { call: originalCall, result: '[interrupted]' as string | any[], toolStatus: 'done' as const }
+								let call = hooks.runHooks(originalCall)
+								if (call.input !== originalCall.input) {
+									const blobId = toolBlobMap.get(call.id)
+									if (blobId) await blob.updateInput(sessionId, blobId, call.input, originalCall.input)
 								}
-							}
+								const args = tools.argsPreview(call)
 
-							if (call.name === 'ask') {
-								const question = (call.input as any)?.question ?? ''
-								const answer = await ctx.askUser(question) || '[no answer]'
-								const { apiContent } = await attachments.resolve(sessionId, answer)
-								result = apiContent
+								let result: string | any[]
+								let toolStatus: 'done' | 'error' = 'done'
+
+								// Permission gate
+								if (needsPermission(call.name, config.getConfig().permissions)) {
+									const answer = await ctx.askUser(`Allow ${call.name} ${args}? (y/n)`)
+									if (answer.trim().toLowerCase() !== 'y') {
+										result = 'error: user denied permission'
+										toolStatus = 'error'
+										return { call, result, toolStatus }
+									}
+								}
+
+								if (call.name === 'ask') {
+									const question = (call.input as any)?.question ?? ''
+									const answer = await ctx.askUser(question) || '[no answer]'
+									const { apiContent } = await attachments.resolve(sessionId, answer)
+									result = apiContent
+								} else {
+									const blobId = toolBlobMap.get(call.id)
+									await emit(sessionId, {
+										type: 'tool', toolId: call.id, name: call.name,
+										args, phase: 'running', blobId,
+									})
+									const onChunk = (text: string) => emit(sessionId, {
+										type: 'tool', toolId: call.id, name: call.name,
+										args, phase: 'streaming', output: text,
+									})
+									const destructive = call.name === 'bash' || call.name === 'write' || call.name === 'edit'
+									if (destructive) ctx.onDestructiveToolStart?.(call.id, call.name)
+									try {
+										result = await tools.executeTool(call, onChunk, { evalCtx, sessionId, signal, cwd: ctx.cwd })
+									} finally {
+										if (destructive) ctx.onDestructiveToolEnd?.(call.id, call.name)
+									}
+									if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
+									await emit(sessionId, {
+										type: 'tool', toolId: call.id, name: call.name,
+										args,
+										phase: toolStatus === 'error' ? 'error' : 'done',
+										output: typeof result === 'string' ? result : '[non-text output]',
+										blobId,
+									})
+								}
+
+								return { call, result, toolStatus }
+							}))
+
+							// Persist all tool results
+							if (!signal?.aborted) {
+								const entries = []
+								for (const { call, result, toolStatus } of toolResults) {
+									entries.push(await sessionHistory.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus))
+								}
+								await sessionHistory.appendHistory(sessionId, entries)
 							} else {
-								const blobId = toolBlobMap.get(call.id)
-								await emit(sessionId, {
-									type: 'tool', toolId: call.id, name: call.name,
-									args, phase: 'running', blobId,
-								})
-								const onChunk = (text: string) => emit(sessionId, {
-									type: 'tool', toolId: call.id, name: call.name,
-									args, phase: 'streaming', output: text,
-								})
-								const destructive = call.name === 'bash' || call.name === 'write' || call.name === 'edit'
-								if (destructive) ctx.onDestructiveToolStart?.(call.id, call.name)
-								try {
-									result = await tools.executeTool(call, onChunk, { evalCtx, sessionId, signal, cwd: ctx.cwd })
-								} finally {
-									if (destructive) ctx.onDestructiveToolEnd?.(call.id, call.name)
-								}
-								if (typeof result === 'string' && result.startsWith('error:')) toolStatus = 'error'
-								await emit(sessionId, {
-									type: 'tool', toolId: call.id, name: call.name,
-									args,
-									phase: toolStatus === 'error' ? 'error' : 'done',
-									output: typeof result === 'string' ? result : '[non-text output]',
-									blobId,
-								})
+								aborted = true
 							}
 
-							return { call, result, toolStatus }
-						}))
+							if (aborted) break
 
-						// Persist all tool results
-						if (!signal?.aborted) {
-							const entries = []
-							for (const { call, result, toolStatus } of toolResults) {
-								entries.push(await sessionHistory.writeToolResultEntry(sessionId, call.id, result, toolBlobMap, toolStatus))
-							}
-							await sessionHistory.appendHistory(sessionId, entries)
-						} else {
-							aborted = true
-						}
-
-						if (aborted) break
-
-						// Add to messages for next round
-						messages.push({
-							role: 'assistant',
-							content: [
-								...(thinkingText && thinkingSignature ? [{ type: 'thinking', thinking: thinkingText, signature: thinkingSignature }] : []),
-								...(assistantText ? [{ type: 'text', text: assistantText }] : []),
-								...toolCalls.map(t => ({
-									type: 'tool_use', id: t.id, name: t.name, input: t.input,
-								})),
-							],
-						})
-						for (const call of toolCalls) {
-							const blobId = toolBlobMap.get(call.id)!
-							const block = await blob.read(sessionId, blobId)
-							const raw = block?.result?.content ?? ''
-							const content = typeof raw === 'string' ? tools.truncate(raw) : raw
+							// Add to messages for next round
 							messages.push({
-								role: 'user',
-								content: [{ type: 'tool_result', tool_use_id: call.id, content }],
+								role: 'assistant',
+								content: [
+									...(thinkingText && thinkingSignature ? [{ type: 'thinking', thinking: thinkingText, signature: thinkingSignature }] : []),
+									...(assistantText ? [{ type: 'text', text: assistantText }] : []),
+									...toolCalls.map(t => ({
+										type: 'tool_use', id: t.id, name: t.name, input: t.input,
+									})),
+								],
 							})
-						}
+							for (const call of toolCalls) {
+								const blobId = toolBlobMap.get(call.id)!
+								const block = await blob.read(sessionId, blobId)
+								const raw = block?.result?.content ?? ''
+								const content = typeof raw === 'string' ? tools.truncate(raw) : raw
+								messages.push({
+									role: 'user',
+									content: [{ type: 'tool_result', tool_use_id: call.id, content }],
+								})
+							}
 
-						break
+							break
+						}
 					}
+				}
+			} catch (err: any) {
+				// Provider throws on abort (AbortError) — convert to aborted flag
+				if (signal?.aborted) {
+					aborted = true
+				} else {
+					throw err
 				}
 			}
 
@@ -289,10 +291,8 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				// Persist partial output before exiting (skip if already written in tool path)
 				if (!persisted && (assistantText || thinkingText)) {
 					if (ctx.continuation) {
-						debugLog(sessionId, 'aborted', `prepending prefix (${ctx.continuation.prefixText.length} chars) to partial assistantText (${assistantText.length} chars)`)
 						assistantText = ctx.continuation.prefixText + assistantText
 					}
-					debugLog(sessionId, 'aborted', `saving partial: text=${(assistantText || '').length}, continuation=${!!ctx.continuation}`)
 					const { entry } = await sessionHistory.writeAssistantEntry(sessionId, {
 						text: assistantText || undefined,
 						thinkingText: thinkingText || undefined,

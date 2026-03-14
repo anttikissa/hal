@@ -2,7 +2,6 @@
 
 import type { Provider, ProviderEvent, GenerateParams } from './provider.ts'
 import { provider as providerUtils } from './provider.ts'
-import { appendFile } from 'node:fs/promises'
 import { auth } from '../runtime/auth.ts'
 
 async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> {
@@ -52,7 +51,6 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 		const _log = `${_lines.join('\n')}\n`
 		await appendFile('/tmp/hal-thinking-debug.all.log', _log)
 		await appendFile(`/tmp/hal-thinking-debug.${_session}.log`, _log)
-		await appendFile('/tmp/hal-continuation-debug.log', _log)
 	} catch {}
 	if (params.tools?.length) body.tools = params.tools
 
@@ -70,7 +68,6 @@ async function* generate(params: GenerateParams): AsyncGenerator<ProviderEvent> 
 
 	if (!res.ok) {
 		const body = (await res.text()).slice(0, 2000)
-		try { await appendFile('/tmp/hal-continuation-debug.log', `${new Date().toISOString()} [${_session}] [API ERROR] status=${res.status} body=${body.slice(0, 500)}\n`) } catch {}
 		yield { type: 'error', message: `API ${res.status}`, status: res.status, body }
 		yield { type: 'done' }
 		return
