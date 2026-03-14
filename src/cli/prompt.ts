@@ -256,7 +256,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 				return true
 			}
 
-			// At boundary → cycle history
+			// At boundary → cycle history or move to line boundary
 			if (history.length > 0) {
 				if (dir === -1) {
 					if (historyIndex < 0) {
@@ -265,12 +265,16 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 					} else if (historyIndex > 0) {
 						historyIndex--
 					} else {
+						cursor = 0; goalCol = null; selAnchor = null
 						return true
 					}
 					buf = history[historyIndex]
 					cursor = buf.length; goalCol = null; selAnchor = null
 				} else {
-					if (historyIndex < 0) return true
+					if (historyIndex < 0) {
+						cursor = buf.length; goalCol = null; selAnchor = null
+						return true
+					}
 					if (historyIndex < history.length - 1) {
 						historyIndex++
 						buf = history[historyIndex]
@@ -282,6 +286,7 @@ export function handleKey(k: KeyEvent, contentWidth: number): boolean {
 				}
 				return true
 			}
+			cursor = dir === -1 ? 0 : buf.length; goalCol = null; selAnchor = null
 		} else {
 			if (selAnchor === null) selAnchor = cursor
 			const r = input.verticalMove(buf, contentWidth, cursor, goalCol, dir)

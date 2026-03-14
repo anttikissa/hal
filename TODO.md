@@ -2,6 +2,7 @@
 
 ## REAL TODO
 
+- Question mode needs to be made better - make it clear which is question and which answer and how it feels and looks
 
 - "waiting for tool calls to finish; ctrl-r again to force" this doesn't quite work
 - 

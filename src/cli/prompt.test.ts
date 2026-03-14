@@ -37,28 +37,37 @@ describe('prompt history', () => {
 		expect(prompt.text()).toBe('x')
 	})
 
-	test('up at oldest stays', () => {
+	test('up at oldest moves cursor to start of line', () => {
 		prompt.handleKey(key('up'), W)
 		prompt.handleKey(key('up'), W)
 		prompt.handleKey(key('up'), W)
 		expect(prompt.text()).toBe('first')
 
-		// One more up should stay at oldest
+		// One more up should stay at oldest but move cursor to start
 		prompt.handleKey(key('up'), W)
 		expect(prompt.text()).toBe('first')
+		expect(prompt.cursorPos()).toBe(0)
 	})
 
-	test('down without history browsing is no-op', () => {
+	test('down without history browsing moves cursor to end', () => {
+		for (const ch of 'hello') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.handleKey(key('a', { ctrl: true }), W) // move cursor to start
+		expect(prompt.cursorPos()).toBe(0)
 		prompt.handleKey(key('down'), W)
-		expect(prompt.text()).toBe('')
+		expect(prompt.text()).toBe('hello')
+		expect(prompt.cursorPos()).toBe(5)
 	})
 
-	test('empty history: up/down are no-ops', () => {
+	test('empty history: up moves cursor to start, down to end', () => {
 		prompt.setHistory([])
+		for (const ch of 'hi') prompt.handleKey(key(ch, { char: ch }), W)
+		prompt.handleKey(key('a', { ctrl: true }), W) // cursor to start
+		expect(prompt.cursorPos()).toBe(0)
 		prompt.handleKey(key('up'), W)
-		expect(prompt.text()).toBe('')
+		expect(prompt.text()).toBe('hi')
+		expect(prompt.cursorPos()).toBe(0) // already at start, stays
 		prompt.handleKey(key('down'), W)
-		expect(prompt.text()).toBe('')
+		expect(prompt.cursorPos()).toBe(2) // moves to end
 	})
 
 	test('setText resets history browsing', () => {
