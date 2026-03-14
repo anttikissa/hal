@@ -32,10 +32,7 @@ export async function saveDraft(sessionId: string, text: string): Promise<void> 
 	if (!text) return
 	state.ensureDir(state.sessionDir(sessionId))
 	const saved = await persistTempImages(sessionId, text)
-	// Merge with existing draft from another client
-	const existing = await loadDraft(sessionId)
-	const merged = (existing && existing !== saved) ? existing + '\n\n' + saved : saved
-	await writeFile(draftPath(sessionId), merged)
+	await writeFile(draftPath(sessionId), saved)
 	void ipc.events.append({ id: protocol.eventId(), type: 'draft_saved', sessionId, createdAt: new Date().toISOString() })
 }
 

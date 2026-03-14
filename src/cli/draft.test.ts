@@ -32,20 +32,12 @@ test('saveDraft empty preserves existing draft', async () => {
 	expect(await draft.loadDraft(SESSION)).toBe('keep me')
 })
 
-test('saveDraft merges with existing draft from another client', async () => {
+test('saveDraft overwrites existing draft (last write wins)', async () => {
 	setup()
 	await draft.clearDraft(SESSION)
 	await draft.saveDraft(SESSION, 'from client A')
 	await draft.saveDraft(SESSION, 'from client B')
-	expect(await draft.loadDraft(SESSION)).toBe('from client A\n\nfrom client B')
-})
-
-test('saveDraft does not merge duplicate text', async () => {
-	setup()
-	await draft.clearDraft(SESSION)
-	await draft.saveDraft(SESSION, 'same text')
-	await draft.saveDraft(SESSION, 'same text')
-	expect(await draft.loadDraft(SESSION)).toBe('same text')
+	expect(await draft.loadDraft(SESSION)).toBe('from client B')
 })
 
 test('saveDraft copies /tmp/ images to session dir and rewrites paths', async () => {
