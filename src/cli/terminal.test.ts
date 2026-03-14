@@ -44,22 +44,13 @@ test('disableTerminalInput keeps a data listener to drain buffered bytes', () =>
 })
 
 test('aborting sessions are excluded from handoff busy list', () => {
-	// Sessions with an aborted signal (being paused) should not
+	// This tests the filtering logic used by busySessionIds() in cli.ts:
+	// sessions with an active AbortController (being paused) should not
 	// appear in the handoff, otherwise they get auto-continued after restart.
-	// Sessions with a non-aborted controller (active generation) should be kept.
 	const busySessionIds = new Set(['session-a', 'session-b', 'session-c'])
-	const abortedController = new AbortController()
-	abortedController.abort()
-	const activeController = new AbortController()
-	const abortControllers = new Map<string, AbortController>([
-		['session-b', abortedController],
-		['session-c', activeController],
-	])
+	const abortControllers = new Map([['session-b', new AbortController()]])
 
-	const filtered = [...busySessionIds].filter(id => {
-		const ac = abortControllers.get(id)
-		return !ac || !ac.signal.aborted
-	})
+	const filtered = [...busySessionIds].filter(id => !abortControllers.has(id))
 
 	expect(filtered).toEqual(['session-a', 'session-c'])
 	expect(filtered).not.toContain('session-b')

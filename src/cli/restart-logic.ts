@@ -59,11 +59,8 @@ function activeSessionIds(): string[] {
 function busySessionIds(): string[] {
 	const rt = runtimeOrNull()
 	if (rt) {
-		// Exclude sessions being paused (abort requested) — they shouldn't auto-continue after restart
-		return [...rt.busySessionIds].filter(id => {
-			const ac = rt.abortControllers.get(id)
-			return !ac || !ac.signal.aborted
-		})
+		// Exclude sessions with pending abort (being paused) — they shouldn't auto-continue after restart
+		return [...rt.busySessionIds].filter(id => !rt.abortControllers.has(id))
 	}
 	return deps.client.getState().tabs.filter(t => t.busy).map(t => t.sessionId)
 }
