@@ -76,7 +76,7 @@ export async function startRuntime(): Promise<Runtime> {
 		const model = info.model ?? config.getConfig().defaultModel
 		await history.ensureModelEvent(id, model)
 		const apiMessages = await history.loadApiMessages(id)
-		if (rt.hasPendingUserTurn(apiMessages)) {
+		if (rt.hasPendingUserTurn(apiMessages) && !(await history.isSessionPaused(id))) {
 			rt.busySessionIds.add(id)
 			pendingSessions.push({ id, info, apiMessages })
 		}

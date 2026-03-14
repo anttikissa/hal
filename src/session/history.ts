@@ -255,6 +255,16 @@ export async function loadHydrationData(sessionId: string): Promise<HydrationDat
 	}
 }
 
+export async function isSessionPaused(sessionId: string): Promise<boolean> {
+	const entries = await readHistory(sessionId)
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const e = entries[i] as any
+		if (e.type === 'info' && e.level === 'meta' && e.text === '[paused]') return true
+		if (e.role) return false
+	}
+	return false
+}
+
 export const history = {
 	config: historyConfig,
 	getLastUsage,
@@ -266,6 +276,7 @@ export const history = {
 	ensureModelEvent,
 	loadApiMessages,
 	loadAllHistory,
+	isSessionPaused,
 	detectInterruptedTools,
 	buildCompactionContext,
 	loadHydrationData,

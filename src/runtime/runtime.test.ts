@@ -289,6 +289,36 @@ test('auto-continues pending user turns at startup without handoff', async () =>
 	}, 4000, 20, 'Timed out waiting for auto-continue at startup')
 })
 
+test('paused sessions are NOT auto-continued at startup', async () => {
+	runtime.stop()
+	await releaseHost(hostId)
+
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	// Simulate: user sent a message, then session was paused (no assistant reply yet)
+	await appendHistory(sid, [
+		{ role: 'user', content: 'Do something long', ts } as any,
+		{ type: 'info', level: 'meta', text: '[paused]', ts } as any,
+	])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+	})
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	// Give it time — if the bug exists, mock provider would finish quickly
+	await new Promise(r => setTimeout(r, 1000))
+
+	// Check that no generation happened by looking for command done events
+	const all = await events.readAll()
+	const doneEvents = all.filter((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	expect(doneEvents.length).toBe(0)
+})
+
 test('handoff continue auto-resumes interrupted user turn on restart', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
