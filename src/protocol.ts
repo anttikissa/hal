@@ -26,6 +26,7 @@ export type CommandType =
 	| 'continue'
 	| 'resume'
 	| 'steer'
+	| 'queue'
 	| 'reset'
 	| 'compact'
 	| 'open'
@@ -46,6 +47,7 @@ export interface RuntimeCommand {
 	type: CommandType
 	sessionId?: string | null
 	text?: string
+	label?: string
 	workingDir?: string
 	source: RuntimeSource
 	createdAt: string

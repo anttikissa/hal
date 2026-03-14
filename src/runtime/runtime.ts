@@ -7,7 +7,7 @@ import { systemPrompt } from './system-prompt.ts'
 import { tools } from './tools.ts'
 import { protocol, type EventLevel, type RuntimeEvent, type SessionInfo } from '../protocol.ts'
 import { config } from '../config.ts'
-
+import { queue } from '../cli/queue.ts'
 const GREETINGS = [
 	'Hello! What shall we build today? Say **help** for help.',
 	'Hey there! What are we working on? Say **help** for help.',
@@ -215,6 +215,15 @@ export class Runtime {
 			this.abortControllers.delete(sid)
 			this.busySessionIds.delete(sid)
 			await this.publish()
+			// Drain queued prompt if any
+			if (!ac.signal.aborted) {
+				const queued = await queue.loadQueue(sid)
+				if (queued) {
+					await queue.saveQueue(sid, '')
+					const cmd = protocol.makeCommand('prompt', { kind: 'cli', clientId: 'queue' }, queued, sid)
+					await ipc.commands.append(cmd)
+				}
+			}
 		})
 	}
 

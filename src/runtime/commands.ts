@@ -10,10 +10,10 @@ import { models } from '../models.ts'
 import { auth } from './auth.ts'
 import { config } from '../config.ts'
 import { promptAnalysis } from './prompt-analysis.ts'
+import { queue } from '../cli/queue.ts'
 import { resolve } from 'path'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
-
 export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<void> {
 	const sid = cmd.sessionId ?? rt.activeSessionId
 	if (!sid) return
@@ -50,7 +50,7 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				rt.pendingInterruptedTools.delete(sid)
 			}
 
-			await rt.emit({ type: 'prompt', sessionId: sid, text: promptText, source: cmd.source })
+			await rt.emit({ type: 'prompt', sessionId: sid, text: promptText, label: cmd.label as any, source: cmd.source })
 
 			const { apiContent, logContent } = await attachments.resolve(sid, promptText)
 			await history.writeUserEntry(sid, logContent)
@@ -92,6 +92,52 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 				}).catch(() => {})
 			}
 			await rt.startGeneration(sid, info, apiMessages)
+			break
+		}
+		case 'steer': {
+			const text = cmd.text ?? ''
+			if (!text) { await warn('/steer <prompt>'); return }
+			if (!rt.sessions.has(sid)) { await error(`Session ${sid} not found`); return }
+			if (!rt.busySessionIds.has(sid)) {
+				// Not busy — treat as a normal prompt
+				await handleCommand(rt, { ...cmd, type: 'prompt', label: 'steering' })
+				return
+			}
+			// Abort current generation
+			const ac = rt.abortControllers.get(sid)
+			if (ac) ac.abort()
+			// Wait for generation to finish cleanup
+			await new Promise<void>(resolve => {
+				const check = () => {
+					if (!rt.busySessionIds.has(sid)) { resolve(); return }
+					setTimeout(check, 50)
+				}
+				check()
+			})
+			// Now send as a normal prompt (generation is done, history has partial output)
+			await handleCommand(rt, { ...cmd, type: 'prompt', label: 'steering' })
+			break
+		}
+		case 'queue': {
+			const text = cmd.text ?? ''
+			if (!rt.sessions.has(sid)) { await error(`Session ${sid} not found`); return }
+			if (!text) {
+				const existing = await queue.loadQueue(sid)
+				if (existing) {
+					await queue.saveQueue(sid, '')
+					await warn('[queue] cleared')
+				} else {
+					await warn('[queue] nothing queued')
+				}
+				return
+			}
+			if (!rt.busySessionIds.has(sid)) {
+				// Not busy — send immediately
+				await handleCommand(rt, { ...cmd, type: 'prompt' })
+				return
+			}
+			await queue.saveQueue(sid, text)
+			await rt.emitInfo(sid, `[queued] ${text.split('\n')[0].slice(0, 80)}`, 'meta')
 			break
 		}
 		case 'open': {

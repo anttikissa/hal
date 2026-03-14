@@ -50,7 +50,8 @@ function handleEvent(event: RuntimeEvent, state: ClientState): void {
 		}
 		case 'prompt': {
 			const t = tab(event.sessionId); if (!t) return
-			t.blocks.push({ type: 'input', text: event.text, model: t.info.model, ts: Date.parse(event.createdAt) })
+			const status = event.label === 'steering' ? 'steering' as const : undefined
+			t.blocks.push({ type: 'input', text: event.text, model: t.info.model, status, ts: Date.parse(event.createdAt) })
 			break
 		}
 		case 'status': {

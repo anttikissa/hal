@@ -131,6 +131,8 @@ function showHelp(ctx: InputContext): void {
 			'  /continue — same as above',
 			'  /resume [id] — reopen a closed session',
 			'  /fork — fork session',
+			'  /steer <prompt> — interrupt and redirect the model',
+			'  /queue <prompt> — send after current generation finishes',
 			'',
 			'**Keys**',
 			'  esc pause │ ctrl-t new tab │ ctrl-f fork │ ctrl-w close │ ctrl-n/p switch tabs',
