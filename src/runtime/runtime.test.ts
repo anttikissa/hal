@@ -738,3 +738,167 @@ test('resume with id opens a closed session as a new tab', async () => {
 	expect(runtime.sessions.has(toClose)).toBe(true)
 	expect(runtime.activeSessionId).toBe(toClose)
 })
+
+
+test('/queue saves text when session is busy', async () => {
+	const sid = runtime.activeSessionId!
+	const snapshot = (await events.readAll()).length
+
+	// Start a slow generation
+	await commands.append(makeCommand('prompt', src, 'spam', sid))
+	// Wait for busy
+	await waitFor(() => runtime.busySessionIds.has(sid), 2000, 20, 'Session never became busy')
+
+	// Queue a message
+	await commands.append(makeCommand('queue', src, 'do this next', sid))
+	await new Promise(r => setTimeout(r, 200))
+
+	// Should be queued
+	const { queue } = await import('../cli/queue.ts')
+	const queued = await queue.loadQueue(sid)
+	expect(queued).toBe('do this next')
+
+	// Should emit info event
+	const all = await events.readAll()
+	const recent = all.slice(snapshot)
+	expect(recent.some(e => e.type === 'line' && e.text.includes('[queued]'))).toBe(true)
+
+	// Wait for generation to finish
+	await waitFor(() => !runtime.busySessionIds.has(sid), 5000, 50, 'Generation never finished')
+	await queue.saveQueue(sid, '') // cleanup
+})
+
+test('/queue on idle session sends prompt immediately', async () => {
+	const sid = runtime.activeSessionId!
+	const snapshot = (await events.readAll()).length
+
+	await commands.append(makeCommand('queue', src, 'Hello via queue', sid))
+
+	// Should be treated as a prompt — wait for done
+	await waitForEvents(
+		snapshot,
+		recent => recent.some(e => e.type === 'command' && e.sessionId === sid && (e.phase === 'done' || e.phase === 'failed')),
+		4000, 20, 'Queue-as-prompt never finished',
+	)
+
+	// Should NOT have saved anything to queue
+	const { queue } = await import('../cli/queue.ts')
+	expect(await queue.loadQueue(sid)).toBe('')
+})
+
+test('/queue with no text clears existing queue', async () => {
+	const sid = runtime.activeSessionId!
+	const { queue } = await import('../cli/queue.ts')
+
+	await queue.saveQueue(sid, 'something pending')
+	expect(await queue.loadQueue(sid)).toBe('something pending')
+
+	const snapshot = (await events.readAll()).length
+	await commands.append(makeCommand('queue', src, undefined, sid))
+	await new Promise(r => setTimeout(r, 200))
+
+	expect(await queue.loadQueue(sid)).toBe('')
+	const all = await events.readAll()
+	const recent = all.slice(snapshot)
+	expect(recent.some(e => e.type === 'line' && e.text.includes('[queue] cleared'))).toBe(true)
+})
+
+test('/queue with no text on empty queue shows nothing queued', async () => {
+	const sid = runtime.activeSessionId!
+
+	const snapshot = (await events.readAll()).length
+	await commands.append(makeCommand('queue', src, undefined, sid))
+	await new Promise(r => setTimeout(r, 200))
+
+	const all = await events.readAll()
+	const recent = all.slice(snapshot)
+	expect(recent.some(e => e.type === 'line' && e.text.includes('[queue] nothing queued'))).toBe(true)
+})
+
+test('/steer on idle session sends as normal prompt', async () => {
+	const sid = runtime.activeSessionId!
+	const snapshot = (await events.readAll()).length
+
+	await commands.append(makeCommand('steer', src, 'do something', sid))
+
+	await waitForEvents(
+		snapshot,
+		recent => recent.some(e => e.type === 'command' && e.sessionId === sid && (e.phase === 'done' || e.phase === 'failed')),
+		4000, 20, 'Steer-as-prompt never finished',
+	)
+
+	// Should have echoed prompt back
+	const all = await events.readAll()
+	const recent = all.slice(snapshot)
+	expect(recent.some(e => e.type === 'prompt' && e.text === 'do something')).toBe(true)
+})
+
+test('/steer on busy session aborts and re-prompts', async () => {
+	const sid = runtime.activeSessionId!
+
+	// Start a slow generation
+	const snapshot = (await events.readAll()).length
+	await commands.append(makeCommand('prompt', src, 'spam', sid))
+	await waitFor(() => runtime.busySessionIds.has(sid), 2000, 20, 'Session never became busy')
+
+	// Wait for at least one chunk
+	await waitForEvents(
+		snapshot,
+		recent => recent.some(e => e.type === 'chunk'),
+		3000, 20, 'Never got a chunk',
+	)
+
+	// Steer it
+	const steerSnapshot = (await events.readAll()).length
+	await commands.append(makeCommand('steer', src, 'actually do this instead', sid))
+
+	// Steer aborts the first gen (done/failed), then starts a new one (another done/failed).
+	// Wait for the steering prompt event which only appears after the re-send.
+	await waitForEvents(
+		steerSnapshot,
+		recent => recent.some(e => e.type === 'prompt' && (e as any).text === 'actually do this instead'),
+		8000, 50, 'Steer prompt never appeared',
+	)
+
+	// Wait for the steered generation to finish
+	await waitFor(() => !runtime.busySessionIds.has(sid), 5000, 50, 'Session never went idle after steer')
+
+	// Session should be idle now
+	expect(runtime.busySessionIds.has(sid)).toBe(false)
+})
+
+test('pending sessions are busy in first published state', async () => {
+	// Stop current runtime
+	runtime.stop()
+	await releaseHost(hostId)
+
+	// Create a session with a pending user turn
+	const info = await createSession()
+	const sid = info.id
+	const ts = new Date().toISOString()
+	await appendHistory(sid, [{ role: 'user', content: 'I need a response', ts } as any])
+	updateState((s) => {
+		s.sessions = [sid]
+		s.activeSessionId = sid
+	})
+
+	// Capture events before starting
+	const snapshot = (await events.readAll()).length
+
+	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
+	await claimHost(hostId)
+	runtime = await startRuntime()
+
+	// The first status event should include the pending session in busySessionIds
+	const all = await events.readAll()
+	const recent = all.slice(snapshot)
+	const firstStatus = recent.find(e => e.type === 'status') as any
+	expect(firstStatus).toBeTruthy()
+	expect(firstStatus.busySessionIds).toContain(sid)
+
+	// Wait for generation to complete
+	await waitFor(async () => {
+		const evts = await events.readAll()
+		return evts.some(e => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	}, 4000, 20, 'Pending session never completed')
+})
