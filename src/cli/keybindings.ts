@@ -19,15 +19,15 @@ export interface InputContext {
 	doRender: () => void
 	redraw: () => void
 	contentWidth: () => number
-	quit: () => void
+	quit: () => void | Promise<void>
 	restart: () => void | Promise<void>
 	suspend: () => void
 }
 
 export function handleInput(k: KeyEvent, ctx: InputContext): void {
-	if (k.key === 'c' && k.ctrl) { ctx.quit(); return }
+	if (k.key === 'c' && k.ctrl) { void ctx.quit(); return }
 
-	if (k.key === 'd' && k.ctrl && !prompt.text()) { ctx.quit(); return }
+	if (k.key === 'd' && k.ctrl && !prompt.text()) { void ctx.quit(); return }
 	if (k.key === 'w' && k.ctrl) {
 		ctx.saveDraft()
 		ctx.send('close')

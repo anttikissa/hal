@@ -101,7 +101,7 @@ function clearPendingAction(): void {
 	if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null }
 }
 
-function quit(): void {
+async function quit(): Promise<void> {
 	if (hasDestructiveTools() && pendingAction !== 'quit') {
 		pendingAction = 'quit'
 		if (pendingTimer) clearTimeout(pendingTimer)
@@ -112,6 +112,7 @@ function quit(): void {
 		return
 	}
 	clearPendingAction()
+	await deps.client.saveDraft()
 	terminal.disableTerminalInput(stdout, stdin)
 	cleanExit = true
 	const rs = deps.getRenderState()
