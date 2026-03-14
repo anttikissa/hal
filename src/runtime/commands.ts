@@ -278,8 +278,17 @@ export async function handleCommand(rt: Runtime, cmd: RuntimeCommand): Promise<v
 			const wasPaused = rawHistory.length > 0 && (rawHistory[rawHistory.length - 1] as any)?.type === 'info'
 				&& (rawHistory[rawHistory.length - 1] as any)?.text === '[paused]'
 			if (!rt.hasPendingUserTurn(apiMessages) && !wasPaused) break // nothing to continue
+			// Detect text continuation: last API message is assistant with text, no tool calls
+			let continuation: { prefixText: string } | undefined
+			if (!rt.hasPendingUserTurn(apiMessages)) {
+				const lastMsg = apiMessages[apiMessages.length - 1]
+				if (lastMsg?.role === 'assistant') {
+					const textBlock = lastMsg.content?.find((b: any) => b.type === 'text')
+					if (textBlock?.text) continuation = { prefixText: textBlock.text }
+				}
+			}
 			await rt.emitInfo(sid, '[continuing] interrupted response', 'meta')
-			await rt.startGeneration(sid, info, apiMessages, 'continuing...')
+			await rt.startGeneration(sid, info, apiMessages, 'continuing...', { continuation })
 			break
 		}
 		case 'resume': {

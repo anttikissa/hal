@@ -115,7 +115,13 @@ export async function loadApiMessages(sessionId: string, loadAllHistory: (id: st
 					content.push({ type: 'tool_use', id: t.id, name: t.name, input: blobData?.call?.input ?? {} })
 				}
 			}
-			if (content.length) out.push({ role: 'assistant', content })
+			if (content.length) {
+				if (msg.continuation && out.length > 0 && out[out.length - 1].role === 'assistant') {
+					out[out.length - 1] = { role: 'assistant', content }
+				} else {
+					out.push({ role: 'assistant', content })
+				}
+			}
 		} else if (msg.role === 'tool_result') {
 			const blobData = await blob.read(sessionId, msg.blobId)
 			let content = blobData?.result?.content ?? '[interrupted]'

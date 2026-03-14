@@ -43,6 +43,7 @@ export interface AssistantMessage {
 	thinkingBlobId?: string
 	tools?: { id: string; name: string; blobId: string }[]
 	usage?: { input: number; output: number }
+	continuation?: boolean
 	ts: string
 }
 
@@ -83,10 +84,11 @@ export async function getLastUsage(sessionId: string): Promise<{ input: number; 
 
 export async function writeAssistantEntry(
 	sessionId: string,
-	opts: { text?: string; thinkingText?: string; thinkingBlobId?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[]; usage?: { input: number; output: number } },
+	opts: { text?: string; thinkingText?: string; thinkingBlobId?: string; thinkingSignature?: string; toolCalls?: { id: string; name: string; input: unknown }[]; usage?: { input: number; output: number }; continuation?: boolean },
 ): Promise<{ entry: AssistantMessage; toolBlobMap: Map<string, string> }> {
 	const entry: AssistantMessage = { role: 'assistant', ts: new Date().toISOString() }
 	const toolBlobMap = new Map<string, string>()
+	if (opts.continuation) entry.continuation = true
 	if (opts.text) entry.text = opts.text
 	if (opts.thinkingText) {
 		entry.thinkingText = opts.thinkingText

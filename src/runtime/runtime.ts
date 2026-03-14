@@ -46,6 +46,7 @@ type RunAgentLoopFn = (ctx: {
 	signal?: AbortSignal
 	onDestructiveToolStart?: (toolId: string, toolName: string) => void
 	onDestructiveToolEnd?: (toolId: string, toolName: string) => void
+	continuation?: { prefixText: string }
 }) => Promise<void>
 
 let _runAgentLoop: RunAgentLoopFn | null = null
@@ -177,6 +178,7 @@ export class Runtime {
 		info: SessionInfo,
 		apiMessages: any[],
 		activity = 'generating...',
+		opts?: { continuation?: { prefixText: string } },
 	): Promise<void> {
 		const ac = new AbortController()
 		this.abortControllers.set(sid, ac)
@@ -209,6 +211,7 @@ export class Runtime {
 			signal: ac.signal,
 			onDestructiveToolStart: (toolId) => { this.activeDestructiveTools.add(`${sid}:${toolId}`) },
 			onDestructiveToolEnd: (toolId) => { this.activeDestructiveTools.delete(`${sid}:${toolId}`) },
+			continuation: opts?.continuation,
 		}).finally(async () => {
 			// Guard: skip cleanup if a new generation already started for this session
 			if (this.abortControllers.get(sid) !== ac) return

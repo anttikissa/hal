@@ -37,6 +37,7 @@ export interface AgentContext {
 	signal?: AbortSignal
 	onDestructiveToolStart?: (toolId: string, toolName: string) => void
 	onDestructiveToolEnd?: (toolId: string, toolName: string) => void
+	continuation?: { prefixText: string }
 }
 
 function emit(sessionId: string, event: Partial<RuntimeEvent> & { type: RuntimeEvent['type'] }): Promise<void> {
@@ -126,6 +127,12 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								await emit(sessionId, { type: 'chunk', text: seg.text!, channel: 'assistant' })
 							}
 						}
+						// Prepend continuation prefix (first round only)
+						const isContinuation = !!ctx.continuation
+						if (ctx.continuation) {
+							assistantText = ctx.continuation.prefixText + assistantText
+							ctx.continuation = undefined
+						}
 						// Calibrate bytes→tokens ratio on first API response
 						if (!calibrated && event.usage && event.usage.input > 0) {
 							calibrated = true
@@ -141,6 +148,7 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							thinkingSignature: thinkingSignature || undefined,
 							toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
 							usage,
+							continuation: isContinuation || undefined,
 						}
 
 						if (toolCalls.length === 0) {
@@ -232,7 +240,10 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						if (aborted) break
 
-						// Add to messages for next round
+						// Add to messages for next round (replace prefill if continuing)
+						if (isContinuation && messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
+							messages.pop()
+						}
 						messages.push({
 							role: 'assistant',
 							content: [
@@ -262,11 +273,15 @@ export async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			if (aborted) {
 				// Persist partial output before exiting (skip if already written in tool path)
 				if (!persisted && (assistantText || thinkingText)) {
+					if (ctx.continuation) {
+						assistantText = ctx.continuation.prefixText + assistantText
+					}
 					const { entry } = await sessionHistory.writeAssistantEntry(sessionId, {
 						text: assistantText || undefined,
 						thinkingText: thinkingText || undefined,
 						thinkingBlobId: thinkingBlobId || undefined,
 						thinkingSignature: thinkingSignature || undefined,
+						continuation: !!ctx.continuation || undefined,
 					})
 					await sessionHistory.appendHistory(sessionId, [entry])
 				}
