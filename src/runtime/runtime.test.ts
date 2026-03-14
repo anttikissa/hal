@@ -266,7 +266,7 @@ test('multiple sessions survive restart in order', async () => {
 })
 
 
-test('restart detects interrupted user turn but waits for /continue', async () => {
+test('auto-continues pending user turns at startup without handoff', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
 
@@ -277,22 +277,16 @@ test('restart detects interrupted user turn but waits for /continue', async () =
 	updateState((s) => {
 		s.sessions = [sid]
 		s.activeSessionId = sid
-		s.busySessionIds = [sid]
 	})
 
 	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 	await claimHost(hostId)
 	runtime = await startRuntime()
 
-	// Runtime should NOT auto-generate — wait a bit and verify no generation started
-	await new Promise(r => setTimeout(r, 200))
-	const all = await events.readAll()
-	const sawDoneBeforeContinue = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
-	expect(sawDoneBeforeContinue).toBe(false)
-
-	const resumed = await sendAndWait('/continue', sid)
-	const doneAfter = resumed.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
-	expect(doneAfter).toBe(true)
+	await waitFor(async () => {
+		const all = await events.readAll()
+		return all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	}, 4000, 20, 'Timed out waiting for auto-continue at startup')
 })
 
 test('handoff continue auto-resumes interrupted user turn on restart', async () => {
@@ -393,18 +387,17 @@ test('quit handoff auto-resumes within window', async () => {
 	}, 4000, 20, 'Timed out waiting for quit handoff auto-continue')
 	expect(getState().handoff).toBeNull()
 })
-test('handoff continue expires after window', async () => {
+test('auto-continues pending turns even with stale handoff', async () => {
 	runtime.stop()
 	await releaseHost(hostId)
 
 	const info = await createSession()
 	const sid = info.id
 	const staleTs = new Date(Date.now() - handoffConfig.continueWindowMs - 1000).toISOString()
-	await appendHistory(sid, [{ role: 'user', content: 'Do not resume stale handoff', ts: staleTs } as any])
+	await appendHistory(sid, [{ role: 'user', content: 'Resume despite stale handoff', ts: staleTs } as any])
 	updateState((s) => {
 		s.sessions = [sid]
 		s.activeSessionId = sid
-		s.busySessionIds = [sid]
 		s.handoff = {
 			mode: 'continue',
 			reason: 'restart',
@@ -418,10 +411,11 @@ test('handoff continue expires after window', async () => {
 	hostId = `${process.pid}-${randomBytes(4).toString('hex')}`
 	await claimHost(hostId)
 	runtime = await startRuntime()
-	await new Promise(r => setTimeout(r, 250))
-	const all = await events.readAll()
-	const sawDone = all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
-	expect(sawDone).toBe(false)
+
+	await waitFor(async () => {
+		const all = await events.readAll()
+		return all.some((e) => e.type === 'command' && e.sessionId === sid && e.phase === 'done')
+	}, 4000, 20, 'Timed out waiting for auto-continue despite stale handoff')
 	expect(getState().handoff).toBeNull()
 })
 

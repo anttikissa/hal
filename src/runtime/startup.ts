@@ -8,15 +8,9 @@ import { context } from './context.ts'
 import { config } from '../config.ts'
 import { HAL_DIR, LAUNCH_CWD } from '../state.ts'
 import { Runtime, runtimeCore } from './runtime.ts'
-import { handoffConfig, type RuntimeHandoffState, type RuntimeCommand } from '../protocol.ts'
+import type { RuntimeCommand } from '../protocol.ts'
 import { startupTrace } from '../perf/startup-trace.ts'
 
-function shouldContinueAfterHandoff(handoff: RuntimeHandoffState | null): boolean {
-	if (!handoff || handoff.mode !== 'continue') return false
-	const createdAt = Date.parse(handoff.createdAt)
-	if (!Number.isFinite(createdAt)) return false
-	return Date.now() - createdAt <= handoffConfig.continueWindowMs
-}
 let _handleCommand: ((rt: Runtime, cmd: RuntimeCommand) => Promise<void>) | null = null
 let _handleCommandPromise: Promise<((rt: Runtime, cmd: RuntimeCommand) => Promise<void>)> | null = null
 
@@ -31,31 +25,15 @@ async function getHandleCommand(): Promise<(rt: Runtime, cmd: RuntimeCommand) =>
 	return _handleCommandPromise
 }
 
-async function continueSessionAfterHandoff(rt: Runtime, sessionId: string): Promise<void> {
+// Continue a session that has a pending user turn (no tool resolution — that's /continue's job).
+async function continueSession(rt: Runtime, sessionId: string): Promise<void> {
+	if (rt.busySessionIds.has(sessionId)) return
 	const info = rt.sessions.get(sessionId)
-	if (!info) {
-		rt.busySessionIds.delete(sessionId)
-		return
-	}
-	const pendingTools = rt.pendingInterruptedTools.get(sessionId)
-		?? history.detectInterruptedTools(await history.readHistory(sessionId))
-	if (pendingTools.length > 0) {
-		const toolBlobMap = new Map(pendingTools.map(t => [t.id, t.blobId]))
-		const entries = []
-		for (const t of pendingTools) {
-			entries.push(await history.writeToolResultEntry(sessionId, t.id, '[interrupted — skipped]', toolBlobMap))
-		}
-		await history.appendHistory(sessionId, entries)
-		rt.pendingInterruptedTools.delete(sessionId)
-	}
-
+	if (!info) return
 	const model = info.model ?? config.getConfig().defaultModel
 	await history.ensureModelEvent(sessionId, model)
 	const apiMessages = await history.loadApiMessages(sessionId)
-	if (!rt.hasPendingUserTurn(apiMessages)) {
-		rt.busySessionIds.delete(sessionId)
-		return
-	}
+	if (!rt.hasPendingUserTurn(apiMessages)) return
 	await rt.startGeneration(sessionId, info, apiMessages, 'continuing...')
 }
 
@@ -69,14 +47,7 @@ export async function startRuntime(): Promise<Runtime> {
 	// Restore sessions from state.ason (preserves tab order across restarts)
 	const prevState = ipc.getState()
 	startupTrace.mark('rt-state-loaded', `${prevState.sessions.length} sessions`)
-	const handoff = prevState.handoff ?? null
-	const continueAfterHandoff = shouldContinueAfterHandoff(handoff)
-	const handoffBusyIds = continueAfterHandoff
-		? [...new Set((handoff?.busySessionIds?.length ? handoff.busySessionIds : prevState.busySessionIds) ?? [])]
-		: []
-	if (handoff) {
-		ipc.updateState(s => { s.handoff = null })
-	}
+	if (prevState.handoff) ipc.updateState(s => { s.handoff = null })
 	for (const id of prevState.sessions) {
 		const meta = await session.loadSessionInfo(id)
 		if (meta) {
@@ -111,22 +82,17 @@ export async function startRuntime(): Promise<Runtime> {
 	}
 	startupTrace.mark('rt-sessions-restored', `${rt.sessions.size} sessions`)
 
-	for (const id of handoffBusyIds) {
-		if (rt.sessions.has(id)) rt.busySessionIds.add(id)
-	}
-
 	await rt.publish()
 	startupTrace.mark('rt-published')
-	if (continueAfterHandoff && handoffBusyIds.length > 0) {
-		// Don't block startup — sessions are already marked busy
-		void (async () => {
-			for (const id of handoffBusyIds) {
-				await continueSessionAfterHandoff(rt, id)
-			}
-			await rt.publish()
-		})()
-	}
-	startupTrace.mark('rt-handoff-done')
+
+	// Continue any sessions with pending user turns (handles restart, promotion, crash)
+	void (async () => {
+		for (const [id] of rt.sessions) {
+			await continueSession(rt, id)
+		}
+		if (rt.busySessionIds.size > 0) await rt.publish()
+	})()
+	startupTrace.mark('rt-startup-continue-done')
 
 	// Tail from offset captured at startup (no race window)
 	let stopped = false
@@ -162,4 +128,4 @@ export async function startRuntime(): Promise<Runtime> {
 	return rt
 }
 
-export const startup = { startRuntime }
+export const startup = { startRuntime, continueSession }
