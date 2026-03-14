@@ -2,7 +2,7 @@
 
 import { watch, type FSWatcher } from 'fs'
 import { ipc } from '../ipc.ts'
-import { session } from '../session/session.ts'
+import { session, type SessionInfo } from '../session/session.ts'
 import { history } from '../session/history.ts'
 import { context } from './context.ts'
 import { config } from '../config.ts'
@@ -23,18 +23,6 @@ async function getHandleCommand(): Promise<(rt: Runtime, cmd: RuntimeCommand) =>
 		})
 	}
 	return _handleCommandPromise
-}
-
-// Continue a session that has a pending user turn (no tool resolution — that's /continue's job).
-async function continueSession(rt: Runtime, sessionId: string): Promise<void> {
-	if (rt.busySessionIds.has(sessionId)) return
-	const info = rt.sessions.get(sessionId)
-	if (!info) return
-	const model = info.model ?? config.getConfig().defaultModel
-	await history.ensureModelEvent(sessionId, model)
-	const apiMessages = await history.loadApiMessages(sessionId)
-	if (!rt.hasPendingUserTurn(apiMessages)) return
-	await rt.startGeneration(sessionId, info, apiMessages, 'continuing...')
 }
 
 export async function startRuntime(): Promise<Runtime> {
@@ -82,16 +70,30 @@ export async function startRuntime(): Promise<Runtime> {
 	}
 	startupTrace.mark('rt-sessions-restored', `${rt.sessions.size} sessions`)
 
+	// Pre-mark sessions with pending user turns as busy before first publish
+	const pendingSessions: { id: string; info: SessionInfo; apiMessages: any[] }[] = []
+	for (const [id, info] of rt.sessions) {
+		const model = info.model ?? config.getConfig().defaultModel
+		await history.ensureModelEvent(id, model)
+		const apiMessages = await history.loadApiMessages(id)
+		if (rt.hasPendingUserTurn(apiMessages)) {
+			rt.busySessionIds.add(id)
+			pendingSessions.push({ id, info, apiMessages })
+		}
+	}
+	startupTrace.mark('rt-pending-scan', `${pendingSessions.length} pending`)
+
 	await rt.publish()
 	startupTrace.mark('rt-published')
 
-	// Continue any sessions with pending user turns (handles restart, promotion, crash)
-	void (async () => {
-		for (const [id] of rt.sessions) {
-			await continueSession(rt, id)
-		}
-		if (rt.busySessionIds.size > 0) await rt.publish()
-	})()
+	// Start generation for pre-marked sessions (don't block startup)
+	if (pendingSessions.length > 0) {
+		void (async () => {
+			for (const { id, info, apiMessages } of pendingSessions) {
+				await rt.startGeneration(id, info, apiMessages, 'continuing...')
+			}
+		})()
+	}
 	startupTrace.mark('rt-startup-continue-done')
 
 	// Tail from offset captured at startup (no race window)
@@ -128,4 +130,4 @@ export async function startRuntime(): Promise<Runtime> {
 	return rt
 }
 
-export const startup = { startRuntime, continueSession }
+export const startup = { startRuntime }
