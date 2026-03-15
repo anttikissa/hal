@@ -1,7 +1,8 @@
 import { basename, resolve, dirname } from 'path'
-import { readdirSync, statSync } from 'fs'
+import { readdirSync, statSync, existsSync } from 'fs'
 import { homedir } from 'os'
 import { models } from '../models.ts'
+import { SESSIONS_DIR } from '../state.ts'
 
 export interface CompletionTab {
 	sessionId: string
@@ -24,7 +25,7 @@ export interface CompletionResult {
 
 interface CommandSpec {
 	name: string
-	arg?: 'model' | 'session' | 'topic' | 'dir'
+	arg?: 'model' | 'session' | 'topic' | 'dir' | 'closed_session'
 }
 
 const COMMANDS: CommandSpec[] = [
@@ -35,7 +36,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'topic', arg: 'topic' },
 	{ name: 'cd', arg: 'dir' },
 	{ name: 'continue' },
-	{ name: 'resume' },
+	{ name: 'resume', arg: 'closed_session' },
 	{ name: 'open', arg: 'session' },
 	{ name: 'fork' },
 	{ name: 'pause' },
@@ -108,6 +109,14 @@ function commandArgValues(command: string, ctx: CompletionContext, argPrefix = '
 			const wd = active?.info?.workingDir?.trim()
 			if (wd) return [basename(wd)]
 			return []
+		}
+		case 'closed_session': {
+			const openIds = new Set(ctx.tabs.map(t => t.sessionId))
+			try {
+				return readdirSync(SESSIONS_DIR)
+					.filter(d => !openIds.has(d) && existsSync(resolve(SESSIONS_DIR, d, 'session.ason')))
+					.sort().reverse()
+			} catch { return [] }
 		}
 		case 'dir': {
 			const active = ctx.tabs[ctx.activeTabIndex]
