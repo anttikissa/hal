@@ -98,6 +98,13 @@ export function readHostLock(): HostLock | null {
 	}
 }
 
+export function readAllEvents(): any[] {
+	ensureFile(EVENTS_FILE)
+	const content = readFileSync(EVENTS_FILE, "utf-8")
+	if (!content.trim()) return []
+	return ason.parseAll(content) as any[]
+}
+
 export function releaseHost(): void {
 	try {
 		unlinkSync(HOST_LOCK)

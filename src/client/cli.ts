@@ -1,7 +1,7 @@
 // CLI client — raw terminal input, event display, prompt editing.
 // See docs/terminal.md for rendering rules.
 
-import { appendCommand, tailEvents } from "../ipc.ts"
+import { appendCommand, tailEvents, readAllEvents } from "../ipc.ts"
 import { render, type RenderState } from "./render.ts"
 
 const RESTART_CODE = 100
@@ -12,29 +12,43 @@ interface Block {
 }
 
 interface Tab {
+	sessionId: string
 	name: string
 	blocks: Block[]
 }
 
-let tabList: Tab[] = [{ name: "main", blocks: [] }]
+let tabList: Tab[] = []
 let currentTab = 0
 let promptText = ""
 let promptCursor = 0
 let role: "server" | "client" = "server"
 
-function activeTab(): Tab {
-	return tabList[currentTab]!
+function activeTab(): Tab | null {
+	return tabList[currentTab] ?? null
 }
 
-function addBlock(block: Block) {
-	activeTab().blocks.push(block)
-	draw()
+function addBlockToTab(sessionId: string | null, block: Block) {
+	let tab = sessionId
+		? tabList.find((t) => t.sessionId === sessionId)
+		: activeTab()
+	// If event arrives before sessions sync, add to active tab anyway
+	if (!tab) tab = activeTab()
+	if (tab) {
+		tab.blocks.push(block)
+		draw()
+	}
 }
 
-// Add a block that only this client sees (perf, local info)
 export function addLocalBlock(text: string) {
-	activeTab().blocks.push({ type: "info", text })
-	draw()
+	const tab = activeTab()
+	if (tab) {
+		tab.blocks.push({ type: "info", text })
+		draw()
+	}
+}
+
+export function setRole(r: "server" | "client") {
+	role = r
 }
 
 function blockToString(block: Block): string {
@@ -60,7 +74,9 @@ function renderSeparator(): string {
 	const dashes = Math.max(0, cols - info.length)
 	const left = Math.floor(dashes / 2)
 	const right = dashes - left
-	return "\x1b[90m" + "─".repeat(left) + info + "─".repeat(right) + "\x1b[0m"
+	return (
+		"\x1b[90m" + "─".repeat(left) + info + "─".repeat(right) + "\x1b[0m"
+	)
 }
 
 function renderPrompt(): string {
@@ -70,7 +86,7 @@ function renderPrompt(): string {
 function draw() {
 	const tab = activeTab()
 	const state: RenderState = {
-		blocks: tab.blocks.map(blockToString),
+		blocks: tab ? tab.blocks.map(blockToString) : [],
 		tabs: renderTabBar(),
 		separator: renderSeparator(),
 		prompt: renderPrompt(),
@@ -79,9 +95,52 @@ function draw() {
 	render(state)
 }
 
-export function setRole(r: "server" | "client") {
-	role = r
-	draw()
+function switchTab(index: number) {
+	if (index >= 0 && index < tabList.length) {
+		currentTab = index
+		draw()
+	}
+}
+
+function sendCommand(type: string, text?: string) {
+	const tab = activeTab()
+	appendCommand({
+		type,
+		text,
+		sessionId: tab?.sessionId,
+	})
+}
+
+function handleEvent(event: any) {
+	if (event.type === "sessions") {
+		const newTabs: Tab[] = []
+		for (const s of event.sessions) {
+			const existing = tabList.find((t) => t.sessionId === s.id)
+			if (existing) {
+				existing.name = s.name
+				newTabs.push(existing)
+			} else {
+				newTabs.push({ sessionId: s.id, name: s.name, blocks: [] })
+			}
+		}
+		const grew = newTabs.length > tabList.length
+		tabList = newTabs
+		if (currentTab >= tabList.length) currentTab = tabList.length - 1
+		if (grew) currentTab = tabList.length - 1
+		draw()
+	} else if (event.type === "prompt") {
+		addBlockToTab(event.sessionId, { type: "input", text: event.text })
+	} else if (event.type === "response") {
+		addBlockToTab(event.sessionId, {
+			type: "assistant",
+			text: event.text,
+		})
+	} else if (event.type === "info") {
+		addBlockToTab(event.sessionId ?? null, {
+			type: "info",
+			text: event.text,
+		})
+	}
 }
 
 export function startCli(signal: AbortSignal): void {
@@ -90,18 +149,16 @@ export function startCli(signal: AbortSignal): void {
 		process.stdin.resume()
 	}
 
+	// Bootstrap: read existing events to get current session list
+	for (const event of readAllEvents()) {
+		if (event.type === "sessions") handleEvent(event)
+	}
+
 	draw()
 
-	// Tail events — route to active tab's blocks
 	void (async () => {
 		for await (const event of tailEvents(signal)) {
-			if (event.type === "prompt") {
-				addBlock({ type: "input", text: event.text })
-			} else if (event.type === "response") {
-				addBlock({ type: "assistant", text: event.text })
-			} else if (event.type === "info") {
-				addBlock({ type: "info", text: event.text })
-			}
+			handleEvent(event)
 			// host-released handled by main.ts
 		}
 	})()
@@ -110,20 +167,50 @@ export function startCli(signal: AbortSignal): void {
 		for (let i = 0; i < data.length; i++) {
 			const byte = data[i]!
 
+			// Ctrl-R: restart
 			if (byte === 0x12) {
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
 				process.exit(RESTART_CODE)
 			}
 
+			// Ctrl-C / Ctrl-D: quit
 			if (byte === 0x03 || byte === 0x04) {
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
 				process.exit(0)
 			}
 
+			// Ctrl-T: new tab
+			if (byte === 0x14) {
+				sendCommand("open")
+				continue
+			}
+
+			// Ctrl-W: close tab
+			if (byte === 0x17) {
+				if (tabList.length > 1) {
+					sendCommand("close")
+				}
+				continue
+			}
+
+			// Ctrl-N: next tab
+			if (byte === 0x0e) {
+				switchTab((currentTab + 1) % tabList.length)
+				continue
+			}
+
+			// Ctrl-P: previous tab
+			if (byte === 0x10) {
+				switchTab(
+					(currentTab - 1 + tabList.length) % tabList.length,
+				)
+				continue
+			}
+
 			// Enter
 			if (byte === 0x0d || byte === 0x0a) {
 				if (promptText.trim()) {
-					appendCommand({ type: "prompt", text: promptText })
+					sendCommand("prompt", promptText)
 				}
 				promptText = ""
 				promptCursor = 0
@@ -154,7 +241,10 @@ export function startCli(signal: AbortSignal): void {
 					promptCursor--
 					draw()
 				}
-				if (code === 0x43 && promptCursor < promptText.length) {
+				if (
+					code === 0x43 &&
+					promptCursor < promptText.length
+				) {
 					promptCursor++
 					draw()
 				}
