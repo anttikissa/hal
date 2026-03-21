@@ -3,8 +3,8 @@
 import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from "fs"
 import { open } from "fs/promises"
 import { IPC_DIR, ensureDir } from "./state.ts"
-import { ason } from "./ason.ts"
-import { tailFile } from "./tail-file.ts"
+import { ason } from "./utils/ason.ts"
+import { tailFile } from "./utils/tail-file.ts"
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`

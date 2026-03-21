@@ -9,6 +9,7 @@ function listTestFiles(filter?: string): string[] {
 	return [...glob.scanSync(ROOT)]
 		.filter((f) => !f.includes("node_modules"))
 		.filter((f) => !f.includes("examples"))
+		.filter((f) => !f.includes("previous"))
 		.filter((f) => !f.endsWith("0-failing.test.ts"))
 		.filter((f) => !filter || f.includes(filter))
 		.sort()
@@ -24,7 +25,7 @@ async function run(): Promise<number> {
 	const failedFiles: string[] = []
 
 	const tasks = files.map(async (file) => {
-		const proc = Bun.spawn(["bun", "test", file], {
+		const proc = Bun.spawn(["bun", "test", `./${file}`], {
 			cwd: ROOT,
 			stdout: "pipe",
 			stderr: "pipe",

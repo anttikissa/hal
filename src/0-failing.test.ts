@@ -1,5 +1,5 @@
-import { test, expect } from "bun:test"
+import { test } from "bun:test"
 
-test("this test should fail - run tests with ./test, not bun test", () => {
-	expect(true).toBe(false)
+test("✗ Run ./test instead of bun test", () => {
+	throw new Error("Run ./test instead of bun test")
 })
