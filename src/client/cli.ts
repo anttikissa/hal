@@ -156,9 +156,9 @@ export function startCli(signal: AbortSignal): void {
 		process.stdin.resume()
 	}
 
-	// Bootstrap: read existing events to get current session list
+	// Bootstrap: replay all existing events to get sessions + history
 	for (const event of readAllEvents()) {
-		if (event.type === 'sessions') handleEvent(event)
+		handleEvent(event)
 	}
 
 	draw()
