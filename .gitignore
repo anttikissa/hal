@@ -1,0 +1,10 @@
+# dependencies (bun install)
+node_modules
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+examples/*

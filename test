@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+dir="$(cd "$(dirname "$0")" && pwd)"
+
+# Type check
+type_errors=$(tsgo --noEmit 2>&1)
+type_exit=$?
+
+# Run tests in parallel
+bun "$dir/scripts/test-parallel.ts" "$@"
+test_exit=$?
+
+if [ $type_exit -ne 0 ]; then
+	echo ""
+	echo "$type_errors"
+	echo ""
+	echo "========================================="
+	echo "  ERROR: TypeScript type errors"
+	echo "========================================="
+fi
+
+if [ $type_exit -ne 0 ] || [ $test_exit -ne 0 ]; then
+	exit 1
+fi

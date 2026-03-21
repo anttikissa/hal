@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+hal_dir="$(cd "$(dirname "$0")" && pwd)"
+bin_dir="$HOME/.local/bin"
+dry_run="${HAL_DRY_RUN:-}"
+auto_yes=""
+
+# Parse flags
+for arg in "$@"; do
+	case "$arg" in
+		-y) auto_yes=1 ;;
+		*) echo "unknown option: $arg"; exit 1 ;;
+	esac
+done
+
+log() { echo "$*"; }
+
+# Replace $HOME with ~ for display
+prettify() { echo "$*" | sed "s|$HOME|~|g"; }
+
+show_usage() {
+	log ""
+	log "To get started:"
+	log ""
+	log "    # Use hal to edit project in current directory"
+	log "    hal"
+	log ""
+	log "    # Or, use hal to modify or analyze itself"
+	log "    hal -s"
+}
+
+run() {
+	if [ -n "$dry_run" ]; then
+		log "[dry-run] $*"
+	else
+		"$@"
+	fi
+}
+
+confirm() {
+	if [ -n "$auto_yes" ]; then
+		return 0
+	fi
+	printf "%s [Y/n] " "$1"
+	read -r answer
+	case "$answer" in
+		""|[Yy]*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+os="$(uname -s)"
+
+# For testing: HAL_SKIP_PATH lets us pretend ~/.local/bin isn't in PATH
+path_to_check="$PATH"
+if [ -n "${HAL_SKIP_PATH:-}" ]; then
+	path_to_check="$(echo "$PATH" | tr ':' '\n' | grep -v "^${HAL_SKIP_PATH}$" | tr '\n' ':')"
+fi
+
+# --- analyze system ---
+
+log ""
+log "Analyzing your system..."
+log ""
+
+need_git=""
+need_rg=""
+need_bun=""
+need_tsgo=""
+need_symlink=""
+need_path=""
+
+if command -v git &>/dev/null; then
+	git_version="$(git --version | sed 's/git version //')"
+	log "[x] git ($git_version)"
+else
+	need_git=1
+	log "[ ] git (version control - duh)"
+fi
+
+if command -v rg &>/dev/null; then
+	rg_version="$(rg --version | head -1 | sed 's/ripgrep //')"
+	log "[x] ripgrep ($rg_version)"
+else
+	need_rg=1
+	log "[ ] ripgrep (the gold standard of code search)"
+fi
+
+if command -v bun &>/dev/null; then
+	bun_version="$(bun --version)"
+	log "[x] bun ($bun_version)"
+else
+	need_bun=1
+	log "[ ] bun (a snappy JS runtime)"
+fi
+
+if command -v tsgo &>/dev/null; then
+	tsgo_version="$(tsgo --version 2>&1 | head -1)"
+	log "[x] tsgo ($tsgo_version)"
+else
+	need_tsgo=1
+	log "[ ] tsgo (analyze TS files at the speed of light)"
+fi
+
+if [ -L "$bin_dir/hal" ] && [ "$(readlink -f "$bin_dir/hal")" = "$hal_dir/run" ]; then
+	log "[x] hal symlinked to $(prettify "$bin_dir")/"
+else
+	need_symlink=1
+	log "[ ] hal symlinked to $(prettify "$bin_dir")/"
+fi
+
+if echo "$path_to_check" | tr ':' '\n' | grep -qx "$bin_dir"; then
+	log "[x] $(prettify "$bin_dir") in PATH"
+else
+	need_path=1
+	log "[ ] $(prettify "$bin_dir") in PATH"
+fi
+
+need_any="${need_git}${need_rg}${need_bun}${need_tsgo}${need_symlink}${need_path}"
+
+log ""
+
+# --- nothing to do? ---
+
+if [ -z "$need_any" ]; then
+	log "Everything in order."
+	show_usage
+	exit 0
+fi
+
+# --- ask to install ---
+
+need_packages="${need_git}${need_rg}${need_bun}${need_tsgo}"
+need_path_setup="${need_symlink}${need_path}"
+
+if [ -n "$need_packages" ] && [ -n "$need_path_setup" ]; then
+	prompt="Install missing prerequisites and add Hal to path?"
+elif [ -n "$need_packages" ]; then
+	prompt="Install missing prerequisites?"
+else
+	prompt="Add Hal to path?"
+fi
+
+if ! confirm "$prompt"; then
+	exit 0
+fi
+
+log ""
+
+# --- homebrew (macOS only, only if packages need installing) ---
+
+if [ "$os" = "Darwin" ] && [ -n "$need_packages" ] && ! command -v brew &>/dev/null; then
+	log "installing homebrew..."
+	run /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# Helper: install a package using the available package manager
+pkg_install() {
+	local pkg="$1"
+	if [ "$os" = "Darwin" ]; then
+		if command -v brew &>/dev/null; then
+			run brew install "$pkg"
+		else
+			log "$pkg: brew not available, please install manually"
+		fi
+	elif [ "$os" = "Linux" ]; then
+		if command -v apt-get &>/dev/null; then
+			run sudo apt-get install -y "$pkg"
+		elif command -v dnf &>/dev/null; then
+			run sudo dnf install -y "$pkg"
+		elif command -v yum &>/dev/null; then
+			run sudo yum install -y "$pkg"
+		else
+			log "$pkg: no supported package manager found, please install manually"
+		fi
+	else
+		log "$pkg: unsupported OS ($os), please install manually"
+	fi
+}
+
+# --- git ---
+
+if [ -n "$need_git" ]; then
+	log "installing git..."
+	pkg_install git
+fi
+
+# --- ripgrep ---
+
+if [ -n "$need_rg" ]; then
+	log "installing ripgrep..."
+	if [ "$os" = "Linux" ] && command -v dnf &>/dev/null; then
+		# CentOS/RHEL: ripgrep is in EPEL
+		if ! dnf list --installed epel-release &>/dev/null 2>&1; then
+			log "enabling EPEL repo..."
+			centos_version="$(rpm -E %rhel)"
+			run sudo dnf config-manager --set-enabled crb
+			run sudo dnf install -y "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${centos_version}.noarch.rpm"
+		fi
+		run sudo dnf install -y ripgrep
+	else
+		pkg_install ripgrep
+	fi
+fi
+
+# --- bun (last, so its PATH message shows at the end) ---
+
+if [ -n "$need_bun" ]; then
+	if ! command -v unzip &>/dev/null; then
+		log "installing unzip (required by bun installer)..."
+		pkg_install unzip
+	fi
+	log "installing bun..."
+	run curl -fsSL https://bun.sh/install | bash
+fi
+
+# --- tsgo (needs bun) ---
+
+if [ -n "$need_tsgo" ]; then
+	log "installing tsgo..."
+	run bun install -g @typescript/native-preview
+fi
+
+# --- symlink ---
+
+if [ -n "$need_symlink" ]; then
+	run mkdir -p "$bin_dir"
+	log "linking $(prettify "$bin_dir")/hal -> $(prettify "$hal_dir")/run"
+	run ln -sf "$hal_dir/run" "$bin_dir/hal"
+fi
+
+# --- PATH ---
+
+if [ -n "$need_path" ]; then
+	shell_name="$(basename "${SHELL:-/bin/sh}")"
+	case "$shell_name" in
+		zsh)
+			config_file="$HOME/.zshenv"
+			path_line='export PATH="$HOME/.local/bin:$PATH"'
+			;;
+		bash)
+			if [ "$os" = "Darwin" ]; then
+				config_file="$HOME/.bash_profile"
+			else
+				config_file="$HOME/.bashrc"
+			fi
+			path_line='export PATH="$HOME/.local/bin:$PATH"'
+			;;
+		fish)
+			config_file="$HOME/.config/fish/config.fish"
+			path_line='fish_add_path $HOME/.local/bin'
+			;;
+		*)
+			config_file=""
+			path_line=""
+			;;
+	esac
+
+	if [ -n "$config_file" ]; then
+		if [ -n "$dry_run" ]; then
+			log "[dry-run] would add to $config_file: $path_line"
+		else
+			if [ -f "$config_file" ] && grep -v '^#' "$config_file" | grep -qF '.local/bin'; then
+				: # already in config file
+			else
+				run mkdir -p "$(dirname "$config_file")"
+				echo "" >> "$config_file"
+				echo "# Added by hal installer" >> "$config_file"
+				echo "$path_line" >> "$config_file"
+			fi
+		fi
+		log ""
+		log "To get started, restart your shell."
+		show_usage
+	else
+		log ""
+		log "Add this to your shell config:"
+		log "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+	fi
+fi

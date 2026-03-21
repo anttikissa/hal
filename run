@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# Resolve symlinks to find the real .hal directory
+hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+while true; do
+	startup_epoch_ms="$(NO_COLOR=1 bun -e 'console.log(Date.now())')"
+	HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "$@"
+
+	code=$?
+	# Exit code 9001 restarts - used by /restart (Ctrl-R) command
+	[ "$code" -ne 9001 ] && exit "$code"
+done
