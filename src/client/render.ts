@@ -12,9 +12,11 @@ function moveUp(n: number): string {
 }
 
 let prevLineCount = 0
+let maxContentHeight = 0 // tallest tab's content (blocks only, not chrome)
 
 export interface RenderState {
 	blocks: string[]
+	allTabBlockCounts: number[] // block line counts for every tab
 	tabs: string
 	separator: string
 	prompt: string
@@ -22,21 +24,31 @@ export interface RenderState {
 }
 
 function computeLines(state: RenderState): string[] {
-	const lines: string[] = []
+	const contentLines: string[] = []
 	for (const block of state.blocks) {
 		for (const line of block.split("\n")) {
-			lines.push(line)
+			contentLines.push(line)
 		}
 	}
-	lines.push(state.tabs)
-	lines.push(state.separator)
-	lines.push(state.prompt)
-	return lines
+
+	// Track tallest tab so prompt stays stable across tab switches
+	for (const count of state.allTabBlockCounts) {
+		if (count > maxContentHeight) maxContentHeight = count
+	}
+
+	// Pad shorter tabs to match tallest
+	while (contentLines.length < maxContentHeight) {
+		contentLines.push("")
+	}
+
+	contentLines.push(state.tabs)
+	contentLines.push(state.separator)
+	contentLines.push(state.prompt)
+	return contentLines
 }
 
 export function render(state: RenderState): void {
 	const lines = computeLines(state)
-	const totalLines = Math.max(lines.length, prevLineCount)
 	const out: string[] = []
 
 	out.push(SYNC_START)
@@ -48,20 +60,24 @@ export function render(state: RenderState): void {
 		out.push(moveUp(prevLineCount - 1))
 	}
 
-	// Paint all lines
-	for (let i = 0; i < totalLines; i++) {
-		out.push(CLEAR_LINE)
-		if (i < lines.length) {
-			out.push(lines[i]!)
+	// Paint new lines
+	for (let i = 0; i < lines.length; i++) {
+		out.push(CLEAR_LINE + lines[i]!)
+		if (i < lines.length - 1) out.push("\r\n")
+	}
+
+	// Clear leftover lines from previous frame
+	if (prevLineCount > lines.length) {
+		for (let i = lines.length; i < prevLineCount; i++) {
+			out.push("\r\n" + CLEAR_LINE)
 		}
-		if (i < totalLines - 1) {
-			out.push("\r\n")
-		}
+		// Move back up to the last line of the new frame
+		out.push(moveUp(prevLineCount - lines.length))
 	}
 
 	prevLineCount = lines.length
 
-	// Position cursor on prompt line, at the right column
+	// Position cursor on prompt line
 	out.push(`\r${ESC}[${state.cursorCol}C`)
 	out.push(SHOW_CURSOR)
 	out.push(SYNC_END)
