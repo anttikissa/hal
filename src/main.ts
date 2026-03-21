@@ -52,7 +52,7 @@ if (isHost) {
 if (!isHost) {
 	let promoting = false
 
-	const tryPromote = async () => {
+	async function tryPromote() {
 		if (promoting || isHost) return
 		promoting = true
 		try {
@@ -68,7 +68,7 @@ if (!isHost) {
 	}
 
 	// Fast path: host announces it's quitting
-	;(async () => {
+	void (async () => {
 		for await (const event of tailEvents(ac.signal)) {
 			if (event.type === 'host-released') {
 				tryPromote()
