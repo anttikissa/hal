@@ -24,7 +24,7 @@ describe.skip("install script", () => {
 
 	test("shows system analysis with checkboxes", async () => {
 		let result = await $`HAL_DRY_RUN=1 ${halDir}/install -y 2>&1`.text()
-		expect(result).toContain("Analyzing your system...")
+		expect(result).toContain("Analyzing...")
 		expect(result).toMatch(/\[x\]/)
 	})
 
@@ -69,14 +69,14 @@ describe.skip("install script", () => {
 		expect(result).not.toContain("already installed")
 	})
 
-	test("asks about both prerequisites and path when both missing", async () => {
+	test("asks about both prerequisites and setup when both missing", async () => {
 		let content = await Bun.file(`${halDir}/install`).text()
-		expect(content).toContain("Install missing prerequisites and add Hal to path?")
+		expect(content).toContain("Install missing prerequisites and set up Hal?")
 	})
 
-	test("asks only about path when only path/symlink missing", async () => {
+	test("asks only about setup when only setup items missing", async () => {
 		let content = await Bun.file(`${halDir}/install`).text()
-		expect(content).toContain("Add Hal to path?")
+		expect(content).toContain("Set up Hal?")
 	})
 
 	test("asks only about prerequisites when only tools missing", async () => {

@@ -19,17 +19,6 @@ log() { echo "$*"; }
 # Replace $HOME with ~ for display
 prettify() { echo "$*" | sed "s|$HOME|~|g"; }
 
-show_usage() {
-	log ""
-	log "To get started:"
-	log ""
-	log "    # Use hal to edit project in current directory"
-	log "    hal"
-	log ""
-	log "    # Or, use hal to modify or analyze itself"
-	log "    hal -s"
-}
-
 run() {
 	if [ -n "$dry_run" ]; then
 		log "[dry-run] $*"
@@ -60,16 +49,19 @@ fi
 
 # --- analyze system ---
 
-log ""
-log "Analyzing your system..."
-log ""
+log
+log "Analyzing..."
+log
 
 need_git=""
 need_rg=""
 need_bun=""
 need_tsgo=""
+need_deps=""
 need_symlink=""
 need_path=""
+
+log "Tools:"
 
 if command -v git &>/dev/null; then
 	git_version="$(git --version | sed 's/git version //')"
@@ -95,19 +87,29 @@ else
 	log "[ ] bun (a snappy JS runtime)"
 fi
 
-if command -v tsgo &>/dev/null; then
-	tsgo_version="$(tsgo --version 2>&1 | head -1)"
+tsgo_version="$(bunx --bun tsgo --version 2>/dev/null || true)"
+if [ -n "$tsgo_version" ]; then
 	log "[x] tsgo ($tsgo_version)"
 else
 	need_tsgo=1
 	log "[ ] tsgo (analyze TS files at the speed of light)"
 fi
 
+log
+log "Setup:"
+
+if [ -d "$hal_dir/node_modules" ]; then
+	log "[x] bun install"
+else
+	need_deps=1
+	log "[ ] bun install"
+fi
+
 if [ -L "$bin_dir/hal" ] && [ "$(readlink -f "$bin_dir/hal")" = "$hal_dir/run" ]; then
-	log "[x] hal symlinked to $(prettify "$bin_dir")/"
+	log "[x] hal executable symlinked to $(prettify "$bin_dir")/"
 else
 	need_symlink=1
-	log "[ ] hal symlinked to $(prettify "$bin_dir")/"
+	log "[ ] hal executable symlinked to $(prettify "$bin_dir")/"
 fi
 
 if echo "$path_to_check" | tr ':' '\n' | grep -qx "$bin_dir"; then
@@ -117,41 +119,50 @@ else
 	log "[ ] $(prettify "$bin_dir") in PATH"
 fi
 
-need_any="${need_git}${need_rg}${need_bun}${need_tsgo}${need_symlink}${need_path}"
+need_any="${need_git}${need_rg}${need_bun}${need_tsgo}${need_deps}${need_symlink}${need_path}"
 
-log ""
+log
 
 # --- nothing to do? ---
 
 if [ -z "$need_any" ]; then
 	log "Everything in order."
-	show_usage
+	log
+	log "To get started:"
+	log
+	log "    # Use hal to edit project in current directory"
+	log "    hal"
+	log
+	log "    # Or, use hal to modify or analyze itself"
+	log "    hal -s"
+	log
 	exit 0
 fi
 
 # --- ask to install ---
 
 need_packages="${need_git}${need_rg}${need_bun}${need_tsgo}"
-need_path_setup="${need_symlink}${need_path}"
+need_setup="${need_deps}${need_symlink}${need_path}"
 
-if [ -n "$need_packages" ] && [ -n "$need_path_setup" ]; then
-	prompt="Install missing prerequisites and add Hal to path?"
+if [ -n "$need_packages" ] && [ -n "$need_setup" ]; then
+	prompt="Install missing prerequisites and set up Hal?"
 elif [ -n "$need_packages" ]; then
 	prompt="Install missing prerequisites?"
 else
-	prompt="Add Hal to path?"
+	prompt="Set up Hal?"
 fi
 
 if ! confirm "$prompt"; then
 	exit 0
 fi
 
-log ""
+log
 
 # --- homebrew (macOS only, only if packages need installing) ---
 
 if [ "$os" = "Darwin" ] && [ -n "$need_packages" ] && ! command -v brew &>/dev/null; then
-	log "installing homebrew..."
+	log "Installing homebrew..."
+	log
 	run /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
@@ -182,18 +193,20 @@ pkg_install() {
 # --- git ---
 
 if [ -n "$need_git" ]; then
-	log "installing git..."
+	log "Installing git..."
+	log
 	pkg_install git
 fi
 
 # --- ripgrep ---
 
 if [ -n "$need_rg" ]; then
-	log "installing ripgrep..."
+	log "Installing ripgrep..."
+	log
 	if [ "$os" = "Linux" ] && command -v dnf &>/dev/null; then
 		# CentOS/RHEL: ripgrep is in EPEL
 		if ! dnf list --installed epel-release &>/dev/null 2>&1; then
-			log "enabling EPEL repo..."
+			log "Enabling EPEL repo..."
 			centos_version="$(rpm -E %rhel)"
 			run sudo dnf config-manager --set-enabled crb
 			run sudo dnf install -y "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${centos_version}.noarch.rpm"
@@ -208,17 +221,29 @@ fi
 
 if [ -n "$need_bun" ]; then
 	if ! command -v unzip &>/dev/null; then
-		log "installing unzip (required by bun installer)..."
+		log "Installing unzip (required by bun installer)..."
 		pkg_install unzip
 	fi
-	log "installing bun..."
+	log "Installing bun..."
+	log
 	run curl -fsSL https://bun.sh/install | bash
+	# Make bun available in current session
+	export BUN_INSTALL="$HOME/.bun"
+	export PATH="$BUN_INSTALL/bin:$PATH"
+fi
+
+# --- project dependencies ---
+
+if [ -n "$need_deps" ]; then
+	log "Installing project dependencies..."
+	log
+	run bun install --cwd "$hal_dir"
 fi
 
 # --- tsgo (needs bun) ---
 
 if [ -n "$need_tsgo" ]; then
-	log "installing tsgo..."
+	log "Installing tsgo..."
 	run bun install -g @typescript/native-preview
 fi
 
@@ -226,7 +251,7 @@ fi
 
 if [ -n "$need_symlink" ]; then
 	run mkdir -p "$bin_dir"
-	log "linking $(prettify "$bin_dir")/hal -> $(prettify "$hal_dir")/run"
+	log "Linking $(prettify "$bin_dir")/hal -> $(prettify "$hal_dir")/run"
 	run ln -sf "$hal_dir/run" "$bin_dir/hal"
 fi
 
@@ -270,12 +295,25 @@ if [ -n "$need_path" ]; then
 				echo "$path_line" >> "$config_file"
 			fi
 		fi
-		log ""
-		log "To get started, restart your shell."
-		show_usage
 	else
 		log ""
 		log "Add this to your shell config:"
 		log "  export PATH=\"\$HOME/.local/bin:\$PATH\""
 	fi
 fi
+
+# --- done ---
+
+log
+if [ -n "$need_path" ]; then
+	log "Restart your shell, then:"
+else
+	log "To get started:"
+fi
+log
+log "    # Use hal to edit project in current directory"
+log "    hal"
+log
+log "    # Or, use hal to modify or analyze itself"
+log "    hal -s"
+log
