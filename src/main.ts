@@ -10,7 +10,7 @@ import {
 	tailEvents,
 } from './ipc.ts'
 import { startRuntime } from './server/runtime.ts'
-import { startCli, addLocalBlock } from './client/cli.ts'
+import { startCli, addLocalBlock, setRole } from './client/cli.ts'
 
 ensureStateDir()
 perf.mark('state-ready')
@@ -20,10 +20,11 @@ const lock = readHostLock()
 let serverPid = isHost ? process.pid : (lock?.pid ?? null)
 perf.mark('host-election')
 
+setRole(isHost ? 'server' : 'client')
 if (isHost) {
-	appendEvent({ type: "info", text: `Server started (pid ${process.pid}) [${perf.elapsed()}ms]` })
+	addLocalBlock(`Server started (pid ${process.pid}) [${perf.elapsed()}ms]`)
 } else {
-	appendEvent({ type: "info", text: `Joined server (pid ${serverPid}) [${perf.elapsed()}ms]` })
+	addLocalBlock(`Joined server (pid ${serverPid}) [${perf.elapsed()}ms]`)
 }
 
 const ac = new AbortController()
@@ -45,11 +46,9 @@ process.on('SIGTERM', () => {
 
 if (isHost) {
 	startRuntime(ac.signal)
-}
-
-// Client: watch for host-released event, promote immediately
-// Fallback: poll server PID every 3s in case of crash
-if (!isHost) {
+} else {
+	// Client: watch for host-released event, promote immediately
+	// Fallback: poll server PID every 3s in case of crash
 	let promoting = false
 
 	async function tryPromote() {
@@ -59,7 +58,8 @@ if (!isHost) {
 			if (await claimHost()) {
 				isHost = true
 				serverPid = process.pid
-				appendEvent({ type: "info", text: `Promoted to server (pid ${process.pid})` })
+				setRole('server')
+				addLocalBlock(`Promoted to server (pid ${process.pid})`)
 				startRuntime(ac.signal)
 			}
 		} finally {
@@ -76,7 +76,8 @@ if (!isHost) {
 		}
 	})()
 
-	// Slow fallback: poll for crash
+	// Slow fallback: poll for crash (when server dies without sending host-released)
+	// process.kill(pid, 0) doesn't kill — signal 0 just checks if the pid exists.
 	const pollTimer = setInterval(() => {
 		if (isHost || promoting) return
 		if (serverPid !== null) {
@@ -87,7 +88,7 @@ if (!isHost) {
 				tryPromote()
 			}
 		}
-	}, 3000)
+	}, 1000)
 
 	ac.signal.addEventListener('abort', () => clearInterval(pollTimer))
 }

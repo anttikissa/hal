@@ -20,6 +20,7 @@ let tabList: Tab[] = [{ name: "main", blocks: [] }]
 let currentTab = 0
 let promptText = ""
 let promptCursor = 0
+let role: "server" | "client" = "server"
 
 function activeTab(): Tab {
 	return tabList[currentTab]!
@@ -55,7 +56,11 @@ function renderTabBar(): string {
 
 function renderSeparator(): string {
 	const cols = process.stdout.columns || 80
-	return "\x1b[90m" + "─".repeat(cols) + "\x1b[0m"
+	const info = ` ${role} · pid ${process.pid} `
+	const dashes = Math.max(0, cols - info.length)
+	const left = Math.floor(dashes / 2)
+	const right = dashes - left
+	return "\x1b[90m" + "─".repeat(left) + info + "─".repeat(right) + "\x1b[0m"
 }
 
 function renderPrompt(): string {
@@ -72,6 +77,11 @@ function draw() {
 		cursorCol: promptCursor + 2,
 	}
 	render(state)
+}
+
+export function setRole(r: "server" | "client") {
+	role = r
+	draw()
 }
 
 export function startCli(signal: AbortSignal): void {

@@ -24,6 +24,7 @@ The directory previous/ contains the old codebase, which is now frozen. You can 
 # Code style
 
 - `function f() {}` over `const f = () => {}`
+- Document non-obvious code. Like "process.kill(serverPid, 0)" looks like killing a process, but actually is a trick to see if process is alive. Document such cases.
 
 # Git
 
