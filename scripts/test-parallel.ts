@@ -1,16 +1,16 @@
 #!/usr/bin/env bun
-import { resolve } from "path"
+import { resolve } from 'path'
 
-const ROOT = resolve(import.meta.dirname, "..")
+const ROOT = resolve(import.meta.dirname, '..')
 const TIMEOUT_MS = 30_000
 
 function listTestFiles(filter?: string): string[] {
-	const glob = new Bun.Glob("**/*.test.ts")
+	const glob = new Bun.Glob('**/*.test.ts')
 	return [...glob.scanSync(ROOT)]
-		.filter((f) => !f.includes("node_modules"))
-		.filter((f) => !f.includes("examples"))
-		.filter((f) => !f.includes("previous"))
-		.filter((f) => !f.endsWith("0-failing.test.ts"))
+		.filter((f) => !f.includes('node_modules'))
+		.filter((f) => !f.includes('examples'))
+		.filter((f) => !f.includes('previous'))
+		.filter((f) => !f.endsWith('0-failing.test.ts'))
 		.filter((f) => !filter || f.includes(filter))
 		.sort()
 }
@@ -25,10 +25,10 @@ async function run(): Promise<number> {
 	const failedFiles: string[] = []
 
 	const tasks = files.map(async (file) => {
-		const proc = Bun.spawn(["bun", "test", `./${file}`], {
+		const proc = Bun.spawn(['bun', 'test', `./${file}`], {
 			cwd: ROOT,
-			stdout: "pipe",
-			stderr: "pipe",
+			stdout: 'pipe',
+			stderr: 'pipe',
 		})
 		const timeout = setTimeout(() => proc.kill(), TIMEOUT_MS)
 		const code = await proc.exited
@@ -55,7 +55,7 @@ async function run(): Promise<number> {
 			failedFiles.push(file)
 		} else {
 			const elapsed = all.match(/\[(\d+\.?\d*ms)\]/)
-			console.log(`✅ ${file} ${elapsed ? elapsed[1] : ""}`)
+			console.log(`✅ ${file} ${elapsed ? elapsed[1] : ''}`)
 		}
 	})
 
@@ -65,7 +65,7 @@ async function run(): Promise<number> {
 	console.log(`\n${totalPass} pass, ${totalFail} fail (${elapsed}ms)`)
 
 	if (failedFiles.length) {
-		console.log("\nfailed:")
+		console.log('\nfailed:')
 		for (const f of failedFiles) console.log(`  ${f}`)
 	}
 

@@ -1,18 +1,24 @@
-import { perf } from "./perf.ts"
-perf.mark("first-code")
+import { perf } from './perf.ts'
+perf.mark('first-code')
 
-import { ensureStateDir } from "./state.ts"
-import { claimHost, readHostLock, releaseHost, appendEvent, tailEvents } from "./ipc.ts"
-import { startRuntime } from "./server/runtime.ts"
-import { startCli } from "./client/cli.ts"
+import { ensureStateDir } from './state.ts'
+import {
+	claimHost,
+	readHostLock,
+	releaseHost,
+	appendEvent,
+	tailEvents,
+} from './ipc.ts'
+import { startRuntime } from './server/runtime.ts'
+import { startCli } from './client/cli.ts'
 
 ensureStateDir()
-perf.mark("state-ready")
+perf.mark('state-ready')
 
 let isHost = await claimHost()
 const lock = readHostLock()
-let serverPid = isHost ? process.pid : lock?.pid ?? null
-perf.mark("host-election")
+let serverPid = isHost ? process.pid : (lock?.pid ?? null)
+perf.mark('host-election')
 
 if (isHost) {
 	console.log(`Server started (pid ${process.pid}) [${perf.elapsed()}ms]`)
@@ -25,14 +31,17 @@ const ac = new AbortController()
 function cleanup() {
 	ac.abort()
 	if (isHost) {
-		appendEvent({ type: "host-released" })
+		appendEvent({ type: 'host-released' })
 		releaseHost()
 	}
 	perf.stop()
 }
 
-process.on("exit", cleanup)
-process.on("SIGTERM", () => { cleanup(); process.exit(0) })
+process.on('exit', cleanup)
+process.on('SIGTERM', () => {
+	cleanup()
+	process.exit(0)
+})
 
 if (isHost) {
 	startRuntime(ac.signal)
@@ -61,7 +70,7 @@ if (!isHost) {
 	// Fast path: host announces it's quitting
 	;(async () => {
 		for await (const event of tailEvents(ac.signal)) {
-			if (event.type === "host-released") {
+			if (event.type === 'host-released') {
 				tryPromote()
 			}
 		}
@@ -80,7 +89,7 @@ if (!isHost) {
 		}
 	}, 3000)
 
-	ac.signal.addEventListener("abort", () => clearInterval(pollTimer))
+	ac.signal.addEventListener('abort', () => clearInterval(pollTimer))
 }
 
 // Dump perf marks to stderr on startup
@@ -88,5 +97,5 @@ perf.setSink((lines) => {
 	for (const line of lines) process.stderr.write(`  ${line}\n`)
 })
 
-perf.mark("cli-start")
+perf.mark('cli-start')
 startCli(ac.signal)

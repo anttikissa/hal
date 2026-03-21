@@ -21,7 +21,7 @@ function flush(): void {
 	if (!sink || marks.length === 0) return
 	const lines = marks.splice(0).map((m) => {
 		const sinceStart = (m.ts + performance.timeOrigin - epoch).toFixed(1)
-		const detail = m.detail ? ` (${m.detail})` : ""
+		const detail = m.detail ? ` (${m.detail})` : ''
 		return `${sinceStart}ms  ${m.name}${detail}`
 	})
 	sink(lines)

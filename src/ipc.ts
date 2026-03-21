@@ -1,21 +1,27 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
-import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from "fs"
-import { open } from "fs/promises"
-import { IPC_DIR, ensureDir } from "./state.ts"
-import { ason } from "./utils/ason.ts"
-import { tailFile } from "./utils/tail-file.ts"
+import {
+	appendFileSync,
+	readFileSync,
+	existsSync,
+	writeFileSync,
+	unlinkSync,
+} from 'fs'
+import { open } from 'fs/promises'
+import { IPC_DIR, ensureDir } from './state.ts'
+import { ason } from './utils/ason.ts'
+import { tailFile } from './utils/tail-file.ts'
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`
 const COMMANDS_FILE = `${IPC_DIR}/commands.asonl`
 
 function ensureFile(file: string): void {
-	if (!existsSync(file)) writeFileSync(file, "")
+	if (!existsSync(file)) writeFileSync(file, '')
 }
 
 function append(file: string, item: any): void {
-	appendFileSync(file, ason.stringify(item, "short") + "\n")
+	appendFileSync(file, ason.stringify(item, 'short') + '\n')
 }
 
 export function appendEvent(event: any): void {
@@ -55,19 +61,26 @@ export async function claimHost(): Promise<boolean> {
 	ensureFile(EVENTS_FILE)
 	ensureFile(COMMANDS_FILE)
 	try {
-		const fh = await open(HOST_LOCK, "wx")
-		const lock: HostLock = { pid: process.pid, createdAt: new Date().toISOString() }
+		const fh = await open(HOST_LOCK, 'wx')
+		const lock: HostLock = {
+			pid: process.pid,
+			createdAt: new Date().toISOString(),
+		}
 		await fh.writeFile(ason.stringify(lock))
 		await fh.close()
 		return true
 	} catch (e: any) {
-		if (e?.code === "EEXIST") {
+		if (e?.code === 'EEXIST') {
 			try {
-				const lock = ason.parse(readFileSync(HOST_LOCK, "utf-8")) as unknown as HostLock
+				const lock = ason.parse(
+					readFileSync(HOST_LOCK, 'utf-8')
+				) as unknown as HostLock
 				process.kill(lock.pid, 0)
 				return false
 			} catch {
-				try { unlinkSync(HOST_LOCK) } catch {}
+				try {
+					unlinkSync(HOST_LOCK)
+				} catch {}
 				return claimHost()
 			}
 		}
@@ -77,12 +90,16 @@ export async function claimHost(): Promise<boolean> {
 
 export function readHostLock(): HostLock | null {
 	try {
-		return ason.parse(readFileSync(HOST_LOCK, "utf-8")) as unknown as HostLock
+		return ason.parse(
+			readFileSync(HOST_LOCK, 'utf-8')
+		) as unknown as HostLock
 	} catch {
 		return null
 	}
 }
 
 export function releaseHost(): void {
-	try { unlinkSync(HOST_LOCK) } catch {}
+	try {
+		unlinkSync(HOST_LOCK)
+	} catch {}
 }

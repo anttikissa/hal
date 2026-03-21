@@ -6,14 +6,21 @@ export const COMMENTS = Symbol('comments')
 
 /** Any value representable in ASON. */
 export type AsonValue =
-	| string | number | boolean | null | undefined
+	| string
+	| number
+	| boolean
+	| null
+	| undefined
 	| AsonArray
 	| AsonObject
 
 /** Array with optional comment metadata per element. */
 export type AsonArray = AsonValue[] & { [COMMENTS]?: (string | undefined)[] }
 /** Object with optional comment metadata per key. */
-export type AsonObject = { [key: string]: AsonValue; [COMMENTS]?: Record<string, string> }
+export type AsonObject = {
+	[key: string]: AsonValue
+	[COMMENTS]?: Record<string, string>
+}
 
 // --- Stringify ---
 
@@ -44,10 +51,15 @@ function quoteKey(key: string): string {
 
 function indentComment(comment: string, pad: string): string {
 	const lines = comment.replace(/\n$/, '').split('\n')
-	return lines.map(l => l ? pad + l : '').join('\n')
+	return lines.map((l) => (l ? pad + l : '')).join('\n')
 }
 
-function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number): string {
+function stringifyValue(
+	obj: unknown,
+	col: number,
+	depth: number,
+	maxWidth: number
+): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
@@ -61,10 +73,16 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
-		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
+		const comments =
+			maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
 		const items = obj.map((v) => stringifyValue(v, 0, depth, maxWidth))
 		const inline = `[${items.join(', ')}]`
-		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
+		if (
+			!comments &&
+			col + inline.length <= maxWidth &&
+			!inline.includes('\n')
+		)
+			return inline
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = obj.map((v, i) => {
@@ -81,17 +99,28 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		if (keys.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
 		const pairs = keys.map(
-			(k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`,
+			(k) =>
+				`${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`
 		)
 		const inline = `{ ${pairs.join(', ')} }`
-		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
+		if (
+			!comments &&
+			col + inline.length <= maxWidth &&
+			!inline.includes('\n')
+		)
+			return inline
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = keys.map((k, i) => {
 			const comment = comments?.[k]
 			const prefix = comment ? indentComment(comment, pad) + '\n' : ''
 			const keyPrefix = `${pad}${quoteKey(k)}: `
-			const val = stringifyValue(rec[k], keyPrefix.length, childDepth, maxWidth)
+			const val = stringifyValue(
+				rec[k],
+				keyPrefix.length,
+				childDepth,
+				maxWidth
+			)
 			return `${prefix}${keyPrefix}${val}${i < keys.length - 1 ? ',' : ''}`
 		})
 		return `{\n${lines.join('\n')}\n${'  '.repeat(depth)}}`
@@ -121,15 +150,19 @@ class ParseError extends Error {
 }
 
 function fail(ctx: Ctx, msg: string): never {
-	let line = 1, col = 1
+	let line = 1,
+		col = 1
 	for (const c of ctx.buf.slice(0, ctx.pos)) {
-		if (c === '\n') { line++; col = 1 } else col++
+		if (c === '\n') {
+			line++
+			col = 1
+		} else col++
 	}
 	const lineText = ctx.buf.split('\n')[line - 1] ?? ''
 	const pad = lineText.slice(0, col - 1).replace(/[^\t]/g, ' ')
 	throw new ParseError(
 		`${msg} at ${line}:${col}:\n    ${lineText}\n    ${pad}^`,
-		ctx.pos,
+		ctx.pos
 	)
 }
 
@@ -142,8 +175,15 @@ function skipWhite(ctx: Ctx): string {
 	let newlines = 0
 	while (ctx.pos < ctx.buf.length) {
 		const ch = peek(ctx)
-		if (ch === '\n') { ctx.pos++; newlines++; continue }
-		if (ch === ' ' || ch === '\t' || ch === '\r') { ctx.pos++; continue }
+		if (ch === '\n') {
+			ctx.pos++
+			newlines++
+			continue
+		}
+		if (ch === ' ' || ch === '\t' || ch === '\r') {
+			ctx.pos++
+			continue
+		}
 		if (ch === '/' && peek2(ctx) === '/') {
 			const start = ctx.pos
 			ctx.pos += 2
@@ -160,7 +200,10 @@ function skipWhite(ctx: Ctx): string {
 			const start = ctx.pos
 			ctx.pos += 2
 			while (ctx.pos < ctx.buf.length) {
-				if (peek(ctx) === '*' && peek2(ctx) === '/') { ctx.pos += 2; break }
+				if (peek(ctx) === '*' && peek2(ctx) === '/') {
+					ctx.pos += 2
+					break
+				}
 				ctx.pos++
 			}
 			if (ctx.comments) {
@@ -175,12 +218,17 @@ function skipWhite(ctx: Ctx): string {
 	return collected
 }
 
-function peek(ctx: Ctx): string { return ctx.buf[ctx.pos] ?? '' }
+function peek(ctx: Ctx): string {
+	return ctx.buf[ctx.pos] ?? ''
+}
 
-function peek2(ctx: Ctx): string { return ctx.buf[ctx.pos + 1] ?? '' }
+function peek2(ctx: Ctx): string {
+	return ctx.buf[ctx.pos + 1] ?? ''
+}
 
 function eat(ctx: Ctx, ch: string): void {
-	if (peek(ctx) !== ch) fail(ctx, `Expected '${ch}', got '${peek(ctx) || 'EOF'}'`)
+	if (peek(ctx) !== ch)
+		fail(ctx, `Expected '${ch}', got '${peek(ctx) || 'EOF'}'`)
 	ctx.pos++
 }
 
@@ -200,10 +248,18 @@ function parseString(ctx: Ctx, quote: string): string {
 	let pos = ctx.pos
 	while (pos < buf.length) {
 		const cc = buf.charCodeAt(pos)
-		if (cc === 0x5C) break // backslash — fall through to slow path
-		if (cc === qc) { ctx.pos = pos + 1; return buf.slice(start, pos) }
-		if (checkTemplateDollar && cc === 0x24 && buf.charCodeAt(pos + 1) === 0x7B) {
-			ctx.pos = pos; fail(ctx, 'Template interpolation is not supported')
+		if (cc === 0x5c) break // backslash — fall through to slow path
+		if (cc === qc) {
+			ctx.pos = pos + 1
+			return buf.slice(start, pos)
+		}
+		if (
+			checkTemplateDollar &&
+			cc === 0x24 &&
+			buf.charCodeAt(pos + 1) === 0x7b
+		) {
+			ctx.pos = pos
+			fail(ctx, 'Template interpolation is not supported')
 		}
 		pos++
 	}
@@ -214,18 +270,26 @@ function parseString(ctx: Ctx, quote: string): string {
 	ctx.pos = pos
 	while (ctx.pos < buf.length) {
 		const cc = buf.charCodeAt(ctx.pos)
-		if (cc === 0x5C) { // backslash
+		if (cc === 0x5c) {
+			// backslash
 			segments.push(buf.slice(segStart, ctx.pos))
 			ctx.pos++
 			const esc = buf.charCodeAt(ctx.pos)
-			if (esc === 0x6E) segments.push('\n')      // n
-			else if (esc === 0x74) segments.push('\t')  // t
-			else if (esc === 0x72) segments.push('\r')  // r
-			else if (esc === 0x62) segments.push('\b')  // b
-			else if (esc === 0x66) segments.push('\f')  // f
-			else if (esc === 0x75) {                     // u
+			if (esc === 0x6e)
+				segments.push('\n') // n
+			else if (esc === 0x74)
+				segments.push('\t') // t
+			else if (esc === 0x72)
+				segments.push('\r') // r
+			else if (esc === 0x62)
+				segments.push('\b') // b
+			else if (esc === 0x66)
+				segments.push('\f') // f
+			else if (esc === 0x75) {
+				// u
 				const hex = buf.slice(ctx.pos + 1, ctx.pos + 5)
-				if (!/^[0-9a-fA-F]{4}$/.test(hex)) fail(ctx, 'Invalid unicode escape')
+				if (!/^[0-9a-fA-F]{4}$/.test(hex))
+					fail(ctx, 'Invalid unicode escape')
 				segments.push(String.fromCharCode(parseInt(hex, 16)))
 				ctx.pos += 4
 			} else segments.push(buf[ctx.pos]!)
@@ -238,7 +302,11 @@ function parseString(ctx: Ctx, quote: string): string {
 			ctx.pos++
 			return segments.join('')
 		}
-		if (checkTemplateDollar && cc === 0x24 && buf.charCodeAt(ctx.pos + 1) === 0x7B) {
+		if (
+			checkTemplateDollar &&
+			cc === 0x24 &&
+			buf.charCodeAt(ctx.pos + 1) === 0x7b
+		) {
 			fail(ctx, 'Template interpolation is not supported')
 		}
 		ctx.pos++
@@ -272,13 +340,17 @@ function parseObject(ctx: Ctx): AsonObject {
 	let commentMap: Record<string, string> | undefined
 	while (true) {
 		const comment = skipWhite(ctx)
-		if (peek(ctx) === '}') { ctx.pos++; break }
+		if (peek(ctx) === '}') {
+			ctx.pos++
+			break
+		}
 		const key = parseKey(ctx)
 		if (comment) {
 			commentMap ??= {}
 			commentMap[key] = comment
 		}
-		skipWhite(ctx); eat(ctx, ':')
+		skipWhite(ctx)
+		eat(ctx, ':')
 		obj[key] = parseAny(ctx)
 		skipWhite(ctx)
 		if (peek(ctx) === ',') ctx.pos++
@@ -293,7 +365,10 @@ function parseArray(ctx: Ctx): AsonArray {
 	let commentArr: (string | undefined)[] | undefined
 	while (true) {
 		const comment = skipWhite(ctx)
-		if (peek(ctx) === ']') { ctx.pos++; break }
+		if (peek(ctx) === ']') {
+			ctx.pos++
+			break
+		}
 		if (comment) {
 			commentArr ??= []
 			commentArr[arr.length] = comment
@@ -313,16 +388,37 @@ function parseAny(ctx: Ctx): AsonValue {
 	if (ch === '[') return parseArray(ctx)
 	if (ch === "'" || ch === '"' || ch === '`') return parseString(ctx, ch)
 	if (ch === '-') {
-		if (peek2(ctx) === 'I') { eatWord(ctx, '-Infinity'); return -Infinity }
+		if (peek2(ctx) === 'I') {
+			eatWord(ctx, '-Infinity')
+			return -Infinity
+		}
 		return parseNumber(ctx)
 	}
 	if (/[0-9]/.test(ch)) return parseNumber(ctx)
-	if (ch === 't') { eatWord(ctx, 'true'); return true }
-	if (ch === 'f') { eatWord(ctx, 'false'); return false }
-	if (ch === 'n') { eatWord(ctx, 'null'); return null }
-	if (ch === 'u') { eatWord(ctx, 'undefined'); return undefined }
-	if (ch === 'N') { eatWord(ctx, 'NaN'); return NaN }
-	if (ch === 'I') { eatWord(ctx, 'Infinity'); return Infinity }
+	if (ch === 't') {
+		eatWord(ctx, 'true')
+		return true
+	}
+	if (ch === 'f') {
+		eatWord(ctx, 'false')
+		return false
+	}
+	if (ch === 'n') {
+		eatWord(ctx, 'null')
+		return null
+	}
+	if (ch === 'u') {
+		eatWord(ctx, 'undefined')
+		return undefined
+	}
+	if (ch === 'N') {
+		eatWord(ctx, 'NaN')
+		return NaN
+	}
+	if (ch === 'I') {
+		eatWord(ctx, 'Infinity')
+		return Infinity
+	}
 	fail(ctx, 'Unexpected token')
 }
 
@@ -351,7 +447,9 @@ export function parseAll(str: string): AsonValue[] {
  *  split('\n') always produces a trailing element after the last \n;
  *  pop() keeps that incomplete fragment in buf for the next chunk.
  *  e.g. "a\nb\nc" → ["a","b","c"] → yield "a","b", buf="c" */
-async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+async function* streamLines(
+	stream: ReadableStream<Uint8Array>
+): AsyncGenerator<string> {
 	const decoder = new TextDecoder()
 	let buf = ''
 	for await (const chunk of stream) {
@@ -366,14 +464,16 @@ async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<
 /** Yields parsed ASON values from a byte stream, one per newline-delimited record.
  *  The first line silently ignores parse errors (the stream may start mid-record). */
 export async function* parseStream(
-	stream: ReadableStream<Uint8Array>,
+	stream: ReadableStream<Uint8Array>
 ): AsyncGenerator<AsonValue> {
 	let first = true
 	for await (const line of streamLines(stream)) {
 		if (!line.trim()) continue
 		if (first) {
 			first = false
-			try { yield parse(line) } catch {}
+			try {
+				yield parse(line)
+			} catch {}
 		} else {
 			yield parse(line)
 		}
