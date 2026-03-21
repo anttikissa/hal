@@ -10,7 +10,7 @@ import {
 	tailEvents,
 } from './ipc.ts'
 import { startRuntime } from './server/runtime.ts'
-import { startCli } from './client/cli.ts'
+import { startCli, addLocalBlock } from './client/cli.ts'
 
 ensureStateDir()
 perf.mark('state-ready')
@@ -92,9 +92,8 @@ if (!isHost) {
 	ac.signal.addEventListener('abort', () => clearInterval(pollTimer))
 }
 
-// Dump perf marks to stderr on startup
 perf.setSink((lines) => {
-	for (const line of lines) process.stderr.write(`  ${line}\n`)
+	for (const line of lines) addLocalBlock(line)
 })
 
 perf.mark('cli-start')

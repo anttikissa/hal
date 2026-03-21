@@ -1,4 +1,5 @@
 // CLI client — raw terminal input, event display, prompt editing.
+// See docs/terminal.md for rendering rules.
 
 import { appendCommand, tailEvents } from "../ipc.ts"
 import { render, type RenderState } from "./render.ts"
@@ -10,24 +11,44 @@ interface Block {
 	text: string
 }
 
-let blocks: Block[] = []
+interface Tab {
+	name: string
+	blocks: Block[]
+}
+
+let tabList: Tab[] = [{ name: "main", blocks: [] }]
+let currentTab = 0
 let promptText = ""
 let promptCursor = 0
-let currentTab = 0
-let tabs = ["main"]
+
+function activeTab(): Tab {
+	return tabList[currentTab]!
+}
+
+function addBlock(block: Block) {
+	activeTab().blocks.push(block)
+	draw()
+}
+
+// Add a block that only this client sees (perf, local info)
+export function addLocalBlock(text: string) {
+	activeTab().blocks.push({ type: "info", text })
+	draw()
+}
 
 function blockToString(block: Block): string {
 	if (block.type === "input") return `\x1b[36mYou:\x1b[0m ${block.text}`
-	if (block.type === "assistant") return `\x1b[33mAssistant:\x1b[0m ${block.text}`
+	if (block.type === "assistant")
+		return `\x1b[33mAssistant:\x1b[0m ${block.text}`
 	return `\x1b[90m${block.text}\x1b[0m`
 }
 
 function renderTabBar(): string {
-	return tabs
-		.map((name, i) =>
+	return tabList
+		.map((tab, i) =>
 			i === currentTab
-				? `\x1b[7m ${i + 1} ${name} \x1b[0m`
-				: ` ${i + 1} ${name} `,
+				? `\x1b[7m ${i + 1} ${tab.name} \x1b[0m`
+				: ` ${i + 1} ${tab.name} `,
 		)
 		.join("")
 }
@@ -42,62 +63,54 @@ function renderPrompt(): string {
 }
 
 function draw() {
+	const tab = activeTab()
 	const state: RenderState = {
-		blocks: blocks.map(blockToString),
+		blocks: tab.blocks.map(blockToString),
 		tabs: renderTabBar(),
 		separator: renderSeparator(),
 		prompt: renderPrompt(),
-		cursorCol: promptCursor + 2, // 2 = "> " prefix
+		cursorCol: promptCursor + 2,
 	}
 	render(state)
 }
 
 export function startCli(signal: AbortSignal): void {
-	// Enter raw mode
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
 		process.stdin.resume()
 	}
 
-	// Initial draw
 	draw()
 
-	// Tail events
+	// Tail events — route to active tab's blocks
 	void (async () => {
 		for await (const event of tailEvents(signal)) {
 			if (event.type === "prompt") {
-				blocks.push({ type: "input", text: event.text })
-				draw()
+				addBlock({ type: "input", text: event.text })
 			} else if (event.type === "response") {
-				blocks.push({ type: "assistant", text: event.text })
-				draw()
+				addBlock({ type: "assistant", text: event.text })
 			} else if (event.type === "info") {
-				blocks.push({ type: "info", text: event.text })
-				draw()
-			} else if (event.type === "host-released") {
-				// handled by main.ts
+				addBlock({ type: "info", text: event.text })
 			}
+			// host-released handled by main.ts
 		}
 	})()
 
-	// Handle raw input
 	process.stdin.on("data", (data: Buffer) => {
 		for (let i = 0; i < data.length; i++) {
 			const byte = data[i]!
 
-			// Ctrl-R: restart
 			if (byte === 0x12) {
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
 				process.exit(RESTART_CODE)
 			}
 
-			// Ctrl-C / Ctrl-D: quit
 			if (byte === 0x03 || byte === 0x04) {
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
 				process.exit(0)
 			}
 
-			// Enter: submit
+			// Enter
 			if (byte === 0x0d || byte === 0x0a) {
 				if (promptText.trim()) {
 					appendCommand({ type: "prompt", text: promptText })
@@ -121,14 +134,16 @@ export function startCli(signal: AbortSignal): void {
 			}
 
 			// Escape sequences
-			if (byte === 0x1b && i + 2 < data.length && data[i + 1] === 0x5b) {
+			if (
+				byte === 0x1b &&
+				i + 2 < data.length &&
+				data[i + 1] === 0x5b
+			) {
 				const code = data[i + 2]
-				// Left arrow
 				if (code === 0x44 && promptCursor > 0) {
 					promptCursor--
 					draw()
 				}
-				// Right arrow
 				if (code === 0x43 && promptCursor < promptText.length) {
 					promptCursor++
 					draw()
@@ -137,7 +152,7 @@ export function startCli(signal: AbortSignal): void {
 				continue
 			}
 
-			// Printable character
+			// Printable
 			if (byte >= 0x20 && byte < 0x7f) {
 				const ch = String.fromCharCode(byte)
 				promptText =
