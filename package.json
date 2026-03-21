@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "bun test --concurrent"
+    "test": "bun test --concurrent",
+    "cloc": "bun scripts/cloc.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

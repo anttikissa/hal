@@ -1,75 +1,46 @@
-import { appendFileSync, writeFileSync, readFileSync, existsSync, unlinkSync, watch } from "fs"
+// File-backed IPC bus. Host appends events, clients append commands.
+
+import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from "fs"
 import { open } from "fs/promises"
 import { IPC_DIR, ensureDir } from "./state.ts"
+import { ason } from "./ason.ts"
+import { tailFile } from "./tail-file.ts"
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
-const EVENTS_FILE = `${IPC_DIR}/events.jsonl`
-const COMMANDS_FILE = `${IPC_DIR}/commands.jsonl`
-
-// --- Append-only log ---
-
-function appendLog(file: string, item: any): void {
-	appendFileSync(file, JSON.stringify(item) + "\n")
-}
+const EVENTS_FILE = `${IPC_DIR}/events.asonl`
+const COMMANDS_FILE = `${IPC_DIR}/commands.asonl`
 
 function ensureFile(file: string): void {
 	if (!existsSync(file)) writeFileSync(file, "")
 }
 
+function append(file: string, item: any): void {
+	appendFileSync(file, ason.stringify(item, "short") + "\n")
+}
+
 export function appendEvent(event: any): void {
-	appendLog(EVENTS_FILE, event)
+	append(EVENTS_FILE, event)
 }
 
 export function appendCommand(command: any): void {
-	appendLog(COMMANDS_FILE, command)
+	append(COMMANDS_FILE, command)
 }
 
-// Tail a log file, yielding new lines as they appear
-export async function* tailLog(file: string, signal?: AbortSignal): AsyncGenerator<any> {
+async function* tail(file: string, signal?: AbortSignal): AsyncGenerator<any> {
 	ensureFile(file)
-	let offset = 0
-	const content = readFileSync(file, "utf-8")
-	offset = content.length
-
-	while (!signal?.aborted) {
-		const current = readFileSync(file, "utf-8")
-		if (current.length > offset) {
-			const newData = current.slice(offset)
-			offset = current.length
-			for (const line of newData.split("\n")) {
-				if (line.trim()) {
-					try {
-						yield JSON.parse(line)
-					} catch {}
-				}
-			}
-		}
-		// Wait for changes
-		await new Promise<void>((resolve) => {
-			const watcher = watch(file, () => {
-				watcher.close()
-				resolve()
-			})
-			// Fallback poll
-			const timer = setTimeout(() => {
-				watcher.close()
-				resolve()
-			}, 100)
-			signal?.addEventListener("abort", () => {
-				clearTimeout(timer)
-				watcher.close()
-				resolve()
-			})
-		})
+	const stream = tailFile(file)
+	for await (const value of ason.parseStream(stream)) {
+		if (signal?.aborted) break
+		yield value
 	}
 }
 
 export function tailEvents(signal?: AbortSignal) {
-	return tailLog(EVENTS_FILE, signal)
+	return tail(EVENTS_FILE, signal)
 }
 
 export function tailCommands(signal?: AbortSignal) {
-	return tailLog(COMMANDS_FILE, signal)
+	return tail(COMMANDS_FILE, signal)
 }
 
 // --- Host election ---
@@ -86,18 +57,16 @@ export async function claimHost(): Promise<boolean> {
 	try {
 		const fh = await open(HOST_LOCK, "wx")
 		const lock: HostLock = { pid: process.pid, createdAt: new Date().toISOString() }
-		await fh.writeFile(JSON.stringify(lock))
+		await fh.writeFile(ason.stringify(lock))
 		await fh.close()
 		return true
 	} catch (e: any) {
 		if (e?.code === "EEXIST") {
-			// Check if existing host is alive
 			try {
-				const lock: HostLock = JSON.parse(readFileSync(HOST_LOCK, "utf-8"))
+				const lock = ason.parse(readFileSync(HOST_LOCK, "utf-8")) as unknown as HostLock
 				process.kill(lock.pid, 0)
-				return false // host is alive
+				return false
 			} catch {
-				// Dead host, remove stale lock and retry
 				try { unlinkSync(HOST_LOCK) } catch {}
 				return claimHost()
 			}
@@ -108,7 +77,7 @@ export async function claimHost(): Promise<boolean> {
 
 export function readHostLock(): HostLock | null {
 	try {
-		return JSON.parse(readFileSync(HOST_LOCK, "utf-8"))
+		return ason.parse(readFileSync(HOST_LOCK, "utf-8")) as unknown as HostLock
 	} catch {
 		return null
 	}
