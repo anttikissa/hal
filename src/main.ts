@@ -21,9 +21,9 @@ let serverPid = isHost ? process.pid : (lock?.pid ?? null)
 perf.mark('host-election')
 
 if (isHost) {
-	console.log(`Server started (pid ${process.pid}) [${perf.elapsed()}ms]`)
+	appendEvent({ type: "info", text: `Server started (pid ${process.pid}) [${perf.elapsed()}ms]` })
 } else {
-	console.log(`Joined server (pid ${serverPid}) [${perf.elapsed()}ms]`)
+	appendEvent({ type: "info", text: `Joined server (pid ${serverPid}) [${perf.elapsed()}ms]` })
 }
 
 const ac = new AbortController()
@@ -59,7 +59,7 @@ if (!isHost) {
 			if (await claimHost()) {
 				isHost = true
 				serverPid = process.pid
-				console.log(`Promoted to server (pid ${process.pid})`)
+				appendEvent({ type: "info", text: `Promoted to server (pid ${process.pid})` })
 				startRuntime(ac.signal)
 			}
 		} finally {

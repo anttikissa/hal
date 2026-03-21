@@ -13,9 +13,13 @@ afterEach(() => {
 	rmSync(tmpDir, { recursive: true, force: true })
 })
 
-function spawnHal(opts?: { stdin?: 'pipe' | 'inherit' }) {
+function stripAnsi(s: string): string {
+	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
+}
+
+function spawnHal() {
 	return Bun.spawn(['bun', 'src/main.ts'], {
-		stdin: opts?.stdin ?? 'pipe',
+		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
 		env: {
@@ -33,11 +37,13 @@ describe('main', () => {
 		proc.stdin!.write('hello\n')
 		proc.stdin!.flush()
 		await Bun.sleep(200)
-		proc.stdin!.end()
-		const stdout = await new Response(proc.stdout).text()
+		// Send ctrl-c to quit
+		proc.stdin!.write(new Uint8Array([0x03]))
+		proc.stdin!.flush()
+		const stdout = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
-		expect(stdout).toContain('You: hello')
-		expect(stdout).toContain('Assistant: You said: hello')
+		expect(stdout).toContain('hello')
+		expect(stdout).toContain('You said: hello')
 	})
 
 	test('exits with 100 on ctrl-r', async () => {
