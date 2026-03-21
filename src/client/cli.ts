@@ -2,7 +2,13 @@
 // See docs/terminal.md for rendering rules.
 
 import { appendCommand, tailEvents, readAllEvents } from '../ipc.ts'
-import { render, type RenderState } from './render.ts'
+import {
+	clearFrame,
+	getRenderMetrics,
+	render,
+	type RenderMetrics,
+	type RenderState,
+} from './render.ts'
 
 const RESTART_CODE = 100
 
@@ -68,13 +74,17 @@ function renderTabBar(): string {
 		.join('')
 }
 
-function renderSeparator(): string {
+function renderSeparator(metrics: RenderMetrics): string {
 	const cols = process.stdout.columns || 80
+	const debug = `content=${metrics.contentLines} pad=${metrics.padding} max=${metrics.maxContentHeight} total=${metrics.totalLines}`
 	const info = ` ${role} · pid ${process.pid} `
 	const dashes = Math.max(0, cols - info.length)
 	const left = Math.floor(dashes / 2)
 	const right = dashes - left
-	return '\x1b[90m' + '─'.repeat(left) + info + '─'.repeat(right) + '\x1b[0m'
+	return (
+		'\x1b[90m' + debug + '\x1b[0m\n' +
+		'\x1b[90m' + '─'.repeat(left) + info + '─'.repeat(right) + '\x1b[0m'
+	)
 }
 
 function renderPrompt(): string {
@@ -91,12 +101,20 @@ function countBlockLines(blocks: Block[]): number {
 
 function draw() {
 	const tab = activeTab()
+	const blocks = tab ? tab.blocks.map(blockToString) : []
+	const allTabBlockCounts = tabList.map((t) => countBlockLines(t.blocks))
+	const tabs = renderTabBar()
+	const prompt = renderPrompt()
+	const metrics = getRenderMetrics(
+		{ blocks, allTabBlockCounts, tabs, prompt },
+		2,
+	)
 	const state: RenderState = {
-		blocks: tab ? tab.blocks.map(blockToString) : [],
-		allTabBlockCounts: tabList.map((t) => countBlockLines(t.blocks)),
-		tabs: renderTabBar(),
-		separator: renderSeparator(),
-		prompt: renderPrompt(),
+		blocks,
+		allTabBlockCounts,
+		tabs,
+		separator: renderSeparator(metrics),
+		prompt,
 		cursorCol: promptCursor + 2,
 	}
 	render(state)
@@ -119,6 +137,11 @@ function sendCommand(type: string, text?: string) {
 }
 
 function handleEvent(event: any) {
+	if (event.type === 'runtime-start' || event.type === 'host-released') {
+		// runtime coordination events are handled elsewhere
+		return
+	}
+
 	if (event.type === 'sessions') {
 		const newTabs: Tab[] = []
 		for (const s of event.sessions) {
@@ -150,14 +173,23 @@ function handleEvent(event: any) {
 	}
 }
 
+function eventsForCurrentRuntime(events: any[]): any[] {
+	for (let i = events.length - 1; i >= 0; i--) {
+		if (events[i]?.type === 'runtime-start') {
+			return events.slice(i + 1)
+		}
+	}
+	return events
+}
+
 export function startCli(signal: AbortSignal): void {
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
 		process.stdin.resume()
 	}
 
-	// Bootstrap: replay all existing events to get sessions + history
-	for (const event of readAllEvents()) {
+	// Bootstrap: replay current runtime events to get sessions + history
+	for (const event of eventsForCurrentRuntime(readAllEvents())) {
 		handleEvent(event)
 	}
 
@@ -176,6 +208,7 @@ export function startCli(signal: AbortSignal): void {
 
 			// Ctrl-R: restart
 			if (byte === 0x12) {
+				clearFrame()
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
 				process.exit(RESTART_CODE)
 			}

@@ -13,6 +13,7 @@ The difference is that hal re-renders its last N lines on every update (for text
 
 When switching tabs, the input area must stay at the exact same row. This means we need to track the height of the tallest tab, even if it's not the current one. Incoming blocks on background tabs must contribute to height tracking.
 
+If the current tab is shorter than that shared height, put the blank padding above its content, not below it. That keeps the tab's visible lines attached to the prompt in shorter terminals instead of pushing them off-screen.
 ## 3. Full-height optimization
 
 Once any tab fills the full terminal height, all tabs are effectively full-height and we no longer need to track the tallest tab. This happens quickly in practice — users will have many tabs with many blocks.

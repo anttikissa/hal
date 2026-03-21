@@ -22,6 +22,11 @@ perf.mark('host-election')
 
 setRole(isHost ? 'server' : 'client')
 if (isHost) {
+	appendEvent({
+		type: 'runtime-start',
+		pid: process.pid,
+		startedAt: new Date().toISOString(),
+	})
 	addLocalBlock(`Server started (pid ${process.pid}) [${perf.elapsed()}ms]`)
 } else {
 	addLocalBlock(`Joined server (pid ${serverPid}) [${perf.elapsed()}ms]`)
@@ -94,7 +99,7 @@ if (isHost) {
 }
 
 perf.setSink((lines) => {
-	for (const line of lines) addLocalBlock(line)
+	addLocalBlock(lines.join('\n'))
 })
 
 perf.mark('cli-start')

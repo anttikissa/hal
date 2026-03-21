@@ -54,4 +54,26 @@ describe('main', () => {
 		const code = await proc.exited
 		expect(code).toBe(100)
 	})
+
+	test('does not replay events from previous runtime', async () => {
+		const marker = `marker-${Date.now()}`
+
+		const first = spawnHal()
+		await Bun.sleep(100)
+		first.stdin!.write(`${marker}\n`)
+		first.stdin!.flush()
+		await Bun.sleep(300)
+		first.stdin!.write(new Uint8Array([0x03]))
+		first.stdin!.flush()
+		await first.exited
+
+		const second = spawnHal()
+		await Bun.sleep(250)
+		second.stdin!.write(new Uint8Array([0x03]))
+		second.stdin!.flush()
+		const stdout = stripAnsi(await new Response(second.stdout).text())
+		await second.exited
+
+		expect(stdout).not.toContain(marker)
+	})
 })
