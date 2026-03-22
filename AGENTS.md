@@ -48,6 +48,16 @@ Bold or italics are ok in keyword-dense technical documentation, but usually unn
 
 Don't be a kiss-ass, I can take critique.
 
+# Terminal width
+
+ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.
+Never use `.length` for measuring how wide a string is on screen. Emojis,
+CJK characters, and other wide chars take 2 columns. ANSI escapes take 0.
+There is ONE function for this. Use it everywhere. No exceptions.
+
+Word wrapping: use `wordWrap()` from the same file. It's ANSI-aware and
+uses `charWidth()` internally which is the same width logic as `visLen()`.
+
 # TODO (random ideas)
 
 AGENTS.md change - should send a summary of changes to agent at start of next turn (like /cd,

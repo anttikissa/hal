@@ -1,18 +1,18 @@
 #!/usr/bin/env bun
 
-// term.ts — Terminal UI skeleton for Hal.
-//
-// Rendering: differential. See docs/terminal.md.
+// term.ts -- Terminal UI skeleton for Hal.
 //
 // The frame is built by three render functions:
-//   renderHistory()    — all history entries for the active tab
-//   renderStatusLine() — tab bar + status info
-//   renderPrompt()     — "> " + user input
+//   renderHistory()    -- all history entries for the active tab
+//   renderStatusLine() -- tab bar + status info
+//   renderPrompt()     -- "> " + user input (word-wrapped)
 //
 // These push lines into an array. The diff engine compares against
 // the previous frame and writes only what changed.
 //
 // NEVER slice history to viewport. See docs/terminal.md rule 3.
+
+import { visLen, wordWrap } from './src/utils/strings.ts'
 
 const CSI = '\x1b['
 
@@ -70,7 +70,7 @@ function renderHistory(lines: string[], tab: Tab): void {
 }
 
 function renderStatusLine(lines: string[], tab: Tab): void {
-	// Tab bar: same width per entry — "[N]" active, " N " inactive.
+	// Tab bar: same width per entry -- "[N]" active, " N " inactive.
 	const tabBar = tabs.map((_, i) =>
 		i === activeTab ? `[${i + 1}]` : ` ${i + 1} `
 	).join('')
@@ -78,22 +78,28 @@ function renderStatusLine(lines: string[], tab: Tab): void {
 	const mode = fullscreen ? 'full' : 'grow'
 	const count = historyLineCount(tab)
 	lines.push(tabBar)
-	lines.push(`── ${count} lines · peak ${peak} · ${mode} ──`)
+	lines.push(`-- ${count} lines / peak ${peak} / ${mode} --`)
 }
 
 function renderPrompt(lines: string[]): void {
-	lines.push(`> ${promptText}`)
+	const cols = process.stdout.columns || 80
+	const wrapped = wordWrap(`> ${promptText}`, cols)
+	for (const line of wrapped) lines.push(line)
 }
 
-// Chrome = tab bar + status + prompt = 3 lines.
-const CHROME = 3
+// How many lines chrome occupies (tab bar + status + wrapped prompt).
+function chromeLines(): number {
+	const cols = process.stdout.columns || 80
+	return 2 + wordWrap(`> ${promptText}`, cols).length
+}
 
 function buildFrame(): string[] {
 	const rows = process.stdout.rows || 24
+	const chrome = chromeLines()
 	const tab = tabs[activeTab]!
 	const lines: string[] = []
 
-	// 1. History — all entries, all lines, never sliced.
+	// 1. History -- all entries, all lines, never sliced.
 	renderHistory(lines, tab)
 
 	// Update peak across all tabs.
@@ -102,13 +108,13 @@ function buildFrame(): string[] {
 		if (c > peak) peak = c
 	}
 
-	// 2. Padding — keeps prompt stable across tab switches.
-	const contentHeight = Math.min(peak, Math.max(0, rows - CHROME))
+	// 2. Padding -- keeps prompt stable across tab switches.
+	const contentHeight = Math.min(peak, Math.max(0, rows - chrome))
 	const padding = Math.max(0, contentHeight - lines.length)
 	for (let i = 0; i < padding; i++) lines.push('')
 
 	// Check if frame exceeds terminal. Once true, never goes back.
-	if (lines.length + CHROME > rows) fullscreen = true
+	if (lines.length + chrome > rows) fullscreen = true
 
 	// 3. Chrome.
 	renderStatusLine(lines, tab)
@@ -118,6 +124,18 @@ function buildFrame(): string[] {
 }
 
 // ── Diff engine ──────────────────────────────────────────────────────────────
+
+// Where to put the cursor after painting. The cursor sits at the end of the
+// prompt text, which may be on a wrapped continuation line.
+function cursorTarget(totalLines: number): string {
+	const cols = process.stdout.columns || 80
+	const wrapped = wordWrap(`> ${promptText}`, cols)
+	// Cursor column: visible width of the last wrapped line (end of typed text).
+	const lastLine = wrapped[wrapped.length - 1]!
+	const col = visLen(lastLine)
+	// CSI G is 1-indexed.
+	return `\r${CSI}${col + 1}G`
+}
 
 function paint(force = false): void {
 	const rows = process.stdout.rows || 24
@@ -143,7 +161,7 @@ function paint(force = false): void {
 		}
 		cursorRow = lines.length - 1
 		prevLines = lines
-		out.push(`\r${CSI}${promptText.length + 3}G`)
+		out.push(cursorTarget(lines.length))
 		out.push(`${CSI}?25h`, `${CSI}?2026l`)
 		process.stdout.write(out.join(''))
 		return
@@ -172,7 +190,7 @@ function paint(force = false): void {
 	}
 
 	cursorRow = lines.length - 1
-	out.push(`\r${CSI}${promptText.length + 3}G`)
+	out.push(cursorTarget(lines.length))
 	out.push(`${CSI}?25h`, `${CSI}?2026l`)
 	prevLines = lines
 	process.stdout.write(out.join(''))
