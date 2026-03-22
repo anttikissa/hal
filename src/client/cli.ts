@@ -61,7 +61,10 @@ function blockToString(block: Block): string {
 	if (block.type === 'input') return `\x1b[36mYou:\x1b[0m ${block.text}`
 	if (block.type === 'assistant')
 		return `\x1b[33mAssistant:\x1b[0m ${block.text}`
-	return `\x1b[90m${block.text}\x1b[0m`
+	return block.text
+		.split('\n')
+		.map((line) => `\x1b[90m${line}\x1b[0m`)
+		.join('\n')
 }
 
 function renderTabBar(): string {
@@ -242,6 +245,13 @@ export function startCli(signal: AbortSignal): void {
 			// Ctrl-P: previous tab
 			if (byte === 0x10) {
 				switchTab((currentTab - 1 + tabList.length) % tabList.length)
+				continue
+			}
+
+			// Ctrl-L: force full redraw of current tab
+			if (byte === 0x0c) {
+				clearFrame()
+				draw()
 				continue
 			}
 

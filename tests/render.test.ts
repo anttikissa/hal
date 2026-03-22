@@ -11,7 +11,7 @@ function stripAnsi(s: string): string {
 }
 
 describe('render', () => {
-	test('counts multi-line separator when moving back to frame top', () => {
+	test('updates the changed prompt line without repainting the full frame', () => {
 		const state: RenderState = {
 			blocks: [],
 			allTabBlockCounts: [0],
@@ -34,7 +34,9 @@ describe('render', () => {
 
 		;(process.stdout as any).write = originalWrite
 
-		expect(writes.join('')).toContain('\x1b[3A')
+		const output = writes.join('')
+		expect(output).not.toContain('\x1b[3A')
+		expect(stripAnsi(output)).toContain('> x')
 	})
 
 	test('pads above short tabs so messages stay near the prompt', () => {
@@ -113,3 +115,49 @@ describe('render', () => {
 		})
 	})
 })
+
+	test('clear tail on shrink does not inject a blank line into scrollback', () => {
+		const originalRows = process.stdout.rows
+		Object.defineProperty(process.stdout, 'rows', {
+			value: 6,
+			configurable: true,
+		})
+
+		const writes: string[] = []
+		const originalWrite = process.stdout.write.bind(process.stdout)
+		;(process.stdout as any).write = (chunk: any) => {
+			writes.push(String(chunk))
+			return true
+		}
+
+		try {
+			render({
+				blocks: ['one\ntwo\nthree\nfour'],
+				allTabBlockCounts: [4],
+				tabs: '1 tab 1',
+				separator: 'sep',
+				prompt: '> ',
+				cursorCol: 2,
+			})
+			writes.length = 0
+
+			render({
+				blocks: ['one\ntwo'],
+				allTabBlockCounts: [2],
+				tabs: '1 tab 1',
+				separator: 'sep',
+				prompt: '> ',
+				cursorCol: 2,
+			})
+
+			const output = writes.join('')
+			expect(output).toContain('\r\x1b[J')
+			expect(output).not.toContain('\r\n\x1b[J')
+		} finally {
+			;(process.stdout as any).write = originalWrite
+			Object.defineProperty(process.stdout, 'rows', {
+				value: originalRows,
+				configurable: true,
+			})
+		}
+	})

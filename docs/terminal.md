@@ -11,11 +11,14 @@ The difference is that hal re-renders its last N lines on every update (for text
 
 ## 2. Stable prompt position across tab switches
 
-When switching tabs, the input area must stay at the exact same row. This means we need to track the height of the tallest tab, even if it's not the current one. Incoming blocks on background tabs must contribute to height tracking.
+When tabs are shorter than the visible content area, keep the input area at the same row by tracking the tallest tab. If the current tab is shorter than that shared height, put the blank padding above its content, not below it. That keeps the tab's visible lines attached to the prompt in shorter terminals instead of pushing them off-screen.
 
-If the current tab is shorter than that shared height, put the blank padding above its content, not below it. That keeps the tab's visible lines attached to the prompt in shorter terminals instead of pushing them off-screen.
+Do not let that shared height grow past the visible content area of the terminal. Once another tab is taller than the viewport, extra blank padding would only pollute scrollback with empty lines. Cap the padding to the visible content area instead.
+
 ## 3. Full-height optimization
 
-Once any tab fills the full terminal height, all tabs are effectively full-height and we no longer need to track the tallest tab. This happens quickly in practice — users will have many tabs with many blocks.
+Once any tab fills the visible content area, all tabs are effectively full-height for prompt positioning. Older content can scroll, but background-tab growth must not inject extra blank lines into terminal history.
 
-Whether to optimize based on this is a judgment call. Keeping the code minimal and simple takes priority over optimizing for edge cases.
+## 4. Quit should preserve the last frame
+
+On normal quit (for example Ctrl-C), keep the last rendered tab content visible in the terminal for copy/paste and review. Do not clear the screen, switch to an alternate screen buffer, or emit teardown sequences that wipe the visible frame on exit.
