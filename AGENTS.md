@@ -25,7 +25,11 @@ The directory previous/ contains the old codebase, which is now frozen. You can 
 # Code style
 
 - `function f() {}` over `const f = () => {}`
-- Document non-obvious code. Like "process.kill(serverPid, 0)" looks like killing a process, but actually is a trick to see if process is alive. Document such cases.
+- Comment code thoroughly. It is intended for a human to read, and nobody has time to dig into
+  your nested for loops and ternaries and break statements and complex logic. Even better,
+  avoid complex logic in the first place!
+- Especially non-obvious tricks like "process.kill(serverPid, 0)" which looks like killing a
+  process need to be explained - if it looks like one thing and does another, comment.
 
 # Git
 
@@ -44,3 +48,8 @@ Avoid phrases that are obvious AI tells:
 Bold or italics are ok in keyword-dense technical documentation, but usually unnecessary in normal text.
 
 Don't be a kiss-ass, I can take critique.
+
+# TODO (random ideas)
+
+AGENTS.md change - should send a summary of changes to agent at start of next turn (like /cd,
+model changes, etc)
