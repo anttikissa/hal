@@ -4,7 +4,7 @@ Requirements for anyone who touches terminal code.
 Implementation: `term.ts` (will move to `src/` later).
 
 These are HOLY TRUTHS that you must obey. You often have a hard time
-understanding how terminals work, and especially what the USER wants from a
+understanding how terminals work, and especially what the user wants from a
 terminal UI. Read this document to understand the rules of the game.
 
 ## Layout
