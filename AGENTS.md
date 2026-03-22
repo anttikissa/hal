@@ -17,9 +17,8 @@ The directory previous/ contains the old codebase, which is now frozen. You can 
 # Rules
 
 - Use bun - never node, npm or npx
-- First run the tests
+- After every step, run 'bun cloc' - our budget for core code is 10 thousand lines
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
-- Use red-green tdd
 - Tabs, not spaces (except for package.json)
 
 # Code style
