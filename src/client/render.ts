@@ -1,11 +1,9 @@
 // Terminal renderer for one logical "app frame" (content + chrome + prompt).
 // See docs/terminal.md for the behavior contract.
 //
-// This renderer keeps the full logical frame in memory, but it only mutates
-// rows that are currently visible in the terminal viewport.
-//
-// Why: rows above the viewport are already in scrollback. Repainting those rows
-// duplicates history or creates gaps in terminal scrollback.
+// Current policy is intentionally blunt: when the frame changes, redraw the
+// whole frame from top-left. This keeps the complete frame in terminal history
+// even when it exceeds viewport height.
 const ESC = "\x1b"
 const RESET = `${ESC}[0m`
 const SYNC_START = `${ESC}[?2026h`
@@ -14,17 +12,6 @@ const CLEAR_LINE = `${ESC}[2K`
 const HIDE_CURSOR = `${ESC}[?25l`
 const SHOW_CURSOR = `${ESC}[?25h`
 const ANSI_CSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
-
-function moveUp(n: number): string {
-	return n > 0 ? `${ESC}[${n}A` : ""
-}
-
-function moveBetweenRows(from: number, to: number): string {
-	const delta = to - from
-	if (delta > 0) return `${ESC}[${delta}B`
-	if (delta < 0) return `${ESC}[${-delta}A`
-	return ""
-}
 
 let prevLines: string[] = []
 
@@ -79,16 +66,6 @@ function splitContentLines(blocks: string[]): string[] {
 	return lines
 }
 
-function getRowStarts(lines: string[], cols: number): number[] {
-	const starts: number[] = []
-	let row = 0
-	for (const line of lines) {
-		starts.push(row)
-		row += countLineRows(line, cols)
-	}
-	return starts
-}
-
 // Metrics are used by both debug output and frame layout.
 // We cap padding by visible content height so short tabs align with tall tabs
 // without growing blank lines into scrollback once content exceeds viewport.
@@ -129,39 +106,6 @@ function computeLines(state: RenderState): string[] {
 	return lines
 }
 
-function getVisibleLines(lines: string[], rows: number, cols: number): string[] {
-	if (!Number.isFinite(rows)) return [...lines]
-	if (rows <= 0) return []
-
-	const visible: string[] = []
-	let usedRows = 0
-	for (let i = lines.length - 1; i >= 0; i--) {
-		const line = lines[i]!
-		const lineRows = countLineRows(line, cols)
-		if (usedRows + lineRows > rows) {
-			if (usedRows === 0) visible.unshift(line)
-			break
-		}
-		visible.unshift(line)
-		usedRows += lineRows
-	}
-	return visible
-}
-
-function findChangedRange(prev: string[], next: string[]): { start: number, end: number } | null {
-	let start = -1
-	let end = -1
-	const maxLen = Math.max(prev.length, next.length)
-	for (let i = 0; i < maxLen; i++) {
-		if ((prev[i] ?? '') !== (next[i] ?? '')) {
-			if (start === -1) start = i
-			end = i
-		}
-	}
-	if (start === -1) return null
-	return { start, end }
-}
-
 function writeLineRange(out: string[], lines: string[], start: number, end: number): void {
 	if (end < start) return
 	for (let i = start; i <= end; i++) {
@@ -170,84 +114,18 @@ function writeLineRange(out: string[], lines: string[], start: number, end: numb
 	}
 }
 
-/**
- * Main render function.
- *
- * Flow:
- * 1) build full logical frame
- * 2) project it to the visible viewport in terminal rows (wrapped width aware)
- * 3) diff/repaint only visible rows (or repaint visible rows when forced)
- * 4) clear stale rows below the new viewport when visible height shrinks
- * 5) restore cursor to prompt input column
- */
 export function render(state: RenderState, options: RenderOptions = {}): void {
 	const lines = computeLines(state)
 	const out: string[] = []
-	const screenRows = process.stdout.rows ?? Number.POSITIVE_INFINITY
-	const cols = process.stdout.columns ?? Number.POSITIVE_INFINITY
-	const prevVisible = getVisibleLines(prevLines, screenRows, cols)
-	const nextVisible = getVisibleLines(lines, screenRows, cols)
-	const prevRowStarts = getRowStarts(prevVisible, cols)
-	const nextRowStarts = getRowStarts(nextVisible, cols)
-	const prevVisibleRows = countRows(prevVisible, cols)
-	const nextVisibleRows = countRows(nextVisible, cols)
 
 	out.push(SYNC_START)
 	out.push(HIDE_CURSOR)
 
-	// Cursor row in viewport coordinates (0 = top row of viewport content).
-	// We end every render on the prompt row, so on entry this starts at the
-	// previous prompt row.
-	let cursorRow = prevVisible.length > 0 ? prevRowStarts[prevVisible.length - 1]! : 0
-	let didRender = false
-
-	if (prevLines.length === 0 || options.force) {
-		if (prevLines.length > 0 && prevVisibleRows > 0) {
-			// On a forced redraw we are currently on the old prompt row. Move to the
-			// top of the old visible area before repainting the new visible viewport.
-			out.push(`\r${moveUp(cursorRow)}`)
-			cursorRow = 0
-		}
-		writeLineRange(out, nextVisible, 0, nextVisible.length - 1)
-		cursorRow = Math.max(0, nextVisibleRows - 1)
-		didRender = nextVisible.length > 0
-	} else {
-		const changed = findChangedRange(prevVisible, nextVisible)
-		if (changed) {
-			const targetRow =
-				changed.start < prevRowStarts.length
-					? prevRowStarts[changed.start]!
-					: prevVisibleRows
-
-			// Carriage return first so clear+rewrite always starts at column 0.
-			out.push(`\r${moveBetweenRows(cursorRow, targetRow)}`)
-			cursorRow = targetRow
-
-			const renderEnd = Math.min(changed.end, nextVisible.length - 1)
-			if (renderEnd >= changed.start) {
-				writeLineRange(out, nextVisible, changed.start, renderEnd)
-				cursorRow =
-					nextRowStarts[renderEnd]! +
-					countLineRows(nextVisible[renderEnd]!, cols) -
-					1
-				didRender = true
-			}
-		}
-	}
-
-	if (nextVisibleRows < prevVisibleRows) {
-		// The old frame had more visible rows than the new frame. Clear once from
-		// the new last row to terminal end, so stale lines disappear.
-		const newLastRow = Math.max(0, nextVisibleRows - 1)
-		out.push(`\r${moveBetweenRows(cursorRow, newLastRow)}${ESC}[J`)
-		cursorRow = newLastRow
-		didRender = true
-	}
-
-	if (didRender) {
-		const promptRow = nextVisible.length > 0 ? nextRowStarts[nextVisible.length - 1]! : 0
-		out.push(moveBetweenRows(cursorRow, promptRow))
-	}
+	// Keep startup behavior REPL-like: first frame is drawn at current cursor.
+	// After that, each redraw clears the viewport and paints the whole frame so
+	// scrollback always contains full frames, not just the visible tail.
+	if (prevLines.length > 0 || options.force) out.push(`${ESC}[2J${ESC}[H`)
+	writeLineRange(out, lines, 0, lines.length - 1)
 
 	prevLines = lines
 	out.push(`\r${ESC}[${state.cursorCol}C`)
@@ -258,12 +136,6 @@ export function render(state: RenderState, options: RenderOptions = {}): void {
 
 export function clearFrame(): void {
 	if (prevLines.length === 0) return
-	const rows = process.stdout.rows ?? Number.POSITIVE_INFINITY
-	const cols = process.stdout.columns ?? Number.POSITIVE_INFINITY
-	const visibleLines = getVisibleLines(prevLines, rows, cols)
-	const visibleRows = countRows(visibleLines, cols)
-	if (visibleRows > 0) {
-		process.stdout.write(`\r${moveUp(visibleRows - 1)}${ESC}[J`)
-	}
+	process.stdout.write(`\r${ESC}[2J${ESC}[H`)
 	prevLines = []
 }

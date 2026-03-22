@@ -43,7 +43,7 @@ describe('render', () => {
 		expect(stripAnsi(output)).toContain('> x')
 	})
 
-	test('force redraw repaints only the visible viewport when frame overflows', () => {
+	test('force redraw repaints the full frame when content overflows viewport', () => {
 		const originalRows = process.stdout.rows
 		Object.defineProperty(process.stdout, 'rows', {
 			value: 4,
@@ -72,6 +72,11 @@ describe('render', () => {
 			render(state, { force: true })
 
 			expect(stripAnsi(writes.join('')).split('\n')).toEqual([
+				'one',
+				'two',
+				'three',
+				'four',
+				'five',
 				'six',
 				'tabs',
 				'sep',
@@ -86,7 +91,7 @@ describe('render', () => {
 		}
 	})
 
-	test('force redraw handles tall-to-short tab switch using only visible lines', () => {
+	test('force redraw handles tall-to-short tab switch and repaints full frame', () => {
 		const originalRows = process.stdout.rows
 		Object.defineProperty(process.stdout, 'rows', {
 			value: 6,
@@ -197,7 +202,7 @@ describe('render', () => {
 
 		;(process.stdout as any).write = originalWrite
 
-		expect(writes.join('')).toContain('\r\x1b[4A\x1b[J')
+		expect(writes.join('')).toContain('\r\x1b[2J\x1b[H')
 	})
 
 	test('reports current frame metrics', () => {
@@ -254,7 +259,7 @@ describe('render', () => {
 			})
 
 			const output = writes.join('')
-			expect(output).toContain('\r\x1b[J')
+			expect(output).toContain('\x1b[2J\x1b[H')
 			expect(output).not.toContain('\r\n\x1b[J')
 		} finally {
 			;(process.stdout as any).write = originalWrite
