@@ -6,7 +6,7 @@
 //   [history lines...]   — per-tab, append-only, ALL of them, NEVER sliced
 //   [padding]            — blank lines to keep prompt stable across tab switches
 //   [tab bar]            — [1]  2   3  — brackets for active, spaces for inactive
-//   [status bar]         — line count for active tab
+//   [status bar]         — line count, peak height, fullscreen flag
 //   [prompt]             — "> " + user input
 //
 // Rendering: differential. See docs/terminal.md.
@@ -34,7 +34,12 @@ let cursorRow = 0
 
 // High-water mark: the tallest content area we've ever needed.
 // Grows when any tab's history exceeds it. Never shrinks.
-let maxContentHeight = 0
+let peak = 0
+
+// Once the frame has exceeded the terminal height, scrollback contains our
+// content that CSI nA can't reach. From this point on, every force repaint
+// must clear scrollback. One-way flag: once true, stays true forever.
+let fullscreen = false
 
 // ── Tab bar ──────────────────────────────────────────────────────────────────
 
@@ -54,21 +59,27 @@ function buildFrame(): string[] {
 	const rows = process.stdout.rows || 24
 	const tab = tabs[activeTab]!
 
-	// Update high-water mark.
+	// Update high-water mark across all tabs.
 	for (const t of tabs) {
-		if (t.history.length > maxContentHeight) maxContentHeight = t.history.length
+		if (t.history.length > peak) peak = t.history.length
 	}
 
 	// Padding: keeps the prompt at a stable row across tab switches.
-	// contentHeight is the tallest any tab has been, capped at terminal size.
-	const contentHeight = Math.min(maxContentHeight, Math.max(0, rows - CHROME))
+	// Content height is the peak capped at what fits on screen.
+	const contentHeight = Math.min(peak, Math.max(0, rows - CHROME))
 	const padding = Math.max(0, contentHeight - tab.history.length)
+
+	// Check if the frame exceeds the terminal. Once true, never goes back.
+	const totalLines = tab.history.length + padding + CHROME
+	if (totalLines > rows) fullscreen = true
+
+	const mode = fullscreen ? 'full' : 'grow'
 
 	return [
 		...tab.history,              // ALL history. Never sliced.
 		...Array(padding).fill(''),  // Padding between history and chrome.
 		renderTabBar(),
-		`── ${tab.history.length} lines ──`,
+		`── ${tab.history.length} lines · peak ${peak} · ${mode} ──`,
 		`> ${promptText}`,
 	]
 }
@@ -79,12 +90,11 @@ function paint(force = false): void {
 
 	if (force) {
 		// FORCE REPAINT (Ctrl-L, resize, tab switch).
-		// Two modes depending on whether the frame fits on screen.
-		const fitsOnScreen = lines.length <= rows
+		// Two modes — once fullscreen, we always clear scrollback.
 		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
 
-		if (fitsOnScreen) {
-			// MODE 1: frame fits on screen.
+		if (!fullscreen) {
+			// GROW MODE: frame fits on screen.
 			// Move to top of our content, clear from there down, rewrite.
 			// Scrollback is untouched — pre-app shell history survives.
 			const up = Math.min(cursorRow, rows - 1)
@@ -92,9 +102,9 @@ function paint(force = false): void {
 			if (up > 0) out.push(`${CSI}${up}A`)
 			out.push(`${CSI}J`)
 		} else {
-			// MODE 2: frame is taller than the terminal.
-			// CSI nA can't reach scrollback — it's immutable. We MUST clear
-			// scrollback first, then rewrite ALL lines from scratch.
+			// FULL MODE: frame has exceeded the terminal at some point.
+			// Scrollback contains our old content that can't be overwritten.
+			// Clear everything and rewrite ALL lines from scratch.
 			out.push(`${CSI}2J${CSI}H${CSI}3J`)
 		}
 
@@ -172,8 +182,6 @@ function handleSubmit(): void {
 function switchTab(index: number): void {
 	if (index === activeTab) return
 	activeTab = index
-	// Tab switch must force repaint — the diff engine can't reach lines
-	// that have scrolled into the terminal's scrollback buffer.
 	paint(true)
 }
 

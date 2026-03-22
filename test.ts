@@ -22,6 +22,11 @@ let generation = 0
 let cursorRow = 0
 let promptBuf = ''
 
+// Once the frame has exceeded the terminal height, we can never go back to
+// mode 1. Old content is stuck in scrollback and we'd show a mix of old and
+// new. This flag is one-way: once true, stays true forever.
+let mustClearScrollback = false
+
 function paint(force: boolean): void {
 	const rows = process.stdout.rows || 26
 
@@ -32,7 +37,8 @@ function paint(force: boolean): void {
 	}
 
 	const totalLines = content.length + 2
-	const fitsOnScreen = totalLines <= rows
+	if (totalLines > rows) mustClearScrollback = true
+	const fitsOnScreen = !mustClearScrollback
 	const mode = fitsOnScreen
 		? 'MODE 1: fits on screen — scrollback preserved'
 		: 'MODE 2: taller than terminal — scrollback cleared'
