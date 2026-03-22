@@ -15,7 +15,7 @@ beforeEach(() => {
 })
 
 describe('render', () => {
-	test('updates the changed prompt line without repainting the full frame', () => {
+	test('updates the changed prompt line by redrawing the frame region only', () => {
 		const state: RenderState = {
 			blocks: [],
 			allTabBlockCounts: [0],
@@ -39,7 +39,8 @@ describe('render', () => {
 		;(process.stdout as any).write = originalWrite
 
 		const output = writes.join('')
-		expect(output).not.toContain('\x1b[3A')
+		expect(output).toContain('\x1b[J')
+		expect(output).not.toContain('\x1b[2J\x1b[H')
 		expect(stripAnsi(output)).toContain('> x')
 	})
 
@@ -179,7 +180,7 @@ describe('render', () => {
 		])
 	})
 
-	test('clears the current frame before restart', () => {
+	test('clears only the current frame before restart', () => {
 		const state: RenderState = {
 			blocks: ['one', 'two'],
 			allTabBlockCounts: [2],
@@ -202,7 +203,8 @@ describe('render', () => {
 
 		;(process.stdout as any).write = originalWrite
 
-		expect(writes.join('')).toContain('\r\x1b[2J\x1b[H')
+		expect(writes.join('')).toContain('\x1b[J')
+		expect(writes.join('')).not.toContain('\x1b[2J\x1b[H')
 	})
 
 	test('reports current frame metrics', () => {
@@ -224,7 +226,7 @@ describe('render', () => {
 		})
 	})
 
-	test('clear tail on shrink does not inject a blank line into scrollback', () => {
+	test('shrink redraw clears frame region without injecting blank scrollback line', () => {
 		const originalRows = process.stdout.rows
 		Object.defineProperty(process.stdout, 'rows', {
 			value: 6,
@@ -259,7 +261,8 @@ describe('render', () => {
 			})
 
 			const output = writes.join('')
-			expect(output).toContain('\x1b[2J\x1b[H')
+			expect(output).toContain('\x1b[J')
+			expect(output).not.toContain('\x1b[2J\x1b[H')
 			expect(output).not.toContain('\r\n\x1b[J')
 		} finally {
 			;(process.stdout as any).write = originalWrite

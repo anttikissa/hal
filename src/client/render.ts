@@ -1,9 +1,14 @@
 // Terminal renderer for one logical "app frame" (content + chrome + prompt).
 // See docs/terminal.md for the behavior contract.
 //
-// Current policy is intentionally blunt: when the frame changes, redraw the
-// whole frame from top-left. This keeps the complete frame in terminal history
-// even when it exceeds viewport height.
+// Policy:
+// - First paint is REPL-like: draw at current cursor without clearing.
+// - Subsequent paints clear only the previous frame region (from previous frame
+//   top to screen end), then repaint the full frame.
+//
+// This keeps shell output above `./run` intact while the app is shorter than
+// the viewport. Once the frame reaches viewport height, redraw still works:
+// move-up clamps at row 1 and we repaint the visible area from there.
 const ESC = "\x1b"
 const RESET = `${ESC}[0m`
 const SYNC_START = `${ESC}[?2026h`
@@ -33,6 +38,10 @@ export interface RenderState {
 
 export interface RenderOptions {
 	force?: boolean
+}
+
+function moveUp(n: number): string {
+	return n > 0 ? `${ESC}[${n}A` : ''
 }
 
 function stripAnsi(text: string): string {
@@ -114,6 +123,18 @@ function writeLineRange(out: string[], lines: string[], start: number, end: numb
 	}
 }
 
+function clearPreviousFrame(out: string[]): void {
+	if (prevLines.length === 0) return
+	const cols = process.stdout.columns ?? Number.POSITIVE_INFINITY
+	const rows = process.stdout.rows ?? Number.POSITIVE_INFINITY
+	const prevRows = countRows(prevLines, cols)
+	const visibleRows = Number.isFinite(rows)
+		? Math.min(prevRows, Math.max(0, rows))
+		: prevRows
+	if (visibleRows <= 0) return
+	out.push(`\r${moveUp(visibleRows - 1)}${ESC}[J`)
+}
+
 export function render(state: RenderState, options: RenderOptions = {}): void {
 	const lines = computeLines(state)
 	const out: string[] = []
@@ -121,10 +142,8 @@ export function render(state: RenderState, options: RenderOptions = {}): void {
 	out.push(SYNC_START)
 	out.push(HIDE_CURSOR)
 
-	// Keep startup behavior REPL-like: first frame is drawn at current cursor.
-	// After that, each redraw clears the viewport and paints the whole frame so
-	// scrollback always contains full frames, not just the visible tail.
-	if (prevLines.length > 0 || options.force) out.push(`${ESC}[2J${ESC}[H`)
+	// First draw is append-only. Later draws repaint the frame region in place.
+	if (prevLines.length > 0 || options.force) clearPreviousFrame(out)
 	writeLineRange(out, lines, 0, lines.length - 1)
 
 	prevLines = lines
@@ -136,6 +155,14 @@ export function render(state: RenderState, options: RenderOptions = {}): void {
 
 export function clearFrame(): void {
 	if (prevLines.length === 0) return
-	process.stdout.write(`\r${ESC}[2J${ESC}[H`)
+	const cols = process.stdout.columns ?? Number.POSITIVE_INFINITY
+	const rows = process.stdout.rows ?? Number.POSITIVE_INFINITY
+	const prevRows = countRows(prevLines, cols)
+	const visibleRows = Number.isFinite(rows)
+		? Math.min(prevRows, Math.max(0, rows))
+		: prevRows
+	if (visibleRows > 0) {
+		process.stdout.write(`\r${moveUp(visibleRows - 1)}${ESC}[J`)
+	}
 	prevLines = []
 }
