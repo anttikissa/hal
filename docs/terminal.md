@@ -4,23 +4,40 @@ Requirements for anyone who touches terminal code.
 Implementation: `term.ts` (will move to `src/` later).
 
 These are HOLY TRUTHS that you must obey. You often have a hard time
-understanding how terminals work, and especially what the user wants from a
+understanding how terminals work, and especially what the USER wants from a
 terminal UI. Read this document to understand the rules of the game.
 
 ## Layout
 
-Bottom-anchored, three sections:
+Bottom-anchored, five sections:
 
 ```
-[history lines...]
-[status bar]
-[prompt]
+[history lines...]   — per-tab, append-only, ALL of them
+[padding]            — blank lines to stabilize prompt position across tabs
+[tab bar]            — [1]  2   3  — brackets for active, spaces for inactive
+[status bar]         — line count, peak, mode
+[prompt]             — "> " + user input
 ```
 
-- **History**: a flat list of lines (user input echoes, assistant responses,
-  debug output). Append-only. Each entry is one logical line.
-- **Status bar**: single line, currently just shows line count.
-- **Prompt**: single line, `> ` followed by user input.
+Chrome = tab bar + status + prompt = 3 lines.
+
+## Tabs
+
+Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
+Tab bar entries are same width: `[N]` for active, ` N ` for inactive.
+
+### Height management
+
+`peak` is a high-water mark: the tallest any tab's history has ever been.
+It grows but never shrinks (even if the tall tab is closed).
+
+Padding = `min(peak, rows - chrome) - activeTab.history.length`. This keeps
+the prompt at a stable row when switching between tabs of different heights.
+
+### Tab switching
+
+Always uses force repaint — the diff engine can't reach lines that have
+scrolled into the terminal's scrollback buffer.
 
 ## Rendering: differential
 
@@ -28,7 +45,7 @@ We do NOT clear-and-redraw a viewport-sized window. That destroys scrollback.
 
 Instead:
 
-1. Build the full frame: all history lines + status + prompt.
+1. Build the full frame: all history lines + padding + chrome.
 2. Diff against the previously-painted lines.
 3. Find the first changed line.
 4. Move the cursor there and rewrite from that point to the end.
@@ -41,13 +58,29 @@ Key state:
   viewport slice).
 - `cursorRow` — which logical line the terminal cursor is on.
 
-### Force repaint (Ctrl-L)
+## Force repaint: two modes
 
-Clears the visible screen, resets `prevLines` and `cursorRow`, and repaints
-everything. Needed when switching to a shorter tab (future) or recovering
-from garbled output.
+Force repaint happens on Ctrl-L, tab switch, and terminal resize. It has
+two modes controlled by the `fullscreen` flag.
 
-Does NOT clear scrollback.
+### Grow mode (`fullscreen = false`)
+
+The frame fits on screen. Move cursor to top of our content, clear from
+there downward (`CSI J`), rewrite all lines. Scrollback is untouched —
+pre-app shell history (ls output, etc.) survives. The app behaves like
+a normal REPL.
+
+### Full mode (`fullscreen = true`)
+
+The frame has exceeded the terminal height at some point in the past.
+Our content is now in the terminal's scrollback buffer, which is immutable
+(see below). We MUST clear scrollback (`CSI 3J`) before rewriting, or
+the user will see stale content from a previous tab interleaved with
+the current one.
+
+**This flag is one-way.** Once `fullscreen` flips true, it stays true
+forever. There's no going back — old content is stuck in scrollback and
+would create garbage if we tried to preserve it.
 
 ## Rules
 
@@ -106,8 +139,8 @@ This means: if you wrote 50 lines and 24 scrolled into scrollback, you can
 only overwrite the 26 lines still on the visible screen. The 24 in scrollback
 are permanent until explicitly cleared.
 
-Verified with `scroll.ts` — a test that writes 50 lines then tries to
-`CSI 49A` and rewrite them all:
+Verified experimentally — write 50 lines then try `CSI 49A` and rewrite
+them all:
 - **Tall terminal** (all 50 lines visible): all 50 rewritten. Works.
 - **Short terminal** (24 lines in scrollback): only the visible 26 are
   rewritten. The 24 in scrollback show the original content.
@@ -125,11 +158,11 @@ way to selectively clear parts of it.
   (recently changed lines near the prompt). Lines in scrollback are old
   history that doesn't need updating.
 
-- **Force repaint (Ctrl-L, tab switch, resize)**: must clear scrollback with
-  `CSI 3J` and rewrite ALL lines from scratch. If we don't clear scrollback,
-  old content from a previous tab or render will remain there and create a
-  confusing interleaved mess when the user scrolls up.
+- **Force repaint in grow mode**: frame fits on screen. Move up, clear down,
+  rewrite. Scrollback untouched.
 
-- **Tab switches**: always force repaint. The previous tab's history is in
-  scrollback and cannot be overwritten. We must clear it and write the new
-  tab's history fresh.
+- **Force repaint in full mode**: frame has exceeded terminal height at some
+  point. Must `CSI 3J` to clear scrollback, then rewrite ALL lines.
+
+- **Tab switches**: always force repaint. The mode determines whether
+  scrollback is cleared.
