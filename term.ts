@@ -44,27 +44,37 @@ let fullscreen = false
 
 // ── Frame building ───────────────────────────────────────────────────────────
 
-// Count how many terminal lines a tab's history produces.
+// Count how many physical terminal rows a tab's history produces.
 function historyLineCount(tab: Tab): number {
+	const cols = process.stdout.columns || 80
 	let count = 0
 	for (const entry of tab.history) {
-		count += entry.text.split('\n').length
+		const prefix = entry.type === 'user' ? '> ' : entry.type === 'echo' ? '  ' : ''
+		for (const raw of entry.text.split('\n')) {
+			count += wordWrap(`${prefix}${raw}`, cols).length
+		}
 	}
 	return count
 }
 
 function renderHistory(lines: string[], tab: Tab): void {
+	const cols = process.stdout.columns || 80
 	for (const entry of tab.history) {
+		let prefix = ''
 		switch (entry.type) {
-			case 'user':
-				for (const line of entry.text.split('\n')) lines.push(`> ${line}`)
-				break
-			case 'echo':
-				for (const line of entry.text.split('\n')) lines.push(`  ${line}`)
-				break
-			case 'info':
-				for (const line of entry.text.split('\n')) lines.push(line)
-				break
+			case 'user': prefix = '> '; break
+			case 'echo': prefix = '  '; break
+			case 'info': prefix = ''; break
+		}
+		// Wrap every line to terminal width. The diff engine assumes
+		// 1 entry in lines[] = 1 physical terminal row. If a line is
+		// wider than the terminal, it would auto-wrap and consume extra
+		// rows that the diff engine doesn't know about, causing cursor
+		// positioning errors on repaint.
+		for (const raw of entry.text.split('\n')) {
+			for (const wrapped of wordWrap(`${prefix}${raw}`, cols)) {
+				lines.push(wrapped)
+			}
 		}
 	}
 }
