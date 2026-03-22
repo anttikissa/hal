@@ -79,19 +79,15 @@ function paint(force = false): void {
 
 	if (force) {
 		// FORCE REPAINT (Ctrl-L, resize, tab switch).
-		// Move to top of visible area, clear downward, rewrite visible portion.
-		// Does NOT touch scrollback.
-		const up = Math.min(cursorRow, rows - 1)
-		const start = Math.max(0, lines.length - rows)
+		// Clear screen AND scrollback, then write ALL lines from scratch.
+		// Every single history line gets written. No slicing. No exceptions.
 		const out: string[] = [
 			`${CSI}?2026h`, `${CSI}?25l`,
-			'\r',
-			up > 0 ? `${CSI}${up}A` : '',
-			`${CSI}J`,
+			`${CSI}2J${CSI}H${CSI}3J`,  // clear screen, home, clear scrollback
 		]
-		for (let i = start; i < lines.length; i++) {
-			if (i > start) out.push('\r\n')
-			out.push(`${CSI}2K${lines[i]}`)
+		for (let i = 0; i < lines.length; i++) {
+			if (i > 0) out.push('\r\n')
+			out.push(lines[i])
 		}
 		cursorRow = lines.length - 1
 		prevLines = lines
@@ -134,17 +130,27 @@ function paint(force = false): void {
 
 // ── Input handling ───────────────────────────────────────────────────────────
 
+function timestamp(): string {
+	const d = new Date()
+	const hh = String(d.getHours()).padStart(2, '0')
+	const mm = String(d.getMinutes()).padStart(2, '0')
+	const ss = String(d.getSeconds()).padStart(2, '0')
+	const ms = String(d.getMilliseconds()).padStart(3, '0')
+	return `${hh}:${mm}:${ss}.${ms}`
+}
+
 function handleSubmit(): void {
 	if (!promptText) { paint(); return }
 
 	const tab = tabs[activeTab]!
-	tab.history.push(`> ${promptText}`)
+	const tag = `[tab ${activeTab + 1} ${timestamp()}]`
+	tab.history.push(`${tag} > ${promptText}`)
 
 	const n = parseInt(promptText, 10)
 	if (n > 0 && String(n) === promptText) {
-		for (let j = 0; j < n; j++) tab.history.push(`line ${tab.history.length}`)
+		for (let j = 0; j < n; j++) tab.history.push(`${tag} line ${tab.history.length}`)
 	} else {
-		tab.history.push(`You wrote: ${promptText}`)
+		tab.history.push(`${tag} You wrote: ${promptText}`)
 	}
 	promptText = ''
 	paint()

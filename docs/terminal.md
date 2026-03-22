@@ -61,14 +61,24 @@ cursor position and flows downward.
 On Ctrl-C / Ctrl-D, keep the last rendered content visible for copy/paste.
 Do not clear the screen or switch to alternate screen buffer.
 
-### 3. All content enters scrollback — NEVER slice to viewport
+### 3. ALWAYS write ALL history lines — NEVER slice to viewport
 
-Every history line must be written to the terminal at least once, so it
-appears in scrollback. NEVER slice history to viewport size. The diff engine
-exists precisely so we can render ALL lines and only rewrite what changed.
-Slicing to viewport means lines that don't fit are never written and vanish
-from scrollback entirely. This is the cardinal sin of this renderer. Don't
-do it. Ever.
+This is the most important rule. Read it twice.
+
+EVERY render path — normal diff AND force repaint — must write ALL history
+lines for the active tab. Not "the last N that fit on screen." Not "starting
+from some clever offset." ALL of them. Every. Single. One.
+
+The diff engine exists so that writing all lines is cheap (only changed lines
+get rewritten). Force repaint clears scrollback and writes everything fresh.
+
+If you slice history to viewport size, lines that don't fit are never written
+to the terminal. They vanish from scrollback. The user scrolls up and sees
+garbage from a previous tab mixed with the current one. This has happened
+THREE TIMES already. It is the cardinal sin of this renderer.
+
+Do not do it. Not in the normal path. Not in the force path. Not in a helper
+function. Not behind a flag. Not "just for performance." NEVER.
 
 ### 4. Synchronized output
 
