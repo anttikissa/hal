@@ -157,7 +157,7 @@ function paint(force = false): void {
 
 		for (let i = 0; i < lines.length; i++) {
 			if (i > 0) out.push('\r\n')
-			out.push(lines[i])
+			out.push(lines[i]!)
 		}
 		cursorRow = lines.length - 1
 		prevLines = lines
