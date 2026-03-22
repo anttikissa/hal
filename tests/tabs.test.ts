@@ -38,7 +38,7 @@ describe("tabs", () => {
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
-		expect(out).toContain(" 1 tab 1")
+		expect(out).toContain("[1] tab 1")
 	})
 
 	test("ctrl-t creates a new tab", async () => {
