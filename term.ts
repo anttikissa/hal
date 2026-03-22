@@ -2,29 +2,32 @@
 
 // term.ts — Terminal UI skeleton for Hal.
 //
-// Layout (top to bottom):
-//   [history lines...]   — per-tab, append-only, ALL of them, NEVER sliced
-//   [padding]            — blank lines to keep prompt stable across tab switches
-//   [tab bar]            — [1]  2   3  — brackets for active, spaces for inactive
-//   [status bar]         — line count, peak height, fullscreen flag
-//   [prompt]             — "> " + user input
-//
 // Rendering: differential. See docs/terminal.md.
 //
-// IMPORTANT: we render ALL history lines. NEVER slice to viewport. The diff
-// engine ensures only changed lines are rewritten. New lines are appended
-// via \r\n so the terminal scrolls naturally and old content enters scrollback.
+// The frame is built by three render functions:
+//   renderHistory()    — all history entries for the active tab
+//   renderStatusLine() — tab bar + status info
+//   renderPrompt()     — "> " + user input
 //
-// Tab switches use force repaint (the diff engine can't reach lines that
-// have scrolled into the terminal's scrollback buffer).
+// These push lines into an array. The diff engine compares against
+// the previous frame and writes only what changed.
+//
+// NEVER slice history to viewport. See docs/terminal.md rule 3.
 
 const CSI = '\x1b['
 
-// ── State ────────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type Entry =
+	| { type: 'user'; text: string }
+	| { type: 'echo'; text: string }
+	| { type: 'info'; text: string }
 
 interface Tab {
-	history: string[]
+	history: Entry[]
 }
+
+// ── State ────────────────────────────────────────────────────────────────────
 
 const tabs: Tab[] = [{ history: [] }]
 let activeTab = 0
@@ -32,25 +35,55 @@ let promptText = ''
 let prevLines: string[] = []
 let cursorRow = 0
 
-// High-water mark: the tallest content area we've ever needed.
-// Grows when any tab's history exceeds it. Never shrinks.
+// High-water mark: tallest history (in lines) across all tabs. Never shrinks.
 let peak = 0
 
-// Once the frame has exceeded the terminal height, scrollback contains our
-// content that CSI nA can't reach. From this point on, every force repaint
-// must clear scrollback. One-way flag: once true, stays true forever.
+// One-way flag. Once the frame exceeds terminal height, every force repaint
+// must clear scrollback. See docs/terminal.md "fullscreen flag".
 let fullscreen = false
 
-// ── Tab bar ──────────────────────────────────────────────────────────────────
+// ── Frame building ───────────────────────────────────────────────────────────
 
-// Each entry is the same width: "[N]" for active, " N " for inactive.
-function renderTabBar(): string {
-	return tabs.map((_, i) =>
-		i === activeTab ? `[${i + 1}]` : ` ${i + 1} `
-	).join('')
+// Count how many terminal lines a tab's history produces.
+function historyLineCount(tab: Tab): number {
+	let count = 0
+	for (const entry of tab.history) {
+		count += entry.text.split('\n').length
+	}
+	return count
 }
 
-// ── Rendering ────────────────────────────────────────────────────────────────
+function renderHistory(lines: string[], tab: Tab): void {
+	for (const entry of tab.history) {
+		switch (entry.type) {
+			case 'user':
+				for (const line of entry.text.split('\n')) lines.push(`> ${line}`)
+				break
+			case 'echo':
+				for (const line of entry.text.split('\n')) lines.push(`  ${line}`)
+				break
+			case 'info':
+				for (const line of entry.text.split('\n')) lines.push(line)
+				break
+		}
+	}
+}
+
+function renderStatusLine(lines: string[], tab: Tab): void {
+	// Tab bar: same width per entry — "[N]" active, " N " inactive.
+	const tabBar = tabs.map((_, i) =>
+		i === activeTab ? `[${i + 1}]` : ` ${i + 1} `
+	).join('')
+
+	const mode = fullscreen ? 'full' : 'grow'
+	const count = historyLineCount(tab)
+	lines.push(tabBar)
+	lines.push(`── ${count} lines · peak ${peak} · ${mode} ──`)
+}
+
+function renderPrompt(lines: string[]): void {
+	lines.push(`> ${promptText}`)
+}
 
 // Chrome = tab bar + status + prompt = 3 lines.
 const CHROME = 3
@@ -58,53 +91,49 @@ const CHROME = 3
 function buildFrame(): string[] {
 	const rows = process.stdout.rows || 24
 	const tab = tabs[activeTab]!
+	const lines: string[] = []
 
-	// Update high-water mark across all tabs.
+	// 1. History — all entries, all lines, never sliced.
+	renderHistory(lines, tab)
+
+	// Update peak across all tabs.
 	for (const t of tabs) {
-		if (t.history.length > peak) peak = t.history.length
+		const c = historyLineCount(t)
+		if (c > peak) peak = c
 	}
 
-	// Padding: keeps the prompt at a stable row across tab switches.
-	// Content height is the peak capped at what fits on screen.
+	// 2. Padding — keeps prompt stable across tab switches.
 	const contentHeight = Math.min(peak, Math.max(0, rows - CHROME))
-	const padding = Math.max(0, contentHeight - tab.history.length)
+	const padding = Math.max(0, contentHeight - lines.length)
+	for (let i = 0; i < padding; i++) lines.push('')
 
-	// Check if the frame exceeds the terminal. Once true, never goes back.
-	const totalLines = tab.history.length + padding + CHROME
-	if (totalLines > rows) fullscreen = true
+	// Check if frame exceeds terminal. Once true, never goes back.
+	if (lines.length + CHROME > rows) fullscreen = true
 
-	const mode = fullscreen ? 'full' : 'grow'
+	// 3. Chrome.
+	renderStatusLine(lines, tab)
+	renderPrompt(lines)
 
-	return [
-		...tab.history,              // ALL history. Never sliced.
-		...Array(padding).fill(''),  // Padding between history and chrome.
-		renderTabBar(),
-		`── ${tab.history.length} lines · peak ${peak} · ${mode} ──`,
-		`> ${promptText}`,
-	]
+	return lines
 }
+
+// ── Diff engine ──────────────────────────────────────────────────────────────
 
 function paint(force = false): void {
 	const rows = process.stdout.rows || 24
 	const lines = buildFrame()
 
 	if (force) {
-		// FORCE REPAINT (Ctrl-L, resize, tab switch).
-		// Two modes — once fullscreen, we always clear scrollback.
 		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
 
 		if (!fullscreen) {
-			// GROW MODE: frame fits on screen.
-			// Move to top of our content, clear from there down, rewrite.
-			// Scrollback is untouched — pre-app shell history survives.
+			// GROW MODE: frame fits on screen. Rewrite in place.
 			const up = Math.min(cursorRow, rows - 1)
 			out.push('\r')
 			if (up > 0) out.push(`${CSI}${up}A`)
 			out.push(`${CSI}J`)
 		} else {
-			// FULL MODE: frame has exceeded the terminal at some point.
-			// Scrollback contains our old content that can't be overwritten.
-			// Clear everything and rewrite ALL lines from scratch.
+			// FULL MODE: must clear scrollback.
 			out.push(`${CSI}2J${CSI}H${CSI}3J`)
 		}
 
@@ -120,7 +149,7 @@ function paint(force = false): void {
 		return
 	}
 
-	// NORMAL REPAINT: diff against previous frame.
+	// Diff: find first changed line.
 	let first = -1
 	const max = Math.max(lines.length, prevLines.length)
 	for (let i = 0; i < max; i++) {
@@ -132,7 +161,6 @@ function paint(force = false): void {
 	if (first === -1) return
 
 	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
-
 	const delta = first - cursorRow
 	if (delta < 0) out.push(`${CSI}${-delta}A`)
 	else if (delta > 0) out.push(`${CSI}${delta}B`)
@@ -146,7 +174,6 @@ function paint(force = false): void {
 	cursorRow = lines.length - 1
 	out.push(`\r${CSI}${promptText.length + 3}G`)
 	out.push(`${CSI}?25h`, `${CSI}?2026l`)
-
 	prevLines = lines
 	process.stdout.write(out.join(''))
 }
@@ -167,13 +194,16 @@ function handleSubmit(): void {
 
 	const tab = tabs[activeTab]!
 	const tag = `[tab ${activeTab + 1} ${timestamp()}]`
-	tab.history.push(`${tag} > ${promptText}`)
+
+	tab.history.push({ type: 'user', text: `${tag} ${promptText}` })
 
 	const n = parseInt(promptText, 10)
 	if (n > 0 && String(n) === promptText) {
-		for (let j = 0; j < n; j++) tab.history.push(`${tag} line ${tab.history.length}`)
+		for (let j = 0; j < n; j++) {
+			tab.history.push({ type: 'info', text: `${tag} line ${historyLineCount(tab)}` })
+		}
 	} else {
-		tab.history.push(`${tag} You wrote: ${promptText}`)
+		tab.history.push({ type: 'echo', text: `${tag} You wrote: ${promptText}` })
 	}
 	promptText = ''
 	paint()
@@ -194,17 +224,8 @@ function handleInput(data: Buffer): void {
 			process.stdout.write('\r\n')
 			process.exit(0)
 		}
-
 		if (b === 0x0c) { paint(true); continue }
-
-		// Ctrl-T: new tab.
-		if (b === 0x14) {
-			tabs.push({ history: [] })
-			switchTab(tabs.length - 1)
-			continue
-		}
-
-		// Ctrl-W: close tab (not the last one).
+		if (b === 0x14) { tabs.push({ history: [] }); switchTab(tabs.length - 1); continue }
 		if (b === 0x17) {
 			if (tabs.length > 1) {
 				tabs.splice(activeTab, 1)
@@ -213,29 +234,14 @@ function handleInput(data: Buffer): void {
 			}
 			continue
 		}
-
-		// Ctrl-N: next tab (wraps).
-		if (b === 0x0e) {
-			switchTab((activeTab + 1) % tabs.length)
-			continue
-		}
-
-		// Ctrl-P: previous tab (wraps).
-		if (b === 0x10) {
-			switchTab((activeTab - 1 + tabs.length) % tabs.length)
-			continue
-		}
-
+		if (b === 0x0e) { switchTab((activeTab + 1) % tabs.length); continue }
+		if (b === 0x10) { switchTab((activeTab - 1 + tabs.length) % tabs.length); continue }
 		if (b === 0x0d || b === 0x0a) { handleSubmit(); continue }
-
 		if ((b === 0x7f || b === 0x08) && promptText.length) {
-			promptText = promptText.slice(0, -1)
-			paint(); continue
+			promptText = promptText.slice(0, -1); paint(); continue
 		}
-
 		if (b >= 0x20 && b < 0x7f) {
-			promptText += String.fromCharCode(b)
-			paint(); continue
+			promptText += String.fromCharCode(b); paint(); continue
 		}
 	}
 }
