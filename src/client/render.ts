@@ -1,13 +1,11 @@
 // Terminal renderer for one logical "app frame" (content + chrome + prompt).
 // See docs/terminal.md for the behavior contract.
 //
-// This module includes a small diff engine:
-// - keep previous logical frame (`prevLines`)
-// - compare current frame to previous frame
-// - repaint only changed rows that are visible right now
+// This renderer keeps the full logical frame in memory, but it only mutates
+// lines that are currently visible in the terminal viewport.
 //
-// Why: repainting rows that are already in scrollback creates duplicated history.
-// After each render we leave the cursor on the prompt row, ready for typing.
+// Why: rows above the viewport are already in scrollback. Repainting those rows
+// duplicates history or creates gaps in terminal scrollback.
 const ESC = "\x1b"
 const RESET = `${ESC}[0m`
 const SYNC_START = `${ESC}[?2026h`
@@ -43,6 +41,10 @@ export interface RenderState {
 	separator: string
 	prompt: string
 	cursorCol: number
+}
+
+export interface RenderOptions {
+	force?: boolean
 }
 
 function countLines(text: string): number {
@@ -92,6 +94,25 @@ function computeLines(state: RenderState): string[] {
 	return lines
 }
 
+function getVisibleLines(lines: string[], rows: number): string[] {
+	const viewportTop = Math.max(0, lines.length - rows)
+	return lines.slice(viewportTop)
+}
+
+function findChangedRange(prev: string[], next: string[]): { start: number, end: number } | null {
+	let start = -1
+	let end = -1
+	const maxLen = Math.max(prev.length, next.length)
+	for (let i = 0; i < maxLen; i++) {
+		if ((prev[i] ?? '') !== (next[i] ?? '')) {
+			if (start === -1) start = i
+			end = i
+		}
+	}
+	if (start === -1) return null
+	return { start, end }
+}
+
 function writeLineRange(out: string[], lines: string[], start: number, end: number): void {
 	if (end < start) return
 	for (let i = start; i <= end; i++) {
@@ -104,90 +125,68 @@ function writeLineRange(out: string[], lines: string[], start: number, end: numb
  * Main render function.
  *
  * Flow:
- * 1) build logical frame lines for current state
- * 2) diff against previous frame
- * 3) repaint only changed visible rows (or clear+redraw in unsafe shrink cases)
- * 4) restore cursor to prompt input column
+ * 1) build full logical frame
+ * 2) project it to the visible viewport
+ * 3) diff/repaint only visible rows (or repaint visible rows when forced)
+ * 4) clear stale rows below the new viewport when visible height shrinks
+ * 5) restore cursor to prompt input column
  */
-export function render(state: RenderState): void {
+export function render(state: RenderState, options: RenderOptions = {}): void {
 	const lines = computeLines(state)
 	const out: string[] = []
 	const screenRows = process.stdout.rows ?? Number.POSITIVE_INFINITY
+	const prevVisible = getVisibleLines(prevLines, screenRows)
+	const nextVisible = getVisibleLines(lines, screenRows)
 
 	out.push(SYNC_START)
 	out.push(HIDE_CURSOR)
 
-	let cursorRow = prevLines.length - 1
+	// Cursor row in viewport coordinates (0 = top row of viewport content).
+	// We end every render on the prompt row, so on entry this starts at the
+	// previous prompt row.
+	let cursorRow = prevVisible.length - 1
 	let didRender = false
 
-	if (prevLines.length === 0) {
-		writeLineRange(out, lines, 0, lines.length - 1)
-		cursorRow = lines.length - 1
-		didRender = true
-	} else {
-		// Diff engine: find first/last changed logical rows in the whole frame.
-		// Indexes are in frame coordinates, not terminal row coordinates.
-		let firstChanged = -1
-		let lastChanged = -1
-		const maxLen = Math.max(prevLines.length, lines.length)
-		for (let i = 0; i < maxLen; i++) {
-			if ((prevLines[i] ?? '') !== (lines[i] ?? '')) {
-				if (firstChanged === -1) firstChanged = i
-				lastChanged = i
-			}
+	if (prevLines.length === 0 || options.force) {
+		if (prevLines.length > 0) {
+			// On a forced redraw we are currently on the old prompt row. Move to the
+			// top of the old visible area before repainting the new visible viewport.
+			out.push(`\r${moveUp(cursorRow)}`)
+			cursorRow = 0
 		}
+		writeLineRange(out, nextVisible, 0, nextVisible.length - 1)
+		cursorRow = nextVisible.length - 1
+		didRender = nextVisible.length > 0
+	} else {
+		const changed = findChangedRange(prevVisible, nextVisible)
+		if (changed) {
+			// Carriage return first so clear+rewrite always starts at column 0.
+			out.push(`\r${moveBetweenRows(cursorRow, changed.start)}`)
+			cursorRow = changed.start
 
-		if (firstChanged !== -1) {
-			const frameShrunk = prevLines.length > lines.length
-			const prevViewportTop = Math.max(0, prevLines.length - screenRows)
-			const nextViewportTop = Math.max(0, lines.length - screenRows)
-			let start = firstChanged
-
-			// Rows above prevViewportTop are already in scrollback and cannot be
-			// safely rewritten. If a shrink crosses this boundary, do a visible clear
-			// and redraw from the new viewport top.
-			if (start < prevViewportTop) {
-				if (lastChanged < prevViewportTop) {
-					start = -1
-				} else if (frameShrunk) {
-					out.push(`${ESC}[2J${ESC}[H`)
-					writeLineRange(out, lines, nextViewportTop, lines.length - 1)
-					cursorRow = lines.length - 1
-					didRender = true
-					start = -1
-				} else {
-					start = prevViewportTop
-				}
-			}
-
-			if (start >= 0) {
-				start = Math.max(start, nextViewportTop)
-			}
-
-			if (start >= 0) {
-				out.push(`\r${moveUp(cursorRow - start)}`)
-				cursorRow = start
-				const renderEnd = Math.min(lastChanged, lines.length - 1)
-				if (renderEnd >= start) {
-					writeLineRange(out, lines, start, renderEnd)
-					cursorRow = renderEnd
-					didRender = true
-				}
-
-				// If the frame shrank and is fully visible, clear stale rows under the
-				// new last line. Move to exactly newLast before clearing to avoid adding
-				// blank lines to scrollback when switching tabs.
-				if (frameShrunk && lines.length < screenRows && didRender) {
-					const newLast = lines.length - 1
-					out.push(moveBetweenRows(cursorRow, newLast))
-					cursorRow = newLast
-					out.push(`\r${ESC}[J`)
-				}
+			const renderEnd = Math.min(changed.end, nextVisible.length - 1)
+			if (renderEnd >= changed.start) {
+				writeLineRange(out, nextVisible, changed.start, renderEnd)
+				cursorRow = renderEnd
+				didRender = true
 			}
 		}
 	}
 
-	if (didRender) out.push(moveBetweenRows(cursorRow, lines.length - 1))
+	if (nextVisible.length < prevVisible.length) {
+		// The old frame had more visible rows than the new frame. Clear once from
+		// the new last row to terminal end, so stale lines disappear.
+		const newLastRow = Math.max(0, nextVisible.length - 1)
+		out.push(`\r${moveBetweenRows(cursorRow, newLastRow)}${ESC}[J`)
+		cursorRow = newLastRow
+		didRender = true
+	}
+
+	if (didRender) {
+		const promptRow = Math.max(0, nextVisible.length - 1)
+		out.push(moveBetweenRows(cursorRow, promptRow))
+	}
+
 	prevLines = lines
 	out.push(`\r${ESC}[${state.cursorCol}C`)
 	out.push(SHOW_CURSOR)

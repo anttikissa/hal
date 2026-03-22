@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'bun:test'
+import { describe, test, expect, beforeEach } from 'bun:test'
 import {
 	clearFrame,
 	getRenderMetrics,
@@ -9,6 +9,10 @@ import {
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
+
+beforeEach(() => {
+	clearFrame()
+})
 
 describe('render', () => {
 	test('updates the changed prompt line without repainting the full frame', () => {
@@ -37,6 +41,106 @@ describe('render', () => {
 		const output = writes.join('')
 		expect(output).not.toContain('\x1b[3A')
 		expect(stripAnsi(output)).toContain('> x')
+	})
+
+	test('force redraw repaints only the visible viewport when frame overflows', () => {
+		const originalRows = process.stdout.rows
+		Object.defineProperty(process.stdout, 'rows', {
+			value: 4,
+			configurable: true,
+		})
+
+		const writes: string[] = []
+		const originalWrite = process.stdout.write.bind(process.stdout)
+		;(process.stdout as any).write = (chunk: any) => {
+			writes.push(String(chunk))
+			return true
+		}
+
+		try {
+			const state: RenderState = {
+				blocks: ['one\ntwo\nthree\nfour\nfive\nsix'],
+				allTabBlockCounts: [6],
+				tabs: 'tabs',
+				separator: 'sep',
+				prompt: '> ',
+				cursorCol: 2,
+			}
+
+			render(state)
+			writes.length = 0
+			render(state, { force: true })
+
+			expect(stripAnsi(writes.join('')).split('\n')).toEqual([
+				'six',
+				'tabs',
+				'sep',
+				'> ',
+			])
+		} finally {
+			;(process.stdout as any).write = originalWrite
+			Object.defineProperty(process.stdout, 'rows', {
+				value: originalRows,
+				configurable: true,
+			})
+		}
+	})
+
+	test('force redraw handles tall-to-short tab switch using only visible lines', () => {
+		const originalRows = process.stdout.rows
+		Object.defineProperty(process.stdout, 'rows', {
+			value: 6,
+			configurable: true,
+		})
+
+		const writes: string[] = []
+		const originalWrite = process.stdout.write.bind(process.stdout)
+		;(process.stdout as any).write = (chunk: any) => {
+			writes.push(String(chunk))
+			return true
+		}
+
+		try {
+			const tall: RenderState = {
+				blocks: ['one\ntwo\nthree\nfour'],
+				allTabBlockCounts: [4],
+				tabs: 'tabs',
+				separator: 'sep',
+				prompt: '> ',
+				cursorCol: 2,
+			}
+			const short: RenderState = {
+				blocks: ['one'],
+				allTabBlockCounts: [4],
+				tabs: 'tabs',
+				separator: 'sep',
+				prompt: '> ',
+				cursorCol: 2,
+			}
+
+			render(tall)
+			writes.length = 0
+			render(short, { force: true })
+
+			const output = stripAnsi(writes.join(''))
+			expect(output.split('\n')).toEqual([
+				'',
+				'',
+				'one',
+				'tabs',
+				'sep',
+				'> ',
+			])
+			expect(output).not.toContain('two')
+			expect(output).not.toContain('three')
+			expect(output).not.toContain('four')
+		} finally {
+			;(process.stdout as any).write = originalWrite
+			Object.defineProperty(process.stdout, 'rows', {
+				value: originalRows,
+				configurable: true,
+			})
+		}
 	})
 
 	test('pads above short tabs so messages stay near the prompt', () => {
@@ -114,7 +218,6 @@ describe('render', () => {
 			totalLines: 9,
 		})
 	})
-})
 
 	test('clear tail on shrink does not inject a blank line into scrollback', () => {
 		const originalRows = process.stdout.rows
@@ -161,3 +264,4 @@ describe('render', () => {
 			})
 		}
 	})
+})

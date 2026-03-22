@@ -102,7 +102,7 @@ function countBlockLines(blocks: Block[]): number {
 	return count
 }
 
-function draw() {
+function draw(force = false) {
 	const tab = activeTab()
 	const blocks = tab ? tab.blocks.map(blockToString) : []
 	const allTabBlockCounts = tabList.map((t) => countBlockLines(t.blocks))
@@ -120,13 +120,13 @@ function draw() {
 		prompt,
 		cursorCol: promptCursor + 2,
 	}
-	render(state)
+	render(state, { force })
 }
 
 function switchTab(index: number) {
 	if (index >= 0 && index < tabList.length) {
 		currentTab = index
-		draw()
+		draw(true)
 	}
 }
 
@@ -250,8 +250,7 @@ export function startCli(signal: AbortSignal): void {
 
 			// Ctrl-L: force full redraw of current tab
 			if (byte === 0x0c) {
-				clearFrame()
-				draw()
+				draw(true)
 				continue
 			}
 
