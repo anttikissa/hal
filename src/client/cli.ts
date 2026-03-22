@@ -3,7 +3,6 @@
 
 import { appendCommand, tailEvents, readAllEvents } from '../ipc.ts'
 import {
-	clearFrame,
 	getRenderMetrics,
 	render,
 	type RenderMetrics,
@@ -15,6 +14,7 @@ const RESTART_CODE = 100
 interface Block {
 	type: 'input' | 'assistant' | 'info'
 	text: string
+	ts?: number
 }
 
 interface Tab {
@@ -48,7 +48,7 @@ function addBlockToTab(sessionId: string | null, block: Block) {
 export function addLocalBlock(text: string) {
 	const tab = activeTab()
 	if (tab) {
-		tab.blocks.push({ type: 'info', text })
+		tab.blocks.push({ type: 'info', text, ts: Date.now() })
 		draw()
 	}
 }
@@ -57,14 +57,39 @@ export function setRole(r: 'server' | 'client') {
 	role = r
 }
 
-function blockToString(block: Block): string {
-	if (block.type === 'input') return `\x1b[36mYou:\x1b[0m ${block.text}`
-	if (block.type === 'assistant')
-		return `\x1b[33mAssistant:\x1b[0m ${block.text}`
-	return block.text
+function formatTimestamp(ts?: number): string {
+	if (ts === undefined) return ''
+	const date = new Date(ts)
+	const hours = String(date.getHours()).padStart(2, '0')
+	const minutes = String(date.getMinutes()).padStart(2, '0')
+	const seconds = String(date.getSeconds()).padStart(2, '0')
+	const millis = String(date.getMilliseconds()).padStart(3, '0')
+	return `\x1b[90m${hours}:${minutes}:${seconds}.${millis}\x1b[0m `
+}
+
+function prefixBlockLines(text: string, ts?: number): string {
+	const prefix = formatTimestamp(ts)
+	if (!prefix) return text
+	return text
 		.split('\n')
-		.map((line) => `\x1b[90m${line}\x1b[0m`)
+		.map((line) => prefix + line)
 		.join('\n')
+}
+
+function blockToString(block: Block): string {
+	if (block.type === 'input') {
+		return prefixBlockLines(`\x1b[36mYou:\x1b[0m ${block.text}`, block.ts)
+	}
+	if (block.type === 'assistant') {
+		return prefixBlockLines(`\x1b[33mAssistant:\x1b[0m ${block.text}`, block.ts)
+	}
+	return prefixBlockLines(
+		block.text
+			.split('\n')
+			.map((line) => `\x1b[90m${line}\x1b[0m`)
+			.join('\n'),
+		block.ts,
+	)
 }
 
 function renderTabBar(): string {
@@ -79,9 +104,11 @@ function renderTabBar(): string {
 
 function renderSeparator(metrics: RenderMetrics): string {
 	const cols = process.stdout.columns || 80
-	const debug = `content=${metrics.contentLines} pad=${metrics.padding} max=${metrics.maxContentHeight} total=${metrics.totalLines}`
+	const rows = process.stdout.rows || 0
+	const mode = metrics.totalLines <= rows ? 'grow' : 'redraw'
+	const debug = `content=${metrics.contentLines} pad=${metrics.padding} max=${metrics.maxContentHeight} total=${metrics.totalLines} rows=${rows} grow<=${rows} mode=${mode}`
 	const info = ` ${role} · pid ${process.pid} `
-	const dashes = Math.max(0, cols - info.length)
+	const dashes = Math.max(0, cols - info.length - 1)
 	const left = Math.floor(dashes / 2)
 	const right = dashes - left
 	return (
@@ -162,16 +189,22 @@ function handleEvent(event: any) {
 		if (grew) currentTab = tabList.length - 1
 		draw()
 	} else if (event.type === 'prompt') {
-		addBlockToTab(event.sessionId, { type: 'input', text: event.text })
+		addBlockToTab(event.sessionId, {
+			type: 'input',
+			text: event.text,
+			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
+		})
 	} else if (event.type === 'response') {
 		addBlockToTab(event.sessionId, {
 			type: 'assistant',
 			text: event.text,
+			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'info') {
 		addBlockToTab(event.sessionId ?? null, {
 			type: 'info',
 			text: event.text,
+			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	}
 }
@@ -211,7 +244,6 @@ export function startCli(signal: AbortSignal): void {
 
 			// Ctrl-R: restart
 			if (byte === 0x12) {
-				clearFrame()
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
 				process.exit(RESTART_CODE)
 			}

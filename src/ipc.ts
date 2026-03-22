@@ -25,11 +25,11 @@ function append(file: string, item: any): void {
 }
 
 export function appendEvent(event: any): void {
-	append(EVENTS_FILE, event)
+	append(EVENTS_FILE, { ...event, createdAt: event.createdAt ?? new Date().toISOString() })
 }
 
 export function appendCommand(command: any): void {
-	append(COMMANDS_FILE, command)
+	append(COMMANDS_FILE, { ...command, createdAt: command.createdAt ?? new Date().toISOString() })
 }
 
 async function* tail(file: string, signal?: AbortSignal): AsyncGenerator<any> {

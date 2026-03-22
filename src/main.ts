@@ -99,7 +99,7 @@ if (isHost) {
 }
 
 perf.setSink((lines) => {
-	addLocalBlock(lines.join('\n'))
+	// addLocalBlock(lines.join('\n'))
 })
 
 perf.mark('cli-start')

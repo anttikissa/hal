@@ -65,6 +65,7 @@ export function startRuntime(signal: AbortSignal): void {
 					type: 'prompt',
 					text: cmd.text,
 					sessionId: cmd.sessionId,
+					createdAt: cmd.createdAt,
 				})
 				appendEvent({
 					type: 'response',

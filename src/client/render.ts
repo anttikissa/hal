@@ -48,25 +48,37 @@ function stripAnsi(text: string): string {
 	return text.replace(ANSI_CSI_PATTERN, '')
 }
 
+function visibleWidth(text: string): number {
+	return [...stripAnsi(text)].length
+}
+
 function countLineRows(line: string, cols: number): number {
 	if (!Number.isFinite(cols) || cols <= 0) return 1
-	const width = [...stripAnsi(line)].length
-	return Math.max(1, Math.ceil(width / cols))
+	return Math.max(1, Math.ceil(visibleWidth(line) / cols))
+}
+
+function countRenderedRows(lines: string[], cols: number): number {
+	let rows = 0
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]!
+		const width = visibleWidth(line)
+		rows += countLineRows(line, cols)
+		if (i < lines.length - 1 && Number.isFinite(cols) && cols > 0 && width > 0 && width % cols === 0) {
+			rows += 1
+		}
+	}
+	return rows
 }
 
 export function countTextRows(
 	text: string,
 	cols = process.stdout.columns ?? Number.POSITIVE_INFINITY,
 ): number {
-	let rows = 0
-	for (const line of text.split('\n')) rows += countLineRows(line, cols)
-	return rows
+	return countRenderedRows(text.split('\n'), cols)
 }
 
 function countRows(lines: string[], cols: number): number {
-	let rows = 0
-	for (const line of lines) rows += countLineRows(line, cols)
-	return rows
+	return countRenderedRows(lines, cols)
 }
 
 function splitContentLines(blocks: string[]): string[] {

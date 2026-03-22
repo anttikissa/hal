@@ -12,7 +12,8 @@ for await (const path of glob.scan({ cwd: dir, onlyFiles: true })) {
 	if (
 		path.endsWith('.test.ts') ||
 		path.startsWith('test') ||
-		path.startsWith('tests/')
+		path.startsWith('tests/') ||
+		path.startsWith('utils/')
 	)
 		continue
 	const content = await Bun.file(`${dir}/${path}`).text()
