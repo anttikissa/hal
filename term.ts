@@ -79,12 +79,25 @@ function paint(force = false): void {
 
 	if (force) {
 		// FORCE REPAINT (Ctrl-L, resize, tab switch).
-		// Clear screen AND scrollback, then write ALL lines from scratch.
-		// Every single history line gets written. No slicing. No exceptions.
-		const out: string[] = [
-			`${CSI}?2026h`, `${CSI}?25l`,
-			`${CSI}2J${CSI}H${CSI}3J`,  // clear screen, home, clear scrollback
-		]
+		// Two modes depending on whether the frame fits on screen.
+		const fitsOnScreen = lines.length <= rows
+		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
+
+		if (fitsOnScreen) {
+			// MODE 1: frame fits on screen.
+			// Move to top of our content, clear from there down, rewrite.
+			// Scrollback is untouched — pre-app shell history survives.
+			const up = Math.min(cursorRow, rows - 1)
+			out.push('\r')
+			if (up > 0) out.push(`${CSI}${up}A`)
+			out.push(`${CSI}J`)
+		} else {
+			// MODE 2: frame is taller than the terminal.
+			// CSI nA can't reach scrollback — it's immutable. We MUST clear
+			// scrollback first, then rewrite ALL lines from scratch.
+			out.push(`${CSI}2J${CSI}H${CSI}3J`)
+		}
+
 		for (let i = 0; i < lines.length; i++) {
 			if (i > 0) out.push('\r\n')
 			out.push(lines[i])
