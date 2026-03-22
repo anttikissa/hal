@@ -61,11 +61,14 @@ cursor position and flows downward.
 On Ctrl-C / Ctrl-D, keep the last rendered content visible for copy/paste.
 Do not clear the screen or switch to alternate screen buffer.
 
-### 3. All content enters scrollback
+### 3. All content enters scrollback — NEVER slice to viewport
 
 Every history line must be written to the terminal at least once, so it
-appears in scrollback. Never silently drop lines by slicing to viewport size
-without writing them first.
+appears in scrollback. NEVER slice history to viewport size. The diff engine
+exists precisely so we can render ALL lines and only rewrite what changed.
+Slicing to viewport means lines that don't fit are never written and vanish
+from scrollback entirely. This is the cardinal sin of this renderer. Don't
+do it. Ever.
 
 ### 4. Synchronized output
 
