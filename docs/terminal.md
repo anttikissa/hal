@@ -85,3 +85,51 @@ function. Not behind a flag. Not "just for performance." NEVER.
 Wrap paint operations in DEC synchronized output markers (`?2026h` / `?2026l`)
 to prevent flicker on terminals that support it. Hide cursor during paint,
 show after.
+
+## Terminal scrollback: how it actually works
+
+This section exists because we've been bitten by wrong assumptions about
+scrollback multiple times. Read it. Understand it. Refer back to it.
+
+### Scrollback is immutable
+
+When output exceeds the terminal height, lines scroll off the top of the
+visible screen into the **scrollback buffer**. Once there, they are frozen.
+You cannot modify them. Period.
+
+`CSI nA` (cursor up) is **clamped at row 1 of the visible screen**. It will
+never move the cursor into the scrollback buffer. If you try `CSI 49A` when
+the cursor is 25 rows from the top of the visible screen, it moves up 25
+rows — not 49. The remaining 24 rows of movement are silently discarded.
+
+This means: if you wrote 50 lines and 24 scrolled into scrollback, you can
+only overwrite the 26 lines still on the visible screen. The 24 in scrollback
+are permanent until explicitly cleared.
+
+Verified with `scroll.ts` — a test that writes 50 lines then tries to
+`CSI 49A` and rewrite them all:
+- **Tall terminal** (all 50 lines visible): all 50 rewritten. Works.
+- **Short terminal** (24 lines in scrollback): only the visible 26 are
+  rewritten. The 24 in scrollback show the original content.
+
+### Clearing scrollback
+
+The ONLY way to remove content from scrollback is `CSI 3J` (xterm extension,
+widely supported). This nukes the entire scrollback buffer — there is no
+way to selectively clear parts of it.
+
+### Implications for our renderer
+
+- **Normal diff path**: works fine. New lines are appended via `\r\n` and
+  scroll naturally. The diff engine only touches lines on the visible screen
+  (recently changed lines near the prompt). Lines in scrollback are old
+  history that doesn't need updating.
+
+- **Force repaint (Ctrl-L, tab switch, resize)**: must clear scrollback with
+  `CSI 3J` and rewrite ALL lines from scratch. If we don't clear scrollback,
+  old content from a previous tab or render will remain there and create a
+  confusing interleaved mess when the user scrolls up.
+
+- **Tab switches**: always force repaint. The previous tab's history is in
+  scrollback and cannot be overwritten. We must clear it and write the new
+  tab's history fresh.
