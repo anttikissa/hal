@@ -57,7 +57,11 @@ go through these objects, so eval patches take effect immediately at runtime.
 // ipc.ts
 function appendEvent(event: any): void { ... }
 function appendCommand(command: any): void { ... }
-export const ipc = { appendEvent, appendCommand, ... }
+let state = {
+	events: [],
+	// ...
+}
+export const ipc = { state, appendEvent, appendCommand, ... }
 ```
 
 Caller:
@@ -66,18 +70,14 @@ import { ipc } from './ipc.ts'
 ipc.appendEvent({ type: 'foo' })
 ```
 
-Stateful modules include a `state` field:
-```ts
-export const client = { state: { tabs: [], activeTab: 0 }, addEntry, switchTab, ... }
-```
+Stateful modules should include `state` field, and tweakable "constants" like maxConcurrentTasks
+should go to `config` field. Non-tweakable constants like ANSI sequences can be const FOO = '...'
 
 This enables the eval tool to inspect and hot-patch anything at runtime:
 ```ts
 import { client } from '~src/client.ts'
 client.addEntry = (text) => { console.log('patched!'); origAddEntry(text) }
 ```
-
-`perf.ts` already follows this pattern. All modules must.
 
 # Terminal width
 
