@@ -44,16 +44,16 @@ function startRuntime(signal: AbortSignal): void {
 	activeRuntimePid = process.pid
 	activeSessions = []
 
-	// Load persisted sessions from disk.
-	const loaded = sessionStore.loadAllSessions()
+	// Load session metadata only (no history — clients load that themselves).
+	const metas = sessionStore.loadSessionMetas()
 
-	if (loaded.length > 0) {
-		for (const s of loaded) {
-			const dirName = s.meta.workingDir?.split('/').pop()
+	if (metas.length > 0) {
+		for (const meta of metas) {
+			const dirName = meta.workingDir?.split('/').pop()
 			activeSessions.push({
-				id: s.meta.id,
-				name: s.meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
-				createdAt: s.meta.createdAt,
+				id: meta.id,
+				name: meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
+				createdAt: meta.createdAt,
 			})
 		}
 	} else {

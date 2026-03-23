@@ -129,4 +129,15 @@ function loadAllSessions(): LoadedSession[] {
 	return result
 }
 
-export const sessions = { loadAllSessions, loadSessionList, loadSessionMeta, loadHistory }
+// Load just session metadata (no history). Fast — only reads session.ason files.
+function loadSessionMetas(): SessionMeta[] {
+	const ids = loadSessionList()
+	const result: SessionMeta[] = []
+	for (const id of ids) {
+		const meta = loadSessionMeta(id)
+		if (meta) result.push(meta)
+	}
+	return result
+}
+
+export const sessions = { loadAllSessions, loadSessionMetas, loadSessionList, loadSessionMeta, loadHistory }
