@@ -166,7 +166,19 @@ then `\r\n` to scroll into new territory.
 For frame shrinks (`lines.length < prevLines.length`): after writing new
 content, `\r\n` then `CSI J` to erase leftover rows.
 
-### 9. Kitty keyboard protocol
+### 9. Frame shrinks in fullscreen → force repaint
+
+When the frame shrinks in fullscreen mode (e.g. multiline prompt collapses
+to single line), the diff engine cannot recover. Lines that were in
+scrollback shift into the visible area, but the diff's line→row mapping
+is based on the old layout. The only safe fix is a force repaint that
+clears scrollback and rewrites everything.
+
+Frame growth in fullscreen is OK — new lines at the bottom scroll
+naturally via `\r\n`, and changed lines are always in the visible area
+(near the prompt).
+
+### 10. Kitty keyboard protocol
 
 Ghostty, Kitty, and iTerm intercept Cmd+C/X/V at the OS level. To receive
 these keys, the app must opt into the Kitty keyboard protocol with

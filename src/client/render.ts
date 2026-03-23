@@ -253,6 +253,17 @@ function draw(force = false): void {
 		return
 	}
 
+	// ── Fullscreen + frame size changed: force repaint ──
+	// In fullscreen mode, some lines are in scrollback (immutable). When the
+	// frame shrinks, the scrollback/visible boundary shifts and the diff
+	// engine's line→row mapping is wrong. The only safe recovery is a full
+	// repaint that clears scrollback and rewrites everything.
+	// Growth is handled by the append path below (new lines at the bottom
+	// scroll naturally), but shrinks cannot be fixed incrementally.
+	if (fullscreen && lines.length < prevLines.length) {
+		return draw(true)
+	}
+
 	// ── Diff: find first changed line ──
 	let first = -1
 	const max = Math.max(lines.length, prevLines.length)
