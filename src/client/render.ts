@@ -237,7 +237,13 @@ function draw(force = false): void {
 			break
 		}
 	}
-	if (first === -1) return
+	if (first === -1) {
+		// No lines changed, but cursor may have moved. Reposition it.
+		const cc = promptCursor()
+		const up = cc.rowsFromBottom > 0 ? `${CSI}${cc.rowsFromBottom}A` : ''
+		process.stdout.write(`${up}\r${CSI}${cc.col + 1}G`)
+		return
+	}
 
 	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
 	const delta = first - cursorRow
