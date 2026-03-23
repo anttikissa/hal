@@ -83,6 +83,6 @@ if (isHost) {
 	ac.signal.addEventListener('abort', () => clearInterval(pollTimer))
 }
 
-perf.setSink(() => {})
+perf.setSink((lines) => client.addEntry(lines.join('\n')))
 perf.mark('cli-start')
 cli.startCli(ac.signal)
