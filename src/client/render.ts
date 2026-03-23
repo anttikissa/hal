@@ -97,27 +97,27 @@ function renderTabBar(lines: string[]): void {
 
 	// Level 1: number + name.
 	const named = tabs.map((tab, i) =>
-		i === active ? `[${i + 1} ${tab.name}]` : ` ${i + 1} ${tab.name} `
+		i === active ? `\x1b[1m[${i + 1} ${tab.name}]\x1b[0m` : `\x1b[90m ${i + 1} ${tab.name} \x1b[0m`
 	)
 	if (visLen(named.join('')) <= cols) {
-		lines.push(named.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
+		lines.push(named.join(''))
 		return
 	}
 
 	// Level 2: number + padding.
 	const padded = tabs.map((_, i) =>
-		i === active ? `[${i + 1}]` : ` ${i + 1} `
+		i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m ${i + 1} \x1b[0m`
 	)
 	if (visLen(padded.join('')) <= cols) {
-		lines.push(padded.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
+		lines.push(padded.join(''))
 		return
 	}
 
 	// Level 3: terse, joined with spaces.
 	const terse = tabs.map((_, i) =>
-		i === active ? `[${i + 1}]` : `${i + 1}`
+		i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m${i + 1}\x1b[0m`
 	)
-	const terseStr = terse.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(' ')
+	const terseStr = terse.join(' ')
 	if (visLen(terseStr) > cols) {
 		lines.push(clipVisual(terseStr, cols))
 	} else {
