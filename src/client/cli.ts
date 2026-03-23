@@ -5,6 +5,7 @@ import { client } from '../client.ts'
 import { render } from './render.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
+import { clipboard } from '../cli/clipboard.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
 const RESTART_CODE = 100
@@ -72,8 +73,11 @@ function handleAppKey(k: KeyEvent): boolean {
 	// Ctrl-N / Ctrl-P: tab switching
 	if (k.key === 'n' && k.ctrl) { client.nextTab(); return true }
 	if (k.key === 'p' && k.ctrl) { client.prevTab(); return true }
-	// Enter: submit
-	if (k.key === 'enter' && !k.shift) { submit(); draw(); return true }
+	// Enter: submit (blocked while image paste is resolving)
+	if (k.key === 'enter' && !k.shift) {
+		if (clipboard.hasPendingPastes()) return true
+		submit(); draw(); return true
+	}
 	return false
 }
 

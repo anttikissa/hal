@@ -96,4 +96,6 @@ function cleanPaste(raw: string): string {
 	return text
 }
 
-export const clipboard = { pasteFromClipboard, cleanPaste }
+function hasPendingPastes(): boolean { return pendingPastes > 0 }
+
+export const clipboard = { pasteFromClipboard, cleanPaste, hasPendingPastes }
