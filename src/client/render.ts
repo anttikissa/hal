@@ -24,6 +24,10 @@ let fullscreen = false
 // High-water mark: tallest history (in rendered lines) across all tabs.
 let peak = 0
 
+// Cached line counts per tab. Key = tab, value = { entryCount, lineCount }.
+// Invalidated when tab.history.length changes.
+const lineCountCache = new WeakMap<Tab, { entryCount: number; lineCount: number }>()
+
 function resetRenderer(): void {
 	prevLines = []
 	cursorRow = 0
@@ -67,9 +71,12 @@ function renderEntry(entry: Entry, cols: number): string[] {
 }
 
 function historyLineCount(tab: Tab): number {
+	const cached = lineCountCache.get(tab)
+	if (cached && cached.entryCount === tab.history.length) return cached.lineCount
 	const cols = process.stdout.columns || 80
 	let count = 0
 	for (const entry of tab.history) count += renderEntry(entry, cols).length
+	lineCountCache.set(tab, { entryCount: tab.history.length, lineCount: count })
 	return count
 }
 
@@ -156,9 +163,11 @@ function buildFrame(): string[] {
 	// 1. History -- all entries, all lines, never sliced.
 	if (tab) renderHistory(lines, tab)
 
-	// Update peak across all tabs.
-	for (const t of client.state.tabs) {
-		const c = historyLineCount(t)
+	// Update peak. Only compute the active tab eagerly — inactive tabs
+	// update peak lazily when switched to (avoids word-wrapping all 20
+	// tabs on first render).
+	if (tab) {
+		const c = historyLineCount(tab)
 		if (c > peak) peak = c
 	}
 
