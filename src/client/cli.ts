@@ -22,9 +22,10 @@ const BRACKETED_PASTE_OFF = '\x1b[?2004l'
 
 function draw(force = false): void { render.draw(force) }
 
-// Restore terminal state before exiting. Must be called on ALL exit paths
-// or the terminal will be left in raw/kitty mode.
+// Restore terminal state and save client state before exiting.
+// Must be called on ALL exit paths.
 function cleanupTerminal(): void {
+	client.saveState()
 	if (useKitty) process.stdout.write(KITTY_OFF)
 	process.stdout.write(BRACKETED_PASTE_OFF)
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)

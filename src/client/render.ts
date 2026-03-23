@@ -32,15 +32,14 @@ let prevLines: string[] = []
 let cursorRow = 0
 let fullscreen = false
 
-// High-water mark: tallest history (in rendered lines) across all tabs.
-// Grows but never shrinks. Used for padding to keep the prompt stable.
-let peak = 0
+// peak lives in client.state.peak (persisted across restarts).
+// Local alias for readability.
 
 // Cached line counts per tab. Invalidated when tab.history.length changes.
 const lineCountCache = new WeakMap<Tab, { entryCount: number; lineCount: number }>()
 
 function resetRenderer(): void {
-	prevLines = []; cursorRow = 0; fullscreen = false; peak = 0
+	prevLines = []; cursorRow = 0; fullscreen = false
 }
 
 // ── Entry rendering ──────────────────────────────────────────────────────────
@@ -146,6 +145,7 @@ function chromeLines(): number {
 
 function buildFrame(): string[] {
 	const rows = process.stdout.rows || 24
+	const cols = process.stdout.columns || 80
 	const chrome = chromeLines()
 	const tab = client.currentTab()
 	const lines: string[] = []
@@ -156,11 +156,14 @@ function buildFrame(): string[] {
 	// Update peak lazily: only the active tab, inactive tabs on switch.
 	if (tab) {
 		const c = historyLineCount(tab)
-		if (c > peak) peak = c
+		if (c > client.state.peak) {
+			client.state.peak = c
+			client.state.peakCols = cols
+		}
 	}
 
 	// 2. Padding — blank lines to keep prompt at a stable row across tabs.
-	const contentHeight = Math.min(peak, Math.max(0, rows - chrome))
+	const contentHeight = Math.min(client.state.peak, Math.max(0, rows - chrome))
 	const padding = Math.max(0, contentHeight - lines.length)
 	for (let i = 0; i < padding; i++) lines.push('')
 

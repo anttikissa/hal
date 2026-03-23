@@ -32,6 +32,10 @@ const state = {
 	promptText: '',
 	promptCursor: 0,
 	role: 'server' as 'server' | 'client',
+	// Persisted across restarts so the prompt stays at a stable position.
+	// Invalidated if terminal width changed since last save.
+	peak: 0,
+	peakCols: 0,
 }
 
 let onChange: (force: boolean) => void = () => {}
@@ -49,7 +53,7 @@ function currentTab(): Tab | null {
 function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
 		state.activeTab = index
-		saveLastTab()
+		saveClientState()
 		onChange(true)
 	}
 }
@@ -58,18 +62,33 @@ function switchTab(index: number): void {
 
 const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 
-function loadLastTab(): string | null {
-	try {
-		const data = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as any
-		return data?.lastTab ?? null
-	} catch { return null }
+interface ClientStateFile {
+	lastTab: string | null
+	peak: number       // high-water mark for rendered line count
+	peakCols: number   // terminal width peak was computed at
 }
 
-function saveLastTab(): void {
-	const tab = currentTab()
-	if (!tab) return
+function loadClientState(): ClientStateFile {
 	try {
-		writeFileSync(CLIENT_STATE_PATH, ason.stringify({ lastTab: tab.sessionId }) + '\n')
+		const data = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as any
+		return {
+			lastTab: data?.lastTab ?? null,
+			peak: data?.peak ?? 0,
+			peakCols: data?.peakCols ?? 0,
+		}
+	} catch {
+		return { lastTab: null, peak: 0, peakCols: 0 }
+	}
+}
+
+function saveClientState(): void {
+	const tab = currentTab()
+	try {
+		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
+			lastTab: tab?.sessionId ?? null,
+			peak: state.peak,
+			peakCols: state.peakCols,
+		}) + '\n')
 	} catch {}
 }
 
@@ -177,10 +196,18 @@ function loadPersistedSessions(): void {
 	}
 	state.tabs = newTabs
 
-	// Restore last active tab.
-	const lastId = loadLastTab()
-	const lastIdx = lastId ? newTabs.findIndex(t => t.sessionId === lastId) : -1
+	// Restore persisted client state (last tab, peak).
+	const saved = loadClientState()
+	const lastIdx = saved.lastTab ? newTabs.findIndex(t => t.sessionId === saved.lastTab) : -1
 	state.activeTab = lastIdx >= 0 ? lastIdx : 0
+
+	// Restore peak if terminal width hasn't changed. If width changed,
+	// cached line counts are invalid — start from 0 and compute lazily.
+	const cols = process.stdout.columns || 80
+	if (saved.peakCols === cols && saved.peak > 0) {
+		state.peak = saved.peak
+	}
+	state.peakCols = cols
 	perf.mark(`Client loaded ${loaded.length} sessions`)
 }
 
@@ -204,4 +231,5 @@ function startClient(signal: AbortSignal): void {
 export const client = {
 	state, setOnChange, currentTab, switchTab, nextTab, prevTab,
 	addEntry, setPrompt, clearPrompt, sendCommand, startClient,
+	saveState: saveClientState,
 }
