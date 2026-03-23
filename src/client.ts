@@ -1,9 +1,12 @@
 // Client -- state manager for tabs, entries, prompt.
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
+import { readFileSync, writeFileSync } from 'fs'
 import { ipc } from './ipc.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { perf } from './perf.ts'
+import { STATE_DIR } from './state.ts'
+import { ason } from './utils/ason.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,8 +49,28 @@ function currentTab(): Tab | null {
 function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
 		state.activeTab = index
+		saveLastTab()
 		onChange(true)
 	}
+}
+
+// ── Last-tab persistence ─────────────────────────────────────────────────────
+
+const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
+
+function loadLastTab(): string | null {
+	try {
+		const data = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as any
+		return data?.lastTab ?? null
+	} catch { return null }
+}
+
+function saveLastTab(): void {
+	const tab = currentTab()
+	if (!tab) return
+	try {
+		writeFileSync(CLIENT_STATE_PATH, ason.stringify({ lastTab: tab.sessionId }) + '\n')
+	} catch {}
 }
 
 function nextTab(): void {
@@ -153,7 +176,11 @@ function loadPersistedSessions(): void {
 		newTabs.push({ sessionId: s.meta.id, name, history })
 	}
 	state.tabs = newTabs
-	state.activeTab = 0
+
+	// Restore last active tab.
+	const lastId = loadLastTab()
+	const lastIdx = lastId ? newTabs.findIndex(t => t.sessionId === lastId) : -1
+	state.activeTab = lastIdx >= 0 ? lastIdx : 0
 	perf.mark(`Client loaded ${loaded.length} sessions`)
 }
 
