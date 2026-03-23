@@ -2,6 +2,8 @@
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
 import { ipc } from './ipc.ts'
+import { sessions as sessionStore } from './server/sessions.ts'
+import { perf } from './perf.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,10 +136,33 @@ function eventsForCurrentRuntime(events: any[]): any[] {
 	return events
 }
 
+function loadPersistedSessions(): void {
+	const loaded = sessionStore.loadAllSessions()
+	if (loaded.length === 0) return
+
+	const newTabs: Tab[] = []
+	for (const s of loaded) {
+		const name = s.meta.topic ?? `tab ${newTabs.length + 1}`
+		const history: Entry[] = s.entries.map(e => ({
+			type: e.type,
+			text: e.text,
+			ts: e.ts,
+		}))
+		newTabs.push({ sessionId: s.meta.id, name, history })
+	}
+	state.tabs = newTabs
+	state.activeTab = 0
+	perf.mark(`Client loaded ${loaded.length} sessions`)
+}
+
 function startClient(signal: AbortSignal): void {
+	// Load persisted sessions directly from disk (fast, no IPC roundtrip).
+	loadPersistedSessions()
+
 	for (const event of eventsForCurrentRuntime(ipc.readAllEvents())) {
 		handleEvent(event)
 	}
+	onChange(false)
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) {
 			handleEvent(event)

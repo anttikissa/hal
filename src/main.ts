@@ -1,5 +1,5 @@
 import { perf } from './perf.ts'
-perf.mark('first-code')
+perf.mark('First line of code executed')
 
 import { ensureStateDir } from './state.ts'
 import { ipc } from './ipc.ts'
@@ -8,12 +8,12 @@ import { cli } from './client/cli.ts'
 import { client } from './client.ts'
 
 ensureStateDir()
-perf.mark('state-ready')
+perf.mark('State directories exist')
 
 let isHost = await ipc.claimHost()
 const lock = ipc.readHostLock()
 let serverPid = isHost ? process.pid : (lock?.pid ?? null)
-perf.mark('host-election')
+perf.mark(`Host status established (I am ${isHost ? 'host' : 'client'}, server pid ${serverPid})`)
 
 client.state.role = isHost ? 'server' : 'client'
 if (isHost) {
@@ -84,5 +84,4 @@ if (isHost) {
 }
 
 perf.setSink((lines) => { for (const line of lines) client.addEntry(line) })
-perf.mark('cli-start')
 cli.startCli(ac.signal)

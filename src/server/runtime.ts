@@ -1,6 +1,9 @@
 // Server runtime -- watches commands and generates responses.
+// Broadcasts session list via IPC. Does NOT broadcast history --
+// clients load that directly from disk.
 
 import { ipc } from '../ipc.ts'
+import { sessions as sessionStore } from './sessions.ts'
 
 interface Session {
 	id: string
@@ -8,10 +11,9 @@ interface Session {
 	createdAt: string
 }
 
-let sessions: Session[] = []
+let activeSessions: Session[] = []
 let activeRuntimePid: number | null = null
 
-// Session IDs: MM-xxx (zero-padded month + 3-char lowercase alphanumeric)
 function makeSessionId(): string {
 	const month = String(new Date().getMonth() + 1).padStart(2, '0')
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -24,38 +26,49 @@ function makeSessionId(): string {
 function createSession(): Session {
 	const session: Session = {
 		id: makeSessionId(),
-		name: `tab ${sessions.length + 1}`,
+		name: `tab ${activeSessions.length + 1}`,
 		createdAt: new Date().toISOString(),
 	}
-	sessions.push(session)
+	activeSessions.push(session)
 	return session
-}
-
-function resetRuntimeState(): void {
-	sessions = []
 }
 
 function broadcastSessions() {
 	ipc.appendEvent({
 		type: 'sessions',
-		sessions: sessions.map((s) => ({ id: s.id, name: s.name })),
+		sessions: activeSessions.map(s => ({ id: s.id, name: s.name })),
 	})
 }
 
 function startRuntime(signal: AbortSignal): void {
 	activeRuntimePid = process.pid
-	resetRuntimeState()
+	activeSessions = []
 
-	createSession()
+	// Load persisted sessions from disk.
+	const loaded = sessionStore.loadAllSessions()
+
+	if (loaded.length > 0) {
+		for (const s of loaded) {
+			activeSessions.push({
+				id: s.meta.id,
+				name: s.meta.topic ?? `tab ${activeSessions.length + 1}`,
+				createdAt: s.meta.createdAt,
+			})
+		}
+	} else {
+		createSession()
+	}
+
+	// Broadcast session list on next tick so client tail is ready.
 	setTimeout(() => {
-		if (!signal.aborted && activeRuntimePid === process.pid) broadcastSessions()
+		if (signal.aborted || activeRuntimePid !== process.pid) return
+		broadcastSessions()
 	}, 0)
 
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || activeRuntimePid !== process.pid) break
-
-			if (cmd.sessionId && !sessions.some((s) => s.id === cmd.sessionId)) continue
+			if (cmd.sessionId && !activeSessions.some(s => s.id === cmd.sessionId)) continue
 
 			if (cmd.type === 'prompt') {
 				ipc.appendEvent({
@@ -73,8 +86,8 @@ function startRuntime(signal: AbortSignal): void {
 				createSession()
 				broadcastSessions()
 			} else if (cmd.type === 'close' && cmd.sessionId) {
-				sessions = sessions.filter((s) => s.id !== cmd.sessionId)
-				if (sessions.length === 0) createSession()
+				activeSessions = activeSessions.filter(s => s.id !== cmd.sessionId)
+				if (activeSessions.length === 0) createSession()
 				broadcastSessions()
 			}
 		}

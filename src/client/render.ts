@@ -55,7 +55,8 @@ function renderEntry(entry: Entry, cols: number): string[] {
 	}
 	const suffix = entry.type === 'info' ? '\x1b[0m' : ''
 	const result: string[] = []
-	for (const raw of entry.text.split('\n')) {
+	const text = entry.text || ''
+	for (const raw of text.split('\n')) {
 		for (const wrapped of wordWrap(`${prefix}${raw}${suffix}`, cols)) {
 			result.push(wrapped)
 		}
