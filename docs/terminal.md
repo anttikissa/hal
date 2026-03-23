@@ -19,7 +19,7 @@ Bottom-anchored, five sections:
 [prompt]             — "> " + user input
 ```
 
-Chrome = tab bar + status + prompt = 3 lines.
+Chrome = tab bar + status + prompt (1+ lines, multiline editing).
 
 ## Tabs
 
@@ -56,7 +56,8 @@ Old content enters scrollback — the user can scroll up and see everything.
 Key state:
 - `prevLines[]` — what we painted last time (the full logical array, not a
   viewport slice).
-- `cursorRow` — which logical line the terminal cursor is on.
+- `cursorRow` — which frame line the terminal cursor is physically on.
+  Updated after EVERY cursor move (see rule 6).
 
 ## Force repaint: two modes
 
@@ -129,6 +130,52 @@ No exceptions.
 Wrap paint operations in DEC synchronized output markers (`?2026h` / `?2026l`)
 to prevent flicker on terminals that support it. Hide cursor during paint,
 show after.
+
+### 6. `cursorRow` must always reflect physical cursor position
+
+`cursorRow` tracks which frame line the terminal cursor sits on. Every code
+path that moves the cursor — force repaint, diff repaint, cursor-only
+repositioning — MUST update `cursorRow` to the final position.
+
+The diff engine uses `cursorRow` to compute how far to move the cursor on
+the next paint. If `cursorRow` is stale (e.g. you moved the cursor up for a
+multiline prompt but forgot to update the variable), the next paint moves
+from the wrong starting position and corrupts the display.
+
+Use `positionCursor(fromRow, target)` which updates `cursorRow` atomically.
+Never move the cursor with raw CSI sequences without updating `cursorRow`.
+
+### 7. Compute cursor target ONCE per draw
+
+The cursor's frame position (row, col) should be computed once at the top of
+`draw()` and passed to all paint paths. Do NOT compute it separately in each
+path — that invites drift between the paths and makes the code harder to
+audit.
+
+### 8. Append vs rewrite in the diff engine
+
+When the frame grows (e.g. prompt goes from 1 to 2 lines), the new lines
+are beyond `prevLines.length`. You CANNOT use `CSI B` (cursor down) to
+move past the bottom of the visible screen — the terminal clamps it. If
+you try, the cursor stays on the last visible row and you overwrite the
+wrong line.
+
+For appends (`first >= prevLines.length`): move to the last existing line,
+then `\r\n` to scroll into new territory.
+
+For frame shrinks (`lines.length < prevLines.length`): after writing new
+content, `\r\n` then `CSI J` to erase leftover rows.
+
+### 9. Kitty keyboard protocol
+
+Ghostty, Kitty, and iTerm intercept Cmd+C/X/V at the OS level. To receive
+these keys, the app must opt into the Kitty keyboard protocol with
+`CSI >19u` (mode 19 = disambiguate + report events + report all keys).
+Disable with `CSI <u` on ALL exit paths, or the terminal stays in protocol
+mode after the app exits.
+
+Bracketed paste (`CSI ?2004h`) should also be enabled so multi-line pastes
+arrive as a single token.
 
 ## Terminal scrollback: how it actually works
 

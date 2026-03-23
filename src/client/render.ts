@@ -1,10 +1,14 @@
-// Terminal renderer -- frame building + differential repaint engine.
+// Terminal renderer — frame building + differential repaint engine.
 // See docs/terminal.md for the full contract.
 //
-// Owns: frame layout, entry rendering, word wrapping, padding, chrome,
-// fullscreen flag, diff engine.
+// Architecture:
+//   buildFrame() produces a flat string[] — one entry per terminal row.
+//   draw() diffs it against prevLines[] and emits minimal escape sequences.
+//   cursorRow always reflects the physical terminal row the cursor is on.
 //
-// Does NOT own: state (tabs, entries, prompt). Reads from client.ts.
+// The prompt can be multiline (shift-enter). The cursor can be on any
+// prompt line, not just the last one. All cursor positioning goes through
+// positionCursor() which updates cursorRow atomically.
 
 import { visLen, wordWrap, clipVisual } from '../utils/strings.ts'
 import { client } from '../client.ts'
@@ -14,26 +18,29 @@ import type { Entry, Tab } from '../client.ts'
 const CSI = '\x1b['
 
 // ── Diff engine state ────────────────────────────────────────────────────────
+//
+// These three variables are the diff engine's memory between paints:
+//
+//   prevLines  — the frame we painted last time. Diff compares against this.
+//   cursorRow  — which frame line the terminal cursor is physically on.
+//                MUST be updated after every cursor move, or the next paint
+//                will compute wrong deltas and corrupt the display.
+//   fullscreen — once the frame exceeds terminal height, we can never go
+//                back to grow mode (scrollback is tainted). One-way flag.
 
 let prevLines: string[] = []
 let cursorRow = 0
-
-// One-way flag. Once the frame exceeds terminal height, every force repaint
-// must clear scrollback. See docs/terminal.md.
 let fullscreen = false
 
 // High-water mark: tallest history (in rendered lines) across all tabs.
+// Grows but never shrinks. Used for padding to keep the prompt stable.
 let peak = 0
 
-// Cached line counts per tab. Key = tab, value = { entryCount, lineCount }.
-// Invalidated when tab.history.length changes.
+// Cached line counts per tab. Invalidated when tab.history.length changes.
 const lineCountCache = new WeakMap<Tab, { entryCount: number; lineCount: number }>()
 
 function resetRenderer(): void {
-	prevLines = []
-	cursorRow = 0
-	fullscreen = false
-	peak = 0
+	prevLines = []; cursorRow = 0; fullscreen = false; peak = 0
 }
 
 // ── Entry rendering ──────────────────────────────────────────────────────────
@@ -65,7 +72,7 @@ function renderEntry(entry: Entry, cols: number): string[] {
 		for (const wrapped of wordWrap(`${prefix}${raw}${suffix}`, cols)) {
 			result.push(wrapped)
 		}
-		// Continuation lines get indentation instead of prefix.
+		// After the first line, continuation lines get indentation, not the prefix.
 		prefix = ts ? '                  ' : '  '
 	}
 	return result
@@ -90,47 +97,29 @@ function renderHistory(lines: string[], tab: Tab): void {
 	}
 }
 
-// Hard cap: at minimum each tab needs 1 char + 1 space, so max ~40 tabs
-// in 80 cols. Beyond that, UI is unusable anyway.
 const MAX_TABS = 40
 
-// Tab bar with progressive sizing. Three levels:
-//   1. "[1 name]" / " 1 name " (number + name, no extra spaces between)
-//   2. "[1]" / " 1 "           (number + padding)
-//   3. "[1]" / "1"             (terse, joined with spaces)
+// Tab bar: tries full names, then just numbers, then terse.
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const tabs = client.state.tabs
 	const active = client.state.activeTab
 
-	// Level 1: number + name.
 	const named = tabs.map((tab, i) =>
 		i === active ? `\x1b[1m[${i + 1} ${tab.name}]\x1b[0m` : `\x1b[90m ${i + 1} ${tab.name} \x1b[0m`
 	)
-	if (visLen(named.join('')) <= cols) {
-		lines.push(named.join(''))
-		return
-	}
+	if (visLen(named.join('')) <= cols) { lines.push(named.join('')); return }
 
-	// Level 2: number + padding.
 	const padded = tabs.map((_, i) =>
 		i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m ${i + 1} \x1b[0m`
 	)
-	if (visLen(padded.join('')) <= cols) {
-		lines.push(padded.join(''))
-		return
-	}
+	if (visLen(padded.join('')) <= cols) { lines.push(padded.join('')); return }
 
-	// Level 3: terse, joined with spaces.
 	const terse = tabs.map((_, i) =>
 		i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m${i + 1}\x1b[0m`
 	)
 	const terseStr = terse.join(' ')
-	if (visLen(terseStr) > cols) {
-		lines.push(clipVisual(terseStr, cols))
-	} else {
-		lines.push(terseStr)
-	}
+	lines.push(visLen(terseStr) > cols ? clipVisual(terseStr, cols) : terseStr)
 }
 
 function renderStatusLine(lines: string[]): void {
@@ -149,6 +138,7 @@ function renderPrompt(lines: string[]): void {
 	for (const line of p.lines) lines.push(line)
 }
 
+// How many frame lines the chrome (tab bar + status + prompt) occupies.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
 	return 2 + prompt.lineCount(cols - 1)
@@ -160,26 +150,24 @@ function buildFrame(): string[] {
 	const tab = client.currentTab()
 	const lines: string[] = []
 
-	// 1. History -- all entries, all lines, never sliced.
+	// 1. History — all entries, all lines, NEVER sliced. See terminal.md rule 3.
 	if (tab) renderHistory(lines, tab)
 
-	// Update peak. Only compute the active tab eagerly — inactive tabs
-	// update peak lazily when switched to (avoids word-wrapping all 20
-	// tabs on first render).
+	// Update peak lazily: only the active tab, inactive tabs on switch.
 	if (tab) {
 		const c = historyLineCount(tab)
 		if (c > peak) peak = c
 	}
 
-	// 2. Padding -- keeps prompt stable across tab switches.
+	// 2. Padding — blank lines to keep prompt at a stable row across tabs.
 	const contentHeight = Math.min(peak, Math.max(0, rows - chrome))
 	const padding = Math.max(0, contentHeight - lines.length)
 	for (let i = 0; i < padding; i++) lines.push('')
 
-	// Check if frame exceeds terminal. Once true, never goes back.
+	// Once the frame exceeds terminal height, fullscreen is permanent.
 	if (lines.length + chrome > rows) fullscreen = true
 
-	// 3. Chrome.
+	// 3. Chrome: tab bar, status line, prompt (1+ lines).
 	renderTabBar(lines)
 	renderStatusLine(lines)
 	renderPrompt(lines)
@@ -187,102 +175,161 @@ function buildFrame(): string[] {
 	return lines
 }
 
-// Returns { col, rowsFromBottom } for cursor positioning.
-function promptCursor(): { col: number; rowsFromBottom: number } {
+// ── Cursor positioning ───────────────────────────────────────────────────────
+//
+// The prompt can be multiline. The cursor can be on any line of the prompt,
+// not just the last. We compute the cursor's absolute frame row ONCE per
+// draw() call — see cursorTarget(). All paint paths use the same target.
+//
+// positionCursor() is the ONLY way to move the cursor to a new position.
+// It updates cursorRow atomically. Using raw CSI moves without updating
+// cursorRow will cause the next paint to compute wrong deltas.
+
+function cursorTarget(frameLen: number): { row: number; col: number } {
 	const cols = process.stdout.columns || 80
 	const p = prompt.buildPrompt(cols - 1)
-	const totalPromptLines = p.lines.length
-	const rowsFromBottom = totalPromptLines - 1 - p.cursor.rowOffset
-	return { col: p.cursor.col, rowsFromBottom }
+	// prompt occupies the last p.lines.length rows of the frame.
+	// cursor.rowOffset is 0-based within the prompt. So:
+	//   absolute row = (frame end) - (prompt height) + (cursor's prompt row)
+	const row = frameLen - p.lines.length + p.cursor.rowOffset
+	// +1 because CSI G is 1-based
+	return { row, col: p.cursor.col + 1 }
+}
+
+function moveCursor(from: number, to: number): string {
+	const d = to - from
+	if (d > 0) return `${CSI}${d}B`
+	if (d < 0) return `${CSI}${-d}A`
+	return ''
+}
+
+// Move cursor to target and update cursorRow. This is the ONLY function
+// that should set cursorRow (besides resetRenderer and clearFrame).
+function positionCursor(from: number, target: { row: number; col: number }): string {
+	cursorRow = target.row
+	return moveCursor(from, target.row) + `\r${CSI}${target.col}G${CSI}?25h`
 }
 
 // ── Paint ────────────────────────────────────────────────────────────────────
+//
+// Three paths:
+//   1. Force repaint (force=true): clear screen, write all lines.
+//   2. Diff repaint: find first changed line, rewrite from there.
+//   3. Cursor-only: no lines changed, just reposition cursor.
+//
+// All three end with positionCursor() to place the cursor and update
+// cursorRow. The cursor target is computed ONCE at the top of draw().
 
 function draw(force = false): void {
 	const rows = process.stdout.rows || 24
 	const lines = buildFrame()
+	const cursor = cursorTarget(lines.length)
 
+	// ── Force repaint ──
 	if (force) {
 		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
-
 		if (!fullscreen) {
+			// Grow mode: move to top of our content, clear downward.
+			// Scrollback (shell history above our content) is preserved.
 			const up = Math.min(cursorRow, rows - 1)
 			out.push('\r')
 			if (up > 0) out.push(`${CSI}${up}A`)
 			out.push(`${CSI}J`)
 		} else {
+			// Full mode: nuke everything. Scrollback has stale content
+			// from other tabs that we can't selectively update.
 			out.push(`${CSI}2J${CSI}H${CSI}3J`)
 		}
-
 		for (let i = 0; i < lines.length; i++) {
 			if (i > 0) out.push('\r\n')
 			out.push(lines[i]!)
 		}
-		cursorRow = lines.length - 1
+		// After writing all lines, cursor is on the last frame line.
+		// positionCursor moves it to the prompt cursor position.
+		out.push(positionCursor(lines.length - 1, cursor))
+		out.push(`${CSI}?2026l`)
 		prevLines = lines
-		const fc = promptCursor()
-		if (fc.rowsFromBottom > 0) out.push(`${CSI}${fc.rowsFromBottom}A`)
-		out.push(`\r${CSI}${fc.col + 1}G`)
-		out.push(`${CSI}?25h`, `${CSI}?2026l`)
 		process.stdout.write(out.join(''))
 		return
 	}
 
-	// Diff: find first changed line.
+	// ── Diff: find first changed line ──
 	let first = -1
 	const max = Math.max(lines.length, prevLines.length)
 	for (let i = 0; i < max; i++) {
-		if ((lines[i] ?? '') !== (prevLines[i] ?? '')) {
-			first = i
-			break
-		}
+		if ((lines[i] ?? '') !== (prevLines[i] ?? '')) { first = i; break }
 	}
+
+	// ── Cursor-only: no lines changed ──
+	// Common case: user moved cursor within the prompt without changing text
+	// (e.g. arrow keys, Ctrl-A/E). Frame lines are identical but cursor
+	// position changed. We skip the full diff machinery and just reposition.
 	if (first === -1) {
-		// No lines changed, but cursor may have moved. Reposition it.
-		const cc = promptCursor()
-		const up = cc.rowsFromBottom > 0 ? `${CSI}${cc.rowsFromBottom}A` : ''
-		process.stdout.write(`${up}\r${CSI}${cc.col + 1}G`)
+		if (cursorRow === cursor.row && prevLines.length > 0) return
+		process.stdout.write(positionCursor(cursorRow, cursor))
 		return
 	}
 
+	// ── Diff repaint: rewrite from first change ──
 	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
-	const delta = first - cursorRow
-	if (delta < 0) out.push(`${CSI}${-delta}A`)
-	else if (delta > 0) out.push(`${CSI}${delta}B`)
-	out.push('\r')
 
-	for (let i = first; i < lines.length; i++) {
-		if (i > first) out.push('\r\n')
-		out.push(`${CSI}2K${lines[i]!}`)
+	// Two sub-cases: rewriting existing lines vs appending new ones.
+	//
+	// APPEND: first >= prevLines.length. All old lines match; we just need
+	// to add new lines at the end. We move to the last existing line and
+	// use \r\n to scroll into new territory. We CANNOT use CSI B to move
+	// past the bottom of the screen — it's clamped and silently ignored,
+	// which would make us overwrite the wrong line.
+	//
+	// REWRITE: first < prevLines.length. Some existing line changed. Move
+	// there, overwrite from that point forward.
+	const isAppend = first >= prevLines.length && prevLines.length > 0
+	if (isAppend) {
+		// Move to the last existing line, then \r\n into new territory.
+		out.push(moveCursor(cursorRow, prevLines.length - 1))
+		for (let i = first; i < lines.length; i++) {
+			out.push(`\r\n${CSI}2K${lines[i]!}`)
+		}
+	} else {
+		out.push(moveCursor(cursorRow, first))
+		out.push('\r')
+		for (let i = first; i < lines.length; i++) {
+			if (i > first) out.push('\r\n')
+			out.push(`${CSI}2K${lines[i]!}`)
+		}
 	}
 
-	cursorRow = lines.length - 1
-	const nc = promptCursor()
-	if (nc.rowsFromBottom > 0) out.push(`${CSI}${nc.rowsFromBottom}A`)
-	out.push(`\r${CSI}${nc.col + 1}G`)
-	out.push(`${CSI}?25h`, `${CSI}?2026l`)
+	// Frame shrunk (e.g. multiline prompt collapsed to single line).
+	// Erase leftover rows below the new frame end. CSI J clears from
+	// cursor to end of screen without touching scrollback.
+	let lastWrittenRow = lines.length - 1
+	if (lines.length < prevLines.length) {
+		out.push(`\r\n${CSI}J`)
+		lastWrittenRow = lines.length // we moved one past the end
+	}
+
+	out.push(positionCursor(lastWrittenRow, cursor))
+	out.push(`${CSI}?2026l`)
 	prevLines = lines
 	process.stdout.write(out.join(''))
 }
+
+// ── Cleanup ──────────────────────────────────────────────────────────────────
 
 // Erase the current frame from the terminal. Used before restart (Ctrl-R)
 // so the new process can paint fresh without leftover content.
 function clearFrame(): void {
 	if (prevLines.length === 0) return
 	const rows = process.stdout.rows || 24
-
 	if (!fullscreen) {
-		// Grow mode: we know exactly how many rows we painted. Move to top, clear down.
 		const up = Math.min(cursorRow, rows - 1)
 		const out = ['\r']
 		if (up > 0) out.push(`${CSI}${up}A`)
 		out.push(`${CSI}J`)
 		process.stdout.write(out.join(''))
 	} else {
-		// Full mode: clear visible screen and scrollback.
 		process.stdout.write(`${CSI}2J${CSI}H${CSI}3J`)
 	}
-
 	prevLines = []
 	cursorRow = 0
 }

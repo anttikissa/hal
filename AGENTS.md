@@ -99,3 +99,5 @@ uses `charWidth()` internally which is the same width logic as `visLen()`.
 
 AGENTS.md change - should send a summary of changes to agent at start of next turn (like /cd,
 model changes, etc)
+
+colgrep https://github.com/lightonai/next-plaid?tab=readme-ov-file#colgrep
