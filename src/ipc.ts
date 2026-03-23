@@ -73,27 +73,17 @@ async function claimHost(): Promise<boolean> {
 	}
 }
 
-// Promotion via IPC consensus. All clients that detect a dead host
-// append a promote event with a random tiebreaker. After a brief
-// settle period, everyone reads the log — lowest tiebreaker wins.
+// Promotion via IPC consensus. Clients append a promote event, wait for
+// others, then read the log. First promote event after host-released wins.
 async function promote(): Promise<boolean> {
-	const rand = Math.random().toString(36).slice(2)
-	appendEvent({ type: 'promote', pid: process.pid, rand })
+	appendEvent({ type: 'promote', pid: process.pid })
 	await Bun.sleep(50)
 	const events = readAllEvents()
-	// Find all promote events (there may be stale ones from earlier rounds).
-	// Only consider events after the last host-released.
-	let startIdx = 0
-	for (let i = events.length - 1; i >= 0; i--) {
-		if (events[i]?.type === 'host-released') { startIdx = i + 1; break }
-	}
-	const candidates = events.slice(startIdx).filter((e: any) => e.type === 'promote')
-	if (candidates.length === 0) return false
-	// Sort by rand — lowest wins. Deterministic, no ties (random strings).
-	candidates.sort((a: any, b: any) => a.rand < b.rand ? -1 : 1)
-	const winner = candidates[0]
-	if (winner.pid !== process.pid) return false
-	// We won — write the lock file.
+	// Find first promote event after the last host-released.
+	let i = events.length - 1
+	while (i >= 0 && events[i]?.type !== 'host-released') i--
+	const first = events.slice(i + 1).find((e: any) => e.type === 'promote')
+	if (!first || first.pid !== process.pid) return false
 	try { unlinkSync(HOST_LOCK) } catch {}
 	writeFileSync(HOST_LOCK, ason.stringify({ pid: process.pid, createdAt: new Date().toISOString() }))
 	return true
