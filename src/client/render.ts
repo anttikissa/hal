@@ -8,6 +8,7 @@
 
 import { visLen, wordWrap, clipVisual } from '../utils/strings.ts'
 import { client } from '../client.ts'
+import { prompt } from '../cli/prompt.ts'
 import type { Entry, Tab } from '../client.ts'
 
 const CSI = '\x1b['
@@ -144,14 +145,13 @@ function renderStatusLine(lines: string[]): void {
 
 function renderPrompt(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	for (const line of wordWrap(`\x1b[32m>\x1b[0m ${client.state.promptText}`, cols)) {
-		lines.push(line)
-	}
+	const p = prompt.buildPrompt(cols - 1)
+	for (const line of p.lines) lines.push(line)
 }
 
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	return 2 + wordWrap(`> ${client.state.promptText}`, cols).length
+	return 2 + prompt.lineCount(cols - 1)
 }
 
 function buildFrame(): string[] {
@@ -187,10 +187,13 @@ function buildFrame(): string[] {
 	return lines
 }
 
-function cursorCol(): number {
+// Returns { col, rowsFromBottom } for cursor positioning.
+function promptCursor(): { col: number; rowsFromBottom: number } {
 	const cols = process.stdout.columns || 80
-	const wrapped = wordWrap(`> ${client.state.promptText}`, cols)
-	return visLen(wrapped[wrapped.length - 1]!)
+	const p = prompt.buildPrompt(cols - 1)
+	const totalPromptLines = p.lines.length
+	const rowsFromBottom = totalPromptLines - 1 - p.cursor.rowOffset
+	return { col: p.cursor.col, rowsFromBottom }
 }
 
 // ── Paint ────────────────────────────────────────────────────────────────────
@@ -217,7 +220,9 @@ function draw(force = false): void {
 		}
 		cursorRow = lines.length - 1
 		prevLines = lines
-		out.push(`\r${CSI}${cursorCol() + 1}G`)
+		const fc = promptCursor()
+		if (fc.rowsFromBottom > 0) out.push(`${CSI}${fc.rowsFromBottom}A`)
+		out.push(`\r${CSI}${fc.col + 1}G`)
 		out.push(`${CSI}?25h`, `${CSI}?2026l`)
 		process.stdout.write(out.join(''))
 		return
@@ -246,7 +251,9 @@ function draw(force = false): void {
 	}
 
 	cursorRow = lines.length - 1
-	out.push(`\r${CSI}${cursorCol() + 1}G`)
+	const nc = promptCursor()
+	if (nc.rowsFromBottom > 0) out.push(`${CSI}${nc.rowsFromBottom}A`)
+	out.push(`\r${CSI}${nc.col + 1}G`)
 	out.push(`${CSI}?25h`, `${CSI}?2026l`)
 	prevLines = lines
 	process.stdout.write(out.join(''))

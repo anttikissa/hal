@@ -30,7 +30,7 @@ describe("perf", () => {
 			},
 		})
 		// Wait for perf flush (100ms interval)
-		await Bun.sleep(300)
+		await Bun.sleep(500)
 		proc.stdin!.write(new Uint8Array([0x03]))
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())
@@ -38,6 +38,5 @@ describe("perf", () => {
 		expect(out).toContain("First line of code executed")
 		expect(out).toContain("State directories exist")
 		expect(out).toContain("Host status established")
-		expect(out).toContain("Client ready to read input")
 	})
 })

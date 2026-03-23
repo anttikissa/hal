@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { render } from '../src/client/render.ts'
 import { client } from '../src/client.ts'
+import { prompt } from '../src/cli/prompt.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -23,17 +24,16 @@ beforeEach(() => {
 	client.state.tabs.length = 0
 	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [] })
 	client.state.activeTab = 0
-	client.state.promptText = ''
-	client.state.promptCursor = 0
+	prompt.clear()
 })
 
 describe('render', () => {
 	test('diff engine only rewrites changed lines', () => {
 		captureOutput(() => render.draw())
-		client.state.promptText = 'x'
+		prompt.setText('x')
 		const output = captureOutput(() => render.draw())
 		expect(output).not.toContain('\x1b[2J\x1b[H')
-		expect(stripAnsi(output)).toContain('> x')
+		expect(stripAnsi(output)).toContain(' x')
 	})
 
 	test('force repaint in grow mode does not clear scrollback', () => {
