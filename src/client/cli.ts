@@ -3,6 +3,7 @@
 
 import { client } from '../client.ts'
 import { render } from './render.ts'
+import { perf } from '../perf.ts'
 
 const RESTART_CODE = 100
 
@@ -19,6 +20,7 @@ function startCli(signal: AbortSignal): void {
 	}
 
 	render.draw()
+	perf.mark('First render done')
 
 	process.stdout.on('resize', () => render.draw(true))
 
@@ -26,9 +28,10 @@ function startCli(signal: AbortSignal): void {
 		for (let i = 0; i < data.length; i++) {
 			const byte = data[i]!
 
-			// Ctrl-R: restart
+			// Ctrl-R: restart. Write \r\n so the new process starts on a clean line.
 			if (byte === 0x12) {
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
+				process.stdout.write('\r\n')
 				process.exit(RESTART_CODE)
 			}
 
@@ -93,6 +96,9 @@ function startCli(signal: AbortSignal): void {
 			}
 		}
 	})
+
+	perf.mark('Client ready to read input')
+
 }
 
 export const cli = { startCli }

@@ -35,9 +35,9 @@ describe("perf", () => {
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
-		expect(out).toContain("first-code")
-		expect(out).toContain("state-ready")
-		expect(out).toContain("host-election")
-		expect(out).toContain("cli-start")
+		expect(out).toContain("First line of code executed")
+		expect(out).toContain("State directories exist")
+		expect(out).toContain("Host status established")
+		expect(out).toContain("Client ready to read input")
 	})
 })
