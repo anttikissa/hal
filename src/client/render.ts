@@ -1,19 +1,18 @@
-// Terminal renderer -- differential repaint engine.
+// Terminal renderer -- frame building + differential repaint engine.
 // See docs/terminal.md for the full contract.
 //
-// The frame is an array of strings where each entry is ONE physical terminal
-// row (already wrapped to terminal width). The diff engine compares against
-// the previous frame and rewrites only what changed.
+// Owns: frame layout, entry rendering, word wrapping, padding, chrome,
+// fullscreen flag, diff engine.
 //
-// NEVER put lines wider than terminal width into the frame. The diff engine
-// assumes 1 array entry = 1 physical row. Wider lines auto-wrap and break
-// cursor positioning.
-//
-// Two force-repaint modes (controlled by the `fullscreen` flag):
-//   grow mode: frame fits on screen, rewrite in place, scrollback untouched.
-//   full mode: frame exceeded terminal at some point, must CSI 3J scrollback.
+// Does NOT own: state (tabs, entries, prompt). Reads from client.ts.
+
+import { visLen, wordWrap } from '../utils/strings.ts'
+import * as client from '../client.ts'
+import type { Entry, Tab } from '../client.ts'
 
 const CSI = '\x1b['
+
+// ── Diff engine state ────────────────────────────────────────────────────────
 
 let prevLines: string[] = []
 let cursorRow = 0
@@ -22,47 +21,150 @@ let cursorRow = 0
 // must clear scrollback. See docs/terminal.md.
 let fullscreen = false
 
-export function isFullscreen(): boolean {
-	return fullscreen
-}
+// High-water mark: tallest history (in rendered lines) across all tabs.
+let peak = 0
 
-export function setFullscreen(v: boolean): void {
-	fullscreen = v
-}
-
-// Reset renderer state (for tests).
 export function resetRenderer(): void {
 	prevLines = []
 	cursorRow = 0
 	fullscreen = false
+	peak = 0
 }
 
-export interface PaintOptions {
-	force?: boolean
-	// Visible width of the cursor position in the last line (for CSI G).
-	cursorCol?: number
+// ── Entry rendering ──────────────────────────────────────────────────────────
+
+function formatTimestamp(ts?: number): string {
+	if (ts === undefined) return ''
+	const d = new Date(ts)
+	const hh = String(d.getHours()).padStart(2, '0')
+	const mm = String(d.getMinutes()).padStart(2, '0')
+	const ss = String(d.getSeconds()).padStart(2, '0')
+	const ms = String(d.getMilliseconds()).padStart(3, '0')
+	return `\x1b[90m${hh}:${mm}:${ss}.${ms}\x1b[0m `
 }
 
-export function paint(lines: string[], options: PaintOptions = {}): void {
+// ONE function that turns an entry into terminal lines. Used by both
+// renderHistory() and historyLineCount(). No drift possible.
+function renderEntry(entry: Entry, cols: number): string[] {
+	const ts = formatTimestamp(entry.ts)
+	let prefix: string
+	switch (entry.type) {
+		case 'input':     prefix = `${ts}\x1b[36mYou:\x1b[0m `; break
+		case 'assistant': prefix = `${ts}\x1b[33mAssistant:\x1b[0m `; break
+		case 'info':      prefix = ts ? `${ts}\x1b[90m` : '\x1b[90m'; break
+	}
+	const suffix = entry.type === 'info' ? '\x1b[0m' : ''
+	const result: string[] = []
+	for (const raw of entry.text.split('\n')) {
+		for (const wrapped of wordWrap(`${prefix}${raw}${suffix}`, cols)) {
+			result.push(wrapped)
+		}
+		// Continuation lines get indentation instead of prefix.
+		prefix = ts ? '                  ' : '  '
+	}
+	return result
+}
+
+function historyLineCount(tab: Tab): number {
+	const cols = process.stdout.columns || 80
+	let count = 0
+	for (const entry of tab.history) count += renderEntry(entry, cols).length
+	return count
+}
+
+// ── Frame building ───────────────────────────────────────────────────────────
+
+function renderHistory(lines: string[], tab: Tab): void {
+	const cols = process.stdout.columns || 80
+	for (const entry of tab.history) {
+		for (const line of renderEntry(entry, cols)) lines.push(line)
+	}
+}
+
+function renderTabBar(lines: string[]): void {
+	lines.push(
+		client.state.tabs.map((tab, i) =>
+			i === client.state.activeTab
+				? `\x1b[7m [${i + 1}] ${tab.name} \x1b[0m`
+				: `  ${i + 1}  ${tab.name}  `
+		).join('')
+	)
+}
+
+function renderStatusLine(lines: string[]): void {
+	const cols = process.stdout.columns || 80
+	const mode = fullscreen ? 'full' : 'grow'
+	const info = ` ${client.state.role} \u00b7 pid ${process.pid} \u00b7 ${mode} `
+	const dashes = Math.max(0, cols - visLen(info) - 1)
+	const left = Math.floor(dashes / 2)
+	const right = dashes - left
+	lines.push(`\x1b[90m${'\u2500'.repeat(left)}${info}${'\u2500'.repeat(right)}\x1b[0m`)
+}
+
+function renderPrompt(lines: string[]): void {
+	const cols = process.stdout.columns || 80
+	for (const line of wordWrap(`\x1b[32m>\x1b[0m ${client.state.promptText}`, cols)) {
+		lines.push(line)
+	}
+}
+
+function chromeLines(): number {
+	const cols = process.stdout.columns || 80
+	return 2 + wordWrap(`> ${client.state.promptText}`, cols).length
+}
+
+function buildFrame(): string[] {
 	const rows = process.stdout.rows || 24
-	const force = options.force ?? false
-	const cursorCol = options.cursorCol ?? 0
+	const chrome = chromeLines()
+	const tab = client.currentTab()
+	const lines: string[] = []
+
+	// 1. History -- all entries, all lines, never sliced.
+	if (tab) renderHistory(lines, tab)
+
+	// Update peak across all tabs.
+	for (const t of client.state.tabs) {
+		const c = historyLineCount(t)
+		if (c > peak) peak = c
+	}
+
+	// 2. Padding -- keeps prompt stable across tab switches.
+	const contentHeight = Math.min(peak, Math.max(0, rows - chrome))
+	const padding = Math.max(0, contentHeight - lines.length)
+	for (let i = 0; i < padding; i++) lines.push('')
 
 	// Check if frame exceeds terminal. Once true, never goes back.
-	if (lines.length > rows) fullscreen = true
+	if (lines.length + chrome > rows) fullscreen = true
+
+	// 3. Chrome.
+	renderTabBar(lines)
+	renderStatusLine(lines)
+	renderPrompt(lines)
+
+	return lines
+}
+
+function cursorCol(): number {
+	const cols = process.stdout.columns || 80
+	const wrapped = wordWrap(`> ${client.state.promptText}`, cols)
+	return visLen(wrapped[wrapped.length - 1]!)
+}
+
+// ── Paint ────────────────────────────────────────────────────────────────────
+
+export function draw(force = false): void {
+	const rows = process.stdout.rows || 24
+	const lines = buildFrame()
 
 	if (force) {
 		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
 
 		if (!fullscreen) {
-			// GROW MODE: frame fits on screen. Rewrite in place.
-			// Scrollback untouched -- pre-app shell history survives.
 			const up = Math.min(cursorRow, rows - 1)
 			out.push('\r')
 			if (up > 0) out.push(`${CSI}${up}A`)
 			out.push(`${CSI}J`)
 		} else {
-			// FULL MODE: must clear scrollback.
 			out.push(`${CSI}2J${CSI}H${CSI}3J`)
 		}
 
@@ -72,13 +174,13 @@ export function paint(lines: string[], options: PaintOptions = {}): void {
 		}
 		cursorRow = lines.length - 1
 		prevLines = lines
-		out.push(`\r${CSI}${cursorCol + 1}G`)
+		out.push(`\r${CSI}${cursorCol() + 1}G`)
 		out.push(`${CSI}?25h`, `${CSI}?2026l`)
 		process.stdout.write(out.join(''))
 		return
 	}
 
-	// NORMAL REPAINT: diff against previous frame.
+	// Diff: find first changed line.
 	let first = -1
 	const max = Math.max(lines.length, prevLines.length)
 	for (let i = 0; i < max; i++) {
@@ -101,7 +203,7 @@ export function paint(lines: string[], options: PaintOptions = {}): void {
 	}
 
 	cursorRow = lines.length - 1
-	out.push(`\r${CSI}${cursorCol + 1}G`)
+	out.push(`\r${CSI}${cursorCol() + 1}G`)
 	out.push(`${CSI}?25h`, `${CSI}?2026l`)
 	prevLines = lines
 	process.stdout.write(out.join(''))
