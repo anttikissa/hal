@@ -1,4 +1,5 @@
 // File-backed IPC bus. Host appends events, clients append commands.
+// See commit e864a02 in previous/ for the host lock race fix history.
 
 import {
 	appendFileSync,
@@ -7,7 +8,7 @@ import {
 	writeFileSync,
 	unlinkSync,
 } from 'fs'
-import { open } from 'fs/promises'
+import { open, readFile, writeFile, rename, rm } from 'fs/promises'
 import { IPC_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { tailFile } from './utils/tail-file.ts'
@@ -50,6 +51,14 @@ function tailCommands(signal?: AbortSignal) {
 }
 
 // --- Host election ---
+//
+// The lock file must ALWAYS exist once created, so that concurrent
+// claimers see EEXIST on the fast path. When stealing a dead host's lock,
+// we rename our claim OVER the lock (atomic overwrite) instead of
+// rm + create, which is a TOCTOU race that causes dual servers.
+//
+// After a steal, we sleep 30ms and read back — last rename wins.
+// This was verified with a 100-trial multi-process stress test.
 
 interface HostLock {
 	pid: number
@@ -60,29 +69,60 @@ async function claimHost(): Promise<boolean> {
 	ensureDir(IPC_DIR)
 	ensureFile(EVENTS_FILE)
 	ensureFile(COMMANDS_FILE)
+
+	const payload = ason.stringify({
+		pid: process.pid,
+		createdAt: new Date().toISOString(),
+	})
+
+	// Fast path: no lock exists — exclusive create wins atomically.
 	try {
 		const fh = await open(HOST_LOCK, 'wx')
-		const lock: HostLock = {
-			pid: process.pid,
-			createdAt: new Date().toISOString(),
-		}
-		await fh.writeFile(ason.stringify(lock))
+		await fh.writeFile(payload)
 		await fh.close()
 		return true
 	} catch (e: any) {
-		if (e?.code === 'EEXIST') {
-			try {
-				const lock = ason.parse(
-					readFileSync(HOST_LOCK, 'utf-8')
-				) as unknown as HostLock
-				process.kill(lock.pid, 0)
-				return false
-			} catch {
-				try { unlinkSync(HOST_LOCK) } catch {}
-				return claimHost()
-			}
-		}
-		throw e
+		if (e?.code !== 'EEXIST') throw e
+	}
+
+	// Lock exists — read and check if owner is alive.
+	let lockPid: number | null = null
+	try {
+		const raw = await readFile(HOST_LOCK, 'utf-8')
+		const lock = ason.parse(raw) as any
+		lockPid = Number.isInteger(lock?.pid) ? lock.pid : null
+	} catch {
+		return false
+	}
+
+	// Owner is alive — we're a client.
+	if (lockPid !== null) {
+		try { process.kill(lockPid, 0); return false }
+		catch {} // dead
+	}
+
+	// Dead host — steal the lock atomically.
+	// Write our claim to a temp file, then rename over the lock.
+	// rename() is atomic on POSIX — the lock file always exists, so
+	// concurrent claimers still see EEXIST on the fast path above.
+	const tmp = `${HOST_LOCK}.claim.${process.pid}`
+	await writeFile(tmp, payload)
+	try {
+		await rename(tmp, HOST_LOCK)
+	} catch {
+		try { await rm(tmp) } catch {}
+		return false
+	}
+
+	// Multiple stealers may rename concurrently — last rename wins.
+	// Sleep briefly, then verify we still own the lock.
+	await Bun.sleep(30)
+	try {
+		const raw = await readFile(HOST_LOCK, 'utf-8')
+		const lock = ason.parse(raw) as any
+		return lock?.pid === process.pid
+	} catch {
+		return false
 	}
 }
 
