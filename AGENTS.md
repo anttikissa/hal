@@ -79,6 +79,12 @@ import { client } from '~src/client.ts'
 client.addEntry = (text) => { console.log('patched!'); origAddEntry(text) }
 ```
 
+# Terminal rules (see docs/terminal.md)
+
+Read docs/terminal.md BEFORE touching any rendering or terminal code. It
+contains hard-won rules about scrollback, line width, diffing, and the
+fullscreen flag. Violating them causes visual corruption.
+
 # Terminal width
 
 ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.

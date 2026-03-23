@@ -6,7 +6,7 @@
 //
 // Does NOT own: state (tabs, entries, prompt). Reads from client.ts.
 
-import { visLen, wordWrap } from '../utils/strings.ts'
+import { visLen, wordWrap, clipVisual } from '../utils/strings.ts'
 import { client } from '../client.ts'
 import type { Entry, Tab } from '../client.ts'
 
@@ -82,14 +82,46 @@ function renderHistory(lines: string[], tab: Tab): void {
 	}
 }
 
+// Tab bar with progressive sizing. Tries formats from widest to narrowest
+// until one fits the terminal width:
+//   1. " [1] migit " / "  2  colors " (number + name)
+//   2. " [1] mig " / "  2  col "     (number + truncated name)
+//   3. " [1] " / "  2  "             (number only)
 function renderTabBar(lines: string[]): void {
-	lines.push(
-		client.state.tabs.map((tab, i) =>
-			i === client.state.activeTab
-				? `\x1b[7m [${i + 1}] ${tab.name} \x1b[0m`
-				: `  ${i + 1}  ${tab.name}  `
-		).join('')
+	const cols = process.stdout.columns || 80
+	const tabs = client.state.tabs
+	const active = client.state.activeTab
+
+	// Try format with full names.
+	const full = tabs.map((tab, i) =>
+		i === active ? ` [${i + 1}] ${tab.name} ` : `  ${i + 1}  ${tab.name}  `
 	)
+	if (visLen(full.join('')) <= cols) {
+		lines.push(full.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
+		return
+	}
+
+	// Try format with truncated names (3 chars).
+	const short = tabs.map((tab, i) => {
+		const name = tab.name.length > 3 ? tab.name.slice(0, 3) : tab.name
+		return i === active ? ` [${i + 1}] ${name} ` : `  ${i + 1}  ${name}  `
+	})
+	if (visLen(short.join('')) <= cols) {
+		lines.push(short.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
+		return
+	}
+
+	// Numbers only.
+	const nums = tabs.map((_, i) =>
+		i === active ? ` [${i + 1}] ` : `  ${i + 1}  `
+	)
+	const numsStr = nums.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join('')
+	// If even numbers don't fit, truncate to terminal width.
+	if (visLen(numsStr) > cols) {
+		lines.push(clipVisual(numsStr, cols))
+	} else {
+		lines.push(numsStr)
+	}
 }
 
 function renderStatusLine(lines: string[]): void {

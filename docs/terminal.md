@@ -113,7 +113,18 @@ THREE TIMES already. It is the cardinal sin of this renderer.
 Do not do it. Not in the normal path. Not in the force path. Not in a helper
 function. Not behind a flag. Not "just for performance." NEVER.
 
-### 4. Synchronized output
+### 4. No line may exceed terminal width
+
+Every line in the frame array MUST be <= terminal width in visible columns.
+The diff engine assumes 1 array entry = 1 physical terminal row. A line
+wider than the terminal auto-wraps to multiple rows, breaking cursor
+positioning on every subsequent repaint. This causes cascading visual
+corruption that gets worse with every paint cycle.
+
+Use `visLen()` to measure, `wordWrap()` to wrap, `clipVisual()` to truncate.
+No exceptions.
+
+### 5. Synchronized output
 
 Wrap paint operations in DEC synchronized output markers (`?2026h` / `?2026l`)
 to prevent flicker on terminals that support it. Hide cursor during paint,

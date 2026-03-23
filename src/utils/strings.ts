@@ -1,4 +1,5 @@
 // Terminal string utilities: visual width, word wrap, clipping.
+// See docs/terminal.md rule 4: no line may exceed terminal width.
 
 /** Split text into lines. Handles both 'foo\nbar\n' and 'foo\nbar' → ['foo', 'bar']. */
 export function toLines(text: string): string[] {

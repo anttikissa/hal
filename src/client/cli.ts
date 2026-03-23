@@ -1,5 +1,5 @@
 // CLI -- terminal input handling. Thin layer: reads keypresses, calls client
-// for state changes, renderer for display.
+// for state changes, renderer for display. See docs/terminal.md for rules.
 
 import { client } from '../client.ts'
 import { render } from './render.ts'
