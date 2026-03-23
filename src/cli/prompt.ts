@@ -385,7 +385,8 @@ function buildPrompt(contentWidth: number): PromptRender {
 		}
 	}
 
-	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol + 2 } }
+	// +1 for the single-space prefix on each line
+	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol + 1 } }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
