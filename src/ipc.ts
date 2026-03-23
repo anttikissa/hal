@@ -1,5 +1,4 @@
 // File-backed IPC bus. Host appends events, clients append commands.
-// See commit e864a02 in previous/ for the host lock race fix history.
 
 import {
 	appendFileSync,
@@ -8,7 +7,7 @@ import {
 	writeFileSync,
 	unlinkSync,
 } from 'fs'
-import { open, readFile, writeFile, rename, rm } from 'fs/promises'
+import { open } from 'fs/promises'
 import { IPC_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { tailFile } from './utils/tail-file.ts'
@@ -51,79 +50,53 @@ function tailCommands(signal?: AbortSignal) {
 }
 
 // --- Host election ---
-//
-// The lock file must ALWAYS exist once created, so that concurrent
-// claimers see EEXIST on the fast path. When stealing a dead host's lock,
-// we rename our claim OVER the lock (atomic overwrite) instead of
-// rm + create, which is a TOCTOU race that causes dual servers.
-//
-// After a steal, we sleep 30ms and read back — last rename wins.
-// This was verified with a 100-trial multi-process stress test.
 
 interface HostLock {
 	pid: number
 	createdAt: string
 }
 
+// Initial claim only. Used at startup when no host exists.
+// open('wx') is atomic — if file exists, fails with EEXIST.
 async function claimHost(): Promise<boolean> {
 	ensureDir(IPC_DIR)
 	ensureFile(EVENTS_FILE)
 	ensureFile(COMMANDS_FILE)
-
-	const payload = ason.stringify({
-		pid: process.pid,
-		createdAt: new Date().toISOString(),
-	})
-
-	// Fast path: no lock exists — exclusive create wins atomically.
 	try {
 		const fh = await open(HOST_LOCK, 'wx')
-		await fh.writeFile(payload)
+		await fh.writeFile(ason.stringify({ pid: process.pid, createdAt: new Date().toISOString() }))
 		await fh.close()
 		return true
 	} catch (e: any) {
-		if (e?.code !== 'EEXIST') throw e
+		if (e?.code === 'EEXIST') return false
+		throw e
 	}
+}
 
-	// Lock exists — read and check if owner is alive.
-	let lockPid: number | null = null
-	try {
-		const raw = await readFile(HOST_LOCK, 'utf-8')
-		const lock = ason.parse(raw) as any
-		lockPid = Number.isInteger(lock?.pid) ? lock.pid : null
-	} catch {
-		return false
+// Promotion via IPC consensus. All clients that detect a dead host
+// append a promote event with a random tiebreaker. After a brief
+// settle period, everyone reads the log — lowest tiebreaker wins.
+async function promote(): Promise<boolean> {
+	const rand = Math.random().toString(36).slice(2)
+	appendEvent({ type: 'promote', pid: process.pid, rand })
+	await Bun.sleep(50)
+	const events = readAllEvents()
+	// Find all promote events (there may be stale ones from earlier rounds).
+	// Only consider events after the last host-released.
+	let startIdx = 0
+	for (let i = events.length - 1; i >= 0; i--) {
+		if (events[i]?.type === 'host-released') { startIdx = i + 1; break }
 	}
-
-	// Owner is alive — we're a client.
-	if (lockPid !== null) {
-		try { process.kill(lockPid, 0); return false }
-		catch {} // dead
-	}
-
-	// Dead host — steal the lock atomically.
-	// Write our claim to a temp file, then rename over the lock.
-	// rename() is atomic on POSIX — the lock file always exists, so
-	// concurrent claimers still see EEXIST on the fast path above.
-	const tmp = `${HOST_LOCK}.claim.${process.pid}`
-	await writeFile(tmp, payload)
-	try {
-		await rename(tmp, HOST_LOCK)
-	} catch {
-		try { await rm(tmp) } catch {}
-		return false
-	}
-
-	// Multiple stealers may rename concurrently — last rename wins.
-	// Sleep briefly, then verify we still own the lock.
-	await Bun.sleep(30)
-	try {
-		const raw = await readFile(HOST_LOCK, 'utf-8')
-		const lock = ason.parse(raw) as any
-		return lock?.pid === process.pid
-	} catch {
-		return false
-	}
+	const candidates = events.slice(startIdx).filter((e: any) => e.type === 'promote')
+	if (candidates.length === 0) return false
+	// Sort by rand — lowest wins. Deterministic, no ties (random strings).
+	candidates.sort((a: any, b: any) => a.rand < b.rand ? -1 : 1)
+	const winner = candidates[0]
+	if (winner.pid !== process.pid) return false
+	// We won — write the lock file.
+	try { unlinkSync(HOST_LOCK) } catch {}
+	writeFileSync(HOST_LOCK, ason.stringify({ pid: process.pid, createdAt: new Date().toISOString() }))
+	return true
 }
 
 function readHostLock(): HostLock | null {
@@ -145,5 +118,5 @@ function releaseHost(): void {
 
 export const ipc = {
 	appendEvent, appendCommand, tailEvents, tailCommands,
-	claimHost, readHostLock, readAllEvents, releaseHost,
+	claimHost, promote, readHostLock, readAllEvents, releaseHost,
 }

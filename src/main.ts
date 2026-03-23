@@ -53,7 +53,7 @@ if (isHost) {
 		if (promoting || isHost) return
 		promoting = true
 		try {
-			if (await ipc.claimHost()) {
+			if (await ipc.promote()) {
 				isHost = true
 				serverPid = process.pid
 				client.state.role = 'server'
