@@ -82,45 +82,46 @@ function renderHistory(lines: string[], tab: Tab): void {
 	}
 }
 
-// Tab bar with progressive sizing. Tries formats from widest to narrowest
-// until one fits the terminal width:
-//   1. " [1] migit " / "  2  colors " (number + name)
-//   2. " [1] mig " / "  2  col "     (number + truncated name)
-//   3. " [1] " / "  2  "             (number only)
+// Hard cap: at minimum each tab needs 1 char + 1 space, so max ~40 tabs
+// in 80 cols. Beyond that, UI is unusable anyway.
+const MAX_TABS = 40
+
+// Tab bar with progressive sizing. Three levels:
+//   1. "[1 name]" / " 1 name " (number + name, no extra spaces between)
+//   2. "[1]" / " 1 "           (number + padding)
+//   3. "[1]" / "1"             (terse, joined with spaces)
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const tabs = client.state.tabs
 	const active = client.state.activeTab
 
-	// Try format with full names.
-	const full = tabs.map((tab, i) =>
-		i === active ? ` [${i + 1}] ${tab.name} ` : `  ${i + 1}  ${tab.name}  `
+	// Level 1: number + name.
+	const named = tabs.map((tab, i) =>
+		i === active ? `[${i + 1} ${tab.name}]` : ` ${i + 1} ${tab.name} `
 	)
-	if (visLen(full.join('')) <= cols) {
-		lines.push(full.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
+	if (visLen(named.join('')) <= cols) {
+		lines.push(named.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
 		return
 	}
 
-	// Try format with truncated names (3 chars).
-	const short = tabs.map((tab, i) => {
-		const name = tab.name.length > 3 ? tab.name.slice(0, 3) : tab.name
-		return i === active ? ` [${i + 1}] ${name} ` : `  ${i + 1}  ${name}  `
-	})
-	if (visLen(short.join('')) <= cols) {
-		lines.push(short.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
+	// Level 2: number + padding.
+	const padded = tabs.map((_, i) =>
+		i === active ? `[${i + 1}]` : ` ${i + 1} `
+	)
+	if (visLen(padded.join('')) <= cols) {
+		lines.push(padded.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(''))
 		return
 	}
 
-	// Numbers only.
-	const nums = tabs.map((_, i) =>
-		i === active ? ` [${i + 1}] ` : `  ${i + 1}  `
+	// Level 3: terse, joined with spaces.
+	const terse = tabs.map((_, i) =>
+		i === active ? `[${i + 1}]` : `${i + 1}`
 	)
-	const numsStr = nums.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join('')
-	// If even numbers don't fit, truncate to terminal width.
-	if (visLen(numsStr) > cols) {
-		lines.push(clipVisual(numsStr, cols))
+	const terseStr = terse.map((s, i) => i === active ? `\x1b[7m${s}\x1b[0m` : s).join(' ')
+	if (visLen(terseStr) > cols) {
+		lines.push(clipVisual(terseStr, cols))
 	} else {
-		lines.push(numsStr)
+		lines.push(terseStr)
 	}
 }
 

@@ -142,7 +142,9 @@ function loadPersistedSessions(): void {
 
 	const newTabs: Tab[] = []
 	for (const s of loaded) {
-		const name = s.meta.topic ?? `tab ${newTabs.length + 1}`
+		// Name priority: topic > last directory component of workingDir > "tab N"
+		const dirName = s.meta.workingDir?.split('/').pop()
+		const name = s.meta.topic ?? dirName ?? `tab ${newTabs.length + 1}`
 		const history: Entry[] = s.entries.map(e => ({
 			type: e.type,
 			text: e.text,

@@ -49,9 +49,10 @@ function startRuntime(signal: AbortSignal): void {
 
 	if (loaded.length > 0) {
 		for (const s of loaded) {
+			const dirName = s.meta.workingDir?.split('/').pop()
 			activeSessions.push({
 				id: s.meta.id,
-				name: s.meta.topic ?? `tab ${activeSessions.length + 1}`,
+				name: s.meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
 				createdAt: s.meta.createdAt,
 			})
 		}

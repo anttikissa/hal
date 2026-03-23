@@ -42,8 +42,11 @@ function startCli(signal: AbortSignal): void {
 				process.exit(0)
 			}
 
-			// Ctrl-T: new tab
-			if (byte === 0x14) { client.sendCommand('open'); continue }
+			// Ctrl-T: new tab (hard cap at 40)
+			if (byte === 0x14) {
+				if (client.state.tabs.length < 40) client.sendCommand('open')
+				continue
+			}
 
 			// Ctrl-W: close tab
 			if (byte === 0x17) {
