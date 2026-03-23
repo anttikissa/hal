@@ -70,6 +70,46 @@ describe('client-server', () => {
 		expect(clientOut).toContain('You said: after promotion')
 	})
 
+	test('only one client promotes when server dies (no dual server)', async () => {
+		const halDir = join(import.meta.dir, '..')
+		const env = {
+			HAL_STATE_DIR: tmpDir,
+			PATH: process.env.PATH,
+			HOME: process.env.HOME,
+		}
+
+		// Start server + two clients.
+		const server = Bun.spawn(['bun', join(halDir, 'src/main.ts')], {
+			stdin: 'pipe', stdout: 'pipe', stderr: 'pipe', env,
+		})
+		await Bun.sleep(200)
+
+		const clientA = Bun.spawn(['bun', join(halDir, 'src/main.ts')], {
+			stdin: 'pipe', stdout: 'pipe', stderr: 'pipe', env,
+		})
+		const clientB = Bun.spawn(['bun', join(halDir, 'src/main.ts')], {
+			stdin: 'pipe', stdout: 'pipe', stderr: 'pipe', env,
+		})
+		await Bun.sleep(200)
+
+		// Kill server — both clients should race to promote.
+		server.kill()
+		await server.exited
+		await Bun.sleep(400)
+
+		// Collect output from both.
+		sendCtrlC(clientA)
+		sendCtrlC(clientB)
+		const outA = stripAnsi(await new Response(clientA.stdout).text())
+		const outB = stripAnsi(await new Response(clientB.stdout).text())
+		await Promise.all([clientA.exited, clientB.exited])
+
+		// Exactly one should have promoted.
+		const promotedA = outA.includes('Promoted to server')
+		const promotedB = outB.includes('Promoted to server')
+		expect(promotedA !== promotedB).toBe(true)
+	})
+
 	test('second process joins first', async () => {
 		const halDir = join(import.meta.dir, '..')
 		const env = {
