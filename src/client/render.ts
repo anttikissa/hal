@@ -13,8 +13,6 @@
 //   grow mode: frame fits on screen, rewrite in place, scrollback untouched.
 //   full mode: frame exceeded terminal at some point, must CSI 3J scrollback.
 
-import { visLen } from '../utils/strings.ts'
-
 const CSI = '\x1b['
 
 let prevLines: string[] = []
