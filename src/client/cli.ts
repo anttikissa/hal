@@ -9,7 +9,25 @@ import type { KeyEvent } from '../cli/keys.ts'
 
 const RESTART_CODE = 100
 
+// Kitty keyboard protocol: tell terminal to send all keys (including Cmd+C/X/V)
+// to the app instead of intercepting them. Mode 19 = disambiguate(1) +
+// report events(2) + report all keys as escapes(16).
+const KITTY_TERMS = /^(kitty|ghostty|iTerm\.app)$/
+const useKitty = KITTY_TERMS.test(process.env.TERM_PROGRAM ?? '')
+const KITTY_ON = '\x1b[>19u'
+const KITTY_OFF = '\x1b[<u'
+const BRACKETED_PASTE_ON = '\x1b[?2004h'
+const BRACKETED_PASTE_OFF = '\x1b[?2004l'
+
 function draw(force = false): void { render.draw(force) }
+
+// Restore terminal state before exiting. Must be called on ALL exit paths
+// or the terminal will be left in raw/kitty mode.
+function cleanupTerminal(): void {
+	if (useKitty) process.stdout.write(KITTY_OFF)
+	process.stdout.write(BRACKETED_PASTE_OFF)
+	if (process.stdin.isTTY) process.stdin.setRawMode(false)
+}
 
 function submit(): void {
 	const text = prompt.text().trim()
@@ -24,18 +42,18 @@ function handleAppKey(k: KeyEvent): boolean {
 	// Ctrl-R: restart
 	if (k.key === 'r' && k.ctrl) {
 		render.clearFrame()
-		if (process.stdin.isTTY) process.stdin.setRawMode(false)
+		cleanupTerminal()
 		process.exit(RESTART_CODE)
 	}
 	// Ctrl-C: quit
 	if (k.key === 'c' && k.ctrl) {
-		if (process.stdin.isTTY) process.stdin.setRawMode(false)
+		cleanupTerminal()
 		process.stdout.write('\r\n')
 		process.exit(0)
 	}
 	// Ctrl-D: quit if prompt empty, else let prompt handle (delete forward)
 	if (k.key === 'd' && k.ctrl && !prompt.text()) {
-		if (process.stdin.isTTY) process.stdin.setRawMode(false)
+		cleanupTerminal()
 		process.stdout.write('\r\n')
 		process.exit(0)
 	}
@@ -74,6 +92,8 @@ function startCli(signal: AbortSignal): void {
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
 		process.stdin.resume()
+		if (useKitty) process.stdout.write(KITTY_ON)
+		process.stdout.write(BRACKETED_PASTE_ON)
 	}
 
 	draw()
