@@ -209,4 +209,26 @@ function draw(force = false): void {
 	process.stdout.write(out.join(''))
 }
 
-export const render = { draw, resetRenderer }
+// Erase the current frame from the terminal. Used before restart (Ctrl-R)
+// so the new process can paint fresh without leftover content.
+function clearFrame(): void {
+	if (prevLines.length === 0) return
+	const rows = process.stdout.rows || 24
+
+	if (!fullscreen) {
+		// Grow mode: we know exactly how many rows we painted. Move to top, clear down.
+		const up = Math.min(cursorRow, rows - 1)
+		const out = ['\r']
+		if (up > 0) out.push(`${CSI}${up}A`)
+		out.push(`${CSI}J`)
+		process.stdout.write(out.join(''))
+	} else {
+		// Full mode: clear visible screen and scrollback.
+		process.stdout.write(`${CSI}2J${CSI}H${CSI}3J`)
+	}
+
+	prevLines = []
+	cursorRow = 0
+}
+
+export const render = { draw, resetRenderer, clearFrame }

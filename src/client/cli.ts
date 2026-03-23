@@ -28,10 +28,10 @@ function startCli(signal: AbortSignal): void {
 		for (let i = 0; i < data.length; i++) {
 			const byte = data[i]!
 
-			// Ctrl-R: restart. Write \r\n so the new process starts on a clean line.
+			// Ctrl-R: restart. Clear the frame so the new process paints fresh.
 			if (byte === 0x12) {
+				render.clearFrame()
 				if (process.stdin.isTTY) process.stdin.setRawMode(false)
-				process.stdout.write('\r\n')
 				process.exit(RESTART_CODE)
 			}
 
