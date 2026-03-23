@@ -2,28 +2,22 @@ import { perf } from './perf.ts'
 perf.mark('first-code')
 
 import { ensureStateDir } from './state.ts'
-import {
-	claimHost,
-	readHostLock,
-	releaseHost,
-	appendEvent,
-	tailEvents,
-} from './ipc.ts'
-import { startRuntime } from './server/runtime.ts'
-import { startCli } from './client/cli.ts'
-import * as client from './client.ts'
+import { ipc } from './ipc.ts'
+import { runtime } from './server/runtime.ts'
+import { cli } from './client/cli.ts'
+import { client } from './client.ts'
 
 ensureStateDir()
 perf.mark('state-ready')
 
-let isHost = await claimHost()
-const lock = readHostLock()
+let isHost = await ipc.claimHost()
+const lock = ipc.readHostLock()
 let serverPid = isHost ? process.pid : (lock?.pid ?? null)
 perf.mark('host-election')
 
 client.state.role = isHost ? 'server' : 'client'
 if (isHost) {
-	appendEvent({
+	ipc.appendEvent({
 		type: 'runtime-start',
 		pid: process.pid,
 		startedAt: new Date().toISOString(),
@@ -38,8 +32,8 @@ const ac = new AbortController()
 function cleanup() {
 	ac.abort()
 	if (isHost) {
-		appendEvent({ type: 'host-released' })
-		releaseHost()
+		ipc.appendEvent({ type: 'host-released' })
+		ipc.releaseHost()
 	}
 	perf.stop()
 }
@@ -51,7 +45,7 @@ process.on('SIGTERM', () => {
 })
 
 if (isHost) {
-	startRuntime(ac.signal)
+	runtime.startRuntime(ac.signal)
 } else {
 	let promoting = false
 
@@ -59,12 +53,12 @@ if (isHost) {
 		if (promoting || isHost) return
 		promoting = true
 		try {
-			if (await claimHost()) {
+			if (await ipc.claimHost()) {
 				isHost = true
 				serverPid = process.pid
 				client.state.role = 'server'
 				client.addEntry(`Promoted to server (pid ${process.pid})`)
-				startRuntime(ac.signal)
+				runtime.startRuntime(ac.signal)
 			}
 		} finally {
 			promoting = false
@@ -72,13 +66,13 @@ if (isHost) {
 	}
 
 	void (async () => {
-		for await (const event of tailEvents(ac.signal)) {
+		for await (const event of ipc.tailEvents(ac.signal)) {
 			if (event.type === 'host-released') tryPromote()
 		}
 	})()
 
 	// Slow fallback: poll for crash (server dies without sending host-released).
-	// process.kill(pid, 0) doesn't kill -- signal 0 just checks if the pid exists.
+	// process.kill(pid, 0) doesn't kill -- signal 0 just checks if pid exists.
 	const pollTimer = setInterval(() => {
 		if (isHost || promoting) return
 		if (serverPid !== null) {
@@ -91,4 +85,4 @@ if (isHost) {
 
 perf.setSink(() => {})
 perf.mark('cli-start')
-startCli(ac.signal)
+cli.startCli(ac.signal)

@@ -24,11 +24,11 @@ function append(file: string, item: any): void {
 	appendFileSync(file, ason.stringify(item, 'short') + '\n')
 }
 
-export function appendEvent(event: any): void {
+function appendEvent(event: any): void {
 	append(EVENTS_FILE, { ...event, createdAt: event.createdAt ?? new Date().toISOString() })
 }
 
-export function appendCommand(command: any): void {
+function appendCommand(command: any): void {
 	append(COMMANDS_FILE, { ...command, createdAt: command.createdAt ?? new Date().toISOString() })
 }
 
@@ -41,22 +41,22 @@ async function* tail(file: string, signal?: AbortSignal): AsyncGenerator<any> {
 	}
 }
 
-export function tailEvents(signal?: AbortSignal) {
+function tailEvents(signal?: AbortSignal) {
 	return tail(EVENTS_FILE, signal)
 }
 
-export function tailCommands(signal?: AbortSignal) {
+function tailCommands(signal?: AbortSignal) {
 	return tail(COMMANDS_FILE, signal)
 }
 
 // --- Host election ---
 
-export interface HostLock {
+interface HostLock {
 	pid: number
 	createdAt: string
 }
 
-export async function claimHost(): Promise<boolean> {
+async function claimHost(): Promise<boolean> {
 	ensureDir(IPC_DIR)
 	ensureFile(EVENTS_FILE)
 	ensureFile(COMMANDS_FILE)
@@ -78,9 +78,7 @@ export async function claimHost(): Promise<boolean> {
 				process.kill(lock.pid, 0)
 				return false
 			} catch {
-				try {
-					unlinkSync(HOST_LOCK)
-				} catch {}
+				try { unlinkSync(HOST_LOCK) } catch {}
 				return claimHost()
 			}
 		}
@@ -88,25 +86,24 @@ export async function claimHost(): Promise<boolean> {
 	}
 }
 
-export function readHostLock(): HostLock | null {
+function readHostLock(): HostLock | null {
 	try {
-		return ason.parse(
-			readFileSync(HOST_LOCK, 'utf-8')
-		) as unknown as HostLock
-	} catch {
-		return null
-	}
+		return ason.parse(readFileSync(HOST_LOCK, 'utf-8')) as unknown as HostLock
+	} catch { return null }
 }
 
-export function readAllEvents(): any[] {
+function readAllEvents(): any[] {
 	ensureFile(EVENTS_FILE)
-	const content = readFileSync(EVENTS_FILE, "utf-8")
+	const content = readFileSync(EVENTS_FILE, 'utf-8')
 	if (!content.trim()) return []
 	return ason.parseAll(content) as any[]
 }
 
-export function releaseHost(): void {
-	try {
-		unlinkSync(HOST_LOCK)
-	} catch {}
+function releaseHost(): void {
+	try { unlinkSync(HOST_LOCK) } catch {}
+}
+
+export const ipc = {
+	appendEvent, appendCommand, tailEvents, tailCommands,
+	claimHost, readHostLock, readAllEvents, releaseHost,
 }

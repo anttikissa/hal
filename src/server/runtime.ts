@@ -1,6 +1,6 @@
-// Server runtime — watches commands and generates responses.
+// Server runtime -- watches commands and generates responses.
 
-import { appendEvent, tailCommands } from '../ipc.ts'
+import { ipc } from '../ipc.ts'
 
 interface Session {
 	id: string
@@ -36,38 +36,35 @@ function resetRuntimeState(): void {
 }
 
 function broadcastSessions() {
-	appendEvent({
+	ipc.appendEvent({
 		type: 'sessions',
 		sessions: sessions.map((s) => ({ id: s.id, name: s.name })),
 	})
 }
 
-export function startRuntime(signal: AbortSignal): void {
+function startRuntime(signal: AbortSignal): void {
 	activeRuntimePid = process.pid
 	resetRuntimeState()
 
-	// Create initial session (broadcast on next tick so client tail is ready)
 	createSession()
 	setTimeout(() => {
 		if (!signal.aborted && activeRuntimePid === process.pid) broadcastSessions()
 	}, 0)
 
 	void (async () => {
-		for await (const cmd of tailCommands(signal)) {
+		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || activeRuntimePid !== process.pid) break
 
-			// Ignore commands from previous runtimes. New runtime starts from empty sessions,
-			// so any unknown session id in the log is stale backlog.
 			if (cmd.sessionId && !sessions.some((s) => s.id === cmd.sessionId)) continue
 
 			if (cmd.type === 'prompt') {
-				appendEvent({
+				ipc.appendEvent({
 					type: 'prompt',
 					text: cmd.text,
 					sessionId: cmd.sessionId,
 					createdAt: cmd.createdAt,
 				})
-				appendEvent({
+				ipc.appendEvent({
 					type: 'response',
 					text: `You said: ${cmd.text}`,
 					sessionId: cmd.sessionId,
@@ -83,3 +80,5 @@ export function startRuntime(signal: AbortSignal): void {
 		}
 	})()
 }
+
+export const runtime = { startRuntime }

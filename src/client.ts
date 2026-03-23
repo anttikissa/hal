@@ -1,7 +1,7 @@
 // Client -- state manager for tabs, entries, prompt.
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
-import { appendCommand, tailEvents, readAllEvents } from './ipc.ts'
+import { ipc } from './ipc.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,10 +19,9 @@ export interface Tab {
 	history: Entry[]
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
+// ── Internal state ───────────────────────────────────────────────────────────
 
-// Mutable state object. Importers read and write fields directly.
-export const state = {
+const state = {
 	tabs: [] as Tab[],
 	activeTab: 0,
 	promptText: '',
@@ -30,37 +29,34 @@ export const state = {
 	role: 'server' as 'server' | 'client',
 }
 
-// Callback: display layer sets this so state changes trigger repaint.
 let onChange: (force: boolean) => void = () => {}
 
-export function setOnChange(fn: (force: boolean) => void): void {
+// ── Functions ────────────────────────────────────────────────────────────────
+
+function setOnChange(fn: (force: boolean) => void): void {
 	onChange = fn
 }
 
-// ── Tab helpers ──────────────────────────────────────────────────────────────
-
-export function currentTab(): Tab | null {
+function currentTab(): Tab | null {
 	return state.tabs[state.activeTab] ?? null
 }
 
-export function switchTab(index: number): void {
+function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
 		state.activeTab = index
 		onChange(true)
 	}
 }
 
-export function nextTab(): void {
+function nextTab(): void {
 	if (state.tabs.length > 0) switchTab((state.activeTab + 1) % state.tabs.length)
 }
 
-export function prevTab(): void {
+function prevTab(): void {
 	if (state.tabs.length > 0) switchTab((state.activeTab - 1 + state.tabs.length) % state.tabs.length)
 }
 
-// ── Mutations ────────────────────────────────────────────────────────────────
-
-export function addEntry(text: string, type: EntryType = 'info'): void {
+function addEntry(text: string, type: EntryType = 'info'): void {
 	const tab = currentTab()
 	if (tab) {
 		tab.history.push({ type, text, ts: Date.now() })
@@ -77,23 +73,21 @@ function addEntryToTab(sessionId: string | null, entry: Entry): void {
 	}
 }
 
-export function setPrompt(text: string, cursor: number): void {
+function setPrompt(text: string, cursor: number): void {
 	state.promptText = text
 	state.promptCursor = cursor
 	onChange(false)
 }
 
-export function clearPrompt(): void {
+function clearPrompt(): void {
 	state.promptText = ''
 	state.promptCursor = 0
 	onChange(false)
 }
 
-// ── IPC ──────────────────────────────────────────────────────────────────────
-
-export function sendCommand(type: string, text?: string): void {
+function sendCommand(type: string, text?: string): void {
 	const tab = currentTab()
-	appendCommand({ type, text, sessionId: tab?.sessionId })
+	ipc.appendCommand({ type, text, sessionId: tab?.sessionId })
 }
 
 function handleEvent(event: any): void {
@@ -140,13 +134,20 @@ function eventsForCurrentRuntime(events: any[]): any[] {
 	return events
 }
 
-export function startClient(signal: AbortSignal): void {
-	for (const event of eventsForCurrentRuntime(readAllEvents())) {
+function startClient(signal: AbortSignal): void {
+	for (const event of eventsForCurrentRuntime(ipc.readAllEvents())) {
 		handleEvent(event)
 	}
 	void (async () => {
-		for await (const event of tailEvents(signal)) {
+		for await (const event of ipc.tailEvents(signal)) {
 			handleEvent(event)
 		}
 	})()
+}
+
+// ── Namespace ────────────────────────────────────────────────────────────────
+
+export const client = {
+	state, setOnChange, currentTab, switchTab, nextTab, prevTab,
+	addEntry, setPrompt, clearPrompt, sendCommand, startClient,
 }

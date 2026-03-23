@@ -7,7 +7,7 @@
 // Does NOT own: state (tabs, entries, prompt). Reads from client.ts.
 
 import { visLen, wordWrap } from '../utils/strings.ts'
-import * as client from '../client.ts'
+import { client } from '../client.ts'
 import type { Entry, Tab } from '../client.ts'
 
 const CSI = '\x1b['
@@ -24,7 +24,7 @@ let fullscreen = false
 // High-water mark: tallest history (in rendered lines) across all tabs.
 let peak = 0
 
-export function resetRenderer(): void {
+function resetRenderer(): void {
 	prevLines = []
 	cursorRow = 0
 	fullscreen = false
@@ -152,7 +152,7 @@ function cursorCol(): number {
 
 // ── Paint ────────────────────────────────────────────────────────────────────
 
-export function draw(force = false): void {
+function draw(force = false): void {
 	const rows = process.stdout.rows || 24
 	const lines = buildFrame()
 
@@ -208,3 +208,5 @@ export function draw(force = false): void {
 	prevLines = lines
 	process.stdout.write(out.join(''))
 }
+
+export const render = { draw, resetRenderer }

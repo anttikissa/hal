@@ -1,14 +1,14 @@
 // CLI -- terminal input handling. Thin layer: reads keypresses, calls client
 // for state changes, renderer for display.
 
-import * as client from '../client.ts'
-import { draw } from './render.ts'
+import { client } from '../client.ts'
+import { render } from './render.ts'
 
 const RESTART_CODE = 100
 
-export function startCli(signal: AbortSignal): void {
+function startCli(signal: AbortSignal): void {
 	// Wire client state changes to terminal repaint.
-	client.setOnChange((force) => draw(force))
+	client.setOnChange((force) => render.draw(force))
 
 	// Bootstrap client (replays IPC log, starts tailing events).
 	client.startClient(signal)
@@ -18,9 +18,9 @@ export function startCli(signal: AbortSignal): void {
 		process.stdin.resume()
 	}
 
-	draw()
+	render.draw()
 
-	process.stdout.on('resize', () => draw(true))
+	process.stdout.on('resize', () => render.draw(true))
 
 	process.stdin.on('data', (data: Buffer) => {
 		for (let i = 0; i < data.length; i++) {
@@ -53,7 +53,7 @@ export function startCli(signal: AbortSignal): void {
 			if (byte === 0x10) { client.prevTab(); continue }
 
 			// Ctrl-L: force redraw
-			if (byte === 0x0c) { draw(true); continue }
+			if (byte === 0x0c) { render.draw(true); continue }
 
 			// Enter
 			if (byte === 0x0d || byte === 0x0a) {
@@ -94,3 +94,5 @@ export function startCli(signal: AbortSignal): void {
 		}
 	})
 }
+
+export const cli = { startCli }

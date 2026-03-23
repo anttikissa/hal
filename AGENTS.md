@@ -48,6 +48,37 @@ Bold or italics are ok in keyword-dense technical documentation, but usually unn
 
 Don't be a kiss-ass, I can take critique.
 
+# Module convention
+
+Every module exports a single mutable namespace object. All cross-module calls
+go through these objects, so eval patches take effect immediately at runtime.
+
+```ts
+// ipc.ts
+function appendEvent(event: any): void { ... }
+function appendCommand(command: any): void { ... }
+export const ipc = { appendEvent, appendCommand, ... }
+```
+
+Caller:
+```ts
+import { ipc } from './ipc.ts'
+ipc.appendEvent({ type: 'foo' })
+```
+
+Stateful modules include a `state` field:
+```ts
+export const client = { state: { tabs: [], activeTab: 0 }, addEntry, switchTab, ... }
+```
+
+This enables the eval tool to inspect and hot-patch anything at runtime:
+```ts
+import { client } from '~src/client.ts'
+client.addEntry = (text) => { console.log('patched!'); origAddEntry(text) }
+```
+
+`perf.ts` already follows this pattern. All modules must.
+
 # Terminal width
 
 ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.
