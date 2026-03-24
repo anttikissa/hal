@@ -1,0 +1,19 @@
+import { describe, test, expect } from 'bun:test'
+import { keys } from '../src/cli/keys.ts'
+
+describe('keys', () => {
+	test('parses alt-left and alt-right word navigation', () => {
+		expect(keys.parseKey('\x1bb')).toEqual({ key: 'left', shift: false, alt: true, ctrl: false, cmd: false })
+		expect(keys.parseKey('\x1bf')).toEqual({ key: 'right', shift: false, alt: true, ctrl: false, cmd: false })
+	})
+
+	test('parses kitty cmd shortcuts', () => {
+		expect(keys.parseKey('\x1b[120;9u')).toEqual({ key: 'x', shift: false, alt: false, ctrl: false, cmd: true })
+		expect(keys.parseKey('\x1b[118;9u')).toEqual({ key: 'v', shift: false, alt: false, ctrl: false, cmd: true })
+	})
+
+	test('parses bracketed paste as one token', () => {
+		const parsed = keys.parseKeys('\x1b[200~hello\nworld\x1b[201~')
+		expect(parsed).toEqual([{ key: 'hello\nworld', char: 'hello\nworld', shift: false, alt: false, ctrl: false, cmd: false }])
+	})
+})
