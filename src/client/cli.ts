@@ -20,7 +20,9 @@ const KITTY_OFF = '\x1b[<u'
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
 const BRACKETED_PASTE_OFF = '\x1b[?2004l'
 
-function draw(force = false): void { render.draw(force) }
+function draw(force = false): void {
+	render.draw(force)
+}
 
 // Restore terminal state and save client state before exiting.
 // Must be called on ALL exit paths.
@@ -60,7 +62,10 @@ function handleAppKey(k: KeyEvent): boolean {
 		process.exit(0)
 	}
 	// Ctrl-L: force redraw
-	if (k.key === 'l' && k.ctrl) { draw(true); return true }
+	if (k.key === 'l' && k.ctrl) {
+		draw(true)
+		return true
+	}
 	// Ctrl-T: new tab
 	if (k.key === 't' && k.ctrl) {
 		if (client.state.tabs.length < 40) client.sendCommand('open')
@@ -72,12 +77,20 @@ function handleAppKey(k: KeyEvent): boolean {
 		return true
 	}
 	// Ctrl-N / Ctrl-P: tab switching
-	if (k.key === 'n' && k.ctrl) { client.nextTab(); return true }
-	if (k.key === 'p' && k.ctrl) { client.prevTab(); return true }
+	if (k.key === 'n' && k.ctrl) {
+		client.nextTab()
+		return true
+	}
+	if (k.key === 'p' && k.ctrl) {
+		client.prevTab()
+		return true
+	}
 	// Enter: submit (blocked while image paste is resolving)
 	if (k.key === 'enter' && !k.shift) {
 		if (clipboard.hasPendingPastes()) return true
-		submit(); draw(); return true
+		submit()
+		draw()
+		return true
 	}
 	return false
 }

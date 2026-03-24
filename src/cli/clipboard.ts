@@ -35,15 +35,18 @@ on error
   return "no-image"
 end try`
 	const proc = Bun.spawn(['osascript', '-e', script], { stdout: 'pipe', stderr: 'pipe' })
-	return new Response(proc.stdout).text().then(out => {
+	return new Response(proc.stdout).text().then((out) => {
 		const s = out.trim()
 		return s === 'no-image' ? null : s
 	})
 }
 
 function readClipboardText(): string {
-	try { return Bun.spawnSync(['pbpaste']).stdout.toString() }
-	catch { return '' }
+	try {
+		return Bun.spawnSync(['pbpaste']).stdout.toString()
+	} catch {
+		return ''
+	}
 }
 
 type PasteResolve = (placeholder: string, replacement: string) => void
@@ -57,7 +60,7 @@ function pasteFromClipboard(onResolve?: PasteResolve): string {
 
 	const placeholder = allocPlaceholder()
 	pendingPastes++
-	getClipboardImageAsync().then(imagePath => {
+	getClipboardImageAsync().then((imagePath) => {
 		pendingPastes--
 		if (pendingPastes === 0) pasteCounter = 0
 		if (onResolve) onResolve(placeholder, imagePath ? `[${imagePath}]` : '')
@@ -69,8 +72,8 @@ function pasteFromClipboard(onResolve?: PasteResolve): string {
 function saveMultilinePaste(text: string): string {
 	ensureDir(PASTE_DIR)
 	const existing = readdirSync(PASTE_DIR)
-		.filter(f => /^\d{4}\.txt$/.test(f))
-		.map(f => parseInt(f.slice(0, 4), 10))
+		.filter((f) => /^\d{4}\.txt$/.test(f))
+		.map((f) => parseInt(f.slice(0, 4), 10))
 	const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
 	const path = `${PASTE_DIR}/${String(next).padStart(4, '0')}.txt`
 	writeFileSync(path, text)
@@ -83,12 +86,13 @@ const IMAGE_EXTS = /\.(png|jpg|jpeg|gif|webp)$/i
 // Single-line image path -> wrap in [brackets].
 // If >5 newlines, save to file and return `[path]` instead.
 function cleanPaste(raw: string): string {
-	const text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+	const text = raw
+		.replace(/\r\n/g, '\n')
+		.replace(/\r/g, '\n')
 		.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
 	if (!text) return ''
 	const trimmed = text.trim()
-	if (trimmed.startsWith('/') && !trimmed.includes('\n')
-		&& IMAGE_EXTS.test(trimmed) && existsSync(trimmed)) {
+	if (trimmed.startsWith('/') && !trimmed.includes('\n') && IMAGE_EXTS.test(trimmed) && existsSync(trimmed)) {
 		return `[${trimmed.replace(homedir(), '~')}]`
 	}
 	const newlineCount = (text.match(/\n/g) || []).length
@@ -96,6 +100,8 @@ function cleanPaste(raw: string): string {
 	return text
 }
 
-function hasPendingPastes(): boolean { return pendingPastes > 0 }
+function hasPendingPastes(): boolean {
+	return pendingPastes > 0
+}
 
 export const clipboard = { pasteFromClipboard, cleanPaste, hasPendingPastes }

@@ -76,12 +76,18 @@ if (isHost) {
 	const pollTimer = setInterval(() => {
 		if (isHost || promoting) return
 		if (serverPid !== null) {
-			try { process.kill(serverPid, 0) }
-			catch { serverPid = null; tryPromote() }
+			try {
+				process.kill(serverPid, 0)
+			} catch {
+				serverPid = null
+				tryPromote()
+			}
 		}
 	}, 1000)
 	ac.signal.addEventListener('abort', () => clearInterval(pollTimer))
 }
 
-perf.setSink((lines) => { for (const line of lines) client.addEntry(line) })
+perf.setSink((lines) => {
+	for (const line of lines) client.addEntry(line)
+})
 cli.startCli(ac.signal)

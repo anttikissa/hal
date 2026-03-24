@@ -18,8 +18,7 @@ function makeSessionId(): string {
 	const month = String(new Date().getMonth() + 1).padStart(2, '0')
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
 	let suffix = ''
-	for (let i = 0; i < 3; i++)
-		suffix += chars[Math.floor(Math.random() * chars.length)]
+	for (let i = 0; i < 3; i++) suffix += chars[Math.floor(Math.random() * chars.length)]
 	return `${month}-${suffix}`
 }
 
@@ -36,7 +35,7 @@ function createSession(): Session {
 function broadcastSessions() {
 	ipc.appendEvent({
 		type: 'sessions',
-		sessions: activeSessions.map(s => ({ id: s.id, name: s.name })),
+		sessions: activeSessions.map((s) => ({ id: s.id, name: s.name })),
 	})
 }
 
@@ -69,7 +68,7 @@ function startRuntime(signal: AbortSignal): void {
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || activeRuntimePid !== process.pid) break
-			if (cmd.sessionId && !activeSessions.some(s => s.id === cmd.sessionId)) continue
+			if (cmd.sessionId && !activeSessions.some((s) => s.id === cmd.sessionId)) continue
 
 			if (cmd.type === 'prompt') {
 				ipc.appendEvent({
@@ -87,7 +86,7 @@ function startRuntime(signal: AbortSignal): void {
 				createSession()
 				broadcastSessions()
 			} else if (cmd.type === 'close' && cmd.sessionId) {
-				activeSessions = activeSessions.filter(s => s.id !== cmd.sessionId)
+				activeSessions = activeSessions.filter((s) => s.id !== cmd.sessionId)
 				if (activeSessions.length === 0) createSession()
 				broadcastSessions()
 			}

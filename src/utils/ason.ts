@@ -5,14 +5,7 @@
 export const COMMENTS = Symbol('comments')
 
 /** Any value representable in ASON. */
-export type AsonValue =
-	| string
-	| number
-	| boolean
-	| null
-	| undefined
-	| AsonArray
-	| AsonObject
+export type AsonValue = string | number | boolean | null | undefined | AsonArray | AsonObject
 
 /** Array with optional comment metadata per element. */
 export type AsonArray = AsonValue[] & { [COMMENTS]?: (string | undefined)[] }
@@ -26,17 +19,10 @@ export type AsonObject = {
 
 function quoteString(s: string, multiline = false): string {
 	if (multiline && s.includes('\n')) {
-		const escaped = s
-			.replace(/\\/g, '\\\\')
-			.replace(/`/g, '\\`')
-			.replace(/\$\{/g, '\\${')
+		const escaped = s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${')
 		return `\`${escaped}\``
 	}
-	const escaped = s
-		.replace(/\\/g, '\\\\')
-		.replace(/\n/g, '\\n')
-		.replace(/\r/g, '\\r')
-		.replace(/\t/g, '\\t')
+	const escaped = s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
 	const hasSingle = s.includes("'")
 	const hasDouble = s.includes('"')
 	if (hasSingle && !hasDouble) return `"${escaped}"`
@@ -54,12 +40,7 @@ function indentComment(comment: string, pad: string): string {
 	return lines.map((l) => (l ? pad + l : '')).join('\n')
 }
 
-function stringifyValue(
-	obj: unknown,
-	col: number,
-	depth: number,
-	maxWidth: number
-): string {
+function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: number): string {
 	if (obj === null) return 'null'
 	if (obj === undefined) return 'undefined'
 	if (typeof obj === 'boolean') return obj ? 'true' : 'false'
@@ -73,16 +54,10 @@ function stringifyValue(
 
 	if (Array.isArray(obj)) {
 		if (obj.length === 0) return '[]'
-		const comments =
-			maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
+		const comments = maxWidth < Infinity ? (obj as AsonArray)[COMMENTS] : undefined
 		const items = obj.map((v) => stringifyValue(v, 0, depth, maxWidth))
 		const inline = `[${items.join(', ')}]`
-		if (
-			!comments &&
-			col + inline.length <= maxWidth &&
-			!inline.includes('\n')
-		)
-			return inline
+		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = obj.map((v, i) => {
@@ -98,29 +73,16 @@ function stringifyValue(
 		const keys = Object.keys(rec)
 		if (keys.length === 0) return '{}'
 		const comments = maxWidth < Infinity ? rec[COMMENTS] : undefined
-		const pairs = keys.map(
-			(k) =>
-				`${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`
-		)
+		const pairs = keys.map((k) => `${quoteKey(k)}: ${stringifyValue(rec[k], 0, depth, maxWidth)}`)
 		const inline = `{ ${pairs.join(', ')} }`
-		if (
-			!comments &&
-			col + inline.length <= maxWidth &&
-			!inline.includes('\n')
-		)
-			return inline
+		if (!comments && col + inline.length <= maxWidth && !inline.includes('\n')) return inline
 		const childDepth = depth + 1
 		const pad = '  '.repeat(childDepth)
 		const lines = keys.map((k, i) => {
 			const comment = comments?.[k]
 			const prefix = comment ? indentComment(comment, pad) + '\n' : ''
 			const keyPrefix = `${pad}${quoteKey(k)}: `
-			const val = stringifyValue(
-				rec[k],
-				keyPrefix.length,
-				childDepth,
-				maxWidth
-			)
+			const val = stringifyValue(rec[k], keyPrefix.length, childDepth, maxWidth)
 			return `${prefix}${keyPrefix}${val}${i < keys.length - 1 ? ',' : ''}`
 		})
 		return `{\n${lines.join('\n')}\n${'  '.repeat(depth)}}`
@@ -160,10 +122,7 @@ function fail(ctx: Ctx, msg: string): never {
 	}
 	const lineText = ctx.buf.split('\n')[line - 1] ?? ''
 	const pad = lineText.slice(0, col - 1).replace(/[^\t]/g, ' ')
-	throw new ParseError(
-		`${msg} at ${line}:${col}:\n    ${lineText}\n    ${pad}^`,
-		ctx.pos
-	)
+	throw new ParseError(`${msg} at ${line}:${col}:\n    ${lineText}\n    ${pad}^`, ctx.pos)
 }
 
 function isIdent(ch: string): boolean {
@@ -227,8 +186,7 @@ function peek2(ctx: Ctx): string {
 }
 
 function eat(ctx: Ctx, ch: string): void {
-	if (peek(ctx) !== ch)
-		fail(ctx, `Expected '${ch}', got '${peek(ctx) || 'EOF'}'`)
+	if (peek(ctx) !== ch) fail(ctx, `Expected '${ch}', got '${peek(ctx) || 'EOF'}'`)
 	ctx.pos++
 }
 
@@ -253,11 +211,7 @@ function parseString(ctx: Ctx, quote: string): string {
 			ctx.pos = pos + 1
 			return buf.slice(start, pos)
 		}
-		if (
-			checkTemplateDollar &&
-			cc === 0x24 &&
-			buf.charCodeAt(pos + 1) === 0x7b
-		) {
+		if (checkTemplateDollar && cc === 0x24 && buf.charCodeAt(pos + 1) === 0x7b) {
 			ctx.pos = pos
 			fail(ctx, 'Template interpolation is not supported')
 		}
@@ -288,8 +242,7 @@ function parseString(ctx: Ctx, quote: string): string {
 			else if (esc === 0x75) {
 				// u
 				const hex = buf.slice(ctx.pos + 1, ctx.pos + 5)
-				if (!/^[0-9a-fA-F]{4}$/.test(hex))
-					fail(ctx, 'Invalid unicode escape')
+				if (!/^[0-9a-fA-F]{4}$/.test(hex)) fail(ctx, 'Invalid unicode escape')
 				segments.push(String.fromCharCode(parseInt(hex, 16)))
 				ctx.pos += 4
 			} else segments.push(buf[ctx.pos]!)
@@ -302,11 +255,7 @@ function parseString(ctx: Ctx, quote: string): string {
 			ctx.pos++
 			return segments.join('')
 		}
-		if (
-			checkTemplateDollar &&
-			cc === 0x24 &&
-			buf.charCodeAt(ctx.pos + 1) === 0x7b
-		) {
+		if (checkTemplateDollar && cc === 0x24 && buf.charCodeAt(ctx.pos + 1) === 0x7b) {
 			fail(ctx, 'Template interpolation is not supported')
 		}
 		ctx.pos++
@@ -447,9 +396,7 @@ export function parseAll(str: string): AsonValue[] {
  *  split('\n') always produces a trailing element after the last \n;
  *  pop() keeps that incomplete fragment in buf for the next chunk.
  *  e.g. "a\nb\nc" → ["a","b","c"] → yield "a","b", buf="c" */
-async function* streamLines(
-	stream: ReadableStream<Uint8Array>
-): AsyncGenerator<string> {
+async function* streamLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
 	const decoder = new TextDecoder()
 	let buf = ''
 	for await (const chunk of stream) {
@@ -463,9 +410,7 @@ async function* streamLines(
 
 /** Yields parsed ASON values from a byte stream, one per newline-delimited record.
  *  The first line silently ignores parse errors (the stream may start mid-record). */
-export async function* parseStream(
-	stream: ReadableStream<Uint8Array>
-): AsyncGenerator<AsonValue> {
+export async function* parseStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<AsonValue> {
 	let first = true
 	for await (const line of streamLines(stream)) {
 		if (!line.trim()) continue

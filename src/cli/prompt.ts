@@ -18,8 +18,7 @@ function wordWrapLines(text: string, width: number): string[] {
 			let breakAt = remaining.lastIndexOf(' ', width)
 			if (breakAt <= 0) breakAt = width
 			result.push(remaining.slice(0, breakAt))
-			remaining = remaining[breakAt] === ' '
-				? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
+			remaining = remaining[breakAt] === ' ' ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
 		}
 		result.push(remaining)
 	}
@@ -38,8 +37,7 @@ function getLayout(input: string, width: number): WrappedLayout {
 	for (let i = 0; i < lines.length; i++) {
 		starts.push(pos)
 		const len = lines[i]!.length
-		const nextChar = i < lines.length - 1 && pos + len < input.length
-			? input[pos + len] : ''
+		const nextChar = i < lines.length - 1 && pos + len < input.length ? input[pos + len] : ''
 		pos += len + (nextChar === ' ' || nextChar === '\n' ? 1 : 0)
 	}
 	return { lines, starts }
@@ -64,14 +62,22 @@ function rowColToCursor(input: string, row: number, col: number, width: number):
 }
 
 function verticalMove(
-	input: string, width: number, cur: number, goal: number | null, dir: -1 | 1,
+	input: string,
+	width: number,
+	cur: number,
+	goal: number | null,
+	dir: -1 | 1,
 ): { cursor: number; goalCol: number; atBoundary: boolean } {
 	const { lines } = getLayout(input, width)
 	const { row, col } = cursorToRowCol(input, cur, width)
 	const g = goal ?? col
 	const target = row + dir
 	if (target < 0 || target >= lines.length) return { cursor: cur, goalCol: g, atBoundary: true }
-	return { cursor: rowColToCursor(input, target, g, width), goalCol: g, atBoundary: false }
+	return {
+		cursor: rowColToCursor(input, target, g, width),
+		goalCol: g,
+		atBoundary: false,
+	}
 }
 
 function wordLeft(text: string, pos: number): number {
@@ -96,7 +102,11 @@ let goalCol: number | null = null
 let selAnchor: number | null = null
 
 // Undo / redo
-interface Snapshot { text: string; cursor: number; selAnchor: number | null }
+interface Snapshot {
+	text: string
+	cursor: number
+	selAnchor: number | null
+}
 let undoStack: Snapshot[] = []
 let redoStack: Snapshot[] = []
 let undoGrouping = false
@@ -111,7 +121,9 @@ let renderCallback: (() => void) | null = null
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function clamp(pos: number): number { return Math.max(0, Math.min(pos, buf.length)) }
+function clamp(pos: number): number {
+	return Math.max(0, Math.min(pos, buf.length))
+}
 
 function selRange(): { start: number; end: number } | null {
 	if (selAnchor === null) return null
@@ -140,7 +152,8 @@ function replaceSelection(text: string): void {
 		buf = buf.slice(0, cursor) + text + buf.slice(cursor)
 		cursor += text.length
 	}
-	selAnchor = null; goalCol = null
+	selAnchor = null
+	goalCol = null
 }
 
 // Single char insert — consecutive inserts coalesce into one undo group
@@ -155,13 +168,16 @@ function typeChar(ch: string): void {
 		buf = buf.slice(0, cursor) + ch + buf.slice(cursor)
 		cursor += ch.length
 	}
-	selAnchor = null; goalCol = null
+	selAnchor = null
+	goalCol = null
 }
 
 function deleteRange(start: number, end: number): void {
 	pushUndo()
 	buf = buf.slice(0, start) + buf.slice(end)
-	cursor = start; selAnchor = null; goalCol = null
+	cursor = start
+	selAnchor = null
+	goalCol = null
 }
 
 function deleteSel(): boolean {
@@ -172,16 +188,25 @@ function deleteSel(): boolean {
 }
 
 function move(pos: number, selecting: boolean): void {
-	if (selecting) { if (selAnchor === null) selAnchor = cursor }
-	else { selAnchor = null }
-	cursor = clamp(pos); goalCol = null
+	if (selecting) {
+		if (selAnchor === null) selAnchor = cursor
+	} else {
+		selAnchor = null
+	}
+	cursor = clamp(pos)
+	goalCol = null
 }
 
 // Collapse selection to one edge, or move if no selection
 function collapseOrMove(pos: number, edge: 'start' | 'end'): void {
 	const sel = selRange()
-	if (sel) { cursor = edge === 'start' ? sel.start : sel.end; selAnchor = null; goalCol = null }
-	else { move(pos, false) }
+	if (sel) {
+		cursor = edge === 'start' ? sel.start : sel.end
+		selAnchor = null
+		goalCol = null
+	} else {
+		move(pos, false)
+	}
 }
 
 function undo(): boolean {
@@ -189,7 +214,10 @@ function undo(): boolean {
 	const snap = undoStack.pop()
 	if (!snap) return false
 	redoStack.push({ text: buf, cursor, selAnchor })
-	buf = snap.text; cursor = clamp(snap.cursor); selAnchor = snap.selAnchor; goalCol = null
+	buf = snap.text
+	cursor = clamp(snap.cursor)
+	selAnchor = snap.selAnchor
+	goalCol = null
 	return true
 }
 
@@ -198,7 +226,10 @@ function redo(): boolean {
 	const snap = redoStack.pop()
 	if (!snap) return false
 	undoStack.push({ text: buf, cursor, selAnchor })
-	buf = snap.text; cursor = clamp(snap.cursor); selAnchor = snap.selAnchor; goalCol = null
+	buf = snap.text
+	cursor = clamp(snap.cursor)
+	selAnchor = snap.selAnchor
+	goalCol = null
 	return true
 }
 
@@ -208,7 +239,8 @@ function writeToClipboard(text: string): void {
 	if (!text) return
 	try {
 		const p = Bun.spawn(['pbcopy'], { stdin: 'pipe' })
-		p.stdin.write(text); p.stdin.end()
+		p.stdin.write(text)
+		p.stdin.end()
 	} catch {}
 }
 
@@ -222,9 +254,11 @@ function resolvePlaceholder(placeholder: string, replacement: string): void {
 }
 
 function doPaste(): void {
-	const t = clipboard.cleanPaste(clipboard.pasteFromClipboard((ph, result) => {
-		resolvePlaceholder(ph, result)
-	}))
+	const t = clipboard.cleanPaste(
+		clipboard.pasteFromClipboard((ph, result) => {
+			resolvePlaceholder(ph, result)
+		}),
+	)
 	if (t) replaceSelection(t)
 }
 
@@ -237,23 +271,53 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 
 	// Cmd shortcuts (macOS)
 	if (k.cmd) {
-		if (k.key === 'c') { const s = selRange(); if (s) writeToClipboard(buf.slice(s.start, s.end)); return true }
-		if (k.key === 'x') { const s = selRange(); if (s) { writeToClipboard(buf.slice(s.start, s.end)); deleteRange(s.start, s.end) }; return true }
-		if (k.key === 'v') { doPaste(); return true }
-		if (k.key === 'a') { selAnchor = 0; cursor = buf.length; return true }
-		if (k.key === 'u' && k.shift) { redo(); return true }
-		if (k.key === 'u') { undo(); return true }
+		if (k.key === 'c') {
+			const s = selRange()
+			if (s) writeToClipboard(buf.slice(s.start, s.end))
+			return true
+		}
+		if (k.key === 'x') {
+			const s = selRange()
+			if (s) {
+				writeToClipboard(buf.slice(s.start, s.end))
+				deleteRange(s.start, s.end)
+			}
+			return true
+		}
+		if (k.key === 'v') {
+			doPaste()
+			return true
+		}
+		if (k.key === 'a') {
+			selAnchor = 0
+			cursor = buf.length
+			return true
+		}
+		if (k.key === 'u' && k.shift) {
+			redo()
+			return true
+		}
+		if (k.key === 'u') {
+			undo()
+			return true
+		}
 		return false
 	}
 
 	// Enter: shift+enter inserts newline; plain enter goes to keybindings (submit)
-	if (k.key === 'enter' && k.shift && !k.alt) { replaceSelection('\n'); return true }
+	if (k.key === 'enter' && k.shift && !k.alt) {
+		replaceSelection('\n')
+		return true
+	}
 	if (k.key === 'enter') return false
 
 	// Backspace / Delete
 	if (k.key === 'backspace') {
-		if (k.alt) { if (!deleteSel() && cursor > 0) deleteRange(wordLeft(buf, cursor), cursor) }
-		else { if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor) }
+		if (k.alt) {
+			if (!deleteSel() && cursor > 0) deleteRange(wordLeft(buf, cursor), cursor)
+		} else {
+			if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor)
+		}
 		return true
 	}
 	if (k.key === 'delete') {
@@ -269,76 +333,154 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	}
 
 	// Ctrl+U/K: kill line
-	if (k.key === 'u' && k.ctrl) { if (cursor > 0) deleteRange(0, cursor); return true }
-	if (k.key === 'k' && k.ctrl) { if (cursor < buf.length) deleteRange(cursor, buf.length); return true }
+	if (k.key === 'u' && k.ctrl) {
+		if (cursor > 0) deleteRange(0, cursor)
+		return true
+	}
+	if (k.key === 'k' && k.ctrl) {
+		if (cursor < buf.length) deleteRange(cursor, buf.length)
+		return true
+	}
 
 	// Ctrl+A/E: home/end (Emacs)
-	if (k.key === 'a' && k.ctrl) { move(0, k.shift); return true }
-	if (k.key === 'e' && k.ctrl) { move(buf.length, k.shift); return true }
+	if (k.key === 'a' && k.ctrl) {
+		move(0, k.shift)
+		return true
+	}
+	if (k.key === 'e' && k.ctrl) {
+		move(buf.length, k.shift)
+		return true
+	}
 
 	// Ctrl+V/Y: paste
-	if ((k.key === 'v' || k.key === 'y') && k.ctrl) { doPaste(); return true }
+	if ((k.key === 'v' || k.key === 'y') && k.ctrl) {
+		doPaste()
+		return true
+	}
 
 	// Ctrl+/: undo, Shift+Ctrl+/: redo
-	if (k.key === '/' && k.ctrl && k.shift) { redo(); return true }
-	if (k.key === '/' && k.ctrl) { undo(); return true }
+	if (k.key === '/' && k.ctrl && k.shift) {
+		redo()
+		return true
+	}
+	if (k.key === '/' && k.ctrl) {
+		undo()
+		return true
+	}
 
 	// Left / Right
 	if (k.key === 'left') {
-		if (k.alt) { move(wordLeft(buf, cursor), k.shift); return true }
-		if (k.shift) { move(cursor - 1, true); return true }
-		collapseOrMove(cursor - 1, 'start'); return true
+		if (k.alt) {
+			move(wordLeft(buf, cursor), k.shift)
+			return true
+		}
+		if (k.shift) {
+			move(cursor - 1, true)
+			return true
+		}
+		collapseOrMove(cursor - 1, 'start')
+		return true
 	}
 	if (k.key === 'right') {
-		if (k.alt) { move(wordRight(buf, cursor), k.shift); return true }
-		if (k.shift) { move(cursor + 1, true); return true }
-		collapseOrMove(cursor + 1, 'end'); return true
+		if (k.alt) {
+			move(wordRight(buf, cursor), k.shift)
+			return true
+		}
+		if (k.shift) {
+			move(cursor + 1, true)
+			return true
+		}
+		collapseOrMove(cursor + 1, 'end')
+		return true
 	}
 
 	// Up / Down: vertical move in wrapped text, history at boundaries
 	if (k.key === 'up' || k.key === 'down') {
 		const dir = k.key === 'up' ? -1 : 1
-		if (k.alt) { move(dir === -1 ? 0 : buf.length, k.shift); return true }
+		if (k.alt) {
+			move(dir === -1 ? 0 : buf.length, k.shift)
+			return true
+		}
 
 		if (!k.shift) {
 			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
 			if (!r.atBoundary) {
-				selAnchor = null; cursor = r.cursor; goalCol = r.goalCol
+				selAnchor = null
+				cursor = r.cursor
+				goalCol = r.goalCol
 				return true
 			}
 			// At boundary: cycle history
 			if (history.length > 0) {
 				if (dir === -1) {
-					if (historyIndex < 0) { historyDraft = buf; historyIndex = history.length - 1 }
-					else if (historyIndex > 0) { historyIndex-- }
-					else { cursor = 0; goalCol = null; selAnchor = null; return true }
-					buf = history[historyIndex]!; cursor = buf.length; goalCol = null; selAnchor = null
+					if (historyIndex < 0) {
+						historyDraft = buf
+						historyIndex = history.length - 1
+					} else if (historyIndex > 0) {
+						historyIndex--
+					} else {
+						cursor = 0
+						goalCol = null
+						selAnchor = null
+						return true
+					}
+					buf = history[historyIndex]!
+					cursor = buf.length
+					goalCol = null
+					selAnchor = null
 				} else {
-					if (historyIndex < 0) { cursor = buf.length; goalCol = null; selAnchor = null; return true }
-					if (historyIndex < history.length - 1) { historyIndex++; buf = history[historyIndex]! }
-					else { historyIndex = -1; buf = historyDraft; historyDraft = '' }
-					cursor = buf.length; goalCol = null; selAnchor = null
+					if (historyIndex < 0) {
+						cursor = buf.length
+						goalCol = null
+						selAnchor = null
+						return true
+					}
+					if (historyIndex < history.length - 1) {
+						historyIndex++
+						buf = history[historyIndex]!
+					} else {
+						historyIndex = -1
+						buf = historyDraft
+						historyDraft = ''
+					}
+					cursor = buf.length
+					goalCol = null
+					selAnchor = null
 				}
 				return true
 			}
-			cursor = dir === -1 ? 0 : buf.length; goalCol = null; selAnchor = null
+			cursor = dir === -1 ? 0 : buf.length
+			goalCol = null
+			selAnchor = null
 		} else {
 			if (selAnchor === null) selAnchor = cursor
 			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
-			if (!r.atBoundary) { cursor = r.cursor; goalCol = r.goalCol }
-			else { cursor = dir === -1 ? 0 : buf.length; goalCol = null }
+			if (!r.atBoundary) {
+				cursor = r.cursor
+				goalCol = r.goalCol
+			} else {
+				cursor = dir === -1 ? 0 : buf.length
+				goalCol = null
+			}
 		}
 		return true
 	}
 
 	// Home / End
-	if (k.key === 'home') { move(0, k.shift); return true }
-	if (k.key === 'end') { move(buf.length, k.shift); return true }
+	if (k.key === 'home') {
+		move(0, k.shift)
+		return true
+	}
+	if (k.key === 'end') {
+		move(buf.length, k.shift)
+		return true
+	}
 
 	// Printable
 	if (k.char) {
-		if (k.char.length === 1 && !selRange()) { typeChar(k.char) }
-		else {
+		if (k.char.length === 1 && !selRange()) {
+			typeChar(k.char)
+		} else {
 			const text = k.char.length > 1 ? clipboard.cleanPaste(k.char) : k.char
 			if (text) replaceSelection(text)
 		}
@@ -391,26 +533,58 @@ function buildPrompt(contentWidth: number): PromptRender {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-function text(): string { return buf }
-function cursorPos(): number { return cursor }
+function text(): string {
+	return buf
+}
+function cursorPos(): number {
+	return cursor
+}
 
 function setText(t: string, c?: number): void {
-	buf = t; cursor = c ?? t.length; goalCol = null; selAnchor = null
-	historyIndex = -1; historyDraft = ''
+	buf = t
+	cursor = c ?? t.length
+	goalCol = null
+	selAnchor = null
+	historyIndex = -1
+	historyDraft = ''
 }
 
 function clear(): void {
-	buf = ''; cursor = 0; goalCol = null; selAnchor = null
-	undoStack = []; redoStack = []; undoGrouping = false
-	historyIndex = -1; historyDraft = ''
+	buf = ''
+	cursor = 0
+	goalCol = null
+	selAnchor = null
+	undoStack = []
+	redoStack = []
+	undoGrouping = false
+	historyIndex = -1
+	historyDraft = ''
 }
 
-function setHistory(h: string[]): void { history = h; historyIndex = -1; historyDraft = '' }
-function pushHistory(text: string): void { history.push(text) }
-function setRenderCallback(cb: () => void): void { renderCallback = cb }
-function lineCount(w: number): number { return Math.min(getLayout(buf, w).lines.length, MAX_PROMPT_LINES) }
+function setHistory(h: string[]): void {
+	history = h
+	historyIndex = -1
+	historyDraft = ''
+}
+function pushHistory(text: string): void {
+	history.push(text)
+}
+function setRenderCallback(cb: () => void): void {
+	renderCallback = cb
+}
+function lineCount(w: number): number {
+	return Math.min(getLayout(buf, w).lines.length, MAX_PROMPT_LINES)
+}
 
 export const prompt = {
-	text, cursorPos, setText, clear, setHistory, pushHistory,
-	setRenderCallback, handleKey, buildPrompt, lineCount,
+	text,
+	cursorPos,
+	setText,
+	clear,
+	setHistory,
+	pushHistory,
+	setRenderCallback,
+	handleKey,
+	buildPrompt,
+	lineCount,
 }

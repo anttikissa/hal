@@ -64,8 +64,8 @@ const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 
 interface ClientStateFile {
 	lastTab: string | null
-	peak: number       // high-water mark for rendered line count
-	peakCols: number   // terminal width peak was computed at
+	peak: number // high-water mark for rendered line count
+	peakCols: number // terminal width peak was computed at
 }
 
 function loadClientState(): ClientStateFile {
@@ -84,11 +84,14 @@ function loadClientState(): ClientStateFile {
 function saveClientState(): void {
 	const tab = currentTab()
 	try {
-		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
-			lastTab: tab?.sessionId ?? null,
-			peak: state.peak,
-			peakCols: state.peakCols,
-		}) + '\n')
+		writeFileSync(
+			CLIENT_STATE_PATH,
+			ason.stringify({
+				lastTab: tab?.sessionId ?? null,
+				peak: state.peak,
+				peakCols: state.peakCols,
+			}) + '\n',
+		)
 	} catch {}
 }
 
@@ -109,7 +112,7 @@ function addEntry(text: string, type: EntryType = 'info'): void {
 }
 
 function addEntryToTab(sessionId: string | null, entry: Entry): void {
-	let tab = sessionId ? state.tabs.find(t => t.sessionId === sessionId) : currentTab()
+	let tab = sessionId ? state.tabs.find((t) => t.sessionId === sessionId) : currentTab()
 	if (!tab) tab = currentTab()
 	if (tab) {
 		tab.history.push(entry)
@@ -140,7 +143,7 @@ function handleEvent(event: any): void {
 	if (event.type === 'sessions') {
 		const newTabs: Tab[] = []
 		for (const s of event.sessions) {
-			const existing = state.tabs.find(t => t.sessionId === s.id)
+			const existing = state.tabs.find((t) => t.sessionId === s.id)
 			if (existing) {
 				existing.name = s.name
 				newTabs.push(existing)
@@ -155,17 +158,20 @@ function handleEvent(event: any): void {
 		onChange(false)
 	} else if (event.type === 'prompt') {
 		addEntryToTab(event.sessionId, {
-			type: 'input', text: event.text,
+			type: 'input',
+			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'response') {
 		addEntryToTab(event.sessionId, {
-			type: 'assistant', text: event.text,
+			type: 'assistant',
+			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'info') {
 		addEntryToTab(event.sessionId ?? null, {
-			type: 'info', text: event.text,
+			type: 'info',
+			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	}
@@ -187,7 +193,7 @@ function loadPersistedSessions(): void {
 		// Name priority: topic > last directory component of workingDir > "tab N"
 		const dirName = s.meta.workingDir?.split('/').pop()
 		const name = s.meta.topic ?? dirName ?? `tab ${newTabs.length + 1}`
-		const history: Entry[] = s.entries.map(e => ({
+		const history: Entry[] = s.entries.map((e) => ({
 			type: e.type,
 			text: e.text,
 			ts: e.ts,
@@ -198,7 +204,7 @@ function loadPersistedSessions(): void {
 
 	// Restore persisted client state (last tab, peak).
 	const saved = loadClientState()
-	const lastIdx = saved.lastTab ? newTabs.findIndex(t => t.sessionId === saved.lastTab) : -1
+	const lastIdx = saved.lastTab ? newTabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
 	state.activeTab = lastIdx >= 0 ? lastIdx : 0
 
 	// Restore peak if terminal width hasn't changed. If width changed,
@@ -229,7 +235,16 @@ function startClient(signal: AbortSignal): void {
 // ── Namespace ────────────────────────────────────────────────────────────────
 
 export const client = {
-	state, setOnChange, currentTab, switchTab, nextTab, prevTab,
-	addEntry, setPrompt, clearPrompt, sendCommand, startClient,
+	state,
+	setOnChange,
+	currentTab,
+	switchTab,
+	nextTab,
+	prevTab,
+	addEntry,
+	setPrompt,
+	clearPrompt,
+	sendCommand,
+	startClient,
 	saveState: saveClientState,
 }

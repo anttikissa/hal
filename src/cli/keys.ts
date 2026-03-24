@@ -2,12 +2,12 @@
 // Parses raw stdin bytes → structured KeyEvent regardless of terminal type.
 
 export interface KeyEvent {
-	key: string       // 'a', 'left', 'up', 'enter', 'backspace', 'tab', 'escape', etc.
-	char?: string     // printable character to insert (may be multi-byte from paste)
+	key: string // 'a', 'left', 'up', 'enter', 'backspace', 'tab', 'escape', etc.
+	char?: string // printable character to insert (may be multi-byte from paste)
 	shift: boolean
-	alt: boolean      // Option key on macOS
+	alt: boolean // Option key on macOS
 	ctrl: boolean
-	cmd: boolean      // Super/Meta key; Command (⌘) on macOS
+	cmd: boolean // Super/Meta key; Command (⌘) on macOS
 }
 
 function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
@@ -24,13 +24,21 @@ function parseMods(raw: number): { shift: boolean; alt: boolean; ctrl: boolean; 
 // ── CSI sequences: \x1b[...X ──
 
 const CSI_SUFFIX_KEYS: Record<string, string> = {
-	A: 'up', B: 'down', C: 'right', D: 'left',
-	H: 'home', F: 'end',
+	A: 'up',
+	B: 'down',
+	C: 'right',
+	D: 'left',
+	H: 'home',
+	F: 'end',
 }
 
 const CSI_TILDE_KEYS: Record<number, string> = {
-	1: 'home', 2: 'insert', 3: 'delete', 4: 'end',
-	5: 'pageup', 6: 'pagedown',
+	1: 'home',
+	2: 'insert',
+	3: 'delete',
+	4: 'end',
+	5: 'pageup',
+	6: 'pagedown',
 }
 
 function parseCsi(body: string, terminator: string): KeyEvent | null {
@@ -79,8 +87,7 @@ function parseCsiU(body: string): KeyEvent | null {
 	let text: string | undefined
 	if (fields.length >= 3 && fields[2]) {
 		const cps = fields[2].split(':').map(Number)
-		if (cps.length > 0 && cps.every(n => Number.isFinite(n) && n > 0))
-			text = String.fromCodePoint(...cps)
+		if (cps.length > 0 && cps.every((n) => Number.isFinite(n) && n > 0)) text = String.fromCodePoint(...cps)
 	}
 
 	// Special codepoints
@@ -105,23 +112,48 @@ function parseCsiU(body: string): KeyEvent | null {
 	// Printable
 	const ch = text ?? (codepoint >= 0x20 ? String.fromCodePoint(codepoint) : undefined)
 	const key = ch?.toLowerCase() ?? `u+${codepoint.toString(16)}`
-	return ke(key, { ...mods, char: (!mods.ctrl && !mods.cmd) ? ch : undefined })
+	return ke(key, { ...mods, char: !mods.ctrl && !mods.cmd ? ch : undefined })
 }
 
 // ── Ctrl key mapping ──
 
 const CTRL_KEYS: Record<number, string> = {
-	0: 'space', 1: 'a', 2: 'b', 3: 'c', 4: 'd', 5: 'e', 6: 'f', 7: 'g',
-	8: 'backspace', 9: 'tab', 10: 'enter', 11: 'k', 12: 'l', 13: 'enter',
-	14: 'n', 15: 'o', 16: 'p', 17: 'q', 18: 'r', 19: 's', 20: 't',
-	21: 'u', 22: 'v', 23: 'w', 24: 'x', 25: 'y', 26: 'z', 27: 'escape',
+	0: 'space',
+	1: 'a',
+	2: 'b',
+	3: 'c',
+	4: 'd',
+	5: 'e',
+	6: 'f',
+	7: 'g',
+	8: 'backspace',
+	9: 'tab',
+	10: 'enter',
+	11: 'k',
+	12: 'l',
+	13: 'enter',
+	14: 'n',
+	15: 'o',
+	16: 'p',
+	17: 'q',
+	18: 'r',
+	19: 's',
+	20: 't',
+	21: 'u',
+	22: 'v',
+	23: 'w',
+	24: 'x',
+	25: 'y',
+	26: 'z',
+	27: 'escape',
 	31: '/',
 	127: 'backspace',
 }
 
 // ── Tokenizer: split raw stdin data into individual key sequences ──
 
-const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~'
+const PASTE_START = '\x1b[200~',
+	PASTE_END = '\x1b[201~'
 
 // Buffer for paste content that spans multiple data events
 let pasteBuffer: string | null = null
@@ -167,20 +199,25 @@ function splitKeys(data: string): string[] {
 				let j = i + 2
 				while (j < data.length && data.charCodeAt(j) >= 0x20 && data.charCodeAt(j) <= 0x3f) j++
 				if (j < data.length) j++ // final byte
-				keys.push(data.slice(i, j)); i = j
+				keys.push(data.slice(i, j))
+				i = j
 			} else if (i + 2 < data.length && data[i + 1] === '\x1b' && (data[i + 2] === '[' || data[i + 2] === 'O')) {
 				// Alt+arrow: ESC ESC [ X
 				let j = i + 3
 				while (j < data.length && data.charCodeAt(j) >= 0x20 && data.charCodeAt(j) <= 0x3f) j++
 				if (j < data.length) j++
-				keys.push(data.slice(i, j)); i = j
+				keys.push(data.slice(i, j))
+				i = j
 			} else if (i + 1 < data.length) {
-				keys.push(data.slice(i, i + 2)); i += 2
+				keys.push(data.slice(i, i + 2))
+				i += 2
 			} else {
-				keys.push('\x1b'); i++
+				keys.push('\x1b')
+				i++
 			}
 		} else {
-			keys.push(data[i]!); i++
+			keys.push(data[i]!)
+			i++
 		}
 	}
 	return keys
@@ -230,8 +267,7 @@ export function parseKey(data: string): KeyEvent | null {
 			const name = CTRL_KEYS[code]
 			if (name) {
 				// Tab, Enter, Backspace, Escape are their own keys (no ctrl flag)
-				if (name === 'tab' || name === 'enter' || name === 'backspace' || name === 'escape')
-					return ke(name)
+				if (name === 'tab' || name === 'enter' || name === 'backspace' || name === 'escape') return ke(name)
 				return ke(name, { ctrl: true })
 			}
 		}

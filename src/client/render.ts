@@ -39,7 +39,9 @@ let fullscreen = false
 const lineCountCache = new WeakMap<Tab, { entryCount: number; lineCount: number }>()
 
 function resetRenderer(): void {
-	prevLines = []; cursorRow = 0; fullscreen = false
+	prevLines = []
+	cursorRow = 0
+	fullscreen = false
 }
 
 // ── Entry rendering ──────────────────────────────────────────────────────────
@@ -60,9 +62,15 @@ function renderEntry(entry: Entry, cols: number): string[] {
 	const ts = formatTimestamp(entry.ts)
 	let prefix: string
 	switch (entry.type) {
-		case 'input':     prefix = `${ts}\x1b[36mYou:\x1b[0m `; break
-		case 'assistant': prefix = `${ts}\x1b[33mAssistant:\x1b[0m `; break
-		case 'info':      prefix = ts ? `${ts}\x1b[90m` : '\x1b[90m'; break
+		case 'input':
+			prefix = `${ts}\x1b[36mYou:\x1b[0m `
+			break
+		case 'assistant':
+			prefix = `${ts}\x1b[33mAssistant:\x1b[0m `
+			break
+		case 'info':
+			prefix = ts ? `${ts}\x1b[90m` : '\x1b[90m'
+			break
 	}
 	const suffix = entry.type === 'info' ? '\x1b[0m' : ''
 	const result: string[] = []
@@ -105,18 +113,20 @@ function renderTabBar(lines: string[]): void {
 	const active = client.state.activeTab
 
 	const named = tabs.map((tab, i) =>
-		i === active ? `\x1b[1m[${i + 1} ${tab.name}]\x1b[0m` : `\x1b[90m ${i + 1} ${tab.name} \x1b[0m`
+		i === active ? `\x1b[1m[${i + 1} ${tab.name}]\x1b[0m` : `\x1b[90m ${i + 1} ${tab.name} \x1b[0m`,
 	)
-	if (visLen(named.join('')) <= cols) { lines.push(named.join('')); return }
+	if (visLen(named.join('')) <= cols) {
+		lines.push(named.join(''))
+		return
+	}
 
-	const padded = tabs.map((_, i) =>
-		i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m ${i + 1} \x1b[0m`
-	)
-	if (visLen(padded.join('')) <= cols) { lines.push(padded.join('')); return }
+	const padded = tabs.map((_, i) => (i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m ${i + 1} \x1b[0m`))
+	if (visLen(padded.join('')) <= cols) {
+		lines.push(padded.join(''))
+		return
+	}
 
-	const terse = tabs.map((_, i) =>
-		i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m${i + 1}\x1b[0m`
-	)
+	const terse = tabs.map((_, i) => (i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m${i + 1}\x1b[0m`))
 	const terseStr = terse.join(' ')
 	lines.push(visLen(terseStr) > cols ? clipVisual(terseStr, cols) : terseStr)
 }
@@ -271,7 +281,10 @@ function draw(force = false): void {
 	let first = -1
 	const max = Math.max(lines.length, prevLines.length)
 	for (let i = 0; i < max; i++) {
-		if ((lines[i] ?? '') !== (prevLines[i] ?? '')) { first = i; break }
+		if ((lines[i] ?? '') !== (prevLines[i] ?? '')) {
+			first = i
+			break
+		}
 	}
 
 	// ── Cursor-only: no lines changed ──
