@@ -4,11 +4,11 @@
 // Architecture:
 //   buildFrame() produces a flat string[] — one entry per terminal row.
 //   draw() diffs it against prevLines[] and emits minimal escape sequences.
-//   cursorRow always reflects the physical terminal row the cursor is on.
+//   cursorRow/cursorCol always reflect the physical terminal cursor position.
 //
 // The prompt can be multiline (shift-enter). The cursor can be on any
 // prompt line, not just the last one. All cursor positioning goes through
-// positionCursor() which updates cursorRow atomically.
+// positionCursor() which updates cursorRow and cursorCol atomically.
 
 import { visLen, wordWrap, clipVisual } from '../utils/strings.ts'
 import { client } from '../client.ts'
@@ -23,8 +23,9 @@ const CSI = '\x1b['
 //
 //   prevLines  — the frame we painted last time. Diff compares against this.
 //   cursorRow  — which frame line the terminal cursor is physically on.
-//                MUST be updated after every cursor move, or the next paint
-//                will compute wrong deltas and corrupt the display.
+//   cursorCol  — which column (1-based, CSI G) the cursor is at.
+//                Both MUST be updated after every cursor move, or the next
+//                paint will compute wrong deltas and corrupt the display.
 //   fullscreen — once the frame exceeds terminal height, we can never go
 //                back to grow mode (scrollback is tainted). One-way flag.
 
@@ -195,8 +196,8 @@ function buildFrame(): string[] {
 // draw() call — see cursorTarget(). All paint paths use the same target.
 //
 // positionCursor() is the ONLY way to move the cursor to a new position.
-// It updates cursorRow atomically. Using raw CSI moves without updating
-// cursorRow will cause the next paint to compute wrong deltas.
+// It updates cursorRow and cursorCol atomically. Using raw CSI moves without
+// updating these will cause the next paint to compute wrong deltas.
 
 function cursorTarget(frameLen: number): { row: number; col: number } {
 	const cols = process.stdout.columns || 80
@@ -216,8 +217,8 @@ function moveCursor(from: number, to: number): string {
 	return ''
 }
 
-// Move cursor to target and update cursorRow. This is the ONLY function
-// that should set cursorRow (besides resetRenderer and clearFrame).
+// Move cursor to target and update cursorRow/cursorCol. This is the ONLY
+// function that should set these (besides resetRenderer and clearFrame).
 function positionCursor(from: number, target: { row: number; col: number }): string {
 	cursorRow = target.row
 	return moveCursor(from, target.row) + `\r${CSI}${target.col}G${CSI}?25h`
@@ -231,7 +232,7 @@ function positionCursor(from: number, target: { row: number; col: number }): str
 //   3. Cursor-only: no lines changed, just reposition cursor.
 //
 // All three end with positionCursor() to place the cursor and update
-// cursorRow. The cursor target is computed ONCE at the top of draw().
+// cursorRow/cursorCol. The cursor target is computed ONCE at the top.
 
 function draw(force = false): void {
 	const rows = process.stdout.rows || 24

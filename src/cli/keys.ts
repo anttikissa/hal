@@ -1,5 +1,14 @@
 // Terminal input normalizer.
-// Parses raw stdin bytes → structured KeyEvent regardless of terminal type.
+// Parses raw stdin bytes into structured KeyEvent objects.
+//
+// Goal: the rest of the app should not care whether Ghostty sent kitty CSI-u,
+// Terminal.app sent ESC-b for opt-left, or bracketed paste wrapped text in
+// ESC [ 200~ ... ESC [ 201~. This file turns all of that into one clean API.
+//
+// Three stages:
+//   1. splitKeys()  — tokenize raw data into individual key sequences
+//   2. parseKey()   — turn one token into a KeyEvent
+//   3. parseKeys()  — convenience: split + parse in one call
 
 export interface KeyEvent {
 	key: string // 'a', 'left', 'up', 'enter', 'backspace', 'tab', 'escape', etc.
@@ -14,15 +23,16 @@ function ke(key: string, mods?: Partial<KeyEvent>): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
 }
 
-// ── CSI modifier bits ──
+// ── CSI modifier bits ────────────────────────────────────────────────────────
 // Raw modifier value = 1 + bitmask. Bits: 0=shift, 1=alt, 2=ctrl, 3=super(cmd)
 function parseMods(raw: number): { shift: boolean; alt: boolean; ctrl: boolean; cmd: boolean } {
 	const m = Math.max(0, raw - 1)
 	return { shift: (m & 1) !== 0, alt: (m & 2) !== 0, ctrl: (m & 4) !== 0, cmd: (m & 8) !== 0 }
 }
 
-// ── CSI sequences: \x1b[...X ──
+// ── CSI sequences: \x1b[...X ─────────────────────────────────────────────────
 
+// Arrow/home/end keys identified by the final byte after CSI parameters.
 const CSI_SUFFIX_KEYS: Record<string, string> = {
 	A: 'up',
 	B: 'down',
@@ -32,6 +42,7 @@ const CSI_SUFFIX_KEYS: Record<string, string> = {
 	F: 'end',
 }
 
+// Function/editing keys identified by number before ~.
 const CSI_TILDE_KEYS: Record<number, string> = {
 	1: 'home',
 	2: 'insert',
@@ -41,9 +52,10 @@ const CSI_TILDE_KEYS: Record<number, string> = {
 	6: 'pagedown',
 }
 
+// Parse a CSI sequence like \x1b[1;2D (shift+left) or \x1b[3~ (delete).
+// Kitty protocol adds :eventType to modifier (1=press, 2=repeat, 3=release);
+// we drop release events.
 function parseCsi(body: string, terminator: string): KeyEvent | null {
-	// Modified keys: \x1b[1;MOD+suffix  e.g. \x1b[1;2D = shift+left
-	// Kitty adds :eventType to modifier (1=press, 2=repeat, 3=release)
 	const parts = body.split(';')
 	const keyName = CSI_SUFFIX_KEYS[terminator]
 	if (keyName) {
@@ -67,8 +79,12 @@ function parseCsi(body: string, terminator: string): KeyEvent | null {
 	return null
 }
 
-// ── Kitty CSI u: \x1b[codepoint;modifier[;text]u ──
-
+// ── Kitty CSI u: \x1b[codepoint;modifier[;text]u ────────────────────────────
+//
+// The kitty keyboard protocol encodes every key as a unicode codepoint plus
+// modifier bitmask. Ghostty/Kitty/iTerm send these when the app opts in
+// with CSI >19u (see cli.ts). This lets us receive Cmd+C/X/V etc. that
+// the terminal would otherwise intercept at the OS level.
 function parseCsiU(body: string): KeyEvent | null {
 	const fields = body.split(';')
 	const codepoint = Number((fields[0] || '').split(':', 1)[0])
@@ -115,7 +131,9 @@ function parseCsiU(body: string): KeyEvent | null {
 	return ke(key, { ...mods, char: !mods.ctrl && !mods.cmd ? ch : undefined })
 }
 
-// ── Ctrl key mapping ──
+// ── Ctrl key mapping ─────────────────────────────────────────────────────────
+// Maps byte values 0-31 and 127 to key names. Used for legacy single-byte
+// control codes (non-kitty terminals).
 
 const CTRL_KEYS: Record<number, string> = {
 	0: 'space',
@@ -150,12 +168,20 @@ const CTRL_KEYS: Record<number, string> = {
 	127: 'backspace',
 }
 
-// ── Tokenizer: split raw stdin data into individual key sequences ──
+// ── Tokenizer: split raw stdin data into individual key sequences ────────────
+//
+// stdin delivers bytes in chunks. A single chunk may contain multiple
+// keypresses concatenated together (especially when pasting). This function
+// splits them into individual tokens that parseKey() can handle.
+//
+// Bracketed paste (ESC[200~ ... ESC[201~) is extracted as a single token
+// containing the pasted text. The paste may span multiple data events, so
+// we buffer across calls.
 
 const PASTE_START = '\x1b[200~',
 	PASTE_END = '\x1b[201~'
 
-// Buffer for paste content that spans multiple data events
+// Buffer for paste content that spans multiple stdin data events
 let pasteBuffer: string | null = null
 
 function splitKeys(data: string): string[] {
@@ -223,8 +249,9 @@ function splitKeys(data: string): string[] {
 	return keys
 }
 
-// ── Main entry point ──
+// ── Main entry point ─────────────────────────────────────────────────────────
 
+/** Parse a single key sequence token into a KeyEvent, or null if unrecognized. */
 export function parseKey(data: string): KeyEvent | null {
 	// Empty
 	if (!data) return null

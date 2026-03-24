@@ -24,9 +24,14 @@ function draw(force = false): void {
 	render.draw(force)
 }
 
+let terminalCleaned = false
+
 // Restore terminal state and save client state before exiting.
-// Must be called on ALL exit paths.
+// Must be called on ALL exit paths. The guard prevents double-cleanup
+// when process.on('exit') fires after an explicit cleanupTerminal() call.
 function cleanupTerminal(): void {
+	if (terminalCleaned) return
+	terminalCleaned = true
 	client.saveState()
 	if (useKitty) process.stdout.write(KITTY_OFF)
 	process.stdout.write(BRACKETED_PASTE_OFF)
@@ -113,6 +118,9 @@ function startCli(signal: AbortSignal): void {
 		if (useKitty) process.stdout.write(KITTY_ON)
 		process.stdout.write(BRACKETED_PASTE_ON)
 	}
+	// Safety net: if we exit without hitting an explicit cleanup path
+	// (e.g. SIGTERM, uncaught exception), this still restores the terminal.
+	process.on('exit', cleanupTerminal)
 
 	draw()
 	process.stdout.on('resize', () => draw(true))
