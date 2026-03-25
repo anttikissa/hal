@@ -1,13 +1,31 @@
-// Server runtime -- watches commands and generates responses.
-// Broadcasts session list via IPC. Does NOT broadcast history --
+// Server runtime — watches commands and dispatches to agent loop.
+//
+// Broadcasts session list via IPC. Does NOT broadcast history —
 // clients load that directly from disk.
+//
+// Command flow:
+//   1. Client appends command to IPC commands file
+//   2. Runtime tails commands, dispatches based on type
+//   3. "prompt" commands are checked for slash commands first
+//   4. Non-command prompts are forwarded to the agent loop
+//   5. Agent loop streams responses back via IPC events
 
 import { ipc } from '../ipc.ts'
+import { protocol } from '../protocol.ts'
+import { models } from '../models.ts'
 import { sessions as sessionStore } from './sessions.ts'
+import { commands } from '../runtime/commands.ts'
+import type { SessionState } from '../runtime/commands.ts'
+import { agentLoop } from '../runtime/agent-loop.ts'
+import { context } from '../runtime/context.ts'
+
+// ── Session state ──
 
 interface Session {
 	id: string
 	name: string
+	model?: string
+	cwd: string
 	createdAt: string
 }
 
@@ -26,18 +44,170 @@ function createSession(): Session {
 	const session: Session = {
 		id: makeSessionId(),
 		name: `tab ${activeSessions.length + 1}`,
+		cwd: process.cwd(),
 		createdAt: new Date().toISOString(),
 	}
 	activeSessions.push(session)
 	return session
 }
 
-function broadcastSessions() {
+function findSession(sessionId: string): Session | undefined {
+	return activeSessions.find(s => s.id === sessionId)
+}
+
+// ── IPC helpers ──
+
+function broadcastSessions(): void {
 	ipc.appendEvent({
 		type: 'sessions',
-		sessions: activeSessions.map((s) => ({ id: s.id, name: s.name })),
+		sessions: activeSessions.map(s => ({ id: s.id, name: s.name })),
 	})
 }
+
+function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info'): void {
+	ipc.appendEvent({
+		id: protocol.eventId(),
+		type: 'info',
+		text,
+		level,
+		sessionId,
+		createdAt: new Date().toISOString(),
+	})
+}
+
+// ── Prompt handling ──
+
+/** Process a prompt: check for slash commands, then forward to agent loop. */
+async function handlePrompt(session: Session, text: string): Promise<void> {
+	// Emit the prompt event so clients see what was typed
+	ipc.appendEvent({
+		type: 'prompt',
+		text,
+		sessionId: session.id,
+		createdAt: new Date().toISOString(),
+	})
+
+	// Build a SessionState for the commands module
+	const sessionState: SessionState = {
+		id: session.id,
+		name: session.name,
+		model: session.model,
+		cwd: session.cwd,
+		createdAt: session.createdAt,
+	}
+
+	// Check for slash commands first
+	const cmdResult = await commands.executeCommand(
+		text,
+		sessionState,
+		(msg, level) => emitInfo(session.id, msg, level),
+	)
+
+	if (cmdResult.handled) {
+		// Sync any mutations back to session (e.g. /model, /cd)
+		session.model = sessionState.model
+		session.cwd = sessionState.cwd
+
+		if (cmdResult.output) emitInfo(session.id, `[info] ${cmdResult.output}`)
+		if (cmdResult.error) emitInfo(session.id, cmdResult.error, 'error')
+		return
+	}
+
+	// Not a command — forward to the agent loop
+	await runGeneration(session, text)
+}
+
+/** Start a generation (agent loop call) for a session. */
+async function runGeneration(session: Session, text: string): Promise<void> {
+	const model = session.model ?? models.defaultModel()
+
+	// Build system prompt
+	const promptResult = context.buildSystemPrompt({
+		model,
+		cwd: session.cwd,
+	})
+
+	// Build messages — for now, just the current prompt.
+	// Plan 3 (Session) will add history loading + message building.
+	const messages: any[] = [
+		{ role: 'user', content: text },
+	]
+
+	// Emit stream-start so clients know generation is happening
+	ipc.appendEvent({
+		type: 'stream-start',
+		sessionId: session.id,
+		createdAt: new Date().toISOString(),
+	})
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId: session.id,
+			model,
+			cwd: session.cwd,
+			systemPrompt: promptResult.text,
+			messages,
+			onStatus: async (busy, activity) => {
+				ipc.appendEvent({
+					type: 'status',
+					sessionId: session.id,
+					busy,
+					activity,
+					createdAt: new Date().toISOString(),
+				})
+			},
+		})
+	} catch (err: any) {
+		emitInfo(session.id, `Generation failed: ${err?.message ?? String(err)}`, 'error')
+	}
+}
+
+// ── Command dispatch ──
+
+async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
+	const sessionId = cmd.sessionId
+	const session = sessionId ? findSession(sessionId) : activeSessions[0]
+
+	switch (cmd.type) {
+		case 'prompt': {
+			if (!session) return
+			await handlePrompt(session, cmd.text ?? '')
+			break
+		}
+
+		case 'abort': {
+			if (!sessionId) return
+			const aborted = agentLoop.abort(sessionId)
+			if (!aborted) emitInfo(sessionId, 'No active generation to abort')
+			break
+		}
+
+		case 'compact': {
+			if (!session) return
+			// Compaction requires history (Plan 3). For now, just acknowledge.
+			emitInfo(session.id, '[info] Compaction not yet implemented (needs Plan 3: Session)')
+			break
+		}
+
+		case 'open': {
+			createSession()
+			broadcastSessions()
+			break
+		}
+
+		case 'close': {
+			if (!sessionId) return
+			// Abort any active generation
+			agentLoop.abort(sessionId)
+			activeSessions = activeSessions.filter(s => s.id !== sessionId)
+			if (activeSessions.length === 0) createSession()
+			broadcastSessions()
+			break
+		}
+	}
+}
+
+// ── Main entry point ──
 
 function startRuntime(signal: AbortSignal): void {
 	activeRuntimePid = process.pid
@@ -52,6 +222,7 @@ function startRuntime(signal: AbortSignal): void {
 			activeSessions.push({
 				id: meta.id,
 				name: meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
+				cwd: meta.workingDir ?? process.cwd(),
 				createdAt: meta.createdAt,
 			})
 		}
@@ -59,39 +230,37 @@ function startRuntime(signal: AbortSignal): void {
 		createSession()
 	}
 
-	// Broadcast session list on next tick so client tail is ready.
+	// Broadcast session list on next tick so client tail is ready
 	setTimeout(() => {
 		if (signal.aborted || activeRuntimePid !== process.pid) return
 		broadcastSessions()
 	}, 0)
 
+	// Tail commands and dispatch
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || activeRuntimePid !== process.pid) break
-			if (cmd.sessionId && !activeSessions.some((s) => s.id === cmd.sessionId)) continue
-
-			if (cmd.type === 'prompt') {
-				ipc.appendEvent({
-					type: 'prompt',
-					text: cmd.text,
-					sessionId: cmd.sessionId,
-					createdAt: cmd.createdAt,
-				})
-				ipc.appendEvent({
-					type: 'response',
-					text: `You said: ${cmd.text}`,
-					sessionId: cmd.sessionId,
-				})
-			} else if (cmd.type === 'open') {
-				createSession()
-				broadcastSessions()
-			} else if (cmd.type === 'close' && cmd.sessionId) {
-				activeSessions = activeSessions.filter((s) => s.id !== cmd.sessionId)
-				if (activeSessions.length === 0) createSession()
-				broadcastSessions()
+			// Skip commands for sessions that don't exist
+			if (cmd.sessionId && !activeSessions.some(s => s.id === cmd.sessionId)) continue
+			try {
+				await handleCommand(cmd, signal)
+			} catch (err: any) {
+				// Don't let a single command crash the runtime
+				const sid = cmd.sessionId ?? activeSessions[0]?.id
+				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error')
 			}
 		}
 	})()
+
+	// Start inbox watcher (external messages)
+	void import('../runtime/inbox.ts').then(({ inbox }) => {
+		inbox.startWatching(signal, (sessionId, text) => {
+			const session = findSession(sessionId)
+			if (session) handlePrompt(session, text)
+		})
+	}).catch(() => {
+		// Inbox module not critical — silently ignore if it fails to load
+	})
 }
 
 export const runtime = { startRuntime }

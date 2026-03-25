@@ -67,7 +67,8 @@ describe('client-server', () => {
 
 		expect(clientOut).toContain('Promoted to server')
 		expect(clientOut).toContain('after promotion')
-		expect(clientOut).toContain('You said: after promotion')
+		// The stub provider responds with a placeholder message
+		expect(clientOut).toContain('Provider not yet implemented')
 	})
 
 	test('only one client promotes when server dies (no dual server)', async () => {
@@ -152,10 +153,11 @@ describe('client-server', () => {
 		const serverOut = stripAnsi(await new Response(server.stdout).text())
 		const clientOut = stripAnsi(await new Response(client.stdout).text())
 
-		// Both should see the prompt and response
+		// Both should see the prompt and the agent loop response
 		expect(serverOut).toContain('hello world')
 		expect(clientOut).toContain('hello world')
-		expect(serverOut).toContain('You said: hello world')
-		expect(clientOut).toContain('You said: hello world')
+		// The stub provider responds with a placeholder message
+		expect(serverOut).toContain('Provider not yet implemented')
+		expect(clientOut).toContain('Provider not yet implemented')
 	})
 })

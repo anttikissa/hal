@@ -1,0 +1,399 @@
+// Agent loop — the core generation cycle.
+//
+// Drives a provider to generate responses, handles streaming, tool execution,
+// and the re-invoke loop (generate → tool_use → tool_result → generate).
+//
+// Provider interface is defined in protocol.ts. Actual providers are built
+// in Plan 4 — for now we use a stub that returns a placeholder message.
+
+import { ipc } from '../ipc.ts'
+import { protocol } from '../protocol.ts'
+import type { Provider, ProviderStreamEvent, Message, ToolDef } from '../protocol.ts'
+import { models } from '../models.ts'
+import { context } from './context.ts'
+
+// ── Configuration ──
+
+const config = {
+	/** Maximum tool→generate cycles before we force-stop. */
+	maxIterations: 50,
+	/** Max concurrent tool executions per cycle. */
+	maxToolConcurrency: 5,
+	/** Retry config for transient API errors. */
+	retryBaseDelayMs: 5_000,
+	retryMaxDelayMs: 60_000,
+	retryMaxTotalMs: 2 * 60 * 60 * 1000, // 2 hours
+	retryableStatuses: new Set([429, 500, 503, 529]),
+}
+
+// ── State ──
+
+const state = {
+	/** Active generation abort controllers, keyed by session ID. */
+	activeRequests: new Map<string, AbortController>(),
+}
+
+// ── Types ──
+
+export interface AgentContext {
+	sessionId: string
+	model: string           // full "provider/model-id" string
+	cwd: string
+	/** Pre-built system prompt text. */
+	systemPrompt: string
+	/** Conversation messages so far (mutated as generation proceeds). */
+	messages: Message[]
+	/** Abort signal — user can ctrl-c to cancel. */
+	signal?: AbortSignal
+	/** Callback for busy/activity status updates. */
+	onStatus?: (busy: boolean, activity?: string) => void | Promise<void>
+}
+
+interface ToolCall {
+	id: string
+	name: string
+	input: any
+}
+
+// ── Stub provider ──
+// Returns a placeholder until real providers are built (Plan 4).
+
+async function* stubGenerate(): AsyncGenerator<ProviderStreamEvent> {
+	yield {
+		type: 'text',
+		text: '[Provider not yet implemented — this is the agent loop stub. Wire a real provider in Plan 4.]',
+	}
+	yield { type: 'done', usage: { input: 0, output: 0 } }
+}
+
+const stubProvider: Provider = {
+	generate: stubGenerate,
+}
+
+// ── Provider registry ──
+// Plan 4 will register real providers here. For now, everything uses the stub.
+
+const providers = new Map<string, Provider>()
+
+function registerProvider(name: string, provider: Provider): void {
+	providers.set(name, provider)
+}
+
+function getProvider(name: string): Provider {
+	return providers.get(name) ?? stubProvider
+}
+
+// ── IPC helpers ──
+
+function emitEvent(sessionId: string, event: Record<string, any>): void {
+	ipc.appendEvent({
+		id: protocol.eventId(),
+		sessionId,
+		createdAt: new Date().toISOString(),
+		...event,
+	})
+}
+
+function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info'): void {
+	emitEvent(sessionId, { type: 'info', text, level })
+}
+
+// ── Retry logic ──
+
+function computeRetryDelay(retryAfterMs: number | undefined, attempt: number): number {
+	const base = retryAfterMs ?? config.retryBaseDelayMs * Math.pow(2, attempt)
+	const capped = Math.min(base, config.retryMaxDelayMs)
+	// Add jitter to avoid thundering herd
+	const jitter = (Math.random() * 2 - 1) * Math.min(2000, capped * 0.2)
+	return Math.max(1000, Math.round(capped + jitter))
+}
+
+function isRetryableStatus(status: number | undefined): boolean {
+	return status != null && config.retryableStatuses.has(status)
+}
+
+// ── Tool execution stub ──
+// Plan 5 builds the real tool executor. This stub returns a placeholder.
+
+async function executeToolStub(call: ToolCall, _signal?: AbortSignal): Promise<string> {
+	return `[Tool "${call.name}" not yet implemented — see Plan 5]`
+}
+
+// The real tool executor will be injected here by Plan 5
+let executeTool: (call: ToolCall, signal?: AbortSignal, cwd?: string) => Promise<string> = executeToolStub
+
+function setToolExecutor(fn: typeof executeTool): void {
+	executeTool = fn
+}
+
+// ── The main loop ──
+
+async function runAgentLoop(ctx: AgentContext): Promise<void> {
+	const { sessionId, model, systemPrompt, messages, signal } = ctx
+
+	// Parse "provider/model-id" — e.g. "anthropic/claude-opus-4-6"
+	const slashIdx = model.indexOf('/')
+	const providerName = slashIdx >= 0 ? model.slice(0, slashIdx) : 'stub'
+	const modelId = slashIdx >= 0 ? model.slice(slashIdx + 1) : model
+	const provider = getProvider(providerName)
+
+	// Register abort controller so external code can abort us
+	const ac = new AbortController()
+	state.activeRequests.set(sessionId, ac)
+
+	// If caller passed a signal, propagate its abort to our controller
+	if (signal) {
+		if (signal.aborted) { ac.abort(); return }
+		signal.addEventListener('abort', () => ac.abort(), { once: true })
+	}
+
+	const loopSignal = ac.signal
+
+	// Tools list — empty until Plan 5 populates it
+	const tools: ToolDef[] = []
+
+	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length
+	await ctx.onStatus?.(true, 'generating...')
+
+	try {
+		const totalUsage = { input: 0, output: 0 }
+		let retryAttempt = 0
+		let retryStartedAt = 0
+
+		// Outer loop: each iteration is one generate call.
+		// We loop when the model returns tool_use blocks.
+		for (let iteration = 0; iteration < config.maxIterations; iteration++) {
+			if (loopSignal.aborted) break
+
+			// Call the provider's streaming generator
+			const gen = provider.generate({
+				messages,
+				model: modelId,
+				systemPrompt,
+				tools,
+				signal: loopSignal,
+				sessionId,
+			})
+
+			let assistantText = ''
+			let thinkingText = ''
+			let thinkingSignature = ''
+			const toolCalls: ToolCall[] = []
+			let aborted = false
+			let shouldRetry = false
+
+			try {
+				for await (const event of gen) {
+					if (loopSignal.aborted) { aborted = true; break }
+
+					switch (event.type) {
+						case 'thinking':
+							thinkingText += event.text ?? ''
+							emitEvent(sessionId, {
+								type: 'stream-delta',
+								text: event.text,
+								channel: 'thinking',
+							})
+							break
+
+						case 'thinking_signature':
+							thinkingSignature = event.signature ?? ''
+							break
+
+						case 'text':
+							assistantText += event.text ?? ''
+							emitEvent(sessionId, {
+								type: 'stream-delta',
+								text: event.text,
+								channel: 'assistant',
+							})
+							break
+
+						case 'tool_call':
+							toolCalls.push({
+								id: event.id!,
+								name: event.name!,
+								input: event.input,
+							})
+							emitEvent(sessionId, {
+								type: 'tool-call',
+								toolId: event.id,
+								name: event.name,
+								phase: 'running',
+							})
+							break
+
+						case 'error': {
+							const status = event.status
+							emitInfo(sessionId, event.message ?? 'Unknown error', 'error')
+							// Check if we should retry
+							if (isRetryableStatus(status)) {
+								if (!retryStartedAt) retryStartedAt = Date.now()
+								const elapsed = Date.now() - retryStartedAt
+								if (elapsed < config.retryMaxTotalMs) {
+									const delay = computeRetryDelay(event.retryAfterMs, retryAttempt)
+									retryAttempt++
+									const delaySec = Math.ceil(delay / 1000)
+									emitInfo(sessionId, `Retrying in ${delaySec}s...`)
+									await ctx.onStatus?.(true, `retrying in ${delaySec}s...`)
+									await Bun.sleep(delay)
+									shouldRetry = true
+								}
+							}
+							break
+						}
+
+						case 'done': {
+							// Reset retry state on successful completion
+							retryAttempt = 0
+							retryStartedAt = 0
+
+							// Accumulate usage
+							if (event.usage) {
+								totalUsage.input += event.usage.input
+								totalUsage.output += event.usage.output
+							}
+							break
+						}
+					}
+				}
+			} catch (err: any) {
+				// Provider throws on abort (AbortError)
+				if (loopSignal.aborted) {
+					aborted = true
+				} else {
+					const message = err?.message ? String(err.message) : String(err)
+					emitInfo(sessionId, message, 'error')
+					emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
+					return
+				}
+			}
+
+			// If aborted, emit partial output and exit
+			if (aborted) {
+				emitInfo(sessionId, '[paused]')
+				emitEvent(sessionId, { type: 'stream-end', phase: 'done' })
+				return
+			}
+
+			// If we need to retry, go back to the top of the loop
+			if (shouldRetry) continue
+
+			// No tool calls — we're done. Emit a response event so the client
+			// can display the assistant's text (client listens for 'response' events).
+			if (toolCalls.length === 0) {
+				if (assistantText) {
+					emitEvent(sessionId, { type: 'response', text: assistantText })
+				}
+				emitEvent(sessionId, {
+					type: 'stream-end',
+					phase: 'done',
+					usage: totalUsage.input > 0 ? totalUsage : undefined,
+				})
+				return
+			}
+
+			// ── Tool execution ──
+			// Build assistant message with text + tool_use blocks
+			const assistantContent: any[] = []
+			if (thinkingText && thinkingSignature) {
+				assistantContent.push({ type: 'thinking', thinking: thinkingText, signature: thinkingSignature })
+			}
+			if (assistantText) {
+				assistantContent.push({ type: 'text', text: assistantText })
+			}
+			for (const tc of toolCalls) {
+				assistantContent.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.input })
+			}
+			messages.push({ role: 'assistant', content: assistantContent })
+
+			// Execute tools (with concurrency limit)
+			await ctx.onStatus?.(true, `running ${toolCalls.length} tool(s)...`)
+			const results = await executeToolsConcurrently(toolCalls, loopSignal, ctx.cwd)
+
+			// Add tool results to messages
+			for (const { call, result } of results) {
+				messages.push({
+					role: 'user',
+					content: [{ type: 'tool_result', tool_use_id: call.id, content: result }],
+				})
+				emitEvent(sessionId, {
+					type: 'tool-result',
+					toolId: call.id,
+					name: call.name,
+					output: result.slice(0, 500), // truncate for IPC
+					phase: 'done',
+				})
+			}
+
+			// Report context usage estimate
+			const est = context.estimateContext(messages, model, overheadBytes)
+			await ctx.onStatus?.(true, 'generating...', )
+
+			// Continue to next iteration (re-invoke the model with tool results)
+		}
+
+		// If we exhausted maxIterations, inform the user
+		emitInfo(sessionId, `[warn] Hit max iterations (${config.maxIterations}). Stopping.`, 'error')
+		emitEvent(sessionId, { type: 'stream-end', phase: 'done', usage: totalUsage })
+
+	} finally {
+		state.activeRequests.delete(sessionId)
+		await ctx.onStatus?.(false)
+	}
+}
+
+/** Execute tool calls with a concurrency cap. */
+async function executeToolsConcurrently(
+	toolCalls: ToolCall[],
+	signal: AbortSignal,
+	cwd?: string,
+): Promise<{ call: ToolCall; result: string }[]> {
+	const results: { call: ToolCall; result: string }[] = []
+
+	// Process in batches of maxToolConcurrency
+	for (let i = 0; i < toolCalls.length; i += config.maxToolConcurrency) {
+		if (signal.aborted) break
+		const batch = toolCalls.slice(i, i + config.maxToolConcurrency)
+		const batchResults = await Promise.all(
+			batch.map(async (call) => {
+				if (signal.aborted) return { call, result: '[interrupted]' }
+				try {
+					const result = await executeTool(call, signal, cwd)
+					return { call, result }
+				} catch (err: any) {
+					return { call, result: `error: ${err?.message ?? String(err)}` }
+				}
+			}),
+		)
+		results.push(...batchResults)
+	}
+
+	return results
+}
+
+/** Abort an active generation for a session. */
+function abort(sessionId: string): boolean {
+	const ac = state.activeRequests.get(sessionId)
+	if (ac) {
+		ac.abort()
+		return true
+	}
+	return false
+}
+
+/** Check if a session has an active generation. */
+function isActive(sessionId: string): boolean {
+	return state.activeRequests.has(sessionId)
+}
+
+export const agentLoop = {
+	config,
+	state,
+	runAgentLoop,
+	abort,
+	isActive,
+	registerProvider,
+	getProvider,
+	setToolExecutor,
+}
