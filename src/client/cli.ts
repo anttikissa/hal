@@ -108,8 +108,8 @@ function handleCompletionKey(k: KeyEvent): boolean {
 		return true
 	}
 
-	// Enter or space: accept selected item
-	if (k.key === 'enter' || (k.char === ' ' && !k.ctrl && !k.alt)) {
+	// Enter or space: accept selected item (but not shift+enter — that's newline)
+	if ((k.key === 'enter' && !k.shift) || (k.char === ' ' && !k.ctrl && !k.alt)) {
 		const item = completion.selectedItem()
 		if (item) {
 			const applied = completion.apply(prompt.text(), prompt.cursorPos(), item)

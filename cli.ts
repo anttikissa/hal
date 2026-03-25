@@ -1,195 +1,125 @@
 #!/usr/bin/env bun
 
 // Standalone terminal redraw debugger.
-// No imports. No shared renderer. No tests.
+// No imports. No shared code. Single file.
 //
-// Behavior:
-// - starts with 20 lines of output
-// - keeps a "> ..." prompt at the bottom
-// - prompt editing supports typing, backspace, left, right
-// - Enter submits the prompt
-//   - if prompt is a positive integer N, append N lines
-//   - otherwise append one echo line
-// - Ctrl-L forces a redraw
+// - starts with 20 timestamped lines
+// - prompt at bottom: "> ..."
+// - typing, backspace, left/right work
+// - Enter: numeric N appends N lines, otherwise echoes input
+// - Ctrl-L force redraw
 // - Ctrl-C / Ctrl-D exits without clearing
 
-const blocks: string[] = Array.from({ length: 20 }, (_, i) => stampLine(`${i + 1}`))
-let nextBlock = blocks.length + 1
+const lines: string[] = []
 let promptText = ''
 let promptCursor = 0
-let previousFrameRows = 0
-let appendedRows = 0
-let previousLines: string[] = []
+let cursorRow = 0  // which frame line the terminal cursor is on (0-based)
+let nextId = 1
 
-function visibleWidth(text: string): number {
-	// This harness only deals with plain text. That keeps width math obvious.
-	return text.length
+function ts(): string {
+	const d = new Date()
+	const hh = String(d.getHours()).padStart(2, '0')
+	const mm = String(d.getMinutes()).padStart(2, '0')
+	const ss = String(d.getSeconds()).padStart(2, '0')
+	const ms = String(d.getMilliseconds()).padStart(3, '0')
+	return `${hh}:${mm}:${ss}.${ms}`
 }
 
-function twoDigits(value: number): string {
-	return String(value).padStart(2, '0')
+function addLine(text: string): void {
+	lines.push(`${ts()} ${text}`)
 }
 
-function threeDigits(value: number): string {
-	return String(value).padStart(3, '0')
-}
+// seed 20 lines
+for (let i = 0; i < 20; i++) addLine(`line ${nextId++}`)
 
-function timestamp(): string {
-	const now = new Date()
-	return `${twoDigits(now.getHours())}:${twoDigits(now.getMinutes())}:${twoDigits(now.getSeconds())}.${threeDigits(now.getMilliseconds())}`
-}
+function draw(): void {
+	const frame = [...lines, `> ${promptText}`]
+	const out: string[] = []
 
-function stampLine(text: string): string {
-	return `${timestamp()} ${text}`
-}
+	// hide cursor during repaint
+	out.push('\x1b[?25l')
 
-function countRenderedRows(lines: string[], cols: number): number {
-	let rows = 0
-	for (let i = 0; i < lines.length; i++) {
-		const width = visibleWidth(lines[i]!)
-		const lineRows = Math.max(1, Math.ceil(width / cols))
-		rows += lineRows
-		if (i < lines.length - 1 && width > 0 && width % cols === 0) rows += 1
-	}
-	return rows
-}
+	// move up to frame top (from wherever cursor currently is)
+	if (cursorRow > 0) out.push(`\x1b[${cursorRow}A`)
 
-function renderPrompt(): string {
-	return `> ${promptText}`
-}
+	// clear from frame top to end of screen
+	out.push('\r\x1b[J')
 
-function buildFrameLines(): string[] {
-	return [...blocks, renderPrompt()]
-}
-
-function moveUp(rows: number): string {
-	return rows > 0 ? `\x1b[${rows}A` : ''
-}
-
-function cursorToPromptColumn(): string {
-	return `\r\x1b[${promptCursor + 3}G`
-}
-
-function writeFrame(lines: string[]): void {
-	process.stdout.write(lines.join('\r\n'))
-}
-
-function draw(force = false): void {
-	const cols = process.stdout.columns || 80
-	const rows = process.stdout.rows || 24
-	const lines = buildFrameLines()
-	const frameRows = countRenderedRows(lines, cols)
-	const maxOrganicRows = Math.max(0, rows - 1)
-	const shouldGrow = !force && appendedRows < maxOrganicRows && frameRows > previousFrameRows
-
-	if (previousFrameRows === 0) {
-		writeFrame(lines)
-		previousFrameRows = frameRows
-		appendedRows = previousFrameRows
-		previousLines = lines
-		process.stdout.write(cursorToPromptColumn())
-		return
+	// write every line
+	for (let i = 0; i < frame.length; i++) {
+		if (i > 0) out.push('\r\n')
+		out.push(frame[i]!)
 	}
 
-	if (shouldGrow) {
-		const commonPrefix = sharedPrefixCount(previousLines, lines)
-		const suffix = lines.slice(commonPrefix)
-		const canContinueFromPrompt = commonPrefix >= previousLines.length - 1
-		if (suffix.length > 0 && canContinueFromPrompt) {
-			if (commonPrefix === previousLines.length) process.stdout.write('\r\n')
-			else process.stdout.write('\r')
-			writeFrame(suffix)
-			previousFrameRows = frameRows
-			appendedRows = Math.min(previousFrameRows, rows)
-			previousLines = lines
-			process.stdout.write(cursorToPromptColumn())
-			return
-		}
-	}
+	// cursor is now on the last line (prompt)
+	cursorRow = frame.length - 1
 
-	process.stdout.write(`\r${moveUp(Math.min(previousFrameRows - 1, rows - 1))}\x1b[J`)
-	writeFrame(lines)
-	previousFrameRows = frameRows
-	appendedRows = Math.min(previousFrameRows, rows)
-	previousLines = lines
-	process.stdout.write(cursorToPromptColumn())
+	// position cursor within prompt
+	out.push(`\r\x1b[${promptCursor + 3}G`)
+
+	// show cursor
+	out.push('\x1b[?25h')
+
+	process.stdout.write(out.join(''))
 }
 
-function sharedPrefixCount(a: string[], b: string[]): number {
-	let i = 0
-	while (i < a.length && i < b.length && a[i] === b[i]) i += 1
-	return i
-}
+// initial draw
+draw()
 
-function redraw(force = false): void {
-	draw(force)
-}
-
-function exit(code: number): void {
-	if (process.stdin.isTTY) process.stdin.setRawMode(false)
-	process.stdout.write('\r\n')
-	process.exit(code)
-}
-
-if (process.stdin.isTTY) {
-	process.stdin.setRawMode(true)
-	process.stdin.resume()
-}
-
-redraw()
+if (process.stdin.isTTY) process.stdin.setRawMode(true)
+process.stdin.resume()
 
 process.stdin.on('data', (data: Buffer) => {
 	for (let i = 0; i < data.length; i++) {
 		const byte = data[i]!
 
+		// Ctrl-C / Ctrl-D: exit
 		if (byte === 0x03 || byte === 0x04) {
-			exit(0)
+			if (process.stdin.isTTY) process.stdin.setRawMode(false)
+			process.stdout.write('\r\n')
+			process.exit(0)
 		}
 
-		if (byte === 0x0c) {
-			redraw(true)
-			continue
-		}
+		// Ctrl-L: force redraw
+		if (byte === 0x0c) { draw(); continue }
 
+		// left arrow
 		if (byte === 0x1b && data[i + 1] === 0x5b && data[i + 2] === 0x44) {
 			promptCursor = Math.max(0, promptCursor - 1)
-			i += 2
-			redraw()
-			continue
+			i += 2; draw(); continue
 		}
 
+		// right arrow
 		if (byte === 0x1b && data[i + 1] === 0x5b && data[i + 2] === 0x43) {
 			promptCursor = Math.min(promptText.length, promptCursor + 1)
-			i += 2
-			redraw()
-			continue
+			i += 2; draw(); continue
 		}
 
+		// backspace
 		if ((byte === 0x7f || byte === 0x08) && promptCursor > 0) {
 			promptText = promptText.slice(0, promptCursor - 1) + promptText.slice(promptCursor)
-			promptCursor -= 1
-			redraw()
-			continue
+			promptCursor--
+			draw(); continue
 		}
 
+		// enter
 		if (byte === 0x0d || byte === 0x0a) {
-			const count = Number.parseInt(promptText, 10)
-			if (promptText !== '' && String(count) === promptText && count > 0) {
-				for (let line = 0; line < count; line++) blocks.push(stampLine(`Inserted ${nextBlock++}`))
+			const n = parseInt(promptText, 10)
+			if (promptText !== '' && String(n) === promptText && n > 0) {
+				for (let j = 0; j < n; j++) addLine(`inserted ${nextId++}`)
 			} else {
-				blocks.push(stampLine(`You said: ${JSON.stringify(promptText)}`))
-				nextBlock = blocks.length + 1
+				addLine(`You said: ${JSON.stringify(promptText)}`)
 			}
 			promptText = ''
 			promptCursor = 0
-			redraw()
-			continue
+			draw(); continue
 		}
+
+		// printable ASCII
 		if (byte >= 0x20 && byte <= 0x7e) {
-			const char = String.fromCharCode(byte)
-			promptText = promptText.slice(0, promptCursor) + char + promptText.slice(promptCursor)
-			promptCursor += 1
-			redraw()
+			promptText = promptText.slice(0, promptCursor) + String.fromCharCode(byte) + promptText.slice(promptCursor)
+			promptCursor++
+			draw()
 		}
 	}
 })

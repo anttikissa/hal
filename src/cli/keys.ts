@@ -134,6 +134,12 @@ function parseCsiU(body: string): KeyEvent | null {
 // ── Ctrl key mapping ─────────────────────────────────────────────────────────
 // Maps byte values 0-31 and 127 to key names. Used for legacy single-byte
 // control codes (non-kitty terminals).
+//
+// Note: 0x0A (\n, LF) is NOT in this table. In raw mode, the Enter key sends
+// 0x0D (\r, CR). A bare 0x0A can only arrive from:
+//   - Ctrl+J (which is the same as LF)
+//   - A terminal mapping shift+enter → \n (common in Ghostty, etc.)
+// We handle 0x0A separately below to treat it as shift+enter.
 
 const CTRL_KEYS: Record<number, string> = {
 	0: 'space',
@@ -146,7 +152,7 @@ const CTRL_KEYS: Record<number, string> = {
 	7: 'g',
 	8: 'backspace',
 	9: 'tab',
-	10: 'enter',
+	// 10 (\n) handled specially — see below
 	11: 'k',
 	12: 'l',
 	13: 'enter',
@@ -290,6 +296,13 @@ export function parseKey(data: string): KeyEvent | null {
 	// Control characters
 	if (data.length === 1) {
 		const code = data.charCodeAt(0)
+
+		// 0x0A (\n) in raw mode: Enter sends \r (0x0D), so a bare \n means
+		// either Ctrl+J or a terminal mapping for shift+enter. Treat it as
+		// shift+enter — this makes shift+enter work in Ghostty and other
+		// terminals that map it to \n, even without kitty keyboard protocol.
+		if (code === 0x0a) return ke('enter', { shift: true })
+
 		if (code < 32 || code === 127) {
 			const name = CTRL_KEYS[code]
 			if (name) {
