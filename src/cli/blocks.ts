@@ -5,7 +5,7 @@
 //   thinking → tool₁ → tool₂ → assistant text
 // The split happens in historyToBlocks(). Rendering is in renderBlock().
 
-import { visLen, wordWrap, clipVisual, resolveMarkers } from '../utils/strings.ts'
+import { visLen, wordWrap, clipVisual, resolveMarkers, expandTabs } from '../utils/strings.ts'
 import { md } from './md.ts'
 import { colors } from './colors.ts'
 import { ason } from '../utils/ason.ts'
@@ -25,7 +25,7 @@ export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number }
 	| { type: 'assistant'; text: string; model?: string; ts?: number }
 	| { type: 'thinking'; text: string; blobId?: string; sessionId?: string; ts?: number }
-	| { type: 'tool'; name: string; title: string; command?: string; output?: string; blobId?: string; sessionId?: string; blobLoaded?: boolean; ts?: number }
+	| { type: 'tool'; name: string; title: string; command?: string; output?: string; blobId?: string; sessionId?: string; blobLoaded?: boolean; toolId?: string; ts?: number }
 	| { type: 'info'; text: string; ts?: number }
 	| { type: 'error'; text: string; ts?: number }
 
@@ -458,7 +458,11 @@ function blockContent(block: Block, cols: number): string[] {
 		const lines: string[] = []
 		for (const span of md.mdSpans(block.text)) {
 			if (span.type === 'code') {
-				for (const l of span.lines) {
+				for (const raw of span.lines) {
+					// Expand tabs BEFORE measuring — charWidth returns 0 for
+					// tabs, so visLen/clipVisual would undercount and bgLine
+					// would overpad, causing the line to wrap on the terminal.
+					const l = expandTabs(raw)
 					const styled = `${indent}${DIM}${l}${DIM_OFF}`
 					lines.push(visLen(styled) > cols ? clipVisual(styled, cols) : styled)
 				}
@@ -475,15 +479,18 @@ function blockContent(block: Block, cols: number): string[] {
 
 	if (block.type === 'tool') {
 		const lines: string[] = []
-		// Command lines (bash, eval)
+		// Command lines (bash, eval) — expand tabs in command text
 		if (block.command) {
-			for (const l of formatBashCommand(block.command, cw)) {
+			for (const l of formatBashCommand(expandTabs(block.command), cw)) {
 				lines.push(`${indent}${l}`)
 			}
 		}
 		// Per-tool formatted output (diff coloring, counts, etc.)
 		if (block.output) {
-			const fmt = formatToolOutput(block.name, block.output)
+			// Expand tabs in output before any measuring/clipping.
+			// Tool output frequently contains tabs (ls, cat, make, etc.)
+			const output = expandTabs(block.output)
+			const fmt = formatToolOutput(block.name, output)
 
 			// Tool-specific body lines (diffs, counts)
 			for (const l of fmt.bodyLines) {
@@ -492,7 +499,7 @@ function blockContent(block: Block, cols: number): string[] {
 
 			// Raw output tail (unless formatter suppressed it)
 			if (!fmt.suppressOutput) {
-				const outLines = block.output.trimEnd().split('\n')
+				const outLines = output.trimEnd().split('\n')
 				const MAX = blockConfig.maxToolOutputLines
 				if (outLines.length > MAX) {
 					const indicator = fmt.hiddenIndicator ?? `[+ ${outLines.length - MAX} lines]`
@@ -510,12 +517,13 @@ function blockContent(block: Block, cols: number): string[] {
 		return lines
 	}
 
-	// User, thinking, info, error — plain text with word wrap
+	// User, thinking, info, error — plain text with word wrap.
+	// Expand tabs here too (users can paste tabbed content).
 	const text = block.type === 'user' ? block.text
 		: block.type === 'thinking' ? block.text
 		: block.text
 	const lines: string[] = []
-	for (const raw of text.split('\n')) {
+	for (const raw of expandTabs(text).split('\n')) {
 		for (const wl of wordWrap(`${indent}${raw}`, cols)) lines.push(wl)
 	}
 	return lines

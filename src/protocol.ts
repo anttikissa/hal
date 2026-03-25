@@ -24,6 +24,7 @@ export type EventType =
 
 export type CommandType =
 	| 'prompt'
+	| 'steer'
 	| 'open'
 	| 'close'
 	| 'abort'

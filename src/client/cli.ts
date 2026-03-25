@@ -46,7 +46,14 @@ function submit(): void {
 	if (!text) return
 	completion.dismiss()
 	prompt.pushHistory(text)
-	client.sendCommand('prompt', text)
+	// If the session is busy (generating/running tools), send a steer command
+	// instead of a plain prompt. The server will abort the current generation,
+	// inject this as a steering message, and restart generation.
+	if (client.isBusy()) {
+		client.sendCommand('steer', text)
+	} else {
+		client.sendCommand('prompt', text)
+	}
 	prompt.clear()
 }
 

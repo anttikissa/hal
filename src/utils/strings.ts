@@ -6,6 +6,41 @@ export function toLines(text: string): string[] {
 	if (!text) return []
 	return text.endsWith('\n') ? text.slice(0, -1).split('\n') : text.split('\n')
 }
+
+/**
+ * Expand tab characters to spaces. Tabs are position-dependent: each tab
+ * advances to the next multiple of `tabWidth` columns. We walk the string
+ * tracking column position so tabs in the middle of a line expand correctly.
+ *
+ * This MUST be called before visLen/wordWrap/clipVisual on any string that
+ * might contain tabs. charWidth() returns 0 for tabs (since their width
+ * depends on position), so visLen undercounts, bgLine overpads, and the
+ * resulting line wraps to a second physical row — causing the "double lines"
+ * rendering bug.
+ */
+export function expandTabs(s: string, tabWidth = 4): string {
+	if (!s.includes('\t')) return s
+	let out = ''
+	let col = 0
+	for (const ch of s) {
+		if (ch === '\t') {
+			// Advance to next tab stop: at least 1 space, up to tabWidth
+			const spaces = tabWidth - (col % tabWidth)
+			out += ' '.repeat(spaces)
+			col += spaces
+		} else if (ch === '\n') {
+			out += ch
+			col = 0
+		} else {
+			out += ch
+			// ANSI escapes don't advance the column, but for tab expansion
+			// purposes this approximation is fine — tabs in ANSI sequences
+			// are vanishingly rare and the worst case is slightly too much padding.
+			col++
+		}
+	}
+	return out
+}
 /** Terminal display width of a Unicode code point. */
 export function charWidth(cp: number): number {
 	if (cp < 0x20) return 0
@@ -231,4 +266,4 @@ export function resolveMarkers(lines: string[]): string[] {
 	})
 }
 
-export const strings = { charWidth, visLen, wordWrap, clipVisual, resolveMarkers }
+export const strings = { charWidth, visLen, wordWrap, clipVisual, resolveMarkers, expandTabs }

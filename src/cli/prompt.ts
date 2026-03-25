@@ -304,8 +304,10 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		return false
 	}
 
-	// Enter: shift+enter inserts newline; plain enter goes to keybindings (submit)
-	if (k.key === 'enter' && k.shift && !k.alt) {
+	// Enter: shift+enter or alt+enter inserts newline; plain enter goes to
+	// keybindings (submit). Alt+enter is the fallback for terminals without
+	// kitty keyboard protocol — they can't distinguish shift+enter from enter.
+	if (k.key === 'enter' && (k.shift || k.alt)) {
 		replaceSelection('\n')
 		return true
 	}

@@ -92,12 +92,14 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 
 // ── Prompt handling ──
 
-/** Process a prompt: check for slash commands, then forward to agent loop. */
-async function handlePrompt(session: Session, text: string): Promise<void> {
+/** Process a prompt: check for slash commands, then forward to agent loop.
+ *  label is 'steering' when the user typed during active generation. */
+async function handlePrompt(session: Session, text: string, label?: 'steering'): Promise<void> {
 	// Emit the prompt event so clients see what was typed
 	ipc.appendEvent({
 		type: 'prompt',
 		text,
+		label,
 		sessionId: session.id,
 		createdAt: new Date().toISOString(),
 	})
@@ -192,6 +194,12 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 }
 
 // ── Command dispatch ──
+//
+// CRITICAL: handleCommand must NEVER await long-running operations like
+// agent loop generation. The command tail loop calls handleCommand for
+// every incoming command. If we block here, all subsequent commands
+// (abort, new prompts, tab operations) are stuck until generation finishes.
+// Generation is fire-and-forget; the agent loop communicates results via IPC events.
 
 async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 	const sessionId = cmd.sessionId
@@ -200,7 +208,21 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!session) return
-			await handlePrompt(session, cmd.text ?? '')
+			// Fire-and-forget: don't block the command loop on generation.
+			void handlePrompt(session, cmd.text ?? '')
+			break
+		}
+
+		case 'steer': {
+			// Steering: user sent a prompt while generation was active.
+			// Abort current generation, inject the steering message, restart.
+			if (!session) return
+			if (agentLoop.isActive(session.id)) {
+				agentLoop.abort(session.id)
+				// Brief yield so the abort propagates before we start a new generation
+				await Bun.sleep(50)
+			}
+			void handlePrompt(session, cmd.text ?? '', 'steering')
 			break
 		}
 

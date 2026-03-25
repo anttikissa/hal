@@ -236,6 +236,7 @@ function handleEvent(event: any): void {
 		addBlockToTab(event.sessionId, {
 			type: 'user',
 			text: event.text,
+			status: event.label, // 'steering' when typed during generation
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'response') {
@@ -254,6 +255,26 @@ function handleEvent(event: any): void {
 		state.busy.set(event.sessionId, event.busy ?? false)
 		state.activity.set(event.sessionId, event.activity ?? '')
 		onChange(false)
+	} else if (event.type === 'tool-call' && event.sessionId) {
+		addBlockToTab(event.sessionId, {
+			type: 'tool',
+			name: event.name,
+			title: event.name,
+			toolId: event.toolId,
+			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
+		})
+	} else if (event.type === 'tool-result' && event.sessionId) {
+		// Find the tool block and update it with output
+		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		if (tab) {
+			const toolBlock = tab.history.find(
+				(b: any) => b.type === 'tool' && b.toolId === event.toolId
+			) as any
+			if (toolBlock) {
+				toolBlock.output = event.output
+				onChange(false)
+			}
+		}
 	}
 }
 

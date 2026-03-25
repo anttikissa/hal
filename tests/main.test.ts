@@ -54,7 +54,7 @@ describe('main', () => {
 		expect(code).toBe(100)
 	})
 
-	test('does not replay events from previous runtime', async () => {
+	test('persists history across restarts', async () => {
 		const marker = `marker-${Date.now()}`
 
 		const first = spawnHal()
@@ -73,6 +73,7 @@ describe('main', () => {
 		const stdout = stripAnsi(await new Response(second.stdout).text())
 		await second.exited
 
-		expect(stdout).not.toContain(marker)
+		// History is now persisted, so the marker should appear on restart
+		expect(stdout).toContain(marker)
 	})
 })
