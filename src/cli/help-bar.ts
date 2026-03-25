@@ -44,16 +44,14 @@ const HINTS: Record<HelpState, Hint[]> = {
 		{ text: 'shift-enter newline', keys: ['shift-enter'] },
 		{ text: 'tab complete', keys: ['tab'] },
 	],
-	'streaming': [
-		{ text: 'esc pause', keys: ['escape'] },
-	],
+	streaming: [{ text: 'esc stop', keys: ['escape'] }],
 }
 
 // ── Logic ────────────────────────────────────────────────────────────────────
 
 function isLearned(hint: Hint): boolean {
 	if (hint.keys.length === 0) return false
-	return hint.keys.every(k => (usageCounts[k] ?? 0) >= config.learnThreshold)
+	return hint.keys.every((k) => (usageCounts[k] ?? 0) >= config.learnThreshold)
 }
 
 function logKey(name: string): void {
@@ -69,9 +67,9 @@ function deriveState(busy: boolean, hasText: boolean): HelpState {
 // Build the help bar string. Returns empty string if all hints are learned.
 function build(busy: boolean, hasText: boolean): string {
 	const st = deriveState(busy, hasText)
-	const visible = HINTS[st].filter(h => !isLearned(h))
+	const visible = HINTS[st].filter((h) => !isLearned(h))
 	if (visible.length === 0) return ''
-	return visible.map(h => h.text).join(' \u2502 ')
+	return visible.map((h) => h.text).join(' \u2502 ')
 }
 
 // ── Namespace ────────────────────────────────────────────────────────────────

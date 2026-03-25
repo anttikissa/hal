@@ -5,11 +5,11 @@ import { client } from '../client.ts'
 import { render } from './render.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
-import { draft } from '../cli/draft.ts'
 import { completion } from '../cli/completion.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { clipboard } from '../cli/clipboard.ts'
 import { blocks } from '../cli/blocks.ts'
+import { draft } from '../cli/draft.ts'
 import { perf } from '../perf.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
@@ -229,6 +229,11 @@ function handleAppKey(k: KeyEvent): boolean {
 	// Opt-1 through Opt-9: jump to tab N, Opt-0: tab 10
 	if (k.alt && k.key >= '0' && k.key <= '9') {
 		client.switchTab(k.key === '0' ? 9 : Number(k.key) - 1)
+		return true
+	}
+	// Escape: abort current generation if busy
+	if (k.key === 'escape' && client.isBusy()) {
+		client.sendCommand('abort')
 		return true
 	}
 	// Enter: submit (blocked while image paste is resolving)
