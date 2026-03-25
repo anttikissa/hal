@@ -226,7 +226,7 @@ function handleEvent(event: any): void {
 		})
 	} else if (event.type === 'response') {
 		addBlockToTab(event.sessionId, {
-			type: 'assistant',
+			type: event.isError ? 'error' : 'assistant',
 			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})

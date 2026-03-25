@@ -175,6 +175,11 @@ function handleAppKey(k: KeyEvent): boolean {
 		client.prevTab()
 		return true
 	}
+	// Opt-1 through Opt-9: jump to tab N, Opt-0: tab 10
+	if (k.alt && k.key >= '0' && k.key <= '9') {
+		client.switchTab(k.key === '0' ? 9 : Number(k.key) - 1)
+		return true
+	}
 	// Enter: submit (blocked while image paste is resolving)
 	if (k.key === 'enter' && !k.shift) {
 		if (clipboard.hasPendingPastes()) return true

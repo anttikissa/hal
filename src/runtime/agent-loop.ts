@@ -31,7 +31,6 @@ const config = {
 	maxToolConcurrency: 5,
 	/** Retry config for transient API errors. */
 	retryBaseDelayMs: 5_000,
-	retryMaxDelayMs: 60_000,
 	retryMaxTotalMs: 2 * 60 * 60 * 1000, // 2 hours
 	retryableStatuses: new Set([429, 500, 503, 529]),
 }
@@ -91,15 +90,38 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 // ── Retry logic ──
 
 function computeRetryDelay(retryAfterMs: number | undefined, attempt: number): number {
+	// If server says when to retry, use that. Otherwise exponential backoff: 5s, 10s, 20s, 40s, 80s, 160s, ...
+	// No cap — if the API is down for an hour, we wait. Max total time (2h) is the only limit.
 	const base = retryAfterMs ?? config.retryBaseDelayMs * Math.pow(2, attempt)
-	const capped = Math.min(base, config.retryMaxDelayMs)
-	// Add jitter to avoid thundering herd
-	const jitter = (Math.random() * 2 - 1) * Math.min(2000, capped * 0.2)
-	return Math.max(1000, Math.round(capped + jitter))
+	const jitterRange = attempt === 0 ? 1000 : attempt === 1 ? 2000 : 5000
+	const jitter = (Math.random() * 2 - 1) * jitterRange
+	return Math.max(1000, Math.round(base + jitter))
 }
 
 function isRetryableStatus(status: number | undefined): boolean {
 	return status != null && config.retryableStatuses.has(status)
+}
+
+/** Extract resets_in_seconds from error response body (Anthropic rate limit format). */
+function parseResetsInSeconds(body: string | undefined): number | undefined {
+	if (!body) return undefined
+	try {
+		const json = JSON.parse(body)
+		// Anthropic nests it under error.resets_in_seconds
+		const secs = json?.error?.resets_in_seconds ?? json?.resets_in_seconds
+		if (typeof secs === 'number' && secs > 0) return secs * 1000
+	} catch {}
+	return undefined
+}
+
+/** Pretty-format an error body for display. Try to indent JSON, fall back to raw text. */
+function formatErrorBody(body: string): string {
+	try {
+		const parsed = JSON.parse(body)
+		return JSON.stringify(parsed, null, 2)
+	} catch {
+		return body
+	}
 }
 
 // ── Tool execution ──
@@ -214,17 +236,27 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						case 'error': {
 							const status = event.status
-							emitInfo(sessionId, event.message ?? 'Unknown error', 'error')
+
+							// Show the full error body so the user sees the actual API response
+							const header = status ? `${status}:` : 'Error:'
+							const body = event.body ?? event.message ?? 'Unknown error'
+							emitEvent(sessionId, {
+								type: 'response',
+								text: `${header}\n${formatErrorBody(body)}`,
+								isError: true,
+							})
 							// Check if we should retry
 							if (isRetryableStatus(status)) {
 								if (!retryStartedAt) retryStartedAt = Date.now()
 								const elapsed = Date.now() - retryStartedAt
 								if (elapsed < config.retryMaxTotalMs) {
-									const delay = computeRetryDelay(event.retryAfterMs, retryAttempt)
+									// Prefer resets_in_seconds from body, then Retry-After header, then exponential backoff
+									const bodyDelay = parseResetsInSeconds(event.body)
+									const delay = bodyDelay ?? computeRetryDelay(event.retryAfterMs, retryAttempt)
 									retryAttempt++
 									const delaySec = Math.ceil(delay / 1000)
-									emitInfo(sessionId, `Retrying in ${delaySec}s...`)
-									await ctx.onStatus?.(true, `retrying in ${delaySec}s...`)
+									emitInfo(sessionId, `Rate limited — retrying in ${delaySec}s`)
+									await ctx.onStatus?.(true, `rate limited — retrying in ${delaySec}s...`)
 									await Bun.sleep(delay)
 									shouldRetry = true
 								}
@@ -233,9 +265,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						}
 
 						case 'done': {
-							// Reset retry state on successful completion
-							retryAttempt = 0
-							retryStartedAt = 0
+							// Only reset retry state on actual success, not when we're about to retry
+							if (!shouldRetry) {
+								retryAttempt = 0
+								retryStartedAt = 0
+							}
 
 							// Accumulate usage
 							if (event.usage) {

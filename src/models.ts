@@ -119,7 +119,7 @@ function formatCost(fullId: string, usage: { input: number; output: number }): s
 function defaultModel(): string {
 	return process.env.HAL_MODEL
 		? resolveModel(process.env.HAL_MODEL)
-		: 'anthropic/claude-sonnet-4-20250514'
+		: 'anthropic/claude-opus-4-6'
 }
 
 // ── Model listing (for /model command) ──

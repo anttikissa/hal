@@ -186,6 +186,10 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 				const msg = ev.error?.message ?? 'Stream error'
 				const body = JSON.stringify(ev.error ?? ev)
 				const status = errorTypeToStatus(ev.error?.type)
+				try {
+					const prev = await Bun.file('/tmp/compare/hal.txt').exists() ? await Bun.file('/tmp/compare/hal.txt').text() : ''
+					await Bun.write('/tmp/compare/hal.txt', prev + `STREAM ERROR: status=${status} type=${ev.error?.type} body=${body}\n\n`)
+				} catch {}
 				yield { type: 'error', message: msg, status, body }
 			}
 		}
@@ -257,6 +261,20 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		...(isOAuth ? { 'user-agent': 'claude-cli/2.1.75', 'x-app': 'cli' } : {}),
 	}
 
+	// Debug dump to /tmp/compare/hal.txt — remove once 529 issue is resolved
+	try {
+		const debugBody = JSON.parse(JSON.stringify(body))
+		if (debugBody.messages) for (const m of debugBody.messages) {
+			if (typeof m.content === 'string' && m.content.length > 200) m.content = m.content.slice(0, 200) + '...'
+			if (Array.isArray(m.content)) for (const b of m.content) {
+				if (b.type === 'text' && b.text?.length > 200) b.text = b.text.slice(0, 200) + '...'
+			}
+		}
+		const dump = `=== HAL REQUEST ${new Date().toISOString()} ===\nURL: ${url}\nHEADERS: ${JSON.stringify(headers, null, 2)}\nBODY: ${JSON.stringify(debugBody, null, 2)}\n\n`
+		const prev = await Bun.file('/tmp/compare/hal.txt').exists() ? await Bun.file('/tmp/compare/hal.txt').text() : ''
+		await Bun.write('/tmp/compare/hal.txt', prev + dump)
+	} catch {}
+
 	const res = await fetch(url, {
 		method: 'POST',
 		headers,
@@ -264,8 +282,19 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		signal: req.signal,
 	})
 
+	// Debug: log response
+	try {
+		const rd = `RESPONSE: ${res.status} ${res.statusText}\n\n`
+		const prev = await Bun.file('/tmp/compare/hal.txt').text()
+		await Bun.write('/tmp/compare/hal.txt', prev + rd)
+	} catch {}
+
 	if (!res.ok) {
 		const text = (await res.text()).slice(0, 2000)
+		try {
+			const prev = await Bun.file('/tmp/compare/hal.txt').text()
+			await Bun.write('/tmp/compare/hal.txt', prev + `ERROR BODY: ${text}\n\n`)
+		} catch {}
 		const retryAfterMs = providerUtils.parseRetryDelay(res, text)
 		yield { type: 'error', message: `Anthropic API ${res.status}`, status: res.status, body: text, retryAfterMs }
 		yield { type: 'done' }

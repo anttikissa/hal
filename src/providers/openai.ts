@@ -9,6 +9,7 @@
 
 import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '../protocol.ts'
 import { provider as providerUtils } from './provider.ts'
+import { auth } from '../auth.ts'
 
 // ── Endpoint configuration ──
 
@@ -18,17 +19,8 @@ const COMPAT_ENDPOINTS: Record<string, string> = {
 	grok: 'https://api.x.ai/v1',
 }
 
-// Map provider names to environment variable names for API keys
-const API_KEY_ENV: Record<string, string> = {
-	openai: 'OPENAI_API_KEY',
-	openrouter: 'OPENROUTER_API_KEY',
-	google: 'GOOGLE_API_KEY',
-	grok: 'GROK_API_KEY',
-}
-
 function getApiKey(providerName: string): string | undefined {
-	const envVar = API_KEY_ENV[providerName] ?? `${providerName.toUpperCase()}_API_KEY`
-	return process.env[envVar]
+	return auth.getCredential(providerName)?.value
 }
 
 // ── Message conversion (Anthropic format → Chat Completions format) ──
@@ -218,9 +210,11 @@ async function* generateCompat(
 	baseUrl: string,
 	req: ProviderRequest,
 ): AsyncGenerator<ProviderStreamEvent> {
+	// Refresh OAuth token if needed (e.g. OpenAI Codex tokens expire)
+	await auth.ensureFresh(providerName)
 	const apiKey = getApiKey(providerName)
 	if (!apiKey) {
-		yield { type: 'error', message: `No API key for '${providerName}'. Set ${API_KEY_ENV[providerName] ?? providerName.toUpperCase() + '_API_KEY'} env var.` }
+		yield { type: 'error', message: `No credentials for '${providerName}'. Run: bun scripts/login-openai.ts (or set ${providerName.toUpperCase()}_API_KEY)` }
 		yield { type: 'done' }
 		return
 	}
