@@ -16,17 +16,27 @@ import type { HistoryEntry } from '../server/sessions.ts'
 // ── Block types ──────────────────────────────────────────────────────────────
 
 const blockConfig = {
-	tabWidth: 4,                 // tab display width (also controls HTS tab stops)
+	tabWidth: 4, // tab display width (also controls HTS tab stops)
 	blobBatchSize: 64,
-	maxToolOutputLines: 20,      // cap tool output at this many tail lines
-	maxEditDiffLines: 3,         // max before/after lines in edit diffs
+	maxToolOutputLines: 20, // cap tool output at this many tail lines
+	maxEditDiffLines: 3, // max before/after lines in edit diffs
 }
 
 export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number }
 	| { type: 'assistant'; text: string; model?: string; ts?: number }
 	| { type: 'thinking'; text: string; blobId?: string; sessionId?: string; ts?: number }
-	| { type: 'tool'; name: string; title: string; command?: string; output?: string; blobId?: string; sessionId?: string; blobLoaded?: boolean; toolId?: string; ts?: number }
+	| {
+			type: 'tool'
+			name: string
+			input?: any      // tool call input — title and command derived from this
+			output?: string
+			blobId?: string
+			sessionId?: string
+			blobLoaded?: boolean
+			toolId?: string
+			ts?: number
+	  }
 	| { type: 'info'; text: string; ts?: number }
 	| { type: 'error'; text: string; ts?: number }
 
@@ -95,14 +105,13 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 			}
 
 			// Tool blocks — created without blob data for fast startup.
-			// Blob content (title details, command, output) loads lazily
-			// on first render via ensureToolBlobLoaded().
+			// Blob loading fills in input + output; title/command are
+			// derived from input at render time.
 			if (entry.tools && Array.isArray(entry.tools)) {
 				for (const tool of entry.tools as any[]) {
 					result.push({
 						type: 'tool',
 						name: tool.name,
-						title: capitalize(tool.name),
 						blobId: tool.blobId,
 						sessionId,
 						ts: parseTs(entry.ts),
@@ -149,9 +158,7 @@ function applyBlob(block: Extract<Block, { type: 'tool' }>, text: string): void 
 	block.blobLoaded = true
 	try {
 		const blob = ason.parse(text) as any
-		const input = blob?.call?.input
-		block.title = toolTitle(block.name, input)
-		block.command = toolCommand(block.name, input)
+		block.input = blob?.call?.input
 		if (typeof blob?.result?.content === 'string') block.output = blob.result.content
 	} catch {}
 }
@@ -172,8 +179,8 @@ async function loadToolBlobs(blocks: Block[]): Promise<number> {
 	for (let i = 0; i < tools.length; i += batchSize) {
 		const batch = tools.slice(i, i + batchSize)
 		// Check file sizes first, skip blobs over 1MB
-		const files = batch.map(b => Bun.file(blobPath(b.sessionId ?? '', b.blobId!)))
-		const sizes = await Promise.allSettled(files.map(f => f.size))
+		const files = batch.map((b) => Bun.file(blobPath(b.sessionId ?? '', b.blobId!)))
+		const sizes = await Promise.allSettled(files.map((f) => f.size))
 
 		// Only read files under the size limit
 		const reads = files.map((f, j) => {
@@ -218,12 +225,18 @@ function toolTitle(name: string, input?: any): string {
 			if (input.limit) s += `-${input.offset + input.limit}`
 			return s
 		}
-		case 'write': return `Write ${input.path ?? '?'}`
-		case 'edit': return `Edit ${input.path ?? '?'}`
-		case 'eval': return 'Eval'
-		case 'grep': return `Grep ${input.pattern ?? '?'} in ${input.path ?? '?'}`
-		case 'ls': return `Ls ${input.path ?? '.'}`
-		default: return capitalize(name)
+		case 'write':
+			return `Write ${input.path ?? '?'}`
+		case 'edit':
+			return `Edit ${input.path ?? '?'}`
+		case 'eval':
+			return 'Eval'
+		case 'grep':
+			return `Grep ${input.pattern ?? '?'} in ${input.path ?? '?'}`
+		case 'ls':
+			return `Ls ${input.path ?? '.'}`
+		default:
+			return capitalize(name)
 	}
 }
 
@@ -288,16 +301,21 @@ function formatEdit(output: string): ToolFormatResult {
 	const afterMatch = output.match(/\+\+\+ after\n([\s\S]*)$/)
 	if (!beforeMatch && !afterMatch) return { bodyLines: [] }
 
-	let beforeLines = beforeMatch ? beforeMatch[1]!.split('\n').filter(l => l.trim()) : []
-	let afterLines = afterMatch ? afterMatch[1]!.split('\n').filter(l => l.trim()) : []
+	let beforeLines = beforeMatch ? beforeMatch[1]!.split('\n').filter((l) => l.trim()) : []
+	let afterLines = afterMatch ? afterMatch[1]!.split('\n').filter((l) => l.trim()) : []
 
 	// Strip common prefix/suffix so only changed lines are shown
 	while (beforeLines.length && afterLines.length && beforeLines[0] === afterLines[0]) {
-		beforeLines.shift(); afterLines.shift()
+		beforeLines.shift()
+		afterLines.shift()
 	}
-	while (beforeLines.length && afterLines.length &&
-		beforeLines[beforeLines.length - 1] === afterLines[afterLines.length - 1]) {
-		beforeLines.pop(); afterLines.pop()
+	while (
+		beforeLines.length &&
+		afterLines.length &&
+		beforeLines[beforeLines.length - 1] === afterLines[afterLines.length - 1]
+	) {
+		beforeLines.pop()
+		afterLines.pop()
 	}
 
 	const lines: string[] = []
@@ -327,7 +345,7 @@ function formatRead(output: string): ToolFormatResult {
 }
 
 function formatWrite(output: string): ToolFormatResult {
-	const lines = output.split('\n').filter(l => l.trim())
+	const lines = output.split('\n').filter((l) => l.trim())
 	if (!lines.length || (lines.length === 1 && lines[0] === 'ok')) {
 		return { bodyLines: [], suppressOutput: true }
 	}
@@ -338,9 +356,9 @@ function formatWrite(output: string): ToolFormatResult {
 const toolFormatters: Record<string, (output: string) => ToolFormatResult> = {
 	edit: formatEdit,
 	write: formatWrite,
-	grep: o => countIndicator(o, 'No matches found.', 'matches'),
-	glob: o => countIndicator(o, 'No files found.', 'files'),
-	ls: o => countIndicator(o, '(empty directory)', 'entries'),
+	grep: (o) => countIndicator(o, 'No matches found.', 'matches'),
+	glob: (o) => countIndicator(o, 'No files found.', 'files'),
+	ls: (o) => countIndicator(o, '(empty directory)', 'entries'),
 	read: formatRead,
 }
 
@@ -392,12 +410,18 @@ function bgLine(content: string, cols: number, bg: string): string {
 // Get the fg/bg colors for a block
 function blockColors(block: Block): { fg: string; bg: string } {
 	switch (block.type) {
-		case 'assistant': return colors.assistant
-		case 'thinking': return colors.thinking
-		case 'user': return colors.user
-		case 'tool': return colors.tool(block.name)
-		case 'info': return colors.info
-		case 'error': return colors.error
+		case 'assistant':
+			return colors.assistant
+		case 'thinking':
+			return colors.thinking
+		case 'user':
+			return colors.user
+		case 'tool':
+			return colors.tool(block.name)
+		case 'info':
+			return colors.info
+		case 'error':
+			return colors.error
 	}
 }
 
@@ -427,11 +451,16 @@ function blockLabel(block: Block): string {
 			if (block.status === 'queued') return 'You (queued)'
 			return 'You'
 		}
-		case 'assistant': return 'Hal'
-		case 'thinking': return 'Thinking'
-		case 'tool': return block.title
-		case 'info': return 'Info'
-		case 'error': return 'Error'
+		case 'assistant':
+			return 'Hal'
+		case 'thinking':
+			return 'Thinking'
+		case 'tool':
+			return toolTitle(block.name, block.input)
+		case 'info':
+			return 'Info'
+		case 'error':
+			return 'Error'
 	}
 }
 
@@ -473,9 +502,10 @@ function blockContent(block: Block, cols: number): string[] {
 					// width check. The actual line keeps raw tabs — HTS tab
 					// stops (set on startup) control their display width.
 					const measured = visLen(expandTabs(raw, blockConfig.tabWidth))
-					const styled = measured > cols
-						? `${indent}${DIM}${clipVisual(expandTabs(raw, blockConfig.tabWidth), cols)}${DIM_OFF}`
-						: `${indent}${DIM}${raw}${DIM_OFF}`
+					const styled =
+						measured > cols
+							? `${indent}${DIM}${clipVisual(expandTabs(raw, blockConfig.tabWidth), cols)}${DIM_OFF}`
+							: `${indent}${DIM}${raw}${DIM_OFF}`
 					lines.push(styled)
 				}
 			} else if (span.type === 'table') {
@@ -486,6 +516,8 @@ function blockContent(block: Block, cols: number): string[] {
 				}
 			}
 		}
+		// Strip leading blank lines (models often start with \n\n)
+		while (lines.length > 0 && lines[0]!.trim() === '') lines.shift()
 		return resolveMarkers(lines)
 	}
 
@@ -493,8 +525,9 @@ function blockContent(block: Block, cols: number): string[] {
 		const lines: string[] = []
 		// Command lines (bash, eval) — keep real tabs for copyability.
 		// expandTabs only for formatBashCommand width calculation.
-		if (block.command) {
-			for (const l of formatBashCommand(block.command, cw)) {
+		const command = toolCommand(block.name, block.input)
+		if (command) {
+			for (const l of formatBashCommand(command, cw)) {
 				lines.push(`${indent}${l}`)
 			}
 		}
@@ -531,9 +564,7 @@ function blockContent(block: Block, cols: number): string[] {
 
 	// User, thinking, info, error — plain text with word wrap.
 	// Expand tabs here (word wrap needs real character widths).
-	const text = block.type === 'user' ? block.text
-		: block.type === 'thinking' ? block.text
-		: block.text
+	const text = block.type === 'user' ? block.text : block.type === 'thinking' ? block.text : block.text
 	const lines: string[] = []
 	for (const raw of expandTabs(text, blockConfig.tabWidth).split('\n')) {
 		for (const wl of wordWrap(`${indent}${raw}`, cols)) lines.push(wl)
@@ -572,6 +603,10 @@ function renderBlock(block: Block, cols: number): string[] {
 
 export const blocks = {
 	config: blockConfig,
-	historyToBlocks, renderBlock, loadToolBlobs,
-	formatToolOutput, spinnerChar, formatElapsed,
+	historyToBlocks,
+	renderBlock,
+	loadToolBlobs,
+	formatToolOutput,
+	spinnerChar,
+	formatElapsed,
 }

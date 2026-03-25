@@ -49,7 +49,7 @@ const state = {
 
 export interface AgentContext {
 	sessionId: string
-	model: string           // full "provider/model-id" string
+	model: string // full "provider/model-id" string
 	cwd: string
 	/** Pre-built system prompt text. */
 	systemPrompt: string
@@ -157,7 +157,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 	// If caller passed a signal, propagate its abort to our controller
 	if (signal) {
-		if (signal.aborted) { ac.abort(); return }
+		if (signal.aborted) {
+			ac.abort()
+			return
+		}
 		signal.addEventListener('abort', () => ac.abort(), { once: true })
 	}
 
@@ -198,7 +201,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 			try {
 				for await (const event of gen) {
-					if (loopSignal.aborted) { aborted = true; break }
+					if (loopSignal.aborted) {
+						aborted = true
+						break
+					}
 
 					switch (event.type) {
 						case 'thinking':
@@ -233,6 +239,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								type: 'tool-call',
 								toolId: event.id,
 								name: event.name,
+								input: event.input,
 								phase: 'running',
 							})
 							break
@@ -317,7 +324,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					if (assistantText) historyEntry.text = assistantText
 					if (thinkingText && thinkingSignature) {
 						const blobId = blob.makeBlobId(sessionId)
-						await blob.writeBlob(sessionId, blobId, { thinking: thinkingText, signature: thinkingSignature })
+						await blob.writeBlob(sessionId, blobId, {
+							thinking: thinkingText,
+							signature: thinkingSignature,
+						})
 						historyEntry.thinkingBlobId = blobId
 					}
 					if (totalUsage.input > 0) historyEntry.usage = totalUsage
@@ -389,12 +399,14 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					existing.result = { content: result, status: 'done' }
 					await blob.writeBlob(sessionId, blobId, existing)
 				}
-				await sessions.appendHistory(sessionId, [{
-					role: 'tool_result',
-					tool_use_id: call.id,
-					blobId,
-					ts: new Date().toISOString(),
-				}])
+				await sessions.appendHistory(sessionId, [
+					{
+						role: 'tool_result',
+						tool_use_id: call.id,
+						blobId,
+						ts: new Date().toISOString(),
+					},
+				])
 
 				emitEvent(sessionId, {
 					type: 'tool-result',
@@ -407,7 +419,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 			// Report context usage estimate
 			const est = context.estimateContext(messages, model, overheadBytes)
-			await ctx.onStatus?.(true, 'generating...', )
+			await ctx.onStatus?.(true, 'generating...')
 
 			// Continue to next iteration (re-invoke the model with tool results)
 		}
@@ -415,7 +427,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		// If we exhausted maxIterations, inform the user
 		emitInfo(sessionId, `Hit max iterations (${config.maxIterations}). Stopping.`, 'error')
 		emitEvent(sessionId, { type: 'stream-end', phase: 'done', usage: totalUsage })
-
 	} finally {
 		state.activeRequests.delete(sessionId)
 		await ctx.onStatus?.(false)

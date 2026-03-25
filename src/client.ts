@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import { ipc } from './ipc.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
+import { draft as draftModule } from './cli/draft.ts'
 import { perf } from './perf.ts'
 import { STATE_DIR } from './state.ts'
 import { ason } from './utils/ason.ts'
@@ -23,6 +24,9 @@ export interface Tab {
 	// Per-tab prompt history for up-arrow recall. Extracted from session
 	// history entries on load, appended to on each prompt submission.
 	inputHistory: string[]
+	// In-memory mirror of the draft.ason on disk. Kept in sync so we
+	// can hand it to the CLI on tab switch without a disk read.
+	inputDraft: string
 	// Tabs start unloaded: raw history is stashed here and converted to
 	// blocks on demand (active tab at startup, others in background).
 	rawHistory?: HistoryEntry[]
@@ -69,12 +73,12 @@ function currentTab(): Tab | null {
 
 function isBusy(): boolean {
 	const tab = currentTab()
-	return tab ? state.busy.get(tab.sessionId) ?? false : false
+	return tab ? (state.busy.get(tab.sessionId) ?? false) : false
 }
 
 function getActivity(): string {
 	const tab = currentTab()
-	return tab ? state.activity.get(tab.sessionId) ?? '' : ''
+	return tab ? (state.activity.get(tab.sessionId) ?? '') : ''
 }
 
 // onTabSwitch callback — set by CLI to save/restore drafts on tab change
@@ -84,13 +88,25 @@ function setOnTabSwitch(fn: (from: string, to: string) => void): void {
 	onTabSwitch = fn
 }
 
+// onDraftArrived callback — fired when another client saves a draft for
+// the active tab and our prompt is empty. The CLI uses this to show the
+// draft text (e.g. client A quits with a draft, client B picks it up).
+let onDraftArrived: ((text: string) => void) | null = null
+
+function setOnDraftArrived(fn: (text: string) => void): void {
+	onDraftArrived = fn
+}
+
 function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
 		const fromSession = state.tabs[state.activeTab]?.sessionId ?? ''
 		state.activeTab = index
-		ensureTabLoaded(state.tabs[index]!)
-		const toSession = state.tabs[index]?.sessionId ?? ''
-		if (onTabSwitch) onTabSwitch(fromSession, toSession)
+		const tab = state.tabs[index]!
+		ensureTabLoaded(tab)
+		// Re-read draft from disk — another client may have saved one
+		const diskDraft = draftModule.loadDraft(tab.sessionId)
+		if (diskDraft && !tab.inputDraft) tab.inputDraft = diskDraft
+		if (onTabSwitch) onTabSwitch(fromSession, tab.sessionId)
 		saveClientState()
 		onChange(true)
 	}
@@ -113,8 +129,8 @@ const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 
 interface ClientStateFile {
 	lastTab: string | null
-	peak: number        // high-water mark for rendered line count
-	peakCols: number    // terminal width peak was computed at
+	peak: number // high-water mark for rendered line count
+	peakCols: number // terminal width peak was computed at
 	model: string | null // last-used model, restored on startup
 }
 
@@ -162,6 +178,34 @@ function appendInputHistory(line: string): void {
 	tab.inputHistory.push(line)
 }
 
+// ── Per-tab draft ────────────────────────────────────────────────────────────
+
+function getInputDraft(): string {
+	return currentTab()?.inputDraft ?? ''
+}
+
+// Save draft text to memory + disk + IPC notification.
+function saveDraft(draftText: string): void {
+	const tab = currentTab()
+	if (!tab) return
+	tab.inputDraft = draftText
+	draftModule.saveDraft(tab.sessionId, draftText)
+}
+
+// Clear draft (called on submit).
+function clearDraft(): void {
+	const tab = currentTab()
+	if (!tab) return
+	tab.inputDraft = ''
+	draftModule.clearDraft(tab.sessionId)
+}
+
+// Called on submit — clear draft and update history.
+function onSubmit(text: string): void {
+	appendInputHistory(text)
+	clearDraft()
+}
+
 function nextTab(): void {
 	if (state.tabs.length > 0) switchTab((state.activeTab + 1) % state.tabs.length)
 }
@@ -199,8 +243,13 @@ function clearPrompt(): void {
 	onChange(false)
 }
 
+// Track pending open/fork so we know to copy draft on fork
+let pendingOpen: 'open' | 'fork' | false = false
+
 function sendCommand(type: string, text?: string): void {
 	const tab = currentTab()
+	if (type === 'open') pendingOpen = 'open'
+	if (type === 'fork') pendingOpen = 'fork'
 	ipc.appendCommand({ type, text, sessionId: tab?.sessionId })
 }
 
@@ -209,19 +258,31 @@ function handleEvent(event: any): void {
 
 	if (event.type === 'sessions') {
 		const newTabs: Tab[] = []
+		const isFork = pendingOpen === 'fork'
 		for (const s of event.sessions) {
 			const existing = state.tabs.find((t) => t.sessionId === s.id)
 			if (existing) {
 				existing.name = s.name
 				newTabs.push(existing)
 			} else {
-				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], loaded: true })
+				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], inputDraft: '', loaded: true })
 			}
 		}
 		const grew = newTabs.length > state.tabs.length
+		const prevSession = state.tabs[state.activeTab]?.sessionId ?? ''
 		state.tabs = newTabs
 		if (state.activeTab >= state.tabs.length) state.activeTab = state.tabs.length - 1
 		if (grew) state.activeTab = state.tabs.length - 1
+		const newSession = state.tabs[state.activeTab]?.sessionId ?? ''
+		// On fork, copy the parent's draft to the new tab
+		if (isFork && grew && prevSession) {
+			const prevTab = newTabs.find(t => t.sessionId === prevSession)
+			const newTab = newTabs[state.activeTab]
+			if (prevTab?.inputDraft && newTab) newTab.inputDraft = prevTab.inputDraft
+		}
+		pendingOpen = false
+		// When active tab changes (e.g. new tab added), save/restore drafts
+		if (prevSession !== newSession && onTabSwitch) onTabSwitch(prevSession, newSession)
 		onChange(false)
 	} else if (event.type === 'prompt') {
 		addBlockToTab(event.sessionId, {
@@ -250,20 +311,30 @@ function handleEvent(event: any): void {
 		addBlockToTab(event.sessionId, {
 			type: 'tool',
 			name: event.name,
-			title: event.name,
+			input: event.input,
 			toolId: event.toolId,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'tool-result' && event.sessionId) {
 		// Find the tool block and update it with output
-		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		const tab = state.tabs.find((t) => t.sessionId === event.sessionId)
 		if (tab) {
-			const toolBlock = tab.history.find(
-				(b: any) => b.type === 'tool' && b.toolId === event.toolId
-			) as any
+			const toolBlock = tab.history.find((b: any) => b.type === 'tool' && b.toolId === event.toolId) as any
 			if (toolBlock) {
 				toolBlock.output = event.output
 				onChange(false)
+			}
+		}
+	} else if (event.type === 'draft_saved' && event.sessionId) {
+		// Another client saved a draft. Update the in-memory copy for that
+		// tab. If it's the active tab and our prompt is empty, show it.
+		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		if (tab) {
+			const text = draftModule.loadDraft(event.sessionId)
+			tab.inputDraft = text
+			const active = currentTab()
+			if (active?.sessionId === event.sessionId && onDraftArrived) {
+				onDraftArrived(text)
 			}
 		}
 	}
@@ -286,7 +357,15 @@ function loadPersistedSessions(): void {
 	for (const s of loaded) {
 		const dirName = s.meta.workingDir?.split('/').pop()
 		const name = s.meta.topic ?? dirName ?? `tab ${newTabs.length + 1}`
-		newTabs.push({ sessionId: s.meta.id, name, history: [], inputHistory: [], rawHistory: s.history, loaded: false })
+		newTabs.push({
+			sessionId: s.meta.id,
+			name,
+			history: [],
+			inputHistory: [],
+			inputDraft: '',
+			rawHistory: s.history,
+			loaded: false,
+		})
 	}
 	state.tabs = newTabs
 
@@ -299,7 +378,10 @@ function loadPersistedSessions(): void {
 	// Only load the active tab now — first paint needs it.
 	// Other tabs are loaded in the background after first paint.
 	const active = state.tabs[state.activeTab]
-	if (active) ensureTabLoaded(active)
+	if (active) {
+		ensureTabLoaded(active)
+		active.inputDraft = draftModule.loadDraft(active.sessionId)
+	}
 
 	const cols = process.stdout.columns || 80
 	if (saved.peakCols === cols && saved.peak > 0) {
@@ -363,6 +445,7 @@ export const client = {
 	state,
 	setOnChange,
 	setOnTabSwitch,
+	setOnDraftArrived,
 	currentTab,
 	isBusy,
 	getActivity,
@@ -377,4 +460,8 @@ export const client = {
 	saveState: saveClientState,
 	getInputHistory,
 	appendInputHistory,
+	getInputDraft,
+	saveDraft,
+	clearDraft,
+	onSubmit,
 }
