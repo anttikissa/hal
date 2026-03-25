@@ -127,7 +127,7 @@ function buildUserContent(sessionId: string, entry: HistoryEntry, pendingInfos: 
 				if (data?.media_type && data?.data) {
 					blocks.push({
 						type: 'image',
-						content: [{ type: 'base64', media_type: data.media_type, data: data.data }],
+						source: { type: 'base64', media_type: data.media_type, data: data.data },
 					} as any)
 				} else {
 					blocks.push({ type: 'text', text: `[image unavailable — blob ${b.blobId}]` })

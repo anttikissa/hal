@@ -18,6 +18,7 @@ import { commands } from '../runtime/commands.ts'
 import type { SessionState } from '../runtime/commands.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
+import { apiMessages } from '../session/api-messages.ts'
 
 // ── Session state ──
 
@@ -40,7 +41,7 @@ function makeSessionId(): string {
 	return `${month}-${suffix}`
 }
 
-function createSession(): Session {
+async function createSession(): Promise<Session> {
 	const session: Session = {
 		id: makeSessionId(),
 		name: `tab ${activeSessions.length + 1}`,
@@ -48,7 +49,21 @@ function createSession(): Session {
 		createdAt: new Date().toISOString(),
 	}
 	activeSessions.push(session)
+
+	// Persist: write session.ason and update the session list in state.ason
+	await sessionStore.createSession(session.id, {
+		id: session.id,
+		workingDir: session.cwd,
+		createdAt: session.createdAt,
+		topic: undefined,
+	})
+	await persistSessionList()
 	return session
+}
+
+/** Write the current in-memory session order to disk. */
+async function persistSessionList(): Promise<void> {
+	await sessionStore.saveSessionList(activeSessions.map(s => s.id))
 }
 
 function findSession(sessionId: string): Session | undefined {
@@ -105,8 +120,18 @@ async function handlePrompt(session: Session, text: string): Promise<void> {
 
 	if (cmdResult.handled) {
 		// Sync any mutations back to session (e.g. /model, /cd)
+		const cwdChanged = session.cwd !== sessionState.cwd
+		const modelChanged = session.model !== sessionState.model
 		session.model = sessionState.model
 		session.cwd = sessionState.cwd
+
+		// Persist changed metadata to disk
+		if (cwdChanged || modelChanged) {
+			void sessionStore.updateMeta(session.id, {
+				workingDir: session.cwd,
+				model: session.model,
+			})
+		}
 
 		if (cmdResult.output) emitInfo(session.id, cmdResult.output)
 		if (cmdResult.error) emitInfo(session.id, cmdResult.error, 'error')
@@ -127,11 +152,15 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 		cwd: session.cwd,
 	})
 
-	// Build messages — for now, just the current prompt.
-	// Plan 3 (Session) will add history loading + message building.
-	const messages: any[] = [
-		{ role: 'user', content: text },
-	]
+	// Save user prompt to history
+	await sessionStore.appendHistory(session.id, [{
+		role: 'user',
+		content: text,
+		ts: new Date().toISOString(),
+	}])
+
+	// Load conversation history and convert to API messages
+	const messages = apiMessages.toAnthropicMessages(session.id)
 
 	// Emit stream-start so clients know generation is happening
 	ipc.appendEvent({
@@ -190,7 +219,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		}
 
 		case 'open': {
-			createSession()
+			await createSession()
 			broadcastSessions()
 			break
 		}
@@ -200,7 +229,8 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			// Abort any active generation
 			agentLoop.abort(sessionId)
 			activeSessions = activeSessions.filter(s => s.id !== sessionId)
-			if (activeSessions.length === 0) createSession()
+			if (activeSessions.length === 0) await createSession()
+			await persistSessionList()
 			broadcastSessions()
 			break
 		}
@@ -227,7 +257,10 @@ function startRuntime(signal: AbortSignal): void {
 			})
 		}
 	} else {
-		createSession()
+		// First run — create and persist the initial tab.
+		// We can't top-level await in startRuntime, so fire-and-forget.
+		// The session is in memory immediately; disk write follows.
+		void createSession()
 	}
 
 	// Broadcast session list on next tick so client tail is ready

@@ -47,6 +47,10 @@ const state = {
 	promptHistory: [] as string[],
 	// Current model selection, persisted across restarts
 	model: null as string | null,
+	// Busy state per session — true while agent is generating/running tools
+	busy: new Map<string, boolean>(),
+	// Activity text per session — "generating...", "running 3 tool(s)...", etc.
+	activity: new Map<string, string>(),
 }
 
 let onChange: (force: boolean) => void = () => {}
@@ -59,6 +63,16 @@ function setOnChange(fn: (force: boolean) => void): void {
 
 function currentTab(): Tab | null {
 	return state.tabs[state.activeTab] ?? null
+}
+
+function isBusy(): boolean {
+	const tab = currentTab()
+	return tab ? state.busy.get(tab.sessionId) ?? false : false
+}
+
+function getActivity(): string {
+	const tab = currentTab()
+	return tab ? state.activity.get(tab.sessionId) ?? '' : ''
 }
 
 // onTabSwitch callback — set by CLI to save/restore drafts on tab change
@@ -236,6 +250,10 @@ function handleEvent(event: any): void {
 			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
+	} else if (event.type === 'status' && event.sessionId) {
+		state.busy.set(event.sessionId, event.busy ?? false)
+		state.activity.set(event.sessionId, event.activity ?? '')
+		onChange(false)
 	}
 }
 
@@ -334,6 +352,8 @@ export const client = {
 	setOnChange,
 	setOnTabSwitch,
 	currentTab,
+	isBusy,
+	getActivity,
 	switchTab,
 	nextTab,
 	prevTab,

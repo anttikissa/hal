@@ -43,8 +43,6 @@ describe('main', () => {
 		const stdout = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
 		expect(stdout).toContain('hello')
-		// The stub provider responds with a placeholder until Plan 4
-		expect(stdout).toContain('Provider not yet implemented')
 	})
 
 	test('exits with 100 on ctrl-r', async () => {

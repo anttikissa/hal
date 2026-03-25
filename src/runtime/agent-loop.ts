@@ -13,6 +13,8 @@ import { models } from '../models.ts'
 import { context } from './context.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { toolRegistry } from '../tools/tool.ts'
+import { sessions } from '../server/sessions.ts'
+import { blob } from '../session/blob.ts'
 // Import all tool modules so they self-register on load
 import '../tools/bash.ts'
 import '../tools/read.ts'
@@ -305,6 +307,22 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			// No tool calls — we're done. Emit a response event so the client
 			// can display the assistant's text (client listens for 'response' events).
 			if (toolCalls.length === 0) {
+				// Save assistant response to history
+				if (assistantText || thinkingText) {
+					const historyEntry: any = {
+						role: 'assistant',
+						ts: new Date().toISOString(),
+					}
+					if (assistantText) historyEntry.text = assistantText
+					if (thinkingText && thinkingSignature) {
+						const blobId = blob.makeBlobId(sessionId)
+						await blob.writeBlob(sessionId, blobId, { thinking: thinkingText, signature: thinkingSignature })
+						historyEntry.thinkingBlobId = blobId
+					}
+					if (totalUsage.input > 0) historyEntry.usage = totalUsage
+					await sessions.appendHistory(sessionId, [historyEntry])
+				}
+
 				if (assistantText) {
 					emitEvent(sessionId, { type: 'response', text: assistantText })
 				}
@@ -330,16 +348,53 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			}
 			messages.push({ role: 'assistant', content: assistantContent })
 
+			// Save assistant message with tool calls to history
+			const toolBlobMap = new Map<string, string>()
+			const historyEntry: any = {
+				role: 'assistant',
+				ts: new Date().toISOString(),
+			}
+			if (assistantText) historyEntry.text = assistantText
+			if (thinkingText && thinkingSignature) {
+				const blobId = blob.makeBlobId(sessionId)
+				await blob.writeBlob(sessionId, blobId, { thinking: thinkingText, signature: thinkingSignature })
+				historyEntry.thinkingBlobId = blobId
+			}
+			// Save each tool call input to a blob
+			historyEntry.tools = []
+			for (const tc of toolCalls) {
+				const blobId = blob.makeBlobId(sessionId)
+				toolBlobMap.set(tc.id, blobId)
+				await blob.writeBlob(sessionId, blobId, { call: { name: tc.name, input: tc.input } })
+				historyEntry.tools.push({ id: tc.id, name: tc.name, blobId })
+			}
+			await sessions.appendHistory(sessionId, [historyEntry])
+
 			// Execute tools (with concurrency limit)
 			await ctx.onStatus?.(true, `running ${toolCalls.length} tool(s)...`)
 			const results = await executeToolsConcurrently(toolCalls, loopSignal, ctx.cwd, sessionId)
 
-			// Add tool results to messages
+			// Add tool results to messages and save to history
 			for (const { call, result } of results) {
 				messages.push({
 					role: 'user',
 					content: [{ type: 'tool_result', tool_use_id: call.id, content: result }],
 				})
+
+				// Save tool result to blob and history
+				const blobId = toolBlobMap.get(call.id)!
+				const existing = blob.readBlob(sessionId, blobId)
+				if (existing) {
+					existing.result = { content: result, status: 'done' }
+					await blob.writeBlob(sessionId, blobId, existing)
+				}
+				await sessions.appendHistory(sessionId, [{
+					role: 'tool_result',
+					tool_use_id: call.id,
+					blobId,
+					ts: new Date().toISOString(),
+				}])
+
 				emitEvent(sessionId, {
 					type: 'tool-result',
 					toolId: call.id,

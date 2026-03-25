@@ -108,7 +108,9 @@ function renderTabBar(lines: string[]): void {
 function renderStatusLine(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const mode = fullscreen ? 'full' : 'grow'
-	const info = ` ${client.state.role} \u00b7 pid ${process.pid} \u00b7 ${mode} `
+	const activity = client.getActivity()
+	const activityPart = activity ? ` \u00b7 ${activity}` : ''
+	const info = ` ${client.state.role} \u00b7 pid ${process.pid} \u00b7 ${mode}${activityPart} `
 	const dashes = Math.max(0, cols - visLen(info) - 1)
 	const left = Math.floor(dashes / 2)
 	const right = dashes - left
@@ -116,8 +118,7 @@ function renderStatusLine(lines: string[]): void {
 }
 
 function renderHelpBar(lines: string[]): void {
-	// TODO: busy flag will be wired when agent loop is implemented
-	const busy = false
+	const busy = client.isBusy()
 	const hasText = prompt.text().length > 0
 	const bar = helpBar.build(busy, hasText)
 	if (bar) lines.push(`\x1b[90m${bar}\x1b[0m`)
@@ -132,7 +133,7 @@ function renderPrompt(lines: string[]): void {
 // How many frame lines the chrome (tab bar + status + help bar + prompt) occupies.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	const busy = false
+	const busy = client.isBusy()
 	const hasText = prompt.text().length > 0
 	const hasHelp = helpBar.build(busy, hasText) !== ''
 	return 2 + (hasHelp ? 1 : 0) + prompt.lineCount(cols - 1)
