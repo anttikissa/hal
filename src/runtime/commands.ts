@@ -76,6 +76,7 @@ handlers['help'] = () => {
 		'  /fork           Fork current session to new tab',
 		'  /compact        Summarize conversation to reduce context',
 		'  /cd [path]      Change working directory',
+		'  /system         Show full preprocessed system prompt',
 		'  /show [what]    Show system prompt, context, model',
 		'  /help           Show this help',
 		'  /exit           Quit Hal',
@@ -159,6 +160,19 @@ handlers['cd'] = (args, session) => {
 		parts.push(`Loaded ${files.join(', ')}`)
 	}
 	return { output: parts.join('\n'), handled: true }
+}
+
+// /system — print the full preprocessed system prompt (SYSTEM.md + AGENTS.md chain)
+handlers['system'] = (_args, session) => {
+	const model = session.model ?? models.defaultModel()
+	const result = context.buildSystemPrompt({ model, cwd: session.cwd })
+	const header = result.loaded
+		.map(f => `  ${f.name} (${context.formatBytes(f.bytes)}) — ${f.path}`)
+		.join('\n')
+	return {
+		output: `${header}\n  Total: ${context.formatBytes(result.bytes)}\n\n${result.text}`,
+		handled: true,
+	}
 }
 
 // /show [what] — show system prompt, context info, etc.

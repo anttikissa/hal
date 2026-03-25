@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync } from 'fs'
 import { dirname } from 'path'
-import { HAL_DIR } from '../state.ts'
+import { HAL_DIR, STATE_DIR } from '../state.ts'
 import { models } from '../models.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
 
@@ -116,6 +116,7 @@ function buildSystemPrompt(opts: {
 	// Variables available for substitution in agent files
 	const vars: Record<string, string> = {
 		model, date, cwd, hal_dir: HAL_DIR,
+		state_dir: STATE_DIR,
 		session_dir: opts.sessionDir ?? '',
 	}
 
@@ -125,6 +126,7 @@ function buildSystemPrompt(opts: {
 		.replace(/\$\{cwd\}/g, cwd)
 		.replace(/\$\{date\}/g, date)
 		.replace(/\$\{hal_dir\}/g, HAL_DIR)
+		.replace(/\$\{state_dir\}/g, STATE_DIR)
 		.replace(/\$\{session_dir\}/g, opts.sessionDir ?? '')
 
 	const parts: string[] = []

@@ -111,10 +111,8 @@ function renderStatusLine(lines: string[]): void {
 	const activity = client.getActivity()
 	const activityPart = activity ? ` \u00b7 ${activity}` : ''
 	const info = ` ${client.state.role} \u00b7 pid ${process.pid} \u00b7 ${mode}${activityPart} `
-	const dashes = Math.max(0, cols - visLen(info) - 1)
-	const left = Math.floor(dashes / 2)
-	const right = dashes - left
-	lines.push(`\x1b[90m${'\u2500'.repeat(left)}${info}${'\u2500'.repeat(right)}\x1b[0m`)
+	const dashes = Math.max(0, cols - visLen(info))
+	lines.push(`\x1b[90m${info}${'\u2500'.repeat(dashes)}\x1b[0m`)
 }
 
 function renderHelpBar(lines: string[]): void {
@@ -126,7 +124,7 @@ function renderHelpBar(lines: string[]): void {
 
 function renderPrompt(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	const p = prompt.buildPrompt(cols - 1)
+	const p = prompt.buildPrompt(cols)
 	for (const line of p.lines) lines.push(line)
 }
 
@@ -136,7 +134,7 @@ function chromeLines(): number {
 	const busy = client.isBusy()
 	const hasText = prompt.text().length > 0
 	const hasHelp = helpBar.build(busy, hasText) !== ''
-	return 2 + (hasHelp ? 1 : 0) + prompt.lineCount(cols - 1)
+	return 2 + (hasHelp ? 1 : 0) + prompt.lineCount(cols)
 }
 
 function buildFrame(): string[] {
@@ -187,7 +185,7 @@ function buildFrame(): string[] {
 
 function cursorTarget(frameLen: number): { row: number; col: number } {
 	const cols = process.stdout.columns || 80
-	const p = prompt.buildPrompt(cols - 1)
+	const p = prompt.buildPrompt(cols)
 	// prompt occupies the last p.lines.length rows of the frame.
 	// cursor.rowOffset is 0-based within the prompt. So:
 	//   absolute row = (frame end) - (prompt height) + (cursor's prompt row)

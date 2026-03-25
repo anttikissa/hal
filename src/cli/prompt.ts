@@ -520,17 +520,16 @@ function buildPrompt(contentWidth: number): PromptRender {
 			const lo = Math.max(0, sel.start - lineStart)
 			const hi = Math.min(lineText.length, sel.end - lineStart)
 			if (lo < hi && lo < lineText.length && hi > 0) {
-				lines.push(` ${lineText.slice(0, lo)}\x1b[7m${lineText.slice(lo, hi)}\x1b[0m${lineText.slice(hi)}`)
+				lines.push(`${lineText.slice(0, lo)}\x1b[7m${lineText.slice(lo, hi)}\x1b[0m${lineText.slice(hi)}`)
 			} else {
-				lines.push(` ${lineText}`)
+				lines.push(lineText)
 			}
 		} else {
-			lines.push(` ${lineText}`)
+			lines.push(lineText)
 		}
 	}
 
-	// +1 for the single-space prefix on each line
-	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol + 1 } }
+	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol } }
 }
 
 // ── Draft save/restore ───────────────────────────────────────────────────────

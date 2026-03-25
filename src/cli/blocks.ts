@@ -16,6 +16,7 @@ import type { HistoryEntry } from '../server/sessions.ts'
 // ── Block types ──────────────────────────────────────────────────────────────
 
 const blockConfig = {
+	tabWidth: 4,                 // tab display width (also controls HTS tab stops)
 	blobBatchSize: 64,
 	maxToolOutputLines: 20,      // cap tool output at this many tail lines
 	maxEditDiffLines: 3,         // max before/after lines in edit diffs
@@ -371,12 +372,21 @@ const RESET_BG = '\x1b[49m'
 const DIM = '\x1b[2m'
 const DIM_OFF = '\x1b[22m'
 
-// Pad content to full terminal width with a given background color.
-// Uses \x1b[49m (default bg) at EOL, not \x1b[0m (full reset),
-// so this is safe even when resolveMarkers has active styles.
+// Clip a line to terminal width, preserving raw tabs when possible.
+// If the line fits, return it as-is (tabs intact for copying).
+// If it overflows, expand tabs first (clipVisual needs real widths) then clip.
+function clipLine(line: string, cols: number): string {
+	if (visLen(expandTabs(line, blockConfig.tabWidth)) <= cols) return line
+	return clipVisual(expandTabs(line, blockConfig.tabWidth), cols)
+}
+
+// Fill a line's background to full terminal width.
+// Paints bg + \x1b[K (erase to EOL with current bg) first, then \r back
+// and writes content on top. Tab characters skip over cells without
+// overwriting, so the bg color shows through tab gaps. No trailing spaces
+// in the copy buffer (unlike space-padding).
 function bgLine(content: string, cols: number, bg: string): string {
-	const pad = Math.max(0, cols - visLen(content))
-	return `${bg}${content}${' '.repeat(pad)}${RESET_BG}`
+	return `${bg}\x1b[K\r${content}${RESET_BG}`
 }
 
 // Get the fg/bg colors for a block
@@ -449,9 +459,8 @@ function formatBashCommand(cmd: string, contentWidth: number): string[] {
 
 // Render block content lines (without background — caller adds it).
 function blockContent(block: Block, cols: number): string[] {
-	// 1 char left margin
-	const cw = cols - 1
-	const indent = ' '
+	const cw = cols
+	const indent = ''
 
 	if (block.type === 'assistant') {
 		// Markdown-rendered assistant text
@@ -459,12 +468,15 @@ function blockContent(block: Block, cols: number): string[] {
 		for (const span of md.mdSpans(block.text)) {
 			if (span.type === 'code') {
 				for (const raw of span.lines) {
-					// Expand tabs BEFORE measuring — charWidth returns 0 for
-					// tabs, so visLen/clipVisual would undercount and bgLine
-					// would overpad, causing the line to wrap on the terminal.
-					const l = expandTabs(raw)
-					const styled = `${indent}${DIM}${l}${DIM_OFF}`
-					lines.push(visLen(styled) > cols ? clipVisual(styled, cols) : styled)
+					// Emit real \t so tabs are copyable. visLen can't measure
+					// tabs (charWidth returns 0), so we expand only for the
+					// width check. The actual line keeps raw tabs — HTS tab
+					// stops (set on startup) control their display width.
+					const measured = visLen(expandTabs(raw, blockConfig.tabWidth))
+					const styled = measured > cols
+						? `${indent}${DIM}${clipVisual(expandTabs(raw, blockConfig.tabWidth), cols)}${DIM_OFF}`
+						: `${indent}${DIM}${raw}${DIM_OFF}`
+					lines.push(styled)
 				}
 			} else if (span.type === 'table') {
 				for (const l of md.mdTable(span.lines, cw)) lines.push(`${indent}${l}`)
@@ -479,22 +491,22 @@ function blockContent(block: Block, cols: number): string[] {
 
 	if (block.type === 'tool') {
 		const lines: string[] = []
-		// Command lines (bash, eval) — expand tabs in command text
+		// Command lines (bash, eval) — keep real tabs for copyability.
+		// expandTabs only for formatBashCommand width calculation.
 		if (block.command) {
-			for (const l of formatBashCommand(expandTabs(block.command), cw)) {
+			for (const l of formatBashCommand(block.command, cw)) {
 				lines.push(`${indent}${l}`)
 			}
 		}
-		// Per-tool formatted output (diff coloring, counts, etc.)
+		// Per-tool formatted output — keep real tabs.
+		// expandTabs only where we need to measure/clip.
 		if (block.output) {
-			// Expand tabs in output before any measuring/clipping.
-			// Tool output frequently contains tabs (ls, cat, make, etc.)
-			const output = expandTabs(block.output)
+			const output = block.output
 			const fmt = formatToolOutput(block.name, output)
 
 			// Tool-specific body lines (diffs, counts)
 			for (const l of fmt.bodyLines) {
-				lines.push(`${indent}${clipVisual(l, cw)}`)
+				lines.push(`${indent}${clipLine(l, cw)}`)
 			}
 
 			// Raw output tail (unless formatter suppressed it)
@@ -505,11 +517,11 @@ function blockContent(block: Block, cols: number): string[] {
 					const indicator = fmt.hiddenIndicator ?? `[+ ${outLines.length - MAX} lines]`
 					lines.push(`${indent}${DIM}${indicator}${DIM_OFF}`)
 					for (const l of outLines.slice(-MAX)) {
-						lines.push(`${indent}${clipVisual(l, cw)}`)
+						lines.push(`${indent}${clipLine(l, cw)}`)
 					}
 				} else {
 					for (const l of outLines) {
-						lines.push(`${indent}${clipVisual(l, cw)}`)
+						lines.push(`${indent}${clipLine(l, cw)}`)
 					}
 				}
 			}
@@ -518,12 +530,12 @@ function blockContent(block: Block, cols: number): string[] {
 	}
 
 	// User, thinking, info, error — plain text with word wrap.
-	// Expand tabs here too (users can paste tabbed content).
+	// Expand tabs here (word wrap needs real character widths).
 	const text = block.type === 'user' ? block.text
 		: block.type === 'thinking' ? block.text
 		: block.text
 	const lines: string[] = []
-	for (const raw of expandTabs(text).split('\n')) {
+	for (const raw of expandTabs(text, blockConfig.tabWidth).split('\n')) {
 		for (const wl of wordWrap(`${indent}${raw}`, cols)) lines.push(wl)
 	}
 	return lines

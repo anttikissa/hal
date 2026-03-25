@@ -18,6 +18,7 @@ import { blob } from '../session/blob.ts'
 // Import all tool modules so they self-register on load
 import '../tools/bash.ts'
 import '../tools/read.ts'
+import '../tools/read_blob.ts'
 import '../tools/grep.ts'
 import '../tools/glob.ts'
 import '../tools/write.ts'

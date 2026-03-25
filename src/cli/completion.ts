@@ -33,6 +33,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'fork' },
 	{ name: 'tab' },
 	{ name: 'close' },
+	{ name: 'system' },
 	{ name: 'show' },
 	{ name: 'clear' },
 	{ name: 'exit' },

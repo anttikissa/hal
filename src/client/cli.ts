@@ -8,6 +8,7 @@ import { prompt } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { clipboard } from '../cli/clipboard.ts'
+import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
@@ -22,6 +23,38 @@ const KITTY_ON = '\x1b[>19u'
 const KITTY_OFF = '\x1b[<u'
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
 const BRACKETED_PASTE_OFF = '\x1b[?2004l'
+
+// Set hardware tab stops every N columns via HTS (ESC H).
+// Terminals default to 8-wide tabs. We set 4 so tab chars render
+// at 4-wide stops and can be copied as real tabs.
+//
+// Procedure:
+//   1. ESC[3g — clear all existing tab stops
+//   2. For each stop: CSI {col}G to move there, then ESC H to set it
+//   3. CSI 1G — move cursor back to column 1
+//
+// CSI G columns are 1-based. For 4-wide tabs the stops are at
+// columns 5, 9, 13, 17, ... (i.e. positions where the cursor lands
+// after pressing tab at columns 1–4, 5–8, etc.)
+
+function setTabStops(cols: number): void {
+	const tw = blocks.config.tabWidth
+	let seq = '\x1b[3g'
+	for (let c = tw + 1; c <= cols; c += tw) {
+		seq += `\x1b[${c}G\x1bH`
+	}
+	seq += '\x1b[1G'
+	process.stdout.write(seq)
+}
+
+function restoreDefaultTabStops(cols: number): void {
+	let seq = '\x1b[3g'
+	for (let c = 9; c <= cols; c += 8) {
+		seq += `\x1b[${c}G\x1bH`
+	}
+	seq += '\x1b[1G'
+	process.stdout.write(seq)
+}
 
 function draw(force = false): void {
 	render.draw(force)
@@ -38,6 +71,7 @@ function cleanupTerminal(): void {
 	client.saveState()
 	if (useKitty) process.stdout.write(KITTY_OFF)
 	process.stdout.write(BRACKETED_PASTE_OFF)
+	restoreDefaultTabStops(process.stdout.columns || 80)
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 }
 
@@ -221,6 +255,7 @@ function startCli(signal: AbortSignal): void {
 		process.stdin.resume()
 		if (useKitty) process.stdout.write(KITTY_ON)
 		process.stdout.write(BRACKETED_PASTE_ON)
+		setTabStops(process.stdout.columns || 80)
 	}
 	// Safety net: if we exit without hitting an explicit cleanup path
 	// (e.g. SIGTERM, uncaught exception), this still restores the terminal.
@@ -229,7 +264,10 @@ function startCli(signal: AbortSignal): void {
 	perf.mark('First draw')
 	draw()
 	perf.mark('First draw done')
-	process.stdout.on('resize', () => draw(true))
+	process.stdout.on('resize', () => {
+		setTabStops(process.stdout.columns || 80)
+		draw(true)
+	})
 
 	perf.mark('Ready for input')
 
@@ -244,8 +282,7 @@ function startCli(signal: AbortSignal): void {
 
 	process.stdin.on('data', (data: Buffer) => {
 		const cols = process.stdout.columns || 80
-		// Prompt content area = terminal width minus the " " prefix
-		const contentWidth = cols - 1
+		const contentWidth = cols
 
 		for (const k of keys.parseKeys(data.toString('utf-8'))) {
 			// Track key usage for help bar
