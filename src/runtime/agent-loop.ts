@@ -12,6 +12,15 @@ import type { Provider, ProviderStreamEvent, Message, ToolDef } from '../protoco
 import { models } from '../models.ts'
 import { context } from './context.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
+import { toolRegistry } from '../tools/tool.ts'
+// Import all tool modules so they self-register on load
+import '../tools/bash.ts'
+import '../tools/read.ts'
+import '../tools/grep.ts'
+import '../tools/glob.ts'
+import '../tools/write.ts'
+import '../tools/eval.ts'
+import '../tools/send.ts'
 
 // ── Configuration ──
 
@@ -93,18 +102,17 @@ function isRetryableStatus(status: number | undefined): boolean {
 	return status != null && config.retryableStatuses.has(status)
 }
 
-// ── Tool execution stub ──
-// Plan 5 builds the real tool executor. This stub returns a placeholder.
+// ── Tool execution ──
+// Dispatches tool calls through the tool registry. Each tool module
+// registers itself on import (see imports above).
 
-async function executeToolStub(call: ToolCall, _signal?: AbortSignal): Promise<string> {
-	return `[Tool "${call.name}" not yet implemented — see Plan 5]`
-}
-
-// The real tool executor will be injected here by Plan 5
-let executeTool: (call: ToolCall, signal?: AbortSignal, cwd?: string) => Promise<string> = executeToolStub
-
-function setToolExecutor(fn: typeof executeTool): void {
-	executeTool = fn
+async function executeTool(call: ToolCall, signal?: AbortSignal, cwd?: string, sessionId?: string): Promise<string> {
+	const context: import('../tools/tool.ts').ToolContext = {
+		sessionId: sessionId ?? 'unknown',
+		cwd: cwd ?? process.cwd(),
+		signal,
+	}
+	return toolRegistry.dispatch(call.name, call.input, context)
 }
 
 // ── The main loop ──
@@ -130,8 +138,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 	const loopSignal = ac.signal
 
-	// Tools list — empty until Plan 5 populates it
-	const tools: ToolDef[] = []
+	// Get tool definitions from the registry for the provider API
+	const tools: ToolDef[] = toolRegistry.toToolDefs()
 
 	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length
 	await ctx.onStatus?.(true, 'generating...')
@@ -290,7 +298,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 			// Execute tools (with concurrency limit)
 			await ctx.onStatus?.(true, `running ${toolCalls.length} tool(s)...`)
-			const results = await executeToolsConcurrently(toolCalls, loopSignal, ctx.cwd)
+			const results = await executeToolsConcurrently(toolCalls, loopSignal, ctx.cwd, sessionId)
 
 			// Add tool results to messages
 			for (const { call, result } of results) {
@@ -329,6 +337,7 @@ async function executeToolsConcurrently(
 	toolCalls: ToolCall[],
 	signal: AbortSignal,
 	cwd?: string,
+	sessionId?: string,
 ): Promise<{ call: ToolCall; result: string }[]> {
 	const results: { call: ToolCall; result: string }[] = []
 
@@ -340,7 +349,7 @@ async function executeToolsConcurrently(
 			batch.map(async (call) => {
 				if (signal.aborted) return { call, result: '[interrupted]' }
 				try {
-					const result = await executeTool(call, signal, cwd)
+					const result = await executeTool(call, signal, cwd, sessionId)
 					return { call, result }
 				} catch (err: any) {
 					return { call, result: `error: ${err?.message ?? String(err)}` }
@@ -374,5 +383,4 @@ export const agentLoop = {
 	runAgentLoop,
 	abort,
 	isActive,
-	setToolExecutor,
 }
