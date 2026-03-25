@@ -8,8 +8,12 @@
 
 import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '../protocol.ts'
 import { provider as providerUtils } from './provider.ts'
+import { auth } from '../auth.ts'
 
-const API_URL = 'https://api.anthropic.com/v1/messages'
+// The ?beta=true query parameter is required for OAuth tokens.
+// Without it, requests hit a different backend pool that returns 529 overloaded
+// errors far more frequently.
+const API_URL = 'https://api.anthropic.com/v1/messages?beta=true'
 const API_VERSION = '2023-06-01'
 const MAX_TOKENS = 16384
 
@@ -193,9 +197,10 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 // ── Generate ──
 
 async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
-	const apiKey = process.env.ANTHROPIC_API_KEY
-	if (!apiKey) {
-		yield { type: 'error', message: 'No ANTHROPIC_API_KEY set. Export it in your shell.' }
+	await auth.ensureFresh('anthropic')
+	const cred = auth.getCredential('anthropic')
+	if (!cred) {
+		yield { type: 'error', message: 'No Anthropic credentials. Run: bun scripts/login-anthropic.ts' }
 		yield { type: 'done' }
 		return
 	}
@@ -204,10 +209,15 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(req.model)
 	const supportsThinking = /^claude-(opus|sonnet)/.test(req.model)
 
-	// Build system blocks with cache control
-	const system: any[] = [
-		{ type: 'text', text: req.systemPrompt, cache_control: { type: 'ephemeral' } },
-	]
+	const isOAuth = cred.type === 'token'
+
+	// Build system blocks with cache control.
+	// OAuth requires the Claude Code identity prefix — without it, the API rejects the request.
+	const system: any[] = []
+	if (isOAuth) {
+		system.push({ type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude." })
+	}
+	system.push({ type: 'text', text: req.systemPrompt, cache_control: { type: 'ephemeral' } })
 
 	// Sanitize messages (handle foreign thinking blocks) then add cache breakpoints
 	const messages = applyCacheBreakpoints(sanitizeMessages(req.messages))
@@ -231,14 +241,25 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		body.tools = req.tools
 	}
 
-	const res = await fetch(API_URL, {
+	const authHeader = isOAuth
+		? { 'Authorization': `Bearer ${cred.value}` }
+		: { 'x-api-key': cred.value }
+
+	const url = API_URL
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+		...authHeader,
+		'anthropic-version': API_VERSION,
+		'anthropic-beta': isOAuth
+			? 'claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14'
+			: 'fine-grained-tool-streaming-2025-05-14',
+		// OAuth requires these headers to identify as Claude Code
+		...(isOAuth ? { 'user-agent': 'claude-cli/2.1.75', 'x-app': 'cli' } : {}),
+	}
+
+	const res = await fetch(url, {
 		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			'x-api-key': apiKey,
-			'anthropic-version': API_VERSION,
-			'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
-		},
+		headers,
 		body: JSON.stringify(body),
 		signal: req.signal,
 	})
