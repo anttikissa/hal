@@ -1,9 +1,10 @@
 // Client -- state manager for tabs, entries, prompt.
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
-import { readFileSync, writeFileSync, appendFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { ipc } from './ipc.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
+import { replay } from './session/replay.ts'
 import { perf } from './perf.ts'
 import { STATE_DIR } from './state.ts'
 import { ason } from './utils/ason.ts'
@@ -19,6 +20,9 @@ export interface Tab {
 	sessionId: string
 	name: string
 	history: Block[]
+	// Per-tab prompt history for up-arrow recall. Extracted from session
+	// history entries on load, appended to on each prompt submission.
+	inputHistory: string[]
 	// Tabs start unloaded: raw history is stashed here and converted to
 	// blocks on demand (active tab at startup, others in background).
 	rawHistory?: HistoryEntry[]
@@ -43,8 +47,6 @@ const state = {
 	// Invalidated if terminal width changed since last save.
 	peak: 0,
 	peakCols: 0,
-	// Prompt history for up-arrow recall, persisted to disk
-	promptHistory: [] as string[],
 	// Current model selection, persisted across restarts
 	model: null as string | null,
 	// Busy state per session — true while agent is generating/running tools
@@ -96,8 +98,10 @@ function switchTab(index: number): void {
 
 // Convert raw history → blocks if not already done.
 // Called on tab switch and during background loading.
+// Also extracts per-tab input history for up-arrow recall.
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
+	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
 	tab.history = blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId)
 	tab.rawHistory = undefined
 	tab.loaded = true
@@ -143,32 +147,19 @@ function saveClientState(): void {
 	} catch {}
 }
 
-// ── Prompt history persistence ──────────────────────────────────────────────
-// Saves prompt history as plain text, one entry per line.
-// Loaded on startup, appended to on each prompt submission.
+// ── Per-tab prompt history ──────────────────────────────────────────────────
+// Each tab has its own inputHistory[]. On tab switch the CLI calls
+// getInputHistory() and passes the result to prompt.setHistory().
+// No separate file — history is reconstructed from session history entries.
 
-const HISTORY_PATH = `${STATE_DIR}/prompt-history.txt`
-const MAX_HISTORY = 500 // keep last N entries
-
-function loadPromptHistory(): string[] {
-	try {
-		const raw = readFileSync(HISTORY_PATH, 'utf-8')
-		return raw.split('\n').filter(Boolean).slice(-MAX_HISTORY)
-	} catch {
-		return []
-	}
+function getInputHistory(): string[] {
+	return currentTab()?.inputHistory ?? []
 }
 
-function appendPromptHistory(line: string): void {
-	if (!line.trim()) return
-	state.promptHistory.push(line)
-	// Keep in-memory list bounded
-	if (state.promptHistory.length > MAX_HISTORY) {
-		state.promptHistory = state.promptHistory.slice(-MAX_HISTORY)
-	}
-	try {
-		appendFileSync(HISTORY_PATH, line.replace(/\n/g, ' ') + '\n')
-	} catch {}
+function appendInputHistory(line: string): void {
+	const tab = currentTab()
+	if (!tab || !line.trim()) return
+	tab.inputHistory.push(line)
 }
 
 function nextTab(): void {
@@ -224,7 +215,7 @@ function handleEvent(event: any): void {
 				existing.name = s.name
 				newTabs.push(existing)
 			} else {
-				newTabs.push({ sessionId: s.id, name: s.name, history: [], loaded: true })
+				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], loaded: true })
 			}
 		}
 		const grew = newTabs.length > state.tabs.length
@@ -290,20 +281,20 @@ function loadPersistedSessions(): void {
 	if (loaded.length === 0) return
 
 	// Create tabs with raw history stashed — don't convert to blocks yet.
+	// inputHistory starts empty; ensureTabLoaded() populates it from rawHistory.
 	const newTabs: Tab[] = []
 	for (const s of loaded) {
 		const dirName = s.meta.workingDir?.split('/').pop()
 		const name = s.meta.topic ?? dirName ?? `tab ${newTabs.length + 1}`
-		newTabs.push({ sessionId: s.meta.id, name, history: [], rawHistory: s.history, loaded: false })
+		newTabs.push({ sessionId: s.meta.id, name, history: [], inputHistory: [], rawHistory: s.history, loaded: false })
 	}
 	state.tabs = newTabs
 
-	// Restore persisted client state (last tab, peak, model, prompt history).
+	// Restore persisted client state (last tab, peak, model).
 	const saved = loadClientState()
 	const lastIdx = saved.lastTab ? newTabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
 	state.activeTab = lastIdx >= 0 ? lastIdx : 0
 	if (saved.model) state.model = saved.model
-	state.promptHistory = loadPromptHistory()
 
 	// Only load the active tab now — first paint needs it.
 	// Other tabs are loaded in the background after first paint.
@@ -384,5 +375,6 @@ export const client = {
 	sendCommand,
 	startClient,
 	saveState: saveClientState,
-	appendPromptHistory,
+	getInputHistory,
+	appendInputHistory,
 }

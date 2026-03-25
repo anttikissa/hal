@@ -45,7 +45,10 @@ function submit(): void {
 	const text = prompt.text().trim()
 	if (!text) return
 	completion.dismiss()
+	// Push to both prompt module (for immediate up-arrow) and client
+	// (so the tab's inputHistory persists across tab switches).
 	prompt.pushHistory(text)
+	client.appendInputHistory(text)
 	// If the session is busy (generating/running tools), send a steer command
 	// instead of a plain prompt. The server will abort the current generation,
 	// inject this as a steering message, and restart generation.
@@ -209,6 +212,10 @@ function startCli(signal: AbortSignal): void {
 
 	client.startClient(signal)
 
+	// Initialize prompt history from the active tab's session history.
+	// (Tab switch handler takes care of swapping it later.)
+	prompt.setHistory(client.getInputHistory())
+
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
 		process.stdin.resume()
@@ -226,10 +233,12 @@ function startCli(signal: AbortSignal): void {
 
 	perf.mark('Ready for input')
 
-	// Wire draft save/restore on tab switch
+	// Wire draft save/restore on tab switch.
+	// Also swap prompt history so up-arrow recalls per-tab entries.
 	client.setOnTabSwitch((fromSession, toSession) => {
 		prompt.saveDraft(fromSession)
 		prompt.restoreDraft(toSession)
+		prompt.setHistory(client.getInputHistory())
 		syncPromptToClient()
 	})
 
