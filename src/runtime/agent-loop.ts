@@ -3,14 +3,15 @@
 // Drives a provider to generate responses, handles streaming, tool execution,
 // and the re-invoke loop (generate → tool_use → tool_result → generate).
 //
-// Provider interface is defined in protocol.ts. Actual providers are built
-// in Plan 4 — for now we use a stub that returns a placeholder message.
+// Provider interface is defined in protocol.ts. Provider implementations
+// are loaded lazily via providers/provider.ts.
 
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import type { Provider, ProviderStreamEvent, Message, ToolDef } from '../protocol.ts'
 import { models } from '../models.ts'
 import { context } from './context.ts'
+import { provider as providerLoader } from '../providers/provider.ts'
 
 // ── Configuration ──
 
@@ -55,32 +56,12 @@ interface ToolCall {
 	input: any
 }
 
-// ── Stub provider ──
-// Returns a placeholder until real providers are built (Plan 4).
+// ── Provider loading ──
+// Providers are loaded lazily via providers/provider.ts.
+// getProvider() is async because it may need to dynamically import modules.
 
-async function* stubGenerate(): AsyncGenerator<ProviderStreamEvent> {
-	yield {
-		type: 'text',
-		text: '[Provider not yet implemented — this is the agent loop stub. Wire a real provider in Plan 4.]',
-	}
-	yield { type: 'done', usage: { input: 0, output: 0 } }
-}
-
-const stubProvider: Provider = {
-	generate: stubGenerate,
-}
-
-// ── Provider registry ──
-// Plan 4 will register real providers here. For now, everything uses the stub.
-
-const providers = new Map<string, Provider>()
-
-function registerProvider(name: string, provider: Provider): void {
-	providers.set(name, provider)
-}
-
-function getProvider(name: string): Provider {
-	return providers.get(name) ?? stubProvider
+async function getProvider(name: string): Promise<Provider> {
+	return providerLoader.getProvider(name)
 }
 
 // ── IPC helpers ──
@@ -135,7 +116,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const slashIdx = model.indexOf('/')
 	const providerName = slashIdx >= 0 ? model.slice(0, slashIdx) : 'stub'
 	const modelId = slashIdx >= 0 ? model.slice(slashIdx + 1) : model
-	const provider = getProvider(providerName)
+	const provider = await getProvider(providerName)
 
 	// Register abort controller so external code can abort us
 	const ac = new AbortController()
@@ -393,7 +374,5 @@ export const agentLoop = {
 	runAgentLoop,
 	abort,
 	isActive,
-	registerProvider,
-	getProvider,
 	setToolExecutor,
 }
