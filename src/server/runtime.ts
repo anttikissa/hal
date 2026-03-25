@@ -252,6 +252,18 @@ function startRuntime(signal: AbortSignal): void {
 		}
 	})()
 
+	// Initialize MCP servers (external tool servers from mcp.json).
+	// Non-blocking — failures are logged but don't prevent startup.
+	void import('../mcp/client.ts').then(({ mcp }) => {
+		mcp.initServers().catch((err: any) => {
+			console.error(`[mcp] init failed: ${err?.message ?? String(err)}`)
+		})
+		// Clean up MCP servers on shutdown
+		signal.addEventListener('abort', () => { void mcp.shutdown() }, { once: true })
+	}).catch(() => {
+		// MCP module not critical — silently ignore if it fails to load
+	})
+
 	// Start inbox watcher (external messages)
 	void import('../runtime/inbox.ts').then(({ inbox }) => {
 		inbox.startWatching(signal, (sessionId, text) => {
