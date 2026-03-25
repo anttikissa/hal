@@ -1,0 +1,12 @@
+// Module config overrides. Keys map to module names.
+// Values are Object.assign'd onto module.config.
+{
+	client: {
+		backgroundLoadTabs: true
+		backgroundLoadBlobs: true
+		repaintAfterBlobLoad: true
+	}
+	blocks: {
+		blobBatchSize: 64
+	}
+}

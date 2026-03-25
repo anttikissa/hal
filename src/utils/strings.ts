@@ -10,6 +10,8 @@ export function toLines(text: string): string[] {
 export function charWidth(cp: number): number {
 	if (cp < 0x20) return 0
 	if (cp < 0x7f) return 1
+	// Style markers (PUA U+E000–E005): zero width, resolved to ANSI later
+	if (cp >= 0xE000 && cp <= 0xE005) return 0
 	// Zero-width: combining marks, ZWJ, variation selectors
 	if (
 		(cp >= 0x0300 && cp <= 0x036f) ||
@@ -181,4 +183,52 @@ export function clipVisual(s: string, max: number): string {
 	return s.slice(0, cut) + '…'
 }
 
-export const strings = { charWidth, visLen, wordWrap, clipVisual }
+// ── Style markers ────────────────────────────────────────────────────────────
+// PUA chars used as lightweight placeholders for ANSI style attributes.
+// Markdown rendering (md.ts) emits these instead of raw ANSI so that
+// wordWrap() can split lines freely. resolveMarkers() converts them to
+// real ANSI, closing active styles at EOL and re-opening at BOL.
+// Convention: even codepoint = ON, odd = OFF. OFF = ON + 1.
+
+export const M_BOLD = '\uE000'
+export const M_BOLD_OFF = '\uE001'
+export const M_ITALIC = '\uE002'
+export const M_ITALIC_OFF = '\uE003'
+export const M_DIM = '\uE004'
+export const M_DIM_OFF = '\uE005'
+
+const MARKER_ANSI: Record<string, string> = {
+	[M_BOLD]: '\x1b[1m', [M_BOLD_OFF]: '\x1b[22m',
+	[M_ITALIC]: '\x1b[3m', [M_ITALIC_OFF]: '\x1b[23m',
+	[M_DIM]: '\x1b[2m', [M_DIM_OFF]: '\x1b[22m',
+}
+
+/** Convert style markers to ANSI escapes, ensuring each line is
+ *  self-contained. Active styles are closed at EOL and re-opened at BOL.
+ *  Uses specific attribute resets (not \x1b[0m) so background color
+ *  is never touched — safe for blocks with full-width backgrounds. */
+export function resolveMarkers(lines: string[]): string[] {
+	const active = new Set<string>()
+	return lines.map(line => {
+		let out = ''
+		// Re-open styles active from previous line
+		for (const m of active) out += MARKER_ANSI[m]!
+		// Walk chars: convert markers, track on/off state
+		for (const ch of line) {
+			const ansi = MARKER_ANSI[ch]
+			if (ansi !== undefined) {
+				out += ansi
+				const cp = ch.codePointAt(0)!
+				if ((cp & 1) === 0) active.add(ch)                    // even = ON
+				else active.delete(String.fromCodePoint(cp - 1))      // odd = OFF
+			} else {
+				out += ch
+			}
+		}
+		// Close active styles at EOL (specific resets, not full reset)
+		for (const m of active) out += MARKER_ANSI[String.fromCodePoint(m.codePointAt(0)! + 1)]!
+		return out
+	})
+}
+
+export const strings = { charWidth, visLen, wordWrap, clipVisual, resolveMarkers }

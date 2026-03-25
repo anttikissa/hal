@@ -8,5 +8,5 @@ node_modules
 .DS_Store
 
 examples/*
-previous
+prev
 state/

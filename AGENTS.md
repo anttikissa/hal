@@ -95,6 +95,11 @@ There is ONE function for this. Use it everywhere. No exceptions.
 Word wrapping: use `wordWrap()` from the same file. It's ANSI-aware and
 uses `charWidth()` internally which is the same width logic as `visLen()`.
 
+# Tool result size limit
+
+Tool call results must never exceed 1 MB. Truncate or summarize if needed. Error message must
+make clear that agent can use eval to change the limit if necessary.
+
 # TODO (random ideas)
 
 AGENTS.md change - should send a summary of changes to agent at start of next turn (like /cd,
