@@ -6,6 +6,9 @@ import { ipc } from './ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
 import { client } from './client.ts'
+import { isPidAlive } from './utils/is-pid-alive.ts'
+import { log } from './utils/log.ts'
+import './config.ts' // load config.ason overrides, watch for changes
 
 ensureStateDir()
 perf.mark('State directories exist')
@@ -14,6 +17,7 @@ let isHost = await ipc.claimHost()
 const lock = ipc.readHostLock()
 let serverPid = isHost ? process.pid : (lock?.pid ?? null)
 perf.mark(`Host status established (I am ${isHost ? 'host' : 'client'}, server pid ${serverPid})`)
+log.info('Startup', { isHost, serverPid, pid: process.pid })
 
 client.state.role = isHost ? 'server' : 'client'
 if (isHost) {
@@ -72,16 +76,13 @@ if (isHost) {
 	})()
 
 	// Slow fallback: poll for crash (server dies without sending host-released).
-	// process.kill(pid, 0) doesn't kill -- signal 0 just checks if pid exists.
+	// isPidAlive uses signal 0 to check without killing — see is-pid-alive.ts.
 	const pollTimer = setInterval(() => {
 		if (isHost || promoting) return
-		if (serverPid !== null) {
-			try {
-				process.kill(serverPid, 0)
-			} catch {
-				serverPid = null
-				tryPromote()
-			}
+		if (serverPid !== null && !isPidAlive(serverPid)) {
+			log.info('Server pid died, promoting', { serverPid })
+			serverPid = null
+			tryPromote()
 		}
 	}, 1000)
 	ac.signal.addEventListener('abort', () => clearInterval(pollTimer))

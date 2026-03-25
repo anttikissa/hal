@@ -1,7 +1,7 @@
 // Client -- state manager for tabs, entries, prompt.
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, appendFileSync } from 'fs'
 import { ipc } from './ipc.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { perf } from './perf.ts'
@@ -43,6 +43,10 @@ const state = {
 	// Invalidated if terminal width changed since last save.
 	peak: 0,
 	peakCols: 0,
+	// Prompt history for up-arrow recall, persisted to disk
+	promptHistory: [] as string[],
+	// Current model selection, persisted across restarts
+	model: null as string | null,
 }
 
 let onChange: (force: boolean) => void = () => {}
@@ -91,8 +95,9 @@ const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 
 interface ClientStateFile {
 	lastTab: string | null
-	peak: number // high-water mark for rendered line count
-	peakCols: number // terminal width peak was computed at
+	peak: number        // high-water mark for rendered line count
+	peakCols: number    // terminal width peak was computed at
+	model: string | null // last-used model, restored on startup
 }
 
 function loadClientState(): ClientStateFile {
@@ -102,9 +107,10 @@ function loadClientState(): ClientStateFile {
 			lastTab: data?.lastTab ?? null,
 			peak: data?.peak ?? 0,
 			peakCols: data?.peakCols ?? 0,
+			model: data?.model ?? null,
 		}
 	} catch {
-		return { lastTab: null, peak: 0, peakCols: 0 }
+		return { lastTab: null, peak: 0, peakCols: 0, model: null }
 	}
 }
 
@@ -117,8 +123,37 @@ function saveClientState(): void {
 				lastTab: tab?.sessionId ?? null,
 				peak: state.peak,
 				peakCols: state.peakCols,
+				model: state.model,
 			}) + '\n',
 		)
+	} catch {}
+}
+
+// ── Prompt history persistence ──────────────────────────────────────────────
+// Saves prompt history as plain text, one entry per line.
+// Loaded on startup, appended to on each prompt submission.
+
+const HISTORY_PATH = `${STATE_DIR}/prompt-history.txt`
+const MAX_HISTORY = 500 // keep last N entries
+
+function loadPromptHistory(): string[] {
+	try {
+		const raw = readFileSync(HISTORY_PATH, 'utf-8')
+		return raw.split('\n').filter(Boolean).slice(-MAX_HISTORY)
+	} catch {
+		return []
+	}
+}
+
+function appendPromptHistory(line: string): void {
+	if (!line.trim()) return
+	state.promptHistory.push(line)
+	// Keep in-memory list bounded
+	if (state.promptHistory.length > MAX_HISTORY) {
+		state.promptHistory = state.promptHistory.slice(-MAX_HISTORY)
+	}
+	try {
+		appendFileSync(HISTORY_PATH, line.replace(/\n/g, ' ') + '\n')
 	} catch {}
 }
 
@@ -224,10 +259,12 @@ function loadPersistedSessions(): void {
 	}
 	state.tabs = newTabs
 
-	// Restore persisted client state (last tab, peak).
+	// Restore persisted client state (last tab, peak, model, prompt history).
 	const saved = loadClientState()
 	const lastIdx = saved.lastTab ? newTabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
 	state.activeTab = lastIdx >= 0 ? lastIdx : 0
+	if (saved.model) state.model = saved.model
+	state.promptHistory = loadPromptHistory()
 
 	// Only load the active tab now — first paint needs it.
 	// Other tabs are loaded in the background after first paint.
@@ -306,4 +343,5 @@ export const client = {
 	sendCommand,
 	startClient,
 	saveState: saveClientState,
+	appendPromptHistory,
 }
