@@ -108,7 +108,7 @@ async function handlePrompt(session: Session, text: string): Promise<void> {
 		session.model = sessionState.model
 		session.cwd = sessionState.cwd
 
-		if (cmdResult.output) emitInfo(session.id, `[info] ${cmdResult.output}`)
+		if (cmdResult.output) emitInfo(session.id, cmdResult.output)
 		if (cmdResult.error) emitInfo(session.id, cmdResult.error, 'error')
 		return
 	}
@@ -185,7 +185,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		case 'compact': {
 			if (!session) return
 			// Compaction requires history (Plan 3). For now, just acknowledge.
-			emitInfo(session.id, '[info] Compaction not yet implemented (needs Plan 3: Session)')
+			emitInfo(session.id, 'Compaction not yet implemented (needs Plan 3: Session)')
 			break
 		}
 

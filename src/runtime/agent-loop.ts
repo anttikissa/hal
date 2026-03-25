@@ -357,7 +357,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		}
 
 		// If we exhausted maxIterations, inform the user
-		emitInfo(sessionId, `[warn] Hit max iterations (${config.maxIterations}). Stopping.`, 'error')
+		emitInfo(sessionId, `Hit max iterations (${config.maxIterations}). Stopping.`, 'error')
 		emitEvent(sessionId, { type: 'stream-end', phase: 'done', usage: totalUsage })
 
 	} finally {

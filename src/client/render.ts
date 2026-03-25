@@ -33,6 +33,7 @@ const CSI = '\x1b['
 
 let prevLines: string[] = []
 let cursorRow = 0
+let cursorCol = 0
 let fullscreen = false
 
 // peak lives in client.state.peak (persisted across restarts).
@@ -44,6 +45,7 @@ const lineCountCache = new WeakMap<Tab, { entryCount: number; lineCount: number 
 function resetRenderer(): void {
 	prevLines = []
 	cursorRow = 0
+	cursorCol = 0
 	fullscreen = false
 }
 
@@ -204,6 +206,7 @@ function moveCursor(from: number, to: number): string {
 // function that should set these (besides resetRenderer and clearFrame).
 function positionCursor(from: number, target: { row: number; col: number }): string {
 	cursorRow = target.row
+	cursorCol = target.col
 	return moveCursor(from, target.row) + `\r${CSI}${target.col}G${CSI}?25h`
 }
 
@@ -276,7 +279,7 @@ function draw(force = false): void {
 	// (e.g. arrow keys, Ctrl-A/E). Frame lines are identical but cursor
 	// position changed. We skip the full diff machinery and just reposition.
 	if (first === -1) {
-		if (cursorRow === cursor.row && prevLines.length > 0) return
+		if (cursorRow === cursor.row && cursorCol === cursor.col && prevLines.length > 0) return
 		process.stdout.write(positionCursor(cursorRow, cursor))
 		return
 	}
