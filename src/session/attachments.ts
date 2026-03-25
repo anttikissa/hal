@@ -38,7 +38,7 @@ export interface ResolvedAttachment {
 async function resolve(sessionId: string, input: string): Promise<ResolvedAttachment> {
 	const matches = [...input.matchAll(ATTACHMENT_RE)]
 	// Only process txt files if they're from known safe paths
-	const valid = matches.filter(m => {
+	const valid = matches.filter((m) => {
 		const ext = m[2].toLowerCase()
 		return ext !== 'txt' || m[1].startsWith('/tmp/hal/')
 	})
@@ -50,9 +50,7 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 	let lastIndex = 0
 
 	for (const match of valid) {
-		const filePath = match[1].startsWith('~')
-			? match[1].replace('~', homedir())
-			: match[1]
+		const filePath = match[1].startsWith('~') ? match[1].replace('~', homedir()) : match[1]
 		const ext = match[2].toLowerCase()
 		const before = input.slice(lastIndex, match.index)
 

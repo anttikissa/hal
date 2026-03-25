@@ -42,7 +42,9 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 		...body,
 		'}',
 		'',
-	].filter(l => l !== undefined).join('\n')
+	]
+		.filter((l) => l !== undefined)
+		.join('\n')
 
 	await Bun.write(file, wrapped)
 
@@ -62,16 +64,23 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 		// Abort promise: rejects if signal fires
 		if (ctx.signal) {
-			promises.push(new Promise<never>((_, reject) => {
-				if (ctx.signal!.aborted) reject(new DOMException('Aborted', 'AbortError'))
-				else ctx.signal!.addEventListener('abort', () =>
-					reject(new DOMException('Aborted', 'AbortError')), { once: true })
-			}))
+			promises.push(
+				new Promise<never>((_, reject) => {
+					if (ctx.signal!.aborted) reject(new DOMException('Aborted', 'AbortError'))
+					else
+						ctx.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {
+							once: true,
+						})
+				}),
+			)
 		}
 
 		// Timeout promise
-		promises.push(new Promise<never>((_, reject) =>
-			setTimeout(() => reject(new Error(`eval timed out after ${config.timeout}ms`)), config.timeout)))
+		promises.push(
+			new Promise<never>((_, reject) =>
+				setTimeout(() => reject(new Error(`eval timed out after ${config.timeout}ms`)), config.timeout),
+			),
+		)
 
 		const result = await Promise.race(promises)
 		if (result === undefined) return 'undefined'
@@ -84,9 +93,13 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 toolRegistry.registerTool({
 	name: 'eval',
-	description: 'Execute TypeScript in the Hal process. Has access to runtime internals via ctx (sessionId, cwd, halDir, stateDir). Use `return` to return a value. Use standard `import` for module access.',
+	description:
+		'Execute TypeScript in the Hal process. Has access to runtime internals via ctx (sessionId, cwd, halDir, stateDir). Use `return` to return a value. Use standard `import` for module access.',
 	parameters: {
-		code: { type: 'string', description: 'TypeScript code. Imports go at top, body is wrapped in async function with ctx in scope.' },
+		code: {
+			type: 'string',
+			description: 'TypeScript code. Imports go at top, body is wrapped in async function with ctx in scope.',
+		},
 	},
 	required: ['code'],
 	execute,

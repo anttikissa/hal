@@ -106,7 +106,10 @@ function applyCacheBreakpoints(msgs: any[]): any[] {
 	// Also mark the second-to-last user message for better cache hit rates
 	if (out.length >= 3) {
 		for (let i = out.length - 2; i >= 0; i--) {
-			if (out[i].role === 'user') { markLast(out[i]); break }
+			if (out[i].role === 'user') {
+				markLast(out[i])
+				break
+			}
 		}
 	}
 
@@ -136,7 +139,11 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 			if (!line.startsWith('data: ')) continue
 
 			let ev: any
-			try { ev = JSON.parse(line.slice(6)) } catch { continue }
+			try {
+				ev = JSON.parse(line.slice(6))
+			} catch {
+				continue
+			}
 
 			if (ev.type === 'content_block_start') {
 				const b = ev.content_block
@@ -164,7 +171,10 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 						input = JSON.parse(t.json || '{}')
 					} catch {
 						yield {
-							type: 'tool_call', id: t.id, name: t.name, input: {},
+							type: 'tool_call',
+							id: t.id,
+							name: t.name,
+							input: {},
 							rawJson: t.json,
 							parseError: `Failed to parse tool input JSON (${t.json.length} chars): ${t.json.slice(0, 200)}`,
 						}
@@ -177,9 +187,8 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 			} else if (ev.type === 'message_start' && ev.message?.usage) {
 				// Input tokens include cache reads and cache creation
 				const u = ev.message.usage
-				usage.input += (u.input_tokens ?? 0)
-					+ (u.cache_read_input_tokens ?? 0)
-					+ (u.cache_creation_input_tokens ?? 0)
+				usage.input +=
+					(u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
 			} else if (ev.type === 'message_delta' && ev.usage) {
 				usage.output += ev.usage.output_tokens ?? 0
 			} else if (ev.type === 'error') {
@@ -187,8 +196,13 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 				const body = JSON.stringify(ev.error ?? ev)
 				const status = errorTypeToStatus(ev.error?.type)
 				try {
-					const prev = await Bun.file('/tmp/compare/hal.txt').exists() ? await Bun.file('/tmp/compare/hal.txt').text() : ''
-					await Bun.write('/tmp/compare/hal.txt', prev + `STREAM ERROR: status=${status} type=${ev.error?.type} body=${body}\n\n`)
+					const prev = (await Bun.file('/tmp/compare/hal.txt').exists())
+						? await Bun.file('/tmp/compare/hal.txt').text()
+						: ''
+					await Bun.write(
+						'/tmp/compare/hal.txt',
+						prev + `STREAM ERROR: status=${status} type=${ev.error?.type} body=${body}\n\n`,
+					)
 				} catch {}
 				yield { type: 'error', message: msg, status, body }
 			}
@@ -245,9 +259,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		body.tools = req.tools
 	}
 
-	const authHeader = isOAuth
-		? { 'Authorization': `Bearer ${cred.value}` }
-		: { 'x-api-key': cred.value }
+	const authHeader = isOAuth ? { Authorization: `Bearer ${cred.value}` } : { 'x-api-key': cred.value }
 
 	const url = API_URL
 	const headers: Record<string, string> = {
@@ -264,14 +276,18 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	// Debug dump to /tmp/compare/hal.txt — remove once 529 issue is resolved
 	try {
 		const debugBody = JSON.parse(JSON.stringify(body))
-		if (debugBody.messages) for (const m of debugBody.messages) {
-			if (typeof m.content === 'string' && m.content.length > 200) m.content = m.content.slice(0, 200) + '...'
-			if (Array.isArray(m.content)) for (const b of m.content) {
-				if (b.type === 'text' && b.text?.length > 200) b.text = b.text.slice(0, 200) + '...'
+		if (debugBody.messages)
+			for (const m of debugBody.messages) {
+				if (typeof m.content === 'string' && m.content.length > 200) m.content = m.content.slice(0, 200) + '...'
+				if (Array.isArray(m.content))
+					for (const b of m.content) {
+						if (b.type === 'text' && b.text?.length > 200) b.text = b.text.slice(0, 200) + '...'
+					}
 			}
-		}
 		const dump = `=== HAL REQUEST ${new Date().toISOString()} ===\nURL: ${url}\nHEADERS: ${JSON.stringify(headers, null, 2)}\nBODY: ${JSON.stringify(debugBody, null, 2)}\n\n`
-		const prev = await Bun.file('/tmp/compare/hal.txt').exists() ? await Bun.file('/tmp/compare/hal.txt').text() : ''
+		const prev = (await Bun.file('/tmp/compare/hal.txt').exists())
+			? await Bun.file('/tmp/compare/hal.txt').text()
+			: ''
 		await Bun.write('/tmp/compare/hal.txt', prev + dump)
 	} catch {}
 

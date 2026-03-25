@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { dirname } from 'path'
 import { HAL_DIR, STATE_DIR } from '../state.ts'
+import { sessions } from '../server/sessions.ts'
 import { models } from '../models.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
 
@@ -106,28 +107,33 @@ interface SystemPromptResult {
 function buildSystemPrompt(opts: {
 	model?: string
 	cwd?: string
-	sessionDir?: string
+	sessionId?: string
 }): SystemPromptResult {
 	const model = opts.model ?? ''
 	const cwd = opts.cwd ?? process.cwd()
+	const sessionDir = opts.sessionId ? sessions.sessionDir(opts.sessionId) : ''
 	const d = new Date()
 	const date = `${d.toISOString().slice(0, 10)}, ${d.toLocaleDateString('en-US', { weekday: 'long' })}`
 
 	// Variables available for substitution in agent files
 	const vars: Record<string, string> = {
-		model, date, cwd, hal_dir: HAL_DIR,
+		model,
+		date,
+		cwd,
+		hal_dir: HAL_DIR,
 		state_dir: STATE_DIR,
-		session_dir: opts.sessionDir ?? '',
+		session_dir: sessionDir,
 	}
 
 	// Substitute ${var} placeholders
-	const sub = (s: string) => s
-		.replace(/\$\{model\}/g, model)
-		.replace(/\$\{cwd\}/g, cwd)
-		.replace(/\$\{date\}/g, date)
-		.replace(/\$\{hal_dir\}/g, HAL_DIR)
-		.replace(/\$\{state_dir\}/g, STATE_DIR)
-		.replace(/\$\{session_dir\}/g, opts.sessionDir ?? '')
+	const sub = (s: string) =>
+		s
+			.replace(/\$\{model\}/g, model)
+			.replace(/\$\{cwd\}/g, cwd)
+			.replace(/\$\{date\}/g, date)
+			.replace(/\$\{hal_dir\}/g, HAL_DIR)
+			.replace(/\$\{state_dir\}/g, STATE_DIR)
+			.replace(/\$\{session_dir\}/g, sessionDir)
 
 	const parts: string[] = []
 	const loaded: { name: string; path: string; bytes: number }[] = []
@@ -152,7 +158,7 @@ function buildSystemPrompt(opts: {
 
 	// Process directives and substitute variables, then collapse excess newlines
 	const text = parts
-		.map(p => processDirectives(p, vars))
+		.map((p) => processDirectives(p, vars))
 		.map(sub)
 		.join('\n\n')
 		.replace(/\n{3,}/g, '\n\n')
@@ -172,9 +178,10 @@ function messageBytes(msg: Message): number {
 			else if (block.type === 'thinking') bytes += block.thinking?.length ?? 0
 			else if (block.type === 'tool_use') bytes += JSON.stringify(block.input ?? {}).length
 			else if (block.type === 'tool_result') {
-				bytes += typeof block.content === 'string'
-					? block.content.length
-					: JSON.stringify(block.content ?? '').length
+				bytes +=
+					typeof block.content === 'string'
+						? block.content.length
+						: JSON.stringify(block.content ?? '').length
 			}
 		}
 		return bytes

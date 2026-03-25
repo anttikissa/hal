@@ -23,7 +23,9 @@ type OnMessage = (sessionId: string, text: string) => void
 /** Process any pending .ason files in a session's inbox directory. */
 function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessage): void {
 	try {
-		const files = readdirSync(sessionDir).filter(f => f.endsWith('.ason')).sort()
+		const files = readdirSync(sessionDir)
+			.filter((f) => f.endsWith('.ason'))
+			.sort()
 		for (const file of files) {
 			const path = `${sessionDir}/${file}`
 			try {
@@ -36,7 +38,9 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 				unlinkSync(path)
 			} catch {
 				// Malformed file — delete it to avoid infinite retries
-				try { unlinkSync(path) } catch {}
+				try {
+					unlinkSync(path)
+				} catch {}
 			}
 		}
 	} catch {
@@ -45,10 +49,7 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 }
 
 /** Start watching the inbox directory for new messages. */
-function startWatching(
-	signal: AbortSignal,
-	onMessage: OnMessage,
-): void {
+function startWatching(signal: AbortSignal, onMessage: OnMessage): void {
 	ensureDir(INBOX_DIR)
 
 	// Process any messages that arrived before we started watching
@@ -79,7 +80,10 @@ function startWatching(
 	} catch {
 		// fs.watch might not be supported on all platforms — fall back to polling
 		const interval = setInterval(() => {
-			if (signal.aborted) { clearInterval(interval); return }
+			if (signal.aborted) {
+				clearInterval(interval)
+				return
+			}
 			try {
 				const sessionDirs = readdirSync(INBOX_DIR)
 				for (const sessionId of sessionDirs) {

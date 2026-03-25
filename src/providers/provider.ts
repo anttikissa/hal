@@ -49,7 +49,7 @@ async function getProvider(providerName: string): Promise<Provider> {
 		} else {
 			throw new Error(
 				`Unknown provider '${providerName}'. ` +
-				`Set ${envKey} for custom endpoints, or use: anthropic, openai, openrouter, google, grok`
+					`Set ${envKey} for custom endpoints, or use: anthropic, openai, openrouter, google, grok`,
 			)
 		}
 	}
@@ -97,10 +97,7 @@ async function readWithTimeout(
 	let timer: Timer
 	const timeout = new Promise<never>((_, reject) => {
 		const ms = config.streamTimeoutMs
-		timer = setTimeout(
-			() => reject(new Error(`Stream read timed out (no data for ${ms}ms)`)),
-			ms,
-		)
+		timer = setTimeout(() => reject(new Error(`Stream read timed out (no data for ${ms}ms)`)), ms)
 	})
 	try {
 		return await Promise.race([reader.read(), timeout])

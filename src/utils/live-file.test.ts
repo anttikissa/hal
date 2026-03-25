@@ -35,7 +35,7 @@ test('mutations auto-save on microtask', async () => {
 	data.count = 5
 	data.count = 10 // coalesced
 	// Flush happens on microtask
-	await new Promise(r => queueMicrotask(r))
+	await new Promise((r) => queueMicrotask(r))
 	await Bun.sleep(0) // extra tick for rename
 	const disk = ason.parse(readFileSync(path, 'utf-8')) as any
 	expect(disk.count).toBe(10)
@@ -54,7 +54,7 @@ test('nested object mutations auto-save', async () => {
 	const path = join(dir, 'nested.ason')
 	const data = liveFiles.liveFile(path, { deep: { val: 1 } }, { watch: false })
 	data.deep.val = 42
-	await new Promise(r => queueMicrotask(r))
+	await new Promise((r) => queueMicrotask(r))
 	await Bun.sleep(0)
 	const disk = ason.parse(readFileSync(path, 'utf-8')) as any
 	expect(disk.deep.val).toBe(42)
@@ -67,7 +67,9 @@ test('onChange fires on external file change', async () => {
 	expect(data.v).toBe(1)
 
 	let called = false
-	liveFiles.onChange(data, () => { called = true })
+	liveFiles.onChange(data, () => {
+		called = true
+	})
 
 	// Simulate external edit
 	writeFileSync(path, ason.stringify({ v: 99 }) + '\n')
@@ -83,7 +85,9 @@ test('own writes do not trigger onChange', async () => {
 	const data = liveFiles.liveFile(path, { v: 0 })
 
 	let called = false
-	liveFiles.onChange(data, () => { called = true })
+	liveFiles.onChange(data, () => {
+		called = true
+	})
 
 	data.v = 42
 	liveFiles.save(data)

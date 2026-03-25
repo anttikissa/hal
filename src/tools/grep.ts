@@ -14,8 +14,12 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const maxResults = input?.maxResults ?? 100
 
 	const args = [
-		'rg', '-nH', '--no-heading', '--color=never',
-		'--hidden', '--no-ignore',
+		'rg',
+		'-nH',
+		'--no-heading',
+		'--color=never',
+		'--hidden',
+		'--no-ignore',
 		`--max-count=${maxResults}`,
 		'--sort=modified',
 	]

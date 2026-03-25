@@ -11,7 +11,7 @@
 
 function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
 	// OKLCH → OKLab (polar → cartesian)
-	const hRad = H * Math.PI / 180
+	const hRad = (H * Math.PI) / 180
 	const a = C * Math.cos(hRad)
 	const b = C * Math.sin(hRad)
 
@@ -19,17 +19,19 @@ function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
 	// These matrices are from Björn Ottosson's original OKLab paper.
 	const l_ = L + 0.3963377774 * a + 0.2158037573 * b
 	const m_ = L - 0.1055613458 * a - 0.0638541728 * b
-	const s_ = L - 0.0894841775 * a - 1.2914855480 * b
-	const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3
+	const s_ = L - 0.0894841775 * a - 1.291485548 * b
+	const l = l_ ** 3,
+		m = m_ ** 3,
+		s = s_ ** 3
 
 	// LMS → linear sRGB
 	const rl = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s
 	const gl = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
-	const bl = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+	const bl = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
 
 	// Linear sRGB → gamma-corrected sRGB (standard sRGB transfer function)
-	const gamma = (c: number) => Math.round(255 * Math.max(0, Math.min(1,
-		c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055)))
+	const gamma = (c: number) =>
+		Math.round(255 * Math.max(0, Math.min(1, c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055)))
 	return [gamma(rl), gamma(gl), gamma(bl)]
 }
 

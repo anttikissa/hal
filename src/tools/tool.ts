@@ -43,7 +43,7 @@ function allTools(): Tool[] {
 
 /** Convert all registered tools to the provider API format (Anthropic tool_use schema). */
 function toToolDefs(): ToolDef[] {
-	return allTools().map(t => ({
+	return allTools().map((t) => ({
 		name: t.name,
 		description: t.description,
 		input_schema: {

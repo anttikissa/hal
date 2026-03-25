@@ -10,7 +10,17 @@
 //   table spans → mdTable() applies mdInline() AND aligns columns
 //                 (caller should NOT call mdInline again on table output)
 
-import { visLen, wordWrap, resolveMarkers, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, M_DIM, M_DIM_OFF } from '../utils/strings.ts'
+import {
+	visLen,
+	wordWrap,
+	resolveMarkers,
+	M_BOLD,
+	M_BOLD_OFF,
+	M_ITALIC,
+	M_ITALIC_OFF,
+	M_DIM,
+	M_DIM_OFF,
+} from '../utils/strings.ts'
 
 // ── ANSI style pairs ─────────────────────────────────────────────────────────
 
@@ -162,19 +172,19 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 	// Parse: strip outer pipes, split by |, trim each cell.
 	// Filter out separator rows (|---|---|).
 	const rawRows = lines
-		.filter(l => !/^\|[\s\-:|]+\|$/.test(l.trim()))
-		.map(l =>
+		.filter((l) => !/^\|[\s\-:|]+\|$/.test(l.trim()))
+		.map((l) =>
 			l
 				.replace(/^\||\|$/g, '')
 				.split('|')
-				.map(c => c.trim()),
+				.map((c) => c.trim()),
 		)
 	if (!rawRows.length) return []
 
 	// Apply inline markdown to each cell.
-	const rendered = rawRows.map(row => row.map(cell => mdInline(cell, colors)))
+	const rendered = rawRows.map((row) => row.map((cell) => mdInline(cell, colors)))
 
-	const numCols = Math.max(...rendered.map(r => r.length))
+	const numCols = Math.max(...rendered.map((r) => r.length))
 	if (numCols === 0) return []
 
 	// Border overhead: "│ " + cell + (" │ " + cell)*(N-1) + " │" = 3N + 1
@@ -183,7 +193,8 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 
 	// Natural width = what each column wants (max cell visLen)
 	const naturalWidths = Array.from({ length: numCols }, (_, i) =>
-		Math.max(...rendered.map(r => visLen(r[i] ?? ''))))
+		Math.max(...rendered.map((r) => visLen(r[i] ?? ''))),
+	)
 
 	// Compute final column widths. If everything fits, use natural widths.
 	// Otherwise shrink proportionally, with a minimum of 1 per column.
@@ -225,21 +236,19 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 	// ── Build output with box-drawing borders ────────────────────────────
 	const out: string[] = []
 	const hRule = (left: string, mid: string, right: string) =>
-		left + colWidths.map(w => '─'.repeat(w + 2)).join(mid) + right
+		left + colWidths.map((w) => '─'.repeat(w + 2)).join(mid) + right
 
 	out.push(hRule('┌', '┬', '┐'))
 
 	for (let rowIdx = 0; rowIdx < rendered.length; rowIdx++) {
 		const row = rendered[rowIdx]!
 		// Wrap each cell into lines
-		const cellLines = Array.from({ length: numCols }, (_, ci) =>
-			wrapCell(row[ci] ?? '', colWidths[ci]!))
-		const rowHeight = Math.max(...cellLines.map(cl => cl.length))
+		const cellLines = Array.from({ length: numCols }, (_, ci) => wrapCell(row[ci] ?? '', colWidths[ci]!))
+		const rowHeight = Math.max(...cellLines.map((cl) => cl.length))
 
 		// Emit each visual line of this row
 		for (let li = 0; li < rowHeight; li++) {
-			const parts = cellLines.map((cl, ci) =>
-				visPad(cl[li] ?? '', colWidths[ci]!))
+			const parts = cellLines.map((cl, ci) => visPad(cl[li] ?? '', colWidths[ci]!))
 			out.push('│ ' + parts.join(' │ ') + ' │')
 		}
 

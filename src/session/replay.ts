@@ -62,12 +62,17 @@ function userContentText(content: any): string {
 function extractToolOutput(blobData: any): { output: string; status: 'done' | 'error'; input: any } {
 	const callData = blobData?.call ?? {}
 	const raw = blobData?.result?.content ?? ''
-	const output = typeof raw === 'string'
-		? raw
-		: Array.isArray(raw)
-			? raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
-			: ''
-	const status: 'done' | 'error' = blobData?.result?.status === 'error' ? 'error' : (blobData?.result ? 'done' : 'error')
+	const output =
+		typeof raw === 'string'
+			? raw
+			: Array.isArray(raw)
+				? raw
+						.filter((b: any) => b.type === 'text')
+						.map((b: any) => b.text)
+						.join('') || '[image]'
+				: ''
+	const status: 'done' | 'error' =
+		blobData?.result?.status === 'error' ? 'error' : blobData?.result ? 'done' : 'error'
 	return { output, status, input: callData.input }
 }
 
@@ -81,11 +86,7 @@ function replaySession(sessionId: string, opts?: { model?: string }): ReplayResu
 }
 
 // Replay a pre-loaded array of history entries into blocks.
-function replayEntries(
-	sessionId: string,
-	entries: HistoryEntry[],
-	opts?: { model?: string },
-): ReplayResult {
+function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { model?: string }): ReplayResult {
 	const model = opts?.model
 	const blocks: ReplayBlock[] = []
 	let tokenText = '' // accumulate text for rough token estimation
@@ -187,7 +188,7 @@ function replayEntries(
 
 	// Add interrupted hint
 	if (interrupted.length > 0) {
-		const toolList = interrupted.map(t => t.name).join(', ')
+		const toolList = interrupted.map((t) => t.name).join(', ')
 		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Press Enter to continue` })
 	}
 
@@ -248,8 +249,8 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 // Extract user input strings from history for readline-style input history.
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	return entries
-		.filter(e => e.role === 'user')
-		.map(e => {
+		.filter((e) => e.role === 'user')
+		.map((e) => {
 			if (typeof e.content === 'string') return e.content
 			if (Array.isArray(e.content)) {
 				return e.content
@@ -259,7 +260,7 @@ function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 			}
 			return ''
 		})
-		.filter(text => text && !text.startsWith('['))
+		.filter((text) => text && !text.startsWith('['))
 		.slice(-200) // cap at last 200 entries
 }
 

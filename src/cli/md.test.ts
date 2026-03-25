@@ -1,12 +1,24 @@
 import { test, expect } from 'bun:test'
 import { md } from './md.ts'
-import { visLen, resolveMarkers, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, M_DIM, M_DIM_OFF } from '../utils/strings.ts'
+import {
+	visLen,
+	resolveMarkers,
+	M_BOLD,
+	M_BOLD_OFF,
+	M_ITALIC,
+	M_ITALIC_OFF,
+	M_DIM,
+	M_DIM_OFF,
+} from '../utils/strings.ts'
 
 // mdInline outputs PUA marker chars, not raw ANSI.
 // resolveMarkers() converts them to ANSI later.
-const B = M_BOLD, B_OFF = M_BOLD_OFF
-const I = M_ITALIC, I_OFF = M_ITALIC_OFF
-const DIM = M_DIM, DIM_OFF = M_DIM_OFF
+const B = M_BOLD,
+	B_OFF = M_BOLD_OFF
+const I = M_ITALIC,
+	I_OFF = M_ITALIC_OFF
+const DIM = M_DIM,
+	DIM_OFF = M_DIM_OFF
 
 /** Strip ANSI escapes AND marker chars for plain-text assertions. */
 function strip(s: string): string {
@@ -116,11 +128,7 @@ test('mdTable: box-drawing with aligned columns', () => {
 })
 
 test('mdTable: bold cells do not inflate column width', () => {
-	const lines = [
-		'| **Commit** | **Fix** |',
-		'|---|---|',
-		'| abc | def |',
-	]
+	const lines = ['| **Commit** | **Fix** |', '|---|---|', '| abc | def |']
 	const result = md.mdTable(lines, 80)
 	// **Commit** has 6 visible chars, not 10. Column should be 6 wide.
 	expect(result.map(strip)).toEqual([
@@ -135,11 +143,7 @@ test('mdTable: bold cells do not inflate column width', () => {
 })
 
 test('mdTable: inline code cells measured correctly', () => {
-	const lines = [
-		'| Command | Description |',
-		'|---|---|',
-		'| `ls -la` | list files |',
-	]
+	const lines = ['| Command | Description |', '|---|---|', '| `ls -la` | list files |']
 	const result = md.mdTable(lines, 80)
 	// "Command" (7) vs "ls -la" (6) → header wins at 7
 	expect(result.map(strip)).toEqual([
@@ -152,12 +156,7 @@ test('mdTable: inline code cells measured correctly', () => {
 })
 
 test('mdTable: emoji cells measured with visLen', () => {
-	const lines = [
-		'| Status | Item |',
-		'|---|---|',
-		'| ✅ | done |',
-		'| ❌ | todo |',
-	]
+	const lines = ['| Status | Item |', '|---|---|', '| ✅ | done |', '| ❌ | todo |']
 	const result = md.mdTable(lines, 80)
 	// ✅ is 2 columns wide. "Status" (6) wins over ✅ (2).
 	expect(result.map(strip)).toEqual([
@@ -186,11 +185,7 @@ test('mdTable: all lines fit within given width', () => {
 })
 
 test('mdTable: wide cells wrap within column', () => {
-	const lines = [
-		'| Name | Description |',
-		'|---|---|',
-		'| foo | This is a very long description that should wrap |',
-	]
+	const lines = ['| Name | Description |', '|---|---|', '| foo | This is a very long description that should wrap |']
 	const result = md.mdTable(lines, 40)
 	const plain = result.map(strip)
 	// Every line has proper borders
@@ -215,7 +210,7 @@ test('mdTable: row dividers between data rows', () => {
 	const result = md.mdTable(lines, 80)
 	const plain = result.map(strip)
 	// Should have a ┼ divider between the two data rows
-	const dividers = plain.filter(l => l.includes('┼'))
+	const dividers = plain.filter((l) => l.includes('┼'))
 	expect(dividers.length).toBe(2) // header-sep + between-rows
 })
 

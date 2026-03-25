@@ -14,15 +14,13 @@ const MAX_SIZE = 1_000_000 // 1MB rotation threshold
 // HAL_LOG=1 enables info+error, HAL_LOG=debug enables all levels
 const envVal = (process.env.HAL_LOG ?? '').toLowerCase()
 const enabledLevel: Level | null =
-	envVal === 'debug' ? 'debug' :
-		envVal === '1' || envVal === 'true' || envVal === 'info' ? 'info' :
-			null
+	envVal === 'debug' ? 'debug' : envVal === '1' || envVal === 'true' || envVal === 'info' ? 'info' : null
 
 // Check if a given level should be logged
 function isEnabled(level: Level): boolean {
 	if (!enabledLevel) return false
 	if (enabledLevel === 'debug') return true // debug enables everything
-	if (level === 'debug') return false        // info mode skips debug
+	if (level === 'debug') return false // info mode skips debug
 	return true
 }
 

@@ -101,7 +101,7 @@ function convertMessages(msgs: Message[]): any[] {
 
 /** Convert our ToolDef[] (Anthropic format) to OpenAI function tools. */
 function convertTools(tools: any[]): any[] {
-	return tools.map(t => ({
+	return tools.map((t) => ({
 		type: 'function',
 		function: {
 			name: t.name,
@@ -114,9 +114,7 @@ function convertTools(tools: any[]): any[] {
 // ── Chat Completions SSE parser ──
 // Handles streaming responses from any Chat Completions-compatible endpoint.
 
-async function* parseChatCompletionsStream(
-	body: ReadableStream<Uint8Array>,
-): AsyncGenerator<ProviderStreamEvent> {
+async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
 	let buf = ''
@@ -141,7 +139,11 @@ async function* parseChatCompletionsStream(
 				if (data === '[DONE]') continue
 
 				let chunk: any
-				try { chunk = JSON.parse(data) } catch { continue }
+				try {
+					chunk = JSON.parse(data)
+				} catch {
+					continue
+				}
 
 				const choice = chunk.choices?.[0]
 				if (!choice) {
@@ -191,7 +193,10 @@ async function* parseChatCompletionsStream(
 			yield { type: 'tool_call', id: tc.id, name: tc.name, input }
 		} catch {
 			yield {
-				type: 'tool_call', id: tc.id, name: tc.name, input: {},
+				type: 'tool_call',
+				id: tc.id,
+				name: tc.name,
+				input: {},
 				parseError: `Failed to parse tool input JSON (${tc.args.length} chars): ${tc.args.slice(0, 200)}`,
 			}
 		}
@@ -199,7 +204,7 @@ async function* parseChatCompletionsStream(
 
 	yield {
 		type: 'done',
-		usage: (inputTokens || outputTokens) ? { input: inputTokens, output: outputTokens } : undefined,
+		usage: inputTokens || outputTokens ? { input: inputTokens, output: outputTokens } : undefined,
 	}
 }
 
@@ -214,7 +219,10 @@ async function* generateCompat(
 	await auth.ensureFresh(providerName)
 	const apiKey = getApiKey(providerName)
 	if (!apiKey) {
-		yield { type: 'error', message: `No credentials for '${providerName}'. Run: bun scripts/login-openai.ts (or set ${providerName.toUpperCase()}_API_KEY)` }
+		yield {
+			type: 'error',
+			message: `No credentials for '${providerName}'. Run: bun scripts/login-openai.ts (or set ${providerName.toUpperCase()}_API_KEY)`,
+		}
 		yield { type: 'done' }
 		return
 	}
@@ -233,7 +241,7 @@ async function* generateCompat(
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			'Authorization': `Bearer ${apiKey}`,
+			Authorization: `Bearer ${apiKey}`,
 		},
 		body: JSON.stringify(body),
 		signal: req.signal,
@@ -242,7 +250,13 @@ async function* generateCompat(
 	if (!res.ok) {
 		const text = (await res.text()).slice(0, 2000)
 		const retryAfterMs = providerUtils.parseRetryDelay(res, text)
-		yield { type: 'error', message: `${providerName} ${res.status}: ${res.statusText}`, status: res.status, body: text, retryAfterMs }
+		yield {
+			type: 'error',
+			message: `${providerName} ${res.status}: ${res.statusText}`,
+			status: res.status,
+			body: text,
+			retryAfterMs,
+		}
 		yield { type: 'done' }
 		return
 	}
@@ -267,8 +281,8 @@ export function createCompatProvider(providerName: string, baseUrl?: string): Pr
 	if (!url) {
 		throw new Error(
 			`Unknown compat provider '${providerName}'. ` +
-			`Known endpoints: ${Object.keys(COMPAT_ENDPOINTS).join(', ')}. ` +
-			`Or pass a custom baseUrl.`
+				`Known endpoints: ${Object.keys(COMPAT_ENDPOINTS).join(', ')}. ` +
+				`Or pass a custom baseUrl.`,
 		)
 	}
 	return {

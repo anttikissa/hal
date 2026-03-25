@@ -1,5 +1,5 @@
 {
-  "exclude": ["examples", "previous", "node_modules", "state"],
+  "exclude": ["examples", "previous", "prev", "node_modules", "state"],
   "compilerOptions": {
     // Environment setup & latest features
     "lib": ["ESNext"],

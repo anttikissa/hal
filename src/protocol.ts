@@ -22,25 +22,11 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType =
-	| 'prompt'
-	| 'steer'
-	| 'open'
-	| 'close'
-	| 'abort'
-	| 'compact'
+export type CommandType = 'prompt' | 'steer' | 'open' | 'close' | 'abort' | 'compact'
 
 // ── Tool call types ──
 
-export type ToolName =
-	| 'bash'
-	| 'read'
-	| 'write'
-	| 'edit'
-	| 'glob'
-	| 'grep'
-	| 'eval'
-	| 'send'
+export type ToolName = 'bash' | 'read' | 'write' | 'edit' | 'glob' | 'grep' | 'eval' | 'send'
 
 // ── Message types (for API conversation format) ──
 
@@ -51,11 +37,11 @@ export interface ContentBlock {
 	text?: string
 	thinking?: string
 	signature?: string
-	id?: string        // tool_use id
-	name?: string      // tool_use name
-	input?: any        // tool_use input
-	tool_use_id?: string  // tool_result reference
-	content?: string | any[]  // tool_result content
+	id?: string // tool_use id
+	name?: string // tool_use name
+	input?: any // tool_use input
+	tool_use_id?: string // tool_result reference
+	content?: string | any[] // tool_result content
 }
 
 export interface Message {

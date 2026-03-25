@@ -46,7 +46,7 @@ export function charWidth(cp: number): number {
 	if (cp < 0x20) return 0
 	if (cp < 0x7f) return 1
 	// Style markers (PUA U+E000–E005): zero width, resolved to ANSI later
-	if (cp >= 0xE000 && cp <= 0xE005) return 0
+	if (cp >= 0xe000 && cp <= 0xe005) return 0
 	// Zero-width: combining marks, ZWJ, variation selectors
 	if (
 		(cp >= 0x0300 && cp <= 0x036f) ||
@@ -233,9 +233,12 @@ export const M_DIM = '\uE004'
 export const M_DIM_OFF = '\uE005'
 
 const MARKER_ANSI: Record<string, string> = {
-	[M_BOLD]: '\x1b[1m', [M_BOLD_OFF]: '\x1b[22m',
-	[M_ITALIC]: '\x1b[3m', [M_ITALIC_OFF]: '\x1b[23m',
-	[M_DIM]: '\x1b[2m', [M_DIM_OFF]: '\x1b[22m',
+	[M_BOLD]: '\x1b[1m',
+	[M_BOLD_OFF]: '\x1b[22m',
+	[M_ITALIC]: '\x1b[3m',
+	[M_ITALIC_OFF]: '\x1b[23m',
+	[M_DIM]: '\x1b[2m',
+	[M_DIM_OFF]: '\x1b[22m',
 }
 
 /** Convert style markers to ANSI escapes, ensuring each line is
@@ -244,7 +247,7 @@ const MARKER_ANSI: Record<string, string> = {
  *  is never touched — safe for blocks with full-width backgrounds. */
 export function resolveMarkers(lines: string[]): string[] {
 	const active = new Set<string>()
-	return lines.map(line => {
+	return lines.map((line) => {
 		let out = ''
 		// Re-open styles active from previous line
 		for (const m of active) out += MARKER_ANSI[m]!
@@ -254,8 +257,9 @@ export function resolveMarkers(lines: string[]): string[] {
 			if (ansi !== undefined) {
 				out += ansi
 				const cp = ch.codePointAt(0)!
-				if ((cp & 1) === 0) active.add(ch)                    // even = ON
-				else active.delete(String.fromCodePoint(cp - 1))      // odd = OFF
+				if ((cp & 1) === 0)
+					active.add(ch) // even = ON
+				else active.delete(String.fromCodePoint(cp - 1)) // odd = OFF
 			} else {
 				out += ch
 			}

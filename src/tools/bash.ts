@@ -23,13 +23,18 @@ function childPids(parentPid: number): number[] {
 	if (result.exitCode !== 0) return []
 	const text = new TextDecoder().decode(result.stdout).trim()
 	if (!text) return []
-	return text.split(/\s+/).map(Number).filter(pid => Number.isInteger(pid) && pid > 0)
+	return text
+		.split(/\s+/)
+		.map(Number)
+		.filter((pid) => Number.isInteger(pid) && pid > 0)
 }
 
 /** Recursively kill a process tree. */
 function killProcessTree(rootPid: number, signal: 'SIGTERM' | 'SIGKILL'): void {
 	for (const pid of childPids(rootPid)) killProcessTree(pid, signal)
-	try { process.kill(rootPid, signal) } catch {}
+	try {
+		process.kill(rootPid, signal)
+	} catch {}
 }
 
 // ── Output truncation ──
@@ -39,9 +44,7 @@ function truncateOutput(text: string): string {
 	if (text.length <= config.maxOutputBytes) return text
 	const half = Math.floor(config.maxOutputBytes / 2)
 	const truncated = text.length - config.maxOutputBytes
-	return text.slice(0, half)
-		+ `\n\n[… truncated ${truncated} bytes …]\n\n`
-		+ text.slice(-half)
+	return text.slice(0, half) + `\n\n[… truncated ${truncated} bytes …]\n\n` + text.slice(-half)
 }
 
 // ── Execution ──

@@ -24,7 +24,8 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 toolRegistry.registerTool({
 	name: 'send',
-	description: "Send a message to another session's inbox. The message will be processed as a prompt (if idle) or queued (if busy).",
+	description:
+		"Send a message to another session's inbox. The message will be processed as a prompt (if idle) or queued (if busy).",
 	parameters: {
 		sessionId: { type: 'string', description: 'Target session ID (or "all" for broadcast)' },
 		text: { type: 'string', description: 'Message text' },

@@ -77,7 +77,7 @@ async function refreshAnthropic(): Promise<void> {
 			client_id: ANTHROPIC_CLIENT_ID,
 		}),
 	})
-	const data = await res.json() as any
+	const data = (await res.json()) as any
 	if (!data.access_token) throw new Error(`Anthropic token refresh failed: ${JSON.stringify(data)}`)
 
 	// Write back — liveFile proxy auto-persists on property set
@@ -109,7 +109,7 @@ async function refreshOpenAI(): Promise<void> {
 		const text = await res.text().catch(() => '')
 		throw new Error(`OpenAI token refresh failed: ${res.status} ${text}`)
 	}
-	const data = await res.json() as any
+	const data = (await res.json()) as any
 	if (!data.access_token) throw new Error('OpenAI refresh: missing access_token')
 
 	store().openai = {

@@ -30,11 +30,7 @@ interface LiveState {
 
 const registry = new WeakMap<object, LiveState>()
 
-function liveFile<T extends Record<string, any>>(
-	path: string,
-	defaults: T,
-	opts?: { watch?: boolean },
-): T {
+function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts?: { watch?: boolean }): T {
 	const data: Record<string, any> = { ...defaults }
 
 	// Load from disk, merging over defaults
@@ -79,7 +75,9 @@ function liveFile<T extends Record<string, any>>(
 			origFlush()
 			// Hold the flag longer than the watch debounce (50ms)
 			// so the fs.watch callback sees it and skips the reload.
-			setTimeout(() => { ownWrite = false }, 100)
+			setTimeout(() => {
+				ownWrite = false
+			}, 100)
 		}
 		try {
 			watch(dirname(path), { persistent: false }, (_, filename) => {

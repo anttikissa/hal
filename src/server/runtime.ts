@@ -63,11 +63,11 @@ async function createSession(): Promise<Session> {
 
 /** Write the current in-memory session order to disk. */
 async function persistSessionList(): Promise<void> {
-	await sessionStore.saveSessionList(activeSessions.map(s => s.id))
+	await sessionStore.saveSessionList(activeSessions.map((s) => s.id))
 }
 
 function findSession(sessionId: string): Session | undefined {
-	return activeSessions.find(s => s.id === sessionId)
+	return activeSessions.find((s) => s.id === sessionId)
 }
 
 // ── IPC helpers ──
@@ -75,7 +75,7 @@ function findSession(sessionId: string): Session | undefined {
 function broadcastSessions(): void {
 	ipc.appendEvent({
 		type: 'sessions',
-		sessions: activeSessions.map(s => ({ id: s.id, name: s.name })),
+		sessions: activeSessions.map((s) => ({ id: s.id, name: s.name })),
 	})
 }
 
@@ -114,10 +114,8 @@ async function handlePrompt(session: Session, text: string, label?: 'steering'):
 	}
 
 	// Check for slash commands first
-	const cmdResult = await commands.executeCommand(
-		text,
-		sessionState,
-		(msg, level) => emitInfo(session.id, msg, level),
+	const cmdResult = await commands.executeCommand(text, sessionState, (msg, level) =>
+		emitInfo(session.id, msg, level),
 	)
 
 	if (cmdResult.handled) {
@@ -152,14 +150,17 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 	const promptResult = context.buildSystemPrompt({
 		model,
 		cwd: session.cwd,
+		sessionId: session.id,
 	})
 
 	// Save user prompt to history
-	await sessionStore.appendHistory(session.id, [{
-		role: 'user',
-		content: text,
-		ts: new Date().toISOString(),
-	}])
+	await sessionStore.appendHistory(session.id, [
+		{
+			role: 'user',
+			content: text,
+			ts: new Date().toISOString(),
+		},
+	])
 
 	// Load conversation history and convert to API messages
 	const messages = apiMessages.toAnthropicMessages(session.id)
@@ -250,7 +251,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			if (!sessionId) return
 			// Abort any active generation
 			agentLoop.abort(sessionId)
-			activeSessions = activeSessions.filter(s => s.id !== sessionId)
+			activeSessions = activeSessions.filter((s) => s.id !== sessionId)
 			if (activeSessions.length === 0) await createSession()
 			await persistSessionList()
 			broadcastSessions()
@@ -296,7 +297,7 @@ function startRuntime(signal: AbortSignal): void {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || activeRuntimePid !== process.pid) break
 			// Skip commands for sessions that don't exist
-			if (cmd.sessionId && !activeSessions.some(s => s.id === cmd.sessionId)) continue
+			if (cmd.sessionId && !activeSessions.some((s) => s.id === cmd.sessionId)) continue
 			try {
 				await handleCommand(cmd, signal)
 			} catch (err: any) {
@@ -309,25 +310,35 @@ function startRuntime(signal: AbortSignal): void {
 
 	// Initialize MCP servers (external tool servers from mcp.json).
 	// Non-blocking — failures are logged but don't prevent startup.
-	void import('../mcp/client.ts').then(({ mcp }) => {
-		mcp.initServers().catch((err: any) => {
-			console.error(`[mcp] init failed: ${err?.message ?? String(err)}`)
+	void import('../mcp/client.ts')
+		.then(({ mcp }) => {
+			mcp.initServers().catch((err: any) => {
+				console.error(`[mcp] init failed: ${err?.message ?? String(err)}`)
+			})
+			// Clean up MCP servers on shutdown
+			signal.addEventListener(
+				'abort',
+				() => {
+					void mcp.shutdown()
+				},
+				{ once: true },
+			)
 		})
-		// Clean up MCP servers on shutdown
-		signal.addEventListener('abort', () => { void mcp.shutdown() }, { once: true })
-	}).catch(() => {
-		// MCP module not critical — silently ignore if it fails to load
-	})
+		.catch(() => {
+			// MCP module not critical — silently ignore if it fails to load
+		})
 
 	// Start inbox watcher (external messages)
-	void import('../runtime/inbox.ts').then(({ inbox }) => {
-		inbox.startWatching(signal, (sessionId, text) => {
-			const session = findSession(sessionId)
-			if (session) handlePrompt(session, text)
+	void import('../runtime/inbox.ts')
+		.then(({ inbox }) => {
+			inbox.startWatching(signal, (sessionId, text) => {
+				const session = findSession(sessionId)
+				if (session) handlePrompt(session, text)
+			})
 		})
-	}).catch(() => {
-		// Inbox module not critical — silently ignore if it fails to load
-	})
+		.catch(() => {
+			// Inbox module not critical — silently ignore if it fails to load
+		})
 }
 
 export const runtime = { startRuntime }

@@ -90,11 +90,7 @@ handlers['model'] = (args, session, emitInfo) => {
 	if (!args) {
 		const current = session.model ?? models.defaultModel()
 		const display = models.displayModel(current)
-		const lines = [
-			`Current: ${display} (${current})`,
-			'',
-			...models.listModels(),
-		]
+		const lines = [`Current: ${display} (${current})`, '', ...models.listModels()]
 		return { output: lines.join('\n'), handled: true }
 	}
 
@@ -152,11 +148,9 @@ handlers['cd'] = (args, session) => {
 
 	// Report loaded agent files in the new directory
 	const agents = context.collectAgentFiles(target)
-	const parts = [
-		`cwd: ${old} -> ${target}`,
-	]
+	const parts = [`cwd: ${old} -> ${target}`]
 	if (agents.length > 0) {
-		const files = agents.map(f => `${f.name} (${context.formatBytes(f.bytes)})`)
+		const files = agents.map((f) => `${f.name} (${context.formatBytes(f.bytes)})`)
 		parts.push(`Loaded ${files.join(', ')}`)
 	}
 	return { output: parts.join('\n'), handled: true }
@@ -165,10 +159,8 @@ handlers['cd'] = (args, session) => {
 // /system — print the full preprocessed system prompt (SYSTEM.md + AGENTS.md chain)
 handlers['system'] = (_args, session) => {
 	const model = session.model ?? models.defaultModel()
-	const result = context.buildSystemPrompt({ model, cwd: session.cwd })
-	const header = result.loaded
-		.map(f => `  ${f.name} (${context.formatBytes(f.bytes)}) — ${f.path}`)
-		.join('\n')
+	const result = context.buildSystemPrompt({ model, cwd: session.cwd, sessionId: session.id })
+	const header = result.loaded.map((f) => `  ${f.name} (${context.formatBytes(f.bytes)}) — ${f.path}`).join('\n')
 	return {
 		output: `${header}\n  Total: ${context.formatBytes(result.bytes)}\n\n${result.text}`,
 		handled: true,
@@ -184,11 +176,9 @@ handlers['show'] = (args, session) => {
 		const result = context.buildSystemPrompt({
 			model,
 			cwd: session.cwd,
+			sessionId: session.id,
 		})
-		const lines = [
-			`System prompt (${context.formatBytes(result.bytes)}):`,
-			'',
-		]
+		const lines = [`System prompt (${context.formatBytes(result.bytes)}):`, '']
 		// Show loaded files
 		for (const f of result.loaded) {
 			lines.push(`  ${f.name} (${context.formatBytes(f.bytes)}) — ${f.path}`)
@@ -210,10 +200,9 @@ handlers['show'] = (args, session) => {
 		const display = models.displayModel(model)
 		const ctxWindow = models.contextWindow(model)
 		return {
-			output: [
-				`Model: ${display} (${model})`,
-				`Context window: ${(ctxWindow / 1000).toFixed(0)}k tokens`,
-			].join('\n'),
+			output: [`Model: ${display} (${model})`, `Context window: ${(ctxWindow / 1000).toFixed(0)}k tokens`].join(
+				'\n',
+			),
 			handled: true,
 		}
 	}

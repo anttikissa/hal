@@ -39,7 +39,7 @@ interface McpServer {
 	proc: ReturnType<typeof Bun.spawn>
 	nextId: number
 	pending: Map<number, PendingRequest>
-	buffer: string          // partial line accumulator for stdout parsing
+	buffer: string // partial line accumulator for stdout parsing
 	dead: boolean
 }
 
@@ -84,12 +84,7 @@ function send(server: McpServer, method: string, params?: any, id?: number): voi
 }
 
 /** Send a JSON-RPC request and wait for the matching response. */
-function request(
-	server: McpServer,
-	method: string,
-	params?: any,
-	timeoutMs = config.requestTimeoutMs,
-): Promise<any> {
+function request(server: McpServer, method: string, params?: any, timeoutMs = config.requestTimeoutMs): Promise<any> {
 	if (server.dead) return Promise.reject(new Error(`MCP server "${server.name}" is dead`))
 	const id = server.nextId++
 	return new Promise((resolve, reject) => {
@@ -187,11 +182,16 @@ async function startServer(name: string, cfg: ServerConfig): Promise<McpServer> 
 	void readStdout(server)
 
 	// MCP initialize handshake
-	await request(server, 'initialize', {
-		protocolVersion: '2024-11-05',
-		capabilities: {},
-		clientInfo: { name: 'hal', version: '1.0.0' },
-	}, config.initTimeoutMs)
+	await request(
+		server,
+		'initialize',
+		{
+			protocolVersion: '2024-11-05',
+			capabilities: {},
+			clientInfo: { name: 'hal', version: '1.0.0' },
+		},
+		config.initTimeoutMs,
+	)
 
 	// Notify server that initialization is complete
 	send(server, 'notifications/initialized')
@@ -259,9 +259,7 @@ async function callTool(prefixedName: string, args: any): Promise<string> {
 		})
 		// MCP tool results contain a content array; concatenate text blocks
 		if (result.content) {
-			return result.content
-				.map((c: any) => c.type === 'text' ? c.text : JSON.stringify(c))
-				.join('\n')
+			return result.content.map((c: any) => (c.type === 'text' ? c.text : JSON.stringify(c))).join('\n')
 		}
 		return JSON.stringify(result)
 	} catch (err: any) {
@@ -278,7 +276,9 @@ function isMcpTool(name: string): boolean {
 async function shutdown(): Promise<void> {
 	for (const server of state.servers.values()) {
 		rejectAll(server, 'shutting down')
-		try { server.proc.kill() } catch {}
+		try {
+			server.proc.kill()
+		} catch {}
 	}
 	state.servers.clear()
 	state.toolMap.clear()

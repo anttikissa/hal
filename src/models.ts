@@ -47,24 +47,33 @@ function resolveModel(input: string): string {
 
 const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	// claude-haiku-4-5-20251001 → Haiku 4.5
-	[/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)-\d{8,}$/, m => {
-		const tier = m[1][0].toUpperCase() + m[1].slice(1)
-		return `${tier} ${m[2]}.${m[3]}`
-	}],
+	[
+		/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)-\d{8,}$/,
+		(m) => {
+			const tier = m[1][0].toUpperCase() + m[1].slice(1)
+			return `${tier} ${m[2]}.${m[3]}`
+		},
+	],
 	// claude-opus-4-6 → Opus 4.6
-	[/^claude-(opus|sonnet|haiku)-(\d+)-(\d{1,2})$/, m => {
-		const tier = m[1][0].toUpperCase() + m[1].slice(1)
-		return `${tier} ${m[2]}.${m[3]}`
-	}],
+	[
+		/^claude-(opus|sonnet|haiku)-(\d+)-(\d{1,2})$/,
+		(m) => {
+			const tier = m[1][0].toUpperCase() + m[1].slice(1)
+			return `${tier} ${m[2]}.${m[3]}`
+		},
+	],
 	// claude-sonnet-4-20250514 → Sonnet 4
-	[/^claude-(opus|sonnet|haiku)-(\d+)-\d{8,}$/, m => {
-		const tier = m[1][0].toUpperCase() + m[1].slice(1)
-		return `${tier} ${m[2]}`
-	}],
+	[
+		/^claude-(opus|sonnet|haiku)-(\d+)-\d{8,}$/,
+		(m) => {
+			const tier = m[1][0].toUpperCase() + m[1].slice(1)
+			return `${tier} ${m[2]}`
+		},
+	],
 	// gpt-5.3-codex → Codex 5.3
-	[/^gpt-(\d+\.\d+)-codex$/, m => `Codex ${m[1]}`],
+	[/^gpt-(\d+\.\d+)-codex$/, (m) => `Codex ${m[1]}`],
 	// gpt-5.4 → GPT 5.4
-	[/^gpt-(\d+\.\d+)$/, m => `GPT ${m[1]}`],
+	[/^gpt-(\d+\.\d+)$/, (m) => `GPT ${m[1]}`],
 ]
 
 function displayModel(fullId: string | undefined): string {
@@ -117,9 +126,7 @@ function formatCost(fullId: string, usage: { input: number; output: number }): s
 // ── Default model ──
 
 function defaultModel(): string {
-	return process.env.HAL_MODEL
-		? resolveModel(process.env.HAL_MODEL)
-		: 'anthropic/claude-opus-4-6'
+	return process.env.HAL_MODEL ? resolveModel(process.env.HAL_MODEL) : 'anthropic/claude-opus-4-6'
 }
 
 // ── Model listing (for /model command) ──

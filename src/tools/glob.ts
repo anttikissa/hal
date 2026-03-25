@@ -12,12 +12,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 	const searchPath = read.resolvePath(input?.path, ctx.cwd)
 
-	const args = [
-		'rg', '--files', '--hidden', '--no-ignore',
-		'--sort=modified',
-		'--glob', pattern,
-		searchPath,
-	]
+	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', pattern, searchPath]
 
 	const proc = Bun.spawn(args, {
 		stdout: 'pipe',

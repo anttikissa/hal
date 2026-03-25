@@ -30,7 +30,8 @@ function formatLines(content: string, start: number, end?: number): string {
 	const e = Math.min(lines.length, end ?? lines.length)
 	const width = String(e).length
 
-	return lines.slice(s - 1, e)
+	return lines
+		.slice(s - 1, e)
 		.map((line, i) => `${String(s + i).padStart(width)} ${line}`)
 		.join('\n')
 }

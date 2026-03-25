@@ -23,7 +23,10 @@ const locks = new Map<string, Promise<void>>()
 async function withLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
 	const prev = locks.get(path) ?? Promise.resolve()
 	const result = prev.then(fn, fn)
-	const done = result.then(() => {}, () => {})
+	const done = result.then(
+		() => {},
+		() => {},
+	)
 	locks.set(path, done)
 	done.then(() => {
 		if (locks.get(path) === done) locks.delete(path)
@@ -104,7 +107,8 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 
 toolRegistry.registerTool({
 	name: 'edit',
-	description: 'Surgical string replacement in a file. Finds the exact old_string and replaces it with new_string. old_string must appear exactly once in the file.',
+	description:
+		'Surgical string replacement in a file. Finds the exact old_string and replaces it with new_string. old_string must appear exactly once in the file.',
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },
 		old_string: { type: 'string', description: 'Exact text to find (must be unique in file)' },

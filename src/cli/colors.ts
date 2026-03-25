@@ -35,9 +35,11 @@ const tools: Record<string, BlockColors> = {}
 type Triple = [number | string, number | string, number | string]
 
 function resolveTriple(t: Triple, vars: Record<string, number>): [number, number, number] {
-	return t.map(v =>
-		typeof v === 'string' && v.startsWith('$') ? vars[v.slice(1)] ?? 0 : Number(v)
-	) as [number, number, number]
+	return t.map((v) => (typeof v === 'string' && v.startsWith('$') ? (vars[v.slice(1)] ?? 0) : Number(v))) as [
+		number,
+		number,
+		number,
+	]
 }
 
 function fg(t: Triple, vars: Record<string, number>): string {
@@ -121,6 +123,14 @@ const watcher = liveFiles.liveFile(COLORS_PATH, {}, { watch: true })
 liveFiles.onChange(watcher, load)
 
 export const colors = {
-	assistant, thinking, user, input, system, info, error,
-	tool, tools, load,
+	assistant,
+	thinking,
+	user,
+	input,
+	system,
+	info,
+	error,
+	tool,
+	tools,
+	load,
 }

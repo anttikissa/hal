@@ -7,12 +7,12 @@
 
 interface Mark {
 	name: string
-	ts: number        // performance.now() at time of mark
+	ts: number // performance.now() at time of mark
 	detail?: string
 }
 
-const allMarks: Mark[] = []    // every mark ever recorded (for trace/summary)
-const pending: Mark[] = []     // marks not yet flushed to sink
+const allMarks: Mark[] = [] // every mark ever recorded (for trace/summary)
+const pending: Mark[] = [] // marks not yet flushed to sink
 const epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || Date.now()
 const enabled = !!process.env.HAL_PERF
 let sink: ((lines: string[]) => void) | null = null

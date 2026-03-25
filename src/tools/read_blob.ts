@@ -26,7 +26,8 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 toolRegistry.registerTool({
 	name: 'read_blob',
-	description: 'Read a stored blob by ID. Blobs are immutable snapshots of tool outputs, images, and thinking blocks from conversation history.',
+	description:
+		'Read a stored blob by ID. Blobs are immutable snapshots of tool outputs, images, and thinking blocks from conversation history.',
 	parameters: {
 		id: { type: 'string', description: 'Blob ID (found in history entries like "blob <id>")' },
 	},

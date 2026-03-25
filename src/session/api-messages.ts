@@ -58,7 +58,7 @@ function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[]): Me
 	const out: Message[] = []
 
 	let currentModel: string | undefined
-	const totalUserTurns = sliced.filter(m => m.role === 'user').length
+	const totalUserTurns = sliced.filter((m) => m.role === 'user').length
 	let userTurnsSeen = 0
 	let pendingInfos: string[] = []
 
@@ -195,9 +195,7 @@ function repairToolPairing(msgs: Message[]): void {
 		const msg = msgs[i]
 		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
 
-		const toolUseIds = (msg.content as ContentBlock[])
-			.filter(b => b.type === 'tool_use')
-			.map(b => b.id!)
+		const toolUseIds = (msg.content as ContentBlock[]).filter((b) => b.type === 'tool_use').map((b) => b.id!)
 
 		if (toolUseIds.length === 0) continue
 
@@ -212,7 +210,7 @@ function repairToolPairing(msgs: Message[]): void {
 			}
 		}
 
-		const missingIds = toolUseIds.filter(id => !haveIds.has(id))
+		const missingIds = toolUseIds.filter((id) => !haveIds.has(id))
 		if (missingIds.length === 0) continue
 
 		// Search later messages for displaced tool_results, or synthesize them
@@ -222,7 +220,7 @@ function repairToolPairing(msgs: Message[]): void {
 			for (let j = nextIdx; j < msgs.length && !found; j++) {
 				if (msgs[j].role !== 'user' || !Array.isArray(msgs[j].content)) continue
 				const blocks = msgs[j].content as ContentBlock[]
-				const bIdx = blocks.findIndex(b => b.type === 'tool_result' && b.tool_use_id === id)
+				const bIdx = blocks.findIndex((b) => b.type === 'tool_result' && b.tool_use_id === id)
 				if (bIdx >= 0) {
 					collected.push(blocks[bIdx])
 					blocks.splice(bIdx, 1)
@@ -236,7 +234,7 @@ function repairToolPairing(msgs: Message[]): void {
 
 		// Insert collected results right after the assistant message
 		if (haveIds.size > 0 && nextIdx < msgs.length) {
-			(msgs[nextIdx].content as ContentBlock[]).push(...collected)
+			;(msgs[nextIdx].content as ContentBlock[]).push(...collected)
 		} else {
 			msgs.splice(nextIdx, 0, { role: 'user', content: collected })
 			i++ // skip the inserted message
@@ -279,18 +277,18 @@ function pruneMessages(msgs: Message[]): Message[] {
 		const msg = msgs[i]
 
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-			let content = (msg.content as ContentBlock[]).map(b => {
+			let content = (msg.content as ContentBlock[]).map((b) => {
 				// Strip tool inputs from old messages
 				if (b.type === 'tool_use' && age[i] > heavy) return { ...b, input: {} }
 				return b
 			})
 			// Strip thinking from old messages
 			if (age[i] > thinking) {
-				content = content.filter(b => b.type !== 'thinking')
+				content = content.filter((b) => b.type !== 'thinking')
 			}
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
-			const content = (msg.content as ContentBlock[]).map(b => {
+			const content = (msg.content as ContentBlock[]).map((b) => {
 				// Strip old tool results
 				if (b.type === 'tool_result' && age[i] > heavy) {
 					return { ...b, content: '[tool result omitted from context]' }

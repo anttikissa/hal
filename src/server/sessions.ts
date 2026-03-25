@@ -128,9 +128,7 @@ function loadAllHistory(sessionId: string): HistoryEntry[] {
 		const parentEntries = loadAllHistory(first.parent)
 		const forkTs = first.ts
 		// Keep parent entries before the fork timestamp
-		const before = forkTs
-			? parentEntries.filter(e => !e.ts || e.ts < forkTs)
-			: parentEntries
+		const before = forkTs ? parentEntries.filter((e) => !e.ts || e.ts < forkTs) : parentEntries
 		return [...before, ...entries.slice(1)]
 	}
 	return entries
@@ -151,7 +149,7 @@ async function appendHistory(sessionId: string, entries: HistoryEntry[]): Promis
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
 	const path = `${sessionDir(sessionId)}/history.asonl`
-	const lines = entries.map(e => ason.stringify(e, 'short')).join('\n') + '\n'
+	const lines = entries.map((e) => ason.stringify(e, 'short')).join('\n') + '\n'
 	await appendFile(path, lines)
 }
 
@@ -161,7 +159,7 @@ function appendHistorySync(sessionId: string, entries: HistoryEntry[]): void {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
 	const path = `${sessionDir(sessionId)}/history.asonl`
-	const lines = entries.map(e => ason.stringify(e, 'short')).join('\n') + '\n'
+	const lines = entries.map((e) => ason.stringify(e, 'short')).join('\n') + '\n'
 	appendFileSync(path, lines)
 }
 
@@ -217,7 +215,9 @@ async function saveSessionList(ids: string[]): Promise<void> {
 	ensureDir(`${STATE_DIR}/ipc`)
 	let existing: any = {}
 	if (existsSync(path)) {
-		try { existing = ason.parse(readFileSync(path, 'utf-8')) as any } catch {}
+		try {
+			existing = ason.parse(readFileSync(path, 'utf-8')) as any
+		} catch {}
 	}
 	existing.sessions = ids
 	await writeFile(path, ason.stringify(existing) + '\n')
@@ -275,7 +275,9 @@ function pruneSessions(): { deleted: number } {
 		const path = `${STATE_DIR}/ipc/state.ason`
 		let existing: any = {}
 		if (existsSync(path)) {
-			try { existing = ason.parse(readFileSync(path, 'utf-8')) as any } catch {}
+			try {
+				existing = ason.parse(readFileSync(path, 'utf-8')) as any
+			} catch {}
 		}
 		existing.sessions = keep
 		// Use writeFileSync for startup path
