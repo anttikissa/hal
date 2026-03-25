@@ -142,7 +142,9 @@ async function handlePrompt(session: Session, text: string, label?: 'steering'):
 	await runGeneration(session, text)
 }
 
-/** Start a generation (agent loop call) for a session. */
+/** Start a generation (agent loop call) for a session.
+ *  If text is empty, this is a continuation (restart after crash) — don't save
+ *  a new user prompt, just rebuild messages from existing history. */
 async function runGeneration(session: Session, text: string): Promise<void> {
 	const model = session.model ?? models.defaultModel()
 
@@ -153,14 +155,16 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 		sessionId: session.id,
 	})
 
-	// Save user prompt to history
-	await sessionStore.appendHistory(session.id, [
-		{
-			role: 'user',
-			content: text,
-			ts: new Date().toISOString(),
-		},
-	])
+	// Save user prompt to history (skip for continuations)
+	if (text) {
+		await sessionStore.appendHistory(session.id, [
+			{
+				role: 'user',
+				content: text,
+				ts: new Date().toISOString(),
+			},
+		])
+	}
 
 	// Load conversation history and convert to API messages
 	const messages = apiMessages.toAnthropicMessages(session.id)
@@ -275,6 +279,7 @@ function startRuntime(signal: AbortSignal): void {
 			activeSessions.push({
 				id: meta.id,
 				name: meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
+				model: meta.model,
 				cwd: meta.workingDir ?? process.cwd(),
 				createdAt: meta.createdAt,
 			})
@@ -291,6 +296,53 @@ function startRuntime(signal: AbortSignal): void {
 		if (signal.aborted || activeRuntimePid !== process.pid) return
 		broadcastSessions()
 	}, 0)
+
+	// Deferred: resolve interrupted tools and auto-continue pending sessions.
+	// This runs after the initial broadcast so clients see tabs immediately,
+	// then we fix up history and restart any in-progress generations.
+	void (async () => {
+		for (const session of activeSessions) {
+			const entries = sessionStore.loadAllHistory(session.id)
+			if (entries.length === 0) continue
+
+			// 1. Find tool calls that never got results (interrupted mid-execution).
+			//    Write placeholder [interrupted] results so the conversation is valid.
+			const interrupted = sessionStore.detectInterruptedTools(entries)
+			if (interrupted.length > 0) {
+				const toolNames = interrupted.map(t => t.name).join(', ')
+				emitInfo(session.id, `Resolving ${interrupted.length} interrupted tool(s): ${toolNames}`)
+				for (const t of interrupted) {
+					await sessionStore.appendHistory(session.id, [{
+						role: 'tool_result',
+						tool_use_id: t.id,
+						ts: new Date().toISOString(),
+						text: '[interrupted]',
+					}])
+				}
+			}
+
+			// 2. Check if the session has a pending turn (user sent prompt or
+			//    tool results were written, but model never responded). If so,
+			//    and the turn is recent (<30s), auto-continue generation.
+			const allEntries = interrupted.length > 0
+				? sessionStore.loadAllHistory(session.id) // re-read with new tool_results
+				: entries
+			let lastRole: string | undefined
+			let lastTs: string | undefined
+			let paused = false
+			for (let i = allEntries.length - 1; i >= 0; i--) {
+				const e = allEntries[i]!
+				if (e.type === 'info' && (e as any).text === '[paused]') { paused = true; break }
+				if (e.role && !lastRole) { lastRole = e.role; lastTs = e.ts }
+				if (lastRole) break
+			}
+			const stale = lastTs && (Date.now() - new Date(lastTs).getTime()) > 30_000
+			if (!paused && !stale && (lastRole === 'user' || lastRole === 'tool_result')) {
+				emitInfo(session.id, 'Continuing...')
+				void runGeneration(session, '') // empty text = continue existing conversation
+			}
+		}
+	})()
 
 	// Tail commands and dispatch
 	void (async () => {

@@ -3,6 +3,7 @@
 
 import { client } from '../client.ts'
 import { render } from './render.ts'
+import { cursor } from '../cli/cursor.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
@@ -69,6 +70,7 @@ let terminalCleaned = false
 function cleanupTerminal(): void {
 	if (terminalCleaned) return
 	terminalCleaned = true
+	cursor.stop()
 	// Persist the current draft so it survives restart
 	const tab = client.currentTab()
 	if (tab) draft.saveDraft(tab.sessionId, prompt.draftText())
@@ -279,6 +281,10 @@ function startCli(signal: AbortSignal): void {
 	// Safety net: if we exit without hitting an explicit cleanup path
 	// (e.g. SIGTERM, uncaught exception), this still restores the terminal.
 	process.on('exit', cleanupTerminal)
+
+	// Start the 500ms blink timer for tab status indicators.
+	// Triggers a repaint on each phase change so busy dots blink.
+	cursor.start(() => draw())
 
 	perf.mark('First draw')
 	draw()

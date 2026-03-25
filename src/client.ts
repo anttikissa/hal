@@ -31,6 +31,8 @@ export interface Tab {
 	// blocks on demand (active tab at startup, others in background).
 	rawHistory?: HistoryEntry[]
 	loaded: boolean
+	// Generation finished on a non-active tab — show ✓ until user switches to it
+	doneUnseen: boolean
 }
 
 // ── Internal state ───────────────────────────────────────────────────────────
@@ -102,6 +104,8 @@ function switchTab(index: number): void {
 		const fromSession = state.tabs[state.activeTab]?.sessionId ?? ''
 		state.activeTab = index
 		const tab = state.tabs[index]!
+		// Clear "done unseen" flag — user is now looking at this tab
+		tab.doneUnseen = false
 		ensureTabLoaded(tab)
 		// Re-read draft from disk — another client may have saved one
 		const diskDraft = draftModule.loadDraft(tab.sessionId)
@@ -265,7 +269,7 @@ function handleEvent(event: any): void {
 				existing.name = s.name
 				newTabs.push(existing)
 			} else {
-				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], inputDraft: '', loaded: true })
+				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], inputDraft: '', loaded: true, doneUnseen: false })
 			}
 		}
 		const grew = newTabs.length > state.tabs.length
@@ -304,8 +308,18 @@ function handleEvent(event: any): void {
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'status' && event.sessionId) {
-		state.busy.set(event.sessionId, event.busy ?? false)
+		const wasBusy = state.busy.get(event.sessionId) ?? false
+		const nowBusy = event.busy ?? false
+		state.busy.set(event.sessionId, nowBusy)
 		state.activity.set(event.sessionId, event.activity ?? '')
+		// Generation just finished on a background tab → mark as done-unseen
+		if (wasBusy && !nowBusy) {
+			const activeSession = currentTab()?.sessionId
+			if (event.sessionId !== activeSession) {
+				const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+				if (tab) tab.doneUnseen = true
+			}
+		}
 		onChange(false)
 	} else if (event.type === 'tool-call' && event.sessionId) {
 		addBlockToTab(event.sessionId, {
@@ -365,6 +379,7 @@ function loadPersistedSessions(): void {
 			inputDraft: '',
 			rawHistory: s.history,
 			loaded: false,
+			doneUnseen: false,
 		})
 	}
 	state.tabs = newTabs

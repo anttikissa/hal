@@ -15,6 +15,7 @@ import { blocks as blockRenderer } from '../cli/blocks.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { client } from '../client.ts'
 import { prompt } from '../cli/prompt.ts'
+import { cursor } from '../cli/cursor.ts'
 import type { Block, Tab } from '../client.ts'
 
 const CSI = '\x1b['
@@ -80,27 +81,87 @@ function renderHistory(lines: string[], tab: Tab): void {
 
 const MAX_TABS = 40
 
+// ── Tab status indicator ─────────────────────────────────────────────────────
+//
+// Each tab gets a 1-char-wide status indicator (all visLen === 1):
+//   •  busy (blinking: visible on even phases, space on odd)
+//   ✓  generation done, user hasn't looked at this tab yet (green)
+//   !  interrupted/paused (blinking)
+//   ✗  ended with error (red, blinking)
+//      (space) idle, nothing notable
+
+const GREEN = '\x1b[32m'
+const RED = '\x1b[31m'
+const BRIGHT_WHITE = '\x1b[97m'
+const DIM = '\x1b[38;5;245m'
+const RESET = '\x1b[0m'
+const INPUT_CURSOR_COLOR = '\x1b[38;5;75m' // matches prompt cursor color
+
+function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
+	const busy = client.state.busy.get(tab.sessionId) ?? false
+
+	if (busy) return { char: '•', color: INPUT_CURSOR_COLOR, blinks: true }
+
+	if (tab.doneUnseen) return { char: '✓', color: GREEN, blinks: false }
+
+	// Check if the last meaningful block is an error or interruption
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const b = tab.history[i]!
+		// Skip trailing info blocks that aren't status-relevant
+		if (b.type === 'info' && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
+		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
+		if (b.type === 'info' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
+			return { char: '!', color: '', blinks: true }
+		}
+		break
+	}
+
+	return { char: ' ', color: '', blinks: false }
+}
+
+// Render the 1-char indicator, respecting blink phase.
+function renderIndicator(tab: Tab, baseColor: string): string {
+	const ind = tabIndicator(tab)
+	if (ind.char === ' ') return ' '
+	if (ind.blinks && !cursor.isVisible()) return ' '
+	return `${ind.color}${ind.char}${baseColor}`
+}
+
 // Tab bar: tries full names, then just numbers, then terse.
+// Each tab shows a 1-char status indicator between the number and title.
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const tabs = client.state.tabs
 	const active = client.state.activeTab
 
-	const named = tabs.map((tab, i) =>
-		i === active ? `\x1b[1m[${i + 1} ${tab.name}]\x1b[0m` : `\x1b[90m ${i + 1} ${tab.name} \x1b[0m`,
-	)
+	const named = tabs.map((tab, i) => {
+		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
+		return i === active
+			? `${BRIGHT_WHITE}[${i + 1}${ind}${tab.name}]${RESET}`
+			: `${DIM} ${i + 1}${ind}${tab.name} ${RESET}`
+	})
 	if (visLen(named.join('')) <= cols) {
 		lines.push(named.join(''))
 		return
 	}
 
-	const padded = tabs.map((_, i) => (i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m ${i + 1} \x1b[0m`))
+	const padded = tabs.map((tab, i) => {
+		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
+		return i === active
+			? `${BRIGHT_WHITE}[${i + 1}${ind}]${RESET}`
+			: `${DIM} ${i + 1}${ind} ${RESET}`
+	})
 	if (visLen(padded.join('')) <= cols) {
 		lines.push(padded.join(''))
 		return
 	}
 
-	const terse = tabs.map((_, i) => (i === active ? `\x1b[1m[${i + 1}]\x1b[0m` : `\x1b[90m${i + 1}\x1b[0m`))
+	const terse = tabs.map((tab, i) => {
+		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
+		return i === active
+			? `${BRIGHT_WHITE}[${i + 1}${ind}]${RESET}`
+			: `${DIM}${i + 1}${ind}${RESET}`
+	})
 	const terseStr = terse.join(' ')
 	lines.push(visLen(terseStr) > cols ? clipVisual(terseStr, cols) : terseStr)
 }
