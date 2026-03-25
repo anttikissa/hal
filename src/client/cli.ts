@@ -5,6 +5,7 @@ import { client } from '../client.ts'
 import { render } from './render.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
+import { draft } from '../cli/draft.ts'
 import { completion } from '../cli/completion.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { clipboard } from '../cli/clipboard.ts'
@@ -68,6 +69,9 @@ let terminalCleaned = false
 function cleanupTerminal(): void {
 	if (terminalCleaned) return
 	terminalCleaned = true
+	// Persist the current draft so it survives restart
+	const tab = client.currentTab()
+	if (tab) draft.saveDraft(tab.sessionId, prompt.draftText())
 	client.saveState()
 	if (useKitty) process.stdout.write(KITTY_OFF)
 	process.stdout.write(BRACKETED_PASTE_OFF)
@@ -92,6 +96,9 @@ function submit(): void {
 		client.sendCommand('prompt', text)
 	}
 	prompt.clear()
+	// Clear the persisted draft — prompt was submitted, nothing left to save
+	const tab = client.currentTab()
+	if (tab) draft.clearDraft(tab.sessionId)
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
@@ -250,6 +257,13 @@ function startCli(signal: AbortSignal): void {
 	// (Tab switch handler takes care of swapping it later.)
 	prompt.setHistory(client.getInputHistory())
 
+	// Restore any draft the user left from a previous session
+	const activeTab = client.currentTab()
+	if (activeTab) {
+		const saved = draft.loadDraft(activeTab.sessionId)
+		if (saved) prompt.setText(saved)
+	}
+
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
 		process.stdin.resume()
@@ -272,10 +286,12 @@ function startCli(signal: AbortSignal): void {
 	perf.mark('Ready for input')
 
 	// Wire draft save/restore on tab switch.
+	// Persists to disk so drafts survive restarts and multi-client setups.
 	// Also swap prompt history so up-arrow recalls per-tab entries.
 	client.setOnTabSwitch((fromSession, toSession) => {
-		prompt.saveDraft(fromSession)
-		prompt.restoreDraft(toSession)
+		draft.saveDraft(fromSession, prompt.draftText())
+		const saved = draft.loadDraft(toSession)
+		prompt.setText(saved)
 		prompt.setHistory(client.getInputHistory())
 		syncPromptToClient()
 	})

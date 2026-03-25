@@ -22,7 +22,7 @@ function captureOutput(fn: () => void): string {
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
-	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [] })
+	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true })
 	client.state.activeTab = 0
 	prompt.clear()
 })

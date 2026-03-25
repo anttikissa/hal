@@ -532,31 +532,13 @@ function buildPrompt(contentWidth: number): PromptRender {
 	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol } }
 }
 
-// ── Draft save/restore ───────────────────────────────────────────────────────
-// When switching tabs, save the current prompt text so it's restored when
-// the user switches back. Drafts are keyed by session ID and stored in memory.
-
-const drafts = new Map<string, string>()
-
-function saveDraft(sessionId: string): void {
-	if (buf) {
-		drafts.set(sessionId, buf)
-	} else {
-		drafts.delete(sessionId)
-	}
-}
-
-function restoreDraft(sessionId: string): void {
-	const saved = drafts.get(sessionId) ?? ''
-	buf = saved
-	cursor = saved.length
-	goalCol = null
-	selAnchor = null
-	historyIndex = -1
-	historyDraft = ''
-}
-
 // ── Public API ───────────────────────────────────────────────────────────────
+
+// The user's own composition text — NOT the history entry they may be
+// browsing with up-arrow. This is what gets persisted as a draft.
+function draftText(): string {
+	return historyIndex < 0 ? buf : historyDraft
+}
 
 function text(): string {
 	return buf
@@ -603,6 +585,7 @@ function lineCount(w: number): number {
 
 export const prompt = {
 	text,
+	draftText,
 	cursorPos,
 	setText,
 	clear,
@@ -612,6 +595,4 @@ export const prompt = {
 	handleKey,
 	buildPrompt,
 	lineCount,
-	saveDraft,
-	restoreDraft,
 }
