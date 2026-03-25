@@ -5,7 +5,10 @@ import { client } from '../client.ts'
 import { render } from './render.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
+import { completion } from '../cli/completion.ts'
+import { helpBar } from '../cli/help-bar.ts'
 import { clipboard } from '../cli/clipboard.ts'
+import { perf } from '../perf.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
 const RESTART_CODE = 100
@@ -41,9 +44,91 @@ function cleanupTerminal(): void {
 function submit(): void {
 	const text = prompt.text().trim()
 	if (!text) return
+	completion.dismiss()
 	prompt.pushHistory(text)
 	client.sendCommand('prompt', text)
 	prompt.clear()
+}
+
+// ── Tab completion key handling ──────────────────────────────────────────────
+// Tab triggers completion. While popup is active:
+//   Tab / Down: cycle forward
+//   Shift-Tab / Up: cycle backward
+//   Enter / Space: accept selected item
+//   Escape: dismiss
+
+function handleCompletionKey(k: KeyEvent): boolean {
+	// Tab triggers or cycles completion
+	if (k.key === 'tab' && !k.ctrl && !k.alt && !k.cmd) {
+		if (!completion.state.active) {
+			// Trigger new completion
+			const result = completion.complete(prompt.text(), prompt.cursorPos())
+			if (!result || result.items.length === 0) return false
+			completion.state.active = true
+			completion.state.lastResult = result
+			completion.state.selectedIndex = 0
+			// If there's a common prefix longer than what we have, extend to it
+			if (result.prefix.length > prompt.text().slice(0, prompt.cursorPos()).length) {
+				const after = prompt.text().slice(prompt.cursorPos())
+				prompt.setText(result.prefix + after, result.prefix.length)
+			}
+			// If only one match, apply it immediately
+			if (result.items.length === 1) {
+				const applied = completion.apply(prompt.text(), prompt.cursorPos(), result.items[0]!)
+				prompt.setText(applied.text, applied.cursor)
+				completion.dismiss()
+			}
+			return true
+		}
+		// Already active: cycle forward
+		completion.cycle(k.shift ? -1 : 1)
+		return true
+	}
+
+	// Only handle remaining keys when popup is active
+	if (!completion.state.active) return false
+
+	// Arrow keys cycle through items
+	if (k.key === 'down' && !k.ctrl && !k.alt) {
+		completion.cycle(1)
+		return true
+	}
+	if (k.key === 'up' && !k.ctrl && !k.alt) {
+		completion.cycle(-1)
+		return true
+	}
+
+	// Enter or space: accept selected item
+	if (k.key === 'enter' || (k.char === ' ' && !k.ctrl && !k.alt)) {
+		const item = completion.selectedItem()
+		if (item) {
+			const applied = completion.apply(prompt.text(), prompt.cursorPos(), item)
+			prompt.setText(applied.text, applied.cursor)
+		}
+		completion.dismiss()
+		return true
+	}
+
+	// Escape: dismiss
+	if (k.key === 'escape') {
+		completion.dismiss()
+		return true
+	}
+
+	// Any other key: dismiss completion, let it fall through
+	completion.dismiss()
+	return false
+}
+
+// Canonical key name for help bar usage tracking
+function canonicalKeyName(k: KeyEvent): string {
+	const parts: string[] = []
+	if (k.ctrl) parts.push('ctrl')
+	if (k.alt) parts.push('alt')
+	if (k.shift) parts.push('shift')
+	if (k.cmd) parts.push('cmd')
+	parts.push(k.key || k.char || '?')
+	return parts.join('-')
 }
 
 // App-level keybindings (not handled by prompt)
@@ -122,8 +207,19 @@ function startCli(signal: AbortSignal): void {
 	// (e.g. SIGTERM, uncaught exception), this still restores the terminal.
 	process.on('exit', cleanupTerminal)
 
+	perf.mark('First draw')
 	draw()
+	perf.mark('First draw done')
 	process.stdout.on('resize', () => draw(true))
+
+	perf.mark('Ready for input')
+
+	// Wire draft save/restore on tab switch
+	client.setOnTabSwitch((fromSession, toSession) => {
+		prompt.saveDraft(fromSession)
+		prompt.restoreDraft(toSession)
+		syncPromptToClient()
+	})
 
 	process.stdin.on('data', (data: Buffer) => {
 		const cols = process.stdout.columns || 80
@@ -131,7 +227,17 @@ function startCli(signal: AbortSignal): void {
 		const contentWidth = cols - 1
 
 		for (const k of keys.parseKeys(data.toString('utf-8'))) {
-			// App keybindings first
+			// Track key usage for help bar
+			if (k.ctrl || k.alt || k.cmd || k.key === 'enter' || k.key === 'escape' || k.key === 'tab') {
+				helpBar.logKey(canonicalKeyName(k))
+			}
+			// Completion keys first (tab, arrows in popup, etc.)
+			if (handleCompletionKey(k)) {
+				syncPromptToClient()
+				draw()
+				continue
+			}
+			// App keybindings
 			if (handleAppKey(k)) continue
 			// Then prompt editing
 			if (prompt.handleKey(k, contentWidth)) {

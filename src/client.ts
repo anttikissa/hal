@@ -10,21 +10,28 @@ import { ason } from './utils/ason.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type EntryType = 'input' | 'assistant' | 'info'
-
-export interface Entry {
-	type: EntryType
-	text: string
-	ts?: number
-}
+import { blocks as blockModule } from './cli/blocks.ts'
+import type { Block } from './cli/blocks.ts'
+import type { HistoryEntry } from './server/sessions.ts'
+export type { Block }
 
 export interface Tab {
 	sessionId: string
 	name: string
-	history: Entry[]
+	history: Block[]
+	// Tabs start unloaded: raw history is stashed here and converted to
+	// blocks on demand (active tab at startup, others in background).
+	rawHistory?: HistoryEntry[]
+	loaded: boolean
 }
 
 // ── Internal state ───────────────────────────────────────────────────────────
+
+const config = {
+	backgroundLoadTabs: true,
+	backgroundLoadBlobs: true,
+	repaintAfterBlobLoad: true,
+}
 
 const state = {
 	tabs: [] as Tab[],
@@ -50,12 +57,32 @@ function currentTab(): Tab | null {
 	return state.tabs[state.activeTab] ?? null
 }
 
+// onTabSwitch callback — set by CLI to save/restore drafts on tab change
+let onTabSwitch: ((fromSession: string, toSession: string) => void) | null = null
+
+function setOnTabSwitch(fn: (from: string, to: string) => void): void {
+	onTabSwitch = fn
+}
+
 function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
+		const fromSession = state.tabs[state.activeTab]?.sessionId ?? ''
 		state.activeTab = index
+		ensureTabLoaded(state.tabs[index]!)
+		const toSession = state.tabs[index]?.sessionId ?? ''
+		if (onTabSwitch) onTabSwitch(fromSession, toSession)
 		saveClientState()
 		onChange(true)
 	}
+}
+
+// Convert raw history → blocks if not already done.
+// Called on tab switch and during background loading.
+function ensureTabLoaded(tab: Tab): void {
+	if (tab.loaded) return
+	tab.history = blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId)
+	tab.rawHistory = undefined
+	tab.loaded = true
 }
 
 // ── Last-tab persistence ─────────────────────────────────────────────────────
@@ -103,7 +130,7 @@ function prevTab(): void {
 	if (state.tabs.length > 0) switchTab((state.activeTab - 1 + state.tabs.length) % state.tabs.length)
 }
 
-function addEntry(text: string, type: EntryType = 'info'): void {
+function addEntry(text: string, type: 'info' | 'error' = 'info'): void {
 	const tab = currentTab()
 	if (tab) {
 		tab.history.push({ type, text, ts: Date.now() })
@@ -111,11 +138,11 @@ function addEntry(text: string, type: EntryType = 'info'): void {
 	}
 }
 
-function addEntryToTab(sessionId: string | null, entry: Entry): void {
+function addBlockToTab(sessionId: string | null, block: Block): void {
 	let tab = sessionId ? state.tabs.find((t) => t.sessionId === sessionId) : currentTab()
 	if (!tab) tab = currentTab()
 	if (tab) {
-		tab.history.push(entry)
+		tab.history.push(block)
 		onChange(false)
 	}
 }
@@ -148,7 +175,7 @@ function handleEvent(event: any): void {
 				existing.name = s.name
 				newTabs.push(existing)
 			} else {
-				newTabs.push({ sessionId: s.id, name: s.name, history: [] })
+				newTabs.push({ sessionId: s.id, name: s.name, history: [], loaded: true })
 			}
 		}
 		const grew = newTabs.length > state.tabs.length
@@ -157,19 +184,19 @@ function handleEvent(event: any): void {
 		if (grew) state.activeTab = state.tabs.length - 1
 		onChange(false)
 	} else if (event.type === 'prompt') {
-		addEntryToTab(event.sessionId, {
-			type: 'input',
+		addBlockToTab(event.sessionId, {
+			type: 'user',
 			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'response') {
-		addEntryToTab(event.sessionId, {
+		addBlockToTab(event.sessionId, {
 			type: 'assistant',
 			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'info') {
-		addEntryToTab(event.sessionId ?? null, {
+		addBlockToTab(event.sessionId ?? null, {
 			type: 'info',
 			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
@@ -188,17 +215,12 @@ function loadPersistedSessions(): void {
 	const loaded = sessionStore.loadAllSessions()
 	if (loaded.length === 0) return
 
+	// Create tabs with raw history stashed — don't convert to blocks yet.
 	const newTabs: Tab[] = []
 	for (const s of loaded) {
-		// Name priority: topic > last directory component of workingDir > "tab N"
 		const dirName = s.meta.workingDir?.split('/').pop()
 		const name = s.meta.topic ?? dirName ?? `tab ${newTabs.length + 1}`
-		const history: Entry[] = s.entries.map((e) => ({
-			type: e.type,
-			text: e.text,
-			ts: e.ts,
-		}))
-		newTabs.push({ sessionId: s.meta.id, name, history })
+		newTabs.push({ sessionId: s.meta.id, name, history: [], rawHistory: s.history, loaded: false })
 	}
 	state.tabs = newTabs
 
@@ -207,14 +229,45 @@ function loadPersistedSessions(): void {
 	const lastIdx = saved.lastTab ? newTabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
 	state.activeTab = lastIdx >= 0 ? lastIdx : 0
 
-	// Restore peak if terminal width hasn't changed. If width changed,
-	// cached line counts are invalid — start from 0 and compute lazily.
+	// Only load the active tab now — first paint needs it.
+	// Other tabs are loaded in the background after first paint.
+	const active = state.tabs[state.activeTab]
+	if (active) ensureTabLoaded(active)
+
 	const cols = process.stdout.columns || 80
 	if (saved.peakCols === cols && saved.peak > 0) {
 		state.peak = saved.peak
 	}
 	state.peakCols = cols
-	perf.mark(`Client loaded ${loaded.length} sessions`)
+	perf.mark(`Client loaded ${loaded.length} sessions (1 active)`)
+}
+
+// Background loader: runs after first paint.
+// 1. Load blobs for active tab's tool blocks (so titles + output appear)
+// 2. Convert remaining tabs from raw history → blocks
+// 3. Load blobs for each remaining tab
+// All async with parallel I/O — UI stays responsive throughout.
+async function loadInBackground(): Promise<void> {
+	// Active tab's blobs first — user is looking at this tab
+	if (config.backgroundLoadBlobs) {
+		const active = state.tabs[state.activeTab]
+		if (active) {
+			const n = await blockModule.loadToolBlobs(active.history)
+			if (n > 0 && config.repaintAfterBlobLoad) onChange(false)
+		}
+	}
+
+	if (!config.backgroundLoadTabs) return
+
+	// Remaining tabs: convert history then load blobs
+	for (const tab of state.tabs) {
+		if (!tab.loaded) ensureTabLoaded(tab)
+		if (config.backgroundLoadBlobs) {
+			const n = await blockModule.loadToolBlobs(tab.history)
+			if (n > 0 && tab === state.tabs[state.activeTab]) onChange(false)
+		}
+	}
+	perf.mark('All tabs loaded')
 }
 
 function startClient(signal: AbortSignal): void {
@@ -225,6 +278,10 @@ function startClient(signal: AbortSignal): void {
 		handleEvent(event)
 	}
 	onChange(false)
+
+	// Background-load blobs + remaining tabs after first paint
+	void loadInBackground()
+
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) {
 			handleEvent(event)
@@ -235,8 +292,10 @@ function startClient(signal: AbortSignal): void {
 // ── Namespace ────────────────────────────────────────────────────────────────
 
 export const client = {
+	config,
 	state,
 	setOnChange,
+	setOnTabSwitch,
 	currentTab,
 	switchTab,
 	nextTab,

@@ -10,10 +10,12 @@
 // prompt line, not just the last one. All cursor positioning goes through
 // positionCursor() which updates cursorRow and cursorCol atomically.
 
-import { visLen, wordWrap, clipVisual } from '../utils/strings.ts'
+import { visLen, clipVisual } from '../utils/strings.ts'
+import { blocks as blockRenderer } from '../cli/blocks.ts'
+import { helpBar } from '../cli/help-bar.ts'
 import { client } from '../client.ts'
 import { prompt } from '../cli/prompt.ts'
-import type { Entry, Tab } from '../client.ts'
+import type { Block, Tab } from '../client.ts'
 
 const CSI = '\x1b['
 
@@ -47,43 +49,10 @@ function resetRenderer(): void {
 
 // ── Entry rendering ──────────────────────────────────────────────────────────
 
-function formatTimestamp(ts?: number): string {
-	if (ts === undefined) return ''
-	const d = new Date(ts)
-	const hh = String(d.getHours()).padStart(2, '0')
-	const mm = String(d.getMinutes()).padStart(2, '0')
-	const ss = String(d.getSeconds()).padStart(2, '0')
-	const ms = String(d.getMilliseconds()).padStart(3, '0')
-	return `\x1b[90m${hh}:${mm}:${ss}.${ms}\x1b[0m `
-}
-
-// ONE function that turns an entry into terminal lines. Used by both
+// ONE function that turns a block into terminal lines. Used by both
 // renderHistory() and historyLineCount(). No drift possible.
-function renderEntry(entry: Entry, cols: number): string[] {
-	const ts = formatTimestamp(entry.ts)
-	let prefix: string
-	switch (entry.type) {
-		case 'input':
-			prefix = `${ts}\x1b[36mYou:\x1b[0m `
-			break
-		case 'assistant':
-			prefix = `${ts}\x1b[33mAssistant:\x1b[0m `
-			break
-		case 'info':
-			prefix = ts ? `${ts}\x1b[90m` : '\x1b[90m'
-			break
-	}
-	const suffix = entry.type === 'info' ? '\x1b[0m' : ''
-	const result: string[] = []
-	const text = entry.text || ''
-	for (const raw of text.split('\n')) {
-		for (const wrapped of wordWrap(`${prefix}${raw}${suffix}`, cols)) {
-			result.push(wrapped)
-		}
-		// After the first line, continuation lines get indentation, not the prefix.
-		prefix = ts ? '                  ' : '  '
-	}
-	return result
+function renderEntry(block: Block, cols: number): string[] {
+	return blockRenderer.renderBlock(block, cols)
 }
 
 function historyLineCount(tab: Tab): number {
@@ -100,8 +69,10 @@ function historyLineCount(tab: Tab): number {
 
 function renderHistory(lines: string[], tab: Tab): void {
 	const cols = process.stdout.columns || 80
-	for (const entry of tab.history) {
-		for (const line of renderEntry(entry, cols)) lines.push(line)
+	for (let i = 0; i < tab.history.length; i++) {
+		// Blank line between blocks (not before the first)
+		if (i > 0) lines.push('')
+		for (const line of renderEntry(tab.history[i]!, cols)) lines.push(line)
 	}
 }
 
@@ -142,16 +113,27 @@ function renderStatusLine(lines: string[]): void {
 	lines.push(`\x1b[90m${'\u2500'.repeat(left)}${info}${'\u2500'.repeat(right)}\x1b[0m`)
 }
 
+function renderHelpBar(lines: string[]): void {
+	// TODO: busy flag will be wired when agent loop is implemented
+	const busy = false
+	const hasText = prompt.text().length > 0
+	const bar = helpBar.build(busy, hasText)
+	if (bar) lines.push(`\x1b[90m${bar}\x1b[0m`)
+}
+
 function renderPrompt(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const p = prompt.buildPrompt(cols - 1)
 	for (const line of p.lines) lines.push(line)
 }
 
-// How many frame lines the chrome (tab bar + status + prompt) occupies.
+// How many frame lines the chrome (tab bar + status + help bar + prompt) occupies.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	return 2 + prompt.lineCount(cols - 1)
+	const busy = false
+	const hasText = prompt.text().length > 0
+	const hasHelp = helpBar.build(busy, hasText) !== ''
+	return 2 + (hasHelp ? 1 : 0) + prompt.lineCount(cols - 1)
 }
 
 function buildFrame(): string[] {
@@ -181,9 +163,10 @@ function buildFrame(): string[] {
 	// Once the frame exceeds terminal height, fullscreen is permanent.
 	if (lines.length + chrome > rows) fullscreen = true
 
-	// 3. Chrome: tab bar, status line, prompt (1+ lines).
+	// 3. Chrome: tab bar, status line, help bar, prompt (1+ lines).
 	renderTabBar(lines)
 	renderStatusLine(lines)
+	renderHelpBar(lines)
 	renderPrompt(lines)
 
 	return lines
