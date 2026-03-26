@@ -33,6 +33,10 @@ export interface Tab {
 	loaded: boolean
 	// Generation finished on a non-active tab — show ✓ until user switches to it
 	doneUnseen: boolean
+	// Live streaming buffers — accumulated text from stream-delta events.
+	// Cleared when the final response/stream-end event arrives.
+	streamingText: string
+	streamingThinking: string
 }
 
 // ── Internal state ───────────────────────────────────────────────────────────
@@ -269,7 +273,7 @@ function handleEvent(event: any): void {
 				existing.name = s.name
 				newTabs.push(existing)
 			} else {
-				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], inputDraft: '', loaded: true, doneUnseen: false })
+				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], inputDraft: '', loaded: true, doneUnseen: false, streamingText: '', streamingThinking: '' })
 			}
 		}
 		const grew = newTabs.length > state.tabs.length
@@ -295,7 +299,38 @@ function handleEvent(event: any): void {
 			status: event.label, // 'steering' when typed during generation
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
+	} else if (event.type === 'stream-start' && event.sessionId) {
+		// New generation starting — clear streaming buffers
+		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		if (tab) {
+			tab.streamingText = ''
+			tab.streamingThinking = ''
+		}
+	} else if (event.type === 'stream-delta' && event.sessionId) {
+		// Append streaming text chunk to the appropriate buffer
+		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		if (tab && event.text) {
+			if (event.channel === 'thinking') {
+				tab.streamingThinking += event.text
+			} else {
+				tab.streamingText += event.text
+			}
+			onChange(false)
+		}
+	} else if (event.type === 'stream-end' && event.sessionId) {
+		// Generation finished — clear streaming buffers (response event will add the final block)
+		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		if (tab) {
+			tab.streamingText = ''
+			tab.streamingThinking = ''
+		}
 	} else if (event.type === 'response') {
+		// Final response — clear streaming buffers and add the block
+		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		if (tab) {
+			tab.streamingText = ''
+			tab.streamingThinking = ''
+		}
 		addBlockToTab(event.sessionId, {
 			type: event.isError ? 'error' : 'assistant',
 			text: event.text,
@@ -380,6 +415,8 @@ function loadPersistedSessions(): void {
 			rawHistory: s.history,
 			loaded: false,
 			doneUnseen: false,
+			streamingText: '',
+			streamingThinking: '',
 		})
 	}
 	state.tabs = newTabs

@@ -77,6 +77,20 @@ function renderHistory(lines: string[], tab: Tab): void {
 		if (i > 0) lines.push('')
 		for (const line of renderEntry(tab.history[i]!, cols)) lines.push(line)
 	}
+	// Live streaming blocks — shown while the model is generating.
+	// These are ephemeral (not in history) and replaced by the final
+	// response/thinking blocks when the stream ends.
+	const hasContent = lines.length > 0
+	if (tab.streamingThinking) {
+		if (hasContent) lines.push('')
+		const block: Block = { type: 'thinking', text: tab.streamingThinking }
+		for (const line of renderEntry(block, cols)) lines.push(line)
+	}
+	if (tab.streamingText) {
+		if (hasContent || tab.streamingThinking) lines.push('')
+		const block: Block = { type: 'assistant', text: tab.streamingText }
+		for (const line of renderEntry(block, cols)) lines.push(line)
+	}
 }
 
 const MAX_TABS = 40
