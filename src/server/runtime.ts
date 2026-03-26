@@ -75,7 +75,12 @@ function findSession(sessionId: string): Session | undefined {
 function broadcastSessions(): void {
 	ipc.appendEvent({
 		type: 'sessions',
-		sessions: activeSessions.map((s) => ({ id: s.id, name: s.name })),
+		sessions: activeSessions.map((s) => ({
+			id: s.id,
+			name: s.name,
+			cwd: s.cwd,
+			model: s.model,
+		})),
 	})
 }
 
@@ -125,12 +130,13 @@ async function handlePrompt(session: Session, text: string, label?: 'steering'):
 		session.model = sessionState.model
 		session.cwd = sessionState.cwd
 
-		// Persist changed metadata to disk
+		// Persist changed metadata to disk and notify clients
 		if (cwdChanged || modelChanged) {
 			void sessionStore.updateMeta(session.id, {
 				workingDir: session.cwd,
 				model: session.model,
 			})
+			broadcastSessions()
 		}
 
 		if (cmdResult.output) emitInfo(session.id, cmdResult.output)

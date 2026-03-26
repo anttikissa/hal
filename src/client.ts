@@ -37,6 +37,17 @@ export interface Tab {
 	// Cleared when the final response/stream-end event arrives.
 	streamingText: string
 	streamingThinking: string
+	// Cumulative token usage for this session (input + output).
+	// Accumulated from stream-end events and loaded from history on startup.
+	usage: { input: number; output: number }
+	// Last known context window usage (estimated tokens used / max).
+	// Updated from stream-end events.
+	contextUsed: number
+	contextMax: number
+	// Working directory and model for this session.
+	// Updated from sessions broadcast events.
+	cwd: string
+	model: string
 }
 
 // ── Internal state ───────────────────────────────────────────────────────────
@@ -67,6 +78,26 @@ const state = {
 
 let onChange: (force: boolean) => void = () => {}
 
+// Create a fresh Tab with all fields initialized.
+function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string }): Tab {
+	return {
+		sessionId: id,
+		name,
+		history: [],
+		inputHistory: [],
+		inputDraft: '',
+		loaded: true,
+		doneUnseen: false,
+		streamingText: '',
+		streamingThinking: '',
+		usage: { input: 0, output: 0 },
+		contextUsed: 0,
+		contextMax: 0,
+		cwd: opts?.cwd ?? '',
+		model: opts?.model ?? '',
+	}
+}
+
 // ── Functions ────────────────────────────────────────────────────────────────
 
 function setOnChange(fn: (force: boolean) => void): void {
@@ -87,7 +118,9 @@ function getActivity(): string {
 	return tab ? (state.activity.get(tab.sessionId) ?? '') : ''
 }
 
-// onTabSwitch callback — set by CLI to save/restore drafts on tab change
+// onTabSwitch callback — called when active tab changes, with the outgoing
+// session ID. The CLI uses this to save the outgoing draft and restore the
+// incoming tab's draft/history.
 let onTabSwitch: ((fromSession: string, toSession: string) => void) | null = null
 
 function setOnTabSwitch(fn: (from: string, to: string) => void): void {
@@ -106,6 +139,9 @@ function setOnDraftArrived(fn: (text: string) => void): void {
 function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
 		const fromSession = state.tabs[state.activeTab]?.sessionId ?? ''
+		// onBeforeTabSwitch lets the CLI save the outgoing draft before
+		// we change activeTab (so client.saveDraft() writes to the right tab)
+		if (onBeforeTabSwitch) onBeforeTabSwitch()
 		state.activeTab = index
 		const tab = state.tabs[index]!
 		// Clear "done unseen" flag — user is now looking at this tab
@@ -271,9 +307,12 @@ function handleEvent(event: any): void {
 			const existing = state.tabs.find((t) => t.sessionId === s.id)
 			if (existing) {
 				existing.name = s.name
+				// Update cwd/model from server (may have changed via /cd or /model)
+				if (s.cwd) existing.cwd = s.cwd
+				if (s.model) existing.model = s.model
 				newTabs.push(existing)
 			} else {
-				newTabs.push({ sessionId: s.id, name: s.name, history: [], inputHistory: [], inputDraft: '', loaded: true, doneUnseen: false, streamingText: '', streamingThinking: '' })
+				newTabs.push(makeTab(s.id, s.name, { cwd: s.cwd, model: s.model }))
 			}
 		}
 		const grew = newTabs.length > state.tabs.length
@@ -290,7 +329,10 @@ function handleEvent(event: any): void {
 		}
 		pendingOpen = false
 		// When active tab changes (e.g. new tab added), save/restore drafts
-		if (prevSession !== newSession && onTabSwitch) onTabSwitch(prevSession, newSession)
+		if (prevSession !== newSession) {
+			if (onBeforeTabSwitch) onBeforeTabSwitch()
+			if (onTabSwitch) onTabSwitch(prevSession, newSession)
+		}
 		onChange(false)
 	} else if (event.type === 'prompt') {
 		addBlockToTab(event.sessionId, {
@@ -323,6 +365,15 @@ function handleEvent(event: any): void {
 		if (tab) {
 			tab.streamingText = ''
 			tab.streamingThinking = ''
+			// Accumulate token usage from this generation
+			if (event.usage) {
+				tab.usage ??= { input: 0, output: 0 } // Initialize usage if it doesn't exist
+				tab.usage.input += event.usage.input ?? 0
+				tab.usage.output += event.usage.output ?? 0
+			}
+			// Update context window estimate
+			if (event.contextUsed != null) tab.contextUsed = event.contextUsed
+			if (event.contextMax != null) tab.contextMax = event.contextMax
 		}
 	} else if (event.type === 'response') {
 		// Final response — clear streaming buffers and add the block
@@ -406,18 +457,17 @@ function loadPersistedSessions(): void {
 	for (const s of loaded) {
 		const dirName = s.meta.workingDir?.split('/').pop()
 		const name = s.meta.topic ?? dirName ?? `tab ${newTabs.length + 1}`
-		newTabs.push({
-			sessionId: s.meta.id,
-			name,
-			history: [],
-			inputHistory: [],
-			inputDraft: '',
-			rawHistory: s.history,
-			loaded: false,
-			doneUnseen: false,
-			streamingText: '',
-			streamingThinking: '',
-		})
+		const tab = makeTab(s.meta.id, name, { cwd: s.meta.workingDir, model: s.meta.model })
+		tab.rawHistory = s.history
+		tab.loaded = false
+		// Sum up usage from history entries (each assistant turn has a .usage field)
+		for (const entry of s.history) {
+			if (entry.usage) {
+				tab.usage.input += (entry.usage as any).input ?? 0
+				tab.usage.output += (entry.usage as any).output ?? 0
+			}
+		}
+		newTabs.push(tab)
 	}
 	state.tabs = newTabs
 

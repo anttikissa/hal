@@ -14,6 +14,9 @@ import { visLen, clipVisual } from '../utils/strings.ts'
 import { blocks as blockRenderer } from '../cli/blocks.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { client } from '../client.ts'
+import { models } from '../models.ts'
+import { auth } from '../auth.ts'
+import { git } from '../utils/git.ts'
 import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
 import type { Block, Tab } from '../client.ts'
@@ -180,12 +183,65 @@ function renderTabBar(lines: string[]): void {
 	lines.push(visLen(terseStr) > cols ? clipVisual(terseStr, cols) : terseStr)
 }
 
+// Shorten a path for display: replace $HOME with ~, then abbreviate.
+function shortenPath(p: string): string {
+	if (!p) return ''
+	const home = process.env.HOME ?? ''
+	if (home && p.startsWith(home)) p = '~' + p.slice(home.length)
+	return p
+}
+
+// Color for context usage percentage.
+function contextColor(pct: number): string {
+	const t = models.contextThresholds
+	if (pct >= t.redAbove) return '\x1b[31m'    // red
+	if (pct >= t.orangeAbove) return '\x1b[33m'  // yellow/orange
+	if (pct < t.greenBelow) return '\x1b[32m'    // green
+	return ''                                     // default (dim)
+}
+
 function renderStatusLine(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	const mode = fullscreen ? 'full' : 'grow'
-	const activity = client.getActivity()
-	const activityPart = activity ? ` \u00b7 ${activity}` : ''
-	const info = ` ${client.state.role} \u00b7 pid ${process.pid} \u00b7 ${mode}${activityPart} `
+	const tab = client.currentTab()
+	const parts: string[] = []
+
+	if (tab) {
+		// 1. Cumulative token count (input + output)
+		const totalTokens = tab.usage.input + tab.usage.output
+		if (totalTokens > 0) parts.push(models.formatTokenCount(totalTokens) + ' tok')
+
+		// 2. Cost (API key) or "(sub)" (OAuth token)
+		const modelId = tab.model || client.state.model || models.defaultModel()
+		const provider = models.providerName(modelId)
+		if (auth.isApiKey(provider)) {
+			const cost = models.formatCost(modelId, tab.usage)
+			if (cost) parts.push(cost)
+		} else {
+			parts.push('(sub)')
+		}
+
+		// 3. Context usage: "25.4k/200k (13%)"
+		if (tab.contextMax > 0) {
+			const pct = Math.round((tab.contextUsed / tab.contextMax) * 100)
+			const color = contextColor(pct)
+			const reset = color ? '\x1b[90m' : ''
+			parts.push(
+				`${models.formatTokenCount(tab.contextUsed)}/${models.formatTokenCount(tab.contextMax)} (${color}${pct}%${reset})`,
+			)
+		}
+
+		// 4. Working directory, shortened
+		const cwd = shortenPath(tab.cwd)
+		if (cwd) parts.push(cwd)
+
+		// 5. Git branch (omit if "main")
+		if (tab.cwd) {
+			const branch = git.currentBranch(tab.cwd)
+			if (branch && branch !== 'main') parts.push(branch)
+		}
+	}
+
+	const info = parts.length > 0 ? ` ${parts.join(' \u00b7 ')} ` : ' '
 	const dashes = Math.max(0, cols - visLen(info))
 	lines.push(`\x1b[90m${info}${'\u2500'.repeat(dashes)}\x1b[0m`)
 }

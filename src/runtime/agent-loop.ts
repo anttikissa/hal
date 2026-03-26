@@ -305,7 +305,14 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			// If aborted, emit partial output and exit
 			if (aborted) {
 				emitInfo(sessionId, '[paused]')
-				emitEvent(sessionId, { type: 'stream-end', phase: 'done' })
+				const est = context.estimateContext(messages, model, overheadBytes)
+				emitEvent(sessionId, {
+					type: 'stream-end',
+					phase: 'done',
+					usage: totalUsage.input > 0 ? totalUsage : undefined,
+					contextUsed: est.used,
+					contextMax: est.max,
+				})
 				return
 			}
 
@@ -337,10 +344,13 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				if (assistantText) {
 					emitEvent(sessionId, { type: 'response', text: assistantText })
 				}
+				const est = context.estimateContext(messages, model, overheadBytes)
 				emitEvent(sessionId, {
 					type: 'stream-end',
 					phase: 'done',
 					usage: totalUsage.input > 0 ? totalUsage : undefined,
+					contextUsed: est.used,
+					contextMax: est.max,
 				})
 				return
 			}
@@ -426,7 +436,14 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 		// If we exhausted maxIterations, inform the user
 		emitInfo(sessionId, `Hit max iterations (${config.maxIterations}). Stopping.`, 'error')
-		emitEvent(sessionId, { type: 'stream-end', phase: 'done', usage: totalUsage })
+		const est = context.estimateContext(messages, model, overheadBytes)
+		emitEvent(sessionId, {
+			type: 'stream-end',
+			phase: 'done',
+			usage: totalUsage,
+			contextUsed: est.used,
+			contextMax: est.max,
+		})
 	} finally {
 		state.activeRequests.delete(sessionId)
 		await ctx.onStatus?.(false)

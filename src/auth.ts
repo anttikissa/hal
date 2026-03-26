@@ -131,5 +131,12 @@ async function ensureFresh(providerName: string): Promise<void> {
 	}
 }
 
-export const auth = { getCredential, getEntry, ensureFresh }
+// Check whether a provider is using an API key (pay-per-token) or
+// OAuth token (subscription). Returns true for API key, false for token/unknown.
+function isApiKey(providerName: string): boolean {
+	const cred = getCredential(providerName)
+	return cred?.type === 'api-key'
+}
+
+export const auth = { getCredential, getEntry, ensureFresh, isApiKey }
 export type { Credential }

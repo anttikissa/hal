@@ -50,7 +50,7 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	[
 		/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)-\d{8,}$/,
 		(m) => {
-			const tier = m[1][0].toUpperCase() + m[1].slice(1)
+			const tier = m[1]![0]!.toUpperCase() + m[1]!.slice(1)
 			return `${tier} ${m[2]}.${m[3]}`
 		},
 	],
@@ -58,7 +58,7 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	[
 		/^claude-(opus|sonnet|haiku)-(\d+)-(\d{1,2})$/,
 		(m) => {
-			const tier = m[1][0].toUpperCase() + m[1].slice(1)
+			const tier = m[1]![0]!.toUpperCase() + m[1]!.slice(1)
 			return `${tier} ${m[2]}.${m[3]}`
 		},
 	],
@@ -66,7 +66,7 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	[
 		/^claude-(opus|sonnet|haiku)-(\d+)-\d{8,}$/,
 		(m) => {
-			const tier = m[1][0].toUpperCase() + m[1].slice(1)
+			const tier = m[1]![0]!.toUpperCase() + m[1]!.slice(1)
 			return `${tier} ${m[2]}`
 		},
 	],
@@ -190,12 +190,37 @@ function estimateTokens(text: string): number {
 	return Math.ceil(text.length / 4)
 }
 
+// ── Context percentage thresholds (for status line coloring) ──
+// Percentage of context window used → color in the status line.
+// Green below greenBelow, orange above orangeAbove, red above redAbove.
+
+const contextThresholds = {
+	greenBelow: 30,
+	orangeAbove: 50,
+	redAbove: 60,
+}
+
+// Format a token count for display: "25.4k" or "200k"
+function formatTokenCount(n: number): string {
+	if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`
+	return String(n)
+}
+
+// Extract provider name from a full model ID ("anthropic/claude-opus-4-6" → "anthropic")
+function providerName(fullId: string): string {
+	const idx = fullId.indexOf('/')
+	return idx >= 0 ? fullId.slice(0, idx) : fullId
+}
+
 export const models = {
 	resolveModel,
 	displayModel,
 	contextWindow,
+	contextThresholds,
 	computeCost,
 	formatCost,
+	formatTokenCount,
+	providerName,
 	defaultModel,
 	listModels,
 	estimateTokens,
