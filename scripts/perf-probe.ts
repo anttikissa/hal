@@ -51,7 +51,7 @@ const ticker = setInterval(() => {
 
 // 5. Load active tab blobs (the suspected blocker)
 log('loading active tab blobs...')
-const n1 = await blocks.loadToolBlobs(activeBlocks)
+const n1 = await blocks.loadBlobs(activeBlocks)
 log(`active tab blobs done: ${n1} blobs`)
 
 // 6. Convert + load remaining tabs
@@ -60,7 +60,7 @@ for (const s of loaded) {
 	if (s.meta.id === lastTab) continue
 	const b = blocks.historyToBlocks(s.history, s.meta.id)
 	log(`  tab ${s.meta.id}: ${b.length} blocks, loading blobs...`)
-	const n = await blocks.loadToolBlobs(b)
+	const n = await blocks.loadBlobs(b)
 	log(`  tab ${s.meta.id}: ${n} blobs done`)
 }
 log('all tabs done')

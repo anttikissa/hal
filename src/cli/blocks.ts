@@ -25,7 +25,7 @@ const blockConfig = {
 export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number }
 	| { type: 'assistant'; text: string; model?: string; ts?: number }
-	| { type: 'thinking'; text: string; blobId?: string; sessionId?: string; ts?: number }
+	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number }
 	| {
 			type: 'tool'
 			name: string
@@ -93,11 +93,11 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 
 		// ── Assistant turn: split into thinking + tools + text ──
 		if (entry.role === 'assistant') {
-			// Thinking block
-			if (entry.thinkingText) {
+			// Thinking block — text may be inline or in a blob
+			if (entry.thinkingText || entry.thinkingBlobId) {
 				result.push({
 					type: 'thinking',
-					text: entry.thinkingText,
+					text: entry.thinkingText ?? '',
 					blobId: entry.thinkingBlobId,
 					sessionId,
 					ts: parseTs(entry.ts),
@@ -150,11 +150,11 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 }
 
 // ── Background blob loading ──────────────────────────────────────────────────
-// Tool blocks are created without blob data for fast startup. After first
-// paint, loadToolBlobs() fills in title details, command, and output
-// using parallel async reads that yield to the event loop.
+// Tool and thinking blocks are created without blob data for fast startup.
+// After first paint, loadBlobs() fills in the details using parallel async
+// reads that yield to the event loop.
 
-function applyBlob(block: Extract<Block, { type: 'tool' }>, text: string): void {
+function applyToolBlob(block: Extract<Block, { type: 'tool' }>, text: string): void {
 	block.blobLoaded = true
 	try {
 		const blob = ason.parse(text) as any
@@ -163,21 +163,32 @@ function applyBlob(block: Extract<Block, { type: 'tool' }>, text: string): void 
 	} catch {}
 }
 
-// Load blobs for a list of tool blocks in parallel batches.
-// Returns the number of blobs loaded.
+function applyThinkingBlob(block: Extract<Block, { type: 'thinking' }>, text: string): void {
+	block.blobLoaded = true
+	try {
+		const blob = ason.parse(text) as any
+		if (typeof blob?.thinking === 'string') block.text = blob.thinking
+	} catch {}
+}
+
 // Skip blobs larger than this — they're anomalous (e.g. unfiltered grep)
 // and would block the event loop during parsing.
 const MAX_BLOB_SIZE = 1024 * 1024 // 1 MB
 
-async function loadToolBlobs(blocks: Block[]): Promise<number> {
-	const tools = blocks.filter(
-		(b): b is Extract<Block, { type: 'tool' }> => b.type === 'tool' && !b.blobLoaded && !!b.blobId,
+type BlobBlock = Extract<Block, { type: 'tool' }> | Extract<Block, { type: 'thinking' }>
+
+// Load blobs for tool and thinking blocks in parallel batches.
+// Returns the number of blobs loaded.
+async function loadBlobs(blocks: Block[]): Promise<number> {
+	const pending = blocks.filter(
+		(b): b is BlobBlock =>
+			(b.type === 'tool' || b.type === 'thinking') && !b.blobLoaded && !!b.blobId,
 	)
-	if (tools.length === 0) return 0
+	if (pending.length === 0) return 0
 
 	const batchSize = blockConfig.blobBatchSize
-	for (let i = 0; i < tools.length; i += batchSize) {
-		const batch = tools.slice(i, i + batchSize)
+	for (let i = 0; i < pending.length; i += batchSize) {
+		const batch = pending.slice(i, i + batchSize)
 		// Check file sizes first, skip blobs over 1MB
 		const files = batch.map((b) => Bun.file(blobPath(b.sessionId ?? '', b.blobId!)))
 		const sizes = await Promise.allSettled(files.map((f) => f.size))
@@ -192,12 +203,17 @@ async function loadToolBlobs(blocks: Block[]): Promise<number> {
 
 		for (let j = 0; j < batch.length; j++) {
 			const r = results[j]!
-			if (r.status === 'fulfilled' && r.value !== null) applyBlob(batch[j]!, r.value)
-			else batch[j]!.blobLoaded = true // mark skipped/failed so we don't retry
+			const block = batch[j]!
+			if (r.status === 'fulfilled' && r.value !== null) {
+				if (block.type === 'tool') applyToolBlob(block, r.value)
+				else applyThinkingBlob(block, r.value)
+			} else {
+				block.blobLoaded = true // mark skipped/failed so we don't retry
+			}
 		}
 		await Bun.sleep(0) // yield to macro-task queue between batches
 	}
-	return tools.length
+	return pending.length
 }
 
 // ── Tool title & command extraction ──────────────────────────────────────────
@@ -605,7 +621,7 @@ export const blocks = {
 	config: blockConfig,
 	historyToBlocks,
 	renderBlock,
-	loadToolBlobs,
+	loadBlobs,
 	formatToolOutput,
 	spinnerChar,
 	formatElapsed,

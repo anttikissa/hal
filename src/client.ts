@@ -501,7 +501,7 @@ async function loadInBackground(): Promise<void> {
 	if (config.backgroundLoadBlobs) {
 		const active = state.tabs[state.activeTab]
 		if (active) {
-			const n = await blockModule.loadToolBlobs(active.history)
+			const n = await blockModule.loadBlobs(active.history)
 			if (n > 0 && config.repaintAfterBlobLoad) onChange(false)
 		}
 	}
@@ -512,7 +512,7 @@ async function loadInBackground(): Promise<void> {
 	for (const tab of state.tabs) {
 		if (!tab.loaded) ensureTabLoaded(tab)
 		if (config.backgroundLoadBlobs) {
-			const n = await blockModule.loadToolBlobs(tab.history)
+			const n = await blockModule.loadBlobs(tab.history)
 			if (n > 0 && tab === state.tabs[state.activeTab]) onChange(false)
 		}
 	}
