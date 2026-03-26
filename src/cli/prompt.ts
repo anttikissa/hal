@@ -4,8 +4,11 @@
 import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
 
-const MAX_PROMPT_LINES = 12
 const MAX_UNDO = 200
+
+const config = {
+	maxPromptLines: 10,
+}
 
 // ── Word wrap + cursor mapping ───────────────────────────────────────────────
 
@@ -501,7 +504,7 @@ interface PromptRender {
 
 function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getLayout(buf, contentWidth)
-	const promptLines = Math.min(layout.lines.length, MAX_PROMPT_LINES)
+	const promptLines = Math.min(layout.lines.length, config.maxPromptLines)
 	const { row: curRow, col: curCol } = cursorToRowCol(buf, cursor, contentWidth)
 	const sel = selRange()
 
@@ -580,10 +583,11 @@ function setRenderCallback(cb: () => void): void {
 	renderCallback = cb
 }
 function lineCount(w: number): number {
-	return Math.min(getLayout(buf, w).lines.length, MAX_PROMPT_LINES)
+	return Math.min(getLayout(buf, w).lines.length, config.maxPromptLines)
 }
 
 export const prompt = {
+	config,
 	text,
 	draftText,
 	cursorPos,

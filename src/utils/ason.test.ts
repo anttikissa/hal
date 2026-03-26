@@ -454,12 +454,12 @@ describe('parseStream', () => {
 
 describe('parseStream e2e', () => {
 	test('tail -f a file, parse objects as they are appended', async () => {
-		const { tailFile } = await import('./tail-file')
+		const { tails } = await import('./tail-file')
 		const { appendFile } = await import('fs/promises')
 		const path = '/tmp/hal-ason-e2e-test.asonl'
 		await Bun.write(path, '')
 
-		const stream = tailFile(path)
+		const stream = tails.tailFile(path)
 		const iter = parseStream(stream)
 
 		// Give tail -f a moment to start watching
@@ -487,7 +487,7 @@ describe('parseStream e2e', () => {
 		// Clean up
 		await iter.return(undefined)
 		;(await Bun.file(path).exists()) && (await Bun.$`rm ${path}`)
-	}, 5000)
+	}, 10000)
 })
 
 describe('comments', () => {

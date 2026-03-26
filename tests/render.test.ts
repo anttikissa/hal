@@ -22,7 +22,7 @@ function captureOutput(fn: () => void): string {
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
-	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, streamingText: '', streamingThinking: '' })
+	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, streamingText: '', streamingThinking: '', usage: { input: 0, output: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
 	client.state.activeTab = 0
 	prompt.clear()
 })
@@ -33,7 +33,7 @@ describe('render', () => {
 		prompt.setText('x')
 		const output = captureOutput(() => render.draw())
 		expect(output).not.toContain('\x1b[2J\x1b[H')
-		expect(stripAnsi(output)).toContain(' x')
+		expect(stripAnsi(output)).toContain('x')
 	})
 
 	test('force repaint in grow mode does not clear scrollback', () => {

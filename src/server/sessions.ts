@@ -27,7 +27,7 @@ export interface HistoryEntry {
 	// Info/session/reset/compact/forked_from entries
 	type?: 'info' | 'session' | 'reset' | 'compact' | 'forked_from'
 	text?: string
-	content?: string
+	content?: string | any[]
 	ts?: string
 	// We preserve all other fields but don't need to type them
 	[key: string]: any
@@ -183,8 +183,8 @@ async function forkSession(sourceId: string, newId: string, atIndex?: number): P
 	let forkTs = new Date().toISOString()
 	if (atIndex !== undefined) {
 		const history = loadHistory(sourceId)
-		if (atIndex >= 0 && atIndex < history.length && history[atIndex].ts) {
-			forkTs = history[atIndex].ts!
+		if (atIndex >= 0 && atIndex < history.length && history[atIndex]!.ts) {
+			forkTs = history[atIndex]!.ts!
 		}
 	}
 
@@ -299,7 +299,7 @@ function detectInterruptedTools(entries: HistoryEntry[]): { name: string; id: st
 	}
 	// Walk backwards to find the last assistant message with tools
 	for (let i = entries.length - 1; i >= 0; i--) {
-		const m = entries[i]
+		const m = entries[i]!
 		if (m.role === 'assistant' && Array.isArray(m.tools)) {
 			const interrupted: { name: string; id: string }[] = []
 			for (const t of m.tools) {

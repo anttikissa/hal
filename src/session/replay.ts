@@ -212,7 +212,7 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 		const text = typeof entry.content === 'string' ? entry.content : ''
 		if (!text || text.startsWith('[')) continue
 		// First line, capped at 200 chars
-		userPrompts.push(text.split('\n')[0].slice(0, 200))
+		userPrompts.push(text.split('\n')[0]!.slice(0, 200))
 	}
 
 	const dir = sessions.sessionDir(sessionId)

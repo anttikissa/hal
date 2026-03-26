@@ -32,7 +32,7 @@ function makeBlobId(sessionId: string): string {
 		.padStart(6, '0')
 	const bytes = randomBytes(3)
 	let suffix = ''
-	for (let i = 0; i < 3; i++) suffix += ID_CHARS[bytes[i] % ID_CHARS.length]
+	for (let i = 0; i < 3; i++) suffix += ID_CHARS[bytes[i]! % ID_CHARS.length]
 	return `${offset}-${suffix}`
 }
 

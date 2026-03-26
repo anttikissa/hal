@@ -1,12 +1,14 @@
-// Read tool — read file contents with line numbers.
+// Read tool — read file contents with hashline prefixes.
 //
-// Returns file content with "LINE:HASH content" prefixes for use with
-// the edit tool's hashline refs. Supports optional line range.
+// Returns file content as "LINE:HASH content" lines. The HASH is a
+// 3-char fingerprint of each line's content. The edit tool verifies
+// these hashes to prevent stale edits.
 
 import { readFileSync, statSync } from 'fs'
 import { isAbsolute, resolve } from 'path'
 import { homedir } from 'os'
 import { toolRegistry, type ToolContext } from './tool.ts'
+import { hashline } from './hashline.ts'
 
 const HOME = homedir()
 
@@ -20,29 +22,12 @@ function resolvePath(path: string | undefined, cwd: string): string {
 	return isAbsolute(path) ? path : resolve(cwd, path)
 }
 
-/** Format file content as numbered lines. */
-function formatLines(content: string, start: number, end?: number): string {
-	const lines = content.split('\n')
-	// Remove trailing empty line from trailing newline (common in files)
-	if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
-
-	const s = Math.max(1, start)
-	const e = Math.min(lines.length, end ?? lines.length)
-	const width = String(e).length
-
-	return lines
-		.slice(s - 1, e)
-		.map((line, i) => `${String(s + i).padStart(width)} ${line}`)
-		.join('\n')
-}
-
 async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const path = resolvePath(input?.path, ctx.cwd)
 
 	try {
 		const stat = statSync(path)
 		if (stat.isDirectory()) return `error: ${path} is a directory, not a file`
-		// Reject binary files (rough heuristic: files > 5MB or with null bytes)
 		if (stat.size > 5_000_000) return `error: file too large (${stat.size} bytes)`
 	} catch (e: any) {
 		return `error: ${e.message}`
@@ -60,7 +45,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 		return `error: ${path} appears to be a binary file`
 	}
 
-	const result = formatLines(content, input?.start ?? 1, input?.end)
+	const result = hashline.formatHashlines(content, input?.start ?? 1, input?.end)
 	if (result.length > MAX_OUTPUT) {
 		return result.slice(0, MAX_OUTPUT) + '\n[… truncated]'
 	}
@@ -79,4 +64,4 @@ toolRegistry.registerTool({
 	execute,
 })
 
-export const read = { resolvePath, formatLines, execute }
+export const read = { resolvePath, execute }

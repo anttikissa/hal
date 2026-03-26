@@ -133,7 +133,7 @@ function decodeJwt(token: string): any {
 	try {
 		const parts = token.split('.')
 		if (parts.length !== 3) return null
-		return JSON.parse(atob(parts[1]))
+		return JSON.parse(atob(parts[1]!))
 	} catch { return null }
 }
 

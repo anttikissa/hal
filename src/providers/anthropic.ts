@@ -119,7 +119,7 @@ function applyCacheBreakpoints(msgs: any[]): any[] {
 // ── SSE stream parser ──
 
 async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
-	const reader = body.getReader()
+	const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>
 	const decoder = new TextDecoder()
 	let buf = ''
 
@@ -259,12 +259,10 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		body.tools = req.tools
 	}
 
-	const authHeader = isOAuth ? { Authorization: `Bearer ${cred.value}` } : { 'x-api-key': cred.value }
-
 	const url = API_URL
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
-		...authHeader,
+		...(isOAuth ? { Authorization: `Bearer ${cred.value}` } : { 'x-api-key': cred.value }),
 		'anthropic-version': API_VERSION,
 		'anthropic-beta': isOAuth
 			? 'claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14'

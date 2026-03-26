@@ -1,6 +1,6 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
 import { liveFiles } from './live-file.ts'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, renameSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { ason } from './ason.ts'
@@ -71,10 +71,14 @@ test('onChange fires on external file change', async () => {
 		called = true
 	})
 
-	// Simulate external edit
-	writeFileSync(path, ason.stringify({ v: 99 }) + '\n')
-	// Wait for debounce (50ms) + some margin
-	await Bun.sleep(200)
+	// Simulate external edit via atomic rename (like real editors do).
+	// The watcher watches the directory, so direct writeFileSync may not
+	// trigger on macOS — but rename does.
+	const tmp = path + '.tmp'
+	writeFileSync(tmp, ason.stringify({ v: 99 }) + '\n')
+	renameSync(tmp, path)
+	// Wait for debounce (50ms) + fs.watch latency on macOS
+	await Bun.sleep(500)
 
 	expect(called).toBe(true)
 	expect(data.v).toBe(99)

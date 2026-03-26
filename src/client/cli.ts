@@ -10,7 +10,6 @@ import { completion } from '../cli/completion.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { clipboard } from '../cli/clipboard.ts'
 import { blocks } from '../cli/blocks.ts'
-import { draft } from '../cli/draft.ts'
 import { perf } from '../perf.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
@@ -72,8 +71,7 @@ function cleanupTerminal(): void {
 	terminalCleaned = true
 	cursor.stop()
 	// Persist the current draft so it survives restart
-	const tab = client.currentTab()
-	if (tab) draft.saveDraft(tab.sessionId, prompt.draftText())
+	client.saveDraft(prompt.draftText())
 	client.saveState()
 	if (useKitty) process.stdout.write(KITTY_OFF)
 	process.stdout.write(BRACKETED_PASTE_OFF)
@@ -85,10 +83,8 @@ function submit(): void {
 	const text = prompt.text().trim()
 	if (!text) return
 	completion.dismiss()
-	// Push to both prompt module (for immediate up-arrow) and client
-	// (so the tab's inputHistory persists across tab switches).
+	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
-	client.appendInputHistory(text)
 	// If the session is busy (generating/running tools), send a steer command
 	// instead of a plain prompt. The server will abort the current generation,
 	// inject this as a steering message, and restart generation.
@@ -98,9 +94,8 @@ function submit(): void {
 		client.sendCommand('prompt', text)
 	}
 	prompt.clear()
-	// Clear the persisted draft — prompt was submitted, nothing left to save
-	const tab = client.currentTab()
-	if (tab) draft.clearDraft(tab.sessionId)
+	// Update tab's inputHistory + clear persisted draft
+	client.onSubmit(text)
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
@@ -260,16 +255,11 @@ function startCli(signal: AbortSignal): void {
 
 	client.startClient(signal)
 
-	// Initialize prompt history from the active tab's session history.
-	// (Tab switch handler takes care of swapping it later.)
+	// Initialize prompt history and draft from the active tab.
+	// (Tab switch handler takes care of swapping these later.)
 	prompt.setHistory(client.getInputHistory())
-
-	// Restore any draft the user left from a previous session
-	const activeTab = client.currentTab()
-	if (activeTab) {
-		const saved = draft.loadDraft(activeTab.sessionId)
-		if (saved) prompt.setText(saved)
-	}
+	const savedDraft = client.getInputDraft()
+	if (savedDraft) prompt.setText(savedDraft)
 
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
@@ -299,12 +289,26 @@ function startCli(signal: AbortSignal): void {
 	// Wire draft save/restore on tab switch.
 	// Persists to disk so drafts survive restarts and multi-client setups.
 	// Also swap prompt history so up-arrow recalls per-tab entries.
-	client.setOnTabSwitch((fromSession, toSession) => {
-		draft.saveDraft(fromSession, prompt.draftText())
-		const saved = draft.loadDraft(toSession)
-		prompt.setText(saved)
+	client.setOnTabSwitch((fromSession, _toSession) => {
+		// Save outgoing tab's draft (uses draftText so we save the
+		// user's composition, not a history entry they're browsing).
+		// Pass fromSession because activeTab has already changed.
+		client.saveDraft(prompt.draftText(), fromSession)
+		// Load incoming tab's draft and history
+		prompt.setText(client.getInputDraft())
 		prompt.setHistory(client.getInputHistory())
 		syncPromptToClient()
+	})
+
+	// When another client saves a draft for our active tab and our
+	// prompt is empty, show it. This is how "client A quits with a
+	// draft on tab 10, client B picks it up" works.
+	client.setOnDraftArrived((text) => {
+		if (!prompt.text() && text) {
+			prompt.setText(text)
+			syncPromptToClient()
+			draw()
+		}
 	})
 
 	process.stdin.on('data', (data: Buffer) => {

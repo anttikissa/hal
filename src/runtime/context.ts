@@ -81,8 +81,10 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 		// Opening directive: ::: if model="claude*"
 		const open = line.match(/^:{3,}\s+if\s+(\w+)="([^"]+)"\s*$/)
 		if (open) {
-			const val = vars[open[1]] ?? ''
-			const re = new RegExp('^' + open[2].replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+			const key = open[1] ?? ''
+			const pattern = open[2] ?? ''
+			const val = vars[key] ?? ''
+			const re = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
 			skip = !re.test(val)
 			continue
 		}

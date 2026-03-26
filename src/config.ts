@@ -12,11 +12,13 @@
 import { liveFiles } from './utils/live-file.ts'
 import { client } from './client.ts'
 import { blocks } from './cli/blocks.ts'
+import { prompt } from './cli/prompt.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {
 	client: client.config,
 	blocks: blocks.config,
+	prompt: prompt.config,
 }
 
 // config.ason lives at project root (not state/) — it's user-facing config

@@ -41,7 +41,7 @@ function applyModelEvent(current: string | undefined, entry: any): string | unde
 // point — we only send messages after the last one.
 function findReplayStart(entries: HistoryEntry[]): number {
 	for (let i = entries.length - 1; i >= 0; i--) {
-		const e = entries[i]
+		const e = entries[i]!
 		if (e.type === 'reset' || e.type === 'compact') return i + 1
 	}
 	return 0
@@ -88,7 +88,7 @@ function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[]): Me
 			const content = buildAssistantContent(sessionId, entry, currentModel)
 			if (content.length > 0) {
 				// Handle continuation: merge with previous assistant message
-				if (entry.continuation && out.length > 0 && out[out.length - 1].role === 'assistant') {
+				if (entry.continuation && out.length > 0 && out[out.length - 1]!.role === 'assistant') {
 					out[out.length - 1] = { role: 'assistant', content }
 				} else {
 					out.push({ role: 'assistant', content })
@@ -192,7 +192,7 @@ function buildToolResultContent(sessionId: string, entry: HistoryEntry): Content
 // entries immediately following it. Missing results get synthesized as [interrupted].
 function repairToolPairing(msgs: Message[]): void {
 	for (let i = 0; i < msgs.length; i++) {
-		const msg = msgs[i]
+		const msg = msgs[i]!
 		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
 
 		const toolUseIds = (msg.content as ContentBlock[]).filter((b) => b.type === 'tool_use').map((b) => b.id!)
@@ -202,8 +202,8 @@ function repairToolPairing(msgs: Message[]): void {
 		// Check which results exist in the next message
 		const nextIdx = i + 1
 		const haveIds = new Set<string>()
-		if (nextIdx < msgs.length && msgs[nextIdx].role === 'user' && Array.isArray(msgs[nextIdx].content)) {
-			for (const b of msgs[nextIdx].content as ContentBlock[]) {
+		if (nextIdx < msgs.length && msgs[nextIdx]!.role === 'user' && Array.isArray(msgs[nextIdx]!.content)) {
+			for (const b of msgs[nextIdx]!.content as ContentBlock[]) {
 				if (b.type === 'tool_result' && toolUseIds.includes(b.tool_use_id!)) {
 					haveIds.add(b.tool_use_id!)
 				}
@@ -218,11 +218,11 @@ function repairToolPairing(msgs: Message[]): void {
 		for (const id of missingIds) {
 			let found = false
 			for (let j = nextIdx; j < msgs.length && !found; j++) {
-				if (msgs[j].role !== 'user' || !Array.isArray(msgs[j].content)) continue
-				const blocks = msgs[j].content as ContentBlock[]
+				if (msgs[j]!.role !== 'user' || !Array.isArray(msgs[j]!.content)) continue
+				const blocks = msgs[j]!.content as ContentBlock[]
 				const bIdx = blocks.findIndex((b) => b.type === 'tool_result' && b.tool_use_id === id)
 				if (bIdx >= 0) {
-					collected.push(blocks[bIdx])
+					collected.push(blocks[bIdx]!)
 					blocks.splice(bIdx, 1)
 					found = true
 				}
@@ -234,7 +234,7 @@ function repairToolPairing(msgs: Message[]): void {
 
 		// Insert collected results right after the assistant message
 		if (haveIds.size > 0 && nextIdx < msgs.length) {
-			;(msgs[nextIdx].content as ContentBlock[]).push(...collected)
+			;(msgs[nextIdx]!.content as ContentBlock[]).push(...collected)
 		} else {
 			msgs.splice(nextIdx, 0, { role: 'user', content: collected })
 			i++ // skip the inserted message
@@ -243,7 +243,7 @@ function repairToolPairing(msgs: Message[]): void {
 
 	// Remove messages emptied by relocation
 	for (let i = msgs.length - 1; i >= 0; i--) {
-		if (Array.isArray(msgs[i].content) && (msgs[i].content as ContentBlock[]).length === 0) {
+		if (Array.isArray(msgs[i]!.content) && (msgs[i]!.content as ContentBlock[]).length === 0) {
 			msgs.splice(i, 1)
 		}
 	}
@@ -269,12 +269,12 @@ function pruneMessages(msgs: Message[]): Message[] {
 	let count = 0
 	for (let i = msgs.length - 1; i >= 0; i--) {
 		age[i] = count
-		if (isTurnEnd(msgs[i])) count++
+		if (isTurnEnd(msgs[i]!)) count++
 	}
 
 	const out: Message[] = []
 	for (let i = 0; i < msgs.length; i++) {
-		const msg = msgs[i]
+		const msg = msgs[i]!
 
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			let content = (msg.content as ContentBlock[]).map((b) => {

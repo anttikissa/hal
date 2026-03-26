@@ -115,7 +115,7 @@ function convertTools(tools: any[]): any[] {
 // Handles streaming responses from any Chat Completions-compatible endpoint.
 
 async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
-	const reader = body.getReader()
+	const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>
 	const decoder = new TextDecoder()
 	let buf = ''
 	let inputTokens = 0

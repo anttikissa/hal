@@ -39,8 +39,8 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 	const matches = [...input.matchAll(ATTACHMENT_RE)]
 	// Only process txt files if they're from known safe paths
 	const valid = matches.filter((m) => {
-		const ext = m[2].toLowerCase()
-		return ext !== 'txt' || m[1].startsWith('/tmp/hal/')
+		const ext = m[2]!.toLowerCase()
+		return ext !== 'txt' || m[1]!.startsWith('/tmp/hal/')
 	})
 
 	if (valid.length === 0) return { apiContent: input, logContent: input }
@@ -50,8 +50,8 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 	let lastIndex = 0
 
 	for (const match of valid) {
-		const filePath = match[1].startsWith('~') ? match[1].replace('~', homedir()) : match[1]
-		const ext = match[2].toLowerCase()
+		const filePath = match[1]!.startsWith('~') ? match[1]!.replace('~', homedir()) : match[1]!
+		const ext = match[2]!.toLowerCase()
 		const before = input.slice(lastIndex, match.index)
 
 		// Text before the attachment reference
@@ -60,7 +60,7 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 			logBlocks.push({ type: 'text', text: before })
 		}
 
-		if (!existsSync(filePath)) {
+		if (!existsSync(filePath!)) {
 			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
 			logBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
 		} else if (IMAGE_EXTS.has(ext)) {

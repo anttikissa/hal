@@ -93,7 +93,7 @@ function parseRetryDelay(res: Response, body?: string): number | undefined {
 /** Race reader.read() against a timeout to detect network drops. */
 async function readWithTimeout(
 	reader: ReadableStreamDefaultReader<Uint8Array>,
-): Promise<ReadableStreamReadResult<Uint8Array>> {
+): Promise<{ done: boolean; value?: Uint8Array }> {
 	let timer: Timer
 	const timeout = new Promise<never>((_, reject) => {
 		const ms = config.streamTimeoutMs

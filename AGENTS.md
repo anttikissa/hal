@@ -9,6 +9,8 @@ The directory previous/ contains the old codebase, which is now frozen. You can 
 # Rules
 
 - Use bun - never node, npm or npx
+- Use red-green TDD.
+- First run the tests.
 - After every step, run `./test` — it runs tsgo type checking and all tests. No other verification needed. No bundling.
 - Run `bun cloc` to check line count — our budget for core code is 10 thousand lines
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.

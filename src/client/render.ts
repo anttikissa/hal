@@ -398,7 +398,11 @@ function draw(force = false): void {
 	let first = -1
 	const max = Math.max(lines.length, prevLines.length)
 	for (let i = 0; i < max; i++) {
-		if ((lines[i] ?? '') !== (prevLines[i] ?? '')) {
+		// Compare with null so we can distinguish "line is empty string"
+		// from "line doesn't exist". Without this, appending an empty line
+		// (e.g. shift+enter at end of prompt → new blank prompt line) is
+		// invisible to the diff because `undefined ?? ''` === `''`.
+		if ((lines[i] ?? null) !== (prevLines[i] ?? null)) {
 			first = i
 			break
 		}

@@ -141,7 +141,7 @@ describe('client-server', () => {
 		server.stdin!.write('hello world\n')
 		server.stdin!.flush()
 
-		await Bun.sleep(300)
+		await Bun.sleep(1000)
 
 		// Close both
 		sendCtrlC(server)

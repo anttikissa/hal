@@ -139,9 +139,6 @@ function setOnDraftArrived(fn: (text: string) => void): void {
 function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
 		const fromSession = state.tabs[state.activeTab]?.sessionId ?? ''
-		// onBeforeTabSwitch lets the CLI save the outgoing draft before
-		// we change activeTab (so client.saveDraft() writes to the right tab)
-		if (onBeforeTabSwitch) onBeforeTabSwitch()
 		state.activeTab = index
 		const tab = state.tabs[index]!
 		// Clear "done unseen" flag — user is now looking at this tab
@@ -229,8 +226,12 @@ function getInputDraft(): string {
 }
 
 // Save draft text to memory + disk + IPC notification.
-function saveDraft(draftText: string): void {
-	const tab = currentTab()
+// If sessionId is given, saves to that tab (used on tab switch to save
+// the outgoing tab's draft after activeTab has already changed).
+function saveDraft(draftText: string, sessionId?: string): void {
+	const tab = sessionId
+		? state.tabs.find(t => t.sessionId === sessionId)
+		: currentTab()
 	if (!tab) return
 	tab.inputDraft = draftText
 	draftModule.saveDraft(tab.sessionId, draftText)
@@ -329,10 +330,7 @@ function handleEvent(event: any): void {
 		}
 		pendingOpen = false
 		// When active tab changes (e.g. new tab added), save/restore drafts
-		if (prevSession !== newSession) {
-			if (onBeforeTabSwitch) onBeforeTabSwitch()
-			if (onTabSwitch) onTabSwitch(prevSession, newSession)
-		}
+		if (prevSession !== newSession && onTabSwitch) onTabSwitch(prevSession, newSession)
 		onChange(false)
 	} else if (event.type === 'prompt') {
 		addBlockToTab(event.sessionId, {

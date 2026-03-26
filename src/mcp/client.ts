@@ -240,9 +240,9 @@ async function initServers(): Promise<void> {
 
 	// Log failures but don't crash
 	for (let i = 0; i < results.length; i++) {
-		const r = results[i]
+		const r = results[i]!
 		if (r.status === 'rejected') {
-			console.error(`[mcp] failed to start "${entries[i][0]}": ${r.reason?.message ?? r.reason}`)
+			console.error(`[mcp] failed to start "${entries[i]![0]}": ${(r as PromiseRejectedResult).reason?.message ?? (r as PromiseRejectedResult).reason}`)
 		}
 	}
 }

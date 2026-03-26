@@ -1,17 +1,18 @@
 // Write + Edit tools — file creation and surgical editing.
 //
 // Write: create or overwrite a file with full content.
-// Edit: exact string replacement — find oldString, replace with newString.
-// Both create parent directories as needed.
+// Edit: replace or insert using hashline refs from the read tool.
+//   Hashes are verified before applying — if the file changed since
+//   the last read, the hash won't match and the edit is rejected.
 
 import { readFileSync, existsSync, mkdirSync } from 'fs'
 import { dirname } from 'path'
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { read } from './read.ts'
+import { hashline } from './hashline.ts'
 
 // ── Shared helpers ──
 
-/** Ensure parent directory exists before writing. */
 function ensureParent(path: string): void {
 	const dir = dirname(path)
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -20,7 +21,7 @@ function ensureParent(path: string): void {
 // Simple per-path lock to prevent concurrent writes to the same file.
 const locks = new Map<string, Promise<void>>()
 
-async function withLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+function withLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
 	const prev = locks.get(path) ?? Promise.resolve()
 	const result = prev.then(fn, fn)
 	const done = result.then(
@@ -45,7 +46,6 @@ async function executeWrite(input: any, ctx: ToolContext): Promise<string> {
 		await Bun.write(path, content)
 
 		const lines = content.split('\n')
-		// Show first few lines as confirmation
 		const preview = lines.slice(0, 5).join('\n')
 		if (lines.length <= 5) return `Wrote ${path} (${lines.length} lines)\n${preview}`
 		return `Wrote ${path} (${lines.length} lines)\n${preview}\n[+ ${lines.length - 5} more lines]`
@@ -65,13 +65,58 @@ toolRegistry.registerTool({
 
 // ── Edit tool ──
 
+const CONTEXT_LINES = 3
+
+function applyReplace(lines: string[], startRef: string, endRef: string, newContent: string): string | { resultLines: string[]; diff: string } {
+	const start = hashline.parseRef(startRef)
+	const end = hashline.parseRef(endRef)
+	if (!start) return `error: invalid start_ref: ${startRef}`
+	if (!end) return `error: invalid end_ref: ${endRef}`
+
+	const startErr = hashline.validateRef(start, lines)
+	const endErr = hashline.validateRef(end, lines)
+	if (startErr) return `error: ${startErr}\n\nRe-read the file to get updated LINE:HASH references.`
+	if (endErr) return `error: ${endErr}\n\nRe-read the file to get updated LINE:HASH references.`
+	if (start.line > end.line) return `error: start line ${start.line} is after end line ${end.line}`
+
+	const before = hashline.formatContext(lines, start.line - 1, end.line, CONTEXT_LINES)
+	// Strip trailing newline from new_content (each line already gets one on join)
+	const normalized = newContent.replace(/\n$/, '')
+	const newLines = normalized === '' ? [] : normalized.split('\n')
+	const resultLines = [...lines.slice(0, start.line - 1), ...newLines, ...lines.slice(end.line)]
+	const after = hashline.formatContext(resultLines, start.line - 1, start.line - 1 + newLines.length, CONTEXT_LINES)
+	return { resultLines, diff: `--- before\n${before}\n\n+++ after\n${after}` }
+}
+
+function applyInsert(lines: string[], afterRef: string, newContent: string): string | { resultLines: string[]; diff: string } {
+	const normalized = newContent.replace(/\n$/, '')
+	const newLines = normalized.split('\n')
+
+	let insertAt: number
+	if (afterRef === '0:000') {
+		insertAt = 0
+	} else {
+		const ref = hashline.parseRef(afterRef)
+		if (!ref) return `error: invalid after_ref: ${afterRef}`
+		const err = hashline.validateRef(ref, lines)
+		if (err) return `error: ${err}\n\nRe-read the file to get updated LINE:HASH references.`
+		insertAt = ref.line
+	}
+
+	const before = hashline.formatContext(lines, insertAt, insertAt, CONTEXT_LINES)
+	const resultLines = [...lines.slice(0, insertAt), ...newLines, ...lines.slice(insertAt)]
+	const after = hashline.formatContext(resultLines, insertAt, insertAt + newLines.length, CONTEXT_LINES)
+	return { resultLines, diff: `--- before\n${before}\n\n+++ after\n${after}` }
+}
+
 async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 	const path = read.resolvePath(input?.path, ctx.cwd)
-	const oldString = String(input?.old_string ?? '')
-	const newString = String(input?.new_string ?? '')
+	const operation = input?.operation
+	const newContent = String(input?.new_content ?? '')
 
-	if (!oldString) return 'error: old_string is required'
-	if (oldString === newString) return 'error: old_string and new_string are identical'
+	if (operation !== 'replace' && operation !== 'insert') {
+		return `error: unknown operation "${operation}" (use "replace" or "insert")`
+	}
 
 	return withLock(path, async () => {
 		let content: string
@@ -81,40 +126,40 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 			return `error: file not found: ${path}`
 		}
 
-		// Count occurrences to detect ambiguous edits
-		const count = content.split(oldString).length - 1
-		if (count === 0) return `error: old_string not found in ${path}`
-		if (count > 1) return `error: old_string found ${count} times in ${path} (must be unique)`
+		const lines = hashline.toLines(content)
 
-		// Apply the replacement
-		const updated = content.replace(oldString, newString)
+		let applied: string | { resultLines: string[]; diff: string }
+		if (operation === 'replace') {
+			if (!input?.start_ref || !input?.end_ref) return 'error: replace requires start_ref and end_ref'
+			applied = applyReplace(lines, input.start_ref, input.end_ref, newContent)
+		} else {
+			if (!input?.after_ref) return 'error: insert requires after_ref'
+			applied = applyInsert(lines, input.after_ref, newContent)
+		}
+
+		if (typeof applied === 'string') return applied
+
 		ensureParent(path)
-		await Bun.write(path, updated)
-
-		// Build a diff-style confirmation showing context around the change
-		const idx = content.indexOf(oldString)
-		const before = content.slice(0, idx)
-		const lineNum = before.split('\n').length
-		const oldLines = oldString.split('\n')
-		const newLines = newString.split('\n')
-
-		let diff = `Edited ${path} at line ${lineNum}\n`
-		for (const line of oldLines) diff += `- ${line}\n`
-		for (const line of newLines) diff += `+ ${line}\n`
-		return diff.trimEnd()
+		await Bun.write(path, applied.resultLines.join('\n') + '\n')
+		return applied.diff
 	})
 }
 
 toolRegistry.registerTool({
 	name: 'edit',
-	description:
-		'Surgical string replacement in a file. Finds the exact old_string and replaces it with new_string. old_string must appear exactly once in the file.',
+	description: `Edit a file using hashline refs from read. Hashes are verified; mismatch = re-read needed.
+- replace: replace start_ref..end_ref (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
+- insert: insert new_content after after_ref. Use "0:000" for beginning of file.
+new_content is raw file content — no hashline prefixes. A trailing newline in new_content is stripped.`,
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },
-		old_string: { type: 'string', description: 'Exact text to find (must be unique in file)' },
-		new_string: { type: 'string', description: 'Replacement text' },
+		operation: { type: 'string', description: '"replace" or "insert"' },
+		start_ref: { type: 'string', description: 'LINE:HASH of first line to replace' },
+		end_ref: { type: 'string', description: 'LINE:HASH of last line to replace' },
+		after_ref: { type: 'string', description: "LINE:HASH to insert after (or '0:000' for start)" },
+		new_content: { type: 'string', description: 'Replacement text (raw, no hashline prefixes)' },
 	},
-	required: ['path', 'old_string', 'new_string'],
+	required: ['path', 'operation', 'new_content'],
 	execute: executeEdit,
 })
 

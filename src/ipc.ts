@@ -4,7 +4,7 @@ import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } f
 import { open } from 'fs/promises'
 import { IPC_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
-import { tailFile } from './utils/tail-file.ts'
+import { tails } from './utils/tail-file.ts'
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`
@@ -28,7 +28,7 @@ function appendCommand(command: any): void {
 
 async function* tail(file: string, signal?: AbortSignal): AsyncGenerator<any> {
 	ensureFile(file)
-	const stream = tailFile(file)
+	const stream = tails.tailFile(file)
 	for await (const value of ason.parseStream(stream)) {
 		if (signal?.aborted) break
 		yield value

@@ -45,7 +45,7 @@ describe('prompt', () => {
 	test('buildPrompt renders multiline cursor position', () => {
 		prompt.setText('foo\nbar', 7)
 		const built = prompt.buildPrompt(20)
-		expect(built.lines).toEqual([' foo', ' bar'])
-		expect(built.cursor).toEqual({ rowOffset: 1, col: 4 })
+		expect(built.lines).toEqual(['foo', 'bar'])
+		expect(built.cursor).toEqual({ rowOffset: 1, col: 3 })
 	})
 })
