@@ -206,6 +206,9 @@ function renderStatusLine(lines: string[]): void {
 	const parts: string[] = []
 
 	if (tab) {
+		// 0. Session ID
+		parts.push(tab.sessionId)
+
 		// 1. Cumulative token count (input + output)
 		const totalTokens = tab.usage.input + tab.usage.output
 		if (totalTokens > 0) parts.push(models.formatTokenCount(totalTokens) + ' tok')
