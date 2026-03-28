@@ -13,6 +13,19 @@ import { sessions } from '../server/sessions.ts'
 import { blob } from './blob.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
 
+// Format an ISO timestamp as local "HH:MM" for injecting into user messages.
+// Lets the model reason about elapsed time without reading history files.
+function formatLocalTime(ts?: string): string | null {
+	if (!ts) return null
+	try {
+		const d = new Date(ts)
+		if (isNaN(d.getTime())) return null
+		return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+	} catch {
+		return null
+	}
+}
+
 const apiConfig = {
 	// Max chars for tool result content before truncation
 	maxToolOutput: 50_000,
@@ -110,15 +123,19 @@ function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[]): Me
 
 // Build content for a user message, prepending any pending injected infos.
 function buildUserContent(sessionId: string, entry: HistoryEntry, pendingInfos: string[]): string | ContentBlock[] {
-	const infoPrefix = pendingInfos.length > 0 ? pendingInfos.join('\n') : ''
+	const time = formatLocalTime(entry.ts)
+	const prefix = [
+		...(time ? [`[${time}]`] : []),
+		...pendingInfos,
+	].join('\n')
 
 	if (typeof entry.content === 'string') {
-		return infoPrefix ? infoPrefix + '\n' + entry.content : entry.content
+		return prefix ? prefix + '\n' + entry.content : entry.content
 	}
 
 	if (Array.isArray(entry.content)) {
 		const blocks: ContentBlock[] = []
-		if (infoPrefix) blocks.push({ type: 'text', text: infoPrefix })
+		if (prefix) blocks.push({ type: 'text', text: prefix })
 
 		for (const b of entry.content) {
 			if (b.type === 'image' && b.blobId) {
@@ -139,7 +156,7 @@ function buildUserContent(sessionId: string, entry: HistoryEntry, pendingInfos: 
 		return blocks
 	}
 
-	return infoPrefix || ''
+	return prefix || ''
 }
 
 // Build content blocks for an assistant message.
@@ -313,4 +330,5 @@ export const apiMessages = {
 	toAnthropicMessages,
 	applyModelEvent,
 	findReplayStart,
+	formatLocalTime,
 }
