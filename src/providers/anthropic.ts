@@ -310,7 +310,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 			await Bun.write('/tmp/compare/hal.txt', prev + `ERROR BODY: ${text}\n\n`)
 		} catch {}
 		const retryAfterMs = providerUtils.parseRetryDelay(res, text)
-		yield { type: 'error', message: `Anthropic API ${res.status}`, status: res.status, body: text, retryAfterMs }
+		yield { type: 'error', message: `Anthropic API ${res.status}`, status: res.status, body: text, endpoint: url, retryAfterMs }
 		yield { type: 'done' }
 		return
 	}

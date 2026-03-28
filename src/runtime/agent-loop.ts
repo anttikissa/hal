@@ -249,10 +249,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 							// Show the full error body so the user sees the actual API response
 							const header = status ? `${status}:` : 'Error:'
+							const endpoint = event.endpoint ? ` (${event.endpoint})` : ''
 							const body = event.body ?? event.message ?? 'Unknown error'
 							emitEvent(sessionId, {
 								type: 'response',
-								text: `${header}\n${formatErrorBody(body)}`,
+								text: `${header}${endpoint}\n${formatErrorBody(body)}`,
 								isError: true,
 							})
 							// Check if we should retry

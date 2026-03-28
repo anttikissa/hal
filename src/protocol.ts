@@ -75,6 +75,7 @@ export interface ProviderStreamEvent {
 	message?: string
 	status?: number
 	body?: string
+	endpoint?: string // the URL the request was sent to
 	retryAfterMs?: number
 	// done fields
 	usage?: { input: number; output: number }
