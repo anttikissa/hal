@@ -209,12 +209,16 @@ function renderStatusLine(lines: string[]): void {
 		// 0. Session ID
 		parts.push(tab.sessionId)
 
-		// 1. Cumulative token count (input + output)
+		// 1. Model name
+		const modelId = tab.model || client.state.model || models.defaultModel()
+		const modelDisplay = models.displayModel(modelId)
+		if (modelDisplay) parts.push(modelDisplay)
+
+		// 2. Cumulative token count (input + output)
 		const totalTokens = tab.usage.input + tab.usage.output
 		if (totalTokens > 0) parts.push(models.formatTokenCount(totalTokens) + ' tok')
 
-		// 2. Cost (API key) or "(sub)" (OAuth token)
-		const modelId = tab.model || client.state.model || models.defaultModel()
+		// 3. Cost (API key) or "(sub)" (OAuth token)
 		const provider = models.providerName(modelId)
 		if (auth.isApiKey(provider)) {
 			const cost = models.formatCost(modelId, tab.usage)
@@ -223,7 +227,7 @@ function renderStatusLine(lines: string[]): void {
 			parts.push('(sub)')
 		}
 
-		// 3. Context usage: "25.4k/200k (13%)"
+		// 4. Context usage: "25.4k/200k (13%)"
 		if (tab.contextMax > 0) {
 			const pct = Math.round((tab.contextUsed / tab.contextMax) * 100)
 			const color = contextColor(pct)
@@ -233,11 +237,11 @@ function renderStatusLine(lines: string[]): void {
 			)
 		}
 
-		// 4. Working directory, shortened
+		// 5. Working directory, shortened
 		const cwd = shortenPath(tab.cwd)
 		if (cwd) parts.push(cwd)
 
-		// 5. Git branch (omit if "main")
+		// 6. Git branch (omit if "main")
 		if (tab.cwd) {
 			const branch = git.currentBranch(tab.cwd)
 			if (branch && branch !== 'main') parts.push(branch)

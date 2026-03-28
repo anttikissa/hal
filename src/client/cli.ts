@@ -79,6 +79,36 @@ function cleanupTerminal(): void {
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 }
 
+let suspended = false
+
+// Suspend the process (ctrl-z). Restores terminal to normal state, then
+// sends SIGSTOP to the process group (or just this pid as fallback).
+// The shell will show its prompt. `fg` resumes us and triggers SIGCONT.
+function suspend(): void {
+	suspended = true
+	process.stdout.write(`${useKitty ? KITTY_OFF : ''}\x1b[?25h`)
+	// process.kill(0, ...) sends to the entire process group — this is
+	// the standard way for a foreground job to suspend itself.
+	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
+}
+
+// Called when the shell resumes us with `fg`. Re-initialize terminal state.
+function onSigcont(): void {
+	if (!suspended) return
+	suspended = false
+	if (process.stdin.isTTY) {
+		// Toggle raw mode off/on to reset the tty driver
+		process.stdin.setRawMode(false)
+		process.stdin.setRawMode(true)
+		process.stdin.setEncoding('utf8')
+		process.stdin.resume()
+	}
+	if (useKitty) process.stdout.write(KITTY_ON)
+	process.stdout.write(BRACKETED_PASTE_ON)
+	setTabStops(process.stdout.columns || 80)
+	draw(true)
+}
+
 function submit(): void {
 	const text = prompt.text().trim()
 	if (!text) return
@@ -199,6 +229,11 @@ function handleAppKey(k: KeyEvent): boolean {
 		process.stdout.write('\r\n')
 		process.exit(0)
 	}
+	// Ctrl-Z: suspend (SIGSTOP to process group, like a normal unix program)
+	if (k.key === 'z' && k.ctrl) {
+		suspend()
+		return true
+	}
 	// Ctrl-L: force redraw
 	if (k.key === 'l' && k.ctrl) {
 		draw(true)
@@ -271,6 +306,7 @@ function startCli(signal: AbortSignal): void {
 	// Safety net: if we exit without hitting an explicit cleanup path
 	// (e.g. SIGTERM, uncaught exception), this still restores the terminal.
 	process.on('exit', cleanupTerminal)
+	process.on('SIGCONT', onSigcont)
 
 	// Start the 500ms blink timer for tab status indicators.
 	// Triggers a repaint on each phase change so busy dots blink.

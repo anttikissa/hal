@@ -38,6 +38,7 @@ const HINTS: Record<HelpState, Hint[]> = {
 		{ text: 'ctrl-f fork', keys: ['ctrl-f'] },
 		{ text: '/ commands', keys: ['/'] },
 		{ text: 'ctrl-c quit', keys: ['ctrl-c'] },
+		{ text: 'ctrl-z suspend', keys: ['ctrl-z'] },
 	],
 	'idle-text': [
 		{ text: 'enter send', keys: ['enter'] },
