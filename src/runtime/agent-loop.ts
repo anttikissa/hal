@@ -151,6 +151,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	const modelId = slashIdx >= 0 ? model.slice(slashIdx + 1) : model
 	const provider = await getProvider(providerName)
 
+	// Abort any existing generation for this session. This prevents two
+	// concurrent generations on the same session (race between client
+	// sending 'prompt' and receiving the 'status: busy' event).
+	const existing = state.activeRequests.get(sessionId)
+	if (existing) existing.abort()
+
 	// Register abort controller so external code can abort us
 	const ac = new AbortController()
 	state.activeRequests.set(sessionId, ac)
