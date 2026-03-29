@@ -133,13 +133,14 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 		break
 	}
 
-	return { char: ' ', color: '', blinks: false }
+	return { char: '', color: '', blinks: false }
 }
 
 // Render the 1-char indicator, respecting blink phase.
+// Returns empty string when there's nothing to show (idle tab, no errors).
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = tabIndicator(tab)
-	if (ind.char === ' ') return ' '
+	if (!ind.char) return ''
 	if (ind.blinks && !cursor.isVisible()) return ' '
 	return `${ind.color}${ind.char}${baseColor}`
 }
@@ -151,11 +152,19 @@ function renderTabBar(lines: string[]): void {
 	const tabs = client.state.tabs
 	const active = client.state.activeTab
 
+	// Helper: build the inner part of a tab label.
+	// ind is '' (idle), ' ' (blink-off), or colored char (blink-on).
+	// When there's a name, ind (or a space if idle) separates number and name.
+	function inner(num: number, ind: string, name?: string): string {
+		if (name) return `${num}${ind || ' '}${name}`
+		return `${num}${ind}`
+	}
+
 	const named = tabs.map((tab, i) => {
 		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
 		return i === active
-			? `${BRIGHT_WHITE}[${i + 1}${ind}${tab.name}]${RESET}`
-			: `${DIM} ${i + 1}${ind}${tab.name} ${RESET}`
+			? `${BRIGHT_WHITE}[${inner(i + 1, ind, tab.name)}]${RESET}`
+			: `${DIM} ${inner(i + 1, ind, tab.name)} ${RESET}`
 	})
 	if (visLen(named.join('')) <= cols) {
 		lines.push(named.join(''))
@@ -165,8 +174,8 @@ function renderTabBar(lines: string[]): void {
 	const padded = tabs.map((tab, i) => {
 		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
 		return i === active
-			? `${BRIGHT_WHITE}[${i + 1}${ind}]${RESET}`
-			: `${DIM} ${i + 1}${ind} ${RESET}`
+			? `${BRIGHT_WHITE}[${inner(i + 1, ind)}]${RESET}`
+			: `${DIM} ${inner(i + 1, ind)} ${RESET}`
 	})
 	if (visLen(padded.join('')) <= cols) {
 		lines.push(padded.join(''))
@@ -176,8 +185,8 @@ function renderTabBar(lines: string[]): void {
 	const terse = tabs.map((tab, i) => {
 		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
 		return i === active
-			? `${BRIGHT_WHITE}[${i + 1}${ind}]${RESET}`
-			: `${DIM}${i + 1}${ind}${RESET}`
+			? `${BRIGHT_WHITE}[${inner(i + 1, ind)}]${RESET}`
+			: `${DIM}${inner(i + 1, ind)}${RESET}`
 	})
 	const terseStr = terse.join(' ')
 	lines.push(visLen(terseStr) > cols ? clipVisual(terseStr, cols) : terseStr)
