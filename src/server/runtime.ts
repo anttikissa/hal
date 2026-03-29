@@ -19,6 +19,7 @@ import type { SessionState } from '../runtime/commands.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
+import { attachments } from '../session/attachments.ts'
 
 // ── Session state ──
 
@@ -161,12 +162,15 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 		sessionId: session.id,
 	})
 
-	// Save user prompt to history (skip for continuations)
+	// Resolve [file.png] / [file.txt] attachment references in user text.
+	// Images get base64-encoded and stored as blobs; history saves lightweight
+	// blob refs (logContent) so the ASONL file stays small.
 	if (text) {
+		const resolved = await attachments.resolve(session.id, text)
 		await sessionStore.appendHistory(session.id, [
 			{
 				role: 'user',
-				content: text,
+				content: resolved.logContent,
 				ts: new Date().toISOString(),
 			},
 		])
