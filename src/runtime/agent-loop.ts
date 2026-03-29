@@ -398,6 +398,14 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			}
 			await sessions.appendHistory(sessionId, [historyEntry])
 
+			// Emit response event for intermediate text so the client can
+			// create a proper block and clear streaming buffers. Without
+			// this, text from successive iterations concatenates in the
+			// streaming buffer (e.g. "controls.Now" with no separator).
+			if (assistantText) {
+				emitEvent(sessionId, { type: 'response', text: assistantText })
+			}
+
 			// Execute tools (with concurrency limit)
 			await ctx.onStatus?.(true, `running ${toolCalls.length} tool(s)...`)
 			const results = await executeToolsConcurrently(toolCalls, loopSignal, ctx.cwd, sessionId)
