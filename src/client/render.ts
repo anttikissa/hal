@@ -215,9 +215,9 @@ function renderStatusLine(lines: string[]): void {
 	const parts: string[] = []
 
 	if (tab) {
-		// 0. Session ID
+		// 0. Session ID + server/client role
 		parts.push(tab.sessionId)
-
+		if (client.state.role === 'client') parts.push('client')
 		// 1. Model name
 		const modelId = tab.model || client.state.model || models.defaultModel()
 		const modelDisplay = models.displayModel(modelId)
