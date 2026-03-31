@@ -218,6 +218,37 @@ export function clipVisual(s: string, max: number): string {
 	return s.slice(0, cut) + '…'
 }
 
+/** Hard-wrap a string at exact column boundaries. ANSI-aware.
+ *  Unlike wordWrap, doesn't try to break at spaces — just cuts at the column limit.
+ *  Used for code blocks where breaking at word boundaries would be worse than mid-token. */
+export function hardWrap(s: string, width: number): string[] {
+	if (width <= 0) return [s]
+	if (visLen(s) <= width) return [s]
+	const out: string[] = []
+	let vis = 0, lineStart = 0, esc = false, osc = false
+	for (let i = 0; i < s.length; ) {
+		const cp = s.codePointAt(i)!
+		const cl = cp > 0xffff ? 2 : 1
+		if (cp === 0x1b) { esc = true; i += cl; continue }
+		if (esc) {
+			if (cp === 0x5d) { osc = true; esc = false; i += cl; continue }
+			if (cp === 0x6d) esc = false
+			i += cl; continue
+		}
+		if (osc) { if (cp === 0x07) osc = false; i += cl; continue }
+		const w = charWidth(cp)
+		if (vis + w > width) {
+			out.push(s.slice(lineStart, i))
+			lineStart = i
+			vis = 0
+		}
+		vis += w
+		i += cl
+	}
+	if (lineStart < s.length) out.push(s.slice(lineStart))
+	return out
+}
+
 // ── Style markers ────────────────────────────────────────────────────────────
 // PUA chars used as lightweight placeholders for ANSI style attributes.
 // Markdown rendering (md.ts) emits these instead of raw ANSI so that
