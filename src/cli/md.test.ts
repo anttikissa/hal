@@ -1,7 +1,8 @@
-import { test, expect } from 'bun:test'
+import { test, expect, describe } from 'bun:test'
 import { md } from './md.ts'
 import {
 	visLen,
+	hardWrap,
 	resolveMarkers,
 	M_BOLD,
 	M_BOLD_OFF,
@@ -247,4 +248,28 @@ test('resolveMarkers: style split across lines — re-opens and closes', () => {
 test('resolveMarkers: no markers — passes through unchanged', () => {
 	const lines = ['plain text', '\x1b[33malready ansi\x1b[0m']
 	expect(resolveMarkers(lines)).toEqual(lines)
+})
+
+describe('hardWrap', () => {
+	test('short line unchanged', () => {
+		expect(hardWrap('hello', 10)).toEqual(['hello'])
+	})
+
+	test('breaks at exact column boundary', () => {
+		expect(hardWrap('abcdefghij', 5)).toEqual(['abcde', 'fghij'])
+	})
+
+	test('handles remainder', () => {
+		expect(hardWrap('abcdefgh', 5)).toEqual(['abcde', 'fgh'])
+	})
+
+	test('preserves ANSI escapes', () => {
+		const s = '\x1b[31mred text here\x1b[0m'
+		const lines = hardWrap(s, 8)
+		// "red text" = 8 cols, " here" = 5 cols
+		expect(lines.length).toBe(2)
+		// ANSI escapes don't count toward column width
+		expect(visLen(lines[0]!)).toBe(8)
+		expect(visLen(lines[1]!)).toBe(5)
+	})
 })

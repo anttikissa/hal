@@ -301,4 +301,4 @@ export function resolveMarkers(lines: string[]): string[] {
 	})
 }
 
-export const strings = { charWidth, visLen, wordWrap, clipVisual, resolveMarkers, expandTabs }
+export const strings = { charWidth, visLen, wordWrap, hardWrap, clipVisual, resolveMarkers, expandTabs }

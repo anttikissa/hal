@@ -5,7 +5,7 @@
 //   thinking → tool₁ → tool₂ → assistant text
 // The split happens in historyToBlocks(). Rendering is in renderBlock().
 
-import { visLen, wordWrap, clipVisual, resolveMarkers, expandTabs } from '../utils/strings.ts'
+import { visLen, wordWrap, hardWrap, clipVisual, resolveMarkers, expandTabs } from '../utils/strings.ts'
 import { md } from './md.ts'
 import { colors } from './colors.ts'
 import { ason } from '../utils/ason.ts'
@@ -513,16 +513,13 @@ function blockContent(block: Block, cols: number): string[] {
 		for (const span of md.mdSpans(block.text)) {
 			if (span.type === 'code') {
 				for (const raw of span.lines) {
-					// Emit real \t so tabs are copyable. visLen can't measure
-					// tabs (charWidth returns 0), so we expand only for the
-					// width check. The actual line keeps raw tabs — HTS tab
-					// stops (set on startup) control their display width.
-					const measured = visLen(expandTabs(raw, blockConfig.tabWidth))
-					const styled =
-						measured > cols
-							? `${indent}${DIM}${clipVisual(expandTabs(raw, blockConfig.tabWidth), cols)}${DIM_OFF}`
-							: `${indent}${DIM}${raw}${DIM_OFF}`
-					lines.push(styled)
+					// Expand tabs for width measurement and wrapping (charWidth
+					// returns 0 for \t). Hard-wrap at column boundary since
+					// word-wrap would mangle code.
+					const expanded = expandTabs(raw, blockConfig.tabWidth)
+					for (const wl of hardWrap(expanded, cols)) {
+						lines.push(`${indent}${DIM}${wl}${DIM_OFF}`)
+					}
 				}
 			} else if (span.type === 'table') {
 				for (const l of md.mdTable(span.lines, cw)) lines.push(`${indent}${l}`)
