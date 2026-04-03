@@ -13,7 +13,8 @@ import './config.ts' // load config.ason overrides, watch for changes
 ensureStateDir()
 perf.mark('State directories exist')
 
-let isHost = await ipc.claimHost()
+ipc.cleanupStaleLock()
+let isHost = ipc.claimHost()
 const lock = ipc.readHostLock()
 let serverPid = isHost ? process.pid : (lock?.pid ?? null)
 perf.mark(`Host status established (I am ${isHost ? 'host' : 'client'}, server pid ${serverPid})`)
@@ -33,7 +34,10 @@ if (isHost) {
 
 const ac = new AbortController()
 
+let cleaned = false
 function cleanup() {
+	if (cleaned) return
+	cleaned = true
 	ac.abort()
 	if (isHost) {
 		ipc.appendEvent({ type: 'host-released' })
@@ -53,11 +57,11 @@ if (isHost) {
 } else {
 	let promoting = false
 
-	async function tryPromote() {
+	function tryPromote() {
 		if (promoting || isHost) return
 		promoting = true
 		try {
-			if (await ipc.promote()) {
+			if (ipc.promote()) {
 				isHost = true
 				serverPid = process.pid
 				client.state.role = 'server'
@@ -72,16 +76,27 @@ if (isHost) {
 	void (async () => {
 		for await (const event of ipc.tailEvents(ac.signal)) {
 			if (event.type === 'host-released') tryPromote()
+			// When another client promotes, update our serverPid so the
+			// poll timer doesn't treat the new server as dead.
+			if (event.type === 'promote' && event.pid !== process.pid) {
+				serverPid = event.pid
+			}
 		}
 	})()
 
 	// Slow fallback: poll for crash (server dies without sending host-released).
 	// isPidAlive uses signal 0 to check without killing — see is-pid-alive.ts.
+	// We re-read the lock on each poll to get the CURRENT holder's PID,
+	// not the stale one from startup — another client may have already promoted.
 	const pollTimer = setInterval(() => {
 		if (isHost || promoting) return
-		if (serverPid !== null && !isPidAlive(serverPid)) {
-			log.info('Server pid died, promoting', { serverPid })
-			serverPid = null
+		const lock = ipc.readHostLock()
+		if (!lock) return // no lock file → either no server or promotion in progress
+		if (!isPidAlive(lock.pid)) {
+			log.info('Server pid died, promoting', { pid: lock.pid })
+			// Server crashed without emitting host-released — stale lock remains.
+			// Remove it so promote()'s open('wx') can succeed.
+			ipc.clearStaleLock()
 			tryPromote()
 		}
 	}, 1000)
