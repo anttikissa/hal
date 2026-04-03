@@ -70,6 +70,22 @@ function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[]): Me
 	const sliced = entries.slice(start)
 	const out: Message[] = []
 
+	// If replay started after a compact entry with a summary, inject it
+	// as a user+assistant pair so the model has context about prior conversation.
+	if (start > 0) {
+		const compactEntry = entries[start - 1]
+		if (compactEntry?.type === 'compact' && compactEntry.summary) {
+			out.push({
+				role: 'user',
+				content: `<context>\nHere is a summary of the conversation so far:\n${compactEntry.summary}\n</context>\n\nPlease continue from where we left off.`,
+			})
+			out.push({
+				role: 'assistant',
+				content: 'Understood. I have the context from our previous conversation and I\'m ready to continue.',
+			})
+		}
+	}
+
 	let currentModel: string | undefined
 	const totalUserTurns = sliced.filter((m) => m.role === 'user').length
 	let userTurnsSeen = 0
