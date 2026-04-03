@@ -215,9 +215,11 @@ function renderStatusLine(lines: string[]): void {
 	const parts: string[] = []
 
 	if (tab) {
-		// 0. Session ID + server/client role
+		// 0. Session ID + process identity. Show both our own PID and the
+		// PID currently written to host.lock so split-brain is visible.
 		parts.push(tab.sessionId)
-		parts.push(client.state.role)
+		parts.push(`${client.state.role}:${client.state.pid}`)
+		if (client.state.hostPid != null) parts.push(`lock:${client.state.hostPid}`)
 		// 1. Model name
 		const modelId = tab.model || client.state.model || models.defaultModel()
 		const modelDisplay = models.displayModel(modelId)

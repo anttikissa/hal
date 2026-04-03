@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
+import { mkdtempSync, rmSync, readFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
@@ -199,5 +199,34 @@ describe('host election', () => {
 		await newProc.exited
 
 		expect(out).toContain('I am host')
+	}, 10_000)
+
+	test('old host exits when another pid takes over the lock', async () => {
+		const env = halEnv()
+		const oldHost = spawnHal(env)
+		await Bun.sleep(300)
+
+		const firstPid = lockPid()
+		expect(firstPid).not.toBeNull()
+
+		// Simulate the failure mode directly: an old host is still alive, but the
+		// lock disappears and a new process becomes host. The old host must fence
+		// itself off instead of continuing to answer prompts.
+		unlinkSync(join(tmpDir, 'ipc/host.lock'))
+		const newHost = spawnHal(env)
+		await Bun.sleep(400)
+
+		const secondPid = lockPid()
+		expect(secondPid).not.toBeNull()
+		expect(secondPid).not.toBe(firstPid)
+
+		const oldExit = await Promise.race([
+			oldHost.exited,
+			Bun.sleep(1500).then(() => 'timeout'),
+		])
+		expect(oldExit).not.toBe('timeout')
+
+		sendCtrlC(newHost)
+		await newHost.exited
 	}, 10_000)
 })

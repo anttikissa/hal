@@ -33,11 +33,41 @@ if (isHost) {
 }
 
 const ac = new AbortController()
+let hostFenceTimer: ReturnType<typeof setInterval> | null = null
+
+function stopHostFence(): void {
+	if (!hostFenceTimer) return
+	clearInterval(hostFenceTimer)
+	hostFenceTimer = null
+}
+
+// Self-fencing: if another PID owns host.lock, this process must stop being
+// server immediately. Otherwise two runtimes will read the same commands file
+// and both answer the same prompt.
+function loseHostRole(lockPid: number): void {
+	if (!isHost) return
+	isHost = false
+	serverPid = lockPid
+	client.state.role = 'client'
+	stopHostFence()
+	log.info('Lost host lock, exiting', { pid: process.pid, lockPid })
+	process.exit(0)
+}
+
+function startHostFence(): void {
+	stopHostFence()
+	hostFenceTimer = setInterval(() => {
+		const lock = ipc.readHostLock()
+		if (!lock || lock.pid === process.pid) return
+		loseHostRole(lock.pid)
+	}, 100)
+}
 
 let cleaned = false
 function cleanup() {
 	if (cleaned) return
 	cleaned = true
+	stopHostFence()
 	ac.abort()
 	if (isHost) {
 		ipc.appendEvent({ type: 'host-released' })
@@ -54,6 +84,7 @@ process.on('SIGTERM', () => {
 
 if (isHost) {
 	runtime.startRuntime(ac.signal)
+	startHostFence()
 } else {
 	let promoting = false
 
@@ -67,6 +98,7 @@ if (isHost) {
 				client.state.role = 'server'
 				client.addEntry(`Promoted to server (pid ${process.pid})`)
 				runtime.startRuntime(ac.signal)
+				startHostFence()
 			}
 		} finally {
 			promoting = false

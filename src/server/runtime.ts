@@ -101,6 +101,10 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 /** Process a prompt: check for slash commands, then forward to agent loop.
  *  label is 'steering' when the user typed during active generation. */
 async function handlePrompt(session: Session, text: string, label?: 'steering'): Promise<void> {
+	// Self-fencing: if leadership moved to another PID, this process must not
+	// emit prompts or start generations. The real host will handle the command.
+	if (!ipc.ownsHostLock()) return
+
 	// Emit the prompt event so clients see what was typed
 	ipc.appendEvent({
 		type: 'prompt',
@@ -153,6 +157,11 @@ async function handlePrompt(session: Session, text: string, label?: 'steering'):
  *  If text is empty, this is a continuation (restart after crash) — don't save
  *  a new user prompt, just rebuild messages from existing history. */
 async function runGeneration(session: Session, text: string): Promise<void> {
+	// Double-check ownership right before we touch history or the model API.
+	// This closes the window where an old host is still alive but has already
+	// been replaced by a new lock holder.
+	if (!ipc.ownsHostLock()) return
+
 	const model = session.model ?? models.defaultModel()
 
 	// Build system prompt
@@ -312,6 +321,7 @@ function startRuntime(signal: AbortSignal): void {
 	// then we fix up history and restart any in-progress generations.
 	void (async () => {
 		for (const session of activeSessions) {
+			if (signal.aborted || activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
 			const entries = sessionStore.loadAllHistory(session.id)
 			if (entries.length === 0) continue
 
@@ -358,6 +368,9 @@ function startRuntime(signal: AbortSignal): void {
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || activeRuntimePid !== process.pid) break
+			// Self-fencing: the old host must stop reading shared commands as soon
+			// as leadership moves to another PID.
+			if (!ipc.ownsHostLock()) break
 			// Skip commands for sessions that don't exist
 			if (cmd.sessionId && !activeSessions.some((s) => s.id === cmd.sessionId)) continue
 			try {

@@ -126,6 +126,14 @@ function readAllEvents(): any[] {
 	return ason.parseAll(content) as any[]
 }
 
+// True only for the current lock holder. This is the self-fencing check:
+// any process that thinks it is host must keep checking the lock file and
+// stop serving if ownership moved to another PID.
+function ownsHostLock(pid = process.pid): boolean {
+	const lock = readHostLock()
+	return lock?.pid === pid
+}
+
 // Release the host lock, but ONLY if it belongs to us.
 // Without this check, a rogue process that incorrectly thinks it's host
 // (e.g. from a prior bug) could delete a legitimate new process's lock.
@@ -148,5 +156,6 @@ export const ipc = {
 	clearStaleLock,
 	readHostLock,
 	readAllEvents,
+	ownsHostLock,
 	releaseHost,
 }

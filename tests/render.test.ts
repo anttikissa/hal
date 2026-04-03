@@ -24,6 +24,8 @@ beforeEach(() => {
 	client.state.tabs.length = 0
 	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, streamingText: '', streamingThinking: '', usage: { input: 0, output: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
 	client.state.activeTab = 0
+	client.state.pid = 111
+	client.state.hostPid = 222
 	prompt.clear()
 })
 
@@ -52,5 +54,11 @@ describe('render', () => {
 		const clean = stripAnsi(output)
 		expect(clean).toContain('hello')
 		expect(clean).toContain('world')
+	})
+
+	test('status line shows local pid and lock pid', () => {
+		const clean = stripAnsi(captureOutput(() => render.draw()))
+		expect(clean).toContain('server:111')
+		expect(clean).toContain('lock:222')
 	})
 })

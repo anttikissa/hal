@@ -1,10 +1,19 @@
 import { watch, statSync, writeFileSync } from 'fs'
+import { dirname, basename } from 'path'
 
 /**
  * Tail a file from its current end, creating it if missing.
  * Uses fs.watch for notifications and Bun.file().slice() for reads.
  * cancel() the returned stream to stop watching.
  */
+function fileSize(path: string): number {
+	try {
+		return statSync(path).size
+	} catch {
+		return 0
+	}
+}
+
 function tailFile(path: string): ReadableStream<Uint8Array> {
 	let offset = 0
 	try {
@@ -16,7 +25,11 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 
 	let resolve: (() => void) | null = null
 	let pending = false // tracks events that fired while we were busy
-	const watcher = watch(path, () => {
+	// Watch the parent directory, not the file itself. Atomic rename/update
+	// patterns can replace the file inode, which makes direct file watches on
+	// macOS miss later appends. Directory watch keeps working across rewrites.
+	const watcher = watch(dirname(path), { persistent: false }, (_, filename) => {
+		if (filename && filename !== basename(path)) return
 		pending = true
 		resolve?.()
 	})
@@ -31,7 +44,7 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 				pending = false
 				if (stopped) break
 
-				const size = statSync(path).size
+				const size = fileSize(path)
 				// Truncation: reset to beginning
 				if (size < offset) offset = 0
 				if (size > offset) {
@@ -41,7 +54,7 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 					// If more data arrived while we were reading, loop
 					// immediately instead of waiting for another fs.watch event.
 					// This prevents missed events under burst writes.
-					const newSize = statSync(path).size
+					const newSize = fileSize(path)
 					if (newSize > offset) pending = true
 					return
 				}

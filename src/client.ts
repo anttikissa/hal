@@ -9,6 +9,7 @@ import { draft as draftModule } from './cli/draft.ts'
 import { perf } from './perf.ts'
 import { STATE_DIR } from './state.ts'
 import { ason } from './utils/ason.ts'
+import { liveFiles } from './utils/live-file.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,8 @@ const state = {
 	promptText: '',
 	promptCursor: 0,
 	role: 'server' as 'server' | 'client',
+	pid: process.pid,
+	hostPid: null as number | null,
 	// Persisted across restarts so the prompt stays at a stable position.
 	// Invalidated if terminal width changed since last save.
 	peak: 0,
@@ -519,7 +522,27 @@ async function loadInBackground(): Promise<void> {
 	perf.mark('All tabs loaded')
 }
 
+let hostLockState: { pid: number | null; createdAt: string } | null = null
+
+function syncHostPid(): void {
+	state.hostPid = hostLockState?.pid ?? null
+}
+
+function startWatchingHostLock(): void {
+	if (hostLockState) return
+	// Keep a live view of host.lock in memory so the status line can show both
+	// our own PID and the PID the cluster currently considers host.
+	hostLockState = liveFiles.liveFile(`${STATE_DIR}/ipc/host.lock`, { pid: null, createdAt: '' })
+	syncHostPid()
+	liveFiles.onChange(hostLockState, () => {
+		syncHostPid()
+		onChange(false)
+	})
+}
+
 function startClient(signal: AbortSignal): void {
+	startWatchingHostLock()
+
 	// Load persisted sessions directly from disk (fast, no IPC roundtrip).
 	loadPersistedSessions()
 
