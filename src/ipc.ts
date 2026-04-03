@@ -43,72 +43,32 @@ function tailCommands(signal?: AbortSignal) {
 	return tail(COMMANDS_FILE, signal)
 }
 
-// --- Host election ---
-
 interface HostLock {
 	pid: number
 	createdAt: string
 }
 
-// Remove a stale lock left by a crashed/killed process at startup.
-// Must be called before claimHost(). Checks if the current lock holder
-// is still alive; if not, deletes the lock so claimHost can proceed.
+// Delete a stale lock left by a dead process. Call this before claimHost().
+// It is safe to call from both startup and client promotion polling.
 function cleanupStaleLock(): void {
 	const lock = readHostLock()
-	if (!lock) return // no lock or unreadable
-	if (!isPidAlive(lock.pid)) {
-		try { unlinkSync(HOST_LOCK) } catch {}
-	}
+	if (!lock || isPidAlive(lock.pid)) return
+	try { unlinkSync(HOST_LOCK) } catch {}
 }
 
-// Atomically claim host at startup.
-// writeFileSync with 'wx' flag creates the file exclusively (O_CREAT | O_EXCL)
-// and writes PID data in a single syscall — no empty-file window.
-//
-// IMPORTANT: Stale lock cleanup must happen before this call
-// (via cleanupStaleLock), not inside it. If we tried to detect
-// and remove stale locks here, we'd race with the winner's async write:
-// process A creates the file but hasn't written PID yet → process B
-// reads an empty file, thinks it's stale, deletes it → dual host.
+// Atomic host claim. Startup and promotion use the exact same operation:
+// if the file already exists, someone else is host. If it doesn't, we win.
 function claimHost(): boolean {
 	ensureDir(IPC_DIR)
 	ensureFile(EVENTS_FILE)
 	ensureFile(COMMANDS_FILE)
 	try {
-		const data = ason.stringify({ pid: process.pid, createdAt: new Date().toISOString() })
-		writeFileSync(HOST_LOCK, data, { flag: 'wx' })
+		writeFileSync(HOST_LOCK, ason.stringify({ pid: process.pid, createdAt: new Date().toISOString() }), { flag: 'wx' })
 		return true
 	} catch (e: any) {
 		if (e?.code === 'EEXIST') return false
 		throw e
 	}
-}
-
-// Promotion: atomically create the lock file using open('wx').
-// This is the same mechanism as claimHost — only one process can
-// create the file, so exactly one wins. If EEXIST, another process
-// already won this election round; return false immediately.
-//
-// For crash recovery (stale lock from dead server), the caller must
-// call clearStaleLock() first, then promote(). The unlink + open('wx')
-// pair is safe because open('wx') is atomic — even if multiple processes
-// race to unlink, only one subsequent open('wx') can succeed.
-function promote(): boolean {
-	try {
-		const data = ason.stringify({ pid: process.pid, createdAt: new Date().toISOString() })
-		writeFileSync(HOST_LOCK, data, { flag: 'wx' })
-		appendEvent({ type: 'promote', pid: process.pid })
-		return true
-	} catch (e: any) {
-		if (e?.code === 'EEXIST') return false
-		throw e
-	}
-}
-
-// Remove a stale lock left by a crashed server (no host-released event).
-// Called from poll-based crash detection before attempting promote().
-function clearStaleLock(): void {
-	try { unlinkSync(HOST_LOCK) } catch {}
 }
 
 function readHostLock(): HostLock | null {
@@ -126,21 +86,17 @@ function readAllEvents(): any[] {
 	return ason.parseAll(content) as any[]
 }
 
-// True only for the current lock holder. This is the self-fencing check:
-// any process that thinks it is host must keep checking the lock file and
-// stop serving if ownership moved to another PID.
+// Self-fencing check. A server must keep verifying that host.lock still points
+// at its own PID. If not, it must stop serving immediately.
 function ownsHostLock(pid = process.pid): boolean {
-	const lock = readHostLock()
-	return lock?.pid === pid
+	return readHostLock()?.pid === pid
 }
 
-// Release the host lock, but ONLY if it belongs to us.
-// Without this check, a rogue process that incorrectly thinks it's host
-// (e.g. from a prior bug) could delete a legitimate new process's lock.
+// Release the host lock, but only if it still belongs to us. This prevents a
+// stale process from deleting a legitimate new host's lock file.
 function releaseHost(): void {
 	try {
-		const lock = readHostLock()
-		if (lock && lock.pid !== process.pid) return // not our lock — don't touch it
+		if (!ownsHostLock()) return
 		unlinkSync(HOST_LOCK)
 	} catch {}
 }
@@ -152,8 +108,6 @@ export const ipc = {
 	tailCommands,
 	cleanupStaleLock,
 	claimHost,
-	promote,
-	clearStaleLock,
 	readHostLock,
 	readAllEvents,
 	ownsHostLock,

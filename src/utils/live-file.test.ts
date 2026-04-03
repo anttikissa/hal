@@ -77,8 +77,9 @@ test('onChange fires on external file change', async () => {
 	const tmp = path + '.tmp'
 	writeFileSync(tmp, ason.stringify({ v: 99 }) + '\n')
 	renameSync(tmp, path)
-	// Wait for debounce (50ms) + fs.watch latency on macOS
-	await Bun.sleep(500)
+	// Wait for debounce (50ms) + fs.watch latency on macOS. Directory watch
+	// notifications can occasionally be slow under load, so give it a full second.
+	await Bun.sleep(1000)
 
 	expect(called).toBe(true)
 	expect(data.v).toBe(99)
