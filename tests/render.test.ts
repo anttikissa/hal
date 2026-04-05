@@ -22,7 +22,7 @@ function captureOutput(fn: () => void): string {
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
-	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, streamingText: '', streamingThinking: '', usage: { input: 0, output: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
+	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, historyVersion: 0, usage: { input: 0, output: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
 	client.state.activeTab = 0
 	client.state.pid = 111
 	client.state.hostPid = 222

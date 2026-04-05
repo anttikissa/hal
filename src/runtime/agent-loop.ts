@@ -6,6 +6,8 @@
 // Provider interface is defined in protocol.ts. Provider implementations
 // are loaded lazily via providers/provider.ts.
 
+import { resolve } from 'path'
+import { homedir } from 'os'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import type { Provider, ProviderStreamEvent, Message, ToolDef } from '../protocol.ts'
@@ -90,6 +92,19 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 	emitEvent(sessionId, { type: 'info', text, level })
 }
 
+async function writeThinkingBlob(sessionId: string, blobId: string, thinkingText: string, thinkingSignature?: string): Promise<void> {
+	await blob.writeBlob(sessionId, blobId, {
+		thinking: thinkingText,
+		signature: thinkingSignature,
+	})
+}
+
+async function writeToolCallBlob(sessionId: string, blobId: string, name: string, input: any): Promise<void> {
+	const existing = blob.readBlob(sessionId, blobId) ?? {}
+	existing.call = { name, input }
+	await blob.writeBlob(sessionId, blobId, existing)
+}
+
 // ── Retry logic ──
 
 function computeRetryDelay(retryAfterMs: number | undefined, attempt: number): number {
@@ -125,6 +140,26 @@ function formatErrorBody(body: string): string {
 	} catch {
 		return body
 	}
+}
+
+// ── Tool call normalization ──
+// Strip redundant "cd $CWD && " prefix that models prepend to bash commands.
+// The tool already runs in the correct cwd, so this is pure noise.
+
+const HOME = homedir()
+
+function resolveTilde(p: string): string {
+	return p.startsWith('~/') ? HOME + p.slice(1) : p
+}
+
+function stripCdCwd(call: ToolCall, cwd: string): ToolCall {
+	if (call.name !== 'bash') return call
+	const cmd = String((call.input as any)?.command ?? '')
+	const m = cmd.match(/^cd\s+(\S+)\s*&&\s*/)
+	if (!m) return call
+	const target = resolve(resolveTilde(m[1]!))
+	if (target !== cwd) return call
+	return { ...call, input: { ...call.input, command: cmd.slice(m[0].length) } }
 }
 
 // ── Tool execution ──
@@ -201,6 +236,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			let assistantText = ''
 			let thinkingText = ''
 			let thinkingSignature = ''
+			let thinkingBlobId = ''
 			const toolCalls: ToolCall[] = []
 			let aborted = false
 			let shouldRetry = false
@@ -213,18 +249,26 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					}
 
 					switch (event.type) {
-						case 'thinking':
-							thinkingText += event.text ?? ''
-							emitEvent(sessionId, {
-								type: 'stream-delta',
-								text: event.text,
-								channel: 'thinking',
-							})
-							break
+					case 'thinking': {
+						if (!event.text) break
+						if (!thinkingBlobId) thinkingBlobId = blob.makeBlobId(sessionId)
+						thinkingText += event.text
+						await writeThinkingBlob(sessionId, thinkingBlobId, thinkingText, thinkingSignature || undefined)
+						emitEvent(sessionId, {
+							type: 'stream-delta',
+							text: event.text,
+							channel: 'thinking',
+							blobId: thinkingBlobId,
+						})
+						break
+					}
 
-						case 'thinking_signature':
-							thinkingSignature = event.signature ?? ''
-							break
+					case 'thinking_signature':
+						thinkingSignature = event.signature ?? ''
+						if (thinkingBlobId) {
+							await writeThinkingBlob(sessionId, thinkingBlobId, thinkingText, thinkingSignature || undefined)
+						}
+						break
 
 						case 'text':
 							assistantText += event.text ?? ''
@@ -235,20 +279,22 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							})
 							break
 
-						case 'tool_call':
-							toolCalls.push({
+						case 'tool_call': {
+							const tc = stripCdCwd({
 								id: event.id!,
 								name: event.name!,
 								input: event.input,
-							})
+							}, ctx.cwd)
+							toolCalls.push(tc)
 							emitEvent(sessionId, {
 								type: 'tool-call',
-								toolId: event.id,
-								name: event.name,
-								input: event.input,
+								toolId: tc.id,
+								name: tc.name,
+								input: tc.input,
 								phase: 'running',
 							})
 							break
+						}
 
 						case 'error': {
 							const status = event.status
@@ -329,7 +375,9 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			// No tool calls — we're done. Emit a response event so the client
 			// can display the assistant's text (client listens for 'response' events).
 			if (toolCalls.length === 0) {
-				// Save assistant response to history
+				// Save assistant response to history.
+				// Reuse the streaming blob when we already created one so the
+				// history points at the same on-disk data the client saw live.
 				if (assistantText || thinkingText) {
 					const historyEntry: any = {
 						role: 'assistant',
@@ -337,11 +385,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					}
 					if (assistantText) historyEntry.text = assistantText
 					if (thinkingText && thinkingSignature) {
-						const blobId = blob.makeBlobId(sessionId)
-						await blob.writeBlob(sessionId, blobId, {
-							thinking: thinkingText,
-							signature: thinkingSignature,
-						})
+						const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
+						await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature)
 						historyEntry.thinkingBlobId = blobId
 					}
 					if (totalUsage.input > 0) historyEntry.usage = totalUsage
@@ -384,8 +429,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			}
 			if (assistantText) historyEntry.text = assistantText
 			if (thinkingText && thinkingSignature) {
-				const blobId = blob.makeBlobId(sessionId)
-				await blob.writeBlob(sessionId, blobId, { thinking: thinkingText, signature: thinkingSignature })
+				const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
+				await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature)
 				historyEntry.thinkingBlobId = blobId
 			}
 			// Save each tool call input to a blob
@@ -393,7 +438,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			for (const tc of toolCalls) {
 				const blobId = blob.makeBlobId(sessionId)
 				toolBlobMap.set(tc.id, blobId)
-				await blob.writeBlob(sessionId, blobId, { call: { name: tc.name, input: tc.input } })
+				await writeToolCallBlob(sessionId, blobId, tc.name, tc.input)
 				historyEntry.tools.push({ id: tc.id, name: tc.name, blobId })
 			}
 			await sessions.appendHistory(sessionId, [historyEntry])

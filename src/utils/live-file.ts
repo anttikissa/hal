@@ -25,6 +25,10 @@ interface LiveState {
 	dirty: boolean
 	flushScheduled: boolean
 	callbacks: Array<() => void>
+	// Keep the watcher alive for as long as the proxy is reachable.
+	// If we drop this reference, Bun/Node may GC the fs.watch handle and
+	// external edits stop arriving intermittently.
+	watcher: ReturnType<typeof watch> | null
 	doFlush: () => void
 }
 
@@ -46,6 +50,7 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 		dirty: false,
 		flushScheduled: false,
 		callbacks: [],
+		watcher: null,
 		doFlush() {
 			if (!state.dirty) return
 			state.dirty = false
@@ -80,13 +85,21 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 			}, 100)
 		}
 		try {
-			watch(dirname(path), { persistent: false }, (_, filename) => {
-				if (filename && filename !== basename(path)) return
+			state.watcher = watch(dirname(path), { persistent: false }, () => {
 				if (ownWrite) return
 				if (debounce) clearTimeout(debounce)
 				debounce = setTimeout(() => {
 					try {
-						Object.assign(data, ason.parse(readFileSync(path, 'utf-8')) as any)
+						const next = ason.parse(readFileSync(path, 'utf-8')) as Record<string, any>
+						const before = ason.stringify(data)
+						const after = ason.stringify(next)
+						if (before === after) return
+						// Replace the object in place so existing proxies keep working,
+						// while also dropping keys removed from the file.
+						for (const key of Object.keys(data)) {
+							if (!(key in next)) delete data[key]
+						}
+						Object.assign(data, next)
 						for (const cb of state.callbacks) cb()
 					} catch {}
 				}, 50)
