@@ -375,6 +375,7 @@ function handleEvent(event: any): void {
 			// Update context window estimate
 			if (event.contextUsed != null) tab.contextUsed = event.contextUsed
 			if (event.contextMax != null) tab.contextMax = event.contextMax
+			onChange(false)
 		}
 	} else if (event.type === 'response') {
 		// Final response — clear streaming buffers and add the block

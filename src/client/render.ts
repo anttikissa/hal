@@ -215,27 +215,24 @@ function renderStatusLine(lines: string[]): void {
 	const parts: string[] = []
 
 	if (tab) {
-		// 0. Session ID + process identity. Show both our own PID and the
-		// PID currently written to host.lock so split-brain is visible.
+		// 0. Session ID + process identity.
 		parts.push(tab.sessionId)
 		parts.push(`${client.state.role}:${client.state.pid}`)
-		if (client.state.hostPid != null) parts.push(`lock:${client.state.hostPid}`)
-		// 1. Model name
+		// 1. Model name (with "(sub)" suffix if using OAuth token)
 		const modelId = tab.model || client.state.model || models.defaultModel()
 		const modelDisplay = models.displayModel(modelId)
-		if (modelDisplay) parts.push(modelDisplay)
+		const provider = models.providerName(modelId)
+		const isSub = !auth.isApiKey(provider)
+		if (modelDisplay) parts.push(isSub ? `${modelDisplay} (sub)` : modelDisplay)
 
 		// 2. Cumulative token count (input + output)
 		const totalTokens = tab.usage.input + tab.usage.output
 		if (totalTokens > 0) parts.push(models.formatTokenCount(totalTokens) + ' tok')
 
-		// 3. Cost (API key) or "(sub)" (OAuth token)
-		const provider = models.providerName(modelId)
-		if (auth.isApiKey(provider)) {
+		// 3. Cost (API key only — sub users already have the "(sub)" tag)
+		if (!isSub) {
 			const cost = models.formatCost(modelId, tab.usage)
 			if (cost) parts.push(cost)
-		} else {
-			parts.push('(sub)')
 		}
 
 		// 4. Context usage: "25.4k/200k (13%)"

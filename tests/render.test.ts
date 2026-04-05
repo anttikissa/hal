@@ -56,9 +56,9 @@ describe('render', () => {
 		expect(clean).toContain('world')
 	})
 
-	test('status line shows local pid and lock pid', () => {
+	test('status line shows local pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')
-		expect(clean).toContain('lock:222')
+		expect(clean).not.toContain('lock:')
 	})
 })
