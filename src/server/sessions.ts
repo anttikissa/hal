@@ -19,6 +19,7 @@ export interface SessionMeta {
 	topic?: string
 	lastPrompt?: string
 	model?: string
+	currentLog?: string
 }
 
 export interface HistoryEntry {
@@ -44,6 +45,14 @@ function ensureSessionDir(sessionId: string): void {
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
 }
 
+function historyLogName(sessionId: string): string {
+	return loadSessionMeta(sessionId)?.currentLog ?? 'history.asonl'
+}
+
+function historyLogPath(sessionId: string, logName?: string): string {
+	return `${sessionDir(sessionId)}/${logName ?? historyLogName(sessionId)}`
+}
+
 // ── Read operations ──
 
 // Load session metadata from session.ason
@@ -57,9 +66,9 @@ function loadSessionMeta(sessionId: string): SessionMeta | null {
 	}
 }
 
-// Load history entries from history.asonl
+// Load history entries from the session's current history log.
 function loadHistory(sessionId: string): HistoryEntry[] {
-	const path = `${sessionDir(sessionId)}/history.asonl`
+	const path = historyLogPath(sessionId)
 	if (!existsSync(path)) return []
 	try {
 		const content = readFileSync(path, 'utf-8')
@@ -140,15 +149,15 @@ function loadAllHistory(sessionId: string): HistoryEntry[] {
 async function createSession(id: string, meta: SessionMeta): Promise<void> {
 	ensureSessionDir(id)
 	const path = `${sessionDir(id)}/session.ason`
-	await writeFile(path, ason.stringify(meta) + '\n')
+	await writeFile(path, ason.stringify({ ...meta, currentLog: meta.currentLog ?? 'history.asonl' }) + '\n')
 }
 
-// Append one or more history entries to session's history.asonl.
+// Append one or more history entries to the session's current history log.
 // Each entry is serialized as a single-line ASON value (short mode).
 async function appendHistory(sessionId: string, entries: HistoryEntry[]): Promise<void> {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
-	const path = `${sessionDir(sessionId)}/history.asonl`
+	const path = historyLogPath(sessionId)
 	const lines = entries.map((e) => ason.stringify(e, 'short')).join('\n') + '\n'
 	await appendFile(path, lines)
 }
@@ -158,7 +167,7 @@ async function appendHistory(sessionId: string, entries: HistoryEntry[]): Promis
 function appendHistorySync(sessionId: string, entries: HistoryEntry[]): void {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
-	const path = `${sessionDir(sessionId)}/history.asonl`
+	const path = historyLogPath(sessionId)
 	const lines = entries.map((e) => ason.stringify(e, 'short')).join('\n') + '\n'
 	appendFileSync(path, lines)
 }
@@ -170,6 +179,26 @@ async function updateMeta(sessionId: string, updates: Partial<SessionMeta>): Pro
 	const merged = { ...existing, ...updates }
 	const path = `${sessionDir(sessionId)}/session.ason`
 	await writeFile(path, ason.stringify(merged) + '\n')
+}
+
+// Rotate to a fresh history log. Old logs stay on disk for manual inspection.
+async function rotateLog(sessionId: string): Promise<string> {
+	const meta = loadSessionMeta(sessionId)
+	if (!meta) throw new Error(`Session ${sessionId} not found`)
+
+	const currentLog = meta.currentLog ?? 'history.asonl'
+	const currentPath = historyLogPath(sessionId, currentLog)
+	if (!existsSync(currentPath)) return currentLog
+
+	let nextN = 2
+	if (currentLog !== 'history.asonl') {
+		const match = currentLog.match(/^history(\d+)\.asonl$/)
+		if (match) nextN = parseInt(match[1]!, 10) + 1
+	}
+
+	const nextLog = `history${nextN}.asonl`
+	await updateMeta(sessionId, { currentLog: nextLog })
+	return nextLog
 }
 
 // Fork a session: create a new session whose history starts with a forked_from
@@ -329,6 +358,7 @@ export const sessions = {
 	forkSession,
 	deleteSession,
 	saveSessionList,
+	rotateLog,
 	// Pruning
 	pruneSessions,
 	pruneConfig,

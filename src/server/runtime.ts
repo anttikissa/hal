@@ -20,7 +20,7 @@ import { agentLoop } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
-import { provider as providerLoader } from '../providers/provider.ts'
+import { replay } from '../session/replay.ts'
 
 // ── Session state ──
 
@@ -219,114 +219,34 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 }
 
 // ── Compaction ──
-// Summarize conversation history into a compact entry, freeing context window.
-// Uses a cheap model (Haiku) for the summarization call.
-
-const COMPACT_MODEL = 'anthropic/claude-haiku-4-5-20251001'
-
-const COMPACT_PROMPT = `Summarize this conversation concisely but thoroughly. Include:
-- What the user is working on (project, files, goals)
-- Key decisions made and their rationale
-- Current state: what's done, what's in progress, what's pending
-- Important code details (file paths, function names, patterns) needed to continue
-- Any errors encountered and how they were resolved
-
-Output ONLY the summary, no preamble. Use bullet points for clarity.`
 
 async function runCompact(session: Session): Promise<void> {
 	if (!ipc.ownsHostLock()) return
-
-	// Abort any active generation first
 	if (agentLoop.isActive(session.id)) {
-		agentLoop.abort(session.id)
-		await Bun.sleep(50)
-	}
-
-	const model = session.model ?? models.defaultModel()
-
-	// Build current messages to summarize
-	const messages = apiMessages.toAnthropicMessages(session.id)
-	if (messages.length === 0) {
-		emitInfo(session.id, 'Nothing to compact — conversation is empty.')
+		emitInfo(session.id, 'Session is busy')
 		return
 	}
 
-	emitInfo(session.id, 'Compacting conversation...')
-	ipc.appendEvent({
-		type: 'status',
-		sessionId: session.id,
-		busy: true,
-		activity: 'compacting...',
-		createdAt: new Date().toISOString(),
-	})
-
-	try {
-		// Use Haiku for summarization — fast and cheap.
-		// Fall back to session model if Haiku isn't available.
-		const compactModelId = COMPACT_MODEL
-		const slashIdx = compactModelId.indexOf('/')
-		const providerName = slashIdx >= 0 ? compactModelId.slice(0, slashIdx) : 'anthropic'
-		const modelId = slashIdx >= 0 ? compactModelId.slice(slashIdx + 1) : compactModelId
-		const prov = await providerLoader.getProvider(providerName)
-
-		// Ask the model to summarize the conversation.
-		// We send the full conversation as context with a summarization request.
-		const summaryMessages = [
-			...messages,
-			{ role: 'user' as const, content: COMPACT_PROMPT },
-		]
-
-		let summary = ''
-		const gen = prov.generate({
-			messages: summaryMessages,
-			model: modelId,
-			systemPrompt: 'You are a conversation summarizer. Be thorough but concise.',
-			tools: [],
-			sessionId: session.id,
-		})
-
-		for await (const event of gen) {
-			if (event.type === 'text') {
-				summary += event.text ?? ''
-			} else if (event.type === 'error') {
-				emitInfo(session.id, `Compact failed: ${event.message ?? 'unknown error'}`, 'error')
-				return
-			}
-		}
-
-		if (!summary.trim()) {
-			emitInfo(session.id, 'Compact failed: model returned empty summary.', 'error')
-			return
-		}
-
-		// Write the compact entry to history. Future toAnthropicMessages calls
-		// will find this entry and inject the summary as initial context.
-		await sessionStore.appendHistory(session.id, [{
-			type: 'compact',
-			summary: summary.trim(),
-			ts: new Date().toISOString(),
-		}])
-
-		// Report how much context was saved
-		const oldBytes = messages.reduce((sum, m) => {
-			if (typeof m.content === 'string') return sum + m.content.length
-			if (Array.isArray(m.content)) return sum + JSON.stringify(m.content).length
-			return sum
-		}, 0)
-		const newBytes = summary.length
-		const saved = Math.round((1 - newBytes / oldBytes) * 100)
-
-		emitInfo(session.id, `Compacted: ${messages.length} messages → summary (${saved}% reduction)`)
-	} catch (err: any) {
-		emitInfo(session.id, `Compact failed: ${err?.message ?? String(err)}`, 'error')
-	} finally {
-		ipc.appendEvent({
-			type: 'status',
-			sessionId: session.id,
-			busy: false,
-			createdAt: new Date().toISOString(),
-		})
+	const entries = sessionStore.loadHistory(session.id)
+	const userMsgs = entries.filter((entry) => entry.role === 'user')
+	if (userMsgs.length === 0) {
+		emitInfo(session.id, 'Nothing to compact')
+		return
 	}
+
+	const contextText = replay.buildCompactionContext(session.id, entries)
+	const oldLog = sessionStore.loadSessionMeta(session.id)?.currentLog ?? 'history.asonl'
+	const newLog = await sessionStore.rotateLog(session.id)
+	const forkEntry = entries[0]?.type === 'forked_from' ? [entries[0]] : []
+	const ts = new Date().toISOString()
+
+	await sessionStore.appendHistory(session.id, [
+		...forkEntry,
+		{ role: 'user', content: `[system] Session was manually compacted. Previous conversation: ${oldLog}`, ts },
+		{ role: 'user', content: contextText, ts },
+	])
+
+	emitInfo(session.id, `Context compacted (${userMsgs.length} user messages summarized, now writing to ${newLog})`)
 }
 
 // ── Command dispatch ──
@@ -371,8 +291,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 
 		case 'compact': {
 			if (!session) return
-			// Fire-and-forget like prompt handling — don't block command loop.
-			void runCompact(session)
+			await runCompact(session)
 			break
 		}
 
