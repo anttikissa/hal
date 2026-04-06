@@ -20,6 +20,8 @@ export interface SessionMeta {
 	lastPrompt?: string
 	model?: string
 	currentLog?: string
+	// Last known context window usage, persisted so it survives restarts
+	context?: { used: number; max: number }
 }
 
 export interface HistoryEntry {
