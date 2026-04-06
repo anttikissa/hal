@@ -25,8 +25,8 @@ function save() {
 const [provider, key] = process.argv.slice(2)
 if (provider && key) {
 	const name = provider.toLowerCase()
-	if (!['anthropic', 'openai'].includes(name)) {
-		console.error(`Unknown provider: ${name}. Use 'anthropic' or 'openai'.`)
+	if (!['anthropic', 'openai', 'serper'].includes(name)) {
+		console.error(`Unknown provider: ${name}. Use 'anthropic', 'openai', or 'serper'.`)
 		process.exit(1)
 	}
 	auth[name] = { ...auth[name], apiKey: key }
@@ -51,7 +51,13 @@ if (openaiKey?.trim()) {
 	console.log('  ✓ OpenAI key set')
 }
 
-if (anthropicKey?.trim() || openaiKey?.trim()) {
+const serperKey = prompt('Serper API key (serper.dev):')
+if (serperKey?.trim()) {
+	auth.serper = { ...auth.serper, apiKey: serperKey.trim() }
+	console.log('  ✓ Serper key set')
+}
+
+if (anthropicKey?.trim() || openaiKey?.trim() || serperKey?.trim()) {
 	save()
 } else {
 	console.log('\nNo keys entered.')

@@ -32,6 +32,7 @@ const ENV_KEYS: Record<string, string> = {
 	openrouter: 'OPENROUTER_API_KEY',
 	google: 'GOOGLE_API_KEY',
 	grok: 'GROK_API_KEY',
+	serper: 'SERPER_API_KEY',
 }
 
 /** Credential with its type so callers know how to authenticate. */

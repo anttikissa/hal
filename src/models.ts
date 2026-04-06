@@ -87,20 +87,70 @@ function displayModel(fullId: string | undefined): string {
 }
 
 // ── Context windows (tokens) ──
+// Fetched from models.dev on startup and cached in state/models.ason.
+// Falls back to hardcoded defaults if the file doesn't exist yet.
 
-const CONTEXT_WINDOWS: Record<string, number> = {
+import { readFileSync, writeFileSync } from 'fs'
+import { STATE_DIR, ensureDir } from './state.ts'
+import { ason } from './utils/ason.ts'
+
+const MODELS_FILE = `${STATE_DIR}/models.ason`
+const DEFAULT_CONTEXT = 200_000
+
+// Hardcoded fallbacks — used before first models.dev fetch completes
+const FALLBACK_WINDOWS: Record<string, number> = {
 	'anthropic/claude-opus-4-6': 200_000,
 	'anthropic/claude-sonnet-4-20250514': 200_000,
 	'anthropic/claude-haiku-4-5-20251001': 200_000,
-	'openai/gpt-5.4': 128_000,
+	'openai/gpt-5.4': 1_050_000,
 	'openai/gpt-5.3': 128_000,
 	'openai/gpt-5.3-codex': 128_000,
 	'google/gemini-2.5-flash': 1_000_000,
 	'google/gemini-2.5-pro': 1_000_000,
 }
 
+// Lazy-loaded context window map from models.dev (state/models.ason).
+// Keys are bare model IDs (without provider prefix), values are token counts.
+let _modelsDevCache: Record<string, number> | null = null
+
+function loadModelsDevCache(): Record<string, number> {
+	if (_modelsDevCache) return _modelsDevCache
+	try {
+		_modelsDevCache = ason.parse(readFileSync(MODELS_FILE, 'utf-8')) as Record<string, number>
+	} catch {
+		_modelsDevCache = {}
+	}
+	return _modelsDevCache
+}
+
+/** Fetch context windows from models.dev and save to state/models.ason.
+ *  Fire-and-forget on startup. The file persists across restarts. */
+async function refreshModels(): Promise<void> {
+	const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(10_000) })
+	const data = (await res.json()) as Record<string, { models?: Record<string, any> }>
+	const ctx: Record<string, number> = {}
+	for (const provider of Object.values(data)) {
+		for (const [id, model] of Object.entries(provider.models ?? {})) {
+			if (model.limit?.context) ctx[id] = model.limit.context
+		}
+	}
+	ensureDir(STATE_DIR)
+	writeFileSync(MODELS_FILE, ason.stringify(ctx) + '\n')
+	_modelsDevCache = ctx
+}
+
 function contextWindow(fullId: string): number {
-	return CONTEXT_WINDOWS[fullId] ?? 200_000
+	// 1. Check hardcoded fallbacks (full provider/model-id)
+	if (FALLBACK_WINDOWS[fullId]) return FALLBACK_WINDOWS[fullId]
+
+	// 2. Check models.dev cache (bare model ID, no provider prefix)
+	const bare = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+	const cached = loadModelsDevCache()
+	if (cached[bare]) return cached[bare]
+	// Also try exact full ID in case the cache uses it
+	if (cached[fullId]) return cached[fullId]
+
+	return DEFAULT_CONTEXT
 }
 
 // ── Pricing (USD per million tokens) ──
@@ -224,4 +274,5 @@ export const models = {
 	defaultModel,
 	listModels,
 	estimateTokens,
+	refreshModels,
 }

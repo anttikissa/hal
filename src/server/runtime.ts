@@ -341,6 +341,9 @@ function startRuntime(signal: AbortSignal): void {
 		void createSession()
 	}
 
+	// Refresh models.dev context window cache (fire-and-forget)
+	models.refreshModels().catch(() => {})
+
 	// Broadcast session list on next tick so client tail is ready
 	setTimeout(() => {
 		if (signal.aborted || activeRuntimePid !== process.pid) return
