@@ -24,8 +24,8 @@ const blockConfig = {
 
 export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number }
-	| { type: 'assistant'; text: string; model?: string; ts?: number }
-	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number }
+	| { type: 'assistant'; text: string; model?: string; ts?: number; streaming?: boolean }
+	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number; streaming?: boolean }
 	| {
 			type: 'tool'
 			name: string
@@ -249,6 +249,8 @@ function toolTitle(name: string, input?: any): string {
 			return 'Eval'
 		case 'grep':
 			return `Grep ${input.pattern ?? '?'} in ${input.path ?? '?'}`
+		case 'glob':
+			return `Glob ${input.pattern ?? '?'} in ${input.path ?? '.'}`
 		case 'ls':
 			return `Ls ${input.path ?? '.'}`
 		default:
@@ -461,7 +463,7 @@ function blockLabel(block: Block): string {
 	switch (block.type) {
 		case 'user': {
 			if (block.source && block.source !== 'user' && block.source !== 'system') {
-				return `Message from ${block.source}`
+				return `Inbox · ${block.source}`
 			}
 			if (block.status === 'steering') return 'You (steering)'
 			if (block.status === 'queued') return 'You (queued)'
