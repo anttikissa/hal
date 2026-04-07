@@ -17,6 +17,7 @@ import { provider as providerLoader } from '../providers/provider.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
+import { log } from '../utils/log.ts'
 // Import all tool modules so they self-register on load
 import '../tools/bash.ts'
 import '../tools/read.ts'
@@ -26,6 +27,8 @@ import '../tools/glob.ts'
 import '../tools/write.ts'
 import '../tools/eval.ts'
 import '../tools/send.ts'
+// web_search is handled as a server-side tool by the Anthropic provider
+// (type: 'web_search_20250305'). No client-side tool registration needed.
 
 // ── Configuration ──
 
@@ -190,7 +193,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	// concurrent generations on the same session (race between client
 	// sending 'prompt' and receiving the 'status: busy' event).
 	const existing = state.activeRequests.get(sessionId)
-	if (existing) existing.abort()
+	if (existing) {
+		log.info('Aborting existing generation (displaced by new one)', { sessionId })
+		existing.abort()
+	}
 
 	// Register abort controller so external code can abort us
 	const ac = new AbortController()
@@ -199,10 +205,14 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	// If caller passed a signal, propagate its abort to our controller
 	if (signal) {
 		if (signal.aborted) {
+			log.info('Agent loop skipped (signal already aborted)', { sessionId })
 			ac.abort()
 			return
 		}
-		signal.addEventListener('abort', () => ac.abort(), { once: true })
+		signal.addEventListener('abort', () => {
+			log.info('Agent loop abort via parent signal', { sessionId })
+			ac.abort()
+		}, { once: true })
 	}
 
 	const loopSignal = ac.signal
@@ -237,7 +247,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			let thinkingText = ''
 			let thinkingSignature = ''
 			let thinkingBlobId = ''
+			const toolBlobMap = new Map<string, string>()
 			const toolCalls: ToolCall[] = []
+			// Server-side tool blocks (e.g. web_search) — opaque, go into assistant content verbatim
+			const serverBlocks: any[] = []
 			let aborted = false
 			let shouldRetry = false
 
@@ -279,23 +292,41 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							})
 							break
 
-						case 'tool_call': {
-							const tc = stripCdCwd({
-								id: event.id!,
-								name: event.name!,
-								input: event.input,
-							}, ctx.cwd)
-							toolCalls.push(tc)
-							emitEvent(sessionId, {
-								type: 'tool-call',
-								toolId: tc.id,
-								name: tc.name,
-								input: tc.input,
-								phase: 'running',
-							})
+					case 'tool_call': {
+						const tc = stripCdCwd({
+							id: event.id!,
+							name: event.name!,
+							input: event.input,
+						}, ctx.cwd)
+						toolCalls.push(tc)
+						const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
+						toolBlobMap.set(tc.id, blobId)
+						await writeToolCallBlob(sessionId, blobId, tc.name, tc.input)
+						emitEvent(sessionId, {
+							type: 'tool-call',
+							toolId: tc.id,
+							name: tc.name,
+							input: tc.input,
+							blobId,
+							phase: 'running',
+						})
+						break
+					}
+
+						case 'server_tool': {
+							// Server-side tool blocks (web_search) — collect for assistant content
+							if (event.serverBlocks) {
+								serverBlocks.push(...event.serverBlocks)
+								// Show web search activity to the user
+								for (const sb of event.serverBlocks) {
+									if (sb.type === 'server_tool_use' && sb.name === 'web_search') {
+										const query = sb.input?.query ?? ''
+										emitInfo(sessionId, `[web_search] "${query}"`)
+									}
+								}
+							}
 							break
 						}
-
 						case 'error': {
 							const status = event.status
 
@@ -346,9 +377,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			} catch (err: any) {
 				// Provider throws on abort (AbortError)
 				if (loopSignal.aborted) {
+					log.info('Agent loop aborted', { sessionId, error: err?.message, stack: err?.stack?.split('\n').slice(0, 5).join(' | ') })
 					aborted = true
 				} else {
 					const message = err?.message ? String(err.message) : String(err)
+					log.error('Agent loop error', { sessionId, message })
 					emitInfo(sessionId, message, 'error')
 					emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
 					return
@@ -366,6 +399,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					contextUsed: est.used,
 					contextMax: est.max,
 				})
+				// Persist context so it survives restarts
+				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 				return
 			}
 
@@ -404,6 +439,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					contextUsed: est.used,
 					contextMax: est.max,
 				})
+				// Persist context so it survives restarts
+				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 				return
 			}
 
@@ -416,13 +453,15 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			if (assistantText) {
 				assistantContent.push({ type: 'text', text: assistantText })
 			}
+			// Include server-side tool blocks (web_search) — these are opaque blocks
+			// that must appear in the assistant content alongside tool_use blocks.
+			for (const sb of serverBlocks) assistantContent.push(sb)
 			for (const tc of toolCalls) {
 				assistantContent.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.input })
 			}
 			messages.push({ role: 'assistant', content: assistantContent })
 
 			// Save assistant message with tool calls to history
-			const toolBlobMap = new Map<string, string>()
 			const historyEntry: any = {
 				role: 'assistant',
 				ts: new Date().toISOString(),
@@ -436,7 +475,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			// Save each tool call input to a blob
 			historyEntry.tools = []
 			for (const tc of toolCalls) {
-				const blobId = blob.makeBlobId(sessionId)
+				const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
 				toolBlobMap.set(tc.id, blobId)
 				await writeToolCallBlob(sessionId, blobId, tc.name, tc.input)
 				historyEntry.tools.push({ id: tc.id, name: tc.name, blobId })
@@ -483,6 +522,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					toolId: call.id,
 					name: call.name,
 					output: result.slice(0, 500), // truncate for IPC
+					blobId,
 					phase: 'done',
 				})
 			}
@@ -504,6 +544,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			contextUsed: est.used,
 			contextMax: est.max,
 		})
+		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 	} finally {
 		state.activeRequests.delete(sessionId)
 		await ctx.onStatus?.(false)
@@ -544,6 +585,7 @@ async function executeToolsConcurrently(
 function abort(sessionId: string): boolean {
 	const ac = state.activeRequests.get(sessionId)
 	if (ac) {
+		log.info('Agent loop explicit abort', { sessionId })
 		ac.abort()
 		return true
 	}

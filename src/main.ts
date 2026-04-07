@@ -42,6 +42,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 function cleanup(): void {
 	if (cleaned) return
 	cleaned = true
+	log.info('Cleanup started', { isHost, pid: process.pid })
 	if (electionTimer) clearInterval(electionTimer)
 	ac.abort()
 	if (isHost) {

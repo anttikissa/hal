@@ -9,7 +9,7 @@ import { STATE_DIR } from '../state.ts'
 type Level = 'info' | 'error' | 'debug'
 
 const LOG_PATH = `${STATE_DIR}/hal.log`
-const MAX_SIZE = 1_000_000 // 1MB rotation threshold
+const MAX_SIZE = 5_000_000 // 5MB rotation threshold
 
 // HAL_LOG=1 enables info+error, HAL_LOG=debug enables all levels
 const envVal = (process.env.HAL_LOG ?? '').toLowerCase()

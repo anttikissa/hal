@@ -15,7 +15,7 @@ done
 
 while true; do
 	startup_epoch_ms="$(NO_COLOR=1 bun -e 'console.log(Date.now())')"
-	HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "$@"
+	HAL_LOG=1 HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "$@"
 
 	code=$?
 	# Exit code 100 restarts - used by Ctrl-R
