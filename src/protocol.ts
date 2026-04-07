@@ -62,7 +62,7 @@ export interface ToolDef {
 // can reference it without circular imports.
 
 export interface ProviderStreamEvent {
-	type: 'text' | 'thinking' | 'thinking_signature' | 'tool_call' | 'error' | 'done'
+	type: 'text' | 'thinking' | 'thinking_signature' | 'tool_call' | 'server_tool' | 'error' | 'done'
 	text?: string
 	signature?: string
 	// tool_call fields
@@ -71,6 +71,9 @@ export interface ProviderStreamEvent {
 	input?: any
 	parseError?: string
 	rawJson?: string
+	// server_tool fields — opaque content blocks from server-side tools (e.g. web_search).
+	// These go into the assistant message content verbatim and need no local execution.
+	serverBlocks?: any[]
 	// error fields
 	message?: string
 	status?: number

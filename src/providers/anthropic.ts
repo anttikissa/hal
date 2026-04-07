@@ -55,6 +55,27 @@ function formatForeignThinking(thinking: unknown, sourceModel?: string): string 
 	return `[model ${model} thinking]\n${text}`
 }
 
+/** Filter out orphaned web_search blocks. A server_tool_use (web_search) must be
+ *  paired with a web_search_tool_result and vice versa — unpaired blocks cause API errors. */
+function filterUnpairedWebSearch(blocks: any[]): any[] {
+	if (!Array.isArray(blocks) || blocks.length === 0) return blocks
+	const useIds = new Set<string>()
+	const resultIds = new Set<string>()
+	for (const b of blocks) {
+		if (b?.type === 'server_tool_use' && b?.name === 'web_search' && typeof b?.id === 'string')
+			useIds.add(b.id)
+		if (b?.type === 'web_search_tool_result' && typeof b?.tool_use_id === 'string')
+			resultIds.add(b.tool_use_id)
+	}
+	return blocks.filter((b: any) => {
+		if (b?.type === 'server_tool_use' && b?.name === 'web_search')
+			return typeof b.id === 'string' && resultIds.has(b.id)
+		if (b?.type === 'web_search_tool_result')
+			return typeof b.tool_use_id === 'string' && useIds.has(b.tool_use_id)
+		return true
+	})
+}
+
 /** Remove or transform blocks Anthropic can't handle. */
 function sanitizeMessages(msgs: Message[]): any[] {
 	if (!msgs.length) return msgs
@@ -64,7 +85,7 @@ function sanitizeMessages(msgs: Message[]): any[] {
 			out.push(msg)
 			continue
 		}
-		const content: any[] = []
+		let content: any[] = []
 		for (const block of msg.content as any[]) {
 			if (block.type === 'thinking') {
 				// Foreign thinking (e.g. OpenAI reasoning) → convert to text
@@ -79,6 +100,8 @@ function sanitizeMessages(msgs: Message[]): any[] {
 			}
 			content.push(block)
 		}
+		// Drop orphaned web_search blocks (can happen after context compaction or aborted turns)
+		content = filterUnpairedWebSearch(content)
 		if (content.length > 0) out.push({ ...msg, content })
 	}
 	return out
@@ -125,6 +148,9 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 
 	// Tool calls are assembled across content_block_start / delta / stop events
 	const tools = new Map<number, { id: string; name: string; json: string }>()
+	// Server-side tool blocks (e.g. web_search) are opaque — collect them verbatim
+	// so the agent loop can include them in the assistant message content.
+	const serverToolBlocks: any[] = []
 	const usage = { input: 0, output: 0 }
 
 	while (true) {
@@ -149,6 +175,10 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 				const b = ev.content_block
 				if (b.type === 'tool_use') {
 					tools.set(ev.index, { id: b.id, name: b.name, json: '' })
+				} else if (b.type === 'server_tool_use' || b.type === 'web_search_tool_result') {
+					// Server-side tools (web_search) — store the full block for passthrough.
+					// These don't stream deltas; the complete content arrives in content_block_start.
+					serverToolBlocks.push(b)
 				}
 			} else if (ev.type === 'content_block_delta') {
 				const d = ev.delta
@@ -209,6 +239,12 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 		}
 	}
 
+	// Yield server-side tool blocks (web_search) before done so the agent loop
+	// can include them in the assistant message content.
+	if (serverToolBlocks.length > 0) {
+		yield { type: 'server_tool', serverBlocks: serverToolBlocks }
+	}
+
 	yield { type: 'done', usage }
 }
 
@@ -256,7 +292,13 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	}
 
 	if (req.tools?.length) {
-		body.tools = req.tools
+		// Append web_search as a server-side tool — Claude searches the web itself,
+		// no local execution needed. Results come back as server_tool_use /
+		// web_search_tool_result content blocks in the stream.
+		body.tools = [
+			...req.tools,
+			{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+		]
 	}
 
 	const url = API_URL
