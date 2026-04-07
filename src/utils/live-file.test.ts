@@ -72,14 +72,12 @@ test('onChange fires on external file change', async () => {
 	})
 
 	// Simulate external edit via atomic rename (like real editors do).
-	// The watcher watches the directory, so direct writeFileSync may not
-	// trigger on macOS — but rename does.
 	const tmp = path + '.tmp'
 	writeFileSync(tmp, ason.stringify({ v: 99 }) + '\n')
 	renameSync(tmp, path)
-	// Wait for debounce (50ms) + fs.watch latency on macOS. Directory watch
-	// notifications can occasionally be slow under load, so give it a full second.
-	await Bun.sleep(1000)
+	// Poll until the watcher fires, rather than sleeping a fixed duration.
+	// fs.watch on macOS can be slow under load.
+	for (let i = 0; i < 100 && !called; i++) await Bun.sleep(50)
 
 	expect(called).toBe(true)
 	expect(data.v).toBe(99)
