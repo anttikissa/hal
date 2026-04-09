@@ -237,8 +237,9 @@ function toolTitle(name: string, input?: any): string {
 		}
 		case 'read': {
 			let s = `Read ${input.path ?? '?'}`
-			if (input.offset) s += `:${input.offset}`
-			if (input.limit) s += `-${input.offset + input.limit}`
+			if (input.start || input.end) {
+				s += ` (${input.start ?? 1}-${input.end ?? 'end'})`
+			}
 			return s
 		}
 		case 'write':
@@ -509,8 +510,8 @@ function blockContent(block: Block, cols: number): string[] {
 	const cw = cols
 	const indent = ''
 
-	if (block.type === 'assistant') {
-		// Markdown-rendered assistant text
+	if (block.type === 'assistant' || block.type === 'thinking') {
+		// Markdown-rendered text (assistant and thinking share the same path)
 		const lines: string[] = []
 		for (const span of md.mdSpans(block.text)) {
 			if (span.type === 'code') {
@@ -533,6 +534,8 @@ function blockContent(block: Block, cols: number): string[] {
 		}
 		// Strip leading blank lines (models often start with \n\n)
 		while (lines.length > 0 && lines[0]!.trim() === '') lines.shift()
+		// Strip trailing blank lines (models often end with \n\n)
+		while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop()
 		return resolveMarkers(lines)
 	}
 
@@ -577,9 +580,9 @@ function blockContent(block: Block, cols: number): string[] {
 		return lines
 	}
 
-	// User, thinking, info, error — plain text with word wrap.
+	// User, info, error — plain text with word wrap.
 	// Expand tabs here (word wrap needs real character widths).
-	const text = block.type === 'user' ? block.text : block.type === 'thinking' ? block.text : block.text
+	const text = block.text
 	const lines: string[] = []
 	for (const raw of expandTabs(text, blockConfig.tabWidth).split('\n')) {
 		for (const wl of wordWrap(`${indent}${raw}`, cols)) lines.push(wl)
