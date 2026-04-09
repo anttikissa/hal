@@ -433,6 +433,9 @@ function draw(force = false): void {
 	// REWRITE: first < prevLines.length. Some existing line changed. Move
 	// there, overwrite from that point forward.
 	const isAppend = first >= prevLines.length && prevLines.length > 0
+	if (fullscreen && lines.length > prevLines.length && !isAppend) {
+		return draw(true)
+	}
 	if (isAppend) {
 		// Move to the last existing line, then \r\n into new territory.
 		out.push(moveCursor(cursorRow, prevLines.length - 1))

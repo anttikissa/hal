@@ -78,9 +78,16 @@ const state = {
 	activity: new Map<string, string>(),
 }
 
+let pendingEntries: Array<{ text: string; type: 'info' | 'error' }> = []
 let onChange: (force: boolean) => void = () => {}
 
-// Create a fresh Tab with all fields initialized.
+function flushPendingEntries(): void {
+	const tab = currentTab()
+	if (!tab || pendingEntries.length === 0) return
+	for (const entry of pendingEntries) tab.history.push({ type: entry.type, text: entry.text, ts: Date.now() })
+	pendingEntries = []
+	touchTab(tab)
+}
 function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string }): Tab {
 	return {
 		sessionId: id,
@@ -285,11 +292,13 @@ function prevTab(): void {
 
 function addEntry(text: string, type: 'info' | 'error' = 'info'): void {
 	const tab = currentTab()
-	if (tab) {
-		tab.history.push({ type, text, ts: Date.now() })
-		touchTab(tab)
-		onChange(false)
+	if (!tab) {
+		pendingEntries.push({ text, type })
+		return
 	}
+	tab.history.push({ type, text, ts: Date.now() })
+	touchTab(tab)
+	onChange(false)
 }
 
 function addBlockToTab(sessionId: string | null, block: Block): void {
@@ -352,6 +361,7 @@ function handleEvent(event: any): void {
 		const grew = newTabs.length > state.tabs.length
 		const prevSession = state.tabs[state.activeTab]?.sessionId ?? ''
 		state.tabs = newTabs
+		flushPendingEntries()
 		if (state.activeTab >= state.tabs.length) state.activeTab = state.tabs.length - 1
 		if (grew) state.activeTab = state.tabs.length - 1
 		const newSession = state.tabs[state.activeTab]?.sessionId ?? ''
