@@ -22,9 +22,12 @@ log.info('Startup', { isHost, hostPid, pid: process.pid })
 const ac = new AbortController()
 let electionTimer: ReturnType<typeof setInterval> | null = null
 let cleaned = false
-const MEMORY_LIMIT_BYTES = 1_000_000_000
+const MEMORY_WARN_BYTES = 1_500_000_000
+const MEMORY_LIMIT_BYTES = 2_000_000_000
 const MEMORY_CHECK_MS = 1_000
 let memoryTimer: ReturnType<typeof setInterval> | null = null
+let warnedHighMemory = false
+let exitingForMemory = false
 
 function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
@@ -42,9 +45,20 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	runtime.startRuntime(ac.signal)
 }
 
+function formatMemory(bytes: number): string {
+	return `${(bytes / 1_000_000_000).toFixed(2)} GB RSS`
+}
+
 function tickMemory(): void {
-	if (process.memoryUsage().rss <= MEMORY_LIMIT_BYTES) return
-	process.exit(0)
+	const rss = process.memoryUsage().rss
+	if (rss >= MEMORY_WARN_BYTES && !warnedHighMemory) {
+		warnedHighMemory = true
+		client.addEntry(`Memory high: ${formatMemory(rss)}`, 'error')
+	}
+	if (rss < MEMORY_LIMIT_BYTES || exitingForMemory) return
+	exitingForMemory = true
+	client.addEntry(`Memory limit exceeded: ${formatMemory(rss)}. Quitting.`, 'error')
+	setTimeout(() => process.exit(0), 500)
 }
 
 function cleanup(): void {
