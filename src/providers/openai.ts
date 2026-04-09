@@ -627,9 +627,11 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	await auth.ensureFresh('openai')
 	const credential = getCredential('openai')
 	if (!credential) {
+		// Check if all accounts are rate-limited vs no accounts at all
+		const exhaustedMsg = auth.allOnCooldownMessage('openai')
 		yield {
 			type: 'error',
-			message: `No credentials for 'openai'. Run: bun scripts/login-openai.ts (or set OPENAI_API_KEY)`,
+			message: exhaustedMsg ?? `No credentials for 'openai'. Run: bun scripts/login-openai.ts (or set OPENAI_API_KEY)`,
 		}
 		yield { type: 'done' }
 		return
@@ -700,13 +702,29 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 
 	if (!res.ok) {
 		const text = (await res.text()).slice(0, 2000)
-		yield {
-			type: 'error',
-			message: `openai ${res.status}: ${res.statusText}`,
-			status: res.status,
-			body: text,
-			endpoint: apiUrl,
-			retryAfterMs: providerUtils.parseRetryDelay(res, text),
+		const retryAfterMs = providerUtils.parseRetryDelay(res, text)
+		// Mark this credential on cooldown so the next retry picks a different account.
+		// Default cooldown: 10 minutes, or whatever the server says via Retry-After.
+		if (res.status === 429) {
+			const label = credential.email ? ` (${credential.email})` : ''
+			auth.markCooldown(credential, retryAfterMs ?? 10 * 60_000)
+			yield {
+				type: 'error',
+				message: `openai ${res.status}: rate limited${label}`,
+				status: res.status,
+				body: text,
+				endpoint: apiUrl,
+				retryAfterMs: 1_000, // retry fast — we'll use the next account
+			}
+		} else {
+			yield {
+				type: 'error',
+				message: `openai ${res.status}: ${res.statusText}`,
+				status: res.status,
+				body: text,
+				endpoint: apiUrl,
+				retryAfterMs,
+			}
 		}
 		yield { type: 'done' }
 		return

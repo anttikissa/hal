@@ -5,6 +5,13 @@
 // 1. auth.ason accessToken (from OAuth login scripts)
 // 2. auth.ason apiKey (from scripts/add-keys.ts)
 // 3. Environment variable (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+//
+// Token rotation:
+// A provider entry can be a single object or an array of objects.
+// Single: { accessToken, refreshToken, email, ... }
+// Multiple: [{ accessToken, ..., email: "a@x.com" }, { ... }]
+// When multiple accounts exist, getCredential() skips ones on cooldown.
+// Call markCooldown() after a 429 to rotate to the next account.
 
 import { liveFiles } from './utils/live-file.ts'
 import { HAL_DIR } from './state.ts'
@@ -39,25 +46,103 @@ const ENV_KEYS: Record<string, string> = {
 interface Credential {
 	value: string
 	type: 'token' | 'api-key'
+	/** Identifying label (e.g. email) for the account this came from. */
+	email?: string
+	/** Internal key for cooldown tracking. Absent for env-var credentials. */
+	_key?: string
 }
 
-/** Get credential for a provider. Returns type so caller uses the right auth header. */
+// ── Cooldown tracking ──
+// In-memory map of "provider:index" -> timestamp when cooldown expires.
+// Populated by markCooldown(), checked by getCredential().
+
+const cooldowns = new Map<string, number>()
+
+/** Normalize a provider entry: single object → [object], array stays array. */
+function normalizeEntries(raw: any): any[] {
+	if (!raw) return []
+	if (Array.isArray(raw)) return raw
+	return [raw]
+}
+
+/** Extract credential from a single auth entry. */
+function credFromEntry(entry: any, key: string): Credential | undefined {
+	if (entry.accessToken) return { value: entry.accessToken, type: 'token', email: entry.email, _key: key }
+	if (entry.apiKey) return { value: entry.apiKey, type: 'api-key', email: entry.email, _key: key }
+	return undefined
+}
+
+/** Get credential for a provider. Skips accounts on cooldown. */
 function getCredential(providerName: string): Credential | undefined {
-	const entry = store()[providerName]
-	if (entry) {
-		if (entry.accessToken) return { value: entry.accessToken, type: 'token' }
-		if (entry.apiKey) return { value: entry.apiKey, type: 'api-key' }
+	const raw = store()[providerName]
+	const entries = normalizeEntries(raw)
+	const now = Date.now()
+
+	// Try each entry, skip ones on cooldown
+	for (let i = 0; i < entries.length; i++) {
+		const key = `${providerName}:${i}`
+		const cooldownUntil = cooldowns.get(key)
+		if (cooldownUntil && now < cooldownUntil) continue
+		const cred = credFromEntry(entries[i], key)
+		if (cred) return cred
 	}
-	// Env vars are always API keys
+
+	// All on cooldown (or no entries at all) — fall back to env var
 	const envVar = ENV_KEYS[providerName] ?? `${providerName.toUpperCase()}_API_KEY`
 	const envVal = process.env[envVar]
 	if (envVal) return { value: envVal, type: 'api-key' }
+
+	// If there were entries but all on cooldown, return undefined
+	// (caller should check allOnCooldownMessage for a user-facing error)
 	return undefined
+}
+
+/** Mark a credential as on cooldown for durationMs. */
+function markCooldown(cred: Credential, durationMs: number): void {
+	if (!cred._key) return
+	cooldowns.set(cred._key, Date.now() + durationMs)
+}
+
+/** If all accounts for a provider are on cooldown, return a user-facing error message. */
+function allOnCooldownMessage(providerName: string): string | null {
+	const raw = store()[providerName]
+	const entries = normalizeEntries(raw)
+	if (entries.length === 0) return null
+
+	const now = Date.now()
+	// Check if any entry is NOT on cooldown
+	for (let i = 0; i < entries.length; i++) {
+		const key = `${providerName}:${i}`
+		const cooldownUntil = cooldowns.get(key)
+		if (!cooldownUntil || now >= cooldownUntil) return null
+	}
+
+	// All on cooldown — build message with account emails
+	const emails = entries
+		.map((e: any) => e.email)
+		.filter(Boolean)
+	const accountList = emails.length > 0
+		? ` (${emails.join(', ')})`
+		: ` (${entries.length} account${entries.length > 1 ? 's' : ''})`
+	return `All ${providerName} accounts rate limited${accountList}. Add another account, upgrade your plan, or switch providers.`
 }
 
 /** Get full auth entry for a provider (for refresh, account ID, etc.) */
 function getEntry(providerName: string): Record<string, any> {
-	return store()[providerName] ?? {}
+	// For multi-account, return the entry matching the current (non-cooldown) credential
+	const raw = store()[providerName]
+	if (Array.isArray(raw)) {
+		const now = Date.now()
+		for (let i = 0; i < raw.length; i++) {
+			const key = `${providerName}:${i}`
+			const cooldownUntil = cooldowns.get(key)
+			if (cooldownUntil && now < cooldownUntil) continue
+			return raw[i] ?? {}
+		}
+		// All on cooldown — return first
+		return raw[0] ?? {}
+	}
+	return raw ?? {}
 }
 
 // ── Token refresh ──
@@ -90,34 +175,47 @@ async function refreshAnthropic(): Promise<void> {
 	}
 }
 
-/** Refresh OpenAI OAuth token if expired. No-op for API keys. */
+/** Refresh OpenAI OAuth tokens if expired. Handles both single and multi-account. */
 async function refreshOpenAI(): Promise<void> {
-	const entry = store().openai
-	if (!entry?.refreshToken) return
-	if (entry.accessToken && isApiKey(entry.accessToken)) return
-	if (entry.expires && Date.now() < entry.expires - 60_000) return
+	const raw = store().openai
+	const entries = normalizeEntries(raw)
 
-	const res = await fetch(OPENAI_TOKEN_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({
-			grant_type: 'refresh_token',
-			refresh_token: entry.refreshToken,
-			client_id: OPENAI_CLIENT_ID,
-		}),
-	})
-	if (!res.ok) {
-		const text = await res.text().catch(() => '')
-		throw new Error(`OpenAI token refresh failed: ${res.status} ${text}`)
-	}
-	const data = (await res.json()) as any
-	if (!data.access_token) throw new Error('OpenAI refresh: missing access_token')
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i]
+		if (!entry?.refreshToken) continue
+		if (entry.accessToken && entry.accessToken.startsWith('sk-')) continue
+		if (entry.expires && Date.now() < entry.expires - 60_000) continue
 
-	store().openai = {
-		...entry,
-		accessToken: data.access_token,
-		refreshToken: data.refresh_token,
-		expires: Date.now() + (data.expires_in ?? 3600) * 1000,
+		const res = await fetch(OPENAI_TOKEN_URL, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams({
+				grant_type: 'refresh_token',
+				refresh_token: entry.refreshToken,
+				client_id: OPENAI_CLIENT_ID,
+			}),
+		})
+		if (!res.ok) {
+			const text = await res.text().catch(() => '')
+			throw new Error(`OpenAI token refresh failed: ${res.status} ${text}`)
+		}
+		const data = (await res.json()) as any
+		if (!data.access_token) throw new Error('OpenAI refresh: missing access_token')
+
+		const updated = {
+			...entry,
+			accessToken: data.access_token,
+			refreshToken: data.refresh_token,
+			expires: Date.now() + (data.expires_in ?? 3600) * 1000,
+		}
+
+		// Write back to the correct slot
+		if (Array.isArray(raw)) {
+			raw[i] = updated
+			store().openai = raw
+		} else {
+			store().openai = updated
+		}
 	}
 }
 
@@ -139,5 +237,24 @@ function isApiKey(providerName: string): boolean {
 	return cred?.type === 'api-key'
 }
 
-export const auth = { getCredential, getEntry, ensureFresh, isApiKey }
+// ── Test helpers ──
+
+function _setStoreForTest(data: Record<string, any>): void {
+	_store = data
+}
+
+function _resetCooldowns(): void {
+	cooldowns.clear()
+}
+
+export const auth = {
+	getCredential,
+	getEntry,
+	ensureFresh,
+	isApiKey,
+	markCooldown,
+	allOnCooldownMessage,
+	_setStoreForTest,
+	_resetCooldowns,
+}
 export type { Credential }
