@@ -1,6 +1,6 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
-import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs'
+import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync, renameSync } from 'fs'
 import { IPC_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { tails } from './utils/tail-file.ts'
@@ -99,7 +99,10 @@ function updateState(mutator: (state: SharedState) => void): SharedState {
 	const state = readState()
 	mutator(state)
 	state.updatedAt = new Date().toISOString()
-	writeFileSync(STATE_FILE, ason.stringify(state) + '\n')
+	const tmp = `${STATE_FILE}.tmp.${process.pid}`
+	// Write state atomically so clients never observe a half-written bootstrap file.
+	writeFileSync(tmp, ason.stringify(state) + '\n')
+	renameSync(tmp, STATE_FILE)
 	return state
 }
 

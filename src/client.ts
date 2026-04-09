@@ -385,7 +385,7 @@ function applySessionList(items: SharedSessionInfo[]): void {
 }
 
 function applySharedState(shared: SharedState): void {
-	if (shared.openSessions.length > 0 || state.tabs.length > 0) {
+	if (shared.openSessions.length > 0) {
 		applySessionList(shared.openSessions)
 	}
 

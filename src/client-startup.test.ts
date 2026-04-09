@@ -85,6 +85,24 @@ describe('client startup', () => {
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
 	})
 
+	test('does not clear disk-loaded tabs when shared state is temporarily empty', async () => {
+		sessions.loadAllSessions = () => [makeLoadedSession('s1')]
+		draft.loadDraft = () => ''
+
+		const shared = makeSharedState([])
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
+	})
+
 	test('tails events from the end without replaying the whole event log', async () => {
 		sessions.loadAllSessions = () => [makeLoadedSession('s1')]
 		draft.loadDraft = () => ''
