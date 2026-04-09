@@ -35,6 +35,8 @@ const apiConfig = {
 	heavyThreshold: 4,
 	// Pruning: strip thinking blocks after this many completed turns
 	thinkingThreshold: 10,
+	// Only rewrite old history every N completed turns to avoid constant cache busting
+	pruneBatchTurns: 8,
 }
 
 // ── Model tracking ──
@@ -64,7 +66,7 @@ function findReplayStart(entries: HistoryEntry[]): number {
 
 // Convert session history to Anthropic API message format.
 // Loads blobs for tool calls, handles images, manages injected info entries.
-function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[]): Message[] {
+function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[], opts?: { prune?: boolean }): Message[] {
 	const entries = allEntries ?? sessions.loadAllHistory(sessionId)
 	const start = findReplayStart(entries)
 	const sliced = entries.slice(start)
@@ -118,7 +120,7 @@ function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[]): Me
 	repairToolPairing(out)
 
 	// Prune old heavy content to save context window space
-	return pruneMessages(out)
+	return opts?.prune === false ? out : pruneMessages(out)
 }
 
 // Build content for a user message, prepending any pending injected infos.
@@ -275,11 +277,19 @@ function isTurnEnd(msg: any): boolean {
 	return !(msg.content as any[]).some((b: any) => b.type === 'tool_use')
 }
 
+function pastBatchThreshold(age: number, threshold: number): boolean {
+	if (age <= threshold) return false
+	const batch = Math.max(1, apiConfig.pruneBatchTurns)
+	const firstBatch = Math.ceil((threshold + 1) / batch) * batch
+	return age >= firstBatch
+}
+
 // Strip old tool results, tool inputs, images, and thinking from API messages.
 // Keeps recent content intact, replaces old heavy content with placeholders.
 function pruneMessages(msgs: Message[]): Message[] {
 	const heavy = apiConfig.heavyThreshold
 	const thinking = apiConfig.thinkingThreshold
+	const batch = Math.max(1, apiConfig.pruneBatchTurns)
 
 	// Count completed turns after each position (how "old" each message is)
 	const age = new Array(msgs.length).fill(0)
@@ -288,30 +298,33 @@ function pruneMessages(msgs: Message[]): Message[] {
 		age[i] = count
 		if (isTurnEnd(msgs[i]!)) count++
 	}
+	const checkpoint = Math.floor(count / batch) * batch
+	const offset = count - checkpoint
 
 	const out: Message[] = []
 	for (let i = 0; i < msgs.length; i++) {
 		const msg = msgs[i]!
+		const frozenAge = age[i] - offset
 
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			let content = (msg.content as ContentBlock[]).map((b) => {
 				// Strip tool inputs from old messages
-				if (b.type === 'tool_use' && age[i] > heavy) return { ...b, input: {} }
+				if (b.type === 'tool_use' && frozenAge > heavy) return { ...b, input: {} }
 				return b
 			})
 			// Strip thinking from old messages
-			if (age[i] > thinking) {
+			if (frozenAge > thinking) {
 				content = content.filter((b) => b.type !== 'thinking')
 			}
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = (msg.content as ContentBlock[]).map((b) => {
 				// Strip old tool results
-				if (b.type === 'tool_result' && age[i] > heavy) {
+				if (b.type === 'tool_result' && frozenAge > heavy) {
 					return { ...b, content: '[tool result omitted from context]' }
 				}
 				// Strip old images
-				if (b.type === 'image' && age[i] > heavy) {
+				if (b.type === 'image' && frozenAge > heavy) {
 					return { type: 'text' as const, text: '[image omitted from context]' }
 				}
 				return b
@@ -328,6 +341,7 @@ function pruneMessages(msgs: Message[]): Message[] {
 export const apiMessages = {
 	config: apiConfig,
 	toAnthropicMessages,
+	pruneMessages,
 	applyModelEvent,
 	findReplayStart,
 	formatLocalTime,
