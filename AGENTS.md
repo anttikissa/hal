@@ -88,3 +88,5 @@ AGENTS.md change - should send a summary of changes to agent at start of next tu
 model changes, etc)
 
 colgrep https://github.com/lightonai/next-plaid?tab=readme-ov-file#colgrep
+
+IPC log truncation / compaction

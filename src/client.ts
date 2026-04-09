@@ -34,10 +34,9 @@ export interface Tab {
 	loaded: boolean
 	// Generation finished on a non-active tab — show ✓ until user switches to it
 	doneUnseen: boolean
-	// Live streaming buffers — accumulated text from stream-delta events.
-	// Cleared when the final response/stream-end event arrives.
-	streamingText: string
-	streamingThinking: string
+	// Bumped whenever history contents change. The renderer uses this to
+	// invalidate cached line counts when a block grows in place.
+	historyVersion: number
 	// Cumulative token usage for this session (input + output).
 	// Accumulated from stream-end events and loaded from history on startup.
 	usage: { input: number; output: number }
@@ -91,8 +90,7 @@ function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string
 		inputDraft: '',
 		loaded: true,
 		doneUnseen: false,
-		streamingText: '',
-		streamingThinking: '',
+		historyVersion: 0,
 		usage: { input: 0, output: 0 },
 		contextUsed: 0,
 		contextMax: 0,
@@ -109,6 +107,28 @@ function setOnChange(fn: (force: boolean) => void): void {
 
 function currentTab(): Tab | null {
 	return state.tabs[state.activeTab] ?? null
+}
+
+function touchTab(tab: Tab): void {
+	tab.historyVersion++
+}
+
+function tabForSession(sessionId: string | null): Tab | null {
+	if (sessionId) return state.tabs.find((tab) => tab.sessionId === sessionId) ?? null
+	return currentTab()
+}
+
+function lastHistoryBlock(tab: Tab): Block | null {
+	return tab.history[tab.history.length - 1] ?? null
+}
+
+function closeStreamingBlock(tab: Tab): void {
+	const last = lastHistoryBlock(tab)
+	if (!last) return
+	if ((last.type === 'assistant' || last.type === 'thinking') && last.streaming) {
+		delete last.streaming
+		touchTab(tab)
+	}
 }
 
 function isBusy(): boolean {
@@ -165,6 +185,7 @@ function ensureTabLoaded(tab: Tab): void {
 	tab.history = blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId)
 	tab.rawHistory = undefined
 	tab.loaded = true
+	touchTab(tab)
 }
 
 // ── Last-tab persistence ─────────────────────────────────────────────────────
@@ -266,15 +287,16 @@ function addEntry(text: string, type: 'info' | 'error' = 'info'): void {
 	const tab = currentTab()
 	if (tab) {
 		tab.history.push({ type, text, ts: Date.now() })
+		touchTab(tab)
 		onChange(false)
 	}
 }
 
 function addBlockToTab(sessionId: string | null, block: Block): void {
-	let tab = sessionId ? state.tabs.find((t) => t.sessionId === sessionId) : currentTab()
-	if (!tab) tab = currentTab()
+	const tab = tabForSession(sessionId)
 	if (tab) {
 		tab.history.push(block)
+		touchTab(tab)
 		onChange(false)
 	}
 }
@@ -299,6 +321,15 @@ function sendCommand(type: string, text?: string): void {
 	if (type === 'open') pendingOpen = 'open'
 	if (type === 'fork') pendingOpen = 'fork'
 	ipc.appendCommand({ type, text, sessionId: tab?.sessionId })
+}
+
+function hasTrailingAssistantText(tab: Tab, text: string): boolean {
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const block = tab.history[i]!
+		if (block.type === 'tool') continue
+		return block.type === 'assistant' && block.text === text
+	}
+	return false
 }
 
 function handleEvent(event: any): void {
@@ -339,56 +370,79 @@ function handleEvent(event: any): void {
 		addBlockToTab(event.sessionId, {
 			type: 'user',
 			text: event.text,
-			status: event.label, // 'steering' when typed during generation
+			status: event.label,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'stream-start' && event.sessionId) {
-		// New generation starting — clear streaming buffers
-		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		const tab = tabForSession(event.sessionId)
+		if (tab) closeStreamingBlock(tab)
+	} else if (event.type === 'stream-delta' && event.sessionId && event.text) {
+		const tab = tabForSession(event.sessionId)
 		if (tab) {
-			tab.streamingText = ''
-			tab.streamingThinking = ''
-		}
-	} else if (event.type === 'stream-delta' && event.sessionId) {
-		// Append streaming text chunk to the appropriate buffer
-		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
-		if (tab && event.text) {
+			const ts = event.createdAt ? Date.parse(event.createdAt) : undefined
+			const last = lastHistoryBlock(tab)
 			if (event.channel === 'thinking') {
-				tab.streamingThinking += event.text
+				if (last?.type === 'thinking' && last.streaming) {
+					last.text += event.text
+					if (event.blobId) last.blobId = event.blobId
+					if (!last.sessionId) last.sessionId = event.sessionId
+					if (!last.ts) last.ts = ts
+				} else {
+					closeStreamingBlock(tab)
+					tab.history.push({
+						type: 'thinking',
+						text: event.text,
+						blobId: event.blobId,
+						sessionId: event.sessionId,
+						ts,
+						streaming: true,
+					})
+				}
+			} else if (last?.type === 'assistant' && last.streaming) {
+				last.text += event.text
+				if (!last.ts) last.ts = ts
 			} else {
-				tab.streamingText += event.text
+				closeStreamingBlock(tab)
+				tab.history.push({
+					type: 'assistant',
+					text: event.text,
+					model: tab.model,
+					ts,
+					streaming: true,
+				})
 			}
+			touchTab(tab)
 			onChange(false)
 		}
 	} else if (event.type === 'stream-end' && event.sessionId) {
-		// Generation finished — clear streaming buffers (response event will add the final block)
-		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
+		const tab = tabForSession(event.sessionId)
 		if (tab) {
-			tab.streamingText = ''
-			tab.streamingThinking = ''
-			// Accumulate token usage from this generation
+			closeStreamingBlock(tab)
 			if (event.usage) {
-				tab.usage ??= { input: 0, output: 0 } // Initialize usage if it doesn't exist
+				tab.usage ??= { input: 0, output: 0 }
 				tab.usage.input += event.usage.input ?? 0
 				tab.usage.output += event.usage.output ?? 0
 			}
-			// Update context window estimate
 			if (event.contextUsed != null) tab.contextUsed = event.contextUsed
 			if (event.contextMax != null) tab.contextMax = event.contextMax
 			onChange(false)
 		}
 	} else if (event.type === 'response') {
-		// Final response — clear streaming buffers and add the block
-		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
-		if (tab) {
-			tab.streamingText = ''
-			tab.streamingThinking = ''
+		const tab = tabForSession(event.sessionId ?? null)
+		if (tab) closeStreamingBlock(tab)
+		if (event.isError) {
+			addBlockToTab(event.sessionId ?? null, {
+				type: 'error',
+				text: event.text,
+				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
+			})
+		} else if (tab && event.text && !hasTrailingAssistantText(tab, event.text)) {
+			addBlockToTab(event.sessionId ?? null, {
+				type: 'assistant',
+				text: event.text,
+				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
+			})
 		}
-		addBlockToTab(event.sessionId, {
-			type: event.isError ? 'error' : 'assistant',
-			text: event.text,
-			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-		})
 	} else if (event.type === 'info') {
 		addBlockToTab(event.sessionId ?? null, {
 			type: 'info',
@@ -400,7 +454,6 @@ function handleEvent(event: any): void {
 		const nowBusy = event.busy ?? false
 		state.busy.set(event.sessionId, nowBusy)
 		state.activity.set(event.sessionId, event.activity ?? '')
-		// Generation just finished on a background tab → mark as done-unseen
 		if (wasBusy && !nowBusy) {
 			const activeSession = currentTab()?.sessionId
 			if (event.sessionId !== activeSession) {
@@ -410,20 +463,25 @@ function handleEvent(event: any): void {
 		}
 		onChange(false)
 	} else if (event.type === 'tool-call' && event.sessionId) {
+		const tab = tabForSession(event.sessionId)
+		if (tab) closeStreamingBlock(tab)
 		addBlockToTab(event.sessionId, {
 			type: 'tool',
 			name: event.name,
 			input: event.input,
+			blobId: event.blobId,
+			sessionId: event.sessionId,
 			toolId: event.toolId,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
 	} else if (event.type === 'tool-result' && event.sessionId) {
-		// Find the tool block and update it with output
 		const tab = state.tabs.find((t) => t.sessionId === event.sessionId)
 		if (tab) {
 			const toolBlock = tab.history.find((b: any) => b.type === 'tool' && b.toolId === event.toolId) as any
 			if (toolBlock) {
 				toolBlock.output = event.output
+				if (event.blobId) toolBlock.blobId = event.blobId
+				touchTab(tab)
 				onChange(false)
 			}
 		}
@@ -469,6 +527,11 @@ function loadPersistedSessions(): void {
 				tab.usage.output += (entry.usage as any).output ?? 0
 			}
 		}
+		// Restore persisted context window usage so the status line shows it immediately
+		if (s.meta.context) {
+			tab.contextUsed = s.meta.context.used
+			tab.contextMax = s.meta.context.max
+		}
 		newTabs.push(tab)
 	}
 	state.tabs = newTabs
@@ -506,6 +569,7 @@ async function loadInBackground(): Promise<void> {
 		const active = state.tabs[state.activeTab]
 		if (active) {
 			const n = await blockModule.loadBlobs(active.history)
+			if (n > 0) touchTab(active)
 			if (n > 0 && config.repaintAfterBlobLoad) onChange(false)
 		}
 	}
@@ -517,6 +581,7 @@ async function loadInBackground(): Promise<void> {
 		if (!tab.loaded) ensureTabLoaded(tab)
 		if (config.backgroundLoadBlobs) {
 			const n = await blockModule.loadBlobs(tab.history)
+			if (n > 0) touchTab(tab)
 			if (n > 0 && tab === state.tabs[state.activeTab]) onChange(false)
 		}
 	}
@@ -587,5 +652,6 @@ export const client = {
 	getInputDraft,
 	saveDraft,
 	clearDraft,
+	handleEvent,
 	onSubmit,
 }

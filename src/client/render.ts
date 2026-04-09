@@ -43,8 +43,8 @@ let fullscreen = false
 // peak lives in client.state.peak (persisted across restarts).
 // Local alias for readability.
 
-// Cached line counts per tab. Invalidated when tab.history.length changes.
-const lineCountCache = new WeakMap<Tab, { entryCount: number; lineCount: number }>()
+// Cached line counts per tab. Invalidated whenever tab.historyVersion changes.
+const lineCountCache = new WeakMap<Tab, { version: number; lineCount: number }>()
 
 function resetRenderer(): void {
 	prevLines = []
@@ -63,11 +63,11 @@ function renderEntry(block: Block, cols: number): string[] {
 
 function historyLineCount(tab: Tab): number {
 	const cached = lineCountCache.get(tab)
-	if (cached && cached.entryCount === tab.history.length) return cached.lineCount
+	if (cached && cached.version === tab.historyVersion) return cached.lineCount
 	const cols = process.stdout.columns || 80
 	let count = 0
 	for (const entry of tab.history) count += renderEntry(entry, cols).length
-	lineCountCache.set(tab, { entryCount: tab.history.length, lineCount: count })
+	lineCountCache.set(tab, { version: tab.historyVersion, lineCount: count })
 	return count
 }
 
@@ -79,20 +79,6 @@ function renderHistory(lines: string[], tab: Tab): void {
 		// Blank line between blocks (not before the first)
 		if (i > 0) lines.push('')
 		for (const line of renderEntry(tab.history[i]!, cols)) lines.push(line)
-	}
-	// Live streaming blocks — shown while the model is generating.
-	// These are ephemeral (not in history) and replaced by the final
-	// response/thinking blocks when the stream ends.
-	const hasContent = lines.length > 0
-	if (tab.streamingThinking) {
-		if (hasContent) lines.push('')
-		const block: Block = { type: 'thinking', text: tab.streamingThinking }
-		for (const line of renderEntry(block, cols)) lines.push(line)
-	}
-	if (tab.streamingText) {
-		if (hasContent || tab.streamingThinking) lines.push('')
-		const block: Block = { type: 'assistant', text: tab.streamingText }
-		for (const line of renderEntry(block, cols)) lines.push(line)
 	}
 }
 
