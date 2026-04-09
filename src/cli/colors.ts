@@ -24,6 +24,7 @@ const input = { fg: '', bg: '', cursor: '' }
 const system: BlockColors = { fg: '', bg: '' }
 const info = { fg: '', bg: '' }
 const error: BlockColors = { fg: '', bg: '' }
+const popup = { current: { fg: '', bg: '' } }
 
 // Tool colors keyed by tool name. Unknown tools fall back to 'default'.
 const tools: Record<string, BlockColors> = {}
@@ -83,6 +84,7 @@ function load(): void {
 	resolveBlock(raw.user, user)
 	resolveBlock(raw.system, system)
 	resolveBlock(raw.error, error)
+	resolveBlock(raw.popup?.current, popup.current)
 
 	if (raw.info?.fg) info.fg = fg(raw.info.fg, vars)
 	info.bg = '' // info blocks have no bg by default
@@ -130,6 +132,7 @@ export const colors = {
 	system,
 	info,
 	error,
+	popup,
 	tool,
 	tools,
 	load,

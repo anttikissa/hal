@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { colors } from '../cli/colors.ts'
 import { popup } from './popup.ts'
 import { visLen } from '../utils/strings.ts'
 import type { KeyEvent } from '../cli/keys.ts'
@@ -30,6 +31,11 @@ describe('popup', () => {
 	test('model picker starts with the current model selected', () => {
 		popup.openModelPicker(() => {}, 'openai/gpt-5.4')
 		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('gpt')
+		const overlay = popup.buildOverlay(120, 30)
+		expect(overlay).not.toBeNull()
+		const selectedLine = overlay!.lines.find((line) => line.includes('GPT 5.4'))
+		expect(selectedLine).toContain(colors.popup.current.bg)
+		expect(selectedLine).toContain(colors.popup.current.fg)
 	})
 
 	test('warning popup uses the same highlighted row layout', () => {

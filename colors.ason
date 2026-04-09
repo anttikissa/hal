@@ -56,6 +56,13 @@
 		bg: [0.27, 0.08, 25]
 	}
 
+	popup: {
+		current: {
+			fg: [0.96, 0.02, 250]
+			bg: [0.42, 0.03, 250]
+		}
+	}
+
 	// Tools — each type gets a distinct hue.
 	// Write tools look dangerous (red). Read tools are calm (green).
 	tools: {

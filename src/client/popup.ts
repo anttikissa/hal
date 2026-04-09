@@ -2,6 +2,7 @@
 // Kept intentionally narrow: one active popup, list-style rows, optional input.
 
 import { lineEditor } from '../cli/line-editor.ts'
+import { colors } from '../cli/colors.ts'
 import { models } from '../models.ts'
 import { clipVisual, visLen } from '../utils/strings.ts'
 import type { KeyEvent } from '../cli/keys.ts'
@@ -136,33 +137,41 @@ function pad(text: string, width: number): string {
 	return text + ' '.repeat(Math.max(0, width - visLen(text)))
 }
 
+function styleRow(text: string, active: boolean): string {
+	if (!active) return text
+	return `${colors.popup.current.bg}${colors.popup.current.fg}${text}${RESET}`
+}
+
 function buildOverlay(cols: number, rows: number): Overlay | null {
 	if (!state.active || cols < 12 || rows < 6) return null
-	const content: string[] = []
+	const content: Array<{ text: string; active: boolean }> = []
 	let inputCursor: { row: number; col: number } | null = null
 	if (state.kind === 'model') {
 		const built = editor.buildLine()
-		content.push(`> ${built.line}`)
-		content.push('')
+		content.push({ text: `> ${built.line}`, active: false })
+		content.push({ text: '', active: false })
 		inputCursor = { row: 1, col: 4 + built.cursor }
 	}
-	for (const line of state.body) content.push(line)
-	if (state.body.length > 0 && state.items.length > 0) content.push('')
-	for (let i = 0; i < state.items.length; i++) content.push(rowText(state.items[i]!, i === state.selectedIndex))
-	if (content.length === 0) content.push('')
+	for (const line of state.body) content.push({ text: line, active: false })
+	if (state.body.length > 0 && state.items.length > 0) content.push({ text: '', active: false })
+	for (let i = 0; i < state.items.length; i++) content.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex })
+	if (content.length === 0) content.push({ text: '', active: false })
 
 	// Keep a safety margin away from the terminal's last column and last row.
 	// Touching those edges can trigger wrap-pending weirdness in some terminals.
 	const rightSlack = cols > 12 ? 1 : 0
 	const bottomSlack = rows > 6 ? 1 : 0
-	const rawWidth = Math.max(visLen(state.title) + 2, ...content.map((line) => visLen(line)))
+	const rawWidth = Math.max(visLen(state.title) + 2, ...content.map((line) => visLen(line.text)))
 	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
 	const innerWidth = Math.max(18, Math.min(maxInnerWidth, state.preferredInnerWidth ?? rawWidth))
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)
 	const top = `┌${title}${'─'.repeat(Math.max(0, innerWidth - titleWidth))}┐`
 	const lines = [top]
-	for (const line of content) lines.push(`│${pad(clipVisual(line, innerWidth), innerWidth)}│`)
+	for (const line of content) {
+		const padded = pad(clipVisual(line.text, innerWidth), innerWidth)
+		lines.push(`│${styleRow(padded, line.active)}│`)
+	}
 	lines.push(`└${'─'.repeat(innerWidth)}┘`)
 	const totalWidth = innerWidth + 2
 	const maxX = Math.max(0, cols - rightSlack - totalWidth)
