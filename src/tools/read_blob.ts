@@ -5,6 +5,7 @@
 // to inspect old tool results or images referenced in conversation history.
 
 import { blob } from '../session/blob.ts'
+import { blobRef } from './blob-ref.ts'
 import { toolRegistry, type ToolContext } from './tool.ts'
 
 const MAX_OUTPUT = 1_000_000
@@ -13,7 +14,12 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const id = input?.id
 	if (!id || typeof id !== 'string') return 'error: id parameter is required'
 
-	const data = blob.readBlobFromChain(ctx.sessionId, id)
+	const ref = blobRef.parse(id, ctx.sessionId)
+	if (!ref) {
+		return 'error: invalid blob id (use "blobId" or "sessionId/blobId")'
+	}
+
+	const data = blob.readBlobFromChain(ref.sessionId, ref.blobId)
 	if (data === null) return `error: blob "${id}" not found`
 
 	// Blob data can be any serializable type — stringify for display
@@ -27,9 +33,9 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 toolRegistry.registerTool({
 	name: 'read_blob',
 	description:
-		'Read a stored blob by ID. Blobs are immutable snapshots of tool outputs, images, and thinking blocks from conversation history.',
+		'Read a stored blob by ID. Use "blobId" for the current session (or its fork chain), or "sessionId/blobId" for a specific session. Blobs are immutable snapshots of tool outputs, images, and thinking blocks from conversation history.',
 	parameters: {
-		id: { type: 'string', description: 'Blob ID (found in history entries like "blob <id>")' },
+		id: { type: 'string', description: 'Blob ID: either "0gdec4-bol" or "04-fyx/0gdec4-bol"' },
 	},
 	required: ['id'],
 	execute,
