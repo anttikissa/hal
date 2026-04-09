@@ -61,6 +61,40 @@ import { client } from '~src/client.ts'
 client.addEntry = (text) => { console.log('patched!'); origAddEntry(text) }
 ```
 
+# Configuration
+
+- Document config rules here and nowhere else.
+- Non-secret user settings live in `config.ason` at the repo root.
+- Each configurable module exports a mutable `config` object.
+- Register that object in `src/config.ts` under the module name.
+- `config.ason` uses that module name as its top-level key.
+- `src/config.ts` applies overrides with `Object.assign`, so keep config values plain.
+- Read config at call time. Do not capture config values at import time.
+
+Example:
+```ts
+// src/providers/anthropic.ts
+const config = {
+	claudeUseSerper: false,
+}
+export const anthropic = { config, generate }
+```
+
+```ts
+// src/config.ts
+const modules = {
+	anthropic: anthropic.config,
+}
+```
+
+```ason
+{
+	anthropic: {
+		claudeUseSerper: true
+	}
+}
+```
+
 # Terminal rules (see docs/terminal.md)
 
 Read docs/terminal.md BEFORE touching any rendering or terminal code. It
@@ -72,7 +106,7 @@ fullscreen flag. Violating them causes visual corruption.
 ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.
 Never use `.length` for measuring how wide a string is on screen. Emojis,
 CJK characters, and other wide chars take 2 columns. ANSI escapes take 0.
-There is ONE function for this. Use it everywhere. No exceptions.
+There is ONE function for this - use it everywhere.
 
 Word wrapping: use `wordWrap()` from the same file. It's ANSI-aware and
 uses `charWidth()` internally which is the same width logic as `visLen()`.
