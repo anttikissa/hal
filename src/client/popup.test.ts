@@ -26,6 +26,12 @@ describe('popup', () => {
 		expect(popup.state.active).toBe(false)
 	})
 
+
+	test('model picker starts with the current model selected', () => {
+		popup.openModelPicker(() => {}, 'openai/gpt-5.4')
+		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('gpt')
+	})
+
 	test('warning popup uses the same highlighted row layout', () => {
 		popup.openConfirm('Looks suspicious', ['read auth.ason'], ['Yes', 'No'], () => {})
 		const overlay = popup.buildOverlay(80, 24)

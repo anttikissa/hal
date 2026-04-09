@@ -57,7 +57,7 @@ function refreshModelItems(): void {
 	if (state.selectedIndex >= state.items.length) state.selectedIndex = Math.max(0, state.items.length - 1)
 }
 
-function openModelPicker(onChoose: (value: string) => void): void {
+function openModelPicker(onChoose: (value: string) => void, currentModel?: string): void {
 	close()
 	state.active = true
 	state.kind = 'model'
@@ -66,6 +66,9 @@ function openModelPicker(onChoose: (value: string) => void): void {
 	state.onChoose = onChoose
 	state.preferredInnerWidth = MODEL_PICKER_INNER_WIDTH
 	refreshModelItems()
+	const target = currentModel ? models.resolveModel(currentModel) : ''
+	const match = target ? MODEL_CHOICES.findIndex((item) => models.resolveModel(item.value) === target) : -1
+	if (match >= 0) state.selectedIndex = match
 }
 
 function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void): void {

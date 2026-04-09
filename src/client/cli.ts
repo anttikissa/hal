@@ -244,11 +244,12 @@ function handleAppKey(k: KeyEvent): boolean {
 	// Model picker: prefer Ctrl-M on modern terminals, keep Alt-M as fallback.
 	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
 		completion.dismiss()
+		const currentModel = client.currentTab()?.model || client.state.model || undefined
 		popup.openModelPicker((model) => {
 			submit(`/model ${model}`)
 			syncPromptToClient()
 			draw()
-		})
+		}, currentModel)
 		draw()
 		return true
 	}
@@ -335,9 +336,9 @@ function startCli(signal: AbortSignal): void {
 	process.on('exit', cleanupTerminal)
 	process.on('SIGCONT', onSigcont)
 
-	// Start the 500ms blink timer for tab status indicators.
-	// Triggers a repaint on each phase change so busy dots blink.
-	cursor.start(() => draw())
+	// Disabled for now: the 500ms blink repaint loop was corrupting the terminal
+	// on large sessions and making typing feel sluggish. Status indicators stay
+	// correct, they just update on normal redraws instead of an animation timer.
 
 	perf.mark('First draw')
 	draw()
