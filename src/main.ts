@@ -22,6 +22,9 @@ log.info('Startup', { isHost, hostPid, pid: process.pid })
 const ac = new AbortController()
 let electionTimer: ReturnType<typeof setInterval> | null = null
 let cleaned = false
+const MEMORY_LIMIT_BYTES = 1_000_000_000
+const MEMORY_CHECK_MS = 1_000
+let memoryTimer: ReturnType<typeof setInterval> | null = null
 
 function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
@@ -39,11 +42,17 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	runtime.startRuntime(ac.signal)
 }
 
+function tickMemory(): void {
+	if (process.memoryUsage().rss <= MEMORY_LIMIT_BYTES) return
+	process.exit(0)
+}
+
 function cleanup(): void {
 	if (cleaned) return
 	cleaned = true
 	log.info('Cleanup started', { isHost, pid: process.pid })
 	if (electionTimer) clearInterval(electionTimer)
+	if (memoryTimer) clearInterval(memoryTimer)
 	ac.abort()
 	if (isHost) {
 		ipc.appendEvent({ type: 'host-released' })
@@ -79,6 +88,8 @@ process.on('SIGTERM', () => {
 	cleanup()
 	process.exit(0)
 })
+
+memoryTimer = setInterval(tickMemory, MEMORY_CHECK_MS)
 
 electionTimer = setInterval(tickElection, 100)
 
