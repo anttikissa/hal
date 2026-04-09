@@ -29,9 +29,11 @@ const state = {
 	items: [] as PopupItem[],
 	selectedIndex: 0,
 	onChoose: null as ((value: string) => void) | null,
+	preferredInnerWidth: null as number | null,
 }
 
 const MODEL_CHOICES = models.listModelChoices()
+const MODEL_PICKER_INNER_WIDTH = 72
 const YELLOW = '\x1b[33m'
 const GRAY = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
@@ -44,6 +46,7 @@ function close(): void {
 	state.items = []
 	state.selectedIndex = 0
 	state.onChoose = null
+	state.preferredInnerWidth = null
 	editor.clear()
 }
 
@@ -61,6 +64,7 @@ function openModelPicker(onChoose: (value: string) => void): void {
 	state.title = 'Pick a model'
 	state.tone = 'neutral'
 	state.onChoose = onChoose
+	state.preferredInnerWidth = MODEL_PICKER_INNER_WIDTH
 	refreshModelItems()
 }
 
@@ -143,16 +147,25 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	if (state.body.length > 0 && state.items.length > 0) content.push('')
 	for (let i = 0; i < state.items.length; i++) content.push(rowText(state.items[i]!, i === state.selectedIndex))
 	if (content.length === 0) content.push('')
+
+	// Keep a safety margin away from the terminal's last column and last row.
+	// Touching those edges can trigger wrap-pending weirdness in some terminals.
+	const rightSlack = cols > 12 ? 1 : 0
+	const bottomSlack = rows > 6 ? 1 : 0
 	const rawWidth = Math.max(visLen(state.title) + 2, ...content.map((line) => visLen(line)))
-	const innerWidth = Math.max(18, Math.min(cols - 4, rawWidth))
+	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
+	const innerWidth = Math.max(18, Math.min(maxInnerWidth, state.preferredInnerWidth ?? rawWidth))
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)
 	const top = `┌${title}${'─'.repeat(Math.max(0, innerWidth - titleWidth))}┐`
 	const lines = [top]
 	for (const line of content) lines.push(`│${pad(clipVisual(line, innerWidth), innerWidth)}│`)
 	lines.push(`└${'─'.repeat(innerWidth)}┘`)
-	const x = Math.max(0, Math.floor((cols - (innerWidth + 2)) / 2))
-	const y = Math.max(0, Math.floor((rows - lines.length) / 2))
+	const totalWidth = innerWidth + 2
+	const maxX = Math.max(0, cols - rightSlack - totalWidth)
+	const x = Math.max(0, Math.floor(maxX / 2))
+	const maxY = Math.max(0, rows - bottomSlack - lines.length)
+	const y = Math.max(0, Math.min(Math.floor((rows - lines.length) / 2), maxY))
 	const color = toneColor()
 	const colored = lines.map((line, index) => {
 		if (index === 0 || index === lines.length - 1) return `${color}${line}${RESET}`

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { popup } from './popup.ts'
+import { visLen } from '../utils/strings.ts'
 import type { KeyEvent } from '../cli/keys.ts'
-
 function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
 }
@@ -31,5 +31,25 @@ describe('popup', () => {
 		const overlay = popup.buildOverlay(80, 24)
 		expect(overlay).not.toBeNull()
 		expect(overlay?.lines.join('\n')).toContain('[Yes]')
+	})
+
+
+	test('model picker keeps a stable width while filtering', () => {
+		popup.openModelPicker(() => {})
+		const before = popup.buildOverlay(120, 30)
+		expect(before).not.toBeNull()
+		popup.handleKey({ key: 'l', char: 'l', shift: false, alt: false, ctrl: false, cmd: false })
+		popup.handleKey({ key: 'l', char: 'l', shift: false, alt: false, ctrl: false, cmd: false })
+		const after = popup.buildOverlay(120, 30)
+		expect(after).not.toBeNull()
+		expect(visLen(after!.lines[0]!)).toBe(visLen(before!.lines[0]!))
+	})
+
+	test('popup keeps a safety margin away from terminal edges', () => {
+		popup.openModelPicker(() => {})
+		const overlay = popup.buildOverlay(40, 24)
+		expect(overlay).not.toBeNull()
+		expect(Math.max(...overlay!.lines.map((line) => visLen(line)))).toBeLessThan(40)
+		expect(overlay!.y + overlay!.lines.length).toBeLessThan(24)
 	})
 })
