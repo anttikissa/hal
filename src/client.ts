@@ -3,6 +3,7 @@
 
 import { readFileSync, writeFileSync } from 'fs'
 import { ipc } from './ipc.ts'
+import type { SharedSessionInfo, SharedState } from './ipc.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
 import { draft as draftModule } from './cli/draft.ts'
@@ -326,41 +327,89 @@ function hasTrailingAssistantText(tab: Tab, text: string): boolean {
 	return false
 }
 
+function makeTabFromDisk(info: SharedSessionInfo): Tab {
+	const meta = sessionStore.loadSessionMeta(info.id)
+	const history = sessionStore.loadHistory(info.id)
+	const dirName = (meta?.workingDir ?? info.cwd)?.split('/').pop()
+	const tab = makeTab(
+		info.id,
+		meta?.topic ?? info.name ?? dirName ?? `tab ${state.tabs.length + 1}`,
+		{ cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model },
+	)
+	tab.rawHistory = history
+	tab.loaded = false
+	for (const entry of history) {
+		if (entry.usage) {
+			tab.usage.input += (entry.usage as any).input ?? 0
+			tab.usage.output += (entry.usage as any).output ?? 0
+		}
+	}
+	if (meta?.context) {
+		tab.contextUsed = meta.context.used
+		tab.contextMax = meta.context.max
+	}
+	return tab
+}
+
+function applySessionList(items: SharedSessionInfo[]): void {
+	const newTabs: Tab[] = []
+	const isFork = pendingOpen === 'fork'
+	for (const s of items) {
+		const existing = state.tabs.find((t) => t.sessionId === s.id)
+		if (existing) {
+			existing.name = s.name
+			existing.cwd = s.cwd || existing.cwd
+			existing.model = s.model || existing.model
+			newTabs.push(existing)
+		} else {
+			newTabs.push(makeTabFromDisk(s))
+		}
+	}
+	const grew = newTabs.length > state.tabs.length
+	const prevSession = state.tabs[state.activeTab]?.sessionId ?? ''
+	state.tabs = newTabs
+	flushPendingEntries()
+	if (state.activeTab >= state.tabs.length) state.activeTab = state.tabs.length - 1
+	if (grew) state.activeTab = state.tabs.length - 1
+	const newSession = state.tabs[state.activeTab]?.sessionId ?? ''
+	const active = state.tabs[state.activeTab]
+	if (active && !active.loaded) ensureTabLoaded(active)
+	if (isFork && grew && prevSession) {
+		const prevTab = newTabs.find(t => t.sessionId === prevSession)
+		const newTab = newTabs[state.activeTab]
+		if (prevTab?.inputDraft && newTab) newTab.inputDraft = prevTab.inputDraft
+	}
+	pendingOpen = false
+	if (prevSession !== newSession && onTabSwitch) onTabSwitch(prevSession, newSession)
+	onChange(false)
+}
+
+function applySharedState(shared: SharedState): void {
+	if (shared.openSessions.length > 0 || state.tabs.length > 0) {
+		applySessionList(shared.openSessions)
+	}
+
+	const activeSession = currentTab()?.sessionId
+	const nextBusy = new Map<string, boolean>()
+	for (const [sessionId, busy] of Object.entries(shared.busy)) {
+		if (busy) nextBusy.set(sessionId, true)
+	}
+	for (const [sessionId, wasBusy] of state.busy) {
+		if (!wasBusy || nextBusy.get(sessionId)) continue
+		if (sessionId !== activeSession) {
+			const tab = state.tabs.find((item) => item.sessionId === sessionId)
+			if (tab) tab.doneUnseen = true
+		}
+	}
+	state.busy = nextBusy
+	state.activity = new Map(Object.entries(shared.activity))
+}
+
 function handleEvent(event: any): void {
 	if (event.type === 'runtime-start' || event.type === 'host-released') return
 
 	if (event.type === 'sessions') {
-		const newTabs: Tab[] = []
-		const isFork = pendingOpen === 'fork'
-		for (const s of event.sessions) {
-			const existing = state.tabs.find((t) => t.sessionId === s.id)
-			if (existing) {
-				existing.name = s.name
-				// Update cwd/model from server (may have changed via /cd or /model)
-				if (s.cwd) existing.cwd = s.cwd
-				if (s.model) existing.model = s.model
-				newTabs.push(existing)
-			} else {
-				newTabs.push(makeTab(s.id, s.name, { cwd: s.cwd, model: s.model }))
-			}
-		}
-		const grew = newTabs.length > state.tabs.length
-		const prevSession = state.tabs[state.activeTab]?.sessionId ?? ''
-		state.tabs = newTabs
-		flushPendingEntries()
-		if (state.activeTab >= state.tabs.length) state.activeTab = state.tabs.length - 1
-		if (grew) state.activeTab = state.tabs.length - 1
-		const newSession = state.tabs[state.activeTab]?.sessionId ?? ''
-		// On fork, copy the parent's draft to the new tab
-		if (isFork && grew && prevSession) {
-			const prevTab = newTabs.find(t => t.sessionId === prevSession)
-			const newTab = newTabs[state.activeTab]
-			if (prevTab?.inputDraft && newTab) newTab.inputDraft = prevTab.inputDraft
-		}
-		pendingOpen = false
-		// When active tab changes (e.g. new tab added), save/restore drafts
-		if (prevSession !== newSession && onTabSwitch) onTabSwitch(prevSession, newSession)
-		onChange(false)
+		applySessionList(event.sessions as SharedSessionInfo[])
 	} else if (event.type === 'prompt') {
 		addBlockToTab(event.sessionId, {
 			type: 'user',
@@ -499,12 +548,6 @@ function handleEvent(event: any): void {
 	}
 }
 
-function eventsForCurrentRuntime(events: any[]): any[] {
-	for (let i = events.length - 1; i >= 0; i--) {
-		if (events[i]?.type === 'runtime-start') return events.slice(i + 1)
-	}
-	return events
-}
 
 function loadPersistedSessions(): void {
 	const loaded = sessionStore.loadAllSessions()
@@ -617,31 +660,36 @@ function startWatchingHostLock(): void {
 	})
 }
 
+let ipcStateFile: SharedState | null = null
+
+function startWatchingIpcState(): void {
+	if (ipcStateFile) return
+	// Bootstrap state belongs in state.ason. New clients read it once, then keep
+	// following changes via the file watcher while tailing only future events.
+	ipcStateFile = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, ipc.readState())
+	applySharedState(ipcStateFile)
+	liveFiles.onChange(ipcStateFile, () => {
+		applySharedState(ipcStateFile!)
+	})
+}
+
 function startClient(signal: AbortSignal): void {
 	startWatchingHostLock()
+	startWatchingIpcState()
+
+	void (async () => {
+		for await (const event of ipc.tailEvents(signal)) {
+			handleEvent(event)
+		}
+	})()
 
 	// Load persisted sessions directly from disk (fast, no IPC roundtrip).
 	loadPersistedSessions()
-
-	// Read a point-in-time snapshot and remember exactly where it ended.
-	// We then tail from that byte offset so any events appended after the
-	// snapshot read are still delivered. This closes the startup race where a
-	// client could briefly load stale tabs and then miss the correcting
-	// sessions event forever.
-	const snapshot = ipc.readEventSnapshot()
-	for (const event of eventsForCurrentRuntime(snapshot.events)) {
-		handleEvent(event)
-	}
+	if (ipcStateFile) applySharedState(ipcStateFile)
 	onChange(false)
 
 	// Background-load blobs + remaining tabs after first paint
 	void loadInBackground()
-
-	void (async () => {
-		for await (const event of ipc.tailEventsFrom(snapshot.endOffset, signal)) {
-			handleEvent(event)
-		}
-	})()
 }
 
 // ── Namespace ────────────────────────────────────────────────────────────────
