@@ -1,13 +1,6 @@
-// Runtime configuration — loads state/config.ason and applies overrides
-// to each module's config object. Watches for changes.
-//
-// config.ason format:
-//   {
-//     client: { backgroundLoadTabs: false }
-//     blocks: { blobBatchSize: 16 }
-//   }
-//
-// Each key maps to a module, values are Object.assign'd onto module.config.
+// Runtime configuration — loads config.ason and applies overrides to module
+// config objects. The exported namespace stays mutable so tests and eval can
+// swap the backing data object or patch save/apply behavior.
 
 import { liveFiles } from './utils/live-file.ts'
 import { client } from './client.ts'
@@ -23,21 +16,29 @@ const modules: Record<string, Record<string, any>> = {
 	agentLoop: agentLoop.config,
 }
 
-// config.ason lives at project root (not state/) — it's user-facing config
+// config.ason lives at repo root — it's user-facing config.
 const HAL_DIR = import.meta.dir.replace(/\/src$/, '')
-const data = liveFiles.liveFile(`${HAL_DIR}/config.ason`, {})
 
 function apply(): void {
-	for (const [name, overrides] of Object.entries(data)) {
-		const target = modules[name]
+	for (const [name, overrides] of Object.entries(config.data)) {
+		const target = config.modules[name]
 		if (target && overrides && typeof overrides === 'object') {
 			Object.assign(target, overrides)
 		}
 	}
 }
 
-// Apply on load and on every external edit
-apply()
-liveFiles.onChange(data, apply)
+function save(): void {
+	liveFiles.save(config.data)
+}
 
-export const config = { data, apply }
+export const config = {
+	modules,
+	data: liveFiles.liveFile(`${HAL_DIR}/config.ason`, {}) as Record<string, any>,
+	apply,
+	save,
+}
+
+// Apply on load and on every external edit.
+config.apply()
+liveFiles.onChange(config.data, config.apply)

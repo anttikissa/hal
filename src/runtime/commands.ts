@@ -8,10 +8,12 @@ import { existsSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { ipc } from '../ipc.ts'
-import { protocol } from '../protocol.ts'
 import { models } from '../models.ts'
+import { ason } from '../utils/ason.ts'
+import { config } from '../config.ts'
 import { context } from './context.ts'
-import { agentLoop } from './agent-loop.ts'
+import { sessions as sessionStore } from '../server/sessions.ts'
+import { inbox } from './inbox.ts'
 
 // ── Types ──
 
@@ -25,12 +27,18 @@ export interface CommandResult {
 }
 
 /** Session state that commands can read and modify. */
+export interface SessionRef {
+	id: string
+	name: string
+}
+
 export interface SessionState {
 	id: string
 	name: string
 	model?: string
 	cwd: string
 	createdAt: string
+	sessions?: SessionRef[]
 }
 
 // ── Command parsing ──
@@ -67,18 +75,118 @@ type CommandHandler = (
 
 const handlers: Record<string, CommandHandler> = {}
 
-// /help — list available commands
-handlers['help'] = () => {
+function parseSendArgs(args: string): { target: string; text: string } | null {
+	const spaceIdx = args.indexOf(' ')
+	if (spaceIdx === -1) return null
+	const target = args.slice(0, spaceIdx).trim()
+	const text = args.slice(spaceIdx + 1).trim()
+	if (!target || !text) return null
+	return { target, text }
+}
+
+function resolveSendTarget(session: SessionState, raw: string): SessionRef | null {
+	const sessions = session.sessions ?? []
+	if (/^\d+$/.test(raw)) {
+		const index = parseInt(raw, 10) - 1
+		return sessions[index] ?? null
+	}
+	return sessions.find((item) => item.id === raw) ?? null
+}
+
+function sendToSession(from: SessionState, target: SessionRef, text: string): CommandResult {
+	if (target.id === from.id) {
+		return { error: 'Cannot send to the current session.', handled: true }
+	}
+	inbox.queueMessage(target.id, text, from.id)
+	return { output: `Sent to ${target.name} (${target.id})`, handled: true }
+}
+
+function closedSessionLines(): string[] {
+	const openIds = new Set(sessionStore.loadSessionList())
+	const closed = sessionStore
+		.loadAllSessionMetas()
+		.filter((meta) => !openIds.has(meta.id))
+		.sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
+	if (closed.length === 0) return ['No closed sessions.']
+	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => `  ${meta.id}`)]
+}
+
+// Keep /help output short, and put the fiddly syntax under /help <command>.
+function normalizeHelpTopic(args: string): string {
+	return args.trim().replace(/^\//, '')
+}
+
+function detailedHelp(topic: string): string | null {
+	if (topic === 'config') {
+		return [
+			'/config',
+			'Show current live config.',
+			'',
+			'/config <module-or-path>',
+			'Show one section or key.',
+			'',
+			'/config <module-or-path> <value>',
+			'Write a value to config.ason and apply it now.',
+			'',
+			'/config <module-or-path> --temp <value>',
+			'/config --temp <module-or-path> <value>',
+			'/config <module-or-path> <value> --temp',
+			'Set a value in memory only.',
+			'',
+			'Caveat: a later config.ason reload can replace temp values.',
+			'',
+			'Examples:',
+			'  /config',
+			'  /config agentLoop',
+			'  /config agentLoop.maxIterations',
+			'  /config agentLoop.maxIterations 2',
+			'  /config agentLoop.maxIterations --temp 2',
+		].join('\n')
+	}
+	if (topic === 'model') {
+		return ['Usage: /model [name]', '', 'With no name, shows the current model and the available choices.'].join('\n')
+	}
+	if (topic === 'send') {
+		return ['Usage: /send <tab|session-id> <message>', '', 'Targets can be a tab number like 2 or a full session id.'].join(
+			'\n',
+		)
+	}
+	if (topic === 'broadcast') {
+		return ['Usage: /broadcast <message>', '', 'Sends the same message to every other open tab.'].join('\n')
+	}
+	if (topic === 'cd') {
+		return ['Usage: /cd [path]', '', 'With no path, shows the current working directory.'].join('\n')
+	}
+	if (topic === 'resume') {
+		return ['Usage: /resume [session-id]', '', 'With no id, lists recently closed sessions.'].join('\n')
+	}
+	return null
+}
+
+// /help — list commands or show details for one command
+handlers['help'] = (args) => {
+	const topic = normalizeHelpTopic(args)
+	if (topic) {
+		const text = detailedHelp(topic)
+		if (!text) {
+			return { error: `No detailed help for /${topic}. Try /help.`, handled: true }
+		}
+		return { output: text, handled: true }
+	}
+
 	const lines = [
 		'Available commands:',
 		'  /model [name]   Switch model or list available models',
 		'  /clear          Clear session history',
 		'  /fork           Fork current session to new tab',
+		'  /resume [id]    Resume a closed session',
 		'  /compact        Summarize conversation to reduce context',
+		'  /send <tab|id>  Send a message to another tab',
+		'  /broadcast ...  Send a message to every other tab',
 		'  /cd [path]      Change working directory',
 		'  /system         Show full preprocessed system prompt',
-		'  /show [what]    Show system prompt, context, model',
-		'  /help           Show this help',
+		'  /config [...]   View or change config',
+		'  /help [cmd]     Show help; try /help config',
 		'  /exit           Quit Hal',
 		'  /eval [code]    Run JavaScript in the runtime',
 	]
@@ -129,6 +237,36 @@ handlers['compact'] = (_args, session) => {
 	return { output: 'Compacting conversation...', handled: true }
 }
 
+// /resume [id] — list closed sessions or reopen one as a tab
+handlers['resume'] = (args, session) => {
+	const id = args.trim()
+	if (!id) return { output: closedSessionLines().join('\n'), handled: true }
+	ipc.appendCommand({ type: 'resume', text: id, sessionId: session.id })
+	return { output: `Resuming ${id}...`, handled: true }
+}
+
+// /send <tab|session-id> <message> — queue a message for another session
+handlers['send'] = (args, session) => {
+	const parsed = parseSendArgs(args)
+	if (!parsed) return { error: 'Usage: /send <tab|session-id> <message>', handled: true }
+	if (parsed.target === 'all') return handlers['broadcast']!(parsed.text, session, () => {})
+	const target = resolveSendTarget(session, parsed.target)
+	if (!target) {
+		return { error: `Unknown tab or session: ${parsed.target}`, handled: true }
+	}
+	return sendToSession(session, target, parsed.text)
+}
+
+// /broadcast <message> — queue the same message for every other session
+handlers['broadcast'] = (args, session) => {
+	const text = args.trim()
+	if (!text) return { error: 'Usage: /broadcast <message>', handled: true }
+	const targets = (session.sessions ?? []).filter((item) => item.id !== session.id)
+	if (targets.length === 0) return { error: 'No other sessions.', handled: true }
+	for (const target of targets) inbox.queueMessage(target.id, text, session.id)
+	return { output: `Broadcast to ${targets.length} sessions`, handled: true }
+}
+
 // /cd [path] — change working directory
 handlers['cd'] = (args, session) => {
 	if (!args) {
@@ -167,60 +305,136 @@ handlers['system'] = (_args, session) => {
 	}
 }
 
-// /show [what] — show system prompt, context info, etc.
-handlers['show'] = (args, session) => {
-	const what = args || 'prompt'
+function currentConfigSnapshot(): Record<string, any> {
+	const snapshot: Record<string, any> = {}
+	for (const [name, moduleConfig] of Object.entries(config.modules)) {
+		snapshot[name] = moduleConfig
+	}
+	return snapshot
+}
 
-	if (what === 'prompt' || what === 'system') {
-		const model = session.model ?? models.defaultModel()
-		const result = context.buildSystemPrompt({
-			model,
-			cwd: session.cwd,
-			sessionId: session.id,
-		})
-		const lines = [`System prompt (${context.formatBytes(result.bytes)}):`, '']
-		// Show loaded files
-		for (const f of result.loaded) {
-			lines.push(`  ${f.name} (${context.formatBytes(f.bytes)}) — ${f.path}`)
+function splitConfigPath(path: string): string[] {
+	return path.split('.').filter(Boolean)
+}
+
+function readConfigPath(path: string): CommandResult {
+	const parts = splitConfigPath(path)
+	if (parts.length === 0) return { error: 'Usage: /config [module[.key]] [value] [--temp]', handled: true }
+	const root = config.modules[parts[0]!]
+	if (!root) return { error: `Unknown config module: ${parts[0]}`, handled: true }
+
+	let value: any = root
+	for (const part of parts.slice(1)) {
+		if (!value || typeof value !== 'object' || !(part in value)) {
+			return { error: `Unknown config key: ${path}`, handled: true }
 		}
-		lines.push('')
-		// Truncate the actual prompt to avoid flooding
-		const maxLen = 2000
-		if (result.text.length > maxLen) {
-			lines.push(result.text.slice(0, maxLen))
-			lines.push(`\n... (${result.text.length - maxLen} more chars)`)
-		} else {
-			lines.push(result.text)
-		}
-		return { output: lines.join('\n'), handled: true }
+		value = value[part]
 	}
 
-	if (what === 'model') {
-		const model = session.model ?? models.defaultModel()
-		const display = models.displayModel(model)
-		const ctxWindow = models.contextWindow(model)
-		return {
-			output: [`Model: ${display} (${model})`, `Context window: ${(ctxWindow / 1000).toFixed(0)}k tokens`].join(
-				'\n',
-			),
-			handled: true,
+	return { output: `${path}:\n${ason.stringify(value, 'long')}`, handled: true }
+}
+
+function ensureConfigObject(root: Record<string, any>, parts: string[]): Record<string, any> | null {
+	let node = root
+	for (const part of parts) {
+		const next = node[part]
+		if (next == null) {
+			node[part] = {}
+			node = node[part]
+			continue
 		}
+		if (!next || typeof next !== 'object' || Array.isArray(next)) return null
+		node = next
+	}
+	return node
+}
+
+function setConfigPath(path: string, value: any, temp: boolean): CommandResult {
+	const parts = splitConfigPath(path)
+	if (parts.length < 2) {
+		return { error: 'Set a specific key like agentLoop.maxIterations.', handled: true }
 	}
 
-	if (what === 'context') {
-		const model = session.model ?? models.defaultModel()
-		const ctxWindow = models.contextWindow(model)
-		return {
-			output: [
-				`Model: ${models.displayModel(model)}`,
-				`Context window: ${(ctxWindow / 1000).toFixed(0)}k tokens`,
-				`Working dir: ${session.cwd}`,
-			].join('\n'),
-			handled: true,
-		}
+	const moduleName = parts[0]!
+	const leaf = parts[parts.length - 1]!
+	const parentParts = parts.slice(1, -1)
+
+	if (temp) {
+		const moduleConfig = config.modules[moduleName]
+		if (!moduleConfig) return { error: `Unknown config module: ${moduleName}`, handled: true }
+		const parent = ensureConfigObject(moduleConfig, parentParts)
+		if (!parent) return { error: `Cannot write temp config at ${path}`, handled: true }
+		parent[leaf] = value
+		return { output: `Temporarily set ${path} = ${ason.stringify(value, 'short')}`, handled: true }
 	}
 
-	return { error: `/show: unknown topic "${what}". Try: prompt, model, context`, handled: true }
+	if (!config.modules[moduleName]) {
+		return { error: `Unknown config module: ${moduleName}`, handled: true }
+	}
+
+	const moduleOverrides = config.data[moduleName]
+	if (!moduleOverrides || typeof moduleOverrides !== 'object' || Array.isArray(moduleOverrides)) {
+		config.data[moduleName] = {}
+	}
+	const parent = ensureConfigObject(config.data[moduleName], parentParts)
+	if (!parent) return { error: `Cannot write config at ${path}`, handled: true }
+	parent[leaf] = value
+	config.apply()
+	config.save()
+	return { output: `Set ${path} = ${ason.stringify(value, 'short')}`, handled: true }
+}
+
+function parseConfigArgs(args: string): { help: boolean; temp: boolean; path: string; value: string } {
+	const tokens = args.trim() ? args.trim().split(/\s+/) : []
+	let help = false
+	let temp = false
+	const rest: string[] = []
+	for (const token of tokens) {
+		if (token === '--help') {
+			help = true
+			continue
+		}
+		if (token === '--temp') {
+			temp = true
+			continue
+		}
+		rest.push(token)
+	}
+	return {
+		help,
+		temp,
+		path: rest[0] ?? '',
+		value: rest.slice(1).join(' '),
+	}
+}
+
+// /config — inspect or change runtime config
+handlers['config'] = (args) => {
+	const parsed = parseConfigArgs(args)
+	if (parsed.help) return { output: detailedHelp('config')!, handled: true }
+	if (!parsed.path) {
+		return { output: `Current config:\n${ason.stringify(currentConfigSnapshot(), 'long')}`, handled: true }
+	}
+	if (!parsed.value) return readConfigPath(parsed.path)
+
+	try {
+		const value = ason.parse(parsed.value)
+		return setConfigPath(parsed.path, value, parsed.temp)
+	} catch (err: any) {
+		return { error: `/config: could not parse value: ${err?.message ?? String(err)}`, handled: true }
+	}
+}
+
+// /show — old compatibility shim. Point users at the real commands instead.
+handlers['show'] = (args) => {
+	const what = args.trim()
+	if (!what || what === 'prompt' || what === 'system') {
+		return { output: 'Use /system for the full prompt.', handled: true }
+	}
+	if (what === 'config' || what === 'agentLoop') {
+		return { output: 'Use /config or /config agentLoop.', handled: true }
+	}
+	return { error: 'Use /system for the prompt, /config for config, and /help for commands.', handled: true }
 }
 
 // /exit — quit

@@ -18,15 +18,16 @@ export interface CompletionResult {
 
 interface CommandSpec {
 	name: string
-	arg?: 'model' | 'dir'
+	arg?: 'model' | 'dir' | 'command'
 }
 
 // ── Known commands ───────────────────────────────────────────────────────────
 
 const COMMANDS: CommandSpec[] = [
-	{ name: 'help' },
+	{ name: 'help', arg: 'command' },
 	{ name: 'reset' },
 	{ name: 'compact' },
+	{ name: 'resume' },
 	{ name: 'model', arg: 'model' },
 	{ name: 'cd', arg: 'dir' },
 	{ name: 'continue' },
@@ -34,7 +35,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'tab' },
 	{ name: 'close' },
 	{ name: 'system' },
-	{ name: 'show' },
+	{ name: 'config' },
 	{ name: 'clear' },
 	{ name: 'exit' },
 ]
@@ -180,6 +181,8 @@ function complete(text: string, cursor: number): CompletionResult | null {
 		values = config.modelNames.filter((m) => m.startsWith(argPrefix))
 	} else if (spec.arg === 'dir') {
 		values = completeDirs(argPrefix, process.cwd())
+	} else if (spec.arg === 'command') {
+		values = COMMANDS.map((item) => item.name).filter((name) => name.startsWith(argPrefix))
 	}
 
 	if (values.length === 0) return null
