@@ -66,6 +66,16 @@ function resolveOpenAIApiUrl(credential: Credential): string {
 	return RESPONSES_API_URL
 }
 
+function parseResetsInSeconds(body: string | undefined): number | undefined {
+	if (!body) return undefined
+	try {
+		const json = JSON.parse(body)
+		const secs = json?.error?.resets_in_seconds ?? json?.resets_in_seconds
+		if (typeof secs === 'number' && secs > 0) return secs * 1000
+	} catch {}
+	return undefined
+}
+
 // ── Responses API message conversion ──
 // Our internal message format follows Anthropic's structure. Native OpenAI
 // expects Responses API items instead.
@@ -707,14 +717,18 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 		// Default cooldown: 10 minutes, or whatever the server says via Retry-After.
 		if (res.status === 429) {
 			const label = credential.email ? ` (${credential.email})` : ''
-			auth.markCooldown(credential, retryAfterMs ?? 10 * 60_000)
+			const bodyResetMs = parseResetsInSeconds(text)
+			auth.markCooldown(credential, bodyResetMs ?? retryAfterMs ?? 10 * 60_000)
+			// Retry fast only if another account is available.
+			// Otherwise use the body's reset time so we don't spin forever.
+			const fast = auth.hasAvailableCredential('openai')
 			yield {
 				type: 'error',
-				message: `openai ${res.status}: rate limited${label}`,
+				message: `openai 429: rate limited${label}`,
 				status: res.status,
 				body: text,
 				endpoint: apiUrl,
-				retryAfterMs: 1_000, // retry fast — we'll use the next account
+				retryAfterMs: fast ? 1_000 : bodyResetMs ?? retryAfterMs,
 			}
 		} else {
 			yield {

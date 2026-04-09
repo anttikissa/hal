@@ -86,6 +86,36 @@ describe('auth.getCredential — multi-account rotation', () => {
 	})
 })
 
+describe('auth.hasAvailableCredential', () => {
+	beforeEach(() => {
+		auth._resetCooldowns()
+		auth._setStoreForTest({
+			openai: [
+				fakeAccount('a@test.com', 'tok_a'),
+				fakeAccount('b@test.com', 'tok_b'),
+			],
+		})
+	})
+
+	test('true when no cooldowns', () => {
+		expect(auth.hasAvailableCredential('openai')).toBe(true)
+	})
+
+	test('true when some but not all on cooldown', () => {
+		const c1 = auth.getCredential('openai')
+		auth.markCooldown(c1!, 60_000)
+		expect(auth.hasAvailableCredential('openai')).toBe(true)
+	})
+
+	test('false when all on cooldown', () => {
+		const c1 = auth.getCredential('openai')
+		auth.markCooldown(c1!, 60_000)
+		const c2 = auth.getCredential('openai')
+		auth.markCooldown(c2!, 60_000)
+		expect(auth.hasAvailableCredential('openai')).toBe(false)
+	})
+})
+
 describe('auth.markCooldown', () => {
 	beforeEach(() => {
 		auth._resetCooldowns()

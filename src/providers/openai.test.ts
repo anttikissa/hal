@@ -11,12 +11,16 @@ const origFetch = globalThis.fetch
 const origGetCredential = auth.getCredential
 const origGetEntry = auth.getEntry
 const origEnsureFresh = auth.ensureFresh
+const origMarkCooldown = auth.markCooldown
+const origHasAvailableCredential = auth.hasAvailableCredential
 
 afterEach(() => {
 	globalThis.fetch = origFetch
 	auth.getCredential = origGetCredential
 	auth.getEntry = origGetEntry
 	auth.ensureFresh = origEnsureFresh
+	auth.markCooldown = origMarkCooldown
+	auth.hasAvailableCredential = origHasAvailableCredential
 })
 
 function encodeBase64Url(text: string): string {
@@ -152,4 +156,73 @@ test('compat providers stay on chat completions endpoints', async () => {
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
 	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6 } })
+})
+
+
+test('openai 429 shows email and retries fast when another account is available', async () => {
+	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0' }
+	let cooldownMs = 0
+	let cooldownCred: Credential | undefined
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => credential
+	auth.getEntry = () => ({})
+	auth.markCooldown = (cred: Credential, ms: number) => {
+		cooldownCred = cred
+		cooldownMs = ms
+	}
+	auth.hasAvailableCredential = () => true
+	installFetchMock(async () => new Response(JSON.stringify({ error: { resets_in_seconds: 2064 } }), { status: 429 }) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) {
+		events.push(event)
+	}
+
+	expect(cooldownCred).toBe(credential)
+	expect(cooldownMs).toBe(2_064_000)
+	expect(events[0]).toMatchObject({
+		type: 'error',
+		message: 'openai 429: rate limited (burned@test.com)',
+		status: 429,
+		retryAfterMs: 1_000,
+	})
+	expect(events.at(-1)).toEqual({ type: 'done' })
+})
+
+test('openai 429 waits for reset when all accounts are on cooldown', async () => {
+	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0' }
+	let cooldownMs = 0
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => credential
+	auth.getEntry = () => ({})
+	auth.markCooldown = (_cred: Credential, ms: number) => {
+		cooldownMs = ms
+	}
+	auth.hasAvailableCredential = () => false
+	installFetchMock(async () => new Response(JSON.stringify({ error: { resets_in_seconds: 2064 } }), { status: 429 }) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) {
+		events.push(event)
+	}
+
+	expect(cooldownMs).toBe(2_064_000)
+	expect(events[0]).toMatchObject({
+		type: 'error',
+		message: 'openai 429: rate limited (burned@test.com)',
+		status: 429,
+		retryAfterMs: 2_064_000,
+	})
 })

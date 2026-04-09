@@ -108,6 +108,17 @@ function markCooldown(cred: Credential, durationMs: number): void {
 	cooldowns.set(cred._key, Date.now() + durationMs)
 }
 
+/** True if at least one credential for this provider is NOT on cooldown. */
+function hasAvailableCredential(providerName: string): boolean {
+	const entries = normalizeEntries(store()[providerName])
+	const now = Date.now()
+	for (let i = 0; i < entries.length; i++) {
+		const until = cooldowns.get(`${providerName}:${i}`) ?? 0
+		if (now >= until) return true
+	}
+	return false
+}
+
 /** If all accounts for a provider are on cooldown, return a user-facing error message. */
 function allOnCooldownMessage(providerName: string): string | null {
 	const raw = store()[providerName]
@@ -258,6 +269,7 @@ export const auth = {
 	ensureFresh,
 	isApiKey,
 	markCooldown,
+	hasAvailableCredential,
 	allOnCooldownMessage,
 	_setStoreForTest,
 	_resetCooldowns,
