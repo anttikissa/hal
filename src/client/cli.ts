@@ -241,8 +241,8 @@ function handleAppKey(k: KeyEvent): boolean {
 		suspend()
 		return true
 	}
-	// Alt-M: prototype model picker popup
-	if (k.key === 'm' && k.alt && !k.ctrl && !k.cmd) {
+	// Model picker: prefer Ctrl-M on modern terminals, keep Alt-M as fallback.
+	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
 		completion.dismiss()
 		popup.openModelPicker((model) => {
 			submit(`/model ${model}`)
