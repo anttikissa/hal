@@ -8,6 +8,7 @@ import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
 import { helpBar } from '../cli/help-bar.ts'
+import { popup } from './popup.ts'
 import { clipboard } from '../cli/clipboard.ts'
 import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
@@ -109,10 +110,11 @@ function onSigcont(): void {
 	draw(true)
 }
 
-function submit(): void {
-	const text = prompt.text().trim()
+function submit(override?: string): void {
+	const text = (override ?? prompt.text()).trim()
 	if (!text) return
 	completion.dismiss()
+	popup.close()
 	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
 	// If the session is busy (generating/running tools), send a steer command
@@ -198,6 +200,11 @@ function handleCompletionKey(k: KeyEvent): boolean {
 	return false
 }
 
+function handlePopupKey(k: KeyEvent): boolean {
+	if (!popup.state.active) return false
+	return popup.handleKey(k)
+}
+
 // Canonical key name for help bar usage tracking
 function canonicalKeyName(k: KeyEvent): string {
 	const parts: string[] = []
@@ -234,6 +241,17 @@ function handleAppKey(k: KeyEvent): boolean {
 		suspend()
 		return true
 	}
+	// Alt-M: prototype model picker popup
+	if (k.key === 'm' && k.alt && !k.ctrl && !k.cmd) {
+		completion.dismiss()
+		popup.openModelPicker((model) => {
+			submit(`/model ${model}`)
+			syncPromptToClient()
+			draw()
+		})
+		draw()
+		return true
+	}
 	// Ctrl-L: force redraw
 	if (k.key === 'l' && k.ctrl) {
 		draw(true)
@@ -242,12 +260,15 @@ function handleAppKey(k: KeyEvent): boolean {
 	// Ctrl-T: new tab
 	if (k.key === 't' && k.ctrl) {
 		if (client.state.tabs.length < 40) client.sendCommand('open')
+		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
 		return true
 	}
 	// Ctrl-F: fork tab
 	if (k.key === 'f' && k.ctrl) {
 		const tab = client.currentTab()
-		if (tab && client.state.tabs.length < 40) client.sendCommand('open', `fork:${tab.sessionId}`)
+		if (!tab) return true
+		if (client.state.tabs.length < 40) client.sendCommand('open', `fork:${tab.sessionId}`)
+		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
 		return true
 	}
 	// Ctrl-W: close tab
@@ -362,7 +383,13 @@ function startCli(signal: AbortSignal): void {
 			if (k.ctrl || k.alt || k.cmd || k.key === 'enter' || k.key === 'escape' || k.key === 'tab') {
 				helpBar.logKey(canonicalKeyName(k))
 			}
-			// Completion keys first (tab, arrows in popup, etc.)
+			// Popup keys first — an active modal owns the keyboard.
+			if (handlePopupKey(k)) {
+				syncPromptToClient()
+				draw()
+				continue
+			}
+			// Completion keys next (tab, arrows in popup, etc.)
 			if (handleCompletionKey(k)) {
 				syncPromptToClient()
 				draw()

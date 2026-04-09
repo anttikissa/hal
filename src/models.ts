@@ -232,6 +232,21 @@ function listModels(): string[] {
 	return lines
 }
 
+function listModelChoices(): Array<{ value: string; label: string; search: string }> {
+	const items: Array<{ value: string; label: string; search: string }> = []
+	for (const group of MODEL_GROUPS) {
+		for (const model of group.models) {
+			const label = `${model.alias.padEnd(14)} ${displayModel(model.fullId)} · ${model.fullId}`
+			items.push({
+				value: model.alias,
+				label,
+				search: `${group.label} ${model.alias} ${model.fullId} ${displayModel(model.fullId)}`.toLowerCase(),
+			})
+		}
+	}
+	return items
+}
+
 // ── Token estimation ──
 // Rough estimate: ~4 chars per token for English text.
 // This is only for UI display — real token counts come from provider responses.
@@ -273,6 +288,7 @@ export const models = {
 	providerName,
 	defaultModel,
 	listModels,
+	listModelChoices,
 	estimateTokens,
 	refreshModels,
 }

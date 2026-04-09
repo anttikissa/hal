@@ -19,10 +19,10 @@ import { auth } from '../auth.ts'
 import { git } from '../utils/git.ts'
 import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
+import { popup } from './popup.ts'
 import type { Block, Tab } from '../client.ts'
 
 const CSI = '\x1b['
-
 // ── Diff engine state ────────────────────────────────────────────────────────
 //
 // These three variables are the diff engine's memory between paints:
@@ -43,9 +43,6 @@ let fullscreen = false
 // peak lives in client.state.peak (persisted across restarts).
 // Local alias for readability.
 
-// Cached line counts per tab. Invalidated whenever tab.historyVersion changes.
-const lineCountCache = new WeakMap<Tab, { version: number; lineCount: number }>()
-
 function resetRenderer(): void {
 	prevLines = []
 	cursorRow = 0
@@ -55,31 +52,23 @@ function resetRenderer(): void {
 
 // ── Entry rendering ──────────────────────────────────────────────────────────
 
-// ONE function that turns a block into terminal lines. Used by both
-// renderHistory() and historyLineCount(). No drift possible.
 function renderEntry(block: Block, cols: number): string[] {
 	return blockRenderer.renderBlock(block, cols)
 }
 
-function historyLineCount(tab: Tab): number {
-	const cached = lineCountCache.get(tab)
-	if (cached && cached.version === tab.historyVersion) return cached.lineCount
-	const cols = process.stdout.columns || 80
-	let count = 0
-	for (const entry of tab.history) count += renderEntry(entry, cols).length
-	lineCountCache.set(tab, { version: tab.historyVersion, lineCount: count })
-	return count
-}
-
 // ── Frame building ───────────────────────────────────────────────────────────
 
-function renderHistory(lines: string[], tab: Tab): void {
+function renderHistory(lines: string[], tab: Tab): number {
 	const cols = process.stdout.columns || 80
+	let count = 0
 	for (let i = 0; i < tab.history.length; i++) {
 		// Blank line between blocks (not before the first)
 		if (i > 0) lines.push('')
-		for (const line of renderEntry(tab.history[i]!, cols)) lines.push(line)
+		const rendered = renderEntry(tab.history[i]!, cols)
+		count += rendered.length
+		for (const line of rendered) lines.push(line)
 	}
+	return count
 }
 
 const MAX_TABS = 40
@@ -88,9 +77,9 @@ const MAX_TABS = 40
 //
 // Each tab gets a 1-char-wide status indicator (all visLen === 1):
 //   •  busy (blinking: visible on even phases, space on odd)
-//   ✓  generation done, user hasn't looked at this tab yet (green)
-//   !  interrupted/paused (blinking)
 //   ✗  ended with error (red, blinking)
+//   !  interrupted/paused (blinking)
+//   ✓  generation done, user hasn't looked at this tab yet (green)
 //      (space) idle, nothing notable
 
 const GREEN = '\x1b[32m'
@@ -105,12 +94,12 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 
 	if (busy) return { char: '•', color: INPUT_CURSOR_COLOR, blinks: true }
 
-	if (tab.doneUnseen) return { char: '✓', color: GREEN, blinks: false }
-
-	// Check if the last meaningful block is an error or interruption
+	// Alerts beat the generic "done unseen" checkmark. This matters for cases
+	// like "Hit max iterations" where generation finished, but the tab still
+	// needs attention.
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const b = tab.history[i]!
-		// Skip trailing info blocks that aren't status-relevant
+		// Skip trailing info blocks that aren't status-relevant.
 		if (b.type === 'info' && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
 		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
 		if (b.type === 'info' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
@@ -118,6 +107,8 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 		}
 		break
 	}
+
+	if (tab.doneUnseen) return { char: '✓', color: GREEN, blinks: false }
 
 	return { char: '', color: '', blinks: false }
 }
@@ -269,7 +260,26 @@ function chromeLines(): number {
 	return 3 + prompt.lineCount(cols) // tab bar + status + help bar + prompt
 }
 
-function buildFrame(): string[] {
+function overlayLine(_base: string, overlay: string, x: number): string {
+	return ' '.repeat(Math.max(0, x)) + overlay
+}
+
+function applyPopupOverlay(lines: string[]): { row: number; col: number } | null {
+	const cols = process.stdout.columns || 80
+	const rows = process.stdout.rows || 24
+	const overlay = popup.buildOverlay(cols, rows)
+	if (!overlay) return null
+	const minHeight = Math.min(rows, overlay.y + overlay.lines.length)
+	while (lines.length < minHeight) lines.push('')
+	for (let i = 0; i < overlay.lines.length; i++) {
+		const row = overlay.y + i
+		if (row < 0 || row >= lines.length) continue
+		lines[row] = overlayLine(lines[row] ?? '', overlay.lines[i]!, overlay.x)
+	}
+	return overlay.cursor
+}
+
+function buildFrame(): { lines: string[]; cursor: { row: number; col: number } } {
 	const rows = process.stdout.rows || 24
 	const cols = process.stdout.columns || 80
 	const chrome = chromeLines()
@@ -277,15 +287,12 @@ function buildFrame(): string[] {
 	const lines: string[] = []
 
 	// 1. History — all entries, all lines, NEVER sliced. See terminal.md rule 3.
-	if (tab) renderHistory(lines, tab)
+	const historyLines = tab ? renderHistory(lines, tab) : 0
 
 	// Update peak lazily: only the active tab, inactive tabs on switch.
-	if (tab) {
-		const c = historyLineCount(tab)
-		if (c > client.state.peak) {
-			client.state.peak = c
-			client.state.peakCols = cols
-		}
+	if (historyLines > client.state.peak) {
+		client.state.peak = historyLines
+		client.state.peakCols = cols
 	}
 
 	// 2. Padding — blank lines to keep prompt at a stable row across tabs.
@@ -302,28 +309,12 @@ function buildFrame(): string[] {
 	renderHelpBar(lines)
 	renderPrompt(lines)
 
-	return lines
-}
+	const popupCursor = applyPopupOverlay(lines)
+	if (popupCursor) return { lines, cursor: popupCursor }
 
-// ── Cursor positioning ───────────────────────────────────────────────────────
-//
-// The prompt can be multiline. The cursor can be on any line of the prompt,
-// not just the last. We compute the cursor's absolute frame row ONCE per
-// draw() call — see cursorTarget(). All paint paths use the same target.
-//
-// positionCursor() is the ONLY way to move the cursor to a new position.
-// It updates cursorRow and cursorCol atomically. Using raw CSI moves without
-// updating these will cause the next paint to compute wrong deltas.
-
-function cursorTarget(frameLen: number): { row: number; col: number } {
-	const cols = process.stdout.columns || 80
 	const p = prompt.buildPrompt(cols)
-	// prompt occupies the last p.lines.length rows of the frame.
-	// cursor.rowOffset is 0-based within the prompt. So:
-	//   absolute row = (frame end) - (prompt height) + (cursor's prompt row)
-	const row = frameLen - p.lines.length + p.cursor.rowOffset
-	// +1 because CSI G is 1-based
-	return { row, col: p.cursor.col + 1 }
+	const row = lines.length - p.lines.length + p.cursor.rowOffset
+	return { lines, cursor: { row, col: p.cursor.col + 1 } }
 }
 
 function moveCursor(from: number, to: number): string {
@@ -353,9 +344,9 @@ function positionCursor(from: number, target: { row: number; col: number }): str
 
 function draw(force = false): void {
 	const rows = process.stdout.rows || 24
-	const lines = buildFrame()
-	const cursor = cursorTarget(lines.length)
-
+	const screen = buildFrame()
+	const lines = screen.lines
+	const cursor = screen.cursor
 	// ── Force repaint ──
 	if (force) {
 		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
