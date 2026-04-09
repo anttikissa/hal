@@ -27,8 +27,9 @@ import '../tools/glob.ts'
 import '../tools/write.ts'
 import '../tools/eval.ts'
 import '../tools/send.ts'
-// web_search is handled as a server-side tool by the Anthropic provider
-// (type: 'web_search_20250305'). No client-side tool registration needed.
+import '../tools/google.ts'
+// Anthropic also has its own server-side web_search tool
+// (type: 'web_search_20250305'). That's separate from our local google tool.
 
 // ── Configuration ──
 

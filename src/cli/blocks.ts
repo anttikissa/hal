@@ -252,6 +252,8 @@ function toolTitle(name: string, input?: any): string {
 			return `Grep ${input.pattern ?? '?'} in ${input.path ?? '?'}`
 		case 'glob':
 			return `Glob ${input.pattern ?? '?'} in ${input.path ?? '.'}`
+		case 'google':
+			return `Google ${input.query ?? '?'}`
 		case 'ls':
 			return `Ls ${input.path ?? '.'}`
 		default:

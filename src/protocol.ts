@@ -26,7 +26,7 @@ export type CommandType = 'prompt' | 'steer' | 'open' | 'close' | 'resume' | 'ab
 
 // ── Tool call types ──
 
-export type ToolName = 'bash' | 'read' | 'write' | 'edit' | 'glob' | 'grep' | 'eval' | 'send'
+export type ToolName = 'bash' | 'read' | 'write' | 'edit' | 'glob' | 'grep' | 'eval' | 'send' | 'google'
 
 // ── Message types (for API conversation format) ──
 
