@@ -242,6 +242,8 @@ function toolTitle(name: string, input?: any): string {
 			}
 			return s
 		}
+		case 'read_url':
+			return `Read URL ${input.url ?? '?'}`
 		case 'write':
 			return `Write ${input.path ?? '?'}`
 		case 'edit':
