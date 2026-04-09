@@ -63,6 +63,17 @@ async function createSession(): Promise<Session> {
 	return session
 }
 
+async function createForkSession(sourceId: string): Promise<Session> {
+	const newId = makeSessionId()
+	await sessionStore.forkSession(sourceId, newId)
+	const meta = sessionStore.loadSessionMeta(newId)
+	const session = sessionFromMeta(meta)
+	if (!session) throw new Error(`Failed to create fork session ${newId}`)
+	activeSessions.push(session)
+	await persistSessionList()
+	return session
+}
+
 /** Write the current in-memory session order to disk. */
 async function persistSessionList(): Promise<void> {
 	await sessionStore.saveSessionList(activeSessions.map((s) => s.id))
@@ -70,6 +81,18 @@ async function persistSessionList(): Promise<void> {
 
 function findSession(sessionId: string): Session | undefined {
 	return activeSessions.find((s) => s.id === sessionId)
+}
+
+function sessionFromMeta(meta: ReturnType<typeof sessionStore.loadSessionMeta>): Session | null {
+	if (!meta) return null
+	const dirName = meta.workingDir?.split('/').pop()
+	return {
+		id: meta.id,
+		name: meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
+		model: meta.model,
+		cwd: meta.workingDir ?? process.cwd(),
+		createdAt: meta.createdAt,
+	}
 }
 
 // ── IPC helpers ──
@@ -296,7 +319,11 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		}
 
 		case 'open': {
-			await createSession()
+			if (typeof cmd.text === 'string' && cmd.text.startsWith('fork:')) {
+				await createForkSession(cmd.text.slice(5))
+			} else {
+				await createSession()
+			}
 			broadcastSessions()
 			break
 		}

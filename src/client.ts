@@ -318,8 +318,7 @@ let pendingOpen: 'open' | 'fork' | false = false
 
 function sendCommand(type: string, text?: string): void {
 	const tab = currentTab()
-	if (type === 'open') pendingOpen = 'open'
-	if (type === 'fork') pendingOpen = 'fork'
+	if (type === 'open') pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	ipc.appendCommand({ type, text, sessionId: tab?.sessionId })
 }
 

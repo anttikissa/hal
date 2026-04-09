@@ -244,6 +244,12 @@ function handleAppKey(k: KeyEvent): boolean {
 		if (client.state.tabs.length < 40) client.sendCommand('open')
 		return true
 	}
+	// Ctrl-F: fork tab
+	if (k.key === 'f' && k.ctrl) {
+		const tab = client.currentTab()
+		if (tab && client.state.tabs.length < 40) client.sendCommand('open', `fork:${tab.sessionId}`)
+		return true
+	}
 	// Ctrl-W: close tab
 	if (k.key === 'w' && k.ctrl) {
 		if (client.state.tabs.length > 1) client.sendCommand('close')
