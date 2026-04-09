@@ -20,6 +20,7 @@ export interface SessionMeta {
 	lastPrompt?: string
 	model?: string
 	currentLog?: string
+	closedAt?: string
 	// Last known context window usage, persisted so it survives restarts
 	context?: { used: number; max: number }
 }
@@ -121,6 +122,17 @@ function loadSessionMetas(): SessionMeta[] {
 	const ids = loadSessionList()
 	const result: SessionMeta[] = []
 	for (const id of ids) {
+		const meta = loadSessionMeta(id)
+		if (meta) result.push(meta)
+	}
+	return result
+}
+
+// Load metadata for every session directory on disk, including closed sessions.
+function loadAllSessionMetas(): SessionMeta[] {
+	if (!existsSync(SESSIONS_DIR)) return []
+	const result: SessionMeta[] = []
+	for (const id of readdirSync(SESSIONS_DIR).sort()) {
 		const meta = loadSessionMeta(id)
 		if (meta) result.push(meta)
 	}
@@ -239,20 +251,7 @@ function deleteSession(sessionId: string): void {
 	}
 }
 
-// Save the ordered session list to IPC state.
-// Reads the existing state.ason (preserving other fields), updates sessions array.
-async function saveSessionList(ids: string[]): Promise<void> {
-	const path = `${STATE_DIR}/ipc/state.ason`
-	ensureDir(`${STATE_DIR}/ipc`)
-	let existing: any = {}
-	if (existsSync(path)) {
-		try {
-			existing = ason.parse(readFileSync(path, 'utf-8')) as any
-		} catch {}
-	}
-	existing.sessions = ids
-	await writeFile(path, ason.stringify(existing) + '\n')
-}
+
 
 // ── Pruning ──
 
@@ -348,6 +347,7 @@ export const sessions = {
 	// Read
 	loadAllSessions,
 	loadSessionMetas,
+	loadAllSessionMetas,
 	loadSessionList,
 	loadSessionMeta,
 	loadHistory,
@@ -359,7 +359,6 @@ export const sessions = {
 	updateMeta,
 	forkSession,
 	deleteSession,
-	saveSessionList,
 	rotateLog,
 	// Pruning
 	pruneSessions,

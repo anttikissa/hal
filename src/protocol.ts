@@ -22,7 +22,7 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'steer' | 'open' | 'close' | 'abort' | 'compact'
+export type CommandType = 'prompt' | 'steer' | 'open' | 'close' | 'resume' | 'abort' | 'compact'
 
 // ── Tool call types ──
 

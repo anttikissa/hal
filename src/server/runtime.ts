@@ -52,14 +52,14 @@ async function createSession(): Promise<Session> {
 	}
 	activeSessions.push(session)
 
-	// Persist: write session.ason and update the session list in state.ason
+	// Persist the session itself. The shared session list is updated when we
+	// broadcast, so state.ason has a single writer.
 	await sessionStore.createSession(session.id, {
 		id: session.id,
 		workingDir: session.cwd,
 		createdAt: session.createdAt,
 		topic: undefined,
 	})
-	await persistSessionList()
 	return session
 }
 
@@ -70,13 +70,7 @@ async function createForkSession(sourceId: string): Promise<Session> {
 	const session = sessionFromMeta(meta)
 	if (!session) throw new Error(`Failed to create fork session ${newId}`)
 	activeSessions.push(session)
-	await persistSessionList()
 	return session
-}
-
-/** Write the current in-memory session order to disk. */
-async function persistSessionList(): Promise<void> {
-	await sessionStore.saveSessionList(activeSessions.map((s) => s.id))
 }
 
 function findSession(sessionId: string): Session | undefined {
@@ -95,9 +89,29 @@ function sessionFromMeta(meta: ReturnType<typeof sessionStore.loadSessionMeta>):
 	}
 }
 
+function syncSharedState(): void {
+	ipc.updateState((state) => {
+		state.sessions = activeSessions.map((s) => s.id)
+		state.openSessions = activeSessions.map((s) => ({
+			id: s.id,
+			name: s.name,
+			cwd: s.cwd,
+			model: s.model,
+		}))
+		const openIds = new Set(state.sessions)
+		for (const sessionId of Object.keys(state.busy)) {
+			if (!openIds.has(sessionId)) delete state.busy[sessionId]
+		}
+		for (const sessionId of Object.keys(state.activity)) {
+			if (!openIds.has(sessionId)) delete state.activity[sessionId]
+		}
+	})
+}
+
 // ── IPC helpers ──
 
 function broadcastSessions(): void {
+	syncSharedState()
 	ipc.appendEvent({
 		type: 'sessions',
 		sessions: activeSessions.map((s) => ({
@@ -124,16 +138,18 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 
 /** Process a prompt: check for slash commands, then forward to agent loop.
  *  label is 'steering' when the user typed during active generation. */
-async function handlePrompt(session: Session, text: string, label?: 'steering'): Promise<void> {
+async function handlePrompt(session: Session, text: string, label?: 'steering', source?: string): Promise<void> {
 	// Self-fencing: if leadership moved to another PID, this process must not
 	// emit prompts or start generations. The real host will handle the command.
 	if (!ipc.ownsHostLock()) return
 
-	// Emit the prompt event so clients see what was typed
+	// Emit the prompt event so clients see what was typed.
+	// Inbox messages carry their source session so the target tab can show where they came from.
 	ipc.appendEvent({
 		type: 'prompt',
 		text,
 		label,
+		source,
 		sessionId: session.id,
 		createdAt: new Date().toISOString(),
 	})
@@ -145,6 +161,7 @@ async function handlePrompt(session: Session, text: string, label?: 'steering'):
 		model: session.model,
 		cwd: session.cwd,
 		createdAt: session.createdAt,
+		sessions: activeSessions.map((item) => ({ id: item.id, name: item.name })),
 	}
 
 	// Check for slash commands first
@@ -174,13 +191,13 @@ async function handlePrompt(session: Session, text: string, label?: 'steering'):
 	}
 
 	// Not a command — forward to the agent loop
-	await runGeneration(session, text)
+	await runGeneration(session, text, source)
 }
 
 /** Start a generation (agent loop call) for a session.
  *  If text is empty, this is a continuation (restart after crash) — don't save
  *  a new user prompt, just rebuild messages from existing history. */
-async function runGeneration(session: Session, text: string): Promise<void> {
+async function runGeneration(session: Session, text: string, source?: string): Promise<void> {
 	// Double-check ownership right before we touch history or the model API.
 	// This closes the window where an old host is still alive but has already
 	// been replaced by a new lock holder.
@@ -204,6 +221,7 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 			{
 				role: 'user',
 				content: resolved.logContent,
+				source,
 				ts: new Date().toISOString(),
 			},
 		])
@@ -227,6 +245,12 @@ async function runGeneration(session: Session, text: string): Promise<void> {
 			systemPrompt: promptResult.text,
 			messages,
 			onStatus: async (busy, activity) => {
+				ipc.updateState((state) => {
+					if (busy) state.busy[session.id] = true
+					else delete state.busy[session.id]
+					if (activity) state.activity[session.id] = activity
+					else delete state.activity[session.id]
+				})
 				ipc.appendEvent({
 					type: 'status',
 					sessionId: session.id,
@@ -328,13 +352,31 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			break
 		}
 
+		case 'resume': {
+			const resumeId = String(cmd.text ?? '').trim()
+			if (!resumeId) break
+			if (activeSessions.some((s) => s.id === resumeId)) {
+				emitInfo(sessionId ?? activeSessions[0]?.id ?? resumeId, `Session ${resumeId} is already open`)
+				break
+			}
+			const resumed = sessionFromMeta(sessionStore.loadSessionMeta(resumeId))
+			if (!resumed) {
+				emitInfo(sessionId ?? activeSessions[0]?.id ?? resumeId, `Session ${resumeId} not found`, 'error')
+				break
+			}
+			activeSessions.push(resumed)
+			void sessionStore.updateMeta(resumeId, { closedAt: undefined })
+			broadcastSessions()
+			break
+		}
+
 		case 'close': {
 			if (!sessionId) return
 			// Abort any active generation
 			agentLoop.abort(sessionId)
+			void sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString() })
 			activeSessions = activeSessions.filter((s) => s.id !== sessionId)
 			if (activeSessions.length === 0) await createSession()
-			await persistSessionList()
 			broadcastSessions()
 			break
 		}
@@ -362,20 +404,32 @@ function startRuntime(signal: AbortSignal): void {
 			})
 		}
 	} else {
-		// First run — create and persist the initial tab.
-		// We can't top-level await in startRuntime, so fire-and-forget.
-		// The session is in memory immediately; disk write follows.
-		void createSession()
+		// First run — create and persist the initial tab, then publish it.
+		// New clients bootstrap from state.ason, so we must not broadcast a tab
+		// until its session files and shared state are actually on disk.
+		void createSession().then(() => {
+			if (signal.aborted || activeRuntimePid !== process.pid) return
+			broadcastSessions()
+		})
 	}
+
+	ipc.updateState((state) => {
+		state.busy = {}
+		state.activity = {}
+	})
+	if (metas.length > 0) syncSharedState()
 
 	// Refresh models.dev context window cache (fire-and-forget)
 	models.refreshModels().catch(() => {})
 
-	// Broadcast session list on next tick so client tail is ready
-	setTimeout(() => {
-		if (signal.aborted || activeRuntimePid !== process.pid) return
-		broadcastSessions()
-	}, 0)
+	// Restored sessions can be published right away. On first run, createSession()
+	// publishes after it finishes persisting the new tab.
+	if (metas.length > 0) {
+		setTimeout(() => {
+			if (signal.aborted || activeRuntimePid !== process.pid) return
+			broadcastSessions()
+		}, 0)
+	}
 
 	// Deferred: resolve interrupted tools and auto-continue pending sessions.
 	// This runs after the initial broadcast so clients see tabs immediately,
@@ -432,8 +486,12 @@ function startRuntime(signal: AbortSignal): void {
 			// Self-fencing: the old host must stop reading shared commands as soon
 			// as leadership moves to another PID.
 			if (!ipc.ownsHostLock()) break
-			// Skip commands for sessions that don't exist
-			if (cmd.sessionId && !activeSessions.some((s) => s.id === cmd.sessionId)) continue
+			// Most commands target a live session. But tab-management commands can
+			// legitimately arrive with a stale sessionId during the brief window after
+			// Ctrl-W, before the client has processed the sessions update and switched
+			// its active tab locally.
+			const hasLiveSession = !cmd.sessionId || activeSessions.some((s) => s.id === cmd.sessionId)
+			if (!hasLiveSession && cmd.type !== 'open' && cmd.type !== 'resume') continue
 			try {
 				await handleCommand(cmd, signal)
 			} catch (err: any) {
@@ -467,9 +525,9 @@ function startRuntime(signal: AbortSignal): void {
 	// Start inbox watcher (external messages)
 	void import('../runtime/inbox.ts')
 		.then(({ inbox }) => {
-			inbox.startWatching(signal, (sessionId, text) => {
+			inbox.startWatching(signal, (sessionId, text, source) => {
 				const session = findSession(sessionId)
-				if (session) handlePrompt(session, text)
+				if (session) handlePrompt(session, text, undefined, source)
 			})
 		})
 		.catch(() => {

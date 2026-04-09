@@ -18,7 +18,7 @@ interface InboxMessage {
 	ts?: string
 }
 
-type OnMessage = (sessionId: string, text: string) => void
+type OnMessage = (sessionId: string, text: string, from?: string) => void
 
 /** Process any pending .ason files in a session's inbox directory. */
 function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessage): void {
@@ -31,9 +31,7 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 			try {
 				const content = readFileSync(path, 'utf-8')
 				const msg = ason.parse(content) as unknown as InboxMessage
-				if (msg.text) {
-					onMessage(sessionId, msg.text)
-				}
+				if (msg.text) onMessage(sessionId, msg.text, msg.from)
 				// Delete after processing
 				unlinkSync(path)
 			} catch {

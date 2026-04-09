@@ -2,13 +2,7 @@ import { watch, statSync, writeFileSync } from 'fs'
 import { dirname, basename } from 'path'
 
 /**
- * Tail a file from a chosen byte offset, creating it if missing.
- *
- * Default behavior matches classic "tail -f": start from the current end so
- * callers only see future appends. Some startup paths need something stricter:
- * they first take a snapshot, remember that snapshot's end offset, then start
- * tailing from exactly that offset so writes that land in between are not lost.
- *
+ * Tail a file from its current end, creating it if missing.
  * Uses fs.watch for notifications and Bun.file().slice() for reads.
  * cancel() the returned stream to stop watching.
  */
@@ -20,16 +14,12 @@ function fileSize(path: string): number {
 	}
 }
 
-function tailFile(path: string, opts?: { startOffset?: number }): ReadableStream<Uint8Array> {
-	let offset = opts?.startOffset ?? 0
+function tailFile(path: string): ReadableStream<Uint8Array> {
+	let offset = 0
 	try {
-		// When the caller does not provide an explicit offset, start at the file's
-		// current end so only future appends are emitted.
-		if (opts?.startOffset == null) offset = statSync(path).size
+		offset = statSync(path).size
 	} catch {
-		// Create the file if it doesn't exist, so fs.watch has something to watch.
-		// If the caller passed an explicit offset, keep it — offset 0 is the only
-		// sensible value for a brand new file anyway.
+		// Create the file if it doesn't exist, so fs.watch has something to watch
 		writeFileSync(path, '')
 	}
 

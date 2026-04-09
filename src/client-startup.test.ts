@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { client } from './client.ts'
-import { ipc } from './ipc.ts'
+import { ipc, type SharedState } from './ipc.ts'
 import { sessions } from './server/sessions.ts'
 import { draft } from './cli/draft.ts'
 import { liveFiles } from './utils/live-file.ts'
@@ -17,15 +17,28 @@ function makeLoadedSession(id: string) {
 	}
 }
 
+function makeSharedState(ids: string[]): SharedState {
+	return {
+		sessions: ids,
+		openSessions: ids.map((id, i) => ({
+			id,
+			name: `tab ${i + 1}`,
+			cwd: `/tmp/${id}`,
+			model: 'openai/gpt-5.4',
+		})),
+		busy: {},
+		activity: {},
+		updatedAt: '2026-04-09T20:00:00.000Z',
+	}
+}
+
 describe('client startup', () => {
 	const origLoadAllSessions = sessions.loadAllSessions
 	const origLoadDraft = draft.loadDraft
-	const origReadAllEvents = ipc.readAllEvents
+	const origReadState = ipc.readState
 	const origTailEvents = ipc.tailEvents
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
-	const origReadEventSnapshot = (ipc as any).readEventSnapshot
-	const origTailEventsFrom = (ipc as any).tailEventsFrom
 
 	beforeEach(() => {
 		client.state.tabs.length = 0
@@ -48,38 +61,20 @@ describe('client startup', () => {
 	afterEach(() => {
 		sessions.loadAllSessions = origLoadAllSessions
 		draft.loadDraft = origLoadDraft
-		ipc.readAllEvents = origReadAllEvents
+		ipc.readState = origReadState
 		ipc.tailEvents = origTailEvents
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
-		;(ipc as any).readEventSnapshot = origReadEventSnapshot
-		;(ipc as any).tailEventsFrom = origTailEventsFrom
 	})
 
-	test('applies sessions updates that land after the snapshot but before tailing starts', async () => {
+	test('bootstraps tabs from shared state instead of replaying old events', async () => {
 		sessions.loadAllSessions = () => [makeLoadedSession('s1'), makeLoadedSession('s2')]
 		draft.loadDraft = () => ''
-		liveFiles.liveFile = () => ({ pid: null, createdAt: '' } as any)
+
+		const shared = makeSharedState(['s1'])
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-
-		const lateSessionsEvent = {
-			type: 'sessions',
-			sessions: [
-				{ id: 's1', name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
-			],
-		}
-
-		// Old startup logic reads a snapshot first, then starts tailing from the
-		// current end. That misses events that arrive in between those two steps.
-		// The fixed path uses a snapshot end offset and tails from that offset.
-		;(ipc as any).readEventSnapshot = () => ({
-			events: [{ type: 'runtime-start' }],
-			endOffset: 123,
-		})
-		;(ipc as any).tailEventsFrom = async function* () {
-			yield lateSessionsEvent
-		}
-		ipc.readAllEvents = () => [{ type: 'runtime-start' }]
 		ipc.tailEvents = async function* () {}
 
 		const ac = new AbortController()
@@ -88,5 +83,27 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
+	})
+
+	test('tails events from the end without replaying the whole event log', async () => {
+		sessions.loadAllSessions = () => [makeLoadedSession('s1')]
+		draft.loadDraft = () => ''
+
+		const shared = makeSharedState(['s1'])
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+
+		let tailCalls = 0
+		ipc.tailEvents = async function* () {
+			tailCalls++
+		}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(tailCalls).toBe(1)
 	})
 })

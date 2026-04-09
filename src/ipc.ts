@@ -9,6 +9,32 @@ import { isPidAlive } from './utils/is-pid-alive.ts'
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`
 const COMMANDS_FILE = `${IPC_DIR}/commands.asonl`
+const STATE_FILE = `${IPC_DIR}/state.ason`
+
+export interface SharedSessionInfo {
+	id: string
+	name: string
+	cwd: string
+	model?: string
+}
+
+export interface SharedState {
+	sessions: string[]
+	openSessions: SharedSessionInfo[]
+	busy: Record<string, boolean>
+	activity: Record<string, string>
+	updatedAt: string
+}
+
+function defaultState(): SharedState {
+	return {
+		sessions: [],
+		openSessions: [],
+		busy: {},
+		activity: {},
+		updatedAt: new Date().toISOString(),
+	}
+}
 
 function ensureFile(file: string): void {
 	if (!existsSync(file)) writeFileSync(file, '')
@@ -26,9 +52,9 @@ function appendCommand(command: any): void {
 	append(COMMANDS_FILE, { ...command, createdAt: command.createdAt ?? new Date().toISOString() })
 }
 
-async function* tail(file: string, signal?: AbortSignal, startOffset?: number): AsyncGenerator<any> {
+async function* tail(file: string, signal?: AbortSignal): AsyncGenerator<any> {
 	ensureFile(file)
-	const stream = tails.tailFile(file, { startOffset })
+	const stream = tails.tailFile(file)
 	for await (const value of ason.parseStream(stream)) {
 		if (signal?.aborted) break
 		yield value
@@ -37,10 +63,6 @@ async function* tail(file: string, signal?: AbortSignal, startOffset?: number): 
 
 function tailEvents(signal?: AbortSignal) {
 	return tail(EVENTS_FILE, signal)
-}
-
-function tailEventsFrom(startOffset: number, signal?: AbortSignal) {
-	return tail(EVENTS_FILE, signal, startOffset)
 }
 
 function tailCommands(signal?: AbortSignal) {
@@ -52,9 +74,33 @@ interface HostLock {
 	createdAt: string
 }
 
-interface EventSnapshot {
-	events: any[]
-	endOffset: number
+function readState(): SharedState {
+	ensureDir(IPC_DIR)
+	if (!existsSync(STATE_FILE)) return defaultState()
+	try {
+		const parsed = ason.parse(readFileSync(STATE_FILE, 'utf-8')) as Partial<SharedState> | null
+		return {
+			...defaultState(),
+			sessions: Array.isArray(parsed?.sessions) ? parsed!.sessions : [],
+			openSessions: Array.isArray(parsed?.openSessions) ? parsed!.openSessions as SharedSessionInfo[] : [],
+			busy: parsed?.busy && typeof parsed.busy === 'object' ? parsed.busy : {},
+			activity: parsed?.activity && typeof parsed.activity === 'object' ? parsed.activity : {},
+			updatedAt: typeof parsed?.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString(),
+		}
+	} catch {
+		return defaultState()
+	}
+}
+
+// Shared runtime state belongs in state.ason, not in the unbounded events log.
+// This file is the bootstrap source of truth for new clients.
+function updateState(mutator: (state: SharedState) => void): SharedState {
+	ensureDir(IPC_DIR)
+	const state = readState()
+	mutator(state)
+	state.updatedAt = new Date().toISOString()
+	writeFileSync(STATE_FILE, ason.stringify(state) + '\n')
+	return state
 }
 
 // Delete a stale lock left by a dead process. Call this before claimHost().
@@ -88,22 +134,6 @@ function readHostLock(): HostLock | null {
 	}
 }
 
-function readAllEvents(): any[] {
-	return readEventSnapshot().events
-}
-
-// Read the full events file and remember the byte offset we stopped at.
-// Clients use this with tailEventsFrom() so they don't miss events that land
-// between the snapshot read and tail startup.
-function readEventSnapshot(): EventSnapshot {
-	ensureFile(EVENTS_FILE)
-	const content = readFileSync(EVENTS_FILE, 'utf-8')
-	return {
-		events: content.trim() ? ason.parseAll(content) as any[] : [],
-		endOffset: Buffer.byteLength(content),
-	}
-}
-
 // Self-fencing check. A server must keep verifying that host.lock still points
 // at its own PID. If not, it must stop serving immediately.
 function ownsHostLock(pid = process.pid): boolean {
@@ -123,13 +153,12 @@ export const ipc = {
 	appendEvent,
 	appendCommand,
 	tailEvents,
-	tailEventsFrom,
 	tailCommands,
+	readState,
+	updateState,
 	cleanupStaleLock,
 	claimHost,
 	readHostLock,
-	readAllEvents,
-	readEventSnapshot,
 	ownsHostLock,
 	releaseHost,
 }
