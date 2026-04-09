@@ -56,6 +56,12 @@ describe('auth.getCredential — multi-account rotation', () => {
 		expect(cred!.email).toBe('a@test.com')
 	})
 
+	test('includes account position for multi-account rotation', () => {
+		const cred = auth.getCredential('openai')
+		expect(cred!.index).toBe(0)
+		expect(cred!.total).toBe(3)
+	})
+
 	test('skips account on cooldown', () => {
 		const cred1 = auth.getCredential('openai')
 		auth.markCooldown(cred1!, 60_000)

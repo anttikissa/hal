@@ -40,6 +40,16 @@ let cursorRow = 0
 let cursorCol = 0
 let fullscreen = false
 
+type HistoryRenderCache = {
+	version: number
+	length: number
+	cols: number
+	lines: string[]
+	count: number
+}
+
+let historyCache = new WeakMap<Tab, HistoryRenderCache>()
+
 // peak lives in client.state.peak (persisted across restarts).
 // Local alias for readability.
 
@@ -48,6 +58,7 @@ function resetRenderer(): void {
 	cursorRow = 0
 	cursorCol = 0
 	fullscreen = false
+	historyCache = new WeakMap<Tab, HistoryRenderCache>()
 }
 
 // ── Entry rendering ──────────────────────────────────────────────────────────
@@ -60,14 +71,30 @@ function renderEntry(block: Block, cols: number): string[] {
 
 function renderHistory(lines: string[], tab: Tab): number {
 	const cols = process.stdout.columns || 80
+	const cached = historyCache.get(tab)
+	if (cached && cached.version === tab.historyVersion && cached.length === tab.history.length && cached.cols === cols) {
+		lines.push(...cached.lines)
+		return cached.count
+	}
+
+	const renderedLines: string[] = []
 	let count = 0
 	for (let i = 0; i < tab.history.length; i++) {
 		// Blank line between blocks (not before the first)
-		if (i > 0) lines.push('')
+		if (i > 0) renderedLines.push('')
 		const rendered = renderEntry(tab.history[i]!, cols)
 		count += rendered.length
-		for (const line of rendered) lines.push(line)
+		renderedLines.push(...rendered)
 	}
+
+	historyCache.set(tab, {
+		version: tab.historyVersion,
+		length: tab.history.length,
+		cols,
+		lines: renderedLines,
+		count,
+	})
+	lines.push(...renderedLines)
 	return count
 }
 
@@ -202,17 +229,21 @@ function renderStatusLine(lines: string[]): void {
 		const isSub = !auth.isApiKey(provider)
 		if (modelDisplay) parts.push(isSub ? `${modelDisplay} (sub)` : modelDisplay)
 
-		// 2. Cumulative token count (input + output)
+		// 2. Current busy activity (active account, rate limit wait, tool run, ...)
+		const activity = client.isBusy() ? client.getActivity() : ''
+		if (activity) parts.push(activity)
+
+		// 3. Cumulative token count (input + output)
 		const totalTokens = tab.usage.input + tab.usage.output
 		if (totalTokens > 0) parts.push(models.formatTokenCount(totalTokens) + ' tok')
 
-		// 3. Cost (API key only — sub users already have the "(sub)" tag)
+		// 4. Cost (API key only — sub users already have the "(sub)" tag)
 		if (!isSub) {
 			const cost = models.formatCost(modelId, tab.usage)
 			if (cost) parts.push(cost)
 		}
 
-		// 4. Context usage: "25.4k/200k (13%)"
+		// 5. Context usage: "25.4k/200k (13%)"
 		if (tab.contextMax > 0) {
 			const pct = Math.round((tab.contextUsed / tab.contextMax) * 100)
 			const color = contextColor(pct)
@@ -222,29 +253,30 @@ function renderStatusLine(lines: string[]): void {
 			)
 		}
 
-		// 5. Working directory, shortened
+		// 6. Working directory, shortened
 		const cwd = shortenPath(tab.cwd)
 		if (cwd) parts.push(cwd)
 
-		// 6. Git branch (omit if "main")
+		// 7. Git branch (omit if "main")
 		if (tab.cwd) {
 			const branch = git.currentBranch(tab.cwd)
 			if (branch && branch !== 'main') parts.push(branch)
 		}
 	}
 
-	const info = parts.length > 0 ? ` ${parts.join(' \u00b7 ')} ` : ' '
-	const dashes = Math.max(0, cols - visLen(info))
-	lines.push(`\x1b[90m${info}${'\u2500'.repeat(dashes)}\x1b[0m`)
+	const info = parts.length > 0 ? ` ${parts.join(' · ')} ` : ' '
+	const line = visLen(info) > cols ? clipVisual(info, cols) : `${info}${'─'.repeat(Math.max(0, cols - visLen(info)))}`
+	lines.push(`\x1b[90m${line}\x1b[0m`)
 }
 
 function renderHelpBar(lines: string[]): void {
+	const cols = process.stdout.columns || 80
 	const busy = client.isBusy()
 	const hasText = prompt.text().length > 0
 	const bar = helpBar.build(busy, hasText)
 	// Always push a line — even when empty — so chrome height is constant.
 	// Without this, typing the first character causes a 1-row jump.
-	lines.push(bar ? `\x1b[90m${bar}\x1b[0m` : '')
+	lines.push(bar ? `\x1b[90m${clipVisual(bar, cols)}\x1b[0m` : '')
 }
 
 function renderPrompt(lines: string[]): void {
@@ -269,14 +301,15 @@ function applyPopupOverlay(lines: string[]): { row: number; col: number } | null
 	const rows = process.stdout.rows || 24
 	const overlay = popup.buildOverlay(cols, rows)
 	if (!overlay) return null
-	const minHeight = Math.min(rows, overlay.y + overlay.lines.length)
+	const viewportTop = Math.max(0, lines.length - rows)
+	const minHeight = Math.min(viewportTop + rows, viewportTop + overlay.y + overlay.lines.length)
 	while (lines.length < minHeight) lines.push('')
 	for (let i = 0; i < overlay.lines.length; i++) {
-		const row = overlay.y + i
+		const row = viewportTop + overlay.y + i
 		if (row < 0 || row >= lines.length) continue
 		lines[row] = overlayLine(lines[row] ?? '', overlay.lines[i]!, overlay.x)
 	}
-	return overlay.cursor
+	return overlay.cursor ? { row: viewportTop + overlay.cursor.row, col: overlay.cursor.col } : null
 }
 
 function buildFrame(): { lines: string[]; cursor: { row: number; col: number } } {

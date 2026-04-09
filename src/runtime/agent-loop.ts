@@ -316,51 +316,59 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 						break
 					}
 
-						case 'server_tool': {
-							// Server-side tool blocks (web_search) — collect for assistant content
-							if (event.serverBlocks) {
-								serverBlocks.push(...event.serverBlocks)
-								// Show web search activity to the user
-								for (const sb of event.serverBlocks) {
-									if (sb.type === 'server_tool_use' && sb.name === 'web_search') {
-										const query = sb.input?.query ?? ''
-										emitInfo(sessionId, `[web_search] "${query}"`)
-									}
+					case 'server_tool': {
+						// Server-side tool blocks (web_search) — collect for assistant content
+						if (event.serverBlocks) {
+							serverBlocks.push(...event.serverBlocks)
+							// Show web search activity to the user
+							for (const sb of event.serverBlocks) {
+								if (sb.type === 'server_tool_use' && sb.name === 'web_search') {
+									const query = sb.input?.query ?? ''
+									emitInfo(sessionId, `[web_search] "${query}"`)
 								}
 							}
-							break
 						}
-						case 'error': {
-							const status = event.status
+						break
+					}
 
-							// Show the full error body so the user sees the actual API response
-							const header = status ? `${status}:` : 'Error:'
-							const endpoint = event.endpoint ? ` (${event.endpoint})` : ''
-							const body = event.body ?? event.message ?? 'Unknown error'
-							emitEvent(sessionId, {
-								type: 'response',
-								text: `${header}${endpoint}\n${formatErrorBody(body)}`,
-								isError: true,
-							})
-							// Check if we should retry
-							if (isRetryableStatus(status)) {
-								if (!retryStartedAt) retryStartedAt = Date.now()
-								const elapsed = Date.now() - retryStartedAt
-								if (elapsed < config.retryMaxTotalMs) {
-									// Provider-set retryAfterMs wins (e.g. token rotation sets 1s).
-									// Otherwise try resets_in_seconds from body, then exponential backoff.
-									const bodyDelay = parseResetsInSeconds(event.body)
-									const delay = event.retryAfterMs ?? bodyDelay ?? computeRetryDelay(undefined, retryAttempt)
-									retryAttempt++
-									const delaySec = Math.ceil(delay / 1000)
-									emitInfo(sessionId, `Rate limited — retrying in ${delaySec}s`)
-									await ctx.onStatus?.(true, `rate limited — retrying in ${delaySec}s...`)
-									await Bun.sleep(delay)
-									shouldRetry = true
-								}
+					case 'status':
+						if (event.activity) await ctx.onStatus?.(true, event.activity)
+						break
+
+					case 'error': {
+						const status = event.status
+
+						// Retryable 429s get a short human message instead of the full JSON body.
+						// For other errors, keep showing the provider payload.
+						const header = status ? `${status}:` : 'Error:'
+						const endpoint = event.endpoint ? ` (${event.endpoint})` : ''
+						const body = status === 429 && event.message
+							? event.message
+							: event.body ?? event.message ?? 'Unknown error'
+						emitEvent(sessionId, {
+							type: 'response',
+							text: `${header}${endpoint}\n${formatErrorBody(body)}`,
+							isError: true,
+						})
+						// Check if we should retry
+						if (isRetryableStatus(status)) {
+							if (!retryStartedAt) retryStartedAt = Date.now()
+							const elapsed = Date.now() - retryStartedAt
+							if (elapsed < config.retryMaxTotalMs) {
+								// Provider-set retryAfterMs wins (e.g. token rotation sets 1s).
+								// Otherwise try resets_in_seconds from body, then exponential backoff.
+								const bodyDelay = parseResetsInSeconds(event.body)
+								const delay = event.retryAfterMs ?? bodyDelay ?? computeRetryDelay(undefined, retryAttempt)
+								retryAttempt++
+								const delaySec = Math.ceil(delay / 1000)
+								emitInfo(sessionId, `Rate limited — retrying in ${delaySec}s`)
+								await ctx.onStatus?.(true, `rate limited — retrying in ${delaySec}s...`)
+								await Bun.sleep(delay)
+								shouldRetry = true
 							}
-							break
 						}
+						break
+					}
 
 						case 'done': {
 							// Only reset retry state on actual success, not when we're about to retry

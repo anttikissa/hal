@@ -76,6 +76,25 @@ function parseResetsInSeconds(body: string | undefined): number | undefined {
 	return undefined
 }
 
+function formatAccountLabel(credential: Credential): string {
+	if (credential.email) return credential.email
+	if (credential.total && credential.index != null) return `account ${credential.index + 1}/${credential.total}`
+	return 'current account'
+}
+
+function formatRotationActivity(credential: Credential): string | undefined {
+	if (!credential.total || credential.total < 2 || credential.index == null) return undefined
+	return `OpenAI ${credential.index + 1}/${credential.total} · ${formatAccountLabel(credential)}`
+}
+
+function formatRotationMessage(current: Credential, next: Credential | undefined, retryAfterMs: number, fast: boolean): string {
+	const total = current.total ?? 1
+	const currentLabel = formatAccountLabel(current)
+	const nextLabel = next ? formatAccountLabel(next) : 'the next available account'
+	if (fast) return `OpenAI rotation: ${total} accounts. 429 on ${currentLabel}. Trying ${nextLabel} next.`
+	return `OpenAI rotation: ${total} accounts. 429 on ${currentLabel}. All accounts cooling down. Next: ${nextLabel} in ${Math.ceil(retryAfterMs / 1000)}s.`
+}
+
 // ── Responses API message conversion ──
 // Our internal message format follows Anthropic's structure. Native OpenAI
 // expects Responses API items instead.
@@ -681,6 +700,9 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 		body.reasoning = { effort: 'high', summary: 'auto' }
 	}
 
+	const rotationActivity = formatRotationActivity(credential)
+	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
+
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 		Authorization: `Bearer ${credential.value}`,
@@ -716,19 +738,20 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 		// Mark this credential on cooldown so the next retry picks a different account.
 		// Default cooldown: 10 minutes, or whatever the server says via Retry-After.
 		if (res.status === 429) {
-			const label = credential.email ? ` (${credential.email})` : ''
 			const bodyResetMs = parseResetsInSeconds(text)
-			auth.markCooldown(credential, bodyResetMs ?? retryAfterMs ?? 10 * 60_000)
+			const cooldownMs = bodyResetMs ?? retryAfterMs ?? 10 * 60_000
+			auth.markCooldown(credential, cooldownMs)
 			// Retry fast only if another account is available.
 			// Otherwise use the body's reset time so we don't spin forever.
 			const fast = auth.hasAvailableCredential('openai')
+			const nextCredential = getCredential('openai')
 			yield {
 				type: 'error',
-				message: `openai 429: rate limited${label}`,
+				message: formatRotationMessage(credential, nextCredential, fast ? 1_000 : cooldownMs, fast),
 				status: res.status,
 				body: text,
 				endpoint: apiUrl,
-				retryAfterMs: fast ? 1_000 : bodyResetMs ?? retryAfterMs,
+				retryAfterMs: fast ? 1_000 : cooldownMs,
 			}
 		} else {
 			yield {

@@ -159,12 +159,32 @@ test('compat providers stay on chat completions endpoints', async () => {
 })
 
 
-test('openai 429 shows email and retries fast when another account is available', async () => {
-	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0' }
+test('openai provider reports the active account while rotating', async () => {
+	const calls: FetchCall[] = []
+	const events = await collect(openaiProvider, 'openai', {
+		value: 'sk-test',
+		type: 'api-key',
+		email: 'first@test.com',
+		index: 0,
+		total: 3,
+	}, calls)
+
+	expect(events[0]).toEqual({
+		type: 'status',
+		activity: 'OpenAI 1/3 · first@test.com',
+	})
+	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+})
+
+
+test('openai 429 shows failed and next account when another account is available', async () => {
+	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0', index: 0, total: 3 }
+	const next: Credential = { value: 'sk-next', type: 'api-key', email: 'next@test.com', _key: 'openai:1', index: 1, total: 3 }
 	let cooldownMs = 0
 	let cooldownCred: Credential | undefined
+	let getCount = 0
 	auth.ensureFresh = async () => {}
-	auth.getCredential = () => credential
+	auth.getCredential = () => (++getCount === 1 ? credential : next)
 	auth.getEntry = () => ({})
 	auth.markCooldown = (cred: Credential, ms: number) => {
 		cooldownCred = cred
@@ -186,9 +206,10 @@ test('openai 429 shows email and retries fast when another account is available'
 
 	expect(cooldownCred).toBe(credential)
 	expect(cooldownMs).toBe(2_064_000)
-	expect(events[0]).toMatchObject({
+	expect(events[0]).toEqual({ type: 'status', activity: 'OpenAI 1/3 · burned@test.com' })
+	expect(events[1]).toMatchObject({
 		type: 'error',
-		message: 'openai 429: rate limited (burned@test.com)',
+		message: 'OpenAI rotation: 3 accounts. 429 on burned@test.com. Trying next@test.com next.',
 		status: 429,
 		retryAfterMs: 1_000,
 	})
@@ -196,10 +217,12 @@ test('openai 429 shows email and retries fast when another account is available'
 })
 
 test('openai 429 waits for reset when all accounts are on cooldown', async () => {
-	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0' }
+	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0', index: 0, total: 3 }
+	const next: Credential = { value: 'sk-next', type: 'api-key', email: 'next@test.com', _key: 'openai:1', index: 1, total: 3 }
 	let cooldownMs = 0
+	let getCount = 0
 	auth.ensureFresh = async () => {}
-	auth.getCredential = () => credential
+	auth.getCredential = () => (++getCount === 1 ? credential : next)
 	auth.getEntry = () => ({})
 	auth.markCooldown = (_cred: Credential, ms: number) => {
 		cooldownMs = ms
@@ -219,9 +242,10 @@ test('openai 429 waits for reset when all accounts are on cooldown', async () =>
 	}
 
 	expect(cooldownMs).toBe(2_064_000)
-	expect(events[0]).toMatchObject({
+	expect(events[0]).toEqual({ type: 'status', activity: 'OpenAI 1/3 · burned@test.com' })
+	expect(events[1]).toMatchObject({
 		type: 'error',
-		message: 'openai 429: rate limited (burned@test.com)',
+		message: 'OpenAI rotation: 3 accounts. 429 on burned@test.com. All accounts cooling down. Next: next@test.com in 2064s.',
 		status: 429,
 		retryAfterMs: 2_064_000,
 	})

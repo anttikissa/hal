@@ -26,7 +26,7 @@ export type CommandType = 'prompt' | 'steer' | 'open' | 'close' | 'resume' | 'ab
 
 // ── Tool call types ──
 
-export type ToolName = 'bash' | 'read' | 'read_url' | 'write' | 'edit' | 'glob' | 'grep' | 'eval' | 'send' | 'google'
+export type ToolName = 'analyze_history' | 'bash' | 'read' | 'read_url' | 'write' | 'edit' | 'glob' | 'grep' | 'eval' | 'send' | 'google'
 
 // ── Message types (for API conversation format) ──
 
@@ -62,7 +62,7 @@ export interface ToolDef {
 // can reference it without circular imports.
 
 export interface ProviderStreamEvent {
-	type: 'text' | 'thinking' | 'thinking_signature' | 'tool_call' | 'server_tool' | 'error' | 'done'
+	type: 'text' | 'thinking' | 'thinking_signature' | 'tool_call' | 'server_tool' | 'status' | 'error' | 'done'
 	text?: string
 	signature?: string
 	// tool_call fields
@@ -74,6 +74,8 @@ export interface ProviderStreamEvent {
 	// server_tool fields — opaque content blocks from server-side tools (e.g. web_search).
 	// These go into the assistant message content verbatim and need no local execution.
 	serverBlocks?: any[]
+	// status fields
+	activity?: string
 	// error fields
 	message?: string
 	status?: number

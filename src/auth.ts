@@ -48,6 +48,10 @@ interface Credential {
 	type: 'token' | 'api-key'
 	/** Identifying label (e.g. email) for the account this came from. */
 	email?: string
+	/** Zero-based position inside the provider's account pool. */
+	index?: number
+	/** Total number of configured accounts for this provider. */
+	total?: number
 	/** Internal key for cooldown tracking. Absent for env-var credentials. */
 	_key?: string
 }
@@ -66,9 +70,9 @@ function normalizeEntries(raw: any): any[] {
 }
 
 /** Extract credential from a single auth entry. */
-function credFromEntry(entry: any, key: string): Credential | undefined {
-	if (entry.accessToken) return { value: entry.accessToken, type: 'token', email: entry.email, _key: key }
-	if (entry.apiKey) return { value: entry.apiKey, type: 'api-key', email: entry.email, _key: key }
+function credFromEntry(entry: any, key: string, index: number, total: number): Credential | undefined {
+	if (entry.accessToken) return { value: entry.accessToken, type: 'token', email: entry.email, index, total, _key: key }
+	if (entry.apiKey) return { value: entry.apiKey, type: 'api-key', email: entry.email, index, total, _key: key }
 	return undefined
 }
 
@@ -77,13 +81,14 @@ function getCredential(providerName: string): Credential | undefined {
 	const raw = store()[providerName]
 	const entries = normalizeEntries(raw)
 	const now = Date.now()
+	const total = entries.length
 
 	// Try each entry, skip ones on cooldown
 	for (let i = 0; i < entries.length; i++) {
 		const key = `${providerName}:${i}`
 		const cooldownUntil = cooldowns.get(key)
 		if (cooldownUntil && now < cooldownUntil) continue
-		const cred = credFromEntry(entries[i], key)
+		const cred = credFromEntry(entries[i], key, i, total)
 		if (cred) return cred
 	}
 
@@ -98,7 +103,7 @@ function getCredential(providerName: string): Credential | undefined {
 		const until = cooldowns.get(`${providerName}:${i}`) ?? 0
 		if (until < bestUntil) { bestUntil = until; bestIdx = i }
 	}
-	if (bestIdx >= 0) return credFromEntry(entries[bestIdx], `${providerName}:${bestIdx}`)
+	if (bestIdx >= 0) return credFromEntry(entries[bestIdx], `${providerName}:${bestIdx}`, bestIdx, total)
 	return undefined
 }
 

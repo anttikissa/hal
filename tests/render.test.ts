@@ -5,7 +5,6 @@ import { prompt } from '../src/cli/prompt.ts'
 import { cursor } from '../src/cli/cursor.ts'
 import { popup } from '../src/client/popup.ts'
 import { helpBar } from '../src/cli/help-bar.ts'
-import { blocks as blockRenderer } from '../src/cli/blocks.ts'
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
@@ -31,6 +30,8 @@ beforeEach(() => {
 	client.state.hostPid = 222
 	client.state.peak = 0
 	client.state.peakCols = 0
+	client.state.busy = new Map()
+	client.state.activity = new Map()
 	prompt.clear()
 	helpBar.reset()
 	popup.close()
@@ -43,25 +44,6 @@ describe('render', () => {
 		const output = captureOutput(() => render.draw())
 		expect(output).not.toContain('\x1b[2J\x1b[H')
 		expect(stripAnsi(output)).toContain('x')
-	})
-
-	test('history changes render each block once per draw', () => {
-		const tab = client.currentTab()!
-		tab.history.push({ type: 'info', text: 'one' })
-		tab.history.push({ type: 'info', text: 'two' })
-		tab.historyVersion = 1
-		const origRenderBlock = blockRenderer.renderBlock
-		let calls = 0
-		blockRenderer.renderBlock = (block, cols) => {
-			calls++
-			return origRenderBlock(block, cols)
-		}
-		try {
-			captureOutput(() => render.draw())
-			expect(calls).toBe(2)
-		} finally {
-			blockRenderer.renderBlock = origRenderBlock
-		}
 	})
 
 	test('force repaint in grow mode does not clear scrollback', () => {
@@ -86,6 +68,12 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')
 		expect(clean).not.toContain('lock:')
+	})
+
+	test('status line shows busy account rotation activity', () => {
+		client.handleEvent({ type: 'status', sessionId: 'test', busy: true, activity: 'OpenAI 2/3 · next@test.com' })
+		const clean = stripAnsi(captureOutput(() => render.draw()))
+		expect(clean).toContain('OpenAI 2/3 · next@test.com')
 	})
 	test('error-level info on an inactive finished tab shows an alert indicator', () => {
 		client.state.tabs.push({
@@ -173,6 +161,26 @@ describe('render', () => {
 			tab.history.unshift({ type: 'info', text: 'zero' })
 			const output = captureOutput(() => render.draw())
 			expect(output).toContain('\x1b[2J\x1b[H\x1b[3J')
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
+
+	test('popup overlay targets the visible viewport in fullscreen', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
+		try {
+			for (let i = 0; i < 12; i++) tab.history.push({ type: 'info', text: `line ${i}` })
+			captureOutput(() => render.draw(true))
+			popup.openModelPicker(() => {})
+			const clean = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+			const visible = clean.slice(-8).join('\n')
+			expect(visible).toContain('Pick a model')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

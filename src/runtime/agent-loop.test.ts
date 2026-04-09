@@ -66,3 +66,38 @@ test('writes thinking blobs while streaming and replays them into API history', 
 		ipc.appendEvent = origAppendEvent
 	}
 })
+
+
+test('provider status updates busy activity', async () => {
+	const sessionId = `test-status-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const statuses: Array<{ busy: boolean; activity?: string }> = []
+	const origGetProvider = providerLoader.getProvider
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'status', activity: 'OpenAI 2/3 · next@test.com' }
+			yield { type: 'done', usage: { input: 0, output: 0 } }
+		},
+	})
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+			onStatus: async (busy, activity) => {
+				statuses.push({ busy, activity })
+			},
+		})
+		expect(statuses).toContainEqual({ busy: true, activity: 'generating...' })
+		expect(statuses).toContainEqual({ busy: true, activity: 'OpenAI 2/3 · next@test.com' })
+		expect(statuses.at(-1)).toEqual({ busy: false, activity: undefined })
+	} finally {
+		providerLoader.getProvider = origGetProvider
+	}
+})
