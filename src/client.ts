@@ -258,29 +258,31 @@ function getInputDraft(): string {
 
 // Save draft text to memory + disk + IPC notification.
 // If sessionId is given, saves to that tab (used on tab switch to save
-// the outgoing tab's draft after activeTab has already changed).
-function saveDraft(draftText: string, sessionId?: string): void {
+// outgoing draft after activeTab already changed).
+function saveDraft(text: string, sessionId?: string): void {
+	const sid = sessionId ?? currentTab()?.sessionId
+	if (!sid) return
 	const tab = sessionId
 		? state.tabs.find(t => t.sessionId === sessionId)
 		: currentTab()
-	if (!tab) return
-	tab.inputDraft = draftText
-	draftModule.saveDraft(tab.sessionId, draftText)
+	if (tab) tab.inputDraft = text
+	draftModule.saveDraft(sid, text)
 }
 
-// Clear draft (called on submit).
-function clearDraft(): void {
-	const tab = currentTab()
-	if (!tab) return
-	tab.inputDraft = ''
-	draftModule.clearDraft(tab.sessionId)
+function clearDraft(sessionId?: string): void {
+	const sid = sessionId ?? currentTab()?.sessionId
+	if (!sid) return
+	const tab = state.tabs.find(t => t.sessionId === sid)
+	if (tab) tab.inputDraft = ''
+	draftModule.clearDraft(sid)
 }
 
-// Called on submit — clear draft and update history.
 function onSubmit(text: string): void {
 	appendInputHistory(text)
 	clearDraft()
 }
+
+// ── Tab switching helpers ────────────────────────────────────────────────────
 
 function nextTab(): void {
 	if (state.tabs.length > 0) switchTab((state.activeTab + 1) % state.tabs.length)
@@ -290,25 +292,7 @@ function prevTab(): void {
 	if (state.tabs.length > 0) switchTab((state.activeTab - 1 + state.tabs.length) % state.tabs.length)
 }
 
-function addEntry(text: string, type: 'info' | 'error' = 'info'): void {
-	const tab = currentTab()
-	if (!tab) {
-		pendingEntries.push({ text, type })
-		return
-	}
-	tab.history.push({ type, text, ts: Date.now() })
-	touchTab(tab)
-	onChange(false)
-}
-
-function addBlockToTab(sessionId: string | null, block: Block): void {
-	const tab = tabForSession(sessionId)
-	if (tab) {
-		tab.history.push(block)
-		touchTab(tab)
-		onChange(false)
-	}
-}
+// ── Prompt mirroring ─────────────────────────────────────────────────────────
 
 function setPrompt(text: string, cursor: number): void {
 	state.promptText = text
@@ -321,6 +305,8 @@ function clearPrompt(): void {
 	state.promptCursor = 0
 	onChange(false)
 }
+
+// ── Commands ─────────────────────────────────────────────────────────────────
 
 // Track pending open/fork so we know to copy draft on fork
 let pendingOpen: 'open' | 'fork' | false = false
@@ -379,6 +365,7 @@ function handleEvent(event: any): void {
 		addBlockToTab(event.sessionId, {
 			type: 'user',
 			text: event.text,
+			source: typeof event.source === 'string' ? event.source : undefined,
 			status: event.label,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
@@ -453,8 +440,11 @@ function handleEvent(event: any): void {
 			})
 		}
 	} else if (event.type === 'info') {
+		// Keep info-level errors as error blocks in memory.
+		// Persisted sessions already do this when replaying history, so live tabs
+		// should match what a reload would show.
 		addBlockToTab(event.sessionId ?? null, {
-			type: 'info',
+			type: event.level === 'error' ? 'error' : 'info',
 			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
@@ -555,7 +545,10 @@ function loadPersistedSessions(): void {
 	// Other tabs are loaded in the background after first paint.
 	const active = state.tabs[state.activeTab]
 	if (active) {
+		const t0 = performance.now()
 		ensureTabLoaded(active)
+		const replayMs = (performance.now() - t0).toFixed(1)
+		perf.mark(`Active tab replayed (${active.history.length} blocks, ${replayMs}ms)`)
 		active.inputDraft = draftModule.loadDraft(active.sessionId)
 	}
 
@@ -577,7 +570,10 @@ async function loadInBackground(): Promise<void> {
 	if (config.backgroundLoadBlobs) {
 		const active = state.tabs[state.activeTab]
 		if (active) {
+			const t0 = performance.now()
 			const n = await blockModule.loadBlobs(active.history)
+			const blobMs = (performance.now() - t0).toFixed(1)
+			perf.mark(`Active tab blobs loaded (${n} blobs, ${blobMs}ms)`)
 			if (n > 0) touchTab(active)
 			if (n > 0 && config.repaintAfterBlobLoad) onChange(false)
 		}
@@ -586,15 +582,21 @@ async function loadInBackground(): Promise<void> {
 	if (!config.backgroundLoadTabs) return
 
 	// Remaining tabs: convert history then load blobs
+	const t1 = performance.now()
+	let tabCount = 0
 	for (const tab of state.tabs) {
-		if (!tab.loaded) ensureTabLoaded(tab)
+		if (!tab.loaded) {
+			ensureTabLoaded(tab)
+			tabCount++
+		}
 		if (config.backgroundLoadBlobs) {
 			const n = await blockModule.loadBlobs(tab.history)
 			if (n > 0) touchTab(tab)
 			if (n > 0 && tab === state.tabs[state.activeTab]) onChange(false)
 		}
 	}
-	perf.mark('All tabs loaded')
+	const bgMs = (performance.now() - t1).toFixed(1)
+	perf.mark(`All tabs loaded (${tabCount} replayed, ${bgMs}ms)`)
 }
 
 let hostLockState: { pid: number | null; createdAt: string } | null = null
@@ -621,7 +623,13 @@ function startClient(signal: AbortSignal): void {
 	// Load persisted sessions directly from disk (fast, no IPC roundtrip).
 	loadPersistedSessions()
 
-	for (const event of eventsForCurrentRuntime(ipc.readAllEvents())) {
+	// Read a point-in-time snapshot and remember exactly where it ended.
+	// We then tail from that byte offset so any events appended after the
+	// snapshot read are still delivered. This closes the startup race where a
+	// client could briefly load stale tabs and then miss the correcting
+	// sessions event forever.
+	const snapshot = ipc.readEventSnapshot()
+	for (const event of eventsForCurrentRuntime(snapshot.events)) {
 		handleEvent(event)
 	}
 	onChange(false)
@@ -630,7 +638,7 @@ function startClient(signal: AbortSignal): void {
 	void loadInBackground()
 
 	void (async () => {
-		for await (const event of ipc.tailEvents(signal)) {
+		for await (const event of ipc.tailEventsFrom(snapshot.endOffset, signal)) {
 			handleEvent(event)
 		}
 	})()
@@ -663,4 +671,23 @@ export const client = {
 	clearDraft,
 	handleEvent,
 	onSubmit,
+}
+
+function addBlockToTab(sessionId: string | null, block: Block): void {
+	const tab = tabForSession(sessionId)
+	if (!tab) return
+	tab.history.push(block)
+	touchTab(tab)
+	onChange(false)
+}
+
+function addEntry(text: string, type: 'info' | 'error' = 'info'): void {
+	const tab = currentTab()
+	if (!tab) {
+		pendingEntries.push({ text, type })
+		return
+	}
+	tab.history.push({ type, text, ts: Date.now() })
+	touchTab(tab)
+	onChange(false)
 }

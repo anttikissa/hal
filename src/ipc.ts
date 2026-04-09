@@ -26,9 +26,9 @@ function appendCommand(command: any): void {
 	append(COMMANDS_FILE, { ...command, createdAt: command.createdAt ?? new Date().toISOString() })
 }
 
-async function* tail(file: string, signal?: AbortSignal): AsyncGenerator<any> {
+async function* tail(file: string, signal?: AbortSignal, startOffset?: number): AsyncGenerator<any> {
 	ensureFile(file)
-	const stream = tails.tailFile(file)
+	const stream = tails.tailFile(file, { startOffset })
 	for await (const value of ason.parseStream(stream)) {
 		if (signal?.aborted) break
 		yield value
@@ -39,6 +39,10 @@ function tailEvents(signal?: AbortSignal) {
 	return tail(EVENTS_FILE, signal)
 }
 
+function tailEventsFrom(startOffset: number, signal?: AbortSignal) {
+	return tail(EVENTS_FILE, signal, startOffset)
+}
+
 function tailCommands(signal?: AbortSignal) {
 	return tail(COMMANDS_FILE, signal)
 }
@@ -46,6 +50,11 @@ function tailCommands(signal?: AbortSignal) {
 interface HostLock {
 	pid: number
 	createdAt: string
+}
+
+interface EventSnapshot {
+	events: any[]
+	endOffset: number
 }
 
 // Delete a stale lock left by a dead process. Call this before claimHost().
@@ -80,10 +89,19 @@ function readHostLock(): HostLock | null {
 }
 
 function readAllEvents(): any[] {
+	return readEventSnapshot().events
+}
+
+// Read the full events file and remember the byte offset we stopped at.
+// Clients use this with tailEventsFrom() so they don't miss events that land
+// between the snapshot read and tail startup.
+function readEventSnapshot(): EventSnapshot {
 	ensureFile(EVENTS_FILE)
 	const content = readFileSync(EVENTS_FILE, 'utf-8')
-	if (!content.trim()) return []
-	return ason.parseAll(content) as any[]
+	return {
+		events: content.trim() ? ason.parseAll(content) as any[] : [],
+		endOffset: Buffer.byteLength(content),
+	}
 }
 
 // Self-fencing check. A server must keep verifying that host.lock still points
@@ -105,11 +123,13 @@ export const ipc = {
 	appendEvent,
 	appendCommand,
 	tailEvents,
+	tailEventsFrom,
 	tailCommands,
 	cleanupStaleLock,
 	claimHost,
 	readHostLock,
 	readAllEvents,
+	readEventSnapshot,
 	ownsHostLock,
 	releaseHost,
 }
