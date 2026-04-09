@@ -359,13 +359,14 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 				emitInfo(sessionId ?? activeSessions[0]?.id ?? resumeId, `Session ${resumeId} is already open`)
 				break
 			}
-			const resumed = sessionFromMeta(sessionStore.loadSessionMeta(resumeId))
+			const meta = sessionStore.activateSession(resumeId)
+			const resumed = sessionFromMeta(meta)
 			if (!resumed) {
 				emitInfo(sessionId ?? activeSessions[0]?.id ?? resumeId, `Session ${resumeId} not found`, 'error')
 				break
 			}
 			activeSessions.push(resumed)
-			void sessionStore.updateMeta(resumeId, { closedAt: undefined })
+			await sessionStore.updateMeta(resumeId, { closedAt: undefined })
 			broadcastSessions()
 			break
 		}
@@ -374,7 +375,8 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			if (!sessionId) return
 			// Abort any active generation
 			agentLoop.abort(sessionId)
-			void sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString() })
+			await sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString() })
+			sessionStore.deactivateSession(sessionId)
 			activeSessions = activeSessions.filter((s) => s.id !== sessionId)
 			if (activeSessions.length === 0) await createSession()
 			broadcastSessions()
@@ -386,8 +388,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 // ── Main entry point ──
 
 function startRuntime(signal: AbortSignal): void {
-	activeRuntimePid = process.pid
-	activeSessions = []
+	activeRuntimePid = process.pid; activeSessions = []; sessionStore.deactivateAllSessions()
 
 	// Load session metadata only (no history — clients load that themselves).
 	const metas = sessionStore.loadSessionMetas()
