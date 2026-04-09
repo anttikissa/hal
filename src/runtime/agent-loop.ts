@@ -86,12 +86,14 @@ async function getProvider(name: string): Promise<Provider> {
 // ── IPC helpers ──
 
 function emitEvent(sessionId: string, event: Record<string, any>): void {
-	ipc.appendEvent({
+	const fullEvent = {
 		id: protocol.eventId(),
 		sessionId,
 		createdAt: new Date().toISOString(),
 		...event,
-	})
+	}
+	sessions.applyLiveEvent(sessionId, fullEvent)
+	ipc.appendEvent(fullEvent)
 }
 
 function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info'): void {
@@ -438,6 +440,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					}
 					if (totalUsage.input > 0) historyEntry.usage = totalUsage
 					await sessions.appendHistory(sessionId, [historyEntry])
+					sessions.clearLive(sessionId)
 				}
 
 				if (assistantText) {
@@ -493,6 +496,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				historyEntry.tools.push({ id: tc.id, name: tc.name, blobId })
 			}
 			await sessions.appendHistory(sessionId, [historyEntry])
+				sessions.clearLive(sessionId)
 
 			// Emit response event for intermediate text so the client can
 			// create a proper block and clear streaming buffers. Without

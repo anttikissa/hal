@@ -32,6 +32,7 @@ export interface Tab {
 	// Tabs start unloaded: raw history is stashed here and converted to
 	// blocks on demand (active tab at startup, others in background).
 	rawHistory?: HistoryEntry[]
+	liveHistory?: Block[]
 	loaded: boolean
 	// Generation finished on a non-active tab — show ✓ until user switches to it
 	doneUnseen: boolean
@@ -96,6 +97,7 @@ function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string
 		history: [],
 		inputHistory: [],
 		inputDraft: '',
+		liveHistory: [],
 		loaded: true,
 		doneUnseen: false,
 		historyVersion: 0,
@@ -119,6 +121,12 @@ function currentTab(): Tab | null {
 
 function touchTab(tab: Tab): void {
 	tab.historyVersion++
+}
+
+function historyWithLive(blocks: Block[], tab: Tab): Block[] {
+	const live = tab.liveHistory ?? []
+	if (live.length === 0) return blocks
+	return [...blocks, ...live]
 }
 
 function tabForSession(sessionId: string | null): Tab | null {
@@ -190,7 +198,7 @@ function switchTab(index: number): void {
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
-	tab.history = blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId)
+	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId), tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
@@ -338,6 +346,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	)
 	tab.rawHistory = history
 	tab.loaded = false
+	tab.liveHistory = sessionStore.loadLive(info.id).blocks as Block[]
 	for (const entry of history) {
 		if (entry.usage) {
 			tab.usage.input += (entry.usage as any).input ?? 0
@@ -562,6 +571,7 @@ function loadPersistedSessions(): void {
 		const tab = makeTab(s.meta.id, name, { cwd: s.meta.workingDir, model: s.meta.model })
 		tab.rawHistory = s.history
 		tab.loaded = false
+		tab.liveHistory = sessionStore.loadLive(s.meta.id).blocks as Block[]
 		// Sum up usage from history entries (each assistant turn has a .usage field)
 		for (const entry of s.history) {
 			if (entry.usage) {

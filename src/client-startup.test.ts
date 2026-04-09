@@ -39,6 +39,7 @@ describe('client startup', () => {
 	const origTailEvents = ipc.tailEvents
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
+	const origLoadLive = sessions.loadLive
 
 	beforeEach(() => {
 		client.state.tabs.length = 0
@@ -65,6 +66,7 @@ describe('client startup', () => {
 		ipc.tailEvents = origTailEvents
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
+		sessions.loadLive = origLoadLive
 	})
 
 	test('bootstraps tabs from shared state instead of replaying old events', async () => {
@@ -123,5 +125,33 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(tailCalls).toBe(1)
+	})
+
+	test('loads live session blocks on startup for tabs opened mid-turn', async () => {
+		sessions.loadAllSessions = () => [makeLoadedSession('s1')]
+		sessions.loadLive = () => ({
+			busy: true,
+			activity: 'generating...',
+			blocks: [{ type: 'assistant', text: 'hello', streaming: true, ts: Date.parse('2026-04-09T20:01:00.000Z') }],
+			updatedAt: '2026-04-09T20:01:00.000Z',
+		})
+		draft.loadDraft = () => ''
+
+		const shared = makeSharedState(['s1'])
+		shared.busy.s1 = true
+		shared.activity.s1 = 'generating...'
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.history).toMatchObject([
+			{ type: 'assistant', text: 'hello', streaming: true, ts: Date.parse('2026-04-09T20:01:00.000Z') },
+		])
 	})
 })

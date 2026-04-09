@@ -40,6 +40,43 @@ test('deleteSession cleans up', async () => {
 	expect(result).toHaveLength(0)
 })
 
+	test('live snapshot stores uncommitted streaming blocks', async () => {
+		const id = await makeSession()
+		sessions.applyLiveEvent(id, {
+			type: 'stream-delta',
+			sessionId: id,
+			channel: 'assistant',
+			text: 'hel',
+			createdAt: '2026-04-09T20:01:00.000Z',
+		})
+		sessions.applyLiveEvent(id, {
+			type: 'stream-delta',
+			sessionId: id,
+			channel: 'assistant',
+			text: 'lo',
+			createdAt: '2026-04-09T20:01:01.000Z',
+		})
+		sessions.applyLiveEvent(id, {
+			type: 'tool-call',
+			sessionId: id,
+			toolId: 'tool-1',
+			name: 'read',
+			input: { path: 'notes.txt' },
+			blobId: '000001-abc',
+			createdAt: '2026-04-09T20:01:02.000Z',
+		})
+
+		const live = sessions.loadLive(id)
+		expect(live.blocks).toMatchObject([
+			{ type: 'assistant', text: 'hello', ts: Date.parse('2026-04-09T20:01:00.000Z') },
+			{ type: 'tool', toolId: 'tool-1', name: 'read', blobId: '000001-abc', input: { path: 'notes.txt' } },
+		])
+		expect(live.blocks[0]?.streaming).toBeUndefined()
+
+		sessions.clearLive(id)
+		expect(sessions.loadLive(id).blocks).toEqual([])
+	})
+
 
 test('rotateLog switches new writes to history2.asonl', async () => {
 	const id = await makeSession()

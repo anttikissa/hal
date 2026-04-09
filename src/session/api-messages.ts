@@ -289,7 +289,6 @@ function pastBatchThreshold(age: number, threshold: number): boolean {
 function pruneMessages(msgs: Message[]): Message[] {
 	const heavy = apiConfig.heavyThreshold
 	const thinking = apiConfig.thinkingThreshold
-	const batch = Math.max(1, apiConfig.pruneBatchTurns)
 
 	// Count completed turns after each position (how "old" each message is)
 	const age = new Array(msgs.length).fill(0)
@@ -298,33 +297,30 @@ function pruneMessages(msgs: Message[]): Message[] {
 		age[i] = count
 		if (isTurnEnd(msgs[i]!)) count++
 	}
-	const checkpoint = Math.floor(count / batch) * batch
-	const offset = count - checkpoint
 
 	const out: Message[] = []
 	for (let i = 0; i < msgs.length; i++) {
 		const msg = msgs[i]!
-		const frozenAge = age[i] - offset
 
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			let content = (msg.content as ContentBlock[]).map((b) => {
 				// Strip tool inputs from old messages
-				if (b.type === 'tool_use' && frozenAge > heavy) return { ...b, input: {} }
+				if (b.type === 'tool_use' && pastBatchThreshold(age[i]!, heavy)) return { ...b, input: {} }
 				return b
 			})
 			// Strip thinking from old messages
-			if (frozenAge > thinking) {
+			if (pastBatchThreshold(age[i]!, thinking)) {
 				content = content.filter((b) => b.type !== 'thinking')
 			}
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = (msg.content as ContentBlock[]).map((b) => {
 				// Strip old tool results
-				if (b.type === 'tool_result' && frozenAge > heavy) {
+				if (b.type === 'tool_result' && pastBatchThreshold(age[i]!, heavy)) {
 					return { ...b, content: '[tool result omitted from context]' }
 				}
 				// Strip old images
-				if (b.type === 'image' && frozenAge > heavy) {
+				if (b.type === 'image' && pastBatchThreshold(age[i]!, heavy)) {
 					return { type: 'text' as const, text: '[image omitted from context]' }
 				}
 				return b

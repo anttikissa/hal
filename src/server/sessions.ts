@@ -1,17 +1,18 @@
-// Session persistence — load/save session metadata and history.
-//
-// Read operations are synchronous (used at startup). Write operations are async
-// because they go through fs.writeFile / fs.appendFile. Pruning deletes old
-// sessions on startup to keep disk usage bounded.
+// Session persistence. Open sessions keep session.ason as a liveFile; closed
+// sessions are read straight from disk until the runtime resumes them.
 
 import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, appendFileSync } from 'fs'
-import { writeFile, appendFile } from 'fs/promises'
+import { appendFile } from 'fs/promises'
 import { STATE_DIR } from '../state.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
+import { liveFiles } from '../utils/live-file.ts'
 import { perf } from '../perf.ts'
 
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
+const DEFAULT_LOG = 'history.asonl'
+const liveSessionMetas = new Map<string, SessionMeta>()
+const liveSessionState = new Map<string, SessionLive>()
 
 export interface SessionMeta {
 	id: string
@@ -38,216 +39,311 @@ export interface HistoryEntry {
 	[key: string]: any
 }
 
-// ── Helpers ──
-
-function sessionDir(sessionId: string): string {
-	return `${SESSIONS_DIR}/${sessionId}`
-}
-
-function ensureSessionDir(sessionId: string): void {
-	const dir = sessionDir(sessionId)
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-}
-
-function historyLogName(sessionId: string): string {
-	return loadSessionMeta(sessionId)?.currentLog ?? 'history.asonl'
-}
-
-function historyLogPath(sessionId: string, logName?: string): string {
-	return `${sessionDir(sessionId)}/${logName ?? historyLogName(sessionId)}`
-}
-
-// ── Read operations ──
-
-// Load session metadata from session.ason
-function loadSessionMeta(sessionId: string): SessionMeta | null {
-	const path = `${sessionDir(sessionId)}/session.ason`
-	if (!existsSync(path)) return null
-	try {
-		return ason.parse(readFileSync(path, 'utf-8')) as unknown as SessionMeta
-	} catch {
-		return null
-	}
-}
-
-// Load history entries from the session's current history log.
-function loadHistory(sessionId: string): HistoryEntry[] {
-	const path = historyLogPath(sessionId)
-	if (!existsSync(path)) return []
-	try {
-		const content = readFileSync(path, 'utf-8')
-		if (!content.trim()) return []
-		return ason.parseAll(content) as unknown as HistoryEntry[]
-	} catch {
-		return []
-	}
-}
-
-// Load a session list (ordered array of session IDs) from shared IPC state.
-function loadSessionList(): string[] {
-	return [...ipc.readState().sessions]
-}
-
 export interface LoadedSession {
 	meta: SessionMeta
 	history: HistoryEntry[]
 }
 
-// Load all sessions. Returns them in tab order.
-// History entries are returned raw — the client uses blocks.historyToBlocks()
-// to split them into renderable blocks.
+export interface SessionLive {
+	busy: boolean
+	activity: string
+	blocks: any[]
+	updatedAt: string
+}
+
+function sessionDir(sessionId: string): string { return `${SESSIONS_DIR}/${sessionId}` }
+
+function sessionLivePath(sessionId: string): string { return `${sessionDir(sessionId)}/live.ason` }
+
+function sessionMetaPath(sessionId: string): string { return `${sessionDir(sessionId)}/session.ason` }
+
+function ensureSessionDir(sessionId: string): void {
+	if (!existsSync(sessionDir(sessionId))) mkdirSync(sessionDir(sessionId), { recursive: true })
+}
+
+function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
+	if (!meta.id) meta.id = sessionId
+	if (!meta.currentLog) meta.currentLog = DEFAULT_LOG
+	return meta
+}
+
+function defaultLive(): SessionLive {
+	return {
+		busy: false,
+		activity: '',
+		blocks: [],
+		updatedAt: new Date().toISOString(),
+	}
+}
+
+function fixLive(live: SessionLive | null | undefined): SessionLive {
+	const data = live ?? defaultLive()
+	if (typeof data.busy !== 'boolean') data.busy = false
+	if (typeof data.activity !== 'string') data.activity = ''
+	if (!Array.isArray(data.blocks)) data.blocks = []
+	if (typeof data.updatedAt !== 'string') data.updatedAt = new Date().toISOString()
+	return data
+}
+
+function readLiveFromDisk(sessionId: string): SessionLive {
+	const path = sessionLivePath(sessionId)
+	if (!existsSync(path)) return defaultLive()
+	try {
+		return fixLive(ason.parse(readFileSync(path, 'utf-8')) as unknown as SessionLive)
+	} catch {
+		return defaultLive()
+	}
+}
+
+function activateLive(sessionId: string): SessionLive {
+	const cached = liveSessionState.get(sessionId)
+	if (cached) return cached
+	ensureSessionDir(sessionId)
+	const live = liveFiles.liveFile(sessionLivePath(sessionId), defaultLive(), { watch: false }) as SessionLive
+	liveSessionState.set(sessionId, fixLive(live))
+	return live
+}
+
+function loadLive(sessionId: string): SessionLive {
+	return liveSessionState.get(sessionId) ?? readLiveFromDisk(sessionId)
+}
+
+function saveLive(live: SessionLive): void {
+	live.updatedAt = new Date().toISOString()
+	liveFiles.save(fixLive(live))
+}
+
+function updateLive(sessionId: string, mutator: (live: SessionLive) => void): SessionLive {
+	const live = activateLive(sessionId)
+	mutator(live)
+	saveLive(live)
+	return live
+}
+
+function lastLiveBlock(live: SessionLive): any | null {
+	return live.blocks[live.blocks.length - 1] ?? null
+}
+
+function closeStreamingBlock(live: SessionLive): void {
+	const last = lastLiveBlock(live)
+	if (!last) return
+	if ((last.type === 'assistant' || last.type === 'thinking') && last.streaming) delete last.streaming
+}
+
+function applyLiveEvent(sessionId: string, event: any): void {
+	if (!event?.type) return
+	updateLive(sessionId, (live) => {
+		const ts = event.createdAt ? Date.parse(event.createdAt) : undefined
+		if (event.type === 'stream-start') {
+			closeStreamingBlock(live)
+			return
+		}
+		if (event.type === 'stream-delta' && event.text) {
+			const last = lastLiveBlock(live)
+			if (event.channel === 'thinking') {
+				if (last?.type === 'thinking' && last.streaming) {
+					last.text += event.text
+					if (event.blobId) last.blobId = event.blobId
+					if (!last.sessionId) last.sessionId = sessionId
+					if (!last.ts) last.ts = ts
+					return
+				}
+				closeStreamingBlock(live)
+				live.blocks.push({ type: 'thinking', text: event.text, blobId: event.blobId, sessionId, ts, streaming: true })
+				return
+			}
+			if (last?.type === 'assistant' && last.streaming) {
+				last.text += event.text
+				if (!last.ts) last.ts = ts
+				return
+			}
+			closeStreamingBlock(live)
+			live.blocks.push({ type: 'assistant', text: event.text, ts, streaming: true })
+			return
+		}
+		if (event.type === 'tool-call') {
+			closeStreamingBlock(live)
+			live.blocks.push({
+				type: 'tool',
+				name: event.name,
+				input: event.input,
+				blobId: event.blobId,
+				sessionId,
+				toolId: event.toolId,
+				ts,
+			})
+			return
+		}
+		if (event.type === 'response' && event.isError && event.text) {
+			closeStreamingBlock(live)
+			live.blocks.push({ type: 'error', text: event.text, ts })
+			return
+		}
+		if (event.type === 'stream-end') closeStreamingBlock(live)
+	})
+}
+
+function clearLive(sessionId: string): void {
+	updateLive(sessionId, (live) => {
+		live.blocks = []
+	})
+}
+
+function readSessionMetaFromDisk(sessionId: string): SessionMeta | null {
+	const path = sessionMetaPath(sessionId)
+	if (!existsSync(path)) return null
+	try {
+		return fixMeta(ason.parse(readFileSync(path, 'utf-8')) as unknown as SessionMeta, sessionId)
+	} catch {
+		return null
+	}
+}
+
+function activateSession(sessionId: string, defaults?: SessionMeta): SessionMeta | null {
+	const cached = liveSessionMetas.get(sessionId)
+	if (cached) return cached
+	const path = sessionMetaPath(sessionId)
+	if (!defaults && !existsSync(path)) return null
+	ensureSessionDir(sessionId)
+	const meta = liveFiles.liveFile(
+		path,
+		fixMeta({ id: sessionId, createdAt: defaults?.createdAt ?? new Date().toISOString(), ...defaults }, sessionId),
+		{ watch: false },
+	) as SessionMeta
+	liveSessionMetas.set(sessionId, fixMeta(meta, sessionId))
+	return meta
+}
+
+function deactivateSession(sessionId: string): void {
+	liveSessionMetas.delete(sessionId)
+	liveSessionState.delete(sessionId)
+}
+
+function deactivateAllSessions(): void {
+	liveSessionMetas.clear()
+	liveSessionState.clear()
+}
+
+function loadSessionMeta(sessionId: string): SessionMeta | null { return liveSessionMetas.get(sessionId) ?? readSessionMetaFromDisk(sessionId) }
+
+function historyLogPath(sessionId: string, logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG): string {
+	return `${sessionDir(sessionId)}/${logName}`
+}
+
+function loadHistory(sessionId: string): HistoryEntry[] {
+	const path = historyLogPath(sessionId)
+	if (!existsSync(path)) return []
+	try {
+		const content = readFileSync(path, 'utf-8')
+		return content.trim() ? (ason.parseAll(content) as unknown as HistoryEntry[]) : []
+	} catch {
+		return []
+	}
+}
+
+function loadSessionList(): string[] {
+	return [...ipc.readState().sessions]
+}
+
+function collectMetas(ids: string[], load: (id: string) => SessionMeta | null): SessionMeta[] {
+	const metas: SessionMeta[] = []
+	for (const id of ids) {
+		const meta = load(id)
+		if (meta) metas.push(meta)
+	}
+	return metas
+}
+
 function loadAllSessions(): LoadedSession[] {
 	perf.mark('Loading sessions')
 	const ids = loadSessionList()
-	if (ids.length === 0) return []
-
 	const result: LoadedSession[] = []
 	for (const id of ids) {
 		const meta = loadSessionMeta(id)
-		if (!meta) continue
-		result.push({ meta, history: loadHistory(id) })
+		if (meta) result.push({ meta, history: loadHistory(id) })
 	}
 	perf.mark(`Loaded ${result.length} sessions (${ids.length} listed)`)
 	return result
 }
 
-// Load just session metadata (no history). Fast — only reads session.ason files.
 function loadSessionMetas(): SessionMeta[] {
-	const ids = loadSessionList()
-	const result: SessionMeta[] = []
-	for (const id of ids) {
-		const meta = loadSessionMeta(id)
-		if (meta) result.push(meta)
-	}
-	return result
+	return collectMetas(loadSessionList(), activateSession)
 }
 
-// Load metadata for every session directory on disk, including closed sessions.
 function loadAllSessionMetas(): SessionMeta[] {
-	if (!existsSync(SESSIONS_DIR)) return []
-	const result: SessionMeta[] = []
-	for (const id of readdirSync(SESSIONS_DIR).sort()) {
-		const meta = loadSessionMeta(id)
-		if (meta) result.push(meta)
-	}
-	return result
+	return existsSync(SESSIONS_DIR) ? collectMetas(readdirSync(SESSIONS_DIR).sort(), readSessionMetaFromDisk) : []
 }
 
-// Load full history including forked parent chains. Follows forked_from entries
-// to reconstruct the complete conversation history.
 function loadAllHistory(sessionId: string): HistoryEntry[] {
 	const entries = loadHistory(sessionId)
-	if (entries.length === 0) return entries
-
-	// If this session was forked, prepend parent history up to the fork point
 	const first = entries[0]
-	if (first?.type === 'forked_from' && first.parent) {
-		const parentEntries = loadAllHistory(first.parent)
-		const forkTs = first.ts
-		// Keep parent entries before the fork timestamp
-		const before = forkTs ? parentEntries.filter((e) => !e.ts || e.ts < forkTs) : parentEntries
-		return [...before, ...entries.slice(1)]
-	}
-	return entries
+	if (first?.type !== 'forked_from' || !first.parent) return entries
+	const parentEntries = loadAllHistory(first.parent)
+	const forkTs = first.ts
+	const before = forkTs ? parentEntries.filter((e) => !e.ts || e.ts < forkTs) : parentEntries
+	return [...before, ...entries.slice(1)]
 }
 
-// ── Write operations ──
+function saveMeta(meta: SessionMeta): void { liveFiles.save(fixMeta(meta, meta.id)) }
 
-// Create a new session with initial metadata.
 async function createSession(id: string, meta: SessionMeta): Promise<void> {
-	ensureSessionDir(id)
-	const path = `${sessionDir(id)}/session.ason`
-	await writeFile(path, ason.stringify({ ...meta, currentLog: meta.currentLog ?? 'history.asonl' }) + '\n')
+	const liveMeta = activateSession(id, meta)
+	if (liveMeta) { Object.assign(liveMeta, meta); saveMeta(liveMeta) }
 }
 
-// Append one or more history entries to the session's current history log.
-// Each entry is serialized as a single-line ASON value (short mode).
+function historyLines(entries: HistoryEntry[]): string {
+	return entries.map((e) => ason.stringify(e, 'short')).join('\n') + '\n'
+}
+
 async function appendHistory(sessionId: string, entries: HistoryEntry[]): Promise<void> {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
-	const path = historyLogPath(sessionId)
-	const lines = entries.map((e) => ason.stringify(e, 'short')).join('\n') + '\n'
-	await appendFile(path, lines)
+	await appendFile(historyLogPath(sessionId), historyLines(entries))
 }
 
-// Synchronous version of appendHistory for cases where we can't await
-// (e.g. signal handlers). Use sparingly.
 function appendHistorySync(sessionId: string, entries: HistoryEntry[]): void {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
-	const path = historyLogPath(sessionId)
-	const lines = entries.map((e) => ason.stringify(e, 'short')).join('\n') + '\n'
-	appendFileSync(path, lines)
+	appendFileSync(historyLogPath(sessionId), historyLines(entries))
 }
 
-// Update session metadata. Reads existing meta, merges updates, writes back.
 async function updateMeta(sessionId: string, updates: Partial<SessionMeta>): Promise<void> {
-	const existing = loadSessionMeta(sessionId)
-	if (!existing) return
-	const merged = { ...existing, ...updates }
-	const path = `${sessionDir(sessionId)}/session.ason`
-	await writeFile(path, ason.stringify(merged) + '\n')
+	const meta = liveSessionMetas.get(sessionId)
+	if (meta) { Object.assign(meta, updates); saveMeta(meta) }
 }
 
-// Rotate to a fresh history log. Old logs stay on disk for manual inspection.
 async function rotateLog(sessionId: string): Promise<string> {
-	const meta = loadSessionMeta(sessionId)
-	if (!meta) throw new Error(`Session ${sessionId} not found`)
-
-	const currentLog = meta.currentLog ?? 'history.asonl'
-	const currentPath = historyLogPath(sessionId, currentLog)
-	if (!existsSync(currentPath)) return currentLog
-
-	let nextN = 2
-	if (currentLog !== 'history.asonl') {
-		const match = currentLog.match(/^history(\d+)\.asonl$/)
-		if (match) nextN = parseInt(match[1]!, 10) + 1
-	}
-
-	const nextLog = `history${nextN}.asonl`
+	const meta = liveSessionMetas.get(sessionId)
+	if (!meta) throw new Error(`Session ${sessionId} is not live`)
+	const currentLog = meta.currentLog ?? DEFAULT_LOG
+	if (!existsSync(historyLogPath(sessionId, currentLog))) return currentLog
+	const match = currentLog.match(/^history(\d+)\.asonl$/)
+	const nextLog = `history${match ? parseInt(match[1]!, 10) + 1 : 2}.asonl`
 	await updateMeta(sessionId, { currentLog: nextLog })
 	return nextLog
 }
 
-// Fork a session: create a new session whose history starts with a forked_from
-// marker, then optionally copy entries up to atIndex from the source.
-// The parent's history is not copied — loadAllHistory follows the fork chain.
 async function forkSession(sourceId: string, newId: string, atIndex?: number): Promise<void> {
 	const sourceMeta = loadSessionMeta(sourceId)
 	if (!sourceMeta) throw new Error(`Source session ${sourceId} not found`)
-
-	// Determine fork timestamp: use the atIndex-th entry's ts, or now
-	let forkTs = new Date().toISOString()
-	if (atIndex !== undefined) {
-		const history = loadHistory(sourceId)
-		if (atIndex >= 0 && atIndex < history.length && history[atIndex]!.ts) {
-			forkTs = history[atIndex]!.ts!
-		}
-	}
-
-	// Create the new session with a forked_from marker as first entry
-	const newMeta: SessionMeta = {
+	const history = atIndex !== undefined ? loadHistory(sourceId) : []
+	const forkTs = atIndex !== undefined && atIndex >= 0 && atIndex < history.length && history[atIndex]!.ts
+		? history[atIndex]!.ts!
+		: new Date().toISOString()
+	await createSession(newId, {
 		id: newId,
 		workingDir: sourceMeta.workingDir,
 		createdAt: forkTs,
 		topic: sourceMeta.topic ? `Fork of ${sourceMeta.topic}` : undefined,
 		model: sourceMeta.model,
-	}
-	await createSession(newId, newMeta)
+	})
 	await appendHistory(newId, [{ type: 'forked_from', parent: sourceId, ts: forkTs }])
 }
 
-// Delete a session directory and all its contents.
 function deleteSession(sessionId: string): void {
-	const dir = sessionDir(sessionId)
-	if (existsSync(dir)) {
-		rmSync(dir, { recursive: true, force: true })
-	}
+	deactivateSession(sessionId)
+	if (existsSync(sessionDir(sessionId))) rmSync(sessionDir(sessionId), { recursive: true, force: true })
 }
-
-
-
-// ── Pruning ──
 
 const pruneConfig = {
 	// Delete sessions older than this many days
@@ -256,80 +352,54 @@ const pruneConfig = {
 	maxCount: 200,
 }
 
-// Prune old sessions on startup. Deletes sessions older than maxAgeDays
-// and trims the list to maxCount (keeping newest). Runs synchronously
-// since it's called once during startup.
 function pruneSessions(): { deleted: number } {
 	const ids = loadSessionList()
 	if (ids.length === 0) return { deleted: 0 }
-
 	const now = Date.now()
 	const maxAge = pruneConfig.maxAgeDays * 24 * 60 * 60 * 1000
 	const keep: string[] = []
 	let deleted = 0
-
 	for (const id of ids) {
 		const meta = loadSessionMeta(id)
 		if (!meta) {
-			// Session dir missing — drop from list
 			deleted++
 			continue
 		}
-		const age = now - new Date(meta.createdAt).getTime()
-		if (age > maxAge) {
+		if (now - new Date(meta.createdAt).getTime() > maxAge) {
 			deleteSession(id)
 			deleted++
 		} else {
 			keep.push(id)
 		}
 	}
-
-	// Trim to maxCount, removing oldest (earliest in list) first
 	if (keep.length > pruneConfig.maxCount) {
-		const excess = keep.splice(0, keep.length - pruneConfig.maxCount)
-		for (const id of excess) {
+		for (const id of keep.splice(0, keep.length - pruneConfig.maxCount)) {
 			deleteSession(id)
 			deleted++
 		}
 	}
-
-	// Update session list in shared state if anything changed.
-	if (deleted > 0) {
-		ipc.updateState((state) => {
-			state.sessions = keep
-		})
-	}
-
+	if (deleted > 0) ipc.updateState((state) => { state.sessions = keep })
 	return { deleted }
 }
 
-// ── Interrupted tool detection ──
-
-// Find tool calls in the last assistant message that lack matching tool_result entries.
-// Used to show "[interrupted] during tools" hint on session resume.
 function detectInterruptedTools(entries: HistoryEntry[]): { name: string; id: string }[] {
 	const completedToolIds = new Set<string>()
-	for (const m of entries) {
-		if (m.role === 'tool_result' && m.tool_use_id) completedToolIds.add(m.tool_use_id)
+	for (const entry of entries) {
+		if (entry.role === 'tool_result' && entry.tool_use_id) completedToolIds.add(entry.tool_use_id)
 	}
-	// Walk backwards to find the last assistant message with tools
 	for (let i = entries.length - 1; i >= 0; i--) {
-		const m = entries[i]!
-		if (m.role === 'assistant' && Array.isArray(m.tools)) {
-			const interrupted: { name: string; id: string }[] = []
-			for (const t of m.tools) {
-				if (!completedToolIds.has(t.id)) {
-					interrupted.push({ name: t.name, id: t.id })
-				}
-			}
-			return interrupted
+		const entry = entries[i]!
+		if (entry.role !== 'assistant' || !Array.isArray(entry.tools)) continue
+		const interrupted: { name: string; id: string }[] = []
+		for (const tool of entry.tools) {
+			if (!completedToolIds.has(tool.id)) interrupted.push({ name: tool.name, id: tool.id })
 		}
+		return interrupted
 	}
 	return []
 }
 
 export const sessions = {
-	// Read
 	loadAllSessions,
 	loadSessionMetas,
 	loadAllSessionMetas,
@@ -337,7 +407,10 @@ export const sessions = {
 	loadSessionMeta,
 	loadHistory,
 	loadAllHistory,
-	// Write
+	loadLive,
+	activateSession,
+	deactivateSession,
+	deactivateAllSessions,
 	createSession,
 	appendHistory,
 	appendHistorySync,
@@ -345,10 +418,10 @@ export const sessions = {
 	forkSession,
 	deleteSession,
 	rotateLog,
-	// Pruning
 	pruneSessions,
 	pruneConfig,
-	// Utilities
 	detectInterruptedTools,
+	applyLiveEvent,
+	clearLive,
 	sessionDir,
 }
