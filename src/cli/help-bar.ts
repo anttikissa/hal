@@ -59,6 +59,10 @@ function logKey(name: string): void {
 	usageCounts[name] = (usageCounts[name] ?? 0) + 1
 }
 
+function reset(): void {
+	for (const key of Object.keys(usageCounts)) delete usageCounts[key]
+}
+
 function deriveState(busy: boolean, hasText: boolean): HelpState {
 	if (busy) return 'streaming'
 	if (hasText) return 'idle-text'
@@ -79,6 +83,7 @@ export const helpBar = {
 	config,
 	build,
 	logKey,
+	reset,
 	deriveState,
 	isLearned,
 	HINTS,

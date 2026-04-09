@@ -251,7 +251,9 @@ function renderHelpBar(lines: string[]): void {
 	const busy = client.isBusy()
 	const hasText = prompt.text().length > 0
 	const bar = helpBar.build(busy, hasText)
-	if (bar) lines.push(`\x1b[90m${bar}\x1b[0m`)
+	// Always push a line — even when empty — so chrome height is constant.
+	// Without this, typing the first character causes a 1-row jump.
+	lines.push(bar ? `\x1b[90m${bar}\x1b[0m` : '')
 }
 
 function renderPrompt(lines: string[]): void {
@@ -261,12 +263,10 @@ function renderPrompt(lines: string[]): void {
 }
 
 // How many frame lines the chrome (tab bar + status + help bar + prompt) occupies.
+// Help bar always counts as 1 line (even when empty) to prevent jumps.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	const busy = client.isBusy()
-	const hasText = prompt.text().length > 0
-	const hasHelp = helpBar.build(busy, hasText) !== ''
-	return 2 + (hasHelp ? 1 : 0) + prompt.lineCount(cols)
+	return 3 + prompt.lineCount(cols) // tab bar + status + help bar + prompt
 }
 
 function buildFrame(): string[] {

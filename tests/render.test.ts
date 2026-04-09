@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach } from 'bun:test'
 import { render } from '../src/client/render.ts'
 import { client } from '../src/client.ts'
 import { prompt } from '../src/cli/prompt.ts'
+import { helpBar } from '../src/cli/help-bar.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -26,7 +27,10 @@ beforeEach(() => {
 	client.state.activeTab = 0
 	client.state.pid = 111
 	client.state.hostPid = 222
+	client.state.peak = 0
+	client.state.peakCols = 0
 	prompt.clear()
+	helpBar.reset()
 })
 
 describe('render', () => {
@@ -60,5 +64,24 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')
 		expect(clean).not.toContain('lock:')
+	})
+
+	test('learned idle-text hints still reserve the help-bar row', () => {
+		for (let i = 0; i < helpBar.config.learnThreshold; i++) {
+			helpBar.logKey('enter')
+			helpBar.logKey('shift-enter')
+			helpBar.logKey('tab')
+		}
+
+		render.resetRenderer()
+		const empty = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+
+		render.resetRenderer()
+		prompt.setText('x')
+		const withText = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+
+		expect(empty[2]).toContain('ctrl-t new')
+		expect(withText[2]).toBe('')
+		expect(withText.length).toBe(empty.length)
 	})
 })
