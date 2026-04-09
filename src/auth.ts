@@ -87,13 +87,18 @@ function getCredential(providerName: string): Credential | undefined {
 		if (cred) return cred
 	}
 
-	// All on cooldown (or no entries at all) — fall back to env var
+	// Fall back to env var
 	const envVar = ENV_KEYS[providerName] ?? `${providerName.toUpperCase()}_API_KEY`
 	const envVal = process.env[envVar]
 	if (envVal) return { value: envVal, type: 'api-key' }
 
-	// If there were entries but all on cooldown, return undefined
-	// (caller should check allOnCooldownMessage for a user-facing error)
+	// All on cooldown — return the one that comes off soonest
+	let bestIdx = -1, bestUntil = Infinity
+	for (let i = 0; i < entries.length; i++) {
+		const until = cooldowns.get(`${providerName}:${i}`) ?? 0
+		if (until < bestUntil) { bestUntil = until; bestIdx = i }
+	}
+	if (bestIdx >= 0) return credFromEntry(entries[bestIdx], `${providerName}:${bestIdx}`)
 	return undefined
 }
 

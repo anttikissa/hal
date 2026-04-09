@@ -29,6 +29,7 @@ import '../tools/eval.ts'
 import '../tools/send.ts'
 import '../tools/google.ts'
 import '../tools/read_url.ts'
+import '../tools/analyze_history.ts'
 // Anthropic also has its own server-side web_search tool
 // (type: 'web_search_20250305'). That's separate from our local google tool.
 
@@ -346,9 +347,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								if (!retryStartedAt) retryStartedAt = Date.now()
 								const elapsed = Date.now() - retryStartedAt
 								if (elapsed < config.retryMaxTotalMs) {
-									// Prefer resets_in_seconds from body, then Retry-After header, then exponential backoff
+									// Provider-set retryAfterMs wins (e.g. token rotation sets 1s).
+									// Otherwise try resets_in_seconds from body, then exponential backoff.
 									const bodyDelay = parseResetsInSeconds(event.body)
-									const delay = bodyDelay ?? computeRetryDelay(event.retryAfterMs, retryAttempt)
+									const delay = event.retryAfterMs ?? bodyDelay ?? computeRetryDelay(undefined, retryAttempt)
 									retryAttempt++
 									const delaySec = Math.ceil(delay / 1000)
 									emitInfo(sessionId, `Rate limited — retrying in ${delaySec}s`)

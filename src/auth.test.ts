@@ -73,15 +73,16 @@ describe('auth.getCredential — multi-account rotation', () => {
 		expect(c3!.value).toBe('tok_c')
 	})
 
-	test('all accounts on cooldown returns undefined', () => {
+	test('all accounts on cooldown returns soonest-expiring one', () => {
 		const c1 = auth.getCredential('openai')
 		auth.markCooldown(c1!, 60_000)
 		const c2 = auth.getCredential('openai')
-		auth.markCooldown(c2!, 60_000)
+		auth.markCooldown(c2!, 30_000)  // shortest cooldown
 		const c3 = auth.getCredential('openai')
-		auth.markCooldown(c3!, 60_000)
+		auth.markCooldown(c3!, 90_000)
 		const c4 = auth.getCredential('openai')
-		expect(c4).toBeUndefined()
+		// Should get b (30s cooldown, soonest)
+		expect(c4!.value).toBe('tok_b')
 	})
 })
 
