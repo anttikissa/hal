@@ -9,4 +9,7 @@
 	blocks: {
 		blobBatchSize: 64
 	}
+	agentLoop: {
+		maxIterations: 50
+	}
 }
