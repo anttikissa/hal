@@ -6,7 +6,8 @@
 
 import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, appendFileSync } from 'fs'
 import { writeFile, appendFile } from 'fs/promises'
-import { STATE_DIR, ensureDir } from '../state.ts'
+import { STATE_DIR } from '../state.ts'
+import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { perf } from '../perf.ts'
 
@@ -82,16 +83,9 @@ function loadHistory(sessionId: string): HistoryEntry[] {
 	}
 }
 
-// Load a session list (ordered array of session IDs) from IPC state.
+// Load a session list (ordered array of session IDs) from shared IPC state.
 function loadSessionList(): string[] {
-	const path = `${STATE_DIR}/ipc/state.ason`
-	if (!existsSync(path)) return []
-	try {
-		const state = ason.parse(readFileSync(path, 'utf-8')) as any
-		return state?.sessions ?? []
-	} catch {
-		return []
-	}
+	return [...ipc.readState().sessions]
 }
 
 export interface LoadedSession {
@@ -299,20 +293,11 @@ function pruneSessions(): { deleted: number } {
 		}
 	}
 
-	// Update session list if anything changed (sync write for startup)
+	// Update session list in shared state if anything changed.
 	if (deleted > 0) {
-		ensureDir(`${STATE_DIR}/ipc`)
-		const path = `${STATE_DIR}/ipc/state.ason`
-		let existing: any = {}
-		if (existsSync(path)) {
-			try {
-				existing = ason.parse(readFileSync(path, 'utf-8')) as any
-			} catch {}
-		}
-		existing.sessions = keep
-		// Use writeFileSync for startup path
-		const { writeFileSync } = require('fs')
-		writeFileSync(path, ason.stringify(existing) + '\n')
+		ipc.updateState((state) => {
+			state.sessions = keep
+		})
 	}
 
 	return { deleted }

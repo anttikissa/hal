@@ -670,6 +670,7 @@ function startWatchingIpcState(): void {
 	applySharedState(ipcStateFile)
 	liveFiles.onChange(ipcStateFile, () => {
 		applySharedState(ipcStateFile!)
+		onChange(false)
 	})
 }
 

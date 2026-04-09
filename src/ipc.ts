@@ -1,8 +1,9 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
-import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync, renameSync } from 'fs'
+import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs'
 import { IPC_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
+import { liveFiles } from './utils/live-file.ts'
 import { tails } from './utils/tail-file.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 
@@ -74,35 +75,33 @@ interface HostLock {
 	createdAt: string
 }
 
-function readState(): SharedState {
+let stateFile: SharedState | null = null
+
+function getStateFile(): SharedState {
+	if (stateFile) return stateFile
 	ensureDir(IPC_DIR)
-	if (!existsSync(STATE_FILE)) return defaultState()
-	try {
-		const parsed = ason.parse(readFileSync(STATE_FILE, 'utf-8')) as Partial<SharedState> | null
-		return {
-			...defaultState(),
-			sessions: Array.isArray(parsed?.sessions) ? parsed!.sessions : [],
-			openSessions: Array.isArray(parsed?.openSessions) ? parsed!.openSessions as SharedSessionInfo[] : [],
-			busy: parsed?.busy && typeof parsed.busy === 'object' ? parsed.busy : {},
-			activity: parsed?.activity && typeof parsed.activity === 'object' ? parsed.activity : {},
-			updatedAt: typeof parsed?.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString(),
-		}
-	} catch {
-		return defaultState()
-	}
+	stateFile = liveFiles.liveFile(STATE_FILE, defaultState(), { watch: false }) as SharedState
+	if (!Array.isArray(stateFile.sessions)) stateFile.sessions = []
+	if (!Array.isArray(stateFile.openSessions)) stateFile.openSessions = []
+	if (!stateFile.busy || typeof stateFile.busy !== 'object') stateFile.busy = {}
+	if (!stateFile.activity || typeof stateFile.activity !== 'object') stateFile.activity = {}
+	if (typeof stateFile.updatedAt !== 'string') stateFile.updatedAt = new Date().toISOString()
+	return stateFile
+}
+
+function readState(): SharedState {
+	return getStateFile()
 }
 
 // Shared runtime state belongs in state.ason, not in the unbounded events log.
 // This file is the bootstrap source of truth for new clients.
 function updateState(mutator: (state: SharedState) => void): SharedState {
-	ensureDir(IPC_DIR)
-	const state = readState()
+	const state = getStateFile()
 	mutator(state)
 	state.updatedAt = new Date().toISOString()
-	const tmp = `${STATE_FILE}.tmp.${process.pid}`
-	// Write state atomically so clients never observe a half-written bootstrap file.
-	writeFileSync(tmp, ason.stringify(state) + '\n')
-	renameSync(tmp, STATE_FILE)
+	// Callers often append a matching event right after updating state. Force the
+	// flush here so new clients never observe the event before the bootstrap file.
+	liveFiles.save(state)
 	return state
 }
 
