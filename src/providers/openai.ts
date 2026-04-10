@@ -10,6 +10,7 @@
 import type { Message, Provider, ProviderRequest, ProviderStreamEvent } from '../protocol.ts'
 import { auth, type Credential } from '../auth.ts'
 import { provider as providerUtils } from './provider.ts'
+import { openaiUsage } from '../openai-usage.ts'
 
 // ── Endpoint configuration ──
 
@@ -647,7 +648,10 @@ async function* generateCompat(
 		return
 	}
 
-	yield* parseChatCompletionsStream(res.body!)
+for await (const event of parseChatCompletionsStream(res.body!)) {
+		if (event.type === 'done' && event.usage && credential.type === 'token') openaiUsage.recordUsage(credential, event.usage)
+		yield event
+	}
 }
 
 // ── Native OpenAI provider implementation ──
@@ -700,6 +704,7 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 		body.reasoning = { effort: 'high', summary: 'auto' }
 	}
 
+	openaiUsage.setCurrentCredential(credential)
 	const rotationActivity = formatRotationActivity(credential)
 	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
 
@@ -767,7 +772,10 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 		return
 	}
 
-	yield* parseResponsesStream(res.body!)
+for await (const event of parseResponsesStream(res.body!)) {
+		if (event.type === 'done' && event.usage) openaiUsage.recordUsage(credential, event.usage)
+		yield event
+	}
 }
 
 // ── Exports ──

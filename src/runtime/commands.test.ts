@@ -3,12 +3,14 @@ import { commands, type SessionState } from './commands.ts'
 import { inbox } from './inbox.ts'
 import { config } from '../config.ts'
 import { agentLoop } from './agent-loop.ts'
+import { openaiUsage } from '../openai-usage.ts'
 
 const sent: Array<{ sessionId: string; text: string; from?: string }> = []
 const origQueueMessage = inbox.queueMessage
 const origConfigData = config.data
 const origConfigSave = config.save
 const origMaxIterations = agentLoop.config.maxIterations
+const origRenderStatus = openaiUsage.renderStatus
 
 function makeSession(id = '04-aaa'): SessionState {
 	return {
@@ -35,6 +37,7 @@ afterEach(() => {
 	config.data = origConfigData
 	config.save = origConfigSave
 	agentLoop.config.maxIterations = origMaxIterations
+	openaiUsage.renderStatus = origRenderStatus
 })
 
 test('/send resolves a tab number', async () => {
@@ -85,6 +88,29 @@ test('/send rejects an unknown tab number', async () => {
 	expect(result.output).toBeUndefined()
 	expect(result.error).toContain('99')
 	expect(sent).toEqual([])
+})
+
+
+test('/status renders OpenAI subscription usage', async () => {
+	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 a@test.com · 5h 23% used'
+
+	const result = await commands.executeCommand('/status', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('OpenAI subscriptions:')
+	expect(result.output).toContain('5h 23% used')
+})
+
+
+test('/usage is an alias for /status', async () => {
+	openaiUsage.renderStatus = async () => 'alias ok'
+
+	const result = await commands.executeCommand('/usage', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toBe('alias ok')
 })
 
 test('/help config shows config caveats and syntax', async () => {

@@ -255,15 +255,6 @@ function estimateTokens(text: string): number {
 	return Math.ceil(text.length / 4)
 }
 
-// ── Context percentage thresholds (for status line coloring) ──
-// Percentage of context window used → color in the status line.
-// Green below greenBelow, orange above orangeAbove, red above redAbove.
-
-const contextThresholds = {
-	greenBelow: 30,
-	orangeAbove: 50,
-	redAbove: 60,
-}
 
 // Format a token count for display: "25.4k" or "200k"
 function formatTokenCount(n: number): string {
@@ -281,7 +272,6 @@ export const models = {
 	resolveModel,
 	displayModel,
 	contextWindow,
-	contextThresholds,
 	computeCost,
 	formatCost,
 	formatTokenCount,

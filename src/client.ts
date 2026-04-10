@@ -11,6 +11,7 @@ import { perf } from './perf.ts'
 import { STATE_DIR } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { liveFiles } from './utils/live-file.ts'
+import { openaiUsage } from './openai-usage.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -308,6 +309,7 @@ function prevTab(): void {
 function setPrompt(text: string, cursor: number): void {
 	state.promptText = text
 	state.promptCursor = cursor
+	openaiUsage.noteActivity()
 	onChange(false)
 }
 
@@ -687,6 +689,7 @@ function startWatchingIpcState(): void {
 function startClient(signal: AbortSignal): void {
 	startWatchingHostLock()
 	startWatchingIpcState()
+	openaiUsage.onChange(() => onChange(false))
 
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) {

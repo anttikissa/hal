@@ -45,3 +45,12 @@ test('clamps out-of-gamut values', () => {
 	expect(b).toBeGreaterThanOrEqual(0)
 	expect(b).toBeLessThanOrEqual(255)
 })
+
+
+test('usageFg moves from green toward red as usage rises', () => {
+	const green = oklch.usageFg(0)
+	const red = oklch.usageFg(100)
+	expect(green).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m$/)
+	expect(red).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m$/)
+	expect(green).not.toBe(red)
+})

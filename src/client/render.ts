@@ -11,11 +11,13 @@
 // positionCursor() which updates cursorRow and cursorCol atomically.
 
 import { visLen, clipVisual } from '../utils/strings.ts'
+import { oklch } from '../utils/oklch.ts'
 import { blocks as blockRenderer } from '../cli/blocks.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { client } from '../client.ts'
 import { models } from '../models.ts'
 import { auth } from '../auth.ts'
+import { openaiUsage } from '../openai-usage.ts'
 import { git } from '../utils/git.ts'
 import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
@@ -64,7 +66,22 @@ function resetRenderer(): void {
 // ── Entry rendering ──────────────────────────────────────────────────────────
 
 function renderEntry(block: Block, cols: number): string[] {
-	return blockRenderer.renderBlock(block, cols)
+	const lines = blockRenderer.renderBlock(block, cols)
+	return block.dimmed ? lines.map(l => oklch.dimAnsi(l)) : lines
+}
+
+function infoGroupKey(block: Block): string | null {
+	if ((block.type !== 'info' && block.type !== 'error') || !block.ts) return null
+	const d = new Date(block.ts)
+	return `${block.type}:${d.getHours()}:${d.getMinutes()}`
+}
+
+function renderGroup(group: Block[], cols: number): string[] {
+	const lines = group.length === 1
+		? renderEntry(group[0]!, cols)
+		: blockRenderer.renderBlockGroup(group as Array<{ type: 'info' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
+	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
+	return group[0]?.dimmed ? lines.map(l => oklch.dimAnsi(l)) : lines
 }
 
 // ── Frame building ───────────────────────────────────────────────────────────
@@ -79,12 +96,19 @@ function renderHistory(lines: string[], tab: Tab): number {
 
 	const renderedLines: string[] = []
 	let count = 0
-	for (let i = 0; i < tab.history.length; i++) {
-		// Blank line between blocks (not before the first)
-		if (i > 0) renderedLines.push('')
-		const rendered = renderEntry(tab.history[i]!, cols)
+	for (let i = 0; i < tab.history.length; ) {
+		const group = [tab.history[i]!]
+		const key = infoGroupKey(group[0]!)
+		if (key) {
+			for (let j = i + 1; j < tab.history.length && infoGroupKey(tab.history[j]!) === key; j++) {
+				group.push(tab.history[j]!)
+			}
+		}
+		if (renderedLines.length > 0) renderedLines.push('')
+		const rendered = renderGroup(group, cols)
 		count += rendered.length
 		renderedLines.push(...rendered)
+		i += group.length
 	}
 
 	historyCache.set(tab, {
@@ -114,6 +138,7 @@ const RED = '\x1b[31m'
 const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
+const ANSI_DIM = '\x1b[2m'
 const INPUT_CURSOR_COLOR = '\x1b[38;5;75m' // matches prompt cursor color
 
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
@@ -140,13 +165,20 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 	return { char: '', color: '', blinks: false }
 }
 
-// Render the 1-char indicator, respecting blink phase.
-// Returns empty string when there's nothing to show (idle tab, no errors).
+function hasAnimatedIndicators(): boolean {
+	for (const tab of client.state.tabs) {
+		if (tabIndicator(tab).blinks) return true
+	}
+	return false
+}
+
+// Render the 1-char indicator. Animated indicators pulse between bright and dim
+// phases instead of disappearing, so a busy tab never looks idle.
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = tabIndicator(tab)
 	if (!ind.char) return ''
-	if (ind.blinks && !cursor.isVisible()) return ' '
-	return `${ind.color}${ind.char}${baseColor}`
+	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
+	return `${ANSI_DIM}${ind.color}${ind.char}${RESET}${baseColor}`
 }
 
 // Tab bar: tries full names, then just numbers, then terse.
@@ -204,13 +236,18 @@ function shortenPath(p: string): string {
 	return p
 }
 
-// Color for context usage percentage.
-function contextColor(pct: number): string {
-	const t = models.contextThresholds
-	if (pct >= t.redAbove) return '\x1b[31m'    // red
-	if (pct >= t.orangeAbove) return '\x1b[33m'  // yellow/orange
-	if (pct < t.greenBelow) return '\x1b[32m'    // green
-	return ''                                     // default (dim)
+// Color percentages with a continuous OKLCH heat scale.
+function usagePct(pct: number): string {
+	return `${oklch.usageFg(pct)}${pct}%\x1b[90m`
+}
+
+function subscriptionBadges(): string[] {
+	const current = openaiUsage.current()
+	if (!current) return []
+	const parts: string[] = []
+	if (current.primary) parts.push(`5h ${usagePct(Math.round(current.primary.usedPercent))}`)
+	if (current.secondary) parts.push(`7d ${usagePct(Math.round(current.secondary.usedPercent))}`)
+	return parts
 }
 
 function renderStatusLine(lines: string[]): void {
@@ -223,12 +260,23 @@ function renderStatusLine(lines: string[]): void {
 		const sessionLabel = tab.forkedFrom ? `${tab.sessionId} ← ${tab.forkedFrom}` : tab.sessionId
 		parts.push(sessionLabel)
 		parts.push(`${client.state.role}:${client.state.pid}`)
-		// 1. Model name (with "(sub)" suffix if using OAuth token)
+
+		// 1. Model name and subscription label.
 		const modelId = tab.model || client.state.model || models.defaultModel()
 		const modelDisplay = models.displayModel(modelId)
 		const provider = models.providerName(modelId)
 		const isSub = !auth.isApiKey(provider)
-		if (modelDisplay) parts.push(isSub ? `${modelDisplay} (sub)` : modelDisplay)
+		if (modelDisplay) {
+			let label = modelDisplay
+			if (provider === 'openai' && isSub) {
+				const current = openaiUsage.current()
+				if (current?.index != null && current.total) label += ` sub${current.index + 1}/${current.total}`
+				else label += ' (sub)'
+			} else if (isSub) {
+				label += ' (sub)'
+			}
+			parts.push(label)
+		}
 
 		// 2. Current busy activity (active account, rate limit wait, tool run, ...)
 		const activity = client.isBusy() ? client.getActivity() : ''
@@ -238,27 +286,26 @@ function renderStatusLine(lines: string[]): void {
 		const totalTokens = tab.usage.input + tab.usage.output
 		if (totalTokens > 0) parts.push(models.formatTokenCount(totalTokens) + ' tok')
 
-		// 4. Cost (API key only — sub users already have the "(sub)" tag)
+		// 4. Cost (API key only — sub users already have the account tag)
 		if (!isSub) {
 			const cost = models.formatCost(modelId, tab.usage)
 			if (cost) parts.push(cost)
 		}
 
-		// 5. Context usage: "25.4k/200k (13%)"
+		// 5. Current OpenAI subscription usage for the selected account.
+		if (provider === 'openai' && isSub) parts.push(...subscriptionBadges())
+
+		// 6. Context usage: "25.4k/200k (13%)"
 		if (tab.contextMax > 0) {
 			const pct = Math.round((tab.contextUsed / tab.contextMax) * 100)
-			const color = contextColor(pct)
-			const reset = color ? '\x1b[90m' : ''
-			parts.push(
-				`${models.formatTokenCount(tab.contextUsed)}/${models.formatTokenCount(tab.contextMax)} (${color}${pct}%${reset})`,
-			)
+			parts.push(`${models.formatTokenCount(tab.contextUsed)}/${models.formatTokenCount(tab.contextMax)} (${usagePct(pct)})`)
 		}
 
-		// 6. Working directory, shortened
+		// 7. Working directory, shortened
 		const cwd = shortenPath(tab.cwd)
 		if (cwd) parts.push(cwd)
 
-		// 7. Git branch (omit if "main")
+		// 8. Git branch (omit if "main")
 		if (tab.cwd) {
 			const branch = git.currentBranch(tab.cwd)
 			if (branch && branch !== 'main') parts.push(branch)
@@ -511,4 +558,4 @@ function clearFrame(): void {
 	cursorRow = 0
 }
 
-export const render = { draw, resetRenderer, clearFrame }
+export const render = { draw, resetRenderer, clearFrame, hasAnimatedIndicators }

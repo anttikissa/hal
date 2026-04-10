@@ -47,4 +47,27 @@ function toBg(L: number, C: number, H: number): string {
 	return `\x1b[48;2;${r};${g};${b}m`
 }
 
-export const oklch = { oklchToRgb, toFg, toBg }
+// Dim all truecolor ANSI escapes in a string by scaling RGB values.
+// factor < 1 darkens, > 1 brightens. Works on both fg (38;2) and bg (48;2).
+const TRUECOLOR_RE = /\x1b\[(38|48);2;(\d+);(\d+);(\d+)m/g
+function dimAnsi(line: string, factor = 0.5): string {
+	return line.replace(TRUECOLOR_RE, (_, mode, r, g, b) => {
+		const scale = (v: string) => Math.round(Math.min(255, Number(v) * factor))
+		return `\x1b[${mode};2;${scale(r)};${scale(g)};${scale(b)}m`
+	})
+}
+
+function clamp01(n: number): number {
+	return Math.max(0, Math.min(1, n))
+}
+
+// Green → yellow → orange → red, with slightly increasing chroma as usage rises.
+function usageFg(usedPercent: number): string {
+	const t = clamp01(usedPercent / 100)
+	const L = 0.78
+	const C = 0.04 + t * 0.12
+	const H = 145 - t * 120
+	return toFg(L, C, H)
+}
+
+export const oklch = { oklchToRgb, toFg, toBg, dimAnsi, usageFg }

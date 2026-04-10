@@ -5,6 +5,7 @@ import { prompt } from '../src/cli/prompt.ts'
 import { cursor } from '../src/cli/cursor.ts'
 import { popup } from '../src/client/popup.ts'
 import { helpBar } from '../src/cli/help-bar.ts'
+import { openaiUsage } from '../src/openai-usage.ts'
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
@@ -24,7 +25,7 @@ function captureOutput(fn: () => void): string {
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
-	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, historyVersion: 0, usage: { input: 0, output: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
+	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, parentEntryCount: 0, historyVersion: 0, usage: { input: 0, output: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
 	client.state.activeTab = 0
 	client.state.pid = 111
 	client.state.hostPid = 222
@@ -35,6 +36,17 @@ beforeEach(() => {
 	prompt.clear()
 	helpBar.reset()
 	popup.close()
+	openaiUsage.state.currentKey = 'openai:1'
+	openaiUsage.state.accounts = {
+		'openai:1': {
+			key: 'openai:1',
+			index: 1,
+			total: 3,
+			pendingTokens: 0,
+			primary: { usedPercent: 23, windowMinutes: 300, resetAt: 1 },
+			secondary: { usedPercent: 61, windowMinutes: 10080, resetAt: 1 },
+		},
+	}
 })
 
 describe('render', () => {
@@ -64,10 +76,29 @@ describe('render', () => {
 		expect(clean).toContain('world')
 	})
 
+	test('consecutive info blocks in the same minute collapse into one rendered block', () => {
+		const tab = client.currentTab()!
+		const ts = Date.now()
+		tab.history.push({ type: 'info', text: '31.0ms First line of code executed', ts })
+		tab.history.push({ type: 'info', text: '31.0ms State directories exist', ts: ts + 1000 })
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('31.0ms First line of code executed')
+		expect(clean).toContain('31.0ms State directories exist')
+		expect(clean.match(/Info/g)?.length ?? 0).toBe(1)
+	})
+
 	test('status line shows local pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')
 		expect(clean).not.toContain('lock:')
+	})
+
+	test('status line shows current OpenAI subscription usage', () => {
+		client.currentTab()!.model = 'openai/gpt-5.4'
+		const clean = stripAnsi(captureOutput(() => render.draw()))
+		expect(clean).toContain('GPT 5.4 sub2/3')
+		expect(clean).toContain('5h 23%')
+		expect(clean).toContain('7d 61%')
 	})
 
 	test('status line shows busy account rotation activity', () => {
@@ -75,6 +106,38 @@ describe('render', () => {
 		client.state.activity.set('test', 'OpenAI 2/3 · next@test.com')
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('OpenAI 2/3 · next@test.com')
+	})
+
+	test('busy tabs stay visible during the dim pulse phase', () => {
+		client.state.tabs.push({
+			sessionId: 'other',
+			name: 'tab 2',
+			history: [],
+			inputHistory: [],
+			loaded: true,
+			inputDraft: '',
+			doneUnseen: false,
+			parentEntryCount: 0,
+			historyVersion: 0,
+			usage: { input: 0, output: 0 },
+			contextUsed: 0,
+			contextMax: 0,
+			cwd: '/tmp',
+			model: 'test',
+		})
+		client.state.busy.set('other', true)
+		const originalIsVisible = cursor.isVisible
+		cursor.isVisible = () => false
+		try {
+			const output = captureOutput(() => render.draw())
+			const clean = stripAnsi(output)
+			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
+			expect(tabBar).toBeDefined()
+			expect(tabBar).toContain('•tab 2')
+			expect(output).toContain('\x1b[2m')
+		} finally {
+			cursor.isVisible = originalIsVisible
+		}
 	})
 	test('error-level info on an inactive finished tab shows an alert indicator', () => {
 		client.state.tabs.push({
@@ -84,7 +147,7 @@ describe('render', () => {
 			inputHistory: [],
 			loaded: true,
 			inputDraft: '',
-			doneUnseen: false,
+			doneUnseen: false, parentEntryCount: 0,
 			historyVersion: 0,
 			usage: { input: 0, output: 0 },
 			contextUsed: 0,

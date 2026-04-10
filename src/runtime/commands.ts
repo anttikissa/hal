@@ -440,15 +440,6 @@ handlers['config'] = (args) => {
 	}
 }
 
-// /status — show cached/refreshed OpenAI subscription usage.
-handlers['status'] = async () => {
-	return { output: await openaiUsage.renderStatus(true), handled: true }
-}
-
-// /usage — old alias for /status.
-handlers['usage'] = async () => {
-	return { output: await openaiUsage.renderStatus(true), handled: true }
-}
 
 // /show — old compatibility shim. Point users at the real commands instead.
 handlers['show'] = (args) => {

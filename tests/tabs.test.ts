@@ -15,7 +15,10 @@ afterEach(() => {
 })
 
 function stripAnsi(s: string): string {
-	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "")
+	return s
+		.replace(/\x1b(?:\[[0-9;?]*[ -/]*[@-~]|[@-_])/g, "")
+		.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
+		.replace(/\r/g, "")
 }
 
 function spawnHal() {

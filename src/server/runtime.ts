@@ -21,6 +21,7 @@ import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
 import { replay } from '../session/replay.ts'
+import { openaiUsage } from '../openai-usage.ts'
 
 // ── Session state ──
 
@@ -43,7 +44,7 @@ function makeSessionId(): string {
 	return `${month}-${suffix}`
 }
 
-async function createSession(): Promise<Session> {
+function createSession(): Session {
 	const session: Session = {
 		id: makeSessionId(),
 		name: `tab ${activeSessions.length + 1}`,
@@ -52,9 +53,11 @@ async function createSession(): Promise<Session> {
 	}
 	activeSessions.push(session)
 
-	// Persist the session itself. The shared session list is updated when we
-	// broadcast, so state.ason has a single writer.
-	await sessionStore.createSession(session.id, {
+	// sessionStore.createSession() is declared async for API symmetry, but the
+	// actual work here is synchronous: it creates the live meta object and writes
+	// session.ason right away. Publish the new tab in the same tick so the first
+	// client paint already knows about it.
+	void sessionStore.createSession(session.id, {
 		id: session.id,
 		workingDir: session.cwd,
 		createdAt: session.createdAt,
@@ -394,13 +397,10 @@ function startRuntime(signal: AbortSignal): void {
 			})
 		}
 	} else {
-		// First run — create and persist the initial tab, then publish it.
-		// New clients bootstrap from state.ason, so we must not broadcast a tab
-		// until its session files and shared state are actually on disk.
-		void createSession().then(() => {
-			if (signal.aborted || activeRuntimePid !== process.pid) return
-			broadcastSessions()
-		})
+		// First run — create and persist the initial tab, then publish it before the
+		// client's first steady-state redraw. This avoids a brief "no tabs" frame.
+		createSession()
+		if (!signal.aborted && activeRuntimePid === process.pid) broadcastSessions()
 	}
 
 	ipc.updateState((state) => {
@@ -411,6 +411,7 @@ function startRuntime(signal: AbortSignal): void {
 
 	// Refresh models.dev context window cache (fire-and-forget)
 	models.refreshModels().catch(() => {})
+	openaiUsage.start(signal)
 
 	// Restored sessions can be published right away. On first run, createSession()
 	// publishes after it finishes persisting the new tab.
