@@ -381,12 +381,12 @@ function applySessionList(items: SharedSessionInfo[]): void {
 	const grew = newTabs.length > state.tabs.length
 	const prevSession = state.tabs[state.activeTab]?.sessionId ?? ''
 	state.tabs = newTabs
-	flushPendingEntries()
 	if (state.activeTab >= state.tabs.length) state.activeTab = state.tabs.length - 1
 	if (grew) state.activeTab = state.tabs.length - 1
 	const newSession = state.tabs[state.activeTab]?.sessionId ?? ''
 	const active = state.tabs[state.activeTab]
 	if (active && !active.loaded) ensureTabLoaded(active)
+	flushPendingEntries()
 	if (isFork && grew && prevSession) {
 		const prevTab = newTabs.find(t => t.sessionId === prevSession)
 		const newTab = newTabs[state.activeTab]

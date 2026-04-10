@@ -352,9 +352,12 @@ function startCli(signal: AbortSignal): void {
 	process.on('exit', cleanupTerminal)
 	process.on('SIGCONT', onSigcont)
 
-	// Disabled for now: the 500ms blink repaint loop was corrupting the terminal
-	// on large sessions and making typing feel sluggish. Status indicators stay
-	// correct, they just update on normal redraws instead of an animation timer.
+	// Keep pulsing indicators in sync with the shared 500ms clock. We only redraw
+	// when some tab actually has an animated indicator, so idle terminals stay quiet.
+	cursor.start(() => {
+		if (!render.hasAnimatedIndicators()) return
+		draw()
+	})
 
 	perf.mark('First draw')
 	draw()
