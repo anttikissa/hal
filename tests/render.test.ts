@@ -71,7 +71,8 @@ describe('render', () => {
 	})
 
 	test('status line shows busy account rotation activity', () => {
-		client.handleEvent({ type: 'status', sessionId: 'test', busy: true, activity: 'OpenAI 2/3 · next@test.com' })
+		client.state.busy.set('test', true)
+		client.state.activity.set('test', 'OpenAI 2/3 · next@test.com')
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('OpenAI 2/3 · next@test.com')
 	})

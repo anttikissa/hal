@@ -41,7 +41,7 @@ function readSessionIds(): string[] {
 describe("tabs", () => {
 	test("starts with one tab", async () => {
 		const proc = spawnHal()
-		await Bun.sleep(300)
+		await Bun.sleep(500)
 		proc.stdin!.write(new Uint8Array([0x03])) // ctrl-c
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())

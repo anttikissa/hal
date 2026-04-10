@@ -112,15 +112,6 @@ function syncSharedState(): void {
 
 function broadcastSessions(): void {
 	syncSharedState()
-	ipc.appendEvent({
-		type: 'sessions',
-		sessions: activeSessions.map((s) => ({
-			id: s.id,
-			name: s.name,
-			cwd: s.cwd,
-			model: s.model,
-		})),
-	})
 }
 
 function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info'): void {
@@ -143,17 +134,6 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 	// emit prompts or start generations. The real host will handle the command.
 	if (!ipc.ownsHostLock()) return
 
-	// Emit the prompt event so clients see what was typed.
-	// Inbox messages carry their source session so the target tab can show where they came from.
-	ipc.appendEvent({
-		type: 'prompt',
-		text,
-		label,
-		source,
-		sessionId: session.id,
-		createdAt: new Date().toISOString(),
-	})
-
 	// Build a SessionState for the commands module
 	const sessionState: SessionState = {
 		id: session.id,
@@ -164,7 +144,8 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 		sessions: activeSessions.map((item) => ({ id: item.id, name: item.name })),
 	}
 
-	// Check for slash commands first
+	// Slash commands are internal runtime commands. Handle them before emitting a
+	// prompt event so they don't show up as user/steering messages in history.
 	const cmdResult = await commands.executeCommand(text, sessionState, (msg, level) =>
 		emitInfo(session.id, msg, level),
 	)
@@ -189,6 +170,17 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 		if (cmdResult.error) emitInfo(session.id, cmdResult.error, 'error')
 		return
 	}
+
+	// Emit the prompt event so clients see what was typed.
+	// Inbox messages carry their source session so the target tab can show where they came from.
+	ipc.appendEvent({
+		type: 'prompt',
+		text,
+		label,
+		source,
+		sessionId: session.id,
+		createdAt: new Date().toISOString(),
+	})
 
 	// Not a command — forward to the agent loop
 	await runGeneration(session, text, source)
@@ -250,13 +242,6 @@ async function runGeneration(session: Session, text: string, source?: string): P
 					else delete state.busy[session.id]
 					if (activity) state.activity[session.id] = activity
 					else delete state.activity[session.id]
-				})
-				ipc.appendEvent({
-					type: 'status',
-					sessionId: session.id,
-					busy,
-					activity,
-					createdAt: new Date().toISOString(),
 				})
 			},
 		})

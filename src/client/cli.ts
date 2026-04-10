@@ -110,6 +110,11 @@ function onSigcont(): void {
 	draw(true)
 }
 
+function submitCommandType(text: string, busy: boolean): 'prompt' | 'steer' {
+	if (text.startsWith('/')) return 'prompt'
+	return busy ? 'steer' : 'prompt'
+}
+
 function submit(override?: string): void {
 	const text = (override ?? prompt.text()).trim()
 	if (!text) return
@@ -117,10 +122,11 @@ function submit(override?: string): void {
 	popup.close()
 	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
-	// If the session is busy (generating/running tools), send a steer command
-	// instead of a plain prompt. The server will abort the current generation,
-	// inject this as a steering message, and restart generation.
-	if (client.isBusy()) {
+	const type = submitCommandType(text, client.isBusy())
+	if (type === 'steer') {
+		// If the session is busy (generating/running tools), send a steer command
+		// instead of a plain prompt. The server will abort the current generation,
+		// inject this as a steering message, and restart generation.
 		client.sendCommand('steer', text)
 	} else {
 		client.sendCommand('prompt', text)
@@ -412,4 +418,4 @@ function syncPromptToClient(): void {
 	client.setPrompt(prompt.text(), prompt.cursorPos())
 }
 
-export const cli = { startCli }
+export const cli = { startCli, submitCommandType }

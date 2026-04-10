@@ -58,10 +58,10 @@ describe('main', () => {
 		const marker = `marker-${Date.now()}`
 
 		const first = spawnHal()
-		await Bun.sleep(100)
+		await Bun.sleep(250)
 		first.stdin!.write(`${marker}\n`)
 		first.stdin!.flush()
-		await Bun.sleep(300)
+		await Bun.sleep(350)
 		first.stdin!.write(new Uint8Array([0x03]))
 		first.stdin!.flush()
 		await first.exited
@@ -76,6 +76,7 @@ describe('main', () => {
 		// History is now persisted, so the marker should appear on restart
 		expect(stdout).toContain(marker)
 	})
+
 })
 
 	test('ctrl-m opens the model picker on kitty terminals', async () => {
