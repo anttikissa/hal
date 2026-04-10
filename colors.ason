@@ -47,8 +47,11 @@
 		bg: ["$bgL", "$bgC", 195]
 	}
 
-	// Info — neutral, dim
-	info: { fg: [0.60, 0, 0] }
+	// Info — neutral, dim, with a subtle grey card
+	info: {
+		fg: [0.60, 0, 0]
+		bg: [0.20, 0, 0]
+	}
 
 	// Errors — hot red
 	error: {

@@ -66,6 +66,9 @@ test('onChange fires on external file change', async () => {
 	const data = liveFiles.liveFile(path, { v: 0 })
 	expect(data.v).toBe(1)
 
+	// Give Bun's directory watcher one tick to arm before we simulate an edit.
+	await Bun.sleep(50)
+
 	let called = false
 	liveFiles.onChange(data, () => {
 		called = true

@@ -514,19 +514,6 @@ function handleEvent(event: any): void {
 			text: event.text,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
-	} else if (event.type === 'status' && event.sessionId) {
-		const wasBusy = state.busy.get(event.sessionId) ?? false
-		const nowBusy = event.busy ?? false
-		state.busy.set(event.sessionId, nowBusy)
-		state.activity.set(event.sessionId, event.activity ?? '')
-		if (wasBusy && !nowBusy) {
-			const activeSession = currentTab()?.sessionId
-			if (event.sessionId !== activeSession) {
-				const tab = state.tabs.find(t => t.sessionId === event.sessionId)
-				if (tab) tab.doneUnseen = true
-			}
-		}
-		onChange(false)
 	} else if (event.type === 'tool-call' && event.sessionId) {
 		const tab = tabForSession(event.sessionId)
 		if (tab) closeStreamingBlock(tab)

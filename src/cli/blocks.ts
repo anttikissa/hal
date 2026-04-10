@@ -22,10 +22,11 @@ const blockConfig = {
 	maxEditDiffLines: 3, // max before/after lines in edit diffs
 }
 
+// dimmed: true for blocks inherited from a fork parent (rendered with muted colors)
 export type Block =
-	| { type: 'user'; text: string; source?: string; status?: string; ts?: number }
-	| { type: 'assistant'; text: string; model?: string; ts?: number; streaming?: boolean }
-	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number; streaming?: boolean }
+	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean }
+	| { type: 'assistant'; text: string; model?: string; ts?: number; streaming?: boolean; dimmed?: boolean }
+	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number; streaming?: boolean; dimmed?: boolean }
 	| {
 			type: 'tool'
 			name: string
@@ -36,9 +37,12 @@ export type Block =
 			blobLoaded?: boolean
 			toolId?: string
 			ts?: number
+			dimmed?: boolean
 	  }
-	| { type: 'info'; text: string; ts?: number }
-	| { type: 'error'; text: string; ts?: number }
+	| { type: 'info'; text: string; ts?: number; dimmed?: boolean }
+	| { type: 'error'; text: string; ts?: number; dimmed?: boolean }
+
+type NoticeBlock = { type: 'info' | 'error'; text: string; ts?: number }
 
 // ── History → Blocks ─────────────────────────────────────────────────────────
 //
@@ -70,10 +74,12 @@ function userText(entry: HistoryEntry): string {
 	return ''
 }
 
-function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
+function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntryCount = 0): Block[] {
 	const result: Block[] = []
 
-	for (const entry of history) {
+	for (let i = 0; i < history.length; i++) {
+		const entry = history[i]!
+		const dimmed = i < parentEntryCount ? true : undefined
 		// ── User message ──
 		if (entry.role === 'user') {
 			const text = userText(entry)
@@ -87,6 +93,7 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 				source,
 				status: entry.status,
 				ts: parseTs(entry.ts),
+				dimmed,
 			})
 			continue
 		}
@@ -101,6 +108,7 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 					blobId: entry.thinkingBlobId,
 					sessionId,
 					ts: parseTs(entry.ts),
+					dimmed,
 				})
 			}
 
@@ -115,6 +123,7 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 						blobId: tool.blobId,
 						sessionId,
 						ts: parseTs(entry.ts),
+						dimmed,
 					})
 				}
 			}
@@ -126,6 +135,7 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 					text: entry.text,
 					model: entry.model,
 					ts: parseTs(entry.ts),
+					dimmed,
 				})
 			}
 			continue
@@ -138,7 +148,7 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string): Block[] {
 		if (entry.type === 'info') {
 			const isError = entry.level === 'error'
 			if (typeof entry.text === 'string') {
-				result.push({ type: isError ? 'error' : 'info', text: entry.text, ts: parseTs(entry.ts) })
+				result.push({ type: isError ? 'error' : 'info', text: entry.text, ts: parseTs(entry.ts), dimmed })
 			}
 			continue
 		}
@@ -256,6 +266,8 @@ function toolTitle(name: string, input?: any): string {
 			return `Glob ${input.pattern ?? '?'} in ${input.path ?? '.'}`
 		case 'google':
 			return `Google ${input.query ?? '?'}`
+		case 'analyze_history':
+			return `Analyze history${input.sessionId ? ` ${input.sessionId}` : ''}`
 		case 'ls':
 			return `Ls ${input.path ?? '.'}`
 		default:
@@ -594,6 +606,52 @@ function blockContent(block: Block, cols: number): string[] {
 	return lines
 }
 
+
+function wrapBricks(bricks: string[], cols: number): string[] {
+	const lines: string[] = []
+	let current = ''
+	for (const brick of bricks) {
+		if (!current) {
+			if (visLen(brick) <= cols) {
+				current = brick
+				continue
+			}
+			const wrapped = wordWrap(brick, cols)
+			lines.push(...wrapped.slice(0, -1))
+			current = wrapped[wrapped.length - 1] ?? ''
+			continue
+		}
+		const joined = `${current} ${brick}`
+		if (visLen(joined) <= cols) {
+			current = joined
+			continue
+		}
+		lines.push(current)
+		if (visLen(brick) <= cols) {
+			current = brick
+			continue
+		}
+		const wrapped = wordWrap(brick, cols)
+		lines.push(...wrapped.slice(0, -1))
+		current = wrapped[wrapped.length - 1] ?? ''
+	}
+	if (current) lines.push(current)
+	return lines
+}
+
+function renderBlockGroup(group: NoticeBlock[], cols: number): string[] {
+	if (group.length === 0) return []
+	if (group.length === 1) return renderBlock(group[0] as Block, cols)
+	const first = group[0]!
+	const { fg, bg } = blockColors(first as Block)
+	const header = buildHeader(blockLabel(first as Block), formatHHMM(first.ts), '', cols)
+	const bricks = group.flatMap((block) => expandTabs(block.text, blockConfig.tabWidth).split('\n').map((line) => `[${line}]`))
+	const lines = [bgLine(`${fg}${header}`, cols, bg)]
+	for (const line of wrapBricks(bricks, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
+	if (lines.length > 0) lines[lines.length - 1] += '\x1b[39m'
+	return lines
+}
+
 // ── Main render function ─────────────────────────────────────────────────────
 
 function renderBlock(block: Block, cols: number): string[] {
@@ -627,6 +685,7 @@ export const blocks = {
 	config: blockConfig,
 	historyToBlocks,
 	renderBlock,
+	renderBlockGroup,
 	loadBlobs,
 	formatToolOutput,
 	spinnerChar,

@@ -25,7 +25,7 @@ beforeEach(() => {
 		inputHistory: [],
 		loaded: true,
 		inputDraft: '',
-		doneUnseen: false,
+		doneUnseen: false, parentEntryCount: 0,
 		historyVersion: 0,
 		usage: { input: 0, output: 0 },
 		contextUsed: 0,
@@ -38,6 +38,8 @@ beforeEach(() => {
 	client.state.hostPid = 222
 	client.state.peak = 0
 	client.state.peakCols = 0
+	client.state.busy = new Map()
+	client.state.activity = new Map()
 	prompt.clear()
 })
 

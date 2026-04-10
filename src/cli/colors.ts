@@ -86,8 +86,7 @@ function load(): void {
 	resolveBlock(raw.error, error)
 	resolveBlock(raw.popup?.current, popup.current)
 
-	if (raw.info?.fg) info.fg = fg(raw.info.fg, vars)
-	info.bg = '' // info blocks have no bg by default
+	resolveBlock(raw.info, info)
 
 	if (raw.input) {
 		if (raw.input.fg) input.fg = fg(raw.input.fg, vars)

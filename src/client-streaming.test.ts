@@ -9,7 +9,7 @@ function makeTab() {
 		inputHistory: [],
 		inputDraft: '',
 		loaded: true,
-		doneUnseen: false,
+		doneUnseen: false, parentEntryCount: 0,
 		historyVersion: 0,
 		usage: { input: 0, output: 0 },
 		contextUsed: 0,

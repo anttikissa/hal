@@ -17,7 +17,7 @@ describe('render single pass', () => {
 			inputHistory: [],
 			loaded: true,
 			inputDraft: '',
-			doneUnseen: false,
+			doneUnseen: false, parentEntryCount: 0,
 			historyVersion: 0,
 			usage: { input: 0, output: 0 },
 			contextUsed: 0,
@@ -30,6 +30,8 @@ describe('render single pass', () => {
 		client.state.hostPid = 222
 		client.state.peak = 0
 		client.state.peakCols = 0
+	client.state.busy = new Map()
+	client.state.activity = new Map()
 		prompt.clear()
 		helpBar.reset()
 		popup.close()
@@ -49,6 +51,30 @@ describe('render single pass', () => {
 		const originalWrite = process.stdout.write.bind(process.stdout)
 		;(process.stdout as any).write = () => true
 		try {
+			render.draw()
+			expect(calls).toBe(2)
+		} finally {
+			(process.stdout as any).write = originalWrite
+			blockRenderer.renderBlock = origRenderBlock
+		}
+	})
+
+	test('prompt-only redraw reuses cached history render', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'info', text: 'one' })
+		tab.history.push({ type: 'info', text: 'two' })
+		tab.historyVersion = 1
+		const origRenderBlock = blockRenderer.renderBlock
+		let calls = 0
+		blockRenderer.renderBlock = (block, cols) => {
+			calls++
+			return origRenderBlock(block, cols)
+		}
+		const originalWrite = process.stdout.write.bind(process.stdout)
+		;(process.stdout as any).write = () => true
+		try {
+			render.draw()
+			prompt.setText('x')
 			render.draw()
 			expect(calls).toBe(2)
 		} finally {
