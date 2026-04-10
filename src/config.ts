@@ -6,6 +6,7 @@ import { liveFiles } from './utils/live-file.ts'
 import { client } from './client.ts'
 import { blocks } from './cli/blocks.ts'
 import { prompt } from './cli/prompt.ts'
+import { render } from './client/render.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
@@ -13,6 +14,7 @@ const modules: Record<string, Record<string, any>> = {
 	client: client.config,
 	blocks: blocks.config,
 	prompt: prompt.config,
+	render: render.config,
 	agentLoop: agentLoop.config,
 }
 

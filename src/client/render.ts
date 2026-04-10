@@ -75,9 +75,10 @@ function renderEntry(block: Block, cols: number): string[] {
 }
 
 function infoGroupKey(block: Block): string | null {
-	if ((block.type !== 'info' && block.type !== 'error') || !block.ts) return null
+	// Only coalesce info blocks — errors are multi-line and need full rendering
+	if (block.type !== 'info' || !block.ts) return null
 	const d = new Date(block.ts)
-	return `${block.type}:${d.getHours()}:${d.getMinutes()}`
+	return `info:${d.getHours()}:${d.getMinutes()}`
 }
 
 function renderGroup(group: Block[], cols: number): string[] {

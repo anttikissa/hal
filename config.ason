@@ -9,6 +9,9 @@
 	blocks: {
 		blobBatchSize: 64
 	}
+	render: {
+		forkHistoryDimFactor: 0.8
+	}
 	agentLoop: {
 		maxIterations: 50
 	}

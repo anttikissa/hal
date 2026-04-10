@@ -50,7 +50,7 @@ function toBg(L: number, C: number, H: number): string {
 // Dim all truecolor ANSI escapes in a string by scaling RGB values.
 // factor < 1 darkens, > 1 brightens. Works on both fg (38;2) and bg (48;2).
 const TRUECOLOR_RE = /\x1b\[(38|48);2;(\d+);(\d+);(\d+)m/g
-function dimAnsi(line: string, factor = 0.5): string {
+function dimAnsi(line: string, factor: number): string {
 	return line.replace(TRUECOLOR_RE, (_, mode, r, g, b) => {
 		const scale = (v: string) => Math.round(Math.min(255, Number(v) * factor))
 		return `\x1b[${mode};2;${scale(r)};${scale(g)};${scale(b)}m`
