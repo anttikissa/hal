@@ -133,7 +133,7 @@ describe('render', () => {
 			const clean = stripAnsi(output)
 			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
 			expect(tabBar).toBeDefined()
-			expect(tabBar).toContain('•tab 2')
+			expect(tabBar).toContain('▪tab 2')
 			expect(output).toContain('\x1b[2m')
 		} finally {
 			cursor.isVisible = originalIsVisible

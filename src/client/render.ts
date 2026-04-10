@@ -24,6 +24,10 @@ import { cursor } from '../cli/cursor.ts'
 import { popup } from './popup.ts'
 import type { Block, Tab } from '../client.ts'
 
+const config = {
+	forkHistoryDimFactor: 0.85,
+}
+
 const CSI = '\x1b['
 // ── Diff engine state ────────────────────────────────────────────────────────
 //
@@ -67,7 +71,7 @@ function resetRenderer(): void {
 
 function renderEntry(block: Block, cols: number): string[] {
 	const lines = blockRenderer.renderBlock(block, cols)
-	return block.dimmed ? lines.map(l => oklch.dimAnsi(l)) : lines
+	return block.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 }
 
 function infoGroupKey(block: Block): string | null {
@@ -81,7 +85,7 @@ function renderGroup(group: Block[], cols: number): string[] {
 		? renderEntry(group[0]!, cols)
 		: blockRenderer.renderBlockGroup(group as Array<{ type: 'info' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
 	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
-	return group[0]?.dimmed ? lines.map(l => oklch.dimAnsi(l)) : lines
+	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 }
 
 // ── Frame building ───────────────────────────────────────────────────────────
@@ -127,7 +131,7 @@ const MAX_TABS = 40
 // ── Tab status indicator ─────────────────────────────────────────────────────
 //
 // Each tab gets a 1-char-wide status indicator (all visLen === 1):
-//   •  busy (blinking: visible on even phases, space on odd)
+//   ▪  busy (blinking: bright on even phases, dim on odd)
 //   ✗  ended with error (red, blinking)
 //   !  interrupted/paused (blinking)
 //   ✓  generation done, user hasn't looked at this tab yet (green)
@@ -144,7 +148,7 @@ const INPUT_CURSOR_COLOR = '\x1b[38;5;75m' // matches prompt cursor color
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
 
-	if (busy) return { char: '•', color: INPUT_CURSOR_COLOR, blinks: true }
+	if (busy) return { char: '▪', color: INPUT_CURSOR_COLOR, blinks: true }
 
 	// Alerts beat the generic "done unseen" checkmark. This matters for cases
 	// like "Hit max iterations" where generation finished, but the tab still
@@ -558,4 +562,4 @@ function clearFrame(): void {
 	cursorRow = 0
 }
 
-export const render = { draw, resetRenderer, clearFrame, hasAnimatedIndicators }
+export const render = { config, draw, resetRenderer, clearFrame, hasAnimatedIndicators }
