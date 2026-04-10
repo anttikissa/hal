@@ -48,4 +48,12 @@ describe('prompt', () => {
 		expect(built.lines).toEqual(['foo', 'bar'])
 		expect(built.cursor).toEqual({ rowOffset: 1, col: 3 })
 	})
+
+	test('buildPrompt wraps to a new blank line when cursor is at exact width', () => {
+		prompt.setText('12345', 5)
+		const built = prompt.buildPrompt(5)
+		expect(built.lines).toEqual(['12345', ''])
+		expect(built.cursor).toEqual({ rowOffset: 1, col: 0 })
+		expect(prompt.lineCount(5)).toBe(2)
+	})
 })

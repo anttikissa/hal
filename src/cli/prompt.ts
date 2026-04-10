@@ -47,14 +47,23 @@ function getLayout(input: string, width: number): WrappedLayout {
 }
 
 function cursorToRowCol(input: string, absPos: number, width: number): { row: number; col: number } {
-	const { lines, starts } = getLayout(input, width)
+	const layout = getLayout(input, width)
+	const { lines, starts } = layout
 	for (let i = 0; i < lines.length; i++) {
-		if (absPos <= starts[i]! + lines[i]!.length) {
-			return { row: i, col: absPos - starts[i]! }
-		}
+		const start = starts[i]!
+		const line = lines[i]!
+		const nextStart = i < lines.length - 1 ? starts[i + 1]! : input.length
+		if (absPos < nextStart) return { row: i, col: Math.min(absPos - start, line.length) }
 	}
 	const last = lines.length - 1
+	if (width > 0 && absPos === input.length && (lines[last]?.length ?? 0) === width && !input.endsWith('\n')) {
+		return { row: last + 1, col: 0 }
+	}
 	return { row: last, col: lines[last]?.length ?? 0 }
+}
+
+function promptRows(layout: WrappedLayout, cursorRow: number): number {
+	return Math.max(layout.lines.length, cursorRow + 1)
 }
 
 function rowColToCursor(input: string, row: number, col: number, width: number): number {
@@ -504,21 +513,22 @@ interface PromptRender {
 
 function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getLayout(buf, contentWidth)
-	const promptLines = Math.min(layout.lines.length, config.maxPromptLines)
 	const { row: curRow, col: curCol } = cursorToRowCol(buf, cursor, contentWidth)
+	const totalRows = promptRows(layout, curRow)
+	const promptLines = Math.min(totalRows, config.maxPromptLines)
 	const sel = selRange()
 
 	// Scroll viewport if prompt is taller than MAX_PROMPT_LINES
 	let scrollTop = 0
-	if (layout.lines.length > promptLines) {
-		scrollTop = Math.min(curRow, layout.lines.length - promptLines)
+	if (totalRows > promptLines) {
+		scrollTop = Math.min(curRow, totalRows - promptLines)
 		scrollTop = Math.max(scrollTop, curRow - promptLines + 1)
 	}
 
 	const lines: string[] = []
 	for (let i = scrollTop; i < scrollTop + promptLines; i++) {
 		const lineText = layout.lines[i] ?? ''
-		const lineStart = layout.starts[i] ?? 0
+		const lineStart = layout.starts[i] ?? buf.length
 		if (sel) {
 			const lo = Math.max(0, sel.start - lineStart)
 			const hi = Math.min(lineText.length, sel.end - lineStart)
@@ -583,7 +593,8 @@ function setRenderCallback(cb: () => void): void {
 	renderCallback = cb
 }
 function lineCount(w: number): number {
-	return Math.min(getLayout(buf, w).lines.length, config.maxPromptLines)
+	const layout = getLayout(buf, w)
+	return Math.min(promptRows(layout, cursorToRowCol(buf, cursor, w).row), config.maxPromptLines)
 }
 
 export const prompt = {

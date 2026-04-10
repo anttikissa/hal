@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { mkdtempSync, rmSync, readFileSync } from "fs"
+import { mkdtempSync, rmSync, readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { ason } from "../src/utils/ason.ts"
@@ -72,6 +72,13 @@ describe("tabs", () => {
 		const before = readSessionIds()
 		expect(before).toHaveLength(1)
 		const parentId = before[0]!
+
+		const parentDir = join(tmpDir, "sessions", parentId)
+		const readyDeadline = Date.now() + 2000
+		while (Date.now() < readyDeadline) {
+			if (existsSync(join(parentDir, "session.ason")) && existsSync(join(parentDir, "history.asonl"))) break
+			await Bun.sleep(50)
+		}
 
 		proc.stdin!.write(new Uint8Array([0x06])) // ctrl-f
 		proc.stdin!.flush()
