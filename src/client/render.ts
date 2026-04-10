@@ -219,8 +219,9 @@ function renderStatusLine(lines: string[]): void {
 	const parts: string[] = []
 
 	if (tab) {
-		// 0. Session ID + process identity.
-		parts.push(tab.sessionId)
+		// 0. Session ID (with fork parent if applicable) + process identity.
+		const sessionLabel = tab.forkedFrom ? `${tab.sessionId} ← ${tab.forkedFrom}` : tab.sessionId
+		parts.push(sessionLabel)
 		parts.push(`${client.state.role}:${client.state.pid}`)
 		// 1. Model name (with "(sub)" suffix if using OAuth token)
 		const modelId = tab.model || client.state.model || models.defaultModel()

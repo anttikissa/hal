@@ -50,6 +50,8 @@ export interface Tab {
 	// Updated from sessions broadcast events.
 	cwd: string
 	model: string
+	// Parent session ID if this tab was forked
+	forkedFrom?: string
 }
 
 // ── Internal state ───────────────────────────────────────────────────────────

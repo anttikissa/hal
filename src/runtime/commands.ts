@@ -225,7 +225,7 @@ handlers['fork'] = (_args, session) => {
 		text: `fork:${session.id}`,
 		sessionId: session.id,
 	})
-	return { output: `Forking session ${session.id}...`, handled: true }
+	return { handled: true }
 }
 
 // /compact — summarize conversation

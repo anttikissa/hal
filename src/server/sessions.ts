@@ -23,6 +23,7 @@ export interface SessionMeta {
 	model?: string
 	currentLog?: string
 	closedAt?: string
+	forkedFrom?: string
 	// Last known context window usage, persisted so it survives restarts
 	context?: { used: number; max: number }
 }
@@ -336,6 +337,7 @@ async function forkSession(sourceId: string, newId: string, atIndex?: number): P
 		createdAt: forkTs,
 		topic: sourceMeta.topic ? `Fork of ${sourceMeta.topic}` : undefined,
 		model: sourceMeta.model,
+		forkedFrom: sourceId,
 	})
 	await appendHistory(newId, [{ type: 'forked_from', parent: sourceId, ts: forkTs }])
 }

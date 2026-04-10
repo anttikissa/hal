@@ -344,7 +344,11 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 
 		case 'open': {
 			if (typeof cmd.text === 'string' && cmd.text.startsWith('fork:')) {
-				await createForkSession(cmd.text.slice(5))
+				const parentId = cmd.text.slice(5)
+				const child = await createForkSession(parentId)
+				const msg = `forked ${parentId} → ${child.id}`
+				emitInfo(parentId, msg)
+				emitInfo(child.id, msg)
 			} else {
 				await createSession()
 			}
