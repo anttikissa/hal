@@ -5,15 +5,12 @@ import { sessions } from './server/sessions.ts'
 import { draft } from './cli/draft.ts'
 import { liveFiles } from './utils/live-file.ts'
 
-function makeLoadedSession(id: string) {
+function makeSessionMeta(id: string) {
 	return {
-		meta: {
-			id,
-			workingDir: `/tmp/${id}`,
-			createdAt: '2026-04-09T20:00:00.000Z',
-			model: 'openai/gpt-5.4',
-		},
-		history: [],
+		id,
+		workingDir: `/tmp/${id}`,
+		createdAt: '2026-04-09T20:00:00.000Z',
+		model: 'openai/gpt-5.4',
 	}
 }
 
@@ -33,7 +30,9 @@ function makeSharedState(ids: string[]): SharedState {
 }
 
 describe('client startup', () => {
-	const origLoadAllSessions = sessions.loadAllSessions
+	const origLoadAllSessionMetas = sessions.loadAllSessionMetas
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origLoadAllHistoryWithOrigin = sessions.loadAllHistoryWithOrigin
 	const origLoadDraft = draft.loadDraft
 	const origReadState = ipc.readState
 	const origTailEvents = ipc.tailEvents
@@ -57,10 +56,17 @@ describe('client startup', () => {
 		client.setOnChange(() => {})
 		client.setOnTabSwitch(() => {})
 		client.setOnDraftArrived(() => {})
+		sessions.loadAllSessionMetas = () => []
+		sessions.loadSessionMeta = (id) => makeSessionMeta(id)
+		sessions.loadAllHistoryWithOrigin = () => ({ entries: [], parentCount: 0 })
+		sessions.loadLive = () => ({ busy: false, activity: '', blocks: [], updatedAt: '' })
+		draft.loadDraft = () => ''
 	})
 
 	afterEach(() => {
-		sessions.loadAllSessions = origLoadAllSessions
+		sessions.loadAllSessionMetas = origLoadAllSessionMetas
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.loadAllHistoryWithOrigin = origLoadAllHistoryWithOrigin
 		draft.loadDraft = origLoadDraft
 		ipc.readState = origReadState
 		ipc.tailEvents = origTailEvents
@@ -70,8 +76,7 @@ describe('client startup', () => {
 	})
 
 	test('bootstraps tabs from shared state instead of replaying old events', async () => {
-		sessions.loadAllSessions = () => [makeLoadedSession('s1'), makeLoadedSession('s2')]
-		draft.loadDraft = () => ''
+		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
 
 		const shared = makeSharedState(['s1'])
 		ipc.readState = () => shared
@@ -87,9 +92,8 @@ describe('client startup', () => {
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
 	})
 
-	test('does not clear disk-loaded tabs when shared state is temporarily empty', async () => {
-		sessions.loadAllSessions = () => [makeLoadedSession('s1')]
-		draft.loadDraft = () => ''
+	test('falls back to disk session metadata when shared state is temporarily empty', async () => {
+		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
 
 		const shared = makeSharedState([])
 		ipc.readState = () => shared
@@ -105,10 +109,36 @@ describe('client startup', () => {
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
 	})
 
-	test('tails events from the end without replaying the whole event log', async () => {
-		sessions.loadAllSessions = () => [makeLoadedSession('s1')]
-		draft.loadDraft = () => ''
+	test('startup fallback uses fork-aware history loading', async () => {
+		sessions.loadAllSessionMetas = () => [{ ...makeSessionMeta('child'), forkedFrom: 'parent' }]
+		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('child'), forkedFrom: 'parent' })
+		sessions.loadAllHistoryWithOrigin = () => ({
+			entries: [
+				{ role: 'user', content: 'before fork', ts: '2026-04-09T20:00:00.000Z' },
+				{ role: 'user', content: 'after fork', ts: '2026-04-09T20:01:00.000Z' },
+			],
+			parentCount: 1,
+		})
 
+		const shared = makeSharedState([])
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.forkedFrom).toBe('parent')
+		expect(client.currentTab()?.history).toMatchObject([
+			{ type: 'user', text: 'before fork', dimmed: true },
+			{ type: 'user', text: 'after fork' },
+		])
+	})
+
+	test('tails events from the end without replaying the whole event log', async () => {
 		const shared = makeSharedState(['s1'])
 		ipc.readState = () => shared
 		liveFiles.liveFile = () => shared as any
@@ -128,14 +158,12 @@ describe('client startup', () => {
 	})
 
 	test('loads live session blocks on startup for tabs opened mid-turn', async () => {
-		sessions.loadAllSessions = () => [makeLoadedSession('s1')]
 		sessions.loadLive = () => ({
 			busy: true,
 			activity: 'generating...',
 			blocks: [{ type: 'assistant', text: 'hello', streaming: true, ts: Date.parse('2026-04-09T20:01:00.000Z') }],
 			updatedAt: '2026-04-09T20:01:00.000Z',
 		})
-		draft.loadDraft = () => ''
 
 		const shared = makeSharedState(['s1'])
 		shared.busy.s1 = true

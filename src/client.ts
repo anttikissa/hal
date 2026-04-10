@@ -17,7 +17,7 @@ import { openaiUsage } from './openai-usage.ts'
 
 import { blocks as blockModule } from './cli/blocks.ts'
 import type { Block } from './cli/blocks.ts'
-import type { HistoryEntry } from './server/sessions.ts'
+import type { HistoryEntry, SessionMeta } from './server/sessions.ts'
 export type { Block }
 
 export interface Tab {
@@ -33,6 +33,8 @@ export interface Tab {
 	// Tabs start unloaded: raw history is stashed here and converted to
 	// blocks on demand (active tab at startup, others in background).
 	rawHistory?: HistoryEntry[]
+	// How many rawHistory entries came from a fork parent (used to dim those blocks)
+	parentEntryCount: number
 	liveHistory?: Block[]
 	loaded: boolean
 	// Generation finished on a non-active tab — show ✓ until user switches to it
@@ -100,6 +102,7 @@ function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string
 		history: [],
 		inputHistory: [],
 		inputDraft: '',
+		parentEntryCount: 0,
 		liveHistory: [],
 		loaded: true,
 		doneUnseen: false,
@@ -201,7 +204,7 @@ function switchTab(index: number): void {
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
-	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId), tab)
+	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount), tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
@@ -341,7 +344,8 @@ function hasTrailingAssistantText(tab: Tab, text: string): boolean {
 
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const meta = sessionStore.loadSessionMeta(info.id)
-	const history = sessionStore.loadHistory(info.id)
+	// Load history including fork parent entries so forked tabs show full context
+	const { entries: history, parentCount } = sessionStore.loadAllHistoryWithOrigin(info.id)
 	const dirName = (meta?.workingDir ?? info.cwd)?.split('/').pop()
 	const tab = makeTab(
 		info.id,
@@ -349,6 +353,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 		{ cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model },
 	)
 	tab.rawHistory = history
+	tab.parentEntryCount = parentCount
 	tab.loaded = false
 	tab.liveHistory = sessionStore.loadLive(info.id).blocks as Block[]
 	for (const entry of history) {
@@ -361,6 +366,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 		tab.contextUsed = meta.context.used
 		tab.contextMax = meta.context.max
 	}
+	if (meta?.forkedFrom) tab.forkedFrom = meta.forkedFrom
 	return tab
 }
 
@@ -560,44 +566,22 @@ function handleEvent(event: any): void {
 }
 
 
-function loadPersistedSessions(): void {
-	const loaded = sessionStore.loadAllSessions()
-	if (loaded.length === 0) return
-
-	// Create tabs with raw history stashed — don't convert to blocks yet.
-	// inputHistory starts empty; ensureTabLoaded() populates it from rawHistory.
-	const newTabs: Tab[] = []
-	for (const s of loaded) {
-		const dirName = s.meta.workingDir?.split('/').pop()
-		const name = s.meta.topic ?? dirName ?? `tab ${newTabs.length + 1}`
-		const tab = makeTab(s.meta.id, name, { cwd: s.meta.workingDir, model: s.meta.model })
-		tab.rawHistory = s.history
-		tab.loaded = false
-		tab.liveHistory = sessionStore.loadLive(s.meta.id).blocks as Block[]
-		// Sum up usage from history entries (each assistant turn has a .usage field)
-		for (const entry of s.history) {
-			if (entry.usage) {
-				tab.usage.input += (entry.usage as any).input ?? 0
-				tab.usage.output += (entry.usage as any).output ?? 0
-			}
-		}
-		// Restore persisted context window usage so the status line shows it immediately
-		if (s.meta.context) {
-			tab.contextUsed = s.meta.context.used
-			tab.contextMax = s.meta.context.max
-		}
-		newTabs.push(tab)
+function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInfo {
+	const dirName = meta.workingDir?.split('/').pop()
+	return {
+		id: meta.id,
+		name: meta.topic ?? dirName ?? `tab ${index + 1}`,
+		cwd: meta.workingDir ?? '',
+		model: meta.model,
 	}
-	state.tabs = newTabs
+}
 
-	// Restore persisted client state (last tab, peak, model).
+function restoreStartupSelection(): void {
 	const saved = loadClientState()
-	const lastIdx = saved.lastTab ? newTabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
+	const lastIdx = saved.lastTab ? state.tabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
 	state.activeTab = lastIdx >= 0 ? lastIdx : 0
 	if (saved.model) state.model = saved.model
 
-	// Only load the active tab now — first paint needs it.
-	// Other tabs are loaded in the background after first paint.
 	const active = state.tabs[state.activeTab]
 	if (active) {
 		const t0 = performance.now()
@@ -608,11 +592,18 @@ function loadPersistedSessions(): void {
 	}
 
 	const cols = process.stdout.columns || 80
-	if (saved.peakCols === cols && saved.peak > 0) {
-		state.peak = saved.peak
-	}
+	if (saved.peakCols === cols && saved.peak > 0) state.peak = saved.peak
 	state.peakCols = cols
-	perf.mark(`Client loaded ${loaded.length} sessions (1 active)`)
+}
+
+function bootstrapSessions(): void {
+	const items = ipcStateFile?.openSessions?.length
+		? ipcStateFile.openSessions
+		: sessionStore.loadAllSessionMetas().map(sessionInfoFromMeta)
+	if (items.length === 0) return
+	applySessionList(items)
+	restoreStartupSelection()
+	perf.mark(`Client loaded ${items.length} sessions (1 active)`)
 }
 
 // Background loader: runs after first paint.
@@ -697,9 +688,8 @@ function startClient(signal: AbortSignal): void {
 		}
 	})()
 
-	// Load persisted sessions directly from disk (fast, no IPC roundtrip).
-	loadPersistedSessions()
-	if (ipcStateFile) applySharedState(ipcStateFile)
+	// Bootstrap tabs once, using the same tab builder as normal session updates.
+	bootstrapSessions()
 	onChange(false)
 
 	// Background-load blobs + remaining tabs after first paint

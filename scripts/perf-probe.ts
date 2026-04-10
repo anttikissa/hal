@@ -23,15 +23,18 @@ log('imports done')
 
 // Simulate what startClient does, with probes
 
-// 1. Load sessions
-const loaded = sessions.loadAllSessions()
+// 1. Load sessions through the same startup path the client uses now
+const loaded = sessions.loadAllSessionMetas().map((meta) => ({
+	meta,
+	history: sessions.loadAllHistory(meta.id),
+}))
 log(`loaded ${loaded.length} sessions`)
 
 // 2. Find active tab
 const lastTab = '09-bx8'
 
 // 3. Convert active tab
-const active = loaded.find(s => s.meta.id === lastTab)!
+const active = loaded.find((s) => s.meta.id === lastTab)!
 const activeBlocks = blocks.historyToBlocks(active.history, active.meta.id)
 log(`active tab converted: ${activeBlocks.length} blocks`)
 

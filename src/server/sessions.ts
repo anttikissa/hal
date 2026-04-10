@@ -7,7 +7,6 @@ import { STATE_DIR } from '../state.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
-import { perf } from '../perf.ts'
 
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
@@ -38,11 +37,6 @@ export interface HistoryEntry {
 	ts?: string
 	// We preserve all other fields but don't need to type them
 	[key: string]: any
-}
-
-export interface LoadedSession {
-	meta: SessionMeta
-	history: HistoryEntry[]
 }
 
 export interface SessionLive {
@@ -255,18 +249,6 @@ function collectMetas(ids: string[], load: (id: string) => SessionMeta | null): 
 	return metas
 }
 
-function loadAllSessions(): LoadedSession[] {
-	perf.mark('Loading sessions')
-	const ids = loadSessionList()
-	const result: LoadedSession[] = []
-	for (const id of ids) {
-		const meta = loadSessionMeta(id)
-		if (meta) result.push({ meta, history: loadHistory(id) })
-	}
-	perf.mark(`Loaded ${result.length} sessions (${ids.length} listed)`)
-	return result
-}
-
 function loadSessionMetas(): SessionMeta[] {
 	return collectMetas(loadSessionList(), activateSession)
 }
@@ -276,13 +258,19 @@ function loadAllSessionMetas(): SessionMeta[] {
 }
 
 function loadAllHistory(sessionId: string): HistoryEntry[] {
+	return loadAllHistoryWithOrigin(sessionId).entries
+}
+
+// Like loadAllHistory but also returns how many entries came from the parent.
+// Used by the client to dim inherited blocks in forked sessions.
+function loadAllHistoryWithOrigin(sessionId: string): { entries: HistoryEntry[]; parentCount: number } {
 	const entries = loadHistory(sessionId)
 	const first = entries[0]
-	if (first?.type !== 'forked_from' || !first.parent) return entries
-	const parentEntries = loadAllHistory(first.parent)
+	if (first?.type !== 'forked_from' || !first.parent) return { entries, parentCount: 0 }
+	const parent = loadAllHistoryWithOrigin(first.parent)
 	const forkTs = first.ts
-	const before = forkTs ? parentEntries.filter((e) => !e.ts || e.ts < forkTs) : parentEntries
-	return [...before, ...entries.slice(1)]
+	const before = forkTs ? parent.entries.filter((e) => !e.ts || e.ts < forkTs) : parent.entries
+	return { entries: [...before, ...entries.slice(1)], parentCount: before.length }
 }
 
 function saveMeta(meta: SessionMeta): void { liveFiles.save(fixMeta(meta, meta.id)) }
@@ -402,13 +390,13 @@ function detectInterruptedTools(entries: HistoryEntry[]): { name: string; id: st
 }
 
 export const sessions = {
-	loadAllSessions,
 	loadSessionMetas,
 	loadAllSessionMetas,
 	loadSessionList,
 	loadSessionMeta,
 	loadHistory,
 	loadAllHistory,
+	loadAllHistoryWithOrigin,
 	loadLive,
 	activateSession,
 	deactivateSession,
