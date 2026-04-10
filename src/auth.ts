@@ -57,10 +57,48 @@ interface Credential {
 }
 
 // ── Cooldown tracking ──
-// In-memory map of "provider:index" -> timestamp when cooldown expires.
-// Populated by markCooldown(), checked by getCredential().
+// Map of "provider:index" -> timestamp when cooldown expires.
+// Persisted to STATE_DIR/cooldowns.json so cooldowns survive restarts.
+// Loaded lazily on first access, written on every markCooldown call.
 
-const cooldowns = new Map<string, number>()
+import { STATE_DIR } from './state.ts'
+import { readFileSync, writeFileSync } from 'fs'
+
+const COOLDOWN_PATH = `${STATE_DIR}/cooldowns.json`
+let cooldowns: Map<string, number> | null = null  // null = not yet loaded
+
+function loadCooldowns(): Map<string, number> {
+	if (cooldowns) return cooldowns
+	cooldowns = new Map()
+	try {
+		const data = JSON.parse(readFileSync(COOLDOWN_PATH, 'utf8'))
+		const now = Date.now()
+		// Only load entries that haven't expired yet
+		for (const [key, until] of Object.entries(data)) {
+			if (typeof until === 'number' && until > now) {
+				cooldowns.set(key, until)
+			}
+		}
+	} catch {
+		// File doesn't exist or is corrupt — start fresh
+	}
+	return cooldowns
+}
+
+function saveCooldowns(): void {
+	const map = loadCooldowns()
+	const obj: Record<string, number> = {}
+	const now = Date.now()
+	for (const [key, until] of map) {
+		// Only persist entries that haven't expired
+		if (until > now) obj[key] = until
+	}
+	try {
+		writeFileSync(COOLDOWN_PATH, JSON.stringify(obj), 'utf8')
+	} catch {
+		// State dir may not exist yet during early startup
+	}
+}
 
 /** Normalize a provider entry: single object → [object], array stays array. */
 function normalizeEntries(raw: any): any[] {
@@ -99,7 +137,7 @@ function getCredential(providerName: string): Credential | undefined {
 	// Try each entry, skip ones on cooldown
 	for (let i = 0; i < entries.length; i++) {
 		const key = `${providerName}:${i}`
-		const cooldownUntil = cooldowns.get(key)
+		const cooldownUntil = loadCooldowns().get(key)
 		if (cooldownUntil && now < cooldownUntil) continue
 		const cred = credFromEntry(entries[i], key, i, total)
 		if (cred) return cred
@@ -113,17 +151,18 @@ function getCredential(providerName: string): Credential | undefined {
 	// All on cooldown — return the one that comes off soonest
 	let bestIdx = -1, bestUntil = Infinity
 	for (let i = 0; i < entries.length; i++) {
-		const until = cooldowns.get(`${providerName}:${i}`) ?? 0
+		const until = loadCooldowns().get(`${providerName}:${i}`) ?? 0
 		if (until < bestUntil) { bestUntil = until; bestIdx = i }
 	}
 	if (bestIdx >= 0) return credFromEntry(entries[bestIdx], `${providerName}:${bestIdx}`, bestIdx, total)
 	return undefined
 }
 
-/** Mark a credential as on cooldown for durationMs. */
+/** Mark a credential as on cooldown for durationMs. Persists to disk. */
 function markCooldown(cred: Credential, durationMs: number): void {
 	if (!cred._key) return
-	cooldowns.set(cred._key, Date.now() + durationMs)
+	loadCooldowns().set(cred._key, Date.now() + durationMs)
+	saveCooldowns()
 }
 
 /** True if at least one credential for this provider is NOT on cooldown. */
@@ -131,7 +170,7 @@ function hasAvailableCredential(providerName: string): boolean {
 	const entries = normalizeEntries(store()[providerName])
 	const now = Date.now()
 	for (let i = 0; i < entries.length; i++) {
-		const until = cooldowns.get(`${providerName}:${i}`) ?? 0
+		const until = loadCooldowns().get(`${providerName}:${i}`) ?? 0
 		if (now >= until) return true
 	}
 	return false
@@ -147,7 +186,7 @@ function allOnCooldownMessage(providerName: string): string | null {
 	// Check if any entry is NOT on cooldown
 	for (let i = 0; i < entries.length; i++) {
 		const key = `${providerName}:${i}`
-		const cooldownUntil = cooldowns.get(key)
+		const cooldownUntil = loadCooldowns().get(key)
 		if (!cooldownUntil || now >= cooldownUntil) return null
 	}
 
@@ -169,7 +208,7 @@ function getEntry(providerName: string): Record<string, any> {
 		const now = Date.now()
 		for (let i = 0; i < raw.length; i++) {
 			const key = `${providerName}:${i}`
-			const cooldownUntil = cooldowns.get(key)
+			const cooldownUntil = loadCooldowns().get(key)
 			if (cooldownUntil && now < cooldownUntil) continue
 			return raw[i] ?? {}
 		}
@@ -278,7 +317,12 @@ function _setStoreForTest(data: Record<string, any>): void {
 }
 
 function _resetCooldowns(): void {
-	cooldowns.clear()
+	cooldowns = new Map()
+}
+
+/** Force next loadCooldowns() to re-read from disk. For testing restart. */
+function _invalidateCooldownCache(): void {
+	cooldowns = null
 }
 
 export const auth = {
@@ -292,5 +336,6 @@ export const auth = {
 	allOnCooldownMessage,
 	_setStoreForTest,
 	_resetCooldowns,
+	_invalidateCooldownCache,
 }
 export type { Credential }

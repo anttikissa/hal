@@ -179,3 +179,31 @@ describe('auth.allOnCooldownMessage', () => {
 		expect(msg).toContain('All')
 	})
 })
+
+describe('cooldown persistence across restarts', () => {
+	beforeEach(() => {
+		auth._resetCooldowns()
+	})
+
+	test('cooldowns survive in-memory reset (simulating restart)', () => {
+		auth._setStoreForTest({
+			openai: [
+				fakeAccount('a@test.com', 'tok_a'),
+				fakeAccount('b@test.com', 'tok_b'),
+			],
+		})
+		// Put account 0 on cooldown
+		const c1 = auth.getCredential('openai')
+		expect(c1!.email).toBe('a@test.com')
+		auth.markCooldown(c1!, 60_000) // writes to disk
+
+		// Simulate restart: clear in-memory state, re-read from disk
+		auth._resetCooldowns()
+		// Force reload from disk on next access
+		auth._invalidateCooldownCache()
+
+		// After "restart", getCredential should skip the cooled-down account
+		const after = auth.getCredential('openai')
+		expect(after!.email).toBe('b@test.com')
+	})
+})

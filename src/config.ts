@@ -43,4 +43,8 @@ export const config = {
 
 // Apply on load and on every external edit.
 config.apply()
-liveFiles.onChange(config.data, config.apply)
+liveFiles.onChange(config.data, () => {
+	config.apply()
+	render.invalidateHistoryCache()
+	client.requestRender(false)
+})

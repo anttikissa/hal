@@ -121,6 +121,8 @@ function setOnChange(fn: (force: boolean) => void): void {
 	onChange = fn
 }
 
+function requestRender(force = false): void { onChange(force) }
+
 function currentTab(): Tab | null {
 	return state.tabs[state.activeTab] ?? null
 }
@@ -689,6 +691,7 @@ export const client = {
 	config,
 	state,
 	setOnChange,
+	requestRender,
 	setOnTabSwitch,
 	setOnDraftArrived,
 	currentTab,

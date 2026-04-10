@@ -67,6 +67,8 @@ function resetRenderer(): void {
 	historyCache = new WeakMap<Tab, HistoryRenderCache>()
 }
 
+function invalidateHistoryCache(): void { historyCache = new WeakMap<Tab, HistoryRenderCache>() }
+
 // ── Entry rendering ──────────────────────────────────────────────────────────
 
 function renderEntry(block: Block, cols: number): string[] {
@@ -563,4 +565,4 @@ function clearFrame(): void {
 	cursorRow = 0
 }
 
-export const render = { config, draw, resetRenderer, clearFrame, hasAnimatedIndicators }
+export const render = { config, draw, resetRenderer, invalidateHistoryCache, clearFrame, hasAnimatedIndicators }

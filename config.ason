@@ -10,7 +10,7 @@
 		blobBatchSize: 64
 	}
 	render: {
-		forkHistoryDimFactor: 0.8
+		forkHistoryDimFactor: .82
 	}
 	agentLoop: {
 		maxIterations: 50
