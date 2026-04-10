@@ -10,9 +10,9 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const pattern = String(input?.pattern ?? '')
 	if (!pattern) return 'error: pattern is required'
 
-	const searchPath = read.resolvePath(input?.path, ctx.cwd)
+	const searchPaths = read.resolvePaths(input?.path, ctx.cwd)
 
-	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', pattern, searchPath]
+	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', pattern, ...searchPaths]
 
 	const proc = Bun.spawn(args, {
 		stdout: 'pipe',
@@ -37,7 +37,7 @@ toolRegistry.registerTool({
 	description: 'Find files by glob pattern. Returns matching file paths sorted by modification time.',
 	parameters: {
 		pattern: { type: 'string', description: "Glob pattern, e.g. '*.ts', 'src/**/*.tsx'" },
-		path: { type: 'string', description: 'Directory to search in (default: cwd)' },
+		path: { type: 'string', description: 'Directory to search in (default: cwd). Space-separated paths ok.' },
 	},
 	required: ['pattern'],
 	execute,

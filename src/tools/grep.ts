@@ -10,7 +10,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const pattern = String(input?.pattern ?? '')
 	if (!pattern) return 'error: pattern is required'
 
-	const searchPath = read.resolvePath(input?.path, ctx.cwd)
+	const searchPaths = read.resolvePaths(input?.path, ctx.cwd)
 	const maxResults = input?.maxResults ?? 100
 
 	const args = [
@@ -24,7 +24,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 		'--sort=modified',
 	]
 	if (input?.include) args.push('--glob', String(input.include))
-	args.push('--', pattern, searchPath)
+	args.push('--', pattern, ...searchPaths)
 
 	const proc = Bun.spawn(args, {
 		stdout: 'pipe',
@@ -54,7 +54,7 @@ toolRegistry.registerTool({
 	description: 'Search file contents using ripgrep. Returns matching lines with file paths and line numbers.',
 	parameters: {
 		pattern: { type: 'string', description: 'Search pattern (regex)' },
-		path: { type: 'string', description: 'Directory or file to search (default: cwd)' },
+		path: { type: 'string', description: 'Directory or file to search (default: cwd). Space-separated paths ok.' },
 		include: { type: 'string', description: "Glob pattern to filter files, e.g. '*.ts'" },
 		maxResults: { type: 'integer', description: 'Max matches per file (default: 100)' },
 	},

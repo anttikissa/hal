@@ -64,4 +64,29 @@ toolRegistry.registerTool({
 	execute,
 })
 
-export const read = { resolvePath, execute }
+/**
+ * Resolve a path string that may contain space-separated multiple paths.
+ * If the full string resolves to an existing path, return it as-is (single element).
+ * Otherwise, split on spaces and check if each part exists. If all do, return
+ * them all — the model intended multiple paths. If not, return the original
+ * single path (let the caller surface the "not found" error).
+ */
+function resolvePaths(raw: string | undefined, cwd: string): string[] {
+	const single = resolvePath(raw, cwd)
+	try {
+		statSync(single)
+		return [single]
+	} catch {
+		// Single path doesn't exist — try splitting on spaces
+	}
+	const parts = (raw ?? '').split(/\s+/).filter(Boolean)
+	if (parts.length <= 1) return [single]
+
+	const resolved = parts.map(p => resolvePath(p, cwd))
+	const allExist = resolved.every(p => {
+		try { statSync(p); return true } catch { return false }
+	})
+	return allExist ? resolved : [single]
+}
+
+export const read = { resolvePath, resolvePaths, execute }
