@@ -91,4 +91,24 @@ describe('client streaming blocks', () => {
 			input: { path: 'notes.txt' },
 		})
 	})
+
+	test('ignores session and status events because shared state owns them', () => {
+		client.state.busy.set('s1', true)
+		client.state.activity.set('s1', 'generating...')
+
+		client.handleEvent({
+			type: 'sessions',
+			sessions: [{ id: 's2', name: 'tab 2', cwd: '/tmp/s2', model: 'openai/gpt-5.4' }],
+		})
+		client.handleEvent({
+			type: 'status',
+			sessionId: 's1',
+			busy: false,
+			activity: '',
+		})
+
+		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
+		expect(client.state.busy.get('s1')).toBe(true)
+		expect(client.state.activity.get('s1')).toBe('generating...')
+	})
 })

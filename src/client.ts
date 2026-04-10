@@ -417,11 +417,9 @@ function applySharedState(shared: SharedState): void {
 }
 
 function handleEvent(event: any): void {
-	if (event.type === 'runtime-start' || event.type === 'host-released') return
+	if (event.type === 'runtime-start' || event.type === 'host-released' || event.type === 'sessions' || event.type === 'status') return
 
-	if (event.type === 'sessions') {
-		applySessionList(event.sessions as SharedSessionInfo[])
-	} else if (event.type === 'prompt') {
+	if (event.type === 'prompt') {
 		addBlockToTab(event.sessionId, {
 			type: 'user',
 			text: event.text,
