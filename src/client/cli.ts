@@ -111,7 +111,9 @@ function onSigcont(): void {
 }
 
 function submitCommandType(text: string, busy: boolean): 'prompt' | 'steer' {
-	if (text.startsWith('/')) return 'prompt'
+	const trimmed = text.trimStart()
+	if (/^\/(model|cd)\b/.test(trimmed)) return busy ? 'steer' : 'prompt'
+	if (trimmed.startsWith('/')) return 'prompt'
 	return busy ? 'steer' : 'prompt'
 }
 
