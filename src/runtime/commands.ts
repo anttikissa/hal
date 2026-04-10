@@ -14,6 +14,7 @@ import { config } from '../config.ts'
 import { context } from './context.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import { inbox } from './inbox.ts'
+import { openaiUsage } from '../openai-usage.ts'
 
 // ── Types ──
 
@@ -154,6 +155,9 @@ function detailedHelp(topic: string): string | null {
 	if (topic === 'broadcast') {
 		return ['Usage: /broadcast <message>', '', 'Sends the same message to every other open tab.'].join('\n')
 	}
+	if (topic === 'status' || topic === 'usage') {
+		return ['Usage: /status', '', 'Show OpenAI ChatGPT subscription usage for all configured accounts.'].join('\n')
+	}
 	if (topic === 'cd') {
 		return ['Usage: /cd [path]', '', 'With no path, shows the current working directory.'].join('\n')
 	}
@@ -181,6 +185,7 @@ handlers['help'] = (args) => {
 		'  /fork           Fork current session to new tab',
 		'  /resume [id]    Resume a closed session',
 		'  /compact        Summarize conversation to reduce context',
+		'  /status         Show ChatGPT subscription usage',
 		'  /send <tab|id>  Send a message to another tab',
 		'  /broadcast ...  Send a message to every other tab',
 		'  /cd [path]      Change working directory',
@@ -235,6 +240,16 @@ handlers['compact'] = (_args, session) => {
 		sessionId: session.id,
 	})
 	return { output: 'Compacting conversation...', handled: true }
+}
+
+// /status — OpenAI ChatGPT subscription usage
+handlers['status'] = async () => {
+	return { output: await openaiUsage.renderStatus(true), handled: true }
+}
+
+// /usage — Claude Code / Codex-style alias for /status
+handlers['usage'] = async (_args, session, emitInfo) => {
+	return handlers['status']!('', session, emitInfo)
 }
 
 // /resume [id] — list closed sessions or reopen one as a tab
@@ -423,6 +438,16 @@ handlers['config'] = (args) => {
 	} catch (err: any) {
 		return { error: `/config: could not parse value: ${err?.message ?? String(err)}`, handled: true }
 	}
+}
+
+// /status — show cached/refreshed OpenAI subscription usage.
+handlers['status'] = async () => {
+	return { output: await openaiUsage.renderStatus(true), handled: true }
+}
+
+// /usage — old alias for /status.
+handlers['usage'] = async () => {
+	return { output: await openaiUsage.renderStatus(true), handled: true }
 }
 
 // /show — old compatibility shim. Point users at the real commands instead.

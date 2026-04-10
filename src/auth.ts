@@ -76,6 +76,19 @@ function credFromEntry(entry: any, key: string, index: number, total: number): C
 	return undefined
 }
 
+/** Get all configured credentials for a provider, in configured order. */
+function listCredentials(providerName: string): Credential[] {
+	const raw = store()[providerName]
+	const entries = normalizeEntries(raw)
+	const total = entries.length
+	const credentials: Credential[] = []
+	for (let i = 0; i < entries.length; i++) {
+		const cred = credFromEntry(entries[i], `${providerName}:${i}`, i, total)
+		if (cred) credentials.push(cred)
+	}
+	return credentials
+}
+
 /** Get credential for a provider. Skips accounts on cooldown. */
 function getCredential(providerName: string): Credential | undefined {
 	const raw = store()[providerName]
@@ -270,6 +283,7 @@ function _resetCooldowns(): void {
 
 export const auth = {
 	getCredential,
+	listCredentials,
 	getEntry,
 	ensureFresh,
 	isApiKey,

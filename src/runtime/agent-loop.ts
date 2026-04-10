@@ -18,6 +18,7 @@ import { toolRegistry } from '../tools/tool.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
+import { ason } from '../utils/ason.ts'
 // Import all tool modules so they self-register on load
 import '../tools/bash.ts'
 import '../tools/read.ts'
@@ -140,14 +141,30 @@ function parseResetsInSeconds(body: string | undefined): number | undefined {
 	return undefined
 }
 
-/** Pretty-format an error body for display. Try to indent JSON, fall back to raw text. */
+/** Pretty-format an error body for display. Parse JSON and print it as ASON. */
 function formatErrorBody(body: string): string {
 	try {
-		const parsed = JSON.parse(body)
-		return JSON.stringify(parsed, null, 2)
+		return ason.stringify(JSON.parse(body), 'long')
 	} catch {
 		return body
 	}
+}
+
+/** Build the user-visible error details below the status/endpoint header. */
+function formatErrorDetails(event: ProviderStreamEvent): string {
+	const prettyBody = event.body ? formatErrorBody(event.body) : ''
+
+	// Provider messages like "Anthropic API 429" add no value once the header
+	// already shows the status code. In that case, show the payload instead.
+	if (event.status === 429 && prettyBody) {
+		if (!event.message || event.message === `Anthropic API ${event.status}` || event.message === `OpenAI API ${event.status}`) {
+			return prettyBody
+		}
+		return `${event.message}\n${prettyBody}`
+	}
+
+	if (prettyBody) return prettyBody
+	return event.message ?? 'Unknown error'
 }
 
 // ── Tool call normalization ──
@@ -340,16 +357,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					case 'error': {
 						const status = event.status
 
-						// Retryable 429s get a short human message instead of the full JSON body.
-						// For other errors, keep showing the provider payload.
 						const header = status ? `${status}:` : 'Error:'
 						const endpoint = event.endpoint ? ` (${event.endpoint})` : ''
-						const body = status === 429 && event.message
-							? event.message
-							: event.body ?? event.message ?? 'Unknown error'
 						emitEvent(sessionId, {
 							type: 'response',
-							text: `${header}${endpoint}\n${formatErrorBody(body)}`,
+							text: `${header}${endpoint}\n${formatErrorDetails(event)}`,
 							isError: true,
 						})
 						// Check if we should retry

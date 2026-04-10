@@ -62,6 +62,18 @@ function draw(force = false): void {
 	render.draw(force)
 }
 
+function exitCli(code: number): void {
+	// Flush any buffered perf marks before the final repaint. Without this,
+	// fast exits can drop startup telemetry because the 100ms sink timer has
+	// not fired yet.
+	perf.stop()
+	// Preserve the last fully up-to-date frame for copy/paste on exit.
+	draw(true)
+	cleanupTerminal()
+	process.stdout.write('\r\n')
+	process.exit(code)
+}
+
 let terminalCleaned = false
 
 // Restore terminal state and save client state before exiting.
@@ -234,15 +246,11 @@ function handleAppKey(k: KeyEvent): boolean {
 	}
 	// Ctrl-C: quit
 	if (k.key === 'c' && k.ctrl) {
-		cleanupTerminal()
-		process.stdout.write('\r\n')
-		process.exit(0)
+		exitCli(0)
 	}
 	// Ctrl-D: quit if prompt empty, else let prompt handle (delete forward)
 	if (k.key === 'd' && k.ctrl && !prompt.text()) {
-		cleanupTerminal()
-		process.stdout.write('\r\n')
-		process.exit(0)
+		exitCli(0)
 	}
 	// Ctrl-Z: suspend (SIGSTOP to process group, like a normal unix program)
 	if (k.key === 'z' && k.ctrl) {
