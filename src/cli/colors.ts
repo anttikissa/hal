@@ -58,10 +58,12 @@ function load(): void {
 	let raw: any
 	try {
 		raw = ason.parse(readFileSync(COLORS_PATH, 'utf-8'))
-	} catch {
-		return // keep current colors on parse error
+	} catch (err: any) {
+		throw new Error(`Fatal: failed to parse ${COLORS_PATH}: ${err?.message ?? String(err)}`)
 	}
-	if (!raw || typeof raw !== 'object') return
+	if (!raw || typeof raw !== 'object') {
+		throw new Error(`Fatal: ${COLORS_PATH} must contain an object`)
+	}
 
 	const vars: Record<string, number> = { ...raw.vars }
 

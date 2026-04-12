@@ -6,80 +6,80 @@
 // Variable references ("$fgL") are resolved from the vars block.
 {
 	vars: {
-		fgL: 0.75
-		fgC: 0.15
-		bgL: 0.25
-		bgC: 0.04
-	}
+		fgL: 0.75,
+		fgC: 0.15,
+		bgL: 0.25,
+		bgC: 0.04,
+	},
 
 	// Hal's responses — warm orange
 	assistant: {
-		fg: ["$fgL", "$fgC", 55]
-		bg: ["$bgL", 0.04, 55]
-		bold: [0.90, 0.06, 55]
-		code: [0.80, 0.04, 55]
-	}
+		fg: ["$fgL", "$fgC", 55],
+		bg: ["$bgL", 0.04, 55],
+		bold: [0.90, 0.06, 55],
+		code: [0.80, 0.04, 55],
+	},
 
 	// Thinking — muted blue-grey, recedes visually
 	thinking: {
-		fg: [0.65, 0.03, 250]
-		bg: [0.26, 0.02, 250]
-		bold: [0.85, 0.02, 250]
-		code: [0.75, 0.03, 250]
-	}
+		fg: [0.65, 0.03, 250],
+		bg: [0.26, 0.02, 250],
+		bold: [0.85, 0.02, 250],
+		code: [0.75, 0.03, 250],
+	},
 
 	// User messages — teal, lively but not competing with orange
 	user: {
-		fg: ["$fgL", 0.10, 185]
-		bg: ["$bgL", 0.03, 185]
-	}
+		fg: ["$fgL", 0.10, 185],
+		bg: ["$bgL", 0.03, 185],
+	},
 
 	// Prompt input area
 	input: {
-		fg: [0.80, 0.008, 250]
-		bg: [0.28, 0.008, 250]
-		cursor: ["$fgL", "$fgC", 55]
-	}
+		fg: [0.80, 0.008, 250],
+		bg: [0.28, 0.008, 250],
+		cursor: ["$fgL", "$fgC", 55],
+	},
 
 	// System messages
 	system: {
-		fg: ["$fgL", 0.10, 195]
-		bg: ["$bgL", "$bgC", 195]
-	}
+		fg: ["$fgL", 0.10, 195],
+		bg: ["$bgL", "$bgC", 195],
+	},
 
 	// Info — neutral, dim, with a subtle grey card
 	info: {
-		fg: [0.60, 0, 0]
-		bg: [0.20, 0, 0]
-	}
+		fg: [0.60, 0, 0],
+		bg: [0.20, 0, 0],
+	},
 
 	// Warnings — amber, noticeable but not fatal
 	warning: {
-		fg: [0.78, 0.14, 85]
-		bg: [0.28, 0.05, 85]
-	}
+		fg: [0.78, 0.14, 85],
+		bg: [0.28, 0.05, 85],
+	},
 
 	// Errors — hot red
 	error: {
-		fg: [0.70, 0.20, 25]
-		bg: [0.27, 0.08, 25]
-	}
+		fg: [0.70, 0.20, 25],
+		bg: [0.27, 0.08, 25],
+	},
 
 	popup: {
 		current: {
-			fg: [0.96, 0.02, 250]
-			bg: [0.42, 0.03, 250]
-		}
-	}
+			fg: [0.96, 0.02, 250],
+			bg: [0.42, 0.03, 250],
+		},
+	},
 
 	// Tools — each type gets a distinct hue.
 	// Write tools look dangerous (red). Read tools are calm (green).
 	tools: {
-		default: { fg: ["$fgL", "$fgC", 250], bg: ["$bgL", "$bgC", 250] }
-		bash:    { fg: ["$fgL", "$fgC", 320], bg: ["$bgL", "$bgC", 320] }
-		eval:    { fg: ["$fgL", "$fgC", 295], bg: ["$bgL", 0.06, 295] }
-		read:    { fg: ["$fgL", "$fgC", 155], bg: ["$bgL", "$bgC", 155] }
-		write:   { fg: ["$fgL", 0.18, 25],   bg: ["$bgL", 0.06, 25] }
-		edit:    { fg: ["$fgL", 0.18, 25],   bg: ["$bgL", 0.06, 25] }
-	}
+		default: { fg: ["$fgL", "$fgC", 250], bg: ["$bgL", "$bgC", 250] },
+		bash:    { fg: ["$fgL", "$fgC", 320], bg: ["$bgL", "$bgC", 320] },
+		eval:    { fg: ["$fgL", "$fgC", 295], bg: ["$bgL", 0.06, 295] },
+		read:    { fg: ["$fgL", "$fgC", 155], bg: ["$bgL", "$bgC", 155] },
+		write:   { fg: ["$fgL", 0.18, 25],   bg: ["$bgL", 0.06, 25] },
+		edit:    { fg: ["$fgL", 0.18, 25],   bg: ["$bgL", 0.06, 25] },
+	},
 }

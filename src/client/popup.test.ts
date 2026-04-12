@@ -34,6 +34,8 @@ describe('popup', () => {
 		const overlay = popup.buildOverlay(120, 30)
 		expect(overlay).not.toBeNull()
 		const selectedLine = overlay!.lines.find((line) => line.includes('GPT 5.4'))
+		expect(colors.popup.current.bg).not.toBe('')
+		expect(colors.popup.current.fg).not.toBe('')
 		expect(selectedLine).toContain(colors.popup.current.bg)
 		expect(selectedLine).toContain(colors.popup.current.fg)
 	})
