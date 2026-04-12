@@ -118,6 +118,7 @@ describe('client startup', () => {
 				{ role: 'user', content: 'after fork', ts: '2026-04-09T20:01:00.000Z' },
 			],
 			parentCount: 1,
+			parentId: 'parent',
 		})
 
 		const shared = makeSharedState([])
