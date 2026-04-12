@@ -6,6 +6,7 @@ import { ipc } from './ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
 import { client } from './client.ts'
+import { memory } from './memory.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
 import './config.ts' // load config.ason overrides, watch for changes
@@ -22,12 +23,7 @@ log.info('Startup', { isHost, hostPid, pid: process.pid })
 const ac = new AbortController()
 let electionTimer: ReturnType<typeof setInterval> | null = null
 let cleaned = false
-const MEMORY_WARN_BYTES = 1_500_000_000
-const MEMORY_LIMIT_BYTES = 2_000_000_000
-const MEMORY_CHECK_MS = 1_000
-let memoryTimer: ReturnType<typeof setInterval> | null = null
-let warnedHighMemory = false
-let exitingForMemory = false
+let memoryTimer: ReturnType<typeof setTimeout> | null = null
 
 function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
@@ -45,20 +41,12 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	runtime.startRuntime(ac.signal)
 }
 
-function formatMemory(bytes: number): string {
-	return `${(bytes / 1_000_000_000).toFixed(2)} GB RSS`
-}
-
-function tickMemory(): void {
-	const rss = process.memoryUsage().rss
-	if (rss >= MEMORY_WARN_BYTES && !warnedHighMemory) {
-		warnedHighMemory = true
-		client.addEntry(`Memory high: ${formatMemory(rss)}`, 'error')
-	}
-	if (rss < MEMORY_LIMIT_BYTES || exitingForMemory) return
-	exitingForMemory = true
-	client.addEntry(`Memory limit exceeded: ${formatMemory(rss)}. Quitting.`, 'error')
-	setTimeout(() => process.exit(0), 500)
+function queueMemoryCheck(): void {
+	if (cleaned) return
+	memoryTimer = setTimeout(() => {
+		memory.tick()
+		queueMemoryCheck()
+	}, memory.config.checkIntervalMs)
 }
 
 function cleanup(): void {
@@ -66,7 +54,7 @@ function cleanup(): void {
 	cleaned = true
 	log.info('Cleanup started', { isHost, pid: process.pid })
 	if (electionTimer) clearInterval(electionTimer)
-	if (memoryTimer) clearInterval(memoryTimer)
+	if (memoryTimer) clearTimeout(memoryTimer)
 	ac.abort()
 	if (isHost) {
 		ipc.appendEvent({ type: 'host-released' })
@@ -103,7 +91,7 @@ process.on('SIGTERM', () => {
 	process.exit(0)
 })
 
-memoryTimer = setInterval(tickMemory, MEMORY_CHECK_MS)
+queueMemoryCheck()
 
 electionTimer = setInterval(tickElection, 100)
 
