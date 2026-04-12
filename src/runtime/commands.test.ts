@@ -4,6 +4,7 @@ import { inbox } from './inbox.ts'
 import { config } from '../config.ts'
 import { agentLoop } from './agent-loop.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { memory } from '../memory.ts'
 
 const sent: Array<{ sessionId: string; text: string; from?: string }> = []
 const origQueueMessage = inbox.queueMessage
@@ -11,6 +12,8 @@ const origConfigData = config.data
 const origConfigSave = config.save
 const origMaxIterations = agentLoop.config.maxIterations
 const origRenderStatus = openaiUsage.renderStatus
+const origMemoryConfig = { ...memory.config }
+const origReadRss = memory.io.readRss
 
 function makeSession(id = '04-aaa'): SessionState {
 	return {
@@ -38,6 +41,8 @@ afterEach(() => {
 	config.save = origConfigSave
 	agentLoop.config.maxIterations = origMaxIterations
 	openaiUsage.renderStatus = origRenderStatus
+	Object.assign(memory.config, origMemoryConfig)
+	memory.io.readRss = origReadRss
 })
 
 test('/send resolves a tab number', async () => {
@@ -111,6 +116,22 @@ test('/usage is an alias for /status', async () => {
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
 	expect(result.output).toBe('alias ok')
+})
+
+
+test('/mem shows current rss and thresholds', async () => {
+	memory.io.readRss = () => 1_234_000_000
+	memory.config.warnBytes = 1_500_000_000
+	memory.config.killBytes = 0
+
+	const result = await commands.executeCommand('/mem', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('Memory:')
+	expect(result.output).toContain('Current: 1.23 GB RSS')
+	expect(result.output).toContain('Warn: 1.50 GB RSS')
+	expect(result.output).toContain('Kill: disabled')
 })
 
 test('/help config shows config caveats and syntax', async () => {

@@ -15,6 +15,7 @@ import { context } from './context.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import { inbox } from './inbox.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { memory } from '../memory.ts'
 
 // ── Types ──
 
@@ -158,6 +159,9 @@ function detailedHelp(topic: string): string | null {
 	if (topic === 'status' || topic === 'usage') {
 		return ['Usage: /status', '', 'Show OpenAI ChatGPT subscription usage for all configured accounts.'].join('\n')
 	}
+	if (topic === 'mem') {
+		return ['Usage: /mem', '', 'Show current RSS memory and the warn/kill thresholds.'].join('\n')
+	}
 	if (topic === 'cd') {
 		return ['Usage: /cd [path]', '', 'With no path, shows the current working directory.'].join('\n')
 	}
@@ -186,6 +190,7 @@ handlers['help'] = (args) => {
 		'  /resume [id]    Resume a closed session',
 		'  /compact        Summarize conversation to reduce context',
 		'  /status         Show ChatGPT subscription usage',
+		'  /mem            Show current memory usage and thresholds',
 		'  /send <tab|id>  Send a message to another tab',
 		'  /broadcast ...  Send a message to every other tab',
 		'  /cd [path]      Change working directory',
@@ -250,6 +255,22 @@ handlers['status'] = async () => {
 // /usage — Claude Code / Codex-style alias for /status
 handlers['usage'] = async (_args, session, emitInfo) => {
 	return handlers['status']!('', session, emitInfo)
+}
+
+// /mem — current RSS + memory thresholds
+handlers['mem'] = () => {
+	function threshold(bytes: number): string {
+		return bytes > 0 ? memory.formatMemory(bytes) : 'disabled'
+	}
+
+	const rss = memory.io.readRss()
+	const lines = [
+		'Memory:',
+		`Current: ${memory.formatMemory(rss)}`,
+		`Warn: ${threshold(memory.config.warnBytes)}`,
+		`Kill: ${threshold(memory.config.killBytes)}`,
+	]
+	return { output: lines.join('\n'), handled: true }
 }
 
 // /resume [id] — list closed sessions or reopen one as a tab
