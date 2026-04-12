@@ -39,7 +39,13 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const result = stdout.trim()
 	if (!result) {
 		// rg returns exit 1 for "no matches" — not an error
-		if (stderr.trim() && proc.exitCode !== 1) return `error: ${stderr.trim()}`
+		const err = stderr.trim()
+		if (err && proc.exitCode !== 1) {
+			// Clean up verbose rg errors like "IO error for operation on /path: No such file or directory (os error 2)"
+			const notFound = err.match(/rg:\s*(.+?):\s*(?:IO error|No such file)/i)
+			if (notFound) return `Error: file not found: ${notFound[1]}`
+			return `error: ${err}`
+		}
 		return 'No matches found.'
 	}
 	// Truncate if over 1MB

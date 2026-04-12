@@ -75,12 +75,14 @@ function userText(entry: HistoryEntry): string {
 	return ''
 }
 
-function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntryCount = 0): Block[] {
+function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntryCount = 0, parentId?: string): Block[] {
 	const result: Block[] = []
 
 	for (let i = 0; i < history.length; i++) {
 		const entry = history[i]!
 		const dimmed = i < parentEntryCount ? true : undefined
+		// Blobs for parent entries live in the parent session's directory
+		const blobOwner = (i < parentEntryCount && parentId) ? parentId : sessionId
 		// ── User message ──
 		if (entry.role === 'user') {
 			const text = userText(entry)
@@ -107,7 +109,7 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 					type: 'thinking',
 					text: entry.thinkingText ?? '',
 					blobId: entry.thinkingBlobId,
-					sessionId,
+					sessionId: blobOwner,
 					ts: parseTs(entry.ts),
 					dimmed,
 				})
@@ -122,7 +124,7 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 						type: 'tool',
 						name: tool.name,
 						blobId: tool.blobId,
-						sessionId,
+						sessionId: blobOwner,
 						ts: parseTs(entry.ts),
 						dimmed,
 					})

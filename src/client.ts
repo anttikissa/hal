@@ -206,7 +206,7 @@ function switchTab(index: number): void {
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
-	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount), tab)
+	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom), tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
@@ -347,7 +347,7 @@ function hasTrailingAssistantText(tab: Tab, text: string): boolean {
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const meta = sessionStore.loadSessionMeta(info.id)
 	// Load history including fork parent entries so forked tabs show full context
-	const { entries: history, parentCount } = sessionStore.loadAllHistoryWithOrigin(info.id)
+	const { entries: history, parentCount, parentId } = sessionStore.loadAllHistoryWithOrigin(info.id)
 	const dirName = (meta?.workingDir ?? info.cwd)?.split('/').pop()
 	const tab = makeTab(
 		info.id,
@@ -368,7 +368,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 		tab.contextUsed = meta.context.used
 		tab.contextMax = meta.context.max
 	}
-	if (meta?.forkedFrom) tab.forkedFrom = meta.forkedFrom
+	tab.forkedFrom = meta?.forkedFrom ?? parentId
 	return tab
 }
 

@@ -261,16 +261,16 @@ function loadAllHistory(sessionId: string): HistoryEntry[] {
 	return loadAllHistoryWithOrigin(sessionId).entries
 }
 
-// Like loadAllHistory but also returns how many entries came from the parent.
-// Used by the client to dim inherited blocks in forked sessions.
-function loadAllHistoryWithOrigin(sessionId: string): { entries: HistoryEntry[]; parentCount: number } {
+// Like loadAllHistory but also returns how many entries came from the parent
+// and the parent's session ID (needed so blob paths resolve correctly).
+function loadAllHistoryWithOrigin(sessionId: string): { entries: HistoryEntry[]; parentCount: number; parentId?: string } {
 	const entries = loadHistory(sessionId)
 	const first = entries[0]
 	if (first?.type !== 'forked_from' || !first.parent) return { entries, parentCount: 0 }
 	const parent = loadAllHistoryWithOrigin(first.parent)
 	const forkTs = first.ts
 	const before = forkTs ? parent.entries.filter((e) => !e.ts || e.ts < forkTs) : parent.entries
-	return { entries: [...before, ...entries.slice(1)], parentCount: before.length }
+	return { entries: [...before, ...entries.slice(1)], parentCount: before.length, parentId: first.parent }
 }
 
 function saveMeta(meta: SessionMeta): void { liveFiles.save(fixMeta(meta, meta.id)) }
