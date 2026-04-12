@@ -1,9 +1,9 @@
 // OpenAI ChatGPT subscription usage via chatgpt.com/backend-api/wham/usage.
 
 import { auth, type Credential } from './auth.ts'
+import { ipc } from './ipc.ts'
 import { STATE_DIR } from './state.ts'
 import { liveFiles } from './utils/live-file.ts'
-import { ipc } from './ipc.ts'
 
 const CACHE_PATH = `${STATE_DIR}/openai-usage.ason`
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -28,13 +28,6 @@ export interface AccountUsage {
 	pendingTokens: number
 }
 
-interface UsageFile {
-	currentKey: string
-	lastActiveAt: string
-	updatedAt: string
-	accounts: Record<string, AccountUsage>
-}
-
 const config = {
 	// Automatic refreshes should be quiet. /status bypasses this floor.
 	minAutoRefreshMs: 60_000,
@@ -45,88 +38,62 @@ const config = {
 	fetchTimeoutMs: 10_000,
 }
 
-function defaultFile(): UsageFile {
-	return {
-		currentKey: '',
-		lastActiveAt: '',
-		updatedAt: '',
-		accounts: {},
-	}
-}
+const state = liveFiles.liveFile(CACHE_PATH, {
+	currentKey: '',
+	lastActiveAt: '',
+	updatedAt: '',
+	accounts: {} as Record<string, AccountUsage>,
+})
 
-const state = liveFiles.liveFile(CACHE_PATH, defaultFile()) as UsageFile
-
-function ensureShape(): void {
+function fix(): void {
 	if (typeof state.currentKey !== 'string') state.currentKey = ''
 	if (typeof state.lastActiveAt !== 'string') state.lastActiveAt = ''
 	if (typeof state.updatedAt !== 'string') state.updatedAt = ''
 	if (!state.accounts || typeof state.accounts !== 'object') state.accounts = {}
-	for (const [key, value] of Object.entries(state.accounts)) {
-		if (!value || typeof value !== 'object') {
+	for (const [key, account] of Object.entries(state.accounts)) {
+		if (!account || typeof account !== 'object') {
 			delete state.accounts[key]
 			continue
 		}
-		if (typeof value.key !== 'string') value.key = key
-		if (typeof value.pendingTokens !== 'number') value.pendingTokens = 0
+		if (typeof account.key !== 'string') account.key = key
+		if (typeof account.pendingTokens !== 'number') account.pendingTokens = 0
 	}
 }
 
-ensureShape()
+fix()
 
 function save(): void {
-	ensureShape()
+	fix()
 	state.updatedAt = new Date().toISOString()
 	liveFiles.save(state)
 }
 
 function onChange(cb: () => void): void {
 	liveFiles.onChange(state, () => {
-		ensureShape()
+		fix()
 		cb()
 	})
 }
 
-function accountKey(credential: Pick<Credential, '_key' | 'index'>): string {
+function keyOf(credential: Pick<Credential, '_key' | 'index'>): string {
 	return credential._key ?? `openai:${credential.index ?? 0}`
 }
 
-function listSubscriptionCredentials(): Credential[] {
+function credentials(): Credential[] {
 	return auth.listCredentials('openai').filter((credential) => credential.type === 'token')
 }
 
-function getAccount(key: string): AccountUsage | null {
-	ensureShape()
-	return state.accounts[key] ?? null
-}
-
-function current(): AccountUsage | null {
-	ensureShape()
-	if (state.currentKey) return state.accounts[state.currentKey] ?? null
-	return null
-}
-
-function all(): AccountUsage[] {
-	ensureShape()
-	return Object.values(state.accounts).sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-}
-
 function parseWindow(raw: any): UsageWindow | undefined {
-	if (!raw || typeof raw !== 'object') return undefined
-	const usedPercent = Number(raw.used_percent)
-	const windowSeconds = Number(raw.limit_window_seconds)
-	const resetAt = Number(raw.reset_at)
-	if (!Number.isFinite(usedPercent) || !Number.isFinite(windowSeconds) || !Number.isFinite(resetAt)) return undefined
-	return {
-		usedPercent,
-		windowMinutes: Math.round(windowSeconds / 60),
-		resetAt,
-	}
+	const usedPercent = Number(raw?.used_percent)
+	const windowSeconds = Number(raw?.limit_window_seconds)
+	const resetAt = Number(raw?.reset_at)
+	if (!Number.isFinite(usedPercent) || !Number.isFinite(windowSeconds) || !Number.isFinite(resetAt)) return
+	return { usedPercent, windowMinutes: Math.round(windowSeconds / 60), resetAt }
 }
 
 function parsePayload(credential: Credential, raw: any): AccountUsage {
-	const key = accountKey(credential)
 	return {
-		key,
+		key: keyOf(credential),
 		email: raw?.email || credential.email,
 		index: credential.index,
 		total: credential.total,
@@ -138,9 +105,19 @@ function parsePayload(credential: Credential, raw: any): AccountUsage {
 	}
 }
 
+function current(): AccountUsage | null {
+	fix()
+	return state.currentKey ? state.accounts[state.currentKey] ?? null : null
+}
+
+function all(): AccountUsage[] {
+	fix()
+	return Object.values(state.accounts).sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+}
+
 function setCurrentCredential(credential: Credential | undefined): void {
 	if (!credential || credential.type !== 'token') return
-	const key = accountKey(credential)
+	const key = keyOf(credential)
 	if (state.currentKey === key) return
 	state.currentKey = key
 	save()
@@ -161,19 +138,7 @@ function formatResetAt(resetAt: number, now = new Date()): string {
 		d.getMonth() === now.getMonth() &&
 		d.getDate() === now.getDate()
 	if (sameDay) return time
-	const date = d.toLocaleDateString([], { day: 'numeric', month: 'short' })
-	return `${time} on ${date}`
-}
-
-function formatAccountLabel(account: AccountUsage): string {
-	if (account.email) return account.email
-	if (account.total && account.index != null) return `account ${account.index + 1}/${account.total}`
-	return account.key
-}
-
-function formatPercent(account: AccountUsage, window: UsageWindow | undefined, label: string): string {
-	if (!window) return `${label} ?`
-	return `${label} ${Math.round(window.usedPercent)}% used (${DIM}resets ${formatResetAt(window.resetAt)}${RESET})`
+	return `${time} on ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`
 }
 
 function formatStatusText(): string {
@@ -181,17 +146,22 @@ function formatStatusText(): string {
 	if (accounts.length === 0) return 'No cached OpenAI subscription usage. Run /status again after logging in with ChatGPT.'
 	const lines = ['OpenAI subscriptions:']
 	for (const account of accounts) {
-		const currentMark = state.currentKey === account.key ? '*' : ' '
-		const head = `${currentMark} ${account.index != null && account.total ? `${account.index + 1}/${account.total}` : '-'} ${formatAccountLabel(account)}`
+		const marker = state.currentKey === account.key ? '*' : ' '
+		const who = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
+		const slot = account.index != null && account.total ? `${account.index + 1}/${account.total}` : '-'
 		const plan = account.planType ? ` (${account.planType})` : ''
-		lines.push(
-			`${head}${plan} · ${formatPercent(account, account.primary, '5h')} · ${formatPercent(account, account.secondary, '7d')}`,
-		)
+		const primary = account.primary
+			? `5h ${Math.round(account.primary.usedPercent)}% used (${DIM}resets ${formatResetAt(account.primary.resetAt)}${RESET})`
+			: '5h ?'
+		const secondary = account.secondary
+			? `7d ${Math.round(account.secondary.usedPercent)}% used (${DIM}resets ${formatResetAt(account.secondary.resetAt)}${RESET})`
+			: '7d ?'
+		lines.push(`${marker} ${slot} ${who}${plan} · ${primary} · ${secondary}`)
 	}
 	return lines.join('\n')
 }
 
-async function fetchAccountUsage(credential: Credential): Promise<AccountUsage> {
+async function fetchUsage(credential: Credential): Promise<AccountUsage> {
 	await auth.ensureFresh('openai')
 	const res = await fetch(USAGE_URL, {
 		headers: { Authorization: `Bearer ${credential.value}` },
@@ -205,33 +175,24 @@ async function fetchAccountUsage(credential: Credential): Promise<AccountUsage> 
 }
 
 async function refreshCredential(credential: Credential, force = false): Promise<AccountUsage> {
-	const key = accountKey(credential)
-	const existing = getAccount(key)
+	const key = keyOf(credential)
+	const existing = state.accounts[key]
 	const lastFetch = existing?.fetchedAt ? Date.parse(existing.fetchedAt) : 0
-	if (!force && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing!
-	const next = await fetchAccountUsage(credential)
-	state.accounts[key] = next
+	if (!force && existing && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing
+	state.accounts[key] = await fetchUsage(credential)
 	if (!state.currentKey) state.currentKey = key
 	save()
-	return next
-}
-
-function findCredentialByKey(key: string): Credential | undefined {
-	return listSubscriptionCredentials().find((credential) => accountKey(credential) === key)
+	return state.accounts[key]!
 }
 
 async function refreshAll(force = false): Promise<AccountUsage[]> {
-	const credentials = listSubscriptionCredentials()
-	if (credentials.length === 0) return []
-	for (const credential of credentials) {
-		await refreshCredential(credential, force)
-	}
+	for (const credential of credentials()) await refreshCredential(credential, force)
 	return all()
 }
 
 function recordUsage(credential: Credential | undefined, usage: { input: number; output: number } | undefined): void {
 	if (!credential || credential.type !== 'token' || !usage) return
-	const key = accountKey(credential)
+	const key = keyOf(credential)
 	const account = state.accounts[key] ?? {
 		key,
 		email: credential.email,
@@ -245,32 +206,19 @@ function recordUsage(credential: Credential | undefined, usage: { input: number;
 	void maybeRefreshCurrent()
 }
 
-function shouldRefreshByActivity(account: AccountUsage | null, now: number): boolean {
-	if (!account?.fetchedAt) return true
-	const lastFetch = Date.parse(account.fetchedAt)
-	if (!Number.isFinite(lastFetch)) return true
-	const lastActive = state.lastActiveAt ? Date.parse(state.lastActiveAt) : 0
-	if (!lastActive || now - lastActive > config.activeWindowMs) return false
-	return now - lastFetch >= config.activeRefreshMs
-}
-
-function shouldRefreshByTokens(account: AccountUsage | null, now: number): boolean {
-	if (!account || account.pendingTokens < config.tokenRefreshThreshold) return false
-	const lastFetch = account.fetchedAt ? Date.parse(account.fetchedAt) : 0
-	if (!lastFetch) return true
-	return now - lastFetch >= config.minAutoRefreshMs
-}
-
 async function maybeRefreshCurrent(): Promise<void> {
-	if (!ipc.ownsHostLock()) return
-	ensureShape()
-	const key = state.currentKey
-	if (!key) return
-	const credential = findCredentialByKey(key)
+	if (!ipc.ownsHostLock() || !state.currentKey) return
+	const credential = credentials().find((item) => keyOf(item) === state.currentKey)
 	if (!credential) return
-	const account = getAccount(key)
+	const account = state.accounts[state.currentKey] ?? null
 	const now = Date.now()
-	if (!shouldRefreshByTokens(account, now) && !shouldRefreshByActivity(account, now)) return
+	const lastFetch = account?.fetchedAt ? Date.parse(account.fetchedAt) : 0
+	const lastActive = state.lastActiveAt ? Date.parse(state.lastActiveAt) : 0
+	const byTokens = !!account && account.pendingTokens >= config.tokenRefreshThreshold && (!lastFetch || now - lastFetch >= config.minAutoRefreshMs)
+	const byActivity = !account?.fetchedAt || !Number.isFinite(lastFetch)
+		? true
+		: !!lastActive && now - lastActive <= config.activeWindowMs && now - lastFetch >= config.activeRefreshMs
+	if (!byTokens && !byActivity) return
 	try {
 		await refreshCredential(credential)
 	} catch {}
@@ -280,35 +228,27 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 function start(signal?: AbortSignal): void {
 	if (timer) return
-	const currentCredential = auth.getCredential('openai')
-	if (currentCredential?.type === 'token') setCurrentCredential(currentCredential)
+	const credential = auth.getCredential('openai')
+	if (credential?.type === 'token') setCurrentCredential(credential)
 	timer = setInterval(() => {
 		void maybeRefreshCurrent()
 	}, config.minAutoRefreshMs)
 	void maybeRefreshCurrent()
-	if (signal) {
-		signal.addEventListener(
-			'abort',
-			() => {
-				if (timer) clearInterval(timer)
-				timer = null
-			},
-			{ once: true },
-		)
-	}
+	signal?.addEventListener('abort', () => {
+		if (!timer) return
+		clearInterval(timer)
+		timer = null
+	}, { once: true })
 }
 
 async function renderStatus(force = true): Promise<string> {
-	const credentials = listSubscriptionCredentials()
-	if (credentials.length === 0) return 'No OpenAI ChatGPT subscriptions configured.'
+	if (credentials().length === 0) return 'No OpenAI ChatGPT subscriptions configured.'
 	try {
 		await refreshAll(force)
 		return formatStatusText()
 	} catch (err: any) {
-		const cached = formatStatusText()
 		const suffix = err?.message ? String(err.message) : String(err)
-		if (all().length > 0) return `${cached}\n\nRefresh failed: ${suffix}`
-		return `OpenAI subscription usage unavailable: ${suffix}`
+		return all().length > 0 ? `${formatStatusText()}\n\nRefresh failed: ${suffix}` : `OpenAI subscription usage unavailable: ${suffix}`
 	}
 }
 
