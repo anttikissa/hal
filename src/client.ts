@@ -85,7 +85,7 @@ const state = {
 	activity: new Map<string, string>(),
 }
 
-let pendingEntries: Array<{ text: string; type: 'info' | 'error' }> = []
+let pendingEntries: Array<{ text: string; type: 'info' | 'warning' | 'error' }> = []
 let onChange: (force: boolean) => void = () => {}
 
 function flushPendingEntries(): void {
@@ -723,7 +723,7 @@ function addBlockToTab(sessionId: string | null, block: Block): void {
 	onChange(false)
 }
 
-function addEntry(text: string, type: 'info' | 'error' = 'info'): void {
+function addEntry(text: string, type: 'info' | 'warning' | 'error' = 'info'): void {
 	const tab = currentTab()
 	if (!tab) {
 		pendingEntries.push({ text, type })

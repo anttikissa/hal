@@ -53,6 +53,12 @@
 		bg: [0.20, 0, 0]
 	}
 
+	// Warnings — amber, noticeable but not fatal
+	warning: {
+		fg: [0.78, 0.14, 85]
+		bg: [0.28, 0.05, 85]
+	}
+
 	// Errors — hot red
 	error: {
 		fg: [0.70, 0.20, 25]

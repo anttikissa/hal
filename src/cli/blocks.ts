@@ -40,9 +40,10 @@ export type Block =
 			dimmed?: boolean
 	  }
 	| { type: 'info'; text: string; ts?: number; dimmed?: boolean }
+	| { type: 'warning'; text: string; ts?: number; dimmed?: boolean }
 	| { type: 'error'; text: string; ts?: number; dimmed?: boolean }
 
-type NoticeBlock = { type: 'info' | 'error'; text: string; ts?: number }
+type NoticeBlock = { type: 'info' | 'warning' | 'error'; text: string; ts?: number }
 
 // ── History → Blocks ─────────────────────────────────────────────────────────
 //
@@ -455,6 +456,8 @@ function blockColors(block: Block): { fg: string; bg: string } {
 			return colors.tool(block.name)
 		case 'info':
 			return colors.info
+		case 'warning':
+			return colors.warning
 		case 'error':
 			return colors.error
 	}
@@ -494,6 +497,8 @@ function blockLabel(block: Block): string {
 			return toolTitle(block.name, block.input)
 		case 'info':
 			return 'Info'
+		case 'warning':
+			return 'Warning'
 		case 'error':
 			return 'Error'
 	}

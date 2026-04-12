@@ -86,7 +86,7 @@ function infoGroupKey(block: Block): string | null {
 function renderGroup(group: Block[], cols: number): string[] {
 	const lines = group.length === 1
 		? renderEntry(group[0]!, cols)
-		: blockRenderer.renderBlockGroup(group as Array<{ type: 'info' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
+		: blockRenderer.renderBlockGroup(group as Array<{ type: 'info' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
 	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
 	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 }
@@ -136,12 +136,14 @@ const MAX_TABS = 40
 // Each tab gets a 1-char-wide status indicator (all visLen === 1):
 //   ▪  busy (blinking: bright on even phases, dim on odd)
 //   ✗  ended with error (red, blinking)
+//   !  ended with warning (yellow)
 //   !  interrupted/paused (blinking)
 //   ✓  generation done, user hasn't looked at this tab yet (green)
 //      (space) idle, nothing notable
 
 const GREEN = '\x1b[32m'
 const RED = '\x1b[31m'
+const YELLOW = '\x1b[33m'
 const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
@@ -160,6 +162,7 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 		const b = tab.history[i]!
 		// Skip trailing info blocks that aren't status-relevant.
 		if (b.type === 'info' && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
+		if (b.type === 'warning') return { char: '!', color: YELLOW, blinks: false }
 		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
 		if (b.type === 'info' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
 			return { char: '!', color: '', blinks: true }

@@ -39,7 +39,10 @@ describe('memory', () => {
 		expect(entries).toHaveLength(0)
 		memory.tick(1_500_000_000)
 		expect(entries).toHaveLength(1)
-		expect(entries[0]?.text).toContain('Memory high: 1.50 GB RSS')
+		expect(entries[0]).toMatchObject({
+			text: 'Memory high: 1.50 GB RSS',
+			type: 'warning',
+		})
 		memory.tick(1_600_000_000)
 		expect(entries).toHaveLength(1)
 	})

@@ -18,7 +18,7 @@ const state = {
 
 const io = {
 	readRss: (): number => process.memoryUsage().rss,
-	addEntry: (text: string, type: 'info' | 'error' = 'info'): void => {
+	addEntry: (text: string, type: 'info' | 'warning' | 'error' = 'info'): void => {
 		client.addEntry(text, type)
 	},
 	scheduleExit: (delayMs: number): void => {
@@ -38,7 +38,7 @@ function reset(): void {
 function tick(rss = io.readRss()): void {
 	if (config.warnBytes > 0 && rss >= config.warnBytes && !state.warnedHighMemory) {
 		state.warnedHighMemory = true
-		io.addEntry(`Memory high: ${formatMemory(rss)}`)
+		io.addEntry(`Memory high: ${formatMemory(rss)}`, 'warning')
 	}
 
 	if (config.limitBytes <= 0 || rss < config.limitBytes || state.exitingForMemory) return

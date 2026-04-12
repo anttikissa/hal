@@ -42,3 +42,18 @@ test('thinking block renders markdown and trims trailing blank lines', () => {
 	const lastContentLine = clean[clean.length - 1]!
 	expect(lastContentLine.trim()).not.toBe('')
 })
+
+
+test('warning block renders a Warning header', () => {
+	const block: Block = {
+		type: 'warning',
+		text: 'Memory high: 1.60 GB RSS',
+		ts: new Date('2026-01-01T17:38:00Z').getTime(),
+	}
+
+	const lines = blocks.renderBlock(block, 80)
+	const header = stripAnsi(lines[0] ?? '')
+
+	expect(header).toContain('Warning')
+	expect(header).not.toContain('Info')
+})

@@ -23,6 +23,7 @@ const user: BlockColors = { fg: '', bg: '' }
 const input = { fg: '', bg: '', cursor: '' }
 const system: BlockColors = { fg: '', bg: '' }
 const info = { fg: '', bg: '' }
+const warning: BlockColors = { fg: '', bg: '' }
 const error: BlockColors = { fg: '', bg: '' }
 const popup = { current: { fg: '', bg: '' } }
 
@@ -87,6 +88,7 @@ function load(): void {
 	resolveBlock(raw.popup?.current, popup.current)
 
 	resolveBlock(raw.info, info)
+	resolveBlock(raw.warning ?? raw.info, warning)
 
 	if (raw.input) {
 		if (raw.input.fg) input.fg = fg(raw.input.fg, vars)
@@ -130,6 +132,7 @@ export const colors = {
 	input,
 	system,
 	info,
+	warning,
 	error,
 	popup,
 	tool,
