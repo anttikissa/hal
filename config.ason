@@ -15,4 +15,10 @@
 	agentLoop: {
 		maxIterations: 50
 	}
+	memory: {
+		// Warn when RSS reaches this many bytes. Dev knob.
+		warnBytes: 1500000000
+		// Kill the process when RSS reaches this many bytes. Dev knob.
+		killBytes: 2000000000
+	}
 }

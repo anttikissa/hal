@@ -6,7 +6,7 @@ import { client } from './client.ts'
 
 const config = {
 	warnBytes: 1_500_000_000,
-	limitBytes: 2_000_000_000,
+	killBytes: 2_000_000_000,
 	checkIntervalMs: 1_000,
 	exitDelayMs: 500,
 }
@@ -41,7 +41,7 @@ function tick(rss = io.readRss()): void {
 		io.addEntry(`Memory high: ${formatMemory(rss)}`, 'warning')
 	}
 
-	if (config.limitBytes <= 0 || rss < config.limitBytes || state.exitingForMemory) return
+	if (config.killBytes <= 0 || rss < config.killBytes || state.exitingForMemory) return
 	state.exitingForMemory = true
 	io.addEntry(`Memory limit exceeded: ${formatMemory(rss)}. Quitting.`, 'error')
 	io.scheduleExit(config.exitDelayMs)
