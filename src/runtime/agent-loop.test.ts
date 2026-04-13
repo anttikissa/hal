@@ -51,7 +51,7 @@ test('writes thinking blobs while streaming and replays them into API history', 
 			messages: [],
 		})
 		const thinkingEvent = events.find((event) => event.type === 'stream-delta' && event.channel === 'thinking')
-		const assistantMessages = apiMessages.toAnthropicMessages(sessionId)
+		const assistantMessages = apiMessages.toProviderMessages(sessionId)
 		const assistant = assistantMessages.find((message) => message.role === 'assistant')!
 		expect(Array.isArray(assistant.content)).toBe(true)
 		expect(assistant.content).toEqual([
@@ -99,5 +99,48 @@ test('provider status updates busy activity', async () => {
 		expect(statuses.at(-1)).toEqual({ busy: false, activity: undefined })
 	} finally {
 		providerLoader.getProvider = origGetProvider
+	}
+})
+
+
+test('abort between tool iterations does not report max iterations', async () => {
+	const sessionId = `test-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const ac = new AbortController()
+	let sawToolRun = false
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'tool_call', id: 'tool-1', name: 'read', input: { path: 'src/runtime/agent-loop.test.ts', start: 1, end: 1 } }
+			yield { type: 'done', usage: { input: 1, output: 1 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+			signal: ac.signal,
+			onStatus: async (_busy, activity) => {
+				if (activity?.startsWith('running ')) sawToolRun = true
+				if (activity === 'generating...' && sawToolRun) ac.abort()
+			},
+		})
+		expect(events.some((event) => event.type === 'info' && event.text === 'Hit max iterations (50). Stopping.')).toBe(false)
+		expect(events.some((event) => event.type === 'info' && event.text === '[paused]')).toBe(true)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
 	}
 })

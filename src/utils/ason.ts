@@ -1,4 +1,8 @@
 // ASON — A Saner Object Notation
+// Goal: be as JavaScript-compatible as practical while staying easy to read
+// and stream. That means JS-like numbers (`.5`, `1e10`, `Infinity`,
+// `undefined`), JS-like strings (single, double, backtick), and JS-like
+// commas: separators are required, trailing commas are allowed.
 // See docs/ason.md — keep it in sync when changing this file.
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
@@ -125,25 +129,25 @@ function fail(ctx: Ctx, msg: string): never {
 	throw new ParseError(`${msg} at ${line}:${col}:\n    ${lineText}\n    ${pad}^`, ctx.pos)
 }
 
-function isIdent(ch: string): boolean {
-	return /[a-zA-Z0-9_$]/.test(ch)
+function isIdent(c: string): boolean {
+	return /[a-zA-Z0-9_$]/.test(c)
 }
 
 function skipWhite(ctx: Ctx): string {
 	let collected = ''
 	let newlines = 0
 	while (ctx.pos < ctx.buf.length) {
-		const ch = peek(ctx)
-		if (ch === '\n') {
+		const c = peek(ctx)
+		if (c === '\n') {
 			ctx.pos++
 			newlines++
 			continue
 		}
-		if (ch === ' ' || ch === '\t' || ch === '\r') {
+		if (c === ' ' || c === '\t' || c === '\r') {
 			ctx.pos++
 			continue
 		}
-		if (ch === '/' && peek2(ctx) === '/') {
+		if (c === '/' && peek2(ctx) === '/') {
 			const start = ctx.pos
 			ctx.pos += 2
 			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n') ctx.pos++
@@ -155,7 +159,7 @@ function skipWhite(ctx: Ctx): string {
 			newlines = 0
 			continue
 		}
-		if (ch === '/' && peek2(ctx) === '*') {
+		if (c === '/' && peek2(ctx) === '*') {
 			const start = ctx.pos
 			ctx.pos += 2
 			while (ctx.pos < ctx.buf.length) {
@@ -185,13 +189,19 @@ function peek2(ctx: Ctx): string {
 	return ctx.buf[ctx.pos + 1] ?? ''
 }
 
-function eat(ctx: Ctx, ch: string): void {
-	if (peek(ctx) !== ch) fail(ctx, `Expected '${ch}', got '${peek(ctx) || 'EOF'}'`)
+// If the next character is 'c', eat it and return true; if it isn't, return false or throw ParseError
+// if `required` is true.
+function eat(ctx: Ctx, c: string, required = false): boolean {
+	if (peek(ctx) !== c) {
+		if (required) fail(ctx, `Expected '${c}', got '${peek(ctx) || 'EOF'}'`)
+		return false
+	}
 	ctx.pos++
+	return true
 }
 
 function eatWord(ctx: Ctx, word: string): void {
-	for (const c of word) eat(ctx, c)
+	for (const c of word) eat(ctx, c, true)
 	if (isIdent(peek(ctx))) fail(ctx, `Unexpected character after '${word}'`)
 }
 
@@ -263,7 +273,7 @@ function parseString(ctx: Ctx, quote: string): string {
 	fail(ctx, 'Unterminated string')
 }
 
-const NUM_RE = /-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/y
+const NUM_RE = /-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/y
 
 function parseNumber(ctx: Ctx): number {
 	NUM_RE.lastIndex = ctx.pos
@@ -275,8 +285,8 @@ function parseNumber(ctx: Ctx): number {
 
 function parseKey(ctx: Ctx): string {
 	skipWhite(ctx)
-	const ch = peek(ctx)
-	if (ch === "'" || ch === '"') return parseString(ctx, ch)
+	const c = peek(ctx)
+	if (c === "'" || c === '"') return parseString(ctx, c)
 	const start = ctx.pos
 	while (isIdent(peek(ctx))) ctx.pos++
 	if (ctx.pos === start) fail(ctx, 'Expected object key')
@@ -289,20 +299,18 @@ function parseObject(ctx: Ctx): AsonObject {
 	let commentMap: Record<string, string> | undefined
 	while (true) {
 		const comment = skipWhite(ctx)
-		if (peek(ctx) === '}') {
-			ctx.pos++
-			break
-		}
+		if (eat(ctx, '}')) break
 		const key = parseKey(ctx)
 		if (comment) {
 			commentMap ??= {}
 			commentMap[key] = comment
 		}
 		skipWhite(ctx)
-		eat(ctx, ':')
+		eat(ctx, ':', true)
 		obj[key] = parseAny(ctx)
 		skipWhite(ctx)
-		if (peek(ctx) === ',') ctx.pos++
+		if (eat(ctx, '}')) break
+		if (!eat(ctx, ',')) fail(ctx, "Expected ',' or '}'")
 	}
 	if (commentMap) obj[COMMENTS] = commentMap
 	return obj
@@ -314,17 +322,15 @@ function parseArray(ctx: Ctx): AsonArray {
 	let commentArr: (string | undefined)[] | undefined
 	while (true) {
 		const comment = skipWhite(ctx)
-		if (peek(ctx) === ']') {
-			ctx.pos++
-			break
-		}
+		if (eat(ctx, ']')) break
 		if (comment) {
 			commentArr ??= []
 			commentArr[arr.length] = comment
 		}
 		arr.push(parseAny(ctx))
 		skipWhite(ctx)
-		if (peek(ctx) === ',') ctx.pos++
+		if (eat(ctx, ']')) break
+		if (!eat(ctx, ',')) fail(ctx, "Expected ',' or ']'")
 	}
 	if (commentArr) arr[COMMENTS] = commentArr
 	return arr
@@ -332,39 +338,39 @@ function parseArray(ctx: Ctx): AsonArray {
 
 function parseAny(ctx: Ctx): AsonValue {
 	skipWhite(ctx)
-	const ch = peek(ctx)
-	if (ch === '{') return parseObject(ctx)
-	if (ch === '[') return parseArray(ctx)
-	if (ch === "'" || ch === '"' || ch === '`') return parseString(ctx, ch)
-	if (ch === '-') {
+	const c = peek(ctx)
+	if (c === '{') return parseObject(ctx)
+	if (c === '[') return parseArray(ctx)
+	if (c === "'" || c === '"' || c === '`') return parseString(ctx, c)
+	if (c === '-') {
 		if (peek2(ctx) === 'I') {
 			eatWord(ctx, '-Infinity')
 			return -Infinity
 		}
 		return parseNumber(ctx)
 	}
-	if (/[0-9]/.test(ch)) return parseNumber(ctx)
-	if (ch === 't') {
+	if (/[0-9.]/.test(c)) return parseNumber(ctx)
+	if (c === 't') {
 		eatWord(ctx, 'true')
 		return true
 	}
-	if (ch === 'f') {
+	if (c === 'f') {
 		eatWord(ctx, 'false')
 		return false
 	}
-	if (ch === 'n') {
+	if (c === 'n') {
 		eatWord(ctx, 'null')
 		return null
 	}
-	if (ch === 'u') {
+	if (c === 'u') {
 		eatWord(ctx, 'undefined')
 		return undefined
 	}
-	if (ch === 'N') {
+	if (c === 'N') {
 		eatWord(ctx, 'NaN')
 		return NaN
 	}
-	if (ch === 'I') {
+	if (c === 'I') {
 		eatWord(ctx, 'Infinity')
 		return Infinity
 	}

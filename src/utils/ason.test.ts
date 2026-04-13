@@ -153,7 +153,8 @@ describe('parse', () => {
 		test('negative integer', () => expect(parse('-1')).toBe(-1))
 		test('float', () => expect(parse('3.14')).toBe(3.14))
 		test('negative float', () => expect(parse('-3.14')).toBe(-3.14))
-		test('invalid: leading decimal', () => expect(() => parse('-.5')).toThrow())
+		test('leading decimal', () => expect(parse('.5')).toBe(0.5))
+		test('negative leading decimal', () => expect(parse('-.5')).toBe(-0.5))
 		test('invalid: trailing dot', () => expect(() => parse('1.')).toThrow())
 
 		test('scientific notation', () => expect(parse('1e10')).toBe(1e10))
@@ -197,6 +198,7 @@ describe('parse', () => {
 		test('quoted keys', () => expect(parse("{ '*': 123 }")).toEqual({ '*': 123 }))
 		test('multiple keys', () => expect(parse('{ a: 1, b: 2 }')).toEqual({ a: 1, b: 2 }))
 		test('nested object', () => expect(parse('{ a: { b: 1 } }')).toEqual({ a: { b: 1 } }))
+		test('missing comma is invalid', () => expect(() => parse('{ a: 1 b: 2 }')).toThrow(/Expected ',' or '}'/))
 		test('trailing comma', () => expect(parse('{ a: 1, b: 2, }')).toEqual({ a: 1, b: 2 }))
 	})
 
@@ -209,6 +211,7 @@ describe('parse', () => {
 				[1, 2],
 				[3, 4],
 			]))
+		test('missing comma is invalid', () => expect(() => parse('[1 2]')).toThrow(/Expected ',' or ']'/))
 		test('trailing comma', () => expect(parse('[1, 2, 3,]')).toEqual([1, 2, 3]))
 	})
 

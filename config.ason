@@ -1,24 +1,12 @@
-// Module config overrides. Keys map to module names.
-// Values are Object.assign'd onto module.config.
 {
-	client: {
-		backgroundLoadTabs: true
-		backgroundLoadBlobs: true
-		repaintAfterBlobLoad: true
-	}
-	blocks: {
-		blobBatchSize: 64
-	}
-	render: {
-		forkHistoryDimFactor: .82
-	}
-	agentLoop: {
-		maxIterations: 50
-	}
-	memory: {
-		// Warn when RSS reaches this many bytes. Dev knob.
-		warnBytes: 1500000000
-		// Kill the process when RSS reaches this many bytes. Dev knob.
-		killBytes: 2000000000
-	}
+  client: {
+    backgroundLoadTabs: true,
+    backgroundLoadBlobs: true,
+    repaintAfterBlobLoad: true
+  },
+  blocks: { blobBatchSize: 64 },
+  render: { forkHistoryDimFactor: 0.82 },
+  agentLoop: { maxIterations: 50 },
+  memory: { warnBytes: 1500000000, killBytes: 5000000000 },
+  models: { defaultModel: 'gpt' }
 }

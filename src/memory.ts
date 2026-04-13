@@ -36,12 +36,14 @@ function reset(): void {
 }
 
 function tick(rss = io.readRss()): void {
+
 	if (config.warnBytes > 0 && rss >= config.warnBytes && !state.warnedHighMemory) {
 		state.warnedHighMemory = true
 		io.addEntry(`Memory high: ${formatMemory(rss)}`, 'warning')
 	}
 
 	if (config.killBytes <= 0 || rss < config.killBytes || state.exitingForMemory) return
+
 	state.exitingForMemory = true
 	io.addEntry(`Memory limit exceeded: ${formatMemory(rss)}. Quitting.`, 'error')
 	io.scheduleExit(config.exitDelayMs)

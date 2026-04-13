@@ -250,6 +250,20 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		let retryAttempt = 0
 		let retryStartedAt = 0
 
+		async function finishAborted(): Promise<void> {
+			emitInfo(sessionId, '[paused]')
+			const est = context.estimateContext(messages, model, overheadBytes)
+			emitEvent(sessionId, {
+				type: 'stream-end',
+				phase: 'done',
+				usage: totalUsage.input > 0 ? totalUsage : undefined,
+				contextUsed: est.used,
+				contextMax: est.max,
+			})
+			// Persist context so it survives restarts.
+			void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+		}
+
 		// Outer loop: each iteration is one generate call.
 		// We loop when the model returns tool_use blocks.
 		for (let iteration = 0; iteration < config.maxIterations; iteration++) {
@@ -414,19 +428,9 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				}
 			}
 
-			// If aborted, emit partial output and exit
+			// If aborted, emit partial output and exit.
 			if (aborted) {
-				emitInfo(sessionId, '[paused]')
-				const est = context.estimateContext(messages, model, overheadBytes)
-				emitEvent(sessionId, {
-					type: 'stream-end',
-					phase: 'done',
-					usage: totalUsage.input > 0 ? totalUsage : undefined,
-					contextUsed: est.used,
-					contextMax: est.max,
-				})
-				// Persist context so it survives restarts
-				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+				await finishAborted()
 				return
 			}
 
@@ -560,6 +564,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			await ctx.onStatus?.(true, 'generating...')
 
 			// Continue to next iteration (re-invoke the model with tool results)
+		}
+
+		if (loopSignal.aborted) {
+			await finishAborted()
+			return
 		}
 
 		// If we exhausted maxIterations, inform the user

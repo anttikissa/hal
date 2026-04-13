@@ -155,7 +155,7 @@ function analyzeSession(sessionId: string, opts: Options): Record<string, Strate
 	for (let i = 0; i < entries.length; i++) {
 		const entry = entries[i]!
 		if (entry.role !== 'user' && entry.role !== 'tool_result') continue
-		const base = apiMessages.toAnthropicMessages(sessionId, entries.slice(0, i + 1), { prune: false })
+		const base = apiMessages.toProviderMessages(sessionId, entries.slice(0, i + 1), { prune: false })
 		const variants: Record<string, Message[]> = {
 			keep_all: base,
 			rolling_prune: pruneWithOffset(cloneMessages(base), opts.heavyThreshold, opts.thinkingThreshold, 0),

@@ -174,7 +174,7 @@ function requestSnapshots(sessionId: string): Message[][] {
 	for (let i = 0; i < entries.length; i++) {
 		const entry = entries[i]!
 		if (entry.role !== 'user' && entry.role !== 'tool_result') continue
-		out.push(apiMessages.toAnthropicMessages(sessionId, entries.slice(0, i + 1), { prune: false }))
+		out.push(apiMessages.toProviderMessages(sessionId, entries.slice(0, i + 1), { prune: false }))
 	}
 	return out
 }

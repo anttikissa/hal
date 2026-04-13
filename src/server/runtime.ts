@@ -424,6 +424,12 @@ function startRuntime(signal: AbortSignal): void {
 		if (!signal.aborted && activeRuntimePid === process.pid) broadcastSessions()
 	}
 
+	restartPromptWatch()
+	signal.addEventListener('abort', () => {
+		stopPromptWatch?.()
+		stopPromptWatch = null
+	}, { once: true })
+
 	ipc.updateState((state) => {
 		state.busy = {}
 		state.activity = {}

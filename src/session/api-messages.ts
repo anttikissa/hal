@@ -1,9 +1,8 @@
 // Convert stored history entries into API-ready message arrays.
 //
 // History entries use a compact on-disk format with blob references for large
-// content. This module expands them into the format providers expect:
-// - Anthropic: content block arrays with type: text/tool_use/tool_result/image/thinking
-// - OpenAI: messages with role/content/tool_calls (not yet implemented, placeholder)
+// content. This module expands them into the provider-neutral Message[] format
+// used internally before each provider converts it to its own wire shape.
 //
 // Also handles context pruning: stripping old tool results, images, and thinking
 // blocks to keep the context window manageable.
@@ -64,9 +63,9 @@ function findReplayStart(entries: HistoryEntry[]): number {
 
 // ── Main conversion ──
 
-// Convert session history to Anthropic API message format.
+// Convert session history to the provider-neutral message format.
 // Loads blobs for tool calls, handles images, manages injected info entries.
-function toAnthropicMessages(sessionId: string, allEntries?: HistoryEntry[], opts?: { prune?: boolean }): Message[] {
+function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts?: { prune?: boolean }): Message[] {
 	const entries = allEntries ?? sessions.loadAllHistory(sessionId)
 	const start = findReplayStart(entries)
 	const sliced = entries.slice(start)
@@ -336,7 +335,7 @@ function pruneMessages(msgs: Message[]): Message[] {
 
 export const apiMessages = {
 	config: apiConfig,
-	toAnthropicMessages,
+	toProviderMessages,
 	pruneMessages,
 	applyModelEvent,
 	findReplayStart,
