@@ -46,3 +46,13 @@ test('raw mode coalesces tokens and exits on escape', () => {
 	expect(sink.lines.at(-1)).toBe('Raw input mode off.')
 	expect(cli.rawModeForTests.active()).toBe(false)
 })
+
+
+test('raw mode exits on kitty CSI-u escape too', () => {
+	const sink = makeRawSink()
+	cli.rawModeForTests.reset()
+	cli.rawModeForTests.start(sink.emit)
+	expect(cli.rawModeForTests.handle('\x1b[27;1u', sink.emit)).toBe(true)
+	expect(sink.lines.at(-1)).toBe('Raw input mode off.')
+	expect(cli.rawModeForTests.active()).toBe(false)
+})

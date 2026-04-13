@@ -58,8 +58,43 @@ function restoreDefaultTabStops(cols: number): void {
 	process.stdout.write(seq)
 }
 
+// ── Paint throttle ───────────────────────────────────────────────────────────
+// During streaming, every token fires onChange → draw(). Without throttling,
+// this saturates the event loop with synchronous frame builds and stdout
+// writes, starving stdin — keypresses don't register while the assistant
+// is typing. Fix: coalesce non-force draws into at most one per PAINT_INTERVAL.
+// Force draws (tab switch, resize, Ctrl-L) always execute immediately.
+const PAINT_INTERVAL = 16 // ms — ~60 fps, plenty for streaming text
+let paintTimer: ReturnType<typeof setTimeout> | null = null
+let paintQueued = false
+
 function draw(force = false): void {
-	render.draw(force)
+	if (force) {
+		// Force paints are user-triggered — execute immediately.
+		// Cancel any pending throttled paint so we don't double-draw.
+		if (paintTimer) {
+			clearTimeout(paintTimer)
+			paintTimer = null
+		}
+		paintQueued = false
+		render.draw(true)
+		return
+	}
+	// Non-force: coalesce. If a timer is already ticking, just note that
+	// another paint was requested. The timer callback will pick it up.
+	if (paintTimer) {
+		paintQueued = true
+		return
+	}
+	// No timer running — paint now, then start the cooldown.
+	render.draw(false)
+	paintTimer = setTimeout(() => {
+		paintTimer = null
+		if (paintQueued) {
+			paintQueued = false
+			render.draw(false)
+		}
+	}, PAINT_INTERVAL)
 }
 
 function exitCli(code: number): void {
@@ -177,7 +212,8 @@ function stopRawMode(emit = (text: string) => client.addEntry(text)): void {
 function handleRawInput(data: string, emit = (text: string) => client.addEntry(text)): boolean {
 	if (!rawState.active) return false
 	for (const token of keys.splitKeys(data)) {
-		if (token === '\x1b') {
+		const key = keys.parseKey(token)
+		if (key?.key === 'escape' && !key.alt && !key.ctrl && !key.cmd) {
 			stopRawMode(emit)
 			continue
 		}
