@@ -258,6 +258,14 @@ function applyLiveEvent(sessionId: string, event: any): void {
 			})
 			return
 		}
+		if (event.type === 'tool-result') {
+			const toolBlock = live.blocks.findLast((block: any) => block?.type === 'tool' && block.toolId === event.toolId)
+			if (toolBlock) {
+				toolBlock.output = event.output
+				if (event.blobId) toolBlock.blobId = event.blobId
+			}
+			return
+		}
 		if (event.type === 'info' && event.text) {
 			closeStreamingBlock(live)
 			live.blocks.push({ type: event.level === 'error' ? 'error' : 'info', text: event.text, ts })

@@ -592,8 +592,19 @@ function handleEvent(event: any): void {
 			if (toolBlock) {
 				toolBlock.output = event.output
 				if (event.blobId) toolBlock.blobId = event.blobId
+				delete toolBlock.blobLoaded
 				touchTab(tab)
 				onChange(false)
+				// IPC tool-result events only carry a truncated preview. Reload the
+				// tool's blob in the background so edit/read blocks show full output.
+				if (toolBlock.blobId) {
+					void (async () => {
+						const loaded = await blockModule.loadBlobs([toolBlock])
+						if (loaded <= 0) return
+						touchTab(tab)
+						onChange(false)
+					})()
+				}
 			}
 		}
 	} else if (event.type === 'draft_saved' && event.sessionId) {

@@ -120,6 +120,33 @@ test('live snapshot links assistant chunks across info interruptions', async () 
 	expect((live.blocks[2] as any).continue).toBe((live.blocks[0] as any).id)
 })
 
+
+test('live snapshot stores tool results on existing tool blocks', async () => {
+	const id = await makeSession()
+	sessions.applyLiveEvent(id, {
+		type: 'tool-call',
+		sessionId: id,
+		toolId: 'tool-1',
+		name: 'edit',
+		input: { path: 'notes.txt' },
+		blobId: '000001-abc',
+		createdAt: '2026-04-09T20:01:00.000Z',
+	})
+	sessions.applyLiveEvent(id, {
+		type: 'tool-result',
+		sessionId: id,
+		toolId: 'tool-1',
+		blobId: '000001-abc',
+		output: 'preview only',
+		createdAt: '2026-04-09T20:01:01.000Z',
+	})
+
+	const live = sessions.loadLive(id)
+	expect(live.blocks).toMatchObject([
+		{ type: 'tool', toolId: 'tool-1', name: 'edit', blobId: '000001-abc', output: 'preview only' },
+	])
+})
+
 test('rotateLog switches new writes to history2.asonl', async () => {
 	const id = await makeSession()
 	await sessions.appendHistory(id, [userEntry('old', new Date().toISOString())])

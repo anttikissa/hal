@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { client } from './client.ts'
-
+import { blocks as blockModule } from './cli/blocks.ts'
 function makeTab() {
 	return {
 		sessionId: 's1',
@@ -149,3 +149,48 @@ describe('client streaming blocks', () => {
 		expect((tab.history[0] as any).id).toEqual(expect.any(String))
 		expect((tab.history[2] as any).continue).toBe((tab.history[0] as any).id)
 	})
+
+
+test('tool-result reloads full blob output for edit blocks', async () => {
+	client.state.tabs.length = 0
+	client.state.tabs.push(makeTab())
+	client.state.activeTab = 0
+	const originalLoadBlobs = blockModule.loadBlobs
+	blockModule.loadBlobs = async (items) => {
+		const tool = items[0] as any
+		tool.output = `--- before\n2:old old line\n\n+++ after\n2:new new line`
+		tool.blobLoaded = true
+		return 1
+	}
+	try {
+		client.handleEvent({
+			type: 'tool-call',
+			sessionId: 's1',
+			toolId: 'tool-1',
+			name: 'edit',
+			input: { path: 'notes.txt' },
+			blobId: '000002-def',
+			createdAt: '2026-04-05T17:31:01.000Z',
+		})
+		client.handleEvent({
+			type: 'tool-result',
+			sessionId: 's1',
+			toolId: 'tool-1',
+			blobId: '000002-def',
+			output: 'preview only',
+			createdAt: '2026-04-05T17:31:02.000Z',
+		})
+		await Bun.sleep(0)
+
+		const tab = client.currentTab()!
+		expect(tab.history).toHaveLength(1)
+		expect(tab.history[0]).toMatchObject({
+			type: 'tool',
+			name: 'edit',
+			blobId: '000002-def',
+			output: `--- before\n2:old old line\n\n+++ after\n2:new new line`,
+		})
+	} finally {
+		blockModule.loadBlobs = originalLoadBlobs
+	}
+})
