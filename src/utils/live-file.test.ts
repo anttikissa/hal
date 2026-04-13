@@ -115,15 +115,15 @@ test('save preserves ASON comments from disk', () => {
 	// model defaults
 	models: {
 		// preferred alias
-		defaultModel: 'opus'
+		default: 'opus'
 	}
 }`
 	writeFileSync(path, src + '\n')
-	const data = liveFiles.liveFile(path, { models: { defaultModel: '' } }, { watch: false })
-	data.models.defaultModel = 'gpt'
+	const data = liveFiles.liveFile(path, { models: { default: '' } }, { watch: false })
+	data.models.default = 'gpt'
 	liveFiles.save(data)
 	const disk = readFileSync(path, 'utf-8')
 	expect(disk).toContain('// model defaults')
 	expect(disk).toContain('// preferred alias')
-	expect(disk).toContain("defaultModel: 'gpt'")
+	expect(disk).toContain("default: 'gpt'")
 })

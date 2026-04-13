@@ -179,11 +179,11 @@ const FALLBACK_MODEL = 'anthropic/claude-opus-4-6'
 
 const config = {
 	// Default model alias or full ID. Set via config.ason under "models".
-	defaultModel: FALLBACK_MODEL,
+	default: FALLBACK_MODEL,
 }
 
 function defaultModel(): string {
-	return resolveModel(config.defaultModel)
+	return resolveModel(config.default)
 }
 
 // ── Model listing (for /model command) ──

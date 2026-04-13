@@ -7,6 +7,7 @@
 import { basename, resolve, dirname } from 'path'
 import { readdirSync, statSync } from 'fs'
 import { homedir } from 'os'
+import { config as runtimeConfig } from '../config.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ export interface CompletionResult {
 
 interface CommandSpec {
 	name: string
-	arg?: 'model' | 'dir' | 'command'
+	arg?: 'model' | 'dir' | 'command' | 'config'
 }
 
 // ── Known commands ───────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ const COMMANDS: CommandSpec[] = [
 	{ name: 'tab' },
 	{ name: 'close' },
 	{ name: 'system' },
-	{ name: 'config' },
+	{ name: 'config', arg: 'config' },
 	{ name: 'clear' },
 	{ name: 'exit' },
 ]
@@ -142,6 +143,23 @@ function completeDirs(argPrefix: string, cwd: string): string[] {
 	return matching.map((d) => base + d + '/')
 }
 
+function listConfigPaths(): string[] {
+	const out: string[] = []
+
+	function visit(prefix: string, value: unknown): void {
+		out.push(prefix)
+		if (!value || typeof value !== 'object' || Array.isArray(value)) return
+		for (const key of Object.keys(value as Record<string, any>).sort()) {
+			visit(`${prefix}.${key}`, (value as Record<string, any>)[key])
+		}
+	}
+
+	for (const name of Object.keys(runtimeConfig.modules).sort()) {
+		visit(name, runtimeConfig.modules[name])
+	}
+	return out
+}
+
 // ── Main completion logic ────────────────────────────────────────────────────
 
 function complete(text: string, cursor: number): CompletionResult | null {
@@ -183,6 +201,8 @@ function complete(text: string, cursor: number): CompletionResult | null {
 		values = completeDirs(argPrefix, process.cwd())
 	} else if (spec.arg === 'command') {
 		values = COMMANDS.map((item) => item.name).filter((name) => name.startsWith(argPrefix))
+	} else if (spec.arg === 'config') {
+		values = listConfigPaths().filter((path) => path.startsWith(argPrefix))
 	}
 
 	if (values.length === 0) return null

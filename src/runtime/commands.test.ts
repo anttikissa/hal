@@ -18,7 +18,7 @@ const origMaxIterations = agentLoop.config.maxIterations
 const origRenderStatus = openaiUsage.renderStatus
 const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
-const origDefaultModel = models.config.defaultModel
+const origDefaultModel = models.config.default
 
 function makeSession(id = '04-aaa'): SessionState {
 	return {
@@ -48,7 +48,7 @@ afterEach(() => {
 	openaiUsage.renderStatus = origRenderStatus
 	Object.assign(memory.config, origMemoryConfig)
 	memory.io.readRss = origReadRss
-	models.config.defaultModel = origDefaultModel
+	models.config.default = origDefaultModel
 })
 
 test('/send resolves a tab number', async () => {
@@ -227,13 +227,13 @@ test('/config writes a persistent override and applies it now', async () => {
 
 test('/config accepts a bare string value', async () => {
 	stubConfigData({ models: {} })
-	const result = await commands.executeCommand('/config models.defaultModel gpt', makeSession(), () => {})
+	const result = await commands.executeCommand('/config models.default gpt', makeSession(), () => {})
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
-	expect(result.output).toContain("Set models.defaultModel = 'gpt'")
-	expect(config.data.models.defaultModel).toBe('gpt')
-	expect(models.config.defaultModel).toBe('gpt')
+	expect(result.output).toContain("Set models.default = 'gpt'")
+	expect(config.data.models.default).toBe('gpt')
+	expect(models.config.default).toBe('gpt')
 })
 
 test('/show config points to /config instead of duplicating it', async () => {
