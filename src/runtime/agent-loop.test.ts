@@ -59,8 +59,8 @@ test('writes thinking blobs while streaming and replays them into API history', 
 			{ type: 'text', text: 'done' },
 		])
 		const history = sessions.loadHistory(sessionId)
-		const entry = history.find((item) => item.role === 'assistant')!
-		expect(entry.thinkingBlobId).toBe(thinkingEvent.blobId)
+		expect(history.find((item) => item.type === 'thinking')?.blobId).toBe(thinkingEvent.blobId)
+		expect(history.find((item) => item.type === 'assistant')?.text).toBe('done')
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent

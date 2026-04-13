@@ -59,20 +59,16 @@ function blobPath(sessionId: string, blobId: string): string {
 	return `${STATE_DIR}/sessions/${sessionId}/blobs/${blobId}.ason`
 }
 
-// Extract display text from a user entry. Handles plain string content
-// and multimodal arrays (text + image blocks).
-function userText(entry: HistoryEntry): string {
-	const content = entry.content ?? entry.text
-	if (typeof content === 'string') return content
-	if (Array.isArray(content)) {
-		const parts: string[] = []
-		for (const part of content as any[]) {
-			if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text)
-			else if (part?.type === 'image') parts.push('[image]')
-		}
-		return parts.join('') || ''
+// Extract display text from a user entry. User history stores flat parts rather
+// than provider-shaped content blocks, but the visual rendering rule is simple:
+// text parts show as-is and images show as [image].
+function userText(entry: Extract<HistoryEntry, { type: 'user' }>): string {
+	const parts: string[] = []
+	for (const part of entry.parts) {
+		if (part.type === 'text') parts.push(part.text)
+		else parts.push('[image]')
 	}
-	return ''
+	return parts.join('')
 }
 
 function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntryCount = 0, parentId?: string): Block[] {
@@ -84,10 +80,9 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 		// Blobs for parent entries live in the parent session's directory
 		const blobOwner = (i < parentEntryCount && parentId) ? parentId : sessionId
 		// ── User message ──
-		if (entry.role === 'user') {
+		if (entry.type === 'user') {
 			const text = userText(entry)
 			if (!text) continue
-			// [system] prefix → source = 'system'
 			const isSystem = text.startsWith('[system] ')
 			const source = isSystem ? 'system' : (entry.source ?? undefined)
 			result.push({
@@ -101,62 +96,52 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 			continue
 		}
 
-		// ── Assistant turn: split into thinking + tools + text ──
-		if (entry.role === 'assistant') {
-			// Thinking block — text may be inline or in a blob
-			if (entry.thinkingText || entry.thinkingBlobId) {
-				result.push({
-					type: 'thinking',
-					text: entry.thinkingText ?? '',
-					blobId: entry.thinkingBlobId,
-					sessionId: blobOwner,
-					ts: parseTs(entry.ts),
-					dimmed,
-				})
-			}
-
-			// Tool blocks — created without blob data for fast startup.
-			// Blob loading fills in input + output; title/command are
-			// derived from input at render time.
-			if (entry.tools && Array.isArray(entry.tools)) {
-				for (const tool of entry.tools as any[]) {
-					result.push({
-						type: 'tool',
-						name: tool.name,
-						blobId: tool.blobId,
-						sessionId: blobOwner,
-						ts: parseTs(entry.ts),
-						dimmed,
-					})
-				}
-			}
-
-			// Assistant text block
-			if (typeof entry.text === 'string' && entry.text) {
-				result.push({
-					type: 'assistant',
-					text: entry.text,
-					model: entry.model,
-					ts: parseTs(entry.ts),
-					dimmed,
-				})
-			}
+		if (entry.type === 'thinking') {
+			result.push({
+				type: 'thinking',
+				text: entry.text ?? '',
+				blobId: entry.blobId,
+				sessionId: blobOwner,
+				ts: parseTs(entry.ts),
+				dimmed,
+			})
 			continue
 		}
 
-		// ── tool_result — skip, data already loaded from blob above ──
-		if (entry.role === 'tool_result') continue
+		if (entry.type === 'tool_call') {
+			result.push({
+				type: 'tool',
+				name: entry.name,
+				input: entry.input,
+				blobId: entry.blobId,
+				sessionId: blobOwner,
+				toolId: entry.toolId,
+				ts: parseTs(entry.ts),
+				dimmed,
+			})
+			continue
+		}
 
-		// ── Info / error ──
+		if (entry.type === 'assistant') {
+			result.push({
+				type: 'assistant',
+				text: entry.text,
+				model: entry.model,
+				ts: parseTs(entry.ts),
+				dimmed,
+			})
+			continue
+		}
+
+		if (entry.type === 'tool_result') continue
+
 		if (entry.type === 'info') {
-			const isError = entry.level === 'error'
-			if (typeof entry.text === 'string') {
-				result.push({ type: isError ? 'error' : 'info', text: entry.text, ts: parseTs(entry.ts), dimmed })
-			}
+			const blockType = entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info'
+			result.push({ type: blockType, text: entry.text, ts: parseTs(entry.ts), dimmed })
 			continue
 		}
 
-		// session, forked_from, etc. — not rendered
+		// session, forked_from, reset, compact, input_history — not rendered
 	}
 
 	return result

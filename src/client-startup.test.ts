@@ -118,8 +118,8 @@ describe('client startup', () => {
 		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('child'), forkedFrom: 'parent' })
 		sessions.loadAllHistoryWithOrigin = () => ({
 			entries: [
-				{ role: 'user', content: 'before fork', ts: '2026-04-09T20:00:00.000Z' },
-				{ role: 'user', content: 'after fork', ts: '2026-04-09T20:01:00.000Z' },
+				{ type: 'user', parts: [{ type: 'text', text: 'before fork' }], ts: '2026-04-09T20:00:00.000Z' },
+				{ type: 'user', parts: [{ type: 'text', text: 'after fork' }], ts: '2026-04-09T20:01:00.000Z' },
 			],
 			parentCount: 1,
 			parentId: 'parent',
@@ -147,7 +147,7 @@ describe('client startup', () => {
 		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
 		sessions.loadAllHistoryWithOrigin = (id) => id === 's2'
 			? {
-				entries: [{ role: 'assistant', ts: '2026-04-09T20:01:00.000Z', tools: [{ id: 'tool-1', name: 'read', blobId: 'blob-1' }] }],
+				entries: [{ type: 'tool_call', toolId: 'tool-1', name: 'read', blobId: 'blob-1', ts: '2026-04-09T20:01:00.000Z' }],
 				parentCount: 0,
 			}
 			: { entries: [], parentCount: 0 }

@@ -440,22 +440,27 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			// No tool calls — we're done. Emit a response event so the client
 			// can display the assistant's text (client listens for 'response' events).
 			if (toolCalls.length === 0) {
-				// Save assistant response to history.
-				// Reuse the streaming blob when we already created one so the
-				// history points at the same on-disk data the client saw live.
-				if (assistantText || thinkingText) {
-					const historyEntry: any = {
-						role: 'assistant',
-						ts: new Date().toISOString(),
-					}
-					if (assistantText) historyEntry.text = assistantText
-					if (thinkingText && thinkingSignature) {
-						const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
-						await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature)
-						historyEntry.thinkingBlobId = blobId
-					}
-					if (totalUsage.input > 0) historyEntry.usage = totalUsage
-					await sessions.appendHistory(sessionId, [historyEntry])
+				// Save the streamed blocks exactly as flat history entries.
+				// Thinking stays separate from assistant text; large payloads still live in blobs.
+				const ts = new Date().toISOString()
+				const historyEntries: any[] = []
+				if (thinkingText) {
+					const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
+					await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
+					historyEntries.push({
+						type: 'thinking',
+						blobId,
+						signature: thinkingSignature || undefined,
+						ts,
+					})
+				}
+				if (assistantText) {
+					const assistantEntry: any = { type: 'assistant', text: assistantText, ts }
+					if (totalUsage.input > 0) assistantEntry.usage = totalUsage
+					historyEntries.push(assistantEntry)
+				}
+				if (historyEntries.length > 0) {
+					await sessions.appendHistory(sessionId, historyEntries)
 					sessions.clearLive(sessionId)
 				}
 
@@ -492,27 +497,28 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			}
 			messages.push({ role: 'assistant', content: assistantContent })
 
-			// Save assistant message with tool calls to history
-			const historyEntry: any = {
-				role: 'assistant',
-				ts: new Date().toISOString(),
-			}
-			if (assistantText) historyEntry.text = assistantText
-			if (thinkingText && thinkingSignature) {
+			// Save assistant response and each tool call as separate history entries.
+			const ts = new Date().toISOString()
+			const historyEntries: any[] = []
+			if (thinkingText) {
 				const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
-				await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature)
-				historyEntry.thinkingBlobId = blobId
+				await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
+				historyEntries.push({
+					type: 'thinking',
+					blobId,
+					signature: thinkingSignature || undefined,
+					ts,
+				})
 			}
-			// Save each tool call input to a blob
-			historyEntry.tools = []
+			if (assistantText) historyEntries.push({ type: 'assistant', text: assistantText, ts })
 			for (const tc of toolCalls) {
 				const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
 				toolBlobMap.set(tc.id, blobId)
 				await writeToolCallBlob(sessionId, blobId, tc.name, tc.input)
-				historyEntry.tools.push({ id: tc.id, name: tc.name, blobId })
+				historyEntries.push({ type: 'tool_call', toolId: tc.id, name: tc.name, input: tc.input, blobId, ts })
 			}
-			await sessions.appendHistory(sessionId, [historyEntry])
-				sessions.clearLive(sessionId)
+			await sessions.appendHistory(sessionId, historyEntries)
+			sessions.clearLive(sessionId)
 
 			// Emit response event for intermediate text so the client can
 			// create a proper block and clear streaming buffers. Without
@@ -540,14 +546,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					existing.result = { content: result, status: 'done' }
 					await blob.writeBlob(sessionId, blobId, existing)
 				}
-				await sessions.appendHistory(sessionId, [
-					{
-						role: 'tool_result',
-						tool_use_id: call.id,
-						blobId,
-						ts: new Date().toISOString(),
-					},
-				])
+				await sessions.appendHistory(sessionId, [{
+					type: 'tool_result',
+					toolId: call.id,
+					blobId,
+					ts: new Date().toISOString(),
+				}])
 
 				emitEvent(sessionId, {
 					type: 'tool-result',

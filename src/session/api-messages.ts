@@ -1,19 +1,16 @@
-// Convert stored history entries into API-ready message arrays.
+// Convert stored flat history entries into API-ready message arrays.
 //
-// History entries use a compact on-disk format with blob references for large
-// content. This module expands them into the provider-neutral Message[] format
-// used internally before each provider converts it to its own wire shape.
+// History is persisted as visible UI events (user, thinking, assistant,
+// tool_call, tool_result, info, ...). This module groups those flat entries back
+// into the provider-neutral Message[] format used by the runtime.
 //
-// Also handles context pruning: stripping old tool results, images, and thinking
-// blocks to keep the context window manageable.
+// Provider-specific quirks belong here, not in the on-disk history model.
 
-import type { HistoryEntry } from '../server/sessions.ts'
+import type { HistoryEntry, UserPart } from '../server/sessions.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from './blob.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
 
-// Format an ISO timestamp as local "HH:MM" for injecting into user messages.
-// Lets the model reason about elapsed time without reading history files.
 function formatLocalTime(ts?: string): string | null {
 	if (!ts) return null
 	try {
@@ -38,21 +35,14 @@ const apiConfig = {
 	pruneBatchTurns: 8,
 }
 
-// ── Model tracking ──
-
-// Track which model is active by scanning session events in history.
-function applyModelEvent(current: string | undefined, entry: any): string | undefined {
-	if (entry?.type !== 'session') return current
+function applyModelEvent(current: string | undefined, entry: HistoryEntry): string | undefined {
+	if (entry.type !== 'session') return current
 	if (entry.action === 'model-set' && entry.model) return entry.model
 	if (entry.action === 'model-change' && entry.new) return entry.new
 	if (entry.action === 'init' && entry.model) return entry.model
 	return current
 }
 
-// ── Replay start detection ──
-
-// Find where to start replaying from. Resets and compactions mark a fresh start
-// point — we only send messages after the last one.
 function findReplayStart(entries: HistoryEntry[]): number {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const e = entries[i]!
@@ -61,10 +51,6 @@ function findReplayStart(entries: HistoryEntry[]): number {
 	return 0
 }
 
-// ── Main conversion ──
-
-// Convert session history to the provider-neutral message format.
-// Loads blobs for tool calls, handles images, manages injected info entries.
 function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts?: { prune?: boolean }): Message[] {
 	const entries = allEntries ?? sessions.loadAllHistory(sessionId)
 	const start = findReplayStart(entries)
@@ -72,166 +58,167 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 	const out: Message[] = []
 
 	let currentModel: string | undefined
-	const totalUserTurns = sliced.filter((m) => m.role === 'user').length
+	const totalUserTurns = sliced.filter((entry) => entry.type === 'user').length
 	let userTurnsSeen = 0
 	let pendingInfos: string[] = []
+	let pendingAssistant: ContentBlock[] = []
+	let pendingToolResults: ContentBlock[] = []
+
+	function flushAssistant(): void {
+		if (pendingAssistant.length === 0) return
+		out.push({ role: 'assistant', content: pendingAssistant })
+		pendingAssistant = []
+	}
+
+	function flushToolResults(): void {
+		if (pendingToolResults.length === 0) return
+		out.push({ role: 'user', content: pendingToolResults })
+		pendingToolResults = []
+	}
 
 	for (const entry of sliced) {
 		currentModel = applyModelEvent(currentModel, entry)
 
-		// Collect injected info entries for the next user message
 		if (entry.type === 'info') {
 			const turnsRemaining = totalUserTurns - userTurnsSeen
-			const visibility = (entry as any).visibility ?? ((entry as any).level === 'error' ? 'next-user' : 'ui')
+			const visibility = entry.visibility ?? (entry.level === 'error' ? 'next-user' : 'ui')
 			if (visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
-				pendingInfos.push(entry.text ?? '')
+				pendingInfos.push(entry.text)
 			}
 			continue
 		}
 
-		// Skip non-message entries
-		if (!entry.role) continue
-
-		if (entry.role === 'user') {
-			userTurnsSeen++
-			const userContent = buildUserContent(sessionId, entry, pendingInfos)
-			pendingInfos = []
-			out.push({ role: 'user', content: userContent })
-		} else if (entry.role === 'assistant') {
-			pendingInfos = [] // discard infos not followed by user message
-			const content = buildAssistantContent(sessionId, entry, currentModel)
-			if (content.length > 0) {
-				// Handle continuation: merge with previous assistant message
-				if (entry.continuation && out.length > 0 && out[out.length - 1]!.role === 'assistant') {
-					out[out.length - 1] = { role: 'assistant', content }
-				} else {
-					out.push({ role: 'assistant', content })
-				}
+		switch (entry.type) {
+			case 'user': {
+				flushAssistant()
+				flushToolResults()
+				userTurnsSeen++
+				out.push({ role: 'user', content: buildUserContent(sessionId, entry, pendingInfos) })
+				pendingInfos = []
+				break
 			}
-		} else if (entry.role === 'tool_result') {
-			const resultContent = buildToolResultContent(sessionId, entry)
-			out.push({ role: 'user', content: [resultContent] })
+			case 'thinking': {
+				flushToolResults()
+				pendingInfos = []
+				const block = buildThinkingContent(sessionId, entry)
+				if (block) pendingAssistant.push(block)
+				break
+			}
+			case 'assistant': {
+				flushToolResults()
+				pendingInfos = []
+				pendingAssistant.push({ type: 'text', text: entry.text })
+				break
+			}
+			case 'tool_call': {
+				flushToolResults()
+				pendingInfos = []
+				pendingAssistant.push(buildToolUseContent(sessionId, entry))
+				break
+			}
+			case 'tool_result': {
+				flushAssistant()
+				pendingToolResults.push(buildToolResultContent(sessionId, entry))
+				break
+			}
+			default:
+				break
 		}
 	}
 
-	// Ensure tool_use/tool_result pairing is correct.
-	// Tool results may be displaced — relocate or synthesize missing ones.
+	flushAssistant()
+	flushToolResults()
 	repairToolPairing(out)
-
-	// Prune old heavy content to save context window space
 	return opts?.prune === false ? out : pruneMessages(out)
 }
 
-// Build content for a user message, prepending any pending injected infos.
-function buildUserContent(sessionId: string, entry: HistoryEntry, pendingInfos: string[]): string | ContentBlock[] {
+function buildUserContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'user' }>, pendingInfos: string[]): string | ContentBlock[] {
 	const time = formatLocalTime(entry.ts)
 	const prefix = [
 		...(time ? [`[${time}]`] : []),
 		...pendingInfos,
 	].join('\n')
 
-	if (typeof entry.content === 'string') {
-		return prefix ? prefix + '\n' + entry.content : entry.content
+	const onlyText = entry.parts.every((part) => part.type === 'text')
+	if (onlyText) {
+		const text = entry.parts.map((part) => (part as Extract<UserPart, { type: 'text' }>).text).join('')
+		return prefix ? `${prefix}\n${text}` : text
 	}
 
-	if (Array.isArray(entry.content)) {
-		const blocks: ContentBlock[] = []
-		if (prefix) blocks.push({ type: 'text', text: prefix })
-
-		for (const b of entry.content) {
-			if (b.type === 'image' && b.blobId) {
-				// Load image data from blob
-				const data = blob.readBlobFromChain(sessionId, b.blobId)
-				if (data?.media_type && data?.data) {
-					blocks.push({
-						type: 'image',
-						source: { type: 'base64', media_type: data.media_type, data: data.data },
-					} as any)
-				} else {
-					blocks.push({ type: 'text', text: `[image unavailable — blob ${b.blobId}]` })
-				}
-			} else {
-				blocks.push(b)
-			}
+	const blocks: ContentBlock[] = []
+	if (prefix) blocks.push({ type: 'text', text: prefix })
+	for (const part of entry.parts) {
+		if (part.type === 'text') {
+			blocks.push({ type: 'text', text: part.text })
+			continue
 		}
-		return blocks
+		const data = blob.readBlobFromChain(sessionId, part.blobId)
+		if (data?.media_type && data?.data) {
+			blocks.push({
+				type: 'image',
+				source: { type: 'base64', media_type: data.media_type, data: data.data },
+			} as any)
+		} else {
+			blocks.push({ type: 'text', text: `[image unavailable — blob ${part.blobId}]` })
+		}
 	}
-
-	return prefix || ''
+	return blocks
 }
 
-// Build content blocks for an assistant message.
-function buildAssistantContent(sessionId: string, entry: HistoryEntry, currentModel?: string): ContentBlock[] {
-	const content: ContentBlock[] = []
-
-	// Thinking block — load from blob if needed
-	let thinkingText = entry.thinkingText
-	let thinkingSignature = entry.thinkingSignature
-	if (entry.thinkingBlobId && (!thinkingText || !thinkingSignature)) {
-		const blobData = blob.readBlobFromChain(sessionId, entry.thinkingBlobId)
+function buildThinkingContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'thinking' }>): ContentBlock | null {
+	let thinkingText = entry.text
+	let thinkingSignature = entry.signature
+	if (entry.blobId && (!thinkingText || !thinkingSignature)) {
+		const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
 		if (!thinkingText) thinkingText = blobData?.thinking
 		if (!thinkingSignature) thinkingSignature = blobData?.signature
 	}
-	if (thinkingText && thinkingSignature) {
-		content.push({ type: 'thinking', thinking: thinkingText, signature: thinkingSignature })
-	}
-
-	// Text response
-	if (entry.text) content.push({ type: 'text', text: entry.text })
-
-	// Tool calls — load input from blob
-	if (Array.isArray(entry.tools)) {
-		for (const t of entry.tools) {
-			const blobData = blob.readBlobFromChain(sessionId, t.blobId)
-			content.push({ type: 'tool_use', id: t.id, name: t.name, input: blobData?.call?.input ?? {} })
-		}
-	}
-
-	return content
+	if (!thinkingText || !thinkingSignature) return null
+	return { type: 'thinking', thinking: thinkingText, signature: thinkingSignature }
 }
 
-// Build a tool_result content block from a history entry.
-function buildToolResultContent(sessionId: string, entry: HistoryEntry): ContentBlock {
-	const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
-	let resultContent = blobData?.result?.content ?? '[interrupted]'
+function buildToolUseContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'tool_call' }>): ContentBlock {
+	let input = entry.input
+	if (entry.blobId && input === undefined) {
+		const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+		input = blobData?.call?.input ?? {}
+	}
+	return { type: 'tool_use', id: entry.toolId, name: entry.name, input: input ?? {} }
+}
 
-	// Truncate oversized tool results
+function buildToolResultContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'tool_result' }>): ContentBlock {
+	let resultContent = entry.output
+	if (entry.blobId && resultContent === undefined) {
+		const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+		resultContent = blobData?.result?.content ?? '[interrupted]'
+	}
+	if (resultContent === undefined) resultContent = '[interrupted]'
 	if (typeof resultContent === 'string' && resultContent.length > apiConfig.maxToolOutput) {
 		const truncated = resultContent.length - apiConfig.maxToolOutput
 		resultContent = resultContent.slice(0, apiConfig.maxToolOutput) + `\n[truncated ${truncated} chars]`
 	}
-
-	return { type: 'tool_result', tool_use_id: entry.tool_use_id, content: resultContent }
+	return { type: 'tool_result', tool_use_id: entry.toolId, content: resultContent }
 }
 
-// ── Tool pairing repair ──
-
-// Ensure every assistant message with tool_use blocks has matching tool_result
-// entries immediately following it. Missing results get synthesized as [interrupted].
 function repairToolPairing(msgs: Message[]): void {
 	for (let i = 0; i < msgs.length; i++) {
 		const msg = msgs[i]!
 		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
 
 		const toolUseIds = (msg.content as ContentBlock[]).filter((b) => b.type === 'tool_use').map((b) => b.id!)
-
 		if (toolUseIds.length === 0) continue
 
-		// Check which results exist in the next message
 		const nextIdx = i + 1
 		const haveIds = new Set<string>()
 		if (nextIdx < msgs.length && msgs[nextIdx]!.role === 'user' && Array.isArray(msgs[nextIdx]!.content)) {
 			for (const b of msgs[nextIdx]!.content as ContentBlock[]) {
-				if (b.type === 'tool_result' && toolUseIds.includes(b.tool_use_id!)) {
-					haveIds.add(b.tool_use_id!)
-				}
+				if (b.type === 'tool_result' && toolUseIds.includes(b.tool_use_id!)) haveIds.add(b.tool_use_id!)
 			}
 		}
 
 		const missingIds = toolUseIds.filter((id) => !haveIds.has(id))
 		if (missingIds.length === 0) continue
 
-		// Search later messages for displaced tool_results, or synthesize them
 		const collected: ContentBlock[] = []
 		for (const id of missingIds) {
 			let found = false
@@ -245,32 +232,23 @@ function repairToolPairing(msgs: Message[]): void {
 					found = true
 				}
 			}
-			if (!found) {
-				collected.push({ type: 'tool_result', tool_use_id: id, content: '[interrupted]' })
-			}
+			if (!found) collected.push({ type: 'tool_result', tool_use_id: id, content: '[interrupted]' })
 		}
 
-		// Insert collected results right after the assistant message
 		if (haveIds.size > 0 && nextIdx < msgs.length) {
 			;(msgs[nextIdx]!.content as ContentBlock[]).push(...collected)
 		} else {
 			msgs.splice(nextIdx, 0, { role: 'user', content: collected })
-			i++ // skip the inserted message
+			i++
 		}
 	}
 
-	// Remove messages emptied by relocation
 	for (let i = msgs.length - 1; i >= 0; i--) {
-		if (Array.isArray(msgs[i]!.content) && (msgs[i]!.content as ContentBlock[]).length === 0) {
-			msgs.splice(i, 1)
-		}
+		if (Array.isArray(msgs[i]!.content) && (msgs[i]!.content as ContentBlock[]).length === 0) msgs.splice(i, 1)
 	}
 }
 
-// ── Context pruning ──
-
-// True if this message ends a completed turn (assistant response with no tool_use).
-function isTurnEnd(msg: any): boolean {
+function isTurnEnd(msg: Message): boolean {
 	if (msg.role !== 'assistant') return false
 	if (!Array.isArray(msg.content)) return true
 	return !(msg.content as any[]).some((b: any) => b.type === 'tool_use')
@@ -283,13 +261,10 @@ function pastBatchThreshold(age: number, threshold: number): boolean {
 	return age >= firstBatch
 }
 
-// Strip old tool results, tool inputs, images, and thinking from API messages.
-// Keeps recent content intact, replaces old heavy content with placeholders.
 function pruneMessages(msgs: Message[]): Message[] {
 	const heavy = apiConfig.heavyThreshold
 	const thinking = apiConfig.thinkingThreshold
 
-	// Count completed turns after each position (how "old" each message is)
 	const age = new Array(msgs.length).fill(0)
 	let count = 0
 	for (let i = msgs.length - 1; i >= 0; i--) {
@@ -300,28 +275,17 @@ function pruneMessages(msgs: Message[]): Message[] {
 	const out: Message[] = []
 	for (let i = 0; i < msgs.length; i++) {
 		const msg = msgs[i]!
-
 		if (msg.role === 'assistant' && Array.isArray(msg.content)) {
 			let content = (msg.content as ContentBlock[]).map((b) => {
-				// Strip tool inputs from old messages
 				if (b.type === 'tool_use' && pastBatchThreshold(age[i]!, heavy)) return { ...b, input: {} }
 				return b
 			})
-			// Strip thinking from old messages
-			if (pastBatchThreshold(age[i]!, thinking)) {
-				content = content.filter((b) => b.type !== 'thinking')
-			}
+			if (pastBatchThreshold(age[i]!, thinking)) content = content.filter((b) => b.type !== 'thinking')
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = (msg.content as ContentBlock[]).map((b) => {
-				// Strip old tool results
-				if (b.type === 'tool_result' && pastBatchThreshold(age[i]!, heavy)) {
-					return { ...b, content: '[tool result omitted from context]' }
-				}
-				// Strip old images
-				if (b.type === 'image' && pastBatchThreshold(age[i]!, heavy)) {
-					return { type: 'text' as const, text: '[image omitted from context]' }
-				}
+				if (b.type === 'tool_result' && pastBatchThreshold(age[i]!, heavy)) return { ...b, content: '[tool result omitted from context]' }
+				if (b.type === 'image' && pastBatchThreshold(age[i]!, heavy)) return { type: 'text' as const, text: '[image omitted from context]' }
 				return b
 			})
 			out.push({ ...msg, content })

@@ -28,8 +28,8 @@ const ATTACHMENT_RE = /\[([^\]]+\.(png|jpg|jpeg|gif|webp|txt|md|json))\]/gi
 export interface ResolvedAttachment {
 	// Content blocks for the API call (images as base64, text inlined)
 	apiContent: string | any[]
-	// Content for history logging (images as blob references, text as placeholders)
-	logContent: string | any[]
+	// History now stores flat user parts instead of provider-shaped content
+	logParts: Array<{ type: 'text'; text: string } | { type: 'image'; blobId: string; originalFile?: string }>
 }
 
 // Resolve attachment references in user input text.
@@ -43,10 +43,10 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 		return ext !== 'txt' || m[1]!.startsWith('/tmp/hal/')
 	})
 
-	if (valid.length === 0) return { apiContent: input, logContent: input }
+	if (valid.length === 0) return { apiContent: input, logParts: [{ type: 'text', text: input }] }
 
 	const apiBlocks: any[] = []
-	const logBlocks: any[] = []
+	const logParts: ResolvedAttachment['logParts'] = []
 	let lastIndex = 0
 
 	for (const match of valid) {
@@ -57,12 +57,12 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 		// Text before the attachment reference
 		if (before.trim()) {
 			apiBlocks.push({ type: 'text', text: before })
-			logBlocks.push({ type: 'text', text: before })
+			logParts.push({ type: 'text', text: before })
 		}
 
 		if (!existsSync(filePath!)) {
 			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
-			logBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
+			logParts.push({ type: 'text', text: `[file not found: ${filePath}]` })
 		} else if (IMAGE_EXTS.has(ext)) {
 			// Image: read, base64 encode, store as blob
 			try {
@@ -72,20 +72,20 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 				const blobId = blob.makeBlobId(sessionId)
 				await blob.writeBlob(sessionId, blobId, { media_type: mediaType, data: b64 })
 				apiBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } })
-				logBlocks.push({ type: 'image', blobId, originalFile: filePath })
+				logParts.push({ type: 'image', blobId, originalFile: filePath })
 			} catch {
 				apiBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
-				logBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
+				logParts.push({ type: 'text', text: `[failed to read: ${filePath}]` })
 			}
 		} else {
 			// Text file: inline the content
 			try {
 				const text = readFileSync(filePath, 'utf-8')
 				apiBlocks.push({ type: 'text', text })
-				logBlocks.push({ type: 'text', text: `[${filePath}]` })
+				logParts.push({ type: 'text', text: `[${filePath}]` })
 			} catch {
 				apiBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
-				logBlocks.push({ type: 'text', text: `[failed to read: ${filePath}]` })
+				logParts.push({ type: 'text', text: `[failed to read: ${filePath}]` })
 			}
 		}
 
@@ -96,10 +96,10 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 	const after = input.slice(lastIndex)
 	if (after.trim()) {
 		apiBlocks.push({ type: 'text', text: after })
-		logBlocks.push({ type: 'text', text: after })
+		logParts.push({ type: 'text', text: after })
 	}
 
-	return { apiContent: apiBlocks, logContent: logBlocks }
+	return { apiContent: apiBlocks, logParts }
 }
 
 export const attachments = { resolve }

@@ -154,7 +154,7 @@ function analyzeSession(sessionId: string, opts: Options): Record<string, Strate
 	const prevPrompts = Object.fromEntries(names.map((name) => [name, ''])) as Record<string, string>
 	for (let i = 0; i < entries.length; i++) {
 		const entry = entries[i]!
-		if (entry.role !== 'user' && entry.role !== 'tool_result') continue
+		if (entry.type !== 'user' && entry.type !== 'tool_result') continue
 		const base = apiMessages.toProviderMessages(sessionId, entries.slice(0, i + 1), { prune: false })
 		const variants: Record<string, Message[]> = {
 			keep_all: base,

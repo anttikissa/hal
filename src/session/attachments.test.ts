@@ -27,7 +27,7 @@ describe('attachments.resolve', () => {
 	test('plain text without attachments passes through unchanged', async () => {
 		const result = await attachments.resolve(TEST_SESSION, 'hello world')
 		expect(result.apiContent).toBe('hello world')
-		expect(result.logContent).toBe('hello world')
+		expect(result.logParts).toEqual([{ type: 'text', text: 'hello world' }])
 	})
 
 	test('image reference is resolved to base64 content block', async () => {
@@ -48,10 +48,9 @@ describe('attachments.resolve', () => {
 		expect(apiBlocks.some((b: any) => b.type === 'text' && b.text.includes('look at this'))).toBe(true)
 		expect(apiBlocks.some((b: any) => b.type === 'image' && b.source?.type === 'base64')).toBe(true)
 
-		// Log content should have blob reference, not raw base64
-		expect(Array.isArray(result.logContent)).toBe(true)
-		const logBlocks = result.logContent as any[]
-		expect(logBlocks.some((b: any) => b.type === 'image' && b.blobId)).toBe(true)
+		// Log history should have a blob reference, not raw base64
+		expect(Array.isArray(result.logParts)).toBe(true)
+		expect(result.logParts.some((b: any) => b.type === 'image' && b.blobId)).toBe(true)
 	})
 
 	test('missing file produces error text block', async () => {

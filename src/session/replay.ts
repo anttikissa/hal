@@ -1,30 +1,20 @@
-// Replay — rebuild session state from history for display and token counting.
+// Replay — rebuild session state from flat history for display and token counting.
 //
-// On startup (or tab switch), we replay history entries to reconstruct:
-// 1. Display blocks for the TUI (via replayToBlocks)
-// 2. Token usage estimates per session
-// 3. Interrupted tool detection
-//
-// The previous codebase had a separate worker file for background hydration.
-// Simplified here: everything runs in the main thread since history files are
-// typically small (<1MB) and ason parsing is fast.
+// History is stored as visible events now, so replay is mostly a direct mapping:
+// user, thinking, assistant, tool_call, tool_result, info.
 
 import type { HistoryEntry } from '../server/sessions.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from './blob.ts'
 import { models } from '../models.ts'
 
-// ── Types ──
-
 export interface ReplayBlock {
 	type: 'input' | 'assistant' | 'thinking' | 'tool' | 'info' | 'error'
 	text: string
-	// Tool-specific fields
 	name?: string
 	args?: string
 	output?: string
 	status?: 'done' | 'error' | 'running'
-	// Metadata
 	model?: string
 	source?: string
 	ts?: number
@@ -39,26 +29,16 @@ export interface ReplayResult {
 	interrupted: { name: string; id: string }[]
 }
 
-// ── Block conversion helpers ──
-
-// Extract text from a user message's content field, which may be a string
-// or an array of content blocks (text + image references).
-function userContentText(content: any): string {
-	if (typeof content === 'string') return content
-	if (!Array.isArray(content)) return ''
-	return content
-		.map((part: any) => {
-			if (part?.type === 'text') return part.text ?? ''
-			if (part?.type === 'image') {
-				const file = part.originalFile ?? part.blobId ?? ''
-				return file ? `[image ${file}]` : '[image]'
-			}
-			return ''
+function userContentText(entry: Extract<HistoryEntry, { type: 'user' }>): string {
+	return entry.parts
+		.map((part) => {
+			if (part.type === 'text') return part.text
+			const file = part.originalFile ?? part.blobId ?? ''
+			return file ? `[image ${file}]` : '[image]'
 		})
 		.join('')
 }
 
-// Extract tool output from blob data. Returns the output text and status.
 function extractToolOutput(blobData: any): { output: string; status: 'done' | 'error'; input: any } {
 	const callData = blobData?.call ?? {}
 	const raw = blobData?.result?.content ?? ''
@@ -66,127 +46,113 @@ function extractToolOutput(blobData: any): { output: string; status: 'done' | 'e
 		typeof raw === 'string'
 			? raw
 			: Array.isArray(raw)
-				? raw
-						.filter((b: any) => b.type === 'text')
-						.map((b: any) => b.text)
-						.join('') || '[image]'
+				? raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
 				: ''
 	const status: 'done' | 'error' =
 		blobData?.result?.status === 'error' ? 'error' : blobData?.result ? 'done' : 'error'
 	return { output, status, input: callData.input }
 }
 
-// ── Core replay ──
-
-// Replay a session's full history into display blocks. Loads blobs for tool
-// calls to get their input/output. Returns blocks + token estimate.
 function replaySession(sessionId: string, opts?: { model?: string }): ReplayResult {
 	const entries = sessions.loadAllHistory(sessionId)
 	return replayEntries(sessionId, entries, opts)
 }
 
-// Replay a pre-loaded array of history entries into blocks.
 function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { model?: string }): ReplayResult {
 	const model = opts?.model
 	const blocks: ReplayBlock[] = []
-	let tokenText = '' // accumulate text for rough token estimation
-
-	// Build a set of tool_use_ids that have results, to find the result blobId
-	const toolResultBlobs = new Map<string, string>()
-	for (const m of entries) {
-		if (m.role === 'tool_result' && m.tool_use_id && m.blobId) {
-			toolResultBlobs.set(m.tool_use_id, m.blobId)
-		}
-	}
+	let tokenText = ''
+	const toolBlocks = new Map<string, ReplayBlock>()
 
 	for (const entry of entries) {
 		const ts = entry.ts ? Date.parse(entry.ts) : undefined
-
-		// Skip structural entries that don't produce blocks
 		if (entry.type === 'reset' || entry.type === 'forked_from' || entry.type === 'compact') continue
+		if (entry.type === 'session' || entry.type === 'input_history') continue
 
-		// Session events (model changes, init)
-		if (entry.type === 'session') continue
-
-		// Info/error entries
 		if (entry.type === 'info') {
-			if ((entry as any).level === 'error') {
-				blocks.push({ type: 'error', text: entry.text ?? '', ts })
-			} else {
-				blocks.push({ type: 'info', text: entry.text ?? '', ts })
-			}
+			blocks.push({ type: entry.level === 'error' ? 'error' : 'info', text: entry.text, ts })
 			continue
 		}
 
-		// User messages
-		if (entry.role === 'user') {
-			const text = userContentText(entry.content)
-			if (text) {
-				blocks.push({
-					type: 'input',
-					text,
-					model,
-					source: typeof entry.source === 'string' ? entry.source : undefined,
-					ts,
-				})
-				tokenText += text + '\n'
-			}
+		if (entry.type === 'user') {
+			const text = userContentText(entry)
+			if (!text) continue
+			blocks.push({ type: 'input', text, model, source: entry.source, ts })
+			tokenText += text + '\n'
 			continue
 		}
 
-		// Assistant messages (may include thinking, text, and tool calls)
-		if (entry.role === 'assistant') {
-			// Thinking block
-			if (entry.thinkingText) {
-				blocks.push({
-					type: 'thinking',
-					text: entry.thinkingText,
-					model,
-					sessionId,
-					blobId: entry.thinkingBlobId,
-					ts,
-				})
+		if (entry.type === 'thinking') {
+			let text = entry.text ?? ''
+			if (entry.blobId && !text) {
+				const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+				text = blobData?.thinking ?? ''
 			}
+			blocks.push({ type: 'thinking', text, model, sessionId, blobId: entry.blobId, ts })
+			continue
+		}
 
-			// Text response
-			if (entry.text) {
-				blocks.push({ type: 'assistant', text: entry.text, model, ts })
-				tokenText += entry.text + '\n'
-			}
+		if (entry.type === 'assistant') {
+			blocks.push({ type: 'assistant', text: entry.text, model, ts })
+			tokenText += entry.text + '\n'
+			continue
+		}
 
-			// Tool calls — load blob data for each to get input/output
-			if (Array.isArray(entry.tools)) {
-				for (const tool of entry.tools) {
-					// Use the tool_result's blobId if available, else the tool call's blobId
-					const resultBlobId = toolResultBlobs.get(tool.id)
-					const blobId = resultBlobId ?? tool.blobId
-					const blobData = blob.readBlobFromChain(sessionId, blobId)
-					const { output, status, input } = extractToolOutput(blobData)
-
-					blocks.push({
-						type: 'tool',
-						text: '', // tools use name/args/output instead
-						name: tool.name,
-						args: typeof input === 'string' ? input : JSON.stringify(input ?? {}),
-						output,
-						status: blobData ? status : 'done',
-						blobId,
-						sessionId,
-						ts,
-					})
-					tokenText += output + '\n'
+		if (entry.type === 'tool_call') {
+			let input = entry.input
+			let output = ''
+			let status: 'done' | 'error' | 'running' = 'running'
+			if (entry.blobId) {
+				const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+				if (input === undefined) input = blobData?.call?.input
+				if (blobData?.result) {
+					const extracted = extractToolOutput(blobData)
+					output = extracted.output
+					status = extracted.status
+					input = input ?? extracted.input
 				}
 			}
+			const block: ReplayBlock = {
+				type: 'tool',
+				text: '',
+				name: entry.name,
+				args: typeof input === 'string' ? input : JSON.stringify(input ?? {}),
+				output,
+				status,
+				blobId: entry.blobId,
+				sessionId,
+				ts,
+			}
+			blocks.push(block)
+			toolBlocks.set(entry.toolId, block)
+			if (output) tokenText += output + '\n'
 			continue
 		}
 
-		// tool_result entries are handled via blob loading in assistant blocks above
+		if (entry.type === 'tool_result') {
+			const block = toolBlocks.get(entry.toolId)
+			let output = entry.output
+			let status: 'done' | 'error' = entry.isError ? 'error' : 'done'
+			if (entry.blobId && output === undefined) {
+				const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+				const extracted = extractToolOutput(blobData)
+				output = extracted.output
+				status = extracted.status
+			}
+			if (block) {
+				block.output = typeof output === 'string' ? output : JSON.stringify(output ?? '')
+				block.status = status
+				if (!block.blobId) block.blobId = entry.blobId
+				if (block.output) tokenText += block.output + '\n'
+			} else {
+				const text = typeof output === 'string' ? output : JSON.stringify(output ?? '')
+				blocks.push({ type: 'tool', text: '', output: text, status, blobId: entry.blobId, sessionId, ts })
+				if (text) tokenText += text + '\n'
+			}
+		}
 	}
 
-	// Detect interrupted tools (last assistant message has unmatched tool calls)
 	const interrupted = sessions.detectInterruptedTools(entries)
-
-	// Add interrupted hint
 	if (interrupted.length > 0) {
 		const toolList = interrupted.map((t) => t.name).join(', ')
 		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Press Enter to continue` })
@@ -200,18 +166,12 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 	}
 }
 
-// ── Compaction context ──
-
-// Build a summary of user prompts for context compaction. When a conversation
-// is compacted to save tokens, this summary helps the model understand what
-// was discussed.
 function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): string {
 	const userPrompts: string[] = []
 	for (const entry of entries) {
-		if (entry.role !== 'user') continue
-		const text = typeof entry.content === 'string' ? entry.content : ''
+		if (entry.type !== 'user') continue
+		const text = entry.parts.filter((part) => part.type === 'text').map((part) => part.text).join('')
 		if (!text || text.startsWith('[')) continue
-		// First line, capped at 200 chars
 		userPrompts.push(text.split('\n')[0]!.slice(0, 200))
 	}
 
@@ -230,7 +190,6 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 	if (userPrompts.length <= 20) {
 		userPrompts.forEach((p, i) => lines.push(`${i + 1}. ${p}`))
 	} else {
-		// Show first 10 and last 10 for long conversations
 		lines.push('First 10:')
 		userPrompts.slice(0, 10).forEach((p, i) => lines.push(`${i + 1}. ${p}`))
 		lines.push('')
@@ -244,25 +203,15 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 	return lines.join('\n')
 }
 
-// ── Input history extraction ──
-
-// Extract user input strings from history for readline-style input history.
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	return entries
 		.map((e) => {
-			if (e.type === 'input_history') return e.text ?? ''
-			if (e.role !== 'user') return ''
-			if (typeof e.content === 'string') return e.content
-			if (Array.isArray(e.content)) {
-				return e.content
-					.filter((b: any) => b.type === 'text')
-					.map((b: any) => b.text)
-					.join(' ')
-			}
-			return ''
+			if (e.type === 'input_history') return e.text
+			if (e.type !== 'user') return ''
+			return e.parts.filter((part) => part.type === 'text').map((part) => part.text).join(' ')
 		})
 		.filter((text) => text && !text.startsWith('['))
-		.slice(-200) // cap at last 200 entries
+		.slice(-200)
 }
 
 export const replay = {

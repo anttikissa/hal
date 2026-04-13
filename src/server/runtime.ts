@@ -230,13 +230,13 @@ async function runGeneration(session: Session, text: string, source?: string): P
 
 	// Resolve [file.png] / [file.txt] attachment references in user text.
 	// Images get base64-encoded and stored as blobs; history saves lightweight
-	// blob refs (logContent) so the ASONL file stays small.
+	// user parts with blob refs so the ASONL file stays small.
 	if (text) {
 		const resolved = await attachments.resolve(session.id, text)
 		await sessionStore.appendHistory(session.id, [
 			{
-				role: 'user',
-				content: resolved.logContent,
+				type: 'user',
+				parts: resolved.logParts,
 				source,
 				ts: new Date().toISOString(),
 			},
@@ -284,7 +284,7 @@ async function runCompact(session: Session): Promise<void> {
 	}
 
 	const entries = sessionStore.loadHistory(session.id)
-	const userMsgs = entries.filter((entry) => entry.role === 'user')
+	const userMsgs = entries.filter((entry) => entry.type === 'user')
 	if (userMsgs.length === 0) {
 		emitInfo(session.id, 'Nothing to compact')
 		return
@@ -298,8 +298,8 @@ async function runCompact(session: Session): Promise<void> {
 
 	await sessionStore.appendHistory(session.id, [
 		...forkEntry,
-		{ role: 'user', content: `[system] Session was manually compacted. Previous conversation: ${oldLog}`, ts },
-		{ role: 'user', content: contextText, ts },
+		{ type: 'user', parts: [{ type: 'text', text: `[system] Session was manually compacted. Previous conversation: ${oldLog}` }], ts },
+		{ type: 'user', parts: [{ type: 'text', text: contextText }], ts },
 	])
 
 	emitInfo(session.id, `Context compacted (${userMsgs.length} user messages summarized, now writing to ${newLog})`)
@@ -462,14 +462,14 @@ function startRuntime(signal: AbortSignal): void {
 			//    Write placeholder [interrupted] results so the conversation is valid.
 			const interrupted = sessionStore.detectInterruptedTools(entries)
 			if (interrupted.length > 0) {
-				const toolNames = interrupted.map(t => t.name).join(', ')
+				const toolNames = interrupted.map((t) => t.name).join(', ')
 				emitInfo(session.id, `Resolving ${interrupted.length} interrupted tool(s): ${toolNames}`)
 				for (const t of interrupted) {
 					await sessionStore.appendHistory(session.id, [{
-						role: 'tool_result',
-						tool_use_id: t.id,
+						type: 'tool_result',
+						toolId: t.id,
+						output: '[interrupted]',
 						ts: new Date().toISOString(),
-						text: '[interrupted]',
 					}])
 				}
 			}
@@ -480,17 +480,20 @@ function startRuntime(signal: AbortSignal): void {
 			const allEntries = interrupted.length > 0
 				? sessionStore.loadAllHistory(session.id) // re-read with new tool_results
 				: entries
-			let lastRole: string | undefined
+			let lastType: string | undefined
 			let lastTs: string | undefined
 			let paused = false
 			for (let i = allEntries.length - 1; i >= 0; i--) {
 				const e = allEntries[i]!
-				if (e.type === 'info' && (e as any).text === '[paused]') { paused = true; break }
-				if (e.role && !lastRole) { lastRole = e.role; lastTs = e.ts }
-				if (lastRole) break
+				if (e.type === 'info' && e.text === '[paused]') { paused = true; break }
+				if (!lastType && (e.type === 'user' || e.type === 'tool_result' || e.type === 'assistant')) {
+					lastType = e.type
+					lastTs = e.ts
+				}
+				if (lastType) break
 			}
 			const stale = lastTs && (Date.now() - new Date(lastTs).getTime()) > 30_000
-			if (!paused && !stale && (lastRole === 'user' || lastRole === 'tool_result')) {
+			if (!paused && !stale && (lastType === 'user' || lastType === 'tool_result')) {
 				emitInfo(session.id, 'Continuing...')
 				void runGeneration(session, '') // empty text = continue existing conversation
 			}

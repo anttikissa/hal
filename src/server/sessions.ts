@@ -27,17 +27,83 @@ export interface SessionMeta {
 	context?: { used: number; max: number }
 }
 
-export interface HistoryEntry {
-	// User/assistant messages
-	role?: 'user' | 'assistant' | 'tool_result'
-	// Info/session/reset/compact/forked_from entries
-	type?: 'info' | 'session' | 'reset' | 'compact' | 'forked_from' | 'input_history'
-	text?: string
-	content?: string | any[]
-	ts?: string
-	// We preserve all other fields but don't need to type them
-	[key: string]: any
-}
+export type UserPart =
+	| { type: 'text'; text: string }
+	| { type: 'image'; blobId: string; originalFile?: string }
+
+export type HistoryEntry =
+	| {
+			type: 'user'
+			parts: UserPart[]
+			text?: never
+			source?: string
+			status?: string
+			ts?: string
+	  }
+	| {
+			type: 'thinking'
+			text?: string
+			blobId?: string
+			signature?: string
+			provider?: string
+			responseId?: string
+			ts?: string
+	  }
+	| {
+			type: 'assistant'
+			text: string
+			model?: string
+			responseId?: string
+			continuation?: boolean
+			usage?: { input: number; output: number }
+			ts?: string
+	  }
+	| {
+			type: 'tool_call'
+			toolId: string
+			name: string
+			input?: any
+			blobId?: string
+			responseId?: string
+			ts?: string
+	  }
+	| {
+			type: 'tool_result'
+			toolId: string
+			output?: any
+			blobId?: string
+			isError?: boolean
+			ts?: string
+	  }
+	| {
+			type: 'info'
+			text: string
+			level?: 'info' | 'warning' | 'error'
+			visibility?: 'ui' | 'next-user'
+			ts?: string
+	  }
+	| {
+			type: 'session'
+			action: string
+			model?: string
+			old?: string
+			new?: string
+			ts?: string
+	  }
+	| {
+			type: 'reset' | 'compact'
+			ts?: string
+	  }
+	| {
+			type: 'forked_from'
+			parent: string
+			ts?: string
+	  }
+	| {
+			type: 'input_history'
+			text: string
+			ts?: string
+	  }
 
 export interface SessionLive {
 	busy: boolean
@@ -375,14 +441,21 @@ function pruneSessions(): { deleted: number } {
 function detectInterruptedTools(entries: HistoryEntry[]): { name: string; id: string }[] {
 	const completedToolIds = new Set<string>()
 	for (const entry of entries) {
-		if (entry.role === 'tool_result' && entry.tool_use_id) completedToolIds.add(entry.tool_use_id)
+		if (entry.type === 'tool_result') completedToolIds.add(entry.toolId)
 	}
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
-		if (entry.role !== 'assistant' || !Array.isArray(entry.tools)) continue
+		if (entry.type !== 'tool_call') continue
+		if (completedToolIds.has(entry.toolId)) return []
 		const interrupted: { name: string; id: string }[] = []
-		for (const tool of entry.tools) {
-			if (!completedToolIds.has(tool.id)) interrupted.push({ name: tool.name, id: tool.id })
+		for (let j = i; j < entries.length; j++) {
+			const next = entries[j]!
+			if (next.type === 'tool_call') {
+				if (!completedToolIds.has(next.toolId)) interrupted.push({ name: next.name, id: next.toolId })
+				continue
+			}
+			if (next.type === 'tool_result') continue
+			break
 		}
 		return interrupted
 	}

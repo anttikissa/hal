@@ -173,7 +173,7 @@ function requestSnapshots(sessionId: string): Message[][] {
 	const out: Message[][] = []
 	for (let i = 0; i < entries.length; i++) {
 		const entry = entries[i]!
-		if (entry.role !== 'user' && entry.role !== 'tool_result') continue
+		if (entry.type !== 'user' && entry.type !== 'tool_result') continue
 		out.push(apiMessages.toProviderMessages(sessionId, entries.slice(0, i + 1), { prune: false }))
 	}
 	return out

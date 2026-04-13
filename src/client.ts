@@ -370,10 +370,9 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	tab.loaded = false
 	tab.liveHistory = sessionStore.loadLive(info.id).blocks as Block[]
 	for (const entry of history) {
-		if (entry.usage) {
-			tab.usage.input += (entry.usage as any).input ?? 0
-			tab.usage.output += (entry.usage as any).output ?? 0
-		}
+		if (entry.type !== 'assistant' || !entry.usage) continue
+		tab.usage.input += entry.usage.input ?? 0
+		tab.usage.output += entry.usage.output ?? 0
 	}
 	if (meta?.context) {
 		tab.contextUsed = meta.context.used
