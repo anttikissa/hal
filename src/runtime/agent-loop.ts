@@ -167,6 +167,26 @@ function formatErrorDetails(event: ProviderStreamEvent): string {
 	return event.message ?? 'Unknown error'
 }
 
+/**
+ * Sleep for a retry delay, but wake up early when the generation is aborted.
+ *
+ * This matters for /model and /cd steering: switching away from a rate-limited
+ * provider should cancel the old wait immediately instead of leaving the session
+ * stuck in a long backoff.
+ */
+async function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
+	if (signal.aborted) return
+	await new Promise<void>((resolve) => {
+		const timer = setTimeout(done, ms)
+		function done(): void {
+			clearTimeout(timer)
+			signal.removeEventListener('abort', done)
+			resolve()
+		}
+		signal.addEventListener('abort', done, { once: true })
+	})
+}
+
 // ── Tool call normalization ──
 // Strip redundant "cd $CWD && " prefix that models prepend to bash commands.
 // The tool already runs in the correct cwd, so this is pure noise.
@@ -391,7 +411,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								const delaySec = Math.ceil(delay / 1000)
 								emitInfo(sessionId, `Rate limited — retrying in ${delaySec}s`)
 								await ctx.onStatus?.(true, `rate limited — retrying in ${delaySec}s...`)
-								await Bun.sleep(delay)
+								await sleepWithAbort(delay, loopSignal)
+								if (loopSignal.aborted) {
+									aborted = true
+									break
+								}
 								shouldRetry = true
 							}
 						}
@@ -585,8 +609,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		})
 		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 	} finally {
-		state.activeRequests.delete(sessionId)
-		await ctx.onStatus?.(false)
+		// A newer generation may have replaced our AbortController already.
+		// In that case, do not clear the active flag or busy status out from under it.
+		if (state.activeRequests.get(sessionId) === ac) {
+			state.activeRequests.delete(sessionId)
+			await ctx.onStatus?.(false)
+		}
 	}
 }
 

@@ -192,6 +192,11 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 
 		if (cmdResult.output) emitInfo(session.id, cmdResult.output)
 		if (cmdResult.error) emitInfo(session.id, cmdResult.error, 'error')
+		if (label === 'steering' && cmdResult.restartGeneration && !cmdResult.error) {
+			// Steering commands like /model and /cd should abort the old run,
+			// apply the change, then immediately continue the pending turn.
+			void runGeneration(session, '', source)
+		}
 		return
 	}
 

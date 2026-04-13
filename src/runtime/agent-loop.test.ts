@@ -147,3 +147,55 @@ test('abort between tool iterations does not report max iterations', async () =>
 		ipc.appendEvent = origAppendEvent
 	}
 })
+
+
+test('abort during rate-limit backoff stops immediately', async () => {
+	const sessionId = `test-rate-limit-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const ac = new AbortController()
+	let abortScheduled = false
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield {
+				type: 'error',
+				message: 'rate limited',
+				status: 429,
+				retryAfterMs: 60_000,
+			}
+			yield { type: 'done' }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	const startedAt = Date.now()
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+			signal: ac.signal,
+			onStatus: async (_busy, activity) => {
+				if (!abortScheduled && activity?.startsWith('rate limited — retrying in ')) {
+					abortScheduled = true
+					setTimeout(() => ac.abort(), 10)
+				}
+			},
+		})
+		const elapsedMs = Date.now() - startedAt
+		expect(elapsedMs).toBeLessThan(1_000)
+		expect(events.some((event) => event.type === 'info' && event.text === '[paused]')).toBe(true)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
