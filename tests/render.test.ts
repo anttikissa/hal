@@ -103,6 +103,24 @@ describe('render', () => {
 		expect(clean.match(/Info/g)?.length ?? 0).toBe(2)
 	})
 
+	test('paused info before a steering prompt is hidden', () => {
+		const tab = client.currentTab()!
+		const ts = Date.now()
+		tab.history.push({ type: 'info', text: '[paused]', ts })
+		tab.history.push({ type: 'user', text: 'Esc does not exit it. What does?', status: 'steering', ts: ts + 1000 })
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).not.toContain('[paused]')
+		expect(clean).toContain('You (steering)')
+		expect(clean).toContain('Esc does not exit it. What does?')
+	})
+
+	test('paused info still renders when there is no steering prompt after it', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('[paused]')
+	})
+
 	test('status line shows local pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')

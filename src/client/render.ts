@@ -93,6 +93,27 @@ function renderGroup(group: Block[], cols: number): string[] {
 	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 }
 
+function shouldHideBlock(history: Block[], index: number): boolean {
+	const block = history[index]
+	if (!block) return false
+
+	// Steering already tells the user why generation stopped. Hiding the
+	// immediately preceding [paused] notice keeps the history focused on the
+	// steering prompt instead of showing a redundant status block right before it.
+	if (block.type !== 'info' || block.text !== '[paused]') return false
+	const next = history[index + 1]
+	return next?.type === 'user' && next.status === 'steering'
+}
+
+function visibleHistory(history: Block[]): Block[] {
+	const visible: Block[] = []
+	for (let i = 0; i < history.length; i++) {
+		if (shouldHideBlock(history, i)) continue
+		visible.push(history[i]!)
+	}
+	return visible
+}
+
 // ── Frame building ───────────────────────────────────────────────────────────
 
 function renderHistory(lines: string[], tab: Tab): number {
@@ -104,13 +125,14 @@ function renderHistory(lines: string[], tab: Tab): number {
 	}
 
 	const renderedLines: string[] = []
+	const history = visibleHistory(tab.history)
 	let count = 0
-	for (let i = 0; i < tab.history.length; ) {
-		const group = [tab.history[i]!]
+	for (let i = 0; i < history.length; ) {
+		const group = [history[i]!]
 		const key = infoGroupKey(group[0]!)
 		if (key) {
-			for (let j = i + 1; j < tab.history.length && infoGroupKey(tab.history[j]!) === key; j++) {
-				group.push(tab.history[j]!)
+			for (let j = i + 1; j < history.length && infoGroupKey(history[j]!) === key; j++) {
+				group.push(history[j]!)
 			}
 		}
 		if (renderedLines.length > 0) renderedLines.push('')
