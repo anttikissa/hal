@@ -21,9 +21,43 @@ function makeTab() {
 
 describe('client streaming blocks', () => {
 	beforeEach(() => {
+		client.resetForTests()
 		client.state.tabs.length = 0
 		client.state.tabs.push(makeTab())
 		client.state.activeTab = 0
+	})
+
+
+	test('paused info waits briefly before rendering', async () => {
+		client.handleEvent({
+			type: 'info',
+			sessionId: 's1',
+			text: '[paused]',
+			createdAt: '2026-04-05T17:31:00.000Z',
+		})
+		expect(client.currentTab()!.history).toHaveLength(0)
+		await Bun.sleep(client.config.pausedNoticeDelayMs + 10)
+		expect(client.currentTab()!.history).toHaveLength(1)
+		expect(client.currentTab()!.history[0]).toMatchObject({ type: 'info', text: '[paused]' })
+	})
+
+	test('steering prompt cancels a pending paused info block', async () => {
+		client.handleEvent({
+			type: 'info',
+			sessionId: 's1',
+			text: '[paused]',
+			createdAt: '2026-04-05T17:31:00.000Z',
+		})
+		client.handleEvent({
+			type: 'prompt',
+			sessionId: 's1',
+			text: 'Steer',
+			label: 'steering',
+			createdAt: '2026-04-05T17:31:00.010Z',
+		})
+		await Bun.sleep(client.config.pausedNoticeDelayMs + 10)
+		expect(client.currentTab()!.history).toHaveLength(1)
+		expect(client.currentTab()!.history[0]).toMatchObject({ type: 'user', text: 'Steer', status: 'steering' })
 	})
 
 	test('thinking stream becomes a real block with blob metadata and survives stream end', () => {

@@ -2,11 +2,16 @@
   client: {
     backgroundLoadTabs: true,
     backgroundLoadBlobs: true,
-    repaintAfterBlobLoad: true
+    repaintAfterBlobLoad: true,
+    pausedNoticeDelayMs: 50,
   },
   blocks: { blobBatchSize: 64 },
   render: { forkHistoryDimFactor: 0.82 },
   agentLoop: { maxIterations: 50 },
   memory: { warnBytes: 1500000000, killBytes: 5000000000 },
-  models: { defaultModel: 'gpt' }
+  models: {
+    // hlelo
+    defaultModel: 'gpt-5.4',
+    default: 'gpt'
+  }
 }
