@@ -45,7 +45,23 @@ function makeSessionId(): string {
 	return `${month}-${suffix}`
 }
 
-function createSession(): Session {
+function sessionLabel(session: Session): string {
+	return `${session.name} (${session.id})`
+}
+
+function recordOpenedTab(session: Session, opener?: Session): void {
+	const text = opener
+		? `User opened a new tab: ${sessionLabel(session)}. Opened from ${sessionLabel(opener)}.`
+		: `User opened a new tab: ${sessionLabel(session)}.`
+	sessionStore.appendHistorySync(session.id, [{ type: 'info', text, ts: session.createdAt }])
+}
+
+function recordForkedTab(child: Session, parent: Session): void {
+	const text = `User forked ${sessionLabel(parent)} into ${sessionLabel(child)}.`
+	sessionStore.appendHistorySync(child.id, [{ type: 'info', text, ts: child.createdAt }])
+}
+
+function createSession(opener?: Session): Session {
 	const session: Session = {
 		id: makeSessionId(),
 		name: `tab ${activeSessions.length + 1}`,
@@ -64,6 +80,7 @@ function createSession(): Session {
 		createdAt: session.createdAt,
 		topic: undefined,
 	})
+	recordOpenedTab(session, opener)
 	return session
 }
 
@@ -86,6 +103,8 @@ async function createForkSession(sourceId: string): Promise<Session> {
 	const meta = sessionStore.loadSessionMeta(newId)
 	const session = sessionFromMeta(meta)
 	if (!session) throw new Error(`Failed to create fork session ${newId}`)
+	const parent = findSession(sourceId)
+	if (parent) recordForkedTab(session, parent)
 	insertSessionAfter(session, sourceId)
 	return session
 }
@@ -377,7 +396,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 				emitInfo(parentId, msg)
 				emitInfo(child.id, msg)
 			} else {
-				await createSession()
+				createSession(session)
 			}
 			broadcastSessions()
 			break

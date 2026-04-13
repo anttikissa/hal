@@ -35,9 +35,27 @@ function spawnHal() {
 }
 
 function readSessionIds(): string[] {
-	const text = readFileSync(join(tmpDir, "ipc", "state.ason"), "utf-8")
+	const path = join(tmpDir, "ipc", "state.ason")
+	if (!existsSync(path)) return []
+	const text = readFileSync(path, "utf-8")
 	const state = ason.parse(text) as { sessions?: string[] }
 	return state.sessions ?? []
+}
+
+function readHistory(sessionId: string): any[] {
+	const text = readFileSync(join(tmpDir, "sessions", sessionId, "history.asonl"), "utf-8").trim()
+	if (!text) return []
+	return text.split("\n").map((line) => ason.parse(line))
+}
+
+async function waitForHistory(sessionId: string): Promise<any[]> {
+	const deadline = Date.now() + 2000
+	while (Date.now() < deadline) {
+		const path = join(tmpDir, "sessions", sessionId, "history.asonl")
+		if (existsSync(path)) return readHistory(sessionId)
+		await Bun.sleep(50)
+	}
+	throw new Error(`Timed out waiting for history for ${sessionId}`)
 }
 
 
@@ -66,6 +84,41 @@ describe("tabs", () => {
 		// Should show two tabs
 		expect(out).toContain(" 1 tab 1 ")
 		expect(out).toContain("[2 tab 2]")
+	})
+
+	test("new tabs record who opened them", async () => {
+		const proc = spawnHal()
+		await Bun.sleep(300)
+
+		const before = readSessionIds()
+		expect(before).toHaveLength(1)
+		const openerId = before[0]!
+
+		proc.stdin!.write(new Uint8Array([0x14])) // ctrl-t
+		proc.stdin!.flush()
+
+		const deadline = Date.now() + 2000
+		while (Date.now() < deadline) {
+			if (readSessionIds().length === 2) break
+			await Bun.sleep(50)
+		}
+
+		const after = readSessionIds()
+		expect(after).toHaveLength(2)
+		const childId = after[1]!
+		const childHistory = await waitForHistory(childId)
+		const first = childHistory[0]
+
+		expect(first).toMatchObject({ type: 'info' })
+		expect(first?.text).toContain('User opened a new tab')
+		expect(first?.text).toContain('tab 2')
+		expect(first?.text).toContain(childId)
+		expect(first?.text).toContain('tab 1')
+		expect(first?.text).toContain(openerId)
+
+		proc.stdin!.write(new Uint8Array([0x03]))
+		proc.stdin!.flush()
+		await proc.exited
 	})
 
 	test("ctrl-f forks the current tab", async () => {
