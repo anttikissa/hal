@@ -284,20 +284,3 @@ test('/system reflects updated prompt files', async () => {
 })
 
 
-test('/model with an explicit target requests a restart while busy', async () => {
-	const session = makeSession()
-	const result = await commands.executeCommand('/model gpt-5.4', session, () => {})
-
-	expect(result.handled).toBe(true)
-	expect(result.error).toBeUndefined()
-	expect(result.output).toContain('Model set to GPT 5.4')
-	expect(result.restartGeneration).toBe(true)
-})
-
-test('/model with no target only lists models', async () => {
-	const result = await commands.executeCommand('/model', makeSession(), () => {})
-
-	expect(result.handled).toBe(true)
-	expect(result.error).toBeUndefined()
-	expect(result.restartGeneration).toBeUndefined()
-})

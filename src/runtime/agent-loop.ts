@@ -170,9 +170,9 @@ function formatErrorDetails(event: ProviderStreamEvent): string {
 /**
  * Sleep for a retry delay, but wake up early when the generation is aborted.
  *
- * This matters for /model and /cd steering: switching away from a rate-limited
- * provider should cancel the old wait immediately instead of leaving the session
- * stuck in a long backoff.
+ * This matters for provider switches: changing away from a rate-limited model
+ * should cancel the old wait immediately instead of leaving the session stuck
+ * in a long backoff.
  */
 async function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
 	if (signal.aborted) return
@@ -609,12 +609,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		})
 		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 	} finally {
-		// A newer generation may have replaced our AbortController already.
-		// In that case, do not clear the active flag or busy status out from under it.
-		if (state.activeRequests.get(sessionId) === ac) {
-			state.activeRequests.delete(sessionId)
-			await ctx.onStatus?.(false)
-		}
+		state.activeRequests.delete(sessionId)
+		await ctx.onStatus?.(false)
 	}
 }
 

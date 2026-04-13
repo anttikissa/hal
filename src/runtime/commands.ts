@@ -26,8 +26,6 @@ export interface CommandResult {
 	error?: string
 	/** Whether the command was recognized and handled. */
 	handled: boolean
-	/** If the command ran while steering, immediately continue generation. */
-	restartGeneration?: boolean
 }
 
 /** Session state that commands can read and modify. */
@@ -221,7 +219,7 @@ handlers['model'] = (args, session, emitInfo) => {
 	const newModel = models.resolveModel(args)
 	session.model = newModel
 	const display = models.displayModel(newModel)
-	return { output: `Model set to ${display} (${newModel})`, handled: true, restartGeneration: true }
+	return { output: `Model set to ${display} (${newModel})`, handled: true }
 }
 
 // /clear — clear session history
@@ -332,7 +330,7 @@ handlers['cd'] = (args, session) => {
 		const files = agents.map((f) => `${f.name} (${context.formatBytes(f.bytes)})`)
 		parts.push(`Loaded ${files.join(', ')}`)
 	}
-	return { output: parts.join('\n'), handled: true, restartGeneration: true }
+	return { output: parts.join('\n'), handled: true }
 }
 
 // /system — print the full preprocessed system prompt (SYSTEM.md + AGENTS.md chain)
