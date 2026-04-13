@@ -59,6 +59,9 @@ test('prompt watcher reports SYSTEM.md edits', async () => {
 	})
 
 	try {
+		// fs.watch can miss an edit that lands immediately after registration on
+		// some platforms. Give the watcher one short tick to attach first.
+		await wait(100)
 		writeFileSync(join(tempDir, 'SYSTEM.md'), 'beta\n')
 		const deadline = Date.now() + 1500
 		while (Date.now() < deadline && seen.length === 0) await wait(25)
@@ -81,6 +84,8 @@ test('prompt watcher reports AGENTS.md edits', async () => {
 	})
 
 	try {
+		// Same race as above: let the watcher fully attach before mutating files.
+		await wait(100)
 		writeFileSync(join(tempDir, 'repo', 'AGENTS.md'), 'updated\n')
 		const deadline = Date.now() + 1500
 		while (Date.now() < deadline && seen.length === 0) await wait(25)
