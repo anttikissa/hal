@@ -40,7 +40,7 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 	// Load from disk, merging over defaults
 	if (existsSync(path)) {
 		try {
-			Object.assign(data, ason.parse(readFileSync(path, 'utf-8')) as any)
+			Object.assign(data, ason.parse(readFileSync(path, 'utf-8'), { comments: true }) as any)
 		} catch {}
 	}
 
@@ -90,7 +90,7 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 				if (debounce) clearTimeout(debounce)
 				debounce = setTimeout(() => {
 					try {
-						const next = ason.parse(readFileSync(path, 'utf-8')) as Record<string, any>
+						const next = ason.parse(readFileSync(path, 'utf-8'), { comments: true }) as Record<string, any>
 						const before = ason.stringify(data)
 						const after = ason.stringify(next)
 						if (before === after) return

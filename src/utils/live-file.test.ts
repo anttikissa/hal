@@ -108,3 +108,22 @@ test('parse errors in file are ignored gracefully', () => {
 	const data = liveFiles.liveFile(path, { safe: true }, { watch: false })
 	expect(data.safe).toBe(true) // defaults survive
 })
+
+test('save preserves ASON comments from disk', () => {
+	const path = join(dir, 'comments.ason')
+	const src = `{
+	// model defaults
+	models: {
+		// preferred alias
+		defaultModel: 'opus'
+	}
+}`
+	writeFileSync(path, src + '\n')
+	const data = liveFiles.liveFile(path, { models: { defaultModel: '' } }, { watch: false })
+	data.models.defaultModel = 'gpt'
+	liveFiles.save(data)
+	const disk = readFileSync(path, 'utf-8')
+	expect(disk).toContain('// model defaults')
+	expect(disk).toContain('// preferred alias')
+	expect(disk).toContain("defaultModel: 'gpt'")
+})
