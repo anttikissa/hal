@@ -370,6 +370,36 @@ function readConfigPath(path: string): CommandResult {
 	return { output: `${path}:\n${ason.stringify(value, 'long')}`, handled: true }
 }
 
+function liveConfigValue(path: string): any {
+	const parts = splitConfigPath(path)
+	if (parts.length === 0) return undefined
+	let value: any = config.modules[parts[0]!]
+	for (const part of parts.slice(1)) {
+		if (!value || typeof value !== 'object' || !(part in value)) return undefined
+		value = value[part]
+	}
+	return value
+}
+
+function canUseBareStringValue(raw: string): boolean {
+	const trimmed = raw.trim()
+	if (!trimmed) return false
+	if (/\s/.test(trimmed)) return false
+	if (/^["'`\[{]/.test(trimmed)) return false
+	return true
+}
+
+function parseConfigValue(path: string, raw: string): any {
+	try {
+		return ason.parse(raw)
+	} catch (err) {
+		// Convenience: if the existing live value is a string, accept a single
+		// bare token like `gpt` without forcing quotes.
+		if (typeof liveConfigValue(path) === 'string' && canUseBareStringValue(raw)) return raw.trim()
+		throw err
+	}
+}
+
 function ensureConfigObject(root: Record<string, any>, parts: string[]): Record<string, any> | null {
 	let node = root
 	for (const part of parts) {
@@ -454,7 +484,7 @@ handlers['config'] = (args) => {
 	if (!parsed.value) return readConfigPath(parsed.path)
 
 	try {
-		const value = ason.parse(parsed.value)
+		const value = parseConfigValue(parsed.path, parsed.value)
 		return setConfigPath(parsed.path, value, parsed.temp)
 	} catch (err: any) {
 		return { error: `/config: could not parse value: ${err?.message ?? String(err)}`, handled: true }
