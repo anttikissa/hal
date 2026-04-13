@@ -211,7 +211,7 @@ describe('render', () => {
 		expect(withText.length).toBe(empty.length)
 	})
 
-	test('fullscreen growth with non-append changes forces repaint', () => {
+	test('fullscreen growth with non-append changes does not clear scrollback', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -223,8 +223,32 @@ describe('render', () => {
 			captureOutput(() => render.draw())
 
 			tab.history.unshift({ type: 'info', text: 'zero' })
+			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).toContain('\x1b[2J\x1b[H\x1b[3J')
+			expect(output).not.toContain('\x1b[3J')
+			expect(output).not.toContain('\x1b[2J\x1b[H')
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
+	test('fullscreen ignores changes entirely above the live viewport', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
+		try {
+			for (let i = 0; i < 12; i++) {
+				tab.history.push({ type: 'assistant', text: `line ${i}`, ts: i })
+			}
+			captureOutput(() => render.draw())
+
+			;(tab.history[0] as any).text = 'changed offscreen'
+			tab.historyVersion++
+			const output = captureOutput(() => render.draw())
+			expect(output).toBe('')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

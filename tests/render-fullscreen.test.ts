@@ -44,7 +44,7 @@ beforeEach(() => {
 })
 
 describe('render fullscreen growth', () => {
-	test('forces repaint when growth changes existing rows', () => {
+	test('rewrites visible rows without clearing scrollback when growth changes existing rows', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -56,8 +56,10 @@ describe('render fullscreen growth', () => {
 			captureOutput(() => render.draw())
 
 			tab.history.unshift({ type: 'info', text: 'zero' })
+			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).toContain('\x1b[2J\x1b[H\x1b[3J')
+			expect(output).not.toContain('\x1b[3J')
+			expect(output).not.toContain('\x1b[2J\x1b[H')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

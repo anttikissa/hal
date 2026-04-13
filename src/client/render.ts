@@ -477,8 +477,9 @@ function draw(force = false): void {
 		return draw(true)
 	}
 
-	// ── Diff: find first changed line ──
+	// ── Diff: find changed range ──
 	let first = -1
+	let last = -1
 	const max = Math.max(lines.length, prevLines.length)
 	for (let i = 0; i < max; i++) {
 		// Compare with null so we can distinguish "line is empty string"
@@ -486,8 +487,21 @@ function draw(force = false): void {
 		// (e.g. shift+enter at end of prompt → new blank prompt line) is
 		// invisible to the diff because `undefined ?? ''` === `''`.
 		if ((lines[i] ?? null) !== (prevLines[i] ?? null)) {
-			first = i
-			break
+			if (first === -1) first = i
+			last = i
+		}
+	}
+
+	// If the first changed line is already in scrollback, we cannot move the
+	// cursor there — terminals clamp cursor-up at the top of the visible screen.
+	// Ignore purely offscreen changes, and clamp mixed changes to the top of the
+	// live viewport so we only redraw what can actually be updated in-place.
+	const viewportTop = Math.max(0, prevLines.length - rows)
+	if (first !== -1 && first < viewportTop) {
+		if (last < viewportTop) {
+			first = -1
+		} else {
+			first = viewportTop
 		}
 	}
 
@@ -515,9 +529,6 @@ function draw(force = false): void {
 	// REWRITE: first < prevLines.length. Some existing line changed. Move
 	// there, overwrite from that point forward.
 	const isAppend = first >= prevLines.length && prevLines.length > 0
-	if (fullscreen && lines.length > prevLines.length && !isAppend) {
-		return draw(true)
-	}
 	if (isAppend) {
 		// Move to the last existing line, then \r\n into new territory.
 		out.push(moveCursor(cursorRow, prevLines.length - 1))
