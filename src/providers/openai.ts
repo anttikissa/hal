@@ -11,6 +11,7 @@ import type { Message, Provider, ProviderRequest, ProviderStreamEvent } from '..
 import { auth, type Credential } from '../auth.ts'
 import { provider as providerUtils } from './provider.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { reasoningSignature } from '../session/reasoning-signature.ts'
 
 // ── Endpoint configuration ──
 
@@ -108,19 +109,6 @@ function formatForeignThinkingForOpenAI(thinking: unknown, sourceModel: unknown)
 	return `[model ${model} thinking]\n${text}`
 }
 
-function parseReasoningSignature(signature: unknown): any | null {
-	if (typeof signature !== 'string' || !signature.trim()) return null
-
-	try {
-		const parsed = JSON.parse(signature)
-		if (parsed?.type !== 'reasoning') return null
-		if (typeof parsed.encrypted_content !== 'string' || !parsed.encrypted_content) return null
-		return parsed
-	} catch {
-		return null
-	}
-}
-
 function convertResponsesMessages(messages: Message[]): any[] {
 	const input: any[] = []
 	const seenReasoningIds = new Set<string>()
@@ -186,9 +174,9 @@ function convertResponsesMessages(messages: Message[]): any[] {
 			}
 
 			if (block.type === 'thinking') {
-				const signature = parseReasoningSignature(block.signature ?? (block as any).thinkingSignature)
-				if (signature && !seenReasoningIds.has(signature.id)) {
-					seenReasoningIds.add(signature.id)
+				const signature = reasoningSignature.parse(block.signature ?? (block as any).thinkingSignature)
+				if (signature && (!signature.id || !seenReasoningIds.has(signature.id))) {
+					if (signature.id) seenReasoningIds.add(signature.id)
 					input.push(signature)
 					continue
 				}
@@ -377,10 +365,8 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 		const info = state.itemMap.get(outputIndex)
 
 		if (info?.type === 'reasoning') {
-			const item = event.item
-			if (item?.type === 'reasoning' && typeof item.encrypted_content === 'string' && item.encrypted_content) {
-				return [{ type: 'thinking_signature', signature: JSON.stringify(item) }]
-			}
+			const signature = reasoningSignature.minimize(event.item)
+			if (signature) return [{ type: 'thinking_signature', signature }]
 			return []
 		}
 
