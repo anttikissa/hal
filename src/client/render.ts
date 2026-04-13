@@ -77,8 +77,10 @@ function renderEntry(block: Block, cols: number): string[] {
 }
 
 function infoGroupKey(block: Block): string | null {
-	// Only coalesce info blocks — errors are multi-line and need full rendering
-	if (block.type !== 'info' || !block.ts) return null
+	// Only coalesce simple one-line info blocks. Multiline output such as
+	// `/config` should render as a normal block so its internal line breaks
+	// survive instead of being flattened into bracket "bricks".
+	if (block.type !== 'info' || !block.ts || block.text.includes('\n')) return null
 	const d = new Date(block.ts)
 	return `info:${d.getHours()}:${d.getMinutes()}`
 }

@@ -87,6 +87,22 @@ describe('render', () => {
 		expect(clean.match(/Info/g)?.length ?? 0).toBe(1)
 	})
 
+	test('multiline info blocks do not get flattened into a coalesced info group', () => {
+		const tab = client.currentTab()!
+		const ts = Date.now()
+		tab.history.push({ type: 'info', text: 'Ready', ts })
+		tab.history.push({
+			type: 'info',
+			text: 'Current config:\n{\n\tprompt: {\n\t\tmaxPromptLines: 10,\n\t},\n}',
+			ts: ts + 1000,
+		})
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('Ready')
+		expect(clean).toContain('Current config:')
+		expect(clean).not.toContain('[Current config:]')
+		expect(clean.match(/Info/g)?.length ?? 0).toBe(2)
+	})
+
 	test('status line shows local pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')
