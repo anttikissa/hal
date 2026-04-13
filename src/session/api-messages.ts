@@ -16,7 +16,9 @@ function formatLocalTime(ts?: string): string | null {
 	try {
 		const d = new Date(ts)
 		if (isNaN(d.getTime())) return null
-		return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+		const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+		const date = d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
+		return `${date} ${time}`
 	} catch {
 		return null
 	}

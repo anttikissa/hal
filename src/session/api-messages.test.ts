@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test'
 import type { Message } from '../protocol.ts'
 import { apiMessages } from './api-messages.ts'
 
-test('formatLocalTime returns HH:MM in local time', () => {
+test('formatLocalTime returns "Mon DD HH:MM" in local time', () => {
 	const result = apiMessages.formatLocalTime('2026-03-28T20:03:39.833Z')
-	// Should be a HH:MM string (exact value depends on system timezone)
-	expect(result).toMatch(/^\d{2}:\d{2}$/)
+	// Should be "Mon DD HH:MM" string (exact value depends on system timezone)
+	expect(result).toMatch(/^\d{1,2} [A-Z][a-z]{2} \d{2}:\d{2}$/)
 })
 
 test('formatLocalTime returns null for missing/invalid input', () => {
