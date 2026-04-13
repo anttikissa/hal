@@ -31,7 +31,7 @@ export interface HistoryEntry {
 	// User/assistant messages
 	role?: 'user' | 'assistant' | 'tool_result'
 	// Info/session/reset/compact/forked_from entries
-	type?: 'info' | 'session' | 'reset' | 'compact' | 'forked_from'
+	type?: 'info' | 'session' | 'reset' | 'compact' | 'forked_from' | 'input_history'
 	text?: string
 	content?: string | any[]
 	ts?: string

@@ -249,8 +249,9 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 // Extract user input strings from history for readline-style input history.
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	return entries
-		.filter((e) => e.role === 'user')
 		.map((e) => {
+			if (e.type === 'input_history') return e.text ?? ''
+			if (e.role !== 'user') return ''
 			if (typeof e.content === 'string') return e.content
 			if (Array.isArray(e.content)) {
 				return e.content

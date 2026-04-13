@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, rmSync, readFileSync, readdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { ason } from '../src/utils/ason.ts'
 
 let tmpDir: string
 
@@ -28,6 +29,29 @@ function spawnHal() {
 			HOME: process.env.HOME,
 		},
 	})
+}
+
+async function readOnlySessionHistory(): Promise<any[]> {
+	const text = readFileSync(await waitForOnlySessionHistoryPath(), 'utf-8')
+	return text
+		.trim()
+		.split('\n')
+		.filter(Boolean)
+		.map((line) => ason.parse(line))
+}
+
+async function waitForOnlySessionHistoryPath(): Promise<string> {
+	const deadline = Date.now() + 2000
+	while (Date.now() < deadline) {
+		const sessionsDir = join(tmpDir, 'sessions')
+		const ids = existsSync(sessionsDir) ? readdirSync(sessionsDir) : []
+		if (ids.length === 1) {
+			const path = join(sessionsDir, ids[0]!, 'history.asonl')
+			if (existsSync(path)) return path
+		}
+		await Bun.sleep(50)
+	}
+	throw new Error('Timed out waiting for history.asonl')
 }
 
 describe('main', () => {
@@ -75,6 +99,23 @@ describe('main', () => {
 
 		// History is now persisted, so the marker should appear on restart
 		expect(stdout).toContain(marker)
+	})
+
+	test('persists failed slash commands for retry history', async () => {
+		const first = spawnHal()
+		await Bun.sleep(250)
+		first.stdin!.write('/nope\r')
+		first.stdin!.flush()
+		await Bun.sleep(1000)
+		first.stdin!.write(new Uint8Array([0x03]))
+		first.stdin!.flush()
+		await first.exited
+
+		const history = await readOnlySessionHistory()
+		expect(history).toContainEqual(expect.objectContaining({
+			type: 'input_history',
+			text: '/nope',
+		}))
 	})
 
 })

@@ -128,6 +128,14 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 	})
 }
 
+function persistCommandRetryInput(sessionId: string, text: string, result: Awaited<ReturnType<typeof commands.executeCommand>>): void {
+	// Persist failed slash commands for up-arrow recall after reload. These are
+	// stored as non-message history entries so they do not appear in the visible
+	// conversation or get sent back to the model.
+	if (!result.handled || !result.error) return
+	sessionStore.appendHistorySync(sessionId, [{ type: 'input_history', text, ts: new Date().toISOString() }])
+}
+
 // ── Prompt handling ──
 
 /** Process a prompt: check for slash commands, then forward to agent loop.
@@ -154,6 +162,7 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 	)
 
 	if (cmdResult.handled) {
+		persistCommandRetryInput(session.id, text, cmdResult)
 		// Sync any mutations back to session (e.g. /model, /cd)
 		const cwdChanged = session.cwd !== sessionState.cwd
 		const modelChanged = session.model !== sessionState.model
