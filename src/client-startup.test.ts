@@ -183,6 +183,93 @@ describe('client startup', () => {
 		expect(blobLoads).toContainEqual(['s2'])
 	})
 
+	test('closing the active tab returns to the most recently visited surviving tab', async () => {
+		const shared = makeSharedState(['s1', 's2', 's3'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: (() => void) | undefined
+		ipc.readState = () => shared
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		client.switchTab(1)
+		client.switchTab(2)
+
+		shared.sessions = ['s1', 's2']
+		shared.openSessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		onIpcChange?.()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.sessionId).toBe('s2')
+	})
+
+	test('opening a tab activates the new session, and closing it returns to the previous tab', async () => {
+		const shared = makeSharedState(['s1', 's2'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: (() => void) | undefined
+		ipc.readState = () => shared
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		client.switchTab(1)
+		client.sendCommand('open')
+
+		shared.sessions = ['s1', 's2', 's3']
+		shared.openSessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		onIpcChange?.()
+		await Bun.sleep(10)
+		expect(client.currentTab()?.sessionId).toBe('s3')
+
+		shared.sessions = ['s1', 's2']
+		shared.openSessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		onIpcChange?.()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.sessionId).toBe('s2')
+	})
+
+	test('closing a forked middle tab returns to the parent tab, not the tab on the right', async () => {
+		const shared = makeSharedState(['s1', 's3', 's2'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: (() => void) | undefined
+		ipc.readState = () => shared
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		client.switchTab(0)
+		client.switchTab(1)
+
+		shared.sessions = ['s1', 's2']
+		shared.openSessions = [
+			{ id: 's1', name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
+			{ id: 's2', name: 'tab 2', cwd: '/tmp/s2', model: 'openai/gpt-5.4' },
+		]
+		onIpcChange?.()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.sessionId).toBe('s1')
+	})
+
 	test('tails events from the end without replaying the whole event log', async () => {
 		const shared = makeSharedState(['s1'])
 		ipc.readState = () => shared

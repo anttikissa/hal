@@ -67,13 +67,26 @@ function createSession(): Session {
 	return session
 }
 
+function insertSessionAfter(session: Session, afterId?: string): void {
+	if (!afterId) {
+		activeSessions.push(session)
+		return
+	}
+	const idx = activeSessions.findIndex((item) => item.id === afterId)
+	if (idx < 0) {
+		activeSessions.push(session)
+		return
+	}
+	activeSessions.splice(idx + 1, 0, session)
+}
+
 async function createForkSession(sourceId: string): Promise<Session> {
 	const newId = makeSessionId()
 	await sessionStore.forkSession(sourceId, newId)
 	const meta = sessionStore.loadSessionMeta(newId)
 	const session = sessionFromMeta(meta)
 	if (!session) throw new Error(`Failed to create fork session ${newId}`)
-	activeSessions.push(session)
+	insertSessionAfter(session, sourceId)
 	return session
 }
 

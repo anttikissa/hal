@@ -106,4 +106,44 @@ describe("tabs", () => {
 		proc.stdin!.flush()
 		await proc.exited
 	})
+
+
+	test("fork inserts the new tab next to its parent", async () => {
+		const proc = spawnHal()
+		await Bun.sleep(300)
+
+		proc.stdin!.write(new Uint8Array([0x14])) // ctrl-t
+		proc.stdin!.flush()
+		const secondTabDeadline = Date.now() + 2000
+		while (Date.now() < secondTabDeadline) {
+			if (readSessionIds().length === 2) break
+			await Bun.sleep(50)
+		}
+
+		const beforeFork = readSessionIds()
+		expect(beforeFork).toHaveLength(2)
+		const parentId = beforeFork[0]!
+		const rightTabId = beforeFork[1]!
+
+		const commandPath = join(tmpDir, "ipc", "commands.asonl")
+		const forkCommand = ason.stringify({ type: 'open', text: `fork:${parentId}`, sessionId: parentId, createdAt: new Date().toISOString() }, 'short')
+		Bun.write(commandPath, `${readFileSync(commandPath, 'utf-8')}${forkCommand}\n`)
+
+		const forkDeadline = Date.now() + 2000
+		while (Date.now() < forkDeadline) {
+			if (readSessionIds().length === 3) break
+			await Bun.sleep(50)
+		}
+
+		const afterFork = readSessionIds()
+		expect(afterFork).toHaveLength(3)
+		expect(afterFork[0]).toBe(parentId)
+		expect(afterFork[2]).toBe(rightTabId)
+		expect(afterFork[1]).not.toBe(parentId)
+		expect(afterFork[1]).not.toBe(rightTabId)
+
+		proc.stdin!.write(new Uint8Array([0x03]))
+		proc.stdin!.flush()
+		await proc.exited
+	})
 })
