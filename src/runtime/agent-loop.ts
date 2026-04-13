@@ -450,7 +450,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					historyEntries.push({
 						type: 'thinking',
 						blobId,
-						signature: thinkingSignature || undefined,
 						ts,
 					})
 				}
@@ -506,7 +505,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				historyEntries.push({
 					type: 'thinking',
 					blobId,
-					signature: thinkingSignature || undefined,
 					ts,
 				})
 			}

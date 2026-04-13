@@ -59,7 +59,10 @@ test('writes thinking blobs while streaming and replays them into API history', 
 			{ type: 'text', text: 'done' },
 		])
 		const history = sessions.loadHistory(sessionId)
-		expect(history.find((item) => item.type === 'thinking')?.blobId).toBe(thinkingEvent.blobId)
+		const thinkingEntry = history.find((item) => item.type === 'thinking')
+		expect(thinkingEntry).toMatchObject({ type: 'thinking', blobId: thinkingEvent.blobId })
+		expect(thinkingEntry && 'signature' in thinkingEntry ? (thinkingEntry as any).signature : undefined).toBeUndefined()
+		expect(thinkingEntry && 'text' in thinkingEntry ? (thinkingEntry as any).text : undefined).toBeUndefined()
 		expect(history.find((item) => item.type === 'assistant')?.text).toBe('done')
 	} finally {
 		providerLoader.getProvider = origGetProvider
