@@ -112,3 +112,40 @@ describe('client streaming blocks', () => {
 		expect(client.state.activity.get('s1')).toBe('generating...')
 	})
 })
+
+	test('info during assistant streaming starts a continuation chunk and response does not duplicate it', () => {
+		client.handleEvent({
+			type: 'stream-delta',
+			sessionId: 's1',
+			channel: 'assistant',
+			text: 'hello ',
+			createdAt: '2026-04-05T17:31:00.000Z',
+		})
+		client.handleEvent({
+			type: 'info',
+			sessionId: 's1',
+			text: 'system.md was reloaded',
+			createdAt: '2026-04-05T17:31:01.000Z',
+		})
+		client.handleEvent({
+			type: 'stream-delta',
+			sessionId: 's1',
+			channel: 'assistant',
+			text: 'world',
+			createdAt: '2026-04-05T17:31:02.000Z',
+		})
+		client.handleEvent({
+			type: 'response',
+			sessionId: 's1',
+			text: 'hello world',
+			createdAt: '2026-04-05T17:31:03.000Z',
+		})
+
+		const tab = client.currentTab()!
+		expect(tab.history).toHaveLength(3)
+		expect(tab.history[0]).toMatchObject({ type: 'assistant', text: 'hello ' })
+		expect(tab.history[1]).toMatchObject({ type: 'info', text: 'system.md was reloaded' })
+		expect(tab.history[2]).toMatchObject({ type: 'assistant', text: 'world' })
+		expect((tab.history[0] as any).id).toEqual(expect.any(String))
+		expect((tab.history[2] as any).continue).toBe((tab.history[0] as any).id)
+	})

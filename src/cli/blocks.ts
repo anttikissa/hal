@@ -34,7 +34,7 @@ function sanitizeTerminalText(text: string): string {
 // dimmed: true for blocks inherited from a fork parent (rendered with muted colors)
 export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean }
-	| { type: 'assistant'; text: string; model?: string; ts?: number; streaming?: boolean; dimmed?: boolean }
+	| { type: 'assistant'; text: string; model?: string; id?: string; continue?: string; ts?: number; streaming?: boolean; dimmed?: boolean }
 	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number; streaming?: boolean; dimmed?: boolean }
 	| {
 			type: 'tool'
@@ -136,6 +136,8 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 				type: 'assistant',
 				text: entry.text,
 				model: entry.model,
+				id: entry.id,
+				continue: entry.continue,
 				ts: parseTs(entry.ts),
 				dimmed,
 			})

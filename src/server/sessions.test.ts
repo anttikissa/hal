@@ -87,6 +87,39 @@ test('live snapshot stores uncommitted streaming blocks', async () => {
 	expect(sessions.loadLive(id).blocks).toEqual([])
 })
 
+
+test('live snapshot links assistant chunks across info interruptions', async () => {
+	const id = await makeSession()
+	sessions.applyLiveEvent(id, {
+		type: 'stream-delta',
+		sessionId: id,
+		channel: 'assistant',
+		text: 'hello ',
+		createdAt: '2026-04-09T20:01:00.000Z',
+	})
+	sessions.applyLiveEvent(id, {
+		type: 'info',
+		sessionId: id,
+		text: 'system.md was reloaded',
+		createdAt: '2026-04-09T20:01:01.000Z',
+	})
+	sessions.applyLiveEvent(id, {
+		type: 'stream-delta',
+		sessionId: id,
+		channel: 'assistant',
+		text: 'world',
+		createdAt: '2026-04-09T20:01:02.000Z',
+	})
+
+	const live = sessions.loadLive(id)
+	expect(live.blocks).toHaveLength(3)
+	expect(live.blocks[0]).toMatchObject({ type: 'assistant', text: 'hello ' })
+	expect(live.blocks[1]).toMatchObject({ type: 'info', text: 'system.md was reloaded' })
+	expect(live.blocks[2]).toMatchObject({ type: 'assistant', text: 'world' })
+	expect((live.blocks[0] as any).id).toEqual(expect.any(String))
+	expect((live.blocks[2] as any).continue).toBe((live.blocks[0] as any).id)
+})
+
 test('rotateLog switches new writes to history2.asonl', async () => {
 	const id = await makeSession()
 	await sessions.appendHistory(id, [userEntry('old', new Date().toISOString())])

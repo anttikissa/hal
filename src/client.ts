@@ -347,12 +347,51 @@ function sendCommand(type: string, text?: string): void {
 }
 
 function hasTrailingAssistantText(tab: Tab, text: string): boolean {
+	return trailingAssistantText(tab) === text
+}
+
+
+function assistantChainId(block: Block): string | null {
+	if (block.type !== 'assistant') return null
+	return block.continue ?? block.id ?? null
+}
+
+function lastInterruptedAssistantId(tab: Tab): string | null {
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
 		if (block.type === 'tool') continue
-		return block.type === 'assistant' && block.text === text
+		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
+		return block.type === 'assistant' ? assistantChainId(block) : null
 	}
-	return false
+	return null
+}
+
+function trailingAssistantText(tab: Tab): string | null {
+	const parts: string[] = []
+	let chainId: string | null = null
+	let sawAssistant = false
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const block = tab.history[i]!
+		if (block.type === 'tool') continue
+		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
+			if (!sawAssistant) continue
+			continue
+		}
+		if (block.type !== 'assistant') break
+		const blockChainId = assistantChainId(block)
+		if (!sawAssistant) {
+			sawAssistant = true
+			chainId = blockChainId
+			parts.unshift(block.text)
+			continue
+		}
+		if (chainId && blockChainId === chainId) {
+			parts.unshift(block.text)
+			continue
+		}
+		break
+	}
+	return sawAssistant ? parts.join('') : null
 }
 
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
@@ -478,10 +517,13 @@ function handleEvent(event: any): void {
 				if (!last.ts) last.ts = ts
 			} else {
 				closeStreamingBlock(tab)
+				const continueId = lastInterruptedAssistantId(tab)
 				tab.history.push({
 					type: 'assistant',
 					text: event.text,
 					model: tab.model,
+					id: continueId ? undefined : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+					continue: continueId ?? undefined,
 					ts,
 					streaming: true,
 				})
@@ -519,6 +561,10 @@ function handleEvent(event: any): void {
 			})
 		}
 	} else if (event.type === 'info') {
+		// Close any open streaming block first so later deltas become a visible
+		// continuation chunk instead of mutating text above this notice.
+		const tab = tabForSession(event.sessionId ?? null)
+		if (tab) closeStreamingBlock(tab)
 		// Keep info-level errors as error blocks in memory.
 		// Persisted sessions already do this when replaying history, so live tabs
 		// should match what a reload would show.

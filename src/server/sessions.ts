@@ -189,6 +189,23 @@ function closeStreamingBlock(live: SessionLive): void {
 	if ((last.type === 'assistant' || last.type === 'thinking') && last.streaming) delete last.streaming
 }
 
+
+function assistantChainId(block: any): string | null {
+	if (block?.type !== 'assistant') return null
+	return block.continue ?? block.id ?? null
+}
+
+function lastInterruptedAssistantId(live: SessionLive): string | null {
+	for (let i = live.blocks.length - 1; i >= 0; i--) {
+		const block = live.blocks[i]
+		if (!block) continue
+		if (block.type === 'tool') continue
+		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
+		return block.type === 'assistant' ? assistantChainId(block) : null
+	}
+	return null
+}
+
 function applyLiveEvent(sessionId: string, event: any): void {
 	if (!event?.type) return
 	updateLive(sessionId, (live) => {
@@ -217,7 +234,15 @@ function applyLiveEvent(sessionId: string, event: any): void {
 				return
 			}
 			closeStreamingBlock(live)
-			live.blocks.push({ type: 'assistant', text: event.text, ts, streaming: true })
+			const continueId = lastInterruptedAssistantId(live)
+			live.blocks.push({
+				type: 'assistant',
+				text: event.text,
+				id: continueId ? undefined : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+				continue: continueId ?? undefined,
+				ts,
+				streaming: true,
+			})
 			return
 		}
 		if (event.type === 'tool-call') {
@@ -231,6 +256,11 @@ function applyLiveEvent(sessionId: string, event: any): void {
 				toolId: event.toolId,
 				ts,
 			})
+			return
+		}
+		if (event.type === 'info' && event.text) {
+			closeStreamingBlock(live)
+			live.blocks.push({ type: event.level === 'error' ? 'error' : 'info', text: event.text, ts })
 			return
 		}
 		if (event.type === 'response' && event.isError && event.text) {
