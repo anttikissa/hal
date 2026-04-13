@@ -36,12 +36,12 @@ describe('client startup', () => {
 	const origLoadAllHistoryWithOrigin = sessions.loadAllHistoryWithOrigin
 	const origLoadDraft = draft.loadDraft
 	const origReadState = ipc.readState
+	const origAppendCommand = ipc.appendCommand
 	const origTailEvents = ipc.tailEvents
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = sessions.loadLive
 	const origLoadBlobs = blockModule.loadBlobs
-
 	beforeEach(() => {
 		client.state.tabs.length = 0
 		client.state.activeTab = 0
@@ -64,6 +64,9 @@ describe('client startup', () => {
 		sessions.loadAllHistoryWithOrigin = () => ({ entries: [], parentCount: 0 })
 		sessions.loadLive = () => ({ busy: false, activity: '', blocks: [], updatedAt: '' })
 		draft.loadDraft = () => ''
+		// Client tests must never append to the real shared IPC command log.
+		// Individual tests can override this stub to assert what would be sent.
+		ipc.appendCommand = () => {}
 	})
 
 	afterEach(() => {
@@ -72,6 +75,7 @@ describe('client startup', () => {
 		sessions.loadAllHistoryWithOrigin = origLoadAllHistoryWithOrigin
 		draft.loadDraft = origLoadDraft
 		ipc.readState = origReadState
+		ipc.appendCommand = origAppendCommand
 		ipc.tailEvents = origTailEvents
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
@@ -213,7 +217,11 @@ describe('client startup', () => {
 		const shared = makeSharedState(['s1', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: (() => void) | undefined
+		const appendedCommands: any[] = []
 		ipc.readState = () => shared
+		ipc.appendCommand = (command) => {
+			appendedCommands.push(command)
+		}
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
@@ -225,6 +233,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		client.switchTab(1)
 		client.sendCommand('open')
+		expect(appendedCommands).toEqual([{ type: 'open', text: undefined, sessionId: 's2' }])
 
 		shared.sessions = ['s1', 's2', 's3']
 		shared.openSessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
