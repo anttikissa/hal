@@ -22,6 +22,15 @@ const blockConfig = {
 	maxEditDiffLines: 3, // max before/after lines in edit diffs
 }
 
+function sanitizeTerminalText(text: string): string {
+	return text.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, (ch) => {
+		if (ch === '\n' || ch === '\t') return ch
+		if (ch === '\r') return '␍'
+		if (ch === '\x1b') return '␛'
+		return `␀${ch.charCodeAt(0).toString(16).padStart(2, '0')}`
+	})
+}
+
 // dimmed: true for blocks inherited from a fork parent (rendered with muted colors)
 export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean }
@@ -66,7 +75,7 @@ function userText(entry: Extract<HistoryEntry, { type: 'user' }>): string {
 	const parts: string[] = []
 	for (const part of entry.parts) {
 		if (part.type === 'text') parts.push(part.text)
-		else parts.push('[image]')
+		else parts.push(part.originalFile ? `[${part.originalFile}]` : '[image]')
 	}
 	return parts.join('')
 }
@@ -521,7 +530,7 @@ function blockContent(block: Block, cols: number): string[] {
 	if (block.type === 'assistant' || block.type === 'thinking') {
 		// Markdown-rendered text (assistant and thinking share the same path)
 		const lines: string[] = []
-		for (const span of md.mdSpans(block.text)) {
+		for (const span of md.mdSpans(sanitizeTerminalText(block.text))) {
 			if (span.type === 'code') {
 				for (const raw of span.lines) {
 					// Expand tabs for width measurement and wrapping (charWidth
@@ -560,7 +569,7 @@ function blockContent(block: Block, cols: number): string[] {
 		// Per-tool formatted output — keep real tabs.
 		// expandTabs only where we need to measure/clip.
 		if (block.output) {
-			const output = block.output
+			const output = sanitizeTerminalText(block.output)
 			const fmt = formatToolOutput(block.name, output)
 
 			// Tool-specific body lines (diffs, counts)
@@ -590,7 +599,7 @@ function blockContent(block: Block, cols: number): string[] {
 
 	// User, info, error — plain text with word wrap.
 	// Expand tabs here (word wrap needs real character widths).
-	const text = block.text
+	const text = sanitizeTerminalText(block.text)
 	const lines: string[] = []
 	for (const raw of expandTabs(text, blockConfig.tabWidth).split('\n')) {
 		for (const wl of wordWrap(`${indent}${raw}`, cols)) lines.push(wl)

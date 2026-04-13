@@ -20,6 +20,23 @@ test('incoming user block shows inbox source instead of You', () => {
 	expect(header).not.toContain('You')
 })
 
+
+test('historyToBlocks preserves original image path in user text', () => {
+	const history: any[] = [
+		{
+			type: 'user',
+			parts: [
+				{ type: 'text', text: 'see ' },
+				{ type: 'image', blobId: 'blob1', originalFile: '/tmp/hal/images/test.png' },
+				{ type: 'text', text: ' now' },
+			],
+		},
+	]
+
+	const result = blocks.historyToBlocks(history as any, 's1')
+	expect(result[0]).toMatchObject({ type: 'user', text: 'see [/tmp/hal/images/test.png] now' })
+})
+
 test('thinking block renders markdown and trims trailing blank lines', () => {
 	const block: Block = {
 		type: 'thinking',
@@ -56,4 +73,23 @@ test('warning block renders a Warning header', () => {
 
 	expect(header).toContain('Warning')
 	expect(header).not.toContain('Info')
+})
+
+
+test('tool output escapes terminal control bytes', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'read',
+		output: 'ok\r\n\x1b[2K\x1bHboom',
+	}
+
+	const lines = blocks.renderBlock(block, 80)
+	const joined = lines.join('\n')
+	const clean = lines.map((l) => stripAnsi(l)).join('\n')
+
+	expect(joined).not.toContain('\x1b[2K')
+	expect(joined).not.toContain('\x1bH')
+	expect(joined).not.toContain('\rboom')
+	expect(clean).toContain('␍')
+	expect(clean).toContain('␛[2K␛Hboom')
 })
