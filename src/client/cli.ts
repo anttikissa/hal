@@ -129,6 +129,78 @@ function submitCommandType(text: string, busy: boolean): 'prompt' | 'steer' {
 	return busy ? 'steer' : 'prompt'
 }
 
+const rawState = {
+	active: false,
+	pending: [] as string[],
+	flushTimer: null as ReturnType<typeof setTimeout> | null,
+}
+
+function flushRawTokens(emit = (text: string) => client.addEntry(text)): void {
+	if (rawState.flushTimer) {
+		clearTimeout(rawState.flushTimer)
+		rawState.flushTimer = null
+	}
+	if (rawState.pending.length === 0) return
+	emit(rawState.pending.join(' '))
+	rawState.pending = []
+}
+
+function quoteRawChar(ch: string): string {
+	if (ch === '\\') return "'\\\\'"
+	if (ch === "'") return "'\\\''"
+	return `'${ch}'`
+}
+
+function formatRawToken(token: string): string {
+	const bytes = [...Buffer.from(token)]
+	if (bytes.length === 1 && bytes[0]! >= 0x20 && bytes[0]! <= 0x7e) return quoteRawChar(String.fromCharCode(bytes[0]!))
+	return `[${bytes.map((b) => `0x${b.toString(16).padStart(2, '0')}`).join(' ')}]`
+}
+
+function startRawMode(emit = (text: string) => client.addEntry(text)): void {
+	if (rawState.active) {
+		emit('Raw input mode is already on.')
+		return
+	}
+	rawState.active = true
+	rawState.pending = []
+	emit('Raw input mode on. Press Esc to exit.')
+}
+
+function stopRawMode(emit = (text: string) => client.addEntry(text)): void {
+	flushRawTokens(emit)
+	if (!rawState.active) return
+	rawState.active = false
+	emit('Raw input mode off.')
+}
+
+function handleRawInput(data: string, emit = (text: string) => client.addEntry(text)): boolean {
+	if (!rawState.active) return false
+	for (const token of keys.splitKeys(data)) {
+		if (token === '\x1b') {
+			stopRawMode(emit)
+			continue
+		}
+		rawState.pending.push(formatRawToken(token))
+	}
+	if (rawState.pending.length > 0 && !rawState.flushTimer) {
+		rawState.flushTimer = setTimeout(() => flushRawTokens(emit), 50)
+	}
+	return true
+}
+
+function handleLocalCommand(text: string): boolean {
+	if (text.trim() !== '/raw') return false
+	startRawMode()
+	return true
+}
+
+function resetRawModeForTests(): void {
+	flushRawTokens(() => {})
+	rawState.active = false
+	rawState.pending = []
+}
+
 function submit(override?: string): void {
 	const text = (override ?? prompt.text()).trim()
 	if (!text) return
@@ -136,6 +208,12 @@ function submit(override?: string): void {
 	popup.close()
 	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
+	if (handleLocalCommand(text)) {
+		prompt.clear()
+		client.onSubmit(text)
+		draw()
+		return
+	}
 	const type = submitCommandType(text, client.isBusy())
 	if (type === 'steer') {
 		// If the session is busy (generating/running tools), send a steer command
@@ -395,6 +473,10 @@ function startCli(signal: AbortSignal): void {
 	})
 
 	process.stdin.on('data', (data: Buffer) => {
+		if (handleRawInput(data.toString('utf-8'))) {
+			draw()
+			return
+		}
 		const cols = process.stdout.columns || 80
 		const contentWidth = cols
 
@@ -431,4 +513,16 @@ function syncPromptToClient(): void {
 	client.setPrompt(prompt.text(), prompt.cursorPos())
 }
 
-export const cli = { startCli, submitCommandType }
+export const cli = {
+	startCli,
+	submitCommandType,
+	formatRawToken,
+	rawModeForTests: {
+		start: startRawMode,
+		stop: stopRawMode,
+		handle: handleRawInput,
+		flush: flushRawTokens,
+		active: () => rawState.active,
+		reset: resetRawModeForTests,
+	},
+}

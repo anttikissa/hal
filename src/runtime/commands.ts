@@ -159,6 +159,9 @@ function detailedHelp(topic: string): string | null {
 	if (topic === 'status' || topic === 'usage') {
 		return ['Usage: /status', '', 'Show OpenAI ChatGPT subscription usage for all configured accounts.'].join('\n')
 	}
+	if (topic === 'raw') {
+		return ['Usage: /raw', '', 'Enable local raw key capture on this terminal. Keys are logged as bytes until Esc exits.'].join('\n')
+	}
 	if (topic === 'mem') {
 		return ['Usage: /mem', '', 'Show current RSS memory and the warn/kill thresholds.'].join('\n')
 	}
@@ -189,6 +192,7 @@ handlers['help'] = (args) => {
 		'  /fork           Fork current session to new tab',
 		'  /resume [id]    Resume a closed session',
 		'  /compact        Summarize conversation to reduce context',
+		'  /raw            Log raw key bytes on this terminal',
 		'  /status         Show ChatGPT subscription usage',
 		'  /mem            Show current memory usage and thresholds',
 		'  /send <tab|id>  Send a message to another tab',
