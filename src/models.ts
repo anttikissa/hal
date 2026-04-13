@@ -175,8 +175,15 @@ function formatCost(fullId: string, usage: { input: number; output: number }): s
 
 // ── Default model ──
 
+const FALLBACK_MODEL = 'anthropic/claude-opus-4-6'
+
+const config = {
+	// Default model alias or full ID. Set via config.ason under "models".
+	defaultModel: FALLBACK_MODEL,
+}
+
 function defaultModel(): string {
-	return process.env.HAL_MODEL ? resolveModel(process.env.HAL_MODEL) : 'anthropic/claude-opus-4-6'
+	return resolveModel(config.defaultModel)
 }
 
 // ── Model listing (for /model command) ──
@@ -269,6 +276,7 @@ function providerName(fullId: string): string {
 }
 
 export const models = {
+	config,
 	resolveModel,
 	displayModel,
 	contextWindow,
