@@ -1,17 +1,16 @@
 // Context builder — system prompt construction and message building.
 //
-// Loads AGENTS.md / CLAUDE.md files from git root down to cwd,
-// builds the system prompt with variable substitution, and provides
-// message building + token estimation for context window management.
+// Loads SYSTEM.md plus AGENTS.md / CLAUDE.md files, builds the system prompt
+// with variable substitution, and provides message sizing helpers.
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, watch } from 'fs'
 import { dirname } from 'path'
 import { HAL_DIR, STATE_DIR } from '../state.ts'
 import { sessions } from '../server/sessions.ts'
 import { models } from '../models.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
 
-// ── AGENTS.md loading ──
+// ── AGENTS.md loading ─────────────────────────────────────────────────────────
 
 type AgentFileName = 'AGENTS.md' | 'CLAUDE.md'
 
@@ -20,6 +19,39 @@ interface AgentFile {
 	name: AgentFileName
 	content: string
 	bytes: number
+}
+
+interface LoadedPromptFile {
+	name: string
+	path: string
+	bytes: number
+}
+
+interface PromptWatchSession {
+	sessionId: string
+	cwd: string
+}
+
+interface PromptWatchChange {
+	sessionId: string
+	name: 'SYSTEM.md' | AgentFileName
+	path: string
+}
+
+function halDir(): string {
+	// Read env at call time so tests and future runtime reload hooks can swap the
+	// location without re-importing this module.
+	return process.env.HAL_DIR ?? HAL_DIR
+}
+
+function stateDir(): string {
+	// Same rule as halDir(): do not capture paths once at import time if the
+	// caller expects live reconfiguration.
+	return process.env.HAL_STATE_DIR ?? STATE_DIR
+}
+
+function systemPromptPath(): string {
+	return `${halDir()}/SYSTEM.md`
 }
 
 /** Walk up from `from` to find the nearest .git directory. */
@@ -70,7 +102,7 @@ function agentWatchDirs(cwd: string): string[] {
 	return directoryChain(cwd, root)
 }
 
-// ── Directive processing ──
+// ── Directive processing ──────────────────────────────────────────────────────
 // Supports ::: if key="glob" ... ::: conditional blocks in agent files.
 
 function processDirectives(text: string, vars: Record<string, string>): string {
@@ -98,11 +130,11 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 	return out.join('\n')
 }
 
-// ── System prompt builder ──
+// ── System prompt builder ─────────────────────────────────────────────────────
 
 interface SystemPromptResult {
 	text: string
-	loaded: { name: string; path: string; bytes: number }[]
+	loaded: LoadedPromptFile[]
 	bytes: number
 }
 
@@ -114,6 +146,8 @@ function buildSystemPrompt(opts: {
 	const model = opts.model ?? ''
 	const cwd = opts.cwd ?? process.cwd()
 	const sessionDir = opts.sessionId ? sessions.sessionDir(opts.sessionId) : ''
+	const currentHalDir = halDir()
+	const currentStateDir = stateDir()
 	const d = new Date()
 	const date = `${d.toISOString().slice(0, 10)}, ${d.toLocaleDateString('en-US', { weekday: 'long' })}`
 
@@ -122,8 +156,8 @@ function buildSystemPrompt(opts: {
 		model,
 		date,
 		cwd,
-		hal_dir: HAL_DIR,
-		state_dir: STATE_DIR,
+		hal_dir: currentHalDir,
+		state_dir: currentStateDir,
 		session_dir: sessionDir,
 	}
 
@@ -133,21 +167,21 @@ function buildSystemPrompt(opts: {
 			.replace(/\$\{model\}/g, model)
 			.replace(/\$\{cwd\}/g, cwd)
 			.replace(/\$\{date\}/g, date)
-			.replace(/\$\{hal_dir\}/g, HAL_DIR)
-			.replace(/\$\{state_dir\}/g, STATE_DIR)
+			.replace(/\$\{hal_dir\}/g, currentHalDir)
+			.replace(/\$\{state_dir\}/g, currentStateDir)
 			.replace(/\$\{session_dir\}/g, sessionDir)
 
 	const parts: string[] = []
-	const loaded: { name: string; path: string; bytes: number }[] = []
+	const loaded: LoadedPromptFile[] = []
 
 	// Load SYSTEM.md from hal dir (the base system prompt)
 	try {
-		let text = readFileSync(`${HAL_DIR}/SYSTEM.md`, 'utf-8')
+		let text = readFileSync(systemPromptPath(), 'utf-8')
 		const bytes = Buffer.byteLength(text)
 		// Strip HTML comments
 		text = text.replace(/<!--[\s\S]*?-->/g, '')
 		parts.push(text)
-		loaded.push({ name: 'SYSTEM.md', path: `${HAL_DIR}/SYSTEM.md`, bytes })
+		loaded.push({ name: 'SYSTEM.md', path: systemPromptPath(), bytes })
 	} catch {
 		parts.push('You are a helpful coding assistant.')
 	}
@@ -168,7 +202,80 @@ function buildSystemPrompt(opts: {
 	return { text, loaded, bytes: Buffer.byteLength(text) }
 }
 
-// ── Message building ──
+// ── Prompt file watching ──────────────────────────────────────────────────────
+
+let promptWatchers: Array<{ close: () => void }> = []
+
+function addWatcher(path: string, onSignal: (eventType: string, filename?: string) => void): void {
+	try {
+		const watcher = watch(path, { persistent: false }, (eventType, filename) => onSignal(eventType, filename ?? undefined))
+		promptWatchers.push(watcher)
+	} catch {
+		// Missing directories/files are normal while watching prompt sources.
+	}
+}
+
+function stopPromptWatchers(): void {
+	for (const watcher of promptWatchers.splice(0)) {
+		try { watcher.close() } catch {}
+	}
+}
+
+function watchPromptFiles(sessionsToWatch: PromptWatchSession[], onChange: (change: PromptWatchChange) => void): () => void {
+	stopPromptWatchers()
+	const pending = new Map<string, ReturnType<typeof setTimeout>>()
+	const systemDir = dirname(systemPromptPath())
+	let stopped = false
+
+	function queue(change: PromptWatchChange): void {
+		if (stopped) return
+		const key = `${change.sessionId}:${change.path}`
+		const old = pending.get(key)
+		if (old) clearTimeout(old)
+		pending.set(key, setTimeout(() => {
+			pending.delete(key)
+			if (!stopped) onChange(change)
+		}, 50))
+	}
+
+	for (const session of sessionsToWatch) {
+		// Watch the global SYSTEM.md directory once per session. Keeping the callback
+		// session-scoped makes it easy for the runtime to emit a visible info block
+		// into every affected tab when the base prompt changes.
+		addWatcher(systemDir, (_eventType, filename) => {
+			const name = String(filename ?? '')
+			if (name && name !== 'SYSTEM.md') return
+			queue({ sessionId: session.sessionId, name: 'SYSTEM.md', path: systemPromptPath() })
+		})
+
+		for (const dir of agentWatchDirs(session.cwd)) {
+			addWatcher(dir, (_eventType, filename) => {
+				const name = String(filename ?? '')
+				if (name === 'AGENTS.md' || name === 'CLAUDE.md') {
+					queue({ sessionId: session.sessionId, name: name as AgentFileName, path: `${dir}/${name}` })
+					return
+				}
+				if (name) return
+				const agent = readAgentFile(dir)
+				if (!agent) return
+				queue({ sessionId: session.sessionId, name: agent.name, path: agent.path })
+			})
+		}
+	}
+
+	return () => {
+		stopped = true
+		for (const timer of pending.values()) clearTimeout(timer)
+		pending.clear()
+		stopPromptWatchers()
+	}
+}
+
+function resetForTests(): void {
+	stopPromptWatchers()
+}
+
+// ── Message building ──────────────────────────────────────────────────────────
 
 /** Estimate byte size of a message (for rough token estimation). */
 function messageBytes(msg: Message): number {
@@ -215,7 +322,9 @@ export const context = {
 	collectAgentFiles,
 	agentWatchDirs,
 	findGitRoot,
+	watchPromptFiles,
 	messageBytes,
 	estimateContext,
 	formatBytes,
+	__resetForTests: resetForTests,
 }

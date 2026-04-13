@@ -7,6 +7,9 @@ import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 import { models } from '../models.ts'
 
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 const sent: Array<{ sessionId: string; text: string; from?: string }> = []
 const origQueueMessage = inbox.queueMessage
 const origConfigData = config.data
@@ -248,4 +251,34 @@ test('/show with no topic points to /system', async () => {
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
 	expect(result.output).toContain('/system')
+})
+
+
+test('/system reflects updated prompt files', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-system-test-'))
+	const origHalDir = process.env.HAL_DIR
+	try {
+		process.env.HAL_DIR = dir
+		writeFileSync(join(dir, 'SYSTEM.md'), 'first\n')
+		const cwd = join(dir, 'repo')
+		mkdirSync(join(cwd, '.git'), { recursive: true })
+		writeFileSync(join(cwd, 'AGENTS.md'), 'agent one\n')
+		const session = makeSession()
+		session.cwd = cwd
+
+		const first = await commands.executeCommand('/system', session, () => {})
+		expect(first.output).toContain('first')
+		expect(first.output).toContain('agent one')
+
+		writeFileSync(join(dir, 'SYSTEM.md'), 'second\n')
+		writeFileSync(join(cwd, 'AGENTS.md'), 'agent two\n')
+
+		const second = await commands.executeCommand('/system', session, () => {})
+		expect(second.output).toContain('second')
+		expect(second.output).toContain('agent two')
+	} finally {
+		if (origHalDir === undefined) delete process.env.HAL_DIR
+		else process.env.HAL_DIR = origHalDir
+		rmSync(dir, { recursive: true, force: true })
+	}
 })

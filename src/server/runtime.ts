@@ -35,6 +35,7 @@ interface Session {
 
 let activeSessions: Session[] = []
 let activeRuntimePid: number | null = null
+let stopPromptWatch: (() => void) | null = null
 
 function makeSessionId(): string {
 	const month = String(new Date().getMonth() + 1).padStart(2, '0')
@@ -115,6 +116,7 @@ function syncSharedState(): void {
 
 function broadcastSessions(): void {
 	syncSharedState()
+	restartPromptWatch()
 }
 
 function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info'): void {
@@ -126,6 +128,16 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 		sessionId,
 		createdAt: new Date().toISOString(),
 	})
+}
+
+function restartPromptWatch(): void {
+	stopPromptWatch?.()
+	stopPromptWatch = context.watchPromptFiles(
+		activeSessions.map((session) => ({ sessionId: session.id, cwd: session.cwd })),
+		(change) => {
+			emitInfo(change.sessionId, `[system reload] ${change.name} changed: ${change.path}`)
+		},
+	)
 }
 
 function persistCommandRetryInput(sessionId: string, text: string, result: Awaited<ReturnType<typeof commands.executeCommand>>): void {
@@ -231,8 +243,8 @@ async function runGeneration(session: Session, text: string, source?: string): P
 		])
 	}
 
-	// Load conversation history and convert to API messages
-	const messages = apiMessages.toAnthropicMessages(session.id)
+	// Load conversation history and convert to provider messages
+	const messages = apiMessages.toProviderMessages(session.id)
 
 	// Emit stream-start so clients know generation is happening
 	ipc.appendEvent({
@@ -389,7 +401,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 // ── Main entry point ──
 
 function startRuntime(signal: AbortSignal): void {
-	activeRuntimePid = process.pid; activeSessions = []; sessionStore.deactivateAllSessions()
+	activeRuntimePid = process.pid; activeSessions = []; stopPromptWatch?.(); stopPromptWatch = null; sessionStore.deactivateAllSessions()
 
 	// Load session metadata only (no history — clients load that themselves).
 	const metas = sessionStore.loadSessionMetas()
