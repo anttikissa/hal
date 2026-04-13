@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
-import { resolve } from 'path'
+import { mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join, resolve } from 'path'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const TIMEOUT_MS = 30_000
@@ -15,6 +17,13 @@ function listTestFiles(filter?: string): string[] {
 		.sort()
 }
 
+export function isolatedTestEnv(stateDir: string): NodeJS.ProcessEnv {
+	return {
+		...process.env,
+		HAL_STATE_DIR: stateDir,
+	}
+}
+
 async function run(): Promise<number> {
 	const filter = process.argv[2]
 	const files = listTestFiles(filter)
@@ -25,10 +34,16 @@ async function run(): Promise<number> {
 	const failedFiles: string[] = []
 
 	const tasks = files.map(async (file) => {
+		// Each test file gets its own isolated state dir. Many tests import src/state.ts
+		// directly, which captures HAL_STATE_DIR at module load time. If we don't set
+		// this before spawning bun test, in-process tests can write to the developer's
+		// real ~/.hal/state and leak commands into the live runtime.
+		const stateDir = mkdtempSync(join(tmpdir(), 'hal-test-state-'))
 		const proc = Bun.spawn(['bun', 'test', `./${file}`], {
 			cwd: ROOT,
 			stdout: 'pipe',
 			stderr: 'pipe',
+			env: isolatedTestEnv(stateDir),
 		})
 		const timeout = setTimeout(() => proc.kill(), TIMEOUT_MS)
 		const code = await proc.exited
@@ -37,6 +52,7 @@ async function run(): Promise<number> {
 		const stdout = await new Response(proc.stdout).text()
 		const stderr = await new Response(proc.stderr).text()
 		const all = stdout + stderr
+		rmSync(stateDir, { recursive: true, force: true })
 
 		const passMatch = all.match(/(\d+) pass/)
 		const failMatch = all.match(/(\d+) fail\b/)
@@ -72,4 +88,4 @@ async function run(): Promise<number> {
 	return failedFiles.length ? 1 : 0
 }
 
-process.exit(await run())
+if (import.meta.main) process.exit(await run())
