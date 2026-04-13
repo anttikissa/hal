@@ -79,7 +79,6 @@ function migrateFlatEntry(entry: any): any[] {
 				type: 'thinking',
 				blobId: entry.blobId,
 				provider: entry.provider,
-				responseId: entry.responseId,
 				ts: entry.ts,
 			})]
 
@@ -89,8 +88,8 @@ function migrateFlatEntry(entry: any): any[] {
 				type: 'assistant',
 				text: entry.text,
 				model: entry.model,
-				responseId: entry.responseId,
-				continuation: entry.continuation,
+				id: entry.id,
+				continue: entry.continue,
 				usage: entry.usage,
 				ts: entry.ts,
 			})]
@@ -102,7 +101,6 @@ function migrateFlatEntry(entry: any): any[] {
 				name: entry.name,
 				input: entry.input,
 				blobId: entry.blobId,
-				responseId: entry.responseId,
 				ts: entry.ts,
 			})]
 

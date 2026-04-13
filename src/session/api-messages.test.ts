@@ -84,3 +84,22 @@ test('pruneMessages batches thinking pruning too', () => {
 	}
 })
 
+
+test('toProviderMessages merges assistant chunks split by ui info', () => {
+	const ts = '2026-04-13T14:43:49.970Z'
+	const entries: any[] = [
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts },
+		{ type: 'assistant', text: 'this is me typing ', id: 'xyz-123', ts },
+		{ type: 'info', text: 'system.md was reloaded', ts },
+		{ type: 'assistant', text: 'and still typing', continue: 'xyz-123', ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[13 Apr 14:43]\nhello' },
+		{ role: 'assistant', content: [
+			{ type: 'text', text: 'this is me typing ' },
+			{ type: 'text', text: 'and still typing' },
+		] },
+	])
+})
+

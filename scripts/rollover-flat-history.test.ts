@@ -24,9 +24,11 @@ test('migrateHistoryEntries converts legacy history to flat entries', () => {
 			text: 'preview',
 			signature: 'sig',
 			provider: 'anthropic',
-			responseId: 'resp-1',
 			ts,
 		},
+		{ type: 'assistant', text: 'hello ', id: 'xyz-123', ts },
+		{ type: 'info', text: 'system.md reloaded', ts },
+		{ type: 'assistant', text: 'world', continue: 'xyz-123', ts },
 	]
 
 	expect(migrateHistoryEntries(entries)).toEqual([
@@ -35,7 +37,10 @@ test('migrateHistoryEntries converts legacy history to flat entries', () => {
 		{ type: 'assistant', text: 'Let me check.', usage: { input: 12, output: 34 }, ts },
 		{ type: 'tool_call', toolId: 'tool-1', name: 'read', blobId: '000bbb-222', ts },
 		{ type: 'tool_result', toolId: 'tool-1', blobId: '000bbb-222', ts },
-		{ type: 'thinking', blobId: '000ccc-333', provider: 'anthropic', responseId: 'resp-1', ts },
+		{ type: 'thinking', blobId: '000ccc-333', provider: 'anthropic', ts },
+		{ type: 'assistant', text: 'hello ', id: 'xyz-123', ts },
+		{ type: 'info', text: 'system.md reloaded', ts },
+		{ type: 'assistant', text: 'world', continue: 'xyz-123', ts },
 	])
 })
 

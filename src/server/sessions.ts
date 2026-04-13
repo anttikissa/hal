@@ -46,15 +46,14 @@ export type HistoryEntry =
 			blobId?: string
 			signature?: string
 			provider?: string
-			responseId?: string
 			ts?: string
 	  }
 	| {
 			type: 'assistant'
 			text: string
 			model?: string
-			responseId?: string
-			continuation?: boolean
+			id?: string
+			continue?: string
 			usage?: { input: number; output: number }
 			ts?: string
 	  }
@@ -64,7 +63,6 @@ export type HistoryEntry =
 			name: string
 			input?: any
 			blobId?: string
-			responseId?: string
 			ts?: string
 	  }
 	| {
