@@ -4,6 +4,7 @@ import { ipc, type SharedState } from './ipc.ts'
 import { sessions } from './server/sessions.ts'
 import { draft } from './cli/draft.ts'
 import { liveFiles } from './utils/live-file.ts'
+import { blocks as blockModule } from './cli/blocks.ts'
 
 function makeSessionMeta(id: string) {
 	return {
@@ -39,6 +40,7 @@ describe('client startup', () => {
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = sessions.loadLive
+	const origLoadBlobs = blockModule.loadBlobs
 
 	beforeEach(() => {
 		client.state.tabs.length = 0
@@ -53,6 +55,7 @@ describe('client startup', () => {
 		client.state.model = null
 		client.state.busy.clear()
 		client.state.activity.clear()
+		client.resetForTests()
 		client.setOnChange(() => {})
 		client.setOnTabSwitch(() => {})
 		client.setOnDraftArrived(() => {})
@@ -73,6 +76,7 @@ describe('client startup', () => {
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
 		sessions.loadLive = origLoadLive
+		blockModule.loadBlobs = origLoadBlobs
 	})
 
 	test('bootstraps tabs from shared state instead of replaying old events', async () => {
@@ -137,6 +141,46 @@ describe('client startup', () => {
 			{ type: 'user', text: 'before fork', dimmed: true },
 			{ type: 'user', text: 'after fork' },
 		])
+	})
+
+	test('loads blobs for tabs opened after startup', async () => {
+		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
+		sessions.loadAllHistoryWithOrigin = (id) => id === 's2'
+			? {
+				entries: [{ role: 'assistant', ts: '2026-04-09T20:01:00.000Z', tools: [{ id: 'tool-1', name: 'read', blobId: 'blob-1' }] }],
+				parentCount: 0,
+			}
+			: { entries: [], parentCount: 0 }
+
+		const shared = makeSharedState(['s1'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: (() => void) | undefined
+		ipc.readState = () => shared
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+
+		const blobLoads: string[][] = []
+		blockModule.loadBlobs = async (blocks) => {
+			blobLoads.push(blocks.map((b) => ('sessionId' in b && b.sessionId) ? b.sessionId : ''))
+			return 0
+		}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		blobLoads.length = 0
+
+		shared.sessions = ['s1', 's2']
+		shared.openSessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		expect(onIpcChange).toBeTruthy()
+		onIpcChange?.()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(blobLoads).toContainEqual(['s2'])
 	})
 
 	test('tails events from the end without replaying the whole event log', async () => {

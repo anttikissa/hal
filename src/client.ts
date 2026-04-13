@@ -191,6 +191,7 @@ function switchTab(index: number): void {
 		// Clear "done unseen" flag — user is now looking at this tab
 		tab.doneUnseen = false
 		ensureTabLoaded(tab)
+		loadTabBlobs(tab)
 		// Re-read draft from disk — another client may have saved one
 		const diskDraft = draftModule.loadDraft(tab.sessionId)
 		if (diskDraft && !tab.inputDraft) tab.inputDraft = diskDraft
@@ -210,6 +211,16 @@ function ensureTabLoaded(tab: Tab): void {
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
+}
+
+function loadTabBlobs(tab: Tab): void {
+	if (!config.backgroundLoadBlobs) return
+	void (async () => {
+		const n = await blockModule.loadBlobs(tab.history)
+		if (n <= 0) return
+		touchTab(tab)
+		if (tab === state.tabs[state.activeTab] && config.repaintAfterBlobLoad) onChange(false)
+	})()
 }
 
 // ── Last-tab persistence ─────────────────────────────────────────────────────
@@ -394,6 +405,7 @@ function applySessionList(items: SharedSessionInfo[]): void {
 	const newSession = state.tabs[state.activeTab]?.sessionId ?? ''
 	const active = state.tabs[state.activeTab]
 	if (active && !active.loaded) ensureTabLoaded(active)
+	if (active) loadTabBlobs(active)
 	flushPendingEntries()
 	if (isFork && grew && prevSession) {
 		const prevTab = newTabs.find(t => t.sessionId === prevSession)
@@ -666,6 +678,16 @@ function startWatchingIpcState(): void {
 	})
 }
 
+function resetForTests(): void {
+	pendingEntries = []
+	onChange = () => {}
+	onTabSwitch = null
+	onDraftArrived = null
+	pendingOpen = false
+	hostLockState = null
+	ipcStateFile = null
+}
+
 function startClient(signal: AbortSignal): void {
 	startWatchingHostLock()
 	startWatchingIpcState()
@@ -713,6 +735,7 @@ export const client = {
 	clearDraft,
 	handleEvent,
 	onSubmit,
+	resetForTests,
 }
 
 function addBlockToTab(sessionId: string | null, block: Block): void {
