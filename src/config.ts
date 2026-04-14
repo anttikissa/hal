@@ -10,6 +10,8 @@ import { render } from './client/render.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { memory } from './memory.ts'
 import { models } from './models.ts'
+import { anthropicUsage } from './anthropic-usage.ts'
+import { openaiUsage } from './openai-usage.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {
@@ -20,6 +22,8 @@ const modules: Record<string, Record<string, any>> = {
 	agentLoop: agentLoop.config,
 	memory: memory.config,
 	models: models.config,
+	anthropicUsage: anthropicUsage.config,
+	openaiUsage: openaiUsage.config,
 }
 
 // config.ason lives at repo root — it's user-facing config.

@@ -9,6 +9,7 @@
 import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '../protocol.ts'
 import { provider as providerUtils } from './provider.ts'
 import { auth } from '../auth.ts'
+import { anthropicUsage } from '../anthropic-usage.ts'
 
 // The ?beta=true query parameter is required for OAuth tokens.
 // Without it, requests hit a different backend pool that returns 529 overloaded
@@ -272,6 +273,7 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
 	await auth.ensureFresh('anthropic')
 	const cred = auth.getCredential('anthropic')
+	anthropicUsage.setCurrentCredential(cred)
 	if (!cred) {
 		yield { type: 'error', message: 'No Anthropic credentials. Run: bun scripts/login-anthropic.ts' }
 		yield { type: 'done' }

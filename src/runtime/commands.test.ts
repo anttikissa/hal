@@ -3,10 +3,12 @@ import { commands, type SessionState } from './commands.ts'
 import { inbox } from './inbox.ts'
 import { config } from '../config.ts'
 import { agentLoop } from './agent-loop.ts'
+import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 import { models } from '../models.ts'
 import { ipc } from '../ipc.ts'
+import { version } from '../version.ts'
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -17,6 +19,7 @@ const origAppendCommand = ipc.appendCommand
 const origConfigData = config.data
 const origConfigSave = config.save
 const origMaxIterations = agentLoop.config.maxIterations
+const origAnthropicRenderStatus = anthropicUsage.renderStatus
 const origRenderStatus = openaiUsage.renderStatus
 const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
@@ -47,6 +50,7 @@ afterEach(() => {
 	config.data = origConfigData
 	config.save = origConfigSave
 	agentLoop.config.maxIterations = origMaxIterations
+	anthropicUsage.renderStatus = origAnthropicRenderStatus
 	openaiUsage.renderStatus = origRenderStatus
 	Object.assign(memory.config, origMemoryConfig)
 	memory.io.readRss = origReadRss
@@ -79,6 +83,24 @@ test('/send resolves a session id', async () => {
 	expect(sent).toEqual([{ sessionId: '04-ccc', text: 'hello', from: '04-aaa' }])
 })
 
+
+test('/send resolves a session name case-insensitively', async () => {
+	inbox.queueMessage = (sessionId, text, from) => {
+		sent.push({ sessionId, text, from })
+	}
+
+	const session = makeSession()
+	session.sessions = [
+		{ id: '04-aaa', name: 'current' },
+		{ id: '04-bbb', name: 'Pause Fix' },
+	]
+	const result = await commands.executeCommand('/send pause fix hello', session, () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(sent).toEqual([{ sessionId: '04-bbb', text: 'hello', from: '04-aaa' }])
+})
+
 test('/broadcast sends to every other session', async () => {
 	inbox.queueMessage = (sessionId, text, from) => {
 		sent.push({ sessionId, text, from })
@@ -105,26 +127,29 @@ test('/send rejects an unknown tab number', async () => {
 })
 
 
-test('/status renders OpenAI subscription usage', async () => {
-	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 a@test.com · 5h 23% used'
+test('/status renders Anthropic and OpenAI subscription usage', async () => {
+	anthropicUsage.renderStatus = async () => 'Anthropic subscriptions:\n* 1/2 a@test.com · 5h 20% used'
+	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 b@test.com · 5h 23% used'
 
 	const result = await commands.executeCommand('/status', makeSession(), () => {})
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('Anthropic subscriptions:')
 	expect(result.output).toContain('OpenAI subscriptions:')
-	expect(result.output).toContain('5h 23% used')
 })
 
 
 test('/usage is an alias for /status', async () => {
-	openaiUsage.renderStatus = async () => 'alias ok'
+	anthropicUsage.renderStatus = async () => 'anthropic ok'
+	openaiUsage.renderStatus = async () => 'openai ok'
 
 	const result = await commands.executeCommand('/usage', makeSession(), () => {})
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
-	expect(result.output).toBe('alias ok')
+	expect(result.output).toContain('anthropic ok')
+	expect(result.output).toContain('openai ok')
 })
 
 
@@ -343,6 +368,29 @@ test('/system reflects updated prompt files', async () => {
 		else process.env.HAL_DIR = origHalDir
 		rmSync(dir, { recursive: true, force: true })
 	}
+})
+
+
+test('/rename updates the current session name directly', async () => {
+	const session = makeSession()
+	const result = await commands.executeCommand('/rename Pause Fix', session, () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('Pause Fix')
+	expect(session.name).toBe('Pause Fix')
+})
+
+
+test('/rename clear resets the current session name', async () => {
+	const session = makeSession()
+	session.name = 'Pause Fix'
+	const result = await commands.executeCommand('/rename clear', session, () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('Cleared')
+	expect(session.name).toBe('')
 })
 
 

@@ -14,6 +14,7 @@ import { config } from '../config.ts'
 import { context } from './context.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import { inbox } from './inbox.ts'
+import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 
@@ -77,13 +78,8 @@ type CommandHandler = (
 
 const handlers: Record<string, CommandHandler> = {}
 
-function parseSendArgs(args: string): { target: string; text: string } | null {
-	const spaceIdx = args.indexOf(' ')
-	if (spaceIdx === -1) return null
-	const target = args.slice(0, spaceIdx).trim()
-	const text = args.slice(spaceIdx + 1).trim()
-	if (!target || !text) return null
-	return { target, text }
+function normalizeSessionName(text: string): string {
+	return text.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 function resolveTabTarget(session: SessionState, raw: string): SessionRef | null {
@@ -92,7 +88,43 @@ function resolveTabTarget(session: SessionState, raw: string): SessionRef | null
 		const index = parseInt(raw, 10) - 1
 		return sessions[index] ?? null
 	}
-	return sessions.find((item) => item.id === raw) ?? null
+	const exactId = sessions.find((item) => item.id === raw)
+	if (exactId) return exactId
+	const normalized = normalizeSessionName(raw)
+	return sessions.find((item) => normalizeSessionName(item.name) === normalized) ?? null
+}
+
+function resolveSendTarget(session: SessionState, args: string): { target: SessionRef; text: string } | null {
+	const trimmed = args.trim()
+	if (!trimmed) return null
+	const sessions = session.sessions ?? []
+	const firstSpace = trimmed.indexOf(' ')
+	const firstToken = firstSpace === -1 ? trimmed : trimmed.slice(0, firstSpace)
+	const firstTarget = resolveTabTarget(session, firstToken)
+	if (firstTarget && firstSpace !== -1) {
+		const text = trimmed.slice(firstSpace + 1).trim()
+		return text ? { target: firstTarget, text } : null
+	}
+	const matches = sessions
+		.filter((item) => item.id !== session.id)
+		.map((item) => ({ item, normalized: normalizeSessionName(item.name) }))
+		.filter(({ normalized }) => trimmed === normalized || trimmed.startsWith(`${normalized} `))
+		.sort((a, b) => b.normalized.length - a.normalized.length)
+	const match = matches[0]
+	if (!match) return null
+	const text = trimmed.slice(match.normalized.length).trim()
+	return text ? { target: match.item, text } : null
+
+}
+
+function parseSendArgs(args: string): { target: string; text: string } | null {
+	const trimmed = args.trim()
+	if (!trimmed) return null
+	const firstSpace = trimmed.indexOf(' ')
+	if (firstSpace === -1) return null
+	const target = trimmed.slice(0, firstSpace).trim()
+	const text = trimmed.slice(firstSpace + 1).trim()
+	return target && text ? { target, text } : null
 }
 
 function currentTabIndex(session: SessionState): number {
@@ -163,7 +195,7 @@ function detailedHelp(topic: string): string | null {
 		return ['Usage: /model [name]', '', 'With no name, shows the current model and the available choices.'].join('\n')
 	}
 	if (topic === 'send') {
-		return ['Usage: /send <tab|session-id> <message>', '', 'Targets can be a tab number like 2 or a full session id.'].join(
+		return ['Usage: /send <tab|session-id|name> <message>', '', 'Targets can be a tab number, full session id, or session name.'].join(
 			'\n',
 		)
 	}
@@ -171,22 +203,25 @@ function detailedHelp(topic: string): string | null {
 		return ['Usage: /broadcast <message>', '', 'Sends the same message to every other open tab.'].join('\n')
 	}
 	if (topic === 'status' || topic === 'usage') {
-		return ['Usage: /status', '', 'Show OpenAI ChatGPT subscription usage for all configured accounts.'].join('\n')
+		return ['Usage: /status', '', 'Show Anthropic / OpenAI OAuth subscription usage for all configured accounts.'].join('\n')
 	}
 	if (topic === 'raw') {
 		return ['Usage: /raw', '', 'Enable local raw key capture on this terminal. Keys are logged as bytes until Esc exits.'].join('\n')
+	}
+	if (topic === 'rename') {
+		return ['Usage: /rename <name>|clear', '', 'Set a short session name used in tabs and command targets.'].join('\n')
 	}
 	if (topic === 'mem') {
 		return ['Usage: /mem', '', 'Show current RSS memory and the warn/kill thresholds.'].join('\n')
 	}
 	if (topic === 'open') {
-		return ['Usage: /open [tab|session-id]', '', 'With no target, opens a new tab at the end. With a target, opens after that tab.'].join('\n')
+		return ['Usage: /open [tab|session-id|name]', '', 'With no target, opens a new tab at the end. With a target, opens after that tab.'].join('\n')
 	}
 	if (topic === 'cd') {
 		return ['Usage: /cd [path]', '', 'With no path, shows the current working directory.'].join('\n')
 	}
 	if (topic === 'resume') {
-		return ['Usage: /resume [session-id]', '', 'With no id, lists recently closed sessions.'].join('\n')
+		return ['Usage: /resume [session-id|name]', '', 'With no id, lists recently closed sessions.'].join('\n')
 	}
 	if (topic === 'move') {
 		return [
@@ -216,10 +251,11 @@ handlers['help'] = (args) => {
 		'  /fork           Fork current session to new tab',
 		'  /open [tab|id]  Open a new tab, optionally after a tab',
 		'  /move <pos>     Move current tab to a position',
+		'  /rename <name>  Rename the current session',
 		'  /resume [id]    Resume a closed session',
 		'  /compact        Summarize conversation to reduce context',
 		'  /raw            Log raw key bytes on this terminal',
-		'  /status         Show ChatGPT subscription usage',
+		'  /status         Show Anthropic / OpenAI subscription usage',
 		'  /mem            Show current memory usage and thresholds',
 		'  /send <tab|id>  Send a message to another tab',
 		'  /broadcast ...  Send a message to every other tab',
@@ -267,7 +303,7 @@ handlers['fork'] = (_args, session) => {
 	return { handled: true }
 }
 
-// /open [tab|session-id] — open a new tab, optionally after an existing tab
+// /open [tab|session-id|name] — open a new tab, optionally after an existing tab
 handlers['open'] = (args, session) => {
 	const targetText = args.trim()
 	if (!targetText) {
@@ -276,9 +312,26 @@ handlers['open'] = (args, session) => {
 	}
 
 	const target = resolveTabTarget(session, targetText)
-	if (!target) return { error: `Unknown tab or session: ${targetText}`, handled: true }
+	if (!target) return { error: `Unknown tab, session, or name: ${targetText}`, handled: true }
 	ipc.appendCommand({ type: 'open', text: `after:${target.id}`, sessionId: session.id })
 	return { output: `Opening new tab after ${target.name} (${target.id})...`, handled: true }
+}
+
+// /rename <name>|clear — set or clear the current session name
+handlers['rename'] = (args, session) => {
+	const raw = args.trim().replace(/\s+/g, ' ')
+	if (!raw) {
+		return { output: session.name ? `Current name: ${session.name}` : `Current name: ${session.id} (session id fallback)`, handled: true }
+	}
+	if (raw === 'clear' || raw === '-') {
+		session.name = ''
+		return { output: `Cleared session name; using ${session.id}`, handled: true }
+	}
+	if (!/^[A-Za-z0-9._ -]+$/.test(raw)) {
+		return { error: 'Name may contain letters, digits, spaces, dot, dash, and underscore only.', handled: true }
+	}
+	session.name = raw
+	return { output: `Renamed session to ${raw}`, handled: true }
 }
 
 // /move <position> — move the current tab to a 1-based position
@@ -305,9 +358,14 @@ handlers['compact'] = (_args, session) => {
 	return { output: 'Compacting conversation...', handled: true }
 }
 
-// /status — OpenAI ChatGPT subscription usage
+// /status — Anthropic / OpenAI OAuth subscription usage
 handlers['status'] = async () => {
-	return { output: await openaiUsage.renderStatus(true), handled: true }
+	const raw = [await anthropicUsage.renderStatus(true), await openaiUsage.renderStatus(true)]
+	const sections = raw.filter((text) => !/^No (Anthropic Claude|OpenAI ChatGPT) subscriptions configured\.$/.test(text.trim()))
+	return {
+		output: sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.',
+		handled: true,
+	}
 }
 
 // /usage — Claude Code / Codex-style alias for /status
@@ -331,24 +389,25 @@ handlers['mem'] = () => {
 	return { output: lines.join('\n'), handled: true }
 }
 
-// /resume [id] — list closed sessions or reopen one as a tab
+// /resume [id|name] — list closed sessions or reopen one as a tab
 handlers['resume'] = (args, session) => {
-	const id = args.trim()
-	if (!id) return { output: closedSessionLines().join('\n'), handled: true }
-	ipc.appendCommand({ type: 'resume', text: id, sessionId: session.id })
-	return { output: `Resuming ${id}...`, handled: true }
+	const selector = args.trim()
+	if (!selector) return { output: closedSessionLines().join('\n'), handled: true }
+	ipc.appendCommand({ type: 'resume', text: selector, sessionId: session.id })
+	return { output: `Resuming ${selector}...`, handled: true }
 }
 
-// /send <tab|session-id> <message> — queue a message for another session
+// /send <tab|session-id|name> <message> — queue a message for another session
 handlers['send'] = (args, session) => {
+	const trimmed = args.trim()
+	if (trimmed === 'all' || trimmed.startsWith('all ')) return handlers['broadcast']!(trimmed.slice(3).trim(), session, () => {})
 	const parsed = parseSendArgs(args)
-	if (!parsed) return { error: 'Usage: /send <tab|session-id> <message>', handled: true }
-	if (parsed.target === 'all') return handlers['broadcast']!(parsed.text, session, () => {})
-	const target = resolveTabTarget(session, parsed.target)
-	if (!target) {
-		return { error: `Unknown tab or session: ${parsed.target}`, handled: true }
-	}
-	return sendToSession(session, target, parsed.text)
+	if (!parsed) return { error: 'Usage: /send <tab|session-id|name> <message>', handled: true }
+	const exactTarget = resolveTabTarget(session, parsed.target)
+	if (exactTarget) return sendToSession(session, exactTarget, parsed.text)
+	const resolved = resolveSendTarget(session, args)
+	if (resolved) return sendToSession(session, resolved.target, resolved.text)
+	return { error: `Unknown tab or session: ${parsed.target}`, handled: true }
 }
 
 // /broadcast <message> — queue the same message for every other session
