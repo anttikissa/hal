@@ -86,7 +86,7 @@ function parseSendArgs(args: string): { target: string; text: string } | null {
 	return { target, text }
 }
 
-function resolveSendTarget(session: SessionState, raw: string): SessionRef | null {
+function resolveTabTarget(session: SessionState, raw: string): SessionRef | null {
 	const sessions = session.sessions ?? []
 	if (/^\d+$/.test(raw)) {
 		const index = parseInt(raw, 10) - 1
@@ -165,6 +165,9 @@ function detailedHelp(topic: string): string | null {
 	if (topic === 'mem') {
 		return ['Usage: /mem', '', 'Show current RSS memory and the warn/kill thresholds.'].join('\n')
 	}
+	if (topic === 'open') {
+		return ['Usage: /open [tab|session-id]', '', 'With no target, opens a new tab at the end. With a target, opens after that tab.'].join('\n')
+	}
 	if (topic === 'cd') {
 		return ['Usage: /cd [path]', '', 'With no path, shows the current working directory.'].join('\n')
 	}
@@ -190,6 +193,7 @@ handlers['help'] = (args) => {
 		'  /model [name]   Switch model or list available models',
 		'  /clear          Clear session history',
 		'  /fork           Fork current session to new tab',
+		'  /open [tab|id]  Open a new tab, optionally after a tab',
 		'  /resume [id]    Resume a closed session',
 		'  /compact        Summarize conversation to reduce context',
 		'  /raw            Log raw key bytes on this terminal',
@@ -241,6 +245,20 @@ handlers['fork'] = (_args, session) => {
 	return { handled: true }
 }
 
+// /open [tab|session-id] — open a new tab, optionally after an existing tab
+handlers['open'] = (args, session) => {
+	const targetText = args.trim()
+	if (!targetText) {
+		ipc.appendCommand({ type: 'open', sessionId: session.id })
+		return { output: 'Opening new tab...', handled: true }
+	}
+
+	const target = resolveTabTarget(session, targetText)
+	if (!target) return { error: `Unknown tab or session: ${targetText}`, handled: true }
+	ipc.appendCommand({ type: 'open', text: `after:${target.id}`, sessionId: session.id })
+	return { output: `Opening new tab after ${target.name} (${target.id})...`, handled: true }
+}
+
 // /compact — summarize conversation
 handlers['compact'] = (_args, session) => {
 	ipc.appendCommand({
@@ -289,7 +307,7 @@ handlers['send'] = (args, session) => {
 	const parsed = parseSendArgs(args)
 	if (!parsed) return { error: 'Usage: /send <tab|session-id> <message>', handled: true }
 	if (parsed.target === 'all') return handlers['broadcast']!(parsed.text, session, () => {})
-	const target = resolveSendTarget(session, parsed.target)
+	const target = resolveTabTarget(session, parsed.target)
 	if (!target) {
 		return { error: `Unknown tab or session: ${parsed.target}`, handled: true }
 	}

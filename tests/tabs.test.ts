@@ -199,4 +199,45 @@ describe("tabs", () => {
 		proc.stdin!.flush()
 		await proc.exited
 	})
+
+
+	test("open after inserts a plain new tab next to the target tab", async () => {
+		const proc = spawnHal()
+		await Bun.sleep(300)
+
+		proc.stdin!.write(new Uint8Array([0x14])) // ctrl-t
+		proc.stdin!.flush()
+		const secondTabDeadline = Date.now() + 2000
+		while (Date.now() < secondTabDeadline) {
+			if (readSessionIds().length === 2) break
+			await Bun.sleep(50)
+		}
+
+		const beforeOpen = readSessionIds()
+		expect(beforeOpen).toHaveLength(2)
+		const targetId = beforeOpen[0]!
+		const rightTabId = beforeOpen[1]!
+
+		const commandPath = join(tmpDir, "ipc", "commands.asonl")
+		const openCommand = ason.stringify({ type: 'open', text: `after:${targetId}`, sessionId: targetId, createdAt: new Date().toISOString() }, 'short')
+		Bun.write(commandPath, `${readFileSync(commandPath, 'utf-8')}${openCommand}\n`)
+
+		const openDeadline = Date.now() + 2000
+		while (Date.now() < openDeadline) {
+			if (readSessionIds().length === 3) break
+			await Bun.sleep(50)
+		}
+
+		const afterOpen = readSessionIds()
+		expect(afterOpen).toHaveLength(3)
+		expect(afterOpen[0]).toBe(targetId)
+		expect(afterOpen[2]).toBe(rightTabId)
+		expect(afterOpen[1]).not.toBe(targetId)
+		expect(afterOpen[1]).not.toBe(rightTabId)
+
+		proc.stdin!.write(new Uint8Array([0x03]))
+		proc.stdin!.flush()
+		await proc.exited
+	})
+
 })

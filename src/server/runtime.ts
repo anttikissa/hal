@@ -61,14 +61,14 @@ function recordForkedTab(child: Session, parent: Session): void {
 	sessionStore.appendHistorySync(child.id, [{ type: 'info', text, ts: child.createdAt }])
 }
 
-function createSession(opener?: Session): Session {
+function createSession(opener?: Session, afterId?: string): Session {
 	const session: Session = {
 		id: makeSessionId(),
 		name: `tab ${activeSessions.length + 1}`,
 		cwd: process.cwd(),
 		createdAt: new Date().toISOString(),
 	}
-	activeSessions.push(session)
+	insertSessionAfter(session, afterId)
 
 	// sessionStore.createSession() is declared async for API symmetry, but the
 	// actual work here is synchronous: it creates the live meta object and writes
@@ -395,6 +395,9 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 				const msg = `forked ${parentId} → ${child.id}`
 				emitInfo(parentId, msg)
 				emitInfo(child.id, msg)
+			} else if (typeof cmd.text === 'string' && cmd.text.startsWith('after:')) {
+				const afterId = cmd.text.slice(6)
+				createSession(session, afterId)
 			} else {
 				createSession(session)
 			}

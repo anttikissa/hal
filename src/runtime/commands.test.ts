@@ -6,12 +6,14 @@ import { agentLoop } from './agent-loop.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 import { models } from '../models.ts'
+import { ipc } from '../ipc.ts'
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 const sent: Array<{ sessionId: string; text: string; from?: string }> = []
 const origQueueMessage = inbox.queueMessage
+const origAppendCommand = ipc.appendCommand
 const origConfigData = config.data
 const origConfigSave = config.save
 const origMaxIterations = agentLoop.config.maxIterations
@@ -49,6 +51,7 @@ afterEach(() => {
 	Object.assign(memory.config, origMemoryConfig)
 	memory.io.readRss = origReadRss
 	models.config.default = origDefaultModel
+	ipc.appendCommand = origAppendCommand
 })
 
 test('/send resolves a tab number', async () => {
@@ -138,6 +141,21 @@ test('/mem shows current rss and thresholds', async () => {
 	expect(result.output).toContain('Current: 1.23 GB RSS')
 	expect(result.output).toContain('Warn: 1.50 GB RSS')
 	expect(result.output).toContain('Kill: disabled')
+})
+
+
+test('/open resolves a tab number and queues placement after it', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const result = await commands.executeCommand('/open 2', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('04-bbb')
+	expect(appended).toEqual([{ type: 'open', text: 'after:04-bbb', sessionId: '04-aaa' }])
 })
 
 test('/help config shows config caveats and syntax', async () => {
