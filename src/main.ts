@@ -7,9 +7,10 @@ import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
 import { client } from './client.ts'
 import { memory } from './memory.ts'
+import { version } from './version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
-import './config.ts' // load config.ason overrides, watch for changes
+import { config } from './config.ts'
 
 ensureStateDir()
 perf.mark('State directories exist')
@@ -25,13 +26,33 @@ let electionTimer: ReturnType<typeof setInterval> | null = null
 let cleaned = false
 let memoryTimer: ReturnType<typeof setTimeout> | null = null
 
+function syncHostVersionState(): void {
+	if (!isHost) return
+	const lock = ipc.readHostLock()
+	ipc.updateState((state) => {
+		state.host = {
+			pid: process.pid,
+			startedAt: lock?.createdAt ?? state.host?.startedAt ?? '',
+			versionStatus: version.state.status,
+			version: version.state.combined || undefined,
+			error: version.state.error || undefined,
+		}
+	})
+}
+
+version.onChange(() => {
+	if (isHost) syncHostVersionState()
+	client.requestRender(false)
+})
+
 function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
 	client.state.role = 'server'
+	syncHostVersionState()
 	ipc.appendEvent({
 		type: 'runtime-start',
 		pid: process.pid,
-		startedAt: new Date().toISOString(),
+		startedAt: ipc.readHostLock()?.createdAt ?? new Date().toISOString(),
 	})
 	if (kind === 'promote') client.addStartupEntry(`Promoted to server (pid ${process.pid})`)
 	runtime.startRuntime(ac.signal)
@@ -75,6 +96,7 @@ function tickElection(): void {
 }
 
 client.state.role = isHost ? 'server' : 'client'
+version.start()
 if (isHost) {
 	becomeHost('start')
 }
