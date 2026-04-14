@@ -388,9 +388,16 @@ function handleAppKey(k: KeyEvent): boolean {
 		draw(true)
 		return true
 	}
-	// Ctrl-T: new tab
-	if (k.key === 't' && k.ctrl) {
+	// Ctrl-T: new tab. Ctrl-Shift-T restores the most recently closed tab,
+	// matching Chrome, so plain Ctrl-T must require no shift.
+	if (k.key === 't' && k.ctrl && !k.shift && !k.alt && !k.cmd) {
 		if (client.state.tabs.length < 40) client.sendCommand('open')
+		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
+		return true
+	}
+	// Ctrl-Shift-T: reopen the most recently closed tab, like Chrome.
+	if (k.key === 't' && k.ctrl && k.shift && !k.alt && !k.cmd) {
+		if (client.state.tabs.length < 40) client.sendCommand('resume')
 		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
 		return true
 	}
@@ -399,12 +406,6 @@ function handleAppKey(k: KeyEvent): boolean {
 		const tab = client.currentTab()
 		if (!tab) return true
 		if (client.state.tabs.length < 40) client.sendCommand('open', `fork:${tab.sessionId}`)
-		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
-		return true
-	}
-	// Ctrl-Shift-Tab: reopen the most recently closed tab, like Chrome.
-	if (k.key === 'tab' && k.ctrl && k.shift && !k.alt && !k.cmd) {
-		if (client.state.tabs.length < 40) client.sendCommand('resume')
 		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
 		return true
 	}

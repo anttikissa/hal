@@ -60,7 +60,7 @@ test('raw mode exits on kitty CSI-u escape too', () => {
 })
 
 
-test('ctrl-shift-tab queues resume of the most recently closed tab', () => {
+test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const origTabs = client.state.tabs.slice()
@@ -88,7 +88,7 @@ test('ctrl-shift-tab queues resume of the most recently closed tab', () => {
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
-		const handled = cli.forTests.handleAppKey({ key: 'tab', shift: true, ctrl: true, alt: false, cmd: false })
+		const handled = cli.forTests.handleAppKey({ key: 't', shift: true, ctrl: true, alt: false, cmd: false })
 		expect(handled).toBe(true)
 		expect(commands).toEqual([{ type: 'resume', text: undefined, sessionId: '04-bbb' }])
 	} finally {
