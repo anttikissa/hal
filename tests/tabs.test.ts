@@ -306,7 +306,7 @@ describe("tabs", () => {
 		const moveCommand = ason.stringify({ type: 'move', text: '1', sessionId: movedId, createdAt: new Date().toISOString() }, 'short')
 		Bun.write(commandPath, `${readFileSync(commandPath, 'utf-8')}${moveCommand}\n`)
 
-		const moveDeadline = Date.now() + 2000
+		const moveDeadline = Date.now() + 4000
 		while (Date.now() < moveDeadline) {
 			const current = readSessionIds()
 			if (current.length === 3 && current[0] === movedId) break

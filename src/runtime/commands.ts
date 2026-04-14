@@ -149,6 +149,98 @@ function closedSessionLines(): string[] {
 	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => `  ${meta.id}`)]
 }
 
+function userEntryText(entry: any): string {
+	if (entry?.type !== 'user' || !Array.isArray(entry.parts)) return ''
+	return entry.parts
+		.map((part: any) => {
+			if (part?.type === 'text') return part.text ?? ''
+			if (part?.type === 'image') return `[${part.originalFile ?? part.blobId ?? 'image'}]`
+			return ''
+		})
+		.join('')
+		.replace(/\s+/g, ' ')
+		.trim()
+}
+
+function previewText(text: string, maxLen = 48): string {
+	if (text.length <= maxLen) return text
+	return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`
+}
+
+function recentPromptPreviews(entries: any[], limit: number): string[] {
+	const prompts: string[] = []
+	for (let i = entries.length - 1; i >= 0 && prompts.length < limit; i--) {
+		const text = userEntryText(entries[i])
+		if (!text) continue
+		prompts.push(previewText(text))
+	}
+	return prompts
+}
+
+function lastTouchedAt(meta: any, entries: any[]): string {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const ts = entries[i]?.ts
+		if (typeof ts === 'string' && ts) return ts
+	}
+	return meta.closedAt ?? meta.createdAt
+}
+
+function formatRelativeAge(now: number, isoTs: string): string {
+	const ts = Date.parse(isoTs)
+	if (!Number.isFinite(ts)) return '?'
+	const deltaMs = Math.max(0, now - ts)
+	const minutes = Math.floor(deltaMs / 60_000)
+	if (minutes < 1) return 'now'
+	if (minutes < 60) return `${minutes}m`
+	const hours = Math.floor(minutes / 60)
+	if (hours < 24) return `${hours}h`
+	const days = Math.floor(hours / 24)
+	return `${days}d`
+}
+
+function formatStamp(isoTs: string): string {
+	return isoTs.replace('T', ' ').slice(0, 16)
+}
+
+function renderTabs(args: string, session: SessionState): CommandResult {
+	const trimmed = args.trim()
+	if (trimmed && trimmed !== '--all') return { error: 'Usage: /tabs [--all]', handled: true }
+	const showAll = trimmed === '--all'
+	const openTabs = session.sessions ?? []
+	const openPos = new Map(openTabs.map((tab, index) => [tab.id, index + 1]))
+	const metas = sessionStore.loadAllSessionMetas().filter((meta) => showAll || openPos.has(meta.id))
+	if (metas.length === 0) return { output: showAll ? 'No sessions.' : 'No open tabs.', handled: true }
+	const cols = process.stdout.columns || 80
+	const promptCount = cols >= 160 ? 3 : cols >= 120 ? 2 : 1
+	const now = Date.now()
+	const rows = metas
+		.map((meta) => {
+			const entries = sessionStore.loadAllHistory(meta.id)
+			const name = meta.topic || meta.name || openTabs.find((tab) => tab.id === meta.id)?.name || meta.id
+			return {
+				id: meta.id,
+				name,
+				createdAt: meta.createdAt,
+				closedAt: meta.closedAt,
+				openPos: openPos.get(meta.id),
+				touchedAt: lastTouchedAt(meta, entries),
+				prompts: recentPromptPreviews(entries, promptCount),
+			}
+		})
+		.sort((a, b) => b.touchedAt.localeCompare(a.touchedAt))
+	const lines = [showAll ? 'Sessions (newest activity first):' : 'Open tabs (newest activity first):']
+	for (const row of rows) {
+		const marker = row.id === session.id ? '*' : ' '
+		const where = row.openPos ? `tab ${row.openPos}` : 'closed'
+		lines.push(`${marker} ${where.padEnd(7)} ${row.id}  ${formatRelativeAge(now, row.touchedAt).padEnd(4)}  ${row.name}`)
+		if (row.prompts.length > 0) lines.push(`          ${row.prompts.join(' · ')}`)
+		const dates = [`start ${formatStamp(row.createdAt)}`]
+		if (row.closedAt) dates.push(`end ${formatStamp(row.closedAt)}`)
+		lines.push(`          ${dates.join(' · ')}`)
+	}
+	return { output: lines.join('\n'), handled: true }
+}
+
 function renderRuntimeStatus(): string {
 	const host = ipc.readState().host
 	const lines = [
@@ -225,6 +317,9 @@ function detailedHelp(topic: string): string | null {
 	if (topic === 'resume') {
 		return ['Usage: /resume [session-id|name]', '', 'With no id, lists recently closed sessions.'].join('\n')
 	}
+	if (topic === 'tabs') {
+		return ['Usage: /tabs [--all]', '', 'List open tabs sorted by most recent activity. Use --all to include closed sessions.'].join('\n')
+	}
 	if (topic === 'move') {
 		return [
 			'Usage: /move <position>',
@@ -255,6 +350,7 @@ handlers['help'] = (args) => {
 		'  /move <pos>     Move current tab to a position',
 		'  /rename <name>  Rename the current session',
 		'  /resume [id]    Resume a closed session',
+		'  /tabs [--all]   List tabs by recent activity',
 		'  /compact        Summarize conversation to reduce context',
 		'  /raw            Log raw key bytes on this terminal',
 		'  /status         Show Anthropic / OpenAI subscription usage',
@@ -317,6 +413,12 @@ handlers['open'] = (args, session) => {
 	if (!target) return { error: `Unknown tab, session, or name: ${targetText}`, handled: true }
 	ipc.appendCommand({ type: 'open', text: `after:${target.id}`, sessionId: session.id })
 	return { output: `Opening new tab after ${target.name} (${target.id})...`, handled: true }
+}
+
+
+// /tabs [--all] — list tabs/sessions by most recent activity
+handlers['tabs'] = (args, session) => {
+	return renderTabs(args, session)
 }
 
 // /rename <name>|clear — set or clear the current session name

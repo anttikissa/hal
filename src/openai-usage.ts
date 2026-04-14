@@ -42,6 +42,7 @@ const config = {
 	activityWriteThrottleMs: 60_000,
 	fetchTimeoutMs: 10_000,
 	progressBarWidth: 14,
+	censorEmails: false,
 }
 
 const state = liveFiles.liveFile(CACHE_PATH, {

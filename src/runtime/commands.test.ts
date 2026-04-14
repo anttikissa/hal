@@ -9,6 +9,7 @@ import { memory } from '../memory.ts'
 import { models } from '../models.ts'
 import { ipc } from '../ipc.ts'
 import { version } from '../version.ts'
+import { sessions as sessionStore } from '../server/sessions.ts'
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -25,6 +26,11 @@ const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
 const origDefaultModel = models.config.default
 const origVersionState = { ...version.state }
+
+const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
+const origLoadAllHistory = sessionStore.loadAllHistory
+const origLoadLive = sessionStore.loadLive
+const origColumnsDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'columns')
 
 function makeSession(id = '04-aaa'): SessionState {
 	return {
@@ -59,6 +65,10 @@ afterEach(() => {
 	ipc.appendCommand = origAppendCommand
 	Object.assign(version.state, origVersionState)
 	version.state.repoDir = origVersionState.repoDir
+	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
+	sessionStore.loadAllHistory = origLoadAllHistory
+	sessionStore.loadLive = origLoadLive
+	if (origColumnsDescriptor) Object.defineProperty(process.stdout, 'columns', origColumnsDescriptor)
 })
 
 test('/send resolves a tab number', async () => {
@@ -184,6 +194,58 @@ test('/open resolves a tab number and queues placement after it', async () => {
 	expect(result.error).toBeUndefined()
 	expect(result.output).toContain('04-bbb')
 	expect(appended).toEqual([{ type: 'open', text: 'after:04-bbb', sessionId: '04-aaa' }])
+})
+
+
+test('/tabs sorts open tabs by latest activity and shows recent prompt previews', async () => {
+	sessionStore.loadAllSessionMetas = () => [
+		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'old tab' },
+		{ id: '04-bbb', createdAt: '2026-04-14T10:00:00.000Z', topic: 'pause fix' },
+		{ id: '04-ccc', createdAt: '2026-04-14T11:00:00.000Z', topic: 'docs' },
+	]
+	sessionStore.loadAllHistory = (sessionId: string) => {
+		if (sessionId === '04-bbb') {
+			return [
+				{ type: 'user', parts: [{ type: 'text', text: 'can you commit now?' }], ts: '2026-04-14T11:58:00.000Z' } as any,
+				{ type: 'user', parts: [{ type: 'text', text: 'i think we good now' }], ts: '2026-04-14T11:59:00.000Z' } as any,
+				{ type: 'assistant', text: 'done', ts: '2026-04-14T12:00:00.000Z' } as any,
+			]
+		}
+		if (sessionId === '04-ccc') return [{ type: 'user', parts: [{ type: 'text', text: 'please do X' }], ts: '2026-04-14T11:00:00.000Z' } as any]
+		return [{ type: 'user', parts: [{ type: 'text', text: 'old task' }], ts: '2026-04-14T10:00:00.000Z' } as any]
+	}
+	sessionStore.loadLive = () => ({ busy: false, activity: '', blocks: [], updatedAt: '2026-04-14T09:00:00.000Z' })
+	Object.defineProperty(process.stdout, 'columns', { value: 160, configurable: true })
+
+	const result = await commands.executeCommand('/tabs', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('Open tabs')
+	expect(result.output).toContain('04-bbb')
+	expect(result.output).toContain('pause fix')
+	expect(result.output).toContain('i think we good now · can you commit now?')
+	expect(result.output!.indexOf('04-bbb')).toBeLessThan(result.output!.indexOf('04-ccc'))
+	expect(result.output!.indexOf('04-ccc')).toBeLessThan(result.output!.indexOf('04-aaa'))
+})
+
+
+test('/tabs --all includes closed sessions', async () => {
+	sessionStore.loadAllSessionMetas = () => [
+		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'open tab' },
+		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', topic: 'closed tab' },
+	]
+	sessionStore.loadAllHistory = (sessionId: string) => sessionId === '04-zzz'
+		? [{ type: 'user', parts: [{ type: 'text', text: 'finished thing' }], ts: '2026-04-13T09:30:00.000Z' } as any]
+		: [{ type: 'user', parts: [{ type: 'text', text: 'still open' }], ts: '2026-04-14T09:30:00.000Z' } as any]
+	sessionStore.loadLive = () => ({ busy: false, activity: '', blocks: [], updatedAt: '2026-04-14T09:00:00.000Z' })
+
+	const result = await commands.executeCommand('/tabs --all', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('04-zzz')
+	expect(result.output).toContain('closed')
 })
 
 

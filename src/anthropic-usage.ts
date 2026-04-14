@@ -165,7 +165,7 @@ function formatResetAt(resetAt: number, now = new Date()): string {
 
 function displayAccount(account: AccountUsage): string {
 	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
-	return subscriptionUsage.config.censorEmails && account.email ? subscriptionUsage.censorEmail(raw) : raw
+	return (config.censorEmails || subscriptionUsage.config.censorEmails) && account.email ? subscriptionUsage.censorEmail(raw) : raw
 }
 
 function displaySlot(account: AccountUsage): string {
