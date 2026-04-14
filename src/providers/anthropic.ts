@@ -32,6 +32,25 @@ function errorTypeToStatus(type: unknown): number | undefined {
 	return typeof type === 'string' ? ERROR_TYPE_STATUS[type] : undefined
 }
 
+function formatAccountLabel(credential: import('../auth.ts').Credential): string {
+	if (credential.email) return credential.email
+	if (credential.total && credential.index != null) return `account ${credential.index + 1}/${credential.total}`
+	return 'current account'
+}
+
+function formatRotationActivity(credential: import('../auth.ts').Credential): string | undefined {
+	if (!credential.total || credential.total < 2 || credential.index == null) return undefined
+	return `Anthropic ${credential.index + 1}/${credential.total} · ${formatAccountLabel(credential)}`
+}
+
+function formatRotationMessage(current: import('../auth.ts').Credential, next: import('../auth.ts').Credential | undefined, retryAfterMs: number, fast: boolean): string {
+	const total = current.total ?? 1
+	const currentLabel = formatAccountLabel(current)
+	const nextLabel = next ? formatAccountLabel(next) : 'the next available account'
+	if (fast) return `Anthropic rotation: ${total} accounts. 429 on ${currentLabel}. Trying ${nextLabel} next.`
+	return `Anthropic rotation: ${total} accounts. 429 on ${currentLabel}. All accounts cooling down. Next: ${nextLabel} in ${Math.ceil(retryAfterMs / 1000)}s.`
+}
+
 // ── Message sanitization ──
 // Strip or convert blocks that Anthropic doesn't understand (e.g. foreign
 // thinking signatures from OpenAI reasoning models).
@@ -265,6 +284,9 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 
 	const isOAuth = cred.type === 'token'
 
+	const rotationActivity = formatRotationActivity(cred)
+	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
+
 	// Build system blocks with cache control.
 	// OAuth requires the Claude Code identity prefix — without it, the API rejects the request.
 	const system: any[] = []
@@ -352,7 +374,22 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 			await Bun.write('/tmp/compare/hal.txt', prev + `ERROR BODY: ${text}\n\n`)
 		} catch {}
 		const retryAfterMs = providerUtils.parseRetryDelay(res, text)
-		yield { type: 'error', message: `Anthropic API ${res.status}`, status: res.status, body: text, endpoint: url, retryAfterMs }
+		if (res.status === 429) {
+			const cooldownMs = retryAfterMs ?? 10 * 60_000
+			auth.markCooldown(cred, cooldownMs)
+			const fast = auth.hasAvailableCredential('anthropic')
+			const nextCredential = auth.getCredential('anthropic')
+			yield {
+				type: 'error',
+				message: formatRotationMessage(cred, nextCredential, fast ? 1_000 : cooldownMs, fast),
+				status: res.status,
+				body: text,
+				endpoint: url,
+				retryAfterMs: fast ? 1_000 : cooldownMs,
+			}
+		} else {
+			yield { type: 'error', message: `Anthropic API ${res.status}`, status: res.status, body: text, endpoint: url, retryAfterMs }
+		}
 		yield { type: 'done' }
 		return
 	}

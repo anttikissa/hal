@@ -220,31 +220,45 @@ function getEntry(providerName: string): Record<string, any> {
 
 // ── Token refresh ──
 
-/** Refresh Anthropic OAuth token if expired. No-op for API keys. */
+/** Refresh Anthropic OAuth tokens if expired. Handles both single and multi-account. */
 async function refreshAnthropic(): Promise<void> {
-	const entry = store().anthropic
-	if (!entry?.refreshToken) return
-	// Still valid? Skip. (60s buffer)
-	if (entry.expires && Date.now() < entry.expires - 60_000) return
+	const raw = store().anthropic
+	const entries = normalizeEntries(raw)
 
-	const res = await fetch('https://console.anthropic.com/v1/oauth/token', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			grant_type: 'refresh_token',
-			refresh_token: entry.refreshToken,
-			client_id: ANTHROPIC_CLIENT_ID,
-		}),
-	})
-	const data = (await res.json()) as any
-	if (!data.access_token) throw new Error(`Anthropic token refresh failed: ${JSON.stringify(data)}`)
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i]
+		if (!entry?.refreshToken) continue
+		if (entry.expires && Date.now() < entry.expires - 60_000) continue
 
-	// Write back — liveFile proxy auto-persists on property set
-	store().anthropic = {
-		...entry,
-		accessToken: data.access_token,
-		refreshToken: data.refresh_token,
-		expires: Date.now() + data.expires_in * 1000,
+		const res = await fetch('https://console.anthropic.com/v1/oauth/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				grant_type: 'refresh_token',
+				refresh_token: entry.refreshToken,
+				client_id: ANTHROPIC_CLIENT_ID,
+			}),
+		})
+		if (!res.ok) {
+			const text = await res.text().catch(() => '')
+			throw new Error(`Anthropic token refresh failed: ${res.status} ${text}`)
+		}
+		const data = (await res.json()) as any
+		if (!data.access_token) throw new Error('Anthropic refresh: missing access_token')
+
+		const updated = {
+			...entry,
+			accessToken: data.access_token,
+			refreshToken: data.refresh_token,
+			expires: Date.now() + (data.expires_in ?? 3600) * 1000,
+		}
+
+		if (Array.isArray(raw)) {
+			raw[i] = updated
+			store().anthropic = raw
+		} else {
+			store().anthropic = updated
+		}
 	}
 }
 

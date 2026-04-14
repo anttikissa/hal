@@ -207,3 +207,42 @@ describe('cooldown persistence across restarts', () => {
 		expect(after!.email).toBe('b@test.com')
 	})
 })
+
+
+describe('auth.ensureFresh — anthropic multi-account refresh', () => {
+	beforeEach(() => {
+		auth._resetCooldowns()
+	})
+
+	test('refreshes each expired anthropic account in an array', async () => {
+		const origFetch = globalThis.fetch
+		const seenRefreshTokens: string[] = []
+		globalThis.fetch = Object.assign(async (_input: any, init?: RequestInit) => {
+			const body = JSON.parse(String(init?.body ?? '{}'))
+			seenRefreshTokens.push(body.refresh_token)
+			return new Response(JSON.stringify({
+				access_token: `fresh_${body.refresh_token}`,
+				refresh_token: `next_${body.refresh_token}`,
+				expires_in: 3600,
+			}), { status: 200 }) as any
+		}, { preconnect: () => {} }) as typeof fetch
+
+		try {
+			auth._setStoreForTest({
+				anthropic: [
+					{ accessToken: 'old_a', refreshToken: 'rt_a', expires: 0, email: 'a@test.com' },
+					{ accessToken: 'old_b', refreshToken: 'rt_b', expires: 0, email: 'b@test.com' },
+				],
+			})
+
+			await auth.ensureFresh('anthropic')
+
+			expect(seenRefreshTokens).toEqual(['rt_a', 'rt_b'])
+			const creds = auth.listCredentials('anthropic')
+			expect(creds.map((cred) => cred.value)).toEqual(['fresh_rt_a', 'fresh_rt_b'])
+			expect(creds.map((cred) => cred.email)).toEqual(['a@test.com', 'b@test.com'])
+		} finally {
+			globalThis.fetch = origFetch
+		}
+	})
+})
