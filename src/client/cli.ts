@@ -402,6 +402,12 @@ function handleAppKey(k: KeyEvent): boolean {
 		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
 		return true
 	}
+	// Ctrl-Shift-Tab: reopen the most recently closed tab, like Chrome.
+	if (k.key === 'tab' && k.ctrl && k.shift && !k.alt && !k.cmd) {
+		if (client.state.tabs.length < 40) client.sendCommand('resume')
+		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
+		return true
+	}
 	// Ctrl-W: close tab
 	if (k.key === 'w' && k.ctrl) {
 		if (client.state.tabs.length > 1) client.sendCommand('close')
@@ -553,6 +559,9 @@ export const cli = {
 	startCli,
 	submitCommandType,
 	formatRawToken,
+	forTests: {
+		handleAppKey,
+	},
 	rawModeForTests: {
 		start: startRawMode,
 		stop: stopRawMode,

@@ -125,6 +125,23 @@ function sessionFromMeta(meta: ReturnType<typeof sessionStore.loadSessionMeta>):
 	}
 }
 
+function pickMostRecentlyClosedSessionId(
+	metas: Array<{ id: string; createdAt: string; closedAt?: string }>,
+	openIds: Set<string>,
+): string | null {
+	const closed = metas
+		.filter((meta) => !openIds.has(meta.id))
+		.sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
+	return closed[0]?.id ?? null
+}
+
+function mostRecentlyClosedSessionId(): string | null {
+	return pickMostRecentlyClosedSessionId(
+		sessionStore.loadAllSessionMetas(),
+		new Set(activeSessions.map((session) => session.id)),
+	)
+}
+
 function syncSharedState(): void {
 	ipc.updateState((state) => {
 		state.sessions = activeSessions.map((s) => s.id)
@@ -406,8 +423,11 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		}
 
 		case 'resume': {
-			const resumeId = String(cmd.text ?? '').trim()
-			if (!resumeId) break
+			const resumeId = String(cmd.text ?? '').trim() || mostRecentlyClosedSessionId()
+			if (!resumeId) {
+				emitInfo(sessionId ?? activeSessions[0]?.id ?? '', 'No closed sessions.')
+				break
+			}
 			if (activeSessions.some((s) => s.id === resumeId)) {
 				emitInfo(sessionId ?? activeSessions[0]?.id ?? resumeId, `Session ${resumeId} is already open`)
 				break
@@ -596,4 +616,4 @@ function startRuntime(signal: AbortSignal): void {
 		})
 }
 
-export const runtime = { startRuntime }
+export const runtime = { startRuntime, pickMostRecentlyClosedSessionId }

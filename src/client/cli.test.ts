@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test'
 import { cli } from './cli.ts'
+import { client } from '../client.ts'
+import { ipc } from '../ipc.ts'
 
 function makeRawSink(): { lines: string[]; emit: (text: string) => void } {
 	const lines: string[] = []
@@ -55,4 +57,44 @@ test('raw mode exits on kitty CSI-u escape too', () => {
 	expect(cli.rawModeForTests.handle('\x1b[27;1u', sink.emit)).toBe(true)
 	expect(sink.lines.at(-1)).toBe('Raw input mode off.')
 	expect(cli.rawModeForTests.active()).toBe(false)
+})
+
+
+test('ctrl-shift-tab queues resume of the most recently closed tab', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origTabs = client.state.tabs.slice()
+	const origActiveTab = client.state.activeTab
+
+	client.state.tabs.length = 0
+	client.state.tabs.push({
+		sessionId: '04-bbb',
+		name: 'tab 2',
+		history: [],
+		inputHistory: [],
+		inputDraft: '',
+		parentEntryCount: 0,
+		liveHistory: [],
+		loaded: true,
+		doneUnseen: false,
+		historyVersion: 0,
+		usage: { input: 0, output: 0 },
+		contextUsed: 0,
+		contextMax: 0,
+		cwd: '/tmp',
+		model: 'openai/gpt-5.4',
+	})
+	client.state.activeTab = 0
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		const handled = cli.forTests.handleAppKey({ key: 'tab', shift: true, ctrl: true, alt: false, cmd: false })
+		expect(handled).toBe(true)
+		expect(commands).toEqual([{ type: 'resume', text: undefined, sessionId: '04-bbb' }])
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.activeTab = origActiveTab
+	}
 })

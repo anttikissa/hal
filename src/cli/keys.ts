@@ -56,6 +56,10 @@ const CSI_TILDE_KEYS: Record<number, string> = {
 // Kitty protocol adds :eventType to modifier (1=press, 2=repeat, 3=release);
 // we drop release events.
 function parseCsi(body: string, terminator: string): KeyEvent | null {
+	// Legacy Shift-Tab arrives as CSI Z with no parameters.
+	// Treat it as Tab plus the shift modifier so completion and app bindings
+	// can handle it the same way as kitty CSI-u tab events.
+	if (terminator === 'Z' && body === '') return ke('tab', { shift: true })
 	const parts = body.split(';')
 	const keyName = CSI_SUFFIX_KEYS[terminator]
 	if (keyName) {
