@@ -147,6 +147,24 @@ test('live snapshot stores tool results on existing tool blocks', async () => {
 	])
 })
 
+
+test('live snapshot keeps blob metadata for response errors', async () => {
+	const id = await makeSession()
+	sessions.applyLiveEvent(id, {
+		type: 'response',
+		sessionId: id,
+		isError: true,
+		text: '503:\nOur servers are currently overloaded. Please try again later.',
+		blobId: '000003-err',
+		createdAt: '2026-04-09T20:01:01.000Z',
+	})
+
+	const live = sessions.loadLive(id)
+	expect(live.blocks).toMatchObject([
+		{ type: 'error', text: '503:\nOur servers are currently overloaded. Please try again later.', blobId: '000003-err', sessionId: id },
+	])
+})
+
 test('rotateLog switches new writes to history2.asonl', async () => {
 	const id = await makeSession()
 	await sessions.appendHistory(id, [userEntry('old', new Date().toISOString())])

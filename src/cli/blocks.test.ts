@@ -147,3 +147,17 @@ test('tool output strips ANSI escapes but keeps other control bytes visible', ()
 	expect(clean).toContain('line 11')
 	expect(clean).not.toContain('␛')
 })
+
+
+test('error block header shows blob ref', () => {
+	const block = {
+		type: 'error',
+		text: 'Short error message',
+		sessionId: '04-abc',
+		blobId: '000003-err',
+		ts: new Date('2026-01-01T17:38:00Z').getTime(),
+	} as Block
+
+	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	expect(header).toContain('04-abc/000003-err')
+})

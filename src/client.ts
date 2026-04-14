@@ -708,6 +708,8 @@ function handleEvent(event: any): void {
 			addBlockToTab(event.sessionId ?? null, {
 				type: 'error',
 				text: event.text,
+				blobId: event.blobId,
+				sessionId: event.sessionId ?? undefined,
 				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 			})
 		} else if (tab && event.text && !hasTrailingAssistantText(tab, event.text)) {

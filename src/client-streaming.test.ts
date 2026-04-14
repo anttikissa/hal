@@ -245,3 +245,29 @@ test('tool-result reloads full blob output for edit blocks', async () => {
 		blockModule.loadBlobs = originalLoadBlobs
 	}
 })
+
+
+test('response errors keep blob metadata for later inspection', () => {
+	client.resetForTests()
+	client.state.tabs.length = 0
+	client.state.tabs.push(makeTab())
+	client.state.activeTab = 0
+
+	client.handleEvent({
+		type: 'response',
+		sessionId: 's1',
+		isError: true,
+		text: '503:\nOur servers are currently overloaded. Please try again later.',
+		blobId: '000003-err',
+		createdAt: '2026-04-05T17:31:02.000Z',
+	})
+
+	const tab = client.currentTab()!
+	expect(tab.history).toHaveLength(1)
+	expect(tab.history[0]).toMatchObject({
+		type: 'error',
+		text: '503:\nOur servers are currently overloaded. Please try again later.',
+		blobId: '000003-err',
+		sessionId: 's1',
+	})
+})

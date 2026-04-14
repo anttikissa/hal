@@ -18,7 +18,6 @@ import { toolRegistry } from '../tools/tool.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
-import { ason } from '../utils/ason.ts'
 // Import all tool modules so they self-register on load
 import '../tools/bash.ts'
 import '../tools/read.ts'
@@ -118,6 +117,26 @@ async function writeToolCallBlob(sessionId: string, blobId: string, name: string
 	await blob.writeBlob(sessionId, blobId, existing)
 }
 
+function parseErrorPayload(body: string | undefined): unknown {
+	if (!body) return undefined
+	try {
+		return JSON.parse(body)
+	} catch {
+		return body
+	}
+}
+
+async function writeErrorBlob(sessionId: string, blobId: string, event: ProviderStreamEvent): Promise<void> {
+	await blob.writeBlob(sessionId, blobId, {
+		type: 'provider_error',
+		message: event.message,
+		status: event.status,
+		endpoint: event.endpoint,
+		retryAfterMs: event.retryAfterMs,
+		payload: parseErrorPayload(event.body),
+	})
+}
+
 // ── Retry logic ──
 
 function computeRetryDelay(retryAfterMs: number | undefined, attempt: number): number {
@@ -145,30 +164,15 @@ function parseResetsInSeconds(body: string | undefined): number | undefined {
 	return undefined
 }
 
-/** Pretty-format an error body for display. Parse JSON and print it as ASON. */
-function formatErrorBody(body: string): string {
-	try {
-		return ason.stringify(JSON.parse(body), 'long')
-	} catch {
-		return body
-	}
-}
-
-/** Build the user-visible error details below the status/endpoint header. */
+/** Build the short user-visible error details below the status/endpoint header. */
 function formatErrorDetails(event: ProviderStreamEvent): string {
-	const prettyBody = event.body ? formatErrorBody(event.body) : ''
-
-	// Provider messages like "Anthropic API 429" add no value once the header
-	// already shows the status code. In that case, show the payload instead.
-	if (event.status === 429 && prettyBody) {
-		if (!event.message || event.message === `Anthropic API ${event.status}` || event.message === `OpenAI API ${event.status}`) {
-			return prettyBody
-		}
-		return `${event.message}\n${prettyBody}`
+	if (typeof event.message === 'string' && event.message.trim()) return event.message.trim()
+	const payload = parseErrorPayload(event.body)
+	if (payload && typeof payload === 'object') {
+		const message = (payload as any)?.error?.message ?? (payload as any)?.message ?? (payload as any)?.response?.error?.message
+		if (typeof message === 'string' && message.trim()) return message.trim()
 	}
-
-	if (prettyBody) return prettyBody
-	return event.message ?? 'Unknown error'
+	return 'Unknown error'
 }
 
 /**
@@ -190,6 +194,7 @@ async function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
 		signal.addEventListener('abort', done, { once: true })
 	})
 }
+
 
 // ── Tool call normalization ──
 // Strip redundant "cd $CWD && " prefix that models prepend to bash commands.
@@ -395,6 +400,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 					case 'error': {
 						const status = event.status
+						const blobId = blob.makeBlobId(sessionId)
+						await writeErrorBlob(sessionId, blobId, event)
 
 						const header = status ? `${status}:` : 'Error:'
 						const endpoint = event.endpoint ? ` (${event.endpoint})` : ''
@@ -402,6 +409,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							type: 'response',
 							text: `${header}${endpoint}\n${formatErrorDetails(event)}`,
 							isError: true,
+							blobId,
 						})
 						// Check if we should retry
 						if (isRetryableStatus(status)) {

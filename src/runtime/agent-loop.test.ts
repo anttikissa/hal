@@ -71,6 +71,80 @@ test('writes thinking blobs while streaming and replays them into API history', 
 })
 
 
+test('provider errors save full payload in a blob but show only the short message', async () => {
+	const sessionId = `test-error-blob-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield {
+				type: 'error',
+				message: 'Our servers are currently overloaded. Please try again later.',
+				status: 400,
+				endpoint: 'https://api.example.test/v1/responses',
+				body: JSON.stringify({
+					type: 'response.failed',
+					response: {
+						status: 'failed',
+						error: {
+							code: 'server_is_overloaded',
+							message: 'Our servers are currently overloaded. Please try again later.',
+						},
+						instructions: '# SYSTEM.md\nvery long prompt here',
+					},
+				}),
+			}
+			yield { type: 'done' }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+		})
+		const responseEvent = events.find((event) => event.type === 'response' && event.isError)
+		expect(responseEvent).toMatchObject({
+			type: 'response',
+			isError: true,
+			text: '400: (https://api.example.test/v1/responses)\nOur servers are currently overloaded. Please try again later.',
+		})
+		expect(responseEvent.text).not.toContain('instructions')
+		expect(responseEvent.text).not.toContain('response.failed')
+		expect(responseEvent.blobId).toBeTruthy()
+		expect(blob.readBlob(sessionId, responseEvent.blobId)).toMatchObject({
+			type: 'provider_error',
+			message: 'Our servers are currently overloaded. Please try again later.',
+			status: 400,
+			endpoint: 'https://api.example.test/v1/responses',
+			payload: {
+				type: 'response.failed',
+				response: {
+					status: 'failed',
+					error: {
+						code: 'server_is_overloaded',
+					},
+				},
+			},
+		})
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
 test('provider status updates busy activity', async () => {
 	const sessionId = `test-status-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

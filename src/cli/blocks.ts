@@ -160,7 +160,7 @@ export type Block =
 	  }
 	| { type: 'info'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
 	| { type: 'warning'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
-	| { type: 'error'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+	| { type: 'error'; text: string; blobId?: string; sessionId?: string; ts?: number; dimmed?: boolean; renderVersion?: number }
 	| { type: 'startup'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
 	| { type: 'fork'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
 

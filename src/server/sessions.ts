@@ -273,7 +273,7 @@ function applyLiveEvent(sessionId: string, event: any): void {
 		}
 		if (event.type === 'response' && event.isError && event.text) {
 			closeStreamingBlock(live)
-			live.blocks.push({ type: 'error', text: event.text, ts })
+			live.blocks.push({ type: 'error', text: event.text, blobId: event.blobId, sessionId, ts })
 			return
 		}
 		if (event.type === 'stream-end') closeStreamingBlock(live)
