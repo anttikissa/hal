@@ -14,6 +14,8 @@ import { config } from './config.ts'
 
 ensureStateDir()
 perf.mark('State directories exist')
+config.init()
+perf.mark('Config initialized')
 
 ipc.cleanupStaleLock()
 let isHost = ipc.claimHost()

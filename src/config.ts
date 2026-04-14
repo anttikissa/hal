@@ -1,6 +1,6 @@
 // Runtime configuration — loads config.ason and applies overrides to module
-// config objects. The exported namespace stays mutable so tests and eval can
-// swap the backing data object or patch save/apply behavior.
+// config objects. Importing this module must stay cheap: no file I/O, no
+// watcher setup, no render invalidation. That all lives behind init().
 
 import { liveFiles } from './utils/live-file.ts'
 import { client } from './client.ts'
@@ -28,6 +28,11 @@ const modules: Record<string, Record<string, any>> = {
 
 // config.ason lives at repo root — it's user-facing config.
 const HAL_DIR = import.meta.dir.replace(/\/src$/, '')
+const CONFIG_PATH = `${HAL_DIR}/config.ason`
+
+const state = {
+	initialized: false,
+}
 
 function apply(): void {
 	for (const [name, overrides] of Object.entries(config.data)) {
@@ -38,21 +43,33 @@ function apply(): void {
 	}
 }
 
+function init(): void {
+	if (state.initialized) return
+	state.initialized = true
+
+	// liveFile() does the real disk load and starts the watcher. Keeping that here
+	// makes importing config.ts side-effect free.
+	config.data = liveFiles.liveFile(CONFIG_PATH, {}) as Record<string, any>
+	config.apply()
+	liveFiles.onChange(config.data, () => {
+		config.apply()
+		render.invalidateHistoryCache()
+		client.requestRender(false)
+	})
+}
+
 function save(): void {
+	// Saving before init would write a plain empty object instead of the watched
+	// live-file proxy. Explicit calls may initialize; imports may not.
+	if (!config.state.initialized) config.init()
 	liveFiles.save(config.data)
 }
 
 export const config = {
+	state,
 	modules,
-	data: liveFiles.liveFile(`${HAL_DIR}/config.ason`, {}) as Record<string, any>,
+	data: {} as Record<string, any>,
+	init,
 	apply,
 	save,
 }
-
-// Apply on load and on every external edit.
-config.apply()
-liveFiles.onChange(config.data, () => {
-	config.apply()
-	render.invalidateHistoryCache()
-	client.requestRender(false)
-})
