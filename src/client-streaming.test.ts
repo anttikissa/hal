@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { client } from './client.ts'
 import { blocks as blockModule } from './cli/blocks.ts'
-function makeTab() {
+function makeTab(sessionId = 's1') {
 	return {
-		sessionId: 's1',
-		name: 'tab 1',
+		sessionId,
+		name: `tab ${sessionId}`,
 		history: [],
 		inputHistory: [],
 		inputDraft: '',
@@ -88,6 +88,23 @@ describe('client streaming blocks', () => {
 		client.handleEvent({ type: 'stream-end', sessionId: 's1' })
 		expect(tab.history).toHaveLength(1)
 		expect(tab.history[0]).toMatchObject({ type: 'thinking', text: 'hmm' })
+	})
+
+	test('background stream updates do not repaint the active tab', () => {
+		client.state.tabs.push(makeTab('s2'))
+		let repaints = 0
+		client.setOnChange(() => { repaints++ })
+		client.handleEvent({
+			type: 'stream-delta',
+			sessionId: 's2',
+			channel: 'assistant',
+			text: 'hello',
+			createdAt: '2026-04-05T17:31:00.000Z',
+		})
+		expect(repaints).toBe(0)
+		expect(client.state.tabs[1]!.history).toHaveLength(1)
+		client.handleEvent({ type: 'stream-end', sessionId: 's2' })
+		expect(repaints).toBe(0)
 	})
 
 	test('streamed assistant text stays before live tool blocks and response does not duplicate it', () => {

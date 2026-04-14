@@ -42,6 +42,8 @@ function ensureFile(file: string): void {
 }
 
 function append(file: string, item: any): void {
+	ensureDir(IPC_DIR)
+	ensureFile(file)
 	appendFileSync(file, ason.stringify(item, 'short') + '\n')
 }
 

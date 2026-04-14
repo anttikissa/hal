@@ -46,6 +46,14 @@ let cursorRow = 0
 let cursorCol = 0
 let fullscreen = false
 
+type BlockRenderCache = {
+	version: number
+	cols: number
+	lines: string[]
+}
+
+let blockCache = new WeakMap<Block, BlockRenderCache>()
+
 type HistoryRenderCache = {
 	version: number
 	length: number
@@ -64,16 +72,25 @@ function resetRenderer(): void {
 	cursorRow = 0
 	cursorCol = 0
 	fullscreen = false
+	blockCache = new WeakMap<Block, BlockRenderCache>()
 	historyCache = new WeakMap<Tab, HistoryRenderCache>()
 }
 
-function invalidateHistoryCache(): void { historyCache = new WeakMap<Tab, HistoryRenderCache>() }
+function invalidateHistoryCache(): void {
+	blockCache = new WeakMap<Block, BlockRenderCache>()
+	historyCache = new WeakMap<Tab, HistoryRenderCache>()
+}
 
 // ── Entry rendering ──────────────────────────────────────────────────────────
 
 function renderEntry(block: Block, cols: number): string[] {
+	const cached = blockCache.get(block)
+	const version = block.renderVersion ?? 0
+	if (cached && cached.version === version && cached.cols === cols) return cached.lines
 	const lines = blockRenderer.renderBlock(block, cols)
-	return block.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
+	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
+	blockCache.set(block, { version, cols, lines: rendered })
+	return rendered
 }
 
 function infoGroupKey(block: Block): string | null {
@@ -118,13 +135,6 @@ function visibleHistory(history: Block[]): Block[] {
 
 function renderHistory(lines: string[], tab: Tab): number {
 	const cols = process.stdout.columns || 80
-	const cached = historyCache.get(tab)
-	if (cached && cached.version === tab.historyVersion && cached.length === tab.history.length && cached.cols === cols) {
-		lines.push(...cached.lines)
-		return cached.count
-	}
-
-	const renderedLines: string[] = []
 	const history = visibleHistory(tab.history)
 	let count = 0
 	for (let i = 0; i < history.length; ) {
@@ -135,21 +145,12 @@ function renderHistory(lines: string[], tab: Tab): number {
 				group.push(history[j]!)
 			}
 		}
-		if (renderedLines.length > 0) renderedLines.push('')
+		if (lines.length > 0) lines.push('')
 		const rendered = renderGroup(group, cols)
 		count += rendered.length
-		renderedLines.push(...rendered)
+		lines.push(...rendered)
 		i += group.length
 	}
-
-	historyCache.set(tab, {
-		version: tab.historyVersion,
-		length: tab.history.length,
-		cols,
-		lines: renderedLines,
-		count,
-	})
-	lines.push(...renderedLines)
 	return count
 }
 

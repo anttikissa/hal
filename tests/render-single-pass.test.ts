@@ -82,4 +82,30 @@ describe('render single pass', () => {
 			blockRenderer.renderBlock = origRenderBlock
 		}
 	})
+
+	test('streaming redraw only rerenders the changed block', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'info', text: 'one' })
+		tab.history.push({ type: 'assistant', text: 'a' })
+		const origRenderBlock = blockRenderer.renderBlock
+		const calls: string[] = []
+		blockRenderer.renderBlock = (block, cols) => {
+			calls.push(`${block.type}:${'text' in block ? block.text : ''}`)
+			return origRenderBlock(block, cols)
+		}
+		const originalWrite = process.stdout.write.bind(process.stdout)
+		;(process.stdout as any).write = () => true
+		try {
+			render.draw()
+			const last = tab.history[1] as typeof tab.history[number] & { renderVersion?: number }
+			if (!last || last.type !== 'assistant') throw new Error('expected assistant block')
+			last.text += 'b'
+			last.renderVersion = 1
+			render.draw()
+			expect(calls).toEqual(['info:one', 'assistant:a', 'assistant:ab'])
+		} finally {
+			(process.stdout as any).write = originalWrite
+			blockRenderer.renderBlock = origRenderBlock
+		}
+	})
 })

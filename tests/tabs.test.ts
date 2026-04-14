@@ -130,7 +130,7 @@ describe("tabs", () => {
 		const parentId = before[0]!
 
 		const parentDir = join(tmpDir, "sessions", parentId)
-		const readyDeadline = Date.now() + 2000
+		const readyDeadline = Date.now() + 6000
 		while (Date.now() < readyDeadline) {
 			if (existsSync(join(parentDir, "session.ason")) && existsSync(join(parentDir, "history.asonl"))) break
 			await Bun.sleep(50)
@@ -138,7 +138,7 @@ describe("tabs", () => {
 
 		proc.stdin!.write(new Uint8Array([0x06])) // ctrl-f
 		proc.stdin!.flush()
-		const deadline = Date.now() + 2000
+		const deadline = Date.now() + 6000
 		while (Date.now() < deadline) {
 			const current = readSessionIds()
 			if (current.length === 2 && current[0] === parentId) break

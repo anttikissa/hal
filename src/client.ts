@@ -196,6 +196,12 @@ function touchTab(tab: Tab): void {
 	tab.historyVersion++
 }
 
+function repaintIfActive(tab: Tab): void {
+	// Background-tab stream updates are invisible until the user switches tabs.
+	// Skip the redraw and let tab switch render the latest history lazily.
+	if (tab === currentTab()) onChange(false)
+}
+
 function queueLocalBlock(block: Block): void {
 	const tab = currentTab()
 	if (!tab) {
@@ -676,7 +682,7 @@ function handleEvent(event: any): void {
 				})
 			}
 			touchTab(tab)
-			onChange(false)
+			repaintIfActive(tab)
 		}
 	} else if (event.type === 'stream-end' && event.sessionId) {
 		flushDelayedPaused(event.sessionId)
@@ -690,7 +696,7 @@ function handleEvent(event: any): void {
 			}
 			if (event.contextUsed != null) tab.contextUsed = event.contextUsed
 			if (event.contextMax != null) tab.contextMax = event.contextMax
-			onChange(false)
+			repaintIfActive(tab)
 		}
 	} else if (event.type === 'response') {
 		flushDelayedPaused(event.sessionId ?? null)

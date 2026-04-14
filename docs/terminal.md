@@ -189,6 +189,30 @@ mode after the app exits.
 Bracketed paste (`CSI ?2004h`) should also be enabled so multi-line pastes
 arrive as a single token.
 
+### 11. Paint throttle — NEVER draw synchronously from event handlers
+
+During streaming, the server emits a `stream-delta` event for every token.
+Each event triggers `onChange()`. If `onChange` calls `draw()` synchronously,
+the event loop is saturated with frame builds + stdout writes, and stdin
+events (keypresses) **never fire**. The user cannot type, abort, or even
+Ctrl-C while the assistant is generating.
+
+**Fix**: `draw()` in `cli.ts` uses a trailing-edge throttle. Non-force draws
+are coalesced to at most one per 16ms (~60 fps). Force draws (tab switch,
+resize, Ctrl-L) execute immediately.
+
+**NEVER remove this throttle.** If you think a draw needs to be synchronous,
+you are wrong — use `draw(true)` for a force paint, which already bypasses
+the throttle. If you add a new `onChange()` call site, it automatically
+benefits from the throttle.
+
+Background-tab `stream-delta` / `stream-end` updates should also skip repaint
+entirely. Their history is invisible until tab switch, so redrawing the active
+tab is wasted work.
+
+This was discovered the hard way: without throttling, keypresses were
+completely unresponsive during assistant output.
+
 ## Terminal scrollback: how it actually works
 
 This section exists because we've been bitten by wrong assumptions about
