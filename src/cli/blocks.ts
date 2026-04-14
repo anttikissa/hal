@@ -11,7 +11,10 @@ import { colors } from './colors.ts'
 import { ason } from '../utils/ason.ts'
 import { STATE_DIR } from '../state.ts'
 import { perf } from '../perf.ts'
+import { subscriptionUsage } from '../subscription-usage.ts'
+import { openaiUsage } from '../openai-usage.ts'
 import type { HistoryEntry } from '../server/sessions.ts'
+import { models } from '../models.ts'
 
 // ── Block types ──────────────────────────────────────────────────────────────
 
@@ -78,25 +81,131 @@ function stripAnsiSequences(text: string): string {
 	return out
 }
 
-function parseLegacyOpenAiStatusRow(line: string): { active: string; slot: string; account: string; primary: string; secondary: string } | null {
+function sanitizeTerminalTextAllowAnsi(text: string): string {
+	let out = ''
+	for (let i = 0; i < text.length; ) {
+		const ch = text[i]!
+		if (ch === '\n' || ch === '\t') {
+			out += ch
+			i++
+			continue
+		}
+		if (ch === '\r') {
+			out += '␍'
+			i++
+			continue
+		}
+		if (ch !== '\x1b') {
+			const code = ch.charCodeAt(0)
+			if ((code >= 0 && code <= 8) || (code >= 11 && code <= 31) || code === 127) {
+				out += `␀${code.toString(16).padStart(2, '0')}`
+			} else {
+				out += ch
+			}
+			i++
+			continue
+		}
+
+		const next = text[i + 1]
+		if (!next) {
+			out += '␛'
+			break
+		}
+
+		if (next === '[') {
+			const start = i
+			i += 2
+			while (i < text.length) {
+				const code = text.charCodeAt(i)
+				i++
+				if (code >= 0x40 && code <= 0x7e) break
+			}
+			out += text.slice(start, i)
+			continue
+		}
+
+		if (next === ']') {
+			const start = i
+			i += 2
+			while (i < text.length) {
+				if (text[i] === '\x07') {
+					i++
+					break
+				}
+				if (text[i] === '\x1b' && text[i + 1] === '\\') {
+					i += 2
+					break
+				}
+				i++
+			}
+			out += text.slice(start, i)
+			continue
+		}
+
+		out += text.slice(i, i + 2)
+		i += 2
+	}
+	return out
+}
+
+function maskLegacyLabel(label: string, stars: number): string {
+	if (!label) return ''
+	return `${label[0]}${'*'.repeat(stars)}`
+}
+
+function maskLegacyEmail(email: string): string {
+	const at = email.indexOf('@')
+	if (at === -1) return email
+	const local = email.slice(0, at)
+	const domain = email.slice(at + 1)
+	const dot = domain.indexOf('.')
+	if (dot === -1) return email
+	const domainLabel = domain.slice(0, dot)
+	const suffix = domain.slice(dot + 1)
+	return `${maskLegacyLabel(local, 3)}@${maskLegacyLabel(domainLabel, domainLabel.length <= 5 ? 4 : 3)}.${suffix}`
+}
+
+function legacyUsageBar(text: string): string {
+	const match = text.match(/^(\d+)% used\b/)
+	if (!match) return text
+	const width = Math.max(1, Math.round(openaiUsage.config.progressBarWidth))
+	const usedPercent = Math.max(0, Math.min(100, Number(match[1])))
+	const totalEighths = Math.round((usedPercent / 100) * width * 8)
+	const full = Math.floor(totalEighths / 8)
+	const partial = totalEighths % 8
+	const empty = width - full - (partial > 0 ? 1 : 0)
+	const partials = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇']
+	const bar = `[${'█'.repeat(full)}${partials[partial] ?? ''}${' '.repeat(Math.max(0, empty))}]`
+	return `${bar}<br>${text}`
+}
+
+function parseLegacyOpenAiStatusRow(line: string): { slot: string; account: string; primary: string; secondary: string } | null {
 	const parts = line.trimStart().split(' · ')
 	if (parts.length !== 3) return null
 
 	let prefix = parts[0]!
-	let active = ''
+	let active = false
 	if (prefix.startsWith('* ')) {
-		active = '*'
+		active = true
 		prefix = prefix.slice(2)
 	}
 
 	const space = prefix.indexOf(' ')
 	if (space === -1) return null
 	const slot = prefix.slice(0, space)
-	const account = prefix.slice(space + 1)
+	let account = prefix.slice(space + 1)
+	if (subscriptionUsage.config.censorEmails) {
+		account = account.replace(/^([^\s]+@[^\s]+)(.*)$/, (_m, email: string, suffix: string) => `${maskLegacyEmail(email)}${suffix}`)
+	}
 	const primary = parts[1]!.replace(/^5h\s+/, '')
 	const secondary = parts[2]!.replace(/^7d\s+/, '')
 	if (!slot || !account || primary === parts[1] || secondary === parts[2]) return null
-	return { active, slot, account, primary, secondary }
+	return {
+		slot: active ? `${slot} *` : slot,
+		account,
+		primary: legacyUsageBar(primary),
+		secondary: legacyUsageBar(secondary),
+	}
 }
 
 function upgradeLegacyOpenAiStatus(text: string): string {
@@ -113,15 +222,15 @@ function upgradeLegacyOpenAiStatus(text: string): string {
 		}
 		const row = parseLegacyOpenAiStatusRow(line)
 		if (!row) return text
-		rows.push(`| ${row.active} | ${row.slot} | ${row.account} | ${row.primary} | ${row.secondary} |`)
+		rows.push(`| ${row.slot} | ${row.account} | ${row.primary} | ${row.secondary} |`)
 	}
 	if (rows.length === 0) return text
 
 	const upgraded = [
 		'OpenAI subscriptions:',
 		'',
-		'| Active | Slot | Account | 5h | 7d |',
-		'|---|---|---|---|---|',
+		'| Slot | Account | 5h | 7d |',
+		'|---|---|---|---|',
 		...rows,
 	]
 	const remainder = lines.slice(i)
@@ -132,9 +241,15 @@ function upgradeLegacyOpenAiStatus(text: string): string {
 function markdownSourceText(block: Exclude<Block, { type: 'tool' }>): string {
 	let text = block.text
 	if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
-		// System notices should not leak raw terminal escapes into the markdown
-		// renderer. Strip ANSI first, then upgrade old OpenAI /status output into a
-		// real table so old persisted entries become readable too.
+		// Most notices should not leak raw terminal escapes into markdown. OpenAI
+		// status tables are the exception: the progress bars intentionally use ANSI
+		// colors inside trusted runtime-generated text.
+		if (text.startsWith('OpenAI subscriptions:') && text.includes('| Slot | Account |')) {
+			return sanitizeTerminalTextAllowAnsi(text)
+		}
+		// Old persisted OpenAI status entries used plain bullet text with ANSI dim
+		// codes around reset times. Strip those codes and upgrade the old layout to
+		// the current table form on the fly.
 		text = upgradeLegacyOpenAiStatus(stripAnsiSequences(text))
 	}
 	return sanitizeTerminalText(text)
@@ -611,10 +726,15 @@ function formatHHMM(ts?: number): string {
 
 // Build the header line:  ── HH:MM Title ──────────── (session/blob) ──
 function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
-	const left = time ? `── ${time} ${title} ` : `── ${title} `
 	const right = blobRef ? ` ${DIM}(${blobRef})${DIM_OFF} ──` : ''
-	// Fill between left and right with ─
-	const fillLen = Math.max(1, cols - visLen(left) - visLen(right))
+	const prefix = time ? `── ${time} ` : '── '
+	// Leave one column slack so we never paint a printable glyph into the last
+	// terminal cell. Exact-width decorative headers can leave some terminals in a
+	// wrap-pending state, which then corrupts copied box-drawing UTF-8 bytes.
+	const budget = Math.max(1, cols - 1)
+	const titleWidth = Math.max(1, budget - visLen(prefix) - visLen(right) - 1)
+	const left = `${prefix}${clipVisual(title, titleWidth)} `
+	const fillLen = Math.max(0, budget - visLen(left) - visLen(right))
 	return `${left}${'─'.repeat(fillLen)}${right}`
 }
 
@@ -629,8 +749,10 @@ function blockLabel(block: Block): string {
 			if (block.status === 'queued') return 'You (queued)'
 			return 'You'
 		}
-		case 'assistant':
-			return 'Hal'
+		case 'assistant': {
+			const display = models.displayModel(block.model)
+			return display ? `Hal (${display})` : 'Hal'
+		}
 		case 'thinking':
 			return 'Thinking'
 		case 'tool':

@@ -12,6 +12,7 @@ import { memory } from './memory.ts'
 import { models } from './models.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { subscriptionUsage } from './subscription-usage.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {
@@ -22,6 +23,7 @@ const modules: Record<string, Record<string, any>> = {
 	agentLoop: agentLoop.config,
 	memory: memory.config,
 	models: models.config,
+	subscriptionUsage: subscriptionUsage.config,
 	anthropicUsage: anthropicUsage.config,
 	openaiUsage: openaiUsage.config,
 }

@@ -3,6 +3,7 @@
 import { auth, type Credential } from './auth.ts'
 import { STATE_DIR } from './state.ts'
 import { liveFiles } from './utils/live-file.ts'
+import { subscriptionUsage } from './subscription-usage.ts'
 
 const CACHE_PATH = `${STATE_DIR}/anthropic-usage.ason`
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
@@ -28,8 +29,8 @@ export interface AccountUsage {
 const config = {
 	minAutoRefreshMs: 60_000,
 	fetchTimeoutMs: 5_000,
-	censorEmails: false,
 	progressBarWidth: 14,
+	censorEmails: false,
 }
 
 const state = liveFiles.liveFile(CACHE_PATH, {
@@ -161,27 +162,10 @@ function formatResetAt(resetAt: number, now = new Date()): string {
 	return `${time} on ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`
 }
 
-function maskLabel(label: string, stars: number): string {
-	if (!label) return ''
-	return `${label[0]}${'*'.repeat(stars)}`
-}
-
-function censorEmail(email: string): string {
-	const at = email.indexOf('@')
-	if (at === -1) return email
-	const local = email.slice(0, at)
-	const domain = email.slice(at + 1)
-	const dot = domain.indexOf('.')
-	if (dot === -1) return email
-	const domainLabel = domain.slice(0, dot)
-	const suffix = domain.slice(dot + 1)
-	const maskedDomain = maskLabel(domainLabel, domainLabel.length <= 5 ? 4 : 3)
-	return `${maskLabel(local, 3)}@${maskedDomain}.${suffix}`
-}
 
 function displayAccount(account: AccountUsage): string {
 	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
-	return config.censorEmails && account.email ? censorEmail(raw) : raw
+	return subscriptionUsage.config.censorEmails && account.email ? subscriptionUsage.censorEmail(raw) : raw
 }
 
 function displaySlot(account: AccountUsage): string {

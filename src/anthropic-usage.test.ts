@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
+import { subscriptionUsage } from './subscription-usage.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
@@ -23,7 +24,7 @@ afterEach(() => {
 	auth.ensureFresh = origEnsureFresh
 	anthropicUsage.state.currentKey = ''
 	anthropicUsage.state.accounts = {}
-	anthropicUsage.config.censorEmails = false
+	subscriptionUsage.config.censorEmails = false
 	anthropicUsage.config.progressBarWidth = 14
 	anthropicUsage.save()
 })
@@ -85,7 +86,7 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 })
 
 test('formatStatusText can censor emails for screenshot-safe output', () => {
-	anthropicUsage.config.censorEmails = true
+	subscriptionUsage.config.censorEmails = true
 	anthropicUsage.state.currentKey = 'anthropic:0'
 	anthropicUsage.state.accounts = {
 		'anthropic:0': {

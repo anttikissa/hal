@@ -2,13 +2,18 @@
 
 import { auth, type Credential } from './auth.ts'
 import { ipc } from './ipc.ts'
+import { colors } from './cli/colors.ts'
 import { STATE_DIR } from './state.ts'
 import { liveFiles } from './utils/live-file.ts'
+import { oklch } from './utils/oklch.ts'
+import { subscriptionUsage } from './subscription-usage.ts'
 
 const CACHE_PATH = `${STATE_DIR}/openai-usage.ason`
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
-const DIM = '\x1b[90m'
-const RESET = '\x1b[0m'
+
+const BAR_PARTIALS = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇']
+const BAR_FILL_FG = oklch.toFg(0.84, 0, 0)
+const BAR_EMPTY_BG = oklch.toBg(0.36, 0, 0)
 
 export interface UsageWindow {
 	usedPercent: number
@@ -36,6 +41,7 @@ const config = {
 	tokenRefreshThreshold: 100_000,
 	activityWriteThrottleMs: 60_000,
 	fetchTimeoutMs: 10_000,
+	progressBarWidth: 14,
 }
 
 const state = liveFiles.liveFile(CACHE_PATH, {
@@ -141,22 +147,52 @@ function formatResetAt(resetAt: number, now = new Date()): string {
 	return `${time} on ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`
 }
 
+
+function displayAccount(account: AccountUsage): string {
+	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
+	const who = (config.censorEmails || subscriptionUsage.config.censorEmails) && account.email ? subscriptionUsage.censorEmail(account.email) : raw
+	const plan = account.planType ? ` (${account.planType})` : ''
+	return `${who}${plan}`
+}
+
+function displaySlot(account: AccountUsage): string {
+	const slot = account.index != null && account.total ? `${account.index + 1}/${account.total}` : '-'
+	return state.currentKey === account.key ? `${slot} *` : slot
+}
+
+function usageBar(usedPercent: number): string {
+	const width = Math.max(1, Math.round(config.progressBarWidth))
+	const clamped = Math.max(0, Math.min(100, usedPercent))
+	const totalEighths = Math.round((clamped / 100) * width * 8)
+	const full = Math.floor(totalEighths / 8)
+	const partial = totalEighths % 8
+	const empty = width - full - (partial > 0 ? 1 : 0)
+	const fill = `${'█'.repeat(full)}${BAR_PARTIALS[partial] ?? ''}`
+	const reset = `${colors.info.fg}${colors.info.bg}`
+	return `[${BAR_EMPTY_BG}${BAR_FILL_FG}${fill}${BAR_EMPTY_BG}${' '.repeat(Math.max(0, empty))}${reset}]`
+}
+
+function formatWindowText(window: UsageWindow | undefined): string {
+	if (!window) return '?'
+	return `${Math.round(window.usedPercent)}% used (resets ${formatResetAt(window.resetAt)})`
+}
+
+function formatWindowCell(window: UsageWindow | undefined): string {
+	if (!window) return '?'
+	return `${usageBar(window.usedPercent)}<br>${formatWindowText(window)}`
+}
+
 function formatStatusText(): string {
 	const accounts = all()
 	if (accounts.length === 0) return 'No cached OpenAI subscription usage. Run /status again after logging in with ChatGPT.'
-	const lines = ['OpenAI subscriptions:']
+	const lines = [
+		'OpenAI subscriptions:',
+		'',
+		'| Slot | Account | 5h | 7d |',
+		'|---|---|---|---|',
+	]
 	for (const account of accounts) {
-		const marker = state.currentKey === account.key ? '*' : ' '
-		const who = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
-		const slot = account.index != null && account.total ? `${account.index + 1}/${account.total}` : '-'
-		const plan = account.planType ? ` (${account.planType})` : ''
-		const primary = account.primary
-			? `5h ${Math.round(account.primary.usedPercent)}% used (${DIM}resets ${formatResetAt(account.primary.resetAt)}${RESET})`
-			: '5h ?'
-		const secondary = account.secondary
-			? `7d ${Math.round(account.secondary.usedPercent)}% used (${DIM}resets ${formatResetAt(account.secondary.resetAt)}${RESET})`
-			: '7d ?'
-		lines.push(`${marker} ${slot} ${who}${plan} · ${primary} · ${secondary}`)
+		lines.push(`| ${displaySlot(account)} | ${displayAccount(account)} | ${formatWindowCell(account.primary)} | ${formatWindowCell(account.secondary)} |`)
 	}
 	return lines.join('\n')
 }

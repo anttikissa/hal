@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { subscriptionUsage } from './subscription-usage.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
@@ -24,6 +25,8 @@ afterEach(() => {
 	openaiUsage.state.currentKey = ''
 	openaiUsage.state.lastActiveAt = ''
 	openaiUsage.state.accounts = {}
+	subscriptionUsage.config.censorEmails = false
+	openaiUsage.config.progressBarWidth = 14
 	openaiUsage.save()
 })
 
@@ -82,7 +85,56 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 	const text = openaiUsage.formatStatusText()
 
 	expect(text).toContain('OpenAI subscriptions:')
-	expect(text).toContain('  1/2 a@test.com (plus) · 5h 20% used')
-	expect(text).toContain('* 2/2 b@test.com (plus) · 5h 21% used')
-	expect(text).toContain('7d 61% used')
+	expect(text).toContain('| Slot | Account | 5h | 7d |')
+	expect(text).toContain('| 1/2 | a@test.com (plus) | [')
+	expect(text).toContain('<br>20% used (resets ')
+	expect(text).toContain('| 2/2 * | b@test.com (plus) | [')
+	expect(text).toContain('<br>61% used (resets ')
+	expect(/[▁▂▃▄▅▆▇]/.test(text)).toBe(true)
+	expect(text).not.toContain('▌')
+})
+
+
+test('formatStatusText can censor emails for screenshot-safe output', () => {
+	subscriptionUsage.config.censorEmails = true
+	openaiUsage.state.currentKey = 'openai:0'
+	openaiUsage.state.accounts = {
+		'openai:0': {
+			key: 'openai:0',
+			email: 'antti@lippukiska.fi',
+			index: 0,
+			total: 3,
+			planType: 'plus',
+			pendingTokens: 0,
+			primary: { usedPercent: 68, windowMinutes: 300, resetAt: 1_775_836_198 },
+		},
+		'openai:1': {
+			key: 'openai:1',
+			email: 'antti.kissaniemi@gmail.com',
+			index: 1,
+			total: 3,
+			planType: 'plus',
+			pendingTokens: 0,
+			primary: { usedPercent: 0, windowMinutes: 300, resetAt: 1_775_836_198 },
+		},
+		'openai:2': {
+			key: 'openai:2',
+			email: 'lex.michaelis@gmail.com',
+			index: 2,
+			total: 3,
+			planType: 'plus',
+			pendingTokens: 0,
+			primary: { usedPercent: 0, windowMinutes: 300, resetAt: 1_775_836_198 },
+		},
+	}
+
+	const text = openaiUsage.formatStatusText()
+
+	expect(text).toContain('a***@l***.fi')
+	expect(text).toContain('a***@g****.com')
+	expect(text).toContain('l***@g****.com')
+	expect(text).toContain('| 1/3 * | a***@l***.fi (plus) | [')
+	expect(text).toContain('<br>68% used (resets ')
+	expect(/[▁▂▃▄▅▆▇]/.test(text)).toBe(true)
+	expect(text).not.toContain('▌')
 })
