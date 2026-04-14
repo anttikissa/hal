@@ -453,12 +453,14 @@ function clearPrompt(): void {
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
-// Track pending open/fork so we know to copy draft on fork
-let pendingOpen: 'open' | 'fork' | false = false
+// Track pending tab actions so a sessions update can focus the reopened/new tab.
+// Fork stays distinct because it also copies the draft from the parent.
+let pendingOpen: 'open' | 'fork' | 'resume' | false = false
 
 function sendCommand(type: string, text?: string): void {
 	const tab = currentTab()
 	if (type === 'open') pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
+	if (type === 'resume') pendingOpen = 'resume'
 	ipc.appendCommand({ type, text, sessionId: tab?.sessionId })
 }
 

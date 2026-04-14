@@ -252,6 +252,37 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
+	test('resuming a tab activates the reopened session', async () => {
+		const shared = makeSharedState(['s1', 's2'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: (() => void) | undefined
+		const appendedCommands: any[] = []
+		ipc.readState = () => shared
+		ipc.appendCommand = (command) => {
+			appendedCommands.push(command)
+		}
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		client.switchTab(1)
+		client.sendCommand('resume')
+		expect(appendedCommands).toEqual([{ type: 'resume', text: undefined, sessionId: 's2' }])
+
+		shared.sessions = ['s1', 's2', 's3']
+		shared.openSessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		onIpcChange?.()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.sessionId).toBe('s3')
+	})
+
 	test('closing a forked middle tab returns to the parent tab, not the tab on the right', async () => {
 		const shared = makeSharedState(['s1', 's3', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
