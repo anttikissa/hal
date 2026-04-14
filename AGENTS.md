@@ -61,6 +61,17 @@ import { client } from '~src/client.ts'
 client.addEntry = (text) => { console.log('patched!'); origAddEntry(text) }
 ```
 
+# Startup initialization rule
+
+- Importing a module must be cheap and side-effect free.
+- At import time, modules may only define types, constants, pure helpers, cheap in-memory state like `new Map()`, and their exported mutable namespace object.
+- Startup work MUST live in explicit `init()` functions.
+- Forbidden at import time: file/network I/O, config loading/applying, file watchers, timers/intervals, signal handlers, tool registration, IPC lock work, and starting runtime/client loops.
+- `init()` must be idempotent.
+- Cross-module startup order must be centralized in one bootstrap path, not spread across imports.
+- When adding a new module, ask: "Can this line wait until `init()`?" If yes, it belongs in `init()`.
+- See `docs/init-plan.md` for the migration plan.
+
 # Configuration
 
 - Document config rules here and nowhere else.
