@@ -160,6 +160,38 @@ describe("tabs", () => {
 		await proc.exited
 	})
 
+	test("fork child history records a visible fork info entry", async () => {
+		const proc = spawnHal()
+		await Bun.sleep(300)
+
+		const before = readSessionIds()
+		expect(before).toHaveLength(1)
+		const parentId = before[0]!
+
+		proc.stdin!.write(new Uint8Array([0x06])) // ctrl-f
+		proc.stdin!.flush()
+
+		const deadline = Date.now() + 6000
+		while (Date.now() < deadline) {
+			if (readSessionIds().length === 2) break
+			await Bun.sleep(50)
+		}
+
+		const after = readSessionIds()
+		expect(after).toHaveLength(2)
+		const childId = after[1]!
+		const childHistory = await waitForHistory(childId)
+		expect(childHistory[0]).toMatchObject({ type: 'forked_from', parent: parentId })
+		expect(childHistory[1]).toMatchObject({ type: 'info' })
+		expect(childHistory[1]?.text).toContain('User forked')
+		expect(childHistory[1]?.text).toContain(parentId)
+		expect(childHistory[1]?.text).toContain(childId)
+
+		proc.stdin!.write(new Uint8Array([0x03]))
+		proc.stdin!.flush()
+		await proc.exited
+	})
+
 
 	test("fork inserts the new tab next to its parent", async () => {
 		const proc = spawnHal()

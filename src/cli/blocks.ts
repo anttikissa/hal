@@ -78,6 +78,68 @@ function stripAnsiSequences(text: string): string {
 	return out
 }
 
+function parseLegacyOpenAiStatusRow(line: string): { active: string; slot: string; account: string; primary: string; secondary: string } | null {
+	const parts = line.trimStart().split(' · ')
+	if (parts.length !== 3) return null
+
+	let prefix = parts[0]!
+	let active = ''
+	if (prefix.startsWith('* ')) {
+		active = '*'
+		prefix = prefix.slice(2)
+	}
+
+	const space = prefix.indexOf(' ')
+	if (space === -1) return null
+	const slot = prefix.slice(0, space)
+	const account = prefix.slice(space + 1)
+	const primary = parts[1]!.replace(/^5h\s+/, '')
+	const secondary = parts[2]!.replace(/^7d\s+/, '')
+	if (!slot || !account || primary === parts[1] || secondary === parts[2]) return null
+	return { active, slot, account, primary, secondary }
+}
+
+function upgradeLegacyOpenAiStatus(text: string): string {
+	const lines = text.split('\n')
+	if (lines[0]?.trim() !== 'OpenAI subscriptions:') return text
+
+	const rows: string[] = []
+	let i = 1
+	for (; i < lines.length; i++) {
+		const line = lines[i]!
+		if (line.trim() === '') {
+			i++
+			break
+		}
+		const row = parseLegacyOpenAiStatusRow(line)
+		if (!row) return text
+		rows.push(`| ${row.active} | ${row.slot} | ${row.account} | ${row.primary} | ${row.secondary} |`)
+	}
+	if (rows.length === 0) return text
+
+	const upgraded = [
+		'OpenAI subscriptions:',
+		'',
+		'| Active | Slot | Account | 5h | 7d |',
+		'|---|---|---|---|---|',
+		...rows,
+	]
+	const remainder = lines.slice(i)
+	if (remainder.length > 0) upgraded.push('', ...remainder)
+	return upgraded.join('\n')
+}
+
+function markdownSourceText(block: Exclude<Block, { type: 'tool' }>): string {
+	let text = block.text
+	if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
+		// System notices should not leak raw terminal escapes into the markdown
+		// renderer. Strip ANSI first, then upgrade old OpenAI /status output into a
+		// real table so old persisted entries become readable too.
+		text = upgradeLegacyOpenAiStatus(stripAnsiSequences(text))
+	}
+	return sanitizeTerminalText(text)
+}
+
 // dimmed: true for blocks inherited from a fork parent (rendered with muted colors)
 export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean; renderVersion?: number }
@@ -500,11 +562,19 @@ function clipLine(line: string, cols: number): string {
 // embedding a carriage return inside the logical line, which some terminals
 // copy poorly even though the on-screen rendering looks correct.
 //
+// Exact-width path: if content already fills the terminal width, do NOT emit
+// EL (\x1b[K). Some terminals keep a hidden wrap-pending state after the last
+// cell is written, and an immediate EL during repeated redraws can corrupt the
+// copied UTF-8 bytes of box-drawing characters.
+//
 // Tab path: tabs advance the cursor without painting the skipped cells, so to
 // keep the background continuous through tab gaps we still pre-fill with
 // background + EL, then carriage-return and paint content on top.
 function bgLine(content: string, cols: number, bg: string): string {
-	if (!content.includes('\t')) return `${bg}${content}\x1b[K${RESET_BG}`
+	if (!content.includes('\t')) {
+		if (visLen(content) >= cols) return `${bg}${content}${RESET_BG}`
+		return `${bg}${content}\x1b[K${RESET_BG}`
+	}
 	return `${bg}\x1b[K\r${content}${RESET_BG}`
 }
 
@@ -615,7 +685,7 @@ function blockContent(block: Block, cols: number): string[] {
 	) {
 		// Markdown-rendered text blocks share the same path.
 		const lines: string[] = []
-		for (const span of md.mdSpans(sanitizeTerminalText(block.text))) {
+		for (const span of md.mdSpans(markdownSourceText(block))) {
 			if (span.type === 'code') {
 				for (const raw of span.lines) {
 					// Expand tabs for width measurement and wrapping (charWidth
