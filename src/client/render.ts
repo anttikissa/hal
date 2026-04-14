@@ -18,6 +18,7 @@ import { client } from '../client.ts'
 import { models } from '../models.ts'
 import { auth } from '../auth.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { version } from '../version.ts'
 import { git } from '../utils/git.ts'
 import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
@@ -216,51 +217,47 @@ function renderIndicator(tab: Tab, baseColor: string): string {
 	return `${ANSI_DIM}${ind.color}${ind.char}${RESET}${baseColor}`
 }
 
-// Tab bar: tries full names, then just numbers, then terse.
+// Tab bar: prefers [n dir name], then [n name], then just numbers.
 // Each tab shows a 1-char status indicator between the number and title.
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const tabs = client.state.tabs
 	const active = client.state.activeTab
 
-	// Helper: build the inner part of a tab label.
-	// ind is '' (idle), ' ' (blink-off), or colored char (blink-on).
-	// When there's a name, ind (or a space if idle) separates number and name.
-	function inner(num: number, ind: string, name?: string): string {
-		if (name) return `${num}${ind || ' '}${name}`
+	function tabDir(tab: Tab): string {
+		return tab.cwd.split('/').filter(Boolean).pop() ?? ''
+	}
+
+	function inner(num: number, ind: string, text?: string): string {
+		if (text) return `${num}${ind || ' '}${text}`
 		return `${num}${ind}`
 	}
 
-	const named = tabs.map((tab, i) => {
+	function label(tab: Tab, i: number, mode: 'wide' | 'name' | 'num'): string {
 		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
-		return i === active
-			? `${BRIGHT_WHITE}[${inner(i + 1, ind, tab.name)}]${RESET}`
-			: `${DIM} ${inner(i + 1, ind, tab.name)} ${RESET}`
-	})
-	if (visLen(named.join('')) <= cols) {
-		lines.push(named.join(''))
-		return
+		const name = tab.name || tab.sessionId
+		const dir = tabDir(tab)
+		const text = mode === 'wide'
+			? (dir && dir !== name ? `${dir} ${name}` : name)
+			: mode === 'name'
+				? name
+				: ''
+		const content = inner(i + 1, ind, text)
+		if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
+		return `${DIM} ${content} ${RESET}`
 	}
 
-	const padded = tabs.map((tab, i) => {
-		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
-		return i === active
-			? `${BRIGHT_WHITE}[${inner(i + 1, ind)}]${RESET}`
-			: `${DIM} ${inner(i + 1, ind)} ${RESET}`
-	})
-	if (visLen(padded.join('')) <= cols) {
-		lines.push(padded.join(''))
-		return
+	for (const mode of ['wide', 'name', 'num'] as const) {
+		const rendered = tabs.map((tab, i) => label(tab, i, mode))
+		const joined = rendered.join('')
+		if (visLen(joined) <= cols) {
+			lines.push(joined)
+			return
+		}
 	}
 
-	const terse = tabs.map((tab, i) => {
-		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
-		return i === active
-			? `${BRIGHT_WHITE}[${inner(i + 1, ind)}]${RESET}`
-			: `${DIM}${inner(i + 1, ind)}${RESET}`
-	})
-	const terseStr = terse.join(' ')
-	lines.push(visLen(terseStr) > cols ? clipVisual(terseStr, cols) : terseStr)
+	const terse = tabs.map((tab, i) => label(tab, i, 'num'))
+	lines.push(clipVisual(terse.join(''), cols))
 }
 
 // Shorten a path for display: replace $HOME with ~, then abbreviate.
@@ -285,17 +282,30 @@ function subscriptionBadges(): string[] {
 	return parts
 }
 
+function hostMismatchBadge(): string {
+	if (client.state.role !== 'client') return ''
+	if (client.state.hostVersionStatus !== 'ready') return ''
+	if (version.state.status !== 'ready') return ''
+	if (!client.state.hostVersion || !version.state.combined) return ''
+	return client.state.hostVersion === version.state.combined ? '' : ' ≠host'
+}
+
 function renderStatusLine(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const tab = client.currentTab()
 	const parts: string[] = []
 
 	if (tab) {
-		// 0. Session ID (with fork parent if applicable) + process identity.
+		// 0. Session ID plus process identity. Clients also show the current host PID,
+		// and a short mismatch marker when their local code differs from the host.
 		const sessionLabel = tab.forkedFrom ? `${tab.sessionId} ← ${tab.forkedFrom}` : tab.sessionId
 		parts.push(sessionLabel)
-		parts.push(`${client.state.role}:${client.state.pid}`)
-
+		if (client.state.role === 'client') {
+			parts.push(`client:${client.state.pid}`)
+			parts.push(`server:${client.state.hostPid ?? '?'}${hostMismatchBadge()}`)
+		} else {
+			parts.push(`server:${client.state.pid}`)
+		}
 		// 1. Model name and subscription label.
 		const modelId = tab.model || client.state.model || models.defaultModel()
 		const modelDisplay = models.displayModel(modelId)
@@ -356,7 +366,8 @@ function renderHelpBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const busy = client.isBusy()
 	const hasText = prompt.text().length > 0
-	const bar = helpBar.build(busy, hasText)
+	const canContinue = client.canContinueCurrentTurn()
+	const bar = helpBar.build(busy, hasText, canContinue)
 	// Always push a line — even when empty — so chrome height is constant.
 	// Without this, typing the first character causes a 1-row jump.
 	lines.push(bar ? `\x1b[90m${clipVisual(bar, cols)}\x1b[0m` : '')

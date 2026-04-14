@@ -74,6 +74,8 @@ const state = {
 	role: 'server' as 'server' | 'client',
 	pid: process.pid,
 	hostPid: null as number | null,
+	hostVersionStatus: 'idle' as 'idle' | 'pending' | 'ready' | 'error',
+	hostVersion: '',
 	// Persisted across restarts so the prompt stays at a stable position.
 	// Invalidated if terminal width changed since last save.
 	peak: 0,
@@ -484,6 +486,28 @@ function lastInterruptedAssistantId(tab: Tab): string | null {
 	return null
 }
 
+function isContinuableStatusBlock(block: Block): boolean {
+	if (block.type === 'error') return true
+	if (block.type === 'info') return block.text === '[paused]' || block.text?.startsWith('[interrupted]')
+	return false
+}
+
+function canContinueTab(tab: Tab | null): boolean {
+	if (!tab) return false
+	if (state.busy.get(tab.sessionId)) return false
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const block = tab.history[i]!
+		if (block.type === 'tool') continue
+		if (block.type === 'info' && !isContinuableStatusBlock(block)) continue
+		return isContinuableStatusBlock(block)
+	}
+	return false
+}
+
+function canContinueCurrentTurn(): boolean {
+	return canContinueTab(currentTab())
+}
+
 function trailingAssistantText(tab: Tab): string | null {
 	const parts: string[] = []
 	let chainId: string | null = null
@@ -516,10 +540,9 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const meta = sessionStore.loadSessionMeta(info.id)
 	// Load history including fork parent entries so forked tabs show full context
 	const { entries: history, parentCount, parentId } = sessionStore.loadAllHistoryWithOrigin(info.id)
-	const dirName = (meta?.workingDir ?? info.cwd)?.split('/').pop()
 	const tab = makeTab(
 		info.id,
-		meta?.topic ?? info.name ?? dirName ?? `tab ${state.tabs.length + 1}`,
+		meta?.name ?? info.name ?? info.id,
 		{ cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model },
 	)
 	tab.rawHistory = history
@@ -551,7 +574,7 @@ function applySessionList(items: SharedSessionInfo[]): void {
 	for (const s of items) {
 		const existing = previousById.get(s.id)
 		if (existing) {
-			existing.name = s.name
+			existing.name = s.name ?? s.id
 			existing.cwd = s.cwd || existing.cwd
 			existing.model = s.model || existing.model
 			newTabs.push(existing)
@@ -619,6 +642,8 @@ function applySharedState(shared: SharedState): void {
 	}
 	state.busy = nextBusy
 	state.activity = new Map(Object.entries(shared.activity))
+	state.hostVersionStatus = shared.host?.versionStatus ?? 'idle'
+	state.hostVersion = shared.host?.version ?? ''
 }
 
 function handleEvent(event: any): void {
@@ -801,11 +826,10 @@ function handleEvent(event: any): void {
 }
 
 
-function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInfo {
-	const dirName = meta.workingDir?.split('/').pop()
+function sessionInfoFromMeta(meta: SessionMeta, _index: number): SharedSessionInfo {
 	return {
 		id: meta.id,
-		name: meta.topic ?? dirName ?? `tab ${index + 1}`,
+		name: meta.name,
 		cwd: meta.workingDir ?? '',
 		model: meta.model,
 	}
@@ -929,6 +953,8 @@ function resetForTests(): void {
 	ipcStateFile = null
 	state.recentTabs = []
 	state.startupSummaryShown = true
+	state.hostVersionStatus = 'idle'
+	state.hostVersion = ''
 }
 
 function startClient(signal: AbortSignal): void {
@@ -962,6 +988,7 @@ export const client = {
 	currentTab,
 	isBusy,
 	getActivity,
+	canContinueCurrentTurn,
 	switchTab,
 	nextTab,
 	prevTab,

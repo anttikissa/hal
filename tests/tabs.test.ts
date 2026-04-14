@@ -62,28 +62,40 @@ async function waitForHistory(sessionId: string): Promise<any[]> {
 describe("tabs", () => {
 	test("starts with one tab", async () => {
 		const proc = spawnHal()
+		const deadline = Date.now() + 2000
+		while (Date.now() < deadline) {
+			if (readSessionIds().length === 1) break
+			await Bun.sleep(50)
+		}
+		const [sessionId] = readSessionIds()
+		expect(sessionId).toBeTruthy()
 		await Bun.sleep(500)
 		proc.stdin!.write(new Uint8Array([0x03])) // ctrl-c
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
-		expect(out).toContain('[1 tab 1]')
+		expect(out).toContain(`[1 .hal ${sessionId}]`)
 	})
 
 	test("ctrl-t creates a new tab", async () => {
 		const proc = spawnHal()
 		await Bun.sleep(200)
-		// Ctrl-T
 		proc.stdin!.write(new Uint8Array([0x14]))
 		proc.stdin!.flush()
-		await Bun.sleep(300)
+		const deadline = Date.now() + 2000
+		while (Date.now() < deadline) {
+			if (readSessionIds().length === 2) break
+			await Bun.sleep(50)
+		}
+		const ids = readSessionIds()
+		await Bun.sleep(150)
 		proc.stdin!.write(new Uint8Array([0x03]))
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
-		// Should show two tabs
-		expect(out).toContain(' 1 tab 1 ')
-		expect(out).toContain('[2 tab 2]')
+		expect(ids).toHaveLength(2)
+		expect(out).toContain(`[1 .hal ${ids[0]!}]`)
+		expect(out).toContain(`[2 .hal ${ids[1]!}]`)
 	})
 
 	test("new tabs record who opened them", async () => {

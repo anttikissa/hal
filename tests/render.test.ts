@@ -6,6 +6,7 @@ import { cursor } from '../src/cli/cursor.ts'
 import { popup } from '../src/client/popup.ts'
 import { helpBar } from '../src/cli/help-bar.ts'
 import { openaiUsage } from '../src/openai-usage.ts'
+import { version } from '../src/version.ts'
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
@@ -48,6 +49,7 @@ beforeEach(() => {
 		},
 	}
 })
+	version.resetForTests()
 
 describe('render', () => {
 	test('diff engine only rewrites changed lines', () => {
@@ -121,10 +123,31 @@ describe('render', () => {
 		expect(clean).toContain('[paused]')
 	})
 
+	test('help bar teaches enter continue on paused tabs with empty prompt', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('enter continue')
+		expect(clean).not.toContain('ctrl-t new')
+	})
+
 	test('status line shows local pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')
 		expect(clean).not.toContain('lock:')
+	})
+
+	test('client status line shows a host mismatch badge next to the server pid', () => {
+		client.state.role = 'client'
+		client.state.pid = 111
+		client.state.hostPid = 222
+		client.state.hostVersionStatus = 'ready'
+		client.state.hostVersion = 'host5678'
+		version.state.status = 'ready'
+		version.state.combined = 'local1234'
+		const clean = stripAnsi(captureOutput(() => render.draw()))
+		expect(clean).toContain('client:111')
+		expect(clean).toContain('server:222 ≠host')
 	})
 
 	test('status line shows current OpenAI subscription usage', () => {
@@ -167,7 +190,7 @@ describe('render', () => {
 			const clean = stripAnsi(output)
 			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
 			expect(tabBar).toBeDefined()
-			expect(tabBar).toContain('▪tab 2')
+			expect(tabBar).toContain('▪tmp tab 2')
 			expect(output).toContain('\x1b[2m')
 		} finally {
 			cursor.isVisible = originalIsVisible
@@ -210,7 +233,7 @@ describe('render', () => {
 			const clean = stripAnsi(captureOutput(() => render.draw()))
 			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
 			expect(tabBar).toBeDefined()
-			expect(tabBar).toContain('✗tab 2')
+			expect(tabBar).toContain('✗tmp tab 2')
 			expect(tabBar).not.toContain('✓tab 2')
 		} finally {
 			cursor.isVisible = originalIsVisible

@@ -85,7 +85,7 @@ function recordForkedTab(child: Session, parent: Session): void {
 function createSession(opener?: Session, afterId?: string): Session {
 	const session: Session = {
 		id: makeSessionId(),
-		name: `tab ${activeSessions.length + 1}`,
+		name: undefined,
 		cwd: process.cwd(),
 		createdAt: new Date().toISOString(),
 	}
@@ -443,6 +443,13 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 				await Bun.sleep(50)
 			}
 			void handlePrompt(session, cmd.text ?? '', 'steering')
+			break
+		}
+
+		case 'continue': {
+			if (!session) return
+			if (agentLoop.isActive(session.id)) return
+			void runGeneration(session, '')
 			break
 		}
 

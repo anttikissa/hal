@@ -17,6 +17,7 @@ export interface SessionMeta {
 	id: string
 	workingDir?: string
 	createdAt: string
+	name?: string
 	topic?: string
 	lastPrompt?: string
 	model?: string

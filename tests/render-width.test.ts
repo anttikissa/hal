@@ -26,7 +26,7 @@ beforeEach(() => {
 	client.state.tabs.length = 0
 	client.state.tabs.push({
 		sessionId: 'test-session-with-a-very-long-id',
-		name: 'tab 1',
+		name: 'Pause Fix',
 		history: [],
 		inputHistory: [],
 		loaded: true,

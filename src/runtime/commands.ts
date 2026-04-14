@@ -115,17 +115,6 @@ function resolveSendTarget(session: SessionState, args: string): { target: Sessi
 	if (!match) return null
 	const text = trimmed.slice(match.normalized.length).trim()
 	return text ? { target: match.item, text } : null
-
-}
-
-function parseSendArgs(args: string): { target: string; text: string } | null {
-	const trimmed = args.trim()
-	if (!trimmed) return null
-	const firstSpace = trimmed.indexOf(' ')
-	if (firstSpace === -1) return null
-	const target = trimmed.slice(0, firstSpace).trim()
-	const text = trimmed.slice(firstSpace + 1).trim()
-	return target && text ? { target, text } : null
 }
 
 function currentTabIndex(session: SessionState): number {
@@ -158,6 +147,7 @@ function closedSessionLines(): string[] {
 		.sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
 	if (closed.length === 0) return ['No closed sessions.']
 	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => `  ${meta.id}`)]
+}
 
 function renderRuntimeStatus(): string {
 	const host = ipc.readState().host
@@ -169,7 +159,6 @@ function renderRuntimeStatus(): string {
 	]
 	if (host?.pid) lines.push(`Host: ${host.pid}${host.startedAt ? ` (${host.startedAt})` : ''}`)
 	return lines.join('\n')
-}
 }
 
 // Keep /help output short, and put the fiddly syntax under /help <command>.
@@ -371,12 +360,13 @@ handlers['compact'] = (_args, session) => {
 	return { output: 'Compacting conversation...', handled: true }
 }
 
-// /status — Anthropic / OpenAI OAuth subscription usage
+// /status — runtime version + Anthropic / OpenAI OAuth subscription usage
 handlers['status'] = async () => {
 	const raw = [await anthropicUsage.renderStatus(true), await openaiUsage.renderStatus(true)]
 	const sections = raw.filter((text) => !/^No (Anthropic Claude|OpenAI ChatGPT) subscriptions configured\.$/.test(text.trim()))
+	const usage = sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.'
 	return {
-		output: sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.',
+		output: `${renderRuntimeStatus()}\n\n${usage}`,
 		handled: true,
 	}
 }
@@ -414,13 +404,9 @@ handlers['resume'] = (args, session) => {
 handlers['send'] = (args, session) => {
 	const trimmed = args.trim()
 	if (trimmed === 'all' || trimmed.startsWith('all ')) return handlers['broadcast']!(trimmed.slice(3).trim(), session, () => {})
-	const parsed = parseSendArgs(args)
+	const parsed = resolveSendTarget(session, args)
 	if (!parsed) return { error: 'Usage: /send <tab|session-id|name> <message>', handled: true }
-	const exactTarget = resolveTabTarget(session, parsed.target)
-	if (exactTarget) return sendToSession(session, exactTarget, parsed.text)
-	const resolved = resolveSendTarget(session, args)
-	if (resolved) return sendToSession(session, resolved.target, resolved.text)
-	return { error: `Unknown tab or session: ${parsed.target}`, handled: true }
+	return sendToSession(session, parsed.target, parsed.text)
 }
 
 // /broadcast <message> — queue the same message for every other session

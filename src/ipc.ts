@@ -14,9 +14,17 @@ const STATE_FILE = `${IPC_DIR}/state.ason`
 
 export interface SharedSessionInfo {
 	id: string
-	name: string
+	name?: string
 	cwd: string
 	model?: string
+}
+
+export interface SharedHostInfo {
+	pid: number | null
+	startedAt: string
+	versionStatus: 'idle' | 'pending' | 'ready' | 'error'
+	version?: string
+	error?: string
 }
 
 export interface SharedState {
@@ -24,6 +32,7 @@ export interface SharedState {
 	openSessions: SharedSessionInfo[]
 	busy: Record<string, boolean>
 	activity: Record<string, string>
+	host?: SharedHostInfo
 	updatedAt: string
 }
 
@@ -33,6 +42,7 @@ function defaultState(): SharedState {
 		openSessions: [],
 		busy: {},
 		activity: {},
+		host: { pid: null, startedAt: '', versionStatus: 'idle' },
 		updatedAt: new Date().toISOString(),
 	}
 }

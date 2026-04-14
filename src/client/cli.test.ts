@@ -98,3 +98,70 @@ test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 		client.state.activeTab = origActiveTab
 	}
 })
+
+function makeTab(overrides: Partial<(typeof client.state.tabs)[number]> = {}): (typeof client.state.tabs)[number] {
+	return {
+		sessionId: 's1',
+		name: 'tab 1',
+		history: [],
+		inputHistory: [],
+		inputDraft: '',
+		parentEntryCount: 0,
+		liveHistory: [],
+		loaded: true,
+		doneUnseen: false,
+		historyVersion: 0,
+		usage: { input: 0, output: 0 },
+		contextUsed: 0,
+		contextMax: 0,
+		cwd: '/tmp',
+		model: 'openai/gpt-5.4',
+		...overrides,
+	}
+}
+
+test('enter on empty paused tab sends continue', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origTabs = client.state.tabs.slice()
+	const origActiveTab = client.state.activeTab
+
+	client.state.tabs.length = 0
+	client.state.tabs.push(makeTab({ history: [{ type: 'info', text: '[paused]' }] as any[] }))
+	client.state.activeTab = 0
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+		expect(handled).toBe(true)
+		expect(commands).toEqual([{ type: 'continue', text: undefined, sessionId: 's1' }])
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.activeTab = origActiveTab
+	}
+})
+
+test('enter on empty normal tab does not send continue', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origTabs = client.state.tabs.slice()
+	const origActiveTab = client.state.activeTab
+
+	client.state.tabs.length = 0
+	client.state.tabs.push(makeTab())
+	client.state.activeTab = 0
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+		expect(handled).toBe(true)
+		expect(commands).toEqual([])
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.activeTab = origActiveTab
+	}
+})

@@ -57,6 +57,8 @@ afterEach(() => {
 	memory.io.readRss = origReadRss
 	models.config.default = origDefaultModel
 	ipc.appendCommand = origAppendCommand
+	Object.assign(version.state, origVersionState)
+	version.state.repoDir = origVersionState.repoDir
 })
 
 test('/send resolves a tab number', async () => {
@@ -123,7 +125,7 @@ test('/send rejects an unknown tab number', async () => {
 
 	expect(result.handled).toBe(true)
 	expect(result.output).toBeUndefined()
-	expect(result.error).toContain('99')
+	expect(result.error).toContain('Usage: /send')
 	expect(sent).toEqual([])
 })
 
