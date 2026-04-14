@@ -17,29 +17,23 @@ export interface CompletionResult {
 	start: number // offset in the original text where prefix begins
 }
 
-interface CommandSpec {
-	name: string
-	arg?: 'model' | 'dir' | 'command' | 'config'
-}
+type CommandArg = 'model' | 'dir' | 'command' | 'config'
 
 // ── Known commands ───────────────────────────────────────────────────────────
 
-const COMMANDS: CommandSpec[] = [
-	{ name: 'help', arg: 'command' },
-	{ name: 'reset' },
-	{ name: 'compact' },
-	{ name: 'resume' },
-	{ name: 'model', arg: 'model' },
-	{ name: 'cd', arg: 'dir' },
-	{ name: 'continue' },
-	{ name: 'fork' },
-	{ name: 'tab' },
-	{ name: 'close' },
-	{ name: 'system' },
-	{ name: 'config', arg: 'config' },
-	{ name: 'clear' },
-	{ name: 'exit' },
-]
+import { commands } from '../runtime/commands.ts'
+
+const COMMAND_ARGS: Record<string, CommandArg> = {
+	help: 'command',
+	model: 'model',
+	cd: 'dir',
+	config: 'config',
+}
+
+function commandNames(): string[] {
+	// `/raw` is handled locally in the CLI, not by runtime/commands.ts.
+	return [...new Set([...commands.commandNames(), 'raw'])].sort()
+}
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -116,7 +110,6 @@ function listDirs(dir: string): string[] {
 // Complete directory paths for /cd
 function completeDirs(argPrefix: string, cwd: string): string[] {
 	const expanded = expandTilde(argPrefix)
-	const useTilde = argPrefix.startsWith('~')
 
 	let searchDir: string
 	let prefix: string
@@ -177,7 +170,7 @@ function complete(text: string, cursor: number): CompletionResult | null {
 	// Case 1: completing the command name itself (e.g. "/he" or "/")
 	if (parts.length === 0 || (parts.length === 1 && !hasSpace)) {
 		const needle = parts[0] ?? ''
-		const names = COMMANDS.map((c) => c.name).sort()
+		const names = commandNames()
 		const matches = names.filter((n) => n.startsWith(needle))
 		if (matches.length === 0) return null
 
@@ -188,20 +181,20 @@ function complete(text: string, cursor: number): CompletionResult | null {
 
 	// Case 2: completing command argument
 	const command = parts[0]!
-	const spec = COMMANDS.find((c) => c.name === command)
-	if (!spec?.arg) return null
+	const arg = COMMAND_ARGS[command]
+	if (!arg) return null
 	if (parts.length > 2) return null
 
 	const argPrefix = hasSpace ? '' : (parts[1] ?? '')
 	let values: string[] = []
 
-	if (spec.arg === 'model') {
+	if (arg === 'model') {
 		values = config.modelNames.filter((m) => m.startsWith(argPrefix))
-	} else if (spec.arg === 'dir') {
+	} else if (arg === 'dir') {
 		values = completeDirs(argPrefix, process.cwd())
-	} else if (spec.arg === 'command') {
-		values = COMMANDS.map((item) => item.name).filter((name) => name.startsWith(argPrefix))
-	} else if (spec.arg === 'config') {
+	} else if (arg === 'command') {
+		values = commandNames().filter((name) => name.startsWith(argPrefix))
+	} else {
 		values = listConfigPaths().filter((path) => path.startsWith(argPrefix))
 	}
 
