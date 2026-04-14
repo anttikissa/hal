@@ -56,10 +56,7 @@ function recordOpenedTab(session: Session, opener?: Session): void {
 	sessionStore.appendHistorySync(session.id, [{ type: 'info', text, ts: session.createdAt }])
 }
 
-function recordForkedTab(child: Session, parent: Session): void {
-	const text = `User forked ${sessionLabel(parent)} into ${sessionLabel(child)}.`
-	sessionStore.appendHistorySync(child.id, [{ type: 'info', text, ts: child.createdAt }])
-}
+function recordForkedTab(_child: Session, _parent: Session): void {}
 
 function createSession(opener?: Session, afterId?: string): Session {
 	const session: Session = {

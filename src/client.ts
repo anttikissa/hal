@@ -87,9 +87,10 @@ const state = {
 	// Most-recently viewed tab order. Used to choose where focus returns after
 	// closing a tab, matching browser behavior better than "always pick left/right".
 	recentTabs: [] as string[],
+	startupSummaryShown: false,
 }
 
-let pendingEntries: Array<{ text: string; type: 'info' | 'warning' | 'error' }> = []
+let pendingEntries: Block[] = []
 let onChange: (force: boolean) => void = () => {}
 
 
@@ -138,7 +139,7 @@ function scheduleDelayedPaused(sessionId: string | null, block: Extract<Block, {
 function flushPendingEntries(): void {
 	const tab = currentTab()
 	if (!tab || pendingEntries.length === 0) return
-	for (const entry of pendingEntries) tab.history.push({ type: entry.type, text: entry.text, ts: Date.now() })
+	for (const entry of pendingEntries) tab.history.push(entry)
 	pendingEntries = []
 	touchTab(tab)
 }
@@ -193,6 +194,50 @@ function mostRecentSurvivingTab(): string | null {
 
 function touchTab(tab: Tab): void {
 	tab.historyVersion++
+}
+
+function queueLocalBlock(block: Block): void {
+	const tab = currentTab()
+	if (!tab) {
+		pendingEntries.push(block)
+		return
+	}
+	tab.history.push(block)
+	touchTab(tab)
+	onChange(false)
+}
+
+function perfMs(prefix: string): string | null {
+	const hit = perf.snapshot().findLast((mark) => mark.name.startsWith(prefix))
+	return hit ? `${hit.ms.toFixed(1)}ms` : null
+}
+
+function showStartupSummary(): void {
+	if (state.startupSummaryShown) return
+	state.startupSummaryShown = true
+	const ready = perfMs('Ready for input')
+	const firstLine = state.role === 'server'
+		? `Server started (pid ${state.pid})${ready ? ` · ready ${ready}` : ''}`
+		: `Joined server (pid ${state.hostPid ?? '?'})${ready ? ` · ready ${ready}` : ''}`
+	const details = [
+		['replay', perfMs('Active tab replayed')],
+		['first draw', perfMs('First draw done')],
+		['blobs', perfMs('Active tab blobs loaded')],
+		['all tabs', perfMs('All tabs loaded')],
+	].filter(([, ms]) => !!ms).map(([label, ms]) => `${label} ${ms}`)
+	queueLocalBlock({
+		type: 'startup',
+		text: details.length > 0 ? `${firstLine}\n${details.join(' · ')}` : firstLine,
+		ts: Date.now(),
+	})
+}
+
+function showServerRestart(pid: number, startedAt?: string): void {
+	queueLocalBlock({
+		type: 'startup',
+		text: `Server restarted (pid ${pid})`,
+		ts: startedAt ? Date.parse(startedAt) : Date.now(),
+	})
 }
 
 function historyWithLive(blocks: Block[], tab: Tab): Block[] {
@@ -569,7 +614,11 @@ function applySharedState(shared: SharedState): void {
 }
 
 function handleEvent(event: any): void {
-	if (event.type === 'runtime-start' || event.type === 'host-released' || event.type === 'sessions' || event.type === 'status') return
+	if (event.type === 'host-released' || event.type === 'sessions' || event.type === 'status') return
+	if (event.type === 'runtime-start') {
+		if (event.pid !== state.pid) showServerRestart(event.pid, event.startedAt)
+		return
+	}
 
 	if (event.type === 'prompt') {
 		if (event.label === 'steering') cancelDelayedPaused(event.sessionId ?? null)
@@ -597,6 +646,7 @@ function handleEvent(event: any): void {
 					if (event.blobId) last.blobId = event.blobId
 					if (!last.sessionId) last.sessionId = event.sessionId
 					if (!last.ts) last.ts = ts
+					blockModule.touch(last)
 				} else {
 					closeStreamingBlock(tab)
 					tab.history.push({
@@ -611,6 +661,7 @@ function handleEvent(event: any): void {
 			} else if (last?.type === 'assistant' && last.streaming) {
 				last.text += event.text
 				if (!last.ts) last.ts = ts
+				blockModule.touch(last)
 			} else {
 				closeStreamingBlock(tab)
 				const continueId = lastInterruptedAssistantId(tab)
@@ -708,6 +759,7 @@ function handleEvent(event: any): void {
 				toolBlock.output = event.output
 				if (event.blobId) toolBlock.blobId = event.blobId
 				delete toolBlock.blobLoaded
+				blockModule.touch(toolBlock)
 				touchTab(tab)
 				onChange(false)
 				// IPC tool-result events only carry a truncated preview. Reload the
@@ -799,7 +851,10 @@ async function loadInBackground(): Promise<void> {
 		}
 	}
 
-	if (!config.backgroundLoadTabs) return
+	if (!config.backgroundLoadTabs) {
+		showStartupSummary()
+		return
+	}
 
 	// Remaining tabs: convert history then load blobs
 	const t1 = performance.now()
@@ -817,6 +872,7 @@ async function loadInBackground(): Promise<void> {
 	}
 	const bgMs = (performance.now() - t1).toFixed(1)
 	perf.mark(`All tabs loaded (${tabCount} replayed, ${bgMs}ms)`)
+	showStartupSummary()
 }
 
 let hostLockState: { pid: number | null; createdAt: string } | null = null
@@ -862,6 +918,7 @@ function resetForTests(): void {
 	hostLockState = null
 	ipcStateFile = null
 	state.recentTabs = []
+	state.startupSummaryShown = true
 }
 
 function startClient(signal: AbortSignal): void {
@@ -899,6 +956,7 @@ export const client = {
 	nextTab,
 	prevTab,
 	addEntry,
+	addStartupEntry: (text: string) => queueLocalBlock({ type: 'startup', text, ts: Date.now() }),
 	setPrompt,
 	clearPrompt,
 	sendCommand,
@@ -923,12 +981,6 @@ function addBlockToTab(sessionId: string | null, block: Block): void {
 }
 
 function addEntry(text: string, type: 'info' | 'warning' | 'error' = 'info'): void {
-	const tab = currentTab()
-	if (!tab) {
-		pendingEntries.push({ text, type })
-		return
-	}
-	tab.history.push({ type, text, ts: Date.now() })
-	touchTab(tab)
-	onChange(false)
+	queueLocalBlock({ type, text, ts: Date.now() })
 }
+

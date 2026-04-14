@@ -11,8 +11,8 @@ interface Mark {
 	detail?: string
 }
 
-const allMarks: Mark[] = [] // every mark ever recorded (for trace/summary)
-const pending: Mark[] = [] // marks not yet flushed to sink
+const allMarks: Mark[] = []
+const pending: Mark[] = []
 const epoch = Number(process.env.HAL_STARTUP_TIMESTAMP) || Date.now()
 const enabled = !!process.env.HAL_PERF
 let sink: ((lines: string[]) => void) | null = null
@@ -57,6 +57,10 @@ function elapsed(): number {
 	return Date.now() - epoch
 }
 
+function snapshot(): Array<{ name: string; ms: number; detail?: string }> {
+	return allMarks.map((m) => ({ name: m.name, ms: absMs(m.ts), detail: m.detail }))
+}
+
 // ── Trace waterfall ──────────────────────────────────────────────────────────
 // Returns a formatted multi-line string showing all marks with deltas
 // and a simple visual bar. Useful for startup diagnostics.
@@ -65,31 +69,34 @@ function trace(): string {
 	if (allMarks.length === 0) return '(no perf marks)'
 	const lines: string[] = []
 	let prevMs = 0
-	// Find the max elapsed for scaling the bar chart
-	const maxMs = allMarks.length > 0 ? absMs(allMarks[allMarks.length - 1]!.ts) : 1
-	const barWidth = 20 // max bar length in chars
+	const marks = snapshot()
+	const maxMs = marks[marks.length - 1]?.ms ?? 1
+	const barWidth = 20
 
-	for (const m of allMarks) {
-		const ms = absMs(m.ts)
-		const delta = ms - prevMs
-		// Scale bar proportionally to total time
+	for (const m of marks) {
+		const delta = m.ms - prevMs
 		const barLen = maxMs > 0 ? Math.round((delta / maxMs) * barWidth) : 0
 		const bar = '\u2588'.repeat(Math.max(barLen, 0))
 		const detail = m.detail ? ` (${m.detail})` : ''
-		// Right-align the ms values for readability
-		const msStr = ms.toFixed(0).padStart(6)
+		const msStr = m.ms.toFixed(0).padStart(6)
 		const deltaStr = delta > 0 ? ` +${delta.toFixed(0)}ms` : ''
 		lines.push(`${msStr}ms ${bar.padEnd(barWidth)} ${m.name}${deltaStr}${detail}`)
-		prevMs = ms
+		prevMs = m.ms
 	}
 	return lines.join('\n')
 }
 
 // One-line summary: "Started in Xms (Y marks)"
 function summary(): string {
-	if (allMarks.length === 0) return 'No perf data'
-	const totalMs = absMs(allMarks[allMarks.length - 1]!.ts)
-	return `Started in ${totalMs.toFixed(0)}ms (${allMarks.length} marks)`
+	const marks = snapshot()
+	if (marks.length === 0) return 'No perf data'
+	const totalMs = marks[marks.length - 1]!.ms
+	return `Started in ${totalMs.toFixed(0)}ms (${marks.length} marks)`
 }
 
-export const perf = { mark, setSink, flush, stop, elapsed, trace, summary, enabled }
+function reset(): void {
+	allMarks.length = 0
+	pending.length = 0
+}
+
+export const perf = { mark, setSink, flush, stop, elapsed, snapshot, trace, summary, reset, enabled }

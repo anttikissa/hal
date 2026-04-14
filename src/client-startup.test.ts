@@ -141,7 +141,9 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.forkedFrom).toBe('parent')
-		expect(client.currentTab()?.history).toMatchObject([
+		// Filter out the startup block that gets appended automatically
+		const nonStartup = client.currentTab()?.history.filter(b => b.type !== 'startup')
+		expect(nonStartup).toMatchObject([
 			{ type: 'user', text: 'before fork', dimmed: true },
 			{ type: 'user', text: 'after fork' },
 		])
@@ -319,7 +321,9 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.history).toMatchObject([
+		// Filter out the startup block that gets appended automatically
+		const nonStartup = client.currentTab()?.history.filter(b => b.type !== 'startup')
+		expect(nonStartup).toMatchObject([
 			{ type: 'assistant', text: 'hello', streaming: true, ts: Date.parse('2026-04-09T20:01:00.000Z') },
 		])
 	})

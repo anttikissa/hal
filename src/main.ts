@@ -33,11 +33,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 		pid: process.pid,
 		startedAt: new Date().toISOString(),
 	})
-	client.addEntry(
-		kind === 'start'
-			? `Server started (pid ${process.pid}) [${perf.elapsed()}ms]`
-			: `Promoted to server (pid ${process.pid})`,
-	)
+	if (kind === 'promote') client.addStartupEntry(`Promoted to server (pid ${process.pid})`)
 	runtime.startRuntime(ac.signal)
 }
 
@@ -81,8 +77,6 @@ function tickElection(): void {
 client.state.role = isHost ? 'server' : 'client'
 if (isHost) {
 	becomeHost('start')
-} else {
-	client.addEntry(`Joined server (pid ${hostPid}) [${perf.elapsed()}ms]`)
 }
 
 process.on('exit', cleanup)
@@ -95,7 +89,4 @@ queueMemoryCheck()
 
 electionTimer = setInterval(tickElection, 100)
 
-perf.setSink((lines) => {
-	for (const line of lines) client.addEntry(line)
-})
 cli.startCli(ac.signal)

@@ -22,9 +22,11 @@ const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
 const input = { fg: '', bg: '', cursor: '' }
 const system: BlockColors = { fg: '', bg: '' }
-const info = { fg: '', bg: '' }
+const info: BlockColors = { fg: '', bg: '' }
 const warning: BlockColors = { fg: '', bg: '' }
 const error: BlockColors = { fg: '', bg: '' }
+const startup: BlockColors = { fg: '', bg: '' }
+const fork: BlockColors = { fg: '', bg: '' }
 const popup = { current: { fg: '', bg: '' } }
 
 // Tool colors keyed by tool name. Unknown tools fall back to 'default'.
@@ -91,6 +93,8 @@ function load(): void {
 
 	resolveBlock(raw.info, info)
 	resolveBlock(raw.warning ?? raw.info, warning)
+	resolveBlock(raw.startup ?? raw.warning ?? raw.info, startup)
+	resolveBlock(raw.fork ?? raw.startup ?? raw.warning ?? raw.info, fork)
 
 	if (raw.input) {
 		if (raw.input.fg) input.fg = fg(raw.input.fg, vars)
@@ -136,6 +140,8 @@ export const colors = {
 	info,
 	warning,
 	error,
+	startup,
+	fork,
 	popup,
 	tool,
 	tools,

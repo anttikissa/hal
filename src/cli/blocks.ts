@@ -31,11 +31,58 @@ function sanitizeTerminalText(text: string): string {
 	})
 }
 
+function stripAnsiSequences(text: string): string {
+	let out = ''
+	for (let i = 0; i < text.length; ) {
+		const ch = text[i]!
+		if (ch !== '\x1b') {
+			out += ch
+			i++
+			continue
+		}
+
+		const next = text[i + 1]
+		if (!next) break
+
+		// CSI: ESC [ ... final-byte
+		if (next === '[') {
+			i += 2
+			while (i < text.length) {
+				const code = text.charCodeAt(i)
+				i++
+				if (code >= 0x40 && code <= 0x7e) break
+			}
+			continue
+		}
+
+		// OSC: ESC ] ... BEL or ST (ESC \)
+		if (next === ']') {
+			i += 2
+			while (i < text.length) {
+				if (text[i] === '\x07') {
+					i++
+					break
+				}
+				if (text[i] === '\x1b' && text[i + 1] === '\\') {
+					i += 2
+					break
+				}
+				i++
+			}
+			continue
+		}
+
+		// Other ESC sequences are two-byte introducer + one-byte command.
+		i += 2
+	}
+	return out
+}
+
 // dimmed: true for blocks inherited from a fork parent (rendered with muted colors)
 export type Block =
-	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean }
-	| { type: 'assistant'; text: string; model?: string; id?: string; continue?: string; ts?: number; streaming?: boolean; dimmed?: boolean }
-	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number; streaming?: boolean; dimmed?: boolean }
+	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+	| { type: 'assistant'; text: string; model?: string; id?: string; continue?: string; ts?: number; streaming?: boolean; dimmed?: boolean; renderVersion?: number }
+	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number; streaming?: boolean; dimmed?: boolean; renderVersion?: number }
 	| {
 			type: 'tool'
 			name: string
@@ -47,10 +94,17 @@ export type Block =
 			toolId?: string
 			ts?: number
 			dimmed?: boolean
+			renderVersion?: number
 	  }
-	| { type: 'info'; text: string; ts?: number; dimmed?: boolean }
-	| { type: 'warning'; text: string; ts?: number; dimmed?: boolean }
-	| { type: 'error'; text: string; ts?: number; dimmed?: boolean }
+	| { type: 'info'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+	| { type: 'warning'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+	| { type: 'error'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+	| { type: 'startup'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+	| { type: 'fork'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+
+function touch(block: Block): void {
+	block.renderVersion = (block.renderVersion ?? 0) + 1
+}
 
 type NoticeBlock = { type: 'info' | 'warning' | 'error'; text: string; ts?: number }
 
@@ -152,7 +206,12 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 			continue
 		}
 
-		// session, forked_from, reset, compact, input_history — not rendered
+		if (entry.type === 'forked_from') {
+			result.push({ type: 'fork', text: `Forked from ${entry.parent}`, ts: parseTs(entry.ts), dimmed })
+			continue
+		}
+
+		// session, reset, compact, input_history — not rendered
 	}
 
 	return result
@@ -169,6 +228,7 @@ function applyToolBlob(block: Extract<Block, { type: 'tool' }>, text: string): v
 		const blob = ason.parse(text) as any
 		block.input = blob?.call?.input
 		if (typeof blob?.result?.content === 'string') block.output = blob.result.content
+		touch(block)
 	} catch {}
 }
 
@@ -177,6 +237,7 @@ function applyThinkingBlob(block: Extract<Block, { type: 'thinking' }>, text: st
 	try {
 		const blob = ason.parse(text) as any
 		if (typeof blob?.thinking === 'string') block.text = blob.thinking
+		touch(block)
 	} catch {}
 }
 
@@ -433,11 +494,17 @@ function clipLine(line: string, cols: number): string {
 }
 
 // Fill a line's background to full terminal width.
-// Paints bg + \x1b[K (erase to EOL with current bg) first, then \r back
-// and writes content on top. Tab characters skip over cells without
-// overwriting, so the bg color shows through tab gaps. No trailing spaces
-// in the copy buffer (unlike space-padding).
+//
+// Fast path: most lines do not contain literal tab characters. For those, write
+// content first and then erase to EOL with the current background. That avoids
+// embedding a carriage return inside the logical line, which some terminals
+// copy poorly even though the on-screen rendering looks correct.
+//
+// Tab path: tabs advance the cursor without painting the skipped cells, so to
+// keep the background continuous through tab gaps we still pre-fill with
+// background + EL, then carriage-return and paint content on top.
 function bgLine(content: string, cols: number, bg: string): string {
+	if (!content.includes('\t')) return `${bg}${content}\x1b[K${RESET_BG}`
 	return `${bg}\x1b[K\r${content}${RESET_BG}`
 }
 
@@ -458,7 +525,12 @@ function blockColors(block: Block): { fg: string; bg: string } {
 			return colors.warning
 		case 'error':
 			return colors.error
+		case 'startup':
+			return colors.startup
+		case 'fork':
+			return colors.fork
 	}
+	return colors.info
 }
 
 function formatHHMM(ts?: number): string {
@@ -499,7 +571,12 @@ function blockLabel(block: Block): string {
 			return 'Warning'
 		case 'error':
 			return 'Error'
+		case 'startup':
+			return 'Startup'
+		case 'fork':
+			return 'Fork'
 	}
+	return 'Info'
 }
 
 // Format bash command for display: append ' \' to all but last line
@@ -529,8 +606,14 @@ function blockContent(block: Block, cols: number): string[] {
 	const cw = cols
 	const indent = ''
 
-	if (block.type === 'assistant' || block.type === 'thinking') {
-		// Markdown-rendered text (assistant and thinking share the same path)
+	if (
+		block.type === 'assistant' ||
+		block.type === 'thinking' ||
+		block.type === 'info' ||
+		block.type === 'warning' ||
+		block.type === 'error'
+	) {
+		// Markdown-rendered text blocks share the same path.
 		const lines: string[] = []
 		for (const span of md.mdSpans(sanitizeTerminalText(block.text))) {
 			if (span.type === 'code') {
@@ -571,7 +654,7 @@ function blockContent(block: Block, cols: number): string[] {
 		// Per-tool formatted output — keep real tabs.
 		// expandTabs only where we need to measure/clip.
 		if (block.output) {
-			const output = sanitizeTerminalText(block.output)
+			const output = sanitizeTerminalText(stripAnsiSequences(block.output))
 			const fmt = formatToolOutput(block.name, output)
 
 			// Tool-specific body lines (diffs, counts)
@@ -599,7 +682,7 @@ function blockContent(block: Block, cols: number): string[] {
 		return lines
 	}
 
-	// User, info, error — plain text with word wrap.
+	// User, notices, startup, fork — plain text with word wrap.
 	// Expand tabs here (word wrap needs real character widths).
 	const text = sanitizeTerminalText(block.text)
 	const lines: string[] = []
@@ -687,6 +770,7 @@ function renderBlock(block: Block, cols: number): string[] {
 export const blocks = {
 	config: blockConfig,
 	historyToBlocks,
+	touch,
 	renderBlock,
 	renderBlockGroup,
 	loadBlobs,

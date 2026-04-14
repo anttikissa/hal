@@ -61,6 +61,57 @@ test('thinking block renders markdown and trims trailing blank lines', () => {
 })
 
 
+test('info block renders markdown tables', () => {
+	const block: Block = {
+		type: 'info',
+		text: 'OpenAI subscriptions:\n\n| Active | Slot | Account |\n|---|---|---|\n| * | 1/2 | a@test.com |',
+	}
+
+	const lines = blocks.renderBlock(block, 80).map((l) => stripAnsi(l))
+	const body = lines.slice(1)
+
+	expect(body).toContain('┌────────┬──────┬────────────┐')
+	expect(body).toContain('│ Active │ Slot │ Account    │')
+	expect(body).toContain('│ *      │ 1/2  │ a@test.com │')
+})
+
+
+test('rendered block lines without tabs do not embed carriage returns', () => {
+	const block: Block = {
+		type: 'thinking',
+		text: 'copy this header safely',
+	}
+
+	const lines = blocks.renderBlock(block, 80)
+	expect(lines.some((line) => line.includes('\r'))).toBe(false)
+})
+
+
+test('forked_from history entry renders as a Fork block', () => {
+	const history: any[] = [
+		{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' },
+	]
+
+	const result = blocks.historyToBlocks(history as any, 'child')
+	expect(result).toMatchObject([{ type: 'fork', text: 'Forked from 04-abc' }])
+	const lines = blocks.renderBlock(result[0]!, 80)
+	expect(stripAnsi(lines[0] ?? '')).toContain('Fork')
+})
+
+
+test('startup block renders a Startup header', () => {
+	const block: Block = {
+		type: 'startup',
+		text: 'Server started (pid 123) · ready 99.9ms',
+		ts: new Date('2026-01-01T17:39:00Z').getTime(),
+	}
+
+	const lines = blocks.renderBlock(block, 80)
+	expect(stripAnsi(lines[0] ?? '')).toContain('Startup')
+	expect(stripAnsi(lines.slice(1).join('\n'))).toContain('Server started')
+})
+
+
 test('warning block renders a Warning header', () => {
 	const block: Block = {
 		type: 'warning',
@@ -76,11 +127,11 @@ test('warning block renders a Warning header', () => {
 })
 
 
-test('tool output escapes terminal control bytes', () => {
+test('tool output strips ANSI escapes but keeps other control bytes visible', () => {
 	const block: Block = {
 		type: 'tool',
 		name: 'read',
-		output: 'ok\r\n\x1b[2K\x1bHboom',
+		output: 'ok\r\n\x1b[2K\x1bHboom\n\x1b[38;2;245;145;69mline 11\x1b[49m\x1b[39m',
 	}
 
 	const lines = blocks.renderBlock(block, 80)
@@ -89,7 +140,10 @@ test('tool output escapes terminal control bytes', () => {
 
 	expect(joined).not.toContain('\x1b[2K')
 	expect(joined).not.toContain('\x1bH')
+	expect(joined).not.toContain('\x1b[38;2;245;145;69m')
 	expect(joined).not.toContain('\rboom')
 	expect(clean).toContain('␍')
-	expect(clean).toContain('␛[2K␛Hboom')
+	expect(clean).toContain('boom')
+	expect(clean).toContain('line 11')
+	expect(clean).not.toContain('␛')
 })
