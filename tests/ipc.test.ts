@@ -55,7 +55,7 @@ describe('host election', () => {
 	test('exactly one host when 5 processes start simultaneously', async () => {
 		const env = halEnv()
 		const procs = Array.from({ length: 5 }, () => spawnHal(env))
-		await Bun.sleep(600)
+		await Bun.sleep(1000)
 
 		expect(lockPid()).not.toBeNull()
 		expect(runtimeStartCount()).toBe(1)

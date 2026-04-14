@@ -17,6 +17,7 @@ import { inbox } from './inbox.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
+import { version } from '../version.ts'
 
 // ── Types ──
 
@@ -157,6 +158,18 @@ function closedSessionLines(): string[] {
 		.sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
 	if (closed.length === 0) return ['No closed sessions.']
 	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => `  ${meta.id}`)]
+
+function renderRuntimeStatus(): string {
+	const host = ipc.readState().host
+	const lines = [
+		'Runtime:',
+		`Role: ${ipc.ownsHostLock() ? 'server' : 'client'}`,
+		`PID: ${process.pid}`,
+		`Version: ${version.state.status === 'ready' ? version.state.combined : version.state.status === 'error' ? `error: ${version.state.error}` : 'checking...'}`,
+	]
+	if (host?.pid) lines.push(`Host: ${host.pid}${host.startedAt ? ` (${host.startedAt})` : ''}`)
+	return lines.join('\n')
+}
 }
 
 // Keep /help output short, and put the fiddly syntax under /help <command>.

@@ -197,6 +197,55 @@ test('custom abort text is persisted', async () => {
 })
 
 
+test('empty abort text stops generation without adding an info block', async () => {
+	const sessionId = `test-silent-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	let abortScheduled = false
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield {
+				type: 'error',
+				message: 'rate limited',
+				status: 429,
+				retryAfterMs: 60_000,
+			}
+			yield { type: 'done' }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+			onStatus: async (_busy, activity) => {
+				if (!abortScheduled && activity?.startsWith('rate limited — retrying in ')) {
+					abortScheduled = true
+					setTimeout(() => agentLoop.abort(sessionId, ''), 10)
+				}
+			},
+		})
+		expect(events.some((event) => event.type === 'info' && (event.text === '[paused]' || event.text === '' || event.text === '[restarted]'))).toBe(false)
+		const streamEnd = events.find((event) => event.type === 'stream-end')
+		expect(streamEnd).toBeTruthy()
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
 test('abort during rate-limit backoff stops immediately', async () => {
 	const sessionId = `test-rate-limit-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

@@ -27,7 +27,7 @@ import { openaiUsage } from '../openai-usage.ts'
 
 interface Session {
 	id: string
-	name: string
+	name?: string
 	model?: string
 	cwd: string
 	createdAt: string
@@ -36,6 +36,26 @@ interface Session {
 let activeSessions: Session[] = []
 let activeRuntimePid: number | null = null
 let stopPromptWatch: (() => void) | null = null
+
+const USER_PAUSED_TEXT = '[paused]'
+const RESTARTED_TEXT = '[restarted]'
+const TAB_CLOSED_TEXT = 'Tab closed'
+
+function shouldAutoContinue(entries: Array<{ type: string; text?: string; ts?: string }>, now = Date.now()): boolean {
+	let lastType: string | undefined
+	let lastTs: string | undefined
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type === 'info' && (entry.text === USER_PAUSED_TEXT || entry.text === TAB_CLOSED_TEXT)) return false
+		if (!lastType && (entry.type === 'user' || entry.type === 'tool_result' || entry.type === 'assistant')) {
+			lastType = entry.type
+			lastTs = entry.ts
+		}
+		if (lastType) break
+	}
+	if (lastType !== 'user' && lastType !== 'tool_result') return false
+	return !lastTs || (now - new Date(lastTs).getTime()) <= 30_000
+}
 
 function makeSessionId(): string {
 	const month = String(new Date().getMonth() + 1).padStart(2, '0')
@@ -46,7 +66,7 @@ function makeSessionId(): string {
 }
 
 function sessionLabel(session: Session): string {
-	return `${session.name} (${session.id})`
+	return `${session.name ?? session.id} (${session.id})`
 }
 
 function recordOpenedTab(session: Session, opener?: Session): void {
@@ -60,6 +80,7 @@ function recordForkedTab(child: Session, parent: Session): void {
 	const text = `User forked ${sessionLabel(parent)} into ${sessionLabel(child)}.`
 	sessionStore.appendHistorySync(child.id, [{ type: 'info', text, ts: child.createdAt }])
 }
+
 
 function createSession(opener?: Session, afterId?: string): Session {
 	const session: Session = {
@@ -78,6 +99,7 @@ function createSession(opener?: Session, afterId?: string): Session {
 		id: session.id,
 		workingDir: session.cwd,
 		createdAt: session.createdAt,
+		name: undefined,
 		topic: undefined,
 	})
 	recordOpenedTab(session, opener)
@@ -129,7 +151,7 @@ function sessionFromMeta(meta: ReturnType<typeof sessionStore.loadSessionMeta>):
 	const dirName = meta.workingDir?.split('/').pop()
 	return {
 		id: meta.id,
-		name: meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
+		name: meta.topic || dirName || meta.id,
 		model: meta.model,
 		cwd: meta.workingDir ?? process.cwd(),
 		createdAt: meta.createdAt,
@@ -151,6 +173,20 @@ function mostRecentlyClosedSessionId(): string | null {
 		sessionStore.loadAllSessionMetas(),
 		new Set(activeSessions.map((session) => session.id)),
 	)
+}
+
+function resolveResumeTarget(
+	metas: Array<{ id: string; createdAt: string; closedAt?: string; name?: string }>,
+	openIds: Set<string>,
+	query?: string,
+): string | null {
+	const trimmed = query?.trim()
+	if (!trimmed) return pickMostRecentlyClosedSessionId(metas, openIds)
+	const exactId = metas.find((meta) => !openIds.has(meta.id) && meta.id === trimmed)
+	if (exactId) return exactId.id
+	const normalized = trimmed.toLowerCase()
+	const exactName = metas.find((meta) => !openIds.has(meta.id) && meta.name?.trim().toLowerCase() === normalized)
+	return exactName?.id ?? null
 }
 
 function syncSharedState(): void {
@@ -190,6 +226,10 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 	})
 }
 
+function recordTabClosed(sessionId: string): void {
+	if (!agentLoop.abort(sessionId, TAB_CLOSED_TEXT)) emitInfo(sessionId, TAB_CLOSED_TEXT)
+}
+
 function restartPromptWatch(): void {
 	stopPromptWatch?.()
 	stopPromptWatch = context.watchPromptFiles(
@@ -220,11 +260,11 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 	// Build a SessionState for the commands module
 	const sessionState: SessionState = {
 		id: session.id,
-		name: session.name,
+		name: session.name ?? '',
 		model: session.model,
 		cwd: session.cwd,
 		createdAt: session.createdAt,
-		sessions: activeSessions.map((item) => ({ id: item.id, name: item.name })),
+		sessions: activeSessions.map((item) => ({ id: item.id, name: item.name ?? item.id })),
 	}
 
 	// Slash commands are internal runtime commands. Handle them before emitting a
@@ -235,17 +275,20 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 
 	if (cmdResult.handled) {
 		persistCommandRetryInput(session.id, text, cmdResult)
-		// Sync any mutations back to session (e.g. /model, /cd)
+		// Sync any mutations back to session (e.g. /model, /cd, /rename)
 		const cwdChanged = session.cwd !== sessionState.cwd
 		const modelChanged = session.model !== sessionState.model
+		const nameChanged = (session.name ?? '') !== (sessionState.name || '')
 		session.model = sessionState.model
 		session.cwd = sessionState.cwd
+		session.name = sessionState.name || undefined
 
 		// Persist changed metadata to disk and notify clients
-		if (cwdChanged || modelChanged) {
+		if (cwdChanged || modelChanged || nameChanged) {
 			void sessionStore.updateMeta(session.id, {
 				workingDir: session.cwd,
 				model: session.model,
+				name: session.name,
 			})
 			broadcastSessions()
 		}
@@ -434,9 +477,14 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		}
 
 		case 'resume': {
-			const resumeId = String(cmd.text ?? '').trim() || mostRecentlyClosedSessionId()
+			const selector = String(cmd.text ?? '').trim()
+			const resumeId = resolveResumeTarget(
+				sessionStore.loadAllSessionMetas(),
+				new Set(activeSessions.map((s) => s.id)),
+				selector,
+			)
 			if (!resumeId) {
-				emitInfo(sessionId ?? activeSessions[0]?.id ?? '', 'No closed sessions.')
+				emitInfo(sessionId ?? activeSessions[0]?.id ?? '', selector ? 'No matching closed session.' : 'No closed sessions.', selector ? 'error' : 'info')
 				break
 			}
 			if (activeSessions.some((s) => s.id === resumeId)) {
@@ -465,8 +513,8 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 
 		case 'close': {
 			if (!sessionId) return
-			// Abort any active generation.
-			agentLoop.abort(sessionId, 'Tab closed')
+			// Record the user-visible close notice whether or not generation was active.
+			recordTabClosed(sessionId)
 			await sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString() })
 			sessionStore.deactivateSession(sessionId)
 			activeSessions = activeSessions.filter((s) => s.id !== sessionId)
@@ -487,10 +535,9 @@ function startRuntime(signal: AbortSignal): void {
 
 	if (metas.length > 0) {
 		for (const meta of metas) {
-			const dirName = meta.workingDir?.split('/').pop()
 			activeSessions.push({
 				id: meta.id,
-				name: meta.topic ?? dirName ?? `tab ${activeSessions.length + 1}`,
+				name: meta.name,
 				model: meta.model,
 				cwd: meta.workingDir ?? process.cwd(),
 				createdAt: meta.createdAt,
@@ -507,6 +554,12 @@ function startRuntime(signal: AbortSignal): void {
 	signal.addEventListener('abort', () => {
 		stopPromptWatch?.()
 		stopPromptWatch = null
+		const ts = new Date().toISOString()
+		for (const session of activeSessions) {
+			if (!agentLoop.isActive(session.id)) continue
+			sessionStore.appendHistorySync(session.id, [{ type: 'info', text: RESTARTED_TEXT, ts }])
+			agentLoop.abort(session.id, '')
+		}
 	}, { once: true })
 
 	ipc.updateState((state) => {
@@ -559,20 +612,7 @@ function startRuntime(signal: AbortSignal): void {
 			const allEntries = interrupted.length > 0
 				? sessionStore.loadAllHistory(session.id) // re-read with new tool_results
 				: entries
-			let lastType: string | undefined
-			let lastTs: string | undefined
-			let paused = false
-			for (let i = allEntries.length - 1; i >= 0; i--) {
-				const e = allEntries[i]!
-				if (e.type === 'info' && (e.text === '[paused]' || e.text === 'Tab closed')) { paused = true; break }
-				if (!lastType && (e.type === 'user' || e.type === 'tool_result' || e.type === 'assistant')) {
-					lastType = e.type
-					lastTs = e.ts
-				}
-				if (lastType) break
-			}
-			const stale = lastTs && (Date.now() - new Date(lastTs).getTime()) > 30_000
-			if (!paused && !stale && (lastType === 'user' || lastType === 'tool_result')) {
+			if (shouldAutoContinue(allEntries)) {
 				emitInfo(session.id, 'Continuing...')
 				void runGeneration(session, '') // empty text = continue existing conversation
 			}
@@ -635,4 +675,4 @@ function startRuntime(signal: AbortSignal): void {
 		})
 }
 
-export const runtime = { startRuntime, pickMostRecentlyClosedSessionId }
+export const runtime = { startRuntime, pickMostRecentlyClosedSessionId, resolveResumeTarget, shouldAutoContinue, recordTabClosed }

@@ -56,6 +56,8 @@ const state = {
 	abortTexts: new Map<string, string>(),
 }
 
+const DEFAULT_ABORT_TEXT = '[paused]'
+
 // ── Types ──
 
 export interface AgentContext {
@@ -273,8 +275,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		let retryStartedAt = 0
 
 		async function finishAborted(): Promise<void> {
-			const abortText = state.abortTexts.get(sessionId) ?? '[paused]'
-			emitInfo(sessionId, abortText)
+			const abortText = state.abortTexts.has(sessionId) ? (state.abortTexts.get(sessionId) ?? '') : DEFAULT_ABORT_TEXT
+			if (abortText) emitInfo(sessionId, abortText)
 			const est = context.estimateContext(messages, model, overheadBytes)
 			emitEvent(sessionId, {
 				type: 'stream-end',
@@ -649,7 +651,7 @@ async function executeToolsConcurrently(
 }
 
 /** Abort an active generation for a session. */
-function abort(sessionId: string, text = '[paused]'): boolean {
+function abort(sessionId: string, text = DEFAULT_ABORT_TEXT): boolean {
 	const ac = state.activeRequests.get(sessionId)
 	if (ac) {
 		log.info('Agent loop explicit abort', { sessionId, text })

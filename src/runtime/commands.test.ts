@@ -24,6 +24,7 @@ const origRenderStatus = openaiUsage.renderStatus
 const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
 const origDefaultModel = models.config.default
+const origVersionState = { ...version.state }
 
 function makeSession(id = '04-aaa'): SessionState {
 	return {

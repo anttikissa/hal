@@ -67,7 +67,7 @@ describe("tabs", () => {
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
-		expect(out).toContain("[1 tab 1]")
+		expect(out).toContain('[1 tab 1]')
 	})
 
 	test("ctrl-t creates a new tab", async () => {
@@ -82,8 +82,8 @@ describe("tabs", () => {
 		const out = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
 		// Should show two tabs
-		expect(out).toContain(" 1 tab 1 ")
-		expect(out).toContain("[2 tab 2]")
+		expect(out).toContain(' 1 tab 1 ')
+		expect(out).toContain('[2 tab 2]')
 	})
 
 	test("new tabs record who opened them", async () => {
@@ -111,9 +111,7 @@ describe("tabs", () => {
 
 		expect(first).toMatchObject({ type: 'info' })
 		expect(first?.text).toContain('User opened a new tab')
-		expect(first?.text).toContain('tab 2')
 		expect(first?.text).toContain(childId)
-		expect(first?.text).toContain('tab 1')
 		expect(first?.text).toContain(openerId)
 
 		proc.stdin!.write(new Uint8Array([0x03]))
