@@ -87,3 +87,52 @@ test('resolveResumeTarget matches a closed session by name case-insensitively', 
 
 	expect(picked).toBe('04-a')
 })
+
+import { mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
+
+test('spawnSession creates a fresh child with queued prompt and auto-close marker', async () => {
+	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))
+	const prevState = process.env.HAL_STATE_DIR
+	process.env.HAL_STATE_DIR = base
+	const { sessions } = await import('./sessions.ts')
+
+	try {
+		await sessions.createSession('04-parent', {
+			id: '04-parent',
+			workingDir: '/work/parent',
+			createdAt: '2026-04-14T12:00:00.000Z',
+			model: 'anthropic/claude-sonnet-4.5',
+		})
+		const child = await runtime.spawnSessionForTests({
+			id: '04-parent',
+			name: 'parent',
+			cwd: '/work/parent',
+			model: 'anthropic/claude-sonnet-4.5',
+			createdAt: '2026-04-14T12:00:00.000Z',
+		}, {
+			task: 'Do the thing',
+			mode: 'fresh',
+			model: 'openai/gpt-5',
+			cwd: '/work/child',
+			title: 'Child tab',
+			closeWhenDone: true,
+		})
+
+		expect(child.model).toBe('openai/gpt-5')
+		expect(child.cwd).toBe('/work/child')
+		const meta = sessions.loadSessionMeta(child.id)
+		expect(meta?.workingDir).toBe('/work/child')
+		expect(meta?.model).toBe('openai/gpt-5')
+		expect(meta?.name).toBe('Child tab')
+		expect(meta?.topic).toBe('Child tab')
+		const history = sessions.loadHistory(child.id)
+		expect(history.some((entry) => entry.type === 'info' && entry.text.includes('close itself after sending a handoff'))).toBe(true)
+		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
+	} finally {
+		rmSync(base, { recursive: true, force: true })
+		if (prevState === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = prevState
+	}
+})

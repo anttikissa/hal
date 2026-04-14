@@ -24,6 +24,8 @@ export interface SessionMeta {
 	currentLog?: string
 	closedAt?: string
 	forkedFrom?: string
+	closeWhenDone?: boolean
+	parentSessionId?: string
 	// Last known context window usage, persisted so it survives restarts
 	context?: { used: number; max: number }
 }

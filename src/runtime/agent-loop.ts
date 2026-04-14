@@ -30,6 +30,7 @@ import '../tools/send.ts'
 import '../tools/google.ts'
 import '../tools/read_url.ts'
 import '../tools/analyze_history.ts'
+import '../tools/spawn_agent.ts'
 // Anthropic also has its own server-side web_search tool
 // (type: 'web_search_20250305'). That's separate from our local google tool.
 

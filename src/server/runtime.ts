@@ -41,6 +41,15 @@ const USER_PAUSED_TEXT = '[paused]'
 const RESTARTED_TEXT = '[restarted]'
 const TAB_CLOSED_TEXT = 'Tab closed'
 
+interface SpawnSpec {
+	task: string
+	mode: 'fork' | 'fresh'
+	model?: string
+	cwd?: string
+	title?: string
+	closeWhenDone?: boolean
+}
+
 function shouldAutoContinue(entries: Array<{ type: string; text?: string; ts?: string }>, now = Date.now()): boolean {
 	let lastType: string | undefined
 	let lastTs: string | undefined
@@ -140,6 +149,52 @@ async function createForkSession(sourceId: string): Promise<Session> {
 	if (parent) recordForkedTab(session, parent)
 	insertSessionAfter(session, sourceId)
 	return session
+}
+
+function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean): string {
+	const closeLine = closeWhenDone
+		? 'After sending the handoff, finish normally and Hal will close this tab for you.'
+		: 'After sending the handoff, stay open so the user can inspect the tab.'
+	return [
+		`You are a subagent working for parent session ${parentId}.`,
+		'',
+		'Task:',
+		task,
+		'',
+		`When finished, send a concise handoff to session ${parentId} using the send tool. Include summary, files changed, and open questions.`,
+		closeLine,
+	].join('\n')
+}
+
+async function spawnSession(parent: Session, spec: SpawnSpec): Promise<Session> {
+	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
+	const child = mode === 'fork' ? await createForkSession(parent.id) : createSession(undefined, parent.id)
+	child.cwd = spec.cwd || (mode === 'fork' ? child.cwd : parent.cwd)
+	child.model = spec.model || (mode === 'fork' ? child.model : parent.model)
+	child.name = spec.title || child.name
+	const topic = spec.title || child.name
+	await sessionStore.updateMeta(child.id, {
+		workingDir: child.cwd,
+		model: child.model,
+		name: child.name,
+		topic,
+		closeWhenDone: !!spec.closeWhenDone,
+		parentSessionId: parent.id,
+	})
+	if (spec.closeWhenDone) {
+		sessionStore.appendHistorySync(child.id, [{
+			type: 'info',
+			text: 'This subagent will close itself after sending a handoff.',
+			ts: new Date().toISOString(),
+		}])
+	}
+	await sessionStore.appendHistory(child.id, [{
+		type: 'user',
+		parts: [{ type: 'text', text: buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone) }],
+		source: parent.id,
+		ts: new Date().toISOString(),
+	}])
+	return child
 }
 
 function findSession(sessionId: string): Session | undefined {
@@ -380,6 +435,13 @@ async function runGeneration(session: Session, text: string, source?: string): P
 	} catch (err: any) {
 		emitInfo(session.id, `Generation failed: ${err?.message ?? String(err)}`, 'error')
 	}
+	const meta = sessionStore.loadSessionMeta(session.id)
+	if (meta?.closeWhenDone && !agentLoop.isActive(session.id)) {
+		await sessionStore.updateMeta(session.id, { closedAt: new Date().toISOString(), closeWhenDone: false })
+		sessionStore.deactivateSession(session.id)
+		activeSessions = activeSessions.filter((s) => s.id !== session.id)
+		broadcastSessions()
+	}
 }
 
 // ── Compaction ──
@@ -479,6 +541,26 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			} else {
 				createSession(session)
 			}
+			broadcastSessions()
+			break
+		}
+
+		case 'spawn': {
+			if (!session) return
+			const raw = typeof cmd.text === 'string' ? cmd.text : ''
+			const parsed = JSON.parse(raw || '{}') as Partial<SpawnSpec>
+			if (!parsed.task || typeof parsed.task !== 'string') {
+				emitInfo(session.id, 'Spawn task is required', 'error')
+				break
+			}
+			await spawnSession(session, {
+				task: parsed.task,
+				mode: parsed.mode === 'fresh' ? 'fresh' : 'fork',
+				model: parsed.model,
+				cwd: parsed.cwd,
+				title: parsed.title,
+				closeWhenDone: !!parsed.closeWhenDone,
+			})
 			broadcastSessions()
 			break
 		}
@@ -682,4 +764,4 @@ function startRuntime(signal: AbortSignal): void {
 		})
 }
 
-export const runtime = { startRuntime, pickMostRecentlyClosedSessionId, resolveResumeTarget, shouldAutoContinue, recordTabClosed }
+export const runtime = { startRuntime, pickMostRecentlyClosedSessionId, resolveResumeTarget, shouldAutoContinue, recordTabClosed, spawnSessionForTests: spawnSession }
