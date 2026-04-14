@@ -95,6 +95,20 @@ function resolveTabTarget(session: SessionState, raw: string): SessionRef | null
 	return sessions.find((item) => item.id === raw) ?? null
 }
 
+function currentTabIndex(session: SessionState): number {
+	const sessions = session.sessions ?? []
+	return sessions.findIndex((item) => item.id === session.id)
+}
+
+function clampMovePosition(session: SessionState, raw: string): { capped: number; max: number } | null {
+	if (!/^-?\d+$/.test(raw)) return null
+	const sessions = session.sessions ?? []
+	const max = Math.max(1, sessions.length)
+	const requested = parseInt(raw, 10)
+	const capped = Math.max(1, Math.min(max, requested))
+	return { capped, max }
+}
+
 function sendToSession(from: SessionState, target: SessionRef, text: string): CommandResult {
 	if (target.id === from.id) {
 		return { error: 'Cannot send to the current session.', handled: true }
@@ -174,6 +188,13 @@ function detailedHelp(topic: string): string | null {
 	if (topic === 'resume') {
 		return ['Usage: /resume [session-id]', '', 'With no id, lists recently closed sessions.'].join('\n')
 	}
+	if (topic === 'move') {
+		return [
+			'Usage: /move <position>',
+			'',
+			'Move the current tab to a 1-based position. Values below 1 clamp to 1; values above the tab count clamp to the last tab.',
+		].join('\n')
+	}
 	return null
 }
 
@@ -194,6 +215,7 @@ handlers['help'] = (args) => {
 		'  /clear          Clear session history',
 		'  /fork           Fork current session to new tab',
 		'  /open [tab|id]  Open a new tab, optionally after a tab',
+		'  /move <pos>     Move current tab to a position',
 		'  /resume [id]    Resume a closed session',
 		'  /compact        Summarize conversation to reduce context',
 		'  /raw            Log raw key bytes on this terminal',
@@ -257,6 +279,21 @@ handlers['open'] = (args, session) => {
 	if (!target) return { error: `Unknown tab or session: ${targetText}`, handled: true }
 	ipc.appendCommand({ type: 'open', text: `after:${target.id}`, sessionId: session.id })
 	return { output: `Opening new tab after ${target.name} (${target.id})...`, handled: true }
+}
+
+// /move <position> — move the current tab to a 1-based position
+handlers['move'] = (args, session) => {
+	const parsed = clampMovePosition(session, args.trim())
+	if (!parsed) return { error: 'Usage: /move <position>', handled: true }
+
+	const currentIndex = currentTabIndex(session)
+	const currentPos = currentIndex >= 0 ? currentIndex + 1 : 1
+	if (parsed.capped === currentPos) {
+		return { output: `Tab already at ${currentPos}.`, handled: true }
+	}
+
+	ipc.appendCommand({ type: 'move', text: String(parsed.capped), sessionId: session.id })
+	return { output: `Moving tab to ${parsed.capped}/${parsed.max}...`, handled: true }
 }
 
 // /compact — summarize conversation

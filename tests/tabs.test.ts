@@ -272,4 +272,43 @@ describe("tabs", () => {
 		await proc.exited
 	})
 
+	test("move reorders tabs to the requested position", async () => {
+		const proc = spawnHal()
+		await Bun.sleep(300)
+
+		proc.stdin!.write(new Uint8Array([0x14])) // ctrl-t
+		proc.stdin!.flush()
+		proc.stdin!.write(new Uint8Array([0x14])) // ctrl-t
+		proc.stdin!.flush()
+		const thirdTabDeadline = Date.now() + 2000
+		while (Date.now() < thirdTabDeadline) {
+			if (readSessionIds().length === 3) break
+			await Bun.sleep(50)
+		}
+
+		const beforeMove = readSessionIds()
+		expect(beforeMove).toHaveLength(3)
+		const movedId = beforeMove[2]!
+		const firstId = beforeMove[0]!
+		const secondId = beforeMove[1]!
+
+		const commandPath = join(tmpDir, "ipc", "commands.asonl")
+		const moveCommand = ason.stringify({ type: 'move', text: '1', sessionId: movedId, createdAt: new Date().toISOString() }, 'short')
+		Bun.write(commandPath, `${readFileSync(commandPath, 'utf-8')}${moveCommand}\n`)
+
+		const moveDeadline = Date.now() + 2000
+		while (Date.now() < moveDeadline) {
+			const current = readSessionIds()
+			if (current.length === 3 && current[0] === movedId) break
+			await Bun.sleep(50)
+		}
+
+		const afterMove = readSessionIds()
+		expect(afterMove).toEqual([movedId, firstId, secondId])
+
+		proc.stdin!.write(new Uint8Array([0x03]))
+		proc.stdin!.flush()
+		await proc.exited
+	})
+
 })

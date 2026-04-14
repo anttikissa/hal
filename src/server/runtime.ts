@@ -97,6 +97,17 @@ function insertSessionAfter(session: Session, afterId?: string): void {
 	activeSessions.splice(idx + 1, 0, session)
 }
 
+function moveSessionToIndex(sessionId: string, targetIndex: number): boolean {
+	const fromIndex = activeSessions.findIndex((session) => session.id === sessionId)
+	if (fromIndex < 0) return false
+	const clampedIndex = Math.max(0, Math.min(activeSessions.length - 1, targetIndex))
+	if (fromIndex === clampedIndex) return false
+	const [session] = activeSessions.splice(fromIndex, 1)
+	if (!session) return false
+	activeSessions.splice(clampedIndex, 0, session)
+	return true
+}
+
 async function createForkSession(sourceId: string): Promise<Session> {
 	const newId = makeSessionId()
 	await sessionStore.forkSession(sourceId, newId)
@@ -441,6 +452,14 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			activeSessions.push(resumed)
 			await sessionStore.updateMeta(resumeId, { closedAt: undefined })
 			broadcastSessions()
+			break
+		}
+
+		case 'move': {
+			if (!sessionId) return
+			const targetPos = parseInt(String(cmd.text ?? ''), 10)
+			if (!Number.isFinite(targetPos)) return
+			if (moveSessionToIndex(sessionId, targetPos - 1)) broadcastSessions()
 			break
 		}
 

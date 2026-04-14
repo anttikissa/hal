@@ -158,6 +158,50 @@ test('/open resolves a tab number and queues placement after it', async () => {
 	expect(appended).toEqual([{ type: 'open', text: 'after:04-bbb', sessionId: '04-aaa' }])
 })
 
+
+test('/move queues a move command for another tab position', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const result = await commands.executeCommand('/move 2', makeSession('04-ccc'), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('2')
+	expect(appended).toEqual([{ type: 'move', text: '2', sessionId: '04-ccc' }])
+})
+
+
+test('/move caps out-of-range positions and no-ops on current tab', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const high = await commands.executeCommand('/move 99', makeSession('04-aaa'), () => {})
+	const low = await commands.executeCommand('/move -5', makeSession('04-ccc'), () => {})
+	const same = await commands.executeCommand('/move 1', makeSession('04-aaa'), () => {})
+
+	expect(high.output).toContain('3')
+	expect(low.output).toContain('1')
+	expect(same.output).toContain('already at 1')
+	expect(appended).toEqual([
+		{ type: 'move', text: '3', sessionId: '04-aaa' },
+		{ type: 'move', text: '1', sessionId: '04-ccc' },
+	])
+})
+
+
+test('/move rejects non-numeric positions', async () => {
+	const result = await commands.executeCommand('/move nope', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.output).toBeUndefined()
+	expect(result.error).toContain('Usage: /move <position>')
+})
+
 test('/help config shows config caveats and syntax', async () => {
 	const result = await commands.executeCommand('/help config', makeSession(), () => {})
 
