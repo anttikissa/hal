@@ -52,6 +52,8 @@ const config = {
 const state = {
 	/** Active generation abort controllers, keyed by session ID. */
 	activeRequests: new Map<string, AbortController>(),
+	/** Info text to emit when an aborted generation finishes unwinding. */
+	abortTexts: new Map<string, string>(),
 }
 
 // ── Types ──
@@ -271,7 +273,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		let retryStartedAt = 0
 
 		async function finishAborted(): Promise<void> {
-			emitInfo(sessionId, '[paused]')
+			const abortText = state.abortTexts.get(sessionId) ?? '[paused]'
+			emitInfo(sessionId, abortText)
 			const est = context.estimateContext(messages, model, overheadBytes)
 			emitEvent(sessionId, {
 				type: 'stream-end',
@@ -610,6 +613,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 	} finally {
 		state.activeRequests.delete(sessionId)
+		state.abortTexts.delete(sessionId)
 		await ctx.onStatus?.(false)
 	}
 }
@@ -645,10 +649,11 @@ async function executeToolsConcurrently(
 }
 
 /** Abort an active generation for a session. */
-function abort(sessionId: string): boolean {
+function abort(sessionId: string, text = '[paused]'): boolean {
 	const ac = state.activeRequests.get(sessionId)
 	if (ac) {
-		log.info('Agent loop explicit abort', { sessionId })
+		log.info('Agent loop explicit abort', { sessionId, text })
+		state.abortTexts.set(sessionId, text)
 		ac.abort()
 		return true
 	}

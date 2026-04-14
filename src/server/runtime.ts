@@ -446,8 +446,8 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 
 		case 'close': {
 			if (!sessionId) return
-			// Abort any active generation
-			agentLoop.abort(sessionId)
+			// Abort any active generation.
+			agentLoop.abort(sessionId, 'Tab closed')
 			await sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString() })
 			sessionStore.deactivateSession(sessionId)
 			activeSessions = activeSessions.filter((s) => s.id !== sessionId)
@@ -455,8 +455,8 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			broadcastSessions()
 			break
 		}
+		}
 	}
-}
 
 // ── Main entry point ──
 
@@ -545,7 +545,7 @@ function startRuntime(signal: AbortSignal): void {
 			let paused = false
 			for (let i = allEntries.length - 1; i >= 0; i--) {
 				const e = allEntries[i]!
-				if (e.type === 'info' && e.text === '[paused]') { paused = true; break }
+				if (e.type === 'info' && (e.text === '[paused]' || e.text === 'Tab closed')) { paused = true; break }
 				if (!lastType && (e.type === 'user' || e.type === 'tool_result' || e.type === 'assistant')) {
 					lastType = e.type
 					lastTs = e.ts
