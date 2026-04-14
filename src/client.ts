@@ -350,6 +350,7 @@ interface ClientStateFile {
 	peak: number // high-water mark for rendered line count
 	peakCols: number // terminal width peak was computed at
 	model: string | null // last-used model, restored on startup
+	doneUnseen: string[] // background-complete tabs that still deserve a ✓
 }
 
 function loadClientState(): ClientStateFile {
@@ -360,9 +361,10 @@ function loadClientState(): ClientStateFile {
 			peak: data?.peak ?? 0,
 			peakCols: data?.peakCols ?? 0,
 			model: data?.model ?? null,
+			doneUnseen: Array.isArray(data?.doneUnseen) ? data.doneUnseen.filter((item: any) => typeof item === 'string') : [],
 		}
 	} catch {
-		return { lastTab: null, peak: 0, peakCols: 0, model: null }
+		return { lastTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [] }
 	}
 }
 
@@ -376,6 +378,7 @@ function saveClientState(): void {
 				peak: state.peak,
 				peakCols: state.peakCols,
 				model: state.model,
+				doneUnseen: state.tabs.filter((item) => item.doneUnseen).map((item) => item.sessionId),
 			}) + '\n',
 		)
 	} catch {}
@@ -630,6 +633,7 @@ function applySharedState(shared: SharedState): void {
 
 	const activeSession = currentTab()?.sessionId
 	const nextBusy = new Map<string, boolean>()
+	let changedDoneUnseen = false
 	for (const [sessionId, busy] of Object.entries(shared.busy)) {
 		if (busy) nextBusy.set(sessionId, true)
 	}
@@ -637,11 +641,15 @@ function applySharedState(shared: SharedState): void {
 		if (!wasBusy || nextBusy.get(sessionId)) continue
 		if (sessionId !== activeSession) {
 			const tab = state.tabs.find((item) => item.sessionId === sessionId)
-			if (tab) tab.doneUnseen = true
+			if (tab && !tab.doneUnseen) {
+				tab.doneUnseen = true
+				changedDoneUnseen = true
+			}
 		}
 	}
 	state.busy = nextBusy
 	state.activity = new Map(Object.entries(shared.activity))
+	if (changedDoneUnseen) saveClientState()
 	state.hostVersionStatus = shared.host?.versionStatus ?? 'idle'
 	state.hostVersion = shared.host?.version ?? ''
 }
@@ -837,6 +845,8 @@ function sessionInfoFromMeta(meta: SessionMeta, _index: number): SharedSessionIn
 
 function restoreStartupSelection(): void {
 	const saved = loadClientState()
+	const unseenDone = new Set(saved.doneUnseen)
+	for (const tab of state.tabs) tab.doneUnseen = unseenDone.has(tab.sessionId)
 	const lastIdx = saved.lastTab ? state.tabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
 	state.activeTab = lastIdx >= 0 ? lastIdx : 0
 	if (state.tabs[state.activeTab]) rememberTab(state.tabs[state.activeTab]!.sessionId)
@@ -844,6 +854,8 @@ function restoreStartupSelection(): void {
 
 	const active = state.tabs[state.activeTab]
 	if (active) {
+		// The focused tab is being viewed now, so its unseen-finished marker should clear.
+		active.doneUnseen = false
 		const t0 = performance.now()
 		ensureTabLoaded(active)
 		const replayMs = (performance.now() - t0).toFixed(1)

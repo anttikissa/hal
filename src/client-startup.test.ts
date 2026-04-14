@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { client } from './client.ts'
 import { ipc, type SharedState } from './ipc.ts'
 import { sessions } from './server/sessions.ts'
 import { draft } from './cli/draft.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { blocks as blockModule } from './cli/blocks.ts'
+import { STATE_DIR, ensureDir } from './state.ts'
+import { ason } from './utils/ason.ts'
 
 function makeSessionMeta(id: string) {
 	return {
@@ -30,6 +33,8 @@ function makeSharedState(ids: string[]): SharedState {
 	}
 }
 
+const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
+
 describe('client startup', () => {
 	const origLoadAllSessionMetas = sessions.loadAllSessionMetas
 	const origLoadSessionMeta = sessions.loadSessionMeta
@@ -42,6 +47,7 @@ describe('client startup', () => {
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = sessions.loadLive
 	const origLoadBlobs = blockModule.loadBlobs
+	let savedClientState: string | null = null
 	beforeEach(() => {
 		client.state.tabs.length = 0
 		client.state.activeTab = 0
@@ -67,6 +73,9 @@ describe('client startup', () => {
 		// Client tests must never append to the real shared IPC command log.
 		// Individual tests can override this stub to assert what would be sent.
 		ipc.appendCommand = () => {}
+		savedClientState = existsSync(CLIENT_STATE_PATH) ? readFileSync(CLIENT_STATE_PATH, 'utf-8') : null
+		ensureDir(STATE_DIR)
+		rmSync(CLIENT_STATE_PATH, { force: true })
 	})
 
 	afterEach(() => {
@@ -81,6 +90,8 @@ describe('client startup', () => {
 		liveFiles.onChange = origOnChange
 		sessions.loadLive = origLoadLive
 		blockModule.loadBlobs = origLoadBlobs
+		if (savedClientState != null) writeFileSync(CLIENT_STATE_PATH, savedClientState)
+		else rmSync(CLIENT_STATE_PATH, { force: true })
 	})
 
 	test('bootstraps tabs from shared state instead of replaying old events', async () => {
@@ -341,6 +352,33 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.sessionId).toBe('s1')
+	})
+
+	test('restores unseen-done checkmarks from client state on startup', async () => {
+		ensureDir(STATE_DIR)
+		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
+			lastTab: 's1',
+			peak: 0,
+			peakCols: 0,
+			model: null,
+			doneUnseen: ['s2'],
+		}) + '\n')
+
+		const shared = makeSharedState(['s1', 's2'])
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.state.tabs.map((tab) => ({ id: tab.sessionId, doneUnseen: tab.doneUnseen }))).toEqual([
+			{ id: 's1', doneUnseen: false },
+			{ id: 's2', doneUnseen: true },
+		])
 	})
 
 	test('tails events from the end without replaying the whole event log', async () => {
