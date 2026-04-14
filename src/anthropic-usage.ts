@@ -6,6 +6,7 @@ import { liveFiles } from './utils/live-file.ts'
 
 const CACHE_PATH = `${STATE_DIR}/anthropic-usage.ason`
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile'
 
 export interface UsageWindow {
 	usedPercent: number
@@ -113,6 +114,24 @@ function parsePayload(credential: Credential, raw: any): AccountUsage {
 	}
 }
 
+/** Fetch account email from the OAuth profile endpoint. */
+async function fetchProfileEmail(credential: Credential): Promise<string | undefined> {
+	try {
+		const res = await fetch(PROFILE_URL, {
+			headers: {
+				Authorization: `Bearer ${credential.value}`,
+				'Content-Type': 'application/json',
+			},
+			signal: AbortSignal.timeout(config.fetchTimeoutMs),
+		})
+		if (!res.ok) return
+		const data = (await res.json()) as any
+		return data?.account?.email || data?.account?.display_name || undefined
+	} catch {
+		return
+	}
+}
+
 function current(): AccountUsage | null {
 	fix()
 	return state.currentKey ? state.accounts[state.currentKey] ?? null : null
@@ -190,22 +209,31 @@ function formatWindowCell(window: UsageWindow | undefined): string {
 	return `${usageBar(window.usedPercent)}<br>${formatWindowText(window)}`
 }
 
-function formatModelWindowCell(account: AccountUsage): string {
-	if (!account.modelWeek) return '?'
-	return `${usageBar(account.modelWeek.usedPercent)}<br>${account.modelWeek.label}: ${formatWindowText(account.modelWeek)}`
-}
-
 function formatStatusText(): string {
 	const accounts = all()
 	if (accounts.length === 0) return 'No cached Anthropic subscription usage. Run /status again after logging in with Claude.'
+
+	// Check if any account has model-specific weekly data
+	const hasModelWeek = accounts.some((a) => a.modelWeek)
+
+	const header = hasModelWeek
+		? '| Slot | Account | 5h | Week | ' + accounts.find((a) => a.modelWeek)!.modelWeek!.label + ' week |'
+		: '| Slot | Account | 5h | Week |'
+	const separator = hasModelWeek ? '|---|---|---|---|---|' : '|---|---|---|---|'
+
 	const lines = [
 		'Anthropic subscriptions:',
 		'',
-		'| Slot | Account | 5h | Week | Model |',
-		'|---|---|---|---|---|',
+		header,
+		separator,
 	]
 	for (const account of accounts) {
-		lines.push(`| ${displaySlot(account)} | ${displayAccount(account)} | ${formatWindowCell(account.fiveHour)} | ${formatWindowCell(account.sevenDay)} | ${formatModelWindowCell(account)} |`)
+		let row = `| ${displaySlot(account)} | ${displayAccount(account)} | ${formatWindowCell(account.fiveHour)} | ${formatWindowCell(account.sevenDay)} |`
+		if (hasModelWeek) {
+			const mw = account.modelWeek
+			row += ` ${mw ? formatWindowCell(mw) : '-'} |`
+		}
+		lines.push(row)
 	}
 	return lines.join('\n')
 }
@@ -233,7 +261,12 @@ async function refreshCredential(credential: Credential, force = false): Promise
 	const existing = state.accounts[key]
 	const lastFetch = existing?.fetchedAt ? Date.parse(existing.fetchedAt) : 0
 	if (!force && existing && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing
-	state.accounts[key] = await fetchUsage(credential)
+	const account = await fetchUsage(credential)
+	// If the credential doesn't have an email yet, try fetching from the profile endpoint
+	if (!account.email) {
+		account.email = existing?.email || await fetchProfileEmail(credential)
+	}
+	state.accounts[key] = account
 	if (!state.currentKey) state.currentKey = key
 	save()
 	return state.accounts[key]!
