@@ -346,9 +346,17 @@ function formatTotalTokens(total: number): string {
 	return models.formatTokenCount(total)
 }
 
-function tokenUsageLabel(total: number, long = false): string {
+function tokenUsageLabel(
+	usage: { input: number; output: number; cacheRead: number; cacheCreation: number },
+	long = false,
+): string {
+	const total = usage.input + usage.output + usage.cacheRead + usage.cacheCreation
 	if (total <= 0) return ''
-	return `${formatTotalTokens(total)} ${long ? 'tokens' : 'tok'}`
+	// Show cache hit rate when cacheRead is a meaningful fraction of total input tokens processed.
+	const totalInput = usage.input + usage.cacheRead + usage.cacheCreation
+	const hitRate = totalInput > 0 ? Math.round((usage.cacheRead / totalInput) * 100) : 0
+	const cacheHint = hitRate >= 5 ? ` CR:${hitRate}%` : ''
+	return `${formatTotalTokens(total)} ${long ? 'tokens' : 'tok'}${cacheHint}`
 }
 
 function subscriptionStatusLabel(base: string): string {
@@ -381,7 +389,6 @@ function renderStatusLine(lines: string[]): void {
 	const modelId = tab.model || client.state.model || models.defaultModel()
 	const provider = models.providerName(modelId)
 	const isSub = !auth.isApiKey(provider)
-	const totalTokens = tab.usage.input + tab.usage.output
 	const left = joinStatusParts([
 		sessionStatusLabel(tab, base),
 		cwdStatusLabel(tab, base),
@@ -390,8 +397,8 @@ function renderStatusLine(lines: string[]): void {
 	])
 
 	const server = serverStatusLabel()
-	const tokenShort = tokenUsageLabel(totalTokens, false)
-	const tokenLong = tokenUsageLabel(totalTokens, true)
+	const tokenShort = tokenUsageLabel(tab.usage, false)
+	const tokenLong = tokenUsageLabel(tab.usage, true)
 	const plan = provider === 'openai' && isSub ? subscriptionStatusLabel(base) : ''
 	const innerWidth = Math.max(0, cols - 2)
 	let showServer = !!server

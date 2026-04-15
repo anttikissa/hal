@@ -12,6 +12,7 @@ import { auth, type Credential } from '../auth.ts'
 import { provider as providerUtils } from './provider.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { reasoningSignature } from '../session/reasoning-signature.ts'
+import { models } from '../models.ts'
 
 // ── Endpoint configuration ──
 
@@ -23,6 +24,7 @@ const COMPAT_ENDPOINTS: Record<string, string> = {
 	google: 'https://generativelanguage.googleapis.com/v1beta/openai',
 	grok: 'https://api.x.ai/v1',
 }
+
 
 function getCredential(providerName: string): Credential | undefined {
 	return auth.getCredential(providerName)
@@ -174,7 +176,13 @@ function convertResponsesMessages(messages: Message[]): any[] {
 			}
 
 			if (block.type === 'thinking') {
-				const signature = reasoningSignature.parse(block.signature ?? (block as any).thinkingSignature)
+				// Codex backend rejects replayed reasoning items that omit `summary`.
+				// Older sessions may have compacted signatures without it, so rebuild
+				// the summary from the stored thinking text when needed.
+				const signature = reasoningSignature.withSummary(
+					block.signature ?? (block as any).thinkingSignature,
+					block.thinking,
+				)
 				if (signature && (!signature.id || !seenReasoningIds.has(signature.id))) {
 					if (signature.id) seenReasoningIds.add(signature.id)
 					input.push(signature)
@@ -411,11 +419,17 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 
 		const usage = response?.usage
 		if (usage) {
+			// OpenAI Responses API reports cached prompt tokens under input_tokens_details.cached_tokens.
+			// input_tokens is the total (cached + uncached), so subtract to get the uncached portion.
+			const cacheRead = usage.input_tokens_details?.cached_tokens ?? 0
+			const totalInput = usage.input_tokens ?? 0
 			events.push({
 				type: 'done',
 				usage: {
-					input: usage.input_tokens ?? 0,
+					input: Math.max(0, totalInput - cacheRead),
 					output: usage.output_tokens ?? 0,
+					cacheRead,
+					cacheCreation: 0,
 				},
 			})
 		} else {
@@ -580,7 +594,10 @@ async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): As
 
 	yield {
 		type: 'done',
-		usage: inputTokens || outputTokens ? { input: inputTokens, output: outputTokens } : undefined,
+		usage:
+			inputTokens || outputTokens
+				? { input: inputTokens, output: outputTokens, cacheRead: 0, cacheCreation: 0 }
+				: undefined,
 	}
 }
 
@@ -683,12 +700,8 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 		body.parallel_tool_calls = true
 	}
 
-	// Match the old provider defaults: codex gets the highest reasoning effort.
-	if (req.model.includes('codex')) {
-		body.reasoning = { effort: 'xhigh', summary: 'auto' }
-	} else if (req.model.startsWith('o') || req.model.startsWith('gpt-5.4')) {
-		body.reasoning = { effort: 'high', summary: 'auto' }
-	}
+	const effort = models.reasoningEffort(req.model)
+	if (effort) body.reasoning = { effort, summary: 'auto' }
 
 	openaiUsage.setCurrentCredential(credential)
 	const rotationActivity = formatRotationActivity(credential)

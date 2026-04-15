@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { auth, type Credential } from '../auth.ts'
-import { createCompatProvider, openaiProvider } from './openai.ts'
+import { createCompatProvider, openai, openaiProvider } from './openai.ts'
 
 interface FetchCall {
 	url: string
@@ -115,7 +115,7 @@ test('openai provider routes ChatGPT OAuth tokens to the Codex backend', async (
 	expect(headers.get('chatgpt-account-id')).toBe('acct_from_token')
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4 } })
+	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
 test('openai provider routes API keys to the public Responses API', async () => {
@@ -132,7 +132,7 @@ test('openai provider routes API keys to the public Responses API', async () => 
 	expect(headers.has('chatgpt-account-id')).toBe(false)
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4 } })
+	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
 test('compat providers stay on chat completions endpoints', async () => {
@@ -155,7 +155,7 @@ test('compat providers stay on chat completions endpoints', async () => {
 	expect(body.input).toBeUndefined()
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6 } })
+	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } })
 })
 
 
@@ -248,5 +248,90 @@ test('openai 429 waits for reset when all accounts are on cooldown', async () =>
 		message: 'OpenAI rotation: 3 accounts. 429 on burned@test.com. All accounts cooling down. Next: next@test.com in 2064s.',
 		status: 429,
 		retryAfterMs: 2_064_000,
+	})
+})
+
+function reasoningSse(): string {
+	return [
+		'data: {"type":"response.output_item.added","output_index":0,"item":{"type":"reasoning"}}',
+		'data: {"type":"response.output_item.done","output_index":0,"item":{"type":"reasoning","id":"rs_123","encrypted_content":"secret","summary":[{"type":"summary_text","text":"duplicate"}]}}',
+		'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":1,"output_tokens":2}}}',
+		'',
+	].join('\n')
+}
+
+test('openai provider minimizes reasoning signatures before emitting them', async () => {
+	const token = makeJwt({
+		scp: ['openid', 'profile', 'email', 'offline_access'],
+		'https://api.openai.com/auth': { chatgpt_account_id: 'acct_from_token' },
+	})
+	auth.ensureFresh = async () => {}
+	auth.getCredential = (name: string) => (name === 'openai' ? { value: token, type: 'token' } : undefined)
+	auth.getEntry = () => ({})
+
+	installFetchMock(async () => new Response(reasoningSse(), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) {
+		events.push(event)
+	}
+
+	expect(events).toContainEqual({
+		type: 'thinking_signature',
+		signature: JSON.stringify({ type: 'reasoning', id: 'rs_123', encrypted_content: 'secret' }),
+	})
+})
+
+test('openai provider rehydrates minimized reasoning signatures with summary text during replay', () => {
+	const input = openai.convertResponsesMessages([
+		{
+			role: 'assistant',
+			content: [{
+				type: 'thinking',
+				thinking: 'previous reasoning summary',
+				signature: JSON.stringify({ type: 'reasoning', id: 'rs_prev', encrypted_content: 'enc_prev' }),
+			}],
+		},
+	] as any)
+
+	expect(input).toContainEqual({
+		type: 'reasoning',
+		id: 'rs_prev',
+		encrypted_content: 'enc_prev',
+		summary: [{ type: 'summary_text', text: 'previous reasoning summary' }],
+	})
+})
+
+test('openai provider preserves stored reasoning summaries during replay', () => {
+	const input = openai.convertResponsesMessages([
+		{
+			role: 'assistant',
+			content: [{
+				type: 'thinking',
+				thinking: 'fallback text',
+				signature: JSON.stringify({
+					type: 'reasoning',
+					id: 'rs_prev',
+					encrypted_content: 'enc_prev',
+					summary: [{ type: 'summary_text', text: 'stored summary' }],
+				}),
+			}],
+		},
+	] as any)
+
+	expect(input).toContainEqual({
+		type: 'reasoning',
+		id: 'rs_prev',
+		encrypted_content: 'enc_prev',
+		summary: [{ type: 'summary_text', text: 'stored summary' }],
 	})
 })

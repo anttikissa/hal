@@ -115,6 +115,12 @@ function parseErrorPayload(body: string | undefined): unknown {
 	}
 }
 
+// True iff any token class is non-zero. A fully-cached turn has input = 0 but
+// non-zero cacheRead, so we can't just check `input > 0`.
+function hasUsage(u: { input: number; output: number; cacheRead: number; cacheCreation: number }): boolean {
+	return u.input > 0 || u.output > 0 || u.cacheRead > 0 || u.cacheCreation > 0
+}
+
 async function writeErrorBlob(sessionId: string, blobId: string, event: ProviderStreamEvent): Promise<void> {
 	await blob.writeBlob(sessionId, blobId, {
 		type: 'provider_error',
@@ -264,7 +270,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 	await ctx.onStatus?.(true, 'generating...')
 
 	try {
-		const totalUsage = { input: 0, output: 0 }
+		const totalUsage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 		let retryAttempt = 0
 		let retryStartedAt = 0
 
@@ -275,7 +281,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			emitEvent(sessionId, {
 				type: 'stream-end',
 				phase: 'done',
-				usage: totalUsage.input > 0 ? totalUsage : undefined,
+				usage: hasUsage(totalUsage) ? totalUsage : undefined,
 				contextUsed: est.used,
 				contextMax: est.max,
 			})
@@ -302,6 +308,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			let thinkingText = ''
 			let thinkingSignature = ''
 			let thinkingBlobId = ''
+			let thinkingEffort = models.reasoningEffort(model)
 			const toolBlobMap = new Map<string, string>()
 			const toolCalls: ToolCall[] = []
 			// Server-side tool blocks (e.g. web_search) — opaque, go into assistant content verbatim
@@ -326,6 +333,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							type: 'stream-delta',
 							text: event.text,
 							channel: 'thinking',
+							model,
+							thinkingEffort,
 							blobId: thinkingBlobId,
 						})
 						break
@@ -340,11 +349,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 						case 'text':
 							assistantText += event.text ?? ''
-							emitEvent(sessionId, {
-								type: 'stream-delta',
-								text: event.text,
-								channel: 'assistant',
-							})
+						emitEvent(sessionId, {
+							type: 'stream-delta',
+							text: event.text,
+							channel: 'assistant',
+							model,
+						})
 							break
 
 					case 'tool_call': {
@@ -431,10 +441,13 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 								retryStartedAt = 0
 							}
 
-							// Accumulate usage
+							// Accumulate usage. Keep cache-read and cache-creation separate from
+							// uncached input so the UI and cost math can weight them correctly.
 							if (event.usage) {
 								totalUsage.input += event.usage.input
 								totalUsage.output += event.usage.output
+								totalUsage.cacheRead += event.usage.cacheRead ?? 0
+								totalUsage.cacheCreation += event.usage.cacheCreation ?? 0
 							}
 							break
 						}
@@ -475,13 +488,15 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
 					historyEntries.push({
 						type: 'thinking',
+						model,
+						thinkingEffort,
 						blobId,
 						ts,
 					})
 				}
 				if (assistantText) {
-					const assistantEntry: any = { type: 'assistant', text: assistantText, ts }
-					if (totalUsage.input > 0) assistantEntry.usage = totalUsage
+					const assistantEntry: any = { type: 'assistant', text: assistantText, model, ts }
+					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
 					historyEntries.push(assistantEntry)
 				}
 				if (historyEntries.length > 0) {
@@ -496,7 +511,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				emitEvent(sessionId, {
 					type: 'stream-end',
 					phase: 'done',
-					usage: totalUsage.input > 0 ? totalUsage : undefined,
+					usage: hasUsage(totalUsage) ? totalUsage : undefined,
 					contextUsed: est.used,
 					contextMax: est.max,
 				})
@@ -530,11 +545,13 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
 				historyEntries.push({
 					type: 'thinking',
+					model,
+					thinkingEffort,
 					blobId,
 					ts,
 				})
 			}
-			if (assistantText) historyEntries.push({ type: 'assistant', text: assistantText, ts })
+			if (assistantText) historyEntries.push({ type: 'assistant', text: assistantText, model, ts })
 			for (const tc of toolCalls) {
 				const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
 				toolBlobMap.set(tc.id, blobId)

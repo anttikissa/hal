@@ -19,7 +19,7 @@ describe('render single pass', () => {
 			inputDraft: '',
 			doneUnseen: false, parentEntryCount: 0,
 			historyVersion: 0,
-			usage: { input: 0, output: 0 },
+			usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
 			contextUsed: 0,
 			contextMax: 0,
 			cwd: '/tmp',

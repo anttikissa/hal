@@ -28,7 +28,7 @@ function captureOutput(fn: () => void): string {
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
-	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, parentEntryCount: 0, historyVersion: 0, usage: { input: 0, output: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
+	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, parentEntryCount: 0, historyVersion: 0, usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
 	client.state.activeTab = 0
 	client.state.pid = 111
 	client.state.hostPid = 222
@@ -162,7 +162,7 @@ describe('render', () => {
 		tab.model = 'openai/gpt-5.4'
 		tab.contextUsed = 39_000
 		tab.contextMax = 1_050_000
-		tab.usage = { input: 600_000, output: 1_100_000 }
+		tab.usage = { input: 600_000, output: 1_100_000, cacheRead: 0, cacheCreation: 0 }
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('test · /tmp · GPT 5.4')
 		expect(clean).toContain('/tmp')
@@ -177,7 +177,7 @@ describe('render', () => {
 		tab.model = 'openai/gpt-5.4'
 		tab.contextUsed = 39_000
 		tab.contextMax = 1_050_000
-		tab.usage = { input: 600_000, output: 1_100_000 }
+		tab.usage = { input: 600_000, output: 1_100_000, cacheRead: 0, cacheCreation: 0 }
 		const originalCols = process.stdout.columns
 		Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true })
 		try {
@@ -193,7 +193,7 @@ describe('render', () => {
 		tab.model = 'openai/gpt-5.4'
 		tab.contextUsed = 39_000
 		tab.contextMax = 1_050_000
-		tab.usage = { input: 600_000, output: 1_100_000 }
+		tab.usage = { input: 600_000, output: 1_100_000, cacheRead: 0, cacheCreation: 0 }
 		client.state.role = 'client'
 		client.state.pid = 111
 		client.state.hostPid = 222
@@ -236,7 +236,7 @@ describe('render', () => {
 			doneUnseen: false,
 			parentEntryCount: 0,
 			historyVersion: 0,
-			usage: { input: 0, output: 0 },
+			usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
 			contextUsed: 0,
 			contextMax: 0,
 			cwd: '/tmp',
@@ -266,7 +266,7 @@ describe('render', () => {
 			inputDraft: '',
 			doneUnseen: false, parentEntryCount: 0,
 			historyVersion: 0,
-			usage: { input: 0, output: 0 },
+			usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
 			contextUsed: 0,
 			contextMax: 0,
 			cwd: '/tmp',

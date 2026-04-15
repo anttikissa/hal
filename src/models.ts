@@ -86,6 +86,14 @@ function displayModel(fullId: string | undefined): string {
 	return modelId
 }
 
+function reasoningEffort(fullId: string | undefined): string {
+	if (!fullId) return ''
+	const modelId = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+	if (modelId.includes('codex')) return 'xhigh'
+	if (/^o\d/.test(modelId) || modelId.startsWith('gpt-5.4')) return 'high'
+	return ''
+}
+
 // ── Context windows (tokens) ──
 // Fetched from models.dev on startup and cached in state/models.ason.
 // Falls back to hardcoded defaults if the file doesn't exist yet.
@@ -161,13 +169,26 @@ const PRICING: Record<string, { input: number; output: number }> = {
 	'anthropic/claude-haiku-4-5-20251001': { input: 1, output: 5 },
 }
 
-function computeCost(fullId: string, usage: { input: number; output: number }): number {
+// Anthropic prompt-cache multipliers: reads bill at 10% of input, writes at 125%.
+// https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#pricing
+const CACHE_READ_MULTIPLIER = 0.1
+const CACHE_WRITE_MULTIPLIER = 1.25
+
+function computeCost(
+	fullId: string,
+	usage: { input: number; output: number; cacheRead?: number; cacheCreation?: number },
+): number {
 	const p = PRICING[fullId]
 	if (!p) return 0
-	return (usage.input * p.input + usage.output * p.output) / 1_000_000
+	const cacheReadCost = (usage.cacheRead ?? 0) * p.input * CACHE_READ_MULTIPLIER
+	const cacheWriteCost = (usage.cacheCreation ?? 0) * p.input * CACHE_WRITE_MULTIPLIER
+	return (usage.input * p.input + usage.output * p.output + cacheReadCost + cacheWriteCost) / 1_000_000
 }
 
-function formatCost(fullId: string, usage: { input: number; output: number }): string {
+function formatCost(
+	fullId: string,
+	usage: { input: number; output: number; cacheRead?: number; cacheCreation?: number },
+): string {
 	const cost = computeCost(fullId, usage)
 	if (cost === 0) return ''
 	return `$${cost.toFixed(4)}`
@@ -279,6 +300,7 @@ export const models = {
 	config,
 	resolveModel,
 	displayModel,
+	reasoningEffort,
 	contextWindow,
 	computeCost,
 	formatCost,

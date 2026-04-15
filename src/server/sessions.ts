@@ -7,6 +7,7 @@ import { STATE_DIR } from '../state.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
+import { models } from '../models.ts'
 
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
@@ -49,15 +50,17 @@ export type HistoryEntry =
 			blobId?: string
 			signature?: string
 			provider?: string
+			model?: string
+			thinkingEffort?: string
 			ts?: string
-	  }
+		  }
 	| {
 			type: 'assistant'
 			text: string
 			model?: string
 			id?: string
 			continue?: string
-			usage?: { input: number; output: number }
+			usage?: { input: number; output: number; cacheRead?: number; cacheCreation?: number }
 			ts?: string
 	  }
 	| {
@@ -225,15 +228,27 @@ function applyLiveEvent(sessionId: string, event: any): void {
 					if (event.blobId) last.blobId = event.blobId
 					if (!last.sessionId) last.sessionId = sessionId
 					if (!last.ts) last.ts = ts
+					if (!last.model) last.model = event.model
+					if (!last.thinkingEffort) last.thinkingEffort = event.thinkingEffort ?? models.reasoningEffort(last.model)
 					return
 				}
 				closeStreamingBlock(live)
-				live.blocks.push({ type: 'thinking', text: event.text, blobId: event.blobId, sessionId, ts, streaming: true })
+				live.blocks.push({
+					type: 'thinking',
+					text: event.text,
+					model: event.model,
+					thinkingEffort: event.thinkingEffort ?? models.reasoningEffort(event.model),
+					blobId: event.blobId,
+					sessionId,
+					ts,
+					streaming: true,
+				})
 				return
 			}
 			if (last?.type === 'assistant' && last.streaming) {
 				last.text += event.text
 				if (!last.ts) last.ts = ts
+				if (!last.model) last.model = event.model
 				return
 			}
 			closeStreamingBlock(live)
@@ -241,6 +256,7 @@ function applyLiveEvent(sessionId: string, event: any): void {
 			live.blocks.push({
 				type: 'assistant',
 				text: event.text,
+				model: event.model,
 				id: continueId ? undefined : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
 				continue: continueId ?? undefined,
 				ts,

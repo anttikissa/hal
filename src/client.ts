@@ -12,6 +12,7 @@ import { STATE_DIR } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { models } from './models.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ export interface Tab {
 	historyVersion: number
 	// Cumulative token usage for this session (input + output).
 	// Accumulated from stream-end events and loaded from history on startup.
-	usage: { input: number; output: number }
+	usage: { input: number; output: number; cacheRead: number; cacheCreation: number }
 	// Last known context window usage (estimated tokens used / max).
 	// Updated from stream-end events.
 	contextUsed: number
@@ -157,7 +158,7 @@ function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string
 		loaded: true,
 		doneUnseen: false,
 		historyVersion: 0,
-		usage: { input: 0, output: 0 },
+		usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
 		contextUsed: 0,
 		contextMax: 0,
 		cwd: opts?.cwd ?? '',
@@ -325,7 +326,7 @@ function switchTab(index: number): void {
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
-	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom), tab)
+	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
@@ -556,6 +557,8 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 		if (entry.type !== 'assistant' || !entry.usage) continue
 		tab.usage.input += entry.usage.input ?? 0
 		tab.usage.output += entry.usage.output ?? 0
+		tab.usage.cacheRead += entry.usage.cacheRead ?? 0
+		tab.usage.cacheCreation += entry.usage.cacheCreation ?? 0
 	}
 	if (meta?.context) {
 		tab.contextUsed = meta.context.used
@@ -687,12 +690,16 @@ function handleEvent(event: any): void {
 					if (event.blobId) last.blobId = event.blobId
 					if (!last.sessionId) last.sessionId = event.sessionId
 					if (!last.ts) last.ts = ts
+					if (!last.model) last.model = event.model ?? tab.model
+					if (!last.thinkingEffort) last.thinkingEffort = event.thinkingEffort ?? models.reasoningEffort(last.model)
 					blockModule.touch(last)
 				} else {
 					closeStreamingBlock(tab)
 					tab.history.push({
 						type: 'thinking',
 						text: event.text,
+						model: event.model ?? tab.model,
+						thinkingEffort: event.thinkingEffort ?? models.reasoningEffort(event.model ?? tab.model),
 						blobId: event.blobId,
 						sessionId: event.sessionId,
 						ts,
@@ -702,6 +709,7 @@ function handleEvent(event: any): void {
 			} else if (last?.type === 'assistant' && last.streaming) {
 				last.text += event.text
 				if (!last.ts) last.ts = ts
+				if (!last.model) last.model = event.model ?? tab.model
 				blockModule.touch(last)
 			} else {
 				closeStreamingBlock(tab)
@@ -709,7 +717,7 @@ function handleEvent(event: any): void {
 				tab.history.push({
 					type: 'assistant',
 					text: event.text,
-					model: tab.model,
+					model: event.model ?? tab.model,
 					id: continueId ? undefined : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
 					continue: continueId ?? undefined,
 					ts,
@@ -725,9 +733,11 @@ function handleEvent(event: any): void {
 		if (tab) {
 			closeStreamingBlock(tab)
 			if (event.usage) {
-				tab.usage ??= { input: 0, output: 0 }
+				tab.usage ??= { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 				tab.usage.input += event.usage.input ?? 0
 				tab.usage.output += event.usage.output ?? 0
+				tab.usage.cacheRead += event.usage.cacheRead ?? 0
+				tab.usage.cacheCreation += event.usage.cacheCreation ?? 0
 			}
 			if (event.contextUsed != null) tab.contextUsed = event.contextUsed
 			if (event.contextMax != null) tab.contextMax = event.contextMax

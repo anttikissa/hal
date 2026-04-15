@@ -64,7 +64,7 @@ test('anthropic provider reports the active account while rotating', async () =>
 		activity: 'Anthropic 1/3 · first@test.com',
 	})
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events.at(-1)).toEqual({ type: 'done', usage: { input: 0, output: 4 } })
+	expect(events.at(-1)).toEqual({ type: 'done', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
 test('anthropic 429 shows failed and next account when another account is available', async () => {

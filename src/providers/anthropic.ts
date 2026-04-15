@@ -10,6 +10,21 @@ import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '..
 import { provider as providerUtils } from './provider.ts'
 import { auth } from '../auth.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
+import { STATE_DIR } from '../state.ts'
+import { appendFileSync } from 'node:fs'
+
+// Per-API-call usage log. One JSON line per call: timestamp, sessionId,
+// input (uncached), cacheRead, cacheCreation, output. Lets us diagnose cache
+// hit rate at the finest available granularity (Anthropic reports usage per
+// message, not per turn).
+const USAGE_LOG_PATH = `${STATE_DIR}/anthropic-call-log.jsonl`
+function logCall(entry: Record<string, unknown>): void {
+	try {
+		appendFileSync(USAGE_LOG_PATH, JSON.stringify(entry) + '\n')
+	} catch {
+		// Logging must never break a generate call.
+	}
+}
 
 // The ?beta=true query parameter is required for OAuth tokens.
 // Without it, requests hit a different backend pool that returns 529 overloaded
@@ -161,7 +176,10 @@ function applyCacheBreakpoints(msgs: any[]): any[] {
 
 // ── SSE stream parser ──
 
-async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
+async function* parseStream(
+	body: ReadableStream<Uint8Array>,
+	logContext?: { sessionId?: string; model?: string },
+): AsyncGenerator<ProviderStreamEvent> {
 	const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>
 	const decoder = new TextDecoder()
 	let buf = ''
@@ -171,7 +189,7 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 	// Server-side tool blocks (e.g. web_search) are opaque — collect them verbatim
 	// so the agent loop can include them in the assistant message content.
 	const serverToolBlocks: any[] = []
-	const usage = { input: 0, output: 0 }
+	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 
 	while (true) {
 		const { done, value } = await providerUtils.readWithTimeout(reader)
@@ -235,10 +253,24 @@ async function* parseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<Pr
 					tools.delete(ev.index)
 				}
 			} else if (ev.type === 'message_start' && ev.message?.usage) {
-				// Input tokens include cache reads and cache creation
+				// Keep input, cacheRead, and cacheCreation separate — they bill at
+				// very different rates (full / ~10% / ~125%). Mashing them together
+				// hides cache misses. Log each API call so we can audit post-hoc.
 				const u = ev.message.usage
-				usage.input +=
-					(u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
+				const inputDelta = u.input_tokens ?? 0
+				const cacheReadDelta = u.cache_read_input_tokens ?? 0
+				const cacheCreationDelta = u.cache_creation_input_tokens ?? 0
+				usage.input += inputDelta
+				usage.cacheRead += cacheReadDelta
+				usage.cacheCreation += cacheCreationDelta
+				logCall({
+					ts: new Date().toISOString(),
+					sessionId: logContext?.sessionId,
+					model: logContext?.model,
+					input: inputDelta,
+					cacheRead: cacheReadDelta,
+					cacheCreation: cacheCreationDelta,
+				})
 			} else if (ev.type === 'message_delta' && ev.usage) {
 				usage.output += ev.usage.output_tokens ?? 0
 			} else if (ev.type === 'error') {
@@ -396,7 +428,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		return
 	}
 
-	yield* parseStream(res.body!)
+	yield* parseStream(res.body!, { sessionId: req.sessionId, model: req.model })
 }
 
 export const anthropicProvider: Provider = { generate }

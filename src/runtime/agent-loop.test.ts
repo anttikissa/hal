@@ -35,7 +35,7 @@ test('writes thinking blobs while streaming and replays them into API history', 
 			expect(blob.readBlob(sessionId, thinkingEvent.blobId)?.signature).toBe('sig-123')
 
 			yield { type: 'text', text: 'done' }
-			yield { type: 'done', usage: { input: 1, output: 1 } }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
 	ipc.appendEvent = (event: any) => {
@@ -156,7 +156,7 @@ test('provider status updates busy activity', async () => {
 	providerLoader.getProvider = async () => ({
 		async *generate() {
 			yield { type: 'status', activity: 'OpenAI 2/3 · next@test.com' }
-			yield { type: 'done', usage: { input: 0, output: 0 } }
+			yield { type: 'done', usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
 
@@ -194,7 +194,7 @@ test('abort between tool iterations does not report max iterations', async () =>
 	providerLoader.getProvider = async () => ({
 		async *generate() {
 			yield { type: 'tool_call', id: 'tool-1', name: 'read', input: { path: 'src/runtime/agent-loop.test.ts', start: 1, end: 1 } }
-			yield { type: 'done', usage: { input: 1, output: 1 } }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
 	ipc.appendEvent = (event: any) => {

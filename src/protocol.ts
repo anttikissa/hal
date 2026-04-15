@@ -83,7 +83,13 @@ export interface ProviderStreamEvent {
 	endpoint?: string // the URL the request was sent to
 	retryAfterMs?: number
 	// done fields
-	usage?: { input: number; output: number }
+	// Token usage breakdown:
+	//   input          — uncached input tokens (billed at full rate)
+	//   output         — output tokens
+	//   cacheRead      — cache-hit tokens (billed at ~10% of input rate)
+	//   cacheCreation  — cache-write tokens (billed at ~125% of input rate)
+	// Providers without cache tracking (e.g. OpenAI) leave cacheRead/cacheCreation as 0.
+	usage?: { input: number; output: number; cacheRead: number; cacheCreation: number }
 }
 
 export interface ProviderRequest {
