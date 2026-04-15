@@ -1,17 +1,16 @@
 # ASON — A Saner Object Notation
 
-ASON is a superset of JSON designed for human-readable config and state files.
-Any valid JSON file is valid ASON.
-
+ASON is a superset of JSON, JSONC, and JSON5 designed for human-readable config and
+state files. Any valid JSON, JSONC, or JSON5 file is valid ASON.
 ## Design goal
 
 ASON should be **as JavaScript-compatible as practical** while staying simple to read,
 write, diff, and stream.
 
 That means:
-- JS-style numbers: `42`, `3.14`, `.82`, `-.5`, `1e10`, `Infinity`, `-Infinity`, `NaN`
-- JS-style strings: single quotes, double quotes, and backticks
-- JS-style object keys: unquoted identifiers allowed
+- JS-style numbers: `42`, `3.14`, `.82`, `1.`, `-.5`, `+1`, `0xFF`, `1e10`, `Infinity`, `-Infinity`, `NaN`
+- JS-style strings: single quotes, double quotes, and backticks, with `\xNN`, `\v`, `\0`, and line continuations
+- JS-style object keys: unquoted identifiers (including non-ASCII like `café`) and `\uXXXX` escapes
 - JS-style commas: **commas are required between items and properties**
 - JS-style trailing commas: **allowed, never required**
 - JS-style `undefined`
@@ -21,11 +20,15 @@ That means:
 ### Values
 
 All JSON types, plus:
-- Unquoted keys: `{ name: 'hal', version: 1 }`
+- Unquoted keys: `{ name: 'hal', version: 1 }` (including non-ASCII like `café`)
 - Single-quoted strings: `'hello'`
 - Backtick strings: `` `line1\nline2` `` — multiline, no interpolation
 - `undefined`
-- `NaN`, `Infinity`, `-Infinity`
+- `NaN`, `Infinity`, `-Infinity`, `+Infinity`, `+NaN`
+- Hex numbers: `0xFF`
+- Signed numbers: `+1`, `+.5`
+- Trailing-dot numbers: `1.`
+- String escapes: `\xNN`, `\v`, `\0`, line continuations
 - Comments: `// line` and `/* block */`
 - Trailing commas
 
