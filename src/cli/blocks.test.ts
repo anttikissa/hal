@@ -76,6 +76,8 @@ test('info block renders markdown tables', () => {
 })
 
 
+
+
 test('rendered block lines without tabs do not embed carriage returns', () => {
 	const block: Block = {
 		type: 'thinking',
@@ -84,6 +86,20 @@ test('rendered block lines without tabs do not embed carriage returns', () => {
 
 	const lines = blocks.renderBlock(block, 80)
 	expect(lines.some((line) => line.includes('\r'))).toBe(false)
+
+})
+
+test('block header leaves one column slack to avoid last-column wrap state', () => {
+	const block: Block = {
+		type: 'thinking',
+		text: 'x',
+		blobId: 'q05d47-tzf',
+		sessionId: '03-idr',
+		ts: new Date('2026-04-14T05:32:00Z').getTime(),
+	}
+
+	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	expect(header.length).toBeLessThan(80)
 })
 
 
