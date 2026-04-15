@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
-// Type-check one file by cloning the repo tsconfig and overriding its entry set.
+// Type-check one file by creating a tiny child tsconfig that extends the real
+// project config and narrows the root file set to a single target.
 //
-// We do not mutate the real tsconfig.json. Instead we parse it as JSONC/ASON,
-// inject a single-file `files` list, then point tsgo at a temporary config.
-// That keeps all normal compiler options intact while narrowing the check.
+// We intentionally use `extends` instead of copying compiler options out of
+// tsconfig.json. That lets TypeScript resolve the project exactly the same way
+// as a normal full-project check, while still letting us override `files`.
 
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, unlinkSync, writeFileSync } from 'fs'
 import { relative, resolve } from 'path'
-import { ason } from '../src/utils/ason.ts'
 
 function fail(message: string): never {
 	console.error(message)
@@ -19,31 +19,25 @@ function main(): void {
 	if (!arg) fail('usage: bun scripts/tsgo-file.ts <file>')
 
 	const root = resolve(import.meta.dir, '..')
-	const tsconfigPath = resolve(root, 'tsconfig.json')
 	const filePath = resolve(process.cwd(), arg)
 	if (!existsSync(filePath)) fail(`error: file not found: ${filePath}`)
 
-	const raw = readFileSync(tsconfigPath, 'utf-8')
-	const parsed = ason.parse(raw, { comments: true })
-	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-		fail(`error: ${tsconfigPath} did not parse to an object`)
+	const config = {
+		extends: './tsconfig.json',
+		// Keep the full project config, but make tsgo treat this file as the only
+		// root input. `types: ["bun"]` makes the Bun ambient globals explicit.
+		compilerOptions: {
+			types: ['bun'],
+		},
+		include: [],
+		files: [relative(root, filePath)],
 	}
 
-	// Clone the top-level config so we keep the real project options, but make
-	// tsgo treat the requested file as the only root input.
-	const config = { ...(parsed as Record<string, unknown>) }
-	config.include = []
-	config.files = [relative(root, filePath)]
-
-	// The temp config must live under the repo root. TypeScript resolves relative
-	// paths like `files`, `exclude`, and config-local references from the config
-	// file location, not from the process cwd. Writing under /tmp made `files`
-	// point at the wrong place, so tsgo silently skipped the target file.
+	// The temp config must live under the repo root because TypeScript resolves
+	// relative `extends` and `files` entries from the config file location.
 	const tempPath = resolve(root, `.tsgo-file-${process.pid}-${Date.now()}.json`)
 	writeFileSync(tempPath, JSON.stringify(config, null, 2))
 
-	// Run tsgo from the repo root so any subprocess-relative behavior matches the
-	// normal `./test` run too.
 	const proc = Bun.spawnSync(['bunx', '--bun', 'tsgo', '-p', tempPath, '--noEmit'], {
 		cwd: root,
 		stdin: 'inherit',
