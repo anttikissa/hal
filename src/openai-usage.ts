@@ -33,6 +33,13 @@ export interface AccountUsage {
 	pendingTokens: number
 }
 
+interface UsageState {
+	currentKey: string
+	lastActiveAt: string
+	updatedAt: string
+	accounts: Record<string, AccountUsage>
+}
+
 const config = {
 	// Automatic refreshes should be quiet. /status bypasses this floor.
 	minAutoRefreshMs: 60_000,
@@ -44,21 +51,29 @@ const config = {
 	progressBarWidth: 14,
 }
 
-const state = liveFiles.liveFile(CACHE_PATH, {
-	currentKey: '',
-	lastActiveAt: '',
-	updatedAt: '',
-	accounts: {} as Record<string, AccountUsage>,
-})
+const runtime = {
+	initialized: false,
+}
+
+function defaultState(): UsageState {
+	return {
+		currentKey: '',
+		lastActiveAt: '',
+		updatedAt: '',
+		accounts: {},
+	}
+}
+
+let state: UsageState = defaultState()
 
 function fix(): void {
-	if (typeof state.currentKey !== 'string') state.currentKey = ''
-	if (typeof state.lastActiveAt !== 'string') state.lastActiveAt = ''
-	if (typeof state.updatedAt !== 'string') state.updatedAt = ''
-	if (!state.accounts || typeof state.accounts !== 'object') state.accounts = {}
-	for (const [key, account] of Object.entries(state.accounts)) {
+	if (typeof openaiUsage.state.currentKey !== 'string') openaiUsage.state.currentKey = ''
+	if (typeof openaiUsage.state.lastActiveAt !== 'string') openaiUsage.state.lastActiveAt = ''
+	if (typeof openaiUsage.state.updatedAt !== 'string') openaiUsage.state.updatedAt = ''
+	if (!openaiUsage.state.accounts || typeof openaiUsage.state.accounts !== 'object') openaiUsage.state.accounts = {}
+	for (const [key, account] of Object.entries(openaiUsage.state.accounts)) {
 		if (!account || typeof account !== 'object') {
-			delete state.accounts[key]
+			delete openaiUsage.state.accounts[key]
 			continue
 		}
 		if (typeof account.key !== 'string') account.key = key
@@ -66,16 +81,23 @@ function fix(): void {
 	}
 }
 
-fix()
+function init(): void {
+	if (runtime.initialized) return
+	runtime.initialized = true
+	openaiUsage.state = liveFiles.liveFile(CACHE_PATH, defaultState()) as UsageState
+	fix()
+}
 
 function save(): void {
+	openaiUsage.init()
 	fix()
-	state.updatedAt = new Date().toISOString()
-	liveFiles.save(state)
+	openaiUsage.state.updatedAt = new Date().toISOString()
+	liveFiles.save(openaiUsage.state)
 }
 
 function onChange(cb: () => void): void {
-	liveFiles.onChange(state, () => {
+	openaiUsage.init()
+	liveFiles.onChange(openaiUsage.state, () => {
 		fix()
 		cb()
 	})
@@ -112,27 +134,31 @@ function parsePayload(credential: Credential, raw: any): AccountUsage {
 }
 
 function current(): AccountUsage | null {
+	openaiUsage.init()
 	fix()
-	return state.currentKey ? state.accounts[state.currentKey] ?? null : null
+	return openaiUsage.state.currentKey ? openaiUsage.state.accounts[openaiUsage.state.currentKey] ?? null : null
 }
 
 function all(): AccountUsage[] {
+	openaiUsage.init()
 	fix()
-	return Object.values(state.accounts).sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+	return Object.values(openaiUsage.state.accounts).sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
 }
 
 function setCurrentCredential(credential: Credential | undefined): void {
+	openaiUsage.init()
 	if (!credential || credential.type !== 'token') return
 	const key = keyOf(credential)
-	if (state.currentKey === key) return
-	state.currentKey = key
+	if (openaiUsage.state.currentKey === key) return
+	openaiUsage.state.currentKey = key
 	save()
 }
 
 function noteActivity(now = Date.now()): void {
-	const last = state.lastActiveAt ? Date.parse(state.lastActiveAt) : 0
+	openaiUsage.init()
+	const last = openaiUsage.state.lastActiveAt ? Date.parse(openaiUsage.state.lastActiveAt) : 0
 	if (last && now - last < config.activityWriteThrottleMs) return
-	state.lastActiveAt = new Date(now).toISOString()
+	openaiUsage.state.lastActiveAt = new Date(now).toISOString()
 	save()
 }
 
@@ -147,7 +173,6 @@ function formatResetAt(resetAt: number, now = new Date()): string {
 	return `${time} on ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`
 }
 
-
 function displayAccount(account: AccountUsage): string {
 	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
 	const who = subscriptionUsage.config.censorEmails && account.email ? subscriptionUsage.censorEmail(account.email) : raw
@@ -157,7 +182,7 @@ function displayAccount(account: AccountUsage): string {
 
 function displaySlot(account: AccountUsage): string {
 	const slot = account.index != null && account.total ? `${account.index + 1}/${account.total}` : '-'
-	return state.currentKey === account.key ? `${slot} *` : slot
+	return openaiUsage.state.currentKey === account.key ? `${slot} *` : slot
 }
 
 function usageBar(usedPercent: number): string {
@@ -211,25 +236,28 @@ async function fetchUsage(credential: Credential): Promise<AccountUsage> {
 }
 
 async function refreshCredential(credential: Credential, force = false): Promise<AccountUsage> {
+	openaiUsage.init()
 	const key = keyOf(credential)
-	const existing = state.accounts[key]
+	const existing = openaiUsage.state.accounts[key]
 	const lastFetch = existing?.fetchedAt ? Date.parse(existing.fetchedAt) : 0
 	if (!force && existing && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing
-	state.accounts[key] = await fetchUsage(credential)
-	if (!state.currentKey) state.currentKey = key
+	openaiUsage.state.accounts[key] = await fetchUsage(credential)
+	if (!openaiUsage.state.currentKey) openaiUsage.state.currentKey = key
 	save()
-	return state.accounts[key]!
+	return openaiUsage.state.accounts[key]!
 }
 
 async function refreshAll(force = false): Promise<AccountUsage[]> {
+	openaiUsage.init()
 	for (const credential of credentials()) await refreshCredential(credential, force)
 	return all()
 }
 
 function recordUsage(credential: Credential | undefined, usage: { input: number; output: number } | undefined): void {
+	openaiUsage.init()
 	if (!credential || credential.type !== 'token' || !usage) return
 	const key = keyOf(credential)
-	const account = state.accounts[key] ?? {
+	const account = openaiUsage.state.accounts[key] ?? {
 		key,
 		email: credential.email,
 		index: credential.index,
@@ -237,19 +265,20 @@ function recordUsage(credential: Credential | undefined, usage: { input: number;
 		pendingTokens: 0,
 	}
 	account.pendingTokens += (usage.input ?? 0) + (usage.output ?? 0)
-	state.accounts[key] = account
+	openaiUsage.state.accounts[key] = account
 	save()
 	void maybeRefreshCurrent()
 }
 
 async function maybeRefreshCurrent(): Promise<void> {
-	if (!ipc.ownsHostLock() || !state.currentKey) return
-	const credential = credentials().find((item) => keyOf(item) === state.currentKey)
+	openaiUsage.init()
+	if (!ipc.ownsHostLock() || !openaiUsage.state.currentKey) return
+	const credential = credentials().find((item) => keyOf(item) === openaiUsage.state.currentKey)
 	if (!credential) return
-	const account = state.accounts[state.currentKey] ?? null
+	const account = openaiUsage.state.accounts[openaiUsage.state.currentKey] ?? null
 	const now = Date.now()
 	const lastFetch = account?.fetchedAt ? Date.parse(account.fetchedAt) : 0
-	const lastActive = state.lastActiveAt ? Date.parse(state.lastActiveAt) : 0
+	const lastActive = openaiUsage.state.lastActiveAt ? Date.parse(openaiUsage.state.lastActiveAt) : 0
 	const byTokens = !!account && account.pendingTokens >= config.tokenRefreshThreshold && (!lastFetch || now - lastFetch >= config.minAutoRefreshMs)
 	const byActivity = !account?.fetchedAt || !Number.isFinite(lastFetch)
 		? true
@@ -263,6 +292,7 @@ async function maybeRefreshCurrent(): Promise<void> {
 let timer: ReturnType<typeof setInterval> | null = null
 
 function start(signal?: AbortSignal): void {
+	openaiUsage.init()
 	if (timer) return
 	const credential = auth.getCredential('openai')
 	if (credential?.type === 'token') setCurrentCredential(credential)
@@ -278,6 +308,7 @@ function start(signal?: AbortSignal): void {
 }
 
 async function renderStatus(force = true): Promise<string> {
+	openaiUsage.init()
 	if (credentials().length === 0) return 'No OpenAI ChatGPT subscriptions configured.'
 	try {
 		await refreshAll(force)
@@ -290,7 +321,9 @@ async function renderStatus(force = true): Promise<string> {
 
 export const openaiUsage = {
 	config,
+	runtime,
 	state,
+	init,
 	onChange,
 	save,
 	all,

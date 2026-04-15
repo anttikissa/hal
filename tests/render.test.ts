@@ -7,6 +7,8 @@ import { popup } from '../src/client/popup.ts'
 import { helpBar } from '../src/cli/help-bar.ts'
 import { openaiUsage } from '../src/openai-usage.ts'
 import { version } from '../src/version.ts'
+
+openaiUsage.init()
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }

@@ -13,6 +13,7 @@ import { log } from './utils/log.ts'
 import { config } from './config.ts'
 import { builtins } from './tools/builtins.ts'
 import { colors } from './cli/colors.ts'
+import { openaiUsage } from './openai-usage.ts'
 
 ensureStateDir()
 perf.mark('State directories exist')
@@ -20,6 +21,8 @@ config.init()
 perf.mark('Config initialized')
 colors.init()
 perf.mark('Colors initialized')
+openaiUsage.init()
+perf.mark('OpenAI usage initialized')
 builtins.init()
 perf.mark('Built-in tools registered')
 
