@@ -137,6 +137,12 @@ describe('render', () => {
 		expect(clean).not.toContain('lock:')
 	})
 
+	test('status line shows custom session name next to the id', () => {
+		client.currentTab()!.name = 'Pause Fix'
+		const clean = stripAnsi(captureOutput(() => render.draw()))
+		expect(clean).toContain('test (Pause Fix)')
+	})
+
 	test('client status line shows a host mismatch badge next to the server pid', () => {
 		client.state.role = 'client'
 		client.state.pid = 111

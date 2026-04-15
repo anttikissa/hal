@@ -296,9 +296,13 @@ function renderStatusLine(lines: string[]): void {
 	const parts: string[] = []
 
 	if (tab) {
-		// 0. Session ID plus process identity. Clients also show the current host PID,
-		// and a short mismatch marker when their local code differs from the host.
-		const sessionLabel = tab.forkedFrom ? `${tab.sessionId} ← ${tab.forkedFrom}` : tab.sessionId
+		// 0. Session identity. Show the stable session id first, and append an
+		// explicit custom name in parentheses so renamed tabs are still easy to
+		// match against commands, logs, and other session-id-based references.
+		const customName = tab.name && tab.name !== tab.sessionId && !/^tab \d+$/i.test(tab.name) ? ` (${tab.name})` : ''
+		const sessionLabel = tab.forkedFrom
+			? `${tab.sessionId}${customName} ← ${tab.forkedFrom}`
+			: `${tab.sessionId}${customName}`
 		parts.push(sessionLabel)
 		if (client.state.role === 'client') {
 			parts.push(`client:${client.state.pid}`)
