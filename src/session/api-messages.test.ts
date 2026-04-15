@@ -103,3 +103,34 @@ test('toProviderMessages merges assistant chunks split by ui info', () => {
 	])
 })
 
+test('toProviderMessages starts after the last reset marker', () => {
+	const ts = '2026-04-15T00:00:00.000Z'
+	const entries: any[] = [
+		{ type: 'user', parts: [{ type: 'text', text: 'old prompt' }], ts },
+		{ type: 'assistant', text: 'old answer', ts },
+		{ type: 'reset', ts },
+		{ type: 'user', parts: [{ type: 'text', text: '[system] Session was reset. Previous conversation: history.asonl' }], ts },
+		{ type: 'user', parts: [{ type: 'text', text: 'fresh prompt' }], ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[15 Apr 00:00]\n[system] Session was reset. Previous conversation: history.asonl' },
+		{ role: 'user', content: '[15 Apr 00:00]\nfresh prompt' },
+	])
+})
+
+test('toProviderMessages starts after the last compact marker', () => {
+	const ts = '2026-04-15T00:00:00.000Z'
+	const entries: any[] = [
+		{ type: 'user', parts: [{ type: 'text', text: 'old prompt' }], ts },
+		{ type: 'assistant', text: 'old answer', ts },
+		{ type: 'compact', ts },
+		{ type: 'user', parts: [{ type: 'text', text: '[system] Session was manually compacted. Previous conversation: history.asonl' }], ts },
+		{ type: 'user', parts: [{ type: 'text', text: 'Context was compacted to avoid exceeding the token limit. Verify before assuming.' }], ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[15 Apr 00:00]\n[system] Session was manually compacted. Previous conversation: history.asonl' },
+		{ role: 'user', content: '[15 Apr 00:00]\nContext was compacted to avoid exceeding the token limit. Verify before assuming.' },
+	])
+})

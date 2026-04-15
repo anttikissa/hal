@@ -382,11 +382,12 @@ handlers['model'] = (args, session, emitInfo) => {
 	return { output: `Model set to ${display} (${newModel})`, handled: true }
 }
 
-// /clear — clear session history
+// /clear — rotate to a fresh log and reset replay context
 handlers['clear'] = (_args, session) => {
-	// Emit a clear-history event for the runtime to handle.
-	// The actual history clearing happens in the runtime glue (Plan 3 will
-	// implement log rotation). For now, just signal it.
+	ipc.appendCommand({
+		type: 'reset',
+		sessionId: session.id,
+	})
 	return { output: 'Conversation cleared.', handled: true }
 }
 

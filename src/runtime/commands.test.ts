@@ -182,6 +182,21 @@ test('/mem shows current rss and thresholds', async () => {
 })
 
 
+test('/clear queues a reset command', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const result = await commands.executeCommand('/clear', makeSession(), () => {})
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toBe('Conversation cleared.')
+	expect(appended).toEqual([{ type: 'reset', sessionId: '04-aaa' }])
+})
+
+
 test('/open resolves a tab number and queues placement after it', async () => {
 	const appended: any[] = []
 	ipc.appendCommand = (command) => {

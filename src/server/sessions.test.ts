@@ -239,3 +239,24 @@ test('compact-style rotation preserves forked_from entry', async () => {
 	const texts = allMsgs.map((m) => entryText(m)).filter(Boolean)
 	expect(texts.some((text) => text.includes('parent msg'))).toBe(true)
 })
+
+
+test('reset-style rotation preserves forked_from entry and writes a reset marker', async () => {
+	const parentId = await makeSession()
+	const childId = await makeSession()
+	const nowTs = new Date().toISOString()
+
+	await sessions.appendHistory(childId, [{ type: 'forked_from', parent: parentId, ts: nowTs }])
+	await sessions.appendHistory(childId, [userEntry('old prompt', nowTs)])
+
+	await sessions.rotateLog(childId)
+	await sessions.appendHistory(childId, [
+		{ type: 'forked_from', parent: parentId, ts: nowTs },
+		{ type: 'reset', ts: nowTs },
+		userEntry('[system] Session was reset. Previous conversation: history.asonl', nowTs),
+	])
+
+	const newMsgs = sessions.loadHistory(childId)
+	expect(newMsgs[0]).toEqual({ type: 'forked_from', parent: parentId, ts: nowTs })
+	expect(newMsgs[1]).toEqual({ type: 'reset', ts: nowTs })
+})

@@ -23,6 +23,7 @@ import { attachments } from '../session/attachments.ts'
 import { replay } from '../session/replay.ts'
 import { openaiUsage } from '../openai-usage.ts'
 
+import { toolRegistry } from '../tools/tool.ts'
 // ── Session state ──
 
 interface Session {
@@ -444,6 +445,48 @@ async function runGeneration(session: Session, text: string, source?: string): P
 	}
 }
 
+// ── Reset / compaction context refresh ───────────────────────────────────────
+
+function publishContextEstimate(session: Session): void {
+	const model = session.model ?? models.defaultModel()
+	const promptResult = context.buildSystemPrompt({
+		model,
+		cwd: session.cwd,
+		sessionId: session.id,
+	})
+	const overheadBytes = promptResult.text.length + JSON.stringify(toolRegistry.toToolDefs()).length
+	const messages = apiMessages.toProviderMessages(session.id)
+	const est = context.estimateContext(messages, model, overheadBytes)
+	void sessionStore.updateMeta(session.id, { context: { used: est.used, max: est.max } })
+	ipc.appendEvent({
+		type: 'status',
+		sessionId: session.id,
+		contextUsed: est.used,
+		contextMax: est.max,
+		createdAt: new Date().toISOString(),
+	})
+}
+
+async function runReset(session: Session): Promise<void> {
+	if (!ipc.ownsHostLock()) return
+	if (agentLoop.isActive(session.id)) {
+		emitInfo(session.id, 'Session is busy')
+		return
+	}
+
+	const entries = sessionStore.loadHistory(session.id)
+	const oldLog = sessionStore.loadSessionMeta(session.id)?.currentLog ?? 'history.asonl'
+	await sessionStore.rotateLog(session.id)
+	const forkEntry = entries[0]?.type === 'forked_from' ? [entries[0]] : []
+	const ts = new Date().toISOString()
+	await sessionStore.appendHistory(session.id, [
+		...forkEntry,
+		{ type: 'reset', ts },
+		{ type: 'user', parts: [{ type: 'text', text: `[system] Session was reset. Previous conversation: ${oldLog}` }], ts },
+	])
+	publishContextEstimate(session)
+	emitInfo(session.id, 'Conversation cleared.')
+}
 // ── Compaction ──
 
 async function runCompact(session: Session): Promise<void> {
@@ -468,10 +511,12 @@ async function runCompact(session: Session): Promise<void> {
 
 	await sessionStore.appendHistory(session.id, [
 		...forkEntry,
+		{ type: 'compact', ts },
 		{ type: 'user', parts: [{ type: 'text', text: `[system] Session was manually compacted. Previous conversation: ${oldLog}` }], ts },
 		{ type: 'user', parts: [{ type: 'text', text: contextText }], ts },
 	])
 
+	publishContextEstimate(session)
 	emitInfo(session.id, `Context compacted (${userMsgs.length} user messages summarized, now writing to ${newLog})`)
 }
 
@@ -519,6 +564,12 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 			if (!sessionId) return
 			const aborted = agentLoop.abort(sessionId)
 			if (!aborted) emitInfo(sessionId, 'No active generation to abort')
+			break
+		}
+
+		case 'reset': {
+			if (!session) return
+			await runReset(session)
 			break
 		}
 
