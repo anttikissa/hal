@@ -433,9 +433,15 @@ function handleAppKey(k: KeyEvent): boolean {
 		client.sendCommand('abort')
 		return true
 	}
-	// Enter: submit (blocked while image paste is resolving)
+	// Enter: continue a paused/error turn when the prompt is empty.
+	// Otherwise submit the current prompt (blocked while image paste resolves).
 	if (k.key === 'enter' && !k.shift) {
 		if (clipboard.hasPendingPastes()) return true
+		if (!prompt.text().trim() && client.canContinueCurrentTurn()) {
+			client.sendCommand('continue')
+			draw()
+			return true
+		}
 		submit()
 		draw()
 		return true

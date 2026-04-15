@@ -61,6 +61,43 @@ test('thinking block renders markdown and trims trailing blank lines', () => {
 })
 
 
+test('assistant header includes display model', () => {
+	const block: Block = {
+		type: 'assistant',
+		text: 'hello',
+		model: 'gpt-5.4',
+	}
+
+	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	expect(header).toContain('Hal (GPT 5.4)')
+})
+
+
+test('thinking header includes model and default thinking level', () => {
+	const block: Block = {
+		type: 'thinking',
+		text: 'hmm',
+		model: 'gpt-5.4',
+	}
+
+	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	expect(header).toContain('Hal (GPT 5.4, thinking high)')
+})
+
+
+test('historyToBlocks carries model changes into later assistant and thinking blocks', () => {
+	const history: any[] = [
+		{ type: 'session', action: 'model', new: 'openai/gpt-5.4', ts: '2026-04-15T14:54:00.000Z' },
+		{ type: 'thinking', text: 'hmm', ts: '2026-04-15T14:54:01.000Z' },
+		{ type: 'assistant', text: 'done', ts: '2026-04-15T14:54:02.000Z' },
+	]
+
+	const rendered = blocks.historyToBlocks(history as any, 's1')
+	expect(rendered[0]).toMatchObject({ type: 'thinking', model: 'openai/gpt-5.4', thinkingEffort: 'high' })
+	expect(rendered[1]).toMatchObject({ type: 'assistant', model: 'openai/gpt-5.4' })
+})
+
+
 test('info block renders markdown tables', () => {
 	const block: Block = {
 		type: 'info',

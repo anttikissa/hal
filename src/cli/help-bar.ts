@@ -7,7 +7,7 @@
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type HelpState = 'idle-empty' | 'idle-text' | 'streaming'
+type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'streaming'
 
 interface Hint {
 	text: string
@@ -45,6 +45,7 @@ const HINTS: Record<HelpState, Hint[]> = {
 		{ text: 'shift-enter newline', keys: ['shift-enter'] },
 		{ text: 'tab complete', keys: ['tab'] },
 	],
+	'idle-continue': [{ text: 'enter continue', keys: ['enter'] }],
 	streaming: [{ text: 'esc stop', keys: ['escape'] }],
 }
 
@@ -63,15 +64,16 @@ function reset(): void {
 	for (const key of Object.keys(usageCounts)) delete usageCounts[key]
 }
 
-function deriveState(busy: boolean, hasText: boolean): HelpState {
+function deriveState(busy: boolean, hasText: boolean, canContinue = false): HelpState {
 	if (busy) return 'streaming'
 	if (hasText) return 'idle-text'
+	if (canContinue) return 'idle-continue'
 	return 'idle-empty'
 }
 
 // Build the help bar string. Returns empty string if all hints are learned.
-function build(busy: boolean, hasText: boolean): string {
-	const st = deriveState(busy, hasText)
+function build(busy: boolean, hasText: boolean, canContinue = false): string {
+	const st = deriveState(busy, hasText, canContinue)
 	const visible = HINTS[st].filter((h) => !isLearned(h))
 	if (visible.length === 0) return ''
 	return visible.map((h) => h.text).join(' \u2502 ')

@@ -1,7 +1,28 @@
 # ASON — A Saner Object Notation
 
-ASON is a superset of JSON, JSONC, and JSON5 designed for human-readable config and
-state files. Any valid JSON, JSONC, or JSON5 file is valid ASON.
+ASON is a superset of JSON designed for human-readable config and state files. Basically any JS
+object literal should be valid ASON.
+
+```
+{
+	format: 'ason',
+	features: [
+		"strings", 'of many kinds', `including
+backtick strings`,
+		'unquoted keys', 'trailing commas',],
+	numberFormats: [
+		42, 3.14, .82, 1., -.5, +1, 0xFF, 1e10, Infinity, -Infinity, NaN
+	],
+	comments: {
+		/* block comments /*
+		like: 'the one above',
+		// and inline comments
+		are: 'just fine',
+	}
+}
+```
+
+
 ## Design goal
 
 ASON should be **as JavaScript-compatible as practical** while staying simple to read,

@@ -34,7 +34,7 @@ function userContentText(entry: Extract<HistoryEntry, { type: 'user' }>): string
 		.map((part) => {
 			if (part.type === 'text') return part.text
 			const file = part.originalFile ?? part.blobId ?? ''
-			return file ? `[image ${file}]` : '[image]'
+			return file ? `[${file}]` : '[image]'
 		})
 		.join('')
 }

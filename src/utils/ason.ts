@@ -1,4 +1,5 @@
 // ASON — A Saner Object Notation
+//
 // Goal: be as JavaScript-compatible as practical while staying easy to read
 // and stream. That means JS-like numbers (`.5`, `1e10`, `Infinity`,
 // `undefined`), JS-like strings (single, double, backtick), and JS-like

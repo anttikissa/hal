@@ -227,6 +227,16 @@ test('mdTable: empty after filtering', () => {
 	expect(md.mdTable(['| --- | --- |'], 80)).toEqual([])
 })
 
+
+test('mdTable: explicit <br> creates multiple lines inside a cell', () => {
+	const lines = ['| name | usage |', '|---|---|', '| alpha | [████▌░░]<br>68% used |']
+	const result = md.mdTable(lines, 80)
+	const plain = result.map(strip)
+
+	expect(plain).toContain('│ alpha │ [████▌░░] │')
+	expect(plain).toContain('│       │ 68% used  │')
+})
+
 // ── resolveMarkers ───────────────────────────────────────────────────────────
 
 test('resolveMarkers: single line, no wrapping', () => {

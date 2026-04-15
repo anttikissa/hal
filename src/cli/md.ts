@@ -171,18 +171,19 @@ function visPad(s: string, targetWidth: number): string {
 function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 	// Parse: strip outer pipes, split by |, trim each cell.
 	// Filter out separator rows (|---|---|).
+	// Cells may contain <br> to force a line break inside a single table cell.
 	const rawRows = lines
 		.filter((l) => !/^\|[\s\-:|]+\|$/.test(l.trim()))
 		.map((l) =>
 			l
 				.replace(/^\||\|$/g, '')
 				.split('|')
-				.map((c) => c.trim()),
+				.map((c) => c.trim().split(/<br\s*\/?>/i)),
 		)
 	if (!rawRows.length) return []
 
-	// Apply inline markdown to each cell.
-	const rendered = rawRows.map((row) => row.map((cell) => mdInline(cell, colors)))
+	// Apply inline markdown to each physical line inside each cell.
+	const rendered = rawRows.map((row) => row.map((cell) => cell.map((line) => mdInline(line, colors))))
 
 	const numCols = Math.max(...rendered.map((r) => r.length))
 	if (numCols === 0) return []
@@ -191,9 +192,11 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 	const borderOverhead = 3 * numCols + 1
 	const availableForCells = width - borderOverhead
 
-	// Natural width = what each column wants (max cell visLen)
+	// Natural width = what each column wants (max visible line in any cell).
 	const naturalWidths = Array.from({ length: numCols }, (_, i) =>
-		Math.max(...rendered.map((r) => visLen(r[i] ?? ''))),
+		Math.max(
+			...rendered.map((r) => Math.max(...(r[i] ?? ['']).map((line) => visLen(line)))),
+		),
 	)
 
 	// Compute final column widths. If everything fits, use natural widths.
@@ -228,9 +231,13 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 	// ── Wrap cells that exceed their column width ────────────────────────
 	// Each cell becomes string[] (one entry per visual line).
 	// resolveMarkers() here so styles don't leak into border chars.
-	function wrapCell(text: string, colWidth: number): string[] {
-		if (visLen(text) <= colWidth) return resolveMarkers([text])
-		return resolveMarkers(wordWrap(text, colWidth))
+	function wrapCell(lines: string[], colWidth: number): string[] {
+		const out: string[] = []
+		for (const line of lines.length > 0 ? lines : ['']) {
+			if (visLen(line) <= colWidth) out.push(...resolveMarkers([line]))
+			else out.push(...resolveMarkers(wordWrap(line, colWidth)))
+		}
+		return out.length > 0 ? out : ['']
 	}
 
 	// ── Build output with box-drawing borders ────────────────────────────
@@ -242,8 +249,8 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 
 	for (let rowIdx = 0; rowIdx < rendered.length; rowIdx++) {
 		const row = rendered[rowIdx]!
-		// Wrap each cell into lines
-		const cellLines = Array.from({ length: numCols }, (_, ci) => wrapCell(row[ci] ?? '', colWidths[ci]!))
+		// Wrap each cell into lines, preserving explicit <br> breaks.
+		const cellLines = Array.from({ length: numCols }, (_, ci) => wrapCell(row[ci] ?? [''], colWidths[ci]!))
 		const rowHeight = Math.max(...cellLines.map((cl) => cl.length))
 
 		// Emit each visual line of this row

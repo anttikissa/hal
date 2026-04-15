@@ -93,7 +93,19 @@ function markdownSourceText(block: Exclude<Block, { type: 'tool' }>): string {
 export type Block =
 	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean; renderVersion?: number }
 	| { type: 'assistant'; text: string; model?: string; id?: string; continue?: string; ts?: number; streaming?: boolean; dimmed?: boolean; renderVersion?: number }
-	| { type: 'thinking'; text: string; blobId?: string; blobLoaded?: boolean; sessionId?: string; ts?: number; streaming?: boolean; dimmed?: boolean; renderVersion?: number }
+	| {
+			type: 'thinking'
+			text: string
+			model?: string
+			thinkingEffort?: string
+			blobId?: string
+			blobLoaded?: boolean
+			sessionId?: string
+			ts?: number
+			streaming?: boolean
+			dimmed?: boolean
+			renderVersion?: number
+	  }
 	| {
 			type: 'tool'
 			name: string
@@ -145,11 +157,16 @@ function userText(entry: Extract<HistoryEntry, { type: 'user' }>): string {
 	return parts.join('')
 }
 
-function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntryCount = 0, parentId?: string): Block[] {
+function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntryCount = 0, parentId?: string, initialModel?: string): Block[] {
 	const result: Block[] = []
+	let currentModel = initialModel
 
 	for (let i = 0; i < history.length; i++) {
 		const entry = history[i]!
+		if (entry.type === 'session') {
+			currentModel = entry.new ?? entry.model ?? currentModel
+			continue
+		}
 		const dimmed = i < parentEntryCount ? true : undefined
 		// Blobs for parent entries live in the parent session's directory
 		const blobOwner = (i < parentEntryCount && parentId) ? parentId : sessionId
@@ -171,9 +188,12 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 		}
 
 		if (entry.type === 'thinking') {
+			const model = entry.model ?? currentModel
 			result.push({
 				type: 'thinking',
 				text: entry.text ?? '',
+				model,
+				thinkingEffort: entry.thinkingEffort ?? models.reasoningEffort(model),
 				blobId: entry.blobId,
 				sessionId: blobOwner,
 				ts: parseTs(entry.ts),
@@ -197,10 +217,11 @@ function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntry
 		}
 
 		if (entry.type === 'assistant') {
+			const model = entry.model ?? currentModel
 			result.push({
 				type: 'assistant',
 				text: entry.text,
-				model: entry.model,
+				model,
 				id: entry.id,
 				continue: entry.continue,
 				ts: parseTs(entry.ts),
@@ -587,8 +608,13 @@ function blockLabel(block: Block): string {
 			const display = models.displayModel(block.model)
 			return display ? `Hal (${display})` : 'Hal'
 		}
-		case 'thinking':
+		case 'thinking': {
+			const display = models.displayModel(block.model)
+			const effort = block.thinkingEffort ?? models.reasoningEffort(block.model)
+			if (display && effort) return `Hal (${display}, thinking ${effort})`
+			if (display) return `Hal (${display}, thinking)`
 			return 'Thinking'
+		}
 		case 'tool':
 			return toolTitle(block.name, block.input)
 		case 'info':
