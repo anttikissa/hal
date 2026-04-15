@@ -22,7 +22,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	}
 }
 
-toolRegistry.registerTool({
+const sendTool = {
 	name: 'send',
 	description:
 		"Send a message to another session's inbox. The message will be processed as a prompt (if idle) or queued (if busy).",
@@ -32,6 +32,10 @@ toolRegistry.registerTool({
 	},
 	required: ['sessionId', 'text'],
 	execute,
-})
+}
 
-export const send = { execute }
+function init(): void {
+	toolRegistry.registerTool(sendTool)
+}
+
+export const send = { execute, init }

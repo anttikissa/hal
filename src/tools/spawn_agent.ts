@@ -32,7 +32,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return `Queued subagent spawn from ${ctx.sessionId}`
 }
 
-toolRegistry.registerTool({
+const spawnAgentTool = {
 	name: 'spawn_agent',
 	description:
 		'Spawn a background subagent tab. It can either fork the current session or start fresh, optionally override model/cwd/title, and can auto-close after sending a handoff.',
@@ -46,6 +46,10 @@ toolRegistry.registerTool({
 	},
 	required: ['task'],
 	execute,
-})
+}
 
-export const spawnAgent = { execute }
+function init(): void {
+	toolRegistry.registerTool(spawnAgentTool)
+}
+
+export const spawnAgent = { execute, init }

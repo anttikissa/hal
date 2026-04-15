@@ -11,11 +11,14 @@ import { version } from './version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
 import { config } from './config.ts'
+import { builtins } from './tools/builtins.ts'
 
 ensureStateDir()
 perf.mark('State directories exist')
 config.init()
 perf.mark('Config initialized')
+builtins.init()
+perf.mark('Built-in tools registered')
 
 ipc.cleanupStaleLock()
 let isHost = ipc.claimHost()

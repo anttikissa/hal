@@ -69,7 +69,7 @@ async function execute(input: any, _ctx: ToolContext): Promise<string> {
 	return parts.join('\n\n')
 }
 
-toolRegistry.registerTool({
+const googleTool = {
 	name: 'google',
 	description: 'Google a query using Serper. Returns titles, URLs, and snippets.',
 	parameters: {
@@ -78,6 +78,10 @@ toolRegistry.registerTool({
 	},
 	required: ['query'],
 	execute,
-})
+}
 
-export const google = { execute }
+function init(): void {
+	toolRegistry.registerTool(googleTool)
+}
+
+export const google = { execute, init }

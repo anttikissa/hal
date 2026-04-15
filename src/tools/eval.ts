@@ -91,7 +91,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	}
 }
 
-toolRegistry.registerTool({
+const evalToolDef = {
 	name: 'eval',
 	description:
 		'Execute TypeScript in the Hal process. Has access to runtime internals via ctx (sessionId, cwd, halDir, stateDir). Use `return` to return a value. Use standard `import` for module access.',
@@ -103,6 +103,10 @@ toolRegistry.registerTool({
 	},
 	required: ['code'],
 	execute,
-})
+}
 
-export const evalTool = { config, execute }
+function init(): void {
+	toolRegistry.registerTool(evalToolDef)
+}
+
+export const evalTool = { config, execute, init }

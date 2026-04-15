@@ -229,7 +229,7 @@ async function execute(input: any, _ctx: ToolContext): Promise<string> {
 	}, null, 2)
 }
 
-toolRegistry.registerTool({
+const analyzeHistoryTool = {
 	name: 'analyze_history',
 	description: 'Analyze past sessions and estimate prompt-cache cost for different pruning strategies.',
 	parameters: {
@@ -242,6 +242,10 @@ toolRegistry.registerTool({
 		cachedInputPrice: { type: 'number', description: 'Cached input price in USD per 1M tokens' },
 	},
 	execute,
-})
+}
 
-export const analyzeHistory = { analyzeSnapshots, execute }
+function init(): void {
+	toolRegistry.registerTool(analyzeHistoryTool)
+}
+
+export const analyzeHistory = { analyzeSnapshots, execute, init }

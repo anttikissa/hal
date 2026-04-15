@@ -1,11 +1,12 @@
 import { afterEach, expect, test } from 'bun:test'
 import { closeSync, existsSync, mkdirSync, openSync, rmSync, truncateSync } from 'fs'
 import { join } from 'path'
-import './read.ts'
 import { hashline } from './hashline.ts'
 import { toolRegistry } from './tool.ts'
+import { builtins } from './builtins.ts'
 import { read } from './read.ts'
 
+builtins.init()
 const TEST_DIR = '/tmp/hal-test-read'
 
 afterEach(() => {

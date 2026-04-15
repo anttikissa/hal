@@ -113,7 +113,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 // ── Registration ──
 
-toolRegistry.registerTool({
+const bashTool = {
 	name: 'bash',
 	description: 'Run a bash command. Output is captured and returned.',
 	parameters: {
@@ -122,6 +122,10 @@ toolRegistry.registerTool({
 	},
 	required: ['command'],
 	execute,
-})
+}
 
-export const bash = { config, killProcessTree, execute }
+function init(): void {
+	toolRegistry.registerTool(bashTool)
+}
+
+export const bash = { config, killProcessTree, execute, init }

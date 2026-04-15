@@ -1,9 +1,10 @@
 import { expect, test } from 'bun:test'
 import { toolRegistry } from './tool.ts'
 import type { Message } from '../protocol.ts'
-import './analyze_history.ts'
+import { builtins } from './builtins.ts'
 import { analyzeHistory } from './analyze_history.ts'
 
+builtins.init()
 test('registers the analyze_history tool', () => {
 	expect(toolRegistry.getTool('analyze_history')?.name).toBe('analyze_history')
 })

@@ -152,7 +152,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return truncateUtf8(result, MAX_OUTPUT_BYTES)
 }
 
-toolRegistry.registerTool({
+const readTool = {
 	name: 'read',
 	description: 'Read a file with line numbers. Use optional start/end for a line range.',
 	parameters: {
@@ -162,7 +162,11 @@ toolRegistry.registerTool({
 	},
 	required: ['path'],
 	execute,
-})
+}
+
+function init(): void {
+	toolRegistry.registerTool(readTool)
+}
 
 /**
  * Resolve a path string that may contain space-separated multiple paths.
@@ -194,4 +198,4 @@ function resolvePaths(raw: string | undefined, cwd: string): string[] {
 	return allExist ? resolved : [single]
 }
 
-export const read = { resolvePath, resolvePaths, execute }
+export const read = { resolvePath, resolvePaths, execute, init }

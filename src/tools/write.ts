@@ -52,7 +52,7 @@ async function executeWrite(input: any, ctx: ToolContext): Promise<string> {
 	})
 }
 
-toolRegistry.registerTool({
+const writeTool = {
 	name: 'write',
 	description: 'Create or overwrite a file with the given content.',
 	parameters: {
@@ -61,7 +61,7 @@ toolRegistry.registerTool({
 	},
 	required: ['path', 'content'],
 	execute: executeWrite,
-})
+}
 
 // ── Edit tool ──
 
@@ -145,7 +145,7 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 	})
 }
 
-toolRegistry.registerTool({
+const editTool = {
 	name: 'edit',
 	description: `Edit a file using hashline refs from read. Hashes are verified; mismatch = re-read needed.
 - replace: replace start_ref..end_ref (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
@@ -161,6 +161,11 @@ new_content is raw file content — no hashline prefixes. A trailing newline in 
 	},
 	required: ['path', 'operation', 'new_content'],
 	execute: executeEdit,
-})
+}
 
-export const write = { executeWrite, executeEdit }
+function init(): void {
+	toolRegistry.registerTool(writeTool)
+	toolRegistry.registerTool(editTool)
+}
+
+export const write = { executeWrite, executeEdit, init }

@@ -1,8 +1,7 @@
 // Tool registry — defines tool interface, registration, dispatch.
 //
-// Every tool module registers itself on import by calling registerTool().
-// The agent loop calls toToolDefs() to get provider-format definitions,
-// and dispatch() to execute tool calls by name.
+// Tool modules are pure on import. They expose init() hooks, and a bootstrap
+// module decides when to register them with the shared registry.
 
 import type { ToolDef } from '../protocol.ts'
 
@@ -41,6 +40,10 @@ function allTools(): Tool[] {
 	return [...registry.values()]
 }
 
+function clearForTests(): void {
+	registry.clear()
+}
+
 /** Convert all registered tools to the provider API format (Anthropic tool_use schema). */
 function toToolDefs(): ToolDef[] {
 	return allTools().map((t) => ({
@@ -65,4 +68,4 @@ async function dispatch(name: string, input: any, context: ToolContext): Promise
 	}
 }
 
-export const toolRegistry = { registerTool, getTool, allTools, toToolDefs, dispatch }
+export const toolRegistry = { registerTool, getTool, allTools, toToolDefs, dispatch, clearForTests }

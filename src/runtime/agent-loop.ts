@@ -18,19 +18,7 @@ import { toolRegistry } from '../tools/tool.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
-// Import all tool modules so they self-register on load
-import '../tools/bash.ts'
-import '../tools/read.ts'
-import '../tools/read_blob.ts'
-import '../tools/grep.ts'
-import '../tools/glob.ts'
-import '../tools/write.ts'
-import '../tools/eval.ts'
-import '../tools/send.ts'
-import '../tools/google.ts'
-import '../tools/read_url.ts'
-import '../tools/analyze_history.ts'
-import '../tools/spawn_agent.ts'
+// Built-in tool registration now happens via explicit startup init.
 // Anthropic also has its own server-side web_search tool
 // (type: 'web_search_20250305'). That's separate from our local google tool.
 
@@ -218,8 +206,8 @@ function stripCdCwd(call: ToolCall, cwd: string): ToolCall {
 }
 
 // ── Tool execution ──
-// Dispatches tool calls through the tool registry. Each tool module
-// registers itself on import (see imports above).
+// Dispatches tool calls through the tool registry. Built-in tool registration
+// now happens explicitly during startup.
 
 async function executeTool(call: ToolCall, signal?: AbortSignal, cwd?: string, sessionId?: string): Promise<string> {
 	const context: import('../tools/tool.ts').ToolContext = {

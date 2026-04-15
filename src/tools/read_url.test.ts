@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from 'bun:test'
 import { toolRegistry } from './tool.ts'
-import './read_url.ts'
+import { builtins } from './builtins.ts'
 import { readUrl } from './read_url.ts'
 
+builtins.init()
 const realFetch = globalThis.fetch
 
 afterEach(() => {

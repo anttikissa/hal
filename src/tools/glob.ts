@@ -32,7 +32,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return result
 }
 
-toolRegistry.registerTool({
+const globTool = {
 	name: 'glob',
 	description: 'Find files by glob pattern. Returns matching file paths sorted by modification time.',
 	parameters: {
@@ -41,6 +41,10 @@ toolRegistry.registerTool({
 	},
 	required: ['pattern'],
 	execute,
-})
+}
 
-export const glob = { execute }
+function init(): void {
+	toolRegistry.registerTool(globTool)
+}
+
+export const glob = { execute, init }

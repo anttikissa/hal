@@ -30,7 +30,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return text
 }
 
-toolRegistry.registerTool({
+const readBlobToolDef = {
 	name: 'read_blob',
 	description:
 		'Read a stored blob by ID. Use "blobId" for the current session (or its fork chain), or "sessionId/blobId" for a specific session. Blobs are immutable snapshots of tool outputs, images, and thinking blocks from conversation history.',
@@ -39,6 +39,10 @@ toolRegistry.registerTool({
 	},
 	required: ['id'],
 	execute,
-})
+}
 
-export const readBlobTool = { execute }
+function init(): void {
+	toolRegistry.registerTool(readBlobToolDef)
+}
+
+export const readBlobTool = { execute, init }

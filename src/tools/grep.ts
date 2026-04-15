@@ -55,7 +55,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return result
 }
 
-toolRegistry.registerTool({
+const grepTool = {
 	name: 'grep',
 	description: 'Search file contents using ripgrep. Returns matching lines with file paths and line numbers.',
 	parameters: {
@@ -66,6 +66,10 @@ toolRegistry.registerTool({
 	},
 	required: ['pattern'],
 	execute,
-})
+}
 
-export const grep = { execute }
+function init(): void {
+	toolRegistry.registerTool(grepTool)
+}
+
+export const grep = { execute, init }

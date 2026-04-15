@@ -62,7 +62,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return out.slice(0, MAX_OUTPUT) + '\n[… truncated]'
 }
 
-toolRegistry.registerTool({
+const readUrlTool = {
 	name: 'read_url',
 	description: 'Read a web page and extract simple readable text from HTML.',
 	parameters: {
@@ -70,6 +70,10 @@ toolRegistry.registerTool({
 	},
 	required: ['url'],
 	execute,
-})
+}
 
-export const readUrl = { execute }
+function init(): void {
+	toolRegistry.registerTool(readUrlTool)
+}
+
+export const readUrl = { execute, init }
