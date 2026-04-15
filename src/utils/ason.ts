@@ -288,8 +288,10 @@ function parseString(ctx: Ctx, quote: string): string {
 	fail(ctx, 'Unterminated string')
 }
 
-const HEX_RE = /[+-]?0[xX][0-9a-fA-F]+/y
-const NUM_RE = /[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/y
+// Numeric separators: underscores between digits are allowed (like JS 1_000_000).
+// The regex accepts them, then we strip before Number()/parseInt().
+const HEX_RE = /[+-]?0[xX][0-9a-fA-F]+(?:_[0-9a-fA-F]+)*/y
+const NUM_RE = /[+-]?(?:[0-9]+(?:_[0-9]+)*(?:\.(?:[0-9]+(?:_[0-9]+)*)?)?|\.[0-9]+(?:_[0-9]+)*)(?:[eE][+-]?[0-9]+(?:_[0-9]+)*)?/y
 
 function parseNumber(ctx: Ctx): number {
 	HEX_RE.lastIndex = ctx.pos
@@ -297,13 +299,13 @@ function parseNumber(ctx: Ctx): number {
 	if (hex) {
 		ctx.pos = HEX_RE.lastIndex
 		const sign = hex[0][0] === '-' ? -1 : 1
-		return sign * parseInt(hex[0].replace(/^[+-]/, ''), 16)
+		return sign * parseInt(hex[0].replace(/^[+-]/, '').replace(/_/g, ''), 16)
 	}
 	NUM_RE.lastIndex = ctx.pos
 	const m = NUM_RE.exec(ctx.buf)
 	if (!m) fail(ctx, 'Invalid number')
 	ctx.pos = NUM_RE.lastIndex
-	return Number(m[0])
+	return Number(m[0].replace(/_/g, ''))
 }
 
 function parseKey(ctx: Ctx): string {

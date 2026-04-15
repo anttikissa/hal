@@ -175,6 +175,16 @@ describe('parse', () => {
 		test('invalid: missing exponent', () => expect(() => parse('1e')).toThrow())
 		test('invalid: missing exponent digits', () => expect(() => parse('1e+')).toThrow())
 
+		// Numeric separators (underscores in numbers, like JS)
+		test('integer with underscores', () => expect(parse('1_000_000')).toBe(1000000))
+		test('float with underscores', () => expect(parse('1_000.50_25')).toBe(1000.5025))
+		test('hex with underscores', () => expect(parse('0xFF_FF')).toBe(0xFFFF))
+		test('negative with underscores', () => expect(parse('-1_000')).toBe(-1000))
+		test('exponent with underscores', () => expect(parse('1_0e1_0')).toBe(10e10))
+		test('invalid: leading underscore', () => expect(() => parse('_100')).toThrow())
+		test('invalid: trailing underscore', () => expect(() => parse('100_')).toThrow())
+		test('invalid: double underscore', () => expect(() => parse('1__0')).toThrow())
+
 		test('NaN', () => expect(parse('NaN')).toBeNaN())
 		test('+NaN', () => expect(parse('+NaN')).toBeNaN())
 		test('Infinity', () => expect(parse('Infinity')).toBe(Infinity))
