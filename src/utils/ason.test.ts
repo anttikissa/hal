@@ -267,6 +267,14 @@ describe('parse', () => {
 		test('line comment does not affect next line', () => {
 			expect(parse("// ignore this\n'real value'")).toBe('real value')
 		})
+		test('form feed and vertical tab as whitespace', () =>
+			expect(parse('\f\v42')).toBe(42))
+		test('NBSP and BOM as whitespace', () =>
+			expect(parse('\u00A0\uFEFF42')).toBe(42))
+		test('line comment terminated by \\r', () =>
+			expect(parse('// ignore\r42')).toBe(42))
+		test('U+2028 and U+2029 as whitespace', () =>
+			expect(parse('\u2028\u202942')).toBe(42))
 	})
 
 	describe('multiline', () => {

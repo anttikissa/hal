@@ -143,14 +143,14 @@ function skipWhite(ctx: Ctx): string {
 			newlines++
 			continue
 		}
-		if (c === ' ' || c === '\t' || c === '\r') {
+		if (c === ' ' || c === '\t' || c === '\r' || c === '\f' || c === '\v' || c === '\u00A0' || c === '\uFEFF' || c === '\u2028' || c === '\u2029') {
 			ctx.pos++
 			continue
 		}
 		if (c === '/' && peek2(ctx) === '/') {
 			const start = ctx.pos
 			ctx.pos += 2
-			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n') ctx.pos++
+			while (ctx.pos < ctx.buf.length && peek(ctx) !== '\n' && peek(ctx) !== '\r' && peek(ctx) !== '\u2028' && peek(ctx) !== '\u2029') ctx.pos++
 			if (ctx.pos < ctx.buf.length) ctx.pos++ // include \n
 			if (ctx.comments) {
 				if (newlines >= 2) collected += '\n'
