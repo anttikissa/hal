@@ -273,7 +273,7 @@ function parseString(ctx: Ctx, quote: string): string {
 	fail(ctx, 'Unterminated string')
 }
 
-const NUM_RE = /-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/y
+const NUM_RE = /-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/y
 
 function parseNumber(ctx: Ctx): number {
 	NUM_RE.lastIndex = ctx.pos

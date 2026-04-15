@@ -155,8 +155,8 @@ describe('parse', () => {
 		test('negative float', () => expect(parse('-3.14')).toBe(-3.14))
 		test('leading decimal', () => expect(parse('.5')).toBe(0.5))
 		test('negative leading decimal', () => expect(parse('-.5')).toBe(-0.5))
-		test('invalid: trailing dot', () => expect(() => parse('1.')).toThrow())
-
+		test('trailing dot', () => expect(parse('1.')).toBe(1))
+		test('negative trailing dot', () => expect(parse('-3.')).toBe(-3))
 		test('scientific notation', () => expect(parse('1e10')).toBe(1e10))
 		test('scientific uppercase', () => expect(parse('1E10')).toBe(1e10))
 		test('scientific positive exponent', () => expect(parse('1e+10')).toBe(1e10))
