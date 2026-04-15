@@ -17,6 +17,7 @@ const COLORS_PATH = `${HAL_DIR}/colors.ason`
 
 type BlockColors = { fg: string; bg: string }
 type MdColors = BlockColors & { bold: string; code: string }
+type StatusColors = { fg: string; highlight: string }
 
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
@@ -28,6 +29,7 @@ const warning: BlockColors = { fg: '', bg: '' }
 const error: BlockColors = { fg: '', bg: '' }
 const startup: BlockColors = { fg: '', bg: '' }
 const fork: BlockColors = { fg: '', bg: '' }
+const status: StatusColors = { fg: '', highlight: '' }
 const popup = { current: { fg: '', bg: '' } }
 
 // Tool colors keyed by tool name. Unknown tools fall back to 'default'.
@@ -102,6 +104,9 @@ function load(): void {
 	resolveBlock(raw.startup ?? raw.warning ?? raw.info, startup)
 	resolveBlock(raw.fork ?? raw.startup ?? raw.warning ?? raw.info, fork)
 
+	status.fg = raw.status?.fg ? fg(raw.status.fg, vars) : info.fg
+	status.highlight = raw.status?.highlight ? fg(raw.status.highlight, vars) : assistant.bold
+
 	if (raw.input) {
 		if (raw.input.fg) input.fg = fg(raw.input.fg, vars)
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
@@ -153,6 +158,7 @@ export const colors = {
 	error,
 	startup,
 	fork,
+	status,
 	popup,
 	tool,
 	tools,

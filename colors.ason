@@ -77,6 +77,12 @@
 		bg: [0.28, 0.06, 320],
 	},
 
+	// Status line — neutral base plus a controllable high-importance highlight.
+	status: {
+		fg: [0.64, 0, 0],
+		highlight: [0.90, 0.01, 250],
+	},
+
 	popup: {
 		current: {
 			fg: [0.96, 0.02, 250],

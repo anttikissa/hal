@@ -19,7 +19,8 @@ import { models } from '../models.ts'
 import { auth } from '../auth.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { version } from '../version.ts'
-import { git } from '../utils/git.ts'
+import { HAL_DIR } from '../state.ts'
+import { colors } from '../cli/colors.ts'
 import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
 import { popup } from './popup.ts'
@@ -268,18 +269,60 @@ function shortenPath(p: string): string {
 	return p
 }
 
-// Color percentages with a continuous OKLCH heat scale.
-function usagePct(pct: number): string {
-	return `${oklch.usageFg(pct)}${pct}%\x1b[90m`
+function statusBaseColor(): string {
+	return colors.status.fg || DIM
 }
 
-function subscriptionBadges(): string[] {
-	const current = openaiUsage.current()
-	if (!current) return []
-	const parts: string[] = []
-	if (current.primary) parts.push(`5h ${usagePct(Math.round(current.primary.usedPercent))}`)
-	if (current.secondary) parts.push(`7d ${usagePct(Math.round(current.secondary.usedPercent))}`)
-	return parts
+function statusHighlightColor(): string {
+	return colors.status.highlight || BRIGHT_WHITE
+}
+
+function colorText(text: string, color: string, base: string): string {
+	if (!text || !color) return text
+	return `${color}${text}${base}`
+}
+
+function heatText(text: string, pct: number, base: string): string {
+	return colorText(text, oklch.usageFg(pct), base)
+}
+
+function hasCustomSessionName(tab: Tab): boolean {
+	return !!tab.name && tab.name !== tab.sessionId && !/^tab \d+$/i.test(tab.name)
+}
+
+function currentHalDir(): string {
+	return process.env.HAL_DIR ?? HAL_DIR
+}
+
+function sessionStatusLabel(tab: Tab, base: string): string {
+	if (!hasCustomSessionName(tab)) return tab.sessionId
+	return `${colorText(tab.name, statusHighlightColor(), base)} (${tab.sessionId})`
+}
+
+function cwdStatusLabel(tab: Tab, base: string): string {
+	const cwd = shortenPath(tab.cwd)
+	if (!cwd) return ''
+	const color = tab.cwd === currentHalDir() ? colors.assistant.fg : statusHighlightColor()
+	return colorText(cwd, color, base)
+}
+
+function modelStatusLabel(modelId: string, base: string): string {
+	const display = models.displayModel(modelId)
+	if (!display) return ''
+	return colorText(display, statusHighlightColor(), base)
+}
+
+function contextStatusLabel(tab: Tab, base: string): string {
+	if (tab.contextMax <= 0) return ''
+	const pct = Math.round((tab.contextUsed / tab.contextMax) * 100)
+	const used = heatText(models.formatTokenCount(tab.contextUsed), pct, base)
+	const max = models.formatTokenCount(tab.contextMax)
+	const percent = heatText(`${pct}%`, pct, base)
+	return `${used}/${max} (${percent})`
+}
+
+function joinStatusParts(parts: string[]): string {
+	return parts.filter(Boolean).join(' · ')
 }
 
 function hostMismatchBadge(): string {
@@ -290,80 +333,115 @@ function hostMismatchBadge(): string {
 	return client.state.hostVersion === version.state.combined ? '' : ' ≠host'
 }
 
+function serverStatusLabel(): string {
+	if (client.state.role === 'client') return `client:${client.state.pid} / server:${client.state.hostPid ?? '?'}${hostMismatchBadge()}`
+	return `server:${client.state.pid}`
+}
+
+function formatTotalTokens(total: number): string {
+	if (total >= 1_000_000) {
+		const millions = total / 1_000_000
+		return `${millions.toFixed(millions >= 10 ? 0 : 1)}M`
+	}
+	return models.formatTokenCount(total)
+}
+
+function tokenUsageLabel(total: number, long = false): string {
+	if (total <= 0) return ''
+	return `${formatTotalTokens(total)} ${long ? 'tokens' : 'tok'}`
+}
+
+function subscriptionStatusLabel(base: string): string {
+	const current = openaiUsage.current()
+	if (!current) return ''
+	const windows: string[] = []
+	if (current.primary) {
+		const pct = Math.round(current.primary.usedPercent)
+		windows.push(`5h ${heatText(`${pct}%`, pct, base)}`)
+	}
+	if (current.secondary) {
+		const pct = Math.round(current.secondary.usedPercent)
+		windows.push(`7d ${heatText(`${pct}%`, pct, base)}`)
+	}
+	const slot = current.index != null && current.total ? ` ${current.index + 1}/${current.total}` : ''
+	if (windows.length === 0) return `Sub${slot}`
+	return `Sub${slot}: ${windows.join(', ')}`
+}
+
 function renderStatusLine(lines: string[]): void {
 	const cols = process.stdout.columns || 80
+	const base = statusBaseColor()
 	const tab = client.currentTab()
-	const parts: string[] = []
-
-	if (tab) {
-		// 0. Session identity. Show the stable session id first, and append an
-		// explicit custom name in parentheses so renamed tabs are still easy to
-		// match against commands, logs, and other session-id-based references.
-		const customName = tab.name && tab.name !== tab.sessionId && !/^tab \d+$/i.test(tab.name) ? ` (${tab.name})` : ''
-		const sessionLabel = tab.forkedFrom
-			? `${tab.sessionId}${customName} ← ${tab.forkedFrom}`
-			: `${tab.sessionId}${customName}`
-		parts.push(sessionLabel)
-		if (client.state.role === 'client') {
-			parts.push(`client:${client.state.pid}`)
-			parts.push(`server:${client.state.hostPid ?? '?'}${hostMismatchBadge()}`)
-		} else {
-			parts.push(`server:${client.state.pid}`)
-		}
-		// 1. Model name and subscription label.
-		const modelId = tab.model || client.state.model || models.defaultModel()
-		const modelDisplay = models.displayModel(modelId)
-		const provider = models.providerName(modelId)
-		const isSub = !auth.isApiKey(provider)
-		if (modelDisplay) {
-			let label = modelDisplay
-			if (provider === 'openai' && isSub) {
-				const current = openaiUsage.current()
-				if (current?.index != null && current.total) label += ` sub${current.index + 1}/${current.total}`
-				else label += ' (sub)'
-			} else if (isSub) {
-				label += ' (sub)'
-			}
-			parts.push(label)
-		}
-
-		// 2. Current busy activity (active account, rate limit wait, tool run, ...)
-		const activity = client.isBusy() ? client.getActivity() : ''
-		if (activity) parts.push(activity)
-
-		// 3. Cumulative token count (input + output)
-		const totalTokens = tab.usage.input + tab.usage.output
-		if (totalTokens > 0) parts.push(models.formatTokenCount(totalTokens) + ' tok')
-
-		// 4. Cost (API key only — sub users already have the account tag)
-		if (!isSub) {
-			const cost = models.formatCost(modelId, tab.usage)
-			if (cost) parts.push(cost)
-		}
-
-		// 5. Current OpenAI subscription usage for the selected account.
-		if (provider === 'openai' && isSub) parts.push(...subscriptionBadges())
-
-		// 6. Context usage: "25.4k/200k (13%)"
-		if (tab.contextMax > 0) {
-			const pct = Math.round((tab.contextUsed / tab.contextMax) * 100)
-			parts.push(`${models.formatTokenCount(tab.contextUsed)}/${models.formatTokenCount(tab.contextMax)} (${usagePct(pct)})`)
-		}
-
-		// 7. Working directory, shortened
-		const cwd = shortenPath(tab.cwd)
-		if (cwd) parts.push(cwd)
-
-		// 8. Git branch (omit if "main")
-		if (tab.cwd) {
-			const branch = git.currentBranch(tab.cwd)
-			if (branch && branch !== 'main') parts.push(branch)
-		}
+	if (!tab) {
+		const blank = cols > 1 ? ` ${' '.repeat(Math.max(0, cols - 2))} ` : ' '
+		lines.push(`${base}${clipVisual(blank, cols)}${RESET}`)
+		return
 	}
 
-	const info = parts.length > 0 ? ` ${parts.join(' · ')} ` : ' '
-	const line = visLen(info) > cols ? clipVisual(info, cols) : `${info}${'─'.repeat(Math.max(0, cols - visLen(info)))}`
-	lines.push(`\x1b[90m${line}\x1b[0m`)
+	const modelId = tab.model || client.state.model || models.defaultModel()
+	const provider = models.providerName(modelId)
+	const isSub = !auth.isApiKey(provider)
+	const totalTokens = tab.usage.input + tab.usage.output
+	const left = joinStatusParts([
+		sessionStatusLabel(tab, base),
+		cwdStatusLabel(tab, base),
+		modelStatusLabel(modelId, base),
+		contextStatusLabel(tab, base),
+	])
+
+	const server = serverStatusLabel()
+	const tokenShort = tokenUsageLabel(totalTokens, false)
+	const tokenLong = tokenUsageLabel(totalTokens, true)
+	const plan = provider === 'openai' && isSub ? subscriptionStatusLabel(base) : ''
+	const innerWidth = Math.max(0, cols - 2)
+	let showServer = !!server
+	let showTokens = !!tokenShort
+	let showPlan = !!plan
+	let inner = ''
+
+	while (true) {
+		const shortRight = joinStatusParts([
+			showServer ? server : '',
+			showTokens ? tokenShort : '',
+			showPlan ? plan : '',
+		])
+		const longRight = joinStatusParts([
+			showServer ? server : '',
+			showTokens ? tokenLong : '',
+			showPlan ? plan : '',
+		])
+		const right = showTokens && tokenLong && innerWidth - visLen(left) - visLen(longRight) >= 10 ? longRight : shortRight
+		const needsDrop = right && innerWidth - visLen(left) - visLen(right) < 1
+		if (needsDrop) {
+			if (showServer) {
+				showServer = false
+				continue
+			}
+			if (showTokens) {
+				showTokens = false
+				continue
+			}
+			if (showPlan) {
+				showPlan = false
+				continue
+			}
+		}
+
+		if (!right) {
+			const clippedLeft = visLen(left) > innerWidth ? clipVisual(left, innerWidth) : left
+			inner = clippedLeft + ' '.repeat(Math.max(0, innerWidth - visLen(clippedLeft)))
+			break
+		}
+
+		const maxLeft = Math.max(0, innerWidth - visLen(right) - 1)
+		const clippedLeft = visLen(left) > maxLeft ? clipVisual(left, maxLeft) : left
+		const gap = Math.max(1, innerWidth - visLen(clippedLeft) - visLen(right))
+		inner = clippedLeft + ' '.repeat(gap) + right
+		break
+	}
+
+	const line = cols >= 2 ? ` ${inner} ` : inner
+	lines.push(`${base}${visLen(line) > cols ? clipVisual(line, cols) : line}${RESET}`)
 }
 
 function renderHelpBar(lines: string[]): void {
