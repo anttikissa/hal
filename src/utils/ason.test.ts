@@ -210,6 +210,7 @@ describe('parse', () => {
 	describe('objects', () => {
 		test('empty object', () => expect(parse('{}')).toEqual({}))
 		test('unquoted keys', () => expect(parse('{ x: 123 }')).toEqual({ x: 123 }))
+		test('non-ascii bare keys', () => expect(parse('{ café: 1, Ωmega: 2 }')).toEqual({ café: 1, Ωmega: 2 }))
 		test('quoted keys', () => expect(parse("{ '*': 123 }")).toEqual({ '*': 123 }))
 		test('multiple keys', () => expect(parse('{ a: 1, b: 2 }')).toEqual({ a: 1, b: 2 }))
 		test('nested object', () => expect(parse('{ a: { b: 1 } }')).toEqual({ a: { b: 1 } }))

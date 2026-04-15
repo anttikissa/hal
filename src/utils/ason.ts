@@ -310,7 +310,12 @@ function parseKey(ctx: Ctx): string {
 	const c = peek(ctx)
 	if (c === "'" || c === '"') return parseString(ctx, c)
 	const start = ctx.pos
-	while (isIdent(peek(ctx))) ctx.pos++
+	while (ctx.pos < ctx.buf.length) {
+		const c = peek(ctx)
+		if (c === ':' || c === ',' || c === '}' || c === ']' || c === ' ' || c === '\t' || c === '\r' || c === '\n') break
+		if (c === '/' && (peek2(ctx) === '/' || peek2(ctx) === '*')) break
+		ctx.pos++
+	}
 	if (ctx.pos === start) fail(ctx, 'Expected object key')
 	return ctx.buf.slice(start, ctx.pos)
 }
