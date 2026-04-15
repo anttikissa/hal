@@ -6,6 +6,23 @@
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { read } from './read.ts'
 
+const MAX_OUTPUT_BYTES = 20_000
+const TRUNCATED_SUFFIX = '\n[… truncated]'
+
+function truncateUtf8(text: string, limit: number): string {
+	if (Buffer.byteLength(text, 'utf8') <= limit) return text
+	const budget = limit - Buffer.byteLength(TRUNCATED_SUFFIX, 'utf8')
+	if (budget <= 0) return TRUNCATED_SUFFIX.slice(0, limit)
+	let lo = 0
+	let hi = text.length
+	while (lo < hi) {
+		const mid = Math.ceil((lo + hi) / 2)
+		if (Buffer.byteLength(text.slice(0, mid), 'utf8') <= budget) lo = mid
+		else hi = mid - 1
+	}
+	return text.slice(0, lo) + TRUNCATED_SUFFIX
+}
+
 async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const pattern = String(input?.pattern ?? '')
 	if (!pattern) return 'error: pattern is required'
@@ -25,11 +42,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 	const result = stdout.trim()
 	if (!result) return 'No files found.'
-	// Truncate if over 1MB
-	if (result.length > 1_000_000) {
-		return result.slice(0, 1_000_000) + '\n[… truncated]'
-	}
-	return result
+	return truncateUtf8(result, MAX_OUTPUT_BYTES)
 }
 
 const globTool = {
