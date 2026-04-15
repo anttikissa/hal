@@ -1,6 +1,6 @@
 // MCP client — connects to external tool servers via JSON-RPC 2.0 over stdio.
 //
-// Reads mcp.json from HAL_DIR, launches each configured server as a child
+// Reads mcp.ason from HAL_DIR, launches each configured server as a child
 // process, performs the initialize handshake, discovers tools, and registers
 // them into the tool registry with a server-name prefix (e.g. "mcp__fs__readFile").
 //
@@ -13,9 +13,9 @@
 import { readFile } from 'fs/promises'
 import { HAL_DIR } from '../state.ts'
 import { toolRegistry, type Tool, type ToolContext } from '../tools/tool.ts'
+import { ason } from '../utils/ason.ts'
 
-const CONFIG_PATH = `${HAL_DIR}/mcp.json`
-
+const CONFIG_PATH = `${HAL_DIR}/mcp.ason`
 // ── Types ──
 
 interface ServerConfig {
@@ -64,7 +64,7 @@ const state = {
 async function loadConfig(): Promise<McpConfig | null> {
 	try {
 		const text = await readFile(CONFIG_PATH, 'utf-8')
-		return JSON.parse(text)
+		return ason.parse(text) as unknown as McpConfig
 	} catch {
 		return null
 	}
@@ -223,7 +223,7 @@ async function startServer(name: string, cfg: ServerConfig): Promise<McpServer> 
 
 // ── Public API ──
 
-/** Initialize all MCP servers from mcp.json. Safe to call if no config exists. */
+/** Initialize all MCP servers from mcp.ason. Safe to call if no config exists. */
 async function initServers(): Promise<void> {
 	const cfg = await loadConfig()
 	if (!cfg?.servers) return

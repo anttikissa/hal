@@ -782,7 +782,7 @@ function startRuntime(signal: AbortSignal): void {
 		}
 	})()
 
-	// Initialize MCP servers (external tool servers from mcp.json).
+	// Initialize MCP servers (external tool servers from mcp.ason).
 	// Non-blocking — failures are logged but don't prevent startup.
 	void import('../mcp/client.ts')
 		.then(({ mcp }) => {

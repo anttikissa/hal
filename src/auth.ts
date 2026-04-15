@@ -15,6 +15,7 @@
 
 import { liveFiles } from './utils/live-file.ts'
 import { HAL_DIR } from './state.ts'
+import { ason } from './utils/ason.ts'
 
 const AUTH_PATH = `${HAL_DIR}/auth.ason`
 
@@ -57,21 +58,21 @@ interface Credential {
 }
 
 // ── Cooldown tracking ──
-// Map of "provider:index" -> timestamp when cooldown expires.
-// Persisted to STATE_DIR/cooldowns.json so cooldowns survive restarts.
+// Map of "provider:key" -> timestamp when cooldown expires.
+// Persisted to STATE_DIR/cooldowns.ason so cooldowns survive restarts.
 // Loaded lazily on first access, written on every markCooldown call.
 
 import { STATE_DIR } from './state.ts'
 import { readFileSync, writeFileSync } from 'fs'
 
-const COOLDOWN_PATH = `${STATE_DIR}/cooldowns.json`
+const COOLDOWN_PATH = `${STATE_DIR}/cooldowns.ason`
 let cooldowns: Map<string, number> | null = null  // null = not yet loaded
 
 function loadCooldowns(): Map<string, number> {
 	if (cooldowns) return cooldowns
 	cooldowns = new Map()
 	try {
-		const data = JSON.parse(readFileSync(COOLDOWN_PATH, 'utf8'))
+		const data = ason.parse(readFileSync(COOLDOWN_PATH, 'utf8')) as Record<string, unknown>
 		const now = Date.now()
 		// Only load entries that haven't expired yet
 		for (const [key, until] of Object.entries(data)) {
@@ -94,7 +95,7 @@ function saveCooldowns(): void {
 		if (until > now) obj[key] = until
 	}
 	try {
-		writeFileSync(COOLDOWN_PATH, JSON.stringify(obj), 'utf8')
+		writeFileSync(COOLDOWN_PATH, ason.stringify(obj) + '\n', 'utf8')
 	} catch {
 		// State dir may not exist yet during early startup
 	}
