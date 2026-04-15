@@ -94,6 +94,37 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 	expect(text).not.toContain('▌')
 })
 
+	test('refreshAll clears cooldown for accounts with remaining quota', async () => {
+		const origClearCooldown = auth.clearCooldown
+		const cleared: Credential[] = []
+		auth.ensureFresh = async () => {}
+		const credential = { ...makeCredential(0, 'a@test.com'), _key: 'openai:acct_a' }
+		auth.listCredentials = () => [credential]
+		auth.clearCooldown = (cred) => { cleared.push(cred) }
+		globalThis.fetch = Object.assign(async () => new Response(JSON.stringify({
+			email: 'a@test.com',
+			plan_type: 'plus',
+			rate_limit: {
+				primary_window: {
+					used_percent: 20,
+					limit_window_seconds: 18_000,
+					reset_at: Math.floor(Date.now() / 1000) + 1800,
+				},
+				secondary_window: {
+					used_percent: 60,
+					limit_window_seconds: 604_800,
+					reset_at: Math.floor(Date.now() / 1000) + 86_400,
+				},
+			},
+		}), { status: 200 }) as any, { preconnect: () => {} }) as typeof fetch
+		try {
+			await openaiUsage.refreshAll(true)
+			expect(cleared).toEqual([credential])
+		} finally {
+			auth.clearCooldown = origClearCooldown
+		}
+	})
+
 
 test('formatStatusText can censor emails for screenshot-safe output', () => {
 	subscriptionUsage.config.censorEmails = true

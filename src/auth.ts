@@ -107,6 +107,19 @@ function normalizeEntries(raw: any): any[] {
 	return [raw]
 }
 
+/**
+ * Cooldowns must follow the real account, not its current array slot.
+ * OpenAI stores accountId/email, Anthropic may only have slot order for now.
+ */
+function cooldownKey(providerName: string, entry: any, index: number): string {
+	const id =
+		typeof entry?.accountId === 'string' && entry.accountId ? entry.accountId
+			: typeof entry?.email === 'string' && entry.email ? entry.email
+			: typeof entry?.id === 'string' && entry.id ? entry.id
+			: ''
+	return `${providerName}:${id || index}`
+}
+
 /** Extract credential from a single auth entry. */
 function credFromEntry(entry: any, key: string, index: number, total: number): Credential | undefined {
 	if (entry.accessToken) return { value: entry.accessToken, type: 'token', email: entry.email, index, total, _key: key }
@@ -121,7 +134,8 @@ function listCredentials(providerName: string): Credential[] {
 	const total = entries.length
 	const credentials: Credential[] = []
 	for (let i = 0; i < entries.length; i++) {
-		const cred = credFromEntry(entries[i], `${providerName}:${i}`, i, total)
+		const key = cooldownKey(providerName, entries[i], i)
+		const cred = credFromEntry(entries[i], key, i, total)
 		if (cred) credentials.push(cred)
 	}
 	return credentials
@@ -136,7 +150,7 @@ function getCredential(providerName: string): Credential | undefined {
 
 	// Try each entry, skip ones on cooldown
 	for (let i = 0; i < entries.length; i++) {
-		const key = `${providerName}:${i}`
+		const key = cooldownKey(providerName, entries[i], i)
 		const cooldownUntil = loadCooldowns().get(key)
 		if (cooldownUntil && now < cooldownUntil) continue
 		const cred = credFromEntry(entries[i], key, i, total)
@@ -151,10 +165,10 @@ function getCredential(providerName: string): Credential | undefined {
 	// All on cooldown — return the one that comes off soonest
 	let bestIdx = -1, bestUntil = Infinity
 	for (let i = 0; i < entries.length; i++) {
-		const until = loadCooldowns().get(`${providerName}:${i}`) ?? 0
+		const until = loadCooldowns().get(cooldownKey(providerName, entries[i], i)) ?? 0
 		if (until < bestUntil) { bestUntil = until; bestIdx = i }
 	}
-	if (bestIdx >= 0) return credFromEntry(entries[bestIdx], `${providerName}:${bestIdx}`, bestIdx, total)
+	if (bestIdx >= 0) return credFromEntry(entries[bestIdx], cooldownKey(providerName, entries[bestIdx], bestIdx), bestIdx, total)
 	return undefined
 }
 
@@ -165,12 +179,19 @@ function markCooldown(cred: Credential, durationMs: number): void {
 	saveCooldowns()
 }
 
+/** Clear one account's cooldown immediately. */
+function clearCooldown(cred: Credential): void {
+	if (!cred._key) return
+	loadCooldowns().delete(cred._key)
+	saveCooldowns()
+}
+
 /** True if at least one credential for this provider is NOT on cooldown. */
 function hasAvailableCredential(providerName: string): boolean {
 	const entries = normalizeEntries(store()[providerName])
 	const now = Date.now()
 	for (let i = 0; i < entries.length; i++) {
-		const until = loadCooldowns().get(`${providerName}:${i}`) ?? 0
+		const until = loadCooldowns().get(cooldownKey(providerName, entries[i], i)) ?? 0
 		if (now >= until) return true
 	}
 	return false
@@ -185,8 +206,7 @@ function allOnCooldownMessage(providerName: string): string | null {
 	const now = Date.now()
 	// Check if any entry is NOT on cooldown
 	for (let i = 0; i < entries.length; i++) {
-		const key = `${providerName}:${i}`
-		const cooldownUntil = loadCooldowns().get(key)
+		const cooldownUntil = loadCooldowns().get(cooldownKey(providerName, entries[i], i))
 		if (!cooldownUntil || now >= cooldownUntil) return null
 	}
 
@@ -207,8 +227,7 @@ function getEntry(providerName: string): Record<string, any> {
 	if (Array.isArray(raw)) {
 		const now = Date.now()
 		for (let i = 0; i < raw.length; i++) {
-			const key = `${providerName}:${i}`
-			const cooldownUntil = loadCooldowns().get(key)
+			const cooldownUntil = loadCooldowns().get(cooldownKey(providerName, raw[i], i))
 			if (cooldownUntil && now < cooldownUntil) continue
 			return raw[i] ?? {}
 		}
@@ -346,6 +365,7 @@ export const auth = {
 	ensureFresh,
 	isApiKey,
 	markCooldown,
+	clearCooldown,
 	hasAvailableCredential,
 	allOnCooldownMessage,
 	_setStoreForTest,

@@ -235,13 +235,20 @@ async function fetchUsage(credential: Credential): Promise<AccountUsage> {
 	return parsePayload(credential, await res.json())
 }
 
+function hasRemainingQuota(account: AccountUsage): boolean {
+	const windows = [account.primary, account.secondary].filter(Boolean) as UsageWindow[]
+	return windows.length > 0 && windows.every((window) => window.usedPercent < 100)
+}
+
 async function refreshCredential(credential: Credential, force = false): Promise<AccountUsage> {
 	openaiUsage.init()
 	const key = keyOf(credential)
 	const existing = openaiUsage.state.accounts[key]
 	const lastFetch = existing?.fetchedAt ? Date.parse(existing.fetchedAt) : 0
 	if (!force && existing && lastFetch && Date.now() - lastFetch < config.minAutoRefreshMs) return existing
-	openaiUsage.state.accounts[key] = await fetchUsage(credential)
+	const account = await fetchUsage(credential)
+	openaiUsage.state.accounts[key] = account
+	if (hasRemainingQuota(account)) auth.clearCooldown(credential)
 	if (!openaiUsage.state.currentKey) openaiUsage.state.currentKey = key
 	save()
 	return openaiUsage.state.accounts[key]!

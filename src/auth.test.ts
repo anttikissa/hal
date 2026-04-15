@@ -90,6 +90,26 @@ describe('auth.getCredential — multi-account rotation', () => {
 		// Should get b (30s cooldown, soonest)
 		expect(c4!.value).toBe('tok_b')
 	})
+
+	test('cooldown follows stable account identity across reordering', () => {
+		auth._setStoreForTest({
+			openai: [
+				{ accessToken: 'tok_a', accountId: 'acct_a', email: 'a@test.com' },
+				{ accessToken: 'tok_b', accountId: 'acct_b', email: 'b@test.com' },
+			],
+		})
+		const first = auth.getCredential('openai')
+		auth.markCooldown(first!, 60_000)
+		auth._setStoreForTest({
+			openai: [
+				{ accessToken: 'tok_b2', accountId: 'acct_b', email: 'b@test.com' },
+				{ accessToken: 'tok_a2', accountId: 'acct_a', email: 'a@test.com' },
+			],
+		})
+		const after = auth.getCredential('openai')
+		expect(after!.value).toBe('tok_b2')
+		expect(after!.email).toBe('b@test.com')
+	})
 })
 
 describe('auth.hasAvailableCredential', () => {
