@@ -239,7 +239,11 @@ function parseString(ctx: Ctx, quote: string): string {
 			segments.push(buf.slice(segStart, ctx.pos))
 			ctx.pos++
 			const esc = buf.charCodeAt(ctx.pos)
-			if (esc === 0x6e)
+			if (esc === 0x0d) {
+				if (buf.charCodeAt(ctx.pos + 1) === 0x0a) ctx.pos++
+			} else if (esc === 0x0a || esc === 0x2028 || esc === 0x2029) {
+				// JSON5 string continuations swallow the escaped line break.
+			} else if (esc === 0x6e)
 				segments.push('\n') // n
 			else if (esc === 0x74)
 				segments.push('\t') // t
