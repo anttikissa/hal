@@ -273,9 +273,17 @@ function parseString(ctx: Ctx, quote: string): string {
 	fail(ctx, 'Unterminated string')
 }
 
+const HEX_RE = /[+-]?0[xX][0-9a-fA-F]+/y
 const NUM_RE = /[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/y
 
 function parseNumber(ctx: Ctx): number {
+	HEX_RE.lastIndex = ctx.pos
+	const hex = HEX_RE.exec(ctx.buf)
+	if (hex) {
+		ctx.pos = HEX_RE.lastIndex
+		const sign = hex[0][0] === '-' ? -1 : 1
+		return sign * parseInt(hex[0].replace(/^[+-]/, ''), 16)
+	}
 	NUM_RE.lastIndex = ctx.pos
 	const m = NUM_RE.exec(ctx.buf)
 	if (!m) fail(ctx, 'Invalid number')
