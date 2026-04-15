@@ -273,7 +273,7 @@ function parseString(ctx: Ctx, quote: string): string {
 	fail(ctx, 'Unterminated string')
 }
 
-const NUM_RE = /-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/y
+const NUM_RE = /[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/y
 
 function parseNumber(ctx: Ctx): number {
 	NUM_RE.lastIndex = ctx.pos
@@ -342,10 +342,14 @@ function parseAny(ctx: Ctx): AsonValue {
 	if (c === '{') return parseObject(ctx)
 	if (c === '[') return parseArray(ctx)
 	if (c === "'" || c === '"' || c === '`') return parseString(ctx, c)
-	if (c === '-') {
+	if (c === '-' || c === '+') {
 		if (peek2(ctx) === 'I') {
-			eatWord(ctx, '-Infinity')
-			return -Infinity
+			eatWord(ctx, c + 'Infinity')
+			return c === '-' ? -Infinity : Infinity
+		}
+		if (peek2(ctx) === 'N') {
+			eatWord(ctx, c + 'NaN')
+			return NaN
 		}
 		return parseNumber(ctx)
 	}
