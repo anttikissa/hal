@@ -317,7 +317,7 @@ function parseKey(ctx: Ctx): string {
 		ctx.pos++
 	}
 	if (ctx.pos === start) fail(ctx, 'Expected object key')
-	return ctx.buf.slice(start, ctx.pos)
+	return ctx.buf.slice(start, ctx.pos).replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
 }
 
 function parseObject(ctx: Ctx): AsonObject {
