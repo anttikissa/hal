@@ -42,7 +42,6 @@ const config = {
 	activityWriteThrottleMs: 60_000,
 	fetchTimeoutMs: 10_000,
 	progressBarWidth: 14,
-	censorEmails: false,
 }
 
 const state = liveFiles.liveFile(CACHE_PATH, {
@@ -151,7 +150,7 @@ function formatResetAt(resetAt: number, now = new Date()): string {
 
 function displayAccount(account: AccountUsage): string {
 	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
-	const who = (config.censorEmails || subscriptionUsage.config.censorEmails) && account.email ? subscriptionUsage.censorEmail(account.email) : raw
+	const who = subscriptionUsage.config.censorEmails && account.email ? subscriptionUsage.censorEmail(account.email) : raw
 	const plan = account.planType ? ` (${account.planType})` : ''
 	return `${who}${plan}`
 }

@@ -30,7 +30,6 @@ const config = {
 	minAutoRefreshMs: 60_000,
 	fetchTimeoutMs: 5_000,
 	progressBarWidth: 14,
-	censorEmails: false,
 }
 
 const state = liveFiles.liveFile(CACHE_PATH, {
@@ -165,7 +164,7 @@ function formatResetAt(resetAt: number, now = new Date()): string {
 
 function displayAccount(account: AccountUsage): string {
 	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)
-	return (config.censorEmails || subscriptionUsage.config.censorEmails) && account.email ? subscriptionUsage.censorEmail(raw) : raw
+	return subscriptionUsage.config.censorEmails && account.email ? subscriptionUsage.censorEmail(raw) : raw
 }
 
 function displaySlot(account: AccountUsage): string {
