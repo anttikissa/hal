@@ -249,11 +249,21 @@ function parseString(ctx: Ctx, quote: string): string {
 				segments.push('\t') // t
 			else if (esc === 0x72)
 				segments.push('\r') // r
+			else if (esc === 0x76)
+				segments.push('\v') // v
+			else if (esc === 0x30)
+				segments.push('\0') // 0
 			else if (esc === 0x62)
 				segments.push('\b') // b
 			else if (esc === 0x66)
 				segments.push('\f') // f
-			else if (esc === 0x75) {
+			else if (esc === 0x78) {
+				// x
+				const hex = buf.slice(ctx.pos + 1, ctx.pos + 3)
+				if (!/^[0-9a-fA-F]{2}$/.test(hex)) fail(ctx, 'Invalid hex escape')
+				segments.push(String.fromCharCode(parseInt(hex, 16)))
+				ctx.pos += 2
+			} else if (esc === 0x75) {
 				// u
 				const hex = buf.slice(ctx.pos + 1, ctx.pos + 5)
 				if (!/^[0-9a-fA-F]{4}$/.test(hex)) fail(ctx, 'Invalid unicode escape')
