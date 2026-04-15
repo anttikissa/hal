@@ -1,8 +1,9 @@
 // Color system — loads colors.ason, resolves OKLCH values to ANSI escapes,
-// live-reloads on file change.
+// and live-reloads on file change.
 //
 // Modules import `colors` and access e.g. `colors.assistant.fg`.
 // The objects are mutable — reload updates them in place.
+// Importing this module stays cheap; file I/O and watchers live in init().
 
 import { readFileSync } from 'fs'
 import { liveFiles } from '../utils/live-file.ts'
@@ -31,6 +32,11 @@ const popup = { current: { fg: '', bg: '' } }
 
 // Tool colors keyed by tool name. Unknown tools fall back to 'default'.
 const tools: Record<string, BlockColors> = {}
+
+const state = {
+	initialized: false,
+	watcher: null as object | null,
+}
 
 // ── OKLCH triple resolution ──────────────────────────────────────────────────
 //
@@ -108,6 +114,7 @@ function load(): void {
 		if (!tools[name]) tools[name] = { fg: '', bg: '' }
 		resolveBlock(def, tools[name]!)
 	}
+
 	// Aliases — read-like tools share read's colors
 	if (tools.read) {
 		tools.grep = tools.read
@@ -116,22 +123,26 @@ function load(): void {
 	}
 }
 
+function init(): void {
+	if (state.initialized) return
+	state.initialized = true
+
+	load()
+
+	// liveFile watches the file; we just need the onChange callback to re-resolve.
+	// Use a dummy liveFile (read-only, we never write back to colors.ason).
+	state.watcher = liveFiles.liveFile(COLORS_PATH, {}, { watch: true })
+	liveFiles.onChange(state.watcher, load)
+}
+
 // Get colors for a tool by name. Strips mcp__ prefix.
 function tool(name: string): BlockColors {
 	const stripped = name.startsWith('mcp__') ? name.replace(/^mcp__[^_]+__/, '') : name
 	return tools[stripped] ?? tools.default ?? { fg: '', bg: '' }
 }
 
-// ── Initialize + watch ───────────────────────────────────────────────────────
-
-load()
-
-// liveFile watches the file; we just need the onChange callback to re-resolve.
-// Use a dummy liveFile (read-only, we never write back to colors.ason).
-const watcher = liveFiles.liveFile(COLORS_PATH, {}, { watch: true })
-liveFiles.onChange(watcher, load)
-
 export const colors = {
+	state,
 	assistant,
 	thinking,
 	user,
@@ -146,4 +157,5 @@ export const colors = {
 	tool,
 	tools,
 	load,
+	init,
 }

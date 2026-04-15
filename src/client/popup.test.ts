@@ -3,6 +3,8 @@ import { colors } from '../cli/colors.ts'
 import { popup } from './popup.ts'
 import { visLen } from '../utils/strings.ts'
 import type { KeyEvent } from '../cli/keys.ts'
+
+colors.init()
 function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
 }
