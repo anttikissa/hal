@@ -15,6 +15,7 @@ The directory prev/ contains the old codebase, which is now frozen. You can refe
 - Run `bun cloc` to check line count — our budget for core code is 10 thousand lines
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
 - Tabs, not spaces (except for package.json)
+- We use ASON here, not JSON, for our own files. Do not introduce new JSON files or JSON-based local state/config formats unless an external tool/protocol forces it.
 
 # Code style
 
