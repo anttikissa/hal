@@ -7,7 +7,6 @@
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { relative, resolve } from 'path'
-import { tmpdir } from 'os'
 import { ason } from '../src/utils/ason.ts'
 
 function fail(message: string): never {
@@ -36,11 +35,15 @@ function main(): void {
 	config.include = []
 	config.files = [relative(root, filePath)]
 
-	const tempPath = resolve(tmpdir(), `hal-tsgo-file-${process.pid}-${Date.now()}.json`)
+	// The temp config must live under the repo root. TypeScript resolves relative
+	// paths like `files`, `exclude`, and config-local references from the config
+	// file location, not from the process cwd. Writing under /tmp made `files`
+	// point at the wrong place, so tsgo silently skipped the target file.
+	const tempPath = resolve(root, `.tsgo-file-${process.pid}-${Date.now()}.json`)
 	writeFileSync(tempPath, JSON.stringify(config, null, 2))
 
-	// Run tsgo from the repo root so any relative paths inside tsconfig keep the
-	// same meaning they have during normal `./test` runs.
+	// Run tsgo from the repo root so any subprocess-relative behavior matches the
+	// normal `./test` run too.
 	const proc = Bun.spawnSync(['bunx', '--bun', 'tsgo', '-p', tempPath, '--noEmit'], {
 		cwd: root,
 		stdin: 'inherit',
