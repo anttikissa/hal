@@ -42,6 +42,10 @@ const USER_PAUSED_TEXT = '[paused]'
 const RESTARTED_TEXT = '[restarted]'
 const TAB_CLOSED_TEXT = 'Tab closed'
 
+function errorMessage(err: unknown): string {
+	return err instanceof Error ? err.message : String(err)
+}
+
 interface SpawnSpec {
 	task: string
 	mode: 'fork' | 'fresh'
@@ -715,7 +719,9 @@ function startRuntime(signal: AbortSignal): void {
 	if (metas.length > 0) syncSharedState()
 
 	// Refresh models.dev context window cache (fire-and-forget)
-	models.refreshModels().catch(() => {})
+	models.refreshModels().catch((err) => {
+		console.error(`[models] refresh failed: ${errorMessage(err)}`)
+	})
 	openaiUsage.start(signal)
 
 	// Restored sessions can be published right away. On first run, createSession()
@@ -804,8 +810,8 @@ function startRuntime(signal: AbortSignal): void {
 				{ once: true },
 			)
 		})
-		.catch(() => {
-			// MCP module not critical — silently ignore if it fails to load
+		.catch((err) => {
+			console.error(`[mcp] failed to load client module: ${errorMessage(err)}`)
 		})
 
 	// Start inbox watcher (external messages)
@@ -816,8 +822,8 @@ function startRuntime(signal: AbortSignal): void {
 				queuePromptCommand(sessionId, text, source)
 			})
 		})
-		.catch(() => {
-			// Inbox module not critical — silently ignore if it fails to load
+		.catch((err) => {
+			console.error(`[inbox] failed to load module: ${errorMessage(err)}`)
 		})
 }
 

@@ -47,6 +47,7 @@ describe('client startup', () => {
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = sessions.loadLive
 	const origLoadBlobs = blockModule.loadBlobs
+	const origConsoleError = console.error
 	let savedClientState: string | null = null
 	beforeEach(() => {
 		client.state.tabs.length = 0
@@ -90,6 +91,7 @@ describe('client startup', () => {
 		liveFiles.onChange = origOnChange
 		sessions.loadLive = origLoadLive
 		blockModule.loadBlobs = origLoadBlobs
+		console.error = origConsoleError
 		if (savedClientState != null) writeFileSync(CLIENT_STATE_PATH, savedClientState)
 		else rmSync(CLIENT_STATE_PATH, { force: true })
 	})
@@ -126,6 +128,28 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
+	})
+
+	test('invalid client.ason logs an explicit error and falls back to defaults', async () => {
+		const shared = makeSharedState(['s1'])
+		const errors: string[] = []
+		console.error = (...args: any[]) => {
+			errors.push(args.join(' '))
+		}
+		writeFileSync(CLIENT_STATE_PATH, '{ definitely not valid ason')
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
+		expect(client.state.activeTab).toBe(0)
+		expect(errors.some((line) => line.includes('[client] failed to load client state'))).toBe(true)
 	})
 
 	test('startup fallback uses fork-aware history loading', async () => {

@@ -428,6 +428,18 @@ interface ClientStateFile {
 	doneUnseen: string[] // background-complete tabs that still deserve a ✓
 }
 
+function defaultClientState(): ClientStateFile {
+	return { lastTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [] }
+}
+
+function errorMessage(err: unknown): string {
+	return err instanceof Error ? err.message : String(err)
+}
+
+function isMissingFileError(err: unknown): boolean {
+	return !!err && typeof err === 'object' && 'code' in err && (err as { code?: unknown }).code === 'ENOENT'
+}
+
 function loadClientState(): ClientStateFile {
 	try {
 		const data = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as any
@@ -438,8 +450,9 @@ function loadClientState(): ClientStateFile {
 			model: data?.model ?? null,
 			doneUnseen: Array.isArray(data?.doneUnseen) ? data.doneUnseen.filter((item: any) => typeof item === 'string') : [],
 		}
-	} catch {
-		return { lastTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [] }
+	} catch (err) {
+		if (!isMissingFileError(err)) console.error(`[client] failed to load client state: ${errorMessage(err)}`)
+		return defaultClientState()
 	}
 }
 
@@ -456,7 +469,9 @@ function saveClientState(): void {
 				doneUnseen: state.tabs.filter((item) => item.doneUnseen).map((item) => item.sessionId),
 			}) + '\n',
 		)
-	} catch {}
+	} catch (err) {
+		console.error(`[client] failed to save client state: ${errorMessage(err)}`)
+	}
 }
 
 // ── Per-tab prompt history ──────────────────────────────────────────────────

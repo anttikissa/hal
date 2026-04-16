@@ -119,10 +119,22 @@ function updateState(mutator: (state: SharedState) => void): SharedState {
 
 // Delete a stale lock left by a dead process. Call this before claimHost().
 // It is safe to call from both startup and client promotion polling.
+function errorMessage(err: unknown): string {
+	return err instanceof Error ? err.message : String(err)
+}
+
+function isMissingFileError(err: unknown): boolean {
+	return !!err && typeof err === 'object' && 'code' in err && (err as { code?: unknown }).code === 'ENOENT'
+}
+
 function cleanupStaleLock(): void {
 	const lock = readHostLock()
 	if (!lock || isPidAlive(lock.pid)) return
-	try { unlinkSync(HOST_LOCK) } catch {}
+	try {
+		unlinkSync(HOST_LOCK)
+	} catch (err) {
+		if (!isMissingFileError(err)) console.error(`[ipc] failed to remove stale host lock: ${errorMessage(err)}`)
+	}
 }
 
 // Atomic host claim. Startup and promotion use the exact same operation:
@@ -143,7 +155,8 @@ function claimHost(): boolean {
 function readHostLock(): HostLock | null {
 	try {
 		return ason.parse(readFileSync(HOST_LOCK, 'utf-8')) as unknown as HostLock
-	} catch {
+	} catch (err) {
+		if (!isMissingFileError(err)) console.error(`[ipc] failed to read host lock: ${errorMessage(err)}`)
 		return null
 	}
 }
@@ -160,7 +173,9 @@ function releaseHost(): void {
 	try {
 		if (!ownsHostLock()) return
 		unlinkSync(HOST_LOCK)
-	} catch {}
+	} catch (err) {
+		if (!isMissingFileError(err)) console.error(`[ipc] failed to release host lock: ${errorMessage(err)}`)
+	}
 }
 
 export const ipc = {
