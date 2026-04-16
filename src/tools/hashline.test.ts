@@ -205,4 +205,54 @@ describe('edit via hashline', () => {
 		expect(readFileSync(file, 'utf-8')).toBe('  keep  \n\n🙂\n')
 		cleanup()
 	})
+
+	test('returns type errors after editing a broken .ts file', async () => {
+		const repoRoot = process.cwd()
+		const file = join(repoRoot, `.tmp-hashline-${process.pid}-${Date.now()}.ts`)
+		writeFileSync(file, 'export const value: number = 1\n')
+		ctx.cwd = repoRoot
+		try {
+			const ref = `1:${hashLine('export const value: number = 1')}`
+			const result = await executeEdit(
+				{
+					path: file,
+					operation: 'replace',
+					start_ref: ref,
+					end_ref: ref,
+					new_content: "export const value: number = 'oops'",
+				},
+				ctx,
+			)
+			expect(result).toContain('TypeScript check failed')
+			expect(result).toContain("Type 'string' is not assignable to type 'number'.")
+			expect(readFileSync(file, 'utf-8')).toBe("export const value: number = 'oops'\n")
+		} finally {
+			rmSync(file, { force: true })
+		}
+	})
+
+	test('returns type errors after editing a broken .tsx file', async () => {
+		const repoRoot = process.cwd()
+		const file = join(repoRoot, `.tmp-hashline-${process.pid}-${Date.now()}.tsx`)
+		writeFileSync(file, 'export const value: number = 1\n')
+		ctx.cwd = repoRoot
+		try {
+			const ref = `1:${hashLine('export const value: number = 1')}`
+			const result = await executeEdit(
+				{
+					path: file,
+					operation: 'replace',
+					start_ref: ref,
+					end_ref: ref,
+					new_content: "export const value: number = 'oops'",
+				},
+				ctx,
+			)
+			expect(result).toContain('TypeScript check failed')
+			expect(result).toContain("Type 'string' is not assignable to type 'number'.")
+			expect(readFileSync(file, 'utf-8')).toBe("export const value: number = 'oops'\n")
+		} finally {
+			rmSync(file, { force: true })
+		}
+	})
 })
