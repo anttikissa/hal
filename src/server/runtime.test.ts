@@ -50,6 +50,15 @@ test('shouldAutoContinue allows restart notices but not manual pauses', () => {
 })
 
 
+test('auto-close only happens after a clean completion', () => {
+	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'completed')).toBe(true)
+	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'aborted')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'failed')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'stopped')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: false }, 'completed')).toBe(false)
+})
+
+
 test('recordTabClosed emits info when no generation is active', () => {
 	const events: any[] = []
 	const origAbort = agentLoop.abort

@@ -62,6 +62,8 @@ export interface AgentContext {
 	onStatus?: (busy: boolean, activity?: string) => void | Promise<void>
 }
 
+export type AgentLoopResult = 'completed' | 'aborted' | 'failed' | 'stopped'
+
 interface ToolCall {
 	id: string
 	name: string
@@ -226,7 +228,7 @@ async function executeTool(call: ToolCall, signal?: AbortSignal, cwd?: string, s
 
 // ── The main loop ──
 
-async function runAgentLoop(ctx: AgentContext): Promise<void> {
+async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	const { sessionId, model, systemPrompt, messages, signal } = ctx
 
 	// Parse "provider/model-id" — e.g. "anthropic/claude-opus-4-6"
@@ -253,7 +255,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		if (signal.aborted) {
 			log.info('Agent loop skipped (signal already aborted)', { sessionId })
 			ac.abort()
-			return
+			return 'aborted'
 		}
 		signal.addEventListener('abort', () => {
 			log.info('Agent loop abort via parent signal', { sessionId })
@@ -273,6 +275,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 		const totalUsage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 		let retryAttempt = 0
 		let retryStartedAt = 0
+		let hadTerminalError = false
 
 		async function finishAborted(): Promise<void> {
 			const abortText = state.abortTexts.has(sessionId) ? (state.abortTexts.get(sessionId) ?? '') : DEFAULT_ABORT_TEXT
@@ -410,7 +413,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							isError: true,
 							blobId,
 						})
-						// Check if we should retry
+						let canRetry = false
 						if (isRetryableStatus(status)) {
 							if (!retryStartedAt) retryStartedAt = Date.now()
 							const elapsed = Date.now() - retryStartedAt
@@ -429,8 +432,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 									break
 								}
 								shouldRetry = true
+								canRetry = true
 							}
 						}
+						if (!canRetry) hadTerminalError = true
 						break
 					}
 
@@ -463,14 +468,14 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 					log.error('Agent loop error', { sessionId, message })
 					emitInfo(sessionId, message, 'error')
 					emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
-					return
+					return 'failed'
 				}
 			}
 
 			// If aborted, emit partial output and exit.
 			if (aborted) {
 				await finishAborted()
-				return
+				return 'aborted'
 			}
 
 			// If we need to retry, go back to the top of the loop
@@ -517,7 +522,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 				})
 				// Persist context so it survives restarts
 				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
-				return
+				return hadTerminalError ? 'failed' : 'completed'
 			}
 
 			// ── Tool execution ──
@@ -613,7 +618,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 
 		if (loopSignal.aborted) {
 			await finishAborted()
-			return
+			return 'aborted'
 		}
 
 		// If we exhausted maxIterations, inform the user
@@ -627,6 +632,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 			contextMax: est.max,
 		})
 		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+
+		return 'stopped'
 	} finally {
 		state.activeRequests.delete(sessionId)
 		state.abortTexts.delete(sessionId)

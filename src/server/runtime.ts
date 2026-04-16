@@ -18,7 +18,7 @@ import { sessions as sessionStore } from './sessions.ts'
 import { commands } from '../runtime/commands.ts'
 import type { SessionState } from '../runtime/commands.ts'
 import type { SpawnMode } from '../protocol.ts'
-import { agentLoop } from '../runtime/agent-loop.ts'
+import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
@@ -71,6 +71,15 @@ interface SpawnSpec {
 	cwd?: string
 	title?: string
 	closeWhenDone?: boolean
+}
+
+function shouldCloseSessionAfterGeneration(
+	meta: { closeWhenDone?: boolean } | null | undefined,
+	result: AgentLoopResult,
+): boolean {
+	// Auto-close is only for a clean model-driven finish. Manual pauses,
+	// provider failures, and max-iteration stops must leave the tab open.
+	return !!meta?.closeWhenDone && result === 'completed'
 }
 
 function shouldAutoContinue(entries: Array<{ type: string; text?: string; ts?: string }>, now = Date.now()): boolean {
@@ -463,8 +472,9 @@ async function runGeneration(session: Session, text: string, source?: string): P
 		createdAt: new Date().toISOString(),
 	})
 
+	let result: AgentLoopResult = 'failed'
 	try {
-		await agentLoop.runAgentLoop({
+		result = await agentLoop.runAgentLoop({
 			sessionId: session.id,
 			model,
 			cwd: session.cwd,
@@ -483,7 +493,7 @@ async function runGeneration(session: Session, text: string, source?: string): P
 		emitInfo(session.id, `Generation failed: ${err?.message ?? String(err)}`, 'error')
 	}
 	const meta = sessionStore.loadSessionMeta(session.id)
-	if (meta?.closeWhenDone && !agentLoop.isActive(session.id)) {
+	if (shouldCloseSessionAfterGeneration(meta, result) && !agentLoop.isActive(session.id)) {
 		await sessionStore.updateMeta(session.id, { closedAt: new Date().toISOString(), closeWhenDone: false })
 		sessionStore.deactivateSession(session.id)
 		activeSessions = activeSessions.filter((s) => s.id !== session.id)
@@ -879,4 +889,4 @@ function startRuntime(signal: AbortSignal): void {
 		})
 }
 
-export const runtime = { startRuntime, pickMostRecentlyClosedSessionId, resolveResumeTarget, shouldAutoContinue, recordTabClosed, spawnSessionForTests: spawnSession }
+export const runtime = { startRuntime, pickMostRecentlyClosedSessionId, resolveResumeTarget, shouldAutoContinue, shouldCloseSessionAfterGeneration, recordTabClosed, spawnSessionForTests: spawnSession }

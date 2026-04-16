@@ -43,13 +43,14 @@ test('writes thinking blobs while streaming and replays them into API history', 
 	}
 
 	try {
-		await agentLoop.runAgentLoop({
+		const result = await agentLoop.runAgentLoop({
 			sessionId,
 			model: 'openai/gpt-5.4',
 			cwd: process.cwd(),
 			systemPrompt: 'test prompt',
 			messages: [],
 		})
+		expect(result).toBe('completed')
 		const thinkingEvent = events.find((event) => event.type === 'stream-delta' && event.channel === 'thinking')
 		const assistantMessages = apiMessages.toProviderMessages(sessionId)
 		const assistant = assistantMessages.find((message) => message.role === 'assistant')!
@@ -107,13 +108,14 @@ test('provider errors save full payload in a blob but show only the short messag
 	}
 
 	try {
-		await agentLoop.runAgentLoop({
+		const result = await agentLoop.runAgentLoop({
 			sessionId,
 			model: 'openai/gpt-5.4',
 			cwd: process.cwd(),
 			systemPrompt: 'test prompt',
 			messages: [],
 		})
+		expect(result).toBe('failed')
 		const responseEvent = events.find((event) => event.type === 'response' && event.isError)
 		expect(responseEvent).toMatchObject({
 			type: 'response',
@@ -202,7 +204,7 @@ test('abort between tool iterations does not report max iterations', async () =>
 	}
 
 	try {
-		await agentLoop.runAgentLoop({
+		const result = await agentLoop.runAgentLoop({
 			sessionId,
 			model: 'openai/gpt-5.4',
 			cwd: process.cwd(),
@@ -214,6 +216,7 @@ test('abort between tool iterations does not report max iterations', async () =>
 				if (activity === 'generating...' && sawToolRun) ac.abort()
 			},
 		})
+		expect(result).toBe('aborted')
 		expect(events.some((event) => event.type === 'info' && event.text === 'Hit max iterations (50). Stopping.')).toBe(false)
 		expect(events.some((event) => event.type === 'info' && event.text === '[paused]')).toBe(true)
 	} finally {
