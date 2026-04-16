@@ -149,6 +149,27 @@ function closedSessionLines(): string[] {
 	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => `  ${meta.id}`)]
 }
 
+interface ResumeLookup {
+	id?: string
+	error?: string
+}
+
+function lookupClosedResumeTarget(selector: string): ResumeLookup {
+	const trimmed = selector.trim()
+	if (!trimmed) return {}
+	const openIds = new Set(sessionStore.loadSessionList())
+	const metas = sessionStore.loadAllSessionMetas()
+	const exactId = metas.find((meta) => meta.id === trimmed)
+	if (exactId) {
+		if (openIds.has(exactId.id)) return { error: `Session ${exactId.id} is already open.` }
+		return { id: exactId.id }
+	}
+	const normalized = normalizeSessionName(trimmed)
+	const exactName = metas.find((meta) => !openIds.has(meta.id) && normalizeSessionName(meta.name ?? '') === normalized)
+	if (exactName) return { id: exactName.id }
+	return { error: 'No matching closed session.' }
+}
+
 function userEntryText(entry: any): string {
 	if (entry?.type !== 'user' || !Array.isArray(entry.parts)) return ''
 	return entry.parts
@@ -498,8 +519,10 @@ handlers['mem'] = () => {
 handlers['resume'] = (args, session) => {
 	const selector = args.trim()
 	if (!selector) return { output: closedSessionLines().join('\n'), handled: true }
+	const target = lookupClosedResumeTarget(selector)
+	if (target.error) return { error: target.error, handled: true }
 	ipc.appendCommand({ type: 'resume', selector, sessionId: session.id })
-	return { output: `Resuming ${selector}...`, handled: true }
+	return { output: `Resuming ${target.id}...`, handled: true }
 }
 
 // /send <tab|session-id|name> <message> — queue a message for another session

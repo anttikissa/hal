@@ -212,6 +212,30 @@ test('/open resolves a tab number and queues placement after it', async () => {
 })
 
 
+test('/resume validates the target before queueing', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+	sessionStore.loadAllSessionMetas = () => [
+		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'open tab' },
+		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', topic: 'closed tab' },
+	]
+	sessionStore.loadSessionList = () => ['04-aaa']
+
+	const ok = await commands.executeCommand('/resume 04-zzz', makeSession(), () => {})
+	const missing = await commands.executeCommand('/resume 04-nope', makeSession(), () => {})
+	const open = await commands.executeCommand('/resume 04-aaa', makeSession(), () => {})
+
+	expect(ok.handled).toBe(true)
+	expect(ok.error).toBeUndefined()
+	expect(ok.output).toContain('04-zzz')
+	expect(missing.error).toBe('No matching closed session.')
+	expect(open.error).toBe('Session 04-aaa is already open.')
+	expect(appended).toEqual([{ type: 'resume', selector: '04-zzz', sessionId: '04-aaa' }])
+})
+
+
 test('/tabs sorts open tabs by latest activity and shows recent prompt previews', async () => {
 	sessionStore.loadAllSessionMetas = () => [
 		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'old tab' },
