@@ -8,19 +8,13 @@ function makeRawSink(): { lines: string[]; emit: (text: string) => void } {
 	return { lines, emit: (text) => lines.push(text) }
 }
 
-test('read-only slash commands never route through steering', () => {
+test('all user submissions use prompt commands even while busy', () => {
 	expect(cli.submitCommandType('/help', false)).toBe('prompt')
 	expect(cli.submitCommandType('/help', true)).toBe('prompt')
-})
-
-test('model changes steer while busy so the old turn gets aborted first', () => {
 	expect(cli.submitCommandType('/model gpt-5.4', false)).toBe('prompt')
-	expect(cli.submitCommandType('/model gpt-5.4', true)).toBe('steer')
-})
-
-test('normal prompts steer only while busy', () => {
+	expect(cli.submitCommandType('/model gpt-5.4', true)).toBe('prompt')
 	expect(cli.submitCommandType('hello', false)).toBe('prompt')
-	expect(cli.submitCommandType('hello', true)).toBe('steer')
+	expect(cli.submitCommandType('hello', true)).toBe('prompt')
 })
 
 test('raw formatter keeps printable ascii readable', () => {

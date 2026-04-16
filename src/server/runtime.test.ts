@@ -95,10 +95,15 @@ import { tmpdir } from 'os'
 test('spawnSession creates a fresh child with queued prompt and auto-close marker', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))
 	const prevState = process.env.HAL_STATE_DIR
+	const queued: any[] = []
+	const origAppendCommand = ipc.appendCommand
 	process.env.HAL_STATE_DIR = base
 	const { sessions } = await import('./sessions.ts')
 
 	try {
+		ipc.appendCommand = (command: any) => {
+			queued.push(command)
+		}
 		await sessions.createSession('04-parent', {
 			id: '04-parent',
 			workingDir: '/work/parent',
@@ -129,8 +134,15 @@ test('spawnSession creates a fresh child with queued prompt and auto-close marke
 		expect(meta?.topic).toBe('Child tab')
 		const history = sessions.loadHistory(child.id)
 		expect(history.some((entry) => entry.type === 'info' && entry.text.includes('close itself after sending a handoff'))).toBe(true)
-		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
+		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(false)
+		expect(queued).toContainEqual(expect.objectContaining({
+			type: 'prompt',
+			sessionId: child.id,
+			source: '04-parent',
+		}))
+		expect(JSON.stringify(queued)).toContain('Do the thing')
 	} finally {
+		ipc.appendCommand = origAppendCommand
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR
 		else process.env.HAL_STATE_DIR = prevState

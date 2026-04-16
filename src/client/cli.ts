@@ -157,11 +157,10 @@ function onSigcont(): void {
 	draw(true)
 }
 
-function submitCommandType(text: string, busy: boolean): 'prompt' | 'steer' {
-	const trimmed = text.trimStart()
-	if (/^\/(model|cd)\b/.test(trimmed)) return busy ? 'steer' : 'prompt'
-	if (trimmed.startsWith('/')) return 'prompt'
-	return busy ? 'steer' : 'prompt'
+function submitCommandType(_text: string, _busy: boolean): 'prompt' {
+	// Human typing now uses the same prompt command path as inbox messages.
+	// The runtime decides whether an active turn makes this behave like steering.
+	return 'prompt'
 }
 
 const rawState = {
@@ -250,15 +249,7 @@ function submit(override?: string): void {
 		draw()
 		return
 	}
-	const type = submitCommandType(text, client.isBusy())
-	if (type === 'steer') {
-		// If the session is busy (generating/running tools), send a steer command
-		// instead of a plain prompt. The server will abort the current generation,
-		// inject this as a steering message, and restart generation.
-		client.sendCommand('steer', text)
-	} else {
-		client.sendCommand('prompt', text)
-	}
+	client.sendCommand(submitCommandType(text, client.isBusy()), text)
 	prompt.clear()
 	// Update tab's inputHistory + clear persisted draft
 	client.onSubmit(text)

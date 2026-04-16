@@ -167,6 +167,10 @@ function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean
 	].join('\n')
 }
 
+function queuePromptCommand(sessionId: string, text: string, source?: string): void {
+	ipc.appendCommand({ type: 'prompt', sessionId, text, source })
+}
+
 async function spawnSession(parent: Session, spec: SpawnSpec): Promise<Session> {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
 	const child = mode === 'fork' ? await createForkSession(parent.id) : createSession(undefined, parent.id)
@@ -189,12 +193,7 @@ async function spawnSession(parent: Session, spec: SpawnSpec): Promise<Session> 
 			ts: new Date().toISOString(),
 		}])
 	}
-	await sessionStore.appendHistory(child.id, [{
-		type: 'user',
-		parts: [{ type: 'text', text: buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone) }],
-		source: parent.id,
-		ts: new Date().toISOString(),
-	}])
+	queuePromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone), parent.id)
 	return child
 }
 
@@ -374,6 +373,16 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 	await runGeneration(session, text, source)
 }
 
+async function dispatchPromptCommand(session: Session, text: string, source?: string, forceSteering = false): Promise<void> {
+	const steering = forceSteering || agentLoop.isActive(session.id)
+	if (steering && agentLoop.isActive(session.id)) {
+		agentLoop.abort(session.id)
+		// Brief yield so the abort propagates before we start a new generation.
+		await Bun.sleep(50)
+	}
+	await handlePrompt(session, text, steering ? 'steering' : undefined, source)
+}
+
 /** Start a generation (agent loop call) for a session.
  *  If text is empty, this is a continuation (restart after crash) — don't save
  *  a new user prompt, just rebuild messages from existing history. */
@@ -532,26 +541,23 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 	const sessionId = cmd.sessionId
 	const session = sessionId ? findSession(sessionId) : activeSessions[0]
 
-	switch (cmd.type) {
-		case 'prompt': {
-			if (!session) return
-			// Fire-and-forget: don't block the command loop on generation.
-			void handlePrompt(session, cmd.text ?? '')
-			break
-		}
-
-		case 'steer': {
-			// Steering: user sent a prompt while generation was active.
-			// Abort current generation, inject the steering message, restart.
-			if (!session) return
-			if (agentLoop.isActive(session.id)) {
-				agentLoop.abort(session.id)
-				// Brief yield so the abort propagates before we start a new generation
-				await Bun.sleep(50)
+		switch (cmd.type) {
+			case 'prompt': {
+				if (!session) return
+				const source = typeof cmd.source === 'string' ? cmd.source : undefined
+				// Fire-and-forget: don't block the command loop on generation.
+				void dispatchPromptCommand(session, cmd.text ?? '', source)
+				break
 			}
-			void handlePrompt(session, cmd.text ?? '', 'steering')
-			break
-		}
+
+			case 'steer': {
+				if (!session) return
+				const source = typeof cmd.source === 'string' ? cmd.source : undefined
+				// Legacy compatibility: older clients can still send explicit steer
+				// commands, but new prompts now go through the prompt path too.
+				void dispatchPromptCommand(session, cmd.text ?? '', source, true)
+				break
+			}
 
 		case 'continue': {
 			if (!session) return
@@ -806,8 +812,8 @@ function startRuntime(signal: AbortSignal): void {
 	void import('../runtime/inbox.ts')
 		.then(({ inbox }) => {
 			inbox.startWatching(signal, (sessionId, text, source) => {
-				const session = findSession(sessionId)
-				if (session) handlePrompt(session, text, undefined, source)
+				if (!findSession(sessionId)) return
+				queuePromptCommand(sessionId, text, source)
 			})
 		})
 		.catch(() => {
