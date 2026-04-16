@@ -51,6 +51,17 @@ function runtimeStartCount(): number {
 	}
 }
 
+async function waitFor<T>(read: () => T, ok: (value: T) => boolean, timeoutMs = 2_000): Promise<T> {
+	const deadline = Date.now() + timeoutMs
+	let last = read()
+	while (Date.now() < deadline) {
+		last = read()
+		if (ok(last)) return last
+		await Bun.sleep(50)
+	}
+	return last
+}
+
 describe('host election', () => {
 	test('exactly one host when 5 processes start simultaneously', async () => {
 		const env = halEnv()
@@ -116,9 +127,9 @@ describe('host election', () => {
 
 		const proc1 = spawnHal(env)
 		const proc2 = spawnHal(env)
-		await Bun.sleep(500)
+		const pidAfterRestart = await waitFor(lockPid, (pid) => pid !== null)
 
-		expect(lockPid()).not.toBeNull()
+		expect(pidAfterRestart).not.toBeNull()
 		expect(runtimeStartCount()).toBe(beforeRestart + 1)
 
 		sendCtrlC(proc1)
@@ -129,17 +140,16 @@ describe('host election', () => {
 	test('stale lock from crashed process gets cleaned up', async () => {
 		const env = halEnv()
 		const server = spawnHal(env)
-		await Bun.sleep(300)
+		const stalePid = await waitFor(lockPid, (pid) => pid !== null)
 		server.kill(9)
 		await server.exited
 
-		const stalePid = lockPid()
 		expect(stalePid).not.toBeNull()
 
 		const newProc = spawnHal(env)
-		await Bun.sleep(500)
+		const newPid = await waitFor(lockPid, (pid) => pid !== null && pid !== stalePid)
 
-		expect(lockPid()).not.toBe(stalePid)
+		expect(newPid).not.toBe(stalePid)
 		expect(runtimeStartCount()).toBe(2)
 
 		sendCtrlC(newProc)
@@ -149,16 +159,14 @@ describe('host election', () => {
 	test('old host exits when another pid takes over the lock', async () => {
 		const env = halEnv()
 		const oldHost = spawnHal(env)
-		await Bun.sleep(300)
+		const firstPid = await waitFor(lockPid, (pid) => pid !== null)
 
-		const firstPid = lockPid()
 		expect(firstPid).not.toBeNull()
 
 		unlinkSync(join(tmpDir, 'ipc/host.lock'))
 		const newHost = spawnHal(env)
-		await Bun.sleep(400)
+		const secondPid = await waitFor(lockPid, (pid) => pid !== null && pid !== firstPid)
 
-		const secondPid = lockPid()
 		expect(secondPid).not.toBeNull()
 		expect(secondPid).not.toBe(firstPid)
 
