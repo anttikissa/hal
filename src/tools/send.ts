@@ -3,12 +3,26 @@
 // Drops an .ason file into state/inbox/<target-session-id>/ which
 // the inbox handler picks up and feeds into the agent loop.
 
-import { toolRegistry, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { inbox } from '../runtime/inbox.ts'
 
-async function execute(input: any, ctx: ToolContext): Promise<string> {
-	const targetId = String(input?.sessionId ?? '')
-	const text = String(input?.text ?? '')
+interface SendInput {
+	sessionId?: string
+	text?: string
+}
+
+function normalizeInput(input: unknown): SendInput {
+	const raw = toolRegistry.inputObject(input)
+	return {
+		sessionId: raw.sessionId === undefined ? undefined : String(raw.sessionId),
+		text: raw.text === undefined ? undefined : String(raw.text),
+	}
+}
+
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+	const spec = normalizeInput(input)
+	const targetId = spec.sessionId ?? ''
+	const text = spec.text ?? ''
 
 	if (!targetId) return 'error: sessionId is required'
 	if (!text) return 'error: text is required'
@@ -17,12 +31,12 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	try {
 		inbox.queueMessage(targetId, text, ctx.sessionId)
 		return `Sent message to session ${targetId}`
-	} catch (err: any) {
-		return `error: ${err?.message ?? String(err)}`
+	} catch (err: unknown) {
+		return `error: ${toolRegistry.errorMessage(err)}`
 	}
 }
 
-const sendTool = {
+const sendTool: Tool = {
 	name: 'send',
 	description:
 		"Send a message to another session's inbox. The message will be processed as a prompt (if idle) or queued (if busy).",

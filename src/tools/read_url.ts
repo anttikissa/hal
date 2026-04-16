@@ -2,9 +2,20 @@
 //
 // This stays tiny on purpose. It is only meant as a simple first pass.
 
-import { toolRegistry, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
 const MAX_OUTPUT = 100_000
+
+interface ReadUrlInput {
+	url?: string
+}
+
+function normalizeInput(input: unknown): ReadUrlInput {
+	const raw = toolRegistry.inputObject(input)
+	return {
+		url: raw.url === undefined ? undefined : String(raw.url),
+	}
+}
 
 function cleanText(s: string): string {
 	return s
@@ -19,8 +30,9 @@ function cleanText(s: string): string {
 		.trim()
 }
 
-async function execute(input: any, ctx: ToolContext): Promise<string> {
-	const rawUrl = String(input?.url ?? '').trim()
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+	const spec = normalizeInput(input)
+	const rawUrl = (spec.url ?? '').trim()
 	let url: URL
 	try {
 		url = new URL(rawUrl)
@@ -62,7 +74,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return out.slice(0, MAX_OUTPUT) + '\n[… truncated]'
 }
 
-const readUrlTool = {
+const readUrlTool: Tool = {
 	name: 'read_url',
 	description: 'Read a web page and extract simple readable text from HTML.',
 	parameters: {

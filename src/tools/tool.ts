@@ -3,25 +3,36 @@
 // Tool modules are pure on import. They expose init() hooks, and a bootstrap
 // module decides when to register them with the shared registry.
 
-import type { ToolDef } from '../protocol.ts'
+import type { JsonSchemaProperties, ToolDef } from '../protocol.ts'
 
 // ── Interfaces ──
+
+export type ToolInput = Record<string, unknown>
 
 export interface Tool {
 	name: string
 	description: string
 	/** JSON Schema properties for tool parameters. */
-	parameters: Record<string, any>
+	parameters: JsonSchemaProperties
 	/** Which parameters are required. */
 	required?: string[]
 	/** Execute the tool. Returns output string. */
-	execute(input: any, context: ToolContext): Promise<string>
+	execute(input: unknown, context: ToolContext): Promise<string>
 }
 
 export interface ToolContext {
 	sessionId: string
 	cwd: string
 	signal?: AbortSignal
+}
+
+function inputObject(input: unknown): ToolInput {
+	if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+	return input as ToolInput
+}
+
+function errorMessage(err: unknown): string {
+	return err instanceof Error ? err.message : String(err)
 }
 
 // ── Registry ──
@@ -58,14 +69,14 @@ function toToolDefs(): ToolDef[] {
 }
 
 /** Dispatch a tool call by name. Returns the tool's output string. */
-async function dispatch(name: string, input: any, context: ToolContext): Promise<string> {
+async function dispatch(name: string, input: unknown, context: ToolContext): Promise<string> {
 	const tool = getTool(name)
 	if (!tool) return `error: unknown tool "${name}"`
 	try {
 		return await tool.execute(input, context)
-	} catch (err: any) {
-		return `error: ${err?.message ?? String(err)}`
+	} catch (err: unknown) {
+		return `error: ${errorMessage(err)}`
 	}
 }
 
-export const toolRegistry = { registerTool, getTool, allTools, toToolDefs, dispatch, clearForTests }
+export const toolRegistry = { registerTool, getTool, allTools, toToolDefs, dispatch, clearForTests, inputObject, errorMessage }

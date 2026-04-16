@@ -4,7 +4,7 @@
 // state/inbox/<session-id>/. This module watches that directory
 // and feeds messages into the agent loop as if the user typed them.
 
-import { existsSync, readdirSync, readFileSync, unlinkSync, mkdirSync } from 'fs'
+import { readdirSync, readFileSync, unlinkSync } from 'fs'
 import { watch } from 'fs'
 import { STATE_DIR, ensureDir } from '../state.ts'
 import { ason } from '../utils/ason.ts'
@@ -20,6 +20,18 @@ interface InboxMessage {
 
 type OnMessage = (sessionId: string, text: string, from?: string) => void
 
+function parseInboxMessage(raw: unknown): InboxMessage | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+	const msg = raw as Record<string, unknown>
+	if (typeof msg.sessionId !== 'string' || typeof msg.text !== 'string') return null
+	return {
+		sessionId: msg.sessionId,
+		text: msg.text,
+		from: typeof msg.from === 'string' ? msg.from : undefined,
+		ts: typeof msg.ts === 'string' ? msg.ts : undefined,
+	}
+}
+
 /** Process any pending .ason files in a session's inbox directory. */
 function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessage): void {
 	try {
@@ -30,8 +42,8 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 			const path = `${sessionDir}/${file}`
 			try {
 				const content = readFileSync(path, 'utf-8')
-				const msg = ason.parse(content) as unknown as InboxMessage
-				if (msg.text) onMessage(sessionId, msg.text, msg.from)
+				const msg = parseInboxMessage(ason.parse(content))
+				if (msg?.text) onMessage(sessionId, msg.text, msg.from)
 				// Delete after processing
 				unlinkSync(path)
 			} catch {
@@ -61,7 +73,7 @@ function startWatching(signal: AbortSignal, onMessage: OnMessage): void {
 
 	// Watch for new files
 	try {
-		const watcher = watch(INBOX_DIR, { recursive: true, persistent: false }, (event, filename) => {
+		const watcher = watch(INBOX_DIR, { recursive: true, persistent: false }, (_event, filename) => {
 			if (signal.aborted) return
 			if (!filename || !filename.endsWith('.ason')) return
 

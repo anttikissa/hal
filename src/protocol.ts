@@ -8,7 +8,6 @@
 export type EventType =
 	| 'runtime-start'
 	| 'host-released'
-	| 'sessions'
 	| 'prompt'
 	| 'response'
 	| 'info'
@@ -18,15 +17,49 @@ export type EventType =
 	| 'stream-end'
 	| 'tool-call'
 	| 'tool-result'
-	| 'status'
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'steer' | 'continue' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'move' | 'rename' | 'spawn'
+export type CommandType = 'prompt' | 'continue' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'move' | 'rename' | 'spawn'
+
+export type SpawnMode = 'fork' | 'fresh'
 
 // ── Tool call types ──
 
-export type ToolName = 'analyze_history' | 'bash' | 'read' | 'read_url' | 'write' | 'edit' | 'glob' | 'grep' | 'eval' | 'send' | 'google'
+export type ToolName =
+	| 'analyze_history'
+	| 'bash'
+	| 'edit'
+	| 'eval'
+	| 'glob'
+	| 'google'
+	| 'grep'
+	| 'read'
+	| 'read_blob'
+	| 'read_url'
+	| 'send'
+	| 'spawn_agent'
+	| 'write'
+
+// ── JSON-schema-lite types for tool definitions ──
+// We only model the subset Hal actually emits today.
+
+export interface JsonSchemaProperty {
+	type: string
+	description?: string
+	enum?: string[]
+	items?: JsonSchemaProperty
+	properties?: JsonSchemaProperties
+	required?: string[]
+}
+
+export type JsonSchemaProperties = Record<string, JsonSchemaProperty>
+
+export interface ToolInputSchema {
+	type: 'object'
+	properties: JsonSchemaProperties
+	required?: string[]
+}
 
 // ── Message types (for API conversation format) ──
 
@@ -39,9 +72,9 @@ export interface ContentBlock {
 	signature?: string
 	id?: string // tool_use id
 	name?: string // tool_use name
-	input?: any // tool_use input
+	input?: Record<string, unknown> // tool_use input
 	tool_use_id?: string // tool_result reference
-	content?: string | any[] // tool_result content
+	content?: string | Record<string, unknown>[] // tool_result content
 }
 
 export interface Message {
@@ -49,12 +82,26 @@ export interface Message {
 	content: string | ContentBlock[]
 }
 
+export interface PartialTokenUsage {
+	input: number
+	output: number
+	cacheRead?: number
+	cacheCreation?: number
+}
+
+export interface TokenUsage {
+	input: number
+	output: number
+	cacheRead: number
+	cacheCreation: number
+}
+
 // ── Tool definitions (sent to providers) ──
 
 export interface ToolDef {
 	name: string
 	description: string
-	input_schema: Record<string, any>
+	input_schema: ToolInputSchema
 }
 
 // ── Provider interface ──
@@ -68,12 +115,12 @@ export interface ProviderStreamEvent {
 	// tool_call fields
 	id?: string
 	name?: string
-	input?: any
+	input?: Record<string, unknown>
 	parseError?: string
 	rawJson?: string
 	// server_tool fields — opaque content blocks from server-side tools (e.g. web_search).
 	// These go into the assistant message content verbatim and need no local execution.
-	serverBlocks?: any[]
+	serverBlocks?: Record<string, unknown>[]
 	// status fields
 	activity?: string
 	// error fields
@@ -89,7 +136,7 @@ export interface ProviderStreamEvent {
 	//   cacheRead      — cache-hit tokens (billed at ~10% of input rate)
 	//   cacheCreation  — cache-write tokens (billed at ~125% of input rate)
 	// Providers without cache tracking (e.g. OpenAI) leave cacheRead/cacheCreation as 0.
-	usage?: { input: number; output: number; cacheRead: number; cacheCreation: number }
+	usage?: TokenUsage
 }
 
 export interface ProviderRequest {

@@ -3,13 +3,29 @@
 // Runs commands via bash -lc with configurable timeout, output capture,
 // and 1MB output limit with middle-truncation.
 
-import { toolRegistry, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
 const config = {
 	/** Default timeout in milliseconds. */
 	defaultTimeout: 120_000,
 	/** Maximum output size in bytes before truncation. */
 	maxOutputBytes: 1_000_000,
+}
+
+interface BashInput {
+	command?: string
+	timeout?: number
+}
+
+type TimerWithUnref = ReturnType<typeof setTimeout> & { unref?: () => void }
+
+function normalizeInput(input: unknown): BashInput {
+	const raw = toolRegistry.inputObject(input)
+	const timeout = Number(raw.timeout)
+	return {
+		command: typeof raw.command === 'string' ? raw.command : raw.command === undefined ? undefined : String(raw.command),
+		timeout: Number.isFinite(timeout) ? timeout : undefined,
+	}
 }
 
 // ── Process tree management ──
@@ -49,11 +65,12 @@ function truncateOutput(text: string): string {
 
 // ── Execution ──
 
-async function execute(input: any, ctx: ToolContext): Promise<string> {
-	const command = String(input?.command ?? '')
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+	const spec = normalizeInput(input)
+	const command = spec.command ?? ''
 	if (!command.trim()) return 'error: empty command'
 
-	const timeout = input?.timeout ?? config.defaultTimeout
+	const timeout = spec.timeout ?? config.defaultTimeout
 
 	const proc = Bun.spawn(['bash', '-lc', command], {
 		cwd: ctx.cwd,
@@ -67,8 +84,8 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	if (ctx.signal) {
 		const onAbort = () => {
 			killProcessTree(proc.pid, 'SIGTERM')
-			const timer = setTimeout(() => killProcessTree(proc.pid, 'SIGKILL'), 2000)
-			;(timer as any).unref?.()
+			const timer: TimerWithUnref = setTimeout(() => killProcessTree(proc.pid, 'SIGKILL'), 2000)
+			timer.unref?.()
 		}
 		if (ctx.signal.aborted) {
 			onAbort()
@@ -113,7 +130,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 // ── Registration ──
 
-const bashTool = {
+const bashTool: Tool = {
 	name: 'bash',
 	description: 'Run a bash command. Output is captured and returned.',
 	parameters: {

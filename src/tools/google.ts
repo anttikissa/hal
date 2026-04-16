@@ -3,10 +3,15 @@
 // Reads API key from auth.ason (serper.apiKey) or SERPER_API_KEY env var.
 // Returns organic results with title, link, and snippet for each hit.
 
-import { toolRegistry, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { auth } from '../auth.ts'
 
 const SERPER_URL = 'https://google.serper.dev/search'
+
+interface GoogleInput {
+	query?: string
+	num?: number
+}
 
 interface SerperResult {
 	title: string
@@ -20,14 +25,24 @@ interface SerperResponse {
 	knowledgeGraph?: { title?: string; description?: string }
 }
 
-async function execute(input: any, _ctx: ToolContext): Promise<string> {
-	const query = String(input?.query ?? '').trim()
+function normalizeInput(input: unknown): GoogleInput {
+	const raw = toolRegistry.inputObject(input)
+	const num = Number(raw.num)
+	return {
+		query: raw.query === undefined ? undefined : String(raw.query),
+		num: Number.isFinite(num) ? num : undefined,
+	}
+}
+
+async function execute(input: unknown, _ctx: ToolContext): Promise<string> {
+	const spec = normalizeInput(input)
+	const query = (spec.query ?? '').trim()
 	if (!query) return 'error: query is required'
 
 	const cred = auth.getCredential('serper')
 	if (!cred) return 'error: no Serper API key. Set serper.apiKey in auth.ason or SERPER_API_KEY env var.'
 
-	const numResults = Math.min(input?.num ?? 5, 10)
+	const numResults = Math.min(spec.num ?? 5, 10)
 
 	const res = await fetch(SERPER_URL, {
 		method: 'POST',
@@ -69,7 +84,7 @@ async function execute(input: any, _ctx: ToolContext): Promise<string> {
 	return parts.join('\n\n')
 }
 
-const googleTool = {
+const googleTool: Tool = {
 	name: 'google',
 	description: 'Google a query using Serper. Returns titles, URLs, and snippets.',
 	parameters: {

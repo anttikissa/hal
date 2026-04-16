@@ -1,27 +1,29 @@
 import { ipc } from '../ipc.ts'
-import { toolRegistry, type ToolContext } from './tool.ts'
+import type { SpawnMode } from '../protocol.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
 interface SpawnInput {
 	task?: string
-	mode?: 'fork' | 'fresh'
+	mode?: SpawnMode
 	model?: string
 	cwd?: string
 	title?: string
 	closeWhenDone?: boolean
 }
 
-function normalize(input: any, ctx: ToolContext): Required<Pick<SpawnInput, 'task' | 'mode' | 'cwd' | 'closeWhenDone'>> & Omit<SpawnInput, 'task' | 'mode' | 'cwd' | 'closeWhenDone'> {
+function normalize(input: unknown, ctx: ToolContext): Required<Pick<SpawnInput, 'task' | 'mode' | 'cwd' | 'closeWhenDone'>> & Omit<SpawnInput, 'task' | 'mode' | 'cwd' | 'closeWhenDone'> {
+	const raw = toolRegistry.inputObject(input)
 	return {
-		task: String(input?.task ?? '').trim(),
-		mode: input?.mode === 'fresh' ? 'fresh' : 'fork',
-		model: input?.model ? String(input.model) : undefined,
-		cwd: input?.cwd ? String(input.cwd) : ctx.cwd,
-		title: input?.title ? String(input.title) : undefined,
-		closeWhenDone: Boolean(input?.closeWhenDone),
+		task: String(raw.task ?? '').trim(),
+		mode: raw.mode === 'fresh' ? 'fresh' : 'fork',
+		model: raw.model ? String(raw.model) : undefined,
+		cwd: raw.cwd ? String(raw.cwd) : ctx.cwd,
+		title: raw.title ? String(raw.title) : undefined,
+		closeWhenDone: Boolean(raw.closeWhenDone),
 	}
 }
 
-async function execute(input: any, ctx: ToolContext): Promise<string> {
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalize(input, ctx)
 	if (!spec.task) return 'error: task is required'
 	ipc.appendCommand({
@@ -32,10 +34,10 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	return `Queued subagent spawn from ${ctx.sessionId}`
 }
 
-const spawnAgentTool = {
+const spawnAgentTool: Tool = {
 	name: 'spawn_agent',
 	description:
-		'Spawn a background subagent tab. It can either fork the current session or start fresh, optionally override model/cwd/title, and can auto-close after sending a handoff.',
+		'Spawn a background subagent tab. It can either fork the current session or start fresh, optionally override model/cwd/title, and can auto-close after sending a handoff and finishing.',
 	parameters: {
 		task: { type: 'string', description: 'What the subagent should do.' },
 		mode: { type: 'string', enum: ['fork', 'fresh'], description: 'Whether to fork this session or start with fresh context.' },

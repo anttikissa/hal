@@ -6,9 +6,21 @@ import type { Message, ContentBlock } from '../protocol.ts'
 import { models } from '../models.ts'
 import { sessions } from '../server/sessions.ts'
 import { apiMessages } from '../session/api-messages.ts'
-import { toolRegistry, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
 const READ_LIKE = new Set(['read', 'grep', 'glob', 'bash', 'read_url'])
+
+interface AnalyzeInput {
+	sessionId?: string
+	limit?: number
+	inputPrice?: number
+	cachedInputPrice?: number
+	heavyThreshold?: number
+	thinkingThreshold?: number
+	batchSizes?: number[]
+	retryRate?: number
+	retryCostTokens?: number
+}
 
 interface AnalyzeOptions {
 	inputPrice: number
@@ -32,15 +44,41 @@ interface StrategySummary {
 	totalWithRetryUsd: number
 }
 
-function defaults(input: any): AnalyzeOptions {
+interface SessionAnalysisSummary {
+	sessionId: string
+	requests: number
+	summary: Record<string, StrategySummary>
+}
+
+function numberValue(value: unknown): number | undefined {
+	const num = Number(value)
+	return Number.isFinite(num) ? num : undefined
+}
+
+function normalizeInput(input: unknown): AnalyzeInput {
+	const raw = toolRegistry.inputObject(input)
 	return {
-		inputPrice: Number(input?.inputPrice ?? 2.5),
-		cachedInputPrice: Number(input?.cachedInputPrice ?? 0.25),
-		heavyThreshold: Number(input?.heavyThreshold ?? apiMessages.config.heavyThreshold),
-		thinkingThreshold: Number(input?.thinkingThreshold ?? apiMessages.config.thinkingThreshold),
-		batchSizes: Array.isArray(input?.batchSizes) ? input.batchSizes.map(Number).filter((n: number) => n > 0) : [4, 8, 16],
-		retryRate: Number(input?.retryRate ?? 0.01),
-		retryCostTokens: Number(input?.retryCostTokens ?? 12_000),
+		sessionId: typeof raw.sessionId === 'string' ? raw.sessionId : undefined,
+		limit: numberValue(raw.limit),
+		inputPrice: numberValue(raw.inputPrice),
+		cachedInputPrice: numberValue(raw.cachedInputPrice),
+		heavyThreshold: numberValue(raw.heavyThreshold),
+		thinkingThreshold: numberValue(raw.thinkingThreshold),
+		batchSizes: Array.isArray(raw.batchSizes) ? raw.batchSizes.map((value) => Number(value)) : undefined,
+		retryRate: numberValue(raw.retryRate),
+		retryCostTokens: numberValue(raw.retryCostTokens),
+	}
+}
+
+function defaults(input: AnalyzeInput): AnalyzeOptions {
+	return {
+		inputPrice: input.inputPrice ?? 2.5,
+		cachedInputPrice: input.cachedInputPrice ?? 0.25,
+		heavyThreshold: input.heavyThreshold ?? apiMessages.config.heavyThreshold,
+		thinkingThreshold: input.thinkingThreshold ?? apiMessages.config.thinkingThreshold,
+		batchSizes: input.batchSizes?.filter((n) => n > 0) ?? [4, 8, 16],
+		retryRate: input.retryRate ?? 0.01,
+		retryCostTokens: input.retryCostTokens ?? 12_000,
 	}
 }
 
@@ -188,22 +226,31 @@ function roundSummary(summary: StrategySummary): StrategySummary {
 	}
 }
 
-async function execute(input: any, _ctx: ToolContext): Promise<string> {
-	const opts = defaults(input)
-	const ids = typeof input?.sessionId === 'string'
-		? [input.sessionId]
+function rollingPenalty(summary: Record<string, StrategySummary>): number {
+	return (summary.rolling_prune?.totalWithRetryUsd ?? 0) - (summary.keep_all?.totalWithRetryUsd ?? 0)
+}
+
+async function execute(input: unknown, _ctx: ToolContext): Promise<string> {
+	const parsed = normalizeInput(input)
+	const opts = defaults(parsed)
+	const ids = parsed.sessionId
+		? [parsed.sessionId]
 		: sessions
 				.loadAllSessionMetas()
 				.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-				.slice(0, Number(input?.limit ?? 50))
+				.slice(0, parsed.limit ?? 50)
 				.map((meta) => meta.id)
 	const aggregate: Record<string, StrategySummary> = {}
-	const perSession: any[] = []
+	const perSession: SessionAnalysisSummary[] = []
 	for (const id of ids) {
 		const snapshots = requestSnapshots(id)
 		if (snapshots.length === 0) continue
 		const analysis = analyzeSnapshots(snapshots, opts)
-		perSession.push({ sessionId: id, requests: snapshots.length, summary: Object.fromEntries(Object.entries(analysis).map(([k, v]) => [k, roundSummary(v)])) })
+		perSession.push({
+			sessionId: id,
+			requests: snapshots.length,
+			summary: Object.fromEntries(Object.entries(analysis).map(([k, v]) => [k, roundSummary(v)])),
+		})
 		for (const [name, summary] of Object.entries(analysis)) {
 			const acc = aggregate[name] ?? {
 				requests: 0,
@@ -220,7 +267,7 @@ async function execute(input: any, _ctx: ToolContext): Promise<string> {
 			aggregate[name] = acc
 		}
 	}
-	perSession.sort((a, b) => (b.summary.rolling_prune.totalWithRetryUsd - b.summary.keep_all.totalWithRetryUsd) - (a.summary.rolling_prune.totalWithRetryUsd - a.summary.keep_all.totalWithRetryUsd))
+	perSession.sort((a, b) => rollingPenalty(b.summary) - rollingPenalty(a.summary))
 	return JSON.stringify({
 		config: opts,
 		sessionsAnalyzed: perSession.length,
@@ -229,7 +276,7 @@ async function execute(input: any, _ctx: ToolContext): Promise<string> {
 	}, null, 2)
 }
 
-const analyzeHistoryTool = {
+const analyzeHistoryTool: Tool = {
 	name: 'analyze_history',
 	description: 'Analyze past sessions and estimate prompt-cache cost for different pruning strategies.',
 	parameters: {

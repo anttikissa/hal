@@ -6,7 +6,7 @@
 
 import { mkdirSync } from 'fs'
 import { join } from 'path'
-import { toolRegistry, type ToolContext } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { STATE_DIR } from '../state.ts'
 
 let counter = 0
@@ -16,8 +16,28 @@ const config = {
 	timeout: 10_000,
 }
 
-async function execute(input: any, ctx: ToolContext): Promise<string> {
-	const code = String(input?.code ?? '')
+interface EvalInput {
+	code?: string
+}
+
+interface EvalRuntimeContext {
+	sessionId: string
+	cwd: string
+	halDir: string
+	stateDir: string
+	signal?: AbortSignal
+}
+
+function normalizeInput(input: unknown): EvalInput {
+	const raw = toolRegistry.inputObject(input)
+	return {
+		code: raw.code === undefined ? undefined : String(raw.code),
+	}
+}
+
+async function execute(input: unknown, ctx: ToolContext): Promise<string> {
+	const spec = normalizeInput(input)
+	const code = spec.code ?? ''
 	if (!code.trim()) return 'error: empty code'
 
 	// Persist eval code for audit trail
@@ -38,7 +58,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const wrapped = [
 		...imports,
 		imports.length ? '' : undefined,
-		'export default async (ctx: any) => {',
+		'export default async (ctx: { sessionId: string; cwd: string; halDir: string; stateDir: string; signal?: AbortSignal }) => {',
 		...body,
 		'}',
 		'',
@@ -50,7 +70,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 	try {
 		const mod = await import(file)
-		const evalCtx = {
+		const evalCtx: EvalRuntimeContext = {
 			sessionId: ctx.sessionId,
 			cwd: ctx.cwd,
 			halDir: join(STATE_DIR, '..'),
@@ -58,24 +78,25 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 			signal: ctx.signal,
 		}
 
-		// Race eval against abort signal and timeout
-		const run = mod.default(evalCtx)
-		const promises: Promise<any>[] = [run]
+		// Race eval against abort signal and timeout.
+		const run = Promise.resolve((mod as { default: (ctx: EvalRuntimeContext) => unknown }).default(evalCtx))
+		const promises: Promise<unknown>[] = [run]
 
-		// Abort promise: rejects if signal fires
+		// Abort promise: rejects if signal fires.
 		if (ctx.signal) {
 			promises.push(
 				new Promise<never>((_, reject) => {
 					if (ctx.signal!.aborted) reject(new DOMException('Aborted', 'AbortError'))
-					else
+					else {
 						ctx.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {
 							once: true,
 						})
+					}
 				}),
 			)
 		}
 
-		// Timeout promise
+		// Timeout promise.
 		promises.push(
 			new Promise<never>((_, reject) =>
 				setTimeout(() => reject(new Error(`eval timed out after ${config.timeout}ms`)), config.timeout),
@@ -85,13 +106,14 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 		const result = await Promise.race(promises)
 		if (result === undefined) return 'undefined'
 		return typeof result === 'string' ? result : JSON.stringify(result)
-	} catch (err: any) {
+	} catch (err: unknown) {
 		if (ctx.signal?.aborted) return '[interrupted]'
-		return `${err.stack ?? err.message}`
+		if (err instanceof Error && err.stack) return err.stack
+		return toolRegistry.errorMessage(err)
 	}
 }
 
-const evalToolDef = {
+const evalToolDef: Tool = {
 	name: 'eval',
 	description:
 		'Execute TypeScript in the Hal process. Has access to runtime internals via ctx (sessionId, cwd, halDir, stateDir). Use `return` to return a value. Use standard `import` for module access.',
