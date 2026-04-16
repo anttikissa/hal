@@ -32,17 +32,21 @@ backtick strings`,
 { type: 'host-released' }
 ```
 
-## Design goal
+## Design goals
 
-ASON parser should accept all primitive objects that JavaScript parser supports, being a superset of
-JSON, JSONC, and JSON5. The stringifier should produce human readable output by default.
-
-The reference implementation has no dependencies and fits under 500 lines of code.
+- Support all primitive JS objects (including BigInt, undefined, Infinity etc)
+- Comments are supported and parse-stringify roundtrip preserves them (with some limitations)
+- Human readable by default, compact mode is available when needed
+- You can paste ASON into any JavaScript REPL
+- Superset of JSON, JSONC, JSON5
+- Reasonably fast TS reference implementation (cannot match native code, but it shouldn't be an
+  order of magnitude slower) with no dependencies and under 500 lines of code
+- Bonus: parse errors should be as helpful as possible
 
 ## API
 
 `ason.parse(str)` parses an ASON string into a JavaScript value
-`ason.parse(str, { comments: true })` also preserves comments as `[COMMENTS]` metadata.
+`ason.parse(str, { comments: true })` also preserves comments as `[COMMENTS]` metadata
 `ason.stringify(value)` print value with smart formatting (similar to prettier)
 `ason.stringify(value, 'short')` prints a compact one-line representation of value
 `ason.stringify(value, 'long')` prints a compact one-line representation of value
@@ -59,7 +63,7 @@ The parser accepts all JSON types, plus:
 - Unquoted keys: `{ name: 'hal', version: 1 }` (including non-ASCII like `café`)
 - Single-quoted strings: `'hello'`
 - Backtick strings: `` `line1\nline2` `` — multiline, no interpolation
-- JSON5-style strings?
+- JSON5-style string continuations and escapes: `'a\\\nb'`, `"\x41\u0042"`
 - `undefined`
 - `NaN`, `Infinity`, `-Infinity`, `+Infinity`, `+NaN`
 - Hex numbers: `0xFF`
@@ -70,23 +74,6 @@ The parser accepts all JSON types, plus:
 - String escapes: `\xNN`, `\v`, `\0`, line continuations
 - Comments: `// line` and `/* block */`
 - Trailing commas
-
-## Commas
-
-Commas follow JavaScript rules:
-
-- required between properties in objects
-- required between items in arrays
-- optional after the last property/item
-
-Valid:
-
-```ason
-{ a: 1, b: 2 }
-{ a: 1, b: 2, }
-[1, 2, 3]
-[1, 2, 3,]
-```
 
 Invalid:
 
