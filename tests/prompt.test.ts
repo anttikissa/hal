@@ -54,6 +54,6 @@ describe('prompt', () => {
 		const built = prompt.buildPrompt(5)
 		expect(built.lines).toEqual(['12345', ''])
 		expect(built.cursor).toEqual({ rowOffset: 1, col: 0 })
-		expect(prompt.lineCount(5)).toBe(2)
+		expect(built.lines).toHaveLength(2)
 	})
 })

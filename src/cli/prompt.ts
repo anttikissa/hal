@@ -62,9 +62,6 @@ function cursorToRowCol(input: string, absPos: number, width: number): { row: nu
 	return { row: last, col: lines[last]?.length ?? 0 }
 }
 
-function promptRows(layout: WrappedLayout, cursorRow: number): number {
-	return Math.max(layout.lines.length, cursorRow + 1)
-}
 
 function rowColToCursor(input: string, row: number, col: number, width: number): number {
 	const { lines, starts } = getLayout(input, width)
@@ -137,6 +134,11 @@ function clamp(pos: number): number {
 	return Math.max(0, Math.min(pos, buf.length))
 }
 
+function clearSelectionAndGoal(): void {
+	selAnchor = null
+	goalCol = null
+}
+
 function selRange(): { start: number; end: number } | null {
 	if (selAnchor === null) return null
 	const lo = Math.min(selAnchor, cursor)
@@ -152,10 +154,7 @@ function pushUndo(): void {
 	redoStack.length = 0
 }
 
-// ── Mutations ────────────────────────────────────────────────────────────────
-
-function replaceSelection(text: string): void {
-	pushUndo()
+function applyInsertion(text: string): void {
 	const sel = selRange()
 	if (sel) {
 		buf = buf.slice(0, sel.start) + text + buf.slice(sel.end)
@@ -164,32 +163,80 @@ function replaceSelection(text: string): void {
 		buf = buf.slice(0, cursor) + text + buf.slice(cursor)
 		cursor += text.length
 	}
-	selAnchor = null
+	clearSelectionAndGoal()
+}
+
+function restoreSnapshot(snap: Snapshot): void {
+	buf = snap.text
+	cursor = clamp(snap.cursor)
+	selAnchor = snap.selAnchor
 	goalCol = null
+}
+
+function stepHistory(from: Snapshot[], to: Snapshot[]): boolean {
+	undoGrouping = false
+	const snap = from.pop()
+	if (!snap) return false
+	to.push({ text: buf, cursor, selAnchor })
+	restoreSnapshot(snap)
+	return true
+}
+
+function loadHistoryText(text: string): void {
+	buf = text
+	cursor = buf.length
+	clearSelectionAndGoal()
+}
+
+function browseHistory(dir: -1 | 1): boolean {
+	if (history.length === 0) return false
+	if (dir === -1) {
+		if (historyIndex < 0) {
+			historyDraft = buf
+			historyIndex = history.length - 1
+		} else if (historyIndex > 0) {
+			historyIndex--
+		} else {
+			move(0, false)
+			return true
+		}
+		loadHistoryText(history[historyIndex]!)
+		return true
+	}
+	if (historyIndex < 0) {
+		move(buf.length, false)
+		return true
+	}
+	if (historyIndex < history.length - 1) {
+		historyIndex++
+		loadHistoryText(history[historyIndex]!)
+		return true
+	}
+	historyIndex = -1
+	loadHistoryText(historyDraft)
+	historyDraft = ''
+	return true
+}
+
+// ── Mutations ────────────────────────────────────────────────────────────────
+
+function replaceSelection(text: string): void {
+	pushUndo()
+	applyInsertion(text)
 }
 
 // Single char insert — consecutive inserts coalesce into one undo group
 function typeChar(ch: string): void {
 	if (!undoGrouping) pushUndo()
 	undoGrouping = true
-	const sel = selRange()
-	if (sel) {
-		buf = buf.slice(0, sel.start) + ch + buf.slice(sel.end)
-		cursor = sel.start + ch.length
-	} else {
-		buf = buf.slice(0, cursor) + ch + buf.slice(cursor)
-		cursor += ch.length
-	}
-	selAnchor = null
-	goalCol = null
+	applyInsertion(ch)
 }
 
 function deleteRange(start: number, end: number): void {
 	pushUndo()
 	buf = buf.slice(0, start) + buf.slice(end)
 	cursor = start
-	selAnchor = null
-	goalCol = null
+	clearSelectionAndGoal()
 }
 
 function deleteSel(): boolean {
@@ -214,35 +261,18 @@ function collapseOrMove(pos: number, edge: 'start' | 'end'): void {
 	const sel = selRange()
 	if (sel) {
 		cursor = edge === 'start' ? sel.start : sel.end
-		selAnchor = null
-		goalCol = null
+		clearSelectionAndGoal()
 	} else {
 		move(pos, false)
 	}
 }
 
 function undo(): boolean {
-	undoGrouping = false
-	const snap = undoStack.pop()
-	if (!snap) return false
-	redoStack.push({ text: buf, cursor, selAnchor })
-	buf = snap.text
-	cursor = clamp(snap.cursor)
-	selAnchor = snap.selAnchor
-	goalCol = null
-	return true
+	return stepHistory(undoStack, redoStack)
 }
 
 function redo(): boolean {
-	undoGrouping = false
-	const snap = redoStack.pop()
-	if (!snap) return false
-	undoStack.push({ text: buf, cursor, selAnchor })
-	buf = snap.text
-	cursor = clamp(snap.cursor)
-	selAnchor = snap.selAnchor
-	goalCol = null
-	return true
+	return stepHistory(redoStack, undoStack)
 }
 
 // ── Clipboard ────────────────────────────────────────────────────────────────
@@ -424,48 +454,8 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 				goalCol = r.goalCol
 				return true
 			}
-			// At boundary: cycle history
-			if (history.length > 0) {
-				if (dir === -1) {
-					if (historyIndex < 0) {
-						historyDraft = buf
-						historyIndex = history.length - 1
-					} else if (historyIndex > 0) {
-						historyIndex--
-					} else {
-						cursor = 0
-						goalCol = null
-						selAnchor = null
-						return true
-					}
-					buf = history[historyIndex]!
-					cursor = buf.length
-					goalCol = null
-					selAnchor = null
-				} else {
-					if (historyIndex < 0) {
-						cursor = buf.length
-						goalCol = null
-						selAnchor = null
-						return true
-					}
-					if (historyIndex < history.length - 1) {
-						historyIndex++
-						buf = history[historyIndex]!
-					} else {
-						historyIndex = -1
-						buf = historyDraft
-						historyDraft = ''
-					}
-					cursor = buf.length
-					goalCol = null
-					selAnchor = null
-				}
-				return true
-			}
-			cursor = dir === -1 ? 0 : buf.length
-			goalCol = null
-			selAnchor = null
+			if (browseHistory(dir)) return true
+			move(dir === -1 ? 0 : buf.length, false)
 		} else {
 			if (selAnchor === null) selAnchor = cursor
 			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
@@ -514,7 +504,7 @@ interface PromptRender {
 function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getLayout(buf, contentWidth)
 	const { row: curRow, col: curCol } = cursorToRowCol(buf, cursor, contentWidth)
-	const totalRows = promptRows(layout, curRow)
+	const totalRows = Math.max(layout.lines.length, curRow + 1)
 	const promptLines = Math.min(totalRows, config.maxPromptLines)
 	const sel = selRange()
 
@@ -563,8 +553,7 @@ function cursorPos(): number {
 function setText(t: string, c?: number): void {
 	buf = t
 	cursor = c ?? t.length
-	goalCol = null
-	selAnchor = null
+	clearSelectionAndGoal()
 	historyIndex = -1
 	historyDraft = ''
 }
@@ -572,8 +561,7 @@ function setText(t: string, c?: number): void {
 function clear(): void {
 	buf = ''
 	cursor = 0
-	goalCol = null
-	selAnchor = null
+	clearSelectionAndGoal()
 	undoStack = []
 	redoStack = []
 	undoGrouping = false
@@ -592,10 +580,6 @@ function pushHistory(text: string): void {
 function setRenderCallback(cb: () => void): void {
 	renderCallback = cb
 }
-function lineCount(w: number): number {
-	const layout = getLayout(buf, w)
-	return Math.min(promptRows(layout, cursorToRowCol(buf, cursor, w).row), config.maxPromptLines)
-}
 
 export const prompt = {
 	config,
@@ -609,5 +593,4 @@ export const prompt = {
 	setRenderCallback,
 	handleKey,
 	buildPrompt,
-	lineCount,
 }

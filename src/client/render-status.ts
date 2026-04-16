@@ -322,7 +322,7 @@ function renderPrompt(lines: string[]): void {
 // Help bar always counts as 1 line (even when empty) to prevent jumps.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	return 3 + prompt.lineCount(cols) // tab bar + status + help bar + prompt
+	return 3 + prompt.buildPrompt(cols).lines.length // tab bar + status + help bar + prompt
 }
 
 export const renderStatus = { chromeLines, hasAnimatedIndicators, renderTabBar, renderStatusLine, renderHelpBar, renderPrompt }
