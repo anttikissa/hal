@@ -265,6 +265,26 @@ test('edit block header shows affected line range', () => {
 })
 
 
+test('edit block shows hashline refs for debugging', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'edit',
+		input: {
+			path: 'src/app.ts',
+			operation: 'replace',
+			start_ref: '12:abc',
+			end_ref: '15:def',
+			new_content: 'next',
+		},
+	}
+
+	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1).join('\n')
+	expect(body).toContain("operation: 'replace'")
+	expect(body).toContain("start_ref: '12:abc'")
+	expect(body).toContain("end_ref: '15:def'")
+})
+
+
 test('edit block keeps failure details visible after diff preview', () => {
 	const block: Block = {
 		type: 'tool',

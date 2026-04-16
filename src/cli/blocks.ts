@@ -405,9 +405,22 @@ function toolCommand(name: string, input?: any): string | undefined {
 	return undefined
 }
 
+function formatEditDetails(input: any): string | undefined {
+	if (input == null) return undefined
+	const details: Record<string, string> = {}
+	if (typeof input.operation === 'string') details.operation = input.operation
+	if (typeof input.start_ref === 'string') details.start_ref = input.start_ref
+	if (typeof input.end_ref === 'string') details.end_ref = input.end_ref
+	if (typeof input.after_ref === 'string') details.after_ref = input.after_ref
+	if (Object.keys(details).length === 0) return undefined
+	return ason.stringify(details, 'long')
+}
+
 function toolDetails(name: string, input: any): string | undefined {
-	if (name !== 'spawn_agent' || input == null) return undefined
-	return ason.stringify(input, 'long')
+	if (input == null) return undefined
+	if (name === 'spawn_agent') return ason.stringify(input, 'long')
+	if (name === 'edit') return formatEditDetails(input)
+	return undefined
 }
 
 // ── Tool output formatting ────────────────────────────────────────────────────
