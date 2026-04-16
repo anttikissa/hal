@@ -39,11 +39,6 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 	return new ReadableStream({
 		async pull(controller) {
 			while (!stopped) {
-				// Only wait for fs.watch if we have no pending notification
-				if (!pending) await new Promise<void>(r => (resolve = r))
-				pending = false
-				if (stopped) break
-
 				const size = fileSize(path)
 				// Truncation: reset to beginning
 				if (size < offset) offset = 0
@@ -58,6 +53,13 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 					if (newSize > offset) pending = true
 					return
 				}
+				// Check the file itself on every pull before waiting on fs.watch.
+				// On macOS we can miss the notification for an append that happened
+				// while the consumer was busy processing the previous record. Without
+				// this, the tail can stall until some later unrelated write nudges it.
+				if (!pending) await new Promise<void>(r => (resolve = r))
+				pending = false
+				if (stopped) break
 			}
 		},
 		cancel() {

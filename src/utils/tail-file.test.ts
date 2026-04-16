@@ -63,6 +63,30 @@ test('multiple appends produce multiple chunks', async () => {
 	}
 })
 
+
+test('next read checks for unread bytes before waiting for another watch event', async () => {
+	const p = tmpFile('next-pull')
+	try {
+		const stream = tailFile(p)
+		const reader = stream.getReader()
+		await Bun.sleep(100)
+		appendFileSync(p, 'first')
+		const first = await reader.read()
+		expect(new TextDecoder().decode(first.value)).toBe('first')
+		appendFileSync(p, 'second')
+		const second = await Promise.race([
+			reader.read(),
+			Bun.sleep(500).then(() => {
+				throw new Error('tail stalled waiting for a later write')
+			}),
+		])
+		expect(new TextDecoder().decode(second.value)).toBe('second')
+		await reader.cancel()
+	} finally {
+		unlinkSync(p)
+	}
+})
+
 test('only gets future data (starts from EOF)', async () => {
 	const p = tmpFile('eof')
 	writeFileSync(p, 'old stuff')
