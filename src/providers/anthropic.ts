@@ -7,7 +7,7 @@
 // - Extended thinking (adaptive for Opus 4.6+, enabled for other thinking models)
 
 import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '../protocol.ts'
-import { provider as providerUtils } from './provider.ts'
+import { providerShared } from './shared.ts'
 import { auth } from '../auth.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
 import { STATE_DIR } from '../state.ts'
@@ -192,7 +192,7 @@ async function* parseStream(
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 
 	while (true) {
-		const { done, value } = await providerUtils.readWithTimeout(reader)
+		const { done, value } = await providerShared.readWithTimeout(reader)
 		if (done) break
 		buf += decoder.decode(value, { stream: true })
 
@@ -407,7 +407,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 			const prev = await Bun.file('/tmp/compare/hal.txt').text()
 			await Bun.write('/tmp/compare/hal.txt', prev + `ERROR BODY: ${text}\n\n`)
 		} catch {}
-		const retryAfterMs = providerUtils.parseRetryDelay(res, text)
+		const retryAfterMs = providerShared.parseRetryDelay(res, text)
 		if (res.status === 429) {
 			const cooldownMs = retryAfterMs ?? 10 * 60_000
 			auth.markCooldown(cred, cooldownMs)

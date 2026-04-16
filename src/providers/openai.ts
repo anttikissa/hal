@@ -9,7 +9,7 @@
 
 import type { Message, Provider, ProviderRequest, ProviderStreamEvent } from '../protocol.ts'
 import { auth, type Credential } from '../auth.ts'
-import { provider as providerUtils } from './provider.ts'
+import { providerShared } from './shared.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { reasoningSignature } from '../session/reasoning-signature.ts'
 import { models } from '../models.ts'
@@ -470,7 +470,7 @@ async function* parseResponsesStream(body: ReadableStream<Uint8Array>): AsyncGen
 
 	try {
 		while (true) {
-			const { done, value } = await providerUtils.readWithTimeout(reader)
+			const { done, value } = await providerShared.readWithTimeout(reader)
 			if (done) break
 			buf += decoder.decode(value, { stream: true })
 
@@ -515,7 +515,7 @@ async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): As
 
 	try {
 		while (true) {
-			const { done, value } = await providerUtils.readWithTimeout(reader)
+			const { done, value } = await providerShared.readWithTimeout(reader)
 			if (done) break
 			buf += decoder.decode(value, { stream: true })
 
@@ -645,7 +645,7 @@ async function* generateCompat(
 			status: res.status,
 			body: text,
 			endpoint,
-			retryAfterMs: providerUtils.parseRetryDelay(res, text),
+			retryAfterMs: providerShared.parseRetryDelay(res, text),
 		}
 		yield { type: 'done' }
 		return
@@ -738,7 +738,7 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 
 	if (!res.ok) {
 		const text = (await res.text()).slice(0, 2000)
-		const retryAfterMs = providerUtils.parseRetryDelay(res, text)
+		const retryAfterMs = providerShared.parseRetryDelay(res, text)
 		// Mark this credential on cooldown so the next retry picks a different account.
 		// Default cooldown: 10 minutes, or whatever the server says via Retry-After.
 		if (res.status === 429) {
