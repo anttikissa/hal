@@ -39,21 +39,9 @@ const BRACKETED_PASTE_OFF = '\x1b[?2004l'
 // columns 5, 9, 13, 17, ... (i.e. positions where the cursor lands
 // after pressing tab at columns 1–4, 5–8, etc.)
 
-function setTabStops(cols: number): void {
-	const tw = blocks.config.tabWidth
+function writeTabStops(cols: number, step: number): void {
 	let seq = '\x1b[3g'
-	for (let c = tw + 1; c <= cols; c += tw) {
-		seq += `\x1b[${c}G\x1bH`
-	}
-	seq += '\x1b[1G'
-	process.stdout.write(seq)
-}
-
-function restoreDefaultTabStops(cols: number): void {
-	let seq = '\x1b[3g'
-	for (let c = 9; c <= cols; c += 8) {
-		seq += `\x1b[${c}G\x1bH`
-	}
+	for (let c = step + 1; c <= cols; c += step) seq += `\x1b[${c}G\x1bH`
 	seq += '\x1b[1G'
 	process.stdout.write(seq)
 }
@@ -123,7 +111,7 @@ function cleanupTerminal(): void {
 	client.saveState()
 	if (useKitty) process.stdout.write(KITTY_OFF)
 	process.stdout.write(BRACKETED_PASTE_OFF)
-	restoreDefaultTabStops(process.stdout.columns || 80)
+	writeTabStops(process.stdout.columns || 80, 8)
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 }
 
@@ -153,14 +141,8 @@ function onSigcont(): void {
 	}
 	if (useKitty) process.stdout.write(KITTY_ON)
 	process.stdout.write(BRACKETED_PASTE_ON)
-	setTabStops(process.stdout.columns || 80)
+	writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 	draw(true)
-}
-
-function submitCommandType(_text: string, _busy: boolean): 'prompt' {
-	// Human typing now uses the same prompt command path as inbox messages.
-	// The runtime decides whether an active turn makes this behave like steering.
-	return 'prompt'
 }
 
 const rawState = {
@@ -224,11 +206,6 @@ function handleRawInput(data: string, emit = (text: string) => client.addEntry(t
 	return true
 }
 
-function handleLocalCommand(text: string): boolean {
-	if (text.trim() !== '/raw') return false
-	startRawMode()
-	return true
-}
 
 function resetRawModeForTests(): void {
 	flushRawTokens(() => {})
@@ -243,13 +220,16 @@ function submit(override?: string): void {
 	popup.close()
 	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
-	if (handleLocalCommand(text)) {
+	if (text === '/raw') {
+		startRawMode()
 		prompt.clear()
 		client.onSubmit(text)
 		draw()
 		return
 	}
-	client.sendCommand(submitCommandType(text, client.isBusy()), text)
+	// Human typing now uses the same prompt command path as inbox messages.
+	// The runtime decides whether an active turn makes this behave like steering.
+	client.sendCommand('prompt', text)
 	prompt.clear()
 	// Update tab's inputHistory + clear persisted draft
 	client.onSubmit(text)
@@ -325,11 +305,6 @@ function handleCompletionKey(k: KeyEvent): boolean {
 	return false
 }
 
-function handlePopupKey(k: KeyEvent): boolean {
-	if (!popup.state.active) return false
-	return popup.handleKey(k)
-}
-
 // Canonical key name for help bar usage tracking
 function canonicalKeyName(k: KeyEvent): string {
 	const parts: string[] = []
@@ -341,28 +316,13 @@ function canonicalKeyName(k: KeyEvent): string {
 	return parts.join('-')
 }
 
+function sendTabCommandIfRoom(type: 'open' | 'resume', text?: string): void {
+	if (client.state.tabs.length < 40) client.sendCommand(type, text)
+	else client.addEntry('Max tabs reached (40). Close one first.', 'error')
+}
+
 // App-level keybindings (not handled by prompt)
 function handleAppKey(k: KeyEvent): boolean {
-	// Ctrl-R: restart
-	if (k.key === 'r' && k.ctrl) {
-		render.clearFrame()
-		cleanupTerminal()
-		process.exit(RESTART_CODE)
-	}
-	// Ctrl-C: quit
-	if (k.key === 'c' && k.ctrl) {
-		exitCli(0)
-	}
-	// Ctrl-D: quit if prompt empty, else let prompt handle (delete forward)
-	if (k.key === 'd' && k.ctrl && !prompt.text()) {
-		exitCli(0)
-	}
-	// Ctrl-Z: suspend (SIGSTOP to process group, like a normal unix program)
-	if (k.key === 'z' && k.ctrl) {
-		suspend()
-		return true
-	}
-	// Model picker: prefer Ctrl-M on modern terminals, keep Alt-M as fallback.
 	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
 		completion.dismiss()
 		const currentModel = client.currentTab()?.model || client.state.model || undefined
@@ -374,45 +334,53 @@ function handleAppKey(k: KeyEvent): boolean {
 		draw()
 		return true
 	}
-	// Ctrl-L: force redraw
-	if (k.key === 'l' && k.ctrl) {
-		draw(true)
-		return true
-	}
-	// Ctrl-T: new tab. Ctrl-Shift-T restores the most recently closed tab,
-	// matching Chrome, so plain Ctrl-T must require no shift.
-	if (k.key === 't' && k.ctrl && !k.shift && !k.alt && !k.cmd) {
-		if (client.state.tabs.length < 40) client.sendCommand('open')
-		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
-		return true
-	}
-	// Ctrl-Shift-T: reopen the most recently closed tab, like Chrome.
-	if (k.key === 't' && k.ctrl && k.shift && !k.alt && !k.cmd) {
-		if (client.state.tabs.length < 40) client.sendCommand('resume')
-		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
-		return true
-	}
-	// Ctrl-F: fork tab
-	if (k.key === 'f' && k.ctrl) {
-		const tab = client.currentTab()
-		if (!tab) return true
-		if (client.state.tabs.length < 40) client.sendCommand('open', `fork:${tab.sessionId}`)
-		else client.addEntry('Max tabs reached (40). Close one first.', 'error')
-		return true
-	}
-	// Ctrl-W: close tab
-	if (k.key === 'w' && k.ctrl) {
-		if (client.state.tabs.length > 1) client.sendCommand('close')
-		return true
-	}
-	// Ctrl-N / Ctrl-P: tab switching
-	if (k.key === 'n' && k.ctrl) {
-		client.nextTab()
-		return true
-	}
-	if (k.key === 'p' && k.ctrl) {
-		client.prevTab()
-		return true
+	if (k.ctrl && !k.alt && !k.cmd) {
+		// Ctrl-R: restart
+		if (k.key === 'r') {
+			render.clearFrame()
+			cleanupTerminal()
+			process.exit(RESTART_CODE)
+		}
+		// Ctrl-C: quit
+		if (k.key === 'c') exitCli(0)
+		// Ctrl-D: quit if prompt empty, else let prompt handle (delete forward)
+		if (k.key === 'd' && !prompt.text()) exitCli(0)
+		// Ctrl-Z: suspend (SIGSTOP to process group, like a normal unix program)
+		if (k.key === 'z') {
+			suspend()
+			return true
+		}
+		// Ctrl-L: force redraw
+		if (k.key === 'l') {
+			draw(true)
+			return true
+		}
+		// Ctrl-T: new tab. Ctrl-Shift-T restores the most recently closed tab,
+		// matching Chrome, so plain Ctrl-T must require no shift.
+		if (k.key === 't') {
+			sendTabCommandIfRoom(k.shift ? 'resume' : 'open')
+			return true
+		}
+		// Ctrl-F: fork tab
+		if (k.key === 'f') {
+			const tab = client.currentTab()
+			if (tab) sendTabCommandIfRoom('open', `fork:${tab.sessionId}`)
+			return true
+		}
+		// Ctrl-W: close tab
+		if (k.key === 'w') {
+			if (client.state.tabs.length > 1) client.sendCommand('close')
+			return true
+		}
+		// Ctrl-N / Ctrl-P: tab switching
+		if (k.key === 'n') {
+			client.nextTab()
+			return true
+		}
+		if (k.key === 'p') {
+			client.prevTab()
+			return true
+		}
 	}
 	// Opt-1 through Opt-9: jump to tab N, Opt-0: tab 10
 	if (k.alt && k.key >= '0' && k.key <= '9') {
@@ -442,7 +410,7 @@ function handleAppKey(k: KeyEvent): boolean {
 
 function startCli(signal: AbortSignal): void {
 	// Wire state changes to repaint.
-	client.setOnChange((force) => draw(force))
+	client.setOnChange(draw)
 
 	// Wire prompt to trigger repaint on async paste resolve.
 	prompt.setRenderCallback(() => {
@@ -463,7 +431,7 @@ function startCli(signal: AbortSignal): void {
 		process.stdin.resume()
 		if (useKitty) process.stdout.write(KITTY_ON)
 		process.stdout.write(BRACKETED_PASTE_ON)
-		setTabStops(process.stdout.columns || 80)
+		writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 	}
 	// Safety net: if we exit without hitting an explicit cleanup path
 	// (e.g. SIGTERM, uncaught exception), this still restores the terminal.
@@ -481,7 +449,7 @@ function startCli(signal: AbortSignal): void {
 	draw()
 	perf.mark('First draw done')
 	process.stdout.on('resize', () => {
-		setTabStops(process.stdout.columns || 80)
+		writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 		draw(true)
 	})
 
@@ -513,20 +481,18 @@ function startCli(signal: AbortSignal): void {
 	})
 
 	process.stdin.on('data', (data: Buffer) => {
-		if (handleRawInput(data.toString('utf-8'))) {
+		const text = data.toString('utf-8')
+		if (handleRawInput(text)) {
 			draw()
 			return
 		}
-		const cols = process.stdout.columns || 80
-		const contentWidth = cols
-
-		for (const k of keys.parseKeys(data.toString('utf-8'))) {
+		for (const k of keys.parseKeys(text)) {
 			// Track key usage for help bar
 			if (k.ctrl || k.alt || k.cmd || k.key === 'enter' || k.key === 'escape' || k.key === 'tab') {
 				helpBar.logKey(canonicalKeyName(k))
 			}
 			// Popup keys first — an active modal owns the keyboard.
-			if (handlePopupKey(k)) {
+			if (popup.state.active && popup.handleKey(k)) {
 				syncPromptToClient()
 				draw()
 				continue
@@ -540,7 +506,7 @@ function startCli(signal: AbortSignal): void {
 			// App keybindings
 			if (handleAppKey(k)) continue
 			// Then prompt editing
-			if (prompt.handleKey(k, contentWidth)) {
+			if (prompt.handleKey(k, process.stdout.columns || 80)) {
 				syncPromptToClient()
 				draw()
 			}
@@ -555,7 +521,6 @@ function syncPromptToClient(): void {
 
 export const cli = {
 	startCli,
-	submitCommandType,
 	formatRawToken,
 	forTests: {
 		handleAppKey,
