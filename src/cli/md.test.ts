@@ -62,6 +62,13 @@ test('mdInline: star inside backtick code is not italic', () => {
 	expect(r).toContain(`${DIM}*${DIM_OFF}`)
 })
 
+
+test('mdInline: escaped stars stay literal', () => {
+	const r = md.mdInline('a\\*\\*\\*@g\\*\\*\\*\\*.com')
+	expect(strip(r)).toBe('a***@g****.com')
+	expect(r).not.toContain(I)
+})
+
 test('mdInline: plain text unchanged', () => {
 	expect(md.mdInline('just text')).toBe('just text')
 })

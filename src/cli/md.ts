@@ -105,15 +105,25 @@ function mdSpans(text: string): MdSpan[] {
 
 // ── Inline formatting ────────────────────────────────────────────────────────
 
-/** Apply inline markdown: **bold**, *italic*, `code`, # headers. */
+/** Apply inline markdown: **bold**, *italic*, `code`, # headers.
+ *  Supports backslash-escaped literal markdown markers like \* and \`. */
 function mdInline(line: string, colors?: MdColors): string {
 	const c = colors ?? DEFAULT_COLORS
+	const escaped: string[] = []
+	const ph = (i: number) => `\x00E${i}\x00`
+
+	// Protect escaped markdown markers so later regexes treat them as literals.
+	// This fixes values like a\*\*\*@g\*\*\*\*.com inside markdown tables.
+	line = line.replace(/\\([\\`*#])/g, (_, ch) => {
+		const i = escaped.length
+		escaped.push(ch)
+		return ph(i)
+	})
 
 	// Headers: # through ######
 	const hm = line.match(/^(#{1,6})\s+(.*)/)
-	if (hm) return `${c.bold[0]}${inlineSpans(hm[2]!, c)}${c.bold[1]}`
-
-	return inlineSpans(line, c)
+	const rendered = hm ? `${c.bold[0]}${inlineSpans(hm[2]!, c)}${c.bold[1]}` : inlineSpans(line, c)
+	return rendered.replace(/\x00E(\d+)\x00/g, (_, i) => escaped[+i]!)
 }
 
 function inlineSpans(s: string, c: MdColors): string {

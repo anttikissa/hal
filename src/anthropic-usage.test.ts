@@ -110,7 +110,7 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 
 	const text = anthropicUsage.formatStatusText()
 
-	expect(text).toContain('a***@l***.fi')
-	expect(text).toContain('a***@g****.com')
-	expect(text).toContain('| 1/2 * | a***@l***.fi | [')
+	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
+	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
+	expect(text).toContain('| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | [')
 })

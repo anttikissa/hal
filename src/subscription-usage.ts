@@ -6,7 +6,9 @@ const config = {
 
 function maskLabel(label: string, stars: number): string {
 	if (!label) return ''
-	return `${label[0]}${'*'.repeat(stars)}`
+	// Status output goes through the markdown table renderer, so the masking stars
+	// must be escaped to stay literal instead of turning nearby text italic.
+	return `${label[0]}${'\\*'.repeat(stars)}`
 }
 
 function censorEmail(email: string): string {

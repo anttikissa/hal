@@ -161,10 +161,10 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 
 	const text = openaiUsage.formatStatusText()
 
-	expect(text).toContain('a***@l***.fi')
-	expect(text).toContain('a***@g****.com')
-	expect(text).toContain('l***@g****.com')
-	expect(text).toContain('| 1/3 * | a***@l***.fi (plus) | [')
+	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
+	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
+	expect(text).toContain('l\\*\\*\\*@g\\*\\*\\*\\*.com')
+	expect(text).toContain('| 1/3 * | a\\*\\*\\*@l\\*\\*\\*.fi (plus) | [')
 	expect(text).toContain('<br>68% used (resets ')
 	expect(/[▁▂▃▄▅▆▇]/.test(text)).toBe(true)
 	expect(text).not.toContain('▌')
