@@ -245,3 +245,45 @@ test('spawn_agent block renders full input args', () => {
 	expect(body).toContain('closeWhenDone: false')
 	expect(body).toContain('Queued subagent spawn from 04-lfp')
 })
+
+
+test('edit block header shows affected line range', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'edit',
+		input: {
+			path: 'src/app.ts',
+			operation: 'replace',
+			start_ref: '12:abc',
+			end_ref: '15:def',
+			new_content: 'next',
+		},
+	}
+
+	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	expect(header).toContain('Edit src/app.ts (12-15)')
+})
+
+
+test('edit block keeps failure details visible after diff preview', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'edit',
+		output: [
+			'--- before',
+			'2:aaa old line',
+			'',
+			'+++ after',
+			'2:bbb new line',
+			'',
+			'TypeScript check failed for src/app.ts:',
+			'error TS2322: Type string is not assignable to number.',
+		].join('\n'),
+	}
+
+	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1).join('\n')
+	expect(body).toContain('− 2:aaa old line')
+	expect(body).toContain('+ 2:bbb new line')
+	expect(body).toContain('TypeScript check failed for src/app.ts:')
+	expect(body).toContain('error TS2322: Type string is not assignable to number.')
+})

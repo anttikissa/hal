@@ -332,6 +332,22 @@ function humanizeName(name: string): string {
 	return capitalize(name.replace(/_/g, ' '))
 }
 
+function editLineRange(input: any): string {
+	if (input?.operation === 'replace') {
+		const start = String(input.start_ref ?? '').match(/^(\d+):/)
+		const end = String(input.end_ref ?? '').match(/^(\d+):/)
+		if (!start || !end) return ''
+		return start[1] === end[1] ? ` (${start[1]})` : ` (${start[1]}-${end[1]})`
+	}
+	if (input?.operation === 'insert') {
+		if (input.after_ref === '0:000') return ' (before 1)'
+		const after = String(input.after_ref ?? '').match(/^(\d+):/)
+		if (!after) return ''
+		return ` (after ${after[1]})`
+	}
+	return ''
+}
+
 function toolTitle(name: string, input?: any): string {
 	if (!input) return humanizeName(name)
 	switch (name) {
@@ -353,7 +369,7 @@ function toolTitle(name: string, input?: any): string {
 		case 'write':
 			return `Write ${input.path ?? '?'}`
 		case 'edit':
-			return `Edit ${input.path ?? '?'}`
+			return `Edit ${input.path ?? '?'}${editLineRange(input)}`
 		case 'eval':
 			return 'Eval'
 		case 'grep':
@@ -432,17 +448,19 @@ function countIndicator(output: string, empty: string, unit: string): ToolFormat
 	}
 }
 
-// Edit: show diff between before/after with +/- coloring
+// Edit: show diff between before/after with +/- coloring, but preserve any
+// trailing diagnostics (typecheck failures, explicit error messages) verbatim so
+// the user can always tell whether the edit really succeeded.
 function formatEdit(output: string): ToolFormatResult {
 	if (!output) return { bodyLines: [] }
-	const beforeMatch = output.match(/^--- before\n([\s\S]*?)(?:\n\n\+\+\+ after|$)/)
-	const afterMatch = output.match(/\+\+\+ after\n([\s\S]*)$/)
-	if (!beforeMatch && !afterMatch) return { bodyLines: [] }
+	const diffMatch = output.match(/^--- before\n([\s\S]*?)\n\n\+\+\+ after\n([\s\S]*?)(?:\n\n([\s\S]*))?$/)
+	if (!diffMatch) return { bodyLines: [] }
 
-	let beforeLines = beforeMatch ? beforeMatch[1]!.split('\n').filter((l) => l.trim()) : []
-	let afterLines = afterMatch ? afterMatch[1]!.split('\n').filter((l) => l.trim()) : []
+	let beforeLines = diffMatch[1]!.split('\n').filter((l) => l.trim())
+	let afterLines = diffMatch[2]!.split('\n').filter((l) => l.trim())
+	const footerLines = (diffMatch[3] ?? '').split('\n').filter((l) => l.trim())
 
-	// Strip common prefix/suffix so only changed lines are shown
+	// Strip common prefix/suffix so only changed lines are shown.
 	while (beforeLines.length && afterLines.length && beforeLines[0] === afterLines[0]) {
 		beforeLines.shift()
 		afterLines.shift()
@@ -463,7 +481,7 @@ function formatEdit(output: string): ToolFormatResult {
 		[afterLines, '+', GREEN_FG],
 	] as const) {
 		if (!content.length) continue
-		// Show all lines when hiding just 1 would waste a line on the indicator
+		// Show all lines when hiding just 1 would waste a line on the indicator.
 		const limit = content.length <= MAX + 1 ? content.length : MAX
 		for (const l of content.slice(0, limit)) {
 			lines.push(`${color}${prefix} ${l}${FG_OFF}`)
@@ -472,6 +490,12 @@ function formatEdit(output: string): ToolFormatResult {
 			lines.push(`  \u2026 ${content.length - limit} more`)
 		}
 	}
+
+	if (footerLines.length) {
+		if (lines.length) lines.push('')
+		lines.push(...footerLines)
+	}
+
 	return { bodyLines: lines, suppressOutput: true }
 }
 
