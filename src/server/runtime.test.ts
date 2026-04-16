@@ -101,18 +101,13 @@ import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
-test('spawnSession creates a fresh child with queued prompt and auto-close marker', async () => {
+test('spawnSession creates a fresh child with auto-close marker', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))
 	const prevState = process.env.HAL_STATE_DIR
-	const queued: any[] = []
-	const origAppendCommand = ipc.appendCommand
 	process.env.HAL_STATE_DIR = base
 	const { sessions } = await import('./sessions.ts')
 
 	try {
-		ipc.appendCommand = (command: any) => {
-			queued.push(command)
-		}
 		await sessions.createSession('04-parent', {
 			id: '04-parent',
 			workingDir: '/work/parent',
@@ -132,10 +127,12 @@ test('spawnSession creates a fresh child with queued prompt and auto-close marke
 			cwd: '/work/child',
 			title: 'Child tab',
 			closeWhenDone: true,
+			sessionId: '04-kid',
 		})
 
 		expect(child.model).toBe('openai/gpt-5')
 		expect(child.cwd).toBe('/work/child')
+		expect(child.id).toBe('04-kid')
 		const meta = sessions.loadSessionMeta(child.id)
 		expect(meta?.workingDir).toBe('/work/child')
 		expect(meta?.model).toBe('openai/gpt-5')
@@ -144,14 +141,63 @@ test('spawnSession creates a fresh child with queued prompt and auto-close marke
 		const history = sessions.loadHistory(child.id)
 		expect(history.some((entry) => entry.type === 'info' && entry.text.includes('close itself after sending a handoff'))).toBe(true)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(false)
-		expect(queued).toContainEqual(expect.objectContaining({
-			type: 'prompt',
-			sessionId: child.id,
-			source: '04-parent',
-		}))
-		expect(JSON.stringify(queued)).toContain('Do the thing')
+	} finally {
+		rmSync(base, { recursive: true, force: true })
+		if (prevState === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = prevState
+	}
+})
+
+
+test('startSpawnedSession dispatches the child prompt directly', async () => {
+	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))
+	const prevState = process.env.HAL_STATE_DIR
+	const queued: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origOwnsHostLock = ipc.ownsHostLock
+	process.env.HAL_STATE_DIR = base
+	const { sessions } = await import('./sessions.ts')
+
+	try {
+		ipc.appendCommand = (command: any) => {
+			queued.push(command)
+		}
+
+		ipc.ownsHostLock = () => true
+		agentLoop.runAgentLoop = async () => 'completed'
+		await sessions.createSession('04-parent', {
+			id: '04-parent',
+			workingDir: '/work/parent',
+			createdAt: '2026-04-14T12:00:00.000Z',
+			model: 'anthropic/claude-sonnet-4.5',
+		})
+		const parent = {
+			id: '04-parent',
+			name: 'parent',
+			cwd: '/work/parent',
+			model: 'anthropic/claude-sonnet-4.5',
+			createdAt: '2026-04-14T12:00:00.000Z',
+		}
+		const spec = {
+			task: 'Do the thing',
+			mode: 'fresh' as const,
+			model: 'openai/gpt-5',
+			cwd: '/work/child',
+			title: 'Child tab',
+			closeWhenDone: false,
+		}
+		const child = await runtime.spawnSessionForTests(parent, spec)
+		await runtime.startSpawnedSessionForTests(parent, child, spec)
+
+		const history = sessions.loadHistory(child.id)
+		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
+		expect(queued).toHaveLength(0)
 	} finally {
 		ipc.appendCommand = origAppendCommand
+		agentLoop.runAgentLoop = origRunAgentLoop
+
+		ipc.ownsHostLock = origOwnsHostLock
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR
 		else process.env.HAL_STATE_DIR = prevState

@@ -22,6 +22,7 @@ import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
+import { sessionIds } from '../session/ids.ts'
 import { replay } from '../session/replay.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { ason } from '../utils/ason.ts'
@@ -71,6 +72,7 @@ interface SpawnSpec {
 	cwd?: string
 	title?: string
 	closeWhenDone?: boolean
+	sessionId?: string
 }
 
 function shouldCloseSessionAfterGeneration(
@@ -98,14 +100,6 @@ function shouldAutoContinue(entries: Array<{ type: string; text?: string; ts?: s
 	return !lastTs || (now - new Date(lastTs).getTime()) <= 30_000
 }
 
-function makeSessionId(): string {
-	const month = String(new Date().getMonth() + 1).padStart(2, '0')
-	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-	let suffix = ''
-	for (let i = 0; i < 3; i++) suffix += chars[Math.floor(Math.random() * chars.length)]
-	return `${month}-${suffix}`
-}
-
 function sessionLabel(session: Session): string {
 	return `${session.name ?? session.id} (${session.id})`
 }
@@ -123,9 +117,9 @@ function recordForkedTab(child: Session, parent: Session): void {
 }
 
 
-function createSession(opener?: Session, afterId?: string): Session {
+function createSession(opener?: Session, afterId?: string, sessionId = sessionIds.reserve()): Session {
 	const session: Session = {
-		id: makeSessionId(),
+		id: sessionId,
 		name: undefined,
 		cwd: process.cwd(),
 		createdAt: new Date().toISOString(),
@@ -171,8 +165,7 @@ function moveSessionToIndex(sessionId: string, targetIndex: number): boolean {
 	return true
 }
 
-async function createForkSession(sourceId: string): Promise<Session> {
-	const newId = makeSessionId()
+async function createForkSession(sourceId: string, newId = sessionIds.reserve()): Promise<Session> {
 	await sessionStore.forkSession(sourceId, newId)
 	const meta = sessionStore.loadSessionMeta(newId)
 	const session = sessionFromMeta(meta)
@@ -212,7 +205,9 @@ function queuePromptCommand(sessionId: string, text: string, source?: string): v
 
 async function spawnSession(parent: Session, spec: SpawnSpec): Promise<Session> {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
-	const child = mode === 'fork' ? await createForkSession(parent.id) : createSession(undefined, parent.id)
+	const child = mode === 'fork'
+		? await createForkSession(parent.id, spec.sessionId)
+		: createSession(undefined, parent.id, spec.sessionId)
 	child.cwd = spec.cwd || (mode === 'fork' ? child.cwd : parent.cwd)
 	child.model = spec.model || (mode === 'fork' ? child.model : parent.model)
 	child.name = spec.title || child.name
@@ -232,8 +227,21 @@ async function spawnSession(parent: Session, spec: SpawnSpec): Promise<Session> 
 			ts: new Date().toISOString(),
 		}])
 	}
-	queuePromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone), parent.id)
 	return child
+}
+
+async function startSpawnedSession(parent: Session, child: Session, spec: SpawnSpec): Promise<void> {
+	const prompt = buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone)
+	logCommandPump('dispatch-spawn-prompt', {
+		sessionId: child.id,
+		source: parent.id,
+		textPreview: prompt.slice(0, 120),
+		textLength: prompt.length,
+	})
+	// This prompt originates inside the host runtime, not from another process.
+	// Dispatch it directly instead of round-tripping through commands.asonl,
+	// which can stall and leave brand-new subagent tabs looking dead.
+	await dispatchPromptCommand(child, prompt, parent.id)
 }
 
 function findSession(sessionId: string): Session | undefined {
@@ -637,20 +645,23 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		case 'spawn': {
 			if (!session) return
 			const raw = typeof cmd.text === 'string' ? cmd.text : ''
-			const parsed = JSON.parse(raw || '{}') as Partial<SpawnSpec>
+			const parsed = ason.parse(raw || '{}') as Partial<SpawnSpec>
 			if (!parsed.task || typeof parsed.task !== 'string') {
 				emitInfo(session.id, 'Spawn task is required', 'error')
 				break
 			}
-			await spawnSession(session, {
+			const spec: SpawnSpec = {
 				task: parsed.task,
 				mode: parsed.mode === 'fresh' ? 'fresh' : 'fork',
 				model: parsed.model,
 				cwd: parsed.cwd,
 				title: parsed.title,
 				closeWhenDone: !!parsed.closeWhenDone,
-			})
+				sessionId: typeof parsed.sessionId === 'string' && parsed.sessionId.trim() ? parsed.sessionId.trim() : undefined,
+			}
+			const child = await spawnSession(session, spec)
 			broadcastSessions()
+			void startSpawnedSession(session, child, spec)
 			break
 		}
 
@@ -889,4 +900,4 @@ function startRuntime(signal: AbortSignal): void {
 		})
 }
 
-export const runtime = { startRuntime, pickMostRecentlyClosedSessionId, resolveResumeTarget, shouldAutoContinue, shouldCloseSessionAfterGeneration, recordTabClosed, spawnSessionForTests: spawnSession }
+export const runtime = { startRuntime, pickMostRecentlyClosedSessionId, resolveResumeTarget, shouldAutoContinue, shouldCloseSessionAfterGeneration, recordTabClosed, spawnSessionForTests: spawnSession, startSpawnedSessionForTests: startSpawnedSession }
