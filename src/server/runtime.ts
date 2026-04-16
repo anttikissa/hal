@@ -10,6 +10,7 @@
 //   4. Non-command prompts are forwarded to the agent loop
 //   5. Agent loop streams responses back via IPC events
 
+import { appendFileSync } from 'fs'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import { models } from '../models.ts'
@@ -23,6 +24,7 @@ import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
 import { replay } from '../session/replay.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { ason } from '../utils/ason.ts'
 
 import { toolRegistry } from '../tools/tool.ts'
 // ── Session state ──
@@ -42,6 +44,21 @@ let stopPromptWatch: (() => void) | null = null
 const USER_PAUSED_TEXT = '[paused]'
 const RESTARTED_TEXT = '[restarted]'
 const TAB_CLOSED_TEXT = 'Tab closed'
+const COMMAND_PUMP_DEBUG_LOG = '/tmp/hal-command-pump.asonl'
+
+function logCommandPump(stage: string, details: Record<string, unknown>): void {
+	// Temporary instrumentation for a stalled command-reader bug. Write to /tmp
+	// so we can inspect the host's internal routing without polluting session
+	// history or the shared IPC logs.
+	try {
+		appendFileSync(COMMAND_PUMP_DEBUG_LOG, ason.stringify({
+			ts: new Date().toISOString(),
+			pid: process.pid,
+			stage,
+			...details,
+		}, 'short') + '\n')
+	} catch {}
+}
 
 function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err)
@@ -173,7 +190,15 @@ function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean
 }
 
 function queuePromptCommand(sessionId: string, text: string, source?: string): void {
-	ipc.appendCommand({ type: 'prompt', sessionId, text, source })
+	const createdAt = new Date().toISOString()
+	logCommandPump('queue-prompt', {
+		sessionId,
+		source,
+		createdAt,
+		textPreview: text.slice(0, 120),
+		textLength: text.length,
+	})
+	ipc.appendCommand({ type: 'prompt', sessionId, text, source, createdAt })
 }
 
 async function spawnSession(parent: Session, spec: SpawnSpec): Promise<Session> {
@@ -316,6 +341,13 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 	// Self-fencing: if leadership moved to another PID, this process must not
 	// emit prompts or start generations. The real host will handle the command.
 	if (!ipc.ownsHostLock()) return
+	logCommandPump('handle-prompt', {
+		sessionId: session.id,
+		label,
+		source,
+		textPreview: text.slice(0, 120),
+		textLength: text.length,
+	})
 
 	// Build a SessionState for the commands module
 	const sessionState: SessionState = {
@@ -760,19 +792,53 @@ function startRuntime(signal: AbortSignal): void {
 	// Tail commands and dispatch
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
-			if (signal.aborted || activeRuntimePid !== process.pid) break
+			logCommandPump('loop-received', {
+				cmdType: cmd?.type,
+				sessionId: cmd?.sessionId,
+				source: cmd?.source,
+				createdAt: cmd?.createdAt,
+				textPreview: typeof cmd?.text === 'string' ? cmd.text.slice(0, 120) : undefined,
+				activeSessions: activeSessions.map((session) => session.id),
+			})
+			if (signal.aborted || activeRuntimePid !== process.pid) {
+				logCommandPump('loop-break-abort', { activeRuntimePid, signalAborted: signal.aborted })
+				break
+			}
 			// Self-fencing: the old host must stop reading shared commands as soon
 			// as leadership moves to another PID.
-			if (!ipc.ownsHostLock()) break
+			if (!ipc.ownsHostLock()) {
+				logCommandPump('loop-break-host-lock', {})
+				break
+			}
 			// Most commands target a live session. But tab-management commands can
 			// legitimately arrive with a stale sessionId during the brief window after
 			// Ctrl-W, before the client has processed the sessions update and switched
 			// its active tab locally.
-			const hasLiveSession = !cmd.sessionId || activeSessions.some((s) => s.id === cmd.sessionId)
-			if (!hasLiveSession && cmd.type !== 'open' && cmd.type !== 'resume') continue
+			const hasLiveSession = !cmd.sessionId || activeSessions.some((session) => session.id === cmd.sessionId)
+			if (!hasLiveSession && cmd.type !== 'open' && cmd.type !== 'resume') {
+				logCommandPump('loop-skip-no-session', {
+					cmdType: cmd?.type,
+					sessionId: cmd?.sessionId,
+					activeSessions: activeSessions.map((session) => session.id),
+				})
+				continue
+			}
 			try {
+				logCommandPump('handle-command-start', {
+					cmdType: cmd?.type,
+					sessionId: cmd?.sessionId,
+				})
 				await handleCommand(cmd, signal)
+				logCommandPump('handle-command-done', {
+					cmdType: cmd?.type,
+					sessionId: cmd?.sessionId,
+				})
 			} catch (err: any) {
+				logCommandPump('handle-command-error', {
+					cmdType: cmd?.type,
+					sessionId: cmd?.sessionId,
+					error: err?.message ?? String(err),
+				})
 				// Don't let a single command crash the runtime
 				const sid = cmd.sessionId ?? activeSessions[0]?.id
 				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error')
