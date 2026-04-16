@@ -23,6 +23,25 @@ function truncateUtf8(text: string, limit: number): string {
 	return text.slice(0, lo) + TRUNCATED_SUFFIX
 }
 
+function formatRgError(stderr: string): string {
+	const err = stderr.trim()
+	if (!err) return ''
+
+	// Clean up verbose rg errors like "IO error for operation on /path: No such file or directory (os error 2)".
+	const notFound = err.match(/rg:\s*(.+?):\s*(?:IO error|No such file)/i)
+	if (notFound) return `Error: file not found: ${notFound[1]}`
+
+	// ripgrep prints multi-line parser diagnostics for invalid regexes. Keep only the
+	// human-meaningful reason and add a short hint for common literal-text mistakes.
+	if (err.includes('regex parse error:')) {
+		const reasonLines = [...err.matchAll(/^error:\s*(.+)$/gm)].map((match) => (match[1] ?? '').trim())
+		const reason = reasonLines.find((line) => line !== 'rg: regex parse error:' && line !== 'regex parse error:') ?? 'ripgrep rejected the pattern'
+		return `error: invalid regex pattern: ${reason}. If you meant literal text, escape regex metacharacters like ?, (, {, [, +, * and |.`
+	}
+
+	return `error: ${err}`
+}
+
 async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const pattern = String(input?.pattern ?? '')
 	if (!pattern) return 'error: pattern is required'
@@ -55,14 +74,9 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 	const result = stdout.trim()
 	if (!result) {
-		// rg returns exit 1 for "no matches" — not an error
-		const err = stderr.trim()
-		if (err && proc.exitCode !== 1) {
-			// Clean up verbose rg errors like "IO error for operation on /path: No such file or directory (os error 2)"
-			const notFound = err.match(/rg:\s*(.+?):\s*(?:IO error|No such file)/i)
-			if (notFound) return `Error: file not found: ${notFound[1]}`
-			return `error: ${err}`
-		}
+		// rg returns exit 1 for "no matches" — not an error.
+		const err = formatRgError(stderr)
+		if (err && proc.exitCode !== 1) return err
 		return 'No matches found.'
 	}
 	return truncateUtf8(result, MAX_OUTPUT_BYTES)

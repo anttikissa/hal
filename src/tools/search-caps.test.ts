@@ -28,3 +28,19 @@ test('grep truncates large match sets well below 1MB', async () => {
 	expect(out.endsWith('[… truncated]')).toBe(true)
 	expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(40_000)
 })
+
+
+test('grep returns a concise hint for invalid regex patterns', async () => {
+	mkdirSync(TEST_DIR, { recursive: true })
+	writeFileSync(`${TEST_DIR}/demo.txt`, 'appendCommand({ type: \'prompt\' })\n')
+
+	const out = await grep.execute(
+		{ pattern: "appendCommand\\({ type: 'prompt'", path: TEST_DIR },
+		{ sessionId: 's', cwd: TEST_DIR },
+	)
+
+	expect(out).toContain('error: invalid regex pattern')
+	expect(out).toContain('escape regex metacharacters')
+	expect(out).not.toContain('regex parse error:')
+	expect(out).not.toContain('(?:')
+})
