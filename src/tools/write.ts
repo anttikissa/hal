@@ -122,6 +122,26 @@ const writeTool = {
 
 const CONTEXT_LINES = 3
 
+function formatRetryContext(lines: string[], startLine: number, endLine: number): string {
+	if (lines.length === 0) return '[file is currently empty]'
+	const from = Math.max(0, Math.min(startLine, endLine) - 1)
+	const to = Math.max(from + 1, Math.min(lines.length, Math.max(startLine, endLine)))
+	return hashline.formatContext(lines, from, to, CONTEXT_LINES)
+}
+
+function staleRefError(lines: string[], err: string, startLine: number, endLine = startLine): string {
+	const context = formatRetryContext(lines, startLine, endLine)
+	return truncateUtf8(
+		`error: ${err}
+
+Current file context around the requested edit:
+${context}
+
+Use these updated LINE:HASH refs to retry without a separate read.`,
+		MAX_OUTPUT_BYTES,
+	)
+}
+
 function applyReplace(lines: string[], startRef: string, endRef: string, newContent: string): string | { resultLines: string[]; diff: string } {
 	const start = hashline.parseRef(startRef)
 	const end = hashline.parseRef(endRef)
@@ -130,8 +150,8 @@ function applyReplace(lines: string[], startRef: string, endRef: string, newCont
 
 	const startErr = hashline.validateRef(start, lines)
 	const endErr = hashline.validateRef(end, lines)
-	if (startErr) return `error: ${startErr}\n\nRe-read the file to get updated LINE:HASH references.`
-	if (endErr) return `error: ${endErr}\n\nRe-read the file to get updated LINE:HASH references.`
+	if (startErr) return staleRefError(lines, startErr, start.line, end.line)
+	if (endErr) return staleRefError(lines, endErr, start.line, end.line)
 	if (start.line > end.line) return `error: start line ${start.line} is after end line ${end.line}`
 
 	const before = hashline.formatContext(lines, start.line - 1, end.line, CONTEXT_LINES)
@@ -154,7 +174,7 @@ function applyInsert(lines: string[], afterRef: string, newContent: string): str
 		const ref = hashline.parseRef(afterRef)
 		if (!ref) return `error: invalid after_ref: ${afterRef}`
 		const err = hashline.validateRef(ref, lines)
-		if (err) return `error: ${err}\n\nRe-read the file to get updated LINE:HASH references.`
+		if (err) return staleRefError(lines, err, ref.line)
 		insertAt = ref.line
 	}
 

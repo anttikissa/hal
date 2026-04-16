@@ -180,7 +180,33 @@ describe('edit via hashline', () => {
 			ctx,
 		)
 		expect(result).toContain('Hash mismatch')
-		expect(result).toContain('Re-read the file')
+		expect(result).toContain('Current file context around the requested edit:')
+		cleanup()
+	})
+	test('stale hash error includes fresh context so the model can retry without re-reading', async () => {
+		setup('a\nb\nc\n')
+		const ref = `2:${hashLine('b')}`
+		writeFileSync(file, 'a\nchanged\nc\n')
+		const result = await executeEdit(
+			{ path: file, operation: 'replace', start_ref: ref, end_ref: ref, new_content: 'X' },
+			ctx,
+		)
+		expect(result).toContain('Hash mismatch')
+		expect(result).toContain('retry without a separate read')
+		expect(result).toContain(`2:${hashLine('changed')} changed`)
+		cleanup()
+	})
+
+	test('insert stale hash error includes fresh context', async () => {
+		setup('a\nb\nc\n')
+		const ref = `2:${hashLine('b')}`
+		writeFileSync(file, 'a\nchanged\nc\n')
+		const result = await executeEdit(
+			{ path: file, operation: 'insert', after_ref: ref, new_content: 'X' },
+			ctx,
+		)
+		expect(result).toContain('Hash mismatch')
+		expect(result).toContain(`2:${hashLine('changed')} changed`)
 		cleanup()
 	})
 
