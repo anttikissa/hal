@@ -232,6 +232,48 @@ describe('edit via hashline', () => {
 		cleanup()
 	})
 
+	test('remaps replace refs after earlier inserts shift line numbers', async () => {
+		setup('one\ntwo\nthree\nfour\n')
+		await executeRead({ path: file, start: 1, end: 10 }, ctx)
+
+		await executeEdit(
+			{ path: file, operation: 'insert', after_ref: '0:000', new_content: 'top' },
+			ctx,
+		)
+
+		const oldRef = `2:${hashLine('two')}`
+		const result = await executeEdit(
+			{ path: file, operation: 'replace', start_ref: oldRef, end_ref: oldRef, new_content: 'TWO' },
+			ctx,
+		)
+
+		expect(result).toContain('Line numbers changed; edit accepted as 3:')
+		expect(result).toContain('Changed lines after edit:')
+		expect(readFileSync(file, 'utf-8')).toBe('top\none\nTWO\nthree\nfour\n')
+		cleanup()
+	})
+
+	test('successful read resets old line-number remapping', async () => {
+		setup('one\ntwo\nthree\n')
+		await executeRead({ path: file, start: 1, end: 10 }, ctx)
+
+		await executeEdit(
+			{ path: file, operation: 'insert', after_ref: '0:000', new_content: 'top' },
+			ctx,
+		)
+		await executeRead({ path: file, start: 1, end: 10 }, ctx)
+
+		const oldRef = `2:${hashLine('two')}`
+		const result = await executeEdit(
+			{ path: file, operation: 'replace', start_ref: oldRef, end_ref: oldRef, new_content: 'TWO' },
+			ctx,
+		)
+
+		expect(result).toContain('Hash mismatch')
+		expect(result).not.toContain('Line numbers changed; edit accepted as')
+		cleanup()
+	})
+
 	test('returns type errors after editing a broken .ts file', async () => {
 		const repoRoot = process.cwd()
 		const file = join(repoRoot, `.tmp-hashline-${process.pid}-${Date.now()}.ts`)

@@ -11,6 +11,7 @@ import { homedir } from 'os'
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { hashline } from './hashline.ts'
 import { helpers } from '../utils/helpers.ts'
+import { editTracker } from './edit-tracker.ts'
 
 const HOME = homedir()
 
@@ -126,6 +127,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	if (selection.sawBinary) return `error: ${path} appears to be a binary file`
 
 	const result = formatSelectedLines(selection.lines, Math.max(1, start))
+	editTracker.resetForRead(ctx.sessionId, path)
 	return helpers.truncateUtf8(result, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 }
 
