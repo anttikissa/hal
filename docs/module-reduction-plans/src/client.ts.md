@@ -17,6 +17,15 @@ Reviewed before planning:
 
 This is the biggest production file in the repo right now.
 
+## Review verdict
+
+This plan is **mostly pointed at real reduction**, not just file-splitting, but it needed two corrections after re-reading the code:
+
+- `promptText` / `promptCursor`, `getActivity()`, `appendInputHistory()`, and persisted `state.model` are more strongly dead than the original wording suggested. These should be treated as **first-pass deletions**, not “maybe later” cleanups.
+- extraction-only steps need a harder gate. Reaching under 500 with flat/down repo `cloc` is realistic only if the pass spends most of its budget on **deletes, in-place simplification, and cross-file dedupe** before any cosmetic module moves.
+
+Also note the current repo baseline is already red in unrelated suites (`src/tools/read.test.ts`, `tests/ipc.test.ts`, `src/utils/tail-file.test.ts`, `tests/tabs.test.ts`, `tests/main.test.ts`, `src/tools/search-caps.test.ts`). For this work, the execution plan should still run `./test` after each step, but judge success as **no new client-facing regressions plus no worsening of the existing baseline**.
+
 ## Responsibilities currently mixed together
 
 `src/client.ts` is doing all of these at once:
@@ -55,24 +64,26 @@ The file has more coupling than it first appears:
 
 #### 1.1 Remove prompt mirroring from `client.state`
 
-Today `client.state.promptText` / `promptCursor` are written by `setPrompt()` / `clearPrompt()`, but grep only found reads/writes inside `src/client.ts` and test reset code.
+Today `client.state.promptText` / `promptCursor` are written by `setPrompt()` / `clearPrompt()`, but grep only found reads/writes inside `src/client.ts`, one call site in `src/client/cli.ts`, and startup test reset code. Current render code does **not** read them.
 
 Proposal:
 - delete `state.promptText`
 - delete `state.promptCursor`
 - delete `setPrompt()`
 - delete `clearPrompt()`
+- delete `syncPromptToClient()` in `src/client/cli.ts`
 - move `openaiUsage.noteActivity()` to the real prompt-owner path in `src/client/cli.ts`
 
 Estimated impact:
 - `src/client.ts`: **-18 to -30 LOC**
+- small extra savings in `src/client/cli.ts` and tests
 - repo total: **down**
 
 Risk / tests:
-- verify no hidden eval usage expects these fields
+- very low product risk; this is mostly dead state removal
 - run `src/client/cli.test.ts`
 - run `src/client-startup.test.ts`
-- run render tests, since prompt redraw timing changes slightly when `setPrompt()` disappears
+- run render tests only as a sanity check, not because the prompt mirror itself is used
 
 #### 1.2 Remove unused exports / wrappers
 
@@ -93,24 +104,26 @@ Risk / tests:
 
 #### 1.3 Delete persisted `state.model` if it is truly unused
 
-`state.model` is loaded/saved in `client.ason`, but current code seems to prefer `currentTab()?.model`, and grep did not find a real writer outside startup restore/tests.
+`state.model` is loaded/saved in `client.ason`, but grep did not find a live writer outside startup restore/tests. The only remaining reads are fallback paths in `src/client/cli.ts` and `src/client/render-status.ts`, both of which can fall back to `models.defaultModel()` instead.
 
 Proposal:
-- verify whether any live path still needs a client-global fallback model
-- if not, remove `state.model` and remove `model` from `client.ason`
-- if a fallback is still needed for the model picker, use `models.defaultModel()` instead
+- treat this as a **first-pass deletion**, not a maybe
+- remove `state.model`
+- remove `model` from `ClientStateFile`, `defaultClientState()`, `loadClientState()`, and `saveClientState()`
+- switch model picker / status fallback to `currentTab()?.model || models.defaultModel()`
 
 Estimated impact:
 - `src/client.ts`: **-10 to -18 LOC**
-- small extra savings in tests/docs
+- small extra savings in startup tests / fixtures
+- repo total: **down**
 
 Risk / tests:
 - `src/client/cli.ts` model picker path
-- startup tests that touch `client.ason`
-- any future no-tab state
+- `src/client-startup.test.ts`
+- `tests/render.test.ts` and friends, because status-line fallback text changes slightly in the no-tab / no-model case
 
 Comment:
-- this is a good candidate, but I would verify before deleting because it crosses startup UX.
+- verified enough to promote into step 1
 
 #### 1.4 Delete `pendingEntries` if startup ordering can be tightened
 
@@ -131,7 +144,7 @@ Risk / tests:
 - `tests/main.test.ts`
 
 Comment:
-- worthwhile only if startup order can be made obviously simpler; do not force this if it complicates host/client bootstrap.
+- real reduction, but **not required for the first pass**. Keep it conditional on the startup rewrite becoming simpler without new buffering glue.
 
 #### 1.5 Move fork-draft copying out of the client
 
@@ -150,6 +163,9 @@ Risk / tests:
 - fork UX in `tests/tabs.test.ts`
 - startup/open/fork interaction in `src/client-startup.test.ts`
 - multi-client draft behavior becomes better if done in runtime
+
+Comment:
+- this is real, but it is **not** a top-three move for a one-pass under-500 push. It introduces cross-layer work, so take it only if steps 1-3 still leave obvious client-only fork glue behind.
 
 ## 2. Simplify local logic in place
 
@@ -361,11 +377,12 @@ Risk / tests:
 - session replay tests if logic moves into `replay`
 
 Comment:
-- good medium-value reduction, especially if we want `client.ts` to stop knowing so much about session disk layout.
+- good medium-value reduction, especially if we want `client.ts` to stop knowing so much about session disk layout
+- promote this **ahead of extraction-first moves** if the goal is flat/down repo `cloc`
 
 ## 4. Extract cohesive domains only after slimming them
 
-These are still worth doing, but only after the true reductions above. Otherwise this becomes a cosmetic split.
+These are still worth doing, but only after the true reductions above, and only if a fresh `bun cloc` check says `src/client.ts` is still above target. Otherwise this becomes a cosmetic split.
 
 ### 4.1 Extract startup/persistence/watchers to `src/client/startup.ts`
 
@@ -507,6 +524,9 @@ Secondary but important:
 - `tests/main.test.ts`
 - `tests/ipc.test.ts`
 
+Operational note:
+- because `./test` is currently red outside this area, use the client-focused suites above as the semantic guardrail after each reduction step, then run full `./test` to confirm the existing unrelated failures are unchanged
+
 ## Recommended execution sequence for a one-pass push under 500 LOC
 
 Goal: get `src/client.ts` under **500 LOC** while keeping total repo `bun cloc` flat or down.
@@ -514,30 +534,31 @@ Goal: get `src/client.ts` under **500 LOC** while keeping total repo `bun cloc` 
 ### Step 1: take the cheap real deletions first
 
 Do only the things that should disappear, not move:
-- remove prompt mirroring if verified dead
+- remove prompt mirroring
 - remove unused wrappers/exports
-- remove global saved model if verified dead
-- remove fork-only draft-copy special case if runtime can own it
+- remove persisted global model state
+- inline/drop tiny one-off helpers that fall out naturally, such as `sessionInfoFromMeta()` if it becomes a single call-site map
 
 Expected `src/client.ts` after step 1:
-- roughly **900 to 920 LOC**
+- roughly **890 to 920 LOC**
 
 Why first:
 - these are true reductions, not reshuffles
-- they buy room so later extractions do not increase total repo LOC
+- they buy room so later helper modules can still leave repo `cloc` flat or down
 
-### Step 2: simplify the startup path in place
+### Step 2: simplify the local startup/update path in place
 
 Do these before extracting modules:
 - unify initial shared-state bootstrap vs disk fallback
 - eliminate the duplicate `applySessionList()` startup path
+- collapse repeated append/touch/repaint helpers where it actually removes code
 - skip duplicate active-tab blob loading
-- factor repeated timestamp/usage helpers
+- factor repeated timestamp / usage / context updates
 
 Expected `src/client.ts` after step 2:
-- roughly **830 to 880 LOC**
+- roughly **820 to 870 LOC**
 
-This should also improve startup clarity and perf.
+This should improve startup clarity and perf without creating new files yet.
 
 ### Step 3: land the shared live-block mutation helper
 
@@ -554,24 +575,31 @@ Expected `src/client.ts` after step 3:
 
 This is the key step that makes “under 500 with flat/down repo LOC” realistic.
 
-### Step 4: extract startup/persistence/watchers as one coherent module
+### Step 4: take the next real cross-file reductions before any extraction-only move
 
-Once the noisy duplication is gone, move the remaining startup-specific chunk into a dedicated client startup module.
+Best candidates:
+- push `makeTabFromDisk()` / startup snapshot assembly into `replay` or `sessions`
+- add a tiny shared ASON file helper if it will be reused in `client.ts` plus at least one other module
 
 Expected `src/client.ts` after step 4:
-- roughly **520 to 600 LOC**
+- roughly **580 to 690 LOC**
 
 Important:
-- do not extract before step 1-3, or this will mostly be a file shuffle.
+- if this step does not reduce total repo `cloc`, stop and reassess before extracting anything
 
-### Step 5: if still above 500, extract the smallest remaining cohesive slice
+### Step 5: only if still above target, extract one cohesive slice with a hard `cloc` gate
 
 Best candidates:
 - `client/commands.ts` if command/continue heuristics still occupy ~70+ LOC
-- or `client/tabs.ts` if switch/load/focus logic is still the largest remaining chunk
+- `client/startup.ts` only if the remaining startup code is already slimmed and obviously cohesive
+- `client/tabs.ts` only if switch/load/focus logic is still the single biggest leftover chunk
 
 Expected final size:
-- **450 to 500 LOC**
+- **450 to 520 LOC**
+
+Rule:
+- do **one** extraction, rerun `bun cloc`, and stop if the repo total goes up without a compensating delete
+
 
 ## Best opportunities that also reduce other large files
 
@@ -582,28 +610,29 @@ Expected final size:
 - reduces `src/server/sessions.ts`
 - removes the most fragile duplication in the repo
 
-2. **Shared ASON file / fs-error helper**
+2. **Push tab snapshot assembly into `replay`/`sessions`**
+- reduces `src/client.ts`
+- may make session-loading responsibilities cleaner in future work on startup/runtime modules
+
+3. **Shared ASON file / fs-error helper**
 - reduces `src/client.ts`
 - reduces `src/cli/draft.ts`
 - likely also helps `src/ipc.ts` and other file-backed modules
 
-3. **Move fork draft copying to runtime/session ownership**
+4. **Move fork draft copying to runtime/session ownership**
 - reduces `src/client.ts`
 - simplifies multi-client behavior
-- may slightly simplify tab/fork tests and future runtime code
-
-4. **Push tab snapshot assembly into `replay`/`sessions`**
-- reduces `src/client.ts`
-- may make session-loading responsibilities cleaner in future work on startup/runtime modules
+- lower priority than the three items above because it adds cross-layer work
 
 ## Bottom line
 
-Under **500 LOC** looks **reachable in one pass**, but not by split-only refactors.
+Under **500 LOC** still looks **reachable in one pass**, but only if the pass stays biased toward deletion, in-place simplification, and shared-logic dedupe.
 
 My recommended recipe is:
 - first delete dead state/API
-- then simplify the duplicated startup path
+- then simplify the duplicated startup/update path in place
 - then remove the big live-event duplication with `src/server/sessions.ts`
-- only after that extract startup and one remaining cohesive slice
+- then take one more real cross-file reduction (`makeTabFromDisk()` snapshot assembly and/or ASON helper reuse)
+- only then consider a single extraction, gated by fresh `bun cloc`
 
-If done in that order, `src/client.ts` should be able to land around **450-500 LOC** with total repo `bun cloc` flat or down, instead of just moving the same complexity into more files.
+If done in that order, `src/client.ts` should be able to land around **450-520 LOC** with total repo `bun cloc` flat or down, instead of just moving the same complexity into more files.
