@@ -50,6 +50,9 @@ backtick strings`,
 `ason.stringify(value)` print value with smart formatting (similar to prettier)
 `ason.stringify(value, 'short')` prints a compact one-line representation of value
 `ason.stringify(value, 'long')` prints a compact one-line representation of value
+`ason.parseAll(str)` parses all ASON values from an ASONL file
+`ason.parseStream(stream)` parses ASON values from a byte stream (ignoring first parse error if we
+we started reading from the middle of an object)
 
 The stringify methods print comments too if they are present, with some limitations (notably,
 comments after the last element in an object or array are not preserved).
@@ -88,21 +91,5 @@ Invalid:
 
 **ASONL** (`.asonl`) — multiple values, one per line. Each record must be written with
 `stringify(value, 'short') + '\n'`.
-
-## Comment preservation
-
-`parse(str, { comments: true })` preserves comments as `[COMMENTS]` metadata.
-
-## API
-
-```ts
-parse(str)                          // AsonValue
-parse(str, { comments: true })      // AsonValue with [COMMENTS]
-parseAll(str)                       // AsonValue[]
-parseStream(stream)                 // AsyncGenerator<AsonValue>
-stringify(value)                    // smart mode
-stringify(value, 'short')           // one line
-stringify(value, 'long')            // always expanded
-```
 
 Source: `src/utils/ason.ts`
