@@ -5,22 +5,20 @@
 //   thinking → tool₁ → tool₂ → assistant text
 // The split happens in historyToBlocks(). Rendering is in renderBlock().
 
-import { visLen, wordWrap, hardWrap, clipVisual, resolveMarkers, expandTabs } from '../utils/strings.ts'
-import { md } from './md.ts'
-import { colors } from './colors.ts'
+import { clipVisual, expandTabs, hardWrap, resolveMarkers, toLines, visLen, wordWrap } from '../utils/strings.ts'
 import { ason } from '../utils/ason.ts'
-import { STATE_DIR } from '../state.ts'
-import { perf } from '../perf.ts'
-import type { HistoryEntry } from '../server/sessions.ts'
 import { models } from '../models.ts'
-
-// ── Block types ──────────────────────────────────────────────────────────────
+import type { HistoryEntry } from '../server/sessions.ts'
+import { sessionEntry } from '../session/entry.ts'
+import { STATE_DIR } from '../state.ts'
+import { colors } from './colors.ts'
+import { md } from './md.ts'
 
 const blockConfig = {
-	tabWidth: 4, // tab display width (also controls HTS tab stops)
+	tabWidth: 4,
 	blobBatchSize: 64,
-	maxToolOutputLines: 20, // cap tool output at this many tail lines
-	maxEditDiffLines: 3, // max before/after lines in edit diffs
+	maxToolOutputLines: 20,
+	maxEditDiffLines: 3,
 }
 
 function sanitizeTerminalText(text: string): string {
@@ -41,22 +39,16 @@ function stripAnsiSequences(text: string): string {
 			i++
 			continue
 		}
-
 		const next = text[i + 1]
 		if (!next) break
-
-		// CSI: ESC [ ... final-byte
 		if (next === '[') {
 			i += 2
 			while (i < text.length) {
-				const code = text.charCodeAt(i)
-				i++
+				const code = text.charCodeAt(i++)
 				if (code >= 0x40 && code <= 0x7e) break
 			}
 			continue
 		}
-
-		// OSC: ESC ] ... BEL or ST (ESC \)
 		if (next === ']') {
 			i += 2
 			while (i < text.length) {
@@ -72,70 +64,38 @@ function stripAnsiSequences(text: string): string {
 			}
 			continue
 		}
-
-		// Other ESC sequences are two-byte introducer + one-byte command.
 		i += 2
 	}
 	return out
 }
 
+interface BlockBase { ts?: number; dimmed?: boolean; renderVersion?: number }
+interface TextBlock extends BlockBase { text: string }
+interface BlobRef { blobId?: string; sessionId?: string; blobLoaded?: boolean }
+type NoticeBlock<T extends 'info' | 'warning' | 'startup' | 'fork'> = { type: T } & TextBlock
 
-function markdownSourceText(block: Exclude<Block, { type: 'tool' }>): string {
-	let text = block.text
-	if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
-		// System notices should not leak raw terminal escapes into the markdown renderer.
-		text = stripAnsiSequences(text)
-	}
-	return sanitizeTerminalText(text)
-}
-
-// dimmed: true for blocks inherited from a fork parent (rendered with muted colors)
 export type Block =
-	| { type: 'user'; text: string; source?: string; status?: string; ts?: number; dimmed?: boolean; renderVersion?: number }
-	| { type: 'assistant'; text: string; model?: string; id?: string; continue?: string; ts?: number; streaming?: boolean; dimmed?: boolean; renderVersion?: number }
-	| {
-			type: 'thinking'
-			text: string
-			model?: string
-			thinkingEffort?: string
-			blobId?: string
-			blobLoaded?: boolean
-			sessionId?: string
-			ts?: number
-			streaming?: boolean
-			dimmed?: boolean
-			renderVersion?: number
-	  }
-	| {
-			type: 'tool'
-			name: string
-			input?: any      // tool call input — title and command derived from this
-			output?: string
-			blobId?: string
-			sessionId?: string
-			blobLoaded?: boolean
-			toolId?: string
-			ts?: number
-			dimmed?: boolean
-			renderVersion?: number
-	  }
-	| { type: 'info'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
-	| { type: 'warning'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
-	| { type: 'error'; text: string; blobId?: string; sessionId?: string; ts?: number; dimmed?: boolean; renderVersion?: number }
-	| { type: 'startup'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
-	| { type: 'fork'; text: string; ts?: number; dimmed?: boolean; renderVersion?: number }
+	| ({ type: 'user'; source?: string; status?: string } & TextBlock)
+	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean } & TextBlock)
+	| ({ type: 'thinking'; model?: string; thinkingEffort?: string; streaming?: boolean } & TextBlock & BlobRef)
+	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string } & BlockBase & BlobRef)
+	| NoticeBlock<'info'>
+	| NoticeBlock<'warning'>
+	| NoticeBlock<'startup'>
+	| NoticeBlock<'fork'>
+	| ({ type: 'error' } & TextBlock & Pick<BlobRef, 'blobId' | 'sessionId'>)
 
 function touch(block: Block): void {
 	block.renderVersion = (block.renderVersion ?? 0) + 1
 }
 
-type NoticeBlock = { type: 'info' | 'warning' | 'error'; text: string; ts?: number }
-
-// ── History → Blocks ─────────────────────────────────────────────────────────
-//
-// Walk history records in order. Each record becomes one or more blocks.
-// tool_result records are skipped — their data is in the blob, which we
-// already loaded from the preceding assistant record's tools[].
+function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'startup' | 'fork' }>): string {
+	const text =
+		block.type === 'info' || block.type === 'warning' || block.type === 'error'
+			? stripAnsiSequences(block.text)
+			: block.text
+	return sanitizeTerminalText(text)
+}
 
 function parseTs(ts?: string): number | undefined {
 	return ts ? Date.parse(ts) : undefined
@@ -145,191 +105,126 @@ function blobPath(sessionId: string, blobId: string): string {
 	return `${STATE_DIR}/sessions/${sessionId}/blobs/${blobId}.ason`
 }
 
-// Extract display text from a user entry. User history stores flat parts rather
-// than provider-shaped content blocks, but the visual rendering rule is simple:
-// text parts show as-is and images show as [image].
-function userText(entry: Extract<HistoryEntry, { type: 'user' }>): string {
-	const parts: string[] = []
-	for (const part of entry.parts) {
-		if (part.type === 'text') parts.push(part.text)
-		else parts.push(part.originalFile ? `[${part.originalFile}]` : '[image]')
-	}
-	return parts.join('')
-}
-
-function historyToBlocks(history: HistoryEntry[], sessionId: string, parentEntryCount = 0, parentId?: string, initialModel?: string): Block[] {
+function historyToBlocks(
+	history: HistoryEntry[],
+	sessionId: string,
+	parentEntryCount = 0,
+	parentId?: string,
+	initialModel?: string,
+): Block[] {
 	const result: Block[] = []
-	let currentModel = initialModel
-
 	for (let i = 0; i < history.length; i++) {
 		const entry = history[i]!
-		if (entry.type === 'session') {
-			currentModel = entry.new ?? entry.model ?? currentModel
-			continue
-		}
+		const ts = parseTs(entry.ts)
 		const dimmed = i < parentEntryCount ? true : undefined
-		// Blobs for parent entries live in the parent session's directory
-		const blobOwner = (i < parentEntryCount && parentId) ? parentId : sessionId
-		// ── User message ──
-		if (entry.type === 'user') {
-			const text = userText(entry)
-			if (!text) continue
-			const isSystem = text.startsWith('[system] ')
-			const source = isSystem ? 'system' : (entry.source ?? undefined)
-			result.push({
-				type: 'user',
-				text: isSystem ? text.slice(9) : text,
-				source,
-				status: entry.status,
-				ts: parseTs(entry.ts),
-				dimmed,
-			})
-			continue
+		const blobOwner = i < parentEntryCount && parentId ? parentId : sessionId
+		switch (entry.type) {
+			case 'user': {
+				const text = sessionEntry.userText(entry, { images: 'path-or-image' })
+				if (!text) break
+				const isSystem = text.startsWith('[system] ')
+				result.push({
+					type: 'user',
+					text: isSystem ? text.slice(9) : text,
+					source: isSystem ? 'system' : entry.source ?? undefined,
+					status: entry.status,
+					ts,
+					dimmed,
+				})
+				break
+			}
+			case 'thinking': {
+				const model = entry.model ?? initialModel
+				result.push({
+					type: 'thinking',
+					text: entry.text ?? '',
+					model,
+					thinkingEffort: entry.thinkingEffort ?? models.reasoningEffort(model),
+					blobId: entry.blobId,
+					sessionId: blobOwner,
+					ts,
+					dimmed,
+				})
+				break
+			}
+			case 'tool_call':
+				result.push({ type: 'tool', name: entry.name, input: entry.input, blobId: entry.blobId, sessionId: blobOwner, toolId: entry.toolId, ts, dimmed })
+				break
+			case 'assistant':
+				result.push({ type: 'assistant', text: entry.text, model: entry.model ?? initialModel, id: entry.id, continue: entry.continue, ts, dimmed })
+				break
+			case 'info':
+				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info', text: entry.text, ts, dimmed })
+				break
+			case 'forked_from':
+				result.push({ type: 'fork', text: `Forked from ${entry.parent}`, ts, dimmed })
+				break
 		}
-
-		if (entry.type === 'thinking') {
-			const model = entry.model ?? currentModel
-			result.push({
-				type: 'thinking',
-				text: entry.text ?? '',
-				model,
-				thinkingEffort: entry.thinkingEffort ?? models.reasoningEffort(model),
-				blobId: entry.blobId,
-				sessionId: blobOwner,
-				ts: parseTs(entry.ts),
-				dimmed,
-			})
-			continue
-		}
-
-		if (entry.type === 'tool_call') {
-			result.push({
-				type: 'tool',
-				name: entry.name,
-				input: entry.input,
-				blobId: entry.blobId,
-				sessionId: blobOwner,
-				toolId: entry.toolId,
-				ts: parseTs(entry.ts),
-				dimmed,
-			})
-			continue
-		}
-
-		if (entry.type === 'assistant') {
-			const model = entry.model ?? currentModel
-			result.push({
-				type: 'assistant',
-				text: entry.text,
-				model,
-				id: entry.id,
-				continue: entry.continue,
-				ts: parseTs(entry.ts),
-				dimmed,
-			})
-			continue
-		}
-
-		if (entry.type === 'tool_result') continue
-
-		if (entry.type === 'info') {
-			const blockType = entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info'
-			result.push({ type: blockType, text: entry.text, ts: parseTs(entry.ts), dimmed })
-			continue
-		}
-
-		if (entry.type === 'forked_from') {
-			result.push({ type: 'fork', text: `Forked from ${entry.parent}`, ts: parseTs(entry.ts), dimmed })
-			continue
-		}
-
-		// session, reset, compact, input_history — not rendered
 	}
-
 	return result
 }
 
-// ── Background blob loading ──────────────────────────────────────────────────
-// Tool and thinking blocks are created without blob data for fast startup.
-// After first paint, loadBlobs() fills in the details using parallel async
-// reads that yield to the event loop.
+function parseBlob(text: string): any | null {
+	try {
+		return ason.parse(text)
+	} catch {
+		return null
+	}
+}
 
 function applyToolBlob(block: Extract<Block, { type: 'tool' }>, text: string): void {
 	block.blobLoaded = true
-	try {
-		const blob = ason.parse(text) as any
-		block.input = blob?.call?.input
-		if (typeof blob?.result?.content === 'string') block.output = blob.result.content
-		touch(block)
-	} catch {}
+	const blob = parseBlob(text)
+	if (!blob) return
+	block.input = blob?.call?.input
+	if (typeof blob?.result?.content === 'string') block.output = blob.result.content
+	touch(block)
 }
 
 function applyThinkingBlob(block: Extract<Block, { type: 'thinking' }>, text: string): void {
 	block.blobLoaded = true
-	try {
-		const blob = ason.parse(text) as any
-		if (typeof blob?.thinking === 'string') block.text = blob.thinking
-		touch(block)
-	} catch {}
+	const blob = parseBlob(text)
+	if (!blob || typeof blob?.thinking !== 'string') return
+	block.text = blob.thinking
+	touch(block)
 }
 
-// Skip blobs larger than this — they're anomalous (e.g. unfiltered grep)
-// and would block the event loop during parsing.
-const MAX_BLOB_SIZE = 1024 * 1024 // 1 MB
+const MAX_BLOB_SIZE = 1024 * 1024
 
-type BlobBlock = Extract<Block, { type: 'tool' }> | Extract<Block, { type: 'thinking' }>
+type BlobBlock = Extract<Block, { type: 'tool' | 'thinking' }>
 
-// Load blobs for tool and thinking blocks in parallel batches.
-// Returns the number of blobs loaded.
 async function loadBlobs(blocks: Block[]): Promise<number> {
 	const pending = blocks.filter(
-		(b): b is BlobBlock =>
-			(b.type === 'tool' || b.type === 'thinking') && !b.blobLoaded && !!b.blobId,
+		(block): block is BlobBlock =>
+			(block.type === 'tool' || block.type === 'thinking') && !block.blobLoaded && !!block.blobId,
 	)
 	if (pending.length === 0) return 0
-
-	const batchSize = blockConfig.blobBatchSize
-	for (let i = 0; i < pending.length; i += batchSize) {
-		const batch = pending.slice(i, i + batchSize)
-		// Check file sizes first, skip blobs over 1MB
-		const files = batch.map((b) => Bun.file(blobPath(b.sessionId ?? '', b.blobId!)))
-		const sizes = await Promise.allSettled(files.map((f) => f.size))
-
-		// Only read files under the size limit
-		const reads = files.map((f, j) => {
-			const sz = sizes[j]!
-			if (sz.status === 'fulfilled' && sz.value <= MAX_BLOB_SIZE) return f.text()
-			return Promise.resolve(null)
+	for (let i = 0; i < pending.length; i += blockConfig.blobBatchSize) {
+		const batch = pending.slice(i, i + blockConfig.blobBatchSize)
+		const files = batch.map((block) => Bun.file(blobPath(block.sessionId ?? '', block.blobId!)))
+		const sizes = await Promise.allSettled(files.map((file) => file.size))
+		const reads = files.map((file, index) => {
+			const size = sizes[index]!
+			return size.status === 'fulfilled' && size.value <= MAX_BLOB_SIZE ? file.text() : Promise.resolve(null)
 		})
 		const results = await Promise.allSettled(reads)
-
 		for (let j = 0; j < batch.length; j++) {
-			const r = results[j]!
+			const result = results[j]!
 			const block = batch[j]!
-			if (r.status === 'fulfilled' && r.value !== null) {
-				if (block.type === 'tool') applyToolBlob(block, r.value)
-				else applyThinkingBlob(block, r.value)
+			if (result.status === 'fulfilled' && result.value !== null) {
+				if (block.type === 'tool') applyToolBlob(block, result.value)
+				else applyThinkingBlob(block, result.value)
 			} else {
-				block.blobLoaded = true // mark skipped/failed so we don't retry
+				block.blobLoaded = true
 			}
 		}
-		await Bun.sleep(0) // yield to macro-task queue between batches
+		await Bun.sleep(0)
 	}
 	return pending.length
 }
 
-// ── Tool title & command extraction ──────────────────────────────────────────
-//
-// Title goes in the header line. Short commands are inlined.
-// Long or multiline commands go to the "command" field and render as
-// content lines with ' \' continuation for copy-pasteability.
-
-function capitalize(s: string): string {
-	return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
 function humanizeName(name: string): string {
-	return capitalize(name.replace(/_/g, ' '))
+	return name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ')
 }
 
 function editLineRange(input: any): string {
@@ -339,106 +234,20 @@ function editLineRange(input: any): string {
 		if (!start || !end) return ''
 		return start === end ? ` (${start})` : ` (${start}-${end})`
 	}
-	if (input?.operation === 'insert') {
-		const after = String(input.after_ref ?? '').trim()
-		if (!after) return ''
-		if (after === '0:000') return ' (before 1)'
-		return ` (after ${after})`
-	}
-	return ''
+	if (input?.operation !== 'insert') return ''
+	const after = String(input.after_ref ?? '').trim()
+	if (!after) return ''
+	return after === '0:000' ? ' (before 1)' : ` (after ${after})`
 }
 
-function toolTitle(name: string, input?: any): string {
-	if (!input) return humanizeName(name)
-	switch (name) {
-		case 'bash': {
-			const cmd = input.command ?? ''
-			// Short single-line commands go in the title
-			if (!cmd.includes('\n') && cmd.length <= 60) return `Bash: ${cmd}`
-			return 'Bash'
-		}
-		case 'read': {
-			let s = `Read ${input.path ?? '?'}`
-			if (input.start || input.end) {
-				s += ` (${input.start ?? 1}-${input.end ?? 'end'})`
-			}
-			return s
-		}
-		case 'read_url':
-			return `Read URL ${input.url ?? '?'}`
-		case 'write':
-			return `Write ${input.path ?? '?'}`
-		case 'edit':
-			return `Edit ${input.path ?? '?'}${editLineRange(input)}`
-		case 'eval':
-			return 'Eval'
-		case 'grep':
-			return `Grep ${input.pattern ?? '?'} in ${input.path ?? '?'}`
-		case 'glob':
-			return `Glob ${input.pattern ?? '?'} in ${input.path ?? '.'}`
-		case 'google':
-			return `Google ${input.query ?? '?'}`
-		case 'analyze_history':
-			return `Analyze history${input.sessionId ? ` ${input.sessionId}` : ''}`
-		case 'ls':
-			return `Ls ${input.path ?? '.'}`
-		case 'spawn_agent':
-			return input.title ? `Spawn agent · ${input.title}` : 'Spawn agent'
-		default:
-			return humanizeName(name)
-	}
-}
+const [RED_FG, GREEN_FG, FG_OFF, RESET_BG, DIM, DIM_OFF] = ['\x1b[31m', '\x1b[32m', '\x1b[39m', '\x1b[49m', '\x1b[2m', '\x1b[22m']
 
-// Returns the command/code to show as content lines (bash commands, eval code).
-// null if the command was already inlined in the title.
-function toolCommand(name: string, input?: any): string | undefined {
-	if (!input) return undefined
-	if (name === 'bash') {
-		const cmd = input.command ?? ''
-		// If it was short enough for the title, don't repeat
-		if (!cmd.includes('\n') && cmd.length <= 60) return undefined
-		return cmd
-	}
-	if (name === 'eval') {
-		return input.code ?? undefined
-	}
-	return undefined
-}
-
-function formatEditDetails(input: any): string | undefined {
-	if (input == null) return undefined
-	const details: Record<string, string> = {}
-	if (typeof input.operation === 'string') details.operation = input.operation
-	if (typeof input.start_ref === 'string') details.start_ref = input.start_ref
-	if (typeof input.end_ref === 'string') details.end_ref = input.end_ref
-	if (typeof input.after_ref === 'string') details.after_ref = input.after_ref
-	if (Object.keys(details).length === 0) return undefined
-	return ason.stringify(details, 'long')
-}
-
-function toolDetails(name: string, input: any): string | undefined {
-	if (input == null) return undefined
-	if (name === 'spawn_agent') return ason.stringify(input, 'long')
-	if (name === 'edit') return formatEditDetails(input)
-	return undefined
-}
-
-// ── Tool output formatting ────────────────────────────────────────────────────
-//
-// Per-tool formatters that turn raw tool output into concise display lines.
-// Edit output gets diff-style coloring. Read shows line/size counts.
-// Grep/glob/ls show match counts. Everything else shows truncated tail.
-
-const RED_FG = '\x1b[31m'
-const GREEN_FG = '\x1b[32m'
-const FG_OFF = '\x1b[39m'
-
-interface ToolFormatResult {
-	bodyLines: string[]
-	// If set, replaces the "[+ N lines]" indicator
-	hiddenIndicator?: string
-	// If true, don't show raw output tail — bodyLines replace it
-	suppressOutput?: boolean
+interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: string; suppressOutput?: boolean }
+type ToolSpec = {
+	title?: (input?: any) => string
+	command?: (input?: any) => string | undefined
+	details?: (input?: any) => string | undefined
+	format?: (output: string) => ToolFormatResult
 }
 
 function formatSize(bytes: number): string {
@@ -447,265 +256,134 @@ function formatSize(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function countLines(output: string): number {
-	return output.trim() ? output.trimEnd().split('\n').length : 0
-}
-
-// For grep/glob/ls: show count of results
 function countIndicator(output: string, empty: string, unit: string): ToolFormatResult {
 	if (!output.trim() || output === empty) return { bodyLines: [] }
-	const total = countLines(output)
-	return {
-		bodyLines: [],
-		hiddenIndicator: total > 5 ? `[${total} ${unit}]` : undefined,
-	}
+	const total = toLines(output.trimEnd()).length
+	return { bodyLines: [], hiddenIndicator: total > 5 ? `[${total} ${unit}]` : undefined }
 }
 
-// Edit: show diff between before/after with +/- coloring, but preserve any
-// trailing diagnostics (typecheck failures, explicit error messages) verbatim so
-// the user can always tell whether the edit really succeeded.
 function formatEdit(output: string): ToolFormatResult {
 	if (!output) return { bodyLines: [] }
 	const diffMatch = output.match(/^--- before\n([\s\S]*?)\n\n\+\+\+ after\n([\s\S]*?)(?:\n\n([\s\S]*))?$/)
 	if (!diffMatch) return { bodyLines: [] }
-
-	let beforeLines = diffMatch[1]!.split('\n').filter((l) => l.trim())
-	let afterLines = diffMatch[2]!.split('\n').filter((l) => l.trim())
-	const footerLines = (diffMatch[3] ?? '').split('\n').filter((l) => l.trim())
-
-	// Strip common prefix/suffix so only changed lines are shown.
+	let beforeLines = diffMatch[1]!.split('\n').filter((line) => line.trim())
+	let afterLines = diffMatch[2]!.split('\n').filter((line) => line.trim())
+	const footerLines = (diffMatch[3] ?? '').split('\n').filter((line) => line.trim())
 	while (beforeLines.length && afterLines.length && beforeLines[0] === afterLines[0]) {
 		beforeLines.shift()
 		afterLines.shift()
 	}
-	while (
-		beforeLines.length &&
-		afterLines.length &&
-		beforeLines[beforeLines.length - 1] === afterLines[afterLines.length - 1]
-	) {
+	while (beforeLines.length && afterLines.length && beforeLines.at(-1) === afterLines.at(-1)) {
 		beforeLines.pop()
 		afterLines.pop()
 	}
-
 	const lines: string[] = []
-	const MAX = blockConfig.maxEditDiffLines
 	for (const [content, prefix, color] of [
-		[beforeLines, '\u2212', RED_FG],
+		[beforeLines, '−', RED_FG],
 		[afterLines, '+', GREEN_FG],
 	] as const) {
 		if (!content.length) continue
-		// Show all lines when hiding just 1 would waste a line on the indicator.
-		const limit = content.length <= MAX + 1 ? content.length : MAX
-		for (const l of content.slice(0, limit)) {
-			lines.push(`${color}${prefix} ${l}${FG_OFF}`)
-		}
-		if (content.length > limit) {
-			lines.push(`  \u2026 ${content.length - limit} more`)
-		}
+		const limit = content.length <= blockConfig.maxEditDiffLines + 1 ? content.length : blockConfig.maxEditDiffLines
+		for (const line of content.slice(0, limit)) lines.push(`${color}${prefix} ${line}${FG_OFF}`)
+		if (content.length > limit) lines.push(`  … ${content.length - limit} more`)
 	}
-
 	if (footerLines.length) {
 		if (lines.length) lines.push('')
 		lines.push(...footerLines)
 	}
-
 	return { bodyLines: lines, suppressOutput: true }
 }
 
 function formatRead(output: string): ToolFormatResult {
 	if (!output.trim()) return { bodyLines: [] }
-	const n = countLines(output)
-	const sz = formatSize(Buffer.byteLength(output, 'utf8'))
-	return { bodyLines: [`${n} lines, ${sz}`] }
+	return { bodyLines: [`${toLines(output.trimEnd()).length} lines, ${formatSize(Buffer.byteLength(output, 'utf8'))}`] }
 }
 
-function formatWrite(output: string): ToolFormatResult {
-	const lines = output.split('\n').filter((l) => l.trim())
-	if (!lines.length || (lines.length === 1 && lines[0] === 'ok')) {
-		return { bodyLines: [], suppressOutput: true }
-	}
-	return { bodyLines: lines, suppressOutput: true }
+const toolSpecs: Record<string, ToolSpec> = {
+	bash: {
+		title(input) {
+			const cmd = input?.command ?? ''
+			return !cmd.includes('\n') && cmd.length <= 60 ? `Bash: ${cmd}` : 'Bash'
+		},
+		command(input) {
+			const cmd = input?.command ?? ''
+			return !cmd.includes('\n') && cmd.length <= 60 ? undefined : cmd
+		},
+	},
+	read: { title(input) { const range = input?.start || input?.end ? ` (${input.start ?? 1}-${input.end ?? 'end'})` : ''; return `Read ${input?.path ?? '?'}${range}` }, format: formatRead },
+	read_url: { title: (input) => `Read URL ${input?.url ?? '?'}` },
+	write: {
+		title: (input) => `Write ${input?.path ?? '?'}`,
+		format(output) {
+			const lines = output.split('\n').filter((line) => line.trim())
+			return !lines.length || (lines.length === 1 && lines[0] === 'ok') ? { bodyLines: [], suppressOutput: true } : { bodyLines: lines, suppressOutput: true }
+		},
+	},
+	edit: {
+		title: (input) => `Edit ${input?.path ?? '?'}${editLineRange(input)}`,
+		details(input) {
+			if (input == null) return undefined
+			const details: Record<string, string> = {}
+			if (typeof input.operation === 'string') details.operation = input.operation
+			if (typeof input.start_ref === 'string') details.start_ref = input.start_ref
+			if (typeof input.end_ref === 'string') details.end_ref = input.end_ref
+			if (typeof input.after_ref === 'string') details.after_ref = input.after_ref
+			return Object.keys(details).length ? ason.stringify(details, 'long') : undefined
+		},
+		format: formatEdit,
+	},
+	eval: { title: () => 'Eval', command: (input) => input?.code ?? undefined },
+	grep: { title: (input) => `Grep ${input?.pattern ?? '?'} in ${input?.path ?? '?'}`, format: (output) => countIndicator(output, 'No matches found.', 'matches') },
+	glob: { title: (input) => `Glob ${input?.pattern ?? '?'} in ${input?.path ?? '.'}`, format: (output) => countIndicator(output, 'No files found.', 'files') },
+	google: { title: (input) => `Google ${input?.query ?? '?'}` },
+	analyze_history: { title: (input) => `Analyze history${input?.sessionId ? ` ${input.sessionId}` : ''}` },
+	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
+	spawn_agent: { title: (input) => input?.title ? `Spawn agent · ${input.title}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
 }
 
-// Dispatch table: tool name → formatter
-const toolFormatters: Record<string, (output: string) => ToolFormatResult> = {
-	edit: formatEdit,
-	write: formatWrite,
-	grep: (o) => countIndicator(o, 'No matches found.', 'matches'),
-	glob: (o) => countIndicator(o, 'No files found.', 'files'),
-	ls: (o) => countIndicator(o, '(empty directory)', 'entries'),
-	read: formatRead,
+function getToolSpec(name: string): ToolSpec { return toolSpecs[name] ?? { title: () => humanizeName(name) } }
+
+function pushDimWrapped(lines: string[], text: string, cols: number): void {
+	for (const raw of text.split('\n')) for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) lines.push(`${DIM}${line}${DIM_OFF}`)
 }
 
-function formatToolOutput(name: string, output: string): ToolFormatResult {
-	return toolFormatters[name]?.(output) ?? { bodyLines: [] }
-}
-
-// ── Spinner for in-progress tool calls ───────────────────────────────────────
-
-const SPINNER_CHARS = '\u280B\u2819\u2839\u2838\u283C\u2834\u2826\u2827\u2807\u280F'
-
-function spinnerChar(elapsed: number): string {
-	// Rotate every 80ms
-	const idx = Math.floor(elapsed / 80) % SPINNER_CHARS.length
-	return SPINNER_CHARS[idx]!
-}
-
-// Format elapsed time: "1.2s" or "1m23s"
-function formatElapsed(ms: number): string {
-	if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
-	const m = Math.floor(ms / 60_000)
-	const s = Math.floor((ms % 60_000) / 1000)
-	return `${m}m${String(s).padStart(2, '0')}s`
-}
-
-// ── Rendering ────────────────────────────────────────────────────────────────
-
-const RESET_BG = '\x1b[49m'
-const DIM = '\x1b[2m'
-const DIM_OFF = '\x1b[22m'
-
-// Clip a line to terminal width, preserving raw tabs when possible.
-// If the line fits, return it as-is (tabs intact for copying).
-// If it overflows, expand tabs first (clipVisual needs real widths) then clip.
-function clipLine(line: string, cols: number): string {
-	if (visLen(expandTabs(line, blockConfig.tabWidth)) <= cols) return line
-	return clipVisual(expandTabs(line, blockConfig.tabWidth), cols)
-}
-
-// Fill a line's background to full terminal width.
-//
-// Fast path: most lines do not contain literal tab characters. For those, write
-// content first and then erase to EOL with the current background. That avoids
-// embedding a carriage return inside the logical line, which some terminals
-// copy poorly even though the on-screen rendering looks correct.
-//
-// Exact-width path: if content already fills the terminal width, do NOT emit
-// EL (\x1b[K). Some terminals keep a hidden wrap-pending state after the last
-// cell is written, and an immediate EL during repeated redraws can corrupt the
-// copied UTF-8 bytes of box-drawing characters.
-//
-// Tab path: tabs advance the cursor without painting the skipped cells, so to
-// keep the background continuous through tab gaps we still pre-fill with
-// background + EL, then carriage-return and paint content on top.
-function bgLine(content: string, cols: number, bg: string): string {
-	if (!content.includes('\t')) {
-		if (visLen(content) >= cols) return `${bg}${content}${RESET_BG}`
-		return `${bg}${content}\x1b[K${RESET_BG}`
-	}
-	return `${bg}\x1b[K\r${content}${RESET_BG}`
-}
-
-// Get the fg/bg colors for a block
-function blockColors(block: Block): { fg: string; bg: string } {
-	switch (block.type) {
-		case 'assistant':
-			return colors.assistant
-		case 'thinking':
-			return colors.thinking
-		case 'user':
-			return colors.user
-		case 'tool':
-			return colors.tool(block.name)
-		case 'info':
-			return colors.info
-		case 'warning':
-			return colors.warning
-		case 'error':
-			return colors.error
-		case 'startup':
-			return colors.startup
-		case 'fork':
-			return colors.fork
-	}
-	return colors.info
-}
-
-function formatHHMM(ts?: number): string {
-	if (!ts) return ''
-	const d = new Date(ts)
-	return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-// Build the header line:  ── HH:MM Title ──────────── (session/blob) ──
-function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
-	const right = blobRef ? ` ${DIM}(${blobRef})${DIM_OFF} ──` : ''
-	const prefix = time ? `── ${time} ` : '── '
-	// Leave one column slack so we never paint a printable glyph into the last
-	// terminal cell. Exact-width decorative headers can leave some terminals in a
-	// wrap-pending state, which then corrupts copied box-drawing UTF-8 bytes.
-	const budget = Math.max(1, cols - 1)
-	const titleWidth = Math.max(1, budget - visLen(prefix) - visLen(right) - 1)
-	const left = `${prefix}${clipVisual(title, titleWidth)} `
-	const fillLen = Math.max(0, budget - visLen(left) - visLen(right))
-	return `${left}${'─'.repeat(fillLen)}${right}`
-}
-
-// Block label for the header
-function blockLabel(block: Block): string {
-	switch (block.type) {
-		case 'user': {
-			if (block.source && block.source !== 'user' && block.source !== 'system') {
-				return `Inbox · ${block.source}`
-			}
-			if (block.status === 'steering') return 'You (steering)'
-			if (block.status === 'queued') return 'You (queued)'
-			return 'You'
+function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'info' | 'warning' | 'error' }>, cols: number): string[] {
+	const lines: string[] = []
+	for (const span of md.mdSpans(markdownSourceText(block))) {
+		if (span.type === 'code') {
+			for (const raw of span.lines) pushDimWrapped(lines, raw, cols)
+		} else if (span.type === 'table') {
+			lines.push(...md.mdTable(span.lines, cols))
+		} else {
+			for (const line of span.lines) lines.push(...wordWrap(md.mdInline(line), cols))
 		}
-		case 'assistant': {
-			const display = models.displayModel(block.model)
-			return display ? `Hal (${display})` : 'Hal'
-		}
-		case 'thinking': {
-			const display = models.displayModel(block.model)
-			const effort = block.thinkingEffort ?? models.reasoningEffort(block.model)
-			if (display && effort) return `Hal (${display}, thinking ${effort})`
-			if (display) return `Hal (${display}, thinking)`
-			return 'Thinking'
-		}
-		case 'tool':
-			return toolTitle(block.name, block.input)
-		case 'info':
-			return 'Info'
-		case 'warning':
-			return 'Warning'
-		case 'error':
-			return 'Error'
-		case 'startup':
-			return 'Startup'
-		case 'fork':
-			return 'Fork'
 	}
-	return 'Info'
+	while (lines[0]?.trim() === '') lines.shift()
+	while (lines.at(-1)?.trim() === '') lines.pop()
+	return resolveMarkers(lines)
 }
 
-// Format bash command for display: append ' \' to all but last line
-// so multiline commands can be copy-pasted into a shell.
-function formatBashCommand(cmd: string, contentWidth: number): string[] {
+function formatBashCommand(cmd: string, cols: number): string[] {
 	const rawLines = cmd.split('\n')
-	if (rawLines.length === 1 && visLen(cmd) <= contentWidth) {
-		return [cmd]
-	}
-	// Wrap each raw line, then join with ' \'
+	if (rawLines.length === 1 && visLen(cmd) <= cols) return [cmd]
 	const result: string[] = []
 	for (let i = 0; i < rawLines.length; i++) {
-		// Reserve 2 chars for ' \' continuation on all but last line
-		const isLast = i === rawLines.length - 1
-		const wrapWidth = isLast ? contentWidth : contentWidth - 2
+		const isLastRaw = i === rawLines.length - 1
+		const wrapWidth = isLastRaw ? cols : cols - 2
 		const wrapped = wordWrap(rawLines[i]!, wrapWidth)
-		for (let j = 0; j < wrapped.length; j++) {
-			const lineIsLast = isLast && j === wrapped.length - 1
-			result.push(lineIsLast ? wrapped[j]! : wrapped[j]! + ' \\')
-		}
+		for (let j = 0; j < wrapped.length; j++)
+			result.push(isLastRaw && j === wrapped.length - 1 ? wrapped[j]! : `${wrapped[j]!} \\`)
 	}
 	return result
 }
 
-// Render block content lines (without background — caller adds it).
-function blockContent(block: Block, cols: number): string[] {
-	const cw = cols
-	const indent = ''
+function clipLine(line: string, cols: number): string {
+	return visLen(expandTabs(line, blockConfig.tabWidth)) <= cols
+		? line
+		: clipVisual(expandTabs(line, blockConfig.tabWidth), cols)
+}
 
+function blockContent(block: Block, cols: number): string[] {
 	if (
 		block.type === 'assistant' ||
 		block.type === 'thinking' ||
@@ -713,168 +391,114 @@ function blockContent(block: Block, cols: number): string[] {
 		block.type === 'warning' ||
 		block.type === 'error'
 	) {
-		// Markdown-rendered text blocks share the same path.
-		const lines: string[] = []
-		for (const span of md.mdSpans(markdownSourceText(block))) {
-			if (span.type === 'code') {
-				for (const raw of span.lines) {
-					// Expand tabs for width measurement and wrapping (charWidth
-					// returns 0 for \t). Hard-wrap at column boundary since
-					// word-wrap would mangle code.
-					const expanded = expandTabs(raw, blockConfig.tabWidth)
-					for (const wl of hardWrap(expanded, cols)) {
-						lines.push(`${indent}${DIM}${wl}${DIM_OFF}`)
-					}
-				}
-			} else if (span.type === 'table') {
-				for (const l of md.mdTable(span.lines, cw)) lines.push(`${indent}${l}`)
-			} else {
-				for (const l of span.lines) {
-					for (const wl of wordWrap(`${indent}${md.mdInline(l)}`, cols)) lines.push(wl)
-				}
-			}
-		}
-		// Strip leading blank lines (models often start with \n\n)
-		while (lines.length > 0 && lines[0]!.trim() === '') lines.shift()
-		// Strip trailing blank lines (models often end with \n\n)
-		while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop()
-		return resolveMarkers(lines)
+		return renderMarkdownLines(block, cols)
 	}
-
 	if (block.type === 'tool') {
 		const lines: string[] = []
-		// Command lines (bash, eval) — keep real tabs for copyability.
-		// expandTabs only for formatBashCommand width calculation.
-		const command = toolCommand(block.name, block.input)
-		if (command) {
-			for (const l of formatBashCommand(command, cw)) {
-				lines.push(`${indent}${l}`)
-			}
+		const spec = getToolSpec(block.name)
+		const command = spec.command?.(block.input)
+		if (command) lines.push(...formatBashCommand(command, cols))
+		const details = spec.details?.(block.input)
+		if (details) pushDimWrapped(lines, details, cols)
+		if (!block.output) return lines
+		const output = sanitizeTerminalText(stripAnsiSequences(block.output))
+		const format = spec.format?.(output) ?? { bodyLines: [] }
+		for (const line of format.bodyLines) lines.push(clipLine(line, cols))
+		if (format.suppressOutput) return lines
+		const outputLines = output.trimEnd().split('\n')
+		if (outputLines.length > blockConfig.maxToolOutputLines) {
+			const hidden = format.hiddenIndicator ?? `[+ ${outputLines.length - blockConfig.maxToolOutputLines} lines]`
+			lines.push(`${DIM}${hidden}${DIM_OFF}`)
+			for (const line of outputLines.slice(-blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
+			return lines
 		}
-		const details = toolDetails(block.name, block.input)
-		if (details) {
-			for (const raw of details.split('\n')) {
-				const expanded = expandTabs(raw, blockConfig.tabWidth)
-				for (const wl of hardWrap(expanded, cols)) {
-					lines.push(`${indent}${DIM}${wl}${DIM_OFF}`)
-				}
-			}
-		}
-		// Per-tool formatted output — keep real tabs.
-		// expandTabs only where we need to measure/clip.
-		if (block.output) {
-			const output = sanitizeTerminalText(stripAnsiSequences(block.output))
-			const fmt = formatToolOutput(block.name, output)
-
-			// Tool-specific body lines (diffs, counts)
-			for (const l of fmt.bodyLines) {
-				lines.push(`${indent}${clipLine(l, cw)}`)
-			}
-
-			// Raw output tail (unless formatter suppressed it)
-			if (!fmt.suppressOutput) {
-				const outLines = output.trimEnd().split('\n')
-				const MAX = blockConfig.maxToolOutputLines
-				if (outLines.length > MAX) {
-					const indicator = fmt.hiddenIndicator ?? `[+ ${outLines.length - MAX} lines]`
-					lines.push(`${indent}${DIM}${indicator}${DIM_OFF}`)
-					for (const l of outLines.slice(-MAX)) {
-						lines.push(`${indent}${clipLine(l, cw)}`)
-					}
-				} else {
-					for (const l of outLines) {
-						lines.push(`${indent}${clipLine(l, cw)}`)
-					}
-				}
-			}
-		}
+		for (const line of outputLines) lines.push(clipLine(line, cols))
 		return lines
 	}
-
-	// User, notices, startup, fork — plain text with word wrap.
-	// Expand tabs here (word wrap needs real character widths).
-	const text = sanitizeTerminalText(block.text)
 	const lines: string[] = []
-	for (const raw of expandTabs(text, blockConfig.tabWidth).split('\n')) {
-		for (const wl of wordWrap(`${indent}${raw}`, cols)) lines.push(wl)
+	for (const raw of expandTabs(sanitizeTerminalText(block.text), blockConfig.tabWidth).split('\n')) {
+		lines.push(...wordWrap(raw, cols))
 	}
 	return lines
 }
 
-
-function wrapBricks(bricks: string[], cols: number): string[] {
-	const lines: string[] = []
-	let current = ''
-	for (const brick of bricks) {
-		if (!current) {
-			if (visLen(brick) <= cols) {
-				current = brick
-				continue
-			}
-			const wrapped = wordWrap(brick, cols)
-			lines.push(...wrapped.slice(0, -1))
-			current = wrapped[wrapped.length - 1] ?? ''
-			continue
-		}
-		const joined = `${current} ${brick}`
-		if (visLen(joined) <= cols) {
-			current = joined
-			continue
-		}
-		lines.push(current)
-		if (visLen(brick) <= cols) {
-			current = brick
-			continue
-		}
-		const wrapped = wordWrap(brick, cols)
-		lines.push(...wrapped.slice(0, -1))
-		current = wrapped[wrapped.length - 1] ?? ''
-	}
-	if (current) lines.push(current)
-	return lines
+function bgLine(content: string, cols: number, bg: string): string {
+	if (!content.includes('\t'))
+		return visLen(content) >= cols ? `${bg}${content}${RESET_BG}` : `${bg}${content}\x1b[K${RESET_BG}`
+	return `${bg}\x1b[K\r${content}${RESET_BG}`
 }
 
-function renderBlockGroup(group: NoticeBlock[], cols: number): string[] {
+const fixedNoticeColors = { info: colors.info, warning: colors.warning, error: colors.error, startup: colors.startup, fork: colors.fork }
+
+function blockColors(block: Block): { fg: string; bg: string } {
+	if (block.type === 'assistant') return colors.assistant
+	if (block.type === 'thinking') return colors.thinking
+	if (block.type === 'user') return colors.user
+	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
+}
+
+function formatHHMM(ts?: number): string {
+	if (!ts) return ''
+	const date = new Date(ts)
+	return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
+	const right = blobRef ? ` ${DIM}(${blobRef})${DIM_OFF} ──` : ''
+	const prefix = time ? `── ${time} ` : '── '
+	const budget = Math.max(1, cols - 1)
+	const titleWidth = Math.max(1, budget - visLen(prefix) - visLen(right) - 1)
+	const left = `${prefix}${clipVisual(title, titleWidth)} `
+	return `${left}${'─'.repeat(Math.max(0, budget - visLen(left) - visLen(right)))}${right}`
+}
+
+const fixedLabels = { info: 'Info', warning: 'Warning', error: 'Error', startup: 'Startup', fork: 'Fork' }
+
+function blockLabel(block: Block): string {
+	if (block.type === 'user') {
+		if (block.source && block.source !== 'user' && block.source !== 'system') return `Inbox · ${block.source}`
+		if (block.status === 'steering') return 'You (steering)'
+		if (block.status === 'queued') return 'You (queued)'
+		return 'You'
+	}
+	if (block.type === 'assistant') {
+		const display = models.displayModel(block.model)
+		return display ? `Hal (${display})` : 'Hal'
+	}
+	if (block.type === 'thinking') {
+		const display = models.displayModel(block.model)
+		const effort = block.thinkingEffort ?? models.reasoningEffort(block.model)
+		if (display && effort) return `Hal (${display}, thinking ${effort})`
+		if (display) return `Hal (${display}, thinking)`
+		return 'Thinking'
+	}
+	if (block.type === 'tool') return getToolSpec(block.name).title?.(block.input) ?? humanizeName(block.name)
+	return fixedLabels[block.type]
+}
+
+function renderBlockGroup(group: Array<Extract<Block, { type: 'info' | 'warning' | 'error' }>>, cols: number): string[] {
 	if (group.length === 0) return []
-	if (group.length === 1) return renderBlock(group[0] as Block, cols)
-	const first = group[0]!
-	const { fg, bg } = blockColors(first as Block)
-	const header = buildHeader(blockLabel(first as Block), formatHHMM(first.ts), '', cols)
-	const bricks = group.flatMap((block) => expandTabs(block.text, blockConfig.tabWidth).split('\n').map((line) => `[${line}]`))
+	if (group.length === 1) return renderBlock(group[0]!, cols)
+	const header = buildHeader('Info', formatHHMM(group[0]!.ts), '', cols)
+	const text = group.map((block) => `[${expandTabs(block.text, blockConfig.tabWidth)}]`).join(' ')
+	const { fg, bg } = colors.info
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
-	for (const line of wrapBricks(bricks, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
-	if (lines.length > 0) lines[lines.length - 1] += '\x1b[39m'
+	for (const line of wordWrap(text, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
+	lines[lines.length - 1]! += FG_OFF
 	return lines
 }
-
-// ── Main render function ─────────────────────────────────────────────────────
 
 function renderBlock(block: Block, cols: number): string[] {
-	// Tool blocks render with whatever data is available.
-	// Blob data is filled in by the background loader, not during render.
-	const label = blockLabel(block)
-	const time = formatHHMM(block.ts)
+	const blobRef =
+		'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId
+			? `${block.sessionId}/${block.blobId}`
+			: ''
 	const { fg, bg } = blockColors(block)
-
-	// Blob ref: "(sessionId/blobId)"
-	let blobRef = ''
-	if ('blobId' in block && block.blobId && 'sessionId' in block && block.sessionId) {
-		blobRef = `${block.sessionId}/${block.blobId}`
-	}
-
-	const header = buildHeader(label, time, blobRef, cols)
-	const content = blockContent(block, cols)
-
-	const lines: string[] = []
-	// Foreground color applied to header and content; bg fills full width
-	lines.push(bgLine(`${fg}${header}`, cols, bg))
-	for (const l of content) lines.push(bgLine(`${fg}${l}`, cols, bg))
-	// Reset fg after block so it doesn't leak into subsequent lines
-	if (lines.length > 0) lines[lines.length - 1] += '\x1b[39m'
+	const lines = [bgLine(`${fg}${buildHeader(blockLabel(block), formatHHMM(block.ts), blobRef, cols)}`, cols, bg)]
+	for (const line of blockContent(block, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
+	lines[lines.length - 1]! += FG_OFF
 	return lines
 }
-
-// ── Namespace ────────────────────────────────────────────────────────────────
 
 export const blocks = {
 	config: blockConfig,
@@ -883,7 +507,4 @@ export const blocks = {
 	renderBlock,
 	renderBlockGroup,
 	loadBlobs,
-	formatToolOutput,
-	spinnerChar,
-	formatElapsed,
 }

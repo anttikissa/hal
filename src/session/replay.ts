@@ -2,7 +2,6 @@
 
 import type { HistoryEntry } from '../server/sessions.ts'
 import { sessions } from '../server/sessions.ts'
-import { blob } from './blob.ts'
 import { models } from '../models.ts'
 import { sessionEntry } from './entry.ts'
 
@@ -27,16 +26,6 @@ export interface ReplayResult {
 	interrupted: { name: string; id: string }[]
 }
 
-function userContentText(entry: Extract<HistoryEntry, { type: 'user' }>): string {
-	return entry.parts
-		.map((part) => {
-			if (part.type === 'text') return part.text
-			const file = part.originalFile ?? part.blobId ?? ''
-			return file ? `[${file}]` : '[image]'
-		})
-		.join('')
-}
-
 function extractToolOutput(blobData: any): { output: string; status: 'done' | 'error'; input: any } {
 	const callData = blobData?.call ?? {}
 	const raw = blobData?.result?.content ?? ''
@@ -44,7 +33,10 @@ function extractToolOutput(blobData: any): { output: string; status: 'done' | 'e
 		typeof raw === 'string'
 			? raw
 			: Array.isArray(raw)
-				? raw.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') || '[image]'
+				? raw
+						.filter((b: any) => b.type === 'text')
+						.map((b: any) => b.text)
+						.join('') || '[image]'
 				: ''
 	const status: 'done' | 'error' =
 		blobData?.result?.status === 'error' ? 'error' : blobData?.result ? 'done' : 'error'
@@ -65,7 +57,7 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 	for (const entry of entries) {
 		const ts = entry.ts ? Date.parse(entry.ts) : undefined
 		if (entry.type === 'reset' || entry.type === 'forked_from' || entry.type === 'compact') continue
-		if (entry.type === 'session' || entry.type === 'input_history') continue
+		if (entry.type === 'input_history') continue
 
 		if (entry.type === 'info') {
 			blocks.push({ type: entry.level === 'error' ? 'error' : 'info', text: entry.text, ts })
@@ -73,7 +65,7 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 		}
 
 		if (entry.type === 'user') {
-			const text = userContentText(entry)
+			const text = sessionEntry.userText(entry, { images: 'path-or-blob-or-image' })
 			if (!text) continue
 			blocks.push({ type: 'input', text, model, source: entry.source, ts })
 			tokenText += text + '\n'
@@ -201,13 +193,13 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	return entries
-		.map((e) => {
-			if (e.type === 'input_history') return e.text
+		.map((entry) => {
+			if (entry.type === 'input_history') return entry.text
 			// Up-arrow recall is for things the human typed. Inbox / subagent handoffs
 			// are persisted as user entries with a source session id, but they should
 			// never show up in local editing history.
-			if (e.type !== 'user' || e.source) return ''
-			return sessionEntry.userText(e, ' ')
+			if (entry.type !== 'user' || entry.source) return ''
+			return sessionEntry.userText(entry, { separator: ' ' })
 		})
 		.filter((text) => text && !text.startsWith('['))
 		.slice(-200)

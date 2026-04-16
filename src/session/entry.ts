@@ -1,18 +1,33 @@
-import type { HistoryEntry, UserPart } from '../server/sessions.ts'
+import type { HistoryEntry } from '../server/sessions.ts'
 import { blob } from './blob.ts'
 
 /**
- * Small helpers for working with stored history entries. Replay and API message
- * rebuilding both need the same "just the user text" and "load the entry blob"
- * operations, so keep them here instead of re-implementing the same filters.
+ * Small helpers for working with stored history entries. Replay, block rendering,
+ * and API message rebuilding all need the same user-text and blob-loading rules,
+ * so keep them here instead of carrying slightly different copies.
  */
 
-function textParts(parts: UserPart[]): Extract<UserPart, { type: 'text' }>[] {
-	return parts.filter((part): part is Extract<UserPart, { type: 'text' }> => part.type === 'text')
+type UserTextOptions = {
+	separator?: string
+	images?: 'omit' | 'path-or-image' | 'path-or-blob-or-image'
 }
 
-function userText(entry: Extract<HistoryEntry, { type: 'user' }>, separator = ''): string {
-	return textParts(entry.parts).map((part) => part.text).join(separator)
+function userText(entry: Extract<HistoryEntry, { type: 'user' }>, opts: UserTextOptions | string = {}): string {
+	const options = typeof opts === 'string' ? { separator: opts } : opts
+	const separator = options.separator ?? ''
+	const images = options.images ?? 'omit'
+	return entry.parts
+		.map((part) => {
+			if (part.type === 'text') return part.text
+			if (images === 'path-or-image') return part.originalFile ? `[${part.originalFile}]` : '[image]'
+			if (images === 'path-or-blob-or-image') {
+				const ref = part.originalFile ?? part.blobId
+				return ref ? `[${ref}]` : '[image]'
+			}
+			return ''
+		})
+		.filter(Boolean)
+		.join(separator)
 }
 
 function loadEntryBlob(sessionId: string, entry: { blobId?: string }): any | null {
@@ -20,4 +35,4 @@ function loadEntryBlob(sessionId: string, entry: { blobId?: string }): any | nul
 	return blob.readBlobFromChain(sessionId, entry.blobId)
 }
 
-export const sessionEntry = { textParts, userText, loadEntryBlob }
+export const sessionEntry = { userText, loadEntryBlob }
