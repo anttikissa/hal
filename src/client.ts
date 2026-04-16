@@ -592,12 +592,18 @@ function applySessionList(items: SharedSessionInfo[]): void {
 		}
 	}
 	const grew = newTabs.length > previousTabs.length
+	const shrank = newTabs.length < previousTabs.length
 	state.tabs = newTabs
 	const openIds = new Set(newTabs.map((tab) => tab.sessionId))
 	pruneRecentTabs(openIds)
 
+	const activeTabClosed = previousSession !== '' && !openIds.has(previousSession)
+	const closedLastTab = shrank && activeTabClosed && previousIndex >= newTabs.length
 	let targetSession = previousSession && openIds.has(previousSession) ? previousSession : ''
 	if (grew && pendingOpen && openedSessionId) targetSession = openedSessionId
+	// Closing the rightmost tab should move focus to its new neighbor on the left,
+	// even if some older tab was visited more recently.
+	if (!targetSession && closedLastTab) targetSession = newTabs[newTabs.length - 1]?.sessionId ?? ''
 	if (!targetSession) targetSession = mostRecentSurvivingTab() ?? ''
 	if (!targetSession) {
 		const fallbackIndex = previousIndex > 0 ? Math.min(previousIndex - 1, newTabs.length - 1) : 0
