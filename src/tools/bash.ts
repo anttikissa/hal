@@ -3,6 +3,8 @@
 // Runs commands via bash -lc with configurable timeout, output capture,
 // and 1MB output limit with middle-truncation.
 
+import { resolve } from 'path'
+import { homedir } from 'os'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
 const config = {
@@ -19,11 +21,21 @@ interface BashInput {
 
 type TimerWithUnref = ReturnType<typeof setTimeout> & { unref?: () => void }
 
-function normalizeInput(input: unknown): BashInput {
+const HOME = homedir()
+
+function stripCdCwd(command: string | undefined, cwd: string): string | undefined {
+	const m = command?.match(/^cd\s+(\S+)\s*&&\s*/)
+	if (!m) return command
+	const target = resolve(m[1]!.startsWith('~/') ? HOME + m[1]!.slice(1) : m[1]!)
+	return target === cwd ? command!.slice(m[0].length) : command
+}
+
+function normalizeInput(input: unknown, cwd: string): BashInput {
 	const raw = toolRegistry.inputObject(input)
 	const timeout = Number(raw.timeout)
+	const command = typeof raw.command === 'string' ? raw.command : raw.command === undefined ? undefined : String(raw.command)
 	return {
-		command: typeof raw.command === 'string' ? raw.command : raw.command === undefined ? undefined : String(raw.command),
+		command: stripCdCwd(command, cwd),
 		timeout: Number.isFinite(timeout) ? timeout : undefined,
 	}
 }
@@ -66,7 +78,7 @@ function truncateOutput(text: string): string {
 // ── Execution ──
 
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
-	const spec = normalizeInput(input)
+	const spec = normalizeInput(input, ctx.cwd)
 	const command = spec.command ?? ''
 	if (!command.trim()) return 'error: empty command'
 
