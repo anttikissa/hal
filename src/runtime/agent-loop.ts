@@ -6,11 +6,9 @@
 // Provider interface is defined in protocol.ts. Provider implementations
 // are loaded lazily via providers/provider.ts.
 
-import { resolve } from 'path'
-import { homedir } from 'os'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
-import type { Provider, ProviderStreamEvent, Message, ToolDef, TokenUsage } from '../protocol.ts'
+import type { ProviderStreamEvent, Message, TokenUsage } from '../protocol.ts'
 import { models } from '../models.ts'
 import { context } from './context.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
@@ -46,6 +44,17 @@ const state = {
 
 const DEFAULT_ABORT_TEXT = '[paused]'
 
+function parseResetsInSeconds(body: string | undefined): number | undefined {
+	if (!body) return undefined
+	try {
+		const json = JSON.parse(body)
+		const secs = json?.error?.resets_in_seconds ?? json?.resets_in_seconds
+		return typeof secs === 'number' && secs > 0 ? secs * 1000 : undefined
+	} catch {
+		return undefined
+	}
+}
+
 // ── Types ──
 
 export interface AgentContext {
@@ -68,14 +77,6 @@ interface ToolCall {
 	id: string
 	name: string
 	input: any
-}
-
-// ── Provider loading ──
-// Providers are loaded lazily via providers/provider.ts.
-// getProvider() is async because it may need to dynamically import modules.
-
-async function getProvider(name: string): Promise<Provider> {
-	return providerLoader.getProvider(name)
 }
 
 // ── IPC helpers ──
@@ -149,18 +150,6 @@ function isRetryableStatus(status: number | undefined): boolean {
 	return status != null && config.retryableStatuses.has(status)
 }
 
-/** Extract resets_in_seconds from error response body (Anthropic rate limit format). */
-function parseResetsInSeconds(body: string | undefined): number | undefined {
-	if (!body) return undefined
-	try {
-		const json = JSON.parse(body)
-		// Anthropic nests it under error.resets_in_seconds
-		const secs = json?.error?.resets_in_seconds ?? json?.resets_in_seconds
-		if (typeof secs === 'number' && secs > 0) return secs * 1000
-	} catch {}
-	return undefined
-}
-
 /** Build the short user-visible error details below the status/endpoint header. */
 function formatErrorDetails(event: ProviderStreamEvent): string {
 	if (typeof event.message === 'string' && event.message.trim()) return event.message.trim()
@@ -192,39 +181,9 @@ async function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
 	})
 }
 
-
-// ── Tool call normalization ──
-// Strip redundant "cd $CWD && " prefix that models prepend to bash commands.
-// The tool already runs in the correct cwd, so this is pure noise.
-
-const HOME = homedir()
-
-function resolveTilde(p: string): string {
-	return p.startsWith('~/') ? HOME + p.slice(1) : p
-}
-
-function stripCdCwd(call: ToolCall, cwd: string): ToolCall {
-	if (call.name !== 'bash') return call
-	const cmd = String((call.input as any)?.command ?? '')
-	const m = cmd.match(/^cd\s+(\S+)\s*&&\s*/)
-	if (!m) return call
-	const target = resolve(resolveTilde(m[1]!))
-	if (target !== cwd) return call
-	return { ...call, input: { ...call.input, command: cmd.slice(m[0].length) } }
-}
-
 // ── Tool execution ──
 // Dispatches tool calls through the tool registry. Built-in tool registration
 // now happens explicitly during startup.
-
-async function executeTool(call: ToolCall, signal?: AbortSignal, cwd?: string, sessionId?: string): Promise<string> {
-	const context: import('../tools/tool.ts').ToolContext = {
-		sessionId: sessionId ?? 'unknown',
-		cwd: cwd ?? process.cwd(),
-		signal,
-	}
-	return toolRegistry.dispatch(call.name, call.input, context)
-}
 
 // ── The main loop ──
 
@@ -235,7 +194,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	const slashIdx = model.indexOf('/')
 	const providerName = slashIdx >= 0 ? model.slice(0, slashIdx) : 'stub'
 	const modelId = slashIdx >= 0 ? model.slice(slashIdx + 1) : model
-	const provider = await getProvider(providerName)
+	const provider = await providerLoader.getProvider(providerName)
 
 	// Abort any existing generation for this session. This prevents two
 	// concurrent generations on the same session (race between client
@@ -266,7 +225,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	const loopSignal = ac.signal
 
 	// Get tool definitions from the registry for the provider API
-	const tools: ToolDef[] = toolRegistry.toToolDefs()
+	const tools = toolRegistry.toToolDefs()
 
 	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length
 	await ctx.onStatus?.(true, 'generating...')
@@ -361,11 +320,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 							break
 
 					case 'tool_call': {
-						const tc = stripCdCwd({
+						const tc = {
 							id: event.id!,
 							name: event.name!,
 							input: event.input,
-						}, ctx.cwd)
+						}
 						toolCalls.push(tc)
 						const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
 						toolBlobMap.set(tc.id, blobId)
@@ -609,8 +568,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				})
 			}
 
-			// Report context usage estimate
-			const est = context.estimateContext(messages, model, overheadBytes)
 			await ctx.onStatus?.(true, 'generating...')
 
 			// Continue to next iteration (re-invoke the model with tool results)
@@ -649,6 +606,7 @@ async function executeToolsConcurrently(
 	sessionId?: string,
 ): Promise<{ call: ToolCall; result: string }[]> {
 	const results: { call: ToolCall; result: string }[] = []
+	const context = { sessionId: sessionId ?? 'unknown', cwd: cwd ?? process.cwd(), signal }
 
 	// Process in batches of maxToolConcurrency
 	for (let i = 0; i < toolCalls.length; i += config.maxToolConcurrency) {
@@ -658,7 +616,7 @@ async function executeToolsConcurrently(
 			batch.map(async (call) => {
 				if (signal.aborted) return { call, result: '[interrupted]' }
 				try {
-					const result = await executeTool(call, signal, cwd, sessionId)
+					const result = await toolRegistry.dispatch(call.name, call.input, context)
 					return { call, result }
 				} catch (err: any) {
 					return { call, result: `error: ${err?.message ?? String(err)}` }

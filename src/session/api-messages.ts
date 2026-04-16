@@ -1,15 +1,12 @@
-// Convert stored flat history entries into API-ready message arrays.
-//
-// History is persisted as visible UI events (user, thinking, assistant,
-// tool_call, tool_result, info, ...). This module groups those flat entries back
-// into the provider-neutral Message[] format used by the runtime.
-//
-// Provider-specific quirks belong here, not in the on-disk history model.
+// Rebuild provider-neutral Message[] values from the flat on-disk history.
+// Provider-specific repair and pruning stays here so the stored history format
+// can remain simple and UI-oriented.
 
-import type { HistoryEntry, UserPart } from '../server/sessions.ts'
+import type { HistoryEntry } from '../server/sessions.ts'
 import { sessions } from '../server/sessions.ts'
-import { blob } from './blob.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
+import { blob } from './blob.ts'
+import { sessionEntry } from './entry.ts'
 
 function formatLocalTime(ts?: string): string | null {
 	if (!ts) return null
@@ -37,14 +34,6 @@ const apiConfig = {
 	pruneBatchTurns: 8,
 }
 
-function applyModelEvent(current: string | undefined, entry: HistoryEntry): string | undefined {
-	if (entry.type !== 'session') return current
-	if (entry.action === 'model-set' && entry.model) return entry.model
-	if (entry.action === 'model-change' && entry.new) return entry.new
-	if (entry.action === 'init' && entry.model) return entry.model
-	return current
-}
-
 function findReplayStart(entries: HistoryEntry[]): number {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const e = entries[i]!
@@ -59,7 +48,6 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 	const sliced = entries.slice(start)
 	const out: Message[] = []
 
-	let currentModel: string | undefined
 	const totalUserTurns = sliced.filter((entry) => entry.type === 'user').length
 	let userTurnsSeen = 0
 	let pendingInfos: string[] = []
@@ -79,8 +67,6 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 	}
 
 	for (const entry of sliced) {
-		currentModel = applyModelEvent(currentModel, entry)
-
 		if (entry.type === 'info') {
 			const turnsRemaining = totalUserTurns - userTurnsSeen
 			const visibility = entry.visibility ?? (entry.level === 'error' ? 'next-user' : 'ui')
@@ -134,16 +120,21 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 	return opts?.prune === false ? out : pruneMessages(out)
 }
 
-function buildUserContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'user' }>, pendingInfos: string[]): string | ContentBlock[] {
+function buildUserContent(
+	sessionId: string,
+	entry: Extract<HistoryEntry, { type: 'user' }>,
+	pendingInfos: string[],
+): string | ContentBlock[] {
 	const time = formatLocalTime(entry.ts)
 	const prefix = [
 		...(time ? [`[${time}]`] : []),
+		...(entry.source ? [`[Inbox · ${entry.source}]`] : []),
 		...pendingInfos,
 	].join('\n')
 
 	const onlyText = entry.parts.every((part) => part.type === 'text')
 	if (onlyText) {
-		const text = entry.parts.map((part) => (part as Extract<UserPart, { type: 'text' }>).text).join('')
+		const text = sessionEntry.userText(entry)
 		return prefix ? `${prefix}\n${text}` : text
 	}
 
@@ -167,11 +158,14 @@ function buildUserContent(sessionId: string, entry: Extract<HistoryEntry, { type
 	return blocks
 }
 
-function buildThinkingContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'thinking' }>): ContentBlock | null {
+function buildThinkingContent(
+	sessionId: string,
+	entry: Extract<HistoryEntry, { type: 'thinking' }>,
+): ContentBlock | null {
 	let thinkingText = entry.text
 	let thinkingSignature = entry.signature
-	if (entry.blobId && (!thinkingText || !thinkingSignature)) {
-		const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+	if (!thinkingText || !thinkingSignature) {
+		const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
 		if (!thinkingText) thinkingText = blobData?.thinking
 		if (!thinkingSignature) thinkingSignature = blobData?.signature
 	}
@@ -181,19 +175,18 @@ function buildThinkingContent(sessionId: string, entry: Extract<HistoryEntry, { 
 
 function buildToolUseContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'tool_call' }>): ContentBlock {
 	let input = entry.input
-	if (entry.blobId && input === undefined) {
-		const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
-		input = blobData?.call?.input ?? {}
-	}
+	const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
+	if (input === undefined) input = blobData?.call?.input ?? {}
 	return { type: 'tool_use', id: entry.toolId, name: entry.name, input: input ?? {} }
 }
 
-function buildToolResultContent(sessionId: string, entry: Extract<HistoryEntry, { type: 'tool_result' }>): ContentBlock {
+function buildToolResultContent(
+	sessionId: string,
+	entry: Extract<HistoryEntry, { type: 'tool_result' }>,
+): ContentBlock {
 	let resultContent = entry.output
-	if (entry.blobId && resultContent === undefined) {
-		const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
-		resultContent = blobData?.result?.content ?? '[interrupted]'
-	}
+	const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
+	if (resultContent === undefined) resultContent = blobData?.result?.content ?? '[interrupted]'
 	if (resultContent === undefined) resultContent = '[interrupted]'
 	if (typeof resultContent === 'string' && resultContent.length > apiConfig.maxToolOutput) {
 		const truncated = resultContent.length - apiConfig.maxToolOutput
@@ -286,8 +279,10 @@ function pruneMessages(msgs: Message[]): Message[] {
 			out.push({ ...msg, content })
 		} else if (msg.role === 'user' && Array.isArray(msg.content)) {
 			const content = (msg.content as ContentBlock[]).map((b) => {
-				if (b.type === 'tool_result' && pastBatchThreshold(age[i]!, heavy)) return { ...b, content: '[tool result omitted from context]' }
-				if (b.type === 'image' && pastBatchThreshold(age[i]!, heavy)) return { type: 'text' as const, text: '[image omitted from context]' }
+				if (b.type === 'tool_result' && pastBatchThreshold(age[i]!, heavy))
+					return { ...b, content: '[tool result omitted from context]' }
+				if (b.type === 'image' && pastBatchThreshold(age[i]!, heavy))
+					return { type: 'text' as const, text: '[image omitted from context]' }
 				return b
 			})
 			out.push({ ...msg, content })
@@ -303,7 +298,6 @@ export const apiMessages = {
 	config: apiConfig,
 	toProviderMessages,
 	pruneMessages,
-	applyModelEvent,
 	findReplayStart,
 	formatLocalTime,
 }

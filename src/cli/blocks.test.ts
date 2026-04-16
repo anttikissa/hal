@@ -20,7 +20,6 @@ test('incoming user block shows inbox source instead of You', () => {
 	expect(header).not.toContain('You')
 })
 
-
 test('historyToBlocks preserves original image path in user text', () => {
 	const history: any[] = [
 		{
@@ -44,7 +43,7 @@ test('thinking block renders markdown and trims trailing blank lines', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 80)
-	const clean = lines.map(l => stripAnsi(l))
+	const clean = lines.map((l) => stripAnsi(l))
 
 	// Header is first line
 	expect(clean[0]).toContain('Thinking')
@@ -60,7 +59,6 @@ test('thinking block renders markdown and trims trailing blank lines', () => {
 	expect(lastContentLine.trim()).not.toBe('')
 })
 
-
 test('assistant header includes display model', () => {
 	const block: Block = {
 		type: 'assistant',
@@ -71,7 +69,6 @@ test('assistant header includes display model', () => {
 	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
 	expect(header).toContain('Hal (GPT 5.4)')
 })
-
 
 test('thinking header includes model and default thinking level', () => {
 	const block: Block = {
@@ -84,19 +81,16 @@ test('thinking header includes model and default thinking level', () => {
 	expect(header).toContain('Hal (GPT 5.4, thinking high)')
 })
 
-
-test('historyToBlocks carries model changes into later assistant and thinking blocks', () => {
+test('historyToBlocks uses the session model for later assistant and thinking blocks', () => {
 	const history: any[] = [
-		{ type: 'session', action: 'model', new: 'openai/gpt-5.4', ts: '2026-04-15T14:54:00.000Z' },
 		{ type: 'thinking', text: 'hmm', ts: '2026-04-15T14:54:01.000Z' },
 		{ type: 'assistant', text: 'done', ts: '2026-04-15T14:54:02.000Z' },
 	]
 
-	const rendered = blocks.historyToBlocks(history as any, 's1')
+	const rendered = blocks.historyToBlocks(history as any, 's1', 0, undefined, 'openai/gpt-5.4')
 	expect(rendered[0]).toMatchObject({ type: 'thinking', model: 'openai/gpt-5.4', thinkingEffort: 'high' })
 	expect(rendered[1]).toMatchObject({ type: 'assistant', model: 'openai/gpt-5.4' })
 })
-
 
 test('info block renders markdown tables', () => {
 	const block: Block = {
@@ -112,9 +106,6 @@ test('info block renders markdown tables', () => {
 	expect(body).toContain('│ *      │ 1/2  │ a@test.com │')
 })
 
-
-
-
 test('rendered block lines without tabs do not embed carriage returns', () => {
 	const block: Block = {
 		type: 'thinking',
@@ -123,7 +114,6 @@ test('rendered block lines without tabs do not embed carriage returns', () => {
 
 	const lines = blocks.renderBlock(block, 80)
 	expect(lines.some((line) => line.includes('\r'))).toBe(false)
-
 })
 
 test('block header leaves one column slack to avoid last-column wrap state', () => {
@@ -139,18 +129,14 @@ test('block header leaves one column slack to avoid last-column wrap state', () 
 	expect(header.length).toBeLessThan(80)
 })
 
-
 test('forked_from history entry renders as a Fork block', () => {
-	const history: any[] = [
-		{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' },
-	]
+	const history: any[] = [{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blocks.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([{ type: 'fork', text: 'Forked from 04-abc' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
 	expect(stripAnsi(lines[0] ?? '')).toContain('Fork')
 })
-
 
 test('startup block renders a Startup header', () => {
 	const block: Block = {
@@ -163,7 +149,6 @@ test('startup block renders a Startup header', () => {
 	expect(stripAnsi(lines[0] ?? '')).toContain('Startup')
 	expect(stripAnsi(lines.slice(1).join('\n'))).toContain('Server started')
 })
-
 
 test('warning block renders a Warning header', () => {
 	const block: Block = {
@@ -178,7 +163,6 @@ test('warning block renders a Warning header', () => {
 	expect(header).toContain('Warning')
 	expect(header).not.toContain('Info')
 })
-
 
 test('tool output strips ANSI escapes but keeps other control bytes visible', () => {
 	const block: Block = {
@@ -201,7 +185,6 @@ test('tool output strips ANSI escapes but keeps other control bytes visible', ()
 	expect(clean).not.toContain('␛')
 })
 
-
 test('error block header shows blob ref', () => {
 	const block = {
 		type: 'error',
@@ -214,7 +197,6 @@ test('error block header shows blob ref', () => {
 	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
 	expect(header).toContain('04-abc/000003-err')
 })
-
 
 test('spawn_agent block renders full input args', () => {
 	const block: Block = {
@@ -246,7 +228,6 @@ test('spawn_agent block renders full input args', () => {
 	expect(body).toContain('Queued subagent spawn from 04-lfp')
 })
 
-
 test('edit block header shows affected hashline refs', () => {
 	const block: Block = {
 		type: 'tool',
@@ -264,7 +245,6 @@ test('edit block header shows affected hashline refs', () => {
 	expect(header).toContain('Edit src/app.ts (12:abc-15:def)')
 })
 
-
 test('edit block shows hashline refs for debugging', () => {
 	const block: Block = {
 		type: 'tool',
@@ -278,12 +258,15 @@ test('edit block shows hashline refs for debugging', () => {
 		},
 	}
 
-	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1).join('\n')
+	const body = blocks
+		.renderBlock(block, 100)
+		.map((l) => stripAnsi(l))
+		.slice(1)
+		.join('\n')
 	expect(body).toContain("operation: 'replace'")
 	expect(body).toContain("start_ref: '12:abc'")
 	expect(body).toContain("end_ref: '15:def'")
 })
-
 
 test('edit block keeps failure details visible after diff preview', () => {
 	const block: Block = {
@@ -301,7 +284,11 @@ test('edit block keeps failure details visible after diff preview', () => {
 		].join('\n'),
 	}
 
-	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1).join('\n')
+	const body = blocks
+		.renderBlock(block, 100)
+		.map((l) => stripAnsi(l))
+		.slice(1)
+		.join('\n')
 	expect(body).toContain('− 2:aaa old line')
 	expect(body).toContain('+ 2:bbb new line')
 	expect(body).toContain('TypeScript check failed for src/app.ts:')
