@@ -328,8 +328,12 @@ function capitalize(s: string): string {
 	return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+function humanizeName(name: string): string {
+	return capitalize(name.replace(/_/g, ' '))
+}
+
 function toolTitle(name: string, input?: any): string {
-	if (!input) return capitalize(name)
+	if (!input) return humanizeName(name)
 	switch (name) {
 		case 'bash': {
 			const cmd = input.command ?? ''
@@ -362,8 +366,10 @@ function toolTitle(name: string, input?: any): string {
 			return `Analyze history${input.sessionId ? ` ${input.sessionId}` : ''}`
 		case 'ls':
 			return `Ls ${input.path ?? '.'}`
+		case 'spawn_agent':
+			return input.title ? `Spawn agent · ${input.title}` : 'Spawn agent'
 		default:
-			return capitalize(name)
+			return humanizeName(name)
 	}
 }
 
@@ -381,6 +387,11 @@ function toolCommand(name: string, input?: any): string | undefined {
 		return input.code ?? undefined
 	}
 	return undefined
+}
+
+function toolDetails(name: string, input: any): string | undefined {
+	if (name !== 'spawn_agent' || input == null) return undefined
+	return ason.stringify(input, 'long')
 }
 
 // ── Tool output formatting ────────────────────────────────────────────────────
@@ -701,6 +712,15 @@ function blockContent(block: Block, cols: number): string[] {
 		if (command) {
 			for (const l of formatBashCommand(command, cw)) {
 				lines.push(`${indent}${l}`)
+			}
+		}
+		const details = toolDetails(block.name, block.input)
+		if (details) {
+			for (const raw of details.split('\n')) {
+				const expanded = expandTabs(raw, blockConfig.tabWidth)
+				for (const wl of hardWrap(expanded, cols)) {
+					lines.push(`${indent}${DIM}${wl}${DIM_OFF}`)
+				}
 			}
 		}
 		// Per-tool formatted output — keep real tabs.

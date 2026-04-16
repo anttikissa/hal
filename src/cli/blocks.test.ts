@@ -214,3 +214,34 @@ test('error block header shows blob ref', () => {
 	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
 	expect(header).toContain('04-abc/000003-err')
 })
+
+
+test('spawn_agent block renders full input args', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'spawn_agent',
+		toolId: 'call_123',
+		input: {
+			task: 'Design the benchmark prompt\nKeep it concise.',
+			mode: 'fresh',
+			model: 'openai/gpt-5.4',
+			cwd: '/Users/antti/.hal',
+			title: 'edit benchmark prompt',
+			closeWhenDone: false,
+		},
+		output: 'Queued subagent spawn from 04-lfp',
+	}
+
+	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
+	const header = lines[0] ?? ''
+	const body = lines.slice(1).join('\n')
+
+	expect(header).toContain('Spawn agent')
+	expect(body).toContain('task: `Design the benchmark prompt')
+	expect(body).toContain("mode: 'fresh'")
+	expect(body).toContain("model: 'openai/gpt-5.4'")
+	expect(body).toContain("cwd: '/Users/antti/.hal'")
+	expect(body).toContain("title: 'edit benchmark prompt'")
+	expect(body).toContain('closeWhenDone: false')
+	expect(body).toContain('Queued subagent spawn from 04-lfp')
+})
