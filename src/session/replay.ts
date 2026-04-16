@@ -1,12 +1,10 @@
-// Replay — rebuild session state from flat history for display and token counting.
-//
-// History is stored as visible events now, so replay is mostly a direct mapping:
-// user, thinking, assistant, tool_call, tool_result, info.
+// Replay visible history entries into UI blocks and a rough token estimate.
 
 import type { HistoryEntry } from '../server/sessions.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from './blob.ts'
 import { models } from '../models.ts'
+import { sessionEntry } from './entry.ts'
 
 export interface ReplayBlock {
 	type: 'input' | 'assistant' | 'thinking' | 'tool' | 'info' | 'error'
@@ -84,8 +82,8 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 
 		if (entry.type === 'thinking') {
 			let text = entry.text ?? ''
-			if (entry.blobId && !text) {
-				const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+			if (!text) {
+				const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
 				text = blobData?.thinking ?? ''
 			}
 			blocks.push({ type: 'thinking', text, model, sessionId, blobId: entry.blobId, ts })
@@ -102,15 +100,13 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 			let input = entry.input
 			let output = ''
 			let status: 'done' | 'error' | 'running' = 'running'
-			if (entry.blobId) {
-				const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
-				if (input === undefined) input = blobData?.call?.input
-				if (blobData?.result) {
-					const extracted = extractToolOutput(blobData)
-					output = extracted.output
-					status = extracted.status
-					input = input ?? extracted.input
-				}
+			const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
+			if (input === undefined) input = blobData?.call?.input
+			if (blobData?.result) {
+				const extracted = extractToolOutput(blobData)
+				output = extracted.output
+				status = extracted.status
+				input = input ?? extracted.input
 			}
 			const block: ReplayBlock = {
 				type: 'tool',
@@ -133,8 +129,8 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 			const block = toolBlocks.get(entry.toolId)
 			let output = entry.output
 			let status: 'done' | 'error' = entry.isError ? 'error' : 'done'
-			if (entry.blobId && output === undefined) {
-				const blobData = blob.readBlobFromChain(sessionId, entry.blobId)
+			if (output === undefined) {
+				const blobData = sessionEntry.loadEntryBlob(sessionId, entry)
 				const extracted = extractToolOutput(blobData)
 				output = extracted.output
 				status = extracted.status
@@ -170,7 +166,7 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 	const userPrompts: string[] = []
 	for (const entry of entries) {
 		if (entry.type !== 'user') continue
-		const text = entry.parts.filter((part) => part.type === 'text').map((part) => part.text).join('')
+		const text = sessionEntry.userText(entry)
 		if (!text || text.startsWith('[')) continue
 		userPrompts.push(text.split('\n')[0]!.slice(0, 200))
 	}
@@ -208,7 +204,7 @@ function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 		.map((e) => {
 			if (e.type === 'input_history') return e.text
 			if (e.type !== 'user') return ''
-			return e.parts.filter((part) => part.type === 'text').map((part) => part.text).join(' ')
+			return sessionEntry.userText(e, ' ')
 		})
 		.filter((text) => text && !text.startsWith('['))
 		.slice(-200)

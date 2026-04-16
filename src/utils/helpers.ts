@@ -11,6 +11,24 @@ function truncateMiddle(text: string, maxLen: number): string {
 	return text.slice(0, startLen) + '…' + text.slice(-endLen)
 }
 
+/** Keep a UTF-8 string within a byte budget, preserving the suffix inside the limit. */
+function truncateUtf8(text: string, limit: number, suffix: string): string {
+	if (Buffer.byteLength(text, 'utf8') <= limit) return text
+
+	const suffixBytes = Buffer.byteLength(suffix, 'utf8')
+	const budget = limit - suffixBytes
+	if (budget <= 0) return suffix.slice(0, limit)
+
+	let lo = 0
+	let hi = text.length
+	while (lo < hi) {
+		const mid = Math.ceil((lo + hi) / 2)
+		if (Buffer.byteLength(text.slice(0, mid), 'utf8') <= budget) lo = mid
+		else hi = mid - 1
+	}
+	return text.slice(0, lo) + suffix
+}
+
 /** "1 file", "3 files", "0 files" — English-only, good enough for a CLI. */
 function pluralize(n: number, word: string): string {
 	return `${n} ${word}${n === 1 ? '' : 's'}`
@@ -18,15 +36,15 @@ function pluralize(n: number, word: string): string {
 
 /** Debounce: call fn at most once per `ms` milliseconds.
  *  Trailing-edge: the last call in a burst wins. */
-function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
+function debounce<Args extends unknown[]>(fn: (...args: Args) => void, ms: number): (...args: Args) => void {
 	let timer: ReturnType<typeof setTimeout> | null = null
-	return ((...args: any[]) => {
+	return (...args: Args) => {
 		if (timer) clearTimeout(timer)
 		timer = setTimeout(() => {
 			timer = null
 			fn(...args)
 		}, ms)
-	}) as unknown as T
+	}
 }
 
-export const helpers = { truncateMiddle, pluralize, debounce }
+export const helpers = { truncateMiddle, truncateUtf8, pluralize, debounce }

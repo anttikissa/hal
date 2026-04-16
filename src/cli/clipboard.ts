@@ -1,15 +1,12 @@
 // Clipboard access -- macOS only.
 
-import { mkdirSync, existsSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
+import { ensureDir } from '../state.ts'
 
 const IMAGE_DIR = '/tmp/hal/images'
 const PASTE_DIR = '/tmp/hal/paste'
 const MAX_INLINE_NEWLINES = 5
-
-function ensureDir(dir: string): void {
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-}
 
 // ── Async image probe ──
 

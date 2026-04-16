@@ -10,6 +10,7 @@ import { isAbsolute, resolve } from 'path'
 import { homedir } from 'os'
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { hashline } from './hashline.ts'
+import { helpers } from '../utils/helpers.ts'
 
 const HOME = homedir()
 
@@ -43,30 +44,6 @@ function formatSelectedLines(lines: string[], startLine: number): string {
 		const lineNo = startLine + i
 		return `${String(lineNo).padStart(width)}:${hashline.hashLine(line)} ${line}`
 	}).join('\n')
-}
-
-/**
- * Trim text to a UTF-8 byte budget. We keep the truncation marker inside the
- * limit so the tool result itself still respects the 1MB cap.
- */
-function truncateUtf8(text: string, limit: number): string {
-	if (Buffer.byteLength(text, 'utf8') <= limit) return text
-
-	const suffixBytes = Buffer.byteLength(TRUNCATED_SUFFIX, 'utf8')
-	const budget = limit - suffixBytes
-	if (budget <= 0) return TRUNCATED_SUFFIX.slice(0, limit)
-
-	let lo = 0
-	let hi = text.length
-	while (lo < hi) {
-		const mid = Math.ceil((lo + hi) / 2)
-		if (Buffer.byteLength(text.slice(0, mid), 'utf8') <= budget) {
-			lo = mid
-		} else {
-			hi = mid - 1
-		}
-	}
-	return text.slice(0, lo) + TRUNCATED_SUFFIX
 }
 
 /**
@@ -149,7 +126,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	if (selection.sawBinary) return `error: ${path} appears to be a binary file`
 
 	const result = formatSelectedLines(selection.lines, Math.max(1, start))
-	return truncateUtf8(result, MAX_OUTPUT_BYTES)
+	return helpers.truncateUtf8(result, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 }
 
 const readTool = {

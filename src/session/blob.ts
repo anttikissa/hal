@@ -1,8 +1,9 @@
 // Store large history payloads in per-session blob files instead of inline ASONL.
 
 import { writeFile } from 'fs/promises'
-import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
+import { ensureDir } from '../state.ts'
 import { sessions } from '../server/sessions.ts'
 import { ason } from '../utils/ason.ts'
 
@@ -34,7 +35,7 @@ function blobsDir(sessionId: string): string {
 
 async function writeBlob(sessionId: string, blobId: string, data: unknown): Promise<void> {
 	const dir = blobsDir(sessionId)
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+	ensureDir(dir)
 	await writeFile(`${dir}/${blobId}.ason`, ason.stringify(data) + '\n')
 }
 

@@ -5,8 +5,10 @@
 //   Hashes are verified before applying — if the file changed since
 //   the last read, the hash won't match and the edit is rejected.
 
-import { readFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync } from 'fs'
 import { dirname, extname, resolve } from 'path'
+import { ensureDir } from '../state.ts'
+import { helpers } from '../utils/helpers.ts'
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { read } from './read.ts'
 import { hashline } from './hashline.ts'
@@ -20,8 +22,7 @@ const TSGO_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/tsgo-file.ts')
 const textDecoder = new TextDecoder()
 
 function ensureParent(path: string): void {
-	const dir = dirname(path)
-	if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+	ensureDir(dirname(path))
 }
 
 // Simple per-path lock to prevent concurrent writes to the same file.
@@ -43,24 +44,9 @@ function withLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
 
 // Keep tool outputs under the 1 MB cap even when tsgo prints a long error list.
 function truncateUtf8(text: string, limit: number): string {
-	if (Buffer.byteLength(text, 'utf8') <= limit) return text
-
-	const suffixBytes = Buffer.byteLength(TRUNCATED_SUFFIX, 'utf8')
-	const budget = limit - suffixBytes
-	if (budget <= 0) return TRUNCATED_SUFFIX.slice(0, limit)
-
-	let lo = 0
-	let hi = text.length
-	while (lo < hi) {
-		const mid = Math.ceil((lo + hi) / 2)
-		if (Buffer.byteLength(text.slice(0, mid), 'utf8') <= budget) {
-			lo = mid
-		} else {
-			hi = mid - 1
-		}
-	}
-	return text.slice(0, lo) + TRUNCATED_SUFFIX
+	return helpers.truncateUtf8(text, limit, TRUNCATED_SUFFIX)
 }
+
 
 function shouldTypecheckEditedPath(path: string): boolean {
 	const ext = extname(path)
