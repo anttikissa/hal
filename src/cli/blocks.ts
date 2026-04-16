@@ -334,16 +334,16 @@ function humanizeName(name: string): string {
 
 function editLineRange(input: any): string {
 	if (input?.operation === 'replace') {
-		const start = String(input.start_ref ?? '').match(/^(\d+):/)
-		const end = String(input.end_ref ?? '').match(/^(\d+):/)
+		const start = String(input.start_ref ?? '').trim()
+		const end = String(input.end_ref ?? '').trim()
 		if (!start || !end) return ''
-		return start[1] === end[1] ? ` (${start[1]})` : ` (${start[1]}-${end[1]})`
+		return start === end ? ` (${start})` : ` (${start}-${end})`
 	}
 	if (input?.operation === 'insert') {
-		if (input.after_ref === '0:000') return ' (before 1)'
-		const after = String(input.after_ref ?? '').match(/^(\d+):/)
+		const after = String(input.after_ref ?? '').trim()
 		if (!after) return ''
-		return ` (after ${after[1]})`
+		if (after === '0:000') return ' (before 1)'
+		return ` (after ${after})`
 	}
 	return ''
 }

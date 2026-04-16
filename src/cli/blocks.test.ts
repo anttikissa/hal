@@ -247,7 +247,7 @@ test('spawn_agent block renders full input args', () => {
 })
 
 
-test('edit block header shows affected line range', () => {
+test('edit block header shows affected hashline refs', () => {
 	const block: Block = {
 		type: 'tool',
 		name: 'edit',
@@ -261,7 +261,7 @@ test('edit block header shows affected line range', () => {
 	}
 
 	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
-	expect(header).toContain('Edit src/app.ts (12-15)')
+	expect(header).toContain('Edit src/app.ts (12:abc-15:def)')
 })
 
 
