@@ -6,197 +6,350 @@
 - Target: **under 500 LOC**
 - Required reduction in this file: **at least 190 LOC**
 
-## What is mixed together today
+## Review verdict
 
-`src/cli/blocks.ts` is doing several jobs at once:
+The original plan had the right diagnosis, but it mixed two different goals:
 
-- block type definitions for both persisted history blocks and live UI blocks
-- history-entry projection (`HistoryEntry[] -> Block[]`)
-- fork-parent dimming / blob-owner selection during projection
-- async blob hydration for tool + thinking blocks
-- terminal-text sanitizing / ANSI stripping
+1. **real LOC reduction**, and
+2. **ownership cleanup / moving code elsewhere**.
+
+For this file, those are not the same thing.
+
+After reviewing the current code and nearby usages, the under-500 path should prioritize:
+
+- deletes,
+- dedupe that removes code from **multiple** files at once, and
+- simplifications that stay mostly inside `src/cli/blocks.ts`.
+
+Several original ideas were boundary moves that are likely **flat or up** in repo cloc on the first pass:
+
+- moving grouped rendering to `src/client/render-history.ts`
+- moving blob hydration to another module
+- adding a higher-level `md.render(...)` API just so this file gets smaller
+- moving fork-parent ownership logic out of `historyToBlocks()` without also deleting equivalent logic elsewhere
+- introducing a broad shared projector layer
+
+Those may still be good architecture work later, but they are **not** the best first move if the goal is “get this file under 500 with flat-or-down repo cloc”.
+
+## What is actually mixed together today
+
+`src/cli/blocks.ts` currently owns several real responsibilities:
+
+- block type definitions for persisted-history blocks and live UI blocks
+- history projection (`HistoryEntry[] -> Block[]`)
+- fork-parent dimming and parent-blob ownership during projection
+- async blob hydration for `tool` and `thinking` blocks
+- terminal text sanitizing / ANSI stripping
 - tool-specific presentation policy
 	- titles
 	- inline command extraction
 	- extra detail bodies
 	- output summarizers / diff rendering
 - low-level rendering primitives
-	- header construction
-	- bg fill behavior
-	- width clipping
+	- headers
+	- background fill
+	- clipping
 	- brick wrapping for grouped notices
 - markdown/plain-text/tool-body rendering
-- grouped notice rendering (`renderBlockGroup`)
-- two exported utility functions that currently look dead (`spinnerChar`, `formatElapsed`)
+- grouped notice rendering
 
-That responsibility pile is the real reason the file is large. It is not just “render a block”.
+That is why it is large.
 
 ## Nearby usages/tests reviewed
 
-Reviewed before planning:
+Reviewed before tightening this plan:
 
+- `src/cli/blocks.ts`
 - `src/cli/blocks.test.ts`
 - `src/client/render-history.ts`
-- `src/client.ts` (`historyToBlocks`, blob loading, tab load path)
-- `src/client/cli.ts` (`blocks.config.tabWidth` only)
-- `src/cli/md.ts`
-- `src/utils/strings.ts`
+- `src/client.ts`
 - `src/session/replay.ts`
 - `src/session/entry.ts`
-- `src/server/sessions.ts` live block creation
-- `src/cli/colors.ts`
+- `src/server/sessions.ts`
+- `src/cli/md.ts`
+- `src/utils/strings.ts`
 
-## Plausible reduction ideas
+Grounded findings from current code:
 
-Below, estimates are for **`src/cli/blocks.ts` bun cloc** impact unless noted otherwise.
+- `spinnerChar()` and `formatElapsed()` currently have **no callers** outside `src/cli/blocks.ts`.
+- `perf` is imported in `src/cli/blocks.ts` and currently appears **unused**.
+- `renderBlockGroup()` has exactly **one** caller: `src/client/render-history.ts`.
+- That caller groups only **single-line `info` blocks** via `infoGroupKey()`.
+	- So `renderBlockGroup()` being typed for `info | warning | error` is broader than current behavior.
+- `historyToBlocks()` is only called from `src/client.ts` and `src/cli/blocks.test.ts`.
+- `src/session/entry.ts::userText()` currently keeps only text parts.
+	- `src/cli/blocks.ts` and `src/session/replay.ts` each carry their own richer image-placeholder logic.
+- `src/cli/blocks.ts::applyToolBlob()` and `src/session/replay.ts::extractToolOutput()` both know the tool-blob shape.
 
-### 1) Delete dead or near-dead code
+## Current test baseline
 
-#### 1.1 Remove unused exported spinner helpers
+`./test` was run before review. The repo is **not currently green**.
+
+Current unrelated failures observed:
+
+- `src/utils/tail-file.test.ts`
+- `src/tools/search-caps.test.ts`
+- `tests/ipc.test.ts`
+- `tests/main.test.ts`
+- `tests/tabs.test.ts`
+
+That matters for execution: the reducer should still run `./test` after each step, but should judge success against the existing baseline unless the change actually touches those areas.
+
+## Best reduction opportunities
+
+Below, estimates are primarily for **`src/cli/blocks.ts` LOC** and secondarily for repo-total direction.
+
+### 1) Cheap deletes and simplifications first
+
+These are the best opening moves because they are real deletions, not code relocation.
+
+#### 1.1 Delete dead exports and dead imports
+
+Delete if grep still confirms zero callers:
 
 - `SPINNER_CHARS`
 - `spinnerChar()`
 - `formatElapsed()`
-- export entries
+- export entries for those helpers
+- unused `perf` import
 
-Evidence:
+Why this is grounded:
 
-- repo grep found no call sites outside `src/cli/blocks.ts`
-- no tests reference them
+- repo grep shows no external call sites for the spinner helpers
+- `perf` is imported but not referenced in this file
 
 Estimated impact:
 
-- **-14 to -18 LOC**
+- **-15 to -20 LOC**
 
 Risk / tests:
 
-- low risk
-- run full suite; nothing targeted today covers these exports, so grep again before removal
+- very low
+- rerun grep before deletion
+- run `./test`
 
-#### 1.2 Delete tiny wrappers that no longer earn their keep
+#### 1.2 Remove tiny helpers and aliases only when they produce a real net delete
 
-Candidates:
+Good candidates:
 
-- `capitalize()` + fold into `humanizeName()`
-- maybe `parseTs()` if call sites become clearer inline
-- maybe `NoticeBlock` alias if replaced with `Extract<Block, ...>` or a shared base type
+- fold `capitalize()` into `humanizeName()`
+- inline `parseTs()` at call sites if it reads shorter
+- replace `countLines()` with `toLines()` from `src/utils/strings.ts`
+- remove trivial local aliases like `const cw = cols` / `const indent = ''` if that shortens the function instead of just rewriting it sideways
 
-Estimated impact:
-
-- **-4 to -8 LOC**
-
-Risk / tests:
-
-- trivial
-
-#### 1.3 Replace `wrapBricks()` with plain `wordWrap(bricks.join(' '), cols)` if behavior matches
-
-Current helper is a full custom wrapper for grouped `[info] [info] [info]` bricks.
-
-Plausible simplification:
-
-- build `const text = bricks.join(' ')`
-- `wordWrap(text, cols)`
-- keep special handling only if a failing test proves brick-boundary behavior matters
+This should stay disciplined: only do the change if the file actually gets shorter.
 
 Estimated impact:
 
-- **-18 to -25 LOC**
-
-Risk / tests:
-
-- moderate: grouped notice wrapping could shift slightly
-- watch render-history tests and grouped info rendering manually via existing render tests
-
----
-
-### 2) Dedupe with existing helpers / existing modules
-
-#### 2.1 Stop re-implementing user-entry text extraction here
-
-Today:
-
-- `src/cli/blocks.ts` has local `userText()`
-- `src/session/entry.ts` has `sessionEntry.userText()`
-- `src/session/replay.ts` has another user-text flavor
-
-Best shape:
-
-- extend `sessionEntry` with one helper that can render user parts for UI/replay
-- options could control image placeholders:
-	- text-only
-	- `[image]`
-	- `[originalFile]`
-	- blob fallback if needed
-
-Then delete local `userText()` from `blocks.ts`, and likely also the replay-local version.
-
-Estimated impact:
-
-- in `blocks.ts`: **-8 to -12 LOC**
-- repo-total opportunity: **-12 to -20 LOC** across `blocks.ts` + `session/replay.ts`
-
-Risk / tests:
-
-- watch `src/cli/blocks.test.ts` image-path preservation test
-- watch `src/session/entry.test.ts`
-- watch replay-related tests if helper semantics change
-
-#### 2.2 Share tool-blob parsing with replay instead of parsing the same blob shape twice
-
-Today there is duplicated knowledge of tool blob structure:
-
-- `applyToolBlob()` in `blocks.ts`
-- `extractToolOutput()` in `src/session/replay.ts`
-
-Plausible shared home:
-
-- `src/session/blob.ts` or `src/session/entry.ts`
-- helpers like:
-	- `toolBlobInput(blob)`
-	- `toolBlobOutput(blob)`
-	- `thinkingBlobText(blob)`
-
-That lets `blocks.ts` stop knowing blob object shape in multiple places.
-
-Estimated impact:
-
-- in `blocks.ts`: **-8 to -15 LOC**
-- repo-total opportunity: **-12 to -20 LOC** if replay also shrinks
-
-Risk / tests:
-
-- watch tool rendering tests, replay tests, blob-loading tests
-- make sure malformed blobs still fail soft
-
-#### 2.3 Merge duplicate line-splitting/counting helpers with existing string helpers
-
-Candidates:
-
-- `countLines()` could lean on `strings.toLines()`
-- similar duplication already exists in `src/tools/hashline.ts`
-
-This is not a huge blocks-only win, but it is a real cross-file cleanup.
-
-Estimated impact:
-
-- in `blocks.ts`: **-2 to -4 LOC**
-- repo-total opportunity: **-5 to -10 LOC** if hashline duplication is cleaned too
+- **-6 to -15 LOC**
 
 Risk / tests:
 
 - low
-- only watch trailing-newline semantics
+- watch trailing-newline semantics when replacing `countLines()`
+
+#### 1.3 Simplify grouped-info wrapping, but do not over-generalize it
+
+Current facts:
+
+- `render-history.ts` only groups one-line `info` blocks
+- `renderBlockGroup()` currently pretends to support `warning` and `error` too
+- `wrapBricks()` is custom logic only for this grouped-info path
+
+Best simplification path:
+
+- first try replacing `wrapBricks()` with `wordWrap(bricks.join(' '), cols)`
+- narrow grouped rendering to what the caller actually uses today: grouped **info** notices
+- avoid spending time on a broader “notice framework” here
+
+Estimated impact:
+
+- **-15 to -30 LOC**
+
+Risk / tests:
+
+- moderate
+- grouped rendering may shift slightly
+- watch render tests plus any grouped-info snapshots/expectations
 
 ---
 
-### 3) Simplify the block data model
+### 2) Cross-file dedupe that should reduce repo cloc, not just move it
 
-#### 3.1 Introduce shared base types instead of repeating `ts`, `dimmed`, `renderVersion`, blob refs, etc.
+These are good because they can delete code from `blocks.ts` **and** another file.
 
-The union currently repeats the same fields on nearly every arm.
+#### 2.1 Unify rich user-entry text extraction in `sessionEntry`
 
-Likely replacement:
+Today there are three variants:
+
+- `src/session/entry.ts::userText()` — text parts only
+- local `userText()` in `src/cli/blocks.ts` — preserves image placeholders / original path
+- `userContentText()` in `src/session/replay.ts` — similar but not identical placeholder policy
+
+Best shape:
+
+- extend `sessionEntry.userText()` with an explicit mode/options object for image placeholders
+- default behavior must preserve the current callers that want **text-only** behavior
+- replace both local helper copies in:
+	- `src/cli/blocks.ts`
+	- `src/session/replay.ts`
+
+Important nuance:
+
+- `buildCompactionContext()` and `inputHistoryFromEntries()` already use `sessionEntry.userText()` and likely want the old text-centric default
+- so this should be a true replacement, not a behavior change hidden behind the same default
+
+Estimated impact:
+
+- in `blocks.ts`: **-8 to -12 LOC**
+- repo total: **down** if replay-local duplication is removed too
+
+Risk / tests:
+
+- moderate
+- watch image-path preservation test in `src/cli/blocks.test.ts`
+- watch `src/session/replay.test.ts`
+- watch `src/session/entry` callers that rely on current default behavior
+
+#### 2.2 Share tool/thinking blob extraction with replay
+
+Today the codebase duplicates blob-shape knowledge:
+
+- `applyToolBlob()` in `blocks.ts`
+- `applyThinkingBlob()` in `blocks.ts`
+- `extractToolOutput()` in `src/session/replay.ts`
+
+Best shape:
+
+- add a small helper in session/blob-ish code for:
+	- thinking text extraction
+	- tool input extraction
+	- tool output extraction/status
+- then delete duplicate parsing branches in both files
+
+Important constraint:
+
+- do this only if it truly **replaces** the current duplicated parsing logic
+- not if it adds a wrapper layer while leaving most of the old code in place
+
+Estimated impact:
+
+- in `blocks.ts`: **-8 to -15 LOC**
+- repo total: **down** if replay also shrinks
+
+Risk / tests:
+
+- moderate
+- watch blob-loading behavior and malformed-blob soft-failure behavior
+
+---
+
+### 3) Strongest local win: collapse scattered tool presentation dispatch into one table
+
+This is the highest-confidence big reduction still grounded in current code.
+
+#### 3.1 Replace multiple dispatch points with one `toolSpecs` table
+
+Today tool-specific behavior is split across:
+
+- `toolTitle()`
+- `toolCommand()`
+- `toolDetails()`
+- `toolFormatters`
+- `formatToolOutput()`
+- edit-specific helpers used by those dispatch points
+
+That means the same tool name gets re-dispatched several times.
+
+Better shape:
+
+```ts
+const toolSpecs = {
+	bash: {
+		title(input) { ... },
+		command(input) { ... },
+	},
+	edit: {
+		title(input) { ... },
+		details(input) { ... },
+		summarize(output) { ... },
+	},
+	read: {
+		title(input) { ... },
+		summarize(output) { ... },
+	},
+	spawn_agent: {
+		title(input) { ... },
+		details(input) { ... },
+	},
+}
+```
+
+Then `blockContent()` and `blockLabel()` do one lookup, not several separate dispatches.
+
+Estimated impact:
+
+- **-45 to -70 LOC**
+
+Risk / tests:
+
+- moderate
+- watch all tool-rendering tests, especially:
+	- `edit`
+	- `spawn_agent`
+	- `bash`
+	- `read`
+	- `grep`
+	- `glob`
+
+#### 3.2 Use generic helpers for boring tools inside that table
+
+Most tools are simple templates:
+
+- `Read ${path}`
+- `Write ${path}`
+- `Read URL ${url}`
+- `Google ${query}`
+- `Glob ${pattern} in ${path}`
+- `Grep ${pattern} in ${path}`
+- `Ls ${path}`
+
+Keep special cases only where the code actually differs:
+
+- `bash`
+- `edit`
+- `spawn_agent`
+- maybe `analyze_history`
+
+Estimated impact:
+
+- usually included in 3.1
+- extra standalone gain: **-5 to -10 LOC**
+
+#### 3.3 Keep edit diff parsing local on the first pass
+
+`blocks.ts` does know a lot about edit output shape, but moving that logic into the edit tool is **not** the best first LOC move.
+
+Reason:
+
+- it spreads work into production code outside this file
+- it could easily become “split and add glue” rather than a net deletion
+
+So for the one-pass reducer:
+
+- keep the diff parser local unless a concrete edit-side change clearly deletes more code than it adds
+
+This is a deliberate constraint to keep the reduction honest.
+
+---
+
+### 4) Type/model cleanup that stays local
+
+#### 4.1 Add shared base types for repeated fields
+
+This is grounded: the union repeats the same fields across many arms.
+
+Best shape:
 
 ```ts
 interface BlockBase {
@@ -212,7 +365,7 @@ interface BlobRef {
 }
 ```
 
-Then build union arms from intersections.
+Then compose block arms from intersections instead of repeating the same field list.
 
 Estimated impact:
 
@@ -221,14 +374,35 @@ Estimated impact:
 Risk / tests:
 
 - low to moderate
-- mostly type-only, but touches many references
-- watch `src/client.ts` and startup tests where live blocks are created inline
+- mostly type churn
+- watch inline block creation in `client.ts` / `server/sessions.ts`
 
-#### 3.2 Collapse notice-like block variants into one shape
+#### 4.2 Prefer static maps for label/color lookups before attempting a full notice collapse
 
-Best single structural simplification in the file.
+`blockColors()` and parts of `blockLabel()` repeat simple static cases.
 
-Today separate types exist for:
+A good low-risk reduction is:
+
+- use tables for fixed label/color cases
+- keep special logic only for:
+	- `user`
+	- `assistant`
+	- `thinking`
+	- `tool`
+
+This is a better first move than collapsing all notice variants into a single `notice` union arm.
+
+Estimated impact:
+
+- **-8 to -15 LOC**
+
+Risk / tests:
+
+- low
+
+#### 4.3 Defer full `notice`-type collapse unless still above target
+
+The original plan pushed hard on turning:
 
 - `info`
 - `warning`
@@ -236,447 +410,194 @@ Today separate types exist for:
 - `startup`
 - `fork`
 
-They differ mostly by:
-
-- label
-- colors
-- whether errors may carry blob refs
-
-Possible replacement:
+into something like:
 
 ```ts
-{ type: 'notice', tone: 'info' | 'warning' | 'error' | 'startup' | 'fork', text: string, ... }
+{ type: 'notice', tone: 'info' | 'warning' | 'error' | 'startup' | 'fork', text: string }
 ```
 
-Why this helps:
+That can reduce `blocks.ts`, but it also touches:
 
-- shrinks the block union
-- removes repeated switch arms in `markdownSourceText`
-- removes repeated switch arms in `blockColors`
-- removes repeated switch arms in `blockLabel`
-- simplifies `blockContent` type checks
-- simplifies `renderBlockGroup` typing
-- simplifies `historyToBlocks` mapping for info/fork/startup-ish events
+- `client.ts`
+- `server/sessions.ts`
+- tests
+- any inline block construction
 
-Estimated impact:
+So it is **not** the best first bet.
 
-- **-35 to -60 LOC** in `blocks.ts`
+Recommendation:
 
-Risk / tests:
+- try base types + static lookup tables first
+- keep full notice collapse as a last-resort step only if the cheaper wins still leave the file above 500
 
-- moderate
-- touches `src/client.ts`, `src/client/render-history.ts`, tests, and any inline block construction
-- verify grouped info behavior still only groups plain info notices, not every tone
-
-#### 3.3 Revisit whether `renderVersion` belongs on every block arm
-
-If `renderVersion` is universal state, put it on one base interface only.
-
-Estimated impact:
-
-- mostly included in 3.1
-- standalone additional gain: **-4 to -8 LOC**
-
-Risk / tests:
-
-- low
-
----
-
-### 4) Simplify history projection (`historyToBlocks`)
-
-#### 4.1 Replace the long `if/continue` ladder with a `switch`
-
-Current flow is repetitive:
-
-- compute `dimmed`
-- compute `blobOwner`
-- branch on entry type
-- repeatedly `result.push({ ... })`
-- repeatedly `continue`
-
-A `switch (entry.type)` will be shorter and easier to scan.
-
-Estimated impact:
-
-- **-10 to -18 LOC**
-
-Risk / tests:
-
-- low
-
-#### 4.2 Factor repeated block-construction boilerplate into small local helpers
-
-Examples:
-
-- `const ts = entry.ts ? Date.parse(entry.ts) : undefined`
-- a small `push()` helper that merges common fields
-- a model-resolving helper for assistant/thinking
-
-This is only worth doing if it removes real repeated code, not if it adds abstraction glue.
-
-Estimated impact:
-
-- **-8 to -15 LOC**
-
-Risk / tests:
-
-- low
-
-#### 4.3 Move fork-parent ownership concerns out of the renderer module
-
-`historyToBlocks()` currently also decides:
-
-- which entries are dimmed because they came from a fork parent
-- which session owns blobs for parent history
-
-That is session/history projection policy, not rendering policy.
-
-Possible owner:
-
-- `src/client.ts` when loading tab history
-- or a shared session projection helper alongside replay
-
-This mostly improves boundaries. LOC win inside `blocks.ts` is modest unless combined with 4.1/4.2.
-
-Estimated impact:
-
-- **-8 to -15 LOC** in `blocks.ts`
-- repo total likely flat, not down, unless shared with replay logic
-
-Risk / tests:
-
-- moderate because forked history behavior is subtle
-- watch fork rendering tests and blob-loading-from-parent behavior
-
----
-
-### 5) Simplify tool-specific presentation logic
-
-This is the biggest “real logic” reduction area.
-
-#### 5.1 Replace the multiple dispatch systems with one `toolSpecs` table
-
-Today tool-specific behavior is split across:
-
-- `toolTitle()`
-- `toolCommand()`
-- `toolDetails()`
-- `toolFormatters`
-- `formatToolOutput()`
-- special `editLineRange()` / `formatEditDetails()` helpers
-
-That means the same tool name is dispatched in multiple places.
-
-Better shape:
-
-```ts
-const toolSpecs = {
-	bash: { title(input), command(input) },
-	read: { title(input), summarize(output) },
-	edit: { title(input), details(input), summarize(output) },
-	spawn_agent: { title(input), details(input) },
-	...
-}
-```
-
-Benefits:
-
-- one lookup instead of several switches/ifs
-- easier to see per-tool policy in one place
-- removes wrapper functions that only re-dispatch
-
-Estimated impact:
-
-- **-40 to -70 LOC**
-
-Risk / tests:
-
-- moderate
-- watch all tool-rendering tests, especially `edit`, `spawn_agent`, `bash`, `read`, `grep`, `glob`
-
-#### 5.2 Use generic title helpers for the boring tools
-
-Several cases are simple templates:
-
-- `Read ${path}`
-- `Write ${path}`
-- `Read URL ${url}`
-- `Google ${query}`
-- `Glob ${pattern} in ${path}`
-- `Grep ${pattern} in ${path}`
-
-A couple of tiny helpers can compress those without losing readability.
-
-Estimated impact:
-
-- **-8 to -15 LOC**
-
-Risk / tests:
-
-- low
-
-#### 5.3 Shrink edit-specific logic by moving more responsibility to the edit tool layer
-
-`blocks.ts` currently knows too much about edit output shape:
-
-- `--- before` / `+++ after` parsing
-- common-prefix/common-suffix trimming
-- footer preservation
-- header range presentation
-- extra detail rendering for hashline refs
-
-A better long-term split is:
-
-- `tools/edit.ts` produces a more display-ready structured result or concise preview text
-- `blocks.ts` renders it generically
-
-This could be a major simplifier, but it spreads into production logic outside this module.
-
-Estimated impact:
+Estimated impact if needed:
 
 - in `blocks.ts`: **-25 to -45 LOC**
-- repo total: **maybe flat**, maybe slightly down if edit-side code already computes similar data
-
-Risk / tests:
-
-- moderate to high
-- edit tests + blocks edit-rendering tests are critical
-
-#### 5.4 Generalize “show some input args in the body” instead of per-tool one-offs
-
-Right now:
-
-- `spawn_agent` dumps full ASON
-- `edit` dumps a small selected subset
-- most tools dump nothing
-
-A generic helper such as `detailObjectForTool(name, input)` could centralize that policy and remove one-off wrapper code.
-
-Estimated impact:
-
-- **-8 to -15 LOC**
-
-Risk / tests:
-
-- low to moderate
-- watch exact expected strings in tests
-
----
-
-### 6) Simplify rendering by pushing existing markdown logic harder
-
-#### 6.1 Add a higher-level markdown renderer in `src/cli/md.ts`
-
-`blocks.ts` currently manually orchestrates:
-
-- `md.mdSpans()`
-- `md.mdInline()`
-- `md.mdTable()`
-- `hardWrap()` for code
-- blank-line trimming
-- `resolveMarkers()`
-
-That is a lot of markdown rendering glue inside the block renderer.
-
-Plausible extraction:
-
-- add `md.render(text, cols, opts?)` or `md.renderBlocks(text, cols, opts?)`
-- keep low-level span helpers for tests and specialized callers
-- let `blocks.ts` call one function for markdown-capable blocks
-
-Estimated impact:
-
-- in `blocks.ts`: **-25 to -40 LOC**
-- repo total likely: **-10 to -20 LOC net** depending on `md.ts` growth
+- repo total: uncertain, likely still down but much less cleanly than the local-first wins
 
 Risk / tests:
 
 - moderate
-- watch `src/cli/md.test.ts`, `src/cli/blocks.test.ts`, render tests
-
-#### 6.2 Move grouped-notice rendering next to history grouping code
-
-`renderBlockGroup()` is only used from `src/client/render-history.ts`, and the grouping rules already live there.
-
-That is a good ownership move:
-
-- `render-history.ts` already decides when groups exist
-- `blocks.ts` should ideally render one block, not history-specific group layouts
-
-Estimated impact:
-
-- **-20 to -30 LOC** in `blocks.ts`
-- repo total roughly flat
-
-Risk / tests:
-
-- low to moderate
-- grouped-info rendering tests need to stay green
-
-#### 6.3 Replace the repeated static label/color switches with tables
-
-`blockColors()` and `blockLabel()` each repeat the same static notice variants.
-
-If notice variants stay separate, use tables for the static cases and only special-case:
-
-- user
-- assistant
-- thinking
-- tool
-
-Estimated impact:
-
-- **-8 to -15 LOC**
-
-Risk / tests:
-
-- low
+- broader type churn than it first appears
 
 ---
 
-### 7) Boundary/ownership changes that also help other large files
+### 5) Things to avoid in the first reduction pass
 
-#### 7.1 Unify “history entry -> UI block” projection with replay/session logic
+These are the main ideas from the original plan that are currently more about ownership than net deletion.
 
-There is overlap between:
+#### 5.1 Do not move grouped rendering to `render-history.ts` just to shrink this file
 
-- `src/cli/blocks.ts::historyToBlocks()`
-- `src/session/replay.ts::replayEntries()`
-- `src/session/entry.ts` helpers
-- live block creation in `src/server/sessions.ts` and `src/client.ts`
+Current reality:
 
-A small shared projector/helper layer could reduce repeated knowledge about:
+- `renderBlockGroup()` is only used from `render-history.ts`
+- but moving it there mostly just relocates lines
 
-- user text extraction
-- current model carry-forward
-- info/error/fork mapping
-- blob-field population
+That is fine architecture work later, but it is not a strong one-pass LOC reduction strategy.
 
-Potential repo impact:
+#### 5.2 Do not move blob hydration out of `blocks.ts` unless replay shares the new helper and old code disappears
 
-- reduces `src/cli/blocks.ts`
-- may also reduce `src/session/replay.ts`
-- may simplify parts of `src/client.ts`
+A pure move from `blocks.ts` to `session/blob.ts` is roughly repo-flat.
 
-Estimated impact:
+Only do it if the new home also replaces duplicate replay parsing/hydration logic.
 
-- in `blocks.ts`: **-15 to -30 LOC**
-- repo total: likely **down** if replay also shrinks
+#### 5.3 Do not introduce a broad shared “history projector” layer on the first pass
 
-Risk / tests:
+That is too easy to turn into abstraction glue.
 
-- moderate because this touches history semantics
+The focused shared helpers are enough for now:
 
-#### 7.2 Consider whether blob hydration belongs in a session/blob module instead of the renderer
+- richer `sessionEntry.userText(...)`
+- shared tool/thinking blob extraction
 
-`loadBlobs()` is async I/O plus parsing policy, not rendering.
+#### 5.4 Do not add `md.render(...)` unless cloc proves a net win
 
-Possible destination:
+A markdown helper may still be worth doing, but only if the repo actually gets smaller.
 
-- `src/session/blob.ts`
-- or a small `src/session/block-blobs.ts`
+For the first reduction pass, the safer assumption is:
 
-This is mostly a responsibility fix. Good for `blocks.ts` size, but repo-total impact is neutral unless blob parsing gets deduped with replay.
+- new API surface in `md.ts` is probably a boundary improvement, not an automatic cloc win
 
-Estimated impact:
-
-- in `blocks.ts`: **-20 to -35 LOC** if moved out entirely
-- repo total: flat unless dedupe also happens
-
-Risk / tests:
-
-- moderate
-- watch startup blob load tests and fork-parent blob ownership behavior
+---
 
 ## Recommended execution sequence
 
-Aim: get `src/cli/blocks.ts` under 500 LOC while keeping total repo cloc flat or down.
+Aim: get `src/cli/blocks.ts` under 500 while keeping repo cloc flat or down.
 
-### Pass 1: guaranteed cheap wins
+### Pass 1: obvious deletions
 
-1. Remove dead spinner helpers if grep still shows zero callers.
-2. Fold tiny wrappers (`capitalize`, maybe `parseTs`, alias cleanup).
-3. Try replacing `wrapBricks()` with `wordWrap(bricks.join(' '), cols)` if tests stay green.
-4. Re-run `./test` and `bun cloc src/cli/blocks.ts`.
+1. Delete dead spinner helpers and exports.
+2. Delete unused `perf` import.
+3. Trim tiny wrappers/aliases only where they produce a real line-count drop.
+4. Run `./test`.
+5. Run `bun cloc src/cli/blocks.ts`.
 
-Expected cumulative impact:
+Expected impact:
 
-- roughly **-20 to -45 LOC**
+- roughly **-20 to -35 LOC**
 
-### Pass 2: dedupe with existing modules
+### Pass 2: grouped-info simplification
 
-5. Extend `sessionEntry` for richer user-text rendering; delete local user-text logic here.
-6. Share tool-blob parsing with `session/replay.ts` / `session/blob.ts`.
-7. Clean up any now-redundant line-count/splitting helpers.
-
-Expected cumulative impact:
-
-- roughly **-15 to -30 LOC** in `blocks.ts`
-- repo total should also go down a bit
-
-### Pass 3: attack the biggest logic duplication in this file
-
-8. Replace the scattered tool title/command/details/output dispatch with one `toolSpecs` table.
-9. Only after that, decide whether edit rendering can be simplified further or moved closer to the edit tool.
+6. Replace `wrapBricks()` with simpler `wordWrap` logic if tests stay acceptable.
+7. Narrow grouped rendering to actual current usage: grouped one-line `info` blocks.
+8. Run `./test`.
+9. Run `bun cloc src/cli/blocks.ts`.
 
 Expected cumulative impact:
 
-- roughly **-40 to -70 LOC**
+- roughly **-35 to -60 LOC** total
 
-### Pass 4: simplify the block model / notice handling
+### Pass 3: real cross-file dedupe
 
-10. First try shared base interfaces.
-11. If still above target, collapse notice-like block variants into one `notice` shape.
-
-Expected cumulative impact:
-
-- base types only: **-20 to -35 LOC**
-- full notice collapse: **-35 to -60 LOC**
-
-### Pass 5: finish with boundary cleanup if still needed
-
-12. Move grouped notice rendering next to `render-history.ts`.
-13. If needed, move blob hydration out of the renderer module.
-14. Optionally add `md.render(...)` to delete markdown glue code here.
+10. Extend `sessionEntry.userText()` to cover rich placeholder modes.
+11. Delete local user-text helper(s) from `blocks.ts` and `replay.ts`.
+12. Add shared tool/thinking blob extraction helper.
+13. Delete duplicate blob parsing branches from `blocks.ts` and `replay.ts`.
+14. Run `./test`.
+15. Run `bun cloc src/cli/blocks.ts`.
 
 Expected cumulative impact:
 
-- **-20 to -40 LOC** in this file, depending on which pieces move
+- `blocks.ts`: roughly **-50 to -85 LOC** total
+- repo total: should also move **down** a bit
 
-## Best path to under 500 in one pass
+### Pass 4: take the big local win
 
-Yes, under 500 looks reachable in one practical pass.
+16. Replace scattered tool dispatch with one `toolSpecs` table.
+17. Keep edit diff parsing local unless a measured alternative is smaller.
+18. Run `./test`.
+19. Run `bun cloc src/cli/blocks.ts`.
 
-Most believable bundle:
+Expected cumulative impact:
 
-- remove dead spinner helpers: **-15**
-- simplify `wrapBricks`: **-20**
-- dedupe user/blob helpers with existing modules: **-20**
-- unify tool presentation into one spec table: **-50**
-- shared base block types: **-25**
-- move grouped rendering to `render-history.ts` or collapse notice variants: **-30 to -45**
+- `blocks.ts`: roughly **-95 to -155 LOC** total
 
-That totals about **-160 to -175 LOC** before counting smaller wrapper cleanups.
+### Pass 5: type cleanup to close the gap
 
-Add either:
+20. Add shared base types.
+21. Replace static label/color switches with maps where possible.
+22. Run `./test`.
+23. Run `bun cloc src/cli/blocks.ts`.
 
-- notice collapse, or
-- markdown/rendering glue reduction, or
-- edit-output simplification
+Expected cumulative impact:
 
-and the file should cross **below 500 LOC**.
+- `blocks.ts`: roughly **-125 to -190 LOC** total
 
-## Risks / tests to watch closely
+### Pass 6: only if still above 500
+
+24. Choose **one** of these, not several architectural moves at once:
+	- full notice collapse, **or**
+	- a measured markdown-helper extraction that is provably net-down in repo cloc
+25. Run `./test`.
+26. Run `bun cloc src/cli/blocks.ts`.
+
+## Is under 500 reachable in one pass?
+
+**Yes, but not from cheap wins alone.**
+
+Grounded expectation:
+
+- deletes + tiny simplifications are not enough
+- deletes + grouped-info simplification + shared helpers are still probably not enough by themselves
+- the file likely needs **both**:
+	- the `toolSpecs` consolidation, and
+	- one meaningful structural cleanup (`BlockBase`/`BlobRef` and/or a last-resort notice collapse)
+
+So the most believable one-pass path is:
+
+1. dead code/import cleanup
+2. grouped-info simplification
+3. shared user/blob helpers that delete duplicate logic in replay too
+4. one-table tool presentation
+5. base block types + static maps
+6. only if still short of target, full notice collapse
+
+That sequence is much more likely to produce a **real** under-500 result than starting with ownership moves.
+
+## Strongest execution path
+
+If I were executing this reduction now, I would do exactly this order:
+
+1. delete dead spinner helpers + dead import
+2. simplify grouped-info rendering (`wrapBricks`, info-only generality)
+3. unify rich user text helper and shared blob extraction with replay
+4. collapse tool title/command/details/output dispatch into one `toolSpecs` table
+5. add `BlockBase` / `BlobRef`
+6. replace static label/color switches with maps
+7. only if still needed, do a full notice collapse
+
+That path keeps the early steps cheap, keeps repo cloc honest, and postpones the highest-churn type changes until the remaining gap is known.
+
+## Risks / tests to watch
 
 ### Highest-risk behavior
 
 - edit diff preview formatting
-- grouped info rendering (`renderBlockGroup` path)
+- grouped info rendering
 - fork-parent dimming and parent-session blob ownership
 - tool-output sanitization of ANSI/control bytes
 - markdown tables / code fences / blank-line trimming
-- header width safety near terminal last column
+- header width safety near the terminal last column
 
 ### Tests to watch first
 
@@ -685,33 +606,22 @@ and the file should cross **below 500 LOC**.
 - `tests/render-single-pass.test.ts`
 - `tests/render-width.test.ts`
 - `tests/render-fullscreen.test.ts`
-- `src/client-startup.test.ts` (blob loading / startup rendering interactions)
+- `src/client-startup.test.ts`
 - `src/session/replay.test.ts`
 
-### Greps to re-run during reduction
+### Greps to rerun while reducing
 
-- `spinnerChar(` and `formatElapsed(` before deleting
-- `type: 'startup'`, `type: 'fork'`, `type: 'warning'`, `type: 'error'` if collapsing notices
-- `historyToBlocks(` call sites before moving ownership
-- `renderBlockGroup(` before relocating group rendering
+- `spinnerChar(`
+- `formatElapsed(`
+- `renderBlockGroup(`
+- `historyToBlocks(`
+- `type: 'startup'`
+- `type: 'fork'`
+- `type: 'warning'`
+- `type: 'error'`
 
-## Opportunities that would also reduce other large files
+## Final verdict
 
-- shared user-entry rendering helper: reduces `src/session/replay.ts` too
-- shared tool-blob parsing helper: reduces `src/session/replay.ts` too
-- shared history projection layer: could reduce both `src/cli/blocks.ts` and `src/session/replay.ts`, maybe also some inline block creation in `src/client.ts`
-- moving grouped notice rendering to `src/client/render-history.ts` makes ownership cleaner there and trims `blocks.ts`
-- higher-level markdown render helper in `src/cli/md.ts` could make that module more reusable and shrink future renderers
+The plan is now tightened toward **real LOC reduction**.
 
-## Recommendation
-
-If the goal is **under 500 with flat-or-down repo cloc**, I would do this order:
-
-1. dead export removal
-2. `wrapBricks` simplification
-3. dedupe with `sessionEntry` / blob helpers
-4. unify tool presentation into one spec table
-5. shared base block types
-6. if still needed, either collapse notice variants or move group rendering out of `blocks.ts`
-
-That sequence keeps the early changes cheap and testable, and saves the more invasive type/ownership change for only if needed.
+It is ready for execution **if** the implementer follows the local-first order above and treats architectural moves as optional last steps, not primary reducers.
