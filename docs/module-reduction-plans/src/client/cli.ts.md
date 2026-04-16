@@ -1,11 +1,21 @@
 # LOC reduction plan for `src/client/cli.ts`
 
+## Review verdict
+
+Mostly grounded, but the earlier version mixed real LOC cuts with several "move it elsewhere" ideas too early.
+
+For this file, **under 400 in one pass is reachable without adding helper modules or new cross-module glue**. The best first pass is a tight delete/dedupe pass inside `src/client/cli.ts` itself, then a small `handleAppKey()` cleanup, then stop and re-measure.
+
+Because repo `bun cloc` is currently **13,500 LOC**, the bar should be **repo-flat-or-down**, not "this one file got shorter".
+
 ## Current size
 
 - Current `bun cloc` LOC for `src/client/cli.ts`: **417**
 - Command run: `bun cloc src/client/cli.ts`
-- Credible path under 400 LOC: **yes, easily**
-- Credible path to a more meaningful drop in one pass: **probably to ~360-380 with low/medium risk; below ~330 likely needs feature cuts or a completion/popup merge**
+- Repo total from `bun cloc`: **13,500**
+- Credible path under 400 in one pass: **yes**
+- Credible first-pass landing zone: **~385-398** with low risk and repo LOC down
+- Bigger one-pass landing zone like **~360-380**: possible, but only if `handleAppKey()` cleanup pays off cleanly or `/raw` is cut
 
 ## Files/read paths reviewed
 
@@ -15,483 +25,411 @@
 - `src/client-startup.test.ts`
 - `src/client/popup.ts`
 - `src/cli/completion.ts`
-- `src/cli/prompt.ts`
-- `src/client/render.ts`
-- `src/client/render-status.ts`
 - `src/cli/help-bar.ts`
-- `src/cli/keys.ts`
-- `docs/terminal.md`
+- `tests/main.test.ts`
+- `tests/tabs.test.ts`
 
-## Responsibilities currently mixed together
+## What is actually in `src/client/cli.ts`
 
-`src/client/cli.ts` is not just “CLI input”. It currently mixes at least these jobs:
+This file is a coordination layer. It currently mixes:
 
-1. Terminal lifecycle
-- kitty keyboard protocol enable/disable
-- bracketed paste enable/disable
-- custom tab stop install/restore
-- raw mode on stdin
-- suspend/resume signal handling
-- final cleanup on exit
+1. terminal lifecycle
+2. paint throttling
+3. submit policy
+4. local `/raw` debug mode
+5. popup/completion/app/prompt key routing
+6. prompt/client sync glue
+7. startup wiring for drafts/history/rendering
 
-2. Paint scheduling
-- throttled redraw policy during streaming
-- immediate force redraw path for resize/tab switch/ctrl-l
+That matters because some reductions are real deletion/dedupe, while others would only spread the coordination logic across more files.
 
-3. Submission policy
-- prompt submission
-- local-only `/raw` interception
-- prompt history updates
-- popup/completion dismissal on submit
+## Grounded reduction ideas that are real first-pass wins
 
-4. Raw debug mode
-- raw-mode state
-- token formatting
-- batching/coalescing output
-- raw-mode test hooks
+These are ordered by "best LOC return per risk", and the estimates are **net repo impact**, not just file-local impact.
 
-5. Key routing
-- popup ownership of the keyboard
-- completion ownership of tab/up/down/enter/escape
-- app-level shortcuts
-- fallback to prompt editing
+### 1) Delete `submitCommandType()` and its test
 
-6. Small bits of presentation/help logic
-- canonical help-bar key naming
-- max-tabs error text
+Why this is real:
 
-7. Startup wiring / state synchronization
-- client onChange hook
-- prompt render callback
-- draft load/save on tab switch
-- draft sync from other clients
-- stdin data event loop
-
-That is why the file feels large: it is a coordination module plus three small feature modules living inline.
-
-## Plausible reduction ideas
-
-Grouped by type. Estimates are net repo-cloc impact, not just “move lines elsewhere”, unless noted.
-
-### A. Delete dead or near-dead wrappers first
-
-#### 1) Delete `submitCommandType()` and inline `'prompt'`
-Why:
-- It always returns `'prompt'`
-- Both parameters are unused
-- The test only proves that a constant-return wrapper returns a constant
+- `submitCommandType()` always returns `'prompt'`
+- both parameters are unused
+- `src/client/cli.test.ts` spends a whole test proving that the constant wrapper returns a constant
 
 Impact:
-- `cli.ts`: about **-6 to -8**
+
+- `cli.ts`: about **-5 to -7**
 - `cli.test.ts`: about **-8 to -12**
-- Net repo impact: about **-14 to -20**
+- Net repo impact: about **-13 to -19**
 
 Risk/tests:
+
 - Very low risk
 - Watch `src/client/cli.test.ts`
-- Watch for any future code path that wanted busy-sensitive routing; none exists now
 
-#### 2) Inline `handleLocalCommand()` into `submit()`
-Why:
-- Single-use wrapper
-- Only supports one command: `/raw`
+### 2) Inline the local `/raw` interception into `submit()`
+
+Why this is real:
+
+- `handleLocalCommand()` is a single-use wrapper
+- it only checks one exact command: `/raw`
 
 Impact:
+
 - `cli.ts`: about **-4 to -6**
 
 Risk/tests:
+
 - Low risk
 - Watch raw-mode tests in `src/client/cli.test.ts`
-- Watch `/raw` help/completion behavior manually through tests already covering formatting/raw mode
 
-#### 3) Delete `handlePopupKey()` wrapper
-Why:
-- It is just `if (!popup.state.active) return false; return popup.handleKey(k)`
-- No extra policy, no extra abstraction value
+### 3) Delete `handlePopupKey()`
+
+Why this is real:
+
+- it is only:
+  - `if (!popup.state.active) return false`
+  - `return popup.handleKey(k)`
+- no extra policy lives there
 
 Impact:
+
 - `cli.ts`: about **-3 to -5**
 
 Risk/tests:
+
 - Very low risk
-- Watch popup-related tests and model picker behavior (`src/client/popup.test.ts`, `tests/main.test.ts` kitty model picker case)
+- Watch `src/client/popup.test.ts`
+- Watch kitty model picker behavior in `tests/main.test.ts`
 
-#### 4) Inline trivial local vars in the stdin handler
-Examples:
-- `const cols = process.stdout.columns || 80`
-- `const contentWidth = cols`
+### 4) Merge `setTabStops()` and `restoreDefaultTabStops()` into one helper
 
-Impact:
-- `cli.ts`: about **-2 to -4**
+Why this is real:
 
-Risk/tests:
-- Very low risk
-- Mostly mechanical
+- same algorithm twice
+- only the step differs: configured tab width vs terminal default `8`
 
-### B. Simplify repeated local patterns
+Best shape:
 
-#### 5) Add one helper for the repeated `syncPromptToClient(); draw()` sequence
-Likely helper shape:
-- `syncAndDraw(force = false)`
-
-Why:
-- The pair appears repeatedly in prompt render callback, popup callback, tab-switch handling, draft-arrival handling, popup/completion/prompt key paths
-- This is coordination logic, but right now it is copied inline many times
-
-Impact:
-- `cli.ts`: about **-5 to -9**
-
-Risk/tests:
-- Low risk
-- Watch prompt state/render coupling tests:
-	- `src/client-startup.test.ts`
-	- `tests/main.test.ts`
-	- `tests/render*.test.ts`
-
-#### 6) Merge `setTabStops()` and `restoreDefaultTabStops()` into one parameterized helper
-Why:
-- Same algorithm twice
-- Only step/start differ (`tabWidth` vs 8)
-
-Possible shape:
 - `writeTabStops(cols, step)`
-- `writeTabStops(cols, blocks.config.tabWidth)`
-- `writeTabStops(cols, 8)`
 
 Impact:
+
 - `cli.ts`: about **-6 to -10**
 
 Risk/tests:
-- Low/medium risk because terminal behavior is fragile
-- Watch terminal startup/exit/resume paths indirectly via:
-	- `tests/main.test.ts`
-	- `tests/tabs.test.ts`
-	- manual bounded startup if needed later
-- Also re-read `docs/terminal.md` before touching behavior, not just code shape
 
-#### 7) Factor “max tab cap” handling into one helper
-Current duplication:
+- Low/medium risk because terminal behavior is fragile
+- Watch `tests/main.test.ts`
+- Watch `tests/tabs.test.ts`
+- Re-read `docs/terminal.md` before changing behavior
+
+### 5) Dedupe the max-tab guard and error text
+
+Why this is real:
+
+Current duplication exists in:
+
 - ctrl-t open
 - ctrl-shift-t resume
 - ctrl-f fork
 
-Possible helper shape:
-- `sendTabCommandIfRoom(type, text?)`
-- or `hasRoomForNewTab()` + one shared error emitter
+Best shape:
+
+- a tiny helper like `sendTabCommandIfRoom(...)`
+- or `hasRoomForNewTab()` plus one shared error emitter
 
 Impact:
+
 - `cli.ts`: about **-6 to -10**
 
 Risk/tests:
+
 - Low risk
 - Watch `src/client/cli.test.ts`
 - Watch `tests/tabs.test.ts`
-- Important detail: fork needs current tab session id, resume/open do not
 
-#### 8) Collapse the long `handleAppKey()` if-chain by grouping by modifier class
-Why:
-- Most branches are `ctrl` shortcuts
-- Many checks repeat `!alt && !cmd` or similar gating
-- A `switch (k.key)` inside a `ctrl-only` block would save repeated boilerplate
+### 6) Simplify `handleAppKey()` only after the deletions above
 
-Impact:
-- `cli.ts`: about **-12 to -25** depending on how aggressively cleaned up
+Why this is real:
 
-Risk/tests:
-- Medium risk: ordering matters
-- Sensitive cases:
-	- ctrl-t vs ctrl-shift-t
-	- ctrl-d only when prompt empty
-	- enter continue vs submit
-	- alt-m fallback must remain
-	- escape abort only while busy
-- Watch `src/client/cli.test.ts`, `tests/main.test.ts`, `tests/tabs.test.ts`
+- the function repeats the same modifier checks many times
+- several branches are ctrl-only shortcuts
+- the `t` shortcut family is already a grouped case conceptually
 
-### C. Dedupe by moving ownership to the module that already owns the state
+Best shape:
 
-#### 9) Move completion key handling into `src/cli/completion.ts`
-Why:
-- `completion.ts` already owns completion state and mutation helpers
-- `cli.ts` currently reaches inside `completion.state` directly and manually orchestrates activation, cycling, selection, dismissal
-- That is a strong sign the ownership boundary is wrong
-
-Possible end state:
-- `completion.handleKey(k, promptText, cursor)` returns either `false` or an apply-result describing new prompt text/cursor/dismissed state
+- a `ctrl-only` block plus a `switch (k.key)`
+- preserve explicit special cases where ordering matters
 
 Impact:
-- `cli.ts`: about **-25 to -40**
-- `completion.ts`: about **+15 to +25**
-- Net repo impact: about **-10 to -15**
+
+- `cli.ts`: about **-8 to -18** if done cleanly
 
 Risk/tests:
+
 - Medium risk
-- Watch `src/cli/completion.test.ts`
+- Sensitive behavior:
+  - ctrl-t vs ctrl-shift-t
+  - ctrl-d only when prompt is empty
+  - enter continue vs submit
+  - alt-m fallback must still work
+  - escape abort only while busy
 - Watch `src/client/cli.test.ts`
-- Watch prompt rendering/tests if accepted completions affect cursor placement
+- Watch `tests/main.test.ts`
+- Watch `tests/tabs.test.ts`
 
-#### 10) Move help-bar key canonicalization into `src/cli/help-bar.ts`
-Why:
-- `canonicalKeyName()` exists only to support help-bar usage tracking
-- The filtering policy (“only log modifier/special keys”) is also local to this concern
-- `prev/src/cli/key-usage.ts` already had this concept as module-owned behavior
+### 7) Inline trivial stdin locals and repeated one-liners opportunistically
 
-Possible end state:
-- `helpBar.logEvent(k)` instead of `helpBar.logKey(canonicalKeyName(k))`
+Grounded examples from current code:
+
+- `const contentWidth = cols` is redundant
+- `data.toString('utf-8')` is effectively parsed twice in the data handler
+- `client.setOnChange((force) => draw(force))` should be checked for direct pass-through
 
 Impact:
-- `cli.ts`: about **-8 to -12**
-- `help-bar.ts`: about **+6 to +10**
-- Net repo impact: about **-2 to -4**
+
+- small, but real: about **-2 to -5**
 
 Risk/tests:
+
+- Very low risk
+
+### 8) Add a shared `syncAndDraw()` helper only if it produces a net deletion
+
+Important nuance:
+
+- repeated `syncPromptToClient(); draw()` pairs are real duplication
+- but a helper here is only worth it if it deletes more lines than it adds
+- if it turns into another thin wrapper that every callsite must special-case, skip it
+
+Impact:
+
+- likely **small**: about **0 to -6** repo LOC depending on final shape
+
+Risk/tests:
+
 - Low risk
-- No strong direct tests today, so behavior drift is easy to miss
-- Watch help-bar text indirectly in render tests if usage learning affects visibility later
+- Watch `src/client-startup.test.ts`
+- Watch `tests/main.test.ts`
+- Watch render tests if touched indirectly
 
-#### 11) Move terminal mode setup/teardown into a tiny helper module only if it also deletes duplication
+## Ideas that are real, but should **not** be phase 1
+
+These were the places where the earlier plan leaned too much toward re-homing logic.
+
+### Move completion key handling into `src/cli/completion.ts`
+
+This is **plausible**, but not a strong first-pass LOC attack.
+
+Why it is not phase 1:
+
+- `completion.ts` currently owns low-level completion state and helpers, not the full modal key-routing policy
+- moving that policy there introduces a new cross-module contract
+- if the old API surface stays, this easily becomes split-and-add-glue
+
+Use this only if:
+
+- the old `completion` API gets smaller at the same time, or
+- it is part of a larger merge with popup ownership
+
+Expected net repo impact:
+
+- probably **small win or neutral** in a standalone pass
+
+### Move help-bar key canonicalization into `src/cli/help-bar.ts`
+
+This is grounded but tiny.
+
+Why it is not phase 1:
+
+- the current helper is very small
+- the likely savings are marginal
+- it risks adding another narrow cross-module method for almost no payoff
+
+Expected net repo impact:
+
+- about **0 to -3** in a good pass
+
+### Push tab/draft sync ownership into `client.ts` or `prompt.ts`
+
+This may be a design cleanup later, but it is **not yet a proven LOC win**.
+
+Why it is not phase 1:
+
+- the current callbacks are subtle startup/state-sync behavior
+- easy to add glue and regressions without deleting much
+- `src/client-startup.test.ts` suggests this area is behavior-dense
+
+Expected net repo impact:
+
+- **unclear / likely neutral** unless a larger simplification falls out
+
+### Extract terminal lifecycle into another module
+
+Do **not** count this as reduction unless it deletes duplication at the same time.
+
+Simple extraction would only move lines around.
+
+## Bigger cuts that would produce real repo reduction
+
+These are real, but they are separate scope decisions, not the strongest path to "under 400 in one pass".
+
+### Delete local `/raw` mode
+
+This is the biggest credible repo reduction around this file.
+
 Why:
-- `cleanupTerminal()`, `suspend()`, `onSigcont()`, startup tty setup, kitty/paste/tab-stop toggles are one conceptual unit
-- But extraction alone does not reduce repo LOC
 
-Net impact:
-- **Neutral or small win only if paired with dedupe**
-- Likely **0 to -8** if the API is tighter than the current duplicated branches
-- If it is just “move lines elsewhere”, skip it
+- it is a debug feature, not core interaction flow
+- it adds local command interception, formatter logic, batching state, tests, and completion knowledge
 
-Risk/tests:
-- Medium/high because terminal state bugs are miserable
-- Good cleanup target eventually, but not the best first LOC win
+Impact:
 
-### D. Merge overlapping features instead of just extracting them
+- Net repo impact: roughly **-70 to -100**
 
-#### 12) Merge completion selection behavior into `popup.ts` as a generic selectable list layer
+Risk:
+
+- product/UX risk, not technical risk
+- needs an explicit product decision
+
+### Merge completion behavior into the popup/selectable-list system
+
+This is the best adjacent structural simplification, but not the safest first pass.
+
 Why:
-- `popup.ts` and `completion.ts` both own:
-	- active state
-	- items
-	- selected index
-	- cycle up/down
-	- enter/escape/tab handling
-- Right now `cli.ts` pays for two modal-selection systems
-- A shared “selectable list + optional editor” could remove duplicate behavior from both modules
 
-Net impact:
-- `cli.ts`: about **-30 to -50**
-- `completion.ts`: about **-10 to -20** or file deletion if fully absorbed
-- `popup.ts`: about **+15 to +30**
-- Net repo impact: about **-20 to -40**
+- `popup.ts` and `completion.ts` both have active state, items, selection, cycling, accept/dismiss behavior
+- today `cli.ts` pays for two overlapping modal-selection systems
 
-Risk/tests:
+Impact:
+
+- Credible net repo win if old duplicated behavior disappears for real
+- But it is too much surface area for the "just get `cli.ts` under 400" pass
+
+Risk:
+
 - Medium/high
-- Biggest behavioral question: completion today is stateful but not obviously rendered as a popup; merging may subtly change UX
-- Watch:
-	- `src/client/popup.test.ts`
-	- `src/cli/completion.test.ts`
-	- `src/client/cli.test.ts`
-	- prompt/render tests
+- Must watch popup, completion, cursor, and render behavior together
 
-This is the best structural reduction idea if the goal is repo-cloc, not just this file.
+## Strongest execution path
 
-#### 13) Push tab/draft sync ownership down into `client.ts` or `prompt.ts`
-Why:
-- `cli.ts` currently wires:
-	- save draft on tab switch
-	- restore per-tab draft/history
-	- show draft when another client saves one
-- Some of this may belong in `client.ts` as higher-level tab lifecycle, or in `prompt.ts` as prompt lifecycle
+This should be the default execution plan if the goal is **real reduction, minimal risk, repo cloc flat/down**.
 
-Net impact:
-- Highly variable; likely **small or neutral unless it deletes cross-module glue**
-- Estimate: **0 to -10** repo LOC in a good pass
+### Phase 1: delete obvious dead weight
 
-Risk/tests:
-- Medium risk because startup behavior is subtle
-- Watch `src/client-startup.test.ts` especially
-- Do not do this only to shuffle lines
+1. Delete `submitCommandType()`
+2. Delete its test in `src/client/cli.test.ts`
+3. Inline local `/raw` handling into `submit()`
+4. Delete `handlePopupKey()`
 
-### E. Feature cuts / optional deletions if the project wants a harder prune
+Expected result:
 
-#### 14) Delete local `/raw` mode entirely
-Why:
-- It is a debug feature, not core product behavior
-- It adds local-command interception, formatter logic, batching state, test hooks, completion special-casing, docs/help text
-- The command is documented in runtime command help, but its behavior is local-only, which is already a smell
+- real repo LOC down immediately
+- probably lands around **405-395** already, depending on final edits
 
-Net impact:
-- `cli.ts`: about **-45 to -70**
-- `cli.test.ts`: about **-25 to -40**
-- `cli/completion.ts`: tiny win (remove `/raw` special-case comment/union handling if simplified)
-- `runtime/commands.ts`: small doc/help win
-- Net repo impact: about **-70 to -100**
+### Phase 2: dedupe concrete repeated code inside `cli.ts`
 
-Risk/tests:
-- Product/UX risk, not technical risk
-- If someone relies on `/raw` to debug terminal protocol issues, this removal hurts
-- If kept, it should at least be isolated better
+5. Merge the tab-stop functions
+6. Dedupe the max-tab guard/error text
+7. Inline trivial locals / repeated one-liners
+8. Add `syncAndDraw()` only if the diff is clearly net-negative in LOC
 
-This is the single biggest credible repo-cloc win around this file.
+Expected result:
 
-#### 15) Trim restart/suspend special handling only if product scope allows it
-Candidates:
-- ctrl-r restart path
-- custom tab-stop restoration on exit/resume
-- maybe even suspend support if not a project requirement
+- very likely enough to get `src/client/cli.ts` **under 400**
+- repo LOC still down
 
-Net impact:
-- Potentially **-15 to -40** depending on scope
+### Phase 3: only if more reduction is still wanted after measuring
 
-Risk/tests:
-- High product-risk
-- These are normal terminal affordances; deleting them may make the app feel broken/unix-hostile
-- Not recommended unless there is an explicit simplification mandate
+9. Simplify `handleAppKey()` into grouped modifier cases
+10. Stop and re-run `bun cloc`
 
-## Ideas I would *not* count as real reduction wins
+Expected result:
 
-These may make the file shorter, but they do not obviously reduce repo cloc:
+- likely lands around **385-395** with a conservative pass
+- maybe **high 370s / low 380s** if the app-key cleanup collapses nicely
 
-- Extract raw mode to `src/cli/raw-mode.ts` without deleting anything
-- Extract terminal lifecycle to `src/cli/terminal-session.ts` without deleting duplication
-- Extract app keybindings to `src/client/keybindings.ts` without shrinking logic
+## What should explicitly *not* happen in the first pass
 
-Those are organization changes, not actual simplifications, unless paired with deletion/merging.
+To keep this a real reduction pass, avoid these unless they delete old code in the same diff:
 
-## Risks / tests to watch by area
+- extracting terminal lifecycle to a new helper module
+- extracting keybindings to a new helper module
+- moving completion handling into `completion.ts` without shrinking the public surface there
+- moving help-bar canonicalization just to relocate a tiny helper
+- moving draft/tab-switch ownership without a measured repo-LOC win
 
-### Terminal lifecycle changes
+## Is under 400 reachable in one pass with repo cloc flat/down?
+
+**Yes.**
+
+A conservative, grounded path is:
+
+- delete `submitCommandType()` and its test
+- inline local `/raw` handling
+- delete `handlePopupKey()`
+- merge the tab-stop functions
+- dedupe max-tab guard logic
+- take the small trivial inlines that fall out naturally
+
+That should be enough without any module splits.
+
+## Tests / risks to call out in the execution plan
+
+### Terminal lifecycle / tab stops
+
 Watch:
+
 - `tests/main.test.ts`
 - `tests/tabs.test.ts`
-- `tests/render*.test.ts`
-- anything touching startup/exit/suspend/model picker on kitty terminals
+- render tests if behavior changes spill into paint timing
 
 Main risks:
-- terminal left in kitty mode/raw mode
-- broken tab stops after exit/resume
-- repaint timing regressions after signal handling cleanup
 
-### Completion / popup changes
+- terminal left in wrong mode
+- default tab stops not restored on exit/resume
+- redraw timing regressions on resize or resume
+
+### Keybinding cleanup
+
 Watch:
-- `src/cli/completion.test.ts`
-- `src/client/popup.test.ts`
-- `src/client/cli.test.ts`
-- render tests for prompt/cursor placement
 
-Main risks:
-- enter/tab/shift-tab precedence changes
-- completion accepted when it should cycle
-- popup stealing keys incorrectly
-
-### App keybinding cleanup
-Watch:
 - `src/client/cli.test.ts`
-- `tests/tabs.test.ts`
 - `tests/main.test.ts`
+- `tests/tabs.test.ts`
 
 Main risks:
+
 - ctrl-t vs ctrl-shift-t collision
-- ctrl-d empty-prompt quit behavior
-- alt-m fallback accidentally broken
-- escape abort firing too broadly
+- ctrl-d quitting too eagerly
+- alt-m fallback broken
+- escape abort too broad
+- enter continue vs submit changed
 
-### Draft/startup ownership changes
+### Draft/prompt sync touches
+
 Watch:
+
 - `src/client-startup.test.ts`
 - `tests/main.test.ts`
 
 Main risks:
-- draft not restored on startup/tab switch
-- prompt/client state diverging
-- multi-client draft pickup regressing
 
-## Recommended execution sequence
-
-Aim: reduce **repo** cloc, not just relocate code.
-
-### Phase 1: easy, low-risk wins
-1. Delete `submitCommandType()` and its tests
-2. Inline `handleLocalCommand()` into `submit()`
-3. Delete `handlePopupKey()`
-4. Add `syncAndDraw()` helper for repeated sync+paint pairs
-5. Merge the two tab-stop functions
-6. Add one helper for tab-cap checks / shared error text
-
-Expected result:
-- Very likely enough to push `src/client/cli.ts` **under 400 LOC**
-- Expected net repo reduction: roughly **20-40 LOC**
-- Low regression risk
-
-### Phase 2: medium-risk, still practical
-7. Rewrite `handleAppKey()` into grouped modifier blocks / switch statements
-8. Move completion key ownership into `completion.ts`
-9. Move help-bar key canonicalization into `help-bar.ts`
-
-Expected result:
-- Likely lands `cli.ts` around **360-380 LOC**
-- Repo reduction maybe **another 15-30 LOC** if done carefully
-
-### Phase 3: bigger structural simplification
-10. Decide whether completion should be absorbed by `popup.ts`
-11. Decide whether `/raw` should survive at all
-
-Expected result:
-- If completion merges into popup: real repo simplification, not just file shuffling
-- If `/raw` is removed: this area can shrink a lot in one pass
-
-## Is under 400 credible?
-
-Yes.
-
-A very believable under-400 route without changing product behavior much is:
-- delete `submitCommandType`
-- inline `handleLocalCommand`
-- delete `handlePopupKey`
-- add a shared `syncAndDraw`
-- dedupe tab-stop functions
-- dedupe tab-cap logic
-
-That should be enough.
-
-## Is a major reduction reachable in one pass?
-
-- **Under 400:** yes, comfortably
-- **Around 360-380:** yes, with moderate refactoring
-- **Around 320-340:** only if you are willing to merge completion into popup and/or delete `/raw`
-- **Much below that:** not credibly without feature cuts or broader ownership changes
-
-## Opportunities that would also reduce other large files
-
-### Completion/popup merge
-This is the clearest adjacent repo win.
-- Could reduce `src/client/cli.ts`
-- Could reduce or delete chunks of `src/cli/completion.ts` (181 LOC)
-- Could modestly simplify `src/client/popup.ts` by making it the single selection UI system
-
-### Remove `/raw`
-Would shrink more than one file.
-- `src/client/cli.ts`
-- `src/client/cli.test.ts`
-- `src/cli/completion.ts` special-case knowledge/comments
-- `src/runtime/commands.ts` help/usage text
-
-### Better ownership of prompt/client sync
-If done carefully, it could trim glue in both:
-- `src/client/cli.ts`
-- `src/client.ts` (954 LOC) by clarifying which module owns draft/history transitions
-
-But this one is easy to get wrong; treat it as a cleanup follow-up, not a first-pass LOC attack.
+- prompt state and client state diverge
+- active-tab draft restore regresses
+- multi-client draft arrival stops updating the prompt
 
 ## Bottom line
 
-Best immediate reduction ideas:
-- delete `submitCommandType`
-- remove trivial wrappers (`handleLocalCommand`, `handlePopupKey`)
-- collapse repeated `syncPromptToClient(); draw()` pairs
-- dedupe tab-stop logic
-- dedupe max-tab guard logic
-- then simplify `handleAppKey()`
+- The file is **only 17 LOC over 400**, so the first pass should be **deletion and dedupe**, not architecture churn.
+- The strongest one-pass route is: **delete dead wrappers/tests, dedupe tab stops and max-tab checks, then lightly simplify `handleAppKey()` if needed**.
+- Ideas like moving completion ownership or extracting terminal/session helpers are **not good first-pass LOC tactics** unless they also delete old API surface in the same diff.
+- If the project wants a materially larger cut than that, the two real levers are:
+  - **delete `/raw`**, or
+  - **merge completion with popup selection behavior**
 
-Best bigger structural win:
-- merge completion behavior into the existing popup/selectable-list system
+## Ready for execution?
 
-Best high-impact optional cut:
-- delete `/raw` if the project is serious about stripping debug-only surface area
+**Yes.**
+
+But the execution should be constrained to the strong path above. If the change starts turning into "split `cli.ts` into more files", it has drifted away from the stated LOC-reduction goal.
