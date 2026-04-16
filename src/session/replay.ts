@@ -203,7 +203,10 @@ function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	return entries
 		.map((e) => {
 			if (e.type === 'input_history') return e.text
-			if (e.type !== 'user') return ''
+			// Up-arrow recall is for things the human typed. Inbox / subagent handoffs
+			// are persisted as user entries with a source session id, but they should
+			// never show up in local editing history.
+			if (e.type !== 'user' || e.source) return ''
 			return sessionEntry.userText(e, ' ')
 		})
 		.filter((text) => text && !text.startsWith('['))

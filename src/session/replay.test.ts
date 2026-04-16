@@ -11,6 +11,16 @@ test('input history includes persisted slash-command retries', () => {
 })
 
 
+test('input history excludes inbox-originated user entries', () => {
+	const history = replay.inputHistoryFromEntries([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'user', parts: [{ type: 'text', text: 'handoff from subagent' }], source: '04-7i2' },
+	])
+
+	expect(history).toEqual(['hello'])
+})
+
+
 test('replay preserves original image path in user text', () => {
 	const result = replay.replayEntries('s1', [
 		{
