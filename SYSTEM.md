@@ -69,7 +69,7 @@ Multiple forks from the same parent share the same prefix of conversation histor
 The eval tool executes TypeScript **inside the Hal process**. Use it to inspect or modify runtime state, call internal functions, or do anything bash can't (bash runs out-of-process). IMPORTANT: first read the code of the part you are accessing. You're doing brain surgery on yourself — get it right the first time.
 
 - **`code`** parameter: TypeScript function body. `ctx` is in scope with `{ sessionId, halDir, stateDir, cwd }`. Use `return` to return a value.
-- **Imports**: use `~src/` prefix, e.g. `import { ipc } from '~src/ipc.ts'`
+- **Imports**: use `~/` prefix, e.g. `import { ipc } from '~/ipc.ts'`
 - **Audit**: scripts persist in `state/sessions/<id>/eval/` — never deleted.
 
 ### Hot-patchable modules
@@ -77,7 +77,7 @@ The eval tool executes TypeScript **inside the Hal process**. Use it to inspect 
 Most modules expose a mutable namespace object (e.g. `ipc.ts` exports `ipc`, `context.ts` exports `context`). Cross-module calls go through these objects, so eval patches take effect immediately.
 
 ```ts
-import { ipc } from '~src/ipc.ts'
+import { ipc } from '~/ipc.ts'
 const orig = ipc.getState
 ipc.getState = () => { console.log('patched!'); return orig() }
 ```

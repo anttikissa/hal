@@ -58,7 +58,7 @@ should go to `config` field. Non-tweakable constants like ANSI sequences can be 
 
 This enables the eval tool to inspect and hot-patch anything at runtime:
 ```ts
-import { client } from '~src/client.ts'
+import { client } from '~/client.ts'
 client.addEntry = (text) => { console.log('patched!'); origAddEntry(text) }
 ```
 
