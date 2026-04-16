@@ -1,14 +1,6 @@
-// MCP client — connects to external tool servers via JSON-RPC 2.0 over stdio.
-//
-// Reads mcp.ason from HAL_DIR, launches each configured server as a child
-// process, performs the initialize handshake, discovers tools, and registers
-// them into the tool registry with a server-name prefix (e.g. "mcp__fs__readFile").
-//
-// Protocol: JSON-RPC 2.0. Each line on stdout is one JSON message.
-// Notifications (no id) are silently ignored. Responses are matched to
-// pending requests by id.
-//
-// Ported and simplified from prev/src/mcp/client.ts.
+// Run MCP servers over stdio, then register their tools under a server-prefixed name.
+// Stdout is newline-delimited JSON-RPC; notifications are ignored and responses
+// resolve pending requests by id.
 
 import { readFile } from 'fs/promises'
 import { HAL_DIR } from '../state.ts'

@@ -1,35 +1,18 @@
-// Context-sensitive help bar — shows keybinding hints based on app state.
-// Ported and simplified from prev/src/cli/help-bar.ts.
-//
-// The bar auto-hides hints after the user has used the associated keys
-// enough times (tracked via usage counts). This keeps the UI clean for
-// experienced users while guiding newcomers.
-
-// ── Types ────────────────────────────────────────────────────────────────────
+// Show a small set of hints until the user has used those keys often enough.
 
 type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'streaming'
 
 interface Hint {
 	text: string
-	// Usage count key names. All must reach threshold to hide this hint.
 	keys: string[]
 }
 
-// ── Config ───────────────────────────────────────────────────────────────────
-
 const config = {
-	// How many times a key combo must be used before its hint disappears.
 	learnThreshold: 5,
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
-
-// Usage counts: keyed by canonical key name (e.g. "ctrl-t", "enter").
-// This is a simple in-memory map — persistence could be added later via
-// liveFile, but for now we just show hints every session.
+// Kept in memory for now; hints reset each launch.
 const usageCounts: Record<string, number> = {}
-
-// ── Hint definitions per state ───────────────────────────────────────────────
 
 const HINTS: Record<HelpState, Hint[]> = {
 	'idle-empty': [
@@ -49,11 +32,9 @@ const HINTS: Record<HelpState, Hint[]> = {
 	streaming: [{ text: 'esc stop', keys: ['escape'] }],
 }
 
-// ── Logic ────────────────────────────────────────────────────────────────────
-
 function isLearned(hint: Hint): boolean {
 	if (hint.keys.length === 0) return false
-	return hint.keys.every((k) => (usageCounts[k] ?? 0) >= config.learnThreshold)
+	return hint.keys.every((key) => (usageCounts[key] ?? 0) >= config.learnThreshold)
 }
 
 function logKey(name: string): void {
@@ -71,15 +52,12 @@ function deriveState(busy: boolean, hasText: boolean, canContinue = false): Help
 	return 'idle-empty'
 }
 
-// Build the help bar string. Returns empty string if all hints are learned.
 function build(busy: boolean, hasText: boolean, canContinue = false): string {
-	const st = deriveState(busy, hasText, canContinue)
-	const visible = HINTS[st].filter((h) => !isLearned(h))
+	const state = deriveState(busy, hasText, canContinue)
+	const visible = HINTS[state].filter((hint) => !isLearned(hint))
 	if (visible.length === 0) return ''
-	return visible.map((h) => h.text).join(' \u2502 ')
+	return visible.map((hint) => hint.text).join(' \u2502 ')
 }
-
-// ── Namespace ────────────────────────────────────────────────────────────────
 
 export const helpBar = {
 	config,

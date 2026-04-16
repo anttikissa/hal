@@ -1,17 +1,10 @@
-// Attachments — resolve [file.png] and [file.txt] references in user input.
-//
-// When a user types "[screenshot.png]" or "[notes.txt]" in their prompt, this
-// module reads the file and converts it into content blocks for the API:
-// - Images: base64-encoded, stored as blobs for history persistence
-// - Text files: inlined as text blocks
-//
-// Pattern: [/path/to/file.ext] — only recognized extensions are expanded.
+// Expand [file.ext] references in user input into API content blocks.
+// History keeps lightweight refs instead of raw image payloads.
 
 import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { blob } from './blob.ts'
 
-// Supported image extensions and their MIME types
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
 
 const MEDIA_TYPES: Record<string, string> = {
@@ -22,25 +15,19 @@ const MEDIA_TYPES: Record<string, string> = {
 	webp: 'image/webp',
 }
 
-// Match [path.ext] patterns for supported file types
 const ATTACHMENT_RE = /\[([^\]]+\.(png|jpg|jpeg|gif|webp|txt|md|json))\]/gi
 
 export interface ResolvedAttachment {
-	// Content blocks for the API call (images as base64, text inlined)
 	apiContent: string | any[]
-	// History now stores flat user parts instead of provider-shaped content
 	logParts: Array<{ type: 'text'; text: string } | { type: 'image'; blobId: string; originalFile?: string }>
 }
 
-// Resolve attachment references in user input text.
-// Returns separate API and log content — API gets the full data, history log
-// gets lightweight blob references to avoid bloating the ASONL file.
 async function resolve(sessionId: string, input: string): Promise<ResolvedAttachment> {
 	const matches = [...input.matchAll(ATTACHMENT_RE)]
-	// Only process txt files if they're from known safe paths
-	const valid = matches.filter((m) => {
-		const ext = m[2]!.toLowerCase()
-		return ext !== 'txt' || m[1]!.startsWith('/tmp/hal/')
+	// Plain .txt reads stay limited to Hal-owned temp files so prompts cannot smuggle in arbitrary local text.
+	const valid = matches.filter((match) => {
+		const ext = match[2]!.toLowerCase()
+		return ext !== 'txt' || match[1]!.startsWith('/tmp/hal/')
 	})
 
 	if (valid.length === 0) return { apiContent: input, logParts: [{ type: 'text', text: input }] }
@@ -54,17 +41,15 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 		const ext = match[2]!.toLowerCase()
 		const before = input.slice(lastIndex, match.index)
 
-		// Text before the attachment reference
 		if (before.trim()) {
 			apiBlocks.push({ type: 'text', text: before })
 			logParts.push({ type: 'text', text: before })
 		}
 
-		if (!existsSync(filePath!)) {
+		if (!existsSync(filePath)) {
 			apiBlocks.push({ type: 'text', text: `[file not found: ${filePath}]` })
 			logParts.push({ type: 'text', text: `[file not found: ${filePath}]` })
 		} else if (IMAGE_EXTS.has(ext)) {
-			// Image: read, base64 encode, store as blob
 			try {
 				const data = readFileSync(filePath)
 				const mediaType = MEDIA_TYPES[ext] ?? 'image/png'
@@ -78,7 +63,6 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 				logParts.push({ type: 'text', text: `[failed to read: ${filePath}]` })
 			}
 		} else {
-			// Text file: inline the content
 			try {
 				const text = readFileSync(filePath, 'utf-8')
 				apiBlocks.push({ type: 'text', text })
@@ -92,7 +76,6 @@ async function resolve(sessionId: string, input: string): Promise<ResolvedAttach
 		lastIndex = match.index! + match[0].length
 	}
 
-	// Text after the last attachment
 	const after = input.slice(lastIndex)
 	if (after.trim()) {
 		apiBlocks.push({ type: 'text', text: after })

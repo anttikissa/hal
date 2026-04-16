@@ -1,27 +1,18 @@
-// Tab completion for slash commands, model names, and file paths.
-// Ported and simplified from prev/src/cli/completion.ts.
-//
-// Usage: completion.complete(text, cursor) returns a result with matching
-// items and a common prefix. completion.apply() inserts the chosen item.
+// Tab completion for slash commands, models, config keys, and /cd paths.
 
 import { basename, resolve, dirname } from 'path'
 import { readdirSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { config as runtimeConfig } from '../config.ts'
-
-// ── Types ────────────────────────────────────────────────────────────────────
+import { commands } from '../runtime/commands.ts'
 
 export interface CompletionResult {
-	items: string[] // display items (e.g. "/model", "/help")
-	prefix: string // longest common prefix among items
-	start: number // offset in the original text where prefix begins
+	items: string[]
+	prefix: string
+	start: number
 }
 
 type CommandArg = 'model' | 'dir' | 'command' | 'config'
-
-// ── Known commands ───────────────────────────────────────────────────────────
-
-import { commands } from '../runtime/commands.ts'
 
 const COMMAND_ARGS: Record<string, CommandArg> = {
 	help: 'command',
@@ -31,15 +22,11 @@ const COMMAND_ARGS: Record<string, CommandArg> = {
 }
 
 function commandNames(): string[] {
-	// `/raw` is handled locally in the CLI, not by runtime/commands.ts.
+	// /raw is handled locally in the CLI, so completion adds it explicitly.
 	return [...new Set([...commands.commandNames(), 'raw'])].sort()
 }
 
-// ── Config ───────────────────────────────────────────────────────────────────
-
 const config = {
-	// Known model strings for /model completion. Will be replaced by
-	// a proper model registry once providers are wired up.
 	modelNames: [
 		'sonnet',
 		'opus',
@@ -54,16 +41,11 @@ const config = {
 	] as string[],
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
-// Tracks which item is selected in the popup so arrow/tab can cycle.
-
 const state = {
 	active: false,
 	selectedIndex: 0,
 	lastResult: null as CompletionResult | null,
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function longestCommonPrefix(values: string[]): string {
 	if (values.length === 0) return ''
@@ -83,31 +65,28 @@ function expandTilde(p: string): string {
 	return p
 }
 
-// List directories (not hidden) in a given path
 function listDirs(dir: string): string[] {
 	try {
 		return readdirSync(dir, { withFileTypes: true })
-			.filter((e) => {
-				if (e.name.startsWith('.')) return false
-				if (e.isDirectory()) return true
-				// Follow symlinks to check if target is directory
-				if (e.isSymbolicLink()) {
+			.filter((entry) => {
+				if (entry.name.startsWith('.')) return false
+				if (entry.isDirectory()) return true
+				if (entry.isSymbolicLink()) {
 					try {
-						return statSync(resolve(dir, e.name)).isDirectory()
+						return statSync(resolve(dir, entry.name)).isDirectory()
 					} catch {
 						return false
 					}
 				}
 				return false
 			})
-			.map((e) => e.name)
+			.map((entry) => entry.name)
 			.sort()
 	} catch {
 		return []
 	}
 }
 
-// Complete directory paths for /cd
 function completeDirs(argPrefix: string, cwd: string): string[] {
 	const expanded = expandTilde(argPrefix)
 
@@ -122,9 +101,7 @@ function completeDirs(argPrefix: string, cwd: string): string[] {
 	}
 
 	const dirs = listDirs(searchDir)
-	const matching = prefix ? dirs.filter((d) => d.startsWith(prefix)) : dirs
-
-	// Build paths relative to what the user typed
+	const matching = prefix ? dirs.filter((dir) => dir.startsWith(prefix)) : dirs
 	const base = expanded.endsWith('/')
 		? argPrefix
 		: argPrefix === ''
@@ -133,7 +110,7 @@ function completeDirs(argPrefix: string, cwd: string): string[] {
 				? argPrefix.slice(0, argPrefix.lastIndexOf('/') + 1)
 				: ''
 
-	return matching.map((d) => base + d + '/')
+	return matching.map((dir) => base + dir + '/')
 }
 
 function listConfigPaths(): string[] {
@@ -153,13 +130,10 @@ function listConfigPaths(): string[] {
 	return out
 }
 
-// ── Main completion logic ────────────────────────────────────────────────────
-
 function complete(text: string, cursor: number): CompletionResult | null {
 	if (cursor < 0 || cursor > text.length) cursor = text.length
 	const before = text.slice(0, cursor)
 	if (!before.startsWith('/')) return null
-	// Don't complete in multiline input
 	if (before.includes('\n')) return null
 
 	const body = before.slice(1)
@@ -167,19 +141,17 @@ function complete(text: string, cursor: number): CompletionResult | null {
 	const trimmed = body.trim()
 	const parts = trimmed ? trimmed.split(/\s+/) : []
 
-	// Case 1: completing the command name itself (e.g. "/he" or "/")
 	if (parts.length === 0 || (parts.length === 1 && !hasSpace)) {
 		const needle = parts[0] ?? ''
 		const names = commandNames()
-		const matches = names.filter((n) => n.startsWith(needle))
+		const matches = names.filter((name) => name.startsWith(needle))
 		if (matches.length === 0) return null
 
-		const items = matches.map((n) => `/${n}`)
+		const items = matches.map((name) => `/${name}`)
 		const prefix = longestCommonPrefix(items)
 		return { items, prefix, start: 0 }
 	}
 
-	// Case 2: completing command argument
 	const command = parts[0]!
 	const arg = COMMAND_ARGS[command]
 	if (!arg) return null
@@ -189,7 +161,7 @@ function complete(text: string, cursor: number): CompletionResult | null {
 	let values: string[] = []
 
 	if (arg === 'model') {
-		values = config.modelNames.filter((m) => m.startsWith(argPrefix))
+		values = config.modelNames.filter((model) => model.startsWith(argPrefix))
 	} else if (arg === 'dir') {
 		values = completeDirs(argPrefix, process.cwd())
 	} else if (arg === 'command') {
@@ -200,16 +172,13 @@ function complete(text: string, cursor: number): CompletionResult | null {
 
 	if (values.length === 0) return null
 
-	const items = values.map((v) => `/${command} ${v}`)
+	const items = values.map((value) => `/${command} ${value}`)
 	const prefix = longestCommonPrefix(items)
 	return { items, prefix, start: 0 }
 }
 
-// Apply a completion: replace text from result.start with the chosen item.
-// Returns the new text and cursor position.
 function apply(text: string, cursor: number, item: string): { text: string; cursor: number } {
 	const after = text.slice(cursor)
-	// For dir completions, don't add trailing space (let user tab deeper)
 	const isDirCompletion = item.match(/^\/cd\s/) && item.endsWith('/')
 	const suffix = isDirCompletion ? '' : ' '
 	const newText = item + suffix + after
@@ -217,7 +186,6 @@ function apply(text: string, cursor: number, item: string): { text: string; curs
 	return { text: newText, cursor: newCursor }
 }
 
-// Cycle selection through items. dir: +1 for next, -1 for previous.
 function cycle(dir: 1 | -1): void {
 	if (!state.lastResult || state.lastResult.items.length === 0) return
 	const len = state.lastResult.items.length
@@ -234,8 +202,6 @@ function selectedItem(): string | null {
 	if (!state.active || !state.lastResult) return null
 	return state.lastResult.items[state.selectedIndex] ?? null
 }
-
-// ── Namespace ────────────────────────────────────────────────────────────────
 
 export const completion = {
 	config,

@@ -1,7 +1,5 @@
-// Context builder — system prompt construction and message building.
-//
-// Loads SYSTEM.md plus AGENTS.md / CLAUDE.md files, builds the system prompt
-// with variable substitution, and provides message sizing helpers.
+// Build the system prompt from SYSTEM.md plus the AGENTS.md / CLAUDE.md chain,
+// then provide lightweight sizing and watch helpers around that prompt.
 
 import { existsSync, readFileSync, watch } from 'fs'
 import { dirname } from 'path'

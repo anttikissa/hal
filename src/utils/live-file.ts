@@ -1,22 +1,8 @@
-// liveFile — proxy-backed auto-persist object with file watching.
-//
-// Usage:
-//   const data = liveFile('state/foo.ason', { count: 0, name: 'default' })
-//   data.count++                       // auto-saved on next microtask
-//   data.name = 'bar'                  // coalesced into one write
-//
-//   liveFiles.save(data)               // force immediate flush
-//   liveFiles.onChange(data, () => {})  // called on external file change
-//
-// save() and onChange() are standalone functions keyed by proxy reference
-// (WeakMap), so liveFile objects stay clean — no magic properties that
-// could collide with user data.
-//
-// CAVEAT: don't stash nested objects — always access through the root
-// proxy so you get the latest data after file reloads.
+// Keep a plain object synced with an ASON file. Mutations write back on the next
+// microtask, and optional watching patches external edits into the same object.
 
 import { readFileSync, writeFileSync, renameSync, existsSync, watch } from 'fs'
-import { dirname, basename } from 'path'
+import { dirname } from 'path'
 import { ason } from './ason.ts'
 
 interface LiveState {
@@ -25,9 +11,7 @@ interface LiveState {
 	dirty: boolean
 	flushScheduled: boolean
 	callbacks: Array<() => void>
-	// Keep the watcher alive for as long as the proxy is reachable.
-	// If we drop this reference, Bun/Node may GC the fs.watch handle and
-	// external edits stop arriving intermittently.
+	// Hold the watcher on the state object itself so the runtime does not lose it to GC.
 	watcher: ReturnType<typeof watch> | null
 	doFlush: () => void
 }
@@ -36,8 +20,6 @@ const registry = new WeakMap<object, LiveState>()
 
 function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts?: { watch?: boolean }): T {
 	const data: Record<string, any> = { ...defaults }
-
-	// Load from disk, merging over defaults
 	if (existsSync(path)) {
 		try {
 			Object.assign(data, ason.parse(readFileSync(path, 'utf-8'), { comments: true }) as any)
@@ -69,8 +51,6 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 		})
 	}
 
-	// Watch directory (not file) so atomic tmp+rename doesn't kill the watcher.
-	// Debounce to coalesce rapid changes.
 	if (opts?.watch !== false) {
 		let debounce: ReturnType<typeof setTimeout> | null = null
 		let ownWrite = false
@@ -78,13 +58,13 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 		state.doFlush = () => {
 			ownWrite = true
 			origFlush()
-			// Hold the flag longer than the watch debounce (50ms)
-			// so the fs.watch callback sees it and skips the reload.
+			// Keep ownWrite true long enough for the debounced directory watch to notice it.
 			setTimeout(() => {
 				ownWrite = false
 			}, 100)
 		}
 		try {
+			// Watch the directory so tmp+rename writes from us or an editor do not break the watch.
 			state.watcher = watch(dirname(path), { persistent: false }, () => {
 				if (ownWrite) return
 				if (debounce) clearTimeout(debounce)
@@ -94,8 +74,7 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 						const before = ason.stringify(data)
 						const after = ason.stringify(next)
 						if (before === after) return
-						// Replace the object in place so existing proxies keep working,
-						// while also dropping keys removed from the file.
+						// Mutate in place so existing proxies keep pointing at fresh data.
 						for (const key of Object.keys(data)) {
 							if (!(key in next)) delete data[key]
 						}
@@ -107,8 +86,6 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 		} catch {}
 	}
 
-	// Recursive proxy: sets mark dirty and schedule flush.
-	// Gets return nested proxies for objects so deep mutations auto-save.
 	const handler: ProxyHandler<any> = {
 		set(target, prop, value) {
 			target[prop] = value
