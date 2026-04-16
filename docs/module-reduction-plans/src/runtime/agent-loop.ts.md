@@ -7,9 +7,24 @@
 - Target: get this module **comfortably under 500 bun cloc LOC** with **flat-or-down total repo cloc**
 - Practical reduction needed: only **24 bun cloc LOC**, but the real target should be **~40-70 LOC removed** so the file has headroom
 
+## Review verdict
+
+The original direction was mostly right, but it needed tighter sequencing.
+
+The current code does have real delete/dedupe opportunities. This is **not** a case where the only way under 500 is splitting the switch into more files. A one-pass reduction is realistic if the pass starts with **deletions, existing-module ownership fixes, and in-file dedupe**, not new abstractions.
+
+The most important correction is priority:
+
+1. **delete dead and thin code first**
+2. **move tool-specific logic to the tool that already owns it**
+3. **share only already-duplicated helpers across existing modules**
+4. **only then add one or two local helpers inside `agent-loop.ts`**
+
+That order makes under-500 reachable with repo cloc flat or down. Starting with new helper modules would miss the real goal.
+
 ## What this file currently mixes together
 
-The file is small enough to rescue without a rewrite, but it currently owns too many unrelated jobs:
+This file is still small enough to rescue without a rewrite, but it owns too many jobs at once:
 
 1. **Provider lookup / model parsing**
 	- parses `provider/model-id`
@@ -58,63 +73,68 @@ The file is small enough to rescue without a rewrite, but it currently owns too 
 	- exports `isActive()`
 	- exports config/state namespace
 
-That is the main reason the file feels slightly too large: the core loop is mixed with persistence details, transport details, and provider-specific cleanup.
+That is why it feels slightly too large: the core loop is mixed with persistence details, transport details, and tool/provider cleanup.
 
 ## Concrete duplication / bloat hotspots
 
-These are the highest-value places to cut:
+These are the highest-value cuts grounded in the current code:
 
-- **Context estimate + `stream-end` + `updateMeta` is repeated**
-	- `280-293` abort finish
-	- `515-525` clean completion
-	- `626-635` max-iteration stop
-	- similar logic also exists in `src/server/runtime.ts:531-542`
+- **Terminal finish logic is repeated three times**
+	- abort finish: `280-293`
+	- clean completion: `515-525`
+	- max-iteration stop: `626-634`
+	- this is the strongest in-file dedupe target
 
 - **Thinking history entry creation is duplicated**
 	- `491-500`
 	- `548-557`
 
-- **Assistant response persistence / event emission is duplicated**
+- **Assistant response persistence / response-event emission is duplicated**
 	- `502-514`
 	- `559-575`
 
-- **Tool call blob persistence is duplicated**
-	- initial write: `370-372`
+- **Tool call blob bookkeeping is duplicated**
+	- initial write on `tool_call`: `370-372`
 	- repeated before history append: `561-563`
 
-- **Retry parsing is duplicated across modules**
+- **Retry reset/body parsing is duplicated across modules**
 	- `src/runtime/agent-loop.ts:153-162`
 	- `src/providers/openai.ts:73-80`
 
-- **Thin wrappers add lines without adding much policy**
+- **Thin wrappers add lines without adding policy**
 	- `getProvider()`
 	- `executeTool()`
 
 - **Bash-specific cleanup lives in the wrong module**
-	- `resolveTilde()` + `stripCdCwd()` only exist to sanitize one tool’s input
+	- `resolveTilde()` + `stripCdCwd()` only exist for bash tool input cleanup
 
-## Reduction ideas, grouped by type
+- **There is one real dead block, not just duplication**
+	- `612-614` computes `est` and then does nothing with it
+	- this should simply be deleted before any refactor discussion
 
-### 1) Delete thin wrappers and one-off scaffolding
+## Reduction ideas, grouped by value
 
-These are the safest first cuts.
+### 1) Real deletions first
+
+These are the safest first cuts because they remove code instead of relocating it.
 
 | Idea | Est. `agent-loop.ts` impact | Est. repo impact | Notes |
 |---|---:|---:|---|
-| Delete `getProvider()` and call `providerLoader.getProvider()` directly | -3 to -5 | -3 to -5 | Pure wrapper today |
-| Delete `executeTool()` and call `toolRegistry.dispatch()` directly from the concurrent executor | -8 to -12 | -8 to -12 | `dispatch()` already catches tool errors and returns `error: ...` |
-| Drop explicit `ToolDef[]` local annotation if inference is clear | -1 | -1 | Tiny, but free |
-| Merge `activeRequests` + `abortTexts` into one map of `{ controller, abortText? }` | -4 to -8 | -4 to -8 | Small cleanup; not a headline change |
+| Delete dead `est` block after tool results (`612-614`) | -2 to -4 | -2 to -4 | Pure deletion; should happen first |
+| Delete `getProvider()` and call `providerLoader.getProvider()` directly | -3 to -6 | -3 to -6 | Also likely drops the `Provider` type import |
+| Delete `executeTool()` and call `toolRegistry.dispatch()` directly from the batched executor | -8 to -12 | -8 to -12 | `dispatch()` already catches and formats errors |
+| Drop explicit `ToolDef[]` local annotation if inference stays clear | -1 to -2 | -1 to -2 | Also may drop imported `ToolDef` type |
+| Merge `activeRequests` + `abortTexts` into one map of `{ controller, abortText? }` | -4 to -8 | -4 to -8 | Real cleanup, but lower priority than the three above |
 
-**Why this is good:** these cuts remove code without moving behavior elsewhere.
+**Why this is good:** these are actual net deletions.
 
 **Risk / tests to watch:**
 - `src/runtime/agent-loop.test.ts`
-- `src/server/runtime.test.ts` for `abort()` / `isActive()` behavior
+- `src/server/runtime.test.ts` for `abort()` / `isActive()` behavior if request state changes
 
 ### 2) Move behavior to the module that already owns it
 
-These are especially good because they can lower both this file and total repo LOC.
+These are the best repo-level reductions because they simplify ownership instead of creating glue.
 
 #### 2.1 Move bash `cd $CWD && ...` stripping into `src/tools/bash.ts`
 
@@ -124,25 +144,27 @@ Right now `agent-loop.ts` imports `path` and `os` only to normalize bash tool in
 - `resolveTilde()`
 - `stripCdCwd()`
 
-That logic is bash-tool-specific policy. The bash tool already normalizes its input in `normalizeInput()`, already knows `ctx.cwd`, and is the natural owner of command cleanup.
+That logic is bash-tool-specific policy. `src/tools/bash.ts` already has `normalizeInput()` and already owns command execution in `ctx.cwd`, so it is the natural home.
 
 **Estimated impact:**
 - `agent-loop.ts`: **-18 to -24 LOC**
-- repo total: **-6 to -10 LOC** after adding the smaller version in `bash.ts`
+- repo total: **down or roughly flat**, likely **-6 to -10 LOC** if implemented tightly inside existing bash normalization
 
-**Why this is strong:**
-- removes two imports from `agent-loop.ts`
-- removes a whole helper section from this file
-- improves ownership instead of just hiding code elsewhere
+**Important review note:** this is only a win if the bash tool absorbs the logic directly into its existing normalization path. Do **not** create a new shared helper file just for this.
 
 **Risk / tests to watch:**
 - `src/runtime/agent-loop.test.ts` tool-call flow
-- add/update direct bash-tool coverage for `cd ~/x && ...` and `cd <cwd> && ...`
-- `src/tools/builtins.test.ts` if tool registration assumptions change
+- add direct bash-tool coverage for:
+	- `cd <cwd> && echo hi`
+	- `cd ~/x && ...` not being stripped unless it resolves to actual `ctx.cwd`
+- `src/tools/builtins.test.ts`
 
-#### 2.2 Move shared retry-body parsing into `src/providers/shared.ts`
+#### 2.2 Share `parseResetsInSeconds()` via `src/providers/shared.ts`
 
-`parseResetsInSeconds()` exists in both `agent-loop.ts` and `openai.ts`. That is real duplication, not just a refactor preference.
+This is real duplication today:
+
+- `src/runtime/agent-loop.ts`
+- `src/providers/openai.ts`
 
 Best home: `src/providers/shared.ts`, next to `parseRetryDelay()`.
 
@@ -151,282 +173,187 @@ Best home: `src/providers/shared.ts`, next to `parseRetryDelay()`.
 - repo total: **-10 to -12 LOC** after deduping `openai.ts`
 
 **Risk / tests to watch:**
-- `src/runtime/agent-loop.test.ts` abort / retry tests
+- `src/runtime/agent-loop.test.ts` retry/abort tests
 - `src/providers/openai.test.ts`
-- possibly `src/providers/anthropic.test.ts` if reused there later
 
-#### 2.3 Share context snapshot persistence with `src/server/runtime.ts`
+#### 2.3 Share context snapshot persistence only if it stays tiny
 
-`agent-loop.ts` and `server/runtime.ts` both do this pattern:
+`agent-loop.ts` and `server/runtime.ts` both estimate context and persist `{ used, max }`.
 
-1. `context.estimateContext(...)`
-2. write `{ used, max }` to `sessions.updateMeta(...)`
-3. sometimes emit `stream-end`
+That duplication is real, but the safe first-pass target is **small**:
 
-This should become one shared helper in an **existing** module, not a new file. Best candidates:
+- helper should only do `estimateContext(...)` + `updateMeta(...)`
+- do **not** invent a broad new “stream finish” shared layer between runtime modules on the first pass
 
-- `src/runtime/context.ts`
-- or `src/server/sessions.ts`
-
-A good shape would be something like:
-
-- `context.snapshot(sessionId, messages, model, overheadBytes)` → returns `{ used, max }` and persists meta
-- optionally another helper to build the `stream-end` payload
+A small helper in an **existing** module like `runtime/context.ts` is plausible. A bigger cross-runtime event/persistence abstraction is not a first-pass LOC play.
 
 **Estimated impact:**
-- `agent-loop.ts`: **-12 to -20 LOC**
-- repo total: **-10 to -15 LOC** once `server/runtime.ts` also uses it
+- `agent-loop.ts`: **-6 to -12 LOC**
+- `server/runtime.ts`: **-4 to -8 LOC**
+- repo total: modestly down if the helper stays tiny
 
-**Risk / tests to watch:**
-- `src/runtime/agent-loop.test.ts`
-- `src/server/runtime.test.ts`
-- `src/client-streaming.test.ts` and startup tests that read persisted context
+**Review note:** this is weaker than the bash move and retry dedupe. Do it only after the obvious deletions land.
 
-### 3) Dedupe repeated branch logic inside the loop
+### 3) Dedupe repeated branch logic inside this file
 
-This is the biggest in-file cleanup opportunity.
+This is the best way to get under 500 **without** creating more files.
 
-#### 3.1 Dedupe finalization: abort / success / stopped
+#### 3.1 Dedupe terminal finish handling inside `agent-loop.ts`
 
-Three branches all recompute context and emit terminal state. They differ only in:
+Three branches recompute context and emit terminal state. They differ only in:
 
 - phase/result
-- whether to emit abort info text
-- whether there is a failure message
+- optional abort info text
+- optional failure message
 - whether usage is included
 
-A single helper can handle this cleanly.
+A **local helper in this file** is the strongest target here.
 
 **Estimated impact:**
 - `agent-loop.ts`: **-18 to -25 LOC**
-- repo total: roughly flat unless shared with `server/runtime.ts`
+- repo total: flat to slightly down
 
-**Good target shape:**
-- `finishLoop({ phase, usage, message, emitAbortText })`
-- or a narrower `emitStreamEndAndPersistContext(...)`
+**Recommended shape:**
+- `finishStream({ phase, usage, message, abortText })`
+- or `emitStreamEndAndPersistContext(...)`
+
+**Review correction:** do this locally first. Sharing with `server/runtime.ts` can come later if a tiny shared helper naturally falls out.
 
 **Risk / tests to watch:**
 - `src/runtime/agent-loop.test.ts`
 - `src/client-streaming.test.ts`
-- any tests expecting `stream-end` contents after abort/error/stop
 
-#### 3.2 Dedupe thinking + assistant history entry construction
+#### 3.2 Dedupe thinking + assistant history construction
 
-Both the no-tool path and the tool-call path build the same thinking history entry, and both partly duplicate assistant handling.
+Both the no-tool path and the tool path repeat:
 
-A helper like `buildAssistantHistoryEntries(...)` or two smaller helpers:
+- thinking entry creation
+- assistant history append
+- response event emission
 
-- `buildThinkingEntry(...)`
-- `appendAssistantTextEntry(...)`
-
-would pay for itself quickly.
+A small local helper should pay for itself quickly.
 
 **Estimated impact:**
 - `agent-loop.ts`: **-20 to -35 LOC**
-- repo total: flat to **-5 LOC** depending on helper shape
+- repo total: flat to slightly down
+
+**Good target shape:**
+- `appendThinkingHistoryEntry(...)`
+- `appendAssistantEntry(...)`
+- or one compact helper that pushes both into a passed `historyEntries` array
+
+**Review correction:** prefer a helper that removes duplicated code in place. Do **not** extract “history helpers” to a brand-new file unless a second caller exists.
 
 **Risk / tests to watch:**
 - `src/runtime/agent-loop.test.ts`
 - `src/session/api-messages.test.ts`
-- `src/client-startup.test.ts` replay cases
+- `src/client-startup.test.ts`
 
-#### 3.3 Dedupe tool blob bookkeeping
+#### 3.3 Tighten tool blob bookkeeping without adding a blob API first
 
-Current pattern:
+Current flow:
 
 - write tool-call blob during streaming
 - write tool-call blob again before history append
 - later read blob and patch in result
 
-This is too much read-modify-write ceremony in the loop.
+That is real duplication, but the first-pass fix should be simple:
 
-Possible simplifications:
-
-1. Add a tiny `ensureToolBlobId()` helper in this file
-2. Add `blob.mergeBlob(sessionId, blobId, patch)` in `blob.ts`
-3. Guarantee tool-call blob was written once, then only patch result later
+- introduce a tiny local `toolBlobId(toolId)` helper or equivalent
+- guarantee the call blob is written once
+- later patch only the result
 
 **Estimated impact:**
-- `agent-loop.ts`: **-10 to -18 LOC**
-- repo total: flat to **-5 LOC** if a reusable blob patch helper replaces repeated read/modify/write code elsewhere later
+- `agent-loop.ts`: **-8 to -14 LOC**
+- repo total: flat
+
+**Review correction:** do **not** start by adding `blob.mergeBlob()` or another new blob abstraction. That risks turning a delete into a sideways move.
 
 **Risk / tests to watch:**
 - `src/runtime/agent-loop.test.ts`
 - `src/session/api-messages.test.ts`
-- anything loading historical tool blobs via `read_blob`
+- `src/client-streaming.test.ts`
 
-### 4) Simplify retry / provider-error handling
+### 4) Lower-priority cleanups
 
-This block is dense because parsing, user messaging, retry decision, blob persistence, and abort-aware sleeping are all interleaved in one `case 'error'`.
+These are real, but they are not needed for the first under-500 pass.
 
 #### 4.1 Collapse provider-error formatting + blob serialization
 
-Today there are three helpers around this:
+Today there are three helpers around provider errors:
 
 - `parseErrorPayload()`
 - `formatErrorDetails()`
 - `writeErrorBlob()`
 
-A tighter shape would be a single helper that returns both:
-
-- parsed payload for blob
-- short message for UI
-
-Example: `summarizeProviderError(event) -> { summary, payload }`
-
-That avoids parsing the same body twice and makes the switch branch shorter.
+A tighter helper could shorten the `error` case, but this is not the first thing to reach for because current behavior is already fairly clear and test-covered.
 
 **Estimated impact:**
 - `agent-loop.ts`: **-8 to -14 LOC**
-- repo total: flat to **-5 LOC** if reused elsewhere later
+- repo total: roughly flat
 
-**Risk / tests to watch:**
-- `src/runtime/agent-loop.test.ts` error blob test
-- ensure long payloads still stay in blob, not visible text
+#### 4.2 Unify active request state into one map
 
-#### 4.2 Pull retry decision into a helper object/function
-
-Right now the `error` case owns:
-
-- terminal vs retryable decision
-- retry window start time
-- elapsed check
-- body retry parsing
-- fallback backoff
-- user-facing wait notice
-- status update
-- abort-aware sleep
-
-A helper like `nextRetryDelay(event, retryState)` or `retryPolicy.onError(...)` would shrink the switch branch.
-
-This is worth doing **only if** it removes local branching, not if it just moves the same code to a brand new file.
-
-**Estimated impact:**
-- `agent-loop.ts`: **-6 to -12 LOC**
-- repo total: flat unless shared with provider code later
-
-**Risk / tests to watch:**
-- `src/runtime/agent-loop.test.ts` rate-limit retry and abort tests
-- `src/providers/openai.test.ts` if logic gets shared
-
-### 5) Merge with existing helpers instead of inventing new files
-
-These are worthwhile if they reuse already-existing modules.
-
-#### 5.1 Reuse `toolRegistry.dispatch()` directly
-
-This is both a deletion and a merge-with-existing-helper case. The registry already:
-
-- resolves unknown tools
-- catches thrown tool errors
-- returns `error: ...`
-
-So `executeTool()` is mostly redundant.
-
-**Estimated impact:** already counted above, but it is a strong recommendation.
-
-#### 5.2 Reuse provider/shared retry helpers more aggressively
-
-`providerShared` already has retry-delay parsing. If it grows one more tiny helper for body-based reset parsing, `agent-loop.ts` gets simpler and `openai.ts` gets smaller too.
-
-**Estimated impact:** already counted above.
-
-#### 5.3 Consider a shared session event helper used by both runtime modules
-
-`agent-loop.ts` has `emitEvent()` / `emitInfo()` and `server/runtime.ts` has its own `emitInfo()` with nearly identical event-envelope creation.
-
-If an existing module gets a helper like `sessions.emitEvent()` or `ipc.emitSessionEvent()`, both files shrink.
+This is a real cleanup, but it is not where the fastest LOC wins are.
 
 **Estimated impact:**
 - `agent-loop.ts`: **-4 to -8 LOC**
-- `server/runtime.ts`: **-4 to -8 LOC**
-- repo total: **-4 to -8 LOC** depending on helper shape
+- repo total: **-4 to -8 LOC**
 
-**Risk / tests to watch:**
-- `src/runtime/agent-loop.test.ts`
-- `src/server/runtime.test.ts`
-- IPC/event ordering tests
+#### 4.3 Shared session event-envelope helper
 
-### 6) Larger contract simplifications worth noting
+There is some duplication between `agent-loop.ts` and `server/runtime.ts`, but the two modules are not identical callers:
 
-These are plausible and could cut more code, but they are not my recommended first pass.
+- `agent-loop.ts` also calls `sessions.applyLiveEvent(...)`
+- `server/runtime.ts` often only appends IPC events
 
-#### 6.1 Normalize provider events earlier
+So this is **not** a top-priority reduction target.
 
-If providers emitted more normalized data, `agent-loop.ts` could drop some provider-specific cleanup:
+**Review correction:** treat this as optional follow-up, not part of the first-pass plan.
 
-- pre-sanitized retry delay
-- pre-parsed short error message
-- possibly normalized bash tool command
-- possibly a user-facing status event instead of raw `server_tool` query inspection
+## Ideas that do **not** count as progress
 
-**Estimated impact:**
-- `agent-loop.ts`: **-25 to -40 LOC**
-- repo total: maybe down, maybe flat, depending on how much logic becomes shared in provider helpers
+These may shrink this file while missing the repo-level goal:
 
-**Why not first:** this changes the provider contract and touches more modules.
+- splitting the switch into a new sibling file with the same logic
+- extracting retry logic into a brand-new helper module used only here
+- extracting history-writing helpers to a new file with no second caller
+- adding a new blob patch API before deleting the duplicated local paths
+- adding a shared event abstraction that makes both runtime modules more indirect but not shorter overall
 
-#### 6.2 Move iteration persistence into `sessions`
+## Strongest execution path
 
-A helper like `sessions.appendAgentIteration(...)` could take:
+This is the best one-pass path to get under 500 with repo cloc flat or down:
 
-- thinking text/signature/blob
-- assistant text
-- tool calls
-- maybe tool results
+### Pass 1: pure deletions and ownership fixes
 
-and write the right history/blob records.
+1. **Delete the dead context-estimate block at `612-614`**
+2. **Delete `getProvider()` and call `providerLoader.getProvider()` directly**
+3. **Delete `executeTool()` and dispatch tools directly through `toolRegistry.dispatch()`**
+4. **Move bash command cleanup into `src/tools/bash.ts`**
+5. **Share `parseResetsInSeconds()` via `src/providers/shared.ts` and remove both copies**
 
-This could reduce `agent-loop.ts` a lot, and it would make `api-messages.ts` / replay logic easier to reason about long-term.
+**Expected result:** roughly **-35 to -50 LOC** from `agent-loop.ts`, with total repo cloc likely down too.
 
-**Estimated impact:**
-- `agent-loop.ts`: **-25 to -40 LOC**
-- repo total: only worth it if it becomes a true shared persistence primitive, otherwise this is mostly line-moving
+That alone should put the file roughly around **473-488 bun cloc LOC**.
 
-**Why not first:** easy to accidentally just relocate complexity.
+### Pass 2: only the highest-value local dedupe
 
-## Ideas I would **not** count as real progress
-
-These may reduce this file’s LOC number but do **not** meet the repo-level goal on their own:
-
-- splitting the switch into a brand-new sibling file with the same amount of code
-- extracting retry logic into a new helper module that only `agent-loop.ts` uses
-- extracting history-writing helpers into a new file without deleting any duplicated logic elsewhere
-
-Those would shrink the module, but probably increase or flatten total repo cloc for the wrong reason.
-
-## Recommended execution sequence
-
-This sequence is aimed at getting under 500 in one pass while keeping total repo cloc flat or down.
-
-### Pass 1: cheap deletions and ownership fixes
-
-1. **Move bash command cleanup into `src/tools/bash.ts`**
-2. **Delete `getProvider()` wrapper**
-3. **Delete `executeTool()` wrapper and simplify `executeToolsConcurrently()` to call `toolRegistry.dispatch()` directly**
-4. **Share `parseResetsInSeconds()` via `src/providers/shared.ts` and reuse it from `openai.ts`**
-
-**Expected result:** roughly **-30 to -45 LOC** from `agent-loop.ts` with repo total likely also down.
-
-That alone likely gets the file from **523** to about **478-493**.
-
-### Pass 2: remove the obvious duplication still left in the loop
-
-5. **Introduce one helper for terminal stream-end/context persistence**
-6. **Introduce one helper for thinking/assistant history entry creation**
-7. **Tighten tool blob bookkeeping so tool-call blobs are not re-written through duplicated paths**
+6. **Add one local helper for terminal `stream-end` + context/meta persistence**
+7. **Add one local helper for thinking/assistant history duplication**
+8. **Tighten tool blob bookkeeping so the tool-call blob is written once per call path**
 
 **Expected result:** another **-15 to -35 LOC** from `agent-loop.ts`.
 
-After this, the file should likely land around **450-480 LOC** and be easier to maintain.
+After this, the file should likely land around **440-475 LOC**.
 
-### Pass 3: only if the file is still awkward after the above
+### Pass 3: only if still awkward
 
-8. **Simplify the `error` case with one provider-error summary helper**
 9. **Optionally unify active request state into one map**
-10. **Optionally share event-envelope creation with `server/runtime.ts`**
+10. **Optionally tighten provider-error helpers**
+11. **Only then consider a tiny shared context snapshot helper with `server/runtime.ts`**
 
-These are worthwhile cleanups, but they are not necessary to hit the target.
+These are cleanup passes, not the main route to the target.
 
 ## Risks / tests to watch
 
@@ -441,18 +368,29 @@ Primary targeted tests:
 	- silent abort text
 	- abort during rate-limit backoff
 
+- `src/client-streaming.test.ts`
+	- no duplicate assistant text after `response`
+	- tool-call / tool-result live block ordering
+	- response error blob metadata
+
+- `src/session/api-messages.test.ts`
+	- replay of thinking / tool_call / tool_result into provider messages
+
 Secondary tests likely affected:
 
 - `src/providers/openai.test.ts`
-	- if retry parsing moves to shared provider helpers
+	- if retry reset parsing moves to `providers/shared.ts`
+- `src/client-startup.test.ts`
+	- if history entry shapes or replay timing change
 - `src/server/runtime.test.ts`
-	- if context persistence or event helpers get shared
-- `src/session/api-messages.test.ts`
-	- if history entry writing changes shape
-- `src/client-streaming.test.ts`
-	- if `stream-end` / `response` emission changes
-- bash tool tests / builtins tests
-	- if `cd $CWD && ...` stripping moves into the bash tool
+	- only if the plan expands into shared context persistence
+- `src/tools/builtins.test.ts`
+	- tool registration assumptions
+
+Missing coverage worth adding during execution:
+
+- direct bash-tool tests for cwd-prefix stripping
+- a focused test that tool-call blobs are not re-written through two divergent paths
 
 Behavioral risks to watch closely:
 
@@ -462,37 +400,16 @@ Behavioral risks to watch closely:
 - not breaking tool result replay into provider messages
 - not duplicating assistant text between streamed live blocks and final `response` events
 
-## Best reduction opportunities outside this file too
-
-These are the changes most likely to reduce other large files at the same time:
-
-1. **Shared context snapshot helper**
-	- reduces `src/runtime/agent-loop.ts`
-	- also reduces `src/server/runtime.ts`
-
-2. **Shared retry reset/body parsing in `providers/shared.ts`**
-	- reduces `src/runtime/agent-loop.ts`
-	- also reduces `src/providers/openai.ts`
-	- may later help `src/providers/anthropic.ts`
-
-3. **Move bash normalization into `src/tools/bash.ts`**
-	- reduces `src/runtime/agent-loop.ts`
-	- makes tool-specific policy live in the tool that already owns it
-
-4. **Shared session event-envelope helper**
-	- reduces `src/runtime/agent-loop.ts`
-	- also reduces `src/server/runtime.ts`
-
 ## Bottom line
 
-Yes: **under 500 bun cloc LOC is reachable in one practical pass** without cheating by just splitting files.
+Yes: **under 500 bun cloc LOC is reachable in one pass** without cheating by splitting files.
 
-The best first cuts are:
+The real route is:
 
-1. move bash input cleanup into `bash.ts`
-2. delete `getProvider()`
-3. delete `executeTool()` and simplify batched tool execution
-4. share `parseResetsInSeconds()` with `providers/shared.ts`
-5. dedupe terminal context/stream-end handling
+1. delete dead code
+2. delete thin wrappers
+3. move bash-only normalization into `bash.ts`
+4. dedupe the already-duplicated retry parser in `providers/shared.ts`
+5. do only the two highest-value local dedupes inside `agent-loop.ts`
 
-That set should be enough to get this module under target while keeping total repo cloc flat or down.
+That path targets actual reduction, keeps repo cloc flat or down, and is ready for execution.
