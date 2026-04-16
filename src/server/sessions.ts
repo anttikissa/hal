@@ -3,11 +3,12 @@
 
 import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, appendFileSync } from 'fs'
 import { appendFile } from 'fs/promises'
-import { STATE_DIR } from '../state.ts'
+import { STATE_DIR, ensureDir } from '../state.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { models } from '../models.ts'
+import type { PartialTokenUsage } from '../protocol.ts'
 
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
@@ -60,7 +61,7 @@ export type HistoryEntry =
 			model?: string
 			id?: string
 			continue?: string
-			usage?: { input: number; output: number; cacheRead?: number; cacheCreation?: number }
+			usage?: PartialTokenUsage
 			ts?: string
 	  }
 	| {
@@ -123,7 +124,7 @@ function sessionLivePath(sessionId: string): string { return `${sessionDir(sessi
 function sessionMetaPath(sessionId: string): string { return `${sessionDir(sessionId)}/session.ason` }
 
 function ensureSessionDir(sessionId: string): void {
-	if (!existsSync(sessionDir(sessionId))) mkdirSync(sessionDir(sessionId), { recursive: true })
+	ensureDir(sessionDir(sessionId))
 }
 
 function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {

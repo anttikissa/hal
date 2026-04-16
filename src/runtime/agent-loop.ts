@@ -10,7 +10,7 @@ import { resolve } from 'path'
 import { homedir } from 'os'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
-import type { Provider, ProviderStreamEvent, Message, ToolDef } from '../protocol.ts'
+import type { Provider, ProviderStreamEvent, Message, ToolDef, TokenUsage } from '../protocol.ts'
 import { models } from '../models.ts'
 import { context } from './context.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
@@ -117,7 +117,7 @@ function parseErrorPayload(body: string | undefined): unknown {
 
 // True iff any token class is non-zero. A fully-cached turn has input = 0 but
 // non-zero cacheRead, so we can't just check `input > 0`.
-function hasUsage(u: { input: number; output: number; cacheRead: number; cacheCreation: number }): boolean {
+function hasUsage(u: TokenUsage): boolean {
 	return u.input > 0 || u.output > 0 || u.cacheRead > 0 || u.cacheCreation > 0
 }
 
@@ -385,7 +385,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<void> {
 							// Show web search activity to the user
 							for (const sb of event.serverBlocks) {
 								if (sb.type === 'server_tool_use' && sb.name === 'web_search') {
-									const query = sb.input?.query ?? ''
+									const query = (sb.input as any)?.query ?? ''
 									emitInfo(sessionId, `[web_search] "${query}"`)
 								}
 							}

@@ -16,6 +16,7 @@ import { blocks as blockRenderer } from '../cli/blocks.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { client } from '../client.ts'
 import { models } from '../models.ts'
+import type { TokenUsage } from '../protocol.ts'
 import { auth } from '../auth.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { version } from '../version.ts'
@@ -347,7 +348,7 @@ function formatTotalTokens(total: number): string {
 }
 
 function tokenUsageLabel(
-	usage: { input: number; output: number; cacheRead: number; cacheCreation: number },
+	usage: TokenUsage,
 	long = false,
 ): string {
 	const total = usage.input + usage.output + usage.cacheRead + usage.cacheCreation

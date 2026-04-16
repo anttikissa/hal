@@ -4,6 +4,8 @@
 import { readFileSync, writeFileSync } from 'fs'
 import { ipc } from './ipc.ts'
 import type { SharedSessionInfo, SharedState } from './ipc.ts'
+import type { TokenUsage } from './protocol.ts'
+import type { VersionStatus } from './version.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
 import { draft as draftModule } from './cli/draft.ts'
@@ -45,7 +47,7 @@ export interface Tab {
 	historyVersion: number
 	// Cumulative token usage for this session (input + output).
 	// Accumulated from stream-end events and loaded from history on startup.
-	usage: { input: number; output: number; cacheRead: number; cacheCreation: number }
+	usage: TokenUsage
 	// Last known context window usage (estimated tokens used / max).
 	// Updated from stream-end events.
 	contextUsed: number
@@ -75,7 +77,7 @@ const state = {
 	role: 'server' as 'server' | 'client',
 	pid: process.pid,
 	hostPid: null as number | null,
-	hostVersionStatus: 'idle' as 'idle' | 'pending' | 'ready' | 'error',
+	hostVersionStatus: 'idle' as VersionStatus,
 	hostVersion: '',
 	// Persisted across restarts so the prompt stays at a stable position.
 	// Invalidated if terminal width changed since last save.

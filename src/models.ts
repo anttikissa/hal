@@ -1,4 +1,5 @@
 // Model registry — aliases, display names, pricing, context windows.
+import type { PartialTokenUsage } from './protocol.ts'
 //
 // Models are identified as "provider/model-id" (e.g. "anthropic/claude-opus-4-6").
 // Short aliases like "opus" resolve to full IDs. Display names are extracted
@@ -176,7 +177,7 @@ const CACHE_WRITE_MULTIPLIER = 1.25
 
 function computeCost(
 	fullId: string,
-	usage: { input: number; output: number; cacheRead?: number; cacheCreation?: number },
+	usage: PartialTokenUsage,
 ): number {
 	const p = PRICING[fullId]
 	if (!p) return 0
@@ -187,7 +188,7 @@ function computeCost(
 
 function formatCost(
 	fullId: string,
-	usage: { input: number; output: number; cacheRead?: number; cacheCreation?: number },
+	usage: PartialTokenUsage,
 ): string {
 	const cost = computeCost(fullId, usage)
 	if (cost === 0) return ''

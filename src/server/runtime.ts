@@ -16,6 +16,7 @@ import { models } from '../models.ts'
 import { sessions as sessionStore } from './sessions.ts'
 import { commands } from '../runtime/commands.ts'
 import type { SessionState } from '../runtime/commands.ts'
+import type { SpawnMode } from '../protocol.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
@@ -48,7 +49,7 @@ function errorMessage(err: unknown): string {
 
 interface SpawnSpec {
 	task: string
-	mode: 'fork' | 'fresh'
+	mode: SpawnMode
 	model?: string
 	cwd?: string
 	title?: string
