@@ -11,7 +11,7 @@ object literal should be valid ASON.
 backtick strings`,
 		'unquoted keys', 'trailing commas',],
 	numberFormats: [
-		42, 3.14, .82, 1., -.5, +1, 0xFF, 1e10, Infinity, -Infinity, NaN
+		42, 3.14, .82, 1., -.5, +1, 0xFF, 1e10, 1_000_000, Infinity, -Infinity, NaN
 	],
 	comments: {
 		/* block comments /*
@@ -29,7 +29,7 @@ ASON should be **as JavaScript-compatible as practical** while staying simple to
 write, diff, and stream.
 
 That means:
-- JS-style numbers: `42`, `3.14`, `.82`, `1.`, `-.5`, `+1`, `0xFF`, `1e10`, `Infinity`, `-Infinity`, `NaN`
+- JS-style numbers: `42`, `3.14`, `.82`, `1.`, `-.5`, `+1`, `0xFF`, `1e10`, `1_000_000`, `Infinity`, `-Infinity`, `NaN`
 - JS-style strings: single quotes, double quotes, and backticks, with `\xNN`, `\v`, `\0`, and line continuations
 - JS-style object keys: unquoted identifiers (including non-ASCII like `café`) and `\uXXXX` escapes
 - JS-style commas: **commas are required between items and properties**
@@ -49,6 +49,7 @@ All JSON types, plus:
 - Hex numbers: `0xFF`
 - Signed numbers: `+1`, `+.5`
 - Trailing-dot numbers: `1.`
+- Numeric separators: `1_000_000`, `0xFF_FF`, `1_0e1_0`
 - String escapes: `\xNN`, `\v`, `\0`, line continuations
 - Comments: `// line` and `/* block */`
 - Trailing commas
