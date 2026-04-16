@@ -427,6 +427,37 @@ describe('client startup', () => {
 		expect(tailCalls).toBe(1)
 	})
 
+	test('startup merge drops live blocks already persisted to history', async () => {
+		sessions.loadAllHistoryWithOrigin = () => ({
+			entries: [
+				{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.', ts: '2026-04-09T20:01:00.000Z' },
+			],
+			parentCount: 0,
+		})
+		sessions.loadLive = () => ({
+			busy: false,
+			activity: '',
+			blocks: [{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.', ts: Date.parse('2026-04-09T20:01:00.000Z') }],
+			updatedAt: '2026-04-09T20:01:00.000Z',
+		})
+
+		const shared = makeSharedState(['s1'])
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		const nonStartup = client.currentTab()?.history.filter(b => b.type !== 'startup')
+		expect(nonStartup).toMatchObject([
+			{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.' },
+		])
+	})
+
 	test('loads live session blocks on startup for tabs opened mid-turn', async () => {
 		sessions.loadLive = () => ({
 			busy: true,
