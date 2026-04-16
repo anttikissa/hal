@@ -146,3 +146,20 @@ test('anthropic 429 waits for reset when all accounts are on cooldown', async ()
 		retryAfterMs: 42_000,
 	})
 })
+
+
+test('anthropic provider ignores malformed SSE JSON lines', async () => {
+	installFetchMock(async () => new Response([
+		'data: {not json}',
+		'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}',
+		'data: {"type":"message_delta","usage":{"output_tokens":4}}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events = await collect({ value: 'tok-test', type: 'token' })
+	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+	expect(events.at(-1)).toEqual({ type: 'done', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
+})

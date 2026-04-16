@@ -9,14 +9,12 @@
 // the loader dynamically imports those providers.
 
 import type { Provider } from '../protocol.ts'
+import { providerShared } from './shared.ts'
 
 // ── Provider cache ──
 // Lazily instantiated providers keyed by provider name (e.g. "anthropic", "openai")
 
 const cache = new Map<string, Provider>()
-
-// Compat providers use Chat Completions API via openai-compat code path
-const COMPAT_PROVIDERS = new Set(['openrouter', 'google', 'grok'])
 
 /** Get (or lazily create) the provider for a given provider name. */
 async function getProvider(providerName: string): Promise<Provider> {
@@ -24,14 +22,13 @@ async function getProvider(providerName: string): Promise<Provider> {
 	if (cached) return cached
 
 	let p: Provider
-
 	if (providerName === 'anthropic') {
 		const { anthropicProvider } = await import('./anthropic.ts')
 		p = anthropicProvider
 	} else if (providerName === 'openai') {
 		const { openaiProvider } = await import('./openai.ts')
 		p = openaiProvider
-	} else if (COMPAT_PROVIDERS.has(providerName)) {
+	} else if (Object.hasOwn(providerShared.compatEndpoints, providerName)) {
 		const { createCompatProvider } = await import('./openai.ts')
 		p = createCompatProvider(providerName)
 	} else {
@@ -45,7 +42,7 @@ async function getProvider(providerName: string): Promise<Provider> {
 		} else {
 			throw new Error(
 				`Unknown provider '${providerName}'. ` +
-					`Set ${envKey} for custom endpoints, or use: anthropic, openai, openrouter, google, grok`,
+					`Set ${envKey} for custom endpoints, or use: anthropic, openai, ${Object.keys(providerShared.compatEndpoints).join(', ')}`,
 			)
 		}
 	}

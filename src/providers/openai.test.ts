@@ -335,3 +335,71 @@ test('openai provider preserves stored reasoning summaries during replay', () =>
 		summary: [{ type: 'summary_text', text: 'stored summary' }],
 	})
 })
+
+
+test('openai provider ignores malformed Responses SSE JSON lines', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+
+	installFetchMock(async () => new Response([
+		'data: {not json}',
+		'data: {"type":"response.output_text.delta","delta":"hello"}',
+		'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":3,"output_tokens":4}}}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
+})
+
+
+test('compat provider reports tool JSON parse errors after [DONE] chunks', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-or-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+	const badToolDelta = JSON.stringify({
+		choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', function: { name: 'search', arguments: '{"bad":' } }] } }],
+	})
+
+	installFetchMock(async () => new Response([
+		'data: {oops}',
+		`data: ${badToolDelta}`,
+		'data: {"choices":[{"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":5,"completion_tokens":6}}',
+		'data: [DONE]',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of createCompatProvider('openrouter').generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events).toContainEqual({
+		type: 'tool_call',
+		id: 'call_1',
+		name: 'search',
+		input: {},
+		parseError: 'Failed to parse tool input JSON (7 chars): {"bad":',
+	})
+	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } })
+})

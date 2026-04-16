@@ -48,24 +48,6 @@ function errorTypeToStatus(type: unknown): number | undefined {
 	return typeof type === 'string' ? ERROR_TYPE_STATUS[type] : undefined
 }
 
-function formatAccountLabel(credential: import('../auth.ts').Credential): string {
-	if (credential.email) return credential.email
-	if (credential.total && credential.index != null) return `account ${credential.index + 1}/${credential.total}`
-	return 'current account'
-}
-
-function formatRotationActivity(credential: import('../auth.ts').Credential): string | undefined {
-	if (!credential.total || credential.total < 2 || credential.index == null) return undefined
-	return `Anthropic ${credential.index + 1}/${credential.total} · ${formatAccountLabel(credential)}`
-}
-
-function formatRotationMessage(current: import('../auth.ts').Credential, next: import('../auth.ts').Credential | undefined, retryAfterMs: number, fast: boolean): string {
-	const total = current.total ?? 1
-	const currentLabel = formatAccountLabel(current)
-	const nextLabel = next ? formatAccountLabel(next) : 'the next available account'
-	if (fast) return `Anthropic rotation: ${total} accounts. 429 on ${currentLabel}. Trying ${nextLabel} next.`
-	return `Anthropic rotation: ${total} accounts. 429 on ${currentLabel}. All accounts cooling down. Next: ${nextLabel} in ${Math.ceil(retryAfterMs / 1000)}s.`
-}
 
 // ── Message sanitization ──
 // Strip or convert blocks that Anthropic doesn't understand (e.g. foreign
@@ -180,10 +162,6 @@ async function* parseStream(
 	body: ReadableStream<Uint8Array>,
 	logContext?: { sessionId?: string; model?: string },
 ): AsyncGenerator<ProviderStreamEvent> {
-	const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>
-	const decoder = new TextDecoder()
-	let buf = ''
-
 	// Tool calls are assembled across content_block_start / delta / stop events
 	const tools = new Map<number, { id: string; name: string; json: string }>()
 	// Server-side tool blocks (e.g. web_search) are opaque — collect them verbatim
@@ -191,112 +169,71 @@ async function* parseStream(
 	const serverToolBlocks: any[] = []
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 
-	while (true) {
-		const { done, value } = await providerShared.readWithTimeout(reader)
-		if (done) break
-		buf += decoder.decode(value, { stream: true })
-
-		let nl: number
-		while ((nl = buf.indexOf('\n')) !== -1) {
-			const line = buf.slice(0, nl).trimEnd()
-			buf = buf.slice(nl + 1)
-			if (!line.startsWith('data: ')) continue
-
-			let ev: any
-			try {
-				ev = JSON.parse(line.slice(6))
-			} catch {
-				continue
+	for await (const ev of providerShared.iterateJsonSse(body)) {
+		if (ev.type === 'content_block_start') {
+			const b = ev.content_block
+			if (b.type === 'tool_use') {
+				tools.set(ev.index, { id: b.id, name: b.name, json: '' })
+			} else if (b.type === 'server_tool_use' || b.type === 'web_search_tool_result') {
+				// Server-side tools (web_search) — store the full block for passthrough.
+				// These don't stream deltas; the complete content arrives in content_block_start.
+				serverToolBlocks.push(b)
 			}
-
-			if (ev.type === 'content_block_start') {
-				const b = ev.content_block
-				if (b.type === 'tool_use') {
-					tools.set(ev.index, { id: b.id, name: b.name, json: '' })
-				} else if (b.type === 'server_tool_use' || b.type === 'web_search_tool_result') {
-					// Server-side tools (web_search) — store the full block for passthrough.
-					// These don't stream deltas; the complete content arrives in content_block_start.
-					serverToolBlocks.push(b)
-				}
-			} else if (ev.type === 'content_block_delta') {
-				const d = ev.delta
-				if (d.type === 'thinking_delta') {
-					yield { type: 'thinking', text: d.thinking }
-				} else if (d.type === 'signature_delta') {
-					yield { type: 'thinking_signature', signature: d.signature }
-				} else if (d.type === 'text_delta') {
-					yield { type: 'text', text: d.text }
-				} else if (d.type === 'input_json_delta') {
-					// Accumulate partial JSON for tool input
-					const t = tools.get(ev.index)
-					if (t) t.json += d.partial_json
-				}
-			} else if (ev.type === 'content_block_stop') {
+		} else if (ev.type === 'content_block_delta') {
+			const d = ev.delta
+			if (d.type === 'thinking_delta') yield { type: 'thinking', text: d.thinking }
+			else if (d.type === 'signature_delta') yield { type: 'thinking_signature', signature: d.signature }
+			else if (d.type === 'text_delta') yield { type: 'text', text: d.text }
+			else if (d.type === 'input_json_delta') {
+				// Accumulate partial JSON for tool input
 				const t = tools.get(ev.index)
-				if (t) {
-					let input: any
-					try {
-						input = JSON.parse(t.json || '{}')
-					} catch {
-						yield {
-							type: 'tool_call',
-							id: t.id,
-							name: t.name,
-							input: {},
-							rawJson: t.json,
-							parseError: `Failed to parse tool input JSON (${t.json.length} chars): ${t.json.slice(0, 200)}`,
-						}
-						tools.delete(ev.index)
-						continue
-					}
-					yield { type: 'tool_call', id: t.id, name: t.name, input, rawJson: t.json }
-					tools.delete(ev.index)
-				}
-			} else if (ev.type === 'message_start' && ev.message?.usage) {
-				// Keep input, cacheRead, and cacheCreation separate — they bill at
-				// very different rates (full / ~10% / ~125%). Mashing them together
-				// hides cache misses. Log each API call so we can audit post-hoc.
-				const u = ev.message.usage
-				const inputDelta = u.input_tokens ?? 0
-				const cacheReadDelta = u.cache_read_input_tokens ?? 0
-				const cacheCreationDelta = u.cache_creation_input_tokens ?? 0
-				usage.input += inputDelta
-				usage.cacheRead += cacheReadDelta
-				usage.cacheCreation += cacheCreationDelta
-				logCall({
-					ts: new Date().toISOString(),
-					sessionId: logContext?.sessionId,
-					model: logContext?.model,
-					input: inputDelta,
-					cacheRead: cacheReadDelta,
-					cacheCreation: cacheCreationDelta,
-				})
-			} else if (ev.type === 'message_delta' && ev.usage) {
-				usage.output += ev.usage.output_tokens ?? 0
-			} else if (ev.type === 'error') {
-				const msg = ev.error?.message ?? 'Stream error'
-				const body = JSON.stringify(ev.error ?? ev)
-				const status = errorTypeToStatus(ev.error?.type)
-				try {
-					const prev = (await Bun.file('/tmp/compare/hal.txt').exists())
-						? await Bun.file('/tmp/compare/hal.txt').text()
-						: ''
-					await Bun.write(
-						'/tmp/compare/hal.txt',
-						prev + `STREAM ERROR: status=${status} type=${ev.error?.type} body=${body}\n\n`,
-					)
-				} catch {}
-				yield { type: 'error', message: msg, status, body }
+				if (t) t.json += d.partial_json
 			}
+		} else if (ev.type === 'content_block_stop') {
+			const t = tools.get(ev.index)
+			if (t) {
+				const parsed = providerShared.parseToolInput(t.json)
+				yield { type: 'tool_call', id: t.id, name: t.name, input: parsed.input, rawJson: t.json, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }
+				tools.delete(ev.index)
+			}
+		} else if (ev.type === 'message_start' && ev.message?.usage) {
+			// Keep input, cacheRead, and cacheCreation separate — they bill at
+			// very different rates (full / ~10% / ~125%). Mashing them together
+			// hides cache misses. Log each API call so we can audit post-hoc.
+			const u = ev.message.usage
+			const inputDelta = u.input_tokens ?? 0
+			const cacheReadDelta = u.cache_read_input_tokens ?? 0
+			const cacheCreationDelta = u.cache_creation_input_tokens ?? 0
+			usage.input += inputDelta
+			usage.cacheRead += cacheReadDelta
+			usage.cacheCreation += cacheCreationDelta
+			logCall({
+				ts: new Date().toISOString(),
+				sessionId: logContext?.sessionId,
+				model: logContext?.model,
+				input: inputDelta,
+				cacheRead: cacheReadDelta,
+				cacheCreation: cacheCreationDelta,
+			})
+		} else if (ev.type === 'message_delta' && ev.usage) {
+			usage.output += ev.usage.output_tokens ?? 0
+		} else if (ev.type === 'error') {
+			const msg = ev.error?.message ?? 'Stream error'
+			const body = JSON.stringify(ev.error ?? ev)
+			const status = errorTypeToStatus(ev.error?.type)
+			try {
+				const prev = (await Bun.file('/tmp/compare/hal.txt').exists())
+					? await Bun.file('/tmp/compare/hal.txt').text()
+					: ''
+				await Bun.write('/tmp/compare/hal.txt', prev + `STREAM ERROR: status=${status} type=${ev.error?.type} body=${body}\n\n`)
+			} catch {}
+			yield { type: 'error', message: msg, status, body }
 		}
 	}
 
 	// Yield server-side tool blocks (web_search) before done so the agent loop
 	// can include them in the assistant message content.
-	if (serverToolBlocks.length > 0) {
-		yield { type: 'server_tool', serverBlocks: serverToolBlocks }
-	}
-
+	if (serverToolBlocks.length > 0) yield { type: 'server_tool', serverBlocks: serverToolBlocks }
 	yield { type: 'done', usage }
 }
 
@@ -318,7 +255,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 
 	const isOAuth = cred.type === 'token'
 
-	const rotationActivity = formatRotationActivity(cred)
+	const rotationActivity = providerShared.formatRotationActivity('Anthropic', cred)
 	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
 
 	// Build system blocks with cache control.
@@ -415,7 +352,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 			const nextCredential = auth.getCredential('anthropic')
 			yield {
 				type: 'error',
-				message: formatRotationMessage(cred, nextCredential, fast ? 1_000 : cooldownMs, fast),
+				message: providerShared.formatRotationMessage('Anthropic', cred, nextCredential, fast ? 1_000 : cooldownMs, fast),
 				status: res.status,
 				body: text,
 				endpoint: url,
