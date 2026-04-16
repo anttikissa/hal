@@ -3,7 +3,11 @@
 ASON is a superset of JSON designed for human-readable config and state files. Basically any JS
 object literal should be valid ASON.
 
-```
+ASONL is similar to JSONL (newline-delimited ASON records)
+
+Example:
+
+```ason
 {
 	format: 'ason',
 	features: [
@@ -11,7 +15,7 @@ object literal should be valid ASON.
 backtick strings`,
 		'unquoted keys', 'trailing commas',],
 	numberFormats: [
-		42, 3.14, .82, 1., -.5, +1, 0xFF, 1e10, 1_000_000, Infinity, -Infinity, NaN
+		42, 3.14, .82, 1., -.5, +1, 0xFF, 1e10, 1_000_000, 42n, 0xFFn, Infinity, -Infinity, NaN
 	],
 	comments: {
 		/* block comments /*
@@ -22,59 +26,61 @@ backtick strings`,
 }
 ```
 
+```asonl
+{ type: 'runtime-start', pid: 25090, startedAt: '2026-03-21T22:09:31.201Z' }
+{ type: 'sessions', sessions: [{ id: '03-52i', name: 'tab 1' }] }
+{ type: 'host-released' }
+```
 
 ## Design goal
 
-ASON should be **as JavaScript-compatible as practical** while staying simple to read,
-write, diff, and stream.
+ASON parser should accept all primitive objects that JavaScript parser supports, being a superset of
+JSON, JSONC, and JSON5. The stringifier should produce human readable output by default.
 
-That means:
-- JS-style numbers: `42`, `3.14`, `.82`, `1.`, `-.5`, `+1`, `0xFF`, `1e10`, `1_000_000`, `Infinity`, `-Infinity`, `NaN`
-- JS-style strings: single quotes, double quotes, and backticks, with `\xNN`, `\v`, `\0`, and line continuations
-- JS-style object keys: unquoted identifiers (including non-ASCII like `café`) and `\uXXXX` escapes
-- JS-style commas: **commas are required between items and properties**
-- JS-style trailing commas: **allowed, never required**
-- JS-style `undefined`
+The reference implementation has no dependencies and fits under 500 lines of code.
+
+## API
+
+`ason.parse(str)` parses an ASON string into a JavaScript value
+`ason.parse(str, { comments: true })` also preserves comments as `[COMMENTS]` metadata.
+`ason.stringify(value)` print value with smart formatting (similar to prettier)
+`ason.stringify(value, 'short')` prints a compact one-line representation of value
+`ason.stringify(value, 'long')` prints a compact one-line representation of value
+
+The stringify methods print comments too if they are present, with some limitations (notably,
+comments after the last element in an object or array are not preserved).
 
 ## Format
 
 ### Values
 
-All JSON types, plus:
+The parser accepts all JSON types, plus:
+
 - Unquoted keys: `{ name: 'hal', version: 1 }` (including non-ASCII like `café`)
 - Single-quoted strings: `'hello'`
 - Backtick strings: `` `line1\nline2` `` — multiline, no interpolation
+- JSON5-style strings?
 - `undefined`
 - `NaN`, `Infinity`, `-Infinity`, `+Infinity`, `+NaN`
 - Hex numbers: `0xFF`
 - Signed numbers: `+1`, `+.5`
 - Trailing-dot numbers: `1.`
 - Numeric separators: `1_000_000`, `0xFF_FF`, `1_0e1_0`
+- BigInt literals: `42n`, `-42n`, `0xFFn`, `1_000_000n`
 - String escapes: `\xNN`, `\v`, `\0`, line continuations
 - Comments: `// line` and `/* block */`
 - Trailing commas
 
-### Example
-
-```ason
-{
-	// Main model for all sessions
-	model: 'anthropic/claude-opus-4-6',
-	theme: 'hal',
-	debug: {
-		tokens: { sys: true, spam: false },
-	},
-}
-```
-
 ## Commas
 
 Commas follow JavaScript rules:
+
 - required between properties in objects
 - required between items in arrays
 - optional after the last property/item
 
 Valid:
+
 ```ason
 { a: 1, b: 2 }
 { a: 1, b: 2, }
@@ -83,6 +89,7 @@ Valid:
 ```
 
 Invalid:
+
 ```ason
 { a: 1 b: 2 }
 [1 2 3]

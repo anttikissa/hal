@@ -13,6 +13,8 @@ describe('stringify', () => {
 		test('NaN', () => expect(stringify(NaN)).toBe('NaN'))
 		test('Infinity', () => expect(stringify(Infinity)).toBe('Infinity'))
 		test('-Infinity', () => expect(stringify(-Infinity)).toBe('-Infinity'))
+		test('bigint', () => expect(stringify(42n)).toBe('42n'))
+		test('negative bigint', () => expect(stringify(-42n)).toBe('-42n'))
 		test('simple string', () => expect(stringify('hello')).toBe("'hello'"))
 		test('empty string', () => expect(stringify('')).toBe("''"))
 		test('string with newline (smart)', () => expect(stringify('a\nb')).toBe('`a\nb`'))
@@ -184,6 +186,17 @@ describe('parse', () => {
 		test('invalid: leading underscore', () => expect(() => parse('_100')).toThrow())
 		test('invalid: trailing underscore', () => expect(() => parse('100_')).toThrow())
 		test('invalid: double underscore', () => expect(() => parse('1__0')).toThrow())
+
+		// BigInt literals
+		test('bigint integer', () => expect(parse('42n')).toBe(42n))
+		test('negative bigint integer', () => expect(parse('-42n')).toBe(-42n))
+		test('positive bigint integer', () => expect(parse('+42n')).toBe(42n))
+		test('hex bigint integer', () => expect(parse('0xFFn')).toBe(255n))
+		test('negative hex bigint integer', () => expect(parse('-0x10n')).toBe(-16n))
+		test('bigint with underscores', () => expect(parse('1_000_000n')).toBe(1000000n))
+		test('hex bigint with underscores', () => expect(parse('0xFF_FFn')).toBe(0xFFFFn))
+		test('invalid: bigint float', () => expect(() => parse('1.5n')).toThrow())
+		test('invalid: bigint exponent', () => expect(() => parse('1e2n')).toThrow())
 
 		test('NaN', () => expect(parse('NaN')).toBeNaN())
 		test('+NaN', () => expect(parse('+NaN')).toBeNaN())

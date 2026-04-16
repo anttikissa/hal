@@ -1,16 +1,18 @@
 // ASON — A Saner Object Notation
 //
 // Goal: be as JavaScript-compatible as practical while staying easy to read
-// and stream. That means JS-like numbers (`.5`, `1e10`, `Infinity`,
+// and stream. That means JS-like numbers (`.5`, `1e10`, `Infinity`, `123n`,
 // `undefined`), JS-like strings (single, double, backtick), and JS-like
 // commas: separators are required, trailing commas are allowed.
 // See docs/ason.md — keep it in sync when changing this file.
+//
+// License: MIT
 
 /** Symbol key for attaching comments to AsonObject/AsonArray. */
 export const COMMENTS = Symbol('comments')
 
 /** Any value representable in ASON. */
-export type AsonValue = string | number | boolean | null | undefined | AsonArray | AsonObject
+export type AsonValue = string | number | bigint | boolean | null | undefined | AsonArray | AsonObject
 
 /** Array with optional comment metadata per element. */
 export type AsonArray = AsonValue[] & { [COMMENTS]?: (string | undefined)[] }
@@ -55,6 +57,7 @@ function stringifyValue(obj: unknown, col: number, depth: number, maxWidth: numb
 		if (obj === -Infinity) return '-Infinity'
 		return String(obj)
 	}
+	if (typeof obj === 'bigint') return `${obj}n`
 	if (typeof obj === 'string') return quoteString(obj, maxWidth < Infinity)
 
 	if (Array.isArray(obj)) {
@@ -289,11 +292,27 @@ function parseString(ctx: Ctx, quote: string): string {
 }
 
 // Numeric separators: underscores between digits are allowed (like JS 1_000_000).
-// The regex accepts them, then we strip before Number()/parseInt().
+// The regex accepts them, then we strip before Number()/BigInt()/parseInt().
+const HEX_BIGINT_RE = /[+-]?0[xX][0-9a-fA-F]+(?:_[0-9a-fA-F]+)*n/y
+const INT_BIGINT_RE = /[+-]?[0-9]+(?:_[0-9]+)*n/y
 const HEX_RE = /[+-]?0[xX][0-9a-fA-F]+(?:_[0-9a-fA-F]+)*/y
 const NUM_RE = /[+-]?(?:[0-9]+(?:_[0-9]+)*(?:\.(?:[0-9]+(?:_[0-9]+)*)?)?|\.[0-9]+(?:_[0-9]+)*)(?:[eE][+-]?[0-9]+(?:_[0-9]+)*)?/y
 
-function parseNumber(ctx: Ctx): number {
+function parseNumber(ctx: Ctx): number | bigint {
+	HEX_BIGINT_RE.lastIndex = ctx.pos
+	const hexBig = HEX_BIGINT_RE.exec(ctx.buf)
+	if (hexBig) {
+		ctx.pos = HEX_BIGINT_RE.lastIndex
+		const literal = hexBig[0].slice(0, -1).replace(/_/g, '')
+		const sign = literal[0] === '-' ? -1n : 1n
+		return sign * BigInt(literal.replace(/^[+-]/, ''))
+	}
+	INT_BIGINT_RE.lastIndex = ctx.pos
+	const intBig = INT_BIGINT_RE.exec(ctx.buf)
+	if (intBig) {
+		ctx.pos = INT_BIGINT_RE.lastIndex
+		return BigInt(intBig[0].slice(0, -1).replace(/_/g, ''))
+	}
 	HEX_RE.lastIndex = ctx.pos
 	const hex = HEX_RE.exec(ctx.buf)
 	if (hex) {
