@@ -395,7 +395,7 @@ handlers['fork'] = (_args, session) => {
 	// Session forking requires disk operations (Plan 3). Signal intent via IPC.
 	ipc.appendCommand({
 		type: 'open',
-		text: `fork:${session.id}`,
+		forkSessionId: session.id,
 		sessionId: session.id,
 	})
 	return { handled: true }
@@ -411,7 +411,7 @@ handlers['open'] = (args, session) => {
 
 	const target = resolveTabTarget(session, targetText)
 	if (!target) return { error: `Unknown tab, session, or name: ${targetText}`, handled: true }
-	ipc.appendCommand({ type: 'open', text: `after:${target.id}`, sessionId: session.id })
+	ipc.appendCommand({ type: 'open', afterSessionId: target.id, sessionId: session.id })
 	return { output: `Opening new tab after ${target.name} (${target.id})...`, handled: true }
 }
 
@@ -449,7 +449,7 @@ handlers['move'] = (args, session) => {
 		return { output: `Tab already at ${currentPos}.`, handled: true }
 	}
 
-	ipc.appendCommand({ type: 'move', text: String(parsed.capped), sessionId: session.id })
+	ipc.appendCommand({ type: 'move', position: parsed.capped, sessionId: session.id })
 	return { output: `Moving tab to ${parsed.capped}/${parsed.max}...`, handled: true }
 }
 
@@ -498,7 +498,7 @@ handlers['mem'] = () => {
 handlers['resume'] = (args, session) => {
 	const selector = args.trim()
 	if (!selector) return { output: closedSessionLines().join('\n'), handled: true }
-	ipc.appendCommand({ type: 'resume', text: selector, sessionId: session.id })
+	ipc.appendCommand({ type: 'resume', selector, sessionId: session.id })
 	return { output: `Resuming ${selector}...`, handled: true }
 }
 

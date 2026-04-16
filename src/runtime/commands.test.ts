@@ -208,7 +208,7 @@ test('/open resolves a tab number and queues placement after it', async () => {
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
 	expect(result.output).toContain('04-bbb')
-	expect(appended).toEqual([{ type: 'open', text: 'after:04-bbb', sessionId: '04-aaa' }])
+	expect(appended).toEqual([{ type: 'open', afterSessionId: '04-bbb', sessionId: '04-aaa' }])
 })
 
 
@@ -275,7 +275,7 @@ test('/move queues a move command for another tab position', async () => {
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
 	expect(result.output).toContain('2')
-	expect(appended).toEqual([{ type: 'move', text: '2', sessionId: '04-ccc' }])
+	expect(appended).toEqual([{ type: 'move', position: 2, sessionId: '04-ccc' }])
 })
 
 
@@ -293,8 +293,8 @@ test('/move caps out-of-range positions and no-ops on current tab', async () => 
 	expect(low.output).toContain('1')
 	expect(same.output).toContain('already at 1')
 	expect(appended).toEqual([
-		{ type: 'move', text: '3', sessionId: '04-aaa' },
-		{ type: 'move', text: '1', sessionId: '04-ccc' },
+		{ type: 'move', position: 3, sessionId: '04-aaa' },
+		{ type: 'move', position: 1, sessionId: '04-ccc' },
 	])
 })
 

@@ -1,7 +1,6 @@
 import { ipc } from '../ipc.ts'
-import type { SpawnMode } from '../protocol.ts'
+import type { SpawnCommandData, SpawnMode } from '../protocol.ts'
 import { sessionIds } from '../session/ids.ts'
-import { ason } from '../utils/ason.ts'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
 interface SpawnInput {
@@ -29,10 +28,11 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalize(input, ctx)
 	if (!spec.task) return 'error: task is required'
 	const childSessionId = sessionIds.reserve()
+	const spawn: SpawnCommandData = { ...spec, childSessionId }
 	ipc.appendCommand({
 		type: 'spawn',
 		sessionId: ctx.sessionId,
-		text: ason.stringify({ ...spec, sessionId: childSessionId }, 'short'),
+		spawn,
 	})
 	return `Queued subagent spawn ${childSessionId} from ${ctx.sessionId}`
 }

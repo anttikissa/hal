@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from 'fs'
 import { ipc } from './ipc.ts'
 import type { SharedSessionInfo, SharedState } from './ipc.ts'
-import type { TokenUsage } from './protocol.ts'
+import type { Command, CommandType, TokenUsage } from './protocol.ts'
 import type { VersionStatus } from './version.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
@@ -554,11 +554,38 @@ function clearPrompt(): void {
 // Fork stays distinct because it also copies the draft from the parent.
 let pendingOpen: 'open' | 'fork' | 'resume' | false = false
 
-function sendCommand(type: string, text?: string): void {
+function sendCommand(type: CommandType, text?: string): void {
 	const tab = currentTab()
 	if (type === 'open') pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') pendingOpen = 'resume'
-	ipc.appendCommand({ type, text, sessionId: tab?.sessionId })
+	ipc.appendCommand(makeCommand(type, tab?.sessionId, text))
+}
+
+function makeCommand(type: CommandType, sessionId: string | undefined, text?: string): Command {
+	switch (type) {
+		case 'prompt':
+			return { type, sessionId, text: text ?? '' }
+		case 'open':
+			if (text?.startsWith('fork:')) return { type, sessionId, forkSessionId: text.slice(5) }
+			if (text?.startsWith('after:')) return { type, sessionId, afterSessionId: text.slice(6) }
+			return { type, sessionId }
+		case 'resume':
+			return text ? { type, sessionId, selector: text } : { type, sessionId }
+		case 'move': {
+			const position = parseInt(text ?? '', 10)
+			return { type, sessionId, position: Number.isFinite(position) ? position : 0 }
+		}
+		case 'continue':
+		case 'close':
+		case 'abort':
+		case 'reset':
+		case 'compact':
+			return { type, sessionId }
+		case 'rename':
+			return { type, sessionId, name: text ?? '' }
+		case 'spawn':
+			throw new Error('spawn commands must be created explicitly')
+	}
 }
 
 function hasTrailingAssistantText(tab: Tab, text: string): boolean {

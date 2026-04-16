@@ -24,6 +24,99 @@ export type CommandType = 'prompt' | 'continue' | 'open' | 'close' | 'resume' | 
 
 export type SpawnMode = 'fork' | 'fresh'
 
+// Commands are stored directly in commands.asonl. Keep them structured and
+// explicit so the log stays readable; never smuggle another serialized object
+// through a generic text field.
+export interface CommandBase {
+	sessionId?: string
+	createdAt?: string
+}
+
+export interface PromptCommand extends CommandBase {
+	type: 'prompt'
+	text: string
+	source?: string
+}
+
+export interface ContinueCommand extends CommandBase {
+	type: 'continue'
+}
+
+export interface OpenNewCommand extends CommandBase {
+	type: 'open'
+}
+
+export interface OpenForkCommand extends CommandBase {
+	type: 'open'
+	forkSessionId: string
+}
+
+export interface OpenAfterCommand extends CommandBase {
+	type: 'open'
+	afterSessionId: string
+}
+
+export interface CloseCommand extends CommandBase {
+	type: 'close'
+}
+
+export interface ResumeCommand extends CommandBase {
+	type: 'resume'
+	selector?: string
+}
+
+export interface AbortCommand extends CommandBase {
+	type: 'abort'
+}
+
+export interface ResetCommand extends CommandBase {
+	type: 'reset'
+}
+
+export interface CompactCommand extends CommandBase {
+	type: 'compact'
+}
+
+export interface MoveCommand extends CommandBase {
+	type: 'move'
+	position: number
+}
+
+export interface RenameCommand extends CommandBase {
+	type: 'rename'
+	name: string
+}
+
+export interface SpawnCommandData {
+	task: string
+	mode: SpawnMode
+	model?: string
+	cwd?: string
+	title?: string
+	closeWhenDone?: boolean
+	childSessionId?: string
+}
+
+export interface SpawnCommand extends CommandBase {
+	type: 'spawn'
+	spawn: SpawnCommandData
+}
+
+export type Command =
+	| PromptCommand
+	| ContinueCommand
+	| OpenNewCommand
+	| OpenForkCommand
+	| OpenAfterCommand
+	| CloseCommand
+	| ResumeCommand
+	| AbortCommand
+	| ResetCommand
+	| CompactCommand
+	| MoveCommand
+	| RenameCommand
+	| SpawnCommand
+
 // ── Tool call types ──
 
 export type ToolName =

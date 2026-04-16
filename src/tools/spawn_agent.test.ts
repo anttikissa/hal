@@ -3,7 +3,6 @@ import { existsSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { ipc } from '../ipc.ts'
-import { ason } from '../utils/ason.ts'
 import { spawnAgent } from './spawn_agent.ts'
 
 const origAppendCommand = ipc.appendCommand
@@ -33,8 +32,8 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 
 	const result = await spawnAgent.execute({ task: 'Investigate foo' }, { sessionId: '04-parent', cwd: '/tmp/project' })
 	const queued = appended[0]
-	const parsed = ason.parse(String(queued.text)) as Record<string, unknown>
-	const childSessionId = String(parsed.sessionId ?? '')
+	const spawn = queued.spawn
+	const childSessionId = String(spawn?.childSessionId ?? '')
 
 	expect(result).toContain('04-parent')
 	expect(result).toContain(childSessionId)
@@ -43,7 +42,7 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 		type: 'spawn',
 		sessionId: '04-parent',
 	})
-	expect(parsed).toMatchObject({
+	expect(spawn).toMatchObject({
 		task: 'Investigate foo',
 		mode: 'fork',
 		cwd: '/tmp/project',
@@ -64,15 +63,15 @@ test('spawn_agent passes through fresh mode and closeWhenDone', async () => {
 		{ task: 'Research bar', mode: 'fresh', model: 'openai/gpt-5', cwd: '/work', title: 'Bar scout', closeWhenDone: true },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
-	const parsed = ason.parse(String(appended[0]?.text)) as Record<string, unknown>
-	const childSessionId = String(parsed.sessionId ?? '')
+	const spawn = appended[0]?.spawn
+	const childSessionId = String(spawn?.childSessionId ?? '')
 
 	expect(result).toContain(childSessionId)
 	expect(appended[0]).toMatchObject({
 		type: 'spawn',
 		sessionId: '04-parent',
 	})
-	expect(parsed).toMatchObject({
+	expect(spawn).toMatchObject({
 		task: 'Research bar',
 		mode: 'fresh',
 		model: 'openai/gpt-5',

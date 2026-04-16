@@ -221,7 +221,7 @@ describe("tabs", () => {
 		const rightTabId = beforeFork[1]!
 
 		const commandPath = join(tmpDir, "ipc", "commands.asonl")
-		const forkCommand = ason.stringify({ type: 'open', text: `fork:${parentId}`, sessionId: parentId, createdAt: new Date().toISOString() }, 'short')
+		const forkCommand = ason.stringify({ type: 'open', forkSessionId: parentId, sessionId: parentId, createdAt: new Date().toISOString() }, 'short')
 		Bun.write(commandPath, `${readFileSync(commandPath, 'utf-8')}${forkCommand}\n`)
 
 		const forkDeadline = Date.now() + 2000
@@ -261,7 +261,7 @@ describe("tabs", () => {
 		const rightTabId = beforeOpen[1]!
 
 		const commandPath = join(tmpDir, "ipc", "commands.asonl")
-		const openCommand = ason.stringify({ type: 'open', text: `after:${targetId}`, sessionId: targetId, createdAt: new Date().toISOString() }, 'short')
+		const openCommand = ason.stringify({ type: 'open', afterSessionId: targetId, sessionId: targetId, createdAt: new Date().toISOString() }, 'short')
 		Bun.write(commandPath, `${readFileSync(commandPath, 'utf-8')}${openCommand}\n`)
 
 		const openDeadline = Date.now() + 2000
@@ -303,7 +303,7 @@ describe("tabs", () => {
 		const secondId = beforeMove[1]!
 
 		const commandPath = join(tmpDir, "ipc", "commands.asonl")
-		const moveCommand = ason.stringify({ type: 'move', text: '1', sessionId: movedId, createdAt: new Date().toISOString() }, 'short')
+		const moveCommand = ason.stringify({ type: 'move', position: 1, sessionId: movedId, createdAt: new Date().toISOString() }, 'short')
 		Bun.write(commandPath, `${readFileSync(commandPath, 'utf-8')}${moveCommand}\n`)
 
 		const moveDeadline = Date.now() + 4000

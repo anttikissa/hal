@@ -6,6 +6,7 @@ import { ason } from './utils/ason.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { tails } from './utils/tail-file.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
+import type { Command } from './protocol.ts'
 import type { VersionStatus } from './version.ts'
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
@@ -52,17 +53,27 @@ function ensureFile(file: string): void {
 	if (!existsSync(file)) writeFileSync(file, '')
 }
 
-function append(file: string, item: any): void {
+function stripUndefined(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map((item) => stripUndefined(item))
+	if (!value || typeof value !== 'object') return value
+	const entries = Object.entries(value)
+	const clean = entries
+		.filter(([, item]) => item !== undefined)
+		.map(([key, item]) => [key, stripUndefined(item)])
+	return Object.fromEntries(clean)
+}
+
+function append(file: string, item: unknown): void {
 	ensureDir(IPC_DIR)
 	ensureFile(file)
-	appendFileSync(file, ason.stringify(item, 'short') + '\n')
+	appendFileSync(file, ason.stringify(stripUndefined(item), 'short') + '\n')
 }
 
 function appendEvent(event: any): void {
 	append(EVENTS_FILE, { ...event, createdAt: event.createdAt ?? new Date().toISOString() })
 }
 
-function appendCommand(command: any): void {
+function appendCommand(command: Command): void {
 	append(COMMANDS_FILE, { ...command, createdAt: command.createdAt ?? new Date().toISOString() })
 }
 
@@ -79,8 +90,8 @@ function tailEvents(signal?: AbortSignal) {
 	return tail(EVENTS_FILE, signal)
 }
 
-function tailCommands(signal?: AbortSignal) {
-	return tail(COMMANDS_FILE, signal)
+function tailCommands(signal?: AbortSignal): AsyncGenerator<Command> {
+	return tail(COMMANDS_FILE, signal) as AsyncGenerator<Command>
 }
 
 interface HostLock {

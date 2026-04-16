@@ -84,7 +84,7 @@ test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 't', shift: true, ctrl: true, alt: false, cmd: false })
 		expect(handled).toBe(true)
-		expect(commands).toEqual([{ type: 'resume', text: undefined, sessionId: '04-bbb' }])
+		expect(commands).toEqual([{ type: 'resume', sessionId: '04-bbb' }])
 	} finally {
 		ipc.appendCommand = origAppendCommand
 		client.state.tabs.length = 0
@@ -128,7 +128,7 @@ test('enter on empty paused tab sends continue', () => {
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 		expect(handled).toBe(true)
-		expect(commands).toEqual([{ type: 'continue', text: undefined, sessionId: 's1' }])
+		expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
 	} finally {
 		ipc.appendCommand = origAppendCommand
 		client.state.tabs.length = 0

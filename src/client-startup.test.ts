@@ -297,7 +297,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		client.switchTab(1)
 		client.sendCommand('open')
-		expect(appendedCommands).toEqual([{ type: 'open', text: undefined, sessionId: 's2' }])
+		expect(appendedCommands).toEqual([{ type: 'open', sessionId: 's2' }])
 
 		shared.sessions = ['s1', 's2', 's3']
 		shared.openSessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
@@ -334,7 +334,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		client.switchTab(1)
 		client.sendCommand('resume')
-		expect(appendedCommands).toEqual([{ type: 'resume', text: undefined, sessionId: 's2' }])
+		expect(appendedCommands).toEqual([{ type: 'resume', sessionId: 's2' }])
 
 		shared.sessions = ['s1', 's2', 's3']
 		shared.openSessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
@@ -365,7 +365,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		client.switchTab(2)
 		client.sendCommand('move', '1')
-		expect(appendedCommands).toEqual([{ type: 'move', text: '1', sessionId: 's3' }])
+		expect(appendedCommands).toEqual([{ type: 'move', position: 1, sessionId: 's3' }])
 
 		shared.sessions = ['s3', 's1', 's2']
 		shared.openSessions = ['s3', 's1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))

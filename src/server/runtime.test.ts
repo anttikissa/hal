@@ -127,7 +127,7 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 			cwd: '/work/child',
 			title: 'Child tab',
 			closeWhenDone: true,
-			sessionId: '04-kid',
+			childSessionId: '04-kid',
 		})
 
 		expect(child.model).toBe('openai/gpt-5')

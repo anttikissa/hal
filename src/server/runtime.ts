@@ -13,11 +13,11 @@
 import { appendFileSync } from 'fs'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
+import type { Command, SpawnCommandData } from '../protocol.ts'
 import { models } from '../models.ts'
 import { sessions as sessionStore } from './sessions.ts'
 import { commands } from '../runtime/commands.ts'
 import type { SessionState } from '../runtime/commands.ts'
-import type { SpawnMode } from '../protocol.ts'
 import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
@@ -65,14 +65,31 @@ function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err)
 }
 
-interface SpawnSpec {
-	task: string
-	mode: SpawnMode
-	model?: string
-	cwd?: string
-	title?: string
-	closeWhenDone?: boolean
-	sessionId?: string
+type SpawnSpec = SpawnCommandData
+
+function commandPreview(cmd: Command): string | undefined {
+	switch (cmd.type) {
+		case 'prompt':
+			return cmd.text.slice(0, 120)
+		case 'open':
+			if ('forkSessionId' in cmd) return `fork:${cmd.forkSessionId}`
+			if ('afterSessionId' in cmd) return `after:${cmd.afterSessionId}`
+			return undefined
+		case 'resume':
+			return cmd.selector?.slice(0, 120)
+		case 'move':
+			return String(cmd.position)
+		case 'rename':
+			return cmd.name.slice(0, 120)
+		case 'spawn':
+			return cmd.spawn.task.slice(0, 120)
+		default:
+			return undefined
+	}
+}
+
+function commandSource(cmd: Command): string | undefined {
+	return cmd.type === 'prompt' ? cmd.source : undefined
 }
 
 function shouldCloseSessionAfterGeneration(
@@ -206,8 +223,8 @@ function queuePromptCommand(sessionId: string, text: string, source?: string): v
 async function spawnSession(parent: Session, spec: SpawnSpec): Promise<Session> {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
 	const child = mode === 'fork'
-		? await createForkSession(parent.id, spec.sessionId)
-		: createSession(undefined, parent.id, spec.sessionId)
+		? await createForkSession(parent.id, spec.childSessionId)
+		: createSession(undefined, parent.id, spec.childSessionId)
 	child.cwd = spec.cwd || (mode === 'fork' ? child.cwd : parent.cwd)
 	child.model = spec.model || (mode === 'fork' ? child.model : parent.model)
 	child.name = spec.title || child.name
@@ -585,19 +602,17 @@ async function runCompact(session: Session): Promise<void> {
 // (abort, new prompts, tab operations) are stuck until generation finishes.
 // Generation is fire-and-forget; the agent loop communicates results via IPC events.
 
-async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
+async function handleCommand(cmd: Command, signal: AbortSignal): Promise<void> {
 	const sessionId = cmd.sessionId
 	const session = sessionId ? findSession(sessionId) : activeSessions[0]
 
-		switch (cmd.type) {
-			case 'prompt': {
-				if (!session) return
-				const source = typeof cmd.source === 'string' ? cmd.source : undefined
-				// Fire-and-forget: don't block the command loop on generation.
-				void dispatchPromptCommand(session, cmd.text ?? '', source)
-				break
-			}
-
+	switch (cmd.type) {
+		case 'prompt': {
+			if (!session) return
+			// Fire-and-forget: don't block the command loop on generation.
+			void dispatchPromptCommand(session, cmd.text, cmd.source)
+			break
+		}
 
 		case 'continue': {
 			if (!session) return
@@ -626,15 +641,14 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		}
 
 		case 'open': {
-			if (typeof cmd.text === 'string' && cmd.text.startsWith('fork:')) {
-				const parentId = cmd.text.slice(5)
+			if ('forkSessionId' in cmd) {
+				const parentId = cmd.forkSessionId
 				const child = await createForkSession(parentId)
 				const msg = `forked ${parentId} → ${child.id}`
 				emitInfo(parentId, msg)
 				emitInfo(child.id, msg)
-			} else if (typeof cmd.text === 'string' && cmd.text.startsWith('after:')) {
-				const afterId = cmd.text.slice(6)
-				createSession(session, afterId)
+			} else if ('afterSessionId' in cmd) {
+				createSession(session, cmd.afterSessionId)
 			} else {
 				createSession(session)
 			}
@@ -644,9 +658,8 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 
 		case 'spawn': {
 			if (!session) return
-			const raw = typeof cmd.text === 'string' ? cmd.text : ''
-			const parsed = ason.parse(raw || '{}') as Partial<SpawnSpec>
-			if (!parsed.task || typeof parsed.task !== 'string') {
+			const parsed = cmd.spawn
+			if (!parsed.task.trim()) {
 				emitInfo(session.id, 'Spawn task is required', 'error')
 				break
 			}
@@ -657,7 +670,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 				cwd: parsed.cwd,
 				title: parsed.title,
 				closeWhenDone: !!parsed.closeWhenDone,
-				sessionId: typeof parsed.sessionId === 'string' && parsed.sessionId.trim() ? parsed.sessionId.trim() : undefined,
+				childSessionId: typeof parsed.childSessionId === 'string' && parsed.childSessionId.trim() ? parsed.childSessionId.trim() : undefined,
 			}
 			const child = await spawnSession(session, spec)
 			broadcastSessions()
@@ -666,7 +679,7 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 		}
 
 		case 'resume': {
-			const selector = String(cmd.text ?? '').trim()
+			const selector = (cmd.selector ?? '').trim()
 			const resumeId = resolveResumeTarget(
 				sessionStore.loadAllSessionMetas(),
 				new Set(activeSessions.map((s) => s.id)),
@@ -694,9 +707,8 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 
 		case 'move': {
 			if (!sessionId) return
-			const targetPos = parseInt(String(cmd.text ?? ''), 10)
-			if (!Number.isFinite(targetPos)) return
-			if (moveSessionToIndex(sessionId, targetPos - 1)) broadcastSessions()
+			if (!Number.isFinite(cmd.position)) return
+			if (moveSessionToIndex(sessionId, cmd.position - 1)) broadcastSessions()
 			break
 		}
 
@@ -814,11 +826,11 @@ function startRuntime(signal: AbortSignal): void {
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			logCommandPump('loop-received', {
-				cmdType: cmd?.type,
-				sessionId: cmd?.sessionId,
-				source: cmd?.source,
-				createdAt: cmd?.createdAt,
-				textPreview: typeof cmd?.text === 'string' ? cmd.text.slice(0, 120) : undefined,
+				cmdType: cmd.type,
+				sessionId: cmd.sessionId,
+				source: commandSource(cmd),
+				createdAt: cmd.createdAt,
+				textPreview: commandPreview(cmd),
 				activeSessions: activeSessions.map((session) => session.id),
 			})
 			if (signal.aborted || activeRuntimePid !== process.pid) {
