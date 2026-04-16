@@ -366,7 +366,6 @@ handlers['help'] = (args) => {
 	]
 	return { output: lines.join('\n'), handled: true }
 }
-
 // /model [name] — switch model or show current + list
 handlers['model'] = (args, session, emitInfo) => {
 	if (!args) {
@@ -711,17 +710,6 @@ handlers['config'] = (args) => {
 }
 
 
-// /show — old compatibility shim. Point users at the real commands instead.
-handlers['show'] = (args) => {
-	const what = args.trim()
-	if (!what || what === 'prompt' || what === 'system') {
-		return { output: 'Use /system for the full prompt.', handled: true }
-	}
-	if (what === 'config' || what === 'agentLoop') {
-		return { output: 'Use /config or /config agentLoop.', handled: true }
-	}
-	return { error: 'Use /system for the prompt, /config for config, and /help for commands.', handled: true }
-}
 
 // /exit — quit
 handlers['exit'] = () => {

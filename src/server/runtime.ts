@@ -378,9 +378,9 @@ async function handlePrompt(session: Session, text: string, label?: 'steering', 
 	await runGeneration(session, text, source)
 }
 
-async function dispatchPromptCommand(session: Session, text: string, source?: string, forceSteering = false): Promise<void> {
-	const steering = forceSteering || agentLoop.isActive(session.id)
-	if (steering && agentLoop.isActive(session.id)) {
+async function dispatchPromptCommand(session: Session, text: string, source?: string): Promise<void> {
+	const steering = agentLoop.isActive(session.id)
+	if (steering) {
 		agentLoop.abort(session.id)
 		// Brief yield so the abort propagates before we start a new generation.
 		await Bun.sleep(50)
@@ -472,13 +472,6 @@ function publishContextEstimate(session: Session): void {
 	const messages = apiMessages.toProviderMessages(session.id)
 	const est = context.estimateContext(messages, model, overheadBytes)
 	void sessionStore.updateMeta(session.id, { context: { used: est.used, max: est.max } })
-	ipc.appendEvent({
-		type: 'status',
-		sessionId: session.id,
-		contextUsed: est.used,
-		contextMax: est.max,
-		createdAt: new Date().toISOString(),
-	})
 }
 
 async function runReset(session: Session): Promise<void> {
@@ -555,14 +548,6 @@ async function handleCommand(cmd: any, signal: AbortSignal): Promise<void> {
 				break
 			}
 
-			case 'steer': {
-				if (!session) return
-				const source = typeof cmd.source === 'string' ? cmd.source : undefined
-				// Legacy compatibility: older clients can still send explicit steer
-				// commands, but new prompts now go through the prompt path too.
-				void dispatchPromptCommand(session, cmd.text ?? '', source, true)
-				break
-			}
 
 		case 'continue': {
 			if (!session) return

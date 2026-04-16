@@ -403,22 +403,6 @@ test('/config accepts a bare string value', async () => {
 	expect(models.config.default).toBe('gpt')
 })
 
-test('/show config points to /config instead of duplicating it', async () => {
-	const result = await commands.executeCommand('/show config', makeSession(), () => {})
-
-	expect(result.handled).toBe(true)
-	expect(result.error).toBeUndefined()
-	expect(result.output).toContain('/config')
-	expect(result.output).not.toContain('Config overrides:')
-})
-
-test('/show with no topic points to /system', async () => {
-	const result = await commands.executeCommand('/show', makeSession(), () => {})
-
-	expect(result.handled).toBe(true)
-	expect(result.error).toBeUndefined()
-	expect(result.output).toContain('/system')
-})
 
 
 test('/system reflects updated prompt files', async () => {

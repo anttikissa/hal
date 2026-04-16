@@ -272,7 +272,8 @@ describe('render', () => {
 			cwd: '/tmp',
 			model: 'test',
 		})
-		client.handleEvent({ type: 'status', sessionId: 'other', busy: true, activity: 'generating...' })
+		client.state.busy.set('other', true)
+		client.state.activity.set('other', 'generating...')
 		client.handleEvent({
 			type: 'info',
 			sessionId: 'other',
@@ -280,7 +281,8 @@ describe('render', () => {
 			level: 'error',
 			createdAt: new Date(0).toISOString(),
 		})
-		client.handleEvent({ type: 'status', sessionId: 'other', busy: false, activity: '' })
+		client.state.busy.delete('other')
+		client.state.activity.delete('other')
 
 		expect(client.state.tabs[1]?.history[0]).toMatchObject({
 			type: 'error',

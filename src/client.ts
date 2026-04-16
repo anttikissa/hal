@@ -752,7 +752,7 @@ function applySharedState(shared: SharedState): void {
 }
 
 function handleEvent(event: any): void {
-	if (event.type === 'host-released' || event.type === 'sessions' || event.type === 'status') return
+	if (event.type === 'host-released') return
 	if (event.type === 'runtime-start') {
 		if (event.pid !== state.pid) showServerRestart(event.pid, event.startedAt)
 		return
