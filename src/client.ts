@@ -187,12 +187,39 @@ function pruneRecentTabs(openIds: Set<string>): void {
 	state.recentTabs = state.recentTabs.filter((id) => openIds.has(id))
 }
 
-function mostRecentSurvivingTab(): string | null {
-	for (let i = state.recentTabs.length - 1; i >= 0; i--) {
-		const sessionId = state.recentTabs[i]!
-		if (state.tabs.some((tab) => tab.sessionId === sessionId)) return sessionId
+export function pickActiveSessionAfterSessionListChange(opts: {
+	previousSession: string
+	previousIndex: number
+	previousLength: number
+	newSessionIds: string[]
+	recentTabs: string[]
+	pendingOpen: 'open' | 'fork' | 'resume' | false
+	openedSessionId: string
+}): string {
+	const { previousSession, previousIndex, previousLength, newSessionIds, recentTabs, pendingOpen, openedSessionId } = opts
+	const openIds = new Set(newSessionIds)
+	const grew = newSessionIds.length > previousLength
+	const shrank = newSessionIds.length < previousLength
+	const activeTabClosed = previousSession !== '' && !openIds.has(previousSession)
+
+	if (grew && pendingOpen && openedSessionId) return openedSessionId
+	if (previousSession && openIds.has(previousSession)) return previousSession
+
+	// If the active tab was closed, stay at the same numeric slot when possible.
+	// Example: closing tab 24 should focus what used to be tab 25, now in slot 24.
+	// Only when the closed tab was the last one do we fall back to the new last tab.
+	if (shrank && activeTabClosed) {
+		const sameSlot = Math.min(previousIndex, newSessionIds.length - 1)
+		return newSessionIds[sameSlot] ?? ''
 	}
-	return null
+
+	for (let i = recentTabs.length - 1; i >= 0; i--) {
+		const sessionId = recentTabs[i]!
+		if (openIds.has(sessionId)) return sessionId
+	}
+
+	const fallbackIndex = previousIndex > 0 ? Math.min(previousIndex - 1, newSessionIds.length - 1) : 0
+	return newSessionIds[fallbackIndex] ?? newSessionIds[0] ?? ''
 }
 
 function touchTab(tab: Tab): void {
@@ -597,18 +624,15 @@ function applySessionList(items: SharedSessionInfo[]): void {
 	const openIds = new Set(newTabs.map((tab) => tab.sessionId))
 	pruneRecentTabs(openIds)
 
-	const activeTabClosed = previousSession !== '' && !openIds.has(previousSession)
-	const closedLastTab = shrank && activeTabClosed && previousIndex >= newTabs.length
-	let targetSession = previousSession && openIds.has(previousSession) ? previousSession : ''
-	if (grew && pendingOpen && openedSessionId) targetSession = openedSessionId
-	// Closing the rightmost tab should move focus to its new neighbor on the left,
-	// even if some older tab was visited more recently.
-	if (!targetSession && closedLastTab) targetSession = newTabs[newTabs.length - 1]?.sessionId ?? ''
-	if (!targetSession) targetSession = mostRecentSurvivingTab() ?? ''
-	if (!targetSession) {
-		const fallbackIndex = previousIndex > 0 ? Math.min(previousIndex - 1, newTabs.length - 1) : 0
-		targetSession = newTabs[fallbackIndex]?.sessionId ?? newTabs[0]?.sessionId ?? ''
-	}
+	const targetSession = pickActiveSessionAfterSessionListChange({
+		previousSession,
+		previousIndex,
+		previousLength: previousTabs.length,
+		newSessionIds: newTabs.map((tab) => tab.sessionId),
+		recentTabs: state.recentTabs,
+		pendingOpen,
+		openedSessionId,
+	})
 
 	const nextIndex = newTabs.findIndex((tab) => tab.sessionId === targetSession)
 	state.activeTab = nextIndex >= 0 ? nextIndex : Math.max(0, Math.min(previousIndex, newTabs.length - 1))

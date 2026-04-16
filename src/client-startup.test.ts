@@ -352,7 +352,7 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s3')
 	})
 
-	test('closing a forked middle tab returns to the parent tab, not the tab on the right', async () => {
+	test('closing a middle tab keeps focus on the tab that slides into its slot', async () => {
 		const shared = makeSharedState(['s1', 's3', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: (() => void) | undefined
@@ -378,7 +378,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.sessionId).toBe('s1')
+		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
 	test('restores unseen-done checkmarks from client state on startup', async () => {
