@@ -145,6 +145,15 @@ function onSigcont(): void {
 	draw(true)
 }
 
+function handleStdinClosed(): void {
+	// Non-interactive callers (tests, scripts, editor integrations) often pipe
+	// stdin to Hal. If that pipe closes, there is nobody left to drive the UI,
+	// so keeping timers, file watchers and host-election polling alive only leaks
+	// an orphaned background process. TTY users do not hit this path.
+	if (process.stdin.isTTY) return
+	exitCli(0)
+}
+
 const rawState = {
 	active: false,
 	pending: [] as string[],
@@ -433,6 +442,11 @@ function startCli(signal: AbortSignal): void {
 		process.stdout.write(BRACKETED_PASTE_ON)
 		writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 	}
+	else {
+		// Pipe-backed stdin stays paused unless we resume it. Without this, EOF from
+		// a dead parent test runner/editor never reaches our end/close handlers.
+		process.stdin.resume()
+	}
 	// Safety net: if we exit without hitting an explicit cleanup path
 	// (e.g. SIGTERM, uncaught exception), this still restores the terminal.
 	process.on('exit', cleanupTerminal)
@@ -512,6 +526,8 @@ function startCli(signal: AbortSignal): void {
 			}
 		}
 	})
+	process.stdin.on('end', handleStdinClosed)
+	process.stdin.on('close', handleStdinClosed)
 }
 
 // Keep client.state in sync with prompt state (for rendering)
