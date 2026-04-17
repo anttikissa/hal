@@ -2,14 +2,18 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { mkdtempSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
+import { cleanupSpawned } from "./process-cleanup.ts"
 
 let tmpDir: string
+let procs: Array<ReturnType<typeof Bun.spawn>>
 
 beforeEach(() => {
 	tmpDir = mkdtempSync(join(tmpdir(), "hal-test-"))
+	procs = []
 })
 
-afterEach(() => {
+afterEach(async () => {
+	await cleanupSpawned(procs)
 	rmSync(tmpDir, { recursive: true, force: true })
 })
 
@@ -32,6 +36,7 @@ describe("perf", () => {
 				HOME: process.env.HOME,
 			},
 		})
+		procs.push(proc)
 		// Wait for startup summary to render
 		await Bun.sleep(500)
 		proc.stdin!.write(new Uint8Array([0x03]))

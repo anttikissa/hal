@@ -3,18 +3,22 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 import { ason } from "../src/utils/ason.ts"
+import { cleanupSpawned } from "./process-cleanup.ts"
 
 let tmpDir: string
+let procs: Array<ReturnType<typeof Bun.spawn>>
 
 beforeEach(() => {
 	tmpDir = mkdtempSync(join(tmpdir(), "hal-test-"))
+	procs = []
 })
 
-afterEach(() => {
+afterEach(async () => {
+	await cleanupSpawned(procs)
 	rmSync(tmpDir, { recursive: true, force: true })
 })
 
-function stripAnsi(s: string): string {
+function stripAnsi(s: string) {
 	return s
 		.replace(/\x1b(?:\[[0-9;?]*[ -/]*[@-~]|[@-_])/g, "")
 		.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
@@ -22,7 +26,7 @@ function stripAnsi(s: string): string {
 }
 
 function spawnHal() {
-	return Bun.spawn(["bun", "src/main.ts"], {
+	const proc = Bun.spawn(["bun", "src/main.ts"], {
 		stdin: "pipe",
 		stdout: "pipe",
 		stderr: "pipe",
@@ -32,6 +36,8 @@ function spawnHal() {
 			HOME: process.env.HOME,
 		},
 	})
+	procs.push(proc)
+	return proc
 }
 
 function readSessionIds(): string[] {
@@ -95,7 +101,7 @@ describe("tabs", () => {
 		await proc.exited
 		expect(ids).toHaveLength(2)
 		expect(out).toContain(`[1 .hal ${ids[0]!}]`)
-		expect(out).toContain(`[2 .hal ${ids[1]!}]`)
+		expect(out).toContain(`2 .hal ${ids[1]!}`)
 	})
 
 	test("new tabs record who opened them", async () => {

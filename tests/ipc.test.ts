@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, readFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { cleanupSpawned } from './process-cleanup.ts'
 
 function sendCtrlC(proc: { stdin: any }) {
 	proc.stdin!.write(new Uint8Array([0x03]))
@@ -12,20 +13,25 @@ const HAL_DIR = join(import.meta.dir, '..')
 const MAIN = join(HAL_DIR, 'src/main.ts')
 
 let tmpDir: string
+let procs: Array<ReturnType<typeof Bun.spawn>>
 
 beforeEach(() => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'hal-test-'))
+	procs = []
 })
 
-afterEach(() => {
+afterEach(async () => {
+	await cleanupSpawned(procs)
 	rmSync(tmpDir, { recursive: true, force: true })
 })
 
 function spawnHal(env: Record<string, string | undefined>) {
-	return Bun.spawn(['bun', MAIN], {
+	const proc = Bun.spawn(['bun', MAIN], {
 		stdin: 'pipe', stdout: 'pipe', stderr: 'pipe',
 		env, cwd: HAL_DIR,
 	})
+	procs.push(proc)
+	return proc
 }
 
 function halEnv(): Record<string, string | undefined> {

@@ -3,23 +3,27 @@ import { mkdtempSync, rmSync, readFileSync, readdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { ason } from '../src/utils/ason.ts'
+import { cleanupSpawned } from './process-cleanup.ts'
 
 let tmpDir: string
+let procs: Array<ReturnType<typeof Bun.spawn>>
 
 beforeEach(() => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'hal-test-'))
+	procs = []
 })
 
-afterEach(() => {
+afterEach(async () => {
+	await cleanupSpawned(procs)
 	rmSync(tmpDir, { recursive: true, force: true })
 })
 
-function stripAnsi(s: string): string {
+function stripAnsi(s: string) {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
 function spawnHal() {
-	return Bun.spawn(['bun', 'src/main.ts'], {
+	const proc = Bun.spawn(['bun', 'src/main.ts'], {
 		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
@@ -29,7 +33,10 @@ function spawnHal() {
 			HOME: process.env.HOME,
 		},
 	})
+	procs.push(proc)
+	return proc
 }
+
 
 async function readOnlySessionHistory(): Promise<any[]> {
 	const text = readFileSync(await waitForOnlySessionHistoryPath(), 'utf-8')
@@ -77,6 +84,7 @@ describe('main', () => {
 		const code = await proc.exited
 		expect(code).toBe(100)
 	})
+
 
 	test('persists history across restarts', async () => {
 		const marker = `marker-${Date.now()}`
@@ -132,6 +140,7 @@ describe('main', () => {
 				TERM_PROGRAM: 'iTerm.app',
 			},
 		})
+		procs.push(proc)
 		await Bun.sleep(150)
 		proc.stdin!.write('\x1b[109;5u')
 		proc.stdin!.flush()
