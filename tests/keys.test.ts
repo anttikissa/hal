@@ -12,6 +12,11 @@ describe('keys', () => {
 		expect(keys.parseKey('\x1b[118;9u')).toEqual({ key: 'v', shift: false, alt: false, ctrl: false, cmd: true })
 	})
 
+	test('parses cmd-left and cmd-right from CSI modifiers', () => {
+		expect(keys.parseKey('\x1b[1;9D')).toEqual({ key: 'left', shift: false, alt: false, ctrl: false, cmd: true })
+		expect(keys.parseKey('\x1b[1;9C')).toEqual({ key: 'right', shift: false, alt: false, ctrl: false, cmd: true })
+	})
+
 	test('parses ctrl-shift-tab from kitty CSI-u', () => {
 		expect(keys.parseKey('\x1b[9;6u')).toEqual({ key: 'tab', shift: true, alt: false, ctrl: true, cmd: false })
 	})

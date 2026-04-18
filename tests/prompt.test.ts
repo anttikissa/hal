@@ -28,6 +28,14 @@ describe('prompt', () => {
 		expect(prompt.cursorPos()).toBe('hello brave'.length)
 	})
 
+	test('cmd-left and cmd-right stop at word edges inside punctuation', () => {
+		prompt.setText('Especially: (paren)', 'Especially: (paren)'.length)
+		prompt.handleKey(key('left', { cmd: true }), 80)
+		expect(prompt.cursorPos()).toBe('Especially: ('.length)
+		prompt.handleKey(key('right', { cmd: true }), 80)
+		expect(prompt.cursorPos()).toBe('Especially: (paren'.length)
+	})
+
 	test('cmd-a then backspace clears multiline selection', () => {
 		prompt.setText('foo\nbar')
 		prompt.handleKey(key('a', { cmd: true }), 80)

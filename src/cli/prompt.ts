@@ -89,6 +89,7 @@ function verticalMove(
 	}
 }
 
+
 function wordLeft(text: string, pos: number): number {
 	let i = pos - 1
 	while (i > 0 && /\s/.test(text[i]!)) i--
@@ -100,6 +101,27 @@ function wordRight(text: string, pos: number): number {
 	let i = pos
 	while (i < text.length && /\s/.test(text[i]!)) i++
 	while (i < text.length && !/\s/.test(text[i]!)) i++
+	return i
+}
+
+// Cmd+Left/Right on macOS should move by the next word token, not by a whole
+// whitespace-delimited chunk. In `(paren)`, moving left from the end should
+// land between `(` and `paren`, skipping closing punctuation first.
+function isWordTokenChar(ch: string): boolean {
+	return /[\p{L}\p{N}\p{M}_]/u.test(ch)
+}
+
+function cmdWordLeft(text: string, pos: number): number {
+	let i = pos
+	while (i > 0 && !isWordTokenChar(text[i - 1]!)) i--
+	while (i > 0 && isWordTokenChar(text[i - 1]!)) i--
+	return i
+}
+
+function cmdWordRight(text: string, pos: number): number {
+	let i = pos
+	while (i < text.length && !isWordTokenChar(text[i]!)) i++
+	while (i < text.length && isWordTokenChar(text[i]!)) i++
 	return i
 }
 
@@ -333,6 +355,14 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		if (k.key === 'a') {
 			selAnchor = 0
 			cursor = buf.length
+			return true
+		}
+		if (k.key === 'left') {
+			move(cmdWordLeft(buf, cursor), k.shift)
+			return true
+		}
+		if (k.key === 'right') {
+			move(cmdWordRight(buf, cursor), k.shift)
 			return true
 		}
 		if (k.key === 'u' && k.shift) {
