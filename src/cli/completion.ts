@@ -12,19 +12,6 @@ export interface CompletionResult {
 	start: number
 }
 
-type CommandArg = 'model' | 'dir' | 'command' | 'config'
-
-const COMMAND_ARGS: Record<string, CommandArg> = {
-	help: 'command',
-	model: 'model',
-	cd: 'dir',
-	config: 'config',
-}
-
-function commandNames(): string[] {
-	// /raw is handled locally in the CLI, so completion adds it explicitly.
-	return [...new Set([...commands.commandNames(), 'raw'])].sort()
-}
 
 const config = {
 	modelNames: [
@@ -113,22 +100,6 @@ function completeDirs(argPrefix: string, cwd: string): string[] {
 	return matching.map((dir) => base + dir + '/')
 }
 
-function listConfigPaths(): string[] {
-	const out: string[] = []
-
-	function visit(prefix: string, value: unknown): void {
-		out.push(prefix)
-		if (!value || typeof value !== 'object' || Array.isArray(value)) return
-		for (const key of Object.keys(value as Record<string, any>).sort()) {
-			visit(`${prefix}.${key}`, (value as Record<string, any>)[key])
-		}
-	}
-
-	for (const name of Object.keys(runtimeConfig.modules).sort()) {
-		visit(name, runtimeConfig.modules[name])
-	}
-	return out
-}
 
 function complete(text: string, cursor: number): CompletionResult | null {
 	if (cursor < 0 || cursor > text.length) cursor = text.length
@@ -143,8 +114,7 @@ function complete(text: string, cursor: number): CompletionResult | null {
 
 	if (parts.length === 0 || (parts.length === 1 && !hasSpace)) {
 		const needle = parts[0] ?? ''
-		const names = commandNames()
-		const matches = names.filter((name) => name.startsWith(needle))
+		const matches = commands.commandNames().filter((name) => name.startsWith(needle))
 		if (matches.length === 0) return null
 
 		const items = matches.map((name) => `/${name}`)
@@ -153,7 +123,7 @@ function complete(text: string, cursor: number): CompletionResult | null {
 	}
 
 	const command = parts[0]!
-	const arg = COMMAND_ARGS[command]
+	const arg = commands.commandArg(command)
 	if (!arg) return null
 	if (parts.length > 2) return null
 
@@ -165,9 +135,9 @@ function complete(text: string, cursor: number): CompletionResult | null {
 	} else if (arg === 'dir') {
 		values = completeDirs(argPrefix, process.cwd())
 	} else if (arg === 'command') {
-		values = commandNames().filter((name) => name.startsWith(argPrefix))
+		values = commands.commandNames().filter((name) => name.startsWith(argPrefix))
 	} else {
-		values = listConfigPaths().filter((path) => path.startsWith(argPrefix))
+		values = runtimeConfig.listPaths().filter((path) => path.startsWith(argPrefix))
 	}
 
 	if (values.length === 0) return null

@@ -76,7 +76,7 @@ test('/send resolves a tab number', async () => {
 		sent.push({ sessionId, text, from })
 	}
 
-	const result = await commands.executeCommand('/send 2 hello there', makeSession(), () => {})
+	const result = await commands.executeCommand('/send 2 hello there', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -89,7 +89,7 @@ test('/send resolves a session id', async () => {
 		sent.push({ sessionId, text, from })
 	}
 
-	const result = await commands.executeCommand('/send 04-ccc hello', makeSession(), () => {})
+	const result = await commands.executeCommand('/send 04-ccc hello', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -107,7 +107,7 @@ test('/send resolves a session name case-insensitively', async () => {
 		{ id: '04-aaa', name: 'current' },
 		{ id: '04-bbb', name: 'Pause Fix' },
 	]
-	const result = await commands.executeCommand('/send pause fix hello', session, () => {})
+	const result = await commands.executeCommand('/send pause fix hello', session)
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -119,7 +119,7 @@ test('/broadcast sends to every other session', async () => {
 		sent.push({ sessionId, text, from })
 	}
 
-	const result = await commands.executeCommand('/broadcast hello all', makeSession(), () => {})
+	const result = await commands.executeCommand('/broadcast hello all', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -131,7 +131,7 @@ test('/broadcast sends to every other session', async () => {
 })
 
 test('/send rejects an unknown tab number', async () => {
-	const result = await commands.executeCommand('/send 99 hello', makeSession(), () => {})
+	const result = await commands.executeCommand('/send 99 hello', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.output).toBeUndefined()
@@ -144,7 +144,7 @@ test('/status renders Anthropic and OpenAI subscription usage', async () => {
 	anthropicUsage.renderStatus = async () => 'Anthropic subscriptions:\n* 1/2 a@test.com · 5h 20% used'
 	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 b@test.com · 5h 23% used'
 
-	const result = await commands.executeCommand('/status', makeSession(), () => {})
+	const result = await commands.executeCommand('/status', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -153,17 +153,6 @@ test('/status renders Anthropic and OpenAI subscription usage', async () => {
 })
 
 
-test('/usage is an alias for /status', async () => {
-	anthropicUsage.renderStatus = async () => 'anthropic ok'
-	openaiUsage.renderStatus = async () => 'openai ok'
-
-	const result = await commands.executeCommand('/usage', makeSession(), () => {})
-
-	expect(result.handled).toBe(true)
-	expect(result.error).toBeUndefined()
-	expect(result.output).toContain('anthropic ok')
-	expect(result.output).toContain('openai ok')
-})
 
 
 test('/mem shows current rss and thresholds', async () => {
@@ -171,7 +160,7 @@ test('/mem shows current rss and thresholds', async () => {
 	memory.config.warnBytes = 1_500_000_000
 	memory.config.killBytes = 0
 
-	const result = await commands.executeCommand('/mem', makeSession(), () => {})
+	const result = await commands.executeCommand('/mem', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -188,7 +177,7 @@ test('/clear queues a reset command', async () => {
 		appended.push(command)
 	}
 
-	const result = await commands.executeCommand('/clear', makeSession(), () => {})
+	const result = await commands.executeCommand('/clear', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -203,7 +192,7 @@ test('/open resolves a tab number and queues placement after it', async () => {
 		appended.push(command)
 	}
 
-	const result = await commands.executeCommand('/open 2', makeSession(), () => {})
+	const result = await commands.executeCommand('/open 2', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -223,9 +212,9 @@ test('/resume validates the target before queueing', async () => {
 	]
 	sessionStore.loadSessionList = () => ['04-aaa']
 
-	const ok = await commands.executeCommand('/resume 04-zzz', makeSession(), () => {})
-	const missing = await commands.executeCommand('/resume 04-nope', makeSession(), () => {})
-	const open = await commands.executeCommand('/resume 04-aaa', makeSession(), () => {})
+	const ok = await commands.executeCommand('/resume 04-zzz', makeSession())
+	const missing = await commands.executeCommand('/resume 04-nope', makeSession())
+	const open = await commands.executeCommand('/resume 04-aaa', makeSession())
 
 	expect(ok.handled).toBe(true)
 	expect(ok.error).toBeUndefined()
@@ -236,55 +225,41 @@ test('/resume validates the target before queueing', async () => {
 })
 
 
-test('/tabs sorts open tabs by latest activity and shows recent prompt previews', async () => {
+test('/tabs keeps open-tab order and no longer shows prompt previews', async () => {
 	sessionStore.loadAllSessionMetas = () => [
 		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'old tab' },
 		{ id: '04-bbb', createdAt: '2026-04-14T10:00:00.000Z', topic: 'pause fix' },
 		{ id: '04-ccc', createdAt: '2026-04-14T11:00:00.000Z', topic: 'docs' },
 	]
-	sessionStore.loadAllHistory = (sessionId: string) => {
-		if (sessionId === '04-bbb') {
-			return [
-				{ type: 'user', parts: [{ type: 'text', text: 'can you commit now?' }], ts: '2026-04-14T11:58:00.000Z' } as any,
-				{ type: 'user', parts: [{ type: 'text', text: 'i think we good now' }], ts: '2026-04-14T11:59:00.000Z' } as any,
-				{ type: 'assistant', text: 'done', ts: '2026-04-14T12:00:00.000Z' } as any,
-			]
-		}
-		if (sessionId === '04-ccc') return [{ type: 'user', parts: [{ type: 'text', text: 'please do X' }], ts: '2026-04-14T11:00:00.000Z' } as any]
-		return [{ type: 'user', parts: [{ type: 'text', text: 'old task' }], ts: '2026-04-14T10:00:00.000Z' } as any]
-	}
-	sessionStore.loadLive = () => ({ busy: false, activity: '', blocks: [], updatedAt: '2026-04-14T09:00:00.000Z' })
-	Object.defineProperty(process.stdout, 'columns', { value: 160, configurable: true })
 
-	const result = await commands.executeCommand('/tabs', makeSession(), () => {})
+	const result = await commands.executeCommand('/tabs', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
-	expect(result.output).toContain('Open tabs')
+	expect(result.output).toContain('Open tabs:')
 	expect(result.output).toContain('04-bbb')
 	expect(result.output).toContain('pause fix')
-	expect(result.output).toContain('i think we good now · can you commit now?')
+	expect(result.output).not.toContain('i think we good now')
+	expect(result.output!.indexOf('04-aaa')).toBeLessThan(result.output!.indexOf('04-bbb'))
 	expect(result.output!.indexOf('04-bbb')).toBeLessThan(result.output!.indexOf('04-ccc'))
-	expect(result.output!.indexOf('04-ccc')).toBeLessThan(result.output!.indexOf('04-aaa'))
 })
 
 
-test('/tabs --all includes closed sessions', async () => {
+test('/tabs --all includes closed sessions after open tabs', async () => {
 	sessionStore.loadAllSessionMetas = () => [
 		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'open tab' },
+		{ id: '04-bbb', createdAt: '2026-04-14T10:00:00.000Z', topic: 'another open tab' },
 		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', topic: 'closed tab' },
 	]
-	sessionStore.loadAllHistory = (sessionId: string) => sessionId === '04-zzz'
-		? [{ type: 'user', parts: [{ type: 'text', text: 'finished thing' }], ts: '2026-04-13T09:30:00.000Z' } as any]
-		: [{ type: 'user', parts: [{ type: 'text', text: 'still open' }], ts: '2026-04-14T09:30:00.000Z' } as any]
-	sessionStore.loadLive = () => ({ busy: false, activity: '', blocks: [], updatedAt: '2026-04-14T09:00:00.000Z' })
 
-	const result = await commands.executeCommand('/tabs --all', makeSession(), () => {})
+	const result = await commands.executeCommand('/tabs --all', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('Sessions:')
 	expect(result.output).toContain('04-zzz')
 	expect(result.output).toContain('closed')
+	expect(result.output!.indexOf('04-bbb')).toBeLessThan(result.output!.indexOf('04-zzz'))
 })
 
 
@@ -294,7 +269,7 @@ test('/move queues a move command for another tab position', async () => {
 		appended.push(command)
 	}
 
-	const result = await commands.executeCommand('/move 2', makeSession('04-ccc'), () => {})
+	const result = await commands.executeCommand('/move 2', makeSession('04-ccc'))
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -309,9 +284,9 @@ test('/move caps out-of-range positions and no-ops on current tab', async () => 
 		appended.push(command)
 	}
 
-	const high = await commands.executeCommand('/move 99', makeSession('04-aaa'), () => {})
-	const low = await commands.executeCommand('/move -5', makeSession('04-ccc'), () => {})
-	const same = await commands.executeCommand('/move 1', makeSession('04-aaa'), () => {})
+	const high = await commands.executeCommand('/move 99', makeSession('04-aaa'))
+	const low = await commands.executeCommand('/move -5', makeSession('04-ccc'))
+	const same = await commands.executeCommand('/move 1', makeSession('04-aaa'))
 
 	expect(high.output).toContain('3')
 	expect(low.output).toContain('1')
@@ -324,7 +299,7 @@ test('/move caps out-of-range positions and no-ops on current tab', async () => 
 
 
 test('/move rejects non-numeric positions', async () => {
-	const result = await commands.executeCommand('/move nope', makeSession(), () => {})
+	const result = await commands.executeCommand('/move nope', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.output).toBeUndefined()
@@ -332,7 +307,7 @@ test('/move rejects non-numeric positions', async () => {
 })
 
 test('/help config shows config caveats and syntax', async () => {
-	const result = await commands.executeCommand('/help config', makeSession(), () => {})
+	const result = await commands.executeCommand('/help config', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -341,7 +316,7 @@ test('/help config shows config caveats and syntax', async () => {
 })
 
 test('/help /config accepts a leading slash', async () => {
-	const result = await commands.executeCommand('/help /config', makeSession(), () => {})
+	const result = await commands.executeCommand('/help /config', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -349,7 +324,7 @@ test('/help /config accepts a leading slash', async () => {
 })
 
 test('/help model shows layered help for another command', async () => {
-	const result = await commands.executeCommand('/help model', makeSession(), () => {})
+	const result = await commands.executeCommand('/help model', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -357,7 +332,7 @@ test('/help model shows layered help for another command', async () => {
 })
 
 test('/config --help reuses detailed config help', async () => {
-	const result = await commands.executeCommand('/config --help', makeSession(), () => {})
+	const result = await commands.executeCommand('/config --help', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -366,7 +341,7 @@ test('/config --help reuses detailed config help', async () => {
 
 test('/config shows current live config', async () => {
 	stubConfigData()
-	const result = await commands.executeCommand('/config', makeSession(), () => {})
+	const result = await commands.executeCommand('/config', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -377,7 +352,7 @@ test('/config shows current live config', async () => {
 
 test('/config path shows one live value', async () => {
 	stubConfigData()
-	const result = await commands.executeCommand('/config agentLoop.maxIterations', makeSession(), () => {})
+	const result = await commands.executeCommand('/config agentLoop.maxIterations', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -387,7 +362,7 @@ test('/config path shows one live value', async () => {
 
 test('/config sets a temp value with --temp at the end', async () => {
 	stubConfigData()
-	const result = await commands.executeCommand('/config agentLoop.maxIterations 2 --temp', makeSession(), () => {})
+	const result = await commands.executeCommand('/config agentLoop.maxIterations 2 --temp', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -397,7 +372,7 @@ test('/config sets a temp value with --temp at the end', async () => {
 
 test('/config sets a temp value with --temp before the path', async () => {
 	stubConfigData()
-	const result = await commands.executeCommand('/config --temp agentLoop.maxIterations 3', makeSession(), () => {})
+	const result = await commands.executeCommand('/config --temp agentLoop.maxIterations 3', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -407,7 +382,7 @@ test('/config sets a temp value with --temp before the path', async () => {
 
 test('/config writes a persistent override and applies it now', async () => {
 	stubConfigData({ agentLoop: {} })
-	const result = await commands.executeCommand('/config agentLoop.maxIterations 7', makeSession(), () => {})
+	const result = await commands.executeCommand('/config agentLoop.maxIterations 7', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -418,7 +393,7 @@ test('/config writes a persistent override and applies it now', async () => {
 
 test('/config accepts a bare string value', async () => {
 	stubConfigData({ models: {} })
-	const result = await commands.executeCommand('/config models.default gpt', makeSession(), () => {})
+	const result = await commands.executeCommand('/config models.default gpt', makeSession())
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -441,14 +416,14 @@ test('/system reflects updated prompt files', async () => {
 		const session = makeSession()
 		session.cwd = cwd
 
-		const first = await commands.executeCommand('/system', session, () => {})
+		const first = await commands.executeCommand('/system', session)
 		expect(first.output).toContain('first')
 		expect(first.output).toContain('agent one')
 
 		writeFileSync(join(dir, 'SYSTEM.md'), 'second\n')
 		writeFileSync(join(cwd, 'AGENTS.md'), 'agent two\n')
 
-		const second = await commands.executeCommand('/system', session, () => {})
+		const second = await commands.executeCommand('/system', session)
 		expect(second.output).toContain('second')
 		expect(second.output).toContain('agent two')
 	} finally {
@@ -461,7 +436,7 @@ test('/system reflects updated prompt files', async () => {
 
 test('/rename updates the current session name directly', async () => {
 	const session = makeSession()
-	const result = await commands.executeCommand('/rename Pause Fix', session, () => {})
+	const result = await commands.executeCommand('/rename Pause Fix', session)
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
@@ -473,7 +448,7 @@ test('/rename updates the current session name directly', async () => {
 test('/rename clear resets the current session name', async () => {
 	const session = makeSession()
 	session.name = 'Pause Fix'
-	const result = await commands.executeCommand('/rename clear', session, () => {})
+	const result = await commands.executeCommand('/rename clear', session)
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()

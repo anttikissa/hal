@@ -74,8 +74,17 @@ function parseCommand(text: string): ParsedCommand | null {
 type CommandHandler = (
 	args: string,
 	session: SessionState,
-	emitInfo: (text: string, level?: 'info' | 'error') => void,
 ) => CommandResult | Promise<CommandResult>
+
+type CommandArg = 'model' | 'dir' | 'command' | 'config'
+
+interface CommandSpec {
+	usage?: string
+	summary: string
+	detail?: string
+	help?: string
+	arg?: CommandArg
+}
 
 const handlers: Record<string, CommandHandler> = {}
 
@@ -170,53 +179,16 @@ function lookupClosedResumeTarget(selector: string): ResumeLookup {
 	return { error: 'No matching closed session.' }
 }
 
-function userEntryText(entry: any): string {
-	if (entry?.type !== 'user' || !Array.isArray(entry.parts)) return ''
-	return entry.parts
-		.map((part: any) => {
-			if (part?.type === 'text') return part.text ?? ''
-			if (part?.type === 'image') return `[${part.originalFile ?? part.blobId ?? 'image'}]`
-			return ''
-		})
-		.join('')
-		.replace(/\s+/g, ' ')
-		.trim()
+function sessionDisplayName(meta: any, fallbackName: string): string {
+	return meta?.topic || meta?.name || fallbackName
 }
 
-function previewText(text: string, maxLen = 48): string {
-	if (text.length <= maxLen) return text
-	return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`
-}
-
-function recentPromptPreviews(entries: any[], limit: number): string[] {
-	const prompts: string[] = []
-	for (let i = entries.length - 1; i >= 0 && prompts.length < limit; i--) {
-		const text = userEntryText(entries[i])
-		if (!text) continue
-		prompts.push(previewText(text))
-	}
-	return prompts
-}
-
-function lastTouchedAt(meta: any, entries: any[]): string {
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const ts = entries[i]?.ts
-		if (typeof ts === 'string' && ts) return ts
-	}
-	return meta.closedAt ?? meta.createdAt
-}
-
-function formatRelativeAge(now: number, isoTs: string): string {
-	const ts = Date.parse(isoTs)
-	if (!Number.isFinite(ts)) return '?'
-	const deltaMs = Math.max(0, now - ts)
-	const minutes = Math.floor(deltaMs / 60_000)
-	if (minutes < 1) return 'now'
-	if (minutes < 60) return `${minutes}m`
-	const hours = Math.floor(minutes / 60)
-	if (hours < 24) return `${hours}h`
-	const days = Math.floor(hours / 24)
-	return `${days}d`
+function closedTabs(showAll: boolean, openIds: Set<string>): any[] {
+	if (!showAll) return []
+	return sessionStore
+		.loadAllSessionMetas()
+		.filter((meta) => !openIds.has(meta.id))
+		.sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
 }
 
 function formatStamp(isoTs: string): string {
@@ -228,33 +200,32 @@ function renderTabs(args: string, session: SessionState): CommandResult {
 	if (trimmed && trimmed !== '--all') return { error: 'Usage: /tabs [--all]', handled: true }
 	const showAll = trimmed === '--all'
 	const openTabs = session.sessions ?? []
-	const openPos = new Map(openTabs.map((tab, index) => [tab.id, index + 1]))
-	const metas = sessionStore.loadAllSessionMetas().filter((meta) => showAll || openPos.has(meta.id))
-	if (metas.length === 0) return { output: showAll ? 'No sessions.' : 'No open tabs.', handled: true }
-	const cols = process.stdout.columns || 80
-	const promptCount = cols >= 160 ? 3 : cols >= 120 ? 2 : 1
-	const now = Date.now()
-	const rows = metas
-		.map((meta) => {
-			const entries = sessionStore.loadAllHistory(meta.id)
-			const name = meta.topic || meta.name || openTabs.find((tab) => tab.id === meta.id)?.name || meta.id
+	const openIds = new Set(openTabs.map((tab) => tab.id))
+	const metaById = new Map(sessionStore.loadAllSessionMetas().map((meta) => [meta.id, meta]))
+	const rows = [
+		...openTabs.map((tab, index) => {
+			const meta = metaById.get(tab.id)
 			return {
-				id: meta.id,
-				name,
-				createdAt: meta.createdAt,
-				closedAt: meta.closedAt,
-				openPos: openPos.get(meta.id),
-				touchedAt: lastTouchedAt(meta, entries),
-				prompts: recentPromptPreviews(entries, promptCount),
+				id: tab.id,
+				where: `tab ${index + 1}`,
+				name: sessionDisplayName(meta, tab.name || tab.id),
+				createdAt: meta?.createdAt ?? session.createdAt,
+				closedAt: meta?.closedAt,
 			}
-		})
-		.sort((a, b) => b.touchedAt.localeCompare(a.touchedAt))
-	const lines = [showAll ? 'Sessions (newest activity first):' : 'Open tabs (newest activity first):']
+		}),
+		...closedTabs(showAll, openIds).map((meta) => ({
+			id: meta.id,
+			where: 'closed',
+			name: sessionDisplayName(meta, meta.id),
+			createdAt: meta.createdAt,
+			closedAt: meta.closedAt,
+		})),
+	]
+	if (rows.length === 0) return { output: showAll ? 'No sessions.' : 'No open tabs.', handled: true }
+	const lines = [showAll ? 'Sessions:' : 'Open tabs:']
 	for (const row of rows) {
 		const marker = row.id === session.id ? '*' : ' '
-		const where = row.openPos ? `tab ${row.openPos}` : 'closed'
-		lines.push(`${marker} ${where.padEnd(7)} ${row.id}  ${formatRelativeAge(now, row.touchedAt).padEnd(4)}  ${row.name}`)
-		if (row.prompts.length > 0) lines.push(`          ${row.prompts.join(' · ')}`)
+		lines.push(`${marker} ${row.where.padEnd(7)} ${row.id}  ${row.name}`)
 		const dates = [`start ${formatStamp(row.createdAt)}`]
 		if (row.closedAt) dates.push(`end ${formatStamp(row.closedAt)}`)
 		lines.push(`          ${dates.join(' · ')}`)
@@ -279,9 +250,27 @@ function normalizeHelpTopic(args: string): string {
 	return args.trim().replace(/^\//, '')
 }
 
-function detailedHelp(topic: string): string | null {
-	if (topic === 'config') {
-		return [
+const commandSpecs: Record<string, CommandSpec> = {
+	model: { usage: '[name]', summary: 'Switch model or list available models.', detail: 'With no name, shows the current model and the available choices.', arg: 'model' },
+	clear: { summary: 'Clear session history.' },
+	fork: { summary: 'Fork current session to new tab.' },
+	open: { usage: '[tab|session-id|name]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
+	move: { usage: '<position>', summary: 'Move the current tab to a position.', detail: 'Values below 1 clamp to 1; values above the tab count clamp to the last tab.' },
+	rename: { usage: '<name>|clear', summary: 'Rename the current session.', detail: 'Set a short session name used in tabs and command targets.' },
+	resume: { usage: '[session-id|name]', summary: 'Resume a closed session.', detail: 'With no id, lists recently closed sessions.' },
+	tabs: { usage: '[--all]', summary: 'List open tabs; use --all to include closed sessions.' },
+	compact: { summary: 'Summarize conversation to reduce context.' },
+	raw: { summary: 'Log raw key bytes on this terminal.', detail: 'Keys are logged as bytes until Esc exits.' },
+	status: { summary: 'Show Anthropic / OpenAI subscription usage.', detail: 'Shows usage for all configured accounts.' },
+	mem: { summary: 'Show current RSS memory and the warn/kill thresholds.' },
+	send: { usage: '<tab|session-id|name> <message>', summary: 'Send a message to another tab.', detail: 'Targets can be a tab number, full session id, or session name.' },
+	broadcast: { usage: '<message>', summary: 'Send a message to every other tab.', detail: 'Sends the same message to every other open tab.' },
+	cd: { usage: '[path]', summary: 'Change working directory.', detail: 'With no path, shows the current working directory.', arg: 'dir' },
+	system: { summary: 'Show full preprocessed system prompt.' },
+	config: {
+		summary: 'View or change config.',
+		arg: 'config',
+		help: [
 			'/config',
 			'Show current live config.',
 			'',
@@ -304,51 +293,25 @@ function detailedHelp(topic: string): string | null {
 			'  /config agentLoop.maxIterations',
 			'  /config agentLoop.maxIterations 2',
 			'  /config agentLoop.maxIterations --temp 2',
-		].join('\n')
-	}
-	if (topic === 'model') {
-		return ['Usage: /model [name]', '', 'With no name, shows the current model and the available choices.'].join('\n')
-	}
-	if (topic === 'send') {
-		return ['Usage: /send <tab|session-id|name> <message>', '', 'Targets can be a tab number, full session id, or session name.'].join(
-			'\n',
-		)
-	}
-	if (topic === 'broadcast') {
-		return ['Usage: /broadcast <message>', '', 'Sends the same message to every other open tab.'].join('\n')
-	}
-	if (topic === 'status' || topic === 'usage') {
-		return ['Usage: /status', '', 'Show Anthropic / OpenAI OAuth subscription usage for all configured accounts.'].join('\n')
-	}
-	if (topic === 'raw') {
-		return ['Usage: /raw', '', 'Enable local raw key capture on this terminal. Keys are logged as bytes until Esc exits.'].join('\n')
-	}
-	if (topic === 'rename') {
-		return ['Usage: /rename <name>|clear', '', 'Set a short session name used in tabs and command targets.'].join('\n')
-	}
-	if (topic === 'mem') {
-		return ['Usage: /mem', '', 'Show current RSS memory and the warn/kill thresholds.'].join('\n')
-	}
-	if (topic === 'open') {
-		return ['Usage: /open [tab|session-id|name]', '', 'With no target, opens a new tab at the end. With a target, opens after that tab.'].join('\n')
-	}
-	if (topic === 'cd') {
-		return ['Usage: /cd [path]', '', 'With no path, shows the current working directory.'].join('\n')
-	}
-	if (topic === 'resume') {
-		return ['Usage: /resume [session-id|name]', '', 'With no id, lists recently closed sessions.'].join('\n')
-	}
-	if (topic === 'tabs') {
-		return ['Usage: /tabs [--all]', '', 'List open tabs sorted by most recent activity. Use --all to include closed sessions.'].join('\n')
-	}
-	if (topic === 'move') {
-		return [
-			'Usage: /move <position>',
-			'',
-			'Move the current tab to a 1-based position. Values below 1 clamp to 1; values above the tab count clamp to the last tab.',
-		].join('\n')
-	}
-	return null
+		].join('\n'),
+	},
+	help: { usage: '[cmd]', summary: 'Show help; try /help config.', arg: 'command' },
+	exit: { summary: 'Quit Hal.' },
+}
+
+function helpUsage(name: string): string {
+	const spec = commandSpecs[name]
+	if (!spec?.usage) return `/${name}`
+	return `/${name} ${spec.usage}`
+}
+
+function detailedHelp(topic: string): string | null {
+	const spec = commandSpecs[topic]
+	if (!spec) return null
+	if (spec.help) return spec.help
+	const lines = [`Usage: ${helpUsage(topic)}`, '', spec.summary]
+	if (spec.detail) lines.push('', spec.detail)
+	return lines.join('\n')
 }
 
 // /help — list commands or show details for one command
@@ -356,39 +319,16 @@ handlers['help'] = (args) => {
 	const topic = normalizeHelpTopic(args)
 	if (topic) {
 		const text = detailedHelp(topic)
-		if (!text) {
-			return { error: `No detailed help for /${topic}. Try /help.`, handled: true }
-		}
+		if (!text) return { error: `No detailed help for /${topic}. Try /help.`, handled: true }
 		return { output: text, handled: true }
 	}
-
-	const lines = [
-		'Available commands:',
-		'  /model [name]   Switch model or list available models',
-		'  /clear          Clear session history',
-		'  /fork           Fork current session to new tab',
-		'  /open [tab|id]  Open a new tab, optionally after a tab',
-		'  /move <pos>     Move current tab to a position',
-		'  /rename <name>  Rename the current session',
-		'  /resume [id]    Resume a closed session',
-		'  /tabs [--all]   List tabs by recent activity',
-		'  /compact        Summarize conversation to reduce context',
-		'  /raw            Log raw key bytes on this terminal',
-		'  /status         Show Anthropic / OpenAI subscription usage',
-		'  /mem            Show current memory usage and thresholds',
-		'  /send <tab|id>  Send a message to another tab',
-		'  /broadcast ...  Send a message to every other tab',
-		'  /cd [path]      Change working directory',
-		'  /system         Show full preprocessed system prompt',
-		'  /config [...]   View or change config',
-		'  /help [cmd]     Show help; try /help config',
-		'  /exit           Quit Hal',
-		'  /eval [code]    Run JavaScript in the runtime',
-	]
+	const names = Object.keys(commandSpecs)
+	const width = Math.max(...names.map((name) => helpUsage(name).length))
+	const lines = ['Available commands:', ...names.map((name) => `  ${helpUsage(name).padEnd(width)}  ${commandSpecs[name]!.summary}`)]
 	return { output: lines.join('\n'), handled: true }
 }
 // /model [name] — switch model or show current + list
-handlers['model'] = (args, session, emitInfo) => {
+handlers['model'] = (args, session) => {
 	if (!args) {
 		const current = session.model ?? models.defaultModel()
 		const display = models.displayModel(current)
@@ -494,10 +434,6 @@ handlers['status'] = async () => {
 	}
 }
 
-// /usage — Claude Code / Codex-style alias for /status
-handlers['usage'] = async (_args, session, emitInfo) => {
-	return handlers['status']!('', session, emitInfo)
-}
 
 // /mem — current RSS + memory thresholds
 handlers['mem'] = () => {
@@ -528,7 +464,7 @@ handlers['resume'] = (args, session) => {
 // /send <tab|session-id|name> <message> — queue a message for another session
 handlers['send'] = (args, session) => {
 	const trimmed = args.trim()
-	if (trimmed === 'all' || trimmed.startsWith('all ')) return handlers['broadcast']!(trimmed.slice(3).trim(), session, () => {})
+	if (trimmed === 'all' || trimmed.startsWith('all ')) return handlers['broadcast']!(trimmed.slice(3).trim(), session)
 	const parsed = resolveSendTarget(session, args)
 	if (!parsed) return { error: 'Usage: /send <tab|session-id|name> <message>', handled: true }
 	return sendToSession(session, parsed.target, parsed.text)
@@ -582,114 +518,6 @@ handlers['system'] = (_args, session) => {
 	}
 }
 
-function currentConfigSnapshot(): Record<string, any> {
-	const snapshot: Record<string, any> = {}
-	for (const [name, moduleConfig] of Object.entries(config.modules)) {
-		snapshot[name] = moduleConfig
-	}
-	return snapshot
-}
-
-function splitConfigPath(path: string): string[] {
-	return path.split('.').filter(Boolean)
-}
-
-function readConfigPath(path: string): CommandResult {
-	const parts = splitConfigPath(path)
-	if (parts.length === 0) return { error: 'Usage: /config [module[.key]] [value] [--temp]', handled: true }
-	const root = config.modules[parts[0]!]
-	if (!root) return { error: `Unknown config module: ${parts[0]}`, handled: true }
-
-	let value: any = root
-	for (const part of parts.slice(1)) {
-		if (!value || typeof value !== 'object' || !(part in value)) {
-			return { error: `Unknown config key: ${path}`, handled: true }
-		}
-		value = value[part]
-	}
-
-	return { output: `${path}:\n${ason.stringify(value, 'long')}`, handled: true }
-}
-
-function liveConfigValue(path: string): any {
-	const parts = splitConfigPath(path)
-	if (parts.length === 0) return undefined
-	let value: any = config.modules[parts[0]!]
-	for (const part of parts.slice(1)) {
-		if (!value || typeof value !== 'object' || !(part in value)) return undefined
-		value = value[part]
-	}
-	return value
-}
-
-function canUseBareStringValue(raw: string): boolean {
-	const trimmed = raw.trim()
-	if (!trimmed) return false
-	if (/\s/.test(trimmed)) return false
-	if (/^["'`\[{]/.test(trimmed)) return false
-	return true
-}
-
-function parseConfigValue(path: string, raw: string): any {
-	try {
-		return ason.parse(raw)
-	} catch (err) {
-		// Convenience: if the existing live value is a string, accept a single
-		// bare token like `gpt` without forcing quotes.
-		if (typeof liveConfigValue(path) === 'string' && canUseBareStringValue(raw)) return raw.trim()
-		throw err
-	}
-}
-
-function ensureConfigObject(root: Record<string, any>, parts: string[]): Record<string, any> | null {
-	let node = root
-	for (const part of parts) {
-		const next = node[part]
-		if (next == null) {
-			node[part] = {}
-			node = node[part]
-			continue
-		}
-		if (!next || typeof next !== 'object' || Array.isArray(next)) return null
-		node = next
-	}
-	return node
-}
-
-function setConfigPath(path: string, value: any, temp: boolean): CommandResult {
-	const parts = splitConfigPath(path)
-	if (parts.length < 2) {
-		return { error: 'Set a specific key like agentLoop.maxIterations.', handled: true }
-	}
-
-	const moduleName = parts[0]!
-	const leaf = parts[parts.length - 1]!
-	const parentParts = parts.slice(1, -1)
-
-	if (temp) {
-		const moduleConfig = config.modules[moduleName]
-		if (!moduleConfig) return { error: `Unknown config module: ${moduleName}`, handled: true }
-		const parent = ensureConfigObject(moduleConfig, parentParts)
-		if (!parent) return { error: `Cannot write temp config at ${path}`, handled: true }
-		parent[leaf] = value
-		return { output: `Temporarily set ${path} = ${ason.stringify(value, 'short')}`, handled: true }
-	}
-
-	if (!config.modules[moduleName]) {
-		return { error: `Unknown config module: ${moduleName}`, handled: true }
-	}
-
-	const moduleOverrides = config.data[moduleName]
-	if (!moduleOverrides || typeof moduleOverrides !== 'object' || Array.isArray(moduleOverrides)) {
-		config.data[moduleName] = {}
-	}
-	const parent = ensureConfigObject(config.data[moduleName], parentParts)
-	if (!parent) return { error: `Cannot write config at ${path}`, handled: true }
-	parent[leaf] = value
-	config.apply()
-	config.save()
-	return { output: `Set ${path} = ${ason.stringify(value, 'short')}`, handled: true }
-}
 
 function parseConfigArgs(args: string): { help: boolean; temp: boolean; path: string; value: string } {
 	const tokens = args.trim() ? args.trim().split(/\s+/) : []
@@ -719,14 +547,17 @@ function parseConfigArgs(args: string): { help: boolean; temp: boolean; path: st
 handlers['config'] = (args) => {
 	const parsed = parseConfigArgs(args)
 	if (parsed.help) return { output: detailedHelp('config')!, handled: true }
-	if (!parsed.path) {
-		return { output: `Current config:\n${ason.stringify(currentConfigSnapshot(), 'long')}`, handled: true }
+	if (!parsed.path) return { output: `Current config:\n${ason.stringify(config.snapshot(), 'long')}`, handled: true }
+	if (!parsed.value) {
+		const read = config.readPath(parsed.path)
+		if (read.error) return { error: read.error, handled: true }
+		return { output: `${parsed.path}:\n${ason.stringify(read.value, 'long')}`, handled: true }
 	}
-	if (!parsed.value) return readConfigPath(parsed.path)
-
 	try {
-		const value = parseConfigValue(parsed.path, parsed.value)
-		return setConfigPath(parsed.path, value, parsed.temp)
+		const value = config.parseValue(parsed.path, parsed.value)
+		const write = config.writePath(parsed.path, value, { temp: parsed.temp })
+		if (write.error) return { error: write.error, handled: true }
+		return { output: write.output, handled: true }
 	} catch (err: any) {
 		return { error: `/config: could not parse value: ${err?.message ?? String(err)}`, handled: true }
 	}
@@ -741,31 +572,11 @@ handlers['exit'] = () => {
 	return { output: 'Goodbye.', handled: true }
 }
 
-// /eval [code] — run JavaScript in the runtime
-handlers['eval'] = async (args, session) => {
-	if (!args) {
-		return { error: '/eval <code>', handled: true }
-	}
-
-	try {
-		// eval runs in the current module scope — useful for debugging
-		// and hot-patching the runtime.
-		const result = await eval(args)
-		const text = result === undefined ? '(undefined)' : String(result)
-		return { output: text.slice(0, 5000), handled: true }
-	} catch (err: any) {
-		return { error: `eval error: ${err?.message ?? String(err)}`, handled: true }
-	}
-}
 
 // ── Main dispatch ──
 
 /** Execute a slash command. Returns { handled: false } if not a command. */
-async function executeCommand(
-	text: string,
-	session: SessionState,
-	emitInfo: (text: string, level?: 'info' | 'error') => void,
-): Promise<CommandResult> {
+async function executeCommand(text: string, session: SessionState): Promise<CommandResult> {
 	const parsed = parseCommand(text)
 	if (!parsed) return { handled: false }
 
@@ -774,16 +585,21 @@ async function executeCommand(
 		return { error: `Unknown command: /${parsed.name}. Type /help for help.`, handled: true }
 	}
 
-	return await handler(parsed.args, session, emitInfo)
+	return await handler(parsed.args, session)
 }
 
-/** Get list of command names (for tab completion). */
+/** Get list of command names (for tab completion and /help topics). */
 function commandNames(): string[] {
-	return Object.keys(handlers)
+	return Object.keys(commandSpecs)
+}
+
+function commandArg(name: string): CommandArg | undefined {
+	return commandSpecs[name]?.arg
 }
 
 export const commands = {
 	parseCommand,
 	executeCommand,
 	commandNames,
+	commandArg,
 }
