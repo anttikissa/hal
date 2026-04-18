@@ -26,3 +26,15 @@ Suggested audit cadence:
 - Every 100 commits: circular deps, strong typing, DRY/dedupe
 - Every 200 commits: shared types, comment/slop
 - Also run immediately after major provider/protocol changes, big module moves, or feature removals
+
+Notes from the first audit run:
+- `bunx` can run suggested external tools like `knip` and `madge` even when they are not in `package.json`. Ask first if you do not want ad-hoc external tools fetched on demand.
+- Raw `knip` on the whole repo was noisy because of `examples/` and manual scripts. Scoped `knip` was much more useful.
+- `madge` was useful for catching real cycles in `src/` when run with a focused TypeScript-only scope.
+- Shared-type audit had overlap with strong-typing work; consider merging those into one pass unless you specifically want type-sharing reviewed on its own.
+- Comment/slop audit had the lowest payoff. Keep it as a late polish pass, not an early maintenance pass.
+- DRY cleanup was useful when it stayed small and helper-oriented. Broad dedupe passes risk churn and over-abstraction.
+- Error-handling audit was valuable when it targeted silent failures and hidden fallbacks, not boundary catches that intentionally absorb missing files, shutdown noise, or OS integration issues.
+- Legacy/fallback and unused-code audits gave high-confidence wins and are good candidates for regular recurring maintenance.
+- Circular-deps audit was one of the highest-value focused passes because it found a real structural issue and fixed it cleanly.
+- Strong-typing audit worked best at dynamic boundaries with validation and narrowing, not by inventing deep wire-payload types speculatively.
