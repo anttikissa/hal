@@ -43,11 +43,26 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('')
 	})
 
-	test('undo reverts grouped typing', () => {
+	test('undo and redo keep grouped typing together', () => {
 		prompt.handleKey({ key: 'h', char: 'h', shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		prompt.handleKey({ key: 'i', char: 'i', shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		prompt.handleKey(key('/', { ctrl: true }), 80)
 		expect(prompt.text()).toBe('')
+		prompt.handleKey(key('/', { ctrl: true, shift: true }), 80)
+		expect(prompt.text()).toBe('hi')
+	})
+
+	test('up enters history and down restores the draft', () => {
+		prompt.setHistory(['older', 'newer'])
+		prompt.setText('draft')
+		prompt.handleKey(key('up'), 80)
+		expect(prompt.text()).toBe('newer')
+		prompt.handleKey(key('up'), 80)
+		expect(prompt.text()).toBe('older')
+		prompt.handleKey(key('down'), 80)
+		expect(prompt.text()).toBe('newer')
+		prompt.handleKey(key('down'), 80)
+		expect(prompt.text()).toBe('draft')
 	})
 
 	test('buildPrompt renders multiline cursor position', () => {
@@ -57,11 +72,18 @@ describe('prompt', () => {
 		expect(built.cursor).toEqual({ rowOffset: 1, col: 3 })
 	})
 
-	test('buildPrompt wraps to a new blank line when cursor is at exact width', () => {
-		prompt.setText('12345', 5)
+	test('buildPrompt highlights selections across wrapped lines', () => {
+		prompt.setText('hello brave world')
+		prompt.handleKey(key('a', { cmd: true }), 80)
+		const built = prompt.buildPrompt(8)
+		expect(built.lines).toEqual(['\x1b[7mhello\x1b[0m', '\x1b[7mbrave\x1b[0m', '\x1b[7mworld\x1b[0m'])
+	})
+
+	test('buildPrompt wraps to a new blank line when cursor hits exact width after typing', () => {
+		prompt.setText('1234', 4)
+		prompt.handleKey({ key: '5', char: '5', shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		const built = prompt.buildPrompt(5)
 		expect(built.lines).toEqual(['12345', ''])
 		expect(built.cursor).toEqual({ rowOffset: 1, col: 0 })
-		expect(built.lines).toHaveLength(2)
 	})
 })

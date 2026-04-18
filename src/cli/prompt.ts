@@ -219,14 +219,14 @@ function browseHistory(dir: -1 | 1): boolean {
 		} else if (historyIndex > 0) {
 			historyIndex--
 		} else {
-			move(0, false)
+			moveEdge(-1, false)
 			return true
 		}
 		loadHistoryText(history[historyIndex]!)
 		return true
 	}
 	if (historyIndex < 0) {
-		move(buf.length, false)
+		moveEdge(1, false)
 		return true
 	}
 	if (historyIndex < history.length - 1) {
@@ -268,6 +268,14 @@ function deleteSel(): boolean {
 	return true
 }
 
+function deleteBackward(byWord = false): void {
+	if (!deleteSel() && cursor > 0) deleteRange(byWord ? wordLeft(buf, cursor) : cursor - 1, cursor)
+}
+
+function deleteForward(): void {
+	if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
+}
+
 function move(pos: number, selecting: boolean): void {
 	if (selecting) {
 		if (selAnchor === null) selAnchor = cursor
@@ -276,6 +284,20 @@ function move(pos: number, selecting: boolean): void {
 	}
 	cursor = clamp(pos)
 	goalCol = null
+}
+
+function moveEdge(dir: -1 | 1, selecting: boolean): void {
+	move(dir === -1 ? 0 : buf.length, selecting)
+}
+
+function moveHorizontal(dir: -1 | 1, selecting: boolean, motion: 'char' | 'word' | 'cmd-word' = 'char'): void {
+	const pos = motion === 'word'
+		? dir === -1 ? wordLeft(buf, cursor) : wordRight(buf, cursor)
+		: motion === 'cmd-word'
+			? dir === -1 ? cmdWordLeft(buf, cursor) : cmdWordRight(buf, cursor)
+			: cursor + dir
+	if (motion === 'char' && !selecting) collapseOrMove(pos, dir === -1 ? 'start' : 'end')
+	else move(pos, selecting)
 }
 
 // Collapse selection to one edge, or move if no selection
@@ -289,12 +311,8 @@ function collapseOrMove(pos: number, edge: 'start' | 'end'): void {
 	}
 }
 
-function undo(): boolean {
-	return stepHistory(undoStack, redoStack)
-}
-
-function redo(): boolean {
-	return stepHistory(redoStack, undoStack)
+function stepUndo(redo = false): boolean {
+	return redo ? stepHistory(redoStack, undoStack) : stepHistory(undoStack, redoStack)
 }
 
 // ── Clipboard ────────────────────────────────────────────────────────────────
@@ -329,199 +347,136 @@ function doPaste(): void {
 // ── Key handling ─────────────────────────────────────────────────────────────
 // Returns true if handled, false to let keybindings (submit, etc.) handle it.
 
-function handleKey(k: KeyEvent, contentWidth: number): boolean {
-	// Any non-single-char key breaks the typing undo group
-	if (!(k.char && k.char.length === 1 && !k.ctrl && !k.alt && !k.cmd)) undoGrouping = false
+function moveVerticalKey(dir: -1 | 1, selecting: boolean, contentWidth: number): void {
+	if (selecting && selAnchor === null) selAnchor = cursor
+	const next = verticalMove(buf, contentWidth, cursor, goalCol, dir)
+	if (!next.atBoundary) {
+		if (!selecting) selAnchor = null
+		cursor = next.cursor
+		goalCol = next.goalCol
+		return
+	}
+	if (!selecting && browseHistory(dir)) return
+	if (selecting) {
+		cursor = dir === -1 ? 0 : buf.length
+		goalCol = null
+		return
+	}
+	moveEdge(dir, false)
+}
 
-	// Cmd shortcuts (macOS)
-	if (k.cmd) {
-		if (k.key === 'c') {
-			const s = selRange()
-			if (s) writeToClipboard(buf.slice(s.start, s.end))
+function handleCmdKey(k: KeyEvent): boolean {
+	switch (k.key) {
+		case 'c': {
+			const sel = selRange()
+			if (sel) writeToClipboard(buf.slice(sel.start, sel.end))
 			return true
 		}
-		if (k.key === 'x') {
-			const s = selRange()
-			if (s) {
-				writeToClipboard(buf.slice(s.start, s.end))
-				deleteRange(s.start, s.end)
+		case 'x': {
+			const sel = selRange()
+			if (sel) {
+				writeToClipboard(buf.slice(sel.start, sel.end))
+				deleteRange(sel.start, sel.end)
 			}
 			return true
 		}
-		if (k.key === 'v') {
+		case 'v':
 			doPaste()
 			return true
-		}
-		if (k.key === 'a') {
+		case 'a':
 			selAnchor = 0
 			cursor = buf.length
 			return true
-		}
-		if (k.key === 'left') {
-			move(cmdWordLeft(buf, cursor), k.shift)
+		case 'left':
+			moveHorizontal(-1, k.shift, 'cmd-word')
 			return true
-		}
-		if (k.key === 'right') {
-			move(cmdWordRight(buf, cursor), k.shift)
+		case 'right':
+			moveHorizontal(1, k.shift, 'cmd-word')
 			return true
-		}
-		if (k.key === 'u' && k.shift) {
-			redo()
+		case 'u':
+			stepUndo(k.shift)
 			return true
-		}
-		if (k.key === 'u') {
-			undo()
-			return true
-		}
-		return false
+		default:
+			return false
 	}
+}
 
-	// Enter: shift+enter or alt+enter inserts newline; plain enter goes to
-	// keybindings (submit). Alt+enter is the fallback for terminals without
-	// kitty keyboard protocol — they can't distinguish shift+enter from enter.
-	if (k.key === 'enter' && (k.shift || k.alt)) {
+function handleKey(k: KeyEvent, contentWidth: number): boolean {
+	// Any non-single-char key breaks the typing undo group
+	if (!(k.char && k.char.length === 1 && !k.ctrl && !k.alt && !k.cmd)) undoGrouping = false
+	if (k.cmd) return handleCmdKey(k)
+
+	if (k.key === 'enter') {
+		if (!k.shift && !k.alt) return false
 		replaceSelection('\n')
 		return true
 	}
-	if (k.key === 'enter') return false
 
-	// Backspace / Delete
-	if (k.key === 'backspace') {
-		if (k.alt) {
-			if (!deleteSel() && cursor > 0) deleteRange(wordLeft(buf, cursor), cursor)
-		} else {
-			if (!deleteSel() && cursor > 0) deleteRange(cursor - 1, cursor)
-		}
-		return true
-	}
-	if (k.key === 'delete') {
-		if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
-		return true
-	}
-
-	// Ctrl+D: delete forward (return false when empty so cli can handle it)
-	if (k.key === 'd' && k.ctrl) {
-		if (buf.length === 0) return false
-		if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
-		return true
-	}
-
-	// Ctrl+U/K: kill line
-	if (k.key === 'u' && k.ctrl) {
-		if (cursor > 0) deleteRange(0, cursor)
-		return true
-	}
-	if (k.key === 'k' && k.ctrl) {
-		if (cursor < buf.length) deleteRange(cursor, buf.length)
-		return true
-	}
-
-	// Ctrl+A/E: home/end (Emacs)
-	if (k.key === 'a' && k.ctrl) {
-		move(0, k.shift)
-		return true
-	}
-	if (k.key === 'e' && k.ctrl) {
-		move(buf.length, k.shift)
-		return true
-	}
-
-	// Ctrl+V/Y: paste
-	if ((k.key === 'v' || k.key === 'y') && k.ctrl) {
-		doPaste()
-		return true
-	}
-
-	// Ctrl+/: undo, Shift+Ctrl+/: redo
-	if (k.key === '/' && k.ctrl && k.shift) {
-		redo()
-		return true
-	}
-	if (k.key === '/' && k.ctrl) {
-		undo()
-		return true
-	}
-
-	// Left / Right
-	if (k.key === 'left') {
-		if (k.alt) {
-			move(wordLeft(buf, cursor), k.shift)
+	switch (k.key) {
+		case 'backspace':
+			deleteBackward(k.alt)
+			return true
+		case 'delete':
+			deleteForward()
+			return true
+		case 'd':
+			if (!k.ctrl) break
+			if (buf.length === 0) return false
+			deleteForward()
+			return true
+		case 'u':
+			if (!k.ctrl) break
+			if (cursor > 0) deleteRange(0, cursor)
+			return true
+		case 'k':
+			if (!k.ctrl) break
+			if (cursor < buf.length) deleteRange(cursor, buf.length)
+			return true
+		case 'a':
+			if (!k.ctrl) break
+			moveEdge(-1, k.shift)
+			return true
+		case 'e':
+			if (!k.ctrl) break
+			moveEdge(1, k.shift)
+			return true
+		case 'v':
+		case 'y':
+			if (!k.ctrl) break
+			doPaste()
+			return true
+		case '/':
+			if (!k.ctrl) break
+			stepUndo(k.shift)
+			return true
+		case 'left':
+			moveHorizontal(-1, k.shift, k.alt ? 'word' : 'char')
+			return true
+		case 'right':
+			moveHorizontal(1, k.shift, k.alt ? 'word' : 'char')
+			return true
+		case 'up':
+		case 'down': {
+			const dir = k.key === 'up' ? -1 : 1
+			if (k.alt) moveEdge(dir, k.shift)
+			else moveVerticalKey(dir, k.shift, contentWidth)
 			return true
 		}
-		if (k.shift) {
-			move(cursor - 1, true)
+		case 'home':
+			moveEdge(-1, k.shift)
 			return true
-		}
-		collapseOrMove(cursor - 1, 'start')
-		return true
-	}
-	if (k.key === 'right') {
-		if (k.alt) {
-			move(wordRight(buf, cursor), k.shift)
+		case 'end':
+			moveEdge(1, k.shift)
 			return true
-		}
-		if (k.shift) {
-			move(cursor + 1, true)
-			return true
-		}
-		collapseOrMove(cursor + 1, 'end')
-		return true
 	}
 
-	// Up / Down: vertical move in wrapped text, history at boundaries
-	if (k.key === 'up' || k.key === 'down') {
-		const dir = k.key === 'up' ? -1 : 1
-		if (k.alt) {
-			move(dir === -1 ? 0 : buf.length, k.shift)
-			return true
-		}
-
-		if (!k.shift) {
-			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
-			if (!r.atBoundary) {
-				selAnchor = null
-				cursor = r.cursor
-				goalCol = r.goalCol
-				return true
-			}
-			if (browseHistory(dir)) return true
-			move(dir === -1 ? 0 : buf.length, false)
-		} else {
-			if (selAnchor === null) selAnchor = cursor
-			const r = verticalMove(buf, contentWidth, cursor, goalCol, dir)
-			if (!r.atBoundary) {
-				cursor = r.cursor
-				goalCol = r.goalCol
-			} else {
-				cursor = dir === -1 ? 0 : buf.length
-				goalCol = null
-			}
-		}
-		return true
+	if (!k.char) return false
+	if (k.char.length === 1 && !selRange()) typeChar(k.char)
+	else {
+		const text = k.char.length > 1 ? clipboard.cleanPaste(k.char) : k.char
+		if (text) replaceSelection(text)
 	}
-
-	// Home / End
-	if (k.key === 'home') {
-		move(0, k.shift)
-		return true
-	}
-	if (k.key === 'end') {
-		move(buf.length, k.shift)
-		return true
-	}
-
-	// Printable
-	if (k.char) {
-		if (k.char.length === 1 && !selRange()) {
-			typeChar(k.char)
-		} else {
-			const text = k.char.length > 1 ? clipboard.cleanPaste(k.char) : k.char
-			if (text) replaceSelection(text)
-		}
-		return true
-	}
-
-	return false
+	return true
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
