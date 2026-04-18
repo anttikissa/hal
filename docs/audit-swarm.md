@@ -20,3 +20,9 @@ Small practical additions:
 - Don’t autoclose the subagents if you want to inspect their tabs later.
 - Have each subagent commit only its own changes.
 - Verify each handoff before trusting the summary.
+
+Suggested audit cadence:
+- Every 50 commits: unused code, legacy/fallback, error handling
+- Every 100 commits: circular deps, strong typing, DRY/dedupe
+- Every 200 commits: shared types, comment/slop
+- Also run immediately after major provider/protocol changes, big module moves, or feature removals
