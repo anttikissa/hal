@@ -18,14 +18,6 @@ import { replay } from '../session/replay.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
 
-interface RuntimeSession {
-	id: string
-	name?: string
-	model?: string
-	cwd: string
-	createdAt: string
-}
-
 let activeSessions: string[] = []
 let activeRuntimePid: number | null = null
 let stopPromptWatch: (() => void) | null = null
@@ -46,26 +38,6 @@ function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name' | 'topic'>): string 
 
 function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name' | 'topic'>): string {
 	return `${sessionTitle(meta)} (${meta.id})`
-}
-
-function runtimeSession(meta: SessionMeta): RuntimeSession {
-	return {
-		id: meta.id,
-		name: meta.name ?? meta.topic,
-		model: meta.model,
-		cwd: meta.workingDir ?? process.cwd(),
-		createdAt: meta.createdAt,
-	}
-}
-
-function testMeta(session: RuntimeSession): SessionMeta {
-	return {
-		id: session.id,
-		name: session.name,
-		model: session.model,
-		workingDir: session.cwd,
-		createdAt: session.createdAt,
-	}
 }
 
 function activeMetas(): SessionMeta[] {
@@ -156,32 +128,26 @@ function recordSessionInfo(sessionId: string, text: string, ts: string): void {
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts }])
 }
 
-function openSession(openerId?: string, afterId?: string, sessionId = sessionIds.reserve()): SessionMeta {
-	const meta = sessionStore.createSession(sessionId, {
-		id: sessionId,
-		workingDir: process.cwd(),
-		createdAt: new Date().toISOString(),
-		name: undefined,
-		topic: undefined,
-	})
-	insertSessionAfter(sessionId, afterId)
-	const opener = openerId ? sessionStore.loadSessionMeta(openerId) : null
-	recordSessionInfo(
-		sessionId,
-		opener
-			? `User opened a new tab: ${sessionLabel(meta)}. Opened from ${sessionLabel(opener)}.`
-			: `User opened a new tab: ${sessionLabel(meta)}.`,
-		meta.createdAt,
-	)
+function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string }): SessionMeta {
+	const sessionId = opts.sessionId ?? sessionIds.reserve()
+	const meta = opts.sourceId
+		? sessionStore.forkSession(opts.sourceId, sessionId)
+		: sessionStore.createSession(sessionId, {
+			id: sessionId,
+			workingDir: process.cwd(),
+			createdAt: new Date().toISOString(),
+			name: undefined,
+			topic: undefined,
+		})
+	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
+	const related = sessionStore.loadSessionMeta(opts.sourceId ?? opts.openerId ?? '')
+	const text = opts.sourceId
+		? related ? `User forked ${sessionLabel(related)} into ${sessionLabel(meta)}.` : ''
+		: related
+			? `User opened a new tab: ${sessionLabel(meta)}. Opened from ${sessionLabel(related)}.`
+			: `User opened a new tab: ${sessionLabel(meta)}.`
+	if (text) recordSessionInfo(sessionId, text, meta.createdAt)
 	return meta
-}
-
-function createForkSession(sourceId: string, newId = sessionIds.reserve()): SessionMeta {
-	const child = sessionStore.forkSession(sourceId, newId)
-	insertSessionAfter(newId, sourceId)
-	const parent = sessionStore.loadSessionMeta(sourceId)
-	if (parent) recordSessionInfo(child.id, `User forked ${sessionLabel(parent)} into ${sessionLabel(child)}.`, child.createdAt)
-	return child
 }
 
 function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean): string {
@@ -204,9 +170,11 @@ function queuePromptCommand(sessionId: string, text: string, source?: string): v
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
-	const child = mode === 'fork'
-		? createForkSession(parent.id, spec.childSessionId)
-		: openSession(undefined, parent.id, spec.childSessionId)
+	const child = createSessionTab(
+		mode === 'fork'
+			? { sourceId: parent.id, sessionId: spec.childSessionId }
+			: { afterId: parent.id, sessionId: spec.childSessionId },
+	)
 	const workingDir = spec.cwd || (mode === 'fork' ? child.workingDir : parent.workingDir) || process.cwd()
 	const model = spec.model || (mode === 'fork' ? child.model : parent.model)
 	const name = spec.title || child.name
@@ -226,7 +194,6 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec: SpawnSpec): Promise<void> {
 	await dispatchPromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone), parent.id)
 }
-
 function restartPromptWatch(): void {
 	stopPromptWatch?.()
 	stopPromptWatch = context.watchPromptFiles(
@@ -306,7 +273,7 @@ function closeSession(sessionId: string, openReplacement = false): void {
 	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closeWhenDone: false })
 	sessionStore.deactivateSession(sessionId)
 	activeSessions = activeSessions.filter((id) => id !== sessionId)
-	if (openReplacement && activeSessions.length === 0) openSession()
+	if (openReplacement && activeSessions.length === 0) createSessionTab({})
 	broadcastSessions()
 }
 
@@ -437,14 +404,14 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'open': {
 			if ('forkSessionId' in cmd) {
-				const child = createForkSession(cmd.forkSessionId)
+				const child = createSessionTab({ sourceId: cmd.forkSessionId })
 				const msg = `forked ${cmd.forkSessionId} → ${child.id}`
 				emitInfo(cmd.forkSessionId, msg)
 				emitInfo(child.id, msg)
 			} else if ('afterSessionId' in cmd) {
-				openSession(sessionId, cmd.afterSessionId)
+				createSessionTab({ openerId: sessionId, afterId: cmd.afterSessionId })
 			} else {
-				openSession(sessionId)
+				createSessionTab({ openerId: sessionId })
 			}
 			broadcastSessions()
 			break
@@ -518,7 +485,7 @@ function startRuntime(signal: AbortSignal): void {
 	const metas = sessionStore.loadSessionMetas()
 	activeSessions = metas.map((meta) => meta.id)
 	if (activeSessions.length === 0) {
-		openSession()
+		createSessionTab({})
 		if (!signal.aborted && activeRuntimePid === process.pid) broadcastSessions()
 	}
 	restartPromptWatch()
@@ -616,7 +583,6 @@ export const runtime = {
 	shouldAutoContinue,
 	shouldCloseSessionAfterGeneration,
 	recordTabClosed,
-	spawnSessionForTests: (parent: RuntimeSession, spec: SpawnSpec): RuntimeSession => runtimeSession(spawnSession(testMeta(parent), spec)),
-	startSpawnedSessionForTests: (parent: RuntimeSession, child: RuntimeSession, spec: SpawnSpec): Promise<void> =>
-		startSpawnedSession(testMeta(parent), testMeta(child), spec),
+	spawnSession,
+	startSpawnedSession,
 }

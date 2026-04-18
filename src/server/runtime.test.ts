@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 import { runtime } from './runtime.ts'
+import type { SessionMeta } from './sessions.ts'
 import { ipc } from '../ipc.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
-
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
 	const picked = runtime.pickMostRecentlyClosedSessionId(
 		[
@@ -114,13 +114,14 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 			createdAt: '2026-04-14T12:00:00.000Z',
 			model: 'anthropic/claude-sonnet-4.5',
 		})
-		const child = await runtime.spawnSessionForTests({
+		const parent: SessionMeta = {
 			id: '04-parent',
 			name: 'parent',
-			cwd: '/work/parent',
+			workingDir: '/work/parent',
 			model: 'anthropic/claude-sonnet-4.5',
 			createdAt: '2026-04-14T12:00:00.000Z',
-		}, {
+		}
+		const child = await runtime.spawnSession(parent, {
 			task: 'Do the thing',
 			mode: 'fresh',
 			model: 'openai/gpt-5',
@@ -131,7 +132,7 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		})
 
 		expect(child.model).toBe('openai/gpt-5')
-		expect(child.cwd).toBe('/work/child')
+		expect(child.workingDir).toBe('/work/child')
 		expect(child.id).toBe('04-kid')
 		const meta = sessions.loadSessionMeta(child.id)
 		expect(meta?.workingDir).toBe('/work/child')
@@ -172,10 +173,10 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 			createdAt: '2026-04-14T12:00:00.000Z',
 			model: 'anthropic/claude-sonnet-4.5',
 		})
-		const parent = {
+		const parent: SessionMeta = {
 			id: '04-parent',
 			name: 'parent',
-			cwd: '/work/parent',
+			workingDir: '/work/parent',
 			model: 'anthropic/claude-sonnet-4.5',
 			createdAt: '2026-04-14T12:00:00.000Z',
 		}
@@ -187,8 +188,8 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 			title: 'Child tab',
 			closeWhenDone: false,
 		}
-		const child = await runtime.spawnSessionForTests(parent, spec)
-		await runtime.startSpawnedSessionForTests(parent, child, spec)
+		const child = await runtime.spawnSession(parent, spec)
+		await runtime.startSpawnedSession(parent, child, spec)
 
 		const history = sessions.loadHistory(child.id)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
