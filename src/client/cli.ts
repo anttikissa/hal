@@ -12,6 +12,7 @@ import { popup } from './popup.ts'
 import { clipboard } from '../cli/clipboard.ts'
 import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
+import { openaiUsage } from '../openai-usage.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
 const RESTART_CODE = 100
@@ -337,7 +338,7 @@ function handleAppKey(k: KeyEvent): boolean {
 		const currentModel = client.currentTab()?.model || client.state.model || undefined
 		popup.openModelPicker((model) => {
 			submit(`/model ${model}`)
-			syncPromptToClient()
+			openaiUsage.noteActivity()
 			draw()
 		}, currentModel)
 		draw()
@@ -423,7 +424,7 @@ function startCli(signal: AbortSignal): void {
 
 	// Wire prompt to trigger repaint on async paste resolve.
 	prompt.setRenderCallback(() => {
-		syncPromptToClient()
+		openaiUsage.noteActivity()
 		draw()
 	})
 
@@ -480,7 +481,7 @@ function startCli(signal: AbortSignal): void {
 		// Load incoming tab's draft and history
 		prompt.setText(client.getInputDraft())
 		prompt.setHistory(client.getInputHistory())
-		syncPromptToClient()
+		openaiUsage.noteActivity()
 	})
 
 	// When another client saves a draft for our active tab and our
@@ -489,7 +490,7 @@ function startCli(signal: AbortSignal): void {
 	client.setOnDraftArrived((text) => {
 		if (!prompt.text() && text) {
 			prompt.setText(text)
-			syncPromptToClient()
+			openaiUsage.noteActivity()
 			draw()
 		}
 	})
@@ -507,13 +508,13 @@ function startCli(signal: AbortSignal): void {
 			}
 			// Popup keys first — an active modal owns the keyboard.
 			if (popup.state.active && popup.handleKey(k)) {
-				syncPromptToClient()
+				openaiUsage.noteActivity()
 				draw()
 				continue
 			}
 			// Completion keys next (tab, arrows in popup, etc.)
 			if (handleCompletionKey(k)) {
-				syncPromptToClient()
+				openaiUsage.noteActivity()
 				draw()
 				continue
 			}
@@ -521,7 +522,7 @@ function startCli(signal: AbortSignal): void {
 			if (handleAppKey(k)) continue
 			// Then prompt editing
 			if (prompt.handleKey(k, process.stdout.columns || 80)) {
-				syncPromptToClient()
+				openaiUsage.noteActivity()
 				draw()
 			}
 		}
@@ -530,10 +531,6 @@ function startCli(signal: AbortSignal): void {
 	process.stdin.on('close', handleStdinClosed)
 }
 
-// Keep client.state in sync with prompt state (for rendering)
-function syncPromptToClient(): void {
-	client.setPrompt(prompt.text(), prompt.cursorPos())
-}
 
 export const cli = {
 	startCli,

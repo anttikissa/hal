@@ -14,7 +14,7 @@ import { STATE_DIR } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { openaiUsage } from './openai-usage.ts'
-import { models } from './models.ts'
+import { liveEventBlocks } from './live-event-blocks.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,8 +72,6 @@ const config = {
 const state = {
 	tabs: [] as Tab[],
 	activeTab: 0,
-	promptText: '',
-	promptCursor: 0,
 	role: 'server' as 'server' | 'client',
 	pid: process.pid,
 	hostPid: null as number | null,
@@ -336,17 +334,15 @@ function tabForSession(sessionId: string | null): Tab | null {
 	return currentTab()
 }
 
-function lastHistoryBlock(tab: Tab): Block | null {
-	return tab.history[tab.history.length - 1] ?? null
-}
-
-function closeStreamingBlock(tab: Tab): void {
-	const last = lastHistoryBlock(tab)
-	if (!last) return
-	if ((last.type === 'assistant' || last.type === 'thinking') && last.streaming) {
-		delete last.streaming
-		touchTab(tab)
-	}
+function applyLiveEventToTab(tab: Tab, event: any): { changed: boolean; toolBlock?: any } {
+	return liveEventBlocks.applyEvent({
+		blocks: tab.history,
+		event,
+		sessionId: tab.sessionId,
+		defaultModel: tab.model,
+		touchBlock: blockModule.touch,
+		onChange: () => touchTab(tab),
+	})
 }
 
 function isBusy(): boolean {
@@ -533,20 +529,6 @@ function prevTab(): void {
 	if (state.tabs.length > 0) switchTab((state.activeTab - 1 + state.tabs.length) % state.tabs.length)
 }
 
-// ── Prompt mirroring ─────────────────────────────────────────────────────────
-
-function setPrompt(text: string, cursor: number): void {
-	state.promptText = text
-	state.promptCursor = cursor
-	openaiUsage.noteActivity()
-	onChange(false)
-}
-
-function clearPrompt(): void {
-	state.promptText = ''
-	state.promptCursor = 0
-	onChange(false)
-}
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
@@ -594,18 +576,7 @@ function hasTrailingAssistantText(tab: Tab, text: string): boolean {
 
 
 function assistantChainId(block: Block): string | null {
-	if (block.type !== 'assistant') return null
-	return block.continue ?? block.id ?? null
-}
-
-function lastInterruptedAssistantId(tab: Tab): string | null {
-	for (let i = tab.history.length - 1; i >= 0; i--) {
-		const block = tab.history[i]!
-		if (block.type === 'tool') continue
-		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
-		return block.type === 'assistant' ? assistantChainId(block) : null
-	}
-	return null
+	return liveEventBlocks.assistantChainId(block)
 }
 
 function isContinuableStatusBlock(block: Block): boolean {
@@ -686,7 +657,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	return tab
 }
 
-function applySessionList(items: SharedSessionInfo[]): void {
+function applySessionList(items: SharedSessionInfo[], preferredSession = ''): void {
 	const previousTabs = state.tabs
 	const previousById = new Map(previousTabs.map((tab) => [tab.sessionId, tab]))
 	const previousSession = previousTabs[state.activeTab]?.sessionId ?? ''
@@ -710,20 +681,21 @@ function applySessionList(items: SharedSessionInfo[]): void {
 		}
 	}
 	const grew = newTabs.length > previousTabs.length
-	const shrank = newTabs.length < previousTabs.length
 	state.tabs = newTabs
 	const openIds = new Set(newTabs.map((tab) => tab.sessionId))
 	pruneRecentTabs(openIds)
 
-	const targetSession = pickActiveSessionAfterSessionListChange({
-		previousSession,
-		previousIndex,
-		previousLength: previousTabs.length,
-		newSessionIds: newTabs.map((tab) => tab.sessionId),
-		recentTabs: state.recentTabs,
-		pendingOpen,
-		openedSessionId,
-	})
+	const targetSession = previousTabs.length === 0 && preferredSession && openIds.has(preferredSession)
+		? preferredSession
+		: pickActiveSessionAfterSessionListChange({
+			previousSession,
+			previousIndex,
+			previousLength: previousTabs.length,
+			newSessionIds: newTabs.map((tab) => tab.sessionId),
+			recentTabs: state.recentTabs,
+			pendingOpen,
+			openedSessionId,
+		})
 
 	const nextIndex = newTabs.findIndex((tab) => tab.sessionId === targetSession)
 	state.activeTab = nextIndex >= 0 ? nextIndex : Math.max(0, Math.min(previousIndex, newTabs.length - 1))
@@ -750,11 +722,7 @@ function applySessionList(items: SharedSessionInfo[]): void {
 	onChange(false)
 }
 
-function applySharedState(shared: SharedState): void {
-	if (shared.openSessions.length > 0) {
-		applySessionList(shared.openSessions)
-	}
-
+function applySharedStatus(shared: SharedState): void {
 	const activeSession = currentTab()?.sessionId
 	const nextBusy = new Map<string, boolean>()
 	let changedDoneUnseen = false
@@ -778,6 +746,11 @@ function applySharedState(shared: SharedState): void {
 	state.hostVersion = shared.host?.version ?? ''
 }
 
+function applySharedState(shared: SharedState): void {
+	if (shared.openSessions.length > 0) applySessionList(shared.openSessions)
+	applySharedStatus(shared)
+}
+
 function handleEvent(event: any): void {
 	if (event.type === 'host-released') return
 	if (event.type === 'runtime-start') {
@@ -795,100 +768,63 @@ function handleEvent(event: any): void {
 			status: event.label,
 			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 		})
-	} else if (event.type === 'stream-start' && event.sessionId) {
+		return
+	}
+
+	if (event.type === 'stream-start' && event.sessionId) {
 		flushDelayedPaused(event.sessionId)
 		const tab = tabForSession(event.sessionId)
-		if (tab) closeStreamingBlock(tab)
-	} else if (event.type === 'stream-delta' && event.sessionId && event.text) {
+		if (tab) applyLiveEventToTab(tab, event)
+		return
+	}
+
+	if (event.type === 'stream-delta' && event.sessionId && event.text) {
 		flushDelayedPaused(event.sessionId)
 		const tab = tabForSession(event.sessionId)
-		if (tab) {
-			const ts = event.createdAt ? Date.parse(event.createdAt) : undefined
-			const last = lastHistoryBlock(tab)
-			if (event.channel === 'thinking') {
-				if (last?.type === 'thinking' && last.streaming) {
-					last.text += event.text
-					if (event.blobId) last.blobId = event.blobId
-					if (!last.sessionId) last.sessionId = event.sessionId
-					if (!last.ts) last.ts = ts
-					if (!last.model) last.model = event.model ?? tab.model
-					if (!last.thinkingEffort) last.thinkingEffort = event.thinkingEffort ?? models.reasoningEffort(last.model)
-					blockModule.touch(last)
-				} else {
-					closeStreamingBlock(tab)
-					tab.history.push({
-						type: 'thinking',
-						text: event.text,
-						model: event.model ?? tab.model,
-						thinkingEffort: event.thinkingEffort ?? models.reasoningEffort(event.model ?? tab.model),
-						blobId: event.blobId,
-						sessionId: event.sessionId,
-						ts,
-						streaming: true,
-					})
-				}
-			} else if (last?.type === 'assistant' && last.streaming) {
-				last.text += event.text
-				if (!last.ts) last.ts = ts
-				if (!last.model) last.model = event.model ?? tab.model
-				blockModule.touch(last)
-			} else {
-				closeStreamingBlock(tab)
-				const continueId = lastInterruptedAssistantId(tab)
-				tab.history.push({
-					type: 'assistant',
-					text: event.text,
-					model: event.model ?? tab.model,
-					id: continueId ? undefined : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-					continue: continueId ?? undefined,
-					ts,
-					streaming: true,
-				})
-			}
-			touchTab(tab)
-			repaintIfActive(tab)
+		if (tab && applyLiveEventToTab(tab, event).changed) repaintIfActive(tab)
+		return
+	}
+
+	if (event.type === 'stream-end' && event.sessionId) {
+		flushDelayedPaused(event.sessionId)
+		const tab = tabForSession(event.sessionId)
+		if (!tab) return
+		applyLiveEventToTab(tab, event)
+		if (event.usage) {
+			tab.usage ??= { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
+			tab.usage.input += event.usage.input ?? 0
+			tab.usage.output += event.usage.output ?? 0
+			tab.usage.cacheRead += event.usage.cacheRead ?? 0
+			tab.usage.cacheCreation += event.usage.cacheCreation ?? 0
 		}
-	} else if (event.type === 'stream-end' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		const tab = tabForSession(event.sessionId)
-		if (tab) {
-			closeStreamingBlock(tab)
-			if (event.usage) {
-				tab.usage ??= { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
-				tab.usage.input += event.usage.input ?? 0
-				tab.usage.output += event.usage.output ?? 0
-				tab.usage.cacheRead += event.usage.cacheRead ?? 0
-				tab.usage.cacheCreation += event.usage.cacheCreation ?? 0
-			}
-			if (event.contextUsed != null) tab.contextUsed = event.contextUsed
-			if (event.contextMax != null) tab.contextMax = event.contextMax
-			repaintIfActive(tab)
-		}
-	} else if (event.type === 'response') {
+		if (event.contextUsed != null) tab.contextUsed = event.contextUsed
+		if (event.contextMax != null) tab.contextMax = event.contextMax
+		repaintIfActive(tab)
+		return
+	}
+
+	if (event.type === 'response') {
 		flushDelayedPaused(event.sessionId ?? null)
 		const tab = tabForSession(event.sessionId ?? null)
-		if (tab) closeStreamingBlock(tab)
+		if (!tab) return
+		applyLiveEventToTab(tab, { type: 'stream-end' })
 		if (event.isError) {
-			addBlockToTab(event.sessionId ?? null, {
-				type: 'error',
-				text: event.text,
-				blobId: event.blobId,
-				sessionId: event.sessionId ?? undefined,
-				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-			})
-		} else if (tab && event.text && !hasTrailingAssistantText(tab, event.text)) {
+			applyLiveEventToTab(tab, event)
+			onChange(false)
+		} else if (event.text && !hasTrailingAssistantText(tab, event.text)) {
 			addBlockToTab(event.sessionId ?? null, {
 				type: 'assistant',
 				text: event.text,
 				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 			})
 		}
-	} else if (event.type === 'info') {
-		// Close any open streaming block first so later deltas become a visible
-		// continuation chunk instead of mutating text above this notice.
+		return
+	}
+
+	if (event.type === 'info') {
 		const sessionId = event.sessionId ?? null
 		const tab = tabForSession(sessionId)
-		if (tab) closeStreamingBlock(tab)
+		if (tab) applyLiveEventToTab(tab, { type: 'stream-end' })
 
 		// Give steering a brief chance to arrive before we render [paused]. If the
 		// very next event is a steering prompt, we cancel this pending notice and
@@ -903,52 +839,45 @@ function handleEvent(event: any): void {
 		}
 
 		flushDelayedPaused(sessionId)
-		// Keep info-level errors as error blocks in memory.
-		// Persisted sessions already do this when replaying history, so live tabs
-		// should match what a reload would show.
-		addBlockToTab(sessionId, {
-			type: event.level === 'error' ? 'error' : 'info',
-			text: event.text,
-			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-		})
-	} else if (event.type === 'tool-call' && event.sessionId) {
+		if (tab) {
+			applyLiveEventToTab(tab, event)
+			onChange(false)
+		}
+		return
+	}
+
+	if (event.type === 'tool-call' && event.sessionId) {
 		flushDelayedPaused(event.sessionId)
 		const tab = tabForSession(event.sessionId)
-		if (tab) closeStreamingBlock(tab)
-		addBlockToTab(event.sessionId, {
-			type: 'tool',
-			name: event.name,
-			input: event.input,
-			blobId: event.blobId,
-			sessionId: event.sessionId,
-			toolId: event.toolId,
-			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-		})
-	} else if (event.type === 'tool-result' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		const tab = state.tabs.find((t) => t.sessionId === event.sessionId)
 		if (tab) {
-			const toolBlock = tab.history.find((b: any) => b.type === 'tool' && b.toolId === event.toolId) as any
-			if (toolBlock) {
-				toolBlock.output = event.output
-				if (event.blobId) toolBlock.blobId = event.blobId
-				delete toolBlock.blobLoaded
-				blockModule.touch(toolBlock)
-				touchTab(tab)
-				onChange(false)
-				// IPC tool-result events only carry a truncated preview. Reload the
-				// tool's blob in the background so edit/read blocks show full output.
-				if (toolBlock.blobId) {
-					void (async () => {
-						const loaded = await blockModule.loadBlobs([toolBlock])
-						if (loaded <= 0) return
-						touchTab(tab)
-						onChange(false)
-					})()
-				}
+			applyLiveEventToTab(tab, event)
+			onChange(false)
+		}
+		return
+	}
+
+	if (event.type === 'tool-result' && event.sessionId) {
+		flushDelayedPaused(event.sessionId)
+		const tab = state.tabs.find((item) => item.sessionId === event.sessionId)
+		const toolBlock = tab ? applyLiveEventToTab(tab, event).toolBlock : null
+		if (toolBlock) {
+			delete toolBlock.blobLoaded
+			onChange(false)
+			// IPC tool-result events only carry a truncated preview. Reload the
+			// tool's blob in the background so edit/read blocks show full output.
+			if (toolBlock.blobId) {
+				void (async () => {
+					const loaded = await blockModule.loadBlobs([toolBlock])
+					if (loaded <= 0) return
+					touchTab(tab!)
+					onChange(false)
+				})()
 			}
 		}
-	} else if (event.type === 'draft_saved' && event.sessionId) {
+		return
+	}
+
+	if (event.type === 'draft_saved' && event.sessionId) {
 		flushDelayedPaused(event.sessionId)
 		// Another client saved a draft. Update the in-memory copy for that
 		// tab. If it's the active tab and our prompt is empty, show it.
@@ -957,9 +886,7 @@ function handleEvent(event: any): void {
 			const text = draftModule.loadDraft(event.sessionId)
 			tab.inputDraft = text
 			const active = currentTab()
-			if (active?.sessionId === event.sessionId && onDraftArrived) {
-				onDraftArrived(text)
-			}
+			if (active?.sessionId === event.sessionId && onDraftArrived) onDraftArrived(text)
 		}
 	}
 }
@@ -974,21 +901,23 @@ function sessionInfoFromMeta(meta: SessionMeta, _index: number): SharedSessionIn
 	}
 }
 
-function restoreStartupSelection(): void {
-	const saved = loadClientState()
-	const unseenDone = new Set(saved.doneUnseen)
-	for (const tab of state.tabs) tab.doneUnseen = unseenDone.has(tab.sessionId)
-	const lastIdx = saved.lastTab ? state.tabs.findIndex((t) => t.sessionId === saved.lastTab) : -1
-	state.activeTab = lastIdx >= 0 ? lastIdx : 0
-	if (state.tabs[state.activeTab]) rememberTab(state.tabs[state.activeTab]!.sessionId)
-	if (saved.model) state.model = saved.model
+function initializeSessions(shared: SharedState): void {
+	const items = shared.openSessions.length > 0
+		? shared.openSessions
+		: sessionStore.loadAllSessionMetas().map(sessionInfoFromMeta)
+	if (items.length === 0) {
+		applySharedStatus(shared)
+		return
+	}
 
-	const active = state.tabs[state.activeTab]
+	const saved = loadClientState()
+	const t0 = performance.now()
+	applySessionList(items, saved.lastTab ?? '')
+	const active = currentTab()
+	const unseenDone = new Set(saved.doneUnseen)
+	for (const tab of state.tabs) tab.doneUnseen = tab.sessionId !== active?.sessionId && unseenDone.has(tab.sessionId)
+	if (saved.model) state.model = saved.model
 	if (active) {
-		// The focused tab is being viewed now, so its unseen-finished marker should clear.
-		active.doneUnseen = false
-		const t0 = performance.now()
-		ensureTabLoaded(active)
 		const replayMs = (performance.now() - t0).toFixed(1)
 		perf.mark(`Active tab replayed (${active.history.length} blocks, ${replayMs}ms)`)
 		active.inputDraft = draftModule.loadDraft(active.sessionId)
@@ -997,15 +926,7 @@ function restoreStartupSelection(): void {
 	const cols = process.stdout.columns || 80
 	if (saved.peakCols === cols && saved.peak > 0) state.peak = saved.peak
 	state.peakCols = cols
-}
-
-function bootstrapSessions(): void {
-	const items = ipcStateFile?.openSessions?.length
-		? ipcStateFile.openSessions
-		: sessionStore.loadAllSessionMetas().map(sessionInfoFromMeta)
-	if (items.length === 0) return
-	applySessionList(items)
-	restoreStartupSelection()
+	applySharedStatus(shared)
 	perf.mark(`Client loaded ${items.length} sessions (1 active)`)
 }
 
@@ -1072,16 +993,17 @@ function startWatchingHostLock(): void {
 
 let ipcStateFile: SharedState | null = null
 
-function startWatchingIpcState(): void {
-	if (ipcStateFile) return
-	// Bootstrap state belongs in state.ason. New clients read it once, then keep
-	// following changes via the file watcher while tailing only future events.
-	ipcStateFile = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, ipc.readState())
-	applySharedState(ipcStateFile)
-	liveFiles.onChange(ipcStateFile, () => {
-		applySharedState(ipcStateFile!)
-		onChange(false)
-	})
+function startWatchingIpcState(): SharedState {
+	if (!ipcStateFile) {
+		// Bootstrap state belongs in state.ason. New clients read it once, then keep
+		// following changes via the file watcher while tailing only future events.
+		ipcStateFile = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, ipc.readState())
+		liveFiles.onChange(ipcStateFile, () => {
+			applySharedState(ipcStateFile!)
+			onChange(false)
+		})
+	}
+	return ipcStateFile
 }
 
 function resetForTests(): void {
@@ -1102,7 +1024,7 @@ function resetForTests(): void {
 
 function startClient(signal: AbortSignal): void {
 	startWatchingHostLock()
-	startWatchingIpcState()
+	const shared = startWatchingIpcState()
 	openaiUsage.onChange(() => onChange(false))
 
 	void (async () => {
@@ -1111,8 +1033,7 @@ function startClient(signal: AbortSignal): void {
 		}
 	})()
 
-	// Bootstrap tabs once, using the same tab builder as normal session updates.
-	bootstrapSessions()
+	initializeSessions(shared)
 	onChange(false)
 
 	// Background-load blobs + remaining tabs after first paint
@@ -1137,8 +1058,6 @@ export const client = {
 	prevTab,
 	addEntry,
 	addStartupEntry: (text: string) => queueLocalBlock({ type: 'startup', text, ts: Date.now() }),
-	setPrompt,
-	clearPrompt,
 	sendCommand,
 	startClient,
 	saveState: saveClientState,

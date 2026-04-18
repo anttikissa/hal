@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { cli } from './cli.ts'
 import { client } from '../client.ts'
 import { ipc } from '../ipc.ts'
+import { prompt } from '../cli/prompt.ts'
 
 function makeRawSink(): { lines: string[]; emit: (text: string) => void } {
 	const lines: string[] = []
@@ -115,6 +116,8 @@ test('enter on empty paused tab sends continue', () => {
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab({ history: [{ type: 'info', text: '[paused]' }] as any[] }))
 	client.state.activeTab = 0
+	prompt.clear()
+	client.state.busy.clear()
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
@@ -138,6 +141,8 @@ test('enter on empty normal tab does not send continue', () => {
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab())
 	client.state.activeTab = 0
+	prompt.clear()
+	client.state.busy.clear()
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {

@@ -7,7 +7,7 @@ import { STATE_DIR, ensureDir } from '../state.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
-import { models } from '../models.ts'
+import { liveEventBlocks } from '../live-event-blocks.ts'
 import type { PartialTokenUsage } from '../protocol.ts'
 
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
@@ -137,117 +137,9 @@ function updateLive(sessionId: string, mutator: (live: SessionLive) => void): Se
 	return live
 }
 
-function lastLiveBlock(live: SessionLive): any | null {
-	return live.blocks[live.blocks.length - 1] ?? null
-}
-
-function closeStreamingBlock(live: SessionLive): void {
-	const last = lastLiveBlock(live)
-	if ((last?.type === 'assistant' || last?.type === 'thinking') && last.streaming) delete last.streaming
-}
-
-function assistantChainId(block: any): string | null {
-	if (block?.type !== 'assistant') return null
-	return block.continue ?? block.id ?? null
-}
-
-function lastInterruptedAssistantId(live: SessionLive): string | null {
-	for (let i = live.blocks.length - 1; i >= 0; i--) {
-		const block = live.blocks[i]
-		if (!block || block.type === 'tool') continue
-		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
-		return block.type === 'assistant' ? assistantChainId(block) : null
-	}
-	return null
-}
-
 function applyLiveEvent(sessionId: string, event: any): void {
-	if (!event?.type) return
 	updateLive(sessionId, (live) => {
-		const ts = event.createdAt ? Date.parse(event.createdAt) : undefined
-		if (event.type === 'stream-start') {
-			closeStreamingBlock(live)
-			return
-		}
-		if (event.type === 'stream-delta' && event.text) {
-			const last = lastLiveBlock(live)
-			if (event.channel === 'thinking') {
-				if (last?.type === 'thinking' && last.streaming) {
-					last.text += event.text
-					if (event.blobId) last.blobId = event.blobId
-					if (!last.sessionId) last.sessionId = sessionId
-					if (!last.ts) last.ts = ts
-					if (!last.model) last.model = event.model
-					if (!last.thinkingEffort)
-						last.thinkingEffort = event.thinkingEffort ?? models.reasoningEffort(last.model)
-					return
-				}
-				closeStreamingBlock(live)
-				live.blocks.push({
-					type: 'thinking',
-					text: event.text,
-					model: event.model,
-					thinkingEffort: event.thinkingEffort ?? models.reasoningEffort(event.model),
-					blobId: event.blobId,
-					sessionId,
-					ts,
-					streaming: true,
-				})
-				return
-			}
-			if (last?.type === 'assistant' && last.streaming) {
-				last.text += event.text
-				if (!last.ts) last.ts = ts
-				if (!last.model) last.model = event.model
-				return
-			}
-			closeStreamingBlock(live)
-			const continueId = lastInterruptedAssistantId(live)
-			live.blocks.push({
-				type: 'assistant',
-				text: event.text,
-				model: event.model,
-				id: continueId ? undefined : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-				continue: continueId ?? undefined,
-				ts,
-				streaming: true,
-			})
-			return
-		}
-		if (event.type === 'tool-call') {
-			closeStreamingBlock(live)
-			live.blocks.push({
-				type: 'tool',
-				name: event.name,
-				input: event.input,
-				blobId: event.blobId,
-				sessionId,
-				toolId: event.toolId,
-				ts,
-			})
-			return
-		}
-		if (event.type === 'tool-result') {
-			const toolBlock = live.blocks.findLast(
-				(block: any) => block?.type === 'tool' && block.toolId === event.toolId,
-			)
-			if (toolBlock) {
-				toolBlock.output = event.output
-				if (event.blobId) toolBlock.blobId = event.blobId
-			}
-			return
-		}
-		if (event.type === 'info' && event.text) {
-			closeStreamingBlock(live)
-			live.blocks.push({ type: event.level === 'error' ? 'error' : 'info', text: event.text, ts })
-			return
-		}
-		if (event.type === 'response' && event.isError && event.text) {
-			closeStreamingBlock(live)
-			live.blocks.push({ type: 'error', text: event.text, blobId: event.blobId, sessionId, ts })
-			return
-		}
-		if (event.type === 'stream-end') closeStreamingBlock(live)
+		liveEventBlocks.applyEvent({ blocks: live.blocks, event, sessionId })
 	})
 }
 
