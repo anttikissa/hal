@@ -1,94 +1,182 @@
-# LOC reduction plan for `src/runtime/commands.ts`
+# LOC-reduction review for `src/runtime/commands.ts`
 
-## 1. Current measured size
+## Current measured size
 
-Measured on the current live branch, not from old notes:
+Measured on the live branch during this review:
 
-- `bun cloc src/runtime/commands.ts`: **656 LOC**
-- `bun cloc` repo total: **12,782 LOC**
+- `bun cloc src/runtime/commands.ts` → **656 LOC**
+- `bun cloc` repo total → **12,782 LOC**
 
-Current files still above 500 LOC:
+Current `src/` files still above 500 LOC from the same run:
 
 - `src/client.ts` — 954
 - `src/runtime/commands.ts` — 656
 - `src/server/runtime.ts` — 580
 - `src/cli/prompt.ts` — 515
 
-So this pass needs about **157 LOC out of `commands.ts`** while keeping total repo LOC flat or down.
+So this file still needs about **157 LOC removed** to get under 500.
 
-## 2. What is actually making this file big today
+## What I reviewed
 
-On the current file, the biggest buckets are:
+I checked the current branch state against:
 
-- **Help/catalog text**: `277-389` — large hand-written `/help` tree and command list
-- **`/tabs` rendering**: `142-263` plus the handler wrapper at `440-443`
-- **`/config` subsystem**: `585-733` — path traversal, parsing, temp writes, persistent writes
-- **Command dispatch plumbing**: handler table, aliases, vestigial `emitInfo`, repeated `{ handled: true }`
+- `docs/module-reduction-plans/src/runtime/commands.ts.md`
+- `src/runtime/commands.ts`
+- `src/runtime/commands.test.ts`
+- `src/server/runtime.ts`
+- `src/cli/completion.ts`
+- `src/config.ts`
+- `tests/tabs.test.ts`
 
-This file is still acting as both:
+## Review verdict
 
-- a command router, and
-- a mini config tool, help generator, tab renderer, and some session-resolution utilities.
+**Verdict: the old direction was partly right, but the strongest plan needed tightening.**
 
-That mixed ownership is the real reason it is stuck at 656.
+What still holds:
 
-## 3. Why the earlier round missed or drifted for this file
+- `commands.ts` is too big because it still owns several unrelated subsystems:
+	- slash-command dispatch
+	- `/tabs` rendering
+	- `/help` text/catalog generation
+	- `/config` tree read/write/parse helpers
+- there is still real duplication with `src/cli/completion.ts`
+- under-500 is still reachable from current state
 
-The existing round-1 plan in this doc is now partly stale.
+What was stale or too optimistic:
 
-Main drift points from current code:
+1. **Resume-target dedupe is already spent.**
+	- `src/server/runtime.ts` already uses `sessionStore.resolveResumeTarget(...)`.
+	- `commands.ts` still has its own closed-session lookup wrapper, but the big cross-file dedupe win described in older notes is no longer ahead of us.
+	- Treat this as a small cleanup at most, not a main lever.
 
-1. **It over-counted already-spent wins.**
-	- The old plan proposed deduplicating closed-session resume lookup with `server/runtime.ts`.
-	- That is **already done** on the live branch: `commands.ts` uses `sessionStore.resolveResumeTarget(...)`, and `server/runtime.ts` also points at the sessions helper.
-	- So that idea no longer buys much or anything for `commands.ts`.
+2. **The old `/tabs` timestamp shortcut was over-optimistic.**
+	- The previous plan talked about using `loadLive(...).updatedAt`.
+	- On the current branch, `SessionLive` in `src/server/sessions.ts` does **not** officially define `updatedAt`.
+	- Tests stub it loosely, but it is not a clean current production contract to build the plan around.
+	- So do **not** count a cheap “use live updatedAt everywhere” win unless execution first proves and formalizes that field.
 
-2. **It included repo-cleanup ideas that barely shrink `commands.ts`.**
-	- Example: deleting dead `rename` IPC support from `protocol.ts` / `client.ts` / `server/runtime.ts` may be worth doing repo-wide.
-	- But it does **almost nothing** for the target file itself.
-	- Good side cleanup, weak primary path for getting `commands.ts` under 500.
+3. **Config extraction is only a real win if duplication is deleted immediately.**
+	- `commands.ts` has config tree walking/parsing/writing logic.
+	- `completion.ts` separately walks config trees for path completion.
+	- Moving code into `src/config.ts` is only worth doing if it deletes both copies in the same pass.
+	- Splitting out helpers while leaving both old call sites mostly intact is fake progress.
 
-3. **It treated `/tabs` simplification as optional late cleanup.**
-	- On the current file, `/tabs` is still one of the biggest self-contained chunks.
-	- If config/help reductions come in smaller than hoped, `/tabs` is the most reliable remaining lever.
-	- So on the current branch it should be in the main path, not only a last-ditch fallback.
+4. **Metadata-driven help is good, but only if it replaces parallel lists.**
+	- Today command knowledge is spread across:
+		- handler registration in `commands.ts`
+		- top-level `/help` list text
+		- `detailedHelp()` branches
+		- `COMMAND_ARGS` in `src/cli/completion.ts`
+	- A command spec table is a real win only if those lists are actually deleted, not mirrored.
 
-4. **It assumed metadata-sharing would automatically pay off enough.**
-	- A command metadata table is still good.
-	- But by itself it is unlikely to save the full 157 LOC needed.
-	- It needs to be paired with either `/config` dedupe or `/tabs` scope trimming.
+## What is still making the file big today
 
-5. **Its repo-total context is outdated.**
-	- Old neighboring plans reference totals around **13,500 LOC**.
-	- Current repo total is **12,782 LOC**.
-	- The pass should be judged against the live branch, not older totals.
+The biggest remaining local buckets are:
 
-Bottom line: round 1 drifted because the branch moved under it, one major dedupe already landed elsewhere, and the old ordering was too architecture-first and not aggressive enough about the remaining biggest local buckets.
+1. **`/tabs` rendering and helpers**
+	- full-history loads per row
+	- prompt-preview extraction
+	- timestamp scanning
+	- extra formatting helpers
+	- this is both a LOC hotspot and a runtime-I/O hotspot
 
-## 4. Plausible LOC reductions from current state
+2. **Hand-written `/help` catalog + details**
+	- large static list in `/help`
+	- separate `detailedHelp()` branches
+	- separate completion metadata elsewhere
 
-Impacts below are rough **`commands.ts` deltas first**, with repo-wide notes where they matter.
+3. **`/config` tree operations**
+	- path splitting
+	- nested reads
+	- nested writes
+	- object creation
+	- value parsing
+	- temp vs persistent write branching
 
-### A. Move generic `/config` tree logic into `src/config.ts`
+4. **Small but real dispatch leftovers**
+	- unused `emitInfo` threading
+	- tiny alias wrappers
+	- repeated IPC append + handled boilerplate
 
-Current `commands.ts` owns:
+## Strongest execution path, ordered by net LOC reduction
 
-- snapshot building
-- path splitting
-- nested reads
-- nested writes
-- parent-object creation
-- value parsing
-- temp-vs-persistent write branching
+This order is based on **real deletion first**. The goal is to reduce repo LOC, not just move code around.
 
-That is command-agnostic config logic and also overlaps with `src/cli/completion.ts`, which still walks config trees itself.
+### Step 1 — Simplify `/tabs` aggressively and honestly
+
+This is the strongest first move on the current branch.
+
+Preferred execution shape:
+
+- delete prompt previews entirely
+	- remove `userEntryText()`
+	- remove `previewText()`
+	- remove `recentPromptPreviews()`
+	- remove the extra preview output lines
+- stop loading full history for every displayed row
+- stop scanning history just to compute a sort key
+- simplify the command to something cheaper that matches data already available
+
+**Best practical target behavior**
+
+- `/tabs` shows **open-tab order** for open tabs
+- `/tabs --all` shows open tabs first, then closed sessions by `closedAt ?? createdAt`
+- keep:
+	- current-tab marker
+	- tab numbers for open tabs
+	- `closed` marker for closed sessions
+	- basic created/closed timestamps
+- stop claiming “newest activity first” unless execution keeps a real activity source
 
 **Likely impact**
 
-- `commands.ts`: **-60 to -95 LOC**
-- repo total: **flat to -30 LOC** if `completion.ts` switches to shared config helpers and the new `config.ts` API stays lean
+- `commands.ts`: **-50 to -80 LOC**
+- repo total: **down**
+- runtime behavior: less disk I/O and less history parsing
 
-**Best shape**
+**Why this should be first**
+
+- biggest self-contained deletion available
+- reduces both LOC and runtime cost
+- avoids a risky helper-extraction pass as the first step
+
+### Step 2 — Replace help/catalog duplication with one command spec table
+
+Keep the specs in or next to `commands.ts`, but only if they replace existing parallel knowledge.
+
+The spec should cover only what is genuinely shared, for example:
+
+- `name`
+- `summary`
+- `usage`
+- `detail?`
+- `argKind?`
+- `handler`
+- `aliases?`
+- `showInHelp?`
+
+Then use that one source for:
+
+- `commandNames()`
+- top-level `/help` listing
+- detailed `/help <cmd>` where possible
+- completion argument classification in `src/cli/completion.ts`
+
+**Important constraint**
+
+- keep only the few long custom help entries that truly need bespoke prose, probably `config`, maybe `send`, maybe `move`
+- do **not** replace one hand-written list with another equally large metadata blob
+
+**Likely impact**
+
+- `commands.ts`: **-25 to -45 LOC**
+- repo total: **-10 to -30 LOC** if `completion.ts` deletes `COMMAND_ARGS` and stops rebuilding its own catalog
+
+### Step 3 — Only then move shared config tree helpers into `src/config.ts`
+
+This is still valuable, but it is **third**, not first, because it can become split-and-glue if done loosely.
+
+Good target scope:
 
 - `config.snapshot()`
 - `config.listPaths()`
@@ -96,322 +184,152 @@ That is command-agnostic config logic and also overlaps with `src/cli/completion
 - `config.parseValue(path, raw)`
 - `config.writePath(path, value, { temp })`
 
-**Why this is real reduction**
+Keep in `commands.ts` only:
 
-This is not fake file splitting if the logic becomes shared and deletes duplicate traversal from completion.
+- `/config` argument parsing
+- `/config` help text / user-facing messages
+- command-specific usage handling
 
-### B. Replace hand-written `/help` branches with one command spec table
+Delete in the same pass:
 
-Today help is duplicated across:
-
-- handler names
-- top-level `/help` list strings
-- `detailedHelp()` special cases
-- `src/cli/completion.ts` command-argument classification
-
-A single command spec can hold:
-
-- `name`
-- `usage`
-- `summary`
-- `detail?`
-- `argKind?`
-- `hiddenFromHelp?`
-- `handler`
-- `aliases?`
+- `commands.ts` tree walkers and write helpers
+- `completion.ts` local `listConfigPaths()` tree walker
 
 **Likely impact**
 
-- `commands.ts`: **-30 to -50 LOC**
-- repo total: **-10 to -35 LOC** if completion consumes the same metadata
+- `commands.ts`: **-40 to -70 LOC**
+- repo total: **flat to -20 LOC** if both duplicate walkers disappear immediately
 
-**Important current nuance**
+**Why this is not step 1**
 
-The big savings come only if most help text becomes generated. If the detailed prose is copied almost verbatim into metadata blobs, the win will be much smaller.
+- it is easier to fool ourselves here with “shared helpers” that mostly just move lines into `src/config.ts`
+- the earlier two steps are more obviously real deletion
 
-### C. Simplify `/tabs`
+### Step 4 — Remove `emitInfo` plumbing and tiny wrapper churn
 
-Current `/tabs` does all of this:
+Current reality:
 
-- loads history for every displayed session
-- scans backward for timestamps
-- extracts recent user prompt previews
-- formats relative age
-- formats start/end stamps
-- sorts by newest activity
+- `executeCommand(..., emitInfo)` still threads an emitter through the whole runtime path
+- real command logic does not use it in any meaningful way
+- `/usage` just forwards it to `/status`
 
-This is both a LOC hotspot and a runtime-cost hotspot.
+Do this only after the bigger cuts above.
 
-Three plausible trims:
+Expected cleanup:
 
-#### C1. Drop prompt previews, keep timestamps/order
-
-Delete:
-
-- `userEntryText()`
-- `previewText()`
-- `recentPromptPreviews()`
-- related render lines
-
-**Likely impact**
-
-- `commands.ts`: **-25 to -40 LOC**
-- repo total: **down**
-
-#### C2. Use cheaper timestamps instead of scanning full history
-
-Prefer:
-
-- `loadLive(...).updatedAt` for open sessions when available
-- `closedAt ?? createdAt` for closed sessions
-
-Then stop walking every history file just to sort rows.
-
-**Likely impact**
-
-- `commands.ts`: **-20 to -35 LOC**
-- runtime behavior: faster and less I/O heavy
-
-#### C3. Show open-tab order instead of newest-activity order
-
-This is the biggest cut, but most behavior-changing.
-
-**Likely impact**
-
-- `commands.ts`: **-40 to -60 LOC**
-
-**Recommendation**
-
-For one-pass under-500 odds, **C1 or C1+C2** is the sweet spot.
-
-### D. Remove vestigial `emitInfo` plumbing
-
-`CommandHandler` still receives `emitInfo`, `executeCommand()` still threads it through, and `server/runtime.ts` still passes it in.
-
-In current `commands.ts`, it is not doing real work. The `/usage` alias only forwards it.
+- remove `emitInfo` from the handler type
+- remove it from `executeCommand()`
+- simplify the `server/runtime.ts` call site
+- collapse tiny alias wrappers only if the helper is actually smaller
 
 **Likely impact**
 
 - `commands.ts`: **-8 to -15 LOC**
 - repo total: **-10 to -20 LOC**
 
-This is a good easy win and also helps `server/runtime.ts`, which is another >500 file.
+### Step 5 — If still above 500, use command-surface cuts instead of more architecture churn
 
-### E. Collapse trivial IPC command handlers
+Fallback order should prefer **real deletion**, not more frameworking.
 
-The following are mostly “append command + return handled result”:
+Best fallback order from current state:
 
-- `/clear`
-- `/fork`
-- `/compact`
-- `/resume`
-- parts of `/open`
-- `/move`
+1. delete `/usage` alias
+2. delete `/eval` slash command if the tool is accepted as the canonical path
+3. fold `/mem` into `/status` only if needed
 
-A tiny helper can remove repeated object literals and repeated `handled: true` scaffolding.
+Why this order:
 
-**Likely impact**
+- `/usage` is tiny but low-risk
+- `/eval` is a bigger cut, but behavior-visible
+- `/mem` changes user-facing command surface more than it saves
 
-- `commands.ts`: **-8 to -15 LOC**
+## What must NOT happen during execution
 
-Do this only if the helper is smaller than the repetition.
+These are the key guardrails.
 
-### F. Trim optional command surface if still needed
+1. **Do not do pure split-and-glue.**
+	- No new module whose only job is to hold almost the same `/tabs` or `/config` code.
+	- A move only counts if duplicate logic is deleted in the same pass.
 
-These are real cuts, but each has UX cost.
+2. **Do not keep duplicate command catalogs alive.**
+	- If command specs land, delete the old `/help` list, delete matching `detailedHelp()` branches where possible, and delete `COMMAND_ARGS` duplication in `completion.ts`.
 
-#### F1. Delete `/usage` alias
+3. **Do not preserve `/tabs` complexity by relocating it.**
+	- The point is to delete prompt previews and history scanning, not to move them to another helper file.
 
-- `commands.ts`: **-4 to -8 LOC**
+4. **Do not assume `loadLive().updatedAt` is already a safe production contract.**
+	- If execution wants that path, it must first prove it exists and is maintained consistently.
+	- Do not spend LOC adding new timestamp plumbing just to protect old `/tabs` wording.
 
-#### F2. Delete `/eval` slash command
+5. **Do not change tab lifecycle semantics covered by integration tests.**
+	- `tests/tabs.test.ts` covers open/fork/move placement.
+	- This reduction pass should not change tab creation or move behavior.
+	- `/tabs` output semantics may change, but tab ordering operations must not.
 
-There is already a first-class eval tool.
+6. **Do not spend time chasing already-landed resume dedupe as a headline win.**
+	- That work is largely already in `src/server/sessions.ts`.
+	- It is not the path that gets 656 under 500 now.
 
-- `commands.ts`: **-15 to -25 LOC**
+7. **Do not let `src/config.ts` become a second command router.**
+	- Put only generic config-tree helpers there.
+	- Leave slash-command parsing and user messaging in `commands.ts`.
 
-#### F3. Fold `/mem` into `/status`
+## Overlap and conflict risks
 
-- `commands.ts`: **-10 to -18 LOC**
+### `src/cli/completion.ts` — direct overlap, high value
 
-#### F4. Drop rich `/cd` reporting and only print the new cwd
+This is the most important adjacent file for making the reduction real.
 
-- `commands.ts`: **-6 to -12 LOC**
+Execution should treat these as one package:
 
-These are backup levers, not the best first move.
+- shared command catalog / arg kinds
+- shared config path listing
 
-### G. Tiny cleanups
+If `commands.ts` shrinks but `completion.ts` keeps parallel knowledge, the pass leaves drift behind and wastes LOC.
 
-- direct alias handlers instead of wrappers: **-3 to -8 LOC**
-- inline one-use helpers: **-3 to -8 LOC**
-- `ok()` / `fail()` helpers if genuinely smaller: **-3 to -8 LOC**
+### `src/server/runtime.ts` — moderate overlap
 
-Useful only after larger cuts.
+Main shared area:
 
-## 5. Strongest execution path, ordered by net LOC reduction
+- `executeCommand()` signature if `emitInfo` is removed
 
-This ordering is based on **expected net size reduction**, not just safety.
+This is a good follow-on cleanup, but it is not the first lever.
 
-### Step 1 — Pull generic config tree operations into `src/config.ts`, then reuse them from completion
+### `tests/tabs.test.ts` — low code overlap, high behavior risk
 
-Why first:
+The integration suite does not care about `/tabs` formatting, but it **does** care about:
 
-- biggest remaining local chunk
-- real cross-file dedupe
-- likely repo-flat or repo-down, not wrapper churn
+- open-after placement
+- fork placement
+- move behavior
 
-Expected result:
+A `/tabs` simplification must stay away from those behaviors.
 
-- `commands.ts`: roughly **656 → 560-595**
+## Stop conditions for execution
 
-Execution notes:
+Use explicit stop rules so the pass does not drift.
 
-- keep the `/config` command as a thin adapter
-- immediately delete `completion.ts`’s local config tree walker in the same pass
-- avoid moving command-specific parsing like `parseConfigArgs()` unless it truly shrinks
+1. Run `./test` and `bun cloc src/runtime/commands.ts` after each completed step.
+2. **Stop immediately if `commands.ts` drops below 500 LOC.**
+3. If step 1 and step 2 together still leave the file above about **560 LOC**, go straight to step 3.
+4. If step 3 would mostly add wrappers or leave old tree walkers in place, **do not do it**; switch to step 5 instead.
+5. If keeping current `/tabs` “newest activity first” semantics requires adding fresh timestamp plumbing, **stop** and choose the simpler semantics instead.
 
-### Step 2 — Replace `/help` text branches with one command spec table used by completion too
+## Is under 500 in one pass still realistic?
 
-Why second:
+**Yes, but only with real simplification.**
 
-- second-largest structural duplication
-- lets `commandNames()` and completion stop rebuilding parallel command catalogs
+Honest current answer:
 
-Expected result:
+- **still realistic in one pass:** yes
+- **realistic without touching `/tabs`:** maybe, but no longer the strongest bet
+- **realistic if `/tabs` keeps current preview + history-scan behavior:** much less likely
 
-- `commands.ts`: roughly **another -30 to -50 LOC**
-- running total target: about **510-565**
+The strongest current one-pass path is:
 
-Execution notes:
-
-- keep only the few genuinely special long help entries, probably `config`, `send`, and maybe `move`
-- generate the rest from compact specs
-
-### Step 3 — Simplify `/tabs` enough to remove the expensive preview/history machinery
-
-Why third, not last:
-
-- it is the cleanest remaining guaranteed lever
-- it improves both LOC and runtime behavior
-- it is more reliable than hoping micro-cleanups add up
-
-Expected result:
-
-- `commands.ts`: **another -25 to -40 LOC**
-- likely lands safely around **470-535** depending on Step 1 and 2 results
-
-Preferred trim order:
-
-1. drop prompt previews
-2. stop scanning full history for timestamps
-3. only if still necessary, simplify ordering semantics
-
-### Step 4 — Remove `emitInfo` plumbing and other small wrappers
-
-Why fourth:
-
-- easy cleanup
-- helps both `commands.ts` and `server/runtime.ts`
-- nice finishing margin if the file is hovering near 500
-
-Expected result:
-
-- `commands.ts`: **another -10-ish LOC**
-
-### Step 5 — Only if still above 500, cut optional command surface
-
-Best fallback order by deletion efficiency:
-
-1. `/eval`
-2. `/mem` folded into `/status`
-3. `/usage`
-4. `/cd` rich reporting
-
-## 6. Overlap and conflict risks with other remaining >500 files
-
-### `src/server/runtime.ts` — high overlap
-
-This is the biggest adjacent risk.
-
-Shared-touch areas:
-
-- `commands.executeCommand(...)` signature if `emitInfo` is removed
-- dead IPC command cleanup such as `rename`
-- any command metadata export shape if runtime imports it later
-
-Important current fact:
-
-- do **not** budget more savings for resume-target dedupe here; that win already moved into `src/server/sessions.ts`
-
-Best coordination rule:
-
-- if both files are being reduced around the same time, do the shared API changes once, then measure both again
-
-### `src/client.ts` — moderate overlap
-
-Mostly via repo-wide cleanup, not direct command logic.
-
-Potential shared touch:
-
-- dead `rename` IPC path cleanup
-
-This can reduce repo total, but it should not be mistaken for a primary `commands.ts` reduction lever.
-
-### `src/cli/prompt.ts` — low overlap
-
-Almost no direct conflict with this pass.
-
-### `src/cli/completion.ts` — not >500, but directly coupled
-
-This file is small, but it is the most important neighbor for a clean pass because:
-
-- it duplicates command argument knowledge
-- it duplicates config-path walking
-
-If the pass changes `/help` or `/config` ownership without updating completion at the same time, the reduction will be weaker and drift will remain.
-
-## 7. Exact tests to watch
-
-Primary unit tests:
-
-- `src/runtime/commands.test.ts`
-- `src/cli/completion.test.ts`
-- `src/config.test.ts`
-- `src/server/runtime.test.ts`
-
-Important integration tests from the nearby set the user named:
-
-- `tests/tabs.test.ts`
-	- especially tab placement and move behavior
-	- especially:
-		- `fork inserts the new tab next to its parent`
-		- `open after inserts a plain new tab next to the target tab`
-		- `move reorders tabs to the requested position`
-
-Behavior-sensitive assertions likely to need special attention:
-
-- `/tabs` ordering and preview output in `src/runtime/commands.test.ts`
-- `/config` temp writes and bare-string parsing
-- `/help config` and `/help model` exact content
-- `/send` target resolution by number, id, and case-insensitive name
-- `/move` message text and clamping behavior
-- `/system` output if command metadata/help refactors accidentally touch command registration order
-
-## 8. Explicit verdict
-
-**Yes — under 500 is reachable in one pass from the current state.**
-
-But on the current branch, the realistic one-pass path is:
-
-1. **config helper dedupe**
-2. **metadata-driven help/catalog**
-3. **some `/tabs` simplification**
-4. **emitInfo/wrapper cleanup for margin**
-
-I would **not** bet on getting from 656 to under 500 by config + help cleanup alone unless those changes are unusually lean.
-
-So the honest verdict is:
-
-- **reachable in one pass:** yes
-- **reachable without touching `/tabs` at all:** maybe, but not the strongest bet from current code
-- **best practical path:** thin `/config`, generated `/help`, then trim `/tabs` prompt-preview/history machinery
+1. **simplify `/tabs` by deleting preview/history machinery**
+2. **share command metadata across help + completion**
+3. **share config tree helpers only if both copies disappear immediately**
+4. **take `emitInfo` / alias cleanup as finishing margin**
+
+That path is still credible from **656 LOC**, and unlike the older draft, it does not rely on savings that are already spent or on a not-yet-real `updatedAt` contract.
