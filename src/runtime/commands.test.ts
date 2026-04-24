@@ -181,8 +181,8 @@ test('/status reports subscription fetch progress before returning', async () =>
 
 	await Promise.resolve()
 	expect(progress).toEqual([
-		'Fetching subscription usage status from Anthropic...',
-		'Fetching status from OpenAI...',
+		'Fetching subscription usage from Anthropic...',
+		'Fetching subscription usage from OpenAI...',
 	])
 
 	finishAnthropic()
@@ -206,7 +206,7 @@ test('/status progress only mentions configured subscriptions', async () => {
 		info: (text) => progress.push(text),
 	})
 
-	expect(progress).toEqual(['Fetching status from OpenAI...'])
+	expect(progress).toEqual(['Fetching subscription usage from OpenAI...'])
 	expect(result.output).toContain('OpenAI subscriptions:')
 	expect(result.output).not.toContain('Anthropic subscriptions:')
 })

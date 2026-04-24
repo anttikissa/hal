@@ -438,11 +438,11 @@ handlers['status'] = async (_args, _session, hooks) => {
 	// Fetch both services concurrently, but emit the notices in a stable order so
 	// the user immediately sees what slow network calls /status is waiting on.
 	if (anthropicUsage.hasCredentials()) {
-		hooks.info?.('Fetching subscription usage status from Anthropic...')
+		hooks.info?.('Fetching subscription usage from Anthropic...')
 		pending.push(anthropicUsage.renderStatus(true).then((text) => { anthropicText = text }))
 	}
 	if (openaiUsage.hasCredentials()) {
-		hooks.info?.('Fetching status from OpenAI...')
+		hooks.info?.('Fetching subscription usage from OpenAI...')
 		pending.push(openaiUsage.renderStatus(true).then((text) => { openaiText = text }))
 	}
 
