@@ -6,6 +6,7 @@ import { readFile } from 'fs/promises'
 import { HAL_DIR } from '../state.ts'
 import { toolRegistry, type Tool, type ToolContext } from '../tools/tool.ts'
 import { ason } from '../utils/ason.ts'
+import { log } from '../utils/log.ts'
 
 const CONFIG_PATH = `${HAL_DIR}/mcp.ason`
 // ── Types ──
@@ -234,7 +235,7 @@ async function initServers(): Promise<void> {
 	for (let i = 0; i < results.length; i++) {
 		const r = results[i]!
 		if (r.status === 'rejected') {
-			console.error(`[mcp] failed to start "${entries[i]![0]}": ${(r as PromiseRejectedResult).reason?.message ?? (r as PromiseRejectedResult).reason}`)
+			log.error('mcp server failed to start', { server: entries[i]![0], error: (r as PromiseRejectedResult).reason?.message ?? String((r as PromiseRejectedResult).reason) })
 		}
 	}
 }

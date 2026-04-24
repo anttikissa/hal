@@ -15,6 +15,7 @@ import { ason } from './utils/ason.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { openaiUsage } from './openai-usage.ts'
 import { liveEventBlocks } from './live-event-blocks.ts'
+import { log } from './utils/log.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -449,7 +450,7 @@ function loadClientState(): ClientStateFile {
 			doneUnseen: Array.isArray(data?.doneUnseen) ? data.doneUnseen.filter((item: any) => typeof item === 'string') : [],
 		}
 	} catch (err) {
-		if (!isMissingFileError(err)) console.error(`[client] failed to load client state: ${errorMessage(err)}`)
+		if (!isMissingFileError(err)) log.error('failed to load client state', { error: errorMessage(err) })
 		return defaultClientState()
 	}
 }
@@ -468,7 +469,7 @@ function saveClientState(): void {
 			}) + '\n',
 		)
 	} catch (err) {
-		console.error(`[client] failed to save client state: ${errorMessage(err)}`)
+		log.error('failed to save client state', { error: errorMessage(err) })
 	}
 }
 

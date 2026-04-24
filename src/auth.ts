@@ -16,6 +16,7 @@
 import { liveFiles } from './utils/live-file.ts'
 import { HAL_DIR } from './state.ts'
 import { ason } from './utils/ason.ts'
+import { log } from './utils/log.ts'
 
 const AUTH_PATH = `${HAL_DIR}/auth.ason`
 
@@ -333,7 +334,7 @@ async function ensureFresh(providerName: string): Promise<void> {
 		else if (providerName === 'openai') await refreshOpenAI()
 	} catch (e: any) {
 		// Log but don't crash — stale token may still work, or user can re-login
-		console.error(`Auth refresh (${providerName}):`, e.message)
+		log.error('auth refresh failed', { provider: providerName, error: e?.message ?? String(e) })
 	}
 }
 

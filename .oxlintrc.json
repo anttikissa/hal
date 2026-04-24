@@ -5,6 +5,7 @@
 		"correctness": "error"
 	},
 	"rules": {
+		"no-console": "error",
 		"no-control-regex": "off",
 		"no-sparse-arrays": "off",
 		"no-unmodified-loop-condition": "off",
@@ -14,6 +15,14 @@
 		"preserve-caught-error": "off",
 		"require-yield": "off"
 	},
+	"overrides": [
+		{
+			"files": ["**/*.test.ts", "scripts/**/*.ts"],
+			"rules": {
+				"no-console": "off"
+			}
+		}
+	],
 	"env": {
 		"builtin": true,
 		"node": true

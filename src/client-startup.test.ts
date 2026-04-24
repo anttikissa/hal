@@ -8,6 +8,7 @@ import { liveFiles } from './utils/live-file.ts'
 import { blocks as blockModule } from './cli/blocks.ts'
 import { STATE_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
+import { log } from './utils/log.ts'
 
 function makeSessionMeta(id: string) {
 	return {
@@ -47,7 +48,7 @@ describe('client startup', () => {
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = sessions.loadLive
 	const origLoadBlobs = blockModule.loadBlobs
-	const origConsoleError = console.error
+	const origLogError = log.error
 	let savedClientState: string | null = null
 	beforeEach(() => {
 		client.state.tabs.length = 0
@@ -89,7 +90,7 @@ describe('client startup', () => {
 		liveFiles.onChange = origOnChange
 		sessions.loadLive = origLoadLive
 		blockModule.loadBlobs = origLoadBlobs
-		console.error = origConsoleError
+		log.error = origLogError
 		if (savedClientState != null) writeFileSync(CLIENT_STATE_PATH, savedClientState)
 		else rmSync(CLIENT_STATE_PATH, { force: true })
 	})
@@ -130,9 +131,9 @@ describe('client startup', () => {
 
 	test('invalid client.ason logs an explicit error and falls back to defaults', async () => {
 		const shared = makeSharedState(['s1'])
-		const errors: string[] = []
-		console.error = (...args: any[]) => {
-			errors.push(args.join(' '))
+		const errors: Array<{ message: string; data?: Record<string, unknown> }> = []
+		log.error = (message: string, data?: Record<string, unknown>) => {
+			errors.push({ message, data })
 		}
 		writeFileSync(CLIENT_STATE_PATH, '{ definitely not valid ason')
 		ipc.readState = () => shared
@@ -147,7 +148,7 @@ describe('client startup', () => {
 
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
 		expect(client.state.activeTab).toBe(0)
-		expect(errors.some((line) => line.includes('[client] failed to load client state'))).toBe(true)
+		expect(errors.some((entry) => entry.message === 'failed to load client state')).toBe(true)
 	})
 
 	test('startup fallback uses fork-aware history loading', async () => {

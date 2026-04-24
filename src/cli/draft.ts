@@ -5,6 +5,7 @@ import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
 import { sessions } from '../server/sessions.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
+import { log } from '../utils/log.ts'
 
 interface DraftFile {
 	text: string
@@ -24,7 +25,7 @@ function isMissingFileError(err: unknown): boolean {
 }
 
 function logDraftError(action: 'save' | 'load' | 'clear', sessionId: string, err: unknown): void {
-	console.error(`[draft] ${action} ${sessionId}: ${errorMessage(err)}`)
+	log.error('draft operation failed', { action, sessionId, error: errorMessage(err) })
 }
 
 function saveDraft(sessionId: string, text: string): void {

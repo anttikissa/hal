@@ -6,6 +6,7 @@ import { ason } from './utils/ason.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { tails } from './utils/tail-file.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
+import { log } from './utils/log.ts'
 import type { Command } from './protocol.ts'
 import type { VersionStatus } from './version.ts'
 
@@ -145,7 +146,7 @@ function cleanupStaleLock(): void {
 	try {
 		unlinkSync(HOST_LOCK)
 	} catch (err) {
-		if (!isMissingFileError(err)) console.error(`[ipc] failed to remove stale host lock: ${errorMessage(err)}`)
+		if (!isMissingFileError(err)) log.error('failed to remove stale host lock', { error: errorMessage(err) })
 	}
 }
 
@@ -168,7 +169,7 @@ function readHostLock(): HostLock | null {
 	try {
 		return ason.parse(readFileSync(HOST_LOCK, 'utf-8')) as unknown as HostLock
 	} catch (err) {
-		if (!isMissingFileError(err)) console.error(`[ipc] failed to read host lock: ${errorMessage(err)}`)
+		if (!isMissingFileError(err)) log.error('failed to read host lock', { error: errorMessage(err) })
 		return null
 	}
 }
@@ -186,7 +187,7 @@ function releaseHost(): void {
 		if (!ownsHostLock()) return
 		unlinkSync(HOST_LOCK)
 	} catch (err) {
-		if (!isMissingFileError(err)) console.error(`[ipc] failed to release host lock: ${errorMessage(err)}`)
+		if (!isMissingFileError(err)) log.error('failed to release host lock', { error: errorMessage(err) })
 	}
 }
 
