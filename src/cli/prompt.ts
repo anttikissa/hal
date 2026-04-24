@@ -257,13 +257,21 @@ function stepHistory(from: Snapshot[], to: Snapshot[]): boolean {
 	return true
 }
 
-function loadHistoryText(text: string): void {
+function loadHistoryText(text: string, dir: -1 | 1, contentWidth: number, preservedGoalCol: number): void {
 	buf = text
-	cursor = buf.length
-	clearSelectionAndGoal()
+	// Treat prompt history as a vertical stack of multiline entries. Moving up
+	// from the top of one entry lands on the bottom visual row of the older
+	// entry; moving down from the bottom lands on the top visual row of the newer
+	// entry. rowColToCursor() clamps short rows exactly like normal vertical
+	// cursor movement, so the remembered goal column survives history browsing.
+	const { lines } = getLayout(buf, contentWidth)
+	const targetRow = dir === -1 ? Math.max(0, lines.length - 1) : 0
+	cursor = rowColToCursor(buf, targetRow, preservedGoalCol, contentWidth)
+	selAnchor = null
+	goalCol = preservedGoalCol
 }
 
-function browseHistory(dir: -1 | 1): boolean {
+function browseHistory(dir: -1 | 1, contentWidth: number, preservedGoalCol: number): boolean {
 	if (history.length === 0) return false
 	if (dir === -1) {
 		if (historyIndex < 0) {
@@ -275,7 +283,7 @@ function browseHistory(dir: -1 | 1): boolean {
 			moveEdge(-1, false)
 			return true
 		}
-		loadHistoryText(history[historyIndex]!)
+		loadHistoryText(history[historyIndex]!, dir, contentWidth, preservedGoalCol)
 		return true
 	}
 	if (historyIndex < 0) {
@@ -284,11 +292,11 @@ function browseHistory(dir: -1 | 1): boolean {
 	}
 	if (historyIndex < history.length - 1) {
 		historyIndex++
-		loadHistoryText(history[historyIndex]!)
+		loadHistoryText(history[historyIndex]!, dir, contentWidth, preservedGoalCol)
 		return true
 	}
 	historyIndex = -1
-	loadHistoryText(historyDraft)
+	loadHistoryText(historyDraft, dir, contentWidth, preservedGoalCol)
 	historyDraft = ''
 	return true
 }
@@ -427,7 +435,7 @@ function moveVerticalKey(dir: -1 | 1, selecting: boolean, contentWidth: number):
 		goalCol = next.goalCol
 		return
 	}
-	if (!selecting && browseHistory(dir)) return
+	if (!selecting && browseHistory(dir, contentWidth, next.goalCol)) return
 	if (selecting) {
 		cursor = dir === -1 ? 0 : buf.length
 		goalCol = null
