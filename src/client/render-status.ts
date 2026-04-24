@@ -236,7 +236,7 @@ function renderStatusLine(lines: string[]): void {
 		return
 	}
 
-	const modelId = tab.model || client.state.model || models.defaultModel()
+	const modelId = tab.model || models.defaultModel()
 	const provider = models.providerName(modelId)
 	const isSub = !auth.isApiKey(provider)
 	const left = joinStatusParts([
@@ -304,7 +304,7 @@ function renderStatusLine(lines: string[]): void {
 function renderHelpBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const busy = client.isBusy()
-	const hasText = prompt.text().length > 0
+	const hasText = prompt.text().trim().length > 0
 	const canContinue = client.canContinueCurrentTurn()
 	const bar = helpBar.build(busy, hasText, canContinue)
 	// Always push a line — even when empty — so chrome height is constant.

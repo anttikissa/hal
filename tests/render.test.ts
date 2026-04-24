@@ -125,12 +125,28 @@ describe('render', () => {
 		expect(clean).toContain('[paused]')
 	})
 
-	test('help bar teaches enter continue on paused tabs with empty prompt', () => {
+	test('help bar teaches press enter to continue on paused tabs with empty prompt', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter continue')
+		expect(clean).toContain('press enter to continue')
 		expect(clean).not.toContain('ctrl-t new')
+	})
+
+	test('continue hint stays visible even after enter is learned', () => {
+		const tab = client.currentTab()!
+		for (let i = 0; i < helpBar.config.learnThreshold; i++) helpBar.logKey('enter')
+		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('press enter to continue')
+	})
+
+	test('continue hint matches enter behavior for whitespace-only prompts', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
+		prompt.setText('   ')
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('press enter to continue')
 	})
 
 	test('status line shows local pid', () => {

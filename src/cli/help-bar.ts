@@ -5,6 +5,9 @@ type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'streaming'
 interface Hint {
 	text: string
 	keys: string[]
+	// Some hints are state, not education. If Enter continues a paused/error
+	// turn, the affordance must stay visible even after the key is learned.
+	alwaysVisible?: boolean
 }
 
 const config = {
@@ -28,11 +31,12 @@ const HINTS: Record<HelpState, Hint[]> = {
 		{ text: 'shift-enter newline', keys: ['shift-enter'] },
 		{ text: 'tab complete', keys: ['tab'] },
 	],
-	'idle-continue': [{ text: 'enter continue', keys: ['enter'] }],
+	'idle-continue': [{ text: 'press enter to continue', keys: ['enter'], alwaysVisible: true }],
 	streaming: [{ text: 'esc stop', keys: ['escape'] }],
 }
 
 function isLearned(hint: Hint): boolean {
+	if (hint.alwaysVisible) return false
 	if (hint.keys.length === 0) return false
 	return hint.keys.every((key) => (usageCounts[key] ?? 0) >= config.learnThreshold)
 }
