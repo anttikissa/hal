@@ -281,7 +281,7 @@ describe('render', () => {
 			const tabBar = lines.findIndex((line) => line.includes('tab 1]'))
 			expect(tabBar).toBeGreaterThanOrEqual(3)
 			expect(lines[tabBar - 3]).toBe('')
-			expect(lines[tabBar - 2]?.trim()).toBe('█')
+			expect(lines[tabBar - 2]).toBe('█')
 			expect(lines[tabBar - 1]).toBe('')
 		} finally {
 			cursor.isVisible = originalIsVisible
@@ -417,6 +417,7 @@ describe('render', () => {
 			for (let i = 0; i < 12; i++) {
 				tab.history.push({ type: 'assistant', text: `line ${i}`, ts: i })
 			}
+			captureOutput(() => render.draw())
 			captureOutput(() => render.draw())
 
 			;(tab.history[0] as any).text = 'changed offscreen'

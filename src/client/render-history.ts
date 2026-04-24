@@ -75,11 +75,8 @@ function visibleHistory(history: Block[]): Block[] {
 	return visible
 }
 
-const HAL_CURSOR_MARGIN = 2
-
 function halCursorLine(visible: boolean): string {
-	const glyph = visible ? `${blockRenderer.cursorColor()}█\x1b[39m` : ' '
-	return `${' '.repeat(HAL_CURSOR_MARGIN)}${glyph}`
+	return visible ? `${blockRenderer.cursorColor()}█\x1b[39m` : ''
 }
 
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {
