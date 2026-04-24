@@ -11,7 +11,7 @@ The directory prev/ contains the old codebase, which is now frozen. You can refe
 - Use bun - never node, npm or npx
 - Use red-green TDD.
 - First run the tests.
-- After every step, run `./test` — it runs tsgo type checking and all tests. No other verification needed. No bundling.
+- After every step, run `./test` — it runs tsgo type checking, oxlint and all tests. No other verification needed. No bundling.
 - Run `bun cloc` to check line count — our budget for core code is 10 thousand lines
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
 - Tabs, not spaces (except for package.json)
@@ -28,10 +28,8 @@ The directory prev/ contains the old codebase, which is now frozen. You can refe
 
 # Logging and user-visible messages
 
-- NEVER use `console.log`, `console.error`, or direct stdout/stderr writes in `src/` runtime code. Hal is a TUI; stray terminal output corrupts rendering and can disappear on redraw.
 - For developer diagnostics, use `src/utils/log.ts` (`log.info`, `log.error`, `log.debug`).
 - For user-visible notices, send proper Hal info events/history entries through the runtime/session mechanisms (for example `emitInfo`, `recordSessionInfo`, or IPC events), not terminal printing.
-- Tests may stub console methods when testing legacy code, but new production code must not introduce console output.
 
 # Git
 
