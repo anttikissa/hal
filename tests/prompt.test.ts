@@ -28,12 +28,38 @@ describe('prompt', () => {
 		expect(prompt.cursorPos()).toBe('hello brave'.length)
 	})
 
-	test('cmd-left and cmd-right stop at word edges inside punctuation', () => {
-		prompt.setText('Especially: (paren)', 'Especially: (paren)'.length)
+	test('cmd-left and cmd-right move to prompt edges', () => {
+		prompt.setText('(hello)', '(hello)'.length - 1)
 		prompt.handleKey(key('left', { cmd: true }), 80)
-		expect(prompt.cursorPos()).toBe('Especially: ('.length)
+		expect(prompt.cursorPos()).toBe(0)
 		prompt.handleKey(key('right', { cmd: true }), 80)
-		expect(prompt.cursorPos()).toBe('Especially: (paren'.length)
+		expect(prompt.cursorPos()).toBe('(hello)'.length)
+	})
+
+	test('option-left and option-right stop inside punctuation like Zed', () => {
+		prompt.setText('(hello)', '(hello'.length)
+		prompt.handleKey(key('left', { alt: true }), 80)
+		expect(prompt.cursorPos()).toBe('('.length)
+		prompt.handleKey(key('right', { alt: true }), 80)
+		expect(prompt.cursorPos()).toBe('(hello'.length)
+	})
+
+	test('option-left and option-right match recorded Zed stops', () => {
+		const text = '\tx = Math.round(255 * Math.max(0, x * 0.0031308))'
+		const leftStops = [48, 40, 38, 36, 34, 32, 31, 27, 22, 20, 16, 10, 5]
+		const rightStops = [9, 15, 19, 21, 26, 30, 32, 35, 37, 39, 47, 48]
+
+		prompt.setText(text, text.length)
+		for (const stop of leftStops) {
+			prompt.handleKey(key('left', { alt: true }), 80)
+			expect(prompt.cursorPos()).toBe(stop)
+		}
+
+		prompt.setText(text, 5)
+		for (const stop of rightStops) {
+			prompt.handleKey(key('right', { alt: true }), 80)
+			expect(prompt.cursorPos()).toBe(stop)
+		}
 	})
 
 	test('cmd-a then backspace clears multiline selection', () => {

@@ -104,23 +104,65 @@ function wordRight(text: string, pos: number): number {
 	return i
 }
 
-// Cmd+Left/Right on macOS should move by the next word token, not by a whole
-// whitespace-delimited chunk. In `(paren)`, moving left from the end should
-// land between `(` and `paren`, skipping closing punctuation first.
+// Option+Left/Right word motion follows editor-style token boundaries: words
+// stop inside surrounding punctuation (`(hello` -> `(|hello`), while bare
+// punctuation still gets its own stop (`foo))` -> `foo)|)`).
 function isWordTokenChar(ch: string): boolean {
 	return /[\p{L}\p{N}\p{M}_]/u.test(ch)
 }
 
-function cmdWordLeft(text: string, pos: number): number {
+function optionWordLeft(text: string, pos: number): number {
 	let i = pos
-	while (i > 0 && !isWordTokenChar(text[i - 1]!)) i--
+
+	// Closing punctuation at the very end gets its own stop first.
+	if (i === text.length && i > 0 && !isWordTokenChar(text[i - 1]!) && !/\s/.test(text[i - 1]!)) return i - 1
+
+	// If we are just after a word, move to that word's start. This is the
+	// `(hello|` -> `(|hello` case.
+	if (i > 0 && isWordTokenChar(text[i - 1]!)) {
+		while (i > 0 && isWordTokenChar(text[i - 1]!)) i--
+		return i
+	}
+
+	const startedOnSeparator = i > 0 && /\s/.test(text[i - 1]!)
+	while (i > 0 && /\s/.test(text[i - 1]!)) i--
+	if (i === 0) return 0
+
+	// Operators reached through whitespace are separate stops. Punctuation
+	// adjacent to a word is just a separator around that word.
+	if (!isWordTokenChar(text[i - 1]!)) {
+		if (startedOnSeparator) return i - 1
+		while (i > 0 && !isWordTokenChar(text[i - 1]!) && !/\s/.test(text[i - 1]!)) i--
+	}
+
 	while (i > 0 && isWordTokenChar(text[i - 1]!)) i--
 	return i
 }
 
-function cmdWordRight(text: string, pos: number): number {
+function optionWordRight(text: string, pos: number): number {
 	let i = pos
-	while (i < text.length && !isWordTokenChar(text[i]!)) i++
+	if (i < text.length && isWordTokenChar(text[i]!)) {
+		while (i < text.length && isWordTokenChar(text[i]!)) i++
+		return i
+	}
+	if (
+		i > 0 &&
+		!isWordTokenChar(text[i - 1]!) &&
+		!/\s/.test(text[i - 1]!) &&
+		!(i < text.length && !isWordTokenChar(text[i]!) && !/\s/.test(text[i]!))
+	) {
+		while (i < text.length && !isWordTokenChar(text[i]!)) i++
+		while (i < text.length && isWordTokenChar(text[i]!)) i++
+		return i
+	}
+	if (i < text.length && !isWordTokenChar(text[i]!) && !/\s/.test(text[i]!) && /[)\]}]/.test(text[i]!)) return i + 1
+	if (i < text.length && !isWordTokenChar(text[i]!) && !/\s/.test(text[i]!)) {
+		while (i < text.length && !isWordTokenChar(text[i]!)) i++
+		while (i < text.length && isWordTokenChar(text[i]!)) i++
+		return i
+	}
+	while (i < text.length && /\s/.test(text[i]!)) i++
+	if (i < text.length && !isWordTokenChar(text[i]!) && !/\s/.test(text[i]!)) return i + 1
 	while (i < text.length && isWordTokenChar(text[i]!)) i++
 	return i
 }
@@ -290,12 +332,10 @@ function moveEdge(dir: -1 | 1, selecting: boolean): void {
 	move(dir === -1 ? 0 : buf.length, selecting)
 }
 
-function moveHorizontal(dir: -1 | 1, selecting: boolean, motion: 'char' | 'word' | 'cmd-word' = 'char'): void {
+function moveHorizontal(dir: -1 | 1, selecting: boolean, motion: 'char' | 'word' = 'char'): void {
 	const pos = motion === 'word'
-		? dir === -1 ? wordLeft(buf, cursor) : wordRight(buf, cursor)
-		: motion === 'cmd-word'
-			? dir === -1 ? cmdWordLeft(buf, cursor) : cmdWordRight(buf, cursor)
-			: cursor + dir
+		? dir === -1 ? optionWordLeft(buf, cursor) : optionWordRight(buf, cursor)
+		: cursor + dir
 	if (motion === 'char' && !selecting) collapseOrMove(pos, dir === -1 ? 'start' : 'end')
 	else move(pos, selecting)
 }
@@ -388,10 +428,10 @@ function handleCmdKey(k: KeyEvent): boolean {
 			cursor = buf.length
 			return true
 		case 'left':
-			moveHorizontal(-1, k.shift, 'cmd-word')
+			moveEdge(-1, k.shift)
 			return true
 		case 'right':
-			moveHorizontal(1, k.shift, 'cmd-word')
+			moveEdge(1, k.shift)
 			return true
 		case 'u':
 			stepUndo(k.shift)
