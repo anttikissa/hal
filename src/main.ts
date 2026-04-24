@@ -16,14 +16,15 @@ import { colors } from './cli/colors.ts'
 import { openaiUsage } from './openai-usage.ts'
 import { startup } from './startup.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
+import { cliArgs } from './cli/args.ts'
 
-const parsedArgs = startup.parseArgs(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
+const parsedArgs = cliArgs.parse(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
 if (!parsedArgs.ok) {
-	process.stderr.write(`${parsedArgs.error}\n\n${startup.helpText()}\n`)
+	process.stderr.write(`${parsedArgs.error}\n\n${cliArgs.helpText()}\n`)
 	process.exit(2)
 }
 if (parsedArgs.help) {
-	process.stdout.write(`${startup.helpText()}\n`)
+	process.stdout.write(`${cliArgs.helpText()}\n`)
 	process.exit(0)
 }
 const startupCwd = startup.normalizeCwd(parsedArgs.targetCwd)

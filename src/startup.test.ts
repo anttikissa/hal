@@ -1,29 +1,6 @@
 import { expect, test } from 'bun:test'
 import { startup } from './startup.ts'
 
-test('parseArgs defaults to the caller working directory', () => {
-	const parsed = startup.parseArgs([], { cwd: '/work/project', halDir: '/hal' })
-
-	expect(parsed).toEqual({ ok: true, help: false, targetCwd: '/work/project' })
-})
-
-test('parseArgs supports --self for the Hal directory', () => {
-	const parsed = startup.parseArgs(['--self'], { cwd: '/work/project', halDir: '/hal' })
-
-	expect(parsed).toEqual({ ok: true, help: false, targetCwd: '/hal' })
-})
-
-test('parseArgs rejects unknown options and positional parameters', () => {
-	expect(startup.parseArgs(['asdf'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
-		ok: false,
-		error: 'Unexpected argument: asdf',
-	})
-	expect(startup.parseArgs(['--wat'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
-		ok: false,
-		error: 'Unknown option: --wat',
-	})
-})
-
 test('planTarget uses an already-open tab in that directory first', () => {
 	const plan = startup.planTarget({
 		cwd: '/work/project',

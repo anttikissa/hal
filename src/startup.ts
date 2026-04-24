@@ -10,14 +10,6 @@ const config = {
 	targetPollMs: 25,
 }
 
-type ParseEnv = {
-	cwd: string
-	halDir: string
-}
-
-type ParseResult =
-	| { ok: true; help: boolean; targetCwd: string }
-	| { ok: false; error: string }
 
 type TargetPlan =
 	| { kind: 'use-open'; sessionId: string }
@@ -29,42 +21,6 @@ type OpenSessionLike = Pick<SharedSessionInfo, 'id' | 'cwd'>
 
 type StoredSessionLike = Pick<SessionMeta, 'id' | 'workingDir' | 'createdAt'>
 
-function helpText(): string {
-	return [
-		'Usage: hal [options]',
-		'',
-		'Options:',
-		'  -s, --self       Open Hal in its own directory instead of the current directory.',
-		'  -f               Use a fresh isolated temporary state directory.',
-		'  -h, -?, --help   Show this help and exit.',
-		'',
-		'No positional arguments are accepted yet.',
-	].join('\n')
-}
-
-function parseArgs(args: string[], env: ParseEnv): ParseResult {
-	let self = false
-	let help = false
-
-	for (const arg of args) {
-		if (arg === '-s' || arg === '--self') {
-			self = true
-			continue
-		}
-		if (arg === '-h' || arg === '-?' || arg === '--help') {
-			help = true
-			continue
-		}
-		// The shell wrapper consumes -f before main.ts starts. Accept it here too so
-		// direct `bun src/main.ts -f` fails for the right reason only if state setup
-		// has already happened elsewhere.
-		if (arg === '-f') continue
-		if (arg.startsWith('-')) return { ok: false, error: `Unknown option: ${arg}` }
-		return { ok: false, error: `Unexpected argument: ${arg}` }
-	}
-
-	return { ok: true, help, targetCwd: self ? env.halDir : env.cwd }
-}
 
 function normalizeCwd(cwd: string | undefined): string {
 	return resolve(cwd || '.')
@@ -111,8 +67,6 @@ function planTarget(opts: {
 
 export const startup = {
 	config,
-	helpText,
-	parseArgs,
 	normalizeCwd,
 	sameCwd,
 	findOpenSessionForCwd,
