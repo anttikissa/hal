@@ -205,7 +205,14 @@ function restartPromptWatch(): void {
 }
 
 function broadcastInfo(text: string, level: 'info' | 'error' = 'info'): void {
-	for (const sessionId of activeSessions) emitInfo(sessionId, text, level)
+	const ts = new Date().toISOString()
+	for (const sessionId of activeSessions) {
+		// Startup metadata refresh can finish before a just-started client begins
+		// tailing IPC events. Persist the notice too so it survives that race and
+		// remains visible in history after reloads.
+		recordSessionInfo(sessionId, text, ts)
+		emitInfo(sessionId, text, level)
+	}
 }
 
 function formatModelRefreshMessage(changes: string[]): string {
