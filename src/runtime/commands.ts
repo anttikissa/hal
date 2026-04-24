@@ -30,6 +30,11 @@ export interface CommandResult {
 	handled: boolean
 }
 
+export interface CommandHooks {
+	/** Emit a user-visible progress/info notice while a command is still running. */
+	info?: (text: string, level?: 'info' | 'error') => void
+}
+
 /** Session state that commands can read and modify. */
 export interface SessionRef {
 	id: string
@@ -74,6 +79,7 @@ function parseCommand(text: string): ParsedCommand | null {
 type CommandHandler = (
 	args: string,
 	session: SessionState,
+	hooks: CommandHooks,
 ) => CommandResult | Promise<CommandResult>
 
 type CommandArg = 'model' | 'dir' | 'command' | 'config'
@@ -424,9 +430,24 @@ handlers['compact'] = (_args, session) => {
 }
 
 // /status — runtime version + Anthropic / OpenAI OAuth subscription usage
-handlers['status'] = async () => {
-	const raw = [await anthropicUsage.renderStatus(true), await openaiUsage.renderStatus(true)]
-	const sections = raw.filter((text) => !/^No (Anthropic Claude|OpenAI ChatGPT) subscriptions configured\.$/.test(text.trim()))
+handlers['status'] = async (_args, _session, hooks) => {
+	let anthropicText = ''
+	let openaiText = ''
+	const pending: Promise<void>[] = []
+
+	// Fetch both services concurrently, but emit the notices in a stable order so
+	// the user immediately sees what slow network calls /status is waiting on.
+	if (anthropicUsage.hasCredentials()) {
+		hooks.info?.('Fetching subscription usage status from Anthropic...')
+		pending.push(anthropicUsage.renderStatus(true).then((text) => { anthropicText = text }))
+	}
+	if (openaiUsage.hasCredentials()) {
+		hooks.info?.('Fetching status from OpenAI...')
+		pending.push(openaiUsage.renderStatus(true).then((text) => { openaiText = text }))
+	}
+
+	await Promise.all(pending)
+	const sections = [anthropicText, openaiText].filter((text) => text && !/^No (Anthropic Claude|OpenAI ChatGPT) subscriptions configured\.$/.test(text.trim()))
 	const usage = sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.'
 	return {
 		output: `${renderRuntimeStatus()}\n\n${usage}`,
@@ -462,9 +483,9 @@ handlers['resume'] = (args, session) => {
 }
 
 // /send <tab|session-id|name> <message> — queue a message for another session
-handlers['send'] = (args, session) => {
+handlers['send'] = (args, session, hooks) => {
 	const trimmed = args.trim()
-	if (trimmed === 'all' || trimmed.startsWith('all ')) return handlers['broadcast']!(trimmed.slice(3).trim(), session)
+	if (trimmed === 'all' || trimmed.startsWith('all ')) return handlers['broadcast']!(trimmed.slice(3).trim(), session, hooks)
 	const parsed = resolveSendTarget(session, args)
 	if (!parsed) return { error: 'Usage: /send <tab|session-id|name> <message>', handled: true }
 	return sendToSession(session, parsed.target, parsed.text)
@@ -576,7 +597,7 @@ handlers['exit'] = () => {
 // ── Main dispatch ──
 
 /** Execute a slash command. Returns { handled: false } if not a command. */
-async function executeCommand(text: string, session: SessionState): Promise<CommandResult> {
+async function executeCommand(text: string, session: SessionState, hooks: CommandHooks = {}): Promise<CommandResult> {
 	const parsed = parseCommand(text)
 	if (!parsed) return { handled: false }
 
@@ -585,7 +606,7 @@ async function executeCommand(text: string, session: SessionState): Promise<Comm
 		return { error: `Unknown command: /${parsed.name}. Type /help for help.`, handled: true }
 	}
 
-	return await handler(parsed.args, session)
+	return await handler(parsed.args, session, hooks)
 }
 
 /** Get list of command names (for tab completion and /help topics). */

@@ -111,6 +111,10 @@ function credentials(): Credential[] {
 	return auth.listCredentials('openai').filter((credential) => credential.type === 'token')
 }
 
+function hasCredentials(): boolean {
+	return credentials().length > 0
+}
+
 function parseWindow(raw: any): UsageWindow | undefined {
 	const usedPercent = Number(raw?.used_percent)
 	const windowSeconds = Number(raw?.limit_window_seconds)
@@ -333,6 +337,7 @@ export const openaiUsage = {
 	init,
 	onChange,
 	save,
+	hasCredentials,
 	all,
 	current,
 	noteActivity,

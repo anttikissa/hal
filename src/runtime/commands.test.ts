@@ -22,6 +22,8 @@ const origConfigSave = config.save
 const origMaxIterations = agentLoop.config.maxIterations
 const origAnthropicRenderStatus = anthropicUsage.renderStatus
 const origRenderStatus = openaiUsage.renderStatus
+const origAnthropicHasCredentials = anthropicUsage.hasCredentials
+const origOpenaiHasCredentials = openaiUsage.hasCredentials
 const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
 const origDefaultModel = models.config.default
@@ -59,6 +61,8 @@ afterEach(() => {
 	agentLoop.config.maxIterations = origMaxIterations
 	anthropicUsage.renderStatus = origAnthropicRenderStatus
 	openaiUsage.renderStatus = origRenderStatus
+	anthropicUsage.hasCredentials = origAnthropicHasCredentials
+	openaiUsage.hasCredentials = origOpenaiHasCredentials
 	Object.assign(memory.config, origMemoryConfig)
 	memory.io.readRss = origReadRss
 	models.config.default = origDefaultModel
@@ -141,6 +145,8 @@ test('/send rejects an unknown tab number', async () => {
 
 
 test('/status renders Anthropic and OpenAI subscription usage', async () => {
+	anthropicUsage.hasCredentials = () => true
+	openaiUsage.hasCredentials = () => true
 	anthropicUsage.renderStatus = async () => 'Anthropic subscriptions:\n* 1/2 a@test.com · 5h 20% used'
 	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 b@test.com · 5h 23% used'
 
@@ -150,6 +156,59 @@ test('/status renders Anthropic and OpenAI subscription usage', async () => {
 	expect(result.error).toBeUndefined()
 	expect(result.output).toContain('Anthropic subscriptions:')
 	expect(result.output).toContain('OpenAI subscriptions:')
+})
+
+
+test('/status reports subscription fetch progress before returning', async () => {
+	anthropicUsage.hasCredentials = () => true
+	openaiUsage.hasCredentials = () => true
+
+	let finishAnthropic!: () => void
+	let finishOpenai!: () => void
+	anthropicUsage.renderStatus = async () => {
+		await new Promise<void>((resolve) => { finishAnthropic = resolve })
+		return 'Anthropic subscriptions:\n* 1/2 a@test.com · 5h 20% used'
+	}
+	openaiUsage.renderStatus = async () => {
+		await new Promise<void>((resolve) => { finishOpenai = resolve })
+		return 'OpenAI subscriptions:\n* 1/2 b@test.com · 5h 23% used'
+	}
+
+	const progress: string[] = []
+	const pending = commands.executeCommand('/status', makeSession(), {
+		info: (text) => progress.push(text),
+	})
+
+	await Promise.resolve()
+	expect(progress).toEqual([
+		'Fetching subscription usage status from Anthropic...',
+		'Fetching status from OpenAI...',
+	])
+
+	finishAnthropic()
+	finishOpenai()
+	const result = await pending
+	expect(result.output).toContain('Anthropic subscriptions:')
+	expect(result.output).toContain('OpenAI subscriptions:')
+})
+
+
+test('/status progress only mentions configured subscriptions', async () => {
+	anthropicUsage.hasCredentials = () => false
+	openaiUsage.hasCredentials = () => true
+	anthropicUsage.renderStatus = async () => {
+		throw new Error('Anthropic should not be fetched without credentials')
+	}
+	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 b@test.com · 5h 23% used'
+
+	const progress: string[] = []
+	const result = await commands.executeCommand('/status', makeSession(), {
+		info: (text) => progress.push(text),
+	})
+
+	expect(progress).toEqual(['Fetching status from OpenAI...'])
+	expect(result.output).toContain('OpenAI subscriptions:')
+	expect(result.output).not.toContain('Anthropic subscriptions:')
 })
 
 

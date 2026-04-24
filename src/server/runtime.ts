@@ -263,7 +263,9 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 	const prevName = sessionState.name
 	const prevModel = sessionState.model
 	const prevCwd = sessionState.cwd
-	const cmdResult = await commands.executeCommand(text, sessionState)
+	const cmdResult = await commands.executeCommand(text, sessionState, {
+		info: (message, level) => emitInfo(sessionId, message, level),
+	})
 	if (cmdResult.handled) {
 		persistCommandRetryInput(sessionId, text, cmdResult)
 		const nextName = sessionState.name || undefined

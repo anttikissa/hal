@@ -75,6 +75,10 @@ function credentials(): Credential[] {
 	return auth.listCredentials('anthropic').filter((credential) => credential.type === 'token')
 }
 
+function hasCredentials(): boolean {
+	return credentials().length > 0
+}
+
 function normalizePercent(raw: unknown): number | undefined {
 	const value = Number(raw)
 	if (!Number.isFinite(value)) return
@@ -277,6 +281,7 @@ export const anthropicUsage = {
 	state,
 	onChange,
 	save,
+	hasCredentials,
 	all,
 	current,
 	setCurrentCredential,
