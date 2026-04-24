@@ -141,30 +141,27 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('draft')
 	})
 
-	test('history browsing crosses multiline entries at matching columns', () => {
+	test('history browsing uses the end of the target row for multiline entries', () => {
 		prompt.setHistory(['older row one\nxy', 'newer first\nnewer second'])
 		prompt.setText('draft top\ndraft bottom', 'draft'.length)
 
 		prompt.handleKey(key('up'), 80)
 		expect(prompt.text()).toBe('newer first\nnewer second')
-		// Moving up from draft row 0 enters the previous history entry on its
-		// bottom row, preserving the visual column we started from.
-		expect(prompt.cursorPos()).toBe('newer first\nnewer'.length)
+		// Up enters history on the bottom visual row, at that row's end.
+		expect(prompt.cursorPos()).toBe('newer first\nnewer second'.length)
 
 		prompt.handleKey(key('up'), 80)
-		expect(prompt.cursorPos()).toBe('newer'.length)
+		// Moving within the recalled multiline entry still reaches the previous row.
+		expect(prompt.cursorPos()).toBe('newer first'.length)
 
 		prompt.handleKey(key('up'), 80)
 		expect(prompt.text()).toBe('older row one\nxy')
-		// The bottom row is shorter than the goal column, so the same vertical
-		// movement clamping used inside a multiline prompt puts us at row end.
 		expect(prompt.cursorPos()).toBe('older row one\nxy'.length)
 
 		prompt.handleKey(key('down'), 80)
 		expect(prompt.text()).toBe('newer first\nnewer second')
-		// Moving down from an older entry enters the newer entry on its first row,
-		// not at the end of the whole message, while keeping the goal column.
-		expect(prompt.cursorPos()).toBe('newer'.length)
+		// Down enters the newer history entry on its top visual row, at row end.
+		expect(prompt.cursorPos()).toBe('newer first'.length)
 	})
 
 	test('buildPrompt renders multiline cursor position', () => {

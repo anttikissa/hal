@@ -257,21 +257,20 @@ function stepHistory(from: Snapshot[], to: Snapshot[]): boolean {
 	return true
 }
 
-function loadHistoryText(text: string, dir: -1 | 1, contentWidth: number, preservedGoalCol: number): void {
+function loadHistoryText(text: string, dir: -1 | 1, contentWidth: number): void {
 	buf = text
-	// Treat prompt history as a vertical stack of multiline entries. Moving up
-	// from the top of one entry lands on the bottom visual row of the older
-	// entry; moving down from the bottom lands on the top visual row of the newer
-	// entry. rowColToCursor() clamps short rows exactly like normal vertical
-	// cursor movement, so the remembered goal column survives history browsing.
+	// History browsing is bash-like: recalled entries put the cursor at the end
+	// of the row selected by browse direction. Up enters an older entry on its
+	// bottom visual row; down enters a newer entry/draft on its top visual row.
 	const { lines } = getLayout(buf, contentWidth)
 	const targetRow = dir === -1 ? Math.max(0, lines.length - 1) : 0
-	cursor = rowColToCursor(buf, targetRow, preservedGoalCol, contentWidth)
+	const targetCol = lines[targetRow]?.length ?? 0
+	cursor = rowColToCursor(buf, targetRow, targetCol, contentWidth)
 	selAnchor = null
-	goalCol = preservedGoalCol
+	goalCol = null
 }
 
-function browseHistory(dir: -1 | 1, contentWidth: number, preservedGoalCol: number): boolean {
+function browseHistory(dir: -1 | 1, contentWidth: number): boolean {
 	if (history.length === 0) return false
 	if (dir === -1) {
 		if (historyIndex < 0) {
@@ -283,7 +282,7 @@ function browseHistory(dir: -1 | 1, contentWidth: number, preservedGoalCol: numb
 			moveEdge(-1, false)
 			return true
 		}
-		loadHistoryText(history[historyIndex]!, dir, contentWidth, preservedGoalCol)
+		loadHistoryText(history[historyIndex]!, dir, contentWidth)
 		return true
 	}
 	if (historyIndex < 0) {
@@ -292,11 +291,11 @@ function browseHistory(dir: -1 | 1, contentWidth: number, preservedGoalCol: numb
 	}
 	if (historyIndex < history.length - 1) {
 		historyIndex++
-		loadHistoryText(history[historyIndex]!, dir, contentWidth, preservedGoalCol)
+		loadHistoryText(history[historyIndex]!, dir, contentWidth)
 		return true
 	}
 	historyIndex = -1
-	loadHistoryText(historyDraft, dir, contentWidth, preservedGoalCol)
+	loadHistoryText(historyDraft, dir, contentWidth)
 	historyDraft = ''
 	return true
 }
@@ -435,7 +434,7 @@ function moveVerticalKey(dir: -1 | 1, selecting: boolean, contentWidth: number):
 		goalCol = next.goalCol
 		return
 	}
-	if (!selecting && browseHistory(dir, contentWidth, next.goalCol)) return
+	if (!selecting && browseHistory(dir, contentWidth)) return
 	if (selecting) {
 		cursor = dir === -1 ? 0 : buf.length
 		goalCol = null
