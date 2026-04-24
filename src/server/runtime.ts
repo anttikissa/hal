@@ -224,7 +224,11 @@ function formatModelRefreshMessage(changes: string[]): string {
 async function refreshModelMetadata(): Promise<void> {
 	try {
 		const result = await models.refreshModels()
-		if (result.changes.length > 0) broadcastInfo(formatModelRefreshMessage(result.changes))
+		if (result.changes.length > 0) {
+			const message = formatModelRefreshMessage(result.changes)
+			console.log(message)
+			broadcastInfo(message)
+		}
 	} catch (err) {
 		console.error(`[models] refresh failed: ${errorMessage(err)}`)
 	}
