@@ -13,7 +13,7 @@ function helpText(): string {
 		'',
 		'Options:',
 		'  -s, --self       Open Hal in its own directory instead of the current directory.',
-		'  -f               Use a fresh isolated temporary state directory.',
+		'  -f, --fresh      Use a fresh isolated temporary state directory.',
 		'  -h, -?, --help   Show this help and exit.',
 		'',
 		'No positional arguments are accepted yet.',
@@ -33,9 +33,10 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 			help = true
 			continue
 		}
-		// The shell wrapper consumes -f before main.ts starts. Accept it here too so
-		// direct `bun src/main.ts -f` has the same command-line surface as `./run -f`.
-		if (arg === '-f') continue
+		// The shell wrapper consumes fresh-state options before main.ts starts.
+		// Accept them here too so direct `bun src/main.ts --fresh` has the same
+		// command-line surface as `./run --fresh`.
+		if (arg === '-f' || arg === '--fresh') continue
 		if (arg.startsWith('-')) return { ok: false, error: `Unknown option: ${arg}` }
 		return { ok: false, error: `Unexpected argument: ${arg}` }
 	}

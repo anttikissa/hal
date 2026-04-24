@@ -13,6 +13,12 @@ test('parse supports --self for the Hal directory', () => {
 	expect(parsed).toEqual({ ok: true, help: false, targetCwd: '/hal' })
 })
 
+test('parse accepts --fresh like -f', () => {
+	const parsed = cliArgs.parse(['--fresh'], { cwd: '/work/project', halDir: '/hal' })
+
+	expect(parsed).toEqual({ ok: true, help: false, targetCwd: '/work/project' })
+})
+
 test('parse rejects unknown options and positional parameters', () => {
 	expect(cliArgs.parse(['asdf'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
 		ok: false,

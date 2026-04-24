@@ -7,7 +7,7 @@ hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 args=()
 for arg in "$@"; do
 	case "$arg" in
-		-f)
+		-f|--fresh)
 			# Fresh state means this invocation is intentionally isolated: no other
 			# terminal can join it, and it cannot join the normal host.
 			export HAL_STATE_DIR="$(mktemp -d /tmp/hal-state-XXXXXX)"
