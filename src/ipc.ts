@@ -17,7 +17,7 @@ const STATE_FILE = `${IPC_DIR}/state.ason`
 
 export interface SharedSessionInfo {
 	// 1-based visible tab number. Stored explicitly so humans and agents do not
-	// need to count large openSessions arrays by hand.
+	// need to count large session arrays by hand.
 	id: string
 	tab?: number
 	name?: string
@@ -34,8 +34,7 @@ export interface SharedHostInfo {
 }
 
 export interface SharedState {
-	sessions: string[]
-	openSessions: SharedSessionInfo[]
+	sessions: SharedSessionInfo[]
 	busy: Record<string, boolean>
 	activity: Record<string, string>
 	host?: SharedHostInfo
@@ -45,7 +44,6 @@ export interface SharedState {
 function defaultState(): SharedState {
 	return {
 		sessions: [],
-		openSessions: [],
 		busy: {},
 		activity: {},
 		host: { pid: null, startedAt: '', versionStatus: 'idle' },
@@ -109,8 +107,15 @@ function getStateFile(): SharedState {
 	if (stateFile) return stateFile
 	ensureDir(IPC_DIR)
 	stateFile = liveFiles.liveFile(STATE_FILE, defaultState(), { watch: false }) as SharedState
-	if (!Array.isArray(stateFile.sessions)) stateFile.sessions = []
-	if (!Array.isArray(stateFile.openSessions)) stateFile.openSessions = []
+	// Migrate older state files. `sessions` used to be id-only strings, then the
+	// rich list briefly lived at `openSessions`; now `sessions` is the rich list.
+	const legacyOpenSessions = (stateFile as any).openSessions
+	if (!Array.isArray(stateFile.sessions)) stateFile.sessions = Array.isArray(legacyOpenSessions) ? legacyOpenSessions : []
+	if (stateFile.sessions.some((item) => typeof item === 'string')) {
+		stateFile.sessions = (stateFile.sessions as any[]).map((id, index) => ({ id, tab: index + 1, cwd: '' }))
+	}
+	stateFile.sessions = stateFile.sessions.map((item, index) => ({ ...item, tab: item.tab ?? index + 1 }))
+	delete (stateFile as any).openSessions
 	if (!stateFile.busy || typeof stateFile.busy !== 'object') stateFile.busy = {}
 	if (!stateFile.activity || typeof stateFile.activity !== 'object') stateFile.activity = {}
 	if (typeof stateFile.updatedAt !== 'string') stateFile.updatedAt = new Date().toISOString()

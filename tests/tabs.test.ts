@@ -44,8 +44,8 @@ function readSessionIds(): string[] {
 	const path = join(tmpDir, "ipc", "state.ason")
 	if (!existsSync(path)) return []
 	const text = readFileSync(path, "utf-8")
-	const state = ason.parse(text) as { sessions?: string[] }
-	return state.sessions ?? []
+	const state = ason.parse(text) as { sessions?: Array<{ id: string }> }
+	return state.sessions?.map((session) => session.id) ?? []
 }
 
 function readHistory(sessionId: string): any[] {

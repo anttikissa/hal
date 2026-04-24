@@ -6,7 +6,7 @@ import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import type { Command, SpawnCommandData } from '../protocol.ts'
 import { models } from '../models.ts'
-import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
+import { sessions as sessionStore, type SessionMeta, type UserPart } from './sessions.ts'
 import { commands } from '../runtime/commands.ts'
 import type { SessionState } from '../runtime/commands.ts'
 import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
@@ -18,6 +18,7 @@ import { replay } from '../session/replay.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
+import { startup } from '../startup.ts'
 
 let activeSessions: string[] = []
 let activeRuntimePid: number | null = null
@@ -45,6 +46,29 @@ function activeMetas(): SessionMeta[] {
 	return activeSessions
 		.map((sessionId) => sessionStore.loadSessionMeta(sessionId))
 		.filter((meta): meta is SessionMeta => !!meta)
+}
+
+function planTargetForCwd(cwd: string): ReturnType<typeof startup.planTarget> {
+	return startup.planTarget({
+		cwd,
+		openSessions: activeMetas().map((meta) => sessionStore.sessionOpenInfo(meta)),
+		allSessions: sessionStore.loadAllSessionMetas(),
+	})
+}
+
+function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { ok: false; reason: string } {
+	const plan = planTargetForCwd(cwd)
+	if (plan.kind === 'use-open') return { ok: true, sessionId: plan.sessionId }
+	if (plan.kind === 'refuse') return { ok: false, reason: plan.reason }
+	if (plan.kind === 'resume') {
+		const resumed = sessionStore.activateSession(plan.sessionId)
+		if (!resumed) return { ok: false, reason: `Session ${plan.sessionId} not found` }
+		activeSessions.push(plan.sessionId)
+		sessionStore.updateMeta(plan.sessionId, { closedAt: undefined })
+		return { ok: true, sessionId: plan.sessionId }
+	}
+	const created = createSessionTab({ workingDir: cwd })
+	return { ok: true, sessionId: created.id }
 }
 
 function insertSessionAfter(sessionId: string, afterId?: string): void {
@@ -75,8 +99,7 @@ function syncSharedState(): void {
 	const openMetas = activeMetas()
 	const openIds = new Set(openMetas.map((meta) => meta.id))
 	ipc.updateState((state) => {
-		state.sessions = openMetas.map((meta) => meta.id)
-		state.openSessions = openMetas.map(sessionStore.sessionOpenInfo)
+		state.sessions = openMetas.map(sessionStore.sessionOpenInfo)
 		for (const sessionId of Object.keys(state.busy)) {
 			if (!openIds.has(sessionId)) delete state.busy[sessionId]
 		}
@@ -129,17 +152,20 @@ function recordSessionInfo(sessionId: string, text: string, ts: string): void {
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts }])
 }
 
-function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string }): SessionMeta {
+function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
 	const meta = opts.sourceId
 		? sessionStore.forkSession(opts.sourceId, sessionId)
 		: sessionStore.createSession(sessionId, {
 			id: sessionId,
-			workingDir: process.cwd(),
+			workingDir: opts.workingDir ?? process.cwd(),
 			createdAt: new Date().toISOString(),
 			name: undefined,
 			topic: undefined,
 		})
+	if (!opts.sourceId && opts.workingDir && meta.workingDir !== opts.workingDir) {
+		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
+	}
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
 	const related = sessionStore.loadSessionMeta(opts.sourceId ?? opts.openerId ?? '')
 	const text = opts.sourceId
@@ -148,7 +174,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 			? `User opened a new tab: ${sessionLabel(meta)}. Opened from ${sessionLabel(related)}.`
 			: `User opened a new tab: ${sessionLabel(meta)}.`
 	if (text) recordSessionInfo(sessionId, text, meta.createdAt)
-	return meta
+	return sessionStore.loadSessionMeta(sessionId) ?? meta
 }
 
 function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean): string {
@@ -255,7 +281,7 @@ function buildSessionState(meta: SessionMeta): SessionState {
 	}
 }
 
-async function handlePrompt(sessionId: string, text: string, label?: 'steering', source?: string): Promise<void> {
+async function handlePrompt(sessionId: string, text: string, label?: 'steering', source?: string, displayText?: string): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
@@ -284,22 +310,22 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 	}
 	ipc.appendEvent({
 		type: 'prompt',
-		text,
+		text: displayText ?? text,
 		label,
 		source,
 		sessionId,
 		createdAt: new Date().toISOString(),
 	})
-	await runGeneration(sessionId, text, source)
+	await runGeneration(sessionId, text, source, displayText)
 }
 
-async function dispatchPromptCommand(sessionId: string, text: string, source?: string): Promise<void> {
+async function dispatchPromptCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	const steering = agentLoop.isActive(sessionId)
 	if (steering) {
 		agentLoop.abort(sessionId)
 		await Bun.sleep(50)
 	}
-	await handlePrompt(sessionId, text, steering ? 'steering' : undefined, source)
+	await handlePrompt(sessionId, text, steering ? 'steering' : undefined, source, displayText)
 }
 
 function closeSession(sessionId: string, openReplacement = false): void {
@@ -310,7 +336,12 @@ function closeSession(sessionId: string, openReplacement = false): void {
 	broadcastSessions()
 }
 
-async function runGeneration(sessionId: string, text: string, source?: string): Promise<void> {
+async function resolvePromptParts(sessionId: string, text: string, displayText?: string): Promise<UserPart[]> {
+	if (displayText && displayText !== text) return [{ type: 'text', text, displayText }]
+	return (await attachments.resolve(sessionId, text)).logParts
+}
+
+async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
@@ -318,10 +349,9 @@ async function runGeneration(sessionId: string, text: string, source?: string): 
 	const model = meta.model ?? models.defaultModel()
 	const promptResult = context.buildSystemPrompt({ model, cwd, sessionId })
 	if (text) {
-		const resolved = await attachments.resolve(sessionId, text)
 		sessionStore.appendHistory(sessionId, [{
 			type: 'user',
-			parts: resolved.logParts,
+			parts: await resolvePromptParts(sessionId, text, displayText),
 			source,
 			ts: new Date().toISOString(),
 		}])
@@ -412,7 +442,7 @@ function handleCommand(cmd: Command): void {
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
-			void dispatchPromptCommand(sessionId, cmd.text, cmd.source)
+			void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
 		case 'continue': {
@@ -443,6 +473,13 @@ function handleCommand(cmd: Command): void {
 				emitInfo(child.id, msg)
 			} else if ('afterSessionId' in cmd) {
 				createSessionTab({ openerId: sessionId, afterId: cmd.afterSessionId })
+			} else if (cmd.cwd) {
+				const target = activateTargetForCwd(cmd.cwd)
+				if (!target.ok) {
+					const sid = sessionId ?? activeSessions[0]
+					if (sid) emitInfo(sid, target.reason, 'error')
+					break
+				}
 			} else {
 				createSessionTab({ openerId: sessionId })
 			}
@@ -509,7 +546,7 @@ function handleCommand(cmd: Command): void {
 	}
 }
 
-function startRuntime(signal: AbortSignal): void {
+function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): { ok: true; sessionId?: string } | { ok: false; reason: string } {
 	activeRuntimePid = process.pid
 	activeSessions = []
 	stopPromptWatch?.()
@@ -517,8 +554,13 @@ function startRuntime(signal: AbortSignal): void {
 	sessionStore.deactivateAllSessions()
 	const metas = sessionStore.loadSessionMetas()
 	activeSessions = metas.map((meta) => meta.id)
-	if (activeSessions.length === 0) {
-		createSessionTab({})
+	let startupSessionId: string | undefined
+	if (opts.targetCwd) {
+		const target = activateTargetForCwd(opts.targetCwd)
+		if (!target.ok) return target
+		startupSessionId = target.sessionId
+	} else if (activeSessions.length === 0) {
+		startupSessionId = createSessionTab({}).id
 		if (!signal.aborted && activeRuntimePid === process.pid) broadcastSessions()
 	}
 	restartPromptWatch()
@@ -536,7 +578,7 @@ function startRuntime(signal: AbortSignal): void {
 		state.busy = {}
 		state.activity = {}
 	})
-	if (metas.length > 0) syncSharedState()
+	if (activeSessions.length > 0) syncSharedState()
 	void refreshModelMetadata()
 	openaiUsage.start(signal)
 	if (metas.length > 0) {
@@ -605,6 +647,7 @@ function startRuntime(signal: AbortSignal): void {
 		.catch((err) => {
 			log.error('inbox module load failed', { error: errorMessage(err) })
 		})
+	return { ok: true, sessionId: startupSessionId }
 }
 
 export const runtime = {

@@ -32,6 +32,16 @@ function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
 	// Linear sRGB → gamma-corrected sRGB (standard sRGB transfer function)
 	const gamma = (c: number) =>
 		Math.round(255 * Math.max(0, Math.min(1, c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055)))
+
+	let x = 0
+	x = Math.round(255 * Math.max(0, x * 0.0031308))
+	//  ^   ^^    ^^   ^ ^   ^^  ^        ^^ ^ ^ ^^^      ^
+	// WebStorm going left ^
+	//      ^^    ^^  ^ ^    ^^  ^         ^^ ^ ^ ^^      ^ ^
+	// WebStorm going right ^
+	//  ^ starting position when going right
+	//                    starting position when going left ^
+
 	return [gamma(rl), gamma(gl), gamma(bl)]
 }
 

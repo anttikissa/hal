@@ -25,7 +25,7 @@ Your code and this SYSTEM.md live in the Hal directory (`hal_dir`).
 - You may access files in the current directory, `/tmp`, and `hal_dir` (if modifying or debugging yourself). Ask before accessing other paths.
 - If you are unsure about what user wants, why a bug happened, or something similar, ask the user.
 - No apologies. Instead, figure out how to get it right the next time — change your code, SYSTEM.md, or AGENTS.md (if working directory is `hal_dir`).
-- Be aware that you are bad at counting (more than 5 items) and doing things like "check elements 40 from this list". Use code to do that.
+- As a language model, you cannot count reliably. To analyze data containing more than 10 elements, write a program or use a shell tool to do that.
 
 ## Coding style
 
@@ -51,7 +51,7 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 
 - For code changes to Hal itself, prefer sessions rooted at `hal_dir`.
 - Multiple sessions may run simultaneously. Other sessions may edit the same files, commit, etc. Handle conflicts gracefully.
-- To map a UI tab number to a session, read `${state_dir}/ipc/state.ason`. The canonical source is `openSessions[].tab`; find the object whose `tab` equals the UI number. Use `openSessions` order only as a fallback for old state files without `tab` fields. `sessions` is legacy/id-only and must not be used for manual tab-number mapping.
+- To map a UI tab number to a session, read `${state_dir}/ipc/state.ason`. The canonical source is `sessions[].tab`; find the object whose `tab` equals the UI number. `sessions` is the only open-tab list. Old state snapshots may still have legacy `sessions` as id-only strings or `openSessions`; do not use either for tab-number mapping unless first converted to rich `sessions` objects with `tab` fields.
 - If a screenshot and old history disagree about tab order, trust the current `${state_dir}/ipc/state.ason` snapshot first; if the screenshot shows a visible session id/status line, trust that over manual counting.
 
 ### Forking

@@ -13,6 +13,7 @@ import { clipboard } from '../cli/clipboard.ts'
 import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { startup } from '../startup.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
 const RESTART_CODE = 100
@@ -224,7 +225,8 @@ function resetRawModeForTests(): void {
 }
 
 function submit(override?: string): void {
-	const text = (override ?? prompt.text()).trim()
+	const text = (override ?? prompt.submitText()).trim()
+	const displayText = override === undefined ? prompt.text().trim() : undefined
 	if (!text) return
 	completion.dismiss()
 	popup.close()
@@ -239,7 +241,7 @@ function submit(override?: string): void {
 	}
 	// Human typing now uses the same prompt command path as inbox messages.
 	// The runtime decides whether an active turn makes this behave like steering.
-	client.sendCommand('prompt', text)
+	client.sendCommand('prompt', text, displayText === text ? undefined : displayText)
 	prompt.clear()
 	// Update tab's inputHistory + clear persisted draft
 	client.onSubmit(text)
@@ -327,8 +329,9 @@ function canonicalKeyName(k: KeyEvent): string {
 }
 
 function sendTabCommandIfRoom(type: 'open' | 'resume', text?: string): void {
-	if (client.state.tabs.length < 40) client.sendCommand(type, text)
-	else client.addEntry('Max tabs reached (40). Close one first.', 'error')
+	const maxTabs = startup.config.maxTabs
+	if (client.state.tabs.length < maxTabs) client.sendCommand(type, text)
+	else client.addEntry(`Max tabs reached (${maxTabs}). Close one first.`, 'error')
 }
 
 // App-level keybindings (not handled by prompt)
@@ -418,7 +421,7 @@ function handleAppKey(k: KeyEvent): boolean {
 	return false
 }
 
-function startCli(signal: AbortSignal): void {
+function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string } = {}): void {
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
 
@@ -428,7 +431,7 @@ function startCli(signal: AbortSignal): void {
 		draw()
 	})
 
-	client.startClient(signal)
+	client.startClient(signal, opts)
 
 	// Initialize prompt history and draft from the active tab.
 	// (Tab switch handler takes care of swapping these later.)

@@ -10,6 +10,7 @@ import { blob } from './blob.ts'
 type UserTextOptions = {
 	separator?: string
 	images?: 'omit' | 'path-or-image' | 'path-or-blob-or-image'
+	display?: 'actual' | 'ui'
 }
 
 function userText(entry: Extract<HistoryEntry, { type: 'user' }>, opts: UserTextOptions | string = {}): string {
@@ -18,7 +19,7 @@ function userText(entry: Extract<HistoryEntry, { type: 'user' }>, opts: UserText
 	const images = options.images ?? 'omit'
 	return entry.parts
 		.map((part) => {
-			if (part.type === 'text') return part.text
+			if (part.type === 'text') return options.display === 'ui' ? part.displayText ?? part.text : part.text
 			if (images === 'path-or-image') return part.originalFile ? `[${part.originalFile}]` : '[image]'
 			if (images === 'path-or-blob-or-image') {
 				const ref = part.originalFile ?? part.blobId

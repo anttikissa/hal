@@ -1,7 +1,7 @@
 import { perf } from './perf.ts'
 perf.mark('First line of code executed')
 
-import { ensureStateDir } from './state.ts'
+import { ensureStateDir, HAL_DIR } from './state.ts'
 import { ipc } from './ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
@@ -14,6 +14,19 @@ import { config } from './config.ts'
 import { builtins } from './tools/builtins.ts'
 import { colors } from './cli/colors.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { startup } from './startup.ts'
+import { sessions as sessionStore } from './server/sessions.ts'
+
+const parsedArgs = startup.parseArgs(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
+if (!parsedArgs.ok) {
+	process.stderr.write(`${parsedArgs.error}\n\n${startup.helpText()}\n`)
+	process.exit(2)
+}
+if (parsedArgs.help) {
+	process.stdout.write(`${startup.helpText()}\n`)
+	process.exit(0)
+}
+const startupCwd = startup.normalizeCwd(parsedArgs.targetCwd)
 
 ensureStateDir()
 perf.mark('State directories exist')
@@ -36,6 +49,37 @@ const ac = new AbortController()
 let electionTimer: ReturnType<typeof setInterval> | null = null
 let cleaned = false
 let memoryTimer: ReturnType<typeof setTimeout> | null = null
+let startupSessionId: string | undefined
+
+function failStartup(message: string, code = 1): never {
+	process.stderr.write(`${message}\n`)
+	if (isHost) ipc.releaseHost()
+	perf.stop()
+	process.exit(code)
+}
+
+async function ensureClientStartupTarget(cwd: string): Promise<string> {
+	const deadline = Date.now() + startup.config.targetWaitMs
+	let commandQueued = false
+
+	while (Date.now() <= deadline) {
+		const shared = ipc.readState()
+		const plan = startup.planTarget({
+			cwd,
+			openSessions: shared.sessions,
+			allSessions: sessionStore.loadAllSessionMetas(),
+		})
+		if (plan.kind === 'use-open') return plan.sessionId
+		if (plan.kind === 'refuse') failStartup(plan.reason)
+		if (!commandQueued) {
+			ipc.appendCommand({ type: 'open', cwd, createdAt: new Date().toISOString() })
+			commandQueued = true
+		}
+		await Bun.sleep(startup.config.targetPollMs)
+	}
+
+	failStartup(`Cannot open ${cwd}: host did not open the requested directory.`)
+}
 
 function syncHostVersionState(): void {
 	if (!isHost) return
@@ -60,13 +104,15 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
 	client.state.role = 'server'
 	syncHostVersionState()
+	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
+	if (!started.ok) failStartup(started.reason)
+	startupSessionId = started.sessionId
 	ipc.appendEvent({
 		type: 'runtime-start',
 		pid: process.pid,
 		startedAt: ipc.readHostLock()?.createdAt ?? new Date().toISOString(),
 	})
 	if (kind === 'promote') client.addStartupEntry(`Promoted to server (pid ${process.pid})`)
-	runtime.startRuntime(ac.signal)
 }
 
 function queueMemoryCheck(): void {
@@ -111,6 +157,9 @@ version.start()
 if (isHost) {
 	becomeHost('start')
 }
+else {
+	startupSessionId = await ensureClientStartupTarget(startupCwd)
+}
 
 process.on('exit', cleanup)
 process.on('SIGTERM', () => {
@@ -122,4 +171,4 @@ queueMemoryCheck()
 
 electionTimer = setInterval(tickElection, 100)
 
-cli.startCli(ac.signal)
+cli.startCli(ac.signal, { preferredCwd: startupCwd, preferredSessionId: startupSessionId })

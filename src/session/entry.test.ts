@@ -15,6 +15,18 @@ test('userText joins only text parts', () => {
 	expect(sessionEntry.userText(entry, { separator: ' ' })).toBe('hello  world')
 })
 
+test('userText can render display text for paste parts', () => {
+	const entry = {
+		type: 'user',
+		parts: [
+			{ type: 'text', text: 'real paste contents', displayText: '[...paste]' },
+		],
+	} as any
+
+	expect(sessionEntry.userText(entry)).toBe('real paste contents')
+	expect(sessionEntry.userText(entry, { display: 'ui' })).toBe('[...paste]')
+})
+
 test('userText can keep image placeholders', () => {
 	const entry = {
 		type: 'user',

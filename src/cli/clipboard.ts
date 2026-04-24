@@ -6,7 +6,6 @@ import { ensureDir } from '../state.ts'
 
 const IMAGE_DIR = '/tmp/hal/images'
 const PASTE_DIR = '/tmp/hal/paste'
-const MAX_INLINE_NEWLINES = 5
 
 // ── Async image probe ──
 
@@ -65,7 +64,6 @@ function pasteFromClipboard(onResolve?: PasteResolve): string {
 	return placeholder
 }
 
-// Save long paste to /tmp/hal/paste/NNNN.txt, return `[path]`.
 function saveMultilinePaste(text: string): string {
 	ensureDir(PASTE_DIR)
 	const existing = readdirSync(PASTE_DIR)
@@ -77,11 +75,13 @@ function saveMultilinePaste(text: string): string {
 	return `[${path}]`
 }
 
+
 const IMAGE_EXTS = /\.(png|jpg|jpeg|gif|webp)$/i
 
 // Normalize pasted text: fix line endings, strip control chars.
 // Single-line image path -> wrap in [brackets].
-// If >5 newlines, save to file and return `[path]` instead.
+// Multiline text stays inline. Replacing it with a temp-file ref makes the
+// model see a path and encourages a pointless read tool call.
 function cleanPaste(raw: string): string {
 	const text = raw
 		.replace(/\r\n/g, '\n')
@@ -92,8 +92,6 @@ function cleanPaste(raw: string): string {
 	if (trimmed.startsWith('/') && !trimmed.includes('\n') && IMAGE_EXTS.test(trimmed) && existsSync(trimmed)) {
 		return `[${trimmed.replace(homedir(), '~')}]`
 	}
-	const newlineCount = (text.match(/\n/g) || []).length
-	if (newlineCount > MAX_INLINE_NEWLINES) return saveMultilinePaste(text)
 	return text
 }
 
@@ -101,4 +99,4 @@ function hasPendingPastes(): boolean {
 	return pendingPastes > 0
 }
 
-export const clipboard = { pasteFromClipboard, cleanPaste, hasPendingPastes }
+export const clipboard = { pasteFromClipboard, cleanPaste, saveMultilinePaste, hasPendingPastes }

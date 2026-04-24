@@ -32,9 +32,11 @@ export interface CommandBase {
 	createdAt?: string
 }
 
+
 export interface PromptCommand extends CommandBase {
 	type: 'prompt'
 	text: string
+	displayText?: string
 	source?: string
 }
 
@@ -44,8 +46,10 @@ export interface ContinueCommand extends CommandBase {
 
 export interface OpenNewCommand extends CommandBase {
 	type: 'open'
+	// Startup can request a tab for the client's directory. The host process may
+	// have a different cwd, so this must travel over IPC explicitly.
+	cwd?: string
 }
-
 export interface OpenForkCommand extends CommandBase {
 	type: 'open'
 	forkSessionId: string

@@ -21,8 +21,7 @@ function makeSessionMeta(id: string) {
 
 function makeSharedState(ids: string[]): SharedState {
 	return {
-		sessions: ids,
-		openSessions: ids.map((id, i) => ({
+		sessions: ids.map((id, i) => ({
 			id,
 			tab: i + 1,
 			name: `tab ${i + 1}`,
@@ -214,8 +213,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		blobLoads.length = 0
 
-		shared.sessions = ['s1', 's2']
-		shared.openSessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		expect(onIpcChange).toBeTruthy()
 		onIpcChange?.()
 		await Bun.sleep(10)
@@ -241,8 +239,7 @@ describe('client startup', () => {
 		client.switchTab(1)
 		client.switchTab(2)
 
-		shared.sessions = ['s1', 's2']
-		shared.openSessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		onIpcChange?.()
 		await Bun.sleep(10)
 		ac.abort()
@@ -268,8 +265,7 @@ describe('client startup', () => {
 		client.switchTab(0)
 		client.switchTab(2)
 
-		shared.sessions = ['s1', 's2']
-		shared.openSessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		onIpcChange?.()
 		await Bun.sleep(10)
 		ac.abort()
@@ -299,14 +295,12 @@ describe('client startup', () => {
 		client.sendCommand('open')
 		expect(appendedCommands).toEqual([{ type: 'open', sessionId: 's2' }])
 
-		shared.sessions = ['s1', 's2', 's3']
-		shared.openSessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		onIpcChange?.()
 		await Bun.sleep(10)
 		expect(client.currentTab()?.sessionId).toBe('s3')
 
-		shared.sessions = ['s1', 's2']
-		shared.openSessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		onIpcChange?.()
 		await Bun.sleep(10)
 		ac.abort()
@@ -336,8 +330,7 @@ describe('client startup', () => {
 		client.sendCommand('resume')
 		expect(appendedCommands).toEqual([{ type: 'resume', sessionId: 's2' }])
 
-		shared.sessions = ['s1', 's2', 's3']
-		shared.openSessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		onIpcChange?.()
 		await Bun.sleep(10)
 		ac.abort()
@@ -367,8 +360,7 @@ describe('client startup', () => {
 		client.sendCommand('move', '1')
 		expect(appendedCommands).toEqual([{ type: 'move', position: 1, sessionId: 's3' }])
 
-		shared.sessions = ['s3', 's1', 's2']
-		shared.openSessions = ['s3', 's1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s3', 's1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		onIpcChange?.()
 		await Bun.sleep(10)
 		ac.abort()
@@ -393,8 +385,7 @@ describe('client startup', () => {
 		client.switchTab(0)
 		client.switchTab(1)
 
-		shared.sessions = ['s1', 's2']
-		shared.openSessions = [
+		shared.sessions = [
 			{ id: 's1', name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
 			{ id: 's2', name: 'tab 2', cwd: '/tmp/s2', model: 'openai/gpt-5.4' },
 		]

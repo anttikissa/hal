@@ -120,7 +120,7 @@ function historyToBlocks(
 		const blobOwner = i < parentEntryCount && parentId ? parentId : sessionId
 		switch (entry.type) {
 			case 'user': {
-				const text = sessionEntry.userText(entry, { images: 'path-or-image' })
+				const text = sessionEntry.userText(entry, { images: 'path-or-image', display: 'ui' })
 				if (!text) break
 				const isSystem = text.startsWith('[system] ')
 				result.push({

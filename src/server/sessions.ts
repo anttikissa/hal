@@ -31,7 +31,7 @@ export interface SessionMeta {
 	context?: { used: number; max: number }
 }
 
-export type UserPart = { type: 'text'; text: string } | { type: 'image'; blobId: string; originalFile?: string }
+export type UserPart = { type: 'text'; text: string; displayText?: string } | { type: 'image'; blobId: string; originalFile?: string }
 
 export type HistoryEntry =
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; status?: string; ts?: string }
@@ -196,7 +196,7 @@ function loadHistory(sessionId: string): HistoryEntry[] {
 }
 
 function loadSessionList(): string[] {
-	return [...ipc.readState().sessions]
+	return ipc.readState().sessions.map((item) => item.id)
 }
 
 function loadMetas(ids: string[], load: (id: string) => SessionMeta | null): SessionMeta[] {

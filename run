@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
+set -uo pipefail
 
-# Resolve symlinks to find the real .hal directory
+# Resolve symlinks to find the real .hal directory.
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
-# -f flag: create a fresh isolated state directory (no other process can join)
+args=()
 for arg in "$@"; do
-	if [ "$arg" = "-f" ]; then
-		export HAL_STATE_DIR="$(mktemp -d /tmp/hal-state-XXXXXX)"
-		# Remove -f from args passed to bun
-		set -- $(printf '%s\n' "$@" | grep -v '^-f$')
-		break
-	fi
+	case "$arg" in
+		-f)
+			# Fresh state means this invocation is intentionally isolated: no other
+			# terminal can join it, and it cannot join the normal host.
+			export HAL_STATE_DIR="$(mktemp -d /tmp/hal-state-XXXXXX)"
+			;;
+		*)
+			args+=("$arg")
+			;;
+	esac
 done
 
 while true; do
 	startup_epoch_ms="$(NO_COLOR=1 bun -e 'console.log(Date.now())')"
-	HAL_LOG=1 HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "$@"
+	HAL_LOG=1 HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "${args[@]}"
 
 	code=$?
-	# Exit code 100 restarts - used by Ctrl-R
+	# Exit code 100 restarts - used by Ctrl-R.
 	[ "$code" -ne 100 ] && exit "$code"
 done

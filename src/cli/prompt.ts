@@ -10,6 +10,7 @@ const config = {
 	maxPromptLines: 10,
 }
 
+
 // ── Word wrap + cursor mapping ───────────────────────────────────────────────
 
 function wordWrapLines(text: string, width: number): string[] {
@@ -192,6 +193,11 @@ let historyDraft = ''
 // Called when async paste resolves (image placeholder -> path)
 let renderCallback: (() => void) | null = null
 
+// Multiline pastes are displayed as the old temp-file marker so humans can
+// tell pastes apart and open them in an external editor. submitText() expands
+// those markers back to the original pasted text for the model.
+const pasteRefs: Array<{ display: string; text: string }> = []
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function clamp(pos: number): number {
@@ -289,6 +295,16 @@ function replaceSelection(text: string): void {
 	applyInsertion(text)
 }
 
+function replaceSelectionWithPastedText(text: string): void {
+	if (!text.includes('\n')) {
+		replaceSelection(text)
+		return
+	}
+	const display = clipboard.saveMultilinePaste(text)
+	pasteRefs.push({ display, text })
+	replaceSelection(display)
+}
+
 // Single char insert — consecutive inserts coalesce into one undo group
 function typeChar(ch: string): void {
 	if (!undoGrouping) pushUndo()
@@ -381,7 +397,7 @@ function doPaste(): void {
 			resolvePlaceholder(ph, result)
 		}),
 	)
-	if (t) replaceSelection(t)
+	if (t) replaceSelectionWithPastedText(t)
 }
 
 // ── Key handling ─────────────────────────────────────────────────────────────
@@ -514,7 +530,7 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	if (k.char.length === 1 && !selRange()) typeChar(k.char)
 	else {
 		const text = k.char.length > 1 ? clipboard.cleanPaste(k.char) : k.char
-		if (text) replaceSelection(text)
+		if (text) replaceSelectionWithPastedText(text)
 	}
 	return true
 }
@@ -557,7 +573,16 @@ function buildPrompt(contentWidth: number): PromptRender {
 		}
 	}
 
+
 	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol } }
+}
+
+function submitText(): string {
+	let out = buf
+	for (const ref of pasteRefs) {
+		out = out.replace(ref.display, ref.text)
+	}
+	return out
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -581,6 +606,7 @@ function setText(t: string, c?: number): void {
 	clearSelectionAndGoal()
 	historyIndex = -1
 	historyDraft = ''
+	pasteRefs.length = 0
 }
 
 function clear(): void {
@@ -592,6 +618,7 @@ function clear(): void {
 	undoGrouping = false
 	historyIndex = -1
 	historyDraft = ''
+	pasteRefs.length = 0
 }
 
 function setHistory(h: string[]): void {
@@ -610,6 +637,7 @@ export const prompt = {
 	config,
 	text,
 	draftText,
+	submitText,
 	cursorPos,
 	setText,
 	clear,

@@ -16,6 +16,7 @@ import { liveFiles } from './utils/live-file.ts'
 import { openaiUsage } from './openai-usage.ts'
 import { liveEventBlocks } from './live-event-blocks.ts'
 import { log } from './utils/log.ts'
+import { startup } from './startup.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -537,17 +538,17 @@ function prevTab(): void {
 // Fork stays distinct because it also copies the draft from the parent.
 let pendingOpen: 'open' | 'fork' | 'resume' | false = false
 
-function sendCommand(type: CommandType, text?: string): void {
+function sendCommand(type: CommandType, text?: string, displayText?: string): void {
 	const tab = currentTab()
 	if (type === 'open') pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') pendingOpen = 'resume'
-	ipc.appendCommand(makeCommand(type, tab?.sessionId, text))
+	ipc.appendCommand(makeCommand(type, tab?.sessionId, text, displayText))
 }
 
-function makeCommand(type: CommandType, sessionId: string | undefined, text?: string): Command {
+function makeCommand(type: CommandType, sessionId: string | undefined, text?: string, displayText?: string): Command {
 	switch (type) {
 		case 'prompt':
-			return { type, sessionId, text: text ?? '' }
+			return { type, sessionId, text: text ?? '', displayText }
 		case 'open':
 			if (text?.startsWith('fork:')) return { type, sessionId, forkSessionId: text.slice(5) }
 			if (text?.startsWith('after:')) return { type, sessionId, afterSessionId: text.slice(6) }
@@ -748,7 +749,7 @@ function applySharedStatus(shared: SharedState): void {
 }
 
 function applySharedState(shared: SharedState): void {
-	if (shared.openSessions.length > 0) applySessionList(shared.openSessions)
+	if (shared.sessions.length > 0) applySessionList(shared.sessions)
 	applySharedStatus(shared)
 }
 
@@ -903,9 +904,9 @@ function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInf
 	}
 }
 
-function initializeSessions(shared: SharedState): void {
-	const items = shared.openSessions.length > 0
-		? shared.openSessions
+function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; preferredSessionId?: string } = {}): void {
+	const items = shared.sessions.length > 0
+		? shared.sessions
 		: sessionStore.loadAllSessionMetas().map(sessionInfoFromMeta)
 	if (items.length === 0) {
 		applySharedStatus(shared)
@@ -913,8 +914,10 @@ function initializeSessions(shared: SharedState): void {
 	}
 
 	const saved = loadClientState()
+	const preferredSession = opts.preferredSessionId
+		?? (opts.preferredCwd ? startup.findOpenSessionForCwd(items, opts.preferredCwd) ?? '' : '')
 	const t0 = performance.now()
-	applySessionList(items, saved.lastTab ?? '')
+	applySessionList(items, preferredSession || saved.lastTab || '')
 	const active = currentTab()
 	const unseenDone = new Set(saved.doneUnseen)
 	for (const tab of state.tabs) tab.doneUnseen = tab.sessionId !== active?.sessionId && unseenDone.has(tab.sessionId)
@@ -1024,7 +1027,7 @@ function resetForTests(): void {
 	state.hostVersion = ''
 }
 
-function startClient(signal: AbortSignal): void {
+function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string } = {}): void {
 	startWatchingHostLock()
 	const shared = startWatchingIpcState()
 	openaiUsage.onChange(() => onChange(false))
@@ -1035,7 +1038,7 @@ function startClient(signal: AbortSignal): void {
 		}
 	})()
 
-	initializeSessions(shared)
+	initializeSessions(shared, opts)
 	onChange(false)
 
 	// Background-load blobs + remaining tabs after first paint

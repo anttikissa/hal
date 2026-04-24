@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'fs'
 import { sessions } from './sessions.ts'
 import { replay } from '../session/replay.ts'
+import { ipc } from '../ipc.ts'
 
 const createdIds: string[] = []
 
@@ -31,6 +32,22 @@ function entryText(entry: any): string {
 
 afterEach(() => {
 	for (const id of createdIds.splice(0)) sessions.deleteSession(id)
+})
+
+
+test('loadSessionList reads rich sessions from shared state', () => {
+	const origReadState = ipc.readState
+	ipc.readState = () => ({
+		sessions: [{ id: 'new', tab: 1, cwd: '/tmp/new' }],
+		busy: {},
+		activity: {},
+		updatedAt: '2026-04-24T11:00:00.000Z',
+	})
+	try {
+		expect(sessions.loadSessionList()).toEqual(['new'])
+	} finally {
+		ipc.readState = origReadState
+	}
 })
 
 test('createSession and loadHistory round-trip', async () => {

@@ -21,10 +21,8 @@ describe('clipboard', () => {
 		expect(clipboard.cleanPaste(path)).toBe(`[${path}]`)
 	})
 
-	test('stores long paste in a temp file', () => {
+	test('keeps multiline text inline', () => {
 		const text = 'a\n'.repeat(6)
-		const cleaned = clipboard.cleanPaste(text)
-		expect(cleaned.startsWith('[/tmp/hal/paste/')).toBe(true)
-		expect(cleaned.endsWith('.txt]')).toBe(true)
+		expect(clipboard.cleanPaste(text)).toBe(text)
 	})
 })

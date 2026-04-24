@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
+import { readFileSync } from 'fs'
 import { prompt } from '../src/cli/prompt.ts'
 import type { KeyEvent } from '../src/cli/keys.ts'
 
@@ -16,6 +17,20 @@ describe('prompt', () => {
 		prompt.setText('hello', 5)
 		expect(prompt.handleKey(key('enter', { shift: true }), 80)).toBe(true)
 		expect(prompt.text()).toBe('hello\n')
+	})
+
+	test('pasted multiline buffers show temp files but keep text for submission', () => {
+		const pasted = 'before\ninside\nafter'
+		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		const first = prompt.text()
+		expect(first).toMatch(/^\[\/tmp\/hal\/paste\/\d{4}\.txt\]$/)
+		expect(readFileSync(first.slice(1, -1), 'utf-8')).toBe(pasted)
+		expect(prompt.submitText()).toBe(pasted)
+
+		const secondPaste = 'second\npaste'
+		prompt.handleKey({ key: '', char: secondPaste, shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		expect(prompt.text()).not.toBe(`${first}${first}`)
+		expect(prompt.submitText()).toBe(pasted + secondPaste)
 	})
 
 	test('alt-left and alt-right move by words', () => {
