@@ -306,9 +306,9 @@ function renderHelpBar(lines: string[]): void {
 	const busy = client.isBusy()
 	const hasText = prompt.text().trim().length > 0
 	const continueAction = client.continueActionForCurrentTurn()
-	const desc = '\x1b[90m'
+	const desc = colors.help.description || '\x1b[90m'
 	const bar = helpBar.build(busy, hasText, continueAction, {
-		key: BRIGHT_WHITE,
+		key: colors.help.key || '\x1b[37m',
 		description: desc,
 		separator: desc,
 	})

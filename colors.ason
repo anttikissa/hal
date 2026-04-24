@@ -83,6 +83,12 @@
 		highlight: [0.90, 0.01, 250],
 	},
 
+	// Help bar — keys stand out from descriptions, but stay below prompt input.
+	help: {
+		key: [0.76, 0.008, 250],
+		description: [0.60, 0, 0],
+	},
+
 	popup: {
 		current: {
 			fg: [0.96, 0.02, 250],

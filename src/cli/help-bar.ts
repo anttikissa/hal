@@ -78,7 +78,7 @@ function build(busy: boolean, hasText: boolean, continueAction: ContinueAction |
 	const state = deriveState(busy, hasText, continueAction)
 	const visible = HINTS[state].filter((hint) => !isLearned(hint))
 	if (visible.length === 0) return ''
-	const separator = style ? `${style.separator} │ ${style.description}` : ' │ '
+	const separator = style ? `${style.separator}, ${style.description}` : ', '
 	return visible.map((hint) => formatHint(hint, style)).join(separator)
 }
 

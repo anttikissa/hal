@@ -158,12 +158,23 @@ describe('render', () => {
 		expect(clean).toContain('enter: continue')
 	})
 
-	test('help bar renders keys brighter than descriptions', () => {
+	test('help bar renders keys brighter than descriptions but not bright white', () => {
 		prompt.setText('hello')
 		const output = captureOutput(() => render.draw(true))
-		expect(output).toContain('\x1b[97menter\x1b[90m: send prompt')
-		expect(output).toContain('\x1b[97mshift-enter\x1b[90m: insert newline')
-		expect(output).toContain('\x1b[97mtab\x1b[90m: complete')
+		expect(output).not.toContain('\x1b[97menter')
+		expect(output).toContain('enter')
+		expect(output).toContain(': send prompt')
+		expect(output).toContain('shift-enter')
+		expect(output).toContain(': insert newline')
+		expect(output).toContain('tab')
+		expect(output).toContain(': complete')
+	})
+
+	test('help bar separates hints with commas', () => {
+		prompt.setText('hello')
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('enter: send prompt, shift-enter: insert newline, tab: complete')
+		expect(clean).not.toContain('│')
 	})
 
 	test('status line shows local pid', () => {

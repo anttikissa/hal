@@ -47,3 +47,11 @@ test('colors.init loads lazily and only once', () => {
 		liveFiles.onChange = origOnChange
 	}
 })
+
+
+test('colors.load exposes help bar colors from colors.ason', () => {
+	colors.load()
+	expect(colors.help.key).toStartWith('\x1b[')
+	expect(colors.help.description).toStartWith('\x1b[')
+	expect(colors.help.key).not.toBe('\x1b[97m')
+})
