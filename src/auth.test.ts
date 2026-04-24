@@ -91,6 +91,24 @@ describe('auth.getCredential — multi-account rotation', () => {
 		expect(c4!.value).toBe('tok_b')
 	})
 
+	test('all configured accounts on cooldown does not fall through to env var', () => {
+		const orig = process.env.OPENAI_API_KEY
+		try {
+			process.env.OPENAI_API_KEY = 'sk-env'
+			const c1 = auth.getCredential('openai')
+			auth.markCooldown(c1!, 60_000)
+			const c2 = auth.getCredential('openai')
+			auth.markCooldown(c2!, 30_000)
+			const c3 = auth.getCredential('openai')
+			auth.markCooldown(c3!, 90_000)
+
+			expect(auth.getCredential('openai')!.value).toBe('tok_b')
+		} finally {
+			if (orig === undefined) delete process.env.OPENAI_API_KEY
+			else process.env.OPENAI_API_KEY = orig
+		}
+	})
+
 	test('cooldown follows stable account identity across reordering', () => {
 		auth._setStoreForTest({
 			openai: [

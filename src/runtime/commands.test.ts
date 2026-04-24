@@ -245,6 +245,30 @@ test('/clear queues a reset command', async () => {
 })
 
 
+test('/self queues a session rooted at HAL_DIR', async () => {
+	const appended: any[] = []
+	const origHalDir = process.env.HAL_DIR
+	const dir = mkdtempSync(join(tmpdir(), 'hal-self-command-'))
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	try {
+		process.env.HAL_DIR = dir
+		const result = await commands.executeCommand('/self', makeSession())
+
+		expect(result.handled).toBe(true)
+		expect(result.error).toBeUndefined()
+		expect(result.output).toContain(dir)
+		expect(appended).toEqual([{ type: 'open', cwd: dir, sessionId: '04-aaa' }])
+	} finally {
+		if (origHalDir === undefined) delete process.env.HAL_DIR
+		else process.env.HAL_DIR = origHalDir
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
 test('/open resolves a tab number and queues placement after it', async () => {
 	const appended: any[] = []
 	ipc.appendCommand = (command) => {

@@ -18,6 +18,7 @@ import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 import { version } from '../version.ts'
+import { HAL_DIR } from '../state.ts'
 
 // ── Types ──
 
@@ -201,6 +202,13 @@ function formatStamp(isoTs: string): string {
 	return isoTs.replace('T', ' ').slice(0, 16)
 }
 
+function currentHalDir(): string {
+	// Tests and embedded runtimes can override HAL_DIR after this module has been
+	// imported, so read the environment at call time and use the imported path only
+	// as the normal startup-time fallback.
+	return process.env.HAL_DIR ?? HAL_DIR
+}
+
 function renderTabs(args: string, session: SessionState): CommandResult {
 	const trimmed = args.trim()
 	if (trimmed && trimmed !== '--all') return { error: 'Usage: /tabs [--all]', handled: true }
@@ -260,6 +268,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	model: { usage: '[name]', summary: 'Switch model or list available models.', detail: 'With no name, shows the current model and the available choices.', arg: 'model' },
 	clear: { summary: 'Clear session history.' },
 	fork: { summary: 'Fork current session to new tab.' },
+	self: { summary: 'Open a session in Hal\'s own directory.' },
 	open: { usage: '[tab|session-id|name]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
 	move: { usage: '<position>', summary: 'Move the current tab to a position.', detail: 'Values below 1 clamp to 1; values above the tab count clamp to the last tab.' },
 	rename: { usage: '<name>|clear', summary: 'Rename the current session.', detail: 'Set a short session name used in tabs and command targets.' },
@@ -366,6 +375,14 @@ handlers['fork'] = (_args, session) => {
 		sessionId: session.id,
 	})
 	return { handled: true }
+}
+
+// /self — open a session rooted at Hal's own source/config directory
+handlers['self'] = (args, session) => {
+	if (args.trim()) return { error: 'Usage: /self', handled: true }
+	const cwd = currentHalDir()
+	ipc.appendCommand({ type: 'open', cwd, sessionId: session.id })
+	return { output: `Opening Hal self session in ${cwd}...`, handled: true }
 }
 
 // /open [tab|session-id|name] — open a new tab, optionally after an existing tab

@@ -149,28 +149,43 @@ function getCredential(providerName: string): Credential | undefined {
 	const entries = normalizeEntries(raw)
 	const now = Date.now()
 	const total = entries.length
+	let hasConfiguredCredential = false
 
-	// Try each entry, skip ones on cooldown
+	// Try configured entries first. Only real credentials count; metadata-only
+	// objects should not block fallback to an environment API key.
 	for (let i = 0; i < entries.length; i++) {
 		const key = cooldownKey(providerName, entries[i], i)
+		const cred = credFromEntry(entries[i], key, i, total)
+		if (!cred) continue
+		hasConfiguredCredential = true
 		const cooldownUntil = loadCooldowns().get(key)
 		if (cooldownUntil && now < cooldownUntil) continue
-		const cred = credFromEntry(entries[i], key, i, total)
-		if (cred) return cred
+		return cred
 	}
 
-	// Fall back to env var
+	// If configured accounts exist but every one is cooling down, keep rotating
+	// within that configured pool. Falling through to an env var here makes local
+	// shell credentials unexpectedly override the user's account-rotation state.
+	if (hasConfiguredCredential) {
+		let best: Credential | undefined
+		let bestUntil = Infinity
+		for (let i = 0; i < entries.length; i++) {
+			const key = cooldownKey(providerName, entries[i], i)
+			const cred = credFromEntry(entries[i], key, i, total)
+			if (!cred) continue
+			const until = loadCooldowns().get(key) ?? 0
+			if (until < bestUntil) {
+				bestUntil = until
+				best = cred
+			}
+		}
+		return best
+	}
+
+	// No configured credentials — fall back to env var.
 	const envVar = ENV_KEYS[providerName] ?? `${providerName.toUpperCase()}_API_KEY`
 	const envVal = process.env[envVar]
 	if (envVal) return { value: envVal, type: 'api-key' }
-
-	// All on cooldown — return the one that comes off soonest
-	let bestIdx = -1, bestUntil = Infinity
-	for (let i = 0; i < entries.length; i++) {
-		const until = loadCooldowns().get(cooldownKey(providerName, entries[i], i)) ?? 0
-		if (until < bestUntil) { bestUntil = until; bestIdx = i }
-	}
-	if (bestIdx >= 0) return credFromEntry(entries[bestIdx], cooldownKey(providerName, entries[bestIdx], bestIdx), bestIdx, total)
 	return undefined
 }
 
