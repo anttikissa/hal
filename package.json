@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "test": "bun test --concurrent",
+    "typecheck": "tsgo --noEmit",
     "lint": "find src scripts tests -name '*.ts' -type f -print0 | sort -z | xargs -0 oxlint",
     "cloc": "bun scripts/cloc.ts",
     "fmt": "bunx prettier --write 'src/**/*.ts'"
