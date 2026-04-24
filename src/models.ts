@@ -113,6 +113,21 @@ interface RefreshModelsResult {
 	changes: string[]
 	modelCount: number
 	hadCache: boolean
+	previous: Record<string, number>
+	next: Record<string, number>
+}
+
+interface FrontierModelInfo {
+	kind: 'gpt' | 'claude'
+	family: string
+	version: number[]
+}
+
+interface ModelUpdateSuggestion {
+	currentModel: string
+	newModel: string
+	family: string
+	displayName: string
 }
 
 function modelsFile(): string {
@@ -152,6 +167,64 @@ function isRelevantModelId(id: string): boolean {
 	return /(^|\/)gpt-[\d.]+/.test(id) || /(^|\/)claude-(opus|sonnet|haiku)-/.test(id)
 }
 
+function frontierModelInfo(fullId: string): FrontierModelInfo | null {
+	const id = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+	const gpt = id.match(/^gpt-(\d+)\.(\d+)$/)
+	if (gpt) return { kind: 'gpt', family: `GPT ${gpt[1]}`, version: [Number(gpt[1]), Number(gpt[2])] }
+
+	const claude = id.match(/^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d+)|-\d{8,})$/)
+	if (!claude) return null
+	const tier = claude[1]![0]!.toUpperCase() + claude[1]!.slice(1)
+	return { kind: 'claude', family: `${tier} ${claude[2]}`, version: [Number(claude[2]), Number(claude[3] ?? 0)] }
+}
+
+function compareVersions(a: number[], b: number[]): number {
+	const len = Math.max(a.length, b.length)
+	for (let i = 0; i < len; i++) {
+		const diff = (a[i] ?? 0) - (b[i] ?? 0)
+		if (diff !== 0) return diff
+	}
+	return 0
+}
+
+function providerPrefix(fullId: string): string {
+	const idx = fullId.indexOf('/')
+	return idx >= 0 ? fullId.slice(0, idx + 1) : ''
+}
+
+function newestModelInFamily(cache: Record<string, number>, family: string): string | null {
+	let bestId: string | null = null
+	let bestInfo: FrontierModelInfo | null = null
+	for (const id of Object.keys(cache)) {
+		const info = frontierModelInfo(id)
+		if (!info || info.family !== family) continue
+		if (!bestInfo || compareVersions(info.version, bestInfo.version) > 0) {
+			bestId = id
+			bestInfo = info
+		}
+	}
+	return bestId
+}
+
+function modelUpdateSuggestion(currentModel: string, previous: Record<string, number>, next: Record<string, number>): ModelUpdateSuggestion | null {
+	const resolved = resolveModel(currentModel)
+	const current = frontierModelInfo(resolved)
+	if (!current) return null
+
+	const previousBest = newestModelInFamily(previous, current.family)
+	const nextBest = newestModelInFamily(next, current.family)
+	if (!nextBest) return null
+
+	const previousBestInfo = previousBest ? frontierModelInfo(previousBest) : null
+	const nextBestInfo = frontierModelInfo(nextBest)
+	if (!nextBestInfo) return null
+	if (previousBestInfo && compareVersions(nextBestInfo.version, previousBestInfo.version) <= 0) return null
+	if (compareVersions(nextBestInfo.version, current.version) <= 0) return null
+
+	const newModel = nextBest.includes('/') ? nextBest : `${providerPrefix(resolved)}${nextBest}`
+	return { currentModel: resolved, newModel, family: current.family, displayName: displayModel(newModel) }
+}
+
 function modelChangeMessages(previous: Record<string, number>, next: Record<string, number>): string[] {
 	const changes: string[] = []
 	for (const [id, context] of Object.entries(next).sort(([a], [b]) => a.localeCompare(b))) {
@@ -188,6 +261,8 @@ async function refreshModels(): Promise<RefreshModelsResult> {
 		changes: hadCache ? modelChangeMessages(previous, ctx) : [],
 		modelCount: Object.keys(ctx).length,
 		hadCache,
+		previous,
+		next: ctx,
 	}
 }
 
@@ -357,4 +432,6 @@ export const models = {
 	estimateTokens,
 	refreshModels,
 	modelChangeMessages,
+	frontierModelInfo,
+	modelUpdateSuggestion,
 }

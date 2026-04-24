@@ -7,6 +7,7 @@ import { context } from '../runtime/context.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 import { models } from '../models.ts'
+import { HAL_DIR } from '../state.ts'
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
 	const picked = runtime.pickMostRecentlyClosedSessionId(
 		[
@@ -101,6 +102,25 @@ test('formatModelRefreshMessage summarizes models.dev changes for the user', () 
 
 test('formatModelRefreshMessage reports initial models.dev fetch without change list', () => {
 	expect(runtime.formatModelRefreshMessage([], 253)).toBe('Fetched recent data from models.dev (253 models)')
+})
+
+
+test('buildModelUpdateSuggestionText mentions subagent only outside ~/.hal', () => {
+	const suggestion = {
+		family: 'GPT 5',
+		currentModel: 'openai/gpt-5.4',
+		newModel: 'openai/gpt-5.5',
+		displayName: 'GPT 5.5',
+	}
+
+	const outside = runtime.buildModelUpdateSuggestionText(suggestion, '/work/project')
+	expect(outside).toContain('GPT 5')
+	expect(outside).toContain('openai/gpt-5.5')
+	expect(outside).toContain('spawn a subagent in ~/.hal')
+
+	const inside = runtime.buildModelUpdateSuggestionText(suggestion, HAL_DIR)
+	expect(inside).toContain('update the default model here in ~/.hal')
+	expect(inside).not.toContain('spawn a subagent')
 })
 
 

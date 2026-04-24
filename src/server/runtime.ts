@@ -15,6 +15,7 @@ import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
 import { sessionIds } from '../session/ids.ts'
 import { replay } from '../session/replay.ts'
+import { HAL_DIR } from '../state.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
@@ -258,6 +259,35 @@ function formatModelRefreshMessage(changes: string[], modelCount?: number): stri
 	return `[models.dev] fetched model metadata; relevant changes: ${shown.join('; ')}${more}`
 }
 
+function buildModelUpdateSuggestionText(suggestion: { family: string; currentModel: string; newModel: string; displayName: string }, cwd: string): string {
+	const intro = `It looks like your ${suggestion.family} model family got an update: **${suggestion.displayName}** (${suggestion.newModel}). Want me to make it the default?`
+	if (cwd === HAL_DIR) {
+		return `${intro}\n\nIf yes, I'll update the default model here in ~/.hal, run the tests, and commit it.`
+	}
+	return `${intro}\n\nIf yes, I'll spawn a subagent in ~/.hal, update the default model, run the tests, and commit it.`
+}
+
+function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: string): void {
+	const ts = new Date().toISOString()
+	sessionStore.appendHistorySync(sessionId, [{ type: 'assistant', text, synthetic: true, syntheticKind, ts }])
+	ipc.appendEvent({
+		id: protocol.eventId(),
+		type: 'response',
+		text,
+		sessionId,
+		createdAt: ts,
+	})
+}
+
+function suggestFrontierModelUpdates(previous: Record<string, number>, next: Record<string, number>): void {
+	for (const meta of activeMetas()) {
+		const currentModel = meta.model ?? models.defaultModel()
+		const suggestion = models.modelUpdateSuggestion(currentModel, previous, next)
+		if (!suggestion) continue
+		emitSyntheticAssistant(meta.id, buildModelUpdateSuggestionText(suggestion, meta.workingDir ?? process.cwd()), 'model-update-suggestion')
+	}
+}
+
 async function refreshModelMetadata(): Promise<void> {
 	try {
 		const result = await models.refreshModels()
@@ -266,6 +296,7 @@ async function refreshModelMetadata(): Promise<void> {
 			log.info('models.dev metadata refreshed', { message })
 			broadcastInfo(message)
 		}
+		if (result.hadCache) suggestFrontierModelUpdates(result.previous, result.next)
 	} catch (err) {
 		log.error('models.dev refresh failed', { error: errorMessage(err) })
 	}
@@ -675,4 +706,5 @@ export const runtime = {
 	startSpawnedSession,
 	refreshModelMetadata,
 	formatModelRefreshMessage,
+	buildModelUpdateSuggestionText,
 }

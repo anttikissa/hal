@@ -42,6 +42,31 @@ test('model picker lists gpt-5.5', () => {
 	})
 })
 
+
+test('modelUpdateSuggestion detects newer GPT and Claude frontier models', () => {
+	expect(models.modelUpdateSuggestion(
+		'openai/gpt-5.4',
+		{ 'gpt-5.4': 1_050_000 },
+		{ 'gpt-5.4': 1_050_000, 'gpt-5.5': 1_050_000 },
+	)).toMatchObject({
+		currentModel: 'openai/gpt-5.4',
+		newModel: 'openai/gpt-5.5',
+		family: 'GPT 5',
+		displayName: 'GPT 5.5',
+	})
+
+	expect(models.modelUpdateSuggestion(
+		'anthropic/claude-opus-4-5',
+		{ 'claude-opus-4-5': 200_000 },
+		{ 'claude-opus-4-5': 200_000, 'claude-opus-4-6': 200_000 },
+	)).toMatchObject({
+		currentModel: 'anthropic/claude-opus-4-5',
+		newModel: 'anthropic/claude-opus-4-6',
+		family: 'Opus 4',
+		displayName: 'Opus 4.6',
+	})
+})
+
 test('refreshModels reports relevant GPT and Claude additions and context changes', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir
