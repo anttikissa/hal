@@ -488,7 +488,42 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'info' | 'warning'
 	return lines
 }
 
-function renderBlock(block: Block, cols: number): string[] {
+function hasStreamingHalCursor(block: Block): boolean {
+	return (block.type === 'assistant' || block.type === 'thinking') && !!block.streaming
+}
+
+function cursorColor(block?: Block): string {
+	if (block?.type === 'thinking') return colors.thinking.fg
+	return colors.input.cursor || colors.assistant.fg
+}
+
+function cursorGlyph(block: Block, visible: boolean): string {
+	return visible ? `${cursorColor(block)}█${FG_OFF}` : ' '
+}
+
+function withInlineCursor(line: string, block: Block, cols: number, visible: boolean): string[] {
+	const glyph = cursorGlyph(block, visible)
+	const eraseIndex = line.lastIndexOf('\x1b[K')
+	if (eraseIndex >= 0) {
+		const beforeErase = line.slice(0, eraseIndex)
+		const afterErase = line.slice(eraseIndex)
+		if (visLen(beforeErase) < cols) return [beforeErase + glyph + afterErase]
+	}
+
+	// If the rendered row is already full-width, adding another printable cell
+	// would trigger terminal auto-wrap and break the one-array-line = one-row
+	// invariant. Put the HAL cursor on its own row instead.
+	if (visLen(line) >= cols) return [line, glyph]
+	return [line + glyph]
+}
+
+function addInlineCursor(lines: string[], block: Block, cols: number, visible: boolean): void {
+	const last = lines.at(-1)
+	if (last == null) return
+	lines.splice(lines.length - 1, 1, ...withInlineCursor(last, block, cols, visible))
+}
+
+function renderBlock(block: Block, cols: number, cursorVisible = false): string[] {
 	const blobRef =
 		'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId
 			? `${block.sessionId}/${block.blobId}`
@@ -497,6 +532,7 @@ function renderBlock(block: Block, cols: number): string[] {
 	const lines = [bgLine(`${fg}${buildHeader(blockLabel(block), formatHHMM(block.ts), blobRef, cols)}`, cols, bg)]
 	for (const line of blockContent(block, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
 	lines[lines.length - 1]! += FG_OFF
+	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, cursorVisible)
 	return lines
 }
 
@@ -505,6 +541,7 @@ export const blocks = {
 	historyToBlocks,
 	touch,
 	renderBlock,
+	cursorColor,
 	renderBlockGroup,
 	loadBlobs,
 }

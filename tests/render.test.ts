@@ -272,6 +272,43 @@ describe('render', () => {
 			cursor.isVisible = originalIsVisible
 		}
 	})
+
+	test('idle HAL cursor reserves three rows above the tab bar', () => {
+		const originalIsVisible = cursor.isVisible
+		cursor.isVisible = () => true
+		try {
+			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+			const tabBar = lines.findIndex((line) => line.includes('tab 1]'))
+			expect(tabBar).toBeGreaterThanOrEqual(3)
+			expect(lines[tabBar - 3]).toBe('')
+			expect(lines[tabBar - 2]?.trim()).toBe('█')
+			expect(lines[tabBar - 1]).toBe('')
+		} finally {
+			cursor.isVisible = originalIsVisible
+		}
+	})
+
+	test('streaming assistant and thinking blocks show blinking HAL cursor inline', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'assistant', text: 'hello', streaming: true })
+		tab.history.push({ type: 'thinking', text: 'hmm', streaming: true })
+
+		const originalIsVisible = cursor.isVisible
+		try {
+			cursor.isVisible = () => true
+			render.resetRenderer()
+			const visible = stripAnsi(captureOutput(() => render.draw(true)))
+			expect(visible).toContain('hmm█')
+
+			cursor.isVisible = () => false
+			render.resetRenderer()
+			const hidden = stripAnsi(captureOutput(() => render.draw(true)))
+			expect(hidden).toContain('hmm')
+			expect(hidden).not.toContain('hmm█')
+		} finally {
+			cursor.isVisible = originalIsVisible
+		}
+	})
 	test('error-level info on an inactive finished tab shows an alert indicator', () => {
 		client.state.tabs.push({
 			sessionId: 'other',
@@ -340,9 +377,11 @@ describe('render', () => {
 		prompt.setText('x')
 		const withText = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 
-		expect(empty[2]).toContain('ctrl-t new')
-		expect(withText[2]).toBe('')
-		expect(withText[3]).toBe('x')
+		const emptyHelp = empty.find((line) => line.includes('ctrl-t new'))
+		const promptLine = withText.findIndex((line) => line === 'x')
+		expect(emptyHelp).toContain('ctrl-t new')
+		expect(promptLine).toBeGreaterThan(0)
+		expect(withText[promptLine - 1]).toBe('')
 		expect(withText.length).toBe(empty.length)
 	})
 

@@ -17,15 +17,23 @@ export type BlockRenderCache = {
 export type HistoryRenderContext = {
 	forkHistoryDimFactor: number
 	blockCache: WeakMap<Block, BlockRenderCache>
+	cursorVisible: boolean
+}
+
+function hasInlineHalCursor(block: Block | undefined): boolean {
+	return (block?.type === 'assistant' || block?.type === 'thinking') && !!block.streaming
 }
 
 function renderEntry(block: Block, cols: number, context: HistoryRenderContext): string[] {
-	const cached = context.blockCache.get(block)
+	// Streaming text/thinking blocks include the blinking HAL cursor. Do not cache
+	// them across blink phases, even when the streamed text did not change.
+	const streamingCursor = hasInlineHalCursor(block)
+	const cached = streamingCursor ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
 	if (cached && cached.version === version && cached.cols === cols) return cached.lines
-	const lines = blockRenderer.renderBlock(block, cols)
+	const lines = blockRenderer.renderBlock(block, cols, context.cursorVisible)
 	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, context.forkHistoryDimFactor)) : lines
-	context.blockCache.set(block, { version, cols, lines: rendered })
+	if (!streamingCursor) context.blockCache.set(block, { version, cols, lines: rendered })
 	return rendered
 }
 
@@ -67,9 +75,16 @@ function visibleHistory(history: Block[]): Block[] {
 	return visible
 }
 
+const HAL_CURSOR_MARGIN = 2
+
+function halCursorLine(visible: boolean): string {
+	const glyph = visible ? `${blockRenderer.cursorColor()}█\x1b[39m` : ' '
+	return `${' '.repeat(HAL_CURSOR_MARGIN)}${glyph}`
+}
+
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {
+	const start = lines.length
 	const history = visibleHistory(tab.history)
-	let count = 0
 	for (let i = 0; i < history.length; ) {
 		const group = [history[i]!]
 		const key = infoGroupKey(group[0]!)
@@ -80,11 +95,22 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		}
 		if (lines.length > 0) lines.push('')
 		const rendered = renderGroup(group, cols, context)
-		count += rendered.length
 		lines.push(...rendered)
 		i += group.length
 	}
-	return count
+
+	// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
+	// another blank row. When history fills the screen, these are the bottom
+	// three history rows immediately above the tab/status/prompt chrome.
+	if (!hasInlineHalCursor(history.at(-1))) {
+		lines.push('', halCursorLine(context.cursorVisible), '')
+	}
+
+	return lines.length - start
 }
 
-export const renderHistory = { renderLines }
+function hasAnimatedCursor(tab: Tab | null | undefined): boolean {
+	return !!tab
+}
+
+export const renderHistory = { renderLines, hasAnimatedCursor }

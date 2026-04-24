@@ -20,6 +20,7 @@ import type { Block } from '../client.ts'
 import { renderHistory } from './render-history.ts'
 import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts'
 import { renderStatus } from './render-status.ts'
+import { cursor as blinkCursor } from '../cli/cursor.ts'
 
 const config = {
 	forkHistoryDimFactor: 0.85,
@@ -50,6 +51,7 @@ function historyContext(): HistoryRenderContext {
 	return {
 		forkHistoryDimFactor: config.forkHistoryDimFactor,
 		blockCache,
+		cursorVisible: blinkCursor.isVisible(),
 	}
 }
 
@@ -297,7 +299,7 @@ function clearFrame(): void {
 }
 
 function hasAnimatedIndicators(): boolean {
-	return renderStatus.hasAnimatedIndicators()
+	return renderStatus.hasAnimatedIndicators() || renderHistory.hasAnimatedCursor(client.currentTab())
 }
 
 export const render = { config, draw, resetRenderer, invalidateHistoryCache, clearFrame, hasAnimatedIndicators }
