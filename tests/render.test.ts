@@ -288,7 +288,7 @@ describe('render', () => {
 		}
 	})
 
-	test('streaming assistant and thinking blocks show blinking HAL cursor inline', () => {
+	test('streaming assistant and thinking blocks show a solid HAL cursor inline', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'assistant', text: 'hello', streaming: true })
 		tab.history.push({ type: 'thinking', text: 'hmm', streaming: true })
@@ -297,14 +297,13 @@ describe('render', () => {
 		try {
 			cursor.isVisible = () => true
 			render.resetRenderer()
-			const visible = stripAnsi(captureOutput(() => render.draw(true)))
-			expect(visible).toContain('hmm█')
+			const visiblePhase = stripAnsi(captureOutput(() => render.draw(true)))
+			expect(visiblePhase).toContain('hmm█')
 
 			cursor.isVisible = () => false
 			render.resetRenderer()
-			const hidden = stripAnsi(captureOutput(() => render.draw(true)))
-			expect(hidden).toContain('hmm')
-			expect(hidden).not.toContain('hmm█')
+			const hiddenPhase = stripAnsi(captureOutput(() => render.draw(true)))
+			expect(hiddenPhase).toContain('hmm█')
 		} finally {
 			cursor.isVisible = originalIsVisible
 		}

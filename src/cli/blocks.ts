@@ -532,7 +532,9 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const lines = [bgLine(`${fg}${buildHeader(blockLabel(block), formatHHMM(block.ts), blobRef, cols)}`, cols, bg)]
 	for (const line of blockContent(block, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
 	lines[lines.length - 1]! += FG_OFF
-	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, cursorVisible)
+	// Streaming cursors are progress markers, not idle blinkers: keep them solid
+	// so the active streamed block is always visually anchored.
+	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, true)
 	return lines
 }
 
