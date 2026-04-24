@@ -20,6 +20,7 @@ const MAX_OUTPUT_BYTES = 1_000_000
 const TRUNCATED_SUFFIX = '\n[… truncated]'
 const REPO_ROOT = resolve(import.meta.dir, '../..')
 const TSGO_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/tsgo-file.ts')
+const OXLINT_CONFIG = resolve(REPO_ROOT, '.oxlintrc.json')
 const textDecoder = new TextDecoder()
 
 function ensureParent(path: string): void {
@@ -73,6 +74,26 @@ function runTypecheckForEdit(path: string): string | null {
 	const stderr = decodeOutput(proc.stderr).trim()
 	const details = [stdout, stderr].filter(Boolean).join('\n')
 	const fallback = `bun scripts/tsgo-file.ts exited ${proc.exitCode ?? 1}`
+	return truncateUtf8(details || fallback, MAX_OUTPUT_BYTES)
+}
+
+function runLintForEdit(path: string): string | null {
+	if (!shouldTypecheckEditedPath(path)) return null
+
+	// Use the repo-local binary directly to avoid Bun's extra "error: oxlint exited"
+	// wrapper noise. Passing the file explicitly keeps this single-file and fast.
+	const proc = Bun.spawnSync(['./node_modules/.bin/oxlint', path, '--config', OXLINT_CONFIG], {
+		cwd: REPO_ROOT,
+		stdin: 'ignore',
+		stdout: 'pipe',
+		stderr: 'pipe',
+	})
+	if ((proc.exitCode ?? 1) === 0) return null
+
+	const stdout = decodeOutput(proc.stdout).trim()
+	const stderr = decodeOutput(proc.stderr).trim()
+	const details = [stdout, stderr].filter(Boolean).join('\n')
+	const fallback = `oxlint exited ${proc.exitCode ?? 1}`
 	return truncateUtf8(details || fallback, MAX_OUTPUT_BYTES)
 }
 
@@ -142,6 +163,8 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 		const parts = [editRemap.buildResult(prepared)]
 		const typecheckError = runTypecheckForEdit(path)
 		if (typecheckError) parts.push(`TypeScript check failed for ${path}:\n${typecheckError}`)
+		const lintError = runLintForEdit(path)
+		if (lintError) parts.push(`Oxlint check failed for ${path}:\n${lintError}`)
 		return truncateUtf8(parts.join('\n\n'), MAX_OUTPUT_BYTES)
 	})
 }
@@ -151,7 +174,7 @@ const editTool = {
 	description: `Edit a file using hashline refs from read. Hashes are verified; line numbers may be remapped after prior edits in the same session.
 - replace: replace start_ref..end_ref (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
 - insert: insert new_content after after_ref. Use "0:000" for beginning of file.
-- if the edited file ends in .ts or .tsx, run tsgo-file on it and return type errors if broken.
+- if the edited file ends in .ts or .tsx, run tsgo-file and oxlint on it and return errors if broken.
 new_content is raw file content — no hashline prefixes. A trailing newline in new_content is stripped.`,
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },

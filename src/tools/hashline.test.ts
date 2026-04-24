@@ -299,6 +299,31 @@ describe('edit via hashline', () => {
 		}
 	})
 
+	test('returns lint errors after editing a lint-broken .ts file', async () => {
+		const repoRoot = process.cwd()
+		const file = join(repoRoot, `.tmp-hashline-lint-${process.pid}-${Date.now()}.ts`)
+		writeFileSync(file, 'export const value = 1\n')
+		ctx.cwd = repoRoot
+		try {
+			const ref = `1:${hashLine('export const value = 1')}`
+			const result = await executeEdit(
+				{
+					path: file,
+					operation: 'replace',
+					start_ref: ref,
+					end_ref: ref,
+					new_content: "console.log('lint me')",
+				},
+				ctx,
+			)
+			expect(result).toContain('Oxlint check failed')
+			expect(result).toContain('no-console')
+			expect(readFileSync(file, 'utf-8')).toBe("console.log('lint me')\n")
+		} finally {
+			rmSync(file, { force: true })
+		}
+	})
+
 	test('returns type errors after editing a broken .tsx file', async () => {
 		const repoRoot = process.cwd()
 		const file = join(repoRoot, `.tmp-hashline-${process.pid}-${Date.now()}.tsx`)
