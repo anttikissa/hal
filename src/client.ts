@@ -552,10 +552,20 @@ function prevTab(): void {
 // Fork stays distinct because it also copies the draft from the parent.
 let pendingOpen: 'open' | 'fork' | 'resume' | false = false
 
+function pendingTabActionForPrompt(text: string): 'open' | 'fork' | 'resume' | false {
+	const trimmed = text.trim()
+	if (/^\/fork(?:\s|$)/.test(trimmed)) return 'fork'
+	if (/^\/self(?:\s|$)/.test(trimmed)) return 'open'
+	if (/^\/open(?:\s|$)/.test(trimmed)) return 'open'
+	if (/^\/resume\s+\S/.test(trimmed)) return 'resume'
+	return false
+}
+
 function sendCommand(type: CommandType, text?: string, displayText?: string): void {
 	const tab = currentTab()
 	if (type === 'open') pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') pendingOpen = 'resume'
+	if (type === 'prompt') pendingOpen = pendingTabActionForPrompt(text ?? '')
 	ipc.appendCommand(makeCommand(type, tab?.sessionId, text, displayText))
 }
 

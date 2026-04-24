@@ -381,7 +381,7 @@ handlers['fork'] = (_args, session) => {
 handlers['self'] = (args, session) => {
 	if (args.trim()) return { error: 'Usage: /self', handled: true }
 	const cwd = currentHalDir()
-	ipc.appendCommand({ type: 'open', cwd, sessionId: session.id })
+	ipc.appendCommand({ type: 'open', cwd, forceNew: true, sessionId: session.id })
 	return { output: `Opening Hal self session in ${cwd}...`, handled: true }
 }
 

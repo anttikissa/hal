@@ -260,7 +260,7 @@ test('/self queues a session rooted at HAL_DIR', async () => {
 		expect(result.handled).toBe(true)
 		expect(result.error).toBeUndefined()
 		expect(result.output).toContain(dir)
-		expect(appended).toEqual([{ type: 'open', cwd: dir, sessionId: '04-aaa' }])
+		expect(appended).toEqual([{ type: 'open', cwd: dir, forceNew: true, sessionId: '04-aaa' }])
 	} finally {
 		if (origHalDir === undefined) delete process.env.HAL_DIR
 		else process.env.HAL_DIR = origHalDir

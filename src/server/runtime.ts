@@ -477,6 +477,8 @@ function handleCommand(cmd: Command): void {
 				const msg = `forked ${cmd.forkSessionId} → ${child.id}`
 				emitInfo(cmd.forkSessionId, msg)
 				emitInfo(child.id, msg)
+			} else if ('cwd' in cmd && cmd.cwd && cmd.forceNew) {
+				createSessionTab({ openerId: sessionId, afterId: sessionId, workingDir: cmd.cwd })
 			} else if ('afterSessionId' in cmd) {
 				createSessionTab({ openerId: sessionId, afterId: cmd.afterSessionId })
 			} else if (cmd.cwd) {

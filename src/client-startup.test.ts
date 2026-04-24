@@ -399,6 +399,31 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s3')
 	})
 
+	test('/self prompt activates the new session tab', async () => {
+		const shared = makeSharedState(['s1', 's2'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: (() => void) | undefined
+		ipc.readState = () => shared
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		client.switchTab(0)
+		client.sendCommand('prompt', '/self')
+
+		shared.sessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		onIpcChange?.()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.sessionId).toBe('s3')
+	})
+
 	test('moving the active tab keeps that same session active after reordering', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }

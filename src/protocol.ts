@@ -49,6 +49,10 @@ export interface OpenNewCommand extends CommandBase {
 	// Startup can request a tab for the client's directory. The host process may
 	// have a different cwd, so this must travel over IPC explicitly.
 	cwd?: string
+	// Slash commands such as /self need a genuinely new tab even if another
+	// open/closed session already has this cwd. Startup leaves this false so a
+	// second terminal still attaches to the existing project session safely.
+	forceNew?: boolean
 }
 export interface OpenForkCommand extends CommandBase {
 	type: 'open'
