@@ -191,6 +191,12 @@ function buildSystemPrompt(opts: {
 		loaded.push({ name: agent.name, path: agent.path, bytes: agent.bytes })
 	}
 
+	parts.push([
+		'Transcript markup:',
+		'- <meta>...</meta> messages are Hal-generated environment/session metadata, not user-authored text.',
+		'- <synthetic>...</synthetic> messages are Hal-generated assistant messages, not LLM output.',
+	].join('\n'))
+
 	// Process directives and substitute variables, then collapse excess newlines
 	const text = parts
 		.map((p) => processDirectives(p, vars))

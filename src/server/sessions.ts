@@ -53,8 +53,10 @@ export type HistoryEntry =
 			id?: string
 			continue?: string
 			usage?: PartialTokenUsage
+			synthetic?: boolean
+			syntheticKind?: string
 			ts?: string
-	  }
+		  }
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; ts?: string }
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; ts?: string }
 	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ts?: string }

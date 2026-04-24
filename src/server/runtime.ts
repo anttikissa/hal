@@ -152,6 +152,10 @@ function recordSessionInfo(sessionId: string, text: string, ts: string): void {
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts }])
 }
 
+function recordSessionMeta(sessionId: string, text: string, ts: string): void {
+	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts }])
+}
+
 function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
 	const sourceMeta = opts.sourceId ? sessionStore.loadSessionMeta(opts.sourceId) : null
@@ -309,6 +313,8 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 			})
 			broadcastSessions()
 		}
+		const metaTs = new Date().toISOString()
+		for (const message of cmdResult.meta ?? []) recordSessionMeta(sessionId, message, metaTs)
 		if (cmdResult.output) emitInfo(sessionId, cmdResult.output)
 		if (cmdResult.error) emitInfo(sessionId, cmdResult.error, 'error')
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)

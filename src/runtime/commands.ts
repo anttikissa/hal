@@ -27,6 +27,8 @@ export interface CommandResult {
 	output?: string
 	/** Error message to show the user. */
 	error?: string
+	/** Metadata text to inject into the next model-visible user turn. */
+	meta?: string[]
 	/** Whether the command was recognized and handled. */
 	handled: boolean
 }
@@ -351,10 +353,15 @@ handlers['model'] = (args, session) => {
 		return { output: lines.join('\n'), handled: true }
 	}
 
+	const oldModel = session.model ?? models.defaultModel()
 	const newModel = models.resolveModel(args)
 	session.model = newModel
 	const display = models.displayModel(newModel)
-	return { output: `Model set to ${display} (${newModel})`, handled: true }
+	return {
+		output: `Model set to ${display} (${newModel})`,
+		meta: [`model changed from ${oldModel} to ${newModel}`],
+		handled: true,
+	}
 }
 
 // /clear — rotate to a fresh log and reset replay context
@@ -542,7 +549,11 @@ handlers['cd'] = (args, session) => {
 		const files = agents.map((f) => `${f.name} (${context.formatBytes(f.bytes)})`)
 		parts.push(`Loaded ${files.join(', ')}`)
 	}
-	return { output: parts.join('\n'), handled: true }
+	return {
+		output: parts.join('\n'),
+		meta: [`cwd changed from ${old} to ${target}`],
+		handled: true,
+	}
 }
 
 // /system — print the full preprocessed system prompt (SYSTEM.md + AGENTS.md chain)

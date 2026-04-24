@@ -103,6 +103,37 @@ test('toProviderMessages merges assistant chunks split by ui info', () => {
 	])
 })
 
+
+test('toProviderMessages wraps next-user info in meta tags', () => {
+	const ts = '2026-04-13T14:43:49.970Z'
+	const entries: any[] = [
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts },
+		{ type: 'assistant', text: 'hello there', ts },
+		{ type: 'info', text: 'cwd changed from /tmp to /Users/antti/.hal', visibility: 'next-user', ts },
+		{ type: 'user', parts: [{ type: 'text', text: 'what now?' }], ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[13 Apr 14:43]\nhello' },
+		{ role: 'assistant', content: [{ type: 'text', text: 'hello there' }] },
+		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /Users/antti/.hal</meta>\nwhat now?' },
+	])
+})
+
+
+test('toProviderMessages wraps synthetic assistant messages in synthetic tags', () => {
+	const ts = '2026-04-13T14:43:49.970Z'
+	const entries: any[] = [
+		{ type: 'assistant', text: 'Howdy! What shall we do today?', synthetic: true, syntheticKind: 'greeting', ts },
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'assistant', content: [{ type: 'text', text: '<synthetic>Howdy! What shall we do today?</synthetic>' }] },
+		{ role: 'user', content: '[13 Apr 14:43]\nhello' },
+	])
+})
+
 test('toProviderMessages starts after the last reset marker', () => {
 	const ts = '2026-04-15T00:00:00.000Z'
 	const entries: any[] = [

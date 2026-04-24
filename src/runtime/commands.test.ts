@@ -414,6 +414,32 @@ test('/help model shows layered help for another command', async () => {
 	expect(result.output).toContain('Usage: /model [name]')
 })
 
+
+test('/model returns model-change metadata for the next model turn', async () => {
+	const session = makeSession()
+	session.model = 'openai/gpt-5.4'
+	const result = await commands.executeCommand('/model gpt-5.5', session)
+
+	expect(result.handled).toBe(true)
+	expect(result.meta).toEqual(['model changed from openai/gpt-5.4 to openai/gpt-5.5'])
+})
+
+
+test('/cd returns cwd-change metadata for the next model turn', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-cd-meta-'))
+	const session = makeSession()
+
+	try {
+		const old = session.cwd
+		const result = await commands.executeCommand(`/cd ${dir}`, session)
+
+		expect(result.handled).toBe(true)
+		expect(result.meta).toEqual([`cwd changed from ${old} to ${dir}`])
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
 test('/config --help reuses detailed config help', async () => {
 	const result = await commands.executeCommand('/config --help', makeSession())
 

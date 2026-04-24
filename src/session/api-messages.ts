@@ -21,6 +21,14 @@ function formatLocalTime(ts?: string): string | null {
 	}
 }
 
+function metaText(text: string): string {
+	return `<meta>${text}</meta>`
+}
+
+function syntheticText(text: string): string {
+	return `<synthetic>${text}</synthetic>`
+}
+
 const apiConfig = {
 	// Max chars for tool result content before truncation
 	maxToolOutput: 50_000,
@@ -71,7 +79,7 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 			const turnsRemaining = totalUserTurns - userTurnsSeen
 			const visibility = entry.visibility ?? (entry.level === 'error' ? 'next-user' : 'ui')
 			if (visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
-				pendingInfos.push(entry.text)
+				pendingInfos.push(metaText(entry.text))
 			}
 			continue
 		}
@@ -95,7 +103,8 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 			case 'assistant': {
 				flushToolResults()
 				pendingInfos = []
-				pendingAssistant.push({ type: 'text', text: entry.text })
+				const text = entry.synthetic ? syntheticText(entry.text) : entry.text
+				pendingAssistant.push({ type: 'text', text })
 				break
 			}
 			case 'tool_call': {
@@ -300,4 +309,6 @@ export const apiMessages = {
 	pruneMessages,
 	findReplayStart,
 	formatLocalTime,
+	metaText,
+	syntheticText,
 }
