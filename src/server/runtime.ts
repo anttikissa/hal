@@ -154,6 +154,7 @@ function recordSessionInfo(sessionId: string, text: string, ts: string): void {
 
 function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
+	const sourceMeta = opts.sourceId ? sessionStore.loadSessionMeta(opts.sourceId) : null
 	const meta = opts.sourceId
 		? sessionStore.forkSession(opts.sourceId, sessionId)
 		: sessionStore.createSession(sessionId, {
@@ -167,13 +168,15 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
 	}
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
-	const related = sessionStore.loadSessionMeta(opts.sourceId ?? opts.openerId ?? '')
+	const related = sourceMeta ?? sessionStore.loadSessionMeta(opts.openerId ?? '')
 	const text = opts.sourceId
 		? related ? `User forked ${sessionLabel(related)} into ${sessionLabel(meta)}.` : ''
 		: related
 			? `User opened a new tab: ${sessionLabel(meta)}. Opened from ${sessionLabel(related)}.`
 			: `User opened a new tab: ${sessionLabel(meta)}.`
 	if (text) recordSessionInfo(sessionId, text, meta.createdAt)
+	if (opts.sourceId && sourceMeta?.context) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })
+	else publishContextEstimate(sessionId)
 	return sessionStore.loadSessionMeta(sessionId) ?? meta
 }
 
@@ -212,6 +215,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 		topic: spec.title || child.name,
 		closeWhenDone: !!spec.closeWhenDone,
 	})
+	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
 	if (spec.closeWhenDone) {
 		recordSessionInfo(child.id, 'This subagent will close itself after sending a handoff.', new Date().toISOString())
 	}

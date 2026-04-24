@@ -3,6 +3,9 @@ import { runtime } from './runtime.ts'
 import type { SessionMeta } from './sessions.ts'
 import { ipc } from '../ipc.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
+import { context } from '../runtime/context.ts'
+import { toolRegistry } from '../tools/tool.ts'
+import { tokenCalibration } from '../token-calibration.ts'
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
 	const picked = runtime.pickMostRecentlyClosedSessionId(
 		[
@@ -125,6 +128,7 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 			createdAt: '2026-04-14T12:00:00.000Z',
 			model: 'anthropic/claude-sonnet-4.5',
 		})
+		tokenCalibration.save(100, 100, 'openai/gpt-5')
 		const parent: SessionMeta = {
 			id: '04-parent',
 			name: 'parent',
@@ -150,9 +154,44 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		expect(meta?.model).toBe('openai/gpt-5')
 		expect(meta?.name).toBe('Child tab')
 		expect(meta?.topic).toBe('Child tab')
+		const prompt = context.buildSystemPrompt({ model: 'openai/gpt-5', cwd: '/work/child', sessionId: child.id })
+		const overheadBytes = prompt.text.length + JSON.stringify(toolRegistry.toToolDefs()).length
+		const expected = context.estimateContext([], 'openai/gpt-5', overheadBytes)
+		expect(meta?.context).toEqual({ used: expected.used, max: expected.max })
 		const history = sessions.loadHistory(child.id)
 		expect(history.some((entry) => entry.type === 'info' && entry.text.includes('close itself after sending a handoff'))).toBe(true)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(false)
+	} finally {
+		rmSync(base, { recursive: true, force: true })
+		if (prevState === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = prevState
+	}
+})
+
+
+test('spawnSession forks with the parent context usage immediately', async () => {
+	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-fork-'))
+	const prevState = process.env.HAL_STATE_DIR
+	process.env.HAL_STATE_DIR = base
+	const { sessions } = await import('./sessions.ts')
+
+	try {
+		await sessions.createSession('04-parent', {
+			id: '04-parent',
+			workingDir: '/work/parent',
+			createdAt: '2026-04-14T12:00:00.000Z',
+			model: 'openai/gpt-5',
+			context: { used: 123, max: 456 },
+		})
+		const parent = sessions.loadSessionMeta('04-parent')!
+
+		const child = await runtime.spawnSession(parent, {
+			task: 'Continue from here',
+			mode: 'fork',
+			childSessionId: '04-child',
+		})
+
+		expect(sessions.loadSessionMeta(child.id)?.context).toEqual({ used: 123, max: 456 })
 	} finally {
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR
