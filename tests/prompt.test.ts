@@ -93,6 +93,24 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('hi')
 	})
 
+	test('ctrl-k kills to yank buffer and ctrl-y yanks it', () => {
+		prompt.setText('hello brave world', 'hello '.length)
+		prompt.handleKey(key('k', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('hello ')
+		prompt.setText('say: ', 'say: '.length)
+		prompt.handleKey(key('y', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('say: brave world')
+	})
+
+	test('ctrl-u kills prefix to the same yank buffer', () => {
+		prompt.setText('hello brave world', 'hello brave '.length)
+		prompt.handleKey(key('u', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('world')
+		prompt.handleKey(key('e', { ctrl: true }), 80)
+		prompt.handleKey(key('y', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('worldhello brave ')
+	})
+
 	test('up enters history and down restores the draft', () => {
 		prompt.setHistory(['older', 'newer'])
 		prompt.setText('draft')

@@ -175,6 +175,11 @@ let cursor = 0
 let goalCol: number | null = null
 let selAnchor: number | null = null
 
+// Readline-style kill/yank buffer. This is intentionally local to the
+// client process: Ctrl-K/Ctrl-U fill it, Ctrl-Y inserts it, and it never
+// touches the OS clipboard, session files, or server runtime.
+let killBuffer = ''
+
 // Undo / redo
 interface Snapshot {
 	text: string
@@ -334,6 +339,16 @@ function deleteForward(): void {
 	if (!deleteSel() && cursor < buf.length) deleteRange(cursor, cursor + 1)
 }
 
+function killRange(start: number, end: number): void {
+	if (start === end) return
+	killBuffer = buf.slice(start, end)
+	deleteRange(start, end)
+}
+
+function yankKillBuffer(): void {
+	if (killBuffer) replaceSelection(killBuffer)
+}
+
 function move(pos: number, selecting: boolean): void {
 	if (selecting) {
 		if (selAnchor === null) selAnchor = cursor
@@ -482,11 +497,11 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			return true
 		case 'u':
 			if (!k.ctrl) break
-			if (cursor > 0) deleteRange(0, cursor)
+			if (cursor > 0) killRange(0, cursor)
 			return true
 		case 'k':
 			if (!k.ctrl) break
-			if (cursor < buf.length) deleteRange(cursor, buf.length)
+			if (cursor < buf.length) killRange(cursor, buf.length)
 			return true
 		case 'a':
 			if (!k.ctrl) break
@@ -497,9 +512,12 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			moveEdge(1, k.shift)
 			return true
 		case 'v':
-		case 'y':
 			if (!k.ctrl) break
 			doPaste()
+			return true
+		case 'y':
+			if (!k.ctrl) break
+			yankKillBuffer()
 			return true
 		case '/':
 			if (!k.ctrl) break
