@@ -1,10 +1,15 @@
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs'
+import { mkdirSync } from 'fs'
 import { STATE_DIR, ensureDir } from '../state.ts'
+import { liveFiles } from '../utils/live-file.ts'
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 const DEFAULT_MAX_ATTEMPTS = 1000
 const MS_PER_DAY = 86_400_000
-const epochCache = new Map<string, number>()
+const metaCache = new Map<string, StateMeta>()
+
+interface StateMeta {
+	epoch?: string
+}
 
 function stateDir(): string {
 	// Read the env at call time so tests and multi-state setups can redirect
@@ -20,26 +25,33 @@ function sessionDir(sessionId: string): string {
 	return `${sessionsDir()}/${sessionId}`
 }
 
-function epochPath(): string {
-	return `${stateDir()}/epoch.txt`
+function metaPath(): string {
+	return `${stateDir()}/meta.ason`
+}
+
+function stateMeta(): StateMeta {
+	const path = metaPath()
+	const cached = metaCache.get(path)
+	if (cached) return cached
+	ensureDir(stateDir())
+	const meta = liveFiles.liveFile<StateMeta>(path, {}, { watch: false })
+	metaCache.set(path, meta)
+	return meta
+}
+
+function validIsoDate(text: unknown): string | null {
+	if (typeof text !== 'string') return null
+	const ms = Date.parse(text)
+	return Number.isNaN(ms) ? null : new Date(ms).toISOString()
 }
 
 function readOrCreateEpochMs(now = Date.now()): number {
-	const path = epochPath()
-	const cached = epochCache.get(path)
-	if (cached !== undefined) return cached
-	ensureDir(stateDir())
-	if (existsSync(path)) {
-		const parsed = Date.parse(readFileSync(path, 'utf-8').trim())
-		if (!Number.isNaN(parsed)) {
-			epochCache.set(path, parsed)
-			return parsed
-		}
-	}
-	const created = now
-	writeFileSync(path, `${new Date(created).toISOString()}\n`)
-	epochCache.set(path, created)
-	return created
+	const meta = stateMeta()
+	const existing = validIsoDate(meta.epoch)
+	if (existing) return Date.parse(existing)
+	meta.epoch = new Date(now).toISOString()
+	liveFiles.save(meta)
+	return Date.parse(meta.epoch)
 }
 
 function make(date = new Date(Date.now()), epochMs = readOrCreateEpochMs(date.getTime())): string {

@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { sessionIds } from './ids.ts'
+import { ason } from '../utils/ason.ts'
 
 const origStateDir = process.env.HAL_STATE_DIR
 const origNow = Date.now
@@ -14,6 +15,10 @@ function useTempStateDir(): string {
 	return tempStateDir
 }
 
+function readMeta(stateDir: string): any {
+	return ason.parse(readFileSync(`${stateDir}/meta.ason`, 'utf-8'))
+}
+
 afterEach(() => {
 	Date.now = origNow
 	if (origStateDir === undefined) delete process.env.HAL_STATE_DIR
@@ -22,10 +27,9 @@ afterEach(() => {
 	tempStateDir = null
 })
 
-test('reserve uses days since the stored epoch in the session id prefix', () => {
+test('reserve uses days since the stored meta epoch in the session id prefix', () => {
 	const stateDir = useTempStateDir()
-	const epochPath = `${stateDir}/epoch.txt`
-	Bun.write(epochPath, '2026-03-15T00:00:00.000Z\n')
+	Bun.write(`${stateDir}/meta.ason`, "{ epoch: '2026-03-15T00:00:00.000Z' }\n")
 	Date.now = () => Date.parse('2026-04-24T12:00:00.000Z')
 
 	const id = sessionIds.reserve()
@@ -34,17 +38,18 @@ test('reserve uses days since the stored epoch in the session id prefix', () => 
 	expect(existsSync(`${stateDir}/sessions/${id}`)).toBe(true)
 })
 
-test('reserve creates epoch.txt once and reuses it for later ids', () => {
+test('reserve creates meta.ason epoch once and reuses it for later ids', () => {
 	const stateDir = useTempStateDir()
 	Date.now = () => Date.parse('2026-03-16T08:00:00.000Z')
 
 	const first = sessionIds.reserve()
-	const epochText = readFileSync(`${stateDir}/epoch.txt`, 'utf-8')
+	const epoch = readMeta(stateDir).epoch
 
 	Date.now = () => Date.parse('2026-03-18T08:00:00.000Z')
 	const second = sessionIds.reserve()
 
 	expect(first).toMatch(/^00-[a-z0-9]{3}$/)
 	expect(second).toMatch(/^02-[a-z0-9]{3}$/)
-	expect(readFileSync(`${stateDir}/epoch.txt`, 'utf-8')).toBe(epochText)
+	expect(readMeta(stateDir).epoch).toBe(epoch)
 })
+
