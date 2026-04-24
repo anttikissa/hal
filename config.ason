@@ -9,10 +9,9 @@
   render: { forkHistoryDimFactor: 0.82 },
   agentLoop: { maxIterations: 50 },
   memory: { warnBytes: 1500000000, killBytes: 5000000000 },
-  models: {
-    // Hello
-    defaultModel: 'gpt-5.5',
-    default: 'gpt'
-  },
+  models: { default: 'gpt' },
   subscriptionUsage: { censorEmails: true }
+  clipboard: {
+    multilinePasteFileLineLimit: 5
+  }
 }
