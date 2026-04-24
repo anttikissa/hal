@@ -152,6 +152,21 @@ function positionCursor(from: number, target: { row: number; col: number }): str
 // All three end with positionCursor() to place the cursor and update
 // cursorRow/cursorCol. The cursor target is computed ONCE at the top.
 
+function repaintVisibleScreen(lines: string[], cursor: { row: number; col: number }): void {
+	// Recovery repaint for fullscreen frame shrinks that move the viewport
+	// boundary. This intentionally clears only the visible screen, not scrollback:
+	// CSI 3J destroys terminal scroll position and snaps users back to bottom in
+	// Ghostty/Kitty-like terminals while they are reading older output.
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}2J${CSI}H`]
+	for (let i = 0; i < lines.length; i++) {
+		if (i > 0) out.push('\r\n')
+		out.push(lines[i]!)
+	}
+	out.push(positionCursor(lines.length - 1, cursor))
+	out.push(`${CSI}?2026l`)
+	prevLines = lines
+	process.stdout.write(out.join(''))
+}
 function draw(force = false): void {
 	const rows = process.stdout.rows || 24
 	const screen = buildFrame()
@@ -185,16 +200,9 @@ function draw(force = false): void {
 		return
 	}
 
-	// ── Fullscreen + frame size changed: force repaint ──
-	// In fullscreen mode, some lines are in scrollback (immutable). When the
-	// frame shrinks, the scrollback/visible boundary shifts and the diff
-	// engine's line→row mapping is wrong. The only safe recovery is a full
-	// repaint that clears scrollback and rewrites everything.
-	// Growth is handled by the append path below (new lines at the bottom
-	// scroll naturally), but shrinks cannot be fixed incrementally.
-	if (fullscreen && lines.length < prevLines.length) {
-		return draw(true)
-	}
+	// Fullscreen frame shrink is handled after diff range calculation below.
+	// Do not call draw(true) here: fullscreen force repaint emits CSI 3J, which
+	// clears scrollback and snaps the user's scroll position to bottom.
 
 	// ── Diff: find changed range ──
 	let first = -1
@@ -216,6 +224,11 @@ function draw(force = false): void {
 	// Ignore purely offscreen changes, and clamp mixed changes to the top of the
 	// live viewport so we only redraw what can actually be updated in-place.
 	const viewportTop = Math.max(0, prevLines.length - rows)
+	const frameShrunk = lines.length < prevLines.length
+	if (fullscreen && frameShrunk && first !== -1 && first < viewportTop && last >= viewportTop) {
+		repaintVisibleScreen(lines, cursor)
+		return
+	}
 	if (first !== -1 && first < viewportTop) {
 		if (last < viewportTop) {
 			first = -1

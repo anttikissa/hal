@@ -446,6 +446,28 @@ describe('render', () => {
 		}
 	})
 
+	test('fullscreen shrink repaints without clearing scrollback', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
+		try {
+			for (let i = 0; i < 20; i++) tab.history.push({ type: 'info', text: `old-${i}` })
+			captureOutput(() => render.draw())
+
+			tab.history.splice(0, tab.history.length, { type: 'info', text: 'new' })
+			tab.historyVersion++
+			const output = captureOutput(() => render.draw())
+			expect(output).toContain('\x1b[2J\x1b[H')
+			expect(output).not.toContain('\x1b[3J')
+			expect(stripAnsi(output)).toContain('new')
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
 
 	test('popup overlay targets the visible viewport in fullscreen', () => {
 		const tab = client.currentTab()!

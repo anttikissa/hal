@@ -166,17 +166,20 @@ then `\r\n` to scroll into new territory.
 For frame shrinks (`lines.length < prevLines.length`): after writing new
 content, `\r\n` then `CSI J` to erase leftover rows.
 
-### 9. Frame shrinks in fullscreen → force repaint
+### 9. Frame shrinks in fullscreen must NOT clear scrollback
 
-When the frame shrinks in fullscreen mode (e.g. multiline prompt collapses
-to single line), the diff engine cannot recover. Lines that were in
-scrollback shift into the visible area, but the diff's line→row mapping
-is based on the old layout. The only safe fix is a force repaint that
-clears scrollback and rewrites everything.
+When the frame shrinks in fullscreen mode, the scrollback/visible boundary can
+shift. If the changed range crosses that boundary, the diff engine cannot patch
+old scrollback rows in place. Recover with a visible-screen repaint (`CSI 2J` +
+`CSI H`) that rewrites the full current frame, but **do not emit `CSI 3J`**.
 
-Frame growth in fullscreen is OK — new lines at the bottom scroll
-naturally via `\r\n`, and changed lines are always in the visible area
-(near the prompt).
+`CSI 3J` clears terminal scrollback. In Ghostty/Kitty-like terminals that also
+snaps a user who scrolled up back to the bottom. This was the exact regression:
+streaming output occasionally shrank/reflowed and a fullscreen force repaint
+cleared scrollback while the user was reading earlier text.
+
+Frame growth in fullscreen is OK — new lines at the bottom scroll naturally via
+`\r\n`, and changed lines are usually in or near the live viewport.
 
 ### 10. Kitty keyboard protocol
 
