@@ -17,6 +17,7 @@ import { sessionIds } from '../session/ids.ts'
 import { replay } from '../session/replay.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
+import { log } from '../utils/log.ts'
 
 let activeSessions: string[] = []
 let activeRuntimePid: number | null = null
@@ -226,11 +227,11 @@ async function refreshModelMetadata(): Promise<void> {
 		const result = await models.refreshModels()
 		if (result.changes.length > 0) {
 			const message = formatModelRefreshMessage(result.changes)
-			console.log(message)
+			log.info('models.dev metadata changed', { message })
 			broadcastInfo(message)
 		}
 	} catch (err) {
-		console.error(`[models] refresh failed: ${errorMessage(err)}`)
+		log.error('models.dev refresh failed', { error: errorMessage(err) })
 	}
 }
 
@@ -583,14 +584,14 @@ function startRuntime(signal: AbortSignal): void {
 	void import('../mcp/client.ts')
 		.then(({ mcp }) => {
 			mcp.initServers().catch((err: any) => {
-				console.error(`[mcp] init failed: ${err?.message ?? String(err)}`)
+				log.error('mcp init failed', { error: err?.message ?? String(err) })
 			})
 			signal.addEventListener('abort', () => {
 				void mcp.shutdown()
 			}, { once: true })
 		})
 		.catch((err) => {
-			console.error(`[mcp] failed to load client module: ${errorMessage(err)}`)
+			log.error('mcp client module load failed', { error: errorMessage(err) })
 		})
 	void import('../runtime/inbox.ts')
 		.then(({ inbox }) => {
@@ -600,7 +601,7 @@ function startRuntime(signal: AbortSignal): void {
 			})
 		})
 		.catch((err) => {
-			console.error(`[inbox] failed to load module: ${errorMessage(err)}`)
+			log.error('inbox module load failed', { error: errorMessage(err) })
 		})
 }
 

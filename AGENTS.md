@@ -26,6 +26,13 @@ The directory prev/ contains the old codebase, which is now frozen. You can refe
 - Especially non-obvious tricks like "process.kill(serverPid, 0)" which looks like killing a
   process need to be explained - if it looks like one thing and does another, comment.
 
+# Logging and user-visible messages
+
+- NEVER use `console.log`, `console.error`, or direct stdout/stderr writes in `src/` runtime code. Hal is a TUI; stray terminal output corrupts rendering and can disappear on redraw.
+- For developer diagnostics, use `src/utils/log.ts` (`log.info`, `log.error`, `log.debug`).
+- For user-visible notices, send proper Hal info events/history entries through the runtime/session mechanisms (for example `emitInfo`, `recordSessionInfo`, or IPC events), not terminal printing.
+- Tests may stub console methods when testing legacy code, but new production code must not introduce console output.
+
 # Git
 
 - Commit after you have done your job (I can't believe I need to tell you this)
@@ -59,7 +66,8 @@ should go to `config` field. Non-tweakable constants like ANSI sequences can be 
 This enables the eval tool to inspect and hot-patch anything at runtime:
 ```ts
 import { client } from '~/client.ts'
-client.addEntry = (text) => { console.log('patched!'); origAddEntry(text) }
+import { log } from '~/utils/log.ts'
+client.addEntry = (text) => { log.info('patched addEntry'); origAddEntry(text) }
 ```
 
 # Startup initialization rule
