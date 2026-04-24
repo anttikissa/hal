@@ -16,7 +16,10 @@ const COMMANDS_FILE = `${IPC_DIR}/commands.asonl`
 const STATE_FILE = `${IPC_DIR}/state.ason`
 
 export interface SharedSessionInfo {
+	// 1-based visible tab number. Stored explicitly so humans and agents do not
+	// need to count large openSessions arrays by hand.
 	id: string
+	tab?: number
 	name?: string
 	cwd: string
 	model?: string

@@ -51,8 +51,8 @@ If the user refers to a fork, a colleague, your buddy, another model, or another
 
 - For code changes to Hal itself, prefer sessions rooted at `hal_dir`.
 - Multiple sessions may run simultaneously. Other sessions may edit the same files, commit, etc. Handle conflicts gracefully.
-- To map a UI tab number to a session, read `${state_dir}/ipc/state.ason`. The canonical current order is `openSessions` (or `sessions` for ids only). Tab numbers are 1-based positions in that array.
-- If a screenshot and old history disagree about tab order, trust the current `${state_dir}/ipc/state.ason` snapshot first.
+- To map a UI tab number to a session, read `${state_dir}/ipc/state.ason`. The canonical source is `openSessions[].tab`; find the object whose `tab` equals the UI number. Use `openSessions` order only as a fallback for old state files without `tab` fields. `sessions` is legacy/id-only and must not be used for manual tab-number mapping.
+- If a screenshot and old history disagree about tab order, trust the current `${state_dir}/ipc/state.ason` snapshot first; if the screenshot shows a visible session id/status line, trust that over manual counting.
 
 ### Forking
 

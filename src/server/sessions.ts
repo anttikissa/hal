@@ -226,8 +226,14 @@ function loadAllHistoryWithOrigin(sessionId: string): {
 	return { entries: [...before, ...entries.slice(1)], parentCount: before.length, parentId: first.parent }
 }
 
-function sessionOpenInfo(meta: Pick<SessionMeta, 'id' | 'name' | 'topic' | 'workingDir' | 'model'>): SharedSessionInfo {
-	return { id: meta.id, name: meta.name ?? meta.topic, cwd: meta.workingDir ?? process.cwd(), model: meta.model }
+function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, index?: number): SharedSessionInfo {
+	return {
+		id: meta.id,
+		tab: index === undefined ? undefined : index + 1,
+		name: meta.name ?? meta.topic,
+		cwd: meta.workingDir ?? process.cwd(),
+		model: meta.model,
+	}
 }
 
 function pickMostRecentlyClosedSessionId(

@@ -88,6 +88,19 @@ test('live snapshot stores uncommitted streaming blocks', async () => {
 })
 
 
+test('sessionOpenInfo includes a 1-based tab number from open order', () => {
+	const info = sessions.sessionOpenInfo({
+		id: '04-middle',
+		workingDir: '/work',
+	}, 31)
+
+	expect(info).toMatchObject({
+		id: '04-middle',
+		tab: 32,
+	})
+})
+
+
 test('live snapshot links assistant chunks across info interruptions', async () => {
 	const id = await makeSession()
 	sessions.applyLiveEvent(id, {

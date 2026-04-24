@@ -24,6 +24,7 @@ function makeSharedState(ids: string[]): SharedState {
 		sessions: ids,
 		openSessions: ids.map((id, i) => ({
 			id,
+			tab: i + 1,
 			name: `tab ${i + 1}`,
 			cwd: `/tmp/${id}`,
 			model: 'openai/gpt-5.4',

@@ -893,9 +893,10 @@ function handleEvent(event: any): void {
 }
 
 
-function sessionInfoFromMeta(meta: SessionMeta, _index: number): SharedSessionInfo {
+function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInfo {
 	return {
 		id: meta.id,
+		tab: index + 1,
 		name: meta.name,
 		cwd: meta.workingDir ?? '',
 		model: meta.model,
