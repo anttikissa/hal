@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { context } from './context.ts'
+import { tokenCalibration } from '../token-calibration.ts'
 
 let tempDir = ''
 let origHalDir = ''
@@ -93,4 +94,13 @@ test('prompt watcher reports AGENTS.md edits', async () => {
 	} finally {
 		stop()
 	}
+})
+
+
+test('estimateContext uses per-model token calibration', () => {
+	tokenCalibration.save(300, 100, 'openai/gpt-calibrated')
+
+	const est = context.estimateContext([{ role: 'user', content: 'x'.repeat(600) }], 'openai/gpt-calibrated')
+
+	expect(est.used).toBe(200)
 })

@@ -1,17 +1,57 @@
 import { afterEach, expect, test } from 'bun:test'
-import { rmSync } from 'fs'
+import { mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { agentLoop } from './agent-loop.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { ipc } from '../ipc.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { apiMessages } from '../session/api-messages.ts'
+import { tokenCalibration } from '../token-calibration.ts'
 
 const createdSessions: string[] = []
 
 afterEach(() => {
 	for (const sessionId of createdSessions.splice(0)) {
 		rmSync(sessions.sessionDir(sessionId), { recursive: true, force: true })
+	}
+})
+
+
+test('calibrates context token estimates from provider input usage', async () => {
+	const sessionId = `test-calibration-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	const origGetProvider = providerLoader.getProvider
+	const origStateDir = process.env.HAL_STATE_DIR
+	const tempStateDir = mkdtempSync(join(tmpdir(), 'hal-agent-calibration-'))
+	createdSessions.push(sessionId)
+	process.env.HAL_STATE_DIR = tempStateDir
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'text', text: 'done' }
+			yield { type: 'done', usage: { input: 50, output: 1, cacheRead: 25, cacheCreation: 25 } }
+		},
+	})
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-calibration-loop',
+			cwd: process.cwd(),
+			systemPrompt: 'x'.repeat(80),
+			messages: [{ role: 'user', content: 'x'.repeat(20) }],
+		})
+
+		const cal = tokenCalibration.get('openai/gpt-calibration-loop')
+		expect(cal?.systemTokens).toBe(100)
+		expect(cal?.systemBytes).toBeGreaterThan(100)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		if (origStateDir === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = origStateDir
+		rmSync(tempStateDir, { recursive: true, force: true })
 	}
 })
 

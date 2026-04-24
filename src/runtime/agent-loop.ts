@@ -16,6 +16,7 @@ import { toolRegistry } from '../tools/tool.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
+import { tokenCalibration } from '../token-calibration.ts'
 // Built-in tool registration now happens via explicit startup init.
 // Anthropic also has its own server-side web_search tool
 // (type: 'web_search_20250305'). That's separate from our local google tool.
@@ -122,6 +123,18 @@ function parseErrorPayload(body: string | undefined): unknown {
 // non-zero cacheRead, so we can't just check `input > 0`.
 function hasUsage(u: TokenUsage): boolean {
 	return u.input > 0 || u.output > 0 || u.cacheRead > 0 || u.cacheCreation > 0
+}
+
+function requestBytes(messages: Message[], overheadBytes: number): number {
+	let total = Math.max(0, overheadBytes)
+	for (const msg of messages) total += context.messageBytes(msg)
+	return total
+}
+
+function calibrateInputTokens(model: string, messages: Message[], overheadBytes: number, usage: TokenUsage): void {
+	const totalInput = usage.input + usage.cacheRead + usage.cacheCreation
+	if (totalInput <= 0) return
+	tokenCalibration.save(requestBytes(messages, overheadBytes), totalInput, model)
 }
 
 async function writeErrorBlob(sessionId: string, blobId: string, event: ProviderStreamEvent): Promise<void> {
@@ -412,6 +425,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 								totalUsage.output += event.usage.output
 								totalUsage.cacheRead += event.usage.cacheRead ?? 0
 								totalUsage.cacheCreation += event.usage.cacheCreation ?? 0
+								calibrateInputTokens(model, messages, overheadBytes, event.usage)
 							}
 							break
 						}

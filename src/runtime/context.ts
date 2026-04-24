@@ -6,6 +6,7 @@ import { dirname } from 'path'
 import { HAL_DIR, STATE_DIR } from '../state.ts'
 import { sessions } from '../server/sessions.ts'
 import { models } from '../models.ts'
+import { tokenCalibration } from '../token-calibration.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
 
 // ── AGENTS.md loading ─────────────────────────────────────────────────────────
@@ -305,8 +306,7 @@ function estimateContext(
 	let totalBytes = Math.max(0, overheadBytes)
 	for (const msg of messages) totalBytes += messageBytes(msg)
 	const max = models.contextWindow(modelId)
-	// ~4 chars per token is a rough approximation
-	return { used: Math.ceil(totalBytes / 4), max, estimated: true as const }
+	return { used: tokenCalibration.estimateTokens(totalBytes, modelId), max, estimated: true as const }
 }
 
 /** Format byte counts for display. */
