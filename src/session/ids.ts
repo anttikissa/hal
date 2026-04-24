@@ -5,7 +5,6 @@ import { liveFiles } from '../utils/live-file.ts'
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 const DEFAULT_MAX_ATTEMPTS = 1000
 const MS_PER_DAY = 86_400_000
-const metaCache = new Map<string, StateMeta>()
 
 interface StateMeta {
 	epoch?: string
@@ -25,33 +24,14 @@ function sessionDir(sessionId: string): string {
 	return `${sessionsDir()}/${sessionId}`
 }
 
-function metaPath(): string {
-	return `${stateDir()}/meta.ason`
-}
-
-function stateMeta(): StateMeta {
-	const path = metaPath()
-	const cached = metaCache.get(path)
-	if (cached) return cached
-	ensureDir(stateDir())
-	const meta = liveFiles.liveFile<StateMeta>(path, {}, { watch: false })
-	metaCache.set(path, meta)
-	return meta
-}
-
-function validIsoDate(text: unknown): string | null {
-	if (typeof text !== 'string') return null
-	const ms = Date.parse(text)
-	return Number.isNaN(ms) ? null : new Date(ms).toISOString()
-}
-
 function readOrCreateEpochMs(now = Date.now()): number {
-	const meta = stateMeta()
-	const existing = validIsoDate(meta.epoch)
-	if (existing) return Date.parse(existing)
-	meta.epoch = new Date(now).toISOString()
-	liveFiles.save(meta)
-	return Date.parse(meta.epoch)
+	ensureDir(stateDir())
+	const meta = liveFiles.liveFile<StateMeta>(`${stateDir()}/meta.ason`, {}, { watch: false })
+	if (!meta.epoch) {
+		meta.epoch = new Date(now).toISOString()
+		liveFiles.save(meta)
+	}
+	return new Date(meta.epoch).getTime()
 }
 
 function make(date = new Date(Date.now()), epochMs = readOrCreateEpochMs(date.getTime())): string {
