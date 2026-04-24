@@ -305,11 +305,16 @@ function renderHelpBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const busy = client.isBusy()
 	const hasText = prompt.text().trim().length > 0
-	const canContinue = client.canContinueCurrentTurn()
-	const bar = helpBar.build(busy, hasText, canContinue)
+	const continueAction = client.continueActionForCurrentTurn()
+	const desc = '\x1b[90m'
+	const bar = helpBar.build(busy, hasText, continueAction, {
+		key: BRIGHT_WHITE,
+		description: desc,
+		separator: desc,
+	})
 	// Always push a line — even when empty — so chrome height is constant.
 	// Without this, typing the first character causes a 1-row jump.
-	lines.push(bar ? `\x1b[90m${clipVisual(bar, cols)}\x1b[0m` : '')
+	lines.push(bar ? `${clipVisual(bar, cols)}${RESET}` : '')
 }
 
 function renderPrompt(lines: string[]): void {

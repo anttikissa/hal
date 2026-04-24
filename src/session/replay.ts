@@ -143,7 +143,7 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 	const interrupted = sessions.detectInterruptedTools(entries)
 	if (interrupted.length > 0) {
 		const toolList = interrupted.map((t) => t.name).join(', ')
-		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Press Enter to continue` })
+		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). enter: continue` })
 	}
 
 	return {

@@ -62,6 +62,8 @@ export interface Tab {
 	forkedFrom?: string
 }
 
+type ContinueAction = 'continue' | 'retry'
+
 // ── Internal state ───────────────────────────────────────────────────────────
 
 const config = {
@@ -605,26 +607,38 @@ function assistantChainId(block: Block): string | null {
 	return liveEventBlocks.assistantChainId(block)
 }
 
-function isContinuableStatusBlock(block: Block): boolean {
-	if (block.type === 'error') return true
-	if (block.type === 'info') return block.text === '[paused]' || block.text?.startsWith('[interrupted]')
+function continuableActionForBlock(block: Block): ContinueAction | false {
+	if (block.type === 'error') return 'retry'
+	if (block.type === 'info' && (block.text === '[paused]' || block.text?.startsWith('[interrupted]'))) return 'continue'
 	return false
 }
 
-function canContinueTab(tab: Tab | null): boolean {
+function isContinuableStatusBlock(block: Block): boolean {
+	return !!continuableActionForBlock(block)
+}
+
+function continueActionForTab(tab: Tab | null): ContinueAction | false {
 	if (!tab) return false
 	if (state.busy.get(tab.sessionId)) return false
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
 		if (block.type === 'tool') continue
 		if (block.type === 'info' && !isContinuableStatusBlock(block)) continue
-		return isContinuableStatusBlock(block)
+		return continuableActionForBlock(block)
 	}
 	return false
 }
 
+function canContinueTab(tab: Tab | null): boolean {
+	return !!continueActionForTab(tab)
+}
+
+function continueActionForCurrentTurn(): ContinueAction | false {
+	return continueActionForTab(currentTab())
+}
+
 function canContinueCurrentTurn(): boolean {
-	return canContinueTab(currentTab())
+	return !!continueActionForCurrentTurn()
 }
 
 function trailingAssistantText(tab: Tab): string | null {
@@ -1091,6 +1105,7 @@ export const client = {
 	isBusy,
 	getActivity,
 	canContinueCurrentTurn,
+	continueActionForCurrentTurn,
 	switchTab,
 	nextTab,
 	prevTab,

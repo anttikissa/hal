@@ -1,13 +1,24 @@
 // Show a small set of hints until the user has used those keys often enough.
 
-type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'streaming'
+type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'idle-retry' | 'streaming'
+
+type ContinueAction = 'continue' | 'retry'
 
 interface Hint {
-	text: string
+	// Render as "key: description". Keeping the parts separate lets the
+	// terminal renderer make keys brighter than explanatory text.
+	keyLabel: string
+	description: string
 	keys: string[]
-	// Some hints are state, not education. If Enter continues a paused/error
-	// turn, the affordance must stay visible even after the key is learned.
+	// Some hints are state, not education. If Enter continues/retries a
+	// paused/error turn, the affordance must stay visible even after learned.
 	alwaysVisible?: boolean
+}
+
+interface HelpStyle {
+	key: string
+	description: string
+	separator: string
 }
 
 const config = {
@@ -19,20 +30,21 @@ const usageCounts: Record<string, number> = {}
 
 const HINTS: Record<HelpState, Hint[]> = {
 	'idle-empty': [
-		{ text: 'ctrl-t new', keys: ['ctrl-t'] },
-		{ text: 'ctrl-n/p switch', keys: ['ctrl-n', 'ctrl-p'] },
-		{ text: 'ctrl-f fork', keys: ['ctrl-f'] },
-		{ text: '/ commands', keys: ['/'] },
-		{ text: 'ctrl-c quit', keys: ['ctrl-c'] },
-		{ text: 'ctrl-z suspend', keys: ['ctrl-z'] },
+		{ keyLabel: 'ctrl-t', description: 'new', keys: ['ctrl-t'] },
+		{ keyLabel: 'ctrl-n/p', description: 'switch', keys: ['ctrl-n', 'ctrl-p'] },
+		{ keyLabel: 'ctrl-f', description: 'fork', keys: ['ctrl-f'] },
+		{ keyLabel: '/', description: 'commands', keys: ['/'] },
+		{ keyLabel: 'ctrl-c', description: 'quit', keys: ['ctrl-c'] },
+		{ keyLabel: 'ctrl-z', description: 'suspend', keys: ['ctrl-z'] },
 	],
 	'idle-text': [
-		{ text: 'enter send', keys: ['enter'] },
-		{ text: 'shift-enter newline', keys: ['shift-enter'] },
-		{ text: 'tab complete', keys: ['tab'] },
+		{ keyLabel: 'enter', description: 'send prompt', keys: ['enter'] },
+		{ keyLabel: 'shift-enter', description: 'insert newline', keys: ['shift-enter'] },
+		{ keyLabel: 'tab', description: 'complete', keys: ['tab'] },
 	],
-	'idle-continue': [{ text: 'press enter to continue', keys: ['enter'], alwaysVisible: true }],
-	streaming: [{ text: 'esc stop', keys: ['escape'] }],
+	'idle-continue': [{ keyLabel: 'enter', description: 'continue', keys: ['enter'], alwaysVisible: true }],
+	'idle-retry': [{ keyLabel: 'enter', description: 'retry', keys: ['enter'], alwaysVisible: true }],
+	streaming: [{ keyLabel: 'esc', description: 'stop', keys: ['escape'] }],
 }
 
 function isLearned(hint: Hint): boolean {
@@ -49,18 +61,25 @@ function reset(): void {
 	for (const key of Object.keys(usageCounts)) delete usageCounts[key]
 }
 
-function deriveState(busy: boolean, hasText: boolean, canContinue = false): HelpState {
+function deriveState(busy: boolean, hasText: boolean, continueAction: ContinueAction | false = false): HelpState {
 	if (busy) return 'streaming'
 	if (hasText) return 'idle-text'
-	if (canContinue) return 'idle-continue'
+	if (continueAction === 'retry') return 'idle-retry'
+	if (continueAction === 'continue') return 'idle-continue'
 	return 'idle-empty'
 }
 
-function build(busy: boolean, hasText: boolean, canContinue = false): string {
-	const state = deriveState(busy, hasText, canContinue)
+function formatHint(hint: Hint, style?: HelpStyle): string {
+	if (!style) return `${hint.keyLabel}: ${hint.description}`
+	return `${style.key}${hint.keyLabel}${style.description}: ${hint.description}`
+}
+
+function build(busy: boolean, hasText: boolean, continueAction: ContinueAction | false = false, style?: HelpStyle): string {
+	const state = deriveState(busy, hasText, continueAction)
 	const visible = HINTS[state].filter((hint) => !isLearned(hint))
 	if (visible.length === 0) return ''
-	return visible.map((hint) => hint.text).join(' \u2502 ')
+	const separator = style ? `${style.separator} │ ${style.description}` : ' │ '
+	return visible.map((hint) => formatHint(hint, style)).join(separator)
 }
 
 export const helpBar = {

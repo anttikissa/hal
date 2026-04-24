@@ -125,20 +125,29 @@ describe('render', () => {
 		expect(clean).toContain('[paused]')
 	})
 
-	test('help bar teaches press enter to continue on paused tabs with empty prompt', () => {
+	test('help bar teaches enter: continue on paused tabs with empty prompt', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('press enter to continue')
+		expect(clean).toContain('enter: continue')
+		expect(clean).not.toContain('press enter')
 		expect(clean).not.toContain('ctrl-t new')
 	})
 
-	test('continue hint stays visible even after enter is learned', () => {
+	test('help bar teaches enter: retry after errors', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('enter: retry')
+		expect(clean).not.toContain('enter: continue')
+	})
+
+	test('continue/retry hint stays visible even after enter is learned', () => {
 		const tab = client.currentTab()!
 		for (let i = 0; i < helpBar.config.learnThreshold; i++) helpBar.logKey('enter')
 		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('press enter to continue')
+		expect(clean).toContain('enter: retry')
 	})
 
 	test('continue hint matches enter behavior for whitespace-only prompts', () => {
@@ -146,7 +155,15 @@ describe('render', () => {
 		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
 		prompt.setText('   ')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('press enter to continue')
+		expect(clean).toContain('enter: continue')
+	})
+
+	test('help bar renders keys brighter than descriptions', () => {
+		prompt.setText('hello')
+		const output = captureOutput(() => render.draw(true))
+		expect(output).toContain('\x1b[97menter\x1b[90m: send prompt')
+		expect(output).toContain('\x1b[97mshift-enter\x1b[90m: insert newline')
+		expect(output).toContain('\x1b[97mtab\x1b[90m: complete')
 	})
 
 	test('status line shows local pid', () => {
@@ -376,9 +393,9 @@ describe('render', () => {
 		prompt.setText('x')
 		const withText = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 
-		const emptyHelp = empty.find((line) => line.includes('ctrl-t new'))
+		const emptyHelp = empty.find((line) => line.includes('ctrl-t: new'))
 		const promptLine = withText.findIndex((line) => line === 'x')
-		expect(emptyHelp).toContain('ctrl-t new')
+		expect(emptyHelp).toContain('ctrl-t: new')
 		expect(promptLine).toBeGreaterThan(0)
 		expect(withText[promptLine - 1]).toBe('')
 		expect(withText.length).toBe(empty.length)
