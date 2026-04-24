@@ -76,3 +76,32 @@ test('refreshModels reports relevant GPT and Claude additions and context change
 		rmSync(dir, { recursive: true, force: true })
 	}
 })
+
+
+test('refreshModels treats missing cache as initial fetch without change spam', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
+	process.env.HAL_STATE_DIR = dir
+	globalThis.fetch = Object.assign(async () => new Response(JSON.stringify({
+		openai: {
+			models: {
+				'gpt-5.5': { limit: { context: 1_050_000 } },
+				'gpt-5.6': { limit: { context: 1_200_000 } },
+			},
+		},
+		anthropic: {
+			models: {
+				'claude-sonnet-4-7': { limit: { context: 1_000_000 } },
+			},
+		},
+	})), { preconnect: () => {} }) as typeof fetch
+
+	try {
+		const result = await models.refreshModels()
+		expect(result.fetched).toBe(true)
+		expect(result.hadCache).toBe(false)
+		expect(result.modelCount).toBe(3)
+		expect(result.changes).toEqual([])
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})

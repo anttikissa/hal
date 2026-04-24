@@ -111,6 +111,8 @@ const state = {
 interface RefreshModelsResult {
 	fetched: boolean
 	changes: string[]
+	modelCount: number
+	hadCache: boolean
 }
 
 function modelsFile(): string {
@@ -168,7 +170,8 @@ function modelChangeMessages(previous: Record<string, number>, next: Record<stri
 /** Fetch context windows from models.dev and save to state/models.ason.
  *  Fire-and-forget on startup. The file persists across restarts. */
 async function refreshModels(): Promise<RefreshModelsResult> {
-	const previous = existsSync(modelsFile()) ? loadModelsDevCache() : {}
+	const hadCache = existsSync(modelsFile())
+	const previous = hadCache ? loadModelsDevCache() : {}
 	const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(10_000) })
 	const data = (await res.json()) as Record<string, { models?: Record<string, any> }>
 	const ctx: Record<string, number> = {}
@@ -180,7 +183,12 @@ async function refreshModels(): Promise<RefreshModelsResult> {
 	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
 	writeFileSync(modelsFile(), ason.stringify(ctx) + '\n')
 	state.cache = ctx
-	return { fetched: true, changes: modelChangeMessages(previous, ctx) }
+	return {
+		fetched: true,
+		changes: hadCache ? modelChangeMessages(previous, ctx) : [],
+		modelCount: Object.keys(ctx).length,
+		hadCache,
+	}
 }
 
 function cachedContextWindow(fullId: string): number | undefined {

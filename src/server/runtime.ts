@@ -247,7 +247,8 @@ function broadcastInfo(text: string, level: 'info' | 'error' = 'info'): void {
 	}
 }
 
-function formatModelRefreshMessage(changes: string[]): string {
+function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
+	if (changes.length === 0) return `Fetched recent data from models.dev (${modelCount ?? 0} models)`
 	const shown = changes.slice(0, 8)
 	const more = changes.length > shown.length ? ` (+${changes.length - shown.length} more)` : ''
 	return `[models.dev] fetched model metadata; relevant changes: ${shown.join('; ')}${more}`
@@ -256,9 +257,9 @@ function formatModelRefreshMessage(changes: string[]): string {
 async function refreshModelMetadata(): Promise<void> {
 	try {
 		const result = await models.refreshModels()
-		if (result.changes.length > 0) {
-			const message = formatModelRefreshMessage(result.changes)
-			log.info('models.dev metadata changed', { message })
+		if (!result.hadCache || result.changes.length > 0) {
+			const message = formatModelRefreshMessage(result.changes, result.modelCount)
+			log.info('models.dev metadata refreshed', { message })
 			broadcastInfo(message)
 		}
 	} catch (err) {

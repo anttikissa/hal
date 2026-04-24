@@ -99,6 +99,11 @@ test('formatModelRefreshMessage summarizes models.dev changes for the user', () 
 })
 
 
+test('formatModelRefreshMessage reports initial models.dev fetch without change list', () => {
+	expect(runtime.formatModelRefreshMessage([], 253)).toBe('Fetched recent data from models.dev (253 models)')
+})
+
+
 test('resolveResumeTarget matches a closed session by name case-insensitively', () => {
 	const picked = runtime.resolveResumeTarget(
 		[
