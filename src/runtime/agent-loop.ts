@@ -592,7 +592,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 		return 'stopped'
 	} finally {
-		state.activeRequests.delete(sessionId)
+		// A new prompt can deliberately displace this generation before this
+		// async function has fully unwound. Only remove the active controller if
+		// it is still ours; otherwise the older request would make the newer
+		// request look idle and later prompts would start concurrently.
+		if (state.activeRequests.get(sessionId) === ac) state.activeRequests.delete(sessionId)
 		state.abortTexts.delete(sessionId)
 		await ctx.onStatus?.(false)
 	}

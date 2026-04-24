@@ -182,6 +182,70 @@ test('provider status updates busy activity', async () => {
 })
 
 
+test('displaced generation cannot clear newer active request state', async () => {
+	const sessionId = `test-displace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	let firstSignal: AbortSignal | undefined
+	const firstStarted = Promise.withResolvers<void>()
+	const releaseFirst = Promise.withResolvers<void>()
+	const secondStarted = Promise.withResolvers<void>()
+	const finishSecond = Promise.withResolvers<void>()
+	let calls = 0
+	const origGetProvider = providerLoader.getProvider
+
+	providerLoader.getProvider = async () => ({
+		async *generate({ signal }: any) {
+			calls++
+			if (calls === 1) {
+				firstSignal = signal
+				firstStarted.resolve()
+				await releaseFirst.promise
+				yield { type: 'done' }
+				return
+			}
+			secondStarted.resolve()
+			await finishSecond.promise
+			yield { type: 'done' }
+		},
+	})
+
+	try {
+		const first = agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+		})
+		await firstStarted.promise
+
+		const second = agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+		})
+		await secondStarted.promise
+		expect(firstSignal?.aborted).toBe(true)
+
+		releaseFirst.resolve()
+		expect(await first).toBe('aborted')
+		expect(agentLoop.isActive(sessionId)).toBe(true)
+
+		finishSecond.resolve()
+		expect(await second).toBe('completed')
+		expect(agentLoop.isActive(sessionId)).toBe(false)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		agentLoop.state.activeRequests.delete(sessionId)
+		agentLoop.state.abortTexts.delete(sessionId)
+	}
+})
+
+
 test('abort between tool iterations does not report max iterations', async () => {
 	const sessionId = `test-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
