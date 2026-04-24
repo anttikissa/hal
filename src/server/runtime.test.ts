@@ -6,6 +6,7 @@ import { agentLoop } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { tokenCalibration } from '../token-calibration.ts'
+import { models } from '../models.ts'
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
 	const picked = runtime.pickMostRecentlyClosedSessionId(
 		[
@@ -161,6 +162,35 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		const history = sessions.loadHistory(child.id)
 		expect(history.some((entry) => entry.type === 'info' && entry.text.includes('close itself after sending a handoff'))).toBe(true)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(false)
+	} finally {
+		rmSync(base, { recursive: true, force: true })
+		if (prevState === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = prevState
+	}
+})
+
+
+test('spawnSession pins the default model when parent has no model', async () => {
+	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-default-model-'))
+	const prevState = process.env.HAL_STATE_DIR
+	process.env.HAL_STATE_DIR = base
+	const { sessions } = await import('./sessions.ts')
+
+	try {
+		await sessions.createSession('04-parent-default', {
+			id: '04-parent-default',
+			workingDir: '/work/parent',
+			createdAt: '2026-04-14T12:00:00.000Z',
+		})
+		const parent = sessions.loadSessionMeta('04-parent-default')!
+		const child = await runtime.spawnSession(parent, {
+			task: 'Do the thing',
+			mode: 'fresh',
+			childSessionId: '04-kid-default',
+		})
+
+		expect(child.model).toBe(models.defaultModel())
+		expect(sessions.loadSessionMeta(child.id)?.model).toBe(models.defaultModel())
 	} finally {
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR

@@ -9,6 +9,7 @@ import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { liveEventBlocks } from '../live-event-blocks.ts'
 import type { PartialTokenUsage } from '../protocol.ts'
+import { models } from '../models.ts'
 
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
@@ -232,7 +233,7 @@ function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, i
 		tab: index === undefined ? undefined : index + 1,
 		name: meta.name ?? meta.topic,
 		cwd: meta.workingDir ?? process.cwd(),
-		model: meta.model,
+		model: meta.model ?? models.defaultModel(),
 	}
 }
 
@@ -318,7 +319,7 @@ function forkSession(sourceId: string, newId: string, atIndex?: number): Session
 		workingDir: sourceMeta.workingDir,
 		createdAt: forkTs,
 		topic: sourceMeta.topic ? `Fork of ${sourceMeta.topic}` : undefined,
-		model: sourceMeta.model,
+		model: sourceMeta.model ?? models.defaultModel(),
 		forkedFrom: sourceId,
 	})
 	appendHistory(newId, [{ type: 'forked_from', parent: sourceId, ts: forkTs }])

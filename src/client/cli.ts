@@ -14,6 +14,7 @@ import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { startup } from '../startup.ts'
+import { models } from '../models.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
 const RESTART_CODE = 100
@@ -338,7 +339,7 @@ function sendTabCommandIfRoom(type: 'open' | 'resume', text?: string): void {
 function handleAppKey(k: KeyEvent): boolean {
 	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
 		completion.dismiss()
-		const currentModel = client.currentTab()?.model || client.state.model || undefined
+		const currentModel = client.currentTab()?.model || models.defaultModel()
 		popup.openModelPicker((model) => {
 			submit(`/model ${model}`)
 			openaiUsage.noteActivity()

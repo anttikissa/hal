@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'fs'
 import { sessions } from './sessions.ts'
 import { replay } from '../session/replay.ts'
 import { ipc } from '../ipc.ts'
+import { models } from '../models.ts'
 
 const createdIds: string[] = []
 
@@ -105,7 +106,7 @@ test('live snapshot stores uncommitted streaming blocks', async () => {
 })
 
 
-test('sessionOpenInfo includes a 1-based tab number from open order', () => {
+test('sessionOpenInfo includes tab number and effective model', () => {
 	const info = sessions.sessionOpenInfo({
 		id: '04-middle',
 		workingDir: '/work',
@@ -114,6 +115,7 @@ test('sessionOpenInfo includes a 1-based tab number from open order', () => {
 	expect(info).toMatchObject({
 		id: '04-middle',
 		tab: 32,
+		model: models.defaultModel(),
 	})
 })
 

@@ -163,6 +163,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 			createdAt: new Date().toISOString(),
 			name: undefined,
 			topic: undefined,
+			model: models.defaultModel(),
 		})
 	if (!opts.sourceId && opts.workingDir && meta.workingDir !== opts.workingDir) {
 		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
@@ -206,7 +207,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 			: { afterId: parent.id, sessionId: spec.childSessionId },
 	)
 	const workingDir = spec.cwd || (mode === 'fork' ? child.workingDir : parent.workingDir) || process.cwd()
-	const model = spec.model || (mode === 'fork' ? child.model : parent.model)
+	const model = spec.model || (mode === 'fork' ? child.model : parent.model) || child.model || models.defaultModel()
 	const name = spec.title || child.name
 	sessionStore.updateMeta(child.id, {
 		workingDir,
