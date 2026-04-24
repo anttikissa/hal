@@ -7,6 +7,7 @@ import { liveFiles } from './utils/live-file.ts'
 import { client } from './client.ts'
 import { blocks } from './cli/blocks.ts'
 import { prompt } from './cli/prompt.ts'
+import { clipboard } from './cli/clipboard.ts'
 import { render } from './client/render.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { memory } from './memory.ts'
@@ -20,6 +21,7 @@ const modules: Record<string, Record<string, any>> = {
 	client: client.config,
 	blocks: blocks.config,
 	prompt: prompt.config,
+	clipboard: clipboard.config,
 	render: render.config,
 	agentLoop: agentLoop.config,
 	memory: memory.config,

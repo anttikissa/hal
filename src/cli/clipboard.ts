@@ -7,6 +7,13 @@ import { ensureDir } from '../state.ts'
 const IMAGE_DIR = '/tmp/hal/images'
 const PASTE_DIR = '/tmp/hal/paste'
 
+const config = {
+	// Multiline pasted text with at least this many lines is written to
+	// /tmp/hal/paste/NNNN.txt and represented in the prompt as [path]. Shorter
+	// multiline pastes stay inline. Read at paste time so /config takes effect.
+	multilinePasteFileLineLimit: 5,
+}
+
 // ── Async image probe ──
 
 let pasteCounter = 0
@@ -75,13 +82,20 @@ function saveMultilinePaste(text: string): string {
 	return `[${path}]`
 }
 
+function lineCount(text: string): number {
+	return text.split('\n').length
+}
+
+function shouldSaveMultilinePaste(text: string): boolean {
+	if (!text.includes('\n')) return false
+	return lineCount(text) >= config.multilinePasteFileLineLimit
+}
 
 const IMAGE_EXTS = /\.(png|jpg|jpeg|gif|webp)$/i
 
 // Normalize pasted text: fix line endings, strip control chars.
-// Single-line image path -> wrap in [brackets].
-// Multiline text stays inline. Replacing it with a temp-file ref makes the
-// model see a path and encourages a pointless read tool call.
+// Single-line image path -> wrap in [brackets]. The prompt module decides
+// whether multiline text is displayed inline or saved to /tmp/hal/paste.
 function cleanPaste(raw: string): string {
 	const text = raw
 		.replace(/\r\n/g, '\n')
@@ -99,4 +113,4 @@ function hasPendingPastes(): boolean {
 	return pendingPastes > 0
 }
 
-export const clipboard = { pasteFromClipboard, cleanPaste, saveMultilinePaste, hasPendingPastes }
+export const clipboard = { config, pasteFromClipboard, cleanPaste, saveMultilinePaste, shouldSaveMultilinePaste, hasPendingPastes }

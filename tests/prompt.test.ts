@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { readFileSync } from 'fs'
+import { clipboard } from '../src/cli/clipboard.ts'
 import { prompt } from '../src/cli/prompt.ts'
 import type { KeyEvent } from '../src/cli/keys.ts'
 
@@ -10,6 +11,7 @@ function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 beforeEach(() => {
 	prompt.clear()
 	prompt.setHistory([])
+	clipboard.config.multilinePasteFileLineLimit = 5
 })
 
 describe('prompt', () => {
@@ -19,8 +21,15 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('hello\n')
 	})
 
-	test('pasted multiline buffers show temp files but keep text for submission', () => {
-		const pasted = 'before\ninside\nafter'
+	test('pasted multiline buffers below the file line limit stay inline', () => {
+		const pasted = 'one\ntwo\nthree\nfour'
+		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		expect(prompt.text()).toBe(pasted)
+		expect(prompt.submitText()).toBe(pasted)
+	})
+
+	test('pasted multiline buffers at the file line limit show temp files but keep text for submission', () => {
+		const pasted = 'before\ninside\nafter\nline4\nline5'
 		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		const first = prompt.text()
 		expect(first).toMatch(/^\[\/tmp\/hal\/paste\/\d{4}\.txt\]$/)
@@ -31,6 +40,14 @@ describe('prompt', () => {
 		prompt.handleKey({ key: '', char: secondPaste, shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		expect(prompt.text()).not.toBe(`${first}${first}`)
 		expect(prompt.submitText()).toBe(pasted + secondPaste)
+	})
+
+	test('paste file line limit is configurable', () => {
+		clipboard.config.multilinePasteFileLineLimit = 3
+		const pasted = 'one\ntwo\nthree'
+		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		expect(prompt.text()).toMatch(/^\[\/tmp\/hal\/paste\/\d{4}\.txt\]$/)
+		expect(prompt.submitText()).toBe(pasted)
 	})
 
 	test('alt-left and alt-right move by words', () => {

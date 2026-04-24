@@ -301,7 +301,7 @@ function replaceSelection(text: string): void {
 }
 
 function replaceSelectionWithPastedText(text: string): void {
-	if (!text.includes('\n')) {
+	if (!clipboard.shouldSaveMultilinePaste(text)) {
 		replaceSelection(text)
 		return
 	}
