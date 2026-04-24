@@ -99,12 +99,23 @@ function reasoningEffort(fullId: string | undefined): string {
 // Fetched from models.dev on startup and cached in state/models.ason.
 // Falls back to hardcoded defaults if the file doesn't exist yet.
 
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { STATE_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 
-const MODELS_FILE = `${STATE_DIR}/models.ason`
 const DEFAULT_CONTEXT = 200_000
+const state = {
+	cache: null as Record<string, number> | null,
+}
+
+interface RefreshModelsResult {
+	fetched: boolean
+	changes: string[]
+}
+
+function modelsFile(): string {
+	return `${process.env.HAL_STATE_DIR ?? STATE_DIR}/models.ason`
+}
 
 // Hardcoded fallbacks — used before first models.dev fetch completes
 const FALLBACK_WINDOWS: Record<string, number> = {
@@ -121,21 +132,43 @@ const FALLBACK_WINDOWS: Record<string, number> = {
 
 // Lazy-loaded context window map from models.dev (state/models.ason).
 // Keys are bare model IDs (without provider prefix), values are token counts.
-let _modelsDevCache: Record<string, number> | null = null
-
 function loadModelsDevCache(): Record<string, number> {
-	if (_modelsDevCache) return _modelsDevCache
+	if (state.cache) return state.cache
 	try {
-		_modelsDevCache = ason.parse(readFileSync(MODELS_FILE, 'utf-8')) as Record<string, number>
+		state.cache = ason.parse(readFileSync(modelsFile(), 'utf-8')) as Record<string, number>
 	} catch {
-		_modelsDevCache = {}
+		state.cache = {}
 	}
-	return _modelsDevCache
+	return state.cache
+}
+
+function formatContext(n: number): string {
+	return `${Math.round(n / 1000)}k`
+}
+
+function isRelevantModelId(id: string): boolean {
+	return /(^|\/)gpt-[\d.]+/.test(id) || /(^|\/)claude-(opus|sonnet|haiku)-/.test(id)
+}
+
+function modelChangeMessages(previous: Record<string, number>, next: Record<string, number>): string[] {
+	const changes: string[] = []
+	for (const [id, context] of Object.entries(next).sort(([a], [b]) => a.localeCompare(b))) {
+		if (!isRelevantModelId(id)) continue
+		const before = previous[id]
+		if (before == null) {
+			const family = id.includes('gpt-') ? 'GPT' : 'Claude'
+			changes.push(`new ${family} model ${id} (${formatContext(context)})`)
+		} else if (before !== context) {
+			changes.push(`${id} context ${formatContext(before)} → ${formatContext(context)}`)
+		}
+	}
+	return changes
 }
 
 /** Fetch context windows from models.dev and save to state/models.ason.
  *  Fire-and-forget on startup. The file persists across restarts. */
-async function refreshModels(): Promise<void> {
+async function refreshModels(): Promise<RefreshModelsResult> {
+	const previous = existsSync(modelsFile()) ? loadModelsDevCache() : {}
 	const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(10_000) })
 	const data = (await res.json()) as Record<string, { models?: Record<string, any> }>
 	const ctx: Record<string, number> = {}
@@ -144,22 +177,22 @@ async function refreshModels(): Promise<void> {
 			if (model.limit?.context) ctx[id] = model.limit.context
 		}
 	}
-	ensureDir(STATE_DIR)
-	writeFileSync(MODELS_FILE, ason.stringify(ctx) + '\n')
-	_modelsDevCache = ctx
+	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
+	writeFileSync(modelsFile(), ason.stringify(ctx) + '\n')
+	state.cache = ctx
+	return { fetched: true, changes: modelChangeMessages(previous, ctx) }
+}
+
+function cachedContextWindow(fullId: string): number | undefined {
+	const bare = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+	const cached = loadModelsDevCache()
+	return cached[bare] ?? cached[fullId]
 }
 
 function contextWindow(fullId: string): number {
-	// 1. Check hardcoded fallbacks (full provider/model-id)
+	const cached = cachedContextWindow(fullId)
+	if (cached) return cached
 	if (FALLBACK_WINDOWS[fullId]) return FALLBACK_WINDOWS[fullId]
-
-	// 2. Check models.dev cache (bare model ID, no provider prefix)
-	const bare = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
-	const cached = loadModelsDevCache()
-	if (cached[bare]) return cached[bare]
-	// Also try exact full ID in case the cache uses it
-	if (cached[fullId]) return cached[fullId]
-
 	return DEFAULT_CONTEXT
 }
 
@@ -299,11 +332,13 @@ function providerName(fullId: string): string {
 }
 
 export const models = {
+	state,
 	config,
 	resolveModel,
 	displayModel,
 	reasoningEffort,
 	contextWindow,
+	cachedContextWindow,
 	computeCost,
 	formatCost,
 	formatTokenCount,
@@ -313,4 +348,5 @@ export const models = {
 	listModelChoices,
 	estimateTokens,
 	refreshModels,
+	modelChangeMessages,
 }

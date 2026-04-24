@@ -84,6 +84,17 @@ test('recordTabClosed emits info when no generation is active', () => {
 })
 
 
+test('formatModelRefreshMessage summarizes models.dev changes for the user', () => {
+	const msg = runtime.formatModelRefreshMessage([
+		'gpt-5.5 context 400k → 1050k',
+		'new Claude model claude-sonnet-4-7 (1000k)',
+	])
+	expect(msg).toContain('[models.dev] fetched model metadata')
+	expect(msg).toContain('gpt-5.5 context 400k → 1050k')
+	expect(msg).toContain('claude-sonnet-4-7')
+})
+
+
 test('resolveResumeTarget matches a closed session by name case-insensitively', () => {
 	const picked = runtime.resolveResumeTarget(
 		[

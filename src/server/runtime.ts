@@ -204,6 +204,25 @@ function restartPromptWatch(): void {
 	)
 }
 
+function broadcastInfo(text: string, level: 'info' | 'error' = 'info'): void {
+	for (const sessionId of activeSessions) emitInfo(sessionId, text, level)
+}
+
+function formatModelRefreshMessage(changes: string[]): string {
+	const shown = changes.slice(0, 8)
+	const more = changes.length > shown.length ? ` (+${changes.length - shown.length} more)` : ''
+	return `[models.dev] fetched model metadata; relevant changes: ${shown.join('; ')}${more}`
+}
+
+async function refreshModelMetadata(): Promise<void> {
+	try {
+		const result = await models.refreshModels()
+		if (result.changes.length > 0) broadcastInfo(formatModelRefreshMessage(result.changes))
+	} catch (err) {
+		console.error(`[models] refresh failed: ${errorMessage(err)}`)
+	}
+}
+
 function recordTabClosed(sessionId: string): void {
 	if (!agentLoop.abort(sessionId, TAB_CLOSED_TEXT)) emitInfo(sessionId, TAB_CLOSED_TEXT)
 }
@@ -504,9 +523,7 @@ function startRuntime(signal: AbortSignal): void {
 		state.activity = {}
 	})
 	if (metas.length > 0) syncSharedState()
-	models.refreshModels().catch((err) => {
-		console.error(`[models] refresh failed: ${errorMessage(err)}`)
-	})
+	void refreshModelMetadata()
 	openaiUsage.start(signal)
 	if (metas.length > 0) {
 		setTimeout(() => {
@@ -585,4 +602,6 @@ export const runtime = {
 	recordTabClosed,
 	spawnSession,
 	startSpawnedSession,
+	refreshModelMetadata,
+	formatModelRefreshMessage,
 }
