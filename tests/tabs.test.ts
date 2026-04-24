@@ -102,15 +102,15 @@ describe("tabs", () => {
 		expect(ids).toHaveLength(2)
 		expect(out).toContain(`[1 .hal ${ids[0]!}]`)
 		expect(out).toContain(`2 .hal ${ids[1]!}`)
+		expect(out).toContain('Initialized session in ')
 	})
 
-	test("new tabs record who opened them", async () => {
+	test("new tabs do not persist UI bookkeeping", async () => {
 		const proc = spawnHal()
 		await Bun.sleep(300)
 
 		const before = readSessionIds()
 		expect(before).toHaveLength(1)
-		const openerId = before[0]!
 
 		proc.stdin!.write(new Uint8Array([0x14])) // ctrl-t
 		proc.stdin!.flush()
@@ -124,13 +124,11 @@ describe("tabs", () => {
 		const after = readSessionIds()
 		expect(after).toHaveLength(2)
 		const childId = after[1]!
-		const childHistory = await waitForHistory(childId)
-		const first = childHistory[0]
+		await Bun.sleep(200)
+		const historyPath = join(tmpDir, "sessions", childId, "history.asonl")
+		const childHistory = existsSync(historyPath) ? readHistory(childId) : []
 
-		expect(first).toMatchObject({ type: 'info' })
-		expect(first?.text).toContain('User opened a new tab')
-		expect(first?.text).toContain(childId)
-		expect(first?.text).toContain(openerId)
+		expect(childHistory.some((entry) => entry.text?.includes('User opened a new tab'))).toBe(false)
 
 		proc.stdin!.write(new Uint8Array([0x03]))
 		proc.stdin!.flush()

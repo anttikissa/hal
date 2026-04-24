@@ -43,10 +43,10 @@ describe("perf", () => {
 		proc.stdin!.flush()
 		const out = stripAnsi(await new Response(proc.stdout).text())
 		await proc.exited
-		// The new startup block shows "Server started (pid X) · ready Yms"
-		// followed by detail timings like "replay", "first draw", etc.
-		expect(out).toContain("Server started")
-		expect(out).toContain("ready")
-		expect(out).toMatch(/\d+\.\d+ms/)
+		// Startup is user-facing by default; perf timings are hidden unless
+		// client.showStartupPerf is enabled in config.
+		expect(out).toContain("Initialized session in ")
+		expect(out).toContain("Using GPT 5.5 via OpenAI.")
+		expect(out).not.toContain("Server started")
 	})
 })

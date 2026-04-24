@@ -9,6 +9,7 @@ import { blocks as blockModule } from './cli/blocks.ts'
 import { STATE_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { log } from './utils/log.ts'
+import { openaiUsage } from './openai-usage.ts'
 
 function makeSessionMeta(id: string) {
 	return {
@@ -49,6 +50,8 @@ describe('client startup', () => {
 	const origLoadLive = sessions.loadLive
 	const origLoadBlobs = blockModule.loadBlobs
 	const origLogError = log.error
+	const origOpenAiCurrent = openaiUsage.current
+	const origClientConfig = { ...client.config }
 	let savedClientState: string | null = null
 	beforeEach(() => {
 		client.state.tabs.length = 0
@@ -65,6 +68,7 @@ describe('client startup', () => {
 		client.setOnChange(() => {})
 		client.setOnTabSwitch(() => {})
 		client.setOnDraftArrived(() => {})
+		Object.assign(client.config, origClientConfig)
 		sessions.loadAllSessionMetas = () => []
 		sessions.loadSessionMeta = (id) => makeSessionMeta(id)
 		sessions.loadAllHistoryWithOrigin = () => ({ entries: [], parentCount: 0 })
@@ -91,6 +95,8 @@ describe('client startup', () => {
 		sessions.loadLive = origLoadLive
 		blockModule.loadBlobs = origLoadBlobs
 		log.error = origLogError
+		openaiUsage.current = origOpenAiCurrent
+		Object.assign(client.config, origClientConfig)
 		if (savedClientState != null) writeFileSync(CLIENT_STATE_PATH, savedClientState)
 		else rmSync(CLIENT_STATE_PATH, { force: true })
 	})
@@ -110,6 +116,63 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
+	})
+
+	test('shows a human startup summary without perf details by default', async () => {
+		const home = process.env.HOME || '/home/test'
+		const resetAt = Math.floor(Date.now() / 1000) + 60 * 60
+		const shared: SharedState = {
+			sessions: [{ id: 's1', tab: 1, name: 'tab 1', cwd: `${home}/sync/lippu`, model: 'openai/gpt-5.5' }],
+			busy: {},
+			activity: {},
+			updatedAt: '2026-04-09T20:00:00.000Z',
+		}
+		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('s1'), workingDir: `${home}/sync/lippu`, model: 'openai/gpt-5.5' })
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+		openaiUsage.current = () => ({
+			key: 'openai:0',
+			planType: 'pro',
+			primary: { usedPercent: 1, windowMinutes: 300, resetAt },
+			pendingTokens: 0,
+		})
+		client.config.backgroundLoadTabs = false
+		client.state.startupSummaryShown = false
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
+		expect(startup?.text).toContain('Initialized session in ~/sync/lippu.')
+		expect(startup?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
+		expect(startup?.text).toContain('99% left on 5h quota, resetting at ')
+		expect(startup?.text).not.toContain('Server started')
+		expect(startup?.text).not.toContain('replay')
+	})
+
+	test('startup summary includes perf details when configured', async () => {
+		const shared = makeSharedState(['s1'])
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+		client.config.backgroundLoadTabs = false
+		client.config.showStartupPerf = true
+		client.state.startupSummaryShown = false
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
+		expect(startup?.text).toContain('Initialized session in /tmp/s1.')
+		expect(startup?.text).toContain('Joined server')
+		expect(startup?.text).toContain('replay')
 	})
 
 	test('falls back to disk session metadata when shared state is temporarily empty', async () => {

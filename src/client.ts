@@ -17,6 +17,7 @@ import { openaiUsage } from './openai-usage.ts'
 import { liveEventBlocks } from './live-event-blocks.ts'
 import { log } from './utils/log.ts'
 import { startup } from './startup.ts'
+import { models } from './models.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,9 @@ const config = {
 	backgroundLoadBlobs: true,
 	repaintAfterBlobLoad: true,
 	pausedNoticeDelayMs: 50,
+	// Startup performance details are developer diagnostics. Keep the default
+	// startup card human-focused and enable these only when debugging startup.
+	showStartupPerf: false,
 }
 
 const state = {
@@ -255,14 +259,70 @@ function queueLocalBlock(block: Block): void {
 	onChange(false)
 }
 
+function addLocalBlockToTab(tab: Tab, block: Block): void {
+	tab.history.push(block)
+	touchTab(tab)
+	if (tab === currentTab()) onChange(false)
+}
+
 function perfMs(prefix: string): string | null {
 	const hit = perf.snapshot().findLast((mark) => mark.name.startsWith(prefix))
 	return hit ? `${hit.ms.toFixed(1)}ms` : null
 }
 
-function showStartupSummary(): void {
-	if (state.startupSummaryShown) return
-	state.startupSummaryShown = true
+function formatHomePath(path: string): string {
+	const home = process.env.HOME
+	if (!home) return path
+	if (path === home) return '~'
+	return path.startsWith(`${home}/`) ? `~/${path.slice(home.length + 1)}` : path
+}
+
+function titleWords(text: string): string {
+	return text
+		.split(/[-_\s]+/)
+		.filter(Boolean)
+		.map((word) => word[0]!.toUpperCase() + word.slice(1).toLowerCase())
+		.join(' ')
+}
+
+function providerDisplayName(model: string): string {
+	const provider = models.providerName(model).toLowerCase()
+	if (provider === 'openai') return 'OpenAI'
+	if (provider === 'openrouter') return 'OpenRouter'
+	return titleWords(provider)
+}
+
+function chatGptSubscriptionText(planType: string | undefined): string {
+	if (!planType) return ''
+	const normalized = planType.toLowerCase().replace(/^chatgpt[-_\s]*/, '')
+	return `(ChatGPT ${titleWords(normalized)} subscription)`
+}
+
+function quotaWindowText(minutes: number): string {
+	if (minutes > 0 && minutes % (24 * 60) === 0) return `${minutes / (24 * 60)}d`
+	if (minutes > 0 && minutes % 60 === 0) return `${minutes / 60}h`
+	return `${minutes}m`
+}
+
+function startupQuotaLine(model: string): string {
+	if (models.providerName(model).toLowerCase() !== 'openai') return ''
+	const window = openaiUsage.current()?.primary
+	if (!window) return ''
+	const left = Math.max(0, Math.min(100, Math.round(100 - window.usedPercent)))
+	return `${left}% left on ${quotaWindowText(window.windowMinutes)} quota, resetting at ${openaiUsage.formatResetAt(window.resetAt)}.`
+}
+
+function startupModelLine(model: string): string {
+	if (!model) return ''
+	const display = models.displayModel(model) || model
+	const provider = providerDisplayName(model)
+	const subscription = models.providerName(model).toLowerCase() === 'openai'
+		? chatGptSubscriptionText(openaiUsage.current()?.planType)
+		: ''
+	return `Using ${display} via ${provider}${subscription ? ` ${subscription}` : ''}.`
+}
+
+function startupPerfText(): string {
 	const ready = perfMs('Ready for input')
 	const firstLine = state.role === 'server'
 		? `Server started (pid ${state.pid})${ready ? ` · ready ${ready}` : ''}`
@@ -273,11 +333,30 @@ function showStartupSummary(): void {
 		['blobs', perfMs('Active tab blobs loaded')],
 		['all tabs', perfMs('All tabs loaded')],
 	].filter(([, ms]) => !!ms).map(([label, ms]) => `${label} ${ms}`)
-	queueLocalBlock({
-		type: 'startup',
-		text: details.length > 0 ? `${firstLine}\n${details.join(' · ')}` : firstLine,
-		ts: Date.now(),
-	})
+	return details.length > 0 ? `${firstLine}\n${details.join(' · ')}` : firstLine
+}
+
+function startupSummaryText(tab: Tab): string {
+	const model = tab.model || state.model || ''
+	const lines = [`Initialized session in ${formatHomePath(tab.cwd || process.cwd())}.`]
+	const modelLine = startupModelLine(model)
+	if (modelLine) lines.push('', modelLine)
+	const quotaLine = startupQuotaLine(model)
+	if (quotaLine) lines.push('', quotaLine)
+	if (config.showStartupPerf) lines.push('', startupPerfText())
+	return lines.join('\n')
+}
+
+function addStartupSummaryToTab(tab: Tab): void {
+	addLocalBlockToTab(tab, { type: 'startup', text: startupSummaryText(tab), ts: Date.now() })
+}
+
+function showStartupSummary(): void {
+	if (state.startupSummaryShown) return
+	state.startupSummaryShown = true
+	const tab = currentTab()
+	if (!tab) return
+	addStartupSummaryToTab(tab)
 }
 
 function showServerRestart(pid: number, startedAt?: string): void {
@@ -705,6 +784,7 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 	const newTabs: Tab[] = []
 	const openedTabs: Tab[] = []
 	const isFork = pendingOpen === 'fork'
+	const isOpen = pendingOpen === 'open'
 	let openedSessionId = ''
 	for (const s of items) {
 		const existing = previousById.get(s.id)
@@ -757,6 +837,9 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		const newTab = openedSessionId ? newTabs.find((tab) => tab.sessionId === openedSessionId) : undefined
 		if (prevTab?.inputDraft && newTab) newTab.inputDraft = prevTab.inputDraft
 	}
+	// A Ctrl-T or /open tab should greet the user in the new tab without
+	// polluting the persisted conversation history with UI bookkeeping.
+	if (isOpen && grew && active && openedTabs.includes(active)) addStartupSummaryToTab(active)
 	pendingOpen = false
 	if (previousSession !== newSession && onTabSwitch) onTabSwitch(previousSession, newSession)
 	onChange(false)

@@ -177,9 +177,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	const related = sourceMeta ?? sessionStore.loadSessionMeta(opts.openerId ?? '')
 	const text = opts.sourceId
 		? related ? `User forked ${sessionLabel(related)} into ${sessionLabel(meta)}.` : ''
-		: related
-			? `User opened a new tab: ${sessionLabel(meta)}. Opened from ${sessionLabel(related)}.`
-			: `User opened a new tab: ${sessionLabel(meta)}.`
+		: ''
 	if (text) recordSessionInfo(sessionId, text, meta.createdAt)
 	if (opts.sourceId && sourceMeta?.context) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })
 	else publishContextEstimate(sessionId)
