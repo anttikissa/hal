@@ -151,6 +151,36 @@ describe('client startup', () => {
 		expect(errors.some((entry) => entry.message === 'failed to load client state')).toBe(true)
 	})
 
+	test('saved last tab wins on restart when it is in the requested cwd', async () => {
+		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
+			lastTab: 's2',
+			peak: 0,
+			peakCols: 0,
+			model: null,
+			doneUnseen: [],
+		}) + '\n')
+		const shared: SharedState = {
+			sessions: [
+				{ id: 's1', tab: 1, name: 'tab 1', cwd: '/work/project', model: 'openai/gpt-5.4' },
+				{ id: 's2', tab: 2, name: 'tab 2', cwd: '/work/project', model: 'openai/gpt-5.4' },
+			],
+			busy: {},
+			activity: {},
+			updatedAt: '2026-04-09T20:00:00.000Z',
+		}
+		ipc.readState = () => shared
+		liveFiles.liveFile = () => shared as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal, { preferredCwd: '/work/project', preferredSessionId: 's1' })
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.sessionId).toBe('s2')
+	})
+
 	test('startup fallback uses fork-aware history loading', async () => {
 		sessions.loadAllSessionMetas = () => [{ ...makeSessionMeta('child'), forkedFrom: 'parent' }]
 		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('child'), forkedFrom: 'parent' })
