@@ -11,7 +11,7 @@
   memory: { warnBytes: 1500000000, killBytes: 5000000000 },
   models: {
     // Hello
-    defaultModel: 'gpt-5.4',
+    defaultModel: 'gpt-5.5',
     default: 'gpt'
   },
   subscriptionUsage: { censorEmails: true }

@@ -58,6 +58,16 @@ function refreshModelItems(): void {
 	if (state.selectedIndex >= state.items.length) state.selectedIndex = Math.max(0, state.items.length - 1)
 }
 
+function fallbackModelChoiceIndex(target: string): number {
+	// The picker only shows one friendly alias for the GPT family. When an older
+	// session still points at gpt-5.4, prefer the current "gpt" row instead of
+	// jumping to the first model in the list.
+	if (target.startsWith('openai/gpt-') && !target.includes('codex')) {
+		return MODEL_CHOICES.findIndex((item) => item.value === 'gpt')
+	}
+	return -1
+}
+
 function openModelPicker(onChoose: (value: string) => void, currentModel?: string): void {
 	close()
 	state.active = true
@@ -69,7 +79,9 @@ function openModelPicker(onChoose: (value: string) => void, currentModel?: strin
 	refreshModelItems()
 	const target = currentModel ? models.resolveModel(currentModel) : ''
 	const match = target ? MODEL_CHOICES.findIndex((item) => models.resolveModel(item.value) === target) : -1
+	const fallback = match >= 0 || !target ? -1 : fallbackModelChoiceIndex(target)
 	if (match >= 0) state.selectedIndex = match
+	else if (fallback >= 0) state.selectedIndex = fallback
 }
 
 function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void): void {

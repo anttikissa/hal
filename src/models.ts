@@ -15,7 +15,7 @@ const ALIASES: Record<string, string> = {
 	sonnet: 'anthropic/claude-sonnet-4-20250514',
 	haiku: 'anthropic/claude-haiku-4-5-20251001',
 	openai: 'openai/gpt-5.3-codex',
-	gpt: 'openai/gpt-5.4',
+	gpt: 'openai/gpt-5.5',
 	codex: 'openai/gpt-5.3-codex',
 	gemini: 'google/gemini-2.5-flash',
 	'gemini-pro': 'google/gemini-2.5-pro',
@@ -91,7 +91,7 @@ function reasoningEffort(fullId: string | undefined): string {
 	if (!fullId) return ''
 	const modelId = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
 	if (modelId.includes('codex')) return 'xhigh'
-	if (/^o\d/.test(modelId) || modelId.startsWith('gpt-5.4')) return 'high'
+	if (/^o\d/.test(modelId) || /^gpt-5\./.test(modelId)) return 'high'
 	return ''
 }
 
@@ -111,6 +111,7 @@ const FALLBACK_WINDOWS: Record<string, number> = {
 	'anthropic/claude-opus-4-6': 200_000,
 	'anthropic/claude-sonnet-4-20250514': 200_000,
 	'anthropic/claude-haiku-4-5-20251001': 200_000,
+	'openai/gpt-5.5': 1_050_000,
 	'openai/gpt-5.4': 1_050_000,
 	'openai/gpt-5.3': 128_000,
 	'openai/gpt-5.3-codex': 128_000,
@@ -197,7 +198,7 @@ function formatCost(
 
 // ── Default model ──
 
-const FALLBACK_MODEL = 'anthropic/claude-opus-4-6'
+const FALLBACK_MODEL = 'openai/gpt-5.5'
 
 const config = {
 	// Default model alias or full ID. Set via config.ason under "models".
@@ -227,7 +228,7 @@ const MODEL_GROUPS: ModelGroup[] = [
 	{
 		label: 'OpenAI',
 		models: [
-			{ alias: 'gpt', fullId: 'openai/gpt-5.4' },
+			{ alias: 'gpt', fullId: 'openai/gpt-5.5' },
 			{ alias: 'codex', fullId: 'openai/gpt-5.3-codex' },
 		],
 	},
