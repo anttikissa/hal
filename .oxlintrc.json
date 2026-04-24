@@ -1,0 +1,24 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "oxc"],
+	"categories": {
+		"correctness": "error"
+	},
+	"rules": {
+		"no-control-regex": "off",
+		"no-sparse-arrays": "off",
+		"no-unmodified-loop-condition": "off",
+		"no-unused-expressions": "off",
+		"no-unused-vars": "off",
+		"no-useless-escape": "off",
+		"preserve-caught-error": "off",
+		"require-yield": "off"
+	},
+	"env": {
+		"builtin": true,
+		"node": true
+	},
+	"options": {
+		"maxWarnings": 0
+	}
+}

@@ -7,6 +7,11 @@ dir="$(cd "$(dirname "$0")" && pwd)"
 type_errors=$(bunx --bun tsgo --noEmit 2>&1)
 type_exit=$?
 
+# Lint. Oxlint currently does not discover files when this repo lives in a
+# hidden directory, so package.json feeds it an explicit file list.
+lint_errors=$(cd "$dir" && bun run --silent lint 2>&1)
+lint_exit=$?
+
 # Run tests in parallel
 bun "$dir/scripts/test-parallel.ts" "$@"
 test_exit=$?
@@ -20,6 +25,15 @@ if [ $type_exit -ne 0 ]; then
 	echo "========================================="
 fi
 
-if [ $type_exit -ne 0 ] || [ $test_exit -ne 0 ]; then
+if [ $lint_exit -ne 0 ]; then
+	echo ""
+	echo "$lint_errors"
+	echo ""
+	echo "========================================="
+	echo "  ERROR: Oxlint errors"
+	echo "========================================="
+fi
+
+if [ $type_exit -ne 0 ] || [ $lint_exit -ne 0 ] || [ $test_exit -ne 0 ]; then
 	exit 1
 fi

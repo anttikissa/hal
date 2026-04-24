@@ -5,12 +5,14 @@
   "private": true,
   "scripts": {
     "test": "bun test --concurrent",
+    "lint": "find src scripts tests -name '*.ts' -type f -print0 | sort -z | xargs -0 oxlint",
     "cloc": "bun scripts/cloc.ts",
     "fmt": "bunx prettier --write 'src/**/*.ts'"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@typescript/native-preview": "^7.0.0-dev.20260415.1",
+    "oxlint": "^1.61.0",
     "prettier": "^3.8.1"
   },
   "peerDependencies": {
