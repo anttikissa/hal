@@ -430,6 +430,10 @@ const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 
 interface ClientStateFile {
 	lastTab: string | null
+	// Set only by Ctrl-R. Unlike normal process startup, an explicit restart must
+	// return to the exact tab the user was viewing, even if that tab's cwd differs
+	// from the shell cwd that started Hal.
+	restartTab: string | null
 	peak: number // high-water mark for rendered line count
 	peakCols: number // terminal width peak was computed at
 	model: string | null // last-used model, restored on startup
@@ -437,7 +441,7 @@ interface ClientStateFile {
 }
 
 function defaultClientState(): ClientStateFile {
-	return { lastTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [] }
+	return { lastTab: null, restartTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [] }
 }
 
 function errorMessage(err: unknown): string {
@@ -453,6 +457,7 @@ function loadClientState(): ClientStateFile {
 		const data = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as any
 		return {
 			lastTab: data?.lastTab ?? null,
+			restartTab: typeof data?.restartTab === 'string' ? data.restartTab : null,
 			peak: data?.peak ?? 0,
 			peakCols: data?.peakCols ?? 0,
 			model: data?.model ?? null,
@@ -464,13 +469,14 @@ function loadClientState(): ClientStateFile {
 	}
 }
 
-function saveClientState(): void {
+function saveClientState(opts: { restart?: boolean } = {}): void {
 	const tab = currentTab()
 	try {
 		writeFileSync(
 			CLIENT_STATE_PATH,
 			ason.stringify({
 				lastTab: tab?.sessionId ?? null,
+				restartTab: opts.restart ? tab?.sessionId ?? null : null,
 				peak: state.peak,
 				peakCols: state.peakCols,
 				model: state.model,
@@ -922,15 +928,17 @@ function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; 
 	}
 
 	const saved = loadClientState()
+	const restartTab = saved.restartTab ? items.find((item) => item.id === saved.restartTab) : undefined
 	const savedTab = saved.lastTab ? items.find((item) => item.id === saved.lastTab) : undefined
 	const savedTabFitsRequest = savedTab && (!opts.preferredCwd || startup.sameCwd(savedTab.cwd, opts.preferredCwd))
 	const cwdPreferredSession = opts.preferredSessionId
 		?? (opts.preferredCwd ? startup.findOpenSessionForCwd(items, opts.preferredCwd) ?? '' : '')
-	// Ctrl-R restarts with the same cwd, and the runtime may report the first tab
-	// for that cwd as the startup target. Prefer the persisted active tab when it
-	// is still open and belongs to the requested cwd, so restart lands where the
-	// user was instead of jumping to the leftmost same-directory tab.
-	const preferredSession = savedTabFitsRequest ? saved.lastTab! : (cwdPreferredSession || saved.lastTab || '')
+	// Ctrl-R is an explicit restart of the current UI, not a fresh attach from the
+	// shell cwd. If the saved restart tab still exists, it wins even when another
+	// tab matches the requested cwd more closely.
+	const preferredSession = restartTab
+		? restartTab.id
+		: savedTabFitsRequest ? saved.lastTab! : (cwdPreferredSession || saved.lastTab || '')
 	const t0 = performance.now()
 	applySessionList(items, preferredSession)
 	const active = currentTab()

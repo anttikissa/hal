@@ -101,6 +101,7 @@ function exitCli(code: number): void {
 }
 
 let terminalCleaned = false
+let restarting = false
 
 // Restore terminal state and save client state before exiting.
 // Must be called on ALL exit paths. The guard prevents double-cleanup
@@ -111,7 +112,7 @@ function cleanupTerminal(): void {
 	cursor.stop()
 	// Persist the current draft so it survives restart
 	client.saveDraft(prompt.draftText())
-	client.saveState()
+	client.saveState({ restart: restarting })
 	if (useKitty) process.stdout.write(KITTY_OFF)
 	process.stdout.write(BRACKETED_PASTE_OFF)
 	writeTabStops(process.stdout.columns || 80, 8)
@@ -351,6 +352,7 @@ function handleAppKey(k: KeyEvent): boolean {
 	if (k.ctrl && !k.alt && !k.cmd) {
 		// Ctrl-R: restart
 		if (k.key === 'r') {
+			restarting = true
 			render.clearFrame()
 			cleanupTerminal()
 			process.exit(RESTART_CODE)
