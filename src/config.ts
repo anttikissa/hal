@@ -15,6 +15,7 @@ import { models } from './models.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
 import { openaiUsage } from './openai-usage.ts'
 import { subscriptionUsage } from './subscription-usage.ts'
+import { toolRegistry } from './tools/tool.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {
@@ -29,6 +30,7 @@ const modules: Record<string, Record<string, any>> = {
 	subscriptionUsage: subscriptionUsage.config,
 	anthropicUsage: anthropicUsage.config,
 	openaiUsage: openaiUsage.config,
+	toolRegistry: toolRegistry.config,
 }
 
 // config.ason lives at repo root — it's user-facing config.

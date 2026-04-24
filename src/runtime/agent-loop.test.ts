@@ -187,6 +187,48 @@ test('provider errors save full payload in a blob but show only the short messag
 })
 
 
+test('context length errors warn when local model limit looked safe', async () => {
+	const sessionId = `test-context-warning-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield {
+				type: 'error',
+				message: 'Your input exceeds the context window of this model.',
+				body: JSON.stringify({ error: { code: 'context_length_exceeded' } }),
+			}
+			yield { type: 'done' }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'short' }],
+		})
+
+		const warning = events.find((event) => event.type === 'info' && event.level === 'error' && event.text.includes('Provider rejected the request for context length'))
+		expect(warning?.text).toContain('Local estimate')
+		expect(warning?.text).toContain('models.ason')
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
 test('provider status updates busy activity', async () => {
 	const sessionId = `test-status-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

@@ -119,6 +119,28 @@ function parseErrorPayload(body: string | undefined): unknown {
 	}
 }
 
+function isContextLengthError(event: ProviderStreamEvent): boolean {
+	const haystack = [event.message, event.body]
+		.filter(Boolean)
+		.join('\n')
+		.toLowerCase()
+	return (
+		haystack.includes('context_length_exceeded') ||
+		haystack.includes('context window') ||
+		haystack.includes('context length')
+	)
+}
+
+function formatContextLengthWarning(messages: Message[], model: string, overheadBytes: number): string | null {
+	const est = context.estimateContext(messages, model, overheadBytes)
+	if (est.used >= est.max) return null
+	return [
+		"Provider rejected the request for context length, but Hal's local estimate was still below the model limit.",
+		`Local estimate: ${est.used}/${est.max} tokens.`,
+		'Provider APIs report token usage after successful calls, but do not report a reliable "context remaining" value on this error; models.ason or token calibration may be optimistic.',
+	].join(' ')
+}
+
 // True iff any token class is non-zero. A fully-cached turn has input = 0 but
 // non-zero cacheRead, so we can't just check `input > 0`.
 function hasUsage(u: TokenUsage): boolean {
@@ -385,6 +407,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 							isError: true,
 							blobId,
 						})
+						const contextWarning = isContextLengthError(event) ? formatContextLengthWarning(messages, model, overheadBytes) : null
+						if (contextWarning) emitInfo(sessionId, contextWarning, 'error')
 						let canRetry = false
 						if (isRetryableStatus(status)) {
 							if (!retryStartedAt) retryStartedAt = Date.now()
