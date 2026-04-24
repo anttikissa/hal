@@ -207,10 +207,18 @@ export function pickActiveSessionAfterSessionListChange(opts: {
 	if (grew && pendingOpen && openedSessionId) return openedSessionId
 	if (previousSession && openIds.has(previousSession)) return previousSession
 
-	// If the active tab was closed, stay at the same numeric slot when possible.
-	// Example: closing tab 24 should focus what used to be tab 25, now in slot 24.
-	// Only when the closed tab was the last one do we fall back to the new last tab.
+	// If the active tab disappeared, prefer the most recently viewed surviving
+	// tab. That preserves the Chrome-like opener behavior: fork/open a child tab,
+	// close it immediately, and focus returns to the tab you came from instead of
+	// blindly moving right.
 	if (shrank && activeTabClosed) {
+		for (let i = recentTabs.length - 1; i >= 0; i--) {
+			const sessionId = recentTabs[i]!
+			if (openIds.has(sessionId)) return sessionId
+		}
+
+		// No remembered predecessor survived. Stay at the same numeric slot when
+		// possible; if the closed tab was last, this naturally falls back left.
 		const sameSlot = Math.min(previousIndex, newSessionIds.length - 1)
 		return newSessionIds[sameSlot] ?? ''
 	}

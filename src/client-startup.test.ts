@@ -247,7 +247,7 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
-	test('closing the last tab keeps focus on the tab immediately to its left', async () => {
+	test('closing the last tab returns to the most recently visited surviving tab', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: (() => void) | undefined
@@ -270,7 +270,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.sessionId).toBe('s2')
+		expect(client.currentTab()?.sessionId).toBe('s1')
 	})
 
 	test('opening a tab activates the new session, and closing it returns to the previous tab', async () => {
@@ -368,7 +368,7 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s3')
 	})
 
-	test('closing a middle tab keeps focus on the tab that slides into its slot', async () => {
+	test('closing a middle tab returns to the most recently visited surviving tab', async () => {
 		const shared = makeSharedState(['s1', 's3', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: (() => void) | undefined
@@ -393,7 +393,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.sessionId).toBe('s2')
+		expect(client.currentTab()?.sessionId).toBe('s1')
 	})
 
 	test('restores unseen-done checkmarks from client state on startup', async () => {
