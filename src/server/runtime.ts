@@ -171,7 +171,8 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 			topic: undefined,
 			model: models.defaultModel(),
 		})
-	if (!opts.sourceId && opts.workingDir && meta.workingDir !== opts.workingDir) {
+	const overridesForkCwd = !!opts.sourceId && !!opts.workingDir && meta.workingDir !== opts.workingDir
+	if (opts.workingDir && meta.workingDir !== opts.workingDir) {
 		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
 	}
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
@@ -180,7 +181,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 		? related ? `User forked ${sessionLabel(related)} into ${sessionLabel(meta)}.` : ''
 		: ''
 	if (text) recordSessionInfo(sessionId, text, meta.createdAt)
-	if (opts.sourceId && sourceMeta?.context) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })
+	if (opts.sourceId && sourceMeta?.context && !overridesForkCwd) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })
 	else publishContextEstimate(sessionId)
 	return sessionStore.loadSessionMeta(sessionId) ?? meta
 }
@@ -511,14 +512,14 @@ function handleCommand(cmd: Command): void {
 			log.info('Runtime handling open command', {
 				sessionId,
 				cwd: 'cwd' in cmd ? cmd.cwd : undefined,
-				forceNew: 'cwd' in cmd ? cmd.forceNew : undefined,
+				forceNew: 'forceNew' in cmd ? cmd.forceNew : undefined,
 				forkSessionId: 'forkSessionId' in cmd ? cmd.forkSessionId : undefined,
 				afterSessionId: 'afterSessionId' in cmd ? cmd.afterSessionId : undefined,
 				activeSessions: activeSessions.length,
 				commandCreatedAt: cmd.createdAt,
 			})
 			if ('forkSessionId' in cmd) {
-				const child = createSessionTab({ sourceId: cmd.forkSessionId })
+				const child = createSessionTab({ sourceId: cmd.forkSessionId, workingDir: cmd.cwd })
 				const msg = `forked ${cmd.forkSessionId} → ${child.id}`
 				emitInfo(cmd.forkSessionId, msg)
 				emitInfo(child.id, msg)

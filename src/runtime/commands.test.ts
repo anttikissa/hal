@@ -269,6 +269,53 @@ test('/self queues a session rooted at HAL_DIR', async () => {
 })
 
 
+test('/self --fork queues a forked session rooted at HAL_DIR', async () => {
+	const appended: any[] = []
+	const origHalDir = process.env.HAL_DIR
+	const dir = mkdtempSync(join(tmpdir(), 'hal-self-fork-command-'))
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	try {
+		process.env.HAL_DIR = dir
+		const result = await commands.executeCommand('/self --fork', makeSession())
+
+		expect(result.handled).toBe(true)
+		expect(result.error).toBeUndefined()
+		expect(result.output).toContain(dir)
+		expect(appended).toEqual([{ type: 'open', cwd: dir, forkSessionId: '04-aaa', sessionId: '04-aaa' }])
+	} finally {
+		if (origHalDir === undefined) delete process.env.HAL_DIR
+		else process.env.HAL_DIR = origHalDir
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
+test('/self -f aliases --fork', async () => {
+	const appended: any[] = []
+	const origHalDir = process.env.HAL_DIR
+	const dir = mkdtempSync(join(tmpdir(), 'hal-self-f-command-'))
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	try {
+		process.env.HAL_DIR = dir
+		const result = await commands.executeCommand('/self -f', makeSession())
+
+		expect(result.handled).toBe(true)
+		expect(result.error).toBeUndefined()
+		expect(appended).toEqual([{ type: 'open', cwd: dir, forkSessionId: '04-aaa', sessionId: '04-aaa' }])
+	} finally {
+		if (origHalDir === undefined) delete process.env.HAL_DIR
+		else process.env.HAL_DIR = origHalDir
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
 test('/open resolves a tab number and queues placement after it', async () => {
 	const appended: any[] = []
 	ipc.appendCommand = (command) => {

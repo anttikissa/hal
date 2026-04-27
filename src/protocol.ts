@@ -57,6 +57,8 @@ export interface OpenNewCommand extends CommandBase {
 export interface OpenForkCommand extends CommandBase {
 	type: 'open'
 	forkSessionId: string
+	// Optional cwd override for fork variants such as /self --fork.
+	cwd?: string
 }
 
 export interface OpenAfterCommand extends CommandBase {

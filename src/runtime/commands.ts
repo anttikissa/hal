@@ -270,7 +270,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	model: { usage: '[name]', summary: 'Switch model or list available models.', detail: 'With no name, shows the current model and the available choices.', arg: 'model' },
 	clear: { summary: 'Clear session history.' },
 	fork: { summary: 'Fork current session to new tab.' },
-	self: { summary: 'Open a session in Hal\'s own directory.' },
+	self: { usage: '[--fork|-f]', summary: 'Open a session in Hal\'s own directory.', detail: 'With --fork, fork this conversation into Hal\'s own directory instead of starting a fresh self tab.' },
 	open: { usage: '[tab|session-id|name]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
 	move: { usage: '<position>', summary: 'Move the current tab to a position.', detail: 'Values below 1 clamp to 1; values above the tab count clamp to the last tab.' },
 	rename: { usage: '<name>|clear', summary: 'Rename the current session.', detail: 'Set a short session name used in tabs and command targets.' },
@@ -386,8 +386,13 @@ handlers['fork'] = (_args, session) => {
 
 // /self — open a session rooted at Hal's own source/config directory
 handlers['self'] = (args, session) => {
-	if (args.trim()) return { error: 'Usage: /self', handled: true }
+	const fork = args === '--fork' || args === '-f'
+	if (args.trim() && !fork) return { error: 'Usage: /self [--fork|-f]', handled: true }
 	const cwd = currentHalDir()
+	if (fork) {
+		ipc.appendCommand({ type: 'open', cwd, forkSessionId: session.id, sessionId: session.id })
+		return { output: `Forking this conversation into Hal self session in ${cwd}...`, handled: true }
+	}
 	ipc.appendCommand({ type: 'open', cwd, forceNew: true, sessionId: session.id })
 	return { output: `Opening Hal self session in ${cwd}...`, handled: true }
 }
