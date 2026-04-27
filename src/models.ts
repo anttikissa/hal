@@ -9,17 +9,17 @@ import type { PartialTokenUsage } from './protocol.ts'
 // Short name → full provider/model-id
 
 const ALIASES: Record<string, string> = {
-	anthropic: 'anthropic/claude-opus-4-6',
-	claude: 'anthropic/claude-opus-4-6',
-	opus: 'anthropic/claude-opus-4-6',
-	sonnet: 'anthropic/claude-sonnet-4-20250514',
-	haiku: 'anthropic/claude-haiku-4-5-20251001',
-	openai: 'openai/gpt-5.3-codex',
+	anthropic: 'anthropic/claude-opus-4-7',
+	claude: 'anthropic/claude-opus-4-7',
+	opus: 'anthropic/claude-opus-4-7',
+	sonnet: 'anthropic/claude-sonnet-4-6',
+	haiku: 'anthropic/claude-haiku-4-5',
+	openai: 'openai/gpt-5.5',
 	gpt: 'openai/gpt-5.5',
 	codex: 'openai/gpt-5.3-codex',
-	gemini: 'google/gemini-2.5-flash',
-	'gemini-pro': 'google/gemini-2.5-pro',
-	grok: 'openrouter/x-ai/grok-4',
+	gemini: 'google/gemini-3-flash-preview',
+	'gemini-pro': 'google/gemini-3.1-pro-preview',
+	grok: 'openrouter/x-ai/grok-4.20',
 	deepseek: 'openrouter/deepseek/deepseek-chat',
 	llama: 'openrouter/meta-llama/llama-4-maverick',
 }
@@ -123,11 +123,16 @@ interface FrontierModelInfo {
 	version: number[]
 }
 
-interface ModelUpdateSuggestion {
-	currentModel: string
+interface AliasUpdateSuggestion {
+	aliases: string[]
+	oldModel: string
 	newModel: string
-	family: string
-	displayName: string
+}
+
+interface ModelCandidate {
+	canonical: string
+	version: number[]
+	stability: number
 }
 
 function modelsFile(): string {
@@ -136,15 +141,16 @@ function modelsFile(): string {
 
 // Hardcoded fallbacks — used before first models.dev fetch completes
 const FALLBACK_WINDOWS: Record<string, number> = {
-	'anthropic/claude-opus-4-6': 200_000,
-	'anthropic/claude-sonnet-4-20250514': 200_000,
-	'anthropic/claude-haiku-4-5-20251001': 200_000,
+	'anthropic/claude-opus-4-7': 1_000_000,
+	'anthropic/claude-sonnet-4-6': 1_000_000,
+	'anthropic/claude-haiku-4-5': 200_000,
 	'openai/gpt-5.5': 1_050_000,
 	'openai/gpt-5.4': 1_050_000,
 	'openai/gpt-5.3': 128_000,
 	'openai/gpt-5.3-codex': 128_000,
-	'google/gemini-2.5-flash': 1_000_000,
-	'google/gemini-2.5-pro': 1_000_000,
+	'google/gemini-3-flash-preview': 1_000_000,
+	'google/gemini-3.1-pro-preview': 1_000_000,
+	'openrouter/x-ai/grok-4.20': 2_000_000,
 }
 
 // Lazy-loaded context window map from models.dev (state/models.ason).
@@ -167,12 +173,16 @@ function isRelevantModelId(id: string): boolean {
 	return /(^|\/)gpt-[\d.]+/.test(id) || /(^|\/)claude-(opus|sonnet|haiku)-/.test(id)
 }
 
+function parseVersionParts(text: string): number[] {
+	return text.split('.').map((part) => Number(part))
+}
+
 function frontierModelInfo(fullId: string): FrontierModelInfo | null {
 	const id = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
 	const gpt = id.match(/^gpt-(\d+)\.(\d+)$/)
 	if (gpt) return { kind: 'gpt', family: `GPT ${gpt[1]}`, version: [Number(gpt[1]), Number(gpt[2])] }
 
-	const claude = id.match(/^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d+)|-\d{8,})$/)
+	const claude = id.match(/^claude-(opus|sonnet|haiku)-(\d+)(?:[.-](\d+)|-\d{8,})?$/)
 	if (!claude) return null
 	const tier = claude[1]![0]!.toUpperCase() + claude[1]!.slice(1)
 	return { kind: 'claude', family: `${tier} ${claude[2]}`, version: [Number(claude[2]), Number(claude[3] ?? 0)] }
@@ -185,6 +195,14 @@ function compareVersions(a: number[], b: number[]): number {
 		if (diff !== 0) return diff
 	}
 	return 0
+}
+
+function compareCandidates(a: ModelCandidate, b: ModelCandidate): number {
+	const versionDiff = compareVersions(a.version, b.version)
+	if (versionDiff !== 0) return versionDiff
+	const stabilityDiff = a.stability - b.stability
+	if (stabilityDiff !== 0) return stabilityDiff
+	return a.canonical.localeCompare(b.canonical)
 }
 
 function providerPrefix(fullId: string): string {
@@ -206,23 +224,90 @@ function newestModelInFamily(cache: Record<string, number>, family: string): str
 	return bestId
 }
 
-function modelUpdateSuggestion(currentModel: string, previous: Record<string, number>, next: Record<string, number>): ModelUpdateSuggestion | null {
-	const resolved = resolveModel(currentModel)
-	const current = frontierModelInfo(resolved)
-	if (!current) return null
+function parseClaudeCandidate(tier: 'opus' | 'sonnet' | 'haiku', modelId: string): ModelCandidate | null {
+	const match = modelId.match(new RegExp(`^claude-${tier}-(\\d+)(?:[.-](\\d+)|-(\\d{8,}))?$`))
+	if (!match) return null
+	const major = Number(match[1])
+	const minor = Number(match[2] ?? 0)
+	const canonical = match[2] ? `claude-${tier}-${major}-${minor}` : `claude-${tier}-${major}`
+	return { canonical, version: [major, minor], stability: match[2] ? 2 : match[3] ? 0 : 1 }
+}
 
-	const previousBest = newestModelInFamily(previous, current.family)
-	const nextBest = newestModelInFamily(next, current.family)
-	if (!nextBest) return null
+function parseGptCandidate(modelId: string): ModelCandidate | null {
+	const match = modelId.match(/^gpt-(\d+)\.(\d+)$/)
+	if (!match) return null
+	return {
+		canonical: `gpt-${match[1]}.${match[2]}`,
+		version: [Number(match[1]), Number(match[2])],
+		stability: 1,
+	}
+}
 
-	const previousBestInfo = previousBest ? frontierModelInfo(previousBest) : null
-	const nextBestInfo = frontierModelInfo(nextBest)
-	if (!nextBestInfo) return null
-	if (previousBestInfo && compareVersions(nextBestInfo.version, previousBestInfo.version) <= 0) return null
-	if (compareVersions(nextBestInfo.version, current.version) <= 0) return null
+function parseCodexCandidate(modelId: string): ModelCandidate | null {
+	const match = modelId.match(/^gpt-(\d+)\.(\d+)-codex$/)
+	if (!match) return null
+	return {
+		canonical: `gpt-${match[1]}.${match[2]}-codex`,
+		version: [Number(match[1]), Number(match[2])],
+		stability: 1,
+	}
+}
 
-	const newModel = nextBest.includes('/') ? nextBest : `${providerPrefix(resolved)}${nextBest}`
-	return { currentModel: resolved, newModel, family: current.family, displayName: displayModel(newModel) }
+function parseGeminiCandidate(kind: 'flash' | 'pro', modelId: string): ModelCandidate | null {
+	const match = modelId.match(new RegExp(`^gemini-((?:\\d+\\.)*\\d+)-${kind}(-preview)?$`))
+	if (!match) return null
+	return {
+		canonical: `gemini-${match[1]}-${kind}${match[2] ?? ''}`,
+		version: parseVersionParts(match[1]!),
+		stability: match[2] ? 0 : 1,
+	}
+}
+
+function parseGrokCandidate(modelId: string): ModelCandidate | null {
+	const match = modelId.match(/^(x-ai|xai)\/grok-((?:\d+\.)*\d+)(-fast)?$/)
+	if (!match) return null
+	return {
+		canonical: `x-ai/grok-${match[2]}${match[3] ?? ''}`,
+		version: parseVersionParts(match[2]!),
+		stability: match[3] ? 0 : 1,
+	}
+}
+
+function newestMatchingModel(cache: Record<string, number>, parse: (modelId: string) => ModelCandidate | null): string | null {
+	let best: ModelCandidate | null = null
+	for (const fullId of Object.keys(cache)) {
+		const stripped = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+		const candidate = parse(fullId) ?? parse(stripped)
+		if (!candidate) continue
+		if (!best || compareCandidates(candidate, best) > 0) best = candidate
+	}
+	return best?.canonical ?? null
+}
+
+const aliasUpdateGroups = [
+	{ aliases: ['anthropic', 'claude', 'opus'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('opus', id)) },
+	{ aliases: ['sonnet'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('sonnet', id)) },
+	{ aliases: ['haiku'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('haiku', id)) },
+	{ aliases: ['openai', 'gpt'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseGptCandidate) },
+	{ aliases: ['codex'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseCodexCandidate) },
+	{ aliases: ['gemini'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseGeminiCandidate('flash', id)) },
+	{ aliases: ['gemini-pro'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseGeminiCandidate('pro', id)) },
+	{ aliases: ['grok'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseGrokCandidate) },
+]
+
+function aliasUpdateSuggestions(previous: Record<string, number>, next: Record<string, number>): AliasUpdateSuggestion[] {
+	const updates: AliasUpdateSuggestion[] = []
+	for (const group of aliasUpdateGroups) {
+		const oldModel = ALIASES[group.aliases[0]!]!
+		const nextModelId = group.latest(next)
+		if (!nextModelId) continue
+		const previousModelId = group.latest(previous)
+		if (previousModelId === nextModelId) continue
+		const newModel = `${providerPrefix(oldModel)}${nextModelId}`
+		if (newModel === oldModel) continue
+		updates.push({ aliases: group.aliases, oldModel, newModel })
+	}
+	return updates
 }
 
 function modelChangeMessages(previous: Record<string, number>, next: Record<string, number>): string[] {
@@ -282,9 +367,9 @@ function contextWindow(fullId: string): number {
 // ── Pricing (USD per million tokens) ──
 
 const PRICING: Record<string, { input: number; output: number }> = {
-	'anthropic/claude-opus-4-6': { input: 5, output: 25 },
-	'anthropic/claude-sonnet-4-20250514': { input: 3, output: 15 },
-	'anthropic/claude-haiku-4-5-20251001': { input: 1, output: 5 },
+	'anthropic/claude-opus-4-7': { input: 5, output: 25 },
+	'anthropic/claude-sonnet-4-6': { input: 3, output: 15 },
+	'anthropic/claude-haiku-4-5': { input: 1, output: 5 },
 }
 
 // Anthropic prompt-cache multipliers: reads bill at 10% of input, writes at 125%.
@@ -336,9 +421,9 @@ const MODEL_GROUPS: ModelGroup[] = [
 	{
 		label: 'Anthropic',
 		models: [
-			{ alias: 'opus', fullId: 'anthropic/claude-opus-4-6' },
-			{ alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-20250514' },
-			{ alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5-20251001' },
+			{ alias: 'opus', fullId: 'anthropic/claude-opus-4-7' },
+			{ alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-6' },
+			{ alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5' },
 		],
 	},
 	{
@@ -351,14 +436,14 @@ const MODEL_GROUPS: ModelGroup[] = [
 	{
 		label: 'Google',
 		models: [
-			{ alias: 'gemini', fullId: 'google/gemini-2.5-flash' },
-			{ alias: 'gemini-pro', fullId: 'google/gemini-2.5-pro' },
+			{ alias: 'gemini', fullId: 'google/gemini-3-flash-preview' },
+			{ alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview' },
 		],
 	},
 	{
 		label: 'OpenRouter',
 		models: [
-			{ alias: 'grok', fullId: 'openrouter/x-ai/grok-4' },
+			{ alias: 'grok', fullId: 'openrouter/x-ai/grok-4.20' },
 			{ alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-chat' },
 			{ alias: 'llama', fullId: 'openrouter/meta-llama/llama-4-maverick' },
 		],
@@ -432,6 +517,6 @@ export const models = {
 	estimateTokens,
 	refreshModels,
 	modelChangeMessages,
+	aliasUpdateSuggestions,
 	frontierModelInfo,
-	modelUpdateSuggestion,
 }

@@ -76,7 +76,7 @@ type NoticeBlock<T extends 'info' | 'warning' | 'startup' | 'fork'> = { type: T 
 
 export type Block =
 	| ({ type: 'user'; source?: string; status?: string } & TextBlock)
-	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean } & TextBlock)
+	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean; synthetic?: boolean; syntheticKind?: string } & TextBlock)
 	| ({ type: 'thinking'; model?: string; thinkingEffort?: string; streaming?: boolean } & TextBlock & BlobRef)
 	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string } & BlockBase & BlobRef)
 	| NoticeBlock<'info'>
@@ -151,7 +151,17 @@ function historyToBlocks(
 				result.push({ type: 'tool', name: entry.name, input: entry.input, blobId: entry.blobId, sessionId: blobOwner, toolId: entry.toolId, ts, dimmed })
 				break
 			case 'assistant':
-				result.push({ type: 'assistant', text: entry.text, model: entry.model ?? initialModel, id: entry.id, continue: entry.continue, ts, dimmed })
+				result.push({
+					type: 'assistant',
+					text: entry.text,
+					model: entry.model ?? initialModel,
+					id: entry.id,
+					continue: entry.continue,
+					synthetic: entry.synthetic,
+					syntheticKind: entry.syntheticKind,
+					ts,
+					dimmed,
+				})
 				break
 			case 'info':
 				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info', text: entry.text, ts, dimmed })
@@ -468,7 +478,9 @@ function blockLabel(block: Block): string {
 	}
 	if (block.type === 'assistant') {
 		const display = models.displayModel(block.model)
-		return display ? `Hal (${display})` : 'Hal'
+		if (display && block.synthetic) return `Hal (${display}, synthetic)`
+		if (display) return `Hal (${display})`
+		return block.synthetic ? 'Hal (synthetic)' : 'Hal'
 	}
 	if (block.type === 'thinking') {
 		const display = models.displayModel(block.model)

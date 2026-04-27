@@ -14,9 +14,18 @@ afterEach(() => {
 	models.state.cache = null
 })
 
-test('gpt alias resolves to gpt-5.5', () => {
+test('gpt and openai aliases resolve to gpt-5.5', () => {
 	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.5')
+	expect(models.resolveModel('openai')).toBe('openai/gpt-5.5')
 })
+
+
+test('updated anthropic aliases avoid dated model ids', () => {
+	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-4-7')
+	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-4-6')
+	expect(models.resolveModel('haiku')).toBe('anthropic/claude-haiku-4-5')
+})
+
 
 test('default model resolves to gpt-5.5', () => {
 	const origDefault = models.config.default
@@ -28,43 +37,62 @@ test('default model resolves to gpt-5.5', () => {
 	}
 })
 
+
 test('gpt-5.5 gets high reasoning effort and fallback context window', () => {
 	expect(models.reasoningEffort('openai/gpt-5.5')).toBe('high')
 	expect(models.contextWindow('openai/gpt-5.5')).toBe(1_050_000)
 })
 
-test('model picker lists gpt-5.5', () => {
-	const choice = models.listModelChoices().find((item) => item.value === 'gpt')
-	expect(choice).toMatchObject({
+
+test('model picker lists updated frontier aliases', () => {
+	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({
 		value: 'gpt',
 		label: expect.stringContaining('GPT 5.5'),
 		search: expect.stringContaining('openai/gpt-5.5'),
 	})
+	expect(models.listModelChoices().find((item) => item.value === 'sonnet')).toMatchObject({
+		value: 'sonnet',
+		search: expect.stringContaining('anthropic/claude-sonnet-4-6'),
+	})
+	expect(models.listModelChoices().find((item) => item.value === 'gemini')).toMatchObject({
+		value: 'gemini',
+		search: expect.stringContaining('google/gemini-3-flash-preview'),
+	})
+	expect(models.listModelChoices().find((item) => item.value === 'grok')).toMatchObject({
+		value: 'grok',
+		search: expect.stringContaining('openrouter/x-ai/grok-4.20'),
+	})
 })
 
 
-test('modelUpdateSuggestion detects newer GPT and Claude frontier models', () => {
-	expect(models.modelUpdateSuggestion(
-		'openai/gpt-5.4',
-		{ 'gpt-5.4': 1_050_000 },
-		{ 'gpt-5.4': 1_050_000, 'gpt-5.5': 1_050_000 },
-	)).toMatchObject({
-		currentModel: 'openai/gpt-5.4',
-		newModel: 'openai/gpt-5.5',
-		family: 'GPT 5',
-		displayName: 'GPT 5.5',
-	})
-
-	expect(models.modelUpdateSuggestion(
-		'anthropic/claude-opus-4-5',
-		{ 'claude-opus-4-5': 200_000 },
-		{ 'claude-opus-4-5': 200_000, 'claude-opus-4-6': 200_000 },
-	)).toMatchObject({
-		currentModel: 'anthropic/claude-opus-4-5',
-		newModel: 'anthropic/claude-opus-4-6',
-		family: 'Opus 4',
-		displayName: 'Opus 4.6',
-	})
+test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
+	expect(models.aliasUpdateSuggestions(
+		{
+			'gpt-5.5': 1_050_000,
+			'claude-opus-4-7': 1_000_000,
+			'claude-sonnet-4-6': 1_000_000,
+			'google/gemini-3-flash-preview': 1_000_000,
+			'x-ai/grok-4.20': 2_000_000,
+		},
+		{
+			'gpt-5.5': 1_050_000,
+			'gpt-5.6': 1_050_000,
+			'claude-opus-4-7': 1_000_000,
+			'claude-opus-4-8': 1_000_000,
+			'claude-sonnet-4-6': 1_000_000,
+			'claude-sonnet-4-7': 1_000_000,
+			'google/gemini-3-flash-preview': 1_000_000,
+			'google/gemini-4-flash-preview': 1_000_000,
+			'x-ai/grok-4.20': 2_000_000,
+			'x-ai/grok-4.21': 2_000_000,
+		},
+	)).toEqual([
+		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-7', newModel: 'anthropic/claude-opus-4-8' },
+		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-4-6', newModel: 'anthropic/claude-sonnet-4-7' },
+		{ aliases: ['openai', 'gpt'], oldModel: 'openai/gpt-5.5', newModel: 'openai/gpt-5.6' },
+		{ aliases: ['gemini'], oldModel: 'google/gemini-3-flash-preview', newModel: 'google/gemini-4-flash-preview' },
+		{ aliases: ['grok'], oldModel: 'openrouter/x-ai/grok-4.20', newModel: 'openrouter/x-ai/grok-4.21' },
+	])
 })
 
 test('refreshModels reports relevant GPT and Claude additions and context changes', async () => {

@@ -307,6 +307,29 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s34')
 	})
 
+	test('startup summary stays out of tabs that already have visible history', async () => {
+		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
+		sessions.loadAllHistoryWithOrigin = () => ({
+			entries: [{ type: 'assistant', text: 'Howdy!', synthetic: true, model: 'openai/gpt-5.4', ts: '2026-04-09T20:01:00.000Z' }],
+			parentCount: 0,
+		})
+
+		const shared = makeSharedState(['s1'])
+		const hostLock = { pid: null, createdAt: '' }
+		ipc.readState = () => shared
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = () => {}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal)
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.history.filter((block) => block.type === 'startup')).toEqual([])
+		expect(client.currentTab()?.history).toMatchObject([{ type: 'assistant', synthetic: true, model: 'openai/gpt-5.4', text: 'Howdy!' }])
+	})
+
 	test('startup fallback uses fork-aware history loading', async () => {
 		sessions.loadAllSessionMetas = () => [{ ...makeSessionMeta('child'), forkedFrom: 'parent' }]
 		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('child'), forkedFrom: 'parent' })
@@ -378,7 +401,7 @@ describe('client startup', () => {
 		expect(blobLoads).toContainEqual(['s2'])
 	})
 
-	test('closing the active tab returns to the most recently visited surviving tab', async () => {
+	test('closing the active last tab falls back to the left neighbor', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: (() => void) | undefined
@@ -403,7 +426,7 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
-	test('closing the last tab returns to the most recently visited surviving tab', async () => {
+	test('closing the last tab ignores remembered focus and falls back left', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: (() => void) | undefined
@@ -426,7 +449,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.sessionId).toBe('s1')
+		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
 	test('opening a tab activates the new session, and closing it returns to the previous tab', async () => {
@@ -549,7 +572,7 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s3')
 	})
 
-	test('closing a middle tab returns to the most recently visited surviving tab', async () => {
+	test('closing a middle tab switches to the right neighbor', async () => {
 		const shared = makeSharedState(['s1', 's3', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: (() => void) | undefined
@@ -574,7 +597,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.sessionId).toBe('s1')
+		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
 	test('restores unseen-done checkmarks from client state on startup', async () => {

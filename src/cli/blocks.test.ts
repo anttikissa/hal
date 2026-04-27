@@ -70,6 +70,19 @@ test('assistant header includes display model', () => {
 	expect(header).toContain('Hal (GPT 5.4)')
 })
 
+
+test('synthetic assistant header includes model and synthetic marker', () => {
+	const block: Block = {
+		type: 'assistant',
+		text: 'hello',
+		model: 'gpt-5.4',
+		synthetic: true,
+	}
+
+	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	expect(header).toContain('Hal (GPT 5.4, synthetic)')
+})
+
 test('thinking header includes model and default thinking level', () => {
 	const block: Block = {
 		type: 'thinking',

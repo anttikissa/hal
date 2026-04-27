@@ -8,6 +8,7 @@ import { toolRegistry } from '../tools/tool.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 import { models } from '../models.ts'
 import { HAL_DIR } from '../state.ts'
+import { config } from '../config.ts'
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
 	const picked = runtime.pickMostRecentlyClosedSessionId(
 		[
@@ -105,22 +106,28 @@ test('formatModelRefreshMessage reports initial models.dev fetch without change 
 })
 
 
-test('buildModelUpdateSuggestionText mentions subagent only outside ~/.hal', () => {
-	const suggestion = {
-		family: 'GPT 5',
-		currentModel: 'openai/gpt-5.4',
-		newModel: 'openai/gpt-5.5',
-		displayName: 'GPT 5.5',
+test('buildAliasUpdateSuggestionText mentions config mapping and subagent only outside ~/.hal', () => {
+	const origConfigData = config.data
+	config.data = { models: { default: 'gpt' } } as Record<string, any>
+	const updates = [
+		{ aliases: ['openai', 'gpt'], oldModel: 'openai/gpt-5.4', newModel: 'openai/gpt-5.5' },
+		{ aliases: ['claude', 'opus'], oldModel: 'anthropic/claude-opus-4-6', newModel: 'anthropic/claude-opus-4-7' },
+	]
+
+	try {
+		const outside = runtime.buildAliasUpdateSuggestionText(updates, '/work/project')
+		expect(outside).toContain('openai**, **gpt')
+		expect(outside).toContain('openai/gpt-5.4')
+		expect(outside).toContain('openai/gpt-5.5')
+		expect(outside).toContain("config.ason sets the default model to **gpt**, which currently maps to **openai/gpt-5.5**.")
+		expect(outside).toContain('spawn a subagent in ~/.hal')
+
+		const inside = runtime.buildAliasUpdateSuggestionText(updates, HAL_DIR)
+		expect(inside).toContain('update those aliases in ~/.hal')
+		expect(inside).not.toContain('spawn a subagent')
+	} finally {
+		config.data = origConfigData
 	}
-
-	const outside = runtime.buildModelUpdateSuggestionText(suggestion, '/work/project')
-	expect(outside).toContain('GPT 5')
-	expect(outside).toContain('openai/gpt-5.5')
-	expect(outside).toContain('spawn a subagent in ~/.hal')
-
-	const inside = runtime.buildModelUpdateSuggestionText(suggestion, HAL_DIR)
-	expect(inside).toContain('update the default model here in ~/.hal')
-	expect(inside).not.toContain('spawn a subagent')
 })
 
 

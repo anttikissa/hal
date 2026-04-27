@@ -95,8 +95,8 @@ const state = {
 	busy: new Map<string, boolean>(),
 	// Activity text per session — "generating...", "running 3 tool(s)...", etc.
 	activity: new Map<string, string>(),
-	// Most-recently viewed tab order. Used to choose where focus returns after
-	// closing a tab, matching browser behavior better than "always pick left/right".
+	// Most-recently viewed tab order. Used as a fallback when session-list changes
+	// do not close the active tab, such as cross-client closes or startup recovery.
 	recentTabs: [] as string[],
 	startupSummaryShown: false,
 }
@@ -203,8 +203,9 @@ export function pickActiveSessionAfterSessionListChange(opts: {
 	recentTabs: string[]
 	pendingOpen: 'open' | 'fork' | 'resume' | false
 	openedSessionId: string
+	returnToSession?: string
 }): string {
-	const { previousSession, previousIndex, previousLength, newSessionIds, recentTabs, pendingOpen, openedSessionId } = opts
+	const { previousSession, previousIndex, previousLength, newSessionIds, recentTabs, pendingOpen, openedSessionId, returnToSession } = opts
 	const openIds = new Set(newSessionIds)
 	const grew = newSessionIds.length > previousLength
 	const shrank = newSessionIds.length < previousLength
@@ -213,20 +214,14 @@ export function pickActiveSessionAfterSessionListChange(opts: {
 	if (grew && pendingOpen && openedSessionId) return openedSessionId
 	if (previousSession && openIds.has(previousSession)) return previousSession
 
-	// If the active tab disappeared, prefer the most recently viewed surviving
-	// tab. That preserves the Chrome-like opener behavior: fork/open a child tab,
-	// close it immediately, and focus returns to the tab you came from instead of
-	// blindly moving right.
+	// If the active tab disappeared, return to its opener only for tabs that this
+	// client explicitly created as a child/new tab. Otherwise use Chrome's
+	// deterministic behavior: pick the tab that shifted into the same numeric slot
+	// (the right neighbor), or fall back left if the closed tab was last.
 	if (shrank && activeTabClosed) {
-		for (let i = recentTabs.length - 1; i >= 0; i--) {
-			const sessionId = recentTabs[i]!
-			if (openIds.has(sessionId)) return sessionId
-		}
-
-		// No remembered predecessor survived. Stay at the same numeric slot when
-		// possible; if the closed tab was last, this naturally falls back left.
-		const sameSlot = Math.min(previousIndex, newSessionIds.length - 1)
-		return newSessionIds[sameSlot] ?? ''
+		if (returnToSession && openIds.has(returnToSession)) return returnToSession
+		const rightNeighborSlot = Math.min(previousIndex, newSessionIds.length - 1)
+		return newSessionIds[rightNeighborSlot] ?? ''
 	}
 
 	for (let i = recentTabs.length - 1; i >= 0; i--) {
@@ -347,7 +342,12 @@ function startupSummaryText(tab: Tab): string {
 	return lines.join('\n')
 }
 
+function shouldShowStartupSummary(tab: Tab): boolean {
+	return !tab.history.some((block) => block.type !== 'startup')
+}
+
 function addStartupSummaryToTab(tab: Tab): void {
+	if (!shouldShowStartupSummary(tab)) return
 	addLocalBlockToTab(tab, { type: 'startup', text: startupSummaryText(tab), ts: Date.now() })
 }
 
@@ -632,6 +632,7 @@ function prevTab(): void {
 // Track pending tab actions so a sessions update can focus the reopened/new tab.
 // Fork stays distinct because it also copies the draft from the parent.
 let pendingOpen: 'open' | 'fork' | 'resume' | false = false
+const returnToBySession = new Map<string, string>()
 
 function pendingTabActionForPrompt(text: string): 'open' | 'fork' | 'resume' | false {
 	const trimmed = text.trim()
@@ -801,9 +802,14 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		}
 	}
 	const grew = newTabs.length > previousTabs.length
+	const returnToSession = returnToBySession.get(previousSession)
 	state.tabs = newTabs
 	const openIds = new Set(newTabs.map((tab) => tab.sessionId))
 	pruneRecentTabs(openIds)
+	for (const sessionId of returnToBySession.keys()) {
+		if (!openIds.has(sessionId)) returnToBySession.delete(sessionId)
+	}
+	if (grew && openedSessionId && previousSession && (isOpen || isFork)) returnToBySession.set(openedSessionId, previousSession)
 
 	const targetSession = previousTabs.length === 0 && preferredSession && openIds.has(preferredSession)
 		? preferredSession
@@ -815,6 +821,7 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 			recentTabs: state.recentTabs,
 			pendingOpen,
 			openedSessionId,
+			returnToSession,
 		})
 
 	const nextIndex = newTabs.findIndex((tab) => tab.sessionId === targetSession)
@@ -938,6 +945,8 @@ function handleEvent(event: any): void {
 			addBlockToTab(event.sessionId ?? null, {
 				type: 'assistant',
 				text: event.text,
+				model: typeof event.model === 'string' ? event.model : undefined,
+				synthetic: event.synthetic === true,
 				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 			})
 		}
@@ -1149,6 +1158,7 @@ function resetForTests(): void {
 	onTabSwitch = null
 	onDraftArrived = null
 	pendingOpen = false
+	returnToBySession.clear()
 	hostLockState = null
 	ipcStateFile = null
 	state.recentTabs = []
