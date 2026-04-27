@@ -9,6 +9,17 @@ import { tokenCalibration } from '../token-calibration.ts'
 import { models } from '../models.ts'
 import { HAL_DIR } from '../state.ts'
 import { config } from '../config.ts'
+
+test('runtime exposes in-memory active sessions for eval helpers', () => {
+	const origActiveSessions = [...runtime.state.activeSessions]
+	try {
+		runtime.state.activeSessions = ['04-one', '04-two', '04-three']
+		expect(runtime.state.activeSessions[2]).toBe('04-three')
+	} finally {
+		runtime.state.activeSessions = origActiveSessions
+	}
+})
+
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
 	const picked = runtime.pickMostRecentlyClosedSessionId(
 		[

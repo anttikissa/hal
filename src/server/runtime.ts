@@ -22,9 +22,11 @@ import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
 import { startup } from '../startup.ts'
 
-let activeSessions: string[] = []
-let activeRuntimePid: number | null = null
-let stopPromptWatch: (() => void) | null = null
+const state = {
+	activeSessions: [] as string[],
+	activeRuntimePid: null as number | null,
+	stopPromptWatch: null as (() => void) | null,
+}
 
 const USER_PAUSED_TEXT = '[paused]'
 const RESTARTED_TEXT = '[restarted]'
@@ -45,7 +47,7 @@ function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name' | 'topic'>): string 
 }
 
 function activeMetas(): SessionMeta[] {
-	return activeSessions
+	return state.activeSessions
 		.map((sessionId) => sessionStore.loadSessionMeta(sessionId))
 		.filter((meta): meta is SessionMeta => !!meta)
 }
@@ -66,7 +68,7 @@ function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { 
 	if (plan.kind === 'resume') {
 		const resumed = sessionStore.activateSession(plan.sessionId)
 		if (!resumed) return { ok: false, reason: `Session ${plan.sessionId} not found` }
-		activeSessions.push(plan.sessionId)
+		state.activeSessions.push(plan.sessionId)
 		sessionStore.updateMeta(plan.sessionId, { closedAt: undefined })
 		return { ok: true, sessionId: plan.sessionId }
 	}
@@ -76,25 +78,25 @@ function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { 
 
 function insertSessionAfter(sessionId: string, afterId?: string): void {
 	if (!afterId) {
-		activeSessions.push(sessionId)
+		state.activeSessions.push(sessionId)
 		return
 	}
-	const idx = activeSessions.findIndex((id) => id === afterId)
+	const idx = state.activeSessions.findIndex((id) => id === afterId)
 	if (idx < 0) {
-		activeSessions.push(sessionId)
+		state.activeSessions.push(sessionId)
 		return
 	}
-	activeSessions.splice(idx + 1, 0, sessionId)
+	state.activeSessions.splice(idx + 1, 0, sessionId)
 }
 
 function moveSessionToIndex(sessionId: string, targetIndex: number): boolean {
-	const fromIndex = activeSessions.findIndex((id) => id === sessionId)
+	const fromIndex = state.activeSessions.findIndex((id) => id === sessionId)
 	if (fromIndex < 0) return false
-	const clampedIndex = Math.max(0, Math.min(activeSessions.length - 1, targetIndex))
+	const clampedIndex = Math.max(0, Math.min(state.activeSessions.length - 1, targetIndex))
 	if (fromIndex === clampedIndex) return false
-	const [id] = activeSessions.splice(fromIndex, 1)
+	const [id] = state.activeSessions.splice(fromIndex, 1)
 	if (!id) return false
-	activeSessions.splice(clampedIndex, 0, id)
+	state.activeSessions.splice(clampedIndex, 0, id)
 	return true
 }
 
@@ -233,8 +235,8 @@ async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec
 	await dispatchPromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone), parent.id)
 }
 function restartPromptWatch(): void {
-	stopPromptWatch?.()
-	stopPromptWatch = context.watchPromptFiles(
+	state.stopPromptWatch?.()
+	state.stopPromptWatch = context.watchPromptFiles(
 		activeMetas().map((meta) => ({ sessionId: meta.id, cwd: meta.workingDir ?? process.cwd() })),
 		(change) => {
 			emitInfo(change.sessionId, `[system reload] ${change.name} changed: ${change.path}`)
@@ -244,7 +246,7 @@ function restartPromptWatch(): void {
 
 function broadcastInfo(text: string, level: 'info' | 'error' = 'info'): void {
 	const ts = new Date().toISOString()
-	for (const sessionId of activeSessions) {
+	for (const sessionId of state.activeSessions) {
 		// Startup metadata refresh can finish before a just-started client begins
 		// tailing IPC events. Persist the notice too so it survives that race and
 		// remains visible in history after reloads.
@@ -385,8 +387,8 @@ async function dispatchPromptCommand(sessionId: string, text: string, source?: s
 function closeSession(sessionId: string, openReplacement = false): void {
 	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closeWhenDone: false })
 	sessionStore.deactivateSession(sessionId)
-	activeSessions = activeSessions.filter((id) => id !== sessionId)
-	if (openReplacement && activeSessions.length === 0) createSessionTab({})
+	state.activeSessions = state.activeSessions.filter((id) => id !== sessionId)
+	if (openReplacement && state.activeSessions.length === 0) createSessionTab({})
 	broadcastSessions()
 }
 
@@ -492,7 +494,7 @@ function runCompact(sessionId: string): void {
 }
 
 function handleCommand(cmd: Command): void {
-	const sessionId = cmd.sessionId ?? activeSessions[0]
+	const sessionId = cmd.sessionId ?? state.activeSessions[0]
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
@@ -526,7 +528,7 @@ function handleCommand(cmd: Command): void {
 				forceNew: 'forceNew' in cmd ? cmd.forceNew : undefined,
 				forkSessionId: 'forkSessionId' in cmd ? cmd.forkSessionId : undefined,
 				afterSessionId: 'afterSessionId' in cmd ? cmd.afterSessionId : undefined,
-				activeSessions: activeSessions.length,
+				activeSessions: state.activeSessions.length,
 				commandCreatedAt: cmd.createdAt,
 			})
 			if ('forkSessionId' in cmd) {
@@ -541,7 +543,7 @@ function handleCommand(cmd: Command): void {
 			} else if (cmd.cwd) {
 				const target = activateTargetForCwd(cmd.cwd)
 				if (!target.ok) {
-					const sid = sessionId ?? activeSessions[0]
+					const sid = sessionId ?? state.activeSessions[0]
 					if (sid) emitInfo(sid, target.reason, 'error')
 					break
 				}
@@ -578,10 +580,10 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'resume': {
 			const selector = (cmd.selector ?? '').trim()
-			const resumeId = sessionStore.resolveResumeTarget(sessionStore.loadAllSessionMetas(), new Set(activeSessions), selector)
+			const resumeId = sessionStore.resolveResumeTarget(sessionStore.loadAllSessionMetas(), new Set(state.activeSessions), selector)
 			if (!resumeId) {
 				emitInfo(
-					sessionId ?? activeSessions[0] ?? '',
+					sessionId ?? state.activeSessions[0] ?? '',
 					selector ? 'No matching closed session.' : 'No closed sessions.',
 					selector ? 'error' : 'info',
 				)
@@ -589,10 +591,10 @@ function handleCommand(cmd: Command): void {
 			}
 			const resumed = sessionStore.activateSession(resumeId)
 			if (!resumed) {
-				emitInfo(sessionId ?? activeSessions[0] ?? resumeId, `Session ${resumeId} not found`, 'error')
+				emitInfo(sessionId ?? state.activeSessions[0] ?? resumeId, `Session ${resumeId} not found`, 'error')
 				break
 			}
-			activeSessions.push(resumeId)
+			state.activeSessions.push(resumeId)
 			sessionStore.updateMeta(resumeId, { closedAt: undefined })
 			broadcastSessions()
 			break
@@ -612,28 +614,28 @@ function handleCommand(cmd: Command): void {
 }
 
 function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): { ok: true; sessionId?: string } | { ok: false; reason: string } {
-	activeRuntimePid = process.pid
-	activeSessions = []
-	stopPromptWatch?.()
-	stopPromptWatch = null
+	state.activeRuntimePid = process.pid
+	state.activeSessions = []
+	state.stopPromptWatch?.()
+	state.stopPromptWatch = null
 	sessionStore.deactivateAllSessions()
 	const metas = sessionStore.loadSessionMetas()
-	activeSessions = metas.map((meta) => meta.id)
+	state.activeSessions = metas.map((meta) => meta.id)
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
 		const target = activateTargetForCwd(opts.targetCwd)
 		if (!target.ok) return target
 		startupSessionId = target.sessionId
-	} else if (activeSessions.length === 0) {
+	} else if (state.activeSessions.length === 0) {
 		startupSessionId = createSessionTab({}).id
-		if (!signal.aborted && activeRuntimePid === process.pid) broadcastSessions()
+		if (!signal.aborted && state.activeRuntimePid === process.pid) broadcastSessions()
 	}
 	restartPromptWatch()
 	signal.addEventListener('abort', () => {
-		stopPromptWatch?.()
-		stopPromptWatch = null
+		state.stopPromptWatch?.()
+		state.stopPromptWatch = null
 		const ts = new Date().toISOString()
-		for (const sessionId of activeSessions) {
+		for (const sessionId of state.activeSessions) {
 			if (!agentLoop.isActive(sessionId)) continue
 			sessionStore.appendHistorySync(sessionId, [{ type: 'info', text: RESTARTED_TEXT, ts }])
 			agentLoop.abort(sessionId, '')
@@ -643,18 +645,18 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		state.busy = {}
 		state.activity = {}
 	})
-	if (activeSessions.length > 0) syncSharedState()
+	if (state.activeSessions.length > 0) syncSharedState()
 	void refreshModelMetadata()
 	openaiUsage.start(signal)
 	if (metas.length > 0) {
 		setTimeout(() => {
-			if (signal.aborted || activeRuntimePid !== process.pid) return
+			if (signal.aborted || state.activeRuntimePid !== process.pid) return
 			broadcastSessions()
 		}, 0)
 	}
 	void (async () => {
-		for (const sessionId of activeSessions) {
-			if (signal.aborted || activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
+		for (const sessionId of state.activeSessions) {
+			if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
 			const entries = sessionStore.loadAllHistory(sessionId)
 			if (entries.length === 0) continue
 			const interrupted = sessionStore.detectInterruptedTools(entries)
@@ -678,14 +680,14 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	})()
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
-			if (signal.aborted || activeRuntimePid !== process.pid) break
+			if (signal.aborted || state.activeRuntimePid !== process.pid) break
 			if (!ipc.ownsHostLock()) break
-			const hasLiveSession = !cmd.sessionId || activeSessions.includes(cmd.sessionId)
+			const hasLiveSession = !cmd.sessionId || state.activeSessions.includes(cmd.sessionId)
 			if (!hasLiveSession && cmd.type !== 'open' && cmd.type !== 'resume') continue
 			try {
 				handleCommand(cmd)
 			} catch (err: any) {
-				const sid = cmd.sessionId ?? activeSessions[0]
+				const sid = cmd.sessionId ?? state.activeSessions[0]
 				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error')
 			}
 		}
@@ -705,7 +707,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	void import('../runtime/inbox.ts')
 		.then(({ inbox }) => {
 			inbox.startWatching(signal, (sessionId, text, source) => {
-				if (!activeSessions.includes(sessionId)) return
+				if (!state.activeSessions.includes(sessionId)) return
 				queuePromptCommand(sessionId, text, source)
 			})
 		})
@@ -716,6 +718,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 }
 
 export const runtime = {
+	state,
 	startRuntime,
 	emitInfo,
 	pickMostRecentlyClosedSessionId: sessionStore.pickMostRecentlyClosedSessionId,
