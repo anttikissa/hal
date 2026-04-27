@@ -8,9 +8,9 @@ const IMAGE_DIR = '/tmp/hal/images'
 const PASTE_DIR = '/tmp/hal/paste'
 
 const config = {
-	// Multiline pasted text with at least this many lines is written to
-	// /tmp/hal/paste/NNNN.txt and represented in the prompt as [path]. Shorter
-	// multiline pastes stay inline. Read at paste time so /config takes effect.
+	// Multiline pasted text with more than this many lines is written to
+	// /tmp/hal/paste/NNNN.txt and represented in the prompt as [path]. Pastes at
+	// or below the limit stay inline. Read at paste time so /config takes effect.
 	multilinePasteFileLineLimit: 5,
 }
 
@@ -88,7 +88,7 @@ function lineCount(text: string): number {
 
 function shouldSaveMultilinePaste(text: string): boolean {
 	if (!text.includes('\n')) return false
-	return lineCount(text) >= config.multilinePasteFileLineLimit
+	return lineCount(text) > config.multilinePasteFileLineLimit
 }
 
 const IMAGE_EXTS = /\.(png|jpg|jpeg|gif|webp)$/i

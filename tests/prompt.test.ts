@@ -28,8 +28,15 @@ describe('prompt', () => {
 		expect(prompt.submitText()).toBe(pasted)
 	})
 
-	test('pasted multiline buffers at the file line limit show temp files but keep text for submission', () => {
+	test('pasted multiline buffers at the file line limit stay inline', () => {
 		const pasted = 'before\ninside\nafter\nline4\nline5'
+		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		expect(prompt.text()).toBe(pasted)
+		expect(prompt.submitText()).toBe(pasted)
+	})
+
+	test('pasted multiline buffers over the file line limit show temp files but keep text for submission', () => {
+		const pasted = 'before\ninside\nafter\nline4\nline5\nline6'
 		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		const first = prompt.text()
 		expect(first).toMatch(/^\[\/tmp\/hal\/paste\/\d{4}\.txt\]$/)
@@ -44,10 +51,16 @@ describe('prompt', () => {
 
 	test('paste file line limit is configurable', () => {
 		clipboard.config.multilinePasteFileLineLimit = 3
-		const pasted = 'one\ntwo\nthree'
-		prompt.handleKey({ key: '', char: pasted, shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		const atLimit = 'one\ntwo\nthree'
+		prompt.handleKey({ key: '', char: atLimit, shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		expect(prompt.text()).toBe(atLimit)
+		expect(prompt.submitText()).toBe(atLimit)
+
+		prompt.clear()
+		const overLimit = 'one\ntwo\nthree\nfour'
+		prompt.handleKey({ key: '', char: overLimit, shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		expect(prompt.text()).toMatch(/^\[\/tmp\/hal\/paste\/\d{4}\.txt\]$/)
-		expect(prompt.submitText()).toBe(pasted)
+		expect(prompt.submitText()).toBe(overLimit)
 	})
 
 	test('alt-left and alt-right move by words', () => {
