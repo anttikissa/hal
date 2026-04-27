@@ -8,6 +8,8 @@ import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { STATE_DIR } from '../state.ts'
+import { ipc } from '../ipc.ts'
+import { protocol } from '../protocol.ts'
 import { ason } from '../utils/ason.ts'
 
 let counter = 0
@@ -21,12 +23,16 @@ interface EvalInput {
 	code?: string
 }
 
+type EvalInfoLevel = 'info' | 'warning' | 'error'
+
 interface EvalRuntimeContext {
 	sessionId: string
 	cwd: string
 	halDir: string
 	stateDir: string
 	signal?: AbortSignal
+	/** Emit a visible info/warning/error line in the current Hal session. */
+	info(text: string, level?: EvalInfoLevel): void
 }
 
 function normalizeInput(input: unknown): EvalInput {
@@ -34,6 +40,17 @@ function normalizeInput(input: unknown): EvalInput {
 	return {
 		code: raw.code === undefined ? undefined : String(raw.code),
 	}
+}
+
+function emitInfo(sessionId: string, text: string, level: EvalInfoLevel = 'info'): void {
+	ipc.appendEvent({
+		id: protocol.eventId(),
+		type: 'info',
+		text,
+		level,
+		sessionId,
+		createdAt: new Date().toISOString(),
+	})
 }
 
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
@@ -59,7 +76,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const wrapped = [
 		...imports,
 		imports.length ? '' : undefined,
-		'export default async (ctx: { sessionId: string; cwd: string; halDir: string; stateDir: string; signal?: AbortSignal }) => {',
+		'export default async (ctx: { sessionId: string; cwd: string; halDir: string; stateDir: string; signal?: AbortSignal; info(text: string, level?: \'info\' | \'warning\' | \'error\'): void }) => {',
 		...body,
 		'}',
 		'',
@@ -77,6 +94,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 			halDir: join(STATE_DIR, '..'),
 			stateDir: STATE_DIR,
 			signal: ctx.signal,
+			info: (text: string, level: EvalInfoLevel = 'info') => emitInfo(ctx.sessionId, text, level),
 		}
 
 		// Race eval against abort signal and timeout.
@@ -117,7 +135,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 const evalToolDef: Tool = {
 	name: 'eval',
 	description:
-		'Execute TypeScript in the Hal process. Has access to runtime internals via ctx (sessionId, cwd, halDir, stateDir). Use `return` to return a value. Use standard `import` for module access.',
+		'Execute TypeScript in the Hal process. Has access to runtime internals via ctx (sessionId, cwd, halDir, stateDir, info). Use `return` to return a value. Use `ctx.info(text)` for visible session messages. Use standard `import` for module access.',
 	parameters: {
 		code: {
 			type: 'string',
