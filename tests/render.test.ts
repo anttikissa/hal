@@ -177,6 +177,18 @@ describe('render', () => {
 		expect(clean).not.toContain('│')
 	})
 
+	test('chrome order is status, prompt, then help at the bottom', () => {
+		prompt.setText('hello')
+		const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+		const statusLine = lines.findIndex((line) => line.includes('server:111'))
+		const promptLine = lines.findIndex((line) => line === 'hello')
+		const helpLine = lines.findIndex((line) => line.includes('enter: send prompt'))
+		expect(statusLine).toBeGreaterThanOrEqual(0)
+		expect(promptLine).toBeGreaterThan(statusLine)
+		expect(helpLine).toBe(promptLine + 1)
+		expect(lines[lines.length - 1]).toContain('enter: send prompt')
+	})
+
 	test('status line shows local pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('server:111')
@@ -408,7 +420,7 @@ describe('render', () => {
 		const promptLine = withText.findIndex((line) => line === 'x')
 		expect(emptyHelp).toContain('ctrl-t: new')
 		expect(promptLine).toBeGreaterThan(0)
-		expect(withText[promptLine - 1]).toBe('')
+		expect(withText[promptLine + 1]).toBe('')
 		expect(withText.length).toBe(empty.length)
 	})
 

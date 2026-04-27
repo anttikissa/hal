@@ -9,17 +9,18 @@ terminal UI. Read this document to understand the rules of the game.
 
 ## Layout
 
-Bottom-anchored, five sections:
+Bottom-anchored, six sections:
 
 ```
 [history lines...]   — per-tab, append-only, ALL of them
 [padding]            — blank lines to stabilize prompt position across tabs
 [tab bar]            — [1]  2   3  — brackets for active, spaces for inactive
-[status bar]         — line count, peak, mode
-[prompt]             — "> " + user input
+[status bar]         — session, cwd, model, usage, server/client details
+[prompt]             — user input, may be multiline
+[help bar]           — bottom key hints, always one row (even when empty)
 ```
 
-Chrome = tab bar + status + prompt (1+ lines, multiline editing).
+Chrome = tab bar + status + prompt (1+ lines, multiline editing) + help bar.
 
 ## Tabs
 
