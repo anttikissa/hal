@@ -20,7 +20,7 @@ test('eval renders returned objects as ASON instead of JSON', async () => {
 	expect(out).not.toContain('"tabs"')
 })
 
-test('eval ctx.info emits a visible session info event', async () => {
+test('eval can call public runtime.emitInfo for visible session messages', async () => {
 	const events: any[] = []
 	const origAppendEvent = ipc.appendEvent
 	ipc.appendEvent = (event: any) => {
@@ -28,7 +28,7 @@ test('eval ctx.info emits a visible session info event', async () => {
 	}
 	try {
 		const out = await evalTool.execute({
-			code: "ctx.info('hello from eval')\nreturn 'done'",
+			code: `import { runtime } from '${process.cwd()}/src/server/runtime.ts'\nruntime.emitInfo(ctx.sessionId, 'hello from eval')\nreturn 'done'`,
 		}, { sessionId: testSessionId, cwd: process.cwd() })
 
 		expect(out).toBe('done')

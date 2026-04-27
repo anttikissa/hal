@@ -717,6 +717,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 
 export const runtime = {
 	startRuntime,
+	emitInfo,
 	pickMostRecentlyClosedSessionId: sessionStore.pickMostRecentlyClosedSessionId,
 	resolveResumeTarget: sessionStore.resolveResumeTarget,
 	shouldAutoContinue,
