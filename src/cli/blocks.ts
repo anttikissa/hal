@@ -299,6 +299,11 @@ function formatRead(output: string): ToolFormatResult {
 	return { bodyLines: [`${toLines(output.trimEnd()).length} lines, ${formatSize(Buffer.byteLength(output, 'utf8'))}`] }
 }
 
+function quoteToolArg(value: unknown): string {
+	const text = typeof value === 'string' ? value : '?'
+	return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`
+}
+
 const toolSpecs: Record<string, ToolSpec> = {
 	bash: {
 		title(input) {
@@ -333,7 +338,7 @@ const toolSpecs: Record<string, ToolSpec> = {
 		format: formatEdit,
 	},
 	eval: { title: () => 'Eval', command: (input) => input?.code ?? undefined },
-	grep: { title: (input) => `Grep ${input?.pattern ?? '?'} in ${input?.path ?? '?'}`, format: (output) => countIndicator(output, 'No matches found.', 'matches') },
+	grep: { title: (input) => `Grep ${quoteToolArg(input?.pattern)} in ${input?.path ?? '?'}`, format: (output) => countIndicator(output, 'No matches found.', 'matches') },
 	glob: { title: (input) => `Glob ${input?.pattern ?? '?'} in ${input?.path ?? '.'}`, format: (output) => countIndicator(output, 'No files found.', 'files') },
 	google: { title: (input) => `Google ${input?.query ?? '?'}` },
 	analyze_history: { title: (input) => `Analyze history${input?.sessionId ? ` ${input.sessionId}` : ''}` },

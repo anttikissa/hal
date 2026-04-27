@@ -228,6 +228,17 @@ test('spawn_agent block renders full input args', () => {
 	expect(body).toContain('Queued subagent spawn from 04-lfp')
 })
 
+test('grep block quotes its search pattern in header', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'grep',
+		input: { pattern: 'const MODEL_GROUPS', path: '/Users/antti/.hal/src' },
+	}
+
+	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	expect(header).toContain('Grep "const MODEL_GROUPS" in /Users/antti/.hal/src')
+})
+
 test('edit block header shows affected hashline refs', () => {
 	const block: Block = {
 		type: 'tool',
