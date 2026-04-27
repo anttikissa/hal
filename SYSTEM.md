@@ -68,21 +68,35 @@ Multiple forks from the same parent share the same prefix of conversation histor
 
 ## Eval tool
 
-The eval tool executes TypeScript **inside the Hal process**. Use it to inspect or modify runtime state, call internal functions, or do anything bash can't (bash runs out-of-process). IMPORTANT: first read the code of the part you are accessing. You're doing brain surgery on yourself — get it right the first time.
+Use the `eval` tool for runtime inspection and small hot patches. It runs TypeScript inside the current Hal process with `ctx` available (`ctx.cwd`, `ctx.halDir`, `ctx.stateDir`, `ctx.sessionId`).
 
-- **`code`** parameter: TypeScript function body. `ctx` is in scope with `{ sessionId, halDir, stateDir, cwd }`. Use `return` to return a value.
-- **Imports**: use `~/` prefix, e.g. `import { ipc } from '~/ipc.ts'`
-- **Audit**: scripts persist in `state/sessions/<id>/eval/` — never deleted.
+Best practices:
 
-### Hot-patchable modules
+- **Imports**: use the `~/` alias for Hal source files, e.g. `import { ipc } from '~/ipc.ts'`.
+- **Return values**: use `return ...` to send useful data back to yourself; avoid huge returns.
+- **Module convention**: most modules export one mutable namespace object, such as `ipc`, `client`, or `context`.
+- **Call functions through that object**: `return ipc.readState()` rather than trying to import private helpers.
+- **Monkey patch by replacing object fields**: save the original function, install a wrapper, and call the original from the wrapper.
+- **Keep patches small and reversible**: prefer diagnostic logging or narrow bug fixes; edit source files for permanent changes.
 
-Most modules expose a mutable namespace object (e.g. `ipc.ts` exports `ipc`, `context.ts` exports `context`). Cross-module calls go through these objects, so eval patches take effect immediately.
+Short example:
 
 ```ts
 import { ipc } from '~/ipc.ts'
 import { log } from '~/utils/log.ts'
-const orig = ipc.getState
-ipc.getState = () => { log.info('patched getState'); return orig() }
+
+const origReadState = ipc.readState
+ipc.readState = () => {
+	log.debug('eval patch: ipc.readState called')
+	return origReadState()
+}
+
+try {
+	const state = ipc.readState()
+	return { tabs: state.sessions.length, sessionId: ctx.sessionId }
+} finally {
+	ipc.readState = origReadState
+}
 ```
 
 # SYSTEM.md ends here.
