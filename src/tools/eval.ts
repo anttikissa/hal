@@ -8,6 +8,7 @@ import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { STATE_DIR } from '../state.ts'
+import { ason } from '../utils/ason.ts'
 
 let counter = 0
 
@@ -105,7 +106,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 		const result = await Promise.race(promises)
 		if (result === undefined) return 'undefined'
-		return typeof result === 'string' ? result : JSON.stringify(result)
+		return typeof result === 'string' ? result : ason.stringify(result, 'short')
 	} catch (err: unknown) {
 		if (ctx.signal?.aborted) return '[interrupted]'
 		if (err instanceof Error && err.stack) return err.stack
