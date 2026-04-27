@@ -378,16 +378,18 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 	return resolveMarkers(lines)
 }
 
-function formatBashCommand(cmd: string, cols: number): string[] {
+function formatToolCommand(cmd: string, cols: number, shellContinuations: boolean): string[] {
 	const rawLines = cmd.split('\n')
 	if (rawLines.length === 1 && visLen(cmd) <= cols) return [cmd]
 	const result: string[] = []
 	for (let i = 0; i < rawLines.length; i++) {
 		const isLastRaw = i === rawLines.length - 1
-		const wrapWidth = isLastRaw ? cols : cols - 2
+		const wrapWidth = shellContinuations ? Math.max(1, cols - 2) : cols
 		const wrapped = wordWrap(rawLines[i]!, wrapWidth)
-		for (let j = 0; j < wrapped.length; j++)
-			result.push(isLastRaw && j === wrapped.length - 1 ? wrapped[j]! : `${wrapped[j]!} \\`)
+		for (let j = 0; j < wrapped.length; j++) {
+			const isLastWrapped = isLastRaw && j === wrapped.length - 1
+			result.push(shellContinuations && !isLastWrapped ? `${wrapped[j]!} \\` : wrapped[j]!)
+		}
 	}
 	return result
 }
@@ -412,7 +414,7 @@ function blockContent(block: Block, cols: number): string[] {
 		const lines: string[] = []
 		const spec = getToolSpec(block.name)
 		const command = spec.command?.(block.input)
-		if (command) lines.push(...formatBashCommand(command, cols))
+		if (command) lines.push(...formatToolCommand(command, cols, block.name === 'bash'))
 		const details = spec.details?.(block.input)
 		if (details) pushDimWrapped(lines, details, cols)
 		if (!block.output) return lines
