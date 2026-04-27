@@ -6,6 +6,7 @@ import { cursor } from '../src/cli/cursor.ts'
 import { popup } from '../src/client/popup.ts'
 import { helpBar } from '../src/cli/help-bar.ts'
 import { openaiUsage } from '../src/openai-usage.ts'
+import { colors } from '../src/cli/colors.ts'
 import { version } from '../src/version.ts'
 
 openaiUsage.init()
@@ -310,6 +311,21 @@ describe('render', () => {
 			expect(output).toContain('\x1b[2m')
 		} finally {
 			cursor.isVisible = originalIsVisible
+		}
+	})
+
+	test('busy tab minicursor uses the main HAL cursor color', () => {
+		const tab = client.currentTab()!
+		client.state.busy.set(tab.sessionId, true)
+
+		const originalCursor = colors.input.cursor
+		colors.input.cursor = '\x1b[38;5;201m'
+		try {
+			const output = captureOutput(() => render.draw())
+			expect(output).toContain(`${colors.input.cursor}▪`)
+			expect(output).not.toContain('\x1b[38;5;75m▪')
+		} finally {
+			colors.input.cursor = originalCursor
 		}
 	})
 

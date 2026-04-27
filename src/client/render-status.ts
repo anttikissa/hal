@@ -25,12 +25,16 @@ const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
 const ANSI_DIM = '\x1b[2m'
-const INPUT_CURSOR_COLOR = '\x1b[38;5;75m' // matches prompt cursor color
+function halCursorColor(): string {
+	// Match the main HAL cursor, including live colors.ason reloads and the
+	// assistant-color fallback when no explicit input cursor color is configured.
+	return colors.input.cursor || colors.assistant.fg
+}
 
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
 
-	if (busy) return { char: '▪', color: INPUT_CURSOR_COLOR, blinks: true }
+	if (busy) return { char: '▪', color: halCursorColor(), blinks: true }
 
 	// Alerts beat the generic "done unseen" checkmark. This matters for cases
 	// like "Hit max iterations" where generation finished, but the tab still
