@@ -244,6 +244,38 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
+	test('startup openCwd queues without blocking and focuses the host-created tab', async () => {
+		const shared = makeSharedState(['s1'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: (() => void) | undefined
+		const appendedCommands: any[] = []
+		ipc.readState = () => shared
+		ipc.appendCommand = (command) => {
+			appendedCommands.push(command)
+		}
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+
+		const ac = new AbortController()
+		client.startClient(ac.signal, { preferredCwd: '/work/project', openCwd: '/work/project' })
+		await Bun.sleep(10)
+		expect(client.currentTab()?.sessionId).toBe('s1')
+		expect(appendedCommands).toEqual([{ type: 'open', cwd: '/work/project', sessionId: 's1' }])
+
+		shared.sessions = [
+			{ id: 's1', tab: 1, name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
+			{ id: 's2', tab: 2, name: 'tab 2', cwd: '/work/project', model: 'openai/gpt-5.4' },
+		]
+		onIpcChange?.()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.sessionId).toBe('s2')
+	})
+
 	test('restart tab wins even when another tab matches the requested cwd', async () => {
 		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
 			lastTab: 's34',

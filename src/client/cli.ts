@@ -424,7 +424,7 @@ function handleAppKey(k: KeyEvent): boolean {
 	return false
 }
 
-function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string } = {}): void {
+function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
 

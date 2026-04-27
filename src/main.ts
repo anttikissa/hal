@@ -50,7 +50,7 @@ const ac = new AbortController()
 let electionTimer: ReturnType<typeof setInterval> | null = null
 let cleaned = false
 let memoryTimer: ReturnType<typeof setTimeout> | null = null
-let startupSessionId: string | undefined
+let startupTarget: { preferredSessionId?: string; openCwd?: string } = {}
 
 function failStartup(message: string, code = 1): never {
 	process.stderr.write(`${message}\n`)
@@ -59,27 +59,34 @@ function failStartup(message: string, code = 1): never {
 	process.exit(code)
 }
 
-async function ensureClientStartupTarget(cwd: string): Promise<string> {
-	const deadline = Date.now() + startup.config.targetWaitMs
-	let commandQueued = false
+function prepareClientStartupTarget(cwd: string): { preferredSessionId?: string; openCwd?: string } {
+	const shared = ipc.readState()
+	const plan = startup.planTarget({
+		cwd,
+		openSessions: shared.sessions,
+		allSessions: sessionStore.loadAllSessionMetas(),
+	})
 
-	while (Date.now() <= deadline) {
-		const shared = ipc.readState()
-		const plan = startup.planTarget({
+	if (plan.kind === 'use-open') {
+		log.info('Client startup target already open', {
 			cwd,
-			openSessions: shared.sessions,
-			allSessions: sessionStore.loadAllSessionMetas(),
+			sessionId: plan.sessionId,
+			openSessions: shared.sessions.length,
+			stateUpdatedAt: shared.updatedAt,
 		})
-		if (plan.kind === 'use-open') return plan.sessionId
-		if (plan.kind === 'refuse') failStartup(plan.reason)
-		if (!commandQueued) {
-			ipc.appendCommand({ type: 'open', cwd, createdAt: new Date().toISOString() })
-			commandQueued = true
-		}
-		await Bun.sleep(startup.config.targetPollMs)
+		return { preferredSessionId: plan.sessionId }
 	}
 
-	failStartup(`Cannot open ${cwd}: host did not open the requested directory.`)
+	if (plan.kind === 'refuse') failStartup(plan.reason)
+
+	log.info('Client startup target queued for host', {
+		cwd,
+		plan: plan.kind,
+		hostPid,
+		openSessions: shared.sessions.length,
+		stateUpdatedAt: shared.updatedAt,
+	})
+	return { openCwd: cwd }
 }
 
 function syncHostVersionState(): void {
@@ -107,7 +114,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	syncHostVersionState()
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
-	startupSessionId = started.sessionId
+	startupTarget.preferredSessionId = started.sessionId
 	ipc.appendEvent({
 		type: 'runtime-start',
 		pid: process.pid,
@@ -159,7 +166,7 @@ if (isHost) {
 	becomeHost('start')
 }
 else {
-	startupSessionId = await ensureClientStartupTarget(startupCwd)
+	startupTarget = prepareClientStartupTarget(startupCwd)
 }
 
 process.on('exit', cleanup)
@@ -172,4 +179,4 @@ queueMemoryCheck()
 
 electionTimer = setInterval(tickElection, 100)
 
-cli.startCli(ac.signal, { preferredCwd: startupCwd, preferredSessionId: startupSessionId })
+cli.startCli(ac.signal, { preferredCwd: startupCwd, ...startupTarget })

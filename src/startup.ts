@@ -6,8 +6,6 @@ import type { SharedSessionInfo } from './ipc.ts'
 // same fatal rule: never attach the user to a different project silently.
 const config = {
 	maxTabs: 40,
-	targetWaitMs: 5_000,
-	targetPollMs: 25,
 }
 
 

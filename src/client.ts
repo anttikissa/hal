@@ -1157,7 +1157,7 @@ function resetForTests(): void {
 	state.hostVersion = ''
 }
 
-function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string } = {}): void {
+function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {
 	startWatchingHostLock()
 	const shared = startWatchingIpcState()
 	openaiUsage.onChange(() => onChange(false))
@@ -1169,6 +1169,11 @@ function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferr
 	})()
 
 	initializeSessions(shared, opts)
+	if (opts.openCwd) {
+		pendingOpen = 'open'
+		ipc.appendCommand({ type: 'open', cwd: opts.openCwd, sessionId: currentTab()?.sessionId })
+		log.info('Client queued startup open command', { cwd: opts.openCwd, sessionId: currentTab()?.sessionId ?? null })
+	}
 	onChange(false)
 
 	// Background-load blobs + remaining tabs after first paint

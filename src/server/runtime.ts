@@ -59,6 +59,7 @@ function planTargetForCwd(cwd: string): ReturnType<typeof startup.planTarget> {
 
 function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { ok: false; reason: string } {
 	const plan = planTargetForCwd(cwd)
+	log.info('Runtime planned cwd activation', { cwd, plan: plan.kind, sessionId: 'sessionId' in plan ? plan.sessionId : undefined })
 	if (plan.kind === 'use-open') return { ok: true, sessionId: plan.sessionId }
 	if (plan.kind === 'refuse') return { ok: false, reason: plan.reason }
 	if (plan.kind === 'resume') {
@@ -507,6 +508,15 @@ function handleCommand(cmd: Command): void {
 			break
 		}
 		case 'open': {
+			log.info('Runtime handling open command', {
+				sessionId,
+				cwd: 'cwd' in cmd ? cmd.cwd : undefined,
+				forceNew: 'cwd' in cmd ? cmd.forceNew : undefined,
+				forkSessionId: 'forkSessionId' in cmd ? cmd.forkSessionId : undefined,
+				afterSessionId: 'afterSessionId' in cmd ? cmd.afterSessionId : undefined,
+				activeSessions: activeSessions.length,
+				commandCreatedAt: cmd.createdAt,
+			})
 			if ('forkSessionId' in cmd) {
 				const child = createSessionTab({ sourceId: cmd.forkSessionId })
 				const msg = `forked ${cmd.forkSessionId} → ${child.id}`
