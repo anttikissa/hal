@@ -2,6 +2,10 @@
 //
 // This module owns only presentation logic for the tab bar, status line,
 // help bar, and prompt. Diff/fullscreen/cursor state still lives in render.ts.
+//
+// Eval-friendliness: every helper lives on the exported `renderStatus`
+// namespace, and intra-module calls go through it. That way any helper
+// (e.g. tokenUsageLabel) can be hot-patched at runtime without restart.
 
 import { visLen, clipVisual } from '../utils/strings.ts'
 import { oklch } from '../utils/oklch.ts'
@@ -25,6 +29,9 @@ const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
 const ANSI_DIM = '\x1b[2m'
+
+type TabLabelMode = 'wide' | 'name' | 'num'
+
 function halCursorColor(): string {
 	// Match the main HAL cursor, including live colors.ason reloads and the
 	// assistant-color fallback when no explicit input cursor color is configured.
@@ -34,7 +41,7 @@ function halCursorColor(): string {
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
 
-	if (busy) return { char: '▪', color: halCursorColor(), blinks: true }
+	if (busy) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
 
 	// Alerts beat the generic "done unseen" checkmark. This matters for cases
 	// like "Hit max iterations" where generation finished, but the tab still
@@ -58,7 +65,7 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 
 function hasAnimatedIndicators(): boolean {
 	for (const tab of client.state.tabs) {
-		if (tabIndicator(tab).blinks) return true
+		if (renderStatus.tabIndicator(tab).blinks) return true
 	}
 	return false
 }
@@ -66,15 +73,11 @@ function hasAnimatedIndicators(): boolean {
 // Render the 1-char indicator. Animated indicators pulse between bright and dim
 // phases instead of disappearing, so a busy tab never looks idle.
 function renderIndicator(tab: Tab, baseColor: string): string {
-	const ind = tabIndicator(tab)
+	const ind = renderStatus.tabIndicator(tab)
 	if (!ind.char) return ''
 	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
 	return `${ANSI_DIM}${ind.color}${ind.char}${RESET}${baseColor}`
 }
-
-// Tab bar: prefers [n dir name], wrapping once before falling back to shorter labels.
-// Each tab shows a 1-char status indicator between the number and title.
-type TabLabelMode = 'wide' | 'name' | 'num'
 
 function tabDir(tab: Tab): string {
 	return tab.cwd.split('/').filter(Boolean).pop() ?? ''
@@ -85,17 +88,19 @@ function tabInner(num: number, ind: string, text?: string): string {
 	return `${num}${ind}`
 }
 
+// Tab bar: prefers [n dir name], wrapping once before falling back to shorter labels.
+// Each tab shows a 1-char status indicator between the number and title.
 function tabLabel(tab: Tab, i: number, mode: TabLabelMode): string {
 	const active = client.state.activeTab
-	const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
+	const ind = renderStatus.renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
 	const name = tab.name || tab.sessionId
-	const dir = tabDir(tab)
+	const dir = renderStatus.tabDir(tab)
 	const text = mode === 'wide'
 		? (dir && dir !== name ? `${dir} ${name}` : name)
 		: mode === 'name'
 			? name
 			: ''
-	const content = tabInner(i + 1, ind, text)
+	const content = renderStatus.tabInner(i + 1, ind, text)
 	if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
 	return `${DIM} ${content} ${RESET}`
 }
@@ -121,23 +126,23 @@ function wrapTabLabels(labels: string[], cols: number): string[] | null {
 function buildTabBarLines(cols: number): string[] {
 	const tabs = client.state.tabs
 	for (const mode of ['wide', 'name', 'num'] as const) {
-		const rendered = tabs.map((tab, i) => tabLabel(tab, i, mode))
+		const rendered = tabs.map((tab, i) => renderStatus.tabLabel(tab, i, mode))
 		const joined = rendered.join('')
 		if (visLen(joined) <= cols) return [joined]
 	}
 
 	for (const mode of ['name', 'num'] as const) {
-		const wrapped = wrapTabLabels(tabs.map((tab, i) => tabLabel(tab, i, mode)), cols)
+		const wrapped = renderStatus.wrapTabLabels(tabs.map((tab, i) => renderStatus.tabLabel(tab, i, mode)), cols)
 		if (wrapped) return wrapped
 	}
 
-	const terse = tabs.map((tab, i) => tabLabel(tab, i, 'num'))
+	const terse = tabs.map((tab, i) => renderStatus.tabLabel(tab, i, 'num'))
 	return [clipVisual(terse.join(''), cols)]
 }
 
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	for (const line of buildTabBarLines(cols)) lines.push(line)
+	for (const line of renderStatus.buildTabBarLines(cols)) lines.push(line)
 }
 
 // Shorten a path for display: replace $HOME with ~, then abbreviate.
@@ -162,7 +167,7 @@ function colorText(text: string, color: string, base: string): string {
 }
 
 function heatText(text: string, pct: number, base: string): string {
-	return colorText(text, oklch.usageFg(pct), base)
+	return renderStatus.colorText(text, oklch.usageFg(pct), base)
 }
 
 function hasCustomSessionName(tab: Tab): boolean {
@@ -174,29 +179,29 @@ function currentHalDir(): string {
 }
 
 function sessionStatusLabel(tab: Tab, base: string): string {
-	if (!hasCustomSessionName(tab)) return tab.sessionId
-	return `${colorText(tab.name, statusHighlightColor(), base)} (${tab.sessionId})`
+	if (!renderStatus.hasCustomSessionName(tab)) return tab.sessionId
+	return `${renderStatus.colorText(tab.name, renderStatus.statusHighlightColor(), base)} (${tab.sessionId})`
 }
 
 function cwdStatusLabel(tab: Tab, base: string): string {
-	const cwd = shortenPath(tab.cwd)
+	const cwd = renderStatus.shortenPath(tab.cwd)
 	if (!cwd) return ''
-	const color = tab.cwd === currentHalDir() ? colors.assistant.fg : statusHighlightColor()
-	return colorText(cwd, color, base)
+	const color = tab.cwd === renderStatus.currentHalDir() ? colors.assistant.fg : renderStatus.statusHighlightColor()
+	return renderStatus.colorText(cwd, color, base)
 }
 
 function modelStatusLabel(modelId: string, base: string): string {
 	const display = models.displayModel(modelId)
 	if (!display) return ''
-	return colorText(display, statusHighlightColor(), base)
+	return renderStatus.colorText(display, renderStatus.statusHighlightColor(), base)
 }
 
 function contextStatusLabel(tab: Tab, base: string): string {
 	if (tab.contextMax <= 0) return ''
 	const pct = Math.round((tab.contextUsed / tab.contextMax) * 100)
-	const used = heatText(models.formatTokenCount(tab.contextUsed), pct, base)
+	const used = renderStatus.heatText(models.formatTokenCount(tab.contextUsed), pct, base)
 	const max = models.formatTokenCount(tab.contextMax)
-	const percent = heatText(`${pct}%`, pct, base)
+	const percent = renderStatus.heatText(`${pct}%`, pct, base)
 	return `${used}/${max} (${percent})`
 }
 
@@ -213,7 +218,7 @@ function hostMismatchBadge(): string {
 }
 
 function serverStatusLabel(): string {
-	if (client.state.role === 'client') return `client:${client.state.pid} / server:${client.state.hostPid ?? '?'}${hostMismatchBadge()}`
+	if (client.state.role === 'client') return `client:${client.state.pid} / server:${client.state.hostPid ?? '?'}${renderStatus.hostMismatchBadge()}`
 	return `server:${client.state.pid}`
 }
 
@@ -231,7 +236,7 @@ function tokenUsageLabel(usage: TokenUsage): string {
 	// these out for billing, but to the user it's all "stuff we sent up".
 	const totalInput = usage.input + usage.cacheRead + usage.cacheCreation
 	if (totalInput <= 0 && usage.output <= 0) return ''
-	return `⬆ ${formatTotalTokens(totalInput)} ⬇ ${formatTotalTokens(usage.output)}`
+	return `⬆ ${renderStatus.formatTotalTokens(totalInput)} ⬇ ${renderStatus.formatTotalTokens(usage.output)}`
 }
 
 function subscriptionStatusLabel(base: string): string {
@@ -240,11 +245,11 @@ function subscriptionStatusLabel(base: string): string {
 	const windows: string[] = []
 	if (current.primary) {
 		const pct = Math.round(current.primary.usedPercent)
-		windows.push(`5h ${heatText(`${pct}%`, pct, base)}`)
+		windows.push(`5h ${renderStatus.heatText(`${pct}%`, pct, base)}`)
 	}
 	if (current.secondary) {
 		const pct = Math.round(current.secondary.usedPercent)
-		windows.push(`7d ${heatText(`${pct}%`, pct, base)}`)
+		windows.push(`7d ${renderStatus.heatText(`${pct}%`, pct, base)}`)
 	}
 	const slot = current.index != null && current.total ? ` ${current.index + 1}/${current.total}` : ''
 	if (windows.length === 0) return `Sub${slot}`
@@ -253,7 +258,7 @@ function subscriptionStatusLabel(base: string): string {
 
 function renderStatusLine(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	const base = statusBaseColor()
+	const base = renderStatus.statusBaseColor()
 	const tab = client.currentTab()
 	if (!tab) {
 		const blank = cols > 1 ? ` ${' '.repeat(Math.max(0, cols - 2))} ` : ' '
@@ -264,16 +269,16 @@ function renderStatusLine(lines: string[]): void {
 	const modelId = tab.model || models.defaultModel()
 	const provider = models.providerName(modelId)
 	const isSub = !auth.isApiKey(provider)
-	const left = joinStatusParts([
-		sessionStatusLabel(tab, base),
-		cwdStatusLabel(tab, base),
-		modelStatusLabel(modelId, base),
-		contextStatusLabel(tab, base),
+	const left = renderStatus.joinStatusParts([
+		renderStatus.sessionStatusLabel(tab, base),
+		renderStatus.cwdStatusLabel(tab, base),
+		renderStatus.modelStatusLabel(modelId, base),
+		renderStatus.contextStatusLabel(tab, base),
 	])
 
-	const server = serverStatusLabel()
-	const tokenLabel = tokenUsageLabel(tab.usage)
-	const plan = provider === 'openai' && isSub ? subscriptionStatusLabel(base) : ''
+	const server = renderStatus.serverStatusLabel()
+	const tokenLabel = renderStatus.tokenUsageLabel(tab.usage)
+	const plan = provider === 'openai' && isSub ? renderStatus.subscriptionStatusLabel(base) : ''
 	const innerWidth = Math.max(0, cols - 2)
 	let showServer = !!server
 	let showTokens = !!tokenLabel
@@ -281,7 +286,7 @@ function renderStatusLine(lines: string[]): void {
 	let inner = ''
 
 	while (true) {
-		const right = joinStatusParts([
+		const right = renderStatus.joinStatusParts([
 			showServer ? server : '',
 			showTokens ? tokenLabel : '',
 			showPlan ? plan : '',
@@ -345,7 +350,41 @@ function renderPrompt(lines: string[]): void {
 // Help bar always counts as 1 line (even when empty) to prevent jumps.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	return buildTabBarLines(cols).length + 2 + prompt.buildPrompt(cols).lines.length
+	return renderStatus.buildTabBarLines(cols).length + 2 + prompt.buildPrompt(cols).lines.length
 }
 
-export const renderStatus = { chromeLines, hasAnimatedIndicators, renderTabBar, renderStatusLine, renderHelpBar, renderPrompt }
+export const renderStatus = {
+	// Public (called from render.ts and elsewhere)
+	chromeLines,
+	hasAnimatedIndicators,
+	renderTabBar,
+	renderStatusLine,
+	renderHelpBar,
+	renderPrompt,
+	// Internal helpers, exposed on the namespace for hot-patching via eval.
+	halCursorColor,
+	tabIndicator,
+	renderIndicator,
+	tabDir,
+	tabInner,
+	tabLabel,
+	wrapTabLabels,
+	buildTabBarLines,
+	shortenPath,
+	statusBaseColor,
+	statusHighlightColor,
+	colorText,
+	heatText,
+	hasCustomSessionName,
+	currentHalDir,
+	sessionStatusLabel,
+	cwdStatusLabel,
+	modelStatusLabel,
+	contextStatusLabel,
+	joinStatusParts,
+	hostMismatchBadge,
+	serverStatusLabel,
+	formatTotalTokens,
+	tokenUsageLabel,
+	subscriptionStatusLabel,
+}
