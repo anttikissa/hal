@@ -252,11 +252,12 @@ test('grep block quotes its search pattern in header', () => {
 	expect(header).toContain('Grep "const MODEL_GROUPS" in /Users/antti/.hal/src')
 })
 
-test('eval block shows multiline code without shell continuation backslashes', () => {
+test('eval block separates returned output from code', () => {
 	const block: Block = {
 		type: 'tool',
 		name: 'eval',
 		input: { code: 'let count = 0\nif (count === 0) {\n\treturn count\n}' },
+		output: '0',
 	}
 
 	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
@@ -265,7 +266,20 @@ test('eval block shows multiline code without shell continuation backslashes', (
 		'if (count === 0) {',
 		'\treturn count',
 		'}',
+		'── Result ──────────────────────────────────────────────────────────────────────────────────────────',
+		'0',
 	])
+})
+
+test('eval block omits result separator when there is no returned output', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'eval',
+		input: { code: 'let count = 0' },
+	}
+
+	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
+	expect(body).toEqual(['let count = 0'])
 })
 
 test('bash block still uses continuation backslashes for multiline commands', () => {

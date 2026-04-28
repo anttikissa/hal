@@ -20,6 +20,14 @@ test('eval renders returned objects as ASON instead of JSON', async () => {
 	expect(out).not.toContain('"tabs"')
 })
 
+test('eval returns no tool output when code does not return a value', async () => {
+	const out = await evalTool.execute({
+		code: 'let x = 1',
+	}, { sessionId: testSessionId, cwd: process.cwd() })
+
+	expect(out).toBe('')
+})
+
 test('eval can call public runtime.emitInfo for visible session messages', async () => {
 	const events: any[] = []
 	const origAppendEvent = ipc.appendEvent

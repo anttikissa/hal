@@ -257,7 +257,7 @@ type ToolSpec = {
 	title?: (input?: any) => string
 	command?: (input?: any) => string | undefined
 	details?: (input?: any) => string | undefined
-	format?: (output: string) => ToolFormatResult
+	format?: (output: string, cols: number) => ToolFormatResult
 }
 
 function formatSize(bytes: number): string {
@@ -309,6 +309,13 @@ function formatRead(output: string): ToolFormatResult {
 	return { bodyLines: [`${toLines(output.trimEnd()).length} lines, ${formatSize(Buffer.byteLength(output, 'utf8'))}`] }
 }
 
+function formatEval(output: string, cols: number): ToolFormatResult {
+	if (!output) return { bodyLines: [] }
+	const label = '── Result '
+	const width = Math.max(0, cols - visLen(label))
+	return { bodyLines: [`${label}${'─'.repeat(width)}`], suppressOutput: false }
+}
+
 function quoteToolArg(value: unknown): string {
 	const text = typeof value === 'string' ? value : '?'
 	return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`
@@ -347,7 +354,7 @@ const toolSpecs: Record<string, ToolSpec> = {
 		},
 		format: formatEdit,
 	},
-	eval: { title: () => 'Eval', command: (input) => input?.code ?? undefined },
+	eval: { title: () => 'Eval', command: (input) => input?.code ?? undefined, format: formatEval },
 	grep: { title: (input) => `Grep ${quoteToolArg(input?.pattern)} in ${input?.path ?? '?'}`, format: (output) => countIndicator(output, 'No matches found.', 'matches') },
 	glob: { title: (input) => `Glob ${input?.pattern ?? '?'} in ${input?.path ?? '.'}`, format: (output) => countIndicator(output, 'No files found.', 'files') },
 	google: { title: (input) => `Google ${input?.query ?? '?'}` },
@@ -419,7 +426,7 @@ function blockContent(block: Block, cols: number): string[] {
 		if (details) pushDimWrapped(lines, details, cols)
 		if (!block.output) return lines
 		const output = sanitizeTerminalText(stripAnsiSequences(block.output))
-		const format = spec.format?.(output) ?? { bodyLines: [] }
+		const format = spec.format?.(output, cols) ?? { bodyLines: [] }
 		for (const line of format.bodyLines) lines.push(clipLine(line, cols))
 		if (format.suppressOutput) return lines
 		const outputLines = output.trimEnd().split('\n')
