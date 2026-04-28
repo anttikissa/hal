@@ -225,17 +225,9 @@ function formatTotalTokens(total: number): string {
 	return models.formatTokenCount(total)
 }
 
-function tokenUsageLabel(
-	usage: TokenUsage,
-	long = false,
-): string {
-	const total = usage.input + usage.output + usage.cacheRead + usage.cacheCreation
-	if (total <= 0) return ''
-	// Show cache hit rate when cacheRead is a meaningful fraction of total input tokens processed.
-	const totalInput = usage.input + usage.cacheRead + usage.cacheCreation
-	const hitRate = totalInput > 0 ? Math.round((usage.cacheRead / totalInput) * 100) : 0
-	const cacheHint = hitRate >= 5 ? ` CR:${hitRate}%` : ''
-	return `${formatTotalTokens(total)} ${long ? 'tokens' : 'tok'}${cacheHint}`
+function tokenUsageLabel(usage: TokenUsage): string {
+	if (usage.input <= 0 && usage.output <= 0) return ''
+	return `⬆ ${formatTotalTokens(usage.input)} ⬇ ${formatTotalTokens(usage.output)}`
 }
 
 function subscriptionStatusLabel(base: string): string {
@@ -276,27 +268,20 @@ function renderStatusLine(lines: string[]): void {
 	])
 
 	const server = serverStatusLabel()
-	const tokenShort = tokenUsageLabel(tab.usage, false)
-	const tokenLong = tokenUsageLabel(tab.usage, true)
+	const tokenLabel = tokenUsageLabel(tab.usage)
 	const plan = provider === 'openai' && isSub ? subscriptionStatusLabel(base) : ''
 	const innerWidth = Math.max(0, cols - 2)
 	let showServer = !!server
-	let showTokens = !!tokenShort
+	let showTokens = !!tokenLabel
 	let showPlan = !!plan
 	let inner = ''
 
 	while (true) {
-		const shortRight = joinStatusParts([
+		const right = joinStatusParts([
 			showServer ? server : '',
-			showTokens ? tokenShort : '',
+			showTokens ? tokenLabel : '',
 			showPlan ? plan : '',
 		])
-		const longRight = joinStatusParts([
-			showServer ? server : '',
-			showTokens ? tokenLong : '',
-			showPlan ? plan : '',
-		])
-		const right = showTokens && tokenLong && innerWidth - visLen(left) - visLen(longRight) >= 10 ? longRight : shortRight
 		const needsDrop = right && innerWidth - visLen(left) - visLen(right) < 1
 		if (needsDrop) {
 			if (showServer) {
