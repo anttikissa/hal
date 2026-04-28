@@ -132,6 +132,63 @@ test('enter on empty paused tab sends continue', () => {
 	}
 })
 
+test('enter on empty busy error tab sends continue', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origTabs = client.state.tabs.slice()
+	const origActiveTab = client.state.activeTab
+
+	client.state.tabs.length = 0
+	client.state.tabs.push(makeTab({ history: [{ type: 'error', text: 'Stream read timed out (no data for 120000ms)' }] as any[] }))
+	client.state.activeTab = 0
+	prompt.clear()
+	client.state.busy.set('s1', true)
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+		expect(handled).toBe(true)
+		expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.busy.clear()
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.activeTab = origActiveTab
+	}
+})
+
+test('enter on empty busy retry status does not interrupt backoff', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origTabs = client.state.tabs.slice()
+	const origActiveTab = client.state.activeTab
+
+	client.state.tabs.length = 0
+	client.state.tabs.push(makeTab({
+		history: [
+			{ type: 'error', text: '429: rate limited' },
+			{ type: 'info', text: 'Rate limited — retrying in 10s' },
+		] as any[],
+	}))
+	client.state.activeTab = 0
+	prompt.clear()
+	client.state.busy.set('s1', true)
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+		expect(handled).toBe(true)
+		expect(commands).toEqual([])
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.busy.clear()
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.activeTab = origActiveTab
+	}
+})
+
 test('enter on empty normal tab does not send continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

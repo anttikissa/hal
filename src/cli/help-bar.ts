@@ -62,10 +62,13 @@ function reset(): void {
 }
 
 function deriveState(busy: boolean, hasText: boolean, continueAction: ContinueAction | false = false): HelpState {
-	if (busy) return 'streaming'
-	if (hasText) return 'idle-text'
+	if (hasText) {
+		if (busy) return 'streaming'
+		return 'idle-text'
+	}
 	if (continueAction === 'retry') return 'idle-retry'
 	if (continueAction === 'continue') return 'idle-continue'
+	if (busy) return 'streaming'
 	return 'idle-empty'
 }
 

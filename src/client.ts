@@ -699,11 +699,17 @@ function isContinuableStatusBlock(block: Block): boolean {
 
 function continueActionForTab(tab: Tab | null): ContinueAction | false {
 	if (!tab) return false
-	if (state.busy.get(tab.sessionId)) return false
+	const busy = state.busy.get(tab.sessionId) ?? false
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
 		if (block.type === 'tool') continue
-		if (block.type === 'info' && !isContinuableStatusBlock(block)) continue
+		if (block.type === 'info' && !isContinuableStatusBlock(block)) {
+			// While a turn is actively retrying/backing off it may have an older
+			// red error followed by a status info line. Do not let that older
+			// error turn Enter into an abort/retry shortcut.
+			if (busy) return false
+			continue
+		}
 		return continuableActionForBlock(block)
 	}
 	return false

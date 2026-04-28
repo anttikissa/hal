@@ -502,8 +502,14 @@ function handleCommand(cmd: Command): void {
 			break
 		}
 		case 'continue': {
-			if (!sessionId || agentLoop.isActive(sessionId)) return
-			void runGeneration(sessionId, '')
+			if (!sessionId) return
+			void (async () => {
+				if (agentLoop.isActive(sessionId)) {
+					agentLoop.abort(sessionId, '')
+					await Bun.sleep(50)
+				}
+				void runGeneration(sessionId, '')
+			})()
 			break
 		}
 		case 'abort': {
