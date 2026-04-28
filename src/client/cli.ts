@@ -149,6 +149,11 @@ function onSigcont(): void {
 	draw(true)
 }
 
+function handleResize(): void {
+	writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
+	draw(true)
+}
+
 function handleStdinClosed(): void {
 	// Non-interactive callers (tests, scripts, editor integrations) often pipe
 	// stdin to Hal. If that pipe closes, there is nobody left to drive the UI,
@@ -469,10 +474,12 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 	perf.mark('First draw')
 	draw()
 	perf.mark('First draw done')
-	process.stdout.on('resize', () => {
-		writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
-		draw(true)
-	})
+	process.stdout.on('resize', handleResize)
+	process.on('SIGWINCH', handleResize)
+	signal.addEventListener('abort', () => {
+		process.stdout.off('resize', handleResize)
+		process.off('SIGWINCH', handleResize)
+	}, { once: true })
 
 	perf.mark('Ready for input')
 

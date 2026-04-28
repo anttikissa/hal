@@ -3,11 +3,54 @@ import { cli } from './cli.ts'
 import { client } from '../client.ts'
 import { ipc } from '../ipc.ts'
 import { prompt } from '../cli/prompt.ts'
+import { render } from './render.ts'
+import { cursor } from '../cli/cursor.ts'
 
 function makeRawSink(): { lines: string[]; emit: (text: string) => void } {
 	const lines: string[] = []
 	return { lines, emit: (text) => lines.push(text) }
 }
+
+function withPatched<T extends object, K extends keyof T>(object: T, key: K, value: T[K], run: () => void): void {
+	const original = object[key]
+	object[key] = value
+	try { run() }
+	finally { object[key] = original }
+}
+
+test('SIGWINCH forces a redraw after terminal resize', () => {
+	let forceDraws = 0
+	const sigwinch: Array<() => void> = []
+	const on = ((event: string, listener: () => void) => {
+		if (event === 'SIGWINCH') sigwinch.push(listener)
+		return process
+	}) as typeof process.on
+	const off = ((event: string, listener: () => void) => {
+		if (event === 'SIGWINCH') sigwinch.splice(sigwinch.indexOf(listener), 1)
+		return process
+	}) as typeof process.off
+	withPatched(process, 'on', on, () => {
+		withPatched(process, 'off', off, () => {
+			withPatched(process.stdout, 'write', (() => true) as typeof process.stdout.write, () => {
+				withPatched(process.stdin, 'on', (() => process.stdin) as typeof process.stdin.on, () => {
+					withPatched(process.stdin, 'resume', (() => process.stdin) as typeof process.stdin.resume, () => {
+						withPatched(render, 'draw', ((force = false) => { if (force) forceDraws++ }) as typeof render.draw, () => {
+							withPatched(client, 'startClient', (() => {}) as typeof client.startClient, () => {
+								withPatched(cursor, 'start', (() => {}) as typeof cursor.start, () => {
+									const controller = new AbortController()
+									cli.startCli(controller.signal)
+									for (const listener of sigwinch) listener()
+									controller.abort()
+								})
+							})
+						})
+					})
+				})
+			})
+		})
+	})
+	expect(forceDraws).toBe(1)
+})
 
 
 test('raw formatter keeps printable ascii readable', () => {
