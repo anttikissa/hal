@@ -21,7 +21,6 @@ import { renderHistory } from './render-history.ts'
 import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts'
 import { renderStatus } from './render-status.ts'
 import { cursor as blinkCursor } from '../cli/cursor.ts'
-import { visLen } from '../utils/strings.ts'
 
 const config = {
 	forkHistoryDimFactor: 0.85,
@@ -146,22 +145,6 @@ function positionCursor(from: number, target: { row: number; col: number }): str
 	return moveCursor(from, target.row) + `\r${CSI}${target.col}G${CSI}?25h`
 }
 
-function reflowedLineRows(line: string, cols: number): number {
-	return Math.max(1, Math.ceil(visLen(line) / Math.max(1, cols)))
-}
-
-function reflowedFrameRows(lines: string[], cols: number): number {
-	let total = 0
-	for (const line of lines) total += reflowedLineRows(line, cols)
-	return total
-}
-
-function reflowedRowsAboveCursor(cols: number): number {
-	let total = 0
-	for (let i = 0; i < cursorRow; i++) total += reflowedLineRows(prevLines[i] ?? '', cols)
-	return total + Math.floor(Math.max(0, cursorCol - 1) / Math.max(1, cols))
-}
-
 // ── Paint ────────────────────────────────────────────────────────────────────
 //
 // Three paths:
@@ -195,20 +178,16 @@ function draw(force = false): void {
 	// ── Force repaint ──
 	if (force) {
 		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
-		const previousRows = reflowedFrameRows(prevLines, process.stdout.columns || 80)
-		if (previousRows > rows) fullscreen = true
 		if (!fullscreen) {
 			// Grow mode: move to top of our content, clear downward.
-			// On terminal width shrink, the previously painted rows may have
-			// reflowed before this handler ran, so cursorRow undercounts. Recompute
-			// from prevLines at the current width before moving up.
-			const up = Math.min(reflowedRowsAboveCursor(process.stdout.columns || 80), rows - 1)
+			// Scrollback (shell history above our content) is preserved.
+			const up = Math.min(cursorRow, rows - 1)
 			out.push('\r')
 			if (up > 0) out.push(`${CSI}${up}A`)
 			out.push(`${CSI}J`)
 		} else {
 			// Full mode: nuke everything. Scrollback has stale content
-			// from other tabs or width-reflowed rows that we can't selectively update.
+			// from other tabs that we can't selectively update.
 			out.push(`${CSI}2J${CSI}H${CSI}3J`)
 		}
 		for (let i = 0; i < lines.length; i++) {
