@@ -235,17 +235,18 @@ describe('render', () => {
 		}
 	})
 
-	test('status line shows input and output tokens with arrows even with cache reads', () => {
+	test('status line shows TOTAL input tokens (uncached + cache reads + cache creation)', () => {
 		const tab = client.currentTab()!
 		tab.model = 'openai/gpt-5.4'
 		tab.contextUsed = 39_000
 		tab.contextMax = 1_050_000
-		tab.usage = { input: 378, output: 2_200, cacheRead: 42_000, cacheCreation: 0 }
+		// 378 fresh + 42k cache reads + 1k cache writes = 43_378 total sent up
+		tab.usage = { input: 378, output: 2_200, cacheRead: 42_000, cacheCreation: 1_000 }
 		const originalCols = process.stdout.columns
 		Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true })
 		try {
 			const clean = stripAnsi(captureOutput(() => render.draw()))
-			expect(clean).toContain('⬆ 378 ⬇ 2.2k')
+			expect(clean).toContain('⬆ 43k ⬇ 2.2k')
 			expect(clean).not.toContain('tokens CR:')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

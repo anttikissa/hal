@@ -226,8 +226,12 @@ function formatTotalTokens(total: number): string {
 }
 
 function tokenUsageLabel(usage: TokenUsage): string {
-	if (usage.input <= 0 && usage.output <= 0) return ''
-	return `⬆ ${formatTotalTokens(usage.input)} ⬇ ${formatTotalTokens(usage.output)}`
+	// "input" should reflect TOTAL tokens sent to the model — uncached input
+	// plus prompt-cache reads and cache-creation writes. The provider splits
+	// these out for billing, but to the user it's all "stuff we sent up".
+	const totalInput = usage.input + usage.cacheRead + usage.cacheCreation
+	if (totalInput <= 0 && usage.output <= 0) return ''
+	return `⬆ ${formatTotalTokens(totalInput)} ⬇ ${formatTotalTokens(usage.output)}`
 }
 
 function subscriptionStatusLabel(base: string): string {

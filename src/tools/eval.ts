@@ -118,11 +118,11 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 const evalToolDef: Tool = {
 	name: 'eval',
 	description:
-		'Execute TS in the Hal process. Has access to runtime internals via ctx (see EvalRuntimeContext in eval.ts). `return` returns a value. Use standard `import` for module access.',
+		'Execute TS in the Hal process. Has access to runtime internals via ctx (see EvalRuntimeContext in eval.ts). `return` returns a value. Use `require` for module access.',
 	parameters: {
 		code: {
 			type: 'string',
-			description: 'TS code. Imports go at top, body is wrapped in async function with ctx in scope.',
+			description: 'TS code with ctx in scope',
 		},
 	},
 	required: ['code'],

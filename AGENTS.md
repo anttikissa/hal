@@ -1,35 +1,49 @@
-# WHAT ARE WE DOING?
+# This is Hal
 
-We're rewriting Hal from scratch, once again.
-
-Working on it started to become hard - performance regressions, recurring terminal rendering bugs, etc. all the time. It seems that it grew too big and too complex that the current high end AI models couldn't handle them. So let's simplify.
-
-The directory prev/ contains the old codebase, which is now frozen. You can reference it. examples/ contains historical reviews, two analyses and all previous editions.
+Hal is a coding agent. If you're Hal, you already saw the system prompt - otherwise read if from SYSTEM.md.
 
 # Rules
 
 - Use bun - never node, npm or npx
 - Use red-green TDD.
-- First run the tests.
-- After every step, run `./test` — it runs tsgo type checking, oxlint and all tests. No other verification needed. No bundling.
-- Run `bun cloc` to check line count — our budget for core code is 10 thousand lines
+- First run the tests with './test'.
+`./test` runs tsgo type checking, oxlint and all tests.
+- Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, of flags that user never asked for or that nobody uses.
+- Run `bun cloc` to check line count — our budget for core code is 15 thousand lines
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
 - Tabs, not spaces (except for package.json)
-- We use ASON here, not JSON, for our own files. Do not introduce new JSON files or JSON-based local state/config formats unless an external tool/protocol forces it.
+- Thinking of using JSON? Don't, use ASON instead. Use .ason or .asonl for internal state files, ason.stringify() to format data for reading ('short' if oneline result is needed)
 
 # Code style
 
 - `function f() {}` over `const f = () => {}`
-- Comment code thoroughly. It is intended for a human to read, and nobody has time to dig into
-  your nested for loops and ternaries and break statements and complex logic. Even better,
-  avoid complex logic in the first place!
-- Especially non-obvious tricks like "process.kill(serverPid, 0)" which looks like killing a
-  process need to be explained - if it looks like one thing and does another, comment.
+- Comment code well, not obvious things but stuff that helps humans to understand why things are written that way
+- Write human-readable, simple and boring code. Avoid complex ternaries, multiple nested for loops, etc. Try to avoid complex logic in the first place.
+- Explain non-obvious tricks like "process.kill(serverPid, 0)" (which looks like it kills a process but doesn't) need to be explained
+
+# Eval-friendliness
+
+All modules should be designed to be safely hot-patchable at runtime through the eval tool. This means:
+
+A single mutable namespace object:
+```
+// ipc.ts
+function appendEvent(event: any): void { ... }
+function appendCommand(command: any): void { ... }
+let state = {
+	events: [],
+	// ...
+}
+export const ipc = { state, appendEvent, appendCommand, ... }
+```
+
+Avoid constants because those cannot be changed with eval.
 
 # Logging and user-visible messages
 
 - For developer diagnostics, use `src/utils/log.ts` (`log.info`, `log.error`, `log.debug`).
 - For user-visible notices, send proper Hal info events/history entries through the runtime/session mechanisms (for example `emitInfo`, `recordSessionInfo`, or IPC events), not terminal printing.
+- In eval code, use `runtime.emitInfo(ctx.sessionId, 'message')` for a visible line in the current session; use `log.debug()` only for file diagnostics.
 
 # Git
 
@@ -58,14 +72,24 @@ import { ipc } from './ipc.ts'
 ipc.appendEvent({ type: 'foo' })
 ```
 
-Stateful modules should include `state` field, and tweakable "constants" like maxConcurrentTasks
-should go to `config` field. Non-tweakable constants like ANSI sequences can be const FOO = '...'
+Stateful modules should include a `state` field. Tweakable "constants" like maxConcurrentTasks
+should go to a `config` field. True invariants like ANSI sequences can stay as `const FOO = ...`.
+
+Eval friendliness is not "avoid `const`". Use `const` freely for local bindings and true constants.
+Avoid import-time snapshots of values that should change at runtime, such as env-derived config,
+feature flags, and replaceable callbacks. Put those values on the exported namespace object,
+`state`, or `config`, and read them at call time.
 
 This enables the eval tool to inspect and hot-patch anything at runtime:
 ```ts
 import { client } from '~/client.ts'
 import { log } from '~/utils/log.ts'
-client.addEntry = (text) => { log.info('patched addEntry'); origAddEntry(text) }
+
+const origAddEntry = client.addEntry
+client.addEntry = (text) => {
+	log.info('patched addEntry')
+	return origAddEntry(text)
+}
 ```
 
 # Startup initialization rule
