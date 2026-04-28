@@ -228,14 +228,14 @@ describe('render', () => {
 			expect(clean).toContain('/tmp')
 			expect(clean).toContain('GPT 5.4')
 			expect(clean).toContain('39k/1050k (4%)')
-			expect(clean).toContain('Σ⬆ 600k ⬇ 1.1M')
+			expect(clean).toContain('⬆ 600k ⬇ 1.1M')
 			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
 	})
 
-	test('status line labels token arrows as cumulative uncached input and output', () => {
+	test('status line shows input and output tokens with arrows even with cache reads', () => {
 		const tab = client.currentTab()!
 		tab.model = 'openai/gpt-5.4'
 		tab.contextUsed = 39_000
@@ -245,7 +245,7 @@ describe('render', () => {
 		Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true })
 		try {
 			const clean = stripAnsi(captureOutput(() => render.draw()))
-			expect(clean).toContain('Σ⬆ 378 ⬇ 2.2k')
+			expect(clean).toContain('⬆ 378 ⬇ 2.2k')
 			expect(clean).not.toContain('tokens CR:')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
@@ -270,13 +270,13 @@ describe('render', () => {
 			Object.defineProperty(process.stdout, 'columns', { value: 86, configurable: true })
 			let clean = stripAnsi(captureOutput(() => render.draw()))
 			expect(clean).not.toContain('client:111 / server:222 ≠host')
-			expect(clean).toContain('Σ⬆ 600k ⬇ 1.1M')
+			expect(clean).toContain('⬆ 600k ⬇ 1.1M')
 			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
 
 			Object.defineProperty(process.stdout, 'columns', { value: 74, configurable: true })
 			clean = stripAnsi(captureOutput(() => render.draw()))
 			expect(clean).not.toContain('client:111 / server:222 ≠host')
-			expect(clean).not.toContain('Σ⬆ 600k ⬇ 1.1M')
+			expect(clean).not.toContain('⬆ 600k ⬇ 1.1M')
 			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
 
 			Object.defineProperty(process.stdout, 'columns', { value: 58, configurable: true })
