@@ -21,6 +21,10 @@ function captureOutput(fn: () => void): string {
 	return writes.join('')
 }
 
+function firstCursorUp(output: string): string | null {
+	return output.match(/\x1b\[\d+A/)?.[0] ?? null
+}
+
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
@@ -60,6 +64,40 @@ test('status and help bar are clipped to terminal width', () => {
 			expect(line.length).toBeLessThanOrEqual(40)
 		}
 	} finally {
+		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+	}
+})
+
+test('force repaint after width shrink clears from reflowed previous top', () => {
+	const originalRows = process.stdout.rows
+	const originalCols = process.stdout.columns
+	const tab = client.currentTab()!
+	tab.history.push({ type: 'info', text: 'x'.repeat(150) })
+	Object.defineProperty(process.stdout, 'rows', { value: 40, configurable: true })
+	Object.defineProperty(process.stdout, 'columns', { value: 200, configurable: true })
+	try {
+		captureOutput(() => render.draw(true))
+		Object.defineProperty(process.stdout, 'columns', { value: 120, configurable: true })
+		const output = captureOutput(() => render.draw(true))
+		expect(firstCursorUp(output)).toBe('\x1b[10A')
+	} finally {
+		Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+	}
+})
+
+test('force repaint after severe width shrink clears scrollback when previous frame reflows past screen', () => {
+	const originalRows = process.stdout.rows
+	const originalCols = process.stdout.columns
+	Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+	Object.defineProperty(process.stdout, 'columns', { value: 200, configurable: true })
+	try {
+		captureOutput(() => render.draw(true))
+		Object.defineProperty(process.stdout, 'columns', { value: 40, configurable: true })
+		const output = captureOutput(() => render.draw(true))
+		expect(output).toContain('\x1b[3J')
+	} finally {
+		Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 	}
 })
