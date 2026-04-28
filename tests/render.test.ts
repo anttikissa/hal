@@ -314,7 +314,7 @@ describe('render', () => {
 		}
 	})
 
-	test('tab bar wraps to a second line before abbreviating labels', () => {
+	test('tab bar abbreviates before wrapping to a second line', () => {
 		const active = client.currentTab()!
 		active.name = 'alpha'
 		client.state.tabs.push({
@@ -354,12 +354,45 @@ describe('render', () => {
 		try {
 			Object.defineProperty(process.stdout, 'columns', { value: 34, configurable: true })
 			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-			const alphaLine = lines.findIndex((line) => line.includes('tmp alpha'))
-			const gammaLine = lines.findIndex((line) => line.includes('tmp gamma'))
-			expect(alphaLine).toBeGreaterThanOrEqual(0)
-			expect(gammaLine).toBe(alphaLine + 1)
-			expect(lines[alphaLine]!).toContain('tmp beta')
-			expect(lines[alphaLine]!).not.toContain('tmp gamma')
+			const nameLine = lines.find((line) => line.includes('alpha')) ?? ''
+			expect(nameLine).toContain('beta')
+			expect(nameLine).toContain('gamma')
+			expect(nameLine).not.toContain('tmp alpha')
+			expect(lines.findIndex((line) => line.includes('gamma'))).toBe(lines.findIndex((line) => line.includes('alpha')))
+		} finally {
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
+	test('tab bar wraps after one-line compressed labels do not fit', () => {
+		client.currentTab()!.name = 'a'
+		for (let i = 2; i <= 6; i++) {
+			client.state.tabs.push({
+				sessionId: `s${i}`,
+				name: String.fromCharCode(96 + i),
+				history: [],
+				inputHistory: [],
+				loaded: true,
+				inputDraft: '',
+				doneUnseen: false,
+				parentEntryCount: 0,
+				historyVersion: 0,
+				usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
+				contextUsed: 0,
+				contextMax: 0,
+				cwd: '/tmp',
+				model: 'test',
+			})
+		}
+
+		const originalCols = process.stdout.columns
+		try {
+			Object.defineProperty(process.stdout, 'columns', { value: 14, configurable: true })
+			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+			const firstTabLine = lines.findIndex((line) => line.includes('[1]'))
+			expect(firstTabLine).toBeGreaterThanOrEqual(0)
+			expect(lines[firstTabLine + 1]).toContain('5')
+			expect(lines[firstTabLine + 1]).toContain('6')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}

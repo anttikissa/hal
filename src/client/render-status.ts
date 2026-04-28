@@ -124,7 +124,10 @@ function buildTabBarLines(cols: number): string[] {
 		const rendered = tabs.map((tab, i) => tabLabel(tab, i, mode))
 		const joined = rendered.join('')
 		if (visLen(joined) <= cols) return [joined]
-		const wrapped = wrapTabLabels(rendered, cols)
+	}
+
+	for (const mode of ['name', 'num'] as const) {
+		const wrapped = wrapTabLabels(tabs.map((tab, i) => tabLabel(tab, i, mode)), cols)
 		if (wrapped) return wrapped
 	}
 
