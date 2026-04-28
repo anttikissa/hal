@@ -14,7 +14,7 @@ Bottom-anchored, six sections:
 ```
 [history lines...]   — per-tab, append-only, ALL of them
 [padding]            — blank lines to stabilize prompt position across tabs
-[tab bar]            — [1]  2   3  — brackets for active, spaces for inactive
+[tab bar]            — [1]  2   3  — wraps to a second row before shortening
 [status bar]         — session, cwd, model, usage, server/client details
 [prompt]             — user input, may be multiline
 [help bar]           — bottom key hints, always one row (even when empty)
@@ -25,7 +25,9 @@ Chrome = tab bar + status + prompt (1+ lines, multiline editing) + help bar.
 ## Tabs
 
 Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
-Tab bar entries are same width: `[N]` for active, ` N ` for inactive.
+Tab bar entries use brackets for the active tab and spaces for inactive tabs.
+When full labels don't fit on one row, the tab bar may wrap once to a second
+row; only after two rows are insufficient should it fall back to shorter labels.
 
 ### Height management
 

@@ -72,47 +72,69 @@ function renderIndicator(tab: Tab, baseColor: string): string {
 	return `${ANSI_DIM}${ind.color}${ind.char}${RESET}${baseColor}`
 }
 
-// Tab bar: prefers [n dir name], then [n name], then just numbers.
+// Tab bar: prefers [n dir name], wrapping once before falling back to shorter labels.
 // Each tab shows a 1-char status indicator between the number and title.
+type TabLabelMode = 'wide' | 'name' | 'num'
+
+function tabDir(tab: Tab): string {
+	return tab.cwd.split('/').filter(Boolean).pop() ?? ''
+}
+
+function tabInner(num: number, ind: string, text?: string): string {
+	if (text) return `${num}${ind || ' '}${text}`
+	return `${num}${ind}`
+}
+
+function tabLabel(tab: Tab, i: number, mode: TabLabelMode): string {
+	const active = client.state.activeTab
+	const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
+	const name = tab.name || tab.sessionId
+	const dir = tabDir(tab)
+	const text = mode === 'wide'
+		? (dir && dir !== name ? `${dir} ${name}` : name)
+		: mode === 'name'
+			? name
+			: ''
+	const content = tabInner(i + 1, ind, text)
+	if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
+	return `${DIM} ${content} ${RESET}`
+}
+
+function wrapTabLabels(labels: string[], cols: number): string[] | null {
+	if (labels.length === 0) return ['']
+	const lines: string[] = []
+	let line = ''
+	for (const label of labels) {
+		if (visLen(label) > cols) return null
+		if (!line || visLen(line) + visLen(label) <= cols) {
+			line += label
+			continue
+		}
+		lines.push(line)
+		if (lines.length >= 2) return null
+		line = label
+	}
+	if (line) lines.push(line)
+	return lines
+}
+
+function buildTabBarLines(cols: number): string[] {
+	const tabs = client.state.tabs
+	for (const mode of ['wide', 'name', 'num'] as const) {
+		const rendered = tabs.map((tab, i) => tabLabel(tab, i, mode))
+		const joined = rendered.join('')
+		if (visLen(joined) <= cols) return [joined]
+		const wrapped = wrapTabLabels(rendered, cols)
+		if (wrapped) return wrapped
+	}
+
+	const terse = tabs.map((tab, i) => tabLabel(tab, i, 'num'))
+	return [clipVisual(terse.join(''), cols)]
+}
+
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	const tabs = client.state.tabs
-	const active = client.state.activeTab
-
-	function tabDir(tab: Tab): string {
-		return tab.cwd.split('/').filter(Boolean).pop() ?? ''
-	}
-
-	function inner(num: number, ind: string, text?: string): string {
-		if (text) return `${num}${ind || ' '}${text}`
-		return `${num}${ind}`
-	}
-
-	function label(tab: Tab, i: number, mode: 'wide' | 'name' | 'num'): string {
-		const ind = renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
-		const name = tab.name || tab.sessionId
-		const dir = tabDir(tab)
-		const text = mode === 'wide'
-			? (dir && dir !== name ? `${dir} ${name}` : name)
-			: mode === 'name'
-				? name
-				: ''
-		const content = inner(i + 1, ind, text)
-		if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
-		return `${DIM} ${content} ${RESET}`
-	}
-
-	for (const mode of ['wide', 'name', 'num'] as const) {
-		const rendered = tabs.map((tab, i) => label(tab, i, mode))
-		const joined = rendered.join('')
-		if (visLen(joined) <= cols) {
-			lines.push(joined)
-			return
-		}
-	}
-
-	const terse = tabs.map((tab, i) => label(tab, i, 'num'))
-	lines.push(clipVisual(terse.join(''), cols))
+	for (const line of buildTabBarLines(cols)) lines.push(line)
 }
 
 // Shorten a path for display: replace $HOME with ~, then abbreviate.
@@ -331,7 +353,7 @@ function renderPrompt(lines: string[]): void {
 // Help bar always counts as 1 line (even when empty) to prevent jumps.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	return 3 + prompt.buildPrompt(cols).lines.length // tab bar + status + prompt + help bar
+	return buildTabBarLines(cols).length + 2 + prompt.buildPrompt(cols).lines.length
 }
 
 export const renderStatus = { chromeLines, hasAnimatedIndicators, renderTabBar, renderStatusLine, renderHelpBar, renderPrompt }
