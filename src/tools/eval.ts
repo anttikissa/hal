@@ -107,7 +107,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 		const result = await Promise.race(promises)
 		if (result === undefined) return ''
-		return typeof result === 'string' ? result : ason.stringify(result, 'short')
+		return typeof result === 'string' ? result : ason.stringify(result)
 	} catch (err: unknown) {
 		if (ctx.signal?.aborted) return '[interrupted]'
 		if (err instanceof Error && err.stack) return err.stack
