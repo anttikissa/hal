@@ -227,7 +227,9 @@ function formatTotalTokens(total: number): string {
 
 function tokenUsageLabel(usage: TokenUsage): string {
 	if (usage.input <= 0 && usage.output <= 0) return ''
-	return `⬆ ${formatTotalTokens(usage.input)} ⬇ ${formatTotalTokens(usage.output)}`
+	// Σ makes the compact status label explicit: these are session totals, not
+	// tokens from the most recent prompt.
+	return `Σ⬆ ${formatTotalTokens(usage.input)} ⬇ ${formatTotalTokens(usage.output)}`
 }
 
 function subscriptionStatusLabel(base: string): string {
