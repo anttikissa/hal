@@ -487,6 +487,18 @@ test('/cd returns cwd-change metadata for the next model turn', async () => {
 	}
 })
 
+
+test('/cd with no args changes to Hal directory', async () => {
+	const session = makeSession()
+	session.cwd = tmpdir()
+	const result = await commands.executeCommand('/cd', session)
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(session.cwd).toBe(process.cwd())
+	expect(result.meta).toEqual([`cwd changed from ${tmpdir()} to ${process.cwd()}`])
+})
+
 test('/config --help reuses detailed config help', async () => {
 	const result = await commands.executeCommand('/config --help', makeSession())
 
