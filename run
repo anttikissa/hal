@@ -5,15 +5,28 @@ set -uo pipefail
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
 args=()
-for arg in "$@"; do
-	case "$arg" in
+while [ "$#" -gt 0 ]; do
+	case "$1" in
 		-f|--fresh)
 			# Fresh state means this invocation is intentionally isolated: no other
 			# terminal can join it, and it cannot join the normal host.
 			export HAL_STATE_DIR="$(mktemp -d /tmp/hal-state-XXXXXX)"
+			shift
+			;;
+		--state-dir)
+			[ "$#" -ge 2 ] || { echo "hal: --state-dir requires a directory" >&2; exit 2; }
+			export HAL_STATE_DIR="$2"
+			shift 2
+			;;
+		--state-dir=*)
+			state_dir="${1#--state-dir=}"
+			[ -n "$state_dir" ] || { echo "hal: --state-dir requires a directory" >&2; exit 2; }
+			export HAL_STATE_DIR="$state_dir"
+			shift
 			;;
 		*)
-			args+=("$arg")
+			args+=("$1")
+			shift
 			;;
 	esac
 done

@@ -19,6 +19,23 @@ test('parse accepts --fresh like -f', () => {
 	expect(parsed).toEqual({ ok: true, help: false, targetCwd: '/work/project' })
 })
 
+test('parse supports --state-dir with a following path or equals form', () => {
+	const env = { cwd: '/work/project', halDir: '/hal' }
+
+	expect(cliArgs.parse(['--state-dir', '/tmp/hal-state-8XonO2'], env)).toEqual({
+		ok: true,
+		help: false,
+		targetCwd: '/work/project',
+		stateDir: '/tmp/hal-state-8XonO2',
+	})
+	expect(cliArgs.parse(['--state-dir=/tmp/hal-state-8XonO2'], env)).toEqual({
+		ok: true,
+		help: false,
+		targetCwd: '/work/project',
+		stateDir: '/tmp/hal-state-8XonO2',
+	})
+})
+
 test('parse rejects unknown options and positional parameters', () => {
 	expect(cliArgs.parse(['asdf'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
 		ok: false,
@@ -27,5 +44,9 @@ test('parse rejects unknown options and positional parameters', () => {
 	expect(cliArgs.parse(['--wat'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
 		ok: false,
 		error: 'Unknown option: --wat',
+	})
+	expect(cliArgs.parse(['--state-dir'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
+		ok: false,
+		error: '--state-dir requires a directory',
 	})
 })

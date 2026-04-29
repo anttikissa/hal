@@ -27,6 +27,10 @@ if (parsedArgs.help) {
 	process.stdout.write(`${cliArgs.helpText()}\n`)
 	process.exit(0)
 }
+if (parsedArgs.stateDir && process.env.HAL_STATE_DIR !== parsedArgs.stateDir) {
+	process.stderr.write('--state-dir must be handled by the hal wrapper so HAL_STATE_DIR is set before startup. Use `hal --state-dir <dir>`.\n')
+	process.exit(2)
+}
 const startupCwd = startup.normalizeCwd(parsedArgs.targetCwd)
 
 ensureStateDir()
