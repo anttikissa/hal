@@ -228,25 +228,25 @@ describe('render', () => {
 			expect(clean).toContain('/tmp')
 			expect(clean).toContain('GPT 5.4')
 			expect(clean).toContain('39k/1050k (4%)')
-			expect(clean).toContain('⬆ 600k ⬇ 1.1M')
+			expect(clean).toContain('↑600k ↓1.1M')
 			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
 	})
 
-	test('status line shows TOTAL input tokens (uncached + cache reads + cache creation)', () => {
+	test('status line formats usage like pi-mono', () => {
 		const tab = client.currentTab()!
 		tab.model = 'openai/gpt-5.4'
 		tab.contextUsed = 39_000
 		tab.contextMax = 1_050_000
-		// 378 fresh + 42k cache reads + 1k cache writes = 43_378 total sent up
 		tab.usage = { input: 378, output: 2_200, cacheRead: 42_000, cacheCreation: 1_000 }
 		const originalCols = process.stdout.columns
 		Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true })
 		try {
 			const clean = stripAnsi(captureOutput(() => render.draw()))
-			expect(clean).toContain('⬆ 43k ⬇ 2.2k')
+			expect(clean).toContain('↑378 ↓2.2k R42k W1.0k')
+			expect(clean).not.toContain('↑43k')
 			expect(clean).not.toContain('tokens CR:')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
@@ -271,19 +271,19 @@ describe('render', () => {
 			Object.defineProperty(process.stdout, 'columns', { value: 86, configurable: true })
 			let clean = stripAnsi(captureOutput(() => render.draw()))
 			expect(clean).not.toContain('client:111 / server:222 ≠host')
-			expect(clean).toContain('⬆ 600k ⬇ 1.1M')
+			expect(clean).toContain('↑600k ↓1.1M')
 			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
 
 			Object.defineProperty(process.stdout, 'columns', { value: 74, configurable: true })
 			clean = stripAnsi(captureOutput(() => render.draw()))
 			expect(clean).not.toContain('client:111 / server:222 ≠host')
-			expect(clean).not.toContain('⬆ 600k ⬇ 1.1M')
+			expect(clean).not.toContain('↑600k ↓1.1M')
 			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
 
 			Object.defineProperty(process.stdout, 'columns', { value: 58, configurable: true })
 			clean = stripAnsi(captureOutput(() => render.draw()))
 			expect(clean).not.toContain('client:111 / server:222 ≠host')
-			expect(clean).not.toContain('⬆ 600k ⬇ 1.1M')
+			expect(clean).not.toContain('↑600k ↓1.1M')
 			expect(clean).not.toContain('Sub 2/3: 5h 23%, 7d 61%')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

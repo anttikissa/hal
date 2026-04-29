@@ -222,21 +222,21 @@ function serverStatusLabel(): string {
 	return `server:${client.state.pid}`
 }
 
-function formatTotalTokens(total: number): string {
-	if (total >= 1_000_000) {
-		const millions = total / 1_000_000
-		return `${millions.toFixed(millions >= 10 ? 0 : 1)}M`
-	}
-	return models.formatTokenCount(total)
+function formatTotalTokens(count: number): string {
+	if (count < 1000) return count.toString()
+	if (count < 10000) return `${(count / 1000).toFixed(1)}k`
+	if (count < 1000000) return `${Math.round(count / 1000)}k`
+	if (count < 10000000) return `${(count / 1000000).toFixed(1)}M`
+	return `${Math.round(count / 1000000)}M`
 }
 
 function tokenUsageLabel(usage: TokenUsage): string {
-	// "input" should reflect TOTAL tokens sent to the model — uncached input
-	// plus prompt-cache reads and cache-creation writes. The provider splits
-	// these out for billing, but to the user it's all "stuff we sent up".
-	const totalInput = usage.input + usage.cacheRead + usage.cacheCreation
-	if (totalInput <= 0 && usage.output <= 0) return ''
-	return `⬆ ${renderStatus.formatTotalTokens(totalInput)} ⬇ ${renderStatus.formatTotalTokens(usage.output)}`
+	const parts: string[] = []
+	if (usage.input) parts.push(`↑${renderStatus.formatTotalTokens(usage.input)}`)
+	if (usage.output) parts.push(`↓${renderStatus.formatTotalTokens(usage.output)}`)
+	if (usage.cacheRead) parts.push(`R${renderStatus.formatTotalTokens(usage.cacheRead)}`)
+	if (usage.cacheCreation) parts.push(`W${renderStatus.formatTotalTokens(usage.cacheCreation)}`)
+	return parts.join(' ')
 }
 
 function subscriptionStatusLabel(base: string): string {
