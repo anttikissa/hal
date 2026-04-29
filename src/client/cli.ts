@@ -266,7 +266,7 @@ function handleCompletionKey(k: KeyEvent): boolean {
 	if (k.key === 'tab' && !k.ctrl && !k.alt && !k.cmd) {
 		if (!completion.state.active) {
 			// Trigger new completion
-			const result = completion.complete(prompt.text(), prompt.cursorPos())
+			const result = completion.complete(prompt.text(), prompt.cursorPos(), client.currentTab()?.cwd)
 			if (!result || result.items.length === 0) return false
 			completion.state.active = true
 			completion.state.lastResult = result

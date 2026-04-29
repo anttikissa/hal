@@ -101,7 +101,7 @@ function completeDirs(argPrefix: string, cwd: string): string[] {
 }
 
 
-function complete(text: string, cursor: number): CompletionResult | null {
+function complete(text: string, cursor: number, cwd = process.cwd()): CompletionResult | null {
 	if (cursor < 0 || cursor > text.length) cursor = text.length
 	const before = text.slice(0, cursor)
 	if (!before.startsWith('/')) return null
@@ -133,7 +133,7 @@ function complete(text: string, cursor: number): CompletionResult | null {
 	if (arg === 'model') {
 		values = config.modelNames.filter((model) => model.startsWith(argPrefix))
 	} else if (arg === 'dir') {
-		values = completeDirs(argPrefix, process.cwd())
+		values = completeDirs(argPrefix, cwd)
 	} else if (arg === 'command') {
 		values = commands.commandNames().filter((name) => name.startsWith(argPrefix))
 	} else {

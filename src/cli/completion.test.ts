@@ -1,4 +1,7 @@
 import { expect, test } from 'bun:test'
+import { mkdtempSync, mkdirSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { completion } from './completion.ts'
 
 test('/config completes as a command name', () => {
@@ -51,4 +54,20 @@ test('/config completes nested config paths', () => {
 
 	expect(result).not.toBeNull()
 	expect(result!.items).toContain('/config models.default')
+})
+
+
+test('/cd completes directories from the active session cwd', () => {
+	const root = mkdtempSync(join(tmpdir(), 'hal-complete-cd-'))
+	try {
+		mkdirSync(join(root, 'alpha'))
+		mkdirSync(join(root, 'beta'))
+
+		const result = completion.complete('/cd a', '/cd a'.length, root)
+
+		expect(result).not.toBeNull()
+		expect(result!.items).toEqual(['/cd alpha/'])
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
 })
