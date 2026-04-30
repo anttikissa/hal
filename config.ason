@@ -29,9 +29,9 @@
 		showContext: true,
 		// server:12345
 		showServer: true,
-		// ↑56k ↓2.8k
+		// ↑56k input tokens sent, ↓2.8k output tokens received.
 		showTokenInOut: true,
-		// R1.7M W42k
+		// R1.7M cache tokens read, W42k cache tokens written; W only appears when writing new cache.
 		showTokenCache: false,
 		// Sub 2/3: 5h 23%, 7d 61%
 		showSubscription: true
