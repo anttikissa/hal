@@ -178,6 +178,10 @@ process.on('SIGTERM', () => {
 	cleanup()
 	process.exit(0)
 })
+// Monitor only observes fatal exceptions; it does not change normal crash behavior.
+process.on('uncaughtExceptionMonitor', (err) => {
+	memory.recordPossibleOom(err)
+})
 
 queueMemoryCheck()
 
