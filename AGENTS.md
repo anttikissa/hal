@@ -115,24 +115,24 @@ client.addEntry = (text) => {
 
 Example:
 ```ts
-// src/providers/anthropic.ts
+// src/runtime/agent-loop.ts
 const config = {
-	claudeUseSerper: false,
+	maxIterations: 50,
 }
-export const anthropic = { config, generate }
+export const agentLoop = { config, runAgentLoop, abort, isActive }
 ```
 
 ```ts
 // src/config.ts
 const modules = {
-	anthropic: anthropic.config,
+	agentLoop: agentLoop.config,
 }
 ```
 
 ```ason
 {
-	anthropic: {
-		claudeUseSerper: true
+	agentLoop: {
+		maxIterations: 50
 	}
 }
 ```
