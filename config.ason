@@ -1,17 +1,42 @@
 {
-  client: {
-    backgroundLoadTabs: true,
-    backgroundLoadBlobs: true,
-    repaintAfterBlobLoad: true,
-    pausedNoticeDelayMs: 50
-  },
-  blocks: { blobBatchSize: 64 },
-  render: { forkHistoryDimFactor: 0.82 },
-  agentLoop: { maxIterations: 50 },
-  memory: { warnBytes: 1500000000, killBytes: 5000000000 },
-  models: { default: 'gpt' },
-  subscriptionUsage: { censorEmails: true }
-  clipboard: {
-    multilinePasteFileLineLimit: 7
-  }
+	client: {
+		// Load non-active session histories in the background so tab switches are fast.
+		backgroundLoadTabs: true,
+		// Hydrate blob-backed history content after the initial session load.
+		backgroundLoadBlobs: true,
+		// Redraw the interface when background blob hydration changes visible content.
+		repaintAfterBlobLoad: true,
+		// Delay before showing a paused notice, to avoid flicker during quick resumes.
+		pausedNoticeDelayMs: 50
+	},
+	blocks: {
+		// Number of blob sidecar files to hydrate in one batch while rendering history.
+		blobBatchSize: 64
+	},
+	render: {
+		// Brightness multiplier for inherited fork history; lower values look dimmer.
+		forkHistoryDimFactor: 0.82
+	},
+	agentLoop: {
+		// Maximum generate/tool-result cycles before stopping a runaway agent loop.
+		maxIterations: 50
+	},
+	memory: {
+		// RSS threshold for showing a high-memory warning; set to 0 to disable warnings.
+		warnBytes: 1500000000,
+		// RSS threshold for exiting before memory grows without bound; set to 0 to disable exits.
+		killBytes: 5000000000
+	},
+	models: {
+		// Default model alias or full model ID for new sessions.
+		default: 'gpt'
+	},
+	subscriptionUsage: {
+		// Mask account email addresses in usage and status output.
+		censorEmails: true
+	},
+	clipboard: {
+		// Pasted text at or below this many lines stays inline; longer pastes become temp files.
+		multilinePasteFileLineLimit: 7
+	}
 }
