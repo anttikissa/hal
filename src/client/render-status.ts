@@ -31,6 +31,16 @@ const RESET = '\x1b[0m'
 const ANSI_DIM = '\x1b[2m'
 
 type TabLabelMode = 'wide' | 'name' | 'num'
+const config = {
+	showSession: true,
+	showCwd: true,
+	showModel: true,
+	showContext: true,
+	showServer: true,
+	showTokenInOut: true,
+	showTokenCache: false,
+	showSubscription: true,
+}
 
 function halCursorColor(): string {
 	// Match the main HAL cursor, including live colors.ason reloads and the
@@ -232,10 +242,14 @@ function formatTotalTokens(count: number): string {
 
 function tokenUsageLabel(usage: TokenUsage): string {
 	const parts: string[] = []
-	if (usage.input) parts.push(`↑${renderStatus.formatTotalTokens(usage.input)}`)
-	if (usage.output) parts.push(`↓${renderStatus.formatTotalTokens(usage.output)}`)
-	if (usage.cacheRead) parts.push(`R${renderStatus.formatTotalTokens(usage.cacheRead)}`)
-	if (usage.cacheCreation) parts.push(`W${renderStatus.formatTotalTokens(usage.cacheCreation)}`)
+	if (renderStatus.config.showTokenInOut) {
+		if (usage.input) parts.push(`↑${renderStatus.formatTotalTokens(usage.input)}`)
+		if (usage.output) parts.push(`↓${renderStatus.formatTotalTokens(usage.output)}`)
+	}
+	if (renderStatus.config.showTokenCache) {
+		if (usage.cacheRead) parts.push(`R${renderStatus.formatTotalTokens(usage.cacheRead)}`)
+		if (usage.cacheCreation) parts.push(`W${renderStatus.formatTotalTokens(usage.cacheCreation)}`)
+	}
 	return parts.join(' ')
 }
 
@@ -270,15 +284,15 @@ function renderStatusLine(lines: string[]): void {
 	const provider = models.providerName(modelId)
 	const isSub = !auth.isApiKey(provider)
 	const left = renderStatus.joinStatusParts([
-		renderStatus.sessionStatusLabel(tab, base),
-		renderStatus.cwdStatusLabel(tab, base),
-		renderStatus.modelStatusLabel(modelId, base),
-		renderStatus.contextStatusLabel(tab, base),
+		renderStatus.config.showSession ? renderStatus.sessionStatusLabel(tab, base) : '',
+		renderStatus.config.showCwd ? renderStatus.cwdStatusLabel(tab, base) : '',
+		renderStatus.config.showModel ? renderStatus.modelStatusLabel(modelId, base) : '',
+		renderStatus.config.showContext ? renderStatus.contextStatusLabel(tab, base) : '',
 	])
 
-	const server = renderStatus.serverStatusLabel()
+	const server = renderStatus.config.showServer ? renderStatus.serverStatusLabel() : ''
 	const tokenLabel = renderStatus.tokenUsageLabel(tab.usage)
-	const plan = provider === 'openai' && isSub ? renderStatus.subscriptionStatusLabel(base) : ''
+	const plan = renderStatus.config.showSubscription && provider === 'openai' && isSub ? renderStatus.subscriptionStatusLabel(base) : ''
 	const innerWidth = Math.max(0, cols - 2)
 	let showServer = !!server
 	let showTokens = !!tokenLabel
@@ -354,6 +368,7 @@ function chromeLines(): number {
 }
 
 export const renderStatus = {
+	config,
 	// Public (called from render.ts and elsewhere)
 	chromeLines,
 	hasAnimatedIndicators,

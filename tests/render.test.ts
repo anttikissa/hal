@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { render } from '../src/client/render.ts'
+import { renderStatus } from '../src/client/render-status.ts'
 import { client } from '../src/client.ts'
 import { prompt } from '../src/cli/prompt.ts'
 import { cursor } from '../src/cli/cursor.ts'
@@ -40,6 +41,16 @@ beforeEach(() => {
 	prompt.clear()
 	helpBar.reset()
 	popup.close()
+	Object.assign(renderStatus.config, {
+		showSession: true,
+		showCwd: true,
+		showModel: true,
+		showContext: true,
+		showServer: true,
+		showTokenInOut: true,
+		showTokenCache: false,
+		showSubscription: true,
+	})
 	openaiUsage.state.currentKey = 'openai:1'
 	openaiUsage.state.accounts = {
 		'openai:1': {
@@ -241,6 +252,7 @@ describe('render', () => {
 		tab.contextUsed = 39_000
 		tab.contextMax = 1_050_000
 		tab.usage = { input: 378, output: 2_200, cacheRead: 42_000, cacheCreation: 1_000 }
+		renderStatus.config.showTokenCache = true
 		const originalCols = process.stdout.columns
 		Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true })
 		try {
@@ -248,6 +260,39 @@ describe('render', () => {
 			expect(clean).toContain('↑378 ↓2.2k R42k W1.0k')
 			expect(clean).not.toContain('↑43k')
 			expect(clean).not.toContain('tokens CR:')
+		} finally {
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
+	test('status line visibility flags hide configured parts', () => {
+		const tab = client.currentTab()!
+		tab.model = 'openai/gpt-5.4'
+		tab.contextUsed = 39_000
+		tab.contextMax = 1_050_000
+		tab.usage = { input: 56_000, output: 2_800, cacheRead: 1_700_000, cacheCreation: 42_000 }
+		Object.assign(renderStatus.config, {
+			showSession: false,
+			showCwd: false,
+			showModel: false,
+			showContext: false,
+			showServer: false,
+			showTokenInOut: false,
+			showTokenCache: true,
+			showSubscription: false,
+		})
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true })
+		try {
+			const clean = stripAnsi(captureOutput(() => render.draw()))
+			expect(clean).not.toContain('test')
+			expect(clean).not.toContain('/tmp')
+			expect(clean).not.toContain('GPT 5.4')
+			expect(clean).not.toContain('39k/1050k (4%)')
+			expect(clean).not.toContain('server:111')
+			expect(clean).not.toContain('↑56k ↓2.8k')
+			expect(clean).not.toContain('Sub 2/3')
+			expect(clean).toContain('R1.7M W42k')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}

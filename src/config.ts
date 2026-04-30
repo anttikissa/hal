@@ -9,6 +9,7 @@ import { blocks } from './cli/blocks.ts'
 import { prompt } from './cli/prompt.ts'
 import { clipboard } from './cli/clipboard.ts'
 import { render } from './client/render.ts'
+import { renderStatus } from './client/render-status.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { memory } from './memory.ts'
 import { models } from './models.ts'
@@ -25,6 +26,7 @@ const modules: Record<string, Record<string, any>> = {
 	prompt: prompt.config,
 	clipboard: clipboard.config,
 	render: render.config,
+	renderStatus: renderStatus.config,
 	agentLoop: agentLoop.config,
 	memory: memory.config,
 	models: models.config,

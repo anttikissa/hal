@@ -17,6 +17,25 @@
 		// Brightness multiplier for inherited fork history; lower values look dimmer.
 		forkHistoryDimFactor: 0.82
 	},
+	// Toggle statusline things on / off
+	renderStatus: {
+		// 04-uki
+		showSession: true,
+		// ~/.hal
+		showCwd: true,
+		// GPT 5.5
+		showModel: true,
+		// 39k/1050k (4%)
+		showContext: true,
+		// server:12345
+		showServer: true,
+		// ↑56k ↓2.8k
+		showTokenInOut: true,
+		// R1.7M W42k
+		showTokenCache: false,
+		// Sub 2/3: 5h 23%, 7d 61%
+		showSubscription: true
+	},
 	agentLoop: {
 		// Maximum generate/tool-result cycles before stopping a runaway agent loop.
 		maxIterations: 50
