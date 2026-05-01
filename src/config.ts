@@ -87,6 +87,15 @@ function parseValue(path: string, raw: string): any {
 	}
 }
 
+function hasPath(root: any, parts: string[]): boolean {
+	let value = root
+	for (const part of parts) {
+		if (!value || typeof value !== 'object' || !(part in value)) return false
+		value = value[part]
+	}
+	return true
+}
+
 function ensureObject(root: Record<string, any>, parts: string[]): Record<string, any> | null {
 	let node = root
 	for (const part of parts) {
@@ -102,12 +111,15 @@ function writePath(path: string, value: any, opts: { temp?: boolean } = {}): { o
 	const parts = splitPath(path)
 	if (parts.length < 2) return { error: 'Set a specific key like agentLoop.maxIterations.' }
 	const moduleName = parts[0]!
+	const keyParts = parts.slice(1)
 	const leaf = parts[parts.length - 1]!
 	const parentParts = parts.slice(1, -1)
-	const root = opts.temp ? config.modules[moduleName] : config.data[moduleName]
-	if (!config.modules[moduleName]) return { error: `Unknown config module: ${moduleName}` }
+	const moduleConfig = config.modules[moduleName]
+	if (!moduleConfig) return { error: `Unknown config module: ${moduleName}` }
+	if (!hasPath(moduleConfig, keyParts)) return { error: `Unknown config key: ${path}` }
+	const root = opts.temp ? moduleConfig : config.data[moduleName]
 	if (!opts.temp && (!root || typeof root !== 'object' || Array.isArray(root))) config.data[moduleName] = {}
-	const parent = ensureObject((opts.temp ? config.modules[moduleName] : config.data[moduleName]) as Record<string, any>, parentParts)
+	const parent = ensureObject((opts.temp ? moduleConfig : config.data[moduleName]) as Record<string, any>, parentParts)
 	if (!parent) return { error: `${opts.temp ? 'Cannot write temp config' : 'Cannot write config'} at ${path}` }
 	parent[leaf] = value
 	if (!opts.temp) {

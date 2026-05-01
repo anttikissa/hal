@@ -46,3 +46,30 @@ test('config.init loads config lazily and only once', () => {
 		models.config.default = origDefaultModel
 	}
 })
+
+test('config.writePath rejects keys not declared by module config', () => {
+	const origInitialized = config.state.initialized
+	const origData = config.data
+	const key = '__halTestUnknownKey'
+	const hadKey = key in models.config
+	const origKey = (models.config as Record<string, any>)[key]
+
+	try {
+		config.state.initialized = true
+		config.data = { models: { default: 'gpt' } }
+
+		const persisted = config.writePath(`models.${key}`, 123)
+		expect(persisted.error).toBe(`Unknown config key: models.${key}`)
+		expect((config.data.models as Record<string, any>)[key]).toBeUndefined()
+		expect((models.config as Record<string, any>)[key]).toBeUndefined()
+
+		const temp = config.writePath(`models.${key}`, 123, { temp: true })
+		expect(temp.error).toBe(`Unknown config key: models.${key}`)
+		expect((models.config as Record<string, any>)[key]).toBeUndefined()
+	} finally {
+		config.state.initialized = origInitialized
+		config.data = origData
+		if (hadKey) (models.config as Record<string, any>)[key] = origKey
+		else delete (models.config as Record<string, any>)[key]
+	}
+})
