@@ -244,6 +244,19 @@ function hasRemainingQuota(account: AccountUsage): boolean {
 	return windows.length > 0 && windows.every((window) => window.usedPercent < 100)
 }
 
+function pruneUnconfiguredAccounts(items: Credential[]): void {
+	if (items.length === 0) return
+	const keys = new Set<string>()
+	for (const credential of items) keys.add(keyOf(credential))
+	let changed = false
+	for (const key of Object.keys(openaiUsage.state.accounts)) {
+		if (keys.has(key)) continue
+		delete openaiUsage.state.accounts[key]
+		changed = true
+	}
+	if (changed) save()
+}
+
 async function refreshCredential(credential: Credential, force = false): Promise<AccountUsage> {
 	openaiUsage.init()
 	const key = keyOf(credential)
@@ -260,7 +273,9 @@ async function refreshCredential(credential: Credential, force = false): Promise
 
 async function refreshAll(force = false): Promise<AccountUsage[]> {
 	openaiUsage.init()
-	for (const credential of credentials()) await refreshCredential(credential, force)
+	const items = credentials()
+	pruneUnconfiguredAccounts(items)
+	for (const credential of items) await refreshCredential(credential, force)
 	return all()
 }
 

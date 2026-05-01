@@ -94,6 +94,45 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 	expect(text).not.toContain('▌')
 })
 
+test('refreshAll drops cached rows for old credential keys', async () => {
+	auth.ensureFresh = async () => {}
+	auth.listCredentials = () => [
+		{ ...makeCredential(0, 'a@test.com'), _key: 'openai:acct_a' },
+		{ ...makeCredential(1, 'b@test.com'), _key: 'openai:acct_b' },
+	]
+	openaiUsage.state.accounts = {
+		'openai:1': {
+			key: 'openai:1',
+			index: 1,
+			total: 2,
+			pendingTokens: 0,
+			primary: { usedPercent: 23, windowMinutes: 300, resetAt: 1 },
+		},
+	}
+
+	globalThis.fetch = Object.assign(async (_input: any, init?: RequestInit) => {
+		const authz = new Headers(init?.headers).get('authorization')
+		const idx = authz?.includes('tok_1') ? 1 : 0
+		return new Response(JSON.stringify({
+			email: idx === 0 ? 'a@test.com' : 'b@test.com',
+			plan_type: 'plus',
+			rate_limit: {
+				primary_window: {
+					used_percent: idx,
+					limit_window_seconds: 18_000,
+					reset_at: Math.floor(Date.now() / 1000) + 1800,
+				},
+			},
+		}), { status: 200 }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	await openaiUsage.refreshAll(true)
+
+	expect(openaiUsage.state.accounts['openai:1']).toBeUndefined()
+	expect(openaiUsage.formatStatusText()).not.toContain('| 2/2 | account 2/2 |')
+	expect(openaiUsage.formatStatusText()).toContain('| 2/2 | b@test.com (plus) |')
+})
+
 	test('refreshAll clears cooldown for accounts with remaining quota', async () => {
 		const origClearCooldown = auth.clearCooldown
 		const cleared: Credential[] = []
