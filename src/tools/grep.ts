@@ -5,7 +5,7 @@
 
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { read } from './read.ts'
-import { helpers } from '../utils/helpers.ts'
+import { processOutput } from '../utils/process-output.ts'
 
 const MAX_OUTPUT_BYTES = 40_000
 const TRUNCATED_SUFFIX = '\n[… truncated]'
@@ -27,6 +27,12 @@ function formatRgError(stderr: string): string {
 	}
 
 	return `error: ${err}`
+}
+
+function kill(proc: { pid: number }): void {
+	try {
+		process.kill(proc.pid, 'SIGTERM')
+	} catch {}
 }
 
 async function execute(input: any, ctx: ToolContext): Promise<string> {
@@ -55,18 +61,20 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 		cwd: ctx.cwd,
 	})
 
-	const stdout = await new Response(proc.stdout).text()
-	const stderr = await new Response(proc.stderr).text()
-	await proc.exited
+	// Stop rg as soon as the visible result is full. Previously this buffered all
+	// stdout before truncating, which let broad searches allocate gigabytes.
+	const stdoutPromise = processOutput.readLimited(proc.stdout, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX, () => kill(proc))
+	const stderrPromise = processOutput.readLimited(proc.stderr, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
+	const [stdout, stderr, code] = await Promise.all([stdoutPromise, stderrPromise, proc.exited])
 
-	const result = stdout.trim()
+	const result = stdout.text.trim()
 	if (!result) {
 		// rg returns exit 1 for "no matches" — not an error.
-		const err = formatRgError(stderr)
-		if (err && proc.exitCode !== 1) return err
+		const err = formatRgError(stderr.text)
+		if (err && code !== 1) return err
 		return 'No matches found.'
 	}
-	return helpers.truncateUtf8(result, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
+	return result
 }
 
 const grepTool = {

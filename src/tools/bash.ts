@@ -6,6 +6,8 @@
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
+import { helpers } from '../utils/helpers.ts'
+import { processOutput } from '../utils/process-output.ts'
 
 const config = {
 	/** Default timeout in milliseconds. */
@@ -67,12 +69,8 @@ function killProcessTree(rootPid: number, signal: 'SIGTERM' | 'SIGKILL'): void {
 
 // ── Output truncation ──
 
-/** If output exceeds maxOutputBytes, keep first half + last half with a marker. */
 function truncateOutput(text: string): string {
-	if (text.length <= config.maxOutputBytes) return text
-	const half = Math.floor(config.maxOutputBytes / 2)
-	const truncated = text.length - config.maxOutputBytes
-	return text.slice(0, half) + `\n\n[… truncated ${truncated} bytes …]\n\n` + text.slice(-half)
+	return helpers.truncateUtf8(text, config.maxOutputBytes, '\n[… truncated]')
 }
 
 // ── Execution ──
@@ -113,19 +111,13 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 		setTimeout(() => killProcessTree(proc.pid, 'SIGKILL'), 2000)
 	}, timeout)
 
-	// Read stdout
-	let out = ''
-	const reader = proc.stdout.getReader()
-	const decoder = new TextDecoder()
-	while (true) {
-		const { done, value } = await reader.read()
-		if (done) break
-		out += decoder.decode(value, { stream: true })
-	}
-
-	// Read stderr and wait for exit
-	const stderr = await new Response(proc.stderr).text()
-	const code = await proc.exited
+	// Read streams with caps while continuing to drain after the cap. This keeps
+	// memory bounded even for noisy long-running commands.
+	const stdoutPromise = processOutput.readLimited(proc.stdout, config.maxOutputBytes, '\n[… truncated]')
+	const stderrPromise = processOutput.readLimited(proc.stderr, config.maxOutputBytes, '\n[… truncated]')
+	const [stdout, stderrResult, code] = await Promise.all([stdoutPromise, stderrPromise, proc.exited])
+	let out = stdout.text
+	const stderr = stderrResult.text
 
 	clearTimeout(timer)
 	abortCleanup?.()

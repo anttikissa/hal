@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { HAL_DIR } from './state.ts'
+import { processOutput } from './utils/process-output.ts'
 
 export type VersionStatus = 'idle' | 'pending' | 'ready' | 'error'
 
@@ -52,11 +53,11 @@ async function runGit(args: string[], opts?: { cwd?: string; env?: Record<string
 		stdout: 'pipe',
 		stderr: 'pipe',
 	})
-	const stdoutPromise = new Response(proc.stdout).text()
-	const stderrPromise = new Response(proc.stderr).text()
-	const code = await proc.exited
-	const stdout = (await stdoutPromise).trim()
-	const stderr = (await stderrPromise).trim()
+	const stdoutPromise = processOutput.readLimited(proc.stdout, 1_000_000, '\n[… truncated]')
+	const stderrPromise = processOutput.readLimited(proc.stderr, 1_000_000, '\n[… truncated]')
+	const [stdoutResult, stderrResult, code] = await Promise.all([stdoutPromise, stderrPromise, proc.exited])
+	const stdout = stdoutResult.text.trim()
+	const stderr = stderrResult.text.trim()
 	if (code !== 0) throw new Error(stderr || stdout || `git ${args.join(' ')} exited ${code}`)
 	return stdout
 }
