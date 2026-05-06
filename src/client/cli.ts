@@ -519,6 +519,10 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
+		// Decode bytes as UTF-8 so multi-byte sequences (e.g. box-drawing chars)
+		// that span chunk boundaries don't get mangled into U+FFFD. Node's stream
+		// uses an internal StringDecoder that buffers partial sequences.
+		process.stdin.setEncoding('utf8')
 		process.stdin.resume()
 		if (useKitty) process.stdout.write(KITTY_ON)
 		process.stdout.write(BRACKETED_PASTE_ON)
@@ -578,8 +582,11 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 		}
 	})
 
-	process.stdin.on('data', (data: Buffer) => {
-		const text = data.toString('utf-8')
+	process.stdin.on('data', (data: Buffer | string) => {
+		// stdin.setEncoding('utf8') makes data a string with multi-byte sequences
+		// already buffered across chunk boundaries. Pipe-backed stdin (no TTY)
+		// may still deliver Buffers, so coerce defensively.
+		const text = typeof data === 'string' ? data : data.toString('utf-8')
 		if (handleRawInput(text)) {
 			draw()
 			return
