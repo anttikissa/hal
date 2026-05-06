@@ -164,6 +164,8 @@ function recordSessionMeta(sessionId: string, text: string, ts: string): void {
 function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
 	const sourceMeta = opts.sourceId ? sessionStore.loadSessionMeta(opts.sourceId) : null
+	const openerMeta = opts.openerId ? sessionStore.loadSessionMeta(opts.openerId) : null
+	const inheritedModel = sourceMeta?.model ?? openerMeta?.model ?? models.defaultModel()
 	const meta = opts.sourceId
 		? sessionStore.forkSession(opts.sourceId, sessionId)
 		: sessionStore.createSession(sessionId, {
@@ -172,14 +174,14 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 			createdAt: new Date().toISOString(),
 			name: undefined,
 			topic: undefined,
-			model: models.defaultModel(),
+			model: inheritedModel,
 		})
 	const overridesForkCwd = !!opts.sourceId && !!opts.workingDir && meta.workingDir !== opts.workingDir
 	if (opts.workingDir && meta.workingDir !== opts.workingDir) {
 		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
 	}
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
-	const related = sourceMeta ?? sessionStore.loadSessionMeta(opts.openerId ?? '')
+	const related = sourceMeta ?? openerMeta
 	const text = opts.sourceId
 		? related ? `User forked ${sessionLabel(related)} into ${sessionLabel(meta)}.` : ''
 		: ''

@@ -40,6 +40,13 @@ function spawnHal() {
 	return proc
 }
 
+function readSessionInfos(): Array<{ id: string; model?: string }> {
+	const path = join(tmpDir, "ipc", "state.ason")
+	if (!existsSync(path)) return []
+	const text = readFileSync(path, "utf-8")
+	const state = ason.parse(text) as { sessions?: Array<{ id: string; model?: string }> }
+	return state.sessions ?? []
+}
 function readSessionIds(): string[] {
 	const path = join(tmpDir, "ipc", "state.ason")
 	if (!existsSync(path)) return []
@@ -103,6 +110,45 @@ describe("tabs", () => {
 		expect(out).toContain(`[1 .hal ${ids[0]!}]`)
 		expect(out).toContain(`2 .hal ${ids[1]!}`)
 		expect(out).toContain('Initialized session in ')
+	})
+
+	test("ctrl-t inherits the current tab model", async () => {
+		const proc = spawnHal()
+		const deadline = Date.now() + 2000
+		while (Date.now() < deadline) {
+			const infos = readSessionInfos()
+			if (infos.length === 1) break
+			await Bun.sleep(50)
+		}
+
+		proc.stdin!.write("/model sonnet\r")
+		proc.stdin!.flush()
+
+		const modelDeadline = Date.now() + 2000
+		while (Date.now() < modelDeadline) {
+			const [info] = readSessionInfos()
+			if (info?.model === "anthropic/claude-sonnet-4-6") break
+			await Bun.sleep(50)
+		}
+
+		proc.stdin!.write(new Uint8Array([0x14])) // ctrl-t
+		proc.stdin!.flush()
+
+		const tabDeadline = Date.now() + 2000
+		while (Date.now() < tabDeadline) {
+			const infos = readSessionInfos()
+			if (infos.length === 2) break
+			await Bun.sleep(50)
+		}
+
+		const infos = readSessionInfos()
+		proc.stdin!.write(new Uint8Array([0x03]))
+		proc.stdin!.flush()
+		await proc.exited
+
+		expect(infos).toHaveLength(2)
+		expect(infos[0]?.model).toBe("anthropic/claude-sonnet-4-6")
+		expect(infos[1]?.model).toBe("anthropic/claude-sonnet-4-6")
 	})
 
 	test("new tabs do not persist UI bookkeeping", async () => {
