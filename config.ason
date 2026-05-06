@@ -7,7 +7,16 @@
 		// Redraw the interface when background blob hydration changes visible content.
 		repaintAfterBlobLoad: true,
 		// Delay before showing a paused notice, to avoid flicker during quick resumes.
-		pausedNoticeDelayMs: 50
+		pausedNoticeDelayMs: 50,
+		// Warn before a stale Claude session writes a large fresh prompt-cache entry.
+		claudeCacheWarningEnabled: true,
+		// Estimated cache-write tokens that correspond to 1% of Anthropic 5h quota.
+		// Default derives from 170k tokens ≈ 24% in the 2026-05-01 Opus incident.
+		claudeCacheWarningTokensPerFiveHourPercent: 7100,
+		// Warn for cache writes estimated to cost at least this much 5h quota.
+		claudeCacheWarningQuotaPercent: 10,
+		// Treat Anthropic prompt cache as cold after this many milliseconds.
+		claudeCacheWarningStaleMs: 300000
 	},
 	blocks: {
 		// Number of blob sidecar files to hydrate in one batch while rendering history.

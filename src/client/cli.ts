@@ -231,10 +231,67 @@ function resetRawModeForTests(): void {
 	rawState.pending = []
 }
 
-function submit(override?: string): void {
-	const text = (override ?? prompt.submitText()).trim()
-	const displayText = override === undefined ? prompt.text().trim() : undefined
-	if (!text) return
+function isAnthropicModel(model: string): boolean {
+	const full = models.resolveModel(model)
+	return models.providerName(full).toLowerCase() === 'anthropic'
+}
+
+function formatAge(ms: number): string {
+	const minute = 60 * 1000
+	const hour = 60 * minute
+	const day = 24 * hour
+	if (ms >= 2 * day) return `${Math.round(ms / day)} days ago`
+	if (ms >= day) return 'yesterday'
+	if (ms >= hour) return `${Math.round(ms / hour)}h ago`
+	if (ms >= minute) return `${Math.round(ms / minute)}m ago`
+	return 'just now'
+}
+
+function lastAnthropicAssistantAt(tab: (typeof client.state.tabs)[number]): number | null {
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const block = tab.history[i]
+		if (!block || block.type !== 'assistant' || !block.ts) continue
+		if (!isAnthropicModel(block.model ?? tab.model)) continue
+		return block.ts
+	}
+	return null
+}
+
+function claudeCacheWarning(tab: (typeof client.state.tabs)[number] | null, text: string, now = Date.now()): { contextTokens: number; thresholdTokens: number; ageText: string } | null {
+	if (!client.config.claudeCacheWarningEnabled) return null
+	if (!tab) return null
+	if (!text.trim() || text.trim().startsWith('/')) return null
+	if (!isAnthropicModel(tab.model)) return null
+
+	const contextTokens = Math.max(0, Math.round(tab.contextUsed ?? 0))
+	const thresholdTokens = Math.max(1, Math.round(client.config.claudeCacheWarningTokensPerFiveHourPercent * client.config.claudeCacheWarningQuotaPercent))
+	if (contextTokens < thresholdTokens) return null
+
+	const lastAt = lastAnthropicAssistantAt(tab)
+	if (lastAt && now - lastAt < client.config.claudeCacheWarningStaleMs) return null
+
+	const ageText = lastAt ? formatAge(now - lastAt) : 'no previous Claude turn in this tab'
+	return { contextTokens, thresholdTokens, ageText }
+}
+
+function openClaudeCacheWarning(text: string, displayText: string | undefined, warning: NonNullable<ReturnType<typeof claudeCacheWarning>>): void {
+	popup.openConfirm(
+		'Claude cache likely cold',
+		[
+			`Sending this may write ~${models.formatTokenCount(warning.contextTokens)} tokens to Anthropic prompt cache.`,
+			`Warning threshold: ~${models.formatTokenCount(warning.thresholdTokens)} tokens, roughly ${client.config.claudeCacheWarningQuotaPercent}% of 5h quota at current estimate.`,
+			`Last Claude turn: ${warning.ageText}.`,
+		],
+		['Send anyway', 'Switch to GPT', 'Cancel'],
+		(choice) => {
+			if (choice === 'Send anyway') submitPromptText(text, displayText)
+			if (choice === 'Switch to GPT') client.sendCommand('prompt', '/model gpt')
+			draw()
+		},
+	)
+}
+
+function submitPromptText(text: string, displayText: string | undefined): void {
 	completion.dismiss()
 	popup.close()
 	// Push to prompt module for immediate up-arrow recall
@@ -252,6 +309,19 @@ function submit(override?: string): void {
 	prompt.clear()
 	// Update tab's inputHistory + clear persisted draft
 	client.onSubmit(text)
+}
+
+function submit(override?: string): void {
+	const text = (override ?? prompt.submitText()).trim()
+	const displayText = override === undefined ? prompt.text().trim() : undefined
+	if (!text) return
+	const warning = override === undefined ? claudeCacheWarning(client.currentTab(), text) : null
+	if (warning) {
+		completion.dismiss()
+		openClaudeCacheWarning(text, displayText, warning)
+		return
+	}
+	submitPromptText(text, displayText)
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
@@ -550,6 +620,7 @@ export const cli = {
 	formatRawToken,
 	forTests: {
 		handleAppKey,
+		claudeCacheWarning,
 	},
 	rawModeForTests: {
 		start: startRawMode,

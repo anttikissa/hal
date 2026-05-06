@@ -5,6 +5,7 @@ import { ipc } from '../ipc.ts'
 import { prompt } from '../cli/prompt.ts'
 import { render } from './render.ts'
 import { cursor } from '../cli/cursor.ts'
+import { popup } from './popup.ts'
 
 function makeRawSink(): { lines: string[]; emit: (text: string) => void } {
 	const lines: string[] = []
@@ -150,6 +151,23 @@ function makeTab(overrides: Partial<(typeof client.state.tabs)[number]> = {}): (
 	}
 }
 
+function withOneTab(tab: (typeof client.state.tabs)[number], run: () => void): void {
+	const origTabs = client.state.tabs.slice()
+	const origActiveTab = client.state.activeTab
+	try {
+		client.state.tabs.length = 0
+		client.state.tabs.push(tab)
+		client.state.activeTab = 0
+		run()
+	} finally {
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.activeTab = origActiveTab
+		prompt.clear()
+		popup.close()
+	}
+}
+
 test('enter on empty paused tab sends continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
@@ -254,5 +272,52 @@ test('enter on empty normal tab does not send continue', () => {
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
 		client.state.activeTab = origActiveTab
+	}
+})
+
+
+test('large stale Claude session opens overage confirmation before sending', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		model: 'anthropic/claude-opus-4-7',
+		contextUsed: 170_000,
+		history: [{ type: 'assistant', text: 'old', model: 'anthropic/claude-opus-4-7', ts: Date.now() - 24 * 60 * 60 * 1000 }],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+	try {
+		withOneTab(tab, () => {
+			prompt.setText('hi')
+			const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+			expect(handled).toBe(true)
+			expect(commands).toEqual([])
+			expect(popup.state.active).toBe(true)
+			expect(popup.state.title).toBe('Claude cache likely cold')
+			expect(prompt.text()).toBe('hi')
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+	}
+})
+
+test('large stale Claude confirmation sends when accepted', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		model: 'anthropic/claude-opus-4-7',
+		contextUsed: 170_000,
+		history: [{ type: 'assistant', text: 'old', model: 'anthropic/claude-opus-4-7', ts: Date.now() - 24 * 60 * 60 * 1000 }],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+	try {
+		withOneTab(tab, () => {
+			prompt.setText('hi')
+			cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+			popup.handleKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+			expect(commands).toMatchObject([{ type: 'prompt', text: 'hi' }])
+			expect(prompt.text()).toBe('')
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
 	}
 })

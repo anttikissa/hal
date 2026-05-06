@@ -164,6 +164,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 		content.push({ text: '', active: false })
 		inputCursor = { row: 1, col: 4 + built.cursor }
 	}
+	if (state.kind === 'confirm' && state.body.length > 0) content.push({ text: '', active: false })
 	for (const line of state.body) content.push({ text: line, active: false })
 	if (state.body.length > 0 && state.items.length > 0) content.push({ text: '', active: false })
 	for (let i = 0; i < state.items.length; i++) content.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex })
@@ -173,15 +174,19 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	// Touching those edges can trigger wrap-pending weirdness in some terminals.
 	const rightSlack = cols > 12 ? 1 : 0
 	const bottomSlack = rows > 6 ? 1 : 0
-	const rawWidth = Math.max(visLen(state.title) + 2, ...content.map((line) => visLen(line.text)))
+	const xMargin = state.kind === 'confirm' ? 1 : 0
+	const rawWidth = Math.max(visLen(state.title) + 2, ...content.map((line) => visLen(line.text) + xMargin * 2))
 	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
 	const innerWidth = Math.max(18, Math.min(maxInnerWidth, state.preferredInnerWidth ?? rawWidth))
+	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)
 	const top = `┌${title}${'─'.repeat(Math.max(0, innerWidth - titleWidth))}┐`
 	const lines = [top]
 	for (const line of content) {
-		const padded = pad(clipVisual(line.text, innerWidth), innerWidth)
+		const clipped = clipVisual(line.text, contentWidth)
+		const paddedContent = pad(clipped, contentWidth)
+		const padded = `${' '.repeat(xMargin)}${paddedContent}${' '.repeat(xMargin)}`
 		lines.push(`│${styleRow(padded, line.active)}│`)
 	}
 	lines.push(`└${'─'.repeat(innerWidth)}┘`)

@@ -75,6 +75,12 @@ const config = {
 	// Startup performance details are developer diagnostics. Keep the default
 	// startup card human-focused and enable these only when debugging startup.
 	showStartupPerf: false,
+	claudeCacheWarningEnabled: true,
+	// Derived from the observed 2026-05-01 Opus incident: ~170k cache-write
+	// tokens moved the 5h subscription meter by about 24%.
+	claudeCacheWarningTokensPerFiveHourPercent: 7_100,
+	claudeCacheWarningQuotaPercent: 10,
+	claudeCacheWarningStaleMs: 5 * 60 * 1000,
 }
 
 const state = {

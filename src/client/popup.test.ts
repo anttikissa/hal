@@ -49,6 +49,18 @@ describe('popup', () => {
 		expect(overlay?.lines.join('\n')).toContain('[Yes]')
 	})
 
+	test('confirm popup gives text horizontal and vertical breathing room', () => {
+		popup.openConfirm('Claude cache likely cold', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
+		const overlay = popup.buildOverlay(100, 30)
+		expect(overlay).not.toBeNull()
+		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))
+		const bodyIndex = clean.findIndex((line) => line.includes('Sending this may write'))
+		expect(bodyIndex).toBeGreaterThan(0)
+		expect(clean[bodyIndex]).toContain('│ Sending this may write 170k tokens.')
+		expect(clean[bodyIndex - 1]).toMatch(/^│ +│$/)
+		expect(clean[bodyIndex + 1]).toMatch(/^│ +│$/)
+	})
+
 
 	test('model picker keeps a stable width while filtering', () => {
 		popup.openModelPicker(() => {})
