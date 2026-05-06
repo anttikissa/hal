@@ -59,6 +59,11 @@ describe('popup', () => {
 		expect(clean[bodyIndex]).toContain('│ Sending this may write 170k tokens.')
 		expect(clean[bodyIndex - 1]).toMatch(/^│ +│$/)
 		expect(clean[bodyIndex + 1]).toMatch(/^│ +│$/)
+		const choiceIndex = clean.findIndex((line) => line.includes('Send anyway'))
+		expect(choiceIndex).toBeGreaterThan(bodyIndex)
+		// Bottom border is the last row; require an empty padding row right above it.
+		expect(clean[clean.length - 2]).toMatch(/^│ +│$/)
+		expect(choiceIndex).toBeLessThan(clean.length - 2)
 	})
 
 

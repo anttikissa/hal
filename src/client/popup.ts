@@ -168,6 +168,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	for (const line of state.body) content.push({ text: line, active: false })
 	if (state.body.length > 0 && state.items.length > 0) content.push({ text: '', active: false })
 	for (let i = 0; i < state.items.length; i++) content.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex })
+	if (state.kind === 'confirm' && state.items.length > 0) content.push({ text: '', active: false })
 	if (content.length === 0) content.push({ text: '', active: false })
 
 	// Keep a safety margin away from the terminal's last column and last row.
