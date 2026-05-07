@@ -15,6 +15,7 @@ import { models } from '../models.ts'
 import type { TokenUsage } from '../protocol.ts'
 import { auth } from '../auth.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { anthropicUsage } from '../anthropic-usage.ts'
 import { version } from '../version.ts'
 import { HAL_DIR } from '../state.ts'
 import { colors } from '../cli/colors.ts'
@@ -253,19 +254,39 @@ function tokenUsageLabel(usage: TokenUsage): string {
 	return parts.join(' ')
 }
 
-function subscriptionStatusLabel(base: string): string {
-	const current = openaiUsage.current()
-	if (!current) return ''
+function subscriptionStatusLabel(provider: string, base: string): string {
+	let primaryPct: number | undefined
+	let secondaryPct: number | undefined
+	let index: number | undefined
+	let total: number | undefined
+	let secondaryLabel = '7d'
+	if (provider === 'openai') {
+		const current = openaiUsage.current()
+		if (!current) return ''
+		primaryPct = current.primary?.usedPercent
+		secondaryPct = current.secondary?.usedPercent
+		index = current.index
+		total = current.total
+	} else if (provider === 'anthropic') {
+		const current = anthropicUsage.current()
+		if (!current) return ''
+		primaryPct = current.fiveHour?.usedPercent
+		secondaryPct = current.sevenDay?.usedPercent
+		index = current.index
+		total = current.total
+	} else {
+		return ''
+	}
 	const windows: string[] = []
-	if (current.primary) {
-		const pct = Math.round(current.primary.usedPercent)
+	if (primaryPct != null) {
+		const pct = Math.round(primaryPct)
 		windows.push(`5h ${renderStatus.heatText(`${pct}%`, pct, base)}`)
 	}
-	if (current.secondary) {
-		const pct = Math.round(current.secondary.usedPercent)
-		windows.push(`7d ${renderStatus.heatText(`${pct}%`, pct, base)}`)
+	if (secondaryPct != null) {
+		const pct = Math.round(secondaryPct)
+		windows.push(`${secondaryLabel} ${renderStatus.heatText(`${pct}%`, pct, base)}`)
 	}
-	const slot = current.index != null && current.total ? ` ${current.index + 1}/${current.total}` : ''
+	const slot = index != null && total ? ` ${index + 1}/${total}` : ''
 	if (windows.length === 0) return `Sub${slot}`
 	return `Sub${slot}: ${windows.join(', ')}`
 }
@@ -292,7 +313,7 @@ function renderStatusLine(lines: string[]): void {
 
 	const server = renderStatus.config.showServer ? renderStatus.serverStatusLabel() : ''
 	const tokenLabel = renderStatus.tokenUsageLabel(tab.usage)
-	const plan = renderStatus.config.showSubscription && provider === 'openai' && isSub ? renderStatus.subscriptionStatusLabel(base) : ''
+	const plan = renderStatus.config.showSubscription && isSub ? renderStatus.subscriptionStatusLabel(provider, base) : ''
 	const innerWidth = Math.max(0, cols - 2)
 	let showServer = !!server
 	let showTokens = !!tokenLabel
