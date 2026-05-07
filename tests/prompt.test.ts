@@ -141,6 +141,24 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('worldhello brave ')
 	})
 
+	test('ctrl-u and ctrl-k operate on current line in multiline text', () => {
+		// ctrl-k from middle of first line: kill to end of that line only
+		prompt.setText('first line\nsecond line\nthird', 'first '.length)
+		prompt.handleKey(key('k', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('first \nsecond line\nthird')
+
+		// ctrl-u from middle of second line: kill from start of that line
+		const pos = 'first \nsecond '.length
+		prompt.setText('first \nsecond line\nthird', pos)
+		prompt.handleKey(key('u', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('first \nline\nthird')
+
+		// ctrl-k at end-of-line position deletes the newline (joins lines)
+		prompt.setText('a\nb', 1)
+		prompt.handleKey(key('k', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('ab')
+	})
+
 	test('up enters history and down restores the draft', () => {
 		prompt.setHistory(['older', 'newer'])
 		prompt.setText('draft')

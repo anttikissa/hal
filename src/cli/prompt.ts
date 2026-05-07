@@ -504,11 +504,22 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			return true
 		case 'u':
 			if (!k.ctrl) break
-			if (cursor > 0) killRange(0, cursor)
+			{
+				// Kill from cursor to start of current line (like bash/readline)
+				const lineStart = buf.lastIndexOf('\n', cursor - 1) + 1
+				if (cursor > lineStart) killRange(lineStart, cursor)
+			}
 			return true
 		case 'k':
 			if (!k.ctrl) break
-			if (cursor < buf.length) killRange(cursor, buf.length)
+			{
+				// Kill from cursor to end of current line. If cursor is at end of
+				// line (on the newline), kill the newline itself.
+				let lineEnd = buf.indexOf('\n', cursor)
+				if (lineEnd === -1) lineEnd = buf.length
+				else if (lineEnd === cursor) lineEnd = cursor + 1
+				if (cursor < lineEnd) killRange(cursor, lineEnd)
+			}
 			return true
 		case 'a':
 			if (!k.ctrl) break
