@@ -370,6 +370,18 @@ function moveEdge(dir: -1 | 1, selecting: boolean): void {
 	move(dir === -1 ? 0 : buf.length, selecting)
 }
 
+// Move to start (-1) or end (1) of the current line (readline ctrl-a/ctrl-e).
+function moveLineEdge(dir: -1 | 1, selecting: boolean): void {
+	if (dir === -1) {
+		const lineStart = buf.lastIndexOf('\n', cursor - 1) + 1
+		move(lineStart, selecting)
+	} else {
+		let lineEnd = buf.indexOf('\n', cursor)
+		if (lineEnd === -1) lineEnd = buf.length
+		move(lineEnd, selecting)
+	}
+}
+
 function moveHorizontal(dir: -1 | 1, selecting: boolean, motion: 'char' | 'word' = 'char'): void {
 	const pos = motion === 'word'
 		? dir === -1 ? optionWordLeft(buf, cursor) : optionWordRight(buf, cursor)
@@ -525,11 +537,20 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			return true
 		case 'a':
 			if (!k.ctrl) break
-			moveEdge(-1, k.shift)
+			moveLineEdge(-1, k.shift)
 			return true
 		case 'e':
 			if (!k.ctrl) break
-			moveEdge(1, k.shift)
+			moveLineEdge(1, k.shift)
+			return true
+		case 'w':
+			if (!k.ctrl) break
+			// Kill word backward (readline ctrl-w). Uses whitespace-delimited
+			// "big word" semantics like bash.
+			if (cursor > 0 && !deleteSel()) {
+				const start = wordLeft(buf, cursor)
+				killRange(start, cursor)
+			}
 			return true
 		case 'v':
 			if (!k.ctrl) break
@@ -557,10 +578,10 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			return true
 		}
 		case 'home':
-			moveEdge(-1, k.shift)
+			moveLineEdge(-1, k.shift)
 			return true
 		case 'end':
-			moveEdge(1, k.shift)
+			moveLineEdge(1, k.shift)
 			return true
 	}
 

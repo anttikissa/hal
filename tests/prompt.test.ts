@@ -164,6 +164,23 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('ab')
 	})
 
+	test('ctrl-a and ctrl-e move to current line edges', () => {
+		prompt.setText('first\nsecond line\nthird', 'first\nsecond '.length)
+		prompt.handleKey(key('a', { ctrl: true }), 80)
+		expect(prompt.cursorPos()).toBe('first\n'.length)
+		prompt.handleKey(key('e', { ctrl: true }), 80)
+		expect(prompt.cursorPos()).toBe('first\nsecond line'.length)
+	})
+
+	test('ctrl-w kills the previous word', () => {
+		prompt.setText('hello brave world', 'hello brave '.length)
+		prompt.handleKey(key('w', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('hello world')
+		// Yank back what was killed
+		prompt.handleKey(key('y', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('hello brave world')
+	})
+
 	test('up enters history and down restores the draft', () => {
 		prompt.setHistory(['older', 'newer'])
 		prompt.setText('draft')
