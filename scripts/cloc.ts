@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 // Count non-comment, non-test, non-blank lines per module under src/
+import { cloc } from '../src/utils/cloc.ts'
 
 const dir = import.meta.dir + '/../src'
 const result = '/tmp/new-cloc.txt'
@@ -16,21 +17,7 @@ for await (const path of glob.scan({ cwd: dir, onlyFiles: true })) {
 	)
 		continue
 	const content = await Bun.file(`${dir}/${path}`).text()
-	let lines = 0
-	let inBlock = false
-	for (const line of content.split('\n')) {
-		const t = line.trim()
-		if (inBlock) {
-			if (t.includes('*/')) inBlock = false
-			continue
-		}
-		if (!t || t.startsWith('//')) continue
-		if (t.startsWith('/*')) {
-			if (!t.includes('*/')) inBlock = true
-			continue
-		}
-		lines++
-	}
+	const lines = cloc.countText(content)
 	counts.push([path, lines])
 	total += lines
 	totalBytes += Buffer.byteLength(content, 'utf8')

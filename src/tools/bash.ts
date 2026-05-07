@@ -9,6 +9,8 @@ import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { helpers } from '../utils/helpers.ts'
 import { processOutput } from '../utils/process-output.ts'
 import { sensitive } from './sensitive.ts'
+import { ason } from '../utils/ason.ts'
+import { cloc } from '../utils/cloc.ts'
 
 const config = {
 	/** Default timeout in milliseconds. */
@@ -24,6 +26,26 @@ interface BashInput {
 
 type TimerWithUnref = ReturnType<typeof setTimeout> & { unref?: () => void }
 
+interface CommitFileStat {
+	path: string
+	added: number
+	removed: number
+	locAdded: number
+	isCode: boolean
+}
+
+interface CommitMetadata {
+	branch: string
+	hash: string
+	summary: string
+	files: CommitFileStat[]
+	locAdded: number
+	locAddedCode: number
+}
+
+const COMMIT_META_START = '[hal-commit]'
+const COMMIT_META_END = '[/hal-commit]'
+
 const HOME = homedir()
 
 function shellPath(text: string, cwd: string): string {
@@ -38,6 +60,104 @@ function stripCdCwd(command: string | undefined, cwd: string): string | undefine
 	if (!match) return command
 	const target = shellPath(match[1]!, cwd)
 	return target === resolve(cwd) ? command!.slice(match[0].length) : command
+}
+
+function isCommitCommand(command: string): boolean {
+	return /\bgit\s+commit\b/.test(command)
+}
+
+function isTestPath(path: string): boolean {
+	return path.includes('.test.') || path.includes('.spec.') || path.startsWith('test/') || path.startsWith('tests/') || path.includes('/test/') || path.includes('/tests/')
+}
+
+function isCodePath(path: string): boolean {
+	return /\.[jt]sx?$/.test(path) && !isTestPath(path)
+}
+
+function plural(n: number, one: string, many: string): string {
+	return n === 1 ? one : many
+}
+
+function commitSummary(files: CommitFileStat[]): string {
+	let added = 0
+	let removed = 0
+	for (const file of files) {
+		added += file.added
+		removed += file.removed
+	}
+	const parts = [`${files.length} ${plural(files.length, 'file', 'files')} changed`]
+	if (added > 0) parts.push(`${added} ${plural(added, 'insertion', 'insertions')}(+)`)
+	if (removed > 0) parts.push(`${removed} ${plural(removed, 'deletion', 'deletions')}(-)`)
+	return parts.join(', ')
+}
+
+function runGit(cwd: string, args: string[]): string {
+	const proc = Bun.spawnSync(['git', ...args], {
+		cwd,
+		stdout: 'pipe',
+		stderr: 'ignore',
+	})
+	if ((proc.exitCode ?? 1) !== 0) return ''
+	return new TextDecoder().decode(proc.stdout).trim()
+}
+
+function changedFiles(cwd: string): CommitFileStat[] {
+	const numstat = runGit(cwd, ['diff-tree', '--root', '--no-commit-id', '--numstat', '-r', 'HEAD'])
+	const patch = runGit(cwd, ['show', '--format=', '--unified=0', '--no-ext-diff', 'HEAD'])
+	const addedLines = addedPatchLines(patch)
+	const files: CommitFileStat[] = []
+	for (const line of numstat.split('\n')) {
+		if (!line.trim()) continue
+		const parts = line.split('\t')
+		const added = Number(parts[0])
+		const removed = Number(parts[1])
+		const path = parts.at(-1) ?? ''
+		const locAdded = cloc.countText((addedLines.get(path) ?? []).join('\n'))
+		files.push({
+			path,
+			added: Number.isFinite(added) ? added : 0,
+			removed: Number.isFinite(removed) ? removed : 0,
+			locAdded,
+			isCode: isCodePath(path),
+		})
+	}
+	return files
+}
+
+function addedPatchLines(patch: string): Map<string, string[]> {
+	const files = new Map<string, string[]>()
+	let path = ''
+	for (const line of patch.split('\n')) {
+		if (line.startsWith('+++ b/')) {
+			path = line.slice(6)
+			if (!files.has(path)) files.set(path, [])
+			continue
+		}
+		if (!path || !line.startsWith('+') || line.startsWith('+++')) continue
+		files.get(path)!.push(line.slice(1))
+	}
+	return files
+}
+
+function commitMetadata(cwd: string): CommitMetadata | null {
+	const hash = runGit(cwd, ['show', '-s', '--format=%h', 'HEAD'])
+	if (!hash) return null
+	const branch = runGit(cwd, ['branch', '--show-current']) || 'HEAD'
+	const files = changedFiles(cwd)
+	let locAdded = 0
+	let locAddedCode = 0
+	for (const file of files) {
+		locAdded += file.locAdded
+		if (file.isCode) locAddedCode += file.locAdded
+	}
+	return { branch, hash, summary: commitSummary(files), files, locAdded, locAddedCode }
+}
+
+function appendCommitMetadata(out: string, command: string, cwd: string, code: number): string {
+	if (code !== 0 || !isCommitCommand(command)) return out
+	const meta = commitMetadata(cwd)
+	if (!meta) return out
+	return `${out}\n${COMMIT_META_START}\n${ason.stringify(meta, 'long')}\n${COMMIT_META_END}`
 }
 
 function normalizeInput(input: unknown, cwd: string): BashInput {
@@ -137,6 +257,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	}
 	if (stderr) out += (out ? '\n' : '') + stderr
 	if (code !== 0) out += `\n[exit ${code}]`
+	out = appendCommitMetadata(out, command, ctx.cwd, code)
 
 	return truncateOutput(out || '(no output)')
 }

@@ -294,11 +294,31 @@ function commitSubject(message: string): string {
 	return message.split('\n').find((line) => line.trim())?.trim() ?? 'commit'
 }
 
-function formatCommitMessage(message: string): string {
+function formatCommitMessageBody(message: string): string | undefined {
 	const lines = message.trim().split('\n')
-	const subject = lines.shift()?.trim() || 'commit'
+	lines.shift()
 	while (lines[0]?.trim() === '') lines.shift()
-	return [`# ${subject}`, ...lines].join('\n')
+	return lines.length ? lines.join('\n') : undefined
+}
+
+const COMMIT_META_START = '[hal-commit]'
+const COMMIT_META_END = '[/hal-commit]'
+
+interface CommitFileStat {
+	path: string
+	added: number
+	removed: number
+	locAdded: number
+	isCode: boolean
+}
+
+interface CommitMetadata {
+	branch: string
+	hash: string
+	summary: string
+	files: CommitFileStat[]
+	locAdded: number
+	locAddedCode: number
 }
 
 interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: string; suppressOutput?: boolean }
@@ -307,7 +327,7 @@ type ToolSpec = {
 	command?: (input?: any) => string | undefined
 	details?: (input?: any) => string | undefined
 	shellContinuations?: (input?: any) => boolean
-	format?: (output: string, cols: number) => ToolFormatResult
+	format?: (output: string, cols: number, input?: any) => ToolFormatResult
 }
 
 function formatSize(bytes: number): string {
@@ -366,6 +386,45 @@ function formatEval(output: string, cols: number): ToolFormatResult {
 	return { bodyLines: [`${label}${'─'.repeat(width)}`], suppressOutput: false }
 }
 
+function parseCommitMetadata(output: string): CommitMetadata | null {
+	const start = output.indexOf(COMMIT_META_START)
+	if (start < 0) return null
+	const dataStart = start + COMMIT_META_START.length
+	const end = output.indexOf(COMMIT_META_END, dataStart)
+	if (end < 0) return null
+	try {
+		return ason.parse(output.slice(dataStart, end).trim()) as unknown as CommitMetadata
+	} catch {
+		return null
+	}
+}
+
+function fileStatLine(file: CommitFileStat): string {
+	const prefix = `${String(file.added).padStart(4)} −${String(file.removed).padEnd(3)}`
+	const loc = file.isCode ? `  +${file.locAdded} loc` : ''
+	return `${prefix} ${file.path}${loc}`
+}
+
+function formatCommitOutput(output: string, cols: number, input?: any): ToolFormatResult {
+	const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
+	if (!commitMessageFromBash(cmd)) return { bodyLines: [] }
+	const meta = parseCommitMetadata(output)
+	if (!meta) return { bodyLines: [], suppressOutput: true }
+	const lines = [`${meta.branch} ${meta.hash} · ${meta.summary}`]
+	const other = meta.files.filter((file) => !file.isCode)
+	const code = meta.files.filter((file) => file.isCode)
+	if (other.length) {
+		lines.push('', 'Tests / docs / other')
+		for (const file of other) lines.push(fileStatLine(file))
+	}
+	if (code.length) {
+		lines.push('', 'Code')
+		for (const file of code) lines.push(fileStatLine(file))
+	}
+	lines.push('', resolveMarkers([md.mdInline(`Core LOC: +${meta.locAdded} total, **+${meta.locAddedCode} excluding tests**`)])[0]!)
+	return { bodyLines: lines, suppressOutput: true }
+}
+
 function quoteToolArg(value: unknown): string {
 	const text = typeof value === 'string' ? value : '?'
 	return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`
@@ -382,13 +441,14 @@ const toolSpecs: Record<string, ToolSpec> = {
 		command(input) {
 			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
 			const message = commitMessageFromBash(cmd)
-			if (message) return formatCommitMessage(message)
+			if (message) return formatCommitMessageBody(message)
 			return !cmd.includes('\n') && cmd.length <= 60 ? undefined : cmd
 		},
 		shellContinuations(input) {
 			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
 			return !commitMessageFromBash(cmd)
 		},
+		format: formatCommitOutput,
 	},
 	read: { title(input) { const range = input?.start || input?.end ? ` (${input.start ?? 1}-${input.end ?? 'end'})` : ''; return `Read ${input?.path ?? '?'}${range}` }, format: formatRead },
 	read_url: { title: (input) => `Read URL ${input?.url ?? '?'}` },
@@ -484,7 +544,7 @@ function blockContent(block: Block, cols: number): string[] {
 		if (details) pushDimWrapped(lines, details, cols)
 		if (!block.output) return lines
 		const output = sanitizeTerminalText(stripAnsiSequences(block.output))
-		const format = spec.format?.(output, cols) ?? { bodyLines: [] }
+		const format = spec.format?.(output, cols, block.input) ?? { bodyLines: [] }
 		for (const line of format.bodyLines) lines.push(clipLine(line, cols))
 		if (format.suppressOutput) return lines
 		const outputLines = output.trimEnd().split('\n')

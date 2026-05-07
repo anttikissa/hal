@@ -9,7 +9,6 @@ import { prompt } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
 import { helpBar } from '../cli/help-bar.ts'
 import { popup } from './popup.ts'
-import { clipboard } from '../cli/clipboard.ts'
 import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
 import { openaiUsage } from '../openai-usage.ts'
@@ -486,9 +485,8 @@ function handleAppKey(k: KeyEvent): boolean {
 		return true
 	}
 	// Enter: continue a paused/error turn when the prompt is empty.
-	// Otherwise submit the current prompt (blocked while image paste resolves).
+	// Otherwise submit the current prompt.
 	if (k.key === 'enter' && !k.shift) {
-		if (clipboard.hasPendingPastes()) return true
 		if (!prompt.text().trim() && client.canContinueCurrentTurn()) {
 			client.sendCommand('continue')
 			draw()

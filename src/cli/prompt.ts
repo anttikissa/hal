@@ -426,11 +426,7 @@ function resolvePlaceholder(placeholder: string, replacement: string): void {
 }
 
 function doPaste(): void {
-	const t = clipboard.cleanPaste(
-		clipboard.pasteFromClipboard((ph, result) => {
-			resolvePlaceholder(ph, result)
-		}),
-	)
+	const t = clipboard.cleanPaste(clipboard.pasteFromClipboard())
 	if (t) replaceSelectionWithPastedText(t)
 }
 
