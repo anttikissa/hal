@@ -411,16 +411,18 @@ function sendTabCommandIfRoom(type: 'open' | 'resume', text?: string): void {
 	else client.addEntry(`Max tabs reached (${maxTabs}). Close one first.`, 'error')
 }
 
+function chooseModelWithoutClearingDraft(model: string): void {
+	client.sendCommand('prompt', `/model ${model}`)
+	openaiUsage.noteActivity()
+	draw()
+}
+
 // App-level keybindings (not handled by prompt)
 function handleAppKey(k: KeyEvent): boolean {
 	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
 		completion.dismiss()
 		const currentModel = client.currentTab()?.model || models.defaultModel()
-		popup.openModelPicker((model) => {
-			submit(`/model ${model}`)
-			openaiUsage.noteActivity()
-			draw()
-		}, currentModel)
+		popup.openModelPicker(chooseModelWithoutClearingDraft, currentModel)
 		draw()
 		return true
 	}

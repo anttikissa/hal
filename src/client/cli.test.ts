@@ -168,6 +168,31 @@ function withOneTab(tab: (typeof client.state.tabs)[number], run: () => void): v
 	}
 }
 
+test('model picker keeps the prompt draft after choosing a model', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	prompt.setText('draft prompt')
+
+	withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
+		withOneTab(makeTab(), () => {
+			ipc.appendCommand = (command) => { commands.push(command) }
+			try {
+				const opened = cli.forTests.handleAppKey({ key: 'm', shift: false, ctrl: true, alt: false, cmd: false })
+				expect(opened).toBe(true)
+				expect(popup.state.active).toBe(true)
+
+				const chosen = popup.handleKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+				expect(chosen).toBe(true)
+
+				expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: '/model gpt' })])
+				expect(prompt.text()).toBe('draft prompt')
+			} finally {
+				ipc.appendCommand = origAppendCommand
+			}
+		})
+	})
+})
+
 test('enter on empty paused tab sends continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
