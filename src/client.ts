@@ -109,6 +109,7 @@ const state = {
 
 let pendingEntries: Block[] = []
 let onChange: (force: boolean) => void = () => {}
+let onToolConfirmRequest: ((event: any) => void) | null = null
 
 
 type DelayedPausedNotice = {
@@ -184,6 +185,10 @@ function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string
 
 function setOnChange(fn: (force: boolean) => void): void {
 	onChange = fn
+}
+
+function setOnToolConfirmRequest(fn: (event: any) => void): void {
+	onToolConfirmRequest = fn
 }
 
 function requestRender(force = false): void { onChange(force) }
@@ -681,6 +686,8 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 			return { type, sessionId, name: text ?? '' }
 		case 'spawn':
 			throw new Error('spawn commands must be created explicitly')
+		case 'tool-confirm':
+			throw new Error('tool confirmations must be created explicitly')
 	}
 }
 
@@ -1007,6 +1014,13 @@ function handleEvent(event: any): void {
 		return
 	}
 
+	if (event.type === 'tool-confirm-request' && event.sessionId) {
+		flushDelayedPaused(event.sessionId)
+		onToolConfirmRequest?.(event)
+		onChange(false)
+		return
+	}
+
 	if (event.type === 'tool-result' && event.sessionId) {
 		flushDelayedPaused(event.sessionId)
 		const tab = state.tabs.find((item) => item.sessionId === event.sessionId)
@@ -1176,6 +1190,7 @@ function resetForTests(): void {
 	onChange = () => {}
 	onTabSwitch = null
 	onDraftArrived = null
+	onToolConfirmRequest = null
 	pendingOpen = false
 	returnToBySession.clear()
 	hostLockState = null
@@ -1216,6 +1231,7 @@ export const client = {
 	state,
 	setOnChange,
 	requestRender,
+	setOnToolConfirmRequest,
 	setOnTabSwitch,
 	setOnDraftArrived,
 	currentTab,

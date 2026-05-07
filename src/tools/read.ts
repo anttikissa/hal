@@ -107,7 +107,7 @@ async function readSelectedLines(path: string, start: number, end: number | unde
 
 async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const path = resolvePath(input?.path, ctx.cwd)
-	const denied = sensitive.denyIfProtected(path, 'read')
+	const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'read')
 	if (denied) return denied
 	const start = Number.isFinite(Number(input?.start)) ? Number(input.start) : 1
 	const end = input?.end === undefined ? undefined : Number(input.end)

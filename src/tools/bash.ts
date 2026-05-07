@@ -207,7 +207,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalizeInput(input, ctx.cwd)
 	const command = spec.command ?? ''
 	if (!command.trim()) return 'error: empty command'
-	if (sensitive.commandMentionsProtectedPath(command)) return 'error: refusing to run command that mentions protected credentials file'
+	if (!ctx.approvedRisk && sensitive.commandMentionsProtectedPath(command)) return 'error: refusing to run command that mentions protected credentials file'
 
 	const timeout = spec.timeout ?? config.defaultTimeout
 

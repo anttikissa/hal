@@ -25,6 +25,8 @@ export interface ToolContext {
 	sessionId: string
 	cwd: string
 	signal?: AbortSignal
+	/** True after the user approved a risky model-initiated tool call. */
+	approvedRisk?: boolean
 }
 
 function inputObject(input: unknown): ToolInput {

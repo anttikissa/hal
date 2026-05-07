@@ -23,10 +23,10 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 	const searchPaths = read.resolvePaths(input?.path, ctx.cwd)
 	for (const path of searchPaths) {
-		const denied = sensitive.denyIfProtected(path, 'list')
+		const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'list')
 		if (denied) return denied
 	}
-	if (sensitive.isProtectedBasename(pattern)) return sensitive.denyMessage('list', pattern)
+	if (!ctx.approvedRisk && sensitive.isProtectedBasename(pattern)) return sensitive.denyMessage('list', pattern)
 
 	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', pattern, ...searchPaths]
 
@@ -41,7 +41,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const [stdout] = await Promise.all([stdoutPromise, stderrPromise])
 	await proc.exited
 
-	const result = sensitive.filterPathList(stdout.text.trim())
+	const result = ctx.approvedRisk ? stdout.text.trim() : sensitive.filterPathList(stdout.text.trim())
 	if (!result) return 'No files found.'
 	return result
 }

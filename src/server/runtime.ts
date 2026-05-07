@@ -597,6 +597,10 @@ function handleCommand(cmd: Command): void {
 			void startSpawnedSession(parent, child, spec)
 			break
 		}
+		case 'tool-confirm': {
+			agentLoop.resolveToolConfirmation(cmd.requestId, cmd.approved)
+			break
+		}
 		case 'resume': {
 			const selector = (cmd.selector ?? '').trim()
 			const resumeId = sessionStore.resolveResumeTarget(sessionStore.loadAllSessionMetas(), new Set(state.activeSessions), selector)

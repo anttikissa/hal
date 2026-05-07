@@ -25,7 +25,7 @@ const state = {
 	active: false,
 	kind: null as 'model' | 'confirm' | null,
 	title: '',
-	tone: 'neutral' as 'neutral' | 'warning',
+	tone: 'neutral' as 'neutral' | 'warning' | 'danger',
 	body: [] as string[],
 	items: [] as PopupItem[],
 	selectedIndex: 0,
@@ -38,6 +38,8 @@ const MODEL_PICKER_INNER_WIDTH = 72
 const YELLOW = '\x1b[33m'
 const GRAY = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
+const DANGER_YELLOW = '\x1b[38;5;226m'
+const DANGER_STRIPE = '\x1b[33;40m'
 
 function close(): void {
 	state.active = false
@@ -84,12 +86,12 @@ function openModelPicker(onChoose: (value: string) => void, currentModel?: strin
 	else if (fallback >= 0) state.selectedIndex = fallback
 }
 
-function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void): void {
+function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void, tone: 'warning' | 'danger' = 'warning'): void {
 	close()
 	state.active = true
 	state.kind = 'confirm'
 	state.title = title
-	state.tone = 'warning'
+	state.tone = tone
 	state.body = body
 	state.items = choices.map((choice) => ({ value: choice, label: choice }))
 	state.onChoose = onChoose
@@ -138,6 +140,7 @@ function handleKey(k: KeyEvent): boolean {
 }
 
 function toneColor(): string {
+	if (state.tone === 'danger') return DANGER_YELLOW
 	return state.tone === 'warning' ? YELLOW : GRAY
 }
 
@@ -147,6 +150,10 @@ function rowText(item: PopupItem, active: boolean): string {
 
 function pad(text: string, width: number): string {
 	return text + ' '.repeat(Math.max(0, width - visLen(text)))
+}
+
+function dangerStripe(width: number): string {
+	return DANGER_STRIPE + '◢◤'.repeat(Math.ceil(width / 2)).slice(0, width) + RESET
 }
 
 function styleRow(text: string, active: boolean): string {
@@ -180,11 +187,16 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
 	const innerWidth = Math.max(18, Math.min(maxInnerWidth, state.preferredInnerWidth ?? rawWidth))
 	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
+	const displayContent = [...content]
+	if (state.tone === 'danger' && state.kind === 'confirm') {
+		displayContent.unshift({ text: dangerStripe(contentWidth), active: false }, { text: '', active: false })
+		displayContent.push({ text: dangerStripe(contentWidth), active: false })
+	}
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)
 	const top = `┌${title}${'─'.repeat(Math.max(0, innerWidth - titleWidth))}┐`
 	const lines = [top]
-	for (const line of content) {
+	for (const line of displayContent) {
 		const clipped = clipVisual(line.text, contentWidth)
 		const paddedContent = pad(clipped, contentWidth)
 		const padded = `${' '.repeat(xMargin)}${paddedContent}${' '.repeat(xMargin)}`

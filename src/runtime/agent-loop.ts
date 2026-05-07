@@ -14,6 +14,7 @@ import { context } from './context.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { bash } from '../tools/bash.ts'
+import { risk, type RiskFinding } from '../tools/risk.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
@@ -43,6 +44,8 @@ const state = {
 	/** Info text to emit when an aborted generation finishes unwinding. */
 	abortTexts: new Map<string, string>(),
 }
+
+const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) => void }>()
 
 const DEFAULT_ABORT_TEXT = '[paused]'
 
@@ -116,6 +119,47 @@ function sanitizeToolCallInput(name: string, input: any, cwd: string): any {
 	const command = bash.stripCdCwd(input.command, cwd)
 	if (command === input.command) return input
 	return { ...input, command, cwd }
+}
+
+function resolveToolConfirmation(requestId: string, approved: boolean): boolean {
+	const pending = pendingToolConfirmations.get(requestId)
+	if (!pending) return false
+	pendingToolConfirmations.delete(requestId)
+	pending.resolve(approved)
+	return true
+}
+
+function toolConfirmationBody(call: ToolCall, findings: RiskFinding[]): string[] {
+	const text = call.name === 'bash' ? String(call.input?.command ?? '') : JSON.stringify(call.input ?? {})
+	const preview = text.length > 800 ? text.slice(0, 800) + '\n[… truncated]' : text
+	const lines = ['This tool call looks risky. Continue?', '', "I'm asking because:"]
+	for (const finding of findings) lines.push(`- ${finding.reason}`)
+	lines.push('', `${call.name}:`, preview)
+	return lines
+}
+
+async function confirmToolCall(sessionId: string, call: ToolCall, signal: AbortSignal): Promise<{ allowed: boolean; approvedRisk: boolean }> {
+	const findings = risk.analyzeToolCall(call.name, call.input)
+	if (findings.length === 0) return { allowed: true, approvedRisk: false }
+	const requestId = protocol.eventId()
+	emitEvent(sessionId, {
+		type: 'tool-confirm-request',
+		requestId,
+		body: toolConfirmationBody(call, findings),
+	})
+	const approved = await new Promise<boolean>((resolve) => {
+		function done(value: boolean): void {
+			signal.removeEventListener('abort', onAbort)
+			resolve(value)
+		}
+		function onAbort(): void {
+			pendingToolConfirmations.delete(requestId)
+			done(false)
+		}
+		pendingToolConfirmations.set(requestId, { resolve: done })
+		signal.addEventListener('abort', onAbort, { once: true })
+	})
+	return { allowed: approved, approvedRisk: approved }
 }
 
 function parseErrorPayload(body: string | undefined): unknown {
@@ -666,7 +710,9 @@ async function executeToolsConcurrently(
 			batch.map(async (call) => {
 				if (signal.aborted) return { call, result: '[interrupted]' }
 				try {
-					const result = await toolRegistry.dispatch(call.name, call.input, context)
+					const approval = await confirmToolCall(context.sessionId, call, signal)
+					if (!approval.allowed) return { call, result: 'error: user rejected risky tool call' }
+					const result = await toolRegistry.dispatch(call.name, call.input, { ...context, approvedRisk: approval.approvedRisk })
 					return { call, result }
 				} catch (err: any) {
 					return { call, result: `error: ${err?.message ?? String(err)}` }
@@ -701,6 +747,7 @@ export const agentLoop = {
 	state,
 	runAgentLoop,
 	abort,
+	resolveToolConfirmation,
 	isActive,
 	sanitizeToolCallInput,
 }

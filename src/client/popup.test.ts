@@ -49,6 +49,13 @@ describe('popup', () => {
 		expect(overlay?.lines.join('\n')).toContain('[Yes]')
 	})
 
+	test('danger confirm popup shows striped warning rows', () => {
+		popup.openConfirm('Risky tool call', ['DESTRUCTIVE RM -RF COMMAND'], ['Yes', 'No'], () => {}, 'danger')
+		const overlay = popup.buildOverlay(100, 30)
+		expect(overlay?.lines.join('\n')).toContain('◢')
+		expect(overlay?.lines.join('\n')).toContain('◤')
+	})
+
 	test('confirm popup gives text horizontal and vertical breathing room', () => {
 		popup.openConfirm('Claude cache likely cold', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
 		const overlay = popup.buildOverlay(100, 30)

@@ -17,10 +17,11 @@ export type EventType =
 	| 'stream-end'
 	| 'tool-call'
 	| 'tool-result'
+	| 'tool-confirm-request'
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'continue' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'move' | 'rename' | 'spawn'
+export type CommandType = 'prompt' | 'continue' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'move' | 'rename' | 'spawn' | 'tool-confirm'
 
 export type SpawnMode = 'fork' | 'fresh'
 
@@ -112,6 +113,12 @@ export interface SpawnCommand extends CommandBase {
 	spawn: SpawnCommandData
 }
 
+export interface ToolConfirmCommand extends CommandBase {
+	type: 'tool-confirm'
+	requestId: string
+	approved: boolean
+}
+
 export type Command =
 	| PromptCommand
 	| ContinueCommand
@@ -126,6 +133,7 @@ export type Command =
 	| MoveCommand
 	| RenameCommand
 	| SpawnCommand
+	| ToolConfirmCommand
 
 // ── Tool call types ──
 

@@ -102,7 +102,7 @@ function runLintForEdit(path: string): string | null {
 
 async function executeWrite(input: any, ctx: ToolContext): Promise<string> {
 	const path = read.resolvePath(input?.path, ctx.cwd)
-	const denied = sensitive.denyIfProtected(path, 'write')
+	const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'write')
 	if (denied) return denied
 	const content = String(input?.content ?? '')
 
@@ -132,7 +132,7 @@ const writeTool = {
 
 async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 	const path = read.resolvePath(input?.path, ctx.cwd)
-	const denied = sensitive.denyIfProtected(path, 'edit')
+	const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'edit')
 	if (denied) return denied
 	const operation = input?.operation
 	const newContent = String(input?.new_content ?? '')

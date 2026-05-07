@@ -27,6 +27,13 @@ describe('client streaming blocks', () => {
 		client.state.activeTab = 0
 	})
 
+	test('tool confirmation requests call the TUI hook', () => {
+		let seen: any = null
+		client.setOnToolConfirmRequest((event) => { seen = event })
+		client.handleEvent({ type: 'tool-confirm-request', sessionId: 's1', requestId: 'r1', body: ['risky'] })
+		expect(seen?.requestId).toBe('r1')
+	})
+
 
 	test('paused info waits briefly before rendering', async () => {
 		client.handleEvent({

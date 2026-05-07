@@ -42,7 +42,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 
 	const searchPaths = read.resolvePaths(input?.path, ctx.cwd)
 	for (const path of searchPaths) {
-		const denied = sensitive.denyIfProtected(path, 'search')
+		const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'search')
 		if (denied) return denied
 	}
 	const maxResults = input?.maxResults ?? 100
@@ -72,7 +72,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const stderrPromise = processOutput.readLimited(proc.stderr, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 	const [stdout, stderr, code] = await Promise.all([stdoutPromise, stderrPromise, proc.exited])
 
-	const result = sensitive.filterPathList(stdout.text.trim())
+	const result = ctx.approvedRisk ? stdout.text.trim() : sensitive.filterPathList(stdout.text.trim())
 	if (!result) {
 		// rg returns exit 1 for "no matches" — not an error.
 		const err = formatRgError(stderr.text)

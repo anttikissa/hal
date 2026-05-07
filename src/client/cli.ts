@@ -14,6 +14,7 @@ import { perf } from '../perf.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { startup } from '../startup.ts'
 import { models } from '../models.ts'
+import { ipc } from '../ipc.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
 const RESTART_CODE = 100
@@ -290,6 +291,21 @@ function openClaudeCacheWarning(text: string, displayText: string | undefined, w
 	)
 }
 
+function openToolConfirm(event: any): void {
+	const body = Array.isArray(event.body) ? event.body.map(String) : ['This tool call looks risky.']
+	popup.openConfirm(
+		event.title ?? 'Risky tool call',
+		body,
+		['Yes', 'No'],
+		(choice) => {
+			ipc.appendCommand({ type: 'tool-confirm', sessionId: event.sessionId, requestId: String(event.requestId), approved: choice === 'Yes' })
+			draw()
+		},
+		'danger',
+	)
+	draw()
+}
+
 function submitPromptText(text: string, displayText: string | undefined): void {
 	completion.dismiss()
 	popup.close()
@@ -502,6 +518,7 @@ function handleAppKey(k: KeyEvent): boolean {
 function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
+	client.setOnToolConfirmRequest(openToolConfirm)
 
 	// Wire prompt to trigger repaint on async paste resolve.
 	prompt.setRenderCallback(() => {
