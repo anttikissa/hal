@@ -690,10 +690,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 					}])
 				}
 			}
-			if (tail.shouldContinue) {
-				emitInfo(sessionId, 'Continuing...')
-				void runGeneration(sessionId, '')
-			}
+			if (tail.shouldContinue) void runGeneration(sessionId, '')
 		}
 	})()
 	void (async () => {
