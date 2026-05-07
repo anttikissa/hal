@@ -85,6 +85,44 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 	expect(text).toContain('<br>11% used')
 })
 
+test('refreshAll prunes cached accounts whose credentials are gone', async () => {
+	auth.ensureFresh = async () => {}
+	// Pre-populate cache with two accounts, but only one credential is currently configured
+	anthropicUsage.state.accounts = {
+		'anthropic:0': {
+			key: 'anthropic:0',
+			email: 'a@test.com',
+			index: 0,
+			total: 2,
+			pendingTokens: 0,
+			fiveHour: { usedPercent: 10 },
+		},
+		'anthropic:1': {
+			key: 'anthropic:1',
+			email: 'b@test.com',
+			index: 1,
+			total: 2,
+			pendingTokens: 0,
+			fiveHour: { usedPercent: 20 },
+		},
+	}
+	anthropicUsage.state.currentKey = 'anthropic:1'
+	auth.listCredentials = () => [{ ...makeCredential(0, 'a@test.com'), total: 1 }]
+
+	globalThis.fetch = Object.assign(async () => {
+		return new Response(JSON.stringify({
+			five_hour: { utilization: 0.10, resets_at: '2026-01-07T05:00:00Z' },
+		}), { status: 200 }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	await anthropicUsage.refreshAll(true)
+
+	expect(anthropicUsage.state.accounts['anthropic:0']).toBeDefined()
+	expect(anthropicUsage.state.accounts['anthropic:1']).toBeUndefined()
+	// stale currentKey gets cleared
+	expect(anthropicUsage.state.currentKey).toBe('anthropic:0')
+})
+
 test('formatStatusText can censor emails for screenshot-safe output', () => {
 	subscriptionUsage.config.censorEmails = true
 	anthropicUsage.state.currentKey = 'anthropic:0'

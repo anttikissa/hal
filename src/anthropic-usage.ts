@@ -261,7 +261,21 @@ async function refreshCredential(credential: Credential, force = false): Promise
 
 async function refreshAll(force = false): Promise<AccountUsage[]> {
 	await auth.ensureFresh('anthropic')
-	for (const credential of credentials()) await refreshCredential(credential, force)
+	const creds = credentials()
+	// Prune cached accounts whose credentials no longer exist in auth.ason.
+	// Done before refresh so that refreshCredential's "first credential becomes current"
+	// fallback can kick in if the stale currentKey gets cleared.
+	const activeKeys = new Set(creds.map(keyOf))
+	let changed = false
+	for (const key of Object.keys(state.accounts)) {
+		if (!activeKeys.has(key)) {
+			delete state.accounts[key]
+			if (state.currentKey === key) state.currentKey = ''
+			changed = true
+		}
+	}
+	if (changed) save()
+	for (const credential of creds) await refreshCredential(credential, force)
 	return all()
 }
 
