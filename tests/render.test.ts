@@ -154,6 +154,14 @@ describe('render', () => {
 		expect(clean).not.toContain('enter: continue')
 	})
 
+	test('help bar teaches enter: continue after max iteration stop', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'error', text: 'Hit max iterations (50). Stopping.', ts: Date.now() })
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('enter: continue')
+		expect(clean).not.toContain('enter: retry')
+	})
+
 	test('continue/retry hint stays visible even after enter is learned', () => {
 		const tab = client.currentTab()!
 		for (let i = 0; i < helpBar.config.learnThreshold; i++) helpBar.logKey('enter')

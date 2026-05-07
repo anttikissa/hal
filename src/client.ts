@@ -693,8 +693,15 @@ function assistantChainId(block: Block): string | null {
 	return liveEventBlocks.assistantChainId(block)
 }
 
+function isMaxIterationsStop(text: string | undefined): boolean {
+	return /^Hit max iterations \(\d+\)\. Stopping\.$/.test(text ?? '')
+}
+
 function continuableActionForBlock(block: Block): ContinueAction | false {
-	if (block.type === 'error') return 'retry'
+	if (block.type === 'error') {
+		if (isMaxIterationsStop(block.text)) return 'continue'
+		return 'retry'
+	}
 	if (block.type === 'info' && (block.text === '[paused]' || block.text?.startsWith('[interrupted]'))) return 'continue'
 	return false
 }
