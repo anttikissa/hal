@@ -286,7 +286,8 @@ function subscriptionStatusLabel(provider: string, base: string): string {
 		const pct = Math.round(secondaryPct)
 		windows.push(`${secondaryLabel} ${renderStatus.heatText(`${pct}%`, pct, base)}`)
 	}
-	const slot = index != null && total ? ` ${index + 1}/${total}` : ''
+	// Drop the slot entirely with one account; show just the index ("Sub 2") otherwise.
+	const slot = index != null && total && total > 1 ? ` ${index + 1}` : ''
 	if (windows.length === 0) return `Sub${slot}`
 	return `Sub${slot}: ${windows.join(', ')}`
 }
