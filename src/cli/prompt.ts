@@ -505,9 +505,11 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		case 'u':
 			if (!k.ctrl) break
 			{
-				// Kill from cursor to start of current line (like bash/readline)
+				// Kill from cursor to start of current line. If already at start
+				// of line, kill the preceding newline (joins with previous line).
 				const lineStart = buf.lastIndexOf('\n', cursor - 1) + 1
 				if (cursor > lineStart) killRange(lineStart, cursor)
+				else if (lineStart > 0) killRange(lineStart - 1, cursor)
 			}
 			return true
 		case 'k':

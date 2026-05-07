@@ -157,6 +157,11 @@ describe('prompt', () => {
 		prompt.setText('a\nb', 1)
 		prompt.handleKey(key('k', { ctrl: true }), 80)
 		expect(prompt.text()).toBe('ab')
+
+		// ctrl-u at start-of-line deletes the preceding newline (joins lines)
+		prompt.setText('a\nb', 2)
+		prompt.handleKey(key('u', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('ab')
 	})
 
 	test('up enters history and down restores the draft', () => {

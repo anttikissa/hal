@@ -41,7 +41,7 @@
 		// ↑56k input tokens sent, ↓2.8k output tokens received.
 		showTokenInOut: true,
 		// R1.7M cache tokens read, W42k cache tokens written; W only appears when writing new cache.
-		showTokenCache: false,
+		showTokenCache: true,
 		// Sub 2/3: 5h 23%, 7d 61%
 		showSubscription: true
 	},
