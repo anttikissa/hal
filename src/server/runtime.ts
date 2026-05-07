@@ -137,20 +137,31 @@ function shouldCloseSessionAfterGeneration(
 	return !!meta?.closeWhenDone && result === 'completed'
 }
 
-function shouldAutoContinue(entries: Array<{ type: string; text?: string; ts?: string }>, now = Date.now()): boolean {
-	let lastType: string | undefined
-	let lastTs: string | undefined
+type TailEntry = { type: string; text?: string; ts?: string; toolId?: string; name?: string; synthetic?: boolean }
+type TailTurnState = { shouldContinue: boolean; interruptedTools: { name: string; id: string }[] }
+
+function tailTurnState(entries: TailEntry[], now = Date.now()): TailTurnState {
+	let sawRestart = false
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
-		if (entry.type === 'info' && (entry.text === USER_PAUSED_TEXT || entry.text === TAB_CLOSED_TEXT)) return false
-		if (!lastType && (entry.type === 'user' || entry.type === 'tool_result' || entry.type === 'assistant')) {
-			lastType = entry.type
-			lastTs = entry.ts
+		if (entry.type === 'info') {
+			if (entry.text === USER_PAUSED_TEXT || entry.text === TAB_CLOSED_TEXT) return { shouldContinue: false, interruptedTools: [] }
+			if (entry.text === RESTARTED_TEXT) sawRestart = true
+			continue
 		}
-		if (lastType) break
+		if (entry.type === 'assistant' && entry.synthetic) continue
+		if (entry.type === 'assistant') return { shouldContinue: false, interruptedTools: [] }
+		if (entry.type === 'tool_call') return { shouldContinue: true, interruptedTools: sessionStore.detectInterruptedTools(entries as any) }
+		if (entry.type !== 'user' && entry.type !== 'thinking' && entry.type !== 'tool_result') continue
+
+		const ms = entry.ts ? Date.parse(entry.ts) : now
+		return { shouldContinue: sawRestart || (Number.isFinite(ms) && now - ms <= 30_000), interruptedTools: [] }
 	}
-	if (lastType !== 'user' && lastType !== 'tool_result') return false
-	return !lastTs || (now - new Date(lastTs).getTime()) <= 30_000
+	return { shouldContinue: false, interruptedTools: [] }
+}
+
+function shouldAutoContinue(entries: TailEntry[], now = Date.now()): boolean {
+	return tailTurnState(entries, now).shouldContinue
 }
 
 function recordSessionInfo(sessionId: string, text: string, ts: string): void {
@@ -667,10 +678,10 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 			if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
 			const entries = sessionStore.loadAllHistory(sessionId)
 			if (entries.length === 0) continue
-			const interrupted = sessionStore.detectInterruptedTools(entries)
-			if (interrupted.length > 0) {
-				emitInfo(sessionId, `Resolving ${interrupted.length} interrupted tool(s): ${interrupted.map((tool) => tool.name).join(', ')}`)
-				for (const tool of interrupted) {
+			const tail = tailTurnState(entries)
+			if (tail.interruptedTools.length > 0) {
+				emitInfo(sessionId, `Resolving ${tail.interruptedTools.length} interrupted tool(s): ${tail.interruptedTools.map((tool) => tool.name).join(', ')}`)
+				for (const tool of tail.interruptedTools) {
 					sessionStore.appendHistory(sessionId, [{
 						type: 'tool_result',
 						toolId: tool.id,
@@ -679,8 +690,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 					}])
 				}
 			}
-			const allEntries = interrupted.length > 0 ? sessionStore.loadAllHistory(sessionId) : entries
-			if (shouldAutoContinue(allEntries)) {
+			if (tail.shouldContinue) {
 				emitInfo(sessionId, 'Continuing...')
 				void runGeneration(sessionId, '')
 			}
