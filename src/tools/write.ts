@@ -13,6 +13,7 @@ import { toolRegistry, type ToolContext } from './tool.ts'
 import { editRemap } from './edit-remap.ts'
 import { hashline } from './hashline.ts'
 import { read } from './read.ts'
+import { sensitive } from './sensitive.ts'
 
 // ── Shared helpers ──
 
@@ -101,6 +102,8 @@ function runLintForEdit(path: string): string | null {
 
 async function executeWrite(input: any, ctx: ToolContext): Promise<string> {
 	const path = read.resolvePath(input?.path, ctx.cwd)
+	const denied = sensitive.denyIfProtected(path, 'write')
+	if (denied) return denied
 	const content = String(input?.content ?? '')
 
 	return withLock(path, async () => {
@@ -129,6 +132,8 @@ const writeTool = {
 
 async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 	const path = read.resolvePath(input?.path, ctx.cwd)
+	const denied = sensitive.denyIfProtected(path, 'edit')
+	if (denied) return denied
 	const operation = input?.operation
 	const newContent = String(input?.new_content ?? '')
 

@@ -8,6 +8,7 @@ import { homedir } from 'os'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { helpers } from '../utils/helpers.ts'
 import { processOutput } from '../utils/process-output.ts'
+import { sensitive } from './sensitive.ts'
 
 const config = {
 	/** Default timeout in milliseconds. */
@@ -25,11 +26,18 @@ type TimerWithUnref = ReturnType<typeof setTimeout> & { unref?: () => void }
 
 const HOME = homedir()
 
+function shellPath(text: string, cwd: string): string {
+	let path = text.replace(/^['"]|['"]$/g, '')
+	if (path === '~') path = HOME
+	if (path.startsWith('~/')) path = HOME + path.slice(1)
+	return resolve(cwd, path)
+}
+
 function stripCdCwd(command: string | undefined, cwd: string): string | undefined {
-	const m = command?.match(/^cd\s+(\S+)\s*&&\s*/)
-	if (!m) return command
-	const target = resolve(m[1]!.startsWith('~/') ? HOME + m[1]!.slice(1) : m[1]!)
-	return target === cwd ? command!.slice(m[0].length) : command
+	const match = command?.match(/^cd\s+(.+?)\s*&&\s*/)
+	if (!match) return command
+	const target = shellPath(match[1]!, cwd)
+	return target === resolve(cwd) ? command!.slice(match[0].length) : command
 }
 
 function normalizeInput(input: unknown, cwd: string): BashInput {
@@ -79,6 +87,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalizeInput(input, ctx.cwd)
 	const command = spec.command ?? ''
 	if (!command.trim()) return 'error: empty command'
+	if (sensitive.commandMentionsProtectedPath(command)) return 'error: refusing to run command that mentions protected credentials file'
 
 	const timeout = spec.timeout ?? config.defaultTimeout
 
@@ -149,4 +158,4 @@ function init(): void {
 	toolRegistry.registerTool(bashTool)
 }
 
-export const bash = { config, killProcessTree, execute, init }
+export const bash = { config, stripCdCwd, killProcessTree, execute, init }

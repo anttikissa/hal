@@ -13,6 +13,7 @@ import { sessionEntry } from '../session/entry.ts'
 import { STATE_DIR } from '../state.ts'
 import { colors } from './colors.ts'
 import { md } from './md.ts'
+import { bash } from '../tools/bash.ts'
 
 const blockConfig = {
 	tabWidth: 4,
@@ -252,11 +253,60 @@ function editLineRange(input: any): string {
 
 const [RED_FG, GREEN_FG, FG_OFF, RESET_BG, DIM, DIM_OFF] = ['\x1b[31m', '\x1b[32m', '\x1b[39m', '\x1b[49m', '\x1b[2m', '\x1b[22m']
 
+function stripRedundantCd(command: string, cwd: string | undefined): string {
+	if (!cwd) return command
+	return bash.stripCdCwd(command, cwd) ?? command
+}
+
+function shellQuotedValue(text: string, start: number): string | null {
+	const quote = text[start]
+	if (quote !== '"' && quote !== "'") return null
+	let value = ''
+	for (let i = start + 1; i < text.length; i++) {
+		const ch = text[i]!
+		if (ch === quote) return value
+		if (ch === '\\' && quote === '"' && i + 1 < text.length) {
+			value += text[++i]!
+			continue
+		}
+		value += ch
+	}
+	return null
+}
+
+function commitMessageFromBash(command: string): string | null {
+	const marker = command.match(/\bgit\s+commit\b/)
+	if (!marker) return null
+	for (let i = marker.index ?? 0; i < command.length; i++) {
+		if (command[i] !== '-' || command[i + 1] !== 'm') continue
+		const before = command[i - 1] ?? ' '
+		const after = command[i + 2] ?? ' '
+		if (!/\s/.test(before) || (after && !/\s/.test(after))) continue
+		let valueStart = i + 2
+		while (/\s/.test(command[valueStart] ?? '')) valueStart++
+		const quoted = shellQuotedValue(command, valueStart)
+		if (quoted) return quoted
+	}
+	return null
+}
+
+function commitSubject(message: string): string {
+	return message.split('\n').find((line) => line.trim())?.trim() ?? 'commit'
+}
+
+function formatCommitMessage(message: string): string {
+	const lines = message.trim().split('\n')
+	const subject = lines.shift()?.trim() || 'commit'
+	while (lines[0]?.trim() === '') lines.shift()
+	return [`# ${subject}`, ...lines].join('\n')
+}
+
 interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: string; suppressOutput?: boolean }
 type ToolSpec = {
 	title?: (input?: any) => string
 	command?: (input?: any) => string | undefined
 	details?: (input?: any) => string | undefined
+	shellContinuations?: (input?: any) => boolean
 	format?: (output: string, cols: number) => ToolFormatResult
 }
 
@@ -324,12 +374,20 @@ function quoteToolArg(value: unknown): string {
 const toolSpecs: Record<string, ToolSpec> = {
 	bash: {
 		title(input) {
-			const cmd = input?.command ?? ''
+			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
+			const message = commitMessageFromBash(cmd)
+			if (message) return `Commit: ${commitSubject(message)}`
 			return !cmd.includes('\n') && cmd.length <= 60 ? `Bash: ${cmd}` : 'Bash'
 		},
 		command(input) {
-			const cmd = input?.command ?? ''
+			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
+			const message = commitMessageFromBash(cmd)
+			if (message) return formatCommitMessage(message)
 			return !cmd.includes('\n') && cmd.length <= 60 ? undefined : cmd
+		},
+		shellContinuations(input) {
+			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
+			return !commitMessageFromBash(cmd)
 		},
 	},
 	read: { title(input) { const range = input?.start || input?.end ? ` (${input.start ?? 1}-${input.end ?? 'end'})` : ''; return `Read ${input?.path ?? '?'}${range}` }, format: formatRead },
@@ -421,7 +479,7 @@ function blockContent(block: Block, cols: number): string[] {
 		const lines: string[] = []
 		const spec = getToolSpec(block.name)
 		const command = spec.command?.(block.input)
-		if (command) lines.push(...formatToolCommand(command, cols, block.name === 'bash'))
+		if (command) lines.push(...formatToolCommand(command, cols, spec.shellContinuations?.(block.input) ?? block.name === 'bash'))
 		const details = spec.details?.(block.input)
 		if (details) pushDimWrapped(lines, details, cols)
 		if (!block.output) return lines

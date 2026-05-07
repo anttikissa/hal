@@ -6,6 +6,7 @@
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { read } from './read.ts'
 import { processOutput } from '../utils/process-output.ts'
+import { sensitive } from './sensitive.ts'
 
 const MAX_OUTPUT_BYTES = 40_000
 const TRUNCATED_SUFFIX = '\n[… truncated]'
@@ -40,6 +41,10 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	if (!pattern) return 'error: pattern is required'
 
 	const searchPaths = read.resolvePaths(input?.path, ctx.cwd)
+	for (const path of searchPaths) {
+		const denied = sensitive.denyIfProtected(path, 'search')
+		if (denied) return denied
+	}
 	const maxResults = input?.maxResults ?? 100
 
 	const args = [
@@ -67,7 +72,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const stderrPromise = processOutput.readLimited(proc.stderr, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 	const [stdout, stderr, code] = await Promise.all([stdoutPromise, stderrPromise, proc.exited])
 
-	const result = stdout.text.trim()
+	const result = sensitive.filterPathList(stdout.text.trim())
 	if (!result) {
 		// rg returns exit 1 for "no matches" — not an error.
 		const err = formatRgError(stderr.text)

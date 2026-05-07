@@ -6,6 +6,7 @@
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { read } from './read.ts'
 import { processOutput } from '../utils/process-output.ts'
+import { sensitive } from './sensitive.ts'
 
 const MAX_OUTPUT_BYTES = 20_000
 const TRUNCATED_SUFFIX = '\n[… truncated]'
@@ -21,6 +22,11 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	if (!pattern) return 'error: pattern is required'
 
 	const searchPaths = read.resolvePaths(input?.path, ctx.cwd)
+	for (const path of searchPaths) {
+		const denied = sensitive.denyIfProtected(path, 'list')
+		if (denied) return denied
+	}
+	if (sensitive.isProtectedBasename(pattern)) return sensitive.denyMessage('list', pattern)
 
 	const args = ['rg', '--files', '--hidden', '--no-ignore', '--sort=modified', '--glob', pattern, ...searchPaths]
 
@@ -35,7 +41,7 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 	const [stdout] = await Promise.all([stdoutPromise, stderrPromise])
 	await proc.exited
 
-	const result = stdout.text.trim()
+	const result = sensitive.filterPathList(stdout.text.trim())
 	if (!result) return 'No files found.'
 	return result
 }

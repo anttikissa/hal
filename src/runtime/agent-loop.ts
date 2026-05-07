@@ -13,6 +13,7 @@ import { models } from '../models.ts'
 import { context } from './context.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { toolRegistry } from '../tools/tool.ts'
+import { bash } from '../tools/bash.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
@@ -108,6 +109,13 @@ async function writeToolCallBlob(sessionId: string, blobId: string, name: string
 	const existing = blob.readBlob(sessionId, blobId) ?? {}
 	existing.call = { name, input }
 	await blob.writeBlob(sessionId, blobId, existing)
+}
+
+function sanitizeToolCallInput(name: string, input: any, cwd: string): any {
+	if (name !== 'bash' || input == null || typeof input !== 'object') return input
+	const command = bash.stripCdCwd(input.command, cwd)
+	if (command === input.command) return input
+	return { ...input, command, cwd }
 }
 
 function parseErrorPayload(body: string | undefined): unknown {
@@ -358,7 +366,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						const tc = {
 							id: event.id!,
 							name: event.name!,
-							input: event.input,
+							input: sanitizeToolCallInput(event.name!, event.input, ctx.cwd),
 						}
 						toolCalls.push(tc)
 						const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
@@ -694,4 +702,5 @@ export const agentLoop = {
 	runAgentLoop,
 	abort,
 	isActive,
+	sanitizeToolCallInput,
 }

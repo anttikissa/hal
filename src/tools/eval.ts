@@ -9,6 +9,7 @@ import { join } from 'path'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { STATE_DIR } from '../state.ts'
 import { ason } from '../utils/ason.ts'
+import { sensitive } from './sensitive.ts'
 
 let counter = 0
 
@@ -41,6 +42,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalizeInput(input)
 	const code = spec.code ?? ''
 	if (!code.trim()) return 'error: empty code'
+	if (sensitive.evalMentionsProtectedAccess(code)) return 'error: refusing to run eval code that mentions protected credentials access'
 
 	// Persist eval code for audit trail
 	const evalDir = join(STATE_DIR, 'sessions', ctx.sessionId, 'eval')

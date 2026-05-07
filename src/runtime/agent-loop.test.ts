@@ -18,6 +18,16 @@ afterEach(() => {
 	}
 })
 
+test('sanitizes redundant bash cd prefix before saving tool calls', () => {
+	const input = { command: 'cd /tmp/../tmp && pwd', timeout: 1000 }
+	expect(agentLoop.sanitizeToolCallInput('bash', input, '/tmp/')).toEqual({
+		command: 'pwd',
+		timeout: 1000,
+		cwd: '/tmp/',
+	})
+	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
+})
+
 
 test('calibrates context token estimates from provider input usage', async () => {
 	const sessionId = `test-calibration-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
