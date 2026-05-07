@@ -66,5 +66,11 @@
 	clipboard: {
 		// Pasted text at or below this many lines stays inline; longer pastes become temp files.
 		multilinePasteFileLineLimit: 7
-	}
+	},
+	keyHelp: {
+		// Shortcut label style: auto uses your OS; mac uses cmd/option; pc uses super/alt.
+		style: 'auto',
+		// Label for the Alt/Option modifier in mac-style shortcut help: option, opt, or alt.
+		macOptionLabel: 'option'
+}
 }

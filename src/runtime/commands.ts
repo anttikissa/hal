@@ -11,6 +11,7 @@ import { ipc } from '../ipc.ts'
 import { models } from '../models.ts'
 import { ason } from '../utils/ason.ts'
 import { config } from '../config.ts'
+import { keyHelp } from '../cli/key-help.ts'
 import { context } from './context.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import { inbox } from './inbox.ts'
@@ -313,6 +314,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 		].join('\n'),
 	},
 	help: { usage: '[cmd]', summary: 'Show help; try /help config.', arg: 'command' },
+	keys: { summary: 'Show keyboard shortcuts.' },
 	exit: { summary: 'Quit Hal.' },
 }
 
@@ -344,6 +346,9 @@ handlers['help'] = (args) => {
 	const lines = ['Available commands:', ...names.map((name) => `  ${helpUsage(name).padEnd(width)}  ${commandSpecs[name]!.summary}`)]
 	return { output: lines.join('\n'), handled: true }
 }
+
+// /keys — show keyboard shortcuts
+handlers['keys'] = () => ({ output: keyHelp.render(), handled: true })
 // /model [name] — switch model or show current + list
 handlers['model'] = (args, session) => {
 	if (!args) {

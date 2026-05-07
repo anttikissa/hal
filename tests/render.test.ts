@@ -183,17 +183,24 @@ describe('render', () => {
 		const output = captureOutput(() => render.draw(true))
 		expect(output).not.toContain('\x1b[97menter')
 		expect(output).toContain('enter')
-		expect(output).toContain(': send prompt')
+		expect(output).toContain(': send')
 		expect(output).toContain('shift-enter')
-		expect(output).toContain(': insert newline')
+		expect(output).toContain(': newline')
 		expect(output).toContain('tab')
 		expect(output).toContain(': complete')
+	})
+
+	test('help bar advertises undo and the /keys shortcut list', () => {
+		prompt.setText('hello')
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('ctrl-/: undo')
+		expect(clean).toContain('/keys: shortcuts')
 	})
 
 	test('help bar separates hints with commas', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: send prompt, shift-enter: insert newline, tab: complete')
+		expect(clean).toContain('enter: send, shift-enter: newline, tab: complete, ctrl-/: undo')
 		expect(clean).not.toContain('│')
 	})
 
@@ -202,11 +209,11 @@ describe('render', () => {
 		const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 		const statusLine = lines.findIndex((line) => line.includes('server:111'))
 		const promptLine = lines.findIndex((line) => line === 'hello')
-		const helpLine = lines.findIndex((line) => line.includes('enter: send prompt'))
+		const helpLine = lines.findIndex((line) => line.includes('enter: send'))
 		expect(statusLine).toBeGreaterThanOrEqual(0)
 		expect(promptLine).toBeGreaterThan(statusLine)
 		expect(helpLine).toBe(promptLine + 1)
-		expect(lines[lines.length - 1]).toContain('enter: send prompt')
+		expect(lines[lines.length - 1]).toContain('enter: send')
 	})
 
 	test('status line shows local pid', () => {
@@ -568,6 +575,7 @@ describe('render', () => {
 			helpBar.logKey('enter')
 			helpBar.logKey('shift-enter')
 			helpBar.logKey('tab')
+			helpBar.logKey('ctrl-/')
 		}
 
 		render.resetRenderer()
@@ -581,7 +589,7 @@ describe('render', () => {
 		const promptLine = withText.findIndex((line) => line === 'x')
 		expect(emptyHelp).toContain('ctrl-t: new')
 		expect(promptLine).toBeGreaterThan(0)
-		expect(withText[promptLine + 1]).toBe('')
+		expect(withText[promptLine + 1]).toContain('/keys: shortcuts')
 		expect(withText.length).toBe(empty.length)
 	})
 

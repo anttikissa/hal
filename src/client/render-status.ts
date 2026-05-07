@@ -366,11 +366,20 @@ function renderHelpBar(lines: string[]): void {
 	const hasText = prompt.text().trim().length > 0
 	const continueAction = client.continueActionForCurrentTurn()
 	const desc = colors.help.description || '\x1b[90m'
-	const bar = helpBar.build(busy, hasText, continueAction, {
+	const style = {
 		key: colors.help.key || '\x1b[37m',
 		description: desc,
 		separator: desc,
-	})
+	}
+	const left = helpBar.build(busy, hasText, continueAction, style)
+	const right = helpBar.shortcutListHint(style)
+	let bar = left
+	if (right) {
+		const maxLeft = Math.max(0, cols - visLen(right) - 1)
+		const clippedLeft = visLen(left) > maxLeft ? clipVisual(left, maxLeft) : left
+		const gap = Math.max(1, cols - visLen(clippedLeft) - visLen(right))
+		bar = clippedLeft ? `${clippedLeft}${' '.repeat(gap)}${right}` : `${' '.repeat(Math.max(0, cols - visLen(right)))}${right}`
+	}
 	// Always push a line — even when empty — so chrome height is constant.
 	// Without this, typing the first character causes a 1-row jump.
 	lines.push(bar ? `${clipVisual(bar, cols)}${RESET}` : '')

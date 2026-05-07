@@ -117,6 +117,10 @@ describe('prompt', () => {
 	test('undo and redo keep grouped typing together', () => {
 		prompt.handleKey({ key: 'h', char: 'h', shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		prompt.handleKey({ key: 'i', char: 'i', shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		prompt.handleKey(key('z', { cmd: true }), 80)
+		expect(prompt.text()).toBe('')
+		prompt.handleKey(key('z', { cmd: true, shift: true }), 80)
+		expect(prompt.text()).toBe('hi')
 		prompt.handleKey(key('/', { ctrl: true }), 80)
 		expect(prompt.text()).toBe('')
 		prompt.handleKey(key('/', { ctrl: true, shift: true }), 80)
@@ -170,15 +174,6 @@ describe('prompt', () => {
 		expect(prompt.cursorPos()).toBe('first\n'.length)
 		prompt.handleKey(key('e', { ctrl: true }), 80)
 		expect(prompt.cursorPos()).toBe('first\nsecond line'.length)
-	})
-
-	test('ctrl-w kills the previous word', () => {
-		prompt.setText('hello brave world', 'hello brave '.length)
-		prompt.handleKey(key('w', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('hello world')
-		// Yank back what was killed
-		prompt.handleKey(key('y', { ctrl: true }), 80)
-		expect(prompt.text()).toBe('hello brave world')
 	})
 
 	test('alt-d kills the next word', () => {

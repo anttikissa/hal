@@ -23,6 +23,8 @@ interface HelpStyle {
 
 const config = {
 	learnThreshold: 5,
+	rightKeyLabel: '/keys',
+	rightDescription: 'shortcuts',
 }
 
 // Kept in memory for now; hints reset each launch.
@@ -38,9 +40,10 @@ const HINTS: Record<HelpState, Hint[]> = {
 		{ keyLabel: 'ctrl-z', description: 'suspend', keys: ['ctrl-z'] },
 	],
 	'idle-text': [
-		{ keyLabel: 'enter', description: 'send prompt', keys: ['enter'] },
-		{ keyLabel: 'shift-enter', description: 'insert newline', keys: ['shift-enter'] },
+		{ keyLabel: 'enter', description: 'send', keys: ['enter'] },
+		{ keyLabel: 'shift-enter', description: 'newline', keys: ['shift-enter'] },
 		{ keyLabel: 'tab', description: 'complete', keys: ['tab'] },
+		{ keyLabel: 'ctrl-/', description: 'undo', keys: ['ctrl-/'] },
 	],
 	'idle-continue': [{ keyLabel: 'enter', description: 'continue', keys: ['enter'], alwaysVisible: true }],
 	'idle-retry': [{ keyLabel: 'enter', description: 'retry', keys: ['enter'], alwaysVisible: true }],
@@ -77,6 +80,11 @@ function formatHint(hint: Hint, style?: HelpStyle): string {
 	return `${style.key}${hint.keyLabel}${style.description}: ${hint.description}`
 }
 
+function shortcutListHint(style?: HelpStyle): string {
+	const hint: Hint = { keyLabel: config.rightKeyLabel, description: config.rightDescription, keys: [] }
+	return formatHint(hint, style)
+}
+
 function build(busy: boolean, hasText: boolean, continueAction: ContinueAction | false = false, style?: HelpStyle): string {
 	const state = deriveState(busy, hasText, continueAction)
 	const visible = HINTS[state].filter((hint) => !isLearned(hint))
@@ -88,6 +96,7 @@ function build(busy: boolean, hasText: boolean, continueAction: ContinueAction |
 export const helpBar = {
 	config,
 	build,
+	shortcutListHint,
 	logKey,
 	reset,
 	deriveState,

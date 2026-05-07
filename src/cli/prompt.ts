@@ -486,6 +486,9 @@ function handleCmdKey(k: KeyEvent): boolean {
 		case 'u':
 			stepUndo(k.shift)
 			return true
+		case 'z':
+			stepUndo(k.shift)
+			return true
 		default:
 			return false
 	}
@@ -549,15 +552,6 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		case 'e':
 			if (!k.ctrl) break
 			moveLineEdge(1, k.shift)
-			return true
-		case 'w':
-			if (!k.ctrl) break
-			// Kill word backward (readline ctrl-w). Uses whitespace-delimited
-			// "big word" semantics like bash.
-			if (cursor > 0 && !deleteSel()) {
-				const start = wordLeft(buf, cursor)
-				killRange(start, cursor)
-			}
 			return true
 		case 'v':
 			if (!k.ctrl) break
