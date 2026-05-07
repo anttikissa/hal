@@ -510,10 +510,17 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			deleteForward()
 			return true
 		case 'd':
-			if (!k.ctrl) break
-			if (buf.length === 0) return false
-			deleteForward()
-			return true
+			if (k.ctrl) {
+				if (buf.length === 0) return false
+				deleteForward()
+				return true
+			}
+			if (k.alt) {
+				// Kill word forward into the yank buffer (readline alt-d).
+				if (cursor < buf.length && !deleteSel()) killRange(cursor, wordRight(buf, cursor))
+				return true
+			}
+			break
 		case 'u':
 			if (!k.ctrl) break
 			{

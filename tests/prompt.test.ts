@@ -181,6 +181,14 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('hello brave world')
 	})
 
+	test('alt-d kills the next word', () => {
+		prompt.setText('hello brave world', 'hello '.length)
+		prompt.handleKey(key('d', { alt: true }), 80)
+		expect(prompt.text()).toBe('hello  world')
+		prompt.handleKey(key('y', { ctrl: true }), 80)
+		expect(prompt.text()).toBe('hello brave world')
+	})
+
 	test('up enters history and down restores the draft', () => {
 		prompt.setHistory(['older', 'newer'])
 		prompt.setText('draft')
