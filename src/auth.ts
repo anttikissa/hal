@@ -385,6 +385,7 @@ export const auth = {
 	clearCooldown,
 	hasAvailableCredential,
 	allOnCooldownMessage,
+	store,
 	_setStoreForTest,
 	_resetCooldowns,
 	_invalidateCooldownCache,

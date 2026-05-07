@@ -215,6 +215,42 @@ test('/status progress only mentions configured subscriptions', async () => {
 })
 
 
+test('/status hints /login when a provider has no credentials', async () => {
+	anthropicUsage.hasCredentials = () => false
+	openaiUsage.hasCredentials = () => true
+	openaiUsage.renderStatus = async () => 'OpenAI subscriptions:\n* 1/2 b@test.com · 5h 23% used'
+
+	const result = await commands.executeCommand('/status', makeSession())
+
+	expect(result.output).toContain('Add a subscription:')
+	expect(result.output).toContain('/login anthropic')
+	expect(result.output).not.toContain('/login openai')
+})
+
+test('/login anthropic returns auth URL on the first call', async () => {
+	const { authLogin } = await import('../auth-login.ts')
+	const result = await commands.executeCommand('/login anthropic', makeSession())
+
+	expect(result.handled).toBe(true)
+	expect(result.output).toContain('claude.ai/oauth/authorize')
+	expect(result.output).toContain('/login anthropic <code#state>')
+	expect(authLogin.state.anthropicPending).not.toBeNull()
+	authLogin.state.anthropicPending = null
+})
+
+test('/login with no provider rejects', async () => {
+	const result = await commands.executeCommand('/login', makeSession())
+	expect(result.error).toContain('Usage:')
+})
+
+test('/login anthropic <code> without a pending session errors out', async () => {
+	const { authLogin } = await import('../auth-login.ts')
+	authLogin.state.anthropicPending = null
+	const result = await commands.executeCommand('/login anthropic abc#xyz', makeSession())
+	expect(result.error).toContain('No pending Anthropic login')
+})
+
+
 
 
 test('/mem shows current rss and thresholds', async () => {

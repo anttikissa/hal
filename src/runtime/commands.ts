@@ -20,6 +20,7 @@ import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 import { version } from '../version.ts'
 import { HAL_DIR } from '../state.ts'
+import { authLogin } from '../auth-login.ts'
 
 // ── Types ──
 
@@ -280,6 +281,20 @@ const commandSpecs: Record<string, CommandSpec> = {
 	compact: { summary: 'Summarize conversation to reduce context.' },
 	raw: { summary: 'Log raw key bytes on this terminal.', detail: 'Keys are logged as bytes until Esc exits.' },
 	status: { summary: 'Show Anthropic / OpenAI subscription usage.', detail: 'Shows usage for all configured accounts.' },
+	login: {
+		usage: '<anthropic|openai> [code]',
+		summary: 'Log in to Claude or ChatGPT via OAuth.',
+		help: [
+			'/login anthropic',
+			'  Open the Claude OAuth page. After authorizing, copy the code',
+			'  shown on the redirect page and paste it back as:',
+			'  /login anthropic <code#state>',
+			'',
+			'/login openai',
+			'  Open the ChatGPT OAuth page; the local callback server catches',
+			'  the redirect and saves your tokens automatically.',
+		].join('\n'),
+	},
 	mem: { summary: 'Show current RSS memory and the warn/kill thresholds.' },
 	send: { usage: '<tab|session-id|name> <message>', summary: 'Send a message to another tab.', detail: 'Targets can be a tab number, full session id, or session name.' },
 	broadcast: { usage: '<message>', summary: 'Send a message to every other tab.', detail: 'Sends the same message to every other open tab.' },
@@ -482,11 +497,62 @@ handlers['status'] = async (_args, _session, hooks) => {
 
 	await Promise.all(pending)
 	const sections = [anthropicText, openaiText].filter((text) => text && !/^No (Anthropic Claude|OpenAI ChatGPT) subscriptions configured\.$/.test(text.trim()))
-	const usage = sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.'
+	const hasAnthropic = anthropicUsage.hasCredentials()
+	const hasOpenai = openaiUsage.hasCredentials()
+	let usage = sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.'
+	const hints: string[] = []
+	if (!hasAnthropic) hints.push('  /login anthropic   — log in to Claude')
+	if (!hasOpenai) hints.push('  /login openai      — log in to ChatGPT')
+	if (hints.length > 0) {
+		usage += `\n\nAdd a subscription:\n${hints.join('\n')}`
+	}
 	return {
 		output: `${renderRuntimeStatus()}\n\n${usage}`,
 		handled: true,
 	}
+}
+
+// /login <provider> [code] — OAuth login for Claude or ChatGPT.
+// Anthropic is two-step (paste code); OpenAI is one-step (localhost callback).
+handlers['login'] = async (args, _session, hooks) => {
+	const parts = args.trim().split(/\s+/).filter(Boolean)
+	const provider = parts[0]
+	const codeArg = parts.slice(1).join(' ')
+
+	if (provider === 'anthropic') {
+		if (codeArg) {
+			try {
+				const { email } = await authLogin.finishAnthropic(codeArg)
+				return { output: `Logged in to Claude${email ? ` as ${email}` : ''}. Run /status to see usage.`, handled: true }
+			} catch (err: any) {
+				return { error: `Login failed: ${err?.message ?? err}`, handled: true }
+			}
+		}
+		const { url } = await authLogin.startAnthropic()
+		return {
+			output: [
+				'Open this URL to log in to Claude:',
+				'',
+				url,
+				'',
+				'Then copy the code shown on the redirect page and run:',
+				'  /login anthropic <code#state>',
+			].join('\n'),
+			handled: true,
+		}
+	}
+
+	if (provider === 'openai') {
+		hooks.info?.('Opening browser for OpenAI login (10min timeout)...')
+		try {
+			await authLogin.loginOpenai((msg) => hooks.info?.(msg))
+			return { output: 'Logged in to ChatGPT. Run /status to see usage.', handled: true }
+		} catch (err: any) {
+			return { error: `Login failed: ${err?.message ?? err}`, handled: true }
+		}
+	}
+
+	return { error: 'Usage: /login <anthropic|openai> [code]', handled: true }
 }
 
 
