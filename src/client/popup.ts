@@ -189,7 +189,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
 	const displayContent = [...content]
 	if (state.tone === 'danger' && state.kind === 'confirm') {
-		displayContent.unshift({ text: dangerStripe(contentWidth), active: false }, { text: '', active: false })
+		displayContent.unshift({ text: dangerStripe(contentWidth), active: false })
 		displayContent.push({ text: dangerStripe(contentWidth), active: false })
 	}
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))

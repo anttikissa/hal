@@ -56,6 +56,15 @@ describe('popup', () => {
 		expect(overlay?.lines.join('\n')).toContain('◤')
 	})
 
+	test('danger confirm popup has only one blank line after top stripe', () => {
+		popup.openConfirm('Risky tool call', ['Session 13-nh4 (tab 38) wants to do this:'], ['Yes', 'No'], () => {}, 'danger')
+		const overlay = popup.buildOverlay(100, 30)
+		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))
+		const stripe = clean.findIndex((line) => line.includes('◢'))
+		expect(clean[stripe + 1]).toMatch(/^│ +│$/)
+		expect(clean[stripe + 2]).toContain('Session 13-nh4 (tab 38) wants to do this:')
+	})
+
 	test('confirm popup gives text horizontal and vertical breathing room', () => {
 		popup.openConfirm('Claude cache likely cold', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
 		const overlay = popup.buildOverlay(100, 30)

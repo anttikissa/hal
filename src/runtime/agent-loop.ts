@@ -129,12 +129,14 @@ function resolveToolConfirmation(requestId: string, approved: boolean): boolean 
 	return true
 }
 
-function toolConfirmationBody(call: ToolCall, findings: RiskFinding[]): string[] {
+
+function toolConfirmationBody(sessionId: string, call: ToolCall, findings: RiskFinding[]): string[] {
 	const text = call.name === 'bash' ? String(call.input?.command ?? '') : JSON.stringify(call.input ?? {})
 	const preview = text.length > 800 ? text.slice(0, 800) + '\n[… truncated]' : text
-	const lines = ['This tool call looks risky. Continue?', '', "I'm asking because:"]
+	const tab = ipc.readState().sessions.find((item) => item.id === sessionId)?.tab
+	const lines = [`Session ${sessionId}${tab ? ` (tab ${tab})` : ''} wants to do this:`, '', `${call.name}:`, preview, '', "I'm asking because:"]
 	for (const finding of findings) lines.push(`- ${finding.reason}`)
-	lines.push('', `${call.name}:`, preview)
+	lines.push('', 'Continue?')
 	return lines
 }
 
@@ -145,7 +147,7 @@ async function confirmToolCall(sessionId: string, call: ToolCall, signal: AbortS
 	emitEvent(sessionId, {
 		type: 'tool-confirm-request',
 		requestId,
-		body: toolConfirmationBody(call, findings),
+		body: toolConfirmationBody(sessionId, call, findings),
 	})
 	const approved = await new Promise<boolean>((resolve) => {
 		function done(value: boolean): void {
