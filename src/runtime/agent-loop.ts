@@ -559,7 +559,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				}
 
 				if (assistantText) {
-					emitEvent(sessionId, { type: 'response', text: assistantText })
+					emitEvent(sessionId, { type: 'response', text: assistantText, model })
 				}
 				const est = context.estimateContext(messages, model, overheadBytes)
 				emitEvent(sessionId, {
@@ -620,7 +620,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			// this, text from successive iterations concatenates in the
 			// streaming buffer (e.g. "controls.Now" with no separator).
 			if (assistantText) {
-				emitEvent(sessionId, { type: 'response', text: assistantText })
+				emitEvent(sessionId, { type: 'response', text: assistantText, model })
 			}
 
 			// Execute tools (with concurrency limit)

@@ -692,7 +692,34 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 }
 
 function hasTrailingAssistantText(tab: Tab, text: string): boolean {
-	return trailingAssistantText(tab) === text
+	const parts: string[] = []
+	let chainId: string | null = null
+	let sawAssistant = false
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const block = tab.history[i]!
+		if (block.type === 'tool') continue
+		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
+			if (!sawAssistant) continue
+			continue
+		}
+		if (block.type !== 'assistant') break
+		const blockChainId = assistantChainId(block)
+		if (!sawAssistant) {
+			sawAssistant = true
+			chainId = blockChainId
+			// Final response events may contain only the latest post-tool segment,
+			// while the visible assistant text is linked as one continuation chain.
+			if (block.text === text) return true
+			parts.unshift(block.text)
+			continue
+		}
+		if (chainId && blockChainId === chainId) {
+			parts.unshift(block.text)
+			continue
+		}
+		break
+	}
+	return sawAssistant && parts.join('') === text
 }
 
 
@@ -747,33 +774,6 @@ function canContinueCurrentTurn(): boolean {
 	return !!continueActionForCurrentTurn()
 }
 
-function trailingAssistantText(tab: Tab): string | null {
-	const parts: string[] = []
-	let chainId: string | null = null
-	let sawAssistant = false
-	for (let i = tab.history.length - 1; i >= 0; i--) {
-		const block = tab.history[i]!
-		if (block.type === 'tool') continue
-		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
-			if (!sawAssistant) continue
-			continue
-		}
-		if (block.type !== 'assistant') break
-		const blockChainId = assistantChainId(block)
-		if (!sawAssistant) {
-			sawAssistant = true
-			chainId = blockChainId
-			parts.unshift(block.text)
-			continue
-		}
-		if (chainId && blockChainId === chainId) {
-			parts.unshift(block.text)
-			continue
-		}
-		break
-	}
-	return sawAssistant ? parts.join('') : null
-}
 
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const meta = sessionStore.loadSessionMeta(info.id)
