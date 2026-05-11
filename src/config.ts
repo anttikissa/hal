@@ -8,7 +8,6 @@ import { client } from './client.ts'
 import { blocks } from './cli/blocks.ts'
 import { prompt } from './cli/prompt.ts'
 import { clipboard } from './cli/clipboard.ts'
-import { keyHelp } from './cli/key-help.ts'
 import { render } from './client/render.ts'
 import { renderStatus } from './client/render-status.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
@@ -26,7 +25,6 @@ const modules: Record<string, Record<string, any>> = {
 	blocks: blocks.config,
 	prompt: prompt.config,
 	clipboard: clipboard.config,
-	keyHelp: keyHelp.config,
 	render: render.config,
 	renderStatus: renderStatus.config,
 	agentLoop: agentLoop.config,

@@ -11,7 +11,6 @@ import { ipc } from '../ipc.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 
-import { keyHelp } from '../cli/key-help.ts'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -29,7 +28,6 @@ const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
 const origDefaultModel = models.config.default
 const origVersionState = { ...version.state }
-const origKeyHelpConfig = { ...keyHelp.config }
 
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 const origLoadAllHistory = sessionStore.loadAllHistory
@@ -68,7 +66,6 @@ afterEach(() => {
 	Object.assign(memory.config, origMemoryConfig)
 	memory.io.readRss = origReadRss
 	models.config.default = origDefaultModel
-	Object.assign(keyHelp.config, origKeyHelpConfig)
 	ipc.appendCommand = origAppendCommand
 	Object.assign(version.state, origVersionState)
 	version.state.repoDir = origVersionState.repoDir
@@ -475,23 +472,16 @@ test('/move rejects non-numeric positions', async () => {
 	expect(result.error).toContain('Usage: /move <position>')
 })
 
-test('/keys shows platform-aware keyboard shortcuts', async () => {
-	keyHelp.config.style = 'mac'
-	keyHelp.config.macOptionLabel = 'option'
+test('/keys shows keyboard shortcuts using pi-style modifier labels', async () => {
 	const result = await commands.executeCommand('/keys', makeSession())
-	expect(result.output).toContain('cmd-c')
-	expect(result.output).toContain('cmd-v')
-	expect(result.output).toContain('option-d')
-	expect(result.output).toContain('ctrl-/')
-	expect(result.output).toContain('shift-<movement>')
+	expect(result.output).toContain('cmd+c')
+	expect(result.output).toContain('cmd+v')
+	expect(result.output).toContain('alt+d')
+	expect(result.output).toContain('ctrl+/')
+	expect(result.output).toContain('shift+<movement>')
 	expect(result.output).toContain('selects text')
-})
-
-test('/keys can use non-mac shortcut labels', async () => {
-	keyHelp.config.style = 'pc'
-	const result = await commands.executeCommand('/keys', makeSession())
-	expect(result.output).toContain('alt-d')
-	expect(result.output).not.toContain('option-d')
+	expect(result.output).not.toContain('option')
+	expect(result.output).not.toContain('keyHelp')
 })
 
 test('/help config shows config caveats and syntax', async () => {

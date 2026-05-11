@@ -32,18 +32,18 @@ const usageCounts: Record<string, number> = {}
 
 const HINTS: Record<HelpState, Hint[]> = {
 	'idle-empty': [
-		{ keyLabel: 'ctrl-t', description: 'new', keys: ['ctrl-t'] },
-		{ keyLabel: 'ctrl-n/p', description: 'switch', keys: ['ctrl-n', 'ctrl-p'] },
-		{ keyLabel: 'ctrl-f', description: 'fork', keys: ['ctrl-f'] },
+		{ keyLabel: 'ctrl+t', description: 'new', keys: ['ctrl-t'] },
+		{ keyLabel: 'ctrl+n/p', description: 'switch', keys: ['ctrl-n', 'ctrl-p'] },
+		{ keyLabel: 'ctrl+f', description: 'fork', keys: ['ctrl-f'] },
 		{ keyLabel: '/', description: 'commands', keys: ['/'] },
-		{ keyLabel: 'ctrl-c', description: 'quit', keys: ['ctrl-c'] },
-		{ keyLabel: 'ctrl-z', description: 'suspend', keys: ['ctrl-z'] },
+		{ keyLabel: 'ctrl+c', description: 'quit', keys: ['ctrl-c'] },
+		{ keyLabel: 'ctrl+z', description: 'suspend', keys: ['ctrl-z'] },
 	],
 	'idle-text': [
 		{ keyLabel: 'enter', description: 'send', keys: ['enter'] },
-		{ keyLabel: 'shift-enter', description: 'newline', keys: ['shift-enter'] },
+		{ keyLabel: 'shift+enter', description: 'newline', keys: ['shift-enter'] },
 		{ keyLabel: 'tab', description: 'complete', keys: ['tab'] },
-		{ keyLabel: 'ctrl-/', description: 'undo', keys: ['ctrl-/'] },
+		{ keyLabel: 'ctrl+/', description: 'undo', keys: ['ctrl-/'] },
 	],
 	'idle-continue': [{ keyLabel: 'enter', description: 'continue', keys: ['enter'], alwaysVisible: true }],
 	'idle-retry': [{ keyLabel: 'enter', description: 'retry', keys: ['enter'], alwaysVisible: true }],

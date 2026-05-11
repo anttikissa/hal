@@ -196,7 +196,7 @@ describe('render', () => {
 		expect(output).not.toContain('\x1b[97menter')
 		expect(output).toContain('enter')
 		expect(output).toContain(': send')
-		expect(output).toContain('shift-enter')
+		expect(output).toContain('shift+enter')
 		expect(output).toContain(': newline')
 		expect(output).toContain('tab')
 		expect(output).toContain(': complete')
@@ -205,14 +205,14 @@ describe('render', () => {
 	test('help bar advertises undo and the /keys shortcut list', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('ctrl-/: undo')
+		expect(clean).toContain('ctrl+/: undo')
 		expect(clean).toContain('/keys: shortcuts')
 	})
 
 	test('help bar separates hints with commas', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: send, shift-enter: newline, tab: complete, ctrl-/: undo')
+		expect(clean).toContain('enter: send, shift+enter: newline, tab: complete, ctrl+/: undo')
 		expect(clean).not.toContain('│')
 	})
 
@@ -597,9 +597,9 @@ describe('render', () => {
 		prompt.setText('x')
 		const withText = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 
-		const emptyHelp = empty.find((line) => line.includes('ctrl-t: new'))
+		const emptyHelp = empty.find((line) => line.includes('ctrl+t: new'))
 		const promptLine = withText.findIndex((line) => line === 'x')
-		expect(emptyHelp).toContain('ctrl-t: new')
+		expect(emptyHelp).toContain('ctrl+t: new')
 		expect(promptLine).toBeGreaterThan(0)
 		expect(withText[promptLine + 1]).toContain('/keys: shortcuts')
 		expect(withText.length).toBe(empty.length)

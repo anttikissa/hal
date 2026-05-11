@@ -1,31 +1,10 @@
 // Human-facing keyboard shortcut labels and /keys output.
 
-type ShortcutStyle = 'auto' | 'mac' | 'pc'
 type ShortcutRow = { keys: string; description: string }
 type ShortcutSection = { title: string; rows: ShortcutRow[] }
 
-const config = {
-	// auto uses process.platform. mac labels Command as cmd and Alt as option.
-	// pc labels Command/Super as super and Alt as alt.
-	style: 'auto' as ShortcutStyle,
-	// mac users may prefer opt or alt; option is the clearest default.
-	macOptionLabel: 'option',
-}
-
-function isMac(): boolean {
-	if (config.style === 'mac') return true
-	if (config.style === 'pc') return false
-	return process.platform === 'darwin'
-}
-
-function labelPart(part: string): string {
-	if (part === 'cmd') return isMac() ? 'cmd' : 'super'
-	if (part === 'alt') return isMac() ? config.macOptionLabel : 'alt'
-	return part
-}
-
 function key(raw: string): string {
-	return raw.split('-').map((part) => labelPart(part)).join('-')
+	return raw.replaceAll('-', '+')
 }
 
 function row(keys: string, description: string): ShortcutRow {
@@ -41,7 +20,7 @@ function sections(): ShortcutSection[] {
 				row('shift-enter', 'insert newline'),
 				row('tab', 'complete slash commands, models, config keys, and paths'),
 				row('ctrl-/ / cmd-z / cmd-u', 'undo'),
-				row('ctrl-shift-/ / cmd-shift-z / cmd-shift-u', 'redo'),
+				row('shift-ctrl-/ / shift-cmd-z / shift-cmd-u', 'redo'),
 			],
 		},
 		{
@@ -74,7 +53,7 @@ function sections(): ShortcutSection[] {
 			title: 'Tabs and app',
 			rows: [
 				row('ctrl-t', 'new tab'),
-				row('ctrl-shift-t', 'reopen most recent closed tab'),
+				row('shift-ctrl-t', 'reopen most recent closed tab'),
 				row('ctrl-f', 'fork current tab'),
 				row('ctrl-w', 'close tab'),
 				row('ctrl-n / ctrl-p', 'next/previous tab'),
@@ -101,8 +80,6 @@ function render(): string {
 }
 
 export const keyHelp = {
-	config,
-	isMac,
 	key,
 	sections,
 	render,
