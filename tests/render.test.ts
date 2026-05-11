@@ -154,6 +154,18 @@ describe('render', () => {
 		expect(clean).not.toContain('enter: continue')
 	})
 
+	test('help bar hides enter: retry once retry is in progress', () => {
+		// Reproduces the bug where the help bar kept showing "enter: retry"
+		// while a retry was already running new tool calls.
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
+		tab.history.push({ type: 'tool', toolId: 't1', name: 'read', input: {}, ts: Date.now() })
+		client.state.busy.set(tab.sessionId, true)
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).not.toContain('enter: retry')
+		client.state.busy.clear()
+	})
+
 	test('help bar teaches enter: continue after max iteration stop', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'Hit max iterations (50). Stopping.', ts: Date.now() })

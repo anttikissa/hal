@@ -749,7 +749,13 @@ function continueActionForTab(tab: Tab | null): ContinueAction | false {
 	const busy = state.busy.get(tab.sessionId) ?? false
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
-		if (block.type === 'tool') continue
+		if (block.type === 'tool') {
+			// A tool block after the error means retry/continue already
+			// started new work. Do not offer Enter as a retry shortcut while
+			// that work is running.
+			if (busy) return false
+			continue
+		}
 		if (block.type === 'info' && !isContinuableStatusBlock(block)) {
 			// While a turn is actively retrying/backing off it may have an older
 			// red error followed by a status info line. Do not let that older
