@@ -68,7 +68,7 @@ function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { 
 	if (plan.kind === 'resume') {
 		const resumed = sessionStore.activateSession(plan.sessionId)
 		if (!resumed) return { ok: false, reason: `Session ${plan.sessionId} not found` }
-		state.activeSessions.push(plan.sessionId)
+		state.activeSessions = restoredSessionOrder(state.activeSessions, plan.sessionId, resumed.closedTabPosition)
 		sessionStore.updateMeta(plan.sessionId, { closedAt: undefined })
 		return { ok: true, sessionId: plan.sessionId }
 	}
@@ -87,6 +87,13 @@ function insertSessionAfter(sessionId: string, afterId?: string): void {
 		return
 	}
 	state.activeSessions.splice(idx + 1, 0, sessionId)
+}
+
+function restoredSessionOrder(activeSessions: string[], sessionId: string, closedTabPosition?: number): string[] {
+	const next = activeSessions.filter((id) => id !== sessionId)
+	const targetIndex = Number.isFinite(closedTabPosition) && (closedTabPosition ?? 0) > 0 ? Math.max(0, Math.min(next.length, Math.floor(closedTabPosition as number) - 1)) : next.length
+	next.splice(targetIndex, 0, sessionId)
+	return next
 }
 
 function moveSessionToIndex(sessionId: string, targetIndex: number): boolean {
@@ -160,17 +167,11 @@ function tailTurnState(entries: TailEntry[], now = Date.now()): TailTurnState {
 	return { shouldContinue: false, interruptedTools: [] }
 }
 
-function shouldAutoContinue(entries: TailEntry[], now = Date.now()): boolean {
-	return tailTurnState(entries, now).shouldContinue
-}
+function shouldAutoContinue(entries: TailEntry[], now = Date.now()): boolean { return tailTurnState(entries, now).shouldContinue }
 
-function recordSessionInfo(sessionId: string, text: string, ts: string): void {
-	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts }])
-}
+function recordSessionInfo(sessionId: string, text: string, ts: string): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts }]) }
 
-function recordSessionMeta(sessionId: string, text: string, ts: string): void {
-	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts }])
-}
+function recordSessionMeta(sessionId: string, text: string, ts: string): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts }]) }
 
 function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
@@ -216,9 +217,7 @@ function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean
 	].join('\n')
 }
 
-function queuePromptCommand(sessionId: string, text: string, source?: string): void {
-	ipc.appendCommand({ type: 'prompt', sessionId, text, source, createdAt: new Date().toISOString() })
-}
+function queuePromptCommand(sessionId: string, text: string, source?: string): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, createdAt: new Date().toISOString() }) }
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
@@ -398,7 +397,7 @@ async function dispatchPromptCommand(sessionId: string, text: string, source?: s
 }
 
 function closeSession(sessionId: string, openReplacement = false): void {
-	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closeWhenDone: false })
+	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closeWhenDone: false, closedTabPosition: state.activeSessions.findIndex((id) => id === sessionId) + 1 })
 	sessionStore.deactivateSession(sessionId)
 	state.activeSessions = state.activeSessions.filter((id) => id !== sessionId)
 	if (openReplacement && state.activeSessions.length === 0) createSessionTab({})
@@ -617,7 +616,7 @@ function handleCommand(cmd: Command): void {
 				emitInfo(sessionId ?? state.activeSessions[0] ?? resumeId, `Session ${resumeId} not found`, 'error')
 				break
 			}
-			state.activeSessions.push(resumeId)
+			state.activeSessions = restoredSessionOrder(state.activeSessions, resumeId, resumed.closedTabPosition)
 			sessionStore.updateMeta(resumeId, { closedAt: undefined })
 			broadcastSessions()
 			break
@@ -740,10 +739,9 @@ export const runtime = {
 	state,
 	startRuntime,
 	emitInfo,
-	pickMostRecentlyClosedSessionId: sessionStore.pickMostRecentlyClosedSessionId,
-	resolveResumeTarget: sessionStore.resolveResumeTarget,
 	shouldAutoContinue,
 	shouldCloseSessionAfterGeneration,
+	restoredSessionOrder,
 	recordTabClosed,
 	spawnSession,
 	startSpawnedSession,

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { runtime } from './runtime.ts'
-import type { SessionMeta } from './sessions.ts'
+import { sessions, type SessionMeta } from './sessions.ts'
 import { ipc } from '../ipc.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
@@ -21,7 +21,7 @@ test('runtime exposes in-memory active sessions for eval helpers', () => {
 })
 
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
-	const picked = runtime.pickMostRecentlyClosedSessionId(
+	const picked = sessions.pickMostRecentlyClosedSessionId(
 		[
 			{ id: '04-open', createdAt: '2026-04-13T18:00:00.000Z' },
 			{ id: '04-old', createdAt: '2026-04-13T18:01:00.000Z', closedAt: '2026-04-13T18:05:00.000Z' },
@@ -34,7 +34,7 @@ test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => 
 })
 
 test('pickMostRecentlyClosedSessionId falls back to createdAt when closedAt is missing', () => {
-	const picked = runtime.pickMostRecentlyClosedSessionId(
+	const picked = sessions.pickMostRecentlyClosedSessionId(
 		[
 			{ id: '04-a', createdAt: '2026-04-13T18:01:00.000Z' },
 			{ id: '04-b', createdAt: '2026-04-13T18:02:00.000Z' },
@@ -46,12 +46,20 @@ test('pickMostRecentlyClosedSessionId falls back to createdAt when closedAt is m
 })
 
 test('pickMostRecentlyClosedSessionId returns null when nothing is closed', () => {
-	const picked = runtime.pickMostRecentlyClosedSessionId(
+	const picked = sessions.pickMostRecentlyClosedSessionId(
 		[{ id: '04-open', createdAt: '2026-04-13T18:00:00.000Z' }],
 		new Set(['04-open']),
 	)
 
 	expect(picked).toBeNull()
+})
+
+test('restoredSessionOrder reinserts a resumed tab at its saved position', () => {
+	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 2)).toEqual(['04-left', '04-closed', '04-right'])
+	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 1)).toEqual(['04-closed', '04-left', '04-right'])
+	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 99)).toEqual(['04-left', '04-right', '04-closed'])
+	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed')).toEqual(['04-left', '04-right', '04-closed'])
+	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 0)).toEqual(['04-left', '04-right', '04-closed'])
 })
 
 test('shouldAutoContinue resumes unfinished turns after restart notices', () => {
@@ -167,7 +175,7 @@ test('buildAliasUpdateSuggestionText mentions config mapping and subagent only o
 
 
 test('resolveResumeTarget matches a closed session by name case-insensitively', () => {
-	const picked = runtime.resolveResumeTarget(
+	const picked = sessions.resolveResumeTarget(
 		[
 			{ id: '04-a', createdAt: '2026-04-13T18:01:00.000Z', name: 'Pause Fix' },
 			{ id: '04-b', createdAt: '2026-04-13T18:02:00.000Z', name: 'Other' },

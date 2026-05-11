@@ -27,6 +27,9 @@ export interface SessionMeta {
 	closedAt?: string
 	forkedFrom?: string
 	closeWhenDone?: boolean
+	// 1-based visible tab position at close time. Used to put Ctrl-Shift-T
+	// restores back where the tab was instead of appending at the end.
+	closedTabPosition?: number
 	parentSessionId?: string
 	// Last known context window usage, persisted so it survives restarts.
 	context?: { used: number; max: number }
