@@ -1,298 +1,226 @@
-# LOC reduction review for `src/cli/prompt.ts`
+# `src/cli/prompt.ts` under-500 plan
 
-## Review verdict
+Current measurement on 2026-05-12:
 
-**Verdict: tighten before execution.**
+- `src/cli/prompt.ts`: **580 bun-cloc LOC**
+- repo total from full `bun cloc`: **14981 LOC**
+- `./test`: **701 pass, 0 fail** before planning
 
-The old direction was partly right, but two parts were too optimistic on the current branch:
+This is a planning document only. The user should review/refine before implementation.
 
-- it overvalued cross-file extraction as the first move for a file that is only **15 LOC** over target
-- it treated width-logic dedupe as a near-term LOC win even though the current prompt code also owns cursor↔row/col mapping, not just wrapping
+## Why this file keeps growing
 
-Verified on the live branch:
+`prompt.ts` combines editor behavior and rendering:
 
-- `./test`: **passes**
-- `bun cloc src/cli/prompt.ts`: **515 LOC**
-- `bun cloc`: **12,782 LOC** total
-- Current files still above 500 LOC:
-	- `src/client.ts` — 954
-	- `src/runtime/commands.ts` — 656
-	- `src/server/runtime.ts` — 580
-	- `src/cli/prompt.ts` — 515
-
-Reviewed against:
-
-- `src/cli/prompt.ts`
-- `tests/prompt.test.ts`
-- `src/cli/line-editor.ts`
-- `src/cli/line-editor.test.ts`
-- `src/client/cli.ts`
-- `src/client/render-status.ts`
-- `tests/render.test.ts`
-- `tests/render-width.test.ts`
-- `docs/terminal.md`
-- `src/utils/strings.ts`
-
-## What is true on the current branch
-
-`src/cli/prompt.ts` still mixes several jobs:
-
-- wrapped prompt layout
-- cursor mapping across wrapped rows
+- word wrapping
+- cursor-to-row/col mapping
+- row/col-to-cursor mapping
+- vertical movement across wrapped rows
+- simple word movement
+- option/cmd word movement with punctuation rules
 - editor state
-- selection primitives
-- undo / redo
+- selection
+- undo/redo
 - submitted-history browsing
-- clipboard glue
-- placeholder resolution for async paste
-- prompt rendering with highlighted selection
-- a large key dispatcher
+- kill/yank
+- OS clipboard write/paste
+- async paste placeholder replacement
+- key dispatch
+- prompt rendering with selection highlighting
+- public API
 
-That mix is real. But from the current file shape, the **largest credible one-pass LOC win is still inside `prompt.ts` itself**, especially `handleKey()` and a few nearby state helpers.
+The file grew because correctness fixes naturally land in the only module that understands both editing state and wrapped layout.
 
-## Strongest execution path, ordered by credible net LOC reduction
+## Current large chunks
 
-This order is about **real repo-wide savings from the current code**, not abstract elegance.
+Large current functions/regions by physical line count:
 
-### 1. Collapse `handleKey()` first
+- layout/wrap/cursor functions — roughly 65 physical lines
+- `optionWordLeft()` + `optionWordRight()` — roughly 58
+- history browse helpers — roughly 45
+- clipboard/paste helpers — roughly 35
+- `handleCmdKey()` + `handleKey()` — roughly 119
+- rendering/public API — roughly 105
 
-This is the best first move now.
+The file is only about 80 LOC over target, so it does not need a broad editor framework.
 
-Why it is first:
+## Architecture alternatives
 
-- it is entirely inside the 515-line file
-- it can plausibly save **20–35 LOC** by deleting duplication, which is already enough to get under 500
-- it avoids helper-module overhead
-- it keeps API churn near zero for `src/client/cli.ts` and `src/client/render-status.ts`
+### Alternative A — Extract wrapped layout/cursor mapping
 
-Where the live duplication still is:
+Move layout-specific code into `src/cli/prompt-layout.ts`:
 
-- repeated cmd-key branches with identical `return true`
-- repeated home/end movement paths
-- repeated left/right structure
-- repeated backspace/delete/ctrl-d structure
-- repeated selection-anchor-or-clear patterns
-- repeated goal-column reset paths
+- `wordWrapLines()`
+- `getLayout()`
+- `cursorToRowCol()`
+- `rowColToCursor()`
+- `verticalMove()`
+- possibly selection rendering spans later
 
-Good shape:
+`prompt.ts` keeps editor state and key handling.
 
-- early `if (k.cmd) return handleCmdKey(...)`
-- normal-path `switch` or equivalent grouped dispatch
-- one helper for horizontal movement
-- one helper for delete direction / word delete vs char delete
-- keep history browse vs wrapped vertical move in prompt; that part is still prompt-specific
+Pros:
 
-**Expected result:** most likely enough by itself to cross 500.
+- clean conceptual boundary
+- likely enough to put `prompt.ts` below 500
+- makes future width-correctness work easier
 
-### 2. Do small prompt-local cleanup immediately after
+Cons:
 
-Take the obvious local deletes before introducing a new shared module.
+- can be repo-LOC flat/up if moved without simplifying
+- current code is `.length`-based; a full `visLen()` rewrite needs tests and may grow first
 
-Targets:
+Verdict: recommended first architecture, with behavior-locking tests.
 
-- fold repeated “load text + move cursor to end + clear selection/goal” paths
-- tighten tiny reset helpers around selection / goal / history state
-- remove one-use helpers that become dead after key-handler cleanup
+### Alternative B — Extract keymap/action table
 
-Realistic savings:
+Keep layout local, but make key handling declarative:
 
-- `prompt.ts`: **-5 to -10 LOC**
-- repo net: same
+- action helpers remain in prompt
+- key dispatch becomes a small table or grouped helper functions
 
-This is the cheapest follow-up after step 1.
+Pros:
 
-### 3. Only then consider a tiny shared editor primitive layer with `line-editor.ts`
+- low risk
+- can save LOC without new module boilerplate
 
-There is real duplication with `src/cli/line-editor.ts`, but this should be a **second move**, not the first one.
+Cons:
 
-Shared seams that really exist today:
+- previous passes already shrank key handling somewhat
+- does not address layout ownership
 
-- clamp cursor to text bounds
-- selection range from `{ cursor, selAnchor }`
+Verdict: good fallback or second step if layout extraction is not desired.
+
+### Alternative C — Extract editor core shared with `line-editor.ts`
+
+Create a tiny shared primitive module for:
+
+- clamp
+- selection range
 - move with optional selection
 - replace selection
 - delete selection
-- inverse-video rendering of the selected span
 
-Hard boundary for the helper:
+Pros:
 
-- plain text state only
-- no undo / redo
-- no prompt history
-- no wrapped layout
-- no clipboard
-- no async placeholder logic
-- no viewport logic
+- real shared domain
 
-Updated savings estimate from the live code:
+Cons:
 
-- likely repo net: **about -5 to -20 LOC**
-- not the earlier `-20 to -40` unless the helper stays extremely small
+- `line-editor.ts` is only 134 LOC, so savings ceiling is low
+- generic editor core can become abstraction-heavy fast
 
-Why the estimate is lower than the older draft:
+Verdict: only do if the helper is tiny and repo LOC goes down.
 
-- `line-editor.ts` is only **134 LOC**, so there is less duplicate bulk to harvest than the old framing implied
-- a new shared module has real boilerplate cost in this codebase
-- if the helper starts carrying behavior branches for both editors, savings evaporate fast
+## Recommended execution path
 
-**Stop condition for this step:** if the helper grows close to the code it replaces, abandon it.
+### Step 1 — Add/verify behavior-locking tests before risky layout/key changes
 
-### 4. Clipboard write glue is optional cleanup, not a main reduction path
+Add or verify tests for:
 
-`prompt.ts` still owns `pbcopy` writing while `clipboard.ts` owns paste cleanup and async replacement entry.
+- history browse restores draft after up/down
+- redo after grouped typing undo
+- wrapped selection rendering
+- exact-width blank-line cursor after edits
+- emoji/CJK prompt width behavior if touching layout
+- cmd/option word movement around punctuation
+- async placeholder replacement when the placeholder is missing or cursor moved
 
-That move is fine only if it stays tiny.
+Expected impact:
 
-Expected savings:
+- tests add LOC, but protect behavior
 
-- `prompt.ts`: **-7 to -9 LOC**
-- repo net: **tiny**
+### Step 2 — Extract layout/cursor mapping to `src/cli/prompt-layout.ts`
 
-Do not take this before steps 1–2.
+Move the layout functions and keep them pure:
 
-### 5. Treat width-logic dedupe as a separate correctness pass unless still needed
+```ts
+export const promptLayout = {
+	wordWrapLines,
+	getLayout,
+	cursorToRowCol,
+	rowColToCursor,
+	verticalMove,
+}
+```
 
-This should **not** be the first-pass LOC plan.
+Potential improvement:
 
-Why the old draft was too optimistic here:
+- use `visLen()` / width-aware helpers where practical
+- if a full width-correct rewrite grows too much, defer it and move current behavior first
 
-- `prompt.ts` does not just wrap text; it also computes `starts`, `cursorToRowCol()`, `rowColToCursor()`, and `verticalMove()`
-- `src/utils/strings.ts` gives shared width primitives like `visLen()` and `wordWrap()`, but not the cursor-mapping machinery prompt currently needs
-- a real width-correct rewrite may end up **flat or up** in LOC before later cleanup pays it back
+Expected impact:
 
-So:
+- `prompt.ts`: -70 to -90 LOC
+- new module: +60 to +85 LOC
+- repo net: flat/slightly down
 
-- yes, the current `.length`-based prompt layout conflicts with the terminal rules in `docs/terminal.md`
-- no, this is not the strongest first pass if the immediate goal is “under 500 with net LOC down”
+This alone should bring `prompt.ts` below 500.
 
-This is a good **second pass** for correctness once prompt is already below target.
+### Step 3 — Compact word movement helpers
 
-## What must NOT happen during execution
+Current option/cmd word movement is behavior-heavy but has repeated scanning loops. Consider tiny local scanner helpers:
 
-Do **not** do any of these:
+- `skipLeft()`
+- `skipRight()`
+- `isSeparator()`
+- token-vs-punctuation predicates
 
-- do **not** push prompt ownership into `src/client.ts`
-	- it is already **954 LOC**
-	- that would reduce one target by bloating a worse one
-- do **not** create a generic “editor framework” to share prompt and line-editor logic
-- do **not** count split-and-glue as reduction
-	- adding a helper module is only valid if repo `cloc` goes down
-- do **not** mix the width-correctness rewrite into the first shrink pass unless tests land first
-- do **not** change prompt’s public surface more than necessary
-	- `src/client/cli.ts`, `src/client/render-status.ts`, and `src/client/render.ts` already depend on it directly
-- do **not** regress these behaviors:
-	- grouped typing undo / redo
-	- history draft enter / exit
-	- exact-width blank-line cursor behavior
-	- selection highlighting in rendered prompt lines
-	- cmd-word motion around punctuation
-	- async placeholder replacement when the placeholder is still present
+Keep comments for tricky punctuation behavior.
 
-## Coverage reality on the current branch
+Expected impact:
 
-Already covered today:
+- `prompt.ts`: -10 to -20 LOC
+- repo net: down if helpers are smaller than repeated loops
 
-- shift-enter inserts newline
-- alt-left / alt-right word motion
-- cmd-left / cmd-right punctuation-aware motion
-- cmd-a + backspace clears multiline selection
-- grouped typing undo
-- exact-width initial blank-line cursor case in `buildPrompt()`
+### Step 4 — Move clipboard write into `src/cli/clipboard.ts`
 
-Still missing before risky prompt surgery:
+`prompt.ts` owns `writeToClipboard()` while `clipboard.ts` already owns paste behavior.
 
-1. history browse enters with `up`, preserves `historyDraft`, and exits back to draft with `down`
-2. redo after grouped typing undo
-3. selection rendering across a wrapped prompt line
-4. exact-width blank-line cursor after edits, not just after `setText()`
-5. emoji / CJK width in `buildPrompt()` and wrapped vertical movement
-6. async placeholder resolution when the placeholder is gone or the user typed after it
+Move a tiny `clipboard.copy(text)` helper.
 
-Important nuance:
+Expected impact:
 
-- `tests/render-width.test.ts` currently checks clipped frame width, but it does **not** directly prove prompt wrapping is width-correct for wide characters
-- if step 5 ever starts, add prompt-focused tests first
+- `prompt.ts`: -7 to -9 LOC
+- `clipboard.ts`: +4 to +7 LOC
+- repo net: small down/flat
 
-## Overlap and merge risk
+### Step 5 — Final key dispatch cleanup if still needed
 
-### `src/client.ts`
+If still over 500 after steps 2–4:
 
-High risk only if the execution cheats.
+- split `handleKey()` into `handleCtrlKey`, `handleNavigationKey`, `handleTextInput`
+- or use a very small action table for simple ctrl keys
 
-Safe rule:
+Avoid overengineering; current `handleKey()` is readable and already partly compacted.
 
-- reduce prompt internals
-- keep prompt ownership inside `prompt.ts`
-- avoid moving draft/history state into `client.ts`
+Expected impact:
 
-### `src/cli/line-editor.ts`
+- `prompt.ts`: -10 to -25 LOC
 
-Medium risk if shared-primitives work is attempted.
+## Expected outcome
 
-Safe rule:
+Conservative:
 
-- coordinate if someone else is actively changing line-editor
-- keep any shared module tiny enough that both callers get simpler
+- layout extraction: 580 → ~500
+- clipboard: ~500 → ~492
 
-### `src/client/render-status.ts` and render tests
+Aggressive:
 
-Moderate correctness risk, low merge risk.
+- layout extraction + word scanner cleanup + key cleanup: **430–470 LOC**
 
-Reason:
+## Tests to watch
 
-- `render-status.ts` calls `prompt.buildPrompt(cols)` directly
-- prompt line count feeds chrome height
-- prompt line content is rendered straight into the frame
+- `tests/prompt.test.ts`
+- `src/cli/line-editor.test.ts` if shared primitives are touched
+- `tests/render.test.ts`
+- `tests/render-width.test.ts`
+- `tests/render-single-pass.test.ts`
 
-So prompt rendering changes can break terminal invariants even when prompt tests pass.
+## Must not happen
 
-## Stop conditions
-
-After each real step, run:
-
-- `./test`
-- `bun cloc src/cli/prompt.ts`
-- `bun cloc`
-
-Stop the pass when **all** of these are true:
-
-- `src/cli/prompt.ts < 500 LOC`
-- repo `cloc` is down, not up
-- no extra helper module was introduced just to move code around
-
-Abort the shared-helper direction if either happens:
-
-- the new helper grows close to the lines it replaces
-- prompt and line-editor need diverging branches inside the helper
-
-Abort the width-rewrite direction for this pass if either happens:
-
-- cursor-mapping complexity expands instead of shrinking
-- new tests reveal wide-char behavior gaps that need a dedicated correctness pass
-
-## Is under-500 in one pass still realistic?
-
-**Yes.**
-
-But the realistic one-pass route from the current branch is:
-
-1. add the few missing prompt tests that protect history / redo / wrap behavior
-2. simplify `handleKey()` hard
-3. take the small prompt-local helper cleanup that falls out of that rewrite
-4. stop as soon as `prompt.ts` is under 500 and repo `cloc` is lower
-
-What is **not** realistic as the first pass:
-
-- replaying stale “cheap deletes” that are already gone
-- assuming the width rewrite is a free LOC win
-- winning by moving code into `src/client.ts`
-
-## Ready-for-execution verdict
-
-**Yes, after this tightening the plan is ready for execution.**
-
-Recommended first pass:
-
-- **prompt-local simplification first**
-- **cross-file dedupe only if still useful after that**
-- **width-correctness rewrite as a separate pass unless the file somehow still stays above 500**
+- Do not push prompt state into `client.ts`; it is already the biggest offender.
+- Do not create a broad editor framework.
+- Do not rewrite width behavior without tests.
+- Do not trade 80 removed LOC for 120 LOC of abstraction.
+- Do not violate terminal width rules in new code: use `visLen()` / width-aware utilities for new width logic.

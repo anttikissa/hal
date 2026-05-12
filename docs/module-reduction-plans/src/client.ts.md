@@ -1,15 +1,16 @@
 # `src/client.ts` under-500 plan
 
-Current measurement on 2026-05-06:
+Current measurement on 2026-05-12:
 
-- `src/client.ts`: **1008 bun-cloc LOC**
-- repo total from full `bun cloc`: **13967 LOC**
+- `src/client.ts`: **1029 bun-cloc LOC**
+- repo total from full `bun cloc`: **14981 LOC**
+- `./test`: **701 pass, 0 fail** before planning
 
 This is a planning document only. The user should review/refine before implementation.
 
 ## Why this file keeps growing
 
-`client.ts` is the broadest remaining client-side ownership point. It currently owns:
+`client.ts` is the broadest client-side ownership point. It currently owns:
 
 - tab/session state shape and active-tab navigation
 - recent-tab and return-to-tab policy
@@ -21,12 +22,24 @@ This is a planning document only. The user should review/refine before implement
 - live IPC event handling and repaint decisions
 - delayed `[paused]` notice logic
 - command construction and pending open/fork/resume focus hints
-- IPC state watching, host-lock watching, event tailing
+- IPC state watching, host-lock watching, and event tailing
 - background loading of histories/blobs
 - startup selection from cwd/restart/saved tab
 - test reset/export surface
 
-The issue is not one big dead block. It is unresolved ownership: new features land here because this file can see all state.
+There is no single dead block large enough to solve this. The real problem is unresolved ownership: new behavior lands here because this file can see all state.
+
+## Current large chunks
+
+Large current functions/regions by physical line count:
+
+- `handleEvent()` — about 143 physical lines
+- `initializeSessions()` — about 83
+- `applySessionList()` — about 75
+- `startup summary/model/quota helpers` — roughly 80–100 combined
+- `makeTabFromDisk()` — about 28, but it owns many responsibilities
+- `save/load client state + watchers + startClient()` — roughly 90–120 combined
+- export surface/reset/test plumbing — roughly 45 combined
 
 ## Architecture alternatives
 
@@ -39,23 +52,54 @@ Extract cohesive helpers while `client.ts` remains owner of `state`, callbacks, 
 - `src/client/tabs.ts`
 - later, maybe `src/client/startup.ts` or `src/client/events.ts`
 
-This is the recommended first architecture: it reduces the file without inventing a second state owner.
+Pros:
+
+- easiest to review incrementally
+- least risky for hot-patching/eval friendliness
+- avoids inventing a second state owner
+
+Cons:
+
+- repo LOC may be flat if extraction is too wrapper-heavy
+- `client.ts` remains central
+
+Verdict: recommended first architecture.
 
 ### Alternative B — Client model + reducers
 
-Introduce a `ClientModel` object and pure reducers:
+Introduce a `ClientModel` object and reducers:
 
 - `clientTabs.applyList(model, items, opts)`
 - `clientEvents.applyEvent(model, event, opts)`
 - `clientStartup.initialize(model, shared, opts)`
 
-This is cleaner long-term, but larger and riskier.
+Pros:
+
+- cleaner long-term state model
+- better tests without global reset gymnastics
+
+Cons:
+
+- larger refactor
+- may add type/glue LOC before shrinking
+- riskier around drafts, delayed pauses, and background loading
+
+Verdict: good long-term, but too large for first pass unless done gradually.
 
 ### Alternative C — UI session store
 
 Move most tab/session state into `src/client/session-store.ts`; `client.ts` becomes process wiring.
 
-This gives the biggest `client.ts` reduction, but risks simply renaming the god module unless the new store has a tight API and remains under 500.
+Pros:
+
+- biggest `client.ts` reduction
+
+Cons:
+
+- easy to create a new god module
+- could simply rename the problem
+
+Verdict: only acceptable if the new store has a tight API and stays well below 500.
 
 ## Recommended execution path
 
@@ -82,7 +126,7 @@ Keep mutation in `client.ts`:
 Expected impact:
 
 - `client.ts`: -70 to -95 LOC
-- repo net: flat/slightly down
+- repo net: flat/slightly down if helpers simplify while moving
 
 Why first: low risk and isolates recent growth around richer startup cards.
 
@@ -155,6 +199,18 @@ Expected impact:
 
 - `client.ts`: -80 to -120 LOC
 - repo net: likely flat
+
+### Step 6 — Small finalizers if needed
+
+If the file remains above 500 after ownership extractions:
+
+- move command construction (`pendingTabActionForPrompt()`, `makeCommand()`) to a tiny `client/commands.ts`
+- move continue/retry status scanning to a small pure helper
+- trim export surface if tests no longer need helper exports
+
+Expected impact:
+
+- `client.ts`: -25 to -55 LOC
 
 ## Expected outcome
 

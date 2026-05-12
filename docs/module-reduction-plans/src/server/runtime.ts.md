@@ -1,9 +1,10 @@
 # `src/server/runtime.ts` under-500 plan
 
-Current measurement on 2026-05-06:
+Current measurement on 2026-05-12:
 
-- `src/server/runtime.ts`: **690 bun-cloc LOC**
-- repo total from full `bun cloc`: **13967 LOC**
+- `src/server/runtime.ts`: **697 bun-cloc LOC**
+- repo total from full `bun cloc`: **14981 LOC**
+- `./test`: **701 pass, 0 fail** before planning
 
 This is a planning document only. The user should review/refine before implementation.
 
@@ -26,6 +27,17 @@ This is a planning document only. The user should review/refine before implement
 
 The file grew again because model metadata refresh, alias suggestions, spawn handling, target-cwd startup, and command/open behavior all landed in the runtime orchestrator.
 
+## Current large chunks
+
+Large current functions/regions by physical line count:
+
+- `handleCommand()` — about 126 physical lines
+- `startRuntime()` — about 104
+- model refresh / alias suggestion helpers — roughly 75 combined
+- `buildSessionState()` / prompt dispatch / generation — roughly 110 combined
+- spawn helpers — roughly 45 combined
+- reset/compact — roughly 40 combined
+
 ## Architecture alternatives
 
 ### Alternative A — Runtime remains orchestrator; extract side domains
@@ -39,13 +51,32 @@ Move cohesive side domains out:
 
 `runtime.ts` keeps session order, command loop, and high-level dispatch.
 
-This is the recommended architecture.
+Pros:
+
+- straightforward
+- fast reduction
+- preserves current runtime state model
+
+Cons:
+
+- can become wrapper-heavy if helpers are not real owners
+
+Verdict: recommended.
 
 ### Alternative B — Command handler table/module
 
 Move most `handleCommand()` cases into a command-handler table with injected runtime operations.
 
-This could reduce `runtime.ts`, but it risks adapter churn and overlaps with `src/runtime/commands.ts`, which is currently also above 500. Use only after side-domain extraction.
+Pros:
+
+- large visible reduction from `runtime.ts`
+
+Cons:
+
+- risks adapter churn
+- overlaps with `src/runtime/commands.ts`, which is currently also above 500
+
+Verdict: use only after side-domain extraction.
 
 ### Alternative C — Supervisor/controller split
 
@@ -55,7 +86,16 @@ Split into:
 - session controller: active sessions, open/fork/resume/close/move
 - generation controller: prompt/generation/context/reset/compact
 
-This is clean long-term, but larger than needed for the first under-500 pass.
+Pros:
+
+- clean long-term architecture
+
+Cons:
+
+- larger refactor
+- higher behavior risk
+
+Verdict: good long-term target, not necessary for first under-500 pass.
 
 ## Recommended execution path
 
@@ -88,7 +128,7 @@ Why first: cohesive, weakly coupled, and clearly not core command/runtime dispat
 
 ### Step 2 — Extract spawn-agent lifecycle
 
-Move to `src/server/spawn.ts` if the dependency injection stays small:
+Move to `src/server/spawn.ts` if dependency injection stays small:
 
 - `buildSpawnPrompt()`
 - `spawnSession()`
@@ -165,9 +205,9 @@ Expected impact:
 
 Conservative path:
 
-- model refresh: 690 → ~610
-- spawn: ~610 → ~565
-- maintenance/startup: ~565 → ~490
+- model refresh: 697 → ~615
+- spawn: ~615 → ~570
+- maintenance/startup: ~570 → ~490
 
 Aggressive path:
 
