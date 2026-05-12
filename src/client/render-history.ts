@@ -20,6 +20,8 @@ export type HistoryRenderContext = {
 	cursorVisible: boolean
 }
 
+const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
+
 function hasInlineHalCursor(block: Block | undefined): boolean {
 	return (block?.type === 'assistant' || block?.type === 'thinking') && !!block.streaming
 }
@@ -38,12 +40,11 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext):
 }
 
 function infoGroupKey(block: Block): string | null {
-	// Only coalesce simple one-line info blocks. Multiline output such as
-	// `/config` should render as a normal block so its internal line breaks
-	// survive instead of being flattened into bracket "bricks".
-	if (block.type !== 'info' || !block.ts || block.text.includes('\n')) return null
-	const d = new Date(block.ts)
-	return `info:${d.getHours()}:${d.getMinutes()}`
+	// Coalesce consecutive one-line info blocks, even across days. Multiline
+	// output such as `/config` stays as a normal block so its line breaks survive.
+	if (block.type !== 'info' || block.text.includes('\n')) return null
+	if (block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)) return null
+	return 'info'
 }
 
 function renderGroup(group: Block[], cols: number, context: HistoryRenderContext): string[] {

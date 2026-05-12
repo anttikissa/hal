@@ -103,6 +103,36 @@ describe('render', () => {
 		expect(clean.match(/Info/g)?.length ?? 0).toBe(1)
 	})
 
+	test('consecutive info blocks across days collapse with a date range header', () => {
+		const originalNow = Date.now
+		Date.now = () => new Date(2026, 4, 6, 13, 0).getTime()
+		try {
+			const tab = client.currentTab()!
+			tab.history.push({ type: 'info', text: 'first metadata refresh', ts: new Date(2026, 4, 4, 19, 30).getTime() })
+			tab.history.push({ type: 'info', text: 'second metadata refresh', ts: new Date(2026, 4, 6, 12, 10).getTime() })
+			const clean = stripAnsi(captureOutput(() => render.draw(true)))
+			expect(clean).toContain('4 May 19:30 - 6 May 12:10 Info')
+			expect(clean).toContain('first metadata refresh')
+			expect(clean).toContain('second metadata refresh')
+			expect(clean.match(/Info/g)?.length ?? 0).toBe(1)
+		} finally {
+			Date.now = originalNow
+		}
+	})
+
+	test('old block timestamps include date', () => {
+		const originalNow = Date.now
+		Date.now = () => new Date(2026, 4, 6, 13, 0).getTime()
+		try {
+			const tab = client.currentTab()!
+			tab.history.push({ type: 'assistant', text: 'old answer', ts: new Date(2026, 4, 4, 19, 30).getTime() })
+			const clean = stripAnsi(captureOutput(() => render.draw(true)))
+			expect(clean).toContain('4 May 19:30 Hal')
+		} finally {
+			Date.now = originalNow
+		}
+	})
+
 	test('multiline info blocks do not get flattened into a coalesced info group', () => {
 		const tab = client.currentTab()!
 		const ts = Date.now()

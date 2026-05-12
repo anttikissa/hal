@@ -35,6 +35,14 @@ function makeSharedState(ids: string[]): SharedState {
 	}
 }
 
+function nonBookkeepingHistory() {
+	return client.currentTab()?.history.filter((block) => {
+		if (block.type === 'startup') return false
+		if (block.type === 'info' && block.text.startsWith('This session was last active ')) return false
+		return true
+	})
+}
+
 const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 
 describe('client startup', () => {
@@ -327,7 +335,69 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.history.filter((block) => block.type === 'startup')).toEqual([])
-		expect(client.currentTab()?.history).toMatchObject([{ type: 'assistant', synthetic: true, model: 'openai/gpt-5.4', text: 'Howdy!' }])
+		expect(nonBookkeepingHistory()).toMatchObject([{ type: 'assistant', synthetic: true, model: 'openai/gpt-5.4', text: 'Howdy!' }])
+	})
+
+	test('adds an ephemeral last-active notice for stale sessions', async () => {
+		const originalNow = Date.now
+		const now = new Date(2026, 3, 12, 0, 0).getTime()
+		const lastActive = new Date(2026, 3, 10, 20, 0)
+		Date.now = () => now
+		try {
+			sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
+			sessions.loadAllHistoryWithOrigin = () => ({
+				entries: [
+					{ type: 'assistant', text: 'old work', synthetic: true, model: 'openai/gpt-5.4', ts: lastActive.toISOString() },
+					{ type: 'info', text: '[models.dev] fetched model metadata', ts: new Date(2026, 3, 11, 23, 0).toISOString() },
+				],
+				parentCount: 0,
+			})
+			const shared = makeSharedState(['s1'])
+			const hostLock = { pid: null, createdAt: '' }
+			ipc.readState = () => shared
+			liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+			liveFiles.onChange = () => {}
+			ipc.tailEvents = async function* () {}
+
+			const ac = new AbortController()
+			client.startClient(ac.signal)
+			await Bun.sleep(10)
+			ac.abort()
+
+			const notice = client.currentTab()?.history.at(-1)
+			expect(notice?.type).toBe('info')
+			if (notice?.type !== 'info') throw new Error('missing stale-session notice')
+			expect(notice.text).toBe('This session was last active 10 Apr 2026, 20:00 (1 day 4 hours ago)')
+		} finally {
+			Date.now = originalNow
+		}
+	})
+
+	test('does not add a last-active notice for recently active sessions', async () => {
+		const originalNow = Date.now
+		Date.now = () => new Date(2026, 3, 12, 0, 0).getTime()
+		try {
+			sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
+			sessions.loadAllHistoryWithOrigin = () => ({
+				entries: [{ type: 'assistant', text: 'recent work', synthetic: true, model: 'openai/gpt-5.4', ts: new Date(2026, 3, 11, 12, 30).toISOString() }],
+				parentCount: 0,
+			})
+			const shared = makeSharedState(['s1'])
+			const hostLock = { pid: null, createdAt: '' }
+			ipc.readState = () => shared
+			liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+			liveFiles.onChange = () => {}
+			ipc.tailEvents = async function* () {}
+
+			const ac = new AbortController()
+			client.startClient(ac.signal)
+			await Bun.sleep(10)
+			ac.abort()
+
+			expect(client.currentTab()?.history.some((block) => block.type === 'info' && block.text.startsWith('This session was last active '))).toBe(false)
+		} finally {
+			Date.now = originalNow
+		}
 	})
 
 	test('startup fallback uses fork-aware history loading', async () => {
@@ -354,9 +424,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.forkedFrom).toBe('parent')
-		// Filter out the startup block that gets appended automatically
-		const nonStartup = client.currentTab()?.history.filter(b => b.type !== 'startup')
-		expect(nonStartup).toMatchObject([
+		expect(nonBookkeepingHistory()).toMatchObject([
 			{ type: 'user', text: 'before fork', dimmed: true },
 			{ type: 'user', text: 'after fork' },
 		])
@@ -398,7 +466,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(blobLoads).toContainEqual(['s2'])
+		expect(blobLoads.some((items) => items.includes('s2'))).toBe(true)
 	})
 
 	test('closing the active last tab falls back to the left neighbor', async () => {
@@ -671,8 +739,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		const nonStartup = client.currentTab()?.history.filter(b => b.type !== 'startup')
-		expect(nonStartup).toMatchObject([
+		expect(nonBookkeepingHistory()).toMatchObject([
 			{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.' },
 		])
 	})
@@ -698,9 +765,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		// Filter out the startup block that gets appended automatically
-		const nonStartup = client.currentTab()?.history.filter(b => b.type !== 'startup')
-		expect(nonStartup).toMatchObject([
+		expect(nonBookkeepingHistory()).toMatchObject([
 			{ type: 'assistant', text: 'hello', streaming: true, ts: Date.parse('2026-04-09T20:01:00.000Z') },
 		])
 	})

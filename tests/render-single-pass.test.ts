@@ -40,7 +40,7 @@ describe('render single pass', () => {
 	test('history changes render each block once per draw', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'info', text: 'one' })
-		tab.history.push({ type: 'info', text: 'two' })
+		tab.history.push({ type: 'assistant', text: 'two' })
 		tab.historyVersion = 1
 		const origRenderBlock = blockRenderer.renderBlock
 		let calls = 0
@@ -62,7 +62,7 @@ describe('render single pass', () => {
 	test('prompt-only redraw reuses cached history render', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'info', text: 'one' })
-		tab.history.push({ type: 'info', text: 'two' })
+		tab.history.push({ type: 'assistant', text: 'two' })
 		tab.historyVersion = 1
 		const origRenderBlock = blockRenderer.renderBlock
 		let calls = 0

@@ -18,6 +18,7 @@ import { liveEventBlocks } from './live-event-blocks.ts'
 import { log } from './utils/log.ts'
 import { startup } from './startup.ts'
 import { models } from './models.ts'
+import { time } from './utils/time.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,8 @@ export interface Tab {
 	model: string
 	// Parent session ID if this tab was forked
 	forkedFrom?: string
+	// Ephemeral UI-only marker shown when a loaded session has been idle >24h.
+	lastActiveTs?: number
 }
 
 type ContinueAction = 'continue' | 'retry'
@@ -82,6 +85,9 @@ const config = {
 	claudeCacheWarningQuotaPercent: 10,
 	claudeCacheWarningStaleMs: 5 * 60 * 1000,
 }
+
+const LAST_ACTIVE_THRESHOLD_MS = 24 * 60 * 60 * 1000
+const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 
 const state = {
 	tabs: [] as Tab[],
@@ -501,6 +507,7 @@ function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
 	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
+	addLastActiveNotice(tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
@@ -781,6 +788,43 @@ function canContinueCurrentTurn(): boolean {
 }
 
 
+function entryActivityTs(entry: HistoryEntry): number | null {
+	if (entry.type === 'input_history') return null
+	if (entry.type === 'info' && entry.level !== 'error') return null
+	return entry.ts ? Date.parse(entry.ts) : null
+}
+
+function blockActivityTs(block: Block): number | null {
+	if (block.type === 'info' || block.type === 'warning' || block.type === 'startup' || block.type === 'fork') return null
+	return block.ts ?? null
+}
+
+function lastActiveTs(entries: HistoryEntry[]): number | undefined {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const ts = entryActivityTs(entries[i]!)
+		if (ts != null && Number.isFinite(ts)) return ts
+	}
+	return undefined
+}
+
+function removeLastActiveNotice(tab: Tab): void {
+	tab.history = tab.history.filter((block) => !(block.type === 'info' && block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)))
+}
+
+function addLastActiveNotice(tab: Tab): void {
+	removeLastActiveNotice(tab)
+	let lastTs = tab.lastActiveTs
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const ts = blockActivityTs(tab.history[i]!)
+		if (ts != null) {
+			lastTs = lastTs ? Math.max(lastTs, ts) : ts
+			break
+		}
+	}
+	if (!lastTs) return
+	if (Date.now() - lastTs <= LAST_ACTIVE_THRESHOLD_MS) return
+	tab.history.push({ type: 'info', text: time.formatLastActiveNotice(lastTs), ts: Date.now() })
+}
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const meta = sessionStore.loadSessionMeta(info.id)
 	// Load history including fork parent entries so forked tabs show full context
@@ -792,6 +836,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	)
 	tab.rawHistory = history
 	tab.parentEntryCount = parentCount
+	tab.lastActiveTs = lastActiveTs(history)
 	tab.loaded = false
 	tab.liveHistory = sessionStore.loadLive(info.id).blocks as Block[]
 	for (const entry of history) {

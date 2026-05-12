@@ -8,6 +8,7 @@
 import { clipVisual, expandTabs, hardWrap, resolveMarkers, toLines, visLen, wordWrap } from '../utils/strings.ts'
 import { ason } from '../utils/ason.ts'
 import { models } from '../models.ts'
+import { time } from '../utils/time.ts'
 import type { HistoryEntry } from '../server/sessions.ts'
 import { sessionEntry } from '../session/entry.ts'
 import { STATE_DIR } from '../state.ts'
@@ -595,10 +596,12 @@ function blockColors(block: Block): { fg: string; bg: string } {
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
 }
 
-function formatHHMM(ts?: number): string {
-	if (!ts) return ''
-	const date = new Date(ts)
-	return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+function formatBlockTime(ts?: number): string {
+	return time.formatTimestamp(ts)
+}
+
+function formatBlockTimeRange(first?: number, last?: number): string {
+	return time.formatTimestampRange(first, last)
 }
 
 function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
@@ -639,11 +642,17 @@ function blockLabel(block: Block): string {
 function renderBlockGroup(group: Array<Extract<Block, { type: 'info' | 'warning' | 'error' }>>, cols: number): string[] {
 	if (group.length === 0) return []
 	if (group.length === 1) return renderBlock(group[0]!, cols)
-	const header = buildHeader('Info', formatHHMM(group[0]!.ts), '', cols)
-	const text = group.map((block) => `[${expandTabs(block.text, blockConfig.tabWidth)}]`).join(' ')
-	const { fg, bg } = colors.info
+	const first = group[0]!
+	const last = group[group.length - 1]!
+	const label = fixedLabels[first.type]
+	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
+	const { fg, bg } = blockColors(first)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
-	for (const line of wordWrap(text, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
+	for (const block of group) {
+		for (const raw of expandTabs(sanitizeTerminalText(block.text), blockConfig.tabWidth).split('\n')) {
+			for (const line of wordWrap(raw, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
+		}
+	}
 	lines[lines.length - 1]! += FG_OFF
 	return lines
 }
@@ -689,7 +698,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 			? `${block.sessionId}/${block.blobId}`
 			: ''
 	const { fg, bg } = blockColors(block)
-	const lines = [bgLine(`${fg}${buildHeader(blockLabel(block), formatHHMM(block.ts), blobRef, cols)}`, cols, bg)]
+	const lines = [bgLine(`${fg}${buildHeader(blockLabel(block), formatBlockTime(block.ts), blobRef, cols)}`, cols, bg)]
 	for (const line of blockContent(block, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
 	lines[lines.length - 1]! += FG_OFF
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid
