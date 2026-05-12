@@ -308,7 +308,8 @@ interface CommitFileStat {
 	path: string
 	added: number
 	removed: number
-	locAdded: number
+	locDelta?: number
+	locAdded?: number
 	isCode: boolean
 }
 
@@ -317,8 +318,10 @@ interface CommitMetadata {
 	hash: string
 	summary: string
 	files: CommitFileStat[]
-	locAdded: number
-	locAddedCode: number
+	locDelta?: number
+	locDeltaCode?: number
+	locAdded?: number
+	locAddedCode?: number
 }
 
 interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: string; suppressOutput?: boolean }
@@ -399,9 +402,18 @@ function parseCommitMetadata(output: string): CommitMetadata | null {
 	}
 }
 
+function signed(n: number): string {
+	if (n > 0) return `+${n}`
+	return String(n)
+}
+
+function commitLocDelta(file: CommitFileStat): number {
+	return file.locDelta ?? file.locAdded ?? 0
+}
+
 function fileStatLine(file: CommitFileStat): string {
 	const prefix = `${String(file.added).padStart(4)} −${String(file.removed).padEnd(3)}`
-	const loc = file.isCode ? `  +${file.locAdded} loc` : ''
+	const loc = file.isCode ? `  ${signed(commitLocDelta(file))} loc` : ''
 	return `${prefix} ${file.path}${loc}`
 }
 
@@ -421,7 +433,11 @@ function formatCommitOutput(output: string, cols: number, input?: any): ToolForm
 		lines.push('', 'Code')
 		for (const file of code) lines.push(fileStatLine(file))
 	}
-	lines.push('', resolveMarkers([md.mdInline(`Core LOC: +${meta.locAdded} total, **+${meta.locAddedCode} excluding tests**`)])[0]!)
+	const hasNetLoc = meta.locDelta !== undefined || meta.locDeltaCode !== undefined
+	const total = meta.locDelta ?? meta.locAdded ?? 0
+	const codeTotal = meta.locDeltaCode ?? meta.locAddedCode ?? 0
+	const locLabel = hasNetLoc ? 'Net LOC' : 'Added LOC'
+	lines.push('', resolveMarkers([md.mdInline(`${locLabel}: ${signed(total)} total, **${signed(codeTotal)} excluding tests**`)])[0]!)
 	return { bodyLines: lines, suppressOutput: true }
 }
 

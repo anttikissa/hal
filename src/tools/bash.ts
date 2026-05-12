@@ -30,7 +30,7 @@ interface CommitFileStat {
 	path: string
 	added: number
 	removed: number
-	locAdded: number
+	locDelta: number
 	isCode: boolean
 }
 
@@ -39,8 +39,8 @@ interface CommitMetadata {
 	hash: string
 	summary: string
 	files: CommitFileStat[]
-	locAdded: number
-	locAddedCode: number
+	locDelta: number
+	locDeltaCode: number
 }
 
 const COMMIT_META_START = '[hal-commit]'
@@ -104,7 +104,7 @@ function runGit(cwd: string, args: string[]): string {
 function changedFiles(cwd: string): CommitFileStat[] {
 	const numstat = runGit(cwd, ['diff-tree', '--root', '--no-commit-id', '--numstat', '-r', 'HEAD'])
 	const patch = runGit(cwd, ['show', '--format=', '--unified=0', '--no-ext-diff', 'HEAD'])
-	const addedLines = addedPatchLines(patch)
+	const changes = changedPatchLines(patch)
 	const files: CommitFileStat[] = []
 	for (const line of numstat.split('\n')) {
 		if (!line.trim()) continue
@@ -112,31 +112,35 @@ function changedFiles(cwd: string): CommitFileStat[] {
 		const added = Number(parts[0])
 		const removed = Number(parts[1])
 		const path = parts.at(-1) ?? ''
-		const locAdded = cloc.countText((addedLines.get(path) ?? []).join('\n'))
+		const locAdded = cloc.countText((changes.added.get(path) ?? []).join('\n'))
+		const locRemoved = cloc.countText((changes.removed.get(path) ?? []).join('\n'))
 		files.push({
 			path,
 			added: Number.isFinite(added) ? added : 0,
 			removed: Number.isFinite(removed) ? removed : 0,
-			locAdded,
+			locDelta: locAdded - locRemoved,
 			isCode: isCodePath(path),
 		})
 	}
 	return files
 }
 
-function addedPatchLines(patch: string): Map<string, string[]> {
-	const files = new Map<string, string[]>()
+function changedPatchLines(patch: string): { added: Map<string, string[]>; removed: Map<string, string[]> } {
+	const added = new Map<string, string[]>()
+	const removed = new Map<string, string[]>()
 	let path = ''
 	for (const line of patch.split('\n')) {
-		if (line.startsWith('+++ b/')) {
+		if (line.startsWith('--- a/') || line.startsWith('+++ b/')) {
 			path = line.slice(6)
-			if (!files.has(path)) files.set(path, [])
+			if (!added.has(path)) added.set(path, [])
+			if (!removed.has(path)) removed.set(path, [])
 			continue
 		}
-		if (!path || !line.startsWith('+') || line.startsWith('+++')) continue
-		files.get(path)!.push(line.slice(1))
+		if (!path || line.startsWith('+++') || line.startsWith('---')) continue
+		if (line.startsWith('+')) added.get(path)!.push(line.slice(1))
+		if (line.startsWith('-')) removed.get(path)!.push(line.slice(1))
 	}
-	return files
+	return { added, removed }
 }
 
 function commitMetadata(cwd: string): CommitMetadata | null {
@@ -144,13 +148,13 @@ function commitMetadata(cwd: string): CommitMetadata | null {
 	if (!hash) return null
 	const branch = runGit(cwd, ['branch', '--show-current']) || 'HEAD'
 	const files = changedFiles(cwd)
-	let locAdded = 0
-	let locAddedCode = 0
+	let locDelta = 0
+	let locDeltaCode = 0
 	for (const file of files) {
-		locAdded += file.locAdded
-		if (file.isCode) locAddedCode += file.locAdded
+		locDelta += file.locDelta
+		if (file.isCode) locDeltaCode += file.locDelta
 	}
-	return { branch, hash, summary: commitSummary(files), files, locAdded, locAddedCode }
+	return { branch, hash, summary: commitSummary(files), files, locDelta, locDeltaCode }
 }
 
 function appendCommitMetadata(out: string, command: string, cwd: string, code: number): string {

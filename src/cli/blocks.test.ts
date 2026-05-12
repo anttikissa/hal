@@ -317,11 +317,11 @@ test('bash git commit renders rich commit details instead of shell plumbing', ()
 	hash: 'abc123',
 	summary: '2 files changed, 3 insertions(+), 1 deletion(-)',
 	files: [
-		{ path: 'src/a.test.ts', added: 2, removed: 0, locAdded: 1, isCode: false },
-		{ path: 'src/a.ts', added: 1, removed: 1, locAdded: 1, isCode: true }
+		{ path: 'src/a.test.ts', added: 2, removed: 0, locDelta: 1, isCode: false },
+		{ path: 'src/a.ts', added: 1, removed: 1, locDelta: 0, isCode: true }
 	],
-	locAdded: 2,
-	locAddedCode: 1
+	locDelta: 1,
+	locDeltaCode: 0
 }
 [/hal-commit]`,
 	}
@@ -334,9 +334,9 @@ test('bash git commit renders rich commit details instead of shell plumbing', ()
 	expect(lines).toContain('Tests / docs / other')
 	expect(lines).toContain('   2 −0   src/a.test.ts')
 	expect(lines).toContain('Code')
-	expect(lines).toContain('   1 −1   src/a.ts  +1 loc')
-	expect(lines).toContain('Core LOC: +2 total, +1 excluding tests')
-	expect(raw.join('\n')).toContain('\x1b[1m+1 excluding tests\x1b[22m')
+	expect(lines).toContain('   1 −1   src/a.ts  0 loc')
+	expect(lines).toContain('Net LOC: +1 total, 0 excluding tests')
+	expect(raw.join('\n')).toContain('\x1b[1m0 excluding tests\x1b[22m')
 	expect(lines.join('\n')).not.toContain('[main abc123]')
 	expect(lines.join('\n')).not.toContain('cd /Users/antti/.hal')
 })

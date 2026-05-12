@@ -42,8 +42,32 @@ test('bash appends structured metadata for successful git commits', async () => 
 		expect(out).toContain('[hal-commit]')
 		expect(out).toContain('summary: \'1 file changed, 2 insertions(+)\'')
 		expect(out).toContain("path: 'a.ts'")
-		expect(out).toContain('locAdded: 1')
-		expect(out).toContain('locAddedCode: 1')
+		expect(out).toContain('locDelta: 1')
+		expect(out).toContain('locDeltaCode: 1')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
+test('bash commit metadata reports net loc delta', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-bash-commit-net-'))
+	try {
+		Bun.spawnSync(['git', 'init'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' })
+		Bun.spawnSync(['git', 'config', 'user.email', 'a@test.com'], { cwd: dir })
+		Bun.spawnSync(['git', 'config', 'user.name', 'Test'], { cwd: dir })
+		writeFileSync(join(dir, 'a.ts'), 'const x = 1\n')
+		Bun.spawnSync(['git', 'add', 'a.ts'], { cwd: dir })
+		Bun.spawnSync(['git', 'commit', '-m', 'initial'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' })
+		writeFileSync(join(dir, 'a.ts'), 'const y = 2\n')
+
+		const out = await bash.execute(
+			{ command: 'git add a.ts && git commit -m "replace a"' },
+			{ sessionId: 's', cwd: dir },
+		)
+
+		expect(out).toContain('locDelta: 0')
+		expect(out).toContain('locDeltaCode: 0')
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
