@@ -327,7 +327,7 @@ interface CommitMetadata {
 
 interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: string; suppressOutput?: boolean }
 type ToolSpec = {
-	title?: (input?: any) => string
+	title?: (input?: any, output?: string) => string
 	command?: (input?: any) => string | undefined
 	details?: (input?: any) => string | undefined
 	shellContinuations?: (input?: any) => boolean
@@ -403,6 +403,10 @@ function parseCommitMetadata(output: string): CommitMetadata | null {
 	}
 }
 
+function commitHashFromOutput(output?: string): string | null {
+	return output ? parseCommitMetadata(output)?.hash ?? null : null
+}
+
 function signed(n: number): string {
 	if (n > 0) return `+${n}`
 	return String(n)
@@ -449,10 +453,13 @@ function quoteToolArg(value: unknown): string {
 
 const toolSpecs: Record<string, ToolSpec> = {
 	bash: {
-		title(input) {
+		title(input, output) {
 			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
 			const message = commitMessageFromBash(cmd)
-			if (message) return `Commit: ${commitSubject(message)}`
+			if (message) {
+				const hash = commitHashFromOutput(output)
+				return `Commit${hash ? ` ${hash}` : ''}: ${commitSubject(message)}`
+			}
 			return !cmd.includes('\n') && cmd.length <= 60 ? `Bash: ${cmd}` : 'Bash'
 		},
 		command(input) {
@@ -635,7 +642,7 @@ function blockLabel(block: Block): string {
 		if (display) return `Hal (${display}, thinking)`
 		return 'Thinking'
 	}
-	if (block.type === 'tool') return getToolSpec(block.name).title?.(block.input) ?? humanizeName(block.name)
+	if (block.type === 'tool') return getToolSpec(block.name).title?.(block.input, block.output) ?? humanizeName(block.name)
 	return fixedLabels[block.type]
 }
 
