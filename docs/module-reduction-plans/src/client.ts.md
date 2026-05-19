@@ -1,10 +1,10 @@
 # `src/client.ts` under-500 plan
 
-Current measurement on 2026-05-12:
+Current measurement on 2026-05-19:
 
-- `src/client.ts`: **1029 bun-cloc LOC**
-- repo total from full `bun cloc`: **14981 LOC**
-- `./test`: **701 pass, 0 fail** before planning
+- `src/client.ts`: **1068 bun-cloc LOC**
+- repo total from full `bun cloc`: **15114 LOC**
+- `./test`: **706 pass, 0 fail** before planning
 
 This is a planning document only. The user should review/refine before implementation.
 
@@ -21,6 +21,9 @@ This is a planning document only. The user should review/refine before implement
 - history/live reconciliation
 - live IPC event handling and repaint decisions
 - delayed `[paused]` notice logic
+- tool-confirmation dialog callback plumbing
+- continue/retry/max-iteration status scanning
+- stale/last-active session notices
 - command construction and pending open/fork/resume focus hints
 - IPC state watching, host-lock watching, and event tailing
 - background loading of histories/blobs
@@ -33,13 +36,13 @@ There is no single dead block large enough to solve this. The real problem is un
 
 Large current functions/regions by physical line count:
 
-- `handleEvent()` — about 143 physical lines
-- `initializeSessions()` — about 83
-- `applySessionList()` — about 75
-- `startup summary/model/quota helpers` — roughly 80–100 combined
-- `makeTabFromDisk()` — about 28, but it owns many responsibilities
-- `save/load client state + watchers + startClient()` — roughly 90–120 combined
-- export surface/reset/test plumbing — roughly 45 combined
+- `handleEvent()` — still the largest function, now includes tool-confirmation events plus stream/response/info/tool/draft handling
+- `initializeSessions()` — still owns saved-tab/restart/cwd preference and startup restore
+- `applySessionList()` — still owns tab reconciliation, return-to-tab, fork draft copy, and startup-summary-on-open
+- `startup summary/model/quota helpers` — still a cohesive presentation block worth moving first
+- `makeTabFromDisk()` plus stale/last-active notice helpers — now a stronger session-loader/snapshot seam than before
+- `save/load client state + watchers + startClient()` — still a cohesive bootstrap/persistence seam
+- continue/retry status scanning and command construction — small finalizer seams
 
 ## Architecture alternatives
 
@@ -140,12 +143,13 @@ Move disk-to-tab snapshot work into `src/client/session-loader.ts`:
 - accumulate usage
 - read context
 - compute fork origin
+- compute last-active/stale-session notice inputs
 
 Return a plain snapshot. Let `client.ts` still assemble the `Tab`.
 
 Expected impact:
 
-- `client.ts`: -35 to -55 LOC
+- `client.ts`: -45 to -75 LOC
 - repo net: flat/down
 
 ### Step 3 — Extract tab-list reconciliation planning
@@ -205,7 +209,8 @@ Expected impact:
 If the file remains above 500 after ownership extractions:
 
 - move command construction (`pendingTabActionForPrompt()`, `makeCommand()`) to a tiny `client/commands.ts`
-- move continue/retry status scanning to a small pure helper
+- move continue/retry/max-iteration status scanning to a small pure helper
+- move tool-confirm callback plumbing with event-family handlers, not as a standalone abstraction
 - trim export surface if tests no longer need helper exports
 
 Expected impact:
@@ -242,3 +247,4 @@ Target outcome: **430–500 LOC**.
 - Do not create a new `client/state.ts` god module.
 - Do not move `handleEvent()` before clarifying delayed pause / repaint / blob reload ownership.
 - Do not accept a split if repo `bun cloc` grows materially.
+- Do not start by extracting all events wholesale; first remove startup/session-loader/tab-planner weight so event extraction has a clear boundary.
