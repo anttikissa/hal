@@ -1,24 +1,29 @@
 // Client -- state manager for tabs, entries, prompt.
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
-import { readFileSync, writeFileSync } from 'fs'
 import { ipc } from './ipc.ts'
 import type { SharedSessionInfo, SharedState } from './ipc.ts'
-import type { Command, CommandType, TokenUsage } from './protocol.ts'
+import type { CommandType, TokenUsage } from './protocol.ts'
 import type { VersionStatus } from './version.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
 import { draft as draftModule } from './cli/draft.ts'
 import { perf } from './perf.ts'
-import { STATE_DIR } from './state.ts'
-import { ason } from './utils/ason.ts'
-import { liveFiles } from './utils/live-file.ts'
-import { openaiUsage } from './openai-usage.ts'
 import { liveEventBlocks } from './live-event-blocks.ts'
-import { log } from './utils/log.ts'
 import { startup } from './startup.ts'
-import { models } from './models.ts'
-import { time } from './utils/time.ts'
+import { startupSummary } from './client/startup-summary.ts'
+import { sessionLoader } from './client/session-loader.ts'
+import { clientTabs } from './client/tabs.ts'
+import { clientCommands } from './client/commands.ts'
+import { continuation } from './client/continuation.ts'
+import type { ContinueAction } from './client/continuation.ts'
+import { clientHistory } from './client/history.ts'
+import { clientEvents } from './client/events.ts'
+import { clientPersistence } from './client/persistence.ts'
+import { backgroundLoader } from './client/background-loader.ts'
+import { sessionTabs } from './client/session-tabs.ts'
+import { clientProcess } from './client/process.ts'
+import { pausedNotices } from './client/paused-notices.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +71,6 @@ export interface Tab {
 	lastActiveTs?: number
 }
 
-type ContinueAction = 'continue' | 'retry'
 
 // ── Internal state ───────────────────────────────────────────────────────────
 
@@ -86,8 +90,6 @@ const config = {
 	claudeCacheWarningStaleMs: 5 * 60 * 1000,
 }
 
-const LAST_ACTIVE_THRESHOLD_MS = 24 * 60 * 60 * 1000
-const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 
 const state = {
 	tabs: [] as Tab[],
@@ -118,47 +120,6 @@ let onChange: (force: boolean) => void = () => {}
 let onToolConfirmRequest: ((event: any) => void) | null = null
 
 
-type DelayedPausedNotice = {
-	timer: ReturnType<typeof setTimeout>
-	block: Extract<Block, { type: 'info' }>
-}
-
-let delayedPausedNotices = new Map<string, DelayedPausedNotice>()
-
-function delayedPausedKey(sessionId: string | null): string {
-	return sessionId ?? ''
-}
-
-function cancelDelayedPaused(sessionId: string | null): void {
-	const key = delayedPausedKey(sessionId)
-	const pending = delayedPausedNotices.get(key)
-	if (!pending) return
-	clearTimeout(pending.timer)
-	delayedPausedNotices.delete(key)
-}
-
-function flushDelayedPaused(sessionId: string | null): void {
-	const key = delayedPausedKey(sessionId)
-	const pending = delayedPausedNotices.get(key)
-	if (!pending) return
-	clearTimeout(pending.timer)
-	delayedPausedNotices.delete(key)
-	addBlockToTab(sessionId, pending.block)
-}
-
-function scheduleDelayedPaused(sessionId: string | null, block: Extract<Block, { type: 'info' }>): void {
-	cancelDelayedPaused(sessionId)
-	if (config.pausedNoticeDelayMs <= 0) {
-		addBlockToTab(sessionId, block)
-		return
-	}
-	const key = delayedPausedKey(sessionId)
-	const timer = setTimeout(() => {
-		delayedPausedNotices.delete(key)
-		addBlockToTab(sessionId, block)
-	}, config.pausedNoticeDelayMs)
-	delayedPausedNotices.set(key, { timer, block })
-}
 
 function flushPendingEntries(): void {
 	const tab = currentTab()
@@ -212,43 +173,7 @@ function pruneRecentTabs(openIds: Set<string>): void {
 	state.recentTabs = state.recentTabs.filter((id) => openIds.has(id))
 }
 
-export function pickActiveSessionAfterSessionListChange(opts: {
-	previousSession: string
-	previousIndex: number
-	previousLength: number
-	newSessionIds: string[]
-	recentTabs: string[]
-	pendingOpen: 'open' | 'fork' | 'resume' | false
-	openedSessionId: string
-	returnToSession?: string
-}): string {
-	const { previousSession, previousIndex, previousLength, newSessionIds, recentTabs, pendingOpen, openedSessionId, returnToSession } = opts
-	const openIds = new Set(newSessionIds)
-	const grew = newSessionIds.length > previousLength
-	const shrank = newSessionIds.length < previousLength
-	const activeTabClosed = previousSession !== '' && !openIds.has(previousSession)
-
-	if (grew && pendingOpen && openedSessionId) return openedSessionId
-	if (previousSession && openIds.has(previousSession)) return previousSession
-
-	// If the active tab disappeared, return to its opener only for tabs that this
-	// client explicitly created as a child/new tab. Otherwise use Chrome's
-	// deterministic behavior: pick the tab that shifted into the same numeric slot
-	// (the right neighbor), or fall back left if the closed tab was last.
-	if (shrank && activeTabClosed) {
-		if (returnToSession && openIds.has(returnToSession)) return returnToSession
-		const rightNeighborSlot = Math.min(previousIndex, newSessionIds.length - 1)
-		return newSessionIds[rightNeighborSlot] ?? ''
-	}
-
-	for (let i = recentTabs.length - 1; i >= 0; i--) {
-		const sessionId = recentTabs[i]!
-		if (openIds.has(sessionId)) return sessionId
-	}
-
-	const fallbackIndex = previousIndex > 0 ? Math.min(previousIndex - 1, newSessionIds.length - 1) : 0
-	return newSessionIds[fallbackIndex] ?? newSessionIds[0] ?? ''
-}
+export const pickActiveSessionAfterSessionListChange = clientTabs.pickActiveSessionAfterSessionListChange
 
 function touchTab(tab: Tab): void {
 	tab.historyVersion++
@@ -277,86 +202,14 @@ function addLocalBlockToTab(tab: Tab, block: Block): void {
 	if (tab === currentTab()) onChange(false)
 }
 
-function perfMs(prefix: string): string | null {
-	const hit = perf.snapshot().findLast((mark) => mark.name.startsWith(prefix))
-	return hit ? `${hit.ms.toFixed(1)}ms` : null
-}
-
-function formatHomePath(path: string): string {
-	const home = process.env.HOME
-	if (!home) return path
-	if (path === home) return '~'
-	return path.startsWith(`${home}/`) ? `~/${path.slice(home.length + 1)}` : path
-}
-
-function titleWords(text: string): string {
-	return text
-		.split(/[-_\s]+/)
-		.filter(Boolean)
-		.map((word) => word[0]!.toUpperCase() + word.slice(1).toLowerCase())
-		.join(' ')
-}
-
-function providerDisplayName(model: string): string {
-	const provider = models.providerName(model).toLowerCase()
-	if (provider === 'openai') return 'OpenAI'
-	if (provider === 'openrouter') return 'OpenRouter'
-	return titleWords(provider)
-}
-
-function chatGptSubscriptionText(planType: string | undefined): string {
-	if (!planType) return ''
-	const normalized = planType.toLowerCase().replace(/^chatgpt[-_\s]*/, '')
-	return `(ChatGPT ${titleWords(normalized)} subscription)`
-}
-
-function quotaWindowText(minutes: number): string {
-	if (minutes > 0 && minutes % (24 * 60) === 0) return `${minutes / (24 * 60)}d`
-	if (minutes > 0 && minutes % 60 === 0) return `${minutes / 60}h`
-	return `${minutes}m`
-}
-
-function startupQuotaLine(model: string): string {
-	if (models.providerName(model).toLowerCase() !== 'openai') return ''
-	const window = openaiUsage.current()?.primary
-	if (!window) return ''
-	const left = Math.max(0, Math.min(100, Math.round(100 - window.usedPercent)))
-	return `${left}% left on ${quotaWindowText(window.windowMinutes)} quota, resetting at ${openaiUsage.formatResetAt(window.resetAt)}.`
-}
-
-function startupModelLine(model: string): string {
-	if (!model) return ''
-	const display = models.displayModel(model) || model
-	const provider = providerDisplayName(model)
-	const subscription = models.providerName(model).toLowerCase() === 'openai'
-		? chatGptSubscriptionText(openaiUsage.current()?.planType)
-		: ''
-	return `Using ${display} via ${provider}${subscription ? ` ${subscription}` : ''}.`
-}
-
-function startupPerfText(): string {
-	const ready = perfMs('Ready for input')
-	const firstLine = state.role === 'server'
-		? `Server started (pid ${state.pid})${ready ? ` · ready ${ready}` : ''}`
-		: `Joined server (pid ${state.hostPid ?? '?'})${ready ? ` · ready ${ready}` : ''}`
-	const details = [
-		['replay', perfMs('Active tab replayed')],
-		['first draw', perfMs('First draw done')],
-		['blobs', perfMs('Active tab blobs loaded')],
-		['all tabs', perfMs('All tabs loaded')],
-	].filter(([, ms]) => !!ms).map(([label, ms]) => `${label} ${ms}`)
-	return details.length > 0 ? `${firstLine}\n${details.join(' · ')}` : firstLine
-}
-
 function startupSummaryText(tab: Tab): string {
-	const model = tab.model || state.model || ''
-	const lines = [`Initialized session in ${formatHomePath(tab.cwd || process.cwd())}.`]
-	const modelLine = startupModelLine(model)
-	if (modelLine) lines.push('', modelLine)
-	const quotaLine = startupQuotaLine(model)
-	if (quotaLine) lines.push('', quotaLine)
-	if (config.showStartupPerf) lines.push('', startupPerfText())
-	return lines.join('\n')
+	return startupSummary.text(tab, {
+		fallbackModel: state.model,
+		role: state.role,
+		pid: state.pid,
+		hostPid: state.hostPid,
+		showPerf: config.showStartupPerf,
+	})
 }
 
 function shouldShowStartupSummary(tab: Tab): boolean {
@@ -384,58 +237,6 @@ function showServerRestart(pid: number, startedAt?: string): void {
 	})
 }
 
-function sameMergeTs(a?: number, b?: number): boolean {
-	// Persisted history and live.ason often agree on timestamps, but some callers
-	// only have one side. Missing ts should not block dedupe.
-	return a == null || b == null || a === b
-}
-
-function sameMergeBlock(a: Block, b: Block): boolean {
-	if (a.type !== b.type) return false
-	if (!sameMergeTs(a.ts, b.ts)) return false
-
-	if (a.type === 'tool' && b.type === 'tool') {
-		// Tool blocks are best matched by toolId. When that's missing, fall back to
-		// the stable parts that survive replay: name, input and blob identity.
-		if (a.toolId && b.toolId) return a.toolId === b.toolId
-		const sameBlob = a.blobId == null || b.blobId == null || a.blobId === b.blobId
-		return sameBlob && a.name === b.name && ason.stringify(a.input ?? null) === ason.stringify(b.input ?? null)
-	}
-
-	if (a.type === 'thinking' && b.type === 'thinking') {
-		const sameBlob = a.blobId == null || b.blobId == null || a.blobId === b.blobId
-		return sameBlob && a.text === b.text
-	}
-
-	if (a.type === 'error' && b.type === 'error') {
-		const sameBlob = a.blobId == null || b.blobId == null || a.blobId === b.blobId
-		return sameBlob && a.text === b.text
-	}
-
-	return 'text' in a && 'text' in b && a.text === b.text
-}
-
-function trimPersistedLiveOverlap(blocks: Block[], live: Block[]): Block[] {
-	const maxOverlap = Math.min(blocks.length, live.length)
-	for (let overlap = maxOverlap; overlap > 0; overlap--) {
-		let matches = true
-		for (let i = 0; i < overlap; i++) {
-			const historyBlock = blocks[blocks.length - overlap + i]!
-			const liveBlock = live[i]!
-			if (sameMergeBlock(historyBlock, liveBlock)) continue
-			matches = false
-			break
-		}
-		if (matches) return live.slice(overlap)
-	}
-	return live
-}
-
-function historyWithLive(blocks: Block[], tab: Tab): Block[] {
-	const live = trimPersistedLiveOverlap(blocks, tab.liveHistory ?? [])
-	if (live.length === 0) return blocks
-	return [...blocks, ...live]
-}
 
 function tabForSession(sessionId: string | null): Tab | null {
 	if (sessionId) return state.tabs.find((tab) => tab.sessionId === sessionId) ?? null
@@ -506,8 +307,8 @@ function switchTab(index: number): void {
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
-	tab.history = historyWithLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
-	addLastActiveNotice(tab)
+	tab.history = clientHistory.withLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
+	sessionLoader.addLastActiveNotice(tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
@@ -525,66 +326,17 @@ function loadTabBlobs(tab: Tab): void {
 
 // ── Last-tab persistence ─────────────────────────────────────────────────────
 
-const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
-
-interface ClientStateFile {
-	lastTab: string | null
-	// Set only by Ctrl-R. Unlike normal process startup, an explicit restart must
-	// return to the exact tab the user was viewing, even if that tab's cwd differs
-	// from the shell cwd that started Hal.
-	restartTab: string | null
-	peak: number // high-water mark for rendered line count
-	peakCols: number // terminal width peak was computed at
-	model: string | null // last-used model, restored on startup
-	doneUnseen: string[] // background-complete tabs that still deserve a ✓
-}
-
-function defaultClientState(): ClientStateFile {
-	return { lastTab: null, restartTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [] }
-}
-
-function errorMessage(err: unknown): string {
-	return err instanceof Error ? err.message : String(err)
-}
-
-function isMissingFileError(err: unknown): boolean {
-	return !!err && typeof err === 'object' && 'code' in err && (err as { code?: unknown }).code === 'ENOENT'
-}
-
-function loadClientState(): ClientStateFile {
-	try {
-		const data = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as any
-		return {
-			lastTab: data?.lastTab ?? null,
-			restartTab: typeof data?.restartTab === 'string' ? data.restartTab : null,
-			peak: data?.peak ?? 0,
-			peakCols: data?.peakCols ?? 0,
-			model: data?.model ?? null,
-			doneUnseen: Array.isArray(data?.doneUnseen) ? data.doneUnseen.filter((item: any) => typeof item === 'string') : [],
-		}
-	} catch (err) {
-		if (!isMissingFileError(err)) log.error('failed to load client state', { error: errorMessage(err) })
-		return defaultClientState()
-	}
-}
 
 function saveClientState(opts: { restart?: boolean } = {}): void {
 	const tab = currentTab()
-	try {
-		writeFileSync(
-			CLIENT_STATE_PATH,
-			ason.stringify({
-				lastTab: tab?.sessionId ?? null,
-				restartTab: opts.restart ? tab?.sessionId ?? null : null,
-				peak: state.peak,
-				peakCols: state.peakCols,
-				model: state.model,
-				doneUnseen: state.tabs.filter((item) => item.doneUnseen).map((item) => item.sessionId),
-			}) + '\n',
-		)
-	} catch (err) {
-		log.error('failed to save client state', { error: errorMessage(err) })
-	}
+	clientPersistence.save({
+		lastTab: tab?.sessionId ?? null,
+		restartTab: opts.restart ? tab?.sessionId ?? null : null,
+		peak: state.peak,
+		peakCols: state.peakCols,
+		model: state.model,
+		doneUnseen: state.tabs.filter((item) => item.doneUnseen).map((item) => item.sessionId),
+	})
 }
 
 // ── Per-tab prompt history ──────────────────────────────────────────────────
@@ -649,134 +401,18 @@ function prevTab(): void {
 
 // Track pending tab actions so a sessions update can focus the reopened/new tab.
 // Fork stays distinct because it also copies the draft from the parent.
-let pendingOpen: 'open' | 'fork' | 'resume' | false = false
-const returnToBySession = new Map<string, string>()
-
-function pendingTabActionForPrompt(text: string): 'open' | 'fork' | 'resume' | false {
-	const trimmed = text.trim()
-	if (/^\/fork(?:\s|$)/.test(trimmed)) return 'fork'
-	if (/^\/self(?:\s|$)/.test(trimmed)) return 'open'
-	if (/^\/open(?:\s|$)/.test(trimmed)) return 'open'
-	if (/^\/resume\s+\S/.test(trimmed)) return 'resume'
-	return false
-}
 
 function sendCommand(type: CommandType, text?: string, displayText?: string): void {
 	const tab = currentTab()
-	if (type === 'open') pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
-	if (type === 'resume') pendingOpen = 'resume'
-	if (type === 'prompt') pendingOpen = pendingTabActionForPrompt(text ?? '')
-	ipc.appendCommand(makeCommand(type, tab?.sessionId, text, displayText))
+	if (type === 'open') sessionTabs.state.pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
+	if (type === 'resume') sessionTabs.state.pendingOpen = 'resume'
+	if (type === 'prompt') sessionTabs.state.pendingOpen = clientCommands.pendingTabActionForPrompt(text ?? '')
+	ipc.appendCommand(clientCommands.makeCommand(type, tab?.sessionId, text, displayText))
 }
 
-function makeCommand(type: CommandType, sessionId: string | undefined, text?: string, displayText?: string): Command {
-	switch (type) {
-		case 'prompt':
-			return { type, sessionId, text: text ?? '', displayText }
-		case 'open':
-			if (text?.startsWith('fork:')) return { type, sessionId, forkSessionId: text.slice(5) }
-			if (text?.startsWith('after:')) return { type, sessionId, afterSessionId: text.slice(6) }
-			return { type, sessionId }
-		case 'resume':
-			return text ? { type, sessionId, selector: text } : { type, sessionId }
-		case 'move': {
-			const position = parseInt(text ?? '', 10)
-			return { type, sessionId, position: Number.isFinite(position) ? position : 0 }
-		}
-		case 'continue':
-		case 'close':
-		case 'abort':
-		case 'reset':
-		case 'compact':
-			return { type, sessionId }
-		case 'rename':
-			return { type, sessionId, name: text ?? '' }
-		case 'spawn':
-			throw new Error('spawn commands must be created explicitly')
-		case 'tool-confirm':
-			throw new Error('tool confirmations must be created explicitly')
-	}
-}
-
-function hasTrailingAssistantText(tab: Tab, text: string): boolean {
-	const parts: string[] = []
-	let chainId: string | null = null
-	let sawAssistant = false
-	for (let i = tab.history.length - 1; i >= 0; i--) {
-		const block = tab.history[i]!
-		if (block.type === 'tool') continue
-		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
-			if (!sawAssistant) continue
-			continue
-		}
-		if (block.type !== 'assistant') break
-		const blockChainId = assistantChainId(block)
-		if (!sawAssistant) {
-			sawAssistant = true
-			chainId = blockChainId
-			// Final response events may contain only the latest post-tool segment,
-			// while the visible assistant text is linked as one continuation chain.
-			if (block.text === text) return true
-			parts.unshift(block.text)
-			continue
-		}
-		if (chainId && blockChainId === chainId) {
-			parts.unshift(block.text)
-			continue
-		}
-		break
-	}
-	return sawAssistant && parts.join('') === text
-}
-
-
-function assistantChainId(block: Block): string | null {
-	return liveEventBlocks.assistantChainId(block)
-}
-
-function isMaxIterationsStop(text: string | undefined): boolean {
-	return /^Hit max iterations \(\d+\)\. Stopping\.$/.test(text ?? '')
-}
-
-function continuableActionForBlock(block: Block): ContinueAction | false {
-	if (block.type === 'error') {
-		if (isMaxIterationsStop(block.text)) return 'continue'
-		return 'retry'
-	}
-	if (block.type === 'info' && (block.text === '[paused]' || block.text?.startsWith('[interrupted]'))) return 'continue'
-	return false
-}
-
-function isContinuableStatusBlock(block: Block): boolean {
-	return !!continuableActionForBlock(block)
-}
 
 function continueActionForTab(tab: Tab | null): ContinueAction | false {
-	if (!tab) return false
-	const busy = state.busy.get(tab.sessionId) ?? false
-	for (let i = tab.history.length - 1; i >= 0; i--) {
-		const block = tab.history[i]!
-		if (block.type === 'tool') {
-			// A tool block after the error means retry/continue already
-			// started new work. Do not offer Enter as a retry shortcut while
-			// that work is running.
-			if (busy) return false
-			continue
-		}
-		if (block.type === 'info' && !isContinuableStatusBlock(block)) {
-			// While a turn is actively retrying/backing off it may have an older
-			// red error followed by a status info line. Do not let that older
-			// error turn Enter into an abort/retry shortcut.
-			if (busy) return false
-			continue
-		}
-		return continuableActionForBlock(block)
-	}
-	return false
-}
-
-function canContinueTab(tab: Tab | null): boolean {
-	return !!continueActionForTab(tab)
+	return continuation.actionForTab(tab, tab ? (state.busy.get(tab.sessionId) ?? false) : false)
 }
 
 function continueActionForCurrentTurn(): ContinueAction | false {
@@ -788,145 +424,34 @@ function canContinueCurrentTurn(): boolean {
 }
 
 
-function entryActivityTs(entry: HistoryEntry): number | null {
-	if (entry.type === 'input_history') return null
-	if (entry.type === 'info' && entry.level !== 'error') return null
-	return entry.ts ? Date.parse(entry.ts) : null
-}
-
-function blockActivityTs(block: Block): number | null {
-	if (block.type === 'info' || block.type === 'warning' || block.type === 'startup' || block.type === 'fork') return null
-	return block.ts ?? null
-}
-
-function lastActiveTs(entries: HistoryEntry[]): number | undefined {
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const ts = entryActivityTs(entries[i]!)
-		if (ts != null && Number.isFinite(ts)) return ts
-	}
-	return undefined
-}
-
-function removeLastActiveNotice(tab: Tab): void {
-	tab.history = tab.history.filter((block) => !(block.type === 'info' && block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)))
-}
-
-function addLastActiveNotice(tab: Tab): void {
-	removeLastActiveNotice(tab)
-	let lastTs = tab.lastActiveTs
-	for (let i = tab.history.length - 1; i >= 0; i--) {
-		const ts = blockActivityTs(tab.history[i]!)
-		if (ts != null) {
-			lastTs = lastTs ? Math.max(lastTs, ts) : ts
-			break
-		}
-	}
-	if (!lastTs) return
-	if (Date.now() - lastTs <= LAST_ACTIVE_THRESHOLD_MS) return
-	tab.history.push({ type: 'info', text: time.formatLastActiveNotice(lastTs), ts: Date.now() })
-}
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
-	const meta = sessionStore.loadSessionMeta(info.id)
-	// Load history including fork parent entries so forked tabs show full context
-	const { entries: history, parentCount, parentId } = sessionStore.loadAllHistoryWithOrigin(info.id)
-	const tab = makeTab(
-		info.id,
-		meta?.name ?? info.name ?? info.id,
-		{ cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model },
-	)
-	tab.rawHistory = history
-	tab.parentEntryCount = parentCount
-	tab.lastActiveTs = lastActiveTs(history)
+	const snapshot = sessionLoader.load(info)
+	const tab = makeTab(snapshot.id, snapshot.name, { cwd: snapshot.cwd, model: snapshot.model })
+	tab.rawHistory = snapshot.history
+	tab.parentEntryCount = snapshot.parentEntryCount
+	tab.lastActiveTs = snapshot.lastActiveTs
 	tab.loaded = false
-	tab.liveHistory = sessionStore.loadLive(info.id).blocks as Block[]
-	for (const entry of history) {
-		if (entry.type !== 'assistant' || !entry.usage) continue
-		tab.usage.input += entry.usage.input ?? 0
-		tab.usage.output += entry.usage.output ?? 0
-		tab.usage.cacheRead += entry.usage.cacheRead ?? 0
-		tab.usage.cacheCreation += entry.usage.cacheCreation ?? 0
-	}
-	if (meta?.context) {
-		tab.contextUsed = meta.context.used
-		tab.contextMax = meta.context.max
-	}
-	tab.forkedFrom = meta?.forkedFrom ?? parentId
+	tab.liveHistory = snapshot.liveHistory
+	tab.usage = snapshot.usage
+	tab.contextUsed = snapshot.contextUsed
+	tab.contextMax = snapshot.contextMax
+	tab.forkedFrom = snapshot.forkedFrom
 	return tab
 }
 
 function applySessionList(items: SharedSessionInfo[], preferredSession = ''): void {
-	const previousTabs = state.tabs
-	const previousById = new Map(previousTabs.map((tab) => [tab.sessionId, tab]))
-	const previousSession = previousTabs[state.activeTab]?.sessionId ?? ''
-	const previousIndex = state.activeTab
-	const newTabs: Tab[] = []
-	const openedTabs: Tab[] = []
-	const isFork = pendingOpen === 'fork'
-	const isOpen = pendingOpen === 'open'
-	let openedSessionId = ''
-	for (const s of items) {
-		const existing = previousById.get(s.id)
-		if (existing) {
-			existing.name = s.name ?? s.id
-			existing.cwd = s.cwd || existing.cwd
-			existing.model = s.model || existing.model
-			newTabs.push(existing)
-		} else {
-			openedSessionId = s.id
-			const tab = makeTabFromDisk(s)
-			openedTabs.push(tab)
-			newTabs.push(tab)
-		}
-	}
-	const grew = newTabs.length > previousTabs.length
-	const returnToSession = returnToBySession.get(previousSession)
-	state.tabs = newTabs
-	const openIds = new Set(newTabs.map((tab) => tab.sessionId))
-	pruneRecentTabs(openIds)
-	for (const sessionId of returnToBySession.keys()) {
-		if (!openIds.has(sessionId)) returnToBySession.delete(sessionId)
-	}
-	if (grew && openedSessionId && previousSession && (isOpen || isFork)) returnToBySession.set(openedSessionId, previousSession)
-
-	const targetSession = previousTabs.length === 0 && preferredSession && openIds.has(preferredSession)
-		? preferredSession
-		: pickActiveSessionAfterSessionListChange({
-			previousSession,
-			previousIndex,
-			previousLength: previousTabs.length,
-			newSessionIds: newTabs.map((tab) => tab.sessionId),
-			recentTabs: state.recentTabs,
-			pendingOpen,
-			openedSessionId,
-			returnToSession,
-		})
-
-	const nextIndex = newTabs.findIndex((tab) => tab.sessionId === targetSession)
-	state.activeTab = nextIndex >= 0 ? nextIndex : Math.max(0, Math.min(previousIndex, newTabs.length - 1))
-	const newSession = state.tabs[state.activeTab]?.sessionId ?? ''
-	const active = state.tabs[state.activeTab]
-	if (active && !active.loaded) ensureTabLoaded(active)
-	if (active) loadTabBlobs(active)
-	if (active) rememberTab(active.sessionId)
-	if (previousTabs.length > 0) {
-		for (const tab of openedTabs) {
-			if (tab === active) continue
-			if (!tab.loaded) ensureTabLoaded(tab)
-			loadTabBlobs(tab)
-		}
-	}
-	flushPendingEntries()
-	if (isFork && grew && previousSession) {
-		const prevTab = newTabs.find((tab) => tab.sessionId === previousSession)
-		const newTab = openedSessionId ? newTabs.find((tab) => tab.sessionId === openedSessionId) : undefined
-		if (prevTab?.inputDraft && newTab) newTab.inputDraft = prevTab.inputDraft
-	}
-	// A Ctrl-T or /open tab should greet the user in the new tab without
-	// polluting the persisted conversation history with UI bookkeeping.
-	if (isOpen && grew && active && openedTabs.includes(active)) addStartupSummaryToTab(active)
-	pendingOpen = false
-	if (previousSession !== newSession && onTabSwitch) onTabSwitch(previousSession, newSession)
-	onChange(false)
+	sessionTabs.apply(items, preferredSession, {
+		model: state,
+		makeTabFromDisk,
+		ensureTabLoaded,
+		loadTabBlobs,
+		flushPendingEntries,
+		rememberTab,
+		pruneRecentTabs,
+		addStartupSummaryToTab,
+		onTabSwitch: (from: string, to: string) => onTabSwitch?.(from, to),
+		onChange,
+	})
 }
 
 function applySharedStatus(shared: SharedState): void {
@@ -959,152 +484,22 @@ function applySharedState(shared: SharedState): void {
 }
 
 function handleEvent(event: any): void {
-	if (event.type === 'host-released') return
-	if (event.type === 'runtime-start') {
-		if (event.pid !== state.pid) showServerRestart(event.pid, event.startedAt)
-		return
-	}
-
-	if (event.type === 'prompt') {
-		if (event.label === 'steering') cancelDelayedPaused(event.sessionId ?? null)
-		else flushDelayedPaused(event.sessionId ?? null)
-		addBlockToTab(event.sessionId, {
-			type: 'user',
-			text: event.text,
-			source: typeof event.source === 'string' ? event.source : undefined,
-			status: event.label,
-			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-		})
-		return
-	}
-
-	if (event.type === 'stream-start' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		const tab = tabForSession(event.sessionId)
-		if (tab) applyLiveEventToTab(tab, event)
-		return
-	}
-
-	if (event.type === 'stream-delta' && event.sessionId && event.text) {
-		flushDelayedPaused(event.sessionId)
-		const tab = tabForSession(event.sessionId)
-		if (tab && applyLiveEventToTab(tab, event).changed) repaintIfActive(tab)
-		return
-	}
-
-	if (event.type === 'stream-end' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		const tab = tabForSession(event.sessionId)
-		if (!tab) return
-		applyLiveEventToTab(tab, event)
-		if (event.usage) {
-			tab.usage ??= { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
-			tab.usage.input += event.usage.input ?? 0
-			tab.usage.output += event.usage.output ?? 0
-			tab.usage.cacheRead += event.usage.cacheRead ?? 0
-			tab.usage.cacheCreation += event.usage.cacheCreation ?? 0
-		}
-		if (event.contextUsed != null) tab.contextUsed = event.contextUsed
-		if (event.contextMax != null) tab.contextMax = event.contextMax
-		repaintIfActive(tab)
-		return
-	}
-
-	if (event.type === 'response') {
-		flushDelayedPaused(event.sessionId ?? null)
-		const tab = tabForSession(event.sessionId ?? null)
-		if (!tab) return
-		applyLiveEventToTab(tab, { type: 'stream-end' })
-		if (event.isError) {
-			applyLiveEventToTab(tab, event)
-			onChange(false)
-		} else if (event.text && !hasTrailingAssistantText(tab, event.text)) {
-			addBlockToTab(event.sessionId ?? null, {
-				type: 'assistant',
-				text: event.text,
-				model: typeof event.model === 'string' ? event.model : undefined,
-				synthetic: event.synthetic === true,
-				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-			})
-		}
-		return
-	}
-
-	if (event.type === 'info') {
-		const sessionId = event.sessionId ?? null
-		const tab = tabForSession(sessionId)
-		if (tab) applyLiveEventToTab(tab, { type: 'stream-end' })
-
-		// Give steering a brief chance to arrive before we render [paused]. If the
-		// very next event is a steering prompt, we cancel this pending notice and
-		// avoid the one-frame blink between abort and steer.
-		if (event.level !== 'error' && event.text === '[paused]') {
-			scheduleDelayedPaused(sessionId, {
-				type: 'info',
-				text: event.text,
-				ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-			})
-			return
-		}
-
-		flushDelayedPaused(sessionId)
-		if (tab) {
-			applyLiveEventToTab(tab, event)
-			onChange(false)
-		}
-		return
-	}
-
-	if (event.type === 'tool-call' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		const tab = tabForSession(event.sessionId)
-		if (tab) {
-			applyLiveEventToTab(tab, event)
-			onChange(false)
-		}
-		return
-	}
-
-	if (event.type === 'tool-confirm-request' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		onToolConfirmRequest?.(event)
-		onChange(false)
-		return
-	}
-
-	if (event.type === 'tool-result' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		const tab = state.tabs.find((item) => item.sessionId === event.sessionId)
-		const toolBlock = tab ? applyLiveEventToTab(tab, event).toolBlock : null
-		if (toolBlock) {
-			delete toolBlock.blobLoaded
-			onChange(false)
-			// IPC tool-result events only carry a truncated preview. Reload the
-			// tool's blob in the background so edit/read blocks show full output.
-			if (toolBlock.blobId) {
-				void (async () => {
-					const loaded = await blockModule.loadBlobs([toolBlock])
-					if (loaded <= 0) return
-					touchTab(tab!)
-					onChange(false)
-				})()
-			}
-		}
-		return
-	}
-
-	if (event.type === 'draft_saved' && event.sessionId) {
-		flushDelayedPaused(event.sessionId)
-		// Another client saved a draft. Update the in-memory copy for that
-		// tab. If it's the active tab and our prompt is empty, show it.
-		const tab = state.tabs.find(t => t.sessionId === event.sessionId)
-		if (tab) {
-			const text = draftModule.loadDraft(event.sessionId)
-			tab.inputDraft = text
-			const active = currentTab()
-			if (active?.sessionId === event.sessionId && onDraftArrived) onDraftArrived(text)
-		}
-	}
+	clientEvents.handle(event, {
+		pid: state.pid,
+		currentTab,
+		tabForSession,
+		addBlockToTab,
+		showServerRestart,
+		cancelDelayedPaused: (sessionId: string | null) => pausedNotices.cancel(sessionId),
+		flushDelayedPaused: (sessionId: string | null) => pausedNotices.flush(sessionId, (block) => addBlockToTab(sessionId, block)),
+		scheduleDelayedPaused: (sessionId: string | null, block: Extract<Block, { type: 'info' }>) => pausedNotices.schedule(sessionId, block, config.pausedNoticeDelayMs, (item) => addBlockToTab(sessionId, item)),
+		applyLiveEventToTab,
+		repaintIfActive,
+		touchTab,
+		onToolConfirmRequest: (item: any) => onToolConfirmRequest?.(item),
+		onDraftArrived: (text: string) => onDraftArrived?.(text),
+		onChange,
+	})
 }
 
 
@@ -1127,7 +522,7 @@ function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; 
 		return
 	}
 
-	const saved = loadClientState()
+	const saved = clientPersistence.load()
 	const restartTab = saved.restartTab ? items.find((item) => item.id === saved.restartTab) : undefined
 	const savedTab = saved.lastTab ? items.find((item) => item.id === saved.lastTab) : undefined
 	const savedTabFitsRequest = savedTab && (!opts.preferredCwd || startup.sameCwd(savedTab.cwd, opts.preferredCwd))
@@ -1158,94 +553,28 @@ function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; 
 	perf.mark(`Client loaded ${items.length} sessions (1 active)`)
 }
 
-// Background loader: runs after first paint.
-// 1. Load blobs for active tab's tool blocks (so titles + output appear)
-// 2. Convert remaining tabs from raw history → blocks
-// 3. Load blobs for each remaining tab
-// All async with parallel I/O — UI stays responsive throughout.
 async function loadInBackground(): Promise<void> {
-	// Active tab's blobs first — user is looking at this tab
-	if (config.backgroundLoadBlobs) {
-		const active = state.tabs[state.activeTab]
-		if (active) {
-			const t0 = performance.now()
-			const n = await blockModule.loadBlobs(active.history)
-			const blobMs = (performance.now() - t0).toFixed(1)
-			perf.mark(`Active tab blobs loaded (${n} blobs, ${blobMs}ms)`)
-			if (n > 0) touchTab(active)
-			if (n > 0 && config.repaintAfterBlobLoad) onChange(false)
-		}
-	}
-
-	if (!config.backgroundLoadTabs) {
-		showStartupSummary()
-		return
-	}
-
-	// Remaining tabs: convert history then load blobs
-	const t1 = performance.now()
-	let tabCount = 0
-	for (const tab of state.tabs) {
-		if (!tab.loaded) {
-			ensureTabLoaded(tab)
-			tabCount++
-		}
-		if (config.backgroundLoadBlobs) {
-			const n = await blockModule.loadBlobs(tab.history)
-			if (n > 0) touchTab(tab)
-			if (n > 0 && tab === state.tabs[state.activeTab]) onChange(false)
-		}
-	}
-	const bgMs = (performance.now() - t1).toFixed(1)
-	perf.mark(`All tabs loaded (${tabCount} replayed, ${bgMs}ms)`)
-	showStartupSummary()
-}
-
-let hostLockState: { pid: number | null; createdAt: string } | null = null
-
-function syncHostPid(): void {
-	state.hostPid = hostLockState?.pid ?? null
-}
-
-function startWatchingHostLock(): void {
-	if (hostLockState) return
-	// Keep a live view of host.lock in memory so the status line can show both
-	// our own PID and the PID the cluster currently considers host.
-	hostLockState = liveFiles.liveFile(`${STATE_DIR}/ipc/host.lock`, { pid: null, createdAt: '' })
-	syncHostPid()
-	liveFiles.onChange(hostLockState, () => {
-		syncHostPid()
-		onChange(false)
+	await backgroundLoader.load({
+		config,
+		tabs: state.tabs,
+		activeTab: () => state.activeTab,
+		ensureTabLoaded,
+		touchTab,
+		showStartupSummary,
+		onChange,
 	})
 }
 
-let ipcStateFile: SharedState | null = null
-
-function startWatchingIpcState(): SharedState {
-	if (!ipcStateFile) {
-		// Bootstrap state belongs in state.ason. New clients read it once, then keep
-		// following changes via the file watcher while tailing only future events.
-		ipcStateFile = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, ipc.readState())
-		liveFiles.onChange(ipcStateFile, () => {
-			applySharedState(ipcStateFile!)
-			onChange(false)
-		})
-	}
-	return ipcStateFile
-}
 
 function resetForTests(): void {
 	pendingEntries = []
-	for (const pending of delayedPausedNotices.values()) clearTimeout(pending.timer)
-	delayedPausedNotices = new Map()
+	pausedNotices.reset()
 	onChange = () => {}
 	onTabSwitch = null
 	onDraftArrived = null
 	onToolConfirmRequest = null
-	pendingOpen = false
-	returnToBySession.clear()
-	hostLockState = null
-	ipcStateFile = null
+	sessionTabs.reset()
+	clientProcess.reset()
 	state.recentTabs = []
 	state.startupSummaryShown = true
 	state.hostVersionStatus = 'idle'
@@ -1253,26 +582,16 @@ function resetForTests(): void {
 }
 
 function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {
-	startWatchingHostLock()
-	const shared = startWatchingIpcState()
-	openaiUsage.onChange(() => onChange(false))
-
-	void (async () => {
-		for await (const event of ipc.tailEvents(signal)) {
-			handleEvent(event)
-		}
-	})()
-
-	initializeSessions(shared, opts)
-	if (opts.openCwd) {
-		pendingOpen = 'open'
-		ipc.appendCommand({ type: 'open', cwd: opts.openCwd, sessionId: currentTab()?.sessionId })
-		log.info('Client queued startup open command', { cwd: opts.openCwd, sessionId: currentTab()?.sessionId ?? null })
-	}
-	onChange(false)
-
-	// Background-load blobs + remaining tabs after first paint
-	void loadInBackground()
+	clientProcess.start(signal, opts, {
+		setHostPid: (pid: number | null) => { state.hostPid = pid },
+		applySharedState,
+		handleEvent,
+		initializeSessions,
+		currentSessionId: () => currentTab()?.sessionId,
+		loadInBackground,
+		onChange,
+		onStartupOpen: () => { sessionTabs.state.pendingOpen = 'open' },
+	})
 }
 
 // ── Namespace ────────────────────────────────────────────────────────────────
