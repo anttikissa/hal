@@ -9,6 +9,7 @@ import { tokenCalibration } from '../token-calibration.ts'
 import { models } from '../models.ts'
 import { HAL_DIR } from '../state.ts'
 import { config } from '../config.ts'
+import { promptQueue } from '../runtime/prompt-queue.ts'
 
 test('runtime exposes in-memory active sessions for eval helpers', () => {
 	const origActiveSessions = [...runtime.state.activeSessions]
@@ -105,6 +106,54 @@ test('auto-close only happens after a clean completion', () => {
 	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'failed')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'stopped')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: false }, 'completed')).toBe(false)
+})
+
+test('queue slash command lists and clears queued prompts', async () => {
+	const sessionId = `test-queue-${Date.now().toString(36)}`
+	const events: any[] = []
+	const origAppendEvent = ipc.appendEvent
+	const origOwnsHostLock = ipc.ownsHostLock
+
+	try {
+		ipc.ownsHostLock = () => true
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		promptQueue.append(sessionId, { text: 'first queued', createdAt: '2026-05-20T00:00:00.000Z' })
+
+		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue')).toBe(true)
+		expect(events.some((event) => event.type === 'info' && event.text.includes('1. first queued'))).toBe(true)
+
+		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue clear')).toBe(true)
+		expect(promptQueue.load(sessionId)).toEqual([])
+		expect(events.some((event) => event.type === 'info' && event.text === 'Queue cleared')).toBe(true)
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		ipc.ownsHostLock = origOwnsHostLock
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
+
+test('enqueuePrompt stores prompts while session is busy', async () => {
+	const sessionId = `test-queue-busy-${Date.now().toString(36)}`
+	const events: any[] = []
+	const origAppendEvent = ipc.appendEvent
+	const origIsActive = agentLoop.isActive
+	const origOwnsHostLock = ipc.ownsHostLock
+
+	try {
+		ipc.ownsHostLock = () => true
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		agentLoop.isActive = () => true
+
+		await runtime.enqueuePrompt(sessionId, 'do this later', 'user')
+
+		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['do this later'])
+		expect(events.some((event) => event.type === 'info' && event.text === 'Queued 1: do this later')).toBe(true)
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		ipc.ownsHostLock = origOwnsHostLock
+		agentLoop.isActive = origIsActive
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
 })
 
 

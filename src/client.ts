@@ -402,12 +402,12 @@ function prevTab(): void {
 // Track pending tab actions so a sessions update can focus the reopened/new tab.
 // Fork stays distinct because it also copies the draft from the parent.
 
-function sendCommand(type: CommandType, text?: string, displayText?: string): void {
+function sendCommand(type: CommandType, text?: string, displayText?: string, delivery?: 'queue'): void {
 	const tab = currentTab()
 	if (type === 'open') sessionTabs.state.pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') sessionTabs.state.pendingOpen = 'resume'
 	if (type === 'prompt') sessionTabs.state.pendingOpen = clientCommands.pendingTabActionForPrompt(text ?? '')
-	ipc.appendCommand(clientCommands.makeCommand(type, tab?.sessionId, text, displayText))
+	ipc.appendCommand(clientCommands.makeCommand(type, tab?.sessionId, text, displayText, delivery))
 }
 
 

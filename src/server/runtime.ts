@@ -21,6 +21,7 @@ import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
 import { startup } from '../startup.ts'
+import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
 
 const state = {
 	activeSessions: [] as string[],
@@ -218,7 +219,7 @@ function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean
 	].join('\n')
 }
 
-function queuePromptCommand(sessionId: string, text: string, source?: string): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, createdAt: new Date().toISOString() }) }
+function queuePromptCommand(sessionId: string, text: string, source?: string, delivery?: 'queue'): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, delivery, createdAt: new Date().toISOString() }) }
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
@@ -349,10 +350,63 @@ function buildSessionState(meta: SessionMeta): SessionState {
 	}
 }
 
+function queuePreview(text: string): string {
+	const first = text.split('\n')[0]!.trim()
+	return first.length > 80 ? `${first.slice(0, 77)}...` : first
+}
+
+function queueEntry(text: string, source?: string, displayText?: string): QueuedPrompt {
+	return {
+		text,
+		createdAt: new Date().toISOString(),
+		...(source ? { source } : {}),
+		...(displayText ? { displayText } : {}),
+	}
+}
+
+async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
+	if (!text.trim()) return
+	if (!agentLoop.isActive(sessionId)) {
+		await handlePrompt(sessionId, text, undefined, source, displayText)
+		return
+	}
+	const count = promptQueue.append(sessionId, queueEntry(text, source, displayText))
+	emitInfo(sessionId, `Queued ${count}: ${queuePreview(text)}`)
+}
+
+async function runNextQueuedPrompt(sessionId: string): Promise<void> {
+	const entries = promptQueue.drain(sessionId)
+	if (entries.length === 0) return
+	const next = entries[0]!
+	const rest = entries.slice(1)
+	for (const entry of rest) promptQueue.append(sessionId, entry)
+	await handlePrompt(sessionId, next.text, undefined, next.source, next.displayText)
+}
+
+async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
+	const match = text.trimStart().match(/^\/queue(?:\s+([\s\S]*))?$/)
+	if (!match) return false
+	const args = (match[1] ?? '').trim()
+	if (!args) {
+		const entries = promptQueue.load(sessionId)
+		if (entries.length === 0) emitInfo(sessionId, 'Queue is empty')
+		else for (let i = 0; i < entries.length; i++) emitInfo(sessionId, `${i + 1}. ${queuePreview(entries[i]!.text)}`)
+		return true
+	}
+	if (args === 'clear') {
+		promptQueue.clear(sessionId)
+		emitInfo(sessionId, 'Queue cleared')
+		return true
+	}
+	await enqueuePrompt(sessionId, args, source, displayText)
+	return true
+}
+
 async function handlePrompt(sessionId: string, text: string, label?: 'steering', source?: string, displayText?: string): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
+	if (await handleQueueSlashCommand(sessionId, text, source, displayText)) return
 	const sessionState = buildSessionState(meta)
 	const prevName = sessionState.name
 	const prevModel = sessionState.model
@@ -450,7 +504,9 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	}
 	if (shouldCloseSessionAfterGeneration(sessionStore.loadSessionMeta(sessionId), result) && !agentLoop.isActive(sessionId)) {
 		closeSession(sessionId)
+		return
 	}
+	if (result === 'completed' && !agentLoop.isActive(sessionId)) await runNextQueuedPrompt(sessionId)
 }
 
 function publishContextEstimate(sessionId: string): void {
@@ -512,7 +568,8 @@ function handleCommand(cmd: Command): void {
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
-			void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
+			if (cmd.delivery === 'queue') void enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
+			else void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
 		case 'continue': {
@@ -725,9 +782,9 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		})
 	void import('../runtime/inbox.ts')
 		.then(({ inbox }) => {
-			inbox.startWatching(signal, (sessionId, text, source) => {
+			inbox.startWatching(signal, (sessionId, text, source, queue) => {
 				if (!state.activeSessions.includes(sessionId)) return
-				queuePromptCommand(sessionId, text, source)
+				queuePromptCommand(sessionId, text, source, queue ? 'queue' : undefined)
 			})
 		})
 		.catch((err) => {
@@ -750,4 +807,7 @@ export const runtime = {
 	formatModelRefreshMessage,
 	buildAliasUpdateSuggestionText,
 	suggestAliasUpdates,
+	enqueuePrompt,
+	handleQueueSlashCommand,
+	runNextQueuedPrompt,
 }

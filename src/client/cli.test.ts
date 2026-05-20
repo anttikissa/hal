@@ -193,6 +193,30 @@ test('model picker keeps the prompt draft after choosing a model', () => {
 	})
 })
 
+test('alt-enter queues prompt without binding cmd-enter', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab()
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		withOneTab(tab, () => {
+			prompt.setText('do this next')
+			const queued = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: true, cmd: false })
+			expect(queued).toBe(true)
+			expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: 'do this next', delivery: 'queue' })])
+			expect(prompt.text()).toBe('')
+
+			prompt.setText('cmd should not queue')
+			const cmdHandled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: true })
+			expect(cmdHandled).toBe(false)
+			expect(commands).toHaveLength(1)
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+	}
+})
+
 test('enter on empty paused tab sends continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

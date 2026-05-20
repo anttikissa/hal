@@ -1,6 +1,6 @@
 // Show a small set of hints until the user has used those keys often enough.
 
-type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'idle-retry' | 'streaming'
+type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'idle-retry' | 'streaming' | 'streaming-text'
 
 type ContinueAction = 'continue' | 'retry'
 
@@ -42,12 +42,17 @@ const HINTS: Record<HelpState, Hint[]> = {
 	'idle-text': [
 		{ keyLabel: 'enter', description: 'send', keys: ['enter'] },
 		{ keyLabel: 'shift+enter', description: 'newline', keys: ['shift-enter'] },
-		{ keyLabel: 'tab', description: 'complete', keys: ['tab'] },
-		{ keyLabel: 'ctrl+/', description: 'undo', keys: ['ctrl-/'] },
+		{ keyLabel: 'alt+enter', description: 'queue', keys: ['alt-enter'] },
 	],
 	'idle-continue': [{ keyLabel: 'enter', description: 'continue', keys: ['enter'], alwaysVisible: true }],
 	'idle-retry': [{ keyLabel: 'enter', description: 'retry', keys: ['enter'], alwaysVisible: true }],
 	streaming: [{ keyLabel: 'esc', description: 'stop', keys: ['escape'] }],
+	'streaming-text': [
+		{ keyLabel: 'enter', description: 'steer', keys: ['enter'] },
+		{ keyLabel: 'shift+enter', description: 'newline', keys: ['shift-enter'] },
+		{ keyLabel: 'alt+enter', description: 'queue', keys: ['alt-enter'] },
+		{ keyLabel: 'esc', description: 'stop', keys: ['escape'] },
+	],
 }
 
 function isLearned(hint: Hint): boolean {
@@ -66,7 +71,7 @@ function reset(): void {
 
 function deriveState(busy: boolean, hasText: boolean, continueAction: ContinueAction | false = false): HelpState {
 	if (hasText) {
-		if (busy) return 'streaming'
+		if (busy) return 'streaming-text'
 		return 'idle-text'
 	}
 	if (continueAction === 'retry') return 'idle-retry'

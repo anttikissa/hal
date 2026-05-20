@@ -38,6 +38,7 @@ export interface PromptCommand extends CommandBase {
 	type: 'prompt'
 	text: string
 	displayText?: string
+	delivery?: 'queue'
 	source?: string
 }
 

@@ -228,21 +228,21 @@ describe('render', () => {
 		expect(output).toContain(': send')
 		expect(output).toContain('shift+enter')
 		expect(output).toContain(': newline')
-		expect(output).toContain('tab')
-		expect(output).toContain(': complete')
+		expect(output).toContain('alt+enter')
+		expect(output).toContain(': queue')
 	})
 
-	test('help bar advertises undo and the /keys shortcut list', () => {
+	test('help bar advertises queue and the /keys shortcut list', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('ctrl+/: undo')
+		expect(clean).toContain('alt+enter: queue')
 		expect(clean).toContain('/keys: shortcuts')
 	})
 
 	test('help bar separates hints with commas', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: send, shift+enter: newline, tab: complete, ctrl+/: undo')
+		expect(clean).toContain('enter: send, shift+enter: newline, alt+enter: queue')
 		expect(clean).not.toContain('│')
 	})
 

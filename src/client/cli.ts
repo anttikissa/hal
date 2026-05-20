@@ -274,7 +274,7 @@ function claudeCacheWarning(tab: (typeof client.state.tabs)[number] | null, text
 	return { contextTokens, thresholdTokens, ageText }
 }
 
-function openClaudeCacheWarning(text: string, displayText: string | undefined, warning: NonNullable<ReturnType<typeof claudeCacheWarning>>): void {
+function openClaudeCacheWarning(text: string, displayText: string | undefined, warning: NonNullable<ReturnType<typeof claudeCacheWarning>>, delivery?: 'queue'): void {
 	popup.openConfirm(
 		'Claude cache likely cold',
 		[
@@ -284,7 +284,7 @@ function openClaudeCacheWarning(text: string, displayText: string | undefined, w
 		],
 		['Send anyway', 'Switch to GPT', 'Cancel'],
 		(choice) => {
-			if (choice === 'Send anyway') submitPromptText(text, displayText)
+			if (choice === 'Send anyway') submitPromptText(text, displayText, delivery)
 			if (choice === 'Switch to GPT') client.sendCommand('prompt', '/model gpt')
 			draw()
 		},
@@ -306,7 +306,7 @@ function openToolConfirm(event: any): void {
 	draw()
 }
 
-function submitPromptText(text: string, displayText: string | undefined): void {
+function submitPromptText(text: string, displayText: string | undefined, delivery?: 'queue'): void {
 	completion.dismiss()
 	popup.close()
 	// Push to prompt module for immediate up-arrow recall
@@ -320,23 +320,23 @@ function submitPromptText(text: string, displayText: string | undefined): void {
 	}
 	// Human typing now uses the same prompt command path as inbox messages.
 	// The runtime decides whether an active turn makes this behave like steering.
-	client.sendCommand('prompt', text, displayText === text ? undefined : displayText)
+	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, delivery)
 	prompt.clear()
 	// Update tab's inputHistory + clear persisted draft
 	client.onSubmit(text)
 }
 
-function submit(override?: string): void {
+function submit(override?: string, delivery?: 'queue'): void {
 	const text = (override ?? prompt.submitText()).trim()
 	const displayText = override === undefined ? prompt.text().trim() : undefined
 	if (!text) return
 	const warning = override === undefined ? claudeCacheWarning(client.currentTab(), text) : null
 	if (warning) {
 		completion.dismiss()
-		openClaudeCacheWarning(text, displayText, warning)
+		openClaudeCacheWarning(text, displayText, warning, delivery)
 		return
 	}
-	submitPromptText(text, displayText)
+	submitPromptText(text, displayText, delivery)
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
@@ -500,9 +500,15 @@ function handleAppKey(k: KeyEvent): boolean {
 		client.sendCommand('abort')
 		return true
 	}
+	// Alt-Enter queues the prompt for later instead of steering the active turn.
+	if (k.key === 'enter' && k.alt && !k.shift && !k.ctrl && !k.cmd) {
+		submit(undefined, 'queue')
+		draw()
+		return true
+	}
 	// Enter: continue a paused/error turn when the prompt is empty.
 	// Otherwise submit the current prompt.
-	if (k.key === 'enter' && !k.shift) {
+	if (k.key === 'enter' && !k.shift && !k.alt && !k.ctrl && !k.cmd) {
 		if (!prompt.text().trim() && client.canContinueCurrentTurn()) {
 			client.sendCommand('continue')
 			draw()

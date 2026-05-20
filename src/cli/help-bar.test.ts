@@ -5,3 +5,21 @@ test('continuable state takes precedence over stale busy state', () => {
 	expect(helpBar.deriveState(true, false, 'retry')).toBe('idle-retry')
 	expect(helpBar.deriveState(true, false, 'continue')).toBe('idle-continue')
 })
+
+
+test('text entry hints show send newline and queue together', () => {
+	const text = helpBar.build(false, true)
+
+	expect(text).toContain('enter: send')
+	expect(text).toContain('shift+enter: newline')
+	expect(text).toContain('alt+enter: queue')
+})
+
+test('busy text hints show steer newline queue and stop', () => {
+	const text = helpBar.build(true, true)
+
+	expect(text).toContain('enter: steer')
+	expect(text).toContain('shift+enter: newline')
+	expect(text).toContain('alt+enter: queue')
+	expect(text).toContain('esc: stop')
+})

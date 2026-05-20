@@ -16,9 +16,10 @@ interface InboxMessage {
 	text: string
 	from?: string
 	ts?: string
+	queue?: boolean
 }
 
-type OnMessage = (sessionId: string, text: string, from?: string) => void
+type OnMessage = (sessionId: string, text: string, from?: string, queue?: boolean) => void
 
 function parseInboxMessage(raw: unknown): InboxMessage | null {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -29,6 +30,7 @@ function parseInboxMessage(raw: unknown): InboxMessage | null {
 		text: msg.text,
 		from: typeof msg.from === 'string' ? msg.from : undefined,
 		ts: typeof msg.ts === 'string' ? msg.ts : undefined,
+		queue: msg.queue === true,
 	}
 }
 
@@ -43,7 +45,7 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 			try {
 				const content = readFileSync(path, 'utf-8')
 				const msg = parseInboxMessage(ason.parse(content))
-				if (msg?.text) onMessage(sessionId, msg.text, msg.from)
+				if (msg?.text) onMessage(sessionId, msg.text, msg.from, msg.queue)
 				// Delete after processing
 				unlinkSync(path)
 			} catch {
@@ -106,7 +108,7 @@ function startWatching(signal: AbortSignal, onMessage: OnMessage): void {
 }
 
 /** Queue a message for a session (used by `hal send` or the send tool). */
-function queueMessage(sessionId: string, text: string, from?: string): void {
+function queueMessage(sessionId: string, text: string, from?: string, queue?: boolean): void {
 	const dir = `${INBOX_DIR}/${sessionId}`
 	ensureDir(dir)
 	const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}.ason`
@@ -115,6 +117,7 @@ function queueMessage(sessionId: string, text: string, from?: string): void {
 		text,
 		from: from ?? 'external',
 		ts: new Date().toISOString(),
+		...(queue ? { queue: true } : {}),
 	}
 	// Write atomically: write to temp, then rename
 	const path = `${dir}/${filename}`

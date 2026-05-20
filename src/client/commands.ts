@@ -11,10 +11,10 @@ function pendingTabActionForPrompt(text: string): PendingTabAction {
 	return false
 }
 
-function makeCommand(type: CommandType, sessionId: string | undefined, text?: string, displayText?: string): Command {
+function makeCommand(type: CommandType, sessionId: string | undefined, text?: string, displayText?: string, delivery?: 'queue'): Command {
 	switch (type) {
 		case 'prompt':
-			return { type, sessionId, text: text ?? '', displayText }
+			return { type, sessionId, text: text ?? '', displayText, delivery }
 		case 'open':
 			if (text?.startsWith('fork:')) return { type, sessionId, forkSessionId: text.slice(5) }
 			if (text?.startsWith('after:')) return { type, sessionId, afterSessionId: text.slice(6) }

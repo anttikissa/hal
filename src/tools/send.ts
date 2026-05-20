@@ -9,6 +9,7 @@ import { inbox } from '../runtime/inbox.ts'
 interface SendInput {
 	sessionId?: string
 	text?: string
+	queue?: boolean
 }
 
 function normalizeInput(input: unknown): SendInput {
@@ -16,6 +17,7 @@ function normalizeInput(input: unknown): SendInput {
 	return {
 		sessionId: raw.sessionId === undefined ? undefined : String(raw.sessionId),
 		text: raw.text === undefined ? undefined : String(raw.text),
+		queue: raw.queue === true,
 	}
 }
 
@@ -29,8 +31,8 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	if (targetId === ctx.sessionId) return 'error: cannot send to own session'
 
 	try {
-		inbox.queueMessage(targetId, text, ctx.sessionId)
-		return `Sent message to session ${targetId}`
+		inbox.queueMessage(targetId, text, ctx.sessionId, spec.queue)
+		return spec.queue ? `Queued message for session ${targetId}` : `Sent message to session ${targetId}`
 	} catch (err: unknown) {
 		return `error: ${toolRegistry.errorMessage(err)}`
 	}
@@ -39,10 +41,11 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 const sendTool: Tool = {
 	name: 'send',
 	description:
-		"Send a message to another session's inbox. The message will be processed as a prompt (if idle) or queued (if busy).",
+		'Send a message to another session. By default this behaves like a prompt and steers if the target is busy; set queue=true to run it after the current turn.',
 	parameters: {
 		sessionId: { type: 'string', description: 'Target session ID (or "all" for broadcast)' },
 		text: { type: 'string', description: 'Message text' },
+		queue: { type: 'boolean', description: 'Queue instead of steering if the target session is busy' },
 	},
 	required: ['sessionId', 'text'],
 	execute,
