@@ -158,6 +158,25 @@ test('compat providers stay on chat completions endpoints', async () => {
 	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } })
 })
 
+test('google compat provider asks for GOOGLE_API_KEY only', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => undefined
+
+	const events: any[] = []
+	for await (const event of createCompatProvider('google').generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'google/gemini-3.5-flash',
+		systemPrompt: 'system',
+		tools: [],
+	})) {
+		events.push(event)
+	}
+
+	expect(events[0]).toEqual({ type: 'error', message: "No credentials for 'google'. Set GOOGLE_API_KEY" })
+	expect(events[0].message).not.toContain('login-openai')
+	expect(events.at(-1)).toEqual({ type: 'done' })
+})
+
 
 test('openai provider reports the active account while rotating', async () => {
 	const calls: FetchCall[] = []

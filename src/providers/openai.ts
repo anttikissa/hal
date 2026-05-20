@@ -307,13 +307,17 @@ async function* yieldErrorAndDone(error: ProviderStreamEvent): AsyncGenerator<Pr
 	yield { type: 'done' }
 }
 
+function compatCredentialMessage(providerName: string): string {
+	return `No credentials for '${providerName}'. Set ${providerName.toUpperCase()}_API_KEY`
+}
+
 async function* generateCompat(providerName: string, baseUrl: string, req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
 	await auth.ensureFresh(providerName)
 	const credential = auth.getCredential(providerName)
 	if (!credential) {
 		yield* yieldErrorAndDone({
 			type: 'error',
-			message: `No credentials for '${providerName}'. Run: bun scripts/login-openai.ts (or set ${providerName.toUpperCase()}_API_KEY)`,
+			message: compatCredentialMessage(providerName),
 		})
 		return
 	}
