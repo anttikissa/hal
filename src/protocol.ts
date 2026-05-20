@@ -21,7 +21,7 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'continue' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'move' | 'rename' | 'spawn' | 'tool-confirm'
+export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'move' | 'rename' | 'spawn' | 'tool-confirm'
 
 export type SpawnMode = 'fork' | 'fresh'
 
@@ -44,6 +44,10 @@ export interface PromptCommand extends CommandBase {
 
 export interface ContinueCommand extends CommandBase {
 	type: 'continue'
+}
+
+export interface QueueNextCommand extends CommandBase {
+	type: 'queue-next'
 }
 
 export interface OpenNewCommand extends CommandBase {
@@ -123,6 +127,7 @@ export interface ToolConfirmCommand extends CommandBase {
 export type Command =
 	| PromptCommand
 	| ContinueCommand
+	| QueueNextCommand
 	| OpenNewCommand
 	| OpenForkCommand
 	| OpenAfterCommand

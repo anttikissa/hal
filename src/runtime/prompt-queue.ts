@@ -21,6 +21,10 @@ function queuePath(sessionId: string): string {
 	return `${sessionDir(sessionId)}/queue.ason`
 }
 
+function statePath(sessionId: string): string {
+	return `${sessionDir(sessionId)}/queue-state.ason`
+}
+
 function clean(entry: QueuedPrompt): QueuedPrompt {
 	const out: QueuedPrompt = { text: entry.text, createdAt: entry.createdAt }
 	if (entry.source !== undefined) out.source = entry.source
@@ -52,6 +56,29 @@ function load(sessionId: string): QueuedPrompt[] {
 	}
 }
 
+function isHeld(sessionId: string): boolean {
+	const path = statePath(sessionId)
+	if (!existsSync(path)) return false
+	try {
+		const parsed = ason.parse(readFileSync(path, 'utf-8'))
+		return !!(parsed && typeof parsed === 'object' && (parsed as Record<string, unknown>).held === true)
+	} catch {
+		return false
+	}
+}
+
+function setHeld(sessionId: string, held: boolean): void {
+	const path = statePath(sessionId)
+	if (!held) {
+		try {
+			unlinkSync(path)
+		} catch {}
+		return
+	}
+	ensureDir(sessionDir(sessionId))
+	writeFileSync(path, ason.stringify({ held: true }) + '\n')
+}
+
 function save(sessionId: string, entries: QueuedPrompt[]): void {
 	ensureDir(sessionDir(sessionId))
 	writeFileSync(queuePath(sessionId), ason.stringify(entries) + '\n')
@@ -64,9 +91,26 @@ function append(sessionId: string, entry: QueuedPrompt): number {
 	return entries.length
 }
 
+function pop(sessionId: string): QueuedPrompt | undefined {
+	const entries = load(sessionId)
+	const first = entries[0]
+	if (!first) return undefined
+	const rest = entries.slice(1)
+	if (rest.length > 0) save(sessionId, rest)
+	else {
+		try {
+			unlinkSync(queuePath(sessionId))
+		} catch {}
+	}
+	return first
+}
+
 function clear(sessionId: string): void {
 	try {
 		unlinkSync(queuePath(sessionId))
+	} catch {}
+	try {
+		unlinkSync(statePath(sessionId))
 	} catch {}
 }
 
@@ -76,4 +120,4 @@ function drain(sessionId: string): QueuedPrompt[] {
 	return entries
 }
 
-export const promptQueue = { config, append, clear, drain, load, queuePath }
+export const promptQueue = { config, append, clear, drain, isHeld, load, pop, queuePath, setHeld, statePath }

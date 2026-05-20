@@ -299,7 +299,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	},
 	mem: { summary: 'Show current RSS memory and the warn/kill thresholds.' },
 	send: { usage: '<tab|session-id|name> <message>', summary: 'Send a message to another tab.', detail: 'Targets can be a tab number, full session id, or session name.' },
-	queue: { usage: '[prompt|clear]', summary: 'Queue a prompt for after the current turn.', detail: 'With no prompt, lists queued prompts. /queue clear removes all queued prompts.' },
+	queue: { usage: '[prompt|next|clear]', summary: 'Queue a prompt for after the current turn.', detail: 'With no prompt, lists queued prompts. /queue next (or Ctrl-Q) runs queued prompts. /queue clear removes all queued prompts.' },
 	broadcast: { usage: '<message>', summary: 'Send a message to every other tab.', detail: 'Sends the same message to every other open tab.' },
 	cd: { usage: '[path]', summary: 'Change working directory.', detail: 'With no path, changes to Hal\'s own directory.', arg: 'dir' },
 	system: { summary: 'Show full preprocessed system prompt.' },

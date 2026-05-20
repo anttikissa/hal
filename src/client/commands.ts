@@ -26,6 +26,7 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 			return { type, sessionId, position: Number.isFinite(position) ? position : 0 }
 		}
 		case 'continue':
+		case 'queue-next':
 		case 'close':
 		case 'abort':
 		case 'reset':

@@ -25,3 +25,18 @@ test('drain returns entries in order and clears', () => {
 	expect(promptQueue.drain(sessionId).map((entry) => entry.text)).toEqual(['first', 'second'])
 	expect(promptQueue.load(sessionId)).toEqual([])
 })
+
+
+test('held state persists separately from entries', () => {
+	promptQueue.append(sessionId, { text: 'first', createdAt: '2026-05-20T00:00:00.000Z' })
+	promptQueue.setHeld(sessionId, true)
+
+	expect(promptQueue.isHeld(sessionId)).toBe(true)
+	expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['first'])
+
+	expect(promptQueue.pop(sessionId)?.text).toBe('first')
+	expect(promptQueue.isHeld(sessionId)).toBe(true)
+
+	promptQueue.clear(sessionId)
+	expect(promptQueue.isHeld(sessionId)).toBe(false)
+})

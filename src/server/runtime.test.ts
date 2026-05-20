@@ -157,6 +157,35 @@ test('enqueuePrompt stores prompts while session is busy', async () => {
 })
 
 
+test('queue paused notice includes count preview and queue hint', () => {
+	const text = runtime.buildQueuePausedNotice([
+		{ text: 'first line\nsecond line', createdAt: '2026-05-20T00:00:00.000Z' },
+		{ text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' },
+	])
+
+	expect(text).toContain('Paused. 2 queued prompts are waiting.')
+	expect(text).toContain('Next: first line...')
+	expect(text).toContain('/queue')
+	expect(text).toContain('Ctrl-Q')
+})
+
+test('held queue does not drain after unrelated completed prompt', () => {
+	const sessionId = `test-held-${Date.now().toString(36)}`
+	try {
+		promptQueue.append(sessionId, { text: 'queued prompt', createdAt: '2026-05-20T00:00:01.000Z' })
+		promptQueue.setHeld(sessionId, true)
+
+		expect(runtime.shouldDrainQueuedPrompt(sessionId, 'completed')).toBe(false)
+
+		promptQueue.setHeld(sessionId, false)
+		expect(runtime.shouldDrainQueuedPrompt(sessionId, 'completed')).toBe(true)
+		expect(runtime.shouldDrainQueuedPrompt(sessionId, 'aborted')).toBe(false)
+	} finally {
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
+
+
 test('recordTabClosed emits info when no generation is active', () => {
 	const events: any[] = []
 	const origAbort = agentLoop.abort

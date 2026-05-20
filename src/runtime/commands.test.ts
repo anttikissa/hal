@@ -478,6 +478,8 @@ test('/keys shows keyboard shortcuts using pi-style modifier labels', async () =
 	expect(result.output).toContain('cmd+v')
 	expect(result.output).toContain('alt+d')
 	expect(result.output).toContain('ctrl+/')
+	expect(result.output).toContain('alt+enter')
+	expect(result.output).toContain('ctrl+q')
 	expect(result.output).toContain('shift+<movement>')
 	expect(result.output).toContain('selects text')
 	expect(result.output).not.toContain('option')

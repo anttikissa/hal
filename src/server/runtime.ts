@@ -350,9 +350,11 @@ function buildSessionState(meta: SessionMeta): SessionState {
 	}
 }
 
-function queuePreview(text: string): string {
-	const first = text.split('\n')[0]!.trim()
-	return first.length > 80 ? `${first.slice(0, 77)}...` : first
+function queuePreview(text: string, max = 80): string {
+	let first = text.split('\n')[0]!.trim()
+	const truncated = text.includes('\n') || first.length > max
+	if (first.length > max) first = first.slice(0, Math.max(0, max - 3)).trimEnd()
+	return truncated ? `${first}...` : first
 }
 
 function queueEntry(text: string, source?: string, displayText?: string): QueuedPrompt {
@@ -366,7 +368,7 @@ function queueEntry(text: string, source?: string, displayText?: string): Queued
 
 async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	if (!text.trim()) return
-	if (!agentLoop.isActive(sessionId)) {
+	if (!agentLoop.isActive(sessionId) && !promptQueue.isHeld(sessionId)) {
 		await handlePrompt(sessionId, text, undefined, source, displayText)
 		return
 	}
@@ -374,13 +376,33 @@ async function enqueuePrompt(sessionId: string, text: string, source?: string, d
 	emitInfo(sessionId, `Queued ${count}: ${queuePreview(text)}`)
 }
 
-async function runNextQueuedPrompt(sessionId: string): Promise<void> {
-	const entries = promptQueue.drain(sessionId)
+function buildQueuePausedNotice(entries: QueuedPrompt[]): string {
+	const count = entries.length
+	const noun = count === 1 ? 'prompt is' : 'prompts are'
+	const next = entries[0] ? ` Next: ${queuePreview(entries[0].text, 50)}` : ''
+	return `Paused. ${count} queued ${noun} waiting.${next} Press Ctrl-Q to run queued prompts, /queue to list them, or /queue clear to discard them.`
+}
+
+function emitQueuePausedNotice(sessionId: string): void {
+	const entries = promptQueue.load(sessionId)
 	if (entries.length === 0) return
-	const next = entries[0]!
-	const rest = entries.slice(1)
-	for (const entry of rest) promptQueue.append(sessionId, entry)
+	promptQueue.setHeld(sessionId, true)
+	emitInfo(sessionId, buildQueuePausedNotice(entries))
+}
+
+function shouldDrainQueuedPrompt(sessionId: string, result: AgentLoopResult): boolean {
+	return result === 'completed' && !promptQueue.isHeld(sessionId) && promptQueue.load(sessionId).length > 0
+}
+
+async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boolean> {
+	const next = promptQueue.pop(sessionId)
+	if (!next) {
+		if (!quiet) emitInfo(sessionId, 'Queue is empty')
+		return false
+	}
+	promptQueue.setHeld(sessionId, false)
 	await handlePrompt(sessionId, next.text, undefined, next.source, next.displayText)
+	return true
 }
 
 async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
@@ -391,6 +413,10 @@ async function handleQueueSlashCommand(sessionId: string, text: string, source?:
 		const entries = promptQueue.load(sessionId)
 		if (entries.length === 0) emitInfo(sessionId, 'Queue is empty')
 		else for (let i = 0; i < entries.length; i++) emitInfo(sessionId, `${i + 1}. ${queuePreview(entries[i]!.text)}`)
+		return true
+	}
+	if (args === 'next') {
+		await runNextQueuedPrompt(sessionId, false)
 		return true
 	}
 	if (args === 'clear') {
@@ -506,7 +532,8 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		closeSession(sessionId)
 		return
 	}
-	if (result === 'completed' && !agentLoop.isActive(sessionId)) await runNextQueuedPrompt(sessionId)
+	if (result !== 'completed') emitQueuePausedNotice(sessionId)
+	if (!agentLoop.isActive(sessionId) && shouldDrainQueuedPrompt(sessionId, result)) await runNextQueuedPrompt(sessionId)
 }
 
 function publishContextEstimate(sessionId: string): void {
@@ -581,6 +608,12 @@ function handleCommand(cmd: Command): void {
 				}
 				void runGeneration(sessionId, '')
 			})()
+			break
+		}
+		case 'queue-next': {
+			if (!sessionId) return
+			if (agentLoop.isActive(sessionId)) emitInfo(sessionId, 'Session is busy')
+			else void runNextQueuedPrompt(sessionId, false)
 			break
 		}
 		case 'abort': {
@@ -810,4 +843,6 @@ export const runtime = {
 	enqueuePrompt,
 	handleQueueSlashCommand,
 	runNextQueuedPrompt,
+	buildQueuePausedNotice,
+	shouldDrainQueuedPrompt,
 }

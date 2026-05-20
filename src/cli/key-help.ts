@@ -18,6 +18,8 @@ function sections(): ShortcutSection[] {
 			rows: [
 				row('enter', 'send prompt; continue/retry when the prompt is empty'),
 				row('shift-enter', 'insert newline'),
+				row('alt-enter', 'queue prompt for later'),
+				row('ctrl-q', 'run queued prompts'),
 				row('tab', 'complete slash commands, models, config keys, and paths'),
 				row('ctrl-/ / cmd-z / cmd-u', 'undo'),
 				row('shift-ctrl-/ / shift-cmd-z / shift-cmd-u', 'redo'),

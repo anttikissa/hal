@@ -217,6 +217,22 @@ test('alt-enter queues prompt without binding cmd-enter', () => {
 	}
 })
 
+test('ctrl-q runs the next queued prompt', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		withOneTab(makeTab(), () => {
+			const handled = cli.forTests.handleAppKey({ key: 'q', shift: false, ctrl: true, alt: false, cmd: false })
+			expect(handled).toBe(true)
+			expect(commands).toEqual([{ type: 'queue-next', sessionId: 's1' }])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+	}
+})
+
 test('enter on empty paused tab sends continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
