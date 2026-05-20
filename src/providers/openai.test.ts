@@ -46,6 +46,7 @@ function makeJwt(payload: Record<string, any>): string {
 }
 
 function installFetchMock(fn: (input: any, init?: RequestInit) => Promise<Response>): void {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'http'
 	globalThis.fetch = Object.assign(fn, { preconnect: () => {} }) as typeof fetch
 }
 

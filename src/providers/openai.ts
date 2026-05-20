@@ -22,7 +22,7 @@ type ResponsesTransportMode = 'http' | 'ws' | 'auto'
 
 const config = {
 	// http: current SSE path. ws: force Responses WebSocket. auto: try WS, fall back to HTTP.
-	responsesTransport: 'http' as ResponsesTransportMode,
+	responsesTransport: 'auto' as ResponsesTransportMode,
 }
 
 const state = {

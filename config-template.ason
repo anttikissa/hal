@@ -113,7 +113,7 @@
 	openai: {
 		// Responses transport for native OpenAI models: 'http', 'ws', or 'auto'.
 		// 'http' is the stable SSE path; 'ws' forces WebSocket; 'auto' tries WS then falls back to HTTP.
-		responsesTransport: 'http'
+		responsesTransport: 'auto'
 	},
 	toolRegistry: {
 		// Hard cap for any tool result sent back to the model.
