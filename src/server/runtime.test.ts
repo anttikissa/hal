@@ -163,7 +163,7 @@ test('queue paused notice includes truncated preview and queue hint', () => {
 		{ text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' },
 	])
 
-	expect(text).toBe('Paused. 2 queued prompts are waiting. Next: first line... **ctrl-q** to run queued prompts, `/queue` to show them, `/queue clear` to discard.')
+	expect(text).toBe('Paused. 2 queued prompts are waiting. Next: **first line...**. **ctrl-q** to run queued prompts, `/queue` to show them, `/queue clear` to discard.')
 })
 
 test('queue paused notice omits show hint when preview is complete', () => {
@@ -172,7 +172,7 @@ test('queue paused notice omits show hint when preview is complete', () => {
 		{ text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' },
 	])
 
-	expect(text).toBe('Paused. 2 queued prompts are waiting. Next: short prompt. **ctrl-q** to run queued prompts, `/queue clear` to discard.')
+	expect(text).toBe('Paused. 2 queued prompts are waiting. Next: **short prompt**. **ctrl-q** to run queued prompts, `/queue clear` to discard.')
 })
 
 test('queue paused notice uses singular pronouns for one prompt', () => {
@@ -180,7 +180,7 @@ test('queue paused notice uses singular pronouns for one prompt', () => {
 		{ text: 'first line\nsecond line', createdAt: '2026-05-20T00:00:00.000Z' },
 	])
 
-	expect(text).toBe('Paused. 1 queued prompt is waiting. Next: first line... **ctrl-q** to run the queued prompt, `/queue` to show it, `/queue clear` to discard it.')
+	expect(text).toBe('Paused. 1 queued prompt is waiting. Next: **first line...**. **ctrl-q** to run the queued prompt, `/queue` to show it, `/queue clear` to discard it.')
 })
 
 test('held queue does not drain after unrelated completed prompt', () => {

@@ -384,7 +384,7 @@ function buildQueuePausedNotice(entries: QueuedPrompt[]): string {
 	const count = entries.length
 	const noun = count === 1 ? 'prompt is' : 'prompts are'
 	const preview = entries[0] ? queuePreviewResult(entries[0].text, 50) : undefined
-	const next = preview ? ` Next: ${preview.text}${preview.truncated ? '' : '.'}` : ''
+	const next = preview ? ` Next: **${preview.text}**.` : ''
 	const run = count === 1 ? 'run the queued prompt' : 'run queued prompts'
 	const discard = count === 1 ? '`/queue clear` to discard it' : '`/queue clear` to discard'
 	const show = preview?.truncated ? `, \`/queue\` to show ${count === 1 ? 'it' : 'them'}` : ''
@@ -395,7 +395,7 @@ function emitQueuePausedNotice(sessionId: string): void {
 	const entries = promptQueue.load(sessionId)
 	if (entries.length === 0) return
 	promptQueue.setHeld(sessionId, true)
-	emitInfo(sessionId, buildQueuePausedNotice(entries))
+	emitInfo(sessionId, buildQueuePausedNotice(entries), 'info', 'notice')
 }
 
 function shouldDrainQueuedPrompt(sessionId: string, result: AgentLoopResult): boolean {
@@ -638,7 +638,7 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'abort': {
 			if (!cmd.sessionId) return
-			if (!agentLoop.abort(cmd.sessionId)) emitInfo(cmd.sessionId, 'No active generation to abort')
+			if (!agentLoop.abort(cmd.sessionId, promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)) emitInfo(cmd.sessionId, 'No active generation to abort')
 			break
 		}
 		case 'reset': {

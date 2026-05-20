@@ -64,7 +64,8 @@ function shouldHideBlock(history: Block[], index: number): boolean {
 	// steering prompt instead of showing a redundant status block right before it.
 	if (block.type !== 'info' || block.text !== '[paused]') return false
 	const next = history[index + 1]
-	return next?.type === 'user' && next.status === 'steering'
+	if (next?.type === 'user' && next.status === 'steering') return true
+	return next?.type === 'startup' && next.text.startsWith('Paused. ') && next.text.includes('queued prompt')
 }
 
 function visibleHistory(history: Block[]): Block[] {

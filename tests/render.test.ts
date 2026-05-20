@@ -161,6 +161,21 @@ describe('render', () => {
 		expect(clean).toContain('Esc does not exit it. What does?')
 	})
 
+	test('paused info before queued prompt notice is hidden and notice markdown renders', () => {
+		const tab = client.currentTab()!
+		const ts = Date.now()
+		tab.history.push({ type: 'info', text: '[paused]', ts })
+		tab.history.push({ type: 'startup', text: 'Paused. 1 queued prompt is waiting. Next: **foo**. **ctrl-q** to run the queued prompt, `/queue clear` to discard it.', ts: ts + 1000 })
+		const raw = captureOutput(() => render.draw(true))
+		const clean = stripAnsi(raw)
+		expect(clean).not.toContain('[paused]')
+		expect(clean).toContain('Info')
+		expect(clean).toContain('Next: foo')
+		expect(clean).not.toContain('**foo**')
+		expect(clean).not.toContain('**ctrl-q**')
+		expect(clean).not.toContain('`/queue clear`')
+	})
+
 	test('paused info still renders when there is no steering prompt after it', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })

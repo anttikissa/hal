@@ -91,9 +91,9 @@ function touch(block: Block): void {
 	block.renderVersion = (block.renderVersion ?? 0) + 1
 }
 
-function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'startup' | 'fork' }>): string {
+function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' }>): string {
 	const text =
-		block.type === 'info' || block.type === 'warning' || block.type === 'error'
+		block.type === 'info' || block.type === 'warning' || block.type === 'error' || block.type === 'startup'
 			? stripAnsiSequences(block.text)
 			: block.text
 	return sanitizeTerminalText(text)
@@ -475,7 +475,7 @@ function pushDimWrapped(lines: string[], text: string, cols: number): void {
 	for (const raw of text.split('\n')) for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) lines.push(`${DIM}${line}${DIM_OFF}`)
 }
 
-function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'info' | 'warning' | 'error' }>, cols: number): string[] {
+function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'info' | 'warning' | 'error' | 'startup' }>, cols: number): string[] {
 	const lines: string[] = []
 	for (const span of md.mdSpans(markdownSourceText(block))) {
 		if (span.type === 'code') {
@@ -519,7 +519,8 @@ function blockContent(block: Block, cols: number): string[] {
 		block.type === 'thinking' ||
 		block.type === 'info' ||
 		block.type === 'warning' ||
-		block.type === 'error'
+		block.type === 'error' ||
+		block.type === 'startup'
 	) {
 		return renderMarkdownLines(block, cols)
 	}
