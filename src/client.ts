@@ -109,6 +109,8 @@ const state = {
 	busy: new Map<string, boolean>(),
 	// Activity text per session — "generating...", "running 3 tool(s)...", etc.
 	activity: new Map<string, string>(),
+	// Sessions waiting for the user to answer a risky tool confirmation popup.
+	toolConfirmPending: new Set<string>(),
 	// Most-recently viewed tab order. Used as a fallback when session-list changes
 	// do not close the active tab, such as cross-client closes or startup recovery.
 	recentTabs: [] as string[],
@@ -262,6 +264,14 @@ function isBusy(): boolean {
 function getActivity(): string {
 	const tab = currentTab()
 	return tab ? (state.activity.get(tab.sessionId) ?? '') : ''
+}
+
+function markToolConfirmPending(sessionId: string): void {
+	state.toolConfirmPending.add(sessionId)
+}
+
+function clearToolConfirmPending(sessionId: string): void {
+	state.toolConfirmPending.delete(sessionId)
 }
 
 // onTabSwitch callback — called when active tab changes, with the outgoing
@@ -474,6 +484,9 @@ function applySharedStatus(shared: SharedState): void {
 	}
 	state.busy = nextBusy
 	state.activity = new Map(Object.entries(shared.activity))
+	for (const sessionId of state.toolConfirmPending) {
+		if (!nextBusy.get(sessionId)) state.toolConfirmPending.delete(sessionId)
+	}
 	if (changedDoneUnseen) saveClientState()
 	state.hostVersionStatus = shared.host?.versionStatus ?? 'idle'
 	state.hostVersion = shared.host?.version ?? ''
@@ -498,6 +511,8 @@ function handleEvent(event: any): void {
 		repaintIfActive,
 		touchTab,
 		onToolConfirmRequest: (item: any) => onToolConfirmRequest?.(item),
+		markToolConfirmPending,
+		clearToolConfirmPending,
 		onDraftArrived: (text: string) => onDraftArrived?.(text),
 		onChange,
 	})
@@ -580,6 +595,7 @@ function resetForTests(): void {
 	state.startupSummaryShown = true
 	state.hostVersionStatus = 'idle'
 	state.hostVersion = ''
+	state.toolConfirmPending.clear()
 }
 
 function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {
@@ -608,6 +624,8 @@ export const client = {
 	currentTab,
 	isBusy,
 	getActivity,
+	markToolConfirmPending,
+	clearToolConfirmPending,
 	canContinueCurrentTurn,
 	continueActionForCurrentTurn,
 	switchTab,

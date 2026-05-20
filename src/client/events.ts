@@ -104,12 +104,14 @@ function handleToolCall(event: any, ctx: any): void {
 
 function handleToolConfirmRequest(event: any, ctx: any): void {
 	ctx.flushDelayedPaused(event.sessionId)
+	ctx.markToolConfirmPending(event.sessionId)
 	ctx.onToolConfirmRequest(event)
 	ctx.onChange(false)
 }
 
 function handleToolResult(event: any, ctx: any): void {
 	ctx.flushDelayedPaused(event.sessionId)
+	ctx.clearToolConfirmPending(event.sessionId)
 	const tab = ctx.tabForSession(event.sessionId)
 	const toolBlock = tab ? ctx.applyLiveEventToTab(tab, event).toolBlock : null
 	if (!tab || !toolBlock) return

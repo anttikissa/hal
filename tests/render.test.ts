@@ -38,6 +38,7 @@ beforeEach(() => {
 	client.state.peakCols = 0
 	client.state.busy = new Map()
 	client.state.activity = new Map()
+	client.state.toolConfirmPending = new Set()
 	prompt.clear()
 	helpBar.reset()
 	popup.close()
@@ -521,6 +522,27 @@ describe('render', () => {
 		} finally {
 			colors.input.cursor = originalCursor
 		}
+	})
+
+	test('pending risky tool confirmation shows a yellow alert instead of busy minicursor', () => {
+		const tab = client.currentTab()!
+		client.state.busy.set(tab.sessionId, true)
+
+		client.handleEvent({
+			type: 'tool-confirm-request',
+			sessionId: tab.sessionId,
+			requestId: 'risk-1',
+			body: ['risky'],
+			createdAt: new Date(0).toISOString(),
+		})
+
+		const output = captureOutput(() => render.draw())
+		const clean = stripAnsi(output)
+		const tabBar = clean.split('\n').find((line) => line.includes('tab 1'))
+		expect(tabBar).toBeDefined()
+		expect(tabBar).toContain('!tmp tab 1')
+		expect(tabBar).not.toContain('▪tmp tab 1')
+		expect(output).toContain('\x1b[33m!')
 	})
 
 	test('idle HAL cursor reserves three rows above the tab bar', () => {

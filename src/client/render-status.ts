@@ -51,6 +51,7 @@ function halCursorColor(): string {
 
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
+	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: YELLOW, blinks: false }
 
 	if (busy) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
 

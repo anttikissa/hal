@@ -298,6 +298,7 @@ function openToolConfirm(event: any): void {
 		body,
 		['Yes', 'No'],
 		(choice) => {
+			client.clearToolConfirmPending(event.sessionId)
 			ipc.appendCommand({ type: 'tool-confirm', sessionId: event.sessionId, requestId: String(event.requestId), approved: choice === 'Yes' })
 			draw()
 		},
