@@ -211,6 +211,49 @@ test('recordTabClosed emits info when no generation is active', () => {
 })
 
 
+test('runCompact emits context estimate for live status line', () => {
+	const sessionId = `test-compact-context-${Date.now().toString(36)}`
+	const events: any[] = []
+	const origAppendEvent = ipc.appendEvent
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origIsActive = agentLoop.isActive
+
+	try {
+		ipc.ownsHostLock = () => true
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		agentLoop.isActive = () => false
+		sessions.createSession(sessionId, {
+			id: sessionId,
+			workingDir: process.cwd(),
+			createdAt: '2026-05-20T12:00:00.000Z',
+			model: 'openai/gpt-5',
+			context: { used: 999_999, max: 999_999 },
+		})
+		sessions.appendHistorySync(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'before compact' }], ts: '2026-05-20T12:00:01.000Z' },
+			{ type: 'assistant', text: 'reply', ts: '2026-05-20T12:00:02.000Z' },
+		])
+
+		runtime.runCompact(sessionId)
+
+		const meta = sessions.loadSessionMeta(sessionId)
+		const event = events.find((event) => event.type === 'stream-end' && event.sessionId === sessionId)
+		expect(event).toMatchObject({
+			type: 'stream-end',
+			sessionId,
+			contextUsed: meta?.context?.used,
+			contextMax: meta?.context?.max,
+		})
+		expect(meta?.context?.used).not.toBe(999_999)
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		ipc.ownsHostLock = origOwnsHostLock
+		agentLoop.isActive = origIsActive
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
 test('formatModelRefreshMessage summarizes models.dev changes for the user', () => {
 	const msg = runtime.formatModelRefreshMessage([
 		'gpt-5.5 context 400k → 1050k',

@@ -536,9 +536,9 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	if (!agentLoop.isActive(sessionId) && shouldDrainQueuedPrompt(sessionId, result)) await runNextQueuedPrompt(sessionId)
 }
 
-function publishContextEstimate(sessionId: string): void {
+function publishContextEstimate(sessionId: string): { used: number; max: number } | null {
 	const meta = sessionStore.loadSessionMeta(sessionId)
-	if (!meta) return
+	if (!meta) return null
 	const model = meta.model ?? models.defaultModel()
 	const promptResult = context.buildSystemPrompt({
 		model,
@@ -549,6 +549,18 @@ function publishContextEstimate(sessionId: string): void {
 	const messages = apiMessages.toProviderMessages(sessionId)
 	const est = context.estimateContext(messages, model, overheadBytes)
 	sessionStore.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+	return { used: est.used, max: est.max }
+}
+
+function emitContextEstimate(sessionId: string, estimate: { used: number; max: number } | null): void {
+	if (!estimate) return
+	ipc.appendEvent({
+		type: 'stream-end',
+		sessionId,
+		contextUsed: estimate.used,
+		contextMax: estimate.max,
+		createdAt: new Date().toISOString(),
+	})
 }
 
 function runReset(sessionId: string): void {
@@ -563,7 +575,7 @@ function runReset(sessionId: string): void {
 		{ type: 'reset', ts },
 		{ type: 'user', parts: [{ type: 'text', text: `[system] Session was reset. Previous conversation: ${oldLog}` }], ts },
 	])
-	publishContextEstimate(sessionId)
+	emitContextEstimate(sessionId, publishContextEstimate(sessionId))
 	emitInfo(sessionId, 'Conversation cleared.')
 }
 
@@ -586,7 +598,7 @@ function runCompact(sessionId: string): void {
 		{ type: 'user', parts: [{ type: 'text', text: `[system] Session was manually compacted. Previous conversation: ${oldLog}` }], ts },
 		{ type: 'user', parts: [{ type: 'text', text: replay.buildCompactionContext(sessionId, entries) }], ts },
 	])
-	publishContextEstimate(sessionId)
+	emitContextEstimate(sessionId, publishContextEstimate(sessionId))
 	emitInfo(sessionId, `Context compacted (${userMsgs.length} user messages summarized, now writing to ${newLog})`)
 }
 
@@ -845,4 +857,5 @@ export const runtime = {
 	runNextQueuedPrompt,
 	buildQueuePausedNotice,
 	shouldDrainQueuedPrompt,
+	runCompact,
 }
