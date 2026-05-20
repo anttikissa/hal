@@ -17,7 +17,7 @@ const ALIASES: Record<string, string> = {
 	openai: 'openai/gpt-5.5',
 	gpt: 'openai/gpt-5.5',
 	codex: 'openai/gpt-5.3-codex',
-	gemini: 'google/gemini-3-flash-preview',
+	gemini: 'google/gemini-3.5-flash',
 	'gemini-pro': 'google/gemini-3.1-pro-preview',
 	grok: 'openrouter/x-ai/grok-4.20',
 	deepseek: 'openrouter/deepseek/deepseek-chat',
@@ -148,7 +148,7 @@ const FALLBACK_WINDOWS: Record<string, number> = {
 	'openai/gpt-5.4': 1_050_000,
 	'openai/gpt-5.3': 128_000,
 	'openai/gpt-5.3-codex': 128_000,
-	'google/gemini-3-flash-preview': 1_000_000,
+	'google/gemini-3.5-flash': 1_000_000,
 	'google/gemini-3.1-pro-preview': 1_000_000,
 	'openrouter/x-ai/grok-4.20': 2_000_000,
 }
@@ -436,7 +436,7 @@ const MODEL_GROUPS: ModelGroup[] = [
 	{
 		label: 'Google',
 		models: [
-			{ alias: 'gemini', fullId: 'google/gemini-3-flash-preview' },
+			{ alias: 'gemini', fullId: 'google/gemini-3.5-flash' },
 			{ alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview' },
 		],
 	},

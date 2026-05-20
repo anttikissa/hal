@@ -39,8 +39,15 @@ test('default model resolves to gpt-5.5', () => {
 
 
 test('gpt-5.5 gets high reasoning effort and fallback context window', () => {
-	expect(models.reasoningEffort('openai/gpt-5.5')).toBe('high')
-	expect(models.contextWindow('openai/gpt-5.5')).toBe(1_050_000)
+	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
+	process.env.HAL_STATE_DIR = dir
+	models.state.cache = null
+	try {
+		expect(models.reasoningEffort('openai/gpt-5.5')).toBe('high')
+		expect(models.contextWindow('openai/gpt-5.5')).toBe(1_050_000)
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
 })
 
 
@@ -56,7 +63,7 @@ test('model picker lists updated frontier aliases', () => {
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'gemini')).toMatchObject({
 		value: 'gemini',
-		search: expect.stringContaining('google/gemini-3-flash-preview'),
+		search: expect.stringContaining('google/gemini-3.5-flash'),
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'grok')).toMatchObject({
 		value: 'grok',
@@ -71,6 +78,7 @@ test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 			'gpt-5.5': 1_050_000,
 			'claude-opus-4-7': 1_000_000,
 			'claude-sonnet-4-6': 1_000_000,
+			'google/gemini-3.5-flash': 1_000_000,
 			'google/gemini-3-flash-preview': 1_000_000,
 			'x-ai/grok-4.20': 2_000_000,
 		},
@@ -81,7 +89,7 @@ test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 			'claude-opus-4-8': 1_000_000,
 			'claude-sonnet-4-6': 1_000_000,
 			'claude-sonnet-4-7': 1_000_000,
-			'google/gemini-3-flash-preview': 1_000_000,
+			'google/gemini-3.5-flash': 1_000_000,
 			'google/gemini-4-flash-preview': 1_000_000,
 			'x-ai/grok-4.20': 2_000_000,
 			'x-ai/grok-4.21': 2_000_000,
@@ -90,7 +98,7 @@ test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-7', newModel: 'anthropic/claude-opus-4-8' },
 		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-4-6', newModel: 'anthropic/claude-sonnet-4-7' },
 		{ aliases: ['openai', 'gpt'], oldModel: 'openai/gpt-5.5', newModel: 'openai/gpt-5.6' },
-		{ aliases: ['gemini'], oldModel: 'google/gemini-3-flash-preview', newModel: 'google/gemini-4-flash-preview' },
+		{ aliases: ['gemini'], oldModel: 'google/gemini-3.5-flash', newModel: 'google/gemini-4-flash-preview' },
 		{ aliases: ['grok'], oldModel: 'openrouter/x-ai/grok-4.20', newModel: 'openrouter/x-ai/grok-4.21' },
 	])
 })
