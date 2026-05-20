@@ -96,7 +96,13 @@ function analyzeToolCall(name: string, input: unknown): RiskFinding[] {
 	const out: RiskFinding[] = []
 	if (name === 'eval') return out
 	if (name === 'bash') checkShell(String(raw.command ?? ''), out)
-	else if (['read', 'grep', 'glob', 'write', 'edit'].includes(name)) checkText(textOf(raw), out)
+	// For file tools, only inspect path/pattern — not file contents or edit bodies,
+	// which routinely contain string literals like 'auth.ason' in tests/docs.
+	// Bash is checked in full because it can read arbitrary files via shell.
+	else if (['read', 'grep', 'glob', 'write', 'edit'].includes(name)) {
+		checkText(textOf(raw.path), out)
+		if (name === 'grep' || name === 'glob') checkText(textOf(raw.pattern), out)
+	}
 	out.sort((a, b) => a.severity === 'danger' && b.severity !== 'danger' ? -1 : b.severity === 'danger' && a.severity !== 'danger' ? 1 : 0)
 	return out
 }
