@@ -34,7 +34,7 @@ const config = {
 	/** Retry config for transient API errors. */
 	retryBaseDelayMs: 5_000,
 	retryMaxTotalMs: 2 * 60 * 60 * 1000, // 2 hours
-	retryableStatuses: new Set([429, 500, 503, 529]),
+	retryableStatuses: [429, 500, 503, 529],
 }
 
 // ── State ──
@@ -238,7 +238,7 @@ function computeRetryDelay(retryAfterMs: number | undefined, attempt: number): n
 }
 
 function isRetryableStatus(status: number | undefined): boolean {
-	return status != null && config.retryableStatuses.has(status)
+	return status != null && config.retryableStatuses.includes(status)
 }
 
 /** Build the short user-visible error details below the status/endpoint header. */

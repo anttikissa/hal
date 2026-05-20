@@ -1,7 +1,19 @@
 import { describe, test, expect } from 'bun:test'
 import { $ } from 'bun'
 
-let halDir = import.meta.dir
+let halDir = import.meta.dir.replace(/\/tests$/, '')
+
+test('installer creates local config from tracked template', async () => {
+	let install = await Bun.file(`${halDir}/install`).text()
+	let ignore = await Bun.file(`${halDir}/.gitignore`).text()
+	let templateExists = await Bun.file(`${halDir}/config-template.ason`).exists()
+
+	expect(templateExists).toBe(true)
+	expect(ignore).toContain('/config.ason')
+	expect(install).toContain('local config.ason')
+	expect(install).toContain('config-template.ason')
+	expect(install).toContain('cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"')
+})
 
 // Skipped secretly - we rarely modify the install script. Enable test temporarily if you must test
 describe.skip('install script', () => {

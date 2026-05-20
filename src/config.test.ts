@@ -1,9 +1,23 @@
 import { expect, test } from 'bun:test'
+import { readFileSync } from 'fs'
+import { ason } from './utils/ason.ts'
 import { config } from './config.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { models } from './models.ts'
 import { client } from './client.ts'
 import { render } from './client/render.ts'
+
+test('config-template.ason matches module config defaults', () => {
+	const template = ason.parse(readFileSync(`${import.meta.dir}/../config-template.ason`, 'utf-8')) as Record<string, any>
+	const defaults = ason.parse(ason.stringify(config.snapshot())) as Record<string, any>
+
+	// log.level intentionally derives from HAL_LOG at import time. The template
+	// pins an explicit install-time value, so do not make this test depend on the
+	// environment that happens to run it.
+	defaults.log.level = template.log.level
+
+	expect(template).toEqual(defaults)
+})
 
 test('config.init loads config lazily and only once', () => {
 	const origInitialized = (config as any).state?.initialized

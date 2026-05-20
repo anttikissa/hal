@@ -86,13 +86,16 @@ Avoid import-time snapshots of values that may change at runtime, such as env-de
 
 # Configuration
 
-- Non-secret user settings live in `config.ason` at the repo root.
+- Non-secret user settings live in local `config.ason` at the repo root.
+- `config.ason` is ignored by git. Never "clean up" or reset a user's local edits to it unless explicitly asked.
+- The tracked source of truth for new installs is `config-template.ason` at the repo root.
+- The install script creates `config.ason` from `config-template.ason` when the local file is missing.
 - Each configurable module exports a mutable `config` object.
 - Register that object in `src/config.ts` under the module name.
-- `config.ason` uses that module name as its top-level key.
-- `src/config.ts` applies overrides with `Object.assign`, so keep config values plain.
+- `config.ason` and `config-template.ason` use that module name as their top-level key.
+- `src/config.ts` applies overrides with `Object.assign`, so keep config values plain ASON-compatible data.
 - Read config at call time. Do not capture config values at import time.
-- When adding new config variables, add them to config.ason too with the default value, with descriptive comment above it.
+- When adding or changing config variables, update `config-template.ason` with the default value and a descriptive comment, and also update your local `config.ason` if it needs the new key for live testing.
 
 Example:
 ```ts
@@ -113,7 +116,7 @@ const modules = {
 ```ason
 {
 	agentLoop: {
-		maxIterations: 50
+		maxIterations: 50,
 	}
 }
 ```

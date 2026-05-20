@@ -59,6 +59,7 @@ need_bun=""
 need_tsgo=""
 need_deps=""
 need_symlink=""
+need_config=""
 need_path=""
 
 log "Tools:"
@@ -105,6 +106,13 @@ else
 	log "[ ] bun install"
 fi
 
+if [ -f "$hal_dir/config.ason" ]; then
+	log "[x] local config.ason"
+else
+	need_config=1
+	log "[ ] local config.ason"
+fi
+
 if [ -L "$bin_dir/hal" ] && [ "$(readlink -f "$bin_dir/hal")" = "$hal_dir/run" ]; then
 	log "[x] hal executable symlinked to $(prettify "$bin_dir")/"
 else
@@ -119,7 +127,7 @@ else
 	log "[ ] $(prettify "$bin_dir") in PATH"
 fi
 
-need_any="${need_git}${need_rg}${need_bun}${need_tsgo}${need_deps}${need_symlink}${need_path}"
+need_any="${need_git}${need_rg}${need_bun}${need_tsgo}${need_deps}${need_config}${need_symlink}${need_path}"
 
 log
 
@@ -142,7 +150,7 @@ fi
 # --- ask to install ---
 
 need_packages="${need_git}${need_rg}${need_bun}${need_tsgo}"
-need_setup="${need_deps}${need_symlink}${need_path}"
+need_setup="${need_deps}${need_config}${need_symlink}${need_path}"
 
 if [ -n "$need_packages" ] && [ -n "$need_setup" ]; then
 	prompt="Install missing prerequisites and set up Hal?"
@@ -230,6 +238,13 @@ if [ -n "$need_bun" ]; then
 	# Make bun available in current session
 	export BUN_INSTALL="$HOME/.bun"
 	export PATH="$BUN_INSTALL/bin:$PATH"
+fi
+
+# --- local config ---
+
+if [ -n "$need_config" ]; then
+	log "Creating config.ason from config-template.ason"
+	run cp "$hal_dir/config-template.ason" "$hal_dir/config.ason"
 fi
 
 # --- project dependencies ---

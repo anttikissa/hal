@@ -8,6 +8,8 @@
 		repaintAfterBlobLoad: true,
 		// Delay before showing a paused notice, to avoid flicker during quick resumes.
 		pausedNoticeDelayMs: 50,
+		// Include startup timing/replay diagnostics in the startup card.
+		showStartupPerf: false,
 		// Warn before a stale Claude session writes a large fresh prompt-cache entry.
 		claudeCacheWarningEnabled: true,
 		// Estimated cache-write tokens that correspond to 1% of Anthropic 5h quota.
@@ -19,14 +21,23 @@
 		claudeCacheWarningStaleMs: 300000
 	},
 	blocks: {
+		// Display width for tab characters in rendered blocks.
+		tabWidth: 4,
 		// Number of blob sidecar files to hydrate in one batch while rendering history.
-		blobBatchSize: 64
+		blobBatchSize: 64,
+		// Maximum lines shown from a tool output before collapsing it.
+		maxToolOutputLines: 20,
+		// Maximum diff lines shown inline for edit tool results.
+		maxEditDiffLines: 3
+	},
+	prompt: {
+		// Maximum prompt editor height before the prompt scrolls internally.
+		maxPromptLines: 10
 	},
 	render: {
 		// Brightness multiplier for inherited fork history; lower values look dimmer.
-		forkHistoryDimFactor: 0.82
+		forkHistoryDimFactor: 0.85
 	},
-	// Toggle statusline things on / off
 	renderStatus: {
 		// 04-uki
 		showSession: true,
@@ -41,30 +52,74 @@
 		// ↑56k input tokens sent, ↓2.8k output tokens received.
 		showTokenInOut: true,
 		// R1.7M cache tokens read, W42k cache tokens written; W only appears when writing new cache.
-		showTokenCache: true,
+		showTokenCache: false,
 		// Sub 2/3: 5h 23%, 7d 61%
 		showSubscription: true
 	},
 	agentLoop: {
 		// Maximum generate/tool-result cycles before stopping a runaway agent loop.
-		maxIterations: 50
+		maxIterations: 50,
+		// Maximum local tools to execute concurrently in one cycle.
+		maxToolConcurrency: 5,
+		// Base retry delay for transient provider errors.
+		retryBaseDelayMs: 5000,
+		// Maximum total retry time for one provider request.
+		retryMaxTotalMs: 7200000,
+		// HTTP statuses treated as transient provider errors.
+		retryableStatuses: [429, 500, 503, 529]
 	},
 	memory: {
 		// RSS threshold for showing a high-memory warning; set to 0 to disable warnings.
 		warnBytes: 1500000000,
 		// RSS threshold for exiting before memory grows without bound; set to 0 to disable exits.
-		killBytes: 5000000000
+		killBytes: 2000000000,
+		// How often to check RSS.
+		checkIntervalMs: 1000,
+		// Delay between warning that Hal will exit and actually exiting.
+		exitDelayMs: 500
 	},
 	models: {
 		// Default model alias or full model ID for new sessions.
-		default: 'gpt'
+		default: 'openai/gpt-5.5'
 	},
 	subscriptionUsage: {
 		// Mask account email addresses in usage and status output.
-		censorEmails: true
+		censorEmails: false
+	},
+	anthropicUsage: {
+		// Minimum delay between automatic usage refreshes.
+		minAutoRefreshMs: 60000,
+		// HTTP timeout for Anthropic usage requests.
+		fetchTimeoutMs: 5000,
+		// Width of the usage progress bar in status output.
+		progressBarWidth: 14
+	},
+	openaiUsage: {
+		// Minimum delay between automatic usage refreshes.
+		minAutoRefreshMs: 60000,
+		// Recently-active window for OpenAI usage refresh decisions.
+		activeWindowMs: 300000,
+		// Refresh cadence while OpenAI usage is active.
+		activeRefreshMs: 600000,
+		// Refresh after this many new OpenAI tokens are observed.
+		tokenRefreshThreshold: 100000,
+		// Minimum delay between activity writes.
+		activityWriteThrottleMs: 60000,
+		// HTTP timeout for OpenAI usage requests.
+		fetchTimeoutMs: 10000,
+		// Width of the usage progress bar in status output.
+		progressBarWidth: 14
+	},
+	toolRegistry: {
+		// Hard cap for any tool result sent back to the model.
+		maxOutputBytes: 65536
+	},
+	log: {
+		// File log level: '', 'off', 'info', 'error', or 'debug'.
+		level: 'info'
 	},
 	clipboard: {
 		// Pasted text at or below this many lines stays inline; longer pastes become temp files.
-		multilinePasteFileLineLimit: 7
+		multilinePasteFileLineLimit: 5
 	}
 }

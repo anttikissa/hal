@@ -11,5 +11,7 @@ examples/*
 prev
 state/
 
+# Local user config; install copies config-template.ason here.
+/config.ason
 auth.ason
 hal.js
