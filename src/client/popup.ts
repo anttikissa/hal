@@ -172,7 +172,11 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 		inputCursor = { row: 1, col: 4 + built.cursor }
 	}
 	if (state.kind === 'confirm' && state.body.length > 0) content.push({ text: '', active: false })
-	for (const line of state.body) content.push({ text: line, active: false })
+	// Split on embedded newlines so multi-line bash commands (e.g. heredocs) render
+	// inside the popup box instead of breaking the border at column 1.
+	for (const line of state.body) {
+		for (const sub of String(line).split('\n')) content.push({ text: sub, active: false })
+	}
 	if (state.body.length > 0 && state.items.length > 0) content.push({ text: '', active: false })
 	for (let i = 0; i < state.items.length; i++) content.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex })
 	if (state.kind === 'confirm' && state.items.length > 0) content.push({ text: '', active: false })

@@ -65,6 +65,19 @@ describe('popup', () => {
 		expect(clean[stripe + 2]).toContain('Session 13-nh4 (tab 38) wants to do this:')
 	})
 
+	test('confirm popup splits body lines that contain embedded newlines', () => {
+		const body = ['Session x (tab 1) wants to do this:', '', 'bash:', "python3 - <<'PY'\nfrom pathlib import Path\np=Path('hello')\nPY"]
+		popup.openConfirm('Risky tool call', body, ['Yes', 'No'], () => {}, 'danger')
+		const overlay = popup.buildOverlay(100, 40)
+		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))
+		for (let i = 1; i < clean.length - 1; i++) {
+			expect(clean[i]).toMatch(/^│.*│$/)
+		}
+		expect(clean.some((line) => line.includes("python3 - <<'PY'"))).toBe(true)
+		expect(clean.some((line) => line.includes('from pathlib import Path'))).toBe(true)
+		expect(clean.some((line) => line.includes("p=Path('hello')"))).toBe(true)
+	})
+
 	test('confirm popup gives text horizontal and vertical breathing room', () => {
 		popup.openConfirm('Claude cache likely cold', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
 		const overlay = popup.buildOverlay(100, 30)
