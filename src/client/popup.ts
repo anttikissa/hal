@@ -4,7 +4,7 @@
 import { lineEditor } from '../cli/line-editor.ts'
 import { colors } from '../cli/colors.ts'
 import { models } from '../models.ts'
-import { clipVisual, visLen } from '../utils/strings.ts'
+import { clipVisual, hardWrap, visLen } from '../utils/strings.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 
 interface PopupItem {
@@ -39,7 +39,6 @@ const YELLOW = '\x1b[33m'
 const GRAY = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
 const DANGER_YELLOW = '\x1b[38;5;226m'
-const DANGER_STRIPE = '\x1b[33;40m'
 
 function close(): void {
 	state.active = false
@@ -152,9 +151,6 @@ function pad(text: string, width: number): string {
 	return text + ' '.repeat(Math.max(0, width - visLen(text)))
 }
 
-function dangerStripe(width: number): string {
-	return DANGER_STRIPE + '◢◤'.repeat(Math.ceil(width / 2)).slice(0, width) + RESET
-}
 
 function styleRow(text: string, active: boolean): string {
 	if (!active) return text
@@ -191,10 +187,17 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
 	const innerWidth = Math.max(18, Math.min(maxInnerWidth, state.preferredInnerWidth ?? rawWidth))
 	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
-	const displayContent = [...content]
-	if (state.tone === 'danger' && state.kind === 'confirm') {
-		displayContent.unshift({ text: dangerStripe(contentWidth), active: false })
-		displayContent.push({ text: dangerStripe(contentWidth), active: false })
+	// For confirm popups, hard-wrap each row to the inner content width so long
+	// bash commands and ason-formatted tool inputs stay inside the popup instead
+	// of being truncated with '…'. Model picker rows are left untouched so the
+	// item count stays 1-to-1 with selectable choices.
+	const displayContent: Array<{ text: string; active: boolean }> = []
+	for (const line of content) {
+		if (state.kind === 'confirm') {
+			for (const sub of hardWrap(line.text, contentWidth)) displayContent.push({ text: sub, active: line.active })
+		} else {
+			displayContent.push({ text: line.text, active: line.active })
+		}
 	}
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)

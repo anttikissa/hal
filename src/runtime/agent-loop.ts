@@ -18,6 +18,7 @@ import { risk, type RiskFinding } from '../tools/risk.ts'
 import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
+import { ason } from '../utils/ason.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 // Built-in tool registration now happens via explicit startup init.
 // Anthropic also has its own server-side web_search tool
@@ -131,10 +132,11 @@ function resolveToolConfirmation(requestId: string, approved: boolean): boolean 
 
 
 function toolConfirmationBody(sessionId: string, call: ToolCall, findings: RiskFinding[]): string[] {
-	const text = call.name === 'bash' ? String(call.input?.command ?? '') : JSON.stringify(call.input ?? {})
-	const preview = text.length > 800 ? text.slice(0, 800) + '\n[… truncated]' : text
+	// Render with ason so multi-line strings stay readable (real newlines, not "\n").
+	// JSON.stringify is forbidden in this codebase for human-facing output.
+	const text = call.name === 'bash' ? String(call.input?.command ?? '') : ason.stringify(call.input ?? {})
 	const tab = ipc.readState().sessions.find((item) => item.id === sessionId)?.tab
-	const lines = [`Session ${sessionId}${tab ? ` (tab ${tab})` : ''} wants to do this:`, '', `${call.name}:`, preview, '', "I'm asking because:"]
+	const lines = [`Session ${sessionId}${tab ? ` (tab ${tab})` : ''} wants to do this:`, '', `${call.name}:`, text, '', "I'm asking because:"]
 	for (const finding of findings) lines.push(`- ${finding.reason}`)
 	lines.push('', 'Continue?')
 	return lines

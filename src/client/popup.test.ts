@@ -49,20 +49,14 @@ describe('popup', () => {
 		expect(overlay?.lines.join('\n')).toContain('[Yes]')
 	})
 
-	test('danger confirm popup shows striped warning rows', () => {
-		popup.openConfirm('Risky tool call', ['DESTRUCTIVE RM -RF COMMAND'], ['Yes', 'No'], () => {}, 'danger')
-		const overlay = popup.buildOverlay(100, 30)
-		expect(overlay?.lines.join('\n')).toContain('◢')
-		expect(overlay?.lines.join('\n')).toContain('◤')
-	})
-
-	test('danger confirm popup has only one blank line after top stripe', () => {
-		popup.openConfirm('Risky tool call', ['Session 13-nh4 (tab 38) wants to do this:'], ['Yes', 'No'], () => {}, 'danger')
-		const overlay = popup.buildOverlay(100, 30)
+	test('danger confirm popup wraps long lines instead of truncating them', () => {
+		// A single long line that exceeds the popup width must be wrapped, not clipped with '…'.
+		const longTail = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+		popup.openConfirm('Risky tool call', [`start ${longTail} end`], ['Yes', 'No'], () => {}, 'danger')
+		const overlay = popup.buildOverlay(60, 40)
 		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))
-		const stripe = clean.findIndex((line) => line.includes('◢'))
-		expect(clean[stripe + 1]).toMatch(/^│ +│$/)
-		expect(clean[stripe + 2]).toContain('Session 13-nh4 (tab 38) wants to do this:')
+		expect(clean.join('\n')).not.toContain('…')
+		expect(clean.some((line) => line.includes('end'))).toBe(true)
 	})
 
 	test('confirm popup splits body lines that contain embedded newlines', () => {
