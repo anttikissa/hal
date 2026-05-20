@@ -4,6 +4,7 @@ import { auth, type Credential } from './auth.ts'
 import { STATE_DIR } from './state.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { subscriptionUsage } from './subscription-usage.ts'
+import { time } from './utils/time.ts'
 
 const CACHE_PATH = `${STATE_DIR}/anthropic-usage.ason`
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
@@ -155,16 +156,8 @@ function setCurrentCredential(credential: Credential | undefined): void {
 }
 
 function formatResetAt(resetAt: number, now = new Date()): string {
-	const d = new Date(resetAt)
-	const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-	const sameDay =
-		d.getFullYear() === now.getFullYear() &&
-		d.getMonth() === now.getMonth() &&
-		d.getDate() === now.getDate()
-	if (sameDay) return time
-	return `${time} on ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`
+	return time.formatResetAt(resetAt, now)
 }
-
 
 function displayAccount(account: AccountUsage): string {
 	const raw = account.email || (account.total && account.index != null ? `account ${account.index + 1}/${account.total}` : account.key)

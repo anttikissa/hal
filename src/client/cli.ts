@@ -16,6 +16,7 @@ import { startup } from '../startup.ts'
 import { models } from '../models.ts'
 import { ipc } from '../ipc.ts'
 import type { KeyEvent } from '../cli/keys.ts'
+import { time } from '../utils/time.ts'
 
 const RESTART_CODE = 100
 
@@ -236,17 +237,6 @@ function isAnthropicModel(model: string): boolean {
 	return models.providerName(full).toLowerCase() === 'anthropic'
 }
 
-function formatAge(ms: number): string {
-	const minute = 60 * 1000
-	const hour = 60 * minute
-	const day = 24 * hour
-	if (ms >= 2 * day) return `${Math.round(ms / day)} days ago`
-	if (ms >= day) return 'yesterday'
-	if (ms >= hour) return `${Math.round(ms / hour)}h ago`
-	if (ms >= minute) return `${Math.round(ms / minute)}m ago`
-	return 'just now'
-}
-
 function lastAnthropicAssistantAt(tab: (typeof client.state.tabs)[number]): number | null {
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]
@@ -270,7 +260,7 @@ function claudeCacheWarning(tab: (typeof client.state.tabs)[number] | null, text
 	const lastAt = lastAnthropicAssistantAt(tab)
 	if (lastAt && now - lastAt < client.config.claudeCacheWarningStaleMs) return null
 
-	const ageText = lastAt ? formatAge(now - lastAt) : 'no previous Claude turn in this tab'
+	const ageText = lastAt ? time.formatShortAge(now - lastAt) : 'no previous Claude turn in this tab'
 	return { contextTokens, thresholdTokens, ageText }
 }
 

@@ -7,18 +7,10 @@ import { sessions } from '../server/sessions.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
 import { blob } from './blob.ts'
 import { sessionEntry } from './entry.ts'
+import { time } from '../utils/time.ts'
 
 function formatLocalTime(ts?: string): string | null {
-	if (!ts) return null
-	try {
-		const d = new Date(ts)
-		if (isNaN(d.getTime())) return null
-		const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-		const date = d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-		return `${date} ${time}`
-	} catch {
-		return null
-	}
+	return time.formatLocalDateTime(ts)
 }
 
 function metaText(text: string): string {

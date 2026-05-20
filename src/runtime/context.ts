@@ -8,6 +8,7 @@ import { sessions } from '../server/sessions.ts'
 import { models } from '../models.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 import type { Message, ContentBlock } from '../protocol.ts'
+import { time } from '../utils/time.ts'
 
 // ── AGENTS.md loading ─────────────────────────────────────────────────────────
 
@@ -147,8 +148,7 @@ function buildSystemPrompt(opts: {
 	const sessionDir = opts.sessionId ? sessions.sessionDir(opts.sessionId) : ''
 	const currentHalDir = halDir()
 	const currentStateDir = stateDir()
-	const d = new Date()
-	const date = `${d.toISOString().slice(0, 10)}, ${d.toLocaleDateString('en-US', { weekday: 'long' })}`
+	const date = time.formatSystemDate()
 
 	// Variables available for substitution in agent files
 	const vars: Record<string, string> = {

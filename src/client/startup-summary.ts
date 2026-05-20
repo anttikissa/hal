@@ -1,6 +1,7 @@
 import { models } from '../models.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { perf } from '../perf.ts'
+import { time } from '../utils/time.ts'
 
 function perfMs(prefix: string): string | null {
 	const hit = perf.snapshot().findLast((mark) => mark.name.startsWith(prefix))
@@ -30,18 +31,13 @@ function chatGptSubscriptionText(planType: string | undefined): string {
 	return `(ChatGPT ${titleWords(planType.toLowerCase().replace(/^chatgpt[-_\s]*/, ''))} subscription)`
 }
 
-function quotaWindowText(minutes: number): string {
-	if (minutes > 0 && minutes % (24 * 60) === 0) return `${minutes / (24 * 60)}d`
-	if (minutes > 0 && minutes % 60 === 0) return `${minutes / 60}h`
-	return `${minutes}m`
-}
-
 function startupQuotaLine(model: string): string {
 	if (models.providerName(model).toLowerCase() !== 'openai') return ''
 	const window = openaiUsage.current()?.primary
 	if (!window) return ''
-	const left = Math.max(0, Math.min(100, Math.round(100 - window.usedPercent)))
-	return `${left}% left on ${quotaWindowText(window.windowMinutes)} quota, resetting at ${openaiUsage.formatResetAt(window.resetAt)}.`
+	const used = Math.max(0, Math.min(100, Math.round(window.usedPercent)))
+	const resetAtMs = window.resetAt * 1000
+	return `${used}% used on ${time.formatQuotaWindow(window.windowMinutes)} quota, resetting at ${openaiUsage.formatResetAt(window.resetAt)} (${time.formatFutureDistance(resetAtMs)}).`
 }
 
 function startupModelLine(model: string): string {
