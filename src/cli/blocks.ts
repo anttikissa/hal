@@ -166,10 +166,10 @@ function historyToBlocks(
 				})
 				break
 			case 'info':
-				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info', text: entry.text, ts, dimmed })
+				result.push({ type: entry.ui === 'tab' ? 'startup' : entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info', text: entry.text, ts, dimmed })
 				break
 			case 'forked_from':
-				result.push({ type: 'fork', text: `Forked from ${entry.parent}`, ts, dimmed })
+				result.push({ type: 'startup', text: `Tab forked from ${entry.parent}.`, ts, dimmed })
 				break
 		}
 	}
@@ -594,7 +594,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 	return `${bg}\x1b[K\r${content}${RESET_BG}`
 }
 
-const fixedNoticeColors = { info: colors.info, warning: colors.warning, error: colors.error, startup: colors.startup, fork: colors.fork }
+const fixedNoticeColors = { info: colors.info, warning: colors.warning, error: colors.error, startup: colors.startup, fork: colors.startup }
 
 function blockColors(block: Block): { fg: string; bg: string } {
 	if (block.type === 'assistant') return colors.assistant
@@ -620,7 +620,7 @@ function buildHeader(title: string, time: string, blobRef: string, cols: number)
 	return `${left}${'─'.repeat(Math.max(0, budget - visLen(left) - visLen(right)))}${right}`
 }
 
-const fixedLabels = { info: 'Info', warning: 'Warning', error: 'Error', startup: 'Startup', fork: 'Fork' }
+const fixedLabels = { info: 'Info', warning: 'Warning', error: 'Error', startup: 'Tab', fork: 'Tab' }
 
 function blockLabel(block: Block): string {
 	if (block.type === 'user') {

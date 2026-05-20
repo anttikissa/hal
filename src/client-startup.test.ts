@@ -155,7 +155,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
-		expect(startup?.text).toContain('Initialized session in ~/sync/lippu.')
+		expect(startup?.text).toContain('Tab opened in ~/sync/lippu.')
 		expect(startup?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
 		expect(startup?.text).toContain('99% left on 5h quota, resetting at ')
 		expect(startup?.text).not.toContain('Server started')
@@ -178,7 +178,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
-		expect(startup?.text).toContain('Initialized session in /tmp/s1.')
+		expect(startup?.text).toContain('Tab opened in /tmp/s1.')
 		expect(startup?.text).toContain('Joined server')
 		expect(startup?.text).toContain('replay')
 	})
@@ -583,6 +583,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.sessionId).toBe('s3')
+		expect(client.currentTab()?.history.at(-1)).toMatchObject({ type: 'startup', text: 'Tab restored.' })
 	})
 
 	test('/self prompt activates the new session tab', async () => {

@@ -66,7 +66,7 @@ function startupPerfText(opts: any): string {
 
 function text(tab: any, opts: any): string {
 	const model = tab.model || opts.fallbackModel || ''
-	const lines = [`Initialized session in ${formatHomePath(tab.cwd || process.cwd())}.`]
+	const lines = [`Tab opened in ${formatHomePath(tab.cwd || process.cwd())}.`]
 	const modelLine = startupModelLine(model)
 	if (modelLine) lines.push('', modelLine)
 	const quotaLine = startupQuotaLine(model)

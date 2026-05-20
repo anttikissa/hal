@@ -45,7 +45,7 @@ describe("perf", () => {
 		await proc.exited
 		// Startup is user-facing by default; perf timings are hidden unless
 		// client.showStartupPerf is enabled in config.
-		expect(out).toContain("Initialized session in ")
+		expect(out).toContain("Tab opened in ")
 		expect(out).toContain("Using GPT 5.5 via OpenAI.")
 		expect(out).not.toContain("Server started")
 	})

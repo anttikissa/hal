@@ -449,6 +449,7 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		rememberTab,
 		pruneRecentTabs,
 		addStartupSummaryToTab,
+		addTabNoticeToTab: (tab: Tab, text: string) => addLocalBlockToTab(tab, { type: 'startup', text, ts: Date.now() }),
 		onTabSwitch: (from: string, to: string) => onTabSwitch?.(from, to),
 		onChange,
 	})

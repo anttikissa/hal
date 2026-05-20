@@ -62,7 +62,7 @@ export type HistoryEntry =
 		  }
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; ts?: string }
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; ts?: string }
-	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ts?: string }
+	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ui?: 'tab'; ts?: string }
 	| { type: 'reset' | 'compact'; ts?: string }
 	| { type: 'forked_from'; parent: string; ts?: string }
 	| { type: 'input_history'; text: string; ts?: string }

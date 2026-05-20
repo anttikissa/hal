@@ -142,16 +142,16 @@ test('block header leaves one column slack to avoid last-column wrap state', () 
 	expect(header.length).toBeLessThan(80)
 })
 
-test('forked_from history entry renders as a Fork block', () => {
+test('forked_from history entry renders as a Tab block', () => {
 	const history: any[] = [{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blocks.historyToBlocks(history as any, 'child')
-	expect(result).toMatchObject([{ type: 'fork', text: 'Forked from 04-abc' }])
+	expect(result).toMatchObject([{ type: 'startup', text: 'Tab forked from 04-abc.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(stripAnsi(lines[0] ?? '')).toContain('Fork')
+	expect(stripAnsi(lines[0] ?? '')).toContain('Tab')
 })
 
-test('startup block renders a Startup header', () => {
+test('startup block renders a Tab header', () => {
 	const block: Block = {
 		type: 'startup',
 		text: 'Server started (pid 123) · ready 99.9ms',
@@ -159,7 +159,7 @@ test('startup block renders a Startup header', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 80)
-	expect(stripAnsi(lines[0] ?? '')).toContain('Startup')
+	expect(stripAnsi(lines[0] ?? '')).toContain('Tab')
 	expect(stripAnsi(lines.slice(1).join('\n'))).toContain('Server started')
 })
 

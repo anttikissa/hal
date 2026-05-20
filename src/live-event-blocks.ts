@@ -136,7 +136,7 @@ function applyEvent(opts: ApplyEventOptions): { changed: boolean; toolBlock?: an
 
 	if (event.type === 'info' && event.text) {
 		close()
-		blocks.push({ type: event.level === 'error' ? 'error' : 'info', text: event.text, ts })
+		blocks.push({ type: event.ui === 'tab' ? 'startup' : event.level === 'error' ? 'error' : 'info', text: event.text, ts })
 		return changed()
 	}
 

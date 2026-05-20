@@ -109,7 +109,7 @@ describe("tabs", () => {
 		expect(ids).toHaveLength(2)
 		expect(out).toContain(`[1 .hal ${ids[0]!}]`)
 		expect(out).toContain(`2 .hal ${ids[1]!}`)
-		expect(out).toContain('Initialized session in ')
+		expect(out).toContain('Tab opened in ')
 	})
 
 	test("ctrl-t inherits the current tab model", async () => {
@@ -242,10 +242,9 @@ describe("tabs", () => {
 		const childId = after[1]!
 		const childHistory = await waitForHistory(childId)
 		expect(childHistory[0]).toMatchObject({ type: 'forked_from', parent: parentId })
-		expect(childHistory[1]).toMatchObject({ type: 'info' })
-		expect(childHistory[1]?.text).toContain('User forked')
+		expect(childHistory[1]).toMatchObject({ type: 'info', ui: 'tab' })
+		expect(childHistory[1]?.text).toContain('Tab forked from')
 		expect(childHistory[1]?.text).toContain(parentId)
-		expect(childHistory[1]?.text).toContain(childId)
 
 		proc.stdin!.write(new Uint8Array([0x03]))
 		proc.stdin!.flush()

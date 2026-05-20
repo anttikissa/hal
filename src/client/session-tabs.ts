@@ -65,6 +65,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	ctx.flushPendingEntries()
 	copyForkDraft(isFork, grew, previousSession, openedSessionId, newTabs)
 	if (isOpen && grew && active && openedTabs.includes(active)) ctx.addStartupSummaryToTab(active)
+	if (state.pendingOpen === 'resume' && grew && active && openedTabs.includes(active)) ctx.addTabNoticeToTab(active, 'Tab restored.')
 	state.pendingOpen = false
 	if (previousSession !== newSession) ctx.onTabSwitch(previousSession, newSession)
 	ctx.onChange(false)
