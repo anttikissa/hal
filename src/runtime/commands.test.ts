@@ -517,6 +517,7 @@ test('/model returns model-change metadata for the next model turn', async () =>
 
 	expect(result.handled).toBe(true)
 	expect(result.meta).toEqual(['model changed from openai/gpt-5.4 to openai/gpt-5.5'])
+	expect(result.ui).toBe('notice')
 })
 
 

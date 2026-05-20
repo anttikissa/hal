@@ -31,6 +31,8 @@ export interface CommandResult {
 	error?: string
 	/** Metadata text to inject into the next model-visible user turn. */
 	meta?: string[]
+	/** Optional presentation for special informational output. */
+	ui?: 'notice'
 	/** Whether the command was recognized and handled. */
 	handled: boolean
 }
@@ -381,6 +383,7 @@ handlers['model'] = (args, session) => {
 	return {
 		output: `Model set to ${display} (${newModel})`,
 		meta: [`model changed from ${oldModel} to ${newModel}`],
+		ui: 'notice',
 		handled: true,
 	}
 }

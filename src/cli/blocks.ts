@@ -166,7 +166,7 @@ function historyToBlocks(
 				})
 				break
 			case 'info':
-				result.push({ type: entry.ui === 'tab' ? 'startup' : entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info', text: entry.text, ts, dimmed })
+				result.push({ type: entry.ui === 'notice' ? 'startup' : entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info', text: entry.text, ts, dimmed })
 				break
 			case 'forked_from':
 				result.push({ type: 'startup', text: `Tab forked from ${entry.parent}.`, ts, dimmed })
@@ -620,7 +620,7 @@ function buildHeader(title: string, time: string, blobRef: string, cols: number)
 	return `${left}${'─'.repeat(Math.max(0, budget - visLen(left) - visLen(right)))}${right}`
 }
 
-const fixedLabels = { info: 'Info', warning: 'Warning', error: 'Error', startup: 'Tab', fork: 'Tab' }
+const fixedLabels = { info: 'Info', warning: 'Warning', error: 'Error', startup: 'Info', fork: 'Info' }
 
 function blockLabel(block: Block): string {
 	if (block.type === 'user') {

@@ -127,7 +127,7 @@ function broadcastSessions(): void {
 	restartPromptWatch()
 }
 
-function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'tab'): void {
+function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice'): void {
 	ipc.appendEvent({
 		id: protocol.eventId(),
 		type: 'info',
@@ -171,9 +171,9 @@ function tailTurnState(entries: TailEntry[], now = Date.now()): TailTurnState {
 
 function shouldAutoContinue(entries: TailEntry[], now = Date.now()): boolean { return tailTurnState(entries, now).shouldContinue }
 
-function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'tab'): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }]) }
+function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }]) }
 
-function recordSessionMeta(sessionId: string, text: string, ts: string): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts }]) }
+function recordSessionMeta(sessionId: string, text: string, ts: string, ui?: 'notice'): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts, ...(ui ? { ui } : {}) }]) }
 
 function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
@@ -199,7 +199,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	const text = opts.sourceId
 		? related ? `Tab forked from ${sessionLabel(related)}.` : ''
 		: ''
-	if (text) recordSessionInfo(sessionId, text, meta.createdAt, 'tab')
+	if (text) recordSessionInfo(sessionId, text, meta.createdAt, 'notice')
 	if (opts.sourceId && sourceMeta?.context && !overridesForkCwd) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })
 	else publishContextEstimate(sessionId)
 	return sessionStore.loadSessionMeta(sessionId) ?? meta
@@ -426,8 +426,8 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 			broadcastSessions()
 		}
 		const metaTs = new Date().toISOString()
-		for (const message of cmdResult.meta ?? []) recordSessionMeta(sessionId, message, metaTs)
-		if (cmdResult.output) emitInfo(sessionId, cmdResult.output)
+		for (const message of cmdResult.meta ?? []) recordSessionMeta(sessionId, message, metaTs, cmdResult.ui)
+		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui)
 		if (cmdResult.error) emitInfo(sessionId, cmdResult.error, 'error')
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
 		return
@@ -610,8 +610,8 @@ function handleCommand(cmd: Command): void {
 			})
 			if ('forkSessionId' in cmd) {
 				const child = createSessionTab({ sourceId: cmd.forkSessionId, workingDir: cmd.cwd })
-				emitInfo(cmd.forkSessionId, `Tab forked to ${sessionLabel(child)}.`, 'info', 'tab')
-				emitInfo(child.id, `Tab forked from ${cmd.forkSessionId}.`, 'info', 'tab')
+				emitInfo(cmd.forkSessionId, `Tab forked to ${sessionLabel(child)}.`, 'info', 'notice')
+				emitInfo(child.id, `Tab forked from ${cmd.forkSessionId}.`, 'info', 'notice')
 			} else if ('cwd' in cmd && cmd.cwd && cmd.forceNew) {
 				createSessionTab({ openerId: sessionId, afterId: sessionId, workingDir: cmd.cwd })
 			} else if ('afterSessionId' in cmd) {
