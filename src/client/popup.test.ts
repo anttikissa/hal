@@ -72,6 +72,24 @@ describe('popup', () => {
 		expect(clean.some((line) => line.includes("p=Path('hello')"))).toBe(true)
 	})
 
+	test('confirm popup clips tall body with the standard hidden-lines indicator', () => {
+		const body = ['start']
+		for (let i = 0; i < 30; i++) body.push(`body line ${i}`)
+		body.push('important reason at the bottom')
+		popup.openConfirm('Risky tool call', body, ['Yes', 'No'], () => {}, 'danger')
+		const overlay = popup.buildOverlay(80, 12)
+		expect(overlay).not.toBeNull()
+		expect(overlay!.y + overlay!.lines.length).toBeLessThan(12)
+		for (const line of overlay!.lines) expect(visLen(line)).toBeLessThan(80)
+		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).join('\n')
+		expect(clean).toContain('[+ ')
+		expect(clean).toContain(' lines]')
+		expect(clean).toContain('start')
+		expect(clean).toContain('important reason at the bottom')
+		expect(clean).toContain('[Yes]')
+		expect(clean).toContain(' No')
+	})
+
 	test('confirm popup gives text horizontal and vertical breathing room', () => {
 		popup.openConfirm('Claude cache likely cold', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
 		const overlay = popup.buildOverlay(100, 30)

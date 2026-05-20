@@ -157,26 +157,61 @@ function styleRow(text: string, active: boolean): string {
 	return `${colors.popup.current.bg}${colors.popup.current.fg}${text}${RESET}`
 }
 
+interface PopupRow {
+	text: string
+	active: boolean
+}
+
+function wrapRows(rows: PopupRow[], width: number): PopupRow[] {
+	const out: PopupRow[] = []
+	for (const row of rows) {
+		for (const text of hardWrap(row.text, width)) out.push({ text, active: row.active })
+	}
+	return out
+}
+
+function clipBodyRows(bodyRows: PopupRow[], tailRows: PopupRow[], maxRows: number): PopupRow[] {
+	if (bodyRows.length + tailRows.length <= maxRows) return [...bodyRows, ...tailRows]
+	const availableBodyRows = maxRows - tailRows.length
+	if (availableBodyRows <= 0) return tailRows.slice(0, maxRows)
+	if (availableBodyRows === 1) return [{ text: `[+ ${bodyRows.length} lines]`, active: false }, ...tailRows]
+
+	const keepRows = availableBodyRows - 1
+	const headRows = Math.max(1, Math.ceil(keepRows / 2))
+	const bottomRows = Math.max(0, keepRows - headRows)
+	const hiddenRows = bodyRows.length - headRows - bottomRows
+	if (hiddenRows <= 0) return [...bodyRows, ...tailRows]
+
+	return [
+		...bodyRows.slice(0, headRows),
+		{ text: `[+ ${hiddenRows} lines]`, active: false },
+		...bodyRows.slice(bodyRows.length - bottomRows),
+		...tailRows,
+	]
+}
+
 function buildOverlay(cols: number, rows: number): Overlay | null {
 	if (!state.active || cols < 12 || rows < 6) return null
-	const content: Array<{ text: string; active: boolean }> = []
+	const bodyContent: PopupRow[] = []
+	const tailContent: PopupRow[] = []
 	let inputCursor: { row: number; col: number } | null = null
 	if (state.kind === 'model') {
 		const built = editor.buildLine()
-		content.push({ text: `> ${built.line}`, active: false })
-		content.push({ text: '', active: false })
+		bodyContent.push({ text: `> ${built.line}`, active: false })
+		bodyContent.push({ text: '', active: false })
 		inputCursor = { row: 1, col: 4 + built.cursor }
 	}
-	if (state.kind === 'confirm' && state.body.length > 0) content.push({ text: '', active: false })
+	if (state.kind === 'confirm' && state.body.length > 0) bodyContent.push({ text: '', active: false })
 	// Split on embedded newlines so multi-line bash commands (e.g. heredocs) render
 	// inside the popup box instead of breaking the border at column 1.
 	for (const line of state.body) {
-		for (const sub of String(line).split('\n')) content.push({ text: sub, active: false })
+		for (const sub of String(line).split('\n')) bodyContent.push({ text: sub, active: false })
 	}
-	if (state.body.length > 0 && state.items.length > 0) content.push({ text: '', active: false })
-	for (let i = 0; i < state.items.length; i++) content.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex })
-	if (state.kind === 'confirm' && state.items.length > 0) content.push({ text: '', active: false })
-	if (content.length === 0) content.push({ text: '', active: false })
+	if (state.body.length > 0 && state.items.length > 0) tailContent.push({ text: '', active: false })
+	for (let i = 0; i < state.items.length; i++) tailContent.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex })
+	if (state.kind === 'confirm' && state.items.length > 0) tailContent.push({ text: '', active: false })
+	if (bodyContent.length === 0 && tailContent.length === 0) bodyContent.push({ text: '', active: false })
+	const content = [...bodyContent, ...tailContent]
 
 	// Keep a safety margin away from the terminal's last column and last row.
 	// Touching those edges can trigger wrap-pending weirdness in some terminals.
@@ -189,15 +224,15 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
 	// For confirm popups, hard-wrap each row to the inner content width so long
 	// bash commands and ason-formatted tool inputs stay inside the popup instead
-	// of being truncated with '…'. Model picker rows are left untouched so the
-	// item count stays 1-to-1 with selectable choices.
-	const displayContent: Array<{ text: string; active: boolean }> = []
-	for (const line of content) {
-		if (state.kind === 'confirm') {
-			for (const sub of hardWrap(line.text, contentWidth)) displayContent.push({ text: sub, active: line.active })
-		} else {
-			displayContent.push({ text: line.text, active: line.active })
-		}
+	// of being truncated with '…'. If the wrapped body is taller than the terminal,
+	// keep the top and bottom context and use the same "[+ X lines]" wording as
+	// tool output renderers for omitted rows.
+	let displayContent: PopupRow[]
+	if (state.kind === 'confirm') {
+		const maxContentRows = Math.max(1, rows - bottomSlack - 2)
+		displayContent = clipBodyRows(wrapRows(bodyContent, contentWidth), wrapRows(tailContent, contentWidth), maxContentRows)
+	} else {
+		displayContent = content
 	}
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)
