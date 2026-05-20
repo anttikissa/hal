@@ -1,3 +1,23 @@
+/*
+Usage:
+
+```ts
+import { liveFiles } from './utils/live-file.ts'
+
+const data = liveFiles.liveFile('/tmp/settings.ason', { enabled: true })
+
+data.enabled = false // writes /tmp/settings.ason on the next microtask
+
+liveFiles.save(data) // force an immediate write when you need disk synced now
+
+liveFiles.onChange(data, (change) => {
+	// Fired after an external edit is reloaded into the same live object.
+	const changedPath = change.path
+	const previousValue = change.previous.enabled
+	const nextValue = change.next.enabled
+})
+```
+*/
 // Keep a plain object synced with an ASON file. Mutations write back on the next
 // microtask, and optional watching patches external edits into the same object.
 
@@ -5,12 +25,36 @@ import { readFileSync, writeFileSync, renameSync, existsSync, watch } from 'fs'
 import { dirname } from 'path'
 import { ason } from './ason.ts'
 
+interface LiveFileChange {
+	path: string
+	previous: Record<string, any>
+	next: Record<string, any>
+}
+
+type LiveFileChangeCallback = (change: LiveFileChange) => void
+
+function cloneValue(value: any): any {
+	if (value && typeof value === 'object' && !Array.isArray(value)) return cloneRecord(value)
+	if (!Array.isArray(value)) return value
+	const out: any[] = []
+	for (const item of value) out.push(cloneValue(item))
+	return out
+}
+
+function cloneRecord(value: Record<string, any>): Record<string, any> {
+	const out: Record<string, any> = {}
+	for (const [key, item] of Object.entries(value)) {
+		out[key] = cloneValue(item)
+	}
+	return out
+}
+
 interface LiveState {
 	path: string
 	data: Record<string, any>
 	dirty: boolean
 	flushScheduled: boolean
-	callbacks: Array<() => void>
+	callbacks: LiveFileChangeCallback[]
 	// Hold the watcher on the state object itself so the runtime does not lose it to GC.
 	watcher: ReturnType<typeof watch> | null
 	doFlush: () => void
@@ -74,12 +118,14 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 						const before = ason.stringify(data)
 						const after = ason.stringify(next)
 						if (before === after) return
+						const previous = cloneRecord(data)
+						const nextSnapshot = cloneRecord(next)
 						// Mutate in place so existing proxies keep pointing at fresh data.
 						for (const key of Object.keys(data)) {
 							if (!(key in next)) delete data[key]
 						}
 						Object.assign(data, next)
-						for (const cb of state.callbacks) cb()
+						for (const cb of state.callbacks) cb({ path, previous, next: nextSnapshot })
 					} catch {}
 				}, 50)
 			})
@@ -111,7 +157,9 @@ function save(proxy: object): void {
 	registry.get(proxy)?.doFlush()
 }
 
-function onChange(proxy: object, cb: () => void): void {
+function onChange(proxy: object, cb: LiveFileChangeCallback): void
+function onChange(proxy: object, cb: () => void): void
+function onChange(proxy: object, cb: LiveFileChangeCallback): void {
 	registry.get(proxy)?.callbacks.push(cb)
 }
 

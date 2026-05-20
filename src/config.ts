@@ -140,6 +140,68 @@ function listPaths(): string[] {
 	return out
 }
 
+type ConfigReloadDiff = {
+	path: string
+	kind: 'added' | 'removed' | 'changed'
+	previous?: any
+	next?: any
+}
+
+function isPlainObject(value: any): value is Record<string, any> {
+	return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function formatValue(value: any): string {
+	return ason.stringify(value, 'short')
+}
+
+function sameValue(a: any, b: any): boolean {
+	return formatValue(a) === formatValue(b)
+}
+
+function diffConfigObjects(previous: Record<string, any>, next: Record<string, any>, prefix = ''): ConfigReloadDiff[] {
+	const out: ConfigReloadDiff[] = []
+	const keys = new Set([...Object.keys(previous), ...Object.keys(next)])
+	for (const key of [...keys].sort()) {
+		const path = prefix ? `${prefix}.${key}` : key
+		const hadPrevious = Object.prototype.hasOwnProperty.call(previous, key)
+		const hasNext = Object.prototype.hasOwnProperty.call(next, key)
+		if (!hadPrevious) {
+			out.push({ path, kind: 'added', next: next[key] })
+			continue
+		}
+		if (!hasNext) {
+			out.push({ path, kind: 'removed', previous: previous[key] })
+			continue
+		}
+		const previousValue = previous[key]
+		const nextValue = next[key]
+		if (isPlainObject(previousValue) && isPlainObject(nextValue)) {
+			out.push(...diffConfigObjects(previousValue, nextValue, path))
+			continue
+		}
+		if (!sameValue(previousValue, nextValue)) out.push({ path, kind: 'changed', previous: previousValue, next: nextValue })
+	}
+	return out
+}
+
+function formatConfigReloadDiff(diff: ConfigReloadDiff): string {
+	if (diff.kind === 'added') return `${diff.path} added: ${formatValue(diff.next)}`
+	if (diff.kind === 'removed') return `${diff.path} removed: ${formatValue(diff.previous)}`
+	return `${diff.path}: ${formatValue(diff.previous)} → ${formatValue(diff.next)}`
+}
+
+function formatReloadMessage(previous: Record<string, any>, next: Record<string, any>): string {
+	const diffs = diffConfigObjects(previous, next)
+	if (diffs.length === 0) return ''
+	const limit = 8
+	const shown = diffs.slice(0, limit)
+	const parts: string[] = []
+	for (const diff of shown) parts.push(formatConfigReloadDiff(diff))
+	const more = diffs.length > shown.length ? ` (+${diffs.length - shown.length} more)` : ''
+	return `config.ason reloaded: ${parts.join('; ')}${more}`
+}
+
 function apply(): void {
 	for (const [name, overrides] of Object.entries(config.data)) {
 		const target = config.modules[name]
@@ -155,10 +217,12 @@ function init(): void {
 	// makes importing config.ts side-effect free.
 	config.data = liveFiles.liveFile(CONFIG_PATH, {}) as Record<string, any>
 	config.apply()
-	liveFiles.onChange(config.data, () => {
+	liveFiles.onChange(config.data, (change: { previous: Record<string, any>; next: Record<string, any> }) => {
+		const message = config.formatReloadMessage(change.previous, change.next)
 		config.apply()
 		render.invalidateHistoryCache()
-		client.requestRender(false)
+		if (message) client.addEntry(message)
+		else client.requestRender(false)
 	})
 }
 
@@ -181,4 +245,5 @@ export const config = {
 	readPath,
 	parseValue,
 	writePath,
+	formatReloadMessage,
 }

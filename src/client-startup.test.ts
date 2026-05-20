@@ -11,6 +11,8 @@ import { ason } from './utils/ason.ts'
 import { log } from './utils/log.ts'
 import { openaiUsage } from './openai-usage.ts'
 
+type TestLiveFileChange = { path: string; previous: Record<string, any>; next: Record<string, any> }
+
 function makeSessionMeta(id: string) {
 	return {
 		id,
@@ -255,7 +257,7 @@ describe('client startup', () => {
 	test('startup openCwd queues without blocking and focuses the host-created tab', async () => {
 		const shared = makeSharedState(['s1'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
 		ipc.readState = () => shared
 		ipc.appendCommand = (command) => {
@@ -277,7 +279,7 @@ describe('client startup', () => {
 			{ id: 's1', tab: 1, name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
 			{ id: 's2', tab: 2, name: 'tab 2', cwd: '/work/project', model: 'openai/gpt-5.4' },
 		]
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -441,7 +443,7 @@ describe('client startup', () => {
 
 		const shared = makeSharedState(['s1'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		ipc.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
@@ -462,7 +464,7 @@ describe('client startup', () => {
 
 		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		expect(onIpcChange).toBeTruthy()
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -472,7 +474,7 @@ describe('client startup', () => {
 	test('closing the active last tab falls back to the left neighbor', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		ipc.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
@@ -487,7 +489,7 @@ describe('client startup', () => {
 		client.switchTab(2)
 
 		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -497,7 +499,7 @@ describe('client startup', () => {
 	test('closing the last tab ignores remembered focus and falls back left', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		ipc.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
@@ -513,7 +515,7 @@ describe('client startup', () => {
 		client.switchTab(2)
 
 		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -523,7 +525,7 @@ describe('client startup', () => {
 	test('opening a tab activates the new session, and closing it returns to the previous tab', async () => {
 		const shared = makeSharedState(['s1', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
 		ipc.readState = () => shared
 		ipc.appendCommand = (command) => {
@@ -543,12 +545,12 @@ describe('client startup', () => {
 		expect(appendedCommands).toEqual([{ type: 'open', sessionId: 's2' }])
 
 		shared.sessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		expect(client.currentTab()?.sessionId).toBe('s3')
 
 		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -558,7 +560,7 @@ describe('client startup', () => {
 	test('resuming a tab activates the reopened session', async () => {
 		const shared = makeSharedState(['s1', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
 		ipc.readState = () => shared
 		ipc.appendCommand = (command) => {
@@ -578,7 +580,7 @@ describe('client startup', () => {
 		expect(appendedCommands).toEqual([{ type: 'resume', sessionId: 's2' }])
 
 		shared.sessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -589,7 +591,7 @@ describe('client startup', () => {
 	test('/self prompt activates the new session tab', async () => {
 		const shared = makeSharedState(['s1', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		ipc.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
@@ -604,7 +606,7 @@ describe('client startup', () => {
 		client.sendCommand('prompt', '/self')
 
 		shared.sessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -614,7 +616,7 @@ describe('client startup', () => {
 	test('moving the active tab keeps that same session active after reordering', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
 		ipc.readState = () => shared
 		ipc.appendCommand = (command) => {
@@ -634,7 +636,7 @@ describe('client startup', () => {
 		expect(appendedCommands).toEqual([{ type: 'move', position: 1, sessionId: 's3' }])
 
 		shared.sessions = ['s3', 's1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
@@ -644,7 +646,7 @@ describe('client startup', () => {
 	test('closing a middle tab switches to the right neighbor', async () => {
 		const shared = makeSharedState(['s1', 's3', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: (() => void) | undefined
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		ipc.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
@@ -662,7 +664,7 @@ describe('client startup', () => {
 			{ id: 's1', name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
 			{ id: 's2', name: 'tab 2', cwd: '/tmp/s2', model: 'openai/gpt-5.4' },
 		]
-		onIpcChange?.()
+		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 

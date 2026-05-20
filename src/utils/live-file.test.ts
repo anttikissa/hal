@@ -86,6 +86,31 @@ test('onChange fires on external file change', async () => {
 	expect(data.v).toBe(99)
 })
 
+test('onChange receives path and previous/next snapshots', async () => {
+	const path = join(dir, 'watched-change.ason')
+	writeFileSync(path, ason.stringify({ nested: { v: 1 }, remove: true }) + '\n')
+	const data = liveFiles.liveFile(path, { nested: { v: 0 } })
+
+	await Bun.sleep(50)
+
+	let change: any = null
+	liveFiles.onChange(data, (item) => {
+		change = item
+	})
+
+	const tmp = path + '.tmp'
+	writeFileSync(tmp, ason.stringify({ nested: { v: 2 }, added: 'yes' }) + '\n')
+	renameSync(tmp, path)
+	for (let i = 0; i < 100 && !change; i++) await Bun.sleep(50)
+
+	expect(change?.path).toBe(path)
+	expect(change?.previous).toEqual({ nested: { v: 1 }, remove: true })
+	expect(change?.next).toEqual({ nested: { v: 2 }, added: 'yes' })
+	expect(data.nested.v).toBe(2)
+	if (change) change.previous.nested.v = 99
+	expect(data.nested.v).toBe(2)
+})
+
 test('own writes do not trigger onChange', async () => {
 	const path = join(dir, 'ownwrite.ason')
 	const data = liveFiles.liveFile(path, { v: 0 })
