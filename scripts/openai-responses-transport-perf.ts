@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { performance } from 'perf_hooks'
-import { openaiProvider } from '../src/providers/openai.ts'
+import { openaiProvider, openai } from '../src/providers/openai.ts'
 import { builtins } from '../src/tools/builtins.ts'
 import { toolRegistry } from '../src/tools/tool.ts'
 import type { ContentBlock, Message, TokenUsage, ToolDef } from '../src/protocol.ts'
@@ -382,6 +382,7 @@ async function main(): Promise<void> {
 		writeStdout(text)
 	}
 
+	openai.resetResponsesWebSocketsForTests()
 	if (results.some((result) => !result.ok)) process.exitCode = 1
 }
 

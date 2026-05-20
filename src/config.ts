@@ -15,6 +15,7 @@ import { memory } from './memory.ts'
 import { models } from './models.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { openai } from './providers/openai.ts'
 import { subscriptionUsage } from './subscription-usage.ts'
 import { toolRegistry } from './tools/tool.ts'
 import { log } from './utils/log.ts'
@@ -33,6 +34,7 @@ const modules: Record<string, Record<string, any>> = {
 	subscriptionUsage: subscriptionUsage.config,
 	anthropicUsage: anthropicUsage.config,
 	openaiUsage: openaiUsage.config,
+	openai: openai.config,
 	toolRegistry: toolRegistry.config,
 	log: log.config,
 }

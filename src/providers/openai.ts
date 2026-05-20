@@ -13,9 +13,21 @@ import { providerShared } from './shared.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { reasoningSignature } from '../session/reasoning-signature.ts'
 import { models } from '../models.ts'
+import { ason } from '../utils/ason.ts'
 
 const RESPONSES_API_URL = 'https://api.openai.com/v1/responses'
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api'
+
+type ResponsesTransportMode = 'http' | 'ws' | 'auto'
+
+const config = {
+	// http: current SSE path. ws: force Responses WebSocket. auto: try WS, fall back to HTTP.
+	responsesTransport: 'http' as ResponsesTransportMode,
+}
+
+const state = {
+	webSockets: new Map<string, ResponsesWebSocketChain>(),
+}
 
 function inspectOpenAIToken(token: string): { accountId: string | null; hasResponsesScope: boolean } {
 	try {
@@ -30,11 +42,19 @@ function inspectOpenAIToken(token: string): { accountId: string | null; hasRespo
 	}
 }
 
-function resolveOpenAITransport(credential: Credential): { apiUrl: string; usesCodexBackend: boolean; accountId: string | null } {
-	if (credential.type === 'api-key') return { apiUrl: RESPONSES_API_URL, usesCodexBackend: false, accountId: null }
+function responsesWsUrl(apiUrl: string): string {
+	if (apiUrl.startsWith('https://')) return `wss://${apiUrl.slice('https://'.length)}`
+	if (apiUrl.startsWith('http://')) return `ws://${apiUrl.slice('http://'.length)}`
+	return apiUrl
+}
+
+function resolveOpenAITransport(credential: Credential): OpenAITransport {
+	if (credential.type === 'api-key') return { apiUrl: RESPONSES_API_URL, wsUrl: responsesWsUrl(RESPONSES_API_URL), usesCodexBackend: false, accountId: null }
 	const token = inspectOpenAIToken(credential.value)
+	const apiUrl = token.hasResponsesScope ? RESPONSES_API_URL : `${CODEX_BASE_URL}/codex/responses`
 	return {
-		apiUrl: token.hasResponsesScope ? RESPONSES_API_URL : `${CODEX_BASE_URL}/codex/responses`,
+		apiUrl,
+		wsUrl: responsesWsUrl(apiUrl),
 		usesCodexBackend: !token.hasResponsesScope,
 		accountId: token.accountId,
 	}
@@ -181,6 +201,36 @@ function convertCompatTools(tools: any[]): any[] {
 	return tools.map((tool) => ({ type: 'function', function: normalizeTool(tool) }))
 }
 
+interface OpenAITransport {
+	apiUrl: string
+	wsUrl: string
+	usesCodexBackend: boolean
+	accountId: string | null
+}
+
+interface ResponsesWebSocketChain {
+	key: string
+	ws: WebSocket
+	previousResponseId: string
+	requestMessageCount: number
+	busy: boolean
+	opened: boolean
+	openPromise: Promise<void>
+}
+
+class ResponsesWebSocketFallback extends Error {}
+
+class ResponsesWebSocketApiError extends ResponsesWebSocketFallback {
+	status?: number
+	body: string
+
+	constructor(event: any) {
+		const message = event.error?.message ?? event.message ?? 'OpenAI Responses WebSocket error'
+		super(message)
+		this.status = event.status
+		this.body = JSON.stringify(event.error ?? event)
+	}
+}
 interface ResponsesStreamState {
 	itemMap: Map<number, { type: 'reasoning' } | { type: 'function_call'; id?: string; name?: string }>
 	toolInputs: Map<number, string>
@@ -307,6 +357,130 @@ async function* yieldErrorAndDone(error: ProviderStreamEvent): AsyncGenerator<Pr
 	yield { type: 'done' }
 }
 
+function responsesTransportMode(): ResponsesTransportMode {
+	const value = process.env.HAL_OPENAI_RESPONSES_TRANSPORT ?? config.responsesTransport
+	if (value === 'ws' || value === 'auto') return value
+	return 'http'
+}
+
+function buildResponsesBody(req: ProviderRequest, transport: OpenAITransport, input: any[], streaming: boolean): any {
+	const body: any = { model: req.model, store: false, input }
+	if (streaming) body.stream = true
+	if (req.systemPrompt) body.instructions = req.systemPrompt
+	if (transport.usesCodexBackend) {
+		body.text = { verbosity: 'high' }
+		body.include = ['reasoning.encrypted_content']
+		if (req.sessionId) body.prompt_cache_key = req.sessionId
+	} else {
+		body.max_output_tokens = req.model.includes('codex') ? 128_000 : 16_384
+	}
+	if (req.tools?.length) {
+		body.tools = convertResponsesTools(req.tools)
+		body.tool_choice = 'auto'
+		body.parallel_tool_calls = true
+	}
+	const effort = models.reasoningEffort(req.model)
+	if (effort) body.reasoning = { effort, summary: 'auto' }
+	return body
+}
+
+function responsesHeaders(credential: Credential, transport: OpenAITransport, openaiEntry: Record<string, any>, streaming: boolean): { headers?: Record<string, string>; error?: string } {
+	const headers: Record<string, string> = {
+		Authorization: `Bearer ${credential.value}`,
+	}
+	if (streaming) {
+		headers['Content-Type'] = 'application/json'
+		headers.accept = 'text/event-stream'
+	}
+	if (transport.usesCodexBackend) {
+		const accountId = transport.accountId || openaiEntry.accountId || ''
+		if (!accountId) return { error: 'OpenAI token missing chatgpt_account_id' }
+		headers['OpenAI-Beta'] = 'responses=experimental'
+		headers.originator = 'pi'
+		headers['chatgpt-account-id'] = accountId
+	}
+	return { headers }
+}
+
+function webSocketKey(req: ProviderRequest, credential: Credential, transport: OpenAITransport): string {
+	return [
+		transport.wsUrl,
+		credential.type,
+		credential._key ?? credential.email ?? credential.index ?? '',
+		req.model,
+		req.systemPrompt,
+		ason.stringify(req.tools ?? []),
+	].join('\n')
+}
+
+function incrementalInput(chain: ResponsesWebSocketChain, messages: Message[]): any[] | null {
+	if (!chain.previousResponseId) return null
+	if (messages.length < chain.requestMessageCount) return null
+	let start = chain.requestMessageCount
+	if (messages[start]?.role === 'assistant') start++
+	return convertResponsesMessages(messages.slice(start))
+}
+
+function closeResponsesWebSocket(sessionId: string): void {
+	const chain = state.webSockets.get(sessionId)
+	if (!chain) return
+	state.webSockets.delete(sessionId)
+	try {
+		chain.ws.close()
+	} catch {}
+}
+
+function resetResponsesWebSocketsForTests(): void {
+	for (const sessionId of state.webSockets.keys()) closeResponsesWebSocket(sessionId)
+	state.webSockets.clear()
+}
+
+function waitForWebSocketOpen(ws: WebSocket, signal?: AbortSignal): Promise<void> {
+	if (ws.readyState === 1) return Promise.resolve()
+	return new Promise((resolve, reject) => {
+		function cleanup(): void {
+			ws.removeEventListener?.('open', onOpen as any)
+			ws.removeEventListener?.('error', onError as any)
+			signal?.removeEventListener('abort', onAbort)
+		}
+		function onOpen(): void {
+			cleanup()
+			resolve()
+		}
+		function onError(): void {
+			cleanup()
+			reject(new ResponsesWebSocketFallback('OpenAI Responses WebSocket connect failed'))
+		}
+		function onAbort(): void {
+			cleanup()
+			reject(new Error('aborted'))
+		}
+		ws.addEventListener('open', onOpen as any, { once: true } as any)
+		ws.addEventListener('error', onError as any, { once: true } as any)
+		signal?.addEventListener('abort', onAbort, { once: true })
+	})
+}
+
+function getResponsesWebSocket(sessionId: string, key: string, url: string, headers: Record<string, string>, signal?: AbortSignal): ResponsesWebSocketChain {
+	const existing = state.webSockets.get(sessionId)
+	if (existing && existing.key === key && existing.ws.readyState !== 2 && existing.ws.readyState !== 3) return existing
+	if (existing) closeResponsesWebSocket(sessionId)
+	const ws = new WebSocket(url, { headers } as any)
+	const chain: ResponsesWebSocketChain = {
+		key,
+		ws,
+		previousResponseId: '',
+		requestMessageCount: 0,
+		busy: false,
+		opened: false,
+		openPromise: waitForWebSocketOpen(ws, signal).then(() => {
+			chain.opened = true
+		}),
+	}
+	state.webSockets.set(sessionId, chain)
+	return chain
+}
+
 function compatCredentialMessage(providerName: string): string {
 	return `No credentials for '${providerName}'. Set ${providerName.toUpperCase()}_API_KEY`
 }
@@ -341,52 +515,117 @@ async function* generateCompat(providerName: string, baseUrl: string, req: Provi
 	}
 }
 
-async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
-	await auth.ensureFresh('openai')
-	const credential = auth.getCredential('openai')
-	if (!credential) {
-		yield* yieldErrorAndDone({ type: 'error', message: auth.allOnCooldownMessage('openai') ?? `No credentials for 'openai'. Run: bun scripts/login-openai.ts (or set OPENAI_API_KEY)` })
+async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: any, signal?: AbortSignal): AsyncGenerator<{ event: ProviderStreamEvent; responseId?: string }> {
+	if (chain.busy) throw new ResponsesWebSocketFallback('OpenAI Responses WebSocket already has an in-flight request')
+	chain.busy = true
+	const pending: any[] = []
+	const streamState: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
+	let done = false
+	let failed: Error | null = null
+	let responseId = ''
+	let wake: (() => void) | null = null
+
+	function notify(): void {
+		if (!wake) return
+		const fn = wake
+		wake = null
+		fn()
+	}
+	function cleanup(): void {
+		chain.busy = false
+		chain.ws.removeEventListener?.('message', onMessage as any)
+		chain.ws.removeEventListener?.('error', onError as any)
+		chain.ws.removeEventListener?.('close', onClose as any)
+		signal?.removeEventListener('abort', onAbort)
+	}
+	function onMessage(event: MessageEvent): void {
+		try {
+			const parsed = JSON.parse(String(event.data))
+			pending.push(parsed)
+			if (parsed.type === 'error') failed = new ResponsesWebSocketApiError(parsed)
+			if (parsed.type === 'response.completed') {
+				responseId = parsed.response?.id ?? responseId
+				done = true
+			}
+			notify()
+		} catch (err) {
+			failed = err instanceof Error ? err : new Error(String(err))
+			notify()
+		}
+	}
+	function onError(): void {
+		failed = new ResponsesWebSocketFallback('OpenAI Responses WebSocket error')
+		notify()
+	}
+	function onClose(): void {
+		if (!done) failed = new ResponsesWebSocketFallback('OpenAI Responses WebSocket closed before response.completed')
+		notify()
+	}
+	function onAbort(): void {
+		failed = new Error('aborted')
+		notify()
+	}
+
+	try {
+		await chain.openPromise
+		chain.ws.addEventListener('message', onMessage as any)
+		chain.ws.addEventListener('error', onError as any)
+		chain.ws.addEventListener('close', onClose as any)
+		signal?.addEventListener('abort', onAbort, { once: true })
+		chain.ws.send(JSON.stringify(body))
+		while (!done || pending.length > 0) {
+			while (pending.length > 0) {
+				const raw = pending.shift()
+				if (raw?.type === 'error') throw failed ?? new ResponsesWebSocketFallback('OpenAI Responses WebSocket error')
+				if (raw?.response?.id) responseId = raw.response.id
+				for (const event of parseResponsesEvent(streamState, raw)) yield { event, responseId }
+			}
+			if (failed) throw failed
+			if (!done) await new Promise<void>((resolve) => { wake = resolve })
+		}
+	} finally {
+		cleanup()
+	}
+}
+
+async function* generateOpenAIWebSocket(req: ProviderRequest, credential: Credential, transport: OpenAITransport, openaiEntry: Record<string, any>): AsyncGenerator<ProviderStreamEvent> {
+	const sessionId = req.sessionId ?? 'default'
+	const headerResult = responsesHeaders(credential, transport, openaiEntry, false)
+	if (headerResult.error || !headerResult.headers) {
+		yield* yieldErrorAndDone({ type: 'error', message: headerResult.error ?? 'OpenAI WebSocket headers unavailable' })
 		return
 	}
-	const transport = resolveOpenAITransport(credential)
-	const openaiEntry = auth.getEntry('openai')
-	const body: any = { model: req.model, store: false, stream: true, input: convertResponsesMessages(req.messages) }
-	if (req.systemPrompt) body.instructions = req.systemPrompt
-	if (transport.usesCodexBackend) {
-		body.text = { verbosity: 'high' }
-		body.include = ['reasoning.encrypted_content']
-		if (req.sessionId) body.prompt_cache_key = req.sessionId
-	} else {
-		body.max_output_tokens = req.model.includes('codex') ? 128_000 : 16_384
+	const key = webSocketKey(req, credential, transport)
+	const chain = getResponsesWebSocket(sessionId, key, transport.wsUrl, headerResult.headers, req.signal)
+	const deltaInput = incrementalInput(chain, req.messages)
+	const input = deltaInput ?? convertResponsesMessages(req.messages)
+	const body = buildResponsesBody(req, transport, input, false)
+	body.type = 'response.create'
+	if (deltaInput && chain.previousResponseId) body.previous_response_id = chain.previousResponseId
+
+	let completedResponseId = ''
+	for await (const item of streamResponsesWebSocket(chain, body, req.signal)) {
+		if (item.responseId) completedResponseId = item.responseId
+		if (item.event.type === 'done' && item.event.usage) openaiUsage.recordUsage(credential, item.event.usage)
+		yield item.event
 	}
-	if (req.tools?.length) {
-		body.tools = convertResponsesTools(req.tools)
-		body.tool_choice = 'auto'
-		body.parallel_tool_calls = true
+	if (completedResponseId) {
+		chain.previousResponseId = completedResponseId
+		chain.requestMessageCount = req.messages.length
 	}
-	const effort = models.reasoningEffort(req.model)
-	if (effort) body.reasoning = { effort, summary: 'auto' }
-	openaiUsage.setCurrentCredential(credential)
-	const rotationActivity = providerShared.formatRotationActivity('OpenAI', credential)
-	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/json',
-		Authorization: `Bearer ${credential.value}`,
-		accept: 'text/event-stream',
-	}
-	if (transport.usesCodexBackend) {
-		const accountId = transport.accountId || openaiEntry.accountId || ''
-		if (!accountId) {
-			yield* yieldErrorAndDone({ type: 'error', message: 'OpenAI token missing chatgpt_account_id' })
-			return
-		}
-		headers['OpenAI-Beta'] = 'responses=experimental'
-		headers.originator = 'pi'
-		headers['chatgpt-account-id'] = accountId
+}
+
+async function* generateOpenAIHttp(req: ProviderRequest, credential: Credential, transport: OpenAITransport, openaiEntry: Record<string, any>): AsyncGenerator<ProviderStreamEvent> {
+	if (req.sessionId) closeResponsesWebSocket(req.sessionId)
+	const body = buildResponsesBody(req, transport, convertResponsesMessages(req.messages), true)
+	const headerResult = responsesHeaders(credential, transport, openaiEntry, true)
+	if (headerResult.error || !headerResult.headers) {
+		yield* yieldErrorAndDone({ type: 'error', message: headerResult.error ?? 'OpenAI headers unavailable' })
+		return
 	}
 	const res = await fetch(transport.apiUrl, {
 		method: 'POST',
-		headers,
+		headers: headerResult.headers,
 		body: JSON.stringify(body),
 		signal: req.signal,
 	})
@@ -417,6 +656,62 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	}
 }
 
+function webSocketApiErrorEvent(err: ResponsesWebSocketApiError, credential: Credential, transport: OpenAITransport): ProviderStreamEvent {
+	if (err.status === 429) {
+		const cooldownMs = parseResetsInSeconds(err.body) ?? 10 * 60_000
+		auth.markCooldown(credential, cooldownMs)
+		const fast = auth.hasAvailableCredential('openai')
+		const nextCredential = auth.getCredential('openai')
+		return {
+			type: 'error',
+			message: providerShared.formatRotationMessage('OpenAI', credential, nextCredential, fast ? 1_000 : cooldownMs, fast),
+			status: err.status,
+			body: err.body,
+			endpoint: transport.wsUrl,
+			retryAfterMs: fast ? 1_000 : cooldownMs,
+		}
+	}
+	return { type: 'error', message: err.message, status: err.status, body: err.body, endpoint: transport.wsUrl }
+}
+
+async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
+	await auth.ensureFresh('openai')
+	const credential = auth.getCredential('openai')
+	if (!credential) {
+		yield* yieldErrorAndDone({ type: 'error', message: auth.allOnCooldownMessage('openai') ?? `No credentials for 'openai'. Run: bun scripts/login-openai.ts (or set OPENAI_API_KEY)` })
+		return
+	}
+	const transport = resolveOpenAITransport(credential)
+	const openaiEntry = auth.getEntry('openai')
+	openaiUsage.setCurrentCredential(credential)
+	const rotationActivity = providerShared.formatRotationActivity('OpenAI', credential)
+	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
+
+	const mode = responsesTransportMode()
+	if (mode === 'http') {
+		yield* generateOpenAIHttp(req, credential, transport, openaiEntry)
+		return
+	}
+
+	try {
+		yield* generateOpenAIWebSocket(req, credential, transport, openaiEntry)
+		return
+	} catch (err) {
+		if (req.sessionId) closeResponsesWebSocket(req.sessionId)
+		if (mode === 'auto' && !req.signal?.aborted) {
+			yield { type: 'status', activity: 'OpenAI WS failed; falling back to HTTP' }
+			yield* generateOpenAIHttp(req, credential, transport, openaiEntry)
+			return
+		}
+		if (err instanceof ResponsesWebSocketApiError) {
+			yield* yieldErrorAndDone(webSocketApiErrorEvent(err, credential, transport))
+			return
+		}
+		const message = err instanceof Error ? err.message : String(err)
+		yield* yieldErrorAndDone({ type: 'error', message, endpoint: transport.wsUrl })
+	}
+}
+
 export const openaiProvider: Provider = { generate: generateOpenAI }
 
 /** Create a Chat Completions-compatible provider for any OpenAI-like endpoint. */
@@ -432,4 +727,4 @@ export function createCompatProvider(providerName: string, baseUrl?: string): Pr
 	return { generate: (req) => generateCompat(providerName, url, req) }
 }
 
-export const openai = { openaiProvider, createCompatProvider, convertResponsesMessages }
+export const openai = { config, state, openaiProvider, createCompatProvider, convertResponsesMessages, resetResponsesWebSocketsForTests }

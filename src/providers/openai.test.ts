@@ -11,6 +11,8 @@ const origFetch = globalThis.fetch
 const origGetCredential = auth.getCredential
 const origGetEntry = auth.getEntry
 const origEnsureFresh = auth.ensureFresh
+const origWebSocket = globalThis.WebSocket
+const origTransportEnv = process.env.HAL_OPENAI_RESPONSES_TRANSPORT
 const origMarkCooldown = auth.markCooldown
 const origHasAvailableCredential = auth.hasAvailableCredential
 
@@ -21,6 +23,10 @@ afterEach(() => {
 	auth.ensureFresh = origEnsureFresh
 	auth.markCooldown = origMarkCooldown
 	auth.hasAvailableCredential = origHasAvailableCredential
+	globalThis.WebSocket = origWebSocket
+	if (origTransportEnv == null) delete process.env.HAL_OPENAI_RESPONSES_TRANSPORT
+	else process.env.HAL_OPENAI_RESPONSES_TRANSPORT = origTransportEnv
+	openai.resetResponsesWebSocketsForTests()
 })
 
 function encodeBase64Url(text: string): string {
@@ -421,4 +427,103 @@ test('compat provider reports tool JSON parse errors after [DONE] chunks', async
 		parseError: 'Failed to parse tool input JSON (7 chars): {"bad":',
 	})
 	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } })
+})
+
+class FakeWebSocket {
+	static instances: FakeWebSocket[] = []
+	url: string
+	options: any
+	sent: any[] = []
+	listeners = new Map<string, ((event: any) => void)[]>()
+	readyState = 1
+
+	constructor(url: string, options: any) {
+		this.url = url
+		this.options = options
+		FakeWebSocket.instances.push(this)
+		queueMicrotask(() => this.emit('open', {}))
+	}
+
+	addEventListener(name: string, cb: (event: any) => void): void {
+		const list = this.listeners.get(name) ?? []
+		list.push(cb)
+		this.listeners.set(name, list)
+	}
+
+	send(raw: string): void {
+		const body = JSON.parse(raw)
+		this.sent.push(body)
+		const id = `resp_${this.sent.length}`
+		queueMicrotask(() => {
+			this.message({ type: 'response.output_text.delta', delta: `text${this.sent.length}` })
+			this.message({ type: 'response.completed', response: { id, status: 'completed', usage: { input_tokens: this.sent.length, output_tokens: 2 } } })
+		})
+	}
+
+	close(): void {
+		this.readyState = 3
+	}
+
+	message(event: any): void {
+		this.emit('message', { data: JSON.stringify(event) })
+	}
+
+	emit(name: string, event: any): void {
+		for (const cb of this.listeners.get(name) ?? []) cb(event)
+	}
+}
+
+test('openai websocket transport uses wss endpoint and response.create', async () => {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
+	FakeWebSocket.instances = []
+	globalThis.WebSocket = FakeWebSocket as any
+	const token = makeJwt({
+		scp: ['openid'],
+		'https://api.openai.com/auth': { chatgpt_account_id: 'acct_ws' },
+	})
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: token, type: 'token' })
+	auth.getEntry = () => ({})
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.5',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_ws',
+	})) events.push(event)
+
+	expect(FakeWebSocket.instances).toHaveLength(1)
+	const ws = FakeWebSocket.instances[0]!
+	expect(ws.url).toBe('wss://chatgpt.com/backend-api/codex/responses')
+	expect(ws.options.headers['chatgpt-account-id']).toBe('acct_ws')
+	expect(ws.sent[0]).toMatchObject({ type: 'response.create', model: 'gpt-5.5', store: false, instructions: 'system' })
+	expect(ws.sent[0].stream).toBeUndefined()
+	expect(events).toContainEqual({ type: 'text', text: 'text1' })
+	expect(events).toContainEqual({ type: 'done', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } })
+})
+
+test('openai websocket continuation sends previous_response_id and only new tool output', async () => {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
+	FakeWebSocket.instances = []
+	globalThis.WebSocket = FakeWebSocket as any
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+	const firstMessages: any[] = [{ role: 'user', content: 'hi' }]
+	const secondMessages: any[] = [
+		...firstMessages,
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'bash', input: { command: 'echo hi' } }] },
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call_1', content: 'hi' }] },
+	]
+
+	for await (const _ of openaiProvider.generate({ messages: firstMessages, model: 'gpt-5.5', systemPrompt: 'system', tools: [], sessionId: 'sid_chain' })) {}
+	for await (const _ of openaiProvider.generate({ messages: secondMessages, model: 'gpt-5.5', systemPrompt: 'system', tools: [], sessionId: 'sid_chain' })) {}
+
+	expect(FakeWebSocket.instances).toHaveLength(1)
+	const sent = FakeWebSocket.instances[0]!.sent
+	expect(sent).toHaveLength(2)
+	expect(sent[1].previous_response_id).toBe('resp_1')
+	expect(sent[1].input).toEqual([{ type: 'function_call_output', call_id: 'call_1', output: 'hi' }])
 })
