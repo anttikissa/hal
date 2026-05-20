@@ -157,7 +157,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
-		expect(startup?.text).toContain('Tab opened in ~/sync/lippu.')
+		expect(startup?.text).toContain('Session opened in ~/sync/lippu.')
 		expect(startup?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
 		expect(startup?.text).toContain('1% used on 5h quota, resetting at ')
 		expect(startup?.text).toMatch(/\(in 1 hour\)|\(in 60 minutes\)/)
@@ -181,7 +181,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
-		expect(startup?.text).toContain('Tab opened in /tmp/s1.')
+		expect(startup?.text).toContain('Session opened in /tmp/s1.')
 		expect(startup?.text).toContain('Joined server')
 		expect(startup?.text).toContain('replay')
 	})

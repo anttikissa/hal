@@ -109,7 +109,7 @@ describe("tabs", () => {
 		expect(ids).toHaveLength(2)
 		expect(out).toContain(`[1 .hal ${ids[0]!}]`)
 		expect(out).toContain(`2 .hal ${ids[1]!}`)
-		expect(out).toContain('Tab opened in ')
+		expect(out).toContain('Session opened in ')
 	})
 
 	test("ctrl-t inherits the current tab model", async () => {
