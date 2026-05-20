@@ -68,6 +68,7 @@ function text(tab: any, opts: any): string {
 	const quotaLine = startupQuotaLine(model)
 	if (quotaLine) lines.push('', quotaLine)
 	if (opts.showPerf) lines.push('', startupPerfText(opts))
+	lines.push('', 'Type `/help` for commands, `/keys` for keyboard shortcuts.')
 	return lines.join('\n')
 }
 

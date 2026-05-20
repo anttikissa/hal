@@ -161,6 +161,7 @@ describe('client startup', () => {
 		expect(startup?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
 		expect(startup?.text).toContain('1% used on 5h quota, resetting at ')
 		expect(startup?.text).toMatch(/\(in 1 hour\)|\(in 60 minutes\)/)
+		expect(startup?.text).toContain('Type `/help` for commands, `/keys` for keyboard shortcuts.')
 		expect(startup?.text).not.toContain('Server started')
 		expect(startup?.text).not.toContain('replay')
 	})
