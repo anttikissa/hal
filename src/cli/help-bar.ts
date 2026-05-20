@@ -35,7 +35,6 @@ const HINTS: Record<HelpState, Hint[]> = {
 		{ keyLabel: 'ctrl+t', description: 'new', keys: ['ctrl-t'] },
 		{ keyLabel: 'ctrl+n/p', description: 'switch', keys: ['ctrl-n', 'ctrl-p'] },
 		{ keyLabel: 'ctrl+f', description: 'fork', keys: ['ctrl-f'] },
-		{ keyLabel: '/', description: 'commands', keys: ['/'] },
 		{ keyLabel: 'ctrl+c', description: 'quit', keys: ['ctrl-c'] },
 		{ keyLabel: 'ctrl+z', description: 'suspend', keys: ['ctrl-z'] },
 	],

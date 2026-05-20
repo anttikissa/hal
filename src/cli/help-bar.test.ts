@@ -6,6 +6,13 @@ test('continuable state takes precedence over stale busy state', () => {
 	expect(helpBar.deriveState(true, false, 'continue')).toBe('idle-continue')
 })
 
+test('idle empty hints do not list slash as a keyboard shortcut', () => {
+	const text = helpBar.build(false, false)
+
+	expect(text).toContain('ctrl+t: new')
+	expect(text).not.toContain('/: commands')
+})
+
 
 test('text entry hints show send newline and queue together', () => {
 	const text = helpBar.build(false, true)
