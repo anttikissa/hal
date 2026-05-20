@@ -379,9 +379,10 @@ handlers['model'] = (args, session) => {
 	const oldModel = session.model ?? models.defaultModel()
 	const newModel = models.resolveModel(args)
 	session.model = newModel
-	const display = models.displayModel(newModel)
+	const oldDisplay = models.displayModel(oldModel)
+	const newDisplay = models.displayModel(newModel)
 	return {
-		output: `Model set to ${display} (${newModel})`,
+		output: `Model changed from ${oldDisplay} (${oldModel}) to ${newDisplay} (${newModel})`,
 		meta: [`model changed from ${oldModel} to ${newModel}`],
 		ui: 'notice',
 		handled: true,
