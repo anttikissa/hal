@@ -12,25 +12,40 @@ function clock(date: Date): string {
 	return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
+function monthName(date: Date): string {
+	return MONTHS[date.getMonth()] ?? ''
+}
+
+function monthDay(date: Date): string {
+	return `${date.getDate()} ${monthName(date)}`
+}
+
+function monthDayClock(date: Date): string {
+	return `${monthDay(date)} ${clock(date)}`
+}
+
 function sameLocalDay(a: Date, b: Date): boolean {
 	return a.getFullYear() === b.getFullYear()
 		&& a.getMonth() === b.getMonth()
 		&& a.getDate() === b.getDate()
 }
 
-function monthName(date: Date): string {
-	return MONTHS[date.getMonth()] ?? ''
+function parsedDate(ts?: string): Date | null {
+	if (!ts) return null
+	const date = new Date(ts)
+	if (isNaN(date.getTime())) return null
+	return date
+}
+
+function unit(value: number, word: string): string {
+	return `${value} ${word}${value === 1 ? '' : 's'}`
 }
 
 function formatTimestamp(ts?: number, now = Date.now()): string {
 	if (!ts) return ''
 	const date = new Date(ts)
 	if (sameLocalDay(date, new Date(now))) return clock(date)
-	return `${date.getDate()} ${monthName(date)} ${clock(date)}`
-}
-
-function formatDatedTimestamp(date: Date): string {
-	return `${date.getDate()} ${monthName(date)} ${clock(date)}`
+	return monthDayClock(date)
 }
 
 function formatTimestampRange(first?: number, last?: number, now = Date.now()): string {
@@ -38,7 +53,7 @@ function formatTimestampRange(first?: number, last?: number, now = Date.now()): 
 	const end = last ? new Date(last) : null
 	if (!start) return ''
 	if (!end || first === last) return formatTimestamp(first, now)
-	if (!sameLocalDay(start, end)) return `${formatDatedTimestamp(start)} - ${formatDatedTimestamp(end)}`
+	if (!sameLocalDay(start, end)) return `${monthDayClock(start)} - ${monthDayClock(end)}`
 	const startText = formatTimestamp(first, now)
 	const endText = clock(end)
 	if (startText === endText) return startText
@@ -47,22 +62,12 @@ function formatTimestampRange(first?: number, last?: number, now = Date.now()): 
 
 function formatDateTime(ts: number): string {
 	const date = new Date(ts)
-	return `${date.getDate()} ${monthName(date)} ${date.getFullYear()}, ${clock(date)}`
+	return `${monthDay(date)} ${date.getFullYear()}, ${clock(date)}`
 }
 
 function formatLocalDateTime(ts?: string): string | null {
-	if (!ts) return null
-	try {
-		const date = new Date(ts)
-		if (isNaN(date.getTime())) return null
-		return `${date.getDate()} ${monthName(date)} ${clock(date)}`
-	} catch {
-		return null
-	}
-}
-
-function unit(value: number, word: string): string {
-	return `${value} ${word}${value === 1 ? '' : 's'}`
+	const date = parsedDate(ts)
+	return date ? monthDayClock(date) : null
 }
 
 function formatAge(ms: number): string {
@@ -91,7 +96,7 @@ function formatResetAt(resetAtMs: number, now = new Date()): string {
 	const date = new Date(resetAtMs)
 	const text = clock(date)
 	if (sameLocalDay(date, now)) return text
-	return `${text} on ${date.getDate()} ${monthName(date)}`
+	return `${text} on ${monthDay(date)}`
 }
 
 function formatSystemDate(date = new Date()): string {
@@ -105,18 +110,12 @@ function formatQuotaWindow(minutes: number): string {
 	return `${minutes}m`
 }
 
-function decimal(value: number): string {
-	const rounded = Math.round(value * 10) / 10
-	if (Number.isInteger(rounded)) return String(rounded)
-	return rounded.toFixed(1)
-}
-
 function formatFutureDistance(targetMs: number, nowMs = Date.now()): string {
 	const ms = Math.max(0, targetMs - nowMs)
 	if (ms < MINUTE_MS) return 'real soon now'
 	if (ms < HOUR_MS) return `in ${unit(Math.max(1, Math.round(ms / MINUTE_MS)), 'minute')}`
 	const hours = Math.max(1, Math.round((ms / HOUR_MS) * 10) / 10)
-	return `in ${decimal(hours)} ${hours === 1 ? 'hour' : 'hours'}`
+	return `in ${hours} ${hours === 1 ? 'hour' : 'hours'}`
 }
 
 export const time = {
