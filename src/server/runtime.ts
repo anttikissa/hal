@@ -307,10 +307,11 @@ function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: 
 function suggestAliasUpdates(previous: Record<string, number>, next: Record<string, number>): void {
 	const updates = models.aliasUpdateSuggestions(previous, next)
 	if (updates.length === 0) return
-	for (const meta of activeMetas()) {
-		const model = meta.model ?? models.defaultModel()
-		emitSyntheticAssistant(meta.id, buildAliasUpdateSuggestionText(updates, meta.workingDir ?? process.cwd()), 'alias-update-suggestion', model)
-	}
+	const metas = activeMetas()
+	const meta = metas.find((item) => item.workingDir === HAL_DIR) ?? metas[0]
+	if (!meta) return
+	const model = meta.model ?? models.defaultModel()
+	emitSyntheticAssistant(meta.id, buildAliasUpdateSuggestionText(updates, meta.workingDir ?? process.cwd()), 'alias-update-suggestion', model)
 }
 
 async function refreshModelMetadata(): Promise<void> {
@@ -748,4 +749,5 @@ export const runtime = {
 	refreshModelMetadata,
 	formatModelRefreshMessage,
 	buildAliasUpdateSuggestionText,
+	suggestAliasUpdates,
 }

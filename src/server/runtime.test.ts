@@ -174,6 +174,47 @@ test('buildAliasUpdateSuggestionText mentions config mapping and subagent only o
 })
 
 
+test('suggestAliasUpdates emits one synthetic notice, preferring an open ~/.hal tab', () => {
+	const origActiveSessions = [...runtime.state.activeSessions]
+	const origAliasUpdateSuggestions = models.aliasUpdateSuggestions
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendEvent = ipc.appendEvent
+	const histories: any[] = []
+	const events: any[] = []
+
+	runtime.state.activeSessions = ['04-work', '04-hal', '04-other']
+	models.aliasUpdateSuggestions = () => [
+		{ aliases: ['gemini'], oldModel: 'google/gemini-3-flash-preview', newModel: 'google/gemini-3.5-flash' },
+	]
+	sessions.loadSessionMeta = (sessionId: string) => {
+		const cwd = sessionId === '04-hal' ? HAL_DIR : '/work/project'
+		return { id: sessionId, createdAt: '2026-05-20T10:00:00.000Z', workingDir: cwd, model: 'openai/gpt-5.5' }
+	}
+	sessions.appendHistorySync = (sessionId: string, entries: any[]) => {
+		histories.push({ sessionId, entries })
+	}
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		runtime.suggestAliasUpdates({}, {})
+		expect(histories).toHaveLength(1)
+		expect(events).toHaveLength(1)
+		expect(histories[0].sessionId).toBe('04-hal')
+		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-hal', synthetic: true })
+		expect(events[0].text).toContain('update those aliases in ~/.hal')
+	} finally {
+		runtime.state.activeSessions = origActiveSessions
+		models.aliasUpdateSuggestions = origAliasUpdateSuggestions
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.appendHistorySync = origAppendHistorySync
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
 test('resolveResumeTarget matches a closed session by name case-insensitively', () => {
 	const picked = sessions.resolveResumeTarget(
 		[
