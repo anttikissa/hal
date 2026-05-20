@@ -259,37 +259,6 @@ function stripRedundantCd(command: string, cwd: string | undefined): string {
 	return bash.stripCdCwd(command, cwd) ?? command
 }
 
-function shellQuotedValue(text: string, start: number): string | null {
-	const quote = text[start]
-	if (quote !== '"' && quote !== "'") return null
-	let value = ''
-	for (let i = start + 1; i < text.length; i++) {
-		const ch = text[i]!
-		if (ch === quote) return value
-		if (ch === '\\' && quote === '"' && i + 1 < text.length) {
-			value += text[++i]!
-			continue
-		}
-		value += ch
-	}
-	return null
-}
-
-function commitMessageFromBash(command: string): string | null {
-	const marker = command.match(/\bgit\s+commit\b/)
-	if (!marker) return null
-	for (let i = marker.index ?? 0; i < command.length; i++) {
-		if (command[i] !== '-' || command[i + 1] !== 'm') continue
-		const before = command[i - 1] ?? ' '
-		const after = command[i + 2] ?? ' '
-		if (!/\s/.test(before) || (after && !/\s/.test(after))) continue
-		let valueStart = i + 2
-		while (/\s/.test(command[valueStart] ?? '')) valueStart++
-		const quoted = shellQuotedValue(command, valueStart)
-		if (quoted) return quoted
-	}
-	return null
-}
 
 function commitSubject(message: string): string {
 	return message.split('\n').find((line) => line.trim())?.trim() ?? 'commit'
@@ -317,6 +286,7 @@ interface CommitFileStat {
 interface CommitMetadata {
 	branch: string
 	hash: string
+	message?: string
 	summary: string
 	files: CommitFileStat[]
 	locDelta?: number
@@ -328,9 +298,9 @@ interface CommitMetadata {
 interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: string; suppressOutput?: boolean }
 type ToolSpec = {
 	title?: (input?: any, output?: string) => string
-	command?: (input?: any) => string | undefined
+	command?: (input?: any, output?: string) => string | undefined
 	details?: (input?: any) => string | undefined
-	shellContinuations?: (input?: any) => boolean
+	shellContinuations?: (input?: any, output?: string) => boolean
 	format?: (output: string, cols: number, input?: any) => ToolFormatResult
 }
 
@@ -403,8 +373,8 @@ function parseCommitMetadata(output: string): CommitMetadata | null {
 	}
 }
 
-function commitHashFromOutput(output?: string): string | null {
-	return output ? parseCommitMetadata(output)?.hash ?? null : null
+function commitMetadataFromOutput(output?: string): CommitMetadata | null {
+	return output ? parseCommitMetadata(output) : null
 }
 
 function signed(n: number): string {
@@ -422,11 +392,9 @@ function fileStatLine(file: CommitFileStat): string {
 	return `${prefix} ${file.path}${loc}`
 }
 
-function formatCommitOutput(output: string, cols: number, input?: any): ToolFormatResult {
-	const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
-	if (!commitMessageFromBash(cmd)) return { bodyLines: [] }
+function formatCommitOutput(output: string, _cols: number): ToolFormatResult {
 	const meta = parseCommitMetadata(output)
-	if (!meta) return { bodyLines: [], suppressOutput: true }
+	if (!meta) return { bodyLines: [] }
 	const lines = [`${meta.branch} ${meta.hash} · ${meta.summary}`]
 	const other = meta.files.filter((file) => !file.isCode)
 	const code = meta.files.filter((file) => file.isCode)
@@ -454,23 +422,19 @@ function quoteToolArg(value: unknown): string {
 const toolSpecs: Record<string, ToolSpec> = {
 	bash: {
 		title(input, output) {
+			const meta = commitMetadataFromOutput(output)
+			if (meta) return `Commit ${meta.hash}: ${commitSubject(meta.message ?? 'commit')}`
 			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
-			const message = commitMessageFromBash(cmd)
-			if (message) {
-				const hash = commitHashFromOutput(output)
-				return `Commit${hash ? ` ${hash}` : ''}: ${commitSubject(message)}`
-			}
 			return !cmd.includes('\n') && cmd.length <= 60 ? `Bash: ${cmd}` : 'Bash'
 		},
-		command(input) {
+		command(input, output) {
+			const meta = commitMetadataFromOutput(output)
+			if (meta?.message) return formatCommitMessageBody(meta.message)
 			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
-			const message = commitMessageFromBash(cmd)
-			if (message) return formatCommitMessageBody(message)
 			return !cmd.includes('\n') && cmd.length <= 60 ? undefined : cmd
 		},
-		shellContinuations(input) {
-			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
-			return !commitMessageFromBash(cmd)
+		shellContinuations(_input, output) {
+			return !commitMetadataFromOutput(output)
 		},
 		format: formatCommitOutput,
 	},
@@ -562,8 +526,8 @@ function blockContent(block: Block, cols: number): string[] {
 	if (block.type === 'tool') {
 		const lines: string[] = []
 		const spec = getToolSpec(block.name)
-		const command = spec.command?.(block.input)
-		if (command) lines.push(...formatToolCommand(command, cols, spec.shellContinuations?.(block.input) ?? block.name === 'bash'))
+		const command = spec.command?.(block.input, block.output)
+		if (command) lines.push(...formatToolCommand(command, cols, spec.shellContinuations?.(block.input, block.output) ?? block.name === 'bash'))
 		const details = spec.details?.(block.input)
 		if (details) pushDimWrapped(lines, details, cols)
 		if (!block.output) return lines

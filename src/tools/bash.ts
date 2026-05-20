@@ -37,6 +37,7 @@ interface CommitFileStat {
 interface CommitMetadata {
 	branch: string
 	hash: string
+	message: string
 	summary: string
 	files: CommitFileStat[]
 	locDelta: number
@@ -147,6 +148,7 @@ function commitMetadata(cwd: string): CommitMetadata | null {
 	const hash = runGit(cwd, ['show', '-s', '--format=%h', 'HEAD'])
 	if (!hash) return null
 	const branch = runGit(cwd, ['branch', '--show-current']) || 'HEAD'
+	const message = runGit(cwd, ['show', '-s', '--format=%B', 'HEAD'])
 	const files = changedFiles(cwd)
 	let locDelta = 0
 	let locDeltaCode = 0
@@ -154,7 +156,7 @@ function commitMetadata(cwd: string): CommitMetadata | null {
 		locDelta += file.locDelta
 		if (file.isCode) locDeltaCode += file.locDelta
 	}
-	return { branch, hash, summary: commitSummary(files), files, locDelta, locDeltaCode }
+	return { branch, hash, message, summary: commitSummary(files), files, locDelta, locDeltaCode }
 }
 
 function appendCommitMetadata(out: string, command: string, cwd: string, code: number): string {

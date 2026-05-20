@@ -40,6 +40,7 @@ test('bash appends structured metadata for successful git commits', async () => 
 		)
 
 		expect(out).toContain('[hal-commit]')
+		expect(out).toContain("message: 'add a'")
 		expect(out).toContain('summary: \'1 file changed, 2 insertions(+)\'')
 		expect(out).toContain("path: 'a.ts'")
 		expect(out).toContain('locDelta: 1')
