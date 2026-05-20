@@ -478,6 +478,23 @@ function listModelChoices(): Array<{ value: string; label: string; search: strin
 	return items
 }
 
+function modelCompletionNames(): string[] {
+	const names = new Set<string>()
+	for (const group of MODEL_GROUPS) {
+		for (const model of group.models) {
+			names.add(model.alias)
+			names.add(model.fullId)
+			const slash = model.fullId.indexOf('/')
+			if (slash >= 0) names.add(model.fullId.slice(slash + 1))
+			const anthropic = model.fullId.match(/^anthropic\/claude-(opus|sonnet|haiku)-(.+)$/)
+			if (anthropic) names.add(`${anthropic[1]}-${anthropic[2]}`)
+			const grok = model.fullId.match(/^openrouter\/x-ai\/grok-(.+)$/)
+			if (grok) names.add(`grok-${grok[1]}`)
+		}
+	}
+	return [...names].sort()
+}
+
 // ── Token estimation ──
 // Rough estimate: ~4 chars per token for English text.
 // This is only for UI display — real token counts come from provider responses.
@@ -514,6 +531,7 @@ export const models = {
 	defaultModel,
 	listModels,
 	listModelChoices,
+	modelCompletionNames,
 	estimateTokens,
 	refreshModels,
 	modelChangeMessages,

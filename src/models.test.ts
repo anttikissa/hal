@@ -72,6 +72,14 @@ test('model picker lists updated frontier aliases', () => {
 })
 
 
+test('model completions include aliases, full ids, and bare ids', () => {
+	expect(models.modelCompletionNames()).toContain('gemini')
+	expect(models.modelCompletionNames()).toContain('google/gemini-3.5-flash')
+	expect(models.modelCompletionNames()).toContain('gemini-3.5-flash')
+	expect(models.modelCompletionNames()).toContain('sonnet-4-6')
+})
+
+
 test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 	expect(models.aliasUpdateSuggestions(
 		{

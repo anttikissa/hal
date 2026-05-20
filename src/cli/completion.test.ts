@@ -42,6 +42,18 @@ test('/model completes model arguments like opus without crashing', () => {
 })
 
 
+test('/model completes current model aliases and bare model ids', () => {
+	const alias = completion.complete('/model gemini', '/model gemini'.length)
+	const bare = completion.complete('/model gemini-3.5-f', '/model gemini-3.5-f'.length)
+
+	expect(alias).not.toBeNull()
+	expect(alias!.items).toContain('/model gemini')
+	expect(alias!.items).toContain('/model gemini-3.5-flash')
+	expect(bare).not.toBeNull()
+	expect(bare!.items).toContain('/model gemini-3.5-flash')
+})
+
+
 test('/config completes module names', () => {
 	const result = completion.complete('/config mod', '/config mod'.length)
 

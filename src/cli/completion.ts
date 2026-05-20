@@ -5,6 +5,7 @@ import { readdirSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { config as runtimeConfig } from '../config.ts'
 import { commands } from '../runtime/commands.ts'
+import { models } from '../models.ts'
 
 export interface CompletionResult {
 	items: string[]
@@ -14,18 +15,7 @@ export interface CompletionResult {
 
 
 const config = {
-	modelNames: [
-		'sonnet',
-		'opus',
-		'haiku',
-		'claude-sonnet-4-20250514',
-		'claude-opus-4-20250514',
-		'gpt-4o',
-		'gpt-4.1',
-		'o3',
-		'o4-mini',
-		'gemini-2.5-pro',
-	] as string[],
+	modelNames: [] as string[],
 }
 
 const state = {
@@ -100,6 +90,10 @@ function completeDirs(argPrefix: string, cwd: string): string[] {
 	return matching.map((dir) => base + dir + '/')
 }
 
+function modelNames(): string[] {
+	return [...new Set([...config.modelNames, ...models.modelCompletionNames()])].sort()
+}
+
 
 function complete(text: string, cursor: number, cwd = process.cwd()): CompletionResult | null {
 	if (cursor < 0 || cursor > text.length) cursor = text.length
@@ -131,7 +125,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	let values: string[] = []
 
 	if (arg === 'model') {
-		values = config.modelNames.filter((model) => model.startsWith(argPrefix))
+		values = modelNames().filter((model) => model.startsWith(argPrefix))
 	} else if (arg === 'dir') {
 		values = completeDirs(argPrefix, cwd)
 	} else if (arg === 'command') {
