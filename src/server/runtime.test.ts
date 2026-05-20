@@ -157,16 +157,30 @@ test('enqueuePrompt stores prompts while session is busy', async () => {
 })
 
 
-test('queue paused notice includes count preview and queue hint', () => {
+test('queue paused notice includes truncated preview and queue hint', () => {
 	const text = runtime.buildQueuePausedNotice([
 		{ text: 'first line\nsecond line', createdAt: '2026-05-20T00:00:00.000Z' },
 		{ text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' },
 	])
 
-	expect(text).toContain('Paused. 2 queued prompts are waiting.')
-	expect(text).toContain('Next: first line...')
-	expect(text).toContain('/queue')
-	expect(text).toContain('Ctrl-Q')
+	expect(text).toBe('Paused. 2 queued prompts are waiting. Next: first line... **ctrl-q** to run queued prompts, `/queue` to show them, `/queue clear` to discard.')
+})
+
+test('queue paused notice omits show hint when preview is complete', () => {
+	const text = runtime.buildQueuePausedNotice([
+		{ text: 'short prompt', createdAt: '2026-05-20T00:00:00.000Z' },
+		{ text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' },
+	])
+
+	expect(text).toBe('Paused. 2 queued prompts are waiting. Next: short prompt. **ctrl-q** to run queued prompts, `/queue clear` to discard.')
+})
+
+test('queue paused notice uses singular pronouns for one prompt', () => {
+	const text = runtime.buildQueuePausedNotice([
+		{ text: 'first line\nsecond line', createdAt: '2026-05-20T00:00:00.000Z' },
+	])
+
+	expect(text).toBe('Paused. 1 queued prompt is waiting. Next: first line... **ctrl-q** to run the queued prompt, `/queue` to show it, `/queue clear` to discard it.')
 })
 
 test('held queue does not drain after unrelated completed prompt', () => {

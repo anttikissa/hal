@@ -350,11 +350,15 @@ function buildSessionState(meta: SessionMeta): SessionState {
 	}
 }
 
-function queuePreview(text: string, max = 80): string {
+function queuePreviewResult(text: string, max = 80): { text: string; truncated: boolean } {
 	let first = text.split('\n')[0]!.trim()
 	const truncated = text.includes('\n') || first.length > max
 	if (first.length > max) first = first.slice(0, Math.max(0, max - 3)).trimEnd()
-	return truncated ? `${first}...` : first
+	return { text: truncated ? `${first}...` : first, truncated }
+}
+
+function queuePreview(text: string, max = 80): string {
+	return queuePreviewResult(text, max).text
 }
 
 function queueEntry(text: string, source?: string, displayText?: string): QueuedPrompt {
@@ -379,8 +383,12 @@ async function enqueuePrompt(sessionId: string, text: string, source?: string, d
 function buildQueuePausedNotice(entries: QueuedPrompt[]): string {
 	const count = entries.length
 	const noun = count === 1 ? 'prompt is' : 'prompts are'
-	const next = entries[0] ? ` Next: ${queuePreview(entries[0].text, 50)}` : ''
-	return `Paused. ${count} queued ${noun} waiting.${next} Press Ctrl-Q to run queued prompts, /queue to list them, or /queue clear to discard them.`
+	const preview = entries[0] ? queuePreviewResult(entries[0].text, 50) : undefined
+	const next = preview ? ` Next: ${preview.text}${preview.truncated ? '' : '.'}` : ''
+	const run = count === 1 ? 'run the queued prompt' : 'run queued prompts'
+	const discard = count === 1 ? '`/queue clear` to discard it' : '`/queue clear` to discard'
+	const show = preview?.truncated ? `, \`/queue\` to show ${count === 1 ? 'it' : 'them'}` : ''
+	return `Paused. ${count} queued ${noun} waiting.${next} **ctrl-q** to ${run}${show}, ${discard}.`
 }
 
 function emitQueuePausedNotice(sessionId: string): void {
