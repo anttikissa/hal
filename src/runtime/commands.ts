@@ -98,6 +98,11 @@ interface CommandSpec {
 	arg?: CommandArg
 }
 
+interface CommandSection {
+	title: string
+	names: string[]
+}
+
 const handlers: Record<string, CommandHandler> = {}
 
 function normalizeSessionName(text: string): string {
@@ -333,10 +338,46 @@ const commandSpecs: Record<string, CommandSpec> = {
 	exit: { summary: 'Quit Hal.' },
 }
 
+const commandSections: CommandSection[] = [
+	{ title: 'Common', names: ['exit', 'help', 'model', 'status'] },
+	{ title: 'Conversation', names: ['clear', 'compact', 'system'] },
+	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
+	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
+	{ title: 'Setup & diagnostics', names: ['cd', 'config', 'login', 'mem'] },
+]
+
 function helpUsage(name: string): string {
 	const spec = commandSpecs[name]
 	if (!spec?.usage) return `/${name}`
 	return `/${name} ${spec.usage}`
+}
+
+function sortedCommandNames(names: string[]): string[] {
+	const sorted = [...names]
+	sorted.sort()
+	return sorted
+}
+
+function helpCommandLine(name: string, width: number): string {
+	return `  ${helpUsage(name).padEnd(width)}  ${commandSpecs[name]!.summary}`
+}
+
+function commandListHelp(): string {
+	let width = 0
+	for (const section of commandSections) {
+		for (const name of section.names) {
+			width = Math.max(width, helpUsage(name).length)
+		}
+	}
+
+	const lines = ['Available commands:']
+	for (const section of commandSections) {
+		lines.push('', `${section.title}:`)
+		for (const name of sortedCommandNames(section.names)) {
+			lines.push(helpCommandLine(name, width))
+		}
+	}
+	return lines.join('\n')
 }
 
 function detailedHelp(topic: string): string | null {
@@ -356,10 +397,7 @@ handlers['help'] = (args) => {
 		if (!text) return { error: `No detailed help for /${topic}. Try /help.`, handled: true }
 		return { output: text, handled: true }
 	}
-	const names = Object.keys(commandSpecs)
-	const width = Math.max(...names.map((name) => helpUsage(name).length))
-	const lines = ['Available commands:', ...names.map((name) => `  ${helpUsage(name).padEnd(width)}  ${commandSpecs[name]!.summary}`)]
-	return { output: lines.join('\n'), handled: true }
+	return { output: commandListHelp(), handled: true }
 }
 
 // /model [name] — switch model or show current + list

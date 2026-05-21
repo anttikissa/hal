@@ -480,6 +480,42 @@ test('/keys is not listed as a runtime command', async () => {
 	expect(result.error).toContain('Unknown command: /keys')
 })
 
+test('/help groups commands thematically and alphabetically within each section', async () => {
+	const result = await commands.executeCommand('/help', makeSession())
+	const output = result.output || ''
+
+	expect(output).toContain('Common:')
+	expect(output).toContain('Conversation:')
+	expect(output).toContain('Tabs & sessions:')
+	expect(output).toContain('Messaging & queue:')
+	expect(output).toContain('Setup & diagnostics:')
+
+	const common = output.indexOf('Common:')
+	const conversation = output.indexOf('Conversation:')
+	const tabs = output.indexOf('Tabs & sessions:')
+	const messaging = output.indexOf('Messaging & queue:')
+	const setup = output.indexOf('Setup & diagnostics:')
+	expect(common).toBeGreaterThan(output.indexOf('Available commands:'))
+	expect(conversation).toBeGreaterThan(common)
+	expect(tabs).toBeGreaterThan(conversation)
+	expect(messaging).toBeGreaterThan(tabs)
+	expect(setup).toBeGreaterThan(messaging)
+
+	expect(output.indexOf('/exit')).toBeLessThan(output.indexOf('/help [cmd]'))
+	expect(output.indexOf('/help [cmd]')).toBeLessThan(output.indexOf('/model [name]'))
+	expect(output.indexOf('/model [name]')).toBeLessThan(output.indexOf('/status'))
+	expect(output.indexOf('/fork')).toBeLessThan(output.indexOf('/move <position>'))
+	expect(output.indexOf('/broadcast <message>')).toBeLessThan(output.indexOf('/queue [prompt|next|clear]'))
+	expect(output.indexOf('/queue [prompt|next|clear]')).toBeLessThan(output.indexOf('/send <tab|session-id|name> <message>'))
+
+	const listed = new Set<string>()
+	for (const line of output.split('\n')) {
+		const match = line.match(/^  \/(\S+)/)
+		if (match) listed.add(match[1]!)
+	}
+	expect([...listed].sort()).toEqual(commands.commandNames().sort())
+})
+
 test('/help config shows config caveats and syntax', async () => {
 	const result = await commands.executeCommand('/help config', makeSession())
 
