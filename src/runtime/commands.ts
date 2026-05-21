@@ -428,7 +428,7 @@ handlers['clear'] = (_args, session) => {
 		type: 'reset',
 		sessionId: session.id,
 	})
-	return { output: 'Conversation cleared.', handled: true }
+	return { handled: true }
 }
 
 // /fork — fork current session to new tab

@@ -276,7 +276,7 @@ test('/clear queues a reset command', async () => {
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
-	expect(result.output).toBe('Conversation cleared.')
+	expect(result.output).toBeUndefined()
 	expect(appended).toEqual([{ type: 'reset', sessionId: '04-aaa' }])
 })
 
