@@ -7,7 +7,6 @@ import { cursor } from '../cli/cursor.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
-import { helpBar } from '../cli/help-bar.ts'
 import { keyHelp } from '../cli/key-help.ts'
 import { popup } from './popup.ts'
 import { blocks } from '../cli/blocks.ts'
@@ -336,16 +335,6 @@ function handleCompletionKey(k: KeyEvent): boolean {
 	return false
 }
 
-// Canonical key name for help bar usage tracking
-function canonicalKeyName(k: KeyEvent): string {
-	const parts: string[] = []
-	if (k.ctrl) parts.push('ctrl')
-	if (k.alt) parts.push('alt')
-	if (k.shift) parts.push('shift')
-	if (k.cmd) parts.push('cmd')
-	parts.push(k.key || k.char || '?')
-	return parts.join('-')
-}
 
 function sendTabCommandIfRoom(type: 'open' | 'resume', text?: string): void {
 	const maxTabs = startup.config.maxTabs
@@ -543,10 +532,6 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 		// may still deliver Buffers, so coerce defensively.
 		const text = typeof data === 'string' ? data : data.toString('utf-8')
 		for (const k of keys.parseKeys(text)) {
-			// Track key usage for help bar
-			if (k.ctrl || k.alt || k.cmd || k.key === 'enter' || k.key === 'escape' || k.key === 'tab') {
-				helpBar.logKey(canonicalKeyName(k))
-			}
 			// Popup keys first — an active modal owns the keyboard.
 			if (popup.state.active && popup.handleKey(k)) {
 				openaiUsage.noteActivity()

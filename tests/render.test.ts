@@ -5,7 +5,6 @@ import { client } from '../src/client.ts'
 import { prompt } from '../src/cli/prompt.ts'
 import { cursor } from '../src/cli/cursor.ts'
 import { popup } from '../src/client/popup.ts'
-import { helpBar } from '../src/cli/help-bar.ts'
 import { openaiUsage } from '../src/openai-usage.ts'
 import { colors } from '../src/cli/colors.ts'
 import { version } from '../src/version.ts'
@@ -40,7 +39,6 @@ beforeEach(() => {
 	client.state.activity = new Map()
 	client.state.toolConfirmPending = new Set()
 	prompt.clear()
-	helpBar.reset()
 	popup.close()
 	Object.assign(renderStatus.config, {
 		showSession: true,
@@ -183,49 +181,41 @@ describe('render', () => {
 		expect(clean).toContain('[paused]')
 	})
 
-	test('help bar teaches enter: continue on paused tabs with empty prompt', () => {
+	test('help bar says press enter to continue on paused tabs with empty prompt', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: continue')
-		expect(clean).not.toContain('press enter')
+		expect(clean).toContain('press enter to continue')
+		expect(clean).not.toContain('enter: continue')
 		expect(clean).not.toContain('ctrl-t new')
 	})
 
-	test('help bar teaches enter: retry after errors', () => {
+	test('help bar says press enter to retry after errors', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: retry')
-		expect(clean).not.toContain('enter: continue')
+		expect(clean).toContain('press enter to retry')
+		expect(clean).not.toContain('press enter to continue')
 	})
 
-	test('help bar hides enter: retry once retry is in progress', () => {
-		// Reproduces the bug where the help bar kept showing "enter: retry"
-		// while a retry was already running new tool calls.
+	test('help bar hides retry once retry is in progress', () => {
+		// Reproduces the bug where the help bar kept showing retry while a retry
+		// was already running new tool calls.
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
 		tab.history.push({ type: 'tool', toolId: 't1', name: 'read', input: {}, ts: Date.now() })
 		client.state.busy.set(tab.sessionId, true)
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).not.toContain('enter: retry')
+		expect(clean).not.toContain('press enter to retry')
 		client.state.busy.clear()
 	})
 
-	test('help bar teaches enter: continue after max iteration stop', () => {
+	test('help bar says press enter to continue after max iteration stop', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'Hit max iterations (50). Stopping.', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: continue')
-		expect(clean).not.toContain('enter: retry')
-	})
-
-	test('continue/retry hint stays visible even after enter is learned', () => {
-		const tab = client.currentTab()!
-		for (let i = 0; i < helpBar.config.learnThreshold; i++) helpBar.logKey('enter')
-		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
-		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: retry')
+		expect(clean).toContain('press enter to continue')
+		expect(clean).not.toContain('press enter to retry')
 	})
 
 	test('continue hint matches enter behavior for whitespace-only prompts', () => {
@@ -233,7 +223,7 @@ describe('render', () => {
 		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
 		prompt.setText('   ')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: continue')
+		expect(clean).toContain('press enter to continue')
 	})
 
 	test('help bar renders keys brighter than descriptions but not bright white', () => {
@@ -649,14 +639,7 @@ describe('render', () => {
 		expect(clean).toContain('sonnet')
 	})
 
-	test('learned idle-text hints still reserve the help-bar row', () => {
-		for (let i = 0; i < helpBar.config.learnThreshold; i++) {
-			helpBar.logKey('enter')
-			helpBar.logKey('shift-enter')
-			helpBar.logKey('tab')
-			helpBar.logKey('ctrl-/')
-		}
-
+	test('text hints still reserve the help-bar row', () => {
 		render.resetRenderer()
 		const empty = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 
