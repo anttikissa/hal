@@ -63,6 +63,65 @@ test('restoredSessionOrder reinserts a resumed tab at its saved position', () =>
 	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 0)).toEqual(['04-left', '04-right', '04-closed'])
 })
 
+test('fork command persists one child notice without duplicating bare session ids', () => {
+	const parentId = '25-parent'
+	const events: any[] = []
+	const history: Record<string, any[]> = {}
+	const metas: Record<string, SessionMeta> = {
+		[parentId]: { id: parentId, workingDir: '/tmp/project', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5' },
+	}
+	const origActiveSessions = [...runtime.state.activeSessions]
+	const origAppendEvent = ipc.appendEvent
+	const origUpdateState = ipc.updateState
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origForkSession = sessions.forkSession
+	const origUpdateMeta = sessions.updateMeta
+	const origAppendHistorySync = sessions.appendHistorySync
+	const origSessionOpenInfo = sessions.sessionOpenInfo
+	const origWatchPromptFiles = context.watchPromptFiles
+
+	try {
+		runtime.state.activeSessions = [parentId]
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		ipc.updateState = () => ({ sessions: [], busy: {}, activity: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
+		context.watchPromptFiles = () => () => {}
+		sessions.loadSessionMeta = (id) => metas[id] ?? null
+		sessions.forkSession = (sourceId, newId) => {
+			const parent = metas[sourceId]!
+			const child = { ...parent, id: newId, createdAt: '2026-05-21T10:01:00.000Z', forkedFrom: sourceId }
+			metas[newId] = child
+			history[newId] = [{ type: 'forked_from', parent: sourceId, ts: child.createdAt }]
+			return child
+		}
+		sessions.updateMeta = (id, patch) => {
+			metas[id] = { ...metas[id]!, ...patch }
+			return metas[id]!
+		}
+		sessions.appendHistorySync = (id, entries) => {
+			history[id] ??= []
+			history[id]!.push(...entries)
+		}
+		sessions.sessionOpenInfo = (meta) => ({ id: meta.id, tab: 1, name: meta.name ?? meta.topic ?? meta.id, cwd: meta.workingDir ?? '', model: meta.model })
+
+		;(runtime as any).handleCommand({ type: 'open', sessionId: parentId, forkSessionId: parentId })
+
+		const childId = runtime.state.activeSessions.find((id) => id !== parentId)!
+		expect(childId).toBeTruthy()
+		expect(events.map((event) => event.text)).toEqual([`Tab forked to ${childId}.`])
+		expect(history[childId]!.filter((entry) => entry.type === 'info').map((entry) => entry.text)).toEqual([`Tab forked from ${parentId}.`])
+	} finally {
+		runtime.state.activeSessions = origActiveSessions
+		ipc.appendEvent = origAppendEvent
+		ipc.updateState = origUpdateState
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.forkSession = origForkSession
+		sessions.updateMeta = origUpdateMeta
+		sessions.appendHistorySync = origAppendHistorySync
+		sessions.sessionOpenInfo = origSessionOpenInfo
+		context.watchPromptFiles = origWatchPromptFiles
+	}
+})
+
 test('shouldAutoContinue resumes unfinished turns after restart notices', () => {
 	const old = '2026-04-14T12:00:00.000Z'
 	const restarted = '2026-04-14T12:01:00.000Z'

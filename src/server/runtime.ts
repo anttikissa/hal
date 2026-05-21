@@ -44,7 +44,9 @@ function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name' | 'topic'>): string 
 }
 
 function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name' | 'topic'>): string {
-	return `${sessionTitle(meta)} (${meta.id})`
+	const title = sessionTitle(meta)
+	if (title === meta.id) return meta.id
+	return `${title} (${meta.id})`
 }
 
 function activeMetas(): SessionMeta[] {
@@ -664,7 +666,6 @@ function handleCommand(cmd: Command): void {
 			if ('forkSessionId' in cmd) {
 				const child = createSessionTab({ sourceId: cmd.forkSessionId, workingDir: cmd.cwd })
 				emitInfo(cmd.forkSessionId, `Tab forked to ${sessionLabel(child)}.`, 'info', 'notice')
-				emitInfo(child.id, `Tab forked from ${cmd.forkSessionId}.`, 'info', 'notice')
 			} else if ('cwd' in cmd && cmd.cwd && cmd.forceNew) {
 				createSessionTab({ openerId: sessionId, afterId: sessionId, workingDir: cmd.cwd })
 			} else if ('afterSessionId' in cmd) {
@@ -866,4 +867,5 @@ export const runtime = {
 	buildQueuePausedNotice,
 	shouldDrainQueuedPrompt,
 	runCompact,
+	handleCommand,
 }
