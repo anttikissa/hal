@@ -472,18 +472,12 @@ test('/move rejects non-numeric positions', async () => {
 	expect(result.error).toContain('Usage: /move <position>')
 })
 
-test('/keys shows keyboard shortcuts using pi-style modifier labels', async () => {
+test('/keys is not listed as a runtime command', async () => {
+	const help = await commands.executeCommand('/help', makeSession())
 	const result = await commands.executeCommand('/keys', makeSession())
-	expect(result.output).toContain('cmd+c')
-	expect(result.output).toContain('cmd+v')
-	expect(result.output).toContain('alt+d')
-	expect(result.output).toContain('ctrl+/')
-	expect(result.output).toContain('alt+enter')
-	expect(result.output).toContain('ctrl+q')
-	expect(result.output).toContain('shift+<movement>')
-	expect(result.output).toContain('selects text')
-	expect(result.output).not.toContain('option')
-	expect(result.output).not.toContain('keyHelp')
+
+	expect(help.output).not.toContain('/keys')
+	expect(result.error).toContain('Unknown command: /keys')
 })
 
 test('/help config shows config caveats and syntax', async () => {

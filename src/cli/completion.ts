@@ -16,6 +16,7 @@ export interface CompletionResult {
 
 const config = {
 	modelNames: [] as string[],
+	localCommandNames: ['keys'],
 }
 
 const state = {
@@ -94,6 +95,10 @@ function modelNames(): string[] {
 	return [...new Set([...config.modelNames, ...models.modelCompletionNames()])].sort()
 }
 
+function commandNamesForPrompt(): string[] {
+	return [...new Set([...commands.commandNames(), ...config.localCommandNames])].sort()
+}
+
 
 function complete(text: string, cursor: number, cwd = process.cwd()): CompletionResult | null {
 	if (cursor < 0 || cursor > text.length) cursor = text.length
@@ -108,7 +113,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 
 	if (parts.length === 0 || (parts.length === 1 && !hasSpace)) {
 		const needle = parts[0] ?? ''
-		const matches = commands.commandNames().filter((name) => name.startsWith(needle))
+		const matches = commandNamesForPrompt().filter((name) => name.startsWith(needle))
 		if (matches.length === 0) return null
 
 		const items = matches.map((name) => `/${name}`)

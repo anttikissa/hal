@@ -233,6 +233,31 @@ test('ctrl-q runs the next queued prompt', () => {
 	}
 })
 
+
+test('/keys is local terminal help and does not send a prompt while busy', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab()
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		client.state.busy.set('s1', true)
+		withOneTab(tab, () => {
+			prompt.setText('/keys')
+			const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+
+			expect(handled).toBe(true)
+			expect(commands).toEqual([])
+			expect(prompt.text()).toBe('')
+			expect(tab.inputHistory).toContain('/keys')
+			expect(tab.history.at(-1)).toMatchObject({ type: 'info', text: expect.stringContaining('cmd+c') })
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.busy.clear()
+	}
+})
+
 test('enter on empty paused tab sends continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

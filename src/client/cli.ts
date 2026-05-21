@@ -8,6 +8,7 @@ import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
 import { helpBar } from '../cli/help-bar.ts'
+import { keyHelp } from '../cli/key-help.ts'
 import { popup } from './popup.ts'
 import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
@@ -317,10 +318,20 @@ function submitPromptText(text: string, displayText: string | undefined, deliver
 	client.onSubmit(text)
 }
 
+function handleLocalCommand(text: string): boolean {
+	if (text !== '/keys') return false
+	prompt.pushHistory(text)
+	client.addEntry(keyHelp.render())
+	prompt.clear()
+	client.onSubmit(text)
+	return true
+}
+
 function submit(override?: string, delivery?: 'queue'): void {
 	const text = (override ?? prompt.submitText()).trim()
 	const displayText = override === undefined ? prompt.text().trim() : undefined
 	if (!text) return
+	if (handleLocalCommand(text)) return
 	const warning = override === undefined ? claudeCacheWarning(client.currentTab(), text) : null
 	if (warning) {
 		completion.dismiss()

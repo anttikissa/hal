@@ -11,6 +11,14 @@ test('/config completes as a command name', () => {
 	expect(result!.items).toContain('/config')
 })
 
+
+test('/keys completes as a terminal-local command name', () => {
+	const result = completion.complete('/k', '/k'.length)
+
+	expect(result).not.toBeNull()
+	expect(result!.items).toContain('/keys')
+})
+
 test('/help completes command topics', () => {
 	const result = completion.complete('/help co', '/help co'.length)
 
