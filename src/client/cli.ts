@@ -165,74 +165,6 @@ function handleStdinClosed(): void {
 	exitCli(0)
 }
 
-const rawState = {
-	active: false,
-	pending: [] as string[],
-	flushTimer: null as ReturnType<typeof setTimeout> | null,
-}
-
-function flushRawTokens(emit = (text: string) => client.addEntry(text)): void {
-	if (rawState.flushTimer) {
-		clearTimeout(rawState.flushTimer)
-		rawState.flushTimer = null
-	}
-	if (rawState.pending.length === 0) return
-	emit(rawState.pending.join(' '))
-	rawState.pending = []
-}
-
-function quoteRawChar(ch: string): string {
-	if (ch === '\\') return "'\\\\'"
-	if (ch === "'") return "'\\\''"
-	return `'${ch}'`
-}
-
-function formatRawToken(token: string): string {
-	const bytes = [...Buffer.from(token)]
-	if (bytes.length === 1 && bytes[0]! >= 0x20 && bytes[0]! <= 0x7e) return quoteRawChar(String.fromCharCode(bytes[0]!))
-	return `[${bytes.map((b) => `0x${b.toString(16).padStart(2, '0')}`).join(' ')}]`
-}
-
-function startRawMode(emit = (text: string) => client.addEntry(text)): void {
-	if (rawState.active) {
-		emit('Raw input mode is already on.')
-		return
-	}
-	rawState.active = true
-	rawState.pending = []
-	emit('Raw input mode on. Press Esc to exit.')
-}
-
-function stopRawMode(emit = (text: string) => client.addEntry(text)): void {
-	flushRawTokens(emit)
-	if (!rawState.active) return
-	rawState.active = false
-	emit('Raw input mode off.')
-}
-
-function handleRawInput(data: string, emit = (text: string) => client.addEntry(text)): boolean {
-	if (!rawState.active) return false
-	for (const token of keys.splitKeys(data)) {
-		const key = keys.parseKey(token)
-		if (key?.key === 'escape' && !key.alt && !key.ctrl && !key.cmd) {
-			stopRawMode(emit)
-			continue
-		}
-		rawState.pending.push(formatRawToken(token))
-	}
-	if (rawState.pending.length > 0 && !rawState.flushTimer) {
-		rawState.flushTimer = setTimeout(() => flushRawTokens(emit), 50)
-	}
-	return true
-}
-
-
-function resetRawModeForTests(): void {
-	flushRawTokens(() => {})
-	rawState.active = false
-	rawState.pending = []
-}
-
 function isAnthropicModel(model: string): boolean {
 	const full = models.resolveModel(model)
 	return models.providerName(full).toLowerCase() === 'anthropic'
@@ -303,13 +235,6 @@ function submitPromptText(text: string, displayText: string | undefined, deliver
 	popup.close()
 	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
-	if (text === '/raw') {
-		startRawMode()
-		prompt.clear()
-		client.onSubmit(text)
-		draw()
-		return
-	}
 	// Human typing now uses the same prompt command path as inbox messages.
 	// The runtime decides whether an active turn makes this behave like steering.
 	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, delivery)
@@ -617,10 +542,6 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 		// already buffered across chunk boundaries. Pipe-backed stdin (no TTY)
 		// may still deliver Buffers, so coerce defensively.
 		const text = typeof data === 'string' ? data : data.toString('utf-8')
-		if (handleRawInput(text)) {
-			draw()
-			return
-		}
 		for (const k of keys.parseKeys(text)) {
 			// Track key usage for help bar
 			if (k.ctrl || k.alt || k.cmd || k.key === 'enter' || k.key === 'escape' || k.key === 'tab') {
@@ -654,17 +575,8 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 
 export const cli = {
 	startCli,
-	formatRawToken,
 	forTests: {
 		handleAppKey,
 		claudeCacheWarning,
-	},
-	rawModeForTests: {
-		start: startRawMode,
-		stop: stopRawMode,
-		handle: handleRawInput,
-		flush: flushRawTokens,
-		active: () => rawState.active,
-		reset: resetRawModeForTests,
 	},
 }

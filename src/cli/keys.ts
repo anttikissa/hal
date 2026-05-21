@@ -336,4 +336,4 @@ export function parseKeys(data: string): KeyEvent[] {
 	return events
 }
 
-export const keys = { splitKeys, parseKey, parseKeys }
+export const keys = { parseKey, parseKeys }
