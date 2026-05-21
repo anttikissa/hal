@@ -155,7 +155,7 @@ function tailTurnState(entries: TailEntry[], now = Date.now()): TailTurnState {
 	let sawRestart = false
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
-		if (entry.type === 'info') {
+		if (entry.type === 'log' || entry.type === 'info') {
 			if (entry.text === USER_PAUSED_TEXT || entry.text === TAB_CLOSED_TEXT) return { shouldContinue: false, interruptedTools: [] }
 			if (entry.text === RESTARTED_TEXT) sawRestart = true
 			continue
@@ -173,9 +173,13 @@ function tailTurnState(entries: TailEntry[], now = Date.now()): TailTurnState {
 
 function shouldAutoContinue(entries: TailEntry[], now = Date.now()): boolean { return tailTurnState(entries, now).shouldContinue }
 
-function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }]) }
+function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
+	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
+}
 
-function recordSessionMeta(sessionId: string, text: string, ts: string, ui?: 'notice'): void { sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts, ...(ui ? { ui } : {}) }]) }
+function recordSessionMeta(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
+	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts, ...(ui ? { ui } : {}) }])
+}
 
 function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
@@ -772,7 +776,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		const ts = new Date().toISOString()
 		for (const sessionId of state.activeSessions) {
 			if (!agentLoop.isActive(sessionId)) continue
-			sessionStore.appendHistorySync(sessionId, [{ type: 'info', text: RESTARTED_TEXT, ts }])
+			sessionStore.appendHistorySync(sessionId, [{ type: 'log', text: RESTARTED_TEXT, ts }])
 			agentLoop.abort(sessionId, '')
 		}
 	}, { once: true })

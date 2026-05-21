@@ -67,9 +67,9 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 	}
 
 	for (const entry of sliced) {
-		if (entry.type === 'info') {
+		if (entry.type === 'log' || entry.type === 'info' || entry.type === 'warning' || entry.type === 'error') {
 			const turnsRemaining = totalUserTurns - userTurnsSeen
-			const visibility = entry.visibility ?? (entry.level === 'error' ? 'next-user' : 'ui')
+			const visibility = entry.visibility ?? (entry.type === 'error' || (entry.type === 'log' && entry.level === 'error') ? 'next-user' : 'ui')
 			if (visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
 				pendingInfos.push(metaText(entry.text))
 			}

@@ -25,10 +25,11 @@ const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
 const input = { fg: '', bg: '', cursor: '' }
 const system: BlockColors = { fg: '', bg: '' }
+const logColors: BlockColors = { fg: '', bg: '' }
 const info: BlockColors = { fg: '', bg: '' }
+const startup: BlockColors = { fg: '', bg: '' }
 const warning: BlockColors = { fg: '', bg: '' }
 const error: BlockColors = { fg: '', bg: '' }
-const startup: BlockColors = { fg: '', bg: '' }
 const fork: BlockColors = { fg: '', bg: '' }
 const status: StatusColors = { fg: '', highlight: '' }
 const help: HelpColors = { key: '', description: '' }
@@ -103,10 +104,11 @@ function load(): void {
 	resolveBlock(raw.error, error)
 	resolveBlock(raw.popup?.current, popup.current)
 
+	resolveBlock(raw.log ?? raw.info, logColors)
 	resolveBlock(raw.info, info)
 	resolveBlock(raw.warning ?? raw.info, warning)
-	resolveBlock(raw.startup ?? raw.warning ?? raw.info, startup)
-	resolveBlock(raw.fork ?? raw.startup ?? raw.warning ?? raw.info, fork)
+	resolveBlock(raw.startup ?? raw.info, startup)
+	resolveBlock(raw.fork ?? raw.startup ?? raw.info, fork)
 
 	status.fg = raw.status?.fg ? fg(raw.status.fg, vars) : info.fg
 	status.highlight = raw.status?.highlight ? fg(raw.status.highlight, vars) : assistant.bold
@@ -159,10 +161,11 @@ export const colors = {
 	user,
 	input,
 	system,
+	log: logColors,
 	info,
+	startup,
 	warning,
 	error,
-	startup,
 	fork,
 	status,
 	help,

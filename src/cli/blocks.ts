@@ -74,13 +74,14 @@ function stripAnsiSequences(text: string): string {
 interface BlockBase { ts?: number; dimmed?: boolean; renderVersion?: number }
 interface TextBlock extends BlockBase { text: string }
 interface BlobRef { blobId?: string; sessionId?: string; blobLoaded?: boolean }
-type NoticeBlock<T extends 'info' | 'warning' | 'startup' | 'fork'> = { type: T } & TextBlock
+type NoticeBlock<T extends 'log' | 'info' | 'warning' | 'startup' | 'fork'> = { type: T } & TextBlock
 
 export type Block =
 	| ({ type: 'user'; source?: string; status?: string } & TextBlock)
 	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean; synthetic?: boolean; syntheticKind?: string } & TextBlock)
 	| ({ type: 'thinking'; model?: string; thinkingEffort?: string; streaming?: boolean } & TextBlock & BlobRef)
 	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string } & BlockBase & BlobRef)
+	| NoticeBlock<'log'>
 	| NoticeBlock<'info'>
 	| NoticeBlock<'warning'>
 	| NoticeBlock<'startup'>
@@ -93,7 +94,7 @@ function touch(block: Block): void {
 
 function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' }>): string {
 	const text =
-		block.type === 'info' || block.type === 'warning' || block.type === 'error' || block.type === 'startup'
+		block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error' || block.type === 'startup'
 			? stripAnsiSequences(block.text)
 			: block.text
 	return sanitizeTerminalText(text)
@@ -165,8 +166,18 @@ function historyToBlocks(
 					dimmed,
 				})
 				break
-			case 'info':
-				result.push({ type: entry.ui === 'notice' ? 'startup' : entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'info', text: entry.text, ts, dimmed })
+			case 'log':
+				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'log', text: entry.text, ts, dimmed })
+				break
+			case 'info': {
+				const level = entry.level
+				const type = entry.ui === 'notice' ? 'startup' : level === 'error' ? 'error' : level === 'warning' ? 'warning' : 'info'
+				result.push({ type, text: entry.text, ts, dimmed })
+				break
+			}
+			case 'warning':
+			case 'error':
+				result.push({ type: entry.type, text: entry.text, ts, dimmed })
 				break
 			case 'forked_from':
 				result.push({ type: 'startup', text: `Tab forked from ${entry.parent}.`, ts, dimmed })
@@ -475,7 +486,7 @@ function pushDimWrapped(lines: string[], text: string, cols: number): void {
 	for (const raw of text.split('\n')) for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) lines.push(`${DIM}${line}${DIM_OFF}`)
 }
 
-function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' | 'info' | 'warning' | 'error' | 'startup' }>): MdColors {
+function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' | 'log' | 'info' | 'warning' | 'error' | 'startup' }>): MdColors {
 	const palette = blockColors(block)
 	return {
 		bold: [M_BOLD, M_BOLD_OFF],
@@ -492,7 +503,7 @@ function pushCodeWrapped(lines: string[], text: string, cols: number, mdColors: 
 	}
 }
 
-function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'info' | 'warning' | 'error' | 'startup' }>, cols: number): string[] {
+function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'log' | 'info' | 'warning' | 'error' | 'startup' }>, cols: number): string[] {
 	const lines: string[] = []
 	const mdColors = markdownColors(block)
 	for (const span of md.mdSpans(markdownSourceText(block))) {
@@ -535,6 +546,7 @@ function blockContent(block: Block, cols: number): string[] {
 	if (
 		block.type === 'assistant' ||
 		block.type === 'thinking' ||
+		block.type === 'log' ||
 		block.type === 'info' ||
 		block.type === 'warning' ||
 		block.type === 'error' ||
@@ -577,7 +589,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 	return `${bg}\x1b[K\r${content}${RESET_BG}`
 }
 
-const fixedNoticeColors = { info: colors.info, warning: colors.warning, error: colors.error, startup: colors.startup, fork: colors.startup }
+const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.warning, error: colors.error, startup: colors.startup, fork: colors.fork }
 
 function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
 	if (block.type === 'assistant') return colors.assistant
@@ -603,7 +615,7 @@ function buildHeader(title: string, time: string, blobRef: string, cols: number)
 	return `${left}${'─'.repeat(Math.max(0, budget - visLen(left) - visLen(right)))}${right}`
 }
 
-const fixedLabels = { info: 'Info', warning: 'Warning', error: 'Error', startup: 'Info', fork: 'Info' }
+const fixedLabels = { log: 'Log', info: 'Info', warning: 'Warning', error: 'Error', startup: 'Info', fork: 'Info' }
 
 function blockLabel(block: Block): string {
 	if (block.type === 'user') {
@@ -629,7 +641,7 @@ function blockLabel(block: Block): string {
 	return fixedLabels[block.type]
 }
 
-function renderBlockGroup(group: Array<Extract<Block, { type: 'info' | 'warning' | 'error' }>>, cols: number): string[] {
+function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | 'warning' | 'error' }>>, cols: number): string[] {
 	if (group.length === 0) return []
 	if (group.length === 1) return renderBlock(group[0]!, cols)
 	const first = group[0]!

@@ -654,7 +654,7 @@ function addBlockToTab(sessionId: string | null, block: Block): void {
 	onChange(false)
 }
 
-function addEntry(text: string, type: 'info' | 'warning' | 'error' = 'info'): void {
+function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'info'): void {
 	queueLocalBlock({ type, text, ts: Date.now() })
 }
 

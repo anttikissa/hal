@@ -13,7 +13,8 @@ function emptyUsage() {
 
 function entryActivityTs(entry: HistoryEntry): number | null {
 	if (entry.type === 'input_history') return null
-	if (entry.type === 'info' && entry.level !== 'error') return null
+	if (entry.type === 'log' && entry.level !== 'error') return null
+	if (entry.type === 'info' || entry.type === 'warning') return null
 	return entry.ts ? Date.parse(entry.ts) : null
 }
 

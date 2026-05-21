@@ -59,8 +59,13 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 		if (entry.type === 'reset' || entry.type === 'forked_from' || entry.type === 'compact') continue
 		if (entry.type === 'input_history') continue
 
-		if (entry.type === 'info') {
+		if (entry.type === 'log') {
 			blocks.push({ type: entry.level === 'error' ? 'error' : 'info', text: entry.text, ts })
+			continue
+		}
+
+		if (entry.type === 'info' || entry.type === 'warning' || entry.type === 'error') {
+			blocks.push({ type: entry.type === 'error' ? 'error' : 'info', text: entry.text, ts })
 			continue
 		}
 
