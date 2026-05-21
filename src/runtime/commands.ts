@@ -280,7 +280,6 @@ const commandSpecs: Record<string, CommandSpec> = {
 	resume: { usage: '[session-id|name]', summary: 'Resume a closed session.', detail: 'With no id, lists recently closed sessions.' },
 	tabs: { usage: '[--all]', summary: 'List open tabs; use --all to include closed sessions.' },
 	compact: { summary: 'Summarize conversation to reduce context.' },
-	raw: { summary: 'Log raw key bytes on this terminal.', detail: 'Keys are logged as bytes until Esc exits.' },
 	status: { summary: 'Show Anthropic / OpenAI subscription usage.', detail: 'Shows usage for all configured accounts.' },
 	login: {
 		usage: '<anthropic|openai> [code]',
