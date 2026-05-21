@@ -182,11 +182,12 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	const sourceMeta = opts.sourceId ? sessionStore.loadSessionMeta(opts.sourceId) : null
 	const openerMeta = opts.openerId ? sessionStore.loadSessionMeta(opts.openerId) : null
 	const inheritedModel = sourceMeta?.model ?? openerMeta?.model ?? models.defaultModel()
+	const inheritedWorkingDir = opts.workingDir ?? openerMeta?.workingDir ?? process.cwd()
 	const meta = opts.sourceId
 		? sessionStore.forkSession(opts.sourceId, sessionId)
 		: sessionStore.createSession(sessionId, {
 			id: sessionId,
-			workingDir: opts.workingDir ?? process.cwd(),
+			workingDir: inheritedWorkingDir,
 			createdAt: new Date().toISOString(),
 			name: undefined,
 			topic: undefined,

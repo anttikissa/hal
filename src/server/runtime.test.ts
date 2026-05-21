@@ -122,6 +122,58 @@ test('fork command persists one child notice without duplicating bare session id
 	}
 })
 
+test('open command inherits cwd and model from opener tab', () => {
+	const parentId = '04-parent-open'
+	const metas: Record<string, SessionMeta> = {
+		[parentId]: { id: parentId, workingDir: '/work/parent', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5' },
+	}
+	const created: SessionMeta[] = []
+	const origActiveSessions = [...runtime.state.activeSessions]
+	const origUpdateState = ipc.updateState
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origCreateSession = sessions.createSession
+	const origUpdateMeta = sessions.updateMeta
+	const origSessionOpenInfo = sessions.sessionOpenInfo
+	const origWatchPromptFiles = context.watchPromptFiles
+	const origBuildSystemPrompt = context.buildSystemPrompt
+	const origEstimateContext = context.estimateContext
+
+	try {
+		runtime.state.activeSessions = [parentId]
+		ipc.updateState = () => ({ sessions: [], busy: {}, activity: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
+		context.watchPromptFiles = () => () => {}
+		context.buildSystemPrompt = () => ({ text: '', loaded: [], bytes: 0 })
+		context.estimateContext = () => ({ used: 0, max: 100, estimated: true })
+		sessions.loadSessionMeta = (id) => metas[id] ?? null
+		sessions.createSession = (id, meta) => {
+			metas[id] = meta
+			created.push(meta)
+			return meta
+		}
+		sessions.updateMeta = (id, patch) => {
+			metas[id] = { ...metas[id]!, ...patch }
+			return metas[id]!
+		}
+		sessions.sessionOpenInfo = (meta) => ({ id: meta.id, tab: 1, name: meta.name ?? meta.topic ?? meta.id, cwd: meta.workingDir ?? '', model: meta.model })
+
+		;(runtime as any).handleCommand({ type: 'open', sessionId: parentId })
+
+		expect(created).toHaveLength(1)
+		expect(created[0]!.workingDir).toBe('/work/parent')
+		expect(created[0]!.model).toBe('openai/gpt-5')
+	} finally {
+		runtime.state.activeSessions = origActiveSessions
+		ipc.updateState = origUpdateState
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.createSession = origCreateSession
+		sessions.updateMeta = origUpdateMeta
+		sessions.sessionOpenInfo = origSessionOpenInfo
+		context.watchPromptFiles = origWatchPromptFiles
+		context.buildSystemPrompt = origBuildSystemPrompt
+		context.estimateContext = origEstimateContext
+	}
+})
+
 test('shouldAutoContinue resumes unfinished turns after restart notices', () => {
 	const old = '2026-04-14T12:00:00.000Z'
 	const restarted = '2026-04-14T12:01:00.000Z'
