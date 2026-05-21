@@ -1,6 +1,6 @@
 import type { Block } from '../cli/blocks.ts'
 
-type PausedBlock = Extract<Block, { type: 'info' }>
+type PausedBlock = Extract<Block, { type: 'log' }>
 type DelayedPausedNotice = { timer: ReturnType<typeof setTimeout>; block: PausedBlock }
 
 const state = { notices: new Map<string, DelayedPausedNotice>() }

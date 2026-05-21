@@ -19,7 +19,7 @@ function lastInterruptedAssistantId(blocks: any[]): string | null {
 	for (let i = blocks.length - 1; i >= 0; i--) {
 		const block = blocks[i]
 		if (!block || block.type === 'tool') continue
-		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
+		if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
 		return block.type === 'assistant' ? assistantChainId(block) : null
 	}
 	return null
@@ -136,7 +136,7 @@ function applyEvent(opts: ApplyEventOptions): { changed: boolean; toolBlock?: an
 
 	if (event.type === 'info' && event.text) {
 		close()
-		blocks.push({ type: event.ui === 'notice' ? 'startup' : event.level === 'error' ? 'error' : 'info', text: event.text, ts })
+		blocks.push({ type: event.ui === 'notice' ? 'info' : event.level === 'error' ? 'error' : event.level === 'warning' ? 'warning' : 'log', text: event.text, ts })
 		return changed()
 	}
 

@@ -191,7 +191,7 @@ function usageBar(usedPercent: number): string {
 	const partial = totalEighths % 8
 	const empty = width - full - (partial > 0 ? 1 : 0)
 	const fill = `${'█'.repeat(full)}${BAR_PARTIALS[partial] ?? ''}`
-	const reset = `${colors.info.fg}${colors.info.bg}`
+	const reset = `${colors.log.fg}${colors.log.bg}`
 	return `[${BAR_EMPTY_BG}${BAR_FILL_FG}${fill}${BAR_EMPTY_BG}${' '.repeat(Math.max(0, empty))}${reset}]`
 }
 

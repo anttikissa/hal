@@ -115,7 +115,7 @@ function migrateFlatEntry(entry: any): any[] {
 			})]
 
 		case 'info':
-			return [clean({ type: 'info', text: entry.text, level: entry.level, visibility: entry.visibility, ts: entry.ts })]
+			return [clean({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'log', text: entry.text, visibility: entry.visibility, ts: entry.ts })]
 
 		case 'session':
 			return [clean({ type: 'session', action: entry.action, model: entry.model, old: entry.old, new: entry.new, ts: entry.ts })]

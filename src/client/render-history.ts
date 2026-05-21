@@ -39,18 +39,18 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext):
 	return rendered
 }
 
-function infoGroupKey(block: Block): string | null {
-	// Coalesce consecutive one-line info blocks, even across days. Multiline
+function logGroupKey(block: Block): string | null {
+	// Coalesce consecutive one-line log blocks, even across days. Multiline
 	// output such as `/config` stays as a normal block so its line breaks survive.
-	if (block.type !== 'info' || block.text.includes('\n')) return null
+	if (block.type !== 'log' || block.text.includes('\n')) return null
 	if (block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)) return null
-	return 'info'
+	return 'log'
 }
 
 function renderGroup(group: Block[], cols: number, context: HistoryRenderContext): string[] {
 	const lines = group.length === 1
 		? renderEntry(group[0]!, cols, context)
-		: blockRenderer.renderBlockGroup(group as Array<{ type: 'info' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
+		: blockRenderer.renderBlockGroup(group as Array<{ type: 'log' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
 	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
 	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, context.forkHistoryDimFactor)) : lines
 }
@@ -62,10 +62,10 @@ function shouldHideBlock(history: Block[], index: number): boolean {
 	// Steering already tells the user why generation stopped. Hiding the
 	// immediately preceding [paused] notice keeps the history focused on the
 	// steering prompt instead of showing a redundant status block right before it.
-	if (block.type !== 'info' || block.text !== '[paused]') return false
+	if (block.type !== 'log' || block.text !== '[paused]') return false
 	const next = history[index + 1]
 	if (next?.type === 'user' && next.status === 'steering') return true
-	return next?.type === 'startup' && next.text.startsWith('Paused. ') && next.text.includes('queued prompt')
+	return next?.type === 'info' && next.text.startsWith('Paused. ') && next.text.includes('queued prompt')
 }
 
 function visibleHistory(history: Block[]): Block[] {
@@ -86,9 +86,9 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 	const history = visibleHistory(tab.history)
 	for (let i = 0; i < history.length; ) {
 		const group = [history[i]!]
-		const key = infoGroupKey(group[0]!)
+		const key = logGroupKey(group[0]!)
 		if (key) {
-			for (let j = i + 1; j < history.length && infoGroupKey(history[j]!) === key; j++) {
+			for (let j = i + 1; j < history.length && logGroupKey(history[j]!) === key; j++) {
 				group.push(history[j]!)
 			}
 		}

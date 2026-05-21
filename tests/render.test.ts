@@ -82,8 +82,8 @@ describe('render', () => {
 
 	test('writes ALL lines on force repaint', () => {
 		const tab = client.currentTab()!
-		tab.history.push({ type: 'info', text: 'hello' })
-		tab.history.push({ type: 'info', text: 'world' })
+		tab.history.push({ type: 'log', text: 'hello' })
+		tab.history.push({ type: 'log', text: 'world' })
 		captureOutput(() => render.draw())
 		const output = captureOutput(() => render.draw(true))
 		const clean = stripAnsi(output)
@@ -94,12 +94,12 @@ describe('render', () => {
 	test('consecutive info blocks in the same minute collapse into one rendered block', () => {
 		const tab = client.currentTab()!
 		const ts = Date.now()
-		tab.history.push({ type: 'info', text: '31.0ms First line of code executed', ts })
-		tab.history.push({ type: 'info', text: '31.0ms State directories exist', ts: ts + 1000 })
+		tab.history.push({ type: 'log', text: '31.0ms First line of code executed', ts })
+		tab.history.push({ type: 'log', text: '31.0ms State directories exist', ts: ts + 1000 })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('31.0ms First line of code executed')
 		expect(clean).toContain('31.0ms State directories exist')
-		expect(clean.match(/Info/g)?.length ?? 0).toBe(1)
+		expect(clean.match(/Log/g)?.length ?? 0).toBe(1)
 	})
 
 	test('consecutive info blocks across days collapse with a date range header', () => {
@@ -107,13 +107,13 @@ describe('render', () => {
 		Date.now = () => new Date(2026, 4, 6, 13, 0).getTime()
 		try {
 			const tab = client.currentTab()!
-			tab.history.push({ type: 'info', text: 'first metadata refresh', ts: new Date(2026, 4, 4, 19, 30).getTime() })
-			tab.history.push({ type: 'info', text: 'second metadata refresh', ts: new Date(2026, 4, 6, 12, 10).getTime() })
+			tab.history.push({ type: 'log', text: 'first metadata refresh', ts: new Date(2026, 4, 4, 19, 30).getTime() })
+			tab.history.push({ type: 'log', text: 'second metadata refresh', ts: new Date(2026, 4, 6, 12, 10).getTime() })
 			const clean = stripAnsi(captureOutput(() => render.draw(true)))
-			expect(clean).toContain('4 May 19:30 - 6 May 12:10 Info')
+			expect(clean).toContain('4 May 19:30 - 6 May 12:10 Log')
 			expect(clean).toContain('first metadata refresh')
 			expect(clean).toContain('second metadata refresh')
-			expect(clean.match(/Info/g)?.length ?? 0).toBe(1)
+			expect(clean.match(/Log/g)?.length ?? 0).toBe(1)
 		} finally {
 			Date.now = originalNow
 		}
@@ -135,9 +135,9 @@ describe('render', () => {
 	test('multiline info blocks do not get flattened into a coalesced info group', () => {
 		const tab = client.currentTab()!
 		const ts = Date.now()
-		tab.history.push({ type: 'info', text: 'Ready', ts })
+		tab.history.push({ type: 'log', text: 'Ready', ts })
 		tab.history.push({
-			type: 'info',
+			type: 'log',
 			text: 'Current config:\n{\n\tprompt: {\n\t\tmaxPromptLines: 10,\n\t},\n}',
 			ts: ts + 1000,
 		})
@@ -145,13 +145,13 @@ describe('render', () => {
 		expect(clean).toContain('Ready')
 		expect(clean).toContain('Current config:')
 		expect(clean).not.toContain('[Current config:]')
-		expect(clean.match(/Info/g)?.length ?? 0).toBe(2)
+		expect(clean.match(/Log/g)?.length ?? 0).toBe(2)
 	})
 
 	test('paused info before a steering prompt is hidden', () => {
 		const tab = client.currentTab()!
 		const ts = Date.now()
-		tab.history.push({ type: 'info', text: '[paused]', ts })
+		tab.history.push({ type: 'log', text: '[paused]', ts })
 		tab.history.push({ type: 'user', text: 'Esc does not exit it. What does?', status: 'steering', ts: ts + 1000 })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).not.toContain('[paused]')
@@ -162,8 +162,8 @@ describe('render', () => {
 	test('paused info before queued prompt notice is hidden and notice markdown renders', () => {
 		const tab = client.currentTab()!
 		const ts = Date.now()
-		tab.history.push({ type: 'info', text: '[paused]', ts })
-		tab.history.push({ type: 'startup', text: 'Paused. 1 queued prompt is waiting. Next: **foo**. **ctrl-q** to run the queued prompt, `/queue clear` to discard it.', ts: ts + 1000 })
+		tab.history.push({ type: 'log', text: '[paused]', ts })
+		tab.history.push({ type: 'info', text: 'Paused. 1 queued prompt is waiting. Next: **foo**. **ctrl-q** to run the queued prompt, `/queue clear` to discard it.', ts: ts + 1000 })
 		const raw = captureOutput(() => render.draw(true))
 		const clean = stripAnsi(raw)
 		expect(clean).not.toContain('[paused]')
@@ -176,14 +176,14 @@ describe('render', () => {
 
 	test('paused info still renders when there is no steering prompt after it', () => {
 		const tab = client.currentTab()!
-		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
+		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('[paused]')
 	})
 
 	test('help bar says press enter to continue on paused tabs with empty prompt', () => {
 		const tab = client.currentTab()!
-		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
+		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('press enter to continue')
 		expect(clean).not.toContain('enter: continue')
@@ -220,7 +220,7 @@ describe('render', () => {
 
 	test('continue hint matches enter behavior for whitespace-only prompts', () => {
 		const tab = client.currentTab()!
-		tab.history.push({ type: 'info', text: '[paused]', ts: Date.now() })
+		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
 		prompt.setText('   ')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('press enter to continue')
@@ -662,11 +662,11 @@ describe('render', () => {
 		Object.defineProperty(process.stdout, 'rows', { value: 6, configurable: true })
 		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
 		try {
-			tab.history.push({ type: 'info', text: 'one' })
-			tab.history.push({ type: 'info', text: 'two' })
+			tab.history.push({ type: 'log', text: 'one' })
+			tab.history.push({ type: 'log', text: 'two' })
 			captureOutput(() => render.draw())
 
-			tab.history.unshift({ type: 'info', text: 'zero' })
+			tab.history.unshift({ type: 'log', text: 'zero' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
 			expect(output).not.toContain('\x1b[3J')
@@ -707,10 +707,10 @@ describe('render', () => {
 		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
 		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
 		try {
-			for (let i = 0; i < 20; i++) tab.history.push({ type: 'info', text: `old-${i}` })
+			for (let i = 0; i < 20; i++) tab.history.push({ type: 'log', text: `old-${i}` })
 			captureOutput(() => render.draw())
 
-			tab.history.splice(0, tab.history.length, { type: 'info', text: 'new' })
+			tab.history.splice(0, tab.history.length, { type: 'log', text: 'new' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
 			expect(output).toContain('\x1b[2J\x1b[H')
@@ -730,7 +730,7 @@ describe('render', () => {
 		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
 		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
 		try {
-			for (let i = 0; i < 12; i++) tab.history.push({ type: 'info', text: `line ${i}` })
+			for (let i = 0; i < 12; i++) tab.history.push({ type: 'log', text: `line ${i}` })
 			captureOutput(() => render.draw(true))
 			popup.openModelPicker(() => {})
 			const clean = stripAnsi(captureOutput(() => render.draw(true))).split('\n')

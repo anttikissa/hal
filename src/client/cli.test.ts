@@ -207,7 +207,7 @@ test('/keys is local terminal help and does not send a prompt while busy', () =>
 			expect(commands).toEqual([])
 			expect(prompt.text()).toBe('')
 			expect(tab.inputHistory).toContain('/keys')
-			expect(tab.history.at(-1)).toMatchObject({ type: 'info', text: expect.stringContaining('cmd+c') })
+			expect(tab.history.at(-1)).toMatchObject({ type: 'log', text: expect.stringContaining('cmd+c') })
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
@@ -222,7 +222,7 @@ test('enter on empty paused tab sends continue', () => {
 	const origActiveTab = client.state.activeTab
 
 	client.state.tabs.length = 0
-	client.state.tabs.push(makeTab({ history: [{ type: 'info', text: '[paused]' }] as any[] }))
+	client.state.tabs.push(makeTab({ history: [{ type: 'log', text: '[paused]' }] as any[] }))
 	client.state.activeTab = 0
 	prompt.clear()
 	client.state.busy.clear()

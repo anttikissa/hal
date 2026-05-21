@@ -60,7 +60,8 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 		if (entry.type === 'input_history') continue
 
 		if (entry.type === 'log') {
-			blocks.push({ type: entry.level === 'error' ? 'error' : 'info', text: entry.text, ts })
+			const type = entry.level === 'error' ? 'error' : 'info'
+			blocks.push({ type, text: entry.text, ts })
 			continue
 		}
 

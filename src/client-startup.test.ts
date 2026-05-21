@@ -39,8 +39,8 @@ function makeSharedState(ids: string[]): SharedState {
 
 function nonBookkeepingHistory() {
 	return client.currentTab()?.history.filter((block) => {
-		if (block.type === 'startup') return false
-		if (block.type === 'info' && block.text.startsWith('This session was last active ')) return false
+		if (block.type === 'info') return false
+		if (block.type === 'log' && block.text.startsWith('This session was last active ')) return false
 		return true
 	})
 }
@@ -156,14 +156,14 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
-		expect(startup?.text).toContain('Session opened in ~/sync/lippu.')
-		expect(startup?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
-		expect(startup?.text).toContain('1% used on 5h quota, resetting at ')
-		expect(startup?.text).toMatch(/\(in 1 hour\)|\(in 60 minutes\)/)
-		expect(startup?.text).toContain('Type `/help` for commands, `/keys` for keyboard shortcuts.')
-		expect(startup?.text).not.toContain('Server started')
-		expect(startup?.text).not.toContain('replay')
+		const info = client.currentTab()?.history.find((block) => block.type === 'info')
+		expect(info?.text).toContain('Session opened in ~/sync/lippu.')
+		expect(info?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
+		expect(info?.text).toContain('1% used on 5h quota, resetting at ')
+		expect(info?.text).toMatch(/\(in 1 hour\)|\(in 60 minutes\)/)
+		expect(info?.text).toContain('Type `/help` for commands, `/keys` for keyboard shortcuts.')
+		expect(info?.text).not.toContain('Server started')
+		expect(info?.text).not.toContain('replay')
 	})
 
 	test('startup summary includes perf details when configured', async () => {
@@ -181,10 +181,10 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		const startup = client.currentTab()?.history.find((block) => block.type === 'startup')
-		expect(startup?.text).toContain('Session opened in /tmp/s1.')
-		expect(startup?.text).toContain('Joined server')
-		expect(startup?.text).toContain('replay')
+		const info = client.currentTab()?.history.find((block) => block.type === 'info')
+		expect(info?.text).toContain('Session opened in /tmp/s1.')
+		expect(info?.text).toContain('Joined server')
+		expect(info?.text).toContain('replay')
 	})
 
 	test('falls back to disk session metadata when shared state is temporarily empty', async () => {
@@ -338,7 +338,7 @@ describe('client startup', () => {
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.history.filter((block) => block.type === 'startup')).toEqual([])
+		expect(client.currentTab()?.history.filter((block) => block.type === 'info')).toEqual([])
 		expect(nonBookkeepingHistory()).toMatchObject([{ type: 'assistant', synthetic: true, model: 'openai/gpt-5.4', text: 'Howdy!' }])
 	})
 
@@ -369,8 +369,8 @@ describe('client startup', () => {
 			ac.abort()
 
 			const notice = client.currentTab()?.history.at(-1)
-			expect(notice?.type).toBe('info')
-			if (notice?.type !== 'info') throw new Error('missing stale-session notice')
+			expect(notice?.type).toBe('log')
+			if (notice?.type !== 'log') throw new Error('missing stale-session notice')
 			expect(notice.text).toBe('This session was last active 10 Apr 2026, 20:00 (1 day 4 hours ago)')
 		} finally {
 			Date.now = originalNow
@@ -587,7 +587,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.sessionId).toBe('s3')
-		expect(client.currentTab()?.history.at(-1)).toMatchObject({ type: 'startup', text: 'Tab restored.' })
+		expect(client.currentTab()?.history.at(-1)).toMatchObject({ type: 'info', text: 'Tab restored.' })
 	})
 
 	test('/self prompt activates the new session tab', async () => {

@@ -120,7 +120,7 @@ test('info block renders markdown tables', () => {
 	expect(body).toContain('│ *      │ 1/2  │ a@test.com │')
 })
 
-const markdownBlockTypes = ['assistant', 'thinking', 'info', 'warning', 'error', 'startup'] as const
+const markdownBlockTypes = ['assistant', 'thinking', 'log', 'info', 'warning', 'error'] as const
 
 test('markdown code fences use block code color instead of dim style', () => {
 	colors.load()
@@ -175,23 +175,23 @@ test('forked_from history entry renders as an Info block', () => {
 	const history: any[] = [{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blocks.historyToBlocks(history as any, 'child')
-	expect(result).toMatchObject([{ type: 'startup', text: 'Tab forked from 04-abc.' }])
+	expect(result).toMatchObject([{ type: 'info', text: 'Tab forked from 04-abc.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
 	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
 })
 
-test('notice info history entries render as highlighted Info blocks', () => {
-	const history: any[] = [{ type: 'info', ui: 'notice', text: 'Model set to GPT 5.5.', ts: '2026-04-09T20:00:00.000Z' }]
+test('info history entries render as highlighted Info blocks', () => {
+	const history: any[] = [{ type: 'info', text: 'Model set to GPT 5.5.', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blocks.historyToBlocks(history as any, 'child')
-	expect(result).toMatchObject([{ type: 'startup', text: 'Model set to GPT 5.5.' }])
+	expect(result).toMatchObject([{ type: 'info', text: 'Model set to GPT 5.5.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
 	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
 })
 
-test('startup block renders an Info header', () => {
+test('info block renders an Info header', () => {
 	const block: Block = {
-		type: 'startup',
+		type: 'info',
 		text: 'Server started (pid 123) · ready 99.9ms',
 		ts: new Date('2026-01-01T17:39:00Z').getTime(),
 	}

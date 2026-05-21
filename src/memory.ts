@@ -26,7 +26,7 @@ const DIAGNOSTIC_PATH = `${STATE_DIR}/oom.asonl`
 
 const io = {
 	readRss: (): number => process.memoryUsage().rss,
-	addEntry: (text: string, type: 'info' | 'warning' | 'error' = 'info'): void => {
+	addEntry: (text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log'): void => {
 		client.addEntry(text, type)
 	},
 	scheduleExit: (delayMs: number): void => {

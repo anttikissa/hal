@@ -85,7 +85,7 @@ function handleInfo(event: any, ctx: any): void {
 	const tab = ctx.tabForSession(sessionId)
 	if (tab) ctx.applyLiveEventToTab(tab, { type: 'stream-end' })
 	if (event.level !== 'error' && event.text === '[paused]') {
-		ctx.scheduleDelayedPaused(sessionId, { type: 'info', text: event.text, ts: event.createdAt ? Date.parse(event.createdAt) : undefined })
+		ctx.scheduleDelayedPaused(sessionId, { type: 'log', text: event.text, ts: event.createdAt ? Date.parse(event.createdAt) : undefined })
 		return
 	}
 	ctx.flushDelayedPaused(sessionId)

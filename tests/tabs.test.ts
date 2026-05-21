@@ -242,7 +242,7 @@ describe("tabs", () => {
 		const childId = after[1]!
 		const childHistory = await waitForHistory(childId)
 		expect(childHistory[0]).toMatchObject({ type: 'forked_from', parent: parentId })
-		expect(childHistory[1]).toMatchObject({ type: 'info', ui: 'notice' })
+		expect(childHistory[1]).toMatchObject({ type: 'info' })
 		expect(childHistory[1]?.text).toContain('Tab forked from')
 		expect(childHistory[1]?.text).toContain(parentId)
 

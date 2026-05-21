@@ -39,7 +39,7 @@ test('migrateHistoryEntries converts legacy history to flat entries', () => {
 		{ type: 'tool_result', toolId: 'tool-1', blobId: '000bbb-222', ts },
 		{ type: 'thinking', blobId: '000ccc-333', provider: 'anthropic', ts },
 		{ type: 'assistant', text: 'hello ', id: 'xyz-123', ts },
-		{ type: 'info', text: 'system.md reloaded', ts },
+		{ type: 'log', text: 'system.md reloaded', ts },
 		{ type: 'assistant', text: 'world', continue: 'xyz-123', ts },
 	])
 })

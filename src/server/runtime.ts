@@ -155,7 +155,7 @@ function tailTurnState(entries: TailEntry[], now = Date.now()): TailTurnState {
 	let sawRestart = false
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
-		if (entry.type === 'log' || entry.type === 'info') {
+		if (entry.type === 'log') {
 			if (entry.text === USER_PAUSED_TEXT || entry.text === TAB_CLOSED_TEXT) return { shouldContinue: false, interruptedTools: [] }
 			if (entry.text === RESTARTED_TEXT) sawRestart = true
 			continue

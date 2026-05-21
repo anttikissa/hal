@@ -60,7 +60,7 @@ function hasTrailingAssistantText(blocks: Block[], text: string): boolean {
 	for (let i = blocks.length - 1; i >= 0; i--) {
 		const block = blocks[i]!
 		if (block.type === 'tool') continue
-		if (block.type === 'info' || block.type === 'warning' || block.type === 'error') {
+		if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error') {
 			if (!sawAssistant) continue
 			continue
 		}

@@ -181,15 +181,15 @@ test('shouldAutoContinue resumes unfinished turns after restart notices', () => 
 
 	expect(runtime.shouldAutoContinue([
 		{ type: 'tool_result', ts: old },
-		{ type: 'info', text: '[restarted]', ts: restarted },
+		{ type: 'log', text: '[restarted]', ts: restarted },
 	], now)).toBe(true)
 	expect(runtime.shouldAutoContinue([
 		{ type: 'thinking', ts: old },
-		{ type: 'info', text: '[restarted]', ts: restarted },
+		{ type: 'log', text: '[restarted]', ts: restarted },
 	], now)).toBe(true)
 	expect(runtime.shouldAutoContinue([
 		{ type: 'user', ts: old },
-		{ type: 'info', text: '[restarted]', ts: restarted },
+		{ type: 'log', text: '[restarted]', ts: restarted },
 	], now)).toBe(true)
 })
 
@@ -199,11 +199,11 @@ test('shouldAutoContinue distinguishes stopped, complete, and stale tails', () =
 
 	expect(runtime.shouldAutoContinue([
 		{ type: 'user', ts: old },
-		{ type: 'info', text: '[paused]', ts: '2026-04-14T12:00:01.000Z' },
+		{ type: 'log', text: '[paused]', ts: '2026-04-14T12:00:01.000Z' },
 	], now)).toBe(false)
 	expect(runtime.shouldAutoContinue([
 		{ type: 'assistant', ts: old },
-		{ type: 'info', text: '[restarted]', ts: '2026-04-14T12:00:01.000Z' },
+		{ type: 'log', text: '[restarted]', ts: '2026-04-14T12:00:01.000Z' },
 	], now)).toBe(false)
 	expect(runtime.shouldAutoContinue([
 		{ type: 'tool_result', ts: old },

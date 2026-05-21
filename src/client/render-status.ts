@@ -61,10 +61,10 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const b = tab.history[i]!
 		// Skip trailing info blocks that aren't status-relevant.
-		if (b.type === 'info' && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
+		if ((b.type === 'log' || b.type === 'info') && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
 		if (b.type === 'warning') return { char: '!', color: YELLOW, blinks: false }
 		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
-		if (b.type === 'info' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
+		if (b.type === 'log' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
 			return { char: '!', color: '', blinks: true }
 		}
 		break

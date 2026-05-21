@@ -13,13 +13,16 @@ function emptyUsage() {
 
 function entryActivityTs(entry: HistoryEntry): number | null {
 	if (entry.type === 'input_history') return null
-	if (entry.type === 'log' && entry.level !== 'error') return null
+	if (entry.type === 'log') {
+		if (entry.level !== 'error') return null
+		return entry.ts ? Date.parse(entry.ts) : null
+	}
 	if (entry.type === 'info' || entry.type === 'warning') return null
 	return entry.ts ? Date.parse(entry.ts) : null
 }
 
 function blockActivityTs(block: Block): number | null {
-	if (block.type === 'info' || block.type === 'warning' || block.type === 'startup' || block.type === 'fork') return null
+	if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'fork') return null
 	return block.ts ?? null
 }
 
@@ -32,7 +35,7 @@ function lastActiveTs(entries: HistoryEntry[]): number | undefined {
 }
 
 function removeLastActiveNotice(tab: any): void {
-	tab.history = tab.history.filter((block: Block) => !(block.type === 'info' && block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)))
+	tab.history = tab.history.filter((block: Block) => !(block.type === 'log' && block.text.startsWith(LAST_ACTIVE_NOTICE_PREFIX)))
 }
 
 function addLastActiveNotice(tab: any): void {
@@ -47,7 +50,7 @@ function addLastActiveNotice(tab: any): void {
 	}
 	if (!lastTs) return
 	if (Date.now() - lastTs <= LAST_ACTIVE_THRESHOLD_MS) return
-	tab.history.push({ type: 'info', text: time.formatLastActiveNotice(lastTs), ts: Date.now() })
+	tab.history.push({ type: 'log', text: time.formatLastActiveNotice(lastTs), ts: Date.now() })
 }
 
 function load(info: SharedSessionInfo) {

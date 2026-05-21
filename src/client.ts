@@ -215,12 +215,12 @@ function startupSummaryText(tab: Tab): string {
 }
 
 function shouldShowStartupSummary(tab: Tab): boolean {
-	return !tab.history.some((block) => block.type !== 'startup')
+	return !tab.history.some((block) => block.type !== 'info')
 }
 
 function addStartupSummaryToTab(tab: Tab): void {
 	if (!shouldShowStartupSummary(tab)) return
-	addLocalBlockToTab(tab, { type: 'startup', text: startupSummaryText(tab), ts: Date.now() })
+	addLocalBlockToTab(tab, { type: 'info', text: startupSummaryText(tab), ts: Date.now() })
 }
 
 function showStartupSummary(): void {
@@ -233,7 +233,7 @@ function showStartupSummary(): void {
 
 function showServerRestart(pid: number, startedAt?: string): void {
 	queueLocalBlock({
-		type: 'startup',
+		type: 'info',
 		text: `Server restarted (pid ${pid})`,
 		ts: startedAt ? Date.parse(startedAt) : Date.now(),
 	})
@@ -459,7 +459,7 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		rememberTab,
 		pruneRecentTabs,
 		addStartupSummaryToTab,
-		addTabNoticeToTab: (tab: Tab, text: string) => addLocalBlockToTab(tab, { type: 'startup', text, ts: Date.now() }),
+		addTabNoticeToTab: (tab: Tab, text: string) => addLocalBlockToTab(tab, { type: 'info', text, ts: Date.now() }),
 		onTabSwitch: (from: string, to: string) => onTabSwitch?.(from, to),
 		onChange,
 	})
@@ -506,7 +506,7 @@ function handleEvent(event: any): void {
 		showServerRestart,
 		cancelDelayedPaused: (sessionId: string | null) => pausedNotices.cancel(sessionId),
 		flushDelayedPaused: (sessionId: string | null) => pausedNotices.flush(sessionId, (block) => addBlockToTab(sessionId, block)),
-		scheduleDelayedPaused: (sessionId: string | null, block: Extract<Block, { type: 'info' }>) => pausedNotices.schedule(sessionId, block, config.pausedNoticeDelayMs, (item) => addBlockToTab(sessionId, item)),
+		scheduleDelayedPaused: (sessionId: string | null, block: Extract<Block, { type: 'log' }>) => pausedNotices.schedule(sessionId, block, config.pausedNoticeDelayMs, (item) => addBlockToTab(sessionId, item)),
 		applyLiveEventToTab,
 		repaintIfActive,
 		touchTab,
@@ -632,7 +632,7 @@ export const client = {
 	nextTab,
 	prevTab,
 	addEntry,
-	addStartupEntry: (text: string) => queueLocalBlock({ type: 'startup', text, ts: Date.now() }),
+	addStartupEntry: (text: string) => queueLocalBlock({ type: 'info', text, ts: Date.now() }),
 	sendCommand,
 	startClient,
 	saveState: saveClientState,
@@ -654,7 +654,7 @@ function addBlockToTab(sessionId: string | null, block: Block): void {
 	onChange(false)
 }
 
-function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'info'): void {
+function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log'): void {
 	queueLocalBlock({ type, text, ts: Date.now() })
 }
 

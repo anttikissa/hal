@@ -45,7 +45,7 @@ describe('client streaming blocks', () => {
 		expect(client.currentTab()!.history).toHaveLength(0)
 		await Bun.sleep(client.config.pausedNoticeDelayMs + 10)
 		expect(client.currentTab()!.history).toHaveLength(1)
-		expect(client.currentTab()!.history[0]).toMatchObject({ type: 'info', text: '[paused]' })
+		expect(client.currentTab()!.history[0]).toMatchObject({ type: 'log', text: '[paused]' })
 	})
 
 	test('steering prompt cancels a pending paused info block', async () => {
@@ -182,7 +182,7 @@ describe('client streaming blocks', () => {
 		const tab = client.currentTab()!
 		expect(tab.history).toHaveLength(3)
 		expect(tab.history[0]).toMatchObject({ type: 'assistant', text: 'hello ' })
-		expect(tab.history[1]).toMatchObject({ type: 'info', text: 'system.md was reloaded' })
+		expect(tab.history[1]).toMatchObject({ type: 'log', text: 'system.md was reloaded' })
 		expect(tab.history[2]).toMatchObject({ type: 'assistant', text: 'world' })
 		expect((tab.history[0] as any).id).toEqual(expect.any(String))
 		expect((tab.history[2] as any).continue).toBe((tab.history[0] as any).id)

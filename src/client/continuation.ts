@@ -8,7 +8,7 @@ function isMaxIterationsStop(text: string | undefined): boolean {
 
 function actionForBlock(block: Block): ContinueAction | false {
 	if (block.type === 'error') return isMaxIterationsStop(block.text) ? 'continue' : 'retry'
-	if (block.type === 'info' && (block.text === '[paused]' || block.text?.startsWith('[interrupted]'))) return 'continue'
+	if (block.type === 'log' && (block.text === '[paused]' || block.text?.startsWith('[interrupted]'))) return 'continue'
 	return false
 }
 
@@ -20,7 +20,7 @@ function actionForTab(tab: any, busy: boolean): ContinueAction | false {
 			if (busy) return false
 			continue
 		}
-		if (block.type === 'info' && !actionForBlock(block)) {
+		if ((block.type === 'log' || block.type === 'info') && !actionForBlock(block)) {
 			if (busy) return false
 			continue
 		}
