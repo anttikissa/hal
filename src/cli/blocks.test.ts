@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { blocks, type Block } from './blocks.ts'
+import { colors } from './colors.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -117,6 +118,34 @@ test('info block renders markdown tables', () => {
 	expect(body).toContain('┌────────┬──────┬────────────┐')
 	expect(body).toContain('│ Active │ Slot │ Account    │')
 	expect(body).toContain('│ *      │ 1/2  │ a@test.com │')
+})
+
+const markdownBlockTypes = ['assistant', 'thinking', 'info', 'warning', 'error', 'startup'] as const
+
+test('markdown code fences use block code color instead of dim style', () => {
+	colors.load()
+	for (const type of markdownBlockTypes) {
+		const block = { type, text: 'before\n```ts\nconst x = 1\n```\nafter' } as Block
+		const palette = (colors as any)[type]
+		const rendered = blocks.renderBlock(block, 80).join('\n')
+
+		expect(palette.code).toBeTruthy()
+		expect(rendered).toContain(`${palette.code}const x = 1${palette.fg}`)
+		expect(rendered).not.toContain('\x1b[2mconst x = 1')
+	}
+})
+
+test('inline markdown code uses block code color instead of dim style', () => {
+	colors.load()
+	for (const type of markdownBlockTypes) {
+		const block = { type, text: 'run `bun test` now' } as Block
+		const palette = (colors as any)[type]
+		const rendered = blocks.renderBlock(block, 80).join('\n')
+
+		expect(palette.code).toBeTruthy()
+		expect(rendered).toContain(`${palette.code}bun test${palette.fg}`)
+		expect(rendered).not.toContain('\x1b[2mbun test')
+	}
 })
 
 test('rendered block lines without tabs do not embed carriage returns', () => {

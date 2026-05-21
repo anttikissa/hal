@@ -17,7 +17,7 @@
 		fg: ["$fgL", "$fgC", 55],
 		bg: ["$bgL", 0.04, 55],
 		bold: [0.90, 0.06, 55],
-		code: [0.80, 0.04, 55],
+		code: [0.86, 0.04, 55],
 	},
 
 	// Thinking — muted blue-grey, recedes visually
@@ -25,7 +25,7 @@
 		fg: [0.65, 0.03, 250],
 		bg: [0.26, 0.02, 250],
 		bold: [0.85, 0.02, 250],
-		code: [0.75, 0.03, 250],
+		code: [0.78, 0.03, 250],
 	},
 
 	// User messages — teal, lively but not competing with orange
@@ -51,24 +51,28 @@
 	info: {
 		fg: [0.60, 0, 0],
 		bg: [0.20, 0, 0],
+		code: [0.72, 0, 0],
 	},
 
 	// Warnings — amber, noticeable but not fatal
 	warning: {
 		fg: [0.78, 0.14, 85],
 		bg: [0.28, 0.05, 85],
+		code: [0.88, 0.10, 85],
 	},
 
 	// Errors — hot red
 	error: {
 		fg: [0.70, 0.20, 25],
 		bg: [0.27, 0.08, 25],
+		code: [0.82, 0.14, 25],
 	},
 
 	// Startup + restart notices — bright cyan, clearly operational
 	startup: {
 		fg: [0.82, 0.11, 220],
 		bg: [0.29, 0.05, 220],
+		code: [0.92, 0.07, 220],
 	},
 
 	// Fork lineage — vivid purple, distinct from normal info/warning

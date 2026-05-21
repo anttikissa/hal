@@ -15,7 +15,7 @@ const COLORS_PATH = `${HAL_DIR}/colors.ason`
 
 // ── Public color objects — mutated in place by load() ────────────────────────
 
-type BlockColors = { fg: string; bg: string }
+type BlockColors = { fg: string; bg: string; bold?: string; code?: string }
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
@@ -79,19 +79,21 @@ function load(): void {
 
 	const vars: Record<string, number> = { ...raw.vars }
 
-	// Helper: resolve a block definition { fg: [...], bg: [...] }
+	// Helper: resolve a block definition { fg: [...], bg: [...] }.
+	// Markdown-rendered blocks may also define brighter inline/fenced code colors.
 	function resolveBlock(def: any, target: BlockColors): void {
 		if (def?.fg) target.fg = fg(def.fg, vars)
 		if (def?.bg) target.bg = bg(def.bg, vars)
+		if (def?.bold) target.bold = fg(def.bold, vars)
+		else delete target.bold
+		if (def?.code) target.code = fg(def.code, vars)
+		else delete target.code
 	}
 
-	// Assistant + thinking have extra md colors (bold, code)
 	function resolveMd(def: any, target: MdColors): void {
 		resolveBlock(def, target)
-		if (def?.bold) target.bold = fg(def.bold, vars)
-		else target.bold = target.fg
-		if (def?.code) target.code = fg(def.code, vars)
-		else target.code = target.fg
+		target.bold = target.bold || target.fg
+		target.code = target.code || target.fg
 	}
 
 	resolveMd(raw.assistant, assistant)

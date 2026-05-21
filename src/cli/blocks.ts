@@ -5,7 +5,7 @@
 //   thinking → tool₁ → tool₂ → assistant text
 // The split happens in historyToBlocks(). Rendering is in renderBlock().
 
-import { clipVisual, expandTabs, hardWrap, resolveMarkers, toLines, visLen, wordWrap } from '../utils/strings.ts'
+import { clipVisual, expandTabs, hardWrap, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, resolveMarkers, toLines, visLen, wordWrap } from '../utils/strings.ts'
 import { ason } from '../utils/ason.ts'
 import { models } from '../models.ts'
 import { time } from '../utils/time.ts'
@@ -13,7 +13,7 @@ import type { HistoryEntry } from '../server/sessions.ts'
 import { sessionEntry } from '../session/entry.ts'
 import { STATE_DIR } from '../state.ts'
 import { colors } from './colors.ts'
-import { md } from './md.ts'
+import { md, type MdColors } from './md.ts'
 import { bash } from '../tools/bash.ts'
 
 const blockConfig = {
@@ -475,15 +475,33 @@ function pushDimWrapped(lines: string[], text: string, cols: number): void {
 	for (const raw of text.split('\n')) for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) lines.push(`${DIM}${line}${DIM_OFF}`)
 }
 
+function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' | 'info' | 'warning' | 'error' | 'startup' }>): MdColors {
+	const palette = blockColors(block)
+	return {
+		bold: [M_BOLD, M_BOLD_OFF],
+		italic: [M_ITALIC, M_ITALIC_OFF],
+		code: palette.code ? [palette.code, palette.fg] : [palette.fg, palette.fg],
+	}
+}
+
+function pushCodeWrapped(lines: string[], text: string, cols: number, mdColors: MdColors): void {
+	for (const raw of text.split('\n')) {
+		for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) {
+			lines.push(`${mdColors.code[0]}${line}${mdColors.code[1]}`)
+		}
+	}
+}
+
 function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'info' | 'warning' | 'error' | 'startup' }>, cols: number): string[] {
 	const lines: string[] = []
+	const mdColors = markdownColors(block)
 	for (const span of md.mdSpans(markdownSourceText(block))) {
 		if (span.type === 'code') {
-			for (const raw of span.lines) pushDimWrapped(lines, raw, cols)
+			for (const raw of span.lines) pushCodeWrapped(lines, raw, cols, mdColors)
 		} else if (span.type === 'table') {
-			lines.push(...md.mdTable(span.lines, cols))
+			lines.push(...md.mdTable(span.lines, cols, mdColors))
 		} else {
-			for (const line of span.lines) lines.push(...wordWrap(md.mdInline(line), cols))
+			for (const line of span.lines) lines.push(...wordWrap(md.mdInline(line, mdColors), cols))
 		}
 	}
 	while (lines[0]?.trim() === '') lines.shift()
@@ -561,7 +579,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 
 const fixedNoticeColors = { info: colors.info, warning: colors.warning, error: colors.error, startup: colors.startup, fork: colors.startup }
 
-function blockColors(block: Block): { fg: string; bg: string } {
+function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.user
@@ -621,9 +639,7 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'info' | 'warning'
 	const { fg, bg } = blockColors(first)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	for (const block of group) {
-		for (const raw of expandTabs(sanitizeTerminalText(block.text), blockConfig.tabWidth).split('\n')) {
-			for (const line of wordWrap(raw, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
-		}
+		for (const line of renderMarkdownLines(block, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
 	}
 	lines[lines.length - 1]! += FG_OFF
 	return lines
