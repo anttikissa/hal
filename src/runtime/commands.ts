@@ -4,7 +4,7 @@
 // is recognized, it's handled directly and the prompt is not forwarded
 // to the model.
 
-import { existsSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { ipc } from '../ipc.ts'
@@ -267,6 +267,27 @@ function renderRuntimeStatus(): string {
 	return lines.join('\n')
 }
 
+async function runEditor(path: string): Promise<number> {
+	const editor = process.env.EDITOR || process.env.VISUAL || 'vim'
+	// Run through sh so EDITOR values with flags, like "vim -f", work.
+	// The file path is passed as $1 to avoid shell-quoting the temp path.
+	const proc = Bun.spawn(['sh', '-c', `${editor} "$1"`, 'hal-editor', path], {
+		stdin: 'inherit',
+		stdout: 'inherit',
+		stderr: 'inherit',
+	})
+	return await proc.exited
+}
+
+async function rebaseEditorSmokeTest(): Promise<CommandResult> {
+	const path = '/tmp/some.txt'
+	writeFileSync(path, 'Edit this text, save, and quit.\n')
+	const code = await runEditor(path)
+	const content = readFileSync(path, 'utf-8')
+	const output = `Editor exited with code ${code}.\n\n${content}`
+	return { output, handled: true }
+}
+
 // Keep /help output short, and put the fiddly syntax under /help <command>.
 function normalizeHelpTopic(args: string): string {
 	return args.trim().replace(/^\//, '')
@@ -283,6 +304,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	resume: { usage: '[session-id|name]', summary: 'Resume a closed session.', detail: 'With no id, lists recently closed sessions.' },
 	tabs: { usage: '[--all]', summary: 'List open tabs; use --all to include closed sessions.' },
 	compact: { summary: 'Summarize conversation to reduce context.' },
+	rebase: { summary: 'Open a temporary editor smoke test.' },
 	status: { summary: 'Show Anthropic / OpenAI subscription usage.', detail: 'Shows usage for all configured accounts.' },
 	login: {
 		usage: '<anthropic|openai> [code]',
@@ -338,7 +360,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 
 const commandSections: CommandSection[] = [
 	{ title: 'Common', names: ['exit', 'help', 'model', 'status'] },
-	{ title: 'Conversation', names: ['clear', 'compact', 'system'] },
+	{ title: 'Conversation', names: ['clear', 'compact', 'rebase', 'system'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
 	{ title: 'Setup & diagnostics', names: ['cd', 'config', 'login', 'mem'] },
@@ -511,6 +533,11 @@ handlers['compact'] = (_args, session) => {
 		sessionId: session.id,
 	})
 	return { output: 'Compacting conversation...', handled: true }
+}
+
+// /rebase — temporary smoke test for launching $EDITOR from Hal.
+handlers['rebase'] = async () => {
+	return await rebaseEditorSmokeTest()
 }
 
 // /status — runtime version + Anthropic / OpenAI OAuth subscription usage

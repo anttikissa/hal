@@ -11,7 +11,7 @@ import { ipc } from '../ipc.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 const sent: Array<{ sessionId: string; text: string; from?: string }> = []
@@ -33,6 +33,8 @@ const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 const origLoadAllHistory = sessionStore.loadAllHistory
 const origLoadLive = sessionStore.loadLive
 const origColumnsDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'columns')
+const origEditor = process.env.EDITOR
+const origVisual = process.env.VISUAL
 
 function makeSession(id = '04-aaa'): SessionState {
 	return {
@@ -73,6 +75,11 @@ afterEach(() => {
 	sessionStore.loadAllHistory = origLoadAllHistory
 	sessionStore.loadLive = origLoadLive
 	if (origColumnsDescriptor) Object.defineProperty(process.stdout, 'columns', origColumnsDescriptor)
+	if (origEditor === undefined) delete process.env.EDITOR
+	else process.env.EDITOR = origEditor
+	if (origVisual === undefined) delete process.env.VISUAL
+	else process.env.VISUAL = origVisual
+	rmSync('/tmp/some.txt', { force: true })
 })
 
 test('/send resolves a tab number', async () => {
@@ -470,6 +477,23 @@ test('/move rejects non-numeric positions', async () => {
 	expect(result.handled).toBe(true)
 	expect(result.output).toBeUndefined()
 	expect(result.error).toContain('Usage: /move <position>')
+})
+
+test('/rebase opens EDITOR and returns edited temp file content', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-rebase-test-'))
+	const editor = join(dir, 'editor.sh')
+	writeFileSync(editor, '#!/bin/sh\nprintf "from editor\\n" > "$1"\n')
+	chmodSync(editor, 0o755)
+	process.env.EDITOR = editor
+	delete process.env.VISUAL
+
+	const result = await commands.executeCommand('/rebase', makeSession())
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toContain('Editor exited with code 0.')
+	expect(result.output).toContain('from editor\n')
+	rmSync(dir, { recursive: true, force: true })
 })
 
 test('/keys is not listed as a runtime command', async () => {
