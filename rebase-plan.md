@@ -237,6 +237,28 @@ queue formula #1
 - Therefore `queue formula #1` queues `formula`, while quoted strings are the hidden way to queue text containing `#`.
 - Empty manual queue messages are rejected.
 
+## Terminal/editor ownership
+
+Launching `$EDITOR` is a full terminal handoff. Hal must not write anything to the initiating terminal while the editor is running.
+
+Client behavior:
+
+- Before spawning the editor, enter an `external-editor` mode for that client.
+- In `external-editor` mode, pause all rendering, status updates, prompt redraws, key-help redraws, progress notices, and history-follow redraws for that terminal.
+- Buffer or mark dirty any server events that arrive while the editor is open; do not render them until after the editor exits.
+- Restore the terminal to the state external programs expect before spawn: leave Hal fullscreen/alternate-screen mode if active, restore cursor, suspend raw-mode key handling, and stop consuming stdin.
+- Spawn the editor attached to the real terminal stdin/stdout/stderr.
+- After editor exit, restore Hal terminal mode, reread IPC/session state, process any buffered/dirty updates, and do one full redraw from scratch.
+- If editor launch fails, restore terminal mode before reporting the error.
+
+Server behavior:
+
+- Rebase itself still requires the target session to be idle, but other sessions may keep changing while the editor is open.
+- The server may keep appending IPC events, but it must not rely on the initiating client displaying anything until the editor exits.
+- Do not use `runtime.emitInfo` or any client-visible progress stream as part of the editor phase; the next visible output should happen only after terminal ownership returns to Hal.
+
+Implementation note: this terminal handoff must be implemented before the real `/rebase` editor UI. The smoke-test bug showed that running `vim` while Hal keeps rendering corrupts the terminal.
+
 ## Client/server protocol
 
 1. Client sends `rebase-start { sessionId, requestId }`.
