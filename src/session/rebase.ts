@@ -106,6 +106,17 @@ function truncateContent(text: string): { text: string; truncated: boolean } {
 	return { text: `${out}...`, truncated: true }
 }
 
+function clipContentToColumns(text: string, max: number): { text: string; truncated: boolean } {
+	if (visLen(text) <= max) return { text, truncated: false }
+	if (max <= 3) return { text: '.'.repeat(Math.max(0, max)), truncated: true }
+	let out = ''
+	for (const ch of text) {
+		if (visLen(`${out}${ch}...`) > max) break
+		out += ch
+	}
+	return { text: `${out}...`, truncated: true }
+}
+
 function makeTextRow(id: string, type: string, entry: HistoryEntry, text: string, editable: boolean, now: number): RebaseRow {
 	const rendered = ason.stringify(text, 'short')
 	const clipped = truncateContent(rendered)
@@ -211,10 +222,21 @@ function buildSnapshot(sessionId: string, baseLog: string, entries: HistoryEntry
 
 function renderRow(row: RebaseRow & { cmd?: RebaseCommand }): string {
 	const cmd = row.cmd ?? 'pick'
-	const head = `${cmd} ${row.id} ${row.type} ${row.contentText}`
+	const prefix = `${cmd} ${row.id} ${row.type} `
+	let contentText = row.contentText
+	if (row.comment) {
+		const maxContentWidth = Math.max(0, COMMENT_COLUMN - 1 - visLen(prefix))
+		const clipped = clipContentToColumns(contentText, maxContentWidth)
+		contentText = clipped.text
+		if (clipped.truncated) {
+			row.contentText = contentText
+			row.truncated = true
+		}
+	}
+	const head = `${prefix}${contentText}`
 	if (!row.comment) return head
 	const width = visLen(head)
-	const gap = width < COMMENT_COLUMN ? ' '.repeat(COMMENT_COLUMN - width) : ' '
+	const gap = width < COMMENT_COLUMN ? ' '.repeat(COMMENT_COLUMN - width) : ''
 	return `${head}${gap}# ${row.comment}`
 }
 

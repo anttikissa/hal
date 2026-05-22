@@ -18,6 +18,18 @@ test('renders and parses quoted hashes without treating them as comments', () =>
 	expect(parsed.items[0]).toMatchObject({ cmd: 'pick', id: '000001-aaa', content: 'hello #1' })
 })
 
+test('aligns comments by rendered screen width after type prefix', () => {
+	const entries = [
+		entry('user', { entryId: '000001-aaa', parts: [{ type: 'text', text: 'short' }] }),
+		entry('thinking', { entryId: '000002-bbb', text: '**Considering Git operations**\n\nI need to inspect the state before continuing.', signature: 'sig', thinkingEffort: 'high' }),
+	]
+	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries, { now: new Date('2026-05-22T10:01:00.000Z') })
+	const lines = rebase.renderTodo(snapshot).split('\n').filter((line) => line.startsWith('pick '))
+	const commentColumns = lines.map((line) => line.indexOf('#'))
+
+	expect(commentColumns).toEqual([66, 66])
+})
+
 test('queue rows must be a suffix', () => {
 	const entries = [
 		entry('user', { entryId: '000001-aaa', parts: [{ type: 'text', text: 'first' }] }),
