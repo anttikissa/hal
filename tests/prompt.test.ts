@@ -105,6 +105,16 @@ describe('prompt', () => {
 		}
 	})
 
+	test('option movement keeps consecutive punctuation together', () => {
+		prompt.setText('word ### another', 'word'.length)
+		prompt.handleKey(key('right', { alt: true }), 80)
+		expect(prompt.cursorPos()).toBe('word ###'.length)
+
+		prompt.setText('word ### another', 'word ### '.length)
+		prompt.handleKey(key('left', { alt: true }), 80)
+		expect(prompt.cursorPos()).toBe('word ###'.length)
+	})
+
 	test('option-left and option-right match recorded Zed stops', () => {
 		const text = '\tx = Math.round(255 * Math.max(0, x * 0.0031308))'
 		const leftStops = [48, 40, 38, 36, 34, 32, 31, 27, 22, 20, 16, 10, 5]

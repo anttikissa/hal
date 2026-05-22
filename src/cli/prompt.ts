@@ -150,8 +150,10 @@ function optionWordLeft(text: string, pos: number): number {
 	// Operators reached through whitespace are separate stops. Punctuation
 	// adjacent to a word is just a separator around that word.
 	if (isPunctuationTokenChar(text[i - 1]!)) {
-		if (startedOnSpace) return i - 1
-		while (i > 0 && isPunctuationTokenChar(text[i - 1]!)) i--
+		let start = i
+		while (start > 0 && isPunctuationTokenChar(text[start - 1]!)) start--
+		if (startedOnSpace) return i - start > 1 ? i : i - 1
+		i = start
 	}
 
 	while (i > 0 && isSpaceChar(text[i - 1]!)) i--
@@ -192,7 +194,10 @@ function optionWordRight(text: string, pos: number): number {
 	}
 
 	while (i < text.length && isSpaceChar(text[i]!)) i++
-	if (i < text.length && isPunctuationTokenChar(text[i]!)) return i + 1
+	if (i < text.length && isPunctuationTokenChar(text[i]!)) {
+		while (i < text.length && isPunctuationTokenChar(text[i]!)) i++
+		return i
+	}
 	while (i < text.length && isWordTokenChar(text[i]!)) i++
 	return i
 }
