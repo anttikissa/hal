@@ -279,10 +279,10 @@ describe('render', () => {
 		expect(clean).not.toContain('lock:')
 	})
 
-	test('status line shows human name before session id', () => {
+	test('status line shows session id before human name', () => {
 		client.currentTab()!.name = 'Pause Fix'
 		const clean = stripAnsi(captureOutput(() => render.draw()))
-		expect(clean).toContain('Pause Fix (test)')
+		expect(clean).toContain('test: Pause Fix')
 	})
 
 	test('client status line shows a host mismatch badge on the right', () => {

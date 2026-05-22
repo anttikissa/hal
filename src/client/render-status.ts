@@ -192,7 +192,7 @@ function currentHalDir(): string {
 
 function sessionStatusLabel(tab: Tab, base: string): string {
 	if (!renderStatus.hasCustomSessionName(tab)) return tab.sessionId
-	return `${renderStatus.colorText(tab.name, renderStatus.statusHighlightColor(), base)} (${tab.sessionId})`
+	return `${tab.sessionId}: ${renderStatus.colorText(tab.name, renderStatus.statusHighlightColor(), base)}`
 }
 
 function cwdStatusLabel(tab: Tab, base: string): string {
