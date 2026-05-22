@@ -68,6 +68,8 @@ export type HistoryEntry =
 	| { type: 'reset' | 'compact'; ts?: string }
 	| { type: 'forked_from'; parent: string; ts?: string }
 	| { type: 'forked_to'; child: string; ts?: string }
+	| { type: 'cwd'; from: string; to: string; visibility?: 'next-user'; ts?: string }
+	| { type: 'model'; from: string; to: string; visibility?: 'next-user'; ts?: string }
 	| { type: 'input_history'; text: string; ts?: string }
 
 export interface SessionLive {

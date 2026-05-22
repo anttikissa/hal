@@ -416,7 +416,6 @@ handlers['model'] = (args, session) => {
 	const newDisplay = models.displayModel(newModel)
 	return {
 		output: `Model changed from ${oldDisplay} (${oldModel}) to ${newDisplay} (${newModel})`,
-		meta: [`model changed from ${oldModel} to ${newModel}`],
 		ui: 'notice',
 		handled: true,
 	}
@@ -661,7 +660,6 @@ handlers['cd'] = (args, session) => {
 	}
 	return {
 		output: parts.join('\n'),
-		meta: [`cwd changed from ${old} to ${target}`],
 		handled: true,
 	}
 }

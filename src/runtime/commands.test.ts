@@ -542,28 +542,29 @@ test('/help model shows layered help for another command', async () => {
 })
 
 
-test('/model returns model-change metadata for the next model turn', async () => {
+test('/model changes session model and user-visible output', async () => {
 	const session = makeSession()
 	session.model = 'openai/gpt-5.4'
 	const result = await commands.executeCommand('/model gpt-5.5', session)
 
 	expect(result.handled).toBe(true)
-	expect(result.meta).toEqual(['model changed from openai/gpt-5.4 to openai/gpt-5.5'])
+	expect(session.model).toBe('openai/gpt-5.5')
+	expect(result.meta).toBeUndefined()
 	expect(result.output).toBe('Model changed from GPT 5.4 (openai/gpt-5.4) to GPT 5.5 (openai/gpt-5.5)')
 	expect(result.ui).toBe('notice')
 })
 
 
-test('/cd returns cwd-change metadata for the next model turn', async () => {
+test('/cd changes session cwd without command metadata', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-cd-meta-'))
 	const session = makeSession()
 
 	try {
-		const old = session.cwd
 		const result = await commands.executeCommand(`/cd ${dir}`, session)
 
 		expect(result.handled).toBe(true)
-		expect(result.meta).toEqual([`cwd changed from ${old} to ${dir}`])
+		expect(session.cwd).toBe(dir)
+		expect(result.meta).toBeUndefined()
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
@@ -578,7 +579,7 @@ test('/cd with no args changes to Hal directory', async () => {
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
 	expect(session.cwd).toBe(process.cwd())
-	expect(result.meta).toEqual([`cwd changed from ${tmpdir()} to ${process.cwd()}`])
+	expect(result.meta).toBeUndefined()
 })
 
 test('/config --help reuses detailed config help', async () => {

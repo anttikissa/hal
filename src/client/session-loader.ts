@@ -18,6 +18,7 @@ function entryActivityTs(entry: HistoryEntry): number | null {
 		return entry.ts ? Date.parse(entry.ts) : null
 	}
 	if (entry.type === 'info' || entry.type === 'warning') return null
+	if (entry.type === 'cwd' || entry.type === 'model') return null
 	return entry.ts ? Date.parse(entry.ts) : null
 }
 

@@ -21,6 +21,10 @@ function syntheticText(text: string): string {
 	return `<synthetic>${text}</synthetic>`
 }
 
+function structuralMetaText(entry: Extract<HistoryEntry, { type: 'cwd' | 'model' }>): string {
+	return `${entry.type} changed from ${entry.from} to ${entry.to}`
+}
+
 const apiConfig = {
 	// Max chars for tool result content before truncation
 	maxToolOutput: 50_000,
@@ -72,6 +76,14 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 			const visibility = entry.visibility ?? (entry.type === 'error' || (entry.type === 'log' && entry.level === 'error') ? 'next-user' : 'ui')
 			if (visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
 				pendingInfos.push(metaText(entry.text))
+			}
+			continue
+		}
+
+		if (entry.type === 'cwd' || entry.type === 'model') {
+			const turnsRemaining = totalUserTurns - userTurnsSeen
+			if (entry.visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
+				pendingInfos.push(metaText(structuralMetaText(entry)))
 			}
 			continue
 		}

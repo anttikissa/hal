@@ -6,7 +6,7 @@ import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import type { Command, SpawnCommandData } from '../protocol.ts'
 import { models } from '../models.ts'
-import { sessions as sessionStore, type SessionMeta, type UserPart } from './sessions.ts'
+import { sessions as sessionStore, type HistoryEntry, type SessionMeta, type UserPart } from './sessions.ts'
 import { commands } from '../runtime/commands.ts'
 import type { SessionState } from '../runtime/commands.ts'
 import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
@@ -179,6 +179,19 @@ function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'no
 
 function recordSessionMeta(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts, ...(ui ? { ui } : {}) }])
+}
+
+function stateModel(model?: string): string {
+	return model ?? models.defaultModel()
+}
+
+function recordSessionStateChanges(sessionId: string, prevCwd: string, nextCwd: string, prevModel?: string, nextModel?: string, ts = new Date().toISOString()): void {
+	const entries: HistoryEntry[] = []
+	if (prevCwd !== nextCwd) entries.push({ type: 'cwd', from: prevCwd, to: nextCwd, visibility: 'next-user', ts })
+	const fromModel = stateModel(prevModel)
+	const toModel = stateModel(nextModel)
+	if (fromModel !== toModel) entries.push({ type: 'model', from: fromModel, to: toModel, visibility: 'next-user', ts })
+	if (entries.length > 0) sessionStore.appendHistorySync(sessionId, entries)
 }
 
 function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
@@ -466,6 +479,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 			})
 			broadcastSessions()
 		}
+		recordSessionStateChanges(sessionId, prevCwd, sessionState.cwd, prevModel, sessionState.model)
 		const metaTs = new Date().toISOString()
 		for (const message of cmdResult.meta ?? []) recordSessionMeta(sessionId, message, metaTs, cmdResult.ui)
 		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui)

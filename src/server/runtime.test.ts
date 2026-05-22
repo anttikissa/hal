@@ -122,6 +122,51 @@ test('fork command persists one child notice without duplicating bare session id
 	}
 })
 
+
+test('slash command state changes are persisted as structural history entries', async () => {
+	const sessionId = '04-structural-meta'
+	const meta: SessionMeta = { id: sessionId, workingDir: '/work', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5.4' }
+	const history: any[] = []
+	const events: any[] = []
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origAppendEvent = ipc.appendEvent
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origUpdateMeta = sessions.updateMeta
+	const origAppendHistorySync = sessions.appendHistorySync
+	const origIsActive = agentLoop.isActive
+	const origIsHeld = promptQueue.isHeld
+
+	try {
+		ipc.ownsHostLock = () => true
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
+		sessions.updateMeta = (_id, patch) => {
+			Object.assign(meta, patch)
+			return meta
+		}
+		sessions.appendHistorySync = (_id, entries) => { history.push(...entries) }
+		agentLoop.isActive = () => false
+		promptQueue.isHeld = () => false
+
+		await runtime.enqueuePrompt(sessionId, '/model gpt-5.5')
+
+		expect(meta.model).toBe('openai/gpt-5.5')
+		expect(history).toMatchObject([
+			{ type: 'model', from: 'openai/gpt-5.4', to: 'openai/gpt-5.5', visibility: 'next-user' },
+		])
+		expect(history[0].text).toBeUndefined()
+		expect(events.some((event) => event.text?.startsWith('Model changed from'))).toBe(true)
+	} finally {
+		ipc.ownsHostLock = origOwnsHostLock
+		ipc.appendEvent = origAppendEvent
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.updateMeta = origUpdateMeta
+		sessions.appendHistorySync = origAppendHistorySync
+		agentLoop.isActive = origIsActive
+		promptQueue.isHeld = origIsHeld
+	}
+})
+
 test('open command inherits cwd and model from opener tab', () => {
 	const parentId = '04-parent-open'
 	const metas: Record<string, SessionMeta> = {
