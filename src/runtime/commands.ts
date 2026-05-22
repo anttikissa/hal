@@ -4,7 +4,7 @@
 // is recognized, it's handled directly and the prompt is not forwarded
 // to the model.
 
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { ipc } from '../ipc.ts'
@@ -267,26 +267,6 @@ function renderRuntimeStatus(): string {
 	return lines.join('\n')
 }
 
-async function runEditor(path: string): Promise<number> {
-	const editor = process.env.EDITOR || process.env.VISUAL || 'vim'
-	// Run through sh so EDITOR values with flags, like "vim -f", work.
-	// The file path is passed as $1 to avoid shell-quoting the temp path.
-	const proc = Bun.spawn(['sh', '-c', `${editor} "$1"`, 'hal-editor', path], {
-		stdin: 'inherit',
-		stdout: 'inherit',
-		stderr: 'inherit',
-	})
-	return await proc.exited
-}
-
-async function rebaseEditorSmokeTest(): Promise<CommandResult> {
-	const path = '/tmp/some.txt'
-	writeFileSync(path, 'Edit this text, save, and quit.\n')
-	const code = await runEditor(path)
-	const content = readFileSync(path, 'utf-8')
-	const output = `Editor exited with code ${code}.\n\n${content}`
-	return { output, handled: true }
-}
 
 // Keep /help output short, and put the fiddly syntax under /help <command>.
 function normalizeHelpTopic(args: string): string {
@@ -304,7 +284,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	resume: { usage: '[session-id|name]', summary: 'Resume a closed session.', detail: 'With no id, lists recently closed sessions.' },
 	tabs: { usage: '[--all]', summary: 'List open tabs; use --all to include closed sessions.' },
 	compact: { summary: 'Summarize conversation to reduce context.' },
-	rebase: { summary: 'Open a temporary editor smoke test.' },
+	rebase: { summary: 'Interactively rewrite session context history.' },
 	status: { summary: 'Show Anthropic / OpenAI subscription usage.', detail: 'Shows usage for all configured accounts.' },
 	login: {
 		usage: '<anthropic|openai> [code]',
@@ -535,9 +515,9 @@ handlers['compact'] = (_args, session) => {
 	return { output: 'Compacting conversation...', handled: true }
 }
 
-// /rebase — temporary smoke test for launching $EDITOR from Hal.
+// /rebase is handled by the interactive client so the editor runs on the user's terminal.
 handlers['rebase'] = async () => {
-	return await rebaseEditorSmokeTest()
+	return { error: 'Run /rebase from an interactive client terminal.', handled: true }
 }
 
 // /status — runtime version + Anthropic / OpenAI OAuth subscription usage

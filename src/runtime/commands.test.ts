@@ -11,7 +11,7 @@ import { ipc } from '../ipc.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 const sent: Array<{ sessionId: string; text: string; from?: string }> = []
@@ -479,21 +479,11 @@ test('/move rejects non-numeric positions', async () => {
 	expect(result.error).toContain('Usage: /move <position>')
 })
 
-test('/rebase opens EDITOR and returns edited temp file content', async () => {
-	const dir = mkdtempSync(join(tmpdir(), 'hal-rebase-test-'))
-	const editor = join(dir, 'editor.sh')
-	writeFileSync(editor, '#!/bin/sh\nprintf "from editor\\n" > "$1"\n')
-	chmodSync(editor, 0o755)
-	process.env.EDITOR = editor
-	delete process.env.VISUAL
-
+test('/rebase runtime handler points users to the interactive client', async () => {
 	const result = await commands.executeCommand('/rebase', makeSession())
 
 	expect(result.handled).toBe(true)
-	expect(result.error).toBeUndefined()
-	expect(result.output).toContain('Editor exited with code 0.')
-	expect(result.output).toContain('from editor\n')
-	rmSync(dir, { recursive: true, force: true })
+	expect(result.error).toBe('Run /rebase from an interactive client terminal.')
 })
 
 test('/keys is not listed as a runtime command', async () => {

@@ -32,6 +32,12 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 		case 'reset':
 		case 'compact':
 			return { type, sessionId }
+		case 'rebase-start':
+			return { type, sessionId, requestId: text ?? '', clientPid: process.pid }
+		case 'rebase-apply': {
+			const requestId = displayText ?? ''
+			return { type, sessionId, requestId, clientPid: process.pid, todo: text ?? '' }
+		}
 		case 'rename':
 			return { type, sessionId, name: text ?? '' }
 		case 'spawn':

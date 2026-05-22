@@ -1,6 +1,8 @@
 // CLI -- terminal input handling. See docs/terminal.md for rules.
 // Thin layer: parses keys, dispatches to prompt or app keybindings.
 
+import { readFileSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import { client } from '../client.ts'
 import { render } from './render.ts'
 import { cursor } from '../cli/cursor.ts'
@@ -229,6 +231,73 @@ function openToolConfirm(event: any): void {
 	draw()
 }
 
+function rebaseRequestId(): string {
+	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+async function runExternalEditor(path: string): Promise<number> {
+	const editor = process.env.EDITOR || process.env.VISUAL || 'vim'
+	const wasTty = process.stdin.isTTY
+	process.stdin.pause()
+	cleanupTerminal()
+	const proc = Bun.spawn(['sh', '-c', `${editor} "$1"`, 'hal-editor', path], {
+		stdin: 'inherit',
+		stdout: 'inherit',
+		stderr: 'inherit',
+	})
+	const code = await proc.exited
+	terminalCleaned = false
+	if (wasTty) {
+		process.stdin.setRawMode(true)
+		process.stdin.setEncoding('utf8')
+		process.stdin.resume()
+		if (useKitty) process.stdout.write(KITTY_ON)
+		process.stdout.write(BRACKETED_PASTE_ON)
+		writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
+	}
+	else {
+		process.stdin.resume()
+	}
+	cursor.start(() => {
+		if (!render.hasAnimatedIndicators()) return
+		draw()
+	})
+	draw(true)
+	return code
+}
+
+async function openRebaseEditor(event: any): Promise<void> {
+	const path = `${tmpdir()}/hal-rebase-${event.sessionId}-${event.requestId}.txt`
+	writeFileSync(path, String(event.todo ?? ''))
+	const code = await runExternalEditor(path)
+	if (code !== 0) {
+		client.addEntry(`Rebase editor exited with code ${code}`, 'error')
+		return
+	}
+	const todo = readFileSync(path, 'utf-8')
+	client.sendCommand('rebase-apply', todo, String(event.requestId ?? ''))
+}
+
+function handleRebaseStart(event: any): void {
+	void openRebaseEditor(event)
+}
+
+function handleRebaseResult(event: any): void {
+	if (event.ok) {
+		if (event.aborted) client.addEntry('Rebase aborted.')
+		else client.addEntry(`Rebased to ${event.newLog}${event.queued ? `; queued ${event.queued}` : ''}.`)
+		draw(true)
+		return
+	}
+	const errors = Array.isArray(event.errors) ? event.errors.map(String) : ['Rebase failed']
+	if (event.todo) {
+		void openRebaseEditor({ ...event, todo: `${errors.map((err: string) => `# ${err}`).join('\n')}\n${event.todo}` })
+		return
+	}
+	client.addEntry(errors.join('\n'), 'error')
+	draw(true)
+}
+
 function submitPromptText(text: string, displayText: string | undefined, delivery?: 'queue'): void {
 	completion.dismiss()
 	popup.close()
@@ -243,12 +312,21 @@ function submitPromptText(text: string, displayText: string | undefined, deliver
 }
 
 function handleLocalCommand(text: string): boolean {
-	if (text !== '/keys') return false
-	prompt.pushHistory(text)
-	client.addEntry(keyHelp.render())
-	prompt.clear()
-	client.onSubmit(text)
-	return true
+	if (text === '/keys') {
+		prompt.pushHistory(text)
+		client.addEntry(keyHelp.render())
+		prompt.clear()
+		client.onSubmit(text)
+		return true
+	}
+	if (text === '/rebase') {
+		prompt.pushHistory(text)
+		client.sendCommand('rebase-start', rebaseRequestId())
+		prompt.clear()
+		client.onSubmit(text)
+		return true
+	}
+	return false
 }
 
 function submit(override?: string, delivery?: 'queue'): void {
@@ -459,6 +537,8 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
 	client.setOnToolConfirmRequest(openToolConfirm)
+	client.setOnRebaseStart(handleRebaseStart)
+	client.setOnRebaseResult(handleRebaseResult)
 
 	// Wire prompt to trigger repaint on async paste resolve.
 	prompt.setRenderCallback(() => {

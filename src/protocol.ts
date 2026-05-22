@@ -18,10 +18,13 @@ export type EventType =
 	| 'tool-call'
 	| 'tool-result'
 	| 'tool-confirm-request'
+	| 'rebase-start'
+	| 'rebase-result'
+	| 'history-rebased'
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'move' | 'rename' | 'spawn' | 'tool-confirm'
+export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'rename' | 'spawn' | 'tool-confirm'
 
 export type SpawnMode = 'fork' | 'fresh'
 
@@ -93,6 +96,19 @@ export interface CompactCommand extends CommandBase {
 	type: 'compact'
 }
 
+export interface RebaseStartCommand extends CommandBase {
+	type: 'rebase-start'
+	requestId: string
+	clientPid: number
+}
+
+export interface RebaseApplyCommand extends CommandBase {
+	type: 'rebase-apply'
+	requestId: string
+	clientPid: number
+	todo: string
+}
+
 export interface MoveCommand extends CommandBase {
 	type: 'move'
 	position: number
@@ -136,6 +152,8 @@ export type Command =
 	| AbortCommand
 	| ResetCommand
 	| CompactCommand
+	| RebaseStartCommand
+	| RebaseApplyCommand
 	| MoveCommand
 	| RenameCommand
 	| SpawnCommand

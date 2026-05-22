@@ -179,6 +179,12 @@ function historyToBlocks(
 			case 'forked_to':
 				result.push({ type: 'info', text: `Tab forked to ${entry.child}.`, ts, dimmed })
 				break
+			case 'rebased_from':
+				result.push({ type: 'info', text: `Rebased from ${entry.log}.`, ts, dimmed })
+				break
+			case 'rebased_to':
+				result.push({ type: 'info', text: `Rebased to ${entry.log}.`, ts, dimmed })
+				break
 			case 'cwd':
 				result.push({ type: 'info', text: `cwd: ${entry.from} -> ${entry.to}`, ts, dimmed })
 				break

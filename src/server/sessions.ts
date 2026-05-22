@@ -2,6 +2,7 @@
 // sessions are read straight from disk until the runtime resumes them.
 
 import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync } from 'fs'
+import { randomBytes } from 'crypto'
 import type { SharedSessionInfo } from '../ipc.ts'
 import { STATE_DIR, ensureDir } from '../state.ts'
 import { ipc } from '../ipc.ts'
@@ -10,7 +11,6 @@ import { liveFiles } from '../utils/live-file.ts'
 import { liveEventBlocks } from '../live-event-blocks.ts'
 import type { PartialTokenUsage } from '../protocol.ts'
 import { models } from '../models.ts'
-
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
 const liveSessionMetas = new Map<string, SessionMeta>()
@@ -37,7 +37,8 @@ export interface SessionMeta {
 
 export type UserPart = { type: 'text'; text: string; displayText?: string } | { type: 'image'; blobId: string; originalFile?: string }
 
-export type HistoryEntry =
+export type EntryIdentity = { entryId?: string }
+export type HistoryEntry = EntryIdentity & (
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; status?: string; ts?: string }
 	| {
 			type: 'thinking'
@@ -48,7 +49,7 @@ export type HistoryEntry =
 			model?: string
 			thinkingEffort?: string
 			ts?: string
-	  }
+		}
 	| {
 			type: 'assistant'
 			text: string
@@ -59,7 +60,7 @@ export type HistoryEntry =
 			synthetic?: boolean
 			syntheticKind?: string
 			ts?: string
-		  }
+		}
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; ts?: string }
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; ts?: string }
 	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ts?: string }
@@ -68,9 +69,12 @@ export type HistoryEntry =
 	| { type: 'reset' | 'compact'; ts?: string }
 	| { type: 'forked_from'; parent: string; ts?: string }
 	| { type: 'forked_to'; child: string; ts?: string }
+	| { type: 'rebased_from'; log: string; ts?: string }
+	| { type: 'rebased_to'; log: string; ts?: string }
 	| { type: 'cwd'; from: string; to: string; visibility?: 'next-user'; ts?: string }
 	| { type: 'model'; from: string; to: string; visibility?: 'next-user'; ts?: string }
 	| { type: 'input_history'; text: string; ts?: string }
+)
 
 export interface SessionLive {
 	blocks: any[]
@@ -113,6 +117,30 @@ function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
 	if (!meta.id) meta.id = sessionId
 	if (!meta.currentLog) meta.currentLog = DEFAULT_LOG
 	return meta
+}
+
+function makeEntryId(): string {
+	const head = Math.max(0, Date.now()).toString(36).slice(-6).padStart(6, '0')
+	const bytes = randomBytes(3)
+	const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+	let tail = ''
+	for (let i = 0; i < 3; i++) tail += alphabet[bytes[i]! % alphabet.length]
+	return `${head}-${tail}`
+}
+
+function ensureEntryIds(entries: HistoryEntry[]): HistoryEntry[] {
+	for (const entry of entries) {
+		const entryId = entry.entryId ?? makeEntryId()
+		Object.defineProperty(entry, 'entryId', { value: entryId, enumerable: true, writable: true, configurable: true })
+	}
+	return entries
+}
+
+function hideEntryIds(entries: HistoryEntry[]): HistoryEntry[] {
+	for (const entry of entries) {
+		if (entry.entryId) Object.defineProperty(entry, 'entryId', { value: entry.entryId, enumerable: false, writable: true, configurable: true })
+	}
+	return entries
 }
 
 function defaultLive(): SessionLive { return { blocks: [] } }
@@ -200,7 +228,7 @@ function loadHistory(sessionId: string): HistoryEntry[] {
 	if (!existsSync(path)) return []
 	try {
 		const content = readFileSync(path, 'utf-8')
-		return content.trim() ? (ason.parseAll(content) as HistoryEntry[]) : []
+		return content.trim() ? hideEntryIds(ason.parseAll(content) as HistoryEntry[]) : []
 	} catch {
 		return []
 	}
@@ -285,7 +313,7 @@ function createSession(id: string, meta: SessionMeta): SessionMeta {
 function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
-	appendFileSync(historyLogPath(sessionId), `${entries.map((entry) => ason.stringify(entry, 'short')).join('\n')}\n`)
+	appendFileSync(historyLogPath(sessionId), `${ensureEntryIds(entries).map((entry) => ason.stringify(entry, 'short')).join('\n')}\n`)
 }
 
 function updateMeta(sessionId: string, updates: Partial<SessionMeta>): void {
@@ -312,6 +340,27 @@ function rewriteHistoryAfterRotation(sessionId: string, entries: HistoryEntry[])
 	const newLog = rotateLog(sessionId)
 	const forkEntry = oldEntries[0]?.type === 'forked_from' ? [oldEntries[0]] : []
 	appendHistory(sessionId, [...forkEntry, ...entries])
+	return { oldLog, newLog }
+}
+
+function nextHistoryLogName(currentLog: string): string {
+	const match = currentLog.match(/^history(\d*)\.asonl$/)
+	const current = match ? (match[1] ? parseInt(match[1], 10) : 1) : 1
+	return `history${current + 1}.asonl`
+}
+
+function rewriteHistoryForRebase(sessionId: string, entries: HistoryEntry[]): { oldLog: string; newLog: string } {
+	ensureSessionDir(sessionId)
+	const oldLog = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
+	const newLog = nextHistoryLogName(oldLog)
+	const ts = new Date().toISOString()
+	const oldEntries = loadHistory(sessionId)
+	const forkEntry = oldEntries[0]?.type === 'forked_from' ? [oldEntries[0]] : []
+	const bodyEntries = entries[0]?.type === 'forked_from' ? entries.slice(1) : entries
+	const rebasedEntries = ensureEntryIds([...forkEntry, { type: 'rebased_from', log: oldLog, ts }, ...bodyEntries])
+	appendFileSync(historyLogPath(sessionId, newLog), `${rebasedEntries.map((entry) => ason.stringify(entry, 'short')).join('\n')}\n`)
+	appendFileSync(historyLogPath(sessionId, oldLog), `${ason.stringify(ensureEntryIds([{ type: 'rebased_to', log: newLog, ts }])[0], 'short')}\n`)
+	updateMeta(sessionId, { currentLog: newLog })
 	return { oldLog, newLog }
 }
 
@@ -386,6 +435,7 @@ export const sessions = {
 	deleteSession,
 	rotateLog,
 	rewriteHistoryAfterRotation,
+	rewriteHistoryForRebase,
 	pickMostRecentlyClosedSessionId,
 	resolveResumeTarget,
 	sessionOpenInfo,

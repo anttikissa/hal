@@ -2,6 +2,7 @@
 //
 // Broadcasts session list via IPC. Clients load history directly from disk.
 
+import { createHash } from 'crypto'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import type { Command, SpawnCommandData } from '../protocol.ts'
@@ -12,6 +13,7 @@ import type { SessionState } from '../runtime/commands.ts'
 import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
+import { rebase, type RebaseSnapshot } from '../session/rebase.ts'
 import { attachments } from '../session/attachments.ts'
 import { sessionIds } from '../session/ids.ts'
 import { replay } from '../session/replay.ts'
@@ -28,6 +30,8 @@ const state = {
 	activeRuntimePid: null as number | null,
 	stopPromptWatch: null as (() => void) | null,
 }
+
+const rebaseSnapshots = new Map<string, { sessionId: string; clientPid: number; baseLog: string; baseHash: string; snapshot: RebaseSnapshot }>()
 
 const USER_PAUSED_TEXT = '[paused]'
 const RESTARTED_TEXT = '[restarted]'
@@ -626,6 +630,69 @@ function runCompact(sessionId: string): void {
 	emitInfo(sessionId, `Context compacted (${userMsgs.length} user messages summarized, now writing to ${newLog})`)
 }
 
+function historyHash(entries: HistoryEntry[]): string {
+	const text = entries.map((entry) => JSON.stringify(entry)).join('\n')
+	return createHash('sha256').update(text).digest('hex')
+}
+
+function emitRebaseResult(clientPid: number, requestId: string, sessionId: string, result: Record<string, any>): void {
+	ipc.appendEvent({ type: 'rebase-result', targetPid: clientPid, requestId, sessionId, ...result })
+}
+
+function runRebaseStart(sessionId: string, requestId: string, clientPid: number): void {
+	if (agentLoop.isActive(sessionId)) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is busy'] })
+		return
+	}
+	const entries = sessionStore.loadHistory(sessionId)
+	const baseLog = sessionStore.loadSessionMeta(sessionId)?.currentLog ?? 'history.asonl'
+	const baseHash = historyHash(entries)
+	const snapshot = rebase.buildSnapshot(sessionId, baseLog, entries)
+	rebaseSnapshots.set(requestId, { sessionId, clientPid, baseLog, baseHash, snapshot })
+	ipc.appendEvent({ type: 'rebase-start', targetPid: clientPid, requestId, sessionId, todo: rebase.renderTodo(snapshot) })
+}
+
+async function runRebaseApply(sessionId: string, requestId: string, clientPid: number, todo: string): Promise<void> {
+	const saved = rebaseSnapshots.get(requestId)
+	if (!saved || saved.sessionId !== sessionId) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Rebase request expired'] })
+		return
+	}
+	if (agentLoop.isActive(sessionId)) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is busy'] })
+		return
+	}
+	const currentEntries = sessionStore.loadHistory(sessionId)
+	const currentLog = sessionStore.loadSessionMeta(sessionId)?.currentLog ?? 'history.asonl'
+	if (currentLog !== saved.baseLog || historyHash(currentEntries) !== saved.baseHash) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['History changed while editor was open; restart /rebase.'] })
+		return
+	}
+	const parsed = rebase.parseTodo(saved.snapshot, todo)
+	if (parsed.aborted) {
+		rebaseSnapshots.delete(requestId)
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, aborted: true })
+		return
+	}
+	if (parsed.errors.length > 0) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: parsed.errors, todo })
+		return
+	}
+	let applied
+	try {
+		applied = rebase.applyParsed(saved.snapshot, parsed)
+		apiMessages.toProviderMessages(sessionId, applied.entries, { prune: false })
+	} catch (err) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: [errorMessage(err)], todo })
+		return
+	}
+	const { oldLog, newLog } = sessionStore.rewriteHistoryForRebase(sessionId, applied.entries)
+	rebaseSnapshots.delete(requestId)
+	ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog })
+	for (const text of applied.queue) await enqueuePrompt(sessionId, text)
+	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
+}
+
 function handleCommand(cmd: Command): void {
 	const sessionId = cmd.sessionId ?? state.activeSessions[0]
 	switch (cmd.type) {
@@ -665,6 +732,16 @@ function handleCommand(cmd: Command): void {
 		case 'compact': {
 			if (!sessionId) return
 			runCompact(sessionId)
+			break
+		}
+		case 'rebase-start': {
+			if (!sessionId) return
+			runRebaseStart(sessionId, cmd.requestId, cmd.clientPid)
+			break
+		}
+		case 'rebase-apply': {
+			if (!sessionId) return
+			void runRebaseApply(sessionId, cmd.requestId, cmd.clientPid, cmd.todo)
 			break
 		}
 		case 'open': {

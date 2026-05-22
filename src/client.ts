@@ -120,6 +120,8 @@ const state = {
 let pendingEntries: Block[] = []
 let onChange: (force: boolean) => void = () => {}
 let onToolConfirmRequest: ((event: any) => void) | null = null
+let onRebaseStart: ((event: any) => void) | null = null
+let onRebaseResult: ((event: any) => void) | null = null
 
 
 
@@ -158,6 +160,14 @@ function setOnChange(fn: (force: boolean) => void): void {
 
 function setOnToolConfirmRequest(fn: (event: any) => void): void {
 	onToolConfirmRequest = fn
+}
+
+function setOnRebaseStart(fn: (event: any) => void): void {
+	onRebaseStart = fn
+}
+
+function setOnRebaseResult(fn: (event: any) => void): void {
+	onRebaseResult = fn
 }
 
 function requestRender(force = false): void { onChange(force) }
@@ -322,6 +332,21 @@ function ensureTabLoaded(tab: Tab): void {
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
+}
+
+function reloadTabFromDisk(tab: Tab): void {
+	const snapshot = sessionLoader.load({ id: tab.sessionId, name: tab.name, cwd: tab.cwd, model: tab.model })
+	tab.rawHistory = snapshot.history
+	tab.parentEntryCount = snapshot.parentEntryCount
+	tab.lastActiveTs = snapshot.lastActiveTs
+	tab.liveHistory = snapshot.liveHistory
+	tab.usage = snapshot.usage
+	tab.contextUsed = snapshot.contextUsed
+	tab.contextMax = snapshot.contextMax
+	tab.forkedFrom = snapshot.forkedFrom
+	tab.loaded = false
+	ensureTabLoaded(tab)
+	loadTabBlobs(tab)
 }
 
 function loadTabBlobs(tab: Tab): void {
@@ -510,10 +535,13 @@ function handleEvent(event: any): void {
 		applyLiveEventToTab,
 		repaintIfActive,
 		touchTab,
+		reloadTabFromDisk,
 		onToolConfirmRequest: (item: any) => onToolConfirmRequest?.(item),
 		markToolConfirmPending,
 		clearToolConfirmPending,
 		onDraftArrived: (text: string) => onDraftArrived?.(text),
+		onRebaseStart: (item: any) => onRebaseStart?.(item),
+		onRebaseResult: (item: any) => onRebaseResult?.(item),
 		onChange,
 	})
 }
@@ -589,6 +617,8 @@ function resetForTests(): void {
 	onTabSwitch = null
 	onDraftArrived = null
 	onToolConfirmRequest = null
+	onRebaseStart = null
+	onRebaseResult = null
 	sessionTabs.reset()
 	clientProcess.reset()
 	state.recentTabs = []
@@ -619,6 +649,8 @@ export const client = {
 	setOnChange,
 	requestRender,
 	setOnToolConfirmRequest,
+	setOnRebaseStart,
+	setOnRebaseResult,
 	setOnTabSwitch,
 	setOnDraftArrived,
 	currentTab,

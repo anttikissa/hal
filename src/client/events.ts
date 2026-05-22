@@ -18,6 +18,9 @@ function handle(event: any, ctx: any): void {
 	if (event.type === 'tool-confirm-request' && event.sessionId) return handleToolConfirmRequest(event, ctx)
 	if (event.type === 'tool-result' && event.sessionId) return handleToolResult(event, ctx)
 	if (event.type === 'draft_saved' && event.sessionId) return handleDraftSaved(event, ctx)
+	if (event.type === 'rebase-start') return handleRebaseStart(event, ctx)
+	if (event.type === 'rebase-result') return handleRebaseResult(event, ctx)
+	if (event.type === 'history-rebased') return handleHistoryRebased(event, ctx)
 }
 
 function handlePrompt(event: any, ctx: any): void {
@@ -133,6 +136,27 @@ function handleDraftSaved(event: any, ctx: any): void {
 	const text = draftModule.loadDraft(event.sessionId)
 	tab.inputDraft = text
 	if (ctx.currentTab()?.sessionId === event.sessionId) ctx.onDraftArrived(text)
+}
+
+function isTargetedHere(event: any, ctx: any): boolean {
+	return !event.targetPid || event.targetPid === ctx.pid
+}
+
+function handleRebaseStart(event: any, ctx: any): void {
+	if (!isTargetedHere(event, ctx)) return
+	ctx.onRebaseStart(event)
+}
+
+function handleRebaseResult(event: any, ctx: any): void {
+	if (!isTargetedHere(event, ctx)) return
+	ctx.onRebaseResult(event)
+}
+
+function handleHistoryRebased(event: any, ctx: any): void {
+	const tab = ctx.tabForSession(event.sessionId)
+	if (!tab) return
+	ctx.reloadTabFromDisk(tab)
+	ctx.onChange(true)
 }
 
 export const clientEvents = { handle }
