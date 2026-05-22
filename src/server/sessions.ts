@@ -67,6 +67,7 @@ export type HistoryEntry =
 	| { type: 'warning' | 'error'; text: string; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'reset' | 'compact'; ts?: string }
 	| { type: 'forked_from'; parent: string; ts?: string }
+	| { type: 'forked_to'; child: string; ts?: string }
 	| { type: 'input_history'; text: string; ts?: string }
 
 export interface SessionLive {
@@ -329,6 +330,7 @@ function forkSession(sourceId: string, newId: string, atIndex?: number): Session
 		model: sourceMeta.model ?? models.defaultModel(),
 		forkedFrom: sourceId,
 	})
+	appendHistory(sourceId, [{ type: 'forked_to', child: newId, ts: forkTs }])
 	appendHistory(newId, [{ type: 'forked_from', parent: sourceId, ts: forkTs }])
 	return child
 }

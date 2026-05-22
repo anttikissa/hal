@@ -180,6 +180,15 @@ test('forked_from history entry renders as an Info block', () => {
 	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
 })
 
+test('forked_to history entry renders as an Info block', () => {
+	const history: any[] = [{ type: 'forked_to', child: '04-def', ts: '2026-04-09T20:00:00.000Z' }]
+
+	const result = blocks.historyToBlocks(history as any, 'parent')
+	expect(result).toMatchObject([{ type: 'info', text: 'Tab forked to 04-def.' }])
+	const lines = blocks.renderBlock(result[0]!, 80)
+	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
+})
+
 test('info history entries render as highlighted Info blocks', () => {
 	const history: any[] = [{ type: 'info', text: 'Model set to GPT 5.5.', ts: '2026-04-09T20:00:00.000Z' }]
 

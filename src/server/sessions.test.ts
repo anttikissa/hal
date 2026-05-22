@@ -60,6 +60,18 @@ test('createSession and loadHistory round-trip', async () => {
 	expect(entryText(result[0])).toBe('hello')
 })
 
+test('forkSession appends fork markers to parent and child history', async () => {
+	const parentId = await makeSession()
+	const childId = uniqueId()
+	createdIds.push(childId)
+
+	const child = sessions.forkSession(parentId, childId)
+
+	expect(child.forkedFrom).toBe(parentId)
+	expect(sessions.loadHistory(parentId)).toMatchObject([{ type: 'forked_to', child: childId }])
+	expect(sessions.loadHistory(childId)).toMatchObject([{ type: 'forked_from', parent: parentId }])
+})
+
 test('deleteSession cleans up', async () => {
 	const id = await makeSession()
 	sessions.deleteSession(id)

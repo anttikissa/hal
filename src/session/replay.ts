@@ -56,7 +56,7 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 
 	for (const entry of entries) {
 		const ts = entry.ts ? Date.parse(entry.ts) : undefined
-		if (entry.type === 'reset' || entry.type === 'forked_from' || entry.type === 'compact') continue
+		if (entry.type === 'reset' || entry.type === 'forked_from' || entry.type === 'forked_to' || entry.type === 'compact') continue
 		if (entry.type === 'input_history') continue
 
 		if (entry.type === 'log') {
