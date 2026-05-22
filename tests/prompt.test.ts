@@ -11,6 +11,8 @@ function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 beforeEach(() => {
 	prompt.clear()
 	prompt.setHistory([])
+	prompt.config.maxPromptLines = 10
+	prompt.state.promptLineLimit = 0
 	clipboard.config.multilinePasteFileLineLimit = 5
 })
 
@@ -254,5 +256,19 @@ describe('prompt', () => {
 		const built = prompt.buildPrompt(5)
 		expect(built.lines).toEqual(['12345', ''])
 		expect(built.cursor).toEqual({ rowOffset: 1, col: 0 })
+	})
+
+	/* ctrl-up/down resize the viewport for composing long prompts without touching text. */
+	test('ctrl-up and ctrl-down resize the prompt editing area', () => {
+		prompt.config.maxPromptLines = 3
+		prompt.state.promptLineLimit = 0
+		prompt.setText('one\ntwo\nthree\nfour', 'one\ntwo\nthree\nfour'.length)
+
+		expect(prompt.buildPrompt(20).lines).toEqual(['two', 'three', 'four'])
+		expect(prompt.handleKey(key('up', { ctrl: true }), 20)).toBe(true)
+		expect(prompt.buildPrompt(20).lines).toEqual(['one', 'two', 'three', 'four'])
+
+		expect(prompt.handleKey(key('down', { ctrl: true }), 20)).toBe(true)
+		expect(prompt.buildPrompt(20).lines).toEqual(['two', 'three', 'four'])
 	})
 })

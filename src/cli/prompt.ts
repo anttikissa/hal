@@ -10,6 +10,12 @@ const config = {
 	maxPromptLines: 10,
 }
 
+const state = {
+	// 0 means use config.maxPromptLines. Ctrl-up/down sets an explicit live
+	// viewport height for composing unusually long prompts.
+	promptLineLimit: 0,
+}
+
 
 // ── Word wrap + cursor mapping ───────────────────────────────────────────────
 
@@ -230,6 +236,39 @@ const pasteRefs: Array<{ display: string; text: string }> = []
 
 function clamp(pos: number): number {
 	return Math.max(0, Math.min(pos, buf.length))
+}
+
+function defaultPromptLineLimit(): number {
+	return Math.max(1, Math.floor(config.maxPromptLines))
+}
+
+function promptLineLimit(): number {
+	if (state.promptLineLimit > 0) return Math.max(1, Math.floor(state.promptLineLimit))
+	return defaultPromptLineLimit()
+}
+
+function resizePromptLineLimit(dir: -1 | 1): void {
+	const current = promptLineLimit()
+	const defaultLimit = defaultPromptLineLimit()
+	if (dir > 0) {
+		state.promptLineLimit = current + 5
+		return
+	}
+	state.promptLineLimit = Math.max(defaultLimit, current - 5)
+	if (state.promptLineLimit === defaultLimit) state.promptLineLimit = 0
+}
+
+function promptRows(contentWidth: number): number {
+	const layout = getLayout(buf, contentWidth)
+	const { row: curRow } = cursorToRowCol(buf, cursor, contentWidth)
+	return Math.max(layout.lines.length, curRow + 1)
+}
+
+function resizeHint(contentWidth: number): string | null {
+	if (!buf.trim()) return null
+	const maxRows = promptLineLimit()
+	if (promptRows(contentWidth) < Math.max(1, maxRows - 2)) return null
+	return 'resize editor'
 }
 
 function clearSelectionAndGoal(): void {
@@ -593,6 +632,10 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		case 'up':
 		case 'down': {
 			const dir = k.key === 'up' ? -1 : 1
+			if (k.ctrl && !k.alt && !k.shift) {
+				resizePromptLineLimit(dir === -1 ? 1 : -1)
+				return true
+			}
 			if (k.alt) moveEdge(dir, k.shift)
 			else moveVerticalKey(dir, k.shift, contentWidth)
 			return true
@@ -625,7 +668,7 @@ function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getLayout(buf, contentWidth)
 	const { row: curRow, col: curCol } = cursorToRowCol(buf, cursor, contentWidth)
 	const totalRows = Math.max(layout.lines.length, curRow + 1)
-	const promptLines = Math.min(totalRows, config.maxPromptLines)
+	const promptLines = Math.min(totalRows, promptLineLimit())
 	const sel = selRange()
 
 	// Scroll viewport if prompt is taller than MAX_PROMPT_LINES
@@ -714,6 +757,7 @@ function setRenderCallback(cb: () => void): void {
 
 export const prompt = {
 	config,
+	state,
 	text,
 	draftText,
 	submitText,
@@ -725,4 +769,6 @@ export const prompt = {
 	setRenderCallback,
 	handleKey,
 	buildPrompt,
+	resizeHint,
+	promptLineLimit,
 }

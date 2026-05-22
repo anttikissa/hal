@@ -39,6 +39,8 @@ beforeEach(() => {
 	client.state.activity = new Map()
 	client.state.toolConfirmPending = new Set()
 	prompt.clear()
+	prompt.config.maxPromptLines = 10
+	prompt.state.promptLineLimit = 0
 	popup.close()
 	Object.assign(renderStatus.config, {
 		showSession: true,
@@ -250,6 +252,13 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: send, shift+enter: newline, alt+enter: queue')
 		expect(clean).not.toContain('│')
+	})
+
+	test('help bar suggests resizing two lines before prompt scrolling', () => {
+		prompt.config.maxPromptLines = 5
+		prompt.setText('one\ntwo\nthree')
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('ctrl+up/down: resize editor')
 	})
 
 	test('chrome order is status, prompt, then help at the bottom', () => {

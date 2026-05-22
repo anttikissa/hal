@@ -266,11 +266,13 @@ function submit(override?: string, delivery?: 'queue'): void {
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
-// Tab triggers completion. While popup is active:
-//   Tab / Down: cycle forward
+// Tab triggers completion. While completion is active:
+//   Tab / Down: cycle forward through candidates
 //   Shift-Tab / Up: cycle backward
 //   Enter / Space: accept selected item
 //   Escape: dismiss
+// There is no visible popup; only the prompt text is mutated. Active state is
+// tracked in `completion.state` and matters for what subsequent keys do.
 
 function handleCompletionKey(k: KeyEvent): boolean {
 	// Tab triggers or cycles completion
@@ -300,7 +302,7 @@ function handleCompletionKey(k: KeyEvent): boolean {
 		return true
 	}
 
-	// Only handle remaining keys when popup is active
+	// Only handle remaining keys when completion is active
 	if (!completion.state.active) return false
 
 	// Arrow keys cycle through items
