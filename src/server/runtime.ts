@@ -177,9 +177,6 @@ function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'no
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
 }
 
-function recordSessionMeta(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
-	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, visibility: 'next-user', ts, ...(ui ? { ui } : {}) }])
-}
 
 function stateModel(model?: string): string {
 	return model ?? models.defaultModel()
@@ -480,8 +477,6 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 			broadcastSessions()
 		}
 		recordSessionStateChanges(sessionId, prevCwd, sessionState.cwd, prevModel, sessionState.model)
-		const metaTs = new Date().toISOString()
-		for (const message of cmdResult.meta ?? []) recordSessionMeta(sessionId, message, metaTs, cmdResult.ui)
 		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui)
 		if (cmdResult.error) emitInfo(sessionId, cmdResult.error, 'error')
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)

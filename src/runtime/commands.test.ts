@@ -549,7 +549,6 @@ test('/model changes session model and user-visible output', async () => {
 
 	expect(result.handled).toBe(true)
 	expect(session.model).toBe('openai/gpt-5.5')
-	expect(result.meta).toBeUndefined()
 	expect(result.output).toBe('Model changed from GPT 5.4 (openai/gpt-5.4) to GPT 5.5 (openai/gpt-5.5)')
 	expect(result.ui).toBe('notice')
 })
@@ -564,7 +563,6 @@ test('/cd changes session cwd without command metadata', async () => {
 
 		expect(result.handled).toBe(true)
 		expect(session.cwd).toBe(dir)
-		expect(result.meta).toBeUndefined()
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
@@ -579,7 +577,6 @@ test('/cd with no args changes to Hal directory', async () => {
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
 	expect(session.cwd).toBe(process.cwd())
-	expect(result.meta).toBeUndefined()
 })
 
 test('/config --help reuses detailed config help', async () => {

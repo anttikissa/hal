@@ -198,6 +198,20 @@ test('info history entries render as highlighted Info blocks', () => {
 	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
 })
 
+
+test('structural cwd and model entries render as Info blocks', () => {
+	const history: any[] = [
+		{ type: 'cwd', from: '/tmp', to: '/Users/antti/.hal/src', ts: '2026-04-09T20:00:00.000Z' },
+		{ type: 'model', from: 'openai/gpt-5.5', to: 'anthropic/claude-opus-4-7', ts: '2026-04-09T20:01:00.000Z' },
+	]
+
+	const result = blocks.historyToBlocks(history as any, 'child')
+	expect(result).toMatchObject([
+		{ type: 'info', text: 'cwd: /tmp -> /Users/antti/.hal/src' },
+		{ type: 'info', text: 'model: openai/gpt-5.5 -> anthropic/claude-opus-4-7' },
+	])
+})
+
 test('info block renders an Info header', () => {
 	const block: Block = {
 		type: 'info',

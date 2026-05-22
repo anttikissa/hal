@@ -28,8 +28,6 @@ export interface CommandResult {
 	output?: string
 	/** Error message to show the user. */
 	error?: string
-	/** Metadata text to inject into the next model-visible user turn. */
-	meta?: string[]
 	/** Optional presentation for special informational output. */
 	ui?: 'notice'
 	/** Whether the command was recognized and handled. */
