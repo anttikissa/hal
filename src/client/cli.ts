@@ -313,6 +313,17 @@ function handleCompletionKey(k: KeyEvent): boolean {
 		return true
 	}
 
+	// Enter on a prompt that already matches the selected item: dismiss and let Enter
+	// fall through to submit. This handles the common Tab→common-prefix→Enter flow,
+	// where applying would only append a trailing space.
+	if (k.key === 'enter' && !k.shift) {
+		const item = completion.selectedItem()
+		if (item && prompt.text() === item) {
+			completion.dismiss()
+			return false
+		}
+	}
+
 	// Enter or space: accept selected item (but not shift+enter — that's newline)
 	if ((k.key === 'enter' && !k.shift) || (k.char === ' ' && !k.ctrl && !k.alt)) {
 		const item = completion.selectedItem()
