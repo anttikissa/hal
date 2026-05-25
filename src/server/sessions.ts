@@ -37,7 +37,7 @@ export interface SessionMeta {
 
 export type UserPart = { type: 'text'; text: string; displayText?: string } | { type: 'image'; blobId: string; originalFile?: string }
 
-export type EntryIdentity = { entryId?: string }
+export type EntryIdentity = { id?: string }
 export type HistoryEntry = EntryIdentity & (
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; status?: string; ts?: string }
 	| {
@@ -54,7 +54,6 @@ export type HistoryEntry = EntryIdentity & (
 			type: 'assistant'
 			text: string
 			model?: string
-			id?: string
 			continue?: string
 			usage?: PartialTokenUsage
 			synthetic?: boolean
@@ -128,19 +127,45 @@ function makeEntryId(): string {
 	return `${head}-${tail}`
 }
 
+const historyTopLevelKeys = new Set([
+	'id', 'type', 'parts', 'text', 'source', 'status', 'ts',
+	'blobId', 'signature', 'provider', 'model', 'thinkingEffort',
+	'continue', 'usage', 'synthetic', 'syntheticKind',
+	'toolId', 'name', 'input', 'output', 'isError',
+	'level', 'visibility', 'ui', 'parent', 'child', 'log', 'from', 'to',
+])
+
+function stripUndefined(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map((item) => stripUndefined(item))
+	if (!value || typeof value !== 'object') return value
+	const clean: Record<string, unknown> = {}
+	for (const [key, item] of Object.entries(value)) {
+		if (item === undefined) continue
+		clean[key] = stripUndefined(item)
+	}
+	return clean
+}
+
+function cleanHistoryEntry(entry: HistoryEntry): unknown {
+	const clean: Record<string, unknown> = {}
+	for (const [key, item] of Object.entries(entry)) {
+		if (!historyTopLevelKeys.has(key)) continue
+		if (item === undefined) continue
+		clean[key] = stripUndefined(item)
+	}
+	return clean
+}
+
 function ensureEntryIds(entries: HistoryEntry[]): HistoryEntry[] {
 	for (const entry of entries) {
-		const entryId = entry.entryId ?? makeEntryId()
-		Object.defineProperty(entry, 'entryId', { value: entryId, enumerable: true, writable: true, configurable: true })
+		const id = entry.id ?? makeEntryId()
+		Object.defineProperty(entry, 'id', { value: id, enumerable: true, writable: true, configurable: true })
 	}
 	return entries
 }
 
-function hideEntryIds(entries: HistoryEntry[]): HistoryEntry[] {
-	for (const entry of entries) {
-		if (entry.entryId) Object.defineProperty(entry, 'entryId', { value: entry.entryId, enumerable: false, writable: true, configurable: true })
-	}
-	return entries
+function stringifyHistoryEntry(entry: HistoryEntry): string {
+	return ason.stringify(cleanHistoryEntry(entry), 'short')
 }
 
 function defaultLive(): SessionLive { return { blocks: [] } }
@@ -228,7 +253,7 @@ function loadHistory(sessionId: string): HistoryEntry[] {
 	if (!existsSync(path)) return []
 	try {
 		const content = readFileSync(path, 'utf-8')
-		return content.trim() ? hideEntryIds(ason.parseAll(content) as HistoryEntry[]) : []
+		return content.trim() ? ason.parseAll(content) as HistoryEntry[] : []
 	} catch {
 		return []
 	}
@@ -313,7 +338,7 @@ function createSession(id: string, meta: SessionMeta): SessionMeta {
 function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
-	appendFileSync(historyLogPath(sessionId), `${ensureEntryIds(entries).map((entry) => ason.stringify(entry, 'short')).join('\n')}\n`)
+	appendFileSync(historyLogPath(sessionId), `${ensureEntryIds(entries).map(stringifyHistoryEntry).join('\n')}\n`)
 }
 
 function updateMeta(sessionId: string, updates: Partial<SessionMeta>): void {
@@ -358,8 +383,8 @@ function rewriteHistoryForRebase(sessionId: string, entries: HistoryEntry[]): { 
 	const forkEntry = oldEntries[0]?.type === 'forked_from' ? [oldEntries[0]] : []
 	const bodyEntries = entries[0]?.type === 'forked_from' ? entries.slice(1) : entries
 	const rebasedEntries = ensureEntryIds([...forkEntry, { type: 'rebased_from', log: oldLog, ts }, ...bodyEntries])
-	appendFileSync(historyLogPath(sessionId, newLog), `${rebasedEntries.map((entry) => ason.stringify(entry, 'short')).join('\n')}\n`)
-	appendFileSync(historyLogPath(sessionId, oldLog), `${ason.stringify(ensureEntryIds([{ type: 'rebased_to', log: newLog, ts }])[0], 'short')}\n`)
+	appendFileSync(historyLogPath(sessionId, newLog), `${rebasedEntries.map(stringifyHistoryEntry).join('\n')}\n`)
+	appendFileSync(historyLogPath(sessionId, oldLog), `${stringifyHistoryEntry(ensureEntryIds([{ type: 'rebased_to', log: newLog, ts }])[0]!)}\n`)
 	updateMeta(sessionId, { currentLog: newLog })
 	return { oldLog, newLog }
 }

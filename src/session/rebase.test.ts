@@ -7,7 +7,7 @@ function entry(type: string, fields: Record<string, any> = {}): HistoryEntry {
 }
 
 test('renders and parses quoted hashes without treating them as comments', () => {
-	const entries = [entry('user', { entryId: '000001-aaa', parts: [{ type: 'text', text: 'hello #1' }] })]
+	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'hello #1' }] })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries, { now: new Date('2026-05-22T10:01:00.000Z') })
 	const todo = rebase.renderTodo(snapshot)
 
@@ -20,8 +20,8 @@ test('renders and parses quoted hashes without treating them as comments', () =>
 
 test('aligns comments by rendered screen width after type prefix', () => {
 	const entries = [
-		entry('user', { entryId: '000001-aaa', parts: [{ type: 'text', text: 'short' }] }),
-		entry('thinking', { entryId: '000002-bbb', text: '**Considering Git operations**\n\nI need to inspect the state before continuing.', signature: 'sig', thinkingEffort: 'high' }),
+		entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'short' }] }),
+		entry('thinking', { id: '000002-bbb', text: '**Considering Git operations**\n\nI need to inspect the state before continuing.', signature: 'sig', thinkingEffort: 'high' }),
 	]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries, { now: new Date('2026-05-22T10:01:00.000Z') })
 	const lines = rebase.renderTodo(snapshot).split('\n').filter((line) => line.startsWith('pick '))
@@ -30,10 +30,22 @@ test('aligns comments by rendered screen width after type prefix', () => {
 	expect(commentColumns).toEqual([66, 66])
 })
 
+
+test('omits tiny char counts and renders rebase marker log', () => {
+	const entries = [
+		entry('rebased_from', { id: '000001-aaa', log: 'history2.asonl' }),
+		entry('user', { id: '000002-bbb', parts: [{ type: 'text', text: 'short' }] }),
+	]
+	const todo = rebase.renderTodo(rebase.buildSnapshot('04-aaa', 'history3.asonl', entries, { now: new Date('2026-05-22T10:01:00.000Z') }))
+
+	expect(todo).toContain("rebased_from { log: 'history2.asonl' }")
+	expect(todo).not.toContain('5 chars')
+})
+
 test('queue rows must be a suffix', () => {
 	const entries = [
-		entry('user', { entryId: '000001-aaa', parts: [{ type: 'text', text: 'first' }] }),
-		entry('assistant', { entryId: '000002-bbb', text: 'second' }),
+		entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'first' }] }),
+		entry('assistant', { id: '000002-bbb', text: 'second' }),
 	]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const todo = [
@@ -47,7 +59,7 @@ test('queue rows must be a suffix', () => {
 })
 
 test('thinking content edits are ignored', () => {
-	const entries = [entry('thinking', { entryId: '000001-aaa', text: 'secret', signature: 'sig' })]
+	const entries = [entry('thinking', { id: '000001-aaa', text: 'secret', signature: 'sig' })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const parsed = rebase.parseTodo(snapshot, "edit 000001-aaa thinking 'changed' # ignored")
 	const applied = rebase.applyParsed(snapshot, parsed)
@@ -56,8 +68,18 @@ test('thinking content edits are ignored', () => {
 	expect(applied.entries).toEqual(entries)
 })
 
+
+test('picked rows keep their original ids', () => {
+	const entries = [entry('assistant', { id: '000001-aaa', text: 'same row' })]
+	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
+	const parsed = rebase.parseTodo(snapshot, rebase.renderTodo(snapshot))
+	const applied = rebase.applyParsed(snapshot, parsed)
+
+	expect(applied.entries[0]?.id).toBe('000001-aaa')
+})
+
 test('queue existing truncated user uses snapshot text and omits row from history', () => {
-	const entries = [entry('user', { entryId: '000001-aaa', parts: [{ type: 'text', text: `${'x'.repeat(120)}\nsecond` }] })]
+	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: `${'x'.repeat(120)}\nsecond` }] })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const parsed = rebase.parseTodo(snapshot, "queue 000001-aaa user 'ignored... # truncated")
 
@@ -70,10 +92,10 @@ test('queue existing truncated user uses snapshot text and omits row from histor
 
 test('tool rows write contiguous calls first then results in visible order', () => {
 	const entries = [
-		entry('tool_call', { entryId: '000001-aaa', toolId: 't1', name: 'read', input: { path: 'a' } }),
-		entry('tool_call', { entryId: '000002-bbb', toolId: 't2', name: 'grep', input: { pattern: 'b' } }),
-		entry('tool_result', { entryId: '000003-ccc', toolId: 't1', output: 'A' }),
-		entry('tool_result', { entryId: '000004-ddd', toolId: 't2', output: 'B' }),
+		entry('tool_call', { id: '000001-aaa', toolId: 't1', name: 'read', input: { path: 'a' } }),
+		entry('tool_call', { id: '000002-bbb', toolId: 't2', name: 'grep', input: { pattern: 'b' } }),
+		entry('tool_result', { id: '000003-ccc', toolId: 't1', output: 'A' }),
+		entry('tool_result', { id: '000004-ddd', toolId: 't2', output: 'B' }),
 	]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const toolRows = snapshot.rows.filter((row) => row.type === 'tool')

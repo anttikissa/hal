@@ -157,7 +157,6 @@ function historyToBlocks(
 					type: 'assistant',
 					text: entry.text,
 					model: entry.model ?? initialModel,
-					id: entry.id,
 					continue: entry.continue,
 					synthetic: entry.synthetic,
 					syntheticKind: entry.syntheticKind,

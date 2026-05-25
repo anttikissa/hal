@@ -60,6 +60,17 @@ test('createSession and loadHistory round-trip', async () => {
 	expect(entryText(result[0])).toBe('hello')
 })
 
+
+test('appendHistory writes id and omits undefined fields', async () => {
+	const id = await makeSession()
+	await sessions.appendHistory(id, [{ type: 'user', id: '000001-aaa', parts: [{ type: 'text', text: 'hello', displayText: undefined }], source: undefined, ts: '2026-05-25T10:00:00.000Z' }])
+
+	const text = readFileSync(`${sessions.sessionDir(id)}/history.asonl`, 'utf-8')
+
+	expect(text).toContain("id: '000001-aaa'")
+	expect(text).not.toContain('undefined')
+})
+
 test('forkSession appends fork markers to parent and child history', async () => {
 	const parentId = await makeSession()
 	const childId = uniqueId()
@@ -301,6 +312,6 @@ test('reset-style rotation preserves forked_from entry and writes a reset marker
 	])
 
 	const newMsgs = sessions.loadHistory(childId)
-	expect(newMsgs[0]).toEqual({ type: 'forked_from', parent: parentId, ts: nowTs })
-	expect(newMsgs[1]).toEqual({ type: 'reset', ts: nowTs })
+	expect(newMsgs[0]).toMatchObject({ type: 'forked_from', parent: parentId, ts: nowTs })
+	expect(newMsgs[1]).toMatchObject({ type: 'reset', ts: nowTs })
 })

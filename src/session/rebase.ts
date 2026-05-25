@@ -57,8 +57,8 @@ function legacyRowId(index: number): string {
 }
 
 function entryRowId(entry: HistoryEntry, index: number): string {
+	if (typeof entry.id === 'string') return entry.id
 	const anyEntry = entry as any
-	if (typeof anyEntry.entryId === 'string') return anyEntry.entryId
 	if (typeof anyEntry.blobId === 'string') return anyEntry.blobId
 	return legacyRowId(index)
 }
@@ -92,7 +92,7 @@ function textStats(text: string): string {
 	if (lines > 1) parts.push(`${lines} lines`)
 	const bytes = new TextEncoder().encode(text).length
 	if (bytes >= 1000) parts.push(`${Math.round(bytes / 100) / 10}kB`)
-	else parts.push(`${bytes} chars`)
+	else if (bytes >= 250) parts.push(`${bytes} chars`)
 	return parts.join(', ')
 }
 
@@ -150,6 +150,7 @@ function buildNormalRow(sessionId: string, entry: HistoryEntry, index: number, n
 	if (entry.type === 'cwd') return makeProtectedRow(id, 'cwd', [entry], [entry.from, entry.to], `${formatRowTime([entry], now)}; next-user`)
 	if (entry.type === 'model') return makeProtectedRow(id, 'model', [entry], [entry.from, entry.to], `${formatRowTime([entry], now)}; next-user`)
 	if (entry.type === 'input_history') return makeProtectedRow(id, 'input_history', [entry], entry.text, formatRowTime([entry], now))
+	if (entry.type === 'rebased_from' || entry.type === 'rebased_to') return makeProtectedRow(id, entry.type, [entry], { log: entry.log }, formatRowTime([entry], now))
 	if ('text' in entry && typeof entry.text === 'string') return makeProtectedRow(id, entry.type, [entry], entry.text, formatRowTime([entry], now))
 	return makeProtectedRow(id, entry.type, [entry], { type: entry.type }, formatRowTime([entry], now))
 }
