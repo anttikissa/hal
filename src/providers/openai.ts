@@ -581,7 +581,17 @@ async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: a
 				for (const event of parseResponsesEvent(streamState, raw)) yield { event, responseId }
 			}
 			if (failed) throw failed
-			if (!done) await new Promise<void>((resolve) => { wake = resolve })
+			if (!done) await new Promise<void>((resolve) => {
+				const ms = providerShared.config.streamTimeoutMs
+				const timer = setTimeout(() => {
+					failed = new ResponsesWebSocketFallback(`OpenAI Responses WebSocket timed out (no data for ${ms}ms)`)
+					notify()
+				}, ms)
+				wake = () => {
+					clearTimeout(timer)
+					resolve()
+				}
+			})
 		}
 	} finally {
 		cleanup()

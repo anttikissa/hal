@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { auth, type Credential } from '../auth.ts'
 import { createCompatProvider, openai, openaiProvider } from './openai.ts'
+import { providerShared } from './shared.ts'
 
 interface FetchCall {
 	url: string
@@ -15,6 +16,7 @@ const origWebSocket = globalThis.WebSocket
 const origTransportEnv = process.env.HAL_OPENAI_RESPONSES_TRANSPORT
 const origMarkCooldown = auth.markCooldown
 const origHasAvailableCredential = auth.hasAvailableCredential
+const origStreamTimeoutMs = providerShared.config.streamTimeoutMs
 
 afterEach(() => {
 	globalThis.fetch = origFetch
@@ -24,6 +26,7 @@ afterEach(() => {
 	auth.markCooldown = origMarkCooldown
 	auth.hasAvailableCredential = origHasAvailableCredential
 	globalThis.WebSocket = origWebSocket
+	providerShared.config.streamTimeoutMs = origStreamTimeoutMs
 	if (origTransportEnv == null) delete process.env.HAL_OPENAI_RESPONSES_TRANSPORT
 	else process.env.HAL_OPENAI_RESPONSES_TRANSPORT = origTransportEnv
 	openai.resetResponsesWebSocketsForTests()
@@ -503,6 +506,46 @@ test('openai websocket transport uses wss endpoint and response.create', async (
 	expect(ws.sent[0].stream).toBeUndefined()
 	expect(events).toContainEqual({ type: 'text', text: 'text1' })
 	expect(events).toContainEqual({ type: 'done', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } })
+})
+
+class HangingWebSocket extends FakeWebSocket {
+	override send(raw: string): void {
+		this.sent.push(JSON.parse(raw))
+	}
+}
+
+test('openai websocket transport times out when no events arrive', async () => {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
+	providerShared.config.streamTimeoutMs = 5
+	FakeWebSocket.instances = []
+	globalThis.WebSocket = HangingWebSocket as any
+	const token = makeJwt({
+		scp: ['openid'],
+		'https://api.openai.com/auth': { chatgpt_account_id: 'acct_ws' },
+	})
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: token, type: 'token' })
+	auth.getEntry = () => ({})
+
+	const events: any[] = []
+	const collect = (async () => {
+		for await (const event of openaiProvider.generate({
+			messages: [{ role: 'user', content: 'hi' }],
+			model: 'gpt-5.5',
+			systemPrompt: 'system',
+			tools: [],
+			sessionId: 'sid_ws_timeout',
+		})) events.push(event)
+	})()
+	const result = await Promise.race([collect.then(() => 'done'), Bun.sleep(100).then(() => 'timeout')])
+
+	expect(result).toBe('done')
+	expect(events).toContainEqual({
+		type: 'error',
+		message: 'OpenAI Responses WebSocket timed out (no data for 5ms)',
+		endpoint: 'wss://chatgpt.com/backend-api/codex/responses',
+	})
+	expect(events).toContainEqual({ type: 'done' })
 })
 
 test('openai websocket continuation sends previous_response_id and only new tool output', async () => {
