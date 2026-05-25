@@ -258,6 +258,19 @@ test('loadHistory reads from current log after rotation', async () => {
 	expect(entryText(result[0])).toBe('new context')
 })
 
+
+test('loadHistoryLog can read a bounded log prefix after later appends', async () => {
+	const id = await makeSession()
+	await sessions.appendHistory(id, [userEntry('old', new Date().toISOString())])
+	const result = sessions.rewriteHistoryForRebase(id, [userEntry('rebased', new Date().toISOString())])
+	await sessions.appendHistory(id, [userEntry('queued later', new Date().toISOString())])
+
+	const prefix = sessions.loadHistoryLog(id, result.newLog, result.entryCount)
+
+	expect(prefix.map(entryText).filter(Boolean)).toEqual(['rebased'])
+	expect(sessions.loadHistory(id).map(entryText).filter(Boolean)).toEqual(['rebased', 'queued later'])
+})
+
 test('compact-style rotation preserves forked_from entry', async () => {
 	const parentId = await makeSession()
 	const childId = await makeSession()

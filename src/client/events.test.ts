@@ -1,38 +1,17 @@
-import { afterEach, expect, test } from 'bun:test'
-import { client } from '../client.ts'
+import { expect, test } from 'bun:test'
+import { clientEvents } from './events.ts'
 
-function makeTab(): any {
-	return {
-		sessionId: 's1',
-		name: 's1',
-		history: [],
-		inputHistory: [],
-		inputDraft: '',
-		parentEntryCount: 0,
-		liveHistory: [],
-		loaded: true,
-		doneUnseen: false,
-		historyVersion: 0,
-		usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
-		contextUsed: 0,
-		contextMax: 0,
-		cwd: '/tmp',
-		model: 'openai/gpt-5.5',
-	}
-}
+test('history-rebased reloads exactly the rebased log prefix', () => {
+	const tab = { sessionId: 's1' }
+	let reload: any = null
+	let force: any = null
 
-afterEach(() => {
-	client.state.tabs.length = 0
-	client.state.activeTab = 0
-	client.resetForTests()
-})
+	clientEvents.handle({ type: 'history-rebased', sessionId: 's1', newLog: 'history8.asonl', entryCount: 6 }, {
+		tabForSession: (sessionId: string) => sessionId === 's1' ? tab : null,
+		reloadTabFromDisk: (receivedTab: any, opts: any) => { reload = { tab: receivedTab, opts } },
+		onChange: (value: boolean) => { force = value },
+	})
 
-test('prompt events do not duplicate a prompt already loaded from rebased history', () => {
-	const tab = makeTab()
-	tab.history.push({ type: 'user', text: 'same prompt', ts: Date.now() })
-	client.state.tabs.push(tab)
-
-	client.handleEvent({ type: 'prompt', sessionId: 's1', text: 'same prompt', createdAt: new Date().toISOString() })
-
-	expect(tab.history.filter((block: any) => block.type === 'user' && block.text === 'same prompt')).toHaveLength(1)
+	expect(reload).toEqual({ tab, opts: { logName: 'history8.asonl', entryLimit: 6 } })
+	expect(force).toBe(true)
 })

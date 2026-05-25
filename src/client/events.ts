@@ -23,15 +23,9 @@ function handle(event: any, ctx: any): void {
 	if (event.type === 'history-rebased') return handleHistoryRebased(event, ctx)
 }
 
-function hasTrailingUserPrompt(tab: any, text: string): boolean {
-	const last = tab.history[tab.history.length - 1]
-	return last?.type === 'user' && last.text === text
-}
 function handlePrompt(event: any, ctx: any): void {
 	if (event.label === 'steering') ctx.cancelDelayedPaused(event.sessionId ?? null)
 	else ctx.flushDelayedPaused(event.sessionId ?? null)
-	const tab = ctx.tabForSession(event.sessionId ?? null)
-	if (tab && hasTrailingUserPrompt(tab, event.text)) return
 	ctx.addBlockToTab(event.sessionId, {
 		type: 'user',
 		text: event.text,
@@ -161,7 +155,7 @@ function handleRebaseResult(event: any, ctx: any): void {
 function handleHistoryRebased(event: any, ctx: any): void {
 	const tab = ctx.tabForSession(event.sessionId)
 	if (!tab) return
-	ctx.reloadTabFromDisk(tab)
+	ctx.reloadTabFromDisk(tab, { logName: event.newLog, entryLimit: event.entryCount })
 	ctx.onChange(true)
 }
 

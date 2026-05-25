@@ -693,10 +693,10 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: [errorMessage(err)], todo })
 		return
 	}
-	const { oldLog, newLog } = sessionStore.rewriteHistoryForRebase(sessionId, applied.entries)
+	const { oldLog, newLog, entryCount } = sessionStore.rewriteHistoryForRebase(sessionId, applied.entries)
 	resetProviderConversation(sessionId)
 	rebaseSnapshots.delete(requestId)
-	ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog })
+	ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog, entryCount })
 	for (const text of applied.queue) await enqueuePrompt(sessionId, text)
 	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
 }

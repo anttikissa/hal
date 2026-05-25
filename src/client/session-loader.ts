@@ -54,9 +54,18 @@ function addLastActiveNotice(tab: any): void {
 	tab.history.push({ type: 'log', text: time.formatLastActiveNotice(lastTs), ts: Date.now() })
 }
 
-function load(info: SharedSessionInfo) {
+function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: number } = {}) {
 	const meta = sessionStore.loadSessionMeta(info.id)
-	const { entries: history, parentCount, parentId } = sessionStore.loadAllHistoryWithOrigin(info.id)
+	let loaded = opts.logName || opts.entryLimit !== undefined
+		? { entries: sessionStore.loadHistoryLog(info.id, opts.logName, opts.entryLimit), parentCount: 0, parentId: undefined as string | undefined }
+		: sessionStore.loadAllHistoryWithOrigin(info.id)
+	const first = loaded.entries[0]
+	if ((opts.logName || opts.entryLimit !== undefined) && first?.type === 'forked_from' && first.parent) {
+		const parent = sessionStore.loadAllHistoryWithOrigin(first.parent)
+		const before = first.ts ? parent.entries.filter((entry) => !entry.ts || entry.ts < first.ts!) : parent.entries
+		loaded = { entries: [...before, ...loaded.entries.slice(1)], parentCount: before.length, parentId: first.parent }
+	}
+	const { entries: history, parentCount, parentId } = loaded
 	const usage = emptyUsage()
 	for (const entry of history) {
 		if (entry.type !== 'assistant' || !entry.usage) continue

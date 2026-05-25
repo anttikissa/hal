@@ -248,15 +248,20 @@ function historyLogPath(sessionId: string, logName = loadSessionMeta(sessionId)?
 	return sessionFile(sessionId, logName)
 }
 
-function loadHistory(sessionId: string): HistoryEntry[] {
-	const path = historyLogPath(sessionId)
+function loadHistoryLog(sessionId: string, logName?: string, limit?: number): HistoryEntry[] {
+	const path = historyLogPath(sessionId, logName)
 	if (!existsSync(path)) return []
 	try {
 		const content = readFileSync(path, 'utf-8')
-		return content.trim() ? ason.parseAll(content) as HistoryEntry[] : []
+		const entries = content.trim() ? ason.parseAll(content) as HistoryEntry[] : []
+		return limit === undefined ? entries : entries.slice(0, limit)
 	} catch {
 		return []
 	}
+}
+
+function loadHistory(sessionId: string): HistoryEntry[] {
+	return loadHistoryLog(sessionId)
 }
 
 function loadSessionList(): string[] {
@@ -374,7 +379,7 @@ function nextHistoryLogName(currentLog: string): string {
 	return `history${current + 1}.asonl`
 }
 
-function rewriteHistoryForRebase(sessionId: string, entries: HistoryEntry[]): { oldLog: string; newLog: string } {
+function rewriteHistoryForRebase(sessionId: string, entries: HistoryEntry[]): { oldLog: string; newLog: string; entryCount: number } {
 	ensureSessionDir(sessionId)
 	const oldLog = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
 	const newLog = nextHistoryLogName(oldLog)
@@ -386,7 +391,7 @@ function rewriteHistoryForRebase(sessionId: string, entries: HistoryEntry[]): { 
 	appendFileSync(historyLogPath(sessionId, newLog), `${rebasedEntries.map(stringifyHistoryEntry).join('\n')}\n`)
 	appendFileSync(historyLogPath(sessionId, oldLog), `${stringifyHistoryEntry(ensureEntryIds([{ type: 'rebased_to', log: newLog, ts }])[0]!)}\n`)
 	updateMeta(sessionId, { currentLog: newLog })
-	return { oldLog, newLog }
+	return { oldLog, newLog, entryCount: rebasedEntries.length }
 }
 
 
@@ -446,6 +451,7 @@ export const sessions = {
 	loadSessionList,
 	loadSessionMeta,
 	loadHistory,
+	loadHistoryLog,
 	loadAllHistory,
 	loadAllHistoryWithOrigin,
 	loadLive,
