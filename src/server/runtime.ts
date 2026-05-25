@@ -706,13 +706,30 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
 }
 
+function handleActiveQueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): boolean {
+	const match = text.trimStart().match(/^\/queue(?:\s+([\s\S]*))?$/)
+	if (!match) return false
+	if ((match[1] ?? '').trim() === 'next') {
+		emitInfo(sessionId, 'Session is busy')
+		return true
+	}
+	void handleQueueSlashCommand(sessionId, text, source, displayText)
+	return true
+}
+
 function handleCommand(cmd: Command): void {
 	const sessionId = cmd.sessionId ?? state.activeSessions[0]
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
-			if (cmd.delivery === 'queue') void enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
-			else void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
+			if (cmd.delivery === 'queue') {
+				void enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
+			} else if (agentLoop.isActive(sessionId) && handleActiveQueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)) {
+				// /queue is an inspection/control command. Do not steer-abort the
+				// running turn just because the user wants to view or edit the queue.
+			} else {
+				void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
+			}
 			break
 		}
 		case 'continue': {

@@ -23,7 +23,7 @@ test('renders rebase instructions with full log path and queue examples', () => 
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history12.asonl', [])
 	const todo = rebase.renderTodo(snapshot)
 
-	expect(todo).toContain('/state/sessions/04-aaa/history12.asonl (new file: history13.asonl)')
+	expect(todo).toContain('/sessions/04-aaa/history12.asonl (new file: history13.asonl)')
 	expect(todo).toContain('# Commands: pick, edit, drop, queue, abort')
 	expect(todo).toContain("# queue 000001-aaa user 'edited prompt'")
 	expect(todo).toContain(`# queue "quotes; what's up"`)

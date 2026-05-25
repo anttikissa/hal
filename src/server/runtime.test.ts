@@ -348,6 +348,66 @@ test('enqueuePrompt stores prompts while session is busy', async () => {
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })
+test('active queue slash command does not abort the running turn', async () => {
+	const sessionId = `test-queue-active-${Date.now().toString(36)}`
+	const events: any[] = []
+	let aborts = 0
+	const origAppendEvent = ipc.appendEvent
+	const origIsActive = agentLoop.isActive
+	const origAbort = agentLoop.abort
+	try {
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		agentLoop.isActive = () => true
+		agentLoop.abort = () => {
+			aborts++
+			return true
+		}
+		promptQueue.append(sessionId, { text: 'queued prompt', createdAt: '2026-05-20T00:00:00.000Z' })
+
+		runtime.handleCommand({ type: 'prompt', sessionId, text: '/queue' })
+		await Bun.sleep(0)
+
+		expect(aborts).toBe(0)
+		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['queued prompt'])
+		expect(events.some((event) => event.type === 'info' && event.text === '1. queued prompt')).toBe(true)
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		agentLoop.isActive = origIsActive
+		agentLoop.abort = origAbort
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
+
+
+test('active queue next reports busy without consuming the queue', async () => {
+	const sessionId = `test-queue-next-active-${Date.now().toString(36)}`
+	const events: any[] = []
+	let aborts = 0
+	const origAppendEvent = ipc.appendEvent
+	const origIsActive = agentLoop.isActive
+	const origAbort = agentLoop.abort
+	try {
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		agentLoop.isActive = () => true
+		agentLoop.abort = () => {
+			aborts++
+			return true
+		}
+		promptQueue.append(sessionId, { text: 'queued prompt', createdAt: '2026-05-20T00:00:00.000Z' })
+
+		runtime.handleCommand({ type: 'prompt', sessionId, text: '/queue next' })
+		await Bun.sleep(0)
+
+		expect(aborts).toBe(0)
+		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['queued prompt'])
+		expect(events.some((event) => event.type === 'info' && event.text === 'Session is busy')).toBe(true)
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		agentLoop.isActive = origIsActive
+		agentLoop.abort = origAbort
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
 
 
 test('queue paused notice includes truncated preview and queue hint', () => {
