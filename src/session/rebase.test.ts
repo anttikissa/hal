@@ -90,6 +90,18 @@ test('queue existing truncated user uses snapshot text and omits row from histor
 	expect(applied.queue).toEqual([`${'x'.repeat(120)}\nsecond`])
 })
 
+
+test('queue existing user row uses edited non-truncated content', () => {
+	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: '1, 2, 3...' }] })]
+	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
+	const parsed = rebase.parseTodo(snapshot, "queue 000001-aaa user 'a, b, c...'")
+	const applied = rebase.applyParsed(snapshot, parsed)
+
+	expect(parsed.errors).toEqual([])
+	expect(applied.entries).toEqual([])
+	expect(applied.queue).toEqual(['a, b, c...'])
+})
+
 test('tool rows write contiguous calls first then results in visible order', () => {
 	const entries = [
 		entry('tool_call', { id: '000001-aaa', toolId: 't1', name: 'read', input: { path: 'a' } }),

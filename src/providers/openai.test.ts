@@ -32,6 +32,18 @@ afterEach(() => {
 	openai.resetResponsesWebSocketsForTests()
 })
 
+test('resetSession closes the cached websocket chain for one session', () => {
+	let closed = 0
+	openai.state.webSockets.set('s1', { ws: { close: () => { closed++ } } } as any)
+	openai.state.webSockets.set('s2', { ws: { close: () => { closed++ } } } as any)
+
+	openai.resetSession('s1')
+
+	expect(closed).toBe(1)
+	expect(openai.state.webSockets.has('s1')).toBe(false)
+	expect(openai.state.webSockets.has('s2')).toBe(true)
+})
+
 function encodeBase64Url(text: string): string {
 	return Buffer.from(text)
 		.toString('base64')

@@ -24,6 +24,7 @@ import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
 import { startup } from '../startup.ts'
 import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
+import { openai } from '../providers/openai.ts'
 
 const state = {
 	activeSessions: [] as string[],
@@ -591,6 +592,10 @@ function emitContextEstimate(sessionId: string, estimate: { used: number; max: n
 	})
 }
 
+function resetProviderConversation(sessionId: string): void {
+	openai.resetSession(sessionId)
+}
+
 function runReset(sessionId: string): void {
 	if (!ipc.ownsHostLock()) return
 	if (agentLoop.isActive(sessionId)) {
@@ -603,6 +608,7 @@ function runReset(sessionId: string): void {
 		{ type: 'reset', ts },
 		{ type: 'user', parts: [{ type: 'text', text: `[system] Session was reset. Previous conversation: ${oldLog}` }], ts },
 	])
+	resetProviderConversation(sessionId)
 	emitContextEstimate(sessionId, publishContextEstimate(sessionId))
 	emitInfo(sessionId, 'Conversation cleared.')
 }
@@ -626,6 +632,7 @@ function runCompact(sessionId: string): void {
 		{ type: 'user', parts: [{ type: 'text', text: `[system] Session was manually compacted. Previous conversation: ${oldLog}` }], ts },
 		{ type: 'user', parts: [{ type: 'text', text: replay.buildCompactionContext(sessionId, entries) }], ts },
 	])
+	resetProviderConversation(sessionId)
 	emitContextEstimate(sessionId, publishContextEstimate(sessionId))
 	emitInfo(sessionId, `Context compacted (${userMsgs.length} user messages summarized, now writing to ${newLog})`)
 }
@@ -687,6 +694,7 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 		return
 	}
 	const { oldLog, newLog } = sessionStore.rewriteHistoryForRebase(sessionId, applied.entries)
+	resetProviderConversation(sessionId)
 	rebaseSnapshots.delete(requestId)
 	ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog })
 	for (const text of applied.queue) await enqueuePrompt(sessionId, text)

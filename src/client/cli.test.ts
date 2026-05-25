@@ -48,6 +48,43 @@ test('SIGWINCH forces a redraw after terminal resize', () => {
 	expect(forceDraws).toBe(1)
 })
 
+
+test('external editor suppresses resize redraws', () => {
+	let forceDraws = 0
+	const sigwinch: Array<() => void> = []
+	const on = ((event: string, listener: () => void) => {
+		if (event === 'SIGWINCH') sigwinch.push(listener)
+		return process
+	}) as typeof process.on
+	const off = ((event: string, listener: () => void) => {
+		if (event === 'SIGWINCH') sigwinch.splice(sigwinch.indexOf(listener), 1)
+		return process
+	}) as typeof process.off
+	withPatched(process, 'on', on, () => {
+		withPatched(process, 'off', off, () => {
+			withPatched(process.stdout, 'write', (() => true) as typeof process.stdout.write, () => {
+				withPatched(process.stdin, 'on', (() => process.stdin) as typeof process.stdin.on, () => {
+					withPatched(process.stdin, 'resume', (() => process.stdin) as typeof process.stdin.resume, () => {
+						withPatched(render, 'draw', ((force = false) => { if (force) forceDraws++ }) as typeof render.draw, () => {
+							withPatched(client, 'startClient', (() => {}) as typeof client.startClient, () => {
+								withPatched(cursor, 'start', (() => {}) as typeof cursor.start, () => {
+									const controller = new AbortController()
+									cli.startCli(controller.signal)
+									cli.forTests.setExternalEditorOpen(true)
+									for (const listener of sigwinch) listener()
+									cli.forTests.setExternalEditorOpen(false)
+									controller.abort()
+								})
+							})
+						})
+					})
+				})
+			})
+		})
+	})
+	expect(forceDraws).toBe(0)
+})
+
 test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

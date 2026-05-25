@@ -61,16 +61,22 @@ function writeTabStops(cols: number, step: number): void {
 const PAINT_INTERVAL = 16 // ms — ~60 fps, plenty for streaming text
 let paintTimer: ReturnType<typeof setTimeout> | null = null
 let paintQueued = false
+let externalEditorOpen = false
+
+function clearPendingPaint(): void {
+	if (paintTimer) {
+		clearTimeout(paintTimer)
+		paintTimer = null
+	}
+	paintQueued = false
+}
 
 function draw(force = false): void {
+	if (externalEditorOpen) return
 	if (force) {
 		// Force paints are user-triggered — execute immediately.
 		// Cancel any pending throttled paint so we don't double-draw.
-		if (paintTimer) {
-			clearTimeout(paintTimer)
-			paintTimer = null
-		}
-		paintQueued = false
+		clearPendingPaint()
 		render.draw(true)
 		return
 	}
@@ -153,6 +159,7 @@ function onSigcont(): void {
 }
 
 function handleResize(): void {
+	if (externalEditorOpen) return
 	writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 	draw(true)
 }
@@ -238,32 +245,36 @@ function rebaseRequestId(): string {
 async function runExternalEditor(path: string): Promise<number> {
 	const editor = process.env.EDITOR || process.env.VISUAL || 'vim'
 	const wasTty = process.stdin.isTTY
+	externalEditorOpen = true
+	clearPendingPaint()
 	process.stdin.pause()
 	cleanupTerminal()
-	const proc = Bun.spawn(['sh', '-c', `${editor} "$1"`, 'hal-editor', path], {
-		stdin: 'inherit',
-		stdout: 'inherit',
-		stderr: 'inherit',
-	})
-	const code = await proc.exited
-	terminalCleaned = false
-	if (wasTty) {
-		process.stdin.setRawMode(true)
-		process.stdin.setEncoding('utf8')
-		process.stdin.resume()
-		if (useKitty) process.stdout.write(KITTY_ON)
-		process.stdout.write(BRACKETED_PASTE_ON)
-		writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
+	try {
+		const proc = Bun.spawn(['sh', '-c', `${editor} "$1"`, 'hal-editor', path], {
+			stdin: 'inherit',
+			stdout: 'inherit',
+			stderr: 'inherit',
+		})
+		return await proc.exited
+	} finally {
+		externalEditorOpen = false
+		terminalCleaned = false
+		if (wasTty) {
+			process.stdin.setRawMode(true)
+			process.stdin.setEncoding('utf8')
+			process.stdin.resume()
+			if (useKitty) process.stdout.write(KITTY_ON)
+			process.stdout.write(BRACKETED_PASTE_ON)
+			writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
+		} else {
+			process.stdin.resume()
+		}
+		cursor.start(() => {
+			if (!render.hasAnimatedIndicators()) return
+			draw()
+		})
+		draw(true)
 	}
-	else {
-		process.stdin.resume()
-	}
-	cursor.start(() => {
-		if (!render.hasAnimatedIndicators()) return
-		draw()
-	})
-	draw(true)
-	return code
 }
 
 async function openRebaseEditor(event: any): Promise<void> {
@@ -656,5 +667,9 @@ export const cli = {
 	forTests: {
 		handleAppKey,
 		claudeCacheWarning,
+		setExternalEditorOpen: (value: boolean) => {
+			externalEditorOpen = value
+			if (value) clearPendingPaint()
+		},
 	},
 }

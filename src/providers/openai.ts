@@ -430,6 +430,10 @@ function closeResponsesWebSocket(sessionId: string): void {
 	} catch {}
 }
 
+function resetSession(sessionId: string): void {
+	closeResponsesWebSocket(sessionId)
+}
+
 function resetResponsesWebSocketsForTests(): void {
 	for (const sessionId of state.webSockets.keys()) closeResponsesWebSocket(sessionId)
 	state.webSockets.clear()
@@ -737,4 +741,4 @@ export function createCompatProvider(providerName: string, baseUrl?: string): Pr
 	return { generate: (req) => generateCompat(providerName, url, req) }
 }
 
-export const openai = { config, state, openaiProvider, createCompatProvider, convertResponsesMessages, resetResponsesWebSocketsForTests }
+export const openai = { config, state, openaiProvider, createCompatProvider, convertResponsesMessages, resetSession, resetResponsesWebSocketsForTests }
