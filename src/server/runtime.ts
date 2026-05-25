@@ -675,6 +675,11 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['History changed while editor was open; restart /rebase.'] })
 		return
 	}
+	if (todo === rebase.renderTodo(saved.snapshot)) {
+		rebaseSnapshots.delete(requestId)
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, unchanged: true })
+		return
+	}
 	const parsed = rebase.parseTodo(saved.snapshot, todo)
 	if (parsed.aborted) {
 		rebaseSnapshots.delete(requestId)

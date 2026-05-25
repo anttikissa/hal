@@ -63,6 +63,43 @@ test('restoredSessionOrder reinserts a resumed tab at its saved position', () =>
 	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 0)).toEqual(['04-left', '04-right', '04-closed'])
 })
 
+test('unchanged rebase apply is a no-op', async () => {
+	const events: any[] = []
+	const entries: any[] = [{ type: 'user', id: '000001-aaa', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-25T12:00:00.000Z' }]
+	let rewrites = 0
+	const origAppendEvent = ipc.appendEvent
+	const origLoadHistory = sessions.loadHistory
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origRewriteHistoryForRebase = sessions.rewriteHistoryForRebase
+	const origIsActive = agentLoop.isActive
+	ipc.appendEvent = (event: any) => { events.push(event) }
+	sessions.loadHistory = () => entries
+	sessions.loadSessionMeta = () => ({ id: 's1', createdAt: '2026-05-25T12:00:00.000Z', currentLog: 'history.asonl' })
+	sessions.rewriteHistoryForRebase = (() => {
+		rewrites++
+		return { oldLog: 'history.asonl', newLog: 'history2.asonl', entryCount: 0 }
+	}) as typeof sessions.rewriteHistoryForRebase
+	agentLoop.isActive = () => false
+	try {
+		runtime.handleCommand({ type: 'rebase-start', sessionId: 's1', requestId: 'r1', clientPid: 123 })
+		const start = events.find((event) => event.type === 'rebase-start')
+		expect(start?.todo).toContain("'hello'")
+
+		runtime.handleCommand({ type: 'rebase-apply', sessionId: 's1', requestId: 'r1', clientPid: 123, todo: start.todo })
+		await Bun.sleep(0)
+
+		expect(rewrites).toBe(0)
+		expect(events.find((event) => event.type === 'history-rebased')).toBeUndefined()
+		expect(events.find((event) => event.type === 'rebase-result')).toMatchObject({ ok: true, unchanged: true })
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		sessions.loadHistory = origLoadHistory
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.rewriteHistoryForRebase = origRewriteHistoryForRebase
+		agentLoop.isActive = origIsActive
+	}
+})
+
 test('fork command persists one child notice without duplicating bare session ids', () => {
 	const parentId = '25-parent'
 	const events: any[] = []

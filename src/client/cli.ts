@@ -295,7 +295,8 @@ function handleRebaseStart(event: any): void {
 
 function handleRebaseResult(event: any): void {
 	if (event.ok) {
-		if (event.aborted) client.addEntry('Rebase aborted.')
+		if (event.unchanged) client.addEntry('Rebase unchanged.')
+		else if (event.aborted) client.addEntry('Rebase aborted.')
 		else client.addEntry(`Rebased to ${event.newLog}${event.queued ? `; queued ${event.queued}` : ''}.`)
 		draw(true)
 		return
