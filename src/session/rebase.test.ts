@@ -18,6 +18,18 @@ test('renders and parses quoted hashes without treating them as comments', () =>
 	expect(parsed.items[0]).toMatchObject({ cmd: 'pick', id: '000001-aaa', content: 'hello #1' })
 })
 
+
+test('renders rebase instructions with full log path and queue examples', () => {
+	const snapshot = rebase.buildSnapshot('04-aaa', 'history12.asonl', [])
+	const todo = rebase.renderTodo(snapshot)
+
+	expect(todo).toContain('/state/sessions/04-aaa/history12.asonl (new file: history13.asonl)')
+	expect(todo).toContain('# Commands: pick, edit, drop, queue, abort')
+	expect(todo).toContain("# queue 000001-aaa user 'edited prompt'")
+	expect(todo).toContain(`# queue "quotes; what's up"`)
+	expect(todo).toContain('# queue send this without quotes')
+})
+
 test('aligns comments by rendered screen width after type prefix', () => {
 	const entries = [
 		entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'short' }] }),

@@ -3,6 +3,7 @@ import { ason } from '../utils/ason.ts'
 import { visLen } from '../utils/strings.ts'
 import { time } from '../utils/time.ts'
 import { sessionEntry } from './entry.ts'
+import { STATE_DIR } from '../state.ts'
 
 const ID_RE = /^[a-z0-9]{6}-[a-z0-9]{3}$/
 const COMMENT_COLUMN = 66
@@ -243,12 +244,17 @@ function renderRow(row: RebaseRow & { cmd?: RebaseCommand }): string {
 
 function renderTodo(snapshot: RebaseSnapshot): string {
 	const nextLog = nextHistoryLog(snapshot.baseLog)
+	const basePath = `${STATE_DIR}/sessions/${snapshot.sessionId}/${snapshot.baseLog}`
 	const lines = [
-		`# Rebase ${snapshot.sessionId} ${snapshot.baseLog} -> ${nextLog}`,
-		'# Commands: pick, edit, drop, queue. Delete a line to drop it. Reorder freely.',
-		'# Abort: empty file, or any non-comment line whose command is abort.',
-		'# Comments after parsed content are ignored. Edits to thinking blocks are ignored.',
-		'# Queue lines must be the final non-comment lines; they are queued after rebase.',
+		`# Interactive rebase of ${basePath} (new file: ${nextLog})`,
+		'# Commands: pick, edit, drop, queue, abort',
+		'# Short lines can be edited in-place',
+		"# Any line with the command 'abort', or an empty file, aborts the rebase",
+		"# Lines with 'queue' must appear last; they are immediately sent after the rebase operation",
+		'# Queue lines can appear like this:',
+		"# queue 000001-aaa user 'edited prompt'            # changing a 'pick' line to 'queue'",
+		`# queue "quotes; what's up"`,
+		'# queue send this without quotes',
 		'',
 		...snapshot.rows.map((row) => renderRow(row)),
 	]
