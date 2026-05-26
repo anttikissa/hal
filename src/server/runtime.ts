@@ -220,7 +220,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
 	const related = sourceMeta ?? openerMeta
 	const text = opts.sourceId
-		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}.` : ''
+		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}` : ''
 		: ''
 	if (text) recordSessionInfo(sessionId, text, meta.createdAt, 'notice')
 	if (opts.sourceId && sourceMeta?.context && !overridesForkCwd) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })

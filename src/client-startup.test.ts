@@ -159,7 +159,7 @@ describe('client startup', () => {
 
 		const info = client.currentTab()?.history.find((block) => block.type === 'info')
 		expect(info?.text).toContain('Session opened in ~/sync/lippu.')
-		expect(info?.text).toContain(`Now writing to ${paths.historyDisplayPath('s1')}.`)
+		expect(info?.text).toContain(`Now writing to ${paths.historyDisplayPath('s1')}`)
 		expect(info?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
 		expect(info?.text).toContain('1% used on 5h quota, resetting at ')
 		expect(info?.text).toMatch(/\(in 1 hour\)|\(in 60 minutes\)/)

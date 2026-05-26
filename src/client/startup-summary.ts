@@ -59,7 +59,7 @@ function text(tab: any, opts: any): string {
 	const model = tab.model || opts.fallbackModel || ''
 	const lines = [
 		`Session opened in ${paths.formatHomePath(tab.cwd || process.cwd())}.`,
-		`Now writing to ${paths.historyDisplayPath(tab.sessionId, tab.currentLog)}.`,
+		`Now writing to ${paths.historyDisplayPath(tab.sessionId, tab.currentLog)}`,
 	]
 	const modelLine = startupModelLine(model)
 	if (modelLine) lines.push('', modelLine)
