@@ -8,15 +8,17 @@ function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 
 describe('prompt editor', () => {
 	test('ctrl-= and ctrl-- resize the prompt editor height', () => {
-		prompt.clear()
+		prompt.setText('one\ntwo')
 		prompt.config.maxPromptLines = 10
 		prompt.state.promptLineLimit = 0
 
+		expect(prompt.buildPrompt(80).lines.length).toBe(2)
 		expect(prompt.handleKey(key('=', { ctrl: true }), 80)).toBe(true)
-		expect(prompt.promptLineLimit()).toBe(15)
+		expect(prompt.promptLineLimit()).toBe(7)
+		expect(prompt.buildPrompt(80).lines.length).toBe(7)
 
 		expect(prompt.handleKey(key('-', { ctrl: true }), 80)).toBe(true)
-		expect(prompt.promptLineLimit()).toBe(10)
+		expect(prompt.buildPrompt(80).lines.length).toBe(2)
 		expect(prompt.state.promptLineLimit).toBe(0)
 	})
 })

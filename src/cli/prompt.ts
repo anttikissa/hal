@@ -252,15 +252,19 @@ function promptLineLimit(): number {
 	return defaultPromptLineLimit()
 }
 
-function resizePromptLineLimit(dir: -1 | 1): void {
-	const current = promptLineLimit()
-	const defaultLimit = defaultPromptLineLimit()
+function autoPromptLineCount(contentWidth: number): number {
+	return Math.min(promptRows(contentWidth), defaultPromptLineLimit())
+}
+
+function resizePromptLineLimit(dir: -1 | 1, contentWidth: number): void {
+	const autoLines = autoPromptLineCount(contentWidth)
+	const current = state.promptLineLimit > 0 ? promptLineLimit() : autoLines
 	if (dir > 0) {
 		state.promptLineLimit = current + 5
 		return
 	}
-	state.promptLineLimit = Math.max(defaultLimit, current - 5)
-	if (state.promptLineLimit === defaultLimit) state.promptLineLimit = 0
+	state.promptLineLimit = Math.max(autoLines, current - 5)
+	if (state.promptLineLimit === autoLines) state.promptLineLimit = 0
 }
 
 function promptRows(contentWidth: number): number {
@@ -626,11 +630,11 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 			return true
 		case '=':
 			if (!k.ctrl || k.alt || k.shift) break
-			resizePromptLineLimit(1)
+			resizePromptLineLimit(1, contentWidth)
 			return true
 		case '-':
 			if (!k.ctrl || k.alt || k.shift) break
-			resizePromptLineLimit(-1)
+			resizePromptLineLimit(-1, contentWidth)
 			return true
 		case '/':
 			if (!k.ctrl) break
@@ -646,7 +650,7 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		case 'down': {
 			const dir = k.key === 'up' ? -1 : 1
 			if (k.ctrl && !k.alt && !k.shift) {
-				resizePromptLineLimit(dir === -1 ? 1 : -1)
+				resizePromptLineLimit(dir === -1 ? 1 : -1, contentWidth)
 				return true
 			}
 			if (k.alt) moveEdge(dir, k.shift)
@@ -681,7 +685,8 @@ function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getLayout(buf, contentWidth)
 	const { row: curRow, col: curCol } = cursorToRowCol(buf, cursor, contentWidth)
 	const totalRows = Math.max(layout.lines.length, curRow + 1)
-	const promptLines = Math.min(totalRows, promptLineLimit())
+	let promptLines = Math.min(totalRows, promptLineLimit())
+	if (state.promptLineLimit > 0 && totalRows <= defaultPromptLineLimit()) promptLines = promptLineLimit()
 	const sel = selRange()
 
 	// Scroll viewport if prompt is taller than MAX_PROMPT_LINES
