@@ -442,11 +442,16 @@ function quoteToolArg(value: unknown): string {
 	return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`
 }
 
+function isGitCommitAmendCommand(input: any): boolean {
+	const command = typeof input?.command === 'string' ? input.command : ''
+	return /\bgit\s+commit\b/.test(command) && /(?:^|\s)--amend(?:\s|$)/.test(command)
+}
+
 const toolSpecs: Record<string, ToolSpec> = {
 	bash: {
 		title(input, output) {
 			const meta = commitMetadataFromOutput(output)
-			if (meta) return `Commit ${meta.hash}: ${commitSubject(meta.message ?? 'commit')}`
+			if (meta) return `${isGitCommitAmendCommand(input) ? 'Amend' : 'Commit'} ${meta.hash}: ${commitSubject(meta.message ?? 'commit')}`
 			const cmd = stripRedundantCd(input?.command ?? '', input?.cwd)
 			return !cmd.includes('\n') && cmd.length <= 60 ? `Bash: ${cmd}` : 'Bash'
 		},

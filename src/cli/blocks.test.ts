@@ -434,6 +434,33 @@ test('bash git commit -F renders from metadata message', () => {
 	expect(lines.join('\n')).not.toContain('git commit -F')
 })
 
+
+test('bash git commit --amend marks commit block as amend', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'bash',
+		input: { command: "cat > /tmp/msg <<'EOF'\nAmended title\nEOF\ngit commit --amend -F /tmp/msg" },
+		output: `[main fed789] Amended title
+[hal-commit]
+{
+	branch: 'main',
+	hash: 'fed789',
+	message: 'Amended title',
+	summary: '1 file changed, 1 insertion(+)',
+	files: [
+		{ path: 'src/a.ts', added: 1, removed: 0, locDelta: 1, isCode: true }
+	],
+	locDelta: 1,
+	locDeltaCode: 1
+}
+[/hal-commit]`,
+	}
+
+	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
+	expect(lines[0]).toContain('Amend fed789: Amended title')
+	expect(lines[0]).not.toContain('Commit fed789')
+})
+
 test('failed shell-substitution commit renders as ordinary bash', () => {
 	const block: Block = {
 		type: 'tool',
