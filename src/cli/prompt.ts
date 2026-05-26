@@ -260,10 +260,10 @@ function resizePromptLineLimit(dir: -1 | 1, contentWidth: number): void {
 	const autoLines = autoPromptLineCount(contentWidth)
 	const current = state.promptLineLimit > 0 ? promptLineLimit() : autoLines
 	if (dir > 0) {
-		state.promptLineLimit = current + 5
+		state.promptLineLimit = current + 1
 		return
 	}
-	state.promptLineLimit = Math.max(autoLines, current - 5)
+	state.promptLineLimit = Math.max(autoLines, current - 1)
 	if (state.promptLineLimit === autoLines) state.promptLineLimit = 0
 }
 

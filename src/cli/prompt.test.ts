@@ -14,8 +14,8 @@ describe('prompt editor', () => {
 
 		expect(prompt.buildPrompt(80).lines.length).toBe(2)
 		expect(prompt.handleKey(key('=', { ctrl: true }), 80)).toBe(true)
-		expect(prompt.promptLineLimit()).toBe(7)
-		expect(prompt.buildPrompt(80).lines.length).toBe(7)
+		expect(prompt.promptLineLimit()).toBe(3)
+		expect(prompt.buildPrompt(80).lines.length).toBe(3)
 
 		expect(prompt.handleKey(key('-', { ctrl: true }), 80)).toBe(true)
 		expect(prompt.buildPrompt(80).lines.length).toBe(2)
