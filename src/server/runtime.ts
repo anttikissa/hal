@@ -436,7 +436,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 	return true
 }
 
-async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
+async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string, active = false): Promise<boolean> {
 	const match = text.trimStart().match(/^\/queue(?:\s+([\s\S]*))?$/)
 	if (!match) return false
 	const args = (match[1] ?? '').trim()
@@ -447,7 +447,8 @@ async function handleQueueSlashCommand(sessionId: string, text: string, source?:
 		return true
 	}
 	if (args === 'next') {
-		await runNextQueuedPrompt(sessionId, false)
+		if (active) emitInfo(sessionId, 'Session is busy')
+		else await runNextQueuedPrompt(sessionId, false)
 		return true
 	}
 	if (args === 'clear') {
@@ -501,6 +502,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 
 async function dispatchPromptCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	const steering = agentLoop.isActive(sessionId)
+	if (steering && await handleQueueSlashCommand(sessionId, text, source, displayText, true)) return
 	if (steering) {
 		agentLoop.abort(sessionId)
 		await Bun.sleep(50)
@@ -707,30 +709,13 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
 }
 
-function handleActiveQueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): boolean {
-	const match = text.trimStart().match(/^\/queue(?:\s+([\s\S]*))?$/)
-	if (!match) return false
-	if ((match[1] ?? '').trim() === 'next') {
-		emitInfo(sessionId, 'Session is busy')
-		return true
-	}
-	void handleQueueSlashCommand(sessionId, text, source, displayText)
-	return true
-}
-
 function handleCommand(cmd: Command): void {
 	const sessionId = cmd.sessionId ?? state.activeSessions[0]
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
-			if (cmd.delivery === 'queue') {
-				void enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
-			} else if (agentLoop.isActive(sessionId) && handleActiveQueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)) {
-				// /queue is an inspection/control command. Do not steer-abort the
-				// running turn just because the user wants to view or edit the queue.
-			} else {
-				void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
-			}
+			if (cmd.delivery === 'queue') void enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
+			else void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
 		case 'continue': {
