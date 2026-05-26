@@ -20,7 +20,6 @@ import { version } from '../version.ts'
 import { HAL_DIR } from '../state.ts'
 import { colors } from '../cli/colors.ts'
 import { prompt } from '../cli/prompt.ts'
-import { cursor } from '../cli/cursor.ts'
 import type { Tab } from '../client.ts'
 
 const GREEN = '\x1b[32m'
@@ -29,7 +28,6 @@ const YELLOW = '\x1b[33m'
 const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
-const ANSI_DIM = '\x1b[2m'
 
 type TabLabelMode = 'wide' | 'name' | 'num'
 const config = {
@@ -49,11 +47,11 @@ function halCursorColor(): string {
 	return colors.input.cursor || colors.assistant.fg
 }
 
-function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
+function tabIndicator(tab: Tab): { char: string; color: string } {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
-	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: YELLOW, blinks: false }
+	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: YELLOW }
 
-	if (busy) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
+	if (busy) return { char: '▪', color: renderStatus.halCursorColor() }
 
 	// Alerts beat the generic "done unseen" checkmark. This matters for cases
 	// like "Hit max iterations" where generation finished, but the tab still
@@ -62,33 +60,27 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 		const b = tab.history[i]!
 		// Skip trailing info blocks that aren't status-relevant.
 		if ((b.type === 'log' || b.type === 'info') && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
-		if (b.type === 'warning') return { char: '!', color: YELLOW, blinks: false }
-		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
+		if (b.type === 'warning') return { char: '!', color: YELLOW }
+		if (b.type === 'error') return { char: '✗', color: RED }
 		if (b.type === 'log' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
-			return { char: '!', color: '', blinks: true }
+			return { char: '!', color: '' }
 		}
 		break
 	}
 
-	if (tab.doneUnseen) return { char: '✓', color: GREEN, blinks: false }
+	if (tab.doneUnseen) return { char: '✓', color: GREEN }
 
-	return { char: '', color: '', blinks: false }
+	return { char: '', color: '' }
 }
 
 function hasAnimatedIndicators(): boolean {
-	for (const tab of client.state.tabs) {
-		if (renderStatus.tabIndicator(tab).blinks) return true
-	}
 	return false
 }
 
-// Render the 1-char indicator. Animated indicators pulse between bright and dim
-// phases instead of disappearing, so a busy tab never looks idle.
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
 	if (!ind.char) return ''
-	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
-	return `${ANSI_DIM}${ind.color}${ind.char}${RESET}${baseColor}`
+	return `${ind.color}${ind.char}${baseColor}`
 }
 
 function tabDir(tab: Tab): string {

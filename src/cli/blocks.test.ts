@@ -288,10 +288,12 @@ test('spawn_agent block renders full input args', () => {
 		output: 'Queued subagent spawn from 04-lfp',
 	}
 
-	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
+	const rendered = blocks.renderBlock(block, 100)
+	const lines = rendered.map((l) => stripAnsi(l))
 	const header = lines[0] ?? ''
 	const body = lines.slice(1).join('\n')
 
+	expect(rendered.join('\n')).not.toContain('\x1b[2m')
 	expect(header).toContain('Spawn agent')
 	expect(body).toContain('task: `Design the benchmark prompt')
 	expect(body).toContain("mode: 'fresh'")

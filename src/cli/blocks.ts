@@ -271,7 +271,7 @@ function editLineRange(input: any): string {
 	return after === '0:000' ? ' (before 1)' : ` (after ${after})`
 }
 
-const [RED_FG, GREEN_FG, FG_OFF, RESET_BG, DIM, DIM_OFF] = ['\x1b[31m', '\x1b[32m', '\x1b[39m', '\x1b[49m', '\x1b[2m', '\x1b[22m']
+const [RED_FG, GREEN_FG, FG_OFF, RESET_BG] = ['\x1b[31m', '\x1b[32m', '\x1b[39m', '\x1b[49m']
 
 function stripRedundantCd(command: string, cwd: string | undefined): string {
 	if (!cwd) return command
@@ -494,8 +494,8 @@ const toolSpecs: Record<string, ToolSpec> = {
 
 function getToolSpec(name: string): ToolSpec { return toolSpecs[name] ?? { title: () => humanizeName(name) } }
 
-function pushDimWrapped(lines: string[], text: string, cols: number): void {
-	for (const raw of text.split('\n')) for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) lines.push(`${DIM}${line}${DIM_OFF}`)
+function pushWrapped(lines: string[], text: string, cols: number): void {
+	for (const raw of text.split('\n')) for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) lines.push(line)
 }
 
 function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' | 'log' | 'info' | 'warning' | 'error' }>): MdColors {
@@ -571,7 +571,7 @@ function blockContent(block: Block, cols: number): string[] {
 		const command = spec.command?.(block.input, block.output)
 		if (command) lines.push(...formatToolCommand(command, cols, spec.shellContinuations?.(block.input, block.output) ?? block.name === 'bash'))
 		const details = spec.details?.(block.input)
-		if (details) pushDimWrapped(lines, details, cols)
+		if (details) pushWrapped(lines, details, cols)
 		if (!block.output) return lines
 		const output = sanitizeTerminalText(stripAnsiSequences(block.output))
 		const format = spec.format?.(output, cols, block.input) ?? { bodyLines: [] }
@@ -580,7 +580,7 @@ function blockContent(block: Block, cols: number): string[] {
 		const outputLines = output.trimEnd().split('\n')
 		if (outputLines.length > blockConfig.maxToolOutputLines) {
 			const hidden = format.hiddenIndicator ?? `[+ ${outputLines.length - blockConfig.maxToolOutputLines} lines]`
-			lines.push(`${DIM}${hidden}${DIM_OFF}`)
+			lines.push(hidden)
 			for (const line of outputLines.slice(-blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
 			return lines
 		}
@@ -618,7 +618,7 @@ function formatBlockTimeRange(first?: number, last?: number): string {
 }
 
 function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
-	const right = blobRef ? ` ${DIM}(${blobRef})${DIM_OFF} ──` : ''
+	const right = blobRef ? ` (${blobRef}) ──` : ''
 	const prefix = time ? `── ${time} ` : '── '
 	const budget = Math.max(1, cols - 1)
 	const titleWidth = Math.max(1, budget - visLen(prefix) - visLen(right) - 1)

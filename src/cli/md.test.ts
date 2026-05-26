@@ -8,8 +8,6 @@ import {
 	M_BOLD_OFF,
 	M_ITALIC,
 	M_ITALIC_OFF,
-	M_DIM,
-	M_DIM_OFF,
 } from '../utils/strings.ts'
 
 // mdInline outputs PUA marker chars, not raw ANSI.
@@ -18,12 +16,9 @@ const B = M_BOLD,
 	B_OFF = M_BOLD_OFF
 const I = M_ITALIC,
 	I_OFF = M_ITALIC_OFF
-const DIM = M_DIM,
-	DIM_OFF = M_DIM_OFF
-
 /** Strip ANSI escapes AND marker chars for plain-text assertions. */
 function strip(s: string): string {
-	return s.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\uE000-\uE005]/g, '')
+	return s.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\uE000-\uE003]/g, '')
 }
 
 // ── mdInline ─────────────────────────────────────────────────────────────────
@@ -36,11 +31,11 @@ test('mdInline: italic', () => {
 	expect(md.mdInline('hello *world*')).toBe(`hello ${I}world${I_OFF}`)
 })
 
-test('mdInline: inline code', () => {
-	expect(md.mdInline('run `npm install`')).toBe(`run ${DIM}npm install${DIM_OFF}`)
+test('mdInline: inline code defaults to plain text', () => {
+	expect(md.mdInline('run `npm install`')).toBe('run npm install')
 })
 
-test('mdInline: bold code — bold wins, no dim', () => {
+test('mdInline: bold code stays bold', () => {
 	expect(md.mdInline('see **`file.ts`**')).toBe(`see ${B}file.ts${B_OFF}`)
 })
 
@@ -58,8 +53,8 @@ test('mdInline: no false italic on **bold**', () => {
 test('mdInline: star inside backtick code is not italic', () => {
 	const r = md.mdInline('matching `state/sessions/*/session.ason` and `*` only')
 	expect(r).not.toContain(I)
-	expect(r).toContain(`${DIM}state/sessions/*/session.ason${DIM_OFF}`)
-	expect(r).toContain(`${DIM}*${DIM_OFF}`)
+	expect(r).toContain('state/sessions/*/session.ason')
+	expect(r).toContain('*')
 })
 
 
@@ -253,13 +248,11 @@ test('resolveMarkers: single line, no wrapping', () => {
 })
 
 test('resolveMarkers: style split across lines — re-opens and closes', () => {
-	// Simulates what happens when wordWrap splits mid-bold
-	const lines = [`${M_DIM}some dim text`, `continues here${M_DIM_OFF}`]
+	// Simulates what happens when wordWrap splits mid-bold.
+	const lines = [`${M_BOLD}some bold text`, `continues here${M_BOLD_OFF}`]
 	const result = resolveMarkers(lines)
-	// Line 1: open dim, close at EOL
-	expect(result[0]).toBe('\x1b[2msome dim text\x1b[22m')
-	// Line 2: re-open dim at BOL, close at marker
-	expect(result[1]).toBe('\x1b[2mcontinues here\x1b[22m')
+	expect(result[0]).toBe('\x1b[1msome bold text\x1b[22m')
+	expect(result[1]).toBe('\x1b[1mcontinues here\x1b[22m')
 })
 
 test('resolveMarkers: no markers — passes through unchanged', () => {

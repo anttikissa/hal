@@ -260,16 +260,12 @@ export const M_BOLD = '\uE000'
 export const M_BOLD_OFF = '\uE001'
 export const M_ITALIC = '\uE002'
 export const M_ITALIC_OFF = '\uE003'
-export const M_DIM = '\uE004'
-export const M_DIM_OFF = '\uE005'
 
 const MARKER_ANSI: Record<string, string> = {
 	[M_BOLD]: '\x1b[1m',
 	[M_BOLD_OFF]: '\x1b[22m',
 	[M_ITALIC]: '\x1b[3m',
 	[M_ITALIC_OFF]: '\x1b[23m',
-	[M_DIM]: '\x1b[2m',
-	[M_DIM_OFF]: '\x1b[22m',
 }
 
 /** Convert style markers to ANSI escapes, ensuring each line is

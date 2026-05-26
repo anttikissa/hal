@@ -18,8 +18,6 @@ import {
 	M_BOLD_OFF,
 	M_ITALIC,
 	M_ITALIC_OFF,
-	M_DIM,
-	M_DIM_OFF,
 } from '../utils/strings.ts'
 
 // ── ANSI style pairs ─────────────────────────────────────────────────────────
@@ -33,7 +31,7 @@ export interface MdColors {
 const DEFAULT_COLORS: MdColors = {
 	bold: [M_BOLD, M_BOLD_OFF],
 	italic: [M_ITALIC, M_ITALIC_OFF],
-	code: [M_DIM, M_DIM_OFF],
+	code: ['', ''],
 }
 
 // ── Block-level: split into spans ────────────────────────────────────────────

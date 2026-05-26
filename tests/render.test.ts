@@ -407,7 +407,7 @@ describe('render', () => {
 		}
 	})
 
-	test('busy tabs stay visible during the dim pulse phase', () => {
+	test('busy tabs stay visible without ANSI dim', () => {
 		client.state.tabs.push({
 			sessionId: 'other',
 			name: 'tab 2',
@@ -433,7 +433,7 @@ describe('render', () => {
 			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
 			expect(tabBar).toBeDefined()
 			expect(tabBar).toContain('▪tmp tab 2')
-			expect(output).toContain('\x1b[2m')
+			expect(output).not.toContain('\x1b[2m')
 		} finally {
 			cursor.isVisible = originalIsVisible
 		}
