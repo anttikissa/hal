@@ -187,6 +187,32 @@ test('model picker keeps the prompt draft after choosing a model', () => {
 	})
 })
 
+
+test('ctrl-f saves the current prompt draft before forking', () => {
+	const commands: any[] = []
+	const drafts: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origSaveDraft = client.saveDraft
+	const tab = makeTab({ sessionId: 's1' })
+
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.saveDraft = (text, sessionId) => { drafts.push({ text, sessionId }) }
+
+	try {
+		withOneTab(tab, () => {
+			prompt.setText('draft prompt')
+			const handled = cli.forTests.handleAppKey({ key: 'f', shift: false, ctrl: true, alt: false, cmd: false })
+
+			expect(handled).toBe(true)
+			expect(drafts).toEqual([{ text: 'draft prompt', sessionId: 's1' }])
+			expect(commands).toEqual([{ type: 'open', sessionId: 's1', forkSessionId: 's1' }])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.saveDraft = origSaveDraft
+	}
+})
+
 test('alt-enter queues prompt without binding cmd-enter', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

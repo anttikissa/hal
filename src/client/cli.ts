@@ -507,7 +507,10 @@ function handleAppKey(k: KeyEvent): boolean {
 		// Ctrl-F: fork tab
 		if (k.key === 'f') {
 			const tab = client.currentTab()
-			if (tab) sendTabCommandIfRoom('open', `fork:${tab.sessionId}`)
+			if (tab) {
+				client.saveDraft(prompt.draftText(), tab.sessionId)
+				sendTabCommandIfRoom('open', `fork:${tab.sessionId}`)
+			}
 			return true
 		}
 		// Ctrl-W: close tab
