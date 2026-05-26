@@ -34,7 +34,7 @@ function sections(): ShortcutSection[] {
 				row('ctrl-a / ctrl-e', 'move to start/end of current line'),
 				row('alt-left / alt-right', 'move by word'),
 				row('shift-<movement>', "selects text (like you'd expect from any modern app)"),
-				row('ctrl-up / ctrl-down', 'expand/shrink prompt editor height'),
+				row('ctrl-= / ctrl--', 'expand/shrink prompt editor height'),
 				row('ctrl-u', 'kill to start of line; at line start, delete preceding newline'),
 				row('ctrl-k', 'kill to end of line; at line end, delete following newline'),
 				row('alt-d', 'kill next word'),

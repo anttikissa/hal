@@ -11,8 +11,8 @@ const config = {
 }
 
 const state = {
-	// 0 means use config.maxPromptLines. Ctrl-up/down sets an explicit live
-	// viewport height for composing unusually long prompts.
+	// 0 means use config.maxPromptLines. Ctrl-= / Ctrl-- sets an explicit
+	// live viewport height for composing unusually long prompts.
 	promptLineLimit: 0,
 }
 
@@ -623,6 +623,14 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 		case 'y':
 			if (!k.ctrl) break
 			yankKillBuffer()
+			return true
+		case '=':
+			if (!k.ctrl || k.alt || k.shift) break
+			resizePromptLineLimit(1)
+			return true
+		case '-':
+			if (!k.ctrl || k.alt || k.shift) break
+			resizePromptLineLimit(-1)
 			return true
 		case '/':
 			if (!k.ctrl) break

@@ -258,7 +258,7 @@ describe('render', () => {
 		prompt.config.maxPromptLines = 5
 		prompt.setText('one\ntwo\nthree')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('ctrl+up/down: resize editor')
+		expect(clean).toContain('ctrl+=/-: resize editor')
 	})
 
 	test('chrome order is status, prompt, then help at the bottom', () => {
