@@ -10,6 +10,7 @@ import { models } from '../models.ts'
 import { HAL_DIR } from '../state.ts'
 import { config } from '../config.ts'
 import { promptQueue } from '../runtime/prompt-queue.ts'
+import { paths } from '../utils/paths.ts'
 
 test('runtime exposes in-memory active sessions for eval helpers', () => {
 	const origActiveSessions = [...runtime.state.activeSessions]
@@ -145,7 +146,7 @@ test('fork command persists one child notice without duplicating bare session id
 		const childId = runtime.state.activeSessions.find((id) => id !== parentId)!
 		expect(childId).toBeTruthy()
 		expect(events.map((event) => event.text)).toEqual([`Tab forked to ${childId}.`])
-		expect(history[childId]!.filter((entry) => entry.type === 'info').map((entry) => entry.text)).toEqual([`Tab forked from ${parentId}.`])
+		expect(history[childId]!.filter((entry) => entry.type === 'info').map((entry) => entry.text)).toEqual([`Tab forked from ${parentId}; now writing to ${paths.historyDisplayPath(childId)}.`])
 	} finally {
 		runtime.state.activeSessions = origActiveSessions
 		ipc.appendEvent = origAppendEvent

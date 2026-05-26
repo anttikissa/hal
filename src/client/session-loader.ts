@@ -76,6 +76,7 @@ function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: nu
 	}
 	return {
 		id: info.id, name: meta?.name ?? info.name ?? info.id, cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model,
+		currentLog: meta?.currentLog ?? info.currentLog ?? 'history.asonl',
 		history, parentEntryCount: parentCount, liveHistory: sessionStore.loadLive(info.id).blocks as Block[], usage,
 		contextUsed: meta?.context?.used ?? 0, contextMax: meta?.context?.max ?? 0, forkedFrom: meta?.forkedFrom ?? parentId, lastActiveTs: lastActiveTs(history),
 	}

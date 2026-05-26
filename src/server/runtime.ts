@@ -25,6 +25,7 @@ import { log } from '../utils/log.ts'
 import { startup } from '../startup.ts'
 import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
+import { paths } from '../utils/paths.ts'
 
 const state = {
 	activeSessions: [] as string[],
@@ -219,7 +220,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
 	const related = sourceMeta ?? openerMeta
 	const text = opts.sourceId
-		? related ? `Tab forked from ${sessionLabel(related)}.` : ''
+		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}.` : ''
 		: ''
 	if (text) recordSessionInfo(sessionId, text, meta.createdAt, 'notice')
 	if (opts.sourceId && sourceMeta?.context && !overridesForkCwd) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })

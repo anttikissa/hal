@@ -23,6 +23,7 @@ export interface SharedSessionInfo {
 	name?: string
 	cwd: string
 	model?: string
+	currentLog?: string
 }
 
 export interface SharedHostInfo {

@@ -10,6 +10,7 @@ import { STATE_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { log } from './utils/log.ts'
 import { openaiUsage } from './openai-usage.ts'
+import { paths } from './utils/paths.ts'
 
 type TestLiveFileChange = { path: string; previous: Record<string, any>; next: Record<string, any> }
 
@@ -158,6 +159,7 @@ describe('client startup', () => {
 
 		const info = client.currentTab()?.history.find((block) => block.type === 'info')
 		expect(info?.text).toContain('Session opened in ~/sync/lippu.')
+		expect(info?.text).toContain(`Now writing to ${paths.historyDisplayPath('s1')}.`)
 		expect(info?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
 		expect(info?.text).toContain('1% used on 5h quota, resetting at ')
 		expect(info?.text).toMatch(/\(in 1 hour\)|\(in 60 minutes\)/)

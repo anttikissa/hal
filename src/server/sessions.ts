@@ -302,6 +302,7 @@ function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, i
 		name: meta.name ?? meta.topic,
 		cwd: meta.workingDir ?? process.cwd(),
 		model: meta.model ?? models.defaultModel(),
+		currentLog: meta.currentLog ?? DEFAULT_LOG,
 	}
 }
 

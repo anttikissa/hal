@@ -65,6 +65,7 @@ export interface Tab {
 	// Updated from sessions broadcast events.
 	cwd: string
 	model: string
+	currentLog?: string
 	// Parent session ID if this tab was forked
 	forkedFrom?: string
 	// Ephemeral UI-only marker shown when a loaded session has been idle >24h.
@@ -132,7 +133,7 @@ function flushPendingEntries(): void {
 	pendingEntries = []
 	touchTab(tab)
 }
-function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string }): Tab {
+function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string; currentLog?: string }): Tab {
 	return {
 		sessionId: id,
 		name,
@@ -149,6 +150,7 @@ function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string
 		contextMax: 0,
 		cwd: opts?.cwd ?? '',
 		model: opts?.model ?? '',
+		currentLog: opts?.currentLog ?? 'history.asonl',
 	}
 }
 
@@ -461,7 +463,7 @@ function canContinueCurrentTurn(): boolean {
 
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const snapshot = sessionLoader.load(info)
-	const tab = makeTab(snapshot.id, snapshot.name, { cwd: snapshot.cwd, model: snapshot.model })
+	const tab = makeTab(snapshot.id, snapshot.name, { cwd: snapshot.cwd, model: snapshot.model, currentLog: snapshot.currentLog })
 	tab.rawHistory = snapshot.history
 	tab.parentEntryCount = snapshot.parentEntryCount
 	tab.lastActiveTs = snapshot.lastActiveTs
@@ -554,6 +556,7 @@ function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInf
 		name: meta.name,
 		cwd: meta.workingDir ?? '',
 		model: meta.model,
+		currentLog: meta.currentLog ?? 'history.asonl',
 	}
 }
 

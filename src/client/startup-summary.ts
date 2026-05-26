@@ -2,18 +2,13 @@ import { models } from '../models.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { perf } from '../perf.ts'
 import { time } from '../utils/time.ts'
+import { paths } from '../utils/paths.ts'
 
 function perfMs(prefix: string): string | null {
 	const hit = perf.snapshot().findLast((mark) => mark.name.startsWith(prefix))
 	return hit ? `${hit.ms.toFixed(1)}ms` : null
 }
 
-function formatHomePath(path: string): string {
-	const home = process.env.HOME
-	if (!home) return path
-	if (path === home) return '~'
-	return path.startsWith(`${home}/`) ? `~/${path.slice(home.length + 1)}` : path
-}
 
 function titleWords(text: string): string {
 	return text.split(/[-_\s]+/).filter(Boolean).map((word) => word[0]!.toUpperCase() + word.slice(1).toLowerCase()).join(' ')
@@ -62,7 +57,10 @@ function startupPerfText(opts: any): string {
 
 function text(tab: any, opts: any): string {
 	const model = tab.model || opts.fallbackModel || ''
-	const lines = [`Session opened in ${formatHomePath(tab.cwd || process.cwd())}.`]
+	const lines = [
+		`Session opened in ${paths.formatHomePath(tab.cwd || process.cwd())}.`,
+		`Now writing to ${paths.historyDisplayPath(tab.sessionId, tab.currentLog)}.`,
+	]
 	const modelLine = startupModelLine(model)
 	if (modelLine) lines.push('', modelLine)
 	const quotaLine = startupQuotaLine(model)

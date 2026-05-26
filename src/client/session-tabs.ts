@@ -27,6 +27,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 			existing.name = s.name ?? s.id
 			existing.cwd = s.cwd || existing.cwd
 			existing.model = s.model || existing.model
+			existing.currentLog = s.currentLog || existing.currentLog
 			newTabs.push(existing)
 		} else {
 			openedSessionId = s.id
