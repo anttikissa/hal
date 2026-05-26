@@ -88,12 +88,11 @@ test('forkSession names child as a lowercase fork of a named parent', async () =
 	const parentId = await makeSession()
 	const childId = uniqueId()
 	createdIds.push(childId)
-	sessions.updateMeta(parentId, { name: 'pause fix', topic: 'rendering plan' })
+	sessions.updateMeta(parentId, { name: 'pause fix' })
 
 	const child = sessions.forkSession(parentId, childId)
 
 	expect(child.name).toBe('fork of pause fix')
-	expect(child.topic).toBe('fork of rendering plan')
 })
 
 test('deleteSession cleans up', async () => {

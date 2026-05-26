@@ -139,7 +139,7 @@ test('fork command persists one child notice without duplicating bare session id
 			history[id] ??= []
 			history[id]!.push(...entries)
 		}
-		sessions.sessionOpenInfo = (meta) => ({ id: meta.id, tab: 1, name: meta.name ?? meta.topic ?? meta.id, cwd: meta.workingDir ?? '', model: meta.model })
+		sessions.sessionOpenInfo = (meta) => ({ id: meta.id, tab: 1, name: meta.name ?? meta.id, cwd: meta.workingDir ?? '', model: meta.model })
 
 		;(runtime as any).handleCommand({ type: 'open', sessionId: parentId, forkSessionId: parentId })
 
@@ -237,7 +237,7 @@ test('open command inherits cwd and model from opener tab', () => {
 			metas[id] = { ...metas[id]!, ...patch }
 			return metas[id]!
 		}
-		sessions.sessionOpenInfo = (meta) => ({ id: meta.id, tab: 1, name: meta.name ?? meta.topic ?? meta.id, cwd: meta.workingDir ?? '', model: meta.model })
+		sessions.sessionOpenInfo = (meta) => ({ id: meta.id, tab: 1, name: meta.name ?? meta.id, cwd: meta.workingDir ?? '', model: meta.model })
 
 		;(runtime as any).handleCommand({ type: 'open', sessionId: parentId })
 
@@ -659,7 +659,6 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		expect(meta?.workingDir).toBe('/work/child')
 		expect(meta?.model).toBe('openai/gpt-5')
 		expect(meta?.name).toBe('Child tab')
-		expect(meta?.topic).toBe('Child tab')
 		const prompt = context.buildSystemPrompt({ model: 'openai/gpt-5', cwd: '/work/child', sessionId: child.id })
 		const overheadBytes = prompt.text.length + JSON.stringify(toolRegistry.toToolDefs()).length
 		const expected = context.estimateContext([], 'openai/gpt-5', overheadBytes)

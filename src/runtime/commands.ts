@@ -195,7 +195,7 @@ function lookupClosedResumeTarget(selector: string): ResumeLookup {
 }
 
 function sessionDisplayName(meta: any, fallbackName: string): string {
-	return meta?.topic || meta?.name || fallbackName
+	return meta?.name || fallbackName
 }
 
 function closedTabs(showAll: boolean, openIds: Set<string>): any[] {
@@ -269,7 +269,7 @@ function renderRuntimeStatus(): string {
 
 
 // Keep /help output short, and put the fiddly syntax under /help <command>.
-function normalizeHelpTopic(args: string): string {
+function normalizeHelpCommand(args: string): string {
 	return args.trim().replace(/^\//, '')
 }
 
@@ -380,21 +380,21 @@ function commandListHelp(): string {
 	return lines.join('\n')
 }
 
-function detailedHelp(topic: string): string | null {
-	const spec = commandSpecs[topic]
+function detailedHelp(commandName: string): string | null {
+	const spec = commandSpecs[commandName]
 	if (!spec) return null
 	if (spec.help) return spec.help
-	const lines = [`Usage: ${helpUsage(topic)}`, '', spec.summary]
+	const lines = [`Usage: ${helpUsage(commandName)}`, '', spec.summary]
 	if (spec.detail) lines.push('', spec.detail)
 	return lines.join('\n')
 }
 
 // /help — list commands or show details for one command
 handlers['help'] = (args) => {
-	const topic = normalizeHelpTopic(args)
-	if (topic) {
-		const text = detailedHelp(topic)
-		if (!text) return { error: `No detailed help for /${topic}. Try /help.`, handled: true }
+	const commandName = normalizeHelpCommand(args)
+	if (commandName) {
+		const text = detailedHelp(commandName)
+		if (!text) return { error: `No detailed help for /${commandName}. Try /help.`, handled: true }
 		return { output: text, handled: true }
 	}
 	return { output: commandListHelp(), handled: true }
@@ -750,7 +750,7 @@ async function executeCommand(text: string, session: SessionState, hooks: Comman
 	return await handler(parsed.args, session, hooks)
 }
 
-/** Get list of command names (for tab completion and /help topics). */
+/** Get list of command names for tab completion and /help. */
 function commandNames(): string[] {
 	return Object.keys(commandSpecs)
 }

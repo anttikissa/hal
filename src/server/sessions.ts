@@ -21,7 +21,6 @@ export interface SessionMeta {
 	workingDir?: string
 	createdAt: string
 	name?: string
-	topic?: string
 	model?: string
 	currentLog?: string
 	closedAt?: string
@@ -299,7 +298,7 @@ function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, i
 	return {
 		id: meta.id,
 		tab: index === undefined ? undefined : index + 1,
-		name: meta.name ?? meta.topic,
+		name: meta.name,
 		cwd: meta.workingDir ?? process.cwd(),
 		model: meta.model ?? models.defaultModel(),
 		currentLog: meta.currentLog ?? DEFAULT_LOG,
@@ -317,7 +316,7 @@ function pickMostRecentlyClosedSessionId(
 function normalizeSessionName(text: string): string { return text.trim().replace(/\s+/g, ' ').toLowerCase() }
 
 function resolveResumeTarget(
-	metas: Array<{ id: string; createdAt: string; closedAt?: string; name?: string; topic?: string }>,
+	metas: Array<{ id: string; createdAt: string; closedAt?: string; name?: string }>,
 	openIds: Set<string>,
 	query?: string,
 ): string | null {
@@ -326,7 +325,7 @@ function resolveResumeTarget(
 	const exactId = metas.find((meta) => !openIds.has(meta.id) && meta.id === trimmed)
 	if (exactId) return exactId.id
 	const normalized = normalizeSessionName(trimmed)
-	return metas.find((meta) => !openIds.has(meta.id) && normalizeSessionName(meta.name ?? meta.topic ?? '') === normalized)?.id ?? null
+	return metas.find((meta) => !openIds.has(meta.id) && normalizeSessionName(meta.name ?? '') === normalized)?.id ?? null
 }
 
 function saveMeta(meta: SessionMeta): void {
@@ -409,7 +408,6 @@ function forkSession(sourceId: string, newId: string, atIndex?: number): Session
 		workingDir: sourceMeta.workingDir,
 		createdAt: forkTs,
 		name: sourceMeta.name ? `fork of ${sourceMeta.name}` : undefined,
-		topic: sourceMeta.topic ? `fork of ${sourceMeta.topic}` : undefined,
 		model: sourceMeta.model ?? models.defaultModel(),
 		forkedFrom: sourceId,
 	})

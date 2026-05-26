@@ -380,8 +380,8 @@ test('/resume validates the target before queueing', async () => {
 		appended.push(command)
 	}
 	sessionStore.loadAllSessionMetas = () => [
-		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'open tab' },
-		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', topic: 'closed tab' },
+		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', name: 'open tab' },
+		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', name: 'closed tab' },
 	]
 	sessionStore.loadSessionList = () => ['04-aaa']
 
@@ -400,9 +400,9 @@ test('/resume validates the target before queueing', async () => {
 
 test('/tabs keeps open-tab order and no longer shows prompt previews', async () => {
 	sessionStore.loadAllSessionMetas = () => [
-		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'old tab' },
-		{ id: '04-bbb', createdAt: '2026-04-14T10:00:00.000Z', topic: 'pause fix' },
-		{ id: '04-ccc', createdAt: '2026-04-14T11:00:00.000Z', topic: 'docs' },
+		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', name: 'old tab' },
+		{ id: '04-bbb', createdAt: '2026-04-14T10:00:00.000Z', name: 'pause fix' },
+		{ id: '04-ccc', createdAt: '2026-04-14T11:00:00.000Z', name: 'docs' },
 	]
 
 	const result = await commands.executeCommand('/tabs', makeSession())
@@ -420,9 +420,9 @@ test('/tabs keeps open-tab order and no longer shows prompt previews', async () 
 
 test('/tabs --all includes closed sessions after open tabs', async () => {
 	sessionStore.loadAllSessionMetas = () => [
-		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', topic: 'open tab' },
-		{ id: '04-bbb', createdAt: '2026-04-14T10:00:00.000Z', topic: 'another open tab' },
-		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', topic: 'closed tab' },
+		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', name: 'open tab' },
+		{ id: '04-bbb', createdAt: '2026-04-14T10:00:00.000Z', name: 'another open tab' },
+		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', name: 'closed tab' },
 	]
 
 	const result = await commands.executeCommand('/tabs --all', makeSession())

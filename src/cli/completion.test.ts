@@ -19,7 +19,7 @@ test('/keys completes as a terminal-local command name', () => {
 	expect(result!.items).toContain('/keys')
 })
 
-test('/help completes command topics', () => {
+test('/help completes command names', () => {
 	const result = completion.complete('/help co', '/help co'.length)
 
 	expect(result).not.toBeNull()
@@ -34,7 +34,7 @@ test('/st completes to /status', () => {
 	expect(result!.items).toContain('/status')
 })
 
-test('/help st completes command topics from runtime command list', () => {
+test('/help st completes command names from runtime command list', () => {
 	const result = completion.complete('/help st', '/help st'.length)
 
 	expect(result).not.toBeNull()

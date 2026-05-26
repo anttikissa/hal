@@ -45,11 +45,11 @@ function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err)
 }
 
-function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name' | 'topic'>): string {
-	return meta.name ?? meta.topic ?? meta.id
+function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name'>): string {
+	return meta.name ?? meta.id
 }
 
-function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name' | 'topic'>): string {
+function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name'>): string {
 	const title = sessionTitle(meta)
 	if (title === meta.id) return meta.id
 	return `${title} (${meta.id})`
@@ -210,7 +210,6 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 			workingDir: inheritedWorkingDir,
 			createdAt: new Date().toISOString(),
 			name: undefined,
-			topic: undefined,
 			model: inheritedModel,
 		})
 	const overridesForkCwd = !!opts.sourceId && !!opts.workingDir && meta.workingDir !== opts.workingDir
@@ -258,7 +257,6 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 		workingDir,
 		model,
 		name,
-		topic: spec.title || child.name,
 		closeWhenDone: !!spec.closeWhenDone,
 	})
 	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
