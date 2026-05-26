@@ -685,8 +685,7 @@ function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getLayout(buf, contentWidth)
 	const { row: curRow, col: curCol } = cursorToRowCol(buf, cursor, contentWidth)
 	const totalRows = Math.max(layout.lines.length, curRow + 1)
-	let promptLines = Math.min(totalRows, promptLineLimit())
-	if (state.promptLineLimit > 0 && totalRows <= defaultPromptLineLimit()) promptLines = promptLineLimit()
+	const promptLines = state.promptLineLimit > 0 ? promptLineLimit() : Math.min(totalRows, promptLineLimit())
 	const sel = selRange()
 
 	// Scroll viewport if prompt is taller than MAX_PROMPT_LINES

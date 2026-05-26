@@ -276,7 +276,7 @@ describe('prompt', () => {
 
 		expect(prompt.buildPrompt(20).lines).toEqual(['two', 'three', 'four'])
 		expect(prompt.handleKey(key('up', { ctrl: true }), 20)).toBe(true)
-		expect(prompt.buildPrompt(20).lines).toEqual(['one', 'two', 'three', 'four'])
+		expect(prompt.buildPrompt(20).lines).toEqual(['one', 'two', 'three', 'four', '', '', '', ''])
 
 		expect(prompt.handleKey(key('down', { ctrl: true }), 20)).toBe(true)
 		expect(prompt.buildPrompt(20).lines).toEqual(['two', 'three', 'four'])
