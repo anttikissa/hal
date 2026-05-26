@@ -36,7 +36,8 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 			return { type, sessionId, requestId: text ?? '', clientPid: process.pid }
 		case 'rebase-apply': {
 			const requestId = displayText ?? ''
-			return { type, sessionId, requestId, clientPid: process.pid, todo: text ?? '' }
+			const parsed = JSON.parse(text ?? '{}') as { todo?: string; edits?: Record<string, string> }
+			return { type, sessionId, requestId, clientPid: process.pid, todo: parsed.todo ?? '', edits: parsed.edits ?? {} }
 		}
 		case 'rename':
 			return { type, sessionId, name: text ?? '' }

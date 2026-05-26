@@ -107,6 +107,7 @@ export interface RebaseApplyCommand extends CommandBase {
 	requestId: string
 	clientPid: number
 	todo: string
+	edits?: Record<string, string>
 }
 
 export interface MoveCommand extends CommandBase {

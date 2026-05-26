@@ -90,6 +90,17 @@ test('picked rows keep their original ids', () => {
 	expect(applied.entries[0]?.id).toBe('000001-aaa')
 })
 
+
+test('edit command uses external edited text payload', () => {
+	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'old text' }] })]
+	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
+	const parsed = rebase.parseTodo(snapshot, "edit 000001-aaa user 'old text'", { edits: { '000001-aaa': 'new text' } })
+	const applied = rebase.applyParsed(snapshot, parsed)
+
+	expect(parsed.errors).toEqual([])
+	expect(applied.entries[0]).toMatchObject({ type: 'user', parts: [{ type: 'text', text: 'new text' }] })
+})
+
 test('queue existing truncated user uses snapshot text and omits row from history', () => {
 	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: `${'x'.repeat(120)}\nsecond` }] })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)

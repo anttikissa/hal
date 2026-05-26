@@ -657,10 +657,10 @@ function runRebaseStart(sessionId: string, requestId: string, clientPid: number)
 	const baseHash = historyHash(entries)
 	const snapshot = rebase.buildSnapshot(sessionId, baseLog, entries)
 	rebaseSnapshots.set(requestId, { sessionId, clientPid, baseLog, baseHash, snapshot })
-	ipc.appendEvent({ type: 'rebase-start', targetPid: clientPid, requestId, sessionId, todo: rebase.renderTodo(snapshot) })
+	ipc.appendEvent({ type: 'rebase-start', targetPid: clientPid, requestId, sessionId, todo: rebase.renderTodo(snapshot), editTexts: rebase.editTexts(snapshot) })
 }
 
-async function runRebaseApply(sessionId: string, requestId: string, clientPid: number, todo: string): Promise<void> {
+async function runRebaseApply(sessionId: string, requestId: string, clientPid: number, todo: string, edits: Record<string, string> = {}): Promise<void> {
 	const saved = rebaseSnapshots.get(requestId)
 	if (!saved || saved.sessionId !== sessionId) {
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Rebase request expired'] })
@@ -676,12 +676,12 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['History changed while editor was open; restart /rebase.'] })
 		return
 	}
-	if (todo === rebase.renderTodo(saved.snapshot)) {
+	if (todo === rebase.renderTodo(saved.snapshot) && Object.keys(edits).length === 0) {
 		rebaseSnapshots.delete(requestId)
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, unchanged: true })
 		return
 	}
-	const parsed = rebase.parseTodo(saved.snapshot, todo)
+	const parsed = rebase.parseTodo(saved.snapshot, todo, { edits })
 	if (parsed.aborted) {
 		rebaseSnapshots.delete(requestId)
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, aborted: true })
@@ -772,7 +772,7 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'rebase-apply': {
 			if (!sessionId) return
-			void runRebaseApply(sessionId, cmd.requestId, cmd.clientPid, cmd.todo)
+			void runRebaseApply(sessionId, cmd.requestId, cmd.clientPid, cmd.todo, cmd.edits)
 			break
 		}
 		case 'open': {

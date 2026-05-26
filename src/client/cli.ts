@@ -286,7 +286,23 @@ async function openRebaseEditor(event: any): Promise<void> {
 		return
 	}
 	const todo = readFileSync(path, 'utf-8')
-	client.sendCommand('rebase-apply', todo, String(event.requestId ?? ''))
+	const edits: Record<string, string> = {}
+	for (const line of todo.split('\n')) {
+		const match = line.match(/^edit\s+(\S+)\s+/)
+		if (!match) continue
+		const id = match[1]!
+		const rowText = event.editTexts?.[id]
+		if (typeof rowText !== 'string') continue
+		const editPath = `${tmpdir()}/hal-rebase-${event.sessionId}-${event.requestId}-${id}.txt`
+		writeFileSync(editPath, rowText)
+		const editCode = await runExternalEditor(editPath)
+		if (editCode !== 0) {
+			client.addEntry(`Rebase edit editor exited with code ${editCode}`, 'error')
+			return
+		}
+		edits[id] = readFileSync(editPath, 'utf-8')
+	}
+	client.sendCommand('rebase-apply', JSON.stringify({ todo, edits }), String(event.requestId ?? ''))
 }
 
 function handleRebaseStart(event: any): void {

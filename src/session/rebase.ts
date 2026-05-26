@@ -46,6 +46,10 @@ type ParsedTodo = {
 	aborted: boolean
 }
 
+type ParseTodoOptions = {
+	edits?: Record<string, string>
+}
+
 type ApplyResult = {
 	entries: HistoryEntry[]
 	queue: string[]
@@ -261,6 +265,14 @@ function renderTodo(snapshot: RebaseSnapshot): string {
 	return `${lines.join('\n')}\n`
 }
 
+function editTexts(snapshot: RebaseSnapshot): Record<string, string> {
+	const out: Record<string, string> = {}
+	for (const row of snapshot.rows) {
+		if (row.editable && typeof row.content === 'string') out[row.id] = row.content
+	}
+	return out
+}
+
 function nextHistoryLog(baseLog: string): string {
 	const match = baseLog.match(/^history(\d*)\.asonl$/)
 	if (!match) return 'history2.asonl'
@@ -395,7 +407,7 @@ function parseQueue(rest: string, rows: Map<string, RebaseRow>, line: string, er
 	return { cmd: 'queue', queueText: text, line }
 }
 
-function parseTodo(snapshot: RebaseSnapshot, todo: string): ParsedTodo {
+function parseTodo(snapshot: RebaseSnapshot, todo: string, opts: ParseTodoOptions = {}): ParsedTodo {
 	const errors: string[] = []
 	const items: ParsedItem[] = []
 	const rows = rowMap(snapshot)
@@ -446,6 +458,7 @@ function parseTodo(snapshot: RebaseSnapshot, todo: string): ParsedTodo {
 				errors.push(`Invalid ASON content for ${row.id}: ${err instanceof Error ? err.message : String(err)}`)
 			}
 		}
+		if (cmd === 'edit' && row.editable && typeof opts.edits?.[row.id] === 'string') content = opts.edits[row.id]
 		if (cmd === 'edit' && !row.editable && row.type !== 'thinking') errors.push(`Cannot edit protected row ${row.id}`)
 		if (!row.editable && row.type !== 'thinking' && !row.truncated && ason.stringify(content, 'short') !== ason.stringify(row.content, 'short')) errors.push(`Cannot edit protected row ${row.id}`)
 		items.push({ cmd, id: row.id, type: row.type, row, content, line })
@@ -509,6 +522,7 @@ function applyParsed(snapshot: RebaseSnapshot, parsed: ParsedTodo): ApplyResult 
 export const rebase = {
 	buildSnapshot,
 	renderTodo,
+	editTexts,
 	renderRow,
 	parseTodo,
 	applyParsed,
