@@ -23,7 +23,7 @@ type HelpColors = { key: string; description: string }
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
-const input = { fg: '', bg: '', cursor: '' }
+const input = { fg: '', bg: '', cursor: '', cursorDim: '' }
 const system: BlockColors = { fg: '', bg: '' }
 const logColors: BlockColors = { fg: '', bg: '' }
 const info: BlockColors = { fg: '', bg: '' }
@@ -62,6 +62,11 @@ function fg(t: Triple, vars: Record<string, number>): string {
 
 function bg(t: Triple, vars: Record<string, number>): string {
 	return oklch.toBg(...resolveTriple(t, vars))
+}
+
+function dimFg(t: Triple, vars: Record<string, number>, factor: number): string {
+	const [L, C, H] = resolveTriple(t, vars)
+	return oklch.toFg(Math.max(0, Math.min(1, L * factor)), C, H)
 }
 
 // ── Load + resolve ───────────────────────────────────────────────────────────
@@ -118,6 +123,7 @@ function load(): void {
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
 		if (raw.input.cursor) input.cursor = fg(raw.input.cursor, vars)
 	}
+	input.cursorDim = dimFg(raw.input?.cursor ?? raw.assistant?.fg ?? [0.75, 0.15, 55], vars, 0.65)
 
 	// Tools
 	const toolDefs = raw.tools ?? {}

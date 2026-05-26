@@ -20,6 +20,7 @@ import { version } from '../version.ts'
 import { HAL_DIR } from '../state.ts'
 import { colors } from '../cli/colors.ts'
 import { prompt } from '../cli/prompt.ts'
+import { cursor } from '../cli/cursor.ts'
 import type { Tab } from '../client.ts'
 
 const GREEN = '\x1b[32m'
@@ -47,11 +48,11 @@ function halCursorColor(): string {
 	return colors.input.cursor || colors.assistant.fg
 }
 
-function tabIndicator(tab: Tab): { char: string; color: string } {
+function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
-	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: YELLOW }
+	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: YELLOW, blinks: false }
 
-	if (busy) return { char: '▪', color: renderStatus.halCursorColor() }
+	if (busy) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
 
 	// Alerts beat the generic "done unseen" checkmark. This matters for cases
 	// like "Hit max iterations" where generation finished, but the tab still
@@ -60,27 +61,32 @@ function tabIndicator(tab: Tab): { char: string; color: string } {
 		const b = tab.history[i]!
 		// Skip trailing info blocks that aren't status-relevant.
 		if ((b.type === 'log' || b.type === 'info') && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
-		if (b.type === 'warning') return { char: '!', color: YELLOW }
-		if (b.type === 'error') return { char: '✗', color: RED }
+		if (b.type === 'warning') return { char: '!', color: YELLOW, blinks: false }
+		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
 		if (b.type === 'log' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
-			return { char: '!', color: '' }
+			return { char: '!', color: '', blinks: true }
 		}
 		break
 	}
 
-	if (tab.doneUnseen) return { char: '✓', color: GREEN }
+	if (tab.doneUnseen) return { char: '✓', color: GREEN, blinks: false }
 
-	return { char: '', color: '' }
+	return { char: '', color: '', blinks: false }
 }
 
 function hasAnimatedIndicators(): boolean {
+	for (const tab of client.state.tabs) {
+		if (renderStatus.tabIndicator(tab).blinks) return true
+	}
 	return false
 }
 
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
 	if (!ind.char) return ''
-	return `${ind.color}${ind.char}${baseColor}`
+	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
+	const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : ind.color
+	return `${color}${ind.char}${baseColor}`
 }
 
 function tabDir(tab: Tab): string {

@@ -407,7 +407,7 @@ describe('render', () => {
 		}
 	})
 
-	test('busy tabs stay visible without ANSI dim', () => {
+	test('busy tab minicursor pulses with OKLCH-dimmed color', () => {
 		client.state.tabs.push({
 			sessionId: 'other',
 			name: 'tab 2',
@@ -426,16 +426,31 @@ describe('render', () => {
 		})
 		client.state.busy.set('other', true)
 		const originalIsVisible = cursor.isVisible
-		cursor.isVisible = () => false
+		const originalCursor = colors.input.cursor
+		const originalCursorDim = colors.input.cursorDim
+		colors.input.cursor = '\x1b[38;2;92;179;255m'
+		colors.input.cursorDim = '\x1b[38;2;36;96;159m'
 		try {
-			const output = captureOutput(() => render.draw())
-			const clean = stripAnsi(output)
+			cursor.isVisible = () => true
+			render.resetRenderer()
+			const bright = captureOutput(() => render.draw(true))
+
+			cursor.isVisible = () => false
+			render.resetRenderer()
+			const dimmed = captureOutput(() => render.draw(true))
+			const clean = stripAnsi(dimmed)
 			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
 			expect(tabBar).toBeDefined()
 			expect(tabBar).toContain('▪tmp tab 2')
-			expect(output).not.toContain('\x1b[2m')
+			expect(dimmed).not.toContain('\x1b[2m')
+			expect(dimmed).not.toContain(renderStatus.halCursorColor())
+			expect(dimmed).not.toBe(bright)
+			expect(render.hasAnimatedIndicators()).toBe(true)
+			expect(dimmed).toContain(`${colors.input.cursorDim}▪`)
 		} finally {
 			cursor.isVisible = originalIsVisible
+			colors.input.cursor = originalCursor
+			colors.input.cursorDim = originalCursorDim
 		}
 	})
 
@@ -528,13 +543,16 @@ describe('render', () => {
 		client.state.busy.set(tab.sessionId, true)
 
 		const originalCursor = colors.input.cursor
+		const originalIsVisible = cursor.isVisible
 		colors.input.cursor = '\x1b[38;5;201m'
+		cursor.isVisible = () => true
 		try {
 			const output = captureOutput(() => render.draw())
 			expect(output).toContain(`${colors.input.cursor}▪`)
 			expect(output).not.toContain('\x1b[38;5;75m▪')
 		} finally {
 			colors.input.cursor = originalCursor
+			cursor.isVisible = originalIsVisible
 		}
 	})
 
