@@ -167,7 +167,9 @@ For appends (`first >= prevLines.length`): move to the last existing line,
 then `\r\n` to scroll into new territory.
 
 For frame shrinks (`lines.length < prevLines.length`): after writing new
-content, `\r\n` then `CSI J` to erase leftover rows.
+content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows. Do NOT use
+`\r\n` here — if the new frame ends on the viewport bottom edge, newline
+scrolls the screen and creates a stray blank row.
 
 ### 9. Frame shrinks in fullscreen must NOT clear scrollback
 

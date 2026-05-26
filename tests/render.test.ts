@@ -731,6 +731,28 @@ describe('render', () => {
 		}
 	})
 
+	test('prompt shrink erases leftover row without scrolling', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
+		try {
+			for (let i = 0; i < 20; i++) tab.history.push({ type: 'log', text: `old-${i}` })
+			prompt.setText('one line\nanother line')
+			captureOutput(() => render.draw())
+
+			prompt.setText('one line')
+			const output = captureOutput(() => render.draw())
+
+			expect(output).not.toContain('\r\n\x1b[J')
+			expect(output).toContain('\r\x1b[1B\x1b[J')
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
 
 	test('popup overlay targets the visible viewport in fullscreen', () => {
 		const tab = client.currentTab()!

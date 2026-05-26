@@ -280,11 +280,12 @@ function draw(force = false): void {
 	}
 
 	// Frame shrunk (e.g. multiline prompt collapsed to single line).
-	// Erase leftover rows below the new frame end. CSI J clears from
-	// cursor to end of screen without touching scrollback.
+	// Move to the first leftover row and clear from there. Use cursor-down,
+	// not CRLF: when the prompt is at the bottom of the viewport, CRLF scrolls
+	// the terminal and leaves a stray blank row below the help bar.
 	let lastWrittenRow = lines.length - 1
 	if (lines.length < prevLines.length) {
-		out.push(`\r\n${CSI}J`)
+		out.push(`\r${CSI}1B${CSI}J`)
 		lastWrittenRow = lines.length // we moved one past the end
 	}
 
