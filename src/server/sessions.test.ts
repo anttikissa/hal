@@ -83,6 +83,19 @@ test('forkSession appends fork markers to parent and child history', async () =>
 	expect(sessions.loadHistory(childId)).toMatchObject([{ type: 'forked_from', parent: parentId }])
 })
 
+
+test('forkSession names child as a lowercase fork of a named parent', async () => {
+	const parentId = await makeSession()
+	const childId = uniqueId()
+	createdIds.push(childId)
+	sessions.updateMeta(parentId, { name: 'pause fix', topic: 'rendering plan' })
+
+	const child = sessions.forkSession(parentId, childId)
+
+	expect(child.name).toBe('fork of pause fix')
+	expect(child.topic).toBe('fork of rendering plan')
+})
+
 test('deleteSession cleans up', async () => {
 	const id = await makeSession()
 	sessions.deleteSession(id)

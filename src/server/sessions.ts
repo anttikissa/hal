@@ -408,7 +408,8 @@ function forkSession(sourceId: string, newId: string, atIndex?: number): Session
 		id: newId,
 		workingDir: sourceMeta.workingDir,
 		createdAt: forkTs,
-		topic: sourceMeta.topic ? `Fork of ${sourceMeta.topic}` : undefined,
+		name: sourceMeta.name ? `fork of ${sourceMeta.name}` : undefined,
+		topic: sourceMeta.topic ? `fork of ${sourceMeta.topic}` : undefined,
 		model: sourceMeta.model ?? models.defaultModel(),
 		forkedFrom: sourceId,
 	})
