@@ -3,6 +3,7 @@
 
 import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
+import { clipVisual, visLen } from '../utils/strings.ts'
 
 const MAX_UNDO = 200
 
@@ -681,6 +682,25 @@ interface PromptRender {
 	cursor: { rowOffset: number; col: number }
 }
 
+function withFoldIndicator(line: string, indicator: string, contentWidth: number): string {
+	const indicatorWidth = visLen(indicator)
+	if (contentWidth <= indicatorWidth) return clipVisual(indicator, contentWidth)
+	const maxText = contentWidth - indicatorWidth - 1
+	const text = visLen(line) > maxText ? clipVisual(line, maxText) : line
+	const reset = text.includes('\x1b[') ? '\x1b[0m' : ''
+	return text + reset + ' '.repeat(Math.max(1, contentWidth - visLen(text) - indicatorWidth)) + indicator
+}
+
+function addFoldIndicators(lines: string[], above: number, below: number, contentWidth: number): void {
+	if (lines.length === 0) return
+	if (above > 0 && below > 0 && lines.length === 1) {
+		lines[0] = withFoldIndicator(lines[0]!, `↑${above} ↓${below}`, contentWidth)
+		return
+	}
+	if (above > 0) lines[0] = withFoldIndicator(lines[0]!, `↑${above}`, contentWidth)
+	if (below > 0) lines[lines.length - 1] = withFoldIndicator(lines[lines.length - 1]!, `↓${below}`, contentWidth)
+}
+
 function buildPrompt(contentWidth: number): PromptRender {
 	const layout = getLayout(buf, contentWidth)
 	const { row: curRow, col: curCol } = cursorToRowCol(buf, cursor, contentWidth)
@@ -711,6 +731,8 @@ function buildPrompt(contentWidth: number): PromptRender {
 			lines.push(lineText)
 		}
 	}
+	const below = Math.max(0, totalRows - scrollTop - promptLines)
+	addFoldIndicators(lines, scrollTop, below, contentWidth)
 
 
 	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol } }
