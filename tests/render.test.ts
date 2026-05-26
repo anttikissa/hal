@@ -731,7 +731,7 @@ describe('render', () => {
 		}
 	})
 
-	test('prompt shrink erases leftover row without scrolling', () => {
+	test('fullscreen prompt shrink repaints so the viewport stays bottom anchored', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -745,8 +745,8 @@ describe('render', () => {
 			prompt.setText('one line')
 			const output = captureOutput(() => render.draw())
 
-			expect(output).not.toContain('\r\n\x1b[J')
-			expect(output).toContain('\r\x1b[1B\x1b[J')
+			expect(output).toContain('\x1b[2J\x1b[H')
+			expect(output).not.toContain('\x1b[3J')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

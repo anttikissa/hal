@@ -228,7 +228,10 @@ function draw(force = false): void {
 	// live viewport so we only redraw what can actually be updated in-place.
 	const viewportTop = Math.max(0, prevLines.length - rows)
 	const frameShrunk = lines.length < prevLines.length
-	if (fullscreen && frameShrunk && first !== -1 && first < viewportTop && last >= viewportTop) {
+	// A shrink changes which logical frame row belongs at the viewport top.
+	// Patching only the changed bottom rows leaves the old viewport anchored and
+	// produces a blank row below the help bar, so repaint the visible screen.
+	if (fullscreen && frameShrunk && first !== -1) {
 		repaintVisibleScreen(lines, cursor)
 		return
 	}

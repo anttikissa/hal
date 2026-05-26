@@ -166,17 +166,18 @@ wrong line.
 For appends (`first >= prevLines.length`): move to the last existing line,
 then `\r\n` to scroll into new territory.
 
-For frame shrinks (`lines.length < prevLines.length`): after writing new
-content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows. Do NOT use
-`\r\n` here — if the new frame ends on the viewport bottom edge, newline
-scrolls the screen and creates a stray blank row.
+For non-fullscreen frame shrinks (`lines.length < prevLines.length`): after
+writing new content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows.
+Do NOT use `\r\n` here — if the new frame ends on the viewport bottom edge,
+newline scrolls the screen and creates a stray blank row.
 
 ### 9. Frame shrinks in fullscreen must NOT clear scrollback
 
-When the frame shrinks in fullscreen mode, the scrollback/visible boundary can
-shift. If the changed range crosses that boundary, the diff engine cannot patch
-old scrollback rows in place. Recover with a visible-screen repaint (`CSI 2J` +
-`CSI H`) that rewrites the full current frame, but **do not emit `CSI 3J`**.
+When the frame shrinks in fullscreen mode, the scrollback/visible boundary
+always shifts. The diff engine cannot patch that in place: patching only the
+bottom rows leaves the old viewport anchored and creates a blank row below the
+help bar. Recover with a visible-screen repaint (`CSI 2J` + `CSI H`) that
+rewrites the full current frame, but **do not emit `CSI 3J`**.
 
 `CSI 3J` clears terminal scrollback. In Ghostty/Kitty-like terminals that also
 snaps a user who scrolled up back to the bottom. This was the exact regression:
