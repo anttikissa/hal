@@ -91,48 +91,18 @@ describe('prompt', () => {
 		expect(prompt.cursorPos()).toBe('(hello'.length)
 	})
 
-	test('option movement skips punctuation attached across spaces like Zed', () => {
-		prompt.setText('hello (world)', 'hello (world)'.length)
-		for (const stop of [12, 7, 0]) {
-			prompt.handleKey(key('left', { alt: true }), 80)
-			expect(prompt.cursorPos()).toBe(stop)
-		}
+	test('option movement uses token edges symmetrically around punctuation runs', () => {
+		const text = 'foo ### zot'
 
-		prompt.setText('(hello) world', 0)
-		for (const stop of [6, '(hello) world'.length]) {
+		prompt.setText(text, 0)
+		for (const stop of [3, 7, 11]) {
 			prompt.handleKey(key('right', { alt: true }), 80)
 			expect(prompt.cursorPos()).toBe(stop)
 		}
-	})
-
-	test('option movement keeps consecutive punctuation as separate tokens', () => {
-		prompt.setText('abc ### 123', 0)
-		for (const stop of ['abc '.length, 'abc ### '.length, 'abc ### 123'.length]) {
-			prompt.handleKey(key('right', { alt: true }), 80)
-			expect(prompt.cursorPos()).toBe(stop)
-		}
-
-		prompt.setText('321 ### cba', '321 ### cba'.length)
-		for (const stop of ['321 ### '.length, '321 '.length, 0]) {
-			prompt.handleKey(key('left', { alt: true }), 80)
-			expect(prompt.cursorPos()).toBe(stop)
-		}
-	})
-
-	test('option-left and option-right match recorded Zed stops', () => {
-		const text = '\tx = Math.round(255 * Math.max(0, x * 0.0031308))'
-		const leftStops = [48, 40, 38, 36, 34, 32, 31, 27, 22, 20, 16, 10, 5]
-		const rightStops = [9, 15, 19, 21, 26, 30, 32, 35, 37, 39, 47, 48]
 
 		prompt.setText(text, text.length)
-		for (const stop of leftStops) {
+		for (const stop of [8, 4, 0]) {
 			prompt.handleKey(key('left', { alt: true }), 80)
-			expect(prompt.cursorPos()).toBe(stop)
-		}
-
-		prompt.setText(text, 5)
-		for (const stop of rightStops) {
-			prompt.handleKey(key('right', { alt: true }), 80)
 			expect(prompt.cursorPos()).toBe(stop)
 		}
 	})

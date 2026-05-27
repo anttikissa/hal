@@ -112,9 +112,8 @@ function wordRight(text: string, pos: number): number {
 	return i
 }
 
-// Option+Left/Right word motion follows editor-style token boundaries: words
-// stop inside surrounding punctuation (`(hello` -> `(|hello`), while bare
-// punctuation still gets its own stop (`foo))` -> `foo)|)`).
+// Option+Left/Right treats words and punctuation runs as tokens. Moving right
+// lands at token ends; moving left lands at token starts. Spaces are skipped.
 function isWordTokenChar(ch: string): boolean {
 	return /[\p{L}\p{N}\p{M}_]/u.test(ch)
 }
@@ -127,91 +126,31 @@ function isPunctuationTokenChar(ch: string): boolean {
 	return !isWordTokenChar(ch) && !isSpaceChar(ch)
 }
 
-function isClosingPunctuationChar(ch: string): boolean {
-	return /[)\]}]/.test(ch)
-}
-
 function optionWordLeft(text: string, pos: number): number {
 	let i = pos
+	while (i > 0 && isSpaceChar(text[i - 1]!)) i--
+	if (i === 0) return 0
 
-	// Closing punctuation at the very end gets its own stop first.
-	if (i === text.length && i > 0 && isPunctuationTokenChar(text[i - 1]!)) return i - 1
-
-	// If we are just after a word, move to that word's start. This is the
-	// `(hello|` -> `(|hello` case.
-	if (i > 0 && isWordTokenChar(text[i - 1]!)) {
+	if (isWordTokenChar(text[i - 1]!)) {
 		while (i > 0 && isWordTokenChar(text[i - 1]!)) i--
 		return i
 	}
 
-	const startedOnSpace = i > 0 && isSpaceChar(text[i - 1]!)
-	while (i > 0 && isSpaceChar(text[i - 1]!)) i--
-	if (i === 0) return 0
-
-	// Operators reached through whitespace are separate stops. Punctuation
-	// adjacent to a word is just a separator around that word.
-	if (isPunctuationTokenChar(text[i - 1]!)) {
-		let start = i
-		while (start > 0 && isPunctuationTokenChar(text[start - 1]!)) start--
-		if (startedOnSpace) return start
-		i = start
-	}
-
-	while (i > 0 && isSpaceChar(text[i - 1]!)) i--
-	while (i > 0 && isWordTokenChar(text[i - 1]!)) i--
+	while (i > 0 && isPunctuationTokenChar(text[i - 1]!)) i--
 	return i
 }
 
 function optionWordRight(text: string, pos: number): number {
 	let i = pos
-	if (i < text.length && isWordTokenChar(text[i]!)) {
-		while (i < text.length && isWordTokenChar(text[i]!)) i++
-		let endOfWord = i
-		while (i < text.length && isSpaceChar(text[i]!)) i++
-		if (i + 1 < text.length && isPunctuationTokenChar(text[i]!) && isPunctuationTokenChar(text[i + 1]!)) return i
-		return endOfWord
-	}
-
-	if (
-		i > 0 &&
-		isPunctuationTokenChar(text[i - 1]!) &&
-		!(i < text.length && isPunctuationTokenChar(text[i]!))
-	) {
-		while (i < text.length && !isWordTokenChar(text[i]!)) i++
-		while (i < text.length && isWordTokenChar(text[i]!)) i++
-		return i
-	}
-
-	// Zed stops between consecutive closing punctuation, but not after a single
-	// closing punctuation before whitespace (`(hello)| world`).
-	if (
-		i + 1 < text.length &&
-		isClosingPunctuationChar(text[i]!) &&
-		isClosingPunctuationChar(text[i + 1]!)
-	) return i + 1
-
-	if (i < text.length && isPunctuationTokenChar(text[i]!)) {
-		let start = i
-		while (i < text.length && isPunctuationTokenChar(text[i]!)) i++
-		let punctuationEnd = i
-		let stoppedAfterSpace = false
-		while (i < text.length && isSpaceChar(text[i]!)) {
-			stoppedAfterSpace = true
-			i++
-		}
-		if (stoppedAfterSpace && punctuationEnd - start > 1) return i
-		while (i < text.length && isWordTokenChar(text[i]!)) i++
-		return i
-	}
-
-	const startedOnSpaceRight = i < text.length && isSpaceChar(text[i]!)
 	while (i < text.length && isSpaceChar(text[i]!)) i++
-	if (i < text.length && isPunctuationTokenChar(text[i]!)) {
-		if (startedOnSpaceRight && i + 1 < text.length && isPunctuationTokenChar(text[i + 1]!)) return i
-		while (i < text.length && isPunctuationTokenChar(text[i]!)) i++
+	if (i === text.length) return i
+
+	if (isWordTokenChar(text[i]!)) {
+		while (i < text.length && isWordTokenChar(text[i]!)) i++
 		return i
 	}
-	while (i < text.length && isWordTokenChar(text[i]!)) i++
+
+	while (i < text.length && isPunctuationTokenChar(text[i]!)) i++
 	return i
 }
 
