@@ -26,7 +26,6 @@ import { startup } from '../startup.ts'
 import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
-import { clientPersistence } from '../client/persistence.ts'
 
 const state = {
 	activeSessions: [] as string[],
@@ -166,11 +165,6 @@ function restartedAfterLastTurnEnd(entries: HistoryEntry[]): boolean {
 
 function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	return restartedAfterLastTurnEnd(entries) && sessionStore.tailTurnState(entries).interrupted
-}
-
-function restartAutoContinueSession(activeSessions = state.activeSessions): string | null {
-	const restartTab = clientPersistence.load().restartTab
-	return restartTab && activeSessions.includes(restartTab) ? restartTab : null
 }
 
 
@@ -894,16 +888,16 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		}, 0)
 	}
 	void (async () => {
-		const restartTab = restartAutoContinueSession()
-		if (!restartTab) return
-		if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
-		const entries = sessionStore.loadAllHistory(restartTab)
-		if (!shouldAutoContinue(entries)) return
-		const tail = sessionStore.tailTurnState(entries)
-		for (const tool of tail.interruptedTools) {
-			sessionStore.appendHistory(restartTab, [{ type: 'tool_result', toolId: tool.id, output: '[interrupted]', ts: new Date().toISOString() }])
+		for (const sessionId of state.activeSessions) {
+			if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
+			const entries = sessionStore.loadAllHistory(sessionId)
+			if (!shouldAutoContinue(entries)) continue
+			const tail = sessionStore.tailTurnState(entries)
+			for (const tool of tail.interruptedTools) {
+				sessionStore.appendHistory(sessionId, [{ type: 'tool_result', toolId: tool.id, output: '[interrupted]', ts: new Date().toISOString() }])
+			}
+			void runGeneration(sessionId, '')
 		}
-		void runGeneration(restartTab, '')
 	})()
 	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
@@ -949,7 +943,6 @@ export const runtime = {
 	startRuntime,
 	emitInfo,
 	shouldAutoContinue,
-	restartAutoContinueSession,
 	shouldCloseSessionAfterGeneration,
 	restoredSessionOrder,
 	recordTabClosed,
