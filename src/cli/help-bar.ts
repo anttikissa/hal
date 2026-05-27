@@ -32,12 +32,12 @@ const HINTS: Record<HelpState, Hint[]> = {
 	],
 	'idle-continue': [{ text: 'press enter to continue' }],
 	'idle-retry': [{ text: 'press enter to retry' }],
-	streaming: [{ keyLabel: 'esc', description: 'stop' }],
+	streaming: [{ keyLabel: 'esc', description: 'pause' }],
 	'streaming-text': [
 		{ keyLabel: 'enter', description: 'steer' },
 		{ keyLabel: 'shift-enter', description: 'newline' },
 		{ keyLabel: 'alt-enter', description: 'queue' },
-		{ keyLabel: 'esc', description: 'stop' },
+		{ keyLabel: 'esc', description: 'pause' },
 	],
 }
 
