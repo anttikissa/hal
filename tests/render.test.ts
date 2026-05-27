@@ -247,6 +247,15 @@ describe('render', () => {
 		expect(clean).toContain('/keys: shortcuts')
 	})
 
+	test('help bar has one-cell padding on both sides', () => {
+		prompt.setText('hello')
+		const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+		const helpLine = lines.find((line) => line.includes('enter: send')) ?? ''
+		expect(helpLine.startsWith(' ')).toBe(true)
+		expect(helpLine.endsWith(' ')).toBe(true)
+		expect(helpLine.length).toBe(process.stdout.columns || 80)
+	})
+
 	test('help bar separates hints with commas', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
@@ -455,7 +464,7 @@ describe('render', () => {
 		}
 	})
 
-	test('tab bar uses only compact numeric labels', () => {
+	test('tab bar keeps prefix, hints, and padded compact labels', () => {
 		client.state.tabs.push({
 			sessionId: 's2',
 			name: 'beta',
@@ -474,11 +483,13 @@ describe('render', () => {
 		})
 
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		const tabLine = clean.split('\n').find((line) => line.includes('[1]')) ?? ''
-		expect(tabLine).toContain('[1]  2')
-		expect(tabLine).not.toContain('Tabs:')
-		expect(tabLine).not.toContain('ctrl-t')
+		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
+		expect(tabLine).toContain(' Tabs: [1] 2 ')
+		expect(tabLine).toContain('ctrl-t: new')
+		expect(tabLine).toContain('ctrl-w: close')
 		expect(tabLine).not.toContain('beta')
+		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[0]!, 0))).toBe('[1]')
+		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[1]!, 1))).toBe(' 2 ')
 	})
 
 	test('tab bar keeps two-digit tabs compact with inline indicators', () => {
@@ -507,9 +518,11 @@ describe('render', () => {
 			Object.defineProperty(process.stdout, 'columns', { value: 120, configurable: true })
 			const clean = stripAnsi(captureOutput(() => render.draw(true)))
 			const tabLine = clean.split('\n').find((line) => line.includes('[24]')) ?? ''
-			expect(tabLine).toContain('1  2✓')
-			expect(tabLine).toContain('23  [24]')
+			expect(tabLine).toContain(' 1  2✓ ')
+			expect(tabLine).toContain(' 23 [24]')
 			expect(tabLine).not.toContain('[24✓]')
+			expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[1]!, 1))).toBe(' 2✓ ')
+			expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[23]!, 23))).toBe('[24]')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}

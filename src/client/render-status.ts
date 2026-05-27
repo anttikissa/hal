@@ -98,7 +98,11 @@ function tabLabel(tab: Tab, i: number): string {
 	const ind = renderStatus.renderIndicator(tab, base)
 	const content = renderStatus.tabInner(i + 1, ind)
 	if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
-	return `${DIM}${content}${RESET}`
+	return `${DIM} ${content} ${RESET}`
+}
+
+function tabHelpText(): string {
+	return '  ctrl-t: new, ctrl-w: close, ctrl-n/p: switch, ctrl-f: fork'
 }
 
 function buildTabBarLines(cols: number): string[] {
@@ -106,7 +110,7 @@ function buildTabBarLines(cols: number): string[] {
 	for (let i = 0; i < client.state.tabs.length; i++) {
 		tabs.push(renderStatus.tabLabel(client.state.tabs[i]!, i))
 	}
-	return [clipVisual(tabs.join('  '), cols)]
+	return [renderStatus.paddedLine(`Tabs: ${tabs.join('')}${renderStatus.tabHelpText()}`, cols)]
 }
 
 function renderTabBar(lines: string[]): void {
@@ -128,6 +132,18 @@ function statusBaseColor(): string {
 
 function statusHighlightColor(): string {
 	return colors.status.highlight || BRIGHT_WHITE
+}
+
+function contentWidth(cols: number): number {
+	return Math.max(0, cols - 2)
+}
+
+function paddedLine(content: string, cols: number): string {
+	if (cols <= 0) return ''
+	if (cols === 1) return ' '
+	const width = renderStatus.contentWidth(cols)
+	const clipped = visLen(content) > width ? clipVisual(content, width) : content
+	return ` ${clipped}${' '.repeat(Math.max(0, width - visLen(clipped)))} `
 }
 
 function colorText(text: string, color: string, base: string): string {
@@ -256,8 +272,7 @@ function renderStatusLine(lines: string[]): void {
 	const base = renderStatus.statusBaseColor()
 	const tab = client.currentTab()
 	if (!tab) {
-		const blank = cols > 1 ? ` ${' '.repeat(Math.max(0, cols - 2))} ` : ' '
-		lines.push(`${base}${clipVisual(blank, cols)}${RESET}`)
+		lines.push(`${base}${renderStatus.paddedLine('', cols)}${RESET}`)
 		return
 	}
 
@@ -274,7 +289,7 @@ function renderStatusLine(lines: string[]): void {
 	const server = renderStatus.config.showServer ? renderStatus.serverStatusLabel() : ''
 	const tokenLabel = renderStatus.tokenUsageLabel(tab.usage)
 	const plan = renderStatus.config.showSubscription && isSub ? renderStatus.subscriptionStatusLabel(provider, base) : ''
-	const innerWidth = Math.max(0, cols - 2)
+	const innerWidth = renderStatus.contentWidth(cols)
 	let showServer = !!server
 	let showTokens = !!tokenLabel
 	let showPlan = !!plan
@@ -315,8 +330,7 @@ function renderStatusLine(lines: string[]): void {
 		break
 	}
 
-	const line = cols >= 2 ? ` ${inner} ` : inner
-	lines.push(`${base}${visLen(line) > cols ? clipVisual(line, cols) : line}${RESET}`)
+	lines.push(`${base}${renderStatus.paddedLine(inner, cols)}${RESET}`)
 }
 
 function renderHelpBar(lines: string[]): void {
@@ -338,18 +352,19 @@ function renderHelpBar(lines: string[]): void {
 	const right = helpBar.shortcutListHint(style)
 	let bar = left
 	if (right) {
-		const maxLeft = Math.max(0, cols - visLen(right) - 1)
+		const innerWidth = renderStatus.contentWidth(cols)
+		const maxLeft = Math.max(0, innerWidth - visLen(right) - 1)
 		const clippedLeft = visLen(left) > maxLeft ? clipVisual(left, maxLeft) : left
-		const gap = Math.max(1, cols - visLen(clippedLeft) - visLen(right))
-		bar = clippedLeft ? `${clippedLeft}${' '.repeat(gap)}${right}` : `${' '.repeat(Math.max(0, cols - visLen(right)))}${right}`
+		const gap = Math.max(1, innerWidth - visLen(clippedLeft) - visLen(right))
+		bar = clippedLeft ? `${clippedLeft}${' '.repeat(gap)}${right}` : `${' '.repeat(Math.max(0, innerWidth - visLen(right)))}${right}`
 	}
 	// Always push a line — even when empty — so chrome height is constant.
 	// Without this, typing the first character causes a 1-row jump.
-	lines.push(bar ? `${clipVisual(bar, cols)}${RESET}` : '')
+	lines.push(`${renderStatus.paddedLine(bar, cols)}${RESET}`)
 }
 
 function promptContentWidth(cols: number): number {
-	return Math.max(0, cols - 2)
+	return renderStatus.contentWidth(cols)
 }
 
 function promptRule(cols: number): string {
@@ -357,12 +372,7 @@ function promptRule(cols: number): string {
 }
 
 function paddedPromptLine(line: string, cols: number): string {
-	if (cols <= 0) return ''
-	if (cols === 1) return ' '
-	const contentWidth = renderStatus.promptContentWidth(cols)
-	const text = visLen(line) > contentWidth ? clipVisual(line, contentWidth) : line
-	const right = Math.max(0, contentWidth - visLen(text))
-	return ` ${text}${' '.repeat(right)} `
+	return renderStatus.paddedLine(line, cols)
 }
 
 function renderPrompt(lines: string[]): void {
@@ -390,11 +400,14 @@ export const renderStatus = {
 	renderHelpBar,
 	renderPrompt,
 	// Internal helpers, exposed on the namespace for hot-patching via eval.
+	contentWidth,
+	paddedLine,
 	halCursorColor,
 	tabIndicator,
 	renderIndicator,
 	tabInner,
 	tabLabel,
+	tabHelpText,
 	buildTabBarLines,
 	shortenPath,
 	statusBaseColor,
