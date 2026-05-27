@@ -17,6 +17,7 @@ const origTransportEnv = process.env.HAL_OPENAI_RESPONSES_TRANSPORT
 const origMarkCooldown = auth.markCooldown
 const origHasAvailableCredential = auth.hasAvailableCredential
 const origStreamTimeoutMs = providerShared.config.streamTimeoutMs
+const origResponsesConnectTimeoutMs = openai.config.responsesConnectTimeoutMs
 
 afterEach(() => {
 	globalThis.fetch = origFetch
@@ -27,6 +28,7 @@ afterEach(() => {
 	auth.hasAvailableCredential = origHasAvailableCredential
 	globalThis.WebSocket = origWebSocket
 	providerShared.config.streamTimeoutMs = origStreamTimeoutMs
+	openai.config.responsesConnectTimeoutMs = origResponsesConnectTimeoutMs
 	if (origTransportEnv == null) delete process.env.HAL_OPENAI_RESPONSES_TRANSPORT
 	else process.env.HAL_OPENAI_RESPONSES_TRANSPORT = origTransportEnv
 	openai.resetResponsesWebSocketsForTests()
@@ -525,6 +527,79 @@ class HangingWebSocket extends FakeWebSocket {
 		this.sent.push(JSON.parse(raw))
 	}
 }
+class NeverOpenWebSocket extends FakeWebSocket {
+	override readyState = 0
+	override emit(name: string, event: any): void {
+		if (name === 'open') return
+		super.emit(name, event)
+	}
+}
+
+function setupOpenAiToken(): void {
+	const token = makeJwt({
+		scp: ['openid'],
+		'https://api.openai.com/auth': { chatgpt_account_id: 'acct_ws' },
+	})
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: token, type: 'token' })
+	auth.getEntry = () => ({})
+}
+
+test('openai auto transport falls back to HTTP when websocket connect times out', async () => {
+	delete process.env.HAL_OPENAI_RESPONSES_TRANSPORT
+	openai.config.responsesConnectTimeoutMs = 5
+	FakeWebSocket.instances = []
+	globalThis.WebSocket = NeverOpenWebSocket as any
+	setupOpenAiToken()
+	const calls: FetchCall[] = []
+	globalThis.fetch = Object.assign(async (input: any, init?: RequestInit) => {
+		const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+		calls.push({ url, init })
+		return new Response(responsesSse(), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.5',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_ws_connect_timeout_auto',
+	})) events.push(event)
+
+	expect(FakeWebSocket.instances[0]!.readyState).toBe(3)
+	expect(openai.state.webSockets.has('sid_ws_connect_timeout_auto')).toBe(false)
+	expect(events).toContainEqual({ type: 'status', activity: 'OpenAI Responses WebSocket connect timed out (5ms); falling back to HTTP' })
+	expect(calls).toHaveLength(1)
+	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
+})
+
+test('forced openai websocket transport reports connect timeout without fallback', async () => {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
+	openai.config.responsesConnectTimeoutMs = 5
+	FakeWebSocket.instances = []
+	globalThis.WebSocket = NeverOpenWebSocket as any
+	setupOpenAiToken()
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.5',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_ws_connect_timeout_forced',
+	})) events.push(event)
+
+	expect(FakeWebSocket.instances[0]!.readyState).toBe(3)
+	expect(openai.state.webSockets.has('sid_ws_connect_timeout_forced')).toBe(false)
+	expect(events).toContainEqual({
+		type: 'error',
+		message: 'OpenAI Responses WebSocket connect timed out (5ms)',
+		endpoint: 'wss://chatgpt.com/backend-api/codex/responses',
+	})
+	expect(events).toContainEqual({ type: 'done' })
+})
 
 test('openai websocket transport times out when no events arrive', async () => {
 	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'

@@ -23,6 +23,8 @@ type ResponsesTransportMode = 'http' | 'ws' | 'auto'
 const config = {
 	// http: current SSE path. ws: force Responses WebSocket. auto: try WS, fall back to HTTP.
 	responsesTransport: 'auto' as ResponsesTransportMode,
+	// Time to wait for the initial Responses WebSocket connection before auto-fallback to HTTP.
+	responsesConnectTimeoutMs: 10_000,
 }
 
 const state = {
@@ -442,7 +444,16 @@ function resetResponsesWebSocketsForTests(): void {
 function waitForWebSocketOpen(ws: WebSocket, signal?: AbortSignal): Promise<void> {
 	if (ws.readyState === 1) return Promise.resolve()
 	return new Promise((resolve, reject) => {
+		const timer = setTimeout(() => {
+			cleanup()
+			try {
+				ws.close()
+			} catch {}
+			const ms = config.responsesConnectTimeoutMs
+			reject(new ResponsesWebSocketFallback(`OpenAI Responses WebSocket connect timed out (${ms}ms)`))
+		}, config.responsesConnectTimeoutMs)
 		function cleanup(): void {
+			clearTimeout(timer)
 			ws.removeEventListener?.('open', onOpen as any)
 			ws.removeEventListener?.('error', onError as any)
 			signal?.removeEventListener('abort', onAbort)
@@ -713,7 +724,8 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	} catch (err) {
 		if (req.sessionId) closeResponsesWebSocket(req.sessionId)
 		if (mode === 'auto' && !req.signal?.aborted) {
-			yield { type: 'status', activity: 'OpenAI WS failed; falling back to HTTP' }
+			const message = err instanceof Error ? err.message : 'OpenAI WS failed'
+			yield { type: 'status', activity: `${message}; falling back to HTTP` }
 			yield* generateOpenAIHttp(req, credential, transport, openaiEntry)
 			return
 		}
