@@ -3,6 +3,7 @@ import { ason } from '../utils/ason.ts'
 import { visLen } from '../utils/strings.ts'
 import { time } from '../utils/time.ts'
 import { sessionEntry } from './entry.ts'
+import { attachments } from './attachments.ts'
 import { STATE_DIR } from '../state.ts'
 
 const ID_RE = /^[a-z0-9]{6}-[a-z0-9]{3}$/
@@ -135,50 +136,9 @@ function makeProtectedRow(id: string, type: string, entries: HistoryEntry[], con
 	return { id, type, entries, content, contentText: clipped.text, truncated: clipped.truncated, editable: false, comment }
 }
 
-function userTextPartIndexes(entry: Extract<HistoryEntry, { type: 'user' }>): number[] {
-	const indexes: number[] = []
-	for (let i = 0; i < entry.parts.length; i++) {
-		if (entry.parts[i]?.type === 'text') indexes.push(i)
-	}
-	return indexes
-}
-
-function userIsTextOnly(entry: Extract<HistoryEntry, { type: 'user' }>): boolean {
-	return entry.parts.every((part) => part.type === 'text')
-}
-
-function userIsEditable(entry: Extract<HistoryEntry, { type: 'user' }>): boolean {
-	if (userIsTextOnly(entry)) return true
-	return userTextPartIndexes(entry).length === 1
-}
-
-function userRowText(entry: Extract<HistoryEntry, { type: 'user' }>): string {
-	if (userIsTextOnly(entry)) return sessionEntry.userText(entry)
-	const textIndexes = userTextPartIndexes(entry)
-	if (textIndexes.length === 1) {
-		const part = entry.parts[textIndexes[0]!]!
-		return part.type === 'text' ? part.text : ''
-	}
-	return sessionEntry.userText(entry, { images: 'path-or-blob-or-image' })
-}
-
-function userImageStats(entry: Extract<HistoryEntry, { type: 'user' }>): string {
-	let count = 0
-	for (const part of entry.parts) {
-		if (part.type === 'image') count++
-	}
-	if (count === 0) return ''
-	return count === 1 ? '1 image' : `${count} images`
-}
-
 function buildNormalRow(sessionId: string, entry: HistoryEntry, index: number, now: number): RebaseRow {
 	const id = entryRowId(entry, index)
-	if (entry.type === 'user') {
-		const row = makeTextRow(id, 'user', entry, userRowText(entry), userIsEditable(entry), now)
-		const images = userImageStats(entry)
-		if (images) row.comment = [row.comment, images].filter(Boolean).join('; ')
-		return row
-	}
+	if (entry.type === 'user') return makeTextRow(id, 'user', entry, sessionEntry.userText(entry, { images: 'path-or-blob-or-image' }), true, now)
 	if (entry.type === 'assistant') return makeTextRow(id, 'assistant', entry, entry.text, true, now)
 	if (entry.type === 'thinking') {
 		const text = entry.text ?? sessionEntry.loadEntryBlob(sessionId, entry)?.thinking ?? ''
@@ -500,19 +460,6 @@ function parseTodo(snapshot: RebaseSnapshot, todo: string, opts: ParseTodoOption
 	return { items, errors, aborted }
 }
 
-function replaceUserText(entry: Extract<HistoryEntry, { type: 'user' }>, text: string): void {
-	if (userIsTextOnly(entry)) {
-		entry.parts = [{ type: 'text', text }]
-		return
-	}
-	const textIndexes = userTextPartIndexes(entry)
-	if (textIndexes.length === 1) {
-		entry.parts[textIndexes[0]!] = { type: 'text', text }
-		return
-	}
-	entry.parts = [{ type: 'text', text }]
-}
-
 function flushToolGroup(out: HistoryEntry[], group: ParsedItem[]): void {
 	if (group.length === 0) return
 	const calls: HistoryEntry[] = []
@@ -527,7 +474,7 @@ function flushToolGroup(out: HistoryEntry[], group: ParsedItem[]): void {
 	out.push(...calls, ...results)
 }
 
-function applyParsed(snapshot: RebaseSnapshot, parsed: ParsedTodo): ApplyResult {
+async function applyParsed(snapshot: RebaseSnapshot, parsed: ParsedTodo): Promise<ApplyResult> {
 	if (parsed.errors.length > 0) throw new Error(parsed.errors.join('\n'))
 	const entries: HistoryEntry[] = []
 	const queue: string[] = []
@@ -557,7 +504,7 @@ function applyParsed(snapshot: RebaseSnapshot, parsed: ParsedTodo): ApplyResult 
 		if (!original) continue
 		const next = cloneEntry(original)
 		if (row.editable && typeof item.content === 'string') {
-			if (next.type === 'user') replaceUserText(next, item.content)
+			if (next.type === 'user') next.parts = (await attachments.resolve(snapshot.sessionId, item.content)).logParts
 			if (next.type === 'assistant') next.text = item.content
 		}
 		entries.push(next)

@@ -1,6 +1,8 @@
 import { test, expect } from 'bun:test'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { rebase } from './rebase.ts'
 import type { HistoryEntry } from '../server/sessions.ts'
+import { sessions } from '../server/sessions.ts'
 
 function entry(type: string, fields: Record<string, any> = {}): HistoryEntry {
 	return { type, ts: '2026-05-22T10:00:00.000Z', ...fields } as HistoryEntry
@@ -70,87 +72,111 @@ test('queue rows must be a suffix', () => {
 	expect(parsed.errors).toContain('Queue rows must be the final non-comment lines.')
 })
 
-test('thinking content edits are ignored', () => {
+test('thinking content edits are ignored', async () => {
 	const entries = [entry('thinking', { id: '000001-aaa', text: 'secret', signature: 'sig' })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const parsed = rebase.parseTodo(snapshot, "edit 000001-aaa thinking 'changed' # ignored")
-	const applied = rebase.applyParsed(snapshot, parsed)
+	const applied = await rebase.applyParsed(snapshot, parsed)
 
 	expect(parsed.errors).toEqual([])
 	expect(applied.entries).toEqual(entries)
 })
 
 
-test('picked rows keep their original ids', () => {
+test('picked rows keep their original ids', async () => {
 	const entries = [entry('assistant', { id: '000001-aaa', text: 'same row' })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const parsed = rebase.parseTodo(snapshot, rebase.renderTodo(snapshot))
-	const applied = rebase.applyParsed(snapshot, parsed)
+	const applied = await rebase.applyParsed(snapshot, parsed)
 
 	expect(applied.entries[0]?.id).toBe('000001-aaa')
 })
 
 
-test('edit command uses external edited text payload', () => {
+test('edit command uses external edited text payload', async () => {
 	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: 'old text' }] })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const parsed = rebase.parseTodo(snapshot, "edit 000001-aaa user 'old text'", { edits: { '000001-aaa': 'new text' } })
-	const applied = rebase.applyParsed(snapshot, parsed)
+	const applied = await rebase.applyParsed(snapshot, parsed)
 
 	expect(parsed.errors).toEqual([])
 	expect(applied.entries[0]).toMatchObject({ type: 'user', parts: [{ type: 'text', text: 'new text' }] })
 })
 
 
-test('edit command preserves images on mixed user rows', () => {
-	const entries = [entry('user', {
-		id: '000001-aaa',
-		parts: [
-			{ type: 'text', text: 'old text' },
-			{ type: 'image', blobId: 'img123', originalFile: '/tmp/image.png' },
-		],
-	})]
-	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
+test('edit command roundtrips image placeholders through prompt attachment parsing', async () => {
+	const testDir = '/tmp/hal-test-rebase'
+	const sessionId = '04-aaa'
+	const sessionDir = `${testDir}/sessions/${sessionId}`
+	const image1 = `${testDir}/one.png`
+	const image2 = `${testDir}/two.png`
+	const originalSessionDir = sessions.sessionDir
+	try {
+		sessions.sessionDir = (id: string) => `${testDir}/sessions/${id}`
+		mkdirSync(`${sessionDir}/blobs`, { recursive: true })
+		writeFileSync(`${sessionDir}/session.ason`, `{ createdAt: '2026-05-22T10:00:00.000Z' }\n`)
+		writeFileSync(image1, 'fake png 1')
+		writeFileSync(image2, 'fake png 2')
 
-	expect(rebase.editTexts(snapshot)['000001-aaa']).toBe('old text')
-	const parsed = rebase.parseTodo(snapshot, "edit 000001-aaa user 'old text'", { edits: { '000001-aaa': 'new text' } })
-	const applied = rebase.applyParsed(snapshot, parsed)
+		const entries = [entry('user', {
+			id: '000001-aaa',
+			parts: [
+				{ type: 'text', text: 'hello this is image ' },
+				{ type: 'image', blobId: 'old1', originalFile: image1 },
+				{ type: 'text', text: ' and this is another ' },
+				{ type: 'image', blobId: 'old2', originalFile: image2 },
+				{ type: 'text', text: ' etc.' },
+			],
+		})]
+		const snapshot = rebase.buildSnapshot(sessionId, 'history.asonl', entries)
+		const originalText = `hello this is image [${image1}] and this is another [${image2}] etc.`
 
-	expect(parsed.errors).toEqual([])
-	expect(applied.entries[0]).toMatchObject({
-		type: 'user',
-		parts: [
-			{ type: 'text', text: 'new text' },
-			{ type: 'image', blobId: 'img123', originalFile: '/tmp/image.png' },
-		],
-	})
+		expect(rebase.editTexts(snapshot)['000001-aaa']).toBe(originalText)
+		const parsed = rebase.parseTodo(snapshot, `edit 000001-aaa user ${JSON.stringify(originalText)}`, { edits: { '000001-aaa': `edited [${image2}] then [${image1}] done` } })
+		const applied = await rebase.applyParsed(snapshot, parsed)
+
+		expect(parsed.errors).toEqual([])
+		expect(applied.entries[0]).toMatchObject({
+			type: 'user',
+			parts: [
+				{ type: 'text', text: 'edited ' },
+				{ type: 'image', originalFile: image2 },
+				{ type: 'text', text: ' then ' },
+				{ type: 'image', originalFile: image1 },
+				{ type: 'text', text: ' done' },
+			],
+		})
+	} finally {
+		sessions.sessionDir = originalSessionDir
+		if (existsSync(testDir)) rmSync(testDir, { recursive: true })
+	}
 })
 
-test('queue existing truncated user uses snapshot text and omits row from history', () => {
+test('queue existing truncated user uses snapshot text and omits row from history', async () => {
 	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: `${'x'.repeat(120)}\nsecond` }] })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const parsed = rebase.parseTodo(snapshot, "queue 000001-aaa user 'ignored... # truncated")
 
 	expect(parsed.errors).toEqual([])
-	const applied = rebase.applyParsed(snapshot, parsed)
+	const applied = await rebase.applyParsed(snapshot, parsed)
 
 	expect(applied.entries).toEqual([])
 	expect(applied.queue).toEqual([`${'x'.repeat(120)}\nsecond`])
 })
 
 
-test('queue existing user row uses edited non-truncated content', () => {
+test('queue existing user row uses edited non-truncated content', async () => {
 	const entries = [entry('user', { id: '000001-aaa', parts: [{ type: 'text', text: '1, 2, 3...' }] })]
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
 	const parsed = rebase.parseTodo(snapshot, "queue 000001-aaa user 'a, b, c...'")
-	const applied = rebase.applyParsed(snapshot, parsed)
+	const applied = await rebase.applyParsed(snapshot, parsed)
 
 	expect(parsed.errors).toEqual([])
 	expect(applied.entries).toEqual([])
 	expect(applied.queue).toEqual(['a, b, c...'])
 })
 
-test('tool rows write contiguous calls first then results in visible order', () => {
+test('tool rows write contiguous calls first then results in visible order', async () => {
 	const entries = [
 		entry('tool_call', { id: '000001-aaa', toolId: 't1', name: 'read', input: { path: 'a' } }),
 		entry('tool_call', { id: '000002-bbb', toolId: 't2', name: 'grep', input: { pattern: 'b' } }),
@@ -165,7 +191,7 @@ test('tool rows write contiguous calls first then results in visible order', () 
 	].join('\n')
 
 	const parsed = rebase.parseTodo(snapshot, todo)
-	const applied = rebase.applyParsed(snapshot, parsed)
+	const applied = await rebase.applyParsed(snapshot, parsed)
 
 	expect(applied.entries.map((item) => {
 		if (item.type === 'tool_call') return `C:${item.toolId}`
@@ -174,13 +200,13 @@ test('tool rows write contiguous calls first then results in visible order', () 
 	})).toEqual(['C:t2', 'C:t1', 'R:t2', 'R:t1'])
 })
 
-test('manual queue supports quoted hashes and raw comments', () => {
+test('manual queue supports quoted hashes and raw comments', async () => {
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', [])
 	const parsed = rebase.parseTodo(snapshot, [
 		"queue 'hello #1' # comment",
 		'queue formula #1',
 	].join('\n'))
-	const applied = rebase.applyParsed(snapshot, parsed)
+	const applied = await rebase.applyParsed(snapshot, parsed)
 
 	expect(parsed.errors).toEqual([])
 	expect(applied.queue).toEqual(['hello #1', 'formula'])

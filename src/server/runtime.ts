@@ -693,7 +693,7 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 	}
 	let applied
 	try {
-		applied = rebase.applyParsed(saved.snapshot, parsed)
+		applied = await rebase.applyParsed(saved.snapshot, parsed)
 		apiMessages.toProviderMessages(sessionId, applied.entries, { prune: false })
 	} catch (err) {
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: [errorMessage(err)], todo })
