@@ -10,6 +10,13 @@ import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 
 const READ_LIKE = new Set(['read', 'grep', 'glob', 'bash', 'read_url'])
 
+const config = {
+	// This tool can walk many old sessions and stringify large prompt snapshots.
+	// Keep it bounded so it cannot monopolize the server event loop.
+	maxSeconds: 8,
+	yieldEverySnapshots: 1,
+}
+
 interface AnalyzeInput {
 	sessionId?: string
 	limit?: number
@@ -20,6 +27,13 @@ interface AnalyzeInput {
 	batchSizes?: number[]
 	retryRate?: number
 	retryCostTokens?: number
+	maxSeconds?: number
+}
+
+interface AnalyzeRun {
+	deadlineMs: number
+	stoppedEarly: boolean
+	snapshotsBuilt: number
 }
 
 interface AnalyzeOptions {
@@ -67,6 +81,7 @@ function normalizeInput(input: unknown): AnalyzeInput {
 		batchSizes: Array.isArray(raw.batchSizes) ? raw.batchSizes.map((value) => Number(value)) : undefined,
 		retryRate: numberValue(raw.retryRate),
 		retryCostTokens: numberValue(raw.retryCostTokens),
+		maxSeconds: numberValue(raw.maxSeconds),
 	}
 }
 
@@ -82,8 +97,28 @@ function defaults(input: AnalyzeInput): AnalyzeOptions {
 	}
 }
 
-function cloneMessages(msgs: Message[]): Message[] {
-	return JSON.parse(JSON.stringify(msgs)) as Message[]
+function startRun(maxSeconds: number): AnalyzeRun {
+	return {
+		deadlineMs: Date.now() + Math.max(0, maxSeconds) * 1000,
+		stoppedEarly: false,
+		snapshotsBuilt: 0,
+	}
+}
+
+function expired(run: AnalyzeRun): boolean {
+	if (Date.now() < run.deadlineMs) return false
+	run.stoppedEarly = true
+	return true
+}
+
+async function yieldToEventLoop(): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+async function maybeYield(run: AnalyzeRun): Promise<void> {
+	if (config.yieldEverySnapshots <= 0) return
+	if (run.snapshotsBuilt % config.yieldEverySnapshots !== 0) return
+	await yieldToEventLoop()
 }
 
 function isTurnEnd(msg: Message): boolean {
@@ -154,9 +189,8 @@ function countPrunedResults(msgs: Message[]): { prunedToolResults: number; prune
 	return { prunedToolResults, prunedReadResults }
 }
 
-function summarizeSnapshots(snapshots: Message[][], opts: AnalyzeOptions, apply: (msgs: Message[]) => Message[]): StrategySummary {
-	let prevPrompt = ''
-	const summary: StrategySummary = {
+function emptySummary(): StrategySummary {
+	return {
 		requests: 0,
 		promptTokens: 0,
 		cachedTokens: 0,
@@ -167,26 +201,38 @@ function summarizeSnapshots(snapshots: Message[][], opts: AnalyzeOptions, apply:
 		retryPenaltyUsd: 0,
 		totalWithRetryUsd: 0,
 	}
-	for (const snapshot of snapshots) {
-		const pruned = apply(cloneMessages(snapshot))
-		const prompt = JSON.stringify(pruned)
-		const promptTokens = models.estimateTokens(prompt)
-		const prefixChars = commonPrefixChars(prevPrompt, prompt)
-		const prefixTokens = models.estimateTokens(prompt.slice(0, prefixChars))
-		const cachedTokens = promptTokens >= 1024 && prefixTokens >= 1024 ? Math.min(promptTokens, prefixTokens) : 0
-		const uncachedTokens = promptTokens - cachedTokens
-		const risk = countPrunedResults(pruned)
-		summary.requests++
-		summary.promptTokens += promptTokens
-		summary.cachedTokens += cachedTokens
-		summary.uncachedTokens += uncachedTokens
-		summary.costUsd += (cachedTokens * opts.cachedInputPrice + uncachedTokens * opts.inputPrice) / 1_000_000
-		summary.prunedToolResults += risk.prunedToolResults
-		summary.prunedReadResults += risk.prunedReadResults
-		prevPrompt = prompt
-	}
+}
+
+function addSnapshot(summary: StrategySummary, opts: AnalyzeOptions, prevPrompt: string, pruned: Message[]): string {
+	const prompt = JSON.stringify(pruned)
+	const promptTokens = models.estimateTokens(prompt)
+	const prefixChars = commonPrefixChars(prevPrompt, prompt)
+	const prefixTokens = models.estimateTokens(prompt.slice(0, prefixChars))
+	const cachedTokens = promptTokens >= 1024 && prefixTokens >= 1024 ? Math.min(promptTokens, prefixTokens) : 0
+	const uncachedTokens = promptTokens - cachedTokens
+	const risk = countPrunedResults(pruned)
+	summary.requests++
+	summary.promptTokens += promptTokens
+	summary.cachedTokens += cachedTokens
+	summary.uncachedTokens += uncachedTokens
+	summary.costUsd += (cachedTokens * opts.cachedInputPrice + uncachedTokens * opts.inputPrice) / 1_000_000
+	summary.prunedToolResults += risk.prunedToolResults
+	summary.prunedReadResults += risk.prunedReadResults
+	return prompt
+}
+
+function finishSummary(summary: StrategySummary, opts: AnalyzeOptions): void {
 	summary.retryPenaltyUsd = (summary.prunedReadResults * opts.retryRate * opts.retryCostTokens * opts.inputPrice) / 1_000_000
 	summary.totalWithRetryUsd = summary.costUsd + summary.retryPenaltyUsd
+}
+
+function summarizeSnapshots(snapshots: Message[][], opts: AnalyzeOptions, apply: (msgs: Message[]) => Message[]): StrategySummary {
+	let prevPrompt = ''
+	const summary = emptySummary()
+	for (const snapshot of snapshots) {
+		prevPrompt = addSnapshot(summary, opts, prevPrompt, apply(snapshot))
+	}
+	finishSummary(summary, opts)
 	return summary
 }
 
@@ -206,13 +252,57 @@ function analyzeSnapshots(snapshots: Message[][], rawOpts?: Partial<AnalyzeOptio
 	return out
 }
 
-function requestSnapshots(sessionId: string): Message[][] {
+async function summarizeSnapshotsBudgeted(
+	snapshots: Message[][],
+	opts: AnalyzeOptions,
+	run: AnalyzeRun,
+	apply: (msgs: Message[]) => Message[],
+): Promise<StrategySummary> {
+	let prevPrompt = ''
+	const summary = emptySummary()
+	for (const snapshot of snapshots) {
+		if (expired(run)) break
+		prevPrompt = addSnapshot(summary, opts, prevPrompt, apply(snapshot))
+		run.snapshotsBuilt++
+		await maybeYield(run)
+	}
+	finishSummary(summary, opts)
+	return summary
+}
+
+async function analyzeSnapshotsBudgeted(
+	snapshots: Message[][],
+	opts: AnalyzeOptions,
+	run: AnalyzeRun,
+): Promise<Record<string, StrategySummary>> {
+	const out: Record<string, StrategySummary> = {}
+	out.keep_all = await summarizeSnapshotsBudgeted(snapshots, opts, run, (msgs) => msgs)
+	if (expired(run)) return out
+	out.rolling_prune = await summarizeSnapshotsBudgeted(snapshots, opts, run, (msgs) =>
+		pruneWithOffset(msgs, opts.heavyThreshold, opts.thinkingThreshold, 0)
+	)
+	for (const batchSize of opts.batchSizes) {
+		if (expired(run)) break
+		out[`batch_prune_${batchSize}`] = await summarizeSnapshotsBudgeted(snapshots, opts, run, (msgs) => {
+			const { completedTurns } = ages(msgs)
+			const checkpoint = Math.floor(completedTurns / batchSize) * batchSize
+			return pruneWithOffset(msgs, opts.heavyThreshold, opts.thinkingThreshold, completedTurns - checkpoint)
+		})
+	}
+	return out
+}
+
+async function requestSnapshots(sessionId: string, run: AnalyzeRun): Promise<Message[][]> {
+	if (expired(run)) return []
 	const entries = sessions.loadAllHistory(sessionId)
 	const out: Message[][] = []
 	for (let i = 0; i < entries.length; i++) {
+		if (expired(run)) break
 		const entry = entries[i]!
 		if (entry.type !== 'user' && entry.type !== 'tool_result') continue
 		out.push(apiMessages.toProviderMessages(sessionId, entries.slice(0, i + 1), { prune: false }))
+		run.snapshotsBuilt++
+		await maybeYield(run)
 	}
 	return out
 }
@@ -233,6 +323,8 @@ function rollingPenalty(summary: Record<string, StrategySummary>): number {
 async function execute(input: unknown, _ctx: ToolContext): Promise<string> {
 	const parsed = normalizeInput(input)
 	const opts = defaults(parsed)
+	const maxSeconds = parsed.maxSeconds ?? config.maxSeconds
+	const run = startRun(maxSeconds)
 	const ids = parsed.sessionId
 		? [parsed.sessionId]
 		: sessions
@@ -243,9 +335,10 @@ async function execute(input: unknown, _ctx: ToolContext): Promise<string> {
 	const aggregate: Record<string, StrategySummary> = {}
 	const perSession: SessionAnalysisSummary[] = []
 	for (const id of ids) {
-		const snapshots = requestSnapshots(id)
+		if (expired(run)) break
+		const snapshots = await requestSnapshots(id, run)
 		if (snapshots.length === 0) continue
-		const analysis = analyzeSnapshots(snapshots, opts)
+		const analysis = await analyzeSnapshotsBudgeted(snapshots, opts, run)
 		perSession.push({
 			sessionId: id,
 			requests: snapshots.length,
@@ -269,8 +362,10 @@ async function execute(input: unknown, _ctx: ToolContext): Promise<string> {
 	}
 	perSession.sort((a, b) => rollingPenalty(b.summary) - rollingPenalty(a.summary))
 	return JSON.stringify({
-		config: opts,
+		config: { ...opts, maxSeconds },
+		stoppedEarly: run.stoppedEarly,
 		sessionsAnalyzed: perSession.length,
+		snapshotsBuilt: run.snapshotsBuilt,
 		aggregate: Object.fromEntries(Object.entries(aggregate).map(([k, v]) => [k, roundSummary(v)])),
 		worstRollingPenaltySessions: perSession.slice(0, 10),
 	}, null, 2)
@@ -287,6 +382,7 @@ const analyzeHistoryTool: Tool = {
 		retryCostTokens: { type: 'integer', description: 'Heuristic uncached input tokens per retry incident' },
 		inputPrice: { type: 'number', description: 'Uncached input price in USD per 1M tokens' },
 		cachedInputPrice: { type: 'number', description: 'Cached input price in USD per 1M tokens' },
+		maxSeconds: { type: 'number', description: 'Stop and return partial results after this many seconds (default: 8)' },
 	},
 	execute,
 }
@@ -295,4 +391,4 @@ function init(): void {
 	toolRegistry.registerTool(analyzeHistoryTool)
 }
 
-export const analyzeHistory = { analyzeSnapshots, execute, init }
+export const analyzeHistory = { config, analyzeSnapshots, execute, init }

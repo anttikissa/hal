@@ -3,10 +3,64 @@ import { toolRegistry } from './tool.ts'
 import type { Message } from '../protocol.ts'
 import { builtins } from './builtins.ts'
 import { analyzeHistory } from './analyze_history.ts'
+import { sessions } from '../server/sessions.ts'
+import { apiMessages } from '../session/api-messages.ts'
 
 builtins.init()
 test('registers the analyze_history tool', () => {
 	expect(toolRegistry.getTool('analyze_history')?.name).toBe('analyze_history')
+})
+
+test('execute stops before expensive history loading when time budget is exhausted', async () => {
+	const oldMaxSeconds = analyzeHistory.config.maxSeconds
+	const oldLoadAllSessionMetas = sessions.loadAllSessionMetas
+	const oldLoadAllHistory = sessions.loadAllHistory
+	analyzeHistory.config.maxSeconds = 0
+	sessions.loadAllSessionMetas = () => [{ id: 'slow-session', createdAt: '2026-01-01T00:00:00.000Z' } as any]
+	sessions.loadAllHistory = () => {
+		throw new Error('history should not load after budget expires')
+	}
+	try {
+		const output = JSON.parse(await analyzeHistory.execute({ limit: 1 }, { sessionId: 'test', cwd: '.' }))
+		expect(output.stoppedEarly).toBe(true)
+		expect(output.sessionsAnalyzed).toBe(0)
+	} finally {
+		analyzeHistory.config.maxSeconds = oldMaxSeconds
+		sessions.loadAllSessionMetas = oldLoadAllSessionMetas
+		sessions.loadAllHistory = oldLoadAllHistory
+	}
+})
+
+test('execute yields to the event loop while scanning history', async () => {
+	const oldMaxSeconds = analyzeHistory.config.maxSeconds
+	const oldYieldEverySnapshots = analyzeHistory.config.yieldEverySnapshots
+	const oldLoadAllSessionMetas = sessions.loadAllSessionMetas
+	const oldLoadAllHistory = sessions.loadAllHistory
+	const oldToProviderMessages = apiMessages.toProviderMessages
+	const entries: any[] = []
+	for (let i = 0; i < 5; i++) {
+		entries.push({ type: 'user', ts: '2026-01-01T00:00:00.000Z', parts: [{ type: 'text', text: `turn ${i}` }] })
+	}
+	analyzeHistory.config.maxSeconds = 60
+	analyzeHistory.config.yieldEverySnapshots = 1
+	sessions.loadAllSessionMetas = () => [{ id: 'yield-session', createdAt: '2026-01-01T00:00:00.000Z' } as any]
+	sessions.loadAllHistory = () => entries as any
+	apiMessages.toProviderMessages = () => [{ role: 'user', content: 'snapshot' }]
+	try {
+		let done = false
+		const promise = analyzeHistory.execute({ limit: 1 }, { sessionId: 'test', cwd: '.' }).then(() => {
+			done = true
+		})
+		await new Promise((resolve) => setTimeout(resolve, 0))
+		expect(done).toBe(false)
+		await promise
+	} finally {
+		analyzeHistory.config.maxSeconds = oldMaxSeconds
+		analyzeHistory.config.yieldEverySnapshots = oldYieldEverySnapshots
+		sessions.loadAllSessionMetas = oldLoadAllSessionMetas
+		sessions.loadAllHistory = oldLoadAllHistory
+		apiMessages.toProviderMessages = oldToProviderMessages
+	}
 })
 
 test('rolling pruning can cost more than keeping the full cached prefix', () => {
