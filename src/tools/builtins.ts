@@ -13,7 +13,6 @@ import { evalTool } from './eval.ts'
 import { send } from './send.ts'
 import { google } from './google.ts'
 import { readUrl } from './read_url.ts'
-import { analyzeHistory } from './analyze_history.ts'
 import { spawnAgent } from './spawn_agent.ts'
 
 const state = {
@@ -34,7 +33,6 @@ function init(): void {
 	send.init()
 	google.init()
 	readUrl.init()
-	analyzeHistory.init()
 	spawnAgent.init()
 }
 

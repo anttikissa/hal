@@ -163,7 +163,6 @@ export type Command =
 // ── Tool call types ──
 
 export type ToolName =
-	| 'analyze_history'
 	| 'bash'
 	| 'edit'
 	| 'eval'

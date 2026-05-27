@@ -48,7 +48,6 @@ Not all weak types are equally bad.
 	- `read_url`
 	- `read_blob`
 	- `eval`
-	- `analyze_history`
 - Restored and typed `truncateUtf8()` in `src/utils/helpers.ts` and strengthened `debounce()` to use tuple generics instead of `any`.
 - Added runtime validation for inbox files in `src/runtime/inbox.ts` instead of casting parsed ASON directly.
 - Restored missing `blob` import in `src/session/replay.ts` while touching type-related fallout.

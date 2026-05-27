@@ -319,7 +319,6 @@ Keep special cases only where the code actually differs:
 - `bash`
 - `edit`
 - `spawn_agent`
-- maybe `analyze_history`
 
 Estimated impact:
 
