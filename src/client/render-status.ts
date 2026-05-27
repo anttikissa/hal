@@ -30,6 +30,8 @@ const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
 
+type TabHelpHint = { text: string; priority: number }
+
 const config = {
 	showSession: true,
 	showCwd: true,
@@ -101,8 +103,58 @@ function tabLabel(tab: Tab, i: number): string {
 	return `${DIM} ${content} ${RESET}`
 }
 
-function tabHelpText(): string {
-	return '  ctrl-t: new, ctrl-w: close, ctrl-n/p: switch, ctrl-f: fork'
+function tabHelpHints(tabCount: number): TabHelpHint[] {
+	if (tabCount <= 1) {
+		return [
+			{ text: 'ctrl-t: new', priority: 2 },
+			{ text: 'ctrl-f: fork', priority: 1 },
+		]
+	}
+	return [
+		{ text: 'alt-#: goto', priority: 5 },
+		{ text: 'ctrl-n/p: switch', priority: 4 },
+		{ text: 'ctrl-w: close', priority: 3 },
+		{ text: 'ctrl-f: fork', priority: 2 },
+		{ text: '/move n: reorder', priority: 1 },
+	]
+}
+
+function joinTabHelpHints(hints: TabHelpHint[]): string {
+	if (hints.length === 0) {
+		return ''
+	}
+	let text = '  '
+	for (let i = 0; i < hints.length; i++) {
+		if (i > 0) {
+			text += ', '
+		}
+		text += hints[i]!.text
+	}
+	return text
+}
+
+function tabHelpText(tabCount = client.state.tabs.length): string {
+	return renderStatus.joinTabHelpHints(renderStatus.tabHelpHints(tabCount))
+}
+
+function fitTabHelpText(tabCount: number, base: string, cols: number): string {
+	const width = renderStatus.contentWidth(cols)
+	const hints = renderStatus.tabHelpHints(tabCount)
+	while (hints.length > 0) {
+		const help = renderStatus.joinTabHelpHints(hints)
+		if (visLen(base) + visLen(help) <= width) {
+			return help
+		}
+
+		let drop = 0
+		for (let i = 1; i < hints.length; i++) {
+			if (hints[i]!.priority <= hints[drop]!.priority) {
+				drop = i
+			}
+		}
+		hints.splice(drop, 1)
+	}
+	return ''
 }
 
 function buildTabBarLines(cols: number): string[] {
@@ -110,7 +162,14 @@ function buildTabBarLines(cols: number): string[] {
 	for (let i = 0; i < client.state.tabs.length; i++) {
 		tabs.push(renderStatus.tabLabel(client.state.tabs[i]!, i))
 	}
-	return [renderStatus.paddedLine(`Tabs: ${tabs.join('')}${renderStatus.tabHelpText()}`, cols)]
+
+	const tabText = tabs.join('')
+	const prefixed = `Tabs: ${tabText}`
+	let content = prefixed + renderStatus.fitTabHelpText(client.state.tabs.length, prefixed, cols)
+	if (visLen(content) > renderStatus.contentWidth(cols)) {
+		content = tabText + renderStatus.fitTabHelpText(client.state.tabs.length, tabText, cols)
+	}
+	return [renderStatus.paddedLine(content, cols)]
 }
 
 function renderTabBar(lines: string[]): void {
@@ -408,6 +467,9 @@ export const renderStatus = {
 	tabInner,
 	tabLabel,
 	tabHelpText,
+	tabHelpHints,
+	joinTabHelpHints,
+	fitTabHelpText,
 	buildTabBarLines,
 	shortenPath,
 	statusBaseColor,

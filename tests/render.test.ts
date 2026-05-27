@@ -464,7 +464,17 @@ describe('render', () => {
 		}
 	})
 
-	test('tab bar keeps prefix, hints, and padded compact labels', () => {
+	test('tab bar shows ctrl-t only when there is one tab', () => {
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
+		expect(tabLine).toContain(' Tabs: [1]')
+		expect(tabLine).toContain('ctrl-t: new')
+		expect(tabLine).toContain('ctrl-f: fork')
+		expect(tabLine).not.toContain('alt-#: goto')
+		expect(tabLine).not.toContain('ctrl-n/p: switch')
+	})
+
+	test('tab bar shows navigation hints instead of ctrl-t with multiple tabs', () => {
 		client.state.tabs.push({
 			sessionId: 's2',
 			name: 'beta',
@@ -485,8 +495,10 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
 		expect(tabLine).toContain(' Tabs: [1] 2 ')
-		expect(tabLine).toContain('ctrl-t: new')
+		expect(tabLine).toContain('alt-#: goto')
+		expect(tabLine).toContain('ctrl-n/p: switch')
 		expect(tabLine).toContain('ctrl-w: close')
+		expect(tabLine).not.toContain('ctrl-t: new')
 		expect(tabLine).not.toContain('beta')
 		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[0]!, 0))).toBe('[1]')
 		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[1]!, 1))).toBe(' 2 ')

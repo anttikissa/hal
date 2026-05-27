@@ -28,7 +28,9 @@ Chrome = tab bar + prompt box + status + help bar.
 
 Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
 The tab bar uses compact numeric labels, brackets for the active tab, and a
-one-character status indicator after the tab number when needed. It stays one
+one-character status indicator after the tab number when needed. With one tab,
+it shows creation hints such as `ctrl-t: new`; with multiple tabs, it switches
+to navigation hints such as `alt-#: goto` and `ctrl-n/p: switch`. It stays one
 row: tab-specific hints are dropped from lowest to highest priority, then the
 "Tabs:" label is dropped, rather than wrapping.
 
