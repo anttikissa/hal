@@ -108,15 +108,7 @@ function getStateFile(): SharedState {
 	if (stateFile) return stateFile
 	ensureDir(IPC_DIR)
 	stateFile = liveFiles.liveFile(STATE_FILE, defaultState(), { watch: false }) as SharedState
-	// Migrate older state files. `sessions` used to be id-only strings, then the
-	// rich list briefly lived at `openSessions`; now `sessions` is the rich list.
-	const legacyOpenSessions = (stateFile as any).openSessions
-	if (!Array.isArray(stateFile.sessions)) stateFile.sessions = Array.isArray(legacyOpenSessions) ? legacyOpenSessions : []
-	if (stateFile.sessions.some((item) => typeof item === 'string')) {
-		stateFile.sessions = (stateFile.sessions as any[]).map((id, index) => ({ id, tab: index + 1, cwd: '' }))
-	}
-	stateFile.sessions = stateFile.sessions.map((item, index) => ({ ...item, tab: item.tab ?? index + 1 }))
-	delete (stateFile as any).openSessions
+	if (!Array.isArray(stateFile.sessions)) stateFile.sessions = []
 	if (!stateFile.busy || typeof stateFile.busy !== 'object') stateFile.busy = {}
 	if (!stateFile.activity || typeof stateFile.activity !== 'object') stateFile.activity = {}
 	if (typeof stateFile.updatedAt !== 'string') stateFile.updatedAt = new Date().toISOString()
