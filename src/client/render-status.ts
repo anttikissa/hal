@@ -29,6 +29,7 @@ const YELLOW = '\x1b[33m'
 const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
+const BLACK_BG = '\x1b[40m'
 
 type TabHelpHint = { text: string; priority: number }
 
@@ -47,6 +48,20 @@ function halCursorColor(): string {
 	// Match the main HAL cursor, including live colors.ason reloads and the
 	// assistant-color fallback when no explicit input cursor color is configured.
 	return colors.input.cursor || colors.assistant.fg
+}
+
+function inputStyle(): string {
+	const bg = colors.input.bg || colors.user.bg || RESET
+	return `${bg}${colors.input.fg || BRIGHT_WHITE}`
+}
+
+function tabBarStyle(): string {
+	const bg = colors.input.bg || colors.user.bg || RESET
+	return `${bg}${colors.input.fg || BRIGHT_WHITE}`
+}
+
+function tabTriangleColor(): string {
+	return colors.input.edge || colors.user.fg || colors.info.fg || BRIGHT_WHITE
 }
 
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
@@ -96,11 +111,14 @@ function tabInner(num: number, ind: string): string {
 
 function tabLabel(tab: Tab, i: number): string {
 	const active = client.state.activeTab
-	const base = i === active ? BRIGHT_WHITE : DIM
+	const base = renderStatus.tabBarStyle()
 	const ind = renderStatus.renderIndicator(tab, base)
 	const content = renderStatus.tabInner(i + 1, ind)
-	if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
-	return `${DIM} ${content} ${RESET}`
+	if (i === active) {
+		const edge = renderStatus.tabTriangleColor()
+		return `${BLACK_BG}${edge}◣${BRIGHT_WHITE}${BLACK_BG}${content}${edge}${BLACK_BG}◢${base}`
+	}
+	return `${DIM}${content}${base}`
 }
 
 function tabHelpHints(tabCount: number): TabHelpHint[] {
@@ -157,19 +175,25 @@ function fitTabHelpText(tabCount: number, base: string, cols: number): string {
 	return ''
 }
 
-function buildTabBarLines(cols: number): string[] {
-	const tabs: string[] = []
+function buildTabText(): string {
+	let text = ''
 	for (let i = 0; i < client.state.tabs.length; i++) {
-		tabs.push(renderStatus.tabLabel(client.state.tabs[i]!, i))
+		if (i > 0 && client.state.activeTab !== i - 1) {
+			text += ' '
+		}
+		text += renderStatus.tabLabel(client.state.tabs[i]!, i)
 	}
+	return text
+}
 
-	const tabText = tabs.join('')
+function buildTabBarLines(cols: number): string[] {
+	const tabText = renderStatus.buildTabText()
 	const prefixed = `Tabs: ${tabText}`
 	let content = prefixed + renderStatus.fitTabHelpText(client.state.tabs.length, prefixed, cols)
 	if (visLen(content) > renderStatus.contentWidth(cols)) {
 		content = tabText + renderStatus.fitTabHelpText(client.state.tabs.length, tabText, cols)
 	}
-	return [renderStatus.paddedLine(content, cols)]
+	return [`${renderStatus.tabBarStyle()}${renderStatus.paddedLine(content, cols)}${RESET}`]
 }
 
 function renderTabBar(lines: string[]): void {
@@ -427,11 +451,11 @@ function promptContentWidth(cols: number): number {
 }
 
 function promptRule(cols: number): string {
-	return '─'.repeat(Math.max(0, cols))
+	return `${renderStatus.inputStyle()}${'─'.repeat(Math.max(0, cols))}${RESET}`
 }
 
 function paddedPromptLine(line: string, cols: number): string {
-	return renderStatus.paddedLine(line, cols)
+	return `${renderStatus.inputStyle()}${renderStatus.paddedLine(line, cols)}${RESET}`
 }
 
 function renderPrompt(lines: string[]): void {
@@ -459,6 +483,9 @@ export const renderStatus = {
 	renderHelpBar,
 	renderPrompt,
 	// Internal helpers, exposed on the namespace for hot-patching via eval.
+	inputStyle,
+	tabBarStyle,
+	tabTriangleColor,
 	contentWidth,
 	paddedLine,
 	halCursorColor,
@@ -470,6 +497,7 @@ export const renderStatus = {
 	tabHelpHints,
 	joinTabHelpHints,
 	fitTabHelpText,
+	buildTabText,
 	buildTabBarLines,
 	shortenPath,
 	statusBaseColor,

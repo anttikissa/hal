@@ -467,7 +467,7 @@ describe('render', () => {
 	test('tab bar shows ctrl-t only when there is one tab', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
-		expect(tabLine).toContain(' Tabs: [1]')
+		expect(tabLine).toContain(' Tabs: ◣1◢')
 		expect(tabLine).toContain('ctrl-t: new')
 		expect(tabLine).toContain('ctrl-f: fork')
 		expect(tabLine).not.toContain('alt-#: goto')
@@ -494,14 +494,14 @@ describe('render', () => {
 
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
-		expect(tabLine).toContain(' Tabs: [1] 2 ')
+		expect(tabLine).toContain(' Tabs: ◣1◢2 ')
 		expect(tabLine).toContain('alt-#: goto')
 		expect(tabLine).toContain('ctrl-n/p: switch')
 		expect(tabLine).toContain('ctrl-w: close')
 		expect(tabLine).not.toContain('ctrl-t: new')
 		expect(tabLine).not.toContain('beta')
-		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[0]!, 0))).toBe('[1]')
-		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[1]!, 1))).toBe(' 2 ')
+		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[0]!, 0))).toBe('◣1◢')
+		expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[1]!, 1))).toBe('2')
 	})
 
 	test('tab bar keeps two-digit tabs compact with inline indicators', () => {
@@ -529,12 +529,12 @@ describe('render', () => {
 		try {
 			Object.defineProperty(process.stdout, 'columns', { value: 120, configurable: true })
 			const clean = stripAnsi(captureOutput(() => render.draw(true)))
-			const tabLine = clean.split('\n').find((line) => line.includes('[24]')) ?? ''
-			expect(tabLine).toContain(' 1  2✓ ')
-			expect(tabLine).toContain(' 23 [24]')
+			const tabLine = clean.split('\n').find((line) => line.includes('◣24◢')) ?? ''
+			expect(tabLine).toContain('1 2✓')
+			expect(tabLine).toContain('23 ◣24◢')
 			expect(tabLine).not.toContain('[24✓]')
-			expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[1]!, 1))).toBe(' 2✓ ')
-			expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[23]!, 23))).toBe('[24]')
+			expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[1]!, 1))).toBe('2✓')
+			expect(stripAnsi(renderStatus.tabLabel(client.state.tabs[23]!, 23))).toBe('◣24◢')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
@@ -572,10 +572,10 @@ describe('render', () => {
 
 		const output = captureOutput(() => render.draw())
 		const clean = stripAnsi(output)
-		const tabBar = clean.split('\n').find((line) => line.includes('[1!'))
+		const tabBar = clean.split('\n').find((line) => line.includes('◣1!◢'))
 		expect(tabBar).toBeDefined()
-		expect(tabBar).toContain('[1!]')
-		expect(tabBar).not.toContain('[1▪]')
+		expect(tabBar).toContain('◣1!◢')
+		expect(tabBar).not.toContain('◣1▪◢')
 		expect(output).toContain('\x1b[33m!')
 	})
 
@@ -584,7 +584,7 @@ describe('render', () => {
 		cursor.isVisible = () => true
 		try {
 			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-			const tabBar = lines.findIndex((line) => line.includes('[1]'))
+			const tabBar = lines.findIndex((line) => line.includes('◣1◢'))
 			expect(tabBar).toBeGreaterThanOrEqual(3)
 			expect(lines[tabBar - 3]).toBe('')
 			expect(lines[tabBar - 2]).toBe('█')
