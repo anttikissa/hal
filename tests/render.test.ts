@@ -474,6 +474,13 @@ describe('render', () => {
 		expect(tabLine).not.toContain('ctrl-n/p: switch')
 	})
 
+	test('active tab uses truecolor black pocket without bright palette ANSI', () => {
+		const label = renderStatus.tabLabel(client.state.tabs[0]!, 0)
+		expect(label).toContain('\x1b[48;2;0;0;0m')
+		expect(label).not.toContain('\x1b[40m')
+		expect(label).not.toContain('\x1b[97m')
+	})
+
 	test('tab bar shows navigation hints instead of ctrl-t with multiple tabs', () => {
 		client.state.tabs.push({
 			sessionId: 's2',
