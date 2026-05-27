@@ -11,6 +11,7 @@ import { HAL_DIR } from '../state.ts'
 import { config } from '../config.ts'
 import { promptQueue } from '../runtime/prompt-queue.ts'
 import { paths } from '../utils/paths.ts'
+import { clientPersistence } from '../client/persistence.ts'
 
 test('runtime exposes in-memory active sessions for eval helpers', () => {
 	const origActiveSessions = [...runtime.state.activeSessions]
@@ -311,6 +312,18 @@ test('shouldAutoContinue resumes only restarted interrupted turns', () => {
 	expect(runtime.shouldAutoContinue([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
 	])).toBe(false)
+})
+
+
+test('restartAutoContinueSession only selects the saved restart tab', () => {
+	const origLoad = clientPersistence.load
+	clientPersistence.load = () => ({ lastTab: null, restartTab: 's2', peak: 0, peakCols: 0, model: null, doneUnseen: [] })
+	try {
+		expect(runtime.restartAutoContinueSession(['s1', 's2', 's3'])).toBe('s2')
+		expect(runtime.restartAutoContinueSession(['s1', 's3'])).toBe(null)
+	} finally {
+		clientPersistence.load = origLoad
+	}
 })
 
 
