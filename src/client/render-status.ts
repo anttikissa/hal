@@ -30,7 +30,6 @@ const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
 
-type FitItem = { text: string; priority: number }
 const config = {
 	showSession: true,
 	showCwd: true,
@@ -102,58 +101,12 @@ function tabLabel(tab: Tab, i: number): string {
 	return `${DIM}${content}${RESET}`
 }
 
-function joinFitItems(items: FitItem[]): string {
-	let out = ''
-	for (const item of items) {
-		out += item.text
-	}
-	return out
-}
-
-function fitOrderedItems(items: FitItem[], cols: number): string {
-	const kept = items.slice()
-	while (kept.length > 0) {
-		const line = renderStatus.joinFitItems(kept)
-		if (visLen(line) <= cols) return line
-
-		let drop = -1
-		let lowest = Infinity
-		for (let i = 0; i < kept.length; i++) {
-			if (kept[i]!.priority <= lowest) {
-				lowest = kept[i]!.priority
-				drop = i
-			}
-		}
-		if (drop < 0) break
-		kept.splice(drop, 1)
-	}
-	return ''
-}
-
-function tabHelpItems(): FitItem[] {
-	return [
-		{ text: '  ctrl-t: new', priority: 5 },
-		{ text: ', ctrl-w: close', priority: 4 },
-		{ text: ', ctrl-n/p: switch', priority: 3 },
-		{ text: ', ctrl-f: fork', priority: 2 },
-		{ text: ', /move n: reorder', priority: 1 },
-	]
-}
-
 function buildTabBarLines(cols: number): string[] {
 	const tabs: string[] = []
 	for (let i = 0; i < client.state.tabs.length; i++) {
 		tabs.push(renderStatus.tabLabel(client.state.tabs[i]!, i))
 	}
-	const tabText = tabs.join('  ')
-	const items: FitItem[] = [
-		{ text: ' Tabs: ', priority: 6 },
-		{ text: tabText, priority: Infinity },
-		...renderStatus.tabHelpItems(),
-	]
-	const line = renderStatus.fitOrderedItems(items, cols)
-	if (line) return [line]
-	return [clipVisual(tabText, cols)]
+	return [clipVisual(tabs.join('  '), cols)]
 }
 
 function renderTabBar(lines: string[]): void {
@@ -440,9 +393,6 @@ export const renderStatus = {
 	halCursorColor,
 	tabIndicator,
 	renderIndicator,
-	joinFitItems,
-	fitOrderedItems,
-	tabHelpItems,
 	tabInner,
 	tabLabel,
 	buildTabBarLines,

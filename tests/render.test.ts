@@ -455,7 +455,7 @@ describe('render', () => {
 		}
 	})
 
-	test('tab bar uses compact numeric labels and tab-specific hints', () => {
+	test('tab bar uses only compact numeric labels', () => {
 		client.state.tabs.push({
 			sessionId: 's2',
 			name: 'beta',
@@ -474,23 +474,23 @@ describe('render', () => {
 		})
 
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
-		expect(tabLine).toContain('Tabs: [1]  2')
-		expect(tabLine).toContain('ctrl-t: new')
-		expect(tabLine).toContain('ctrl-w: close')
+		const tabLine = clean.split('\n').find((line) => line.includes('[1]')) ?? ''
+		expect(tabLine).toContain('[1]  2')
+		expect(tabLine).not.toContain('Tabs:')
+		expect(tabLine).not.toContain('ctrl-t')
 		expect(tabLine).not.toContain('beta')
 	})
 
-	test('tab bar drops low-priority hints before the Tabs label', () => {
-		for (let i = 2; i <= 6; i++) {
+	test('tab bar keeps two-digit tabs compact with inline indicators', () => {
+		for (let i = 2; i <= 24; i++) {
 			client.state.tabs.push({
 				sessionId: `s${i}`,
-				name: String.fromCharCode(96 + i),
+				name: `tab ${i}`,
 				history: [],
 				inputHistory: [],
 				loaded: true,
 				inputDraft: '',
-				doneUnseen: false,
+				doneUnseen: i === 2,
 				parentEntryCount: 0,
 				historyVersion: 0,
 				usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
@@ -500,22 +500,16 @@ describe('render', () => {
 				model: 'test',
 			})
 		}
+		client.state.activeTab = 23
 
 		const originalCols = process.stdout.columns
 		try {
-			Object.defineProperty(process.stdout, 'columns', { value: 48, configurable: true })
-			let lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-			let tabLine = lines.find((line) => line.includes('[1]')) ?? ''
-			expect(tabLine).toContain('Tabs:')
-			expect(tabLine).toContain('6')
-			expect(tabLine).toContain('ctrl-t: new')
-			expect(tabLine).not.toContain('/move n: reorder')
-
-			Object.defineProperty(process.stdout, 'columns', { value: 18, configurable: true })
-			lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-			tabLine = lines.find((line) => line.includes('[1]')) ?? ''
-			expect(tabLine).not.toContain('Tabs:')
-			expect(tabLine).toContain('6')
+			Object.defineProperty(process.stdout, 'columns', { value: 120, configurable: true })
+			const clean = stripAnsi(captureOutput(() => render.draw(true)))
+			const tabLine = clean.split('\n').find((line) => line.includes('[24]')) ?? ''
+			expect(tabLine).toContain('1  2✓')
+			expect(tabLine).toContain('23  [24]')
+			expect(tabLine).not.toContain('[24✓]')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
