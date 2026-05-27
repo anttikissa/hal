@@ -503,7 +503,7 @@ async function applyParsed(snapshot: RebaseSnapshot, parsed: ParsedTodo): Promis
 		const original = row.entries[0]
 		if (!original) continue
 		const next = cloneEntry(original)
-		if (row.editable && typeof item.content === 'string') {
+		if (row.editable && typeof item.content === 'string' && item.content !== row.content) {
 			if (next.type === 'user') next.parts = (await attachments.resolve(snapshot.sessionId, item.content)).logParts
 			if (next.type === 'assistant') next.text = item.content
 		}

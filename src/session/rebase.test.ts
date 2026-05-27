@@ -132,6 +132,9 @@ test('edit command roundtrips image placeholders through prompt attachment parsi
 		const originalText = `hello this is image [${image1}] and this is another [${image2}] etc.`
 
 		expect(rebase.editTexts(snapshot)['000001-aaa']).toBe(originalText)
+		const unchanged = rebase.parseTodo(snapshot, `edit 000001-aaa user ${JSON.stringify(originalText)}`, { edits: { '000001-aaa': originalText } })
+		const unchangedApplied = await rebase.applyParsed(snapshot, unchanged)
+		expect(unchangedApplied.entries[0]).toEqual(entries[0])
 		const parsed = rebase.parseTodo(snapshot, `edit 000001-aaa user ${JSON.stringify(originalText)}`, { edits: { '000001-aaa': `edited [${image2}] then [${image1}] done` } })
 		const applied = await rebase.applyParsed(snapshot, parsed)
 

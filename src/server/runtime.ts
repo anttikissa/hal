@@ -699,6 +699,11 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: [errorMessage(err)], todo })
 		return
 	}
+	if (applied.queue.length === 0 && historyHash(applied.entries) === historyHash(currentEntries)) {
+		rebaseSnapshots.delete(requestId)
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, unchanged: true })
+		return
+	}
 	const { oldLog, newLog, entryCount } = sessionStore.rewriteHistoryForRebase(sessionId, applied.entries)
 	resetProviderConversation(sessionId)
 	rebaseSnapshots.delete(requestId)
