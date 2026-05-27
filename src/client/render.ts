@@ -113,21 +113,19 @@ function buildFrame(): { lines: string[]; cursor: { row: number; col: number } }
 	// Once the frame exceeds terminal height, fullscreen is permanent.
 	if (lines.length + chrome > rows) fullscreen = true
 
-	// 3. Chrome: tab bar, status line, prompt (1+ lines), help bar.
-	// Help stays last so it reads as bottom-of-screen key hints, not part of
-	// the editable prompt itself.
+	// 3. Chrome: tab bar, prompt box, status line, help bar.
 	renderStatus.renderTabBar(lines)
-	renderStatus.renderStatusLine(lines)
 	renderStatus.renderPrompt(lines)
+	renderStatus.renderStatusLine(lines)
 	renderStatus.renderHelpBar(lines)
 
 	const popupCursor = applyPopupOverlay(lines)
 	if (popupCursor) return { lines, cursor: popupCursor }
 
-	const p = prompt.buildPrompt(cols)
-	// Prompt is immediately above the single help-bar row.
-	const row = lines.length - 1 - p.lines.length + p.cursor.rowOffset
-	return { lines, cursor: { row, col: p.cursor.col + 1 } }
+	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
+	// Prompt sits between two rule rows, immediately above status + help.
+	const promptStart = lines.length - p.lines.length - 3
+	return { lines, cursor: { row: promptStart + p.cursor.rowOffset, col: Math.min(cols, p.cursor.col + 2) } }
 }
 
 function moveCursor(from: number, to: number): string {

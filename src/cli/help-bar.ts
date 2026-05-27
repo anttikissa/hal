@@ -24,25 +24,19 @@ const config = {
 }
 
 const HINTS: Record<HelpState, Hint[]> = {
-	'idle-empty': [
-		{ keyLabel: 'ctrl+t', description: 'new' },
-		{ keyLabel: 'ctrl+n/p', description: 'switch' },
-		{ keyLabel: 'ctrl+f', description: 'fork' },
-		{ keyLabel: 'ctrl+c', description: 'quit' },
-		{ keyLabel: 'ctrl+z', description: 'suspend' },
-	],
+	'idle-empty': [{ text: 'type a prompt' }],
 	'idle-text': [
 		{ keyLabel: 'enter', description: 'send' },
-		{ keyLabel: 'shift+enter', description: 'newline' },
-		{ keyLabel: 'alt+enter', description: 'queue' },
+		{ keyLabel: 'shift-enter', description: 'newline' },
+		{ keyLabel: 'alt-enter', description: 'queue' },
 	],
 	'idle-continue': [{ text: 'press enter to continue' }],
 	'idle-retry': [{ text: 'press enter to retry' }],
 	streaming: [{ keyLabel: 'esc', description: 'stop' }],
 	'streaming-text': [
 		{ keyLabel: 'enter', description: 'steer' },
-		{ keyLabel: 'shift+enter', description: 'newline' },
-		{ keyLabel: 'alt+enter', description: 'queue' },
+		{ keyLabel: 'shift-enter', description: 'newline' },
+		{ keyLabel: 'alt-enter', description: 'queue' },
 		{ keyLabel: 'esc', description: 'stop' },
 	],
 }

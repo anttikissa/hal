@@ -30,7 +30,7 @@ const BRIGHT_WHITE = '\x1b[97m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
 
-type TabLabelMode = 'wide' | 'name' | 'num'
+type FitItem = { text: string; priority: number }
 const config = {
 	showSession: true,
 	showCwd: true,
@@ -89,70 +89,76 @@ function renderIndicator(tab: Tab, baseColor: string): string {
 	return `${color}${ind.char}${baseColor}`
 }
 
-function tabDir(tab: Tab): string {
-	return tab.cwd.split('/').filter(Boolean).pop() ?? ''
-}
-
-function tabInner(num: number, ind: string, text?: string): string {
-	if (text) return `${num}${ind || ' '}${text}`
+function tabInner(num: number, ind: string): string {
 	return `${num}${ind}`
 }
 
-// Tab bar: prefers [n dir name], wrapping once before falling back to shorter labels.
-// Each tab shows a 1-char status indicator between the number and title.
-function tabLabel(tab: Tab, i: number, mode: TabLabelMode): string {
+function tabLabel(tab: Tab, i: number): string {
 	const active = client.state.activeTab
-	const ind = renderStatus.renderIndicator(tab, i === active ? BRIGHT_WHITE : DIM)
-	const name = tab.name || tab.sessionId
-	const dir = renderStatus.tabDir(tab)
-	const text = mode === 'wide'
-		? (dir && dir !== name ? `${dir} ${name}` : name)
-		: mode === 'name'
-			? name
-			: ''
-	const content = renderStatus.tabInner(i + 1, ind, text)
+	const base = i === active ? BRIGHT_WHITE : DIM
+	const ind = renderStatus.renderIndicator(tab, base)
+	const content = renderStatus.tabInner(i + 1, ind)
 	if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
-	return `${DIM} ${content} ${RESET}`
+	return `${DIM}${content}${RESET}`
 }
 
-function wrapTabLabels(labels: string[], cols: number): string[] | null {
-	if (labels.length === 0) return ['']
-	const lines: string[] = []
-	let line = ''
-	for (const label of labels) {
-		if (visLen(label) > cols) return null
-		if (!line || visLen(line) + visLen(label) <= cols) {
-			line += label
-			continue
-		}
-		lines.push(line)
-		if (lines.length >= 2) return null
-		line = label
+function joinFitItems(items: FitItem[]): string {
+	let out = ''
+	for (const item of items) {
+		out += item.text
 	}
-	if (line) lines.push(line)
-	return lines
+	return out
+}
+
+function fitOrderedItems(items: FitItem[], cols: number): string {
+	const kept = items.slice()
+	while (kept.length > 0) {
+		const line = renderStatus.joinFitItems(kept)
+		if (visLen(line) <= cols) return line
+
+		let drop = -1
+		let lowest = Infinity
+		for (let i = 0; i < kept.length; i++) {
+			if (kept[i]!.priority <= lowest) {
+				lowest = kept[i]!.priority
+				drop = i
+			}
+		}
+		if (drop < 0) break
+		kept.splice(drop, 1)
+	}
+	return ''
+}
+
+function tabHelpItems(): FitItem[] {
+	return [
+		{ text: '  ctrl-t: new', priority: 5 },
+		{ text: ', ctrl-w: close', priority: 4 },
+		{ text: ', ctrl-n/p: switch', priority: 3 },
+		{ text: ', ctrl-f: fork', priority: 2 },
+		{ text: ', /move n: reorder', priority: 1 },
+	]
 }
 
 function buildTabBarLines(cols: number): string[] {
-	const tabs = client.state.tabs
-	for (const mode of ['wide', 'name', 'num'] as const) {
-		const rendered = tabs.map((tab, i) => renderStatus.tabLabel(tab, i, mode))
-		const joined = rendered.join('')
-		if (visLen(joined) <= cols) return [joined]
+	const tabs: string[] = []
+	for (let i = 0; i < client.state.tabs.length; i++) {
+		tabs.push(renderStatus.tabLabel(client.state.tabs[i]!, i))
 	}
-
-	for (const mode of ['name', 'num'] as const) {
-		const wrapped = renderStatus.wrapTabLabels(tabs.map((tab, i) => renderStatus.tabLabel(tab, i, mode)), cols)
-		if (wrapped) return wrapped
-	}
-
-	const terse = tabs.map((tab, i) => renderStatus.tabLabel(tab, i, 'num'))
-	return [clipVisual(terse.join(''), cols)]
+	const tabText = tabs.join('  ')
+	const items: FitItem[] = [
+		{ text: ' Tabs: ', priority: 6 },
+		{ text: tabText, priority: Infinity },
+		...renderStatus.tabHelpItems(),
+	]
+	const line = renderStatus.fitOrderedItems(items, cols)
+	if (line) return [line]
+	return [clipVisual(tabText, cols)]
 }
 
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	for (const line of renderStatus.buildTabBarLines(cols)) lines.push(line)
+	lines.push(renderStatus.buildTabBarLines(cols)[0] ?? '')
 }
 
 // Shorten a path for display: replace $HOME with ~, then abbreviate.
@@ -228,8 +234,9 @@ function hostMismatchBadge(): string {
 }
 
 function serverStatusLabel(): string {
-	if (client.state.role === 'client') return `client:${client.state.pid} / server:${client.state.hostPid ?? '?'}${renderStatus.hostMismatchBadge()}`
-	return `server:${client.state.pid}`
+	const badge = renderStatus.hostMismatchBadge()
+	if (client.state.role === 'client') return `client${badge}`
+	return 'server'
 }
 
 function formatTotalTokens(count: number): string {
@@ -328,16 +335,16 @@ function renderStatusLine(lines: string[]): void {
 		])
 		const needsDrop = right && innerWidth - visLen(left) - visLen(right) < 1
 		if (needsDrop) {
-			if (showServer) {
-				showServer = false
+			if (showPlan) {
+				showPlan = false
 				continue
 			}
 			if (showTokens) {
 				showTokens = false
 				continue
 			}
-			if (showPlan) {
-				showPlan = false
+			if (showServer) {
+				showServer = false
 				continue
 			}
 		}
@@ -388,17 +395,36 @@ function renderHelpBar(lines: string[]): void {
 	lines.push(bar ? `${clipVisual(bar, cols)}${RESET}` : '')
 }
 
-function renderPrompt(lines: string[]): void {
-	const cols = process.stdout.columns || 80
-	const p = prompt.buildPrompt(cols)
-	for (const line of p.lines) lines.push(line)
+function promptContentWidth(cols: number): number {
+	return Math.max(0, cols - 2)
 }
 
-// How many frame lines the chrome (tab bar + status + prompt + help bar) occupies.
+function promptRule(cols: number): string {
+	return '─'.repeat(Math.max(0, cols))
+}
+
+function paddedPromptLine(line: string, cols: number): string {
+	if (cols <= 0) return ''
+	if (cols === 1) return ' '
+	const contentWidth = renderStatus.promptContentWidth(cols)
+	const text = visLen(line) > contentWidth ? clipVisual(line, contentWidth) : line
+	const right = Math.max(0, contentWidth - visLen(text))
+	return ` ${text}${' '.repeat(right)} `
+}
+
+function renderPrompt(lines: string[]): void {
+	const cols = process.stdout.columns || 80
+	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
+	lines.push(renderStatus.promptRule(cols))
+	for (const line of p.lines) lines.push(renderStatus.paddedPromptLine(line, cols))
+	lines.push(renderStatus.promptRule(cols))
+}
+
+// How many frame lines the chrome (tab bar + prompt box + status + help) occupies.
 // Help bar always counts as 1 line (even when empty) to prevent jumps.
 function chromeLines(): number {
 	const cols = process.stdout.columns || 80
-	return renderStatus.buildTabBarLines(cols).length + 2 + prompt.buildPrompt(cols).lines.length
+	return renderStatus.buildTabBarLines(cols).length + 4 + prompt.buildPrompt(renderStatus.promptContentWidth(cols)).lines.length
 }
 
 export const renderStatus = {
@@ -414,10 +440,11 @@ export const renderStatus = {
 	halCursorColor,
 	tabIndicator,
 	renderIndicator,
-	tabDir,
+	joinFitItems,
+	fitOrderedItems,
+	tabHelpItems,
 	tabInner,
 	tabLabel,
-	wrapTabLabels,
 	buildTabBarLines,
 	shortenPath,
 	statusBaseColor,
@@ -436,4 +463,7 @@ export const renderStatus = {
 	formatTotalTokens,
 	tokenUsageLabel,
 	subscriptionStatusLabel,
+	promptContentWidth,
+	promptRule,
+	paddedPromptLine,
 }

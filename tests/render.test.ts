@@ -234,23 +234,23 @@ describe('render', () => {
 		expect(output).not.toContain('\x1b[97menter')
 		expect(output).toContain('enter')
 		expect(output).toContain(': send')
-		expect(output).toContain('shift+enter')
+		expect(output).toContain('shift-enter')
 		expect(output).toContain(': newline')
-		expect(output).toContain('alt+enter')
+		expect(output).toContain('alt-enter')
 		expect(output).toContain(': queue')
 	})
 
 	test('help bar advertises queue and the /keys shortcut list', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('alt+enter: queue')
+		expect(clean).toContain('alt-enter: queue')
 		expect(clean).toContain('/keys: shortcuts')
 	})
 
 	test('help bar separates hints with commas', () => {
 		prompt.setText('hello')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('enter: send, shift+enter: newline, alt+enter: queue')
+		expect(clean).toContain('enter: send, shift-enter: newline, alt-enter: queue')
 		expect(clean).not.toContain('│')
 	})
 
@@ -261,21 +261,22 @@ describe('render', () => {
 		expect(clean).toContain('ctrl+=/-: resize editor')
 	})
 
-	test('chrome order is status, prompt, then help at the bottom', () => {
+	test('chrome order is tabs, prompt box, status, then help at the bottom', () => {
 		prompt.setText('hello')
 		const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-		const statusLine = lines.findIndex((line) => line.includes('server:111'))
-		const promptLine = lines.findIndex((line) => line === 'hello')
+		const promptLine = lines.findIndex((line) => line.trim() === 'hello')
+		const statusLine = lines.findIndex((line) => line.includes('server'))
 		const helpLine = lines.findIndex((line) => line.includes('enter: send'))
-		expect(statusLine).toBeGreaterThanOrEqual(0)
-		expect(promptLine).toBeGreaterThan(statusLine)
-		expect(helpLine).toBe(promptLine + 1)
+		expect(promptLine).toBeGreaterThanOrEqual(0)
+		expect(statusLine).toBe(promptLine + 2)
+		expect(helpLine).toBe(statusLine + 1)
 		expect(lines[lines.length - 1]).toContain('enter: send')
 	})
 
-	test('status line shows local pid', () => {
+	test('status line shows host role without pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
-		expect(clean).toContain('server:111')
+		expect(clean).toContain('server')
+		expect(clean).not.toContain('server:111')
 		expect(clean).not.toContain('lock:')
 	})
 
@@ -294,7 +295,7 @@ describe('render', () => {
 		version.state.status = 'ready'
 		version.state.combined = 'local1234'
 		const clean = stripAnsi(captureOutput(() => render.draw()))
-		expect(clean).toContain('client:111 / server:222 ≠host')
+		expect(clean).toContain('client ≠host')
 	})
 
 	test('status line shows model, context, token arrows, and grouped subscription usage', () => {
@@ -361,7 +362,7 @@ describe('render', () => {
 			expect(clean).not.toContain('/tmp')
 			expect(clean).not.toContain('GPT 5.4')
 			expect(clean).not.toContain('39k/1050k (4%)')
-			expect(clean).not.toContain('server:111')
+			expect(clean).not.toContain('server')
 			expect(clean).not.toContain('↑56k ↓2.8k')
 			expect(clean).not.toContain('Sub 2/3')
 			expect(clean).toContain('R1.7M W42k')
@@ -387,19 +388,19 @@ describe('render', () => {
 		try {
 			Object.defineProperty(process.stdout, 'columns', { value: 86, configurable: true })
 			let clean = stripAnsi(captureOutput(() => render.draw()))
-			expect(clean).not.toContain('client:111 / server:222 ≠host')
+			expect(clean).toContain('client ≠host')
 			expect(clean).toContain('↑600k ↓1.1M')
-			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
+			expect(clean).not.toContain('Sub 2/3: 5h 23%, 7d 61%')
 
 			Object.defineProperty(process.stdout, 'columns', { value: 74, configurable: true })
 			clean = stripAnsi(captureOutput(() => render.draw()))
-			expect(clean).not.toContain('client:111 / server:222 ≠host')
-			expect(clean).not.toContain('↑600k ↓1.1M')
-			expect(clean).toContain('Sub 2/3: 5h 23%, 7d 61%')
+			expect(clean).toContain('client ≠host')
+			expect(clean).toContain('↑600k ↓1.1M')
+			expect(clean).not.toContain('Sub 2/3: 5h 23%, 7d 61%')
 
 			Object.defineProperty(process.stdout, 'columns', { value: 58, configurable: true })
 			clean = stripAnsi(captureOutput(() => render.draw()))
-			expect(clean).not.toContain('client:111 / server:222 ≠host')
+			expect(clean).toContain('client ≠host')
 			expect(clean).not.toContain('↑600k ↓1.1M')
 			expect(clean).not.toContain('Sub 2/3: 5h 23%, 7d 61%')
 		} finally {
@@ -439,9 +440,9 @@ describe('render', () => {
 			render.resetRenderer()
 			const dimmed = captureOutput(() => render.draw(true))
 			const clean = stripAnsi(dimmed)
-			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
+			const tabBar = clean.split('\n').find((line) => line.includes('2▪'))
 			expect(tabBar).toBeDefined()
-			expect(tabBar).toContain('▪tmp tab 2')
+			expect(tabBar).toContain('2▪')
 			expect(dimmed).not.toContain('\x1b[2m')
 			expect(dimmed).not.toContain(renderStatus.halCursorColor())
 			expect(dimmed).not.toBe(bright)
@@ -454,9 +455,7 @@ describe('render', () => {
 		}
 	})
 
-	test('tab bar abbreviates before wrapping to a second line', () => {
-		const active = client.currentTab()!
-		active.name = 'alpha'
+	test('tab bar uses compact numeric labels and tab-specific hints', () => {
 		client.state.tabs.push({
 			sessionId: 's2',
 			name: 'beta',
@@ -473,39 +472,16 @@ describe('render', () => {
 			cwd: '/tmp',
 			model: 'test',
 		})
-		client.state.tabs.push({
-			sessionId: 's3',
-			name: 'gamma',
-			history: [],
-			inputHistory: [],
-			loaded: true,
-			inputDraft: '',
-			doneUnseen: false,
-			parentEntryCount: 0,
-			historyVersion: 0,
-			usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
-			contextUsed: 0,
-			contextMax: 0,
-			cwd: '/tmp',
-			model: 'test',
-		})
 
-		const originalCols = process.stdout.columns
-		try {
-			Object.defineProperty(process.stdout, 'columns', { value: 34, configurable: true })
-			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-			const nameLine = lines.find((line) => line.includes('alpha')) ?? ''
-			expect(nameLine).toContain('beta')
-			expect(nameLine).toContain('gamma')
-			expect(nameLine).not.toContain('tmp alpha')
-			expect(lines.findIndex((line) => line.includes('gamma'))).toBe(lines.findIndex((line) => line.includes('alpha')))
-		} finally {
-			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
-		}
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
+		expect(tabLine).toContain('Tabs: [1]  2')
+		expect(tabLine).toContain('ctrl-t: new')
+		expect(tabLine).toContain('ctrl-w: close')
+		expect(tabLine).not.toContain('beta')
 	})
 
-	test('tab bar wraps after one-line compressed labels do not fit', () => {
-		client.currentTab()!.name = 'a'
+	test('tab bar drops low-priority hints before the Tabs label', () => {
 		for (let i = 2; i <= 6; i++) {
 			client.state.tabs.push({
 				sessionId: `s${i}`,
@@ -527,12 +503,19 @@ describe('render', () => {
 
 		const originalCols = process.stdout.columns
 		try {
-			Object.defineProperty(process.stdout, 'columns', { value: 14, configurable: true })
-			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-			const firstTabLine = lines.findIndex((line) => line.includes('[1]'))
-			expect(firstTabLine).toBeGreaterThanOrEqual(0)
-			expect(lines[firstTabLine + 1]).toContain('5')
-			expect(lines[firstTabLine + 1]).toContain('6')
+			Object.defineProperty(process.stdout, 'columns', { value: 48, configurable: true })
+			let lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+			let tabLine = lines.find((line) => line.includes('[1]')) ?? ''
+			expect(tabLine).toContain('Tabs:')
+			expect(tabLine).toContain('6')
+			expect(tabLine).toContain('ctrl-t: new')
+			expect(tabLine).not.toContain('/move n: reorder')
+
+			Object.defineProperty(process.stdout, 'columns', { value: 18, configurable: true })
+			lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
+			tabLine = lines.find((line) => line.includes('[1]')) ?? ''
+			expect(tabLine).not.toContain('Tabs:')
+			expect(tabLine).toContain('6')
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
@@ -570,10 +553,10 @@ describe('render', () => {
 
 		const output = captureOutput(() => render.draw())
 		const clean = stripAnsi(output)
-		const tabBar = clean.split('\n').find((line) => line.includes('tab 1'))
+		const tabBar = clean.split('\n').find((line) => line.includes('[1!'))
 		expect(tabBar).toBeDefined()
-		expect(tabBar).toContain('!tmp tab 1')
-		expect(tabBar).not.toContain('▪tmp tab 1')
+		expect(tabBar).toContain('[1!]')
+		expect(tabBar).not.toContain('[1▪]')
 		expect(output).toContain('\x1b[33m!')
 	})
 
@@ -582,7 +565,7 @@ describe('render', () => {
 		cursor.isVisible = () => true
 		try {
 			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
-			const tabBar = lines.findIndex((line) => line.includes('tab 1]'))
+			const tabBar = lines.findIndex((line) => line.includes('[1]'))
 			expect(tabBar).toBeGreaterThanOrEqual(3)
 			expect(lines[tabBar - 3]).toBe('')
 			expect(lines[tabBar - 2]).toBe('█')
@@ -649,10 +632,10 @@ describe('render', () => {
 		cursor.isVisible = () => true
 		try {
 			const clean = stripAnsi(captureOutput(() => render.draw()))
-			const tabBar = clean.split('\n').find((line) => line.includes('tab 2'))
+			const tabBar = clean.split('\n').find((line) => line.includes('2✗'))
 			expect(tabBar).toBeDefined()
-			expect(tabBar).toContain('✗tmp tab 2')
-			expect(tabBar).not.toContain('✓tab 2')
+			expect(tabBar).toContain('2✗')
+			expect(tabBar).not.toContain('2✓')
 		} finally {
 			cursor.isVisible = originalIsVisible
 		}
@@ -674,11 +657,11 @@ describe('render', () => {
 		prompt.setText('x')
 		const withText = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 
-		const emptyHelp = empty.find((line) => line.includes('ctrl+t: new'))
-		const promptLine = withText.findIndex((line) => line === 'x')
-		expect(emptyHelp).toContain('ctrl+t: new')
+		const emptyHelp = empty.find((line) => line.includes('type a prompt'))
+		const promptLine = withText.findIndex((line) => line.trim() === 'x')
+		expect(emptyHelp).toContain('type a prompt')
 		expect(promptLine).toBeGreaterThan(0)
-		expect(withText[promptLine + 1]).toContain('/keys: shortcuts')
+		expect(withText[promptLine + 3]).toContain('/keys: shortcuts')
 		expect(withText.length).toBe(empty.length)
 	})
 

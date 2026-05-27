@@ -9,25 +9,28 @@ terminal UI. Read this document to understand the rules of the game.
 
 ## Layout
 
-Bottom-anchored, six sections:
+Bottom-anchored sections:
 
 ```
 [history lines...]   — per-tab, append-only, ALL of them
 [padding]            — blank lines to stabilize prompt position across tabs
-[tab bar]            — [1]  2   3  — wraps only after one-row compression fails
-[status bar]         — session, cwd, model, usage, server/client details
-[prompt]             — user input, may be multiline
-[help bar]           — bottom key hints, always one row (even when empty)
+[tab bar]            — " Tabs: [1]  2" plus tab-specific hints when they fit
+[prompt top rule]    — one full-width rule
+[prompt]             — user input, padded one column on each side, may be multiline
+[prompt bottom rule] — one full-width rule
+[status bar]         — left: session/cwd/model/context; right: role/usage/subscription
+[help bar]           — prompt-specific key hints, always one row (even when empty)
 ```
 
-Chrome = tab bar + status + prompt (1+ lines, multiline editing) + help bar.
+Chrome = tab bar + prompt box + status + help bar.
 
 ## Tabs
 
 Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
-Tab bar entries use brackets for the active tab and spaces for inactive tabs.
-It first tries all one-row compression modes (wide labels, names, then numbers).
-Only if those fail may it wrap once to a second row, using compressed labels.
+The tab bar uses compact numeric labels, brackets for the active tab, and a
+one-character status indicator after the tab number when needed. It stays one
+row: tab-specific hints are dropped from lowest to highest priority, then the
+"Tabs:" label is dropped, rather than wrapping.
 
 ### Height management
 
