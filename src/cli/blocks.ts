@@ -619,26 +619,15 @@ function formatBlockTimeRange(first?: number, last?: number): string {
 	return time.formatTimestampRange(first, last)
 }
 
-type HeaderStyle = 'rule' | 'plain'
-
-function buildHeader(title: string, time: string, blobRef: string, cols: number, style: HeaderStyle = 'rule'): string {
-	if (style === 'plain') {
-		const prefix = time ? ` ${time} ` : ' '
-		const right = blobRef ? ` (${blobRef}) ` : ''
-		const titleWidth = Math.max(1, cols - visLen(prefix) - visLen(right))
-		const left = `${prefix}${clipVisual(title, titleWidth)}`
-		return `${left}${' '.repeat(Math.max(0, cols - visLen(left) - visLen(right)))}${right}`
-	}
-
-	const right = blobRef ? ` (${blobRef}) ──` : ''
-	const prefix = time ? `── ${time} ` : '── '
-	const budget = Math.max(1, cols - 1)
-	const titleWidth = Math.max(1, budget - visLen(prefix) - visLen(right) - 1)
-	const left = `${prefix}${clipVisual(title, titleWidth)} `
-	return `${left}${'─'.repeat(Math.max(0, budget - visLen(left) - visLen(right)))}${right}`
+function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
+	const prefix = time ? ` ${time} ` : ' '
+	const right = blobRef ? ` (${blobRef}) ` : ''
+	const titleWidth = Math.max(1, cols - visLen(prefix) - visLen(right))
+	const left = `${prefix}${clipVisual(title, titleWidth)}`
+	return `${left}${' '.repeat(Math.max(0, cols - visLen(left) - visLen(right)))}${right}`
 }
 
-function padToolLine(line: string): string {
+function padBlockLine(line: string): string {
 	return ` ${line}`
 }
 
@@ -677,8 +666,9 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
 	const { fg, bg } = blockColors(first)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
+	const contentCols = Math.max(1, cols - 1)
 	for (const block of group) {
-		for (const line of renderMarkdownLines(block, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
+		for (const line of renderMarkdownLines(block, contentCols)) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
 	lines[lines.length - 1]! += FG_OFF
 	return lines
@@ -727,14 +717,11 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const { fg, bg } = blockColors(block)
 	const label = blockLabel(block)
 	const blockTime = formatBlockTime(block.ts)
-	const headerStyle = block.type === 'tool' ? 'plain' : 'rule'
-	const header = buildHeader(label, blockTime, blobRef, cols, headerStyle)
+	const header = buildHeader(label, blockTime, blobRef, cols)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
-	const contentCols = block.type === 'tool' ? Math.max(1, cols - 1) : cols
+	const contentCols = Math.max(1, cols - 1)
 	for (const line of blockContent(block, contentCols)) {
-		let renderedLine = line
-		if (block.type === 'tool') renderedLine = padToolLine(line)
-		lines.push(bgLine(`${fg}${renderedLine}`, cols, bg))
+		lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
 	lines[lines.length - 1]! += FG_OFF
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid

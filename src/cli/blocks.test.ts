@@ -115,9 +115,9 @@ test('info block renders markdown tables', () => {
 	const lines = blocks.renderBlock(block, 80).map((l) => stripAnsi(l))
 	const body = lines.slice(1)
 
-	expect(body).toContain('┌────────┬──────┬────────────┐')
-	expect(body).toContain('│ Active │ Slot │ Account    │')
-	expect(body).toContain('│ *      │ 1/2  │ a@test.com │')
+	expect(body).toContain(' ┌────────┬──────┬────────────┐')
+	expect(body).toContain(' │ Active │ Slot │ Account    │')
+	expect(body).toContain(' │ *      │ 1/2  │ a@test.com │')
 })
 
 const markdownBlockTypes = ['assistant', 'thinking', 'log', 'info', 'warning', 'error'] as const
@@ -158,7 +158,7 @@ test('rendered block lines without tabs do not embed carriage returns', () => {
 	expect(lines.some((line) => line.includes('\r'))).toBe(false)
 })
 
-test('block header leaves one column slack to avoid last-column wrap state', () => {
+test('block header uses plain full-width layout without horizontal rules', () => {
 	const block: Block = {
 		type: 'thinking',
 		text: 'x',
@@ -168,7 +168,9 @@ test('block header leaves one column slack to avoid last-column wrap state', () 
 	}
 
 	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
-	expect(header.length).toBeLessThan(80)
+	expect(header.length).toBe(80)
+	expect(header).not.toContain('─')
+	expect(header).toContain('03-idr/q05d47-tzf')
 })
 
 test('forked_from history entry renders as an Info block', () => {
