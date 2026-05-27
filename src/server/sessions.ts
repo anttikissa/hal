@@ -9,7 +9,7 @@ import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { liveEventBlocks } from '../live-event-blocks.ts'
-import type { PartialTokenUsage } from '../protocol.ts'
+import type { PartialTokenUsage, TurnEndMeta } from '../protocol.ts'
 import { models } from '../models.ts'
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
@@ -61,6 +61,7 @@ export type HistoryEntry = EntryIdentity & (
 		}
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; ts?: string }
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; ts?: string }
+	| ({ type: 'turn_end'; ts?: string } & TurnEndMeta)
 	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ui?: 'notice'; ts?: string }
 	| { type: 'warning' | 'error'; text: string; visibility?: 'ui' | 'next-user'; ts?: string }
@@ -421,28 +422,31 @@ function deleteSession(sessionId: string): void {
 	if (existsSync(sessionDir(sessionId))) rmSync(sessionDir(sessionId), { recursive: true, force: true })
 }
 
-function detectInterruptedTools(entries: HistoryEntry[]): { name: string; id: string }[] {
-	const completedToolIds = new Set<string>()
-	for (const entry of entries) {
-		if (entry.type === 'tool_result') completedToolIds.add(entry.toolId)
-	}
+function tailTurnState(entries: HistoryEntry[]): { interrupted: boolean; interruptedTools: { name: string; id: string }[]; ended?: Extract<HistoryEntry, { type: 'turn_end' }> } {
+	let start = -1
+	let ended: Extract<HistoryEntry, { type: 'turn_end' }> | undefined
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
-		if (entry.type !== 'tool_call') continue
-		if (completedToolIds.has(entry.toolId)) return []
-		const interrupted: { name: string; id: string }[] = []
-		for (let j = i; j < entries.length; j++) {
-			const next = entries[j]!
-			if (next.type === 'tool_call') {
-				if (!completedToolIds.has(next.toolId)) interrupted.push({ name: next.name, id: next.toolId })
-				continue
-			}
-			if (next.type === 'tool_result') continue
+		if (entry.type === 'turn_end') {
+			start = i
+			ended = entry
 			break
 		}
-		return interrupted
 	}
-	return []
+
+	const completedToolIds = new Set<string>()
+	const interruptedTools: { name: string; id: string }[] = []
+	let sawTurnContent = false
+	for (let i = start + 1; i < entries.length; i++) {
+		const entry = entries[i]!
+		if (entry.type === 'tool_result') completedToolIds.add(entry.toolId)
+		if (entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result') sawTurnContent = true
+	}
+	for (let i = start + 1; i < entries.length; i++) {
+		const entry = entries[i]!
+		if (entry.type === 'tool_call' && !completedToolIds.has(entry.toolId)) interruptedTools.push({ name: entry.name, id: entry.toolId })
+	}
+	return { interrupted: sawTurnContent, interruptedTools, ended }
 }
 
 export const sessions = {
@@ -470,7 +474,7 @@ export const sessions = {
 	pickMostRecentlyClosedSessionId,
 	resolveResumeTarget,
 	sessionOpenInfo,
-	detectInterruptedTools,
+	tailTurnState,
 	applyLiveEvent,
 	clearLive,
 	sessionDir,

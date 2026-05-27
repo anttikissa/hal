@@ -146,10 +146,16 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 		}
 	}
 
-	const interrupted = sessions.detectInterruptedTools(entries)
-	if (interrupted.length > 0) {
-		const toolList = interrupted.map((t) => t.name).join(', ')
-		blocks.push({ type: 'info', text: `[interrupted] during tools (${toolList}). Press Enter to continue` })
+	const tail = sessions.tailTurnState(entries)
+	const interrupted = tail.interruptedTools
+	if (tail.interrupted) {
+		let text = '[interrupted] Press Enter to continue'
+		if (interrupted.length > 0) {
+			const names: string[] = []
+			for (const tool of interrupted) names.push(tool.name)
+			text = `[interrupted] during tools (${names.join(', ')}). Press Enter to continue`
+		}
+		blocks.push({ type: 'info', text })
 	}
 
 	return {

@@ -154,30 +154,6 @@ function shouldCloseSessionAfterGeneration(
 	return !!meta?.closeWhenDone && result === 'completed'
 }
 
-type TailEntry = { type: string; text?: string; ts?: string; toolId?: string; name?: string; synthetic?: boolean }
-type TailTurnState = { shouldContinue: boolean; interruptedTools: { name: string; id: string }[] }
-
-function tailTurnState(entries: TailEntry[], now = Date.now()): TailTurnState {
-	let sawRestart = false
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const entry = entries[i]!
-		if (entry.type === 'log') {
-			if (entry.text === USER_PAUSED_TEXT || entry.text === TAB_CLOSED_TEXT) return { shouldContinue: false, interruptedTools: [] }
-			if (entry.text === RESTARTED_TEXT) sawRestart = true
-			continue
-		}
-		if (entry.type === 'assistant' && entry.synthetic) continue
-		if (entry.type === 'assistant') return { shouldContinue: false, interruptedTools: [] }
-		if (entry.type === 'tool_call') return { shouldContinue: true, interruptedTools: sessionStore.detectInterruptedTools(entries as any) }
-		if (entry.type !== 'user' && entry.type !== 'thinking' && entry.type !== 'tool_result') continue
-
-		const ms = entry.ts ? Date.parse(entry.ts) : now
-		return { shouldContinue: sawRestart || (Number.isFinite(ms) && now - ms <= 30_000), interruptedTools: [] }
-	}
-	return { shouldContinue: false, interruptedTools: [] }
-}
-
-function shouldAutoContinue(entries: TailEntry[], now = Date.now()): boolean { return tailTurnState(entries, now).shouldContinue }
 
 function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
@@ -899,26 +875,6 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		}, 0)
 	}
 	void (async () => {
-		for (const sessionId of state.activeSessions) {
-			if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
-			const entries = sessionStore.loadAllHistory(sessionId)
-			if (entries.length === 0) continue
-			const tail = tailTurnState(entries)
-			if (tail.interruptedTools.length > 0) {
-				emitInfo(sessionId, `Resolving ${tail.interruptedTools.length} interrupted tool(s): ${tail.interruptedTools.map((tool) => tool.name).join(', ')}`)
-				for (const tool of tail.interruptedTools) {
-					sessionStore.appendHistory(sessionId, [{
-						type: 'tool_result',
-						toolId: tool.id,
-						output: '[interrupted]',
-						ts: new Date().toISOString(),
-					}])
-				}
-			}
-			if (tail.shouldContinue) void runGeneration(sessionId, '')
-		}
-	})()
-	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || state.activeRuntimePid !== process.pid) break
 			if (!ipc.ownsHostLock()) break
@@ -961,7 +917,6 @@ export const runtime = {
 	state,
 	startRuntime,
 	emitInfo,
-	shouldAutoContinue,
 	shouldCloseSessionAfterGeneration,
 	restoredSessionOrder,
 	recordTabClosed,

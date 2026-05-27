@@ -139,7 +139,7 @@ test('openai provider routes ChatGPT OAuth tokens to the Codex backend', async (
 	expect(headers.get('chatgpt-account-id')).toBe('acct_from_token')
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 test('openai provider routes API keys to the public Responses API', async () => {
@@ -156,7 +156,7 @@ test('openai provider routes API keys to the public Responses API', async () => 
 	expect(headers.has('chatgpt-account-id')).toBe(false)
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 test('compat providers stay on chat completions endpoints', async () => {
@@ -179,7 +179,7 @@ test('compat providers stay on chat completions endpoints', async () => {
 	expect(body.input).toBeUndefined()
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 test('google compat provider asks for GOOGLE_API_KEY only', async () => {
@@ -198,7 +198,7 @@ test('google compat provider asks for GOOGLE_API_KEY only', async () => {
 
 	expect(events[0]).toEqual({ type: 'error', message: "No credentials for 'google'. Set GOOGLE_API_KEY" })
 	expect(events[0].message).not.toContain('login-openai')
-	expect(events.at(-1)).toEqual({ type: 'done' })
+	expect(events.at(-1)?.type).toBe('error')
 })
 
 
@@ -256,7 +256,7 @@ test('openai 429 shows failed and next account when another account is available
 		status: 429,
 		retryAfterMs: 1_000,
 	})
-	expect(events.at(-1)).toEqual({ type: 'done' })
+	expect(events.at(-1)?.type).toBe('error')
 })
 
 test('openai 429 waits for reset when all accounts are on cooldown', async () => {
@@ -405,7 +405,34 @@ test('openai provider ignores malformed Responses SSE JSON lines', async () => {
 	})) events.push(event)
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
+})
+
+
+test('openai Responses stream without response.completed does not emit done', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+
+	installFetchMock(async () => new Response([
+		'data: {"type":"response.output_text.delta","delta":"partial"}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) events.push(event)
+
+	expect(events).toContainEqual({ type: 'text', text: 'partial' })
+	expect(events.some((event) => event.type === 'done')).toBe(false)
 })
 
 
@@ -444,7 +471,7 @@ test('compat provider reports tool JSON parse errors after [DONE] chunks', async
 		input: {},
 		parseError: 'Failed to parse tool input JSON (7 chars): {"bad":',
 	})
-	expect(events).toContainEqual({ type: 'done', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 class FakeWebSocket {
@@ -519,7 +546,7 @@ test('openai websocket transport uses wss endpoint and response.create', async (
 	expect(ws.sent[0]).toMatchObject({ type: 'response.create', model: 'gpt-5.5', store: false, instructions: 'system' })
 	expect(ws.sent[0].stream).toBeUndefined()
 	expect(events).toContainEqual({ type: 'text', text: 'text1' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 class HangingWebSocket extends FakeWebSocket {
@@ -572,7 +599,7 @@ test('openai auto transport falls back to HTTP when websocket connect times out'
 	expect(events).toContainEqual({ type: 'status', activity: 'OpenAI Responses WebSocket connect timed out (5ms); falling back to HTTP' })
 	expect(calls).toHaveLength(1)
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual({ type: 'done', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 test('forced openai websocket transport reports connect timeout without fallback', async () => {
@@ -598,7 +625,7 @@ test('forced openai websocket transport reports connect timeout without fallback
 		message: 'OpenAI Responses WebSocket connect timed out (5ms)',
 		endpoint: 'wss://chatgpt.com/backend-api/codex/responses',
 	})
-	expect(events).toContainEqual({ type: 'done' })
+	expect(events.some((event) => event.type === 'done')).toBe(false)
 })
 
 test('openai websocket transport times out when no events arrive', async () => {
@@ -632,7 +659,7 @@ test('openai websocket transport times out when no events arrive', async () => {
 		message: 'OpenAI Responses WebSocket timed out (no data for 5ms)',
 		endpoint: 'wss://chatgpt.com/backend-api/codex/responses',
 	})
-	expect(events).toContainEqual({ type: 'done' })
+	expect(events.some((event) => event.type === 'done')).toBe(false)
 })
 
 test('openai websocket continuation sends previous_response_id and only new tool output', async () => {

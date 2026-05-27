@@ -295,41 +295,6 @@ test('open command inherits cwd and model from opener tab', () => {
 	}
 })
 
-test('shouldAutoContinue resumes unfinished turns after restart notices', () => {
-	const old = '2026-04-14T12:00:00.000Z'
-	const restarted = '2026-04-14T12:01:00.000Z'
-	const now = Date.parse('2026-04-14T12:01:05.000Z')
-
-	expect(runtime.shouldAutoContinue([
-		{ type: 'tool_result', ts: old },
-		{ type: 'log', text: '[restarted]', ts: restarted },
-	], now)).toBe(true)
-	expect(runtime.shouldAutoContinue([
-		{ type: 'thinking', ts: old },
-		{ type: 'log', text: '[restarted]', ts: restarted },
-	], now)).toBe(true)
-	expect(runtime.shouldAutoContinue([
-		{ type: 'user', ts: old },
-		{ type: 'log', text: '[restarted]', ts: restarted },
-	], now)).toBe(true)
-})
-
-test('shouldAutoContinue distinguishes stopped, complete, and stale tails', () => {
-	const old = '2026-04-14T12:00:00.000Z'
-	const now = Date.parse('2026-04-14T12:01:05.000Z')
-
-	expect(runtime.shouldAutoContinue([
-		{ type: 'user', ts: old },
-		{ type: 'log', text: '[paused]', ts: '2026-04-14T12:00:01.000Z' },
-	], now)).toBe(false)
-	expect(runtime.shouldAutoContinue([
-		{ type: 'assistant', ts: old },
-		{ type: 'log', text: '[restarted]', ts: '2026-04-14T12:00:01.000Z' },
-	], now)).toBe(false)
-	expect(runtime.shouldAutoContinue([
-		{ type: 'tool_result', ts: old },
-	], now)).toBe(false)
-})
 
 
 test('auto-close only happens after a clean completion', () => {

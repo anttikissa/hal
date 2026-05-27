@@ -168,6 +168,9 @@ async function* parseStream(
 	// so the agent loop can include them in the assistant message content.
 	const serverToolBlocks: any[] = []
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
+	let gotStop = false
+	let stopReason: string | undefined
+	let stopSequence: string | undefined
 
 	for await (const ev of providerShared.iterateJsonSse(body)) {
 		if (ev.type === 'content_block_start') {
@@ -215,8 +218,12 @@ async function* parseStream(
 				cacheRead: cacheReadDelta,
 				cacheCreation: cacheCreationDelta,
 			})
-		} else if (ev.type === 'message_delta' && ev.usage) {
-			usage.output += ev.usage.output_tokens ?? 0
+		} else if (ev.type === 'message_delta') {
+			if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason
+			if (ev.delta?.stop_sequence) stopSequence = ev.delta.stop_sequence
+			if (ev.usage) usage.output += ev.usage.output_tokens ?? 0
+		} else if (ev.type === 'message_stop') {
+			gotStop = true
 		} else if (ev.type === 'error') {
 			const msg = ev.error?.message ?? 'Stream error'
 			const body = JSON.stringify(ev.error ?? ev)
@@ -231,10 +238,11 @@ async function* parseStream(
 		}
 	}
 
+	if (!gotStop) return
 	// Yield server-side tool blocks (web_search) before done so the agent loop
 	// can include them in the assistant message content.
 	if (serverToolBlocks.length > 0) yield { type: 'server_tool', serverBlocks: serverToolBlocks }
-	yield { type: 'done', usage }
+	yield { type: 'done', provider: 'anthropic', doneStatus: 'completed', providerStatus: 'message_stop', stopReason, stopSequence, usage }
 }
 
 // ── Generate ──
@@ -245,7 +253,6 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	anthropicUsage.setCurrentCredential(cred)
 	if (!cred) {
 		yield { type: 'error', message: 'No Anthropic credentials. Run: bun scripts/login-anthropic.ts' }
-		yield { type: 'done' }
 		return
 	}
 
@@ -361,7 +368,6 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		} else {
 			yield { type: 'error', message: `Anthropic API ${res.status}`, status: res.status, body: text, endpoint: url, retryAfterMs }
 		}
-		yield { type: 'done' }
 		return
 	}
 

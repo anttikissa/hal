@@ -277,21 +277,23 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 		}
 		return []
 	}
-	if (type === 'response.completed') {
+	if (type === 'response.completed' || type === 'response.incomplete') {
 		const response = event.response
+		const providerStatus = response?.status ?? (type === 'response.incomplete' ? 'incomplete' : 'completed')
+		const doneStatus = providerStatus === 'failed' || providerStatus === 'cancelled' || providerStatus === 'incomplete' ? providerStatus : 'completed'
 		const events: ProviderStreamEvent[] = []
-		if (response?.status === 'failed' || response?.status === 'cancelled') {
-			const detail = response?.status_details?.error?.message ?? response?.status_details?.message ?? response?.status
-			events.push({ type: 'error', message: `Response ${response.status}`, body: String(detail) })
+		if (doneStatus === 'failed' || doneStatus === 'cancelled') {
+			const detail = response?.status_details?.error?.message ?? response?.status_details?.message ?? providerStatus
+			events.push({ type: 'error', message: `Response ${providerStatus}`, body: String(detail) })
 		}
 		const usage = response?.usage
-		if (!usage) return [...events, { type: 'done' }]
-		const cacheRead = usage.input_tokens_details?.cached_tokens ?? 0
-		const totalInput = usage.input_tokens ?? 0
-		events.push({
-			type: 'done',
-			usage: { input: Math.max(0, totalInput - cacheRead), output: usage.output_tokens ?? 0, cacheRead, cacheCreation: 0 },
-		})
+		const done: ProviderStreamEvent = { type: 'done', provider: 'openai', doneStatus, providerStatus }
+		if (usage) {
+			const cacheRead = usage.input_tokens_details?.cached_tokens ?? 0
+			const totalInput = usage.input_tokens ?? 0
+			done.usage = { input: Math.max(0, totalInput - cacheRead), output: usage.output_tokens ?? 0, cacheRead, cacheCreation: 0 }
+		}
+		events.push(done)
 		return events
 	}
 	if (type === 'error') return [{ type: 'error', message: event.error?.message ?? event.message ?? 'Unknown error', body: JSON.stringify(event.error ?? event) }]
@@ -300,20 +302,16 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 }
 
 async function* parseResponsesStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
-	let gotDone = false
 	const state: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
 	for await (const event of providerShared.iterateJsonSse(body)) {
-		for (const parsed of parseResponsesEvent(state, event)) {
-			yield parsed
-			if (parsed.type === 'done') gotDone = true
-		}
+		for (const parsed of parseResponsesEvent(state, event)) yield parsed
 	}
-	if (!gotDone) yield { type: 'done' }
 }
 
 async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): AsyncGenerator<ProviderStreamEvent> {
 	let inputTokens = 0
 	let outputTokens = 0
+	let gotFinish = false
 	const toolCalls = new Map<number, { id: string; name: string; args: string }>()
 	for await (const event of providerShared.iterateJsonSse(body, { trim: 'both', doneSentinel: '[DONE]' })) {
 		if (event === providerShared.sseDone) continue
@@ -338,16 +336,21 @@ async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): As
 				if (tc.function?.arguments) entry.args += tc.function.arguments
 			}
 		}
-		if ((choice.finish_reason === 'stop' || choice.finish_reason === 'tool_calls') && chunk.usage) {
-			inputTokens = chunk.usage.prompt_tokens ?? 0
-			outputTokens = chunk.usage.completion_tokens ?? 0
+		if (choice.finish_reason === 'stop' || choice.finish_reason === 'tool_calls') {
+			gotFinish = true
+			if (chunk.usage) {
+				inputTokens = chunk.usage.prompt_tokens ?? 0
+				outputTokens = chunk.usage.completion_tokens ?? 0
+			}
 		}
 	}
+	if (!gotFinish) return
 	for (const [, toolCall] of toolCalls) {
 		const parsed = providerShared.parseToolInput(toolCall.args)
 		yield { type: 'tool_call', id: toolCall.id, name: toolCall.name, input: parsed.input, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }
 	}
-	yield { type: 'done', usage: inputTokens || outputTokens ? { input: inputTokens, output: outputTokens, cacheRead: 0, cacheCreation: 0 } : undefined }
+	const usage = inputTokens || outputTokens ? { input: inputTokens, output: outputTokens, cacheRead: 0, cacheCreation: 0 } : undefined
+	yield { type: 'done', provider: 'openai', doneStatus: 'completed', providerStatus: 'stop', usage }
 }
 
 async function readErrorBody(res: Response): Promise<string> {
@@ -356,7 +359,6 @@ async function readErrorBody(res: Response): Promise<string> {
 
 async function* yieldErrorAndDone(error: ProviderStreamEvent): AsyncGenerator<ProviderStreamEvent> {
 	yield error
-	yield { type: 'done' }
 }
 
 function responsesTransportMode(): ResponsesTransportMode {

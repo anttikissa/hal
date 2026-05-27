@@ -31,6 +31,7 @@ test('replay preserves original image path in user text', () => {
 				{ type: 'text', text: ' now' },
 			],
 		},
+		{ type: 'turn_end', status: 'completed' },
 	])
 
 	expect(result.blocks).toEqual([

@@ -115,6 +115,7 @@ test('writes thinking blobs while streaming and replays them into API history', 
 		expect(thinkingEntry && 'signature' in thinkingEntry ? (thinkingEntry as any).signature : undefined).toBeUndefined()
 		expect(thinkingEntry && 'text' in thinkingEntry ? (thinkingEntry as any).text : undefined).toBeUndefined()
 		expect(history.find((item) => item.type === 'assistant')?.text).toBe('done')
+		expect(history.find((item) => item.type === 'turn_end')).toMatchObject({ type: 'turn_end', status: 'completed', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } })
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent

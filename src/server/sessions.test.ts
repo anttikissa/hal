@@ -321,6 +321,28 @@ test('compact-style rotation preserves forked_from entry', async () => {
 })
 
 
+test('tailTurnState uses turn_end as the finished-turn boundary', () => {
+	const entries: any[] = [
+		userEntry('hello', '2026-05-27T12:00:00.000Z'),
+		{ type: 'assistant', text: 'done', ts: '2026-05-27T12:00:01.000Z' },
+		{ type: 'turn_end', status: 'completed', provider: 'openai', ts: '2026-05-27T12:00:02.000Z' },
+	]
+
+	expect(sessions.tailTurnState(entries)).toMatchObject({ interrupted: false, interruptedTools: [], ended: { type: 'turn_end', status: 'completed' } })
+})
+
+
+test('tailTurnState treats content after the last turn_end as interrupted', () => {
+	const entries: any[] = [
+		{ type: 'turn_end', status: 'completed', ts: '2026-05-27T12:00:00.000Z' },
+		{ type: 'assistant', text: 'partial', ts: '2026-05-27T12:00:01.000Z' },
+		{ type: 'tool_call', toolId: 'call_1', name: 'bash', ts: '2026-05-27T12:00:02.000Z' },
+	]
+
+	expect(sessions.tailTurnState(entries)).toMatchObject({ interrupted: true, interruptedTools: [{ name: 'bash', id: 'call_1' }] })
+})
+
+
 test('reset-style rotation preserves forked_from entry and writes a reset marker', async () => {
 	const parentId = await makeSession()
 	const childId = await makeSession()

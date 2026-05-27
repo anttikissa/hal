@@ -24,6 +24,8 @@ function anthropicSse(): string {
 	return [
 		'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}',
 		'data: {"type":"message_delta","usage":{"output_tokens":4}}',
+		'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null}}',
+		'data: {"type":"message_stop"}',
 		'',
 	].join('\n')
 }
@@ -64,7 +66,7 @@ test('anthropic provider reports the active account while rotating', async () =>
 		activity: 'Anthropic 1/3 · first@test.com',
 	})
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events.at(-1)).toEqual({ type: 'done', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events.at(-1)).toMatchObject({ type: 'done', provider: 'anthropic', doneStatus: 'completed', stopReason: 'end_turn', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
 test('anthropic 429 shows failed and next account when another account is available', async () => {
@@ -106,7 +108,7 @@ test('anthropic 429 shows failed and next account when another account is availa
 		status: 429,
 		retryAfterMs: 1_000,
 	})
-	expect(events.at(-1)).toEqual({ type: 'done' })
+	expect(events.at(-1)?.type).toBe('error')
 })
 
 test('anthropic 429 waits for reset when all accounts are on cooldown', async () => {
@@ -148,11 +150,29 @@ test('anthropic 429 waits for reset when all accounts are on cooldown', async ()
 })
 
 
+test('anthropic stream without message_stop does not emit done', async () => {
+	installFetchMock(async () => new Response([
+		'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"partial"}}',
+		'data: {"type":"message_delta","usage":{"output_tokens":2}}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events = await collect({ value: 'tok-test', type: 'token' })
+	expect(events).toContainEqual({ type: 'text', text: 'partial' })
+	expect(events.some((event) => event.type === 'done')).toBe(false)
+})
+
+
 test('anthropic provider ignores malformed SSE JSON lines', async () => {
 	installFetchMock(async () => new Response([
 		'data: {not json}',
 		'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}',
 		'data: {"type":"message_delta","usage":{"output_tokens":4}}',
+		'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}',
+		'data: {"type":"message_stop"}',
 		'',
 	].join('\n'), {
 		status: 200,
@@ -161,5 +181,5 @@ test('anthropic provider ignores malformed SSE JSON lines', async () => {
 
 	const events = await collect({ value: 'tok-test', type: 'token' })
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events.at(-1)).toEqual({ type: 'done', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events.at(-1)).toMatchObject({ type: 'done', provider: 'anthropic', doneStatus: 'completed', stopReason: 'end_turn', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })

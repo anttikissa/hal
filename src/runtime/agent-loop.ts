@@ -8,7 +8,7 @@
 
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
-import type { ProviderStreamEvent, Message, TokenUsage } from '../protocol.ts'
+import type { ProviderStreamEvent, Message, TokenUsage, TurnEndMeta } from '../protocol.ts'
 import { models } from '../models.ts'
 import { context } from './context.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
@@ -203,6 +203,23 @@ function hasUsage(u: TokenUsage): boolean {
 	return u.input > 0 || u.output > 0 || u.cacheRead > 0 || u.cacheCreation > 0
 }
 
+function appendTurnEnd(sessionId: string, meta: TurnEndMeta): void {
+	const entry: any = { type: 'turn_end', ts: new Date().toISOString(), ...meta }
+	if (!entry.usage) delete entry.usage
+	sessions.appendHistory(sessionId, [entry])
+}
+
+function doneMeta(event: ProviderStreamEvent): TurnEndMeta {
+	return {
+		provider: event.provider,
+		status: event.doneStatus ?? 'completed',
+		providerStatus: event.providerStatus,
+		stopReason: event.stopReason,
+		stopSequence: event.stopSequence,
+		usage: event.usage,
+	}
+}
+
 function requestBytes(messages: Message[], overheadBytes: number): number {
 	let total = Math.max(0, overheadBytes)
 	for (const msg of messages) total += context.messageBytes(msg)
@@ -323,6 +340,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 	try {
 		const totalUsage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
+		let lastDoneMeta: TurnEndMeta | null = null
 		let retryAttempt = 0
 		let retryStartedAt = 0
 		let hadTerminalError = false
@@ -340,6 +358,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			})
 			// Persist context so it survives restarts.
 			void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+			appendTurnEnd(sessionId, { status: 'aborted', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 		}
 
 		// Outer loop: each iteration is one generate call.
@@ -368,6 +387,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			const serverBlocks: any[] = []
 			let aborted = false
 			let shouldRetry = false
+			let iterationDone = false
 
 			try {
 				for await (const event of gen) {
@@ -507,6 +527,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 								totalUsage.cacheCreation += event.usage.cacheCreation ?? 0
 								calibrateInputTokens(model, messages, overheadBytes, event.usage)
 							}
+							iterationDone = true
+							lastDoneMeta = doneMeta(event)
 							break
 						}
 					}
@@ -521,6 +543,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					log.error('Agent loop error', { sessionId, message })
 					emitInfo(sessionId, message, 'error')
 					emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
+					appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 					return 'failed'
 				}
 			}
@@ -533,6 +556,29 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 			// If we need to retry, go back to the top of the loop
 			if (shouldRetry) continue
+
+			if (!iterationDone && !hadTerminalError) {
+				const ts = new Date().toISOString()
+				const historyEntries: any[] = []
+				if (thinkingText) {
+					const blobId = thinkingBlobId || blob.makeBlobId(sessionId)
+					await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
+					historyEntries.push({ type: 'thinking', model, thinkingEffort, blobId, ts })
+				}
+				if (assistantText) historyEntries.push({ type: 'assistant', text: assistantText, model, ts })
+				for (const tc of toolCalls) {
+					const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
+					toolBlobMap.set(tc.id, blobId)
+					await writeToolCallBlob(sessionId, blobId, tc.name, tc.input)
+					historyEntries.push({ type: 'tool_call', toolId: tc.id, name: tc.name, input: tc.input, blobId, ts })
+				}
+				if (historyEntries.length > 0) {
+					await sessions.appendHistory(sessionId, historyEntries)
+					sessions.clearLive(sessionId)
+				}
+				emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message: 'Provider stream ended before terminal event' })
+				return 'failed'
+			}
 
 			// No tool calls — we're done. Emit a response event so the client
 			// can display the assistant's text (client listens for 'response' events).
@@ -575,6 +621,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				})
 				// Persist context so it survives restarts
 				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+				if (hadTerminalError) appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
+				else appendTurnEnd(sessionId, lastDoneMeta ?? { status: 'completed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 				return hadTerminalError ? 'failed' : 'completed'
 			}
 
@@ -683,6 +731,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			contextMax: est.max,
 		})
 		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+		appendTurnEnd(sessionId, { status: 'stopped', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 
 		return 'stopped'
 	} finally {
