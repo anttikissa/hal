@@ -166,7 +166,10 @@ function optionWordRight(text: string, pos: number): number {
 	let i = pos
 	if (i < text.length && isWordTokenChar(text[i]!)) {
 		while (i < text.length && isWordTokenChar(text[i]!)) i++
-		return i
+		let endOfWord = i
+		while (i < text.length && isSpaceChar(text[i]!)) i++
+		if (i + 1 < text.length && isPunctuationTokenChar(text[i]!) && isPunctuationTokenChar(text[i + 1]!)) return i
+		return endOfWord
 	}
 
 	if (

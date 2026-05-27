@@ -106,15 +106,17 @@ describe('prompt', () => {
 	})
 
 	test('option movement keeps consecutive punctuation as separate tokens', () => {
-		prompt.setText('word ### another', 'word'.length)
-		for (const stop of ['word '.length, 'word ### '.length, 'word ### another'.length]) {
+		prompt.setText('abc ### 123', 0)
+		for (const stop of ['abc '.length, 'abc ### '.length, 'abc ### 123'.length]) {
 			prompt.handleKey(key('right', { alt: true }), 80)
 			expect(prompt.cursorPos()).toBe(stop)
 		}
 
-		prompt.setText('word ### another', 'word ### '.length)
-		prompt.handleKey(key('left', { alt: true }), 80)
-		expect(prompt.cursorPos()).toBe('word '.length)
+		prompt.setText('321 ### cba', '321 ### cba'.length)
+		for (const stop of ['321 ### '.length, '321 '.length, 0]) {
+			prompt.handleKey(key('left', { alt: true }), 80)
+			expect(prompt.cursorPos()).toBe(stop)
+		}
 	})
 
 	test('option-left and option-right match recorded Zed stops', () => {
