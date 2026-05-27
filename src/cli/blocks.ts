@@ -372,11 +372,9 @@ function formatRead(output: string): ToolFormatResult {
 	return { bodyLines: [`${toLines(output.trimEnd()).length} lines, ${formatSize(Buffer.byteLength(output, 'utf8'))}`] }
 }
 
-function formatEval(output: string, cols: number): ToolFormatResult {
+function formatEval(output: string, _cols: number): ToolFormatResult {
 	if (!output) return { bodyLines: [] }
-	const label = '── Result '
-	const width = Math.max(0, cols - visLen(label))
-	return { bodyLines: [`${label}${'─'.repeat(width)}`], suppressOutput: false }
+	return { bodyLines: ['Result:'], suppressOutput: false }
 }
 
 function parseCommitMetadata(output: string): CommitMetadata | null {
@@ -621,13 +619,27 @@ function formatBlockTimeRange(first?: number, last?: number): string {
 	return time.formatTimestampRange(first, last)
 }
 
-function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
+type HeaderStyle = 'rule' | 'plain'
+
+function buildHeader(title: string, time: string, blobRef: string, cols: number, style: HeaderStyle = 'rule'): string {
+	if (style === 'plain') {
+		const prefix = time ? ` ${time} ` : ' '
+		const right = blobRef ? ` (${blobRef}) ` : ''
+		const titleWidth = Math.max(1, cols - visLen(prefix) - visLen(right))
+		const left = `${prefix}${clipVisual(title, titleWidth)}`
+		return `${left}${' '.repeat(Math.max(0, cols - visLen(left) - visLen(right)))}${right}`
+	}
+
 	const right = blobRef ? ` (${blobRef}) ──` : ''
 	const prefix = time ? `── ${time} ` : '── '
 	const budget = Math.max(1, cols - 1)
 	const titleWidth = Math.max(1, budget - visLen(prefix) - visLen(right) - 1)
 	const left = `${prefix}${clipVisual(title, titleWidth)} `
 	return `${left}${'─'.repeat(Math.max(0, budget - visLen(left) - visLen(right)))}${right}`
+}
+
+function padToolLine(line: string): string {
+	return ` ${line}`
 }
 
 const fixedLabels = { log: 'Log', info: 'Info', warning: 'Warning', error: 'Error', fork: 'Info' }
@@ -713,8 +725,17 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 			? `${block.sessionId}/${block.blobId}`
 			: ''
 	const { fg, bg } = blockColors(block)
-	const lines = [bgLine(`${fg}${buildHeader(blockLabel(block), formatBlockTime(block.ts), blobRef, cols)}`, cols, bg)]
-	for (const line of blockContent(block, cols)) lines.push(bgLine(`${fg}${line}`, cols, bg))
+	const label = blockLabel(block)
+	const blockTime = formatBlockTime(block.ts)
+	const headerStyle = block.type === 'tool' ? 'plain' : 'rule'
+	const header = buildHeader(label, blockTime, blobRef, cols, headerStyle)
+	const lines = [bgLine(`${fg}${header}`, cols, bg)]
+	const contentCols = block.type === 'tool' ? Math.max(1, cols - 1) : cols
+	for (const line of blockContent(block, contentCols)) {
+		let renderedLine = line
+		if (block.type === 'tool') renderedLine = padToolLine(line)
+		lines.push(bgLine(`${fg}${renderedLine}`, cols, bg))
+	}
 	lines[lines.length - 1]! += FG_OFF
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid
 	// so the active streamed block is always visually anchored.
