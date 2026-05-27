@@ -6,6 +6,7 @@ import { ipc } from '../ipc.ts'
 import { spawnAgent } from './spawn_agent.ts'
 
 const origAppendCommand = ipc.appendCommand
+const origReadState = ipc.readState
 const origStateDir = process.env.HAL_STATE_DIR
 let tempStateDir: string | null = null
 
@@ -17,6 +18,7 @@ function useTempStateDir(): string {
 
 afterEach(() => {
 	ipc.appendCommand = origAppendCommand
+	ipc.readState = origReadState
 	if (origStateDir === undefined) delete process.env.HAL_STATE_DIR
 	else process.env.HAL_STATE_DIR = origStateDir
 	if (tempStateDir) rmSync(tempStateDir, { recursive: true, force: true })
@@ -29,6 +31,16 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 	ipc.appendCommand = (command) => {
 		appended.push(command)
 	}
+	ipc.readState = () => ({
+		sessions: [
+			{ id: '04-left', tab: 1, cwd: '/tmp/left' },
+			{ id: '04-parent', tab: 2, cwd: '/tmp/project' },
+			{ id: '04-right', tab: 3, cwd: '/tmp/right' },
+		],
+		busy: {},
+		activity: {},
+		updatedAt: new Date().toISOString(),
+	})
 
 	const result = await spawnAgent.execute({ task: 'Investigate foo' }, { sessionId: '04-parent', cwd: '/tmp/project' })
 	const queued = appended[0]
@@ -37,6 +49,7 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 
 	expect(result).toContain('04-parent')
 	expect(result).toContain(childSessionId)
+	expect(result).toContain('tab 3')
 	expect(appended).toHaveLength(1)
 	expect(queued).toMatchObject({
 		type: 'spawn',

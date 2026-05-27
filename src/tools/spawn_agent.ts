@@ -24,6 +24,21 @@ function normalize(input: unknown, ctx: ToolContext): Required<Pick<SpawnInput, 
 	}
 }
 
+function plannedChildTab(parentSessionId: string): number | undefined {
+	const sessions = ipc.readState().sessions
+	const parentIndex = sessions.findIndex((session) => session.id === parentSessionId)
+	if (parentIndex < 0) return undefined
+	const parentTab = sessions[parentIndex]?.tab
+	if (Number.isFinite(parentTab)) return Math.floor(parentTab as number) + 1
+	return parentIndex + 2
+}
+
+function spawnResult(childSessionId: string, parentSessionId: string): string {
+	const tab = plannedChildTab(parentSessionId)
+	if (tab) return `Queued subagent spawn ${childSessionId} to tab ${tab} from ${parentSessionId}`
+	return `Queued subagent spawn ${childSessionId} from ${parentSessionId}`
+}
+
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalize(input, ctx)
 	if (!spec.task) return 'error: task is required'
@@ -34,7 +49,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 		sessionId: ctx.sessionId,
 		spawn,
 	})
-	return `Queued subagent spawn ${childSessionId} from ${ctx.sessionId}`
+	return spawnResult(childSessionId, ctx.sessionId)
 }
 
 const spawnAgentTool: Tool = {
@@ -57,4 +72,4 @@ function init(): void {
 	toolRegistry.registerTool(spawnAgentTool)
 }
 
-export const spawnAgent = { execute, init }
+export const spawnAgent = { execute, init, plannedChildTab, spawnResult }
