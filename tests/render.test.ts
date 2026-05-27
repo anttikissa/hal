@@ -183,12 +183,12 @@ describe('render', () => {
 		expect(clean).toContain('[paused]')
 	})
 
-	test('help bar says press enter to continue on paused tabs with empty prompt', () => {
+	test('help bar says enter continue on paused tabs with empty prompt', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('press enter to continue')
-		expect(clean).not.toContain('enter: continue')
+		expect(clean).toContain('enter: continue')
+		expect(clean).not.toContain('press enter to continue')
 		expect(clean).not.toContain('ctrl-t new')
 	})
 
@@ -212,11 +212,11 @@ describe('render', () => {
 		client.state.busy.clear()
 	})
 
-	test('help bar says press enter to continue after max iteration stop', () => {
+	test('help bar says enter continue after max iteration stop', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'Hit max iterations (50). Stopping.', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('press enter to continue')
+		expect(clean).toContain('enter: continue')
 		expect(clean).not.toContain('press enter to retry')
 	})
 
@@ -225,7 +225,7 @@ describe('render', () => {
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
 		prompt.setText('   ')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('press enter to continue')
+		expect(clean).toContain('enter: continue')
 	})
 
 	test('help bar renders keys brighter than descriptions but not bright white', () => {
