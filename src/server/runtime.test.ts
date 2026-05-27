@@ -296,6 +296,24 @@ test('open command inherits cwd and model from opener tab', () => {
 })
 
 
+test('shouldAutoContinue resumes only restarted interrupted turns', () => {
+	expect(runtime.shouldAutoContinue([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
+		{ type: 'log', text: '[restarted]', ts: '2026-05-27T12:00:01.000Z' },
+	])).toBe(true)
+
+	expect(runtime.shouldAutoContinue([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
+		{ type: 'turn_end', status: 'completed', ts: '2026-05-27T12:00:01.000Z' },
+		{ type: 'log', text: '[restarted]', ts: '2026-05-27T12:00:02.000Z' },
+	])).toBe(false)
+
+	expect(runtime.shouldAutoContinue([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
+	])).toBe(false)
+})
+
+
 
 test('auto-close only happens after a clean completion', () => {
 	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'completed')).toBe(true)

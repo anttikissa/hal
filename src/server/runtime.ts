@@ -154,6 +154,19 @@ function shouldCloseSessionAfterGeneration(
 	return !!meta?.closeWhenDone && result === 'completed'
 }
 
+function restartedAfterLastTurnEnd(entries: HistoryEntry[]): boolean {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type === 'turn_end') return false
+		if (entry.type === 'log' && entry.text === RESTARTED_TEXT) return true
+	}
+	return false
+}
+
+function shouldAutoContinue(entries: HistoryEntry[]): boolean {
+	return restartedAfterLastTurnEnd(entries) && sessionStore.tailTurnState(entries).interrupted
+}
+
 
 function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
@@ -875,6 +888,18 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		}, 0)
 	}
 	void (async () => {
+		for (const sessionId of state.activeSessions) {
+			if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
+			const entries = sessionStore.loadAllHistory(sessionId)
+			if (!shouldAutoContinue(entries)) continue
+			const tail = sessionStore.tailTurnState(entries)
+			for (const tool of tail.interruptedTools) {
+				sessionStore.appendHistory(sessionId, [{ type: 'tool_result', toolId: tool.id, output: '[interrupted]', ts: new Date().toISOString() }])
+			}
+			void runGeneration(sessionId, '')
+		}
+	})()
+	void (async () => {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || state.activeRuntimePid !== process.pid) break
 			if (!ipc.ownsHostLock()) break
@@ -917,6 +942,7 @@ export const runtime = {
 	state,
 	startRuntime,
 	emitInfo,
+	shouldAutoContinue,
 	shouldCloseSessionAfterGeneration,
 	restoredSessionOrder,
 	recordTabClosed,
