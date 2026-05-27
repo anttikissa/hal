@@ -13,8 +13,9 @@ async function load(ctx: any): Promise<void> {
 			if (n > 0 && ctx.config.repaintAfterBlobLoad) ctx.onChange(false)
 		}
 	}
+	if (!ctx.config.showStartupPerf) ctx.showStartupSummary()
 	if (!ctx.config.backgroundLoadTabs) {
-		ctx.showStartupSummary()
+		if (ctx.config.showStartupPerf) ctx.showStartupSummary()
 		return
 	}
 	const t1 = performance.now()
@@ -32,7 +33,7 @@ async function load(ctx: any): Promise<void> {
 	}
 	const bgMs = (performance.now() - t1).toFixed(1)
 	perf.mark(`All tabs loaded (${tabCount} replayed, ${bgMs}ms)`)
-	ctx.showStartupSummary()
+	if (ctx.config.showStartupPerf) ctx.showStartupSummary()
 }
 
 export const backgroundLoader = { load }
