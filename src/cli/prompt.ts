@@ -153,7 +153,7 @@ function optionWordLeft(text: string, pos: number): number {
 	if (isPunctuationTokenChar(text[i - 1]!)) {
 		let start = i
 		while (start > 0 && isPunctuationTokenChar(text[start - 1]!)) start--
-		if (startedOnSpace) return i - start > 1 ? i : i - 1
+		if (startedOnSpace) return start
 		i = start
 	}
 
@@ -188,14 +188,23 @@ function optionWordRight(text: string, pos: number): number {
 	) return i + 1
 
 	if (i < text.length && isPunctuationTokenChar(text[i]!)) {
+		let start = i
 		while (i < text.length && isPunctuationTokenChar(text[i]!)) i++
-		while (i < text.length && isSpaceChar(text[i]!)) i++
+		let punctuationEnd = i
+		let stoppedAfterSpace = false
+		while (i < text.length && isSpaceChar(text[i]!)) {
+			stoppedAfterSpace = true
+			i++
+		}
+		if (stoppedAfterSpace && punctuationEnd - start > 1) return i
 		while (i < text.length && isWordTokenChar(text[i]!)) i++
 		return i
 	}
 
+	const startedOnSpaceRight = i < text.length && isSpaceChar(text[i]!)
 	while (i < text.length && isSpaceChar(text[i]!)) i++
 	if (i < text.length && isPunctuationTokenChar(text[i]!)) {
+		if (startedOnSpaceRight && i + 1 < text.length && isPunctuationTokenChar(text[i + 1]!)) return i
 		while (i < text.length && isPunctuationTokenChar(text[i]!)) i++
 		return i
 	}
