@@ -631,7 +631,7 @@ const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.
 
 function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
 	if (block.type === 'assistant') return { ...colors.assistant, bg: '' }
-	if (block.type === 'thinking') return colors.thinking
+	if (block.type === 'thinking') return { ...colors.thinking, bg: '' }
 	if (block.type === 'user') return colors.user
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
 }
