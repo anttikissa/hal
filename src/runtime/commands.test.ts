@@ -28,6 +28,7 @@ const origMemoryConfig = { ...memory.config }
 const origReadRss = memory.io.readRss
 const origDefaultModel = models.config.default
 const origVersionState = { ...version.state }
+const origScheduleExit = commands.state.scheduleExit
 
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 const origLoadAllHistory = sessionStore.loadAllHistory
@@ -70,6 +71,7 @@ afterEach(() => {
 	models.config.default = origDefaultModel
 	ipc.appendCommand = origAppendCommand
 	Object.assign(version.state, origVersionState)
+	commands.state.scheduleExit = origScheduleExit
 	version.state.repoDir = origVersionState.repoDir
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
 	sessionStore.loadAllHistory = origLoadAllHistory
@@ -486,6 +488,23 @@ test('/rebase runtime handler points users to the interactive client', async () 
 	expect(result.error).toBe('Run /rebase from an interactive client terminal.')
 })
 
+test('/quit quits and /exit is a silent alias', async () => {
+	const exits: Array<{ code: number; delayMs: number }> = []
+	commands.state.scheduleExit = (code, delayMs) => {
+		exits.push({ code, delayMs })
+	}
+
+	const quit = await commands.executeCommand('/quit', makeSession())
+	const exit = await commands.executeCommand('/exit', makeSession())
+
+	expect(quit).toMatchObject({ handled: true, output: 'Goodbye.' })
+	expect(exit).toMatchObject({ handled: true })
+	expect(exit.output).toBeUndefined()
+	expect(commands.commandNames()).toContain('quit')
+	expect(commands.commandNames()).not.toContain('exit')
+	expect(exits).toEqual([{ code: 0, delayMs: 100 }, { code: 0, delayMs: 100 }])
+})
+
 test('/keys is not listed as a runtime command', async () => {
 	const help = await commands.executeCommand('/help', makeSession())
 	const result = await commands.executeCommand('/keys', makeSession())
@@ -515,12 +534,18 @@ test('/help groups commands thematically and alphabetically within each section'
 	expect(messaging).toBeGreaterThan(tabs)
 	expect(setup).toBeGreaterThan(messaging)
 
-	expect(output.indexOf('/exit')).toBeLessThan(output.indexOf('/help [cmd]'))
-	expect(output.indexOf('/help [cmd]')).toBeLessThan(output.indexOf('/model [name]'))
-	expect(output.indexOf('/model [name]')).toBeLessThan(output.indexOf('/status'))
+	expect(output).toContain('Syntax:')
+	expect(output).toContain('  literal          type exactly as shown: clear, next, --all')
+	expect(output).toContain('  <text…>          rest of line; may contain spaces')
+	expect(output).not.toContain('/exit')
+	expect(output.indexOf('/help [<command>]')).toBeLessThan(output.indexOf('/model [<model>]'))
+	expect(output.indexOf('/model [<model>]')).toBeLessThan(output.indexOf('/quit'))
+	expect(output.indexOf('/quit')).toBeLessThan(output.indexOf('/status'))
 	expect(output.indexOf('/fork')).toBeLessThan(output.indexOf('/move <position>'))
-	expect(output.indexOf('/broadcast <message>')).toBeLessThan(output.indexOf('/queue [prompt|next|clear]'))
-	expect(output.indexOf('/queue [prompt|next|clear]')).toBeLessThan(output.indexOf('/send <tab|session-id|name> <message>'))
+	expect(output.indexOf('/broadcast <message…>')).toBeLessThan(output.indexOf('/queue <prompt…>'))
+	expect(output.indexOf('/queue <prompt…>')).toBeLessThan(output.indexOf('/queue next'))
+	expect(output.indexOf('/queue next')).toBeLessThan(output.indexOf('/queue clear'))
+	expect(output.indexOf('/queue clear')).toBeLessThan(output.indexOf('/send <target> <message…>'))
 
 	const listed = new Set<string>()
 	for (const line of output.split('\n')) {
@@ -552,7 +577,7 @@ test('/help model shows layered help for another command', async () => {
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBeUndefined()
-	expect(result.output).toContain('Usage: /model [name]')
+	expect(result.output).toContain('Usage:\n  /model [<model>]')
 })
 
 

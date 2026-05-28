@@ -18,6 +18,7 @@ import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 import { version } from '../version.ts'
+import { visLen } from '../utils/strings.ts'
 import { HAL_DIR } from '../state.ts'
 import { authLogin } from '../auth-login.ts'
 
@@ -37,6 +38,12 @@ export interface CommandResult {
 export interface CommandHooks {
 	/** Emit a user-visible progress/info notice while a command is still running. */
 	info?: (text: string, level?: 'info' | 'error') => void
+}
+
+let state = {
+	scheduleExit(code: number, delayMs: number): void {
+		setTimeout(() => process.exit(code), delayMs)
+	},
 }
 
 /** Session state that commands can read and modify. */
@@ -89,7 +96,7 @@ type CommandHandler = (
 type CommandArg = 'model' | 'dir' | 'command' | 'config'
 
 interface CommandSpec {
-	usage?: string
+	usage?: string | string[]
 	summary: string
 	detail?: string
 	help?: string
@@ -274,20 +281,20 @@ function normalizeHelpCommand(args: string): string {
 }
 
 const commandSpecs: Record<string, CommandSpec> = {
-	model: { usage: '[name]', summary: 'Switch model or list available models.', detail: 'With no name, shows the current model and the available choices.', arg: 'model' },
+	model: { usage: '[<model>]', summary: 'Switch model or list available models.', detail: 'With no model, shows the current model and the available choices.', arg: 'model' },
 	clear: { summary: 'Clear session history.' },
 	fork: { summary: 'Fork current session to new tab.' },
-	self: { usage: '[--fork|-f]', summary: 'Open a session in Hal\'s own directory.', detail: 'With --fork, fork this conversation into Hal\'s own directory instead of starting a fresh self tab.' },
-	open: { usage: '[tab|session-id|name]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
+	self: { usage: '[--fork | -f]', summary: 'Open a session in Hal\'s own directory.', detail: 'With --fork, fork this conversation into Hal\'s own directory instead of starting a fresh self tab.' },
+	open: { usage: '[<target>]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
 	move: { usage: '<position>', summary: 'Move the current tab to a position.', detail: 'Values below 1 clamp to 1; values above the tab count clamp to the last tab.' },
-	rename: { usage: '<name>|clear', summary: 'Rename the current session.', detail: 'Set a short session name used in tabs and command targets.' },
-	resume: { usage: '[session-id|name]', summary: 'Resume a closed session.', detail: 'With no id, lists recently closed sessions.' },
+	rename: { usage: ['<name…>', 'clear'], summary: 'Rename or clear the current session name.', detail: 'Set a short session name used in tabs and command targets.' },
+	resume: { usage: '[<target>]', summary: 'Resume a closed session.', detail: 'With no target, lists recently closed sessions.' },
 	tabs: { usage: '[--all]', summary: 'List open tabs; use --all to include closed sessions.' },
 	compact: { summary: 'Summarize conversation to reduce context.' },
-	rebase: { summary: 'Interactively rewrite session context history.' },
+	rebase: { summary: 'Rewrite session history (similar to `git rebase -i`).' },
 	status: { summary: 'Show Anthropic / OpenAI subscription usage.', detail: 'Shows usage for all configured accounts.' },
 	login: {
-		usage: '<anthropic|openai> [code]',
+		usage: '<anthropic | openai> [<code>]',
 		summary: 'Log in to Claude or ChatGPT via OAuth.',
 		help: [
 			'/login anthropic',
@@ -301,10 +308,10 @@ const commandSpecs: Record<string, CommandSpec> = {
 		].join('\n'),
 	},
 	mem: { summary: 'Show current RSS memory and the warn/kill thresholds.' },
-	send: { usage: '<tab|session-id|name> <message>', summary: 'Send a message to another tab.', detail: 'Targets can be a tab number, full session id, or session name.' },
-	queue: { usage: '[prompt|next|clear]', summary: 'Queue a prompt for after the current turn.', detail: 'With no prompt, lists queued prompts. /queue next (or Ctrl-Q) runs queued prompts. /queue clear removes all queued prompts.' },
-	broadcast: { usage: '<message>', summary: 'Send a message to every other tab.', detail: 'Sends the same message to every other open tab.' },
-	cd: { usage: '[path]', summary: 'Change working directory.', detail: 'With no path, changes to Hal\'s own directory.', arg: 'dir' },
+	send: { usage: '<target> <message…>', summary: 'Send a message to another tab.', detail: 'Target can be a tab number, full session id, or session name.' },
+	queue: { usage: ['<prompt…>', 'next', 'clear'], summary: 'Queue, run, clear, or list queued prompts.', detail: 'With no prompt, lists queued prompts. /queue next (or Ctrl-Q) runs queued prompts. /queue clear removes all queued prompts.' },
+	broadcast: { usage: '<message…>', summary: 'Send a message to every other tab.', detail: 'Sends the same message to every other open tab.' },
+	cd: { usage: '[<path>]', summary: 'Change working directory.', detail: 'With no path, changes to Hal\'s own directory.', arg: 'dir' },
 	system: { summary: 'Show full preprocessed system prompt.' },
 	config: {
 		summary: 'View or change config.',
@@ -334,23 +341,33 @@ const commandSpecs: Record<string, CommandSpec> = {
 			'  /config agentLoop.maxIterations --temp 2',
 		].join('\n'),
 	},
-	help: { usage: '[cmd]', summary: 'Show help; try /help config.', arg: 'command' },
-	exit: { summary: 'Quit Hal.' },
+	help: { usage: '[<command>]', summary: 'Show help; try /help config.', arg: 'command' },
+	quit: { summary: 'Quit Hal.' },
 }
 
 const commandSections: CommandSection[] = [
-	{ title: 'Common', names: ['exit', 'help', 'model', 'status'] },
+	{ title: 'Common', names: ['help', 'model', 'quit', 'status'] },
 	{ title: 'Conversation', names: ['clear', 'compact', 'rebase', 'system'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
 	{ title: 'Setup & diagnostics', names: ['cd', 'config', 'login', 'mem'] },
 ]
 
-function helpUsage(name: string): string {
+function helpUsageLines(name: string): string[] {
 	const spec = commandSpecs[name]
-	if (!spec?.usage) return `/${name}`
-	return `/${name} ${spec.usage}`
+	if (!spec?.usage) return [`/${name}`]
+
+	if (Array.isArray(spec.usage)) {
+		const lines: string[] = []
+		for (const usage of spec.usage) {
+			lines.push(`/${name} ${usage}`)
+		}
+		return lines
+	}
+
+	return [`/${name} ${spec.usage}`]
 }
+
 
 function sortedCommandNames(names: string[]): string[] {
 	const sorted = [...names]
@@ -358,23 +375,45 @@ function sortedCommandNames(names: string[]): string[] {
 	return sorted
 }
 
-function helpCommandLine(name: string, width: number): string {
-	return `  ${helpUsage(name).padEnd(width)}  ${commandSpecs[name]!.summary}`
+function padVisible(text: string, width: number): string {
+	return text + ' '.repeat(Math.max(0, width - visLen(text)))
+}
+
+function helpCommandLines(name: string, width: number): string[] {
+	const lines: string[] = []
+	for (const usage of helpUsageLines(name)) {
+		lines.push(`  ${padVisible(usage, width)}  ${commandSpecs[name]!.summary}`)
+	}
+	return lines
+}
+
+function syntaxLegend(): string[] {
+	return [
+		'Syntax:',
+		'  literal          type exactly as shown: clear, next, --all',
+		'  <value>          required value',
+		'  [value]          optional item/group',
+		'  a | b            choose one',
+		'  <text…>          rest of line; may contain spaces',
+		'  <target>         tab number, session id, or session name',
+	]
 }
 
 function commandListHelp(): string {
 	let width = 0
 	for (const section of commandSections) {
 		for (const name of section.names) {
-			width = Math.max(width, helpUsage(name).length)
+			for (const usage of helpUsageLines(name)) {
+				width = Math.max(width, visLen(usage))
+			}
 		}
 	}
 
-	const lines = ['Available commands:']
+	const lines = ['Available commands:', '', ...syntaxLegend()]
 	for (const section of commandSections) {
 		lines.push('', `${section.title}:`)
 		for (const name of sortedCommandNames(section.names)) {
-			lines.push(helpCommandLine(name, width))
+			lines.push(...helpCommandLines(name, width))
 		}
 	}
 	return lines.join('\n')
@@ -384,9 +423,19 @@ function detailedHelp(commandName: string): string | null {
 	const spec = commandSpecs[commandName]
 	if (!spec) return null
 	if (spec.help) return spec.help
-	const lines = [`Usage: ${helpUsage(commandName)}`, '', spec.summary]
+	const lines = ['Usage:']
+	for (const line of helpUsageLines(commandName)) {
+		lines.push(`  ${line}`)
+	}
+	lines.push('', spec.summary)
 	if (spec.detail) lines.push('', spec.detail)
 	return lines.join('\n')
+}
+
+function helpText(commandName = ''): string | null {
+	const normalized = normalizeHelpCommand(commandName)
+	if (normalized) return detailedHelp(normalized)
+	return commandListHelp()
 }
 
 // /help — list commands or show details for one command
@@ -727,12 +776,15 @@ handlers['config'] = (args) => {
 
 
 
-// /exit — quit
-handlers['exit'] = () => {
-	// Give a brief moment for cleanup, then exit
-	setTimeout(() => process.exit(0), 100)
-	return { output: 'Goodbye.', handled: true }
+// /quit — quit
+function quitCommand(output?: string): CommandResult {
+	// Give cleanup and IPC tails a brief moment to flush before exiting.
+	state.scheduleExit(0, 100)
+	return { output, handled: true }
 }
+
+handlers['quit'] = () => quitCommand('Goodbye.')
+handlers['exit'] = () => quitCommand()
 
 
 // ── Main dispatch ──
@@ -760,8 +812,10 @@ function commandArg(name: string): CommandArg | undefined {
 }
 
 export const commands = {
+	state,
 	parseCommand,
 	executeCommand,
 	commandNames,
 	commandArg,
+	helpText,
 }
