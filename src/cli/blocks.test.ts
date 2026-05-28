@@ -71,6 +71,19 @@ test('assistant header includes display model', () => {
 	expect(header).toContain('Hal (GPT 5.4)')
 })
 
+test('assistant blocks render without a background color', () => {
+	colors.load()
+	const assistantBlock: Block = { type: 'assistant', text: 'hello', model: 'gpt-5.4' }
+	const thinkingBlock: Block = { type: 'thinking', text: 'hmm', model: 'gpt-5.4' }
+
+	const assistantRendered = blocks.renderBlock(assistantBlock, 80).join('\n')
+	const thinkingRendered = blocks.renderBlock(thinkingBlock, 80).join('\n')
+
+	expect(colors.assistant.bg).toBeTruthy()
+	expect(assistantRendered).not.toContain(colors.assistant.bg)
+	expect(thinkingRendered).toContain(colors.thinking.bg)
+})
+
 
 test('synthetic assistant header includes model and synthetic marker', () => {
 	const block: Block = {

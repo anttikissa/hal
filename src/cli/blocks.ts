@@ -630,7 +630,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.warning, error: colors.error, fork: colors.fork }
 
 function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
-	if (block.type === 'assistant') return colors.assistant
+	if (block.type === 'assistant') return { ...colors.assistant, bg: '' }
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.user
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
