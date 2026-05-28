@@ -17,6 +17,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Thinking of fixing duplicate messages by deduplicating? DON'T, fix the root cause instead: don't produce duplicates in the first place
 - When removing a feature, don't add a test to check that the feature is removed (lol)
 - Do not leave any tech debt behind. If you have taken any shortcuts, go back and do them right.
+- Put one-off scripts in `/tmp`
 
 # Code style
 
