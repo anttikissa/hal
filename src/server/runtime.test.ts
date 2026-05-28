@@ -560,6 +560,47 @@ test('formatModelRefreshMessage reports initial models.dev fetch without change 
 })
 
 
+test('model metadata refresh notice goes only to focused session', async () => {
+	const origActiveSessions = [...runtime.state.activeSessions]
+	const origCurrentSessionId = runtime.state.currentSessionId
+	const origRefreshModels = models.refreshModels
+	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendEvent = ipc.appendEvent
+	const histories: any[] = []
+	const events: any[] = []
+
+	runtime.state.activeSessions = ['04-left', '04-current', '04-right']
+	runtime.state.currentSessionId = '04-current'
+	models.refreshModels = async () => ({
+		fetched: true,
+		hadCache: true,
+		changes: ['new Claude model claude-opus-4-7 (1000k)'],
+		modelCount: 123,
+		previous: {},
+		next: {},
+	})
+	sessions.appendHistorySync = (sessionId: string, entries: any[]) => {
+		histories.push({ sessionId, entries })
+	}
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		await runtime.refreshModelMetadata()
+		expect(histories.map((item) => item.sessionId)).toEqual(['04-current'])
+		expect(events.map((item) => item.sessionId)).toEqual(['04-current'])
+		expect(events[0]).toMatchObject({ type: 'info', text: expect.stringContaining('[models.dev] fetched model metadata') })
+	} finally {
+		runtime.state.activeSessions = origActiveSessions
+		runtime.state.currentSessionId = origCurrentSessionId
+		models.refreshModels = origRefreshModels
+		sessions.appendHistorySync = origAppendHistorySync
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
 test('buildAliasUpdateSuggestionText mentions config mapping and subagent only outside ~/.hal', () => {
 	const origConfigData = config.data
 	config.data = { models: { default: 'gpt' } } as Record<string, any>

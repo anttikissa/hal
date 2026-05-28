@@ -24,7 +24,7 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'rename' | 'spawn' | 'tool-confirm'
+export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'rename' | 'spawn' | 'tool-confirm' | 'focus'
 
 export type SpawnMode = 'fork' | 'fresh'
 export type SpawnKind = 'subagent' | 'subagent-autoclose' | 'interactive'
@@ -142,6 +142,10 @@ export interface ToolConfirmCommand extends CommandBase {
 	approved: boolean
 }
 
+export interface FocusCommand extends CommandBase {
+	type: 'focus'
+}
+
 export type Command =
 	| PromptCommand
 	| ContinueCommand
@@ -160,6 +164,7 @@ export type Command =
 	| RenameCommand
 	| SpawnCommand
 	| ToolConfirmCommand
+	| FocusCommand
 
 // ── Tool call types ──
 

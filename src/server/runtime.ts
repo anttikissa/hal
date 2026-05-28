@@ -29,6 +29,7 @@ import { paths } from '../utils/paths.ts'
 
 const state = {
 	activeSessions: [] as string[],
+	currentSessionId: null as string | null,
 	activeRuntimePid: null as number | null,
 	stopPromptWatch: null as (() => void) | null,
 }
@@ -61,6 +62,17 @@ function activeMetas(): SessionMeta[] {
 		.filter((meta): meta is SessionMeta => !!meta)
 }
 
+function focusSession(sessionId: string | null | undefined): void {
+	if (!sessionId) return
+	if (!state.activeSessions.includes(sessionId)) return
+	state.currentSessionId = sessionId
+}
+
+function focusedSessionId(): string | null {
+	if (state.currentSessionId && state.activeSessions.includes(state.currentSessionId)) return state.currentSessionId
+	return state.activeSessions[0] ?? null
+}
+
 function planTargetForCwd(cwd: string): ReturnType<typeof startup.planTarget> {
 	return startup.planTarget({
 		cwd,
@@ -79,6 +91,7 @@ function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { 
 		if (!resumed) return { ok: false, reason: `Session ${plan.sessionId} not found` }
 		state.activeSessions = restoredSessionOrder(state.activeSessions, plan.sessionId, resumed.closedTabPosition)
 		sessionStore.updateMeta(plan.sessionId, { closedAt: undefined })
+		focusSession(plan.sessionId)
 		return { ok: true, sessionId: plan.sessionId }
 	}
 	const created = createSessionTab({ workingDir: cwd })
@@ -206,6 +219,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
 	}
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
+	focusSession(sessionId)
 	const related = sourceMeta ?? openerMeta
 	const text = opts.sourceId
 		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}` : ''
@@ -269,15 +283,15 @@ function restartPromptWatch(): void {
 	)
 }
 
-function broadcastInfo(text: string, level: 'info' | 'error' = 'info'): void {
+function emitFocusedInfo(text: string, level: 'info' | 'error' = 'info'): void {
+	const sessionId = focusedSessionId()
+	if (!sessionId) return
 	const ts = new Date().toISOString()
-	for (const sessionId of state.activeSessions) {
-		// Startup metadata refresh can finish before a just-started client begins
-		// tailing IPC events. Persist the notice too so it survives that race and
-		// remains visible in history after reloads.
-		recordSessionInfo(sessionId, text, ts)
-		emitInfo(sessionId, text, level)
-	}
+	// Startup metadata refresh can finish before a just-started client begins
+	// tailing IPC events. Persist the notice too so it survives that race and
+	// remains visible in history after reloads.
+	recordSessionInfo(sessionId, text, ts)
+	emitInfo(sessionId, text, level)
 }
 
 function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
@@ -333,7 +347,7 @@ async function refreshModelMetadata(): Promise<void> {
 		if (!result.hadCache || result.changes.length > 0) {
 			const message = formatModelRefreshMessage(result.changes, result.modelCount)
 			log.info('models.dev metadata refreshed', { message })
-			broadcastInfo(message)
+			emitFocusedInfo(message)
 		}
 		if (result.hadCache) suggestAliasUpdates(result.previous, result.next)
 	} catch (err) {
@@ -502,6 +516,7 @@ function closeSession(sessionId: string, openReplacement = false): void {
 	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closedTabPosition: state.activeSessions.findIndex((id) => id === sessionId) + 1 })
 	sessionStore.deactivateSession(sessionId)
 	state.activeSessions = state.activeSessions.filter((id) => id !== sessionId)
+	if (state.currentSessionId === sessionId) state.currentSessionId = state.activeSessions[0] ?? null
 	if (openReplacement && state.activeSessions.length === 0) createSessionTab({})
 	broadcastSessions()
 }
@@ -704,6 +719,7 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 
 function handleCommand(cmd: Command): void {
 	const sessionId = cmd.sessionId ?? state.activeSessions[0]
+	focusSession(cmd.sessionId)
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
@@ -832,6 +848,7 @@ function handleCommand(cmd: Command): void {
 			}
 			state.activeSessions = restoredSessionOrder(state.activeSessions, resumeId, resumed.closedTabPosition)
 			sessionStore.updateMeta(resumeId, { closedAt: undefined })
+			focusSession(resumeId)
 			broadcastSessions()
 			break
 		}
@@ -846,17 +863,22 @@ function handleCommand(cmd: Command): void {
 			closeSession(cmd.sessionId, true)
 			break
 		}
+		case 'focus': {
+			break
+		}
 	}
 }
 
 function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): { ok: true; sessionId?: string } | { ok: false; reason: string } {
 	state.activeRuntimePid = process.pid
 	state.activeSessions = []
+	state.currentSessionId = null
 	state.stopPromptWatch?.()
 	state.stopPromptWatch = null
 	sessionStore.deactivateAllSessions()
 	const metas = sessionStore.loadSessionMetas()
 	state.activeSessions = metas.map((meta) => meta.id)
+	state.currentSessionId = state.activeSessions[0] ?? null
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
 		const target = activateTargetForCwd(opts.targetCwd)

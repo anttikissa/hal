@@ -31,6 +31,7 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 		case 'abort':
 		case 'reset':
 		case 'compact':
+		case 'focus':
 			return { type, sessionId }
 		case 'rebase-start':
 			return { type, sessionId, requestId: text ?? '', clientPid: process.pid }

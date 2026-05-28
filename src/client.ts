@@ -178,6 +178,15 @@ function currentTab(): Tab | null {
 	return state.tabs[state.activeTab] ?? null
 }
 
+function focusSession(sessionId: string | undefined): void {
+	if (!sessionId) return
+	ipc.appendCommand({ type: 'focus', sessionId })
+}
+
+function focusCurrentTab(): void {
+	focusSession(currentTab()?.sessionId)
+}
+
 function rememberTab(sessionId: string): void {
 	state.recentTabs = state.recentTabs.filter((id) => id !== sessionId)
 	state.recentTabs.push(sessionId)
