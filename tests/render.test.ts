@@ -267,7 +267,7 @@ describe('render', () => {
 		prompt.config.maxPromptLines = 5
 		prompt.setText('one\ntwo\nthree')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('ctrl+=/-: resize editor')
+		expect(clean).toContain('ctrl-=/-: resize editor')
 	})
 
 	test('chrome order is tabs, prompt box, status, then help at the bottom', () => {

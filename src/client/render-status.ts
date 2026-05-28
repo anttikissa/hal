@@ -435,7 +435,7 @@ function renderHelpBar(lines: string[]): void {
 	}
 	const baseLeft = helpBar.build(busy, hasText, continueAction, style)
 	const resizeHint = prompt.resizeHint(cols)
-	const resizeText = resizeHint ? `${style.key}ctrl+=/-${style.description}: ${resizeHint}` : ''
+	const resizeText = resizeHint ? `${style.key}ctrl-=/-${style.description}: ${resizeHint}` : ''
 	const separator = `${style.separator}, `
 	const left = baseLeft && resizeText ? `${resizeText}${separator}${baseLeft}` : baseLeft || resizeText
 	const right = helpBar.shortcutListHint(style)
