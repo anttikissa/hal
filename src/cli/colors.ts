@@ -127,7 +127,7 @@ function load(): void {
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
 		if (raw.input.cursor) input.cursor = fg(raw.input.cursor, vars)
 	}
-	input.cursorDim = dimFg(raw.input?.cursor ?? raw.assistant?.fg ?? [0.75, 0.15, 55], vars, 0.65)
+	input.cursorDim = dimFg(raw.assistant?.fg ?? [0.75, 0.15, 55], vars, 0.65)
 
 	// Tools
 	const toolDefs = raw.tools ?? {}

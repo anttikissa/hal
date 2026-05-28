@@ -34,6 +34,8 @@ const KITTY_ON = '\x1b[>17u'
 const KITTY_OFF = '\x1b[<u'
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
 const BRACKETED_PASTE_OFF = '\x1b[?2004l'
+const CURSOR_SHAPE_DEFAULT = '\x1b[0 q'
+const CURSOR_COLOR_DEFAULT = '\x1b]112\x07'
 
 // Set hardware tab stops every N columns via HTS (ESC H).
 // Terminals default to 8-wide tabs. We set 4 so tab chars render
@@ -126,7 +128,7 @@ function cleanupTerminal(): void {
 	client.saveDraft(prompt.draftText())
 	client.saveState({ restart: restarting })
 	if (useKitty) process.stdout.write(KITTY_OFF)
-	process.stdout.write(BRACKETED_PASTE_OFF)
+	process.stdout.write(BRACKETED_PASTE_OFF + CURSOR_SHAPE_DEFAULT + CURSOR_COLOR_DEFAULT)
 	writeTabStops(process.stdout.columns || 80, 8)
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 }
@@ -138,7 +140,7 @@ let suspended = false
 // The shell will show its prompt. `fg` resumes us and triggers SIGCONT.
 function suspend(): void {
 	suspended = true
-	process.stdout.write(`${useKitty ? KITTY_OFF : ''}\x1b[?25h`)
+	process.stdout.write(`${useKitty ? KITTY_OFF : ''}${CURSOR_SHAPE_DEFAULT}${CURSOR_COLOR_DEFAULT}\x1b[?25h`)
 	// process.kill(0, ...) sends to the entire process group — this is
 	// the standard way for a foreground job to suspend itself.
 	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }

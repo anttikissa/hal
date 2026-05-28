@@ -48,7 +48,6 @@ test('colors.init loads lazily and only once', () => {
 	}
 })
 
-
 test('colors reload notifies callbacks', () => {
 	const state = (colors as any).state
 	const origInitialized = state.initialized
@@ -83,6 +82,7 @@ test('colors reload notifies callbacks', () => {
 		liveFiles.onChange = origOnChange
 	}
 })
+
 
 test('colors.load exposes help bar colors from colors.ason', () => {
 	colors.load()

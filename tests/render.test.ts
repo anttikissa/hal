@@ -11,7 +11,10 @@ import { version } from '../src/version.ts'
 
 openaiUsage.init()
 function stripAnsi(s: string): string {
-	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
+	return s
+		.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')
+		.replace(/\x1b\[[0-9;? ]*[a-zA-Z]/g, '')
+		.replace(/\r/g, '')
 }
 
 function captureOutput(fn: () => void): string {
@@ -51,6 +54,7 @@ beforeEach(() => {
 		showTokenInOut: true,
 		showTokenCache: false,
 		showSubscription: true,
+		promptCursorShape: 'block',
 	})
 	openaiUsage.state.currentKey = 'openai:1'
 	openaiUsage.state.accounts = {
@@ -282,12 +286,41 @@ describe('render', () => {
 		expect(lines[lines.length - 1]).toContain('enter: send')
 	})
 
-	test('prompt box keeps the input blue background', () => {
+	test('prompt box uses info colors for user input', () => {
 		colors.load()
 		expect(colors.input.bg).toStartWith('\x1b[48;2;')
 		expect(renderStatus.promptRule(10)).toContain(colors.input.bg)
 		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.input.bg)
-		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.user.fg)
+		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.info.fg)
+	})
+
+
+	test('prompt cursor shape is configurable', () => {
+		renderStatus.config.promptCursorShape = 'bar'
+		expect(renderStatus.cursorShapeSequence()).toBe('\x1b[6 q')
+
+		renderStatus.config.promptCursorShape = 'block'
+		expect(renderStatus.cursorShapeSequence()).toBe('\x1b[2 q')
+
+		renderStatus.config.promptCursorShape = 'native'
+		expect(renderStatus.cursorShapeSequence()).toBe('')
+	})
+
+	test('prompt cursor color uses the input cursor color', () => {
+		expect(renderStatus.promptCursorColorSequence('\x1b[38;2;130;40;7m')).toBe('\x1b]12;#822807\x07')
+	})
+
+	test('draw applies the configured prompt cursor shape and color', () => {
+		const originalCursor = colors.input.cursor
+		renderStatus.config.promptCursorShape = 'block'
+		colors.input.cursor = '\x1b[38;2;130;40;7m'
+		try {
+			const output = captureOutput(() => render.draw(true))
+			expect(output).toContain('\x1b[2 q')
+			expect(output).toContain('\x1b]12;#822807\x07')
+		} finally {
+			colors.input.cursor = originalCursor
+		}
 	})
 
 	test('status line shows host role without pid', () => {
