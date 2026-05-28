@@ -78,7 +78,7 @@ function visibleHistory(history: Block[]): Block[] {
 }
 
 function halCursorLine(visible: boolean): string {
-	return visible ? `${blockRenderer.cursorColor()}█\x1b[39m` : ''
+	return visible ? ` ${blockRenderer.cursorColor()}█\x1b[39m` : ''
 }
 
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {
@@ -98,10 +98,15 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		i += group.length
 	}
 
-	// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
-	// another blank row. When history fills the screen, these are the bottom
-	// three history rows immediately above the tab/status/prompt chrome.
-	if (!hasInlineHalCursor(history.at(-1))) {
+	const last = history.at(-1)
+	if (hasInlineHalCursor(last)) {
+		// Streaming blocks carry an inline cursor, but still need breathing room
+		// before the tab bar when they are the last visible history row.
+		lines.push('')
+	} else {
+		// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
+		// another blank row. When history fills the screen, these are the bottom
+		// three history rows immediately above the tab/status/prompt chrome.
 		lines.push('', halCursorLine(context.cursorVisible), '')
 	}
 

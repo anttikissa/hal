@@ -596,7 +596,7 @@ describe('render', () => {
 			const tabBar = lines.findIndex((line) => line.includes('[1]'))
 			expect(tabBar).toBeGreaterThanOrEqual(3)
 			expect(lines[tabBar - 3]).toBe('')
-			expect(lines[tabBar - 2]).toBe('█')
+			expect(lines[tabBar - 2]).toBe(' █')
 			expect(lines[tabBar - 1]).toBe('')
 		} finally {
 			cursor.isVisible = originalIsVisible
@@ -614,6 +614,10 @@ describe('render', () => {
 			render.resetRenderer()
 			const visiblePhase = stripAnsi(captureOutput(() => render.draw(true)))
 			expect(visiblePhase).toContain('hmm█')
+			const visibleLines = visiblePhase.split('\n')
+			const visibleTabBar = visibleLines.findIndex((line) => line.includes('[1]'))
+			expect(visibleTabBar).toBeGreaterThan(0)
+			expect(visibleLines[visibleTabBar - 1]).toBe('')
 
 			cursor.isVisible = () => false
 			render.resetRenderer()
