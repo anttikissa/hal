@@ -9,7 +9,7 @@ import { cursor } from '../cli/cursor.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
-import { keyHelp } from '../cli/key-help.ts'
+import { clientLocalCommands } from './local-commands.ts'
 import { popup } from './popup.ts'
 import { blocks } from '../cli/blocks.ts'
 import { perf } from '../perf.ts'
@@ -340,13 +340,6 @@ function submitPromptText(text: string, displayText: string | undefined, deliver
 }
 
 function handleLocalCommand(text: string): boolean {
-	if (text === '/keys') {
-		prompt.pushHistory(text)
-		client.addEntry(keyHelp.render())
-		prompt.clear()
-		client.onSubmit(text)
-		return true
-	}
 	if (text === '/rebase') {
 		prompt.pushHistory(text)
 		client.sendCommand('rebase-start', rebaseRequestId())
@@ -354,7 +347,24 @@ function handleLocalCommand(text: string): boolean {
 		client.onSubmit(text)
 		return true
 	}
-	return false
+
+	const parsed = clientLocalCommands.parse(text)
+	if (!parsed) return false
+	if (!clientLocalCommands.commandNames(true).includes(parsed.name)) return false
+
+	prompt.pushHistory(text)
+	prompt.clear()
+	client.onSubmit(text)
+	const result = clientLocalCommands.execute(text, {
+		tabs: client.state.tabs,
+		activeTab: client.state.activeTab,
+		switchTab: client.switchTab,
+		sendCommand: client.sendCommand,
+	})
+	if (result.output) client.addEntry(result.output)
+	if (result.error) client.addEntry(result.error, 'error')
+	if (result.quit) exitCli(0)
+	return true
 }
 
 function submit(override?: string, delivery?: 'queue'): void {

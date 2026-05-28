@@ -6,6 +6,7 @@ import { homedir } from 'os'
 import { config as runtimeConfig } from '../config.ts'
 import { commands } from '../runtime/commands.ts'
 import { models } from '../models.ts'
+import { clientLocalCommands } from '../client/local-commands.ts'
 
 export interface CompletionResult {
 	items: string[]
@@ -16,7 +17,6 @@ export interface CompletionResult {
 
 const config = {
 	modelNames: [] as string[],
-	localCommandNames: ['keys'],
 }
 
 const state = {
@@ -96,7 +96,7 @@ function modelNames(): string[] {
 }
 
 function commandNamesForPrompt(): string[] {
-	return [...new Set([...commands.commandNames(), ...config.localCommandNames])].sort()
+	return [...new Set([...commands.commandNames(), ...clientLocalCommands.commandNames()])].sort()
 }
 
 
@@ -122,7 +122,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	}
 
 	const command = parts[0]!
-	const arg = commands.commandArg(command)
+	const arg = clientLocalCommands.commandArg(command) ?? commands.commandArg(command)
 	if (!arg) return null
 	if (parts.length > 2) return null
 
@@ -134,7 +134,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	} else if (arg === 'dir') {
 		values = completeDirs(argPrefix, cwd)
 	} else if (arg === 'command') {
-		values = commands.commandNames().filter((name) => name.startsWith(argPrefix))
+		values = commandNamesForPrompt().filter((name) => name.startsWith(argPrefix))
 	} else {
 		values = runtimeConfig.listPaths().filter((path) => path.startsWith(argPrefix))
 	}
