@@ -50,14 +50,12 @@ test('/quit quits with a visible goodbye', () => {
 	expect(result).toMatchObject({ handled: true, output: 'Goodbye.', quit: true })
 })
 
-test('/exit is a silent local alias for /quit', () => {
+test('/exit is a local alias for /quit', () => {
 	const result = clientLocalCommands.execute('/exit', ctx())
 
-	expect(result).toMatchObject({ handled: true, quit: true })
-	expect(result.output).toBeUndefined()
+	expect(result).toMatchObject({ handled: true, output: 'Goodbye.', quit: true })
 	expect(clientLocalCommands.commandNames()).toContain('quit')
-	expect(clientLocalCommands.commandNames()).not.toContain('exit')
-	expect(clientLocalCommands.commandNames(true)).toContain('exit')
+	expect(clientLocalCommands.commandNames()).toContain('exit')
 })
 
 test('/help includes terminal-local commands and shortcut hint', () => {
@@ -67,7 +65,7 @@ test('/help includes terminal-local commands and shortcut hint', () => {
 	expect(result.output).toContain('/go')
 	expect(result.output).toContain('/keys')
 	expect(result.output).toContain('/quit')
-	expect(result.output).not.toContain('/exit')
+	expect(result.output).toContain('/exit')
 	expect(result.output).toContain('/go <target>')
 	expect(result.output).toContain('/help [<command>]')
 	expect(result.output).toContain('Keyboard shortcuts')

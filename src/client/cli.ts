@@ -352,7 +352,7 @@ function handleLocalCommand(text: string): boolean {
 
 	const parsed = clientLocalCommands.parse(text)
 	if (!parsed) return false
-	if (!clientLocalCommands.commandNames(true).includes(parsed.name)) return false
+	if (!clientLocalCommands.commandNames().includes(parsed.name)) return false
 
 	prompt.pushHistory(text)
 	prompt.clear()

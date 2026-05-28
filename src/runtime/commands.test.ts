@@ -488,7 +488,7 @@ test('/rebase runtime handler points users to the interactive client', async () 
 	expect(result.error).toBe('Run /rebase from an interactive client terminal.')
 })
 
-test('/quit quits and /exit is a silent alias', async () => {
+test('/quit quits and /exit is an alias', async () => {
 	const exits: Array<{ code: number; delayMs: number }> = []
 	commands.state.scheduleExit = (code, delayMs) => {
 		exits.push({ code, delayMs })
@@ -498,10 +498,9 @@ test('/quit quits and /exit is a silent alias', async () => {
 	const exit = await commands.executeCommand('/exit', makeSession())
 
 	expect(quit).toMatchObject({ handled: true, output: 'Goodbye.' })
-	expect(exit).toMatchObject({ handled: true })
-	expect(exit.output).toBeUndefined()
+	expect(exit).toMatchObject({ handled: true, output: 'Goodbye.' })
 	expect(commands.commandNames()).toContain('quit')
-	expect(commands.commandNames()).not.toContain('exit')
+	expect(commands.commandNames()).toContain('exit')
 	expect(exits).toEqual([{ code: 0, delayMs: 100 }, { code: 0, delayMs: 100 }])
 })
 
@@ -537,7 +536,7 @@ test('/help groups commands thematically and alphabetically within each section'
 	expect(output).toContain('Syntax:')
 	expect(output).toContain('  literal          type exactly as shown: clear, next, --all')
 	expect(output).toContain('  <text…>          rest of line; may contain spaces')
-	expect(output).not.toContain('/exit')
+	expect(output.indexOf('/exit')).toBeLessThan(output.indexOf('/help [<command>]'))
 	expect(output.indexOf('/help [<command>]')).toBeLessThan(output.indexOf('/model [<model>]'))
 	expect(output.indexOf('/model [<model>]')).toBeLessThan(output.indexOf('/quit'))
 	expect(output.indexOf('/quit')).toBeLessThan(output.indexOf('/status'))

@@ -343,10 +343,11 @@ const commandSpecs: Record<string, CommandSpec> = {
 	},
 	help: { usage: '[<command>]', summary: 'Show help; try /help config.', arg: 'command' },
 	quit: { summary: 'Quit Hal.' },
+	exit: { summary: 'Quit Hal.' },
 }
 
 const commandSections: CommandSection[] = [
-	{ title: 'Common', names: ['help', 'model', 'quit', 'status'] },
+	{ title: 'Common', names: ['exit', 'help', 'model', 'quit', 'status'] },
 	{ title: 'Conversation', names: ['clear', 'compact', 'rebase', 'system'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
@@ -777,14 +778,14 @@ handlers['config'] = (args) => {
 
 
 // /quit — quit
-function quitCommand(output?: string): CommandResult {
+function quitCommand(): CommandResult {
 	// Give cleanup and IPC tails a brief moment to flush before exiting.
 	state.scheduleExit(0, 100)
-	return { output, handled: true }
+	return { output: 'Goodbye.', handled: true }
 }
 
-handlers['quit'] = () => quitCommand('Goodbye.')
-handlers['exit'] = () => quitCommand()
+handlers['quit'] = quitCommand
+handlers['exit'] = quitCommand
 
 
 // ── Main dispatch ──

@@ -32,7 +32,6 @@ interface ClientLocalCommandSpec {
 	summary: string
 	detail?: string
 	arg?: ClientLocalCommandArg
-	hidden?: boolean
 	run: ClientLocalCommandHandler
 }
 
@@ -166,9 +165,6 @@ function runQuit(_args: string, _ctx: ClientLocalCommandContext): ClientLocalCom
 	return { handled: true, output: 'Goodbye.', quit: true }
 }
 
-function runExit(_args: string, _ctx: ClientLocalCommandContext): ClientLocalCommandResult {
-	return { handled: true, quit: true }
-}
 
 function helpUsageLines(name: string): string[] {
 	const spec = specs[name]
@@ -211,7 +207,7 @@ function localCommandHelp(): string {
 
 function detailedHelp(name: string): string | null {
 	const spec = specs[name]
-	if (!spec || spec.hidden) return null
+	if (!spec) return null
 	const lines = [`Usage: ${helpUsage(name)}`, '', spec.summary]
 	if (spec.detail) lines.push('', spec.detail)
 	return lines.join('\n')
@@ -243,13 +239,8 @@ function execute(text: string, ctx: ClientLocalCommandContext): ClientLocalComma
 	return spec.run(parsed.args, ctx)
 }
 
-function commandNames(includeHidden = false): string[] {
-	const names: string[] = []
-	for (const name of Object.keys(specs)) {
-		if (!includeHidden && specs[name]?.hidden) continue
-		names.push(name)
-	}
-	return names.sort()
+function commandNames(): string[] {
+	return Object.keys(specs).sort()
 }
 
 function commandArg(name: string): ClientLocalCommandArg | undefined {
@@ -282,8 +273,7 @@ specs['quit'] = {
 
 specs['exit'] = {
 	summary: 'Quit this terminal.',
-	hidden: true,
-	run: runExit,
+	run: runQuit,
 }
 
 export const clientLocalCommands = {

@@ -19,6 +19,14 @@ test('/keys completes as a terminal-local command name', () => {
 	expect(result!.items).toContain('/keys')
 })
 
+test('/exi completes to /exit', () => {
+	const result = completion.complete('/exi', '/exi'.length)
+
+	expect(result).not.toBeNull()
+	expect(result!.items).toContain('/exit')
+	expect(result!.prefix).toBe('/exit')
+})
+
 test('/help completes command names', () => {
 	const result = completion.complete('/help co', '/help co'.length)
 
