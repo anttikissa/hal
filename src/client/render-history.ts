@@ -78,7 +78,7 @@ function visibleHistory(history: Block[]): Block[] {
 }
 
 function halCursorLine(visible: boolean): string {
-	return visible ? ` ${blockRenderer.cursorColor()}█\x1b[39m` : ''
+	return visible ? ` ${blockRenderer.idleCursorColor()}█\x1b[39m` : ''
 }
 
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {

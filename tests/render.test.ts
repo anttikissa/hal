@@ -11,10 +11,7 @@ import { version } from '../src/version.ts'
 
 openaiUsage.init()
 function stripAnsi(s: string): string {
-	return s
-		.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')
-		.replace(/\x1b\[[0-9;? ]*[a-zA-Z]/g, '')
-		.replace(/\r/g, '')
+	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
 function captureOutput(fn: () => void): string {
@@ -54,7 +51,6 @@ beforeEach(() => {
 		showTokenInOut: true,
 		showTokenCache: false,
 		showSubscription: true,
-		promptCursorShape: 'block',
 	})
 	openaiUsage.state.currentKey = 'openai:1'
 	openaiUsage.state.accounts = {
@@ -286,41 +282,12 @@ describe('render', () => {
 		expect(lines[lines.length - 1]).toContain('enter: send')
 	})
 
-	test('prompt box uses info colors for user input', () => {
+	test('prompt box keeps the input blue background', () => {
 		colors.load()
 		expect(colors.input.bg).toStartWith('\x1b[48;2;')
 		expect(renderStatus.promptRule(10)).toContain(colors.input.bg)
 		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.input.bg)
-		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.info.fg)
-	})
-
-
-	test('prompt cursor shape is configurable', () => {
-		renderStatus.config.promptCursorShape = 'bar'
-		expect(renderStatus.cursorShapeSequence()).toBe('\x1b[6 q')
-
-		renderStatus.config.promptCursorShape = 'block'
-		expect(renderStatus.cursorShapeSequence()).toBe('\x1b[2 q')
-
-		renderStatus.config.promptCursorShape = 'native'
-		expect(renderStatus.cursorShapeSequence()).toBe('')
-	})
-
-	test('prompt cursor color uses the input cursor color', () => {
-		expect(renderStatus.promptCursorColorSequence('\x1b[38;2;130;40;7m')).toBe('\x1b]12;#822807\x07')
-	})
-
-	test('draw applies the configured prompt cursor shape and color', () => {
-		const originalCursor = colors.input.cursor
-		renderStatus.config.promptCursorShape = 'block'
-		colors.input.cursor = '\x1b[38;2;130;40;7m'
-		try {
-			const output = captureOutput(() => render.draw(true))
-			expect(output).toContain('\x1b[2 q')
-			expect(output).toContain('\x1b]12;#822807\x07')
-		} finally {
-			colors.input.cursor = originalCursor
-		}
+		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.user.fg)
 	})
 
 	test('status line shows host role without pid', () => {
@@ -643,12 +610,33 @@ describe('render', () => {
 		}
 	})
 
+	test('idle HAL cursor uses the assistant idle cursor color', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'assistant', text: 'done' })
+		const originalIsVisible = cursor.isVisible
+		const originalCursor = colors.assistant.cursor
+		const originalIdleCursor = colors.assistant.cursorIdle
+		colors.assistant.cursor = '\x1b[38;5;214m'
+		colors.assistant.cursorIdle = '\x1b[38;5;245m'
+		cursor.isVisible = () => true
+		try {
+			const output = captureOutput(() => render.draw(true))
+			expect(output).toContain(`${colors.assistant.cursorIdle}█`)
+			expect(output).not.toContain(`${colors.assistant.cursor}█`)
+		} finally {
+			cursor.isVisible = originalIsVisible
+			colors.assistant.cursor = originalCursor
+			colors.assistant.cursorIdle = originalIdleCursor
+		}
+	})
+
 	test('streaming assistant and thinking blocks show a solid HAL cursor inline', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'assistant', text: 'hello', streaming: true })
 		tab.history.push({ type: 'thinking', text: 'hmm', streaming: true })
 
 		const originalIsVisible = cursor.isVisible
+		const originalAssistantCursor = colors.assistant.cursor
 		try {
 			cursor.isVisible = () => true
 			render.resetRenderer()
@@ -659,12 +647,18 @@ describe('render', () => {
 			expect(visibleTabBar).toBeGreaterThan(0)
 			expect(visibleLines[visibleTabBar - 1]).toBe('')
 
+			colors.assistant.cursor = '\x1b[38;5;215m'
+			render.resetRenderer()
+			const activeColorPhase = captureOutput(() => render.draw(true))
+			expect(activeColorPhase).toContain(`${colors.assistant.cursor}█`)
+
 			cursor.isVisible = () => false
 			render.resetRenderer()
 			const hiddenPhase = stripAnsi(captureOutput(() => render.draw(true)))
 			expect(hiddenPhase).toContain('hmm█')
 		} finally {
 			cursor.isVisible = originalIsVisible
+			colors.assistant.cursor = originalAssistantCursor
 		}
 	})
 	test('error-level info on an inactive finished tab shows an alert indicator', () => {

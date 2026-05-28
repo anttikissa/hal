@@ -12,9 +12,14 @@
 		bgC: 0.04,
 	},
 
-	// Hal's responses — warm orange
+	// Hal's responses — warm orange.
+	// fg colors assistant text. cursor colors the active HAL cursor while Hal is
+	// thinking/streaming or shown as a busy tab marker. cursorIdle colors the
+	// idle cursor after Hal has finished its final message.
 	assistant: {
 		fg: ["$fgL", "$fgC", 55],
+		cursor: ["$fgL", "$fgC", 55],
+		cursorIdle: [0.56, 0, 0],
 		bg: ["$bgL", 0.04, 55],
 		bold: [0.90, 0.06, 55],
 		code: [0.86, 0.04, 55],
@@ -34,10 +39,10 @@
 		bg: [0.24, 0.07, 250],
 	},
 
-	// Prompt input area — use the same blue as user-visible info cards.
+	// Prompt input area — dark human blue
 	input: {
-		bg: [0.29, 0.05, 220],
-		cursor: [0.82, 0.11, 220],
+		bg: [0.24, 0.07, 250],
+		cursor: ["$fgL", "$fgC", 55],
 	},
 
 	// System messages

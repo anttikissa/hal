@@ -90,3 +90,11 @@ test('colors.load exposes help bar colors from colors.ason', () => {
 	expect(colors.help.description).toStartWith('\x1b[')
 	expect(colors.help.key).not.toBe('\x1b[97m')
 })
+
+
+test('colors.load exposes assistant HAL cursor colors from colors.ason', () => {
+	colors.load()
+	expect(colors.assistant.cursor).toStartWith('\x1b[')
+	expect(colors.assistant.cursorIdle).toStartWith('\x1b[')
+	expect(colors.assistant.cursorIdle).not.toBe(colors.assistant.cursor)
+})

@@ -631,8 +631,8 @@ const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.
 
 function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
 	if (block.type === 'assistant') return { ...colors.assistant, bg: '' }
-	if (block.type === 'thinking') return colors.thinking
-	if (block.type === 'user') return colors.info
+	if (block.type === 'thinking') return { ...colors.thinking, bg: '' }
+	if (block.type === 'user') return colors.user
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
 }
 
@@ -690,7 +690,7 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 	const label = fixedLabels[first.type]
 	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
 	const { fg, bg } = blockColors(first)
-	const lines = [bgLine(`${fg}${header}`, cols, bg), bgLine(`${fg}${padBlockLine('')}`, cols, bg)]
+	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
 	for (const block of group) {
 		for (const line of renderMarkdownLines(block, contentCols)) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
@@ -704,8 +704,12 @@ function hasStreamingHalCursor(block: Block): boolean {
 }
 
 function cursorColor(block?: Block): string {
-	if (block?.type === 'thinking') return colors.thinking.fg
-	return colors.assistant.fg
+	if (block?.type === 'thinking') return colors.thinking.cursor ?? colors.thinking.fg
+	return colors.assistant.cursor ?? colors.assistant.fg
+}
+
+function idleCursorColor(): string {
+	return colors.assistant.cursorIdle ?? colors.assistant.cursor ?? colors.assistant.fg
 }
 
 function cursorGlyph(block: Block, visible: boolean): string {
@@ -743,12 +747,11 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const label = blockLabel(block)
 	const blockTime = formatBlockTime(block.ts)
 	const header = buildHeader(label, blockTime, blobRef, cols)
-	const lines = [bgLine(`${fg}${header}`, cols, bg), bgLine(`${fg}${padBlockLine('')}`, cols, bg)]
+	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
 	for (const line of blockContent(block, contentCols)) {
 		lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
-	if (block.type === 'tool') lines.push(bgLine(`${fg}${padBlockLine('')}`, cols, bg))
 	lines[lines.length - 1]! += FG_OFF
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid
 	// so the active streamed block is always visually anchored.
@@ -762,6 +765,7 @@ export const blocks = {
 	touch,
 	renderBlock,
 	cursorColor,
+	idleCursorColor,
 	renderBlockGroup,
 	loadBlobs,
 }
