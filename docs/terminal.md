@@ -14,7 +14,7 @@ Bottom-anchored sections:
 ```
 [history lines...]   — per-tab, append-only, ALL of them
 [padding]            — blank lines to stabilize prompt position across tabs
-[tab bar]            — blue row, e.g. " Tabs: ◣1◢2" plus tab-specific hints
+[tab bar]            — " Tabs: [1]  2" plus tab-specific hints when they fit
 [prompt top rule]    — one full-width rule on the prompt blue background
 [prompt]             — user input, blue bg, padded one column on each side
 [prompt bottom rule] — one full-width rule on the prompt blue background
@@ -27,13 +27,12 @@ Chrome = tab bar + prompt box + status + help bar.
 ## Tabs
 
 Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
-The tab bar is a blue strip. Inactive tabs are compact numeric labels; the
-active tab is drawn as a black pocket with blue diagonal edges, e.g. `◣1◢`.
-A one-character status indicator follows the tab number when needed. With one
-tab, it shows creation hints such as `ctrl-t: new`; with multiple tabs, it
-switches to navigation hints such as `alt-#: goto` and `ctrl-n/p: switch`. It
-stays one row: tab-specific hints are dropped from lowest to highest priority,
-then the "Tabs:" label is dropped, rather than wrapping.
+The tab bar uses compact numeric labels, brackets for the active tab, and a
+one-character status indicator after the tab number when needed. With one tab,
+it shows creation hints such as `ctrl-t: new`; with multiple tabs, it switches
+to navigation hints such as `alt-#: goto` and `ctrl-n/p: switch`. It stays one
+row: tab-specific hints are dropped from lowest to highest priority, then the
+"Tabs:" label is dropped, rather than wrapping.
 
 ### Height management
 

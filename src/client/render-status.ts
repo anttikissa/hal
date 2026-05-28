@@ -27,10 +27,8 @@ const GREEN = '\x1b[32m'
 const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
 const BRIGHT_WHITE = '\x1b[97m'
-const WHITE = '\x1b[37m'
 const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
-const BLACK_BG = '\x1b[48;2;0;0;0m'
 
 type TabHelpHint = { text: string; priority: number }
 
@@ -52,21 +50,8 @@ function halCursorColor(): string {
 }
 
 function inputStyle(): string {
-	const bg = colors.input.bg || colors.user.bg || RESET
-	return `${bg}${colors.input.fg || WHITE}`
-}
-
-function tabBarStyle(): string {
-	const bg = colors.input.bg || colors.user.bg || RESET
-	return `${bg}${colors.input.fg || WHITE}`
-}
-
-function activeTabTextColor(): string {
-	return colors.input.fg || WHITE
-}
-
-function tabTriangleColor(): string {
-	return colors.input.edge || colors.user.fg || colors.info.fg || WHITE
+	const bg = colors.input.bg || colors.user.bg || ''
+	return `${bg}${colors.input.fg || BRIGHT_WHITE}`
 }
 
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
@@ -116,15 +101,11 @@ function tabInner(num: number, ind: string): string {
 
 function tabLabel(tab: Tab, i: number): string {
 	const active = client.state.activeTab
-	const base = renderStatus.tabBarStyle()
+	const base = i === active ? BRIGHT_WHITE : DIM
 	const ind = renderStatus.renderIndicator(tab, base)
 	const content = renderStatus.tabInner(i + 1, ind)
-	if (i === active) {
-		const edge = renderStatus.tabTriangleColor()
-		const text = renderStatus.activeTabTextColor()
-		return `${BLACK_BG}${edge}◣${text}${BLACK_BG}${content}${edge}${BLACK_BG}◢${base}`
-	}
-	return `${DIM}${content}${base}`
+	if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
+	return `${DIM} ${content} ${RESET}`
 }
 
 function tabHelpHints(tabCount: number): TabHelpHint[] {
@@ -184,9 +165,6 @@ function fitTabHelpText(tabCount: number, base: string, cols: number): string {
 function buildTabText(): string {
 	let text = ''
 	for (let i = 0; i < client.state.tabs.length; i++) {
-		if (i > 0 && client.state.activeTab !== i - 1) {
-			text += ' '
-		}
 		text += renderStatus.tabLabel(client.state.tabs[i]!, i)
 	}
 	return text
@@ -199,7 +177,7 @@ function buildTabBarLines(cols: number): string[] {
 	if (visLen(content) > renderStatus.contentWidth(cols)) {
 		content = tabText + renderStatus.fitTabHelpText(client.state.tabs.length, tabText, cols)
 	}
-	return [`${renderStatus.tabBarStyle()}${renderStatus.paddedLine(content, cols)}${RESET}`]
+	return [renderStatus.paddedLine(content, cols)]
 }
 
 function renderTabBar(lines: string[]): void {
@@ -490,9 +468,6 @@ export const renderStatus = {
 	renderPrompt,
 	// Internal helpers, exposed on the namespace for hot-patching via eval.
 	inputStyle,
-	tabBarStyle,
-	activeTabTextColor,
-	tabTriangleColor,
 	contentWidth,
 	paddedLine,
 	halCursorColor,

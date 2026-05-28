@@ -23,7 +23,7 @@ type HelpColors = { key: string; description: string }
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
-const input = { fg: '', bg: '', edge: '', cursor: '', cursorDim: '' }
+const input = { fg: '', bg: '', cursor: '', cursorDim: '' }
 const system: BlockColors = { fg: '', bg: '' }
 const logColors: BlockColors = { fg: '', bg: '' }
 const info: BlockColors = { fg: '', bg: '' }
@@ -121,7 +121,6 @@ function load(): void {
 	if (raw.input) {
 		if (raw.input.fg) input.fg = fg(raw.input.fg, vars)
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
-		if (raw.input.edge) input.edge = fg(raw.input.edge, vars)
 		if (raw.input.cursor) input.cursor = fg(raw.input.cursor, vars)
 	}
 	input.cursorDim = dimFg(raw.input?.cursor ?? raw.assistant?.fg ?? [0.75, 0.15, 55], vars, 0.65)
