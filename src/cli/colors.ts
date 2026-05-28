@@ -40,6 +40,7 @@ const tools: Record<string, BlockColors> = {}
 const state = {
 	initialized: false,
 	watcher: null as object | null,
+	callbacks: [] as Array<() => void>,
 }
 
 // ── OKLCH triple resolution ──────────────────────────────────────────────────
@@ -139,6 +140,15 @@ function load(): void {
 	}
 }
 
+function reload(): void {
+	load()
+	for (const cb of state.callbacks) cb()
+}
+
+function onChange(cb: () => void): void {
+	state.callbacks.push(cb)
+}
+
 function init(): void {
 	if (state.initialized) return
 	state.initialized = true
@@ -148,7 +158,7 @@ function init(): void {
 	// liveFile watches the file; we just need the onChange callback to re-resolve.
 	// Use a dummy liveFile (read-only, we never write back to colors.ason).
 	state.watcher = liveFiles.liveFile(COLORS_PATH, {}, { watch: true })
-	liveFiles.onChange(state.watcher, load)
+	liveFiles.onChange(state.watcher, reload)
 }
 
 // Get colors for a tool by name. Strips mcp__ prefix.
@@ -176,4 +186,5 @@ export const colors = {
 	tools,
 	load,
 	init,
+	onChange,
 }

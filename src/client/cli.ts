@@ -12,6 +12,7 @@ import { completion } from '../cli/completion.ts'
 import { clientLocalCommands } from './local-commands.ts'
 import { popup } from './popup.ts'
 import { blocks } from '../cli/blocks.ts'
+import { colors } from '../cli/colors.ts'
 import { perf } from '../perf.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { startup } from '../startup.ts'
@@ -582,6 +583,10 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 	client.setOnToolConfirmRequest(openToolConfirm)
 	client.setOnRebaseStart(handleRebaseStart)
 	client.setOnRebaseResult(handleRebaseResult)
+	colors.onChange(() => {
+		render.invalidateHistoryCache()
+		draw()
+	})
 
 	// Wire prompt to trigger repaint on async paste resolve.
 	prompt.setRenderCallback(() => {

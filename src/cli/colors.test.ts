@@ -49,6 +49,41 @@ test('colors.init loads lazily and only once', () => {
 })
 
 
+test('colors reload notifies callbacks', () => {
+	const state = (colors as any).state
+	const origInitialized = state.initialized
+	const origWatcher = state.watcher
+	const origCallbacks = state.callbacks
+	const origLiveFile = liveFiles.liveFile
+	const origOnChange = liveFiles.onChange
+	let watchedCallback: any = null
+	let calls = 0
+
+	liveFiles.liveFile = (() => ({ watched: true })) as typeof liveFiles.liveFile
+	liveFiles.onChange = ((_: object, cb: () => void) => {
+		watchedCallback = cb
+	}) as typeof liveFiles.onChange
+
+	try {
+		state.initialized = false
+		state.watcher = null
+		state.callbacks = []
+		colors.onChange(() => { calls++ })
+		colors.init()
+
+		expect(calls).toBe(0)
+		if (!watchedCallback) throw new Error('missing colors watcher callback')
+		watchedCallback()
+		expect(calls).toBe(1)
+	} finally {
+		state.initialized = origInitialized
+		state.watcher = origWatcher
+		state.callbacks = origCallbacks
+		liveFiles.liveFile = origLiveFile
+		liveFiles.onChange = origOnChange
+	}
+})
+
 test('colors.load exposes help bar colors from colors.ason', () => {
 	colors.load()
 	expect(colors.help.key).toStartWith('\x1b[')
