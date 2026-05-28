@@ -285,7 +285,7 @@ test('spawn_agent block renders full input args', () => {
 			model: 'openai/gpt-5.4',
 			cwd: '/Users/antti/.hal',
 			title: 'edit benchmark prompt',
-			closeWhenDone: false,
+			kind: 'subagent',
 		},
 		output: 'Queued subagent spawn from 04-lfp',
 	}
@@ -302,7 +302,7 @@ test('spawn_agent block renders full input args', () => {
 	expect(body).toContain("model: 'openai/gpt-5.4'")
 	expect(body).toContain("cwd: '/Users/antti/.hal'")
 	expect(body).toContain("title: 'edit benchmark prompt'")
-	expect(body).toContain('closeWhenDone: false')
+	expect(body).toContain("kind: 'subagent'")
 	expect(body).toContain('Queued subagent spawn from 04-lfp')
 })
 

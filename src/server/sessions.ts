@@ -9,7 +9,7 @@ import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { liveEventBlocks } from '../live-event-blocks.ts'
-import type { PartialTokenUsage, TurnEndMeta } from '../protocol.ts'
+import type { PartialTokenUsage, SpawnKind, TurnEndMeta } from '../protocol.ts'
 import { models } from '../models.ts'
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
@@ -25,7 +25,7 @@ export interface SessionMeta {
 	currentLog?: string
 	closedAt?: string
 	forkedFrom?: string
-	closeWhenDone?: boolean
+	spawnKind?: SpawnKind
 	// 1-based visible tab position at close time. Used to put Ctrl-Shift-T
 	// restores back where the tab was instead of appending at the end.
 	closedTabPosition?: number

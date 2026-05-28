@@ -57,15 +57,15 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 	})
 	expect(spawn).toMatchObject({
 		task: 'Investigate foo',
+		kind: 'subagent',
 		mode: 'fork',
 		cwd: '/tmp/project',
-		closeWhenDone: false,
 	})
 	expect(childSessionId).toMatch(/^\d{2}-[a-z0-9]{3}$/)
 	expect(existsSync(`${stateDir}/sessions/${childSessionId}`)).toBe(true)
 })
 
-test('spawn_agent passes through fresh mode and closeWhenDone', async () => {
+test('spawn_agent passes through fresh mode and subagent-autoclose kind', async () => {
 	useTempStateDir()
 	const appended: any[] = []
 	ipc.appendCommand = (command) => {
@@ -73,7 +73,7 @@ test('spawn_agent passes through fresh mode and closeWhenDone', async () => {
 	}
 
 	const result = await spawnAgent.execute(
-		{ task: 'Research bar', mode: 'fresh', model: 'openai/gpt-5', cwd: '/work', title: 'Bar scout', closeWhenDone: true },
+		{ task: 'Research bar', kind: 'subagent-autoclose', mode: 'fresh', model: 'openai/gpt-5', cwd: '/work', title: 'Bar scout' },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
 	const spawn = appended[0]?.spawn
@@ -86,10 +86,33 @@ test('spawn_agent passes through fresh mode and closeWhenDone', async () => {
 	})
 	expect(spawn).toMatchObject({
 		task: 'Research bar',
+		kind: 'subagent-autoclose',
 		mode: 'fresh',
 		model: 'openai/gpt-5',
 		cwd: '/work',
 		title: 'Bar scout',
-		closeWhenDone: true,
+	})
+})
+
+test('spawn_agent can open an interactive session without a task', async () => {
+	useTempStateDir()
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const result = await spawnAgent.execute(
+		{ kind: 'interactive', mode: 'fresh', title: 'Scratch' },
+		{ sessionId: '04-parent', cwd: '/tmp/project' },
+	)
+	const spawn = appended[0]?.spawn
+
+	expect(result).toContain('Queued interactive session')
+	expect(spawn).toMatchObject({
+		task: '',
+		kind: 'interactive',
+		mode: 'fresh',
+		cwd: '/tmp/project',
+		title: 'Scratch',
 	})
 })

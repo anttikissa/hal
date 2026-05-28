@@ -27,6 +27,7 @@ export type EventType =
 export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'rename' | 'spawn' | 'tool-confirm'
 
 export type SpawnMode = 'fork' | 'fresh'
+export type SpawnKind = 'subagent' | 'subagent-autoclose' | 'interactive'
 
 // Commands are stored directly in commands.asonl. Keep them structured and
 // explicit so the log stays readable; never smuggle another serialized object
@@ -122,11 +123,11 @@ export interface RenameCommand extends CommandBase {
 
 export interface SpawnCommandData {
 	task: string
+	kind: SpawnKind
 	mode: SpawnMode
 	model?: string
 	cwd?: string
 	title?: string
-	closeWhenDone?: boolean
 	childSessionId?: string
 }
 

@@ -5,7 +5,7 @@
 import { createHash } from 'crypto'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
-import type { Command, SpawnCommandData } from '../protocol.ts'
+import type { Command, SpawnCommandData, SpawnKind } from '../protocol.ts'
 import { models } from '../models.ts'
 import { sessions as sessionStore, type HistoryEntry, type SessionMeta, type UserPart } from './sessions.ts'
 import { commands } from '../runtime/commands.ts'
@@ -148,10 +148,10 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 }
 
 function shouldCloseSessionAfterGeneration(
-	meta: { closeWhenDone?: boolean } | null | undefined,
+	meta: { spawnKind?: SpawnKind } | null | undefined,
 	result: AgentLoopResult,
 ): boolean {
-	return !!meta?.closeWhenDone && result === 'completed'
+	return meta?.spawnKind === 'subagent-autoclose' && result === 'completed'
 }
 
 function restartedAfterLastTurnEnd(entries: HistoryEntry[]): boolean {
@@ -216,7 +216,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	return sessionStore.loadSessionMeta(sessionId) ?? meta
 }
 
-function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean): string {
+function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind): string {
 	return [
 		`You are a subagent working for parent session ${parentId}.`,
 		'',
@@ -224,7 +224,7 @@ function buildSpawnPrompt(parentId: string, task: string, closeWhenDone: boolean
 		task,
 		'',
 		`When finished, send a concise handoff to session ${parentId} using the send tool. Include summary, files changed, and open questions.`,
-		closeWhenDone
+		kind === 'subagent-autoclose'
 			? 'After sending the handoff, finish normally and Hal will close this tab for you.'
 			: 'After sending the handoff, stay open so the user can inspect the tab.',
 	].join('\n')
@@ -246,17 +246,18 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 		workingDir,
 		model,
 		name,
-		closeWhenDone: !!spec.closeWhenDone,
+		spawnKind: spec.kind,
 	})
 	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
-	if (spec.closeWhenDone) {
+	if (spec.kind === 'subagent-autoclose') {
 		recordSessionInfo(child.id, 'This subagent will close itself after sending a handoff.', new Date().toISOString())
 	}
 	return sessionStore.loadSessionMeta(child.id) ?? child
 }
 
 async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec: SpawnSpec): Promise<void> {
-	await dispatchPromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, !!spec.closeWhenDone), parent.id)
+	if (spec.kind === 'interactive') return
+	await dispatchPromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, spec.kind), parent.id)
 }
 function restartPromptWatch(): void {
 	state.stopPromptWatch?.()
@@ -498,7 +499,7 @@ async function dispatchPromptCommand(sessionId: string, text: string, source?: s
 }
 
 function closeSession(sessionId: string, openReplacement = false): void {
-	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closeWhenDone: false, closedTabPosition: state.activeSessions.findIndex((id) => id === sessionId) + 1 })
+	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closedTabPosition: state.activeSessions.findIndex((id) => id === sessionId) + 1 })
 	sessionStore.deactivateSession(sessionId)
 	state.activeSessions = state.activeSessions.filter((id) => id !== sessionId)
 	if (openReplacement && state.activeSessions.length === 0) createSessionTab({})
@@ -786,17 +787,19 @@ function handleCommand(cmd: Command): void {
 			if (!sessionId) return
 			const parent = sessionStore.loadSessionMeta(sessionId)
 			if (!parent) return
-			if (!cmd.spawn.task.trim()) {
-				emitInfo(sessionId, 'Spawn task is required', 'error')
+			let kind: SpawnKind = 'subagent'
+			if (cmd.spawn.kind === 'subagent-autoclose' || cmd.spawn.kind === 'interactive') kind = cmd.spawn.kind
+			if (kind !== 'interactive' && !cmd.spawn.task.trim()) {
+				emitInfo(sessionId, 'Spawn task is required unless kind is interactive', 'error')
 				break
 			}
 			const spec: SpawnSpec = {
 				task: cmd.spawn.task,
+				kind,
 				mode: cmd.spawn.mode === 'fresh' ? 'fresh' : 'fork',
 				model: cmd.spawn.model,
 				cwd: cmd.spawn.cwd,
 				title: cmd.spawn.title,
-				closeWhenDone: !!cmd.spawn.closeWhenDone,
 				childSessionId:
 					typeof cmd.spawn.childSessionId === 'string' && cmd.spawn.childSessionId.trim()
 						? cmd.spawn.childSessionId.trim()

@@ -315,12 +315,13 @@ test('shouldAutoContinue resumes only restarted interrupted turns', () => {
 
 
 
-test('auto-close only happens after a clean completion', () => {
-	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'completed')).toBe(true)
-	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'aborted')).toBe(false)
-	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'failed')).toBe(false)
-	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: true }, 'stopped')).toBe(false)
-	expect(runtime.shouldCloseSessionAfterGeneration({ closeWhenDone: false }, 'completed')).toBe(false)
+test('subagent-autoclose only closes after a clean completion', () => {
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'completed')).toBe(true)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'aborted')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'failed')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'stopped')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'completed')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'interactive' }, 'completed')).toBe(false)
 })
 
 test('queue slash command lists and clears queued prompts', async () => {
@@ -665,11 +666,11 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		}
 		const child = await runtime.spawnSession(parent, {
 			task: 'Do the thing',
+			kind: 'subagent-autoclose',
 			mode: 'fresh',
 			model: 'openai/gpt-5',
 			cwd: '/work/child',
 			title: 'Child tab',
-			closeWhenDone: true,
 			childSessionId: '04-kid',
 		})
 
@@ -710,6 +711,7 @@ test('spawnSession pins the default model when parent has no model', async () =>
 		const parent = sessions.loadSessionMeta('04-parent-default')!
 		const child = await runtime.spawnSession(parent, {
 			task: 'Do the thing',
+			kind: 'subagent',
 			mode: 'fresh',
 			childSessionId: '04-kid-default',
 		})
@@ -742,6 +744,7 @@ test('spawnSession forks with the parent context usage immediately', async () =>
 
 		const child = await runtime.spawnSession(parent, {
 			task: 'Continue from here',
+			kind: 'subagent',
 			mode: 'fork',
 			childSessionId: '04-child',
 		})
@@ -787,11 +790,11 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 		}
 		const spec = {
 			task: 'Do the thing',
+			kind: 'subagent' as const,
 			mode: 'fresh' as const,
 			model: 'openai/gpt-5',
 			cwd: '/work/child',
 			title: 'Child tab',
-			closeWhenDone: false,
 		}
 		const child = await runtime.spawnSession(parent, spec)
 		await runtime.startSpawnedSession(parent, child, spec)
@@ -799,6 +802,17 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 		const history = sessions.loadHistory(child.id)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
 		expect(queued).toHaveLength(0)
+
+		const interactiveSpec = {
+			task: '',
+			kind: 'interactive' as const,
+			mode: 'fresh' as const,
+			title: 'Scratch tab',
+		}
+		const interactiveChild = await runtime.spawnSession(parent, interactiveSpec)
+		await runtime.startSpawnedSession(parent, interactiveChild, interactiveSpec)
+		const interactiveHistory = sessions.loadHistory(interactiveChild.id)
+		expect(interactiveHistory.some((entry) => entry.type === 'user')).toBe(false)
 	} finally {
 		ipc.appendCommand = origAppendCommand
 		agentLoop.runAgentLoop = origRunAgentLoop
