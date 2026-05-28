@@ -6,6 +6,8 @@ import type { KeyEvent } from './keys.ts'
 import { clipVisual, visLen } from '../utils/strings.ts'
 
 const MAX_UNDO = 200
+const SELECTION_ON = '\x1b[7m'
+const SELECTION_OFF = '\x1b[27m'
 
 const config = {
 	maxPromptLines: 10,
@@ -638,8 +640,8 @@ function withFoldIndicator(line: string, indicator: string, contentWidth: number
 	if (contentWidth <= indicatorWidth) return clipVisual(indicator, contentWidth)
 	const maxText = contentWidth - indicatorWidth - 1
 	const text = visLen(line) > maxText ? clipVisual(line, maxText) : line
-	const reset = text.includes('\x1b[') ? '\x1b[0m' : ''
-	return text + reset + ' '.repeat(Math.max(1, contentWidth - visLen(text) - indicatorWidth)) + indicator
+	const selectionOff = text.includes('\x1b[') ? SELECTION_OFF : ''
+	return text + selectionOff + ' '.repeat(Math.max(1, contentWidth - visLen(text) - indicatorWidth)) + indicator
 }
 
 function addFoldIndicators(lines: string[], above: number, below: number, contentWidth: number): void {
@@ -674,7 +676,7 @@ function buildPrompt(contentWidth: number): PromptRender {
 			const lo = Math.max(0, sel.start - lineStart)
 			const hi = Math.min(lineText.length, sel.end - lineStart)
 			if (lo < hi && lo < lineText.length && hi > 0) {
-				lines.push(`${lineText.slice(0, lo)}\x1b[7m${lineText.slice(lo, hi)}\x1b[0m${lineText.slice(hi)}`)
+				lines.push(`${lineText.slice(0, lo)}${SELECTION_ON}${lineText.slice(lo, hi)}${SELECTION_OFF}${lineText.slice(hi)}`)
 			} else {
 				lines.push(lineText)
 			}

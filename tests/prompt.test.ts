@@ -231,7 +231,7 @@ describe('prompt', () => {
 		prompt.setText('hello brave world')
 		prompt.handleKey(key('a', { cmd: true }), 80)
 		const built = prompt.buildPrompt(8)
-		expect(built.lines).toEqual(['\x1b[7mhello\x1b[0m', '\x1b[7mbrave\x1b[0m', '\x1b[7mworld\x1b[0m'])
+		expect(built.lines).toEqual(['\x1b[7mhello\x1b[27m', '\x1b[7mbrave\x1b[27m', '\x1b[7mworld\x1b[27m'])
 	})
 
 	test('buildPrompt wraps to a new blank line when cursor hits exact width after typing', () => {
