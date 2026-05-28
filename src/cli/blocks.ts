@@ -492,6 +492,17 @@ const toolSpecs: Record<string, ToolSpec> = {
 	google: { title: (input) => `Google ${input?.query ?? '?'}` },
 	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
 	spawn_agent: { title: (input) => input?.title ? `Spawn agent · ${input.title}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
+	send: {
+		title(input) {
+			const target = input?.sessionId ?? '?'
+			if (input?.queue) return `Queue to ${target}`
+			return `Send to ${target}`
+		},
+		command(input) {
+			if (typeof input?.text !== 'string') return undefined
+			return input.text
+		},
+	},
 }
 
 function getToolSpec(name: string): ToolSpec { return toolSpecs[name] ?? { title: () => humanizeName(name) } }

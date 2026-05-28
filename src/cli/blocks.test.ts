@@ -306,6 +306,27 @@ test('spawn_agent block renders full input args', () => {
 	expect(body).toContain('Queued subagent spawn from 04-lfp')
 })
 
+test('send block renders target session and message text', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'send',
+		input: {
+			sessionId: '33-270',
+			text: 'Stop. Do not do any analysis or file access.',
+			queue: false,
+		},
+		output: 'Sent message to session 33-270',
+	}
+
+	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
+	const header = lines[0] ?? ''
+	const body = lines.slice(1).join('\n')
+
+	expect(header).toContain('Send to 33-270')
+	expect(body).toContain('Stop. Do not do any analysis or file access.')
+	expect(body).toContain('Sent message to session 33-270')
+})
+
 test('grep block quotes its search pattern in header', () => {
 	const block: Block = {
 		type: 'tool',
