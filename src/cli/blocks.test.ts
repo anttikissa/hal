@@ -21,6 +21,17 @@ test('incoming user block shows inbox source instead of You', () => {
 	expect(header).not.toContain('You')
 })
 
+
+test('user blocks use info colors', () => {
+	colors.load()
+	const block: Block = { type: 'user', text: 'hello' }
+	const rendered = blocks.renderBlock(block, 80).join('\n')
+
+	expect(rendered).toContain(colors.info.fg)
+	expect(rendered).toContain(colors.info.bg)
+	expect(rendered).not.toContain(colors.user.bg)
+})
+
 test('historyToBlocks preserves original image path in user text', () => {
 	const history: any[] = [
 		{
@@ -71,7 +82,7 @@ test('assistant header includes display model', () => {
 	expect(header).toContain('Hal (GPT 5.4)')
 })
 
-test('assistant and thinking blocks render without a background color', () => {
+test('assistant blocks render without a background color', () => {
 	colors.load()
 	const assistantBlock: Block = { type: 'assistant', text: 'hello', model: 'gpt-5.4' }
 	const thinkingBlock: Block = { type: 'thinking', text: 'hmm', model: 'gpt-5.4' }
@@ -82,7 +93,7 @@ test('assistant and thinking blocks render without a background color', () => {
 	expect(colors.assistant.bg).toBeTruthy()
 	expect(colors.thinking.bg).toBeTruthy()
 	expect(assistantRendered).not.toContain(colors.assistant.bg)
-	expect(thinkingRendered).not.toContain(colors.thinking.bg)
+	expect(thinkingRendered).toContain(colors.thinking.bg)
 })
 
 
@@ -167,6 +178,7 @@ test('text code fences wrap at word boundaries', () => {
 	const lines = blocks.renderBlock(block, 21).map((l) => stripAnsi(l)).slice(1)
 
 	expect(lines).toEqual([
+		' ',
 		' Open without an',
 		' initial prompt.',
 	])
@@ -372,12 +384,14 @@ test('eval block separates returned output from code', () => {
 
 	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
 	expect(body).toEqual([
+		' ',
 		' let count = 0',
 		' if (count === 0) {',
 		' \treturn count',
 		' }',
 		' Result:',
 		' 0',
+		' ',
 	])
 })
 
@@ -389,7 +403,7 @@ test('eval block omits result separator when there is no returned output', () =>
 	}
 
 	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
-	expect(body).toEqual([' let count = 0'])
+	expect(body).toEqual([' ', ' let count = 0', ' '])
 })
 
 test('bash block still uses continuation backslashes for multiline commands', () => {
@@ -400,7 +414,7 @@ test('bash block still uses continuation backslashes for multiline commands', ()
 	}
 
 	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
-	expect(body).toEqual([' echo one \\', ' echo two'])
+	expect(body).toEqual([' ', ' echo one \\', ' echo two', ' '])
 })
 
 test('bash block strips redundant cd prefix for the current cwd', () => {
@@ -445,7 +459,9 @@ test('tool block header uses padded text without horizontal rules', () => {
 	expect(rendered[0]?.startsWith(colors.tool('bash').bg)).toBe(true)
 	expect(lines[0]).toBe(' 1 Jan 17:38 Bash: ./test                                  (11-ok3/000123-bash) ')
 	expect(lines[0]).not.toContain('─')
-	expect(lines[1]).toBe(' done')
+	expect(lines[1]).toBe(' ')
+	expect(lines[2]).toBe(' done')
+	expect(lines[3]).toBe(' ')
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
 })
 

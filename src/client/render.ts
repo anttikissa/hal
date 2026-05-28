@@ -140,7 +140,7 @@ function moveCursor(from: number, to: number): string {
 function positionCursor(from: number, target: { row: number; col: number }): string {
 	cursorRow = target.row
 	cursorCol = target.col
-	return moveCursor(from, target.row) + `\r${CSI}${target.col}G${CSI}?25h`
+	return moveCursor(from, target.row) + `\r${renderStatus.promptCursorColorSequence()}${renderStatus.cursorShapeSequence()}${CSI}${target.col}G${CSI}?25h`
 }
 
 // ── Paint ────────────────────────────────────────────────────────────────────

@@ -5,7 +5,10 @@ import { prompt } from '../src/cli/prompt.ts'
 import { popup } from '../src/client/popup.ts'
 
 function stripAnsi(s: string): string {
-	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
+	return s
+		.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')
+		.replace(/\x1b\[[0-9;? ]*[a-zA-Z]/g, '')
+		.replace(/\r/g, '')
 }
 
 function captureOutput(fn: () => void): string {

@@ -54,7 +54,9 @@
 		// R1.7M cache tokens read, W42k cache tokens written; W only appears when writing new cache.
 		showTokenCache: false,
 		// Sub 2/3: 5h 23%, 7d 61%
-		showSubscription: true
+		showSubscription: true,
+		// Prompt cursor shape: 'block', 'blinking-block', 'underline', 'blinking-underline', 'bar', 'blinking-bar', or 'native'.
+		promptCursorShape: 'block'
 	},
 	agentLoop: {
 		// Maximum generate/tool-result cycles before stopping a runaway agent loop.

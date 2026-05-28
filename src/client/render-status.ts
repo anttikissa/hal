@@ -41,16 +41,35 @@ const config = {
 	showTokenInOut: true,
 	showTokenCache: false,
 	showSubscription: true,
+	promptCursorShape: 'block',
 }
 
 function halCursorColor(): string {
-	// Match the main HAL cursor, including live colors.ason reloads and the
-	// assistant-color fallback when no explicit input cursor color is configured.
-	return colors.input.cursor || colors.assistant.fg
+	return colors.assistant.cursor ?? colors.assistant.fg
 }
 
 function inputStyle(): string {
-	return `${colors.input.bg || colors.user.bg}${colors.user.fg}`
+	return `${colors.input.bg || colors.info.bg}${colors.info.fg}`
+}
+
+function cursorShapeSequence(shape = renderStatus.config.promptCursorShape): string {
+	if (shape === 'native') return ''
+	if (shape === 'block') return '\x1b[2 q'
+	if (shape === 'blinking-block') return '\x1b[1 q'
+	if (shape === 'underline') return '\x1b[4 q'
+	if (shape === 'blinking-underline') return '\x1b[3 q'
+	if (shape === 'bar') return '\x1b[6 q'
+	if (shape === 'blinking-bar') return '\x1b[5 q'
+	return ''
+}
+
+function promptCursorColorSequence(color = colors.input.cursor || colors.info.fg): string {
+	const match = color.match(/\x1b\[38;2;(\d+);(\d+);(\d+)m/)
+	if (!match) return ''
+	const r = Number(match[1]).toString(16).padStart(2, '0')
+	const g = Number(match[2]).toString(16).padStart(2, '0')
+	const b = Number(match[3]).toString(16).padStart(2, '0')
+	return `\x1b]12;#${r}${g}${b}\x07`
 }
 
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
@@ -470,6 +489,8 @@ export const renderStatus = {
 	contentWidth,
 	paddedLine,
 	halCursorColor,
+	cursorShapeSequence,
+	promptCursorColorSequence,
 	tabIndicator,
 	renderIndicator,
 	tabInner,

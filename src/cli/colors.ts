@@ -15,7 +15,7 @@ const COLORS_PATH = `${HAL_DIR}/colors.ason`
 
 // ── Public color objects — mutated in place by load() ────────────────────────
 
-type BlockColors = { fg: string; bg: string; bold?: string; code?: string }
+type BlockColors = { fg: string; bg: string; bold?: string; code?: string; cursor?: string; cursorIdle?: string }
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
@@ -94,6 +94,10 @@ function load(): void {
 		else delete target.bold
 		if (def?.code) target.code = fg(def.code, vars)
 		else delete target.code
+		if (def?.cursor) target.cursor = fg(def.cursor, vars)
+		else delete target.cursor
+		if (def?.cursorIdle) target.cursorIdle = fg(def.cursorIdle, vars)
+		else delete target.cursorIdle
 	}
 
 	function resolveMd(def: any, target: MdColors): void {
@@ -123,7 +127,7 @@ function load(): void {
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
 		if (raw.input.cursor) input.cursor = fg(raw.input.cursor, vars)
 	}
-	input.cursorDim = dimFg(raw.input?.cursor ?? raw.assistant?.fg ?? [0.75, 0.15, 55], vars, 0.65)
+	input.cursorDim = dimFg(raw.assistant?.fg ?? [0.75, 0.15, 55], vars, 0.65)
 
 	// Tools
 	const toolDefs = raw.tools ?? {}
