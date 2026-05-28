@@ -36,7 +36,6 @@
 
 	// Prompt input area — dark human blue
 	input: {
-		fg: [0.88, 0.02, 250],
 		bg: [0.24, 0.07, 250],
 		cursor: ["$fgL", "$fgC", 55],
 	},

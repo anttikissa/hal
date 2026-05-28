@@ -287,6 +287,7 @@ describe('render', () => {
 		expect(colors.input.bg).toStartWith('\x1b[48;2;')
 		expect(renderStatus.promptRule(10)).toContain(colors.input.bg)
 		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.input.bg)
+		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.user.fg)
 	})
 
 	test('status line shows host role without pid', () => {

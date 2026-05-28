@@ -50,8 +50,7 @@ function halCursorColor(): string {
 }
 
 function inputStyle(): string {
-	const bg = colors.input.bg || colors.user.bg || ''
-	return `${bg}${colors.input.fg || BRIGHT_WHITE}`
+	return `${colors.input.bg || colors.user.bg}${colors.user.fg}`
 }
 
 function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {

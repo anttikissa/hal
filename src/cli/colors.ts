@@ -23,7 +23,7 @@ type HelpColors = { key: string; description: string }
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
-const input = { fg: '', bg: '', cursor: '', cursorDim: '' }
+const input = { bg: '', cursor: '', cursorDim: '' }
 const system: BlockColors = { fg: '', bg: '' }
 const logColors: BlockColors = { fg: '', bg: '' }
 const info: BlockColors = { fg: '', bg: '' }
@@ -119,7 +119,6 @@ function load(): void {
 	help.description = raw.help?.description ? fg(raw.help.description, vars) : status.fg
 
 	if (raw.input) {
-		if (raw.input.fg) input.fg = fg(raw.input.fg, vars)
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
 		if (raw.input.cursor) input.cursor = fg(raw.input.cursor, vars)
 	}
