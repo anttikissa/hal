@@ -234,12 +234,12 @@ describe('prompt', () => {
 		expect(built.lines).toEqual(['\x1b[7mhello\x1b[27m', '\x1b[7mbrave\x1b[27m', '\x1b[7mworld\x1b[27m'])
 	})
 
-	test('buildPrompt wraps to a new blank line when cursor hits exact width after typing', () => {
+	test('buildPrompt keeps the cursor in right padding when text hits exact width after typing', () => {
 		prompt.setText('1234', 4)
 		prompt.handleKey({ key: '5', char: '5', shift: false, alt: false, ctrl: false, cmd: false }, 80)
 		const built = prompt.buildPrompt(5)
-		expect(built.lines).toEqual(['12345', ''])
-		expect(built.cursor).toEqual({ rowOffset: 1, col: 0 })
+		expect(built.lines).toEqual(['12345'])
+		expect(built.cursor).toEqual({ rowOffset: 0, col: 5 })
 	})
 
 	test('buildPrompt shows fold indicators for hidden prompt lines', () => {

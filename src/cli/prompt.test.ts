@@ -32,4 +32,14 @@ describe('prompt editor', () => {
 		expect(line).not.toContain('\x1b[0m')
 		prompt.clear()
 	})
+
+	test('cursor stays in right padding when text exactly fills prompt row', () => {
+		prompt.setText('abcd')
+
+		const built = prompt.buildPrompt(4)
+
+		expect(built.lines).toEqual(['abcd'])
+		expect(built.cursor).toEqual({ rowOffset: 0, col: 4 })
+		prompt.clear()
+	})
 })

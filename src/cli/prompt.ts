@@ -66,9 +66,6 @@ function cursorToRowCol(input: string, absPos: number, width: number): { row: nu
 		if (absPos < nextStart) return { row: i, col: Math.min(absPos - start, line.length) }
 	}
 	const last = lines.length - 1
-	if (width > 0 && absPos === input.length && (lines[last]?.length ?? 0) === width && !input.endsWith('\n')) {
-		return { row: last + 1, col: 0 }
-	}
 	return { row: last, col: lines[last]?.length ?? 0 }
 }
 
