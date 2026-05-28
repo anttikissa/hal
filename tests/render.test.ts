@@ -630,6 +630,28 @@ describe('render', () => {
 		}
 	})
 
+	test('busy HAL cursor uses the assistant active cursor color without streaming text', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'log', text: '[restarted]' })
+		client.state.busy.set(tab.sessionId, true)
+		const originalIsVisible = cursor.isVisible
+		const originalCursor = colors.assistant.cursor
+		const originalIdleCursor = colors.assistant.cursorIdle
+		colors.assistant.cursor = '\x1b[38;5;214m'
+		colors.assistant.cursorIdle = '\x1b[38;5;245m'
+		cursor.isVisible = () => true
+		try {
+			const output = captureOutput(() => render.draw(true))
+			expect(output).toContain(`${colors.assistant.cursor}█`)
+			expect(output).not.toContain(`${colors.assistant.cursorIdle}█`)
+		} finally {
+			client.state.busy.delete(tab.sessionId)
+			cursor.isVisible = originalIsVisible
+			colors.assistant.cursor = originalCursor
+			colors.assistant.cursorIdle = originalIdleCursor
+		}
+	})
+
 	test('streaming assistant and thinking blocks show a solid HAL cursor inline', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'assistant', text: 'hello', streaming: true })

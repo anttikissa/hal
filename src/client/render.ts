@@ -52,6 +52,7 @@ function historyContext(): HistoryRenderContext {
 		forkHistoryDimFactor: config.forkHistoryDimFactor,
 		blockCache,
 		cursorVisible: blinkCursor.isVisible(),
+		busySessions: client.state.busy,
 	}
 }
 

@@ -18,6 +18,7 @@ export type HistoryRenderContext = {
 	forkHistoryDimFactor: number
 	blockCache: WeakMap<Block, BlockRenderCache>
 	cursorVisible: boolean
+	busySessions: ReadonlyMap<string, boolean>
 }
 
 const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
@@ -77,8 +78,9 @@ function visibleHistory(history: Block[]): Block[] {
 	return visible
 }
 
-function halCursorLine(visible: boolean): string {
-	return visible ? ` ${blockRenderer.idleCursorColor()}█\x1b[39m` : ''
+function halCursorLine(visible: boolean, active: boolean): string {
+	const color = active ? blockRenderer.cursorColor() : blockRenderer.idleCursorColor()
+	return visible ? ` ${color}█\x1b[39m` : ''
 }
 
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {
@@ -98,6 +100,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		i += group.length
 	}
 
+	const active = context.busySessions.get(tab.sessionId) ?? false
 	const last = history.at(-1)
 	if (hasInlineHalCursor(last)) {
 		// Streaming blocks carry an inline cursor, but still need breathing room
@@ -107,7 +110,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
 		// another blank row. When history fills the screen, these are the bottom
 		// three history rows immediately above the tab/status/prompt chrome.
-		lines.push('', halCursorLine(context.cursorVisible), '')
+		lines.push('', halCursorLine(context.cursorVisible, active), '')
 	}
 
 	return lines.length - start
