@@ -148,6 +148,16 @@ test('inline markdown code uses block code color instead of dim style', () => {
 	}
 })
 
+test('text code fences wrap at word boundaries', () => {
+	const block = { type: 'assistant', text: '```text\nOpen without an initial prompt.\n```' } as Block
+	const lines = blocks.renderBlock(block, 21).map((l) => stripAnsi(l)).slice(1)
+
+	expect(lines).toEqual([
+		' Open without an',
+		' initial prompt.',
+	])
+})
+
 test('rendered block lines without tabs do not embed carriage returns', () => {
 	const block: Block = {
 		type: 'thinking',

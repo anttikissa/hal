@@ -520,9 +520,16 @@ function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' |
 	}
 }
 
-function pushCodeWrapped(lines: string[], text: string, cols: number, mdColors: MdColors): void {
+function isTextCodeLang(lang: string): boolean {
+	const normalized = lang.trim().toLowerCase()
+	return normalized === 'text' || normalized === 'txt' || normalized === 'plain' || normalized === 'plaintext'
+}
+
+function pushCodeWrapped(lines: string[], text: string, cols: number, mdColors: MdColors, preserveWords: boolean): void {
 	for (const raw of text.split('\n')) {
-		for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) {
+		const expanded = expandTabs(raw, blockConfig.tabWidth)
+		const wrapped = preserveWords ? wordWrap(expanded, cols) : hardWrap(expanded, cols)
+		for (const line of wrapped) {
 			lines.push(`${mdColors.code[0]}${line}${mdColors.code[1]}`)
 		}
 	}
@@ -533,7 +540,7 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 	const mdColors = markdownColors(block)
 	for (const span of md.mdSpans(markdownSourceText(block))) {
 		if (span.type === 'code') {
-			for (const raw of span.lines) pushCodeWrapped(lines, raw, cols, mdColors)
+			for (const raw of span.lines) pushCodeWrapped(lines, raw, cols, mdColors, isTextCodeLang(span.lang))
 		} else if (span.type === 'table') {
 			lines.push(...md.mdTable(span.lines, cols, mdColors))
 		} else {
