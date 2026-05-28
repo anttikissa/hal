@@ -440,6 +440,12 @@ function quoteToolArg(value: unknown): string {
 	return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`
 }
 
+function readBlobTitle(input: any): string {
+	const id = input?.id ?? input?.blobId
+	if (id == null) return 'Read blob ?'
+	return `Read blob ${String(id)}`
+}
+
 function isGitCommitAmendCommand(input: any): boolean {
 	const command = typeof input?.command === 'string' ? input.command : ''
 	return /\bgit\s+commit\b/.test(command) && /(?:^|\s)--amend(?:\s|$)/.test(command)
@@ -473,6 +479,7 @@ const toolSpecs: Record<string, ToolSpec> = {
 			return !lines.length || (lines.length === 1 && lines[0] === 'ok') ? { bodyLines: [], suppressOutput: true } : { bodyLines: lines, suppressOutput: true }
 		},
 	},
+	read_blob: { title: readBlobTitle },
 	edit: {
 		title: (input) => `Edit ${input?.path ?? '?'}${editLineRange(input)}`,
 		details(input) {

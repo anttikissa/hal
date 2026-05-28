@@ -401,6 +401,18 @@ test('bash block strips redundant cd prefix for the current cwd', () => {
 	expect(header).not.toContain('cd /Users/antti/.hal')
 })
 
+test('read blob block header names the source blob', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'read_blob',
+		input: { id: '04-fyx/0gdec4-bol' },
+		output: 'blob data',
+	}
+
+	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	expect(header).toContain('Read blob 04-fyx/0gdec4-bol')
+})
+
 
 test('tool block header uses padded text without horizontal rules', () => {
 	const block: Block = {
