@@ -23,11 +23,13 @@ import { time } from '../utils/time.ts'
 const RESTART_CODE = 100
 
 // Kitty keyboard protocol: tell terminal to send all keys (including Cmd+C/X/V)
-// to the app instead of intercepting them. Mode 19 = disambiguate(1) +
-// report events(2) + report all keys as escapes(16).
+// to the app instead of intercepting them. Mode 17 = disambiguate(1) +
+// report all keys as escapes(16). Do NOT enable report events(2): in Ghostty,
+// Cmd-C while selecting scrollback sends only a key-release event to the pty,
+// and any pty input snaps scrollback to the bottom and clears the selection.
 const KITTY_TERMS = /^(kitty|ghostty|iTerm\.app)$/
 const useKitty = KITTY_TERMS.test(process.env.TERM_PROGRAM ?? '')
-const KITTY_ON = '\x1b[>19u'
+const KITTY_ON = '\x1b[>17u'
 const KITTY_OFF = '\x1b[<u'
 const BRACKETED_PASTE_ON = '\x1b[?2004h'
 const BRACKETED_PASTE_OFF = '\x1b[?2004l'
@@ -697,6 +699,7 @@ export const cli = {
 	forTests: {
 		handleAppKey,
 		claudeCacheWarning,
+		kittyOnSequence: () => KITTY_ON,
 		setExternalEditorOpen: (value: boolean) => {
 			externalEditorOpen = value
 			if (value) clearPendingPaint()

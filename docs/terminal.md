@@ -196,7 +196,7 @@ Frame growth in fullscreen is OK — new lines at the bottom scroll naturally vi
 
 Ghostty, Kitty, and iTerm intercept Cmd+C/X/V at the OS level. To receive
 these keys, the app must opt into the Kitty keyboard protocol with
-`CSI >19u` (mode 19 = disambiguate + report events + report all keys).
+`CSI >17u` (mode 17 = disambiguate + report all keys; no release events).
 Disable with `CSI <u` on ALL exit paths, or the terminal stays in protocol
 mode after the app exits.
 

@@ -87,7 +87,7 @@ function parseCsi(body: string, terminator: string): KeyEvent | null {
 //
 // The kitty keyboard protocol encodes every key as a unicode codepoint plus
 // modifier bitmask. Ghostty/Kitty/iTerm send these when the app opts in
-// with CSI >19u (see cli.ts). This lets us receive Cmd+C/X/V etc. that
+// with CSI >17u (see cli.ts). This lets us receive Cmd+C/X/V etc. that
 // the terminal would otherwise intercept at the OS level.
 function parseCsiU(body: string): KeyEvent | null {
 	const fields = body.split(';')

@@ -14,6 +14,12 @@ function withPatched<T extends object, K extends keyof T>(object: T, key: K, val
 	finally { object[key] = original }
 }
 
+test('kitty keyboard mode does not request key release events', () => {
+	// Ghostty sends Cmd-C-in-scrollback as only a key-release event when report
+	// events is enabled; that pty input snaps scrollback to the bottom.
+	expect(cli.forTests.kittyOnSequence()).toBe('\x1b[>17u')
+})
+
 test('SIGWINCH forces a redraw after terminal resize', () => {
 	let forceDraws = 0
 	const sigwinch: Array<() => void> = []
