@@ -505,6 +505,10 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 async function dispatchPromptCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	const steering = agentLoop.isActive(sessionId)
 	if (steering && await handleQueueSlashCommand(sessionId, text, source, displayText, true)) return
+	if (steering && commands.canRunWhileActive(text)) {
+		await handlePrompt(sessionId, text, undefined, source, displayText)
+		return
+	}
 	if (steering) {
 		agentLoop.abort(sessionId)
 		await Bun.sleep(50)

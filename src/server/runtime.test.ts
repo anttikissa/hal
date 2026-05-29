@@ -402,6 +402,64 @@ test('active queue slash command does not abort the running turn', async () => {
 })
 
 
+test('active-safe slash command does not abort the running turn', async () => {
+	const sessionId = `test-active-safe-${Date.now().toString(36)}`
+	const meta: SessionMeta = {
+		id: sessionId,
+		createdAt: '2026-05-20T00:00:00.000Z',
+		currentLog: 'history.asonl',
+		workingDir: '/tmp',
+		model: 'openai/gpt-5.5',
+	}
+	let aborts = 0
+	const origActiveSessions = [...runtime.state.activeSessions]
+	const origCurrentSessionId = runtime.state.currentSessionId
+	const origStopPromptWatch = runtime.state.stopPromptWatch
+	const origAppendEvent = ipc.appendEvent
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origIsActive = agentLoop.isActive
+	const origAbort = agentLoop.abort
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origUpdateMeta = sessions.updateMeta
+	const origSessionOpenInfo = sessions.sessionOpenInfo
+	const origWatchPromptFiles = context.watchPromptFiles
+	try {
+		runtime.state.activeSessions = [sessionId]
+		runtime.state.currentSessionId = sessionId
+		runtime.state.stopPromptWatch = null
+		ipc.appendEvent = () => {}
+		ipc.ownsHostLock = () => true
+		agentLoop.isActive = (id) => id === sessionId
+		agentLoop.abort = () => {
+			aborts++
+			return true
+		}
+		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
+		sessions.updateMeta = (_id, patch) => { Object.assign(meta, patch) }
+		sessions.sessionOpenInfo = (item) => ({ id: item.id, tab: 1, name: item.name, cwd: item.workingDir ?? '', model: item.model })
+		context.watchPromptFiles = () => () => {}
+
+		runtime.handleCommand({ type: 'prompt', sessionId, text: '/rename foo bar' })
+		await Bun.sleep(0)
+
+		expect(aborts).toBe(0)
+		expect(meta.name).toBe('foo bar')
+	} finally {
+		runtime.state.activeSessions = origActiveSessions
+		runtime.state.currentSessionId = origCurrentSessionId
+		runtime.state.stopPromptWatch = origStopPromptWatch
+		ipc.appendEvent = origAppendEvent
+		ipc.ownsHostLock = origOwnsHostLock
+		agentLoop.isActive = origIsActive
+		agentLoop.abort = origAbort
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.updateMeta = origUpdateMeta
+		sessions.sessionOpenInfo = origSessionOpenInfo
+		context.watchPromptFiles = origWatchPromptFiles
+	}
+})
+
+
 test('active queue next reports busy without consuming the queue', async () => {
 	const sessionId = `test-queue-next-active-${Date.now().toString(36)}`
 	const events: any[] = []

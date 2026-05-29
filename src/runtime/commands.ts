@@ -109,6 +109,21 @@ interface CommandSection {
 }
 
 const handlers: Record<string, CommandHandler> = {}
+const activeSafeCommands = new Set([
+	'broadcast',
+	'fork',
+	'help',
+	'mem',
+	'move',
+	'open',
+	'rename',
+	'resume',
+	'self',
+	'send',
+	'status',
+	'system',
+	'tabs',
+])
 
 function normalizeSessionName(text: string): string {
 	return text.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -790,6 +805,10 @@ handlers['exit'] = quitCommand
 
 
 // ── Main dispatch ──
+function canRunWhileActive(text: string): boolean {
+	const parsed = parseCommand(text)
+	return !!parsed && activeSafeCommands.has(parsed.name)
+}
 
 /** Execute a slash command. Returns { handled: false } if not a command. */
 async function executeCommand(text: string, session: SessionState, hooks: CommandHooks = {}): Promise<CommandResult> {
@@ -817,6 +836,7 @@ export const commands = {
 	state,
 	parseCommand,
 	executeCommand,
+	canRunWhileActive,
 	commandNames,
 	commandArg,
 	helpText,
