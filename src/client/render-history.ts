@@ -18,12 +18,12 @@ export type HistoryRenderContext = {
 	forkHistoryDimFactor: number
 	blockCache: WeakMap<Block, BlockRenderCache>
 	cursorVisible: boolean
-	busySessions: ReadonlyMap<string, boolean>
+	workingSessions: ReadonlyMap<string, boolean>
 }
 
 const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 const FADE_MS = 1000
-let activeSeen = new Set<string>()
+let workingSeen = new Set<string>()
 let fadeStart = new Map<string, number>()
 
 function hasInlineHalCursor(block: Block | undefined): boolean {
@@ -81,20 +81,20 @@ function visibleHistory(history: Block[]): Block[] {
 	return visible
 }
 
-function fadeAmount(sessionId: string, active: boolean): number {
-	if (active) {
-		activeSeen.add(sessionId)
+function fadeAmount(sessionId: string, working: boolean): number {
+	if (working) {
+		workingSeen.add(sessionId)
 		fadeStart.delete(sessionId)
 		return 0
 	}
-	if (activeSeen.has(sessionId) && !fadeStart.has(sessionId)) fadeStart.set(sessionId, Date.now())
+	if (workingSeen.has(sessionId) && !fadeStart.has(sessionId)) fadeStart.set(sessionId, Date.now())
 	const start = fadeStart.get(sessionId)
 	return start == null ? 1 : Math.min(1, (Date.now() - start) / FADE_MS)
 }
 
-function halCursorLine(sessionId: string, visible: boolean, active: boolean): string {
-	const t = fadeAmount(sessionId, active)
-	const color = active ? blockRenderer.cursorColor() : oklch.mixFg(blockRenderer.cursorColor(), blockRenderer.idleCursorColor(), t)
+function halCursorLine(sessionId: string, visible: boolean, working: boolean): string {
+	const t = fadeAmount(sessionId, working)
+	const color = working ? blockRenderer.cursorColor() : oklch.mixFg(blockRenderer.cursorColor(), blockRenderer.idleCursorColor(), t)
 	return visible ? ` ${color}█\x1b[39m` : ''
 }
 
@@ -115,7 +115,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		i += group.length
 	}
 
-	const active = context.busySessions.get(tab.sessionId) ?? false
+	const working = context.workingSessions.get(tab.sessionId) ?? false
 	const last = history.at(-1)
 	if (hasInlineHalCursor(last)) {
 		// Streaming blocks carry an inline cursor, but still need breathing room
@@ -125,7 +125,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
 		// another blank row. When history fills the screen, these are the bottom
 		// three history rows immediately above the tab/status/prompt chrome.
-		lines.push('', halCursorLine(tab.sessionId, context.cursorVisible, active), '')
+		lines.push('', halCursorLine(tab.sessionId, context.cursorVisible, working), '')
 	}
 
 	return lines.length - start
@@ -137,7 +137,7 @@ function hasFadingCursor(tab: Tab | null | undefined): boolean {
 }
 
 function resetAnimation(): void {
-	activeSeen = new Set()
+	workingSeen = new Set()
 	fadeStart = new Map()
 }
 

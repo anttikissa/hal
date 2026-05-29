@@ -28,7 +28,7 @@ import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
 
 const state = {
-	activeSessions: [] as string[],
+	openSessionIds: [] as string[],
 	currentSessionId: null as string | null,
 	activeRuntimePid: null as number | null,
 	stopPromptWatch: null as (() => void) | null,
@@ -56,27 +56,27 @@ function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name'>): string {
 	return `${title} (${meta.id})`
 }
 
-function activeMetas(): SessionMeta[] {
-	return state.activeSessions
+function openSessionMetas(): SessionMeta[] {
+	return state.openSessionIds
 		.map((sessionId) => sessionStore.loadSessionMeta(sessionId))
 		.filter((meta): meta is SessionMeta => !!meta)
 }
 
 function focusSession(sessionId: string | null | undefined): void {
 	if (!sessionId) return
-	if (!state.activeSessions.includes(sessionId)) return
+	if (!state.openSessionIds.includes(sessionId)) return
 	state.currentSessionId = sessionId
 }
 
 function focusedSessionId(): string | null {
-	if (state.currentSessionId && state.activeSessions.includes(state.currentSessionId)) return state.currentSessionId
-	return state.activeSessions[0] ?? null
+	if (state.currentSessionId && state.openSessionIds.includes(state.currentSessionId)) return state.currentSessionId
+	return state.openSessionIds[0] ?? null
 }
 
 function planTargetForCwd(cwd: string): ReturnType<typeof startup.planTarget> {
 	return startup.planTarget({
 		cwd,
-		openSessions: activeMetas().map((meta) => sessionStore.sessionOpenInfo(meta)),
+		openSessions: openSessionMetas().map((meta) => sessionStore.sessionOpenInfo(meta)),
 		allSessions: sessionStore.loadAllSessionMetas(),
 	})
 }
@@ -89,7 +89,7 @@ function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { 
 	if (plan.kind === 'resume') {
 		const resumed = sessionStore.activateSession(plan.sessionId)
 		if (!resumed) return { ok: false, reason: `Session ${plan.sessionId} not found` }
-		state.activeSessions = restoredSessionOrder(state.activeSessions, plan.sessionId, resumed.closedTabPosition)
+		state.openSessionIds = restoredSessionOrder(state.openSessionIds, plan.sessionId, resumed.closedTabPosition)
 		sessionStore.updateMeta(plan.sessionId, { closedAt: undefined })
 		focusSession(plan.sessionId)
 		return { ok: true, sessionId: plan.sessionId }
@@ -100,45 +100,42 @@ function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { 
 
 function insertSessionAfter(sessionId: string, afterId?: string): void {
 	if (!afterId) {
-		state.activeSessions.push(sessionId)
+		state.openSessionIds.push(sessionId)
 		return
 	}
-	const idx = state.activeSessions.findIndex((id) => id === afterId)
+	const idx = state.openSessionIds.findIndex((id) => id === afterId)
 	if (idx < 0) {
-		state.activeSessions.push(sessionId)
+		state.openSessionIds.push(sessionId)
 		return
 	}
-	state.activeSessions.splice(idx + 1, 0, sessionId)
+	state.openSessionIds.splice(idx + 1, 0, sessionId)
 }
 
-function restoredSessionOrder(activeSessions: string[], sessionId: string, closedTabPosition?: number): string[] {
-	const next = activeSessions.filter((id) => id !== sessionId)
+function restoredSessionOrder(openSessionIds: string[], sessionId: string, closedTabPosition?: number): string[] {
+	const next = openSessionIds.filter((id) => id !== sessionId)
 	const targetIndex = Number.isFinite(closedTabPosition) && (closedTabPosition ?? 0) > 0 ? Math.max(0, Math.min(next.length, Math.floor(closedTabPosition as number) - 1)) : next.length
 	next.splice(targetIndex, 0, sessionId)
 	return next
 }
 
 function moveSessionToIndex(sessionId: string, targetIndex: number): boolean {
-	const fromIndex = state.activeSessions.findIndex((id) => id === sessionId)
+	const fromIndex = state.openSessionIds.findIndex((id) => id === sessionId)
 	if (fromIndex < 0) return false
-	const clampedIndex = Math.max(0, Math.min(state.activeSessions.length - 1, targetIndex))
+	const clampedIndex = Math.max(0, Math.min(state.openSessionIds.length - 1, targetIndex))
 	if (fromIndex === clampedIndex) return false
-	const [id] = state.activeSessions.splice(fromIndex, 1)
+	const [id] = state.openSessionIds.splice(fromIndex, 1)
 	if (!id) return false
-	state.activeSessions.splice(clampedIndex, 0, id)
+	state.openSessionIds.splice(clampedIndex, 0, id)
 	return true
 }
 
 function syncSharedState(): void {
-	const openMetas = activeMetas()
+	const openMetas = openSessionMetas()
 	const openIds = new Set(openMetas.map((meta) => meta.id))
 	ipc.updateState((state) => {
 		state.sessions = openMetas.map(sessionStore.sessionOpenInfo)
-		for (const sessionId of Object.keys(state.busy)) {
-			if (!openIds.has(sessionId)) delete state.busy[sessionId]
-		}
-		for (const sessionId of Object.keys(state.activity)) {
-			if (!openIds.has(sessionId)) delete state.activity[sessionId]
+		for (const sessionId of Object.keys(state.working)) {
+			if (!openIds.has(sessionId)) delete state.working[sessionId]
 		}
 	})
 }
@@ -276,7 +273,7 @@ async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec
 function restartPromptWatch(): void {
 	state.stopPromptWatch?.()
 	state.stopPromptWatch = context.watchPromptFiles(
-		activeMetas().map((meta) => ({ sessionId: meta.id, cwd: meta.workingDir ?? process.cwd() })),
+		openSessionMetas().map((meta) => ({ sessionId: meta.id, cwd: meta.workingDir ?? process.cwd() })),
 		(change) => {
 			emitInfo(change.sessionId, `[system reload] ${change.name} changed: ${change.path}`)
 		},
@@ -334,7 +331,7 @@ function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: 
 function suggestAliasUpdates(previous: Record<string, number>, next: Record<string, number>): void {
 	const updates = models.aliasUpdateSuggestions(previous, next)
 	if (updates.length === 0) return
-	const metas = activeMetas()
+	const metas = openSessionMetas()
 	const meta = metas.find((item) => item.workingDir === HAL_DIR) ?? metas[0]
 	if (!meta) return
 	const model = meta.model ?? models.defaultModel()
@@ -371,7 +368,7 @@ function buildSessionState(meta: SessionMeta): SessionState {
 		model: meta.model,
 		cwd: meta.workingDir ?? process.cwd(),
 		createdAt: meta.createdAt,
-		sessions: activeMetas().map((item) => ({ id: item.id, name: sessionTitle(item) })),
+		sessions: openSessionMetas().map((item) => ({ id: item.id, name: sessionTitle(item) })),
 	}
 }
 
@@ -397,7 +394,7 @@ function queueEntry(text: string, source?: string, displayText?: string): Queued
 
 async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	if (!text.trim()) return
-	if (!agentLoop.isActive(sessionId) && !promptQueue.isHeld(sessionId)) {
+	if (!agentLoop.isWorking(sessionId) && !promptQueue.isHeld(sessionId)) {
 		await handlePrompt(sessionId, text, undefined, source, displayText)
 		return
 	}
@@ -438,7 +435,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 	return true
 }
 
-async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string, active = false): Promise<boolean> {
+async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string, working = false): Promise<boolean> {
 	const match = text.trimStart().match(/^\/queue(?:\s+([\s\S]*))?$/)
 	if (!match) return false
 	const args = (match[1] ?? '').trim()
@@ -449,7 +446,7 @@ async function handleQueueSlashCommand(sessionId: string, text: string, source?:
 		return true
 	}
 	if (args === 'next') {
-		if (active) emitInfo(sessionId, 'Session is busy')
+		if (working) emitInfo(sessionId, 'Session is working')
 		else await runNextQueuedPrompt(sessionId, false)
 		return true
 	}
@@ -503,9 +500,9 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering',
 }
 
 async function dispatchPromptCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
-	const steering = agentLoop.isActive(sessionId)
+	const steering = agentLoop.isWorking(sessionId)
 	if (steering && await handleQueueSlashCommand(sessionId, text, source, displayText, true)) return
-	if (steering && commands.canRunWhileActive(text)) {
+	if (steering && commands.canRunWhileWorking(text)) {
 		await handlePrompt(sessionId, text, undefined, source, displayText)
 		return
 	}
@@ -517,11 +514,11 @@ async function dispatchPromptCommand(sessionId: string, text: string, source?: s
 }
 
 function closeSession(sessionId: string, openReplacement = false): void {
-	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closedTabPosition: state.activeSessions.findIndex((id) => id === sessionId) + 1 })
+	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closedTabPosition: state.openSessionIds.findIndex((id) => id === sessionId) + 1 })
 	sessionStore.deactivateSession(sessionId)
-	state.activeSessions = state.activeSessions.filter((id) => id !== sessionId)
-	if (state.currentSessionId === sessionId) state.currentSessionId = state.activeSessions[0] ?? null
-	if (openReplacement && state.activeSessions.length === 0) createSessionTab({})
+	state.openSessionIds = state.openSessionIds.filter((id) => id !== sessionId)
+	if (state.currentSessionId === sessionId) state.currentSessionId = state.openSessionIds[0] ?? null
+	if (openReplacement && state.openSessionIds.length === 0) createSessionTab({})
 	broadcastSessions()
 }
 
@@ -555,24 +552,22 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 			cwd,
 			systemPrompt: promptResult.text,
 			messages,
-			onStatus: async (busy, activity) => {
+			onStatus: async (working) => {
 				ipc.updateState((state) => {
-					if (busy) state.busy[sessionId] = true
-					else delete state.busy[sessionId]
-					if (activity) state.activity[sessionId] = activity
-					else delete state.activity[sessionId]
+					if (working) state.working[sessionId] = true
+					else delete state.working[sessionId]
 				})
 			},
 		})
 	} catch (err: any) {
 		emitInfo(sessionId, `Generation failed: ${err?.message ?? String(err)}`, 'error')
 	}
-	if (shouldCloseSessionAfterGeneration(sessionStore.loadSessionMeta(sessionId), result) && !agentLoop.isActive(sessionId)) {
+	if (shouldCloseSessionAfterGeneration(sessionStore.loadSessionMeta(sessionId), result) && !agentLoop.isWorking(sessionId)) {
 		closeSession(sessionId)
 		return
 	}
 	if (result !== 'completed') emitQueuePausedNotice(sessionId)
-	if (!agentLoop.isActive(sessionId) && shouldDrainQueuedPrompt(sessionId, result)) await runNextQueuedPrompt(sessionId)
+	if (!agentLoop.isWorking(sessionId) && shouldDrainQueuedPrompt(sessionId, result)) await runNextQueuedPrompt(sessionId)
 }
 
 function publishContextEstimate(sessionId: string): { used: number; max: number } | null {
@@ -608,8 +603,8 @@ function resetProviderConversation(sessionId: string): void {
 
 function runReset(sessionId: string): void {
 	if (!ipc.ownsHostLock()) return
-	if (agentLoop.isActive(sessionId)) {
-		emitInfo(sessionId, 'Session is busy')
+	if (agentLoop.isWorking(sessionId)) {
+		emitInfo(sessionId, 'Session is working')
 		return
 	}
 	const ts = new Date().toISOString()
@@ -625,8 +620,8 @@ function runReset(sessionId: string): void {
 
 function runCompact(sessionId: string): void {
 	if (!ipc.ownsHostLock()) return
-	if (agentLoop.isActive(sessionId)) {
-		emitInfo(sessionId, 'Session is busy')
+	if (agentLoop.isWorking(sessionId)) {
+		emitInfo(sessionId, 'Session is working')
 		return
 	}
 	const entries = sessionStore.loadHistory(sessionId)
@@ -657,8 +652,8 @@ function emitRebaseResult(clientPid: number, requestId: string, sessionId: strin
 }
 
 function runRebaseStart(sessionId: string, requestId: string, clientPid: number): void {
-	if (agentLoop.isActive(sessionId)) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is busy'] })
+	if (agentLoop.isWorking(sessionId)) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is working'] })
 		return
 	}
 	const entries = sessionStore.loadHistory(sessionId)
@@ -675,8 +670,8 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Rebase request expired'] })
 		return
 	}
-	if (agentLoop.isActive(sessionId)) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is busy'] })
+	if (agentLoop.isWorking(sessionId)) {
+		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is working'] })
 		return
 	}
 	const currentEntries = sessionStore.loadHistory(sessionId)
@@ -722,7 +717,7 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 }
 
 function handleCommand(cmd: Command): void {
-	const sessionId = cmd.sessionId ?? state.activeSessions[0]
+	const sessionId = cmd.sessionId ?? state.openSessionIds[0]
 	focusSession(cmd.sessionId)
 	switch (cmd.type) {
 		case 'prompt': {
@@ -734,7 +729,7 @@ function handleCommand(cmd: Command): void {
 		case 'continue': {
 			if (!sessionId) return
 			void (async () => {
-				if (agentLoop.isActive(sessionId)) {
+				if (agentLoop.isWorking(sessionId)) {
 					agentLoop.abort(sessionId, '')
 					await Bun.sleep(50)
 				}
@@ -744,13 +739,13 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'queue-next': {
 			if (!sessionId) return
-			if (agentLoop.isActive(sessionId)) emitInfo(sessionId, 'Session is busy')
+			if (agentLoop.isWorking(sessionId)) emitInfo(sessionId, 'Session is working')
 			else void runNextQueuedPrompt(sessionId, false)
 			break
 		}
 		case 'abort': {
 			if (!cmd.sessionId) return
-			if (!agentLoop.abort(cmd.sessionId, promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)) emitInfo(cmd.sessionId, 'No active generation to abort')
+			if (!agentLoop.abort(cmd.sessionId, promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)) emitInfo(cmd.sessionId, 'No working turn to pause')
 			break
 		}
 		case 'reset': {
@@ -780,7 +775,7 @@ function handleCommand(cmd: Command): void {
 				forceNew: 'forceNew' in cmd ? cmd.forceNew : undefined,
 				forkSessionId: 'forkSessionId' in cmd ? cmd.forkSessionId : undefined,
 				afterSessionId: 'afterSessionId' in cmd ? cmd.afterSessionId : undefined,
-				activeSessions: state.activeSessions.length,
+				openSessionIds: state.openSessionIds.length,
 				commandCreatedAt: cmd.createdAt,
 			})
 			if ('forkSessionId' in cmd) {
@@ -793,7 +788,7 @@ function handleCommand(cmd: Command): void {
 			} else if (cmd.cwd) {
 				const target = activateTargetForCwd(cmd.cwd)
 				if (!target.ok) {
-					const sid = sessionId ?? state.activeSessions[0]
+					const sid = sessionId ?? state.openSessionIds[0]
 					if (sid) emitInfo(sid, target.reason, 'error')
 					break
 				}
@@ -836,10 +831,10 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'resume': {
 			const selector = (cmd.selector ?? '').trim()
-			const resumeId = sessionStore.resolveResumeTarget(sessionStore.loadAllSessionMetas(), new Set(state.activeSessions), selector)
+			const resumeId = sessionStore.resolveResumeTarget(sessionStore.loadAllSessionMetas(), new Set(state.openSessionIds), selector)
 			if (!resumeId) {
 				emitInfo(
-					sessionId ?? state.activeSessions[0] ?? '',
+					sessionId ?? state.openSessionIds[0] ?? '',
 					selector ? 'No matching closed session.' : 'No closed sessions.',
 					selector ? 'error' : 'info',
 				)
@@ -847,10 +842,10 @@ function handleCommand(cmd: Command): void {
 			}
 			const resumed = sessionStore.activateSession(resumeId)
 			if (!resumed) {
-				emitInfo(sessionId ?? state.activeSessions[0] ?? resumeId, `Session ${resumeId} not found`, 'error')
+				emitInfo(sessionId ?? state.openSessionIds[0] ?? resumeId, `Session ${resumeId} not found`, 'error')
 				break
 			}
-			state.activeSessions = restoredSessionOrder(state.activeSessions, resumeId, resumed.closedTabPosition)
+			state.openSessionIds = restoredSessionOrder(state.openSessionIds, resumeId, resumed.closedTabPosition)
 			sessionStore.updateMeta(resumeId, { closedAt: undefined })
 			focusSession(resumeId)
 			broadcastSessions()
@@ -875,20 +870,20 @@ function handleCommand(cmd: Command): void {
 
 function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): { ok: true; sessionId?: string } | { ok: false; reason: string } {
 	state.activeRuntimePid = process.pid
-	state.activeSessions = []
+	state.openSessionIds = []
 	state.currentSessionId = null
 	state.stopPromptWatch?.()
 	state.stopPromptWatch = null
 	sessionStore.deactivateAllSessions()
 	const metas = sessionStore.loadSessionMetas()
-	state.activeSessions = metas.map((meta) => meta.id)
-	state.currentSessionId = state.activeSessions[0] ?? null
+	state.openSessionIds = metas.map((meta) => meta.id)
+	state.currentSessionId = state.openSessionIds[0] ?? null
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
 		const target = activateTargetForCwd(opts.targetCwd)
 		if (!target.ok) return target
 		startupSessionId = target.sessionId
-	} else if (state.activeSessions.length === 0) {
+	} else if (state.openSessionIds.length === 0) {
 		startupSessionId = createSessionTab({}).id
 		if (!signal.aborted && state.activeRuntimePid === process.pid) broadcastSessions()
 	}
@@ -897,17 +892,16 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		state.stopPromptWatch?.()
 		state.stopPromptWatch = null
 		const ts = new Date().toISOString()
-		for (const sessionId of state.activeSessions) {
-			if (!agentLoop.isActive(sessionId)) continue
+		for (const sessionId of state.openSessionIds) {
+			if (!agentLoop.isWorking(sessionId)) continue
 			sessionStore.appendHistorySync(sessionId, [{ type: 'log', text: RESTARTED_TEXT, ts }])
 			agentLoop.abort(sessionId, '')
 		}
 	}, { once: true })
 	ipc.updateState((state) => {
-		state.busy = {}
-		state.activity = {}
+		state.working = {}
 	})
-	if (state.activeSessions.length > 0) syncSharedState()
+	if (state.openSessionIds.length > 0) syncSharedState()
 	void refreshModelMetadata()
 	openaiUsage.start(signal)
 	if (metas.length > 0) {
@@ -917,7 +911,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		}, 0)
 	}
 	void (async () => {
-		for (const sessionId of state.activeSessions) {
+		for (const sessionId of state.openSessionIds) {
 			if (signal.aborted || state.activeRuntimePid !== process.pid || !ipc.ownsHostLock()) return
 			const entries = sessionStore.loadAllHistory(sessionId)
 			if (!shouldAutoContinue(entries)) continue
@@ -932,12 +926,12 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		for await (const cmd of ipc.tailCommands(signal)) {
 			if (signal.aborted || state.activeRuntimePid !== process.pid) break
 			if (!ipc.ownsHostLock()) break
-			const hasLiveSession = !cmd.sessionId || state.activeSessions.includes(cmd.sessionId)
+			const hasLiveSession = !cmd.sessionId || state.openSessionIds.includes(cmd.sessionId)
 			if (!hasLiveSession && cmd.type !== 'open' && cmd.type !== 'resume') continue
 			try {
 				handleCommand(cmd)
 			} catch (err: any) {
-				const sid = cmd.sessionId ?? state.activeSessions[0]
+				const sid = cmd.sessionId ?? state.openSessionIds[0]
 				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error')
 			}
 		}
@@ -957,7 +951,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	void import('../runtime/inbox.ts')
 		.then(({ inbox }) => {
 			inbox.startWatching(signal, (sessionId, text, source, queue) => {
-				if (!state.activeSessions.includes(sessionId)) return
+				if (!state.openSessionIds.includes(sessionId)) return
 				queuePromptCommand(sessionId, text, source, queue ? 'queue' : undefined)
 			})
 		})

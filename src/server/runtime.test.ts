@@ -12,13 +12,13 @@ import { config } from '../config.ts'
 import { promptQueue } from '../runtime/prompt-queue.ts'
 import { paths } from '../utils/paths.ts'
 
-test('runtime exposes in-memory active sessions for eval helpers', () => {
-	const origActiveSessions = [...runtime.state.activeSessions]
+test('runtime exposes in-memory focused sessions for eval helpers', () => {
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	try {
-		runtime.state.activeSessions = ['04-one', '04-two', '04-three']
-		expect(runtime.state.activeSessions[2]).toBe('04-three')
+		runtime.state.openSessionIds = ['04-one', '04-two', '04-three']
+		expect(runtime.state.openSessionIds[2]).toBe('04-three')
 	} finally {
-		runtime.state.activeSessions = origActiveSessions
+		runtime.state.openSessionIds = origOpenSessionIds
 	}
 })
 
@@ -72,7 +72,7 @@ test('unchanged rebase apply is a no-op', async () => {
 	const origLoadHistory = sessions.loadHistory
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origRewriteHistoryForRebase = sessions.rewriteHistoryForRebase
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 	ipc.appendEvent = (event: any) => { events.push(event) }
 	sessions.loadHistory = () => entries
 	sessions.loadSessionMeta = () => ({ id: 's1', createdAt: '2026-05-25T12:00:00.000Z', currentLog: 'history.asonl' })
@@ -80,7 +80,7 @@ test('unchanged rebase apply is a no-op', async () => {
 		rewrites++
 		return { oldLog: 'history.asonl', newLog: 'history2.asonl', entryCount: 0 }
 	}) as typeof sessions.rewriteHistoryForRebase
-	agentLoop.isActive = () => false
+	agentLoop.isWorking = () => false
 	try {
 		runtime.handleCommand({ type: 'rebase-start', sessionId: 's1', requestId: 'r1', clientPid: 123 })
 		const start = events.find((event) => event.type === 'rebase-start')
@@ -97,7 +97,7 @@ test('unchanged rebase apply is a no-op', async () => {
 		sessions.loadHistory = origLoadHistory
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.rewriteHistoryForRebase = origRewriteHistoryForRebase
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 	}
 })
 
@@ -110,7 +110,7 @@ test('rebase edit with unchanged content is a no-op', async () => {
 	const origLoadHistory = sessions.loadHistory
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origRewriteHistoryForRebase = sessions.rewriteHistoryForRebase
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 	ipc.appendEvent = (event: any) => { events.push(event) }
 	sessions.loadHistory = () => entries
 	sessions.loadSessionMeta = () => ({ id: 's1', createdAt: '2026-05-25T12:00:00.000Z', currentLog: 'history.asonl' })
@@ -118,7 +118,7 @@ test('rebase edit with unchanged content is a no-op', async () => {
 		rewrites++
 		return { oldLog: 'history.asonl', newLog: 'history2.asonl', entryCount: 0 }
 	}) as typeof sessions.rewriteHistoryForRebase
-	agentLoop.isActive = () => false
+	agentLoop.isWorking = () => false
 	try {
 		runtime.handleCommand({ type: 'rebase-start', sessionId: 's1', requestId: 'r2', clientPid: 123 })
 		const start = events.find((event) => event.type === 'rebase-start')
@@ -135,7 +135,7 @@ test('rebase edit with unchanged content is a no-op', async () => {
 		sessions.loadHistory = origLoadHistory
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.rewriteHistoryForRebase = origRewriteHistoryForRebase
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 	}
 })
 
@@ -146,7 +146,7 @@ test('fork command persists one child notice without duplicating bare session id
 	const metas: Record<string, SessionMeta> = {
 		[parentId]: { id: parentId, workingDir: '/tmp/project', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5' },
 	}
-	const origActiveSessions = [...runtime.state.activeSessions]
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origAppendEvent = ipc.appendEvent
 	const origUpdateState = ipc.updateState
 	const origLoadSessionMeta = sessions.loadSessionMeta
@@ -157,9 +157,9 @@ test('fork command persists one child notice without duplicating bare session id
 	const origWatchPromptFiles = context.watchPromptFiles
 
 	try {
-		runtime.state.activeSessions = [parentId]
+		runtime.state.openSessionIds = [parentId]
 		ipc.appendEvent = (event: any) => { events.push(event) }
-		ipc.updateState = () => ({ sessions: [], busy: {}, activity: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
+		ipc.updateState = () => ({ sessions: [], working: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
 		context.watchPromptFiles = () => () => {}
 		sessions.loadSessionMeta = (id) => metas[id] ?? null
 		sessions.forkSession = (sourceId, newId) => {
@@ -181,12 +181,12 @@ test('fork command persists one child notice without duplicating bare session id
 
 		;(runtime as any).handleCommand({ type: 'open', sessionId: parentId, forkSessionId: parentId })
 
-		const childId = runtime.state.activeSessions.find((id) => id !== parentId)!
+		const childId = runtime.state.openSessionIds.find((id) => id !== parentId)!
 		expect(childId).toBeTruthy()
 		expect(events.map((event) => event.text)).toEqual([`Tab forked to ${childId}.`])
 		expect(history[childId]!.filter((entry) => entry.type === 'info').map((entry) => entry.text)).toEqual([`Tab forked from ${parentId}; now writing to ${paths.historyDisplayPath(childId)}`])
 	} finally {
-		runtime.state.activeSessions = origActiveSessions
+		runtime.state.openSessionIds = origOpenSessionIds
 		ipc.appendEvent = origAppendEvent
 		ipc.updateState = origUpdateState
 		sessions.loadSessionMeta = origLoadSessionMeta
@@ -209,7 +209,7 @@ test('slash command state changes are persisted as structural history entries', 
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origUpdateMeta = sessions.updateMeta
 	const origAppendHistorySync = sessions.appendHistorySync
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 	const origIsHeld = promptQueue.isHeld
 
 	try {
@@ -221,7 +221,7 @@ test('slash command state changes are persisted as structural history entries', 
 			return meta
 		}
 		sessions.appendHistorySync = (_id, entries) => { history.push(...entries) }
-		agentLoop.isActive = () => false
+		agentLoop.isWorking = () => false
 		promptQueue.isHeld = () => false
 
 		await runtime.enqueuePrompt(sessionId, '/model gpt-5.5')
@@ -238,7 +238,7 @@ test('slash command state changes are persisted as structural history entries', 
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.updateMeta = origUpdateMeta
 		sessions.appendHistorySync = origAppendHistorySync
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 		promptQueue.isHeld = origIsHeld
 	}
 })
@@ -249,7 +249,7 @@ test('open command inherits cwd and model from opener tab', () => {
 		[parentId]: { id: parentId, workingDir: '/work/parent', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5' },
 	}
 	const created: SessionMeta[] = []
-	const origActiveSessions = [...runtime.state.activeSessions]
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origUpdateState = ipc.updateState
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origCreateSession = sessions.createSession
@@ -260,8 +260,8 @@ test('open command inherits cwd and model from opener tab', () => {
 	const origEstimateContext = context.estimateContext
 
 	try {
-		runtime.state.activeSessions = [parentId]
-		ipc.updateState = () => ({ sessions: [], busy: {}, activity: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
+		runtime.state.openSessionIds = [parentId]
+		ipc.updateState = () => ({ sessions: [], working: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
 		context.watchPromptFiles = () => () => {}
 		context.buildSystemPrompt = () => ({ text: '', loaded: [], bytes: 0 })
 		context.estimateContext = () => ({ used: 0, max: 100, estimated: true })
@@ -283,7 +283,7 @@ test('open command inherits cwd and model from opener tab', () => {
 		expect(created[0]!.workingDir).toBe('/work/parent')
 		expect(created[0]!.model).toBe('openai/gpt-5')
 	} finally {
-		runtime.state.activeSessions = origActiveSessions
+		runtime.state.openSessionIds = origOpenSessionIds
 		ipc.updateState = origUpdateState
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.createSession = origCreateSession
@@ -348,17 +348,17 @@ test('queue slash command lists and clears queued prompts', async () => {
 	}
 })
 
-test('enqueuePrompt stores prompts while session is busy', async () => {
-	const sessionId = `test-queue-busy-${Date.now().toString(36)}`
+test('enqueuePrompt stores prompts while session is working', async () => {
+	const sessionId = `test-queue-working-${Date.now().toString(36)}`
 	const events: any[] = []
 	const origAppendEvent = ipc.appendEvent
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 	const origOwnsHostLock = ipc.ownsHostLock
 
 	try {
 		ipc.ownsHostLock = () => true
 		ipc.appendEvent = (event: any) => { events.push(event) }
-		agentLoop.isActive = () => true
+		agentLoop.isWorking = () => true
 
 		await runtime.enqueuePrompt(sessionId, 'do this later', 'user')
 
@@ -367,20 +367,20 @@ test('enqueuePrompt stores prompts while session is busy', async () => {
 	} finally {
 		ipc.appendEvent = origAppendEvent
 		ipc.ownsHostLock = origOwnsHostLock
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })
-test('active queue slash command does not abort the running turn', async () => {
-	const sessionId = `test-queue-active-${Date.now().toString(36)}`
+test('working queue slash command does not abort the running turn', async () => {
+	const sessionId = `test-queue-working-${Date.now().toString(36)}`
 	const events: any[] = []
 	let aborts = 0
 	const origAppendEvent = ipc.appendEvent
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 	const origAbort = agentLoop.abort
 	try {
 		ipc.appendEvent = (event: any) => { events.push(event) }
-		agentLoop.isActive = () => true
+		agentLoop.isWorking = () => true
 		agentLoop.abort = () => {
 			aborts++
 			return true
@@ -395,15 +395,15 @@ test('active queue slash command does not abort the running turn', async () => {
 		expect(events.some((event) => event.type === 'info' && event.text === '1. queued prompt')).toBe(true)
 	} finally {
 		ipc.appendEvent = origAppendEvent
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 		agentLoop.abort = origAbort
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })
 
 
-test('active-safe slash command does not abort the running turn', async () => {
-	const sessionId = `test-active-safe-${Date.now().toString(36)}`
+test('working-safe slash command does not abort the running turn', async () => {
+	const sessionId = `test-working-safe-${Date.now().toString(36)}`
 	const meta: SessionMeta = {
 		id: sessionId,
 		createdAt: '2026-05-20T00:00:00.000Z',
@@ -412,24 +412,24 @@ test('active-safe slash command does not abort the running turn', async () => {
 		model: 'openai/gpt-5.5',
 	}
 	let aborts = 0
-	const origActiveSessions = [...runtime.state.activeSessions]
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origStopPromptWatch = runtime.state.stopPromptWatch
 	const origAppendEvent = ipc.appendEvent
 	const origOwnsHostLock = ipc.ownsHostLock
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 	const origAbort = agentLoop.abort
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origUpdateMeta = sessions.updateMeta
 	const origSessionOpenInfo = sessions.sessionOpenInfo
 	const origWatchPromptFiles = context.watchPromptFiles
 	try {
-		runtime.state.activeSessions = [sessionId]
+		runtime.state.openSessionIds = [sessionId]
 		runtime.state.currentSessionId = sessionId
 		runtime.state.stopPromptWatch = null
 		ipc.appendEvent = () => {}
 		ipc.ownsHostLock = () => true
-		agentLoop.isActive = (id) => id === sessionId
+		agentLoop.isWorking = (id) => id === sessionId
 		agentLoop.abort = () => {
 			aborts++
 			return true
@@ -445,12 +445,12 @@ test('active-safe slash command does not abort the running turn', async () => {
 		expect(aborts).toBe(0)
 		expect(meta.name).toBe('foo bar')
 	} finally {
-		runtime.state.activeSessions = origActiveSessions
+		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
 		runtime.state.stopPromptWatch = origStopPromptWatch
 		ipc.appendEvent = origAppendEvent
 		ipc.ownsHostLock = origOwnsHostLock
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 		agentLoop.abort = origAbort
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.updateMeta = origUpdateMeta
@@ -460,16 +460,16 @@ test('active-safe slash command does not abort the running turn', async () => {
 })
 
 
-test('active queue next reports busy without consuming the queue', async () => {
-	const sessionId = `test-queue-next-active-${Date.now().toString(36)}`
+test('working queue next reports working without consuming the queue', async () => {
+	const sessionId = `test-queue-next-working-${Date.now().toString(36)}`
 	const events: any[] = []
 	let aborts = 0
 	const origAppendEvent = ipc.appendEvent
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 	const origAbort = agentLoop.abort
 	try {
 		ipc.appendEvent = (event: any) => { events.push(event) }
-		agentLoop.isActive = () => true
+		agentLoop.isWorking = () => true
 		agentLoop.abort = () => {
 			aborts++
 			return true
@@ -481,10 +481,10 @@ test('active queue next reports busy without consuming the queue', async () => {
 
 		expect(aborts).toBe(0)
 		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['queued prompt'])
-		expect(events.some((event) => event.type === 'info' && event.text === 'Session is busy')).toBe(true)
+		expect(events.some((event) => event.type === 'info' && event.text === 'Session is working')).toBe(true)
 	} finally {
 		ipc.appendEvent = origAppendEvent
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 		agentLoop.abort = origAbort
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
@@ -534,7 +534,7 @@ test('held queue does not drain after unrelated completed prompt', () => {
 })
 
 
-test('recordTabClosed emits info when no generation is active', () => {
+test('recordTabClosed emits info when no turn is working', () => {
 	const events: any[] = []
 	const origAbort = agentLoop.abort
 	const origAppendEvent = ipc.appendEvent
@@ -564,12 +564,12 @@ test('runCompact emits context estimate for live status line', () => {
 	const events: any[] = []
 	const origAppendEvent = ipc.appendEvent
 	const origOwnsHostLock = ipc.ownsHostLock
-	const origIsActive = agentLoop.isActive
+	const origIsWorking = agentLoop.isWorking
 
 	try {
 		ipc.ownsHostLock = () => true
 		ipc.appendEvent = (event: any) => { events.push(event) }
-		agentLoop.isActive = () => false
+		agentLoop.isWorking = () => false
 		sessions.createSession(sessionId, {
 			id: sessionId,
 			workingDir: process.cwd(),
@@ -596,7 +596,7 @@ test('runCompact emits context estimate for live status line', () => {
 	} finally {
 		ipc.appendEvent = origAppendEvent
 		ipc.ownsHostLock = origOwnsHostLock
-		agentLoop.isActive = origIsActive
+		agentLoop.isWorking = origIsWorking
 		sessions.deleteSession(sessionId)
 	}
 })
@@ -619,7 +619,7 @@ test('formatModelRefreshMessage reports initial models.dev fetch without change 
 
 
 test('model metadata refresh notice goes only to focused session', async () => {
-	const origActiveSessions = [...runtime.state.activeSessions]
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origRefreshModels = models.refreshModels
 	const origAppendHistorySync = sessions.appendHistorySync
@@ -627,7 +627,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 	const histories: any[] = []
 	const events: any[] = []
 
-	runtime.state.activeSessions = ['04-left', '04-current', '04-right']
+	runtime.state.openSessionIds = ['04-left', '04-current', '04-right']
 	runtime.state.currentSessionId = '04-current'
 	models.refreshModels = async () => ({
 		fetched: true,
@@ -650,7 +650,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		expect(events.map((item) => item.sessionId)).toEqual(['04-current'])
 		expect(events[0]).toMatchObject({ type: 'info', text: expect.stringContaining('[models.dev] fetched model metadata') })
 	} finally {
-		runtime.state.activeSessions = origActiveSessions
+		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
 		models.refreshModels = origRefreshModels
 		sessions.appendHistorySync = origAppendHistorySync
@@ -685,7 +685,7 @@ test('buildAliasUpdateSuggestionText mentions config mapping and subagent only o
 
 
 test('suggestAliasUpdates emits one synthetic notice, preferring an open ~/.hal tab', () => {
-	const origActiveSessions = [...runtime.state.activeSessions]
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origAliasUpdateSuggestions = models.aliasUpdateSuggestions
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origAppendHistorySync = sessions.appendHistorySync
@@ -693,7 +693,7 @@ test('suggestAliasUpdates emits one synthetic notice, preferring an open ~/.hal 
 	const histories: any[] = []
 	const events: any[] = []
 
-	runtime.state.activeSessions = ['04-work', '04-hal', '04-other']
+	runtime.state.openSessionIds = ['04-work', '04-hal', '04-other']
 	models.aliasUpdateSuggestions = () => [
 		{ aliases: ['gemini'], oldModel: 'google/gemini-3-flash-preview', newModel: 'google/gemini-3.5-flash' },
 	]
@@ -716,7 +716,7 @@ test('suggestAliasUpdates emits one synthetic notice, preferring an open ~/.hal 
 		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-hal', synthetic: true })
 		expect(events[0].text).toContain('update those aliases in ~/.hal')
 	} finally {
-		runtime.state.activeSessions = origActiveSessions
+		runtime.state.openSessionIds = origOpenSessionIds
 		models.aliasUpdateSuggestions = origAliasUpdateSuggestions
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.appendHistorySync = origAppendHistorySync

@@ -32,8 +32,7 @@ function makeSharedState(ids: string[]): SharedState {
 			cwd: `/tmp/${id}`,
 			model: 'openai/gpt-5.4',
 		})),
-		busy: {},
-		activity: {},
+		working: {},
 		updatedAt: '2026-04-09T20:00:00.000Z',
 	}
 }
@@ -66,16 +65,15 @@ describe('client startup', () => {
 	let savedClientState: string | null = null
 	beforeEach(() => {
 		client.state.tabs.length = 0
-		client.state.activeTab = 0
+		client.state.focusedTabIndex = 0
 		client.state.role = 'client'
 		client.state.pid = process.pid
 		client.state.hostPid = null
 		client.state.peak = 0
 		client.state.peakCols = 0
 		client.state.model = null
-		client.state.busy.clear()
-		client.state.activity.clear()
-		client.resetForTests()
+		client.state.working.clear()
+				client.resetForTests()
 		client.setOnChange(() => {})
 		client.setOnTabSwitch(() => {})
 		client.setOnDraftArrived(() => {})
@@ -83,7 +81,7 @@ describe('client startup', () => {
 		sessions.loadAllSessionMetas = () => []
 		sessions.loadSessionMeta = (id) => makeSessionMeta(id)
 		sessions.loadAllHistoryWithOrigin = () => ({ entries: [], parentCount: 0 })
-		sessions.loadLive = () => ({ busy: false, activity: '', blocks: [], updatedAt: '' })
+		sessions.loadLive = () => ({ blocks: [] })
 		draft.loadDraft = () => ''
 		// Client tests must never append to the real shared IPC command log.
 		// Individual tests can override this stub to assert what would be sent.
@@ -134,9 +132,8 @@ describe('client startup', () => {
 		const resetAt = Math.floor(Date.now() / 1000) + 60 * 60
 		const shared: SharedState = {
 			sessions: [{ id: 's1', tab: 1, name: 'tab 1', cwd: `${home}/sync/lippu`, model: 'openai/gpt-5.5' }],
-			busy: {},
-			activity: {},
-			updatedAt: '2026-04-09T20:00:00.000Z',
+			working: {},
+				updatedAt: '2026-04-09T20:00:00.000Z',
 		}
 		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('s1'), workingDir: `${home}/sync/lippu`, model: 'openai/gpt-5.5' })
 		ipc.readState = () => shared
@@ -223,7 +220,7 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
-		expect(client.state.activeTab).toBe(0)
+		expect(client.state.focusedTabIndex).toBe(0)
 		expect(errors.some((entry) => entry.message === 'failed to load client state')).toBe(true)
 	})
 
@@ -240,9 +237,8 @@ describe('client startup', () => {
 				{ id: 's1', tab: 1, name: 'tab 1', cwd: '/work/project', model: 'openai/gpt-5.4' },
 				{ id: 's2', tab: 2, name: 'tab 2', cwd: '/work/project', model: 'openai/gpt-5.4' },
 			],
-			busy: {},
-			activity: {},
-			updatedAt: '2026-04-09T20:00:00.000Z',
+			working: {},
+				updatedAt: '2026-04-09T20:00:00.000Z',
 		}
 		ipc.readState = () => shared
 		liveFiles.liveFile = () => shared as any
@@ -303,9 +299,8 @@ describe('client startup', () => {
 				{ id: 's34', tab: 34, name: 'tab 34', cwd: '/other/project', model: 'openai/gpt-5.4' },
 				{ id: 's35', tab: 35, name: 'tab 35', cwd: '/work/project', model: 'openai/gpt-5.4' },
 			],
-			busy: {},
-			activity: {},
-			updatedAt: '2026-04-09T20:00:00.000Z',
+			working: {},
+				updatedAt: '2026-04-09T20:00:00.000Z',
 		}
 		ipc.readState = () => shared
 		liveFiles.liveFile = () => shared as any
@@ -378,7 +373,7 @@ describe('client startup', () => {
 		}
 	})
 
-	test('does not add a last-active notice for recently active sessions', async () => {
+	test('does not add a last-active notice for recently focused sessions', async () => {
 		const originalNow = Date.now
 		Date.now = () => new Date(2026, 3, 12, 0, 0).getTime()
 		try {
@@ -474,7 +469,7 @@ describe('client startup', () => {
 		expect(blobLoads.some((items) => items.includes('s2'))).toBe(true)
 	})
 
-	test('closing the active last tab falls back to the left neighbor', async () => {
+	test('closing the focused last tab falls back to the left neighbor', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
@@ -616,7 +611,7 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s3')
 	})
 
-	test('moving the active tab keeps that same session active after reordering', async () => {
+	test('moving the focused tab keeps that same session focused after reordering', async () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
@@ -728,9 +723,7 @@ describe('client startup', () => {
 			parentCount: 0,
 		})
 		sessions.loadLive = () => ({
-			busy: false,
-			activity: '',
-			blocks: [{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.', ts: Date.parse('2026-04-09T20:01:00.000Z') }],
+						blocks: [{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.', ts: Date.parse('2026-04-09T20:01:00.000Z') }],
 			updatedAt: '2026-04-09T20:01:00.000Z',
 		})
 
@@ -752,15 +745,13 @@ describe('client startup', () => {
 
 	test('loads live session blocks on startup for tabs opened mid-turn', async () => {
 		sessions.loadLive = () => ({
-			busy: true,
-			activity: 'generating...',
+			working: true,
 			blocks: [{ type: 'assistant', text: 'hello', streaming: true, ts: Date.parse('2026-04-09T20:01:00.000Z') }],
 			updatedAt: '2026-04-09T20:01:00.000Z',
 		})
 
 		const shared = makeSharedState(['s1'])
-		shared.busy.s1 = true
-		shared.activity.s1 = 'generating...'
+		shared.working.s1 = true
 		ipc.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}

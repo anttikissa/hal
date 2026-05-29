@@ -33,13 +33,12 @@ beforeEach(() => {
 		cwd: '/tmp',
 		model: 'test',
 	})
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	client.state.pid = 111
 	client.state.hostPid = 222
 	client.state.peak = 0
 	client.state.peakCols = 0
-	client.state.busy = new Map()
-	client.state.activity = new Map()
+	client.state.working = new Map()
 	prompt.clear()
 })
 

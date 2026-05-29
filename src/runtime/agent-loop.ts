@@ -40,9 +40,9 @@ const config = {
 // ── State ──
 
 const state = {
-	/** Active generation abort controllers, keyed by session ID. */
-	activeRequests: new Map<string, AbortController>(),
-	/** Info text to emit when an aborted generation finishes unwinding. */
+	/** In-progress turn abort controllers, keyed by session ID. */
+	workingRequests: new Map<string, AbortController>(),
+	/** Info text to emit when an aborted turn finishes unwinding. */
 	abortTexts: new Map<string, string>(),
 }
 
@@ -73,8 +73,8 @@ export interface AgentContext {
 	messages: Message[]
 	/** Abort signal — user can ctrl-c to cancel. */
 	signal?: AbortSignal
-	/** Callback for busy/activity status updates. */
-	onStatus?: (busy: boolean, activity?: string) => void | Promise<void>
+	/** Callback for session-level working state updates. */
+	onStatus?: (working: boolean) => void | Promise<void>
 }
 
 export type AgentLoopResult = 'completed' | 'aborted' | 'failed' | 'stopped'
@@ -312,8 +312,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 	// Abort any existing generation for this session. This prevents two
 	// concurrent generations on the same session (race between client
-	// sending 'prompt' and receiving the 'status: busy' event).
-	const existing = state.activeRequests.get(sessionId)
+	// sending 'prompt' and receiving the 'status: working' event).
+	const existing = state.workingRequests.get(sessionId)
 	if (existing) {
 		log.info('Aborting existing generation (displaced by new one)', { sessionId })
 		existing.abort()
@@ -321,7 +321,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 	// Register abort controller so external code can abort us
 	const ac = new AbortController()
-	state.activeRequests.set(sessionId, ac)
+	state.workingRequests.set(sessionId, ac)
 
 	// If caller passed a signal, propagate its abort to our controller
 	if (signal) {
@@ -342,7 +342,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	const tools = toolRegistry.toToolDefs()
 
 	const overheadBytes = systemPrompt.length + JSON.stringify(tools).length
-	await ctx.onStatus?.(true, 'generating...')
+	await ctx.onStatus?.(true)
 
 	try {
 		const totalUsage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
@@ -462,7 +462,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						// Server-side tool blocks (web_search) — collect for assistant content
 						if (event.serverBlocks) {
 							serverBlocks.push(...event.serverBlocks)
-							// Show web search activity to the user
+							// Surface web search through the visible info path.
 							for (const sb of event.serverBlocks) {
 								if (sb.type === 'server_tool_use' && sb.name === 'web_search') {
 									const query = (sb.input as any)?.query ?? ''
@@ -473,9 +473,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						break
 					}
 
-					case 'status':
-						if (event.activity) await ctx.onStatus?.(true, event.activity)
-						break
 
 					case 'error': {
 						const status = event.status
@@ -505,7 +502,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 								retryAttempt++
 								const delaySec = Math.ceil(delay / 1000)
 								emitInfo(sessionId, `Rate limited — retrying in ${delaySec}s`)
-								await ctx.onStatus?.(true, `rate limited — retrying in ${delaySec}s...`)
+								await ctx.onStatus?.(true)
 								await sleepWithAbort(delay, loopSignal)
 								if (loopSignal.aborted) {
 									aborted = true
@@ -694,7 +691,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			}
 
 			// Execute tools (with concurrency limit)
-			await ctx.onStatus?.(true, `running ${toolCalls.length} tool(s)...`)
+			await ctx.onStatus?.(true)
 			const results = await executeToolsConcurrently(toolCalls, loopSignal, ctx.cwd, sessionId)
 
 			// Add tool results to messages and save to history
@@ -728,7 +725,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				})
 			}
 
-			await ctx.onStatus?.(true, 'generating...')
+			await ctx.onStatus?.(true)
 
 			// Continue to next iteration (re-invoke the model with tool results)
 		}
@@ -756,11 +753,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 		return 'stopped'
 	} finally {
-		// A new prompt can deliberately displace this generation before this
-		// async function has fully unwound. Only remove the active controller if
+		// A new prompt can deliberately displace this turn before this
+		// async function has fully unwound. Only remove the working controller if
 		// it is still ours; otherwise the older request would make the newer
 		// request look idle and later prompts would start concurrently.
-		if (state.activeRequests.get(sessionId) === ac) state.activeRequests.delete(sessionId)
+		if (state.workingRequests.get(sessionId) === ac) state.workingRequests.delete(sessionId)
 		state.abortTexts.delete(sessionId)
 		await ctx.onStatus?.(false)
 	}
@@ -799,9 +796,9 @@ async function executeToolsConcurrently(
 	return results
 }
 
-/** Abort an active generation for a session. */
+/** Abort an working turn for a session. */
 function abort(sessionId: string, text = DEFAULT_ABORT_TEXT): boolean {
-	const ac = state.activeRequests.get(sessionId)
+	const ac = state.workingRequests.get(sessionId)
 	if (ac) {
 		log.info('Agent loop explicit abort', { sessionId, text })
 		state.abortTexts.set(sessionId, text)
@@ -811,9 +808,9 @@ function abort(sessionId: string, text = DEFAULT_ABORT_TEXT): boolean {
 	return false
 }
 
-/** Check if a session has an active generation. */
-function isActive(sessionId: string): boolean {
-	return state.activeRequests.has(sessionId)
+/** Check if a session has an working turn. */
+function isWorking(sessionId: string): boolean {
+	return state.workingRequests.has(sessionId)
 }
 
 export const agentLoop = {
@@ -822,6 +819,6 @@ export const agentLoop = {
 	runAgentLoop,
 	abort,
 	resolveToolConfirmation,
-	isActive,
+	isWorking,
 	sanitizeToolCallInput,
 }

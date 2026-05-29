@@ -215,7 +215,7 @@ interface ResponsesWebSocketChain {
 	ws: WebSocket
 	previousResponseId: string
 	requestMessageCount: number
-	busy: boolean
+	working: boolean
 	opened: boolean
 	openPromise: Promise<void>
 }
@@ -488,7 +488,7 @@ function getResponsesWebSocket(sessionId: string, key: string, url: string, head
 		ws,
 		previousResponseId: '',
 		requestMessageCount: 0,
-		busy: false,
+		working: false,
 		opened: false,
 		openPromise: waitForWebSocketOpen(ws, signal).then(() => {
 			chain.opened = true
@@ -533,8 +533,8 @@ async function* generateCompat(providerName: string, baseUrl: string, req: Provi
 }
 
 async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: any, signal?: AbortSignal): AsyncGenerator<{ event: ProviderStreamEvent; responseId?: string }> {
-	if (chain.busy) throw new ResponsesWebSocketFallback('OpenAI Responses WebSocket already has an in-flight request')
-	chain.busy = true
+	if (chain.working) throw new ResponsesWebSocketFallback('OpenAI Responses WebSocket already has an in-flight request')
+	chain.working = true
 	const pending: any[] = []
 	const streamState: ResponsesStreamState = { itemMap: new Map(), toolInputs: new Map() }
 	let done = false
@@ -549,7 +549,7 @@ async function* streamResponsesWebSocket(chain: ResponsesWebSocketChain, body: a
 		fn()
 	}
 	function cleanup(): void {
-		chain.busy = false
+		chain.working = false
 		chain.ws.removeEventListener?.('message', onMessage as any)
 		chain.ws.removeEventListener?.('error', onError as any)
 		chain.ws.removeEventListener?.('close', onClose as any)
@@ -711,8 +711,6 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	const transport = resolveOpenAITransport(credential)
 	const openaiEntry = auth.getEntry('openai')
 	openaiUsage.setCurrentCredential(credential)
-	const rotationActivity = providerShared.formatRotationActivity('OpenAI', credential)
-	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
 
 	const mode = responsesTransportMode()
 	if (mode === 'http') {
@@ -726,8 +724,6 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	} catch (err) {
 		if (req.sessionId) closeResponsesWebSocket(req.sessionId)
 		if (mode === 'auto' && !req.signal?.aborted) {
-			const message = err instanceof Error ? err.message : 'OpenAI WS failed'
-			yield { type: 'status', activity: `${message}; falling back to HTTP` }
 			yield* generateOpenAIHttp(req, credential, transport, openaiEntry)
 			return
 		}

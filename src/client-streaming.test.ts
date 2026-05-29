@@ -24,7 +24,7 @@ describe('client streaming blocks', () => {
 		client.resetForTests()
 		client.state.tabs.length = 0
 		client.state.tabs.push(makeTab())
-		client.state.activeTab = 0
+		client.state.focusedTabIndex = 0
 	})
 
 	test('tool confirmation requests call the TUI hook', () => {
@@ -97,7 +97,7 @@ describe('client streaming blocks', () => {
 		expect(tab.history[0]).toMatchObject({ type: 'thinking', text: 'hmm' })
 	})
 
-	test('background stream updates do not repaint the active tab', () => {
+	test('background stream updates do not repaint the focused tab', () => {
 		client.state.tabs.push(makeTab('s2'))
 		let repaints = 0
 		client.setOnChange(() => { repaints++ })
@@ -234,7 +234,7 @@ describe('client streaming blocks', () => {
 test('tool-result reloads full blob output for edit blocks', async () => {
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab())
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	const originalLoadBlobs = blockModule.loadBlobs
 	blockModule.loadBlobs = async (items) => {
 		const tool = items[0] as any
@@ -280,7 +280,7 @@ test('response errors keep blob metadata for later inspection', () => {
 	client.resetForTests()
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab())
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 
 	client.handleEvent({
 		type: 'response',

@@ -37,8 +37,7 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 			{ id: '04-parent', tab: 2, cwd: '/tmp/project' },
 			{ id: '04-right', tab: 3, cwd: '/tmp/right' },
 		],
-		busy: {},
-		activity: {},
+		working: {},
 		updatedAt: new Date().toISOString(),
 	})
 

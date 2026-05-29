@@ -47,7 +47,7 @@ async function collect(credential: Credential): Promise<any[]> {
 	return events
 }
 
-test('anthropic provider reports the active account while rotating', async () => {
+test('anthropic provider streams text while rotating accounts', async () => {
 	installFetchMock(async () => new Response(anthropicSse(), {
 		status: 200,
 		headers: { 'content-type': 'text/event-stream' },
@@ -61,11 +61,7 @@ test('anthropic provider reports the active account while rotating', async () =>
 		total: 3,
 	})
 
-	expect(events[0]).toEqual({
-		type: 'status',
-		activity: 'Anthropic 1/3 · first@test.com',
-	})
-	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+	expect(events[0]).toEqual({ type: 'text', text: 'hello' })
 	expect(events.at(-1)).toMatchObject({ type: 'done', provider: 'anthropic', doneStatus: 'completed', stopReason: 'end_turn', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
@@ -101,8 +97,7 @@ test('anthropic 429 shows failed and next account when another account is availa
 
 	expect(cooldownCred).toBe(credential)
 	expect(cooldownMs).toBe(42_000)
-	expect(events[0]).toEqual({ type: 'status', activity: 'Anthropic 1/3 · burned@test.com' })
-	expect(events[1]).toMatchObject({
+	expect(events[0]).toMatchObject({
 		type: 'error',
 		message: 'Anthropic rotation: 3 accounts. 429 on burned@test.com. Trying next@test.com next.',
 		status: 429,
@@ -140,8 +135,7 @@ test('anthropic 429 waits for reset when all accounts are on cooldown', async ()
 	}
 
 	expect(cooldownMs).toBe(42_000)
-	expect(events[0]).toEqual({ type: 'status', activity: 'Anthropic 1/3 · burned@test.com' })
-	expect(events[1]).toMatchObject({
+	expect(events[0]).toMatchObject({
 		type: 'error',
 		message: 'Anthropic rotation: 3 accounts. 429 on burned@test.com. All accounts cooling down. Next: next@test.com in 42s.',
 		status: 429,

@@ -66,10 +66,10 @@ function promptCursorColorSequence(color = colors.input.cursor || colors.info.fg
 }
 
 function tabIndicator(tab: Tab): TabIndicator {
-	const busy = client.state.busy.get(tab.sessionId) ?? false
+	const working = client.state.working.get(tab.sessionId) ?? false
 	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 
-	if (busy) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
+	if (working) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
 
 	// Alerts beat the generic "done unseen" checkmark. This matters for cases
 	// like "Hit max iterations" where generation finished, but the tab still
@@ -112,11 +112,11 @@ function tabInner(num: number, ind: string): string {
 }
 
 function tabLabel(tab: Tab, i: number): string {
-	const active = client.state.activeTab
-	const base = i === active ? colors.tab.activeFg || colors.status.highlight : colors.tab.inactiveFg || colors.status.fg
+	const focusedIndex = client.state.focusedTabIndex
+	const base = i === focusedIndex ? colors.tab.activeFg || colors.status.highlight : colors.tab.inactiveFg || colors.status.fg
 	const ind = renderStatus.renderIndicator(tab, base)
 	const content = renderStatus.tabInner(i + 1, ind)
-	if (i === active) return `${base}[${content}]${RESET}`
+	if (i === focusedIndex) return `${base}[${content}]${RESET}`
 	return `${base} ${content} ${RESET}`
 }
 
@@ -414,7 +414,7 @@ function renderStatusLine(lines: string[]): void {
 
 function renderHelpBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
-	const busy = client.isBusy()
+	const working = client.isWorking()
 	const hasText = prompt.text().trim().length > 0
 	const continueAction = client.continueActionForCurrentTurn()
 	const desc = colors.help.description || colors.status.fg
@@ -423,7 +423,7 @@ function renderHelpBar(lines: string[]): void {
 		description: desc,
 		separator: desc,
 	}
-	const baseLeft = helpBar.build(busy, hasText, continueAction, style)
+	const baseLeft = helpBar.build(working, hasText, continueAction, style)
 	const resizeHint = prompt.resizeHint(cols)
 	const resizeText = resizeHint ? `${style.key}ctrl-=/-${style.description}: ${resizeHint}` : ''
 	const separator = `${style.separator}, `

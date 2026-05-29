@@ -95,7 +95,7 @@ test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const origTabs = client.state.tabs.slice()
-	const origActiveTab = client.state.activeTab
+	const origFocusedTab = client.state.focusedTabIndex
 
 	client.state.tabs.length = 0
 	client.state.tabs.push({
@@ -115,7 +115,7 @@ test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 		cwd: '/tmp',
 		model: 'openai/gpt-5.4',
 	})
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
@@ -126,7 +126,7 @@ test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 		ipc.appendCommand = origAppendCommand
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
-		client.state.activeTab = origActiveTab
+		client.state.focusedTabIndex = origFocusedTab
 	}
 })
 
@@ -153,16 +153,16 @@ function makeTab(overrides: Partial<(typeof client.state.tabs)[number]> = {}): (
 
 function withOneTab(tab: (typeof client.state.tabs)[number], run: () => void): void {
 	const origTabs = client.state.tabs.slice()
-	const origActiveTab = client.state.activeTab
+	const origFocusedTab = client.state.focusedTabIndex
 	try {
 		client.state.tabs.length = 0
 		client.state.tabs.push(tab)
-		client.state.activeTab = 0
+		client.state.focusedTabIndex = 0
 		run()
 	} finally {
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
-		client.state.activeTab = origActiveTab
+		client.state.focusedTabIndex = origFocusedTab
 		prompt.clear()
 		popup.close()
 	}
@@ -260,14 +260,14 @@ test('ctrl-q runs the next queued prompt', () => {
 })
 
 
-test('/keys is local terminal help and does not send a prompt while busy', () => {
+test('/keys is local terminal help and does not send a prompt while working', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const tab = makeTab()
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
-		client.state.busy.set('s1', true)
+		client.state.working.set('s1', true)
 		withOneTab(tab, () => {
 			prompt.setText('/keys')
 			const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
@@ -280,7 +280,7 @@ test('/keys is local terminal help and does not send a prompt while busy', () =>
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
-		client.state.busy.clear()
+		client.state.working.clear()
 	}
 })
 
@@ -288,13 +288,13 @@ test('enter on empty paused tab sends continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const origTabs = client.state.tabs.slice()
-	const origActiveTab = client.state.activeTab
+	const origFocusedTab = client.state.focusedTabIndex
 
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab({ history: [{ type: 'log', text: '[paused]' }] as any[] }))
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	prompt.clear()
-	client.state.busy.clear()
+	client.state.working.clear()
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
@@ -305,21 +305,21 @@ test('enter on empty paused tab sends continue', () => {
 		ipc.appendCommand = origAppendCommand
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
-		client.state.activeTab = origActiveTab
+		client.state.focusedTabIndex = origFocusedTab
 	}
 })
 
-test('enter on empty busy error tab sends continue', () => {
+test('enter on empty working error tab sends continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const origTabs = client.state.tabs.slice()
-	const origActiveTab = client.state.activeTab
+	const origFocusedTab = client.state.focusedTabIndex
 
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab({ history: [{ type: 'error', text: 'Stream read timed out (no data for 120000ms)' }] as any[] }))
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	prompt.clear()
-	client.state.busy.set('s1', true)
+	client.state.working.set('s1', true)
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
@@ -328,18 +328,18 @@ test('enter on empty busy error tab sends continue', () => {
 		expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
 	} finally {
 		ipc.appendCommand = origAppendCommand
-		client.state.busy.clear()
+		client.state.working.clear()
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
-		client.state.activeTab = origActiveTab
+		client.state.focusedTabIndex = origFocusedTab
 	}
 })
 
-test('enter on empty busy retry status does not interrupt backoff', () => {
+test('enter on empty working retry status does not interrupt backoff', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const origTabs = client.state.tabs.slice()
-	const origActiveTab = client.state.activeTab
+	const origFocusedTab = client.state.focusedTabIndex
 
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab({
@@ -348,9 +348,9 @@ test('enter on empty busy retry status does not interrupt backoff', () => {
 			{ type: 'info', text: 'Rate limited — retrying in 10s' },
 		] as any[],
 	}))
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	prompt.clear()
-	client.state.busy.set('s1', true)
+	client.state.working.set('s1', true)
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
@@ -359,10 +359,10 @@ test('enter on empty busy retry status does not interrupt backoff', () => {
 		expect(commands).toEqual([])
 	} finally {
 		ipc.appendCommand = origAppendCommand
-		client.state.busy.clear()
+		client.state.working.clear()
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
-		client.state.activeTab = origActiveTab
+		client.state.focusedTabIndex = origFocusedTab
 	}
 })
 
@@ -370,13 +370,13 @@ test('enter on empty normal tab does not send continue', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const origTabs = client.state.tabs.slice()
-	const origActiveTab = client.state.activeTab
+	const origFocusedTab = client.state.focusedTabIndex
 
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab())
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	prompt.clear()
-	client.state.busy.clear()
+	client.state.working.clear()
 	ipc.appendCommand = (command) => { commands.push(command) }
 
 	try {
@@ -387,7 +387,7 @@ test('enter on empty normal tab does not send continue', () => {
 		ipc.appendCommand = origAppendCommand
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
-		client.state.activeTab = origActiveTab
+		client.state.focusedTabIndex = origFocusedTab
 	}
 })
 

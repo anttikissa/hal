@@ -41,13 +41,12 @@ beforeEach(() => {
 		cwd: '/Users/antti/projects/some/really/long/path/that/should/not/wrap/in/the/status/line',
 		model: 'openai/gpt-5.4',
 	})
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	client.state.pid = 111
 	client.state.hostPid = 222
 	client.state.peak = 0
 	client.state.peakCols = 0
-	client.state.busy = new Map()
-	client.state.activity = new Map()
+	client.state.working = new Map()
 	prompt.clear()
 	popup.close()
 })

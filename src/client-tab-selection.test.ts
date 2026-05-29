@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { pickActiveSessionAfterSessionListChange } from './client.ts'
+import { pickFocusedSessionAfterSessionListChange } from './client.ts'
 
-describe('pickActiveSessionAfterSessionListChange', () => {
-	test('closing the active middle tab switches to the right neighbor', () => {
-		const picked = pickActiveSessionAfterSessionListChange({
+describe('pickFocusedSessionAfterSessionListChange', () => {
+	test('closing the focused middle tab switches to the right neighbor', () => {
+		const picked = pickFocusedSessionAfterSessionListChange({
 			previousSession: 'closed',
 			previousIndex: 1,
 			previousLength: 3,
@@ -17,7 +17,7 @@ describe('pickActiveSessionAfterSessionListChange', () => {
 	})
 
 	test('closing a client-created child tab returns to its opener', () => {
-		const picked = pickActiveSessionAfterSessionListChange({
+		const picked = pickFocusedSessionAfterSessionListChange({
 			previousSession: 'child',
 			previousIndex: 1,
 			previousLength: 3,
@@ -31,8 +31,8 @@ describe('pickActiveSessionAfterSessionListChange', () => {
 		expect(picked).toBe('parent')
 	})
 
-	test('closing the active last tab falls back left even with remembered focus', () => {
-		const picked = pickActiveSessionAfterSessionListChange({
+	test('closing the focused last tab falls back left even with remembered focus', () => {
+		const picked = pickFocusedSessionAfterSessionListChange({
 			previousSession: 's3',
 			previousIndex: 2,
 			previousLength: 3,
@@ -45,8 +45,8 @@ describe('pickActiveSessionAfterSessionListChange', () => {
 		expect(picked).toBe('s2')
 	})
 
-	test('closing the active last tab falls back to the new last tab without memory', () => {
-		const picked = pickActiveSessionAfterSessionListChange({
+	test('closing the focused last tab falls back to the new last tab without memory', () => {
+		const picked = pickFocusedSessionAfterSessionListChange({
 			previousSession: 's3',
 			previousIndex: 2,
 			previousLength: 3,

@@ -5,15 +5,15 @@ type PickActiveOptions = {
 	pendingOpen: PendingOpen; openedSessionId: string; returnToSession?: string
 }
 
-function pickActiveSessionAfterSessionListChange(opts: PickActiveOptions): string {
+function pickFocusedSessionAfterSessionListChange(opts: PickActiveOptions): string {
 	const { previousSession, previousIndex, previousLength, newSessionIds, recentTabs, pendingOpen, openedSessionId, returnToSession } = opts
 	const openIds = new Set(newSessionIds)
 	const grew = newSessionIds.length > previousLength
 	const shrank = newSessionIds.length < previousLength
-	const activeTabClosed = previousSession !== '' && !openIds.has(previousSession)
+	const focusedTabClosed = previousSession !== '' && !openIds.has(previousSession)
 	if (grew && pendingOpen && openedSessionId) return openedSessionId
 	if (previousSession && openIds.has(previousSession)) return previousSession
-	if (shrank && activeTabClosed) {
+	if (shrank && focusedTabClosed) {
 		if (returnToSession && openIds.has(returnToSession)) return returnToSession
 		const rightNeighborSlot = Math.min(previousIndex, newSessionIds.length - 1)
 		return newSessionIds[rightNeighborSlot] ?? ''
@@ -26,4 +26,4 @@ function pickActiveSessionAfterSessionListChange(opts: PickActiveOptions): strin
 	return newSessionIds[fallbackIndex] ?? newSessionIds[0] ?? ''
 }
 
-export const clientTabs = { pickActiveSessionAfterSessionListChange }
+export const clientTabs = { pickFocusedSessionAfterSessionListChange }

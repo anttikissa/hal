@@ -47,9 +47,9 @@ function startupPerfText(opts: any): string {
 	const ready = perfMs('Ready for input')
 	const firstLine = opts.role === 'server' ? `Server started (pid ${opts.pid})${ready ? ` · ready ${ready}` : ''}` : `Joined server (pid ${opts.hostPid ?? '?'})${ready ? ` · ready ${ready}` : ''}`
 	const details = [
-		['replay', perfMs('Active tab replayed')],
+		['replay', perfMs('Focused tab replayed')],
 		['first draw', perfMs('First draw done')],
-		['blobs', perfMs('Active tab blobs loaded')],
+		['blobs', perfMs('Focused tab blobs loaded')],
 		['all tabs', perfMs('All tabs loaded')],
 	].filter(([, ms]) => !!ms).map(([label, ms]) => `${label} ${ms}`)
 	return details.length > 0 ? `${firstLine}\n${details.join(' · ')}` : firstLine

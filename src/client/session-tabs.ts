@@ -14,8 +14,8 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	const model = ctx.model
 	const previousTabs = model.tabs as Tab[]
 	const previousById = new Map<string, Tab>(previousTabs.map((tab) => [tab.sessionId, tab]))
-	const previousSession = previousTabs[model.activeTab]?.sessionId ?? ''
-	const previousIndex = model.activeTab
+	const previousSession = previousTabs[model.focusedTabIndex]?.sessionId ?? ''
+	const previousIndex = model.focusedTabIndex
 	const newTabs: Tab[] = []
 	const openedTabs: Tab[] = []
 	const isFork = state.pendingOpen === 'fork'
@@ -45,7 +45,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	for (const sessionId of state.returnToBySession.keys()) if (!openIds.has(sessionId)) state.returnToBySession.delete(sessionId)
 	if (grew && openedSessionId && previousSession && (isOpen || isFork)) state.returnToBySession.set(openedSessionId, previousSession)
 
-	const targetSession = previousTabs.length === 0 && preferredSession && openIds.has(preferredSession) ? preferredSession : clientTabs.pickActiveSessionAfterSessionListChange({
+	const targetSession = previousTabs.length === 0 && preferredSession && openIds.has(preferredSession) ? preferredSession : clientTabs.pickFocusedSessionAfterSessionListChange({
 		previousSession,
 		previousIndex,
 		previousLength: previousTabs.length,
@@ -56,25 +56,25 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 		returnToSession,
 	})
 	const nextIndex = newTabs.findIndex((tab) => tab.sessionId === targetSession)
-	model.activeTab = nextIndex >= 0 ? nextIndex : Math.max(0, Math.min(previousIndex, newTabs.length - 1))
-	const newSession = model.tabs[model.activeTab]?.sessionId ?? ''
-	const active = model.tabs[model.activeTab]
-	if (active && !active.loaded) ctx.ensureTabLoaded(active)
-	if (active) ctx.loadTabBlobs(active)
-	if (active) ctx.rememberTab(active.sessionId)
-	if (previousTabs.length > 0) loadOpenedBackground(openedTabs, active, ctx)
+	model.focusedTabIndex = nextIndex >= 0 ? nextIndex : Math.max(0, Math.min(previousIndex, newTabs.length - 1))
+	const newSession = model.tabs[model.focusedTabIndex]?.sessionId ?? ''
+	const focused = model.tabs[model.focusedTabIndex]
+	if (focused && !focused.loaded) ctx.ensureTabLoaded(focused)
+	if (focused) ctx.loadTabBlobs(focused)
+	if (focused) ctx.rememberTab(focused.sessionId)
+	if (previousTabs.length > 0) loadOpenedBackground(openedTabs, focused, ctx)
 	ctx.flushPendingEntries()
 	copyForkDraft(isFork, grew, previousSession, openedSessionId, newTabs)
-	if (isOpen && grew && active && openedTabs.includes(active)) ctx.addStartupSummaryToTab(active)
-	if (state.pendingOpen === 'resume' && grew && active && openedTabs.includes(active)) ctx.addTabNoticeToTab(active, 'Tab restored.')
+	if (isOpen && grew && focused && openedTabs.includes(focused)) ctx.addStartupSummaryToTab(focused)
+	if (state.pendingOpen === 'resume' && grew && focused && openedTabs.includes(focused)) ctx.addTabNoticeToTab(focused, 'Tab restored.')
 	state.pendingOpen = false
 	if (previousSession !== newSession) ctx.onTabSwitch(previousSession, newSession)
 	ctx.onChange(false)
 }
 
-function loadOpenedBackground(openedTabs: Tab[], active: Tab | undefined, ctx: any): void {
+function loadOpenedBackground(openedTabs: Tab[], focused: Tab | undefined, ctx: any): void {
 	for (const tab of openedTabs) {
-		if (tab === active) continue
+		if (tab === focused) continue
 		if (!tab.loaded) ctx.ensureTabLoaded(tab)
 		ctx.loadTabBlobs(tab)
 	}

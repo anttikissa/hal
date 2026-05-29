@@ -137,10 +137,6 @@ function formatAccountLabel(credential: Credential): string {
 	return 'current account'
 }
 
-function formatRotationActivity(providerLabel: string, credential: Credential): string | undefined {
-	if (!credential.total || credential.total < 2 || credential.index == null) return undefined
-	return `${providerLabel} ${credential.index + 1}/${credential.total} · ${formatAccountLabel(credential)}`
-}
 
 function formatRotationMessage(
 	providerLabel: string,
@@ -165,6 +161,5 @@ export const providerShared = {
 	readWithTimeout,
 	iterateJsonSse,
 	parseToolInput,
-	formatRotationActivity,
 	formatRotationMessage,
 }

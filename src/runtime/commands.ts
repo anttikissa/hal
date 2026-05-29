@@ -109,7 +109,7 @@ interface CommandSection {
 }
 
 const handlers: Record<string, CommandHandler> = {}
-const activeSafeCommands = new Set([
+const workingSafeCommands = new Set([
 	'broadcast',
 	'fork',
 	'help',
@@ -805,9 +805,9 @@ handlers['exit'] = quitCommand
 
 
 // ── Main dispatch ──
-function canRunWhileActive(text: string): boolean {
+function canRunWhileWorking(text: string): boolean {
 	const parsed = parseCommand(text)
-	return !!parsed && activeSafeCommands.has(parsed.name)
+	return !!parsed && workingSafeCommands.has(parsed.name)
 }
 
 /** Execute a slash command. Returns { handled: false } if not a command. */
@@ -836,7 +836,7 @@ export const commands = {
 	state,
 	parseCommand,
 	executeCommand,
-	canRunWhileActive,
+	canRunWhileWorking,
 	commandNames,
 	commandArg,
 	helpText,

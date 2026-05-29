@@ -12,16 +12,16 @@ function actionForBlock(block: Block): ContinueAction | false {
 	return false
 }
 
-function actionForTab(tab: any, busy: boolean): ContinueAction | false {
+function actionForTab(tab: any, working: boolean): ContinueAction | false {
 	if (!tab) return false
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
 		if (block.type === 'tool') {
-			if (busy) return false
+			if (working) return false
 			continue
 		}
 		if ((block.type === 'log' || block.type === 'info') && !actionForBlock(block)) {
-			if (busy) return false
+			if (working) return false
 			continue
 		}
 		return actionForBlock(block)

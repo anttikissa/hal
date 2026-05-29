@@ -337,7 +337,7 @@ function submitPromptText(text: string, displayText: string | undefined, deliver
 	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
 	// Human typing now uses the same prompt command path as inbox messages.
-	// The runtime decides whether an active turn makes this behave like steering.
+	// The runtime decides whether an working turn makes this behave like steering.
 	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, delivery)
 	prompt.clear()
 	// Update tab's inputHistory + clear persisted draft
@@ -362,7 +362,7 @@ function handleLocalCommand(text: string): boolean {
 	client.onSubmit(text)
 	const result = clientLocalCommands.execute(text, {
 		tabs: client.state.tabs,
-		activeTab: client.state.activeTab,
+		focusedTabIndex: client.state.focusedTabIndex,
 		switchTab: client.switchTab,
 		sendCommand: client.sendCommand,
 	})
@@ -553,12 +553,12 @@ function handleAppKey(k: KeyEvent): boolean {
 		client.switchTab(k.key === '0' ? 9 : Number(k.key) - 1)
 		return true
 	}
-	// Escape: abort current generation if busy
-	if (k.key === 'escape' && client.isBusy()) {
+	// Escape: abort current generation if working
+	if (k.key === 'escape' && client.isWorking()) {
 		client.sendCommand('abort')
 		return true
 	}
-	// Alt-Enter queues the prompt for later instead of steering the active turn.
+	// Alt-Enter queues the prompt for later instead of steering the working turn.
 	if (k.key === 'enter' && k.alt && !k.shift && !k.ctrl && !k.cmd) {
 		submit(undefined, 'queue')
 		draw()
@@ -598,7 +598,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 
 	client.startClient(signal, opts)
 
-	// Initialize prompt history and draft from the active tab.
+	// Initialize prompt history and draft from the focused tab.
 	// (Tab switch handler takes care of swapping these later.)
 	prompt.setHistory(client.getInputHistory())
 	const savedDraft = client.getInputDraft()
@@ -650,7 +650,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 	client.setOnTabSwitch((fromSession, _toSession) => {
 		// Save outgoing tab's draft (uses draftText so we save the
 		// user's composition, not a history entry they're browsing).
-		// Pass fromSession because activeTab has already changed.
+		// Pass fromSession because focusedTabIndex has already changed.
 		client.saveDraft(prompt.draftText(), fromSession)
 		// Load incoming tab's draft and history
 		prompt.setText(client.getInputDraft())
@@ -658,7 +658,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 		openaiUsage.noteActivity()
 	})
 
-	// When another client saves a draft for our active tab and our
+	// When another client saves a draft for our focused tab and our
 	// prompt is empty, show it. This is how "client A quits with a
 	// draft on tab 10, client B picks it up" works.
 	client.setOnDraftArrived((text) => {

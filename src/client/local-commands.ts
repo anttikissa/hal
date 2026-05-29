@@ -11,7 +11,7 @@ export interface ClientLocalTabRef {
 
 export interface ClientLocalCommandContext {
 	tabs: ClientLocalTabRef[]
-	activeTab: number
+	focusedTabIndex: number
 	switchTab: (index: number) => void
 	sendCommand: (type: CommandType, text?: string) => void
 }
@@ -132,7 +132,7 @@ function runGo(args: string, ctx: ClientLocalCommandContext): ClientLocalCommand
 
 	const exact = exactOpenMatch(raw, ctx)
 	if (exact) {
-		if (exact.index === ctx.activeTab) return { handled: true, output: `Already on tab ${exact.index + 1}: ${exact.name}` }
+		if (exact.index === ctx.focusedTabIndex) return { handled: true, output: `Already on tab ${exact.index + 1}: ${exact.name}` }
 		ctx.switchTab(exact.index)
 		return { handled: true, output: `Switched to tab ${exact.index + 1}: ${exact.name}` }
 	}
@@ -140,7 +140,7 @@ function runGo(args: string, ctx: ClientLocalCommandContext): ClientLocalCommand
 	const open = partialOpenMatches(raw, ctx)
 	if (open.length === 1) {
 		const match = open[0]!
-		if (match.index === ctx.activeTab) return { handled: true, output: `Already on tab ${match.index + 1}: ${match.name}` }
+		if (match.index === ctx.focusedTabIndex) return { handled: true, output: `Already on tab ${match.index + 1}: ${match.name}` }
 		ctx.switchTab(match.index)
 		return { handled: true, output: `Switched to tab ${match.index + 1}: ${match.name}` }
 	}

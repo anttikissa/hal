@@ -5,7 +5,7 @@ function ctx(calls: string[], showStartupPerf = false) {
 	return {
 		config: { backgroundLoadBlobs: false, backgroundLoadTabs: true, showStartupPerf },
 		tabs: [{ loaded: true, history: [] }, { loaded: false, history: [] }],
-		activeTab: () => 0,
+		focusedTabIndex: () => 0,
 		ensureTabLoaded: () => { calls.push('load background tab') },
 		touchTab: () => {},
 		onChange: () => {},

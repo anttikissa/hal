@@ -24,10 +24,10 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 	}
 
 	let resolve: (() => void) | null = null
-	let pending = false // tracks events that fired while we were busy
+	let pending = false // tracks events that fired while we were processing
 	// Watch the parent directory, not the file itself. Atomic rename/update
 	// patterns can replace the file inode, which makes direct file watches on
-	// macOS miss later appends. Directory watch keeps working across rewrites.
+	// macOS miss later appends. Directory watch survives rewrites.
 	const watcher = watch(dirname(path), { persistent: false }, (_, filename) => {
 		if (filename && filename !== basename(path)) return
 		pending = true
@@ -55,7 +55,7 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 				}
 				// Check the file itself on every pull before waiting on fs.watch.
 				// On macOS we can miss the notification for an append that happened
-				// while the consumer was busy processing the previous record. Without
+				// while the consumer was processing the previous record. Without
 				// this, the tail can stall until some later unrelated write nudges it.
 				if (!pending) await new Promise<void>(r => (resolve = r))
 				pending = false

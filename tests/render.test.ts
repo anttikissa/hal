@@ -34,13 +34,12 @@ beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
 	client.state.tabs.push({ sessionId: 'test', name: 'tab 1', history: [], inputHistory: [], loaded: true, inputDraft: '', doneUnseen: false, parentEntryCount: 0, historyVersion: 0, usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }, contextUsed: 0, contextMax: 0, cwd: '/tmp', model: 'test' })
-	client.state.activeTab = 0
+	client.state.focusedTabIndex = 0
 	client.state.pid = 111
 	client.state.hostPid = 222
 	client.state.peak = 0
 	client.state.peakCols = 0
-	client.state.busy = new Map()
-	client.state.activity = new Map()
+	client.state.working = new Map()
 	client.state.toolConfirmPending = new Set()
 	prompt.clear()
 	prompt.config.maxPromptLines = 10
@@ -211,10 +210,10 @@ describe('render', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
 		tab.history.push({ type: 'tool', toolId: 't1', name: 'read', input: {}, ts: Date.now() })
-		client.state.busy.set(tab.sessionId, true)
+		client.state.working.set(tab.sessionId, true)
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).not.toContain('enter: retry')
-		client.state.busy.clear()
+		client.state.working.clear()
 	})
 
 	test('help bar says enter continue after max iteration stop', () => {
@@ -460,7 +459,7 @@ describe('render', () => {
 		}
 	})
 
-	test('busy tab minicursor pulses with OKLCH-dimmed color', () => {
+	test('working tab minicursor pulses with OKLCH-dimmed color', () => {
 		client.state.tabs.push({
 			sessionId: 'other',
 			name: 'tab 2',
@@ -477,7 +476,7 @@ describe('render', () => {
 			cwd: '/tmp',
 			model: 'test',
 		})
-		client.state.busy.set('other', true)
+		client.state.working.set('other', true)
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.input.cursor
 		const originalCursorDim = colors.input.cursorDim
@@ -507,7 +506,7 @@ describe('render', () => {
 		}
 	})
 
-	test('tab bar shows bracketed active tab and ctrl-t only when there is one tab', () => {
+	test('tab bar shows bracketed focused tab and ctrl-t only when there is one tab', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		const tabLine = clean.split('\n').find((line) => line.includes('Tabs:')) ?? ''
 		expect(tabLine).toContain(' Tabs: [1]')
@@ -567,7 +566,7 @@ describe('render', () => {
 				model: 'test',
 			})
 		}
-		client.state.activeTab = 23
+		client.state.focusedTabIndex = 23
 
 		const originalCols = process.stdout.columns
 		try {
@@ -584,9 +583,9 @@ describe('render', () => {
 		}
 	})
 
-	test('busy tab minicursor uses the main HAL cursor color', () => {
+	test('working tab minicursor uses the main HAL cursor color', () => {
 		const tab = client.currentTab()!
-		client.state.busy.set(tab.sessionId, true)
+		client.state.working.set(tab.sessionId, true)
 
 		const originalCursor = colors.input.cursor
 		const originalAssistant = colors.assistant.fg
@@ -609,9 +608,9 @@ describe('render', () => {
 		}
 	})
 
-	test('pending risky tool confirmation uses the configured warning alert instead of busy minicursor', () => {
+	test('pending risky tool confirmation uses the configured warning alert instead of working minicursor', () => {
 		const tab = client.currentTab()!
-		client.state.busy.set(tab.sessionId, true)
+		client.state.working.set(tab.sessionId, true)
 
 		client.handleEvent({
 			type: 'tool-confirm-request',
@@ -680,10 +679,10 @@ describe('render', () => {
 		}
 	})
 
-	test('busy HAL cursor uses the assistant active cursor color without streaming text', () => {
+	test('working HAL cursor uses the assistant working cursor color without streaming text', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[restarted]' })
-		client.state.busy.set(tab.sessionId, true)
+		client.state.working.set(tab.sessionId, true)
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
@@ -695,17 +694,17 @@ describe('render', () => {
 			expect(output).toContain(`${colors.assistant.cursor}█`)
 			expect(output).not.toContain(`${colors.assistant.cursorIdle}█`)
 		} finally {
-			client.state.busy.delete(tab.sessionId)
+			client.state.working.delete(tab.sessionId)
 			cursor.isVisible = originalIsVisible
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
 		}
 	})
 
-	test('HAL cursor fades linearly from active to idle after busy ends', () => {
+	test('HAL cursor fades linearly from working to idle after working ends', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'assistant', text: 'done' })
-		client.state.busy.set(tab.sessionId, true)
+		client.state.working.set(tab.sessionId, true)
 		const originalNow = Date.now
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.assistant.cursor
@@ -717,14 +716,14 @@ describe('render', () => {
 		cursor.isVisible = () => true
 		try {
 			captureOutput(() => render.draw(true))
-			client.state.busy.delete(tab.sessionId)
+			client.state.working.delete(tab.sessionId)
 			captureOutput(() => render.draw(true))
 			now = 500
 			const output = captureOutput(() => render.draw(true))
 			expect(output).toContain(`${oklch.mixFg(colors.assistant.cursor, colors.assistant.cursorIdle, 0.5)}█`)
 		} finally {
 			Date.now = originalNow
-			client.state.busy.delete(tab.sessionId)
+			client.state.working.delete(tab.sessionId)
 			cursor.isVisible = originalIsVisible
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
@@ -779,8 +778,7 @@ describe('render', () => {
 			cwd: '/tmp',
 			model: 'test',
 		})
-		client.state.busy.set('other', true)
-		client.state.activity.set('other', 'generating...')
+		client.state.working.set('other', true)
 		client.handleEvent({
 			type: 'info',
 			sessionId: 'other',
@@ -788,8 +786,7 @@ describe('render', () => {
 			level: 'error',
 			createdAt: new Date(0).toISOString(),
 		})
-		client.state.busy.delete('other')
-		client.state.activity.delete('other')
+		client.state.working.delete('other')
 
 		expect(client.state.tabs[1]?.history[0]).toMatchObject({
 			type: 'error',

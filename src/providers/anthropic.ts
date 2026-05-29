@@ -262,8 +262,6 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 
 	const isOAuth = cred.type === 'token'
 
-	const rotationActivity = providerShared.formatRotationActivity('Anthropic', cred)
-	if (rotationActivity) yield { type: 'status', activity: rotationActivity }
 
 	// Build system blocks with cache control.
 	// OAuth requires the Claude Code identity prefix — without it, the API rejects the request.

@@ -202,7 +202,7 @@ test('google compat provider asks for GOOGLE_API_KEY only', async () => {
 })
 
 
-test('openai provider reports the active account while rotating', async () => {
+test('openai provider streams text while rotating accounts', async () => {
 	const calls: FetchCall[] = []
 	const events = await collect(openaiProvider, 'openai', {
 		value: 'sk-test',
@@ -212,11 +212,8 @@ test('openai provider reports the active account while rotating', async () => {
 		total: 3,
 	}, calls)
 
-	expect(events[0]).toEqual({
-		type: 'status',
-		activity: 'OpenAI 1/3 · first@test.com',
-	})
-	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+	expect(events[0]).toEqual({ type: 'text', text: 'hello' })
+	expect(events.at(-1)?.type).toBe('done')
 })
 
 
@@ -249,8 +246,7 @@ test('openai 429 shows failed and next account when another account is available
 
 	expect(cooldownCred).toBe(credential)
 	expect(cooldownMs).toBe(2_064_000)
-	expect(events[0]).toEqual({ type: 'status', activity: 'OpenAI 1/3 · burned@test.com' })
-	expect(events[1]).toMatchObject({
+	expect(events[0]).toMatchObject({
 		type: 'error',
 		message: 'OpenAI rotation: 3 accounts. 429 on burned@test.com. Trying next@test.com next.',
 		status: 429,
@@ -285,8 +281,7 @@ test('openai 429 waits for reset when all accounts are on cooldown', async () =>
 	}
 
 	expect(cooldownMs).toBe(2_064_000)
-	expect(events[0]).toEqual({ type: 'status', activity: 'OpenAI 1/3 · burned@test.com' })
-	expect(events[1]).toMatchObject({
+	expect(events[0]).toMatchObject({
 		type: 'error',
 		message: 'OpenAI rotation: 3 accounts. 429 on burned@test.com. All accounts cooling down. Next: next@test.com in 2064s.',
 		status: 429,
@@ -596,7 +591,6 @@ test('openai auto transport falls back to HTTP when websocket connect times out'
 
 	expect(FakeWebSocket.instances[0]!.readyState).toBe(3)
 	expect(openai.state.webSockets.has('sid_ws_connect_timeout_auto')).toBe(false)
-	expect(events).toContainEqual({ type: 'status', activity: 'OpenAI Responses WebSocket connect timed out (5ms); falling back to HTTP' })
 	expect(calls).toHaveLength(1)
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))

@@ -53,7 +53,7 @@ function historyContext(): HistoryRenderContext {
 		forkHistoryDimFactor: config.forkHistoryDimFactor,
 		blockCache,
 		cursorVisible: blinkCursor.isVisible(),
-		busySessions: client.state.busy,
+		workingSessions: client.state.working,
 	}
 }
 
@@ -117,7 +117,7 @@ function buildFrame(): { lines: string[]; cursor: { row: number; col: number } }
 	// 1. History — all entries, all lines, NEVER sliced. See terminal.md rule 3.
 	const historyLines = tab ? renderHistory.renderLines(lines, tab, cols, historyContext()) : 0
 
-	// Update peak lazily: only the active tab, inactive tabs on switch.
+	// Update peak lazily: the focused tab now, other tabs on switch.
 	if (historyLines > client.state.peak) {
 		client.state.peak = historyLines
 		client.state.peakCols = cols

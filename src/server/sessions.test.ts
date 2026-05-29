@@ -40,8 +40,7 @@ test('loadSessionList reads rich sessions from shared state', () => {
 	const origReadState = ipc.readState
 	ipc.readState = () => ({
 		sessions: [{ id: 'new', tab: 1, cwd: '/tmp/new' }],
-		busy: {},
-		activity: {},
+		working: {},
 		updatedAt: '2026-04-24T11:00:00.000Z',
 	})
 	try {

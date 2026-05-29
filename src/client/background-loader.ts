@@ -3,13 +3,13 @@ import { perf } from '../perf.ts'
 
 async function load(ctx: any): Promise<void> {
 	if (ctx.config.backgroundLoadBlobs) {
-		const active = ctx.tabs[ctx.activeTab()]
-		if (active) {
+		const focused = ctx.tabs[ctx.focusedTabIndex()]
+		if (focused) {
 			const t0 = performance.now()
-			const n = await blockModule.loadBlobs(active.history)
+			const n = await blockModule.loadBlobs(focused.history)
 			const blobMs = (performance.now() - t0).toFixed(1)
-			perf.mark(`Active tab blobs loaded (${n} blobs, ${blobMs}ms)`)
-			if (n > 0) ctx.touchTab(active)
+			perf.mark(`Focused tab blobs loaded (${n} blobs, ${blobMs}ms)`)
+			if (n > 0) ctx.touchTab(focused)
 			if (n > 0 && ctx.config.repaintAfterBlobLoad) ctx.onChange(false)
 		}
 	}
@@ -28,7 +28,7 @@ async function load(ctx: any): Promise<void> {
 		if (ctx.config.backgroundLoadBlobs) {
 			const n = await blockModule.loadBlobs(tab.history)
 			if (n > 0) ctx.touchTab(tab)
-			if (n > 0 && tab === ctx.tabs[ctx.activeTab()]) ctx.onChange(false)
+			if (n > 0 && tab === ctx.tabs[ctx.focusedTabIndex()]) ctx.onChange(false)
 		}
 	}
 	const bgMs = (performance.now() - t1).toFixed(1)

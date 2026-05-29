@@ -93,7 +93,7 @@ test('/config completes nested config paths', () => {
 })
 
 
-test('/cd completes directories from the active session cwd', () => {
+test('/cd completes directories from the focused session cwd', () => {
 	const root = mkdtempSync(join(tmpdir(), 'hal-complete-cd-'))
 	try {
 		mkdirSync(join(root, 'alpha'))

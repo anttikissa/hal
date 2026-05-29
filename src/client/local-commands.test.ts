@@ -8,9 +8,9 @@ function ctx(): ClientLocalCommandContext {
 			{ sessionId: '04-two', name: 'pause fix' },
 			{ sessionId: '04-three', name: 'docs' },
 		],
-		activeTab: 0,
+		focusedTabIndex: 0,
 		switchTab(index: number) {
-			this.activeTab = index
+			this.focusedTabIndex = index
 		},
 		sendCommand() {},
 	}
@@ -21,7 +21,7 @@ test('/go switches by tab number locally', () => {
 	const result = clientLocalCommands.execute('/go 2', c)
 
 	expect(result).toMatchObject({ handled: true, output: 'Switched to tab 2: pause fix' })
-	expect(c.activeTab).toBe(1)
+	expect(c.focusedTabIndex).toBe(1)
 })
 
 test('/go switches by partial tab name', () => {
@@ -29,7 +29,7 @@ test('/go switches by partial tab name', () => {
 	const result = clientLocalCommands.execute('/go pause', c)
 
 	expect(result).toMatchObject({ handled: true, output: 'Switched to tab 2: pause fix' })
-	expect(c.activeTab).toBe(1)
+	expect(c.focusedTabIndex).toBe(1)
 })
 
 test('/go reports ambiguous partial tab names', () => {
@@ -41,7 +41,7 @@ test('/go reports ambiguous partial tab names', () => {
 	expect(result.error).toContain('Ambiguous')
 	expect(result.error).toContain('pause fix')
 	expect(result.error).toContain('pause docs')
-	expect(c.activeTab).toBe(0)
+	expect(c.focusedTabIndex).toBe(0)
 })
 
 test('/quit quits with a visible goodbye', () => {

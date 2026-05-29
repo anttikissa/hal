@@ -1,6 +1,6 @@
 // Static context-sensitive help for the bottom help line.
 
-type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'idle-retry' | 'streaming' | 'streaming-text'
+type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'idle-retry' | 'working' | 'working-text'
 
 type ContinueAction = 'continue' | 'retry'
 
@@ -32,8 +32,8 @@ const HINTS: Record<HelpState, Hint[]> = {
 	],
 	'idle-continue': [{ keyLabel: 'enter', description: 'continue' }],
 	'idle-retry': [{ keyLabel: 'enter', description: 'retry' }],
-	streaming: [{ keyLabel: 'esc', description: 'pause' }],
-	'streaming-text': [
+	working: [{ keyLabel: 'esc', description: 'pause' }],
+	'working-text': [
 		{ keyLabel: 'enter', description: 'steer' },
 		{ keyLabel: 'shift-enter', description: 'newline' },
 		{ keyLabel: 'alt-enter', description: 'queue' },
@@ -41,14 +41,14 @@ const HINTS: Record<HelpState, Hint[]> = {
 	],
 }
 
-function deriveState(busy: boolean, hasText: boolean, continueAction: ContinueAction | false = false): HelpState {
+function deriveState(working: boolean, hasText: boolean, continueAction: ContinueAction | false = false): HelpState {
 	if (hasText) {
-		if (busy) return 'streaming-text'
+		if (working) return 'working-text'
 		return 'idle-text'
 	}
 	if (continueAction === 'retry') return 'idle-retry'
 	if (continueAction === 'continue') return 'idle-continue'
-	if (busy) return 'streaming'
+	if (working) return 'working'
 	return 'idle-empty'
 }
 
@@ -66,8 +66,8 @@ function shortcutListHint(style?: HelpStyle): string {
 	return formatHint({ keyLabel: config.rightKeyLabel, description: config.rightDescription }, style)
 }
 
-function build(busy: boolean, hasText: boolean, continueAction: ContinueAction | false = false, style?: HelpStyle): string {
-	const state = deriveState(busy, hasText, continueAction)
+function build(working: boolean, hasText: boolean, continueAction: ContinueAction | false = false, style?: HelpStyle): string {
+	const state = deriveState(working, hasText, continueAction)
 	const separator = style ? `${style.separator}, ${style.description}` : ', '
 	return HINTS[state].map((hint) => formatHint(hint, style)).filter(Boolean).join(separator)
 }

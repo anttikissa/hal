@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { helpBar } from './help-bar.ts'
 
-test('continuable state takes precedence over stale busy state', () => {
+test('continuable state takes precedence over stale working state', () => {
 	expect(helpBar.deriveState(true, false, 'retry')).toBe('idle-retry')
 	expect(helpBar.deriveState(true, false, 'continue')).toBe('idle-continue')
 })
@@ -23,7 +23,7 @@ test('text entry hints show send newline and queue together', () => {
 	expect(text).toContain('alt-enter: queue')
 })
 
-test('busy text hints show steer newline queue and pause', () => {
+test('working text hints show steer newline queue and pause', () => {
 	const text = helpBar.build(true, true)
 
 	expect(text).toContain('enter: steer')

@@ -41,11 +41,11 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 const sendTool: Tool = {
 	name: 'send',
 	description:
-		'Send a message to another session. By default this behaves like a prompt and steers if the target is busy; set queue=true to run it after the current turn.',
+		'Send a message to another session. By default this behaves like a prompt and steers if the target is working; set queue=true to run it after the current turn.',
 	parameters: {
 		sessionId: { type: 'string', description: 'Target session ID (or "all" for broadcast)' },
 		text: { type: 'string', description: 'Message text' },
-		queue: { type: 'boolean', description: 'Queue instead of steering if the target session is busy' },
+		queue: { type: 'boolean', description: 'Queue instead of steering if the target session is working' },
 	},
 	required: ['sessionId', 'text'],
 	execute,

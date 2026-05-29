@@ -36,8 +36,7 @@ export interface SharedHostInfo {
 
 export interface SharedState {
 	sessions: SharedSessionInfo[]
-	busy: Record<string, boolean>
-	activity: Record<string, string>
+	working: Record<string, boolean>
 	host?: SharedHostInfo
 	updatedAt: string
 }
@@ -45,8 +44,7 @@ export interface SharedState {
 function defaultState(): SharedState {
 	return {
 		sessions: [],
-		busy: {},
-		activity: {},
+		working: {},
 		host: { pid: null, startedAt: '', versionStatus: 'idle' },
 		updatedAt: new Date().toISOString(),
 	}
@@ -109,8 +107,7 @@ function getStateFile(): SharedState {
 	ensureDir(IPC_DIR)
 	stateFile = liveFiles.liveFile(STATE_FILE, defaultState(), { watch: false }) as SharedState
 	if (!Array.isArray(stateFile.sessions)) stateFile.sessions = []
-	if (!stateFile.busy || typeof stateFile.busy !== 'object') stateFile.busy = {}
-	if (!stateFile.activity || typeof stateFile.activity !== 'object') stateFile.activity = {}
+	if (!stateFile.working || typeof stateFile.working !== 'object') stateFile.working = {}
 	if (typeof stateFile.updatedAt !== 'string') stateFile.updatedAt = new Date().toISOString()
 	return stateFile
 }

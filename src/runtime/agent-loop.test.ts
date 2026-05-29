@@ -249,17 +249,16 @@ test('context length errors warn when local model limit looked safe', async () =
 })
 
 
-test('provider status updates busy activity', async () => {
+test('session working state updates at turn start and end', async () => {
 	const sessionId = `test-status-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
 
-	const statuses: Array<{ busy: boolean; activity?: string }> = []
+	const statuses: boolean[] = []
 	const origGetProvider = providerLoader.getProvider
 
 	providerLoader.getProvider = async () => ({
 		async *generate() {
-			yield { type: 'status', activity: 'OpenAI 2/3 · next@test.com' }
 			yield { type: 'done', usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
@@ -271,20 +270,18 @@ test('provider status updates busy activity', async () => {
 			cwd: process.cwd(),
 			systemPrompt: 'test prompt',
 			messages: [],
-			onStatus: async (busy, activity) => {
-				statuses.push({ busy, activity })
+			onStatus: async (working) => {
+				statuses.push(working)
 			},
 		})
-		expect(statuses).toContainEqual({ busy: true, activity: 'generating...' })
-		expect(statuses).toContainEqual({ busy: true, activity: 'OpenAI 2/3 · next@test.com' })
-		expect(statuses.at(-1)).toEqual({ busy: false, activity: undefined })
+		expect(statuses).toEqual([true, false])
 	} finally {
 		providerLoader.getProvider = origGetProvider
 	}
 })
 
 
-test('displaced generation cannot clear newer active request state', async () => {
+test('displaced generation cannot clear newer working request state', async () => {
 	const sessionId = `test-displace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
@@ -335,14 +332,14 @@ test('displaced generation cannot clear newer active request state', async () =>
 
 		releaseFirst.resolve()
 		expect(await first).toBe('aborted')
-		expect(agentLoop.isActive(sessionId)).toBe(true)
+		expect(agentLoop.isWorking(sessionId)).toBe(true)
 
 		finishSecond.resolve()
 		expect(await second).toBe('completed')
-		expect(agentLoop.isActive(sessionId)).toBe(false)
+		expect(agentLoop.isWorking(sessionId)).toBe(false)
 	} finally {
 		providerLoader.getProvider = origGetProvider
-		agentLoop.state.activeRequests.delete(sessionId)
+		agentLoop.state.workingRequests.delete(sessionId)
 		agentLoop.state.abortTexts.delete(sessionId)
 	}
 })
@@ -357,7 +354,7 @@ test('abort between tool iterations does not report max iterations', async () =>
 	const origGetProvider = providerLoader.getProvider
 	const origAppendEvent = ipc.appendEvent
 	const ac = new AbortController()
-	let sawToolRun = false
+	let workingUpdates = 0
 
 	providerLoader.getProvider = async () => ({
 		async *generate() {
@@ -377,9 +374,10 @@ test('abort between tool iterations does not report max iterations', async () =>
 			systemPrompt: 'test prompt',
 			messages: [],
 			signal: ac.signal,
-			onStatus: async (_busy, activity) => {
-				if (activity?.startsWith('running ')) sawToolRun = true
-				if (activity === 'generating...' && sawToolRun) ac.abort()
+			onStatus: async (working) => {
+				if (!working) return
+				workingUpdates++
+				if (workingUpdates === 3) ac.abort()
 			},
 		})
 		expect(result).toBe('aborted')
@@ -400,10 +398,10 @@ test('custom abort text is persisted', async () => {
 	const events: any[] = []
 	const origGetProvider = providerLoader.getProvider
 	const origAppendEvent = ipc.appendEvent
-	let abortScheduled = false
 
 	providerLoader.getProvider = async () => ({
 		async *generate() {
+			setTimeout(() => agentLoop.abort(sessionId, 'Tab closed'), 10)
 			yield {
 				type: 'error',
 				message: 'rate limited',
@@ -424,12 +422,6 @@ test('custom abort text is persisted', async () => {
 			cwd: process.cwd(),
 			systemPrompt: 'test prompt',
 			messages: [],
-			onStatus: async (_busy, activity) => {
-				if (!abortScheduled && activity?.startsWith('rate limited — retrying in ')) {
-					abortScheduled = true
-					setTimeout(() => agentLoop.abort(sessionId, 'Tab closed'), 10)
-				}
-			},
 		})
 		expect(events.some((event) => event.type === 'info' && event.text === 'Tab closed')).toBe(true)
 		expect(events.some((event) => event.type === 'info' && event.text === '[paused]')).toBe(false)
@@ -448,10 +440,10 @@ test('empty abort text stops generation without adding an info block', async () 
 	const events: any[] = []
 	const origGetProvider = providerLoader.getProvider
 	const origAppendEvent = ipc.appendEvent
-	let abortScheduled = false
 
 	providerLoader.getProvider = async () => ({
 		async *generate() {
+			setTimeout(() => agentLoop.abort(sessionId, ''), 10)
 			yield {
 				type: 'error',
 				message: 'rate limited',
@@ -472,12 +464,6 @@ test('empty abort text stops generation without adding an info block', async () 
 			cwd: process.cwd(),
 			systemPrompt: 'test prompt',
 			messages: [],
-			onStatus: async (_busy, activity) => {
-				if (!abortScheduled && activity?.startsWith('rate limited — retrying in ')) {
-					abortScheduled = true
-					setTimeout(() => agentLoop.abort(sessionId, ''), 10)
-				}
-			},
 		})
 		expect(events.some((event) => event.type === 'info' && (event.text === '[paused]' || event.text === '' || event.text === '[restarted]'))).toBe(false)
 		const streamEnd = events.find((event) => event.type === 'stream-end')
@@ -499,10 +485,10 @@ test('abort during rate-limit backoff stops immediately', async () => {
 	const origGetProvider = providerLoader.getProvider
 	const origAppendEvent = ipc.appendEvent
 	const ac = new AbortController()
-	let abortScheduled = false
 
 	providerLoader.getProvider = async () => ({
 		async *generate() {
+			setTimeout(() => ac.abort(), 10)
 			yield {
 				type: 'error',
 				message: 'rate limited',
@@ -525,12 +511,6 @@ test('abort during rate-limit backoff stops immediately', async () => {
 			systemPrompt: 'test prompt',
 			messages: [],
 			signal: ac.signal,
-			onStatus: async (_busy, activity) => {
-				if (!abortScheduled && activity?.startsWith('rate limited — retrying in ')) {
-					abortScheduled = true
-					setTimeout(() => ac.abort(), 10)
-				}
-			},
 		})
 		const elapsedMs = Date.now() - startedAt
 		expect(elapsedMs).toBeLessThan(1_000)

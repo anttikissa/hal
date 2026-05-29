@@ -43,13 +43,13 @@ export interface Tab {
 	// can hand it to the CLI on tab switch without a disk read.
 	inputDraft: string
 	// Tabs start unloaded: raw history is stashed here and converted to
-	// blocks on demand (active tab at startup, others in background).
+	// blocks on demand (focused tab at startup, others in background).
 	rawHistory?: HistoryEntry[]
 	// How many rawHistory entries came from a fork parent (used to dim those blocks)
 	parentEntryCount: number
 	liveHistory?: Block[]
 	loaded: boolean
-	// Generation finished on a non-active tab — show ✓ until user switches to it
+	// Generation finished on a non-focused tab — show ✓ until user switches to it
 	doneUnseen: boolean
 	// Bumped whenever history contents change. The renderer uses this to
 	// invalidate cached line counts when a block grows in place.
@@ -94,7 +94,7 @@ const config = {
 
 const state = {
 	tabs: [] as Tab[],
-	activeTab: 0,
+	focusedTabIndex: 0,
 	role: 'server' as 'server' | 'client',
 	pid: process.pid,
 	hostPid: null as number | null,
@@ -106,14 +106,12 @@ const state = {
 	peakCols: 0,
 	// Current model selection, persisted across restarts
 	model: null as string | null,
-	// Busy state per session — true while agent is generating/running tools
-	busy: new Map<string, boolean>(),
-	// Activity text per session — "generating...", "running 3 tool(s)...", etc.
-	activity: new Map<string, string>(),
+	// Working state per session — true while a turn is in progress.
+	working: new Map<string, boolean>(),
 	// Sessions waiting for the user to answer a risky tool confirmation popup.
 	toolConfirmPending: new Set<string>(),
 	// Most-recently viewed tab order. Used as a fallback when session-list changes
-	// do not close the active tab, such as cross-client closes or startup recovery.
+	// do not close the focused tab, such as cross-client closes or startup recovery.
 	recentTabs: [] as string[],
 	startupSummaryShown: false,
 }
@@ -175,7 +173,7 @@ function setOnRebaseResult(fn: (event: any) => void): void {
 function requestRender(force = false): void { onChange(force) }
 
 function currentTab(): Tab | null {
-	return state.tabs[state.activeTab] ?? null
+	return state.tabs[state.focusedTabIndex] ?? null
 }
 
 function focusSession(sessionId: string | undefined): void {
@@ -196,7 +194,7 @@ function pruneRecentTabs(openIds: Set<string>): void {
 	state.recentTabs = state.recentTabs.filter((id) => openIds.has(id))
 }
 
-export const pickActiveSessionAfterSessionListChange = clientTabs.pickActiveSessionAfterSessionListChange
+export const pickFocusedSessionAfterSessionListChange = clientTabs.pickFocusedSessionAfterSessionListChange
 
 function touchTab(tab: Tab): void {
 	tab.historyVersion++
@@ -277,15 +275,11 @@ function applyLiveEventToTab(tab: Tab, event: any): { changed: boolean; toolBloc
 	})
 }
 
-function isBusy(): boolean {
+function isWorking(): boolean {
 	const tab = currentTab()
-	return tab ? (state.busy.get(tab.sessionId) ?? false) : false
+	return tab ? (state.working.get(tab.sessionId) ?? false) : false
 }
 
-function getActivity(): string {
-	const tab = currentTab()
-	return tab ? (state.activity.get(tab.sessionId) ?? '') : ''
-}
 
 function markToolConfirmPending(sessionId: string): void {
 	state.toolConfirmPending.add(sessionId)
@@ -295,7 +289,7 @@ function clearToolConfirmPending(sessionId: string): void {
 	state.toolConfirmPending.delete(sessionId)
 }
 
-// onTabSwitch callback — called when active tab changes, with the outgoing
+// onTabSwitch callback — called when focused tab changes, with the outgoing
 // session ID. The CLI uses this to save the outgoing draft and restore the
 // incoming tab's draft/history.
 let onTabSwitch: ((fromSession: string, toSession: string) => void) | null = null
@@ -305,7 +299,7 @@ function setOnTabSwitch(fn: (from: string, to: string) => void): void {
 }
 
 // onDraftArrived callback — fired when another client saves a draft for
-// the active tab and our prompt is empty. The CLI uses this to show the
+// the focused tab and our prompt is empty. The CLI uses this to show the
 // draft text (e.g. client A quits with a draft, client B picks it up).
 let onDraftArrived: ((text: string) => void) | null = null
 
@@ -314,9 +308,9 @@ function setOnDraftArrived(fn: (text: string) => void): void {
 }
 
 function switchTab(index: number): void {
-	if (index >= 0 && index < state.tabs.length && index !== state.activeTab) {
-		const fromSession = state.tabs[state.activeTab]?.sessionId ?? ''
-		state.activeTab = index
+	if (index >= 0 && index < state.tabs.length && index !== state.focusedTabIndex) {
+		const fromSession = state.tabs[state.focusedTabIndex]?.sessionId ?? ''
+		state.focusedTabIndex = index
 		const tab = state.tabs[index]!
 		// Clear "done unseen" flag — user is now looking at this tab
 		tab.doneUnseen = false
@@ -366,7 +360,7 @@ function loadTabBlobs(tab: Tab): void {
 		const n = await blockModule.loadBlobs(tab.history)
 		if (n <= 0) return
 		touchTab(tab)
-		if (tab === state.tabs[state.activeTab] && config.repaintAfterBlobLoad) onChange(false)
+		if (tab === state.tabs[state.focusedTabIndex] && config.repaintAfterBlobLoad) onChange(false)
 	})()
 }
 
@@ -408,7 +402,7 @@ function getInputDraft(): string {
 
 // Save draft text to memory + disk + IPC notification.
 // If sessionId is given, saves to that tab (used on tab switch to save
-// outgoing draft after activeTab already changed).
+// outgoing draft after focusedTabIndex already changed).
 function saveDraft(text: string, sessionId?: string): void {
 	const sid = sessionId ?? currentTab()?.sessionId
 	if (!sid) return
@@ -435,11 +429,11 @@ function onSubmit(text: string): void {
 // ── Tab switching helpers ────────────────────────────────────────────────────
 
 function nextTab(): void {
-	if (state.tabs.length > 0) switchTab((state.activeTab + 1) % state.tabs.length)
+	if (state.tabs.length > 0) switchTab((state.focusedTabIndex + 1) % state.tabs.length)
 }
 
 function prevTab(): void {
-	if (state.tabs.length > 0) switchTab((state.activeTab - 1 + state.tabs.length) % state.tabs.length)
+	if (state.tabs.length > 0) switchTab((state.focusedTabIndex - 1 + state.tabs.length) % state.tabs.length)
 }
 
 
@@ -458,7 +452,7 @@ function sendCommand(type: CommandType, text?: string, displayText?: string, del
 
 
 function continueActionForTab(tab: Tab | null): ContinueAction | false {
-	return continuation.actionForTab(tab, tab ? (state.busy.get(tab.sessionId) ?? false) : false)
+	return continuation.actionForTab(tab, tab ? (state.working.get(tab.sessionId) ?? false) : false)
 }
 
 function continueActionForCurrentTurn(): ContinueAction | false {
@@ -503,13 +497,13 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 
 function applySharedStatus(shared: SharedState): void {
 	const activeSession = currentTab()?.sessionId
-	const nextBusy = new Map<string, boolean>()
+	const nextWorking = new Map<string, boolean>()
 	let changedDoneUnseen = false
-	for (const [sessionId, busy] of Object.entries(shared.busy)) {
-		if (busy) nextBusy.set(sessionId, true)
+	for (const [sessionId, working] of Object.entries(shared.working)) {
+		if (working) nextWorking.set(sessionId, true)
 	}
-	for (const [sessionId, wasBusy] of state.busy) {
-		if (!wasBusy || nextBusy.get(sessionId)) continue
+	for (const [sessionId, wasWorking] of state.working) {
+		if (!wasWorking || nextWorking.get(sessionId)) continue
 		if (sessionId !== activeSession) {
 			const tab = state.tabs.find((item) => item.sessionId === sessionId)
 			if (tab && !tab.doneUnseen) {
@@ -518,10 +512,9 @@ function applySharedStatus(shared: SharedState): void {
 			}
 		}
 	}
-	state.busy = nextBusy
-	state.activity = new Map(Object.entries(shared.activity))
+	state.working = nextWorking
 	for (const sessionId of state.toolConfirmPending) {
-		if (!nextBusy.get(sessionId)) state.toolConfirmPending.delete(sessionId)
+		if (!nextWorking.get(sessionId)) state.toolConfirmPending.delete(sessionId)
 	}
 	if (changedDoneUnseen) saveClientState()
 	state.hostVersionStatus = shared.host?.versionStatus ?? 'idle'
@@ -592,28 +585,28 @@ function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; 
 		: savedTabFitsRequest ? saved.lastTab! : (cwdPreferredSession || saved.lastTab || '')
 	const t0 = performance.now()
 	applySessionList(items, preferredSession)
-	const active = currentTab()
+	const focused = currentTab()
 	const unseenDone = new Set(saved.doneUnseen)
-	for (const tab of state.tabs) tab.doneUnseen = tab.sessionId !== active?.sessionId && unseenDone.has(tab.sessionId)
+	for (const tab of state.tabs) tab.doneUnseen = tab.sessionId !== focused?.sessionId && unseenDone.has(tab.sessionId)
 	if (saved.model) state.model = saved.model
-	if (active) {
+	if (focused) {
 		const replayMs = (performance.now() - t0).toFixed(1)
-		perf.mark(`Active tab replayed (${active.history.length} blocks, ${replayMs}ms)`)
-		active.inputDraft = draftModule.loadDraft(active.sessionId)
+		perf.mark(`Focused tab replayed (${focused.history.length} blocks, ${replayMs}ms)`)
+		focused.inputDraft = draftModule.loadDraft(focused.sessionId)
 	}
 
 	const cols = process.stdout.columns || 80
 	if (saved.peakCols === cols && saved.peak > 0) state.peak = saved.peak
 	state.peakCols = cols
 	applySharedStatus(shared)
-	perf.mark(`Client loaded ${items.length} sessions (1 active)`)
+	perf.mark(`Client loaded ${items.length} sessions (1 focused)`)
 }
 
 async function loadInBackground(): Promise<void> {
 	await backgroundLoader.load({
 		config,
 		tabs: state.tabs,
-		activeTab: () => state.activeTab,
+		focusedTabIndex: () => state.focusedTabIndex,
 		ensureTabLoaded,
 		touchTab,
 		showStartupSummary,
@@ -666,8 +659,7 @@ export const client = {
 	setOnTabSwitch,
 	setOnDraftArrived,
 	currentTab,
-	isBusy,
-	getActivity,
+	isWorking,
 	markToolConfirmPending,
 	clearToolConfirmPending,
 	canContinueCurrentTurn,
