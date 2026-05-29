@@ -57,6 +57,16 @@ test('historyToBlocks recovers retry state from failed turn_end', () => {
 	expect(result.at(-1)).toMatchObject({ type: 'error', text: 'Generation failed.' })
 })
 
+
+test('historyToBlocks recovers continue state from aborted turn_end', () => {
+	const result = blocks.historyToBlocks([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'turn_end', status: 'aborted' },
+	] as any, 's1')
+
+	expect(result.at(-1)).toMatchObject({ type: 'log', text: '[paused]' })
+})
+
 test('thinking block renders markdown and trims trailing blank lines', () => {
 	const block: Block = {
 		type: 'thinking',
