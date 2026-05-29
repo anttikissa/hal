@@ -664,7 +664,7 @@ function padBlockLine(line: string): string {
 }
 
 function padBlock(lines: string[], fg: string, bg: string, cols: number): void {
-	if (!bg || bg === colors.assistant.bg || bg === colors.thinking.bg) return
+	if (!bg || bg.includes('[48;2;0;0;0m')) return
 	lines.unshift(bgLine(`${fg} `, cols, bg))
 	lines.push(bgLine(`${fg} `, cols, bg))
 }

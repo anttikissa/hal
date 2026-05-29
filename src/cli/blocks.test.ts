@@ -127,6 +127,23 @@ test('assistant and thinking backgrounds come from colors', () => {
 })
 
 
+test('assistant blocks get padding when background is colorful', () => {
+	const original = colors.assistant.bg
+	try {
+		const block: Block = { type: 'assistant', text: 'hello' }
+		colors.assistant.bg = '\x1b[48;2;0;0;0m'
+		expect(blocks.renderBlock(block, 80).map(stripAnsi)[0]?.trim()).not.toBe('')
+
+		colors.assistant.bg = '\x1b[48;2;1;0;0m'
+		const lines = blocks.renderBlock(block, 80).map(stripAnsi)
+		expect(lines[0]).toBe(' ')
+		expect(lines.at(-1)).toBe(' ')
+	} finally {
+		colors.assistant.bg = original
+	}
+})
+
+
 test('synthetic assistant header includes model and synthetic marker', () => {
 	const block: Block = {
 		type: 'assistant',
