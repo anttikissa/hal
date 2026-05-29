@@ -24,6 +24,8 @@ import { cursor as blinkCursor } from '../cli/cursor.ts'
 
 const config = {
 	forkHistoryDimFactor: 0.85,
+	halCursorFadeMs: 1000,
+	halCursorFadeFrameMs: 67,
 }
 
 const CSI = '\x1b['
@@ -54,15 +56,17 @@ function historyContext(): HistoryRenderContext {
 		blockCache,
 		cursorVisible: blinkCursor.isVisible(),
 		workingSessions: client.state.working,
+		cursorFadeMs: config.halCursorFadeMs,
 	}
 }
 
 function scheduleFade(): void {
-	if (fadeTimer || !renderHistory.hasFadingCursor(client.currentTab())) return
+	if (fadeTimer || !renderHistory.hasFadingCursor(client.currentTab(), config.halCursorFadeMs)) return
+	const delay = Math.max(1, config.halCursorFadeFrameMs)
 	fadeTimer = setTimeout(() => {
 		fadeTimer = null
 		draw()
-	}, 67)
+	}, delay)
 }
 
 function writeTerminal(s: string): void {

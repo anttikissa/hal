@@ -36,7 +36,11 @@
 	},
 	render: {
 		// Brightness multiplier for inherited fork history; lower values look dimmer.
-		forkHistoryDimFactor: 0.85
+		forkHistoryDimFactor: 0.85,
+		// Duration of HAL cursor fade from working to idle after generation ends.
+		halCursorFadeMs: 1000,
+		// Delay between fade animation frames; 67ms is about 15fps.
+		halCursorFadeFrameMs: 67
 	},
 	renderStatus: {
 		// 04-uki

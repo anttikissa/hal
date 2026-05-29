@@ -19,10 +19,10 @@ export type HistoryRenderContext = {
 	blockCache: WeakMap<Block, BlockRenderCache>
 	cursorVisible: boolean
 	workingSessions: ReadonlyMap<string, boolean>
+	cursorFadeMs: number
 }
 
 const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
-const FADE_MS = 1000
 let workingSeen = new Set<string>()
 let fadeStart = new Map<string, number>()
 
@@ -81,19 +81,20 @@ function visibleHistory(history: Block[]): Block[] {
 	return visible
 }
 
-function fadeAmount(sessionId: string, working: boolean): number {
+function fadeAmount(sessionId: string, working: boolean, fadeMs: number): number {
 	if (working) {
 		workingSeen.add(sessionId)
 		fadeStart.delete(sessionId)
 		return 0
 	}
+	if (fadeMs <= 0) return 1
 	if (workingSeen.has(sessionId) && !fadeStart.has(sessionId)) fadeStart.set(sessionId, Date.now())
 	const start = fadeStart.get(sessionId)
-	return start == null ? 1 : Math.min(1, (Date.now() - start) / FADE_MS)
+	return start == null ? 1 : Math.min(1, (Date.now() - start) / fadeMs)
 }
 
-function halCursorLine(sessionId: string, visible: boolean, working: boolean): string {
-	const t = fadeAmount(sessionId, working)
+function halCursorLine(sessionId: string, visible: boolean, working: boolean, fadeMs: number): string {
+	const t = fadeAmount(sessionId, working, fadeMs)
 	const color = working ? blockRenderer.cursorColor() : oklch.mixFg(blockRenderer.cursorColor(), blockRenderer.idleCursorColor(), t)
 	return visible ? ` ${color}█\x1b[39m` : ''
 }
@@ -125,15 +126,15 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
 		// another blank row. When history fills the screen, these are the bottom
 		// three history rows immediately above the tab/status/prompt chrome.
-		lines.push('', halCursorLine(tab.sessionId, context.cursorVisible, working), '')
+		lines.push('', halCursorLine(tab.sessionId, context.cursorVisible, working, context.cursorFadeMs), '')
 	}
 
 	return lines.length - start
 }
 
-function hasFadingCursor(tab: Tab | null | undefined): boolean {
+function hasFadingCursor(tab: Tab | null | undefined, fadeMs: number): boolean {
 	const start = tab ? fadeStart.get(tab.sessionId) : undefined
-	return start != null && Date.now() - start < FADE_MS
+	return start != null && fadeMs > 0 && Date.now() - start < fadeMs
 }
 
 function resetAnimation(): void {

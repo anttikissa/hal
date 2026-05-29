@@ -709,16 +709,18 @@ describe('render', () => {
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
+		const originalFadeMs = render.config.halCursorFadeMs
 		let now = 0
 		Date.now = () => now
 		colors.assistant.cursor = oklch.toFg(0.48, 0, 0)
 		colors.assistant.cursorIdle = oklch.toFg(0.66, 0.14, 55)
+		render.config.halCursorFadeMs = 2000
 		cursor.isVisible = () => true
 		try {
 			captureOutput(() => render.draw(true))
 			client.state.working.delete(tab.sessionId)
 			captureOutput(() => render.draw(true))
-			now = 500
+			now = 1000
 			const output = captureOutput(() => render.draw(true))
 			expect(output).toContain(`${oklch.mixFg(colors.assistant.cursor, colors.assistant.cursorIdle, 0.5)}█`)
 		} finally {
@@ -727,6 +729,7 @@ describe('render', () => {
 			cursor.isVisible = originalIsVisible
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
+			render.config.halCursorFadeMs = originalFadeMs
 			render.resetRenderer()
 		}
 	})
