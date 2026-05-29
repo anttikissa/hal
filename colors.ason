@@ -91,6 +91,11 @@
 		highlight: [0.90, 0.01, 250],
 	},
 
+	// Tab indicators — paused tabs use a small bright warning background.
+	tab: {
+		alertBg: [0.86, 0.16, 95],
+	},
+
 	// Help bar — keys stand out from descriptions, but stay below prompt input.
 	help: {
 		key: [0.76, 0.008, 250],

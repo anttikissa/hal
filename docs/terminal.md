@@ -133,6 +133,18 @@ corruption that gets worse with every paint cycle.
 Use `visLen()` to measure, `wordWrap()` to wrap, `clipVisual()` to truncate.
 No exceptions.
 
+### 4a. Terminal colors come from `colors.ason`
+
+Do not hard-code RGB colors, 16/256-color ANSI codes, or named ANSI color
+choices in terminal UI code. Define color choices as OKLCH triples in
+`colors.ason`, load them through `src/cli/colors.ts`, and use the exported
+`colors` object at render time. Mixing raw ANSI colors with OKLCH-derived
+colors makes the palette inconsistent and hard to tune.
+
+ANSI reset/style/control sequences are different from color choices: use them
+when needed to end styling or control the terminal, but do not use them to pick
+foreground/background colors.
+
 ### 5. Synchronized output
 
 Wrap paint operations in DEC synchronized output markers (`?2026h` / `?2026l`)

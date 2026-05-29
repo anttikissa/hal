@@ -19,6 +19,7 @@ type BlockColors = { fg: string; bg: string; bold?: string; code?: string; curso
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
+type TabColors = { alertBg: string }
 
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
@@ -32,6 +33,7 @@ const error: BlockColors = { fg: '', bg: '' }
 const fork: BlockColors = { fg: '', bg: '' }
 const status: StatusColors = { fg: '', highlight: '' }
 const help: HelpColors = { key: '', description: '' }
+const tab: TabColors = { alertBg: '' }
 const popup = { current: { fg: '', bg: '' } }
 
 // Tool colors keyed by tool name. Unknown tools fall back to 'default'.
@@ -122,6 +124,7 @@ function load(): void {
 	status.highlight = raw.status?.highlight ? fg(raw.status.highlight, vars) : assistant.bold
 	help.key = raw.help?.key ? fg(raw.help.key, vars) : status.highlight
 	help.description = raw.help?.description ? fg(raw.help.description, vars) : status.fg
+	tab.alertBg = raw.tab?.alertBg ? bg(raw.tab.alertBg, vars) : warning.bg
 
 	if (raw.input) {
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
@@ -185,6 +188,7 @@ export const colors = {
 	fork,
 	status,
 	help,
+	tab,
 	popup,
 	tool,
 	tools,

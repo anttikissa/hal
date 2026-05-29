@@ -628,6 +628,21 @@ describe('render', () => {
 		expect(output).toContain('\x1b[33m!')
 	})
 
+	test('paused tab alert uses the configured background color', () => {
+		colors.load()
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
+		const originalIsVisible = cursor.isVisible
+		cursor.isVisible = () => true
+		try {
+			const output = renderStatus.tabLabel(tab, 0)
+			expect(stripAnsi(output)).toBe('[1!]')
+			expect(output).toContain(`${colors.tab.alertBg}!`)
+		} finally {
+			cursor.isVisible = originalIsVisible
+		}
+	})
+
 	test('idle HAL cursor reserves three rows above the tab bar', () => {
 		const originalIsVisible = cursor.isVisible
 		cursor.isVisible = () => true
