@@ -72,7 +72,7 @@ function promptCursorColorSequence(color = colors.input.cursor || colors.info.fg
 	return `\x1b]12;#${r}${g}${b}\x07`
 }
 
-function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean; bg?: string } {
+function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
 	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: YELLOW, blinks: false }
 
@@ -88,7 +88,7 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean;
 		if (b.type === 'warning') return { char: '!', color: YELLOW, blinks: false }
 		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
 		if (b.type === 'log' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
-			return { char: '!', color: '', bg: colors.tab.alertBg || colors.warning.bg, blinks: false }
+			return { char: '!', color: colors.tab.alertFg || colors.warning.fg, blinks: false }
 		}
 		break
 	}
@@ -108,9 +108,7 @@ function hasAnimatedIndicators(): boolean {
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
 	if (!ind.char) return ''
-	const style = `${ind.bg ?? ''}${ind.color}`
-	const restore = ind.bg ? `${RESET}${baseColor}` : baseColor
-	if (!ind.blinks || cursor.isVisible()) return `${style}${ind.char}${restore}`
+	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
 	const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : ind.color
 	return `${color}${ind.char}${baseColor}`
 }

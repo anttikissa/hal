@@ -628,7 +628,7 @@ describe('render', () => {
 		expect(output).toContain('\x1b[33m!')
 	})
 
-	test('paused tab alert uses the configured background color', () => {
+	test('paused tab alert uses the configured foreground color', () => {
 		colors.load()
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
@@ -637,7 +637,7 @@ describe('render', () => {
 		try {
 			const output = renderStatus.tabLabel(tab, 0)
 			expect(stripAnsi(output)).toBe('[1!]')
-			expect(output).toContain(`${colors.tab.alertBg}!`)
+			expect(output).toContain(`${colors.tab.alertFg}!`)
 		} finally {
 			cursor.isVisible = originalIsVisible
 		}
