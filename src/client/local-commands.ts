@@ -231,12 +231,20 @@ function runHelp(args: string, _ctx: ClientLocalCommandContext): ClientLocalComm
 	return { handled: true, error: `No detailed help for /${commandName}. Try /help.` }
 }
 
+function formatCommandError(name: string, error: string): string {
+	const command = `/${name}`
+	if (error.startsWith(`${command}:`)) return error
+	return `${command}: ${error}`
+}
+
 function execute(text: string, ctx: ClientLocalCommandContext): ClientLocalCommandResult {
 	const parsed = clientLocalCommands.parse(text)
 	if (!parsed) return { handled: false }
 	const spec = specs[parsed.name]
 	if (!spec) return { handled: false }
-	return spec.run(parsed.args, ctx)
+	const result = spec.run(parsed.args, ctx)
+	if (result.error) result.error = formatCommandError(parsed.name, result.error)
+	return result
 }
 
 function commandNames(): string[] {

@@ -22,6 +22,11 @@ test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	}
 })
 
+test('command errors include the slash command that caused them', () => {
+	expect(runtime.formatCommandError('/rename /what', 'Name may contain letters only.')).toBe('/rename: Name may contain letters only.')
+	expect(runtime.formatCommandError('/rename /what', '/rename: Name may contain letters only.')).toBe('/rename: Name may contain letters only.')
+})
+
 test('pickMostRecentlyClosedSessionId prefers the newest closed session', () => {
 	const picked = sessions.pickMostRecentlyClosedSessionId(
 		[

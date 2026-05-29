@@ -46,6 +46,17 @@ function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err)
 }
 
+function promptCommandName(text: string): string {
+	const match = text.trimStart().match(/^\/(\S+)/)
+	return match ? `/${match[1]}` : 'command'
+}
+
+function formatCommandError(text: string, error: string): string {
+	const command = promptCommandName(text)
+	if (error.startsWith(`${command}:`)) return error
+	return `${command}: ${error}`
+}
+
 function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name'>): string {
 	return meta.name ?? meta.id
 }
@@ -485,7 +496,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		}
 		recordSessionStateChanges(sessionId, prevCwd, sessionState.cwd, prevModel, sessionState.model)
 		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui)
-		if (cmdResult.error) emitInfo(sessionId, cmdResult.error, 'error', undefined, false)
+		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error', undefined, false)
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
 		return
 	}
@@ -972,6 +983,7 @@ export const runtime = {
 	refreshModelMetadata,
 	formatModelRefreshMessage,
 	buildAliasUpdateSuggestionText,
+	formatCommandError,
 	suggestAliasUpdates,
 	enqueuePrompt,
 	handleQueueSlashCommand,

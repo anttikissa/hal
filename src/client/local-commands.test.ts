@@ -38,6 +38,7 @@ test('/go reports ambiguous partial tab names', () => {
 	const result = clientLocalCommands.execute('/go pause', c)
 
 	expect(result.handled).toBe(true)
+	expect(result.error).toStartWith('/go: ')
 	expect(result.error).toContain('Ambiguous')
 	expect(result.error).toContain('pause fix')
 	expect(result.error).toContain('pause docs')
