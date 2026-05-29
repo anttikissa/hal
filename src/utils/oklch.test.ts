@@ -5,6 +5,13 @@ test('black', () => {
 	expect(oklch.oklchToRgb(0, 0, 0)).toEqual([0, 0, 0])
 })
 
+
+test('OKLCH black has zero lightness and zero chroma', () => {
+	expect(oklch.isBlack(0, 0)).toBe(true)
+	expect(oklch.isBlack(0, 0.01)).toBe(false)
+	expect(oklch.isBlack(0.01, 0)).toBe(false)
+})
+
 test('white', () => {
 	expect(oklch.oklchToRgb(1, 0, 0)).toEqual([255, 255, 255])
 })

@@ -725,7 +725,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 
 const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.warning, error: colors.error, fork: colors.fork }
 
-function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
+function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.user
@@ -752,8 +752,8 @@ function padBlockLine(line: string): string {
 	return ` ${line}`
 }
 
-function padBlock(lines: string[], fg: string, bg: string, cols: number): void {
-	if (!bg || bg.includes('[48;2;0;0;0m')) return
+function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | undefined, cols: number): void {
+	if (!bg || bgIsBlack) return
 	lines.unshift(bgLine(`${fg} `, cols, bg))
 	lines.push(bgLine(`${fg} `, cols, bg))
 }
@@ -784,20 +784,58 @@ function blockLabel(block: Block): string {
 	return fixedLabels[block.type]
 }
 
+function inlineNoticeText(block: Block): string | undefined {
+	if (block.type !== 'log' && block.type !== 'info' && block.type !== 'fork') return undefined
+	const text = expandTabs(sanitizeTerminalText(stripAnsiSequences(block.text)), blockConfig.tabWidth).trim()
+	if (!text || text.includes('\n')) return undefined
+	if (text.includes('`')) return undefined
+	if ((block.type === 'log' || block.type === 'info') && !/^\[[^\]\n]+\]$/.test(text)) return undefined
+	if (visLen(text) > 50) return undefined
+	return text
+}
+
+function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefined {
+	const text = inlineNoticeText(block)
+	if (!text) return undefined
+	const blobRef = 'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId ? `${block.sessionId}/${block.blobId}` : ''
+	if (blobRef) return undefined
+	const { fg, bg } = blockColors(block)
+	const header = buildHeader(`${blockLabel(block)}: ${text}`, formatBlockTime(block.ts), '', cols)
+	return [`${bgLine(`${fg}${header}`, cols, bg)}${FG_OFF}`]
+}
+
 function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | 'warning' | 'error' }>>, cols: number): string[] {
 	if (group.length === 0) return []
 	if (group.length === 1) return renderBlock(group[0]!, cols)
+	const inlineLines: string[] = []
+	let allInline = true
+	for (const block of group) {
+		const rendered = renderInlineNoticeBlock(block, cols)
+		if (!rendered) {
+			allInline = false
+			break
+		}
+		inlineLines.push(...rendered)
+	}
+	if (allInline) return inlineLines
+
 	const first = group[0]!
 	const last = group[group.length - 1]!
 	const label = fixedLabels[first.type]
 	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
-	const { fg, bg } = blockColors(first)
+	const { fg, bg, bgIsBlack } = blockColors(first)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
+	let hasContent = false
 	for (const block of group) {
-		for (const line of hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
+		const content = hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)
+		if (content.length > 0 && !hasContent) {
+			lines.push(bgLine(`${fg} `, cols, bg))
+			hasContent = true
+		}
+		for (const line of content) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
-	padBlock(lines, fg, bg, cols)
+	padBlock(lines, fg, bg, bgIsBlack, cols)
 	lines[lines.length - 1]! += FG_OFF
 	return lines
 }
@@ -842,23 +880,28 @@ function addInlineCursor(lines: string[], block: Block, cols: number, visible: b
 }
 
 function renderBlock(block: Block, cols: number, cursorVisible = false): string[] {
+	const inlineNotice = renderInlineNoticeBlock(block, cols)
+	if (inlineNotice) return inlineNotice
+
 	const blobRef =
 		'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId
 			? `${block.sessionId}/${block.blobId}`
 			: ''
-	const { fg, bg } = blockColors(block)
+	const { fg, bg, bgIsBlack } = blockColors(block)
 	const label = blockLabel(block)
 	const blockTime = formatBlockTime(block.ts)
 	const header = buildHeader(label, blockTime, blobRef, cols)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
-	for (const line of hyperlinkUrls(blockContent(block, contentCols), contentCols)) {
+	const content = hyperlinkUrls(blockContent(block, contentCols), contentCols)
+	if (content.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
+	for (const line of content) {
 		lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid
 	// so the active streamed block is always visually anchored.
 	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, true)
-	padBlock(lines, fg, bg, cols)
+	padBlock(lines, fg, bg, bgIsBlack, cols)
 	lines[lines.length - 1]! += FG_OFF
 	return lines
 }

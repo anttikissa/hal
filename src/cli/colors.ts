@@ -15,7 +15,7 @@ const COLORS_PATH = `${HAL_DIR}/colors.ason`
 
 // ── Public color objects — mutated in place by load() ────────────────────────
 
-type BlockColors = { fg: string; bg: string; bold?: string; code?: string; cursor?: string; cursorIdle?: string }
+type BlockColors = { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; cursor?: string; cursorIdle?: string }
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
@@ -94,7 +94,11 @@ function load(): void {
 	// Markdown-rendered blocks may also define brighter inline/fenced code colors.
 	function resolveBlock(def: any, target: BlockColors): void {
 		if (def?.fg) target.fg = fg(def.fg, vars)
-		if (def?.bg) target.bg = bg(def.bg, vars)
+		if (def?.bg) {
+			const triple = resolveTriple(def.bg, vars)
+			target.bg = oklch.toBg(...triple)
+			target.bgIsBlack = oklch.isBlack(triple[0], triple[1])
+		}
 		if (def?.bold) target.bold = fg(def.bold, vars)
 		else delete target.bold
 		if (def?.code) target.code = fg(def.code, vars)

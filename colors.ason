@@ -6,7 +6,7 @@
 // Variable references ("$fgL") are resolved from the vars block.
 {
 	vars: {
-		fgL: 0.75,
+		fgL: 0.80,
 		fgC: 0.15,
 		bgL: 0.25,
 		bgC: 0.04,

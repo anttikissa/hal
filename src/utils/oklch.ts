@@ -57,6 +57,10 @@ function toBg(L: number, C: number, H: number): string {
 	return `\x1b[48;2;${r};${g};${b}m`
 }
 
+function isBlack(L: number, C: number): boolean {
+	return L <= 0 && C <= 0
+}
+
 // Dim all truecolor ANSI escapes in a string by scaling RGB values.
 // factor < 1 darkens, > 1 brightens. Works on both fg (38;2) and bg (48;2).
 const TRUECOLOR_RE = /\x1b\[(38|48);2;(\d+);(\d+);(\d+)m/g
@@ -102,4 +106,4 @@ function usageFg(usedPercent: number): string {
 	return toFg(L, C, H)
 }
 
-export const oklch = { oklchToRgb, toFg, toBg, fgHex, mixFg, dimAnsi, usageFg }
+export const oklch = { oklchToRgb, toFg, toBg, isBlack, fgHex, mixFg, dimAnsi, usageFg }

@@ -13,10 +13,50 @@ function headerLine(lines: string[]): string {
 
 function contentLines(lines: string[]): string[] {
 	const clean = lines.map(stripAnsi)
-	const start = clean.findIndex((line) => line.trim()) + 1
+	let start = clean.findIndex((line) => line.trim()) + 1
 	const end = clean.at(-1)?.trim() ? clean.length : clean.length - 1
+	if (!clean[start]?.trim()) start++
 	return clean.slice(start, end)
 }
+
+function blockBodyStart(lines: string[]): number {
+	const clean = lines.map(stripAnsi)
+	const header = clean.findIndex((line) => line.trim())
+	return header + 1
+}
+
+test('body blocks render a blank line after the header', () => {
+	const samples: Block[] = [
+		{ type: 'user', text: 'hello' },
+		{ type: 'assistant', text: 'hello' },
+		{ type: 'thinking', text: 'hello' },
+		{ type: 'tool', name: 'bash', input: { command: 'echo hello' }, output: 'hello' },
+	]
+
+	for (const block of samples) {
+		const lines = blocks.renderBlock(block, 80).map(stripAnsi)
+		expect(lines[blockBodyStart(lines)]?.trim()).toBe('')
+	}
+})
+
+test('bodyless tool blocks do not add a separator row', () => {
+	const lines = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'true' } }, 80).map(stripAnsi)
+	expect(lines.filter((line) => line.trim())).toHaveLength(1)
+})
+
+test('short status notices render on one line', () => {
+	const lines = blocks.renderBlock({ type: 'log', text: '[paused]', ts: new Date('2026-01-01T17:38:00Z').getTime() }, 80).map(stripAnsi)
+
+	expect(lines).toHaveLength(1)
+	expect(lines[0]).toContain('Log: [paused]')
+})
+
+test('long notices render a blank line after the header', () => {
+	const block: Block = { type: 'info', text: 'First line of a longer notice.\nSecond line.' }
+	const lines = blocks.renderBlock(block, 80).map(stripAnsi)
+
+	expect(lines[blockBodyStart(lines)]?.trim()).toBe('')
+})
 
 test('incoming user block shows inbox source instead of You', () => {
 	const block: Block = {
@@ -128,19 +168,23 @@ test('assistant and thinking backgrounds come from colors', () => {
 })
 
 
-test('assistant blocks get padding when background is colorful', () => {
-	const original = colors.assistant.bg
+test('assistant block padding uses resolved OKLCH blackness', () => {
+	const originalBg = colors.assistant.bg
+	const originalBgIsBlack = colors.assistant.bgIsBlack
 	try {
 		const block: Block = { type: 'assistant', text: 'hello' }
-		colors.assistant.bg = '\x1b[48;2;0;0;0m'
+		colors.assistant.bg = '\x1b[48;2;1;0;0m'
+		colors.assistant.bgIsBlack = true
 		expect(blocks.renderBlock(block, 80).map(stripAnsi)[0]?.trim()).not.toBe('')
 
-		colors.assistant.bg = '\x1b[48;2;1;0;0m'
+		colors.assistant.bg = '\x1b[48;2;0;0;0m'
+		colors.assistant.bgIsBlack = false
 		const lines = blocks.renderBlock(block, 80).map(stripAnsi)
 		expect(lines[0]).toBe(' ')
 		expect(lines.at(-1)).toBe(' ')
 	} finally {
-		colors.assistant.bg = original
+		colors.assistant.bg = originalBg
+		colors.assistant.bgIsBlack = originalBgIsBlack
 	}
 })
 
@@ -223,7 +267,7 @@ test('inline markdown code uses block code color instead of dim style', () => {
 
 test('text code fences wrap at word boundaries', () => {
 	const block = { type: 'assistant', text: '```text\nOpen without an initial prompt.\n```' } as Block
-	const lines = blocks.renderBlock(block, 21).map((l) => stripAnsi(l)).slice(1)
+	const lines = contentLines(blocks.renderBlock(block, 21))
 
 	expect(lines).toEqual([
 		' Open without an',
@@ -517,8 +561,9 @@ test('tool block header uses padded text without horizontal rules', () => {
 	expect(lines[0]).toBe(' ')
 	expect(lines[1]).toBe(' 1 Jan 17:38 Bash: ./test                                  (11-ok3/000123-bash) ')
 	expect(lines[1]).not.toContain('─')
-	expect(lines[2]).toBe(' done')
-	expect(lines[3]).toBe(' ')
+	expect(lines[2]).toBe(' ')
+	expect(lines[3]).toBe(' done')
+	expect(lines[4]).toBe(' ')
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
 })
 

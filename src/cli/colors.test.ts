@@ -100,6 +100,14 @@ test('colors.load exposes assistant HAL cursor colors from colors.ason', () => {
 })
 
 
+test('colors.load derives black backgrounds from OKLCH lightness and chroma', () => {
+	colors.load()
+	expect(colors.assistant.bgIsBlack).toBe(true)
+	expect(colors.thinking.bgIsBlack).toBe(true)
+	expect(colors.info.bgIsBlack).toBe(false)
+})
+
+
 test('colors.load exposes tab, popup tone, and diff colors from colors.ason', () => {
 	colors.load()
 	expect(colors.tab.activeFg).toStartWith('\x1b[')
