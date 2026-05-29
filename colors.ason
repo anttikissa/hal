@@ -33,14 +33,12 @@
 		code: [0.78, 0.03, 250],
 	},
 
-	// User messages — organic blue. The prompt input uses this foreground on a
-	// related blue background, while Hal-produced system notices use warm brown.
+	// User messages and prompt input — the same bright blue card.
 	user: {
-		fg: [0.84, 0.05, 250],
-		bg: [0.24, 0.07, 250],
+		fg: [0.82, 0.11, 220],
+		bg: [0.29, 0.05, 220],
 	},
 
-	// Prompt input area — blue, matching user-authored text rather than notices.
 	input: {
 		bg: [0.29, 0.05, 220],
 		cursor: [0.82, 0.11, 220],

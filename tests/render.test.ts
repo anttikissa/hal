@@ -286,11 +286,11 @@ describe('render', () => {
 		expect(lines[lines.length - 1]).toContain('enter: send')
 	})
 
-	test('prompt box uses input background and user foreground', () => {
+	test('prompt box uses the same colors as user blocks', () => {
 		colors.load()
-		expect(colors.input.bg).toStartWith('\x1b[48;2;')
-		expect(renderStatus.promptRule(10)).toContain(colors.input.bg)
-		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.input.bg)
+		expect(colors.input.bg).toBe(colors.user.bg)
+		expect(renderStatus.promptRule(10)).toContain(colors.user.bg)
+		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.user.bg)
 		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.user.fg)
 	})
 

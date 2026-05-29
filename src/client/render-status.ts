@@ -46,7 +46,7 @@ function halCursorColor(): string {
 }
 
 function inputStyle(): string {
-	return `${colors.input.bg || colors.user.bg}${colors.user.fg || colors.info.fg}`
+	return `${colors.user.bg || colors.input.bg}${colors.user.fg || colors.info.fg}`
 }
 
 function cursorShapeSequence(shape = renderStatus.config.promptCursorShape): string {
