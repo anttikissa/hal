@@ -7,6 +7,7 @@ import { cursor } from '../src/cli/cursor.ts'
 import { popup } from '../src/client/popup.ts'
 import { openaiUsage } from '../src/openai-usage.ts'
 import { colors } from '../src/cli/colors.ts'
+import { oklch } from '../src/utils/oklch.ts'
 import { version } from '../src/version.ts'
 
 openaiUsage.init()
@@ -307,17 +308,18 @@ describe('render', () => {
 	})
 
 	test('prompt cursor color uses the input cursor color', () => {
-		expect(renderStatus.promptCursorColorSequence('\x1b[38;2;130;40;7m')).toBe('\x1b]12;#822807\x07')
+		const cursorColor = oklch.toFg(0.45, 0.14, 35)
+		expect(renderStatus.promptCursorColorSequence(cursorColor)).toBe(`\x1b]12;#${oklch.fgHex(cursorColor)}\x07`)
 	})
 
 	test('draw applies the configured prompt cursor shape and color', () => {
 		const originalCursor = colors.input.cursor
 		renderStatus.config.promptCursorShape = 'block'
-		colors.input.cursor = '\x1b[38;2;130;40;7m'
+		colors.input.cursor = oklch.toFg(0.45, 0.14, 35)
 		try {
 			const output = captureOutput(() => render.draw(true))
 			expect(output).toContain('\x1b[2 q')
-			expect(output).toContain('\x1b]12;#822807\x07')
+			expect(output).toContain(`\x1b]12;#${oklch.fgHex(colors.input.cursor)}\x07`)
 		} finally {
 			colors.input.cursor = originalCursor
 		}
@@ -479,8 +481,8 @@ describe('render', () => {
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.input.cursor
 		const originalCursorDim = colors.input.cursorDim
-		colors.input.cursor = '\x1b[38;2;92;179;255m'
-		colors.input.cursorDim = '\x1b[38;2;36;96;159m'
+		colors.input.cursor = oklch.toFg(0.72, 0.12, 245)
+		colors.input.cursorDim = oklch.toFg(0.46, 0.10, 245)
 		try {
 			cursor.isVisible = () => true
 			render.resetRenderer()
@@ -590,9 +592,9 @@ describe('render', () => {
 		const originalAssistant = colors.assistant.fg
 		const originalAssistantCursor = colors.assistant.cursor
 		const originalIsVisible = cursor.isVisible
-		colors.input.cursor = '\x1b[38;5;201m'
-		colors.assistant.fg = '\x1b[38;5;214m'
-		colors.assistant.cursor = '\x1b[38;5;215m'
+		colors.input.cursor = oklch.toFg(0.70, 0.20, 330)
+		colors.assistant.fg = oklch.toFg(0.70, 0.18, 55)
+		colors.assistant.cursor = oklch.toFg(0.78, 0.14, 55)
 		cursor.isVisible = () => true
 		try {
 			const output = captureOutput(() => render.draw())
@@ -664,8 +666,8 @@ describe('render', () => {
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
-		colors.assistant.cursor = '\x1b[38;5;214m'
-		colors.assistant.cursorIdle = '\x1b[38;5;245m'
+		colors.assistant.cursor = oklch.toFg(0.70, 0.18, 55)
+		colors.assistant.cursorIdle = oklch.toFg(0.56, 0, 55)
 		cursor.isVisible = () => true
 		try {
 			const output = captureOutput(() => render.draw(true))
@@ -685,8 +687,8 @@ describe('render', () => {
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
-		colors.assistant.cursor = '\x1b[38;5;214m'
-		colors.assistant.cursorIdle = '\x1b[38;5;245m'
+		colors.assistant.cursor = oklch.toFg(0.70, 0.18, 55)
+		colors.assistant.cursorIdle = oklch.toFg(0.56, 0, 55)
 		cursor.isVisible = () => true
 		try {
 			const output = captureOutput(() => render.draw(true))
@@ -697,6 +699,36 @@ describe('render', () => {
 			cursor.isVisible = originalIsVisible
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
+		}
+	})
+
+	test('HAL cursor fades linearly from active to idle after busy ends', () => {
+		const tab = client.currentTab()!
+		tab.history.push({ type: 'assistant', text: 'done' })
+		client.state.busy.set(tab.sessionId, true)
+		const originalNow = Date.now
+		const originalIsVisible = cursor.isVisible
+		const originalCursor = colors.assistant.cursor
+		const originalIdleCursor = colors.assistant.cursorIdle
+		let now = 0
+		Date.now = () => now
+		colors.assistant.cursor = oklch.toFg(0.48, 0, 0)
+		colors.assistant.cursorIdle = oklch.toFg(0.66, 0.14, 55)
+		cursor.isVisible = () => true
+		try {
+			captureOutput(() => render.draw(true))
+			client.state.busy.delete(tab.sessionId)
+			captureOutput(() => render.draw(true))
+			now = 500
+			const output = captureOutput(() => render.draw(true))
+			expect(output).toContain(`${oklch.mixFg(colors.assistant.cursor, colors.assistant.cursorIdle, 0.5)}█`)
+		} finally {
+			Date.now = originalNow
+			client.state.busy.delete(tab.sessionId)
+			cursor.isVisible = originalIsVisible
+			colors.assistant.cursor = originalCursor
+			colors.assistant.cursorIdle = originalIdleCursor
+			render.resetRenderer()
 		}
 	})
 
@@ -717,7 +749,7 @@ describe('render', () => {
 			expect(visibleTabBar).toBeGreaterThan(0)
 			expect(visibleLines[visibleTabBar - 1]).toBe('')
 
-			colors.assistant.cursor = '\x1b[38;5;215m'
+			colors.assistant.cursor = oklch.toFg(0.78, 0.14, 55)
 			render.resetRenderer()
 			const activeColorPhase = captureOutput(() => render.draw(true))
 			expect(activeColorPhase).toContain(`${colors.assistant.cursor}█`)

@@ -46,6 +46,7 @@ let cursorRow = 0
 let cursorCol = 0
 let fullscreen = false
 let blockCache = new WeakMap<Block, BlockRenderCache>()
+let fadeTimer: ReturnType<typeof setTimeout> | null = null
 
 function historyContext(): HistoryRenderContext {
 	return {
@@ -56,12 +57,28 @@ function historyContext(): HistoryRenderContext {
 	}
 }
 
+function scheduleFade(): void {
+	if (fadeTimer || !renderHistory.hasFadingCursor(client.currentTab())) return
+	fadeTimer = setTimeout(() => {
+		fadeTimer = null
+		draw()
+	}, 67)
+}
+
+function writeTerminal(s: string): void {
+	process.stdout.write(s)
+	scheduleFade()
+}
+
 function resetRenderer(): void {
 	prevLines = []
 	cursorRow = 0
 	cursorCol = 0
 	fullscreen = false
 	blockCache = new WeakMap<Block, BlockRenderCache>()
+	renderHistory.resetAnimation()
+	if (fadeTimer) clearTimeout(fadeTimer)
+	fadeTimer = null
 }
 
 function invalidateHistoryCache(): void {
@@ -167,7 +184,7 @@ function repaintVisibleScreen(lines: string[], cursor: { row: number; col: numbe
 	out.push(positionCursor(lines.length - 1, cursor))
 	out.push(`${CSI}?2026l`)
 	prevLines = lines
-	process.stdout.write(out.join(''))
+	writeTerminal(out.join(''))
 }
 function draw(force = false): void {
 	const rows = process.stdout.rows || 24
@@ -198,7 +215,7 @@ function draw(force = false): void {
 		out.push(positionCursor(lines.length - 1, cursor))
 		out.push(`${CSI}?2026l`)
 		prevLines = lines
-		process.stdout.write(out.join(''))
+		writeTerminal(out.join(''))
 		return
 	}
 
@@ -247,8 +264,11 @@ function draw(force = false): void {
 	// (e.g. arrow keys, Ctrl-A/E). Frame lines are identical but cursor
 	// position changed. We skip the full diff machinery and just reposition.
 	if (first === -1) {
-		if (cursorRow === cursor.row && cursorCol === cursor.col && prevLines.length > 0) return
-		process.stdout.write(positionCursor(cursorRow, cursor))
+		if (cursorRow === cursor.row && cursorCol === cursor.col && prevLines.length > 0) {
+			scheduleFade()
+			return
+		}
+		writeTerminal(positionCursor(cursorRow, cursor))
 		return
 	}
 
@@ -294,7 +314,7 @@ function draw(force = false): void {
 	out.push(positionCursor(lastWrittenRow, cursor))
 	out.push(`${CSI}?2026l`)
 	prevLines = lines
-	process.stdout.write(out.join(''))
+	writeTerminal(out.join(''))
 }
 
 // ── Cleanup ──────────────────────────────────────────────────────────────────

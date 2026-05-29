@@ -19,7 +19,7 @@
 	assistant: {
 		fg: ["$fgL", "$fgC", 55],
 		cursor: ["$fgL", "$fgC", 55],
-		cursorIdle: [0.56, 0, 0],
+		cursorIdle: [0.56, 0, 55],
 		bg: [0, 0, 0],
 		bold: [0.90, 0.06, 55],
 		code: [0.86, 0.04, 55],
