@@ -410,16 +410,16 @@ test('send block renders target session and message text', () => {
 			text: 'Stop. Do not do any analysis or file access.',
 			queue: false,
 		},
-		output: 'Sent message to session 33-270',
+		output: 'Sent message to tab 4 (33-270)',
 	}
 
 	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
 	const header = lines.find((line) => line.trim()) ?? ''
 	const body = lines.slice(1).join('\n')
 
-	expect(header).toContain('Send to 33-270')
+	expect(header).toContain('Send to tab 4 (33-270)')
 	expect(body).toContain('Stop. Do not do any analysis or file access.')
-	expect(body).toContain('Sent message to session 33-270')
+	expect(body).toContain('Sent message to tab 4 (33-270)')
 })
 
 test('grep block quotes its search pattern in header', () => {

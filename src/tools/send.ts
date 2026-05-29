@@ -4,6 +4,7 @@
 // the inbox handler picks up and feeds into the agent loop.
 
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
+import { ipc } from '../ipc.ts'
 import { inbox } from '../runtime/inbox.ts'
 
 interface SendInput {
@@ -21,6 +22,20 @@ function normalizeInput(input: unknown): SendInput {
 	}
 }
 
+function targetTab(sessionId: string): number | undefined {
+	const session = ipc.readState().sessions.find((item) => item.id === sessionId)
+	const tab = session?.tab
+	if (!Number.isFinite(tab)) return undefined
+	return Math.floor(tab as number)
+}
+
+function resultText(targetId: string, queued: boolean): string {
+	const tab = targetTab(targetId)
+	const action = queued ? 'Queued message for' : 'Sent message to'
+	if (tab) return `${action} tab ${tab} (${targetId})`
+	return `${action} session ${targetId}`
+}
+
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalizeInput(input)
 	const targetId = spec.sessionId ?? ''
@@ -32,7 +47,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 	try {
 		inbox.queueMessage(targetId, text, ctx.sessionId, spec.queue)
-		return spec.queue ? `Queued message for session ${targetId}` : `Sent message to session ${targetId}`
+		return resultText(targetId, !!spec.queue)
 	} catch (err: unknown) {
 		return `error: ${toolRegistry.errorMessage(err)}`
 	}
@@ -55,4 +70,4 @@ function init(): void {
 	toolRegistry.registerTool(sendTool)
 }
 
-export const send = { execute, init }
+export const send = { execute, init, resultText, targetTab }

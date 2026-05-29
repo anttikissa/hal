@@ -540,6 +540,13 @@ function isGitCommitAmendCommand(input: any): boolean {
 	return /\bgit\s+commit\b/.test(command) && /(?:^|\s)--amend(?:\s|$)/.test(command)
 }
 
+function sendTargetLabel(input?: any, output?: string): string {
+	const target = input?.sessionId ?? '?'
+	const tabMatch = output?.match(/\btab (\d+) \(([^)]+)\)/)
+	if (tabMatch && tabMatch[2] === target) return `tab ${tabMatch[1]} (${target})`
+	return target
+}
+
 const toolSpecs: Record<string, ToolSpec> = {
 	bash: {
 		title(input, output) {
@@ -589,8 +596,8 @@ const toolSpecs: Record<string, ToolSpec> = {
 	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
 	spawn_agent: { title: (input) => input?.title ? `Spawn agent · ${input.title}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
 	send: {
-		title(input) {
-			const target = input?.sessionId ?? '?'
+		title(input, output) {
+			const target = sendTargetLabel(input, output)
 			if (input?.queue) return `Queue to ${target}`
 			return `Send to ${target}`
 		},
