@@ -262,10 +262,10 @@ function historyToBlocks(
 				if (entry.status === 'aborted') result.push({ type: 'log', text: '[paused]', ts, dimmed })
 				break
 			case 'forked_from':
-				result.push({ type: 'info', text: `Tab forked from ${entry.parent}.`, ts, dimmed })
+				result.push({ type: 'fork', text: `Tab forked from ${entry.parent}.`, ts, dimmed })
 				break
 			case 'forked_to':
-				result.push({ type: 'info', text: `Tab forked to ${entry.child}.`, ts, dimmed })
+				result.push({ type: 'fork', text: `Tab forked to ${entry.child}.`, ts, dimmed })
 				break
 			case 'rebased_from':
 				result.push({ type: 'info', text: `Rebased from ${entry.log}.`, ts, dimmed })
@@ -721,7 +721,7 @@ const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.
 function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
-	if (block.type === 'user') return colors.info
+	if (block.type === 'user') return colors.user
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
 }
 
@@ -751,7 +751,7 @@ function padBlock(lines: string[], fg: string, bg: string, cols: number): void {
 	lines.push(bgLine(`${fg} `, cols, bg))
 }
 
-const fixedLabels = { log: 'Log', info: 'Info', warning: 'Warning', error: 'Error', fork: 'Info' }
+const fixedLabels = { log: 'Log', info: 'System', warning: 'Warning', error: 'Error', fork: 'Fork' }
 
 function blockLabel(block: Block): string {
 	if (block.type === 'user') {

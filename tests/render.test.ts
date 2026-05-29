@@ -173,7 +173,7 @@ describe('render', () => {
 		const raw = captureOutput(() => render.draw(true))
 		const clean = stripAnsi(raw)
 		expect(clean).not.toContain('[paused]')
-		expect(clean).toContain('Info')
+		expect(clean).toContain('System')
 		expect(clean).toContain('Next: foo')
 		expect(clean).not.toContain('**foo**')
 		expect(clean).not.toContain('**ctrl-q**')
@@ -286,12 +286,12 @@ describe('render', () => {
 		expect(lines[lines.length - 1]).toContain('enter: send')
 	})
 
-	test('prompt box uses info colors for user input', () => {
+	test('prompt box uses input background and user foreground', () => {
 		colors.load()
 		expect(colors.input.bg).toStartWith('\x1b[48;2;')
 		expect(renderStatus.promptRule(10)).toContain(colors.input.bg)
 		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.input.bg)
-		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.info.fg)
+		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.user.fg)
 	})
 
 

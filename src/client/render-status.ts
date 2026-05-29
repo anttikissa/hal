@@ -46,7 +46,7 @@ function halCursorColor(): string {
 }
 
 function inputStyle(): string {
-	return `${colors.input.bg || colors.info.bg}${colors.info.fg}`
+	return `${colors.input.bg || colors.user.bg}${colors.user.fg || colors.info.fg}`
 }
 
 function cursorShapeSequence(shape = renderStatus.config.promptCursorShape): string {
@@ -60,7 +60,7 @@ function cursorShapeSequence(shape = renderStatus.config.promptCursorShape): str
 	return ''
 }
 
-function promptCursorColorSequence(color = colors.input.cursor || colors.info.fg): string {
+function promptCursorColorSequence(color = colors.input.cursor || colors.user.fg): string {
 	const hex = oklch.fgHex(color)
 	return hex ? `\x1b]12;#${hex}\x07` : ''
 }

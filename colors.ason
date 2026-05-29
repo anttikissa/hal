@@ -33,22 +33,23 @@
 		code: [0.78, 0.03, 250],
 	},
 
-	// User messages — organic blue, shared with the prompt input
+	// User messages — organic blue. The prompt input uses this foreground on a
+	// related blue background, while Hal-produced system notices use warm brown.
 	user: {
 		fg: [0.84, 0.05, 250],
 		bg: [0.24, 0.07, 250],
 	},
 
-	// Prompt input area — use the same blue as user-visible info cards.
+	// Prompt input area — blue, matching user-authored text rather than notices.
 	input: {
 		bg: [0.29, 0.05, 220],
 		cursor: [0.82, 0.11, 220],
 	},
 
-	// System messages
+	// System notices — Hal-produced operational messages, muted and warm.
 	system: {
-		fg: ["$fgL", 0.10, 195],
-		bg: ["$bgL", "$bgC", 195],
+		fg: [0.74, 0.06, 55],
+		bg: [0.22, 0.025, 55],
 	},
 
 	// Log — neutral, moderately dim, with a subtle grey card
@@ -72,11 +73,11 @@
 		code: [0.82, 0.14, 25],
 	},
 
-	// Info — prominent user-visible operational notices
+	// Info cards use the same palette as system notices.
 	info: {
-		fg: [0.82, 0.11, 220],
-		bg: [0.29, 0.05, 220],
-		code: [0.92, 0.07, 220],
+		fg: [0.74, 0.06, 55],
+		bg: [0.22, 0.025, 55],
+		code: [0.86, 0.04, 55],
 	},
 
 	// Fork lineage — vivid purple, distinct from normal info/warning
@@ -125,13 +126,13 @@
 	},
 
 	// Tools — each type gets a distinct hue.
-	// Write tools look dangerous (red). Read tools are calm (green).
+	// Write/edit use non-error hues; red is reserved for actual failures.
 	tools: {
 		default: { fg: ["$fgL", "$fgC", 250], bg: ["$bgL", "$bgC", 250] },
 		bash:    { fg: ["$fgL", "$fgC", 320], bg: ["$bgL", "$bgC", 320] },
 		eval:    { fg: ["$fgL", "$fgC", 295], bg: ["$bgL", 0.06, 295] },
 		read:    { fg: ["$fgL", "$fgC", 155], bg: ["$bgL", "$bgC", 155] },
-		write:   { fg: ["$fgL", 0.18, 25],   bg: ["$bgL", 0.06, 25] },
-		edit:    { fg: ["$fgL", 0.18, 25],   bg: ["$bgL", 0.06, 25] },
+		write:   { fg: [0.78, 0.12, 75],       bg: ["$bgL", 0.04, 75] },
+		edit:    { fg: [0.76, 0.11, 190],      bg: ["$bgL", 0.04, 190] },
 	},
 }

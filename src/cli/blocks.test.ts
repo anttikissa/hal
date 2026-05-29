@@ -34,14 +34,14 @@ test('incoming user block shows inbox source instead of You', () => {
 })
 
 
-test('user blocks use info colors', () => {
+test('user blocks use user colors', () => {
 	colors.load()
 	const block: Block = { type: 'user', text: 'hello' }
 	const rendered = blocks.renderBlock(block, 80).join('\n')
 
-	expect(rendered).toContain(colors.info.fg)
-	expect(rendered).toContain(colors.info.bg)
-	expect(rendered).not.toContain(colors.user.bg)
+	expect(rendered).toContain(colors.user.fg)
+	expect(rendered).toContain(colors.user.bg)
+	expect(rendered).not.toContain(colors.info.bg)
 })
 
 test('historyToBlocks preserves original image path in user text', () => {
@@ -268,35 +268,35 @@ test('block header uses plain full-width layout without horizontal rules', () =>
 	expect(header).toContain('03-idr/q05d47-tzf')
 })
 
-test('forked_from history entry renders as an Info block', () => {
+test('forked_from history entry renders as a Fork block', () => {
 	const history: any[] = [{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blocks.historyToBlocks(history as any, 'child')
-	expect(result).toMatchObject([{ type: 'info', text: 'Tab forked from 04-abc.' }])
+	expect(result).toMatchObject([{ type: 'fork', text: 'Tab forked from 04-abc.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(headerLine(lines)).toContain('Info')
+	expect(headerLine(lines)).toContain('Fork')
 })
 
-test('forked_to history entry renders as an Info block', () => {
+test('forked_to history entry renders as a Fork block', () => {
 	const history: any[] = [{ type: 'forked_to', child: '04-def', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blocks.historyToBlocks(history as any, 'parent')
-	expect(result).toMatchObject([{ type: 'info', text: 'Tab forked to 04-def.' }])
+	expect(result).toMatchObject([{ type: 'fork', text: 'Tab forked to 04-def.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(headerLine(lines)).toContain('Info')
+	expect(headerLine(lines)).toContain('Fork')
 })
 
-test('info history entries render as highlighted Info blocks', () => {
+test('info history entries render as system blocks', () => {
 	const history: any[] = [{ type: 'info', text: 'Model set to GPT 5.5.', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blocks.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([{ type: 'info', text: 'Model set to GPT 5.5.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(headerLine(lines)).toContain('Info')
+	expect(headerLine(lines)).toContain('System')
 })
 
 
-test('structural cwd and model entries render as Info blocks', () => {
+test('structural cwd and model entries render as system blocks', () => {
 	const history: any[] = [
 		{ type: 'cwd', from: '/tmp', to: '/Users/antti/.hal/src', ts: '2026-04-09T20:00:00.000Z' },
 		{ type: 'model', from: 'openai/gpt-5.5', to: 'anthropic/claude-opus-4-7', ts: '2026-04-09T20:01:00.000Z' },
@@ -309,7 +309,7 @@ test('structural cwd and model entries render as Info blocks', () => {
 	])
 })
 
-test('info block renders an Info header', () => {
+test('info block renders a System header', () => {
 	const block: Block = {
 		type: 'info',
 		text: 'Server started (pid 123) · ready 99.9ms',
@@ -317,7 +317,7 @@ test('info block renders an Info header', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 80)
-	expect(headerLine(lines)).toContain('Info')
+	expect(headerLine(lines)).toContain('System')
 	expect(stripAnsi(lines.slice(1).join('\n'))).toContain('Server started')
 })
 
