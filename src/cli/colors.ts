@@ -19,7 +19,7 @@ type BlockColors = { fg: string; bg: string; bgIsBlack?: boolean; bold?: string;
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
-type TabColors = { activeFg: string; inactiveFg: string; doneFg: string; warningFg: string; errorFg: string; pausedFg: string; pausedBg: string }
+type TabColors = { activeFg: string; inactiveFg: string; doneFg: string; warningFg: string; errorFg: string; pausedFg: string }
 type PopupColors = { current: { fg: string; bg: string }; neutralFg: string; warningFg: string; dangerFg: string }
 type DiffColors = { addFg: string; removeFg: string }
 
@@ -35,7 +35,7 @@ const error: BlockColors = { fg: '', bg: '' }
 const fork: BlockColors = { fg: '', bg: '' }
 const status: StatusColors = { fg: '', highlight: '' }
 const help: HelpColors = { key: '', description: '' }
-const tab: TabColors = { activeFg: '', inactiveFg: '', doneFg: '', warningFg: '', errorFg: '', pausedFg: '', pausedBg: '' }
+const tab: TabColors = { activeFg: '', inactiveFg: '', doneFg: '', warningFg: '', errorFg: '', pausedFg: '' }
 const popup: PopupColors = { current: { fg: '', bg: '' }, neutralFg: '', warningFg: '', dangerFg: '' }
 const diff: DiffColors = { addFg: '', removeFg: '' }
 
@@ -136,8 +136,7 @@ function load(): void {
 	tab.doneFg = raw.tab?.doneFg ? fg(raw.tab.doneFg, vars) : info.fg
 	tab.warningFg = raw.tab?.warningFg ? fg(raw.tab.warningFg, vars) : warning.fg
 	tab.errorFg = raw.tab?.errorFg ? fg(raw.tab.errorFg, vars) : error.fg
-	tab.pausedFg = raw.tab?.pausedFg ? fg(raw.tab.pausedFg, vars) : status.highlight
-	tab.pausedBg = raw.tab?.pausedBg ? bg(raw.tab.pausedBg, vars) : warning.bg
+	tab.pausedFg = raw.tab?.pausedFg ? fg(raw.tab.pausedFg, vars) : warning.fg
 	popup.neutralFg = raw.popup?.neutralFg ? fg(raw.popup.neutralFg, vars) : status.fg
 	popup.warningFg = raw.popup?.warningFg ? fg(raw.popup.warningFg, vars) : warning.fg
 	popup.dangerFg = raw.popup?.dangerFg ? fg(raw.popup.dangerFg, vars) : warning.fg

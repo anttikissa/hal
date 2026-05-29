@@ -111,7 +111,7 @@ test('colors.load derives black backgrounds from OKLCH lightness and chroma', ()
 test('colors.load exposes tab, popup tone, and diff colors from colors.ason', () => {
 	colors.load()
 	expect(colors.tab.activeFg).toStartWith('\x1b[')
-	expect(colors.tab.pausedBg).toStartWith('\x1b[')
+	expect(colors.tab.pausedFg).toStartWith('\x1b[')
 	expect(colors.popup.warningFg).toStartWith('\x1b[')
 	expect(colors.diff.addFg).toStartWith('\x1b[')
 })

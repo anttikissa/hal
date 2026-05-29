@@ -24,10 +24,9 @@ import { cursor } from '../cli/cursor.ts'
 import type { Tab } from '../client.ts'
 
 const RESET = '\x1b[0m'
-const RESET_BG = '\x1b[49m'
 
 type TabHelpHint = { text: string; priority: number }
-type TabIndicator = { char: string; color: string; blinks: boolean; restore?: string }
+type TabIndicator = { char: string; color: string; blinks: boolean }
 
 const config = {
 	showSession: true,
@@ -81,7 +80,7 @@ function tabIndicator(tab: Tab): TabIndicator {
 		if (b.type === 'warning') return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 		if (b.type === 'error') return { char: '✗', color: colors.tab.errorFg || colors.error.fg, blinks: true }
 		if (b.type === 'log' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
-			return { char: '!', color: `${colors.tab.pausedBg}${colors.tab.pausedFg}`, blinks: false, restore: RESET_BG }
+			return { char: '!', color: colors.tab.pausedFg || colors.tab.warningFg || colors.warning.fg, blinks: false }
 		}
 		break
 	}
@@ -101,10 +100,9 @@ function hasAnimatedIndicators(): boolean {
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
 	if (!ind.char) return ''
-	const restore = ind.restore ?? ''
-	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${restore}${baseColor}`
+	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
 	const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : ind.color
-	return `${color}${ind.char}${restore}${baseColor}`
+	return `${color}${ind.char}${baseColor}`
 }
 
 function tabInner(num: number, ind: string): string {
