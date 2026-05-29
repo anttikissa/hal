@@ -1,17 +1,22 @@
 import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { models } from './models.ts'
+import { auth } from './auth.ts'
 
 const origFetch = globalThis.fetch
 const origStateDir = process.env.HAL_STATE_DIR
 
+beforeEach(() => {
+	auth._setStoreForTest({})
+})
 afterEach(() => {
 	globalThis.fetch = origFetch
 	if (origStateDir === undefined) delete process.env.HAL_STATE_DIR
 	else process.env.HAL_STATE_DIR = origStateDir
 	models.state.cache = null
+	auth._setStoreForTest({})
 })
 
 test('gpt and openai aliases resolve to gpt-5.5', () => {
@@ -45,6 +50,19 @@ test('gpt-5.5 gets high reasoning effort and fallback context window', () => {
 	try {
 		expect(models.reasoningEffort('openai/gpt-5.5')).toBe('high')
 		expect(models.contextWindow('openai/gpt-5.5')).toBe(1_050_000)
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
+test('gpt-5.5 subscription route uses Codex input cap', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
+	process.env.HAL_STATE_DIR = dir
+	models.state.cache = null
+	auth._setStoreForTest({ openai: { accessToken: 'tok', refreshToken: 'rt' } })
+	try {
+		expect(models.contextWindow('openai/gpt-5.5')).toBe(272_000)
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}

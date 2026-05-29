@@ -1,5 +1,6 @@
 // Model registry — aliases, display names, pricing, context windows.
 import type { PartialTokenUsage } from './protocol.ts'
+import { auth } from './auth.ts'
 //
 // Models are identified as "provider/model-id" (e.g. "anthropic/claude-opus-4-6").
 // Short aliases like "opus" resolve to full IDs. Display names are extracted
@@ -357,7 +358,18 @@ function cachedContextWindow(fullId: string): number | undefined {
 	return cached[bare] ?? cached[fullId]
 }
 
+function subscriptionContextWindow(fullId: string): number | undefined {
+	if (fullId !== 'openai/gpt-5.5' && fullId !== 'gpt-5.5') return undefined
+	const credential = auth.getCredential('openai')
+	if (credential?.type !== 'token') return undefined
+	// ChatGPT/Codex-backed OAuth uses the product limit: 400k total
+	// window = 272k input + 128k reserved output, not the 1.05M API cap.
+	return 272_000
+}
+
 function contextWindow(fullId: string): number {
+	const subscription = subscriptionContextWindow(fullId)
+	if (subscription) return subscription
 	const cached = cachedContextWindow(fullId)
 	if (cached) return cached
 	if (FALLBACK_WINDOWS[fullId]) return FALLBACK_WINDOWS[fullId]
