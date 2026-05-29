@@ -93,7 +93,7 @@ type CommandHandler = (
 	hooks: CommandHooks,
 ) => CommandResult | Promise<CommandResult>
 
-type CommandArg = 'model' | 'dir' | 'command' | 'config'
+type CommandArg = 'model' | 'dir' | 'command' | 'config' | 'login-provider'
 
 interface CommandSpec {
 	usage?: string | string[]
@@ -296,6 +296,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	login: {
 		usage: '<anthropic | openai> [<code>]',
 		summary: 'Log in to Claude or ChatGPT via OAuth.',
+		arg: 'login-provider',
 		help: [
 			'/login anthropic',
 			'  Open the Claude OAuth page. After authorizing, copy the code',

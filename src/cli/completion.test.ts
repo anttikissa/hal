@@ -50,6 +50,14 @@ test('/help st completes command names from runtime command list', () => {
 })
 
 
+test('/login completes provider names', () => {
+	const result = completion.complete('/login a', '/login a'.length)
+
+	expect(result).not.toBeNull()
+	expect(result!.items).toEqual(['/login anthropic'])
+})
+
+
 test('/model completes model arguments like opus without crashing', () => {
 	const result = completion.complete('/model opus', '/model opus'.length)
 

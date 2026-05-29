@@ -135,6 +135,8 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 		values = completeDirs(argPrefix, cwd)
 	} else if (arg === 'command') {
 		values = commandNamesForPrompt().filter((name) => name.startsWith(argPrefix))
+	} else if (arg === 'login-provider') {
+		values = ['anthropic', 'openai'].filter((provider) => provider.startsWith(argPrefix))
 	} else {
 		values = runtimeConfig.listPaths().filter((path) => path.startsWith(argPrefix))
 	}
