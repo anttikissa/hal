@@ -145,13 +145,14 @@ function broadcastSessions(): void {
 	restartPromptWatch()
 }
 
-function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice'): void {
+function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', retryable?: boolean): void {
 	ipc.appendEvent({
 		id: protocol.eventId(),
 		type: 'info',
 		text,
 		level,
 		...(ui ? { ui } : {}),
+		...(retryable === false ? { retryable: false } : {}),
 		sessionId,
 		createdAt: new Date().toISOString(),
 	})
@@ -484,7 +485,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		}
 		recordSessionStateChanges(sessionId, prevCwd, sessionState.cwd, prevModel, sessionState.model)
 		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui)
-		if (cmdResult.error) emitInfo(sessionId, cmdResult.error, 'error')
+		if (cmdResult.error) emitInfo(sessionId, cmdResult.error, 'error', undefined, false)
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
 		return
 	}
@@ -929,7 +930,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 				handleCommand(cmd)
 			} catch (err: any) {
 				const sid = cmd.sessionId ?? state.openSessionIds[0]
-				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error')
+				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error', undefined, false)
 			}
 		}
 	})()

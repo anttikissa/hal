@@ -202,6 +202,34 @@ test('google compat provider asks for GOOGLE_API_KEY only', async () => {
 })
 
 
+test('openai http network errors include Bun error code details', async () => {
+	const cause: any = new Error('getaddrinfo ENOTFOUND api.openai.com')
+	cause.code = 'ENOTFOUND'
+	cause.syscall = 'getaddrinfo'
+	cause.hostname = 'api.openai.com'
+	const err: any = new Error('fetch failed')
+	err.cause = cause
+	installFetchMock(async () => { throw err })
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_network',
+	})) events.push(event)
+
+	expect(events[0]).toMatchObject({ type: 'error', endpoint: 'https://api.openai.com/v1/responses' })
+	expect(events[0].message).toContain('fetch failed')
+	expect(events[0].message).toContain('code=ENOTFOUND')
+	expect(events[0].message).toContain('syscall=getaddrinfo')
+})
+
+
 test('openai provider streams text while rotating accounts', async () => {
 	const calls: FetchCall[] = []
 	const events = await collect(openaiProvider, 'openai', {

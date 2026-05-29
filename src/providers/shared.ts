@@ -52,6 +52,35 @@ function parseRetryDelay(res: Response, body?: string): number | undefined {
 	return undefined
 }
 
+function errorMessage(err: unknown): string {
+	return err instanceof Error ? err.message : String(err)
+}
+
+function appendErrorField(fields: string[], seen: Set<string>, name: string, value: unknown): void {
+	if (value === undefined || value === null || value === '') return
+	const text = `${name}=${String(value)}`
+	if (seen.has(text)) return
+	seen.add(text)
+	fields.push(text)
+}
+
+function formatNetworkError(err: unknown): string {
+	const fields: string[] = []
+	const seen = new Set<string>()
+	let current: any = err
+	for (let depth = 0; current && depth < 4; depth++) {
+		appendErrorField(fields, seen, 'code', current.code)
+		appendErrorField(fields, seen, 'errno', current.errno)
+		appendErrorField(fields, seen, 'syscall', current.syscall)
+		appendErrorField(fields, seen, 'hostname', current.hostname)
+		appendErrorField(fields, seen, 'address', current.address)
+		appendErrorField(fields, seen, 'port', current.port)
+		current = current.cause
+	}
+	if (fields.length === 0) return errorMessage(err)
+	return `${errorMessage(err)} (${fields.join(', ')})`
+}
+
 /** Extract resets_in_seconds from error response bodies (Anthropic/OpenAI rate limit format). */
 function parseResetsInSeconds(body: string | undefined): number | undefined {
 	if (!body) return undefined
@@ -162,4 +191,5 @@ export const providerShared = {
 	iterateJsonSse,
 	parseToolInput,
 	formatRotationMessage,
+	formatNetworkError,
 }

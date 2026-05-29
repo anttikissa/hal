@@ -515,20 +515,32 @@ async function* generateCompat(providerName: string, baseUrl: string, req: Provi
 	const body: any = { model: req.model, messages: [{ role: 'system', content: req.systemPrompt }, ...convertCompatMessages(req.messages)], stream: true }
 	if (req.tools?.length) body.tools = convertCompatTools(req.tools)
 	const endpoint = `${baseUrl}/chat/completions`
-	const res = await fetch(endpoint, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credential.value}` },
-		body: JSON.stringify(body),
-		signal: req.signal,
-	})
+	let res: Response
+	try {
+		res = await fetch(endpoint, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credential.value}` },
+			body: JSON.stringify(body),
+			signal: req.signal,
+		})
+	} catch (err) {
+		if (req.signal?.aborted) throw err
+		yield* yieldErrorAndDone({ type: 'error', message: providerShared.formatNetworkError(err), endpoint })
+		return
+	}
 	if (!res.ok) {
 		const text = await readErrorBody(res)
 		yield* yieldErrorAndDone({ type: 'error', message: `${providerName} ${res.status}: ${res.statusText}`, status: res.status, body: text, endpoint, retryAfterMs: providerShared.parseRetryDelay(res, text) })
 		return
 	}
-	for await (const event of parseChatCompletionsStream(res.body!)) {
-		if (event.type === 'done' && event.usage && credential.type === 'token') openaiUsage.recordUsage(credential, event.usage)
-		yield event
+	try {
+		for await (const event of parseChatCompletionsStream(res.body!)) {
+			if (event.type === 'done' && event.usage && credential.type === 'token') openaiUsage.recordUsage(credential, event.usage)
+			yield event
+		}
+	} catch (err) {
+		if (req.signal?.aborted) throw err
+		yield* yieldErrorAndDone({ type: 'error', message: providerShared.formatNetworkError(err), endpoint })
 	}
 }
 
@@ -650,12 +662,19 @@ async function* generateOpenAIHttp(req: ProviderRequest, credential: Credential,
 		yield* yieldErrorAndDone({ type: 'error', message: headerResult.error ?? 'OpenAI headers unavailable' })
 		return
 	}
-	const res = await fetch(transport.apiUrl, {
-		method: 'POST',
-		headers: headerResult.headers,
-		body: JSON.stringify(body),
-		signal: req.signal,
-	})
+	let res: Response
+	try {
+		res = await fetch(transport.apiUrl, {
+			method: 'POST',
+			headers: headerResult.headers,
+			body: JSON.stringify(body),
+			signal: req.signal,
+		})
+	} catch (err) {
+		if (req.signal?.aborted) throw err
+		yield* yieldErrorAndDone({ type: 'error', message: providerShared.formatNetworkError(err), endpoint: transport.apiUrl })
+		return
+	}
 	if (!res.ok) {
 		const text = await readErrorBody(res)
 		const retryAfterMs = providerShared.parseRetryDelay(res, text)
@@ -677,9 +696,14 @@ async function* generateOpenAIHttp(req: ProviderRequest, credential: Credential,
 		yield* yieldErrorAndDone({ type: 'error', message: `openai ${res.status}: ${res.statusText}`, status: res.status, body: text, endpoint: transport.apiUrl, retryAfterMs })
 		return
 	}
-	for await (const event of parseResponsesStream(res.body!)) {
-		if (event.type === 'done' && event.usage) openaiUsage.recordUsage(credential, event.usage)
-		yield event
+	try {
+		for await (const event of parseResponsesStream(res.body!)) {
+			if (event.type === 'done' && event.usage) openaiUsage.recordUsage(credential, event.usage)
+			yield event
+		}
+	} catch (err) {
+		if (req.signal?.aborted) throw err
+		yield* yieldErrorAndDone({ type: 'error', message: providerShared.formatNetworkError(err), endpoint: transport.apiUrl })
 	}
 }
 
@@ -731,7 +755,7 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 			yield* yieldErrorAndDone(webSocketApiErrorEvent(err, credential, transport))
 			return
 		}
-		const message = err instanceof Error ? err.message : String(err)
+		const message = providerShared.formatNetworkError(err)
 		yield* yieldErrorAndDone({ type: 'error', message, endpoint: transport.wsUrl })
 	}
 }

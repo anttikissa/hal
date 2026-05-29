@@ -39,6 +39,13 @@ function makeAssistantId(): string {
 	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function infoBlockType(event: any): 'log' | 'info' | 'warning' | 'error' {
+	if (event.ui === 'notice') return 'info'
+	if (event.level === 'error') return 'error'
+	if (event.level === 'warning') return 'warning'
+	return 'log'
+}
+
 interface ApplyEventOptions {
 	blocks: any[]
 	event: any
@@ -136,7 +143,9 @@ function applyEvent(opts: ApplyEventOptions): { changed: boolean; toolBlock?: an
 
 	if (event.type === 'info' && event.text) {
 		close()
-		blocks.push({ type: event.ui === 'notice' ? 'info' : event.level === 'error' ? 'error' : event.level === 'warning' ? 'warning' : 'log', text: event.text, ts })
+		const block: any = { type: infoBlockType(event), text: event.text, ts }
+		if (block.type === 'error' && event.retryable === false) block.retryable = false
+		blocks.push(block)
 		return changed()
 	}
 

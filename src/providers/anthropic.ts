@@ -329,12 +329,19 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		await Bun.write('/tmp/compare/hal.txt', prev + dump)
 	} catch {}
 
-	const res = await fetch(url, {
-		method: 'POST',
-		headers,
-		body: JSON.stringify(body),
-		signal: req.signal,
-	})
+	let res: Response
+	try {
+		res = await fetch(url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify(body),
+			signal: req.signal,
+		})
+	} catch (err) {
+		if (req.signal?.aborted) throw err
+		yield { type: 'error', message: providerShared.formatNetworkError(err), endpoint: url }
+		return
+	}
 
 	// Debug: log response
 	try {
@@ -369,7 +376,12 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		return
 	}
 
-	yield* parseStream(res.body!, { sessionId: req.sessionId, model: req.model })
+	try {
+		yield* parseStream(res.body!, { sessionId: req.sessionId, model: req.model })
+	} catch (err) {
+		if (req.signal?.aborted) throw err
+		yield { type: 'error', message: providerShared.formatNetworkError(err), endpoint: url }
+	}
 }
 
 export const anthropicProvider: Provider = { generate }

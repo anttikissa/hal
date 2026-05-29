@@ -65,6 +65,33 @@ test('anthropic provider streams text while rotating accounts', async () => {
 	expect(events.at(-1)).toMatchObject({ type: 'done', provider: 'anthropic', doneStatus: 'completed', stopReason: 'end_turn', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
+test('anthropic network errors include Bun error code details', async () => {
+	const cause: any = new Error('connect ECONNREFUSED 127.0.0.1:443')
+	cause.code = 'ECONNREFUSED'
+	cause.syscall = 'connect'
+	cause.address = '127.0.0.1'
+	cause.port = 443
+	const err: any = new Error('fetch failed')
+	err.cause = cause
+	installFetchMock(async () => { throw err })
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'tok-test', type: 'token' })
+
+	const events: any[] = []
+	for await (const event of anthropicProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'claude-sonnet-4-5',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_network',
+	})) events.push(event)
+
+	expect(events[0]).toMatchObject({ type: 'error', endpoint: 'https://api.anthropic.com/v1/messages?beta=true' })
+	expect(events[0].message).toContain('fetch failed')
+	expect(events[0].message).toContain('code=ECONNREFUSED')
+	expect(events[0].message).toContain('syscall=connect')
+})
+
 test('anthropic 429 shows failed and next account when another account is available', async () => {
 	const credential: Credential = { value: 'tok-test', type: 'token', email: 'burned@test.com', _key: 'anthropic:0', index: 0, total: 3 }
 	const next: Credential = { value: 'tok-next', type: 'token', email: 'next@test.com', _key: 'anthropic:1', index: 1, total: 3 }

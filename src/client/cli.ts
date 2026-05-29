@@ -367,7 +367,7 @@ function handleLocalCommand(text: string): boolean {
 		sendCommand: client.sendCommand,
 	})
 	if (result.output) client.addEntry(result.output)
-	if (result.error) client.addEntry(result.error, 'error')
+	if (result.error) client.addEntry(result.error, 'error', false)
 	if (result.quit) exitCli(0)
 	return true
 }

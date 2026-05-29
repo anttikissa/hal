@@ -7,7 +7,11 @@ function isMaxIterationsStop(text: string | undefined): boolean {
 }
 
 function actionForBlock(block: Block): ContinueAction | false {
-	if (block.type === 'error') return isMaxIterationsStop(block.text) ? 'continue' : 'retry'
+	if (block.type === 'error') {
+		if ((block as any).retryable === false) return false
+		if (isMaxIterationsStop(block.text)) return 'continue'
+		return 'retry'
+	}
 	if (block.type === 'log' && (block.text === '[paused]' || block.text?.startsWith('[interrupted]'))) return 'continue'
 	return false
 }

@@ -692,7 +692,9 @@ function addBlockToTab(sessionId: string | null, block: Block): void {
 	onChange(false)
 }
 
-function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log'): void {
-	queueLocalBlock({ type, text, ts: Date.now() })
+function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log', retryable?: boolean): void {
+	const block: any = { type, text, ts: Date.now() }
+	if (type === 'error' && retryable === false) block.retryable = false
+	queueLocalBlock(block)
 }
 
