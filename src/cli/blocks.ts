@@ -71,6 +71,88 @@ function stripAnsiSequences(text: string): string {
 	return out
 }
 
+interface LinkSpan { line: number; start: number; end: number; url: string }
+
+const URL_RE = /https?:\/\/[^\s<>"']+/g
+const TRAILING_URL_PUNCT = '.,!?;:)]}'
+
+function firstWhitespaceIndex(s: string): number {
+	for (let i = 0; i < s.length; i++) {
+		if (/\s/.test(s[i]!)) return i
+	}
+	return -1
+}
+
+function trimTrailingUrlPunctuation(url: string, spans: LinkSpan[]): string {
+	while (url && TRAILING_URL_PUNCT.includes(url.at(-1)!)) {
+		url = url.slice(0, -1)
+		const last = spans.at(-1)
+		if (!last) break
+		last.end--
+		if (last.end <= last.start) spans.pop()
+	}
+	return url
+}
+
+function pushUrlSpans(spans: LinkSpan[], lines: string[], lineIndex: number, start: number, end: number, cols: number): void {
+	let url = lines[lineIndex]!.slice(start, end)
+	const urlSpans: LinkSpan[] = [{ line: lineIndex, start, end, url: '' }]
+	let currentLine = lineIndex
+	let currentEnd = end
+
+	while (currentEnd === lines[currentLine]!.length && visLen(lines[currentLine]!) >= cols && currentLine + 1 < lines.length) {
+		const next = lines[currentLine + 1]!
+		if (!next || /^\s/.test(next) || /^https?:\/\//.test(next)) break
+		const whitespace = firstWhitespaceIndex(next)
+		if (whitespace >= 0) break
+		url += next
+		urlSpans.push({ line: currentLine + 1, start: 0, end: next.length, url: '' })
+		currentLine++
+		currentEnd = next.length
+	}
+
+	url = trimTrailingUrlPunctuation(url, urlSpans)
+	if (!url || url === 'http://' || url === 'https://') return
+	for (const span of urlSpans) {
+		span.url = url
+		spans.push(span)
+	}
+}
+
+function osc8(url: string, label: string): string {
+	return `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`
+}
+
+function hyperlinkUrls(lines: string[], cols: number): string[] {
+	const spans: LinkSpan[] = []
+	for (let i = 0; i < lines.length; i++) {
+		URL_RE.lastIndex = 0
+		let match: RegExpExecArray | null
+		while ((match = URL_RE.exec(lines[i]!))) {
+			pushUrlSpans(spans, lines, i, match.index, match.index + match[0].length, cols)
+		}
+	}
+	if (spans.length === 0) return lines
+
+	const byLine = new Map<number, LinkSpan[]>()
+	for (const span of spans) {
+		const lineSpans = byLine.get(span.line) ?? []
+		lineSpans.push(span)
+		byLine.set(span.line, lineSpans)
+	}
+
+	const linked = lines.slice()
+	for (const [lineIndex, lineSpans] of byLine) {
+		lineSpans.sort((a, b) => b.start - a.start)
+		let line = linked[lineIndex]!
+		for (const span of lineSpans) {
+			line = line.slice(0, span.start) + osc8(span.url, line.slice(span.start, span.end)) + line.slice(span.end)
+		}
+		linked[lineIndex] = line
+	}
+	return linked
+}
+
 interface BlockBase { ts?: number; dimmed?: boolean; renderVersion?: number }
 interface TextBlock extends BlockBase { text: string }
 interface BlobRef { blobId?: string; sessionId?: string; blobLoaded?: boolean }
@@ -706,7 +788,7 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
 	for (const block of group) {
-		for (const line of renderMarkdownLines(block, contentCols)) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
+		for (const line of hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
 	padBlock(lines, fg, bg, cols)
 	lines[lines.length - 1]! += FG_OFF
@@ -763,7 +845,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const header = buildHeader(label, blockTime, blobRef, cols)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
-	for (const line of blockContent(block, contentCols)) {
+	for (const line of hyperlinkUrls(blockContent(block, contentCols), contentCols)) {
 		lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid

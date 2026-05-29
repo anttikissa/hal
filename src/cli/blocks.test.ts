@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { blocks, type Block } from './blocks.ts'
 import { colors } from './colors.ts'
+import { visLen } from '../utils/strings.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -228,6 +229,18 @@ test('text code fences wrap at word boundaries', () => {
 		' Open without an',
 		' initial prompt.',
 	])
+})
+
+
+test('wrapped URLs use OSC 8 links for every visual segment', () => {
+	const url = `https://claude.ai/oauth/authorize?client_id=${'a'.repeat(80)}`
+	const lines = blocks.renderBlock({ type: 'log', text: url }, 40)
+	const rendered = lines.join('\n')
+	const openLink = `\x1b]8;;${url}\x07`
+
+	expect(rendered).toContain(`${openLink}https://`)
+	expect(rendered.split(openLink).length - 1).toBeGreaterThan(1)
+	for (const line of lines) expect(visLen(line)).toBeLessThanOrEqual(40)
 })
 
 test('rendered block lines without tabs do not embed carriage returns', () => {
