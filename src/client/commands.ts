@@ -40,8 +40,6 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 			const parsed = JSON.parse(text ?? '{}') as { todo?: string; edits?: Record<string, string> }
 			return { type, sessionId, requestId, clientPid: process.pid, todo: parsed.todo ?? '', edits: parsed.edits ?? {} }
 		}
-		case 'rename':
-			return { type, sessionId, name: text ?? '' }
 		case 'spawn':
 			throw new Error('spawn commands must be created explicitly')
 		case 'tool-confirm':
