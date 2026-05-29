@@ -317,6 +317,7 @@ function switchTab(index: number): void {
 		ensureTabLoaded(tab)
 		loadTabBlobs(tab)
 		rememberTab(tab.sessionId)
+		focusSession(tab.sessionId)
 		// Re-read draft from disk — another client may have saved one
 		const diskDraft = draftModule.loadDraft(tab.sessionId)
 		if (diskDraft && !tab.inputDraft) tab.inputDraft = diskDraft
@@ -640,6 +641,7 @@ function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferr
 		handleEvent,
 		initializeSessions,
 		currentSessionId: () => currentTab()?.sessionId,
+		focusCurrentTab,
 		loadInBackground,
 		onChange,
 		onStartupOpen: () => { sessionTabs.state.pendingOpen = 'open' },

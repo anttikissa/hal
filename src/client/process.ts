@@ -47,6 +47,7 @@ function start(signal: AbortSignal, opts: any, ctx: any): void {
 		for await (const event of ipc.tailEvents(signal)) ctx.handleEvent(event)
 	})()
 	ctx.initializeSessions(shared, opts)
+	if (!opts.openCwd) ctx.focusCurrentTab()
 	if (opts.openCwd) {
 		ctx.onStartupOpen()
 		ipc.appendCommand({ type: 'open', cwd: opts.openCwd, sessionId: ctx.currentSessionId() })
