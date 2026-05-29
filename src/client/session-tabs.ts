@@ -43,7 +43,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	const openIds = new Set(newTabs.map((tab) => tab.sessionId))
 	ctx.pruneRecentTabs(openIds)
 	for (const sessionId of state.returnToBySession.keys()) if (!openIds.has(sessionId)) state.returnToBySession.delete(sessionId)
-	if (grew && openedSessionId && previousSession && (isOpen || isFork)) state.returnToBySession.set(openedSessionId, previousSession)
+	if (grew && openedSessionId && previousSession && state.pendingOpen) state.returnToBySession.set(openedSessionId, previousSession)
 
 	const targetSession = previousTabs.length === 0 && preferredSession && openIds.has(preferredSession) ? preferredSession : clientTabs.pickFocusedSessionAfterSessionListChange({
 		previousSession,

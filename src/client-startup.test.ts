@@ -573,17 +573,21 @@ describe('client startup', () => {
 		const ac = new AbortController()
 		client.startClient(ac.signal)
 		await Bun.sleep(10)
-		client.switchTab(1)
 		client.sendCommand('resume')
-		expect(appendedCommands).toEqual([{ type: 'resume', sessionId: 's2' }])
+		expect(appendedCommands).toEqual([{ type: 'resume', sessionId: 's1' }])
 
-		shared.sessions = ['s1', 's2', 's3'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		shared.sessions = ['s1', 's3', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
+		onIpcChange?.({ path: '', previous: {}, next: shared })
+		await Bun.sleep(10)
+		expect(client.currentTab()?.sessionId).toBe('s3')
+		expect(client.currentTab()?.history.at(-1)).toMatchObject({ type: 'info', text: 'Tab restored.' })
+
+		shared.sessions = ['s1', 's2'].map((id, i) => ({ id, name: `tab ${i + 1}`, cwd: `/tmp/${id}`, model: 'openai/gpt-5.4' }))
 		onIpcChange?.({ path: '', previous: {}, next: shared })
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.sessionId).toBe('s3')
-		expect(client.currentTab()?.history.at(-1)).toMatchObject({ type: 'info', text: 'Tab restored.' })
+		expect(client.currentTab()?.sessionId).toBe('s1')
 	})
 
 	test('/self prompt activates the new session tab', async () => {
