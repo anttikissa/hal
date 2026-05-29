@@ -3,7 +3,7 @@
 
 import { ipc } from './ipc.ts'
 import type { SharedSessionInfo, SharedState } from './ipc.ts'
-import type { CommandType, TokenUsage } from './protocol.ts'
+import type { TokenUsage } from './protocol.ts'
 import type { VersionStatus } from './version.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
@@ -14,7 +14,7 @@ import { startup } from './startup.ts'
 import { startupSummary } from './client/startup-summary.ts'
 import { sessionLoader } from './client/session-loader.ts'
 import { clientTabs } from './client/tabs.ts'
-import { clientCommands } from './client/commands.ts'
+import { clientCommands, type ClientCommandType } from './client/commands.ts'
 import { continuation } from './client/continuation.ts'
 import type { ContinueAction } from './client/continuation.ts'
 import { clientHistory } from './client/history.ts'
@@ -442,7 +442,7 @@ function prevTab(): void {
 // Track pending tab actions so a sessions update can focus the reopened/new tab.
 // Fork stays distinct because it also copies the draft from the parent.
 
-function sendCommand(type: CommandType, text?: string, displayText?: string, delivery?: 'queue'): void {
+function sendCommand(type: ClientCommandType, text?: string, displayText?: string, delivery?: 'queue'): void {
 	const tab = currentTab()
 	if (type === 'open') sessionTabs.state.pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') sessionTabs.state.pendingOpen = 'resume'

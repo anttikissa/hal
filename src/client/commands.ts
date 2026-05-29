@@ -1,5 +1,7 @@
 import type { Command, CommandType } from '../protocol.ts'
 
+export type ClientCommandType = Exclude<CommandType, 'compact' | 'focus' | 'reset' | 'spawn' | 'tool-confirm'>
+
 type PendingTabAction = 'open' | 'fork' | 'resume' | false
 
 function pendingTabActionForPrompt(text: string): PendingTabAction {
@@ -11,7 +13,7 @@ function pendingTabActionForPrompt(text: string): PendingTabAction {
 	return false
 }
 
-function makeCommand(type: CommandType, sessionId: string | undefined, text?: string, displayText?: string, delivery?: 'queue'): Command {
+function makeCommand(type: ClientCommandType, sessionId: string | undefined, text?: string, displayText?: string, delivery?: 'queue'): Command {
 	switch (type) {
 		case 'prompt':
 			return { type, sessionId, text: text ?? '', displayText, delivery }
@@ -29,9 +31,6 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 		case 'queue-next':
 		case 'close':
 		case 'abort':
-		case 'reset':
-		case 'compact':
-		case 'focus':
 			return { type, sessionId }
 		case 'rebase-start':
 			return { type, sessionId, requestId: text ?? '', clientPid: process.pid }
@@ -40,10 +39,6 @@ function makeCommand(type: CommandType, sessionId: string | undefined, text?: st
 			const parsed = JSON.parse(text ?? '{}') as { todo?: string; edits?: Record<string, string> }
 			return { type, sessionId, requestId, clientPid: process.pid, todo: parsed.todo ?? '', edits: parsed.edits ?? {} }
 		}
-		case 'spawn':
-			throw new Error('spawn commands must be created explicitly')
-		case 'tool-confirm':
-			throw new Error('tool confirmations must be created explicitly')
 	}
 }
 

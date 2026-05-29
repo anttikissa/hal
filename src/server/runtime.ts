@@ -862,9 +862,6 @@ function handleCommand(cmd: Command): void {
 			closeSession(cmd.sessionId, true)
 			break
 		}
-		case 'focus': {
-			break
-		}
 	}
 }
 

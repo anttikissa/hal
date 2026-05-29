@@ -2,7 +2,7 @@ import { keyHelp } from '../cli/key-help.ts'
 import { visLen } from '../utils/strings.ts'
 import { commands } from '../runtime/commands.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
-import type { CommandType } from '../protocol.ts'
+import type { ClientCommandType } from './commands.ts'
 
 export interface ClientLocalTabRef {
 	sessionId: string
@@ -13,7 +13,7 @@ export interface ClientLocalCommandContext {
 	tabs: ClientLocalTabRef[]
 	focusedTabIndex: number
 	switchTab: (index: number) => void
-	sendCommand: (type: CommandType, text?: string) => void
+	sendCommand: (type: ClientCommandType, text?: string) => void
 }
 
 export interface ClientLocalCommandResult {
