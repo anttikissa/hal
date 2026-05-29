@@ -98,3 +98,12 @@ test('colors.load exposes assistant HAL cursor colors from colors.ason', () => {
 	expect(colors.assistant.cursorIdle).toStartWith('\x1b[')
 	expect(colors.assistant.cursorIdle).not.toBe(colors.assistant.cursor)
 })
+
+
+test('colors.load exposes tab, popup tone, and diff colors from colors.ason', () => {
+	colors.load()
+	expect(colors.tab.activeFg).toStartWith('\x1b[')
+	expect(colors.tab.pausedBg).toStartWith('\x1b[')
+	expect(colors.popup.warningFg).toStartWith('\x1b[')
+	expect(colors.diff.addFg).toStartWith('\x1b[')
+})

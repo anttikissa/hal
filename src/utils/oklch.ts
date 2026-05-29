@@ -60,6 +60,28 @@ function toBg(L: number, C: number, H: number): string {
 // Dim all truecolor ANSI escapes in a string by scaling RGB values.
 // factor < 1 darkens, > 1 brightens. Works on both fg (38;2) and bg (48;2).
 const TRUECOLOR_RE = /\x1b\[(38|48);2;(\d+);(\d+);(\d+)m/g
+const TRUECOLOR_FG_RE = /\x1b\[38;2;(\d+);(\d+);(\d+)m/
+
+function fgRgb(color: string): [number, number, number] | null {
+	const match = color.match(TRUECOLOR_FG_RE)
+	if (!match) return null
+	return [Number(match[1]), Number(match[2]), Number(match[3])]
+}
+
+function fgHex(color: string): string {
+	const rgb = fgRgb(color)
+	if (!rgb) return ''
+	return rgb.map((v) => v.toString(16).padStart(2, '0')).join('')
+}
+
+function mixFg(a: string, b: string, t: number): string {
+	const start = fgRgb(a)
+	const end = fgRgb(b)
+	if (!start || !end) return t < 1 ? a : b
+	const rgb = start.map((v, i) => Math.round(v + (end[i]! - v) * t))
+	return `\x1b[38;2;${rgb.join(';')}m`
+}
+
 function dimAnsi(line: string, factor: number): string {
 	return line.replace(TRUECOLOR_RE, (_, mode, r, g, b) => {
 		const scale = (v: string) => Math.round(Math.min(255, Number(v) * factor))
@@ -80,4 +102,4 @@ function usageFg(usedPercent: number): string {
 	return toFg(L, C, H)
 }
 
-export const oklch = { oklchToRgb, toFg, toBg, dimAnsi, usageFg }
+export const oklch = { oklchToRgb, toFg, toBg, fgHex, mixFg, dimAnsi, usageFg }

@@ -607,7 +607,7 @@ describe('render', () => {
 		}
 	})
 
-	test('pending risky tool confirmation shows a yellow alert instead of busy minicursor', () => {
+	test('pending risky tool confirmation uses the configured warning alert instead of busy minicursor', () => {
 		const tab = client.currentTab()!
 		client.state.busy.set(tab.sessionId, true)
 
@@ -625,10 +625,10 @@ describe('render', () => {
 		expect(tabBar).toBeDefined()
 		expect(tabBar).toContain('[1!]')
 		expect(tabBar).not.toContain('[1▪]')
-		expect(output).toContain('\x1b[33m!')
+		expect(output).toContain(`${colors.tab.warningFg}!`)
 	})
 
-	test('paused tab alert uses the configured foreground color', () => {
+	test('paused tab alert uses the configured bright background', () => {
 		colors.load()
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
@@ -637,7 +637,7 @@ describe('render', () => {
 		try {
 			const output = renderStatus.tabLabel(tab, 0)
 			expect(stripAnsi(output)).toBe('[1!]')
-			expect(output).toContain(`${colors.tab.alertFg}!`)
+			expect(output).toContain(`${colors.tab.pausedBg}${colors.tab.pausedFg}!`)
 		} finally {
 			cursor.isVisible = originalIsVisible
 		}

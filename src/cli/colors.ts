@@ -19,7 +19,9 @@ type BlockColors = { fg: string; bg: string; bold?: string; code?: string; curso
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
-type TabColors = { alertFg: string }
+type TabColors = { activeFg: string; inactiveFg: string; doneFg: string; warningFg: string; errorFg: string; pausedFg: string; pausedBg: string }
+type PopupColors = { current: { fg: string; bg: string }; neutralFg: string; warningFg: string; dangerFg: string }
+type DiffColors = { addFg: string; removeFg: string }
 
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
@@ -33,8 +35,9 @@ const error: BlockColors = { fg: '', bg: '' }
 const fork: BlockColors = { fg: '', bg: '' }
 const status: StatusColors = { fg: '', highlight: '' }
 const help: HelpColors = { key: '', description: '' }
-const tab: TabColors = { alertFg: '' }
-const popup = { current: { fg: '', bg: '' } }
+const tab: TabColors = { activeFg: '', inactiveFg: '', doneFg: '', warningFg: '', errorFg: '', pausedFg: '', pausedBg: '' }
+const popup: PopupColors = { current: { fg: '', bg: '' }, neutralFg: '', warningFg: '', dangerFg: '' }
+const diff: DiffColors = { addFg: '', removeFg: '' }
 
 // Tool colors keyed by tool name. Unknown tools fall back to 'default'.
 const tools: Record<string, BlockColors> = {}
@@ -124,7 +127,18 @@ function load(): void {
 	status.highlight = raw.status?.highlight ? fg(raw.status.highlight, vars) : assistant.bold
 	help.key = raw.help?.key ? fg(raw.help.key, vars) : status.highlight
 	help.description = raw.help?.description ? fg(raw.help.description, vars) : status.fg
-	tab.alertFg = raw.tab?.alertFg ? fg(raw.tab.alertFg, vars) : warning.fg
+	tab.activeFg = raw.tab?.activeFg ? fg(raw.tab.activeFg, vars) : status.highlight
+	tab.inactiveFg = raw.tab?.inactiveFg ? fg(raw.tab.inactiveFg, vars) : status.fg
+	tab.doneFg = raw.tab?.doneFg ? fg(raw.tab.doneFg, vars) : info.fg
+	tab.warningFg = raw.tab?.warningFg ? fg(raw.tab.warningFg, vars) : warning.fg
+	tab.errorFg = raw.tab?.errorFg ? fg(raw.tab.errorFg, vars) : error.fg
+	tab.pausedFg = raw.tab?.pausedFg ? fg(raw.tab.pausedFg, vars) : status.highlight
+	tab.pausedBg = raw.tab?.pausedBg ? bg(raw.tab.pausedBg, vars) : warning.bg
+	popup.neutralFg = raw.popup?.neutralFg ? fg(raw.popup.neutralFg, vars) : status.fg
+	popup.warningFg = raw.popup?.warningFg ? fg(raw.popup.warningFg, vars) : warning.fg
+	popup.dangerFg = raw.popup?.dangerFg ? fg(raw.popup.dangerFg, vars) : warning.fg
+	diff.addFg = raw.diff?.addFg ? fg(raw.diff.addFg, vars) : info.fg
+	diff.removeFg = raw.diff?.removeFg ? fg(raw.diff.removeFg, vars) : error.fg
 
 	if (raw.input) {
 		if (raw.input.bg) input.bg = bg(raw.input.bg, vars)
@@ -190,6 +204,7 @@ export const colors = {
 	help,
 	tab,
 	popup,
+	diff,
 	tool,
 	tools,
 	load,

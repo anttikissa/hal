@@ -47,6 +47,7 @@ describe('popup', () => {
 		const overlay = popup.buildOverlay(80, 24)
 		expect(overlay).not.toBeNull()
 		expect(overlay?.lines.join('\n')).toContain('[Yes]')
+		expect(overlay?.lines[0]).toContain(colors.popup.warningFg)
 	})
 
 	test('danger confirm popup wraps long lines instead of truncating them', () => {

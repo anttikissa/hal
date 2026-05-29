@@ -91,9 +91,15 @@
 		highlight: [0.90, 0.01, 250],
 	},
 
-	// Tab indicators — paused tabs use a bright warning foreground.
+	// Tab indicators and labels. Paused tabs use a bright warning background.
 	tab: {
-		alertFg: [0.86, 0.16, 95],
+		activeFg: [0.90, 0.01, 250],
+		inactiveFg: [0.58, 0, 0],
+		doneFg: [0.78, 0.14, 145],
+		warningFg: [0.86, 0.16, 95],
+		errorFg: [0.70, 0.20, 25],
+		pausedFg: [0.10, 0.03, 95],
+		pausedBg: [0.86, 0.16, 95],
 	},
 
 	// Help bar — keys stand out from descriptions, but stay below prompt input.
@@ -103,10 +109,19 @@
 	},
 
 	popup: {
+		neutralFg: [0.64, 0, 0],
+		warningFg: [0.78, 0.14, 85],
+		dangerFg: [0.86, 0.16, 85],
 		current: {
 			fg: [0.96, 0.02, 250],
 			bg: [0.42, 0.03, 250],
 		},
+	},
+
+	// Edit diffs — additions are green, removals use the error hue.
+	diff: {
+		addFg: [0.78, 0.14, 145],
+		removeFg: [0.70, 0.20, 25],
 	},
 
 	// Tools — each type gets a distinct hue.

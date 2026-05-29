@@ -35,10 +35,7 @@ const state = {
 
 const MODEL_CHOICES = models.listModelChoices()
 const MODEL_PICKER_INNER_WIDTH = 72
-const YELLOW = '\x1b[33m'
-const GRAY = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
-const DANGER_YELLOW = '\x1b[38;5;226m'
 
 function close(): void {
 	state.active = false
@@ -139,8 +136,8 @@ function handleKey(k: KeyEvent): boolean {
 }
 
 function toneColor(): string {
-	if (state.tone === 'danger') return DANGER_YELLOW
-	return state.tone === 'warning' ? YELLOW : GRAY
+	if (state.tone === 'danger') return colors.popup.dangerFg || colors.warning.fg
+	return state.tone === 'warning' ? colors.popup.warningFg || colors.warning.fg : colors.popup.neutralFg || colors.status.fg
 }
 
 function rowText(item: PopupItem, active: boolean): string {

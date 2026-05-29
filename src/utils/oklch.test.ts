@@ -54,3 +54,16 @@ test('usageFg moves from green toward red as usage rises', () => {
 	expect(red).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m$/)
 	expect(green).not.toBe(red)
 })
+
+test('fgHex extracts a cursor color from an OKLCH-derived foreground escape', () => {
+	const color = oklch.toFg(0.5, 0.1, 90)
+	expect(oklch.fgHex(color)).toMatch(/^[0-9a-f]{6}$/)
+})
+
+test('mixFg interpolates foreground escapes', () => {
+	const start = oklch.toFg(0.4, 0, 0)
+	const end = oklch.toFg(0.8, 0, 0)
+	expect(oklch.mixFg(start, end, 0.5)).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m$/)
+	expect(oklch.mixFg(start, end, 0)).toBe(start)
+	expect(oklch.mixFg(start, end, 1)).toBe(end)
+})

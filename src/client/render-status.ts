@@ -23,14 +23,11 @@ import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
 import type { Tab } from '../client.ts'
 
-const GREEN = '\x1b[32m'
-const RED = '\x1b[31m'
-const YELLOW = '\x1b[33m'
-const BRIGHT_WHITE = '\x1b[97m'
-const DIM = '\x1b[38;5;245m'
 const RESET = '\x1b[0m'
+const RESET_BG = '\x1b[49m'
 
 type TabHelpHint = { text: string; priority: number }
+type TabIndicator = { char: string; color: string; blinks: boolean; restore?: string }
 
 const config = {
 	showSession: true,
@@ -64,17 +61,13 @@ function cursorShapeSequence(shape = renderStatus.config.promptCursorShape): str
 }
 
 function promptCursorColorSequence(color = colors.input.cursor || colors.info.fg): string {
-	const match = color.match(/\x1b\[38;2;(\d+);(\d+);(\d+)m/)
-	if (!match) return ''
-	const r = Number(match[1]).toString(16).padStart(2, '0')
-	const g = Number(match[2]).toString(16).padStart(2, '0')
-	const b = Number(match[3]).toString(16).padStart(2, '0')
-	return `\x1b]12;#${r}${g}${b}\x07`
+	const hex = oklch.fgHex(color)
+	return hex ? `\x1b]12;#${hex}\x07` : ''
 }
 
-function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean } {
+function tabIndicator(tab: Tab): TabIndicator {
 	const busy = client.state.busy.get(tab.sessionId) ?? false
-	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: YELLOW, blinks: false }
+	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 
 	if (busy) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
 
@@ -85,15 +78,15 @@ function tabIndicator(tab: Tab): { char: string; color: string; blinks: boolean 
 		const b = tab.history[i]!
 		// Skip trailing info blocks that aren't status-relevant.
 		if ((b.type === 'log' || b.type === 'info') && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
-		if (b.type === 'warning') return { char: '!', color: YELLOW, blinks: false }
-		if (b.type === 'error') return { char: '✗', color: RED, blinks: true }
+		if (b.type === 'warning') return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
+		if (b.type === 'error') return { char: '✗', color: colors.tab.errorFg || colors.error.fg, blinks: true }
 		if (b.type === 'log' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
-			return { char: '!', color: colors.tab.alertFg || colors.warning.fg, blinks: false }
+			return { char: '!', color: `${colors.tab.pausedBg}${colors.tab.pausedFg}`, blinks: false, restore: RESET_BG }
 		}
 		break
 	}
 
-	if (tab.doneUnseen) return { char: '✓', color: GREEN, blinks: false }
+	if (tab.doneUnseen) return { char: '✓', color: colors.tab.doneFg || colors.info.fg, blinks: false }
 
 	return { char: '', color: '', blinks: false }
 }
@@ -108,9 +101,10 @@ function hasAnimatedIndicators(): boolean {
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
 	if (!ind.char) return ''
-	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
+	const restore = ind.restore ?? ''
+	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${restore}${baseColor}`
 	const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : ind.color
-	return `${color}${ind.char}${baseColor}`
+	return `${color}${ind.char}${restore}${baseColor}`
 }
 
 function tabInner(num: number, ind: string): string {
@@ -119,11 +113,11 @@ function tabInner(num: number, ind: string): string {
 
 function tabLabel(tab: Tab, i: number): string {
 	const active = client.state.activeTab
-	const base = i === active ? BRIGHT_WHITE : DIM
+	const base = i === active ? colors.tab.activeFg || colors.status.highlight : colors.tab.inactiveFg || colors.status.fg
 	const ind = renderStatus.renderIndicator(tab, base)
 	const content = renderStatus.tabInner(i + 1, ind)
-	if (i === active) return `${BRIGHT_WHITE}[${content}]${RESET}`
-	return `${DIM} ${content} ${RESET}`
+	if (i === active) return `${base}[${content}]${RESET}`
+	return `${base} ${content} ${RESET}`
 }
 
 function tabHelpHints(tabCount: number): TabHelpHint[] {
@@ -212,11 +206,11 @@ function shortenPath(p: string): string {
 }
 
 function statusBaseColor(): string {
-	return colors.status.fg || DIM
+	return colors.status.fg || colors.tab.inactiveFg
 }
 
 function statusHighlightColor(): string {
-	return colors.status.highlight || BRIGHT_WHITE
+	return colors.status.highlight || colors.tab.activeFg
 }
 
 function contentWidth(cols: number): number {
@@ -423,9 +417,9 @@ function renderHelpBar(lines: string[]): void {
 	const busy = client.isBusy()
 	const hasText = prompt.text().trim().length > 0
 	const continueAction = client.continueActionForCurrentTurn()
-	const desc = colors.help.description || '\x1b[90m'
+	const desc = colors.help.description || colors.status.fg
 	const style = {
-		key: colors.help.key || '\x1b[37m',
+		key: colors.help.key || colors.status.highlight,
 		description: desc,
 		separator: desc,
 	}

@@ -278,7 +278,7 @@ function editLineRange(input: any): string {
 	return after === '0:000' ? ' (before 1)' : ` (after ${after})`
 }
 
-const [RED_FG, GREEN_FG, FG_OFF, RESET_BG] = ['\x1b[31m', '\x1b[32m', '\x1b[39m', '\x1b[49m']
+const [FG_OFF, RESET_BG] = ['\x1b[39m', '\x1b[49m']
 
 function stripRedundantCd(command: string, cwd: string | undefined): string {
 	if (!cwd) return command
@@ -359,8 +359,8 @@ function formatEdit(output: string): ToolFormatResult {
 	}
 	const lines: string[] = []
 	for (const [content, prefix, color] of [
-		[beforeLines, '−', RED_FG],
-		[afterLines, '+', GREEN_FG],
+		[beforeLines, '−', colors.diff.removeFg || colors.error.fg],
+		[afterLines, '+', colors.diff.addFg || colors.info.fg],
 	] as const) {
 		if (!content.length) continue
 		const limit = content.length <= blockConfig.maxEditDiffLines + 1 ? content.length : blockConfig.maxEditDiffLines
@@ -664,7 +664,7 @@ function padBlockLine(line: string): string {
 }
 
 function padBlock(lines: string[], fg: string, bg: string, cols: number): void {
-	if (!bg || bg.includes('[48;2;0;0;0m')) return
+	if (!bg || bg === colors.assistant.bg || bg === colors.thinking.bg) return
 	lines.unshift(bgLine(`${fg} `, cols, bg))
 	lines.push(bgLine(`${fg} `, cols, bg))
 }
