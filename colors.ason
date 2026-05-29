@@ -51,11 +51,11 @@
 		bg: ["$bgL", "$bgC", 195],
 	},
 
-	// Log — neutral, dim, with a subtle grey card
+	// Log — neutral, moderately dim, with a subtle grey card
 	log: {
-		fg: [0.60, 0, 0],
-		bg: [0.20, 0, 0],
-		code: [0.72, 0, 0],
+		fg: [0.66, 0, 0],
+		bg: [0.23, 0, 0],
+		code: [0.78, 0, 0],
 	},
 
 	// Warnings — amber, noticeable but not fatal
