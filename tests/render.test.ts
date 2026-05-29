@@ -196,12 +196,12 @@ describe('render', () => {
 		expect(clean).not.toContain('ctrl-t new')
 	})
 
-	test('help bar says press enter to retry after errors', () => {
+	test('help bar says enter retry after errors', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('press enter to retry')
-		expect(clean).not.toContain('press enter to continue')
+		expect(clean).toContain('enter: retry')
+		expect(clean).not.toContain('press enter to retry')
 	})
 
 	test('help bar hides retry once retry is in progress', () => {
@@ -212,7 +212,7 @@ describe('render', () => {
 		tab.history.push({ type: 'tool', toolId: 't1', name: 'read', input: {}, ts: Date.now() })
 		client.state.busy.set(tab.sessionId, true)
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).not.toContain('press enter to retry')
+		expect(clean).not.toContain('enter: retry')
 		client.state.busy.clear()
 	})
 
@@ -221,7 +221,7 @@ describe('render', () => {
 		tab.history.push({ type: 'error', text: 'Hit max iterations (50). Stopping.', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: continue')
-		expect(clean).not.toContain('press enter to retry')
+		expect(clean).not.toContain('enter: retry')
 	})
 
 	test('continue hint matches enter behavior for whitespace-only prompts', () => {
