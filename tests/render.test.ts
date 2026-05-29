@@ -809,6 +809,15 @@ describe('render', () => {
 		}
 	})
 
+	test('non-retryable command errors do not show alert indicators', () => {
+		const tab = client.state.tabs[0]!
+		tab.doneUnseen = true
+		tab.history.push({ type: 'error', text: '/rename: Name may contain letters only.', retryable: false } as any)
+
+		expect(renderStatus.tabIndicator(tab)).toEqual({ char: '', color: '', blinks: false })
+		expect(stripAnsi(renderStatus.tabLabel(tab, 0))).toBe('[1]')
+	})
+
 	test('model picker popup draws over the normal frame', () => {
 		popup.openModelPicker(() => {})
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
