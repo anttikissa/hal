@@ -442,7 +442,7 @@ async function handleQueueSlashCommand(sessionId: string, text: string, source?:
 	if (!args) {
 		const entries = promptQueue.load(sessionId)
 		if (entries.length === 0) emitInfo(sessionId, 'Queue is empty')
-		else for (let i = 0; i < entries.length; i++) emitInfo(sessionId, `${i + 1}. ${queuePreview(entries[i]!.text)}`)
+		else for (let i = 0; i < entries.length; i++) emitInfo(sessionId, `${i + 1}. ${entries[i]!.text}`)
 		return true
 	}
 	if (args === 'next') {

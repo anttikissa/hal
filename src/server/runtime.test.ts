@@ -338,6 +338,11 @@ test('queue slash command lists and clears queued prompts', async () => {
 		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue')).toBe(true)
 		expect(events.some((event) => event.type === 'info' && event.text.includes('1. first queued'))).toBe(true)
 
+		const longPrompt = `${'x'.repeat(100)}\nsecond line`
+		promptQueue.append(sessionId, { text: longPrompt, createdAt: '2026-05-20T00:00:01.000Z' })
+		events.length = 0
+		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue')).toBe(true)
+		expect(events.some((event) => event.type === 'info' && event.text.includes(`2. ${longPrompt}`))).toBe(true)
 		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue clear')).toBe(true)
 		expect(promptQueue.load(sessionId)).toEqual([])
 		expect(events.some((event) => event.type === 'info' && event.text === 'Queue cleared')).toBe(true)
