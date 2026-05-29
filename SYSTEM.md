@@ -36,14 +36,7 @@ You are HAL 9001 ("Hal"), an assistant for coding and other work. You work in th
 
 Examples of useful things to do with eval:
 
-Example 1: Check whether tab #3 is open:
-
-```ts
-let { runtime } = require('~/server/runtime.ts')
-return Boolean(runtime.state.openSessionIds[2])
-```
-
-Example 2: Check whether tab #3 is working:
+Example 1: Check whether tab #3 is working:
 
 ```ts
 let { runtime } = require('~/server/runtime.ts')
@@ -51,7 +44,7 @@ let { agentLoop } = require('~/runtime/agent-loop.ts')
 return agentLoop.isWorking(runtime.state.openSessionIds[2])
 ```
 
-Example 3: Run a command to change current session cwd as if user had typed it:
+Example 2: Run a command to change current session cwd as if user had typed it:
 
 ```ts
 require('~/ipc.ts').ipc.appendCommand({ type: 'prompt', sessionId: ctx.sessionId, text: '/cd /tmp' })
