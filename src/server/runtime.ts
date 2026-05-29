@@ -431,7 +431,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 		return false
 	}
 	promptQueue.setHeld(sessionId, false)
-	await handlePrompt(sessionId, next.text, undefined, next.source, next.displayText)
+	await handlePrompt(sessionId, `<meta>Queued prompt, queued at ${next.createdAt}.</meta>\n${next.text}`, 'queued', next.source, next.displayText ?? next.text)
 	return true
 }
 
@@ -459,7 +459,7 @@ async function handleQueueSlashCommand(sessionId: string, text: string, source?:
 	return true
 }
 
-async function handlePrompt(sessionId: string, text: string, label?: 'steering', source?: string, displayText?: string): Promise<void> {
+async function handlePrompt(sessionId: string, text: string, label?: 'steering' | 'queued', source?: string, displayText?: string): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
