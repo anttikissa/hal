@@ -48,6 +48,15 @@ test('historyToBlocks preserves original image path in user text', () => {
 	expect(result[0]).toMatchObject({ type: 'user', text: 'see [/tmp/hal/images/test.png] now' })
 })
 
+test('historyToBlocks recovers retry state from failed turn_end', () => {
+	const result = blocks.historyToBlocks([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'turn_end', status: 'failed' },
+	] as any, 's1')
+
+	expect(result.at(-1)).toMatchObject({ type: 'error', text: 'Generation failed.' })
+})
+
 test('thinking block renders markdown and trims trailing blank lines', () => {
 	const block: Block = {
 		type: 'thinking',

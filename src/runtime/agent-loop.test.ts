@@ -176,6 +176,8 @@ test('provider errors save full payload in a blob but show only the short messag
 		expect(responseEvent.text).not.toContain('instructions')
 		expect(responseEvent.text).not.toContain('response.failed')
 		expect(responseEvent.blobId).toBeTruthy()
+		const streamEnd = events.find((event) => event.type === 'stream-end')
+		expect(streamEnd).toMatchObject({ phase: 'failed' })
 		expect(blob.readBlob(sessionId, responseEvent.blobId)).toMatchObject({
 			type: 'provider_error',
 			message: 'Our servers are currently overloaded. Please try again later.',
@@ -191,6 +193,13 @@ test('provider errors save full payload in a blob but show only the short messag
 				},
 			},
 		})
+		const history = sessions.loadHistory(sessionId)
+		expect(history.at(-2)).toMatchObject({
+			type: 'error',
+			text: '400: (https://api.example.test/v1/responses)\nOur servers are currently overloaded. Please try again later.',
+		})
+		expect(history.at(-1)).toMatchObject({ type: 'turn_end', status: 'failed' })
+		expect(sessions.loadLive(sessionId).blocks).toEqual([])
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent

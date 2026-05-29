@@ -209,6 +209,12 @@ function appendTurnEnd(sessionId: string, meta: TurnEndMeta): void {
 	sessions.appendHistory(sessionId, [entry])
 }
 
+function errorHistoryEntry(text: string, blobId?: string, ts = new Date().toISOString()): any {
+	const entry: any = { type: 'error', text, ts }
+	if (blobId) entry.blobId = blobId
+	return entry
+}
+
 function doneMeta(event: ProviderStreamEvent): TurnEndMeta {
 	return {
 		provider: event.provider,
@@ -388,6 +394,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			let aborted = false
 			let shouldRetry = false
 			let iterationDone = false
+			let terminalErrorEntry: any | null = null
 
 			try {
 				for await (const event of gen) {
@@ -477,9 +484,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 
 						const header = status ? `${status}:` : 'Error:'
 						const endpoint = event.endpoint ? ` (${event.endpoint})` : ''
+						const errorText = `${header}${endpoint}\n${formatErrorDetails(event)}`
 						emitEvent(sessionId, {
 							type: 'response',
-							text: `${header}${endpoint}\n${formatErrorDetails(event)}`,
+							text: errorText,
 							isError: true,
 							blobId,
 						})
@@ -507,7 +515,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 								canRetry = true
 							}
 						}
-						if (!canRetry) hadTerminalError = true
+						if (!canRetry) {
+							hadTerminalError = true
+							terminalErrorEntry = errorHistoryEntry(errorText, blobId)
+						}
 						break
 					}
 
@@ -543,6 +554,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					log.error('Agent loop error', { sessionId, message })
 					emitInfo(sessionId, message, 'error')
 					emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
+					if (!thinkingText && !assistantText && toolCalls.length === 0) {
+						sessions.appendHistory(sessionId, [errorHistoryEntry(message)])
+						sessions.clearLive(sessionId)
+					}
 					appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 					return 'failed'
 				}
@@ -572,11 +587,13 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					await writeToolCallBlob(sessionId, blobId, tc.name, tc.input)
 					historyEntries.push({ type: 'tool_call', toolId: tc.id, name: tc.name, input: tc.input, blobId, ts })
 				}
-				if (historyEntries.length > 0) {
-					await sessions.appendHistory(sessionId, historyEntries)
-					sessions.clearLive(sessionId)
-				}
-				emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message: 'Provider stream ended before terminal event' })
+				const message = 'Provider stream ended before terminal event'
+				historyEntries.push(errorHistoryEntry(message, undefined, ts))
+				await sessions.appendHistory(sessionId, historyEntries)
+				emitEvent(sessionId, { type: 'response', text: message, isError: true })
+				emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
+				sessions.clearLive(sessionId)
+				appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 				return 'failed'
 			}
 
@@ -603,6 +620,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
 					historyEntries.push(assistantEntry)
 				}
+				if (terminalErrorEntry) historyEntries.push(terminalErrorEntry)
 				if (historyEntries.length > 0) {
 					await sessions.appendHistory(sessionId, historyEntries)
 					sessions.clearLive(sessionId)
@@ -614,7 +632,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				const est = context.estimateContext(messages, model, overheadBytes)
 				emitEvent(sessionId, {
 					type: 'stream-end',
-					phase: 'done',
+					phase: hadTerminalError ? 'failed' : 'done',
 					usage: hasUsage(totalUsage) ? totalUsage : undefined,
 					contextUsed: est.used,
 					contextMax: est.max,
@@ -721,7 +739,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		}
 
 		// If we exhausted maxIterations, inform the user
-		emitInfo(sessionId, `Hit max iterations (${config.maxIterations}). Stopping.`, 'error')
+		const stopText = `Hit max iterations (${config.maxIterations}). Stopping.`
+		emitInfo(sessionId, stopText, 'error')
 		const est = context.estimateContext(messages, model, overheadBytes)
 		emitEvent(sessionId, {
 			type: 'stream-end',
@@ -731,6 +750,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			contextMax: est.max,
 		})
 		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+		sessions.appendHistory(sessionId, [errorHistoryEntry(stopText)])
+		sessions.clearLive(sessionId)
 		appendTurnEnd(sessionId, { status: 'stopped', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 
 		return 'stopped'

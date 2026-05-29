@@ -64,7 +64,7 @@ export type HistoryEntry = EntryIdentity & (
 	| ({ type: 'turn_end'; ts?: string } & TurnEndMeta)
 	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ui?: 'notice'; ts?: string }
-	| { type: 'warning' | 'error'; text: string; visibility?: 'ui' | 'next-user'; ts?: string }
+	| { type: 'warning' | 'error'; text: string; blobId?: string; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'reset' | 'compact'; ts?: string }
 	| { type: 'forked_from'; parent: string; ts?: string }
 	| { type: 'forked_to'; child: string; ts?: string }
@@ -129,7 +129,7 @@ function makeEntryId(): string {
 
 const historyTopLevelKeys = new Set([
 	'id', 'type', 'parts', 'text', 'source', 'status', 'ts',
-	'blobId', 'signature', 'provider', 'model', 'thinkingEffort',
+	'blobId', 'signature', 'provider', 'providerStatus', 'stopReason', 'stopSequence', 'model', 'thinkingEffort',
 	'continue', 'usage', 'synthetic', 'syntheticKind',
 	'toolId', 'name', 'input', 'output', 'isError',
 	'level', 'visibility', 'ui', 'parent', 'child', 'log', 'from', 'to',
