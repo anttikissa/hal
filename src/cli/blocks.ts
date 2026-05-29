@@ -637,7 +637,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.warning, error: colors.error, fork: colors.fork }
 
 function blockColors(block: Block): { fg: string; bg: string; bold?: string; code?: string } {
-	if (block.type === 'assistant') return { ...colors.assistant, bg: '' }
+	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.info
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
@@ -661,6 +661,12 @@ function buildHeader(title: string, time: string, blobRef: string, cols: number)
 
 function padBlockLine(line: string): string {
 	return ` ${line}`
+}
+
+function padBlock(lines: string[], fg: string, bg: string, cols: number): void {
+	if (!bg || bg.includes('[48;2;0;0;0m')) return
+	lines.unshift(bgLine(`${fg} `, cols, bg))
+	lines.push(bgLine(`${fg} `, cols, bg))
 }
 
 const fixedLabels = { log: 'Log', info: 'Info', warning: 'Warning', error: 'Error', fork: 'Info' }
@@ -697,11 +703,12 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 	const label = fixedLabels[first.type]
 	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
 	const { fg, bg } = blockColors(first)
-	const lines = [bgLine(`${fg}${header}`, cols, bg), bgLine(`${fg}${padBlockLine('')}`, cols, bg)]
+	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
 	for (const block of group) {
 		for (const line of renderMarkdownLines(block, contentCols)) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
+	padBlock(lines, fg, bg, cols)
 	lines[lines.length - 1]! += FG_OFF
 	return lines
 }
@@ -754,16 +761,16 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const label = blockLabel(block)
 	const blockTime = formatBlockTime(block.ts)
 	const header = buildHeader(label, blockTime, blobRef, cols)
-	const lines = [bgLine(`${fg}${header}`, cols, bg), bgLine(`${fg}${padBlockLine('')}`, cols, bg)]
+	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
 	for (const line of blockContent(block, contentCols)) {
 		lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
 	}
-	if (block.type === 'tool') lines.push(bgLine(`${fg}${padBlockLine('')}`, cols, bg))
-	lines[lines.length - 1]! += FG_OFF
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid
 	// so the active streamed block is always visually anchored.
 	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, true)
+	padBlock(lines, fg, bg, cols)
+	lines[lines.length - 1]! += FG_OFF
 	return lines
 }
 

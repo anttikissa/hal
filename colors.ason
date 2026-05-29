@@ -20,7 +20,7 @@
 		fg: ["$fgL", "$fgC", 55],
 		cursor: ["$fgL", "$fgC", 55],
 		cursorIdle: [0.56, 0, 0],
-		bg: ["$bgL", 0.04, 55],
+		bg: [0, 0, 0],
 		bold: [0.90, 0.06, 55],
 		code: [0.86, 0.04, 55],
 	},
@@ -28,7 +28,7 @@
 	// Thinking — muted blue-grey, recedes visually
 	thinking: {
 		fg: [0.72, 0.03, 250],
-		bg: [0.26, 0.02, 250],
+		bg: [0, 0, 0],
 		bold: [0.85, 0.02, 250],
 		code: [0.78, 0.03, 250],
 	},

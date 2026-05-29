@@ -6,6 +6,17 @@ function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
+function headerLine(lines: string[]): string {
+	return lines.map(stripAnsi).find((line) => line.trim()) ?? ''
+}
+
+function contentLines(lines: string[]): string[] {
+	const clean = lines.map(stripAnsi)
+	const start = clean.findIndex((line) => line.trim()) + 1
+	const end = clean.at(-1)?.trim() ? clean.length : clean.length - 1
+	return clean.slice(start, end)
+}
+
 test('incoming user block shows inbox source instead of You', () => {
 	const block: Block = {
 		type: 'user',
@@ -15,7 +26,7 @@ test('incoming user block shows inbox source instead of You', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 80)
-	const header = stripAnsi(lines[0] ?? '')
+	const header = headerLine(lines)
 
 	expect(header).toContain('Inbox · 09-bx8')
 	expect(header).not.toContain('You')
@@ -97,22 +108,22 @@ test('assistant header includes display model', () => {
 		model: 'gpt-5.4',
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 80))
 	expect(header).toContain('Hal (GPT 5.4)')
 })
 
-test('assistant blocks render without a background color', () => {
+test('assistant and thinking backgrounds come from colors', () => {
 	colors.load()
 	const assistantBlock: Block = { type: 'assistant', text: 'hello', model: 'gpt-5.4' }
 	const thinkingBlock: Block = { type: 'thinking', text: 'hmm', model: 'gpt-5.4' }
-
 	const assistantRendered = blocks.renderBlock(assistantBlock, 80).join('\n')
 	const thinkingRendered = blocks.renderBlock(thinkingBlock, 80).join('\n')
 
 	expect(colors.assistant.bg).toBeTruthy()
 	expect(colors.thinking.bg).toBeTruthy()
-	expect(assistantRendered).not.toContain(colors.assistant.bg)
+	expect(assistantRendered).toContain(colors.assistant.bg)
 	expect(thinkingRendered).toContain(colors.thinking.bg)
+	expect(blocks.renderBlock(assistantBlock, 80).map(stripAnsi)[0]?.trim()).not.toBe('')
 })
 
 
@@ -124,7 +135,7 @@ test('synthetic assistant header includes model and synthetic marker', () => {
 		synthetic: true,
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 80))
 	expect(header).toContain('Hal (GPT 5.4, synthetic)')
 })
 
@@ -135,7 +146,7 @@ test('thinking header includes model and default thinking level', () => {
 		model: 'gpt-5.4',
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 80))
 	expect(header).toContain('Hal (GPT 5.4, thinking high)')
 })
 
@@ -197,7 +208,6 @@ test('text code fences wrap at word boundaries', () => {
 	const lines = blocks.renderBlock(block, 21).map((l) => stripAnsi(l)).slice(1)
 
 	expect(lines).toEqual([
-		' ',
 		' Open without an',
 		' initial prompt.',
 	])
@@ -222,7 +232,7 @@ test('block header uses plain full-width layout without horizontal rules', () =>
 		ts: new Date('2026-04-14T05:32:00Z').getTime(),
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 80)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 80))
 	expect(header.length).toBe(80)
 	expect(header).not.toContain('─')
 	expect(header).toContain('03-idr/q05d47-tzf')
@@ -234,7 +244,7 @@ test('forked_from history entry renders as an Info block', () => {
 	const result = blocks.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([{ type: 'info', text: 'Tab forked from 04-abc.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
+	expect(headerLine(lines)).toContain('Info')
 })
 
 test('forked_to history entry renders as an Info block', () => {
@@ -243,7 +253,7 @@ test('forked_to history entry renders as an Info block', () => {
 	const result = blocks.historyToBlocks(history as any, 'parent')
 	expect(result).toMatchObject([{ type: 'info', text: 'Tab forked to 04-def.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
+	expect(headerLine(lines)).toContain('Info')
 })
 
 test('info history entries render as highlighted Info blocks', () => {
@@ -252,7 +262,7 @@ test('info history entries render as highlighted Info blocks', () => {
 	const result = blocks.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([{ type: 'info', text: 'Model set to GPT 5.5.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
+	expect(headerLine(lines)).toContain('Info')
 })
 
 
@@ -277,7 +287,7 @@ test('info block renders an Info header', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 80)
-	expect(stripAnsi(lines[0] ?? '')).toContain('Info')
+	expect(headerLine(lines)).toContain('Info')
 	expect(stripAnsi(lines.slice(1).join('\n'))).toContain('Server started')
 })
 
@@ -289,7 +299,7 @@ test('warning block renders a Warning header', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 80)
-	const header = stripAnsi(lines[0] ?? '')
+	const header = headerLine(lines)
 
 	expect(header).toContain('Warning')
 	expect(header).not.toContain('Info')
@@ -325,7 +335,7 @@ test('error block header shows blob ref', () => {
 		ts: new Date('2026-01-01T17:38:00Z').getTime(),
 	} as Block
 
-	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 100))
 	expect(header).toContain('04-abc/000003-err')
 })
 
@@ -347,7 +357,7 @@ test('spawn_agent block renders full input args', () => {
 
 	const rendered = blocks.renderBlock(block, 100)
 	const lines = rendered.map((l) => stripAnsi(l))
-	const header = lines[0] ?? ''
+	const header = lines.find((line) => line.trim()) ?? ''
 	const body = lines.slice(1).join('\n')
 
 	expect(rendered.join('\n')).not.toContain('\x1b[2m')
@@ -374,7 +384,7 @@ test('send block renders target session and message text', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	const header = lines[0] ?? ''
+	const header = lines.find((line) => line.trim()) ?? ''
 	const body = lines.slice(1).join('\n')
 
 	expect(header).toContain('Send to 33-270')
@@ -389,7 +399,7 @@ test('grep block quotes its search pattern in header', () => {
 		input: { pattern: 'const MODEL_GROUPS', path: '/Users/antti/.hal/src' },
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 100))
 	expect(header).toContain('Grep "const MODEL_GROUPS" in /Users/antti/.hal/src')
 })
 
@@ -401,16 +411,14 @@ test('eval block separates returned output from code', () => {
 		output: '0',
 	}
 
-	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
+	const body = contentLines(blocks.renderBlock(block, 100))
 	expect(body).toEqual([
-		' ',
 		' let count = 0',
 		' if (count === 0) {',
 		' \treturn count',
 		' }',
 		' Result:',
 		' 0',
-		' ',
 	])
 })
 
@@ -421,8 +429,8 @@ test('eval block omits result separator when there is no returned output', () =>
 		input: { code: 'let count = 0' },
 	}
 
-	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
-	expect(body).toEqual([' ', ' let count = 0', ' '])
+	const body = contentLines(blocks.renderBlock(block, 100))
+	expect(body).toEqual([' let count = 0'])
 })
 
 test('bash block still uses continuation backslashes for multiline commands', () => {
@@ -432,8 +440,8 @@ test('bash block still uses continuation backslashes for multiline commands', ()
 		input: { command: 'echo one\necho two' },
 	}
 
-	const body = blocks.renderBlock(block, 100).map((l) => stripAnsi(l)).slice(1)
-	expect(body).toEqual([' ', ' echo one \\', ' echo two', ' '])
+	const body = contentLines(blocks.renderBlock(block, 100))
+	expect(body).toEqual([' echo one \\', ' echo two'])
 })
 
 test('bash block strips redundant cd prefix for the current cwd', () => {
@@ -443,7 +451,7 @@ test('bash block strips redundant cd prefix for the current cwd', () => {
 		input: { command: 'cd /Users/antti/.hal && git status', cwd: '/Users/antti/.hal/' },
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 100))
 	expect(header).toContain('Bash: git status')
 	expect(header).not.toContain('cd /Users/antti/.hal')
 })
@@ -456,7 +464,7 @@ test('read blob block header names the source blob', () => {
 		output: 'blob data',
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 100))
 	expect(header).toContain('Read blob 04-fyx/0gdec4-bol')
 })
 
@@ -476,9 +484,9 @@ test('tool block header uses padded text without horizontal rules', () => {
 	const lines = rendered.map((l) => stripAnsi(l))
 
 	expect(rendered[0]?.startsWith(colors.tool('bash').bg)).toBe(true)
-	expect(lines[0]).toBe(' 1 Jan 17:38 Bash: ./test                                  (11-ok3/000123-bash) ')
-	expect(lines[0]).not.toContain('─')
-	expect(lines[1]).toBe(' ')
+	expect(lines[0]).toBe(' ')
+	expect(lines[1]).toBe(' 1 Jan 17:38 Bash: ./test                                  (11-ok3/000123-bash) ')
+	expect(lines[1]).not.toContain('─')
 	expect(lines[2]).toBe(' done')
 	expect(lines[3]).toBe(' ')
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
@@ -508,7 +516,7 @@ test('bash git commit renders rich commit details instead of shell plumbing', ()
 
 	const raw = blocks.renderBlock(block, 100)
 	const lines = raw.map((l) => stripAnsi(l))
-	expect(lines[0]).toContain('Commit abc123: Nice title')
+	expect(headerLine(raw)).toContain('Commit abc123: Nice title')
 	expect(lines).toContain(' Generated by test')
 	expect(lines).toContain(' main abc123 · 2 files changed, 3 insertions(+), 1 deletion(-)')
 	expect(lines).toContain(' Tests / docs / other')
@@ -543,7 +551,7 @@ test('bash git commit -F renders from metadata message', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	expect(lines[0]).toContain('Commit def456: File title')
+	expect(lines.find((line) => line.trim()) ?? '').toContain('Commit def456: File title')
 	expect(lines).toContain(' File body')
 	expect(lines).toContain(' main def456 · 1 file changed, 1 insertion(+)')
 	expect(lines.join('\n')).not.toContain('[hal-commit]')
@@ -573,8 +581,9 @@ test('bash git commit --amend marks commit block as amend', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	expect(lines[0]).toContain('Amend fed789: Amended title')
-	expect(lines[0]).not.toContain('Commit fed789')
+	const header = lines.find((line) => line.trim()) ?? ''
+	expect(header).toContain('Amend fed789: Amended title')
+	expect(header).not.toContain('Commit fed789')
 })
 
 test('failed shell-substitution commit renders as ordinary bash', () => {
@@ -586,8 +595,9 @@ test('failed shell-substitution commit renders as ordinary bash', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	expect(lines[0]).toContain('Bash')
-	expect(lines[0]).not.toContain('Commit')
+	const header = lines.find((line) => line.trim()) ?? ''
+	expect(header).toContain('Bash')
+	expect(header).not.toContain('Commit')
 	expect(lines.join('\n')).toContain("git commit -m")
 	expect(lines.join('\n')).toContain('bash: unexpected EOF')
 })
@@ -605,7 +615,7 @@ test('edit block header shows affected hashline refs', () => {
 		},
 	}
 
-	const header = stripAnsi(blocks.renderBlock(block, 100)[0] ?? '')
+	const header = headerLine(blocks.renderBlock(block, 100))
 	expect(header).toContain('Edit src/app.ts (12:abc-15:def)')
 })
 
