@@ -709,11 +709,39 @@ handlers['broadcast'] = (args, session) => {
 	return { output: `Broadcast to ${targets.length} sessions`, handled: true }
 }
 
+function parseCdPathArg(args: string): { path?: string; error?: string } {
+	const text = args.trim()
+	if (!text) return { path: HAL_DIR }
+	let out = ''
+	let quote = ''
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i]!
+		if (ch === '\\') {
+			if (i + 1 < text.length) out += text[++i]!
+			else out += ch
+			continue
+		}
+		if (quote) {
+			if (ch === quote) quote = ''
+			else out += ch
+			continue
+		}
+		if (ch === '"' || ch === "'") {
+			quote = ch
+			continue
+		}
+		out += ch
+	}
+	if (quote) return { error: 'missing closing quote' }
+	return { path: out.replace(/^~(?=$|\/)/, homedir()) }
+}
+
 // /cd [path] — change working directory. With no path, jump to Hal's own
 // directory as a quick recovery when a self-edit prompt was typed elsewhere.
 handlers['cd'] = (args, session) => {
-	const raw = args ? args.replace(/^~(?=$|\/)/, homedir()) : HAL_DIR
-	const target = resolve(session.cwd, raw)
+	const parsed = parseCdPathArg(args)
+	if (parsed.error) return { error: `cd failed: ${parsed.error}`, handled: true }
+	const target = resolve(session.cwd, parsed.path!)
 
 	if (!existsSync(target)) {
 		return { error: `cd failed: ${target}: not found`, handled: true }

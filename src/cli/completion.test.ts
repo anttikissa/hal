@@ -107,3 +107,18 @@ test('/cd completes directories from the focused session cwd', () => {
 		rmSync(root, { recursive: true, force: true })
 	}
 })
+
+
+test('/cd completes paths whose prefix contains spaces', () => {
+	const root = mkdtempSync(join(tmpdir(), 'hal-complete-cd-spaces-'))
+	try {
+		mkdirSync(join(root, 'Mobile Documents'))
+
+		const result = completion.complete('/cd Mobile ', '/cd Mobile '.length, root)
+
+		expect(result).not.toBeNull()
+		expect(result!.items).toEqual(['/cd Mobile Documents/'])
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})

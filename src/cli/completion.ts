@@ -65,6 +65,11 @@ function listDirs(dir: string): string[] {
 	}
 }
 
+function cdArgPrefix(before: string, command: string): string {
+	const start = 1 + command.length
+	return before.slice(start).replace(/^[ \t]/, '')
+}
+
 function completeDirs(argPrefix: string, cwd: string): string[] {
 	const expanded = expandTilde(argPrefix)
 
@@ -124,14 +129,15 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	const command = parts[0]!
 	const arg = clientLocalCommands.commandArg(command) ?? commands.commandArg(command)
 	if (!arg) return null
-	if (parts.length > 2) return null
+	if (parts.length > 2 && arg !== 'dir') return null
 
-	const argPrefix = hasSpace ? '' : (parts[1] ?? '')
+	let argPrefix = hasSpace ? '' : (parts[1] ?? '')
 	let values: string[] = []
 
 	if (arg === 'model') {
 		values = modelNames().filter((model) => model.startsWith(argPrefix))
 	} else if (arg === 'dir') {
+		argPrefix = cdArgPrefix(before, command)
 		values = completeDirs(argPrefix, cwd)
 	} else if (arg === 'command') {
 		values = commandNamesForPrompt().filter((name) => name.startsWith(argPrefix))

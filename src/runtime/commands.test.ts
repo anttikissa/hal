@@ -607,6 +607,41 @@ test('/cd changes session cwd without command metadata', async () => {
 })
 
 
+test('/cd accepts paths with shell-style quoting and escapes', async () => {
+	const root = mkdtempSync(join(tmpdir(), 'hal-cd-spaces-'))
+	const dir = join(root, 'Mobile Documents')
+	mkdirSync(dir)
+	const cases = [
+		`/cd ${dir}`,
+		`/cd ${dir.replaceAll(' ', '\\ ')}`,
+		`/cd "${dir}"`,
+		`/cd "${dir.replaceAll(' ', '\\ ')}"`,
+	]
+
+	try {
+		for (const text of cases) {
+			const session = makeSession()
+			const result = await commands.executeCommand(text, session)
+
+			expect(result.handled).toBe(true)
+			expect(result.error).toBeUndefined()
+			expect(session.cwd).toBe(dir)
+		}
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+
+test('/cd reports an unclosed quoted path', async () => {
+	const session = makeSession()
+	const result = await commands.executeCommand('/cd "/tmp/unterminated', session)
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBe('cd failed: missing closing quote')
+})
+
+
 test('/cd with no args changes to Hal directory', async () => {
 	const session = makeSession()
 	session.cwd = tmpdir()
