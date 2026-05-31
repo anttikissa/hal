@@ -7,7 +7,7 @@ import { client } from '../client.ts'
 import { render } from './render.ts'
 import { cursor } from '../cli/cursor.ts'
 import { keys } from '../cli/keys.ts'
-import { prompt } from '../cli/prompt.ts'
+import { prompt, type PromptEditorState } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
 import { clientLocalCommands } from './local-commands.ts'
 import { popup } from './popup.ts'
@@ -67,6 +67,7 @@ const PAINT_INTERVAL = 16 // ms — ~60 fps, plenty for streaming text
 let paintTimer: ReturnType<typeof setTimeout> | null = null
 let paintQueued = false
 let externalEditorOpen = false
+let promptStates = new Map<string, PromptEditorState>()
 
 function clearPendingPaint(): void {
 	if (paintTimer) {
@@ -340,6 +341,7 @@ function submitPromptText(text: string, displayText: string | undefined, deliver
 	// The runtime decides whether an working turn makes this behave like steering.
 	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, delivery)
 	prompt.clear()
+	clearSavedPromptState()
 	// Update tab's inputHistory + clear persisted draft
 	client.onSubmit(text)
 }
@@ -349,6 +351,7 @@ function handleLocalCommand(text: string): boolean {
 		prompt.pushHistory(text)
 		client.sendCommand('rebase-start', rebaseRequestId())
 		prompt.clear()
+		clearSavedPromptState()
 		client.onSubmit(text)
 		return true
 	}
@@ -359,6 +362,7 @@ function handleLocalCommand(text: string): boolean {
 
 	prompt.pushHistory(text)
 	prompt.clear()
+	clearSavedPromptState()
 	client.onSubmit(text)
 	const result = clientLocalCommands.execute(text, {
 		tabs: client.state.tabs,
@@ -482,6 +486,35 @@ function chooseModelWithoutClearingDraft(model: string): void {
 	draw()
 }
 
+function clearSavedPromptState(): void {
+	const tab = client.currentTab()
+	if (tab) promptStates.delete(tab.sessionId)
+}
+
+function restorePromptForCurrentTab(): void {
+	const tab = client.currentTab()
+	if (!tab) {
+		prompt.clear()
+		return
+	}
+	const saved = promptStates.get(tab.sessionId)
+	if (saved) {
+		prompt.restoreState(saved)
+		return
+	}
+	prompt.setHistory(client.getInputHistory())
+	prompt.setText(client.getInputDraft())
+}
+
+function installPromptTabSwitchHandler(): void {
+	client.setOnTabSwitch((fromSession, _toSession) => {
+		promptStates.set(fromSession, prompt.snapshotState())
+		client.saveDraft(prompt.draftText(), fromSession)
+		restorePromptForCurrentTab()
+		openaiUsage.noteActivity()
+	})
+}
+
 // App-level keybindings (not handled by prompt)
 function handleAppKey(k: KeyEvent): boolean {
 	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
@@ -600,9 +633,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 
 	// Initialize prompt history and draft from the focused tab.
 	// (Tab switch handler takes care of swapping these later.)
-	prompt.setHistory(client.getInputHistory())
-	const savedDraft = client.getInputDraft()
-	if (savedDraft) prompt.setText(savedDraft)
+	restorePromptForCurrentTab()
 
 	if (process.stdin.isTTY) {
 		process.stdin.setRawMode(true)
@@ -647,16 +678,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 	// Wire draft save/restore on tab switch.
 	// Persists to disk so drafts survive restarts and multi-client setups.
 	// Also swap prompt history so up-arrow recalls per-tab entries.
-	client.setOnTabSwitch((fromSession, _toSession) => {
-		// Save outgoing tab's draft (uses draftText so we save the
-		// user's composition, not a history entry they're browsing).
-		// Pass fromSession because focusedTabIndex has already changed.
-		client.saveDraft(prompt.draftText(), fromSession)
-		// Load incoming tab's draft and history
-		prompt.setText(client.getInputDraft())
-		prompt.setHistory(client.getInputHistory())
-		openaiUsage.noteActivity()
-	})
+	installPromptTabSwitchHandler()
 
 	// When another client saves a draft for our focused tab and our
 	// prompt is empty, show it. This is how "client A quits with a
@@ -707,6 +729,10 @@ export const cli = {
 		handleAppKey,
 		claudeCacheWarning,
 		kittyOnSequence: () => KITTY_ON,
+		installPromptTabSwitchHandler,
+		resetPromptStates: () => {
+			promptStates = new Map<string, PromptEditorState>()
+		},
 		setExternalEditorOpen: (value: boolean) => {
 			externalEditorOpen = value
 			if (value) clearPendingPaint()

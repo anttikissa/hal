@@ -180,6 +180,21 @@ let history: string[] = []
 let historyIndex = -1
 let historyDraft = ''
 
+export interface PromptEditorState {
+	text: string
+	cursor: number
+	goalCol: number | null
+	selAnchor: number | null
+	undoStack: Snapshot[]
+	redoStack: Snapshot[]
+	undoGrouping: boolean
+	history: string[]
+	historyIndex: number
+	historyDraft: string
+	pasteRefs: Array<{ display: string; text: string }>
+	promptLineLimit: number
+}
+
 // Called when async paste resolves (image placeholder -> path)
 let renderCallback: (() => void) | null = null
 
@@ -234,6 +249,10 @@ function resizeHint(contentWidth: number): string | null {
 function clearSelectionAndGoal(): void {
 	selAnchor = null
 	goalCol = null
+}
+
+function cloneSnapshot(snap: Snapshot): Snapshot {
+	return { text: snap.text, cursor: snap.cursor, selAnchor: snap.selAnchor }
 }
 
 function selRange(): { start: number; end: number } | null {
@@ -698,10 +717,44 @@ function submitText(): string {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
+function snapshotState(): PromptEditorState {
+	return {
+		text: buf,
+		cursor,
+		goalCol,
+		selAnchor,
+		undoStack: undoStack.map(cloneSnapshot),
+		redoStack: redoStack.map(cloneSnapshot),
+		undoGrouping,
+		history: history.slice(),
+		historyIndex,
+		historyDraft,
+		pasteRefs: pasteRefs.map((ref) => ({ ...ref })),
+		promptLineLimit: state.promptLineLimit,
+	}
+}
+
+function restoreState(saved: PromptEditorState): void {
+	buf = saved.text
+	cursor = clamp(saved.cursor)
+	goalCol = saved.goalCol
+	selAnchor = saved.selAnchor
+	undoStack = saved.undoStack.map(cloneSnapshot)
+	redoStack = saved.redoStack.map(cloneSnapshot)
+	undoGrouping = saved.undoGrouping
+	history = saved.history.slice()
+	historyIndex = saved.historyIndex
+	historyDraft = saved.historyDraft
+	pasteRefs.length = 0
+	pasteRefs.push(...saved.pasteRefs.map((ref) => ({ ...ref })))
+	state.promptLineLimit = saved.promptLineLimit
+}
+
 // The user's own composition text — NOT the history entry they may be
 // browsing with up-arrow. This is what gets persisted as a draft.
 function draftText(): string {
-	return historyIndex < 0 ? buf : historyDraft
+	if (historyIndex < 0) return buf
+	return history[historyIndex] === buf ? historyDraft : buf
 }
 
 function text(): string {
@@ -749,6 +802,8 @@ export const prompt = {
 	state,
 	text,
 	draftText,
+	snapshotState,
+	restoreState,
 	submitText,
 	cursorPos,
 	setText,

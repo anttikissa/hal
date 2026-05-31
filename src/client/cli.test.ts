@@ -7,6 +7,9 @@ import { render } from './render.ts'
 import { cursor } from '../cli/cursor.ts'
 import { popup } from './popup.ts'
 
+function key(key: string, mods: any = {}): any {
+	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
+}
 function withPatched<T extends object, K extends keyof T>(object: T, key: K, value: T[K], run: () => void): void {
 	const original = object[key]
 	object[key] = value
@@ -167,6 +170,47 @@ function withOneTab(tab: (typeof client.state.tabs)[number], run: () => void): v
 		popup.close()
 	}
 }
+
+test('tab switching preserves the full prompt editor state', () => {
+	const tab1 = makeTab({ sessionId: 's1', inputHistory: ['old prompt'] })
+	const tab2 = makeTab({ sessionId: 's2', inputDraft: 'second draft' })
+	const origTabs = client.state.tabs.slice()
+	const origFocusedTab = client.state.focusedTabIndex
+	const origSaveDraft = client.saveDraft
+	client.saveDraft = () => {}
+
+	try {
+		withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
+			client.state.tabs.length = 0
+			client.state.tabs.push(tab1, tab2)
+			client.state.focusedTabIndex = 0
+			cli.forTests.resetPromptStates()
+			cli.forTests.installPromptTabSwitchHandler()
+			prompt.setHistory(client.getInputHistory())
+			prompt.setText('')
+			prompt.handleKey(key('up'), 80)
+			prompt.handleKey({ key: '!', char: '!', shift: false, alt: false, ctrl: false, cmd: false }, 80)
+			const cursorBefore = prompt.cursorPos()
+
+			client.switchTab(1)
+			expect(prompt.text()).toBe('second draft')
+			client.switchTab(0)
+
+			expect(prompt.text()).toBe('old prompt!')
+			expect(prompt.cursorPos()).toBe(cursorBefore)
+			prompt.handleKey(key('down'), 80)
+			expect(prompt.text()).toBe('')
+		})
+	} finally {
+		client.saveDraft = origSaveDraft
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.focusedTabIndex = origFocusedTab
+		client.setOnTabSwitch(() => {})
+		cli.forTests.resetPromptStates()
+		prompt.clear()
+	}
+})
 
 test('model picker keeps the prompt draft after choosing a model', () => {
 	const commands: any[] = []

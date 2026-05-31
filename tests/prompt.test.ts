@@ -197,6 +197,16 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('draft')
 	})
 
+	test('draftText returns an edited recalled history entry', () => {
+		prompt.setHistory(['old prompt'])
+		prompt.setText('')
+		prompt.handleKey(key('up'), 80)
+		expect(prompt.draftText()).toBe('')
+		prompt.handleKey({ key: '!', char: '!', shift: false, alt: false, ctrl: false, cmd: false }, 80)
+		expect(prompt.text()).toBe('old prompt!')
+		expect(prompt.draftText()).toBe('old prompt!')
+	})
+
 	test('history browsing uses the end of the target row for multiline entries', () => {
 		prompt.setHistory(['older row one\nxy', 'newer first\nnewer second'])
 		prompt.setText('draft top\ndraft bottom', 'draft'.length)
