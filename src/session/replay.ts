@@ -209,11 +209,12 @@ function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 			if (entry.type === 'input_history') return entry.text
 			// Up-arrow recall is for things the human typed. Inbox / subagent handoffs
 			// are persisted as user entries with a source session id, but they should
-			// never show up in local editing history.
+			// never show up in local editing history. Reconstruct attachments as the
+			// bracketed placeholders the user typed, not as missing spaces.
 			if (entry.type !== 'user' || entry.source) return ''
-			return sessionEntry.userText(entry, { separator: ' ' })
+			return sessionEntry.userText(entry, { images: 'path-or-blob-or-image', display: 'ui' })
 		})
-		.filter((text) => text && !text.startsWith('['))
+		.filter((text) => text && !text.startsWith('[system]'))
 		.slice(-200)
 }
 
