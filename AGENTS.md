@@ -10,7 +10,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - If tests fail, look for busy sessions that might have ongoing changes (eval "require('~/ipc.ts').ipc.readState().busy")
 - If no busy sessions, work with the user to fix the tests.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
-- Run `bun cloc` to check line count — our budget for core code is 15 thousand lines
+- Run `bun cloc` to check line count — our budget for core code is 20 thousand lines. If you added many, see if you can do the same with less.
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
 - Tabs, not spaces (except for package.json)
 - Thinking of using JSON? Don't, use ASON instead. Use .ason or .asonl for internal state files, ason.stringify() to format data for reading ('short' if oneline result is needed)
