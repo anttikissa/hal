@@ -260,7 +260,7 @@ async function runExternalEditor(path: string): Promise<number> {
 	terminalOutput.setExternalEditorOpen(true)
 	process.stdin.pause()
 	cleanupTerminal()
-	await terminalOutput.flush({ bypassExternalEditorLatch: true })
+	await terminalOutput.flush()
 	try {
 		const proc = Bun.spawn(['sh', '-c', `${editor} "$1"`, 'hal-editor', path], {
 			stdin: 'inherit',

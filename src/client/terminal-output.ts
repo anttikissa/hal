@@ -19,12 +19,10 @@ function write(text: string, opts: WriteOptions = {}): boolean {
 	return process.stdout.write(text)
 }
 
-async function flush(opts: WriteOptions = {}): Promise<boolean> {
-	if (state.externalEditorOpen && !opts.bypassExternalEditorLatch) return false
+async function flush(): Promise<void> {
 	await new Promise<void>((resolve) => {
 		process.stdout.write('', () => resolve())
 	})
-	return true
 }
 
 export const terminalOutput = { state, setExternalEditorOpen, isExternalEditorOpen, write, flush }
