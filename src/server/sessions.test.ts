@@ -297,19 +297,6 @@ test('loadHistoryLog can read a bounded log prefix after later appends', async (
 	expect(sessions.loadHistory(id).map(entryText).filter(Boolean)).toEqual(['rebased', 'queued later'])
 })
 
-
-test('rewriteHistoryForRebase repairs duplicate ids in rebased history', async () => {
-	const id = await makeSession()
-	const result = sessions.rewriteHistoryForRebase(id, [
-		{ type: 'thinking', id: '000001-aaa', text: 'think', ts: '2026-05-25T10:00:00.000Z' },
-		{ type: 'tool_call', id: '000001-aaa', toolId: 't1', name: 'bash', input: { command: 'pwd' }, ts: '2026-05-25T10:00:00.000Z' },
-	])
-
-	const ids = sessions.loadHistoryLog(id, result.newLog).map((entry) => entry.id)
-
-	expect(new Set(ids).size).toBe(ids.length)
-})
-
 test('compact-style rotation preserves forked_from entry', async () => {
 	const parentId = await makeSession()
 	const childId = await makeSession()

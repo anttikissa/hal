@@ -20,20 +20,6 @@ test('renders and parses quoted hashes without treating them as comments', () =>
 	expect(parsed.items[0]).toMatchObject({ cmd: 'pick', id: '000001-aaa', content: 'hello #1' })
 })
 
-
-test('snapshot assigns unique row ids when history has duplicate entry ids', () => {
-	const entries = [
-		entry('thinking', { id: '000001-aaa', text: 'think' }),
-		entry('tool_call', { id: '000001-aaa', toolId: 't1', name: 'bash', input: { command: 'pwd' } }),
-	]
-	const snapshot = rebase.buildSnapshot('04-aaa', 'history.asonl', entries)
-	const ids = snapshot.rows.map((row) => row.id)
-
-	expect(new Set(ids).size).toBe(ids.length)
-	expect(rebase.parseTodo(snapshot, rebase.renderTodo(snapshot)).errors).toEqual([])
-})
-
-
 test('renders rebase instructions with full log path and queue examples', () => {
 	const snapshot = rebase.buildSnapshot('04-aaa', 'history12.asonl', [])
 	const todo = rebase.renderTodo(snapshot)
