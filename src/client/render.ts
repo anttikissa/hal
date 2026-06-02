@@ -25,7 +25,7 @@ import { terminalOutput } from './terminal-output.ts'
 
 const config = {
 	forkHistoryDimFactor: 0.85,
-	halCursorFadeMs: 1000,
+	halCursorFadeMs: 5000,
 	halCursorFadeFrameMs: 67,
 }
 
