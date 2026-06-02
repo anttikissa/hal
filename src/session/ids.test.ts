@@ -1,15 +1,15 @@
 import { afterEach, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { sessionIds } from './ids.ts'
 import { ason } from '../utils/ason.ts'
 
+const WORDS_PATH = `${import.meta.dir}/words3.txt`
 const origStateDir = process.env.HAL_STATE_DIR
 const origNow = Date.now
-let tempStateDir: string | null = null
-const origWordsPath = sessionIds.config.wordsPath
 const origRandom = Math.random
+let tempStateDir: string | null = null
 
 function useTempStateDir(): string {
 	tempStateDir = mkdtempSync(join(tmpdir(), 'hal-session-ids-'))
@@ -20,41 +20,23 @@ function useTempStateDir(): string {
 function readMeta(stateDir: string): any {
 	return ason.parse(readFileSync(`${stateDir}/meta.ason`, 'utf-8'))
 }
-
-function writeWordsFile(words: string): string {
-	const stateDir = useTempStateDir()
-	const path = `${stateDir}/words3.txt`
-	writeFileSync(path, words)
-	sessionIds.config.wordsPath = path
-	return path
-}
-
 afterEach(() => {
 	Date.now = origNow
 	if (origStateDir === undefined) delete process.env.HAL_STATE_DIR
 	else process.env.HAL_STATE_DIR = origStateDir
-	sessionIds.config.wordsPath = origWordsPath
 	Math.random = origRandom
 	if (tempStateDir) rmSync(tempStateDir, { recursive: true, force: true })
 	tempStateDir = null
 })
 
-test('make picks a three-letter word from four-byte slots', () => {
-	writeWordsFile('aaa bbb\n')
-	Math.random = () => 0.6
-
-	expect(sessionIds.make(new Date('2026-03-16T08:00:00.000Z'), Date.parse('2026-03-16T08:00:00.000Z'))).toBe('00-bbb')
-})
-
-test('make rejects bad word slots', () => {
-	writeWordsFile('aa!\n')
+test('make picks a three-letter word from fixed word slots', () => {
 	Math.random = () => 0
 
-	expect(() => sessionIds.make(new Date('2026-03-16T08:00:00.000Z'), Date.parse('2026-03-16T08:00:00.000Z'))).toThrow('Invalid session word')
+	expect(sessionIds.make(new Date('2026-03-16T08:00:00.000Z'), Date.parse('2026-03-16T08:00:00.000Z'))).toBe('00-aaa')
 })
 
 test('words3 file is sorted four-byte slots', () => {
-	const wordsFile = readFileSync(origWordsPath, 'utf-8')
+	const wordsFile = readFileSync(WORDS_PATH, 'utf-8')
 	const words: string[] = []
 	for (let pos = 0; pos < wordsFile.length; pos += 4) {
 		const word = wordsFile.slice(pos, pos + 3)

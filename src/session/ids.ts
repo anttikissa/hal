@@ -3,12 +3,9 @@ import { STATE_DIR, ensureDir } from '../state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
-const DEFAULT_MAX_ATTEMPTS = 1000
+const MAX_ATTEMPTS = 1000
 const MS_PER_DAY = 86_400_000
-
-let config = {
-	wordsPath: `${import.meta.dir}/words3.txt`,
-}
+const WORDS_PATH = `${import.meta.dir}/words3.txt`
 
 interface StateMeta {
 	epoch?: string
@@ -47,7 +44,7 @@ function randomChars(): string {
 // Picks a three-character session suffix from words3.txt. That file is
 // fixed-width: each candidate is exactly 3 chars followed by a space or newline.
 function randomWord(): string {
-	const words = readFileSync(config.wordsPath, 'utf-8')
+	const words = readFileSync(WORDS_PATH, 'utf-8')
 	const pos = Math.floor(Math.random() * (words.length / 4)) * 4
 	const word = words.slice(pos, pos + 3)
 	if (!/^[a-z0-9]{3}$/.test(word)) throw new Error(`Invalid session word at offset ${pos}`)
@@ -71,17 +68,17 @@ function claim(sessionId: string): boolean {
 	}
 }
 
-function reserve(maxAttempts = DEFAULT_MAX_ATTEMPTS): string {
+function reserve(): string {
 	ensureDir(sessionsDir())
-	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 		const sessionId = make()
 		if (claim(sessionId)) return sessionId
 	}
-	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 		const sessionId = make(undefined, undefined, randomChars())
 		if (claim(sessionId)) return sessionId
 	}
-	throw new Error(`Failed to reserve unique session ID after ${maxAttempts} attempts`)
+	throw new Error(`Failed to reserve unique session ID after ${MAX_ATTEMPTS} attempts`)
 }
 
-export const sessionIds = { config, make, randomWord, reserve, sessionDir, sessionsDir }
+export const sessionIds = { make, randomWord, reserve, sessionDir, sessionsDir }
