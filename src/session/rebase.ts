@@ -452,7 +452,7 @@ function parseTodo(snapshot: RebaseSnapshot, todo: string, opts: ParseTodoOption
 				errors.push(`Invalid ASON content for ${row.id}: ${err instanceof Error ? err.message : String(err)}`)
 			}
 		}
-		if (cmd === 'edit' && row.editable && typeof opts.edits?.[row.id] === 'string') content = opts.edits[row.id]
+		if (cmd === 'edit' && row.editable && typeof opts.edits?.[row.id] === 'string') content = opts.edits![row.id]!.replace(/\r?\n$/, '')
 		if (cmd === 'edit' && !row.editable && row.type !== 'thinking') errors.push(`Cannot edit protected row ${row.id}`)
 		if (!row.editable && row.type !== 'thinking' && !row.truncated && ason.stringify(content, 'short') !== ason.stringify(row.content, 'short')) errors.push(`Cannot edit protected row ${row.id}`)
 		items.push({ cmd, id: row.id, type: row.type, row, content, line })
