@@ -17,6 +17,7 @@ import { openaiUsage } from './openai-usage.ts'
 import { startup } from './startup.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './cli/args.ts'
+import { terminalOutput } from './client/terminal-output.ts'
 
 const parsedArgs = cliArgs.parse(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
 if (!parsedArgs.ok) {
@@ -24,7 +25,7 @@ if (!parsedArgs.ok) {
 	process.exit(2)
 }
 if (parsedArgs.help) {
-	process.stdout.write(`${cliArgs.helpText()}\n`)
+	terminalOutput.write(`${cliArgs.helpText()}\n`)
 	process.exit(0)
 }
 if (parsedArgs.stateDir && process.env.HAL_STATE_DIR !== parsedArgs.stateDir) {

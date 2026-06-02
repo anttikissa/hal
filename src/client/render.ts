@@ -21,6 +21,7 @@ import { renderHistory } from './render-history.ts'
 import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts'
 import { renderStatus } from './render-status.ts'
 import { cursor as blinkCursor } from '../cli/cursor.ts'
+import { terminalOutput } from './terminal-output.ts'
 
 const config = {
 	forkHistoryDimFactor: 0.85,
@@ -70,7 +71,7 @@ function scheduleFade(): void {
 }
 
 function writeTerminal(s: string): void {
-	process.stdout.write(s)
+	if (!terminalOutput.write(s)) return
 	scheduleFade()
 }
 
@@ -191,6 +192,7 @@ function repaintVisibleScreen(lines: string[], cursor: { row: number; col: numbe
 	writeTerminal(out.join(''))
 }
 function draw(force = false): void {
+	if (terminalOutput.isExternalEditorOpen()) return
 	const rows = process.stdout.rows || 24
 	const screen = buildFrame()
 	const lines = screen.lines
@@ -326,6 +328,7 @@ function draw(force = false): void {
 // Erase the current frame from the terminal. Used before restart (Ctrl-R)
 // so the new process can paint fresh without leftover content.
 function clearFrame(): void {
+	if (terminalOutput.isExternalEditorOpen()) return
 	if (prevLines.length === 0) return
 	const rows = process.stdout.rows || 24
 	if (!fullscreen) {
@@ -333,9 +336,9 @@ function clearFrame(): void {
 		const out = ['\r']
 		if (up > 0) out.push(`${CSI}${up}A`)
 		out.push(`${CSI}J`)
-		process.stdout.write(out.join(''))
+		terminalOutput.write(out.join(''))
 	} else {
-		process.stdout.write(`${CSI}2J${CSI}H${CSI}3J`)
+		terminalOutput.write(`${CSI}2J${CSI}H${CSI}3J`)
 	}
 	prevLines = []
 	cursorRow = 0

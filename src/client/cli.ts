@@ -20,6 +20,7 @@ import { models } from '../models.ts'
 import { ipc } from '../ipc.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 import { time } from '../utils/time.ts'
+import { terminalOutput } from './terminal-output.ts'
 
 const RESTART_CODE = 100
 
@@ -50,11 +51,11 @@ const CURSOR_COLOR_DEFAULT = '\x1b]112\x07'
 // columns 5, 9, 13, 17, ... (i.e. positions where the cursor lands
 // after pressing tab at columns 1–4, 5–8, etc.)
 
-function writeTabStops(cols: number, step: number): void {
+function writeTabStops(cols: number, step: number, opts: { bypassExternalEditorLatch?: boolean } = {}): void {
 	let seq = '\x1b[3g'
 	for (let c = step + 1; c <= cols; c += step) seq += `\x1b[${c}G\x1bH`
 	seq += '\x1b[1G'
-	process.stdout.write(seq)
+	terminalOutput.write(seq, opts)
 }
 
 // ── Paint throttle ───────────────────────────────────────────────────────────
@@ -66,7 +67,6 @@ function writeTabStops(cols: number, step: number): void {
 const PAINT_INTERVAL = 16 // ms — ~60 fps, plenty for streaming text
 let paintTimer: ReturnType<typeof setTimeout> | null = null
 let paintQueued = false
-let externalEditorOpen = false
 let promptStates = new Map<string, PromptEditorState>()
 
 function clearPendingPaint(): void {
@@ -78,7 +78,7 @@ function clearPendingPaint(): void {
 }
 
 function draw(force = false): void {
-	if (externalEditorOpen) return
+	if (terminalOutput.isExternalEditorOpen()) return
 	if (force) {
 		// Force paints are user-triggered — execute immediately.
 		// Cancel any pending throttled paint so we don't double-draw.
@@ -111,7 +111,7 @@ function exitCli(code: number): void {
 	// Preserve the last fully up-to-date frame for copy/paste on exit.
 	draw(true)
 	cleanupTerminal()
-	process.stdout.write('\r\n')
+	terminalOutput.write('\r\n')
 	process.exit(code)
 }
 
@@ -124,13 +124,14 @@ let restarting = false
 function cleanupTerminal(): void {
 	if (terminalCleaned) return
 	terminalCleaned = true
+	const bypass = { bypassExternalEditorLatch: true }
 	cursor.stop()
 	// Persist the current draft so it survives restart
 	client.saveDraft(prompt.draftText())
 	client.saveState({ restart: restarting })
-	if (useKitty) process.stdout.write(KITTY_OFF)
-	process.stdout.write(BRACKETED_PASTE_OFF + CURSOR_SHAPE_DEFAULT + CURSOR_COLOR_DEFAULT)
-	writeTabStops(process.stdout.columns || 80, 8)
+	if (useKitty) terminalOutput.write(KITTY_OFF, bypass)
+	terminalOutput.write(BRACKETED_PASTE_OFF + CURSOR_SHAPE_DEFAULT + CURSOR_COLOR_DEFAULT, bypass)
+	writeTabStops(process.stdout.columns || 80, 8, bypass)
 	if (process.stdin.isTTY) process.stdin.setRawMode(false)
 }
 
@@ -141,7 +142,7 @@ let suspended = false
 // The shell will show its prompt. `fg` resumes us and triggers SIGCONT.
 function suspend(): void {
 	suspended = true
-	process.stdout.write(`${useKitty ? KITTY_OFF : ''}${CURSOR_SHAPE_DEFAULT}${CURSOR_COLOR_DEFAULT}\x1b[?25h`)
+	terminalOutput.write(`${useKitty ? KITTY_OFF : ''}${CURSOR_SHAPE_DEFAULT}${CURSOR_COLOR_DEFAULT}\x1b[?25h`)
 	// process.kill(0, ...) sends to the entire process group — this is
 	// the standard way for a foreground job to suspend itself.
 	try { process.kill(0, 'SIGSTOP') } catch { process.kill(process.pid, 'SIGSTOP') }
@@ -158,14 +159,14 @@ function onSigcont(): void {
 		process.stdin.setEncoding('utf8')
 		process.stdin.resume()
 	}
-	if (useKitty) process.stdout.write(KITTY_ON)
-	process.stdout.write(BRACKETED_PASTE_ON)
+	if (useKitty) terminalOutput.write(KITTY_ON)
+	terminalOutput.write(BRACKETED_PASTE_ON)
 	writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 	draw(true)
 }
 
 function handleResize(): void {
-	if (externalEditorOpen) return
+	if (terminalOutput.isExternalEditorOpen()) return
 	writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 	draw(true)
 }
@@ -251,10 +252,15 @@ function rebaseRequestId(): string {
 async function runExternalEditor(path: string): Promise<number> {
 	const editor = process.env.EDITOR || process.env.VISUAL || 'vim'
 	const wasTty = process.stdin.isTTY
-	externalEditorOpen = true
 	clearPendingPaint()
+	// Clear Hal's frame before handing the terminal to the editor. The latch is
+	// enabled immediately after this, so later Hal paints are dropped while the
+	// editor owns stdout.
+	render.clearFrame()
+	terminalOutput.setExternalEditorOpen(true)
 	process.stdin.pause()
 	cleanupTerminal()
+	await terminalOutput.flush({ bypassExternalEditorLatch: true })
 	try {
 		const proc = Bun.spawn(['sh', '-c', `${editor} "$1"`, 'hal-editor', path], {
 			stdin: 'inherit',
@@ -263,14 +269,14 @@ async function runExternalEditor(path: string): Promise<number> {
 		})
 		return await proc.exited
 	} finally {
-		externalEditorOpen = false
+		terminalOutput.setExternalEditorOpen(false)
 		terminalCleaned = false
 		if (wasTty) {
 			process.stdin.setRawMode(true)
 			process.stdin.setEncoding('utf8')
 			process.stdin.resume()
-			if (useKitty) process.stdout.write(KITTY_ON)
-			process.stdout.write(BRACKETED_PASTE_ON)
+			if (useKitty) terminalOutput.write(KITTY_ON)
+			terminalOutput.write(BRACKETED_PASTE_ON)
 			writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 		} else {
 			process.stdin.resume()
@@ -642,8 +648,8 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 		// uses an internal StringDecoder that buffers partial sequences.
 		process.stdin.setEncoding('utf8')
 		process.stdin.resume()
-		if (useKitty) process.stdout.write(KITTY_ON)
-		process.stdout.write(BRACKETED_PASTE_ON)
+		if (useKitty) terminalOutput.write(KITTY_ON)
+		terminalOutput.write(BRACKETED_PASTE_ON)
 		writeTabStops(process.stdout.columns || 80, blocks.config.tabWidth)
 	}
 	else {
@@ -734,7 +740,7 @@ export const cli = {
 			promptStates = new Map<string, PromptEditorState>()
 		},
 		setExternalEditorOpen: (value: boolean) => {
-			externalEditorOpen = value
+			terminalOutput.setExternalEditorOpen(value)
 			if (value) clearPendingPaint()
 		},
 	},
