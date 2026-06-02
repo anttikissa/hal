@@ -118,13 +118,16 @@ function fixMeta(meta: SessionMeta, sessionId: string): SessionMeta {
 	return meta
 }
 
-function makeEntryId(): string {
-	const head = Math.max(0, Date.now()).toString(36).slice(-6).padStart(6, '0')
-	const bytes = randomBytes(3)
-	const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
-	let tail = ''
-	for (let i = 0; i < 3; i++) tail += alphabet[bytes[i]! % alphabet.length]
-	return `${head}-${tail}`
+function makeEntryId(used = new Set<string>()): string {
+	for (;;) {
+		const head = Math.max(0, Date.now()).toString(36).slice(-6).padStart(6, '0')
+		const bytes = randomBytes(3)
+		const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+		let tail = ''
+		for (let i = 0; i < 3; i++) tail += alphabet[bytes[i]! % alphabet.length]
+		const id = `${head}-${tail}`
+		if (!used.has(id)) return id
+	}
 }
 
 const historyTopLevelKeys = new Set([
@@ -156,10 +159,22 @@ function cleanHistoryEntry(entry: HistoryEntry): unknown {
 	return clean
 }
 
-function ensureEntryIds(entries: HistoryEntry[]): HistoryEntry[] {
+function collectEntryIds(entries: HistoryEntry[], used = new Set<string>()): Set<string> {
 	for (const entry of entries) {
-		const id = entry.id ?? makeEntryId()
+		if (typeof entry.id === 'string') used.add(entry.id)
+	}
+	return used
+}
+
+function usedHistoryIds(sessionId: string, logName?: string): Set<string> {
+	return collectEntryIds(loadHistoryLog(sessionId, logName))
+}
+
+function ensureEntryIds(entries: HistoryEntry[], used = new Set<string>()): HistoryEntry[] {
+	for (const entry of entries) {
+		const id = typeof entry.id === 'string' && !used.has(entry.id) ? entry.id : makeEntryId(used)
 		Object.defineProperty(entry, 'id', { value: id, enumerable: true, writable: true, configurable: true })
+		used.add(id)
 	}
 	return entries
 }
@@ -344,7 +359,9 @@ function createSession(id: string, meta: SessionMeta): SessionMeta {
 function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
 	if (entries.length === 0) return
 	ensureSessionDir(sessionId)
-	appendFileSync(historyLogPath(sessionId), `${ensureEntryIds(entries).map(stringifyHistoryEntry).join('\n')}\n`)
+	const logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
+	const used = usedHistoryIds(sessionId, logName)
+	appendFileSync(historyLogPath(sessionId, logName), `${ensureEntryIds(entries, used).map(stringifyHistoryEntry).join('\n')}\n`)
 }
 
 function updateMeta(sessionId: string, updates: Partial<SessionMeta>): void {
@@ -388,9 +405,10 @@ function rewriteHistoryForRebase(sessionId: string, entries: HistoryEntry[]): { 
 	const oldEntries = loadHistory(sessionId)
 	const forkEntry = oldEntries[0]?.type === 'forked_from' ? [oldEntries[0]] : []
 	const bodyEntries = entries[0]?.type === 'forked_from' ? entries.slice(1) : entries
-	const rebasedEntries = ensureEntryIds([...forkEntry, { type: 'rebased_from', log: oldLog, ts }, ...bodyEntries])
+	const rebasedEntries = ensureEntryIds([...forkEntry, { type: 'rebased_from', log: oldLog, ts }, ...bodyEntries], usedHistoryIds(sessionId, newLog))
 	appendFileSync(historyLogPath(sessionId, newLog), `${rebasedEntries.map(stringifyHistoryEntry).join('\n')}\n`)
-	appendFileSync(historyLogPath(sessionId, oldLog), `${stringifyHistoryEntry(ensureEntryIds([{ type: 'rebased_to', log: newLog, ts }])[0]!)}\n`)
+	const oldLogMarker = ensureEntryIds([{ type: 'rebased_to', log: newLog, ts }], collectEntryIds(oldEntries))[0]!
+	appendFileSync(historyLogPath(sessionId, oldLog), `${stringifyHistoryEntry(oldLogMarker)}\n`)
 	updateMeta(sessionId, { currentLog: newLog })
 	return { oldLog, newLog, entryCount: rebasedEntries.length }
 }

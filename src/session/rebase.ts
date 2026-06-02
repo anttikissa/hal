@@ -62,6 +62,14 @@ function legacyRowId(index: number): string {
 	return `${head}-${tail}`
 }
 
+function uniqueRowId(preferred: string, index: number, used: Set<string>): string {
+	if (ID_RE.test(preferred) && !used.has(preferred)) return preferred
+	for (let offset = 0; ; offset++) {
+		const id = legacyRowId(index + offset)
+		if (!used.has(id)) return id
+	}
+}
+
 function entryRowId(entry: HistoryEntry, index: number): string {
 	if (typeof entry.id === 'string') return entry.id
 	const anyEntry = entry as any
@@ -206,16 +214,22 @@ function findToolBatchEnd(entries: HistoryEntry[], start: number): number {
 
 function buildSnapshot(sessionId: string, baseLog: string, entries: HistoryEntry[], opts: { now?: Date } = {}): RebaseSnapshot {
 	const rows: RebaseRow[] = []
+	const used = new Set<string>()
 	const now = opts.now?.getTime() ?? Date.now()
+	function addRow(row: RebaseRow): void {
+		row.id = uniqueRowId(row.id, rows.length, used)
+		used.add(row.id)
+		rows.push(row)
+	}
 	for (let i = 0; i < entries.length; i++) {
 		const entry = entries[i]!
 		if (entry.type === 'tool_call' || entry.type === 'tool_result') {
 			const end = findToolBatchEnd(entries, i)
-			rows.push(...buildToolRows(entries, i, end, now))
+			for (const row of buildToolRows(entries, i, end, now)) addRow(row)
 			i = end
 			continue
 		}
-		rows.push(buildNormalRow(sessionId, entry, i, now))
+		addRow(buildNormalRow(sessionId, entry, i, now))
 	}
 	return { sessionId, baseLog, rows }
 }
