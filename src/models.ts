@@ -226,12 +226,12 @@ function newestModelInFamily(cache: Record<string, number>, family: string): str
 }
 
 function parseClaudeCandidate(tier: 'opus' | 'sonnet' | 'haiku', modelId: string): ModelCandidate | null {
-	const match = modelId.match(new RegExp(`^claude-${tier}-(\\d+)(?:[.-](\\d+)|-(\\d{8,}))?$`))
+	const match = modelId.match(new RegExp(`^claude-${tier}-(\\d+)(?:-(\\d{8,})|[.-](\\d+))?$`))
 	if (!match) return null
 	const major = Number(match[1])
-	const minor = Number(match[2] ?? 0)
-	const canonical = match[2] ? `claude-${tier}-${major}-${minor}` : `claude-${tier}-${major}`
-	return { canonical, version: [major, minor], stability: match[2] ? 2 : match[3] ? 0 : 1 }
+	const minor = Number(match[3] ?? 0)
+	const canonical = match[3] ? `claude-${tier}-${major}-${minor}` : `claude-${tier}-${major}`
+	return { canonical, version: [major, minor], stability: match[3] ? 2 : match[2] ? 0 : 1 }
 }
 
 function parseGptCandidate(modelId: string): ModelCandidate | null {

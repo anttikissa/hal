@@ -129,6 +129,19 @@ test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 	])
 })
 
+
+test('aliasUpdateSuggestions treats dated Claude IDs as older than decimal versions', () => {
+	expect(models.aliasUpdateSuggestions(
+		{ 'claude-opus-4-7': 1_000_000 },
+		{
+			'anthropic/claude-opus-4-20250514': 200_000,
+			'anthropic/claude-opus-4.8': 1_000_000,
+		},
+	)).toEqual([
+		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-7', newModel: 'anthropic/claude-opus-4-8' },
+	])
+})
+
 test('refreshModels reports relevant GPT and Claude additions and context changes', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir
