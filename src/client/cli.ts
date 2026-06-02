@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { client } from '../client.ts'
 import { render } from './render.ts'
+import { renderStatus } from './render-status.ts'
 import { cursor } from '../cli/cursor.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt, type PromptEditorState } from '../cli/prompt.ts'
@@ -492,6 +493,10 @@ function chooseModelWithoutClearingDraft(model: string): void {
 	draw()
 }
 
+function promptInputWidth(): number {
+	return renderStatus.promptContentWidth(process.stdout.columns || 80)
+}
+
 function clearSavedPromptState(): void {
 	const tab = client.currentTab()
 	if (tab) promptStates.delete(tab.sessionId)
@@ -718,7 +723,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 			// App keybindings
 			if (handleAppKey(k)) continue
 			// Then prompt editing
-			if (prompt.handleKey(k, process.stdout.columns || 80)) {
+			if (prompt.handleKey(k, promptInputWidth())) {
 				openaiUsage.noteActivity()
 				draw()
 			}
@@ -736,6 +741,7 @@ export const cli = {
 		claudeCacheWarning,
 		kittyOnSequence: () => KITTY_ON,
 		installPromptTabSwitchHandler,
+		promptInputWidth,
 		resetPromptStates: () => {
 			promptStates = new Map<string, PromptEditorState>()
 		},

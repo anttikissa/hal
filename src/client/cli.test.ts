@@ -23,6 +23,16 @@ test('kitty keyboard mode does not request key release events', () => {
 	expect(cli.forTests.kittyOnSequence()).toBe('\x1b[>17u')
 })
 
+test('prompt key handling uses rendered prompt content width', () => {
+	const originalCols = process.stdout.columns
+	Object.defineProperty(process.stdout, 'columns', { value: 111, configurable: true })
+	try {
+		expect(cli.forTests.promptInputWidth()).toBe(109)
+	} finally {
+		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+	}
+})
+
 test('SIGWINCH forces a redraw after terminal resize', () => {
 	let forceDraws = 0
 	const sigwinch: Array<() => void> = []
