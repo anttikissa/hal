@@ -44,6 +44,8 @@ function randomChars(): string {
 	return suffix
 }
 
+// Picks a three-character session suffix from words3.txt. That file is
+// fixed-width: each candidate is exactly 3 chars followed by a space or newline.
 function randomWord(): string {
 	const words = readFileSync(config.wordsPath, 'utf-8')
 	const pos = Math.floor(Math.random() * (words.length / 4)) * 4
