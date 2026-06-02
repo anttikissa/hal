@@ -252,6 +252,26 @@ describe('prompt', () => {
 		expect(built.cursor).toEqual({ rowOffset: 0, col: 5 })
 	})
 
+	test('prompt wraps a trailing space at exact row width', () => {
+		prompt.setText('12345', 5)
+		prompt.handleKey({ key: ' ', char: ' ', shift: false, alt: false, ctrl: false, cmd: false }, 5)
+
+		const built = prompt.buildPrompt(5)
+		expect(built.lines).toEqual(['12345', ''])
+		expect(built.cursor).toEqual({ rowOffset: 1, col: 0 })
+	})
+
+	test('cursor position survives newline after a wrapped trailing space', () => {
+		prompt.setText('12345', 5)
+		prompt.handleKey({ key: ' ', char: ' ', shift: false, alt: false, ctrl: false, cmd: false }, 5)
+		prompt.handleKey(key('enter', { shift: true }), 5)
+		prompt.handleKey({ key: 'a', char: 'a', shift: false, alt: false, ctrl: false, cmd: false }, 5)
+
+		const built = prompt.buildPrompt(5)
+		expect(built.lines).toEqual(['12345', '', 'a'])
+		expect(built.cursor).toEqual({ rowOffset: 2, col: 1 })
+	})
+
 	test('buildPrompt wraps and positions the cursor by visual width', () => {
 		prompt.setText('12345678▪x', '12345678▪x'.length)
 		const built = prompt.buildPrompt(10)
