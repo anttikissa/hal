@@ -42,4 +42,23 @@ describe('prompt editor', () => {
 		expect(built.cursor).toEqual({ rowOffset: 0, col: 4 })
 		prompt.clear()
 	})
+
+	test('down keeps existing prompt viewport when cursor remains visible', () => {
+		prompt.config.maxPromptLines = 10
+		prompt.state.promptLineLimit = 3
+		prompt.setText('one\ntwo\nthree\nfour\nfive\nsix\nseven\neight', 'one\ntwo\nthree\nfour\n'.length)
+		prompt.state.promptScrollTop = 4
+
+		const before = prompt.buildPrompt(80)
+		expect(before.lines[0]!).toStartWith('five')
+		expect(before.cursor.rowOffset).toBe(0)
+
+		expect(prompt.handleKey(key('down'), 80)).toBe(true)
+		const after = prompt.buildPrompt(80)
+		expect(after.lines[0]!).toStartWith('five')
+		expect(after.cursor.rowOffset).toBe(1)
+
+		prompt.clear()
+		prompt.state.promptLineLimit = 0
+	})
 })

@@ -17,6 +17,7 @@ const state = {
 	// 0 means use config.maxPromptLines. Ctrl-= / Ctrl-- sets an explicit
 	// live viewport height for composing unusually long prompts.
 	promptLineLimit: 0,
+	promptScrollTop: 0,
 }
 
 
@@ -185,6 +186,7 @@ export interface PromptEditorState {
 	historyDraft: string
 	pasteRefs: Array<{ display: string; text: string }>
 	promptLineLimit: number
+	promptScrollTop?: number
 }
 
 // Called when async paste resolves (image placeholder -> path)
@@ -669,12 +671,17 @@ function buildPrompt(contentWidth: number): PromptRender {
 	const promptLines = state.promptLineLimit > 0 ? promptLineLimit() : Math.min(totalRows, promptLineLimit())
 	const sel = selRange()
 
-	// Scroll viewport if prompt is taller than MAX_PROMPT_LINES
+	// Keep the prompt viewport stable across cursor moves. Only scroll when the
+	// cursor leaves the viewport; ±1 keeps one context row when scrolling is forced.
 	let scrollTop = 0
 	if (totalRows > promptLines) {
-		scrollTop = Math.min(curRow, totalRows - promptLines)
-		scrollTop = Math.max(scrollTop, curRow - promptLines + 1)
+		const maxScrollTop = totalRows - promptLines
+		const contextRows = promptLines >= 3 ? 1 : 0
+		scrollTop = Math.max(0, Math.min(state.promptScrollTop, maxScrollTop))
+		if (curRow < scrollTop) scrollTop = Math.max(0, curRow - contextRows)
+		if (curRow >= scrollTop + promptLines) scrollTop = Math.min(maxScrollTop, curRow - promptLines + contextRows + 1)
 	}
+	state.promptScrollTop = scrollTop
 
 	const lines: string[] = []
 	for (let i = scrollTop; i < scrollTop + promptLines; i++) {
@@ -723,6 +730,7 @@ function snapshotState(): PromptEditorState {
 		historyDraft,
 		pasteRefs: pasteRefs.map((ref) => ({ ...ref })),
 		promptLineLimit: state.promptLineLimit,
+		promptScrollTop: state.promptScrollTop,
 	}
 }
 
@@ -740,6 +748,7 @@ function restoreState(saved: PromptEditorState): void {
 	pasteRefs.length = 0
 	pasteRefs.push(...saved.pasteRefs.map((ref) => ({ ...ref })))
 	state.promptLineLimit = saved.promptLineLimit
+	state.promptScrollTop = saved.promptScrollTop ?? 0
 }
 
 // The user's own composition text — NOT the history entry they may be
@@ -763,6 +772,7 @@ function setText(t: string, c?: number): void {
 	historyIndex = -1
 	historyDraft = ''
 	pasteRefs.length = 0
+	state.promptScrollTop = 0
 }
 
 function clear(): void {
@@ -775,6 +785,7 @@ function clear(): void {
 	historyIndex = -1
 	historyDraft = ''
 	pasteRefs.length = 0
+	state.promptScrollTop = 0
 }
 
 function setHistory(h: string[]): void {
