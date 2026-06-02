@@ -143,8 +143,7 @@ export function wordWrap(text: string, width: number): string[] {
 		let vis = 0,
 			wordStart = 0,
 			lineStart = 0,
-			esc = false,
-			wrappedTrailingSpace = false
+			esc = false
 		for (let i = 0; i < raw.length; ) {
 			const cp = raw.codePointAt(i)!
 			const cl = cp > 0xffff ? 2 : 1
@@ -163,7 +162,6 @@ export function wordWrap(text: string, width: number): string[] {
 			if (vis > width) {
 				const at = wordStart > lineStart ? wordStart : i
 				out.push(raw.slice(lineStart, at))
-				wrappedTrailingSpace = raw[at] === ' ' && at + 1 === raw.length
 				lineStart = raw[at] === ' ' ? at + 1 : at
 				wordStart = lineStart
 				vis = visLen(raw.slice(lineStart, i + cl))
@@ -171,7 +169,6 @@ export function wordWrap(text: string, width: number): string[] {
 			i += cl
 		}
 		if (lineStart < raw.length) out.push(raw.slice(lineStart))
-		else if (wrappedTrailingSpace) out.push('')
 	}
 	return out
 }
