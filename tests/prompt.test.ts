@@ -252,6 +252,14 @@ describe('prompt', () => {
 		expect(built.cursor).toEqual({ rowOffset: 0, col: 5 })
 	})
 
+	test('buildPrompt wraps and positions the cursor by visual width', () => {
+		prompt.setText('12345678▪x', '12345678▪x'.length)
+		const built = prompt.buildPrompt(10)
+
+		expect(built.lines).toEqual(['12345678▪', 'x'])
+		expect(built.cursor).toEqual({ rowOffset: 1, col: 1 })
+	})
+
 	test('buildPrompt shows fold indicators for hidden prompt lines', () => {
 		prompt.config.maxPromptLines = 3
 		prompt.setText('one\ntwo\nthree\nfour', 0)

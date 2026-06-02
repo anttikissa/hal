@@ -3,7 +3,7 @@
 
 import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
-import { clipVisual, visLen } from '../utils/strings.ts'
+import { charWidth, clipVisual, visLen, wordWrap } from '../utils/strings.ts'
 
 const MAX_UNDO = 200
 const SELECTION_ON = '\x1b[7m'
@@ -22,59 +22,51 @@ const state = {
 
 // ── Word wrap + cursor mapping ───────────────────────────────────────────────
 
-function wordWrapLines(text: string, width: number): string[] {
-	if (width <= 0) return [text]
-	const result: string[] = []
-	for (const segment of text.split('\n')) {
-		let remaining = segment
-		while (remaining.length > width) {
-			let breakAt = remaining.lastIndexOf(' ', width)
-			if (breakAt <= 0) breakAt = width
-			result.push(remaining.slice(0, breakAt))
-			remaining = remaining[breakAt] === ' ' ? remaining.slice(breakAt + 1) : remaining.slice(breakAt)
-		}
-		result.push(remaining)
-	}
-	return result
-}
-
 interface WrappedLayout {
 	lines: string[]
 	starts: number[] // character offset where each wrapped line begins
+	ends: number[]
 }
 
 function getLayout(input: string, width: number): WrappedLayout {
-	const lines = wordWrapLines(input, width)
+	const lines = wordWrap(input, width)
 	const starts: number[] = []
+	const ends: number[] = []
 	let pos = 0
-	for (let i = 0; i < lines.length; i++) {
+	for (const line of lines) {
 		starts.push(pos)
-		const len = lines[i]!.length
-		const nextChar = i < lines.length - 1 && pos + len < input.length ? input[pos + len] : ''
-		pos += len + (nextChar === ' ' || nextChar === '\n' ? 1 : 0)
+		ends.push(pos + line.length)
+		const nextChar = pos + line.length < input.length ? input[pos + line.length] : ''
+		pos += line.length + (nextChar === ' ' || nextChar === '\n' ? 1 : 0)
 	}
-	return { lines, starts }
+	return { lines, starts, ends }
 }
 
 function cursorToRowCol(input: string, absPos: number, width: number): { row: number; col: number } {
 	const layout = getLayout(input, width)
-	const { lines, starts } = layout
-	for (let i = 0; i < lines.length; i++) {
-		const start = starts[i]!
-		const line = lines[i]!
-		const nextStart = i < lines.length - 1 ? starts[i + 1]! : input.length
-		if (absPos < nextStart) return { row: i, col: Math.min(absPos - start, line.length) }
+	for (let i = 0; i < layout.lines.length; i++) {
+		const nextStart = i < layout.lines.length - 1 ? layout.starts[i + 1]! : input.length + 1
+		if (absPos < nextStart) return { row: i, col: visLen(input.slice(layout.starts[i]!, Math.min(absPos, layout.ends[i]!))) }
 	}
-	const last = lines.length - 1
-	return { row: last, col: lines[last]?.length ?? 0 }
+	const last = layout.lines.length - 1
+	return { row: last, col: visLen(layout.lines[last] ?? '') }
 }
 
 
 function rowColToCursor(input: string, row: number, col: number, width: number): number {
-	const { lines, starts } = getLayout(input, width)
-	if (lines.length === 0) return 0
-	const r = Math.max(0, Math.min(row, lines.length - 1))
-	return starts[r]! + Math.max(0, Math.min(col, lines[r]!.length))
+	const layout = getLayout(input, width)
+	if (layout.lines.length === 0) return 0
+	const r = Math.max(0, Math.min(row, layout.lines.length - 1))
+	let vis = 0
+	for (let i = layout.starts[r]!; i < layout.ends[r]!;) {
+		const cp = input.codePointAt(i)!
+		const charLen = cp > 0xffff ? 2 : 1
+		const charCols = charWidth(cp)
+		if (vis + charCols > col) return i
+		vis += charCols
+		i += charLen
+	}
+	return layout.ends[r]!
 }
 
 function verticalMove(
