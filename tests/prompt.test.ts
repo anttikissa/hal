@@ -252,12 +252,13 @@ describe('prompt', () => {
 		expect(built.cursor).toEqual({ rowOffset: 0, col: 5 })
 	})
 
-	test('buildPrompt wraps and positions the cursor by visual width', () => {
-		prompt.setText('12345678▪x', '12345678▪x'.length)
+	test('small square advances the prompt cursor by one column', () => {
+		prompt.setText('a▪b', 1)
+		prompt.handleKey(key('right'), 10)
 		const built = prompt.buildPrompt(10)
 
-		expect(built.lines).toEqual(['12345678▪', 'x'])
-		expect(built.cursor).toEqual({ rowOffset: 1, col: 1 })
+		expect(prompt.cursorPos()).toBe(2)
+		expect(built.cursor).toEqual({ rowOffset: 0, col: 2 })
 	})
 
 	test('buildPrompt shows fold indicators for hidden prompt lines', () => {
