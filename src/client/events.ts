@@ -5,7 +5,10 @@ import { clientHistory } from './history.ts'
 function handle(event: any, ctx: any): void {
 	if (event.type === 'host-released') return
 	if (event.type === 'runtime-start') {
-		if (event.pid !== ctx.pid) ctx.showServerRestart(event.pid, event.startedAt)
+		if (event.pid !== ctx.pid) {
+			if (event.reason === 'promote') ctx.showServerPromotion(event.pid, event.startedAt)
+			else ctx.showServerRestart(event.pid, event.startedAt)
+		}
 		return
 	}
 	if (event.type === 'prompt') return handlePrompt(event, ctx)

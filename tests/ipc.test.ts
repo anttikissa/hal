@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { cleanupSpawned } from './process-cleanup.ts'
+import { ason } from '../src/utils/ason.ts'
 
 function sendCtrlC(proc: { stdin: any }) {
 	proc.stdin!.write(new Uint8Array([0x03]))
@@ -57,6 +58,20 @@ function runtimeStartCount(): number {
 	}
 }
 
+function runtimeStartEvents(): any[] {
+	try {
+		const content = readFileSync(join(tmpDir, 'ipc/events.asonl'), 'utf-8')
+		const events = []
+		for (const line of content.split('\n')) {
+			if (!line.includes('runtime-start')) continue
+			events.push(ason.parse(line))
+		}
+		return events
+	} catch {
+		return []
+	}
+}
+
 async function waitFor<T>(read: () => T, ok: (value: T) => boolean, timeoutMs = 2_000): Promise<T> {
 	const deadline = Date.now() + timeoutMs
 	let last = read()
@@ -95,6 +110,7 @@ describe('host election', () => {
 
 		expect(lockPid()).not.toBeNull()
 		expect(runtimeStartCount()).toBe(2)
+		expect(runtimeStartEvents().map((event) => event.reason)).toEqual(['start', 'promote'])
 
 		sendCtrlC(client)
 		await client.exited
@@ -134,6 +150,7 @@ describe('host election', () => {
 		const proc1 = spawnHal(env)
 		const proc2 = spawnHal(env)
 		const pidAfterRestart = await waitFor(lockPid, (pid) => pid !== null)
+		await waitFor(runtimeStartCount, (count) => count === beforeRestart + 1)
 
 		expect(pidAfterRestart).not.toBeNull()
 		expect(runtimeStartCount()).toBe(beforeRestart + 1)

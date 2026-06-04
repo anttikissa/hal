@@ -124,6 +124,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 		type: 'runtime-start',
 		pid: process.pid,
 		startedAt: ipc.readHostLock()?.createdAt ?? new Date().toISOString(),
+		reason: kind,
 	})
 	if (kind === 'promote') client.addStartupEntry(`Promoted to server (pid ${process.pid})`)
 }

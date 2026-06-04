@@ -264,6 +264,14 @@ function showServerRestart(pid: number, startedAt?: string): void {
 	})
 }
 
+function showServerPromotion(pid: number, startedAt?: string): void {
+	queueLocalBlock({
+		type: 'info',
+		text: `Client promoted to server (pid ${pid})`,
+		ts: startedAt ? Date.parse(startedAt) : Date.now(),
+	})
+}
+
 
 function tabForSession(sessionId: string | null): Tab | null {
 	if (sessionId) return state.tabs.find((tab) => tab.sessionId === sessionId) ?? null
@@ -547,6 +555,7 @@ function handleEvent(event: any): void {
 		tabForSession,
 		addBlockToTab,
 		showServerRestart,
+		showServerPromotion,
 		cancelDelayedPaused: (sessionId: string | null) => pausedNotices.cancel(sessionId),
 		flushDelayedPaused: (sessionId: string | null) => pausedNotices.flush(sessionId, (block) => addBlockToTab(sessionId, block)),
 		scheduleDelayedPaused: (sessionId: string | null, block: Extract<Block, { type: 'log' }>) => pausedNotices.schedule(sessionId, block, config.pausedNoticeDelayMs, (item) => addBlockToTab(sessionId, item)),
