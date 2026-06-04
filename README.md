@@ -12,7 +12,7 @@ Meanwhile, it tries to be reasonably feature complete, have a nice terminal and 
 ## Highlights
 
 - Fast and frugal, uses a minimal system prompt by default (see SYSTEM.md) and has a few basic tools that get the job done
-- Anthropic and OpenAI supported (subscriptions and API keys), and a bunch of other providers too
+- Anthropic Claude and OpenAI are supported directly; OpenRouter, Google Gemini, xAI/Grok, and custom OpenAI-compatible providers work through the compat layer
 - Tabs (ctrl-t to create one, ctrl-w to close, ctrl-n/p and alt-# to switch)
 - Forking (ctrl-f forks current session so you can explore alternative approaches with the current context)
 - /cd <directory> changes working directory to another project
@@ -27,6 +27,7 @@ Meanwhile, it tries to be reasonably feature complete, have a nice terminal and 
 - No fancy UI except for quick model selector (ctrl-m) - basically it's just text in, text out
 - /go command goes to any current or past session / tab and resumes the session if it was closed
 - Google search supported through https://serper.dev/ (ask Hal to implement other providers if you like)
+- New models are found automatically by checking https://models.dev/ (so you don't need to update Hal when new models become available)
 - There are some very basic security guardrails: if the tool call looks suspiciously (destructive action or reading security credentials), Hal will ask you to confirm before running it (see risk.ts for details)
 - There's an `eval` tool that lets Hal run arbitrary JavaScript in the running process. Especially useful for introspective work like "Summarize what happened in tabs 4-7 during the last 24 hours". Disable if you don't like dangerous tools.
 
@@ -37,9 +38,33 @@ What's not implemented:
 
 ## Provider support
 
-I mostly use Claude and GPT but all OpenAI compatible models from models.dev are supported (TODO: plus others?) including Gemini (TODO: is it?)
+Supported out of the box:
 
-# Installation
+- `anthropic/...` — Claude through Anthropic. Supports Anthropic OAuth subscriptions via `/login anthropic` and `ANTHROPIC_API_KEY`.
+- `openai/...` — OpenAI through the Responses API. Supports ChatGPT/Codex OAuth subscriptions via `/login openai` and `OPENAI_API_KEY`.
+- `openrouter/...` — OpenRouter through its OpenAI-compatible Chat Completions API. Uses `OPENROUTER_API_KEY`.
+- `google/...` — Gemini through Google's OpenAI-compatible endpoint. Uses `GOOGLE_API_KEY`.
+- `grok/...` — xAI/Grok through its OpenAI-compatible endpoint. Uses `GROK_API_KEY`.
+
+Hal also fetches model metadata from [models.dev](https://models.dev/) for context windows and newly released model IDs. A model appearing there does not by itself mean Hal can use it; the provider still needs to be one of the supported prefixes above, or a custom OpenAI-compatible provider configured with `BASE_URL` and `API_KEY`.
+
+Custom OpenAI-compatible providers are also supported. Use an env-friendly provider name in the form `provider/model` and set matching environment variables:
+
+```sh
+export KILO_BASE_URL='https://api.kilo.ai/api/gateway'
+export KILO_API_KEY='...'
+hal
+```
+
+Then inside Hal:
+
+```text
+/model kilo/stealth/claude-opus-4.7
+```
+
+Hal calls `${PROVIDER}_BASE_URL/chat/completions`, so the base URL should be the OpenAI-compatible API root before `/chat/completions`. Custom providers do not get provider-specific compatibility tweaks; if a gateway needs unusual request fields, headers, or a different endpoint shape, Hal may need code changes.
+
+## Installation
 
 ```
 git clone https://github.com/anttikissa/hal.git ~/.hal
@@ -56,8 +81,4 @@ cd ~/my/project
 hal
 ```
 
-Hal picks up the API keys from your environment, or you can use /login to log in with your favorite subscription (OpenAI and Anthropic supported for now).
-
-(TODO API keys:)
-
-TODO: comment about BASE_URL too
+Hal picks up API keys from your environment. You can also use `/login` for OpenAI and Anthropic subscription/OAuth credentials.
