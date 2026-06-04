@@ -66,6 +66,10 @@ function shortcutListHint(style?: HelpStyle): string {
 	return formatHint({ keyLabel: config.rightKeyLabel, description: config.rightDescription }, style)
 }
 
+function restoreTabHint(style?: HelpStyle): string {
+	return formatHint({ keyLabel: 'ctrl-shift-t', description: 'restore tab' }, style)
+}
+
 function build(working: boolean, hasText: boolean, continueAction: ContinueAction | false = false, style?: HelpStyle): string {
 	const state = deriveState(working, hasText, continueAction)
 	const separator = style ? `${style.separator}, ${style.description}` : ', '
@@ -76,6 +80,7 @@ export const helpBar = {
 	config,
 	build,
 	shortcutListHint,
+	restoreTabHint,
 	deriveState,
 	HINTS,
 }

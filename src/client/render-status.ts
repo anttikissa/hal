@@ -425,10 +425,11 @@ function renderHelpBar(lines: string[]): void {
 		separator: desc,
 	}
 	const baseLeft = helpBar.build(working, hasText, continueAction, style)
+	const restoreText = client.restoreTabHintActive() ? helpBar.restoreTabHint(style) : ''
 	const resizeHint = prompt.resizeHint(cols)
 	const resizeText = resizeHint ? `${style.key}ctrl-=/-${style.description}: ${resizeHint}` : ''
 	const separator = `${style.separator}, `
-	const left = baseLeft && resizeText ? `${resizeText}${separator}${baseLeft}` : baseLeft || resizeText
+	const left = [restoreText, resizeText, baseLeft].filter(Boolean).join(separator)
 	const right = helpBar.shortcutListHint(style)
 	let bar = left
 	if (right) {

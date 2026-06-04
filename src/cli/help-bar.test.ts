@@ -23,6 +23,13 @@ test('text entry hints show send newline and queue together', () => {
 	expect(text).toContain('alt-enter: queue')
 })
 
+
+test('restore tab hint is formatted like shortcut hints', () => {
+	const text = helpBar.restoreTabHint()
+
+	expect(text).toBe('ctrl-shift-t: restore tab')
+})
+
 test('working text hints show steer newline queue and pause', () => {
 	const text = helpBar.build(true, true)
 

@@ -80,6 +80,8 @@ const config = {
 	backgroundLoadBlobs: true,
 	repaintAfterBlobLoad: true,
 	pausedNoticeDelayMs: 50,
+	// How long the help bar keeps showing ctrl-shift-t after a tab closes.
+	restoreTabHintMs: 12_000,
 	// Startup performance details are developer diagnostics. Keep the default
 	// startup card human-focused and enable these only when debugging startup.
 	showStartupPerf: false,
@@ -114,6 +116,8 @@ const state = {
 	// do not close the focused tab, such as cross-client closes or startup recovery.
 	recentTabs: [] as string[],
 	startupSummaryShown: false,
+	// Ephemeral affordance for undoing the latest closed tab in the normal help bar.
+	restoreTabHintUntil: 0,
 }
 
 let pendingEntries: Block[] = []
@@ -121,6 +125,7 @@ let onChange: (force: boolean) => void = () => {}
 let onToolConfirmRequest: ((event: any) => void) | null = null
 let onRebaseStart: ((event: any) => void) | null = null
 let onRebaseResult: ((event: any) => void) | null = null
+let restoreTabHintTimer: ReturnType<typeof setTimeout> | null = null
 
 
 
@@ -171,6 +176,37 @@ function setOnRebaseResult(fn: (event: any) => void): void {
 }
 
 function requestRender(force = false): void { onChange(force) }
+
+function clearRestoreTabHint(): void {
+	if (restoreTabHintTimer) clearTimeout(restoreTabHintTimer)
+	restoreTabHintTimer = null
+	const hadHint = state.restoreTabHintUntil > 0
+	state.restoreTabHintUntil = 0
+	if (hadHint) onChange(false)
+}
+
+function restoreTabHintActive(now = Date.now()): boolean {
+	return state.restoreTabHintUntil > now
+}
+
+function showRestoreTabHint(now = Date.now()): void {
+	if (restoreTabHintTimer) clearTimeout(restoreTabHintTimer)
+	restoreTabHintTimer = null
+	const ms = Math.max(0, config.restoreTabHintMs)
+	if (ms <= 0) {
+		state.restoreTabHintUntil = 0
+		return
+	}
+
+	state.restoreTabHintUntil = now + ms
+	restoreTabHintTimer = setTimeout(() => {
+		restoreTabHintTimer = null
+		if (restoreTabHintActive()) return
+		state.restoreTabHintUntil = 0
+		onChange(false)
+	}, ms)
+	restoreTabHintTimer.unref?.()
+}
 
 function currentTab(): Tab | null {
 	return state.tabs[state.focusedTabIndex] ?? null
@@ -309,6 +345,7 @@ function setOnDraftArrived(fn: (text: string) => void): void {
 
 function switchTab(index: number): void {
 	if (index >= 0 && index < state.tabs.length && index !== state.focusedTabIndex) {
+		clearRestoreTabHint()
 		const fromSession = state.tabs[state.focusedTabIndex]?.sessionId ?? ''
 		state.focusedTabIndex = index
 		const tab = state.tabs[index]!
@@ -444,6 +481,7 @@ function prevTab(): void {
 // Fork stays distinct because it also copies the draft from the parent.
 
 function sendCommand(type: ClientCommandType, text?: string, displayText?: string, delivery?: 'queue'): void {
+	if (type !== 'close') clearRestoreTabHint()
 	const tab = currentTab()
 	if (type === 'open') sessionTabs.state.pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') sessionTabs.state.pendingOpen = 'resume'
@@ -491,6 +529,8 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		pruneRecentTabs,
 		addStartupSummaryToTab,
 		addTabNoticeToTab: (tab: Tab, text: string) => addLocalBlockToTab(tab, { type: 'info', text, ts: Date.now() }),
+		showRestoreTabHint,
+		clearRestoreTabHint,
 		onTabSwitch: (from: string, to: string) => onTabSwitch?.(from, to),
 		onChange,
 	})
@@ -625,6 +665,7 @@ function resetForTests(): void {
 	onToolConfirmRequest = null
 	onRebaseStart = null
 	onRebaseResult = null
+	clearRestoreTabHint()
 	sessionTabs.reset()
 	clientProcess.reset()
 	state.recentTabs = []
@@ -681,6 +722,9 @@ export const client = {
 	clearDraft,
 	handleEvent,
 	onSubmit,
+	showRestoreTabHint,
+	clearRestoreTabHint,
+	restoreTabHintActive,
 	resetForTests,
 }
 

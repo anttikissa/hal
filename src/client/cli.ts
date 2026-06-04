@@ -724,6 +724,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 			if (handleAppKey(k)) continue
 			// Then prompt editing
 			if (prompt.handleKey(k, promptInputWidth())) {
+				client.clearRestoreTabHint()
 				openaiUsage.noteActivity()
 				draw()
 			}

@@ -41,6 +41,7 @@ beforeEach(() => {
 	client.state.peakCols = 0
 	client.state.working = new Map()
 	client.state.toolConfirmPending = new Set()
+	client.state.restoreTabHintUntil = 0
 	prompt.clear()
 	prompt.config.maxPromptLines = 10
 	prompt.state.promptLineLimit = 0
@@ -265,6 +266,14 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: send, shift-enter: newline, alt-enter: queue')
 		expect(clean).not.toContain('│')
+	})
+
+	test('help bar shows restore tab as a normal shortcut hint', () => {
+		prompt.setText('hello')
+		client.state.restoreTabHintUntil = Date.now() + 60_000
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+		expect(clean).toContain('ctrl-shift-t: restore tab, enter: send')
+		expect(clean).not.toContain('Tab closed')
 	})
 
 	test('help bar suggests resizing two lines before prompt scrolling', () => {

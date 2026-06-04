@@ -38,6 +38,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	}
 
 	const grew = newTabs.length > previousTabs.length
+	const shrank = newTabs.length < previousTabs.length
 	const returnToSession = state.returnToBySession.get(previousSession)
 	model.tabs = newTabs
 	const openIds = new Set(newTabs.map((tab) => tab.sessionId))
@@ -67,6 +68,8 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	copyForkDraft(isFork, grew, previousSession, openedSessionId, newTabs)
 	if (isOpen && grew && focused && openedTabs.includes(focused)) ctx.addStartupSummaryToTab(focused)
 	if (state.pendingOpen === 'resume' && grew && focused && openedTabs.includes(focused)) ctx.addTabNoticeToTab(focused, 'Tab restored.')
+	if (shrank) ctx.showRestoreTabHint()
+	if (state.pendingOpen === 'resume' && grew) ctx.clearRestoreTabHint()
 	state.pendingOpen = false
 	if (previousSession !== newSession) ctx.onTabSwitch(previousSession, newSession)
 	ctx.onChange(false)
