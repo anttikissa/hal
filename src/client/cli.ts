@@ -10,6 +10,7 @@ import { cursor } from '../cli/cursor.ts'
 import { keys } from '../cli/keys.ts'
 import { prompt, type PromptEditorState } from '../cli/prompt.ts'
 import { completion } from '../cli/completion.ts'
+import { completionHints } from '../cli/completion-hints.ts'
 import { clientLocalCommands } from './local-commands.ts'
 import { popup } from './popup.ts'
 import { blocks } from '../cli/blocks.ts'
@@ -403,8 +404,9 @@ function submit(override?: string, delivery?: 'queue'): void {
 //   Shift-Tab / Up: cycle backward
 //   Enter / Space: accept selected item
 //   Escape: dismiss
-// There is no visible popup; only the prompt text is mutated. Active state is
-// tracked in `completion.state` and matters for what subsequent keys do.
+// Ambiguous choices are shown in the help line instead of printing into
+// scrollback. Active state is tracked in `completion.state` and matters for
+// what subsequent keys do.
 
 function handleCompletionKey(k: KeyEvent): boolean {
 	// Tab triggers or cycles completion
@@ -415,6 +417,7 @@ function handleCompletionKey(k: KeyEvent): boolean {
 			if (!result || result.items.length === 0) return false
 			completion.state.active = true
 			completion.state.lastResult = result
+			completionHints.set(result.hints)
 			completion.state.selectedIndex = 0
 			// If there's a common prefix longer than what we have, extend to it
 			if (result.prefix.length > prompt.text().slice(0, prompt.cursorPos()).length) {

@@ -7,6 +7,7 @@ import { cursor } from '../src/cli/cursor.ts'
 import { popup } from '../src/client/popup.ts'
 import { openaiUsage } from '../src/openai-usage.ts'
 import { colors } from '../src/cli/colors.ts'
+import { completionHints } from '../src/cli/completion-hints.ts'
 import { oklch } from '../src/utils/oklch.ts'
 import { version } from '../src/version.ts'
 
@@ -46,6 +47,7 @@ beforeEach(() => {
 	prompt.config.maxPromptLines = 10
 	prompt.state.promptLineLimit = 0
 	popup.close()
+	completionHints.clear()
 	Object.assign(renderStatus.config, {
 		showSession: true,
 		showCwd: true,
@@ -250,6 +252,16 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('alt-enter: queue')
 		expect(clean).toContain('/keys: shortcuts')
+	})
+
+	test('help bar shows ambiguous completion choices while completing', () => {
+		prompt.setText('/cd ./s', '/cd ./s'.length)
+		completionHints.set(['scripts/', 'src/', 'state/'])
+
+		const clean = stripAnsi(captureOutput(() => render.draw(true)))
+
+		expect(clean).toContain('scripts/  src/  state/')
+		expect(clean).not.toContain('enter: send')
 	})
 
 	test('help bar has one-cell padding on both sides', () => {

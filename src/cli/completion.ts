@@ -9,8 +9,10 @@ import { models } from '../models.ts'
 import { clientLocalCommands } from '../client/local-commands.ts'
 import { ipc } from '../ipc.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
+import { completionHints } from './completion-hints.ts'
 
 export interface CompletionResult {
+	hints: string[]
 	items: string[]
 	prefix: string
 	start: number
@@ -98,6 +100,14 @@ function completeDirs(argPrefix: string, cwd: string): string[] {
 	return matching.map((dir) => base + dir + '/')
 }
 
+function dirHint(value: string): string {
+	const suffix = value.endsWith('/') ? '/' : ''
+	const withoutSuffix = suffix ? value.slice(0, -1) : value
+	const name = basename(withoutSuffix)
+	if (!name) return value
+	return name + suffix
+}
+
 function modelNames(): string[] {
 	return [...new Set([...config.modelNames, ...models.modelCompletionNames()])].sort()
 }
@@ -150,7 +160,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 
 		const items = matches.map((name) => `/${name}`)
 		const prefix = longestCommonPrefix(items)
-		return { items, prefix, start: 0 }
+		return { hints: items, items, prefix, start: 0 }
 	}
 
 	const command = parts[0]!
@@ -180,8 +190,9 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	if (values.length === 0) return null
 
 	const items = values.map((value) => `/${command} ${value}`)
+	const hints = arg === 'dir' ? values.map((value) => completion.dirHint(value)) : values
 	const prefix = longestCommonPrefix(items)
-	return { items, prefix, start: 0 }
+	return { hints, items, prefix, start: 0 }
 }
 
 function apply(text: string, cursor: number, item: string): { text: string; cursor: number } {
@@ -203,6 +214,7 @@ function dismiss(): void {
 	state.active = false
 	state.selectedIndex = 0
 	state.lastResult = null
+	completionHints.clear()
 }
 
 function selectedItem(): string | null {
@@ -213,6 +225,7 @@ function selectedItem(): string | null {
 export const completion = {
 	config,
 	state,
+	dirHint,
 	complete,
 	apply,
 	cycle,

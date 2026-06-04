@@ -5,6 +5,7 @@ import { join } from 'path'
 import { ipc } from '../ipc.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import { completion } from './completion.ts'
+import { completionHints } from './completion-hints.ts'
 
 const origReadState = ipc.readState
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
@@ -12,6 +13,14 @@ const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 afterEach(() => {
 	ipc.readState = origReadState
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
+	completion.dismiss()
+})
+
+test('completion hint text joins choices and clips with ellipsis', () => {
+	completionHints.set(['33-alpha', '33-beta', '33-gamma'])
+
+	expect(completionHints.text(80)).toBe('33-alpha  33-beta  33-gamma')
+	expect(completionHints.text(16)).toBe('33-alpha  33-be…')
 })
 
 test('/config completes as a command name', () => {
@@ -83,6 +92,8 @@ test('/go completes session ids and names but not tab numbers', () => {
 
 	expect(id!.items).toContain('/go 04-two')
 	expect(id!.items).toContain('/go 04-old')
+	expect(id!.hints).toContain('04-two')
+	expect(id!.hints).toContain('04-old')
 	expect(name!.items).toEqual(['/go pause fix'])
 	expect(closedName!.items).toEqual(['/go old work'])
 	expect(empty!.items).not.toContain('/go 1')
@@ -143,6 +154,24 @@ test('/cd completes directories from the focused session cwd', () => {
 
 		expect(result).not.toBeNull()
 		expect(result!.items).toEqual(['/cd alpha/'])
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+
+test('/cd exposes basename hints for ambiguous directory matches', () => {
+	const root = mkdtempSync(join(tmpdir(), 'hal-complete-cd-hints-'))
+	try {
+		mkdirSync(join(root, 'scripts'))
+		mkdirSync(join(root, 'src'))
+		mkdirSync(join(root, 'state'))
+
+		const result = completion.complete('/cd ./s', '/cd ./s'.length, root)
+
+		expect(result).not.toBeNull()
+		expect(result!.items).toEqual(['/cd ./scripts/', '/cd ./src/', '/cd ./state/'])
+		expect(result!.hints).toEqual(['scripts/', 'src/', 'state/'])
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}

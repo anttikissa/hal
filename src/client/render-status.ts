@@ -21,6 +21,7 @@ import { HAL_DIR } from '../state.ts'
 import { colors } from '../cli/colors.ts'
 import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
+import { completionHints } from '../cli/completion-hints.ts'
 import type { Tab } from '../client.ts'
 
 const RESET = '\x1b[0m'
@@ -423,6 +424,12 @@ function renderHelpBar(lines: string[]): void {
 		key: colors.help.key || colors.status.highlight,
 		description: desc,
 		separator: desc,
+	}
+	const completionText = completionHints.text(renderStatus.contentWidth(cols))
+	if (completionText) {
+		const styledCompletion = `${desc}${completionText}`
+		lines.push(`${renderStatus.paddedLine(styledCompletion, cols)}${RESET}`)
+		return
 	}
 	const baseLeft = helpBar.build(working, hasText, continueAction, style)
 	const restoreText = client.state.restoreTabHint ? helpBar.restoreTabHint(style) : ''
