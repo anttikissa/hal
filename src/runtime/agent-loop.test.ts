@@ -390,6 +390,49 @@ test('abort between tool iterations does not report max iterations', async () =>
 })
 
 
+test('max iterations persists a continuable error without ending the turn', async () => {
+	const sessionId = `test-max-iterations-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const origMaxIterations = agentLoop.config.maxIterations
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'tool_call', id: 'tool-1', name: 'read', input: { path: 'src/runtime/agent-loop.test.ts', start: 1, end: 1 } }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+	agentLoop.config.maxIterations = 1
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+		})
+		const history = sessions.loadHistory(sessionId)
+		expect(result).toBe('paused')
+		expect(events).toContainEqual(expect.objectContaining({ type: 'info', text: 'Hit max iterations (1). Stopping.', level: 'error' }))
+		expect(events).toContainEqual(expect.objectContaining({ type: 'stream-end', phase: 'done' }))
+		expect(history.at(-1)).toMatchObject({ type: 'error', text: 'Hit max iterations (1). Stopping.' })
+		expect(history.some((entry) => entry.type === 'turn_end')).toBe(false)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+		agentLoop.config.maxIterations = origMaxIterations
+	}
+})
+
+
 test('custom abort text is persisted', async () => {
 	const sessionId = `test-custom-abort-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

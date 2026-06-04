@@ -258,7 +258,6 @@ function historyToBlocks(
 				break
 			case 'turn_end':
 				if (entry.status === 'failed' && result.at(-1)?.type !== 'error') result.push({ type: 'error', text: 'Generation failed.', ts, dimmed })
-				if (entry.status === 'stopped' && result.at(-1)?.type !== 'error') result.push({ type: 'error', text: 'Hit max iterations (50). Stopping.', ts, dimmed })
 				if (entry.status === 'aborted') result.push({ type: 'log', text: '[paused]', ts, dimmed })
 				break
 			case 'forked_from':

@@ -324,7 +324,7 @@ test('subagent-autoclose only closes after a clean completion', () => {
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'completed')).toBe(true)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'aborted')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'failed')).toBe(false)
-	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'stopped')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'paused')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'completed')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'interactive' }, 'completed')).toBe(false)
 })

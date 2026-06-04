@@ -77,7 +77,7 @@ export interface AgentContext {
 	onStatus?: (working: boolean) => void | Promise<void>
 }
 
-export type AgentLoopResult = 'completed' | 'aborted' | 'failed' | 'stopped'
+export type AgentLoopResult = 'completed' | 'aborted' | 'failed' | 'paused'
 
 interface ToolCall {
 	id: string
@@ -735,8 +735,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			return 'aborted'
 		}
 
-		// If we exhausted maxIterations, inform the user
+		// If we exhausted maxIterations, pause in a continuable state. `stream-end`
+		// closes the live UI stream, but we deliberately do not append `turn_end`:
+		// the agent turn has not semantically finished, and Enter should continue it.
 		const stopText = `Hit max iterations (${config.maxIterations}). Stopping.`
+		sessions.appendHistory(sessionId, [errorHistoryEntry(stopText)])
+		sessions.clearLive(sessionId)
 		emitInfo(sessionId, stopText, 'error')
 		const est = context.estimateContext(messages, model, overheadBytes)
 		emitEvent(sessionId, {
@@ -747,11 +751,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			contextMax: est.max,
 		})
 		void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
-		sessions.appendHistory(sessionId, [errorHistoryEntry(stopText)])
-		sessions.clearLive(sessionId)
-		appendTurnEnd(sessionId, { status: 'stopped', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 
-		return 'stopped'
+		return 'paused'
 	} finally {
 		// A new prompt can deliberately displace this turn before this
 		// async function has fully unwound. Only remove the working controller if

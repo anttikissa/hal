@@ -232,7 +232,7 @@ export interface TokenUsage {
 }
 
 export type ProviderName = 'openai' | 'anthropic'
-export type TurnEndStatus = 'completed' | 'failed' | 'aborted' | 'stopped' | 'cancelled' | 'incomplete'
+export type TurnEndStatus = 'completed' | 'failed' | 'aborted' | 'cancelled' | 'incomplete'
 
 export interface TurnEndMeta {
 	provider?: ProviderName
