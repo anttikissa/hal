@@ -244,6 +244,7 @@ function shouldShowStartupSummary(tab: Tab): boolean {
 
 function addStartupSummaryToTab(tab: Tab): void {
 	if (!shouldShowStartupSummary(tab)) return
+	state.startupSummaryShown = true
 	addLocalBlockToTab(tab, { type: 'info', text: startupSummaryText(tab), ts: Date.now() })
 }
 

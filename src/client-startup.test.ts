@@ -285,6 +285,51 @@ describe('client startup', () => {
 		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
 
+	test('startup openCwd shows startup summary only once when background loading finishes later', async () => {
+		const shared = makeSharedState(['s1'])
+		const hostLock = { pid: null, createdAt: '' }
+		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
+		let unblockBlobs!: () => void
+		let blobLoadStarted = false
+		const blobGate = new Promise<void>((resolve) => { unblockBlobs = resolve })
+		let blobCalls = 0
+		blockModule.loadBlobs = async () => {
+			blobCalls++
+			if (blobCalls === 1) {
+				blobLoadStarted = true
+				await blobGate
+			}
+			return 0
+		}
+		ipc.readState = () => shared
+		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
+		liveFiles.onChange = (file, cb) => {
+			if (file === shared) onIpcChange = cb
+		}
+		ipc.tailEvents = async function* () {}
+		client.config.showStartupPerf = true
+		client.state.startupSummaryShown = false
+
+		const ac = new AbortController()
+		client.startClient(ac.signal, { preferredCwd: '/work/project', openCwd: '/work/project' })
+		for (let i = 0; i < 50 && !blobLoadStarted; i++) await Bun.sleep(1)
+		expect(blobLoadStarted).toBe(true)
+
+		shared.sessions = [
+			{ id: 's1', tab: 1, name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
+			{ id: 's2', tab: 2, name: 'tab 2', cwd: '/work/project', model: 'openai/gpt-5.4' },
+		]
+		onIpcChange?.({ path: '', previous: {}, next: shared })
+		expect(client.currentTab()?.sessionId).toBe('s2')
+		expect(client.currentTab()?.history.filter((block) => block.type === 'info')).toHaveLength(1)
+
+		unblockBlobs()
+		await Bun.sleep(10)
+		ac.abort()
+
+		expect(client.currentTab()?.history.filter((block) => block.type === 'info')).toHaveLength(1)
+	})
+
 	test('restart tab wins even when another tab matches the requested cwd', async () => {
 		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
 			lastTab: 's34',
