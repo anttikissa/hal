@@ -80,8 +80,6 @@ const config = {
 	backgroundLoadBlobs: true,
 	repaintAfterBlobLoad: true,
 	pausedNoticeDelayMs: 50,
-	// How long the help bar keeps showing ctrl-shift-t after a tab closes.
-	restoreTabHintMs: 12_000,
 	// Startup performance details are developer diagnostics. Keep the default
 	// startup card human-focused and enable these only when debugging startup.
 	showStartupPerf: false,
@@ -487,6 +485,9 @@ function sendCommand(type: ClientCommandType, text?: string, displayText?: strin
 	if (type === 'resume') sessionTabs.state.pendingOpen = 'resume'
 	if (type === 'prompt') sessionTabs.state.pendingOpen = clientCommands.pendingTabActionForPrompt(text ?? '')
 	ipc.appendCommand(clientCommands.makeCommand(type, tab?.sessionId, text, displayText, delivery))
+	// Hide the retry/continue affordance immediately; the shared working state
+	// arrives on the next IPC update, but this client already queued the turn.
+	if (type === 'continue' && tab) state.working.set(tab.sessionId, true)
 }
 
 

@@ -18,16 +18,11 @@ function actionForBlock(block: Block): ContinueAction | false {
 
 function actionForTab(tab: any, working: boolean): ContinueAction | false {
 	if (!tab) return false
+	if (working) return false
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
-		if (block.type === 'tool') {
-			if (working) return false
-			continue
-		}
-		if ((block.type === 'log' || block.type === 'info') && !actionForBlock(block)) {
-			if (working) return false
-			continue
-		}
+		if (block.type === 'tool') continue
+		if ((block.type === 'log' || block.type === 'info') && !actionForBlock(block)) continue
 		return actionForBlock(block)
 	}
 	return false

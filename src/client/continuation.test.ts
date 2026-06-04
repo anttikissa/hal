@@ -12,3 +12,10 @@ test('provider errors remain retryable by default', () => {
 
 	expect(continuation.actionForTab(tab, false)).toBe('retry')
 })
+
+
+test('working retryable error has no continue action', () => {
+	const tab = { history: [{ type: 'error', text: 'Stream read timed out' }] }
+
+	expect(continuation.actionForTab(tab, true)).toBe(false)
+})

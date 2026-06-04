@@ -363,7 +363,7 @@ test('enter on empty paused tab sends continue', () => {
 	}
 })
 
-test('enter on empty working error tab sends continue', () => {
+test('enter on empty working error tab does not retry again', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const origTabs = client.state.tabs.slice()
@@ -379,7 +379,35 @@ test('enter on empty working error tab sends continue', () => {
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 		expect(handled).toBe(true)
+		expect(commands).toEqual([])
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.focusedTabIndex = origFocusedTab
+	}
+})
+
+
+test('enter on empty error tab hides retry action immediately', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origTabs = client.state.tabs.slice()
+	const origFocusedTab = client.state.focusedTabIndex
+
+	client.state.tabs.length = 0
+	client.state.tabs.push(makeTab({ history: [{ type: 'error', text: 'Stream read timed out (no data for 120000ms)' }] as any[] }))
+	client.state.focusedTabIndex = 0
+	prompt.clear()
+	client.state.working.clear()
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
+		expect(handled).toBe(true)
 		expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
+		expect(client.continueActionForCurrentTurn()).toBe(false)
 	} finally {
 		ipc.appendCommand = origAppendCommand
 		client.state.working.clear()

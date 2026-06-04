@@ -46,9 +46,9 @@ function deriveState(working: boolean, hasText: boolean, continueAction: Continu
 		if (working) return 'working-text'
 		return 'idle-text'
 	}
+	if (working) return 'working'
 	if (continueAction === 'retry') return 'idle-retry'
 	if (continueAction === 'continue') return 'idle-continue'
-	if (working) return 'working'
 	return 'idle-empty'
 }
 
