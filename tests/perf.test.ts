@@ -32,6 +32,7 @@ describe("perf", () => {
 			stderr: "pipe",
 			env: {
 				HAL_STATE_DIR: tmpDir,
+				HAL_DIR: tmpDir,
 				PATH: process.env.PATH,
 				HOME: process.env.HOME,
 			},

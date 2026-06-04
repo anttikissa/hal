@@ -19,6 +19,7 @@ import { openai } from './providers/openai.ts'
 import { subscriptionUsage } from './subscription-usage.ts'
 import { toolRegistry } from './tools/tool.ts'
 import { log } from './utils/log.ts'
+import { HAL_DIR } from './state.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {
@@ -39,9 +40,10 @@ const modules: Record<string, Record<string, any>> = {
 	log: log.config,
 }
 
-// config.ason lives at repo root — it's user-facing config.
-const HAL_DIR = import.meta.dir.replace(/\/src$/, '')
-const CONFIG_PATH = `${HAL_DIR}/config.ason`
+// config.ason lives at the Hal root — it's user-facing config.
+function path(): string {
+	return `${process.env.HAL_DIR ?? HAL_DIR}/config.ason`
+}
 
 const state = {
 	initialized: false,
@@ -217,7 +219,7 @@ function init(): void {
 
 	// liveFile() does the real disk load and starts the watcher. Keeping that here
 	// makes importing config.ts side-effect free.
-	config.data = liveFiles.liveFile(CONFIG_PATH, {}) as Record<string, any>
+	config.data = liveFiles.liveFile(config.path(), {}) as Record<string, any>
 	config.apply()
 	liveFiles.onChange(config.data, (change: { previous: Record<string, any>; next: Record<string, any> }) => {
 		const message = config.formatReloadMessage(change.previous, change.next)
@@ -239,6 +241,7 @@ export const config = {
 	state,
 	modules,
 	data: {} as Record<string, any>,
+	path,
 	init,
 	apply,
 	save,

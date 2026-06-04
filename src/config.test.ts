@@ -19,19 +19,21 @@ test('config-template.ason matches module config defaults', () => {
 	expect(template).toEqual(defaults)
 })
 
-test('config.init loads config lazily and only once', () => {
+test('config.init loads config lazily from HAL_DIR and only once', () => {
 	const origInitialized = (config as any).state?.initialized
 	const origData = config.data
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
 	const origDefaultModel = models.config.default
+	const origHalDir = process.env.HAL_DIR
 	const loadedData = { models: { default: 'gpt' } } as Record<string, any>
 	let liveFileCalls = 0
 	let onChangeCalls = 0
 
+	process.env.HAL_DIR = '/tmp/hal-config-test'
 	liveFiles.liveFile = ((path: string) => {
 		liveFileCalls++
-		expect(path.endsWith('/config.ason')).toBe(true)
+		expect(path).toBe('/tmp/hal-config-test/config.ason')
 		return loadedData
 	}) as typeof liveFiles.liveFile
 	liveFiles.onChange = ((data: object) => {
@@ -60,6 +62,8 @@ test('config.init loads config lazily and only once', () => {
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
 		models.config.default = origDefaultModel
+		if (origHalDir === undefined) delete process.env.HAL_DIR
+		else process.env.HAL_DIR = origHalDir
 	}
 })
 
