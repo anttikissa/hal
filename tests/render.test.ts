@@ -835,7 +835,7 @@ describe('render', () => {
 		expect(clean).toContain('sonnet')
 	})
 
-	test('text hints still reserve the help-bar row', () => {
+	test('empty help bar still reserves the help-bar row', () => {
 		render.resetRenderer()
 		const empty = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 
@@ -843,9 +843,9 @@ describe('render', () => {
 		prompt.setText('x')
 		const withText = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 
-		const emptyHelp = empty.find((line) => line.includes('type a prompt'))
+		const emptyHelp = empty.find((line) => line.includes('/keys: shortcuts'))
 		const promptLine = withText.findIndex((line) => line.trim() === 'x')
-		expect(emptyHelp).toContain('type a prompt')
+		expect(emptyHelp).toContain('/keys: shortcuts')
 		expect(promptLine).toBeGreaterThan(0)
 		expect(withText[promptLine + 3]).toContain('/keys: shortcuts')
 		expect(withText.length).toBe(empty.length)

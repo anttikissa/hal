@@ -5,11 +5,8 @@ type HelpState = 'idle-empty' | 'idle-text' | 'idle-continue' | 'idle-retry' | '
 type ContinueAction = 'continue' | 'retry'
 
 interface Hint {
-	// Render as "key: description" when keyLabel/description are set. Free-text
-	// hints are for state affordances that should read as a sentence.
-	keyLabel?: string
-	description?: string
-	text?: string
+	keyLabel: string
+	description: string
 }
 
 interface HelpStyle {
@@ -23,8 +20,7 @@ const config = {
 	rightDescription: 'shortcuts',
 }
 
-const HINTS: Record<HelpState, Hint[]> = {
-	'idle-empty': [{ text: 'type a prompt' }],
+const HINTS: Partial<Record<HelpState, Hint[]>> = {
 	'idle-text': [
 		{ keyLabel: 'enter', description: 'send' },
 		{ keyLabel: 'shift-enter', description: 'newline' },
@@ -53,11 +49,6 @@ function deriveState(working: boolean, hasText: boolean, continueAction: Continu
 }
 
 function formatHint(hint: Hint, style?: HelpStyle): string {
-	if (hint.text) {
-		if (!style) return hint.text
-		return `${style.description}${hint.text}`
-	}
-	if (!hint.keyLabel || !hint.description) return ''
 	if (!style) return `${hint.keyLabel}: ${hint.description}`
 	return `${style.key}${hint.keyLabel}${style.description}: ${hint.description}`
 }
@@ -73,7 +64,7 @@ function restoreTabHint(style?: HelpStyle): string {
 function build(working: boolean, hasText: boolean, continueAction: ContinueAction | false = false, style?: HelpStyle): string {
 	const state = deriveState(working, hasText, continueAction)
 	const separator = style ? `${style.separator}, ${style.description}` : ', '
-	return HINTS[state].map((hint) => formatHint(hint, style)).filter(Boolean).join(separator)
+	return (HINTS[state] ?? []).map((hint) => formatHint(hint, style)).filter(Boolean).join(separator)
 }
 
 export const helpBar = {
