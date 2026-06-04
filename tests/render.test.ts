@@ -313,16 +313,16 @@ describe('render', () => {
 			renderStatus.renderPrompt(lines)
 			const clean = lines.map(stripAnsi)
 			expect(clean[0]).toBe('────────────────────')
-			expect(clean[4]).toBe('↓1 ─────────────────')
+			expect(clean[4]).toBe(' ↓1 ────────────────')
 
 			prompt.state.promptLineLimit = 1
 			prompt.setText('one\ntwo\nthree', 'one\ntwo'.length)
 			lines.length = 0
 			renderStatus.renderPrompt(lines)
 			expect(lines.map(stripAnsi)).toEqual([
-				'↑1 ─────────────────',
+				' ↑1 ────────────────',
 				' two                ',
-				'↓1 ─────────────────',
+				' ↓1 ────────────────',
 			])
 		} finally {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

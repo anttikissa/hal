@@ -449,7 +449,7 @@ function promptContentWidth(cols: number): number {
 }
 
 function promptRule(cols: number, indicator = ''): string {
-	const prefix = indicator ? `${indicator} ` : ''
+	const prefix = indicator ? ` ${indicator} ` : ''
 	const clipped = visLen(prefix) > cols ? clipVisual(prefix, cols) : prefix
 	const rule = '─'.repeat(Math.max(0, cols - visLen(clipped)))
 	return `${renderStatus.inputStyle()}${clipped}${rule}${RESET}`
