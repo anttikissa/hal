@@ -34,10 +34,22 @@ export interface SharedHostInfo {
 	error?: string
 }
 
+export interface SharedClientInfo {
+	pid: number
+	startedAt: string
+	updatedAt: string
+	sessionId?: string
+	cwd?: string
+	versionStatus: VersionStatus
+	version?: string
+	error?: string
+}
+
 export interface SharedState {
 	sessions: SharedSessionInfo[]
 	working: Record<string, boolean>
 	host?: SharedHostInfo
+	clients?: SharedClientInfo[]
 	updatedAt: string
 }
 
@@ -45,6 +57,7 @@ function defaultState(): SharedState {
 	return {
 		sessions: [],
 		working: {},
+		clients: [],
 		host: { pid: null, startedAt: '', versionStatus: 'idle' },
 		updatedAt: new Date().toISOString(),
 	}
@@ -108,6 +121,7 @@ function getStateFile(): SharedState {
 	stateFile = liveFiles.liveFile(STATE_FILE, defaultState(), { watch: false }) as SharedState
 	if (!Array.isArray(stateFile.sessions)) stateFile.sessions = []
 	if (!stateFile.working || typeof stateFile.working !== 'object') stateFile.working = {}
+	if (!Array.isArray(stateFile.clients)) stateFile.clients = []
 	if (typeof stateFile.updatedAt !== 'string') stateFile.updatedAt = new Date().toISOString()
 	return stateFile
 }

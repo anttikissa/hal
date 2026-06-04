@@ -22,6 +22,42 @@ test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	}
 })
 
+test('client status commands update shared client process list', () => {
+	const origUpdateState = ipc.updateState
+	const shared: any = { sessions: [], working: {}, clients: [], updatedAt: '' }
+	ipc.updateState = ((mutator: (state: any) => void) => {
+		mutator(shared)
+		return shared
+	}) as typeof ipc.updateState
+	try {
+		runtime.handleCommand({
+			type: 'client-status',
+			sessionId: '04-one',
+			pid: 123,
+			startedAt: '2026-06-04T12:00:00.000Z',
+			updatedAt: '2026-06-04T12:01:00.000Z',
+			cwd: '/work',
+			versionStatus: 'ready',
+			version: 'client123',
+		})
+		expect(shared.clients).toEqual([{
+			pid: 123,
+			startedAt: '2026-06-04T12:00:00.000Z',
+			updatedAt: '2026-06-04T12:01:00.000Z',
+			sessionId: '04-one',
+			cwd: '/work',
+			versionStatus: 'ready',
+			version: 'client123',
+			error: undefined,
+		}])
+
+		runtime.handleCommand({ type: 'client-exit', pid: 123 })
+		expect(shared.clients).toEqual([])
+	} finally {
+		ipc.updateState = origUpdateState
+	}
+})
+
 test('command errors include the slash command that caused them', () => {
 	expect(runtime.formatCommandError('/rename /what', 'Name may contain letters only.')).toBe('/rename: Name may contain letters only.')
 	expect(runtime.formatCommandError('/rename /what', '/rename: Name may contain letters only.')).toBe('/rename: Name may contain letters only.')

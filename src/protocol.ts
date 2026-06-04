@@ -24,7 +24,7 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus'
+export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'client-status' | 'client-exit'
 
 export type SpawnMode = 'fork' | 'fresh'
 export type SpawnKind = 'subagent' | 'subagent-autoclose' | 'interactive'
@@ -141,8 +141,26 @@ export interface FocusCommand extends CommandBase {
 	type: 'focus'
 }
 
+export interface ClientStatusCommand extends CommandBase {
+	type: 'client-status'
+	pid: number
+	startedAt: string
+	updatedAt: string
+	cwd?: string
+	versionStatus: import('./version.ts').VersionStatus
+	version?: string
+	error?: string
+}
+
+export interface ClientExitCommand extends CommandBase {
+	type: 'client-exit'
+	pid: number
+}
+
 export type Command =
 	| PromptCommand
+	| ClientStatusCommand
+	| ClientExitCommand
 	| ContinueCommand
 	| QueueNextCommand
 	| OpenNewCommand

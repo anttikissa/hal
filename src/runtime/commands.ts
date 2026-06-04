@@ -21,6 +21,8 @@ import { version } from '../version.ts'
 import { visLen } from '../utils/strings.ts'
 import { HAL_DIR } from '../state.ts'
 import { authLogin } from '../auth-login.ts'
+import { isPidAlive } from '../utils/is-pid-alive.ts'
+import type { SharedClientInfo } from '../ipc.ts'
 
 // ── Types ──
 
@@ -111,6 +113,7 @@ interface CommandSection {
 const handlers: Record<string, CommandHandler> = {}
 const workingSafeCommands = new Set([
 	'broadcast',
+	'clients',
 	'fork',
 	'help',
 	'mem',
@@ -289,6 +292,45 @@ function renderRuntimeStatus(): string {
 	return lines.join('\n')
 }
 
+function processVersionLabel(status: string, value?: string, error?: string): string {
+	if (status === 'ready') return value || 'unknown'
+	if (status === 'error') return `error: ${error || 'unknown'}`
+	return status || 'unknown'
+}
+
+function connectedClients(clients: SharedClientInfo[]): SharedClientInfo[] {
+	return clients.filter((item) => item.pid > 0 && isPidAlive(item.pid))
+}
+
+function renderClientsStatus(): string {
+	const shared = ipc.readState()
+	const host = shared.host
+	const lines = ['Processes:', 'Server:']
+	if (host?.pid) {
+		lines.push(`  pid ${host.pid}  version ${processVersionLabel(host.versionStatus, host.version, host.error)}`)
+		if (host.startedAt) lines.push(`       started ${formatStamp(host.startedAt)}`)
+	} else {
+		lines.push('  none')
+	}
+
+	lines.push('Clients:')
+	const clients = connectedClients(shared.clients ?? []).sort((a, b) => a.pid - b.pid)
+	if (clients.length === 0) {
+		lines.push('  none')
+		return lines.join('\n')
+	}
+
+	for (const item of clients) {
+		const session = item.sessionId ? `  session ${item.sessionId}` : ''
+		lines.push(`  pid ${item.pid}${session}  version ${processVersionLabel(item.versionStatus, item.version, item.error)}`)
+		const dates = [`seen ${formatStamp(item.updatedAt)}`]
+		if (item.startedAt) dates.push(`started ${formatStamp(item.startedAt)}`)
+		if (item.cwd) dates.push(item.cwd)
+		lines.push(`       ${dates.join(' · ')}`)
+	}
+	return lines.join('\n')
+}
+
 
 // Keep /help output short, and put the fiddly syntax under /help <command>.
 function normalizeHelpCommand(args: string): string {
@@ -298,6 +340,7 @@ function normalizeHelpCommand(args: string): string {
 const commandSpecs: Record<string, CommandSpec> = {
 	model: { usage: '[<model>]', summary: 'Switch model or list available models.', detail: 'With no model, shows the current model and the available choices.', arg: 'model' },
 	clear: { summary: 'Clear session history.' },
+	clients: { summary: 'List server and connected client versions.' },
 	fork: { summary: 'Fork current session to new tab.' },
 	self: { usage: '[--fork | -f]', summary: 'Open a session in Hal\'s own directory.', detail: 'With --fork, fork this conversation into Hal\'s own directory instead of starting a fresh self tab.' },
 	open: { usage: '[<target>]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
@@ -367,7 +410,7 @@ const commandSections: CommandSection[] = [
 	{ title: 'Conversation', names: ['clear', 'compact', 'rebase', 'system'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
-	{ title: 'Setup & diagnostics', names: ['cd', 'config', 'login', 'mem'] },
+	{ title: 'Setup & diagnostics', names: ['cd', 'clients', 'config', 'login', 'mem'] },
 ]
 
 function helpUsageLines(name: string): string[] {
@@ -584,6 +627,10 @@ handlers['compact'] = (_args, session) => {
 // /rebase is handled by the interactive client so the editor runs on the user's terminal.
 handlers['rebase'] = async () => {
 	return { error: 'Run /rebase from an interactive client terminal.', handled: true }
+}
+
+handlers['clients'] = () => {
+	return { output: renderClientsStatus(), handled: true }
 }
 
 // /status — runtime version + Anthropic / OpenAI OAuth subscription usage

@@ -728,8 +728,37 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
 }
 
+function recordClientStatus(cmd: Extract<Command, { type: 'client-status' }>): void {
+	ipc.updateState((shared) => {
+		shared.clients = (shared.clients ?? []).filter((item) => item.pid !== cmd.pid)
+		shared.clients.push({
+			pid: cmd.pid,
+			startedAt: cmd.startedAt,
+			updatedAt: cmd.updatedAt,
+			sessionId: cmd.sessionId,
+			cwd: cmd.cwd,
+			versionStatus: cmd.versionStatus,
+			version: cmd.version,
+			error: cmd.error,
+		})
+	})
+}
+
+function removeClient(pid: number): void {
+	ipc.updateState((shared) => {
+		shared.clients = (shared.clients ?? []).filter((item) => item.pid !== pid)
+	})
+}
 function handleCommand(cmd: Command): void {
 	const sessionId = cmd.sessionId ?? state.openSessionIds[0]
+	if (cmd.type === 'client-status') {
+		recordClientStatus(cmd)
+		return
+	}
+	if (cmd.type === 'client-exit') {
+		removeClient(cmd.pid)
+		return
+	}
 	focusSession(cmd.sessionId)
 	switch (cmd.type) {
 		case 'prompt': {
@@ -936,7 +965,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 			if (signal.aborted || state.activeRuntimePid !== process.pid) break
 			if (!ipc.ownsHostLock()) break
 			const hasLiveSession = !cmd.sessionId || state.openSessionIds.includes(cmd.sessionId)
-			if (!hasLiveSession && cmd.type !== 'open' && cmd.type !== 'resume') continue
+			if (!hasLiveSession && cmd.type !== 'client-exit' && cmd.type !== 'client-status' && cmd.type !== 'open' && cmd.type !== 'resume') continue
 			try {
 				handleCommand(cmd)
 			} catch (err: any) {

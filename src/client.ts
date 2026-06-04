@@ -4,7 +4,7 @@
 import { ipc } from './ipc.ts'
 import type { SharedSessionInfo, SharedState } from './ipc.ts'
 import type { TokenUsage } from './protocol.ts'
-import type { VersionStatus } from './version.ts'
+import { version, type VersionStatus } from './version.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
 import { draft as draftModule } from './cli/draft.ts'
@@ -97,6 +97,7 @@ const state = {
 	focusedTabIndex: 0,
 	role: 'server' as 'server' | 'client',
 	pid: process.pid,
+	startedAt: new Date().toISOString(),
 	hostPid: null as number | null,
 	hostVersionStatus: 'idle' as VersionStatus,
 	hostVersion: '',
@@ -188,6 +189,27 @@ function focusSession(sessionId: string | undefined): void {
 
 function focusCurrentTab(): void {
 	focusSession(currentTab()?.sessionId)
+}
+
+function publishStatus(): void {
+	if (state.role !== 'client') return
+	const tab = currentTab()
+	ipc.appendCommand({
+		type: 'client-status',
+		sessionId: tab?.sessionId,
+		pid: state.pid,
+		startedAt: state.startedAt,
+		updatedAt: new Date().toISOString(),
+		cwd: tab?.cwd,
+		versionStatus: version.state.status,
+		version: version.state.combined || undefined,
+		error: version.state.error || undefined,
+	})
+}
+
+function publishExit(): void {
+	if (state.role !== 'client') return
+	ipc.appendCommand({ type: 'client-exit', sessionId: currentTab()?.sessionId, pid: state.pid })
 }
 
 function rememberTab(sessionId: string): void {
@@ -695,6 +717,8 @@ export const client = {
 	addEntry,
 	addStartupEntry: (text: string) => queueLocalBlock({ type: 'info', text, ts: Date.now() }),
 	sendCommand,
+	publishStatus,
+	publishExit,
 	startClient,
 	saveState: saveClientState,
 	getInputHistory,

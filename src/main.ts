@@ -105,11 +105,13 @@ function syncHostVersionState(): void {
 			version: version.state.combined || undefined,
 			error: version.state.error || undefined,
 		}
+		state.clients = (state.clients ?? []).filter((item) => item.pid !== process.pid)
 	})
 }
 
 version.onChange(() => {
 	if (isHost) syncHostVersionState()
+	else client.publishStatus()
 	client.requestRender(false)
 })
 
@@ -147,6 +149,8 @@ function cleanup(): void {
 	if (isHost) {
 		ipc.appendEvent({ type: 'host-released' })
 		ipc.releaseHost()
+	} else {
+		client.publishExit()
 	}
 	perf.stop()
 }
@@ -190,3 +194,4 @@ queueMemoryCheck()
 electionTimer = setInterval(tickElection, 100)
 
 cli.startCli(ac.signal, { preferredCwd: startupCwd, ...startupTarget })
+if (!isHost) client.publishStatus()

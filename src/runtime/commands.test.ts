@@ -29,6 +29,8 @@ const origReadRss = memory.io.readRss
 const origDefaultModel = models.config.default
 const origVersionState = { ...version.state }
 const origScheduleExit = commands.state.scheduleExit
+const origReadState = ipc.readState
+const origOwnsHostLock = ipc.ownsHostLock
 
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 const origLoadAllHistory = sessionStore.loadAllHistory
@@ -72,6 +74,8 @@ afterEach(() => {
 	ipc.appendCommand = origAppendCommand
 	Object.assign(version.state, origVersionState)
 	commands.state.scheduleExit = origScheduleExit
+	ipc.readState = origReadState
+	ipc.ownsHostLock = origOwnsHostLock
 	version.state.repoDir = origVersionState.repoDir
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
 	sessionStore.loadAllHistory = origLoadAllHistory
@@ -165,6 +169,36 @@ test('/status renders Anthropic and OpenAI subscription usage', async () => {
 	expect(result.error).toBeUndefined()
 	expect(result.output).toContain('Anthropic subscriptions:')
 	expect(result.output).toContain('OpenAI subscriptions:')
+})
+
+test('/clients lists server and client versions', async () => {
+	ipc.ownsHostLock = () => true
+	ipc.readState = () => ({
+		sessions: [{ id: '04-aaa', tab: 1, cwd: '/work', model: 'gpt-5.5' }],
+		working: {},
+		host: { pid: 111, startedAt: '2026-06-04T12:00:00.000Z', versionStatus: 'ready', version: 'host1234' },
+		clients: [{
+			pid: process.pid,
+			startedAt: '2026-06-04T12:01:00.000Z',
+			updatedAt: '2026-06-04T12:02:00.000Z',
+			sessionId: '04-aaa',
+			cwd: '/work',
+			versionStatus: 'ready',
+			version: 'client5678',
+		}],
+		updatedAt: '2026-06-04T12:02:00.000Z',
+	}) as any
+
+	const result = await commands.executeCommand('/clients', makeSession())
+
+	expect(result.handled).toBe(true)
+	expect(result.output).toContain('Server:')
+	expect(result.output).toContain('pid 111')
+	expect(result.output).toContain('host1234')
+	expect(result.output).toContain('Clients:')
+	expect(result.output).toContain(`pid ${process.pid}`)
+	expect(result.output).toContain('client5678')
+	expect(result.output).toContain('session 04-aaa')
 })
 
 
