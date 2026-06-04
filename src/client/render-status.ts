@@ -425,7 +425,7 @@ function renderHelpBar(lines: string[]): void {
 		separator: desc,
 	}
 	const baseLeft = helpBar.build(working, hasText, continueAction, style)
-	const restoreText = client.restoreTabHintActive() ? helpBar.restoreTabHint(style) : ''
+	const restoreText = client.state.restoreTabHint ? helpBar.restoreTabHint(style) : ''
 	const resizeHint = prompt.resizeHint(cols)
 	const resizeText = resizeHint ? `${style.key}ctrl-=/-${style.description}: ${resizeHint}` : ''
 	const separator = `${style.separator}, `

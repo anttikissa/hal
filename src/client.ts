@@ -114,8 +114,7 @@ const state = {
 	// do not close the focused tab, such as cross-client closes or startup recovery.
 	recentTabs: [] as string[],
 	startupSummaryShown: false,
-	// Ephemeral affordance for undoing the latest closed tab in the normal help bar.
-	restoreTabHintUntil: 0,
+	restoreTabHint: false,
 }
 
 let pendingEntries: Block[] = []
@@ -123,7 +122,6 @@ let onChange: (force: boolean) => void = () => {}
 let onToolConfirmRequest: ((event: any) => void) | null = null
 let onRebaseStart: ((event: any) => void) | null = null
 let onRebaseResult: ((event: any) => void) | null = null
-let restoreTabHintTimer: ReturnType<typeof setTimeout> | null = null
 
 
 
@@ -175,36 +173,9 @@ function setOnRebaseResult(fn: (event: any) => void): void {
 
 function requestRender(force = false): void { onChange(force) }
 
-function clearRestoreTabHint(): void {
-	if (restoreTabHintTimer) clearTimeout(restoreTabHintTimer)
-	restoreTabHintTimer = null
-	const hadHint = state.restoreTabHintUntil > 0
-	state.restoreTabHintUntil = 0
-	if (hadHint) onChange(false)
-}
+function clearRestoreTabHint(): void { state.restoreTabHint = false }
 
-function restoreTabHintActive(now = Date.now()): boolean {
-	return state.restoreTabHintUntil > now
-}
-
-function showRestoreTabHint(now = Date.now()): void {
-	if (restoreTabHintTimer) clearTimeout(restoreTabHintTimer)
-	restoreTabHintTimer = null
-	const ms = Math.max(0, config.restoreTabHintMs)
-	if (ms <= 0) {
-		state.restoreTabHintUntil = 0
-		return
-	}
-
-	state.restoreTabHintUntil = now + ms
-	restoreTabHintTimer = setTimeout(() => {
-		restoreTabHintTimer = null
-		if (restoreTabHintActive()) return
-		state.restoreTabHintUntil = 0
-		onChange(false)
-	}, ms)
-	restoreTabHintTimer.unref?.()
-}
+function showRestoreTabHint(): void { state.restoreTabHint = true }
 
 function currentTab(): Tab | null {
 	return state.tabs[state.focusedTabIndex] ?? null
@@ -725,7 +696,6 @@ export const client = {
 	onSubmit,
 	showRestoreTabHint,
 	clearRestoreTabHint,
-	restoreTabHintActive,
 	resetForTests,
 }
 
