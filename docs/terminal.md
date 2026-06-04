@@ -15,9 +15,9 @@ Bottom-anchored sections:
 [history lines...]   — per-tab, append-only, ALL of them
 [padding]            — blank lines to stabilize prompt position across tabs
 [tab bar]            — " Tabs: [1]  2" plus tab-specific hints when they fit
-[prompt top rule]    — one full-width rule on the prompt blue background
+[prompt top rule]    — one full-width rule on the prompt blue background; shows ↑N when prompt rows are hidden above
 [prompt]             — user input, blue bg, padded one column on each side
-[prompt bottom rule] — one full-width rule on the prompt blue background
+[prompt bottom rule] — one full-width rule on the prompt blue background; shows ↓N when prompt rows are hidden below
 [status bar]         — left: session/cwd/model/context; right: role/usage/subscription
 [help bar]           — prompt-specific key hints, always one row (even when empty)
 ```

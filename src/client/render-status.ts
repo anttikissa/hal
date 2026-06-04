@@ -448,8 +448,11 @@ function promptContentWidth(cols: number): number {
 	return renderStatus.contentWidth(cols)
 }
 
-function promptRule(cols: number): string {
-	return `${renderStatus.inputStyle()}${'─'.repeat(Math.max(0, cols))}${RESET}`
+function promptRule(cols: number, indicator = ''): string {
+	const prefix = indicator ? `${indicator} ` : ''
+	const clipped = visLen(prefix) > cols ? clipVisual(prefix, cols) : prefix
+	const rule = '─'.repeat(Math.max(0, cols - visLen(clipped)))
+	return `${renderStatus.inputStyle()}${clipped}${rule}${RESET}`
 }
 
 function paddedPromptLine(line: string, cols: number): string {
@@ -459,9 +462,11 @@ function paddedPromptLine(line: string, cols: number): string {
 function renderPrompt(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
-	lines.push(renderStatus.promptRule(cols))
+	const above = p.fold.above > 0 ? `↑${p.fold.above}` : ''
+	const below = p.fold.below > 0 ? `↓${p.fold.below}` : ''
+	lines.push(renderStatus.promptRule(cols, above))
 	for (const line of p.lines) lines.push(renderStatus.paddedPromptLine(line, cols))
-	lines.push(renderStatus.promptRule(cols))
+	lines.push(renderStatus.promptRule(cols, below))
 }
 
 // How many frame lines the chrome (tab bar + prompt box + status + help) occupies.

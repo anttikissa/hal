@@ -303,6 +303,32 @@ describe('render', () => {
 		expect(renderStatus.paddedPromptLine('hello', 10)).toContain(colors.user.fg)
 	})
 
+	test('prompt fold indicators render in horizontal bars', () => {
+		const originalCols = process.stdout.columns
+		try {
+			Object.defineProperty(process.stdout, 'columns', { value: 20, configurable: true })
+			prompt.config.maxPromptLines = 3
+			prompt.setText('one\ntwo\nthree\nfour', 0)
+			const lines: string[] = []
+			renderStatus.renderPrompt(lines)
+			const clean = lines.map(stripAnsi)
+			expect(clean[0]).toBe('────────────────────')
+			expect(clean[4]).toBe('↓1 ─────────────────')
+
+			prompt.state.promptLineLimit = 1
+			prompt.setText('one\ntwo\nthree', 'one\ntwo'.length)
+			lines.length = 0
+			renderStatus.renderPrompt(lines)
+			expect(lines.map(stripAnsi)).toEqual([
+				'↑1 ─────────────────',
+				' two                ',
+				'↓1 ─────────────────',
+			])
+		} finally {
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
 
 	test('prompt cursor shape is configurable', () => {
 		renderStatus.config.promptCursorShape = 'bar'

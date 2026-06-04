@@ -3,7 +3,7 @@
 
 import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
-import { charWidth, clipVisual, visLen, wordWrap } from '../utils/strings.ts'
+import { charWidth, visLen, wordWrap } from '../utils/strings.ts'
 
 const MAX_UNDO = 200
 const SELECTION_ON = '\x1b[7m'
@@ -643,25 +643,7 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 interface PromptRender {
 	lines: string[]
 	cursor: { rowOffset: number; col: number }
-}
-
-function withFoldIndicator(line: string, indicator: string, contentWidth: number): string {
-	const indicatorWidth = visLen(indicator)
-	if (contentWidth <= indicatorWidth) return clipVisual(indicator, contentWidth)
-	const maxText = contentWidth - indicatorWidth - 1
-	const text = visLen(line) > maxText ? clipVisual(line, maxText) : line
-	const selectionOff = text.includes('\x1b[') ? SELECTION_OFF : ''
-	return text + selectionOff + ' '.repeat(Math.max(1, contentWidth - visLen(text) - indicatorWidth)) + indicator
-}
-
-function addFoldIndicators(lines: string[], above: number, below: number, contentWidth: number): void {
-	if (lines.length === 0) return
-	if (above > 0 && below > 0 && lines.length === 1) {
-		lines[0] = withFoldIndicator(lines[0]!, `↑${above} ↓${below}`, contentWidth)
-		return
-	}
-	if (above > 0) lines[0] = withFoldIndicator(lines[0]!, `↑${above}`, contentWidth)
-	if (below > 0) lines[lines.length - 1] = withFoldIndicator(lines[lines.length - 1]!, `↓${below}`, contentWidth)
+	fold: { above: number; below: number }
 }
 
 function buildPrompt(contentWidth: number): PromptRender {
@@ -699,11 +681,9 @@ function buildPrompt(contentWidth: number): PromptRender {
 			lines.push(lineText)
 		}
 	}
-	const below = Math.max(0, totalRows - scrollTop - promptLines)
-	addFoldIndicators(lines, scrollTop, below, contentWidth)
+	const fold = { above: scrollTop, below: Math.max(0, totalRows - scrollTop - promptLines) }
 
-
-	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol } }
+	return { lines, cursor: { rowOffset: curRow - scrollTop, col: curCol }, fold }
 }
 
 function submitText(): string {

@@ -281,14 +281,18 @@ describe('prompt', () => {
 		expect(built.cursor).toEqual({ rowOffset: 0, col: 2 })
 	})
 
-	test('buildPrompt shows fold indicators for hidden prompt lines', () => {
+	test('buildPrompt reports hidden prompt lines', () => {
 		prompt.config.maxPromptLines = 3
 		prompt.setText('one\ntwo\nthree\nfour', 0)
-		expect(prompt.buildPrompt(20).lines).toEqual(['one', 'two', 'three             ↓1'])
+		let built = prompt.buildPrompt(20)
+		expect(built.lines).toEqual(['one', 'two', 'three'])
+		expect(built.fold).toEqual({ above: 0, below: 1 })
 
 		prompt.state.promptLineLimit = 1
 		prompt.setText('one\ntwo\nthree', 'one\ntwo'.length)
-		expect(prompt.buildPrompt(20).lines).toEqual(['two            ↑1 ↓1'])
+		built = prompt.buildPrompt(20)
+		expect(built.lines).toEqual(['two'])
+		expect(built.fold).toEqual({ above: 1, below: 1 })
 	})
 
 	/* ctrl-up/down resize the viewport for composing long prompts without touching text. */
@@ -297,11 +301,11 @@ describe('prompt', () => {
 		prompt.state.promptLineLimit = 0
 		prompt.setText('one\ntwo\nthree\nfour', 'one\ntwo\nthree\nfour'.length)
 
-		expect(prompt.buildPrompt(20).lines).toEqual(['two               ↑1', 'three', 'four'])
+		expect(prompt.buildPrompt(20).lines).toEqual(['two', 'three', 'four'])
 		expect(prompt.handleKey(key('up', { ctrl: true }), 20)).toBe(true)
 		expect(prompt.buildPrompt(20).lines).toEqual(['one', 'two', 'three', 'four'])
 
 		expect(prompt.handleKey(key('down', { ctrl: true }), 20)).toBe(true)
-		expect(prompt.buildPrompt(20).lines).toEqual(['two               ↑1', 'three', 'four'])
+		expect(prompt.buildPrompt(20).lines).toEqual(['two', 'three', 'four'])
 	})
 })
