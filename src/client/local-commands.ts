@@ -25,7 +25,7 @@ export interface ClientLocalCommandResult {
 
 type ClientLocalCommandHandler = (args: string, ctx: ClientLocalCommandContext) => ClientLocalCommandResult
 
-type ClientLocalCommandArg = 'command'
+type ClientLocalCommandArg = 'command' | 'session'
 
 interface ClientLocalCommandSpec {
 	usage?: string | string[]
@@ -259,6 +259,7 @@ specs['go'] = {
 	usage: '<target>',
 	summary: 'Switch this terminal to a tab or resume a matching closed session.',
 	detail: 'Target can be a tab number, session id, or session name. Exact matches are preferred, then partial open/closed session names.',
+	arg: 'session',
 	run: runGo,
 }
 

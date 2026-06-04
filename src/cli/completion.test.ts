@@ -1,8 +1,18 @@
-import { expect, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { ipc } from '../ipc.ts'
+import { sessions as sessionStore } from '../server/sessions.ts'
 import { completion } from './completion.ts'
+
+const origReadState = ipc.readState
+const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
+
+afterEach(() => {
+	ipc.readState = origReadState
+	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
+})
 
 test('/config completes as a command name', () => {
 	const result = completion.complete('/con', '/con'.length)
@@ -47,6 +57,36 @@ test('/help st completes command names from runtime command list', () => {
 
 	expect(result).not.toBeNull()
 	expect(result!.items).toContain('/help status')
+})
+
+
+test('/go completes session ids and names but not tab numbers', () => {
+	ipc.readState = () => ({
+		sessions: [
+			{ id: '04-one', tab: 1, name: 'main', cwd: '/tmp/main' },
+			{ id: '04-two', tab: 2, name: 'pause fix', cwd: '/tmp/pause' },
+		],
+		busy: {},
+		activity: {},
+		working: {},
+		updatedAt: new Date().toISOString(),
+	})
+	sessionStore.loadAllSessionMetas = () => [
+		{ id: '04-one', name: 'main', workingDir: '/tmp/main', createdAt: '2026-01-01T00:00:00.000Z' },
+		{ id: '04-old', name: 'old work', workingDir: '/tmp/old', createdAt: '2026-01-01T00:00:00.000Z', closedAt: '2026-01-01T01:00:00.000Z' },
+	]
+
+	const id = completion.complete('/go 04-', '/go 04-'.length)
+	const name = completion.complete('/go pause ', '/go pause '.length)
+	const closedName = completion.complete('/go old', '/go old'.length)
+	const empty = completion.complete('/go ', '/go '.length)
+
+	expect(id!.items).toContain('/go 04-two')
+	expect(id!.items).toContain('/go 04-old')
+	expect(name!.items).toEqual(['/go pause fix'])
+	expect(closedName!.items).toEqual(['/go old work'])
+	expect(empty!.items).not.toContain('/go 1')
+	expect(empty!.items).not.toContain('/go 2')
 })
 
 

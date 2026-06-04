@@ -7,6 +7,8 @@ import { config as runtimeConfig } from '../config.ts'
 import { commands } from '../runtime/commands.ts'
 import { models } from '../models.ts'
 import { clientLocalCommands } from '../client/local-commands.ts'
+import { ipc } from '../ipc.ts'
+import { sessions as sessionStore } from '../server/sessions.ts'
 
 export interface CompletionResult {
 	items: string[]
@@ -104,6 +106,31 @@ function commandNamesForPrompt(): string[] {
 	return [...new Set([...commands.commandNames(), ...clientLocalCommands.commandNames()])].sort()
 }
 
+function addUnique(values: string[], seen: Set<string>, value: string | undefined): void {
+	if (!value || seen.has(value)) return
+	seen.add(value)
+	values.push(value)
+}
+
+function sessionTargets(): string[] {
+	const values: string[] = []
+	const seen = new Set<string>()
+	for (const session of ipc.readState().sessions) {
+		addUnique(values, seen, session.id)
+		addUnique(values, seen, session.name)
+	}
+	for (const meta of sessionStore.loadAllSessionMetas()) {
+		addUnique(values, seen, meta.id)
+		addUnique(values, seen, meta.name)
+	}
+	return values.sort()
+}
+
+function completeSessionTargets(argPrefix: string): string[] {
+	const needle = argPrefix.toLowerCase()
+	return sessionTargets().filter((target) => target.toLowerCase().startsWith(needle))
+}
+
 
 function complete(text: string, cursor: number, cwd = process.cwd()): CompletionResult | null {
 	if (cursor < 0 || cursor > text.length) cursor = text.length
@@ -129,7 +156,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	const command = parts[0]!
 	const arg = clientLocalCommands.commandArg(command) ?? commands.commandArg(command)
 	if (!arg) return null
-	if (parts.length > 2 && arg !== 'dir') return null
+	if (parts.length > 2 && arg !== 'dir' && arg !== 'session') return null
 
 	let argPrefix = hasSpace ? '' : (parts[1] ?? '')
 	let values: string[] = []
@@ -141,6 +168,9 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 		values = completeDirs(argPrefix, cwd)
 	} else if (arg === 'command') {
 		values = commandNamesForPrompt().filter((name) => name.startsWith(argPrefix))
+	} else if (arg === 'session') {
+		argPrefix = cdArgPrefix(before, command)
+		values = completeSessionTargets(argPrefix)
 	} else if (arg === 'login-provider') {
 		values = ['anthropic', 'openai'].filter((provider) => provider.startsWith(argPrefix))
 	} else {
