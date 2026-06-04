@@ -41,10 +41,10 @@ What's not implemented:
 Supported out of the box:
 
 - `anthropic/...` — Claude through Anthropic. Supports Anthropic OAuth subscriptions via `/login anthropic` and `ANTHROPIC_API_KEY`.
-- `openai/...` — OpenAI through the Responses API. Supports ChatGPT/Codex OAuth subscriptions via `/login openai` and `OPENAI_API_KEY`.
+- `openai/...` — OpenAI models. `OPENAI_API_KEY` uses OpenAI's official Responses API; `/login openai` uses ChatGPT/Codex subscription OAuth and may route through the ChatGPT Codex backend when the token is not scoped for the public API.
 - `openrouter/...` — OpenRouter through its OpenAI-compatible Chat Completions API. Uses `OPENROUTER_API_KEY`.
-- `google/...` — Gemini through Google's OpenAI-compatible endpoint. Uses `GOOGLE_API_KEY`.
-- `grok/...` — xAI/Grok through its OpenAI-compatible endpoint. Uses `GROK_API_KEY`.
+- `google/...` — Gemini through the Gemini API's OpenAI compatibility endpoint, using Chat Completions syntax. Uses `GOOGLE_API_KEY`.
+- `grok/...` — xAI/Grok through its OpenAI-compatible Chat Completions API. Uses `GROK_API_KEY`.
 
 Hal also fetches model metadata from [models.dev](https://models.dev/) for context windows and newly released model IDs. A model appearing there does not by itself mean Hal can use it; the provider still needs to be one of the supported prefixes above, or a custom OpenAI-compatible provider configured with `BASE_URL` and `API_KEY`.
 
