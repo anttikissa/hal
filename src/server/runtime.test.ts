@@ -705,6 +705,7 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		expect(meta?.workingDir).toBe('/work/child')
 		expect(meta?.model).toBe('openai/gpt-5')
 		expect(meta?.name).toBe('Child tab')
+		expect(meta?.attention).toBe('new')
 		const prompt = context.buildSystemPrompt({ model: 'openai/gpt-5', cwd: '/work/child', sessionId: child.id })
 		const overheadBytes = prompt.text.length + JSON.stringify(toolRegistry.toToolDefs()).length
 		const expected = context.estimateContext([], 'openai/gpt-5', overheadBytes)
