@@ -1,19 +1,14 @@
-// Block rendering — convert history records to visual blocks, render to
-// terminal lines with colored backgrounds and headers.
-//
-// A single assistant history record can produce multiple blocks:
-//   thinking → tool₁ → tool₂ → assistant text
-// The split happens in historyToBlocks(). Rendering is in renderBlock().
+// Block rendering — paint Block objects (see block-data.ts) as terminal
+// lines with colored backgrounds, headers, markdown bodies and streaming
+// cursors. Text sanitization/hyperlinking lives in block-text.ts and
+// per-tool display logic in tool-specs.ts.
 
 import { clipVisual, expandTabs, hardWrap, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, resolveMarkers, visLen, wordWrap } from '../utils/strings.ts'
-import { ason } from '../utils/ason.ts'
 import { models } from '../models.ts'
 import { time } from '../utils/time.ts'
-import type { HistoryEntry } from '../server/sessions.ts'
-import { sessionEntry } from '../session/entry.ts'
-import { STATE_DIR } from '../state.ts'
 import { colors } from './colors.ts'
 import { md, type MdColors } from './md.ts'
+import { blockText } from './block-text.ts'
 // Sibling import; circular with tool-specs.ts but safe per module convention —
 // all access happens at call time, never at import time.
 import { toolSpecs } from './tool-specs.ts'
@@ -25,136 +20,6 @@ const blockConfig = {
 	maxEditDiffLines: 3,
 }
 
-function sanitizeTerminalText(text: string): string {
-	return text.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, (ch) => {
-		if (ch === '\n' || ch === '\t') return ch
-		if (ch === '\r') return '␍'
-		if (ch === '\x1b') return '␛'
-		return `␀${ch.charCodeAt(0).toString(16).padStart(2, '0')}`
-	})
-}
-
-function stripAnsiSequences(text: string): string {
-	let out = ''
-	for (let i = 0; i < text.length; ) {
-		const ch = text[i]!
-		if (ch !== '\x1b') {
-			out += ch
-			i++
-			continue
-		}
-		const next = text[i + 1]
-		if (!next) break
-		if (next === '[') {
-			i += 2
-			while (i < text.length) {
-				const code = text.charCodeAt(i++)
-				if (code >= 0x40 && code <= 0x7e) break
-			}
-			continue
-		}
-		if (next === ']') {
-			i += 2
-			while (i < text.length) {
-				if (text[i] === '\x07') {
-					i++
-					break
-				}
-				if (text[i] === '\x1b' && text[i + 1] === '\\') {
-					i += 2
-					break
-				}
-				i++
-			}
-			continue
-		}
-		i += 2
-	}
-	return out
-}
-
-interface LinkSpan { line: number; start: number; end: number; url: string }
-
-const URL_RE = /https?:\/\/[^\s<>"']+/g
-const TRAILING_URL_PUNCT = '.,!?;:)]}'
-
-function firstWhitespaceIndex(s: string): number {
-	for (let i = 0; i < s.length; i++) {
-		if (/\s/.test(s[i]!)) return i
-	}
-	return -1
-}
-
-function trimTrailingUrlPunctuation(url: string, spans: LinkSpan[]): string {
-	while (url && TRAILING_URL_PUNCT.includes(url.at(-1)!)) {
-		url = url.slice(0, -1)
-		const last = spans.at(-1)
-		if (!last) break
-		last.end--
-		if (last.end <= last.start) spans.pop()
-	}
-	return url
-}
-
-function pushUrlSpans(spans: LinkSpan[], lines: string[], lineIndex: number, start: number, end: number, cols: number): void {
-	let url = lines[lineIndex]!.slice(start, end)
-	const urlSpans: LinkSpan[] = [{ line: lineIndex, start, end, url: '' }]
-	let currentLine = lineIndex
-	let currentEnd = end
-
-	while (currentEnd === lines[currentLine]!.length && visLen(lines[currentLine]!) >= cols && currentLine + 1 < lines.length) {
-		const next = lines[currentLine + 1]!
-		if (!next || /^\s/.test(next) || /^https?:\/\//.test(next)) break
-		const whitespace = firstWhitespaceIndex(next)
-		if (whitespace >= 0) break
-		url += next
-		urlSpans.push({ line: currentLine + 1, start: 0, end: next.length, url: '' })
-		currentLine++
-		currentEnd = next.length
-	}
-
-	url = trimTrailingUrlPunctuation(url, urlSpans)
-	if (!url || url === 'http://' || url === 'https://') return
-	for (const span of urlSpans) {
-		span.url = url
-		spans.push(span)
-	}
-}
-
-function osc8(url: string, label: string): string {
-	return `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`
-}
-
-function hyperlinkUrls(lines: string[], cols: number): string[] {
-	const spans: LinkSpan[] = []
-	for (let i = 0; i < lines.length; i++) {
-		URL_RE.lastIndex = 0
-		let match: RegExpExecArray | null
-		while ((match = URL_RE.exec(lines[i]!))) {
-			pushUrlSpans(spans, lines, i, match.index, match.index + match[0].length, cols)
-		}
-	}
-	if (spans.length === 0) return lines
-
-	const byLine = new Map<number, LinkSpan[]>()
-	for (const span of spans) {
-		const lineSpans = byLine.get(span.line) ?? []
-		lineSpans.push(span)
-		byLine.set(span.line, lineSpans)
-	}
-
-	const linked = lines.slice()
-	for (const [lineIndex, lineSpans] of byLine) {
-		lineSpans.sort((a, b) => b.start - a.start)
-		let line = linked[lineIndex]!
-		for (const span of lineSpans) {
-			line = line.slice(0, span.start) + osc8(span.url, line.slice(span.start, span.end)) + line.slice(span.end)
-		}
-		linked[lineIndex] = line
-	}
-	return linked
-}
-
 // Block type lives in block-data.ts; re-exported so renderers can keep
 // importing it from blocks.ts.
 export type { Block } from './block-data.ts'
@@ -163,9 +28,9 @@ import type { Block } from './block-data.ts'
 function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' }>): string {
 	const text =
 		block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error'
-			? stripAnsiSequences(block.text)
+			? blockText.stripAnsiSequences(block.text)
 			: block.text
-	return sanitizeTerminalText(text)
+	return blockText.sanitizeTerminalText(text)
 }
 
 const [FG_OFF, RESET_BG] = ['\x1b[39m', '\x1b[49m']
@@ -256,7 +121,7 @@ function blockContent(block: Block, cols: number): string[] {
 		const details = spec.details?.(block.input)
 		if (details) pushWrapped(lines, details, cols)
 		if (!block.output) return lines
-		const output = sanitizeTerminalText(stripAnsiSequences(block.output))
+		const output = blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.output))
 		const format = spec.format?.(output, cols, block.input) ?? { bodyLines: [] }
 		for (const line of format.bodyLines) lines.push(clipLine(line, cols))
 		if (format.suppressOutput) return lines
@@ -271,7 +136,7 @@ function blockContent(block: Block, cols: number): string[] {
 		return lines
 	}
 	const lines: string[] = []
-	for (const raw of expandTabs(sanitizeTerminalText(block.text), blockConfig.tabWidth).split('\n')) {
+	for (const raw of expandTabs(blockText.sanitizeTerminalText(block.text), blockConfig.tabWidth).split('\n')) {
 		lines.push(...wordWrap(raw, cols))
 	}
 	return lines
@@ -346,7 +211,7 @@ function blockLabel(block: Block): string {
 
 function inlineNoticeText(block: Block): string | undefined {
 	if (block.type !== 'log' && block.type !== 'info' && block.type !== 'fork') return undefined
-	const text = expandTabs(sanitizeTerminalText(stripAnsiSequences(block.text)), blockConfig.tabWidth).trim()
+	const text = expandTabs(blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.text)), blockConfig.tabWidth).trim()
 	if (!text || text.includes('\n')) return undefined
 	if (text.includes('`')) return undefined
 	if ((block.type === 'log' || block.type === 'info') && !/^\[[^\]\n]+\]$/.test(text)) return undefined
@@ -388,7 +253,7 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 	const contentCols = Math.max(1, cols - 1)
 	let hasContent = false
 	for (const block of group) {
-		const content = hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)
+		const content = blockText.hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)
 		if (content.length > 0 && !hasContent) {
 			lines.push(bgLine(`${fg} `, cols, bg))
 			hasContent = true
@@ -453,7 +318,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const header = buildHeader(label, blockTime, blobRef, cols)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
 	const contentCols = Math.max(1, cols - 1)
-	const content = hyperlinkUrls(blockContent(block, contentCols), contentCols)
+	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
 	if (content.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
 		lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
