@@ -282,6 +282,7 @@ function handleKey(k: KeyEvent): boolean {
 	}
 	if (state.kind === 'model' && editor.handleKey(k)) {
 		refreshModelItems()
+		state.selectedIndex = 0
 		return true
 	}
 	return false

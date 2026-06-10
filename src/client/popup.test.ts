@@ -35,6 +35,14 @@ describe('popup', () => {
 		expect(popup.state.active).toBe(false)
 	})
 
+	test('model picker filtering selects the first match', () => {
+		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-7')
+		models.state.cache = { 'claude-opus-4-8': 1_000_000, 'claude-opus-4-7': 1_000_000, 'claude-opus-4-6': 1_000_000 }
+		popup.state.selectedIndex = 5
+		for (const ch of 'opus') popup.handleKey({ key: ch, char: ch, shift: false, alt: false, ctrl: false, cmd: false })
+		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('opus')
+	})
+
 
 	test('model picker selects the visible GPT version for older GPT sessions', () => {
 		popup.openModelPicker(() => {}, 'openai/gpt-5.4')
