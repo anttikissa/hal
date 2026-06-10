@@ -292,16 +292,14 @@ function restartPromptWatch(): void {
 	)
 }
 
-function emitFocusedInfo(text: string, level: 'info' | 'error' = 'info'): void {
+function emitFocusedInfo(text: string): void {
 	const sessionId = focusedSessionId()
 	if (!sessionId) return
 	const ts = new Date().toISOString()
 	// Startup metadata refresh can finish before a just-started client begins
-	// tailing IPC events. Persist the notice too so it survives that race, but
-	// keep the persisted block type aligned with the live IPC rendering.
-	const entry: HistoryEntry = level === 'error' ? { type: 'error', text, ts } : { type: 'log', text, ts }
-	sessionStore.appendHistorySync(sessionId, [entry])
-	emitInfo(sessionId, text, level)
+	// tailing IPC events, so persist the same Log block the live event renders.
+	sessionStore.appendHistorySync(sessionId, [{ type: 'log', text, ts }])
+	emitInfo(sessionId, text)
 }
 
 function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
