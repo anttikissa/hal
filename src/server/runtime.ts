@@ -3,6 +3,7 @@
 // Broadcasts session list via IPC. Clients load history directly from disk.
 
 import { rebaseHandler } from './rebase-handler.ts'
+import { modelNotices } from './model-notices.ts'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import type { Command, SpawnCommandData, SpawnKind } from '../protocol.ts'
@@ -16,7 +17,6 @@ import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
 import { sessionIds } from '../session/ids.ts'
 import { replay } from '../session/replay.ts'
-import { HAL_DIR } from '../state.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
@@ -24,7 +24,6 @@ import { startup } from '../startup.ts'
 import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
-import { modelRefresh } from '../model-refresh.ts'
 
 const state = {
 	openSessionIds: [] as string[],
@@ -290,91 +289,6 @@ function restartPromptWatch(): void {
 			emitInfo(change.sessionId, `[system reload] ${change.name} changed: ${change.path}`)
 		},
 	)
-}
-
-function emitFocusedInfo(text: string): void {
-	const sessionId = focusedSessionId()
-	if (!sessionId) return
-	const ts = new Date().toISOString()
-	// Startup metadata refresh can finish before a just-started client begins
-	// tailing IPC events, so persist the same Log block the live event renders.
-	sessionStore.appendHistorySync(sessionId, [{ type: 'log', text, ts }])
-	emitInfo(sessionId, text)
-}
-
-function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
-	return modelRefresh.formatModelRefreshMessage(changes, modelCount)
-}
-
-function buildAliasUpdateSuggestionText(updates: Array<{ aliases: string[]; oldModel: string; newModel: string }>, cwd: string): string {
-	return modelRefresh.buildAliasUpdateSuggestionText(updates, cwd)
-}
-
-function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: string, model: string): void {
-	const ts = new Date().toISOString()
-	sessionStore.appendHistorySync(sessionId, [{ type: 'assistant', text, model, synthetic: true, syntheticKind, ts }])
-	ipc.appendEvent({
-		id: protocol.eventId(),
-		type: 'response',
-		text,
-		sessionId,
-		model,
-		synthetic: true,
-		createdAt: ts,
-	})
-}
-
-function suggestAliasUpdates(previous: Record<string, number>, next: Record<string, number>): void {
-	const updates = models.aliasUpdateSuggestions(previous, next)
-	if (updates.length === 0) return
-	const metas = openSessionMetas()
-	const meta = metas.find((item) => item.workingDir === HAL_DIR) ?? metas[0]
-	if (!meta) return
-	const model = meta.model ?? models.defaultModel()
-	emitSyntheticAssistant(meta.id, buildAliasUpdateSuggestionText(updates, meta.workingDir ?? process.cwd()), 'alias-update-suggestion', model)
-}
-
-function sessionWillProduceOutput(sessionId: string): boolean {
-	if (agentLoop.isWorking(sessionId)) return true
-	return shouldAutoContinue(sessionStore.loadAllHistory(sessionId))
-}
-
-function modelDiscoveryTarget(): SessionMeta | null {
-	const focused = focusedSessionId()
-	if (focused && sessionWillProduceOutput(focused)) {
-		const child = createSessionTab({ openerId: focused, afterId: focused, workingDir: HAL_DIR, focus: false })
-		sessionStore.updateMeta(child.id, { name: 'new models' })
-		broadcastSessions()
-		return sessionStore.loadSessionMeta(child.id) ?? child
-	}
-	const metas = openSessionMetas()
-	return metas.find((item) => item.id === focused) ?? metas[0] ?? null
-}
-
-function suggestModelDiscoveries(previous: Record<string, number>, next: Record<string, number>): void {
-	const discoveries = models.modelDiscoveries(previous, next)
-	if (discoveries.length === 0) return
-	const meta = modelDiscoveryTarget()
-	if (!meta) return
-	const model = meta.model ?? models.defaultModel()
-	emitSyntheticAssistant(meta.id, modelRefresh.buildNewModelDiscoveryText(discoveries, meta.workingDir ?? process.cwd()), 'model-discovery', model)
-}
-
-async function refreshModelMetadata(): Promise<void> {
-	try {
-		const checked = await modelRefresh.checkModels()
-		const result = checked.result
-		if (!result.hadCache || result.changes.length > 0) {
-			log.info('models.dev metadata refreshed', { message: checked.message })
-			emitFocusedInfo(checked.message)
-		}
-		if (result.hadCache) {
-			suggestAliasUpdates(result.previous, result.next)
-			suggestModelDiscoveries(result.previous, result.next)
-		}
-	} catch (err) {
-		log.error('models.dev refresh failed', { error: errorMessage(err) })
-	}
 }
 
 function recordTabClosed(sessionId: string): void {
@@ -883,7 +797,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		state.working = {}
 	})
 	if (state.openSessionIds.length > 0) syncSharedState()
-	void refreshModelMetadata()
+	void modelNotices.refreshModelMetadata()
 	openaiUsage.start(signal)
 	if (metas.length > 0) {
 		setTimeout(() => {
@@ -952,12 +866,7 @@ export const runtime = {
 	recordTabClosed,
 	spawnSession,
 	startSpawnedSession,
-	refreshModelMetadata,
-	formatModelRefreshMessage,
-	buildAliasUpdateSuggestionText,
 	formatCommandError,
-	suggestAliasUpdates,
-	suggestModelDiscoveries,
 	enqueuePrompt,
 	handleQueueSlashCommand,
 	runNextQueuedPrompt,
@@ -965,4 +874,9 @@ export const runtime = {
 	shouldDrainQueuedPrompt,
 	runCompact,
 	handleCommand,
+	// Tab/session helpers used by sibling server modules (e.g. model-notices).
+	focusedSessionId,
+	openSessionMetas,
+	createSessionTab,
+	broadcastSessions,
 }
