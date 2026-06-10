@@ -69,8 +69,8 @@ function tabIndicator(tab: Tab): TabIndicator {
 	const working = client.state.working.get(tab.sessionId) ?? false
 	if (client.state.toolConfirmPending.has(tab.sessionId)) return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 
+	if (working && tab.attention === 'new') return { char: '◆', color: colors.tab.warningFg || colors.warning.fg, blinks: true }
 	if (working) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
-
 	// Alerts beat the generic "done unseen" checkmark. This matters for cases
 	// like "Hit max iterations" where generation finished, but the tab still
 	// needs attention.
@@ -106,7 +106,7 @@ function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
 	if (!ind.char) return ''
 	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
-	const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : ind.color
+	const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : oklch.dimAnsi(ind.color, 0.65)
 	return `${color}${ind.char}${baseColor}`
 }
 

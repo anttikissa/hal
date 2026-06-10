@@ -35,12 +35,12 @@ test('tabIndicator shows amber diamond for new attention marker', () => {
 	}
 })
 
-test('tabIndicator lets working marker beat new attention marker', () => {
+test('tabIndicator shows blinking amber diamond for new working tab', () => {
 	const origWorking = client.state.working
 	client.state.working = new Map([['04-new', true]])
 	try {
 		const indicator = renderStatus.tabIndicator(tab({ attention: 'new' }))
-		expect(indicator.char).toBe('▪')
+		expect(indicator.char).toBe('◆')
 		expect(indicator.blinks).toBe(true)
 	} finally {
 		client.state.working = origWorking
