@@ -68,7 +68,6 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	if (previousTabs.length > 0) loadOpenedBackground(openedTabs, focused, ctx)
 	ctx.flushPendingEntries()
 	copyForkDraft(isFork, grew, previousSession, openedSessionId, newTabs)
-	if (isOpen && grew && focused && openedTabs.includes(focused)) ctx.addStartupSummaryToTab(focused)
 	if (state.pendingOpen === 'resume' && grew && focused && openedTabs.includes(focused)) ctx.addTabNoticeToTab(focused, 'Tab restored.')
 	if (shrank) ctx.showRestoreTabHint()
 	if (state.pendingOpen === 'resume' && grew) ctx.clearRestoreTabHint()

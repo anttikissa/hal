@@ -115,7 +115,6 @@ const state = {
 	// Most-recently viewed tab order. Used as a fallback when session-list changes
 	// do not close the focused tab, such as cross-client closes or startup recovery.
 	recentTabs: [] as string[],
-	startupSummaryShown: false,
 	restoreTabHint: false,
 }
 
@@ -263,21 +262,14 @@ function startupSummaryText(tab: Tab): string {
 }
 
 function shouldShowStartupSummary(tab: Tab): boolean {
-	return !tab.history.some((block) => block.type !== 'info')
+	return !tab.history.some((block) => block.type === 'user' || block.type === 'assistant' || block.type === 'thinking' || block.type === 'tool')
 }
 
 function addStartupSummaryToTab(tab: Tab): void {
 	if (!shouldShowStartupSummary(tab)) return
-	state.startupSummaryShown = true
-	addLocalBlockToTab(tab, { type: 'info', text: startupSummaryText(tab), ts: Date.now() })
-}
-
-function showStartupSummary(): void {
-	if (state.startupSummaryShown) return
-	state.startupSummaryShown = true
-	const tab = currentTab()
-	if (!tab) return
-	addStartupSummaryToTab(tab)
+	tab.history.unshift({ type: 'info', text: startupSummaryText(tab), ts: Date.now() })
+	touchTab(tab)
+	if (tab === currentTab()) onChange(false)
 }
 
 function showServerRestart(pid: number, startedAt?: string): void {
@@ -375,6 +367,7 @@ function ensureTabLoaded(tab: Tab): void {
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
 	tab.history = clientHistory.withLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
 	sessionLoader.addLastActiveNotice(tab)
+	addStartupSummaryToTab(tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)
@@ -534,7 +527,6 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		flushPendingEntries,
 		rememberTab,
 		pruneRecentTabs,
-		addStartupSummaryToTab,
 		addTabNoticeToTab: (tab: Tab, text: string) => addLocalBlockToTab(tab, { type: 'info', text, ts: Date.now() }),
 		showRestoreTabHint,
 		clearRestoreTabHint,
@@ -658,7 +650,6 @@ async function loadInBackground(): Promise<void> {
 		focusedTabIndex: () => state.focusedTabIndex,
 		ensureTabLoaded,
 		touchTab,
-		showStartupSummary,
 		onChange,
 	})
 }
@@ -677,7 +668,6 @@ function resetForTests(): void {
 	sessionTabs.reset()
 	clientProcess.reset()
 	state.recentTabs = []
-	state.startupSummaryShown = true
 	state.hostVersionStatus = 'idle'
 	state.hostVersion = ''
 	state.toolConfirmPending.clear()

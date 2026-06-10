@@ -147,7 +147,6 @@ describe('client startup', () => {
 			pendingTokens: 0,
 		})
 		client.config.backgroundLoadTabs = false
-		client.state.startupSummaryShown = false
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -172,7 +171,6 @@ describe('client startup', () => {
 		ipc.tailEvents = async function* () {}
 		client.config.backgroundLoadTabs = false
 		client.config.showStartupPerf = true
-		client.state.startupSummaryShown = false
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -308,7 +306,6 @@ describe('client startup', () => {
 		}
 		ipc.tailEvents = async function* () {}
 		client.config.showStartupPerf = true
-		client.state.startupSummaryShown = false
 
 		const ac = new AbortController()
 		client.startClient(ac.signal, { preferredCwd: '/work/project', openCwd: '/work/project' })
