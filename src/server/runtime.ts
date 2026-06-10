@@ -3,6 +3,7 @@
 // Broadcasts session list via IPC. Clients load history directly from disk.
 
 import { rebaseHandler } from './rebase-handler.ts'
+import { queueRunner } from './queue-runner.ts'
 import { modelNotices } from './model-notices.ts'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
@@ -21,7 +22,7 @@ import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
 import { startup } from '../startup.ts'
-import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
+import { promptQueue } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
 
@@ -318,98 +319,11 @@ function buildSessionState(meta: SessionMeta): SessionState {
 	}
 }
 
-function queuePreviewResult(text: string, max = 80): { text: string; truncated: boolean } {
-	let first = text.split('\n')[0]!.trim()
-	const truncated = text.includes('\n') || first.length > max
-	if (first.length > max) first = first.slice(0, Math.max(0, max - 3)).trimEnd()
-	return { text: truncated ? `${first}...` : first, truncated }
-}
-
-function queuePreview(text: string, max = 80): string {
-	return queuePreviewResult(text, max).text
-}
-
-function queueEntry(text: string, source?: string, displayText?: string): QueuedPrompt {
-	return {
-		text,
-		createdAt: new Date().toISOString(),
-		...(source ? { source } : {}),
-		...(displayText ? { displayText } : {}),
-	}
-}
-
-async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
-	if (!text.trim()) return
-	if (!agentLoop.isWorking(sessionId) && !promptQueue.isHeld(sessionId)) {
-		await handlePrompt(sessionId, text, undefined, source, displayText)
-		return
-	}
-	const count = promptQueue.append(sessionId, queueEntry(text, source, displayText))
-	emitInfo(sessionId, `Queued ${count}: ${queuePreview(text)}`)
-}
-
-function buildQueuePausedNotice(entries: QueuedPrompt[]): string {
-	const count = entries.length
-	const noun = count === 1 ? 'prompt is' : 'prompts are'
-	const preview = entries[0] ? queuePreviewResult(entries[0].text, 50) : undefined
-	const next = preview ? ` Next: **${preview.text}**.` : ''
-	const run = count === 1 ? 'run the queued prompt' : 'run queued prompts'
-	const discard = count === 1 ? '`/queue clear` to discard it' : '`/queue clear` to discard'
-	const show = preview?.truncated ? `, \`/queue\` to show ${count === 1 ? 'it' : 'them'}` : ''
-	return `Paused. ${count} queued ${noun} waiting.${next} **ctrl-q** to ${run}${show}, ${discard}.`
-}
-
-function emitQueuePausedNotice(sessionId: string): void {
-	const entries = promptQueue.load(sessionId)
-	if (entries.length === 0) return
-	promptQueue.setHeld(sessionId, true)
-	emitInfo(sessionId, buildQueuePausedNotice(entries), 'info', 'notice')
-}
-
-function shouldDrainQueuedPrompt(sessionId: string, result: AgentLoopResult): boolean {
-	return result === 'completed' && !promptQueue.isHeld(sessionId) && promptQueue.load(sessionId).length > 0
-}
-
-async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boolean> {
-	const next = promptQueue.pop(sessionId)
-	if (!next) {
-		if (!quiet) emitInfo(sessionId, 'Queue is empty')
-		return false
-	}
-	promptQueue.setHeld(sessionId, false)
-	await handlePrompt(sessionId, `<meta>Queued prompt, queued at ${next.createdAt}.</meta>\n${next.text}`, 'queued', next.source, next.displayText ?? next.text)
-	return true
-}
-
-async function handleQueueSlashCommand(sessionId: string, text: string, source?: string, displayText?: string, working = false): Promise<boolean> {
-	const match = text.trimStart().match(/^\/queue(?:\s+([\s\S]*))?$/)
-	if (!match) return false
-	const args = (match[1] ?? '').trim()
-	if (!args) {
-		const entries = promptQueue.load(sessionId)
-		if (entries.length === 0) emitInfo(sessionId, 'Queue is empty')
-		else for (let i = 0; i < entries.length; i++) emitInfo(sessionId, `${i + 1}. ${entries[i]!.text}`)
-		return true
-	}
-	if (args === 'next') {
-		if (working) emitInfo(sessionId, 'Session is working')
-		else await runNextQueuedPrompt(sessionId, false)
-		return true
-	}
-	if (args === 'clear') {
-		promptQueue.clear(sessionId)
-		emitInfo(sessionId, 'Queue cleared')
-		return true
-	}
-	await enqueuePrompt(sessionId, args, source, displayText)
-	return true
-}
-
 async function handlePrompt(sessionId: string, text: string, label?: 'steering' | 'queued', source?: string, displayText?: string): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
-	if (await handleQueueSlashCommand(sessionId, text, source, displayText)) return
+	if (await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText)) return
 	const sessionState = buildSessionState(meta)
 	const prevName = sessionState.name
 	const prevModel = sessionState.model
@@ -447,7 +361,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 
 async function dispatchPromptCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	const steering = agentLoop.isWorking(sessionId)
-	if (steering && await handleQueueSlashCommand(sessionId, text, source, displayText, true)) return
+	if (steering && await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, true)) return
 	if (steering && commands.canRunWhileWorking(text)) {
 		await handlePrompt(sessionId, text, undefined, source, displayText)
 		return
@@ -512,8 +426,8 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		closeSession(sessionId)
 		return
 	}
-	if (result !== 'completed') emitQueuePausedNotice(sessionId)
-	if (!agentLoop.isWorking(sessionId) && shouldDrainQueuedPrompt(sessionId, result)) await runNextQueuedPrompt(sessionId)
+	if (result !== 'completed') queueRunner.emitQueuePausedNotice(sessionId)
+	if (!agentLoop.isWorking(sessionId) && queueRunner.shouldDrainQueuedPrompt(sessionId, result)) await queueRunner.runNextQueuedPrompt(sessionId)
 }
 
 function publishContextEstimate(sessionId: string): { used: number; max: number } | null {
@@ -627,7 +541,7 @@ function handleCommand(cmd: Command): void {
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
-			if (cmd.delivery === 'queue') void enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
+			if (cmd.delivery === 'queue') void queueRunner.enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
 			else void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
@@ -645,7 +559,7 @@ function handleCommand(cmd: Command): void {
 		case 'queue-next': {
 			if (!sessionId) return
 			if (agentLoop.isWorking(sessionId)) emitInfo(sessionId, 'Session is working')
-			else void runNextQueuedPrompt(sessionId, false)
+			else void queueRunner.runNextQueuedPrompt(sessionId, false)
 			break
 		}
 		case 'abort': {
@@ -874,12 +788,7 @@ export const runtime = {
 	spawnSession,
 	startSpawnedSession,
 	formatCommandError,
-	enqueuePrompt,
 	handlePrompt,
-	handleQueueSlashCommand,
-	runNextQueuedPrompt,
-	buildQueuePausedNotice,
-	shouldDrainQueuedPrompt,
 	runCompact,
 	handleCommand,
 	// Tab/session helpers used by sibling server modules (e.g. model-notices).

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { runtime } from './runtime.ts'
+import { queueRunner } from './queue-runner.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 import { ipc } from '../ipc.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
@@ -265,7 +266,7 @@ test('slash command state changes are persisted as structural history entries', 
 		agentLoop.isWorking = () => false
 		promptQueue.isHeld = () => false
 
-		await runtime.enqueuePrompt(sessionId, '/model gpt-5.5')
+		await queueRunner.enqueuePrompt(sessionId, '/model gpt-5.5')
 
 		expect(meta.model).toBe('openai/gpt-5.5')
 		expect(history.find((entry) => entry.type === 'model')).toMatchObject(
@@ -375,15 +376,15 @@ test('queue slash command lists and clears queued prompts', async () => {
 		ipc.appendEvent = (event: any) => { events.push(event) }
 		promptQueue.append(sessionId, { text: 'first queued', createdAt: '2026-05-20T00:00:00.000Z' })
 
-		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue')).toBe(true)
+		expect(await queueRunner.handleQueueSlashCommand(sessionId, '/queue')).toBe(true)
 		expect(events.some((event) => event.type === 'info' && event.text.includes('1. first queued'))).toBe(true)
 
 		const longPrompt = `${'x'.repeat(100)}\nsecond line`
 		promptQueue.append(sessionId, { text: longPrompt, createdAt: '2026-05-20T00:00:01.000Z' })
 		events.length = 0
-		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue')).toBe(true)
+		expect(await queueRunner.handleQueueSlashCommand(sessionId, '/queue')).toBe(true)
 		expect(events.some((event) => event.type === 'info' && event.text.includes(`2. ${longPrompt}`))).toBe(true)
-		expect(await runtime.handleQueueSlashCommand(sessionId, '/queue clear')).toBe(true)
+		expect(await queueRunner.handleQueueSlashCommand(sessionId, '/queue clear')).toBe(true)
 		expect(promptQueue.load(sessionId)).toEqual([])
 		expect(events.some((event) => event.type === 'info' && event.text === 'Queue cleared')).toBe(true)
 	} finally {
@@ -405,7 +406,7 @@ test('enqueuePrompt stores prompts while session is working', async () => {
 		ipc.appendEvent = (event: any) => { events.push(event) }
 		agentLoop.isWorking = () => true
 
-		await runtime.enqueuePrompt(sessionId, 'do this later', 'user')
+		await queueRunner.enqueuePrompt(sessionId, 'do this later', 'user')
 
 		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['do this later'])
 		expect(events.some((event) => event.type === 'info' && event.text === 'Queued 1: do this later')).toBe(true)
@@ -537,7 +538,7 @@ test('working queue next reports working without consuming the queue', async () 
 
 
 test('queue paused notice includes truncated preview and queue hint', () => {
-	const text = runtime.buildQueuePausedNotice([
+	const text = queueRunner.buildQueuePausedNotice([
 		{ text: 'first line\nsecond line', createdAt: '2026-05-20T00:00:00.000Z' },
 		{ text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' },
 	])
@@ -546,7 +547,7 @@ test('queue paused notice includes truncated preview and queue hint', () => {
 })
 
 test('queue paused notice omits show hint when preview is complete', () => {
-	const text = runtime.buildQueuePausedNotice([
+	const text = queueRunner.buildQueuePausedNotice([
 		{ text: 'short prompt', createdAt: '2026-05-20T00:00:00.000Z' },
 		{ text: 'second prompt', createdAt: '2026-05-20T00:00:01.000Z' },
 	])
@@ -555,7 +556,7 @@ test('queue paused notice omits show hint when preview is complete', () => {
 })
 
 test('queue paused notice uses singular pronouns for one prompt', () => {
-	const text = runtime.buildQueuePausedNotice([
+	const text = queueRunner.buildQueuePausedNotice([
 		{ text: 'first line\nsecond line', createdAt: '2026-05-20T00:00:00.000Z' },
 	])
 
@@ -568,11 +569,11 @@ test('held queue does not drain after unrelated completed prompt', () => {
 		promptQueue.append(sessionId, { text: 'queued prompt', createdAt: '2026-05-20T00:00:01.000Z' })
 		promptQueue.setHeld(sessionId, true)
 
-		expect(runtime.shouldDrainQueuedPrompt(sessionId, 'completed')).toBe(false)
+		expect(queueRunner.shouldDrainQueuedPrompt(sessionId, 'completed')).toBe(false)
 
 		promptQueue.setHeld(sessionId, false)
-		expect(runtime.shouldDrainQueuedPrompt(sessionId, 'completed')).toBe(true)
-		expect(runtime.shouldDrainQueuedPrompt(sessionId, 'aborted')).toBe(false)
+		expect(queueRunner.shouldDrainQueuedPrompt(sessionId, 'completed')).toBe(true)
+		expect(queueRunner.shouldDrainQueuedPrompt(sessionId, 'aborted')).toBe(false)
 	} finally {
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}

@@ -10,9 +10,9 @@ import { agentLoop } from '../runtime/agent-loop.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { rebase, type RebaseSnapshot } from '../session/rebase.ts'
 import { openai } from '../providers/openai.ts'
-// Circular import with runtime.ts is safe: we only access runtime.* at call time
+// Circular import is safe: we only access queueRunner.* at call time
 // (module convention — all cross-module calls go through namespace objects).
-import { runtime } from './runtime.ts'
+import { queueRunner } from './queue-runner.ts'
 
 const snapshots = new Map<string, { sessionId: string; clientPid: number; baseLog: string; baseHash: string; snapshot: RebaseSnapshot }>()
 
@@ -90,7 +90,7 @@ async function runRebaseApply(sessionId: string, requestId: string, clientPid: n
 	openai.resetSession(sessionId)
 	snapshots.delete(requestId)
 	ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog, entryCount })
-	for (const text of applied.queue) await runtime.enqueuePrompt(sessionId, text)
+	for (const text of applied.queue) await queueRunner.enqueuePrompt(sessionId, text)
 	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
 }
 
