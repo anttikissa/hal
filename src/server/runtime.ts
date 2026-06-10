@@ -144,6 +144,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 		model,
 		name,
 		spawnKind: spec.kind,
+		parentSessionId: parent.id,
 	})
 	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
 	if (spec.kind === 'subagent-autoclose') {

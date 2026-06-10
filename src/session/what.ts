@@ -103,6 +103,53 @@ function clip(text: string, max = config.maxFieldChars): string {
 	return `${text.slice(0, max).trimEnd()}\n[truncated ${text.length - max} chars]`
 }
 
+
+function sessionState(sessionId: string, openIndex: number, working: Record<string, boolean>): string {
+	if (working[sessionId]) return 'working'
+	if (openIndex >= 0) return 'idle/open'
+	return 'closed'
+}
+
+function agentRole(meta: SessionMeta): string {
+	if (meta.spawnKind === 'interactive') return 'interactive'
+	if (meta.spawnKind === 'subagent' || meta.spawnKind === 'subagent-autoclose') return 'subagent'
+	if (meta.forkedFrom) return 'fork'
+	return 'primary'
+}
+
+function attributionLines(sessionId: string, meta: SessionMeta, openSessionIds: string[], working: Record<string, boolean>): string[] {
+	const openIndex = openSessionIds.indexOf(sessionId)
+	const lines = [
+		'Attribution:',
+		`Session id: ${sessionId}`,
+		`Tab: ${openIndex >= 0 ? openIndex + 1 : 'closed'}`,
+		`Name: ${meta.name ?? '(empty)'}`,
+		`State: ${sessionState(sessionId, openIndex, working)}`,
+		`Spawn kind: ${meta.spawnKind ?? '(none)'}`,
+		`Agent role: ${agentRole(meta)}`,
+	]
+	if (meta.parentSessionId) lines.push(`Parent session id: ${meta.parentSessionId}`)
+	if (meta.forkedFrom) lines.push(`Forked from: ${meta.forkedFrom}`)
+	return lines
+}
+
+function attributionHeader(sessionId: string, openSessionIds: string[], working: Record<string, boolean>): string {
+	const meta = sessions.loadSessionMeta(sessionId)
+	const openIndex = openSessionIds.indexOf(sessionId)
+	if (!meta) return `session ${sessionId}; tab ${openIndex >= 0 ? openIndex + 1 : 'closed'}`
+	const parts = [
+		`tab ${openIndex >= 0 ? openIndex + 1 : 'closed'}`,
+		`session ${sessionId}`,
+		`name ${meta.name ?? '(empty)'}`,
+		`state ${sessionState(sessionId, openIndex, working)}`,
+		`spawn ${meta.spawnKind ?? '(none)'}`,
+		`role ${agentRole(meta)}`,
+	]
+	if (meta.parentSessionId) parts.push(`parent ${meta.parentSessionId}`)
+	if (meta.forkedFrom) parts.push(`forked from ${meta.forkedFrom}`)
+	return parts.join('; ')
+}
+
 function entryLine(sessionId: string, entry: HistoryEntry): string {
 	const ts = entry.ts ? ` ${entry.ts}` : ''
 	if (entry.type === 'user') return `user${ts}: ${clip(sessionEntry.userText(entry, { images: 'path-or-blob-or-image' }))}`
@@ -133,17 +180,51 @@ function liveText(sessionId: string): string {
 	return lines.join('\n')
 }
 
+
+function isHighlight(entry: HistoryEntry): boolean {
+	return entry.type === 'user'
+		|| entry.type === 'assistant'
+		|| entry.type === 'info'
+		|| entry.type === 'log'
+		|| entry.type === 'warning'
+		|| entry.type === 'error'
+		|| entry.type === 'cwd'
+		|| entry.type === 'model'
+		|| entry.type === 'forked_from'
+		|| entry.type === 'forked_to'
+		|| entry.type === 'rebased_from'
+		|| entry.type === 'rebased_to'
+}
+
+function appendWithinBudget(lines: string[], additions: string[], maxChars: number): void {
+	for (const addition of additions) {
+		const separator = lines.length > 0 ? 1 : 0
+		const used = lines.join('\n').length
+		if (used + separator + addition.length <= maxChars) {
+			lines.push(addition)
+			continue
+		}
+		const remaining = maxChars - used - separator
+		if (remaining > 40) lines.push(clip(addition, remaining))
+		lines.push('[remaining details clipped]')
+		return
+	}
+}
+
 function buildDigest(sessionId: string, openSessionIds: string[], working: Record<string, boolean>): string {
 	const meta = sessions.loadSessionMeta(sessionId)
 	if (!meta) return `Session ${sessionId} not found.`
-	const openIndex = openSessionIds.indexOf(sessionId)
 	const entries = sessions.loadAllHistory(sessionId)
 	const recent = entries.slice(-config.maxEntries)
+	const highlights: string[] = []
+	const details: string[] = []
+	for (const entry of recent) {
+		const line = entryLine(sessionId, entry)
+		if (isHighlight(entry)) highlights.push(line)
+		else details.push(line)
+	}
 	const lines = [
-		`Session: ${sessionId}`,
-		`Tab: ${openIndex >= 0 ? openIndex + 1 : 'closed'}`,
-		`Name: ${meta.name ?? '(empty)'}`,
-		`State: ${working[sessionId] ? 'working' : openIndex >= 0 ? 'idle/open' : 'closed'}`,
+		...attributionLines(sessionId, meta, openSessionIds, working),
 		`Created: ${meta.createdAt}`,
 		...(meta.closedAt ? [`Closed: ${meta.closedAt}`] : []),
 		`Cwd: ${meta.workingDir ?? ''}`,
@@ -152,9 +233,11 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 		`Session dir: ${paths.formatHomePath(sessions.sessionDir(sessionId))}`,
 		`Entries: ${entries.length}`,
 		'',
-		'Recent transcript:',
+		'Conversation and meta highlights:',
 	]
-	for (const entry of recent) lines.push(entryLine(sessionId, entry))
+	appendWithinBudget(lines, highlights.length > 0 ? highlights : ['[none]'], Math.floor(config.maxDigestChars * 0.75))
+	lines.push('', 'Tool/action details:')
+	appendWithinBudget(lines, details.length > 0 ? details : ['[none]'], config.maxDigestChars)
 	if (working[sessionId]) {
 		lines.push('', liveText(sessionId))
 	}
@@ -163,10 +246,14 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 
 function systemPrompt(): string {
 	return [
-		'You summarize Hal coding-agent sessions for the user.',
-		'Explain what the user asked, what Hal did, current state, files/actions if visible, and what might need attention next.',
+		'You write session-recall briefs for Hal coding-agent sessions.',
 		'Return only ASON with fields: title, summary.',
 		'Title must be short, lower-case, descriptive, and at most 60 characters.',
+		'Summary must use these fixed sections, in this order: Attribution; What user asked; Why / goal; Clarifications and design; Plan / approval; Work done and current state; Files, actions, and evidence; Next steps / open questions.',
+		'Focus on what the user asked for, why, clarifying questions Hal asked, what was clarified or designed, architectural decisions, and whether a plan was made or approved.',
+		'Do not invent missing why, approval, files, or decisions; say "not visible" or "not stated" when the digest does not show them.',
+		'Ignore routine tool noise such as raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, failure, or current state.',
+		'Preserve attribution from the digest, including tab/closed state, session id, name, state, spawn kind or agent role, parent session id, and forked-from when present.',
 	].join('\n')
 }
 
@@ -204,10 +291,10 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 	return parseSummary(text)
 }
 
-function formatSection(sessionId: string, result: SummaryResult): string {
+function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[], working: Record<string, boolean>): string {
 	const meta = sessions.loadSessionMeta(sessionId)
 	const title = result.title || meta?.name || sessionId
-	return [`## ${title} (${sessionId})`, '', result.summary].join('\n')
+	return [`## ${title} (${attributionHeader(sessionId, openSessionIds, working)})`, '', result.summary].join('\n')
 }
 
 function maybeNameSession(sessionId: string, title: string): boolean {
@@ -262,9 +349,9 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean }> {
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
 			const summary = await whatSummary.summarizeDigest(model, digest)
 			if (whatSummary.maybeNameSession(sessionId, summary.title)) renamed = true
-			sections.push(formatSection(sessionId, summary))
+			sections.push(formatSection(sessionId, summary, opts.openSessionIds, shared.working ?? {}))
 		} catch (err) {
-			sections.push([`## ${sessionId}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
+			sections.push([`## ${sessionId} (${attributionHeader(sessionId, opts.openSessionIds, shared.working ?? {})})`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
 		}
 	}
 	persistResult(opts.requesterSessionId, targetIds, sections.join('\n\n'))
@@ -276,6 +363,7 @@ export const whatSummary = {
 	resolveTargets,
 	buildDigest,
 	summarizeDigest,
+	systemPrompt,
 	maybeNameSession,
 	run,
 }
