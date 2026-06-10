@@ -54,13 +54,13 @@ describe('popup', () => {
 		models.state.cache = {
 			'claude-sonnet-4-5': 1_000_000,
 		}
-		popup.openModelPicker(() => {}, 'openai/gpt-5.5')
+		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-8')
 		let overlay = popup.buildOverlay(120, 30)
 		expect(overlay).not.toBeNull()
 		let clean = cleanLines(overlay!.lines).join('\n')
 		expect(clean).toContain('←/→: open/close category')
 		expect(visLen('▶')).toBe(1)
-		expect(clean).toContain('Pick a model (current: openai/gpt-5.5)')
+		expect(clean).toContain('Pick a model (current: anthropic/claude-opus-4-8)')
 		expect(clean).toContain('▶ sonnet (default: sonnet-4-6)')
 		expect(clean).not.toContain('Sonnet 4.5')
 
@@ -99,7 +99,7 @@ describe('popup', () => {
 		expect(popup.state.items[popup.state.selectedIndex]?.label).toContain('gpt')
 		expect(clean).toContain('▶ gpt (default: gpt-5.5)')
 		expect(clean).not.toContain('GPT 5.4')
-
+		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-8')
 		popup.state.selectedIndex = popup.state.items.findIndex((item) => item.label.includes('sonnet'))
 		popup.handleKey(key('left'))
 		overlay = popup.buildOverlay(120, 30)
@@ -130,12 +130,12 @@ describe('popup', () => {
 	})
 
 	test('model picker marks the current model row', () => {
-		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-7')
+		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-8')
 		popup.state.selectedIndex = 0
 		const overlay = popup.buildOverlay(120, 30)
 		const clean = cleanLines(overlay!.lines).join('\n')
-		expect(clean).toContain('*      4.7          Opus 4.7 · anthropic/claude-opus-4-7')
-		expect(overlay!.lines.find((line) => line.includes('Opus 4.7'))).toContain(colors.popup.modelCurrent.bg)
+		expect(clean).toContain('*      4.8          Opus 4.8 · anthropic/claude-opus-4-8')
+		expect(overlay!.lines.find((line) => line.includes('Opus 4.8'))).toContain(colors.popup.modelCurrent.bg)
 	})
 
 	test('warning popup uses the same highlighted row layout', () => {

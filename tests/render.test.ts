@@ -870,7 +870,7 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('Pick a model')
 		expect(clean).toContain('> ')
-		expect(clean).toContain('sonnet')
+		expect(clean).toContain('anthropic')
 	})
 
 	test('empty help bar still reserves the help-bar row', () => {

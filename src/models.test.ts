@@ -27,7 +27,7 @@ test('gpt and openai aliases resolve to gpt-5.5', () => {
 
 
 test('updated anthropic aliases avoid dated model ids', () => {
-	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-4-7')
+	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-4-8')
 	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-4-6')
 	expect(models.resolveModel('haiku')).toBe('anthropic/claude-haiku-4-5')
 })
@@ -187,8 +187,8 @@ test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 		{
 			'gpt-5.5': 1_050_000,
 			'gpt-5.6': 1_050_000,
-			'claude-opus-4-7': 1_000_000,
 			'claude-opus-4-8': 1_000_000,
+			'claude-opus-4-9': 1_000_000,
 			'claude-sonnet-4-6': 1_000_000,
 			'claude-sonnet-4-7': 1_000_000,
 			'google/gemini-3.5-flash': 1_000_000,
@@ -197,7 +197,7 @@ test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 			'x-ai/grok-4.21': 2_000_000,
 		},
 	)).toEqual([
-		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-7', newModel: 'anthropic/claude-opus-4-8' },
+		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-8', newModel: 'anthropic/claude-opus-4-9' },
 		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-4-6', newModel: 'anthropic/claude-sonnet-4-7' },
 		{ aliases: ['openai', 'gpt'], oldModel: 'openai/gpt-5.5', newModel: 'openai/gpt-5.6' },
 		{ aliases: ['gemini'], oldModel: 'google/gemini-3.5-flash', newModel: 'google/gemini-4-flash-preview' },
@@ -208,13 +208,13 @@ test('aliasUpdateSuggestions detects multiple alias-family upgrades', () => {
 
 test('aliasUpdateSuggestions treats dated Claude IDs as older than decimal versions', () => {
 	expect(models.aliasUpdateSuggestions(
-		{ 'claude-opus-4-7': 1_000_000 },
+		{ 'claude-opus-4-8': 1_000_000 },
 		{
 			'anthropic/claude-opus-4-20250514': 200_000,
-			'anthropic/claude-opus-4.8': 1_000_000,
+			'anthropic/claude-opus-4.9': 1_000_000,
 		},
 	)).toEqual([
-		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-7', newModel: 'anthropic/claude-opus-4-8' },
+		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-8', newModel: 'anthropic/claude-opus-4-9' },
 	])
 })
 

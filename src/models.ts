@@ -6,26 +6,36 @@ import { auth } from './auth.ts'
 // Short aliases like "opus" resolve to full IDs. Display names are extracted
 // from model IDs via regex patterns for human-readable UI.
 
-// ── Aliases ──
-// Short name → full provider/model-id
+// ── Curated model catalog ──
 
-const ALIASES: Record<string, string> = {
-	anthropic: 'anthropic/claude-opus-4-7',
-	claude: 'anthropic/claude-opus-4-7',
-	opus: 'anthropic/claude-opus-4-7',
-	sonnet: 'anthropic/claude-sonnet-4-6',
-	haiku: 'anthropic/claude-haiku-4-5',
-	fable: 'anthropic/claude-fable-5',
-	openai: 'openai/gpt-5.5',
-	gpt: 'openai/gpt-5.5',
-	instant: 'openai/gpt-5.5-instant',
-	codex: 'openai/gpt-5.3-codex',
-	gemini: 'google/gemini-3.5-flash',
-	'gemini-pro': 'google/gemini-3.1-pro-preview',
-	grok: 'openrouter/x-ai/grok-4.20',
-	deepseek: 'openrouter/deepseek/deepseek-chat',
-	llama: 'openrouter/meta-llama/llama-4-maverick',
+type TrackFamily = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'gpt' | 'codex' | 'gemini' | 'gemini-pro' | 'grok'
+
+interface CatalogEntry {
+	group: 'Anthropic' | 'OpenAI' | 'Google' | 'OpenRouter'
+	alias: string
+	aliases?: string[]
+	fullId: string
+	fallbackContext?: number
+	pricing?: { input: number; output: number }
+	track?: TrackFamily
 }
+
+const CATALOG: CatalogEntry[] = [
+	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-4-8', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
+	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-6', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
+	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
+	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
+	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai'], fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000, track: 'gpt' },
+	{ group: 'OpenAI', alias: 'gpt-5.4', fullId: 'openai/gpt-5.4', fallbackContext: 1_050_000 },
+	{ group: 'OpenAI', alias: 'gpt-5.3', fullId: 'openai/gpt-5.3', fallbackContext: 128_000 },
+	{ group: 'OpenAI', alias: 'instant', fullId: 'openai/gpt-5.5-instant', fallbackContext: 400_000, pricing: { input: 5, output: 30 } },
+	{ group: 'OpenAI', alias: 'codex', fullId: 'openai/gpt-5.3-codex', fallbackContext: 128_000, track: 'codex' },
+	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.5-flash', fallbackContext: 1_000_000, track: 'gemini' },
+	{ group: 'Google', alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview', fallbackContext: 1_000_000, track: 'gemini-pro' },
+	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.20', fallbackContext: 2_000_000, track: 'grok' },
+	{ group: 'OpenRouter', alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-chat' },
+	{ group: 'OpenRouter', alias: 'llama', fullId: 'openrouter/meta-llama/llama-4-maverick' },
+]
 
 // Pattern-based alias: opus-X → anthropic/claude-opus-X, etc.
 const PATTERNS: [RegExp, string][] = [
@@ -166,22 +176,6 @@ interface ModelCandidate {
 
 function modelsFile(): string {
 	return `${process.env.HAL_STATE_DIR ?? STATE_DIR}/models.ason`
-}
-
-// Hardcoded fallbacks — used before first models.dev fetch completes
-const FALLBACK_WINDOWS: Record<string, number> = {
-	'anthropic/claude-opus-4-7': 1_000_000,
-	'anthropic/claude-sonnet-4-6': 1_000_000,
-	'anthropic/claude-haiku-4-5': 200_000,
-	'anthropic/claude-fable-5': 1_000_000,
-	'openai/gpt-5.5': 1_050_000,
-	'openai/gpt-5.5-instant': 400_000,
-	'openai/gpt-5.4': 1_050_000,
-	'openai/gpt-5.3': 128_000,
-	'openai/gpt-5.3-codex': 128_000,
-	'google/gemini-3.5-flash': 1_000_000,
-	'google/gemini-3.1-pro-preview': 1_000_000,
-	'openrouter/x-ai/grok-4.20': 2_000_000,
 }
 
 // Lazy-loaded context window map from models.dev (state/models.ason).
@@ -354,32 +348,33 @@ function newestMatchingModel(cache: Record<string, number>, parse: (modelId: str
 	return best?.canonical ?? null
 }
 
-const aliasUpdateGroups = [
-	{ aliases: ['anthropic', 'claude', 'opus'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('opus', id)) },
-	{ aliases: ['sonnet'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('sonnet', id)) },
-	{ aliases: ['haiku'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('haiku', id)) },
-	{ aliases: ['fable'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('fable', id)) },
-	{ aliases: ['openai', 'gpt'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseGptCandidate) },
-	{ aliases: ['codex'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseCodexCandidate) },
-	{ aliases: ['gemini'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseGeminiCandidate('flash', id)) },
-	{ aliases: ['gemini-pro'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseGeminiCandidate('pro', id)) },
-	{ aliases: ['grok'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseGrokCandidate) },
-]
-
 function providerId(provider: 'Anthropic' | 'OpenAI'): string {
 	if (provider === 'Anthropic') return 'anthropic'
 	return 'openai'
 }
 
+function catalogAliases(entry: CatalogEntry): string[] {
+	return [...(entry.aliases ?? []), entry.alias]
+}
+
+function catalogEntryForAlias(alias: string): CatalogEntry | undefined {
+	return CATALOG.find((entry) => catalogAliases(entry).includes(alias))
+}
+
+function latestTrackedModel(track: TrackFamily, cache: Record<string, number>): string | null {
+	if (track === 'opus' || track === 'sonnet' || track === 'haiku' || track === 'fable') return newestMatchingModel(cache, (id) => parseClaudeCandidate(track, id))
+	if (track === 'gpt') return newestMatchingModel(cache, parseGptCandidate)
+	if (track === 'codex') return newestMatchingModel(cache, parseCodexCandidate)
+	if (track === 'gemini') return newestMatchingModel(cache, (id) => parseGeminiCandidate('flash', id))
+	if (track === 'gemini-pro') return newestMatchingModel(cache, (id) => parseGeminiCandidate('pro', id))
+	return newestMatchingModel(cache, parseGrokCandidate)
+}
+
 function aliasFullId(alias: string): string | null {
-	const fallback = ALIASES[alias]
-	if (!fallback) return null
-	for (const group of aliasUpdateGroups) {
-		if (!group.aliases.includes(alias)) continue
-		const latest = group.latest(loadModelsDevCache())
-		if (latest) return `${providerPrefix(fallback)}${latest}`
-	}
-	return fallback
+	const entry = catalogEntryForAlias(alias)
+	if (!entry) return null
+	const latest = entry.track ? latestTrackedModel(entry.track, loadModelsDevCache()) : null
+	return latest ? `${providerPrefix(entry.fullId)}${latest}` : entry.fullId
 }
 
 function cachedNativeFullId(modelId: string): string | null {
@@ -393,15 +388,15 @@ function cachedNativeFullId(modelId: string): string | null {
 
 function aliasUpdateSuggestions(previous: Record<string, number>, next: Record<string, number>): AliasUpdateSuggestion[] {
 	const updates: AliasUpdateSuggestion[] = []
-	for (const group of aliasUpdateGroups) {
-		const oldModel = ALIASES[group.aliases[0]!]!
-		const nextModelId = group.latest(next)
+	for (const entry of CATALOG) {
+		if (!entry.track) continue
+		const nextModelId = latestTrackedModel(entry.track, next)
 		if (!nextModelId) continue
-		const previousModelId = group.latest(previous)
+		const previousModelId = latestTrackedModel(entry.track, previous)
 		if (previousModelId === nextModelId) continue
-		const newModel = `${providerPrefix(oldModel)}${nextModelId}`
-		if (newModel === oldModel) continue
-		updates.push({ aliases: group.aliases, oldModel, newModel })
+		const newModel = `${providerPrefix(entry.fullId)}${nextModelId}`
+		if (newModel === entry.fullId) continue
+		updates.push({ aliases: catalogAliases(entry), oldModel: entry.fullId, newModel })
 	}
 	return updates
 }
@@ -467,19 +462,13 @@ function contextWindow(fullId: string): number {
 	if (subscription) return subscription
 	const cached = cachedContextWindow(fullId)
 	if (cached) return cached
-	if (FALLBACK_WINDOWS[fullId]) return FALLBACK_WINDOWS[fullId]
+	for (const entry of CATALOG) {
+		if (entry.fullId === fullId && entry.fallbackContext) return entry.fallbackContext
+	}
 	return DEFAULT_CONTEXT
 }
 
 // ── Pricing (USD per million tokens) ──
-
-const PRICING: Record<string, { input: number; output: number }> = {
-	'anthropic/claude-opus-4-7': { input: 5, output: 25 },
-	'anthropic/claude-sonnet-4-6': { input: 3, output: 15 },
-	'anthropic/claude-haiku-4-5': { input: 1, output: 5 },
-	'anthropic/claude-fable-5': { input: 10, output: 50 },
-	'openai/gpt-5.5-instant': { input: 5, output: 30 },
-}
 
 // Prompt-cache reads bill at 10% for the priced Anthropic/OpenAI models here.
 // Anthropic writes bill at 125%.
@@ -491,7 +480,7 @@ function computeCost(
 	fullId: string,
 	usage: PartialTokenUsage,
 ): number {
-	const p = PRICING[fullId]
+	const p = CATALOG.find((entry) => entry.fullId === fullId)?.pricing
 	if (!p) return 0
 	const cacheReadCost = (usage.cacheRead ?? 0) * p.input * CACHE_READ_MULTIPLIER
 	const cacheWriteCost = (usage.cacheCreation ?? 0) * p.input * CACHE_WRITE_MULTIPLIER
@@ -522,11 +511,6 @@ function defaultModel(): string {
 
 // ── Model listing (for /model command) ──
 
-interface ModelGroup {
-	label: string
-	models: { alias: string; fullId: string }[]
-}
-
 interface ModelEntry {
 	alias: string
 	fullId: string
@@ -543,53 +527,23 @@ interface ModelChoice {
 	fullId: string
 }
 
-const MODEL_GROUPS: ModelGroup[] = [
-	{
-		label: 'Anthropic',
-		models: [
-			{ alias: 'opus', fullId: 'anthropic/claude-opus-4-7' },
-			{ alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-6' },
-			{ alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5' },
-			{ alias: 'fable', fullId: 'anthropic/claude-fable-5' },
-		],
-	},
-	{
-		label: 'OpenAI',
-		models: [
-			{ alias: 'gpt', fullId: 'openai/gpt-5.5' },
-			{ alias: 'instant', fullId: 'openai/gpt-5.5-instant' },
-			{ alias: 'codex', fullId: 'openai/gpt-5.3-codex' },
-		],
-	},
-	{
-		label: 'Google',
-		models: [
-			{ alias: 'gemini', fullId: 'google/gemini-3.5-flash' },
-			{ alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview' },
-		],
-	},
-	{
-		label: 'OpenRouter',
-		models: [
-			{ alias: 'grok', fullId: 'openrouter/x-ai/grok-4.20' },
-			{ alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-chat' },
-			{ alias: 'llama', fullId: 'openrouter/meta-llama/llama-4-maverick' },
-		],
-	},
-]
+function catalogGroups(): CatalogEntry['group'][] {
+	return [...new Set(CATALOG.map((entry) => entry.group))]
+}
 
-function groupModelEntries(group: ModelGroup): ModelEntry[] {
+function groupModelEntries(group: CatalogEntry['group']): ModelEntry[] {
 	const entries: ModelEntry[] = []
 	const seen = new Set<string>()
-	for (const model of group.models) {
-		const fullId = aliasFullId(model.alias) ?? model.fullId
-		entries.push({ alias: model.alias, fullId, static: true })
+	for (const entry of CATALOG) {
+		if (entry.group !== group) continue
+		const fullId = aliasFullId(entry.alias) ?? entry.fullId
+		entries.push({ alias: entry.alias, fullId, static: true })
 		seen.add(fullId)
 	}
-	if (group.label !== 'Anthropic' && group.label !== 'OpenAI') return entries
+	if (group !== 'Anthropic' && group !== 'OpenAI') return entries
 	for (const id of Object.keys(loadModelsDevCache()).sort()) {
 		const info = discoveryModelInfo(id)
-		if (!info || info.provider !== group.label) continue
+		if (!info || info.provider !== group) continue
 		const fullId = `${providerId(info.provider)}/${info.model}`
 		if (seen.has(fullId)) continue
 		seen.add(fullId)
@@ -612,7 +566,7 @@ function addModelCompletionNames(names: Set<string>, model: ModelEntry): void {
 
 function allKnownModelIds(): string[] {
 	const ids = new Set<string>()
-	for (const id of Object.keys(FALLBACK_WINDOWS)) ids.add(id)
+	for (const entry of CATALOG) ids.add(entry.fullId)
 	for (const id of Object.keys(loadModelsDevCache())) {
 		const info = discoveryModelInfo(id)
 		if (!info) continue
@@ -695,22 +649,22 @@ function addOpenAiChoices(items: ModelChoice[]): void {
 	}
 	choices.sort((a, b) => compareCandidates(b.candidate, a.candidate))
 	for (const choice of choices) addModelChoice(items, choice.value, choice.fullId, ['openai', 'gpt'], choice.suffix)
-	addModelChoice(items, 'instant', aliasFullId('instant') ?? ALIASES.instant!, ['openai', 'gpt'], 'instant')
+	const instant = catalogEntryForAlias('instant')!
+	addModelChoice(items, instant.alias, aliasFullId(instant.alias) ?? instant.fullId, ['openai', 'gpt'], 'instant')
 }
 
-function addStaticProviderChoices(items: ModelChoice[], groupLabel: string, providerPath: string): void {
-	const group = MODEL_GROUPS.find((g) => g.label === groupLabel)
-	if (!group) return
-	for (const model of group.models) {
-		const fullId = aliasFullId(model.alias) ?? model.fullId
-		addModelChoice(items, model.alias, fullId, [providerPath], model.alias)
+function addStaticProviderChoices(items: ModelChoice[], group: CatalogEntry['group'], providerPath: string): void {
+	for (const entry of CATALOG) {
+		if (entry.group !== group) continue
+		const fullId = aliasFullId(entry.alias) ?? entry.fullId
+		addModelChoice(items, entry.alias, fullId, [providerPath], entry.alias)
 	}
 }
 
 function listModels(): string[] {
 	const lines: string[] = []
-	for (const group of MODEL_GROUPS) {
-		lines.push(group.label)
+	for (const group of catalogGroups()) {
+		lines.push(group)
 		for (const m of groupModelEntries(group)) {
 			lines.push(`  ${m.alias.padEnd(14)} ${m.fullId}`)
 		}
@@ -731,7 +685,7 @@ function listModelChoices(): ModelChoice[] {
 
 function modelCompletionNames(): string[] {
 	const names = new Set<string>()
-	for (const group of MODEL_GROUPS) {
+	for (const group of catalogGroups()) {
 		for (const model of groupModelEntries(group)) {
 			addModelCompletionNames(names, model)
 		}
