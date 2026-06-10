@@ -211,13 +211,20 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 	if (!meta) return `Session ${sessionId} not found.`
 	const entries = sessions.loadAllHistory(sessionId)
 	const recent = entries.slice(-config.maxEntries)
-	const highlights: string[] = []
+	const opening: string[] = []
+	const userRequests: string[] = []
+	const recentHighlights: string[] = []
 	const commitEvidence: string[] = []
 	const details: string[] = []
+	for (const entry of entries) {
+		const line = entryLine(sessionId, entry)
+		if (entry.type === 'user') userRequests.push(line)
+		if (opening.length < 12 && isHighlight(entry)) opening.push(line)
+	}
 	for (const entry of recent) {
 		const line = entryLine(sessionId, entry)
 		if (isCommitEvidenceLine(line)) commitEvidence.push(line)
-		else if (isHighlight(entry)) highlights.push(line)
+		else if (isHighlight(entry)) recentHighlights.push(line)
 		else details.push(line)
 	}
 	const lines = [
@@ -230,9 +237,13 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 		`Session dir: ${paths.formatHomePath(sessions.sessionDir(sessionId))}`,
 		`Entries: ${entries.length}`,
 		'',
-		'Conversation and meta highlights:',
+		'Opening conversation:',
 	]
-	appendWithinBudget(lines, highlights.length > 0 ? highlights : ['[none]'], Math.floor(config.maxDigestChars * 0.75))
+	appendWithinBudget(lines, opening.length > 0 ? opening : ['[none]'], Math.floor(config.maxDigestChars * 0.30))
+	lines.push('', 'User request timeline:')
+	appendWithinBudget(lines, userRequests.length > 0 ? userRequests : ['[none]'], Math.floor(config.maxDigestChars * 0.55))
+	lines.push('', 'Recent conversation and meta highlights:')
+	appendWithinBudget(lines, recentHighlights.length > 0 ? recentHighlights : ['[none]'], Math.floor(config.maxDigestChars * 0.75))
 	lines.push('', 'Commit evidence:')
 	appendWithinBudget(lines, commitEvidence.length > 0 ? commitEvidence : ['[none]'], Math.floor(config.maxDigestChars * 0.85))
 	lines.push('', 'Tool/action details:')
@@ -258,14 +269,8 @@ function systemPrompt(): string {
 		'Do not invent missing why, approval, files, commits, or decisions; say less rather than filling checklist sections.',
 		'Ignore routine tool noise, raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, final commit, failure, or current state.',
 		'Use exact quotes only when the wording itself matters.',
-		'',
-		'Desired style example:',
-		'Title: minor client command cleanup',
-		'Summary: You showed a case where asking an active tab to rename itself left it paused. Hal diagnosed this as a bug in safe/local-ish command handling and fixed the agreed command paths so those commands do not unnecessarily pause or abort active work.',
-		'Follow-up: after the main bug fix, you approved minor cleanup and said not to worry about tests in that old session.',
-		'- Touched commands.ts, client.ts, local-commands.ts, plus a small runtime.ts cleanup.',
-		'- Removed dead client command branches / about 9 LOC.',
-		'- Commit 9b71e64 — Remove dead client command branches.'
+		'Do not copy any examples or unrelated prior summaries; the title and first paragraph must be grounded in the provided digest for the target session.',
+		'Output shape: title plus compact narrative; optional bullets only for changed files, test status, final commit, or a real blocking follow-up.'
 	].join('\n')
 }
 

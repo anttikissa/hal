@@ -129,7 +129,7 @@ test('run does not overwrite existing target name', async () => {
 })
 
 
-test('summary prompt asks for compact narrative style with concrete example', () => {
+test('summary prompt asks for compact grounded narrative style', () => {
 	const prompt = whatSummary.systemPrompt()
 
 	expect(prompt).toContain('initiating user problem')
@@ -137,66 +137,11 @@ test('summary prompt asks for compact narrative style with concrete example', ()
 	expect(prompt).toContain('Every sentence must help')
 	expect(prompt).toContain('metadata inventories')
 	expect(prompt).toContain('final relevant abbreviated commit hash')
-	expect(prompt).toContain('Desired style example')
-	expect(prompt).toContain('active tab to rename itself left it paused')
-	expect(prompt).toContain('Commit 9b71e64 — Remove dead client command branches')
+	expect(prompt).toContain('grounded in the provided digest')
 	expect(prompt).toContain('Return only ASON with fields: title, summary')
 	expect(prompt).not.toContain('fixed sections')
-	expect(prompt).not.toContain('Commits made; Files, actions, and evidence')
-})
-
-
-test('golden tab4-style summary favors initiating bug over later cleanup', async () => {
-	const requester = makeSession('requester', 'requester')
-	const target = makeSession('tab4', 'minor client command cleanup')
-	const origAppendEvent = ipc.appendEvent
-	const origGetProvider = providerLoader.getProvider
-	let captured: any
-	const golden = [
-		'You showed a case where asking an active tab to rename itself left it paused. Hal diagnosed this as a bug in safe/local-ish command handling and fixed the agreed command paths so those commands do not unnecessarily pause or abort active work.',
-		'',
-		'Follow-up: after the main bug fix, you approved minor cleanup and said not to worry about tests in that old session.',
-		'',
-		'- Touched commands.ts, client.ts, local-commands.ts, plus a small runtime.ts cleanup.',
-		'- Removed dead client command branches / about 9 LOC.',
-		'- Commit 9b71e64 — Remove dead client command branches.',
-	].join('\n')
-	ipc.appendEvent = () => {}
-	providerLoader.getProvider = async () => ({
-		async *generate(req: any) {
-			captured = req
-			yield { type: 'text' as const, text: `{ title: ${JSON.stringify('active session rename pause bug')}, summary: ${JSON.stringify(golden)} }` }
-		},
-	})
-
-	sessions.appendHistory(target, [
-		{ type: 'user', parts: [{ type: 'text', text: 'Screenshot: asking active tab 40 to rename itself left it paused. Is this a bug?' }], ts: '2026-06-10T12:01:00.000Z' },
-		{ type: 'assistant', text: 'Yes, this looks like active-session safe command handling is wrong. Plan: keep local-ish commands from pausing active work.', ts: '2026-06-10T12:02:00.000Z' },
-		{ type: 'user', parts: [{ type: 'text', text: 'Plan approved. Fix it.' }], ts: '2026-06-10T12:03:00.000Z' },
-		{ type: 'user', parts: [{ type: 'text', text: 'There is a minor cleanup too, go ahead; do not worry about tests.' }], ts: '2026-06-10T12:04:00.000Z' },
-		{ type: 'tool_result', toolId: 'commit-1', output: '[main 9b71e64] Remove dead client command branches\n 4 files changed', ts: '2026-06-10T12:05:00.000Z' },
-	])
-
-	try {
-		await whatSummary.run({ requesterSessionId: requester, target, openSessionIds: [requester, target] })
-	} finally {
-		ipc.appendEvent = origAppendEvent
-		providerLoader.getProvider = origGetProvider
-	}
-
-	const digest = captured.messages[0].content as string
-	expect(captured.systemPrompt).toContain('Desired style example')
-	expect(digest).toContain('active tab 40 to rename itself left it paused')
-	expect(digest).toContain('minor cleanup')
-	expect(digest).toContain('[main 9b71e64] Remove dead client command branches')
-
-	const summary = sessions.loadHistory(requester).find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
-	const text = summary?.type === 'assistant' ? summary.text : ''
-	expect(text).toContain('## active session rename pause bug')
-	expect(text).toContain(golden)
-	expect(text).not.toContain('session id')
-	expect(text).not.toContain('history.asonl')
-	expect(text).not.toContain('No next steps')
+	expect(prompt).not.toContain('Desired style example')
+	expect(prompt).not.toContain('active tab to rename itself left it paused')
 })
 
 test('digest includes deterministic attribution metadata', () => {
@@ -238,14 +183,34 @@ test('digest puts conversation highlights before clipped tool details', () => {
 
 		const digest = whatSummary.buildDigest(target, [target], {})
 
-		expect(digest).toContain('Conversation and meta highlights:')
+		expect(digest).toContain('Recent conversation and meta highlights:')
 		expect(digest).toContain('Clarifying question: should we preserve legacy ids?')
 		expect(digest).toContain('Yes, preserve ids. Plan approved.')
-		expect(digest.indexOf('Conversation and meta highlights:')).toBeLessThan(digest.indexOf('Tool/action details:'))
+		expect(digest.indexOf('Recent conversation and meta highlights:')).toBeLessThan(digest.indexOf('Tool/action details:'))
 	} finally {
 		whatSummary.config.maxDigestChars = origMaxDigestChars
 		whatSummary.config.maxFieldChars = origMaxFieldChars
 	}
+})
+
+
+test('digest keeps initiating user request even after many later entries', () => {
+	const target = makeSession('initial-request', 'later cleanup')
+	const entries: any[] = [
+		{ type: 'user', parts: [{ type: 'text', text: 'Initial request: make this URL clickable from the screenshot.' }], ts: '2026-06-10T12:01:00.000Z' },
+	]
+	for (let i = 0; i < 100; i++) {
+		entries.push({ type: 'tool_result', toolId: `noise-${i}`, output: `routine implementation noise ${i}`, ts: '2026-06-10T12:02:00.000Z' })
+	}
+	entries.push({ type: 'user', parts: [{ type: 'text', text: 'Later follow-up: minor cleanup.' }], ts: '2026-06-10T12:03:00.000Z' })
+	sessions.appendHistory(target, entries)
+
+	const digest = whatSummary.buildDigest(target, [target], {})
+
+	expect(digest).toContain('Opening conversation:')
+	expect(digest).toContain('User request timeline:')
+	expect(digest).toContain('Initial request: make this URL clickable from the screenshot.')
+	expect(digest).toContain('Later follow-up: minor cleanup.')
 })
 
 
