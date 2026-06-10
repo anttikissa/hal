@@ -84,7 +84,7 @@ function defaultLabel(choice: ReturnType<typeof models.listModelChoices>[number]
 }
 
 function modelCategoryLabel(node: ModelTreeNode, depth: number, open: boolean): string {
-	let text = `${'  '.repeat(depth)}${open ? '▼' : '►'} ${node.name}`
+	let text = `${'  '.repeat(depth)}${open ? '▼' : '▶'} ${node.name}`
 	if (node.defaultChoice) text += ` (default: ${defaultLabel(node.defaultChoice)})`
 	return text
 }
@@ -148,7 +148,7 @@ function addModelTreeRows(rows: PopupItem[], node: ModelTreeNode, depth: number)
 			continue
 		}
 		const open = state.openModelCategories.has(child.path)
-		rows.push({ value: `category:${child.path}`, label: modelCategoryLabel(child, depth, open), kind: 'category', path: child.path, defaultChoice: child.defaultChoice })
+		rows.push({ value: `category:${child.path}`, label: modelCategoryLabel(child, depth, open), kind: 'category', path: child.path, parentPath: node.path || undefined, defaultChoice: child.defaultChoice })
 		if (open) addModelTreeRows(rows, child, depth + 1)
 	}
 }
@@ -222,7 +222,7 @@ function setSelectedCategoryOpen(open: boolean): boolean {
 
 function closeContainingCategory(): boolean {
 	const item = state.items[state.selectedIndex]
-	if (!item || item.kind !== 'model' || !item.parentPath) return false
+	if (!item?.parentPath) return false
 	state.openModelCategories.delete(item.parentPath)
 	refreshModelItems()
 	selectCategoryPath(item.parentPath)
