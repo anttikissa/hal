@@ -288,7 +288,7 @@ function toneColor(): string {
 }
 
 function rowText(item: PopupItem, active: boolean): string {
-	if (active) return item.isCurrent ? `[*${item.label}]` : `[${item.label}]`
+	if (state.kind !== 'model') return active ? `[${item.label}]` : ` ${item.label}`
 	return `${item.isCurrent ? '*' : ' '}${item.label}`
 }
 
@@ -310,7 +310,7 @@ function withOuterPadding(rows: PopupRow[]): { rows: PopupRow[]; topAdded: boole
 
 function modelHint(): string {
 	const item = state.items[state.selectedIndex]
-	const parts = ['>/<: open/close category']
+	const parts = ['←/→: open/close category']
 	if (item?.kind === 'model') parts.push('enter: pick')
 	else if (item?.defaultChoice) parts.push('enter: pick default')
 	parts.push('esc: cancel')
@@ -327,20 +327,22 @@ function bottomBorder(innerWidth: number, hint: string): string {
 }
 
 
-function styleRow(text: string, active: boolean): string {
-	if (!active) return text
-	return `${colors.popup.current.bg}${colors.popup.current.fg}${text}${RESET}`
+function styleRow(text: string, row: PopupRow): string {
+	if (row.active) return `${colors.popup.current.bg}${colors.popup.current.fg}${text}${RESET}`
+	if (row.current) return `${colors.popup.modelCurrent.bg}${colors.popup.modelCurrent.fg}${text}${RESET}`
+	return text
 }
 
 interface PopupRow {
 	text: string
 	active: boolean
+	current?: boolean
 }
 
 function wrapRows(rows: PopupRow[], width: number): PopupRow[] {
 	const out: PopupRow[] = []
 	for (const row of rows) {
-		for (const text of hardWrap(row.text, width)) out.push({ text, active: row.active })
+		for (const text of hardWrap(row.text, width)) out.push({ text, active: row.active, current: row.current })
 	}
 	return out
 }
@@ -383,7 +385,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 		for (const sub of String(line).split('\n')) bodyContent.push({ text: sub, active: false })
 	}
 	if (state.body.length > 0 && state.items.length > 0) tailContent.push({ text: '', active: false })
-	for (let i = 0; i < state.items.length; i++) tailContent.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex })
+	for (let i = 0; i < state.items.length; i++) tailContent.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex, current: state.items[i]!.isCurrent })
 	if (state.kind === 'confirm' && state.items.length > 0) tailContent.push({ text: '', active: false })
 	if (bodyContent.length === 0 && tailContent.length === 0) bodyContent.push({ text: '', active: false })
 	const content = [...bodyContent, ...tailContent]
@@ -422,7 +424,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 		const clipped = clipVisual(line.text, contentWidth)
 		const paddedContent = pad(clipped, contentWidth)
 		const padded = `${' '.repeat(xMargin)}${paddedContent}${' '.repeat(xMargin)}`
-		lines.push(`│${styleRow(padded, line.active)}│`)
+		lines.push(`│${styleRow(padded, line)}│`)
 	}
 	lines.push(bottomBorder(innerWidth, hint))
 	const totalWidth = innerWidth + 2

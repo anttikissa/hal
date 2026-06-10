@@ -42,6 +42,8 @@ describe('popup', () => {
 		const overlay = popup.buildOverlay(120, 30)
 		expect(overlay).not.toBeNull()
 		const selectedLine = overlay!.lines.find((line) => line.includes('GPT 5.4'))
+		expect(cleanLines([selectedLine ?? ''])[0]).toContain(' 5.4          GPT 5.4')
+		expect(cleanLines([selectedLine ?? ''])[0]).not.toContain('[')
 		expect(colors.popup.current.bg).not.toBe('')
 		expect(colors.popup.current.fg).not.toBe('')
 		expect(selectedLine).toContain(colors.popup.current.bg)
@@ -56,7 +58,7 @@ describe('popup', () => {
 		let overlay = popup.buildOverlay(120, 30)
 		expect(overlay).not.toBeNull()
 		let clean = cleanLines(overlay!.lines).join('\n')
-		expect(clean).toContain('>/<: open/close category')
+		expect(clean).toContain('←/→: open/close category')
 		expect(clean).toContain('Pick a model (current: openai/gpt-5.5)')
 		expect(clean).toContain('▶ sonnet (default: sonnet-4-6)')
 		expect(clean).not.toContain('Sonnet 4.5')
@@ -105,7 +107,7 @@ describe('popup', () => {
 		const clean = cleanLines(overlay!.lines)
 		expect(clean[1]).toMatch(/^│ +│$/)
 		expect(clean[clean.length - 2]).toMatch(/^│ +│$/)
-		expect(clean[clean.length - 1]).toContain('>/<: open/close category')
+		expect(clean[clean.length - 1]).toContain('←/→: open/close category')
 		expect(clean[0]).toContain('current: anthropic/claude-fable-5')
 	})
 
@@ -121,9 +123,11 @@ describe('popup', () => {
 
 	test('model picker marks the current model row', () => {
 		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-7')
+		popup.state.selectedIndex = 0
 		const overlay = popup.buildOverlay(120, 30)
 		const clean = cleanLines(overlay!.lines).join('\n')
-		expect(clean).toContain('[*      4.7          Opus 4.7 · anthropic/claude-opus-4-7]')
+		expect(clean).toContain('*      4.7          Opus 4.7 · anthropic/claude-opus-4-7')
+		expect(overlay!.lines.find((line) => line.includes('Opus 4.7'))).toContain(colors.popup.modelCurrent.bg)
 	})
 
 	test('warning popup uses the same highlighted row layout', () => {
