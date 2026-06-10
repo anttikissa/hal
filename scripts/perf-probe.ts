@@ -15,7 +15,7 @@ log('probe start')
 // Import the app modules
 const { perf } = await import('../src/perf.ts')
 const { client } = await import('../src/client.ts')
-const { blocks } = await import('../src/cli/blocks.ts')
+const { blockData } = await import('../src/cli/block-data.ts')
 await import('../src/config.ts')
 const { sessions } = await import('../src/server/sessions.ts')
 
@@ -35,7 +35,7 @@ const lastTab = '09-bx8'
 
 // 3. Convert active tab
 const active = loaded.find((s) => s.meta.id === lastTab)!
-const activeBlocks = blocks.historyToBlocks(active.history, active.meta.id)
+const activeBlocks = blockData.historyToBlocks(active.history, active.meta.id)
 log(`active tab converted: ${activeBlocks.length} blocks`)
 
 // 4. Simulate keypress responsiveness: setInterval that logs timestamps.
@@ -54,16 +54,16 @@ const ticker = setInterval(() => {
 
 // 5. Load active tab blobs (the suspected blocker)
 log('loading active tab blobs...')
-const n1 = await blocks.loadBlobs(activeBlocks)
+const n1 = await blockData.loadBlobs(activeBlocks)
 log(`active tab blobs done: ${n1} blobs`)
 
 // 6. Convert + load remaining tabs
 log('loading remaining tabs...')
 for (const s of loaded) {
 	if (s.meta.id === lastTab) continue
-	const b = blocks.historyToBlocks(s.history, s.meta.id)
+	const b = blockData.historyToBlocks(s.history, s.meta.id)
 	log(`  tab ${s.meta.id}: ${b.length} blocks, loading blobs...`)
-	const n = await blocks.loadBlobs(b)
+	const n = await blockData.loadBlobs(b)
 	log(`  tab ${s.meta.id}: ${n} blobs done`)
 }
 log('all tabs done')

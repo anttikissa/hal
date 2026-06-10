@@ -5,7 +5,7 @@ import { ipc, type SharedState } from './ipc.ts'
 import { sessions } from './server/sessions.ts'
 import { draft } from './cli/draft.ts'
 import { liveFiles } from './utils/live-file.ts'
-import { blocks as blockModule } from './cli/blocks.ts'
+import { blockData } from './cli/block-data.ts'
 import { STATE_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { log } from './utils/log.ts'
@@ -56,7 +56,7 @@ describe('client startup', () => {
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = sessions.loadLive
-	const origLoadBlobs = blockModule.loadBlobs
+	const origLoadBlobs = blockData.loadBlobs
 	const origLogError = log.error
 	const origClientConfig = { ...client.config }
 	let savedClientState: string | null = null
@@ -99,7 +99,7 @@ describe('client startup', () => {
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
 		sessions.loadLive = origLoadLive
-		blockModule.loadBlobs = origLoadBlobs
+		blockData.loadBlobs = origLoadBlobs
 		log.error = origLogError
 		Object.assign(client.config, origClientConfig)
 		if (savedClientState != null) writeFileSync(CLIENT_STATE_PATH, savedClientState)
@@ -365,7 +365,7 @@ describe('client startup', () => {
 		ipc.tailEvents = async function* () {}
 
 		const blobLoads: string[][] = []
-		blockModule.loadBlobs = async (blocks) => {
+		blockData.loadBlobs = async (blocks) => {
 			blobLoads.push(blocks.map((b) => ('sessionId' in b && b.sessionId) ? b.sessionId : ''))
 			return 0
 		}

@@ -26,7 +26,7 @@ import { pausedNotices } from './client/paused-notices.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-import { blocks as blockModule } from './cli/blocks.ts'
+import { blockData } from './cli/block-data.ts'
 import type { Block } from './cli/blocks.ts'
 import type { HistoryEntry, SessionMeta } from './server/sessions.ts'
 export type { Block }
@@ -276,7 +276,7 @@ function applyLiveEventToTab(tab: Tab, event: any): { changed: boolean; toolBloc
 		event,
 		sessionId: tab.sessionId,
 		defaultModel: tab.model,
-		touchBlock: blockModule.touch,
+		touchBlock: blockData.touch,
 		onChange: () => touchTab(tab),
 	})
 }
@@ -341,7 +341,7 @@ function switchTab(index: number): void {
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
-	tab.history = clientHistory.withLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
+	tab.history = clientHistory.withLive(blockData.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
 	sessionLoader.addLastActiveNotice(tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
@@ -366,7 +366,7 @@ function reloadTabFromDisk(tab: Tab, opts: { logName?: string; entryLimit?: numb
 function loadTabBlobs(tab: Tab): void {
 	if (!config.backgroundLoadBlobs) return
 	void (async () => {
-		const n = await blockModule.loadBlobs(tab.history)
+		const n = await blockData.loadBlobs(tab.history)
 		if (n <= 0) return
 		touchTab(tab)
 		if (tab === state.tabs[state.focusedTabIndex] && config.repaintAfterBlobLoad) onChange(false)

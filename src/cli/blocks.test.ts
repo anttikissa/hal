@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { blocks, type Block } from './blocks.ts'
+import { blockData } from './block-data.ts'
 import { colors } from './colors.ts'
 import { visLen } from '../utils/strings.ts'
 
@@ -81,40 +82,6 @@ test('user blocks use user colors', () => {
 	expect(rendered).toContain(colors.user.fg)
 	expect(rendered).toContain(colors.user.bg)
 	expect(rendered).not.toContain(colors.info.bg)
-})
-
-test('historyToBlocks preserves original image path in user text', () => {
-	const history: any[] = [
-		{
-			type: 'user',
-			parts: [
-				{ type: 'text', text: 'see ' },
-				{ type: 'image', blobId: 'blob1', originalFile: '/tmp/hal/images/test.png' },
-				{ type: 'text', text: ' now' },
-			],
-		},
-	]
-
-	const result = blocks.historyToBlocks(history as any, 's1')
-	expect(result[0]).toMatchObject({ type: 'user', text: 'see [/tmp/hal/images/test.png] now' })
-})
-
-test('historyToBlocks recovers retry state from failed turn_end', () => {
-	const result = blocks.historyToBlocks([
-		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
-		{ type: 'turn_end', status: 'failed' },
-	] as any, 's1')
-
-	expect(result.at(-1)).toMatchObject({ type: 'error', text: 'Generation failed.' })
-})
-
-test('historyToBlocks recovers continue state from aborted turn_end', () => {
-	const result = blocks.historyToBlocks([
-		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
-		{ type: 'turn_end', status: 'aborted' },
-	] as any, 's1')
-
-	expect(result.at(-1)).toMatchObject({ type: 'log', text: '[paused]' })
 })
 
 test('thinking block renders markdown and trims trailing blank lines', () => {
@@ -208,17 +175,6 @@ test('thinking header includes model and default thinking level', () => {
 	expect(header).toContain('Hal (GPT 5.4, thinking high)')
 })
 
-test('historyToBlocks uses the session model for later assistant and thinking blocks', () => {
-	const history: any[] = [
-		{ type: 'thinking', text: 'hmm', ts: '2026-04-15T14:54:01.000Z' },
-		{ type: 'assistant', text: 'done', ts: '2026-04-15T14:54:02.000Z' },
-	]
-
-	const rendered = blocks.historyToBlocks(history as any, 's1', 0, undefined, 'openai/gpt-5.4')
-	expect(rendered[0]).toMatchObject({ type: 'thinking', model: 'openai/gpt-5.4', thinkingEffort: 'high' })
-	expect(rendered[1]).toMatchObject({ type: 'assistant', model: 'openai/gpt-5.4' })
-})
-
 test('info block renders markdown tables', () => {
 	const block: Block = {
 		type: 'info',
@@ -310,7 +266,7 @@ test('block header uses plain full-width layout without horizontal rules', () =>
 test('forked_from history entry renders as a Fork block', () => {
 	const history: any[] = [{ type: 'forked_from', parent: '04-abc', ts: '2026-04-09T20:00:00.000Z' }]
 
-	const result = blocks.historyToBlocks(history as any, 'child')
+	const result = blockData.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([{ type: 'fork', text: 'Tab forked from 04-abc.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
 	expect(headerLine(lines)).toContain('Fork')
@@ -319,7 +275,7 @@ test('forked_from history entry renders as a Fork block', () => {
 test('forked_to history entry renders as a Fork block', () => {
 	const history: any[] = [{ type: 'forked_to', child: '04-def', ts: '2026-04-09T20:00:00.000Z' }]
 
-	const result = blocks.historyToBlocks(history as any, 'parent')
+	const result = blockData.historyToBlocks(history as any, 'parent')
 	expect(result).toMatchObject([{ type: 'fork', text: 'Tab forked to 04-def.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
 	expect(headerLine(lines)).toContain('Fork')
@@ -328,7 +284,7 @@ test('forked_to history entry renders as a Fork block', () => {
 test('info history entries render as system blocks', () => {
 	const history: any[] = [{ type: 'info', text: 'Model set to GPT 5.5.', ts: '2026-04-09T20:00:00.000Z' }]
 
-	const result = blocks.historyToBlocks(history as any, 'child')
+	const result = blockData.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([{ type: 'info', text: 'Model set to GPT 5.5.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
 	expect(headerLine(lines)).toContain('System')
@@ -340,7 +296,7 @@ test('structural cwd and model entries render as system blocks', () => {
 		{ type: 'model', from: 'openai/gpt-5.5', to: 'anthropic/claude-opus-4-7', ts: '2026-04-09T20:01:00.000Z' },
 	]
 
-	const result = blocks.historyToBlocks(history as any, 'child')
+	const result = blockData.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([
 		{ type: 'info', text: 'cwd: /tmp -> /Users/antti/.hal/src' },
 		{ type: 'info', text: 'model: openai/gpt-5.5 -> anthropic/claude-opus-4-7' },

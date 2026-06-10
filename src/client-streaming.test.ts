@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { client } from './client.ts'
-import { blocks as blockModule } from './cli/blocks.ts'
+import { blockData } from './cli/block-data.ts'
 function makeTab(sessionId = 's1') {
 	return {
 		sessionId,
@@ -249,8 +249,8 @@ test('tool-result reloads full blob output for edit blocks', async () => {
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab())
 	client.state.focusedTabIndex = 0
-	const originalLoadBlobs = blockModule.loadBlobs
-	blockModule.loadBlobs = async (items) => {
+	const originalLoadBlobs = blockData.loadBlobs
+	blockData.loadBlobs = async (items) => {
 		const tool = items[0] as any
 		tool.output = `--- before\n2:old old line\n\n+++ after\n2:new new line`
 		tool.blobLoaded = true
@@ -285,7 +285,7 @@ test('tool-result reloads full blob output for edit blocks', async () => {
 			output: `--- before\n2:old old line\n\n+++ after\n2:new new line`,
 		})
 	} finally {
-		blockModule.loadBlobs = originalLoadBlobs
+		blockData.loadBlobs = originalLoadBlobs
 	}
 })
 

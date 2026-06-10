@@ -1,5 +1,5 @@
 import { draft as draftModule } from '../cli/draft.ts'
-import { blocks as blockModule } from '../cli/blocks.ts'
+import { blockData } from '../cli/block-data.ts'
 import { clientHistory } from './history.ts'
 
 function handle(event: any, ctx: any): void {
@@ -125,7 +125,7 @@ function handleToolResult(event: any, ctx: any): void {
 	ctx.onChange(false)
 	if (!toolBlock.blobId) return
 	void (async () => {
-		const loaded = await blockModule.loadBlobs([toolBlock])
+		const loaded = await blockData.loadBlobs([toolBlock])
 		if (loaded <= 0) return
 		ctx.touchTab(tab)
 		ctx.onChange(false)

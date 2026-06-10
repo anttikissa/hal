@@ -1,4 +1,4 @@
-import { blocks as blockModule } from '../cli/blocks.ts'
+import { blockData } from '../cli/block-data.ts'
 import { perf } from '../perf.ts'
 
 async function load(ctx: any): Promise<void> {
@@ -6,7 +6,7 @@ async function load(ctx: any): Promise<void> {
 		const focused = ctx.tabs[ctx.focusedTabIndex()]
 		if (focused) {
 			const t0 = performance.now()
-			const n = await blockModule.loadBlobs(focused.history)
+			const n = await blockData.loadBlobs(focused.history)
 			const blobMs = (performance.now() - t0).toFixed(1)
 			perf.mark(`Focused tab blobs loaded (${n} blobs, ${blobMs}ms)`)
 			if (n > 0) ctx.touchTab(focused)
@@ -22,7 +22,7 @@ async function load(ctx: any): Promise<void> {
 			tabCount++
 		}
 		if (ctx.config.backgroundLoadBlobs) {
-			const n = await blockModule.loadBlobs(tab.history)
+			const n = await blockData.loadBlobs(tab.history)
 			if (n > 0) ctx.touchTab(tab)
 			if (n > 0 && tab === ctx.tabs[ctx.focusedTabIndex()]) ctx.onChange(false)
 		}
