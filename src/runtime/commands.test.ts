@@ -32,6 +32,7 @@ const origScheduleExit = commands.state.scheduleExit
 const origReadState = ipc.readState
 const origOwnsHostLock = ipc.ownsHostLock
 
+const origRefreshModels = models.refreshModels
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 const origLoadAllHistory = sessionStore.loadAllHistory
 const origLoadLive = sessionStore.loadLive
@@ -77,6 +78,7 @@ afterEach(() => {
 	ipc.readState = origReadState
 	ipc.ownsHostLock = origOwnsHostLock
 	version.state.repoDir = origVersionState.repoDir
+	models.refreshModels = origRefreshModels
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
 	sessionStore.loadAllHistory = origLoadAllHistory
 	sessionStore.loadLive = origLoadLive
@@ -199,6 +201,30 @@ test('/clients lists server and client versions', async () => {
 	expect(result.output).toContain(`pid ${process.pid}`)
 	expect(result.output).toContain('client5678')
 	expect(result.output).toContain('session 04-aaa')
+})
+
+test('/check refreshes model metadata and reports alias updates', async () => {
+	models.refreshModels = async () => ({
+		fetched: true,
+		changes: ['new Claude model claude-opus-4-8 (1000k)'],
+		modelCount: 257,
+		hadCache: true,
+		previous: { 'claude-opus-4-7': 1_000_000 },
+		next: { 'claude-opus-4-7': 1_000_000, 'claude-opus-4-8': 1_000_000 },
+	})
+	const progress: string[] = []
+
+	const result = await commands.executeCommand('/check', makeSession(), {
+		info: (text) => progress.push(text),
+	})
+
+	expect(result.handled).toBe(true)
+	expect(progress).toEqual(['Checking models.dev for model updates...'])
+	expect(result.output).toContain('[models.dev] fetched model metadata')
+	expect(result.output).toContain('new Claude model claude-opus-4-8 (1000k)')
+	expect(result.output).toContain('It looks like some of your model aliases got updates:')
+	expect(result.output).toContain('anthropic/claude-opus-4-7')
+	expect(result.output).toContain('anthropic/claude-opus-4-8')
 })
 
 

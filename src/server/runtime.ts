@@ -18,7 +18,6 @@ import { attachments } from '../session/attachments.ts'
 import { sessionIds } from '../session/ids.ts'
 import { replay } from '../session/replay.ts'
 import { HAL_DIR } from '../state.ts'
-import { config } from '../config.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { log } from '../utils/log.ts'
@@ -26,6 +25,7 @@ import { startup } from '../startup.ts'
 import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
+import { modelRefresh } from '../model-refresh.ts'
 
 const state = {
 	openSessionIds: [] as string[],
@@ -304,26 +304,11 @@ function emitFocusedInfo(text: string, level: 'info' | 'error' = 'info'): void {
 }
 
 function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
-	if (changes.length === 0) return `Fetched recent data from models.dev (${modelCount ?? 0} models)`
-	const shown = changes.slice(0, 8)
-	const more = changes.length > shown.length ? ` (+${changes.length - shown.length} more)` : ''
-	return `[models.dev] fetched model metadata; relevant changes: ${shown.join('; ')}${more}`
+	return modelRefresh.formatModelRefreshMessage(changes, modelCount)
 }
 
 function buildAliasUpdateSuggestionText(updates: Array<{ aliases: string[]; oldModel: string; newModel: string }>, cwd: string): string {
-	const lines = [
-		'It looks like some of your model aliases got updates:',
-		'',
-		...updates.map((update) => `- **${update.aliases.join('**, **')}**: **${update.oldModel}** → **${update.newModel}**`),
-	]
-	const configuredDefault = config.data.models?.default
-	if (typeof configuredDefault === 'string') {
-		lines.push('', `config.ason sets the default model to **${configuredDefault}**, which currently maps to **${models.resolveModel(configuredDefault)}**.`)
-	}
-	lines.push('')
-	if (cwd === HAL_DIR) lines.push('Would you like me to update those aliases in ~/.hal?')
-	else lines.push('Would you like me to spawn a subagent in ~/.hal and update those aliases?')
-	return lines.join('\n')
+	return modelRefresh.buildAliasUpdateSuggestionText(updates, cwd)
 }
 
 function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: string, model: string): void {
@@ -352,11 +337,11 @@ function suggestAliasUpdates(previous: Record<string, number>, next: Record<stri
 
 async function refreshModelMetadata(): Promise<void> {
 	try {
-		const result = await models.refreshModels()
+		const checked = await modelRefresh.checkModels()
+		const result = checked.result
 		if (!result.hadCache || result.changes.length > 0) {
-			const message = formatModelRefreshMessage(result.changes, result.modelCount)
-			log.info('models.dev metadata refreshed', { message })
-			emitFocusedInfo(message)
+			log.info('models.dev metadata refreshed', { message: checked.message })
+			emitFocusedInfo(checked.message)
 		}
 		if (result.hadCache) suggestAliasUpdates(result.previous, result.next)
 	} catch (err) {

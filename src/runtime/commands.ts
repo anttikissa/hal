@@ -23,6 +23,7 @@ import { HAL_DIR } from '../state.ts'
 import { authLogin } from '../auth-login.ts'
 import { isPidAlive } from '../utils/is-pid-alive.ts'
 import type { SharedClientInfo } from '../ipc.ts'
+import { modelRefresh } from '../model-refresh.ts'
 
 // ── Types ──
 
@@ -114,6 +115,7 @@ const handlers: Record<string, CommandHandler> = {}
 const workingSafeCommands = new Set([
 	'broadcast',
 	'clients',
+	'check',
 	'fork',
 	'help',
 	'mem',
@@ -341,6 +343,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	model: { usage: '[<model>]', summary: 'Switch model or list available models.', detail: 'With no model, shows the current model and the available choices.', arg: 'model' },
 	clear: { summary: 'Clear session history.' },
 	clients: { summary: 'List server and connected client versions.' },
+	check: { summary: 'Check models.dev for model metadata and alias updates.' },
 	fork: { summary: 'Fork current session to new tab.' },
 	self: { usage: '[--fork | -f]', summary: 'Open a session in Hal\'s own directory.', detail: 'With --fork, fork this conversation into Hal\'s own directory instead of starting a fresh self tab.' },
 	open: { usage: '[<target>]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
@@ -410,7 +413,7 @@ const commandSections: CommandSection[] = [
 	{ title: 'Conversation', names: ['clear', 'compact', 'rebase', 'system'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
-	{ title: 'Setup & diagnostics', names: ['cd', 'clients', 'config', 'login', 'mem'] },
+	{ title: 'Setup & diagnostics', names: ['cd', 'check', 'clients', 'config', 'login', 'mem'] },
 ]
 
 function helpUsageLines(name: string): string[] {
@@ -631,6 +634,23 @@ handlers['rebase'] = async () => {
 
 handlers['clients'] = () => {
 	return { output: renderClientsStatus(), handled: true }
+}
+
+// /check — manually run the same models.dev refresh used on startup.
+handlers['check'] = async (args, session, hooks) => {
+	if (args.trim()) return { error: 'Usage: /check', handled: true }
+	hooks.info?.('Checking models.dev for model updates...')
+	try {
+		const checked = await modelRefresh.checkModels()
+		const lines = [checked.message]
+		if (checked.result.hadCache) {
+			const updates = models.aliasUpdateSuggestions(checked.result.previous, checked.result.next)
+			if (updates.length > 0) lines.push('', modelRefresh.buildAliasUpdateSuggestionText(updates, session.cwd))
+		}
+		return { output: lines.join('\n'), handled: true }
+	} catch (err: any) {
+		return { error: `/check: ${err?.message ?? String(err)}`, handled: true }
+	}
 }
 
 // /status — runtime version + Anthropic / OpenAI OAuth subscription usage
