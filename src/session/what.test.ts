@@ -135,6 +135,8 @@ test('summary prompt asks for recall sections without invented why or routine to
 	expect(prompt).toContain('Why / goal')
 	expect(prompt).toContain('Clarifications and design')
 	expect(prompt).toContain('Plan / approval')
+	expect(prompt).toContain('Commits made')
+	expect(prompt).toContain('abbreviated commit hashes')
 	expect(prompt).toContain('Do not invent')
 	expect(prompt).toContain('Ignore routine tool noise')
 	expect(prompt).toContain('Return only ASON with fields: title, summary')
@@ -187,4 +189,21 @@ test('digest puts conversation highlights before clipped tool details', () => {
 		whatSummary.config.maxDigestChars = origMaxDigestChars
 		whatSummary.config.maxFieldChars = origMaxFieldChars
 	}
+})
+
+
+test('digest highlights commit evidence before routine tool details', () => {
+	const target = makeSession('commits', 'commits')
+	sessions.appendHistory(target, [
+		{ type: 'tool_call', toolId: 'commit-1', name: 'bash', input: { command: 'git commit -m "Add what command"' }, ts: '2026-06-10T12:01:00.000Z' },
+		{ type: 'tool_result', toolId: 'commit-1', output: '[main abc1234] Add what command\n 2 files changed', ts: '2026-06-10T12:02:00.000Z' },
+		{ type: 'tool_result', toolId: 'noise-1', output: 'routine output', ts: '2026-06-10T12:03:00.000Z' },
+	])
+
+	const digest = whatSummary.buildDigest(target, [target], {})
+
+	expect(digest).toContain('Commit evidence:')
+	expect(digest).toContain('git commit -m')
+	expect(digest).toContain('[main abc1234] Add what command')
+	expect(digest.indexOf('Commit evidence:')).toBeLessThan(digest.indexOf('Tool/action details:'))
 })

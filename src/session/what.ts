@@ -196,6 +196,12 @@ function isHighlight(entry: HistoryEntry): boolean {
 		|| entry.type === 'rebased_to'
 }
 
+function isCommitEvidenceLine(line: string): boolean {
+	return /\bgit\s+commit\b/.test(line)
+		|| line.includes('[hal-commit]')
+		|| /^tool_result.*\[[^\]]+ [0-9a-f]{7,}\]/.test(line)
+}
+
 function appendWithinBudget(lines: string[], additions: string[], maxChars: number): void {
 	for (const addition of additions) {
 		const separator = lines.length > 0 ? 1 : 0
@@ -217,10 +223,12 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 	const entries = sessions.loadAllHistory(sessionId)
 	const recent = entries.slice(-config.maxEntries)
 	const highlights: string[] = []
+	const commitEvidence: string[] = []
 	const details: string[] = []
 	for (const entry of recent) {
 		const line = entryLine(sessionId, entry)
-		if (isHighlight(entry)) highlights.push(line)
+		if (isCommitEvidenceLine(line)) commitEvidence.push(line)
+		else if (isHighlight(entry)) highlights.push(line)
 		else details.push(line)
 	}
 	const lines = [
@@ -236,6 +244,8 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 		'Conversation and meta highlights:',
 	]
 	appendWithinBudget(lines, highlights.length > 0 ? highlights : ['[none]'], Math.floor(config.maxDigestChars * 0.75))
+	lines.push('', 'Commit evidence:')
+	appendWithinBudget(lines, commitEvidence.length > 0 ? commitEvidence : ['[none]'], Math.floor(config.maxDigestChars * 0.85))
 	lines.push('', 'Tool/action details:')
 	appendWithinBudget(lines, details.length > 0 ? details : ['[none]'], config.maxDigestChars)
 	if (working[sessionId]) {
@@ -249,11 +259,12 @@ function systemPrompt(): string {
 		'You write session-recall briefs for Hal coding-agent sessions.',
 		'Return only ASON with fields: title, summary.',
 		'Title must be short, lower-case, descriptive, and at most 60 characters.',
-		'Summary must use these fixed sections, in this order: Attribution; What user asked; Why / goal; Clarifications and design; Plan / approval; Work done and current state; Files, actions, and evidence; Next steps / open questions.',
-		'Focus on what the user asked for, why, clarifying questions Hal asked, what was clarified or designed, architectural decisions, and whether a plan was made or approved.',
-		'Do not invent missing why, approval, files, or decisions; say "not visible" or "not stated" when the digest does not show them.',
-		'Ignore routine tool noise such as raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, failure, or current state.',
-		'Preserve attribution from the digest, including tab/closed state, session id, name, state, spawn kind or agent role, parent session id, and forked-from when present.',
+		'Summary must use these fixed sections, in this order: Attribution; What user asked; Why / goal; Clarifications and design; Plan / approval; Work done and current state; Commits made; Files, actions, and evidence; Next steps / open questions.',
+		'Focus on what the user asked for, why, clarifying questions Hal asked, what was clarified or designed, architectural decisions, whether a plan was made or approved, and commits made.',
+		'When commits are visible, mention abbreviated commit hashes and one-line summaries; if no commits are visible, say "none visible".',
+		'Do not invent missing why, approval, files, commits, or decisions; say "not visible" or "not stated" when the digest does not show them.',
+		'Ignore routine tool noise such as raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, commit, failure, or current state.',
+		'Preserve attribution from the digest, including tab/closed state, session id, name, state, spawn kind or agent role, parent session id, and forked-from when present.'
 	].join('\n')
 }
 
