@@ -28,7 +28,7 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai'], fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000, track: 'gpt' },
 	{ group: 'OpenAI', alias: 'gpt-5.4', fullId: 'openai/gpt-5.4', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-5.3', fullId: 'openai/gpt-5.3', fallbackContext: 128_000 },
-	{ group: 'OpenAI', alias: 'instant', fullId: 'openai/gpt-5.5-instant', fallbackContext: 400_000, pricing: { input: 5, output: 30 } },
+	{ group: 'OpenAI', alias: 'gpt-instant', fullId: 'openai/gpt-5.5-instant', fallbackContext: 400_000, pricing: { input: 5, output: 30 } },
 	{ group: 'OpenAI', alias: 'codex', fullId: 'openai/gpt-5.3-codex', fallbackContext: 128_000, track: 'codex' },
 	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.5-flash', fallbackContext: 1_000_000, track: 'gemini' },
 	{ group: 'Google', alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview', fallbackContext: 1_000_000, track: 'gemini-pro' },
@@ -649,7 +649,7 @@ function addOpenAiChoices(items: ModelChoice[]): void {
 	}
 	choices.sort((a, b) => compareCandidates(b.candidate, a.candidate))
 	for (const choice of choices) addModelChoice(items, choice.value, choice.fullId, ['openai', 'gpt'], choice.suffix)
-	const instant = catalogEntryForAlias('instant')!
+	const instant = catalogEntryForAlias('gpt-instant')!
 	addModelChoice(items, instant.alias, aliasFullId(instant.alias) ?? instant.fullId, ['openai', 'gpt'], 'instant')
 }
 

@@ -147,15 +147,16 @@ test('model completions include aliases, full ids, and bare ids', () => {
 })
 
 
-test('Fable and instant aliases resolve to provider model ids', () => {
+test('Fable and gpt-instant aliases resolve to provider model ids', () => {
 	expect(models.resolveModel('fable')).toBe('anthropic/claude-fable-5')
 	expect(models.resolveModel('fable-5')).toBe('anthropic/claude-fable-5')
-	expect(models.resolveModel('instant')).toBe('openai/gpt-5.5-instant')
+	expect(models.resolveModel('gpt-instant')).toBe('openai/gpt-5.5-instant')
+	expect(models.resolveModel('instant')).toBe('instant')
 	expect(models.resolveModel('gpt-5.5-instant')).toBe('openai/gpt-5.5-instant')
 })
 
 
-test('Fable and instant have picker entries, fallback context, and prices', () => {
+test('Fable and gpt-instant have picker entries, fallback context, and prices', () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir
 	models.state.cache = null
@@ -167,7 +168,7 @@ test('Fable and instant have picker entries, fallback context, and prices', () =
 		expect(models.computeCost('anthropic/claude-fable-5', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.06)
 		expect(models.computeCost('openai/gpt-5.5-instant', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.035)
 		expect(models.listModelChoices().find((item) => item.value === 'fable')).toMatchObject({ search: expect.stringContaining('anthropic/claude-fable-5') })
-		expect(models.listModelChoices().find((item) => item.value === 'instant')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.5-instant') })
+		expect(models.listModelChoices().find((item) => item.value === 'gpt-instant')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.5-instant') })
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
