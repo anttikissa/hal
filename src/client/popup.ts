@@ -49,7 +49,6 @@ const state = {
 	currentModel: '',
 }
 
-const DEFAULT_OPEN_MODEL_CATEGORIES = ['openai', 'openai/gpt', 'anthropic', 'anthropic/fable', 'anthropic/opus']
 const MODEL_PICKER_INNER_WIDTH = 90
 const RESET = '\x1b[0m'
 
@@ -68,7 +67,13 @@ function close(): void {
 }
 
 function resetOpenModelCategories(): void {
-	state.openModelCategories = new Set(DEFAULT_OPEN_MODEL_CATEGORIES)
+	state.openModelCategories = new Set()
+	const choice = models.listModelChoices().find((item) => isCurrentModelChoice(item))
+	let path = ''
+	for (const part of choice?.path ?? []) {
+		path = path ? `${path}/${part}` : part
+		state.openModelCategories.add(path)
+	}
 }
 
 function isCurrentModelChoice(choice: ReturnType<typeof models.listModelChoices>[number] | undefined): boolean {
@@ -174,10 +179,10 @@ function selectModelValue(target: string): void {
 
 function openModelPicker(onChoose: (value: string) => void, currentModel?: string): void {
 	close()
-	resetOpenModelCategories()
 	state.active = true
 	state.kind = 'model'
 	state.currentModel = currentModel ? models.resolveModel(currentModel) : ''
+	resetOpenModelCategories()
 	state.title = state.currentModel ? `Pick a model (current: ${state.currentModel})` : 'Pick a model'
 	state.tone = 'neutral'
 	state.onChoose = onChoose
