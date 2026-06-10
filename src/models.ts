@@ -650,7 +650,7 @@ function addOpenAiChoices(items: ModelChoice[]): void {
 	choices.sort((a, b) => compareCandidates(b.candidate, a.candidate))
 	for (const choice of choices) addModelChoice(items, choice.value, choice.fullId, ['openai', 'gpt'], choice.suffix)
 	const instant = catalogEntryForAlias('gpt-instant')!
-	addModelChoice(items, instant.alias, aliasFullId(instant.alias) ?? instant.fullId, ['openai', 'gpt'], 'instant')
+	addModelChoice(items, instant.alias, aliasFullId(instant.alias) ?? instant.fullId, ['openai', 'gpt'], instant.alias)
 }
 
 function addStaticProviderChoices(items: ModelChoice[], group: CatalogEntry['group'], providerPath: string): void {

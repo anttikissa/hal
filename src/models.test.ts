@@ -168,7 +168,7 @@ test('Fable and gpt-instant have picker entries, fallback context, and prices', 
 		expect(models.computeCost('anthropic/claude-fable-5', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.06)
 		expect(models.computeCost('openai/gpt-5.5-instant', { input: 1000, output: 1000, cacheRead: 0, cacheCreation: 0 })).toBe(0.035)
 		expect(models.listModelChoices().find((item) => item.value === 'fable')).toMatchObject({ search: expect.stringContaining('anthropic/claude-fable-5') })
-		expect(models.listModelChoices().find((item) => item.value === 'gpt-instant')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.5-instant') })
+		expect(models.listModelChoices().find((item) => item.value === 'gpt-instant')).toMatchObject({ leafLabel: 'gpt-instant', search: expect.stringContaining('openai/gpt-5.5-instant') })
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
