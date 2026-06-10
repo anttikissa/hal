@@ -27,6 +27,7 @@ import { promptQueue } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
 import { openingSummary } from '../session/opening-summary.ts'
+import { whatSummary } from '../session/what.ts'
 
 const state = {
 	openSessionIds: [] as string[],
@@ -445,6 +446,18 @@ function handleCommand(cmd: Command): void {
 		case 'rebase-apply': {
 			if (!sessionId) return
 			void rebaseHandler.runRebaseApply(sessionId, cmd.requestId, cmd.clientPid, cmd.todo, cmd.edits)
+			break
+		}
+		case 'what': {
+			if (!sessionId) return
+			void (async () => {
+				try {
+					const result = await whatSummary.run({ requesterSessionId: sessionId, target: cmd.target ?? '', openSessionIds: state.openSessionIds })
+					if (result.renamed) broadcastSessions()
+				} catch (err) {
+					emitInfo(sessionId, `/what failed: ${errorMessage(err)}`, 'error', undefined, false)
+				}
+			})()
 			break
 		}
 		case 'open': {

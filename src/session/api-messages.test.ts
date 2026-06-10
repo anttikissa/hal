@@ -148,6 +148,20 @@ test('toProviderMessages wraps synthetic assistant messages in synthetic tags', 
 	])
 })
 
+
+test('toProviderMessages skips ui-only assistant messages', () => {
+	const ts = '2026-04-13T14:43:49.970Z'
+	const entries: any[] = [
+		{ type: 'assistant', text: 'What summary', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui', ts },
+		{ type: 'info', text: 'User ran /what for session 04-one.', visibility: 'next-user', ts },
+		{ type: 'user', parts: [{ type: 'text', text: 'continue' }], ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[13 Apr 14:43]\n<meta>User ran /what for session 04-one.</meta>\ncontinue' },
+	])
+})
+
 test('toProviderMessages starts after the last reset marker', () => {
 	const ts = '2026-04-15T00:00:00.000Z'
 	const entries: any[] = [

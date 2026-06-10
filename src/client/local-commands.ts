@@ -157,6 +157,11 @@ function runGo(args: string, ctx: ClientLocalCommandContext): ClientLocalCommand
 	return { handled: true, error: `No tab or session matches: ${raw}` }
 }
 
+function runWhat(args: string, ctx: ClientLocalCommandContext): ClientLocalCommandResult {
+	ctx.sendCommand('what', args.trim())
+	return { handled: true, output: 'Summarizing session(s)...' }
+}
+
 function runKeys(_args: string, _ctx: ClientLocalCommandContext): ClientLocalCommandResult {
 	return { handled: true, output: keyHelp.render() }
 }
@@ -268,6 +273,14 @@ specs['help'] = {
 	summary: 'Show combined server, terminal-local, and keyboard help.',
 	arg: 'command',
 	run: runHelp,
+}
+
+specs['what'] = {
+	usage: '[<target> | <start-end> | --all]',
+	summary: 'Summarize what is going on in one or more sessions without interrupting them.',
+	detail: 'With no target, summarizes the current session. Target can be a tab number/range, session id, or session name.',
+	arg: 'session',
+	run: runWhat,
 }
 
 specs['keys'] = {

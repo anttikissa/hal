@@ -109,6 +109,16 @@ test('forkSession names child as a lowercase fork of a named parent', async () =
 	expect(child.name).toBe('fork of pause fix')
 })
 
+
+test('updateMeta writes closed session metadata', async () => {
+	const id = await makeSession()
+	sessions.deactivateSession(id)
+
+	sessions.updateMeta(id, { name: 'closed summary' })
+
+	expect(sessions.loadSessionMeta(id)?.name).toBe('closed summary')
+})
+
 test('deleteSession cleans up', async () => {
 	const id = await makeSession()
 	sessions.deleteSession(id)

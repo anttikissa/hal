@@ -105,6 +105,7 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 				break
 			}
 			case 'assistant': {
+				if (entry.visibility === 'ui') break
 				flushToolResults()
 				pendingInfos = []
 				const text = entry.synthetic ? syntheticText(entry.text) : entry.text

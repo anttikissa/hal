@@ -1,7 +1,7 @@
 // Session persistence. Open sessions keep session.ason as a liveFile; closed
 // sessions are read straight from disk until the runtime resumes them.
 
-import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync } from 'fs'
+import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync, writeFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import type { SharedSessionInfo } from '../ipc.ts'
 import { STATE_DIR, ensureDir } from '../state.ts'
@@ -58,6 +58,7 @@ export type HistoryEntry = EntryIdentity & (
 			usage?: PartialTokenUsage
 			synthetic?: boolean
 			syntheticKind?: string
+			visibility?: 'ui'
 			ts?: string
 		}
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; ts?: string }
@@ -367,10 +368,18 @@ function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
 }
 
 function updateMeta(sessionId: string, updates: Partial<SessionMeta>): void {
-	const meta = liveSessionMetas.get(sessionId)
+	const live = liveSessionMetas.get(sessionId)
+	if (live) {
+		Object.assign(live, updates)
+		saveMeta(live)
+		return
+	}
+
+	const meta = readSessionMetaFromDisk(sessionId)
 	if (!meta) return
 	Object.assign(meta, updates)
-	saveMeta(meta)
+	ensureSessionDir(sessionId)
+	writeFileSync(sessionFile(sessionId, 'session.ason'), ason.stringify(fixMeta(meta, sessionId)) + '\n')
 }
 
 function rotateLog(sessionId: string): string {

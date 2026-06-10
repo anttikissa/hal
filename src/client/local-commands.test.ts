@@ -45,6 +45,25 @@ test('/go reports ambiguous partial tab names', () => {
 	expect(c.focusedTabIndex).toBe(0)
 })
 
+test('/what sends non-interrupting what command with target text', () => {
+	const c = ctx()
+	const sent: any[] = []
+	c.sendCommand = (type, text) => { sent.push({ type, text }) }
+	const result = clientLocalCommands.execute('/what 5-9', c)
+
+	expect(result).toMatchObject({ handled: true, output: 'Summarizing session(s)...' })
+	expect(sent).toEqual([{ type: 'what', text: '5-9' }])
+})
+
+test('/what defaults to current session target', () => {
+	const c = ctx()
+	const sent: any[] = []
+	c.sendCommand = (type, text) => { sent.push({ type, text }) }
+	clientLocalCommands.execute('/what', c)
+
+	expect(sent).toEqual([{ type: 'what', text: '' }])
+})
+
 test('/quit quits with a visible goodbye', () => {
 	const result = clientLocalCommands.execute('/quit', ctx())
 

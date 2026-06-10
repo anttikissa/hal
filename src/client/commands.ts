@@ -27,6 +27,8 @@ function makeCommand(type: ClientCommandType, sessionId: string | undefined, tex
 			const position = parseInt(text ?? '', 10)
 			return { type, sessionId, position: Number.isFinite(position) ? position : 0 }
 		}
+		case 'what':
+			return { type, sessionId, target: text ?? '' }
 		case 'continue':
 		case 'queue-next':
 		case 'close':
