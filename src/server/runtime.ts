@@ -297,9 +297,10 @@ function emitFocusedInfo(text: string, level: 'info' | 'error' = 'info'): void {
 	if (!sessionId) return
 	const ts = new Date().toISOString()
 	// Startup metadata refresh can finish before a just-started client begins
-	// tailing IPC events. Persist the notice too so it survives that race and
-	// remains visible in history after reloads.
-	recordSessionInfo(sessionId, text, ts)
+	// tailing IPC events. Persist the notice too so it survives that race, but
+	// keep the persisted block type aligned with the live IPC rendering.
+	const entry: HistoryEntry = level === 'error' ? { type: 'error', text, ts } : { type: 'log', text, ts }
+	sessionStore.appendHistorySync(sessionId, [entry])
 	emitInfo(sessionId, text, level)
 }
 

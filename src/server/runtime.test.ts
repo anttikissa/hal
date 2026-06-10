@@ -695,6 +695,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		expect(histories.map((item) => item.sessionId)).toEqual(['04-current'])
 		expect(events.map((item) => item.sessionId)).toEqual(['04-current'])
 		expect(events[0]).toMatchObject({ type: 'info', text: expect.stringContaining('[models.dev] fetched model metadata') })
+		expect(histories[0]!.entries[0]).toMatchObject({ type: 'log', text: expect.stringContaining('[models.dev] fetched model metadata') })
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
