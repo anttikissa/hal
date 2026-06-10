@@ -163,7 +163,20 @@ function refreshModelItems(): void {
 	const choices = models.listModelChoices()
 	if (query) {
 		const matches = choices.filter((item) => item.search.includes(query))
-		state.items = matches.map((item) => ({ value: item.value, label: item.label, kind: 'model', choice: item, isCurrent: isCurrentModelChoice(item) }))
+		const rows: PopupItem[] = []
+		const oldOpen = state.openModelCategories
+		state.openModelCategories = new Set()
+		for (const item of matches) {
+			let path = ''
+			for (const part of item.path) {
+				path = path ? `${path}/${part}` : part
+				state.openModelCategories.add(path)
+			}
+		}
+		addModelTreeRows(rows, buildModelTree(matches), 0)
+		state.openModelCategories = oldOpen
+		state.items = rows
+		state.selectedIndex = Math.max(0, rows.findIndex((item) => item.path?.includes(query) || item.choice?.search.includes(query)))
 	} else {
 		const rows: PopupItem[] = []
 		addModelTreeRows(rows, buildModelTree(choices), 0)
@@ -282,7 +295,6 @@ function handleKey(k: KeyEvent): boolean {
 	}
 	if (state.kind === 'model' && editor.handleKey(k)) {
 		refreshModelItems()
-		state.selectedIndex = 0
 		return true
 	}
 	return false

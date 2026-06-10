@@ -29,18 +29,23 @@ describe('popup', () => {
 		popup.handleKey({ key: 'o', char: 'o', shift: false, alt: false, ctrl: false, cmd: false })
 		popup.handleKey({ key: 'n', char: 'n', shift: false, alt: false, ctrl: false, cmd: false })
 		expect(popup.state.active).toBe(true)
-		expect(popup.state.items[0]?.value).toBe('sonnet')
+		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('category:anthropic/sonnet')
 		popup.handleKey(key('enter'))
 		expect(picked).toBe('sonnet')
 		expect(popup.state.active).toBe(false)
 	})
 
-	test('model picker filtering selects the first match', () => {
+	test('model picker filtering keeps hierarchy and selects first matching row', () => {
 		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-7')
 		models.state.cache = { 'claude-opus-4-8': 1_000_000, 'claude-opus-4-7': 1_000_000, 'claude-opus-4-6': 1_000_000 }
 		popup.state.selectedIndex = 5
 		for (const ch of 'opus') popup.handleKey({ key: ch, char: ch, shift: false, alt: false, ctrl: false, cmd: false })
-		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('opus')
+		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('category:anthropic/opus')
+		const clean = cleanLines(popup.buildOverlay(120, 30)!.lines).join('\n')
+		expect(clean).toContain('▼ anthropic')
+		expect(clean).toContain('▼ opus')
+		expect(clean).toContain('opus-4-8')
+		expect(clean).not.toContain('fable')
 	})
 
 
