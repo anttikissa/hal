@@ -73,7 +73,9 @@ test('run writes ui-only summary to requester and fills empty target name', asyn
 	const requesterHistory = sessions.loadHistory(requester)
 	expect(requesterHistory).toContainEqual(expect.objectContaining({ type: 'assistant', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui' }))
 	const summary = requesterHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
-	expect(summary?.type === 'assistant' ? summary.text : '').toContain(`## plan bug fix (tab 2; session ${target}; name plan bug fix; state idle/open; spawn (none); role primary)`)
+	expect(summary?.type === 'assistant' ? summary.text : '').toContain('## plan bug fix')
+	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('session ')
+	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('state idle/open')
 	expect(requesterHistory).toContainEqual(expect.objectContaining({ type: 'info', visibility: 'next-user', text: `User ran /what for session ${target}.` }))
 	expect(events.some((event) => event.type === 'response' && event.sessionId === requester && event.synthetic)).toBe(true)
 })
@@ -127,19 +129,74 @@ test('run does not overwrite existing target name', async () => {
 })
 
 
-test('summary prompt asks for recall sections without invented why or routine tool noise', () => {
+test('summary prompt asks for compact narrative style with concrete example', () => {
 	const prompt = whatSummary.systemPrompt()
 
-	expect(prompt).toContain('fixed sections')
-	expect(prompt).toContain('What user asked')
-	expect(prompt).toContain('Why / goal')
-	expect(prompt).toContain('Clarifications and design')
-	expect(prompt).toContain('Plan / approval')
-	expect(prompt).toContain('Commits made')
-	expect(prompt).toContain('abbreviated commit hashes')
-	expect(prompt).toContain('Do not invent')
-	expect(prompt).toContain('Ignore routine tool noise')
+	expect(prompt).toContain('initiating user problem')
+	expect(prompt).toContain('short narrative')
+	expect(prompt).toContain('Every sentence must help')
+	expect(prompt).toContain('metadata inventories')
+	expect(prompt).toContain('final relevant abbreviated commit hash')
+	expect(prompt).toContain('Desired style example')
+	expect(prompt).toContain('active tab to rename itself left it paused')
+	expect(prompt).toContain('Commit 9b71e64 — Remove dead client command branches')
 	expect(prompt).toContain('Return only ASON with fields: title, summary')
+	expect(prompt).not.toContain('fixed sections')
+	expect(prompt).not.toContain('Commits made; Files, actions, and evidence')
+})
+
+
+test('golden tab4-style summary favors initiating bug over later cleanup', async () => {
+	const requester = makeSession('requester', 'requester')
+	const target = makeSession('tab4', 'minor client command cleanup')
+	const origAppendEvent = ipc.appendEvent
+	const origGetProvider = providerLoader.getProvider
+	let captured: any
+	const golden = [
+		'You showed a case where asking an active tab to rename itself left it paused. Hal diagnosed this as a bug in safe/local-ish command handling and fixed the agreed command paths so those commands do not unnecessarily pause or abort active work.',
+		'',
+		'Follow-up: after the main bug fix, you approved minor cleanup and said not to worry about tests in that old session.',
+		'',
+		'- Touched commands.ts, client.ts, local-commands.ts, plus a small runtime.ts cleanup.',
+		'- Removed dead client command branches / about 9 LOC.',
+		'- Commit 9b71e64 — Remove dead client command branches.',
+	].join('\n')
+	ipc.appendEvent = () => {}
+	providerLoader.getProvider = async () => ({
+		async *generate(req: any) {
+			captured = req
+			yield { type: 'text' as const, text: `{ title: ${JSON.stringify('active session rename pause bug')}, summary: ${JSON.stringify(golden)} }` }
+		},
+	})
+
+	sessions.appendHistory(target, [
+		{ type: 'user', parts: [{ type: 'text', text: 'Screenshot: asking active tab 40 to rename itself left it paused. Is this a bug?' }], ts: '2026-06-10T12:01:00.000Z' },
+		{ type: 'assistant', text: 'Yes, this looks like active-session safe command handling is wrong. Plan: keep local-ish commands from pausing active work.', ts: '2026-06-10T12:02:00.000Z' },
+		{ type: 'user', parts: [{ type: 'text', text: 'Plan approved. Fix it.' }], ts: '2026-06-10T12:03:00.000Z' },
+		{ type: 'user', parts: [{ type: 'text', text: 'There is a minor cleanup too, go ahead; do not worry about tests.' }], ts: '2026-06-10T12:04:00.000Z' },
+		{ type: 'tool_result', toolId: 'commit-1', output: '[main 9b71e64] Remove dead client command branches\n 4 files changed', ts: '2026-06-10T12:05:00.000Z' },
+	])
+
+	try {
+		await whatSummary.run({ requesterSessionId: requester, target, openSessionIds: [requester, target] })
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		providerLoader.getProvider = origGetProvider
+	}
+
+	const digest = captured.messages[0].content as string
+	expect(captured.systemPrompt).toContain('Desired style example')
+	expect(digest).toContain('active tab 40 to rename itself left it paused')
+	expect(digest).toContain('minor cleanup')
+	expect(digest).toContain('[main 9b71e64] Remove dead client command branches')
+
+	const summary = sessions.loadHistory(requester).find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
+	const text = summary?.type === 'assistant' ? summary.text : ''
+	expect(text).toContain('## active session rename pause bug')
+	expect(text).toContain(golden)
+	expect(text).not.toContain('session id')
+	expect(text).not.toContain('history.asonl')
+	expect(text).not.toContain('No next steps')
 })
 
 test('digest includes deterministic attribution metadata', () => {

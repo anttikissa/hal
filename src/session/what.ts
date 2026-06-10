@@ -133,21 +133,10 @@ function attributionLines(sessionId: string, meta: SessionMeta, openSessionIds: 
 	return lines
 }
 
-function attributionHeader(sessionId: string, openSessionIds: string[], working: Record<string, boolean>): string {
-	const meta = sessions.loadSessionMeta(sessionId)
+function compactTargetLabel(sessionId: string, openSessionIds: string[]): string {
 	const openIndex = openSessionIds.indexOf(sessionId)
-	if (!meta) return `session ${sessionId}; tab ${openIndex >= 0 ? openIndex + 1 : 'closed'}`
-	const parts = [
-		`tab ${openIndex >= 0 ? openIndex + 1 : 'closed'}`,
-		`session ${sessionId}`,
-		`name ${meta.name ?? '(empty)'}`,
-		`state ${sessionState(sessionId, openIndex, working)}`,
-		`spawn ${meta.spawnKind ?? '(none)'}`,
-		`role ${agentRole(meta)}`,
-	]
-	if (meta.parentSessionId) parts.push(`parent ${meta.parentSessionId}`)
-	if (meta.forkedFrom) parts.push(`forked from ${meta.forkedFrom}`)
-	return parts.join('; ')
+	if (openIndex >= 0) return `tab ${openIndex + 1}`
+	return `session ${sessionId}`
 }
 
 function entryLine(sessionId: string, entry: HistoryEntry): string {
@@ -256,15 +245,27 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 
 function systemPrompt(): string {
 	return [
-		'You write session-recall briefs for Hal coding-agent sessions.',
+		'You write compact session-recall briefs for Hal coding-agent sessions.',
 		'Return only ASON with fields: title, summary.',
-		'Title must be short, lower-case, descriptive, and at most 60 characters.',
-		'Summary must use these fixed sections, in this order: Attribution; What user asked; Why / goal; Clarifications and design; Plan / approval; Work done and current state; Commits made; Files, actions, and evidence; Next steps / open questions.',
-		'Focus on what the user asked for, why, clarifying questions Hal asked, what was clarified or designed, architectural decisions, whether a plan was made or approved, and commits made.',
-		'When commits are visible, mention abbreviated commit hashes and one-line summaries; if no commits are visible, say "none visible".',
-		'Do not invent missing why, approval, files, commits, or decisions; say "not visible" or "not stated" when the digest does not show them.',
-		'Ignore routine tool noise such as raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, commit, failure, or current state.',
-		'Preserve attribution from the digest, including tab/closed state, session id, name, state, spawn kind or agent role, parent session id, and forked-from when present.'
+		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, lower-case, descriptive, and at most 60 characters.',
+		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
+		'Lead with the initiating user request and main conversation arc, then mention major pivots or follow-ups only if they matter for continuing the work.',
+		'Include why/context, clarifications, design or architectural decisions, and plan approval only when they are actually visible and useful.',
+		'Every sentence must help a human remember the user intent or continue the session; omit zero-information lines such as "no next steps", "no plan visible", or metadata inventories.',
+		'Do not show session id, tab, cwd, model, history path, entry counts, state, or role unless that provenance directly explains who did the work.',
+		'Mention files/actions only at continuation-level detail; do not create a separate file/evidence section unless there is an unresolved issue.',
+		'When commits are visible, mention only the final relevant abbreviated commit hash and one-line title; omit amended/intermediate commits, commit bodies, and trailers. If no commit matters, omit commits entirely.',
+		'Do not invent missing why, approval, files, commits, or decisions; say less rather than filling checklist sections.',
+		'Ignore routine tool noise, raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, final commit, failure, or current state.',
+		'Use exact quotes only when the wording itself matters.',
+		'',
+		'Desired style example:',
+		'Title: minor client command cleanup',
+		'Summary: You showed a case where asking an active tab to rename itself left it paused. Hal diagnosed this as a bug in safe/local-ish command handling and fixed the agreed command paths so those commands do not unnecessarily pause or abort active work.',
+		'Follow-up: after the main bug fix, you approved minor cleanup and said not to worry about tests in that old session.',
+		'- Touched commands.ts, client.ts, local-commands.ts, plus a small runtime.ts cleanup.',
+		'- Removed dead client command branches / about 9 LOC.',
+		'- Commit 9b71e64 — Remove dead client command branches.'
 	].join('\n')
 }
 
@@ -302,10 +303,11 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 	return parseSummary(text)
 }
 
-function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[], working: Record<string, boolean>): string {
+function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[], includeLabel: boolean): string {
 	const meta = sessions.loadSessionMeta(sessionId)
 	const title = result.title || meta?.name || sessionId
-	return [`## ${title} (${attributionHeader(sessionId, openSessionIds, working)})`, '', result.summary].join('\n')
+	const label = includeLabel ? ` (${compactTargetLabel(sessionId, openSessionIds)})` : ''
+	return [`## ${title}${label}`, '', result.summary].join('\n')
 }
 
 function maybeNameSession(sessionId: string, title: string): boolean {
@@ -353,6 +355,7 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean }> {
 	const model = opts.model ?? requester?.model ?? models.defaultModel()
 	const shared = ipc.readState()
 	const targetIds = unique(resolved.ids)
+	const includeLabel = targetIds.length > 1
 	const sections: string[] = []
 	let renamed = false
 	for (const sessionId of targetIds) {
@@ -360,9 +363,10 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean }> {
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
 			const summary = await whatSummary.summarizeDigest(model, digest)
 			if (whatSummary.maybeNameSession(sessionId, summary.title)) renamed = true
-			sections.push(formatSection(sessionId, summary, opts.openSessionIds, shared.working ?? {}))
+			sections.push(formatSection(sessionId, summary, opts.openSessionIds, includeLabel))
 		} catch (err) {
-			sections.push([`## ${sessionId} (${attributionHeader(sessionId, opts.openSessionIds, shared.working ?? {})})`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
+			const label = includeLabel ? ` (${compactTargetLabel(sessionId, opts.openSessionIds)})` : ''
+			sections.push([`## ${sessionId}${label}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
 		}
 	}
 	persistResult(opts.requesterSessionId, targetIds, sections.join('\n\n'))
