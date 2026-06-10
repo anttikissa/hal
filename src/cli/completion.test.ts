@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -6,14 +6,19 @@ import { ipc } from '../ipc.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import { completion } from './completion.ts'
 import { completionHints } from './completion-hints.ts'
+import { models } from '../models.ts'
 
 const origReadState = ipc.readState
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 
+beforeEach(() => {
+	models.state.cache = {}
+})
 afterEach(() => {
 	ipc.readState = origReadState
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
 	completion.dismiss()
+	models.state.cache = null
 })
 
 test('completion hint text joins choices and clips with ellipsis', () => {
@@ -126,6 +131,21 @@ test('/model completes current model aliases and bare model ids', () => {
 	expect(alias!.items).toContain('/model gemini-3.5-flash')
 	expect(bare).not.toBeNull()
 	expect(bare!.items).toContain('/model gemini-3.5-flash')
+})
+
+
+test('/model completes latest cached Opus shortcut before older versions', () => {
+	models.state.cache = {
+		'claude-opus-4-7': 1_000_000,
+		'claude-opus-4-8': 1_000_000,
+	}
+
+	const result = completion.complete('/model opus-4', '/model opus-4'.length)
+
+	expect(result).not.toBeNull()
+	expect(result!.items).toContain('/model opus-4-8')
+	expect(result!.items).not.toContain('/model opus-4-7')
+	expect(result!.prefix).toBe('/model opus-4-8')
 })
 
 

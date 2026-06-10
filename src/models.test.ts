@@ -10,6 +10,7 @@ const origStateDir = process.env.HAL_STATE_DIR
 
 beforeEach(() => {
 	auth._setStoreForTest({})
+	models.state.cache = {}
 })
 afterEach(() => {
 	globalThis.fetch = origFetch
@@ -87,6 +88,39 @@ test('model picker lists updated frontier aliases', () => {
 		value: 'grok',
 		search: expect.stringContaining('openrouter/x-ai/grok-4.20'),
 	})
+})
+
+
+test('model picker and aliases use newest cached Anthropic and OpenAI models automatically', () => {
+	models.state.cache = {
+		'claude-opus-4-7': 1_000_000,
+		'claude-opus-4-8': 1_000_000,
+		'claude-sonnet-4-6': 1_000_000,
+		'claude-sonnet-4-7': 1_000_000,
+		'gpt-5.5': 1_050_000,
+		'gpt-5.6': 1_200_000,
+	}
+
+	expect(models.resolveModel('opus')).toBe('anthropic/claude-opus-4-8')
+	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-4-8')
+	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-4-7')
+	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.6')
+	expect(models.listModelChoices().find((item) => item.value === 'opus')).toMatchObject({ search: expect.stringContaining('anthropic/claude-opus-4-8') })
+	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6') })
+	expect(models.modelCompletionNames()).toContain('opus-4-8')
+})
+
+
+test('models.dev Anthropic and OpenAI entries become usable even without static aliases', () => {
+	models.state.cache = {
+		'claude-lyric-6': 1_000_000,
+		'o5': 200_000,
+	}
+
+	expect(models.resolveModel('claude-lyric-6')).toBe('anthropic/claude-lyric-6')
+	expect(models.resolveModel('o5')).toBe('openai/o5')
+	expect(models.listModelChoices().find((item) => item.value === 'claude-lyric-6')).toMatchObject({ search: expect.stringContaining('anthropic/claude-lyric-6') })
+	expect(models.listModelChoices().find((item) => item.value === 'o5')).toMatchObject({ search: expect.stringContaining('openai/o5') })
 })
 
 

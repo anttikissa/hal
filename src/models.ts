@@ -40,11 +40,12 @@ const PATTERNS: [RegExp, string][] = [
 
 function resolveModel(input: string): string {
 	if (input.includes('/')) return input
-	if (ALIASES[input]) return ALIASES[input]
+	const alias = aliasFullId(input)
+	if (alias) return alias
 	for (const [re, replacement] of PATTERNS) {
 		if (re.test(input)) return input.replace(re, replacement)
 	}
-	return input
+	return cachedNativeFullId(input) ?? input
 }
 
 // ── Display names ──
@@ -365,6 +366,31 @@ const aliasUpdateGroups = [
 	{ aliases: ['grok'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseGrokCandidate) },
 ]
 
+function providerId(provider: 'Anthropic' | 'OpenAI'): string {
+	if (provider === 'Anthropic') return 'anthropic'
+	return 'openai'
+}
+
+function aliasFullId(alias: string): string | null {
+	const fallback = ALIASES[alias]
+	if (!fallback) return null
+	for (const group of aliasUpdateGroups) {
+		if (!group.aliases.includes(alias)) continue
+		const latest = group.latest(loadModelsDevCache())
+		if (latest) return `${providerPrefix(fallback)}${latest}`
+	}
+	return fallback
+}
+
+function cachedNativeFullId(modelId: string): string | null {
+	for (const id of Object.keys(loadModelsDevCache())) {
+		const info = discoveryModelInfo(id)
+		if (!info || info.model !== modelId) continue
+		return `${providerId(info.provider)}/${info.model}`
+	}
+	return null
+}
+
 function aliasUpdateSuggestions(previous: Record<string, number>, next: Record<string, number>): AliasUpdateSuggestion[] {
 	const updates: AliasUpdateSuggestion[] = []
 	for (const group of aliasUpdateGroups) {
@@ -501,6 +527,12 @@ interface ModelGroup {
 	models: { alias: string; fullId: string }[]
 }
 
+interface ModelEntry {
+	alias: string
+	fullId: string
+	static: boolean
+}
+
 const MODEL_GROUPS: ModelGroup[] = [
 	{
 		label: 'Anthropic',
@@ -536,11 +568,43 @@ const MODEL_GROUPS: ModelGroup[] = [
 	},
 ]
 
+function groupModelEntries(group: ModelGroup): ModelEntry[] {
+	const entries: ModelEntry[] = []
+	const seen = new Set<string>()
+	for (const model of group.models) {
+		const fullId = aliasFullId(model.alias) ?? model.fullId
+		entries.push({ alias: model.alias, fullId, static: true })
+		seen.add(fullId)
+	}
+	if (group.label !== 'Anthropic' && group.label !== 'OpenAI') return entries
+	for (const id of Object.keys(loadModelsDevCache()).sort()) {
+		const info = discoveryModelInfo(id)
+		if (!info || info.provider !== group.label) continue
+		const fullId = `${providerId(info.provider)}/${info.model}`
+		if (seen.has(fullId)) continue
+		seen.add(fullId)
+		entries.push({ alias: info.model, fullId, static: false })
+	}
+	return entries
+}
+
+function addModelCompletionNames(names: Set<string>, model: ModelEntry): void {
+	names.add(model.alias)
+	names.add(model.fullId)
+	const slash = model.fullId.indexOf('/')
+	if (slash >= 0) names.add(model.fullId.slice(slash + 1))
+	if (!model.static) return
+	const anthropic = model.fullId.match(/^anthropic\/claude-(opus|sonnet|haiku|fable)-(.+)$/)
+	if (anthropic) names.add(`${anthropic[1]}-${anthropic[2]}`)
+	const grok = model.fullId.match(/^openrouter\/x-ai\/grok-(.+)$/)
+	if (grok) names.add(`grok-${grok[1]}`)
+}
+
 function listModels(): string[] {
 	const lines: string[] = []
 	for (const group of MODEL_GROUPS) {
 		lines.push(group.label)
-		for (const m of group.models) {
+		for (const m of groupModelEntries(group)) {
 			lines.push(`  ${m.alias.padEnd(14)} ${m.fullId}`)
 		}
 		lines.push('')
@@ -552,8 +616,8 @@ function listModels(): string[] {
 function listModelChoices(): Array<{ value: string; label: string; search: string }> {
 	const items: Array<{ value: string; label: string; search: string }> = []
 	for (const group of MODEL_GROUPS) {
-		for (const model of group.models) {
-			const label = `${model.alias.padEnd(14)} ${displayModel(model.fullId)} · ${model.fullId}`
+		for (const model of groupModelEntries(group)) {
+			const label = `${model.alias.padEnd(18)} ${displayModel(model.fullId)} · ${model.fullId}`
 			items.push({
 				value: model.alias,
 				label,
@@ -567,15 +631,8 @@ function listModelChoices(): Array<{ value: string; label: string; search: strin
 function modelCompletionNames(): string[] {
 	const names = new Set<string>()
 	for (const group of MODEL_GROUPS) {
-		for (const model of group.models) {
-			names.add(model.alias)
-			names.add(model.fullId)
-			const slash = model.fullId.indexOf('/')
-			if (slash >= 0) names.add(model.fullId.slice(slash + 1))
-			const anthropic = model.fullId.match(/^anthropic\/claude-(opus|sonnet|haiku|fable)-(.+)$/)
-			if (anthropic) names.add(`${anthropic[1]}-${anthropic[2]}`)
-			const grok = model.fullId.match(/^openrouter\/x-ai\/grok-(.+)$/)
-			if (grok) names.add(`grok-${grok[1]}`)
+		for (const model of groupModelEntries(group)) {
+			addModelCompletionNames(names, model)
 		}
 	}
 	return [...names].sort()
