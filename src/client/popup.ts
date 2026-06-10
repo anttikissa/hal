@@ -84,7 +84,7 @@ function defaultLabel(choice: ReturnType<typeof models.listModelChoices>[number]
 }
 
 function modelCategoryLabel(node: ModelTreeNode, depth: number, open: boolean): string {
-	let text = `${'  '.repeat(depth)}${open ? '▼' : '▶'} ${node.name}`
+	let text = `${'  '.repeat(depth)}${open ? '▼' : '►'} ${node.name}`
 	if (node.defaultChoice) text += ` (default: ${defaultLabel(node.defaultChoice)})`
 	return text
 }

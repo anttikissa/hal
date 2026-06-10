@@ -60,7 +60,7 @@ describe('popup', () => {
 		let clean = cleanLines(overlay!.lines).join('\n')
 		expect(clean).toContain('←/→: open/close category')
 		expect(clean).toContain('Pick a model (current: openai/gpt-5.5)')
-		expect(clean).toContain('▶ sonnet (default: sonnet-4-6)')
+		expect(clean).toContain('► sonnet (default: sonnet-4-6)')
 		expect(clean).not.toContain('Sonnet 4.5')
 
 		popup.state.selectedIndex = popup.state.items.findIndex((item) => item.label.includes('sonnet'))
@@ -73,7 +73,7 @@ describe('popup', () => {
 		popup.handleKey(key('left'))
 		overlay = popup.buildOverlay(120, 30)
 		clean = cleanLines(overlay!.lines).join('\n')
-		expect(clean).toContain('▶ sonnet (default: sonnet-4-6)')
+		expect(clean).toContain('► sonnet (default: sonnet-4-6)')
 		expect(clean).not.toContain('Sonnet 4.5')
 	})
 
@@ -96,7 +96,7 @@ describe('popup', () => {
 		overlay = popup.buildOverlay(120, 30)
 		clean = cleanLines(overlay!.lines).join('\n')
 		expect(popup.state.items[popup.state.selectedIndex]?.label).toContain('gpt')
-		expect(clean).toContain('▶ gpt (default: gpt-5.5)')
+		expect(clean).toContain('► gpt (default: gpt-5.5)')
 		expect(clean).not.toContain('GPT 5.4')
 	})
 
