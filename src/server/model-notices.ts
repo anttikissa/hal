@@ -20,10 +20,6 @@ function errorMessage(err: unknown): string {
 function emitFocusedInfo(text: string): void {
 	const sessionId = runtime.focusedSessionId()
 	if (!sessionId) return
-	const ts = new Date().toISOString()
-	// Startup metadata refresh can finish before a just-started client begins
-	// tailing IPC events, so persist the same Log block the live event renders.
-	sessionStore.appendHistorySync(sessionId, [{ type: 'log', text, ts }])
 	runtime.emitInfo(sessionId, text)
 }
 

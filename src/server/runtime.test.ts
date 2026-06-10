@@ -268,10 +268,9 @@ test('slash command state changes are persisted as structural history entries', 
 		await runtime.enqueuePrompt(sessionId, '/model gpt-5.5')
 
 		expect(meta.model).toBe('openai/gpt-5.5')
-		expect(history).toMatchObject([
+		expect(history.find((entry) => entry.type === 'model')).toMatchObject(
 			{ type: 'model', from: 'openai/gpt-5.4', to: 'openai/gpt-5.5', visibility: 'next-user' },
-		])
-		expect(history[0].text).toBeUndefined()
+		)
 		expect(events.some((event) => event.text?.startsWith('Model changed from'))).toBe(true)
 	} finally {
 		ipc.ownsHostLock = origOwnsHostLock

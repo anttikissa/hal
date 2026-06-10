@@ -154,6 +154,11 @@ function broadcastSessions(): void {
 }
 
 function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', retryable?: boolean): void {
+	const createdAt = new Date().toISOString()
+	const entry: HistoryEntry = ui === 'notice'
+		? { type: 'info', text, ts: createdAt, ui }
+		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}) }
+	sessionStore.appendHistorySync(sessionId, [entry])
 	ipc.appendEvent({
 		id: protocol.eventId(),
 		type: 'info',
@@ -162,7 +167,7 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 		...(ui ? { ui } : {}),
 		...(retryable === false ? { retryable: false } : {}),
 		sessionId,
-		createdAt: new Date().toISOString(),
+		createdAt,
 	})
 }
 
@@ -190,7 +195,6 @@ function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
 }
-
 
 function stateModel(model?: string): string {
 	return model ?? models.defaultModel()
@@ -871,6 +875,7 @@ export const runtime = {
 	startSpawnedSession,
 	formatCommandError,
 	enqueuePrompt,
+	handlePrompt,
 	handleQueueSlashCommand,
 	runNextQueuedPrompt,
 	buildQueuePausedNotice,
