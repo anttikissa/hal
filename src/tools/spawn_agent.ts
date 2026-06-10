@@ -53,7 +53,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 const spawnAgentTool: Tool = {
 	name: 'spawn_agent',
 	description:
-		'Spawn a subagent tab or open an interactive session. Interactive sessions are blank without a task; with a task, Hal sends it as the first visible user prompt immediately.',
+		'Spawn a subagent tab or open an interactive session. Interactive sessions are blank without a task; with a task, Hal sends it as the first visible user prompt immediately. Don’t restate standing instructions in the task; only add task-specific details.',
 	parameters: {
 		task: { type: 'string', description: 'What the spawned session should do. Required for subagents; optional for interactive sessions.' },
 		kind: { type: 'string', enum: ['subagent', 'subagent-autoclose', 'interactive'], description: 'subagent sends a handoff and stays open; subagent-autoclose closes after the handoff; interactive opens a user-visible session and runs task when provided.' },
