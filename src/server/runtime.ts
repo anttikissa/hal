@@ -2,7 +2,7 @@
 //
 // Broadcasts session list via IPC. Clients load history directly from disk.
 
-import { createHash } from 'crypto'
+import { rebaseHandler } from './rebase-handler.ts'
 import { ipc } from '../ipc.ts'
 import { protocol } from '../protocol.ts'
 import type { Command, SpawnCommandData, SpawnKind } from '../protocol.ts'
@@ -13,7 +13,6 @@ import type { SessionState } from '../runtime/commands.ts'
 import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/context.ts'
 import { apiMessages } from '../session/api-messages.ts'
-import { rebase, type RebaseSnapshot } from '../session/rebase.ts'
 import { attachments } from '../session/attachments.ts'
 import { sessionIds } from '../session/ids.ts'
 import { replay } from '../session/replay.ts'
@@ -33,8 +32,6 @@ const state = {
 	activeRuntimePid: null as number | null,
 	stopPromptWatch: null as (() => void) | null,
 }
-
-const rebaseSnapshots = new Map<string, { sessionId: string; clientPid: number; baseLog: string; baseHash: string; snapshot: RebaseSnapshot }>()
 
 const USER_PAUSED_TEXT = '[paused]'
 const RESTARTED_TEXT = '[restarted]'
@@ -670,80 +667,6 @@ function runCompact(sessionId: string): void {
 	emitInfo(sessionId, `Context compacted (${userMsgs.length} user messages summarized, now writing to ${newLog})`)
 }
 
-function historyHash(entries: HistoryEntry[]): string {
-	const text = entries.map((entry) => JSON.stringify(entry)).join('\n')
-	return createHash('sha256').update(text).digest('hex')
-}
-
-function emitRebaseResult(clientPid: number, requestId: string, sessionId: string, result: Record<string, any>): void {
-	ipc.appendEvent({ type: 'rebase-result', targetPid: clientPid, requestId, sessionId, ...result })
-}
-
-function runRebaseStart(sessionId: string, requestId: string, clientPid: number): void {
-	if (agentLoop.isWorking(sessionId)) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is working'] })
-		return
-	}
-	const entries = sessionStore.loadHistory(sessionId)
-	const baseLog = sessionStore.loadSessionMeta(sessionId)?.currentLog ?? 'history.asonl'
-	const baseHash = historyHash(entries)
-	const snapshot = rebase.buildSnapshot(sessionId, baseLog, entries)
-	rebaseSnapshots.set(requestId, { sessionId, clientPid, baseLog, baseHash, snapshot })
-	ipc.appendEvent({ type: 'rebase-start', targetPid: clientPid, requestId, sessionId, todo: rebase.renderTodo(snapshot), editTexts: rebase.editTexts(snapshot) })
-}
-
-async function runRebaseApply(sessionId: string, requestId: string, clientPid: number, todo: string, edits: Record<string, string> = {}): Promise<void> {
-	const saved = rebaseSnapshots.get(requestId)
-	if (!saved || saved.sessionId !== sessionId) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Rebase request expired'] })
-		return
-	}
-	if (agentLoop.isWorking(sessionId)) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['Session is working'] })
-		return
-	}
-	const currentEntries = sessionStore.loadHistory(sessionId)
-	const currentLog = sessionStore.loadSessionMeta(sessionId)?.currentLog ?? 'history.asonl'
-	if (currentLog !== saved.baseLog || historyHash(currentEntries) !== saved.baseHash) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: ['History changed while editor was open; restart /rebase.'] })
-		return
-	}
-	if (todo === rebase.renderTodo(saved.snapshot) && Object.keys(edits).length === 0) {
-		rebaseSnapshots.delete(requestId)
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, unchanged: true })
-		return
-	}
-	const parsed = rebase.parseTodo(saved.snapshot, todo, { edits })
-	if (parsed.aborted) {
-		rebaseSnapshots.delete(requestId)
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, aborted: true })
-		return
-	}
-	if (parsed.errors.length > 0) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: parsed.errors, todo })
-		return
-	}
-	let applied
-	try {
-		applied = await rebase.applyParsed(saved.snapshot, parsed)
-		apiMessages.toProviderMessages(sessionId, applied.entries, { prune: false })
-	} catch (err) {
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: false, errors: [errorMessage(err)], todo })
-		return
-	}
-	if (applied.queue.length === 0 && historyHash(applied.entries) === historyHash(currentEntries)) {
-		rebaseSnapshots.delete(requestId)
-		emitRebaseResult(clientPid, requestId, sessionId, { ok: true, unchanged: true })
-		return
-	}
-	const { oldLog, newLog, entryCount } = sessionStore.rewriteHistoryForRebase(sessionId, applied.entries)
-	resetProviderConversation(sessionId)
-	rebaseSnapshots.delete(requestId)
-	ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog, entryCount })
-	for (const text of applied.queue) await enqueuePrompt(sessionId, text)
-	emitRebaseResult(clientPid, requestId, sessionId, { ok: true, newLog, queued: applied.queue.length })
-}
-
 function recordClientStatus(cmd: Extract<Command, { type: 'client-status' }>): void {
 	ipc.updateState((shared) => {
 		shared.clients = (shared.clients ?? []).filter((item) => item.pid !== cmd.pid)
@@ -821,12 +744,12 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'rebase-start': {
 			if (!sessionId) return
-			runRebaseStart(sessionId, cmd.requestId, cmd.clientPid)
+			rebaseHandler.runRebaseStart(sessionId, cmd.requestId, cmd.clientPid)
 			break
 		}
 		case 'rebase-apply': {
 			if (!sessionId) return
-			void runRebaseApply(sessionId, cmd.requestId, cmd.clientPid, cmd.todo, cmd.edits)
+			void rebaseHandler.runRebaseApply(sessionId, cmd.requestId, cmd.clientPid, cmd.todo, cmd.edits)
 			break
 		}
 		case 'open': {
