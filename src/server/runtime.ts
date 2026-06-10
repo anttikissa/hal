@@ -25,6 +25,7 @@ import { startup } from '../startup.ts'
 import { promptQueue } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
+import { openingSummary } from '../session/opening-summary.ts'
 
 const state = {
 	openSessionIds: [] as string[],
@@ -197,6 +198,15 @@ function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'no
 	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
 }
 
+function recordOpeningSummary(meta: SessionMeta): void {
+	recordSessionInfo(meta.id, openingSummary.text({
+		sessionId: meta.id,
+		cwd: meta.workingDir,
+		currentLog: meta.currentLog,
+		model: meta.model,
+	}), meta.createdAt)
+}
+
 function stateModel(model?: string): string {
 	return model ?? models.defaultModel()
 }
@@ -232,6 +242,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	sessionStore.updateMeta(sessionId, { attention: 'new' })
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
 	if (opts.focus !== false) focusSession(sessionId)
+	if (!opts.sourceId) recordOpeningSummary(sessionStore.loadSessionMeta(sessionId) ?? meta)
 	const related = sourceMeta ?? openerMeta
 	const text = opts.sourceId
 		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}` : ''

@@ -11,7 +11,6 @@ import { draft as draftModule } from './cli/draft.ts'
 import { perf } from './perf.ts'
 import { liveEventBlocks } from './live-event-blocks.ts'
 import { startup } from './startup.ts'
-import { startupSummary } from './client/startup-summary.ts'
 import { sessionLoader } from './client/session-loader.ts'
 import { clientTabs } from './client/tabs.ts'
 import { clientCommands, type ClientCommandType } from './client/commands.ts'
@@ -81,9 +80,6 @@ const config = {
 	backgroundLoadBlobs: true,
 	repaintAfterBlobLoad: true,
 	pausedNoticeDelayMs: 50,
-	// Startup performance details are developer diagnostics. Keep the default
-	// startup card human-focused and enable these only when debugging startup.
-	showStartupPerf: false,
 	claudeCacheWarningEnabled: true,
 	// Derived from the observed 2026-05-01 Opus incident: ~170k cache-write
 	// tokens moved the 5h subscription meter by about 24%.
@@ -251,26 +247,6 @@ function addLocalBlockToTab(tab: Tab, block: Block): void {
 	if (tab === currentTab()) onChange(false)
 }
 
-function startupSummaryText(tab: Tab): string {
-	return startupSummary.text(tab, {
-		fallbackModel: state.model,
-		role: state.role,
-		pid: state.pid,
-		hostPid: state.hostPid,
-		showPerf: config.showStartupPerf,
-	})
-}
-
-function shouldShowStartupSummary(tab: Tab): boolean {
-	return !tab.history.some((block) => block.type === 'user' || block.type === 'assistant' || block.type === 'thinking' || block.type === 'tool')
-}
-
-function addStartupSummaryToTab(tab: Tab): void {
-	if (!shouldShowStartupSummary(tab)) return
-	tab.history.unshift({ type: 'info', text: startupSummaryText(tab), ts: Date.now() })
-	touchTab(tab)
-	if (tab === currentTab()) onChange(false)
-}
 
 function showServerRestart(pid: number, startedAt?: string): void {
 	queueLocalBlock({
@@ -367,7 +343,6 @@ function ensureTabLoaded(tab: Tab): void {
 	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
 	tab.history = clientHistory.withLive(blockModule.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
 	sessionLoader.addLastActiveNotice(tab)
-	addStartupSummaryToTab(tab)
 	tab.rawHistory = undefined
 	tab.loaded = true
 	touchTab(tab)

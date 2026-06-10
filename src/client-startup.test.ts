@@ -9,8 +9,6 @@ import { blocks as blockModule } from './cli/blocks.ts'
 import { STATE_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 import { log } from './utils/log.ts'
-import { openaiUsage } from './openai-usage.ts'
-import { paths } from './utils/paths.ts'
 
 type TestLiveFileChange = { path: string; previous: Record<string, any>; next: Record<string, any> }
 
@@ -60,7 +58,6 @@ describe('client startup', () => {
 	const origLoadLive = sessions.loadLive
 	const origLoadBlobs = blockModule.loadBlobs
 	const origLogError = log.error
-	const origOpenAiCurrent = openaiUsage.current
 	const origClientConfig = { ...client.config }
 	let savedClientState: string | null = null
 	beforeEach(() => {
@@ -104,7 +101,6 @@ describe('client startup', () => {
 		sessions.loadLive = origLoadLive
 		blockModule.loadBlobs = origLoadBlobs
 		log.error = origLogError
-		openaiUsage.current = origOpenAiCurrent
 		Object.assign(client.config, origClientConfig)
 		if (savedClientState != null) writeFileSync(CLIENT_STATE_PATH, savedClientState)
 		else rmSync(CLIENT_STATE_PATH, { force: true })
@@ -127,61 +123,6 @@ describe('client startup', () => {
 		expect(client.state.tabs.map((tab) => tab.sessionId)).toEqual(['s1'])
 	})
 
-	test('shows a human startup summary without perf details by default', async () => {
-		const home = process.env.HOME || '/home/test'
-		const resetAt = Math.floor(Date.now() / 1000) + 60 * 60
-		const shared: SharedState = {
-			sessions: [{ id: 's1', tab: 1, name: 'tab 1', cwd: `${home}/sync/lippu`, model: 'openai/gpt-5.5' }],
-			working: {},
-				updatedAt: '2026-04-09T20:00:00.000Z',
-		}
-		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('s1'), workingDir: `${home}/sync/lippu`, model: 'openai/gpt-5.5' })
-		ipc.readState = () => shared
-		liveFiles.liveFile = () => shared as any
-		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
-		openaiUsage.current = () => ({
-			key: 'openai:0',
-			planType: 'pro',
-			primary: { usedPercent: 1, windowMinutes: 300, resetAt },
-			pendingTokens: 0,
-		})
-		client.config.backgroundLoadTabs = false
-
-		const ac = new AbortController()
-		client.startClient(ac.signal)
-		await Bun.sleep(10)
-		ac.abort()
-
-		const info = client.currentTab()?.history.find((block) => block.type === 'info')
-		expect(info?.text).toContain(`Session \`s1\` opened in ~/sync/lippu; writing history to ${paths.historyDisplayPath('s1')}`)
-		expect(info?.text).toContain('Using GPT 5.5 via OpenAI (ChatGPT Pro subscription).')
-		expect(info?.text).toContain('1% used on 5h quota, resetting at ')
-		expect(info?.text).toMatch(/\(in 1 hour\)|\(in 60 minutes\)/)
-		expect(info?.text).toContain('Type `/help` for commands, `/keys` for keyboard shortcuts.')
-		expect(info?.text).not.toContain('Server started')
-		expect(info?.text).not.toContain('replay')
-	})
-
-	test('startup summary includes perf details when configured', async () => {
-		const shared = makeSharedState(['s1'])
-		ipc.readState = () => shared
-		liveFiles.liveFile = () => shared as any
-		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
-		client.config.backgroundLoadTabs = false
-		client.config.showStartupPerf = true
-
-		const ac = new AbortController()
-		client.startClient(ac.signal)
-		await Bun.sleep(10)
-		ac.abort()
-
-		const info = client.currentTab()?.history.find((block) => block.type === 'info')
-		expect(info?.text).toContain(`Session \`s1\` opened in /tmp/s1; writing history to ${paths.historyDisplayPath('s1')}`)
-		expect(info?.text).toContain('Joined server')
-		expect(info?.text).toContain('replay')
-	})
 
 	test('falls back to disk session metadata when shared state is temporarily empty', async () => {
 		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
@@ -282,51 +223,6 @@ describe('client startup', () => {
 
 		expect(client.currentTab()?.sessionId).toBe('s2')
 	})
-
-	test('startup openCwd shows startup summary only once when background loading finishes later', async () => {
-		const shared = makeSharedState(['s1'])
-		const hostLock = { pid: null, createdAt: '' }
-		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
-		let unblockBlobs!: () => void
-		let blobLoadStarted = false
-		const blobGate = new Promise<void>((resolve) => { unblockBlobs = resolve })
-		let blobCalls = 0
-		blockModule.loadBlobs = async () => {
-			blobCalls++
-			if (blobCalls === 1) {
-				blobLoadStarted = true
-				await blobGate
-			}
-			return 0
-		}
-		ipc.readState = () => shared
-		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
-		liveFiles.onChange = (file, cb) => {
-			if (file === shared) onIpcChange = cb
-		}
-		ipc.tailEvents = async function* () {}
-		client.config.showStartupPerf = true
-
-		const ac = new AbortController()
-		client.startClient(ac.signal, { preferredCwd: '/work/project', openCwd: '/work/project' })
-		for (let i = 0; i < 50 && !blobLoadStarted; i++) await Bun.sleep(1)
-		expect(blobLoadStarted).toBe(true)
-
-		shared.sessions = [
-			{ id: 's1', tab: 1, name: 'tab 1', cwd: '/tmp/s1', model: 'openai/gpt-5.4' },
-			{ id: 's2', tab: 2, name: 'tab 2', cwd: '/work/project', model: 'openai/gpt-5.4' },
-		]
-		onIpcChange?.({ path: '', previous: {}, next: shared })
-		expect(client.currentTab()?.sessionId).toBe('s2')
-		expect(client.currentTab()?.history.filter((block) => block.type === 'info')).toHaveLength(1)
-
-		unblockBlobs()
-		await Bun.sleep(10)
-		ac.abort()
-
-		expect(client.currentTab()?.history.filter((block) => block.type === 'info')).toHaveLength(1)
-	})
-
 	test('restart tab wins even when another tab matches the requested cwd', async () => {
 		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
 			lastTab: 's34',
@@ -355,29 +251,6 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.sessionId).toBe('s34')
-	})
-
-	test('startup summary stays out of tabs that already have visible history', async () => {
-		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
-		sessions.loadAllHistoryWithOrigin = () => ({
-			entries: [{ type: 'assistant', text: 'Howdy!', synthetic: true, model: 'openai/gpt-5.4', ts: '2026-04-09T20:01:00.000Z' }],
-			parentCount: 0,
-		})
-
-		const shared = makeSharedState(['s1'])
-		const hostLock = { pid: null, createdAt: '' }
-		ipc.readState = () => shared
-		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
-		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
-
-		const ac = new AbortController()
-		client.startClient(ac.signal)
-		await Bun.sleep(10)
-		ac.abort()
-
-		expect(client.currentTab()?.history.filter((block) => block.type === 'info')).toEqual([])
-		expect(nonBookkeepingHistory()).toMatchObject([{ type: 'assistant', synthetic: true, model: 'openai/gpt-5.4', text: 'Howdy!' }])
 	})
 
 	test('adds an ephemeral last-active notice for stale sessions', async () => {

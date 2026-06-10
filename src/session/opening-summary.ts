@@ -1,14 +1,7 @@
 import { models } from '../models.ts'
 import { openaiUsage } from '../openai-usage.ts'
-import { perf } from '../perf.ts'
 import { time } from '../utils/time.ts'
 import { paths } from '../utils/paths.ts'
-
-function perfMs(prefix: string): string | null {
-	const hit = perf.snapshot().findLast((mark) => mark.name.startsWith(prefix))
-	return hit ? `${hit.ms.toFixed(1)}ms` : null
-}
-
 
 function titleWords(text: string): string {
 	return text.split(/[-_\s]+/).filter(Boolean).map((word) => word[0]!.toUpperCase() + word.slice(1).toLowerCase()).join(' ')
@@ -43,20 +36,8 @@ function startupModelLine(model: string): string {
 	return `Using ${display} via ${provider}${subscription ? ` ${subscription}` : ''}.`
 }
 
-function startupPerfText(opts: any): string {
-	const ready = perfMs('Ready for input')
-	const firstLine = opts.role === 'server' ? `Server started (pid ${opts.pid})${ready ? ` · ready ${ready}` : ''}` : `Joined server (pid ${opts.hostPid ?? '?'})${ready ? ` · ready ${ready}` : ''}`
-	const details = [
-		['replay', perfMs('Focused tab replayed')],
-		['first draw', perfMs('First draw done')],
-		['blobs', perfMs('Focused tab blobs loaded')],
-		['all tabs', perfMs('All tabs loaded')],
-	].filter(([, ms]) => !!ms).map(([label, ms]) => `${label} ${ms}`)
-	return details.length > 0 ? `${firstLine}\n${details.join(' · ')}` : firstLine
-}
-
-function text(tab: any, opts: any): string {
-	const model = tab.model || opts.fallbackModel || ''
+function text(tab: any): string {
+	const model = tab.model || ''
 	const lines = [
 		`Session \`${tab.sessionId}\` opened in ${paths.formatHomePath(tab.cwd || process.cwd())}; writing history to ${paths.historyDisplayPath(tab.sessionId, tab.currentLog)}`,
 	]
@@ -64,9 +45,8 @@ function text(tab: any, opts: any): string {
 	if (modelLine) lines.push('', modelLine)
 	const quotaLine = startupQuotaLine(model)
 	if (quotaLine) lines.push('', quotaLine)
-	if (opts.showPerf) lines.push('', startupPerfText(opts))
 	lines.push('', 'Type `/help` for commands, `/keys` for keyboard shortcuts.')
 	return lines.join('\n')
 }
 
-export const startupSummary = { text }
+export const openingSummary = { text }

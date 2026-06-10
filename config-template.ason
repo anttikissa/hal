@@ -8,8 +8,6 @@
 		repaintAfterBlobLoad: true,
 		// Delay before showing a paused notice, to avoid flicker during quick resumes.
 		pausedNoticeDelayMs: 50,
-		// Include startup timing/replay diagnostics in the startup card.
-		showStartupPerf: false,
 		// Warn before a stale Claude session writes a large fresh prompt-cache entry.
 		claudeCacheWarningEnabled: true,
 		// Estimated cache-write tokens that correspond to 1% of Anthropic 5h quota.
