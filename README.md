@@ -81,7 +81,7 @@ cd ~/.hal
 # You could skip this part but I wouldn't recommend it - for this or any other project
 claude -p "I just downloaded this project. Do a security review - if I run ./install or the app it installs, does it do anything nasty?"
 # Or:
-codex -p "I just downloaded this project. Do a security review - if I run ./install or the app it installs, does it do anything nasty?"
+codex exec "I just downloaded this project. Do a security review - if I run ./install or the app it installs, does it do anything nasty?"
 
 # Installs prerequisites and adds 'hal' to PATH
 ./install
