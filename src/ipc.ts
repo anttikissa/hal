@@ -24,6 +24,7 @@ export interface SharedSessionInfo {
 	cwd: string
 	model?: string
 	currentLog?: string
+	attention?: 'new'
 }
 
 export interface SharedHostInfo {

@@ -862,10 +862,11 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 		const childId = runtime.state.openSessionIds[1]
 		expect(childId).toBeDefined()
 		if (!childId) throw new Error('expected model discovery tab')
-		expect(runtime.state.currentSessionId).toBe(childId)
+		expect(runtime.state.currentSessionId).toBe('04-busy')
 		const child = sessions.loadSessionMeta(childId!)
 		expect(child?.workingDir).toBe(HAL_DIR)
 		expect(child?.name).toBe('new models')
+		expect(child?.attention).toBe('new')
 		expect(events[0]).toMatchObject({ type: 'response', sessionId: childId, synthetic: true })
 		expect(events[0].text).toContain('Claude Fable 5')
 		expect(shared.sessions.some((item: any) => item.id === childId)).toBe(true)

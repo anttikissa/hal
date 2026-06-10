@@ -26,6 +26,7 @@ export interface SessionMeta {
 	closedAt?: string
 	forkedFrom?: string
 	spawnKind?: SpawnKind
+	attention?: 'new'
 	// 1-based visible tab position at close time. Used to put Ctrl-Shift-T
 	// restores back where the tab was instead of appending at the end.
 	closedTabPosition?: number
@@ -318,6 +319,7 @@ function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, i
 		cwd: meta.workingDir ?? process.cwd(),
 		model: meta.model ?? models.defaultModel(),
 		currentLog: meta.currentLog ?? DEFAULT_LOG,
+		attention: meta.attention,
 	}
 }
 

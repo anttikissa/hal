@@ -51,6 +51,7 @@ export interface Tab {
 	loaded: boolean
 	// Generation finished on a non-focused tab — show ✓ until user switches to it
 	doneUnseen: boolean
+	attention?: 'new'
 	// Bumped whenever history contents change. The renderer uses this to
 	// invalidate cached line counts when a block grows in place.
 	historyVersion: number
@@ -144,6 +145,7 @@ function makeTab(id: string, name: string, opts?: { cwd?: string; model?: string
 		liveHistory: [],
 		loaded: true,
 		doneUnseen: false,
+		attention: undefined,
 		historyVersion: 0,
 		usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
 		contextUsed: 0,
@@ -351,6 +353,7 @@ function switchTab(index: number): void {
 		const tab = state.tabs[index]!
 		// Clear "done unseen" flag — user is now looking at this tab
 		tab.doneUnseen = false
+		tab.attention = undefined
 		ensureTabLoaded(tab)
 		loadTabBlobs(tab)
 		rememberTab(tab.sessionId)
@@ -518,6 +521,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	tab.contextUsed = snapshot.contextUsed
 	tab.contextMax = snapshot.contextMax
 	tab.forkedFrom = snapshot.forkedFrom
+	tab.attention = info.attention
 	return tab
 }
 

@@ -89,6 +89,7 @@ function tabIndicator(tab: Tab): TabIndicator {
 		break
 	}
 
+	if (tab.attention === 'new') return { char: '◆', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 	if (tab.doneUnseen) return { char: '✓', color: colors.tab.doneFg || colors.info.fg, blinks: false }
 
 	return { char: '', color: '', blinks: false }

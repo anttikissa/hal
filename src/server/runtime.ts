@@ -77,6 +77,7 @@ function focusSession(sessionId: string | null | undefined): void {
 	if (!sessionId) return
 	if (!state.openSessionIds.includes(sessionId)) return
 	state.currentSessionId = sessionId
+	sessionStore.updateMeta(sessionId, { attention: undefined })
 }
 
 function focusedSessionId(): string | null {
@@ -208,7 +209,7 @@ function recordSessionStateChanges(sessionId: string, prevCwd: string, nextCwd: 
 	if (entries.length > 0) sessionStore.appendHistorySync(sessionId, entries)
 }
 
-function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string }): SessionMeta {
+function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string; focus?: boolean }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
 	const sourceMeta = opts.sourceId ? sessionStore.loadSessionMeta(opts.sourceId) : null
 	const openerMeta = opts.openerId ? sessionStore.loadSessionMeta(opts.openerId) : null
@@ -227,8 +228,9 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	if (opts.workingDir && meta.workingDir !== opts.workingDir) {
 		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
 	}
+	sessionStore.updateMeta(sessionId, { attention: 'new' })
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
-	focusSession(sessionId)
+	if (opts.focus !== false) focusSession(sessionId)
 	const related = sourceMeta ?? openerMeta
 	const text = opts.sourceId
 		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}` : ''
@@ -259,8 +261,8 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
 	const child = createSessionTab(
 		mode === 'fork'
-			? { sourceId: parent.id, sessionId: spec.childSessionId }
-			: { afterId: parent.id, sessionId: spec.childSessionId },
+			? { sourceId: parent.id, sessionId: spec.childSessionId, focus: false }
+			: { afterId: parent.id, sessionId: spec.childSessionId, focus: false },
 	)
 	const workingDir = spec.cwd || (mode === 'fork' ? child.workingDir : parent.workingDir) || process.cwd()
 	const model = spec.model || (mode === 'fork' ? child.model : parent.model) || child.model || models.defaultModel()
@@ -270,6 +272,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 		model,
 		name,
 		spawnKind: spec.kind,
+		attention: spec.kind === 'interactive' ? 'new' : undefined,
 	})
 	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
 	if (spec.kind === 'subagent-autoclose') {
@@ -342,7 +345,7 @@ function sessionWillProduceOutput(sessionId: string): boolean {
 function modelDiscoveryTarget(): SessionMeta | null {
 	const focused = focusedSessionId()
 	if (focused && sessionWillProduceOutput(focused)) {
-		const child = createSessionTab({ openerId: focused, afterId: focused, workingDir: HAL_DIR })
+		const child = createSessionTab({ openerId: focused, afterId: focused, workingDir: HAL_DIR, focus: false })
 		sessionStore.updateMeta(child.id, { name: 'new models' })
 		broadcastSessions()
 		return sessionStore.loadSessionMeta(child.id) ?? child
@@ -773,6 +776,10 @@ function handleCommand(cmd: Command): void {
 		return
 	}
 	focusSession(cmd.sessionId)
+	if (cmd.type === 'focus') {
+		broadcastSessions()
+		return
+	}
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return

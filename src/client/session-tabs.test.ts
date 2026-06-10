@@ -11,6 +11,7 @@ function tab(sessionId: string): any {
 		parentEntryCount: 0,
 		loaded: true,
 		doneUnseen: false,
+		attention: undefined,
 		historyVersion: 0,
 		usage: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 },
 		contextUsed: 0,
@@ -71,4 +72,42 @@ test('restoring a tab clears the restore-tab help hint', () => {
 	}))
 
 	expect(cleared).toBe(1)
+})
+
+
+test('background opened tab keeps new attention marker', () => {
+	sessionTabs.reset()
+	const model = {
+		tabs: [tab('left')],
+		focusedTabIndex: 0,
+		recentTabs: ['left'],
+	}
+	const c = ctx({
+		model,
+		makeTabFromDisk: (item: any) => ({ ...tab(item.id), attention: item.attention }),
+	})
+
+	sessionTabs.apply([{ id: 'left' } as any, { id: 'new', attention: 'new' } as any], 'left', c)
+
+	expect(model.focusedTabIndex).toBe(0)
+	expect(model.tabs[1]?.attention).toBe('new')
+})
+
+test('focused newly opened tab clears new attention marker', () => {
+	sessionTabs.reset()
+	sessionTabs.state.pendingOpen = 'open'
+	const model = {
+		tabs: [tab('left')],
+		focusedTabIndex: 0,
+		recentTabs: ['left'],
+	}
+	const c = ctx({
+		model,
+		makeTabFromDisk: (item: any) => ({ ...tab(item.id), attention: item.attention }),
+	})
+
+	sessionTabs.apply([{ id: 'left' } as any, { id: 'new', attention: 'new' } as any], 'left', c)
+
+	expect(model.focusedTabIndex).toBe(1)
+	expect(model.tabs[1]?.attention).toBeUndefined()
 })

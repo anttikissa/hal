@@ -28,6 +28,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 			existing.cwd = s.cwd || existing.cwd
 			existing.model = s.model || existing.model
 			existing.currentLog = s.currentLog || existing.currentLog
+			existing.attention = s.attention
 			newTabs.push(existing)
 		} else {
 			openedSessionId = s.id
@@ -62,6 +63,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	const focused = model.tabs[model.focusedTabIndex]
 	if (focused && !focused.loaded) ctx.ensureTabLoaded(focused)
 	if (focused) ctx.loadTabBlobs(focused)
+	if (focused) focused.attention = undefined
 	if (focused) ctx.rememberTab(focused.sessionId)
 	if (previousTabs.length > 0) loadOpenedBackground(openedTabs, focused, ctx)
 	ctx.flushPendingEntries()
