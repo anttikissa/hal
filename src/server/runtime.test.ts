@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { runtime } from './runtime.ts'
 import { queueRunner } from './queue-runner.ts'
+import { tabs } from './tabs.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
 import { ipc } from '../ipc.ts'
 import { agentLoop } from '../runtime/agent-loop.ts'
@@ -99,11 +100,11 @@ test('pickMostRecentlyClosedSessionId returns null when nothing is closed', () =
 })
 
 test('restoredSessionOrder reinserts a resumed tab at its saved position', () => {
-	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 2)).toEqual(['04-left', '04-closed', '04-right'])
-	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 1)).toEqual(['04-closed', '04-left', '04-right'])
-	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 99)).toEqual(['04-left', '04-right', '04-closed'])
-	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed')).toEqual(['04-left', '04-right', '04-closed'])
-	expect(runtime.restoredSessionOrder(['04-left', '04-right'], '04-closed', 0)).toEqual(['04-left', '04-right', '04-closed'])
+	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 2)).toEqual(['04-left', '04-closed', '04-right'])
+	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 1)).toEqual(['04-closed', '04-left', '04-right'])
+	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 99)).toEqual(['04-left', '04-right', '04-closed'])
+	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed')).toEqual(['04-left', '04-right', '04-closed'])
+	expect(tabs.restoredSessionOrder(['04-left', '04-right'], '04-closed', 0)).toEqual(['04-left', '04-right', '04-closed'])
 })
 
 test('unchanged rebase apply is a no-op', async () => {

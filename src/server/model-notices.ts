@@ -12,13 +12,14 @@ import { modelRefresh } from '../model-refresh.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'
+import { tabs } from './tabs.ts'
 
 function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err)
 }
 
 function emitFocusedInfo(text: string): void {
-	const sessionId = runtime.focusedSessionId()
+	const sessionId = tabs.focusedSessionId()
 	if (!sessionId) return
 	runtime.emitInfo(sessionId, text)
 }
@@ -40,7 +41,7 @@ function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: 
 function suggestAliasUpdates(previous: Record<string, number>, next: Record<string, number>): void {
 	const updates = models.aliasUpdateSuggestions(previous, next)
 	if (updates.length === 0) return
-	const metas = runtime.openSessionMetas()
+	const metas = tabs.openSessionMetas()
 	const meta = metas.find((item) => item.workingDir === HAL_DIR) ?? metas[0]
 	if (!meta) return
 	const model = meta.model ?? models.defaultModel()
@@ -53,14 +54,14 @@ function sessionWillProduceOutput(sessionId: string): boolean {
 }
 
 function modelDiscoveryTarget(): SessionMeta | null {
-	const focused = runtime.focusedSessionId()
+	const focused = tabs.focusedSessionId()
 	if (focused && sessionWillProduceOutput(focused)) {
-		const child = runtime.createSessionTab({ openerId: focused, afterId: focused, workingDir: HAL_DIR, focus: false })
+		const child = tabs.createSessionTab({ openerId: focused, afterId: focused, workingDir: HAL_DIR, focus: false })
 		sessionStore.updateMeta(child.id, { name: 'new models' })
 		runtime.broadcastSessions()
 		return sessionStore.loadSessionMeta(child.id) ?? child
 	}
-	const metas = runtime.openSessionMetas()
+	const metas = tabs.openSessionMetas()
 	return metas.find((item) => item.id === focused) ?? metas[0] ?? null
 }
 

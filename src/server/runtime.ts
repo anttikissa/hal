@@ -3,6 +3,7 @@
 // Broadcasts session list via IPC. Clients load history directly from disk.
 
 import { rebaseHandler } from './rebase-handler.ts'
+import { tabs } from './tabs.ts'
 import { queueRunner } from './queue-runner.ts'
 import { modelNotices } from './model-notices.ts'
 import { ipc } from '../ipc.ts'
@@ -55,103 +56,8 @@ function formatCommandError(text: string, error: string): string {
 	return `${command}: ${error}`
 }
 
-function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name'>): string {
-	return meta.name ?? meta.id
-}
-
-function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name'>): string {
-	const title = sessionTitle(meta)
-	if (title === meta.id) return meta.id
-	return `${title} (${meta.id})`
-}
-
-function openSessionMetas(): SessionMeta[] {
-	return state.openSessionIds
-		.map((sessionId) => sessionStore.loadSessionMeta(sessionId))
-		.filter((meta): meta is SessionMeta => !!meta)
-}
-
-function focusSession(sessionId: string | null | undefined): void {
-	if (!sessionId) return
-	if (!state.openSessionIds.includes(sessionId)) return
-	state.currentSessionId = sessionId
-	sessionStore.updateMeta(sessionId, { attention: undefined })
-}
-
-function focusedSessionId(): string | null {
-	if (state.currentSessionId && state.openSessionIds.includes(state.currentSessionId)) return state.currentSessionId
-	return state.openSessionIds[0] ?? null
-}
-
-function planTargetForCwd(cwd: string): ReturnType<typeof startup.planTarget> {
-	return startup.planTarget({
-		cwd,
-		openSessions: openSessionMetas().map((meta) => sessionStore.sessionOpenInfo(meta)),
-		allSessions: sessionStore.loadAllSessionMetas(),
-	})
-}
-
-function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { ok: false; reason: string } {
-	const plan = planTargetForCwd(cwd)
-	log.info('Runtime planned cwd activation', { cwd, plan: plan.kind, sessionId: 'sessionId' in plan ? plan.sessionId : undefined })
-	if (plan.kind === 'use-open') return { ok: true, sessionId: plan.sessionId }
-	if (plan.kind === 'refuse') return { ok: false, reason: plan.reason }
-	if (plan.kind === 'resume') {
-		const resumed = sessionStore.activateSession(plan.sessionId)
-		if (!resumed) return { ok: false, reason: `Session ${plan.sessionId} not found` }
-		state.openSessionIds = restoredSessionOrder(state.openSessionIds, plan.sessionId, resumed.closedTabPosition)
-		sessionStore.updateMeta(plan.sessionId, { closedAt: undefined })
-		focusSession(plan.sessionId)
-		return { ok: true, sessionId: plan.sessionId }
-	}
-	const created = createSessionTab({ workingDir: cwd })
-	return { ok: true, sessionId: created.id }
-}
-
-function insertSessionAfter(sessionId: string, afterId?: string): void {
-	if (!afterId) {
-		state.openSessionIds.push(sessionId)
-		return
-	}
-	const idx = state.openSessionIds.findIndex((id) => id === afterId)
-	if (idx < 0) {
-		state.openSessionIds.push(sessionId)
-		return
-	}
-	state.openSessionIds.splice(idx + 1, 0, sessionId)
-}
-
-function restoredSessionOrder(openSessionIds: string[], sessionId: string, closedTabPosition?: number): string[] {
-	const next = openSessionIds.filter((id) => id !== sessionId)
-	const targetIndex = Number.isFinite(closedTabPosition) && (closedTabPosition ?? 0) > 0 ? Math.max(0, Math.min(next.length, Math.floor(closedTabPosition as number) - 1)) : next.length
-	next.splice(targetIndex, 0, sessionId)
-	return next
-}
-
-function moveSessionToIndex(sessionId: string, targetIndex: number): boolean {
-	const fromIndex = state.openSessionIds.findIndex((id) => id === sessionId)
-	if (fromIndex < 0) return false
-	const clampedIndex = Math.max(0, Math.min(state.openSessionIds.length - 1, targetIndex))
-	if (fromIndex === clampedIndex) return false
-	const [id] = state.openSessionIds.splice(fromIndex, 1)
-	if (!id) return false
-	state.openSessionIds.splice(clampedIndex, 0, id)
-	return true
-}
-
-function syncSharedState(): void {
-	const openMetas = openSessionMetas()
-	const openIds = new Set(openMetas.map((meta) => meta.id))
-	ipc.updateState((state) => {
-		state.sessions = openMetas.map(sessionStore.sessionOpenInfo)
-		for (const sessionId of Object.keys(state.working)) {
-			if (!openIds.has(sessionId)) delete state.working[sessionId]
-		}
-	})
-}
-
 function broadcastSessions(): void {
-	syncSharedState()
+	tabs.syncSharedState()
 	restartPromptWatch()
 }
 
@@ -193,20 +99,6 @@ function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	return restartedAfterLastTurnEnd(entries) && sessionStore.tailTurnState(entries).interrupted
 }
 
-
-function recordSessionInfo(sessionId: string, text: string, ts: string, ui?: 'notice'): void {
-	sessionStore.appendHistorySync(sessionId, [{ type: 'info', text, ts, ...(ui ? { ui } : {}) }])
-}
-
-function recordOpeningSummary(meta: SessionMeta): void {
-	recordSessionInfo(meta.id, openingSummary.text({
-		sessionId: meta.id,
-		cwd: meta.workingDir,
-		currentLog: meta.currentLog,
-		model: meta.model,
-	}), meta.createdAt)
-}
-
 function stateModel(model?: string): string {
 	return model ?? models.defaultModel()
 }
@@ -218,39 +110,6 @@ function recordSessionStateChanges(sessionId: string, prevCwd: string, nextCwd: 
 	const toModel = stateModel(nextModel)
 	if (fromModel !== toModel) entries.push({ type: 'model', from: fromModel, to: toModel, visibility: 'next-user', ts })
 	if (entries.length > 0) sessionStore.appendHistorySync(sessionId, entries)
-}
-
-function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string; focus?: boolean }): SessionMeta {
-	const sessionId = opts.sessionId ?? sessionIds.reserve()
-	const sourceMeta = opts.sourceId ? sessionStore.loadSessionMeta(opts.sourceId) : null
-	const openerMeta = opts.openerId ? sessionStore.loadSessionMeta(opts.openerId) : null
-	const inheritedModel = sourceMeta?.model ?? openerMeta?.model ?? models.defaultModel()
-	const inheritedWorkingDir = opts.workingDir ?? openerMeta?.workingDir ?? process.cwd()
-	const meta = opts.sourceId
-		? sessionStore.forkSession(opts.sourceId, sessionId)
-		: sessionStore.createSession(sessionId, {
-			id: sessionId,
-			workingDir: inheritedWorkingDir,
-			createdAt: new Date().toISOString(),
-			name: undefined,
-			model: inheritedModel,
-		})
-	const overridesForkCwd = !!opts.sourceId && !!opts.workingDir && meta.workingDir !== opts.workingDir
-	if (opts.workingDir && meta.workingDir !== opts.workingDir) {
-		sessionStore.updateMeta(sessionId, { workingDir: opts.workingDir })
-	}
-	sessionStore.updateMeta(sessionId, { attention: 'new' })
-	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
-	if (opts.focus !== false) focusSession(sessionId)
-	if (!opts.sourceId) recordOpeningSummary(sessionStore.loadSessionMeta(sessionId) ?? meta)
-	const related = sourceMeta ?? openerMeta
-	const text = opts.sourceId
-		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}` : ''
-		: ''
-	if (text) recordSessionInfo(sessionId, text, meta.createdAt, 'notice')
-	if (opts.sourceId && sourceMeta?.context && !overridesForkCwd) sessionStore.updateMeta(sessionId, { context: sourceMeta.context })
-	else publishContextEstimate(sessionId)
-	return sessionStore.loadSessionMeta(sessionId) ?? meta
 }
 
 function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind): string {
@@ -271,7 +130,7 @@ function queuePromptCommand(sessionId: string, text: string, source?: string, de
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
-	const child = createSessionTab(
+	const child = tabs.createSessionTab(
 		mode === 'fork'
 			? { sourceId: parent.id, sessionId: spec.childSessionId, focus: false }
 			: { afterId: parent.id, sessionId: spec.childSessionId, focus: false },
@@ -288,7 +147,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	})
 	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
 	if (spec.kind === 'subagent-autoclose') {
-		recordSessionInfo(child.id, 'This subagent will close itself after sending a handoff.', new Date().toISOString())
+		tabs.recordSessionInfo(child.id, 'This subagent will close itself after sending a handoff.', new Date().toISOString())
 	}
 	return sessionStore.loadSessionMeta(child.id) ?? child
 }
@@ -303,7 +162,7 @@ async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec
 function restartPromptWatch(): void {
 	state.stopPromptWatch?.()
 	state.stopPromptWatch = context.watchPromptFiles(
-		openSessionMetas().map((meta) => ({ sessionId: meta.id, cwd: meta.workingDir ?? process.cwd() })),
+		tabs.openSessionMetas().map((meta) => ({ sessionId: meta.id, cwd: meta.workingDir ?? process.cwd() })),
 		(change) => {
 			emitInfo(change.sessionId, `[system reload] ${change.name} changed: ${change.path}`)
 		},
@@ -326,7 +185,7 @@ function buildSessionState(meta: SessionMeta): SessionState {
 		model: meta.model,
 		cwd: meta.workingDir ?? process.cwd(),
 		createdAt: meta.createdAt,
-		sessions: openSessionMetas().map((item) => ({ id: item.id, name: sessionTitle(item) })),
+		sessions: tabs.openSessionMetas().map((item) => ({ id: item.id, name: tabs.sessionTitle(item) })),
 	}
 }
 
@@ -384,15 +243,6 @@ async function dispatchPromptCommand(sessionId: string, text: string, source?: s
 	await handlePrompt(sessionId, text, steering ? 'steering' : undefined, source, displayText)
 }
 
-function closeSession(sessionId: string, openReplacement = false): void {
-	sessionStore.updateMeta(sessionId, { closedAt: new Date().toISOString(), closedTabPosition: state.openSessionIds.findIndex((id) => id === sessionId) + 1 })
-	sessionStore.deactivateSession(sessionId)
-	state.openSessionIds = state.openSessionIds.filter((id) => id !== sessionId)
-	if (state.currentSessionId === sessionId) state.currentSessionId = state.openSessionIds[0] ?? null
-	if (openReplacement && state.openSessionIds.length === 0) createSessionTab({})
-	broadcastSessions()
-}
-
 async function resolvePromptParts(sessionId: string, text: string, displayText?: string): Promise<UserPart[]> {
 	if (displayText && displayText !== text) return [{ type: 'text', text, displayText }]
 	return (await attachments.resolve(sessionId, text)).logParts
@@ -434,7 +284,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		emitInfo(sessionId, `Generation failed: ${err?.message ?? String(err)}`, 'error')
 	}
 	if (shouldCloseSessionAfterGeneration(sessionStore.loadSessionMeta(sessionId), result) && !agentLoop.isWorking(sessionId)) {
-		closeSession(sessionId)
+		tabs.closeSession(sessionId)
 		return
 	}
 	if (result !== 'completed') queueRunner.emitQueuePausedNotice(sessionId)
@@ -544,7 +394,7 @@ function handleCommand(cmd: Command): void {
 		removeClient(cmd.pid)
 		return
 	}
-	focusSession(cmd.sessionId)
+	tabs.focusSession(cmd.sessionId)
 	if (cmd.type === 'focus') {
 		broadcastSessions()
 		return
@@ -609,21 +459,21 @@ function handleCommand(cmd: Command): void {
 				commandCreatedAt: cmd.createdAt,
 			})
 			if ('forkSessionId' in cmd) {
-				const child = createSessionTab({ sourceId: cmd.forkSessionId, workingDir: cmd.cwd })
-				emitInfo(cmd.forkSessionId, `Tab forked to ${sessionLabel(child)}.`, 'info', 'notice')
+				const child = tabs.createSessionTab({ sourceId: cmd.forkSessionId, workingDir: cmd.cwd })
+				emitInfo(cmd.forkSessionId, `Tab forked to ${tabs.sessionLabel(child)}.`, 'info', 'notice')
 			} else if ('cwd' in cmd && cmd.cwd && cmd.forceNew) {
-				createSessionTab({ openerId: sessionId, afterId: sessionId, workingDir: cmd.cwd })
+				tabs.createSessionTab({ openerId: sessionId, afterId: sessionId, workingDir: cmd.cwd })
 			} else if ('afterSessionId' in cmd) {
-				createSessionTab({ openerId: sessionId, afterId: cmd.afterSessionId })
+				tabs.createSessionTab({ openerId: sessionId, afterId: cmd.afterSessionId })
 			} else if (cmd.cwd) {
-				const target = activateTargetForCwd(cmd.cwd)
+				const target = tabs.activateTargetForCwd(cmd.cwd)
 				if (!target.ok) {
 					const sid = sessionId ?? state.openSessionIds[0]
 					if (sid) emitInfo(sid, target.reason, 'error')
 					break
 				}
 			} else {
-				createSessionTab({ openerId: sessionId })
+				tabs.createSessionTab({ openerId: sessionId })
 			}
 			broadcastSessions()
 			break
@@ -675,21 +525,21 @@ function handleCommand(cmd: Command): void {
 				emitInfo(sessionId ?? state.openSessionIds[0] ?? resumeId, `Session ${resumeId} not found`, 'error')
 				break
 			}
-			state.openSessionIds = restoredSessionOrder(state.openSessionIds, resumeId, resumed.closedTabPosition)
+			state.openSessionIds = tabs.restoredSessionOrder(state.openSessionIds, resumeId, resumed.closedTabPosition)
 			sessionStore.updateMeta(resumeId, { closedAt: undefined })
-			focusSession(resumeId)
+			tabs.focusSession(resumeId)
 			broadcastSessions()
 			break
 		}
 		case 'move': {
 			if (!cmd.sessionId || !Number.isFinite(cmd.position)) return
-			if (moveSessionToIndex(cmd.sessionId, cmd.position - 1)) broadcastSessions()
+			if (tabs.moveSessionToIndex(cmd.sessionId, cmd.position - 1)) broadcastSessions()
 			break
 		}
 		case 'close': {
 			if (!cmd.sessionId) return
 			recordTabClosed(cmd.sessionId)
-			closeSession(cmd.sessionId, true)
+			tabs.closeSession(cmd.sessionId, true)
 			break
 		}
 	}
@@ -707,11 +557,11 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	state.currentSessionId = state.openSessionIds[0] ?? null
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
-		const target = activateTargetForCwd(opts.targetCwd)
+		const target = tabs.activateTargetForCwd(opts.targetCwd)
 		if (!target.ok) return target
 		startupSessionId = target.sessionId
 	} else if (state.openSessionIds.length === 0) {
-		startupSessionId = createSessionTab({}).id
+		startupSessionId = tabs.createSessionTab({}).id
 		if (!signal.aborted && state.activeRuntimePid === process.pid) broadcastSessions()
 	}
 	restartPromptWatch()
@@ -728,7 +578,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	ipc.updateState((state) => {
 		state.working = {}
 	})
-	if (state.openSessionIds.length > 0) syncSharedState()
+	if (state.openSessionIds.length > 0) tabs.syncSharedState()
 	void modelNotices.refreshModelMetadata()
 	openaiUsage.start(signal)
 	if (metas.length > 0) {
@@ -794,7 +644,6 @@ export const runtime = {
 	emitInfo,
 	shouldAutoContinue,
 	shouldCloseSessionAfterGeneration,
-	restoredSessionOrder,
 	recordTabClosed,
 	spawnSession,
 	startSpawnedSession,
@@ -802,9 +651,7 @@ export const runtime = {
 	handlePrompt,
 	runCompact,
 	handleCommand,
-	// Tab/session helpers used by sibling server modules (e.g. model-notices).
-	focusedSessionId,
-	openSessionMetas,
-	createSessionTab,
+	// Used by sibling server modules (tabs, model-notices) at call time.
 	broadcastSessions,
+	publishContextEstimate,
 }
