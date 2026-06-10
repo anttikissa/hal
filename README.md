@@ -29,6 +29,7 @@ Meanwhile, it tries to be reasonably feature complete, have a nice terminal and 
 - Google search supported through https://serper.dev/ (ask Hal to implement other providers if you like)
 - New models are found automatically by checking https://models.dev/ (so you don't need to update Hal when new models become available)
 - There are some very basic security guardrails: if the tool call looks suspiciously (destructive action or reading security credentials), Hal will ask you to confirm before running it (see risk.ts for details)
+- `hal` works locally, but it has a client-server architecture (via a file-based IPC bus) - you can run Hal in multiple terminals at the same time, and one of them will be the server and others will be clients. Handoff happens automatically: if you're in the middle of doing changes to Hal itself and want to see them live, just start hal in another terminal and close the previous one if it works, and voilà, you're running new code.
 - There's an `eval` tool that lets Hal run arbitrary JavaScript in the running process. Especially useful for introspective work like "Summarize what happened in tabs 4-7 during the last 24 hours". Disable if you don't like dangerous tools.
 
 What's not implemented:
