@@ -3,7 +3,7 @@
 
 import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
-import { charWidth, visLen, wordWrap } from '../utils/strings.ts'
+import { glyphWidthAt, visLen, wordWrap } from '../utils/strings.ts'
 
 const MAX_UNDO = 200
 const SELECTION_ON = '\x1b[7m'
@@ -60,12 +60,10 @@ function rowColToCursor(input: string, row: number, col: number, width: number):
 	const r = Math.max(0, Math.min(row, layout.lines.length - 1))
 	let vis = 0
 	for (let i = layout.starts[r]!; i < layout.ends[r]!;) {
-		const cp = input.codePointAt(i)!
-		const charLen = cp > 0xffff ? 2 : 1
-		const charCols = charWidth(cp)
-		if (vis + charCols > col) return i
-		vis += charCols
-		i += charLen
+		const glyph = glyphWidthAt(input, i)
+		if (vis + glyph.width > col) return i
+		vis += glyph.width
+		i += glyph.length
 	}
 	return layout.ends[r]!
 }

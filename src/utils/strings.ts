@@ -41,14 +41,33 @@ export function expandTabs(s: string, tabWidth = 4): string {
 	}
 	return out
 }
-/** Terminal display width of a Unicode code point. */
+function codePointLength(cp: number): number {
+	return cp > 0xffff ? 2 : 1
+}
+
+/** Terminal display width of a Unicode code point without looking at neighbors. */
 export function charWidth(cp: number): number {
 	if (cp < 0x20) return 0
 	if (cp < 0x7f) return 1
 	// Style markers (PUA U+E000–E005): zero width, resolved to ANSI later
 	if (cp >= 0xe000 && cp <= 0xe005) return 0
-	// Zero-width: combining marks, ZWJ, variation selectors
-	if (
+	if (isZeroWidth(cp)) return 0
+	if (isWide(cp)) return 2
+	return 1
+}
+
+/** Terminal display width and UTF-16 length for the glyph starting at index. */
+export function glyphWidthAt(s: string, i: number): { width: number; length: number } {
+	const cp = s.codePointAt(i)!
+	const length = codePointLength(cp)
+	if (s.codePointAt(i + length) === 0xfe0f && isVs16WideBase(cp)) {
+		return { width: 2, length: length + 1 }
+	}
+	return { width: charWidth(cp), length }
+}
+
+function isZeroWidth(cp: number): boolean {
+	return (
 		(cp >= 0x0300 && cp <= 0x036f) ||
 		(cp >= 0x1ab0 && cp <= 0x1aff) ||
 		(cp >= 0x1dc0 && cp <= 0x1dff) ||
@@ -62,29 +81,32 @@ export function charWidth(cp: number): number {
 		cp === 0xfeff ||
 		(cp >= 0xe0100 && cp <= 0xe01ef)
 	)
-		return 0
-	// East Asian Wide/Fullwidth + Emoji_Presentation characters
-	if (isWide(cp)) return 2
-	return 1
 }
 
-// Emoji_Presentation=Yes codepoints in BMP (Unicode 15.0, compacted)
-const EMOJI_PRESENTATION = new Set([
-	0x231a, 0x231b, 0x23e9, 0x23ea, 0x23eb, 0x23ec, 0x23ed, 0x23ee, 0x23ef, 0x23f0, 0x23f1, 0x23f2, 0x23f3, 0x23f8,
-	0x23f9, 0x23fa, 0x25ab, 0x25c0, 0x25fb, 0x25fc, 0x25fd, 0x25fe, 0x2600, 0x2601, 0x2602, 0x2603,
-	0x2604, 0x260e, 0x2611, 0x2614, 0x2615, 0x2618, 0x261d, 0x2620, 0x2622, 0x2623, 0x2626, 0x262a, 0x262e, 0x262f,
-	0x2638, 0x2639, 0x263a, 0x2640, 0x2642, 0x2648, 0x2649, 0x264a, 0x264b, 0x264c, 0x264d, 0x264e, 0x264f, 0x2650,
-	0x2651, 0x2652, 0x2653, 0x265f, 0x2660, 0x2663, 0x2665, 0x2666, 0x2668, 0x267b, 0x267e, 0x267f, 0x2692, 0x2693,
-	0x2694, 0x2695, 0x2696, 0x2697, 0x2699, 0x269b, 0x269c, 0x26a0, 0x26a1, 0x26a7, 0x26aa, 0x26ab, 0x26b0, 0x26b1,
-	0x26bd, 0x26be, 0x26c4, 0x26c5, 0x26c8, 0x26ce, 0x26cf, 0x26d1, 0x26d3, 0x26d4, 0x26e9, 0x26ea, 0x26f0, 0x26f1,
-	0x26f2, 0x26f3, 0x26f4, 0x26f5, 0x26f7, 0x26f8, 0x26f9, 0x26fa, 0x26fd, 0x2702, 0x2705, 0x2708, 0x2709, 0x270a,
-	0x270b, 0x270c, 0x270d, 0x270f, 0x2712, 0x2714, 0x2716, 0x271d, 0x2721, 0x2728, 0x2733, 0x2734, 0x2744, 0x2747,
-	0x274c, 0x274e, 0x2753, 0x2754, 0x2755, 0x2757, 0x2763, 0x2764, 0x2795, 0x2796, 0x2797, 0x27a1, 0x27b0, 0x27bf,
-	0x2934, 0x2935, 0x2b05, 0x2b06, 0x2b07, 0x2b1b, 0x2b1c, 0x2b50, 0x2b55, 0x3030, 0x303d, 0x3297, 0x3299,
-])
+const BMP_WIDE_RANGES: Array<[number, number]> = [
+	[0x231a, 0x231b], [0x2329, 0x232a], [0x23e9, 0x23ec], [0x23f0, 0x23f3], [0x25fd, 0x25fe], [0x2614, 0x2615],
+	[0x2648, 0x2653], [0x267f, 0x267f], [0x2693, 0x2693], [0x26a1, 0x26a1], [0x26aa, 0x26ab], [0x26bd, 0x26be],
+	[0x26c4, 0x26c5], [0x26ce, 0x26ce], [0x26d4, 0x26d4], [0x26ea, 0x26ea], [0x26f2, 0x26f3], [0x26f5, 0x26f5],
+	[0x26fa, 0x26fa], [0x26fd, 0x26fd], [0x2705, 0x2705], [0x270a, 0x270b], [0x2728, 0x2728], [0x274c, 0x274e],
+	[0x2753, 0x2755], [0x2757, 0x2757], [0x2795, 0x2797], [0x27b0, 0x27b0], [0x27bf, 0x27bf], [0x2b1b, 0x2b1c],
+	[0x2b50, 0x2b50], [0x2b55, 0x2b55],
+]
+
+const VS16_WIDE_BASES = new Set([0x2600, 0x2708, 0x2764, 0x26a0, 0x27a1, 0x2b05, 0x2b06, 0x2b07])
+
+function inRanges(cp: number, ranges: Array<[number, number]>): boolean {
+	for (const [from, to] of ranges) {
+		if (cp >= from && cp <= to) return true
+	}
+	return false
+}
+
+function isVs16WideBase(cp: number): boolean {
+	return VS16_WIDE_BASES.has(cp)
+}
 
 function isWide(cp: number): boolean {
-	if (EMOJI_PRESENTATION.has(cp)) return true
+	if (inRanges(cp, BMP_WIDE_RANGES)) return true
 	return (
 		(cp >= 0x1100 && cp <= 0x115f) ||
 		(cp >= 0x2e80 && cp <= 0x303e) ||
@@ -107,26 +129,30 @@ export function visLen(s: string): number {
 	let n = 0,
 		esc = false,
 		osc = false
-	for (const ch of s) {
-		const cp = ch.codePointAt(0)!
+	for (let i = 0; i < s.length;) {
+		const cp = s.codePointAt(i)!
+		const cl = codePointLength(cp)
 		if (cp === 0x1b) {
 			esc = true
+			i += cl
 			continue
 		}
 		if (esc) {
 			if (cp === 0x5d) {
 				osc = true
 				esc = false
-				continue
-			} // ESC ] = OSC
-			if (cp === 0x6d) esc = false // ESC [ ... m = CSI
+			} else if (cp === 0x6d) esc = false
+			i += cl
 			continue
 		}
 		if (osc) {
 			if (cp === 0x07) osc = false
+			i += cl
 			continue
-		} // BEL terminates OSC
-		n += charWidth(cp)
+		}
+		const glyph = glyphWidthAt(s, i)
+		n += glyph.width
+		i += glyph.length
 	}
 	return n
 }
@@ -147,7 +173,8 @@ export function wordWrap(text: string, width: number): string[] {
 			wrappedTrailingSpace = false
 		for (let i = 0; i < raw.length; ) {
 			const cp = raw.codePointAt(i)!
-			const cl = cp > 0xffff ? 2 : 1
+			const glyph = glyphWidthAt(raw, i)
+			const cl = glyph.length
 			if (cp === 0x1b) {
 				esc = true
 				i += cl
@@ -159,7 +186,7 @@ export function wordWrap(text: string, width: number): string[] {
 				continue
 			}
 			if (cp === 0x20) wordStart = i
-			vis += charWidth(cp)
+			vis += glyph.width
 			if (vis > width) {
 				const at = wordStart > lineStart ? wordStart : i
 				out.push(raw.slice(lineStart, at))
@@ -188,7 +215,8 @@ export function clipVisual(s: string, max: number): string {
 		cut = 0
 	for (let i = 0; i < s.length; ) {
 		const cp = s.codePointAt(i)!
-		const cl = cp > 0xffff ? 2 : 1
+		const glyph = glyphWidthAt(s, i)
+		const cl = glyph.length
 		if (cp === 0x1b) {
 			esc = true
 			i += cl
@@ -210,12 +238,11 @@ export function clipVisual(s: string, max: number): string {
 			i += cl
 			continue
 		}
-		const w = charWidth(cp)
-		if (vis + w > max - 1) {
+		if (vis + glyph.width > max - 1) {
 			cut = i
 			break
 		}
-		vis += w
+		vis += glyph.width
 		i += cl
 	}
 	return s.slice(0, cut) + '…'
@@ -231,7 +258,8 @@ export function hardWrap(s: string, width: number): string[] {
 	let vis = 0, lineStart = 0, esc = false, osc = false
 	for (let i = 0; i < s.length; ) {
 		const cp = s.codePointAt(i)!
-		const cl = cp > 0xffff ? 2 : 1
+		const glyph = glyphWidthAt(s, i)
+		const cl = glyph.length
 		if (cp === 0x1b) { esc = true; i += cl; continue }
 		if (esc) {
 			if (cp === 0x5d) { osc = true; esc = false; i += cl; continue }
@@ -239,13 +267,12 @@ export function hardWrap(s: string, width: number): string[] {
 			i += cl; continue
 		}
 		if (osc) { if (cp === 0x07) osc = false; i += cl; continue }
-		const w = charWidth(cp)
-		if (vis + w > width) {
+		if (vis + glyph.width > width) {
 			out.push(s.slice(lineStart, i))
 			lineStart = i
 			vis = 0
 		}
-		vis += w
+		vis += glyph.width
 		i += cl
 	}
 	if (lineStart < s.length) out.push(s.slice(lineStart))
@@ -300,4 +327,4 @@ export function resolveMarkers(lines: string[]): string[] {
 	})
 }
 
-export const strings = { charWidth, visLen, wordWrap, hardWrap, clipVisual, resolveMarkers, expandTabs }
+export const strings = { charWidth, glyphWidthAt, visLen, wordWrap, hardWrap, clipVisual, resolveMarkers, expandTabs }
