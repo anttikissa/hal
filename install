@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Hal installer. Keep this preamble updated when changing installer behavior.
+# Installs missing tools when needed: Homebrew, git, ripgrep, unzip, bun, and tsgo.
+# Sets up Hal: creates config.ason, installs project deps, links ~/.local/bin/hal, and updates PATH.
 set -euo pipefail
 
 hal_dir="$(cd "$(dirname "$0")" && pwd)"
