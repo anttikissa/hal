@@ -258,7 +258,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 
 	// Determine thinking mode based on model
 	const isAdaptive = /^claude-(opus|sonnet)-4-6/.test(req.model)
-	const supportsThinking = /^claude-(opus|sonnet)/.test(req.model)
+	const supportsThinking = /^claude-(opus|sonnet|fable)/.test(req.model)
 
 	const isOAuth = cred.type === 'token'
 

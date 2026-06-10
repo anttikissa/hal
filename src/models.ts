@@ -15,8 +15,10 @@ const ALIASES: Record<string, string> = {
 	opus: 'anthropic/claude-opus-4-7',
 	sonnet: 'anthropic/claude-sonnet-4-6',
 	haiku: 'anthropic/claude-haiku-4-5',
+	fable: 'anthropic/claude-fable-5',
 	openai: 'openai/gpt-5.5',
 	gpt: 'openai/gpt-5.5',
+	instant: 'openai/gpt-5.5-instant',
 	codex: 'openai/gpt-5.3-codex',
 	gemini: 'google/gemini-3.5-flash',
 	'gemini-pro': 'google/gemini-3.1-pro-preview',
@@ -30,7 +32,8 @@ const PATTERNS: [RegExp, string][] = [
 	[/^opus-(.+)$/, 'anthropic/claude-opus-$1'],
 	[/^sonnet-(.+)$/, 'anthropic/claude-sonnet-$1'],
 	[/^haiku-(.+)$/, 'anthropic/claude-haiku-$1'],
-	[/^gpt-?(\d+\.\d+)$/, 'openai/gpt-$1'],
+	[/^fable-(.+)$/, 'anthropic/claude-fable-$1'],
+	[/^gpt-?(\d+\.\d+(?:-[a-z0-9.-]+)?)$/, 'openai/gpt-$1'],
 	[/^gemini-(.+)$/, 'google/gemini-$1'],
 	[/^grok-(.+)$/, 'openrouter/x-ai/grok-$1'],
 ]
@@ -47,10 +50,18 @@ function resolveModel(input: string): string {
 // ── Display names ──
 // Regex patterns to extract human-readable names from model IDs.
 
+function displayTitleSuffix(text: string): string {
+	const words: string[] = []
+	for (const part of text.split('-')) {
+		words.push(part[0]!.toUpperCase() + part.slice(1))
+	}
+	return words.join(' ')
+}
+
 const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	// claude-haiku-4-5-20251001 → Haiku 4.5
 	[
-		/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)-\d{8,}$/,
+		/^claude-(opus|sonnet|haiku|fable)-(\d+)-(\d+)-\d{8,}$/,
 		(m) => {
 			const tier = m[1]![0]!.toUpperCase() + m[1]!.slice(1)
 			return `${tier} ${m[2]}.${m[3]}`
@@ -58,7 +69,7 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	],
 	// claude-opus-4-6 → Opus 4.6
 	[
-		/^claude-(opus|sonnet|haiku)-(\d+)-(\d{1,2})$/,
+		/^claude-(opus|sonnet|haiku|fable)-(\d+)-(\d{1,2})$/,
 		(m) => {
 			const tier = m[1]![0]!.toUpperCase() + m[1]!.slice(1)
 			return `${tier} ${m[2]}.${m[3]}`
@@ -66,7 +77,15 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	],
 	// claude-sonnet-4-20250514 → Sonnet 4
 	[
-		/^claude-(opus|sonnet|haiku)-(\d+)-\d{8,}$/,
+		/^claude-(opus|sonnet|haiku|fable)-(\d+)-\d{8,}$/,
+		(m) => {
+			const tier = m[1]![0]!.toUpperCase() + m[1]!.slice(1)
+			return `${tier} ${m[2]}`
+		},
+	],
+	// claude-fable-5 → Fable 5
+	[
+		/^claude-(opus|sonnet|haiku|fable)-(\d+)$/,
 		(m) => {
 			const tier = m[1]![0]!.toUpperCase() + m[1]!.slice(1)
 			return `${tier} ${m[2]}`
@@ -74,6 +93,8 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	],
 	// gpt-5.3-codex → Codex 5.3
 	[/^gpt-(\d+\.\d+)-codex$/, (m) => `Codex ${m[1]}`],
+	// gpt-5.5-instant → GPT 5.5 Instant
+	[/^gpt-(\d+\.\d+)-([a-z0-9.-]+)$/, (m) => `GPT ${m[1]} ${displayTitleSuffix(m[2]!)}`],
 	// gpt-5.4 → GPT 5.4
 	[/^gpt-(\d+\.\d+)$/, (m) => `GPT ${m[1]}`],
 ]
@@ -151,7 +172,9 @@ const FALLBACK_WINDOWS: Record<string, number> = {
 	'anthropic/claude-opus-4-7': 1_000_000,
 	'anthropic/claude-sonnet-4-6': 1_000_000,
 	'anthropic/claude-haiku-4-5': 200_000,
+	'anthropic/claude-fable-5': 1_000_000,
 	'openai/gpt-5.5': 1_050_000,
+	'openai/gpt-5.5-instant': 400_000,
 	'openai/gpt-5.4': 1_050_000,
 	'openai/gpt-5.3': 128_000,
 	'openai/gpt-5.3-codex': 128_000,
@@ -228,7 +251,7 @@ function frontierModelInfo(fullId: string): FrontierModelInfo | null {
 	const gpt = id.match(/^gpt-(\d+)\.(\d+)$/)
 	if (gpt) return { kind: 'gpt', family: `GPT ${gpt[1]}`, version: [Number(gpt[1]), Number(gpt[2])] }
 
-	const claude = id.match(/^claude-(opus|sonnet|haiku)-(\d+)(?:[.-](\d+)|-\d{8,})?$/)
+	const claude = id.match(/^claude-(opus|sonnet|haiku|fable)-(\d+)(?:[.-](\d+)|-\d{8,})?$/)
 	if (!claude) return null
 	const tier = claude[1]![0]!.toUpperCase() + claude[1]!.slice(1)
 	return { kind: 'claude', family: `${tier} ${claude[2]}`, version: [Number(claude[2]), Number(claude[3] ?? 0)] }
@@ -270,7 +293,7 @@ function newestModelInFamily(cache: Record<string, number>, family: string): str
 	return bestId
 }
 
-function parseClaudeCandidate(tier: 'opus' | 'sonnet' | 'haiku', modelId: string): ModelCandidate | null {
+function parseClaudeCandidate(tier: 'opus' | 'sonnet' | 'haiku' | 'fable', modelId: string): ModelCandidate | null {
 	const match = modelId.match(new RegExp(`^claude-${tier}-(\\d+)(?:-(\\d{8,})|[.-](\\d+))?$`))
 	if (!match) return null
 	const major = Number(match[1])
@@ -334,6 +357,7 @@ const aliasUpdateGroups = [
 	{ aliases: ['anthropic', 'claude', 'opus'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('opus', id)) },
 	{ aliases: ['sonnet'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('sonnet', id)) },
 	{ aliases: ['haiku'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('haiku', id)) },
+	{ aliases: ['fable'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseClaudeCandidate('fable', id)) },
 	{ aliases: ['openai', 'gpt'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseGptCandidate) },
 	{ aliases: ['codex'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, parseCodexCandidate) },
 	{ aliases: ['gemini'], latest: (cache: Record<string, number>) => newestMatchingModel(cache, (id) => parseGeminiCandidate('flash', id)) },
@@ -427,9 +451,12 @@ const PRICING: Record<string, { input: number; output: number }> = {
 	'anthropic/claude-opus-4-7': { input: 5, output: 25 },
 	'anthropic/claude-sonnet-4-6': { input: 3, output: 15 },
 	'anthropic/claude-haiku-4-5': { input: 1, output: 5 },
+	'anthropic/claude-fable-5': { input: 10, output: 50 },
+	'openai/gpt-5.5-instant': { input: 5, output: 30 },
 }
 
-// Anthropic prompt-cache multipliers: reads bill at 10% of input, writes at 125%.
+// Prompt-cache reads bill at 10% for the priced Anthropic/OpenAI models here.
+// Anthropic writes bill at 125%.
 // https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#pricing
 const CACHE_READ_MULTIPLIER = 0.1
 const CACHE_WRITE_MULTIPLIER = 1.25
@@ -481,12 +508,14 @@ const MODEL_GROUPS: ModelGroup[] = [
 			{ alias: 'opus', fullId: 'anthropic/claude-opus-4-7' },
 			{ alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-6' },
 			{ alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5' },
+			{ alias: 'fable', fullId: 'anthropic/claude-fable-5' },
 		],
 	},
 	{
 		label: 'OpenAI',
 		models: [
 			{ alias: 'gpt', fullId: 'openai/gpt-5.5' },
+			{ alias: 'instant', fullId: 'openai/gpt-5.5-instant' },
 			{ alias: 'codex', fullId: 'openai/gpt-5.3-codex' },
 		],
 	},
@@ -516,7 +545,7 @@ function listModels(): string[] {
 		}
 		lines.push('')
 	}
-	lines.push('Patterns: opus-X, sonnet-X, haiku-X, gpt-X.Y, gemini-X, grok-X')
+	lines.push('Patterns: opus-X, sonnet-X, haiku-X, fable-X, gpt-X.Y[-suffix], gemini-X, grok-X')
 	return lines
 }
 
@@ -543,7 +572,7 @@ function modelCompletionNames(): string[] {
 			names.add(model.fullId)
 			const slash = model.fullId.indexOf('/')
 			if (slash >= 0) names.add(model.fullId.slice(slash + 1))
-			const anthropic = model.fullId.match(/^anthropic\/claude-(opus|sonnet|haiku)-(.+)$/)
+			const anthropic = model.fullId.match(/^anthropic\/claude-(opus|sonnet|haiku|fable)-(.+)$/)
 			if (anthropic) names.add(`${anthropic[1]}-${anthropic[2]}`)
 			const grok = model.fullId.match(/^openrouter\/x-ai\/grok-(.+)$/)
 			if (grok) names.add(`grok-${grok[1]}`)

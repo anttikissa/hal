@@ -65,6 +65,30 @@ test('anthropic provider streams text while rotating accounts', async () => {
 	expect(events.at(-1)).toMatchObject({ type: 'done', provider: 'anthropic', doneStatus: 'completed', stopReason: 'end_turn', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
+
+test('anthropic provider enables thinking for Claude Fable', async () => {
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'tok-test', type: 'api-key' })
+	let body: any
+	installFetchMock(async (_input, init) => {
+		body = JSON.parse(String(init?.body ?? '{}'))
+		return new Response(anthropicSse(), {
+			status: 200,
+			headers: { 'content-type': 'text/event-stream' },
+		}) as any
+	})
+
+	for await (const _ of anthropicProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'claude-fable-5',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_fable',
+	})) {}
+
+	expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 10000 })
+})
+
 test('anthropic network errors include Bun error code details', async () => {
 	const cause: any = new Error('connect ECONNREFUSED 127.0.0.1:443')
 	cause.code = 'ECONNREFUSED'
