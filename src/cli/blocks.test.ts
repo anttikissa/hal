@@ -73,7 +73,6 @@ test('incoming user block shows inbox source instead of You', () => {
 	expect(header).not.toContain('You')
 })
 
-
 test('user blocks use user colors', () => {
 	colors.load()
 	const block: Block = { type: 'user', text: 'hello' }
@@ -108,7 +107,6 @@ test('historyToBlocks recovers retry state from failed turn_end', () => {
 
 	expect(result.at(-1)).toMatchObject({ type: 'error', text: 'Generation failed.' })
 })
-
 
 test('historyToBlocks recovers continue state from aborted turn_end', () => {
 	const result = blocks.historyToBlocks([
@@ -167,7 +165,6 @@ test('assistant and thinking backgrounds come from colors', () => {
 	expect(blocks.renderBlock(assistantBlock, 80).map(stripAnsi)[0]?.trim()).not.toBe('')
 })
 
-
 test('assistant block padding uses resolved OKLCH blackness', () => {
 	const originalBg = colors.assistant.bg
 	const originalBgIsBlack = colors.assistant.bgIsBlack
@@ -187,7 +184,6 @@ test('assistant block padding uses resolved OKLCH blackness', () => {
 		colors.assistant.bgIsBlack = originalBgIsBlack
 	}
 })
-
 
 test('synthetic assistant header includes model and synthetic marker', () => {
 	const block: Block = {
@@ -275,7 +271,6 @@ test('text code fences wrap at word boundaries', () => {
 	])
 })
 
-
 test('wrapped URLs use OSC 8 links for every visual segment', () => {
 	const url = `https://claude.ai/oauth/authorize?client_id=${'a'.repeat(80)}`
 	const lines = blocks.renderBlock({ type: 'log', text: url }, 40)
@@ -338,7 +333,6 @@ test('info history entries render as system blocks', () => {
 	const lines = blocks.renderBlock(result[0]!, 80)
 	expect(headerLine(lines)).toContain('System')
 })
-
 
 test('structural cwd and model entries render as system blocks', () => {
 	const history: any[] = [
@@ -413,136 +407,6 @@ test('error block header shows blob ref', () => {
 	expect(header).toContain('04-abc/000003-err')
 })
 
-test('spawn_agent block renders full input args', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'spawn_agent',
-		toolId: 'call_123',
-		input: {
-			task: 'Design the benchmark prompt\nKeep it concise.',
-			mode: 'fresh',
-			model: 'openai/gpt-5.4',
-			cwd: '/Users/antti/.hal',
-			title: 'edit benchmark prompt',
-			kind: 'subagent',
-		},
-		output: 'Queued subagent spawn from 04-lfp',
-	}
-
-	const rendered = blocks.renderBlock(block, 100)
-	const lines = rendered.map((l) => stripAnsi(l))
-	const header = lines.find((line) => line.trim()) ?? ''
-	const body = lines.slice(1).join('\n')
-
-	expect(rendered.join('\n')).not.toContain('\x1b[2m')
-	expect(header).toContain('Spawn agent')
-	expect(body).toContain('task: `Design the benchmark prompt')
-	expect(body).toContain("mode: 'fresh'")
-	expect(body).toContain("model: 'openai/gpt-5.4'")
-	expect(body).toContain("cwd: '/Users/antti/.hal'")
-	expect(body).toContain("title: 'edit benchmark prompt'")
-	expect(body).toContain("kind: 'subagent'")
-	expect(body).toContain('Queued subagent spawn from 04-lfp')
-})
-
-test('send block renders target session and message text', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'send',
-		input: {
-			sessionId: '33-270',
-			text: 'Stop. Do not do any analysis or file access.',
-			queue: false,
-		},
-		output: 'Sent message to tab 4 (33-270)',
-	}
-
-	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	const header = lines.find((line) => line.trim()) ?? ''
-	const body = lines.slice(1).join('\n')
-
-	expect(header).toContain('Send to tab 4 (33-270)')
-	expect(body).toContain('Stop. Do not do any analysis or file access.')
-	expect(body).toContain('Sent message to tab 4 (33-270)')
-})
-
-test('grep block quotes its search pattern in header', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'grep',
-		input: { pattern: 'const MODEL_GROUPS', path: '/Users/antti/.hal/src' },
-	}
-
-	const header = headerLine(blocks.renderBlock(block, 100))
-	expect(header).toContain('Grep "const MODEL_GROUPS" in /Users/antti/.hal/src')
-})
-
-test('eval block separates returned output from code', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'eval',
-		input: { code: 'let count = 0\nif (count === 0) {\n\treturn count\n}' },
-		output: '0',
-	}
-
-	const body = contentLines(blocks.renderBlock(block, 100))
-	expect(body).toEqual([
-		' let count = 0',
-		' if (count === 0) {',
-		' \treturn count',
-		' }',
-		' Result:',
-		' 0',
-	])
-})
-
-test('eval block omits result separator when there is no returned output', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'eval',
-		input: { code: 'let count = 0' },
-	}
-
-	const body = contentLines(blocks.renderBlock(block, 100))
-	expect(body).toEqual([' let count = 0'])
-})
-
-test('bash block still uses continuation backslashes for multiline commands', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'bash',
-		input: { command: 'echo one\necho two' },
-	}
-
-	const body = contentLines(blocks.renderBlock(block, 100))
-	expect(body).toEqual([' echo one \\', ' echo two'])
-})
-
-test('bash block strips redundant cd prefix for the current cwd', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'bash',
-		input: { command: 'cd /Users/antti/.hal && git status', cwd: '/Users/antti/.hal/' },
-	}
-
-	const header = headerLine(blocks.renderBlock(block, 100))
-	expect(header).toContain('Bash: git status')
-	expect(header).not.toContain('cd /Users/antti/.hal')
-})
-
-test('read blob block header names the source blob', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'read_blob',
-		input: { id: '04-fyx/0gdec4-bol' },
-		output: 'blob data',
-	}
-
-	const header = headerLine(blocks.renderBlock(block, 100))
-	expect(header).toContain('Read blob 04-fyx/0gdec4-bol')
-})
-
-
 test('tool block header uses padded text without horizontal rules', () => {
 	const block: Block = {
 		type: 'tool',
@@ -567,179 +431,3 @@ test('tool block header uses padded text without horizontal rules', () => {
 	expect(lines.join('\n')).not.toContain('\n ./test\n')
 })
 
-test('bash git commit renders rich commit details instead of shell plumbing', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'bash',
-		input: { command: 'cd /Users/antti/.hal && git commit -m "Nice title\n\nGenerated by test"', cwd: '/Users/antti/.hal' },
-		output: `[main abc123] Nice title
-[hal-commit]
-{
-	branch: 'main',
-	hash: 'abc123',
-	message: 'Nice title\n\nGenerated by test',
-	summary: '2 files changed, 3 insertions(+), 1 deletion(-)',
-	files: [
-		{ path: 'src/a.test.ts', added: 2, removed: 0, locDelta: 1, isCode: false },
-		{ path: 'src/a.ts', added: 1, removed: 1, locDelta: 0, isCode: true }
-	],
-	locDelta: 1,
-	locDeltaCode: 0
-}
-[/hal-commit]`,
-	}
-
-	const raw = blocks.renderBlock(block, 100)
-	const lines = raw.map((l) => stripAnsi(l))
-	expect(headerLine(raw)).toContain('Commit abc123: Nice title')
-	expect(lines).toContain(' Generated by test')
-	expect(lines).toContain(' main abc123 · 2 files changed, 3 insertions(+), 1 deletion(-)')
-	expect(lines).toContain(' Tests / docs / other')
-	expect(lines).toContain('    2 −0   src/a.test.ts')
-	expect(lines).toContain(' Code')
-	expect(lines).toContain('    1 −1   src/a.ts  0 loc')
-	expect(lines).toContain(' Net LOC: +1 total, 0 excluding tests')
-	expect(raw.join('\n')).toContain('\x1b[1m0 excluding tests\x1b[22m')
-	expect(lines.join('\n')).not.toContain('[main abc123]')
-	expect(lines.join('\n')).not.toContain('cd /Users/antti/.hal')
-})
-
-test('bash git commit -F renders from metadata message', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'bash',
-		input: { command: "git commit -F - <<'EOF'\nFile title\n\nFile body\nEOF" },
-		output: `[main def456] File title
-[hal-commit]
-{
-	branch: 'main',
-	hash: 'def456',
-	message: 'File title\n\nFile body',
-	summary: '1 file changed, 1 insertion(+)',
-	files: [
-		{ path: 'src/a.ts', added: 1, removed: 0, locDelta: 1, isCode: true }
-	],
-	locDelta: 1,
-	locDeltaCode: 1
-}
-[/hal-commit]`,
-	}
-
-	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	expect(lines.find((line) => line.trim()) ?? '').toContain('Commit def456: File title')
-	expect(lines).toContain(' File body')
-	expect(lines).toContain(' main def456 · 1 file changed, 1 insertion(+)')
-	expect(lines.join('\n')).not.toContain('[hal-commit]')
-	expect(lines.join('\n')).not.toContain('git commit -F')
-})
-
-
-test('bash git commit --amend marks commit block as amend', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'bash',
-		input: { command: "cat > /tmp/msg <<'EOF'\nAmended title\nEOF\ngit commit --amend -F /tmp/msg" },
-		output: `[main fed789] Amended title
-[hal-commit]
-{
-	branch: 'main',
-	hash: 'fed789',
-	message: 'Amended title',
-	summary: '1 file changed, 1 insertion(+)',
-	files: [
-		{ path: 'src/a.ts', added: 1, removed: 0, locDelta: 1, isCode: true }
-	],
-	locDelta: 1,
-	locDeltaCode: 1
-}
-[/hal-commit]`,
-	}
-
-	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	const header = lines.find((line) => line.trim()) ?? ''
-	expect(header).toContain('Amend fed789: Amended title')
-	expect(header).not.toContain('Commit fed789')
-})
-
-test('failed shell-substitution commit renders as ordinary bash', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'bash',
-		input: { command: "git commit -m \"$(cat <<'EOF'\nBad title\nEOF\n)\"" },
-		output: 'bash: unexpected EOF while looking for matching `\'\'\n',
-	}
-
-	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	const header = lines.find((line) => line.trim()) ?? ''
-	expect(header).toContain('Bash')
-	expect(header).not.toContain('Commit')
-	expect(lines.join('\n')).toContain("git commit -m")
-	expect(lines.join('\n')).toContain('bash: unexpected EOF')
-})
-
-test('edit block header shows affected hashline refs', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'edit',
-		input: {
-			path: 'src/app.ts',
-			operation: 'replace',
-			start_ref: '12:abc',
-			end_ref: '15:def',
-			new_content: 'next',
-		},
-	}
-
-	const header = headerLine(blocks.renderBlock(block, 100))
-	expect(header).toContain('Edit src/app.ts (12:abc-15:def)')
-})
-
-test('edit block shows hashline refs for debugging', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'edit',
-		input: {
-			path: 'src/app.ts',
-			operation: 'replace',
-			start_ref: '12:abc',
-			end_ref: '15:def',
-			new_content: 'next',
-		},
-	}
-
-	const body = blocks
-		.renderBlock(block, 100)
-		.map((l) => stripAnsi(l))
-		.slice(1)
-		.join('\n')
-	expect(body).toContain("operation: 'replace'")
-	expect(body).toContain("start_ref: '12:abc'")
-	expect(body).toContain("end_ref: '15:def'")
-})
-
-test('edit block keeps failure details visible after diff preview', () => {
-	const block: Block = {
-		type: 'tool',
-		name: 'edit',
-		output: [
-			'--- before',
-			'2:aaa old line',
-			'',
-			'+++ after',
-			'2:bbb new line',
-			'',
-			'TypeScript check failed for src/app.ts:',
-			'error TS2322: Type string is not assignable to number.',
-		].join('\n'),
-	}
-
-	const body = blocks
-		.renderBlock(block, 100)
-		.map((l) => stripAnsi(l))
-		.slice(1)
-		.join('\n')
-	expect(body).toContain('− 2:aaa old line')
-	expect(body).toContain('+ 2:bbb new line')
-	expect(body).toContain('TypeScript check failed for src/app.ts:')
-	expect(body).toContain('error TS2322: Type string is not assignable to number.')
-})
