@@ -171,7 +171,17 @@ function formatContext(n: number): string {
 }
 
 function isRelevantModelId(id: string): boolean {
-	return /(^|\/)gpt-[\d.]+/.test(id) || /(^|\/)claude-[a-z0-9-]+/.test(id)
+	if (/(^|\/)gpt-[a-z0-9.-]+/.test(id)) return true
+	if (/(^|\/)o\d[a-z0-9.-]*/.test(id)) return true
+	if (/(^|\/)codex-[a-z0-9.-]+/.test(id)) return true
+	if (/(^|\/)claude-[a-z0-9-]+/.test(id)) return true
+	return false
+}
+
+function modelFamilyLabel(id: string): string {
+	if (/(^|\/)gpt-[a-z0-9.-]+/.test(id)) return 'GPT'
+	if (/(^|\/)(o\d|codex-)/.test(id)) return 'OpenAI'
+	return 'Claude'
 }
 
 function parseVersionParts(text: string): number[] {
@@ -317,7 +327,7 @@ function modelChangeMessages(previous: Record<string, number>, next: Record<stri
 		if (!isRelevantModelId(id)) continue
 		const before = previous[id]
 		if (before == null) {
-			const family = id.includes('gpt-') ? 'GPT' : 'Claude'
+			const family = modelFamilyLabel(id)
 			changes.push(`new ${family} model ${id} (${formatContext(context)})`)
 		} else if (before !== context) {
 			changes.push(`${id} context ${formatContext(before)} → ${formatContext(context)}`)

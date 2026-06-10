@@ -185,6 +185,20 @@ test('modelChangeMessages reports new Claude families such as Fable', () => {
 })
 
 
+test('modelChangeMessages reports new GPT variants such as instant', () => {
+	expect(models.modelChangeMessages({}, {
+		'gpt-5.5-instant': 400_000,
+	})).toContain('new GPT model gpt-5.5-instant (400k)')
+})
+
+
+test('modelChangeMessages reports new non-GPT OpenAI reasoning models', () => {
+	expect(models.modelChangeMessages({}, {
+		'openai/o5': 200_000,
+	})).toContain('new OpenAI model openai/o5 (200k)')
+})
+
+
 test('refreshModels treats missing cache as initial fetch without change spam', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir
