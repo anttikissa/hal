@@ -225,6 +225,7 @@ test('/check refreshes model metadata and reports alias updates', async () => {
 	expect(result.output).toContain('It looks like some of your model aliases got updates:')
 	expect(result.output).toContain('anthropic/claude-opus-4-7')
 	expect(result.output).toContain('anthropic/claude-opus-4-8')
+	expect(result.output).toContain('🚨 New Anthropic/OpenAI models detected')
 })
 
 

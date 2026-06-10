@@ -334,6 +334,32 @@ function suggestAliasUpdates(previous: Record<string, number>, next: Record<stri
 	emitSyntheticAssistant(meta.id, buildAliasUpdateSuggestionText(updates, meta.workingDir ?? process.cwd()), 'alias-update-suggestion', model)
 }
 
+function sessionWillProduceOutput(sessionId: string): boolean {
+	if (agentLoop.isWorking(sessionId)) return true
+	return shouldAutoContinue(sessionStore.loadAllHistory(sessionId))
+}
+
+function modelDiscoveryTarget(): SessionMeta | null {
+	const focused = focusedSessionId()
+	if (focused && sessionWillProduceOutput(focused)) {
+		const child = createSessionTab({ openerId: focused, afterId: focused, workingDir: HAL_DIR })
+		sessionStore.updateMeta(child.id, { name: 'new models' })
+		broadcastSessions()
+		return sessionStore.loadSessionMeta(child.id) ?? child
+	}
+	const metas = openSessionMetas()
+	return metas.find((item) => item.id === focused) ?? metas[0] ?? null
+}
+
+function suggestModelDiscoveries(previous: Record<string, number>, next: Record<string, number>): void {
+	const discoveries = models.modelDiscoveries(previous, next)
+	if (discoveries.length === 0) return
+	const meta = modelDiscoveryTarget()
+	if (!meta) return
+	const model = meta.model ?? models.defaultModel()
+	emitSyntheticAssistant(meta.id, modelRefresh.buildNewModelDiscoveryText(discoveries, meta.workingDir ?? process.cwd()), 'model-discovery', model)
+}
+
 async function refreshModelMetadata(): Promise<void> {
 	try {
 		const checked = await modelRefresh.checkModels()
@@ -342,7 +368,10 @@ async function refreshModelMetadata(): Promise<void> {
 			log.info('models.dev metadata refreshed', { message: checked.message })
 			emitFocusedInfo(checked.message)
 		}
-		if (result.hadCache) suggestAliasUpdates(result.previous, result.next)
+		if (result.hadCache) {
+			suggestAliasUpdates(result.previous, result.next)
+			suggestModelDiscoveries(result.previous, result.next)
+		}
 	} catch (err) {
 		log.error('models.dev refresh failed', { error: errorMessage(err) })
 	}
@@ -998,6 +1027,7 @@ export const runtime = {
 	buildAliasUpdateSuggestionText,
 	formatCommandError,
 	suggestAliasUpdates,
+	suggestModelDiscoveries,
 	enqueuePrompt,
 	handleQueueSlashCommand,
 	runNextQueuedPrompt,

@@ -199,6 +199,25 @@ test('modelChangeMessages reports new non-GPT OpenAI reasoning models', () => {
 })
 
 
+test('modelDiscoveries reports only new Anthropic and OpenAI models once', () => {
+	expect(models.modelDiscoveries(
+		{ 'claude-opus-4-7': 1_000_000, 'gpt-5.5': 1_000_000 },
+		{
+			'claude-opus-4-7': 1_000_000,
+			'claude-fable-5': 1_000_000,
+			'anthropic/claude-fable-5': 1_000_000,
+			'~anthropic/claude-fable-latest': 1_000_000,
+			'openai/gpt-5.5-instant': 400_000,
+			'gpt-5.5-instant': 400_000,
+			'google/gemini-4-ultra': 1_000_000,
+		},
+	)).toEqual([
+		{ provider: 'Anthropic', model: 'claude-fable-5', context: 1_000_000 },
+		{ provider: 'OpenAI', model: 'gpt-5.5-instant', context: 400_000 },
+	])
+})
+
+
 test('refreshModels treats missing cache as initial fetch without change spam', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir

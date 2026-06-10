@@ -130,6 +130,12 @@ interface AliasUpdateSuggestion {
 	newModel: string
 }
 
+interface ModelDiscovery {
+	provider: 'Anthropic' | 'OpenAI'
+	model: string
+	context: number
+}
+
 interface ModelCandidate {
 	canonical: string
 	version: number[]
@@ -176,6 +182,35 @@ function isRelevantModelId(id: string): boolean {
 	if (/(^|\/)codex-[a-z0-9.-]+/.test(id)) return true
 	if (/(^|\/)claude-[a-z0-9-]+/.test(id)) return true
 	return false
+}
+
+function discoveryModelInfo(id: string): { provider: 'Anthropic' | 'OpenAI'; model: string } | null {
+	let text = id.startsWith('~') ? id.slice(1) : id
+	if (text.startsWith('anthropic/')) text = text.slice('anthropic/'.length)
+	else if (text.startsWith('openai/')) text = text.slice('openai/'.length)
+	else if (text.includes('/')) return null
+	if (text.includes('latest')) return null
+	if (/^claude-[a-z0-9-]+$/.test(text)) return { provider: 'Anthropic', model: text }
+	if (/^(gpt-[a-z0-9.-]+|o\d[a-z0-9.-]*|codex-[a-z0-9.-]+)$/.test(text)) return { provider: 'OpenAI', model: text }
+	return null
+}
+
+function modelDiscoveries(previous: Record<string, number>, next: Record<string, number>): ModelDiscovery[] {
+	const old = new Set<string>()
+	for (const id of Object.keys(previous)) {
+		const info = discoveryModelInfo(id)
+		if (info) old.add(`${info.provider}/${info.model}`)
+	}
+	const found = new Map<string, ModelDiscovery>()
+	for (const [id, context] of Object.entries(next)) {
+		const info = discoveryModelInfo(id)
+		if (!info) continue
+		const key = `${info.provider}/${info.model}`
+		if (old.has(key)) continue
+		const existing = found.get(key)
+		if (!existing || context > existing.context) found.set(key, { ...info, context })
+	}
+	return [...found.values()].sort((a, b) => `${a.provider}/${a.model}`.localeCompare(`${b.provider}/${b.model}`))
 }
 
 function modelFamilyLabel(id: string): string {
@@ -558,5 +593,6 @@ export const models = {
 	refreshModels,
 	modelChangeMessages,
 	aliasUpdateSuggestions,
+	modelDiscoveries,
 	frontierModelInfo,
 }

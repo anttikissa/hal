@@ -771,6 +771,122 @@ test('suggestAliasUpdates emits one synthetic notice, preferring an open ~/.hal 
 })
 
 
+test('suggestModelDiscoveries emits a prominent synthetic notice for new Anthropic and OpenAI models', () => {
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
+	const origCurrentSessionId = runtime.state.currentSessionId
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origAppendHistorySync = sessions.appendHistorySync
+	const origAppendEvent = ipc.appendEvent
+	const histories: any[] = []
+	const events: any[] = []
+
+	runtime.state.openSessionIds = ['04-work', '04-hal']
+	runtime.state.currentSessionId = '04-work'
+	sessions.loadSessionMeta = (sessionId: string) => {
+		const cwd = sessionId === '04-hal' ? HAL_DIR : '/work/project'
+		return { id: sessionId, createdAt: '2026-05-20T10:00:00.000Z', workingDir: cwd, model: 'openai/gpt-5.5' }
+	}
+	sessions.appendHistorySync = (sessionId: string, entries: any[]) => {
+		histories.push({ sessionId, entries })
+	}
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		runtime.suggestModelDiscoveries(
+			{ 'claude-opus-4-7': 1_000_000 },
+			{
+				'claude-opus-4-7': 1_000_000,
+				'claude-fable-5': 1_000_000,
+				'anthropic/claude-fable-5': 1_000_000,
+				'openai/gpt-5.5-instant': 400_000,
+			},
+		)
+		expect(histories).toHaveLength(1)
+		expect(events).toHaveLength(1)
+		expect(histories[0].sessionId).toBe('04-work')
+		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-work', synthetic: true })
+		expect(events[0].text).toContain('🚨 New Anthropic/OpenAI models detected')
+		expect(events[0].text).toContain('claude-fable-5')
+		expect(events[0].text).toContain('gpt-5.5-instant')
+		expect(events[0].text).toContain('update model aliases')
+	} finally {
+		runtime.state.openSessionIds = origOpenSessionIds
+		runtime.state.currentSessionId = origCurrentSessionId
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.appendHistorySync = origAppendHistorySync
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
+test('suggestModelDiscoveries opens a new Hal tab when focused session will resume after restart', () => {
+	const base = mkdtempSync(join(tmpdir(), 'hal-model-discovery-'))
+	const prevState = process.env.HAL_STATE_DIR
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
+	const origCurrentSessionId = runtime.state.currentSessionId
+	const origStopPromptWatch = runtime.state.stopPromptWatch
+	const origIsWorking = agentLoop.isWorking
+	const origAppendEvent = ipc.appendEvent
+	const origUpdateState = ipc.updateState
+	const origWatchPromptFiles = context.watchPromptFiles
+	const events: any[] = []
+	const shared: any = { sessions: [], working: {}, updatedAt: '' }
+
+	process.env.HAL_STATE_DIR = base
+	sessions.deactivateAllSessions()
+	sessions.createSession('04-busy', {
+		id: '04-busy',
+		workingDir: '/work/current',
+		createdAt: '2026-05-20T10:00:00.000Z',
+		model: 'openai/gpt-5.5',
+	})
+	runtime.state.openSessionIds = ['04-busy']
+	runtime.state.currentSessionId = '04-busy'
+	runtime.state.stopPromptWatch = null
+	agentLoop.isWorking = () => false
+	sessions.appendHistorySync('04-busy', [
+		{ type: 'user', parts: [{ type: 'text', text: 'keep going' }], ts: '2026-05-20T10:00:01.000Z' },
+		{ type: 'log', text: '[restarted]', ts: '2026-05-20T10:00:02.000Z' },
+	])
+	ipc.appendEvent = (event: any) => { events.push(event) }
+	ipc.updateState = ((mutator: (state: any) => void) => {
+		mutator(shared)
+		return shared
+	}) as typeof ipc.updateState
+	context.watchPromptFiles = (() => () => {}) as typeof context.watchPromptFiles
+
+	try {
+		runtime.suggestModelDiscoveries({}, { 'claude-fable-5': 1_000_000 })
+		const childId = runtime.state.openSessionIds[1]
+		expect(childId).toBeDefined()
+		if (!childId) throw new Error('expected model discovery tab')
+		expect(runtime.state.currentSessionId).toBe(childId)
+		const child = sessions.loadSessionMeta(childId!)
+		expect(child?.workingDir).toBe(HAL_DIR)
+		expect(child?.name).toBe('new models')
+		expect(events[0]).toMatchObject({ type: 'response', sessionId: childId, synthetic: true })
+		expect(events[0].text).toContain('Claude Fable 5')
+		expect(shared.sessions.some((item: any) => item.id === childId)).toBe(true)
+	} finally {
+		runtime.state.openSessionIds = origOpenSessionIds
+		runtime.state.currentSessionId = origCurrentSessionId
+		const stopPromptWatch = runtime.state.stopPromptWatch as (() => void) | null
+		if (stopPromptWatch) stopPromptWatch()
+		runtime.state.stopPromptWatch = origStopPromptWatch
+		agentLoop.isWorking = origIsWorking
+		ipc.appendEvent = origAppendEvent
+		ipc.updateState = origUpdateState
+		context.watchPromptFiles = origWatchPromptFiles
+		sessions.deactivateAllSessions()
+		rmSync(base, { recursive: true, force: true })
+		if (prevState === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = prevState
+	}
+})
+
+
 test('resolveResumeTarget matches a closed session by name case-insensitively', () => {
 	const picked = sessions.resolveResumeTarget(
 		[

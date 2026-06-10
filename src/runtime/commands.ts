@@ -646,6 +646,8 @@ handlers['check'] = async (args, session, hooks) => {
 		if (checked.result.hadCache) {
 			const updates = models.aliasUpdateSuggestions(checked.result.previous, checked.result.next)
 			if (updates.length > 0) lines.push('', modelRefresh.buildAliasUpdateSuggestionText(updates, session.cwd))
+			const discoveries = models.modelDiscoveries(checked.result.previous, checked.result.next)
+			if (discoveries.length > 0) lines.push('', modelRefresh.buildNewModelDiscoveryText(discoveries, session.cwd))
 		}
 		return { output: lines.join('\n'), handled: true }
 	} catch (err: any) {
