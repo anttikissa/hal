@@ -3,6 +3,7 @@ import { colors } from '../cli/colors.ts'
 import { popup } from './popup.ts'
 import { visLen } from '../utils/strings.ts'
 import type { KeyEvent } from '../cli/keys.ts'
+import { models } from '../models.ts'
 
 colors.init()
 function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
@@ -11,6 +12,7 @@ function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 
 beforeEach(() => {
 	popup.close()
+	models.state.cache = {}
 })
 
 describe('popup', () => {
@@ -30,16 +32,43 @@ describe('popup', () => {
 	})
 
 
-	test('model picker maps older GPT sessions to the gpt row', () => {
+	test('model picker selects the visible GPT version for older GPT sessions', () => {
 		popup.openModelPicker(() => {}, 'openai/gpt-5.4')
-		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('gpt')
+		expect(popup.state.items[popup.state.selectedIndex]?.value).toBe('gpt-5.4')
 		const overlay = popup.buildOverlay(120, 30)
 		expect(overlay).not.toBeNull()
-		const selectedLine = overlay!.lines.find((line) => line.includes('GPT 5.5'))
+		const selectedLine = overlay!.lines.find((line) => line.includes('GPT 5.4'))
 		expect(colors.popup.current.bg).not.toBe('')
 		expect(colors.popup.current.fg).not.toBe('')
 		expect(selectedLine).toContain(colors.popup.current.bg)
 		expect(selectedLine).toContain(colors.popup.current.fg)
+	})
+
+	test('model picker shows tree hints and opens or closes categories with arrows', () => {
+		models.state.cache = {
+			'claude-sonnet-4-5': 1_000_000,
+		}
+		popup.openModelPicker(() => {})
+		let overlay = popup.buildOverlay(120, 30)
+		expect(overlay).not.toBeNull()
+		let clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).join('\n')
+		expect(clean).toContain('right opens category')
+		expect(clean).toContain('left closes category')
+		expect(clean).toContain('▸ sonnet')
+		expect(clean).not.toContain('Sonnet 4.5')
+
+		popup.state.selectedIndex = popup.state.items.findIndex((item) => item.label.includes('sonnet'))
+		popup.handleKey(key('right'))
+		overlay = popup.buildOverlay(120, 30)
+		clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).join('\n')
+		expect(clean).toContain('▾ sonnet')
+		expect(clean).toContain('Sonnet 4.5')
+
+		popup.handleKey(key('left'))
+		overlay = popup.buildOverlay(120, 30)
+		clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).join('\n')
+		expect(clean).toContain('▸ sonnet')
+		expect(clean).not.toContain('Sonnet 4.5')
 	})
 
 	test('warning popup uses the same highlighted row layout', () => {

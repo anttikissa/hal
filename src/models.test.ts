@@ -111,16 +111,23 @@ test('model picker and aliases use newest cached Anthropic and OpenAI models aut
 })
 
 
-test('models.dev Anthropic and OpenAI entries become usable even without static aliases', () => {
+test('models.dev Anthropic and OpenAI entries resolve without polluting picker choices', () => {
 	models.state.cache = {
 		'claude-lyric-6': 1_000_000,
+		'claude-opus-3-20240229': 200_000,
+		'gpt-5.5-thinking': 1_000_000,
+		'gpt-5.5-fast': 1_000_000,
 		'o5': 200_000,
 	}
 
 	expect(models.resolveModel('claude-lyric-6')).toBe('anthropic/claude-lyric-6')
 	expect(models.resolveModel('o5')).toBe('openai/o5')
-	expect(models.listModelChoices().find((item) => item.value === 'claude-lyric-6')).toMatchObject({ search: expect.stringContaining('anthropic/claude-lyric-6') })
-	expect(models.listModelChoices().find((item) => item.value === 'o5')).toMatchObject({ search: expect.stringContaining('openai/o5') })
+	const values = models.listModelChoices().map((item) => item.value)
+	expect(values).not.toContain('claude-lyric-6')
+	expect(values).not.toContain('claude-opus-3-20240229')
+	expect(values).not.toContain('gpt-5.5-thinking')
+	expect(values).not.toContain('gpt-5.5-fast')
+	expect(values).not.toContain('o5')
 })
 
 

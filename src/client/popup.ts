@@ -10,6 +10,16 @@ import type { KeyEvent } from '../cli/keys.ts'
 interface PopupItem {
 	value: string
 	label: string
+	kind: 'model' | 'category'
+	path?: string
+	choice?: ReturnType<typeof models.listModelChoices>[number]
+}
+
+interface ModelTreeNode {
+	name: string
+	path: string
+	children: ModelTreeNode[]
+	choice?: ReturnType<typeof models.listModelChoices>[number]
 }
 
 interface Overlay {
@@ -31,9 +41,10 @@ const state = {
 	selectedIndex: 0,
 	onChoose: null as ((value: string) => void) | null,
 	preferredInnerWidth: null as number | null,
+	openModelCategories: new Set<string>(),
 }
 
-const MODEL_CHOICES = models.listModelChoices()
+const DEFAULT_OPEN_MODEL_CATEGORIES = ['openai', 'openai/gpt', 'anthropic', 'anthropic/fable', 'anthropic/opus']
 const MODEL_PICKER_INNER_WIDTH = 72
 const RESET = '\x1b[0m'
 
@@ -46,28 +57,79 @@ function close(): void {
 	state.selectedIndex = 0
 	state.onChoose = null
 	state.preferredInnerWidth = null
+	state.openModelCategories = new Set()
 	editor.clear()
+}
+
+function resetOpenModelCategories(): void {
+	state.openModelCategories = new Set(DEFAULT_OPEN_MODEL_CATEGORIES)
+}
+
+function modelCategoryLabel(name: string, depth: number, open: boolean): string {
+	return `${'  '.repeat(depth)}${open ? '▾' : '▸'} ${name}`
+}
+
+function modelLeafLabel(choice: ReturnType<typeof models.listModelChoices>[number], depth: number): string {
+	return `${'  '.repeat(depth)}  ${choice.leafLabel.padEnd(12)} ${choice.display} · ${choice.fullId}`
+}
+
+function treeChild(parent: ModelTreeNode, name: string, path: string): ModelTreeNode {
+	let child = parent.children.find((node) => node.name === name && !node.choice)
+	if (!child) {
+		child = { name, path, children: [] }
+		parent.children.push(child)
+	}
+	return child
+}
+
+function buildModelTree(choices: ReturnType<typeof models.listModelChoices>): ModelTreeNode {
+	const root: ModelTreeNode = { name: '', path: '', children: [] }
+	for (const choice of choices) {
+		let parent = root
+		let path = ''
+		for (const part of choice.path) {
+			path = path ? `${path}/${part}` : part
+			parent = treeChild(parent, part, path)
+		}
+		parent.children.push({ name: choice.leafLabel, path: `${path}/${choice.value}`, children: [], choice })
+	}
+	return root
+}
+
+function addModelTreeRows(rows: PopupItem[], node: ModelTreeNode, depth: number): void {
+	for (const child of node.children) {
+		if (child.choice) {
+			rows.push({ value: child.choice.value, label: modelLeafLabel(child.choice, depth), kind: 'model', choice: child.choice })
+			continue
+		}
+		const open = state.openModelCategories.has(child.path)
+		rows.push({ value: `category:${child.path}`, label: modelCategoryLabel(child.name, depth, open), kind: 'category', path: child.path })
+		if (open) addModelTreeRows(rows, child, depth + 1)
+	}
 }
 
 function refreshModelItems(): void {
 	const query = editor.text().trim().toLowerCase()
-	const matches = MODEL_CHOICES.filter((item) => item.search.includes(query))
-	state.items = matches.map((item) => ({ value: item.value, label: item.label }))
+	const choices = models.listModelChoices()
+	if (query) {
+		const matches = choices.filter((item) => item.search.includes(query))
+		state.items = matches.map((item) => ({ value: item.value, label: item.label, kind: 'model', choice: item }))
+	} else {
+		const rows: PopupItem[] = []
+		addModelTreeRows(rows, buildModelTree(choices), 0)
+		state.items = rows
+	}
 	if (state.selectedIndex >= state.items.length) state.selectedIndex = Math.max(0, state.items.length - 1)
 }
 
-function fallbackModelChoiceIndex(target: string): number {
-	// The picker only shows one friendly alias for the GPT family. When an older
-	// session still points at gpt-5.4, prefer the current "gpt" row instead of
-	// jumping to the first model in the list.
-	if (target.startsWith('openai/gpt-') && !target.includes('codex')) {
-		return MODEL_CHOICES.findIndex((item) => item.value === 'gpt')
-	}
-	return -1
+function selectModelValue(target: string): void {
+	const index = state.items.findIndex((item) => item.kind === 'model' && models.resolveModel(item.value) === target)
+	if (index >= 0) state.selectedIndex = index
 }
 
 function openModelPicker(onChoose: (value: string) => void, currentModel?: string): void {
 	close()
+	resetOpenModelCategories()
 	state.active = true
 	state.kind = 'model'
 	state.title = 'Pick a model'
@@ -75,11 +137,7 @@ function openModelPicker(onChoose: (value: string) => void, currentModel?: strin
 	state.onChoose = onChoose
 	state.preferredInnerWidth = MODEL_PICKER_INNER_WIDTH
 	refreshModelItems()
-	const target = currentModel ? models.resolveModel(currentModel) : ''
-	const match = target ? MODEL_CHOICES.findIndex((item) => models.resolveModel(item.value) === target) : -1
-	const fallback = match >= 0 || !target ? -1 : fallbackModelChoiceIndex(target)
-	if (match >= 0) state.selectedIndex = match
-	else if (fallback >= 0) state.selectedIndex = fallback
+	if (currentModel) selectModelValue(models.resolveModel(currentModel))
 }
 
 function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void, tone: 'warning' | 'danger' = 'warning'): void {
@@ -89,7 +147,7 @@ function openConfirm(title: string, body: string[], choices: string[], onChoose:
 	state.title = title
 	state.tone = tone
 	state.body = body
-	state.items = choices.map((choice) => ({ value: choice, label: choice }))
+	state.items = choices.map((choice) => ({ value: choice, label: choice, kind: 'model' }))
 	state.onChoose = onChoose
 }
 
@@ -98,9 +156,27 @@ function cycle(dir: 1 | -1): void {
 	state.selectedIndex = (state.selectedIndex + dir + state.items.length) % state.items.length
 }
 
+function setSelectedCategoryOpen(open: boolean): boolean {
+	const item = state.items[state.selectedIndex]
+	if (!item || item.kind !== 'category' || !item.path) return false
+	const wasOpen = state.openModelCategories.has(item.path)
+	if (open === wasOpen) return false
+	if (open) state.openModelCategories.add(item.path)
+	else state.openModelCategories.delete(item.path)
+	const selectedPath = item.path
+	refreshModelItems()
+	const nextIndex = state.items.findIndex((row) => row.kind === 'category' && row.path === selectedPath)
+	if (nextIndex >= 0) state.selectedIndex = nextIndex
+	return true
+}
+
 function chooseSelected(): void {
 	const item = state.items[state.selectedIndex]
 	if (!item || !state.onChoose) return
+	if (item.kind === 'category') {
+		if (!setSelectedCategoryOpen(!state.openModelCategories.has(item.path ?? ''))) setSelectedCategoryOpen(true)
+		return
+	}
 	const onChoose = state.onChoose
 	close()
 	onChoose(item.value)
@@ -126,6 +202,12 @@ function handleKey(k: KeyEvent): boolean {
 	}
 	if (k.key === 'up') {
 		cycle(-1)
+		return true
+	}
+	if (state.kind === 'model' && k.key === 'right' && setSelectedCategoryOpen(true)) {
+		return true
+	}
+	if (state.kind === 'model' && k.key === 'left' && setSelectedCategoryOpen(false)) {
 		return true
 	}
 	if (state.kind === 'model' && editor.handleKey(k)) {
@@ -195,6 +277,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	if (state.kind === 'model') {
 		const built = editor.buildLine()
 		bodyContent.push({ text: `> ${built.line}`, active: false })
+		bodyContent.push({ text: 'hint: right opens category · left closes category', active: false })
 		bodyContent.push({ text: '', active: false })
 		inputCursor = { row: 1, col: 4 + built.cursor }
 	}

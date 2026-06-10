@@ -299,7 +299,7 @@ function parseClaudeCandidate(tier: 'opus' | 'sonnet' | 'haiku' | 'fable', model
 	if (!match) return null
 	const major = Number(match[1])
 	const minor = Number(match[3] ?? 0)
-	const canonical = match[3] ? `claude-${tier}-${major}-${minor}` : `claude-${tier}-${major}`
+	const canonical = minor > 0 ? `claude-${tier}-${major}-${minor}` : `claude-${tier}-${major}`
 	return { canonical, version: [major, minor], stability: match[3] ? 2 : match[2] ? 0 : 1 }
 }
 
@@ -533,6 +533,16 @@ interface ModelEntry {
 	static: boolean
 }
 
+interface ModelChoice {
+	value: string
+	label: string
+	search: string
+	path: string[]
+	leafLabel: string
+	display: string
+	fullId: string
+}
+
 const MODEL_GROUPS: ModelGroup[] = [
 	{
 		label: 'Anthropic',
@@ -600,6 +610,102 @@ function addModelCompletionNames(names: Set<string>, model: ModelEntry): void {
 	if (grok) names.add(`grok-${grok[1]}`)
 }
 
+function allKnownModelIds(): string[] {
+	const ids = new Set<string>()
+	for (const id of Object.keys(FALLBACK_WINDOWS)) ids.add(id)
+	for (const id of Object.keys(loadModelsDevCache())) {
+		const info = discoveryModelInfo(id)
+		if (!info) continue
+		ids.add(`${providerId(info.provider)}/${info.model}`)
+	}
+	return [...ids]
+}
+
+function bareModelId(fullId: string): string {
+	return fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+}
+
+function curatedCandidates(parse: (modelId: string) => ModelCandidate | null, minMajor: number): ModelCandidate[] {
+	const best = new Map<string, ModelCandidate>()
+	for (const fullId of allKnownModelIds()) {
+		const candidate = parse(bareModelId(fullId))
+		if (!candidate) continue
+		if ((candidate.version[0] ?? 0) < minMajor) continue
+		const existing = best.get(candidate.canonical)
+		if (!existing || compareCandidates(candidate, existing) > 0) best.set(candidate.canonical, candidate)
+	}
+	return [...best.values()].sort(compareCandidates)
+}
+
+function modelChoiceLabel(value: string, display: string, fullId: string): string {
+	return `${value.padEnd(18)} ${display} · ${fullId}`
+}
+
+function addModelChoice(items: ModelChoice[], value: string, fullId: string, path: string[], leafLabel: string): void {
+	const display = displayModel(fullId)
+	items.push({
+		value,
+		label: modelChoiceLabel(value, display, fullId),
+		search: `${path.join(' ')} ${leafLabel} ${value} ${fullId} ${display}`.toLowerCase(),
+		path,
+		leafLabel,
+		display,
+		fullId,
+	})
+}
+
+function versionLeaf(version: number[], forceMinor: boolean): string {
+	const major = version[0] ?? 0
+	const minor = version[1] ?? 0
+	if (forceMinor || minor > 0) return `${major}.${minor}`
+	return String(major)
+}
+
+function anthropicChoiceValue(tier: 'opus' | 'sonnet' | 'haiku' | 'fable', fullId: string, canonical: string): string {
+	if (aliasFullId(tier) === fullId) return tier
+	return `${tier}-${canonical.slice(`claude-${tier}-`.length)}`
+}
+
+function addAnthropicChoices(items: ModelChoice[]): void {
+	const tiers: Array<{ tier: 'fable' | 'opus' | 'sonnet' | 'haiku'; minMajor: number }> = [
+		{ tier: 'fable', minMajor: 5 },
+		{ tier: 'opus', minMajor: 4 },
+		{ tier: 'sonnet', minMajor: 4 },
+		{ tier: 'haiku', minMajor: 4 },
+	]
+	for (const { tier, minMajor } of tiers) {
+		const candidates = curatedCandidates((id) => parseClaudeCandidate(tier, id), minMajor)
+		for (const candidate of candidates) {
+			const fullId = `anthropic/${candidate.canonical}`
+			const value = anthropicChoiceValue(tier, fullId, candidate.canonical)
+			addModelChoice(items, value, fullId, ['anthropic', tier], versionLeaf(candidate.version, tier !== 'fable'))
+		}
+	}
+}
+
+function addOpenAiChoices(items: ModelChoice[]): void {
+	for (const candidate of curatedCandidates(parseCodexCandidate, 5)) {
+		const fullId = `openai/${candidate.canonical}`
+		const value = aliasFullId('codex') === fullId ? 'codex' : candidate.canonical
+		addModelChoice(items, value, fullId, ['openai', 'gpt'], `${versionLeaf(candidate.version, true)}-codex`)
+	}
+	for (const candidate of curatedCandidates(parseGptCandidate, 5)) {
+		const fullId = `openai/${candidate.canonical}`
+		const value = aliasFullId('gpt') === fullId ? 'gpt' : candidate.canonical
+		addModelChoice(items, value, fullId, ['openai', 'gpt'], versionLeaf(candidate.version, true))
+	}
+	addModelChoice(items, 'instant', aliasFullId('instant') ?? ALIASES.instant!, ['openai', 'gpt'], 'instant')
+}
+
+function addStaticProviderChoices(items: ModelChoice[], groupLabel: string, providerPath: string): void {
+	const group = MODEL_GROUPS.find((g) => g.label === groupLabel)
+	if (!group) return
+	for (const model of group.models) {
+		const fullId = aliasFullId(model.alias) ?? model.fullId
+		addModelChoice(items, model.alias, fullId, [providerPath], model.alias)
+	}
+}
+
 function listModels(): string[] {
 	const lines: string[] = []
 	for (const group of MODEL_GROUPS) {
@@ -613,18 +719,12 @@ function listModels(): string[] {
 	return lines
 }
 
-function listModelChoices(): Array<{ value: string; label: string; search: string }> {
-	const items: Array<{ value: string; label: string; search: string }> = []
-	for (const group of MODEL_GROUPS) {
-		for (const model of groupModelEntries(group)) {
-			const label = `${model.alias.padEnd(18)} ${displayModel(model.fullId)} · ${model.fullId}`
-			items.push({
-				value: model.alias,
-				label,
-				search: `${group.label} ${model.alias} ${model.fullId} ${displayModel(model.fullId)}`.toLowerCase(),
-			})
-		}
-	}
+function listModelChoices(): ModelChoice[] {
+	const items: ModelChoice[] = []
+	addOpenAiChoices(items)
+	addAnthropicChoices(items)
+	addStaticProviderChoices(items, 'Google', 'google')
+	addStaticProviderChoices(items, 'OpenRouter', 'openrouter')
 	return items
 }
 

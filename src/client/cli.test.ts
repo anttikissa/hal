@@ -238,7 +238,7 @@ test('model picker keeps the prompt draft after choosing a model', () => {
 				const chosen = popup.handleKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 				expect(chosen).toBe(true)
 
-				expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: '/model gpt' })])
+				expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: '/model gpt-5.4' })])
 				expect(prompt.text()).toBe('draft prompt')
 			} finally {
 				ipc.appendCommand = origAppendCommand
