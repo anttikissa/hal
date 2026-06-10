@@ -836,6 +836,18 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 		await runtime.startSpawnedSession(parent, interactiveChild, interactiveSpec)
 		const interactiveHistory = sessions.loadHistory(interactiveChild.id)
 		expect(interactiveHistory.some((entry) => entry.type === 'user')).toBe(false)
+
+		const promptedInteractiveSpec = {
+			task: 'MAKE MODEL PICKER GREAT AGAIN',
+			kind: 'interactive' as const,
+			mode: 'fresh' as const,
+			title: 'Prompted tab',
+		}
+		const promptedInteractiveChild = await runtime.spawnSession(parent, promptedInteractiveSpec)
+		await runtime.startSpawnedSession(parent, promptedInteractiveChild, promptedInteractiveSpec)
+		const promptedInteractiveHistory = sessions.loadHistory(promptedInteractiveChild.id)
+		expect(promptedInteractiveHistory.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('MAKE MODEL PICKER GREAT AGAIN'))).toBe(true)
+		expect(queued).toHaveLength(0)
 	} finally {
 		ipc.appendCommand = origAppendCommand
 		agentLoop.runAgentLoop = origRunAgentLoop

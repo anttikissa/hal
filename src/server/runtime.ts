@@ -278,7 +278,10 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 }
 
 async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec: SpawnSpec): Promise<void> {
-	if (spec.kind === 'interactive') return
+	if (spec.kind === 'interactive') {
+		if (spec.task.trim()) await dispatchPromptCommand(child.id, spec.task, parent.id)
+		return
+	}
 	await dispatchPromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, spec.kind), parent.id)
 }
 function restartPromptWatch(): void {

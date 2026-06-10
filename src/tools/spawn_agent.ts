@@ -26,11 +26,15 @@ function plannedChildTab(parentSessionId: string): number | undefined {
 	return parentIndex + 2
 }
 
-function spawnResult(childSessionId: string, parentSessionId: string, kind: SpawnKind): string {
+function spawnResult(childSessionId: string, parentSessionId: string, kind: SpawnKind, hasTask: boolean): string {
 	const tab = plannedChildTab(parentSessionId)
-	const label = kind === 'interactive' ? 'interactive session' : 'subagent spawn'
-	if (tab) return `Queued ${label} ${childSessionId} to tab ${tab} from ${parentSessionId}`
-	return `Queued ${label} ${childSessionId} from ${parentSessionId}`
+	if (kind === 'interactive') {
+		const action = hasTask ? 'and sent initial prompt' : 'blank'
+		if (tab) return `Opened interactive session ${childSessionId} in tab ${tab} ${action}.`
+		return `Opened interactive session ${childSessionId} ${action}.`
+	}
+	if (tab) return `Queued subagent spawn ${childSessionId} to tab ${tab} from ${parentSessionId}`
+	return `Queued subagent spawn ${childSessionId} from ${parentSessionId}`
 }
 
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
@@ -43,16 +47,16 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 		sessionId: ctx.sessionId,
 		spawn,
 	})
-	return spawnResult(childSessionId, ctx.sessionId, spec.kind)
+	return spawnResult(childSessionId, ctx.sessionId, spec.kind, !!spec.task)
 }
 
 const spawnAgentTool: Tool = {
 	name: 'spawn_agent',
 	description:
-		'Spawn a subagent tab or open an interactive session. Subagents can fork the current session or start fresh; interactive sessions open without an initial prompt.',
+		'Spawn a subagent tab or open an interactive session. Interactive sessions are blank without a task; with a task, Hal sends it as the first visible user prompt immediately.',
 	parameters: {
-		task: { type: 'string', description: 'What the subagent should do. Required unless kind is interactive.' },
-		kind: { type: 'string', enum: ['subagent', 'subagent-autoclose', 'interactive'], description: 'subagent sends a handoff and stays open; subagent-autoclose closes after the handoff; interactive opens an idle session for the user.' },
+		task: { type: 'string', description: 'What the spawned session should do. Required for subagents; optional for interactive sessions.' },
+		kind: { type: 'string', enum: ['subagent', 'subagent-autoclose', 'interactive'], description: 'subagent sends a handoff and stays open; subagent-autoclose closes after the handoff; interactive opens a user-visible session and runs task when provided.' },
 		mode: { type: 'string', enum: ['fork', 'fresh'], description: 'Whether to fork this session or start with fresh context.' },
 		model: { type: 'string', description: 'Optional model override for the child session.' },
 		cwd: { type: 'string', description: 'Optional working directory override for the child session.' },

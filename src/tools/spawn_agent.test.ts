@@ -106,12 +106,43 @@ test('spawn_agent can open an interactive session without a task', async () => {
 	)
 	const spawn = appended[0]?.spawn
 
-	expect(result).toContain('Queued interactive session')
+	expect(result).toContain('Opened interactive session')
+	expect(result).toContain('blank')
 	expect(spawn).toMatchObject({
 		task: '',
 		kind: 'interactive',
 		mode: 'fresh',
 		cwd: '/tmp/project',
 		title: 'Scratch',
+	})
+})
+
+
+test('spawn_agent sends an initial prompt to interactive sessions when task is provided', async () => {
+	useTempStateDir()
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+	ipc.readState = () => ({
+		sessions: [{ id: '04-parent', tab: 24, cwd: '/tmp/project' }],
+		working: {},
+		updatedAt: new Date().toISOString(),
+	})
+
+	const result = await spawnAgent.execute(
+		{ task: 'MAKE MODEL PICKER GREAT AGAIN', kind: 'interactive', mode: 'fresh', title: 'fix picker' },
+		{ sessionId: '04-parent', cwd: '/tmp/project' },
+	)
+	const spawn = appended[0]?.spawn
+
+	expect(result).toContain('Opened interactive session')
+	expect(result).toContain('tab 25')
+	expect(result).toContain('sent initial prompt')
+	expect(spawn).toMatchObject({
+		task: 'MAKE MODEL PICKER GREAT AGAIN',
+		kind: 'interactive',
+		mode: 'fresh',
+		title: 'fix picker',
 	})
 })
