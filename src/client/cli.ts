@@ -491,6 +491,11 @@ function sendTabCommandIfRoom(type: 'open' | 'resume', text?: string): void {
 }
 
 function chooseModelWithoutClearingDraft(model: string): void {
+	const tab = client.currentTab()
+	if (tab && models.resolveModel(model) === models.resolveModel(tab.model ?? models.defaultModel())) {
+		draw()
+		return
+	}
 	client.sendCommand('prompt', `/model ${model}`)
 	openaiUsage.noteActivity()
 	draw()

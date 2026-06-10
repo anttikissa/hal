@@ -15,6 +15,7 @@ interface PopupItem {
 	parentPath?: string
 	choice?: ReturnType<typeof models.listModelChoices>[number]
 	defaultChoice?: ReturnType<typeof models.listModelChoices>[number]
+	isCurrent?: boolean
 }
 
 interface ModelTreeNode {
@@ -68,6 +69,11 @@ function close(): void {
 
 function resetOpenModelCategories(): void {
 	state.openModelCategories = new Set(DEFAULT_OPEN_MODEL_CATEGORIES)
+}
+
+function isCurrentModelChoice(choice: ReturnType<typeof models.listModelChoices>[number] | undefined): boolean {
+	if (!choice || !state.currentModel) return false
+	return choice.fullId === state.currentModel || models.resolveModel(choice.value) === state.currentModel
 }
 
 function defaultLabel(choice: ReturnType<typeof models.listModelChoices>[number]): string {
@@ -138,7 +144,7 @@ function buildModelTree(choices: ReturnType<typeof models.listModelChoices>): Mo
 function addModelTreeRows(rows: PopupItem[], node: ModelTreeNode, depth: number): void {
 	for (const child of node.children) {
 		if (child.choice) {
-			rows.push({ value: child.choice.value, label: modelLeafLabel(child.choice, depth), kind: 'model', parentPath: node.path, choice: child.choice })
+			rows.push({ value: child.choice.value, label: modelLeafLabel(child.choice, depth), kind: 'model', parentPath: node.path, choice: child.choice, isCurrent: isCurrentModelChoice(child.choice) })
 			continue
 		}
 		const open = state.openModelCategories.has(child.path)
@@ -152,7 +158,7 @@ function refreshModelItems(): void {
 	const choices = models.listModelChoices()
 	if (query) {
 		const matches = choices.filter((item) => item.search.includes(query))
-		state.items = matches.map((item) => ({ value: item.value, label: item.label, kind: 'model', choice: item }))
+		state.items = matches.map((item) => ({ value: item.value, label: item.label, kind: 'model', choice: item, isCurrent: isCurrentModelChoice(item) }))
 	} else {
 		const rows: PopupItem[] = []
 		addModelTreeRows(rows, buildModelTree(choices), 0)
@@ -282,7 +288,8 @@ function toneColor(): string {
 }
 
 function rowText(item: PopupItem, active: boolean): string {
-	return active ? `[${item.label}]` : ` ${item.label}`
+	if (active) return item.isCurrent ? `[*${item.label}]` : `[${item.label}]`
+	return `${item.isCurrent ? '*' : ' '}${item.label}`
 }
 
 function pad(text: string, width: number): string {
@@ -365,7 +372,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	let inputCursor: { row: number; col: number } | null = null
 	if (state.kind === 'model') {
 		const built = editor.buildLine()
-		inputCursor = { row: bodyContent.length, col: 4 + built.cursor }
+		inputCursor = { row: bodyContent.length + 1, col: 4 + built.cursor }
 		bodyContent.push({ text: `> ${built.line}`, active: false })
 		bodyContent.push({ text: '', active: false })
 	}

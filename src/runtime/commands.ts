@@ -521,8 +521,9 @@ handlers['model'] = (args, session) => {
 		return { output: lines.join('\n'), handled: true }
 	}
 
-	const oldModel = session.model ?? models.defaultModel()
+	const oldModel = models.resolveModel(session.model ?? models.defaultModel())
 	const newModel = models.resolveModel(args)
+	if (newModel === oldModel) return { handled: true }
 	session.model = newModel
 	const oldDisplay = models.displayModel(oldModel)
 	const newDisplay = models.displayModel(newModel)

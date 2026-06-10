@@ -222,7 +222,7 @@ test('tab switching preserves the full prompt editor state', () => {
 	}
 })
 
-test('model picker keeps the prompt draft after choosing a model', () => {
+test('model picker keeps the prompt draft and skips unchanged model', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	prompt.setText('draft prompt')
@@ -238,7 +238,7 @@ test('model picker keeps the prompt draft after choosing a model', () => {
 				const chosen = popup.handleKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 				expect(chosen).toBe(true)
 
-				expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: '/model gpt-5.4' })])
+				expect(commands).toEqual([])
 				expect(prompt.text()).toBe('draft prompt')
 			} finally {
 				ipc.appendCommand = origAppendCommand

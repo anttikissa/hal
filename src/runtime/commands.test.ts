@@ -653,6 +653,18 @@ test('/model changes session model and user-visible output', async () => {
 })
 
 
+test('/model is quiet when the resolved model is unchanged', async () => {
+	const session = makeSession()
+	session.model = 'openai/gpt-5.5'
+	const result = await commands.executeCommand('/model gpt', session)
+
+	expect(result.handled).toBe(true)
+	expect(session.model).toBe('openai/gpt-5.5')
+	expect(result.output).toBeUndefined()
+	expect(result.ui).toBeUndefined()
+})
+
+
 test('/cd changes session cwd without command metadata', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-cd-meta-'))
 	const session = makeSession()

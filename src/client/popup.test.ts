@@ -109,6 +109,23 @@ describe('popup', () => {
 		expect(clean[0]).toContain('current: anthropic/claude-fable-5')
 	})
 
+	test('model picker cursor stays on the input row after outer padding', () => {
+		popup.openModelPicker(() => {}, 'openai/gpt-5.5')
+		popup.handleKey({ key: 'o', char: 'o', shift: false, alt: false, ctrl: false, cmd: false })
+		popup.handleKey({ key: 'p', char: 'p', shift: false, alt: false, ctrl: false, cmd: false })
+		const overlay = popup.buildOverlay(120, 30)
+		expect(overlay?.cursor).not.toBeNull()
+		const clean = cleanLines(overlay!.lines)
+		expect(clean[overlay!.cursor!.row - overlay!.y]).toContain('> op')
+	})
+
+	test('model picker marks the current model row', () => {
+		popup.openModelPicker(() => {}, 'anthropic/claude-opus-4-7')
+		const overlay = popup.buildOverlay(120, 30)
+		const clean = cleanLines(overlay!.lines).join('\n')
+		expect(clean).toContain('[*      4.7          Opus 4.7 · anthropic/claude-opus-4-7]')
+	})
+
 	test('warning popup uses the same highlighted row layout', () => {
 		popup.openConfirm('Looks suspicious', ['read auth.ason'], ['Yes', 'No'], () => {})
 		const overlay = popup.buildOverlay(80, 24)
