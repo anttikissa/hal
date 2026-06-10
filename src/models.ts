@@ -171,7 +171,7 @@ function formatContext(n: number): string {
 }
 
 function isRelevantModelId(id: string): boolean {
-	return /(^|\/)gpt-[\d.]+/.test(id) || /(^|\/)claude-(opus|sonnet|haiku)-/.test(id)
+	return /(^|\/)gpt-[\d.]+/.test(id) || /(^|\/)claude-[a-z0-9-]+/.test(id)
 }
 
 function parseVersionParts(text: string): number[] {

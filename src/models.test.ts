@@ -178,6 +178,13 @@ test('refreshModels reports relevant GPT and Claude additions and context change
 })
 
 
+test('modelChangeMessages reports new Claude families such as Fable', () => {
+	expect(models.modelChangeMessages({}, {
+		'claude-fable-5': 1_000_000,
+	})).toContain('new Claude model claude-fable-5 (1000k)')
+})
+
+
 test('refreshModels treats missing cache as initial fetch without change spam', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
 	process.env.HAL_STATE_DIR = dir
