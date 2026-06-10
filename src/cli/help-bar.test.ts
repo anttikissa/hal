@@ -20,11 +20,8 @@ test('restore tab hint is formatted like shortcut hints', () => {
 	expect(text).toBe('ctrl-shift-t: restore tab')
 })
 
-test('working text hints show steer newline queue and pause', () => {
+test('working text hints keep steer and queue adjacent', () => {
 	const text = helpBar.build(true, true)
 
-	expect(text).toContain('enter: steer')
-	expect(text).toContain('shift-enter: newline')
-	expect(text).toContain('alt-enter: queue')
-	expect(text).toContain('esc: pause')
+	expect(text).toBe('enter: steer, alt-enter: queue, shift-enter: newline, esc: pause')
 })

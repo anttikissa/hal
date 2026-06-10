@@ -31,8 +31,8 @@ const HINTS: Partial<Record<HelpState, Hint[]>> = {
 	working: [{ keyLabel: 'esc', description: 'pause' }],
 	'working-text': [
 		{ keyLabel: 'enter', description: 'steer' },
-		{ keyLabel: 'shift-enter', description: 'newline' },
 		{ keyLabel: 'alt-enter', description: 'queue' },
+		{ keyLabel: 'shift-enter', description: 'newline' },
 		{ keyLabel: 'esc', description: 'pause' },
 	],
 }
