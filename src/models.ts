@@ -634,7 +634,7 @@ function curatedCandidates(parse: (modelId: string) => ModelCandidate | null, mi
 		const existing = best.get(candidate.canonical)
 		if (!existing || compareCandidates(candidate, existing) > 0) best.set(candidate.canonical, candidate)
 	}
-	return [...best.values()].sort(compareCandidates)
+	return [...best.values()].sort((a, b) => compareCandidates(b, a))
 }
 
 function modelChoiceLabel(value: string, display: string, fullId: string): string {
@@ -684,16 +684,17 @@ function addAnthropicChoices(items: ModelChoice[]): void {
 }
 
 function addOpenAiChoices(items: ModelChoice[]): void {
-	for (const candidate of curatedCandidates(parseCodexCandidate, 5)) {
-		const fullId = `openai/${candidate.canonical}`
-		const value = aliasFullId('codex') === fullId ? 'codex' : candidate.canonical
-		addModelChoice(items, value, fullId, ['openai', 'gpt'], `${versionLeaf(candidate.version, true)}-codex`)
-	}
+	const choices: Array<{ candidate: ModelCandidate; suffix: string; value: string; fullId: string }> = []
 	for (const candidate of curatedCandidates(parseGptCandidate, 5)) {
 		const fullId = `openai/${candidate.canonical}`
-		const value = aliasFullId('gpt') === fullId ? 'gpt' : candidate.canonical
-		addModelChoice(items, value, fullId, ['openai', 'gpt'], versionLeaf(candidate.version, true))
+		choices.push({ candidate, suffix: versionLeaf(candidate.version, true), value: aliasFullId('gpt') === fullId ? 'gpt' : candidate.canonical, fullId })
 	}
+	for (const candidate of curatedCandidates(parseCodexCandidate, 5)) {
+		const fullId = `openai/${candidate.canonical}`
+		choices.push({ candidate, suffix: `${versionLeaf(candidate.version, true)}-codex`, value: aliasFullId('codex') === fullId ? 'codex' : candidate.canonical, fullId })
+	}
+	choices.sort((a, b) => compareCandidates(b.candidate, a.candidate))
+	for (const choice of choices) addModelChoice(items, choice.value, choice.fullId, ['openai', 'gpt'], choice.suffix)
 	addModelChoice(items, 'instant', aliasFullId('instant') ?? ALIASES.instant!, ['openai', 'gpt'], 'instant')
 }
 

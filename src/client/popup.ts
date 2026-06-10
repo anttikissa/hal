@@ -12,7 +12,9 @@ interface PopupItem {
 	label: string
 	kind: 'model' | 'category'
 	path?: string
+	parentPath?: string
 	choice?: ReturnType<typeof models.listModelChoices>[number]
+	defaultChoice?: ReturnType<typeof models.listModelChoices>[number]
 }
 
 interface ModelTreeNode {
@@ -20,6 +22,7 @@ interface ModelTreeNode {
 	path: string
 	children: ModelTreeNode[]
 	choice?: ReturnType<typeof models.listModelChoices>[number]
+	defaultChoice?: ReturnType<typeof models.listModelChoices>[number]
 }
 
 interface Overlay {
@@ -42,10 +45,11 @@ const state = {
 	onChoose: null as ((value: string) => void) | null,
 	preferredInnerWidth: null as number | null,
 	openModelCategories: new Set<string>(),
+	currentModel: '',
 }
 
 const DEFAULT_OPEN_MODEL_CATEGORIES = ['openai', 'openai/gpt', 'anthropic', 'anthropic/fable', 'anthropic/opus']
-const MODEL_PICKER_INNER_WIDTH = 72
+const MODEL_PICKER_INNER_WIDTH = 90
 const RESET = '\x1b[0m'
 
 function close(): void {
@@ -58,6 +62,7 @@ function close(): void {
 	state.onChoose = null
 	state.preferredInnerWidth = null
 	state.openModelCategories = new Set()
+	state.currentModel = ''
 	editor.clear()
 }
 
@@ -65,8 +70,17 @@ function resetOpenModelCategories(): void {
 	state.openModelCategories = new Set(DEFAULT_OPEN_MODEL_CATEGORIES)
 }
 
-function modelCategoryLabel(name: string, depth: number, open: boolean): string {
-	return `${'  '.repeat(depth)}${open ? '▾' : '▸'} ${name}`
+function defaultLabel(choice: ReturnType<typeof models.listModelChoices>[number]): string {
+	const bare = choice.fullId.includes('/') ? choice.fullId.slice(choice.fullId.indexOf('/') + 1) : choice.fullId
+	const claude = bare.match(/^claude-(opus|sonnet|haiku|fable)-(.+)$/)
+	if (claude) return `${claude[1]}-${claude[2]}`
+	return bare
+}
+
+function modelCategoryLabel(node: ModelTreeNode, depth: number, open: boolean): string {
+	let text = `${'  '.repeat(depth)}${open ? '▼' : '▶'} ${node.name}`
+	if (node.defaultChoice) text += ` (default: ${defaultLabel(node.defaultChoice)})`
+	return text
 }
 
 function modelLeafLabel(choice: ReturnType<typeof models.listModelChoices>[number], depth: number): string {
@@ -82,6 +96,30 @@ function treeChild(parent: ModelTreeNode, name: string, path: string): ModelTree
 	return child
 }
 
+function firstModelChoice(node: ModelTreeNode): ReturnType<typeof models.listModelChoices>[number] | undefined {
+	if (node.choice) return node.choice
+	for (const child of node.children) {
+		const choice = firstModelChoice(child)
+		if (choice) return choice
+	}
+	return undefined
+}
+
+function assignModelDefaults(node: ModelTreeNode): ReturnType<typeof models.listModelChoices>[number] | undefined {
+	for (const child of node.children) assignModelDefaults(child)
+	if (node.choice) return node.choice
+	if (node.path === 'openai' || node.path === 'openai/gpt') {
+		node.defaultChoice = firstModelChoice(node.children.find((child) => child.path === 'openai/gpt') ?? node)
+		const gpt = firstModelChoice({ name: '', path: '', children: node.children.filter((child) => child.choice?.value === 'gpt' || child.path === 'openai/gpt') })
+		if (gpt?.value === 'gpt') node.defaultChoice = gpt
+	} else if (node.path === 'anthropic') {
+		node.defaultChoice = firstModelChoice(node.children.find((child) => child.path === 'anthropic/opus') ?? node)
+	} else if (node.path.includes('/')) {
+		node.defaultChoice = firstModelChoice(node)
+	}
+	return node.defaultChoice
+}
+
 function buildModelTree(choices: ReturnType<typeof models.listModelChoices>): ModelTreeNode {
 	const root: ModelTreeNode = { name: '', path: '', children: [] }
 	for (const choice of choices) {
@@ -93,17 +131,18 @@ function buildModelTree(choices: ReturnType<typeof models.listModelChoices>): Mo
 		}
 		parent.children.push({ name: choice.leafLabel, path: `${path}/${choice.value}`, children: [], choice })
 	}
+	assignModelDefaults(root)
 	return root
 }
 
 function addModelTreeRows(rows: PopupItem[], node: ModelTreeNode, depth: number): void {
 	for (const child of node.children) {
 		if (child.choice) {
-			rows.push({ value: child.choice.value, label: modelLeafLabel(child.choice, depth), kind: 'model', choice: child.choice })
+			rows.push({ value: child.choice.value, label: modelLeafLabel(child.choice, depth), kind: 'model', parentPath: node.path, choice: child.choice })
 			continue
 		}
 		const open = state.openModelCategories.has(child.path)
-		rows.push({ value: `category:${child.path}`, label: modelCategoryLabel(child.name, depth, open), kind: 'category', path: child.path })
+		rows.push({ value: `category:${child.path}`, label: modelCategoryLabel(child, depth, open), kind: 'category', path: child.path, defaultChoice: child.defaultChoice })
 		if (open) addModelTreeRows(rows, child, depth + 1)
 	}
 }
@@ -132,7 +171,8 @@ function openModelPicker(onChoose: (value: string) => void, currentModel?: strin
 	resetOpenModelCategories()
 	state.active = true
 	state.kind = 'model'
-	state.title = 'Pick a model'
+	state.currentModel = currentModel ? models.resolveModel(currentModel) : ''
+	state.title = state.currentModel ? `Pick a model (current: ${state.currentModel})` : 'Pick a model'
 	state.tone = 'neutral'
 	state.onChoose = onChoose
 	state.preferredInnerWidth = MODEL_PICKER_INNER_WIDTH
@@ -156,6 +196,11 @@ function cycle(dir: 1 | -1): void {
 	state.selectedIndex = (state.selectedIndex + dir + state.items.length) % state.items.length
 }
 
+function selectCategoryPath(path: string): void {
+	const index = state.items.findIndex((row) => row.kind === 'category' && row.path === path)
+	if (index >= 0) state.selectedIndex = index
+}
+
 function setSelectedCategoryOpen(open: boolean): boolean {
 	const item = state.items[state.selectedIndex]
 	if (!item || item.kind !== 'category' || !item.path) return false
@@ -165,21 +210,35 @@ function setSelectedCategoryOpen(open: boolean): boolean {
 	else state.openModelCategories.delete(item.path)
 	const selectedPath = item.path
 	refreshModelItems()
-	const nextIndex = state.items.findIndex((row) => row.kind === 'category' && row.path === selectedPath)
-	if (nextIndex >= 0) state.selectedIndex = nextIndex
+	selectCategoryPath(selectedPath)
 	return true
+}
+
+function closeContainingCategory(): boolean {
+	const item = state.items[state.selectedIndex]
+	if (!item || item.kind !== 'model' || !item.parentPath) return false
+	state.openModelCategories.delete(item.parentPath)
+	refreshModelItems()
+	selectCategoryPath(item.parentPath)
+	return true
+}
+
+function chooseValue(value: string): void {
+	if (!state.onChoose) return
+	const onChoose = state.onChoose
+	close()
+	onChoose(value)
 }
 
 function chooseSelected(): void {
 	const item = state.items[state.selectedIndex]
-	if (!item || !state.onChoose) return
+	if (!item) return
 	if (item.kind === 'category') {
-		if (!setSelectedCategoryOpen(!state.openModelCategories.has(item.path ?? ''))) setSelectedCategoryOpen(true)
+		if (item.defaultChoice) chooseValue(item.defaultChoice.value)
+		else if (!setSelectedCategoryOpen(!state.openModelCategories.has(item.path ?? ''))) setSelectedCategoryOpen(true)
 		return
 	}
-	const onChoose = state.onChoose
-	close()
-	onChoose(item.value)
+	chooseValue(item.value)
 }
 
 function handleKey(k: KeyEvent): boolean {
@@ -207,7 +266,7 @@ function handleKey(k: KeyEvent): boolean {
 	if (state.kind === 'model' && k.key === 'right' && setSelectedCategoryOpen(true)) {
 		return true
 	}
-	if (state.kind === 'model' && k.key === 'left' && setSelectedCategoryOpen(false)) {
+	if (state.kind === 'model' && k.key === 'left' && (setSelectedCategoryOpen(false) || closeContainingCategory())) {
 		return true
 	}
 	if (state.kind === 'model' && editor.handleKey(k)) {
@@ -228,6 +287,36 @@ function rowText(item: PopupItem, active: boolean): string {
 
 function pad(text: string, width: number): string {
 	return text + ' '.repeat(Math.max(0, width - visLen(text)))
+}
+
+function withOuterPadding(rows: PopupRow[]): { rows: PopupRow[]; topAdded: boolean } {
+	const out = [...rows]
+	if (out.length === 0) out.push({ text: '', active: false })
+	let topAdded = false
+	if (out[0]?.text !== '') {
+		out.unshift({ text: '', active: false })
+		topAdded = true
+	}
+	if (out[out.length - 1]?.text !== '') out.push({ text: '', active: false })
+	return { rows: out, topAdded }
+}
+
+function modelHint(): string {
+	const item = state.items[state.selectedIndex]
+	const parts = ['>/<: open/close category']
+	if (item?.kind === 'model') parts.push('enter: pick')
+	else if (item?.defaultChoice) parts.push('enter: pick default')
+	parts.push('esc: cancel')
+	return parts.join(', ')
+}
+
+function bottomBorder(innerWidth: number, hint: string): string {
+	if (!hint) return `└${'─'.repeat(innerWidth)}┘`
+	const text = clipVisual(` ${hint} `, innerWidth)
+	const textWidth = visLen(text)
+	const left = Math.max(0, Math.floor((innerWidth - textWidth) / 2))
+	const right = Math.max(0, innerWidth - textWidth - left)
+	return `└${'─'.repeat(left)}${text}${'─'.repeat(right)}┘`
 }
 
 
@@ -276,10 +365,9 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	let inputCursor: { row: number; col: number } | null = null
 	if (state.kind === 'model') {
 		const built = editor.buildLine()
+		inputCursor = { row: bodyContent.length, col: 4 + built.cursor }
 		bodyContent.push({ text: `> ${built.line}`, active: false })
-		bodyContent.push({ text: 'hint: right opens category · left closes category', active: false })
 		bodyContent.push({ text: '', active: false })
-		inputCursor = { row: 1, col: 4 + built.cursor }
 	}
 	if (state.kind === 'confirm' && state.body.length > 0) bodyContent.push({ text: '', active: false })
 	// Split on embedded newlines so multi-line bash commands (e.g. heredocs) render
@@ -292,15 +380,17 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	if (state.kind === 'confirm' && state.items.length > 0) tailContent.push({ text: '', active: false })
 	if (bodyContent.length === 0 && tailContent.length === 0) bodyContent.push({ text: '', active: false })
 	const content = [...bodyContent, ...tailContent]
+	const hint = state.kind === 'model' ? modelHint() : ''
 
 	// Keep a safety margin away from the terminal's last column and last row.
 	// Touching those edges can trigger wrap-pending weirdness in some terminals.
 	const rightSlack = cols > 12 ? 1 : 0
 	const bottomSlack = rows > 6 ? 1 : 0
 	const xMargin = state.kind === 'confirm' ? 1 : 0
-	const rawWidth = Math.max(visLen(state.title) + 2, ...content.map((line) => visLen(line.text) + xMargin * 2))
+	const rawWidth = Math.max(visLen(state.title) + 2, visLen(hint) + 2, ...content.map((line) => visLen(line.text) + xMargin * 2))
 	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
-	const innerWidth = Math.max(18, Math.min(maxInnerWidth, state.preferredInnerWidth ?? rawWidth))
+	const preferredWidth = Math.max(state.preferredInnerWidth ?? rawWidth, rawWidth)
+	const innerWidth = Math.max(18, Math.min(maxInnerWidth, preferredWidth))
 	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
 	// For confirm popups, hard-wrap each row to the inner content width so long
 	// bash commands and ason-formatted tool inputs stay inside the popup instead
@@ -314,6 +404,9 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	} else {
 		displayContent = content
 	}
+	const paddedDisplay = withOuterPadding(displayContent)
+	if (inputCursor && paddedDisplay.topAdded) inputCursor.row++
+	displayContent = paddedDisplay.rows
 	const title = clipVisual(` ${state.title} `, Math.max(0, innerWidth - 2))
 	const titleWidth = visLen(title)
 	const top = `┌${title}${'─'.repeat(Math.max(0, innerWidth - titleWidth))}┐`
@@ -324,7 +417,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 		const padded = `${' '.repeat(xMargin)}${paddedContent}${' '.repeat(xMargin)}`
 		lines.push(`│${styleRow(padded, line.active)}│`)
 	}
-	lines.push(`└${'─'.repeat(innerWidth)}┘`)
+	lines.push(bottomBorder(innerWidth, hint))
 	const totalWidth = innerWidth + 2
 	const maxX = Math.max(0, cols - rightSlack - totalWidth)
 	const x = Math.max(0, Math.floor(maxX / 2))

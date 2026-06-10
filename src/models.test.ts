@@ -91,6 +91,14 @@ test('model picker lists updated frontier aliases', () => {
 })
 
 
+test('model picker choices list newest curated versions first', () => {
+	const choices = models.listModelChoices().filter((item) => item.path.join('/') === 'openai/gpt')
+	const values = choices.map((item) => item.value)
+	expect(values.indexOf('gpt')).toBeLessThan(values.indexOf('gpt-5.4'))
+	expect(values.indexOf('gpt-5.4')).toBeLessThan(values.indexOf('codex'))
+})
+
+
 test('model picker and aliases use newest cached Anthropic and OpenAI models automatically', () => {
 	models.state.cache = {
 		'claude-opus-4-7': 1_000_000,

@@ -10,6 +10,10 @@ function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
 }
 
+function cleanLines(lines: string[]): string[] {
+	return lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))
+}
+
 beforeEach(() => {
 	popup.close()
 	models.state.cache = {}
@@ -48,27 +52,61 @@ describe('popup', () => {
 		models.state.cache = {
 			'claude-sonnet-4-5': 1_000_000,
 		}
-		popup.openModelPicker(() => {})
+		popup.openModelPicker(() => {}, 'openai/gpt-5.5')
 		let overlay = popup.buildOverlay(120, 30)
 		expect(overlay).not.toBeNull()
-		let clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).join('\n')
-		expect(clean).toContain('right opens category')
-		expect(clean).toContain('left closes category')
-		expect(clean).toContain('▸ sonnet')
+		let clean = cleanLines(overlay!.lines).join('\n')
+		expect(clean).toContain('>/<: open/close category')
+		expect(clean).toContain('Pick a model (current: openai/gpt-5.5)')
+		expect(clean).toContain('▶ sonnet (default: sonnet-4-6)')
 		expect(clean).not.toContain('Sonnet 4.5')
 
 		popup.state.selectedIndex = popup.state.items.findIndex((item) => item.label.includes('sonnet'))
 		popup.handleKey(key('right'))
 		overlay = popup.buildOverlay(120, 30)
-		clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).join('\n')
-		expect(clean).toContain('▾ sonnet')
-		expect(clean).toContain('Sonnet 4.5')
+		clean = cleanLines(overlay!.lines).join('\n')
+		expect(clean).toContain('▼ sonnet (default: sonnet-4-6)')
+		expect(clean).toContain('Sonnet 4.6')
 
 		popup.handleKey(key('left'))
 		overlay = popup.buildOverlay(120, 30)
-		clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).join('\n')
-		expect(clean).toContain('▸ sonnet')
+		clean = cleanLines(overlay!.lines).join('\n')
+		expect(clean).toContain('▶ sonnet (default: sonnet-4-6)')
 		expect(clean).not.toContain('Sonnet 4.5')
+	})
+
+	test('model picker enter on categories picks defaults and left on models closes their category', () => {
+		let picked = ''
+		popup.openModelPicker((value) => {
+			picked = value
+		}, 'openai/gpt-5.5')
+		popup.state.selectedIndex = popup.state.items.findIndex((item) => item.label.includes('openai'))
+		let overlay = popup.buildOverlay(120, 30)
+		let clean = cleanLines(overlay!.lines).join('\n')
+		expect(clean).toContain('enter: pick default')
+		popup.handleKey(key('enter'))
+		expect(picked).toBe('gpt')
+		expect(popup.state.active).toBe(false)
+
+		popup.openModelPicker(() => {}, 'openai/gpt-5.5')
+		popup.state.selectedIndex = popup.state.items.findIndex((item) => item.value === 'gpt-5.4')
+		popup.handleKey(key('left'))
+		overlay = popup.buildOverlay(120, 30)
+		clean = cleanLines(overlay!.lines).join('\n')
+		expect(popup.state.items[popup.state.selectedIndex]?.label).toContain('gpt')
+		expect(clean).toContain('▶ gpt (default: gpt-5.5)')
+		expect(clean).not.toContain('GPT 5.4')
+	})
+
+	test('model picker has outer breathing room and puts hint in bottom border', () => {
+		popup.openModelPicker(() => {}, 'anthropic/claude-fable-5')
+		const overlay = popup.buildOverlay(120, 30)
+		expect(overlay).not.toBeNull()
+		const clean = cleanLines(overlay!.lines)
+		expect(clean[1]).toMatch(/^│ +│$/)
+		expect(clean[clean.length - 2]).toMatch(/^│ +│$/)
+		expect(clean[clean.length - 1]).toContain('>/<: open/close category')
+		expect(clean[0]).toContain('current: anthropic/claude-fable-5')
 	})
 
 	test('warning popup uses the same highlighted row layout', () => {
