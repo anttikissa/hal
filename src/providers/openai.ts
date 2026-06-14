@@ -280,9 +280,9 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 	if (type === 'response.completed' || type === 'response.incomplete') {
 		const response = event.response
 		const providerStatus = response?.status ?? (type === 'response.incomplete' ? 'incomplete' : 'completed')
-		const doneStatus = providerStatus === 'failed' || providerStatus === 'cancelled' || providerStatus === 'incomplete' ? providerStatus : 'completed'
+		const doneStatus = providerStatus === 'failed' || providerStatus === 'canceled' || providerStatus === 'incomplete' ? providerStatus : 'completed'
 		const events: ProviderStreamEvent[] = []
-		if (doneStatus === 'failed' || doneStatus === 'cancelled') {
+		if (doneStatus === 'failed' || doneStatus === 'canceled') {
 			const detail = response?.status_details?.error?.message ?? response?.status_details?.message ?? providerStatus
 			events.push({ type: 'error', message: `Response ${providerStatus}`, body: String(detail) })
 		}

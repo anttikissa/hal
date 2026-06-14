@@ -195,7 +195,7 @@ test('cancel stops the stream', async () => {
 	}
 })
 
-test('stops promptly when cancelled with no writes', async () => {
+test('stops promptly when canceled with no writes', async () => {
 	const p = tmpFile('timeout')
 	try {
 		const stream = tailFile(p)
