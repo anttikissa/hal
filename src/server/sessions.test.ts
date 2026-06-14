@@ -113,6 +113,24 @@ test('cancelTailTurn marks last prompt and partial output canceled in current hi
 	expect(readFileSync(`${sessions.sessionDir(id)}/history.asonl`, 'utf-8')).toContain('canceled: true')
 })
 
+
+test('cancelTailTurn cancels read-only tool tails', async () => {
+	const id = await makeSession()
+	await sessions.appendHistory(id, [
+		userEntry('old prompt', '2026-05-25T10:00:00.000Z'),
+		{ type: 'tool_call', toolId: 'read-1', name: 'read', input: { path: 'README.md' }, ts: '2026-05-25T10:00:01.000Z' },
+		{ type: 'tool_result', toolId: 'read-1', output: 'file contents', ts: '2026-05-25T10:00:02.000Z' },
+		{ type: 'turn_end', status: 'aborted', ts: '2026-05-25T10:00:03.000Z' },
+	])
+
+	expect(sessions.cancelTailTurn(id)).toMatchObject({ logName: 'history.asonl', entryCount: 3 })
+	expect(sessions.loadHistory(id)).toMatchObject([
+		{ type: 'user', canceled: true },
+		{ type: 'tool_call', name: 'read', canceled: true },
+		{ type: 'tool_result', toolId: 'read-1', canceled: true },
+	])
+})
+
 test('forkSession appends fork markers to parent and child history', async () => {
 	const parentId = await makeSession()
 	const childId = uniqueId()

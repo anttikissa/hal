@@ -213,7 +213,10 @@ function blockLabel(block: Block): string {
 		if (display) return `Hal (${display}, thinking)`
 		return block.canceled ? 'Thinking (canceled)' : 'Thinking'
 	}
-	if (block.type === 'tool') return toolSpecs.getToolSpec(block.name).title?.(block.input, block.output) ?? toolSpecs.humanizeName(block.name)
+	if (block.type === 'tool') {
+		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, block.output) ?? toolSpecs.humanizeName(block.name)
+		return block.canceled ? `${title} (canceled)` : title
+	}
 	return fixedLabels[block.type]
 }
 

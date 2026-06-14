@@ -86,7 +86,7 @@ function historyToBlocks(
 				break
 			}
 			case 'tool_call':
-				result.push({ type: 'tool', name: entry.name, input: entry.input, blobId: entry.blobId, sessionId: blobOwner, toolId: entry.toolId, ts, dimmed })
+				result.push({ type: 'tool', name: entry.name, input: entry.input, blobId: entry.blobId, sessionId: blobOwner, toolId: entry.toolId, ts, dimmed, canceled: entry.canceled })
 				break
 			case 'assistant':
 				result.push({

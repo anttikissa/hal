@@ -38,6 +38,12 @@ export interface SessionMeta {
 export type UserPart = { type: 'text'; text: string; displayText?: string } | { type: 'image'; blobId: string; originalFile?: string }
 
 export type EntryIdentity = { id?: string; canceled?: true }
+const SIDE_EFFECT_TOOL_NAMES = new Set(['bash', 'edit', 'write', 'eval', 'send', 'spawn_agent'])
+
+function isSideEffectTool(name: string): boolean {
+	return SIDE_EFFECT_TOOL_NAMES.has(name)
+}
+
 export type HistoryEntry = EntryIdentity & (
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; status?: string; ts?: string }
 	| {
@@ -385,10 +391,10 @@ function liveBlockToCanceledEntry(block: any): HistoryEntry | null {
 }
 
 // Mark the visible tail turn as history-only before retrying an edited prompt.
-// The tail starts at the last user entry. Assistant/thinking entries after it
-// become canceled, the old aborted turn_end is removed, and live streamed
-// assistant/thinking blocks are copied into history as canceled too. Tool tails
-// are deliberately refused for v1 because tool side effects already happened.
+// The tail starts at the last user entry. User, assistant, thinking, and
+// side-effectless tool entries after it become canceled; the old aborted
+// turn_end is removed. Side-effectful tool tails are refused because the world
+// already changed.
 function cancelTailTurn(sessionId: string): { logName: string; entryCount: number } | false {
 	const entries = loadHistory(sessionId)
 	let lastUser = -1
@@ -402,17 +408,17 @@ function cancelTailTurn(sessionId: string): { logName: string; entryCount: numbe
 
 	const liveBlocks = loadLive(sessionId).blocks
 	for (const entry of entries.slice(lastUser + 1)) {
-		if (entry.type === 'tool_call' || entry.type === 'tool_result') return false
+		if (entry.type === 'tool_call' && isSideEffectTool(entry.name)) return false
 	}
 	for (const block of liveBlocks) {
-		if (block?.type === 'tool') return false
+		if (block?.type === 'tool' && isSideEffectTool(block.name)) return false
 	}
 
 	const next: HistoryEntry[] = []
 	for (let i = 0; i < entries.length; i++) {
 		const entry = entries[i]!
 		if (i === lastUser && entry.type === 'user') next.push({ ...entry, canceled: true })
-		else if (i > lastUser && (entry.type === 'assistant' || entry.type === 'thinking')) next.push({ ...entry, canceled: true })
+		else if (i > lastUser && (entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result')) next.push({ ...entry, canceled: true })
 		else if (i > lastUser && entry.type === 'turn_end') continue
 		else next.push(entry)
 	}
