@@ -159,6 +159,39 @@ test('openai provider routes API keys to the public Responses API', async () => 
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
+test('openai provider normalizes raw cancelled status to canceled', async () => {
+	const calls: FetchCall[] = []
+	auth.ensureFresh = async () => {}
+	auth.getCredential = (name: string) => (name === 'openai' ? { value: 'sk-test', type: 'api-key' } : undefined)
+	auth.getEntry = () => ({})
+	installFetchMock(async (input, init) => {
+		const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+		calls.push({ url, init })
+		return new Response([
+			'data: {"type":"response.completed","response":{"status":"cancelled","status_details":{"message":"user canceled"}}}',
+			'',
+		].join('\n'), {
+			status: 200,
+			headers: { 'content-type': 'text/event-stream' },
+		}) as any
+	})
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.3-codex',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_123',
+	})) {
+		events.push(event)
+	}
+
+	expect(calls).toHaveLength(1)
+	expect(events).toContainEqual(expect.objectContaining({ type: 'error', message: 'Response cancelled' }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'canceled', providerStatus: 'cancelled' }))
+})
+
 test('compat providers stay on chat completions endpoints', async () => {
 	const calls: FetchCall[] = []
 	const provider = createCompatProvider('openrouter')

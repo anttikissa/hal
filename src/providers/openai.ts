@@ -7,7 +7,7 @@
 // OpenAI-compatible providers (OpenRouter, Google, Grok, Ollama, etc.) still
 // use the Chat Completions API because that is the broadest common denominator.
 
-import type { Message, Provider, ProviderRequest, ProviderStreamEvent } from '../protocol.ts'
+import type { Message, Provider, ProviderRequest, ProviderStreamEvent, TurnEndStatus } from '../protocol.ts'
 import { auth, type Credential } from '../auth.ts'
 import { providerShared } from './shared.ts'
 import { openaiUsage } from '../openai-usage.ts'
@@ -238,6 +238,14 @@ interface ResponsesStreamState {
 	toolInputs: Map<number, string>
 }
 
+function normalizeResponsesStatus(providerStatus: string): TurnEndStatus {
+	// OpenAI's raw Responses status uses British spelling for this state.
+	// Hal normalizes internal status names to US spelling everywhere else.
+	if (providerStatus === 'cancelled') return 'canceled'
+	if (providerStatus === 'failed' || providerStatus === 'canceled' || providerStatus === 'incomplete') return providerStatus
+	return 'completed'
+}
+
 function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderStreamEvent[] {
 	const type = event.type
 	if (!type) return []
@@ -280,7 +288,7 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 	if (type === 'response.completed' || type === 'response.incomplete') {
 		const response = event.response
 		const providerStatus = response?.status ?? (type === 'response.incomplete' ? 'incomplete' : 'completed')
-		const doneStatus = providerStatus === 'failed' || providerStatus === 'canceled' || providerStatus === 'incomplete' ? providerStatus : 'completed'
+		const doneStatus = normalizeResponsesStatus(providerStatus)
 		const events: ProviderStreamEvent[] = []
 		if (doneStatus === 'failed' || doneStatus === 'canceled') {
 			const detail = response?.status_details?.error?.message ?? response?.status_details?.message ?? providerStatus
