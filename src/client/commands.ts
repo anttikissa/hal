@@ -17,6 +17,8 @@ function makeCommand(type: ClientCommandType, sessionId: string | undefined, tex
 	switch (type) {
 		case 'prompt':
 			return { type, sessionId, text: text ?? '', displayText, delivery }
+		case 'prompt-amend':
+			return { type, sessionId, text: text ?? '', displayText }
 		case 'open':
 			if (text?.startsWith('fork:')) return { type, sessionId, forkSessionId: text.slice(5) }
 			if (text?.startsWith('after:')) return { type, sessionId, afterSessionId: text.slice(6) }
@@ -33,7 +35,7 @@ function makeCommand(type: ClientCommandType, sessionId: string | undefined, tex
 		case 'queue-next':
 		case 'close':
 		case 'abort':
-			return { type, sessionId }
+			return text === undefined ? { type, sessionId } : { type, sessionId, abortText: text }
 		case 'rebase-start':
 			return { type, sessionId, requestId: text ?? '', clientPid: process.pid }
 		case 'rebase-apply': {

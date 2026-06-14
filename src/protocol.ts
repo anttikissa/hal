@@ -24,7 +24,7 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'client-status' | 'client-exit'
+export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'client-status' | 'client-exit'
 
 export type SpawnMode = 'fork' | 'fresh'
 export type SpawnKind = 'subagent' | 'subagent-autoclose' | 'interactive'
@@ -43,6 +43,13 @@ export interface PromptCommand extends CommandBase {
 	text: string
 	displayText?: string
 	delivery?: 'queue'
+	source?: string
+}
+
+export interface PromptAmendCommand extends CommandBase {
+	type: 'prompt-amend'
+	text: string
+	displayText?: string
 	source?: string
 }
 
@@ -87,6 +94,7 @@ export interface ResumeCommand extends CommandBase {
 
 export interface AbortCommand extends CommandBase {
 	type: 'abort'
+	abortText?: string
 }
 
 export interface ResetCommand extends CommandBase {
@@ -164,6 +172,7 @@ export interface ClientExitCommand extends CommandBase {
 
 export type Command =
 	| PromptCommand
+	| PromptAmendCommand
 	| ClientStatusCommand
 	| ClientExitCommand
 	| ContinueCommand

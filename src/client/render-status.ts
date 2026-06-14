@@ -21,6 +21,7 @@ import { HAL_DIR } from '../state.ts'
 import { colors } from '../cli/colors.ts'
 import { prompt } from '../cli/prompt.ts'
 import { cursor } from '../cli/cursor.ts'
+import { promptEdit } from './prompt-edit.ts'
 import { completionHints } from '../cli/completion-hints.ts'
 import type { Tab } from '../client.ts'
 
@@ -425,6 +426,12 @@ function renderHelpBar(lines: string[]): void {
 		key: colors.help.key || colors.status.highlight,
 		description: desc,
 		separator: desc,
+	}
+	const editHint = promptEdit.hint(client.currentTab()?.sessionId)
+	if (editHint) {
+		const warning = colors.warning.fg || colors.help.description || colors.status.fg
+		lines.push(`${renderStatus.paddedLine(`${warning}${editHint}`, cols)}${RESET}`)
+		return
 	}
 	const completionText = completionHints.text(renderStatus.contentWidth(cols))
 	if (completionText) {

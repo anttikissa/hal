@@ -23,6 +23,7 @@ import { ipc } from '../ipc.ts'
 import type { KeyEvent } from '../cli/keys.ts'
 import { time } from '../utils/time.ts'
 import { terminalOutput } from './terminal-output.ts'
+import { promptEdit } from './prompt-edit.ts'
 
 const RESTART_CODE = 100
 
@@ -340,9 +341,107 @@ function handleRebaseResult(event: any): void {
 	draw(true)
 }
 
+const SIDE_EFFECT_TOOL_NAMES = new Set(['bash', 'edit', 'write', 'eval', 'send', 'spawn_agent'])
+
+function lastUserBlock(tab: (typeof client.state.tabs)[number] | null): any | null {
+	if (!tab) return null
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const block = tab.history[i]
+		if (block?.type === 'user') return block
+	}
+	return null
+}
+
+function blocksAfterLastUser(tab: (typeof client.state.tabs)[number]): any[] {
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		if (tab.history[i]?.type === 'user') return tab.history.slice(i + 1)
+	}
+	return tab.history
+}
+
+function hasVisibleOutputAfterLastUser(tab: (typeof client.state.tabs)[number]): boolean {
+	for (const block of blocksAfterLastUser(tab)) {
+		if (block.type !== 'log' || block.text !== '[paused]') return true
+	}
+	return false
+}
+
+function hasSideEffectfulToolAfterLastUser(tab: (typeof client.state.tabs)[number]): boolean {
+	for (const block of blocksAfterLastUser(tab)) {
+		if (block.type === 'tool' && SIDE_EFFECT_TOOL_NAMES.has(block.name)) return true
+	}
+	return false
+}
+
+function beginPreviousPromptEdit(): boolean {
+	if (prompt.text().trim()) return false
+	const tab = client.currentTab()
+	if (!tab) return false
+	const originalText = client.getInputHistory().at(-1)
+	if (!originalText) return false
+	const working = client.isWorking()
+	const canAmend = working && !hasVisibleOutputAfterLastUser(tab)
+	const mode = canAmend ? 'amend' : hasSideEffectfulToolAfterLastUser(tab) ? 'side-effect-copy' : 'copy'
+	promptEdit.start({
+		sessionId: tab.sessionId,
+		mode,
+		originalText,
+		pausedWorkingTurn: working,
+		block: mode === 'amend' ? lastUserBlock(tab) ?? undefined : undefined,
+	})
+	prompt.setText(originalText)
+	if (working) client.sendCommand('abort', canAmend ? '' : undefined)
+	return true
+}
+
+function continueAfterPromptEdit(active: NonNullable<typeof promptEdit.state.active>): void {
+	const shouldContinue = active.mode === 'amend' || active.pausedWorkingTurn
+	promptEdit.cancel()
+	prompt.clear()
+	clearSavedPromptState()
+	if (shouldContinue) client.sendCommand('continue')
+}
+
+function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, delivery?: 'queue'): void {
+	const text = prompt.submitText().trim()
+	const displayText = prompt.text().trim()
+	if (!text) return
+	if (active.mode === 'amend') {
+		prompt.pushHistory(text)
+		promptEdit.cancel()
+		client.sendCommand('prompt-amend', text, displayText === text ? undefined : displayText)
+		prompt.clear()
+		clearSavedPromptState()
+		client.onSubmit(text)
+		return
+	}
+	promptEdit.cancel()
+	submit(text, delivery)
+}
+
+function handlePromptEditKey(k: KeyEvent): boolean {
+	const active = promptEdit.activeFor(client.currentTab()?.sessionId)
+	if (!active) return false
+	if (k.key === 'enter' && !k.shift && !k.ctrl && !k.cmd) {
+		submitPromptEdit(active, k.alt ? 'queue' : undefined)
+		return true
+	}
+	if (k.key === 'down' && !k.ctrl && !k.alt && !k.shift && !k.cmd) {
+		continueAfterPromptEdit(active)
+		return true
+	}
+	if (k.key === 'escape' && !k.ctrl && !k.alt && !k.shift && !k.cmd) {
+		if (active.mode === 'amend') return true
+		continueAfterPromptEdit(active)
+		return true
+	}
+	return false
+}
+
 function submitPromptText(text: string, displayText: string | undefined, delivery?: 'queue'): void {
 	completion.dismiss()
 	popup.close()
+	promptEdit.cancel()
 	// Push to prompt module for immediate up-arrow recall
 	prompt.pushHistory(text)
 	// Human typing now uses the same prompt command path as inbox messages.
@@ -527,6 +626,7 @@ function restorePromptForCurrentTab(): void {
 
 function installPromptTabSwitchHandler(): void {
 	client.setOnTabSwitch((fromSession, _toSession) => {
+		if (promptEdit.activeFor(fromSession)) promptEdit.cancel()
 		promptStates.set(fromSession, prompt.snapshotState())
 		client.saveDraft(prompt.draftText(), fromSession)
 		restorePromptForCurrentTab()
@@ -536,6 +636,8 @@ function installPromptTabSwitchHandler(): void {
 
 // App-level keybindings (not handled by prompt)
 function handleAppKey(k: KeyEvent): boolean {
+	if (handlePromptEditKey(k)) return true
+	if (k.key === 'up' && !k.shift && !k.alt && !k.ctrl && !k.cmd && beginPreviousPromptEdit()) return true
 	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
 		completion.dismiss()
 		const currentModel = client.currentTab()?.model || models.defaultModel()

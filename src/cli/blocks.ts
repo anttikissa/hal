@@ -188,6 +188,7 @@ const fixedLabels = { log: 'Log', info: 'System', warning: 'Warning', error: 'Er
 function blockLabel(block: Block): string {
 	if (block.type === 'user') {
 		if (block.source && block.source !== 'user' && block.source !== 'system') return `Inbox · ${block.source}`
+		if (block.status === 'editing') return 'You (editing this prompt)'
 		if (block.status === 'steering') return 'You (steering)'
 		if (block.status === 'queued') return 'You (queued)'
 		return 'You'

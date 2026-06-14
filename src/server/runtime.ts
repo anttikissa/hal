@@ -249,6 +249,55 @@ async function resolvePromptParts(sessionId: string, text: string, displayText?:
 	return (await attachments.resolve(sessionId, text)).logParts
 }
 
+function hasTurnContentAfterLastUser(entries: HistoryEntry[]): boolean {
+	let lastUser = -1
+	for (let i = entries.length - 1; i >= 0; i--) {
+		if (entries[i]?.type === 'user') {
+			lastUser = i
+			break
+		}
+	}
+	if (lastUser < 0) return true
+	for (const entry of entries.slice(lastUser + 1)) {
+		if (entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result') return true
+	}
+	return false
+}
+
+async function amendLastPrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
+	const entries = sessionStore.loadHistory(sessionId)
+	if (entries.length === 0 || hasTurnContentAfterLastUser(entries)) return false
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]
+		if (entry?.type !== 'user') continue
+		entries[i] = {
+			type: 'user',
+			parts: await resolvePromptParts(sessionId, text, displayText),
+			source,
+			ts: entry.ts ?? new Date().toISOString(),
+		}
+		const { oldLog, newLog, entryCount } = sessionStore.rewriteHistoryForRebase(sessionId, entries)
+		resetProviderConversation(sessionId)
+		sessionStore.clearLive(sessionId)
+		ipc.appendEvent({ type: 'history-rebased', sessionId, oldLog, newLog, entryCount })
+		return true
+	}
+	return false
+}
+
+async function handlePromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
+	if (!text.trim()) return
+	if (agentLoop.isWorking(sessionId)) {
+		agentLoop.abort(sessionId, '')
+		await Bun.sleep(50)
+	}
+	if (!await amendLastPrompt(sessionId, text, source, displayText)) {
+		await handlePrompt(sessionId, text, undefined, source, displayText)
+		return
+	}
+	await runGeneration(sessionId, '')
+}
+
 async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
@@ -407,6 +456,11 @@ function handleCommand(cmd: Command): void {
 			else void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
+		case 'prompt-amend': {
+			if (!sessionId) return
+			void handlePromptAmendCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
+			break
+		}
 		case 'continue': {
 			if (!sessionId) return
 			void (async () => {
@@ -426,7 +480,8 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'abort': {
 			if (!cmd.sessionId) return
-			if (!agentLoop.abort(cmd.sessionId, promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)) emitInfo(cmd.sessionId, 'No working turn to pause')
+			const abortText = cmd.abortText ?? (promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)
+			if (!agentLoop.abort(cmd.sessionId, abortText)) emitInfo(cmd.sessionId, 'No working turn to pause')
 			break
 		}
 		case 'reset': {

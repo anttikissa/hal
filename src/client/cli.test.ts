@@ -6,6 +6,7 @@ import { prompt } from '../cli/prompt.ts'
 import { render } from './render.ts'
 import { cursor } from '../cli/cursor.ts'
 import { popup } from './popup.ts'
+import { promptEdit } from './prompt-edit.ts'
 
 function key(key: string, mods: any = {}): any {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
@@ -178,6 +179,7 @@ function withOneTab(tab: (typeof client.state.tabs)[number], run: () => void): v
 		client.state.focusedTabIndex = origFocusedTab
 		prompt.clear()
 		popup.close()
+		promptEdit.cancel()
 	}
 }
 
@@ -294,6 +296,63 @@ test('alt-enter queues prompt without binding cmd-enter', () => {
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
+	}
+})
+
+test('up while working before output edits the just-sent prompt', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			const handled = cli.forTests.handleAppKey(key('up'))
+			expect(handled).toBe(true)
+			expect(prompt.text()).toBe('original prompt')
+			expect(tab.history[0]).toMatchObject({ status: 'editing' })
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
+
+			prompt.setText('edited prompt')
+			cli.forTests.handleAppKey(key('enter'))
+			expect(commands.at(-1)).toEqual({ type: 'prompt-amend', sessionId: 's1', text: 'edited prompt', displayText: undefined })
+			expect(prompt.text()).toBe('')
+			expect(promptEdit.state.active).toBe(null)
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
+test('down from just-sent edit continues the original prompt', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			cli.forTests.handleAppKey(key('up'))
+			prompt.setText('edited but discarded')
+			const handled = cli.forTests.handleAppKey(key('down'))
+			expect(handled).toBe(true)
+			expect(prompt.text()).toBe('')
+			expect(tab.history[0]).toMatchObject({ status: undefined })
+			expect(commands).toEqual([
+				{ type: 'abort', sessionId: 's1', abortText: '' },
+				{ type: 'continue', sessionId: 's1' },
+			])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
 	}
 })
 
