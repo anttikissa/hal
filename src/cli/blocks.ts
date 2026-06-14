@@ -329,8 +329,8 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
 	if (content.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
-		let body = padBlockLine(line)
-		if (block.canceled) body = `${STRIKE}${body}${STRIKE_OFF}`
+		const text = block.canceled ? `${STRIKE}${line}${STRIKE_OFF}` : line
+		const body = padBlockLine(text)
 		lines.push(bgLine(`${fg}${body}`, cols, bg))
 	}
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid
