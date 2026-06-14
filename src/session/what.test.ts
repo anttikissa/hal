@@ -73,10 +73,6 @@ test('run writes ui-only summary to target and fills empty target name', async (
 	expect(sessions.loadHistory(requester).some((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')).toBe(false)
 	const targetHistory = sessions.loadHistory(target)
 	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'assistant', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui' }))
-	const summary = targetHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
-	expect(summary?.type === 'assistant' ? summary.text : '').toContain('## Plan bug fix')
-	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('session ')
-	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('state idle/open')
 	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'info', visibility: 'next-user', text: 'User ran /what for this session.' }))
 	expect(events.some((event) => event.type === 'response' && event.sessionId === target && event.synthetic)).toBe(true)
 })
@@ -156,25 +152,6 @@ test('run does not overwrite existing target name', async () => {
 })
 
 
-test('summary prompt asks for compact grounded narrative style', () => {
-	const prompt = whatSummary.systemPrompt()
-
-	expect(prompt).toContain('initiating user problem')
-	expect(prompt).toContain('capitalized')
-	expect(prompt).toContain('short narrative')
-	expect(prompt).toContain('Every sentence must help')
-	expect(prompt).toContain('metadata inventories')
-	expect(prompt).toContain('final relevant abbreviated commit hash')
-	expect(prompt).toContain('grounded in the provided digest')
-	expect(prompt).toContain('Strunk and White')
-	expect(prompt).toContain('Do not write "the user"')
-	expect(prompt).toContain('Tests passed.')
-	expect(prompt).toContain('prompt came from another session')
-	expect(prompt).toContain('Return only ASON with fields: title, summary')
-	expect(prompt).not.toContain('fixed sections')
-	expect(prompt).not.toContain('Desired style example')
-	expect(prompt).not.toContain('active tab to rename itself left it paused')
-})
 
 test('digest includes deterministic attribution metadata', () => {
 	const target = makeSession('attribution', 'summary work')

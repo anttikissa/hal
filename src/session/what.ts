@@ -263,7 +263,7 @@ function systemPrompt(): string {
 	return [
 		'You write compact session-recall briefs for Hal coding-agent sessions.',
 		'Return only ASON with fields: title, summary.',
-		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, descriptive, capitalized, and at most 60 characters.',
+		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, descriptive, and at most 60 characters.',
 		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
 		'Write like Strunk and White: short, plain sentences. Omit needless words. Split long sentences.',
 		'Address the reader as "you". Do not write "the user" unless quoting text.',
@@ -303,9 +303,6 @@ function sanitizeTitle(text: string): string {
 	return text.trim().replace(/\s+/g, ' ').slice(0, 60).trim()
 }
 
-function capitalizedTitle(text: string): string {
-	return text ? text[0]!.toUpperCase() + text.slice(1) : ''
-}
 
 async function summarizeDigest(model: string, digest: string): Promise<SummaryResult> {
 	const slash = model.indexOf('/')
@@ -323,7 +320,7 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 
 function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[], includeLabel: boolean): string {
 	const meta = sessions.loadSessionMeta(sessionId)
-	const title = capitalizedTitle(result.title || meta?.name || sessionId)
+	const title = result.title || meta?.name || sessionId
 	const label = includeLabel ? ` (${compactTargetLabel(sessionId, openSessionIds)})` : ''
 	return [`## ${title}${label}`, '', result.summary].join('\n')
 }
