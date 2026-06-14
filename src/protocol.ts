@@ -265,15 +265,10 @@ export interface TokenUsage {
 	cacheCreation: number
 }
 
-export type ProviderName = 'openai' | 'anthropic'
-export type TurnEndStatus = 'completed' | 'failed' | 'aborted' | 'canceled' | 'incomplete'
+export type TurnEndStatus = 'completed' | 'failed' | 'aborted'
 
 export interface TurnEndMeta {
-	provider?: ProviderName
 	status: TurnEndStatus
-	providerStatus?: string
-	stopReason?: string
-	stopSequence?: string
 	usage?: PartialTokenUsage
 }
 
@@ -316,11 +311,7 @@ export interface ProviderStreamEvent {
 	//   cacheCreation  — cache-write tokens (billed at ~125% of input rate)
 	// Providers without cache tracking (e.g. OpenAI) leave cacheRead/cacheCreation as 0.
 	usage?: TokenUsage
-	provider?: ProviderName
 	doneStatus?: TurnEndStatus
-	providerStatus?: string
-	stopReason?: string
-	stopSequence?: string
 }
 
 export interface ProviderRequest {

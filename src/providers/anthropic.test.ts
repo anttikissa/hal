@@ -62,7 +62,7 @@ test('anthropic provider streams text while rotating accounts', async () => {
 	})
 
 	expect(events[0]).toEqual({ type: 'text', text: 'hello' })
-	expect(events.at(-1)).toMatchObject({ type: 'done', provider: 'anthropic', doneStatus: 'completed', stopReason: 'end_turn', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events.at(-1)).toMatchObject({ type: 'done', doneStatus: 'completed', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
 
 
@@ -226,5 +226,5 @@ test('anthropic provider ignores malformed SSE JSON lines', async () => {
 
 	const events = await collect({ value: 'tok-test', type: 'token' })
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events.at(-1)).toMatchObject({ type: 'done', provider: 'anthropic', doneStatus: 'completed', stopReason: 'end_turn', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
+	expect(events.at(-1)).toMatchObject({ type: 'done', doneStatus: 'completed', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })

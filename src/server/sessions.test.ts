@@ -349,7 +349,7 @@ test('tailTurnState uses turn_end as the finished-turn boundary', () => {
 	const entries: any[] = [
 		userEntry('hello', '2026-05-27T12:00:00.000Z'),
 		{ type: 'assistant', text: 'done', ts: '2026-05-27T12:00:01.000Z' },
-		{ type: 'turn_end', status: 'completed', provider: 'openai', ts: '2026-05-27T12:00:02.000Z' },
+		{ type: 'turn_end', status: 'completed', ts: '2026-05-27T12:00:02.000Z' },
 	]
 
 	expect(sessions.tailTurnState(entries)).toMatchObject({ interrupted: false, interruptedTools: [], ended: { type: 'turn_end', status: 'completed' } })

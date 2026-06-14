@@ -238,11 +238,10 @@ interface ResponsesStreamState {
 	toolInputs: Map<number, string>
 }
 
-function normalizeResponsesStatus(providerStatus: string): TurnEndStatus {
-	// OpenAI's raw Responses status uses British spelling for this state.
-	// Hal normalizes internal status names to US spelling everywhere else.
-	if (providerStatus === 'cancelled') return 'canceled'
-	if (providerStatus === 'failed' || providerStatus === 'canceled' || providerStatus === 'incomplete') return providerStatus
+function responsesDoneStatus(rawStatus: string): TurnEndStatus {
+	if (rawStatus === 'failed') return 'failed'
+	if (rawStatus === 'cancelled') return 'failed'
+	if (rawStatus === 'incomplete') return 'failed'
 	return 'completed'
 }
 
@@ -287,15 +286,15 @@ function parseResponsesEvent(state: ResponsesStreamState, event: any): ProviderS
 	}
 	if (type === 'response.completed' || type === 'response.incomplete') {
 		const response = event.response
-		const providerStatus = response?.status ?? (type === 'response.incomplete' ? 'incomplete' : 'completed')
-		const doneStatus = normalizeResponsesStatus(providerStatus)
+		const rawStatus = response?.status ?? (type === 'response.incomplete' ? 'incomplete' : 'completed')
+		const doneStatus = responsesDoneStatus(rawStatus)
 		const events: ProviderStreamEvent[] = []
-		if (doneStatus === 'failed' || doneStatus === 'canceled') {
-			const detail = response?.status_details?.error?.message ?? response?.status_details?.message ?? providerStatus
-			events.push({ type: 'error', message: `Response ${providerStatus}`, body: String(detail) })
+		if (doneStatus === 'failed') {
+			const detail = response?.status_details?.error?.message ?? response?.status_details?.message ?? rawStatus
+			events.push({ type: 'error', message: `Response ${rawStatus}`, body: String(detail) })
 		}
 		const usage = response?.usage
-		const done: ProviderStreamEvent = { type: 'done', provider: 'openai', doneStatus, providerStatus }
+		const done: ProviderStreamEvent = { type: 'done', doneStatus }
 		if (usage) {
 			const cacheRead = usage.input_tokens_details?.cached_tokens ?? 0
 			const totalInput = usage.input_tokens ?? 0
@@ -358,7 +357,7 @@ async function* parseChatCompletionsStream(body: ReadableStream<Uint8Array>): As
 		yield { type: 'tool_call', id: toolCall.id, name: toolCall.name, input: parsed.input, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }
 	}
 	const usage = inputTokens || outputTokens ? { input: inputTokens, output: outputTokens, cacheRead: 0, cacheCreation: 0 } : undefined
-	yield { type: 'done', provider: 'openai', doneStatus: 'completed', providerStatus: 'stop', usage }
+	yield { type: 'done', doneStatus: 'completed', usage }
 }
 
 async function readErrorBody(res: Response): Promise<string> {

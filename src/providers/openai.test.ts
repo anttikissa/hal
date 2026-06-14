@@ -139,7 +139,7 @@ test('openai provider routes ChatGPT OAuth tokens to the Codex backend', async (
 	expect(headers.get('chatgpt-account-id')).toBe('acct_from_token')
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 test('openai provider routes API keys to the public Responses API', async () => {
@@ -156,10 +156,10 @@ test('openai provider routes API keys to the public Responses API', async () => 
 	expect(headers.has('chatgpt-account-id')).toBe(false)
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
-test('openai provider normalizes raw cancelled status to canceled', async () => {
+test('openai provider treats raw cancelled status as failed', async () => {
 	const calls: FetchCall[] = []
 	auth.ensureFresh = async () => {}
 	auth.getCredential = (name: string) => (name === 'openai' ? { value: 'sk-test', type: 'api-key' } : undefined)
@@ -189,7 +189,7 @@ test('openai provider normalizes raw cancelled status to canceled', async () => 
 
 	expect(calls).toHaveLength(1)
 	expect(events).toContainEqual(expect.objectContaining({ type: 'error', message: 'Response cancelled' }))
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'canceled', providerStatus: 'cancelled' }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'failed' }))
 })
 
 test('compat providers stay on chat completions endpoints', async () => {
@@ -212,7 +212,7 @@ test('compat providers stay on chat completions endpoints', async () => {
 	expect(body.input).toBeUndefined()
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 test('google compat provider asks for GOOGLE_API_KEY only', async () => {
@@ -461,7 +461,7 @@ test('openai provider ignores malformed Responses SSE JSON lines', async () => {
 	})) events.push(event)
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 
@@ -527,7 +527,7 @@ test('compat provider reports tool JSON parse errors after [DONE] chunks', async
 		input: {},
 		parseError: 'Failed to parse tool input JSON (7 chars): {"bad":',
 	})
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 5, output: 6, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 class FakeWebSocket {
@@ -602,7 +602,7 @@ test('openai websocket transport uses wss endpoint and response.create', async (
 	expect(ws.sent[0]).toMatchObject({ type: 'response.create', model: 'gpt-5.5', store: false, instructions: 'system' })
 	expect(ws.sent[0].stream).toBeUndefined()
 	expect(events).toContainEqual({ type: 'text', text: 'text1' })
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 class HangingWebSocket extends FakeWebSocket {
@@ -654,7 +654,7 @@ test('openai auto transport falls back to HTTP when websocket connect times out'
 	expect(openai.state.webSockets.has('sid_ws_connect_timeout_auto')).toBe(false)
 	expect(calls).toHaveLength(1)
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
-	expect(events).toContainEqual(expect.objectContaining({ type: 'done', provider: 'openai', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 } }))
 })
 
 test('forced openai websocket transport reports connect timeout without fallback', async () => {

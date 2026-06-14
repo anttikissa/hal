@@ -45,7 +45,6 @@ export type HistoryEntry = EntryIdentity & (
 			text?: string
 			blobId?: string
 			signature?: string
-			provider?: string
 			model?: string
 			thinkingEffort?: string
 			ts?: string
@@ -134,7 +133,7 @@ function makeEntryId(used = new Set<string>()): string {
 
 const historyTopLevelKeys = new Set([
 	'id', 'type', 'parts', 'text', 'source', 'status', 'ts',
-	'blobId', 'signature', 'provider', 'providerStatus', 'stopReason', 'stopSequence', 'model', 'thinkingEffort',
+	'blobId', 'signature', 'model', 'thinkingEffort',
 	'continue', 'usage', 'synthetic', 'syntheticKind',
 	'toolId', 'name', 'input', 'output', 'isError',
 	'level', 'visibility', 'ui', 'parent', 'child', 'log', 'from', 'to',

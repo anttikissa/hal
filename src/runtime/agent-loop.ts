@@ -217,11 +217,7 @@ function errorHistoryEntry(text: string, blobId?: string, ts = new Date().toISOS
 
 function doneMeta(event: ProviderStreamEvent): TurnEndMeta {
 	return {
-		provider: event.provider,
 		status: event.doneStatus ?? 'completed',
-		providerStatus: event.providerStatus,
-		stopReason: event.stopReason,
-		stopSequence: event.stopSequence,
 		usage: event.usage,
 	}
 }
