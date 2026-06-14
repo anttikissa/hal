@@ -141,7 +141,10 @@ function compactTargetLabel(sessionId: string, openSessionIds: string[]): string
 
 function entryLine(sessionId: string, entry: HistoryEntry): string {
 	const ts = entry.ts ? ` ${entry.ts}` : ''
-	if (entry.type === 'user') return `user${ts}: ${clip(sessionEntry.userText(entry, { images: 'path-or-blob-or-image' }))}`
+	if (entry.type === 'user') {
+		const who = entry.source ? `prompt from session ${entry.source}` : 'user'
+		return `${who}${ts}: ${clip(sessionEntry.userText(entry, { images: 'path-or-blob-or-image' }))}`
+	}
 	if (entry.type === 'assistant') return `assistant${ts}: ${clip(entry.text)}`
 	if (entry.type === 'thinking') return `thinking${ts}: ${entry.blobId ? `[blob ${entry.blobId}]` : clip(entry.text ?? '')}`
 	if (entry.type === 'tool_call') return `tool_call${ts}: ${entry.name} ${clip(ason.stringify(entry.input ?? sessionEntry.loadEntryBlob(sessionId, entry)?.call?.input ?? {}, 'short'))}`
@@ -260,12 +263,16 @@ function systemPrompt(): string {
 		'Return only ASON with fields: title, summary.',
 		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, lower-case, descriptive, and at most 60 characters.',
 		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
-		'Lead with the initiating user request and main conversation arc, then mention major pivots or follow-ups only if they matter for continuing the work.',
+		'Write like Strunk and White: short, plain sentences. Omit needless words. Split long sentences.',
+		'Address the reader as "you". Do not write "the user" unless quoting text.',
+		'If a prompt came from another session, say that plainly when it matters, for example "Session 47-abc asked this session to ...".',
+		'Lead with what you asked for and the main conversation arc, then mention major pivots or follow-ups only if they matter for continuing the work.',
 		'Include why/context, clarifications, design or architectural decisions, and plan approval only when they are actually visible and useful.',
 		'Every sentence must help a human remember the user intent or continue the session; omit zero-information lines such as "no next steps", "no plan visible", or metadata inventories.',
 		'Do not show session id, tab, cwd, model, history path, entry counts, state, or role unless that provenance directly explains who did the work.',
 		'Mention files/actions only at continuation-level detail; do not create a separate file/evidence section unless there is an unresolved issue.',
 		'When commits are visible, mention only the final relevant abbreviated commit hash and one-line title; omit amended/intermediate commits, commit bodies, and trailers. If no commit matters, omit commits entirely.',
+		'For successful validation, write "Tests passed." Do not list pass counts unless a failure or count mismatch matters.',
 		'Do not invent missing why, approval, files, commits, or decisions; say less rather than filling checklist sections.',
 		'Ignore routine tool noise, raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, final commit, failure, or current state.',
 		'Use exact quotes only when the wording itself matters.',

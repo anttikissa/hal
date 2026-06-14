@@ -138,6 +138,10 @@ test('summary prompt asks for compact grounded narrative style', () => {
 	expect(prompt).toContain('metadata inventories')
 	expect(prompt).toContain('final relevant abbreviated commit hash')
 	expect(prompt).toContain('grounded in the provided digest')
+	expect(prompt).toContain('Strunk and White')
+	expect(prompt).toContain('Do not write "the user"')
+	expect(prompt).toContain('Tests passed.')
+	expect(prompt).toContain('prompt came from another session')
 	expect(prompt).toContain('Return only ASON with fields: title, summary')
 	expect(prompt).not.toContain('fixed sections')
 	expect(prompt).not.toContain('Desired style example')
@@ -164,6 +168,19 @@ test('digest includes deterministic attribution metadata', () => {
 	expect(digest).toContain('Agent role: subagent')
 	expect(digest).toContain('Parent session id: 34-parent')
 	expect(digest).toContain('Forked from: 12-source')
+})
+
+
+test('digest marks prompts sent from another session', () => {
+	const target = makeSession('source', 'source')
+	sessions.appendHistory(target, [
+		{ type: 'user', source: '47-abc', parts: [{ type: 'text', text: 'Handoff from another tab.' }], ts: '2026-06-10T12:01:00.000Z' },
+	])
+
+	const digest = whatSummary.buildDigest(target, [target], {})
+
+	expect(digest).toContain('prompt from session 47-abc')
+	expect(digest).toContain('Handoff from another tab.')
 })
 
 test('digest puts conversation highlights before clipped tool details', () => {
