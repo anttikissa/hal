@@ -89,7 +89,7 @@ function formatShortAge(ms: number): string {
 }
 
 function formatLastActiveNotice(ts: number, now = Date.now()): string {
-	return `This session was last active ${formatDateTime(ts)} (${formatAge(now - ts)})`
+	return `This session was last active ${formatDateTime(ts)} (${formatAge(now - ts)}). Run /what if you would like a summary of what happened here.`
 }
 
 function formatResetAt(resetAtMs: number, now = new Date()): string {

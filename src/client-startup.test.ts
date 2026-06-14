@@ -282,7 +282,7 @@ describe('client startup', () => {
 			const notice = client.currentTab()?.history.at(-1)
 			expect(notice?.type).toBe('log')
 			if (notice?.type !== 'log') throw new Error('missing stale-session notice')
-			expect(notice.text).toBe('This session was last active 10 Apr 2026, 20:00 (1 day 4 hours ago)')
+			expect(notice.text).toBe('This session was last active 10 Apr 2026, 20:00 (1 day 4 hours ago). Run /what if you would like a summary of what happened here.')
 		} finally {
 			Date.now = originalNow
 		}
