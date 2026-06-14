@@ -270,6 +270,7 @@ export type TurnEndStatus = 'completed' | 'failed' | 'aborted'
 export interface TurnEndMeta {
 	status: TurnEndStatus
 	usage?: PartialTokenUsage
+	abortText?: string
 }
 
 // ── Tool definitions (sent to providers) ──

@@ -35,6 +35,16 @@ test('historyToBlocks recovers continue state from aborted turn_end', () => {
 	expect(result.at(-1)).toMatchObject({ type: 'log', text: '[paused]' })
 })
 
+
+test('historyToBlocks hides internally-suppressed aborted turn_end', () => {
+	const result = blockData.historyToBlocks([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'turn_end', status: 'aborted', abortText: '' },
+	] as any, 's1')
+
+	expect(result.at(-1)).toMatchObject({ type: 'user', text: 'hello' })
+})
+
 test('historyToBlocks uses the session model for later assistant and thinking blocks', () => {
 	const history: any[] = [
 		{ type: 'thinking', text: 'hmm', ts: '2026-04-15T14:54:01.000Z' },

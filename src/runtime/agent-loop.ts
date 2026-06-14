@@ -393,7 +393,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			})
 			// Persist context so it survives restarts.
 			void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
-			appendTurnEnd(sessionId, { status: 'aborted', usage: hasUsage(totalUsage) ? totalUsage : undefined })
+			appendTurnEnd(sessionId, { status: 'aborted', abortText, usage: hasUsage(totalUsage) ? totalUsage : undefined })
 		}
 
 		// Outer loop: each iteration is one generate call.

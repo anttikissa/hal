@@ -134,7 +134,7 @@ function makeEntryId(used = new Set<string>()): string {
 const historyTopLevelKeys = new Set([
 	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled',
 	'blobId', 'signature', 'model', 'thinkingEffort',
-	'continue', 'usage', 'synthetic', 'syntheticKind',
+	'continue', 'usage', 'abortText', 'synthetic', 'syntheticKind',
 	'toolId', 'name', 'input', 'output', 'isError',
 	'level', 'visibility', 'ui', 'parent', 'child', 'log', 'from', 'to',
 ])

@@ -524,6 +524,7 @@ test('custom abort text is persisted', async () => {
 		})
 		expect(events.some((event) => event.type === 'info' && event.text === 'Tab closed')).toBe(true)
 		expect(events.some((event) => event.type === 'info' && event.text === '[paused]')).toBe(false)
+		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'aborted', abortText: 'Tab closed' })
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
@@ -567,7 +568,7 @@ test('empty abort text stops generation without adding an info block', async () 
 		expect(events.some((event) => event.type === 'info' && (event.text === '[paused]' || event.text === '' || event.text === '[restarted]'))).toBe(false)
 		const streamEnd = events.find((event) => event.type === 'stream-end')
 		expect(streamEnd).toBeTruthy()
-		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'aborted' })
+		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'aborted', abortText: '' })
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
