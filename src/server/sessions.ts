@@ -380,25 +380,17 @@ function rewriteCurrentHistory(sessionId: string, entries: HistoryEntry[]): { lo
 }
 
 function liveBlockToCanceledEntry(block: any): HistoryEntry | null {
-	const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : new Date().toISOString()
-	if (block.type === 'assistant' && block.text) {
-		return { type: 'assistant', text: block.text, model: block.model, ts, canceled: true }
-	}
-	if (block.type === 'thinking' && (block.text || block.blobId)) {
-		const entry: HistoryEntry = {
-			type: 'thinking',
-			blobId: block.blobId,
-			model: block.model,
-			thinkingEffort: block.thinkingEffort,
-			ts,
-			canceled: true,
-		}
-		if (!block.blobId) entry.text = block.text
-		return entry
-	}
-	return null
+	if (block.type !== 'assistant' && block.type !== 'thinking') return null
+	if (!block.text && !block.blobId) return null
+	const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : block.ts
+	return { ...block, ts, canceled: true }
 }
 
+// Mark the visible tail turn as history-only before retrying an edited prompt.
+// The tail starts at the last user entry. Assistant/thinking entries after it
+// become canceled, the old aborted turn_end is removed, and live streamed
+// assistant/thinking blocks are copied into history as canceled too. Tool tails
+// are deliberately refused for v1 because tool side effects already happened.
 function cancelTailTurn(sessionId: string): { logName: string; entryCount: number } | false {
 	const entries = loadHistory(sessionId)
 	let lastUser = -1
