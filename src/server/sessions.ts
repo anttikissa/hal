@@ -367,7 +367,6 @@ function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
 }
 
 function rewriteCurrentHistory(sessionId: string, entries: HistoryEntry[]): { logName: string; entryCount: number } {
-	ensureSessionDir(sessionId)
 	const logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
 	const path = historyLogPath(sessionId, logName)
 	const rewritten = ensureEntryIds(entries, new Set()).map(stringifyHistoryEntry).join('\n')
@@ -381,7 +380,6 @@ function rewriteCurrentHistory(sessionId: string, entries: HistoryEntry[]): { lo
 
 function liveBlockToCanceledEntry(block: any): HistoryEntry | null {
 	if (block.type !== 'assistant' && block.type !== 'thinking') return null
-	if (!block.text && !block.blobId) return null
 	const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : block.ts
 	return { ...block, ts, canceled: true }
 }
@@ -558,7 +556,6 @@ export const sessions = {
 	rotateLog,
 	rewriteHistoryAfterRotation,
 	rewriteHistoryForRebase,
-	rewriteCurrentHistory,
 	cancelTailTurn,
 	pickMostRecentlyClosedSessionId,
 	resolveResumeTarget,
