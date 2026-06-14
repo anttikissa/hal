@@ -224,6 +224,63 @@ test('tab switching preserves the full prompt editor state', () => {
 	}
 })
 
+
+test('idle up uses normal prompt history without edit mode hint', () => {
+	const tab = makeTab({ inputHistory: ['old prompt'] })
+	client.state.working.clear()
+
+	withOneTab(tab, () => {
+		prompt.clear()
+		expect(cli.forTests.handleAppKey(key('up'))).toBe(false)
+		expect(promptEdit.activeFor('s1')).toBe(null)
+		expect(promptEdit.hint('s1')).toBe(null)
+	})
+})
+
+
+test('just-sent edit mode survives tab switching', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const origSaveDraft = client.saveDraft
+	const tab1 = makeTab({ sessionId: 's1', inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }, { type: 'assistant', text: 'partial' }] as any[] })
+	const tab2 = makeTab({ sessionId: 's2', inputDraft: 'second draft' })
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.saveDraft = () => {}
+	client.state.working.set('s1', true)
+
+	try {
+		withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
+			client.state.tabs.length = 0
+			client.state.tabs.push(tab1, tab2)
+			client.state.focusedTabIndex = 0
+			cli.forTests.resetPromptStates()
+			cli.forTests.installPromptTabSwitchHandler()
+			prompt.clear()
+
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
+			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
+			prompt.setText('edited prompt')
+
+			client.switchTab(1)
+			expect(prompt.text()).toBe('second draft')
+			expect(promptEdit.activeFor('s1')).not.toBe(null)
+			expect(promptEdit.hint('s2')).toBe(null)
+
+			client.switchTab(0)
+			expect(prompt.text()).toBe('edited prompt')
+			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.saveDraft = origSaveDraft
+		client.state.working.clear()
+		client.setOnTabSwitch(() => {})
+		cli.forTests.resetPromptStates()
+		prompt.clear()
+		promptEdit.cancel()
+	}
+})
+
 test('model picker keeps the prompt draft and skips unchanged model', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

@@ -380,6 +380,7 @@ function beginPreviousPromptEdit(): boolean {
 	const originalText = client.getInputHistory().at(-1)
 	if (!originalText) return false
 	const working = client.isWorking()
+	if (!working) return false
 	const visibleOutput = hasVisibleOutputAfterLastUser(tab)
 	const sideEffectfulTool = hasSideEffectfulToolAfterLastUser(tab)
 	let mode: 'amend' | 'cancel' | 'copy' | 'side-effect-copy' = 'copy'
@@ -630,7 +631,6 @@ function restorePromptForCurrentTab(): void {
 
 function installPromptTabSwitchHandler(): void {
 	client.setOnTabSwitch((fromSession, _toSession) => {
-		if (promptEdit.activeFor(fromSession)) promptEdit.cancel()
 		promptStates.set(fromSession, prompt.snapshotState())
 		client.saveDraft(prompt.draftText(), fromSession)
 		restorePromptForCurrentTab()
