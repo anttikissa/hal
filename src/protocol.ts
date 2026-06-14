@@ -325,6 +325,7 @@ export interface ProviderRequest {
 
 export interface Provider {
 	generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent>
+	resetSession?: (sessionId: string) => void
 }
 
 // ── Event ID generator ──

@@ -767,7 +767,7 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	}
 }
 
-export const openaiProvider: Provider = { generate: generateOpenAI }
+export const openaiProvider: Provider = { generate: generateOpenAI, resetSession }
 
 /** Create a Chat Completions-compatible provider for any OpenAI-like endpoint. */
 export function createCompatProvider(providerName: string, baseUrl?: string): Provider {

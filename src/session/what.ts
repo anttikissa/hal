@@ -262,7 +262,7 @@ function systemPrompt(): string {
 	return [
 		'You write compact session-recall briefs for Hal coding-agent sessions.',
 		'Return only ASON with fields: title, summary.',
-		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, lower-case, descriptive, and at most 60 characters.',
+		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, descriptive, capitalized, and at most 60 characters.',
 		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
 		'Write like Strunk and White: short, plain sentences. Omit needless words. Split long sentences.',
 		'Address the reader as "you". Do not write "the user" unless quoting text.',
@@ -299,7 +299,15 @@ function parseSummary(text: string): SummaryResult {
 }
 
 function sanitizeTitle(text: string): string {
-	return text.trim().replace(/\s+/g, ' ').toLowerCase().slice(0, 60).trim()
+	return text.trim().replace(/\s+/g, ' ').slice(0, 60).trim()
+}
+
+function capitalizedTitle(text: string): string {
+	return text ? text[0]!.toUpperCase() + text.slice(1) : ''
+}
+
+function summarySessionId(): string {
+	return `what-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 async function summarizeDigest(model: string, digest: string): Promise<SummaryResult> {
@@ -309,16 +317,21 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 	const provider = await providerLoader.getProvider(providerName)
 	const messages: Message[] = [{ role: 'user', content: userPrompt(digest) }]
 	let text = ''
-	for await (const event of provider.generate({ messages, model: modelId, systemPrompt: systemPrompt(), tools: [] })) {
-		if (event.type === 'text') text += event.text ?? ''
-		if (event.type === 'error') throw new Error(event.message ?? 'summary generation failed')
+	const sessionId = summarySessionId()
+	try {
+		for await (const event of provider.generate({ messages, model: modelId, systemPrompt: systemPrompt(), tools: [], sessionId })) {
+			if (event.type === 'text') text += event.text ?? ''
+			if (event.type === 'error') throw new Error(event.message ?? 'summary generation failed')
+		}
+	} finally {
+		provider.resetSession?.(sessionId)
 	}
 	return parseSummary(text)
 }
 
 function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[], includeLabel: boolean): string {
 	const meta = sessions.loadSessionMeta(sessionId)
-	const title = result.title || meta?.name || sessionId
+	const title = capitalizedTitle(result.title || meta?.name || sessionId)
 	const label = includeLabel ? ` (${compactTargetLabel(sessionId, openSessionIds)})` : ''
 	return [`## ${title}${label}`, '', result.summary].join('\n')
 }

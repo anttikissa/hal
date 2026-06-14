@@ -74,7 +74,7 @@ test('run writes ui-only summary to target and fills empty target name', async (
 	const targetHistory = sessions.loadHistory(target)
 	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'assistant', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui' }))
 	const summary = targetHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
-	expect(summary?.type === 'assistant' ? summary.text : '').toContain('## plan bug fix')
+	expect(summary?.type === 'assistant' ? summary.text : '').toContain('## Plan bug fix')
 	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('session ')
 	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('state idle/open')
 	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'info', visibility: 'next-user', text: 'User ran /what for this session.' }))
@@ -106,6 +106,40 @@ test('run persists per-target summary errors', async () => {
 	expect(summary?.type === 'assistant' ? summary.text : '').toContain('Summary failed: provider down')
 })
 
+
+test('summaries use isolated provider sessions', async () => {
+	const requester = makeSession('requester', 'requester')
+	const one = makeSession('one', 'one')
+	const two = makeSession('two', 'two')
+	const sessionIds: string[] = []
+	const resetIds: string[] = []
+	const origAppendEvent = ipc.appendEvent
+	const origGetProvider = providerLoader.getProvider
+	ipc.appendEvent = () => {}
+	providerLoader.getProvider = async () => ({
+		async *generate(req: any) {
+			sessionIds.push(req.sessionId)
+			yield { type: 'text' as const, text: "{ title: 'summary', summary: 'Summary.' }" }
+		},
+		resetSession(sessionId: string) {
+			resetIds.push(sessionId)
+		},
+	})
+
+	try {
+		await whatSummary.run({ requesterSessionId: requester, target: '2-3', openSessionIds: [requester, one, two] })
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		providerLoader.getProvider = origGetProvider
+	}
+
+	expect(sessionIds).toHaveLength(2)
+	expect(sessionIds[0]!.startsWith('what-')).toBe(true)
+	expect(sessionIds[1]!.startsWith('what-')).toBe(true)
+	expect(sessionIds[0]).not.toBe(sessionIds[1])
+	expect(resetIds).toEqual(sessionIds)
+})
+
 test('run does not overwrite existing target name', async () => {
 	const requester = makeSession('requester', 'requester')
 	const target = makeSession('target', 'manual name')
@@ -134,6 +168,7 @@ test('summary prompt asks for compact grounded narrative style', () => {
 	const prompt = whatSummary.systemPrompt()
 
 	expect(prompt).toContain('initiating user problem')
+	expect(prompt).toContain('capitalized')
 	expect(prompt).toContain('short narrative')
 	expect(prompt).toContain('Every sentence must help')
 	expect(prompt).toContain('metadata inventories')
