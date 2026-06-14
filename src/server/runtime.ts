@@ -494,6 +494,10 @@ function handleCommand(cmd: Command): void {
 					agentLoop.abort(sessionId, '')
 					await Bun.sleep(50)
 				}
+				// Continuing resumes the paused turn that held the queue. If it completes,
+				// queued prompts should drain immediately instead of staying stuck behind
+				// the paused-turn safety hold.
+				promptQueue.setHeld(sessionId, false)
 				void runGeneration(sessionId, '')
 			})()
 			break

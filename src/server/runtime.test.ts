@@ -613,6 +613,46 @@ test('held queue does not drain after unrelated completed prompt', () => {
 })
 
 
+test('continue releases a held queue so completion drains it', async () => {
+	const sessionId = `test-continue-held-${Date.now().toString(36)}`
+	const calls: any[] = []
+	const origHandlePrompt = runtime.handlePrompt
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origIsWorking = agentLoop.isWorking
+	const origOwnsHostLock = ipc.ownsHostLock
+	try {
+		ipc.ownsHostLock = () => true
+		agentLoop.isWorking = () => false
+		agentLoop.runAgentLoop = async () => 'completed'
+		runtime.handlePrompt = async (id, text, label) => {
+			calls.push({ id, text, label })
+		}
+		sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: '2026-05-20T00:00:00.000Z',
+			currentLog: 'history.asonl',
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.5',
+		})
+		promptQueue.append(sessionId, { text: 'run after continue', createdAt: '2026-05-20T00:00:01.000Z' })
+		promptQueue.setHeld(sessionId, true)
+
+		runtime.handleCommand({ type: 'continue', sessionId })
+		await Bun.sleep(10)
+
+		expect(calls).toEqual([{ id: sessionId, text: 'run after continue', label: 'queued' }])
+		expect(promptQueue.load(sessionId)).toEqual([])
+		expect(promptQueue.isHeld(sessionId)).toBe(false)
+	} finally {
+		runtime.handlePrompt = origHandlePrompt
+		agentLoop.runAgentLoop = origRunAgentLoop
+		agentLoop.isWorking = origIsWorking
+		ipc.ownsHostLock = origOwnsHostLock
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
+
+
 test('recordTabClosed emits info when no turn is working', () => {
 	const events: any[] = []
 	const origAbort = agentLoop.abort
