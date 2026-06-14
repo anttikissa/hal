@@ -43,6 +43,11 @@ const TAB_CLOSED_TEXT = 'Tab closed'
 const pendingWhatResults = new Map<string, string[]>()
 
 function emitBackgroundActivity(sessionId: string, activity: 'summarizing', active: boolean, done = false): void {
+	ipc.updateState((shared) => {
+		shared.summarizing ??= {}
+		if (active) shared.summarizing[sessionId] = true
+		else delete shared.summarizing[sessionId]
+	})
 	ipc.appendEvent({ type: 'background-activity', sessionId, activity, active, done, createdAt: new Date().toISOString() })
 }
 
@@ -557,16 +562,23 @@ function handleCommand(cmd: Command): void {
 		case 'what': {
 			if (!sessionId) return
 			const resolved = whatSummary.resolveTargets(cmd.target ?? '', sessionId, state.openSessionIds)
-			const activityIds = resolved.ok ? [...new Set(resolved.ids)] : []
+			const ids = resolved.ok ? [...new Set(resolved.ids)] : []
+			const summarizing = ipc.readState().summarizing ?? {}
+			const activityIds = ids.filter((id) => !summarizing[id])
+			const skippedIds = ids.filter((id) => summarizing[id])
+			if (skippedIds.length > 0) emitInfo(sessionId, `Already summarizing: ${skippedIds.join(', ')}`)
+			if (resolved.ok && activityIds.length === 0) return
 			for (const id of activityIds) emitBackgroundActivity(id, 'summarizing', true)
 			void (async () => {
 				try {
-					const result = await whatSummary.run({ requesterSessionId: sessionId, target: cmd.target ?? '', openSessionIds: state.openSessionIds, persist: persistWhatResult })
+					const result = await whatSummary.run({ requesterSessionId: sessionId, target: cmd.target ?? '', targetIds: resolved.ok ? activityIds : undefined, openSessionIds: state.openSessionIds, persist: persistWhatResult })
 					if (result.renamed) broadcastSessions()
 				} catch (err) {
 					emitInfo(sessionId, `/what failed: ${errorMessage(err)}`, 'error', undefined, false)
 				} finally {
-					for (const id of activityIds) emitBackgroundActivity(id, 'summarizing', false)
+					for (const id of activityIds) {
+						if (!pendingWhatResults.has(id)) emitBackgroundActivity(id, 'summarizing', false)
+					}
 				}
 			})()
 			break
@@ -700,6 +712,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	}, { once: true })
 	ipc.updateState((state) => {
 		state.working = {}
+		state.summarizing = {}
 	})
 	if (state.openSessionIds.length > 0) tabs.syncSharedState()
 	void modelNotices.refreshModelMetadata()

@@ -543,6 +543,7 @@ function applySharedStatus(shared: SharedState): void {
 		}
 	}
 	state.working = nextWorking
+	state.summarizing = new Set(Object.keys(shared.summarizing ?? {}))
 	for (const sessionId of state.toolConfirmPending) {
 		if (!nextWorking.get(sessionId)) state.toolConfirmPending.delete(sessionId)
 	}

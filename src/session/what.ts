@@ -21,6 +21,7 @@ interface RunWhatOpts {
 	requesterSessionId: string
 	target: string
 	openSessionIds: string[]
+	targetIds?: string[]
 	model?: string
 	persist?: (sessionId: string, targetIds: string[], text: string) => void
 }
@@ -363,17 +364,20 @@ function errorMessage(err: unknown): string {
 
 async function run(opts: RunWhatOpts): Promise<{ renamed: boolean; targetIds: string[] }> {
 	const metas = sessions.loadAllSessionMetas()
-	const resolved = whatSummary.resolveTargets(opts.target, opts.requesterSessionId, opts.openSessionIds, metas)
 	const persist = opts.persist ?? whatSummary.persistResult
-	if (!resolved.ok) {
-		persist(opts.requesterSessionId, [], resolved.error)
-		return { renamed: false, targetIds: [] }
+	let targetIds = unique(opts.targetIds ?? [])
+	if (!opts.targetIds) {
+		const resolved = whatSummary.resolveTargets(opts.target, opts.requesterSessionId, opts.openSessionIds, metas)
+		if (!resolved.ok) {
+			persist(opts.requesterSessionId, [], resolved.error)
+			return { renamed: false, targetIds: [] }
+		}
+		targetIds = unique(resolved.ids)
 	}
 
 	const requester = sessions.loadSessionMeta(opts.requesterSessionId)
 	const model = opts.model ?? requester?.model ?? models.defaultModel()
 	const shared = ipc.readState()
-	const targetIds = unique(resolved.ids)
 	let renamed = false
 	for (const sessionId of targetIds) {
 		try {

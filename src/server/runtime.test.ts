@@ -13,6 +13,7 @@ import { HAL_DIR } from '../state.ts'
 import { config } from '../config.ts'
 import { promptQueue } from '../runtime/prompt-queue.ts'
 import { paths } from '../utils/paths.ts'
+import { whatSummary } from '../session/what.ts'
 
 test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -57,6 +58,51 @@ test('client status commands update shared client process list', () => {
 		expect(shared.clients).toEqual([])
 	} finally {
 		ipc.updateState = origUpdateState
+	}
+})
+
+
+test('/what stores summarizing in shared state and skips duplicate targets', async () => {
+	const origUpdateState = ipc.updateState
+	const origReadState = ipc.readState
+	const origAppendEvent = ipc.appendEvent
+	const origResolveTargets = whatSummary.resolveTargets
+	const origRun = whatSummary.run
+	const origOpenSessionIds = [...runtime.state.openSessionIds]
+	const shared: any = { sessions: [], working: {}, summarizing: {}, clients: [], updatedAt: '' }
+	const events: any[] = []
+	const runs: any[] = []
+	let release!: () => void
+	const done = new Promise<void>((resolve) => { release = resolve })
+	ipc.updateState = ((mutator: (state: any) => void) => {
+		mutator(shared)
+		return shared
+	}) as typeof ipc.updateState
+	ipc.readState = (() => shared) as typeof ipc.readState
+	ipc.appendEvent = (event: any) => { events.push(event) }
+	whatSummary.resolveTargets = () => ({ ok: true, ids: ['04-target'] })
+	whatSummary.run = (async (opts: any) => {
+		runs.push(opts.targetIds)
+		await done
+		return { renamed: false, targetIds: opts.targetIds }
+	}) as typeof whatSummary.run
+	try {
+		runtime.state.openSessionIds = ['04-requester', '04-target']
+		runtime.handleCommand({ type: 'what', sessionId: '04-requester', target: '2' })
+		expect(shared.summarizing).toEqual({ '04-target': true })
+		runtime.handleCommand({ type: 'what', sessionId: '04-requester', target: '2' })
+		expect(runs).toEqual([['04-target']])
+		expect(events).toContainEqual(expect.objectContaining({ type: 'info', text: 'Already summarizing: 04-target' }))
+		release()
+		await new Promise((resolve) => setTimeout(resolve, 0))
+		expect(shared.summarizing).toEqual({})
+	} finally {
+		ipc.updateState = origUpdateState
+		ipc.readState = origReadState
+		ipc.appendEvent = origAppendEvent
+		whatSummary.resolveTargets = origResolveTargets
+		whatSummary.run = origRun
+		runtime.state.openSessionIds = origOpenSessionIds
 	}
 })
 
@@ -202,7 +248,7 @@ test('fork command persists one child notice without duplicating bare session id
 	try {
 		runtime.state.openSessionIds = [parentId]
 		ipc.appendEvent = (event: any) => { events.push(event) }
-		ipc.updateState = () => ({ sessions: [], working: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
+		ipc.updateState = () => ({ sessions: [], working: {}, summarizing: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
 		context.watchPromptFiles = () => () => {}
 		sessions.loadSessionMeta = (id) => metas[id] ?? null
 		sessions.forkSession = (sourceId, newId) => {
@@ -303,7 +349,7 @@ test('open command inherits cwd and model from opener tab', () => {
 
 	try {
 		runtime.state.openSessionIds = [parentId]
-		ipc.updateState = () => ({ sessions: [], working: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
+		ipc.updateState = () => ({ sessions: [], working: {}, summarizing: {}, updatedAt: '2026-05-21T10:00:00.000Z' })
 		context.watchPromptFiles = () => () => {}
 		context.buildSystemPrompt = () => ({ text: '', loaded: [], bytes: 0 })
 		context.estimateContext = () => ({ used: 0, max: 100, estimated: true })
