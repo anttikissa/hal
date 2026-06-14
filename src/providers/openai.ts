@@ -744,6 +744,10 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	openaiUsage.setCurrentCredential(credential)
 
 	const mode = responsesTransportMode()
+	if (req.stateless) {
+		yield* generateOpenAIHttp(req, credential, transport, openaiEntry)
+		return
+	}
 	if (mode === 'http') {
 		yield* generateOpenAIHttp(req, credential, transport, openaiEntry)
 		return
@@ -767,7 +771,7 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	}
 }
 
-export const openaiProvider: Provider = { generate: generateOpenAI, resetSession }
+export const openaiProvider: Provider = { generate: generateOpenAI }
 
 /** Create a Chat Completions-compatible provider for any OpenAI-like endpoint. */
 export function createCompatProvider(providerName: string, baseUrl?: string): Provider {

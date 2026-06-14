@@ -605,6 +605,34 @@ test('openai websocket transport uses wss endpoint and response.create', async (
 	expect(events).toContainEqual(expect.objectContaining({ type: 'done', doneStatus: 'completed', usage: { input: 1, output: 2, cacheRead: 0, cacheCreation: 0 } }))
 })
 
+
+test('openai stateless requests use HTTP instead of websocket continuation', async () => {
+	process.env.HAL_OPENAI_RESPONSES_TRANSPORT = 'ws'
+	FakeWebSocket.instances = []
+	globalThis.WebSocket = FakeWebSocket as any
+	setupOpenAiToken()
+	const calls: FetchCall[] = []
+	globalThis.fetch = Object.assign(async (input: any, init?: RequestInit) => {
+		const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+		calls.push({ url, init })
+		return new Response(responsesSse(), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	}, { preconnect: () => {} }) as typeof fetch
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'gpt-5.5',
+		systemPrompt: 'system',
+		tools: [],
+		stateless: true,
+	})) events.push(event)
+
+	expect(FakeWebSocket.instances).toHaveLength(0)
+	expect(calls).toHaveLength(1)
+	expect(events).toContainEqual({ type: 'text', text: 'hello' })
+	expect(events).toContainEqual(expect.objectContaining({ type: 'done' }))
+})
+
 class HangingWebSocket extends FakeWebSocket {
 	override send(raw: string): void {
 		this.sent.push(JSON.parse(raw))

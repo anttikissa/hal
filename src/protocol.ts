@@ -321,11 +321,11 @@ export interface ProviderRequest {
 	tools: ToolDef[]
 	signal?: AbortSignal
 	sessionId?: string
+	stateless?: boolean
 }
 
 export interface Provider {
 	generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEvent>
-	resetSession?: (sessionId: string) => void
 }
 
 // ── Event ID generator ──

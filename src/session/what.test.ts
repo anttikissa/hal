@@ -107,22 +107,18 @@ test('run persists per-target summary errors', async () => {
 })
 
 
-test('summaries use isolated provider sessions', async () => {
+test('summaries ask provider for stateless calls', async () => {
 	const requester = makeSession('requester', 'requester')
 	const one = makeSession('one', 'one')
 	const two = makeSession('two', 'two')
-	const sessionIds: string[] = []
-	const resetIds: string[] = []
+	const stateless: boolean[] = []
 	const origAppendEvent = ipc.appendEvent
 	const origGetProvider = providerLoader.getProvider
 	ipc.appendEvent = () => {}
 	providerLoader.getProvider = async () => ({
 		async *generate(req: any) {
-			sessionIds.push(req.sessionId)
+			stateless.push(req.stateless)
 			yield { type: 'text' as const, text: "{ title: 'summary', summary: 'Summary.' }" }
-		},
-		resetSession(sessionId: string) {
-			resetIds.push(sessionId)
 		},
 	})
 
@@ -133,11 +129,7 @@ test('summaries use isolated provider sessions', async () => {
 		providerLoader.getProvider = origGetProvider
 	}
 
-	expect(sessionIds).toHaveLength(2)
-	expect(sessionIds[0]!.startsWith('what-')).toBe(true)
-	expect(sessionIds[1]!.startsWith('what-')).toBe(true)
-	expect(sessionIds[0]).not.toBe(sessionIds[1])
-	expect(resetIds).toEqual(sessionIds)
+	expect(stateless).toEqual([true, true])
 })
 
 test('run does not overwrite existing target name', async () => {

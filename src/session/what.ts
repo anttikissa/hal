@@ -306,10 +306,6 @@ function capitalizedTitle(text: string): string {
 	return text ? text[0]!.toUpperCase() + text.slice(1) : ''
 }
 
-function summarySessionId(): string {
-	return `what-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-}
-
 async function summarizeDigest(model: string, digest: string): Promise<SummaryResult> {
 	const slash = model.indexOf('/')
 	const providerName = slash >= 0 ? model.slice(0, slash) : 'stub'
@@ -317,14 +313,9 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 	const provider = await providerLoader.getProvider(providerName)
 	const messages: Message[] = [{ role: 'user', content: userPrompt(digest) }]
 	let text = ''
-	const sessionId = summarySessionId()
-	try {
-		for await (const event of provider.generate({ messages, model: modelId, systemPrompt: systemPrompt(), tools: [], sessionId })) {
-			if (event.type === 'text') text += event.text ?? ''
-			if (event.type === 'error') throw new Error(event.message ?? 'summary generation failed')
-		}
-	} finally {
-		provider.resetSession?.(sessionId)
+	for await (const event of provider.generate({ messages, model: modelId, systemPrompt: systemPrompt(), tools: [], stateless: true })) {
+		if (event.type === 'text') text += event.text ?? ''
+		if (event.type === 'error') throw new Error(event.message ?? 'summary generation failed')
 	}
 	return parseSummary(text)
 }
