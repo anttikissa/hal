@@ -21,7 +21,7 @@ liveFiles.onChange(data, (change) => {
 // Keep a plain object synced with an ASON file. Mutations write back on the next
 // microtask, and optional watching patches external edits into the same object.
 
-import { readFileSync, writeFileSync, renameSync, existsSync, watch } from 'fs'
+import { readFileSync, writeFileSync, renameSync, watch } from 'fs'
 import { dirname } from 'path'
 import { ason } from './ason.ts'
 
@@ -33,21 +33,6 @@ interface LiveFileChange {
 
 type LiveFileChangeCallback = (change: LiveFileChange) => void
 
-function cloneValue(value: any): any {
-	if (value && typeof value === 'object' && !Array.isArray(value)) return cloneRecord(value)
-	if (!Array.isArray(value)) return value
-	const out: any[] = []
-	for (const item of value) out.push(cloneValue(item))
-	return out
-}
-
-function cloneRecord(value: Record<string, any>): Record<string, any> {
-	const out: Record<string, any> = {}
-	for (const [key, item] of Object.entries(value)) {
-		out[key] = cloneValue(item)
-	}
-	return out
-}
 
 interface LiveState {
 	path: string
@@ -62,13 +47,23 @@ interface LiveState {
 
 const registry = new WeakMap<object, LiveState>()
 
+function loadFromDisk(path: string, data: Record<string, any>, notify = false, callbacks: LiveFileChangeCallback[] = [], replace = true): void {
+	try {
+		const next = ason.parse(readFileSync(path, 'utf-8'), { comments: true }) as Record<string, any>
+		if (ason.stringify(data) === ason.stringify(next)) return
+		let change: LiveFileChange | null = null
+		if (notify) change = { path, previous: structuredClone(data), next: structuredClone(next) }
+		// Mutate in place so existing proxies keep pointing at fresh data.
+		if (replace) for (const key of Object.keys(data)) {
+			if (!(key in next)) delete data[key]
+		}
+		Object.assign(data, next)
+		if (change) for (const cb of callbacks) cb(change)
+	} catch {}
+}
 function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts?: { watch?: boolean }): T {
 	const data: Record<string, any> = { ...defaults }
-	if (existsSync(path)) {
-		try {
-			Object.assign(data, ason.parse(readFileSync(path, 'utf-8'), { comments: true }) as any)
-		} catch {}
-	}
+	loadFromDisk(path, data, false, [], false)
 
 	const state: LiveState = {
 		path,
@@ -113,20 +108,7 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 				if (ownWrite) return
 				if (debounce) clearTimeout(debounce)
 				debounce = setTimeout(() => {
-					try {
-						const next = ason.parse(readFileSync(path, 'utf-8'), { comments: true }) as Record<string, any>
-						const before = ason.stringify(data)
-						const after = ason.stringify(next)
-						if (before === after) return
-						const previous = cloneRecord(data)
-						const nextSnapshot = cloneRecord(next)
-						// Mutate in place so existing proxies keep pointing at fresh data.
-						for (const key of Object.keys(data)) {
-							if (!(key in next)) delete data[key]
-						}
-						Object.assign(data, next)
-						for (const cb of state.callbacks) cb({ path, previous, next: nextSnapshot })
-					} catch {}
+					loadFromDisk(path, data, true, state.callbacks)
 				}, 50)
 			})
 		} catch {}
@@ -157,10 +139,16 @@ function save(proxy: object): void {
 	registry.get(proxy)?.doFlush()
 }
 
+function reload<T extends object>(proxy: T): T {
+	const state = registry.get(proxy)
+	if (state) loadFromDisk(state.path, state.data)
+	return proxy
+}
+
 function onChange(proxy: object, cb: LiveFileChangeCallback): void
 function onChange(proxy: object, cb: () => void): void
 function onChange(proxy: object, cb: LiveFileChangeCallback): void {
 	registry.get(proxy)?.callbacks.push(cb)
 }
 
-export const liveFiles = { liveFile, save, onChange }
+export const liveFiles = { liveFile, save, reload, onChange }

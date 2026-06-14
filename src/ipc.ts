@@ -131,13 +131,13 @@ function getStateFile(): SharedState {
 }
 
 function readState(): SharedState {
-	return getStateFile()
+	return liveFiles.reload(getStateFile())
 }
 
 // Shared runtime state belongs in state.ason, not in the unbounded events log.
 // This file is the bootstrap source of truth for new clients.
 function updateState(mutator: (state: SharedState) => void): SharedState {
-	const state = getStateFile()
+	const state = readState()
 	mutator(state)
 	state.updatedAt = new Date().toISOString()
 	// Callers often append a matching event right after updating state. Force the

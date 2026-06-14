@@ -83,6 +83,30 @@ async function waitFor<T>(read: () => T, ok: (value: T) => boolean, timeoutMs = 
 	return last
 }
 
+test('readState refreshes state.ason after another process writes it', () => {
+	const result = Bun.spawnSync({
+		cmd: ['bun', '-e', `
+			import { writeFileSync } from 'fs'
+			import { join } from 'path'
+			import { ensureStateDir, IPC_DIR } from './src/state.ts'
+			import { ipc } from './src/ipc.ts'
+			import { ason } from './src/utils/ason.ts'
+			ensureStateDir()
+			const file = join(IPC_DIR, 'state.ason')
+			const base = { sessions: [], working: {}, updatedAt: 'one' }
+			writeFileSync(file, ason.stringify(base) + '\\n')
+			ipc.readState()
+			writeFileSync(file, ason.stringify({ ...base, sessions: [{ id: 'fresh', cwd: '/tmp' }], updatedAt: 'two' }) + '\\n')
+			if (ipc.readState().sessions[0]?.id !== 'fresh') process.exit(1)
+		`],
+		cwd: HAL_DIR,
+		env: halEnv(),
+		stdout: 'pipe',
+		stderr: 'pipe',
+	})
+	expect(result.exitCode).toBe(0)
+})
+
 describe('host election', () => {
 	test('exactly one host when 5 processes start simultaneously', async () => {
 		const env = halEnv()

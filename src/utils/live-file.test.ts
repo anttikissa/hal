@@ -50,6 +50,14 @@ test('save() forces immediate flush', () => {
 	expect(disk.x).toBe(99)
 })
 
+test('reload refreshes unwatched data from disk', () => {
+	const path = join(dir, 'reload.ason')
+	writeFileSync(path, ason.stringify({ v: 1 }) + '\n')
+	const data = liveFiles.liveFile(path, { v: 0 }, { watch: false })
+	writeFileSync(path, ason.stringify({ v: 2 }) + '\n')
+	expect(liveFiles.reload(data).v).toBe(2)
+})
+
 test('nested object mutations auto-save', async () => {
 	const path = join(dir, 'nested.ason')
 	const data = liveFiles.liveFile(path, { deep: { val: 1 } }, { watch: false })
