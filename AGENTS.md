@@ -7,7 +7,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Use bun - never node, npm or npx
 - Use red-green TDD.
 - Do not write tests for exact LLM output. LLM output is indeterministic; test deterministic parsing, wiring, and fallback behavior instead.
-- Use `./test` to run all tests, typechecker and oxlint. First run all the tests.
+- Use `./test` to run all tests, typechecker and oxlint. Run the tests before writing code.
 - If tests fail, look for busy sessions that might have ongoing changes (eval "require('~/ipc.ts').ipc.readState().busy")
 - If no busy sessions, work with the user to fix the tests.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
