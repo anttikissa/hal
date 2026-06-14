@@ -29,6 +29,15 @@ test('formatModelRefreshMessage reports initial models.dev fetch without change 
 })
 
 
+test('new model discovery labels keep raw model ids', () => {
+	const text = modelRefresh.buildNewModelDiscoveryText([
+		{ provider: 'Anthropic', model: 'claude-opus4-8', context: 1_000_000 },
+	])
+	expect(text).toContain('Anthropic claude-opus4-8')
+	expect(text).not.toContain('Claude Opus4 8')
+})
+
+
 test('model metadata refresh notice goes only to focused session', async () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
@@ -45,8 +54,8 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		hadCache: true,
 		changes: ['new Claude model claude-opus-4-7 (1000k)'],
 		modelCount: 123,
-		previous: {},
-		next: {},
+		previous: { 'claude-opus-4-8': 1_000_000 },
+		next: { 'claude-opus-4-8': 1_000_000, 'claude-opus-4-9': 1_000_000 },
 	})
 	sessions.appendHistorySync = (sessionId: string, entries: any[]) => {
 		histories.push({ sessionId, entries })
@@ -66,6 +75,32 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		models.refreshModels = origRefreshModels
 		sessions.appendHistorySync = origAppendHistorySync
 		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
+test('automatic model metadata refresh does not prompt for new model ids', async () => {
+	const origRefreshModels = models.refreshModels
+	const origSuggestAliasUpdates = modelNotices.suggestAliasUpdates
+	const origSuggestModelDiscoveries = modelNotices.suggestModelDiscoveries
+	let discoveryPrompts = 0
+	models.refreshModels = async () => ({
+		fetched: true,
+		hadCache: true,
+		changes: [],
+		modelCount: 123,
+		previous: {},
+		next: { 'gpt-6': 1_000_000 },
+	})
+	modelNotices.suggestAliasUpdates = () => {}
+	modelNotices.suggestModelDiscoveries = () => { discoveryPrompts++ }
+	try {
+		await modelNotices.refreshModelMetadata()
+		expect(discoveryPrompts).toBe(0)
+	} finally {
+		models.refreshModels = origRefreshModels
+		modelNotices.suggestAliasUpdates = origSuggestAliasUpdates
+		modelNotices.suggestModelDiscoveries = origSuggestModelDiscoveries
 	}
 })
 
@@ -136,7 +171,7 @@ test('suggestAliasUpdates emits one synthetic notice, preferring an open ~/.hal 
 })
 
 
-test('suggestModelDiscoveries emits a prominent synthetic notice for new Anthropic and OpenAI models', () => {
+test('suggestModelDiscoveries emits a low-key informational notice for new Anthropic and OpenAI model ids', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origLoadSessionMeta = sessions.loadSessionMeta
@@ -172,10 +207,12 @@ test('suggestModelDiscoveries emits a prominent synthetic notice for new Anthrop
 		expect(events).toHaveLength(1)
 		expect(histories[0].sessionId).toBe('04-work')
 		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-work', synthetic: true })
-		expect(events[0].text).toContain('🚨 New Anthropic/OpenAI models detected')
-		expect(events[0].text).toContain('claude-fable-5')
-		expect(events[0].text).toContain('gpt-5.5-instant')
-		expect(events[0].text).toContain('update model aliases')
+		expect(events[0].text).toContain('ℹ️ New model ids found in models.dev')
+		expect(events[0].text).toContain('Anthropic claude-fable-5')
+		expect(events[0].text).toContain('OpenAI gpt-5.5-instant')
+		expect(events[0].text).toContain('This is informational')
+		expect(events[0].text).not.toContain('Would you like')
+		expect(events[0].text).not.toContain('🚨')
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
@@ -233,7 +270,7 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 		expect(child?.name).toBe('new models')
 		expect(child?.attention).toBe('new')
 		expect(events[0]).toMatchObject({ type: 'response', sessionId: childId, synthetic: true })
-		expect(events[0].text).toContain('Claude Fable 5')
+		expect(events[0].text).toContain('Anthropic claude-fable-5')
 		expect(shared.sessions.some((item: any) => item.id === childId)).toBe(true)
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds

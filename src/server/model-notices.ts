@@ -71,7 +71,7 @@ function suggestModelDiscoveries(previous: Record<string, number>, next: Record<
 	const meta = modelDiscoveryTarget()
 	if (!meta) return
 	const model = meta.model ?? models.defaultModel()
-	emitSyntheticAssistant(meta.id, modelRefresh.buildNewModelDiscoveryText(discoveries, meta.workingDir ?? process.cwd()), 'model-discovery', model)
+	modelNotices.emitSyntheticAssistant(meta.id, modelRefresh.buildNewModelDiscoveryText(discoveries), 'model-discovery', model)
 }
 
 async function refreshModelMetadata(): Promise<void> {
@@ -84,7 +84,6 @@ async function refreshModelMetadata(): Promise<void> {
 		}
 		if (result.hadCache) {
 			modelNotices.suggestAliasUpdates(result.previous, result.next)
-			modelNotices.suggestModelDiscoveries(result.previous, result.next)
 		}
 	} catch (err) {
 		log.error('models.dev refresh failed', { error: errorMessage(err) })
