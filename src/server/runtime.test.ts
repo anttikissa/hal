@@ -418,6 +418,38 @@ test('enqueuePrompt stores prompts while session is working', async () => {
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })
+
+
+test('drained queued prompts keep raw text so slash commands stay commands', async () => {
+	const sessionId = `test-queue-raw-${Date.now().toString(36)}`
+	const calls: any[] = []
+	const origHandlePrompt = runtime.handlePrompt
+
+	try {
+		runtime.handlePrompt = async (id, text, label, source, displayText) => {
+			calls.push({ id, text, label, source, displayText })
+		}
+		promptQueue.append(sessionId, {
+			text: '/rename after queue',
+			source: 'user',
+			displayText: '/rename after queue',
+			createdAt: '2026-05-20T00:00:00.000Z',
+		})
+
+		expect(await queueRunner.runNextQueuedPrompt(sessionId, false)).toBe(true)
+
+		expect(calls).toEqual([{
+			id: sessionId,
+			text: '/rename after queue',
+			label: 'queued',
+			source: 'user',
+			displayText: '/rename after queue',
+		}])
+	} finally {
+		runtime.handlePrompt = origHandlePrompt
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
 test('working queue slash command does not abort the running turn', async () => {
 	const sessionId = `test-queue-working-${Date.now().toString(36)}`
 	const events: any[] = []

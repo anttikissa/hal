@@ -63,7 +63,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 		return false
 	}
 	promptQueue.setHeld(sessionId, false)
-	await runtime.handlePrompt(sessionId, `<meta>Queued prompt, queued at ${next.createdAt}.</meta>\n${next.text}`, 'queued', next.source, next.displayText ?? next.text)
+	await runtime.handlePrompt(sessionId, next.text, 'queued', next.source, next.displayText ?? next.text)
 	return true
 }
 
