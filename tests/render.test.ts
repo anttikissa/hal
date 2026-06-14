@@ -341,6 +341,19 @@ describe('render', () => {
 		}
 	})
 
+	test('prompt top rule centers working activity status', () => {
+		const originalCols = process.stdout.columns
+		try {
+			Object.defineProperty(process.stdout, 'columns', { value: 20, configurable: true })
+			client.currentTab()!.history.push({ type: 'assistant', text: 'hello', streaming: true })
+			client.state.working.set('test', true)
+			const lines: string[] = []
+			renderStatus.renderPrompt(lines)
+			expect(stripAnsi(lines[0]!)).toBe('───── writing ──────')
+		} finally {
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
 
 	test('prompt cursor shape is configurable', () => {
 		renderStatus.config.promptCursorShape = 'bar'

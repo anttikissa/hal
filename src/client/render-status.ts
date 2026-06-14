@@ -456,11 +456,50 @@ function promptContentWidth(cols: number): number {
 	return renderStatus.contentWidth(cols)
 }
 
-function promptRule(cols: number, indicator = ''): string {
-	const prefix = indicator ? ` ${indicator} ` : ''
-	const clipped = visLen(prefix) > cols ? clipVisual(prefix, cols) : prefix
-	const rule = '─'.repeat(Math.max(0, cols - visLen(clipped)))
-	return `${renderStatus.inputStyle()}${clipped}${rule}${RESET}`
+function activityStatusLabel(tab = client.currentTab()): string {
+	if (!tab) return ''
+	if (client.state.toolConfirmPending.has(tab.sessionId)) return 'waiting for approval'
+	if (!client.state.working.get(tab.sessionId)) return ''
+
+	for (let i = tab.history.length - 1; i >= 0; i--) {
+		const block = tab.history[i]!
+		if (block.type === 'assistant' && block.streaming) return 'writing'
+		if (block.type === 'thinking' && block.streaming) return 'thinking'
+		if (block.type === 'tool' && block.output == null) return `running ${block.name}`
+		if (block.type === 'info') {
+			const match = block.text.match(/retrying in (\S+)/i)
+			if (match) return `retrying in ${match[1]}`
+		}
+	}
+
+	return 'thinking'
+}
+
+function ruleText(cols: number, left = '', center = ''): string {
+	const leftText = left ? ` ${left} ` : ''
+	const centerText = center ? ` ${center} ` : ''
+	if (!centerText) {
+		const clippedLeft = visLen(leftText) > cols ? clipVisual(leftText, cols) : leftText
+		return `${clippedLeft}${'─'.repeat(Math.max(0, cols - visLen(clippedLeft)))}`
+	}
+
+	const clippedCenter = visLen(centerText) > cols ? clipVisual(centerText, cols) : centerText
+	const centerWidth = visLen(clippedCenter)
+	let clippedLeft = leftText
+	if (visLen(clippedLeft) + centerWidth > cols) clippedLeft = clipVisual(clippedLeft, Math.max(0, cols - centerWidth))
+
+	const leftWidth = visLen(clippedLeft)
+	let centerStart = Math.floor(Math.max(0, cols - centerWidth) / 2)
+	if (centerStart < leftWidth) centerStart = leftWidth
+	if (centerStart + centerWidth > cols) centerStart = Math.max(0, cols - centerWidth)
+
+	const beforeCenter = Math.max(0, centerStart - leftWidth)
+	const afterCenter = Math.max(0, cols - leftWidth - beforeCenter - centerWidth)
+	return `${clippedLeft}${'─'.repeat(beforeCenter)}${clippedCenter}${'─'.repeat(afterCenter)}`
+}
+
+function promptRule(cols: number, indicator = '', status = ''): string {
+	return `${renderStatus.inputStyle()}${renderStatus.ruleText(cols, indicator, status)}${RESET}`
 }
 
 function paddedPromptLine(line: string, cols: number): string {
@@ -472,7 +511,7 @@ function renderPrompt(lines: string[]): void {
 	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
 	const above = p.fold.above > 0 ? `↑${p.fold.above}` : ''
 	const below = p.fold.below > 0 ? `↓${p.fold.below}` : ''
-	lines.push(renderStatus.promptRule(cols, above))
+	lines.push(renderStatus.promptRule(cols, above, renderStatus.activityStatusLabel()))
 	for (const line of p.lines) lines.push(renderStatus.paddedPromptLine(line, cols))
 	lines.push(renderStatus.promptRule(cols, below))
 }
@@ -528,6 +567,8 @@ export const renderStatus = {
 	tokenUsageLabel,
 	subscriptionStatusLabel,
 	promptContentWidth,
+	activityStatusLabel,
+	ruleText,
 	promptRule,
 	paddedPromptLine,
 }

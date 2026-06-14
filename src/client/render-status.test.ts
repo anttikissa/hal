@@ -46,3 +46,20 @@ test('tabIndicator shows blinking amber diamond for new working tab', () => {
 		client.state.working = origWorking
 	}
 })
+
+test('activityStatusLabel names visible working phases', () => {
+	const origWorking = client.state.working
+	const origToolConfirm = client.state.toolConfirmPending
+	client.state.working = new Map([['04-new', true]])
+	client.state.toolConfirmPending = new Set()
+	try {
+		expect(renderStatus.activityStatusLabel(tab())).toBe('thinking')
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'assistant', text: 'hi', streaming: true }] }))).toBe('writing')
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'tool', name: 'bash' }] }))).toBe('running bash')
+		client.state.toolConfirmPending.add('04-new')
+		expect(renderStatus.activityStatusLabel(tab())).toBe('waiting for approval')
+	} finally {
+		client.state.working = origWorking
+		client.state.toolConfirmPending = origToolConfirm
+	}
+})
