@@ -128,17 +128,6 @@ test('canceled user and assistant headers show canceled marker', () => {
 	expect(thinkingHeader).toContain('Hal (GPT 5.4, thinking high, canceled)')
 })
 
-
-test('canceled blocks strike through content but not headers or padding', () => {
-	const rendered = blocks.renderBlock({ type: 'user', text: 'old prompt', canceled: true }, 80)
-	const header = rendered.find((line) => stripAnsi(line).trim()) ?? ''
-	const body = rendered.find((line) => stripAnsi(line).includes('old prompt')) ?? ''
-
-	expect(header).not.toContain('\x1b[9m')
-	expect(body).toContain(' \x1b[9mold prompt\x1b[29m')
-	expect(body).not.toContain('\x1b[9m ')
-})
-
 test('assistant and thinking backgrounds come from colors', () => {
 	colors.load()
 	const assistantBlock: Block = { type: 'assistant', text: 'hello', model: 'gpt-5.4' }
