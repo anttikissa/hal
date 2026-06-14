@@ -328,6 +328,39 @@ test('up while working before output edits the just-sent prompt', () => {
 	}
 })
 
+
+test('up while working after visible output edits by canceling old turn', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		inputHistory: ['original prompt'],
+		history: [
+			{ type: 'user', text: 'original prompt' },
+			{ type: 'assistant', text: 'partial answer' },
+		] as any[],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
+			expect(prompt.text()).toBe('original prompt')
+			expect((tab.history[0] as any).status).toBeUndefined()
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
+
+			prompt.setText('edited prompt')
+			cli.forTests.handleAppKey(key('enter'))
+			expect(commands.at(-1)).toEqual({ type: 'prompt-amend', sessionId: 's1', text: 'edited prompt', displayText: undefined })
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
 test('down from just-sent edit continues the original prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

@@ -187,6 +187,7 @@ const fixedLabels = { log: 'Log', info: 'System', warning: 'Warning', error: 'Er
 
 function blockLabel(block: Block): string {
 	if (block.type === 'user') {
+		if (block.canceled) return 'You (canceled)'
 		if (block.source && block.source !== 'user' && block.source !== 'system') return `Inbox · ${block.source}`
 		if (block.status === 'editing') return 'You (editing this prompt)'
 		if (block.status === 'steering') return 'You (steering)'
@@ -195,16 +196,22 @@ function blockLabel(block: Block): string {
 	}
 	if (block.type === 'assistant') {
 		const display = models.displayModel(block.model)
+		if (display && block.synthetic && block.canceled) return `Hal (${display}, synthetic, canceled)`
 		if (display && block.synthetic) return `Hal (${display}, synthetic)`
+		if (display && block.canceled) return `Hal (${display}, canceled)`
 		if (display) return `Hal (${display})`
+		if (block.synthetic && block.canceled) return 'Hal (synthetic, canceled)'
+		if (block.canceled) return 'Hal (canceled)'
 		return block.synthetic ? 'Hal (synthetic)' : 'Hal'
 	}
 	if (block.type === 'thinking') {
 		const display = models.displayModel(block.model)
 		const effort = block.thinkingEffort ?? models.reasoningEffort(block.model)
+		if (display && effort && block.canceled) return `Hal (${display}, thinking ${effort}, canceled)`
 		if (display && effort) return `Hal (${display}, thinking ${effort})`
+		if (display && block.canceled) return `Hal (${display}, thinking, canceled)`
 		if (display) return `Hal (${display}, thinking)`
-		return 'Thinking'
+		return block.canceled ? 'Thinking (canceled)' : 'Thinking'
 	}
 	if (block.type === 'tool') return toolSpecs.getToolSpec(block.name).title?.(block.input, block.output) ?? toolSpecs.humanizeName(block.name)
 	return fixedLabels[block.type]

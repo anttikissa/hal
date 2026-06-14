@@ -49,7 +49,7 @@ function findReplayStart(entries: HistoryEntry[]): number {
 function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts?: { prune?: boolean }): Message[] {
 	const entries = allEntries ?? sessions.loadAllHistory(sessionId)
 	const start = findReplayStart(entries)
-	const sliced = entries.slice(start)
+	const sliced = entries.slice(start).filter((entry) => !entry.canceled)
 	const out: Message[] = []
 
 	const totalUserTurns = sliced.filter((entry) => entry.type === 'user').length

@@ -1,7 +1,7 @@
 // Session persistence. Open sessions keep session.ason as a liveFile; closed
 // sessions are read straight from disk until the runtime resumes them.
 
-import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync, writeFileSync } from 'fs'
+import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync, writeFileSync, renameSync } from 'fs'
 import { randomBytes } from 'crypto'
 import type { SharedSessionInfo } from '../ipc.ts'
 import { STATE_DIR, ensureDir } from '../state.ts'
@@ -37,7 +37,7 @@ export interface SessionMeta {
 
 export type UserPart = { type: 'text'; text: string; displayText?: string } | { type: 'image'; blobId: string; originalFile?: string }
 
-export type EntryIdentity = { id?: string }
+export type EntryIdentity = { id?: string; canceled?: true }
 export type HistoryEntry = EntryIdentity & (
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; status?: string; ts?: string }
 	| {
@@ -132,7 +132,7 @@ function makeEntryId(used = new Set<string>()): string {
 }
 
 const historyTopLevelKeys = new Set([
-	'id', 'type', 'parts', 'text', 'source', 'status', 'ts',
+	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled',
 	'blobId', 'signature', 'model', 'thinkingEffort',
 	'continue', 'usage', 'synthetic', 'syntheticKind',
 	'toolId', 'name', 'input', 'output', 'isError',
@@ -366,6 +366,73 @@ function appendHistory(sessionId: string, entries: HistoryEntry[]): void {
 	appendFileSync(historyLogPath(sessionId, logName), `${ensureEntryIds(entries, used).map(stringifyHistoryEntry).join('\n')}\n`)
 }
 
+function rewriteCurrentHistory(sessionId: string, entries: HistoryEntry[]): { logName: string; entryCount: number } {
+	ensureSessionDir(sessionId)
+	const logName = loadSessionMeta(sessionId)?.currentLog ?? DEFAULT_LOG
+	const path = historyLogPath(sessionId, logName)
+	const rewritten = ensureEntryIds(entries, new Set()).map(stringifyHistoryEntry).join('\n')
+	let content = ''
+	if (rewritten) content = `${rewritten}\n`
+	const tmp = `${path}.tmp.${process.pid}`
+	writeFileSync(tmp, content)
+	renameSync(tmp, path)
+	return { logName, entryCount: entries.length }
+}
+
+function liveBlockToCanceledEntry(block: any): HistoryEntry | null {
+	const ts = typeof block.ts === 'number' ? new Date(block.ts).toISOString() : new Date().toISOString()
+	if (block.type === 'assistant' && block.text) {
+		return { type: 'assistant', text: block.text, model: block.model, ts, canceled: true }
+	}
+	if (block.type === 'thinking' && (block.text || block.blobId)) {
+		const entry: HistoryEntry = {
+			type: 'thinking',
+			blobId: block.blobId,
+			model: block.model,
+			thinkingEffort: block.thinkingEffort,
+			ts,
+			canceled: true,
+		}
+		if (!block.blobId) entry.text = block.text
+		return entry
+	}
+	return null
+}
+
+function cancelTailTurn(sessionId: string): { logName: string; entryCount: number } | false {
+	const entries = loadHistory(sessionId)
+	let lastUser = -1
+	for (let i = entries.length - 1; i >= 0; i--) {
+		if (entries[i]?.type === 'user') {
+			lastUser = i
+			break
+		}
+	}
+	if (lastUser < 0) return false
+
+	const liveBlocks = loadLive(sessionId).blocks
+	for (const entry of entries.slice(lastUser + 1)) {
+		if (entry.type === 'tool_call' || entry.type === 'tool_result') return false
+	}
+	for (const block of liveBlocks) {
+		if (block?.type === 'tool') return false
+	}
+
+	const next: HistoryEntry[] = []
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i]!
+		if (i === lastUser && entry.type === 'user') next.push({ ...entry, canceled: true })
+		else if (i > lastUser && (entry.type === 'assistant' || entry.type === 'thinking')) next.push({ ...entry, canceled: true })
+		else if (i > lastUser && entry.type === 'turn_end') continue
+		else next.push(entry)
+	}
+	for (const block of liveBlocks) {
+		const entry = liveBlockToCanceledEntry(block)
+		if (entry) next.push(entry)
+	}
+	return rewriteCurrentHistory(sessionId, next)
+}
+
 function updateMeta(sessionId: string, updates: Partial<SessionMeta>): void {
 	const live = liveSessionMetas.get(sessionId)
 	if (live) {
@@ -499,6 +566,8 @@ export const sessions = {
 	rotateLog,
 	rewriteHistoryAfterRotation,
 	rewriteHistoryForRebase,
+	rewriteCurrentHistory,
+	cancelTailTurn,
 	pickMostRecentlyClosedSessionId,
 	resolveResumeTarget,
 	sessionOpenInfo,

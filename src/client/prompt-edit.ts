@@ -1,6 +1,6 @@
 import type { Block } from '../cli/block-data.ts'
 
-export type PromptEditMode = 'amend' | 'copy' | 'side-effect-copy'
+export type PromptEditMode = 'amend' | 'cancel' | 'copy' | 'side-effect-copy'
 
 type PromptEditState = {
 	sessionId: string
@@ -46,6 +46,7 @@ function hint(sessionId?: string | null): string | null {
 	const active = promptEdit.activeFor(sessionId)
 	if (!active) return null
 	if (active.mode === 'amend') return 'editing just-sent prompt — enter: send edited · ↓: continue with original · esc: stay paused'
+	if (active.mode === 'cancel') return 'editing just-sent prompt — enter: send edited · ↓/esc: continue with original'
 	if (active.mode === 'side-effect-copy') return 'editing previous prompt copy — enter: send as new · alt-enter: queue · ↓/esc: cancel · /rebase: rewrite history'
 	return 'editing previous prompt copy — enter: send as new · alt-enter: queue · ↓/esc: cancel'
 }

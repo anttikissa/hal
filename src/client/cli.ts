@@ -380,8 +380,12 @@ function beginPreviousPromptEdit(): boolean {
 	const originalText = client.getInputHistory().at(-1)
 	if (!originalText) return false
 	const working = client.isWorking()
-	const canAmend = working && !hasVisibleOutputAfterLastUser(tab)
-	const mode = canAmend ? 'amend' : hasSideEffectfulToolAfterLastUser(tab) ? 'side-effect-copy' : 'copy'
+	const visibleOutput = hasVisibleOutputAfterLastUser(tab)
+	const sideEffectfulTool = hasSideEffectfulToolAfterLastUser(tab)
+	let mode: 'amend' | 'cancel' | 'copy' | 'side-effect-copy' = 'copy'
+	if (working && !visibleOutput) mode = 'amend'
+	else if (working && visibleOutput && !sideEffectfulTool) mode = 'cancel'
+	else if (sideEffectfulTool) mode = 'side-effect-copy'
 	promptEdit.start({
 		sessionId: tab.sessionId,
 		mode,
@@ -390,7 +394,7 @@ function beginPreviousPromptEdit(): boolean {
 		block: mode === 'amend' ? lastUserBlock(tab) ?? undefined : undefined,
 	})
 	prompt.setText(originalText)
-	if (working) client.sendCommand('abort', canAmend ? '' : undefined)
+	if (working) client.sendCommand('abort', mode === 'amend' || mode === 'cancel' ? '' : undefined)
 	return true
 }
 
@@ -406,7 +410,7 @@ function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, d
 	const text = prompt.submitText().trim()
 	const displayText = prompt.text().trim()
 	if (!text) return
-	if (active.mode === 'amend') {
+	if (active.mode === 'amend' || active.mode === 'cancel') {
 		prompt.pushHistory(text)
 		promptEdit.cancel()
 		client.sendCommand('prompt-amend', text, displayText === text ? undefined : displayText)

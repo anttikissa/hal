@@ -104,6 +104,20 @@ test('toProviderMessages merges assistant chunks split by ui info', () => {
 })
 
 
+test('toProviderMessages skips canceled history entries', () => {
+	const ts = '2026-04-13T14:43:49.970Z'
+	const entries: any[] = [
+		{ type: 'user', parts: [{ type: 'text', text: 'old prompt' }], canceled: true, ts },
+		{ type: 'assistant', text: 'old partial', canceled: true, ts },
+		{ type: 'user', parts: [{ type: 'text', text: 'new prompt' }], ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[13 Apr 14:43]\nnew prompt' },
+	])
+})
+
+
 test('toProviderMessages wraps next-user info in meta tags', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [

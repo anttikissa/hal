@@ -117,6 +117,17 @@ test('assistant header includes display model', () => {
 	expect(header).toContain('Hal (GPT 5.4)')
 })
 
+
+test('canceled user and assistant headers show canceled marker', () => {
+	const userHeader = headerLine(blocks.renderBlock({ type: 'user', text: 'old prompt', canceled: true }, 80))
+	const assistantHeader = headerLine(blocks.renderBlock({ type: 'assistant', text: 'old answer', model: 'gpt-5.4', canceled: true }, 80))
+	const thinkingHeader = headerLine(blocks.renderBlock({ type: 'thinking', text: 'old thought', model: 'gpt-5.4', thinkingEffort: 'high', canceled: true }, 80))
+
+	expect(userHeader).toContain('You (canceled)')
+	expect(assistantHeader).toContain('Hal (GPT 5.4, canceled)')
+	expect(thinkingHeader).toContain('Hal (GPT 5.4, thinking high, canceled)')
+})
+
 test('assistant and thinking backgrounds come from colors', () => {
 	colors.load()
 	const assistantBlock: Block = { type: 'assistant', text: 'hello', model: 'gpt-5.4' }

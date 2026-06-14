@@ -289,9 +289,23 @@ function hasTurnContentAfterLastUser(entries: HistoryEntry[]): boolean {
 	return false
 }
 
+function hasLiveTurnContent(sessionId: string): boolean {
+	for (const block of sessionStore.loadLive(sessionId).blocks) {
+		if (block?.type === 'assistant' || block?.type === 'thinking' || block?.type === 'tool') return true
+	}
+	return false
+}
+
+async function waitForIdle(sessionId: string): Promise<void> {
+	for (let i = 0; i < 20; i++) {
+		if (!agentLoop.isWorking(sessionId)) return
+		await Bun.sleep(25)
+	}
+}
+
 async function amendLastPrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
 	const entries = sessionStore.loadHistory(sessionId)
-	if (entries.length === 0 || hasTurnContentAfterLastUser(entries)) return false
+	if (entries.length === 0 || hasTurnContentAfterLastUser(entries) || hasLiveTurnContent(sessionId)) return false
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]
 		if (entry?.type !== 'user') continue
@@ -314,9 +328,15 @@ async function handlePromptAmendCommand(sessionId: string, text: string, source?
 	if (!text.trim()) return
 	if (agentLoop.isWorking(sessionId)) {
 		agentLoop.abort(sessionId, '')
-		await Bun.sleep(50)
+		await waitForIdle(sessionId)
 	}
 	if (!await amendLastPrompt(sessionId, text, source, displayText)) {
+		const canceled = sessionStore.cancelTailTurn(sessionId)
+		if (canceled) {
+			resetProviderConversation(sessionId)
+			sessionStore.clearLive(sessionId)
+			ipc.appendEvent({ type: 'history-rebased', sessionId, newLog: canceled.logName, entryCount: canceled.entryCount })
+		}
 		await handlePrompt(sessionId, text, undefined, source, displayText)
 		return
 	}

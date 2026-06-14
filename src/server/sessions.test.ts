@@ -85,6 +85,34 @@ test('appendHistory repairs duplicate ids before writing', async () => {
 	expect(ids[0]).toBe('000001-aaa')
 })
 
+
+test('cancelTailTurn marks last prompt and partial output canceled in current history', async () => {
+	const id = await makeSession()
+	await sessions.appendHistory(id, [
+		userEntry('old prompt', '2026-05-25T10:00:00.000Z'),
+		{ type: 'turn_end', status: 'aborted', ts: '2026-05-25T10:00:01.000Z' },
+	])
+	sessions.applyLiveEvent(id, {
+		type: 'stream-delta',
+		sessionId: id,
+		channel: 'assistant',
+		text: 'partial answer',
+		model: 'openai/gpt-5.5',
+		createdAt: '2026-05-25T10:00:02.000Z',
+	})
+
+	const result = sessions.cancelTailTurn(id)
+	const history = sessions.loadHistory(id)
+
+	expect(result).toMatchObject({ logName: 'history.asonl', entryCount: 2 })
+	expect(history).toMatchObject([
+		{ type: 'user', canceled: true },
+		{ type: 'assistant', text: 'partial answer', model: 'openai/gpt-5.5', canceled: true },
+	])
+	expect(history.some((entry) => entry.type === 'turn_end')).toBe(false)
+	expect(readFileSync(`${sessions.sessionDir(id)}/history.asonl`, 'utf-8')).toContain('canceled: true')
+})
+
 test('forkSession appends fork markers to parent and child history', async () => {
 	const parentId = await makeSession()
 	const childId = uniqueId()

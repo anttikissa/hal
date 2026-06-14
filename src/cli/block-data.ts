@@ -13,7 +13,7 @@ import { STATE_DIR } from '../state.ts'
 // module convention — all access happens at call time, never at import time.
 import { blocks } from './blocks.ts'
 
-interface BlockBase { ts?: number; dimmed?: boolean; renderVersion?: number }
+interface BlockBase { ts?: number; dimmed?: boolean; renderVersion?: number; canceled?: boolean }
 interface TextBlock extends BlockBase { text: string }
 interface BlobRef { blobId?: string; sessionId?: string; blobLoaded?: boolean }
 type NoticeBlock<T extends 'log' | 'info' | 'warning' | 'fork'> = { type: T } & TextBlock
@@ -66,6 +66,7 @@ function historyToBlocks(
 					status: entry.status,
 					ts,
 					dimmed,
+					canceled: entry.canceled,
 				})
 				break
 			}
@@ -80,6 +81,7 @@ function historyToBlocks(
 					sessionId: blobOwner,
 					ts,
 					dimmed,
+					canceled: entry.canceled,
 				})
 				break
 			}
@@ -96,6 +98,7 @@ function historyToBlocks(
 					syntheticKind: entry.syntheticKind,
 					ts,
 					dimmed,
+					canceled: entry.canceled,
 				})
 				break
 			case 'log':
