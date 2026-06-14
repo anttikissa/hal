@@ -9,6 +9,8 @@ import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { tokenCalibration } from '../token-calibration.ts'
+import { toolRegistry } from '../tools/tool.ts'
+import { ason } from '../utils/ason.ts'
 
 const createdSessions: string[] = []
 
@@ -26,6 +28,60 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 		cwd: '/tmp/',
 	})
 	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
+})
+
+test('adds commit LOC line to final assistant response', async () => {
+	const sessionId = `test-final-loc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const origDispatch = toolRegistry.dispatch
+	let calls = 0
+	const metadata = ason.stringify({
+		branch: 'main',
+		hash: 'abc123',
+		message: 'Test commit',
+		summary: '2 files changed',
+		files: [],
+		locDelta: 5,
+		locDeltaCode: 3,
+	}, 'long')
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			calls++
+			if (calls === 1) {
+				yield { type: 'tool_call', id: 'commit-1', name: 'bash', input: { command: 'git commit -m test' } }
+			} else {
+				yield { type: 'text', text: 'Done.' }
+			}
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+	toolRegistry.dispatch = async () => `ok\n[hal-commit]\n${metadata}\n[/hal-commit]`
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'commit' }],
+		})
+		expect(result).toBe('completed')
+		expect(events.find((event) => event.type === 'response')?.text).toBe('Done.\nLOC: +3 excluding tests (+5 total)')
+		expect(sessions.loadHistory(sessionId).findLast((item) => item.type === 'assistant')?.text).toBe('Done.\nLOC: +3 excluding tests (+5 total)')
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+		toolRegistry.dispatch = origDispatch
+	}
 })
 
 

@@ -33,7 +33,7 @@ function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'for
 	return blockText.sanitizeTerminalText(text)
 }
 
-const [FG_OFF, RESET_BG] = ['\x1b[39m', '\x1b[49m']
+const [FG_OFF, RESET_BG, STRIKE, STRIKE_OFF] = ['\x1b[39m', '\x1b[49m', '\x1b[9m', '\x1b[29m']
 
 function pushWrapped(lines: string[], text: string, cols: number): void {
 	for (const raw of text.split('\n')) for (const line of hardWrap(expandTabs(raw, blockConfig.tabWidth), cols)) lines.push(line)
@@ -329,7 +329,9 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
 	if (content.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
-		lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
+		let body = padBlockLine(line)
+		if (block.canceled) body = `${STRIKE}${body}${STRIKE_OFF}`
+		lines.push(bgLine(`${fg}${body}`, cols, bg))
 	}
 	// Streaming cursors are progress markers, not idle blinkers: keep them solid
 	// so the active streamed block is always visually anchored.

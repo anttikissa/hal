@@ -50,6 +50,9 @@ const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) 
 
 const DEFAULT_ABORT_TEXT = '[paused]'
 
+const COMMIT_META_START = '[hal-commit]'
+const COMMIT_META_END = '[/hal-commit]'
+
 function parseResetsInSeconds(body: string | undefined): number | undefined {
 	if (!body) return undefined
 	try {
@@ -59,6 +62,35 @@ function parseResetsInSeconds(body: string | undefined): number | undefined {
 	} catch {
 		return undefined
 	}
+}
+
+function signed(n: number): string {
+	if (n > 0) return `+${n}`
+	return String(n)
+}
+
+function commitLocLine(output: string): string | undefined {
+	const start = output.indexOf(COMMIT_META_START)
+	if (start < 0) return undefined
+	const dataStart = start + COMMIT_META_START.length
+	const end = output.indexOf(COMMIT_META_END, dataStart)
+	if (end < 0) return undefined
+	try {
+		const meta = ason.parse(output.slice(dataStart, end).trim()) as any
+		const code = meta.locDeltaCode ?? meta.locAddedCode
+		const total = meta.locDelta ?? meta.locAdded
+		if (typeof code !== 'number' || typeof total !== 'number') return undefined
+		return `LOC: ${signed(code)} excluding tests (${signed(total)} total)`
+	} catch {
+		return undefined
+	}
+}
+
+function addCommitLocLine(text: string, locLine: string | undefined): string {
+	if (!locLine) return text
+	const trimmed = text.trimEnd()
+	if (!trimmed) return locLine
+	return `${trimmed}\n${locLine}`
 }
 
 // ── Types ──
@@ -346,6 +378,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		let retryAttempt = 0
 		let retryStartedAt = 0
 		let hadTerminalError = false
+		let latestCommitLocLine: string | undefined
 
 		async function finishAborted(): Promise<void> {
 			const abortText = state.abortTexts.has(sessionId) ? (state.abortTexts.get(sessionId) ?? '') : DEFAULT_ABORT_TEXT
@@ -608,6 +641,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						ts,
 					})
 				}
+				assistantText = addCommitLocLine(assistantText, latestCommitLocLine)
 				if (assistantText) {
 					const assistantEntry: any = { type: 'assistant', text: assistantText, model, ts }
 					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
@@ -696,6 +730,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					role: 'user',
 					content: [{ type: 'tool_result', tool_use_id: call.id, content: result }],
 				})
+				const locLine = commitLocLine(result)
+				if (locLine) latestCommitLocLine = locLine
 
 				// Save tool result to blob and history
 				const blobId = toolBlobMap.get(call.id)!
