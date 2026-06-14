@@ -374,7 +374,7 @@ function hasSideEffectfulToolAfterLastUser(tab: (typeof client.state.tabs)[numbe
 }
 
 function beginPreviousPromptEdit(): boolean {
-	if (prompt.text().trim()) return false
+	if (prompt.text() !== '') return false
 	const tab = client.currentTab()
 	if (!tab) return false
 	const originalText = client.getInputHistory().at(-1)
@@ -424,18 +424,22 @@ function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, d
 	submit(text, delivery)
 }
 
-function handlePromptEditKey(k: KeyEvent): boolean {
+function plainKey(k: KeyEvent, key: string): boolean {
+	return k.key === key && !k.shift && !k.ctrl && !k.alt && !k.cmd
+}
+
+function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 	const active = promptEdit.activeFor(client.currentTab()?.sessionId)
 	if (!active) return false
 	if (k.key === 'enter' && !k.shift && !k.ctrl && !k.cmd) {
 		submitPromptEdit(active, k.alt ? 'queue' : undefined)
 		return true
 	}
-	if (k.key === 'down' && !k.ctrl && !k.alt && !k.shift && !k.cmd) {
+	if (plainKey(k, 'down') && prompt.atVerticalBoundary(1, contentWidth)) {
 		continueAfterPromptEdit(active)
 		return true
 	}
-	if (k.key === 'escape' && !k.ctrl && !k.alt && !k.shift && !k.cmd) {
+	if (plainKey(k, 'escape')) {
 		if (active.mode === 'amend') return true
 		continueAfterPromptEdit(active)
 		return true
@@ -640,8 +644,8 @@ function installPromptTabSwitchHandler(): void {
 
 // App-level keybindings (not handled by prompt)
 function handleAppKey(k: KeyEvent): boolean {
-	if (handlePromptEditKey(k)) return true
-	if (k.key === 'up' && !k.shift && !k.alt && !k.ctrl && !k.cmd && beginPreviousPromptEdit()) return true
+	if (handlePromptEditKey(k, promptInputWidth())) return true
+	if (plainKey(k, 'up') && beginPreviousPromptEdit()) return true
 	if (k.key === 'm' && !k.cmd && ((k.ctrl && !k.alt) || (k.alt && !k.ctrl))) {
 		completion.dismiss()
 		const currentModel = client.currentTab()?.model || models.defaultModel()

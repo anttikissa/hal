@@ -386,6 +386,32 @@ test('up while working before output edits the just-sent prompt', () => {
 })
 
 
+test('up on newline draft while working stays in the prompt', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.setText('\n')
+
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(false)
+			expect(prompt.handleKey(key('up'), cli.forTests.promptInputWidth())).toBe(true)
+
+			expect(prompt.cursorPos()).toBe(0)
+			expect(promptEdit.activeFor('s1')).toBe(null)
+			expect(commands).toEqual([])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
+
 test('up while working after visible output edits by canceling old turn', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
@@ -438,6 +464,34 @@ test('down from just-sent edit continues the original prompt', () => {
 				{ type: 'abort', sessionId: 's1', abortText: '' },
 				{ type: 'continue', sessionId: 's1' },
 			])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
+
+test('down in just-sent edit moves through blank prompt lines before continuing', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			cli.forTests.handleAppKey(key('up'))
+			prompt.setText('edited\n\n', 'edited'.length)
+
+			expect(cli.forTests.handleAppKey(key('down'))).toBe(false)
+			expect(prompt.handleKey(key('down'), cli.forTests.promptInputWidth())).toBe(true)
+
+			expect(prompt.cursorPos()).toBe('edited\n'.length)
+			expect(promptEdit.activeFor('s1')).not.toBe(null)
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand

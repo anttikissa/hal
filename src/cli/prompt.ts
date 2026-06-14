@@ -87,6 +87,10 @@ function verticalMove(
 	}
 }
 
+function atVerticalBoundary(dir: -1 | 1, contentWidth: number): boolean {
+	return verticalMove(buf, contentWidth, cursor, goalCol, dir).atBoundary
+}
+
 
 function wordLeft(text: string, pos: number): number {
 	let i = pos - 1
@@ -793,6 +797,7 @@ export const prompt = {
 	pushHistory,
 	setRenderCallback,
 	handleKey,
+	atVerticalBoundary,
 	buildPrompt,
 	resizeHint,
 	promptLineLimit,
