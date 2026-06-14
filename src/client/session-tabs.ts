@@ -71,7 +71,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 	if (state.pendingOpen === 'resume' && grew && focused && openedTabs.includes(focused)) ctx.addTabNoticeToTab(focused, 'Tab restored.')
 	if (shrank) ctx.showRestoreTabHint()
 	if (state.pendingOpen === 'resume' && grew) ctx.clearRestoreTabHint()
-	state.pendingOpen = false
+	if (grew && openedSessionId) state.pendingOpen = false
 	if (previousSession !== newSession) ctx.onTabSwitch(previousSession, newSession)
 	ctx.onChange(false)
 }

@@ -111,3 +111,26 @@ test('focused newly opened tab clears new attention marker', () => {
 	expect(model.focusedTabIndex).toBe(1)
 	expect(model.tabs[1]?.attention).toBeUndefined()
 })
+
+test('pending open survives unrelated session refresh until the new tab arrives', () => {
+	sessionTabs.reset()
+	sessionTabs.state.pendingOpen = 'open'
+	const model = {
+		tabs: [tab('left')],
+		focusedTabIndex: 0,
+		recentTabs: ['left'],
+	}
+	const c = ctx({ model })
+
+	// IPC state changes often update working/client metadata without changing the
+	// actual tab list. Do not consume the pending open on those refreshes.
+	sessionTabs.apply([{ id: 'left' } as any], 'left', c)
+	expect(sessionTabs.state.pendingOpen).toBe('open')
+	expect(model.focusedTabIndex).toBe(0)
+
+	sessionTabs.apply([{ id: 'left' } as any, { id: 'new' } as any], 'left', c)
+
+	expect(model.focusedTabIndex).toBe(1)
+	expect(model.tabs[1]?.sessionId).toBe('new')
+	expect(sessionTabs.state.pendingOpen).toBeFalsy()
+})
