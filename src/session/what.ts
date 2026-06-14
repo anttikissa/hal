@@ -22,6 +22,7 @@ interface RunWhatOpts {
 	target: string
 	openSessionIds: string[]
 	model?: string
+	persist?: (sessionId: string, targetIds: string[], text: string) => void
 }
 
 interface SummaryResult {
@@ -332,12 +333,13 @@ function maybeNameSession(sessionId: string, title: string): boolean {
 
 function whatMetaText(targetIds: string[]): string {
 	if (targetIds.length === 0) return 'User ran /what but no session matched.'
-	return `User ran /what for session${targetIds.length === 1 ? '' : 's'} ${targetIds.join(', ')}.`
+	if (targetIds.length === 1) return 'User ran /what for this session.'
+	return `User ran /what for sessions ${targetIds.join(', ')}.`
 }
 
-function persistResult(requesterSessionId: string, targetIds: string[], text: string): void {
+function persistResult(sessionId: string, targetIds: string[], text: string): void {
 	const ts = new Date().toISOString()
-	sessions.appendHistorySync(requesterSessionId, [
+	sessions.appendHistorySync(sessionId, [
 		{ type: 'assistant', text, synthetic: true, syntheticKind: 'what-summary', visibility: 'ui', ts },
 		{ type: 'info', text: whatMetaText(targetIds), visibility: 'next-user', ts },
 	])
@@ -346,7 +348,7 @@ function persistResult(requesterSessionId: string, targetIds: string[], text: st
 		type: 'response',
 		text,
 		synthetic: true,
-		sessionId: requesterSessionId,
+		sessionId,
 		createdAt: ts,
 	})
 }
@@ -355,34 +357,31 @@ function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err)
 }
 
-async function run(opts: RunWhatOpts): Promise<{ renamed: boolean }> {
+async function run(opts: RunWhatOpts): Promise<{ renamed: boolean; targetIds: string[] }> {
 	const metas = sessions.loadAllSessionMetas()
 	const resolved = whatSummary.resolveTargets(opts.target, opts.requesterSessionId, opts.openSessionIds, metas)
+	const persist = opts.persist ?? whatSummary.persistResult
 	if (!resolved.ok) {
-		persistResult(opts.requesterSessionId, [], resolved.error)
-		return { renamed: false }
+		persist(opts.requesterSessionId, [], resolved.error)
+		return { renamed: false, targetIds: [] }
 	}
 
 	const requester = sessions.loadSessionMeta(opts.requesterSessionId)
 	const model = opts.model ?? requester?.model ?? models.defaultModel()
 	const shared = ipc.readState()
 	const targetIds = unique(resolved.ids)
-	const includeLabel = targetIds.length > 1
-	const sections: string[] = []
 	let renamed = false
 	for (const sessionId of targetIds) {
 		try {
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
 			const summary = await whatSummary.summarizeDigest(model, digest)
 			if (whatSummary.maybeNameSession(sessionId, summary.title)) renamed = true
-			sections.push(formatSection(sessionId, summary, opts.openSessionIds, includeLabel))
+			persist(sessionId, [sessionId], formatSection(sessionId, summary, opts.openSessionIds, false))
 		} catch (err) {
-			const label = includeLabel ? ` (${compactTargetLabel(sessionId, opts.openSessionIds)})` : ''
-			sections.push([`## ${sessionId}${label}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
+			persist(sessionId, [sessionId], [`## ${sessionId}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
 		}
 	}
-	persistResult(opts.requesterSessionId, targetIds, sections.join('\n\n'))
-	return { renamed }
+	return { renamed, targetIds }
 }
 
 export const whatSummary = {
@@ -392,5 +391,6 @@ export const whatSummary = {
 	summarizeDigest,
 	systemPrompt,
 	maybeNameSession,
+	persistResult,
 	run,
 }

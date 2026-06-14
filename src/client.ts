@@ -106,6 +106,9 @@ const state = {
 	model: null as string | null,
 	// Working state per session — true while a turn is in progress.
 	working: new Map<string, boolean>(),
+	// Background /what summaries. Separate from normal working state so prompts still behave as idle.
+	summarizing: new Set<string>(),
+	whatDoneUnseen: new Set<string>(),
 	// Sessions waiting for the user to answer a risky tool confirmation popup.
 	toolConfirmPending: new Set<string>(),
 	// Most-recently viewed tab order. Used as a fallback when session-list changes
@@ -286,6 +289,17 @@ function isWorking(): boolean {
 	return tab ? (state.working.get(tab.sessionId) ?? false) : false
 }
 
+function setSummarizing(sessionId: string, active: boolean): void {
+	if (active) state.summarizing.add(sessionId)
+	else state.summarizing.delete(sessionId)
+	onChange(false)
+}
+
+function markWhatDone(sessionId: string): void {
+	if (currentTab()?.sessionId !== sessionId) state.whatDoneUnseen.add(sessionId)
+	onChange(false)
+}
+
 
 function markToolConfirmPending(sessionId: string): void {
 	state.toolConfirmPending.add(sessionId)
@@ -321,6 +335,7 @@ function switchTab(index: number): void {
 		const tab = state.tabs[index]!
 		// Clear "done unseen" flag — user is now looking at this tab
 		tab.doneUnseen = false
+		state.whatDoneUnseen.delete(tab.sessionId)
 		tab.attention = undefined
 		ensureTabLoaded(tab)
 		loadTabBlobs(tab)
@@ -559,6 +574,8 @@ function handleEvent(event: any): void {
 		onToolConfirmRequest: (item: any) => onToolConfirmRequest?.(item),
 		markToolConfirmPending,
 		clearToolConfirmPending,
+		setSummarizing,
+		markWhatDone,
 		onDraftArrived: (text: string) => onDraftArrived?.(text),
 		onRebaseStart: (item: any) => onRebaseStart?.(item),
 		onRebaseResult: (item: any) => onRebaseResult?.(item),
@@ -646,6 +663,8 @@ function resetForTests(): void {
 	state.hostVersionStatus = 'idle'
 	state.hostVersion = ''
 	state.toolConfirmPending.clear()
+	state.summarizing.clear()
+	state.whatDoneUnseen.clear()
 }
 
 function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {

@@ -43,7 +43,7 @@ test('resolveTargets supports current, all, open ranges, and closed ids', () => 
 	expect(whatSummary.resolveTargets('04-closed', requester, openIds, metas)).toEqual({ ok: true, ids: ['04-closed'] })
 })
 
-test('run writes ui-only summary to requester and fills empty target name', async () => {
+test('run writes ui-only summary to target and fills empty target name', async () => {
 	const requester = makeSession('requester', 'requester')
 	const target = makeSession('target')
 	const events: any[] = []
@@ -70,14 +70,15 @@ test('run writes ui-only summary to requester and fills empty target name', asyn
 	}
 
 	expect(sessions.loadSessionMeta(target)?.name).toBe('plan bug fix')
-	const requesterHistory = sessions.loadHistory(requester)
-	expect(requesterHistory).toContainEqual(expect.objectContaining({ type: 'assistant', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui' }))
-	const summary = requesterHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
+	expect(sessions.loadHistory(requester).some((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')).toBe(false)
+	const targetHistory = sessions.loadHistory(target)
+	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'assistant', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui' }))
+	const summary = targetHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
 	expect(summary?.type === 'assistant' ? summary.text : '').toContain('## plan bug fix')
 	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('session ')
 	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('state idle/open')
-	expect(requesterHistory).toContainEqual(expect.objectContaining({ type: 'info', visibility: 'next-user', text: `User ran /what for session ${target}.` }))
-	expect(events.some((event) => event.type === 'response' && event.sessionId === requester && event.synthetic)).toBe(true)
+	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'info', visibility: 'next-user', text: 'User ran /what for this session.' }))
+	expect(events.some((event) => event.type === 'response' && event.sessionId === target && event.synthetic)).toBe(true)
 })
 
 
@@ -100,8 +101,8 @@ test('run persists per-target summary errors', async () => {
 		providerLoader.getProvider = origGetProvider
 	}
 
-	const requesterHistory = sessions.loadHistory(requester)
-	const summary = requesterHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
+	const targetHistory = sessions.loadHistory(target)
+	const summary = targetHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
 	expect(summary?.type === 'assistant' ? summary.text : '').toContain('Summary failed: provider down')
 })
 

@@ -99,16 +99,36 @@ function tabIndicator(tab: Tab): TabIndicator {
 function hasAnimatedIndicators(): boolean {
 	for (const tab of client.state.tabs) {
 		if (renderStatus.tabIndicator(tab).blinks) return true
+		if (client.state.summarizing.has(tab.sessionId)) return true
 	}
 	return false
 }
 
+function backgroundIndicatorColor(): string {
+	return colors.status.fg || colors.tab.inactiveFg || colors.info.fg
+}
+
+function renderBackgroundIndicator(tab: Tab, baseColor: string): string {
+	const color = renderStatus.backgroundIndicatorColor()
+	if (client.state.summarizing.has(tab.sessionId)) {
+		const visibleColor = cursor.isVisible() ? color : oklch.dimAnsi(color, 0.65)
+		return `${visibleColor}▪${baseColor}`
+	}
+	if (client.state.whatDoneUnseen.has(tab.sessionId)) return `${color}✓${baseColor}`
+	return ''
+}
+
 function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
-	if (!ind.char) return ''
-	if (!ind.blinks || cursor.isVisible()) return `${ind.color}${ind.char}${baseColor}`
-	const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : oklch.dimAnsi(ind.color, 0.65)
-	return `${color}${ind.char}${baseColor}`
+	let out = ''
+	if (ind.char) {
+		if (!ind.blinks || cursor.isVisible()) out += `${ind.color}${ind.char}${baseColor}`
+		else {
+			const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : oklch.dimAnsi(ind.color, 0.65)
+			out += `${color}${ind.char}${baseColor}`
+		}
+	}
+	return out + renderStatus.renderBackgroundIndicator(tab, baseColor)
 }
 
 function tabInner(num: number, ind: string): string {
@@ -463,8 +483,7 @@ function promptContentWidth(cols: number): number {
 	return renderStatus.contentWidth(cols)
 }
 
-function activityStatusLabel(tab = client.currentTab()): string {
-	if (!tab) return ''
+function turnActivityStatusLabel(tab: Tab): string {
 	if (client.state.toolConfirmPending.has(tab.sessionId)) return 'waiting for approval'
 	if (!client.state.working.get(tab.sessionId)) return ''
 
@@ -480,6 +499,14 @@ function activityStatusLabel(tab = client.currentTab()): string {
 	}
 
 	return 'thinking'
+}
+
+function activityStatusLabel(tab = client.currentTab()): string {
+	if (!tab) return ''
+	return [
+		renderStatus.turnActivityStatusLabel(tab),
+		client.state.summarizing.has(tab.sessionId) ? 'summarizing' : '',
+	].filter(Boolean).join(' · ')
 }
 
 function ruleText(cols: number, left = '', center = ''): string {
@@ -548,6 +575,8 @@ export const renderStatus = {
 	promptCursorColorSequence,
 	tabIndicator,
 	renderIndicator,
+	backgroundIndicatorColor,
+	renderBackgroundIndicator,
 	tabInner,
 	tabLabel,
 	tabHelpText,
@@ -574,6 +603,7 @@ export const renderStatus = {
 	tokenUsageLabel,
 	subscriptionStatusLabel,
 	promptContentWidth,
+	turnActivityStatusLabel,
 	activityStatusLabel,
 	ruleText,
 	promptRule,

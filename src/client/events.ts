@@ -24,6 +24,7 @@ function handle(event: any, ctx: any): void {
 	if (event.type === 'rebase-start') return handleRebaseStart(event, ctx)
 	if (event.type === 'rebase-result') return handleRebaseResult(event, ctx)
 	if (event.type === 'history-rebased') return handleHistoryRebased(event, ctx)
+	if (event.type === 'background-activity' && event.sessionId) return handleBackgroundActivity(event, ctx)
 }
 
 function handlePrompt(event: any, ctx: any): void {
@@ -160,6 +161,12 @@ function handleHistoryRebased(event: any, ctx: any): void {
 	if (!tab) return
 	ctx.reloadTabFromDisk(tab, { logName: event.newLog, entryLimit: event.entryCount })
 	ctx.onChange(true)
+}
+
+function handleBackgroundActivity(event: any, ctx: any): void {
+	if (event.activity !== 'summarizing') return
+	ctx.setSummarizing(event.sessionId, event.active === true)
+	if (event.done) ctx.markWhatDone(event.sessionId)
 }
 
 export const clientEvents = { handle }

@@ -63,3 +63,17 @@ test('activityStatusLabel names visible working phases', () => {
 		client.state.toolConfirmPending = origToolConfirm
 	}
 })
+
+
+test('activityStatusLabel combines working and summarizing', () => {
+	const origWorking = client.state.working
+	const origSummarizing = client.state.summarizing
+	client.state.working = new Map([['04-new', true]])
+	client.state.summarizing = new Set(['04-new'])
+	try {
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'assistant', text: 'hi', streaming: true }] }))).toBe('writing · summarizing')
+	} finally {
+		client.state.working = origWorking
+		client.state.summarizing = origSummarizing
+	}
+})

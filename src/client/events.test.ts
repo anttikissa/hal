@@ -29,3 +29,17 @@ test('runtime-start from promoted client is not described as restart', () => {
 	expect(restart).toBeNull()
 	expect(promotion).toEqual({ pid: 123, startedAt: '2026-06-04T12:00:00.000Z' })
 })
+
+
+test('background-activity updates summarizing state and done marker', () => {
+	const calls: any[] = []
+	clientEvents.handle({ type: 'background-activity', sessionId: 's1', activity: 'summarizing', active: false, done: true }, {
+		setSummarizing: (sessionId: string, active: boolean) => calls.push(['summarizing', sessionId, active]),
+		markWhatDone: (sessionId: string) => calls.push(['done', sessionId]),
+	})
+
+	expect(calls).toEqual([
+		['summarizing', 's1', false],
+		['done', 's1'],
+	])
+})

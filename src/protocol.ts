@@ -21,6 +21,7 @@ export type EventType =
 	| 'rebase-start'
 	| 'rebase-result'
 	| 'history-rebased'
+	| 'background-activity'
 
 // ── Command types (client → server) ──
 

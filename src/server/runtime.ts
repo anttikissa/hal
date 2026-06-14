@@ -40,6 +40,31 @@ const USER_PAUSED_TEXT = '[paused]'
 const RESTARTED_TEXT = '[restarted]'
 const TAB_CLOSED_TEXT = 'Tab closed'
 
+const pendingWhatResults = new Map<string, string[]>()
+
+function emitBackgroundActivity(sessionId: string, activity: 'summarizing', active: boolean, done = false): void {
+	ipc.appendEvent({ type: 'background-activity', sessionId, activity, active, done, createdAt: new Date().toISOString() })
+}
+
+function persistWhatResult(sessionId: string, targetIds: string[], text: string): void {
+	if (agentLoop.isWorking(sessionId)) {
+		const pending = pendingWhatResults.get(sessionId) ?? []
+		pending.push(text)
+		pendingWhatResults.set(sessionId, pending)
+		return
+	}
+	whatSummary.persistResult(sessionId, targetIds, text)
+	emitBackgroundActivity(sessionId, 'summarizing', false, true)
+}
+
+function flushPendingWhatResults(sessionId: string): void {
+	const pending = pendingWhatResults.get(sessionId)
+	if (!pending) return
+	pendingWhatResults.delete(sessionId)
+	for (const text of pending) whatSummary.persistResult(sessionId, [sessionId], text)
+	emitBackgroundActivity(sessionId, 'summarizing', false, true)
+}
+
 type SpawnSpec = SpawnCommandData
 
 function errorMessage(err: unknown): string {
@@ -333,6 +358,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	} catch (err: any) {
 		emitInfo(sessionId, `Generation failed: ${err?.message ?? String(err)}`, 'error')
 	}
+	flushPendingWhatResults(sessionId)
 	if (shouldCloseSessionAfterGeneration(sessionStore.loadSessionMeta(sessionId), result) && !agentLoop.isWorking(sessionId)) {
 		tabs.closeSession(sessionId)
 		return
@@ -506,12 +532,17 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'what': {
 			if (!sessionId) return
+			const resolved = whatSummary.resolveTargets(cmd.target ?? '', sessionId, state.openSessionIds)
+			const activityIds = resolved.ok ? [...new Set(resolved.ids)] : []
+			for (const id of activityIds) emitBackgroundActivity(id, 'summarizing', true)
 			void (async () => {
 				try {
-					const result = await whatSummary.run({ requesterSessionId: sessionId, target: cmd.target ?? '', openSessionIds: state.openSessionIds })
+					const result = await whatSummary.run({ requesterSessionId: sessionId, target: cmd.target ?? '', openSessionIds: state.openSessionIds, persist: persistWhatResult })
 					if (result.renamed) broadcastSessions()
 				} catch (err) {
 					emitInfo(sessionId, `/what failed: ${errorMessage(err)}`, 'error', undefined, false)
+				} finally {
+					for (const id of activityIds) emitBackgroundActivity(id, 'summarizing', false)
 				}
 			})()
 			break
