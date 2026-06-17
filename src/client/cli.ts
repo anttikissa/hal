@@ -436,7 +436,7 @@ function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 		submitPromptEdit(active, k.alt ? 'queue' : undefined)
 		return true
 	}
-	if (plainKey(k, 'down') && prompt.atVerticalBoundary(1, contentWidth)) {
+	if (plainKey(k, 'down') && !prompt.isBrowsingHistory() && prompt.atVerticalBoundary(1, contentWidth)) {
 		continueAfterPromptEdit(active)
 		return true
 	}

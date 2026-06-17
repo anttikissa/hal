@@ -313,6 +313,8 @@ function browseHistory(dir: -1 | 1, contentWidth: number): boolean {
 		if (historyIndex < 0) {
 			historyDraft = buf
 			historyIndex = history.length - 1
+			// Just-sent edit mode preloads the latest prompt; skip reloading it.
+			if (historyIndex > 0 && history[historyIndex] === buf) historyIndex--
 		} else if (historyIndex > 0) {
 			historyIndex--
 		} else {
@@ -740,6 +742,10 @@ function draftText(): string {
 	return history[historyIndex] === buf ? historyDraft : buf
 }
 
+function isBrowsingHistory(): boolean {
+	return historyIndex >= 0
+}
+
 function text(): string {
 	return buf
 }
@@ -787,6 +793,7 @@ export const prompt = {
 	state,
 	text,
 	draftText,
+	isBrowsingHistory,
 	snapshotState,
 	restoreState,
 	submitText,

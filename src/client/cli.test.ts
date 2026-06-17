@@ -471,6 +471,40 @@ test('up while working after visible output edits by canceling old turn', () => 
 	}
 })
 
+
+test('history navigation inside just-sent edit skips the already loaded prompt', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		inputHistory: ['older prompt', 'original prompt'],
+		history: [{ type: 'user', text: 'original prompt' }] as any[],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.setHistory(tab.inputHistory)
+			prompt.clear()
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
+			expect(prompt.text()).toBe('original prompt')
+
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(false)
+			expect(prompt.handleKey(key('up'), cli.forTests.promptInputWidth())).toBe(true)
+			expect(prompt.text()).toBe('older prompt')
+
+			expect(cli.forTests.handleAppKey(key('down'))).toBe(false)
+			expect(prompt.handleKey(key('down'), cli.forTests.promptInputWidth())).toBe(true)
+			expect(prompt.text()).toBe('original prompt')
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
 test('down from just-sent edit continues the original prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
