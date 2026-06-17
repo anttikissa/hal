@@ -47,12 +47,19 @@ interface LiveState {
 
 const registry = new WeakMap<object, LiveState>()
 
+function snapshot(value: Record<string, any>): Record<string, any> {
+	// Defaults can come from another liveFile, which means nested values may be
+	// proxies. structuredClone() rejects proxies; ASON roundtrips them as plain
+	// data, matching what live files can persist anyway.
+	return ason.parse(ason.stringify(value), { comments: true }) as Record<string, any>
+}
+
 function loadFromDisk(path: string, data: Record<string, any>, notify = false, callbacks: LiveFileChangeCallback[] = [], replace = true): void {
 	try {
 		const next = ason.parse(readFileSync(path, 'utf-8'), { comments: true }) as Record<string, any>
 		if (ason.stringify(data) === ason.stringify(next)) return
 		let change: LiveFileChange | null = null
-		if (notify) change = { path, previous: structuredClone(data), next: structuredClone(next) }
+		if (notify) change = { path, previous: snapshot(data), next: snapshot(next) }
 		// Mutate in place so existing proxies keep pointing at fresh data.
 		if (replace) for (const key of Object.keys(data)) {
 			if (!(key in next)) delete data[key]

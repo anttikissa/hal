@@ -119,6 +119,28 @@ test('onChange receives path and previous/next snapshots', async () => {
 	expect(data.nested.v).toBe(2)
 })
 
+test('onChange works when defaults contain nested live-file proxies', async () => {
+	const path = join(dir, 'proxy-defaults.ason')
+	writeFileSync(path, ason.stringify({ sessions: [{ id: 'old' }], working: {}, updatedAt: 'one' }) + '\n')
+	const writer = liveFiles.liveFile<{ sessions: any[]; working: Record<string, any>; updatedAt: string }>(path, { sessions: [], working: {}, updatedAt: '' }, { watch: false })
+	const data = liveFiles.liveFile(path, writer)
+
+	await Bun.sleep(50)
+
+	let called = false
+	liveFiles.onChange(data, () => {
+		called = true
+	})
+
+	writer.sessions = [{ id: 'old' }, { id: 'new' }]
+	writer.updatedAt = 'two'
+	liveFiles.save(writer)
+	for (let i = 0; i < 40 && !called; i++) await Bun.sleep(50)
+
+	expect(called).toBe(true)
+	expect(data.sessions.map((session: any) => session.id)).toEqual(['old', 'new'])
+})
+
 test('own writes do not trigger onChange', async () => {
 	const path = join(dir, 'ownwrite.ason')
 	const data = liveFiles.liveFile(path, { v: 0 })
