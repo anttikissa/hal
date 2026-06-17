@@ -386,6 +386,33 @@ test('up while working before output edits the just-sent prompt', () => {
 })
 
 
+test('up while working edits the visible latest prompt when local input history is stale', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		inputHistory: ['older prompt'],
+		history: [{ type: 'user', text: 'latest visible prompt' }] as any[],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			const handled = cli.forTests.handleAppKey(key('up'))
+			expect(handled).toBe(true)
+			expect(prompt.text()).toBe('latest visible prompt')
+			expect(tab.history[0]).toMatchObject({ status: 'editing' })
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
+
 test('up on newline draft while working stays in the prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

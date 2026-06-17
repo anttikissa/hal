@@ -377,7 +377,8 @@ function beginPreviousPromptEdit(): boolean {
 	if (prompt.text() !== '') return false
 	const tab = client.currentTab()
 	if (!tab) return false
-	const originalText = client.getInputHistory().at(-1)
+	const block = lastUserBlock(tab)
+	const originalText = block?.text ?? client.getInputHistory().at(-1)
 	if (!originalText) return false
 	const working = client.isWorking()
 	if (!working) return false
@@ -392,7 +393,7 @@ function beginPreviousPromptEdit(): boolean {
 		mode,
 		originalText,
 		pausedWorkingTurn: working,
-		block: mode === 'amend' ? lastUserBlock(tab) ?? undefined : undefined,
+		block: mode === 'amend' ? block ?? undefined : undefined,
 	})
 	prompt.setText(originalText)
 	if (working) client.sendCommand('abort', mode === 'amend' || mode === 'cancel' ? '' : undefined)
