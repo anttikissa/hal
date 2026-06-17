@@ -536,7 +536,7 @@ function handleCommand(cmd: Command): void {
 		case 'abort': {
 			if (!cmd.sessionId) return
 			const abortText = cmd.abortText ?? (promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)
-			if (!agentLoop.abort(cmd.sessionId, abortText)) emitInfo(cmd.sessionId, 'No working turn to pause')
+			if (!agentLoop.abort(cmd.sessionId, abortText) && abortText !== '') emitInfo(cmd.sessionId, 'No working turn to pause')
 			break
 		}
 		case 'reset': {

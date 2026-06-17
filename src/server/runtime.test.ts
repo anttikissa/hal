@@ -698,6 +698,24 @@ test('continue releases a held queue so completion drains it', async () => {
 	}
 })
 
+test('empty abort is silent when no turn is working', () => {
+	const events: any[] = []
+	const origAbort = agentLoop.abort
+	const origAppendEvent = ipc.appendEvent
+	agentLoop.abort = () => false
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		runtime.handleCommand({ type: 'abort', sessionId: '04-idle', abortText: '' })
+		expect(events).toEqual([])
+	} finally {
+		agentLoop.abort = origAbort
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
 
 test('recordTabClosed emits info when no turn is working', () => {
 	const events: any[] = []
