@@ -45,6 +45,29 @@ test('saveDraft logs write failures and skips the draft_saved event', () => {
 	expect(errors[0]?.data?.sessionId).toBe('04-test')
 })
 
+
+test('saveDraft preserves prompt edit metadata for restart restore', () => {
+	const sessionDir = join(dir, '04-test')
+	mkdirSync(sessionDir, { recursive: true })
+	sessions.sessionDir = () => sessionDir
+	ipc.appendEvent = () => {}
+
+	draft.saveDraft('04-test', 'edited prompt', {
+		mode: 'cancel',
+		originalText: 'original prompt',
+		pausedWorkingTurn: true,
+	})
+
+	expect(draft.loadDraftState('04-test')).toMatchObject({
+		text: 'edited prompt',
+		promptEdit: {
+			mode: 'cancel',
+			originalText: 'original prompt',
+			pausedWorkingTurn: true,
+		},
+	})
+})
+
 test('loadDraft logs parse failures and falls back to an empty draft', () => {
 	const sessionDir = join(dir, '04-test')
 	mkdirSync(sessionDir, { recursive: true })

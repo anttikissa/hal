@@ -50,6 +50,7 @@ describe('client startup', () => {
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origLoadAllHistoryWithOrigin = sessions.loadAllHistoryWithOrigin
 	const origLoadDraft = draft.loadDraft
+	const origLoadDraftState = draft.loadDraftState
 	const origReadState = ipc.readState
 	const origAppendCommand = ipc.appendCommand
 	const origTailEvents = ipc.tailEvents
@@ -80,6 +81,7 @@ describe('client startup', () => {
 		sessions.loadAllHistoryWithOrigin = () => ({ entries: [], parentCount: 0 })
 		sessions.loadLive = () => ({ blocks: [] })
 		draft.loadDraft = () => ''
+		draft.loadDraftState = () => ({ text: '', savedAt: '' })
 		// Client tests must never append to the real shared IPC command log.
 		// Individual tests can override this stub to assert what would be sent.
 		ipc.appendCommand = () => {}
@@ -93,6 +95,7 @@ describe('client startup', () => {
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.loadAllHistoryWithOrigin = origLoadAllHistoryWithOrigin
 		draft.loadDraft = origLoadDraft
+		draft.loadDraftState = origLoadDraftState
 		ipc.readState = origReadState
 		ipc.appendCommand = origAppendCommand
 		ipc.tailEvents = origTailEvents

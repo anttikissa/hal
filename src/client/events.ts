@@ -124,9 +124,10 @@ function handleDraftSaved(event: any, ctx: any): void {
 	ctx.flushDelayedPaused(event.sessionId)
 	const tab = ctx.tabForSession(event.sessionId)
 	if (!tab) return
-	const text = draftModule.loadDraft(event.sessionId)
-	tab.inputDraft = text
-	if (ctx.currentTab()?.sessionId === event.sessionId) ctx.onDraftArrived(text)
+	const draft = draftModule.loadDraftState(event.sessionId)
+	tab.inputDraft = draft.text
+	tab.inputDraftEdit = draft.promptEdit
+	if (ctx.currentTab()?.sessionId === event.sessionId) ctx.onDraftArrived(draft.text, draft.promptEdit)
 }
 
 function isTargetedHere(event: any, ctx: any): boolean {

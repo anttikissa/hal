@@ -7,7 +7,7 @@ import type { TokenUsage } from './protocol.ts'
 import { version, type VersionStatus } from './version.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { replay } from './session/replay.ts'
-import { draft as draftModule } from './cli/draft.ts'
+import { draft as draftModule, type DraftPromptEdit } from './cli/draft.ts'
 import { perf } from './perf.ts'
 import { liveEventBlocks } from './live-event-blocks.ts'
 import { startup } from './startup.ts'
@@ -41,6 +41,7 @@ export interface Tab {
 	// In-memory mirror of the draft.ason on disk. Kept in sync so we
 	// can hand it to the CLI on tab switch without a disk read.
 	inputDraft: string
+	inputDraftEdit?: DraftPromptEdit
 	// Tabs start unloaded: raw history is stashed here and converted to
 	// blocks on demand (focused tab at startup, others in background).
 	rawHistory?: HistoryEntry[]
@@ -321,9 +322,9 @@ function setOnTabSwitch(fn: (from: string, to: string) => void): void {
 // onDraftArrived callback — fired when another client saves a draft for
 // the focused tab and our prompt is empty. The CLI uses this to show the
 // draft text (e.g. client A quits with a draft, client B picks it up).
-let onDraftArrived: ((text: string) => void) | null = null
+let onDraftArrived: ((text: string, promptEdit?: DraftPromptEdit) => void) | null = null
 
-function setOnDraftArrived(fn: (text: string) => void): void {
+function setOnDraftArrived(fn: (text: string, promptEdit?: DraftPromptEdit) => void): void {
 	onDraftArrived = fn
 }
 
@@ -342,8 +343,11 @@ function switchTab(index: number): void {
 		rememberTab(tab.sessionId)
 		focusSession(tab.sessionId)
 		// Re-read draft from disk — another client may have saved one
-		const diskDraft = draftModule.loadDraft(tab.sessionId)
-		if (diskDraft && !tab.inputDraft) tab.inputDraft = diskDraft
+		const diskDraft = draftModule.loadDraftState(tab.sessionId)
+		if (diskDraft.text && !tab.inputDraft) {
+			tab.inputDraft = diskDraft.text
+			tab.inputDraftEdit = diskDraft.promptEdit
+		}
 		if (onTabSwitch) onTabSwitch(fromSession, tab.sessionId)
 		saveClientState()
 		onChange(true)
@@ -419,6 +423,41 @@ function appendInputHistory(line: string): void {
 }
 
 // ── Per-tab draft ────────────────────────────────────────────────────────────
+function isVisibleTurnEntry(entry: HistoryEntry): boolean {
+	return entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result' || entry.type === 'error'
+}
+
+function inferPromptEditFromHistory(entries: HistoryEntry[]): DraftPromptEdit | undefined {
+	let lastUser = -1
+	for (let i = entries.length - 1; i >= 0; i--) {
+		if (entries[i]?.type === 'user') {
+			lastUser = i
+			break
+		}
+	}
+	if (lastUser < 0) return undefined
+	const inputHistory = replay.inputHistoryFromEntries(entries.slice(0, lastUser + 1))
+	const originalText = inputHistory.at(-1)
+	if (!originalText) return undefined
+	let silentAbort = false
+	let visibleOutput = false
+	for (const entry of entries.slice(lastUser + 1)) {
+		if (entry.type === 'turn_end') {
+			if (entry.status === 'completed' || entry.status === 'failed') return undefined
+			if (entry.status === 'aborted' && entry.abortText === '') silentAbort = true
+			continue
+		}
+		if (isVisibleTurnEntry(entry)) visibleOutput = true
+	}
+	if (!silentAbort) return undefined
+	return { mode: visibleOutput ? 'cancel' : 'amend', originalText, pausedWorkingTurn: true }
+}
+
+function loadDraftIntoTab(tab: Tab, history?: HistoryEntry[]): void {
+	const file = draftModule.loadDraftState(tab.sessionId)
+	tab.inputDraft = file.text
+	tab.inputDraftEdit = file.promptEdit ?? (file.text ? inferPromptEditFromHistory(history ?? []) : undefined)
+}
 
 function getInputDraft(): string {
 	return currentTab()?.inputDraft ?? ''
@@ -427,21 +466,27 @@ function getInputDraft(): string {
 // Save draft text to memory + disk + IPC notification.
 // If sessionId is given, saves to that tab (used on tab switch to save
 // outgoing draft after focusedTabIndex already changed).
-function saveDraft(text: string, sessionId?: string): void {
+function saveDraft(text: string, sessionId?: string, promptEdit?: DraftPromptEdit): void {
 	const sid = sessionId ?? currentTab()?.sessionId
 	if (!sid) return
 	const tab = sessionId
 		? state.tabs.find(t => t.sessionId === sessionId)
 		: currentTab()
-	if (tab) tab.inputDraft = text
-	draftModule.saveDraft(sid, text)
+	if (tab) {
+		tab.inputDraft = text
+		tab.inputDraftEdit = promptEdit
+	}
+	draftModule.saveDraft(sid, text, promptEdit)
 }
 
 function clearDraft(sessionId?: string): void {
 	const sid = sessionId ?? currentTab()?.sessionId
 	if (!sid) return
 	const tab = state.tabs.find(t => t.sessionId === sid)
-	if (tab) tab.inputDraft = ''
+	if (tab) {
+		tab.inputDraft = ''
+		tab.inputDraftEdit = undefined
+	}
 	draftModule.clearDraft(sid)
 }
 
@@ -505,6 +550,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	tab.contextMax = snapshot.contextMax
 	tab.forkedFrom = snapshot.forkedFrom
 	tab.attention = info.attention
+	loadDraftIntoTab(tab, snapshot.history)
 	return tab
 }
 
@@ -577,7 +623,7 @@ function handleEvent(event: any): void {
 		clearToolConfirmPending,
 		setSummarizing,
 		markWhatDone,
-		onDraftArrived: (text: string) => onDraftArrived?.(text),
+		onDraftArrived: (text: string, promptEdit?: DraftPromptEdit) => onDraftArrived?.(text, promptEdit),
 		onRebaseStart: (item: any) => onRebaseStart?.(item),
 		onRebaseResult: (item: any) => onRebaseResult?.(item),
 		onChange,
@@ -626,7 +672,6 @@ function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; 
 	if (focused) {
 		const replayMs = (performance.now() - t0).toFixed(1)
 		perf.mark(`Focused tab replayed (${focused.history.length} blocks, ${replayMs}ms)`)
-		focused.inputDraft = draftModule.loadDraft(focused.sessionId)
 	}
 
 	const cols = process.stdout.columns || 80

@@ -24,6 +24,7 @@ import type { KeyEvent } from '../cli/keys.ts'
 import { time } from '../utils/time.ts'
 import { terminalOutput } from './terminal-output.ts'
 import { promptEdit } from './prompt-edit.ts'
+import type { DraftPromptEdit } from '../cli/draft.ts'
 
 const RESTART_CODE = 100
 
@@ -119,6 +120,21 @@ function exitCli(code: number): void {
 }
 
 let terminalCleaned = false
+function promptEditDraftFor(sessionId?: string | null): DraftPromptEdit | undefined {
+	const active = promptEdit.activeFor(sessionId)
+	if (!active) return undefined
+	return {
+		mode: active.mode,
+		originalText: active.originalText,
+		pausedWorkingTurn: active.pausedWorkingTurn,
+	}
+}
+
+function saveCurrentPromptDraft(sessionId?: string): void {
+	const sid = sessionId ?? client.currentTab()?.sessionId
+	if (!sid) return
+	client.saveDraft(prompt.draftText(), sid, promptEditDraftFor(sid))
+}
 let restarting = false
 
 // Restore terminal state and save client state before exiting.
@@ -130,7 +146,7 @@ function cleanupTerminal(): void {
 	const bypass = { bypassExternalEditorLatch: true }
 	cursor.stop()
 	// Persist the current draft so it survives restart
-	client.saveDraft(prompt.draftText())
+	saveCurrentPromptDraft()
 	client.saveState({ restart: restarting })
 	if (useKitty) terminalOutput.write(KITTY_OFF, bypass)
 	terminalOutput.write(BRACKETED_PASTE_OFF + CURSOR_SHAPE_DEFAULT + CURSOR_COLOR_DEFAULT, bypass)
@@ -405,6 +421,7 @@ function continueAfterPromptEdit(active: NonNullable<typeof promptEdit.state.act
 	promptEdit.cancel()
 	prompt.clear()
 	clearSavedPromptState()
+	client.clearDraft(active.sessionId)
 	if (shouldContinue) client.sendCommand('continue')
 }
 
@@ -618,6 +635,17 @@ function clearSavedPromptState(): void {
 	const tab = client.currentTab()
 	if (tab) promptStates.delete(tab.sessionId)
 }
+function restorePromptEditForTab(tab: (typeof client.state.tabs)[number]): void {
+	const saved = tab.inputDraftEdit
+	if (!saved || promptEdit.activeFor(tab.sessionId)) return
+	promptEdit.start({
+		sessionId: tab.sessionId,
+		mode: saved.mode,
+		originalText: saved.originalText,
+		pausedWorkingTurn: saved.pausedWorkingTurn,
+		block: saved.mode === 'amend' ? lastUserBlock(tab) ?? undefined : undefined,
+	})
+}
 
 function restorePromptForCurrentTab(): void {
 	const tab = client.currentTab()
@@ -632,12 +660,13 @@ function restorePromptForCurrentTab(): void {
 	}
 	prompt.setHistory(client.getInputHistory())
 	prompt.setText(client.getInputDraft())
+	restorePromptEditForTab(tab)
 }
 
 function installPromptTabSwitchHandler(): void {
 	client.setOnTabSwitch((fromSession, _toSession) => {
 		promptStates.set(fromSession, prompt.snapshotState())
-		client.saveDraft(prompt.draftText(), fromSession)
+		saveCurrentPromptDraft(fromSession)
 		restorePromptForCurrentTab()
 		openaiUsage.noteActivity()
 	})
@@ -686,7 +715,7 @@ function handleAppKey(k: KeyEvent): boolean {
 		if (k.key === 'f') {
 			const tab = client.currentTab()
 			if (tab) {
-				client.saveDraft(prompt.draftText(), tab.sessionId)
+				client.saveDraft(prompt.draftText(), tab.sessionId, promptEditDraftFor(tab.sessionId))
 				sendTabCommandIfRoom('open', `fork:${tab.sessionId}`)
 			}
 			return true
@@ -813,9 +842,12 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 	// When another client saves a draft for our focused tab and our
 	// prompt is empty, show it. This is how "client A quits with a
 	// draft on tab 10, client B picks it up" works.
-	client.setOnDraftArrived((text) => {
+	client.setOnDraftArrived((text, savedEdit) => {
 		if (!prompt.text() && text) {
 			prompt.setText(text)
+			const tab = client.currentTab()
+			if (tab) tab.inputDraftEdit = savedEdit
+			if (tab) restorePromptEditForTab(tab)
 			openaiUsage.noteActivity()
 			draw()
 		}
@@ -861,6 +893,7 @@ export const cli = {
 		claudeCacheWarning,
 		kittyOnSequence: () => KITTY_ON,
 		installPromptTabSwitchHandler,
+		restorePromptForCurrentTab,
 		promptInputWidth,
 		resetPromptStates: () => {
 			promptStates = new Map<string, PromptEditorState>()

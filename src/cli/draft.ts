@@ -7,9 +7,16 @@ import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
 
+export type DraftPromptEdit = {
+	mode: 'amend' | 'cancel' | 'copy' | 'side-effect-copy'
+	originalText: string
+	pausedWorkingTurn: boolean
+}
+
 interface DraftFile {
 	text: string
 	savedAt: string
+	promptEdit?: DraftPromptEdit
 }
 
 function draftPath(sessionId: string): string {
@@ -28,12 +35,13 @@ function logDraftError(action: 'save' | 'load' | 'clear', sessionId: string, err
 	log.error('draft operation failed', { action, sessionId, error: errorMessage(err) })
 }
 
-function saveDraft(sessionId: string, text: string): void {
-	if (!text) {
+function saveDraft(sessionId: string, text: string, promptEdit?: DraftPromptEdit): void {
+	if (!text && !promptEdit) {
 		clearDraft(sessionId)
 		return
 	}
 	const data: DraftFile = { text, savedAt: new Date().toISOString() }
+	if (promptEdit) data.promptEdit = promptEdit
 	try {
 		writeFileSync(draftPath(sessionId), ason.stringify(data) + '\n')
 	} catch (err) {
@@ -44,16 +52,28 @@ function saveDraft(sessionId: string, text: string): void {
 	ipc.appendEvent({ type: 'draft_saved', sessionId })
 }
 
-function loadDraft(sessionId: string): string {
+function emptyDraftFile(): DraftFile {
+	return { text: '', savedAt: '' }
+}
+
+function loadDraftState(sessionId: string): DraftFile {
 	const path = draftPath(sessionId)
-	if (!existsSync(path)) return ''
+	if (!existsSync(path)) return emptyDraftFile()
 	try {
 		const data = ason.parse(readFileSync(path, 'utf-8')) as unknown as DraftFile
-		return data?.text ?? ''
+		return {
+			text: data?.text ?? '',
+			savedAt: data?.savedAt ?? '',
+			promptEdit: data?.promptEdit,
+		}
 	} catch (err) {
 		logDraftError('load', sessionId, err)
-		return ''
+		return emptyDraftFile()
 	}
+}
+
+function loadDraft(sessionId: string): string {
+	return loadDraftState(sessionId).text
 }
 
 function clearDraft(sessionId: string): void {
@@ -71,4 +91,4 @@ function clearDraft(sessionId: string): void {
 	ipc.appendEvent({ type: 'draft_saved', sessionId })
 }
 
-export const draft = { saveDraft, loadDraft, clearDraft }
+export const draft = { saveDraft, loadDraft, loadDraftState, clearDraft }

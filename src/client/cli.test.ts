@@ -534,6 +534,36 @@ test('down from just-sent edit continues the original prompt', () => {
 })
 
 
+test('down from restored just-sent edit continues the original prompt', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		inputDraft: 'edited but discarded',
+		inputDraftEdit: { mode: 'cancel', originalText: 'original prompt', pausedWorkingTurn: true },
+		history: [{ type: 'user', text: 'original prompt' }, { type: 'assistant', text: 'partial' }] as any[],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			cli.forTests.restorePromptForCurrentTab()
+
+			expect(prompt.text()).toBe('edited but discarded')
+			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
+
+			const handled = cli.forTests.handleAppKey(key('down'))
+			expect(handled).toBe(true)
+			expect(prompt.text()).toBe('')
+			expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		promptEdit.cancel()
+	}
+})
+
+
 test('down in just-sent edit moves through blank prompt lines before continuing', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
