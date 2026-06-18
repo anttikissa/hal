@@ -76,7 +76,13 @@ function handleResponse(event: any, ctx: any): void {
 	if (event.isError) {
 		ctx.applyLiveEventToTab(tab, event)
 		ctx.onChange(false)
-	} else if (event.text && !clientHistory.hasTrailingAssistantText(tab.history, event.text)) {
+	} else if (event.text) {
+		if (clientHistory.hasTrailingAssistantText(tab.history, event.text)) return
+		if (clientHistory.extendTrailingAssistantText(tab.history, event.text, typeof event.model === 'string' ? event.model : undefined)) {
+			ctx.touchTab(tab)
+			ctx.onChange(false)
+			return
+		}
 		ctx.addBlockToTab(event.sessionId ?? null, {
 			type: 'assistant',
 			text: event.text,

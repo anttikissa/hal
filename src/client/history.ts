@@ -53,6 +53,21 @@ function withLive(blocks: Block[], tab: LiveTab): Block[] {
 	return [...blocks, ...live]
 }
 
+// Final response text can include server-side post-processing (for example the
+// commit LOC line) that was not present in the streamed block. Update that block
+// in place so the final response does not appear as a second assistant message.
+
+function extendTrailingAssistantText(blocks: Block[], text: string, model?: string): boolean {
+	const block = blocks[blocks.length - 1]
+	if (!block || block.type !== 'assistant') return false
+	if (block.text === text) return true
+	if (!text.startsWith(block.text)) return false
+	block.text = text
+	if (model) block.model = model
+	block.renderVersion = (block.renderVersion ?? 0) + 1
+	return true
+}
+
 function hasTrailingAssistantText(blocks: Block[], text: string): boolean {
 	const parts: string[] = []
 	let chainId: string | null = null
@@ -89,5 +104,6 @@ export const clientHistory = {
 	sameMergeBlock,
 	trimPersistedLiveOverlap,
 	withLive,
+	extendTrailingAssistantText,
 	hasTrailingAssistantText,
 }
