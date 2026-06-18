@@ -1,6 +1,5 @@
 import { draft as draftModule } from '../cli/draft.ts'
 import { blockData } from '../cli/block-data.ts'
-import { clientHistory } from './history.ts'
 
 function handle(event: any, ctx: any): void {
 	if (event.type === 'host-released') return
@@ -72,25 +71,7 @@ function handleResponse(event: any, ctx: any): void {
 	ctx.flushDelayedPaused(event.sessionId ?? null)
 	const tab = ctx.tabForSession(event.sessionId ?? null)
 	if (!tab) return
-	ctx.applyLiveEventToTab(tab, { type: 'stream-end' })
-	if (event.isError) {
-		ctx.applyLiveEventToTab(tab, event)
-		ctx.onChange(false)
-	} else if (event.text) {
-		if (clientHistory.hasTrailingAssistantText(tab.history, event.text)) return
-		if (clientHistory.extendTrailingAssistantText(tab.history, event.text, typeof event.model === 'string' ? event.model : undefined)) {
-			ctx.touchTab(tab)
-			ctx.onChange(false)
-			return
-		}
-		ctx.addBlockToTab(event.sessionId ?? null, {
-			type: 'assistant',
-			text: event.text,
-			model: typeof event.model === 'string' ? event.model : undefined,
-			synthetic: event.synthetic === true,
-			ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
-		})
-	}
+	if (ctx.applyLiveEventToTab(tab, event).changed) ctx.onChange(false)
 }
 
 function handleInfo(event: any, ctx: any): void {

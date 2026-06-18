@@ -35,6 +35,60 @@ function closeStreamingBlock(blocks: any[], onChange?: () => void): boolean {
 	return false
 }
 
+function trailingAssistantText(blocks: any[]): string | null {
+	const parts: string[] = []
+	let chainId: string | null = null
+	let sawAssistant = false
+	for (let i = blocks.length - 1; i >= 0; i--) {
+		const block = blocks[i]
+		if (!block || block.type === 'tool') continue
+		if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error') {
+			if (!sawAssistant) continue
+			continue
+		}
+		if (block.type !== 'assistant') break
+		const blockChainId = liveEventBlocks.assistantChainId(block)
+		if (!sawAssistant) {
+			sawAssistant = true
+			chainId = blockChainId
+			parts.unshift(block.text)
+			continue
+		}
+		if (chainId && blockChainId === chainId) {
+			parts.unshift(block.text)
+			continue
+		}
+		break
+	}
+	if (!sawAssistant) return null
+	return parts.join('')
+}
+
+function applyAssistantResponse(blocks: any[], event: any, sessionId: string | undefined, defaultModel: string | undefined, ts: number | undefined, touchBlock: ((block: any) => void) | undefined, onChange: (() => void) | undefined): { changed: boolean } {
+	const last = blocks[blocks.length - 1] ?? null
+	if (last?.type === 'assistant' && last.streaming && event.text.startsWith(last.text)) {
+		last.text = event.text
+		if (!last.model) last.model = event.model ?? defaultModel
+		if (!last.ts) last.ts = ts
+		delete last.streaming
+		touchBlock?.(last)
+		onChange?.()
+		return { changed: true }
+	}
+	if (trailingAssistantText(blocks) === event.text) return { changed: closeStreamingBlock(blocks, onChange) }
+	closeStreamingBlock(blocks, onChange)
+	blocks.push({
+		type: 'assistant',
+		text: event.text,
+		model: event.model ?? defaultModel,
+		synthetic: event.synthetic === true,
+		sessionId,
+		ts,
+	})
+	onChange?.()
+	return { changed: true }
+}
+
 function makeAssistantId(): string {
 	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -149,10 +203,13 @@ function applyEvent(opts: ApplyEventOptions): { changed: boolean; toolBlock?: an
 		return changed()
 	}
 
-	if (event.type === 'response' && event.isError && event.text) {
-		close()
-		blocks.push({ type: 'error', text: event.text, blobId: event.blobId, sessionId, ts })
-		return changed()
+	if (event.type === 'response' && event.text) {
+		if (event.isError) {
+			close()
+			blocks.push({ type: 'error', text: event.text, blobId: event.blobId, sessionId, ts })
+			return changed()
+		}
+		return applyAssistantResponse(blocks, event, sessionId, defaultModel, ts, touchBlock, onChange)
 	}
 
 	if (event.type === 'stream-end') return { changed: close() }
