@@ -197,6 +197,22 @@ describe('prompt', () => {
 		expect(prompt.text()).toBe('draft')
 	})
 
+	test('setHistory does not let caller appends duplicate prompt recall', () => {
+		const inputHistory = ['older']
+		prompt.setHistory(inputHistory)
+
+		// The CLI echoes a just-submitted prompt into the editor history for
+		// immediate up-arrow recall, then appends the same prompt to the tab's
+		// inputHistory. These are separate owners; sharing the same array makes the
+		// just-sent prompt appear twice while editing it.
+		prompt.pushHistory('hello')
+		inputHistory.push('hello')
+		prompt.setText('hello')
+
+		prompt.handleKey(key('up'), 80)
+		expect(prompt.text()).toBe('older')
+	})
+
 	test('draftText returns an edited recalled history entry', () => {
 		prompt.setHistory(['old prompt'])
 		prompt.setText('')

@@ -777,7 +777,7 @@ function clear(): void {
 }
 
 function setHistory(h: string[]): void {
-	history = h
+	history = h.slice()
 	historyIndex = -1
 	historyDraft = ''
 }
