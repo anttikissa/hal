@@ -99,9 +99,14 @@ function halCursorLine(sessionId: string, visible: boolean, working: boolean, fa
 	return visible ? ` ${color}█\x1b[39m` : ''
 }
 
+function isAssistantBlock(block: Block | undefined): boolean {
+	return block?.type === 'assistant'
+}
+
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {
 	const start = lines.length
 	const history = visibleHistory(tab.history)
+	let previousBlock: Block | undefined
 	for (let i = 0; i < history.length; ) {
 		const group = [history[i]!]
 		const key = logGroupKey(group[0]!)
@@ -110,9 +115,16 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 				group.push(history[j]!)
 			}
 		}
-		if (lines.length > 0) lines.push('')
+		if (lines.length > 0) {
+			let separator = ''
+			if (isAssistantBlock(previousBlock) && isAssistantBlock(group[0])) {
+				separator = blockRenderer.assistantSeparatorLine(cols)
+			}
+			lines.push(separator)
+		}
 		const rendered = renderGroup(group, cols, context)
 		lines.push(...rendered)
+		previousBlock = group.at(-1)
 		i += group.length
 	}
 

@@ -289,6 +289,10 @@ function idleCursorColor(): string {
 	return colors.assistant.cursorIdle ?? colors.assistant.cursor ?? colors.assistant.fg
 }
 
+function assistantSeparatorLine(cols: number): string {
+	return `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}${FG_OFF}`
+}
+
 function cursorGlyph(block: Block, visible: boolean): string {
 	return visible ? `${cursorColor(block)}█${FG_OFF}` : ' '
 }
@@ -349,5 +353,6 @@ export const blocks = {
 	renderBlock,
 	cursorColor,
 	idleCursorColor,
+	assistantSeparatorLine,
 	renderBlockGroup,
 }
