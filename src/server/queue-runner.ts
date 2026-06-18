@@ -4,6 +4,7 @@
 
 import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
 import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
+import { sessions } from './sessions.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'
@@ -53,7 +54,7 @@ function emitQueuePausedNotice(sessionId: string): void {
 }
 
 function shouldDrainQueuedPrompt(sessionId: string, result: AgentLoopResult): boolean {
-	return result === 'completed' && !promptQueue.isHeld(sessionId) && promptQueue.load(sessionId).length > 0
+	return result === 'completed' && !sessions.findPendingTools(sessionId) && !promptQueue.isHeld(sessionId) && promptQueue.load(sessionId).length > 0
 }
 
 async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boolean> {

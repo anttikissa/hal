@@ -27,6 +27,7 @@ import { promptQueue } from '../runtime/prompt-queue.ts'
 import { openai } from '../providers/openai.ts'
 import { paths } from '../utils/paths.ts'
 import { openingSummary } from '../session/opening-summary.ts'
+import { blob } from '../session/blob.ts'
 import { whatSummary } from '../session/what.ts'
 
 const state = {
@@ -348,6 +349,33 @@ async function handlePromptAmendCommand(sessionId: string, text: string, source?
 	await runGeneration(sessionId, '')
 }
 
+async function continuePendingTools(sessionId: string): Promise<boolean> {
+	const pending = sessionStore.findPendingTools(sessionId)
+	if (!pending) return false
+	// Pending tools must run before provider-message rebuild; otherwise
+	// repairToolPairing() would correctly treat the missing tool results as an
+	// interruption and inject synthetic [interrupted] results.
+	const ac = new AbortController()
+	ipc.updateState((shared) => {
+		shared.working[sessionId] = true
+	})
+	try {
+		const blobMap = new Map<string, string>()
+		const calls = pending.toolCalls.map((call) => {
+			if (call.blobId) blobMap.set(call.id, call.blobId)
+			const input = call.input === undefined && call.blobId ? blob.readBlob(sessionId, call.blobId)?.call?.input : call.input
+			return { id: call.id, name: call.name, input }
+		})
+		await agentLoop.executeToolBatch(sessionId, calls, pending.cwd, ac.signal, blobMap)
+		sessionStore.resolvePendingTools(sessionId, pending.id)
+		return true
+	} finally {
+		ipc.updateState((shared) => {
+			delete shared.working[sessionId]
+		})
+	}
+}
+
 async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
@@ -355,6 +383,10 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	const cwd = meta.workingDir ?? process.cwd()
 	const model = meta.model ?? models.defaultModel()
 	const promptResult = context.buildSystemPrompt({ model, cwd, sessionId })
+	if (text) {
+		const pending = sessionStore.findPendingTools(sessionId)
+		if (pending) sessionStore.resolvePendingTools(sessionId, pending.id)
+	}
 	if (text) {
 		sessionStore.appendHistory(sessionId, [{
 			type: 'user',
@@ -516,6 +548,7 @@ function handleCommand(cmd: Command): void {
 			if (!sessionId) return
 			void (async () => {
 				if (agentLoop.isWorking(sessionId)) {
+					if (agentLoop.hasPauseBeforeTools(sessionId)) return
 					agentLoop.abort(sessionId, '')
 					await Bun.sleep(50)
 				}
@@ -523,8 +556,15 @@ function handleCommand(cmd: Command): void {
 				// queued prompts should drain immediately instead of staying stuck behind
 				// the paused-turn safety hold.
 				promptQueue.setHeld(sessionId, false)
+				await continuePendingTools(sessionId)
 				void runGeneration(sessionId, '')
 			})()
+			break
+		}
+		case 'pause-before-tools': {
+			if (!sessionId) return
+			if (agentLoop.requestPauseBeforeTools(sessionId)) emitInfo(sessionId, 'Will pause before next local tool batch')
+			else emitInfo(sessionId, 'No working turn to pause before local tools')
 			break
 		}
 		case 'queue-next': {
@@ -787,6 +827,7 @@ export const runtime = {
 	handlePrompt,
 	runCompact,
 	handleCommand,
+	continuePendingTools,
 	// Used by sibling server modules (tabs, model-notices) at call time.
 	broadcastSessions,
 	publishContextEstimate,

@@ -12,7 +12,7 @@ function actionForBlock(block: Block): ContinueAction | false {
 		if (isMaxIterationsStop(block.text)) return 'continue'
 		return 'retry'
 	}
-	if (block.type === 'log' && (block.text === '[paused]' || block.text?.startsWith('[interrupted]'))) return 'continue'
+	if (block.type === 'log' && (block.text === '[paused]' || block.text === '[paused before local tools]' || block.text?.startsWith('[interrupted]'))) return 'continue'
 	return false
 }
 

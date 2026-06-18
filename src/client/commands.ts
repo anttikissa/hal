@@ -33,6 +33,7 @@ function makeCommand(type: ClientCommandType, sessionId: string | undefined, tex
 			return { type, sessionId, target: text ?? '' }
 		case 'continue':
 		case 'queue-next':
+		case 'pause-before-tools':
 		case 'close':
 		case 'abort':
 			return text === undefined ? { type, sessionId } : { type, sessionId, abortText: text }

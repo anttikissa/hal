@@ -25,7 +25,7 @@ export type EventType =
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'queue-next' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'client-status' | 'client-exit'
+export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'queue-next' | 'pause-before-tools' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'client-status' | 'client-exit'
 
 export type SpawnMode = 'fork' | 'fresh'
 export type SpawnKind = 'subagent' | 'subagent-autoclose' | 'interactive'
@@ -60,6 +60,10 @@ export interface ContinueCommand extends CommandBase {
 
 export interface QueueNextCommand extends CommandBase {
 	type: 'queue-next'
+}
+
+export interface PauseBeforeToolsCommand extends CommandBase {
+	type: 'pause-before-tools'
 }
 
 export interface OpenNewCommand extends CommandBase {
@@ -178,6 +182,7 @@ export type Command =
 	| ClientExitCommand
 	| ContinueCommand
 	| QueueNextCommand
+	| PauseBeforeToolsCommand
 	| OpenNewCommand
 	| OpenForkCommand
 	| OpenAfterCommand

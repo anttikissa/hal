@@ -85,6 +85,23 @@ test('appendHistory repairs duplicate ids before writing', async () => {
 	expect(ids[0]).toBe('000001-aaa')
 })
 
+test('pending tools marker persists and resolves across reload-style reads', async () => {
+	const id = await makeSession()
+	await sessions.appendHistory(id, [
+		userEntry('run tool', '2026-05-25T10:00:00.000Z'),
+		{ type: 'tool_call', toolId: 'tool-1', name: 'read', input: { path: 'README.md' }, blobId: 'blob-1', ts: '2026-05-25T10:00:01.000Z' },
+		{ type: 'pending_tools', toolIds: ['tool-1'], cwd: '/tmp/work', model: 'openai/gpt-5', reason: 'soft-pause', ts: '2026-05-25T10:00:02.000Z' },
+	])
+
+	const pending = sessions.findPendingTools(id)
+	expect(pending).toMatchObject({ cwd: '/tmp/work', toolIds: ['tool-1'] })
+	expect(pending?.toolCalls).toEqual([{ id: 'tool-1', name: 'read', input: { path: 'README.md' }, blobId: 'blob-1' }])
+
+	expect(sessions.resolvePendingTools(id, pending!.id)).toBe(true)
+	expect(sessions.findPendingTools(id)).toBeNull()
+	expect(sessions.loadHistory(id).find((entry) => entry.type === 'pending_tools')).toMatchObject({ canceled: true })
+})
+
 
 test('cancelTailTurn marks last prompt and partial output canceled in current history', async () => {
 	const id = await makeSession()

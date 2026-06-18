@@ -44,6 +44,8 @@ const state = {
 	workingRequests: new Map<string, AbortController>(),
 	/** Info text to emit when an aborted turn finishes unwinding. */
 	abortTexts: new Map<string, string>(),
+	/** Soft pause requests that stop at the next local tool batch boundary. */
+	pauseBeforeTools: new Set<string>(),
 }
 
 const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) => void }>()
@@ -219,6 +221,10 @@ function formatContextLengthWarning(messages: Message[], model: string, overhead
 // non-zero cacheRead, so we can't just check `input > 0`.
 function hasUsage(u: TokenUsage): boolean {
 	return u.input > 0 || u.output > 0 || u.cacheRead > 0 || u.cacheCreation > 0
+}
+
+function usageOrUndefined(usage: TokenUsage): TokenUsage | undefined {
+	return hasUsage(usage) ? usage : undefined
 }
 
 function appendTurnEnd(sessionId: string, meta: TurnEndMeta): void {
@@ -699,6 +705,22 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				await writeToolCallBlob(sessionId, blobId, tc.name, tc.input)
 				historyEntries.push({ type: 'tool_call', toolId: tc.id, name: tc.name, input: tc.input, blobId, ts })
 			}
+			const pauseBeforeTools = hasPauseBeforeTools(sessionId)
+			if (pauseBeforeTools) {
+				// Provider streams cannot be reconstructed after a crash. We only call this
+				// a durable pause after the complete local tool-call batch is saved, and
+				// before any local tool starts. The batch is all-or-nothing: once a tool
+				// starts, this feature must not claim a clean pause before tools.
+				historyEntries.push({
+					type: 'pending_tools',
+					toolIds: toolCalls.map((call) => call.id),
+					cwd: ctx.cwd,
+					model,
+					usage: usageOrUndefined(totalUsage),
+					reason: 'soft-pause',
+					ts,
+				})
+			}
 			await sessions.appendHistory(sessionId, historyEntries)
 			sessions.clearLive(sessionId)
 
@@ -710,11 +732,26 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				emitEvent(sessionId, { type: 'response', text: assistantText, model })
 			}
 
+			if (pauseBeforeTools) {
+				clearPauseBeforeTools(sessionId)
+				emitInfo(sessionId, '[paused before local tools]')
+				const est = context.estimateContext(messages, model, overheadBytes)
+				emitEvent(sessionId, {
+					type: 'stream-end',
+					phase: 'done',
+					usage: usageOrUndefined(totalUsage),
+					contextUsed: est.used,
+					contextMax: est.max,
+				})
+				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+				return 'paused'
+			}
+
 			// Execute tools (with concurrency limit)
 			await ctx.onStatus?.(true)
-			const results = await executeToolsConcurrently(toolCalls, loopSignal, ctx.cwd, sessionId)
+			const results = await executeToolBatch(sessionId, toolCalls, ctx.cwd, loopSignal, toolBlobMap)
 
-			// Add tool results to messages and save to history
+			// Add tool results to messages.
 			for (const { call, result } of results) {
 				messages.push({
 					role: 'user',
@@ -722,29 +759,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				})
 				const locLine = commitLocLine(result)
 				if (locLine) latestCommitLocLine = locLine
-
-				// Save tool result to blob and history
-				const blobId = toolBlobMap.get(call.id)!
-				const existing = blob.readBlob(sessionId, blobId)
-				if (existing) {
-					existing.result = { content: result, status: 'done' }
-					await blob.writeBlob(sessionId, blobId, existing)
-				}
-				await sessions.appendHistory(sessionId, [{
-					type: 'tool_result',
-					toolId: call.id,
-					blobId,
-					ts: new Date().toISOString(),
-				}])
-
-				emitEvent(sessionId, {
-					type: 'tool-result',
-					toolId: call.id,
-					name: call.name,
-					output: result.slice(0, 500), // truncate for IPC
-					blobId,
-					phase: 'done',
-				})
 			}
 
 			await ctx.onStatus?.(true)
@@ -782,6 +796,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		// request look idle and later prompts would start concurrently.
 		if (state.workingRequests.get(sessionId) === ac) state.workingRequests.delete(sessionId)
 		state.abortTexts.delete(sessionId)
+		clearPauseBeforeTools(sessionId)
 		await ctx.onStatus?.(false)
 	}
 }
@@ -819,6 +834,52 @@ async function executeToolsConcurrently(
 	return results
 }
 
+async function executeToolBatch(
+	sessionId: string,
+	toolCalls: ToolCall[],
+	cwd: string,
+	signal: AbortSignal,
+	toolBlobMap?: Map<string, string>,
+): Promise<{ call: ToolCall; result: string; blobId: string }[]> {
+	const blobs = toolBlobMap ?? new Map<string, string>()
+	for (const call of toolCalls) {
+		if (!blobs.has(call.id)) blobs.set(call.id, blob.makeBlobId(sessionId))
+	}
+	const results = await executeToolsConcurrently(toolCalls, signal, cwd, sessionId)
+	const saved: { call: ToolCall; result: string; blobId: string }[] = []
+	for (const { call, result } of results) {
+		const blobId = blobs.get(call.id) ?? blob.makeBlobId(sessionId)
+		const existing = blob.readBlob(sessionId, blobId) ?? { call: { name: call.name, input: call.input } }
+		existing.result = { content: result, status: 'done' }
+		await blob.writeBlob(sessionId, blobId, existing)
+		await sessions.appendHistory(sessionId, [{ type: 'tool_result', toolId: call.id, blobId, ts: new Date().toISOString() }])
+		emitEvent(sessionId, {
+			type: 'tool-result',
+			toolId: call.id,
+			name: call.name,
+			output: result.slice(0, 500),
+			blobId,
+			phase: 'done',
+		})
+		saved.push({ call, result, blobId })
+	}
+	return saved
+}
+
+function requestPauseBeforeTools(sessionId: string): boolean {
+	if (!state.workingRequests.has(sessionId)) return false
+	state.pauseBeforeTools.add(sessionId)
+	return true
+}
+
+function clearPauseBeforeTools(sessionId: string): void {
+	state.pauseBeforeTools.delete(sessionId)
+}
+
+function hasPauseBeforeTools(sessionId: string): boolean {
+	return state.pauseBeforeTools.has(sessionId)
+}
+
 /** Abort an working turn for a session. */
 function abort(sessionId: string, text = DEFAULT_ABORT_TEXT): boolean {
 	const ac = state.workingRequests.get(sessionId)
@@ -843,5 +904,9 @@ export const agentLoop = {
 	abort,
 	resolveToolConfirmation,
 	isWorking,
+	requestPauseBeforeTools,
+	clearPauseBeforeTools,
+	hasPauseBeforeTools,
+	executeToolBatch,
 	sanitizeToolCallInput,
 }

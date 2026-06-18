@@ -445,6 +445,59 @@ test('abort between tool iterations does not report max iterations', async () =>
 	}
 })
 
+test('pause before all tools in batch persists pending marker without executing tools', async () => {
+	const sessionId = `test-pending-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const origDispatch = toolRegistry.dispatch
+	let dispatched = false
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			expect(agentLoop.requestPauseBeforeTools(sessionId)).toBe(true)
+			yield { type: 'text', text: 'checking' }
+			yield { type: 'tool_call', id: 'tool-1', name: 'read', input: { path: 'README.md' } }
+			yield { type: 'done', usage: { input: 2, output: 3, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => { events.push(event) }
+	toolRegistry.dispatch = async () => {
+		dispatched = true
+		return 'should not run'
+	}
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'use tool' }],
+		})
+
+		const history = sessions.loadHistory(sessionId)
+		expect(result).toBe('paused')
+		expect(dispatched).toBe(false)
+		expect(history).toMatchObject([
+			{ type: 'assistant', text: 'checking' },
+			{ type: 'tool_call', toolId: 'tool-1', name: 'read' },
+			{ type: 'pending_tools', toolIds: ['tool-1'], reason: 'soft-pause', usage: { input: 2, output: 3, cacheRead: 0, cacheCreation: 0 } },
+		])
+		expect(history.some((entry) => entry.type === 'tool_result')).toBe(false)
+		expect(history.some((entry) => entry.type === 'turn_end')).toBe(false)
+		expect(events).toContainEqual(expect.objectContaining({ type: 'info', text: '[paused before local tools]' }))
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+		toolRegistry.dispatch = origDispatch
+		agentLoop.clearPauseBeforeTools(sessionId)
+	}
+})
+
 
 test('max iterations persists a continuable error without ending the turn', async () => {
 	const sessionId = `test-max-iterations-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`

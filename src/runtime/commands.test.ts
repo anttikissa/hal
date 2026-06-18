@@ -353,6 +353,21 @@ test('/clear queues a reset command', async () => {
 })
 
 
+test('/pause queues a soft pause command', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const result = await commands.executeCommand('/pause', makeSession())
+
+	expect(result.handled).toBe(true)
+	expect(result.error).toBeUndefined()
+	expect(result.output).toBeUndefined()
+	expect(appended).toEqual([{ type: 'pause-before-tools', sessionId: '04-aaa' }])
+})
+
+
 test('/self queues a session rooted at HAL_DIR', async () => {
 	const appended: any[] = []
 	const origHalDir = process.env.HAL_DIR

@@ -88,6 +88,9 @@ function historyToBlocks(
 			case 'tool_call':
 				result.push({ type: 'tool', name: entry.name, input: entry.input, blobId: entry.blobId, sessionId: blobOwner, toolId: entry.toolId, ts, dimmed, canceled: entry.canceled })
 				break
+			case 'pending_tools':
+				if (!entry.canceled) result.push({ type: 'log', text: '[paused before local tools]', ts, dimmed })
+				break
 			case 'assistant':
 				result.push({
 					type: 'assistant',

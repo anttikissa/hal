@@ -46,10 +46,22 @@ function findReplayStart(entries: HistoryEntry[]): number {
 	return 0
 }
 
+function assertNoUnresolvedPendingTools(entries: HistoryEntry[]): void {
+	for (const entry of entries) {
+		if (entry.type === 'pending_tools') {
+			throw new Error('Cannot rebuild provider messages while pending tools are unresolved; continue must execute pending tools first.')
+		}
+	}
+}
+
 function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts?: { prune?: boolean }): Message[] {
 	const entries = allEntries ?? sessions.loadAllHistory(sessionId)
 	const start = findReplayStart(entries)
 	const sliced = entries.slice(start).filter((entry) => !entry.canceled)
+	// Unmatched tool calls are repaired as interrupted/corrupt history below, but
+	// an explicit pending-tools marker means the batch is deliberately paused and
+	// must be executed before provider replay can happen.
+	assertNoUnresolvedPendingTools(sliced)
 	const out: Message[] = []
 
 	const totalUserTurns = sliced.filter((entry) => entry.type === 'user').length

@@ -44,6 +44,22 @@ function isSideEffectTool(name: string): boolean {
 	return SIDE_EFFECT_TOOL_NAMES.has(name)
 }
 
+export interface PendingToolCall {
+	id: string
+	name: string
+	input?: any
+	blobId?: string
+}
+
+export interface PendingToolsState {
+	id: string
+	toolIds: string[]
+	toolCalls: PendingToolCall[]
+	cwd: string
+	model?: string
+	usage?: PartialTokenUsage
+}
+
 export type HistoryEntry = EntryIdentity & (
 	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; status?: string; ts?: string }
 	| {
@@ -68,6 +84,7 @@ export type HistoryEntry = EntryIdentity & (
 		}
 	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; ts?: string }
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; ts?: string }
+	| { type: 'pending_tools'; toolIds: string[]; cwd: string; model?: string; usage?: PartialTokenUsage; reason?: 'soft-pause'; ts?: string }
 	| ({ type: 'turn_end'; ts?: string } & TurnEndMeta)
 	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ui?: 'notice'; ts?: string }
@@ -141,7 +158,7 @@ const historyTopLevelKeys = new Set([
 	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled',
 	'blobId', 'signature', 'model', 'thinkingEffort',
 	'continue', 'usage', 'abortText', 'synthetic', 'syntheticKind',
-	'toolId', 'name', 'input', 'output', 'isError',
+	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
 	'level', 'visibility', 'ui', 'parent', 'child', 'log', 'from', 'to',
 ])
 
@@ -429,6 +446,42 @@ function cancelTailTurn(sessionId: string): { logName: string; entryCount: numbe
 	return rewriteCurrentHistory(sessionId, next)
 }
 
+function findPendingTools(sessionId: string): PendingToolsState | null {
+	const entries = loadHistory(sessionId)
+	const toolCalls = new Map<string, PendingToolCall>()
+	let pending: Extract<HistoryEntry, { type: 'pending_tools' }> | null = null
+	for (const entry of entries) {
+		if (entry.canceled) continue
+		if (entry.type === 'tool_call') toolCalls.set(entry.toolId, { id: entry.toolId, name: entry.name, input: entry.input, blobId: entry.blobId })
+		if (entry.type === 'pending_tools') pending = entry
+	}
+	if (!pending?.id) return null
+	const calls: PendingToolCall[] = []
+	for (const toolId of pending.toolIds) {
+		const call = toolCalls.get(toolId)
+		if (call) calls.push(call)
+	}
+	return { id: pending.id, toolIds: pending.toolIds, toolCalls: calls, cwd: pending.cwd, model: pending.model, usage: pending.usage }
+}
+
+function resolvePendingTools(sessionId: string, pendingId: string): boolean {
+	// Pending-tools is explicit durable state, not inferred from missing results.
+	// Resolving it rewrites only the current log so normal replay can safely pair
+	// the already-written tool calls with newly-written tool results.
+	const entries = loadHistory(sessionId)
+	let changed = false
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type !== 'pending_tools' || entry.id !== pendingId || entry.canceled) continue
+		entries[i] = { ...entry, canceled: true }
+		changed = true
+		break
+	}
+	if (!changed) return false
+	rewriteCurrentHistory(sessionId, entries)
+	return true
+}
+
 function updateMeta(sessionId: string, updates: Partial<SessionMeta>): void {
 	const live = liveSessionMetas.get(sessionId)
 	if (live) {
@@ -563,6 +616,8 @@ export const sessions = {
 	rewriteHistoryAfterRotation,
 	rewriteHistoryForRebase,
 	cancelTailTurn,
+	findPendingTools,
+	resolvePendingTools,
 	pickMostRecentlyClosedSessionId,
 	resolveResumeTarget,
 	sessionOpenInfo,

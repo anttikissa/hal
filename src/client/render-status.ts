@@ -78,13 +78,13 @@ function tabIndicator(tab: Tab): TabIndicator {
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const b = tab.history[i]!
 		// Skip trailing info blocks that aren't status-relevant.
-		if ((b.type === 'log' || b.type === 'info') && b.text !== '[paused]' && !b.text?.startsWith('[interrupted]')) continue
+		if ((b.type === 'log' || b.type === 'info') && b.text !== '[paused]' && b.text !== '[paused before local tools]' && !b.text?.startsWith('[interrupted]')) continue
 		if (b.type === 'warning') return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 		if (b.type === 'error') {
 			if ((b as any).retryable === false) return { char: '', color: '', blinks: false }
 			return { char: '✗', color: colors.tab.errorFg || colors.error.fg, blinks: true }
 		}
-		if (b.type === 'log' && (b.text === '[paused]' || b.text?.startsWith('[interrupted]'))) {
+		if (b.type === 'log' && (b.text === '[paused]' || b.text === '[paused before local tools]' || b.text?.startsWith('[interrupted]'))) {
 			return { char: '!', color: colors.tab.pausedFg || colors.tab.warningFg || colors.warning.fg, blinks: false }
 		}
 		break

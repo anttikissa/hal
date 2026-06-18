@@ -14,6 +14,7 @@ import { config } from '../config.ts'
 import { promptQueue } from '../runtime/prompt-queue.ts'
 import { paths } from '../utils/paths.ts'
 import { whatSummary } from '../session/what.ts'
+import { apiMessages } from '../session/api-messages.ts'
 
 test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -695,6 +696,43 @@ test('continue releases a held queue so completion drains it', async () => {
 		agentLoop.isWorking = origIsWorking
 		ipc.ownsHostLock = origOwnsHostLock
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
+
+
+test('pending tools execute before provider replay can repair them as interrupted', async () => {
+	const sessionId = `test-pending-runtime-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	const origDispatch = toolRegistry.dispatch
+	const origUpdateState = ipc.updateState
+	const shared: any = { sessions: [], working: {}, summarizing: {}, updatedAt: '' }
+	ipc.updateState = ((mutator: (state: any) => void) => {
+		mutator(shared)
+		return shared
+	}) as typeof ipc.updateState
+	toolRegistry.dispatch = async (name, input: any) => `${name}:${input.path}`
+
+	try {
+		await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: '/tmp/original' })
+		await sessions.appendHistory(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'read' }], ts: '2026-06-18T10:00:00.000Z' },
+			{ type: 'tool_call', toolId: 'tool-1', name: 'read', input: { path: 'README.md' }, ts: '2026-06-18T10:00:01.000Z' },
+			{ type: 'pending_tools', toolIds: ['tool-1'], cwd: '/tmp/persisted', reason: 'soft-pause', ts: '2026-06-18T10:00:02.000Z' },
+		])
+
+		expect(() => apiMessages.toProviderMessages(sessionId, undefined, { prune: false })).toThrow('pending tools')
+		expect(await runtime.continuePendingTools(sessionId)).toBe(true)
+
+		const history = sessions.loadHistory(sessionId)
+		expect(history.find((entry) => entry.type === 'pending_tools')).toMatchObject({ canceled: true })
+		expect(history.find((entry) => entry.type === 'tool_result')).toMatchObject({ type: 'tool_result', toolId: 'tool-1' })
+		expect(apiMessages.toProviderMessages(sessionId, undefined, { prune: false }).at(-1)).toEqual({
+			role: 'user',
+			content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'read:README.md' }],
+		})
+	} finally {
+		toolRegistry.dispatch = origDispatch
+		ipc.updateState = origUpdateState
+		sessions.deleteSession(sessionId)
 	}
 })
 

@@ -207,3 +207,42 @@ test('toProviderMessages starts after the last compact marker', () => {
 		{ role: 'user', content: '[15 Apr 00:00]\nContext was compacted to avoid exceeding the token limit. Verify before assuming.' },
 	])
 })
+
+
+test('unmatched non-pending tool calls still repair to interrupted result', () => {
+	const ts = '2026-04-15T00:00:00.000Z'
+	const entries: any[] = [
+		{ type: 'tool_call', toolId: 'tool-1', name: 'read', input: { path: 'README.md' }, ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'read', input: { path: 'README.md' } }] },
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: '[interrupted]' }] },
+	])
+})
+
+
+test('unresolved pending tools guard against provider replay before execution', () => {
+	const ts = '2026-04-15T00:00:00.000Z'
+	const entries: any[] = [
+		{ type: 'tool_call', toolId: 'tool-1', name: 'read', input: { path: 'README.md' }, ts },
+		{ type: 'pending_tools', toolIds: ['tool-1'], cwd: '/tmp/work', reason: 'soft-pause', ts },
+	]
+
+	expect(() => apiMessages.toProviderMessages('test-session', entries, { prune: false })).toThrow('pending tools')
+})
+
+
+test('resolved pending tools markers are ignored during provider replay', () => {
+	const ts = '2026-04-15T00:00:00.000Z'
+	const entries: any[] = [
+		{ type: 'tool_call', toolId: 'tool-1', name: 'read', input: { path: 'README.md' }, ts },
+		{ type: 'pending_tools', toolIds: ['tool-1'], cwd: '/tmp/work', reason: 'soft-pause', canceled: true, ts },
+		{ type: 'tool_result', toolId: 'tool-1', output: 'ok', ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'read', input: { path: 'README.md' } }] },
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' }] },
+	])
+})
