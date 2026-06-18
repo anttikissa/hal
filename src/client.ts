@@ -423,40 +423,10 @@ function appendInputHistory(line: string): void {
 }
 
 // ── Per-tab draft ────────────────────────────────────────────────────────────
-function isVisibleTurnEntry(entry: HistoryEntry): boolean {
-	return entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result' || entry.type === 'error'
-}
-
-function inferPromptEditFromHistory(entries: HistoryEntry[]): DraftPromptEdit | undefined {
-	let lastUser = -1
-	for (let i = entries.length - 1; i >= 0; i--) {
-		if (entries[i]?.type === 'user') {
-			lastUser = i
-			break
-		}
-	}
-	if (lastUser < 0) return undefined
-	const inputHistory = replay.inputHistoryFromEntries(entries.slice(0, lastUser + 1))
-	const originalText = inputHistory.at(-1)
-	if (!originalText) return undefined
-	let silentAbort = false
-	let visibleOutput = false
-	for (const entry of entries.slice(lastUser + 1)) {
-		if (entry.type === 'turn_end') {
-			if (entry.status === 'completed' || entry.status === 'failed') return undefined
-			if (entry.status === 'aborted' && entry.abortText === '') silentAbort = true
-			continue
-		}
-		if (isVisibleTurnEntry(entry)) visibleOutput = true
-	}
-	if (!silentAbort) return undefined
-	return { mode: visibleOutput ? 'cancel' : 'amend', originalText, pausedWorkingTurn: true }
-}
-
-function loadDraftIntoTab(tab: Tab, history?: HistoryEntry[]): void {
+function loadDraftIntoTab(tab: Tab): void {
 	const file = draftModule.loadDraftState(tab.sessionId)
 	tab.inputDraft = file.text
-	tab.inputDraftEdit = file.promptEdit ?? (file.text ? inferPromptEditFromHistory(history ?? []) : undefined)
+	tab.inputDraftEdit = file.promptEdit
 }
 
 function getInputDraft(): string {
@@ -550,7 +520,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	tab.contextMax = snapshot.contextMax
 	tab.forkedFrom = snapshot.forkedFrom
 	tab.attention = info.attention
-	loadDraftIntoTab(tab, snapshot.history)
+	loadDraftIntoTab(tab)
 	return tab
 }
 
