@@ -50,8 +50,23 @@ const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) 
 
 const DEFAULT_ABORT_TEXT = '[paused]'
 
-const COMMIT_META_START = '[hal-commit]'
-const COMMIT_META_END = '[/hal-commit]'
+function signed(n: number): string {
+	return n > 0 ? `+${n}` : String(n)
+}
+
+function commitLocLine(output: string): string | undefined {
+	const match = output.match(/\[hal-commit\]\n([\s\S]*?)\n\[\/hal-commit\]/)
+	if (!match) return undefined
+	try {
+		const meta = ason.parse(match[1]!) as any
+		const code = meta.locDeltaCode ?? meta.locAddedCode
+		const total = meta.locDelta ?? meta.locAdded
+		if (!Number.isFinite(code) || !Number.isFinite(total)) return undefined
+		return `LOC: ${signed(code)} excluding tests (${signed(total)} total)`
+	} catch {
+		return undefined
+	}
+}
 
 function parseResetsInSeconds(body: string | undefined): number | undefined {
 	if (!body) return undefined
@@ -62,35 +77,6 @@ function parseResetsInSeconds(body: string | undefined): number | undefined {
 	} catch {
 		return undefined
 	}
-}
-
-function signed(n: number): string {
-	if (n > 0) return `+${n}`
-	return String(n)
-}
-
-function commitLocLine(output: string): string | undefined {
-	const start = output.indexOf(COMMIT_META_START)
-	if (start < 0) return undefined
-	const dataStart = start + COMMIT_META_START.length
-	const end = output.indexOf(COMMIT_META_END, dataStart)
-	if (end < 0) return undefined
-	try {
-		const meta = ason.parse(output.slice(dataStart, end).trim()) as any
-		const code = meta.locDeltaCode ?? meta.locAddedCode
-		const total = meta.locDelta ?? meta.locAdded
-		if (typeof code !== 'number' || typeof total !== 'number') return undefined
-		return `LOC: ${signed(code)} excluding tests (${signed(total)} total)`
-	} catch {
-		return undefined
-	}
-}
-
-function addCommitLocLine(text: string, locLine: string | undefined): string {
-	if (!locLine) return text
-	const trimmed = text.trimEnd()
-	if (!trimmed) return locLine
-	return `${trimmed}\n${locLine}`
 }
 
 // ── Types ──
@@ -641,7 +627,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						ts,
 					})
 				}
-				assistantText = addCommitLocLine(assistantText, latestCommitLocLine)
+				if (latestCommitLocLine) {
+					const trimmed = assistantText.trimEnd()
+					assistantText = latestCommitLocLine
+					if (trimmed) assistantText = `${trimmed}\n${latestCommitLocLine}`
+				}
 				if (assistantText) {
 					const assistantEntry: any = { type: 'assistant', text: assistantText, model, ts }
 					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
