@@ -736,7 +736,7 @@ async function* generateOpenAI(req: ProviderRequest): AsyncGenerator<ProviderStr
 	await auth.ensureFresh('openai')
 	const credential = auth.getCredential('openai')
 	if (!credential) {
-		yield* yieldErrorAndDone({ type: 'error', message: auth.allOnCooldownMessage('openai') ?? `No credentials for 'openai'. Run: bun scripts/login-openai.ts (or set OPENAI_API_KEY)` })
+		yield* yieldErrorAndDone({ type: 'error', message: auth.allOnCooldownMessage('openai') ?? `No credentials for 'openai'. Run /login openai (or set OPENAI_API_KEY).` })
 		return
 	}
 	const transport = resolveOpenAITransport(credential)

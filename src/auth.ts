@@ -1,9 +1,9 @@
 // Auth — reads credentials from auth.ason, falls back to env vars.
-// auth.ason is live-reloaded so OAuth login scripts take effect immediately.
+// auth.ason is live-reloaded so /login changes take effect immediately.
 //
 // Credential priority:
-// 1. auth.ason accessToken (from OAuth login scripts)
-// 2. auth.ason apiKey (from scripts/add-keys.ts)
+// 1. auth.ason accessToken (from /login OAuth)
+// 2. auth.ason apiKey (from auth.ason or scripts/add-keys.ts)
 // 3. Environment variable (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
 //
 // Token rotation:
@@ -20,14 +20,14 @@ import { log } from './utils/log.ts'
 
 const AUTH_PATH = `${HAL_DIR}/auth.ason`
 
-// Anthropic OAuth client ID (shared with scripts/login-anthropic.ts)
+// Anthropic OAuth client ID (shared with /login anthropic).
 const ANTHROPIC_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 
-// OpenAI OAuth client ID (shared with scripts/login-openai.ts)
+// OpenAI OAuth client ID (shared with /login openai).
 const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 
-// Live-reloaded auth store — external edits (login scripts) are picked up automatically
+// Live-reloaded auth store — external edits and /login updates are picked up automatically.
 let _store: Record<string, any> | null = null
 function store(): Record<string, any> {
 	if (!_store) _store = liveFiles.liveFile(AUTH_PATH, {})

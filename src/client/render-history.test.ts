@@ -46,10 +46,12 @@ test('adjacent assistant blocks use a Hal-colored rule separator', () => {
 
 	const clean = lines.map(stripAnsi)
 	const firstIndex = clean.findIndex((line) => line.includes('first'))
-	const ruleIndex = firstIndex + 1
-	const secondIndex = ruleIndex + 1
+	const ruleIndex = firstIndex + 2
+	const secondIndex = ruleIndex + 2
 
 	expect(firstIndex).toBeGreaterThanOrEqual(0)
+	expect(clean[ruleIndex - 1]).toBe('')
+	expect(clean[ruleIndex + 1]).toBe('')
 	expect(clean[ruleIndex]).toBe('─'.repeat(20))
 	expect(lines[ruleIndex]).toStartWith(colors.assistant.fg)
 	expect(clean[secondIndex]).toContain('Hal (synthetic)')

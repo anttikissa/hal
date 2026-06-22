@@ -116,6 +116,27 @@ test('anthropic network errors include Bun error code details', async () => {
 	expect(events[0].message).toContain('syscall=connect')
 })
 
+test('anthropic oauth 401 tells user to log in again', async () => {
+	installFetchMock(async () => new Response(JSON.stringify({ error: { type: 'authentication_error' } }), {
+		status: 401,
+	}) as any)
+
+	const events = await collect({ value: 'tok-test', type: 'token' })
+
+	expect(events[0]).toMatchObject({ type: 'error', status: 401 })
+	expect(events[0].message).toContain('/login anthropic')
+})
+
+test('anthropic api-key 401 stays generic', async () => {
+	installFetchMock(async () => new Response(JSON.stringify({ error: { type: 'authentication_error' } }), {
+		status: 401,
+	}) as any)
+
+	const events = await collect({ value: 'key-test', type: 'api-key' })
+
+	expect(events[0]).toMatchObject({ type: 'error', status: 401, message: 'Anthropic API 401' })
+})
+
 test('anthropic 429 shows failed and next account when another account is available', async () => {
 	const credential: Credential = { value: 'tok-test', type: 'token', email: 'burned@test.com', _key: 'anthropic:0', index: 0, total: 3 }
 	const next: Credential = { value: 'tok-next', type: 'token', email: 'next@test.com', _key: 'anthropic:1', index: 1, total: 3 }
