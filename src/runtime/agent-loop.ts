@@ -646,11 +646,16 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				if (terminalErrorEntry) historyEntries.push(terminalErrorEntry)
 				if (historyEntries.length > 0) {
 					await sessions.appendHistory(sessionId, historyEntries)
-					sessions.clearLive(sessionId)
 				}
 
 				if (assistantText) {
 					emitEvent(sessionId, { type: 'response', text: assistantText, model })
+				}
+				// response events update live.ason for crash/restart recovery while a turn is active.
+				// Once the same response is durable history, live must be cleared last or the
+				// next prompt edit can mistake stale completed text for current partial output.
+				if (historyEntries.length > 0) {
+					sessions.clearLive(sessionId)
 				}
 				const est = context.estimateContext(messages, model, overheadBytes)
 				emitEvent(sessionId, {
@@ -722,7 +727,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				})
 			}
 			await sessions.appendHistory(sessionId, historyEntries)
-			sessions.clearLive(sessionId)
 
 			// Emit response event for intermediate text so the client can
 			// create a proper block and clear streaming buffers. Without
@@ -731,6 +735,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			if (assistantText) {
 				emitEvent(sessionId, { type: 'response', text: assistantText, model })
 			}
+			sessions.clearLive(sessionId)
 
 			if (pauseBeforeTools) {
 				clearPauseBeforeTools(sessionId)

@@ -121,6 +121,36 @@ test('calibrates context token estimates from provider input usage', async () =>
 	}
 })
 
+
+test('completed final response does not remain in live scratch state', async () => {
+	const sessionId = `test-live-clear-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const origGetProvider = providerLoader.getProvider
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'text', text: 'done' }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+		})
+		expect(result).toBe('completed')
+		expect(sessions.loadHistory(sessionId).find((item) => item.type === 'assistant')?.text).toBe('done')
+		expect(sessions.loadLive(sessionId).blocks).toEqual([])
+	} finally {
+		providerLoader.getProvider = origGetProvider
+	}
+})
+
 test('writes thinking blobs while streaming and replays them into API history', async () => {
 	const sessionId = `test-thinking-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
