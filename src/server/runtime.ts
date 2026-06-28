@@ -38,6 +38,7 @@ const state = {
 }
 
 const USER_PAUSED_TEXT = '[paused]'
+const RESUMING_TEXT = '[resuming]'
 const RESTARTED_TEXT = '[restarted]'
 const TAB_CLOSED_TEXT = 'Tab closed'
 
@@ -129,6 +130,25 @@ function restartedAfterLastTurnEnd(entries: HistoryEntry[]): boolean {
 
 function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	return restartedAfterLastTurnEnd(entries) && sessionStore.tailTurnState(entries).interrupted
+}
+
+function entryIsPausedForResume(entry: HistoryEntry): boolean {
+	if (entry.type === 'pending_tools' && entry.reason === 'soft-pause') return true
+	if (entry.type === 'turn_end' && entry.status === 'aborted' && !!entry.abortText) return true
+	if (entry.type !== 'log') return false
+	return entry.text === USER_PAUSED_TEXT || entry.text === '[paused before local tools]' || entry.text.startsWith('[interrupted]')
+}
+
+function shouldShowResumingNotice(sessionId: string): boolean {
+	const entries = sessionStore.loadHistory(sessionId)
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type === 'log' && entry.text === RESUMING_TEXT) return false
+		if (entryIsPausedForResume(entry)) return true
+		if (entry.type === 'log' || entry.type === 'info') continue
+		break
+	}
+	return false
 }
 
 function stateModel(model?: string): string {
@@ -556,6 +576,7 @@ function handleCommand(cmd: Command): void {
 				// Continuing resumes the paused turn that held the queue. If it completes,
 				// queued prompts should drain immediately instead of staying stuck behind
 				// the paused-turn safety hold.
+				if (shouldShowResumingNotice(sessionId)) emitInfo(sessionId, RESUMING_TEXT)
 				promptQueue.setHeld(sessionId, false)
 				await continuePendingTools(sessionId)
 				void runGeneration(sessionId, '')

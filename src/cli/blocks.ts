@@ -220,6 +220,14 @@ function blockLabel(block: Block): string {
 	return fixedLabels[block.type]
 }
 
+function formatInlineNoticeText(text: string): string {
+	if (/^\[[^\]\n]+\]$/.test(text)) {
+		const inner = text.slice(1, -1)
+		return `${inner.slice(0, 1).toUpperCase()}${inner.slice(1)}`
+	}
+	return text
+}
+
 function inlineNoticeText(block: Block): string | undefined {
 	if (block.type !== 'log' && block.type !== 'info' && block.type !== 'fork') return undefined
 	const text = expandTabs(blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.text)), blockConfig.tabWidth).trim()
@@ -227,7 +235,7 @@ function inlineNoticeText(block: Block): string | undefined {
 	if (text.includes('`')) return undefined
 	if ((block.type === 'log' || block.type === 'info') && !/^\[[^\]\n]+\]$/.test(text)) return undefined
 	if (visLen(text) > 50) return undefined
-	return text
+	return formatInlineNoticeText(text)
 }
 
 function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefined {

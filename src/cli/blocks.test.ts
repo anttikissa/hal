@@ -44,11 +44,19 @@ test('bodyless tool blocks do not add a separator row', () => {
 	expect(lines.filter((line) => line.trim())).toHaveLength(1)
 })
 
-test('short status notices render on one line', () => {
+test('short status notices render on one line without marker brackets', () => {
 	const lines = blocks.renderBlock({ type: 'log', text: '[paused]', ts: new Date('2026-01-01T17:38:00Z').getTime() }, 80).map(stripAnsi)
 
 	expect(lines).toHaveLength(1)
-	expect(lines[0]).toContain('Log: [paused]')
+	expect(lines[0]).toContain('Log: Paused')
+	expect(lines[0]).not.toContain('[paused]')
+})
+
+test('multiword status notices also drop marker brackets', () => {
+	const lines = blocks.renderBlock({ type: 'log', text: '[paused before local tools]' }, 80).map(stripAnsi)
+
+	expect(lines[0]).toContain('Log: Paused before local tools')
+	expect(lines[0]).not.toContain('[paused before local tools]')
 })
 
 test('long notices render a blank line after the header', () => {

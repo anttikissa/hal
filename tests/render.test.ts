@@ -183,11 +183,12 @@ describe('render', () => {
 		expect(clean).not.toContain('`/queue clear`')
 	})
 
-	test('paused info still renders when there is no steering prompt after it', () => {
+	test('paused info still renders without marker brackets when there is no steering prompt after it', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('[paused]')
+		expect(clean).toContain('Log: Paused')
+		expect(clean).not.toContain('[paused]')
 	})
 
 	test('help bar says enter continue on paused tabs with empty prompt', () => {
