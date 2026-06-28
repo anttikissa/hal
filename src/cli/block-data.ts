@@ -19,7 +19,7 @@ interface BlobRef { blobId?: string; sessionId?: string; blobLoaded?: boolean }
 type NoticeBlock<T extends 'log' | 'info' | 'warning' | 'fork'> = { type: T } & TextBlock
 
 export type Block =
-	| ({ type: 'user'; source?: string; status?: string } & TextBlock)
+	| ({ type: 'user'; source?: string; status?: string; actualText?: string } & TextBlock)
 	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean; synthetic?: boolean; syntheticKind?: string } & TextBlock)
 	| ({ type: 'thinking'; model?: string; thinkingEffort?: string; streaming?: boolean } & TextBlock & BlobRef)
 	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string } & BlockBase & BlobRef)
@@ -57,11 +57,15 @@ function historyToBlocks(
 		switch (entry.type) {
 			case 'user': {
 				const text = sessionEntry.userText(entry, { images: 'path-or-image', display: 'ui' })
+				const actualText = sessionEntry.userText(entry, { images: 'path-or-image' })
 				if (!text) break
 				const isSystem = text.startsWith('[system] ')
+				const displayText = isSystem ? text.slice(9) : text
+				const editText = isSystem && actualText.startsWith('[system] ') ? actualText.slice(9) : actualText
 				result.push({
 					type: 'user',
-					text: isSystem ? text.slice(9) : text,
+					text: displayText,
+					actualText: editText === displayText ? undefined : editText,
 					source: isSystem ? 'system' : entry.source ?? undefined,
 					status: entry.status,
 					ts,

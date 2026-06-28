@@ -17,6 +17,25 @@ test('historyToBlocks preserves original image path in user text', () => {
 	expect(result[0]).toMatchObject({ type: 'user', text: 'see [/tmp/hal/images/test.png] now' })
 })
 
+
+test('historyToBlocks keeps pasted text contents behind display text', () => {
+	const history: any[] = [
+		{
+			type: 'user',
+			parts: [
+				{ type: 'text', text: 'Analyze this:\n\nline one\nline two', displayText: 'Analyze this:\n\n[/tmp/hal/paste/0002.txt]' },
+			],
+		},
+	]
+
+	const result = blockData.historyToBlocks(history as any, 's1')
+	expect(result[0]).toMatchObject({
+		type: 'user',
+		text: 'Analyze this:\n\n[/tmp/hal/paste/0002.txt]',
+		actualText: 'Analyze this:\n\nline one\nline two',
+	})
+})
+
 test('historyToBlocks recovers retry state from failed turn_end', () => {
 	const result = blockData.historyToBlocks([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },

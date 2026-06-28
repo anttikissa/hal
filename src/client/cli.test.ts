@@ -386,6 +386,35 @@ test('up while working before output edits the just-sent prompt', () => {
 })
 
 
+test('up while working edits pasted prompt contents instead of display marker', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const actual = 'Analyze this:\n\nline one\nline two\nline three'
+	const display = 'Analyze this:\n\n[/tmp/hal/paste/0002.txt]'
+	const tab = makeTab({
+		inputHistory: [actual],
+		history: [{ type: 'user', text: display, actualText: actual }] as any[],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
+			expect(prompt.text()).toBe(actual)
+
+			cli.forTests.handleAppKey(key('enter'))
+			expect(commands.at(-1)).toEqual({ type: 'prompt-amend', sessionId: 's1', text: actual, displayText: undefined })
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
+
 test('up while working edits the visible latest prompt when local input history is stale', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand

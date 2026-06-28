@@ -394,7 +394,7 @@ function beginPreviousPromptEdit(): boolean {
 	const tab = client.currentTab()
 	if (!tab) return false
 	const block = lastUserBlock(tab)
-	const originalText = block?.text ?? client.getInputHistory().at(-1)
+	const originalText = block?.actualText ?? block?.text ?? client.getInputHistory().at(-1)
 	if (!originalText) return false
 	const working = client.isWorking()
 	if (!working) return false

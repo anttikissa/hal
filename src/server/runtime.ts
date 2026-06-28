@@ -253,6 +253,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 	ipc.appendEvent({
 		type: 'prompt',
 		text: displayText ?? text,
+		actualText: displayText && displayText !== text ? text : undefined,
 		label,
 		source,
 		sessionId,
