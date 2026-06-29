@@ -19,3 +19,18 @@ test('working retryable error has no continue action', () => {
 
 	expect(continuation.actionForTab(tab, true)).toBe(false)
 })
+
+test('skips incidental logs and command errors to resume a failed turn', () => {
+	// A 401 turn failed, then the user fixed login (a /login typo + login logs).
+	// Enter should still resume the underlying retryable turn.
+	const tab = {
+		history: [
+			{ type: 'error', text: '401:\nAnthropic login expired' },
+			{ type: 'error', text: '/login: Usage: /login <anthropic|openai> [code]', retryable: false },
+			{ type: 'log', text: 'Open this URL to log in to Claude:' },
+			{ type: 'log', text: 'Logged in to Claude as user@example.com.' },
+		],
+	}
+
+	expect(continuation.actionForTab(tab, false)).toBe('retry')
+})

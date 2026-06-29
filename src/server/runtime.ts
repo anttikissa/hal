@@ -132,21 +132,13 @@ function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	return restartedAfterLastTurnEnd(entries) && sessionStore.tailTurnState(entries).interrupted
 }
 
-function entryIsPausedForResume(entry: HistoryEntry): boolean {
-	if (entry.type === 'pending_tools' && entry.reason === 'soft-pause') return true
-	if (entry.type === 'turn_end' && entry.status === 'aborted' && !!entry.abortText) return true
-	if (entry.type !== 'log') return false
-	return entry.text === USER_PAUSED_TEXT || entry.text === '[paused before local tools]' || entry.text.startsWith('[interrupted]')
-}
-
 function shouldShowResumingNotice(sessionId: string): boolean {
-	const entries = sessionStore.loadHistory(sessionId)
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const entry = entries[i]!
+	for (const entry of sessionStore.loadHistory(sessionId).toReversed()) {
 		if (entry.type === 'log' && entry.text === RESUMING_TEXT) return false
-		if (entryIsPausedForResume(entry)) return true
-		if (entry.type === 'log' || entry.type === 'info') continue
-		break
+		if (entry.type === 'pending_tools' && entry.reason === 'soft-pause') return true
+		if (entry.type === 'turn_end' && entry.status === 'aborted' && !!entry.abortText) return true
+		if (entry.type === 'log' && (entry.text === USER_PAUSED_TEXT || entry.text === '[paused before local tools]' || entry.text.startsWith('[interrupted]'))) return true
+		if (entry.type !== 'log' && entry.type !== 'info') return false
 	}
 	return false
 }

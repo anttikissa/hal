@@ -220,22 +220,16 @@ function blockLabel(block: Block): string {
 	return fixedLabels[block.type]
 }
 
-function formatInlineNoticeText(text: string): string {
-	if (/^\[[^\]\n]+\]$/.test(text)) {
-		const inner = text.slice(1, -1)
-		return `${inner.slice(0, 1).toUpperCase()}${inner.slice(1)}`
-	}
-	return text
-}
-
 function inlineNoticeText(block: Block): string | undefined {
 	if (block.type !== 'log' && block.type !== 'info' && block.type !== 'fork') return undefined
 	const text = expandTabs(blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.text)), blockConfig.tabWidth).trim()
+	const marker = text.match(/^\[([^\]\n]+)\]$/)
 	if (!text || text.includes('\n')) return undefined
 	if (text.includes('`')) return undefined
-	if ((block.type === 'log' || block.type === 'info') && !/^\[[^\]\n]+\]$/.test(text)) return undefined
+	if ((block.type === 'log' || block.type === 'info') && !marker) return undefined
 	if (visLen(text) > 50) return undefined
-	return formatInlineNoticeText(text)
+	if (marker) return `${marker[1]!.slice(0, 1).toUpperCase()}${marker[1]!.slice(1)}`
+	return text
 }
 
 function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefined {

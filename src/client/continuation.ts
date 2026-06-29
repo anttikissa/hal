@@ -22,8 +22,13 @@ function actionForTab(tab: any, working: boolean): ContinueAction | false {
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
 		if (block.type === 'tool') continue
-		if ((block.type === 'log' || block.type === 'info') && !actionForBlock(block)) continue
-		return actionForBlock(block)
+		const action = actionForBlock(block)
+		if (action) return action
+		// No action here. Logs, info, and non-retryable command errors (e.g. a
+		// "/login: Usage" typo) are incidental activity, not turn outcomes — skip
+		// them so a fixed login can still resume the failed turn behind them.
+		if (block.type === 'log' || block.type === 'info' || (block.type === 'error' && (block as any).retryable === false)) continue
+		return false
 	}
 	return false
 }
