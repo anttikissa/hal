@@ -197,8 +197,8 @@ function formatStatusText(): string {
 	const hasModelWeek = accounts.some((a) => a.modelWeek)
 
 	const header = hasModelWeek
-		? '| Slot | Account | 5h | Week | ' + accounts.find((a) => a.modelWeek)!.modelWeek!.label + ' week |'
-		: '| Slot | Account | 5h | Week |'
+		? '| Slot | Account | 5h | 7d | ' + accounts.find((a) => a.modelWeek)!.modelWeek!.label + ' 7d |'
+		: '| Slot | Account | 5h | 7d |'
 	const separator = hasModelWeek ? '|---|---|---|---|---|' : '|---|---|---|---|'
 
 	const lines = [

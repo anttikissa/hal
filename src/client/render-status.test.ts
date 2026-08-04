@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { renderStatus } from './render-status.ts'
 import { client } from '../client.ts'
+import { openaiUsage } from '../openai-usage.ts'
 
 function tab(overrides: any = {}): any {
 	return {
@@ -22,6 +23,32 @@ function tab(overrides: any = {}): any {
 		...overrides,
 	}
 }
+
+test('subscriptionStatusLabel labels OpenAI windows from their returned duration', () => {
+	openaiUsage.init()
+	const currentKey = openaiUsage.state.currentKey
+	const accounts = openaiUsage.state.accounts
+	try {
+		openaiUsage.state.currentKey = 'openai:0'
+		openaiUsage.state.accounts = {
+			'openai:0': {
+				key: 'openai:0',
+				index: 0,
+				total: 1,
+				pendingTokens: 0,
+				primary: { usedPercent: 24, windowMinutes: 10_080, resetAt: 1 },
+			},
+		}
+
+		const label = renderStatus.subscriptionStatusLabel('openai', '')
+
+		expect(label).toContain('7d')
+		expect(label).not.toContain('5h')
+	} finally {
+		openaiUsage.state.currentKey = currentKey
+		openaiUsage.state.accounts = accounts
+	}
+})
 
 test('tabIndicator shows amber diamond for new attention marker', () => {
 	const origWorking = client.state.working

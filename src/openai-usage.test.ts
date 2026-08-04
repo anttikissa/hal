@@ -55,6 +55,28 @@ test('parsePayload maps the ChatGPT rate-limit payload', () => {
 	expect(snapshot.pendingTokens).toBe(0)
 })
 
+test('formatStatusText labels OpenAI windows from their returned duration', () => {
+	openaiUsage.state.currentKey = 'openai:0'
+	openaiUsage.state.accounts = {
+		'openai:0': {
+			key: 'openai:0',
+			email: 'a@test.com',
+			index: 0,
+			total: 1,
+			planType: 'plus',
+			pendingTokens: 0,
+			primary: { usedPercent: 24, windowMinutes: 10_080, resetAt: 1_775_836_198 },
+		},
+	}
+
+	const text = openaiUsage.formatStatusText()
+
+	expect(text).toContain('| Slot | Account | 7d |')
+	expect(text).not.toContain('| Slot | Account | 5h | 7d |')
+	expect(text).not.toContain('| ? |')
+	expect(text).toContain('<br>24% used')
+})
+
 test('refreshAll caches all accounts and status text marks the current one', async () => {
 	auth.ensureFresh = async () => {}
 	auth.listCredentials = () => [makeCredential(0, 'a@test.com'), makeCredential(1, 'b@test.com')]

@@ -205,17 +205,53 @@ function formatWindowCell(window: UsageWindow | undefined): string {
 	return `${usageBar(window.usedPercent)}<br>${formatWindowText(window)}`
 }
 
+function windowLabel(window: UsageWindow): string {
+	return time.formatQuotaWindow(window.windowMinutes)
+}
+
+function displayWindows(account: AccountUsage): { label: string; window: UsageWindow }[] {
+	const result: { label: string; window: UsageWindow }[] = []
+	if (account.primary) result.push({ label: windowLabel(account.primary), window: account.primary })
+	if (account.secondary) result.push({ label: windowLabel(account.secondary), window: account.secondary })
+	result.sort((a, b) => a.window.windowMinutes - b.window.windowMinutes)
+	return result
+}
+
+function statusColumns(accounts: AccountUsage[]): string[] {
+	const labels = new Map<string, number>()
+	for (const account of accounts) {
+		for (const item of displayWindows(account)) {
+			if (!labels.has(item.label)) labels.set(item.label, item.window.windowMinutes)
+		}
+	}
+	const entries = [...labels.entries()].sort((a, b) => a[1] - b[1])
+	const columns: string[] = []
+	for (const [label] of entries) columns.push(label)
+	return columns.length > 0 ? columns : ['5h', '7d']
+}
+
+function windowForLabel(account: AccountUsage, label: string): UsageWindow | undefined {
+	for (const item of displayWindows(account)) {
+		if (item.label === label) return item.window
+	}
+}
+
 function formatStatusText(): string {
 	const accounts = all()
 	if (accounts.length === 0) return 'No cached OpenAI subscription usage. Run /status again after logging in with ChatGPT.'
+	const columns = statusColumns(accounts)
+	const separatorCells = ['---', '---']
+	for (const _column of columns) separatorCells.push('---')
 	const lines = [
 		'OpenAI subscriptions:',
 		'',
-		'| Slot | Account | 5h | 7d |',
-		'|---|---|---|---|',
+		`| Slot | Account | ${columns.join(' | ')} |`,
+		`|${separatorCells.join('|')}|`,
 	]
 	for (const account of accounts) {
-		lines.push(`| ${displaySlot(account)} | ${displayAccount(account)} | ${formatWindowCell(account.primary)} | ${formatWindowCell(account.secondary)} |`)
+		const cells = [displaySlot(account), displayAccount(account)]
+		for (const column of columns) cells.push(formatWindowCell(windowForLabel(account, column)))
+		lines.push(`| ${cells.join(' | ')} |`)
 	}
 	return lines.join('\n')
 }
@@ -356,6 +392,7 @@ export const openaiUsage = {
 	maybeRefreshCurrent,
 	formatResetAt,
 	formatStatusText,
+	displayWindows,
 	renderStatus,
 	parsePayload,
 	start,

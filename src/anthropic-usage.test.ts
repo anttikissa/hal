@@ -77,7 +77,7 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 	const text = anthropicUsage.formatStatusText()
 
 	expect(text).toContain('Anthropic subscriptions:')
-	expect(text).toContain('| Slot | Account | 5h | Week | Sonnet week |')
+	expect(text).toContain('| Slot | Account | 5h | 7d | Sonnet 7d |')
 	expect(text).toContain('| 1/2 | a@test.com | [')
 	expect(text).toContain('<br>20% used')
 	expect(text).toContain('| 2/2 * | b@test.com | [')

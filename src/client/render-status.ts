@@ -333,36 +333,33 @@ function tokenUsageLabel(usage: TokenUsage): string {
 }
 
 function subscriptionStatusLabel(provider: string, base: string): string {
-	let primaryPct: number | undefined
-	let secondaryPct: number | undefined
 	let index: number | undefined
 	let total: number | undefined
-	let secondaryLabel = '7d'
+	const windows: string[] = []
 	if (provider === 'openai') {
 		const current = openaiUsage.current()
 		if (!current) return ''
-		primaryPct = current.primary?.usedPercent
-		secondaryPct = current.secondary?.usedPercent
 		index = current.index
 		total = current.total
+		for (const item of openaiUsage.displayWindows(current)) {
+			const pct = Math.round(item.window.usedPercent)
+			windows.push(`${item.label} ${renderStatus.heatText(`${pct}%`, pct, base)}`)
+		}
 	} else if (provider === 'anthropic') {
 		const current = anthropicUsage.current()
 		if (!current) return ''
-		primaryPct = current.fiveHour?.usedPercent
-		secondaryPct = current.sevenDay?.usedPercent
 		index = current.index
 		total = current.total
+		if (current.fiveHour?.usedPercent != null) {
+			const pct = Math.round(current.fiveHour.usedPercent)
+			windows.push(`5h ${renderStatus.heatText(`${pct}%`, pct, base)}`)
+		}
+		if (current.sevenDay?.usedPercent != null) {
+			const pct = Math.round(current.sevenDay.usedPercent)
+			windows.push(`7d ${renderStatus.heatText(`${pct}%`, pct, base)}`)
+		}
 	} else {
 		return ''
-	}
-	const windows: string[] = []
-	if (primaryPct != null) {
-		const pct = Math.round(primaryPct)
-		windows.push(`5h ${renderStatus.heatText(`${pct}%`, pct, base)}`)
-	}
-	if (secondaryPct != null) {
-		const pct = Math.round(secondaryPct)
-		windows.push(`${secondaryLabel} ${renderStatus.heatText(`${pct}%`, pct, base)}`)
 	}
 	// Show the slot as index/total when multiple subscription accounts exist.
 	const slot = index != null && total && total > 1 ? ` ${index + 1}/${total}` : ''
