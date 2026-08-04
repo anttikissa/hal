@@ -24,8 +24,6 @@ import { cursor as blinkCursor } from '../cli/cursor.ts'
 import { terminalOutput } from './terminal-output.ts'
 
 const config = {
-	forkHistoryDimFactor: 0.85,
-	halCursorFadeMs: 5000,
 	halCursorFadeFrameMs: 67,
 }
 
@@ -53,17 +51,14 @@ let fadeTimer: ReturnType<typeof setTimeout> | null = null
 
 function historyContext(): HistoryRenderContext {
 	return {
-		forkHistoryDimFactor: config.forkHistoryDimFactor,
 		blockCache,
-		cursorVisible: blinkCursor.isVisible(),
-		streamingCursorVisible: blinkCursor.isFastVisible(),
+		cursorTick: blinkCursor.tick(),
 		workingSessions: client.state.working,
-		cursorFadeMs: config.halCursorFadeMs,
 	}
 }
 
 function scheduleFade(): void {
-	if (fadeTimer || !renderHistory.hasFadingCursor(client.currentTab(), config.halCursorFadeMs)) return
+	if (fadeTimer || !renderHistory.hasFadingCursor(client.currentTab())) return
 	const delay = Math.max(1, config.halCursorFadeFrameMs)
 	fadeTimer = setTimeout(() => {
 		fadeTimer = null

@@ -9,12 +9,9 @@ function stripAnsi(s: string): string {
 
 function context(): HistoryRenderContext {
 	return {
-		forkHistoryDimFactor: 0.5,
 		blockCache: new WeakMap(),
-		cursorVisible: false,
-		streamingCursorVisible: false,
+		cursorTick: 0,
 		workingSessions: new Map(),
-		cursorFadeMs: 0,
 	}
 }
 

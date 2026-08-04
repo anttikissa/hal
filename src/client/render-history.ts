@@ -16,12 +16,14 @@ export type BlockRenderCache = {
 }
 
 export type HistoryRenderContext = {
-	forkHistoryDimFactor: number
 	blockCache: WeakMap<Block, BlockRenderCache>
-	cursorVisible: boolean
-	streamingCursorVisible: boolean
+	cursorTick: number
 	workingSessions: ReadonlyMap<string, boolean>
-	cursorFadeMs: number
+}
+
+const config = {
+	forkHistoryDimFactor: 0.85,
+	halCursorFadeMs: 5000,
 }
 
 const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
@@ -39,9 +41,10 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext):
 	const cached = streamingCursor ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
 	if (cached && cached.version === version && cached.cols === cols) return cached.lines
-	const cursorVisible = streamingCursor ? context.streamingCursorVisible : context.cursorVisible
-	const lines = blockRenderer.renderBlock(block, cols, cursorVisible)
-	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, context.forkHistoryDimFactor)) : lines
+	const slowCursorVisible = context.cursorTick % 4 < 2
+	const fastCursorVisible = context.cursorTick % 2 === 0
+	const lines = blockRenderer.renderBlock(block, cols, streamingCursor ? fastCursorVisible : slowCursorVisible)
+	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 	if (!streamingCursor) context.blockCache.set(block, { version, cols, lines: rendered })
 	return rendered
 }
@@ -59,7 +62,7 @@ function renderGroup(group: Block[], cols: number, context: HistoryRenderContext
 		? renderEntry(group[0]!, cols, context)
 		: blockRenderer.renderBlockGroup(group as Array<{ type: 'log' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
 	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
-	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, context.forkHistoryDimFactor)) : lines
+	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 }
 
 function shouldHideBlock(history: Block[], index: number): boolean {
@@ -96,8 +99,8 @@ function fadeAmount(sessionId: string, working: boolean, fadeMs: number): number
 	return start == null ? 1 : Math.min(1, (Date.now() - start) / fadeMs)
 }
 
-function halCursorLine(sessionId: string, visible: boolean, working: boolean, fadeMs: number): string {
-	const t = fadeAmount(sessionId, working, fadeMs)
+function halCursorLine(sessionId: string, visible: boolean, working: boolean): string {
+	const t = fadeAmount(sessionId, working, config.halCursorFadeMs)
 	const color = working ? blockRenderer.cursorColor() : oklch.mixFg(blockRenderer.cursorColor(), blockRenderer.idleCursorColor(), t)
 	return visible ? ` ${color}█\x1b[39m` : ''
 }
@@ -130,15 +133,15 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
 		// another blank row. When history fills the screen, these are the bottom
 		// three history rows immediately above the tab/status/prompt chrome.
-		lines.push('', halCursorLine(tab.sessionId, context.cursorVisible, working, context.cursorFadeMs), '')
+		lines.push('', halCursorLine(tab.sessionId, context.cursorTick % 4 < 2, working), '')
 	}
 
 	return lines.length - start
 }
 
-function hasFadingCursor(tab: Tab | null | undefined, fadeMs: number): boolean {
+function hasFadingCursor(tab: Tab | null | undefined): boolean {
 	const start = tab ? fadeStart.get(tab.sessionId) : undefined
-	return start != null && fadeMs > 0 && Date.now() - start < fadeMs
+	return start != null && config.halCursorFadeMs > 0 && Date.now() - start < config.halCursorFadeMs
 }
 
 function resetAnimation(): void {
@@ -150,4 +153,4 @@ function hasAnimatedCursor(tab: Tab | null | undefined): boolean {
 	return !!tab
 }
 
-export const renderHistory = { renderLines, hasAnimatedCursor, hasFadingCursor, resetAnimation }
+export const renderHistory = { config, renderLines, hasAnimatedCursor, hasFadingCursor, resetAnimation }

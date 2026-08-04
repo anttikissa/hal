@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { render } from '../src/client/render.ts'
 import { renderStatus } from '../src/client/render-status.ts'
+import { renderHistory } from '../src/client/render-history.ts'
 import { client } from '../src/client.ts'
 import { prompt } from '../src/cli/prompt.ts'
 import { cursor } from '../src/cli/cursor.ts'
@@ -706,8 +707,8 @@ describe('render', () => {
 	})
 
 	test('idle HAL cursor reserves three rows above the tab bar', () => {
-		const originalIsVisible = cursor.isVisible
-		cursor.isVisible = () => true
+		const originalTick = cursor.tick
+		cursor.tick = () => 0
 		try {
 			const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 			const tabBar = lines.findIndex((line) => line.includes('[1]'))
@@ -716,25 +717,25 @@ describe('render', () => {
 			expect(lines[tabBar - 2]).toBe(' █')
 			expect(lines[tabBar - 1]).toBe('')
 		} finally {
-			cursor.isVisible = originalIsVisible
+			cursor.tick = originalTick
 		}
 	})
 
 	test('idle HAL cursor uses the assistant idle cursor color', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'assistant', text: 'done' })
-		const originalIsVisible = cursor.isVisible
+		const originalTick = cursor.tick
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
 		colors.assistant.cursor = oklch.toFg(0.70, 0.18, 55)
 		colors.assistant.cursorIdle = oklch.toFg(0.56, 0, 55)
-		cursor.isVisible = () => true
+		cursor.tick = () => 0
 		try {
 			const output = captureOutput(() => render.draw(true))
 			expect(output).toContain(`${colors.assistant.cursorIdle}█`)
 			expect(output).not.toContain(`${colors.assistant.cursor}█`)
 		} finally {
-			cursor.isVisible = originalIsVisible
+			cursor.tick = originalTick
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
 		}
@@ -744,19 +745,19 @@ describe('render', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[restarted]' })
 		client.state.working.set(tab.sessionId, true)
-		const originalIsVisible = cursor.isVisible
+		const originalTick = cursor.tick
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
 		colors.assistant.cursor = oklch.toFg(0.70, 0.18, 55)
 		colors.assistant.cursorIdle = oklch.toFg(0.56, 0, 55)
-		cursor.isVisible = () => true
+		cursor.tick = () => 0
 		try {
 			const output = captureOutput(() => render.draw(true))
 			expect(output).toContain(`${colors.assistant.cursor}█`)
 			expect(output).not.toContain(`${colors.assistant.cursorIdle}█`)
 		} finally {
 			client.state.working.delete(tab.sessionId)
-			cursor.isVisible = originalIsVisible
+			cursor.tick = originalTick
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
 		}
@@ -767,16 +768,14 @@ describe('render', () => {
 		tab.history.push({ type: 'assistant', text: 'done' })
 		client.state.working.set(tab.sessionId, true)
 		const originalNow = Date.now
-		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
-		const originalFadeMs = render.config.halCursorFadeMs
+		const originalFadeMs = renderHistory.config.halCursorFadeMs
 		let now = 0
 		Date.now = () => now
 		colors.assistant.cursor = oklch.toFg(0.48, 0, 0)
 		colors.assistant.cursorIdle = oklch.toFg(0.66, 0.14, 55)
-		render.config.halCursorFadeMs = 2000
-		cursor.isVisible = () => true
+		renderHistory.config.halCursorFadeMs = 2000
 		try {
 			captureOutput(() => render.draw(true))
 			client.state.working.delete(tab.sessionId)
@@ -787,10 +786,9 @@ describe('render', () => {
 		} finally {
 			Date.now = originalNow
 			client.state.working.delete(tab.sessionId)
-			cursor.isVisible = originalIsVisible
 			colors.assistant.cursor = originalCursor
 			colors.assistant.cursorIdle = originalIdleCursor
-			render.config.halCursorFadeMs = originalFadeMs
+			renderHistory.config.halCursorFadeMs = originalFadeMs
 			render.resetRenderer()
 		}
 	})
@@ -800,10 +798,10 @@ describe('render', () => {
 		tab.history.push({ type: 'assistant', text: 'hello', streaming: true })
 		tab.history.push({ type: 'thinking', text: 'hmm', streaming: true })
 
-		const originalIsFastVisible = cursor.isFastVisible
+		const originalTick = cursor.tick
 		const originalAssistantCursor = colors.assistant.cursor
 		try {
-			cursor.isFastVisible = () => true
+			cursor.tick = () => 0
 			render.resetRenderer()
 			const visiblePhase = stripAnsi(captureOutput(() => render.draw(true)))
 			expect(visiblePhase).toContain('hmm█')
@@ -817,13 +815,13 @@ describe('render', () => {
 			const activeColorPhase = captureOutput(() => render.draw(true))
 			expect(activeColorPhase).toContain(`${colors.assistant.cursor}█`)
 
-			cursor.isFastVisible = () => false
+			cursor.tick = () => 1
 			render.resetRenderer()
 			const hiddenPhase = stripAnsi(captureOutput(() => render.draw(true)))
 			expect(hiddenPhase).toContain('hmm ')
 			expect(hiddenPhase).not.toContain('hmm█')
 		} finally {
-			cursor.isFastVisible = originalIsFastVisible
+			cursor.tick = originalTick
 			colors.assistant.cursor = originalAssistantCursor
 		}
 	})

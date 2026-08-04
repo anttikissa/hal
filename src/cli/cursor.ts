@@ -10,11 +10,7 @@ function tick(): number {
 }
 
 function isVisible(): boolean {
-	return tick() % 4 < 2
-}
-
-function isFastVisible(): boolean {
-	return tick() % 2 === 0
+	return cursor.tick() % 4 < 2
 }
 
 function scheduleNext(): void {
@@ -41,4 +37,4 @@ function stop(): void {
 	onChange = null
 }
 
-export const cursor = { isVisible, isFastVisible, start, stop }
+export const cursor = { tick, isVisible, start, stop }
