@@ -147,19 +147,15 @@ function webSearchInput(block: any): { query: string } {
 
 function formatWebSearchResults(block: any): string {
 	const content = Array.isArray(block?.content) ? block.content : []
-	const results: Array<{ title: string; url: string }> = []
+	const parts: string[] = []
 	for (const item of content) {
 		if (item?.type !== 'web_search_result') continue
-		const title = typeof item.title === 'string' ? item.title : ''
-		const url = typeof item.url === 'string' ? item.url : ''
-		if (title || url) results.push({ title, url })
+		const lines: string[] = []
+		if (typeof item.title === 'string' && item.title) lines.push(item.title)
+		if (typeof item.url === 'string' && item.url) lines.push(item.url)
+		if (lines.length) parts.push(lines.join('\n'))
 	}
-	const lines = [`${results.length} result${results.length === 1 ? '' : 's'}`]
-	for (const result of results) {
-		lines.push(`- ${result.title || result.url}`)
-		if (result.title && result.url) lines.push(`  ${result.url}`)
-	}
-	return lines.join('\n')
+	return parts.join('\n\n') || 'No results found.'
 }
 
 function sanitizeToolCallInput(name: string, input: any, cwd: string): any {

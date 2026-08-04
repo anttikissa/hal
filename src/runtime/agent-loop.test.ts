@@ -96,7 +96,17 @@ test('surfaces Claude web_search as a visible tool with result titles', async ()
 	providerLoader.getProvider = async () => ({
 		async *generate() {
 			yield { type: 'server_tool', serverBlocks: [{ type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'latest NASA news today' } }] }
-			yield { type: 'server_tool', serverBlocks: [{ type: 'web_search_tool_result', tool_use_id: 'srvtoolu_1', content: [{ type: 'web_search_result', title: 'NASA News', url: 'https://www.nasa.gov/news/' }] }] }
+			yield {
+				type: 'server_tool',
+				serverBlocks: [{
+					type: 'web_search_tool_result',
+					tool_use_id: 'srvtoolu_1',
+					content: [
+						{ type: 'web_search_result', title: 'NASA News', url: 'https://www.nasa.gov/news/' },
+						{ type: 'web_search_result', title: 'NASA JPL', url: 'https://www.jpl.nasa.gov/' },
+					],
+				}],
+			}
 			yield { type: 'text', text: 'Found NASA news.' }
 			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
@@ -116,8 +126,11 @@ test('surfaces Claude web_search as a visible tool with result titles', async ()
 		expect(result).toBe('completed')
 		expect(events.find((event) => event.type === 'info' && event.text?.includes('[web_search]'))).toBeUndefined()
 		expect(events.find((event) => event.type === 'tool-call')).toMatchObject({ name: 'web_search', input: { query: 'latest NASA news today' } })
-		expect(events.find((event) => event.type === 'tool-result')?.output).toContain('NASA News')
-		expect(events.find((event) => event.type === 'tool-result')?.output).toContain('https://www.nasa.gov/news/')
+		const webSearchOutput = events.find((event) => event.type === 'tool-result')?.output
+		expect(webSearchOutput).toContain('NASA News\nhttps://www.nasa.gov/news/')
+		expect(webSearchOutput).toContain('\n\nNASA JPL\nhttps://www.jpl.nasa.gov/')
+		expect(webSearchOutput).not.toContain('result')
+		expect(webSearchOutput).not.toContain('- NASA')
 
 		const history = sessions.loadHistory(sessionId)
 		expect(history.find((entry) => entry.type === 'tool_call')).toMatchObject({ type: 'tool_call', name: 'web_search', visibility: 'ui' })
