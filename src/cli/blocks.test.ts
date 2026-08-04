@@ -25,6 +25,11 @@ function blockBodyStart(lines: string[]): number {
 	return header + 1
 }
 
+test('block body keeps left and right margins when wrapping', () => {
+	expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo bar' }, 9))).toEqual([' foo bar'])
+	expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo bar' }, 8))).toEqual([' foo', ' bar'])
+})
+
 test('body blocks render a blank line after the header', () => {
 	const samples: Block[] = [
 		{ type: 'user', text: 'hello' },

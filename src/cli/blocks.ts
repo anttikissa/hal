@@ -263,7 +263,7 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 	const header = buildHeader(label, formatBlockTimeRange(first.ts, last.ts), '', cols)
 	const { fg, bg, bgIsBlack } = blockColors(first)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
-	const contentCols = Math.max(1, cols - 1)
+	const contentCols = Math.max(1, cols - 2)
 	let hasContent = false
 	for (const block of group) {
 		const content = blockText.hyperlinkUrls(renderMarkdownLines(block, contentCols), contentCols)
@@ -330,7 +330,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 	const blockTime = formatBlockTime(block.ts)
 	const header = buildHeader(label, blockTime, blobRef, cols)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]
-	const contentCols = Math.max(1, cols - 1)
+	const contentCols = Math.max(1, cols - 2)
 	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
 	if (content.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
