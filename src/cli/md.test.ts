@@ -208,6 +208,39 @@ test('mdTable: wide cells wrap within column', () => {
 	expect(allText).toContain('should wrap')
 })
 
+test('mdTable: keeps narrow identifier columns wide before shrinking prose', () => {
+	const lines = [
+		'| Model | What is known |',
+		'|---|---|',
+		'| gpt-5.6-luna | A separate provider/routing variant with no publicly documented specialization available here. |',
+	]
+	const result = md.mdTable(lines, 50)
+	const plain = result.map(strip)
+
+	expect(plain.some((line) => line.includes('│ gpt-5.6-luna │'))).toBe(true)
+	for (const line of result) {
+		expect(visLen(line)).toBeLessThanOrEqual(50)
+	}
+})
+
+test('mdTable: wrapped inline code cells reset color at visual line boundaries', () => {
+	const fg = '\x1b[38;2;1;2;3m'
+	const code = '\x1b[31m'
+	const colors = {
+		bold: [M_BOLD, M_BOLD_OFF] as [string, string],
+		italic: [M_ITALIC, M_ITALIC_OFF] as [string, string],
+		code: [code, fg] as [string, string],
+	}
+	const result = md.mdTable(['| Model | What |', '|---|---|', '| `gpt-5.6-luna` | x |'], 20, colors)
+	const dataLines = result.filter((line) => line.includes(code) || line.includes('na'))
+
+	expect(dataLines[0]).toContain(`${code}gpt-5.6-lu${fg} │`)
+	expect(dataLines[1]).toContain(`│ ${code}na${fg}`)
+	for (const line of result) {
+		expect(visLen(line)).toBeLessThanOrEqual(20)
+	}
+})
+
 test('mdTable: row dividers between data rows', () => {
 	const lines = ['| a | b |', '|---|---|', '| x | y |', '| p | q |']
 	const result = md.mdTable(lines, 80)

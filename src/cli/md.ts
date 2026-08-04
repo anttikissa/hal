@@ -165,6 +165,85 @@ function visPad(s: string, targetWidth: number): string {
 	return s + ' '.repeat(Math.max(0, targetWidth - visLen(s)))
 }
 
+function longestWordWidth(lines: string[]): number {
+	let width = 1
+	for (const line of lines) {
+		for (const word of line.split(/\s+/)) {
+			if (!word) continue
+			width = Math.max(width, visLen(word))
+		}
+	}
+	return width
+}
+
+function shrinkColumns(widths: number[], floors: number[], excess: number): number {
+	while (excess > 0) {
+		let totalShrinkable = 0
+		for (let i = 0; i < widths.length; i++) {
+			totalShrinkable += Math.max(0, widths[i]! - floors[i]!)
+		}
+		if (totalShrinkable === 0) break
+
+		for (let i = 0; i < widths.length && excess > 0; i++) {
+			const shrinkable = Math.max(0, widths[i]! - floors[i]!)
+			if (shrinkable === 0) continue
+			const proportional = Math.floor((shrinkable / totalShrinkable) * excess)
+			const shrink = Math.min(shrinkable, Math.max(1, proportional), excess)
+			widths[i]! -= shrink
+			excess -= shrink
+		}
+	}
+	return excess
+}
+
+function fitColumnWidths(naturalWidths: number[], minWidths: number[], availableForCells: number): number[] {
+	const widths = [...naturalWidths]
+	const totalNatural = naturalWidths.reduce((a, b) => a + b, 0)
+	let excess = totalNatural - availableForCells
+	if (excess <= 0) return widths
+
+	// Prefer wrapping prose before breaking identifiers. The first floor is each
+	// column's longest whitespace-delimited word, matching wordWrap() behavior.
+	excess = shrinkColumns(widths, minWidths, excess)
+	if (excess > 0) {
+		// If the terminal is too narrow even for every word, fall back to hard cuts.
+		excess = shrinkColumns(widths, new Array(widths.length).fill(1), excess)
+	}
+	return widths
+}
+
+function activeAfterStyle(s: string, active: boolean, on: string, off: string): boolean {
+	let i = 0
+	while (i < s.length) {
+		const onAt = on ? s.indexOf(on, i) : -1
+		const offAt = off ? s.indexOf(off, i) : -1
+		if (onAt === -1 && offAt === -1) break
+		if (offAt === -1 || (onAt !== -1 && onAt < offAt)) {
+			active = true
+			i = onAt + on.length
+		} else {
+			active = false
+			i = offAt + off.length
+		}
+	}
+	return active
+}
+
+function containWrappedAnsiStyle(lines: string[], style?: [on: string, off: string]): string[] {
+	if (!style?.[0] || !style[1]) return lines
+	const [on, off] = style
+	const out: string[] = []
+	let active = false
+	for (const line of lines) {
+		const startsActive = active
+		active = activeAfterStyle(line, active, on, off)
+		let fixed = startsActive ? `${on}${line}` : line
+		if (active) fixed += off
+		out.push(fixed)
+	}
+	return out
+}
+
 /** Render a markdown table with box-drawing borders.
  *
  *  - Applies mdInline() to each cell (so **bold** renders as bold, not raw stars)
@@ -207,34 +286,12 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 		),
 	)
 
-	// Compute final column widths. If everything fits, use natural widths.
-	// Otherwise shrink proportionally, with a minimum of 1 per column.
-	const totalNatural = naturalWidths.reduce((a, b) => a + b, 0)
-	let colWidths: number[]
-
-	if (totalNatural <= availableForCells) {
-		colWidths = naturalWidths
-	} else {
-		// Start at minimum 1 per column, distribute remaining space
-		// proportionally to natural width.
-		colWidths = new Array(numCols).fill(1)
-		const extra = Math.max(0, availableForCells - numCols)
-		if (extra > 0 && totalNatural > 0) {
-			// Proportional distribution
-			for (let i = 0; i < numCols; i++) {
-				colWidths[i] = Math.max(1, Math.floor((naturalWidths[i]! / totalNatural) * availableForCells))
-			}
-			// Distribute rounding remainder
-			let allocated = colWidths.reduce((a, b) => a + b, 0)
-			let remaining = availableForCells - allocated
-			for (let i = 0; remaining > 0 && i < numCols; i++) {
-				if (colWidths[i]! < naturalWidths[i]!) {
-					colWidths[i]!++
-					remaining--
-				}
-			}
-		}
-	}
+	// Compute final column widths. If the table needs to shrink, protect each
+	// column's longest word before giving remaining width to prose columns.
+	const minWidths = Array.from({ length: numCols }, (_, i) =>
+		longestWordWidth(rendered.flatMap((r) => r[i] ?? [''])),
+	)
+	const colWidths = fitColumnWidths(naturalWidths, minWidths, availableForCells)
 
 	// ── Wrap cells that exceed their column width ────────────────────────
 	// Each cell becomes string[] (one entry per visual line).
@@ -242,8 +299,8 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 	function wrapCell(lines: string[], colWidth: number): string[] {
 		const out: string[] = []
 		for (const line of lines.length > 0 ? lines : ['']) {
-			if (visLen(line) <= colWidth) out.push(...resolveMarkers([line]))
-			else out.push(...resolveMarkers(wordWrap(line, colWidth)))
+			const wrapped = visLen(line) <= colWidth ? [line] : wordWrap(line, colWidth)
+			out.push(...resolveMarkers(containWrappedAnsiStyle(wrapped, colors?.code)))
 		}
 		return out.length > 0 ? out : ['']
 	}
