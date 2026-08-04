@@ -118,7 +118,7 @@ test('buildAliasUpdateSuggestionText mentions config mapping and subagent only o
 		expect(outside).toContain('openai**, **gpt')
 		expect(outside).toContain('openai/gpt-5.4')
 		expect(outside).toContain('openai/gpt-5.5')
-		expect(outside).toContain("config.ason sets the default model to **gpt**, which currently maps to **openai/gpt-5.5**.")
+		expect(outside).toContain("config.ason sets the default model to **gpt**, which currently maps to **openai/gpt-5.6-terra**.")
 		expect(outside).toContain('spawn a subagent in ~/.hal')
 
 		const inside = modelRefresh.buildAliasUpdateSuggestionText(updates, HAL_DIR)

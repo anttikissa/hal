@@ -86,7 +86,8 @@
 	},
 	models: {
 		// Default model alias or full model ID for new sessions.
-		default: 'openai/gpt-5.5'
+		// 'gpt' tracks the newest GPT everyday tier (currently openai/gpt-5.6-terra).
+		default: 'gpt'
 	},
 	subscriptionUsage: {
 		// Mask account email addresses in usage and status output.

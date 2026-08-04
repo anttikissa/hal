@@ -20,9 +20,30 @@ afterEach(() => {
 	auth._setStoreForTest({})
 })
 
-test('gpt and openai aliases resolve to gpt-5.5', () => {
-	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.5')
-	expect(models.resolveModel('openai')).toBe('openai/gpt-5.5')
+test('gpt and openai aliases resolve to the terra tier', () => {
+	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.6-terra')
+	expect(models.resolveModel('openai')).toBe('openai/gpt-5.6-terra')
+})
+
+
+test('sol, terra, and luna aliases resolve to gpt-5.6 tier models', () => {
+	expect(models.resolveModel('sol')).toBe('openai/gpt-5.6-sol')
+	expect(models.resolveModel('terra')).toBe('openai/gpt-5.6-terra')
+	expect(models.resolveModel('luna')).toBe('openai/gpt-5.6-luna')
+})
+
+
+test('tier aliases track newer generations but ignore pro variants', () => {
+	models.state.cache = {
+		'gpt-5.6-sol': 1_050_000,
+		'gpt-5.6-terra': 1_050_000,
+		'gpt-5.7-terra': 1_050_000,
+		'gpt-5.7-terra-pro': 1_050_000,
+		'gpt-5.8-sol-pro': 1_050_000,
+	}
+	expect(models.resolveModel('terra')).toBe('openai/gpt-5.7-terra')
+	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.7-terra')
+	expect(models.resolveModel('sol')).toBe('openai/gpt-5.6-sol')
 })
 
 
@@ -33,11 +54,11 @@ test('updated anthropic aliases avoid dated model ids', () => {
 })
 
 
-test('default model resolves to gpt-5.5', () => {
+test('default model resolves to gpt-5.6-terra', () => {
 	const origDefault = models.config.default
 	try {
 		models.config.default = 'gpt'
-		expect(models.defaultModel()).toBe('openai/gpt-5.5')
+		expect(models.defaultModel()).toBe('openai/gpt-5.6-terra')
 	} finally {
 		models.config.default = origDefault
 	}
@@ -73,8 +94,16 @@ test('gpt-5.5 subscription route uses Codex input cap', () => {
 test('model picker lists updated frontier aliases', () => {
 	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({
 		value: 'gpt',
-		label: expect.stringContaining('GPT 5.5'),
-		search: expect.stringContaining('openai/gpt-5.5'),
+		label: expect.stringContaining('GPT 5.6 Terra'),
+		search: expect.stringContaining('openai/gpt-5.6-terra'),
+	})
+	expect(models.listModelChoices().find((item) => item.value === 'sol')).toMatchObject({
+		value: 'sol',
+		search: expect.stringContaining('openai/gpt-5.6-sol'),
+	})
+	expect(models.listModelChoices().find((item) => item.value === 'luna')).toMatchObject({
+		value: 'luna',
+		search: expect.stringContaining('openai/gpt-5.6-luna'),
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'sonnet')).toMatchObject({
 		value: 'sonnet',
@@ -99,7 +128,7 @@ test('model picker choices list newest curated versions first', () => {
 })
 
 
-test('model picker and aliases use newest cached Anthropic models but keep GPT pinned', () => {
+test('model picker and aliases use newest cached Anthropic models; GPT falls back to catalog terra', () => {
 	models.state.cache = {
 		'claude-opus-4-7': 1_000_000,
 		'claude-opus-4-8': 1_000_000,
@@ -112,10 +141,11 @@ test('model picker and aliases use newest cached Anthropic models but keep GPT p
 	expect(models.resolveModel('opus')).toBe('anthropic/claude-opus-4-8')
 	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-4-8')
 	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-4-7')
-	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.5')
-	expect(models.resolveModel('openai')).toBe('openai/gpt-5.5')
+	// No tier models in cache: the gpt alias falls back to the catalog terra entry.
+	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.6-terra')
+	expect(models.resolveModel('openai')).toBe('openai/gpt-5.6-terra')
 	expect(models.listModelChoices().find((item) => item.value === 'opus')).toMatchObject({ search: expect.stringContaining('anthropic/claude-opus-4-8') })
-	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.5') })
+	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6-terra') })
 	expect(models.listModelChoices().find((item) => item.value === 'gpt-5.6')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6') })
 	expect(models.modelCompletionNames()).toContain('opus-4-8')
 })

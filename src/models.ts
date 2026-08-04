@@ -8,7 +8,7 @@ import { auth } from './auth.ts'
 
 // ── Curated model catalog ──
 
-type TrackFamily = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'gpt' | 'codex' | 'gemini' | 'gemini-pro' | 'grok'
+type TrackFamily = 'opus' | 'sonnet' | 'haiku' | 'fable' | 'sol' | 'terra' | 'luna' | 'codex' | 'gemini' | 'gemini-pro' | 'grok'
 
 interface CatalogEntry {
 	group: 'Anthropic' | 'OpenAI' | 'Google' | 'OpenRouter'
@@ -25,9 +25,13 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-6', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
 	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
 	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
-	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai'], fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000 },
+	// GPT tiers since 5.6: sol = flagship, terra = everyday/default, luna = fast+cheap.
+	// The plain-numbered gpt-X.Y line ended at 5.5; "gpt" tracks the terra tier.
+	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai', 'terra'], fullId: 'openai/gpt-5.6-terra', fallbackContext: 1_050_000, pricing: { input: 2.5, output: 15 }, track: 'terra' },
+	{ group: 'OpenAI', alias: 'sol', fullId: 'openai/gpt-5.6-sol', fallbackContext: 1_050_000, pricing: { input: 5, output: 30 }, track: 'sol' },
+	{ group: 'OpenAI', alias: 'luna', fullId: 'openai/gpt-5.6-luna', fallbackContext: 1_050_000, pricing: { input: 1, output: 6 }, track: 'luna' },
+	{ group: 'OpenAI', alias: 'gpt-5.5', fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-5.4', fullId: 'openai/gpt-5.4', fallbackContext: 1_050_000 },
-	{ group: 'OpenAI', alias: 'gpt-5.3', fullId: 'openai/gpt-5.3', fallbackContext: 128_000 },
 	{ group: 'OpenAI', alias: 'gpt-instant', fullId: 'openai/gpt-5.5-instant', fallbackContext: 400_000, pricing: { input: 5, output: 30 } },
 	{ group: 'OpenAI', alias: 'codex', fullId: 'openai/gpt-5.3-codex', fallbackContext: 128_000, track: 'codex' },
 	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.5-flash', fallbackContext: 1_000_000, track: 'gemini' },
@@ -307,6 +311,18 @@ function parseGptCandidate(modelId: string): ModelCandidate | null {
 	}
 }
 
+// GPT tier IDs like gpt-5.6-terra. Excludes -pro variants (API/Pro-plan only,
+// rejected by the ChatGPT subscription backend).
+function parseGptTierCandidate(tier: 'sol' | 'terra' | 'luna', modelId: string): ModelCandidate | null {
+	const match = modelId.match(new RegExp(`^gpt-(\\d+)\\.(\\d+)-${tier}$`))
+	if (!match) return null
+	return {
+		canonical: `gpt-${match[1]}.${match[2]}-${tier}`,
+		version: [Number(match[1]), Number(match[2])],
+		stability: 1,
+	}
+}
+
 function parseCodexCandidate(modelId: string): ModelCandidate | null {
 	const match = modelId.match(/^gpt-(\d+)\.(\d+)-codex$/)
 	if (!match) return null
@@ -363,7 +379,7 @@ function catalogEntryForAlias(alias: string): CatalogEntry | undefined {
 
 function latestTrackedModel(track: TrackFamily, cache: Record<string, number>): string | null {
 	if (track === 'opus' || track === 'sonnet' || track === 'haiku' || track === 'fable') return newestMatchingModel(cache, (id) => parseClaudeCandidate(track, id))
-	if (track === 'gpt') return newestMatchingModel(cache, parseGptCandidate)
+	if (track === 'sol' || track === 'terra' || track === 'luna') return newestMatchingModel(cache, (id) => parseGptTierCandidate(track, id))
 	if (track === 'codex') return newestMatchingModel(cache, parseCodexCandidate)
 	if (track === 'gemini') return newestMatchingModel(cache, (id) => parseGeminiCandidate('flash', id))
 	if (track === 'gemini-pro') return newestMatchingModel(cache, (id) => parseGeminiCandidate('pro', id))
@@ -449,7 +465,9 @@ function cachedContextWindow(fullId: string): number | undefined {
 }
 
 function subscriptionContextWindow(fullId: string): number | undefined {
-	if (fullId !== 'openai/gpt-5.5' && fullId !== 'gpt-5.5') return undefined
+	const bare = bareModelId(fullId)
+	const capped = bare === 'gpt-5.5' || /^gpt-\d+\.\d+-(sol|terra|luna)$/.test(bare)
+	if (!capped) return undefined
 	const credential = auth.getCredential('openai')
 	if (credential?.type !== 'token') return undefined
 	// ChatGPT/Codex-backed OAuth uses the product limit: 400k total
@@ -498,11 +516,10 @@ function formatCost(
 
 // ── Default model ──
 
-const FALLBACK_MODEL = 'openai/gpt-5.5'
-
 const config = {
 	// Default model alias or full ID. Set via config.ason under "models".
-	default: FALLBACK_MODEL,
+	// 'gpt' tracks the newest GPT everyday tier (currently openai/gpt-5.6-terra).
+	default: 'gpt',
 }
 
 function defaultModel(): string {
@@ -642,6 +659,15 @@ function addOpenAiChoices(items: ModelChoice[]): void {
 	for (const candidate of curatedCandidates(parseGptCandidate, 5)) {
 		const fullId = `openai/${candidate.canonical}`
 		choices.push({ candidate, suffix: versionLeaf(candidate.version, true), value: aliasFullId('gpt') === fullId ? 'gpt' : candidate.canonical, fullId })
+	}
+	for (const tier of ['sol', 'terra', 'luna'] as const) {
+		for (const candidate of curatedCandidates((id) => parseGptTierCandidate(tier, id), 5)) {
+			const fullId = `openai/${candidate.canonical}`
+			// terra is the "gpt" default alias; sol/luna use their own tier aliases.
+			const alias = tier === 'terra' ? 'gpt' : tier
+			const value = aliasFullId(alias) === fullId ? alias : candidate.canonical
+			choices.push({ candidate, suffix: `${versionLeaf(candidate.version, true)}-${tier}`, value, fullId })
+		}
 	}
 	for (const candidate of curatedCandidates(parseCodexCandidate, 5)) {
 		const fullId = `openai/${candidate.canonical}`

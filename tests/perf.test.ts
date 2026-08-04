@@ -47,7 +47,7 @@ describe("perf", () => {
 		// Startup is user-facing by default; perf timings are hidden unless
 		// client.showStartupPerf is enabled in config.
 		expect(out).toContain("opened in ")
-		expect(out).toContain("Using GPT 5.5 via OpenAI.")
+		expect(out).toContain("Using GPT 5.6 Terra via OpenAI.")
 		expect(out).not.toContain("Server started")
 	})
 })
