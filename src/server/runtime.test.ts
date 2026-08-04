@@ -928,6 +928,41 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 })
 
 
+test('spawnSession opening summary shows the spawned model, not the default', async () => {
+	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-banner-'))
+	const prevState = process.env.HAL_STATE_DIR
+	process.env.HAL_STATE_DIR = base
+	const { sessions } = await import('./sessions.ts')
+
+	try {
+		await sessions.createSession('04-parent-banner', {
+			id: '04-parent-banner',
+			workingDir: '/work/parent',
+			createdAt: '2026-04-14T12:00:00.000Z',
+			model: 'openai/gpt-5.5',
+		})
+		const parent = sessions.loadSessionMeta('04-parent-banner')!
+		const child = await runtime.spawnSession(parent, {
+			task: '',
+			kind: 'interactive',
+			mode: 'fresh',
+			model: 'openai/gpt-5.6-luna',
+			cwd: '/work/child',
+			childSessionId: '04-kid-banner',
+		})
+
+		const history = sessions.loadHistory(child.id)
+		const banner = history.find((entry) => entry.type === 'info' && entry.text.includes('Using '))
+		expect(banner && banner.type === 'info' ? banner.text : '').toContain('GPT 5.6 Luna')
+		expect(banner && banner.type === 'info' ? banner.text : '').toContain('/work/child')
+	} finally {
+		rmSync(base, { recursive: true, force: true })
+		if (prevState === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = prevState
+	}
+})
+
+
 test('spawnSession pins the default model when parent has no model', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-default-model-'))
 	const prevState = process.env.HAL_STATE_DIR

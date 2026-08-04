@@ -174,13 +174,21 @@ function queuePromptCommand(sessionId: string, text: string, source?: string, de
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
+	// Resolve model/cwd before creating the tab so the opening summary banner
+	// (written during creation) reports the spawned model, not the default.
 	const child = tabs.createSessionTab(
 		mode === 'fork'
 			? { sourceId: parent.id, sessionId: spec.childSessionId, focus: false }
-			: { afterId: parent.id, sessionId: spec.childSessionId, focus: false },
+			: {
+				afterId: parent.id,
+				sessionId: spec.childSessionId,
+				workingDir: spec.cwd || parent.workingDir || process.cwd(),
+				model: spec.model || parent.model || models.defaultModel(),
+				focus: false,
+			},
 	)
-	const workingDir = spec.cwd || (mode === 'fork' ? child.workingDir : parent.workingDir) || process.cwd()
-	const model = spec.model || (mode === 'fork' ? child.model : parent.model) || child.model || models.defaultModel()
+	const workingDir = spec.cwd || child.workingDir || process.cwd()
+	const model = spec.model || child.model || models.defaultModel()
 	const name = spec.title || child.name
 	sessionStore.updateMeta(child.id, {
 		workingDir,

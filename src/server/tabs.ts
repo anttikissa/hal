@@ -114,11 +114,11 @@ function recordOpeningSummary(meta: SessionMeta): void {
 	}), meta.createdAt)
 }
 
-function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string; focus?: boolean }): SessionMeta {
+function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?: string; sessionId?: string; workingDir?: string; model?: string; focus?: boolean }): SessionMeta {
 	const sessionId = opts.sessionId ?? sessionIds.reserve()
 	const sourceMeta = opts.sourceId ? sessionStore.loadSessionMeta(opts.sourceId) : null
 	const openerMeta = opts.openerId ? sessionStore.loadSessionMeta(opts.openerId) : null
-	const inheritedModel = sourceMeta?.model ?? openerMeta?.model ?? models.defaultModel()
+	const inheritedModel = opts.model ?? sourceMeta?.model ?? openerMeta?.model ?? models.defaultModel()
 	const inheritedWorkingDir = opts.workingDir ?? openerMeta?.workingDir ?? process.cwd()
 	const meta = opts.sourceId
 		? sessionStore.forkSession(opts.sourceId, sessionId)
