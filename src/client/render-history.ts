@@ -1,8 +1,13 @@
-// History rendering helpers extracted from render.ts.
+// Transcript/history renderer used by render.ts.
 //
-// Important: renderer-owned caches still live in render.ts. This module stays
-// focused on history formatting and grouping, and takes cache/config state as
-// explicit input so the diff/fullscreen/cursor/cache state remains centralized.
+// render.ts owns the whole terminal frame and diff engine. This module only turns
+// a tab's historical blocks into rows for the history area: block rendering,
+// grouping, hidden paused notices, assistant separators, fork-history dimming,
+// and the idle/working inline HAL cursor.
+//
+// The separation keeps transcript semantics here while terminal mechanics stay
+// in render.ts. Renderer-owned cache state is still allocated by render.ts and
+// passed in so reset/diff/fullscreen behavior remains centralized.
 
 import { oklch } from '../utils/oklch.ts'
 import { blocks as blockRenderer } from '../cli/blocks.ts'

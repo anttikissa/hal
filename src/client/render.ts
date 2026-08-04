@@ -1,17 +1,18 @@
-// Terminal renderer — frame building + differential repaint engine.
-// See docs/terminal.md for the full contract.
+// Top-level terminal renderer — frame orchestration + differential repaint.
+// See docs/terminal.md for the full terminal contract.
 //
-// Architecture:
-//   buildFrame() produces a flat string[] — one entry per terminal row.
-//   draw() diffs it against prevLines[] and emits minimal escape sequences.
-//   cursorRow/cursorCol always reflect the physical terminal cursor position.
+// This module builds the complete screen frame: history rows from
+// render-history.ts, plus tabs, prompt, status/help lines, and popups. It also
+// owns the terminal diff engine that writes the frame safely.
 //
-// The prompt can be multiline (shift-enter). The cursor can be on any
-// prompt line, not just the last one. All cursor positioning goes through
+// render-history.ts is separate because historical transcript rendering has its
+// own rules: block grouping, hidden paused notices, assistant separators, fork
+// dimming, and the idle/working HAL cursor. Keeping those out of this file makes
+// this module about terminal mechanics instead of transcript semantics.
+//
+// cursorRow/cursorCol always reflect the physical terminal cursor position. The
+// prompt can be multiline, so all cursor positioning goes through
 // positionCursor() which updates cursorRow and cursorCol atomically.
-//
-// History and status helpers live in dedicated modules now, but renderer-owned
-// diff/fullscreen/cursor/cache state stays centralized here.
 
 import { client } from '../client.ts'
 import { prompt } from '../cli/prompt.ts'
