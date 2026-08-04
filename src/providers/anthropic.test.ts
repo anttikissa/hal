@@ -249,3 +249,28 @@ test('anthropic provider ignores malformed SSE JSON lines', async () => {
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
 	expect(events.at(-1)).toMatchObject({ type: 'done', doneStatus: 'completed', usage: { input: 0, output: 4, cacheRead: 0, cacheCreation: 0 } })
 })
+
+
+test('anthropic provider assembles streamed web_search query', async () => {
+	installFetchMock(async () => new Response([
+		'data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{}}}',
+		'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"query\\": \\"news.ycombinator.com top story"}}',
+		'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" today\\"}"}}',
+		'data: {"type":"content_block_stop","index":0}',
+		'data: {"type":"content_block_start","index":1,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_1","content":[]}}',
+		'data: {"type":"content_block_stop","index":1}',
+		'data: {"type":"message_stop"}',
+		'',
+	].join('\n'), {
+		status: 200,
+		headers: { 'content-type': 'text/event-stream' },
+	}) as any)
+
+	const events = await collect({ value: 'tok-test', type: 'token' })
+	const serverTool = events.find((event) => event.type === 'server_tool')
+	expect(serverTool.serverBlocks[0]).toMatchObject({
+		type: 'server_tool_use',
+		name: 'web_search',
+		input: { query: 'news.ycombinator.com top story today' },
+	})
+})

@@ -164,6 +164,7 @@ async function* parseStream(
 ): AsyncGenerator<ProviderStreamEvent> {
 	// Tool calls are assembled across content_block_start / delta / stop events
 	const tools = new Map<number, { id: string; name: string; json: string }>()
+	const serverTools = new Map<number, { block: any; json: string }>()
 	// Server-side tool blocks (e.g. web_search) are opaque — collect them verbatim
 	// so the agent loop can include them in the assistant message content.
 	const serverToolBlocks: any[] = []
@@ -175,9 +176,11 @@ async function* parseStream(
 			const b = ev.content_block
 			if (b.type === 'tool_use') {
 				tools.set(ev.index, { id: b.id, name: b.name, json: '' })
-			} else if (b.type === 'server_tool_use' || b.type === 'web_search_tool_result') {
-				// Server-side tools (web_search) — store the full block for passthrough.
-				// These don't stream deltas; the complete content arrives in content_block_start.
+			} else if (b.type === 'server_tool_use') {
+				// Server-side tool input streams as input_json_delta after this empty block.
+				serverToolBlocks.push(b)
+				serverTools.set(ev.index, { block: b, json: '' })
+			} else if (b.type === 'web_search_tool_result') {
 				serverToolBlocks.push(b)
 			}
 		} else if (ev.type === 'content_block_delta') {
@@ -186,9 +189,11 @@ async function* parseStream(
 			else if (d.type === 'signature_delta') yield { type: 'thinking_signature', signature: d.signature }
 			else if (d.type === 'text_delta') yield { type: 'text', text: d.text }
 			else if (d.type === 'input_json_delta') {
-				// Accumulate partial JSON for tool input
+				// Accumulate partial JSON for local and server-side tool input.
 				const t = tools.get(ev.index)
 				if (t) t.json += d.partial_json
+				const st = serverTools.get(ev.index)
+				if (st) st.json += d.partial_json
 			}
 		} else if (ev.type === 'content_block_stop') {
 			const t = tools.get(ev.index)
@@ -196,6 +201,12 @@ async function* parseStream(
 				const parsed = providerShared.parseToolInput(t.json)
 				yield { type: 'tool_call', id: t.id, name: t.name, input: parsed.input, rawJson: t.json, ...(parsed.parseError ? { parseError: parsed.parseError } : {}) }
 				tools.delete(ev.index)
+			}
+			const st = serverTools.get(ev.index)
+			if (st) {
+				const parsed = providerShared.parseToolInput(st.json)
+				if (!parsed.parseError) st.block.input = parsed.input
+				serverTools.delete(ev.index)
 			}
 		} else if (ev.type === 'message_start' && ev.message?.usage) {
 			// Keep input, cacheRead, and cacheCreation separate — they bill at
