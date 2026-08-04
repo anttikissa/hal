@@ -222,11 +222,12 @@ test('provider errors save full payload in a blob but show only the short messag
 		async *generate() {
 			yield {
 				type: 'error',
-				message: 'Our servers are currently overloaded. Please try again later.',
+				message: '400: Bad Request',
 				status: 400,
 				endpoint: 'https://api.example.test/v1/responses',
 				body: JSON.stringify({
 					type: 'response.failed',
+					detail: 'Our servers are currently overloaded. Please try again later.',
 					response: {
 						status: 'failed',
 						error: {
@@ -266,7 +267,7 @@ test('provider errors save full payload in a blob but show only the short messag
 		expect(streamEnd).toMatchObject({ phase: 'failed' })
 		expect(blob.readBlob(sessionId, responseEvent.blobId)).toMatchObject({
 			type: 'provider_error',
-			message: 'Our servers are currently overloaded. Please try again later.',
+			message: '400: Bad Request',
 			status: 400,
 			endpoint: 'https://api.example.test/v1/responses',
 			payload: {

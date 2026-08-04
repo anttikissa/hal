@@ -286,12 +286,16 @@ function isRetryableStatus(status: number | undefined): boolean {
 
 /** Build the short user-visible error details below the status/endpoint header. */
 function formatErrorDetails(event: ProviderStreamEvent): string {
-	if (typeof event.message === 'string' && event.message.trim()) return event.message.trim()
 	const payload = parseErrorPayload(event.body)
 	if (payload && typeof payload === 'object') {
-		const message = (payload as any)?.error?.message ?? (payload as any)?.message ?? (payload as any)?.response?.error?.message
+		const message =
+			(payload as any)?.detail ??
+			(payload as any)?.error?.message ??
+			(payload as any)?.response?.error?.message ??
+			(payload as any)?.message
 		if (typeof message === 'string' && message.trim()) return message.trim()
 	}
+	if (typeof event.message === 'string' && event.message.trim()) return event.message.trim()
 	return 'Unknown error'
 }
 
