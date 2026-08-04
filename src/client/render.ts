@@ -56,6 +56,7 @@ function historyContext(): HistoryRenderContext {
 		forkHistoryDimFactor: config.forkHistoryDimFactor,
 		blockCache,
 		cursorVisible: blinkCursor.isVisible(),
+		streamingCursorVisible: blinkCursor.isFastVisible(),
 		workingSessions: client.state.working,
 		cursorFadeMs: config.halCursorFadeMs,
 	}

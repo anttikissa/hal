@@ -800,10 +800,10 @@ describe('render', () => {
 		tab.history.push({ type: 'assistant', text: 'hello', streaming: true })
 		tab.history.push({ type: 'thinking', text: 'hmm', streaming: true })
 
-		const originalIsVisible = cursor.isVisible
+		const originalIsFastVisible = cursor.isFastVisible
 		const originalAssistantCursor = colors.assistant.cursor
 		try {
-			cursor.isVisible = () => true
+			cursor.isFastVisible = () => true
 			render.resetRenderer()
 			const visiblePhase = stripAnsi(captureOutput(() => render.draw(true)))
 			expect(visiblePhase).toContain('hmm█')
@@ -817,13 +817,13 @@ describe('render', () => {
 			const activeColorPhase = captureOutput(() => render.draw(true))
 			expect(activeColorPhase).toContain(`${colors.assistant.cursor}█`)
 
-			cursor.isVisible = () => false
+			cursor.isFastVisible = () => false
 			render.resetRenderer()
 			const hiddenPhase = stripAnsi(captureOutput(() => render.draw(true)))
 			expect(hiddenPhase).toContain('hmm ')
 			expect(hiddenPhase).not.toContain('hmm█')
 		} finally {
-			cursor.isVisible = originalIsVisible
+			cursor.isFastVisible = originalIsFastVisible
 			colors.assistant.cursor = originalAssistantCursor
 		}
 	})

@@ -19,6 +19,7 @@ export type HistoryRenderContext = {
 	forkHistoryDimFactor: number
 	blockCache: WeakMap<Block, BlockRenderCache>
 	cursorVisible: boolean
+	streamingCursorVisible: boolean
 	workingSessions: ReadonlyMap<string, boolean>
 	cursorFadeMs: number
 }
@@ -38,7 +39,8 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext):
 	const cached = streamingCursor ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
 	if (cached && cached.version === version && cached.cols === cols) return cached.lines
-	const lines = blockRenderer.renderBlock(block, cols, context.cursorVisible)
+	const cursorVisible = streamingCursor ? context.streamingCursorVisible : context.cursorVisible
+	const lines = blockRenderer.renderBlock(block, cols, cursorVisible)
 	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, context.forkHistoryDimFactor)) : lines
 	if (!streamingCursor) context.blockCache.set(block, { version, cols, lines: rendered })
 	return rendered

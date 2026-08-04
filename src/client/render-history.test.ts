@@ -12,6 +12,7 @@ function context(): HistoryRenderContext {
 		forkHistoryDimFactor: 0.5,
 		blockCache: new WeakMap(),
 		cursorVisible: false,
+		streamingCursorVisible: false,
 		workingSessions: new Map(),
 		cursorFadeMs: 0,
 	}

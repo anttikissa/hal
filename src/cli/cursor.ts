@@ -1,12 +1,20 @@
-// Wall-clock-synced 250ms pulse clock for status indicators.
-// Phase changes land on every quarter-second boundary so all tabs stay in sync
-// even if they started blinking at different times.
+// Wall-clock-synced 250ms pulse clock for rendered cursor indicators.
+// Slow cursors derive a 500ms blink from the same tick, while streaming cursors
+// can use the raw 250ms phase without a second timer.
 
 let timer: ReturnType<typeof setTimeout> | null = null
 let onChange: (() => void) | null = null
 
+function tick(): number {
+	return Math.floor(Date.now() / 250)
+}
+
 function isVisible(): boolean {
-	return Math.floor(Date.now() / 250) % 2 === 0
+	return tick() % 4 < 2
+}
+
+function isFastVisible(): boolean {
+	return tick() % 2 === 0
 }
 
 function scheduleNext(): void {
@@ -33,4 +41,4 @@ function stop(): void {
 	onChange = null
 }
 
-export const cursor = { isVisible, start, stop }
+export const cursor = { isVisible, isFastVisible, start, stop }
