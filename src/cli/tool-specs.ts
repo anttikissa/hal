@@ -258,7 +258,7 @@ const specs: Record<string, ToolSpec> = {
 	eval: { title: () => 'Eval', command: (input) => input?.code ?? undefined, format: formatEval },
 	grep: { title: (input) => `Grep ${quoteToolArg(input?.pattern)} in ${input?.path ?? '?'}`, format: (output) => countIndicator(output, 'No matches found.', 'matches') },
 	glob: { title: (input) => `Glob ${input?.pattern ?? '?'} in ${input?.path ?? '.'}`, format: (output) => countIndicator(output, 'No files found.', 'files') },
-	google: { title: (input) => `Google ${input?.query ?? '?'}` },
+	google: { title: (input) => `Google ${quoteToolArg(input?.query)}` },
 	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
 	spawn_agent: { title: (input) => input?.title ? `Spawn agent · ${input.title}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
 	send: {
