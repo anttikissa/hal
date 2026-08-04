@@ -25,7 +25,7 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-6', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
 	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
 	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
-	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai'], fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000, track: 'gpt' },
+	{ group: 'OpenAI', alias: 'gpt', aliases: ['openai'], fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-5.4', fullId: 'openai/gpt-5.4', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-5.3', fullId: 'openai/gpt-5.3', fallbackContext: 128_000 },
 	{ group: 'OpenAI', alias: 'gpt-instant', fullId: 'openai/gpt-5.5-instant', fallbackContext: 400_000, pricing: { input: 5, output: 30 } },
