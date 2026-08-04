@@ -92,6 +92,7 @@ describe('popup', () => {
 	})
 
 	test('model picker enter on categories picks defaults and left on models closes their category', () => {
+		models.state.cache = { 'gpt-5.6': 1_200_000, 'gpt-5.5': 1_050_000 }
 		let picked = ''
 		popup.openModelPicker((value) => {
 			picked = value
@@ -100,6 +101,7 @@ describe('popup', () => {
 		let overlay = popup.buildOverlay(120, 30)
 		let clean = cleanLines(overlay!.lines).join('\n')
 		expect(clean).toContain('enter: pick default')
+		expect(clean).toContain('▼ openai (default: gpt-5.5)')
 		popup.handleKey(key('enter'))
 		expect(picked).toBe('gpt')
 		expect(popup.state.active).toBe(false)

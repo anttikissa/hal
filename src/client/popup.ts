@@ -116,13 +116,22 @@ function firstModelChoice(node: ModelTreeNode): ReturnType<typeof models.listMod
 	return undefined
 }
 
+function findModelChoice(node: ModelTreeNode, predicate: (choice: ReturnType<typeof models.listModelChoices>[number]) => boolean): ReturnType<typeof models.listModelChoices>[number] | undefined {
+	if (node.choice && predicate(node.choice)) return node.choice
+	for (const child of node.children) {
+		const choice = findModelChoice(child, predicate)
+		if (choice) return choice
+	}
+	return undefined
+}
+
 function assignModelDefaults(node: ModelTreeNode): ReturnType<typeof models.listModelChoices>[number] | undefined {
 	for (const child of node.children) assignModelDefaults(child)
 	if (node.choice) return node.choice
 	if (node.path === 'openai' || node.path === 'openai/gpt') {
 		node.defaultChoice = firstModelChoice(node.children.find((child) => child.path === 'openai/gpt') ?? node)
-		const gpt = firstModelChoice({ name: '', path: '', children: node.children.filter((child) => child.choice?.value === 'gpt' || child.path === 'openai/gpt') })
-		if (gpt?.value === 'gpt') node.defaultChoice = gpt
+		const gpt = findModelChoice(node, (choice) => choice.value === 'gpt')
+		if (gpt) node.defaultChoice = gpt
 	} else if (node.path === 'anthropic') {
 		node.defaultChoice = firstModelChoice(node.children.find((child) => child.path === 'anthropic/opus') ?? node)
 	} else if (node.path.includes('/')) {
