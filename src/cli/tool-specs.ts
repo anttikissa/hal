@@ -78,6 +78,9 @@ export type ToolSpec = {
 	details?: (input?: any) => string | undefined
 	shellContinuations?: (input?: any, output?: string) => boolean
 	format?: (output: string, cols: number, input?: any) => ToolFormatResult
+	// Which side of long raw output stays visible after truncation.
+	// 'tail' keeps the final lines (default, useful for logs); 'head' keeps the first lines (useful for ranked search results).
+	overflow?: 'head' | 'tail'
 }
 
 function formatSize(bytes: number): string {
@@ -258,8 +261,8 @@ const specs: Record<string, ToolSpec> = {
 	eval: { title: () => 'Eval', command: (input) => input?.code ?? undefined, format: formatEval },
 	grep: { title: (input) => `Grep ${quoteToolArg(input?.pattern)} in ${input?.path ?? '?'}`, format: (output) => countIndicator(output, 'No matches found.', 'matches') },
 	glob: { title: (input) => `Glob ${input?.pattern ?? '?'} in ${input?.path ?? '.'}`, format: (output) => countIndicator(output, 'No files found.', 'files') },
-	google: { title: (input) => `Google ${quoteToolArg(input?.query)}` },
-	web_search: { title: (input) => `web_search ${quoteToolArg(input?.query)}` },
+	google: { title: (input) => `Google ${quoteToolArg(input?.query)}`, overflow: 'head' },
+	web_search: { title: (input) => `web_search ${quoteToolArg(input?.query)}`, overflow: 'head' },
 	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
 	spawn_agent: { title: (input) => input?.title ? `Spawn agent · ${input.title}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
 	send: {

@@ -128,8 +128,13 @@ function blockContent(block: Block, cols: number): string[] {
 		const outputLines = output.trimEnd().split('\n')
 		if (outputLines.length > blockConfig.maxToolOutputLines) {
 			const hidden = format.hiddenIndicator ?? `[+ ${outputLines.length - blockConfig.maxToolOutputLines} lines]`
-			lines.push(hidden)
-			for (const line of outputLines.slice(-blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
+			if (spec.overflow === 'head') {
+				for (const line of outputLines.slice(0, blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
+				lines.push(hidden)
+			} else {
+				lines.push(hidden)
+				for (const line of outputLines.slice(-blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
+			}
 			return lines
 		}
 		for (const line of outputLines) lines.push(clipLine(line, cols))

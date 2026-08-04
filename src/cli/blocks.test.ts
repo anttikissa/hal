@@ -49,6 +49,38 @@ test('bodyless tool blocks do not add a separator row', () => {
 	expect(lines.filter((line) => line.trim())).toHaveLength(1)
 })
 
+
+test('tool output truncation keeps tail by default', () => {
+	const oldMax = blocks.config.maxToolOutputLines
+	blocks.config.maxToolOutputLines = 2
+	try {
+		const clean = blocks.renderBlock({ type: 'tool', name: 'bash', output: 'one\ntwo\nthree\nfour' }, 80).map(stripAnsi)
+		expect(clean.some((line) => line.trim() === '[+ 2 lines]')).toBe(true)
+		expect(clean.some((line) => line.trim() === 'one')).toBe(false)
+		expect(clean.some((line) => line.trim() === 'three')).toBe(true)
+		expect(clean.some((line) => line.trim() === 'four')).toBe(true)
+	} finally {
+		blocks.config.maxToolOutputLines = oldMax
+	}
+})
+
+
+test('search tool output truncation keeps head', () => {
+	const oldMax = blocks.config.maxToolOutputLines
+	blocks.config.maxToolOutputLines = 2
+	try {
+		for (const name of ['google', 'web_search']) {
+			const clean = blocks.renderBlock({ type: 'tool', name, output: 'one\ntwo\nthree\nfour' }, 80).map(stripAnsi)
+			expect(clean.some((line) => line.trim() === 'one')).toBe(true)
+			expect(clean.some((line) => line.trim() === 'two')).toBe(true)
+			expect(clean.some((line) => line.trim() === 'four')).toBe(false)
+			expect(clean.findIndex((line) => line.trim() === '[+ 2 lines]')).toBeGreaterThan(clean.findIndex((line) => line.trim() === 'two'))
+		}
+	} finally {
+		blocks.config.maxToolOutputLines = oldMax
+	}
+})
+
 test('short status notices render on one line without marker brackets', () => {
 	const lines = blocks.renderBlock({ type: 'log', text: '[paused]', ts: new Date('2026-01-01T17:38:00Z').getTime() }, 80).map(stripAnsi)
 
