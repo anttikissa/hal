@@ -338,9 +338,9 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 		const body = padBlockLine(text)
 		lines.push(bgLine(`${fg}${body}`, cols, bg))
 	}
-	// Streaming cursors are progress markers, not idle blinkers: keep them solid
-	// so the active streamed block is always visually anchored.
-	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, true)
+	// Streaming cursors blink on the shared pulse so active output feels alive
+	// without adding a separate rendering clock.
+	if (hasStreamingHalCursor(block)) addInlineCursor(lines, block, cols, cursorVisible)
 	padBlock(lines, fg, bg, bgIsBlack, cols)
 	lines[lines.length - 1]! += FG_OFF
 	return lines

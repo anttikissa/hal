@@ -150,6 +150,17 @@ test('assistant and thinking backgrounds come from colors', () => {
 	expect(blocks.renderBlock(assistantBlock, 80).map(stripAnsi)[0]?.trim()).not.toBe('')
 })
 
+test('streaming assistant and thinking cursors respect blink visibility', () => {
+	for (const type of ['assistant', 'thinking'] as const) {
+		const block = { type, text: 'hello', streaming: true } as Block
+		const visible = blocks.renderBlock(block, 40, true).map(stripAnsi).join('\n')
+		const hidden = blocks.renderBlock(block, 40, false).map(stripAnsi).join('\n')
+
+		expect(visible).toContain('█')
+		expect(hidden).not.toContain('█')
+	}
+})
+
 test('assistant block padding uses resolved OKLCH blackness', () => {
 	const originalBg = colors.assistant.bg
 	const originalBgIsBlack = colors.assistant.bgIsBlack
