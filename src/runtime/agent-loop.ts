@@ -135,6 +135,33 @@ async function writeToolCallBlob(sessionId: string, blobId: string, name: string
 	await blob.writeBlob(sessionId, blobId, existing)
 }
 
+async function writeToolResultBlob(sessionId: string, blobId: string, output: string): Promise<void> {
+	const existing = blob.readBlob(sessionId, blobId) ?? {}
+	existing.result = { content: output, status: 'done' }
+	await blob.writeBlob(sessionId, blobId, existing)
+}
+
+function webSearchInput(block: any): { query: string } {
+	return { query: typeof block?.input?.query === 'string' ? block.input.query : '' }
+}
+
+function formatWebSearchResults(block: any): string {
+	const content = Array.isArray(block?.content) ? block.content : []
+	const results: Array<{ title: string; url: string }> = []
+	for (const item of content) {
+		if (item?.type !== 'web_search_result') continue
+		const title = typeof item.title === 'string' ? item.title : ''
+		const url = typeof item.url === 'string' ? item.url : ''
+		if (title || url) results.push({ title, url })
+	}
+	const lines = [`${results.length} result${results.length === 1 ? '' : 's'}`]
+	for (const result of results) {
+		lines.push(`- ${result.title || result.url}`)
+		if (result.title && result.url) lines.push(`  ${result.url}`)
+	}
+	return lines.join('\n')
+}
+
 function sanitizeToolCallInput(name: string, input: any, cwd: string): any {
 	if (name !== 'bash' || input == null || typeof input !== 'object') return input
 	const command = bash.stripCdCwd(input.command, cwd)
@@ -416,6 +443,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			const toolCalls: ToolCall[] = []
 			// Server-side tool blocks (e.g. web_search) — opaque, go into assistant content verbatim
 			const serverBlocks: any[] = []
+			const serverToolHistory: any[] = []
+			const serverToolBlobMap = new Map<string, string>()
 			let aborted = false
 			let shouldRetry = false
 			let iterationDone = false
@@ -484,14 +513,24 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					}
 
 					case 'server_tool': {
-						// Server-side tool blocks (web_search) — collect for assistant content
 						if (event.serverBlocks) {
 							serverBlocks.push(...event.serverBlocks)
-							// Surface web search through the visible info path.
 							for (const sb of event.serverBlocks) {
-								if (sb.type === 'server_tool_use' && sb.name === 'web_search') {
-									const query = (sb.input as any)?.query ?? ''
-									emitInfo(sessionId, `[web_search] "${query}"`)
+								if (sb.type === 'server_tool_use' && sb.name === 'web_search' && typeof sb.id === 'string') {
+									const input = webSearchInput(sb)
+									const blobId = serverToolBlobMap.get(sb.id) ?? blob.makeBlobId(sessionId)
+									serverToolBlobMap.set(sb.id, blobId)
+									await writeToolCallBlob(sessionId, blobId, 'web_search', input)
+									serverToolHistory.push({ type: 'tool_call', toolId: sb.id, name: 'web_search', input, blobId, visibility: 'ui', ts: new Date().toISOString() })
+									emitEvent(sessionId, { type: 'tool-call', toolId: sb.id, name: 'web_search', input, blobId, phase: 'running' })
+								}
+								if (sb.type === 'web_search_tool_result' && typeof sb.tool_use_id === 'string') {
+									const output = formatWebSearchResults(sb)
+									const blobId = serverToolBlobMap.get(sb.tool_use_id) ?? blob.makeBlobId(sessionId)
+									serverToolBlobMap.set(sb.tool_use_id, blobId)
+									await writeToolResultBlob(sessionId, blobId, output)
+									serverToolHistory.push({ type: 'tool_result', toolId: sb.tool_use_id, blobId, visibility: 'ui', ts: new Date().toISOString() })
+									emitEvent(sessionId, { type: 'tool-result', toolId: sb.tool_use_id, name: 'web_search', output: output.slice(0, 500), blobId, phase: 'done' })
 								}
 							}
 						}
@@ -602,6 +641,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					await writeThinkingBlob(sessionId, blobId, thinkingText, thinkingSignature || undefined)
 					historyEntries.push({ type: 'thinking', model, thinkingEffort, blobId, ts })
 				}
+				for (const entry of serverToolHistory) historyEntries.push(entry)
 				if (assistantText) historyEntries.push({ type: 'assistant', text: assistantText, model, ts })
 				for (const tc of toolCalls) {
 					const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)
@@ -637,6 +677,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						ts,
 					})
 				}
+				for (const entry of serverToolHistory) historyEntries.push(entry)
 				if (latestCommitLocLine) {
 					const trimmed = assistantText.trimEnd()
 					assistantText = latestCommitLocLine
@@ -707,6 +748,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					ts,
 				})
 			}
+			for (const entry of serverToolHistory) historyEntries.push(entry)
 			if (assistantText) historyEntries.push({ type: 'assistant', text: assistantText, model, ts })
 			for (const tc of toolCalls) {
 				const blobId = toolBlobMap.get(tc.id) ?? blob.makeBlobId(sessionId)

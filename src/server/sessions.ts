@@ -82,8 +82,8 @@ export type HistoryEntry = EntryIdentity & (
 			visibility?: 'ui'
 			ts?: string
 		}
-	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; ts?: string }
-	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; ts?: string }
+	| { type: 'tool_call'; toolId: string; name: string; input?: any; blobId?: string; visibility?: 'ui'; ts?: string }
+	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; visibility?: 'ui'; ts?: string }
 	| { type: 'pending_tools'; toolIds: string[]; cwd: string; model?: string; usage?: PartialTokenUsage; reason?: 'soft-pause'; ts?: string }
 	| ({ type: 'turn_end'; ts?: string } & TurnEndMeta)
 	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; visibility?: 'ui' | 'next-user'; ts?: string }

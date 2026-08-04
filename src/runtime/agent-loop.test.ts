@@ -85,6 +85,50 @@ test('adds commit LOC line to final assistant response', async () => {
 })
 
 
+test('surfaces Claude web_search as a visible tool with result titles', async () => {
+	const sessionId = `test-web-search-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'server_tool', serverBlocks: [{ type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'latest NASA news today' } }] }
+			yield { type: 'server_tool', serverBlocks: [{ type: 'web_search_tool_result', tool_use_id: 'srvtoolu_1', content: [{ type: 'web_search_result', title: 'NASA News', url: 'https://www.nasa.gov/news/' }] }] }
+			yield { type: 'text', text: 'Found NASA news.' }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'anthropic/claude-opus-4-8',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'search' }],
+		})
+		expect(result).toBe('completed')
+		expect(events.find((event) => event.type === 'info' && event.text?.includes('[web_search]'))).toBeUndefined()
+		expect(events.find((event) => event.type === 'tool-call')).toMatchObject({ name: 'web_search', input: { query: 'latest NASA news today' } })
+		expect(events.find((event) => event.type === 'tool-result')?.output).toContain('NASA News')
+		expect(events.find((event) => event.type === 'tool-result')?.output).toContain('https://www.nasa.gov/news/')
+
+		const history = sessions.loadHistory(sessionId)
+		expect(history.find((entry) => entry.type === 'tool_call')).toMatchObject({ type: 'tool_call', name: 'web_search', visibility: 'ui' })
+		expect(apiMessages.toProviderMessages(sessionId, history).some((message: any) => JSON.stringify(message).includes('web_search'))).toBe(false)
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
+
 test('calibrates context token estimates from provider input usage', async () => {
 	const sessionId = `test-calibration-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	const origGetProvider = providerLoader.getProvider

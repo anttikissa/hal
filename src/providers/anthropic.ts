@@ -165,9 +165,6 @@ async function* parseStream(
 	// Tool calls are assembled across content_block_start / delta / stop events
 	const tools = new Map<number, { id: string; name: string; json: string }>()
 	const serverTools = new Map<number, { block: any; json: string }>()
-	// Server-side tool blocks (e.g. web_search) are opaque — collect them verbatim
-	// so the agent loop can include them in the assistant message content.
-	const serverToolBlocks: any[] = []
 	const usage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 	let gotStop = false
 
@@ -178,10 +175,9 @@ async function* parseStream(
 				tools.set(ev.index, { id: b.id, name: b.name, json: '' })
 			} else if (b.type === 'server_tool_use') {
 				// Server-side tool input streams as input_json_delta after this empty block.
-				serverToolBlocks.push(b)
 				serverTools.set(ev.index, { block: b, json: '' })
 			} else if (b.type === 'web_search_tool_result') {
-				serverToolBlocks.push(b)
+				yield { type: 'server_tool', serverBlocks: [b] }
 			}
 		} else if (ev.type === 'content_block_delta') {
 			const d = ev.delta
@@ -206,6 +202,7 @@ async function* parseStream(
 			if (st) {
 				const parsed = providerShared.parseToolInput(st.json)
 				if (!parsed.parseError) st.block.input = parsed.input
+				yield { type: 'server_tool', serverBlocks: [st.block] }
 				serverTools.delete(ev.index)
 			}
 		} else if (ev.type === 'message_start' && ev.message?.usage) {
@@ -240,9 +237,6 @@ async function* parseStream(
 	}
 
 	if (!gotStop) return
-	// Yield server-side tool blocks (web_search) before done so the agent loop
-	// can include them in the assistant message content.
-	if (serverToolBlocks.length > 0) yield { type: 'server_tool', serverBlocks: serverToolBlocks }
 	yield { type: 'done', doneStatus: 'completed', usage }
 }
 

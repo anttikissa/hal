@@ -125,12 +125,14 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 				break
 			}
 			case 'tool_call': {
+				if (entry.visibility === 'ui') break
 				flushToolResults()
 				pendingInfos = []
 				pendingAssistant.push(buildToolUseContent(sessionId, entry))
 				break
 			}
 			case 'tool_result': {
+				if (entry.visibility === 'ui') break
 				flushAssistant()
 				pendingToolResults.push(buildToolResultContent(sessionId, entry))
 				break
