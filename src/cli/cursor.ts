@@ -9,8 +9,12 @@ function tick(): number {
 	return Math.floor(Date.now() / 250)
 }
 
-function isVisible(): boolean {
-	return cursor.tick() % 4 < 2
+function isVisible(t = cursor.tick()): boolean {
+	return t % 4 < 2
+}
+
+function isFastVisible(t = cursor.tick()): boolean {
+	return t % 2 === 0
 }
 
 function scheduleNext(): void {
@@ -37,4 +41,4 @@ function stop(): void {
 	onChange = null
 }
 
-export const cursor = { tick, isVisible, start, stop }
+export const cursor = { tick, isVisible, isFastVisible, start, stop }

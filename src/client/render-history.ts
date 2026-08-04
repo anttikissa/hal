@@ -7,6 +7,7 @@
 import { oklch } from '../utils/oklch.ts'
 import { blocks as blockRenderer } from '../cli/blocks.ts'
 import { colors } from '../cli/colors.ts'
+import { cursor } from '../cli/cursor.ts'
 import type { Block, Tab } from '../client.ts'
 
 export type BlockRenderCache = {
@@ -41,8 +42,8 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext):
 	const cached = streamingCursor ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
 	if (cached && cached.version === version && cached.cols === cols) return cached.lines
-	const slowCursorVisible = context.cursorTick % 4 < 2
-	const fastCursorVisible = context.cursorTick % 2 === 0
+	const slowCursorVisible = cursor.isVisible(context.cursorTick)
+	const fastCursorVisible = cursor.isFastVisible(context.cursorTick)
 	const lines = blockRenderer.renderBlock(block, cols, streamingCursor ? fastCursorVisible : slowCursorVisible)
 	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 	if (!streamingCursor) context.blockCache.set(block, { version, cols, lines: rendered })
@@ -133,7 +134,7 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		// Prev-style idle HAL cursor: a blank row, a blinking cursor row, then
 		// another blank row. When history fills the screen, these are the bottom
 		// three history rows immediately above the tab/status/prompt chrome.
-		lines.push('', halCursorLine(tab.sessionId, context.cursorTick % 4 < 2, working), '')
+		lines.push('', halCursorLine(tab.sessionId, cursor.isVisible(context.cursorTick), working), '')
 	}
 
 	return lines.length - start

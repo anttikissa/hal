@@ -20,7 +20,7 @@ import type { Block } from '../client.ts'
 import { renderHistory } from './render-history.ts'
 import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts'
 import { renderStatus } from './render-status.ts'
-import { cursor as blinkCursor } from '../cli/cursor.ts'
+import { cursor } from '../cli/cursor.ts'
 import { terminalOutput } from './terminal-output.ts'
 
 const config = {
@@ -52,7 +52,7 @@ let fadeTimer: ReturnType<typeof setTimeout> | null = null
 function historyContext(): HistoryRenderContext {
 	return {
 		blockCache,
-		cursorTick: blinkCursor.tick(),
+		cursorTick: cursor.tick(),
 		workingSessions: client.state.working,
 	}
 }
