@@ -31,6 +31,18 @@ test('block body keeps left and right margins when wrapping', () => {
 	expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo bar' }, 8))).toEqual([' foo', ' bar'])
 })
 
+test('block headers keep a right margin', () => {
+	// Header text (title on the left, blob ref on the right) must stop one column
+	// short of the terminal edge, matching the body margin.
+	const longTitle = blocks.renderBlock({ type: 'tool', name: 'bash', input: { command: 'z'.repeat(200) } }, 40)
+	expect(stripAnsi(longTitle[0]!)).toMatch(/ $/)
+	expect(stripAnsi(longTitle[0]!).length).toBe(39)
+
+	const withBlobRef = blocks.renderBlock({ type: 'error', text: 'boom', blobId: '0008sg-46t', sessionId: '102-era' }, 40)
+	expect(stripAnsi(withBlobRef[0]!)).toMatch(/\) $/)
+	expect(stripAnsi(withBlobRef[0]!).length).toBe(39)
+})
+
 test('body blocks render a blank line after the header', () => {
 	const samples: Block[] = [
 		{ type: 'user', text: 'hello' },
@@ -304,7 +316,7 @@ test('rendered block lines without tabs do not embed carriage returns', () => {
 	expect(lines.some((line) => line.includes('\r'))).toBe(false)
 })
 
-test('block header uses plain full-width layout without horizontal rules', () => {
+test('block header uses plain layout without horizontal rules', () => {
 	const block: Block = {
 		type: 'thinking',
 		text: 'x',
@@ -314,7 +326,8 @@ test('block header uses plain full-width layout without horizontal rules', () =>
 	}
 
 	const header = headerLine(blocks.renderBlock(block, 80))
-	expect(header.length).toBe(80)
+	// One column short of the terminal width: the last column is the right margin.
+	expect(header.length).toBe(79)
 	expect(header).not.toContain('─')
 	expect(header).toContain('03-idr/q05d47-tzf')
 })
@@ -414,7 +427,7 @@ test('tool block header uses padded text without horizontal rules', () => {
 
 	expect(rendered[0]?.startsWith(colors.tool('bash').bg)).toBe(true)
 	expect(lines[0]).toBe(' ')
-	expect(lines[1]).toBe(' 1 Jan 17:38 Bash: ./test                                  (11-ok3/000123-bash) ')
+	expect(lines[1]).toBe(' 1 Jan 17:38 Bash: ./test                                 (11-ok3/000123-bash) ')
 	expect(lines[1]).not.toContain('─')
 	expect(lines[2]).toBe(' ')
 	expect(lines[3]).toBe(' done')

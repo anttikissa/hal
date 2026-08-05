@@ -182,9 +182,12 @@ function formatBlockTimeRange(first?: number, last?: number): string {
 function buildHeader(title: string, time: string, blobRef: string, cols: number): string {
 	const prefix = time ? ` ${time} ` : ' '
 	const right = blobRef ? ` (${blobRef}) ` : ''
-	const titleWidth = Math.max(1, cols - visLen(prefix) - visLen(right))
+	// Stop one column short of the edge so headers keep the same right margin as
+	// block bodies. bgLine still paints the background across the full row.
+	const width = Math.max(1, cols - 1)
+	const titleWidth = Math.max(1, width - visLen(prefix) - visLen(right))
 	const left = `${prefix}${clipVisual(title, titleWidth)}`
-	return `${left}${' '.repeat(Math.max(0, cols - visLen(left) - visLen(right)))}${right}`
+	return `${left}${' '.repeat(Math.max(0, width - visLen(left) - visLen(right)))}${right}`
 }
 
 function padBlockLine(line: string): string {
