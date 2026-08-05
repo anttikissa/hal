@@ -198,6 +198,7 @@ function applyEvent(opts: ApplyEventOptions): { changed: boolean; toolBlock?: an
 	if (event.type === 'info' && event.text) {
 		close()
 		const block: any = { type: infoBlockType(event), text: event.text, ts }
+		if (event.usageBars === true) block.usageBars = true
 		if (block.type === 'error' && event.retryable === false) block.retryable = false
 		blocks.push(block)
 		return changed()

@@ -170,13 +170,7 @@ function displaySlot(account: AccountUsage): string {
 }
 
 function usageBar(usedPercent: number): string {
-	const width = Math.max(1, Math.round(config.progressBarWidth))
-	const clamped = Math.max(0, Math.min(100, usedPercent))
-	const halfSteps = Math.round((clamped / 100) * width * 2)
-	const full = Math.floor(halfSteps / 2)
-	const half = halfSteps % 2
-	const empty = width - full - half
-	return `[${'█'.repeat(full)}${half ? '▌' : ''}${'░'.repeat(empty)}]`
+	return subscriptionUsage.usageBar(usedPercent, config.progressBarWidth)
 }
 
 function formatWindowText(window: UsageWindow | undefined): string {

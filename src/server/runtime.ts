@@ -94,11 +94,11 @@ function broadcastSessions(): void {
 	restartPromptWatch()
 }
 
-function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', retryable?: boolean): void {
+function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', retryable?: boolean, usageBars?: true): void {
 	const createdAt = new Date().toISOString()
 	const entry: HistoryEntry = ui === 'notice'
-		? { type: 'info', text, ts: createdAt, ui }
-		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}) }
+		? { type: 'info', text, ts: createdAt, ui, ...(usageBars ? { usageBars } : {}) }
+		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}), ...(usageBars ? { usageBars } : {}) }
 	sessionStore.appendHistorySync(sessionId, [entry])
 	ipc.appendEvent({
 		id: protocol.eventId(),
@@ -107,6 +107,7 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 		level,
 		...(ui ? { ui } : {}),
 		...(retryable === false ? { retryable: false } : {}),
+		...(usageBars ? { usageBars } : {}),
 		sessionId,
 		createdAt,
 	})
@@ -271,7 +272,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 			broadcastSessions()
 		}
 		recordSessionStateChanges(sessionId, prevCwd, sessionState.cwd, prevModel, sessionState.model)
-		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui)
+		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui, undefined, cmdResult.usageBars)
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error', undefined, false)
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
 		return

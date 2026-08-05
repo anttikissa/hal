@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { blocks, type Block } from './blocks.ts'
 import { blockData } from './block-data.ts'
 import { colors } from './colors.ts'
+import { subscriptionUsage } from '../subscription-usage.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -94,6 +95,17 @@ test('multiword status notices also drop marker brackets', () => {
 
 	expect(lines[0]).toContain('Log: Paused before local tools')
 	expect(lines[0]).not.toContain('[paused before local tools]')
+})
+
+test('usage bars preserve their generated background color only when marked trusted', () => {
+	const bar = subscriptionUsage.usageBar(50, 2)
+	const trusted = blocks.renderBlock({ type: 'log', text: bar, usageBars: true }, 80).join('\n')
+	const untrusted = blocks.renderBlock({ type: 'log', text: bar }, 80).join('\n')
+
+	expect(trusted).toContain('\x1b[48;2;61;61;61m')
+	expect(untrusted).not.toContain('\x1b[48;2;61;61;61m')
+	const unsafe = blocks.renderBlock({ type: 'log', text: `${bar}\x1b[2J`, usageBars: true }, 80).join('\n')
+	expect(unsafe).not.toContain('\x1b[2J')
 })
 
 test('long notices render a blank line after the header', () => {

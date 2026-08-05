@@ -6,6 +6,7 @@
 import { clipVisual, expandTabs, hardWrap, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, resolveMarkers, visLen, wordWrap } from '../utils/strings.ts'
 import { models } from '../models.ts'
 import { time } from '../utils/time.ts'
+import { subscriptionUsage } from '../subscription-usage.ts'
 import { colors } from './colors.ts'
 import { md, type MdColors } from './md.ts'
 import { blockText } from './block-text.ts'
@@ -26,6 +27,14 @@ export type { Block } from './block-data.ts'
 import type { Block } from './block-data.ts'
 
 function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' }>): string {
+	if (block.usageBars) {
+		// /status marks this trusted presentation data, but account labels still
+		// originate outside Hal. Retain only the precise SGR sequences our bar emits.
+		const codes = subscriptionUsage.usageBarAnsiSequences()
+		let text = block.text
+		for (let i = 0; i < codes.length; i++) text = text.replaceAll(codes[i]!, `\uE000${i}\uE001`)
+		return blockText.sanitizeTerminalText(text).replace(/\uE000(\d+)\uE001/g, (_, i) => codes[Number(i)]!)
+	}
 	const text =
 		block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error'
 			? blockText.stripAnsiSequences(block.text)

@@ -34,6 +34,8 @@ export interface CommandResult {
 	error?: string
 	/** Optional presentation for special informational output. */
 	ui?: 'notice'
+	/** Permit only /status's generated ANSI progress bars to reach the renderer. */
+	usageBars?: true
 	/** Whether the command was recognized and handled. */
 	handled: boolean
 }
@@ -693,6 +695,7 @@ handlers['status'] = async (_args, _session, hooks) => {
 	}
 	return {
 		output: `${renderRuntimeStatus()}\n\n${usage}`,
+		usageBars: true,
 		handled: true,
 	}
 }

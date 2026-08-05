@@ -78,9 +78,9 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 
 	expect(text).toContain('Anthropic subscriptions:')
 	expect(text).toContain('| Slot | Account | 5h | 7d | Sonnet 7d |')
-	expect(text).toContain('| 1/2 | a@test.com | [')
+	expect(text).toContain('| 1/2 | a@test.com | \x1b[48;2')
 	expect(text).toContain('<br>20% used')
-	expect(text).toContain('| 2/2 * | b@test.com | [')
+	expect(text).toContain('| 2/2 * | b@test.com | \x1b[48;2')
 	expect(text).toContain('<br>61% used')
 	expect(text).toContain('<br>11% used')
 })
@@ -150,5 +150,5 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 
 	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
 	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
-	expect(text).toContain('| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | [')
+	expect(text).toContain('| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | \x1b[48;2')
 })

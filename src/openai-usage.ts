@@ -2,20 +2,13 @@
 
 import { auth, type Credential } from './auth.ts'
 import { ipc } from './ipc.ts'
-import { colors } from './cli/colors.ts'
 import { STATE_DIR } from './state.ts'
 import { liveFiles } from './utils/live-file.ts'
-import { oklch } from './utils/oklch.ts'
 import { subscriptionUsage } from './subscription-usage.ts'
 import { time } from './utils/time.ts'
 
 const CACHE_PATH = `${STATE_DIR}/openai-usage.ason`
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
-
-const BAR_PARTIALS = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇']
-const BAR_FILL_FG = oklch.toFg(0.84, 0, 0)
-const BAR_EMPTY_BG = oklch.toBg(0.36, 0, 0)
-
 export interface UsageWindow {
 	usedPercent: number
 	windowMinutes: number
@@ -184,15 +177,7 @@ function displaySlot(account: AccountUsage): string {
 }
 
 function usageBar(usedPercent: number): string {
-	const width = Math.max(1, Math.round(config.progressBarWidth))
-	const clamped = Math.max(0, Math.min(100, usedPercent))
-	const totalEighths = Math.round((clamped / 100) * width * 8)
-	const full = Math.floor(totalEighths / 8)
-	const partial = totalEighths % 8
-	const empty = width - full - (partial > 0 ? 1 : 0)
-	const fill = `${'█'.repeat(full)}${BAR_PARTIALS[partial] ?? ''}`
-	const reset = `${colors.log.fg}${colors.log.bg}`
-	return `[${BAR_EMPTY_BG}${BAR_FILL_FG}${fill}${BAR_EMPTY_BG}${' '.repeat(Math.max(0, empty))}${reset}]`
+	return subscriptionUsage.usageBar(usedPercent, config.progressBarWidth)
 }
 
 function formatWindowText(window: UsageWindow | undefined): string {
