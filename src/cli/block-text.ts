@@ -54,7 +54,7 @@ function stripAnsiSequences(text: string): string {
 
 interface LinkSpan { line: number; start: number; end: number; url: string }
 
-const URL_RE = /https?:\/\/[^\s<>"']+/g
+const URL_RE = /https?:\/\/[^\s<>"'\x1b]+/g
 const TRAILING_URL_PUNCT = '.,!?;:)]}'
 
 function firstWhitespaceIndex(s: string): number {
@@ -64,35 +64,81 @@ function firstWhitespaceIndex(s: string): number {
 	return -1
 }
 
-function trimTrailingUrlPunctuation(url: string, spans: LinkSpan[]): string {
+function ansiSequenceEnd(s: string, start: number): number {
+	if (s[start] !== '\x1b') return start
+	if (s[start + 1] === '[') {
+		let i = start + 2
+		while (i < s.length) {
+			const code = s.charCodeAt(i++)
+			if (code >= 0x40 && code <= 0x7e) return i
+		}
+		return s.length
+	}
+	if (s[start + 1] === ']') {
+		let i = start + 2
+		while (i < s.length) {
+			if (s[i] === '\x07') return i + 1
+			if (s[i] === '\x1b' && s[i + 1] === '\\') return i + 2
+			i++
+		}
+		return s.length
+	}
+	return Math.min(s.length, start + 2)
+}
+
+function hasOnlyAnsiAfter(s: string, start: number): boolean {
+	for (let i = start; i < s.length;) {
+		if (s[i] !== '\x1b') return false
+		i = ansiSequenceEnd(s, i)
+	}
+	return true
+}
+
+function lastPrintableStart(s: string, start: number, end: number): number {
+	let last = -1
+	for (let i = start; i < end;) {
+		if (s[i] === '\x1b') {
+			i = ansiSequenceEnd(s, i)
+			continue
+		}
+		last = i
+		i += s.codePointAt(i)! > 0xffff ? 2 : 1
+	}
+	return last
+}
+
+function trimTrailingUrlPunctuation(url: string, spans: LinkSpan[], lines: string[]): string {
 	while (url && TRAILING_URL_PUNCT.includes(url.at(-1)!)) {
 		url = url.slice(0, -1)
 		const last = spans.at(-1)
 		if (!last) break
-		last.end--
+		last.end = lastPrintableStart(lines[last.line]!, last.start, last.end)
 		if (last.end <= last.start) spans.pop()
 	}
 	return url
 }
 
 function pushUrlSpans(spans: LinkSpan[], lines: string[], lineIndex: number, start: number, end: number, cols: number): void {
-	let url = lines[lineIndex]!.slice(start, end)
+	let url = stripAnsiSequences(lines[lineIndex]!.slice(start, end))
 	const urlSpans: LinkSpan[] = [{ line: lineIndex, start, end, url: '' }]
 	let currentLine = lineIndex
 	let currentEnd = end
 
-	while (currentEnd === lines[currentLine]!.length && visLen(lines[currentLine]!) >= cols && currentLine + 1 < lines.length) {
+	// Markdown styling adds SGR sequences at each visual-row boundary. They are
+	// part of the visible label, never the hyperlink destination.
+	while (hasOnlyAnsiAfter(lines[currentLine]!, currentEnd) && visLen(lines[currentLine]!) >= cols && currentLine + 1 < lines.length) {
 		const next = lines[currentLine + 1]!
-		if (!next || /^\s/.test(next) || /^https?:\/\//.test(next)) break
-		const whitespace = firstWhitespaceIndex(next)
+		const plainNext = stripAnsiSequences(next)
+		if (!plainNext || /^\s/.test(plainNext) || /^https?:\/\//.test(plainNext)) break
+		const whitespace = firstWhitespaceIndex(plainNext)
 		if (whitespace >= 0) break
-		url += next
+		url += plainNext
 		urlSpans.push({ line: currentLine + 1, start: 0, end: next.length, url: '' })
 		currentLine++
 		currentEnd = next.length
 	}
 
-	url = trimTrailingUrlPunctuation(url, urlSpans)
+	url = trimTrailingUrlPunctuation(url, urlSpans, lines)
 	if (!url || url === 'http://' || url === 'https://') return
 	for (const span of urlSpans) {
 		span.url = url
