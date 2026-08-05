@@ -52,7 +52,7 @@ test('run writes ui-only summary to target and fills empty target name', async (
 	ipc.appendEvent = (event: any) => { events.push(event) }
 	providerLoader.getProvider = async () => ({
 		async *generate() {
-			yield { type: 'text' as const, text: "{ title: 'plan bug fix', summary: 'User asked to plan and fix a bug. Hal inspected code and proposed changes.' }" }
+			yield { type: 'text' as const, text: 'plan bug fix\n\nUser asked to plan and fix a bug. Hal inspected code and proposed changes.' }
 			yield { type: 'done' as const, usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
@@ -114,7 +114,7 @@ test('summaries ask provider for stateless calls', async () => {
 	providerLoader.getProvider = async () => ({
 		async *generate(req: any) {
 			stateless.push(req.stateless)
-			yield { type: 'text' as const, text: "{ title: 'summary', summary: 'Summary.' }" }
+			yield { type: 'text' as const, text: 'summary\n\nSummary.' }
 		},
 	})
 
@@ -136,7 +136,7 @@ test('run does not overwrite existing target name', async () => {
 	ipc.appendEvent = () => {}
 	providerLoader.getProvider = async () => ({
 		async *generate() {
-			yield { type: 'text' as const, text: "{ title: 'new title', summary: 'Summary.' }" }
+			yield { type: 'text' as const, text: 'new title\n\nSummary.' }
 			yield { type: 'done' as const, usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})

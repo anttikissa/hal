@@ -262,7 +262,8 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 function systemPrompt(): string {
 	return [
 		'You write compact session-recall briefs for Hal coding-agent sessions.',
-		'Return only ASON with fields: title, summary.',
+		'Output plain text only: a bare title on the first line, one blank line, then the summary.',
+		'Do not use ASON, JSON, YAML, code fences, or labels such as "title:" and "summary:".',
 		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, descriptive, and at most 60 characters.',
 		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
 		'Write like Strunk and White: short, plain sentences. Omit needless words. Split long sentences.',
@@ -279,7 +280,6 @@ function systemPrompt(): string {
 		'Ignore routine tool noise, raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, final commit, failure, or current state.',
 		'Use exact quotes only when the wording itself matters.',
 		'Do not copy any examples or unrelated prior summaries; the title and first paragraph must be grounded in the provided digest for the target session.',
-		'Output shape: title plus compact narrative; optional bullets only for changed files, test status, final commit, or a real blocking follow-up.'
 	].join('\n')
 }
 
@@ -288,15 +288,9 @@ function userPrompt(digest: string): string {
 }
 
 function parseSummary(text: string): SummaryResult {
-	try {
-		const parsed = ason.parse(text) as any
-		return {
-			title: sanitizeTitle(String(parsed?.title ?? '')),
-			summary: String(parsed?.summary ?? '').trim() || text.trim(),
-		}
-	} catch {
-		return { title: '', summary: text.trim() }
-	}
+	const lines = text.trim().split('\n')
+	const title = sanitizeTitle(lines.shift() ?? '')
+	return { title, summary: lines.join('\n').trim() }
 }
 
 function sanitizeTitle(text: string): string {
@@ -311,11 +305,11 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 	const provider = await providerLoader.getProvider(providerName)
 	const messages: Message[] = [{ role: 'user', content: userPrompt(digest) }]
 	let text = ''
-	for await (const event of provider.generate({ messages, model: modelId, systemPrompt: systemPrompt(), tools: [], stateless: true })) {
+	for await (const event of provider.generate({ messages, model: modelId, systemPrompt: whatSummary.systemPrompt(), tools: [], stateless: true })) {
 		if (event.type === 'text') text += event.text ?? ''
 		if (event.type === 'error') throw new Error(event.message ?? 'summary generation failed')
 	}
-	return parseSummary(text)
+	return whatSummary.parseSummary(text)
 }
 
 function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[], includeLabel: boolean): string {
@@ -395,6 +389,7 @@ export const whatSummary = {
 	buildDigest,
 	summarizeDigest,
 	systemPrompt,
+	parseSummary,
 	maybeNameSession,
 	persistResult,
 	run,
