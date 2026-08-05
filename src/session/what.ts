@@ -312,11 +312,13 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 	return whatSummary.parseSummary(text)
 }
 
-function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[], includeLabel: boolean): string {
+// A summary may be read days later, out of context, so it states up front that it is
+// /what output and which session it describes.
+function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[]): string {
 	const meta = sessions.loadSessionMeta(sessionId)
 	const title = result.title || meta?.name || sessionId
-	const label = includeLabel ? ` (${compactTargetLabel(sessionId, openSessionIds)})` : ''
-	return [`## ${title}${label}`, '', result.summary].join('\n')
+	const preamble = `You ran /what. This is a generated summary of earlier activity in ${compactTargetLabel(sessionId, openSessionIds)} (session ${sessionId}).`
+	return [`## /what summary: ${title}`, '', preamble, '', result.summary].join('\n')
 }
 
 function maybeNameSession(sessionId: string, title: string): boolean {
@@ -375,9 +377,9 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean; targetIds: st
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
 			const summary = await whatSummary.summarizeDigest(model, digest)
 			if (whatSummary.maybeNameSession(sessionId, summary.title)) renamed = true
-			persist(sessionId, [sessionId], formatSection(sessionId, summary, opts.openSessionIds, false))
+			persist(sessionId, [sessionId], formatSection(sessionId, summary, opts.openSessionIds))
 		} catch (err) {
-			persist(sessionId, [sessionId], [`## ${sessionId}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
+			persist(sessionId, [sessionId], [`## /what summary: ${sessionId}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
 		}
 	}
 	return { renamed, targetIds }

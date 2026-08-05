@@ -213,13 +213,15 @@ function blockLabel(block: Block): string {
 	}
 	if (block.type === 'assistant') {
 		const display = models.displayModel(block.model)
-		if (display && block.synthetic && block.canceled) return `Hal (${display}, synthetic, canceled)`
-		if (display && block.synthetic) return `Hal (${display}, synthetic)`
+		// Synthetic summaries are read out of context later, so name the command that made them.
+		const kind = block.syntheticKind === 'what-summary' ? '/what summary' : 'synthetic'
+		if (display && block.synthetic && block.canceled) return `Hal (${display}, ${kind}, canceled)`
+		if (display && block.synthetic) return `Hal (${display}, ${kind})`
 		if (display && block.canceled) return `Hal (${display}, canceled)`
 		if (display) return `Hal (${display})`
-		if (block.synthetic && block.canceled) return 'Hal (synthetic, canceled)'
+		if (block.synthetic && block.canceled) return `Hal (${kind}, canceled)`
 		if (block.canceled) return 'Hal (canceled)'
-		return block.synthetic ? 'Hal (synthetic)' : 'Hal'
+		return block.synthetic ? `Hal (${kind})` : 'Hal'
 	}
 	if (block.type === 'thinking') {
 		const display = models.displayModel(block.model)

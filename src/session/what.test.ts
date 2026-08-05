@@ -73,6 +73,10 @@ test('run writes ui-only summary to target and fills empty target name', async (
 	expect(sessions.loadHistory(requester).some((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')).toBe(false)
 	const targetHistory = sessions.loadHistory(target)
 	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'assistant', synthetic: true, syntheticKind: 'what-summary', visibility: 'ui' }))
+	const summary = targetHistory.find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
+	const summaryText = summary?.type === 'assistant' ? summary.text : ''
+	expect(summaryText).toStartWith('## /what summary: plan bug fix\n')
+	expect(summaryText).toContain(`You ran /what. This is a generated summary of earlier activity in tab 2 (session ${target}).`)
 	expect(targetHistory).toContainEqual(expect.objectContaining({ type: 'info', visibility: 'next-user', text: 'User ran /what for this session.' }))
 	expect(events.some((event) => event.type === 'response' && event.sessionId === target && event.synthetic)).toBe(true)
 })

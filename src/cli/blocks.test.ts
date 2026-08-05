@@ -243,6 +243,19 @@ test('synthetic assistant header includes model and synthetic marker', () => {
 	expect(header).toContain('Hal (GPT 5.4, synthetic)')
 })
 
+test('what summary header names the command instead of "synthetic"', () => {
+	const block: Block = {
+		type: 'assistant',
+		text: 'hello',
+		model: 'gpt-5.4',
+		synthetic: true,
+		syntheticKind: 'what-summary',
+	}
+
+	const header = headerLine(blocks.renderBlock(block, 80))
+	expect(header).toContain('Hal (GPT 5.4, /what summary)')
+})
+
 test('thinking header includes model and default thinking level', () => {
 	const block: Block = {
 		type: 'thinking',
