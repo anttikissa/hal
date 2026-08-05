@@ -225,8 +225,11 @@ function recordTabClosed(sessionId: string): void {
 	if (!agentLoop.abort(sessionId, TAB_CLOSED_TEXT)) emitInfo(sessionId, TAB_CLOSED_TEXT)
 }
 
-function persistCommandRetryInput(sessionId: string, text: string, result: Awaited<ReturnType<typeof commands.executeCommand>>): void {
-	if (!result.handled || !result.error) return
+// Handled slash commands never become user entries, so persist the typed text
+// as input_history for up-arrow recall after restart. Commands arriving from
+// subagents or the inbox carry a source and are not human keystrokes.
+function persistCommandInput(sessionId: string, text: string, source?: string): void {
+	if (source) return
 	sessionStore.appendHistorySync(sessionId, [{ type: 'input_history', text, ts: new Date().toISOString() }])
 }
 
@@ -245,7 +248,10 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
-	if (await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText)) return
+	if (await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText)) {
+		persistCommandInput(sessionId, text, source)
+		return
+	}
 	const sessionState = buildSessionState(meta)
 	const prevName = sessionState.name
 	const prevModel = sessionState.model
@@ -254,7 +260,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		info: (message, level) => emitInfo(sessionId, message, level),
 	})
 	if (cmdResult.handled) {
-		persistCommandRetryInput(sessionId, text, cmdResult)
+		persistCommandInput(sessionId, text, source)
 		const nextName = sessionState.name || undefined
 		if (prevCwd !== sessionState.cwd || prevModel !== sessionState.model || prevName !== (nextName ?? '')) {
 			sessionStore.updateMeta(sessionId, {
@@ -284,7 +290,10 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 
 async function dispatchPromptCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	const steering = agentLoop.isWorking(sessionId)
-	if (steering && await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, true)) return
+	if (steering && await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, true)) {
+		persistCommandInput(sessionId, text, source)
+		return
+	}
 	if (steering && commands.canRunWhileWorking(text)) {
 		await handlePrompt(sessionId, text, undefined, source, displayText)
 		return

@@ -321,6 +321,8 @@ test('slash command state changes are persisted as structural history entries', 
 			{ type: 'model', from: 'openai/gpt-5.4', to: 'openai/gpt-5.5', visibility: 'next-user' },
 		)
 		expect(events.some((event) => event.text?.startsWith('Model changed from'))).toBe(true)
+		// Typed slash commands must survive restart for up-arrow recall.
+		expect(history.find((entry) => entry.type === 'input_history')).toMatchObject({ type: 'input_history', text: '/model gpt-5.5' })
 	} finally {
 		ipc.ownsHostLock = origOwnsHostLock
 		ipc.appendEvent = origAppendEvent
