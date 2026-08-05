@@ -8,8 +8,8 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Use red-green TDD.
 - Do not write tests for exact LLM output. LLM output is indeterministic; test deterministic parsing, wiring, and fallback behavior instead.
 - Use `./test` to run all tests, typechecker and oxlint. Run the tests before writing code.
-- If tests fail, look for busy sessions that might have ongoing changes (eval "require('~/ipc.ts').ipc.readState().busy")
-- If no busy sessions, work with the user to fix the tests.
+- If tests fail, look for working sessions that might have ongoing changes (eval "require('~/ipc.ts').ipc.readState().working")
+- If no working sessions, work with the user to fix the tests.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
 - Run `bun cloc` to check line count — our budget for core code is 20 thousand lines. If you added many, see if you can do the same with less.
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
