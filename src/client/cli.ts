@@ -411,20 +411,21 @@ function beginPreviousPromptEdit(): boolean {
 		sessionId: tab.sessionId,
 		mode,
 		originalText,
-		// Looking at the previous prompt must not pause the active turn. A deliberate
-		// submission is the only action that may replace or steer that turn.
-		pausedWorkingTurn: false,
+		pausedWorkingTurn: working,
 		block: mode === 'amend' ? block ?? undefined : undefined,
 	})
 	prompt.setText(originalText)
+	if (working) client.sendCommand('abort', mode === 'amend' || mode === 'cancel' ? '' : undefined)
 	return true
 }
 
-function dismissPromptEdit(active: NonNullable<typeof promptEdit.state.active>): void {
+function continueAfterPromptEdit(active: NonNullable<typeof promptEdit.state.active>): void {
+	const shouldContinue = active.mode === 'amend' || active.pausedWorkingTurn
 	promptEdit.cancel()
 	prompt.clear()
 	clearSavedPromptState()
 	client.clearDraft(active.sessionId)
+	if (shouldContinue) client.sendCommand('continue')
 }
 
 function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>): void {
@@ -456,11 +457,12 @@ function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 		return true
 	}
 	if (plainKey(k, 'down') && !prompt.isBrowsingHistory() && prompt.atVerticalBoundary(1, contentWidth)) {
-		dismissPromptEdit(active)
+		continueAfterPromptEdit(active)
 		return true
 	}
 	if (plainKey(k, 'escape')) {
-		dismissPromptEdit(active)
+		if (active.mode === 'amend') return true
+		continueAfterPromptEdit(active)
 		return true
 	}
 	return false

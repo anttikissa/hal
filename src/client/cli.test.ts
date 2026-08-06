@@ -258,7 +258,7 @@ test('just-sent edit mode survives tab switching', () => {
 			prompt.clear()
 
 			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
-			expect(promptEdit.hint('s1')).toContain('reviewing just-sent prompt')
+			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
 			prompt.setText('edited prompt')
 
 			client.switchTab(1)
@@ -268,7 +268,7 @@ test('just-sent edit mode survives tab switching', () => {
 
 			client.switchTab(0)
 			expect(prompt.text()).toBe('edited prompt')
-			expect(promptEdit.hint('s1')).toContain('reviewing just-sent prompt')
+			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
@@ -367,7 +367,7 @@ test('up while working before output edits the just-sent prompt', () => {
 			expect(handled).toBe(true)
 			expect(prompt.text()).toBe('original prompt')
 			expect(tab.history[0]).toMatchObject({ status: 'editing' })
-			expect(commands).toEqual([])
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 
 			prompt.setText('edited prompt')
 			cli.forTests.handleAppKey(key('enter'))
@@ -429,7 +429,7 @@ test('up while working edits the visible latest prompt when local input history 
 			expect(handled).toBe(true)
 			expect(prompt.text()).toBe('latest visible prompt')
 			expect(tab.history[0]).toMatchObject({ status: 'editing' })
-			expect(commands).toEqual([])
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
@@ -514,7 +514,7 @@ test('up while working after visible output edits by canceling old turn', () => 
 			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
 			expect(prompt.text()).toBe('original prompt')
 			expect((tab.history[0] as any).status).toBeUndefined()
-			expect(commands).toEqual([])
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 
 			prompt.setText('edited prompt')
 			cli.forTests.handleAppKey(key('enter'))
@@ -552,30 +552,7 @@ test('history navigation inside just-sent edit skips the already loaded prompt',
 			expect(cli.forTests.handleAppKey(key('down'))).toBe(false)
 			expect(prompt.handleKey(key('down'), cli.forTests.promptInputWidth())).toBe(true)
 			expect(prompt.text()).toBe('original prompt')
-			expect(commands).toEqual([])
-		})
-	} finally {
-		ipc.appendCommand = origAppendCommand
-		client.state.working.clear()
-		promptEdit.cancel()
-	}
-})
-test('up then down while working only reviews the prompt', () => {
-	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
-	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
-	ipc.appendCommand = (command) => { commands.push(command) }
-	client.state.working.set('s1', true)
-
-	try {
-		withOneTab(tab, () => {
-			prompt.clear()
-			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
-			expect(prompt.text()).toBe('original prompt')
-			expect(cli.forTests.handleAppKey(key('down'))).toBe(true)
-			expect(prompt.text()).toBe('')
-			expect(commands).toEqual([])
-			expect(client.isWorking()).toBe(true)
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
@@ -584,31 +561,7 @@ test('up then down while working only reviews the prompt', () => {
 	}
 })
 
-test('escape dismisses a prompt review without pausing the turn', () => {
-	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
-	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
-	ipc.appendCommand = (command) => { commands.push(command) }
-	client.state.working.set('s1', true)
-
-	try {
-		withOneTab(tab, () => {
-			prompt.clear()
-			cli.forTests.handleAppKey(key('up'))
-			expect(cli.forTests.handleAppKey(key('escape'))).toBe(true)
-			expect(prompt.text()).toBe('')
-			expect(commands).toEqual([])
-			expect(client.isWorking()).toBe(true)
-		})
-	} finally {
-		ipc.appendCommand = origAppendCommand
-		client.state.working.clear()
-		promptEdit.cancel()
-	}
-})
-
-
-test('down from just-sent edit dismisses the review without continuing', () => {
+test('down from just-sent edit continues the original prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
@@ -624,7 +577,10 @@ test('down from just-sent edit dismisses the review without continuing', () => {
 			expect(handled).toBe(true)
 			expect(prompt.text()).toBe('')
 			expect(tab.history[0]).toMatchObject({ status: undefined })
-			expect(commands).toEqual([])
+			expect(commands).toEqual([
+				{ type: 'abort', sessionId: 's1', abortText: '' },
+				{ type: 'continue', sessionId: 's1' },
+			])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
@@ -634,7 +590,7 @@ test('down from just-sent edit dismisses the review without continuing', () => {
 })
 
 
-test('down from restored just-sent edit dismisses the review without continuing', () => {
+test('down from restored just-sent edit continues the original prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const tab = makeTab({
@@ -650,12 +606,12 @@ test('down from restored just-sent edit dismisses the review without continuing'
 			cli.forTests.restorePromptForCurrentTab()
 
 			expect(prompt.text()).toBe('edited but discarded')
-			expect(promptEdit.hint('s1')).toContain('reviewing just-sent prompt')
+			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
 
 			const handled = cli.forTests.handleAppKey(key('down'))
 			expect(handled).toBe(true)
 			expect(prompt.text()).toBe('')
-			expect(commands).toEqual([])
+			expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
@@ -664,7 +620,7 @@ test('down from restored just-sent edit dismisses the review without continuing'
 })
 
 
-test('down in just-sent edit moves through blank prompt lines before dismissing', () => {
+test('down in just-sent edit moves through blank prompt lines before continuing', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
@@ -682,7 +638,7 @@ test('down in just-sent edit moves through blank prompt lines before dismissing'
 
 			expect(prompt.cursorPos()).toBe('edited\n'.length)
 			expect(promptEdit.activeFor('s1')).not.toBe(null)
-			expect(commands).toEqual([])
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
