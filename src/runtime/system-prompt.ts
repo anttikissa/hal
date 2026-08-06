@@ -6,27 +6,41 @@
  *     ~/project/lib/AGENTS.md  // CLAUDE.md only when AGENTS.md is absent
  *
  * The project chain starts at the nearest Git root. Outside Git, only cwd is
- * checked. Markdown, HTML, and XML-like tags are plain model-visible text.
- * The special cases below are the complete prompt-file language.
+ * checked. Markdown, code fences, HTML, and XML-like tags are plain prompt text.
+ * These are the exceptions.
  *
- * `<!-- comments -->` are stripped from SYSTEM.md only. They remain visible in
- * AGENTS.md and CLAUDE.md.
+ * `<!-- HTML comments -->`
  *
- * `${agent}`, `${model}`, `${date}`, `${cwd}`, `${hal_dir}`, `${state_dir}`,
- * `${session_dir}`, and `${hal_source}` are substituted after directives. The
- * agent is `hal`; hal_source is `true` only inside Hal's canonical source tree.
+ * HTML comments are removed from SYSTEM.md before the prompt is sent. In
+ * AGENTS.md and CLAUDE.md, they remain visible prompt text.
+ *
+ * `${variable}`
+ *
+ * These placeholders are replaced after conditional blocks are selected:
+ *
+ * - `${agent}`       → `hal`
+ * - `${model}`       → `openai/gpt-5.6-terra`
+ * - `${date}`        → `2026-08-06, Thursday`
+ * - `${cwd}`         → `~/project/lib`
+ * - `${hal_dir}`     → `~/.hal`
+ * - `${state_dir}`   → `~/.hal/state`
+ * - `${session_dir}` → `~/.hal/state/sessions/00-abc` (empty outside a session)
+ * - `${hal_source}` → `true` when `${cwd}` is in Hal's source tree; otherwise `false`
+ *
+ * `::: if name="glob"`
  *
  *     ::: if model="openai/*"
  *     - Include this text only for a matching model.
  *     :::
  *
- * `*` matches any sequence and `?` one character; other punctuation is literal.
- * Directive lines stand alone and use at least three colons. No else, elif,
- * negation, nesting, escaping, or code-fence awareness exists.
+ * `*` matches any sequence and `?` one character; all other punctuation is
+ * literal. Directive lines stand alone and use at least three colons. There is
+ * no else, elif, negation, nesting, escaping, or code-fence awareness.
  *
- * Hal finally appends: `<meta>` means Hal-generated environment/session data,
- * not a user message; `<synthetic>` means Hal-generated assistant text, not
- * model output. See docs/system-prompt.md for examples and full details.
+ * Hal finally appends:
+ *
+ *     <meta>...</meta>            Hal-created session/context, not user text
+ *     <synthetic>...</synthetic>  Hal-generated assistant text, not model output
  */
 
 import { existsSync, readFileSync, realpathSync, watch } from 'fs'
