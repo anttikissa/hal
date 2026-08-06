@@ -715,6 +715,7 @@ export const client = {
 	clearToolConfirmPending,
 	canContinueCurrentTurn,
 	continueActionForCurrentTurn,
+	continueActionForTab,
 	switchTab,
 	nextTab,
 	prevTab,

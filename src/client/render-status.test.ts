@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { renderStatus } from './render-status.ts'
 import { client } from '../client.ts'
 import { openaiUsage } from '../openai-usage.ts'
+import { promptEdit } from './prompt-edit.ts'
 
 function tab(overrides: any = {}): any {
 	return {
@@ -88,6 +89,30 @@ test('activityStatusLabel names visible working phases', () => {
 	} finally {
 		client.state.working = origWorking
 		client.state.toolConfirmPending = origToolConfirm
+	}
+})
+
+test('activityStatusLabel describes a prompt edit while its turn is pausing or paused', () => {
+	const origWorking = client.state.working
+	client.state.working = new Map([['04-new', true]])
+	promptEdit.start({ sessionId: '04-new', mode: 'amend', originalText: 'original prompt', pausedWorkingTurn: true })
+	try {
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'thinking', text: 'hmm', streaming: true }] }))).toBe('editing current prompt · pausing')
+		client.state.working = new Map()
+		expect(renderStatus.activityStatusLabel(tab())).toBe('editing current prompt · paused')
+	} finally {
+		promptEdit.cancel()
+		client.state.working = origWorking
+	}
+})
+
+test('activityStatusLabel identifies an idle continuable turn as paused', () => {
+	const origWorking = client.state.working
+	client.state.working = new Map()
+	try {
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'log', text: '[paused]' }] }))).toBe('paused')
+	} finally {
+		client.state.working = origWorking
 	}
 })
 

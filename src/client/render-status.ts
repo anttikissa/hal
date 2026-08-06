@@ -480,9 +480,26 @@ function promptContentWidth(cols: number): number {
 	return renderStatus.contentWidth(cols)
 }
 
+function promptEditActivityStatusLabel(tab: Tab): string {
+	const active = promptEdit.activeFor(tab.sessionId)
+	if (!active) return ''
+
+	let label = 'editing previous prompt copy'
+	if (active.mode === 'amend' || active.mode === 'cancel') label = 'editing current prompt'
+	if (!active.pausedWorkingTurn) return label
+
+	const phase = client.state.working.get(tab.sessionId) ? 'pausing' : 'paused'
+	return `${label} · ${phase}`
+}
+
 function turnActivityStatusLabel(tab: Tab): string {
+	const editStatus = renderStatus.promptEditActivityStatusLabel(tab)
+	if (editStatus) return editStatus
 	if (client.state.toolConfirmPending.has(tab.sessionId)) return 'waiting for approval'
-	if (!client.state.working.get(tab.sessionId)) return ''
+	if (!client.state.working.get(tab.sessionId)) {
+		if (client.continueActionForTab(tab) === 'continue') return 'paused'
+		return ''
+	}
 
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
@@ -601,6 +618,7 @@ export const renderStatus = {
 	subscriptionStatusLabel,
 	promptContentWidth,
 	turnActivityStatusLabel,
+	promptEditActivityStatusLabel,
 	activityStatusLabel,
 	ruleText,
 	promptRule,
