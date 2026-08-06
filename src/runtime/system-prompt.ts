@@ -1,41 +1,32 @@
 /*
- * System-prompt source-file format
+ * Prompt files are concatenated in this order (for cwd = ~/project/lib):
  *
- * This module compiles Hal's base SYSTEM.md and project instruction files into
- * one string. Markdown is otherwise ordinary model-visible text: headings,
- * lists, fenced code, and XML-looking tags have no parser or special meaning.
- * In particular, `<agent>` is literal text; only the documented `${name}`
- * values interpolate.
+ *     ${hal_dir}/SYSTEM.md
+ *     ~/project/AGENTS.md
+ *     ~/project/lib/AGENTS.md  // CLAUDE.md only when AGENTS.md is absent
  *
- * Source order is SYSTEM.md, then one AGENTS.md or CLAUDE.md per directory from
- * the nearest Git root through cwd (AGENTS.md wins when both exist), followed by
- * Hal's fixed transcript-markup note. Outside Git, only cwd is checked. SYSTEM.md
- * is the only source whose `<!-- HTML comments -->` are stripped; comments in
- * project files are normal prompt text. This makes SYSTEM.md comments suitable
- * for maintainer notes, but they cannot hide instructions in AGENTS.md/CLAUDE.md.
+ * The project chain starts at the nearest Git root. Outside Git, only cwd is
+ * checked. Markdown, HTML, and XML-like tags are plain model-visible text.
+ * The special cases below are the complete prompt-file language.
  *
- * The fixed note defines `<meta>` and `<synthetic>` transcript wrappers as
- * Hal-generated environment/session data and assistant text, respectively.
- * They are conversation protocol markup, not prompt-file XML syntax.
+ * `<!-- comments -->` are stripped from SYSTEM.md only. They remain visible in
+ * AGENTS.md and CLAUDE.md.
  *
- * Conditional blocks are the only directive syntax:
+ * `${agent}`, `${model}`, `${date}`, `${cwd}`, `${hal_dir}`, `${state_dir}`,
+ * `${session_dir}`, and `${hal_source}` are substituted after directives. The
+ * agent is `hal`; hal_source is `true` only inside Hal's canonical source tree.
  *
- *     ::: if model="anthropic/*"
- *     - This body is emitted only when the complete value matches.
+ *     ::: if model="openai/*"
+ *     - Include this text only for a matching model.
  *     :::
  *
- * Opening and closing directives must occupy their own lines and use three or
- * more colons. `*` means any sequence and `?` one character; other pattern
- * punctuation is literal. Values are double-quoted and cannot contain a double
- * quote. Directives have no else, negation, nesting, escaping, or Markdown/code-fence
- * awareness. A directive-shaped line in a code example is still a directive.
- * Unknown variables are empty strings. Available values are agent, model, date,
- * cwd, hal_dir, state_dir, session_dir, and hal_source (`true` only within Hal's
- * canonical source tree).
+ * `*` matches any sequence and `?` one character; other punctuation is literal.
+ * Directive lines stand alone and use at least three colons. No else, elif,
+ * negation, nesting, escaping, or code-fence awareness exists.
  *
- * After selecting directives, `${name}` substitutions use those same variables.
- * Sources are joined with blank lines and runs of three or more newlines become
- * two. See docs/system-prompt.md for user-facing details and examples.
+ * Hal finally appends: `<meta>` means Hal-generated environment/session data,
+ * not a user message; `<synthetic>` means Hal-generated assistant text, not
+ * model output. See docs/system-prompt.md for examples and full details.
  */
 
 import { existsSync, readFileSync, realpathSync, watch } from 'fs'
