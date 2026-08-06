@@ -366,13 +366,6 @@ function requestContinue(sessionId: string): void {
 	)
 }
 
-function cancelPendingContinue(sessionId: string): boolean {
-	const continuation = state.continuingTurns.get(sessionId)
-	if (!continuation) return false
-	continuation.canceled = true
-	state.continuingTurns.delete(sessionId)
-	return true
-}
 
 async function amendLastPrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
 	const entries = sessionStore.loadHistory(sessionId)
@@ -628,9 +621,13 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'abort': {
 			if (!cmd.sessionId) return
-			const canceledContinuation = cancelPendingContinue(cmd.sessionId)
+			const continuation = state.continuingTurns.get(cmd.sessionId)
+			if (continuation) {
+				continuation.canceled = true
+				state.continuingTurns.delete(cmd.sessionId)
+			}
 			const abortText = cmd.abortText ?? (promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)
-			if (!agentLoop.abort(cmd.sessionId, abortText) && abortText !== '' && !canceledContinuation) emitInfo(cmd.sessionId, 'No working turn to pause')
+			if (!agentLoop.abort(cmd.sessionId, abortText) && abortText !== '' && !continuation) emitInfo(cmd.sessionId, 'No working turn to pause')
 			break
 		}
 		case 'reset': {
