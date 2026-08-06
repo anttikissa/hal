@@ -137,7 +137,19 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 
 
 function toolOutputPreview(output: string): string {
-	return helpers.truncateUtf8(output, 500, '\n[… output continues; preview limited]')
+	const limit = 500
+	const suffix = '\n[… output continues; preview limited]'
+	if (Buffer.byteLength(output, 'utf8') <= limit) return output
+
+	const lines = output.split('\n')
+	const trailingNewline = lines.at(-1) === ''
+	if (trailingNewline) lines.pop()
+	if (lines.length <= 10) return helpers.truncateUtf8(output, limit, suffix)
+
+	const omitted = lines.length - 10
+	let tail = lines.slice(-10).join('\n')
+	if (trailingNewline) tail += '\n'
+	return helpers.truncateUtf8(`[+${omitted} earlier lines; showing last 10]\n${tail}`, limit, suffix)
 }
 
 async function writeThinkingBlob(sessionId: string, blobId: string, thinkingText: string, thinkingSignature?: string): Promise<void> {
