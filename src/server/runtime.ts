@@ -30,13 +30,14 @@ import { openingSummary } from '../session/opening-summary.ts'
 import { blob } from '../session/blob.ts'
 import { whatSummary } from '../session/what.ts'
 
+type PendingContinuation = { canceled: boolean }
 const state = {
 	openSessionIds: [] as string[],
 	currentSessionId: null as string | null,
 	activeRuntimePid: null as number | null,
 	stopPromptWatch: null as (() => void) | null,
 	/** Continuations that are waiting for the turn they replace to finish. */
-	continuingTurns: new Map<string, Promise<void>>(),
+	continuingTurns: new Map<string, PendingContinuation>(),
 }
 
 const USER_PAUSED_TEXT = '[paused]'
@@ -337,29 +338,40 @@ function hasLiveTurnContent(sessionId: string): boolean {
 	return false
 }
 
-async function continueTurn(sessionId: string): Promise<void> {
+async function continueTurn(sessionId: string, continuation: PendingContinuation): Promise<void> {
 	if (agentLoop.isWorking(sessionId)) {
 		if (agentLoop.hasPauseBeforeTools(sessionId)) return
 		const settled = agentLoop.abortAndWait(sessionId, '')
 		if (settled) await settled
 	}
+	if (continuation.canceled) return
 	// Continuing resumes the paused turn that held the queue. If it completes,
 	// queued prompts should drain immediately instead of staying stuck behind
 	// the paused-turn safety hold.
 	if (shouldShowResumingNotice(sessionId)) emitInfo(sessionId, RESUMING_TEXT)
 	promptQueue.setHeld(sessionId, false)
 	await continuePendingTools(sessionId)
+	if (continuation.canceled) return
 	void runGeneration(sessionId, '')
 }
 
 function requestContinue(sessionId: string): void {
 	if (state.continuingTurns.has(sessionId)) return
-	const task = continueTurn(sessionId)
-	state.continuingTurns.set(sessionId, task)
+	const continuation = { canceled: false }
+	state.continuingTurns.set(sessionId, continuation)
+	const task = continueTurn(sessionId, continuation)
 	void task.then(
-		() => { if (state.continuingTurns.get(sessionId) === task) state.continuingTurns.delete(sessionId) },
-		() => { if (state.continuingTurns.get(sessionId) === task) state.continuingTurns.delete(sessionId) },
+		() => { if (state.continuingTurns.get(sessionId) === continuation) state.continuingTurns.delete(sessionId) },
+		() => { if (state.continuingTurns.get(sessionId) === continuation) state.continuingTurns.delete(sessionId) },
 	)
+}
+
+function cancelPendingContinue(sessionId: string): boolean {
+	const continuation = state.continuingTurns.get(sessionId)
+	if (!continuation) return false
+	continuation.canceled = true
+	state.continuingTurns.delete(sessionId)
+	return true
 }
 
 async function amendLastPrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
@@ -616,8 +628,9 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'abort': {
 			if (!cmd.sessionId) return
+			const canceledContinuation = cancelPendingContinue(cmd.sessionId)
 			const abortText = cmd.abortText ?? (promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)
-			if (!agentLoop.abort(cmd.sessionId, abortText) && abortText !== '') emitInfo(cmd.sessionId, 'No working turn to pause')
+			if (!agentLoop.abort(cmd.sessionId, abortText) && abortText !== '' && !canceledContinuation) emitInfo(cmd.sessionId, 'No working turn to pause')
 			break
 		}
 		case 'reset': {
