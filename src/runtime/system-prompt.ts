@@ -24,7 +24,7 @@
  * - `${cwd}`         → `~/project/lib`
  * - `${hal_dir}`     → `~/.hal`
  * - `${state_dir}`   → `~/.hal/state`
- * - `${session_dir}` → `~/.hal/state/sessions/00-abc` (empty outside a session)
+ * - `${session_dir}` → `~/.hal/state/sessions/00-abc`
  * - `${hal_source}` → `true` when `${cwd}` is in Hal's source tree; otherwise `false`
  *
  * `::: if name="glob"`
