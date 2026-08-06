@@ -512,7 +512,7 @@ function turnActivityStatusLabel(tab: Tab): string {
 		}
 	}
 
-	return 'thinking'
+	return 'processing'
 }
 
 function activityStatusLabel(tab = client.currentTab()): string {

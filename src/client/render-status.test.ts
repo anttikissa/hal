@@ -81,7 +81,8 @@ test('activityStatusLabel names visible working phases', () => {
 	client.state.working = new Map([['04-new', true]])
 	client.state.toolConfirmPending = new Set()
 	try {
-		expect(renderStatus.activityStatusLabel(tab())).toBe('thinking')
+		expect(renderStatus.activityStatusLabel(tab())).toBe('processing')
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'thinking', text: 'reasoning', streaming: true }] }))).toBe('thinking')
 		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'assistant', text: 'hi', streaming: true }] }))).toBe('writing')
 		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'tool', name: 'bash' }] }))).toBe('running bash')
 		client.state.toolConfirmPending.add('04-new')
