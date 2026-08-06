@@ -30,6 +30,58 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
 })
 
+
+	test('streams partial output for each concurrent tool call', async () => {
+		const sessionId = `test-tool-output-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+		createdSessions.push(sessionId)
+		await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+		const events: any[] = []
+		const origGetProvider = providerLoader.getProvider
+		const origAppendEvent = ipc.appendEvent
+		const origDispatch = toolRegistry.dispatch
+		let generations = 0
+		providerLoader.getProvider = async () => ({
+			async *generate() {
+				generations++
+				if (generations === 1) {
+					yield { type: 'tool_call', id: 'tool-a', name: 'bash', input: { command: 'printf a' } }
+					yield { type: 'tool_call', id: 'tool-b', name: 'bash', input: { command: 'printf b' } }
+				}
+				yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+			},
+		})
+		ipc.appendEvent = (event: any) => {
+			events.push(event)
+		}
+		toolRegistry.dispatch = async (_name, input: any, context) => {
+			context.onOutput?.(`${input.command}: started`)
+			await Bun.sleep(10)
+			return `${input.command}: finished`
+		}
+
+		try {
+			await agentLoop.runAgentLoop({
+				sessionId,
+				model: 'openai/gpt-5.4',
+				cwd: process.cwd(),
+				systemPrompt: 'test prompt',
+				messages: [{ role: 'user', content: 'run two commands' }],
+			})
+
+			for (const toolId of ['tool-a', 'tool-b']) {
+				const partial = events.findIndex((event) => event.type === 'tool-result' && event.toolId === toolId && event.phase === 'running')
+				const done = events.findIndex((event) => event.type === 'tool-result' && event.toolId === toolId && event.phase === 'done')
+				expect(partial).toBeGreaterThanOrEqual(0)
+				expect(done).toBeGreaterThan(partial)
+			}
+		} finally {
+			providerLoader.getProvider = origGetProvider
+			ipc.appendEvent = origAppendEvent
+			toolRegistry.dispatch = origDispatch
+		}
+	})
+
 test('adds commit LOC line to final assistant response', async () => {
 	const sessionId = `test-final-loc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

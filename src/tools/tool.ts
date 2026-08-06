@@ -25,6 +25,8 @@ export interface ToolContext {
 	sessionId: string
 	cwd: string
 	signal?: AbortSignal
+	/** Called with cumulative output while a tool is executing. */
+	onOutput?: (output: string) => void
 	/** True after the user approved a risky model-initiated tool call. */
 	approvedRisk?: boolean
 }

@@ -97,3 +97,32 @@ test('bash commit metadata reports net loc delta', async () => {
 		rmSync(dir, { recursive: true, force: true })
 	}
 })
+
+
+test('bash reports output before the command finishes', async () => {
+	const updates: string[] = []
+	let finished = false
+	let firstUpdate!: () => void
+	const outputStarted = new Promise<void>((resolve) => {
+		firstUpdate = resolve
+	})
+	const command = bash.execute(
+		{ command: "printf first; sleep 0.1; printf second" },
+		{
+			sessionId: 's',
+			cwd: process.cwd(),
+			onOutput: (output) => {
+				updates.push(output)
+				firstUpdate()
+			},
+		},
+	).then((output) => {
+		finished = true
+		return output
+	})
+
+	await outputStarted
+	expect(finished).toBe(false)
+	expect(updates).toContain('first')
+	expect(await command).toBe('firstsecond')
+})

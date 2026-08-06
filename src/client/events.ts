@@ -112,6 +112,7 @@ function handleToolResult(event: any, ctx: any): void {
 	if (!tab || !toolBlock) return
 	delete toolBlock.blobLoaded
 	ctx.onChange(false)
+	if (event.phase === 'running') return
 	if (!toolBlock.blobId) return
 	void (async () => {
 		const loaded = await blockData.loadBlobs([toolBlock])

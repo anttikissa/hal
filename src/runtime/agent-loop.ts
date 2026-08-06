@@ -854,6 +854,7 @@ async function executeToolsConcurrently(
 	signal: AbortSignal,
 	cwd?: string,
 	sessionId?: string,
+	onOutput?: (call: ToolCall, output: string) => void,
 ): Promise<{ call: ToolCall; result: string }[]> {
 	const results: { call: ToolCall; result: string }[] = []
 	const context = { sessionId: sessionId ?? 'unknown', cwd: cwd ?? process.cwd(), signal }
@@ -868,7 +869,11 @@ async function executeToolsConcurrently(
 				try {
 					const approval = await confirmToolCall(context.sessionId, call, signal)
 					if (!approval.allowed) return { call, result: 'error: user rejected risky tool call' }
-					const result = await toolRegistry.dispatch(call.name, call.input, { ...context, approvedRisk: approval.approvedRisk })
+					const result = await toolRegistry.dispatch(call.name, call.input, {
+						...context,
+						approvedRisk: approval.approvedRisk,
+						onOutput: (output) => onOutput?.(call, output),
+					})
 					return { call, result }
 				} catch (err: any) {
 					return { call, result: `error: ${err?.message ?? String(err)}` }
@@ -892,7 +897,16 @@ async function executeToolBatch(
 	for (const call of toolCalls) {
 		if (!blobs.has(call.id)) blobs.set(call.id, blob.makeBlobId(sessionId))
 	}
-	const results = await executeToolsConcurrently(toolCalls, signal, cwd, sessionId)
+	const results = await executeToolsConcurrently(toolCalls, signal, cwd, sessionId, (call, output) => {
+		emitEvent(sessionId, {
+			type: 'tool-result',
+			toolId: call.id,
+			name: call.name,
+			output: output.slice(0, 500),
+			blobId: blobs.get(call.id),
+			phase: 'running',
+		})
+	})
 	const saved: { call: ToolCall; result: string; blobId: string }[] = []
 	for (const { call, result } of results) {
 		const blobId = blobs.get(call.id) ?? blob.makeBlobId(sessionId)

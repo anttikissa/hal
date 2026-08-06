@@ -265,8 +265,21 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 	// Read streams with caps while continuing to drain after the cap. This keeps
 	// memory bounded even for noisy long-running commands.
-	const stdoutPromise = processOutput.readLimited(proc.stdout, config.maxOutputBytes, '\n[… truncated]')
-	const stderrPromise = processOutput.readLimited(proc.stderr, config.maxOutputBytes, '\n[… truncated]')
+	let streamedStdout = ''
+	let streamedStderr = ''
+	function reportOutput(): void {
+		let output = streamedStdout
+		if (streamedStderr) output += (output ? '\n' : '') + streamedStderr
+		ctx.onOutput?.(output)
+	}
+	const stdoutPromise = processOutput.readLimited(proc.stdout, config.maxOutputBytes, '\n[… truncated]', undefined, (text) => {
+		streamedStdout += text
+		reportOutput()
+	})
+	const stderrPromise = processOutput.readLimited(proc.stderr, config.maxOutputBytes, '\n[… truncated]', undefined, (text) => {
+		streamedStderr += text
+		reportOutput()
+	})
 	const [stdout, stderrResult, code] = await Promise.all([stdoutPromise, stderrPromise, proc.exited])
 	let out = stdout.text
 	const stderr = stderrResult.text

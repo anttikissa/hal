@@ -268,6 +268,40 @@ describe('client streaming blocks', () => {
 		expect(tab.history[2]).toMatchObject({ type: 'assistant', text: 'after tool' })
 	})
 
+
+	test('running tool output updates directly without reloading its blob', async () => {
+		const originalLoadBlobs = blockData.loadBlobs
+		let loads = 0
+		blockData.loadBlobs = async () => {
+			loads++
+			return 0
+		}
+		try {
+			client.handleEvent({
+				type: 'tool-call',
+				sessionId: 's1',
+				toolId: 'tool-1',
+				name: 'bash',
+				input: { command: 'slow-command' },
+				blobId: '000002-def',
+			})
+			client.handleEvent({
+				type: 'tool-result',
+				sessionId: 's1',
+				toolId: 'tool-1',
+				blobId: '000002-def',
+				output: 'first line',
+				phase: 'running',
+			})
+			await Bun.sleep(0)
+
+			expect(loads).toBe(0)
+			expect(client.currentTab()!.history[0]).toMatchObject({ type: 'tool', output: 'first line' })
+		} finally {
+			blockData.loadBlobs = originalLoadBlobs
+		}
+	})
+
 test('tool-result reloads full blob output for edit blocks', async () => {
 	client.state.tabs.length = 0
 	client.state.tabs.push(makeTab())

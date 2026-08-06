@@ -5,10 +5,11 @@ interface LimitedRead {
 	truncated: boolean
 }
 
-async function readLimited(stream: ReadableStream<Uint8Array> | null | undefined, limitBytes: number, suffix: string, onLimit?: () => void): Promise<LimitedRead> {
+async function readLimited(stream: ReadableStream<Uint8Array> | null | undefined, limitBytes: number, suffix: string, onLimit?: () => void, onOutput?: (text: string) => void): Promise<LimitedRead> {
 	if (!stream) return { text: '', truncated: false }
 
 	const reader = stream.getReader()
+	const decoder = new TextDecoder()
 	const chunks: Uint8Array[] = []
 	let keptBytes = 0
 	let truncated = false
@@ -22,8 +23,11 @@ async function readLimited(stream: ReadableStream<Uint8Array> | null | undefined
 			if (keptBytes < limitBytes) {
 				const keepBytes = Math.min(value.byteLength, limitBytes - keptBytes)
 				if (keepBytes > 0) {
-					chunks.push(value.slice(0, keepBytes))
+					const kept = value.slice(0, keepBytes)
+					chunks.push(kept)
 					keptBytes += keepBytes
+					const text = decoder.decode(kept, { stream: true })
+					if (text) onOutput?.(text)
 				}
 				if (keepBytes === value.byteLength) continue
 			}
@@ -41,6 +45,8 @@ async function readLimited(stream: ReadableStream<Uint8Array> | null | undefined
 		reader.releaseLock()
 	}
 
+	const tail = decoder.decode()
+	if (tail) onOutput?.(tail)
 	const text = new TextDecoder().decode(Buffer.concat(chunks))
 	if (!truncated) return { text, truncated }
 	return { text: helpers.truncateUtf8(text + suffix, limitBytes, suffix), truncated }
