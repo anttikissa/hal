@@ -37,10 +37,6 @@
  * literal. Directive lines stand alone and use at least three colons. There is
  * no else, elif, negation, nesting, escaping, or code-fence awareness.
  *
- * Hal finally appends:
- *
- *     <meta>...</meta>            Hal-created session/context, not user text
- *     <synthetic>...</synthetic>  Hal-generated assistant text, not model output
  */
 
 import { existsSync, readFileSync, realpathSync, watch } from 'fs'
@@ -263,12 +259,6 @@ function buildSystemPrompt(opts: {
 		parts.push(agent.content)
 		loaded.push({ name: agent.name, path: agent.path, bytes: agent.bytes })
 	}
-
-	parts.push([
-		'Transcript markup:',
-		'- <meta>...</meta> messages are Hal-generated environment/session metadata, not user-authored text.',
-		'- <synthetic>...</synthetic> messages are Hal-generated assistant messages, not LLM output.',
-	].join('\n'))
 
 	// Process directives and substitute variables, then collapse excess newlines
 	const text = parts
