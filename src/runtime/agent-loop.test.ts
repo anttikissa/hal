@@ -55,7 +55,7 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 			events.push(event)
 		}
 		toolRegistry.dispatch = async (_name, input: any, context) => {
-			context.onOutput?.(`${input.command}: started`)
+			context.onOutput?.(`${input.command}: ${'x'.repeat(600)}`)
 			await Bun.sleep(10)
 			return `${input.command}: finished`
 		}
@@ -73,6 +73,8 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 				const partial = events.findIndex((event) => event.type === 'tool-result' && event.toolId === toolId && event.phase === 'running')
 				const done = events.findIndex((event) => event.type === 'tool-result' && event.toolId === toolId && event.phase === 'done')
 				expect(partial).toBeGreaterThanOrEqual(0)
+				expect(events[partial]!.output).toEndWith('\n[… output continues; preview limited]')
+				expect(Buffer.byteLength(events[partial]!.output, 'utf8')).toBeLessThanOrEqual(500)
 				expect(done).toBeGreaterThan(partial)
 			}
 		} finally {

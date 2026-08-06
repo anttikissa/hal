@@ -19,6 +19,7 @@ import { sessions } from '../server/sessions.ts'
 import { blob } from '../session/blob.ts'
 import { log } from '../utils/log.ts'
 import { ason } from '../utils/ason.ts'
+import { helpers } from '../utils/helpers.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 // Built-in tool registration now happens via explicit startup init.
 // Anthropic also has its own server-side web_search tool
@@ -132,6 +133,11 @@ function emitEvent(sessionId: string, event: Record<string, any>): void {
 
 function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info'): void {
 	emitEvent(sessionId, { type: 'info', text, level })
+}
+
+
+function toolOutputPreview(output: string): string {
+	return helpers.truncateUtf8(output, 500, '\n[… output continues; preview limited]')
 }
 
 async function writeThinkingBlob(sessionId: string, blobId: string, thinkingText: string, thinkingSignature?: string): Promise<void> {
@@ -921,7 +927,7 @@ async function executeToolBatch(
 			type: 'tool-result',
 			toolId: call.id,
 			name: call.name,
-			output: output.slice(0, 500),
+			output: toolOutputPreview(output),
 			blobId: blobs.get(call.id),
 			phase: 'running',
 		})
