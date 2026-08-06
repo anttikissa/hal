@@ -14,6 +14,10 @@
  * project files are normal prompt text. This makes SYSTEM.md comments suitable
  * for maintainer notes, but they cannot hide instructions in AGENTS.md/CLAUDE.md.
  *
+ * The fixed note defines `<meta>` and `<synthetic>` transcript wrappers as
+ * Hal-generated environment/session data and assistant text, respectively.
+ * They are conversation protocol markup, not prompt-file XML syntax.
+ *
  * Conditional blocks are the only directive syntax:
  *
  *     ::: if model="anthropic/*"
