@@ -44,10 +44,12 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	if (!code.trim()) return 'error: empty code'
 	if (sensitive.evalMentionsProtectedAccess(code)) return 'error: refusing to run eval code that mentions protected credentials access'
 
-	// Persist eval code for audit trail
-	const evalDir = join(STATE_DIR, 'sessions', ctx.sessionId, 'eval')
+	// Persist eval code for audit. Bun caches directory entries after importing a
+	// module, so each evaluation needs its own directory for later imports to work.
+	const evalId = `${Date.now()}-${counter++}`
+	const evalDir = join(STATE_DIR, 'sessions', ctx.sessionId, 'eval', evalId)
 	mkdirSync(evalDir, { recursive: true })
-	const file = join(evalDir, `${Date.now()}-${counter++}.ts`)
+	const file = join(evalDir, 'eval.ts')
 
 	// Separate import lines from body, then wrap body in an async function.
 	// This lets the code use `return` to produce a value and `import` for modules.
