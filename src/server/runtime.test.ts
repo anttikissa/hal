@@ -1070,6 +1070,10 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 
 		const history = sessions.loadHistory(child.id)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
+		expect(history.find((entry) => entry.type === 'input_history')).toMatchObject({
+			type: 'input_history',
+			text: expect.stringContaining('Task:\nDo the thing'),
+		})
 		expect(queued).toHaveLength(0)
 
 		const interactiveSpec = {
@@ -1093,6 +1097,10 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 		await runtime.startSpawnedSession(parent, promptedInteractiveChild, promptedInteractiveSpec)
 		const promptedInteractiveHistory = sessions.loadHistory(promptedInteractiveChild.id)
 		expect(promptedInteractiveHistory.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('MAKE MODEL PICKER GREAT AGAIN'))).toBe(true)
+		expect(promptedInteractiveHistory.find((entry) => entry.type === 'input_history')).toMatchObject({
+			type: 'input_history',
+			text: 'MAKE MODEL PICKER GREAT AGAIN',
+		})
 		expect(queued).toHaveLength(0)
 	} finally {
 		ipc.appendCommand = origAppendCommand

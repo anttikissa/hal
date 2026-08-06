@@ -206,11 +206,13 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 }
 
 async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec: SpawnSpec): Promise<void> {
-	if (spec.kind === 'interactive') {
-		if (spec.task.trim()) await dispatchPromptCommand(child.id, spec.task, parent.id)
-		return
-	}
-	await dispatchPromptCommand(child.id, buildSpawnPrompt(parent.id, spec.task, spec.kind), parent.id)
+	const text = spec.kind === 'interactive' ? spec.task : buildSpawnPrompt(parent.id, spec.task, spec.kind)
+	if (!text.trim()) return
+	// The initial prompt is injected by the parent, so it retains its source in
+	// the transcript. Keep an explicit recall entry as well: it is the child
+	// user's only way to inspect exactly what was started after switching tabs.
+	sessionStore.appendHistorySync(child.id, [{ type: 'input_history', text, ts: new Date().toISOString() }])
+	await dispatchPromptCommand(child.id, text, parent.id)
 }
 function restartPromptWatch(): void {
 	state.stopPromptWatch?.()
