@@ -17,7 +17,7 @@ I want each to do detailed research on their task, write a critical assessment o
 ```
 
 Small practical additions:
-- Don’t autoclose the subagents if you want to inspect their tabs later.
+- Use `kind: 'subagent-leave-open'` when you want to inspect a child tab after it finishes.
 - Have each subagent commit only its own changes.
 - Verify each handoff before trusting the summary.
 

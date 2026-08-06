@@ -64,7 +64,7 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 	expect(existsSync(`${stateDir}/sessions/${childSessionId}`)).toBe(true)
 })
 
-test('spawn_agent passes through fresh mode and subagent-autoclose kind', async () => {
+test('spawn_agent passes through fresh mode and subagent-leave-open kind', async () => {
 	useTempStateDir()
 	const appended: any[] = []
 	ipc.appendCommand = (command) => {
@@ -72,7 +72,7 @@ test('spawn_agent passes through fresh mode and subagent-autoclose kind', async 
 	}
 
 	const result = await spawnAgent.execute(
-		{ task: 'Research bar', kind: 'subagent-autoclose', mode: 'fresh', model: 'openai/gpt-5', cwd: '/work', title: 'Bar scout' },
+		{ task: 'Research bar', kind: 'subagent-leave-open', mode: 'fresh', model: 'openai/gpt-5', cwd: '/work', title: 'Bar scout' },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
 	const spawn = appended[0]?.spawn
@@ -85,7 +85,7 @@ test('spawn_agent passes through fresh mode and subagent-autoclose kind', async 
 	})
 	expect(spawn).toMatchObject({
 		task: 'Research bar',
-		kind: 'subagent-autoclose',
+		kind: 'subagent-leave-open',
 		mode: 'fresh',
 		model: 'openai/gpt-5',
 		cwd: '/work',

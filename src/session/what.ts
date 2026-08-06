@@ -114,7 +114,7 @@ function sessionState(sessionId: string, openIndex: number, working: Record<stri
 
 function agentRole(meta: SessionMeta): string {
 	if (meta.spawnKind === 'interactive') return 'interactive'
-	if (meta.spawnKind === 'subagent' || meta.spawnKind === 'subagent-autoclose') return 'subagent'
+	if (meta.spawnKind === 'subagent' || meta.spawnKind === 'subagent-leave-open') return 'subagent'
 	if (meta.forkedFrom) return 'fork'
 	return 'primary'
 }

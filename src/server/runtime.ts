@@ -117,7 +117,7 @@ function shouldCloseSessionAfterGeneration(
 	meta: { spawnKind?: SpawnKind } | null | undefined,
 	result: AgentLoopResult,
 ): boolean {
-	return meta?.spawnKind === 'subagent-autoclose' && result === 'completed'
+	return meta?.spawnKind === 'subagent' && result === 'completed'
 }
 
 function restartedAfterLastTurnEnd(entries: HistoryEntry[]): boolean {
@@ -165,9 +165,9 @@ function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind): stri
 		task,
 		'',
 		`When finished, send a concise handoff to session ${parentId} using the send tool. Include summary, files changed, and open questions.`,
-		kind === 'subagent-autoclose'
+		kind === 'subagent'
 			? 'After sending the handoff, finish normally and Hal will close this tab for you.'
-			: 'After sending the handoff, stay open so the user can inspect the tab.',
+			: 'After sending the handoff, leave this tab open for the user to inspect.'
 	].join('\n')
 }
 
@@ -199,7 +199,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 		parentSessionId: parent.id,
 	})
 	if (mode === 'fresh' || spec.cwd || spec.model) publishContextEstimate(child.id)
-	if (spec.kind === 'subagent-autoclose') {
+	if (spec.kind === 'subagent') {
 		tabs.recordSessionInfo(child.id, 'This subagent will close itself after sending a handoff.', new Date().toISOString())
 	}
 	return sessionStore.loadSessionMeta(child.id) ?? child
@@ -690,7 +690,7 @@ function handleCommand(cmd: Command): void {
 			const parent = sessionStore.loadSessionMeta(sessionId)
 			if (!parent) return
 			let kind: SpawnKind = 'subagent'
-			if (cmd.spawn.kind === 'subagent-autoclose' || cmd.spawn.kind === 'interactive') kind = cmd.spawn.kind
+			if (cmd.spawn.kind === 'subagent-leave-open' || cmd.spawn.kind === 'interactive') kind = cmd.spawn.kind
 			if (kind !== 'interactive' && !cmd.spawn.task.trim()) {
 				emitInfo(sessionId, 'Spawn task is required unless kind is interactive', 'error')
 				break

@@ -28,7 +28,7 @@ export type EventType =
 export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'queue-next' | 'pause-before-tools' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'client-status' | 'client-exit'
 
 export type SpawnMode = 'fork' | 'fresh'
-export type SpawnKind = 'subagent' | 'subagent-autoclose' | 'interactive'
+export type SpawnKind = 'subagent' | 'subagent-leave-open' | 'interactive'
 
 // Commands are stored directly in commands.asonl. Keep them structured and
 // explicit so the log stays readable; never smuggle another serialized object

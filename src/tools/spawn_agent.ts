@@ -6,7 +6,7 @@ import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 function normalize(input: unknown, ctx: ToolContext): SpawnCommandData {
 	const raw = toolRegistry.inputObject(input)
 	let kind: SpawnKind = 'subagent'
-	if (raw.kind === 'subagent-autoclose' || raw.kind === 'interactive') kind = raw.kind
+	if (raw.kind === 'subagent-leave-open' || raw.kind === 'interactive') kind = raw.kind
 	return {
 		task: String(raw.task ?? '').trim(),
 		kind,
@@ -56,7 +56,7 @@ const spawnAgentTool: Tool = {
 		'Spawn a subagent tab or open an interactive session. Interactive sessions are blank without a task; with a task, Hal sends it as the first visible user prompt immediately. Don’t restate standing instructions in the task; only add task-specific details.',
 	parameters: {
 		task: { type: 'string', description: 'What the spawned session should do. Required for subagents; optional for interactive sessions.' },
-		kind: { type: 'string', enum: ['subagent', 'subagent-autoclose', 'interactive'], description: 'subagent sends a handoff and stays open; subagent-autoclose closes after the handoff; interactive opens a user-visible session and runs task when provided.' },
+		kind: { type: 'string', enum: ['subagent', 'subagent-leave-open', 'interactive'], description: 'subagent sends a handoff and closes after clean completion; subagent-leave-open sends a handoff but leaves its tab open for user inspection; interactive opens a user-owned session and runs a task when provided.' },
 		mode: { type: 'string', enum: ['fork', 'fresh'], description: 'Whether to fork this session or start with fresh context.' },
 		model: { type: 'string', description: 'Optional model override for the child session.' },
 		cwd: { type: 'string', description: 'Optional working directory override for the child session.' },

@@ -406,12 +406,12 @@ test('shouldAutoContinue resumes only restarted interrupted turns', () => {
 
 
 
-test('subagent-autoclose only closes after a clean completion', () => {
-	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'completed')).toBe(true)
-	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'aborted')).toBe(false)
-	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'failed')).toBe(false)
-	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-autoclose' }, 'paused')).toBe(false)
-	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'completed')).toBe(false)
+test('subagent closes after a clean completion while leave-open and interactive sessions remain', () => {
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'completed')).toBe(true)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'aborted')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'failed')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'paused')).toBe(false)
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent-leave-open' }, 'completed')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'interactive' }, 'completed')).toBe(false)
 })
 
@@ -898,7 +898,7 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 		}
 		const child = await runtime.spawnSession(parent, {
 			task: 'Do the thing',
-			kind: 'subagent-autoclose',
+			kind: 'subagent',
 			mode: 'fresh',
 			model: 'openai/gpt-5',
 			cwd: '/work/child',
