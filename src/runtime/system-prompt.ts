@@ -1,5 +1,38 @@
-// Build the system prompt from SYSTEM.md plus the AGENTS.md / CLAUDE.md chain,
-// then provide lightweight sizing and watch helpers around that prompt.
+/*
+ * System-prompt source-file format
+ *
+ * This module compiles Hal's base SYSTEM.md and project instruction files into
+ * one string. Markdown is otherwise ordinary model-visible text: headings,
+ * lists, fenced code, and XML-looking tags have no parser or special meaning.
+ * In particular, `<agent>` is literal text; only the documented `${name}`
+ * values interpolate.
+ *
+ * Source order is SYSTEM.md, then one AGENTS.md or CLAUDE.md per directory from
+ * the nearest Git root through cwd (AGENTS.md wins when both exist), followed by
+ * Hal's fixed transcript-markup note. Outside Git, only cwd is checked. SYSTEM.md
+ * is the only source whose `<!-- HTML comments -->` are stripped; comments in
+ * project files are normal prompt text. This makes SYSTEM.md comments suitable
+ * for maintainer notes, but they cannot hide instructions in AGENTS.md/CLAUDE.md.
+ *
+ * Conditional blocks are the only directive syntax:
+ *
+ *     ::: if model="anthropic/*"
+ *     - This body is emitted only when the complete value matches.
+ *     :::
+ *
+ * Opening and closing directives must occupy their own lines and use three or
+ * more colons. `*` means any sequence and `?` one character; other pattern
+ * punctuation is literal. Values are double-quoted and cannot contain a double
+ * quote. Directives have no else, negation, nesting, escaping, or Markdown/code-fence
+ * awareness. A directive-shaped line in a code example is still a directive.
+ * Unknown variables are empty strings. Available values are model, date, cwd,
+ * hal_dir, state_dir, session_dir, and hal_source (`true` only within Hal's
+ * canonical source tree).
+ *
+ * After selecting directives, `${name}` substitutions use those same variables.
+ * Sources are joined with blank lines and runs of three or more newlines become
+ * two. See docs/system-prompt.md for user-facing details and examples.
+ */
 
 import { existsSync, readFileSync, realpathSync, watch } from 'fs'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
