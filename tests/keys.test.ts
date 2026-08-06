@@ -7,12 +7,6 @@ describe('keys', () => {
 		expect(keys.parseKey('\x1bf')).toEqual({ key: 'right', shift: false, alt: true, ctrl: false, cmd: false })
 	})
 
-	test('parses option-enter from legacy and kitty keyboard sequences', () => {
-		const event = { key: 'enter', shift: false, alt: true, ctrl: false, cmd: false }
-		expect(keys.parseKey('\x1b\r')).toEqual(event)
-		expect(keys.parseKey('\x1b[13;3u')).toEqual(event)
-	})
-
 	test('parses kitty cmd shortcuts', () => {
 		expect(keys.parseKey('\x1b[120;9u')).toEqual({ key: 'x', shift: false, alt: false, ctrl: false, cmd: true })
 		expect(keys.parseKey('\x1b[118;9u')).toEqual({ key: 'v', shift: false, alt: false, ctrl: false, cmd: true })

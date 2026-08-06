@@ -47,8 +47,8 @@ function hint(sessionId?: string | null): string | null {
 	if (!active) return null
 	if (active.mode === 'amend') return 'editing just-sent prompt — enter: send edited · ↓: continue with original · esc: stay paused'
 	if (active.mode === 'cancel') return 'editing just-sent prompt — enter: send edited · ↓/esc: continue with original'
-	if (active.mode === 'side-effect-copy') return 'editing previous prompt copy — enter: send as new · shift/option-enter: newline · ↓/esc: cancel · /rebase: rewrite history'
-	return 'editing previous prompt copy — enter: send as new · shift/option-enter: newline · ↓/esc: cancel'
+	if (active.mode === 'side-effect-copy') return 'editing previous prompt copy — enter: send as new · alt-enter: queue · ↓/esc: cancel · /rebase: rewrite history'
+	return 'editing previous prompt copy — enter: send as new · alt-enter: queue · ↓/esc: cancel'
 }
 
 export const promptEdit = { state, start, cancel, activeFor, hint }

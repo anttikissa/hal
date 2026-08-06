@@ -17,13 +17,10 @@ beforeEach(() => {
 })
 
 describe('prompt', () => {
-	test('shift-enter and option-enter insert newlines', () => {
+	test('shift-enter inserts newline', () => {
 		prompt.setText('hello', 5)
 		expect(prompt.handleKey(key('enter', { shift: true }), 80)).toBe(true)
 		expect(prompt.text()).toBe('hello\n')
-
-		prompt.handleKey(key('enter', { alt: true }), 80)
-		expect(prompt.text()).toBe('hello\n\n')
 	})
 
 	test('pasted multiline buffers below the file line limit stay inline', () => {

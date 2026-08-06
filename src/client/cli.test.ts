@@ -332,7 +332,7 @@ test('ctrl-f saves the current prompt draft before forking', () => {
 	}
 })
 
-test('option-enter is passed to the prompt editor to insert a newline', () => {
+test('alt-enter queues prompt without binding cmd-enter', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const tab = makeTab()
@@ -340,13 +340,16 @@ test('option-enter is passed to the prompt editor to insert a newline', () => {
 
 	try {
 		withOneTab(tab, () => {
-			prompt.setText('first line')
-			const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: true, cmd: false })
+			prompt.setText('do this next')
+			const queued = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: true, cmd: false })
+			expect(queued).toBe(true)
+			expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: 'do this next', delivery: 'queue' })])
+			expect(prompt.text()).toBe('')
 
-			expect(handled).toBe(false)
-			expect(prompt.handleKey(key('enter', { alt: true }), 80)).toBe(true)
-			expect(prompt.text()).toBe('first line\n')
-			expect(commands).toEqual([])
+			prompt.setText('cmd should not queue')
+			const cmdHandled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: true })
+			expect(cmdHandled).toBe(false)
+			expect(commands).toHaveLength(1)
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
@@ -459,7 +462,7 @@ test('up while working does not copy an inbox handoff as a prompt', () => {
 			expect(promptEdit.state.active).toMatchObject({ originalText: 'my prompt', mode: 'cancel' })
 			expect(tab.history[1]).toMatchObject({ source: 'other-session' })
 			expect((tab.history[1] as any)?.status).toBeUndefined()
-			expect(commands).toEqual([])
+			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand

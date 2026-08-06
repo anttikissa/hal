@@ -5,12 +5,12 @@ test('working state hides stale continue actions', () => {
 	expect(helpBar.deriveState(true, false, 'retry')).toBe('working')
 	expect(helpBar.deriveState(true, false, 'continue')).toBe('working')
 })
-test('text entry hints show send and option-enter newline together', () => {
+test('text entry hints show send newline and queue together', () => {
 	const text = helpBar.build(false, true)
 
 	expect(text).toContain('enter: send')
-	expect(text).toContain('shift/option-enter: newline')
-	expect(text).not.toContain('queue')
+	expect(text).toContain('shift-enter: newline')
+	expect(text).toContain('alt-enter: queue')
 })
 
 
@@ -20,8 +20,8 @@ test('restore tab hint is formatted like shortcut hints', () => {
 	expect(text).toBe('ctrl-shift-t: restore tab')
 })
 
-test('working text hints keep steer and newline adjacent', () => {
+test('working text hints keep steer and queue adjacent', () => {
 	const text = helpBar.build(true, true)
 
-	expect(text).toBe('enter: steer, shift/option-enter: newline, esc: pause')
+	expect(text).toBe('enter: steer, alt-enter: queue, shift-enter: newline, esc: pause')
 })

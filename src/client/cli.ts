@@ -231,7 +231,7 @@ function claudeCacheWarning(tab: (typeof client.state.tabs)[number] | null, text
 	return { contextTokens, thresholdTokens, ageText }
 }
 
-function openClaudeCacheWarning(text: string, displayText: string | undefined, warning: NonNullable<ReturnType<typeof claudeCacheWarning>>): void {
+function openClaudeCacheWarning(text: string, displayText: string | undefined, warning: NonNullable<ReturnType<typeof claudeCacheWarning>>, delivery?: 'queue'): void {
 	popup.openConfirm(
 		'Claude cache likely cold',
 		[
@@ -241,7 +241,7 @@ function openClaudeCacheWarning(text: string, displayText: string | undefined, w
 		],
 		['Send anyway', 'Switch to GPT', 'Cancel'],
 		(choice) => {
-			if (choice === 'Send anyway') submitPromptText(text, displayText)
+			if (choice === 'Send anyway') submitPromptText(text, displayText, delivery)
 			if (choice === 'Switch to GPT') client.sendCommand('prompt', '/model gpt')
 			draw()
 		},
@@ -428,7 +428,7 @@ function continueAfterPromptEdit(active: NonNullable<typeof promptEdit.state.act
 	if (shouldContinue) client.sendCommand('continue')
 }
 
-function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>): void {
+function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, delivery?: 'queue'): void {
 	const text = prompt.submitText().trim()
 	const displayText = prompt.text().trim()
 	if (!text) return
@@ -442,7 +442,7 @@ function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>): 
 		return
 	}
 	promptEdit.cancel()
-	submit(text)
+	submit(text, delivery)
 }
 
 function plainKey(k: KeyEvent, key: string): boolean {
@@ -452,8 +452,8 @@ function plainKey(k: KeyEvent, key: string): boolean {
 function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 	const active = promptEdit.activeFor(client.currentTab()?.sessionId)
 	if (!active) return false
-	if (k.key === 'enter' && !k.shift && !k.alt && !k.ctrl && !k.cmd) {
-		submitPromptEdit(active)
+	if (k.key === 'enter' && !k.shift && !k.ctrl && !k.cmd) {
+		submitPromptEdit(active, k.alt ? 'queue' : undefined)
 		return true
 	}
 	if (plainKey(k, 'down') && !prompt.isBrowsingHistory() && prompt.atVerticalBoundary(1, contentWidth)) {
@@ -468,7 +468,7 @@ function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 	return false
 }
 
-function submitPromptText(text: string, displayText: string | undefined): void {
+function submitPromptText(text: string, displayText: string | undefined, delivery?: 'queue'): void {
 	completion.dismiss()
 	popup.close()
 	promptEdit.cancel()
@@ -476,7 +476,7 @@ function submitPromptText(text: string, displayText: string | undefined): void {
 	prompt.pushHistory(text)
 	// Human typing now uses the same prompt command path as inbox messages.
 	// The runtime decides whether an working turn makes this behave like steering.
-	client.sendCommand('prompt', text, displayText === text ? undefined : displayText)
+	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, delivery)
 	prompt.clear()
 	clearSavedPromptState()
 	// Update tab's inputHistory + clear persisted draft
@@ -513,7 +513,7 @@ function handleLocalCommand(text: string): boolean {
 	return true
 }
 
-function submit(override?: string): void {
+function submit(override?: string, delivery?: 'queue'): void {
 	const text = (override ?? prompt.submitText()).trim()
 	const displayText = override === undefined ? prompt.text().trim() : undefined
 	if (!text) return
@@ -521,10 +521,10 @@ function submit(override?: string): void {
 	const warning = override === undefined ? claudeCacheWarning(client.currentTab(), text) : null
 	if (warning) {
 		completion.dismiss()
-		openClaudeCacheWarning(text, displayText, warning)
+		openClaudeCacheWarning(text, displayText, warning, delivery)
 		return
 	}
-	submitPromptText(text, displayText)
+	submitPromptText(text, displayText, delivery)
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
@@ -751,6 +751,12 @@ function handleAppKey(k: KeyEvent): boolean {
 	// Escape: abort current generation if working
 	if (k.key === 'escape' && client.isWorking()) {
 		client.sendCommand('abort')
+		return true
+	}
+	// Alt-Enter queues the prompt for later instead of steering the working turn.
+	if (k.key === 'enter' && k.alt && !k.shift && !k.ctrl && !k.cmd) {
+		submit(undefined, 'queue')
+		draw()
 		return true
 	}
 	// Enter: continue a paused/error turn when the prompt is empty.

@@ -23,14 +23,16 @@ const config = {
 const HINTS: Partial<Record<HelpState, Hint[]>> = {
 	'idle-text': [
 		{ keyLabel: 'enter', description: 'send' },
-		{ keyLabel: 'shift/option-enter', description: 'newline' },
+		{ keyLabel: 'shift-enter', description: 'newline' },
+		{ keyLabel: 'alt-enter', description: 'queue' },
 	],
 	'idle-continue': [{ keyLabel: 'enter', description: 'continue' }],
 	'idle-retry': [{ keyLabel: 'enter', description: 'retry' }],
 	working: [{ keyLabel: 'esc', description: 'pause' }],
 	'working-text': [
 		{ keyLabel: 'enter', description: 'steer' },
-		{ keyLabel: 'shift/option-enter', description: 'newline' },
+		{ keyLabel: 'alt-enter', description: 'queue' },
+		{ keyLabel: 'shift-enter', description: 'newline' },
 		{ keyLabel: 'esc', description: 'pause' },
 	],
 }
