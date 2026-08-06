@@ -3,20 +3,20 @@
  *
  *     ${hal_dir}/SYSTEM.md
  *     ~/project/AGENTS.md
- *     ~/project/lib/AGENTS.md  // CLAUDE.md only when AGENTS.md is absent
+ *     ~/project/lib/AGENTS.md  // or CLAUDE.md; AGENTS.md takes precedence
  *
  * The project chain starts at the nearest Git root. Outside Git, only cwd is
- * checked. Markdown, code fences, HTML, and XML-like tags are plain prompt text.
- * These are the exceptions.
+ * checked.
+ *
+ * SYSTEM.md will have HTML comments stripped, in others they are preserved:
  *
  * `<!-- HTML comments -->`
  *
- * HTML comments are removed from SYSTEM.md before the prompt is sent. In
- * AGENTS.md and CLAUDE.md, they remain visible prompt text.
+ * Variable substitutions:
  *
  * `${variable}`
  *
- * These placeholders are replaced after conditional blocks are selected:
+ * These placeholders are replaced after conditional blocks are selected (with examples):
  *
  * - `${agent}`       → `hal`
  * - `${model}`       → `openai/gpt-5.6-terra`
@@ -28,6 +28,8 @@
  * - `${hal_source}` → `true` when `${cwd}` is in Hal's source tree; otherwise `false`
  *
  * `::: if name="glob"`
+ *
+ * Example:
  *
  *     ::: if model="openai/*"
  *     - Include this text only for a matching model.
@@ -259,6 +261,7 @@ function buildSystemPrompt(opts: {
 		parts.push(agent.content)
 		loaded.push({ name: agent.name, path: agent.path, bytes: agent.bytes })
 	}
+
 
 	// Process directives and substitute variables, then collapse excess newlines
 	const text = parts
