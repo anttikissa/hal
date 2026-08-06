@@ -35,6 +35,8 @@ const state = {
 	currentSessionId: null as string | null,
 	activeRuntimePid: null as number | null,
 	stopPromptWatch: null as (() => void) | null,
+	/** Continuations that are waiting for the turn they replace to finish. */
+	continuingTurns: new Map<string, Promise<void>>(),
 }
 
 const USER_PAUSED_TEXT = '[paused]'
@@ -302,8 +304,8 @@ async function dispatchPromptCommand(sessionId: string, text: string, source?: s
 		return
 	}
 	if (steering) {
-		agentLoop.abort(sessionId)
-		await Bun.sleep(50)
+		const settled = agentLoop.abortAndWait(sessionId)
+		if (settled) await settled
 	}
 	await handlePrompt(sessionId, text, steering ? 'steering' : undefined, source, displayText)
 }
@@ -335,11 +337,29 @@ function hasLiveTurnContent(sessionId: string): boolean {
 	return false
 }
 
-async function waitForIdle(sessionId: string): Promise<void> {
-	for (let i = 0; i < 20; i++) {
-		if (!agentLoop.isWorking(sessionId)) return
-		await Bun.sleep(25)
+async function continueTurn(sessionId: string): Promise<void> {
+	if (agentLoop.isWorking(sessionId)) {
+		if (agentLoop.hasPauseBeforeTools(sessionId)) return
+		const settled = agentLoop.abortAndWait(sessionId, '')
+		if (settled) await settled
 	}
+	// Continuing resumes the paused turn that held the queue. If it completes,
+	// queued prompts should drain immediately instead of staying stuck behind
+	// the paused-turn safety hold.
+	if (shouldShowResumingNotice(sessionId)) emitInfo(sessionId, RESUMING_TEXT)
+	promptQueue.setHeld(sessionId, false)
+	await continuePendingTools(sessionId)
+	void runGeneration(sessionId, '')
+}
+
+function requestContinue(sessionId: string): void {
+	if (state.continuingTurns.has(sessionId)) return
+	const task = continueTurn(sessionId)
+	state.continuingTurns.set(sessionId, task)
+	void task.then(
+		() => { if (state.continuingTurns.get(sessionId) === task) state.continuingTurns.delete(sessionId) },
+		() => { if (state.continuingTurns.get(sessionId) === task) state.continuingTurns.delete(sessionId) },
+	)
 }
 
 async function amendLastPrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<boolean> {
@@ -366,8 +386,8 @@ async function amendLastPrompt(sessionId: string, text: string, source?: string,
 async function handlePromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	if (!text.trim()) return
 	if (agentLoop.isWorking(sessionId)) {
-		agentLoop.abort(sessionId, '')
-		await waitForIdle(sessionId)
+		const settled = agentLoop.abortAndWait(sessionId, '')
+		if (settled) await settled
 	}
 	if (!await amendLastPrompt(sessionId, text, source, displayText)) {
 		const canceled = sessionStore.cancelTailTurn(sessionId)
@@ -579,20 +599,7 @@ function handleCommand(cmd: Command): void {
 		}
 		case 'continue': {
 			if (!sessionId) return
-			void (async () => {
-				if (agentLoop.isWorking(sessionId)) {
-					if (agentLoop.hasPauseBeforeTools(sessionId)) return
-					agentLoop.abort(sessionId, '')
-					await Bun.sleep(50)
-				}
-				// Continuing resumes the paused turn that held the queue. If it completes,
-				// queued prompts should drain immediately instead of staying stuck behind
-				// the paused-turn safety hold.
-				if (shouldShowResumingNotice(sessionId)) emitInfo(sessionId, RESUMING_TEXT)
-				promptQueue.setHeld(sessionId, false)
-				await continuePendingTools(sessionId)
-				void runGeneration(sessionId, '')
-			})()
+			requestContinue(sessionId)
 			break
 		}
 		case 'pause-before-tools': {

@@ -36,14 +36,26 @@ const config = {
 	retryMaxTotalMs: 2 * 60 * 60 * 1000, // 2 hours
 	retryableStatuses: [429, 500, 503, 529],
 }
+type SettledRequest = {
+	promise: Promise<void>
+	resolve: () => void
+}
+
+function makeSettledRequest(): SettledRequest {
+	let resolve: () => void = () => {}
+	const promise = new Promise<void>((done) => { resolve = done })
+	return { promise, resolve }
+}
 
 // ── State ──
 
 const state = {
 	/** In-progress turn abort controllers, keyed by session ID. */
 	workingRequests: new Map<string, AbortController>(),
-	/** Info text to emit when an aborted turn finishes unwinding. */
-	abortTexts: new Map<string, string>(),
+	/** Completion signals for individual turns, including turns superseded in the map. */
+	settledRequests: new Map<AbortController, SettledRequest>(),
+	/** Info text to emit when a particular aborted turn finishes unwinding. */
+	abortTexts: new Map<AbortController, string>(),
 	/** Soft pause requests that stop at the next local tool batch boundary. */
 	pauseBeforeTools: new Set<string>(),
 }
@@ -366,21 +378,22 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		existing.abort()
 	}
 
-	// Register abort controller so external code can abort us
+	// Register abort controller so external code can abort us.
 	const ac = new AbortController()
 	state.workingRequests.set(sessionId, ac)
+	state.settledRequests.set(ac, makeSettledRequest())
 
-	// If caller passed a signal, propagate its abort to our controller
+	// If caller passed a signal, propagate its abort to our controller.
 	if (signal) {
 		if (signal.aborted) {
 			log.info('Agent loop skipped (signal already aborted)', { sessionId })
 			ac.abort()
-			return 'aborted'
+		} else {
+			signal.addEventListener('abort', () => {
+				log.info('Agent loop abort via parent signal', { sessionId })
+				ac.abort()
+			}, { once: true })
 		}
-		signal.addEventListener('abort', () => {
-			log.info('Agent loop abort via parent signal', { sessionId })
-			ac.abort()
-		}, { once: true })
 	}
 
 	const loopSignal = ac.signal
@@ -400,7 +413,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		let latestCommitLocLine: string | undefined
 
 		async function finishAborted(): Promise<void> {
-			const abortText = state.abortTexts.has(sessionId) ? (state.abortTexts.get(sessionId) ?? '') : DEFAULT_ABORT_TEXT
+			const abortText = state.abortTexts.has(ac) ? (state.abortTexts.get(ac) ?? '') : DEFAULT_ABORT_TEXT
 			if (abortText) emitInfo(sessionId, abortText)
 			const est = context.estimateContext(messages, model, overheadBytes)
 			emitEvent(sessionId, {
@@ -842,9 +855,15 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		// it is still ours; otherwise the older request would make the newer
 		// request look idle and later prompts would start concurrently.
 		if (state.workingRequests.get(sessionId) === ac) state.workingRequests.delete(sessionId)
-		state.abortTexts.delete(sessionId)
+		state.abortTexts.delete(ac)
 		clearPauseBeforeTools(sessionId)
-		await ctx.onStatus?.(false)
+		try {
+			await ctx.onStatus?.(false)
+		} finally {
+			const settled = state.settledRequests.get(ac)
+			state.settledRequests.delete(ac)
+			settled?.resolve()
+		}
 	}
 }
 
@@ -946,11 +965,21 @@ function abort(sessionId: string, text = DEFAULT_ABORT_TEXT): boolean {
 	const ac = state.workingRequests.get(sessionId)
 	if (ac) {
 		log.info('Agent loop explicit abort', { sessionId, text })
-		state.abortTexts.set(sessionId, text)
+		// An abort has one terminal history entry. The first requester owns its text
+		// so a later continuation cannot rewrite a visible pause into a silent one.
+		if (!state.abortTexts.has(ac)) state.abortTexts.set(ac, text)
 		ac.abort()
 		return true
 	}
 	return false
+}
+
+/** Abort the current turn and wait until that specific invocation has fully unwound. */
+function abortAndWait(sessionId: string, text = DEFAULT_ABORT_TEXT): Promise<void> | false {
+	const ac = state.workingRequests.get(sessionId)
+	if (!ac) return false
+	abort(sessionId, text)
+	return state.settledRequests.get(ac)?.promise ?? false
 }
 
 /** Check if a session has an working turn. */
@@ -963,6 +992,7 @@ export const agentLoop = {
 	state,
 	runAgentLoop,
 	abort,
+	abortAndWait,
 	resolveToolConfirmation,
 	isWorking,
 	requestPauseBeforeTools,

@@ -701,6 +701,56 @@ test('continue releases a held queue so completion drains it', async () => {
 	}
 })
 
+test('continue waits for an in-flight abort and coalesces duplicate requests', async () => {
+	const sessionId = `test-continue-after-abort-${Date.now().toString(36)}`
+	const origAbortAndWait = agentLoop.abortAndWait
+	const origIsWorking = agentLoop.isWorking
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origOwnsHostLock = ipc.ownsHostLock
+	let releaseAbort: () => void = () => {}
+	const abortSettled = new Promise<void>((resolve) => { releaseAbort = resolve })
+	let working = true
+	let aborts = 0
+	let runs = 0
+
+	try {
+		ipc.ownsHostLock = () => true
+		agentLoop.isWorking = () => working
+		agentLoop.abortAndWait = () => {
+			aborts++
+			return abortSettled
+		}
+		agentLoop.runAgentLoop = async () => {
+			runs++
+			return 'completed'
+		}
+		sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: '2026-05-20T00:00:00.000Z',
+			currentLog: 'history.asonl',
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.5',
+		})
+
+		runtime.handleCommand({ type: 'continue', sessionId })
+		runtime.handleCommand({ type: 'continue', sessionId })
+		await Bun.sleep(0)
+		expect(aborts).toBe(1)
+		expect(runs).toBe(0)
+
+		working = false
+		releaseAbort()
+		await Bun.sleep(10)
+		expect(runs).toBe(1)
+	} finally {
+		agentLoop.abortAndWait = origAbortAndWait
+		agentLoop.isWorking = origIsWorking
+		agentLoop.runAgentLoop = origRunAgentLoop
+		ipc.ownsHostLock = origOwnsHostLock
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
+
 
 test('continue records a resuming notice after a paused turn', async () => {
 	const sessionId = `test-continue-resuming-${Date.now().toString(36)}`

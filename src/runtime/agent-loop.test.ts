@@ -536,7 +536,49 @@ test('displaced generation cannot clear newer working request state', async () =
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		agentLoop.state.workingRequests.delete(sessionId)
-		agentLoop.state.abortTexts.delete(sessionId)
+		agentLoop.state.abortTexts.clear()
+	}
+})
+
+test('abortAndWait resolves only after its generation finishes', async () => {
+	const sessionId = `test-abort-wait-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const started = Promise.withResolvers<void>()
+	const release = Promise.withResolvers<void>()
+	const origGetProvider = providerLoader.getProvider
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			started.resolve()
+			await release.promise
+			yield { type: 'done' }
+		},
+	})
+
+	try {
+		const turn = agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [],
+		})
+		await started.promise
+
+		const settled = agentLoop.abortAndWait(sessionId, '')
+		expect(settled).not.toBe(false)
+		let didSettle = false
+		void (settled as Promise<void>).then(() => { didSettle = true })
+		await Bun.sleep(0)
+		expect(didSettle).toBe(false)
+
+		release.resolve()
+		expect(await turn).toBe('aborted')
+		await settled
+		expect(didSettle).toBe(true)
+	} finally {
+		providerLoader.getProvider = origGetProvider
 	}
 })
 
