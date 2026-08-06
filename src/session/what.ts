@@ -135,12 +135,6 @@ function attributionLines(sessionId: string, meta: SessionMeta, openSessionIds: 
 	return lines
 }
 
-function compactTargetLabel(sessionId: string, openSessionIds: string[]): string {
-	const openIndex = openSessionIds.indexOf(sessionId)
-	if (openIndex >= 0) return `tab ${openIndex + 1}`
-	return `session ${sessionId}`
-}
-
 function entryLine(sessionId: string, entry: HistoryEntry): string {
 	const ts = entry.ts ? ` ${entry.ts}` : ''
 	if (entry.type === 'user') {
@@ -312,13 +306,10 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 	return whatSummary.parseSummary(text)
 }
 
-// A summary may be read days later, out of context, so it states up front that it is
-// /what output and which session it describes.
-function formatSection(sessionId: string, result: SummaryResult, openSessionIds: string[]): string {
+function formatSection(sessionId: string, result: SummaryResult): string {
 	const meta = sessions.loadSessionMeta(sessionId)
 	const title = result.title || meta?.name || sessionId
-	const preamble = `You ran /what. This is a generated summary of earlier activity in ${compactTargetLabel(sessionId, openSessionIds)} (session ${sessionId}).`
-	return [`## /what summary: ${title}`, '', preamble, '', result.summary].join('\n')
+	return [`## /what summary: ${title}`, '', result.summary].join('\n')
 }
 
 function maybeNameSession(sessionId: string, title: string): boolean {
@@ -377,7 +368,7 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean; targetIds: st
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
 			const summary = await whatSummary.summarizeDigest(model, digest)
 			if (whatSummary.maybeNameSession(sessionId, summary.title)) renamed = true
-			persist(sessionId, [sessionId], formatSection(sessionId, summary, opts.openSessionIds))
+			persist(sessionId, [sessionId], formatSection(sessionId, summary))
 		} catch (err) {
 			persist(sessionId, [sessionId], [`## /what summary: ${sessionId}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
 		}
