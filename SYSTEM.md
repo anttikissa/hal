@@ -7,13 +7,13 @@ Prompt-file notes (this comment is removed before SYSTEM.md is sent to the model
     ::: if model="anthropic/*"
     - This line is included only for Anthropic models.
     :::
-  Names include model, cwd, hal_source, and the path variables below.
+  Names include agent, model, cwd, hal_source, and the path variables below.
 - HTML comments are maintenance notes; directive lines in an HTML comment do nothing.
 See src/runtime/system-prompt.ts and docs/system-prompt.md for load order, all variables,
 directive limits, substitutions, and the different treatment of project-file comments.
 -->
 
-<agent>hal</agent>
+<agent>${agent}</agent>
 <model>${model}</model>
 <cwd>${cwd}</cwd>
 <session_dir>${session_dir}</session_dir>

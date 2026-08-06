@@ -29,8 +29,8 @@
  * punctuation is literal. Values are double-quoted and cannot contain a double
  * quote. Directives have no else, negation, nesting, escaping, or Markdown/code-fence
  * awareness. A directive-shaped line in a code example is still a directive.
- * Unknown variables are empty strings. Available values are model, date, cwd,
- * hal_dir, state_dir, session_dir, and hal_source (`true` only within Hal's
+ * Unknown variables are empty strings. Available values are agent, model, date,
+ * cwd, hal_dir, state_dir, session_dir, and hal_source (`true` only within Hal's
  * canonical source tree).
  *
  * After selecting directives, `${name}` substitutions use those same variables.
@@ -206,6 +206,7 @@ function buildSystemPrompt(opts: {
 	sessionId?: string
 }): SystemPromptResult {
 	const model = opts.model ?? ''
+	const agent = 'hal'
 	const cwd = opts.cwd ?? process.cwd()
 	const sessionDir = opts.sessionId ? sessions.sessionDir(opts.sessionId) : ''
 	const currentHalDir = halDir()
@@ -215,6 +216,7 @@ function buildSystemPrompt(opts: {
 
 	// Variables available for substitution in agent files
 	const vars: Record<string, string> = {
+		agent,
 		model,
 		date,
 		cwd,
@@ -227,6 +229,7 @@ function buildSystemPrompt(opts: {
 	// Substitute ${var} placeholders
 	const sub = (s: string) =>
 		s
+			.replace(/\$\{agent\}/g, agent)
 			.replace(/\$\{model\}/g, model)
 			.replace(/\$\{cwd\}/g, cwd)
 			.replace(/\$\{date\}/g, date)

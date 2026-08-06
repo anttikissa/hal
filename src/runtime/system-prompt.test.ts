@@ -62,6 +62,12 @@ test('buildSystemPrompt omits the self-switch instruction inside the Hal source 
 	expect(projectPrompt).toContain(instruction)
 })
 
+test('substitutes the Hal agent identity', () => {
+	writeFileSync(join(tempDir, 'SYSTEM.md'), 'Agent: ${agent}')
+
+	expect(context.buildSystemPrompt({ cwd: tempDir }).text).toContain('Agent: hal')
+})
+
 test('directives treat non-glob pattern characters literally', () => {
 	writeFileSync(join(tempDir, 'SYSTEM.md'), [
 		'::: if model="openai/gpt-5.6"',
