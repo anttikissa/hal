@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { context } from './context.ts'
@@ -47,6 +47,15 @@ test('buildSystemPrompt reads updated SYSTEM.md contents', () => {
 	writeFileSync(join(tempDir, 'SYSTEM.md'), 'beta\n')
 
 	expect(context.buildSystemPrompt({ cwd, model: 'openai/gpt-5.4' }).text).toContain('beta')
+})
+
+test('buildSystemPrompt omits the self-switch instruction inside the Hal source tree', () => {
+	writeFileSync(join(tempDir, 'SYSTEM.md'), readFileSync(`${import.meta.dir}/../../SYSTEM.md`, 'utf-8'))
+	const elsewhere = join(tempDir, '..')
+	const instruction = 'If user asks a question about Hal itself'
+
+	expect(context.buildSystemPrompt({ cwd: tempDir }).text).not.toContain(instruction)
+	expect(context.buildSystemPrompt({ cwd: elsewhere }).text).toContain(instruction)
 })
 
 test('prompt watcher reports SYSTEM.md edits', async () => {

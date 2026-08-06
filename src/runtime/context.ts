@@ -1,8 +1,8 @@
 // Build the system prompt from SYSTEM.md plus the AGENTS.md / CLAUDE.md chain,
 // then provide lightweight sizing and watch helpers around that prompt.
 
-import { existsSync, readFileSync, watch } from 'fs'
-import { dirname } from 'path'
+import { existsSync, readFileSync, realpathSync, watch } from 'fs'
+import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { HAL_DIR, STATE_DIR } from '../state.ts'
 import { sessions } from '../server/sessions.ts'
 import { models } from '../models.ts'
@@ -52,6 +52,25 @@ function stateDir(): string {
 
 function systemPromptPath(): string {
 	return `${halDir()}/SYSTEM.md`
+}
+
+/** True when cwd is the Hal checkout or one of its descendants. */
+function isHalSource(cwd: string, currentHalDir: string): boolean {
+	let current = resolve(cwd)
+	let source = resolve(currentHalDir)
+	try {
+		// Resolve symlinks before comparing: a session may have entered the checkout
+		// through a symlink while HAL_DIR retains its canonical path.
+		current = realpathSync(current)
+		source = realpathSync(source)
+	} catch {
+		// A missing cwd cannot normally be a session directory; resolved paths still
+		// give the least surprising result to callers constructing a prompt manually.
+	}
+	const pathFromSource = relative(source, current)
+	if (pathFromSource === '') return true
+	if (pathFromSource === '..' || pathFromSource.startsWith(`..${sep}`)) return false
+	return !isAbsolute(pathFromSource)
 }
 
 /** Walk up from `from` to find the nearest .git directory. */
@@ -148,6 +167,7 @@ function buildSystemPrompt(opts: {
 	const sessionDir = opts.sessionId ? sessions.sessionDir(opts.sessionId) : ''
 	const currentHalDir = halDir()
 	const currentStateDir = stateDir()
+	const halSource = isHalSource(cwd, currentHalDir) ? 'true' : 'false'
 	const date = time.formatSystemDate()
 
 	// Variables available for substitution in agent files
@@ -158,6 +178,7 @@ function buildSystemPrompt(opts: {
 		hal_dir: currentHalDir,
 		state_dir: currentStateDir,
 		session_dir: sessionDir,
+		hal_source: halSource,
 	}
 
 	// Substitute ${var} placeholders
@@ -169,6 +190,7 @@ function buildSystemPrompt(opts: {
 			.replace(/\$\{hal_dir\}/g, currentHalDir)
 			.replace(/\$\{state_dir\}/g, currentStateDir)
 			.replace(/\$\{session_dir\}/g, sessionDir)
+			.replace(/\$\{hal_source\}/g, halSource)
 
 	const parts: string[] = []
 	const loaded: LoadedPromptFile[] = []
