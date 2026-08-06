@@ -14,7 +14,7 @@ import { sessions as sessionStore, type HistoryEntry, type SessionMeta, type Use
 import { commands } from '../runtime/commands.ts'
 import type { SessionState } from '../runtime/commands.ts'
 import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
-import { context } from '../runtime/context.ts'
+import { context } from '../runtime/system-prompt.ts'
 import { apiMessages } from '../session/api-messages.ts'
 import { attachments } from '../session/attachments.ts'
 import { sessionIds } from '../session/ids.ts'

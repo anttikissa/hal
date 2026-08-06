@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { context } from './context.ts'
+import { context } from './system-prompt.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 
 let tempDir = ''
@@ -54,8 +54,23 @@ test('buildSystemPrompt omits the self-switch instruction inside the Hal source 
 	const elsewhere = join(tempDir, '..')
 	const instruction = 'If user asks a question about Hal itself'
 
-	expect(context.buildSystemPrompt({ cwd: tempDir }).text).not.toContain(instruction)
-	expect(context.buildSystemPrompt({ cwd: elsewhere }).text).toContain(instruction)
+	const sourcePrompt = context.buildSystemPrompt({ cwd: tempDir }).text
+	const projectPrompt = context.buildSystemPrompt({ cwd: elsewhere }).text
+
+	expect(sourcePrompt).not.toContain(instruction)
+	expect(sourcePrompt).not.toContain('Prompt-file notes')
+	expect(projectPrompt).toContain(instruction)
+})
+
+test('directives treat non-glob pattern characters literally', () => {
+	writeFileSync(join(tempDir, 'SYSTEM.md'), [
+		'::: if model="openai/gpt-5.6"',
+		'exact model only',
+		':::',
+	].join('\n'))
+
+	const text = context.buildSystemPrompt({ cwd: tempDir, model: 'openai/gpt-5X6' }).text
+	expect(text).not.toContain('exact model only')
 })
 
 test('prompt watcher reports SYSTEM.md edits', async () => {

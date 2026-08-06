@@ -124,6 +124,12 @@ function agentWatchDirs(cwd: string): string[] {
 // ── Directive processing ──────────────────────────────────────────────────────
 // Supports ::: if key="glob" ... ::: conditional blocks in agent files.
 
+function globPattern(pattern: string): RegExp {
+	// Escape regex metacharacters, then translate the two supported glob wildcards.
+	// Prompt authors should not have to know regular-expression syntax.
+	const escaped = pattern.replace(/[\\^$+.()|[\]{}]/g, '\\$&')
+	return new RegExp(`^${escaped.replace(/\*/g, '.*').replace(/\?/g, '.')}$`)
+}
 function processDirectives(text: string, vars: Record<string, string>): string {
 	const lines = text.split('\n')
 	const out: string[] = []
@@ -135,7 +141,7 @@ function processDirectives(text: string, vars: Record<string, string>): string {
 			const key = open[1] ?? ''
 			const pattern = open[2] ?? ''
 			const val = vars[key] ?? ''
-			const re = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+			const re = globPattern(pattern)
 			skip = !re.test(val)
 			continue
 		}
