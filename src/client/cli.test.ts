@@ -438,6 +438,36 @@ test('up while working edits the visible latest prompt when local input history 
 	}
 })
 
+test('up while working does not copy an inbox handoff as a prompt', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		inputHistory: ['my prompt'],
+		history: [
+			{ type: 'user', text: 'my prompt' },
+			{ type: 'user', text: 'handoff from another tab', source: 'other-session' },
+		] as any[],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
+			expect(prompt.text()).toBe('my prompt')
+			expect(promptEdit.state.active).toMatchObject({ originalText: 'my prompt', mode: 'cancel' })
+			expect(tab.history[1]).toMatchObject({ source: 'other-session' })
+			expect((tab.history[1] as any)?.status).toBeUndefined()
+			expect(commands).toEqual([])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
+
 
 test('up on newline draft while working stays in the prompt', () => {
 	const commands: any[] = []

@@ -359,18 +359,21 @@ function handleRebaseResult(event: any): void {
 
 const SIDE_EFFECT_TOOL_NAMES = new Set(['bash', 'edit', 'write', 'eval', 'send', 'spawn_agent'])
 
+// Inbound messages are displayed as user blocks, but are not text typed in this
+// terminal. Never offer one for the previous-prompt edit shortcut.
 function lastUserBlock(tab: (typeof client.state.tabs)[number] | null): any | null {
 	if (!tab) return null
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]
-		if (block?.type === 'user') return block
+		if (block?.type === 'user' && !block.source) return block
 	}
 	return null
 }
 
 function blocksAfterLastUser(tab: (typeof client.state.tabs)[number]): any[] {
 	for (let i = tab.history.length - 1; i >= 0; i--) {
-		if (tab.history[i]?.type === 'user') return tab.history.slice(i + 1)
+		const block = tab.history[i]
+		if (block?.type === 'user' && !block.source) return tab.history.slice(i + 1)
 	}
 	return tab.history
 }
