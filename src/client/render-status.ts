@@ -511,6 +511,10 @@ function turnActivityStatusLabel(tab: Tab): string {
 			if (match) return `retrying in ${match[1]}`
 		}
 	}
+	// The final stream event precedes the working=false IPC update. Avoid briefly
+	// relabeling a completed response as processing during that cleanup gap.
+	const lastBlock = tab.history.at(-1)
+	if (lastBlock?.type === 'assistant' && !lastBlock.streaming) return ''
 
 	return 'processing'
 }

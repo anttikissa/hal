@@ -93,6 +93,16 @@ test('activityStatusLabel names visible working phases', () => {
 	}
 })
 
+test('activityStatusLabel clears after final assistant text while turn cleanup is pending', () => {
+	const origWorking = client.state.working
+	client.state.working = new Map([['04-new', true]])
+	try {
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'assistant', text: 'done', streaming: false }] }))).toBe('')
+	} finally {
+		client.state.working = origWorking
+	}
+})
+
 test('activityStatusLabel describes a prompt edit while its turn is pausing or paused', () => {
 	const origWorking = client.state.working
 	client.state.working = new Map([['04-new', true]])
