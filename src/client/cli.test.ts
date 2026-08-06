@@ -332,7 +332,7 @@ test('ctrl-f saves the current prompt draft before forking', () => {
 	}
 })
 
-test('alt-enter queues prompt without binding cmd-enter', () => {
+test('option-enter is passed to the prompt editor to insert a newline', () => {
 	const commands: any[] = []
 	const origAppendCommand = ipc.appendCommand
 	const tab = makeTab()
@@ -340,16 +340,13 @@ test('alt-enter queues prompt without binding cmd-enter', () => {
 
 	try {
 		withOneTab(tab, () => {
-			prompt.setText('do this next')
-			const queued = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: true, cmd: false })
-			expect(queued).toBe(true)
-			expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: 'do this next', delivery: 'queue' })])
-			expect(prompt.text()).toBe('')
+			prompt.setText('first line')
+			const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: true, cmd: false })
 
-			prompt.setText('cmd should not queue')
-			const cmdHandled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: true })
-			expect(cmdHandled).toBe(false)
-			expect(commands).toHaveLength(1)
+			expect(handled).toBe(false)
+			expect(prompt.handleKey(key('enter', { alt: true }), 80)).toBe(true)
+			expect(prompt.text()).toBe('first line\n')
+			expect(commands).toEqual([])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand
