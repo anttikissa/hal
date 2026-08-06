@@ -49,7 +49,7 @@ function sections(): ShortcutSection[] {
 				row('cmd-a', 'select all prompt text'),
 				row('cmd-c', 'copy selection'),
 				row('cmd-x', 'cut selection'),
-				row('cmd-v / ctrl-v', 'paste'),
+				row('cmd-v / ctrl-v', 'paste (ctrl-v to paste images)'),
 			],
 		},
 		{
