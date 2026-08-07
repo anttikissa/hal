@@ -41,6 +41,9 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 		const origAppendEvent = ipc.appendEvent
 		const origDispatch = toolRegistry.dispatch
 		let generations = 0
+		let releaseB: (() => void) | undefined
+		const bStarted = Promise.withResolvers<void>()
+		const aDone = Promise.withResolvers<void>()
 		providerLoader.getProvider = async () => ({
 			async *generate() {
 				generations++
@@ -53,21 +56,30 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 		})
 		ipc.appendEvent = (event: any) => {
 			events.push(event)
+			if (event.type === 'tool-result' && event.toolId === 'tool-a' && event.phase === 'done') aDone.resolve()
 		}
 		toolRegistry.dispatch = async (_name, input: any, context) => {
 			context.onOutput?.(Array.from({ length: 30 }, (_, index) => `${input.command}: line ${index + 1} ${'x'.repeat(20)}`).join('\n'))
-			await Bun.sleep(10)
+			if (input.command === 'printf b') {
+				bStarted.resolve()
+				await new Promise<void>((resolve) => { releaseB = resolve })
+			}
 			return `${input.command}: finished`
 		}
 
 		try {
-			await agentLoop.runAgentLoop({
+			const loop = agentLoop.runAgentLoop({
 				sessionId,
 				model: 'openai/gpt-5.4',
 				cwd: process.cwd(),
 				systemPrompt: 'test prompt',
 				messages: [{ role: 'user', content: 'run two commands' }],
 			})
+			await bStarted.promise
+			const aFinishedBeforeB = await Promise.race([aDone.promise.then(() => true), Bun.sleep(100).then(() => false)])
+			releaseB?.()
+			expect(aFinishedBeforeB).toBe(true)
+			await loop
 
 			for (const toolId of ['tool-a', 'tool-b']) {
 				const partial = events.findIndex((event) => event.type === 'tool-result' && event.toolId === toolId && event.phase === 'running')
