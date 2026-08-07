@@ -846,7 +846,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 	// prompt is empty, show it. This is how "client A quits with a
 	// draft on tab 10, client B picks it up" works.
 	client.setOnDraftArrived((text, savedEdit) => {
-		if (!prompt.text() && text) {
+		if (!prompt.text() && (text || savedEdit)) {
 			prompt.setText(text)
 			const tab = client.currentTab()
 			if (tab) tab.inputDraftEdit = savedEdit

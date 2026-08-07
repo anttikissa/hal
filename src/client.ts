@@ -344,7 +344,7 @@ function switchTab(index: number): void {
 		focusSession(tab.sessionId)
 		// Re-read draft from disk — another client may have saved one
 		const diskDraft = draftModule.loadDraftState(tab.sessionId)
-		if (diskDraft.text && !tab.inputDraft) {
+		if ((diskDraft.text || diskDraft.promptEdit) && !tab.inputDraft) {
 			tab.inputDraft = diskDraft.text
 			tab.inputDraftEdit = diskDraft.promptEdit
 		}

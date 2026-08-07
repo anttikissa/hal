@@ -7,6 +7,7 @@ import { render } from './render.ts'
 import { cursor } from '../cli/cursor.ts'
 import { popup } from './popup.ts'
 import { promptEdit } from './prompt-edit.ts'
+import { draft } from '../cli/draft.ts'
 
 function key(key: string, mods: any = {}): any {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
@@ -619,6 +620,36 @@ test('down from restored just-sent edit continues the original prompt', () => {
 	} finally {
 		ipc.appendCommand = origAppendCommand
 		promptEdit.cancel()
+	}
+})
+
+test('tab switch loads empty draft when prompt-edit metadata exists', () => {
+	const origLoadDraftState = draft.loadDraftState
+	const origTabs = client.state.tabs.slice()
+	const origFocusedTab = client.state.focusedTabIndex
+	const tab1 = makeTab({ sessionId: 's1' })
+	const tab2 = makeTab({ sessionId: 's2' })
+
+	draft.loadDraftState = () => ({
+		text: '',
+		savedAt: '',
+		promptEdit: { mode: 'cancel', originalText: 'original prompt', pausedWorkingTurn: true },
+	})
+
+	try {
+		client.state.tabs.length = 0
+		client.state.tabs.push(tab1, tab2)
+		client.state.focusedTabIndex = 0
+
+		client.switchTab(1)
+
+		expect(tab2.inputDraft).toBe('')
+		expect(tab2.inputDraftEdit).toMatchObject({ mode: 'cancel', originalText: 'original prompt' })
+	} finally {
+		draft.loadDraftState = origLoadDraftState
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.focusedTabIndex = origFocusedTab
 	}
 })
 
