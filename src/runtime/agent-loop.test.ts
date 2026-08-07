@@ -30,6 +30,30 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
 })
 
+	test('settles unstarted tool calls when a batch is aborted', async () => {
+		const sessionId = `test-aborted-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+		createdSessions.push(sessionId)
+		await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+		const events: any[] = []
+		const origAppendEvent = ipc.appendEvent
+		const ac = new AbortController()
+		ac.abort()
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		try {
+			const results = await agentLoop.executeToolBatch(sessionId, [
+				{ id: 'tool-a', name: 'bash', input: { command: 'one' } },
+				{ id: 'tool-b', name: 'eval', input: { code: 'two' } },
+			], process.cwd(), ac.signal)
+			expect(results).toEqual([
+				{ call: { id: 'tool-a', name: 'bash', input: { command: 'one' } }, result: '[interrupted]', blobId: expect.any(String) },
+				{ call: { id: 'tool-b', name: 'eval', input: { code: 'two' } }, result: '[interrupted]', blobId: expect.any(String) },
+			])
+			expect(events.filter((event) => event.type === 'tool-result' && event.phase === 'done').map((event) => event.toolId)).toEqual(['tool-a', 'tool-b'])
+		} finally {
+			ipc.appendEvent = origAppendEvent
+		}
+	})
+
 
 	test('streams partial output for each concurrent tool call', async () => {
 		const sessionId = `test-tool-output-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`

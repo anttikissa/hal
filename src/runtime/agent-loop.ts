@@ -905,7 +905,14 @@ async function executeToolsConcurrently(
 
 	// Process in batches of maxToolConcurrency
 	for (let i = 0; i < toolCalls.length; i += config.maxToolConcurrency) {
-		if (signal.aborted) break
+		if (signal.aborted) {
+			for (const call of toolCalls.slice(i)) {
+				const result = '[interrupted]'
+				await onDone?.(call, result)
+				results.push({ call, result })
+			}
+			break
+		}
 		const batch = toolCalls.slice(i, i + config.maxToolConcurrency)
 		const batchResults = await Promise.all(
 			batch.map(async (call) => {
