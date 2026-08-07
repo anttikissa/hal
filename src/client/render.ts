@@ -188,6 +188,37 @@ function repaintVisibleScreen(lines: string[], cursor: { row: number; col: numbe
 	prevLines = lines
 	writeTerminal(out.join(''))
 }
+
+function repaintFullscreenGrowth(lines: string[], cursor: { row: number; col: number }, rows: number): void {
+	const growth = lines.length - prevLines.length
+	const oldViewportTop = Math.max(0, prevLines.length - rows)
+	const viewportTop = Math.max(0, lines.length - rows)
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
+
+	// Rows about to enter scrollback must already contain their current values.
+	// Terminals cannot repair them afterward, and repainting the whole longer tail
+	// first would instead scroll stale copies of its changed prefix.
+	out.push(moveCursor(cursorRow, oldViewportTop), '\r')
+	for (let i = oldViewportTop; i < viewportTop; i++) {
+		if (i > oldViewportTop) out.push('\r\n')
+		out.push(`${CSI}2K${lines[i]!}`)
+	}
+
+	// Advance exactly the newly-needed rows from the old final frame row. This
+	// preserves the freshly-updated prefix in scrollback and leaves a viewport
+	// that can be safely repainted in place.
+	out.push(moveCursor(viewportTop - 1, prevLines.length - 1))
+	for (let i = 0; i < growth; i++) out.push('\r\n')
+	out.push(moveCursor(lines.length - 1, viewportTop), '\r')
+	for (let i = viewportTop; i < lines.length; i++) {
+		if (i > viewportTop) out.push('\r\n')
+		out.push(`${CSI}2K${lines[i]!}`)
+	}
+	out.push(positionCursor(lines.length - 1, cursor))
+	out.push(`${CSI}?2026l`)
+	prevLines = lines
+	writeTerminal(out.join(''))
+}
 function draw(force = false): void {
 	if (terminalOutput.isExternalEditorOpen()) return
 	const rows = process.stdout.rows || 24
@@ -247,11 +278,16 @@ function draw(force = false): void {
 	// live viewport so we only redraw what can actually be updated in-place.
 	const viewportTop = Math.max(0, prevLines.length - rows)
 	const frameShrunk = lines.length < prevLines.length
+	const frameGrew = lines.length > prevLines.length
 	// A shrink changes which logical frame row belongs at the viewport top.
 	// Patching only the changed bottom rows leaves the old viewport anchored and
 	// produces a blank row below the help bar, so repaint the visible screen.
 	if (fullscreen && frameShrunk && first !== -1) {
 		repaintVisibleScreen(lines, cursor)
+		return
+	}
+	if (fullscreen && frameGrew && lines.length > rows && first >= 0 && first < prevLines.length) {
+		repaintFullscreenGrowth(lines, cursor, rows)
 		return
 	}
 	if (first !== -1 && first < viewportTop) {

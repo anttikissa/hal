@@ -64,4 +64,28 @@ describe('render fullscreen growth', () => {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
 	})
+
+	test('advances the viewport before repainting changed rows in a growing fullscreen frame', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 40, configurable: true })
+		try {
+			tab.history.push({ type: 'assistant', text: 'old text', streaming: true })
+			captureOutput(() => render.draw())
+
+			;(tab.history[0] as any).streaming = false
+			tab.history.push({ type: 'tool', name: 'read', input: { path: 'a' } })
+			const output = captureOutput(() => render.draw())
+
+			// Advance the newly-needed rows at the old frame bottom first, then paint
+			// the new viewport; otherwise rewriting the longer tail scrolls stale
+			// copies of the changed assistant block into terminal scrollback.
+			expect(output).toMatch(/\x1b\[\d+B(?:\r\n)+\x1b\[\d+A\r/)
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
 })

@@ -231,8 +231,11 @@ snaps a user who scrolled up back to the bottom. This was the exact regression:
 streaming output occasionally shrank/reflowed and a fullscreen force repaint
 cleared scrollback while the user was reading earlier text.
 
-Frame growth in fullscreen is OK — new lines at the bottom scroll naturally via
-`\r\n`, and changed lines are usually in or near the live viewport.
+Frame growth in fullscreen is straightforward only when it is a pure append: new
+lines at the bottom scroll naturally via `\r\n`. If a pre-existing visible row also
+changes, first repaint the rows that will scroll off, then advance by the growth
+and repaint the new viewport. Rewriting the whole longer tail first scrolls stale
+copies of the changed prefix into immutable scrollback.
 
 ### 10. Kitty keyboard protocol
 
