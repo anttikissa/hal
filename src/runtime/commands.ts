@@ -833,7 +833,7 @@ handlers['cd'] = (args, session) => {
 	const target = resolve(session.cwd, parsed.path!)
 
 	if (!existsSync(target)) {
-		return { error: `cd failed: ${target}: not found`, handled: true }
+		return { error: `${target} not found. Would you like to create that directory and then /cd into it?`, handled: true }
 	}
 
 	const old = session.cwd

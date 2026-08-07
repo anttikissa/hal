@@ -708,6 +708,19 @@ test('/cd changes session cwd without command metadata', async () => {
 })
 
 
+test('/cd offers to create a missing directory', async () => {
+	const session = makeSession()
+	const target = join(tmpdir(), `hal-cd-missing-${crypto.randomUUID()}`)
+	const result = await commands.executeCommand(`/cd ${target}`, session)
+
+	expect(result).toEqual({
+		error: `${target} not found. Would you like to create that directory and then /cd into it?`,
+		handled: true,
+	})
+	expect(session.cwd).toBe(process.cwd())
+})
+
+
 test('/cd accepts paths with shell-style quoting and escapes', async () => {
 	const root = mkdtempSync(join(tmpdir(), 'hal-cd-spaces-'))
 	const dir = join(root, 'Mobile Documents')
