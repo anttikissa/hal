@@ -10,6 +10,7 @@ import { models } from '../models.ts'
 import { ipc } from '../ipc.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
+import { paths } from '../utils/paths.ts'
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -34,6 +35,7 @@ const origOwnsHostLock = ipc.ownsHostLock
 
 const origRefreshModels = models.refreshModels
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
+const origLoadSessionMeta = sessionStore.loadSessionMeta
 const origLoadAllHistory = sessionStore.loadAllHistory
 const origLoadLive = sessionStore.loadLive
 const origColumnsDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'columns')
@@ -80,6 +82,7 @@ afterEach(() => {
 	version.state.repoDir = origVersionState.repoDir
 	models.refreshModels = origRefreshModels
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
+	sessionStore.loadSessionMeta = origLoadSessionMeta
 	sessionStore.loadAllHistory = origLoadAllHistory
 	sessionStore.loadLive = origLoadLive
 	if (origColumnsDescriptor) Object.defineProperty(process.stdout, 'columns', origColumnsDescriptor)
@@ -88,6 +91,14 @@ afterEach(() => {
 	if (origVisual === undefined) delete process.env.VISUAL
 	else process.env.VISUAL = origVisual
 	rmSync('/tmp/some.txt', { force: true })
+})
+
+test('/history reports the active session history log', async () => {
+	sessionStore.loadSessionMeta = () => ({ id: '04-aaa', createdAt: '2026-06-10T12:00:00.000Z', currentLog: 'history3.asonl' })
+
+	const result = await commands.executeCommand('/history', makeSession())
+
+	expect(result).toEqual({ handled: true, output: `History: ${paths.historyDisplayPath('04-aaa', 'history3.asonl')}` })
 })
 
 test('/send resolves a tab number', async () => {

@@ -24,6 +24,7 @@ import { authLogin } from '../auth-login.ts'
 import { isPidAlive } from '../utils/is-pid-alive.ts'
 import type { SharedClientInfo } from '../ipc.ts'
 import { modelRefresh } from '../model-refresh.ts'
+import { paths } from '../utils/paths.ts'
 
 // ── Types ──
 
@@ -120,6 +121,7 @@ const workingSafeCommands = new Set([
 	'check',
 	'fork',
 	'help',
+	'history',
 	'mem',
 	'move',
 	'open',
@@ -355,6 +357,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	resume: { usage: '[<target>]', summary: 'Resume a closed session.', detail: 'With no target, lists recently closed sessions.' },
 	tabs: { usage: '[--all]', summary: 'List open tabs; use --all to include closed sessions.' },
 	compact: { summary: 'Summarize conversation to reduce context.' },
+	history: { summary: 'Show the active session history file.' },
 	rebase: { summary: 'Rewrite session history (similar to `git rebase -i`).' },
 	status: { summary: 'Show Anthropic / OpenAI subscription usage.', detail: 'Shows usage for all configured accounts.' },
 	login: {
@@ -414,7 +417,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 
 const commandSections: CommandSection[] = [
 	{ title: 'Common', names: ['exit', 'help', 'model', 'pause', 'quit', 'status'] },
-	{ title: 'Conversation', names: ['clear', 'compact', 'rebase', 'system'] },
+	{ title: 'Conversation', names: ['clear', 'compact', 'history', 'rebase', 'system'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
 	{ title: 'Setup & diagnostics', names: ['cd', 'check', 'clients', 'config', 'login', 'mem'] },
@@ -545,6 +548,12 @@ handlers['clear'] = (_args, session) => {
 		sessionId: session.id,
 	})
 	return { handled: true }
+}
+
+// /history — show the active log, which may rotate after /clear or a rebase.
+handlers['history'] = (_args, session) => {
+	const logName = sessionStore.loadSessionMeta(session.id)?.currentLog
+	return { output: `History: ${paths.historyDisplayPath(session.id, logName)}`, handled: true }
 }
 
 handlers['pause'] = (_args, session) => {
