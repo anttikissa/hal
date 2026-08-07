@@ -24,6 +24,36 @@ Bottom-anchored sections:
 
 Chrome = tab bar + prompt box + status + help bar.
 
+### Horizontal box model
+
+Every section — history blocks, prompt, status, help — uses the same one
+column of padding on each side. For a terminal of `cols` columns:
+
+```
+col 0          left padding (always blank)
+col 1..cols-2  content — text starts and ends here
+col cols-1     right padding (always blank)
+```
+
+So content width is `cols - 2`, and no text may occupy the last column.
+Backgrounds still paint the full row, including both padding columns; it is
+only the *text* that stops short. Getting this wrong is very visible: blocks
+whose text runs to the right edge look wrong next to the prompt, which has
+always had the margin.
+
+Two painters implement this, and they are deliberately not shared:
+
+- `bgLine()` in `src/cli/blocks.ts` fills the rest of the row with `CSI K`
+  (erase to end of line) while the background color is active. History is
+  append-only and fully rewritten by the diff engine on every paint, so this
+  is far cheaper than emitting explicit spaces.
+- `paddedLine()` in `src/client/render-status.ts` pads with real spaces,
+  because chrome rows compose segments with different backgrounds and `CSI K`
+  would flood the row with whichever background happened to be active.
+
+Do not "unify" these into one helper with a mode flag: it adds code and slows
+down the hottest repaint path. Do keep their widths in agreement.
+
 ## Tabs
 
 Each tab has its own history. Ctrl-T opens, Ctrl-W closes, Ctrl-N/P switches.
