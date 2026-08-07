@@ -227,18 +227,29 @@ function tryOpenBrowser(url: string): void {
 	} catch {}
 }
 
-// Persist tokens. Overwrites the existing single entry for now; multi-account add
-// will land in a follow-up. We go through auth.store() so the in-memory cache and
-// liveFile watcher both stay consistent.
+// Persist new tokens without discarding separately authenticated accounts. OpenAI's
+// JWT accountId and Anthropic's profile email are their respective stable identities.
 function saveAuth(provider: 'anthropic' | 'openai', entry: Record<string, any>): void {
 	const s = auth.store()
 	const existing = s[provider]
-	if (Array.isArray(existing) && existing.length > 0) {
-		// Merge into first entry, preserving extra fields not set by the new login.
-		existing[0] = { ...existing[0], ...entry }
+	const identityField = provider === 'openai' ? 'accountId' : 'email'
+	const identity = entry[identityField]
+	const hasIdentity = typeof identity === 'string' && identity.length > 0
+
+	if (Array.isArray(existing)) {
+		let matchIndex = -1
+		if (hasIdentity) matchIndex = existing.findIndex((candidate) => candidate?.[identityField] === identity)
+		if (matchIndex >= 0) existing[matchIndex] = { ...existing[matchIndex], ...entry }
+		else existing.push(entry)
 		s[provider] = existing
+	} else if (existing) {
+		if (hasIdentity && existing[identityField] === identity) {
+			s[provider] = { ...existing, ...entry }
+		} else {
+			s[provider] = [existing, entry]
+		}
 	} else {
-		s[provider] = { ...(existing ?? {}), ...entry }
+		s[provider] = entry
 	}
 	liveFiles.save(s)
 }
@@ -248,4 +259,5 @@ export const authLogin = {
 	startAnthropic,
 	finishAnthropic,
 	loginOpenai,
+	saveAuth,
 }
