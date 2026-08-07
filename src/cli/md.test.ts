@@ -57,6 +57,20 @@ test('mdInline: star inside backtick code is not italic', () => {
 	expect(r).toContain('*')
 })
 
+test('mdInline: backslash stays literal inside inline code', () => {
+	const source = 'Git receives `\\` then `n`.'
+	const colors = {
+		bold: ['', ''] as [string, string],
+		italic: ['', ''] as [string, string],
+		code: ['<', '>'] as [string, string],
+	}
+	expect(md.mdInline(source, colors)).toBe('Git receives <\\> then <n>.')
+})
+
+test('mdInline: escaped backtick stays literal outside code', () => {
+	expect(md.mdInline('escape \\` marker')).toBe('escape ` marker')
+})
+
 
 test('mdInline: escaped stars stay literal', () => {
 	const r = md.mdInline('a\\*\\*\\*@g\\*\\*\\*\\*.com')

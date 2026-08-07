@@ -110,11 +110,11 @@ function mdInline(line: string, colors?: MdColors): string {
 	const escaped: string[] = []
 	const ph = (i: number) => `\x00E${i}\x00`
 
-	// Protect escaped markdown markers so later regexes treat them as literals.
-	// This fixes values like a\*\*\*@g\*\*\*\*.com inside markdown tables.
-	line = line.replace(/\\([\\`*#])/g, (_, ch) => {
+	// Code spans come first because Markdown treats backslashes in them literally.
+	line = line.replace(/`[^`\n]+`|\\([\\`*#])/g, (match, marker) => {
+		if (!marker) return match
 		const i = escaped.length
-		escaped.push(ch)
+		escaped.push(marker)
 		return ph(i)
 	})
 
