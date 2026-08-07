@@ -716,9 +716,15 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					historyEntries.push(assistantEntry)
 				}
 				if (terminalErrorEntry) historyEntries.push(terminalErrorEntry)
+				let emptyResponseMessage = ''
+				if (!thinkingText && !assistantText && serverToolHistory.length === 0 && !terminalErrorEntry) {
+					emptyResponseMessage = 'Provider returned an empty response. Please retry.'
+					historyEntries.push({ type: 'log', text: emptyResponseMessage, ts })
+				}
 				if (historyEntries.length > 0) {
 					await sessions.appendHistory(sessionId, historyEntries)
 				}
+				if (emptyResponseMessage) emitInfo(sessionId, emptyResponseMessage)
 
 				if (assistantText) {
 					emitEvent(sessionId, { type: 'response', text: assistantText, model })

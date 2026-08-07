@@ -262,6 +262,47 @@ test('completed final response does not remain in live scratch state', async () 
 	}
 })
 
+test('logs an empty completed provider response so the user can retry', async () => {
+	const sessionId = `test-empty-response-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'done', usage: { input: 1, output: 4, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'answer me' }],
+		})
+		expect(result).toBe('completed')
+		expect(events).toContainEqual(expect.objectContaining({
+			type: 'info',
+			text: 'Provider returned an empty response. Please retry.',
+		}))
+		expect(sessions.loadHistory(sessionId)).toContainEqual(expect.objectContaining({
+			type: 'log',
+			text: 'Provider returned an empty response. Please retry.',
+		}))
+		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'completed' })
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+	}
+})
+
 test('writes thinking blobs while streaming and replays them into API history', async () => {
 	const sessionId = `test-thinking-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
