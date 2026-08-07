@@ -1122,6 +1122,41 @@ test('spawnSession forks with the parent context usage immediately', async () =>
 	}
 })
 
+test('spawnSession canonicalizes a bare discovered model override', async () => {
+	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-model-'))
+	const prevState = process.env.HAL_STATE_DIR
+	const prevModelCache = models.state.cache
+	process.env.HAL_STATE_DIR = base
+	const { sessions } = await import('./sessions.ts')
+
+	try {
+		models.state.cache = { 'claude-opus-5': 1_000_000 }
+		await sessions.createSession('04-parent', {
+			id: '04-parent',
+			workingDir: '/work/parent',
+			createdAt: '2026-04-14T12:00:00.000Z',
+			model: 'openai/gpt-5',
+		})
+		const parent = sessions.loadSessionMeta('04-parent')!
+
+		const child = await runtime.spawnSession(parent, {
+			task: 'Continue from here',
+			kind: 'subagent',
+			mode: 'fork',
+			model: 'claude-opus-5',
+			childSessionId: '04-child',
+		})
+
+		expect(child.model).toBe('anthropic/claude-opus-5')
+		expect(sessions.loadSessionMeta(child.id)?.model).toBe('anthropic/claude-opus-5')
+	} finally {
+		models.state.cache = prevModelCache
+		rmSync(base, { recursive: true, force: true })
+		if (prevState === undefined) delete process.env.HAL_STATE_DIR
+		else process.env.HAL_STATE_DIR = prevState
+	}
+})
+
 
 test('startSpawnedSession dispatches the child prompt directly', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))

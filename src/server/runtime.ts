@@ -180,6 +180,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
 	// Resolve model/cwd before creating the tab so the opening summary banner
 	// (written during creation) reports the spawned model, not the default.
+	const model = models.resolveModel(spec.model || parent.model || models.defaultModel())
 	const child = tabs.createSessionTab(
 		mode === 'fork'
 			? { sourceId: parent.id, sessionId: spec.childSessionId, focus: false }
@@ -187,12 +188,11 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 				afterId: parent.id,
 				sessionId: spec.childSessionId,
 				workingDir: spec.cwd || parent.workingDir || process.cwd(),
-				model: spec.model || parent.model || models.defaultModel(),
+				model,
 				focus: false,
 			},
 	)
 	const workingDir = spec.cwd || child.workingDir || process.cwd()
-	const model = spec.model || child.model || models.defaultModel()
 	const name = spec.title || child.name
 	sessionStore.updateMeta(child.id, {
 		workingDir,
