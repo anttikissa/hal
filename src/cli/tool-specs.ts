@@ -185,11 +185,11 @@ function formatCommitOutput(output: string, _cols: number): ToolFormatResult {
 		lines.push('', 'Code')
 		for (const file of code) lines.push(fileStatLine(file))
 	}
-	const hasNetLoc = meta.locDelta !== undefined || meta.locDeltaCode !== undefined
 	const total = meta.locDelta ?? meta.locAdded ?? 0
 	const codeTotal = meta.locDeltaCode ?? meta.locAddedCode ?? 0
-	const locLabel = hasNetLoc ? 'Net LOC' : 'Added LOC'
-	lines.push('', resolveMarkers([md.mdInline(`${locLabel}: ${signed(total)} total, **${signed(codeTotal)} excluding tests**`)])[0]!)
+	// Code LOC leads because that is the number under budget; the with-tests
+	// figure trails in parentheses as context.
+	lines.push('', resolveMarkers([md.mdInline(`LOC: **${signed(codeTotal)}** (with tests, ${signed(total)})`)])[0]!)
 	return { bodyLines: lines, suppressOutput: true }
 }
 

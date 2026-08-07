@@ -120,14 +120,7 @@ function blockContent(block: Block, cols: number): string[] {
 		block.type === 'warning' ||
 		block.type === 'error'
 	) {
-		const lines = renderMarkdownLines(block, cols)
-		// Commit LOC summary: our own footnote, set apart by a blank line so it
-		// reads as metadata rather than as part of what the model wrote.
-		if (block.type === 'assistant' && block.loc) {
-			if (lines.length > 0) lines.push('')
-			lines.push(...wordWrap(md.mdInline(block.loc), cols))
-		}
-		return lines
+		return renderMarkdownLines(block, cols)
 	}
 	if (block.type === 'tool') {
 		const lines: string[] = []

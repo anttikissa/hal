@@ -65,24 +65,6 @@ const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) 
 
 const DEFAULT_ABORT_TEXT = '[paused]'
 
-function signed(n: number): string {
-	return n > 0 ? `+${n}` : String(n)
-}
-
-function commitLocLine(output: string): string | undefined {
-	const match = output.match(/\[hal-commit\]\n([\s\S]*?)\n\[\/hal-commit\]/)
-	if (!match) return undefined
-	try {
-		const meta = ason.parse(match[1]!) as any
-		const code = meta.locDeltaCode ?? meta.locAddedCode
-		const total = meta.locDelta ?? meta.locAdded
-		if (!Number.isFinite(code) || !Number.isFinite(total)) return undefined
-		return `LOC: ${signed(code)} excluding tests (${signed(total)} total)`
-	} catch {
-		return undefined
-	}
-}
-
 function parseResetsInSeconds(body: string | undefined): number | undefined {
 	if (!body) return undefined
 	try {
@@ -428,7 +410,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		let retryAttempt = 0
 		let retryStartedAt = 0
 		let hadTerminalError = false
-		let latestCommitLocLine: string | undefined
 
 		async function finishAborted(): Promise<void> {
 			const abortText = state.abortTexts.has(ac) ? (state.abortTexts.get(ac) ?? '') : DEFAULT_ABORT_TEXT
@@ -705,12 +686,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					})
 				}
 				for (const entry of serverToolHistory) historyEntries.push(entry)
-				// The LOC summary is presentation only: it lives in its own field so it
-				// never enters the provider message, where the model would read it back
-				// and start imitating it in its own prose.
-				if (assistantText || latestCommitLocLine) {
+				if (assistantText) {
 					const assistantEntry: any = { type: 'assistant', text: assistantText, model, ts }
-					if (latestCommitLocLine) assistantEntry.loc = latestCommitLocLine
 					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
 					historyEntries.push(assistantEntry)
 				}
@@ -725,10 +702,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				}
 				if (emptyResponseMessage) emitInfo(sessionId, emptyResponseMessage)
 
-				if (assistantText || latestCommitLocLine) {
-					const response: any = { type: 'response', text: assistantText, model }
-					if (latestCommitLocLine) response.loc = latestCommitLocLine
-					emitEvent(sessionId, response)
+				if (assistantText) {
+					emitEvent(sessionId, { type: 'response', text: assistantText, model })
 				}
 				// response events update live.ason for crash/restart recovery while a turn is active.
 				// Once the same response is durable history, live must be cleared last or the
@@ -842,8 +817,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					role: 'user',
 					content: [{ type: 'tool_result', tool_use_id: call.id, content: result }],
 				})
-				const locLine = commitLocLine(result)
-				if (locLine) latestCommitLocLine = locLine
 			}
 
 			await ctx.onStatus?.(true)

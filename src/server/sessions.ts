@@ -77,8 +77,6 @@ export type HistoryEntry = EntryIdentity & (
 			model?: string
 			continue?: string
 			usage?: PartialTokenUsage
-			/** Commit LOC summary. UI only — never sent to the provider. */
-			loc?: string
 			synthetic?: boolean
 			syntheticKind?: string
 			visibility?: 'ui'
@@ -159,7 +157,7 @@ function makeEntryId(used = new Set<string>()): string {
 const historyTopLevelKeys = new Set([
 	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled',
 	'blobId', 'signature', 'model', 'thinkingEffort',
-	'continue', 'usage', 'loc', 'abortText', 'synthetic', 'syntheticKind',
+	'continue', 'usage', 'abortText', 'synthetic', 'syntheticKind',
 	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
 	'level', 'visibility', 'ui', 'parent', 'child', 'log', 'from', 'to',
 ])

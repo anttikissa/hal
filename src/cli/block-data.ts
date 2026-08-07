@@ -20,7 +20,7 @@ type NoticeBlock<T extends 'log' | 'info' | 'warning' | 'fork'> = { type: T } & 
 
 export type Block =
 	| ({ type: 'user'; source?: string; status?: string; actualText?: string } & TextBlock)
-	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean; synthetic?: boolean; syntheticKind?: string; loc?: string } & TextBlock)
+	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean; synthetic?: boolean; syntheticKind?: string } & TextBlock)
 	| ({ type: 'thinking'; model?: string; thinkingEffort?: string; streaming?: boolean } & TextBlock & BlobRef)
 	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string; running?: boolean } & BlockBase & BlobRef)
 	| NoticeBlock<'log'>
@@ -101,7 +101,6 @@ function historyToBlocks(
 					text: entry.text,
 					model: entry.model ?? initialModel,
 					continue: entry.continue,
-					loc: entry.loc,
 					synthetic: entry.synthetic,
 					syntheticKind: entry.syntheticKind,
 					ts,

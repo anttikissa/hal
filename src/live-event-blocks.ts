@@ -68,7 +68,6 @@ function applyAssistantResponse(blocks: any[], event: any, sessionId: string | u
 	const last = blocks[blocks.length - 1] ?? null
 	if (last?.type === 'assistant' && last.streaming && event.text.startsWith(last.text)) {
 		last.text = event.text
-		if (event.loc) last.loc = event.loc
 		if (!last.model) last.model = event.model ?? defaultModel
 		if (!last.ts) last.ts = ts
 		delete last.streaming
@@ -76,23 +75,11 @@ function applyAssistantResponse(blocks: any[], event: any, sessionId: string | u
 		onChange?.()
 		return { changed: true }
 	}
-	// Same text already shown, but the LOC summary arrives with the final
-	// response event, so attach it to the block that is already there.
-	if (trailingAssistantText(blocks) === event.text) {
-		const closed = closeStreamingBlock(blocks, onChange)
-		if (!event.loc) return { changed: closed }
-		const target = blocks[blocks.length - 1]
-		if (target?.type !== 'assistant') return { changed: closed }
-		target.loc = event.loc
-		touchBlock?.(target)
-		onChange?.()
-		return { changed: true }
-	}
+	if (trailingAssistantText(blocks) === event.text) return { changed: closeStreamingBlock(blocks, onChange) }
 	closeStreamingBlock(blocks, onChange)
 	blocks.push({
 		type: 'assistant',
 		text: event.text,
-		loc: event.loc,
 		model: event.model ?? defaultModel,
 		synthetic: event.synthetic === true,
 		sessionId,
