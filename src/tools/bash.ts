@@ -279,7 +279,9 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 
 	// Build output string
 	if (ctx.signal?.aborted) {
-		return truncateOutput(out + (stderr ? '\n' + stderr : '') + '\n[interrupted]')
+		if (stderr) out += (out && !out.endsWith('\n') ? '\n' : '') + stderr
+		if (out && !out.endsWith('\n')) out += '\n'
+		return truncateOutput(out + '[interrupted]')
 	}
 	if (stderr) out += (out ? '\n' : '') + stderr
 	if (code !== 0) out += `\n[exit ${code}]`

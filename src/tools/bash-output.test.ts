@@ -132,3 +132,14 @@ test('bash reports output before the command finishes', async () => {
 	expect(updates).toContain('first')
 	expect(await command).toBe('firstsecond')
 })
+
+test('bash interruption without output has no leading blank line', async () => {
+	const controller = new AbortController()
+	const command = bash.execute(
+		{ command: 'sleep 30' },
+		{ sessionId: 's', cwd: process.cwd(), signal: controller.signal },
+	)
+	controller.abort()
+
+	expect(await command).toBe('[interrupted]')
+})
