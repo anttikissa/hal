@@ -17,7 +17,7 @@ import { toolSpecs } from './tool-specs.ts'
 const blockConfig = {
 	tabWidth: 4,
 	blobBatchSize: 64,
-	maxToolOutputLines: 20,
+	maxToolOutputLines: 16,
 	maxEditDiffLines: 3,
 }
 

@@ -78,6 +78,16 @@ test('tool output truncation keeps tail by default', () => {
 })
 
 
+test('default tool output tail shows 16 lines', () => {
+	const output = Array.from({ length: 17 }, (_, index) => `line ${index + 1}`).join('\n')
+	const clean = blocks.renderBlock({ type: 'tool', name: 'bash', output }, 80).map(stripAnsi)
+	expect(clean.some((line) => line.trim() === '[+ 1 lines]')).toBe(true)
+	expect(clean.some((line) => line.trim() === 'line 1')).toBe(false)
+	expect(clean.some((line) => line.trim() === 'line 2')).toBe(true)
+	expect(clean.some((line) => line.trim() === 'line 17')).toBe(true)
+})
+
+
 test('search tool output truncation keeps head', () => {
 	const oldMax = blocks.config.maxToolOutputLines
 	blocks.config.maxToolOutputLines = 2

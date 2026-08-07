@@ -24,7 +24,7 @@
 		// Number of blob sidecar files to hydrate in one batch while rendering history.
 		blobBatchSize: 64,
 		// Maximum lines shown from a tool output before collapsing it.
-		maxToolOutputLines: 20,
+		maxToolOutputLines: 16,
 		// Maximum diff lines shown inline for edit tool results.
 		maxEditDiffLines: 3
 	},
