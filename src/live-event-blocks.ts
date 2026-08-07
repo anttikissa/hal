@@ -181,6 +181,7 @@ function applyEvent(opts: ApplyEventOptions): { changed: boolean; toolBlock?: an
 			sessionId,
 			toolId: event.toolId,
 			ts,
+			running: true,
 		})
 		return changed()
 	}
@@ -189,6 +190,8 @@ function applyEvent(opts: ApplyEventOptions): { changed: boolean; toolBlock?: an
 		const toolBlock = blocks.findLast((block) => block?.type === 'tool' && block.toolId === event.toolId)
 		if (!toolBlock) return { changed: false }
 		toolBlock.output = event.output
+		if (event.phase === 'running') toolBlock.running = true
+		else delete toolBlock.running
 		if (event.blobId) toolBlock.blobId = event.blobId
 		touchBlock?.(toolBlock)
 		onChange?.()

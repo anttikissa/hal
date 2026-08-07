@@ -501,11 +501,21 @@ function turnActivityStatusLabel(tab: Tab): string {
 		return ''
 	}
 
+	let runningTools = 0
+	let runningToolName = ''
+	for (const block of tab.history) {
+		if (block.type === 'tool' && block.running) {
+			runningTools++
+			runningToolName = block.name
+		}
+	}
+	if (runningTools > 1) return `running ${runningTools} tools`
+	if (runningTools === 1) return `running ${runningToolName}`
+
 	for (let i = tab.history.length - 1; i >= 0; i--) {
 		const block = tab.history[i]!
 		if (block.type === 'assistant' && block.streaming) return 'writing'
 		if (block.type === 'thinking' && block.streaming) return 'thinking'
-		if (block.type === 'tool' && block.output == null) return `running ${block.name}`
 		if (block.type === 'info') {
 			const match = block.text.match(/retrying in (\S+)/i)
 			if (match) return `retrying in ${match[1]}`

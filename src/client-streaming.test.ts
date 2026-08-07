@@ -296,7 +296,10 @@ describe('client streaming blocks', () => {
 			await Bun.sleep(0)
 
 			expect(loads).toBe(0)
-			expect(client.currentTab()!.history[0]).toMatchObject({ type: 'tool', output: 'first line' })
+			expect(client.currentTab()!.history[0]).toMatchObject({ type: 'tool', output: 'first line', running: true })
+			client.handleEvent({ type: 'tool-result', sessionId: 's1', toolId: 'tool-1', blobId: '000002-def', output: 'final line', phase: 'done' })
+			await Bun.sleep(0)
+			expect((client.currentTab()!.history[0] as any).running).toBeUndefined()
 		} finally {
 			blockData.loadBlobs = originalLoadBlobs
 		}

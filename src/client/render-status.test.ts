@@ -84,7 +84,11 @@ test('activityStatusLabel names visible working phases', () => {
 		expect(renderStatus.activityStatusLabel(tab())).toBe('processing')
 		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'thinking', text: 'reasoning', streaming: true }] }))).toBe('thinking')
 		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'assistant', text: 'hi', streaming: true }] }))).toBe('writing')
-		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'tool', name: 'bash' }] }))).toBe('running bash')
+		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'tool', name: 'bash', output: 'first line', running: true }] }))).toBe('running bash')
+		expect(renderStatus.activityStatusLabel(tab({ history: [
+			{ type: 'tool', name: 'bash', output: 'first line', running: true },
+			{ type: 'tool', name: 'eval', output: 'second line', running: true },
+		] }))).toBe('running 2 tools')
 		client.state.toolConfirmPending.add('04-new')
 		expect(renderStatus.activityStatusLabel(tab())).toBe('waiting for approval')
 	} finally {

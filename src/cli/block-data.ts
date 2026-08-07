@@ -22,7 +22,7 @@ export type Block =
 	| ({ type: 'user'; source?: string; status?: string; actualText?: string } & TextBlock)
 	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean; synthetic?: boolean; syntheticKind?: string } & TextBlock)
 	| ({ type: 'thinking'; model?: string; thinkingEffort?: string; streaming?: boolean } & TextBlock & BlobRef)
-	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string } & BlockBase & BlobRef)
+	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string; running?: boolean } & BlockBase & BlobRef)
 	| NoticeBlock<'log'>
 	| NoticeBlock<'info'>
 	| NoticeBlock<'warning'>
