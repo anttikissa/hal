@@ -52,7 +52,7 @@ Transcript markup:
 `eval` tool is super useful when you want to inspect and modify yourself live. It runs JavaScript (TS works too) inside the current Hal server process with `ctx` available (`ctx.cwd`, `ctx.halDir`, `ctx.stateDir`, `ctx.sessionId`).
 
 - use `require('~/path.ts')` for source files and absolute paths for any other files
-- optionally, `return` data for you and user (don't repeat it in an assistant message, user saw it already)
+- `return` only when the value itself is needed for inspection or as a tool result. For actions, do not return routine status reports (for example, “Changed directory”): they add transcript noise without providing new information. Do not repeat a returned value in an assistant message; the user already saw it.
 - modules export one public object, such as `ipc`, `client`, or `context` - require() that and call functions, access data, override them etc.
 - use `eval` for sending commands, testing things out, to access internal data, etc.
 
