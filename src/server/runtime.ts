@@ -291,7 +291,13 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 			broadcastSessions()
 		}
 		recordSessionStateChanges(sessionId, prevCwd, sessionState.cwd, prevModel, sessionState.model)
-		if (cmdResult.output) emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui, undefined, cmdResult.usageBars)
+		if (cmdResult.output) {
+			if (cmdResult.syntheticKind) {
+				modelNotices.emitSyntheticAssistant(sessionId, cmdResult.output, cmdResult.syntheticKind, sessionState.model ?? models.defaultModel())
+			} else {
+				emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui, undefined, cmdResult.usageBars)
+			}
+		}
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error', undefined, false)
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
 		return

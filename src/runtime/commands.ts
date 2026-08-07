@@ -37,6 +37,8 @@ export interface CommandResult {
 	ui?: 'notice'
 	/** Permit only /status's generated ANSI progress bars to reach the renderer. */
 	usageBars?: true
+	/** Render output as a persisted synthetic assistant message. */
+	syntheticKind?: string
 	/** Whether the command was recognized and handled. */
 	handled: boolean
 }
@@ -833,7 +835,11 @@ handlers['cd'] = (args, session) => {
 	const target = resolve(session.cwd, parsed.path!)
 
 	if (!existsSync(target)) {
-		return { error: `${target} not found. Would you like to create that directory and then /cd into it?`, handled: true }
+		return {
+			output: `/cd: ${target} not found. Would you like to create that directory and then /cd into it?`,
+			syntheticKind: 'cd-create-suggestion',
+			handled: true,
+		}
 	}
 
 	const old = session.cwd

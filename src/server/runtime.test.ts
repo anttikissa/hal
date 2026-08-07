@@ -15,6 +15,9 @@ import { promptQueue } from '../runtime/prompt-queue.ts'
 import { paths } from '../utils/paths.ts'
 import { whatSummary } from '../session/what.ts'
 import { apiMessages } from '../session/api-messages.ts'
+import { mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 
 test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -285,6 +288,48 @@ test('fork command persists one child notice without duplicating bare session id
 		sessions.appendHistorySync = origAppendHistorySync
 		sessions.sessionOpenInfo = origSessionOpenInfo
 		context.watchPromptFiles = origWatchPromptFiles
+	}
+})
+
+
+test('a missing /cd path emits a synthetic creation suggestion', async () => {
+	const sessionId = '04-cd-suggestion'
+	const target = join(tmpdir(), `hal-cd-missing-${crypto.randomUUID()}`)
+	const meta: SessionMeta = { id: sessionId, workingDir: '/work', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5.5' }
+	const history: any[] = []
+	const events: any[] = []
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origAppendEvent = ipc.appendEvent
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origAppendHistorySync = sessions.appendHistorySync
+
+	try {
+		ipc.ownsHostLock = () => true
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
+		sessions.appendHistorySync = (_id, entries) => { history.push(...entries) }
+
+		await runtime.handlePrompt(sessionId, `/cd ${target}`)
+		expect(meta.workingDir).toBe('/work')
+
+		expect(history).toContainEqual(expect.objectContaining({
+			type: 'assistant',
+			text: `/cd: ${target} not found. Would you like to create that directory and then /cd into it?`,
+			model: 'openai/gpt-5.5',
+			synthetic: true,
+			syntheticKind: 'cd-create-suggestion',
+		}))
+		expect(events).toContainEqual(expect.objectContaining({
+			type: 'response',
+			sessionId,
+			synthetic: true,
+		}))
+		expect(events.some((event) => event.type === 'info' && event.level === 'error')).toBe(false)
+	} finally {
+		ipc.ownsHostLock = origOwnsHostLock
+		ipc.appendEvent = origAppendEvent
+		sessions.loadSessionMeta = origLoadSessionMeta
+		sessions.appendHistorySync = origAppendHistorySync
 	}
 })
 
@@ -967,9 +1012,6 @@ test('resolveResumeTarget matches a closed session by name case-insensitively', 
 	expect(picked).toBe('04-a')
 })
 
-import { mkdtempSync, rmSync } from 'fs'
-import { join } from 'path'
-import { tmpdir } from 'os'
 
 test('spawnSession creates a fresh child with auto-close marker', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))

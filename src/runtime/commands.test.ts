@@ -714,7 +714,8 @@ test('/cd offers to create a missing directory', async () => {
 	const result = await commands.executeCommand(`/cd ${target}`, session)
 
 	expect(result).toEqual({
-		error: `${target} not found. Would you like to create that directory and then /cd into it?`,
+		output: `/cd: ${target} not found. Would you like to create that directory and then /cd into it?`,
+		syntheticKind: 'cd-create-suggestion',
 		handled: true,
 	})
 	expect(session.cwd).toBe(process.cwd())
