@@ -175,7 +175,7 @@ describe('client streaming blocks', () => {
 		client.handleEvent({
 			type: 'response',
 			sessionId: 's1',
-			text: 'Done.\nLOC: 0 excluding tests (+16 total)',
+			text: 'Done. Committed it.',
 			createdAt: '2026-04-05T17:31:01.000Z',
 		})
 
@@ -183,7 +183,33 @@ describe('client streaming blocks', () => {
 		expect(tab.history).toHaveLength(1)
 		expect(tab.history[0]).toMatchObject({
 			type: 'assistant',
-			text: 'Done.\nLOC: 0 excluding tests (+16 total)',
+			text: 'Done. Committed it.',
+		})
+	})
+
+
+	test('response attaches the commit LOC summary to already-streamed text', () => {
+		client.handleEvent({
+			type: 'stream-delta',
+			sessionId: 's1',
+			channel: 'assistant',
+			text: 'Done.',
+			createdAt: '2026-04-05T17:31:00.000Z',
+		})
+		client.handleEvent({
+			type: 'response',
+			sessionId: 's1',
+			text: 'Done.',
+			loc: 'LOC: 0 excluding tests (+16 total)',
+			createdAt: '2026-04-05T17:31:01.000Z',
+		})
+
+		const tab = client.currentTab()!
+		expect(tab.history).toHaveLength(1)
+		expect(tab.history[0]).toMatchObject({
+			type: 'assistant',
+			text: 'Done.',
+			loc: 'LOC: 0 excluding tests (+16 total)',
 		})
 	})
 

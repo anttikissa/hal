@@ -705,17 +705,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					})
 				}
 				for (const entry of serverToolHistory) historyEntries.push(entry)
-				if (latestCommitLocLine) {
-					const trimmed = assistantText.trimEnd()
-					// Models often volunteer their own closing LOC line. Appending ours
-					// then shows it twice, so only add it when the text lacks one.
-					const alreadyReported = trimmed.split('\n').pop()!.trimStart().startsWith('LOC:')
-					if (!trimmed) assistantText = latestCommitLocLine
-					else if (!alreadyReported) assistantText = `${trimmed}\n${latestCommitLocLine}`
-					else assistantText = trimmed
-				}
-				if (assistantText) {
+				// The LOC summary is presentation only: it lives in its own field so it
+				// never enters the provider message, where the model would read it back
+				// and start imitating it in its own prose.
+				if (assistantText || latestCommitLocLine) {
 					const assistantEntry: any = { type: 'assistant', text: assistantText, model, ts }
+					if (latestCommitLocLine) assistantEntry.loc = latestCommitLocLine
 					if (hasUsage(totalUsage)) assistantEntry.usage = totalUsage
 					historyEntries.push(assistantEntry)
 				}
@@ -730,8 +725,10 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				}
 				if (emptyResponseMessage) emitInfo(sessionId, emptyResponseMessage)
 
-				if (assistantText) {
-					emitEvent(sessionId, { type: 'response', text: assistantText, model })
+				if (assistantText || latestCommitLocLine) {
+					const response: any = { type: 'response', text: assistantText, model }
+					if (latestCommitLocLine) response.loc = latestCommitLocLine
+					emitEvent(sessionId, response)
 				}
 				// response events update live.ason for crash/restart recovery while a turn is active.
 				// Once the same response is durable history, live must be cleared last or the

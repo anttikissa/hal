@@ -120,7 +120,7 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 		}
 	})
 
-test('adds commit LOC line to final assistant response', async () => {
+test('reports commit LOC beside the assistant text, not inside it', async () => {
 	const sessionId = `test-final-loc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
@@ -165,8 +165,12 @@ test('adds commit LOC line to final assistant response', async () => {
 			messages: [{ role: 'user', content: 'commit' }],
 		})
 		expect(result).toBe('completed')
-		expect(events.find((event) => event.type === 'response')?.text).toBe('Done.\nLOC: +3 excluding tests (+5 total)')
-		expect(sessions.loadHistory(sessionId).findLast((item) => item.type === 'assistant')?.text).toBe('Done.\nLOC: +3 excluding tests (+5 total)')
+		const response = events.find((event) => event.type === 'response')
+		expect(response?.text).toBe('Done.')
+		expect(response?.loc).toBe('LOC: +3 excluding tests (+5 total)')
+		const entry = sessions.loadHistory(sessionId).findLast((item) => item.type === 'assistant') as any
+		expect(entry?.text).toBe('Done.')
+		expect(entry?.loc).toBe('LOC: +3 excluding tests (+5 total)')
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent
@@ -175,7 +179,7 @@ test('adds commit LOC line to final assistant response', async () => {
 })
 
 
-test('does not repeat the commit LOC line when the model already wrote one', async () => {
+test('keeps the LOC field separate when the model writes its own LOC line', async () => {
 	const sessionId = `test-dup-loc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
@@ -201,8 +205,9 @@ test('does not repeat the commit LOC line when the model already wrote one', asy
 			if (calls === 1) {
 				yield { type: 'tool_call', id: 'commit-1', name: 'bash', input: { command: 'git commit -m test' } }
 			} else {
-				// The model volunteers its own LOC line, in a slightly different format.
-				yield { type: 'text', text: 'Done.\nLOC: +3 excluding tests (+5 total)' }
+				// Models sometimes volunteer their own LOC line. It stays part of their
+				// prose; ours is a separate field, so the two can never merge or double.
+				yield { type: 'text', text: 'Done.\nLOC: whatever the model thinks' }
 			}
 			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
@@ -221,7 +226,9 @@ test('does not repeat the commit LOC line when the model already wrote one', asy
 			messages: [{ role: 'user', content: 'commit' }],
 		})
 		expect(result).toBe('completed')
-		expect(events.find((event) => event.type === 'response')?.text).toBe('Done.\nLOC: +3 excluding tests (+5 total)')
+		const response = events.find((event) => event.type === 'response')
+		expect(response?.text).toBe('Done.\nLOC: whatever the model thinks')
+		expect(response?.loc).toBe('LOC: +3 excluding tests (+5 total)')
 	} finally {
 		providerLoader.getProvider = origGetProvider
 		ipc.appendEvent = origAppendEvent

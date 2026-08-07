@@ -104,6 +104,20 @@ test('toProviderMessages merges assistant chunks split by ui info', () => {
 })
 
 
+test('toProviderMessages hides the LOC field from the model', () => {
+	const ts = '2026-04-13T14:43:49.970Z'
+	const entries: any[] = [
+		{ type: 'user', parts: [{ type: 'text', text: 'commit it' }], ts },
+		{ type: 'assistant', text: 'Committed.', loc: 'LOC: +2 excluding tests (+51 total)', ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[13 Apr 14:43]\ncommit it' },
+		{ role: 'assistant', content: [{ type: 'text', text: 'Committed.' }] },
+	])
+})
+
+
 test('toProviderMessages skips canceled history entries', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [

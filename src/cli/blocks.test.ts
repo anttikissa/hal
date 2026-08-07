@@ -31,6 +31,16 @@ test('block body keeps left and right margins when wrapping', () => {
 	expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo bar' }, 8))).toEqual([' foo', ' bar'])
 })
 
+test('assistant LOC line renders after a blank separator line', () => {
+	const lines = contentLines(blocks.renderBlock({ type: 'assistant', text: 'Done.', loc: 'LOC: +2 excluding tests (+51 total)' } as Block, 80))
+	expect(lines).toEqual([' Done.', ' ', ' LOC: +2 excluding tests (+51 total)'])
+})
+
+
+test('assistant block without LOC renders no trailing separator', () => {
+	expect(contentLines(blocks.renderBlock({ type: 'assistant', text: 'Done.' }, 80))).toEqual([' Done.'])
+})
+
 test('block headers keep a right margin', () => {
 	// Header text (title on the left, blob ref on the right) must stop one column
 	// short of the terminal edge, matching the body margin.
