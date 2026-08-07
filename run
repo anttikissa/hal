@@ -36,9 +36,9 @@ while true; do
 	if [ "${#args[@]}" -eq 0 ]; then
 		# macOS still ships Bash 3.2. Under `set -u`, expanding an empty array raises
 		# "unbound variable", so only forward the array when it actually has items.
-		HAL_LOG=1 HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts"
+		HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts"
 	else
-		HAL_LOG=1 HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "${args[@]}"
+		HAL_STARTUP_TIMESTAMP="$startup_epoch_ms" bun "$hal_dir/src/main.ts" "${args[@]}"
 	fi
 
 	code=$?
