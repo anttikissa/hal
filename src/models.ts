@@ -22,7 +22,7 @@ interface CatalogEntry {
 
 const CATALOG: CatalogEntry[] = [
 	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-4-8', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
-	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-4-6', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
+	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-5', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
 	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
 	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
 	// GPT tiers since 5.6: sol = flagship, terra = everyday/default, luna = fast+cheap.
@@ -386,11 +386,30 @@ function latestTrackedModel(track: TrackFamily, cache: Record<string, number>): 
 	return newestMatchingModel(cache, parseGrokCandidate)
 }
 
+function candidateForTrack(track: TrackFamily, fullId: string): ModelCandidate | null {
+	const stripped = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+	if (track === 'opus' || track === 'sonnet' || track === 'haiku' || track === 'fable') return parseClaudeCandidate(track, stripped)
+	if (track === 'sol' || track === 'terra' || track === 'luna') return parseGptTierCandidate(track, stripped)
+	if (track === 'codex') return parseCodexCandidate(stripped)
+	if (track === 'gemini') return parseGeminiCandidate('flash', stripped)
+	if (track === 'gemini-pro') return parseGeminiCandidate('pro', stripped)
+	return parseGrokCandidate(fullId) ?? parseGrokCandidate(stripped)
+}
+
+function latestCatalogFullId(entry: CatalogEntry, cache: Record<string, number>): string {
+	if (!entry.track) return entry.fullId
+	const latestModelId = latestTrackedModel(entry.track, cache)
+	if (!latestModelId) return entry.fullId
+	const catalogCandidate = candidateForTrack(entry.track, entry.fullId)
+	const latestCandidate = candidateForTrack(entry.track, latestModelId)
+	if (catalogCandidate && latestCandidate && compareCandidates(latestCandidate, catalogCandidate) <= 0) return entry.fullId
+	return `${providerPrefix(entry.fullId)}${latestModelId}`
+}
+
 function aliasFullId(alias: string): string | null {
 	const entry = catalogEntryForAlias(alias)
 	if (!entry) return null
-	const latest = entry.track ? latestTrackedModel(entry.track, loadModelsDevCache()) : null
-	return latest ? `${providerPrefix(entry.fullId)}${latest}` : entry.fullId
+	return latestCatalogFullId(entry, loadModelsDevCache())
 }
 
 function cachedNativeFullId(modelId: string): string | null {
@@ -406,11 +425,9 @@ function aliasUpdateSuggestions(previous: Record<string, number>, next: Record<s
 	const updates: AliasUpdateSuggestion[] = []
 	for (const entry of CATALOG) {
 		if (!entry.track) continue
-		const nextModelId = latestTrackedModel(entry.track, next)
-		if (!nextModelId) continue
-		const previousModelId = latestTrackedModel(entry.track, previous)
-		if (previousModelId === nextModelId) continue
-		const newModel = `${providerPrefix(entry.fullId)}${nextModelId}`
+		const previousModel = latestCatalogFullId(entry, previous)
+		const newModel = latestCatalogFullId(entry, next)
+		if (previousModel === newModel) continue
 		if (newModel === entry.fullId) continue
 		updates.push({ aliases: catalogAliases(entry), oldModel: entry.fullId, newModel })
 	}

@@ -49,7 +49,7 @@ test('tier aliases track newer generations but ignore pro variants', () => {
 
 test('updated anthropic aliases avoid dated model ids', () => {
 	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-4-8')
-	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-4-6')
+	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-5')
 	expect(models.resolveModel('haiku')).toBe('anthropic/claude-haiku-4-5')
 })
 
@@ -107,7 +107,7 @@ test('model picker lists updated frontier aliases', () => {
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'sonnet')).toMatchObject({
 		value: 'sonnet',
-		search: expect.stringContaining('anthropic/claude-sonnet-4-6'),
+		search: expect.stringContaining('anthropic/claude-sonnet-5'),
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'gemini')).toMatchObject({
 		value: 'gemini',
@@ -128,7 +128,7 @@ test('model picker choices list newest curated versions first', () => {
 })
 
 
-test('model picker and aliases use newest cached Anthropic models; GPT falls back to catalog terra', () => {
+test('model picker and aliases use the newest Anthropic model from catalog or cache; GPT falls back to catalog terra', () => {
 	models.state.cache = {
 		'claude-opus-4-7': 1_000_000,
 		'claude-opus-4-8': 1_000_000,
@@ -140,11 +140,12 @@ test('model picker and aliases use newest cached Anthropic models; GPT falls bac
 
 	expect(models.resolveModel('opus')).toBe('anthropic/claude-opus-4-8')
 	expect(models.resolveModel('claude')).toBe('anthropic/claude-opus-4-8')
-	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-4-7')
+	expect(models.resolveModel('sonnet')).toBe('anthropic/claude-sonnet-5')
 	// No tier models in cache: the gpt alias falls back to the catalog terra entry.
 	expect(models.resolveModel('gpt')).toBe('openai/gpt-5.6-terra')
 	expect(models.resolveModel('openai')).toBe('openai/gpt-5.6-terra')
 	expect(models.listModelChoices().find((item) => item.value === 'opus')).toMatchObject({ search: expect.stringContaining('anthropic/claude-opus-4-8') })
+	expect(models.listModelChoices().find((item) => item.value === 'sonnet')).toMatchObject({ search: expect.stringContaining('anthropic/claude-sonnet-5') })
 	expect(models.listModelChoices().find((item) => item.value === 'gpt')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6-terra') })
 	expect(models.listModelChoices().find((item) => item.value === 'gpt-5.6')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6') })
 	expect(models.modelCompletionNames()).toContain('opus-4-8')
@@ -175,7 +176,7 @@ test('model completions include aliases, full ids, and bare ids', () => {
 	expect(models.modelCompletionNames()).toContain('gemini')
 	expect(models.modelCompletionNames()).toContain('google/gemini-3.5-flash')
 	expect(models.modelCompletionNames()).toContain('gemini-3.5-flash')
-	expect(models.modelCompletionNames()).toContain('sonnet-4-6')
+	expect(models.modelCompletionNames()).toContain('sonnet-5')
 })
 
 
@@ -212,7 +213,7 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 		{
 			'gpt-5.5': 1_050_000,
 			'claude-opus-4-7': 1_000_000,
-			'claude-sonnet-4-6': 1_000_000,
+			'claude-sonnet-5': 1_000_000,
 			'google/gemini-3.5-flash': 1_000_000,
 			'google/gemini-3-flash-preview': 1_000_000,
 			'x-ai/grok-4.20': 2_000_000,
@@ -222,8 +223,8 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 			'gpt-5.6': 1_050_000,
 			'claude-opus-4-8': 1_000_000,
 			'claude-opus-4-9': 1_000_000,
-			'claude-sonnet-4-6': 1_000_000,
-			'claude-sonnet-4-7': 1_000_000,
+			'claude-sonnet-5': 1_000_000,
+			'claude-sonnet-5-1': 1_000_000,
 			'google/gemini-3.5-flash': 1_000_000,
 			'google/gemini-4-flash-preview': 1_000_000,
 			'x-ai/grok-4.20': 2_000_000,
@@ -231,7 +232,7 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 		},
 	)).toEqual([
 		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-4-8', newModel: 'anthropic/claude-opus-4-9' },
-		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-4-6', newModel: 'anthropic/claude-sonnet-4-7' },
+		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-5', newModel: 'anthropic/claude-sonnet-5-1' },
 		{ aliases: ['gemini'], oldModel: 'google/gemini-3.5-flash', newModel: 'google/gemini-4-flash-preview' },
 		{ aliases: ['grok'], oldModel: 'openrouter/x-ai/grok-4.20', newModel: 'openrouter/x-ai/grok-4.21' },
 	])
