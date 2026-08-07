@@ -210,12 +210,26 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 
 async function startSpawnedSession(parent: SessionMeta, child: SessionMeta, spec: SpawnSpec): Promise<void> {
 	const text = spec.kind === 'interactive' ? spec.task : buildSpawnPrompt(parent.id, spec.task, spec.kind)
-	if (!text.trim()) return
+	// Blank interactive tab: nothing to inject, just publish it.
+	if (!text.trim()) {
+		broadcastSessions()
+		return
+	}
+	const ts = new Date().toISOString()
 	// The initial prompt is injected by the parent, so it retains its source in
 	// the transcript. Keep an explicit recall entry as well: it is the child
 	// user's only way to inspect exactly what was started after switching tabs.
-	sessionStore.appendHistorySync(child.id, [{ type: 'input_history', text, ts: new Date().toISOString() }])
-	await dispatchPromptCommand(child.id, text, parent.id)
+	//
+	// Write the user entry straight to history instead of emitting a 'prompt'
+	// event. Clients learn about the new tab from the session list and build it
+	// from history, so a prompt event would race the tab creation and render the
+	// same message a second time.
+	sessionStore.appendHistorySync(child.id, [
+		{ type: 'input_history', text, ts },
+		{ type: 'user', parts: await resolvePromptParts(child.id, text), source: parent.id, ts },
+	])
+	broadcastSessions()
+	await runGeneration(child.id, '')
 }
 function restartPromptWatch(): void {
 	state.stopPromptWatch?.()
@@ -727,7 +741,8 @@ function handleCommand(cmd: Command): void {
 						: undefined,
 			}
 			const child = spawnSession(parent, spec)
-			broadcastSessions()
+			// No broadcast here: startSpawnedSession publishes the session list once
+			// the initial prompt is in history, so clients render it exactly once.
 			void startSpawnedSession(parent, child, spec)
 			break
 		}

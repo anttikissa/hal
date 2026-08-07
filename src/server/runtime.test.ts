@@ -1158,11 +1158,13 @@ test('spawnSession canonicalizes a bare discovered model override', async () => 
 })
 
 
-test('startSpawnedSession dispatches the child prompt directly', async () => {
+test('startSpawnedSession writes the child prompt to history without a prompt event', async () => {
 	const base = mkdtempSync(join(tmpdir(), 'hal-spawn-'))
 	const prevState = process.env.HAL_STATE_DIR
 	const queued: any[] = []
+	const emitted: any[] = []
 	const origAppendCommand = ipc.appendCommand
+	const origAppendEvent = ipc.appendEvent
 	const origRunAgentLoop = agentLoop.runAgentLoop
 	const origOwnsHostLock = ipc.ownsHostLock
 	process.env.HAL_STATE_DIR = base
@@ -1171,6 +1173,9 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 	try {
 		ipc.appendCommand = (command: any) => {
 			queued.push(command)
+		}
+		ipc.appendEvent = (event: any) => {
+			emitted.push(event)
 		}
 
 		ipc.ownsHostLock = () => true
@@ -1200,11 +1205,15 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 		await runtime.startSpawnedSession(parent, child, spec)
 
 		const history = sessions.loadHistory(child.id)
+		// Exactly one user entry, and no 'prompt' IPC event: clients build the new
+		// tab from history, so an extra broadcast prompt event would render twice.
+		expect(history.filter((entry) => entry.type === 'user')).toHaveLength(1)
 		expect(history.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('Do the thing'))).toBe(true)
 		expect(history.find((entry) => entry.type === 'input_history')).toMatchObject({
 			type: 'input_history',
 			text: expect.stringContaining('Task:\nDo the thing'),
 		})
+		expect(emitted.filter((event) => event.type === 'prompt' && event.sessionId === child.id)).toHaveLength(0)
 		expect(queued).toHaveLength(0)
 
 		const interactiveSpec = {
@@ -1227,14 +1236,17 @@ test('startSpawnedSession dispatches the child prompt directly', async () => {
 		const promptedInteractiveChild = await runtime.spawnSession(parent, promptedInteractiveSpec)
 		await runtime.startSpawnedSession(parent, promptedInteractiveChild, promptedInteractiveSpec)
 		const promptedInteractiveHistory = sessions.loadHistory(promptedInteractiveChild.id)
+		expect(promptedInteractiveHistory.filter((entry) => entry.type === 'user')).toHaveLength(1)
 		expect(promptedInteractiveHistory.some((entry) => entry.type === 'user' && JSON.stringify(entry).includes('MAKE MODEL PICKER GREAT AGAIN'))).toBe(true)
 		expect(promptedInteractiveHistory.find((entry) => entry.type === 'input_history')).toMatchObject({
 			type: 'input_history',
 			text: 'MAKE MODEL PICKER GREAT AGAIN',
 		})
+		expect(emitted.filter((event) => event.type === 'prompt' && event.sessionId === promptedInteractiveChild.id)).toHaveLength(0)
 		expect(queued).toHaveLength(0)
 	} finally {
 		ipc.appendCommand = origAppendCommand
+		ipc.appendEvent = origAppendEvent
 		agentLoop.runAgentLoop = origRunAgentLoop
 
 		ipc.ownsHostLock = origOwnsHostLock
