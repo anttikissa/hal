@@ -241,7 +241,7 @@ test('assistant block padding uses resolved OKLCH blackness', () => {
 	}
 })
 
-test('synthetic assistant header includes model and synthetic marker', () => {
+test('synthetic assistant header omits the model', () => {
 	const block: Block = {
 		type: 'assistant',
 		text: 'hello',
@@ -250,10 +250,11 @@ test('synthetic assistant header includes model and synthetic marker', () => {
 	}
 
 	const header = headerLine(blocks.renderBlock(block, 80))
-	expect(header).toContain('Hal (GPT 5.4, synthetic)')
+	expect(header).toContain('Hal (synthetic)')
+	expect(header).not.toContain('GPT 5.4')
 })
 
-test('what summary header names the command instead of "synthetic"', () => {
+test('what summary header names the command without the model', () => {
 	const block: Block = {
 		type: 'assistant',
 		text: 'hello',
@@ -263,7 +264,8 @@ test('what summary header names the command instead of "synthetic"', () => {
 	}
 
 	const header = headerLine(blocks.renderBlock(block, 80))
-	expect(header).toContain('Hal (GPT 5.4, /what summary)')
+	expect(header).toContain('Hal (/what summary)')
+	expect(header).not.toContain('GPT 5.4')
 })
 
 test('thinking header includes model and default thinking level', () => {
