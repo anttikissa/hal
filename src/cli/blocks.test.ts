@@ -254,7 +254,7 @@ test('synthetic assistant header omits the model', () => {
 	expect(header).not.toContain('GPT 5.4')
 })
 
-test('what summary header names the command without the model', () => {
+test('what summary header uses the synthetic label', () => {
 	const block: Block = {
 		type: 'assistant',
 		text: 'hello',
@@ -264,7 +264,7 @@ test('what summary header names the command without the model', () => {
 	}
 
 	const header = headerLine(blocks.renderBlock(block, 80))
-	expect(header).toContain('Hal (/what summary)')
+	expect(header).toContain('Hal (synthetic)')
 	expect(header).not.toContain('GPT 5.4')
 })
 
