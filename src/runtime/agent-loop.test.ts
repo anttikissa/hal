@@ -175,6 +175,61 @@ test('adds commit LOC line to final assistant response', async () => {
 })
 
 
+test('does not repeat the commit LOC line when the model already wrote one', async () => {
+	const sessionId = `test-dup-loc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const origDispatch = toolRegistry.dispatch
+	let calls = 0
+	const metadata = ason.stringify({
+		branch: 'main',
+		hash: 'abc123',
+		message: 'Test commit',
+		summary: '2 files changed',
+		files: [],
+		locDelta: 5,
+		locDeltaCode: 3,
+	}, 'long')
+
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			calls++
+			if (calls === 1) {
+				yield { type: 'tool_call', id: 'commit-1', name: 'bash', input: { command: 'git commit -m test' } }
+			} else {
+				// The model volunteers its own LOC line, in a slightly different format.
+				yield { type: 'text', text: 'Done.\nLOC: +3 excluding tests (+5 total)' }
+			}
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => {
+		events.push(event)
+	}
+	toolRegistry.dispatch = async () => `ok\n[hal-commit]\n${metadata}\n[/hal-commit]`
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'commit' }],
+		})
+		expect(result).toBe('completed')
+		expect(events.find((event) => event.type === 'response')?.text).toBe('Done.\nLOC: +3 excluding tests (+5 total)')
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
+
 test('surfaces Claude web_search as a visible tool with result titles', async () => {
 	const sessionId = `test-web-search-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

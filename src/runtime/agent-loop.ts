@@ -707,8 +707,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				for (const entry of serverToolHistory) historyEntries.push(entry)
 				if (latestCommitLocLine) {
 					const trimmed = assistantText.trimEnd()
-					assistantText = latestCommitLocLine
-					if (trimmed) assistantText = `${trimmed}\n${latestCommitLocLine}`
+					// Models often volunteer their own closing LOC line. Appending ours
+					// then shows it twice, so only add it when the text lacks one.
+					const alreadyReported = trimmed.split('\n').pop()!.trimStart().startsWith('LOC:')
+					if (!trimmed) assistantText = latestCommitLocLine
+					else if (!alreadyReported) assistantText = `${trimmed}\n${latestCommitLocLine}`
+					else assistantText = trimmed
 				}
 				if (assistantText) {
 					const assistantEntry: any = { type: 'assistant', text: assistantText, model, ts }
