@@ -64,7 +64,7 @@ test('multiple appends produce multiple chunks', async () => {
 })
 
 
-test('next read checks for unread bytes before waiting for another watch event', async () => {
+test('next read checks for unread bytes immediately', async () => {
 	const p = tmpFile('next-pull')
 	try {
 		const stream = tailFile(p)

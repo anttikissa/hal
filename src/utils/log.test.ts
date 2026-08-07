@@ -1,10 +1,18 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { log } from './log.ts'
 
 const originalLevel = log.config.level
 
 afterEach(() => {
 	log.config.level = originalLevel
+	if (originalEnvLevel === undefined) delete process.env.HAL_LOG
+	else process.env.HAL_LOG = originalEnvLevel
+})
+
+const originalEnvLevel = process.env.HAL_LOG
+
+beforeEach(() => {
+	delete process.env.HAL_LOG
 })
 
 test('debug logging can be enabled at runtime', () => {
@@ -24,4 +32,9 @@ test('info logging skips debug messages', () => {
 	expect(log.isEnabled('debug')).toBe(false)
 	expect(log.isEnabled('info')).toBe(true)
 	expect(log.isEnabled('error')).toBe(true)
+})
+test('HAL_LOG overrides the configured level', () => {
+	log.config.level = 'info'
+	process.env.HAL_LOG = 'debug'
+	expect(log.isEnabled('debug')).toBe(true)
 })

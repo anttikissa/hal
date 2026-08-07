@@ -10,7 +10,6 @@ const TIMEOUT_MS = 30_000
 // flakes came from fs.watch timing, process startup races, or both. Keep them
 // out of the default suite so ./test stays signal-rich while we fix them.
 export const FLAKY_TEST_FILES = new Set([
-	'src/utils/tail-file.test.ts',
 	'tests/ipc.test.ts',
 	'tests/tabs.test.ts',
 ])

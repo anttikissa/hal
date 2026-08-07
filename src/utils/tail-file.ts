@@ -1,10 +1,10 @@
-import { watch, statSync, writeFileSync } from 'fs'
-import { dirname, basename } from 'path'
+import { statSync, writeFileSync } from 'fs'
 
 /**
  * Tail a file from its current end, creating it if missing.
- * Uses fs.watch for notifications and Bun.file().slice() for reads.
- * cancel() the returned stream to stop watching.
+ * Reads are discovered by polling rather than filesystem notifications, which
+ * can be dropped when several processes append to an IPC file at once.
+ * cancel() stops a pending poll wait immediately.
  */
 function fileSize(path: string): number {
 	try {
@@ -19,53 +19,46 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 	try {
 		offset = statSync(path).size
 	} catch {
-		// Create the file if it doesn't exist, so fs.watch has something to watch
 		writeFileSync(path, '')
 	}
 
-	let resolve: (() => void) | null = null
-	let pending = false // tracks events that fired while we were processing
-	// Watch the parent directory, not the file itself. Atomic rename/update
-	// patterns can replace the file inode, which makes direct file watches on
-	// macOS miss later appends. Directory watch survives rewrites.
-	const watcher = watch(dirname(path), { persistent: false }, (_, filename) => {
-		if (filename && filename !== basename(path)) return
-		pending = true
-		resolve?.()
-	})
-
 	let stopped = false
+	let wakePoll: (() => void) | null = null
+
+	function waitForPoll(): Promise<void> {
+		return new Promise(resolve => {
+			let timer: ReturnType<typeof setTimeout> | null = null
+			function wake(): void {
+				if (timer !== null) clearTimeout(timer)
+				if (wakePoll === wake) wakePoll = null
+				resolve()
+			}
+			timer = setTimeout(wake, 100)
+			wakePoll = wake
+		})
+	}
 
 	return new ReadableStream({
 		async pull(controller) {
 			while (!stopped) {
 				const size = fileSize(path)
-				// Truncation: reset to beginning
+				// Truncation: reset to beginning.
 				if (size < offset) offset = 0
 				if (size > offset) {
 					const buf = await Bun.file(path).slice(offset, size).arrayBuffer()
 					offset = size
 					controller.enqueue(new Uint8Array(buf))
-					// If more data arrived while we were reading, loop
-					// immediately instead of waiting for another fs.watch event.
-					// This prevents missed events under burst writes.
-					const newSize = fileSize(path)
-					if (newSize > offset) pending = true
 					return
 				}
-				// Check the file itself on every pull before waiting on fs.watch.
-				// On macOS we can miss the notification for an append that happened
-				// while the consumer was processing the previous record. Without
-				// this, the tail can stall until some later unrelated write nudges it.
-				if (!pending) await new Promise<void>(r => (resolve = r))
-				pending = false
-				if (stopped) break
+
+				// Use an owned one-shot timer rather than setInterval so an idle tail
+				// has exactly one cancellable wait in flight.
+				await waitForPoll()
 			}
 		},
 		cancel() {
 			stopped = true
-			watcher.close()
-			resolve?.()
+			wakePoll?.()
 		},
 	})
 }

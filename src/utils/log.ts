@@ -13,9 +13,9 @@ const LOG_PATH = `${STATE_DIR}/hal.log`
 const MAX_SIZE = 5_000_000 // 5MB rotation threshold
 
 const config = {
-	// Defaults from HAL_LOG, but stays mutable so eval and /config can turn logging
-	// on in a running server without monkey-patching this module.
-	level: envLevel(process.env.HAL_LOG),
+	// config.ason supplies the normal default. An explicit HAL_LOG takes priority
+	// at every write so one diagnostic launch cannot be overridden by that file.
+	level: '',
 }
 
 function envLevel(value: unknown): ConfigLevel {
@@ -29,7 +29,8 @@ function envLevel(value: unknown): ConfigLevel {
 // Check if a given level should be logged. Read config.level at call time so eval
 // patches like `log.config.level = 'debug'` take effect immediately.
 function isEnabled(level: Level): boolean {
-	const enabledLevel = envLevel(config.level)
+	const configured = process.env.HAL_LOG === undefined ? config.level : process.env.HAL_LOG
+	const enabledLevel = envLevel(configured)
 	if (!enabledLevel) return false
 	if (enabledLevel === 'debug') return true // debug enables everything
 	if (enabledLevel === 'info') return level !== 'debug'
