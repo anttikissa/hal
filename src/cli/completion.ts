@@ -122,23 +122,28 @@ function addUnique(values: string[], seen: Set<string>, value: string | undefine
 	values.push(value)
 }
 
-function sessionTargets(): string[] {
+function sessionTargets(closedOnly = false): string[] {
 	const values: string[] = []
 	const seen = new Set<string>()
-	for (const session of ipc.readState().sessions) {
+	const openSessions = ipc.readState().sessions
+	const openIds = new Set<string>()
+	for (const session of openSessions) {
+		openIds.add(session.id)
+		if (closedOnly) continue
 		addUnique(values, seen, session.id)
 		addUnique(values, seen, session.name)
 	}
 	for (const meta of sessionStore.loadAllSessionMetas()) {
+		if (closedOnly && openIds.has(meta.id)) continue
 		addUnique(values, seen, meta.id)
 		addUnique(values, seen, meta.name)
 	}
 	return values.sort()
 }
 
-function completeSessionTargets(argPrefix: string): string[] {
+function completeSessionTargets(argPrefix: string, closedOnly = false): string[] {
 	const needle = argPrefix.toLowerCase()
-	return sessionTargets().filter((target) => target.toLowerCase().startsWith(needle))
+	return sessionTargets(closedOnly).filter((target) => target.toLowerCase().startsWith(needle))
 }
 
 
@@ -166,7 +171,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	const command = parts[0]!
 	const arg = clientLocalCommands.commandArg(command) ?? commands.commandArg(command)
 	if (!arg) return null
-	if (parts.length > 2 && arg !== 'dir' && arg !== 'session') return null
+	if (parts.length > 2 && arg !== 'dir' && arg !== 'session' && arg !== 'closed-session') return null
 
 	let argPrefix = hasSpace ? '' : (parts[1] ?? '')
 	let values: string[] = []
@@ -181,6 +186,9 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	} else if (arg === 'session') {
 		argPrefix = cdArgPrefix(before, command)
 		values = completeSessionTargets(argPrefix)
+	} else if (arg === 'closed-session') {
+		argPrefix = cdArgPrefix(before, command)
+		values = completeSessionTargets(argPrefix, true)
 	} else if (arg === 'login-provider') {
 		values = ['anthropic', 'openai'].filter((provider) => provider.startsWith(argPrefix))
 	} else {

@@ -101,7 +101,7 @@ type CommandHandler = (
 	hooks: CommandHooks,
 ) => CommandResult | Promise<CommandResult>
 
-type CommandArg = 'model' | 'dir' | 'command' | 'config' | 'login-provider'
+type CommandArg = 'model' | 'dir' | 'command' | 'config' | 'login-provider' | 'closed-session'
 
 interface CommandSpec {
 	usage?: string | string[]
@@ -356,7 +356,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 	open: { usage: '[<target>]', summary: 'Open a new tab, optionally after a tab.', detail: 'With no target, opens a new tab at the end. With a target, opens after that tab.' },
 	move: { usage: '<position>', summary: 'Move the current tab to a position.', detail: 'Values below 1 clamp to 1; values above the tab count clamp to the last tab.' },
 	rename: { usage: ['<name…>', 'clear'], summary: 'Rename or clear the current session name.', detail: 'Set a short session name used in tabs and command targets.' },
-	resume: { usage: '[<target>]', summary: 'Resume a closed session.', detail: 'With no target, lists recently closed sessions.' },
+	resume: { usage: '[<target>]', summary: 'Resume a closed session.', detail: 'With no target, lists recently closed sessions.', arg: 'closed-session' },
 	tabs: { usage: '[--all]', summary: 'List open tabs; use --all to include closed sessions.' },
 	compact: { summary: 'Summarize conversation to reduce context.' },
 	history: { summary: 'Show the active session history file.' },

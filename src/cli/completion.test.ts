@@ -74,7 +74,7 @@ test('/help st completes command names from runtime command list', () => {
 })
 
 
-test('/go completes session ids and names but not tab numbers', () => {
+test('/go completes all sessions and /resume completes closed sessions', () => {
 	ipc.readState = () => ({
 		sessions: [
 			{ id: '04-one', tab: 1, name: 'main', cwd: '/tmp/main' },
@@ -103,6 +103,13 @@ test('/go completes session ids and names but not tab numbers', () => {
 	expect(closedName!.items).toEqual(['/go old work'])
 	expect(empty!.items).not.toContain('/go 1')
 	expect(empty!.items).not.toContain('/go 2')
+
+	const resumeId = completion.complete('/resume 04-', '/resume 04-'.length)
+	const resumeName = completion.complete('/resume old', '/resume old'.length)
+
+	expect(resumeId!.items).toEqual(['/resume 04-old'])
+	expect(resumeId!.hints).toEqual(['04-old'])
+	expect(resumeName!.items).toEqual(['/resume old work'])
 })
 
 
