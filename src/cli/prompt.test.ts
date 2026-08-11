@@ -43,6 +43,14 @@ describe('prompt editor', () => {
 		prompt.clear()
 	})
 
+	test('tab keeps a literal tab in the prompt and displays a four-column stop', () => {
+		prompt.setText('ab')
+		expect(prompt.handleKey(key('tab'), 80)).toBe(true)
+		expect(prompt.text()).toBe('ab\t')
+		expect(prompt.buildPrompt(80)).toMatchObject({ lines: ['ab  '], cursor: { rowOffset: 0, col: 4 } })
+		prompt.clear()
+	})
+
 	test('down keeps existing prompt viewport when cursor remains visible', () => {
 		prompt.config.maxPromptLines = 10
 		prompt.state.promptLineLimit = 3

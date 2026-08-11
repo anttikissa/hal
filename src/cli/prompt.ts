@@ -3,7 +3,7 @@
 
 import { clipboard } from './clipboard.ts'
 import type { KeyEvent } from './keys.ts'
-import { glyphWidthAt, visLen, wordWrap } from '../utils/strings.ts'
+import { expandTabs, glyphWidthAt, visLen, wordWrap } from '../utils/strings.ts'
 
 const MAX_UNDO = 200
 const SELECTION_ON = '\x1b[7m'
@@ -47,7 +47,7 @@ function cursorToRowCol(input: string, absPos: number, width: number): { row: nu
 	const layout = getLayout(input, width)
 	for (let i = 0; i < layout.lines.length; i++) {
 		const nextStart = i < layout.lines.length - 1 ? layout.starts[i + 1]! : input.length + 1
-		if (absPos < nextStart) return { row: i, col: visLen(input.slice(layout.starts[i]!, Math.min(absPos, layout.ends[i]!))) }
+		if (absPos < nextStart) return { row: i, col: visLen(expandTabs(input.slice(layout.starts[i]!, Math.min(absPos, layout.ends[i]!)))) }
 	}
 	const last = layout.lines.length - 1
 	return { row: last, col: visLen(layout.lines[last] ?? '') }
@@ -541,6 +541,9 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 	}
 
 	switch (k.key) {
+		case 'tab':
+			replaceSelection('\t')
+			return true
 		case 'backspace':
 			deleteBackward(k.alt)
 			return true
@@ -679,10 +682,10 @@ function buildPrompt(contentWidth: number): PromptRender {
 			if (lo < hi && lo < lineText.length && hi > 0) {
 				lines.push(`${lineText.slice(0, lo)}${SELECTION_ON}${lineText.slice(lo, hi)}${SELECTION_OFF}${lineText.slice(hi)}`)
 			} else {
-				lines.push(lineText)
+				lines.push(expandTabs(lineText))
 			}
 		} else {
-			lines.push(lineText)
+			lines.push(expandTabs(lineText))
 		}
 	}
 	const fold = { above: scrollTop, below: Math.max(0, totalRows - scrollTop - promptLines) }
