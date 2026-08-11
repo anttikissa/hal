@@ -33,6 +33,13 @@ describe('prompt editor', () => {
 		prompt.clear()
 	})
 
+	test('selected tabs render as styled spaces through the next tab stop', () => {
+		prompt.setText('a\tb', 1)
+		prompt.handleKey(key('right', { shift: true }), 80)
+		expect(prompt.buildPrompt(80).lines).toEqual(['a\x1b[7m   \x1b[27mb'])
+		prompt.clear()
+	})
+
 	test('cursor stays in right padding when text exactly fills prompt row', () => {
 		prompt.setText('abcd')
 

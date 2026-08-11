@@ -681,7 +681,10 @@ function buildPrompt(contentWidth: number): PromptRender {
 			const lo = Math.max(0, sel.start - lineStart)
 			const hi = Math.min(lineText.length, sel.end - lineStart)
 			if (lo < hi && lo < lineText.length && hi > 0) {
-				lines.push(`${lineText.slice(0, lo)}${SELECTION_ON}${lineText.slice(lo, hi)}${SELECTION_OFF}${lineText.slice(hi)}`)
+				const expanded = expandTabs(lineText)
+				const expandedLo = expandTabs(lineText.slice(0, lo)).length
+				const expandedHi = expandTabs(lineText.slice(0, hi)).length
+				lines.push(`${expanded.slice(0, expandedLo)}${SELECTION_ON}${expanded.slice(expandedLo, expandedHi)}${SELECTION_OFF}${expanded.slice(expandedHi)}`)
 			} else {
 				lines.push(expandTabs(lineText))
 			}
