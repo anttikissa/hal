@@ -15,6 +15,42 @@ function captureOutput(fn: () => void): string {
 	return writes.join('')
 }
 
+function terminalLines(output: string, rows: number, state = { screen: Array<string>(rows).fill(''), scrollback: [] as string[], row: 0, col: 0 }): typeof state {
+	for (let i = 0; i < output.length; i++) {
+		if (output[i] === '\x1b' && output[i + 1] === '[') {
+			let end = i + 2
+			while (end < output.length && !/[A-Za-z]/.test(output[end]!)) end++
+			const arg = output.slice(i + 2, end)
+			const amount = Number.parseInt(arg, 10) || 1
+			const command = output[end]
+			if (command === 'A') state.row = Math.max(0, state.row - amount)
+			if (command === 'B') state.row = Math.min(rows - 1, state.row + amount)
+			if (command === 'G') state.col = amount - 1
+			if (command === 'H') state.row = state.col = 0
+			if (command === 'K' && arg === '2') state.screen[state.row] = ''
+			if (command === 'J' && (arg === '2' || arg === '')) state.screen.fill('')
+			if (command === 'J' && arg === '3') state.scrollback.length = 0
+			i = end
+			continue
+		}
+		if (output[i] === '\r') state.col = 0
+		else if (output[i] === '\n' && state.row === rows - 1) {
+			state.scrollback.push(state.screen.shift()!)
+			state.screen.push('')
+		} else if (output[i] === '\n') state.row++
+		else {
+			const line = state.screen[state.row]!
+			state.screen[state.row] = line.slice(0, state.col) + output[i] + line.slice(state.col + 1)
+			state.col++
+		}
+	}
+	return state
+}
+
+function physicalLines(state: ReturnType<typeof terminalLines>): string[] {
+	return [...state.scrollback, ...state.screen]
+}
+
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
@@ -65,24 +101,24 @@ describe('render fullscreen growth', () => {
 		}
 	})
 
-	test('advances the viewport before repainting changed rows in a growing fullscreen frame', () => {
+	test('keeps the physical buffer canonical when changed growth exceeds the viewport', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
-		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'rows', { value: 10, configurable: true })
 		Object.defineProperty(process.stdout, 'columns', { value: 40, configurable: true })
 		try {
-			tab.history.push({ type: 'assistant', text: 'old text', streaming: true })
-			captureOutput(() => render.draw())
+			tab.history.push({ type: 'assistant', text: 'live marker', streaming: true })
+			const state = terminalLines(captureOutput(() => render.draw()), 10)
 
 			;(tab.history[0] as any).streaming = false
-			tab.history.push({ type: 'tool', name: 'read', input: { path: 'a' } })
-			const output = captureOutput(() => render.draw())
+			tab.history.push({ type: 'tool', name: 'bash', input: { command: 'test' }, output: Array(100).fill('output line').join('\n') })
+			terminalLines(captureOutput(() => render.draw()), 10, state)
 
-			// Advance the newly-needed rows at the old frame bottom first, then paint
-			// the new viewport; otherwise rewriting the longer tail scrolls stale
-			// copies of the changed assistant block into terminal scrollback.
-			expect(output).toMatch(/\x1b\[\d+B(?:\r\n)+\x1b\[\d+A\r/)
+			render.resetRenderer()
+			const canonical = terminalLines(captureOutput(() => render.draw(true)), 10)
+
+			expect(physicalLines(state)).toEqual(physicalLines(canonical))
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

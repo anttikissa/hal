@@ -190,32 +190,18 @@ function repaintVisibleScreen(lines: string[], cursor: { row: number; col: numbe
 }
 
 function repaintFullscreenGrowth(lines: string[], cursor: { row: number; col: number }, rows: number): void {
-	const growth = lines.length - prevLines.length
-	const oldViewportTop = Math.max(0, prevLines.length - rows)
-	const viewportTop = Math.max(0, lines.length - rows)
-	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
+	const oldLength = prevLines.length
+	const viewportTop = Math.max(0, oldLength - rows)
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, moveCursor(cursorRow, viewportTop), '\r']
 
-	// Rows about to enter scrollback must already contain their current values.
-	// Terminals cannot repair them afterward, and repainting the whole longer tail
-	// first would instead scroll stale copies of its changed prefix.
-	out.push(moveCursor(cursorRow, oldViewportTop), '\r')
-	for (let i = oldViewportTop; i < viewportTop; i++) {
-		if (i > oldViewportTop) out.push('\r\n')
-		out.push(`${CSI}2K${lines[i]!}`)
-	}
-
-	// Advance exactly the newly-needed rows from the old final frame row. This
-	// preserves the freshly-updated prefix in scrollback and leaves a viewport
-	// that can be safely repainted in place.
-	out.push(moveCursor(viewportTop - 1, prevLines.length - 1))
-	for (let i = 0; i < growth; i++) out.push('\r\n')
-	out.push(moveCursor(lines.length - 1, viewportTop), '\r')
-	for (let i = viewportTop; i < lines.length; i++) {
+	// Commit the old viewport before growth pushes any of it into immutable
+	// scrollback, then append only the new suffix and let it scroll naturally.
+	for (let i = viewportTop; i < oldLength; i++) {
 		if (i > viewportTop) out.push('\r\n')
 		out.push(`${CSI}2K${lines[i]!}`)
 	}
-	out.push(positionCursor(lines.length - 1, cursor))
-	out.push(`${CSI}?2026l`)
+	for (let i = oldLength; i < lines.length; i++) out.push(`\r\n${CSI}2K${lines[i]!}`)
+	out.push(positionCursor(lines.length - 1, cursor), `${CSI}?2026l`)
 	prevLines = lines
 	writeTerminal(out.join(''))
 }
