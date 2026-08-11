@@ -347,6 +347,35 @@ function replaceSelection(text: string): void {
 	applyInsertion(text)
 }
 
+function indentRows(deindent: boolean): void {
+	const sel = selRange()
+	const first = buf.lastIndexOf('\n', (sel?.start ?? cursor) - 1) + 1
+	let end = sel?.end ?? cursor
+	// A selection ending at the next row's first column does not select that row.
+	if (sel && buf[end - 1] === '\n') end--
+	let last = buf.indexOf('\n', end)
+	if (last < 0) last = buf.length
+	const before = buf.slice(first, last)
+	let pattern = /^/gm
+	let inserted = '\t'
+	if (deindent) {
+		pattern = /^(?: {1,3}\t| {1,4}|\t)/gm
+		inserted = ''
+	}
+	const after = before.replace(pattern, inserted)
+	if (after === before) return
+	pushUndo()
+	function remap(offset: number): number {
+		if (offset < first) return offset
+		if (offset >= last) return offset + after.length - before.length
+		return first + before.slice(0, offset - first).replace(pattern, inserted).length
+	}
+	cursor = remap(cursor)
+	if (selAnchor !== null) selAnchor = remap(selAnchor)
+	buf = buf.slice(0, first) + after + buf.slice(last)
+	goalCol = null
+}
+
 function replaceSelectionWithPastedText(text: string): void {
 	if (!clipboard.shouldSaveMultilinePaste(text)) {
 		replaceSelection(text)
@@ -543,7 +572,10 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 
 	switch (k.key) {
 		case 'tab':
-			if (k.shift || selRange()) return false
+			if (k.shift || selRange()) {
+				indentRows(k.shift)
+				return true
+			}
 			replaceSelection('\t')
 			return true
 		case 'backspace':

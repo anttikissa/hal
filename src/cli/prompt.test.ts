@@ -6,6 +6,11 @@ function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
 }
 
+function select(text: string, anchor: number, cursor: number): void {
+	prompt.setText(text, cursor)
+	prompt.restoreState({ ...prompt.snapshotState(), selAnchor: anchor })
+}
+
 describe('prompt editor', () => {
 	test('ctrl-= and ctrl-- resize the prompt editor height', () => {
 		prompt.setText('one\ntwo')
@@ -78,19 +83,45 @@ describe('prompt editor', () => {
 		prompt.clear()
 	})
 
-	test('tab leaves a selection alone until multiline indentation is implemented', () => {
-		prompt.setText('one\ntwo')
-		prompt.handleKey(key('a', { cmd: true }), 80)
-		expect(prompt.handleKey(key('tab'), 80)).toBe(false)
-		expect(prompt.text()).toBe('one\ntwo')
-		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(false)
+	test('tab indents every selected logical row and keeps selection offsets for undo', () => {
+		select('one\ntwo\nthree', 1, 6)
+		expect(prompt.handleKey(key('tab'), 80)).toBe(true)
+		expect(prompt.text()).toBe('\tone\n\ttwo\nthree')
+		expect(prompt.snapshotState()).toMatchObject({ cursor: 8, selAnchor: 2 })
+
+		prompt.handleKey(key('z', { cmd: true }), 80)
+		expect(prompt.text()).toBe('one\ntwo\nthree')
+		expect(prompt.snapshotState()).toMatchObject({ cursor: 6, selAnchor: 1 })
 		prompt.clear()
 	})
 
-	test('shift-tab waits for deindentation support', () => {
+	test('tab excludes a row touched only by the selection endpoint', () => {
+		select('one\ntwo', 1, 4)
+		prompt.handleKey(key('tab'), 80)
+		expect(prompt.text()).toBe('\tone\ntwo')
+		expect(prompt.snapshotState()).toMatchObject({ cursor: 5, selAnchor: 2 })
 		prompt.clear()
-		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(false)
-		expect(prompt.text()).toBe('')
+	})
+
+	test('shift-tab deindents selected rows by one four-column level', () => {
+		const text = '\tone\n  \ttwo\n   three\nfour'
+		select(text, text.length, 0)
+		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(true)
+		expect(prompt.text()).toBe('one\ntwo\nthree\nfour')
+		expect(prompt.snapshotState()).toMatchObject({ cursor: 0, selAnchor: prompt.text().length })
+
+		prompt.handleKey(key('z', { cmd: true }), 80)
+		expect(prompt.text()).toBe(text)
+		expect(prompt.snapshotState()).toMatchObject({ cursor: 0, selAnchor: text.length })
+		prompt.clear()
+	})
+
+	test('shift-tab deindents the current logical row without a selection', () => {
+		prompt.setText('one\n  two', 'one\n  tw'.length)
+		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(true)
+		expect(prompt.text()).toBe('one\ntwo')
+		expect(prompt.cursorPos()).toBe('one\ntw'.length)
+		prompt.clear()
 	})
 
 	test('history recall places the cursor at the visual row end', () => {
