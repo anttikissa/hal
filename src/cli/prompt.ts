@@ -61,11 +61,9 @@ function rowColToCursor(input: string, row: number, col: number, width: number):
 	let vis = 0
 	for (let i = layout.starts[r]!; i < layout.ends[r]!;) {
 		const glyph = glyphWidthAt(input, i, vis)
-		if (vis + glyph.width > col) {
-			// A multi-column glyph has no cursor positions inside it, so choose its nearest edge.
-			if (glyph.width > 1 && col - vis >= glyph.width / 2) return i + glyph.length
-			return i
-		}
+		// A multi-column glyph has no cursor positions inside it, so choose its nearest edge.
+		if (vis + glyph.width > col && col - vis < glyph.width / 2) return i
+		if (vis + glyph.width > col) return i + glyph.length
 		vis += glyph.width
 		i += glyph.length
 	}

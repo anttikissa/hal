@@ -13,18 +13,14 @@ export function expandTabs(s: string, tabWidth = TAB_WIDTH): string {
 	if (!s.includes('\t')) return s
 	const lines: string[] = []
 	for (const line of s.split('\n')) {
-		let expanded = '', col = 0
-		const parts = line.split('\t')
-		for (let i = 0; i < parts.length; i++) {
-			const part = parts[i]!
-			expanded += part
-			col += visLen(part, col)
-			if (i === parts.length - 1) continue
+		let col = 0, last = 0
+		lines.push(line.replaceAll('\t', function expand(_tab, offset) {
+			col += visLen(line.slice(last, offset), col)
 			const spaces = tabWidth - (col % tabWidth)
-			expanded += ' '.repeat(spaces)
 			col += spaces
-		}
-		lines.push(expanded)
+			last = offset + 1
+			return ' '.repeat(spaces)
+		}))
 	}
 	return lines.join('\n')
 }
@@ -246,7 +242,7 @@ export function hardWrap(s: string, width: number): string[] {
 	let vis = 0, lineStart = 0, esc = false, osc = false
 	for (let i = 0; i < s.length; ) {
 		const cp = s.codePointAt(i)!
-		let glyph = glyphWidthAt(s, i, vis)
+		const glyph = glyphWidthAt(s, i, vis)
 		const cl = glyph.length
 		if (cp === 0x1b) { esc = true; i += cl; continue }
 		if (esc) {
@@ -259,9 +255,8 @@ export function hardWrap(s: string, width: number): string[] {
 			out.push(s.slice(lineStart, i))
 			lineStart = i
 			vis = 0
-			glyph = glyphWidthAt(s, i)
 		}
-		vis += glyph.width
+		vis += glyphWidthAt(s, i, vis).width
 		i += cl
 	}
 	if (lineStart < s.length) out.push(s.slice(lineStart))
