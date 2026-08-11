@@ -19,9 +19,11 @@ test('history-rebased reloads exactly the rebased log prefix', () => {
 
 test('prompt event keeps actual text behind display text', () => {
 	let block: any = null
+	const cleared: string[] = []
 	clientEvents.handle({ type: 'prompt', sessionId: 's1', text: 'Ask:\n\n[/tmp/hal/paste/0002.txt]', actualText: 'Ask:\n\nfull paste' }, {
 		flushDelayedPaused: () => {},
 		addBlockToTab: (_sessionId: string, value: any) => { block = value },
+		clearPendingPrompt: (sessionId: string) => { cleared.push(sessionId) }
 	})
 
 	expect(block).toMatchObject({
@@ -29,6 +31,7 @@ test('prompt event keeps actual text behind display text', () => {
 		text: 'Ask:\n\n[/tmp/hal/paste/0002.txt]',
 		actualText: 'Ask:\n\nfull paste',
 	})
+	expect(cleared).toEqual(['s1'])
 })
 
 test('runtime-start from promoted client is not described as restart', () => {

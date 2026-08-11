@@ -169,6 +169,7 @@ function makeTab(overrides: Partial<(typeof client.state.tabs)[number]> = {}): (
 function withOneTab(tab: (typeof client.state.tabs)[number], run: () => void): void {
 	const origTabs = client.state.tabs.slice()
 	const origFocusedTab = client.state.focusedTabIndex
+	const origPendingPromptTexts = new Map(client.state.pendingPromptTexts)
 	try {
 		client.state.tabs.length = 0
 		client.state.tabs.push(tab)
@@ -178,6 +179,8 @@ function withOneTab(tab: (typeof client.state.tabs)[number], run: () => void): v
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
 		client.state.focusedTabIndex = origFocusedTab
+		client.state.pendingPromptTexts.clear()
+		for (const [sessionId, text] of origPendingPromptTexts) client.state.pendingPromptTexts.set(sessionId, text)
 		prompt.clear()
 		popup.close()
 		promptEdit.cancel()
@@ -383,6 +386,59 @@ test('up while working before output edits the just-sent prompt', () => {
 		ipc.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
+	}
+})
+
+test('up immediately after submit pauses before shared working state arrives', () => {
+	const commands: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab({
+		inputHistory: ['old prompt'],
+		history: [{ type: 'user', text: 'old prompt' }, { type: 'assistant', text: 'old answer' }] as any[],
+	})
+	ipc.appendCommand = (command) => { commands.push(command) }
+
+	try {
+		withOneTab(tab, () => {
+			prompt.setText('original prompt')
+			expect(cli.forTests.handleAppKey(key('enter'))).toBe(true)
+
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
+			expect(prompt.text()).toBe('original prompt')
+			expect(commands).toEqual([
+				expect.objectContaining({ type: 'prompt', sessionId: 's1', text: 'original prompt' }),
+				{ type: 'abort', sessionId: 's1', abortText: '' },
+			])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.working.clear()
+		client.state.pendingPromptTexts.clear()
+		promptEdit.cancel()
+	}
+})
+
+test('host delivers prompt and abort directly instead of waiting for disk IPC', () => {
+	const disk: any[] = []
+	const urgent: any[] = []
+	const origAppendCommand = ipc.appendCommand
+	const tab = makeTab()
+	ipc.appendCommand = (command) => { disk.push(command) }
+	client.state.localCommandHandler = (command) => { urgent.push(command) }
+
+	try {
+		withOneTab(tab, () => {
+			client.sendCommand('prompt', 'hello')
+			client.sendCommand('abort', '')
+			expect(urgent).toEqual([
+				{ type: 'prompt', sessionId: 's1', text: 'hello', displayText: undefined, queue: undefined },
+				{ type: 'abort', sessionId: 's1', abortText: '' },
+			])
+			expect(disk).toEqual([])
+		})
+	} finally {
+		ipc.appendCommand = origAppendCommand
+		client.state.localCommandHandler = null
 	}
 })
 

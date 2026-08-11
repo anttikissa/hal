@@ -107,6 +107,11 @@ const state = {
 	model: null as string | null,
 	// Working state per session — true while a turn is in progress.
 	working: new Map<string, boolean>(),
+	// Submitted text stays locally pending until its prompt event arrives, closing
+	// the command-delivery window where Up must already pause the turn.
+	pendingPromptTexts: new Map<string, string>(),
+	// Host-local turn control bypasses disk IPC so prompt/abort ordering is synchronous.
+	localCommandHandler: null as ((command: ReturnType<typeof clientCommands.makeCommand>) => void) | null,
 	// Background /what summaries. Separate from normal working state so prompts still behave as idle.
 	summarizing: new Set<string>(),
 	whatDoneUnseen: new Set<string>(),
@@ -287,7 +292,8 @@ function applyLiveEventToTab(tab: Tab, event: any): { changed: boolean; toolBloc
 
 function isWorking(): boolean {
 	const tab = currentTab()
-	return tab ? (state.working.get(tab.sessionId) ?? false) : false
+	if (!tab) return false
+	return state.working.get(tab.sessionId) === true || state.pendingPromptTexts.has(tab.sessionId)
 }
 
 function setSummarizing(sessionId: string, active: boolean): void {
@@ -487,7 +493,14 @@ function sendCommand(type: ClientCommandType, text?: string, displayText?: strin
 	if (type === 'open') sessionTabs.state.pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') sessionTabs.state.pendingOpen = 'resume'
 	if (type === 'prompt') sessionTabs.state.pendingOpen = clientCommands.pendingTabActionForPrompt(text ?? '')
-	ipc.appendCommand(clientCommands.makeCommand(type, tab?.sessionId, text, displayText, queue))
+	const command = clientCommands.makeCommand(type, tab?.sessionId, text, displayText, queue)
+	const isTurnControl = type === 'prompt' || type === 'prompt-amend' || type === 'abort' || type === 'continue'
+	if (isTurnControl && state.localCommandHandler) state.localCommandHandler(command)
+	else ipc.appendCommand(command)
+	const isPromptTurn = type === 'prompt' || type === 'prompt-amend'
+	if (isPromptTurn && tab && text && !text.trimStart().startsWith('/') && (type === 'prompt-amend' || !queue || !isWorking())) {
+		state.pendingPromptTexts.set(tab.sessionId, text)
+	}
 	// Hide the retry/continue affordance immediately; the shared working state
 	// arrives on the next IPC update, but this client already queued the turn.
 	if (type === 'continue' && tab) state.working.set(tab.sessionId, true)
@@ -576,6 +589,9 @@ function applySharedState(shared: SharedState): void {
 function handleEvent(event: any): void {
 	clientEvents.handle(event, {
 		pid: state.pid,
+		clearPendingPrompt: (sessionId: string, text?: string) => {
+			if (text === undefined || state.pendingPromptTexts.get(sessionId) === text) state.pendingPromptTexts.delete(sessionId)
+		},
 		currentTab,
 		tabForSession,
 		addBlockToTab,

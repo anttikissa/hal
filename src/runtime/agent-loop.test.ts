@@ -55,6 +55,29 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 	})
 
 
+test('abort before tool dispatch keeps the tool from starting', async () => {
+	const sessionId = `test-abort-before-dispatch-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origDispatch = toolRegistry.dispatch
+	const ac = new AbortController()
+	let dispatches = 0
+	toolRegistry.dispatch = async () => {
+		dispatches++
+		return 'ran'
+	}
+	try {
+		const batch = agentLoop.executeToolBatch(sessionId, [{ id: 'tool-a', name: 'read', input: { path: 'x' } }], process.cwd(), ac.signal)
+		ac.abort()
+		const results = await batch
+		expect(dispatches).toBe(0)
+		expect(results[0]?.result).toBe('[interrupted]')
+	} finally {
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
+
 	test('streams partial output for each concurrent tool call', async () => {
 		const sessionId = `test-tool-output-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 		createdSessions.push(sessionId)

@@ -118,6 +118,7 @@ version.onChange(() => {
 function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
 	client.state.role = 'server'
+	client.state.localCommandHandler = (command) => { runtime.handleCommand(command) }
 	syncHostVersionState()
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
@@ -160,6 +161,7 @@ function tickElection(): void {
 		if (ipc.ownsHostLock()) return
 		isHost = false
 		client.state.role = 'client'
+		client.state.localCommandHandler = null
 		log.info('Lost host lock, exiting', { pid: process.pid, lockPid: ipc.readHostLock()?.pid ?? null })
 		process.exit(0)
 	}

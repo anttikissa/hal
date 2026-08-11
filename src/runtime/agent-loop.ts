@@ -387,11 +387,11 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	if (signal) {
 		if (signal.aborted) {
 			log.info('Agent loop skipped (signal already aborted)', { sessionId })
-			ac.abort()
+			ac.abort(signal.reason)
 		} else {
 			signal.addEventListener('abort', () => {
 				log.info('Agent loop abort via parent signal', { sessionId })
-				ac.abort()
+				ac.abort(signal.reason)
 			}, { once: true })
 		}
 	}
@@ -412,7 +412,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 		let hadTerminalError = false
 
 		async function finishAborted(): Promise<void> {
-			const abortText = state.abortTexts.has(ac) ? (state.abortTexts.get(ac) ?? '') : DEFAULT_ABORT_TEXT
+			const signalText = typeof loopSignal.reason === 'string' ? loopSignal.reason : DEFAULT_ABORT_TEXT
+			const abortText = state.abortTexts.has(ac) ? (state.abortTexts.get(ac) ?? '') : signalText
 			if (abortText) emitInfo(sessionId, abortText)
 			const est = context.estimateContext(messages, model, overheadBytes)
 			emitEvent(sessionId, {
@@ -897,6 +898,7 @@ async function executeToolsConcurrently(
 				if (signal.aborted) return finish('[interrupted]')
 				try {
 					const approval = await confirmToolCall(context.sessionId, call, signal)
+					if (signal.aborted) return finish('[interrupted]')
 					if (!approval.allowed) return finish('error: user rejected risky tool call')
 					const result = await toolRegistry.dispatch(call.name, call.input, {
 						...context,

@@ -843,6 +843,57 @@ test('a later abort cancels a continuation that is still waiting', async () => {
 })
 
 
+test('abort cancels a prompt before its agent controller is registered', async () => {
+	const sessionId = `test-pending-prompt-abort-${Date.now().toString(36)}`
+	const origQueueCommand = queueRunner.handleQueueSlashCommand
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origAbort = agentLoop.abort
+	const origOwnsHostLock = ipc.ownsHostLock
+	const entered = Promise.withResolvers<void>()
+	const release = Promise.withResolvers<void>()
+	const ran = Promise.withResolvers<void>()
+	let queueChecks = 0
+	let receivedSignal: AbortSignal | undefined
+
+	try {
+		ipc.ownsHostLock = () => true
+		queueRunner.handleQueueSlashCommand = async () => {
+			queueChecks++
+			if (queueChecks === 1) {
+				entered.resolve()
+				await release.promise
+			}
+			return false
+		}
+		agentLoop.abort = () => false
+		agentLoop.runAgentLoop = async (ctx) => {
+			receivedSignal = ctx.signal
+			ran.resolve()
+			return 'aborted'
+		}
+		await sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: new Date().toISOString(),
+			currentLog: 'history.asonl',
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.5',
+		})
+
+		runtime.handleCommand({ type: 'prompt', sessionId, text: 'do not run tools' })
+		await entered.promise
+		runtime.handleCommand({ type: 'abort', sessionId, abortText: '' })
+		release.resolve()
+		await ran.promise
+
+		expect(receivedSignal?.aborted).toBe(true)
+	} finally {
+		queueRunner.handleQueueSlashCommand = origQueueCommand
+		agentLoop.runAgentLoop = origRunAgentLoop
+		agentLoop.abort = origAbort
+		ipc.ownsHostLock = origOwnsHostLock
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
+	}
+})
 test('continue records a resuming notice after a paused turn', async () => {
 	const sessionId = `test-continue-resuming-${Date.now().toString(36)}`
 	const origRunAgentLoop = agentLoop.runAgentLoop
@@ -907,6 +958,56 @@ test('pending tools execute before provider replay can repair them as interrupte
 	} finally {
 		toolRegistry.dispatch = origDispatch
 		ipc.updateState = origUpdateState
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
+test('abort reaches resumed pending-tool batches and stops later tools', async () => {
+	const sessionId = `test-abort-pending-tools-${Date.now().toString(36)}`
+	const origDispatch = toolRegistry.dispatch
+	const origUpdateState = ipc.updateState
+	const origAbort = agentLoop.abort
+	const origConcurrency = agentLoop.config.maxToolConcurrency
+	const started = Promise.withResolvers<AbortSignal>()
+	const release = Promise.withResolvers<void>()
+	const dispatched: string[] = []
+	ipc.updateState = ((mutator: (state: any) => void) => {
+		const shared: any = { sessions: [], working: {}, summarizing: {}, updatedAt: '' }
+		mutator(shared)
+		return shared
+	}) as typeof ipc.updateState
+	agentLoop.abort = () => false
+	agentLoop.config.maxToolConcurrency = 1
+	toolRegistry.dispatch = async (_name, input: any, ctx) => {
+		dispatched.push(input.path)
+		started.resolve(ctx.signal)
+		await release.promise
+		return 'done'
+	}
+
+	try {
+		await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: '/tmp' })
+		await sessions.appendHistory(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'read' }], ts: new Date().toISOString() },
+			{ type: 'tool_call', toolId: 'tool-1', name: 'read', input: { path: 'one' }, ts: new Date().toISOString() },
+			{ type: 'tool_call', toolId: 'tool-2', name: 'read', input: { path: 'two' }, ts: new Date().toISOString() },
+			{ type: 'pending_tools', toolIds: ['tool-1', 'tool-2'], cwd: '/tmp', reason: 'soft-pause', ts: new Date().toISOString() },
+		])
+
+		const run = runtime.continuePendingTools(sessionId)
+		const signal = await started.promise
+		runtime.handleCommand({ type: 'abort', sessionId, abortText: '' })
+		expect(signal.aborted).toBe(true)
+		release.resolve()
+		await run
+		expect(dispatched).toEqual(['one'])
+		expect(sessions.loadHistory(sessionId).find((entry) => entry.type === 'tool_result' && entry.toolId === 'tool-2')).toBeDefined()
+	} finally {
+		toolRegistry.dispatch = origDispatch
+		ipc.updateState = origUpdateState
+		agentLoop.abort = origAbort
+		agentLoop.config.maxToolConcurrency = origConcurrency
 		sessions.deleteSession(sessionId)
 	}
 })

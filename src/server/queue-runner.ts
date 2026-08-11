@@ -28,7 +28,7 @@ function queueEntry(text: string, source?: string, displayText?: string): Queued
 async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
 	if (!text.trim()) return
 	if (!agentLoop.isWorking(sessionId) && !promptQueue.isHeld(sessionId)) {
-		await runtime.handlePrompt(sessionId, text, undefined, source, displayText)
+		await runtime.startPromptCommand(sessionId, text, source, displayText)
 		return
 	}
 	const count = promptQueue.append(sessionId, queueEntry(text, source, displayText))
@@ -64,7 +64,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 		return false
 	}
 	promptQueue.setHeld(sessionId, false)
-	await runtime.handlePrompt(sessionId, next.text, 'queued', next.source, next.displayText ?? next.text)
+	await runtime.startPromptCommand(sessionId, next.text, next.source, next.displayText ?? next.text, 'queued')
 	return true
 }
 

@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { tails } from './tail-file.ts'
 
-test('tail finds an append by polling', async () => {
+test('tail recovers an append through polling', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-tail-recovery-'))
 	const path = join(dir, 'events.asonl')
 	writeFileSync(path, '')
@@ -12,13 +12,13 @@ test('tail finds an append by polling', async () => {
 	try {
 		reader = tails.tailFile(path).getReader()
 		const read = reader.read()
-		// The tail is waiting at EOF. No filesystem notification is involved.
+		// Arm the EOF wait before appending so recovery has to observe a later size change.
 		await Bun.sleep(25)
 		appendFileSync(path, 'recovered')
 		const result = await Promise.race([
 			read,
 			Bun.sleep(500).then(() => {
-				throw new Error('tail did not recover the append by polling')
+				throw new Error('tail did not recover the append')
 			}),
 		])
 		expect(new TextDecoder().decode(result.value)).toBe('recovered')

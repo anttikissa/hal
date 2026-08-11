@@ -31,11 +31,19 @@ import { blob } from '../session/blob.ts'
 import { whatSummary } from '../session/what.ts'
 
 type PendingContinuation = { canceled: boolean }
+type PendingPrompt = {
+	controller: AbortController
+	task: Promise<void> | null
+}
 const state = {
 	openSessionIds: [] as string[],
 	currentSessionId: null as string | null,
 	activeRuntimePid: null as number | null,
 	stopPromptWatch: null as (() => void) | null,
+	/** Prompt commands that have started dispatching but do not yet have an agent controller. */
+	pendingPrompts: new Map<string, PendingPrompt>(),
+	/** Resumed local-tool batches need their own controller before a provider turn exists. */
+	pendingToolRuns: new Map<string, AbortController>(),
 	/** Continuations that are waiting for the turn they replace to finish. */
 	continuingTurns: new Map<string, PendingContinuation>(),
 }
@@ -264,7 +272,7 @@ function buildSessionState(meta: SessionMeta): SessionState {
 	}
 }
 
-async function handlePrompt(sessionId: string, text: string, label?: 'steering' | 'queued', source?: string, displayText?: string): Promise<void> {
+async function handlePrompt(sessionId: string, text: string, label?: 'steering' | 'queued', source?: string, displayText?: string, pending?: PendingPrompt): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
@@ -311,10 +319,10 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		sessionId,
 		createdAt: new Date().toISOString(),
 	})
-	await runGeneration(sessionId, text, source, displayText)
+	await runGeneration(sessionId, text, source, displayText, pending)
 }
 
-async function dispatchPromptCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
+async function dispatchPromptCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, label?: 'queued'): Promise<void> {
 	const steering = agentLoop.isWorking(sessionId)
 	if (steering && await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, true)) {
 		persistCommandInput(sessionId, text, source)
@@ -328,7 +336,35 @@ async function dispatchPromptCommand(sessionId: string, text: string, source?: s
 		const settled = agentLoop.abortAndWait(sessionId)
 		if (settled) await settled
 	}
-	await handlePrompt(sessionId, text, steering ? 'steering' : undefined, source, displayText)
+	await runtime.handlePrompt(sessionId, text, label ?? (steering ? 'steering' : undefined), source, displayText, pending)
+}
+
+function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
+	const previous = state.pendingPrompts.get(sessionId)
+	const pending: PendingPrompt = { controller: new AbortController(), task: null }
+	state.pendingPrompts.set(sessionId, pending)
+	const task = run(pending, previous)
+	pending.task = task
+	function clear(): void {
+		if (state.pendingPrompts.get(sessionId) === pending) state.pendingPrompts.delete(sessionId)
+	}
+	void task.then(clear, clear)
+	return task
+}
+
+function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued'): Promise<void> {
+	return trackPendingPrompt(sessionId, (pending) => dispatchPromptCommand(sessionId, text, source, displayText, pending, label))
+}
+
+function startPromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
+	return trackPendingPrompt(sessionId, (pending, previous) => handlePromptAmendCommand(sessionId, text, source, displayText, pending, previous))
+}
+
+function abortPendingPrompt(sessionId: string, abortText: string): Promise<void> | false {
+	const pending = state.pendingPrompts.get(sessionId)
+	if (!pending) return false
+	pending.controller.abort(abortText)
+	return pending.task ?? Promise.resolve()
 }
 
 async function resolvePromptParts(sessionId: string, text: string, displayText?: string): Promise<UserPart[]> {
@@ -359,6 +395,8 @@ function hasLiveTurnContent(sessionId: string): boolean {
 }
 
 async function continueTurn(sessionId: string, continuation: PendingContinuation): Promise<void> {
+	const pending = abortPendingPrompt(sessionId, '')
+	if (pending) await pending
 	if (agentLoop.isWorking(sessionId)) {
 		if (agentLoop.hasPauseBeforeTools(sessionId)) return
 		const settled = agentLoop.abortAndWait(sessionId, '')
@@ -408,8 +446,12 @@ async function amendLastPrompt(sessionId: string, text: string, source?: string,
 	return false
 }
 
-async function handlePromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
+async function handlePromptAmendCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, previous?: PendingPrompt): Promise<void> {
 	if (!text.trim()) return
+	if (previous) {
+		previous.controller.abort('')
+		if (previous.task) await previous.task
+	}
 	if (agentLoop.isWorking(sessionId)) {
 		const settled = agentLoop.abortAndWait(sessionId, '')
 		if (settled) await settled
@@ -421,10 +463,10 @@ async function handlePromptAmendCommand(sessionId: string, text: string, source?
 			sessionStore.clearLive(sessionId)
 			ipc.appendEvent({ type: 'history-rebased', sessionId, newLog: canceled.logName, entryCount: canceled.entryCount })
 		}
-		await handlePrompt(sessionId, text, undefined, source, displayText)
+		await handlePrompt(sessionId, text, undefined, source, displayText, pending)
 		return
 	}
-	await runGeneration(sessionId, '')
+	await runGeneration(sessionId, '', undefined, undefined, pending)
 }
 
 async function continuePendingTools(sessionId: string): Promise<boolean> {
@@ -434,6 +476,7 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 	// repairToolPairing() would correctly treat the missing tool results as an
 	// interruption and inject synthetic [interrupted] results.
 	const ac = new AbortController()
+	state.pendingToolRuns.set(sessionId, ac)
 	ipc.updateState((shared) => {
 		shared.working[sessionId] = true
 	})
@@ -448,13 +491,14 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 		sessionStore.resolvePendingTools(sessionId, pending.id)
 		return true
 	} finally {
+		if (state.pendingToolRuns.get(sessionId) === ac) state.pendingToolRuns.delete(sessionId)
 		ipc.updateState((shared) => {
 			delete shared.working[sessionId]
 		})
 	}
 }
 
-async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
+async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
@@ -483,6 +527,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 			cwd,
 			systemPrompt: promptResult.text,
 			messages,
+			signal: pending?.controller.signal,
 			onStatus: async (working) => {
 				ipc.updateState((state) => {
 					if (working) state.working[sessionId] = true
@@ -614,12 +659,12 @@ function handleCommand(cmd: Command): void {
 		case 'prompt': {
 			if (!sessionId) return
 			if (cmd.queue) void queueRunner.enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
-			else void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
+			else startPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
 		case 'prompt-amend': {
 			if (!sessionId) return
-			void handlePromptAmendCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
+			void startPromptAmendCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
 		case 'continue': {
@@ -647,7 +692,11 @@ function handleCommand(cmd: Command): void {
 				state.continuingTurns.delete(cmd.sessionId)
 			}
 			const abortText = cmd.abortText ?? (promptQueue.load(cmd.sessionId).length > 0 ? '' : USER_PAUSED_TEXT)
-			if (!agentLoop.abort(cmd.sessionId, abortText) && abortText !== '' && !continuation) emitInfo(cmd.sessionId, 'No working turn to pause')
+			const pending = abortPendingPrompt(cmd.sessionId, abortText)
+			const toolRun = state.pendingToolRuns.get(cmd.sessionId)
+			toolRun?.abort()
+			const working = agentLoop.abort(cmd.sessionId, abortText)
+			if (!pending && !toolRun && !working && abortText !== '' && !continuation) emitInfo(cmd.sessionId, 'No working turn to pause')
 			break
 		}
 		case 'reset': {
@@ -791,7 +840,6 @@ function handleCommand(cmd: Command): void {
 		}
 	}
 }
-
 function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): { ok: true; sessionId?: string } | { ok: false; reason: string } {
 	state.activeRuntimePid = process.pid
 	state.openSessionIds = []
@@ -802,6 +850,10 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	const metas = sessionStore.loadSessionMetas()
 	state.openSessionIds = metas.map((meta) => meta.id)
 	state.currentSessionId = state.openSessionIds[0] ?? null
+	for (const pending of state.pendingPrompts.values()) pending.controller.abort(RESTARTED_TEXT)
+	state.pendingPrompts.clear()
+	for (const controller of state.pendingToolRuns.values()) controller.abort()
+	state.pendingToolRuns.clear()
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
 		const target = tabs.activateTargetForCwd(opts.targetCwd)
@@ -900,6 +952,7 @@ export const runtime = {
 	runCompact,
 	handleCommand,
 	continuePendingTools,
+	startPromptCommand,
 	// Used by sibling server modules (tabs, model-notices) at call time.
 	broadcastSessions,
 	publishContextEstimate,

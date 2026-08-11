@@ -37,6 +37,7 @@ function handlePrompt(event: any, ctx: any): void {
 		status: event.label,
 		ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 	})
+	ctx.clearPendingPrompt?.(event.sessionId, event.actualText ?? event.text)
 }
 
 function handleStreamStart(event: any, ctx: any): void {
@@ -147,6 +148,7 @@ function handleRebaseResult(event: any, ctx: any): void {
 }
 
 function handleHistoryRebased(event: any, ctx: any): void {
+	ctx.clearPendingPrompt?.(event.sessionId)
 	const tab = ctx.tabForSession(event.sessionId)
 	if (!tab) return
 	ctx.reloadTabFromDisk(tab, { logName: event.newLog, entryLimit: event.entryCount })

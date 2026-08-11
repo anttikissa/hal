@@ -2,9 +2,8 @@ import { statSync, writeFileSync } from 'fs'
 
 /**
  * Tail a file from its current end, creating it if missing.
- * Reads are discovered by polling rather than filesystem notifications, which
- * can be dropped when several processes append to an IPC file at once.
- * cancel() stops a pending poll wait immediately.
+ * Polling avoids dropped filesystem notifications; the short interval keeps
+ * safety-critical IPC commands responsive. cancel() stops pending waits immediately.
  */
 function fileSize(path: string): number {
 	try {
@@ -33,7 +32,7 @@ function tailFile(path: string): ReadableStream<Uint8Array> {
 				if (wakePoll === wake) wakePoll = null
 				resolve()
 			}
-			timer = setTimeout(wake, 100)
+			timer = setTimeout(wake, 25)
 			wakePoll = wake
 		})
 	}
