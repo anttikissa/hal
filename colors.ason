@@ -12,17 +12,19 @@
 		bgC: 0.04,
 	},
 
-	// Hal's responses — warm orange.
+	// Hal's responses — a light warm amber, chosen for sustained reading on black.
+	// Its lower chroma and higher lightness preserve Hal's warm identity without
+	// the visual vibration of saturated orange in long answers.
 	// fg colors assistant text. cursor colors the active HAL cursor while Hal is
 	// thinking/streaming or shown as a busy tab marker. cursorIdle colors the
 	// idle cursor after Hal has finished its final message.
 	assistant: {
-		fg: ["$fgL", "$fgC", 55],
-		cursor: ["$fgL", "$fgC", 55],
-		cursorIdle: [0.56, 0, 55],
-		bg: [0, 0, 55],
-		bold: [0.90, 0.06, 55],
-		code: [0.86, 0.04, 55],
+		fg: [0.86, 0.10, 65],
+		cursor: [0.86, 0.10, 65],
+		cursorIdle: [0.56, 0, 65],
+		bg: [0, 0, 65],
+		bold: [0.92, 0.05, 65],
+		code: [0.88, 0.06, 65],
 	},
 
 	// Thinking — muted blue-grey, recedes visually
