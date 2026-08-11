@@ -11,6 +11,7 @@ import { processOutput } from '../utils/process-output.ts'
 import { sensitive } from './sensitive.ts'
 import { ason } from '../utils/ason.ts'
 import { cloc } from '../utils/cloc.ts'
+import { HAL_DIR } from '../state.ts'
 
 const config = {
 	/** Default timeout in milliseconds. */
@@ -30,8 +31,8 @@ interface CommitFileStat {
 	path: string
 	added: number
 	removed: number
-	locDelta: number
-	isCode: boolean
+	locDelta?: number
+	isCode?: boolean
 }
 
 interface CommitMetadata {
@@ -40,8 +41,8 @@ interface CommitMetadata {
 	message: string
 	summary: string
 	files: CommitFileStat[]
-	locDelta: number
-	locDeltaCode: number
+	locDelta?: number
+	locDeltaCode?: number
 }
 
 const COMMIT_META_START = '[hal-commit]'
@@ -108,9 +109,9 @@ function runGit(cwd: string, args: string[]): string {
 	return new TextDecoder().decode(proc.stdout).trim()
 }
 
-function changedFiles(cwd: string): CommitFileStat[] {
+function changedFiles(cwd: string, countLoc: boolean): CommitFileStat[] {
 	const numstat = runGit(cwd, ['diff-tree', '--root', '--no-commit-id', '--numstat', '-r', 'HEAD'])
-	const patch = runGit(cwd, ['show', '--format=', '--unified=0', '--no-ext-diff', 'HEAD'])
+	const patch = countLoc ? runGit(cwd, ['show', '--format=', '--unified=0', '--no-ext-diff', 'HEAD']) : ''
 	const changes = changedPatchLines(patch)
 	const files: CommitFileStat[] = []
 	for (const line of numstat.split('\n')) {
@@ -119,15 +120,18 @@ function changedFiles(cwd: string): CommitFileStat[] {
 		const added = Number(parts[0])
 		const removed = Number(parts[1])
 		const path = parts.at(-1) ?? ''
-		const locAdded = cloc.countText((changes.added.get(path) ?? []).join('\n'))
-		const locRemoved = cloc.countText((changes.removed.get(path) ?? []).join('\n'))
-		files.push({
+		const file: CommitFileStat = {
 			path,
 			added: Number.isFinite(added) ? added : 0,
 			removed: Number.isFinite(removed) ? removed : 0,
-			locDelta: locAdded - locRemoved,
-			isCode: isCodePath(path),
-		})
+		}
+		if (countLoc) {
+			const locAdded = cloc.countText((changes.added.get(path) ?? []).join('\n'))
+			const locRemoved = cloc.countText((changes.removed.get(path) ?? []).join('\n'))
+			file.locDelta = locAdded - locRemoved
+			file.isCode = isCodePath(path)
+		}
+		files.push(file)
 	}
 	return files
 }
@@ -150,19 +154,29 @@ function changedPatchLines(patch: string): { added: Map<string, string[]>; remov
 	return { added, removed }
 }
 
+// LOC counting knows only this repo's languages, comment syntax, and budget,
+// so it is reported for Hal's own commits and omitted everywhere else.
+function countsLoc(cwd: string): boolean {
+	const root = runGit(cwd, ['rev-parse', '--show-toplevel'])
+	return !!root && resolve(root) === resolve(HAL_DIR)
+}
+
 function commitMetadata(cwd: string): CommitMetadata | null {
 	const hash = runGit(cwd, ['show', '-s', '--format=%h', 'HEAD'])
 	if (!hash) return null
 	const branch = runGit(cwd, ['branch', '--show-current']) || 'HEAD'
 	const message = runGit(cwd, ['show', '-s', '--format=%B', 'HEAD'])
-	const files = changedFiles(cwd)
+	const countLoc = bash.countsLoc(cwd)
+	const files = changedFiles(cwd, countLoc)
+	const meta: CommitMetadata = { branch, hash, message, summary: commitSummary(files), files }
+	if (!countLoc) return meta
 	let locDelta = 0
 	let locDeltaCode = 0
 	for (const file of files) {
-		locDelta += file.locDelta
-		if (file.isCode) locDeltaCode += file.locDelta
+		locDelta += file.locDelta ?? 0
+		if (file.isCode) locDeltaCode += file.locDelta ?? 0
 	}
-	return { branch, hash, message, summary: commitSummary(files), files, locDelta, locDeltaCode }
+	return { ...meta, locDelta, locDeltaCode }
 }
 
 function appendCommitMetadata(out: string, command: string, cwd: string, code: number): string {
@@ -307,4 +321,4 @@ function init(): void {
 	toolRegistry.registerTool(bashTool)
 }
 
-export const bash = { config, stripCdCwd, killProcessTree, execute, init }
+export const bash = { config, stripCdCwd, killProcessTree, countsLoc, execute, init }

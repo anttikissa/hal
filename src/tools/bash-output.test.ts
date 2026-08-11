@@ -29,6 +29,9 @@ test('bash strips redundant cd prefix after normalizing cwd', () => {
 
 test('bash appends structured metadata for successful git commits', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-bash-commit-'))
+	// The scratch repo is not ~/.hal, so opt it into LOC counting explicitly.
+	const origCountsLoc = bash.countsLoc
+	bash.countsLoc = () => true
 	try {
 		Bun.spawnSync(['git', 'init'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' })
 		Bun.spawnSync(['git', 'config', 'user.email', 'a@test.com'], { cwd: dir })
@@ -45,6 +48,31 @@ test('bash appends structured metadata for successful git commits', async () => 
 		expect(out).toContain("path: 'a.ts'")
 		expect(out).toContain('locDelta: 1')
 		expect(out).toContain('locDeltaCode: 1')
+	} finally {
+		bash.countsLoc = origCountsLoc
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
+test('bash omits the LOC count for commits outside the Hal repo', async () => {
+	// LOC counting only understands this repo's language and comment syntax, so
+	// a Python project would otherwise report a meaningless "0 code lines".
+	const dir = mkdtempSync(join(tmpdir(), 'hal-bash-foreign-'))
+	try {
+		Bun.spawnSync(['git', 'init'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' })
+		Bun.spawnSync(['git', 'config', 'user.email', 'a@test.com'], { cwd: dir })
+		Bun.spawnSync(['git', 'config', 'user.name', 'Test'], { cwd: dir })
+		writeFileSync(join(dir, 'main.py'), 'def add(a, b):\n    # adds\n    return a + b\n')
+		const out = await bash.execute(
+			{ command: 'git add main.py && git commit -m "add main"' },
+			{ sessionId: 's', cwd: dir },
+		)
+
+		expect(out).toContain('[hal-commit]')
+		expect(out).toContain("path: 'main.py'")
+		expect(out).not.toContain('locDelta')
+		expect(out).not.toContain('isCode')
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
@@ -83,6 +111,8 @@ test('bash preserves paragraphs from separate git commit messages', async () => 
 
 test('bash commit metadata reports net loc delta', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-bash-commit-net-'))
+	const origCountsLoc = bash.countsLoc
+	bash.countsLoc = () => true
 	try {
 		Bun.spawnSync(['git', 'init'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' })
 		Bun.spawnSync(['git', 'config', 'user.email', 'a@test.com'], { cwd: dir })
@@ -100,6 +130,7 @@ test('bash commit metadata reports net loc delta', async () => {
 		expect(out).toContain('locDelta: 0')
 		expect(out).toContain('locDeltaCode: 0')
 	} finally {
+		bash.countsLoc = origCountsLoc
 		rmSync(dir, { recursive: true, force: true })
 	}
 })

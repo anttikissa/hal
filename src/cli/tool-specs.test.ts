@@ -182,6 +182,35 @@ test('bash git commit renders rich commit details instead of shell plumbing', ()
 	expect(lines.join('\n')).not.toContain('cd /Users/antti/.hal')
 })
 
+test('commit block outside the Hal repo lists files without LOC framing', () => {
+	// Foreign repos carry no locDelta/isCode, so there is no code-vs-test split
+	// and no LOC total to show.
+	const block: Block = {
+		type: 'tool',
+		name: 'bash',
+		input: { command: 'git commit -m "add main"' },
+		output: `[main 5ba831a] add main
+[hal-commit]
+{
+	branch: 'main',
+	hash: '5ba831a',
+	message: 'add main',
+	summary: '1 file changed, 3 insertions(+)',
+	files: [
+		{ path: 'main.py', added: 3, removed: 0 }
+	]
+}
+[/hal-commit]`,
+	}
+
+	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
+	expect(lines).toContain(' main 5ba831a · 1 file changed, 3 insertions(+)')
+	expect(lines).toContain('    3 −0   main.py')
+	expect(lines.join('\n')).not.toContain('LOC:')
+	expect(lines.join('\n')).not.toContain('Tests / docs / other')
+	expect(lines.join('\n')).not.toContain('Code')
+})
+
 test('bash git commit -F renders from metadata message', () => {
 	const block: Block = {
 		type: 'tool',

@@ -175,6 +175,14 @@ function formatCommitOutput(output: string, _cols: number): ToolFormatResult {
 	const meta = parseCommitMetadata(output)
 	if (!meta) return { bodyLines: [] }
 	const lines = [`${meta.branch} ${meta.hash} · ${meta.summary}`]
+	// Only Hal's own commits carry LOC data. Elsewhere there is no code-vs-test
+	// split to show, so list the files plainly.
+	const total = meta.locDelta ?? meta.locAdded
+	const codeTotal = meta.locDeltaCode ?? meta.locAddedCode
+	if (total === undefined || codeTotal === undefined) {
+		for (const file of meta.files) lines.push(fileStatLine(file))
+		return { bodyLines: lines, suppressOutput: true }
+	}
 	const other = meta.files.filter((file) => !file.isCode)
 	const code = meta.files.filter((file) => file.isCode)
 	if (other.length) {
@@ -185,8 +193,6 @@ function formatCommitOutput(output: string, _cols: number): ToolFormatResult {
 		lines.push('', 'Code')
 		for (const file of code) lines.push(fileStatLine(file))
 	}
-	const total = meta.locDelta ?? meta.locAdded ?? 0
-	const codeTotal = meta.locDeltaCode ?? meta.locAddedCode ?? 0
 	// Code LOC leads because that is the number under budget; the with-tests
 	// figure trails in parentheses as context.
 	lines.push('', resolveMarkers([md.mdInline(`LOC: **${signed(codeTotal)}** (with tests, ${signed(total)})`)])[0]!)
