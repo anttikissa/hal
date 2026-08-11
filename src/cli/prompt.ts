@@ -372,6 +372,10 @@ function indentRows(deindent: boolean): void {
 	}
 	cursor = remap(cursor)
 	if (selAnchor !== null) selAnchor = remap(selAnchor)
+	if (!deindent && selAnchor !== null) {
+		if (selAnchor < cursor) selAnchor = first
+		else cursor = first
+	}
 	buf = buf.slice(0, first) + after + buf.slice(last)
 	goalCol = null
 }

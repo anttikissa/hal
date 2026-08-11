@@ -83,11 +83,12 @@ describe('prompt editor', () => {
 		prompt.clear()
 	})
 
-	test('tab indents every selected logical row and keeps selection offsets for undo', () => {
+	test('tab indents selected rows and includes the first inserted tab in the selection', () => {
 		select('one\ntwo\nthree', 1, 6)
 		expect(prompt.handleKey(key('tab'), 80)).toBe(true)
 		expect(prompt.text()).toBe('\tone\n\ttwo\nthree')
-		expect(prompt.snapshotState()).toMatchObject({ cursor: 8, selAnchor: 2 })
+		expect(prompt.snapshotState()).toMatchObject({ cursor: 8, selAnchor: 0 })
+		expect(prompt.buildPrompt(80).lines[0]).toBe('\x1b[7m    one\x1b[27m')
 
 		prompt.handleKey(key('z', { cmd: true }), 80)
 		expect(prompt.text()).toBe('one\ntwo\nthree')
@@ -96,10 +97,10 @@ describe('prompt editor', () => {
 	})
 
 	test('tab excludes a row touched only by the selection endpoint', () => {
-		select('one\ntwo', 1, 4)
+		select('one\ntwo', 4, 1)
 		prompt.handleKey(key('tab'), 80)
 		expect(prompt.text()).toBe('\tone\ntwo')
-		expect(prompt.snapshotState()).toMatchObject({ cursor: 5, selAnchor: 2 })
+		expect(prompt.snapshotState()).toMatchObject({ cursor: 0, selAnchor: 5 })
 		prompt.clear()
 	})
 
