@@ -51,6 +51,14 @@ describe('prompt editor', () => {
 		prompt.clear()
 	})
 
+	test('tab leaves a selection alone until multiline indentation is implemented', () => {
+		prompt.setText('one\ntwo')
+		prompt.handleKey(key('a', { cmd: true }), 80)
+		expect(prompt.handleKey(key('tab'), 80)).toBe(false)
+		expect(prompt.text()).toBe('one\ntwo')
+		prompt.clear()
+	})
+
 	test('down keeps existing prompt viewport when cursor remains visible', () => {
 		prompt.config.maxPromptLines = 10
 		prompt.state.promptLineLimit = 3
