@@ -344,7 +344,7 @@ test('alt-enter queues prompt without binding cmd-enter', () => {
 			prompt.setText('do this next')
 			const queued = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: true, cmd: false })
 			expect(queued).toBe(true)
-			expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: 'do this next', delivery: 'queue' })])
+			expect(commands).toEqual([expect.objectContaining({ type: 'prompt', sessionId: 's1', text: 'do this next', queue: true })])
 			expect(prompt.text()).toBe('')
 
 			prompt.setText('cmd should not queue')
@@ -690,7 +690,7 @@ test('ctrl-q runs the next queued prompt', () => {
 		withOneTab(makeTab(), () => {
 			const handled = cli.forTests.handleAppKey({ key: 'q', shift: false, ctrl: true, alt: false, cmd: false })
 			expect(handled).toBe(true)
-			expect(commands).toEqual([{ type: 'queue-next', sessionId: 's1' }])
+			expect(commands).toEqual([{ type: 'run-next-from-queue', sessionId: 's1' }])
 		})
 	} finally {
 		ipc.appendCommand = origAppendCommand

@@ -174,7 +174,7 @@ function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind): stri
 	].join('\n')
 }
 
-function queuePromptCommand(sessionId: string, text: string, source?: string, delivery?: 'queue'): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, delivery, createdAt: new Date().toISOString() }) }
+function queuePromptCommand(sessionId: string, text: string, source?: string, queue?: boolean): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, queue, createdAt: new Date().toISOString() }) }
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
@@ -613,7 +613,7 @@ function handleCommand(cmd: Command): void {
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
-			if (cmd.delivery === 'queue') void queueRunner.enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
+			if (cmd.queue) void queueRunner.enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
 			else void dispatchPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
 			break
 		}
@@ -633,7 +633,7 @@ function handleCommand(cmd: Command): void {
 			else emitInfo(sessionId, 'No working turn to pause before local tools')
 			break
 		}
-		case 'queue-next': {
+		case 'run-next-from-queue': {
 			if (!sessionId) return
 			if (agentLoop.isWorking(sessionId)) emitInfo(sessionId, 'Session is working')
 			else void queueRunner.runNextQueuedPrompt(sessionId, false)
@@ -877,7 +877,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		.then(({ inbox }) => {
 			inbox.startWatching(signal, (sessionId, text, source, queue) => {
 				if (!state.openSessionIds.includes(sessionId)) return
-				queuePromptCommand(sessionId, text, source, queue ? 'queue' : undefined)
+				queuePromptCommand(sessionId, text, source, queue)
 			})
 		})
 		.catch((err) => {

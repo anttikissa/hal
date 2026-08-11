@@ -481,13 +481,13 @@ function prevTab(): void {
 // Track pending tab actions so a sessions update can focus the reopened/new tab.
 // Fork stays distinct because it also copies the draft from the parent.
 
-function sendCommand(type: ClientCommandType, text?: string, displayText?: string, delivery?: 'queue'): void {
+function sendCommand(type: ClientCommandType, text?: string, displayText?: string, queue?: boolean): void {
 	if (type !== 'close') clearRestoreTabHint()
 	const tab = currentTab()
 	if (type === 'open') sessionTabs.state.pendingOpen = text?.startsWith('fork:') ? 'fork' : 'open'
 	if (type === 'resume') sessionTabs.state.pendingOpen = 'resume'
 	if (type === 'prompt') sessionTabs.state.pendingOpen = clientCommands.pendingTabActionForPrompt(text ?? '')
-	ipc.appendCommand(clientCommands.makeCommand(type, tab?.sessionId, text, displayText, delivery))
+	ipc.appendCommand(clientCommands.makeCommand(type, tab?.sessionId, text, displayText, queue))
 	// Hide the retry/continue affordance immediately; the shared working state
 	// arrives on the next IPC update, but this client already queued the turn.
 	if (type === 'continue' && tab) state.working.set(tab.sessionId, true)

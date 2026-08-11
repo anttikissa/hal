@@ -634,7 +634,7 @@ test('working-safe slash command does not abort the running turn', async () => {
 
 
 test('working queue next reports working without consuming the queue', async () => {
-	const sessionId = `test-queue-next-working-${Date.now().toString(36)}`
+	const sessionId = `test-run-next-from-queue-working-${Date.now().toString(36)}`
 	const events: any[] = []
 	let aborts = 0
 	const origAppendEvent = ipc.appendEvent

@@ -231,7 +231,7 @@ function claudeCacheWarning(tab: (typeof client.state.tabs)[number] | null, text
 	return { contextTokens, thresholdTokens, ageText }
 }
 
-function openClaudeCacheWarning(text: string, displayText: string | undefined, warning: NonNullable<ReturnType<typeof claudeCacheWarning>>, delivery?: 'queue'): void {
+function openClaudeCacheWarning(text: string, displayText: string | undefined, warning: NonNullable<ReturnType<typeof claudeCacheWarning>>, queue?: boolean): void {
 	popup.openConfirm(
 		'Claude cache likely cold',
 		[
@@ -241,7 +241,7 @@ function openClaudeCacheWarning(text: string, displayText: string | undefined, w
 		],
 		['Send anyway', 'Switch to GPT', 'Cancel'],
 		(choice) => {
-			if (choice === 'Send anyway') submitPromptText(text, displayText, delivery)
+			if (choice === 'Send anyway') submitPromptText(text, displayText, queue)
 			if (choice === 'Switch to GPT') client.sendCommand('prompt', '/model gpt')
 			draw()
 		},
@@ -428,7 +428,7 @@ function continueAfterPromptEdit(active: NonNullable<typeof promptEdit.state.act
 	if (shouldContinue) client.sendCommand('continue')
 }
 
-function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, delivery?: 'queue'): void {
+function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, queue?: boolean): void {
 	const text = prompt.submitText().trim()
 	const displayText = prompt.text().trim()
 	if (!text) return
@@ -442,7 +442,7 @@ function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, d
 		return
 	}
 	promptEdit.cancel()
-	submit(text, delivery)
+	submit(text, queue)
 }
 
 function plainKey(k: KeyEvent, key: string): boolean {
@@ -453,7 +453,7 @@ function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 	const active = promptEdit.activeFor(client.currentTab()?.sessionId)
 	if (!active) return false
 	if (k.key === 'enter' && !k.shift && !k.ctrl && !k.cmd) {
-		submitPromptEdit(active, k.alt ? 'queue' : undefined)
+		submitPromptEdit(active, k.alt)
 		return true
 	}
 	if (plainKey(k, 'down') && !prompt.isBrowsingHistory() && prompt.atVerticalBoundary(1, contentWidth)) {
@@ -468,7 +468,7 @@ function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 	return false
 }
 
-function submitPromptText(text: string, displayText: string | undefined, delivery?: 'queue'): void {
+function submitPromptText(text: string, displayText: string | undefined, queue?: boolean): void {
 	completion.dismiss()
 	popup.close()
 	promptEdit.cancel()
@@ -476,7 +476,7 @@ function submitPromptText(text: string, displayText: string | undefined, deliver
 	prompt.pushHistory(text)
 	// Human typing now uses the same prompt command path as inbox messages.
 	// The runtime decides whether an working turn makes this behave like steering.
-	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, delivery)
+	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, queue)
 	prompt.clear()
 	clearSavedPromptState()
 	// Update tab's inputHistory + clear persisted draft
@@ -513,7 +513,7 @@ function handleLocalCommand(text: string): boolean {
 	return true
 }
 
-function submit(override?: string, delivery?: 'queue'): void {
+function submit(override?: string, queue?: boolean): void {
 	const text = (override ?? prompt.submitText()).trim()
 	const displayText = override === undefined ? prompt.text().trim() : undefined
 	if (!text) return
@@ -521,10 +521,10 @@ function submit(override?: string, delivery?: 'queue'): void {
 	const warning = override === undefined ? claudeCacheWarning(client.currentTab(), text) : null
 	if (warning) {
 		completion.dismiss()
-		openClaudeCacheWarning(text, displayText, warning, delivery)
+		openClaudeCacheWarning(text, displayText, warning, queue)
 		return
 	}
-	submitPromptText(text, displayText, delivery)
+	submitPromptText(text, displayText, queue)
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
@@ -739,7 +739,7 @@ function handleAppKey(k: KeyEvent): boolean {
 		}
 	}
 	if (k.key === 'q' && k.ctrl && !k.alt && !k.cmd) {
-		client.sendCommand('queue-next')
+		client.sendCommand('run-next-from-queue')
 		draw()
 		return true
 	}
@@ -755,7 +755,7 @@ function handleAppKey(k: KeyEvent): boolean {
 	}
 	// Alt-Enter queues the prompt for later instead of steering the working turn.
 	if (k.key === 'enter' && k.alt && !k.shift && !k.ctrl && !k.cmd) {
-		submit(undefined, 'queue')
+		submit(undefined, true)
 		draw()
 		return true
 	}

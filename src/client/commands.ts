@@ -13,10 +13,10 @@ function pendingTabActionForPrompt(text: string): PendingTabAction {
 	return false
 }
 
-function makeCommand(type: ClientCommandType, sessionId: string | undefined, text?: string, displayText?: string, delivery?: 'queue'): Command {
+function makeCommand(type: ClientCommandType, sessionId: string | undefined, text?: string, displayText?: string, queue?: boolean): Command {
 	switch (type) {
 		case 'prompt':
-			return { type, sessionId, text: text ?? '', displayText, delivery }
+			return { type, sessionId, text: text ?? '', displayText, queue }
 		case 'prompt-amend':
 			return { type, sessionId, text: text ?? '', displayText }
 		case 'open':
@@ -32,7 +32,7 @@ function makeCommand(type: ClientCommandType, sessionId: string | undefined, tex
 		case 'what':
 			return { type, sessionId, target: text ?? '' }
 		case 'continue':
-		case 'queue-next':
+		case 'run-next-from-queue':
 		case 'pause-before-tools':
 		case 'close':
 		case 'abort':
