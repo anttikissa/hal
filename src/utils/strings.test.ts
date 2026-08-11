@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { charWidth, visLen, wordWrap } from './strings.ts'
+import { charWidth, clipVisual, expandTabs, hardWrap, visLen, wordWrap } from './strings.ts'
 
 test('plain symbol glyphs match Ghostty single-cell width', () => {
 	for (const glyph of ['▪', '▫', '▶', '◀', '✓', '×', '✗', '✔', '✔️', '✖️', '☀', '❤', '⚠', '➡', '⬅', '⬆', '⬇', '←', '→', '↑', '↓', '…']) {
@@ -25,4 +25,15 @@ test('unicode width model keeps CJK wide and combining marks narrow', () => {
 test('word wrap uses emoji presentation sequence width', () => {
 	expect(wordWrap('ab☀️cd', 3)).toEqual(['ab', '☀️c', 'd'])
 	expect(charWidth('☀'.codePointAt(0)!)).toBe(1)
+})
+
+test('tabs use four-column stops after wide glyphs', () => {
+	expect(visLen('界\tX')).toBe(5)
+	expect(expandTabs('界\tX')).toBe('界  X')
+})
+
+test('wrapping and clipping measure literal tabs at their displayed width', () => {
+	expect(wordWrap('abc\tX', 4)).toEqual(['abc\t', 'X'])
+	expect(hardWrap('abc\tX', 4)).toEqual(['abc\t', 'X'])
+	expect(clipVisual('ab\tX', 4)).toBe('ab…')
 })

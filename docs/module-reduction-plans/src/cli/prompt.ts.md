@@ -68,7 +68,7 @@ Pros:
 Cons:
 
 - can be repo-LOC flat/up if moved without simplifying
-- current code is `.length`-based; a full `visLen()` rewrite needs tests and may grow first
+- source offsets and display columns must remain distinct through any extraction
 
 Verdict: recommended first architecture, with behavior-locking tests.
 
@@ -122,7 +122,7 @@ Add or verify tests for:
 - redo after grouped typing undo
 - wrapped selection rendering
 - exact-width blank-line cursor after edits
-- emoji/CJK prompt width behavior if touching layout
+- emoji/CJK/tab wrapping and vertical visual-column movement
 - cmd/option word movement around punctuation
 - async placeholder replacement when the placeholder is missing or cursor moved
 
@@ -144,10 +144,10 @@ export const promptLayout = {
 }
 ```
 
-Potential improvement:
+Width invariant:
 
-- use `visLen()` / width-aware helpers where practical
-- if a full width-correct rewrite grows too much, defer it and move current behavior first
+- preserve the existing `visLen()`-based tab and wide-glyph behavior
+- never replace display-column calculations with source `.length` shortcuts
 
 Expected impact:
 

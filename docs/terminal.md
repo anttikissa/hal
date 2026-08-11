@@ -64,6 +64,20 @@ to navigation hints such as `alt-#: goto` and `ctrl-n/p: switch`. It stays one
 row: tab-specific hints are dropped from lowest to highest priority, then the
 "Tabs:" label is dropped, rather than wrapping.
 
+### Text tab characters
+
+Prompt buffers preserve literal `\t` characters and display them at four-column
+tab stops. Frame lines must contain the corresponding spaces, not raw terminal
+tab controls; otherwise terminal state and selection styling can change their
+physical width behind the renderer's back.
+
+Source offsets and display columns are different coordinate systems. `.length`
+is valid for slicing the source buffer, but never for cursor columns, wrapping,
+clipping, or padding. Those calculations must use `visLen()` and the shared
+width-aware string helpers. Vertical cursor movement keeps its visual column;
+when that column falls inside a tab or another multi-column glyph, use the
+nearest valid source boundary.
+
 ### Height management
 
 `peak` is a high-water mark: the tallest any tab's history has ever been.

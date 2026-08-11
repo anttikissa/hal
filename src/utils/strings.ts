@@ -1,5 +1,6 @@
 // Terminal string utilities: visual width, word wrap, clipping.
 // See docs/terminal.md rule 4: no line may exceed terminal width.
+const TAB_WIDTH = 4
 
 /** Split text into lines. Handles both 'foo\nbar\n' and 'foo\nbar' → ['foo', 'bar']. */
 export function toLines(text: string): string[] {
@@ -7,39 +8,25 @@ export function toLines(text: string): string[] {
 	return text.endsWith('\n') ? text.slice(0, -1).split('\n') : text.split('\n')
 }
 
-/**
- * Expand tab characters to spaces. Tabs are position-dependent: each tab
- * advances to the next multiple of `tabWidth` columns. We walk the string
- * tracking column position so tabs in the middle of a line expand correctly.
- *
- * This MUST be called before visLen/wordWrap/clipVisual on any string that
- * might contain tabs. charWidth() returns 0 for tabs (since their width
- * depends on position), so visLen undercounts, bgLine overpads, and the
- * resulting line wraps to a second physical row — causing the "double lines"
- * rendering bug.
- */
-export function expandTabs(s: string, tabWidth = 4): string {
+/** Expand tabs to spaces at visual four-column stops without changing the source text. */
+export function expandTabs(s: string, tabWidth = TAB_WIDTH): string {
 	if (!s.includes('\t')) return s
-	let out = ''
-	let col = 0
-	for (const ch of s) {
-		if (ch === '\t') {
-			// Advance to next tab stop: at least 1 space, up to tabWidth
+	const lines: string[] = []
+	for (const line of s.split('\n')) {
+		let expanded = '', col = 0
+		const parts = line.split('\t')
+		for (let i = 0; i < parts.length; i++) {
+			const part = parts[i]!
+			expanded += part
+			col += visLen(part, col)
+			if (i === parts.length - 1) continue
 			const spaces = tabWidth - (col % tabWidth)
-			out += ' '.repeat(spaces)
+			expanded += ' '.repeat(spaces)
 			col += spaces
-		} else if (ch === '\n') {
-			out += ch
-			col = 0
-		} else {
-			out += ch
-			// ANSI escapes don't advance the column, but for tab expansion
-			// purposes this approximation is fine — tabs in ANSI sequences
-			// are vanishingly rare and the worst case is slightly too much padding.
-			col++
 		}
+		lines.push(expanded)
 	}
-	return out
+	return lines.join('\n')
 }
 function codePointLength(cp: number): number {
 	return cp > 0xffff ? 2 : 1
@@ -56,10 +43,11 @@ export function charWidth(cp: number): number {
 	return 1
 }
 
-/** Terminal display width and UTF-16 length for the glyph starting at index. */
-export function glyphWidthAt(s: string, i: number): { width: number; length: number } {
+/** Terminal display width and UTF-16 length for the glyph at `column`. */
+export function glyphWidthAt(s: string, i: number, column = 0): { width: number; length: number } {
 	const cp = s.codePointAt(i)!
 	const length = codePointLength(cp)
+	if (cp === 0x09) return { width: TAB_WIDTH - (column % TAB_WIDTH), length }
 	if (s.codePointAt(i + length) === 0xfe0f && isVs16WideBase(cp)) {
 		return { width: 2, length: length + 1 }
 	}
@@ -124,9 +112,9 @@ function isWide(cp: number): boolean {
 	)
 }
 
-/** Visible length of string (ignoring ANSI escapes, respecting wide chars). */
-export function visLen(s: string): number {
-	let n = 0,
+/** Visible width, with tabs advancing from `startColumn` to four-column stops. */
+export function visLen(s: string, startColumn = 0): number {
+	let n = startColumn,
 		esc = false,
 		osc = false
 	for (let i = 0; i < s.length;) {
@@ -150,11 +138,11 @@ export function visLen(s: string): number {
 			i += cl
 			continue
 		}
-		const glyph = glyphWidthAt(s, i)
+		const glyph = glyphWidthAt(s, i, n)
 		n += glyph.width
 		i += glyph.length
 	}
-	return n
+	return n - startColumn
 }
 
 /** Word-wrap an ANSI string. Walks codepoints, skips escapes, breaks at word boundaries. */
@@ -173,7 +161,7 @@ export function wordWrap(text: string, width: number): string[] {
 			wrappedTrailingSpace = false
 		for (let i = 0; i < raw.length; ) {
 			const cp = raw.codePointAt(i)!
-			const glyph = glyphWidthAt(raw, i)
+			const glyph = glyphWidthAt(raw, i, vis)
 			const cl = glyph.length
 			if (cp === 0x1b) {
 				esc = true
@@ -215,7 +203,7 @@ export function clipVisual(s: string, max: number): string {
 		cut = 0
 	for (let i = 0; i < s.length; ) {
 		const cp = s.codePointAt(i)!
-		const glyph = glyphWidthAt(s, i)
+		const glyph = glyphWidthAt(s, i, vis)
 		const cl = glyph.length
 		if (cp === 0x1b) {
 			esc = true
@@ -258,7 +246,7 @@ export function hardWrap(s: string, width: number): string[] {
 	let vis = 0, lineStart = 0, esc = false, osc = false
 	for (let i = 0; i < s.length; ) {
 		const cp = s.codePointAt(i)!
-		const glyph = glyphWidthAt(s, i)
+		let glyph = glyphWidthAt(s, i, vis)
 		const cl = glyph.length
 		if (cp === 0x1b) { esc = true; i += cl; continue }
 		if (esc) {
@@ -271,6 +259,7 @@ export function hardWrap(s: string, width: number): string[] {
 			out.push(s.slice(lineStart, i))
 			lineStart = i
 			vis = 0
+			glyph = glyphWidthAt(s, i)
 		}
 		vis += glyph.width
 		i += cl

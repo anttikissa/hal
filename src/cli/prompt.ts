@@ -47,7 +47,7 @@ function cursorToRowCol(input: string, absPos: number, width: number): { row: nu
 	const layout = getLayout(input, width)
 	for (let i = 0; i < layout.lines.length; i++) {
 		const nextStart = i < layout.lines.length - 1 ? layout.starts[i + 1]! : input.length + 1
-		if (absPos < nextStart) return { row: i, col: visLen(expandTabs(input.slice(layout.starts[i]!, Math.min(absPos, layout.ends[i]!)))) }
+		if (absPos < nextStart) return { row: i, col: visLen(input.slice(layout.starts[i]!, Math.min(absPos, layout.ends[i]!))) }
 	}
 	const last = layout.lines.length - 1
 	return { row: last, col: visLen(layout.lines[last] ?? '') }
@@ -60,8 +60,12 @@ function rowColToCursor(input: string, row: number, col: number, width: number):
 	const r = Math.max(0, Math.min(row, layout.lines.length - 1))
 	let vis = 0
 	for (let i = layout.starts[r]!; i < layout.ends[r]!;) {
-		const glyph = glyphWidthAt(input, i)
-		if (vis + glyph.width > col) return i
+		const glyph = glyphWidthAt(input, i, vis)
+		if (vis + glyph.width > col) {
+			// A multi-column glyph has no cursor positions inside it, so choose its nearest edge.
+			if (glyph.width > 1 && col - vis >= glyph.width / 2) return i + glyph.length
+			return i
+		}
 		vis += glyph.width
 		i += glyph.length
 	}
@@ -299,10 +303,9 @@ function loadHistoryText(text: string, dir: -1 | 1, contentWidth: number): void 
 	// History browsing is bash-like: recalled entries put the cursor at the end
 	// of the row selected by browse direction. Up enters an older entry on its
 	// bottom visual row; down enters a newer entry/draft on its top visual row.
-	const { lines } = getLayout(buf, contentWidth)
-	const targetRow = dir === -1 ? Math.max(0, lines.length - 1) : 0
-	const targetCol = lines[targetRow]?.length ?? 0
-	cursor = rowColToCursor(buf, targetRow, targetCol, contentWidth)
+	const layout = getLayout(buf, contentWidth)
+	const targetRow = dir === -1 ? Math.max(0, layout.lines.length - 1) : 0
+	cursor = layout.ends[targetRow] ?? buf.length
 	selAnchor = null
 	goalCol = null
 }

@@ -58,6 +58,26 @@ describe('prompt editor', () => {
 		prompt.clear()
 	})
 
+	test('up preserves visual column across tab-indented lines', () => {
+		prompt.setText('\tif\n\t\tprintf', '\tif\n'.length)
+		prompt.handleKey(key('up'), 80)
+		expect(prompt.cursorPos()).toBe(0)
+		prompt.clear()
+	})
+
+	test('vertical movement chooses the nearest edge of a tab', () => {
+		prompt.setText('\tX\nabc', '\tX\nabc'.length)
+		prompt.handleKey(key('up'), 80)
+		expect(prompt.cursorPos()).toBe(1)
+		prompt.clear()
+	})
+
+	test('tabs participate in prompt wrapping at their displayed width', () => {
+		prompt.setText('abc\tX')
+		expect(prompt.buildPrompt(4).lines).toEqual(['abc ', 'X'])
+		prompt.clear()
+	})
+
 	test('tab leaves a selection alone until multiline indentation is implemented', () => {
 		prompt.setText('one\ntwo')
 		prompt.handleKey(key('a', { cmd: true }), 80)
@@ -71,6 +91,15 @@ describe('prompt editor', () => {
 		prompt.clear()
 		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(false)
 		expect(prompt.text()).toBe('')
+	})
+
+	test('history recall places the cursor at the visual row end', () => {
+		prompt.setHistory(['界界X'])
+		prompt.setText('')
+		prompt.handleKey(key('up'), 80)
+		expect(prompt.cursorPos()).toBe(3)
+		prompt.setHistory([])
+		prompt.clear()
 	})
 
 	test('down keeps existing prompt viewport when cursor remains visible', () => {
