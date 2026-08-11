@@ -542,7 +542,7 @@ function handleKey(k: KeyEvent, contentWidth: number): boolean {
 
 	switch (k.key) {
 		case 'tab':
-			if (selRange()) return false
+			if (k.shift || selRange()) return false
 			replaceSelection('\t')
 			return true
 		case 'backspace':

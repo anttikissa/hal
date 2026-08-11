@@ -56,7 +56,14 @@ describe('prompt editor', () => {
 		prompt.handleKey(key('a', { cmd: true }), 80)
 		expect(prompt.handleKey(key('tab'), 80)).toBe(false)
 		expect(prompt.text()).toBe('one\ntwo')
+		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(false)
 		prompt.clear()
+	})
+
+	test('shift-tab waits for deindentation support', () => {
+		prompt.clear()
+		expect(prompt.handleKey(key('tab', { shift: true }), 80)).toBe(false)
+		expect(prompt.text()).toBe('')
 	})
 
 	test('down keeps existing prompt viewport when cursor remains visible', () => {
