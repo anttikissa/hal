@@ -131,10 +131,10 @@ function historyToBlocks(
 				result.push({ type: 'fork', text: `Tab forked to ${entry.child}.`, ts, dimmed })
 				break
 			case 'rebased_from':
-				result.push({ type: 'info', text: `Rebased from ${entry.log}.`, ts, dimmed })
-				break
 			case 'rebased_to':
-				result.push({ type: 'info', text: `Rebased to ${entry.log}.`, ts, dimmed })
+				// These link immutable history files for auditing; they are not
+				// chronological conversation events. Explicit /rebase separately
+				// reports completion at the point where the user performed it.
 				break
 			case 'cwd':
 				result.push({ type: 'info', text: `cwd: ${entry.from} -> ${entry.to}`, ts, dimmed })

@@ -74,3 +74,14 @@ test('historyToBlocks uses the session model for later assistant and thinking bl
 	expect(rendered[0]).toMatchObject({ type: 'thinking', model: 'openai/gpt-5.4', thinkingEffort: 'high' })
 	expect(rendered[1]).toMatchObject({ type: 'assistant', model: 'openai/gpt-5.4' })
 })
+
+
+test('historyToBlocks keeps rebase lineage out of the transcript', () => {
+	const result = blockData.historyToBlocks([
+		{ type: 'rebased_from', log: 'history.asonl', ts: '2026-04-15T14:54:00.000Z' },
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'rebased_to', log: 'history3.asonl', ts: '2026-04-15T14:55:00.000Z' },
+	] as any, 's1')
+
+	expect(result).toEqual([expect.objectContaining({ type: 'user', text: 'hello' })])
+})
