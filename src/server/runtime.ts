@@ -33,7 +33,7 @@ import { whatSummary } from '../session/what.ts'
 type PendingContinuation = { canceled: boolean }
 type PendingPrompt = {
 	controller: AbortController
-	task: Promise<void> | null
+	task: Promise<void>
 }
 const state = {
 	openSessionIds: [] as string[],
@@ -85,13 +85,11 @@ function flushPendingWhatResults(sessionId: string): void {
 
 type SpawnSpec = SpawnCommandData
 
-function errorMessage(err: unknown): string {
-	return err instanceof Error ? err.message : String(err)
-}
+function errorMessage(err: unknown): string { return err instanceof Error ? err.message : String(err) }
 
 function promptCommandName(text: string): string {
-	const match = text.trimStart().match(/^\/(\S+)/)
-	return match ? `/${match[1]}` : 'command'
+	const command = text.trimStart().match(/^\/(\S+)/)?.[1]
+	return command ? `/${command}` : 'command'
 }
 
 function formatCommandError(text: string, error: string): string {
@@ -100,10 +98,7 @@ function formatCommandError(text: string, error: string): string {
 	return `${command}: ${error}`
 }
 
-function broadcastSessions(): void {
-	tabs.syncSharedState()
-	restartPromptWatch()
-}
+function broadcastSessions(): void { tabs.syncSharedState(); restartPromptWatch() }
 
 function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', retryable?: boolean, usageBars?: true): void {
 	const createdAt = new Date().toISOString()
@@ -124,10 +119,7 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 	})
 }
 
-function shouldCloseSessionAfterGeneration(
-	meta: { spawnKind?: SpawnKind } | null | undefined,
-	result: AgentLoopResult,
-): boolean {
+function shouldCloseSessionAfterGeneration(meta: { spawnKind?: SpawnKind } | null | undefined, result: AgentLoopResult): boolean {
 	return meta?.spawnKind === 'subagent' && result === 'completed'
 }
 
@@ -155,9 +147,7 @@ function shouldShowResumingNotice(sessionId: string): boolean {
 	return false
 }
 
-function stateModel(model?: string): string {
-	return model ?? models.defaultModel()
-}
+function stateModel(model?: string): string { return model ?? models.defaultModel() }
 
 function recordSessionStateChanges(sessionId: string, prevCwd: string, nextCwd: string, prevModel?: string, nextModel?: string, ts = new Date().toISOString()): void {
 	const entries: HistoryEntry[] = []
@@ -341,15 +331,14 @@ async function dispatchPromptCommand(sessionId: string, text: string, source: st
 
 function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
 	const previous = state.pendingPrompts.get(sessionId)
-	const pending: PendingPrompt = { controller: new AbortController(), task: null }
+	const pending: PendingPrompt = { controller: new AbortController(), task: Promise.resolve() }
 	state.pendingPrompts.set(sessionId, pending)
-	const task = run(pending, previous)
-	pending.task = task
+	pending.task = run(pending, previous)
 	function clear(): void {
 		if (state.pendingPrompts.get(sessionId) === pending) state.pendingPrompts.delete(sessionId)
 	}
-	void task.then(clear, clear)
-	return task
+	void pending.task.then(clear, clear)
+	return pending.task
 }
 
 function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued'): Promise<void> {
@@ -364,7 +353,7 @@ function abortPendingPrompt(sessionId: string, abortText: string): Promise<void>
 	const pending = state.pendingPrompts.get(sessionId)
 	if (!pending) return false
 	pending.controller.abort(abortText)
-	return pending.task ?? Promise.resolve()
+	return pending.task
 }
 
 async function resolvePromptParts(sessionId: string, text: string, displayText?: string): Promise<UserPart[]> {
@@ -450,7 +439,7 @@ async function handlePromptAmendCommand(sessionId: string, text: string, source:
 	if (!text.trim()) return
 	if (previous) {
 		previous.controller.abort('')
-		if (previous.task) await previous.task
+		await previous.task
 	}
 	if (agentLoop.isWorking(sessionId)) {
 		const settled = agentLoop.abortAndWait(sessionId, '')
@@ -506,10 +495,8 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	const model = meta.model ?? models.defaultModel()
 	const promptResult = context.buildSystemPrompt({ model, cwd, sessionId })
 	if (text) {
-		const pending = sessionStore.findPendingTools(sessionId)
-		if (pending) sessionStore.resolvePendingTools(sessionId, pending.id)
-	}
-	if (text) {
+		const pendingTools = sessionStore.findPendingTools(sessionId)
+		if (pendingTools) sessionStore.resolvePendingTools(sessionId, pendingTools.id)
 		sessionStore.appendHistory(sessionId, [{
 			type: 'user',
 			parts: await resolvePromptParts(sessionId, text, displayText),

@@ -397,22 +397,15 @@ function beginPreviousPromptEdit(): boolean {
 	const tab = client.currentTab()
 	if (!tab) return false
 	const pendingText = client.state.pendingPromptTexts.get(tab.sessionId)
-	let block = lastUserBlock(tab)
-	if (pendingText) block = null
+	const block = pendingText ? null : lastUserBlock(tab)
 	const originalText = pendingText ?? block?.actualText ?? block?.text ?? client.getInputHistory().at(-1)
 	if (!originalText) return false
 	const working = client.isWorking()
 	if (!working) return false
-	let visibleOutput = hasVisibleOutputAfterLastUser(tab)
-	let sideEffectfulTool = hasSideEffectfulToolAfterLastUser(tab)
-	if (pendingText) {
-		visibleOutput = false
-		sideEffectfulTool = false
-	}
-	let mode: 'amend' | 'cancel' | 'copy' | 'side-effect-copy' = 'copy'
-	if (!visibleOutput) mode = 'amend'
-	else if (!sideEffectfulTool) mode = 'cancel'
-	else mode = 'side-effect-copy'
+	const visibleOutput = !pendingText && hasVisibleOutputAfterLastUser(tab)
+	const sideEffectfulTool = !pendingText && hasSideEffectfulToolAfterLastUser(tab)
+	let mode: 'amend' | 'cancel' | 'side-effect-copy' = 'amend'
+	if (visibleOutput) mode = sideEffectfulTool ? 'side-effect-copy' : 'cancel'
 	promptEdit.start({
 		sessionId: tab.sessionId,
 		mode,
