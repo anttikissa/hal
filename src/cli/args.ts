@@ -16,7 +16,7 @@ function helpText(): string {
 		'  -f, --fresh      Use a fresh isolated temporary state directory.',
 		'  -h, -?, --help   Show this help and exit.',
 		'      --state-dir <dir>  Use an existing state directory (or create it).',
-		'      --web[=<port>]    Serve the local web client (default port: 3000).',
+		'      --web[=<port>]    Serve the local web client (default port: 9001).',
 		'',
 		'No positional arguments are accepted yet.',
 	].join('\n')
@@ -48,7 +48,7 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 			continue
 		}
 		if (arg === '--web' || arg.startsWith('--web=')) {
-			const value = arg === '--web' ? '3000' : arg.slice('--web='.length)
+			const value = arg === '--web' ? '9001' : arg.slice('--web='.length)
 			webPort = Number(value)
 			if (!Number.isInteger(webPort) || webPort < 1 || webPort > 65535) return { ok: false, error: '--web port must be a number from 1 to 65535' }
 			continue
