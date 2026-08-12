@@ -5,6 +5,7 @@ set -uo pipefail
 hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
 args=()
+web=false
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		-f|--fresh)
@@ -24,12 +25,23 @@ while [ "$#" -gt 0 ]; do
 			export HAL_STATE_DIR="$state_dir"
 			shift
 			;;
+		--web|--web=*)
+			web=true
+			args+=("$1")
+			shift
+			;;
 		*)
 			args+=("$1")
 			shift
 			;;
 	esac
 done
+
+# The local browser client is part of the normal `./run` experience. Direct
+# `bun src/main.ts` remains useful for tests and starts without it.
+if [ "$web" = false ]; then
+	args+=("--web")
+fi
 
 while true; do
 	startup_epoch_ms="$(NO_COLOR=1 bun -e 'console.log(Date.now())')"

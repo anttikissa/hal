@@ -37,8 +37,15 @@ async function bundleClient(): Promise<string> {
 	return clientBuild
 }
 
+function nextPort(previousPort: number, tries: number, random = Math.random): number {
+	return previousPort + Math.floor((1 + random() * 2) ** tries)
+}
+
 function start(port: number, signal: AbortSignal): void {
-	const server = Bun.serve<{ id: string }>({
+	let server: Bun.Server<{ id: string }>
+	for (let tries = 1;; tries++) {
+		try {
+		server = Bun.serve<{ id: string }>({
 		hostname: '127.0.0.1',
 		port,
 		fetch: async (request, server) => {
@@ -64,7 +71,13 @@ function start(port: number, signal: AbortSignal): void {
 			open(ws) { ws.subscribe('web') },
 			message() {},
 		},
-	})
+		})
+			break
+		} catch (error: any) {
+			if (error?.code !== 'EADDRINUSE' || tries === 10) throw error
+			port = nextPort(port, tries)
+		}
+	}
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) server.publish('web', JSON.stringify({ sessionId: (event as any).sessionId }))
 	})()
@@ -72,4 +85,4 @@ function start(port: number, signal: AbortSignal): void {
 	runtime.emitInfo(ipc.readState().sessions[0]?.id ?? '', `Web client: http://127.0.0.1:${port}`)
 }
 
-export const web = { start }
+export const web = { start, nextPort }
