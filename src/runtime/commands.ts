@@ -18,6 +18,7 @@ import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
 import { version } from '../version.ts'
+import { time } from '../utils/time.ts'
 import { visLen } from '../utils/strings.ts'
 import { HAL_DIR } from '../state.ts'
 import { authLogin } from '../auth-login.ts'
@@ -204,10 +205,12 @@ function closedSessionLines(): string[] {
 		.filter((meta) => !openIds.has(meta.id))
 		.sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
 	if (closed.length === 0) return ['No closed sessions.']
-	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => {
-		if (!meta.name || meta.name === meta.id) return `  ${meta.id}`
-		return `  ${meta.id}  ${meta.name}`
-	})]
+	const rows = closed.slice(0, 20).map((meta) => ({
+		label: meta.name && meta.name !== meta.id ? `${meta.id}  ${meta.name}` : meta.id,
+		closedAt: meta.closedAt && time.formatLocalDateTime(meta.closedAt),
+	}))
+	const width = Math.max(...rows.map((row) => visLen(row.label)))
+	return ['Closed sessions:', ...rows.map((row) => `  ${padVisible(row.label, width)}${row.closedAt ? `  · closed ${row.closedAt}` : ''}`)]
 }
 
 interface ResumeLookup {

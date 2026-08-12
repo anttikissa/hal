@@ -475,7 +475,12 @@ test('/resume lists closed session names next to their IDs', async () => {
 
 	const result = await commands.executeCommand('/resume', makeSession())
 
-	expect(result).toEqual({ handled: true, output: 'Closed sessions:\n  04-zzz  closed tab\n  04-unnamed' })
+	expect(result.output).toContain('04-zzz  closed tab')
+	expect(result.output).toContain('04-unnamed')
+	const lines = result.output!.split('\n')
+	expect(lines[1]!.indexOf('· closed')).toBe(lines[2]!.indexOf('· closed'))
+	expect(lines[1]).toMatch(/· closed 13 Apr 10:00$/)
+	expect(lines[2]).toMatch(/· closed 13 Apr 09:00$/)
 })
 
 test('/resume validates the target before queueing', async () => {
