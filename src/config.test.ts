@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import { ason } from './utils/ason.ts'
 import { config } from './config.ts'
 import { liveFiles } from './utils/live-file.ts'
-import { models } from './models.ts'
+import { models } from './common/models.ts'
 import { client } from './client/app.ts'
 import { render } from './client/render.ts'
 

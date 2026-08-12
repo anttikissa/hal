@@ -18,6 +18,7 @@ import { startup } from './startup.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './client/terminal/args.ts'
 import { terminalOutput } from './client/terminal-output.ts'
+import { serverModels } from './server/models.ts'
 
 const parsedArgs = cliArgs.parse(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
 if (!parsedArgs.ok) {
@@ -38,6 +39,8 @@ ensureStateDir()
 perf.mark('State directories exist')
 config.init()
 perf.mark('Config initialized')
+serverModels.init()
+perf.mark('Model metadata initialized')
 colors.init()
 perf.mark('Colors initialized')
 openaiUsage.init()

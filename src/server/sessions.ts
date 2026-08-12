@@ -10,7 +10,7 @@ import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { liveEventBlocks } from '../live-event-blocks.ts'
 import type { PartialTokenUsage, SpawnKind, TurnEndMeta } from '../common/protocol.ts'
-import { models } from '../models.ts'
+import { models } from '../common/models.ts'
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
 const liveSessionMetas = new Map<string, SessionMeta>()

@@ -5,7 +5,7 @@
 //   thinking → tool₁ → tool₂ → assistant text
 
 import { ason } from '../../utils/ason.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
 import type { HistoryEntry } from '../../server/sessions.ts'
 import { sessionEntry } from '../../server/session/entry.ts'
 import { STATE_DIR } from '../../state.ts'

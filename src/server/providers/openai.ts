@@ -12,7 +12,7 @@ import { auth, type Credential } from '../../auth.ts'
 import { providerShared } from './shared.ts'
 import { openaiUsage } from '../../openai-usage.ts'
 import { reasoningSignature } from '../session/reasoning-signature.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
 import { ason } from '../../utils/ason.ts'
 
 const RESPONSES_API_URL = 'https://api.openai.com/v1/responses'

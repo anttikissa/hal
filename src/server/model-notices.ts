@@ -3,12 +3,13 @@
 
 import { ipc } from '../ipc.ts'
 import { protocol } from '../common/protocol.ts'
-import { models } from '../models.ts'
+import { models } from '../common/models.ts'
 import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { HAL_DIR } from '../state.ts'
 import { log } from '../utils/log.ts'
 import { modelRefresh } from './model-refresh.ts'
+import { serverModels } from './models.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'
@@ -58,7 +59,7 @@ function modelDiscoveryTarget(): SessionMeta | null {
 
 function suggestModelDiscoveries(previous: Record<string, number>, next: Record<string, number>): void {
 	const discoveries = models.modelDiscoveries(previous, next).filter((item) => {
-		return models.hasConfiguredDirectSource(item.model) && item.context > 0 && !/(embedding|image|tts|live|realtime|computer|robotics|omni)/.test(item.model)
+		return serverModels.hasConfiguredDirectSource(item.model) && item.context > 0 && !/(embedding|image|tts|live|realtime|computer|robotics|omni)/.test(item.model)
 	})
 	const updates = models.aliasUpdateSuggestions(previous, next)
 	if (discoveries.length === 0 && updates.length === 0) return
@@ -76,7 +77,7 @@ async function refreshModelMetadata(): Promise<void> {
 		// Context changes remain quiet unless that model has a configured direct route.
 		const changes = result.changes.filter((change) => {
 			if (change.startsWith('new ')) return false
-			return models.hasConfiguredDirectSource(change.split(' context ')[0]!)
+			return serverModels.hasConfiguredDirectSource(change.split(' context ')[0]!)
 		})
 		if (!result.hadCache || changes.length > 0) {
 			const message = modelRefresh.formatModelRefreshMessage(changes, result.modelCount)

@@ -6,7 +6,7 @@ import { ipc } from '../../ipc.ts'
 import { sessions as sessionStore } from '../../server/sessions.ts'
 import { completion } from './completion.ts'
 import { completionHints } from './completion-hints.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
 
 const origReadState = ipc.readState
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas

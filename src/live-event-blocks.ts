@@ -1,4 +1,4 @@
-import { models } from './models.ts'
+import { models } from './common/models.ts'
 
 // Shared live-block mutation rules.
 //

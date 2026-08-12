@@ -6,7 +6,7 @@
 // 	bun scripts/analyze-history.ts --limit=20 --batch=4,8,16 --retry-rate=0.01
 
 import type { Message, ContentBlock } from '../src/common/protocol.ts'
-import { models } from '../src/models.ts'
+import { models } from '../src/common/models.ts'
 import { sessions } from '../src/server/sessions.ts'
 import { apiMessages } from '../src/server/session/api-messages.ts'
 

@@ -45,7 +45,8 @@ import { existsSync, readFileSync, realpathSync, watch } from 'fs'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { HAL_DIR, STATE_DIR } from '../../state.ts'
 import { sessions } from '../sessions.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
+import { serverModels } from '../models.ts'
 import { tokenCalibration } from '../token-calibration.ts'
 import type { Message, ContentBlock } from '../../common/protocol.ts'
 import { time } from '../../utils/time.ts'
@@ -377,7 +378,7 @@ function estimateContext(
 ): { used: number; max: number; estimated: true } {
 	let totalBytes = Math.max(0, overheadBytes)
 	for (const msg of messages) totalBytes += messageBytes(msg)
-	const max = models.contextWindow(modelId)
+	const max = serverModels.contextWindow(modelId)
 	return { used: tokenCalibration.estimateTokens(totalBytes, modelId), max, estimated: true as const }
 }
 

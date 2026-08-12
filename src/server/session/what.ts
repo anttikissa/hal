@@ -1,5 +1,5 @@
 import { ipc } from '../../ipc.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { protocol, type Message } from '../../common/protocol.ts'
 import { sessions, type HistoryEntry, type SessionMeta } from '../sessions.ts'

@@ -8,7 +8,8 @@ import { existsSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { ipc } from '../../ipc.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
+import { serverModels } from '../models.ts'
 import { ason } from '../../utils/ason.ts'
 import { config } from '../../config.ts'
 import { context } from './system-prompt.ts'
@@ -672,7 +673,7 @@ handlers['check'] = async (args, session, hooks) => {
 		const lines = [checked.message]
 		if (checked.result.hadCache) {
 			const updates = models.aliasUpdateSuggestions(checked.result.previous, checked.result.next)
-			const discoveries = models.modelDiscoveries(checked.result.previous, checked.result.next).filter((item) => models.hasConfiguredDirectSource(item.model))
+			const discoveries = models.modelDiscoveries(checked.result.previous, checked.result.next).filter((item) => serverModels.hasConfiguredDirectSource(item.model))
 			if (updates.length || discoveries.length) lines.push('', modelRefresh.buildNewModelDiscoveryText(discoveries, updates))
 		}
 		return { output: lines.join('\n'), handled: true }

@@ -3,7 +3,7 @@
 // operations on it.
 
 import { ipc } from '../ipc.ts'
-import { models } from '../models.ts'
+import { models } from '../common/models.ts'
 import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
 import { sessionIds } from './session/ids.ts'
 import { openingSummary } from './session/opening-summary.ts'

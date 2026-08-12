@@ -2,7 +2,7 @@
 
 import type { HistoryEntry } from '../sessions.ts'
 import { sessions } from '../sessions.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
 import { sessionEntry } from './entry.ts'
 
 export interface ReplayBlock {

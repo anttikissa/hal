@@ -4,7 +4,7 @@
 // per-tool display logic in tool-specs.ts.
 
 import { clipVisual, expandTabs, hardWrap, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, resolveMarkers, visLen, wordWrap } from '../../utils/strings.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
 import { time } from '../../utils/time.ts'
 import { subscriptionUsage } from '../../subscription-usage.ts'
 import { colors } from './colors.ts'

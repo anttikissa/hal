@@ -1,5 +1,6 @@
 import { config } from '../config.ts'
-import { models } from '../models.ts'
+import { models } from '../common/models.ts'
+import { serverModels } from './models.ts'
 
 function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
 	if (changes.length === 0) return `Fetched recent data from models.dev (${modelCount ?? 0} models)`
@@ -30,8 +31,8 @@ function buildNewModelDiscoveryText(discoveries: Array<{ provider: string; model
 	return lines.join('\n')
 }
 
-async function checkModels(): Promise<{ result: Awaited<ReturnType<typeof models.refreshModels>>; message: string }> {
-	const result = await models.refreshModels()
+async function checkModels(): Promise<{ result: Awaited<ReturnType<typeof serverModels.refreshModels>>; message: string }> {
+	const result = await serverModels.refreshModels()
 	return {
 		result,
 		message: modelRefresh.formatModelRefreshMessage(result.changes, result.modelCount),

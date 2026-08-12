@@ -8,7 +8,8 @@ import { sessions } from './sessions.ts'
 import { ipc } from '../ipc.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { context } from './runtime/system-prompt.ts'
-import { models } from '../models.ts'
+import { models } from '../common/models.ts'
+import { serverModels } from './models.ts'
 import { modelRefresh } from './model-refresh.ts'
 import { config } from '../config.ts'
 import { HAL_DIR } from '../state.ts'
@@ -55,17 +56,17 @@ test('new model report explains the configured default', () => {
 test('model metadata refresh notice goes only to focused session', async () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
-	const origRefreshModels = models.refreshModels
+	const origRefreshModels = serverModels.refreshModels
 	const origAppendHistorySync = sessions.appendHistorySync
 	const origAppendEvent = ipc.appendEvent
-	const origHasConfiguredDirectSource = models.hasConfiguredDirectSource
-	models.hasConfiguredDirectSource = () => true
+	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
+	serverModels.hasConfiguredDirectSource = () => true
 	const histories: any[] = []
 	const events: any[] = []
 
 	runtime.state.openSessionIds = ['04-left', '04-current', '04-right']
 	runtime.state.currentSessionId = '04-current'
-	models.refreshModels = async () => ({
+	serverModels.refreshModels = async () => ({
 		fetched: true,
 		hadCache: true,
 		changes: ['claude-opus-4-8 context 200k → 1000k'],
@@ -88,19 +89,19 @@ test('model metadata refresh notice goes only to focused session', async () => {
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
-		models.refreshModels = origRefreshModels
+		serverModels.refreshModels = origRefreshModels
 		sessions.appendHistorySync = origAppendHistorySync
 		ipc.appendEvent = origAppendEvent
-		models.hasConfiguredDirectSource = origHasConfiguredDirectSource
+		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
 	}
 })
 
 
 test('automatic model metadata refresh checks new model ids for configured routes', async () => {
-	const origRefreshModels = models.refreshModels
+	const origRefreshModels = serverModels.refreshModels
 	const origSuggestModelDiscoveries = modelNotices.suggestModelDiscoveries
 	let discoveryPrompts = 0
-	models.refreshModels = async () => ({
+	serverModels.refreshModels = async () => ({
 		fetched: true,
 		hadCache: true,
 		changes: [],
@@ -113,7 +114,7 @@ test('automatic model metadata refresh checks new model ids for configured route
 		await modelNotices.refreshModelMetadata()
 		expect(discoveryPrompts).toBe(1)
 	} finally {
-		models.refreshModels = origRefreshModels
+		serverModels.refreshModels = origRefreshModels
 		modelNotices.suggestModelDiscoveries = origSuggestModelDiscoveries
 	}
 })
@@ -127,8 +128,8 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origAppendHistorySync = sessions.appendHistorySync
 	const origAppendEvent = ipc.appendEvent
-	const origHasConfiguredDirectSource = models.hasConfiguredDirectSource
-	models.hasConfiguredDirectSource = (model) => model !== 'claude-mythos-5'
+	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
+	serverModels.hasConfiguredDirectSource = (model) => model !== 'claude-mythos-5'
 	const histories: any[] = []
 	const events: any[] = []
 
@@ -174,7 +175,7 @@ test('suggestModelDiscoveries shows configured aliases and ignores unavailable m
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.appendHistorySync = origAppendHistorySync
 		ipc.appendEvent = origAppendEvent
-		models.hasConfiguredDirectSource = origHasConfiguredDirectSource
+		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
 	}
 })
 
@@ -189,8 +190,8 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 	const origAppendEvent = ipc.appendEvent
 	const origUpdateState = ipc.updateState
 	const origWatchPromptFiles = context.watchPromptFiles
-	const origHasConfiguredDirectSource = models.hasConfiguredDirectSource
-	models.hasConfiguredDirectSource = () => true
+	const origHasConfiguredDirectSource = serverModels.hasConfiguredDirectSource
+	serverModels.hasConfiguredDirectSource = () => true
 	const events: any[] = []
 	const shared: any = { sessions: [], working: {}, updatedAt: '' }
 
@@ -240,7 +241,7 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 		ipc.appendEvent = origAppendEvent
 		ipc.updateState = origUpdateState
 		context.watchPromptFiles = origWatchPromptFiles
-		models.hasConfiguredDirectSource = origHasConfiguredDirectSource
+		serverModels.hasConfiguredDirectSource = origHasConfiguredDirectSource
 		sessions.deactivateAllSessions()
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR

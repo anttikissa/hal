@@ -3,7 +3,7 @@
 
 import { lineEditor } from './terminal/line-editor.ts'
 import { colors } from './terminal/colors.ts'
-import { models } from '../models.ts'
+import { models } from '../common/models.ts'
 import { clipVisual, hardWrap, visLen } from '../utils/strings.ts'
 import type { KeyEvent } from './terminal/keys.ts'
 

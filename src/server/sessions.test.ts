@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'fs'
 import { sessions } from './sessions.ts'
 import { replay } from './session/replay.ts'
 import { ipc } from '../ipc.ts'
-import { models } from '../models.ts'
+import { models } from '../common/models.ts'
 
 const createdIds: string[] = []
 

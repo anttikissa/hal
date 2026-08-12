@@ -6,7 +6,8 @@ import { agentLoop } from './agent-loop.ts'
 import { anthropicUsage } from '../../anthropic-usage.ts'
 import { openaiUsage } from '../../openai-usage.ts'
 import { memory } from '../../memory.ts'
-import { models } from '../../models.ts'
+import { models } from '../../common/models.ts'
+import { serverModels } from '../models.ts'
 import { ipc } from '../../ipc.ts'
 import { version } from '../../version.ts'
 import { sessions as sessionStore } from '../sessions.ts'
@@ -33,7 +34,7 @@ const origScheduleExit = commands.state.scheduleExit
 const origReadState = ipc.readState
 const origOwnsHostLock = ipc.ownsHostLock
 
-const origRefreshModels = models.refreshModels
+const origRefreshModels = serverModels.refreshModels
 const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
 const origLoadSessionMeta = sessionStore.loadSessionMeta
 const origLoadAllHistory = sessionStore.loadAllHistory
@@ -80,7 +81,7 @@ afterEach(() => {
 	ipc.readState = origReadState
 	ipc.ownsHostLock = origOwnsHostLock
 	version.state.repoDir = origVersionState.repoDir
-	models.refreshModels = origRefreshModels
+	serverModels.refreshModels = origRefreshModels
 	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
 	sessionStore.loadSessionMeta = origLoadSessionMeta
 	sessionStore.loadAllHistory = origLoadAllHistory
@@ -215,7 +216,7 @@ test('/clients lists server and client versions', async () => {
 })
 
 test('/check refreshes model metadata and reports alias updates', async () => {
-	models.refreshModels = async () => ({
+	serverModels.refreshModels = async () => ({
 		fetched: true,
 		changes: ['new Claude model claude-opus-5-1 (1000k)'],
 		modelCount: 257,
