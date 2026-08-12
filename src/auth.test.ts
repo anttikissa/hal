@@ -29,6 +29,18 @@ describe('auth.getCredential — single account (backward compat)', () => {
 		expect(cred!.type).toBe('token')
 	})
 
+	test('Gemini API key enables the Google route', () => {
+		const original = process.env.GEMINI_API_KEY
+		try {
+			auth._setStoreForTest({})
+			process.env.GEMINI_API_KEY = 'gemini-key'
+			expect(auth.getCredential('google')?.value).toBe('gemini-key')
+		} finally {
+			if (original === undefined) delete process.env.GEMINI_API_KEY
+			else process.env.GEMINI_API_KEY = original
+		}
+	})
+
 	test('single object entry with email returns email', () => {
 		auth._setStoreForTest({
 			openai: { accessToken: 'tok_1', email: 'a@test.com' },

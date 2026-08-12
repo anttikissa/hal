@@ -44,6 +44,8 @@ test('model metadata refresh notice goes only to focused session', async () => {
 	const origRefreshModels = models.refreshModels
 	const origAppendHistorySync = sessions.appendHistorySync
 	const origAppendEvent = ipc.appendEvent
+	const origHasConfiguredDirectSource = models.hasConfiguredDirectSource
+	models.hasConfiguredDirectSource = () => true
 	const histories: any[] = []
 	const events: any[] = []
 
@@ -52,7 +54,7 @@ test('model metadata refresh notice goes only to focused session', async () => {
 	models.refreshModels = async () => ({
 		fetched: true,
 		hadCache: true,
-		changes: ['new Claude model claude-opus-4-7 (1000k)'],
+		changes: ['claude-opus-4-8 context 200k → 1000k'],
 		modelCount: 123,
 		previous: { 'claude-opus-4-8': 1_000_000 },
 		next: { 'claude-opus-4-8': 1_000_000, 'claude-opus-4-9': 1_000_000 },
@@ -75,11 +77,12 @@ test('model metadata refresh notice goes only to focused session', async () => {
 		models.refreshModels = origRefreshModels
 		sessions.appendHistorySync = origAppendHistorySync
 		ipc.appendEvent = origAppendEvent
+		models.hasConfiguredDirectSource = origHasConfiguredDirectSource
 	}
 })
 
 
-test('automatic model metadata refresh does not prompt for new model ids', async () => {
+test('automatic model metadata refresh checks new model ids for configured routes', async () => {
 	const origRefreshModels = models.refreshModels
 	const origSuggestAliasUpdates = modelNotices.suggestAliasUpdates
 	const origSuggestModelDiscoveries = modelNotices.suggestModelDiscoveries
@@ -96,7 +99,7 @@ test('automatic model metadata refresh does not prompt for new model ids', async
 	modelNotices.suggestModelDiscoveries = () => { discoveryPrompts++ }
 	try {
 		await modelNotices.refreshModelMetadata()
-		expect(discoveryPrompts).toBe(0)
+		expect(discoveryPrompts).toBe(1)
 	} finally {
 		models.refreshModels = origRefreshModels
 		modelNotices.suggestAliasUpdates = origSuggestAliasUpdates
@@ -177,6 +180,8 @@ test('suggestModelDiscoveries emits a low-key informational notice for new Anthr
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origAppendHistorySync = sessions.appendHistorySync
 	const origAppendEvent = ipc.appendEvent
+	const origHasConfiguredDirectSource = models.hasConfiguredDirectSource
+	models.hasConfiguredDirectSource = (model) => model !== 'claude-mythos-5'
 	const histories: any[] = []
 	const events: any[] = []
 
@@ -201,6 +206,7 @@ test('suggestModelDiscoveries emits a low-key informational notice for new Anthr
 				'claude-fable-5': 1_000_000,
 				'anthropic/claude-fable-5': 1_000_000,
 				'openai/gpt-5.5-instant': 400_000,
+				'claude-mythos-5': 1_000_000,
 			},
 		)
 		expect(histories).toHaveLength(1)
@@ -210,6 +216,7 @@ test('suggestModelDiscoveries emits a low-key informational notice for new Anthr
 		expect(events[0].text).toContain('ℹ️ New model ids found in models.dev')
 		expect(events[0].text).toContain('Anthropic claude-fable-5')
 		expect(events[0].text).toContain('OpenAI gpt-5.5-instant')
+		expect(events[0].text).not.toContain('claude-mythos-5')
 		expect(events[0].text).toContain('This is informational')
 		expect(events[0].text).not.toContain('Would you like')
 		expect(events[0].text).not.toContain('🚨')
@@ -219,6 +226,7 @@ test('suggestModelDiscoveries emits a low-key informational notice for new Anthr
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.appendHistorySync = origAppendHistorySync
 		ipc.appendEvent = origAppendEvent
+		models.hasConfiguredDirectSource = origHasConfiguredDirectSource
 	}
 })
 
@@ -233,6 +241,8 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 	const origAppendEvent = ipc.appendEvent
 	const origUpdateState = ipc.updateState
 	const origWatchPromptFiles = context.watchPromptFiles
+	const origHasConfiguredDirectSource = models.hasConfiguredDirectSource
+	models.hasConfiguredDirectSource = () => true
 	const events: any[] = []
 	const shared: any = { sessions: [], working: {}, updatedAt: '' }
 
@@ -282,6 +292,7 @@ test('suggestModelDiscoveries opens a new Hal tab when focused session will resu
 		ipc.appendEvent = origAppendEvent
 		ipc.updateState = origUpdateState
 		context.watchPromptFiles = origWatchPromptFiles
+		models.hasConfiguredDirectSource = origHasConfiguredDirectSource
 		sessions.deactivateAllSessions()
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR

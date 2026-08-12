@@ -66,7 +66,7 @@ function modelDiscoveryTarget(): SessionMeta | null {
 }
 
 function suggestModelDiscoveries(previous: Record<string, number>, next: Record<string, number>): void {
-	const discoveries = models.modelDiscoveries(previous, next)
+	const discoveries = models.modelDiscoveries(previous, next).filter((item) => models.hasConfiguredDirectSource(item.model))
 	if (discoveries.length === 0) return
 	const meta = modelDiscoveryTarget()
 	if (!meta) return
@@ -78,12 +78,20 @@ async function refreshModelMetadata(): Promise<void> {
 	try {
 		const checked = await modelRefresh.checkModels()
 		const result = checked.result
-		if (!result.hadCache || result.changes.length > 0) {
-			log.info('models.dev metadata refreshed', { message: checked.message })
-			emitFocusedInfo(checked.message)
+		// New-model notices below are actionable and replace the raw catalog delta.
+		// Context changes remain quiet unless that model has a configured direct route.
+		const changes = result.changes.filter((change) => {
+			if (change.startsWith('new ')) return false
+			return models.hasConfiguredDirectSource(change.split(' context ')[0]!)
+		})
+		if (!result.hadCache || changes.length > 0) {
+			const message = modelRefresh.formatModelRefreshMessage(changes, result.modelCount)
+			log.info('models.dev metadata refreshed', { message })
+			emitFocusedInfo(message)
 		}
 		if (result.hadCache) {
 			modelNotices.suggestAliasUpdates(result.previous, result.next)
+			modelNotices.suggestModelDiscoveries(result.previous, result.next)
 		}
 	} catch (err) {
 		log.error('models.dev refresh failed', { error: errorMessage(err) })

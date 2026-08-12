@@ -184,7 +184,7 @@ function getCredential(providerName: string): Credential | undefined {
 
 	// No configured credentials — fall back to env var.
 	const envVar = ENV_KEYS[providerName] ?? `${providerName.toUpperCase()}_API_KEY`
-	const envVal = process.env[envVar]
+	const envVal = process.env[envVar] ?? (providerName === 'google' ? process.env.GEMINI_API_KEY : undefined)
 	if (envVal) return { value: envVal, type: 'api-key' }
 	return undefined
 }

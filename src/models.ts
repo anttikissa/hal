@@ -192,7 +192,7 @@ interface AliasUpdateSuggestion {
 }
 
 interface ModelDiscovery {
-	provider: 'Anthropic' | 'OpenAI'
+	provider: 'Anthropic' | 'OpenAI' | 'Google'
 	model: string
 	context: number
 }
@@ -228,6 +228,17 @@ function cachedModelMetadata(fullId: string): ModelMetadata | undefined {
 	return state.metadata?.[bare] ?? state.metadata?.[fullId]
 }
 
+
+function hasConfiguredDirectSource(fullId: string): boolean {
+	const metadata = cachedModelMetadata(fullId)
+	if (!metadata) return false
+	for (const source of metadata.sources) {
+		if (!['anthropic', 'openai', 'google', 'openrouter'].includes(source.provider)) continue
+		if (auth.getCredential(source.provider)) return true
+	}
+	return false
+}
+
 function formatContext(n: number): string {
 	return `${Math.round(n / 1000)}k`
 }
@@ -240,14 +251,16 @@ function isRelevantModelId(id: string): boolean {
 	return false
 }
 
-function discoveryModelInfo(id: string): { provider: 'Anthropic' | 'OpenAI'; model: string } | null {
+function discoveryModelInfo(id: string): { provider: ModelDiscovery['provider']; model: string } | null {
 	let text = id.startsWith('~') ? id.slice(1) : id
 	if (text.startsWith('anthropic/')) text = text.slice('anthropic/'.length)
 	else if (text.startsWith('openai/')) text = text.slice('openai/'.length)
+	else if (text.startsWith('google/')) text = text.slice('google/'.length)
 	else if (text.includes('/')) return null
 	if (text.includes('latest')) return null
 	if (/^claude-[a-z0-9-]+$/.test(text)) return { provider: 'Anthropic', model: text }
 	if (/^(gpt-[a-z0-9.-]+|o\d[a-z0-9.-]*|codex-[a-z0-9.-]+)$/.test(text)) return { provider: 'OpenAI', model: text }
+	if (/^gemini-[a-z0-9.-]+$/.test(text)) return { provider: 'Google', model: text }
 	return null
 }
 
@@ -398,8 +411,9 @@ function newestMatchingModel(cache: Record<string, number>, parse: (modelId: str
 	return best?.canonical ?? null
 }
 
-function providerId(provider: 'Anthropic' | 'OpenAI'): string {
+function providerId(provider: ModelDiscovery['provider']): string {
 	if (provider === 'Anthropic') return 'anthropic'
+	if (provider === 'Google') return 'google'
 	return 'openai'
 }
 
@@ -832,6 +846,7 @@ export const models = {
 	contextWindow,
 	cachedContextWindow,
 	cachedModelMetadata,
+	hasConfiguredDirectSource,
 	computeCost,
 	formatCost,
 	formatTokenCount,

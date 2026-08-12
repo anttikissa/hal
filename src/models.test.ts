@@ -329,6 +329,18 @@ test('refreshModels stores model metadata and source providers in the ASON cache
 })
 
 
+test('configured direct model source requires both a supported route and its credential', () => {
+	models.state.metadata = {
+		'claude-mythos-5': { context: 1_000_000, sources: [{ provider: 'azure', context: 1_000_000 }] },
+		'claude-fable-5': { context: 1_000_000, sources: [{ provider: 'anthropic', context: 1_000_000 }] },
+	}
+	expect(models.hasConfiguredDirectSource('claude-mythos-5')).toBe(false)
+	expect(models.hasConfiguredDirectSource('claude-fable-5')).toBe(false)
+	auth._setStoreForTest({ anthropic: { apiKey: 'test' } })
+	expect(models.hasConfiguredDirectSource('claude-fable-5')).toBe(true)
+})
+
+
 test('modelChangeMessages reports new Claude families such as Fable', () => {
 	expect(models.modelChangeMessages({}, {
 		'claude-fable-5': 1_000_000,
@@ -350,7 +362,7 @@ test('modelChangeMessages reports new non-GPT OpenAI reasoning models', () => {
 })
 
 
-test('modelDiscoveries reports only new Anthropic and OpenAI models once', () => {
+test('modelDiscoveries reports new direct-provider models once', () => {
 	expect(models.modelDiscoveries(
 		{ 'claude-opus-4-7': 1_000_000, 'gpt-5.5': 1_000_000 },
 		{
@@ -364,7 +376,8 @@ test('modelDiscoveries reports only new Anthropic and OpenAI models once', () =>
 		},
 	)).toEqual([
 		{ provider: 'Anthropic', model: 'claude-fable-5', context: 1_000_000 },
-		{ provider: 'OpenAI', model: 'gpt-5.5-instant', context: 400_000 },
+		{ provider: 'Google', model: 'gemini-4-ultra', context: 1_000_000 },
+		{ provider: 'OpenAI', model: 'gpt-5.5-instant', context: 400_000 }
 	])
 })
 
