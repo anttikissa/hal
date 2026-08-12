@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
@@ -11,12 +11,14 @@ const origStateDir = process.env.HAL_STATE_DIR
 beforeEach(() => {
 	auth._setStoreForTest({})
 	models.state.cache = {}
+	models.state.metadata = {}
 })
 afterEach(() => {
 	globalThis.fetch = origFetch
 	if (origStateDir === undefined) delete process.env.HAL_STATE_DIR
 	else process.env.HAL_STATE_DIR = origStateDir
 	models.state.cache = null
+	models.state.metadata = null
 	auth._setStoreForTest({})
 })
 
@@ -281,6 +283,44 @@ test('refreshModels reports relevant GPT and Claude additions and context change
 		expect(result.changes).toContain('gpt-5.5 context 400k → 1050k')
 		expect(result.changes).toContain('new GPT model gpt-5.6 (1200k)')
 		expect(result.changes).toContain('new Claude model claude-sonnet-4-7 (1000k)')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+
+test('refreshModels stores model metadata and source providers in the ASON cache', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-models-'))
+	process.env.HAL_STATE_DIR = dir
+	globalThis.fetch = Object.assign(async () => new Response(JSON.stringify({
+		azure: {
+			models: {
+				'claude-mythos-5': {
+					name: 'Claude Mythos 5',
+					description: 'Restricted Claude model',
+					family: 'claude-mythos',
+					release_date: '2026-06-09',
+					last_updated: '2026-06-09',
+					status: 'beta',
+					limit: { context: 1_000_000, output: 128_000 },
+				},
+			},
+		},
+	})), { preconnect: () => {} }) as typeof fetch
+
+	try {
+		await models.refreshModels()
+		const saved = readFileSync(join(dir, 'models.ason'), 'utf-8')
+		expect(saved).toContain('version: 1')
+		expect(saved).toContain("'claude-mythos-5': {")
+		expect(saved).toContain("releaseDate: '2026-06-09'")
+		expect(saved).toContain("provider: 'azure'")
+		expect(saved).toContain("status: 'beta'")
+		expect(models.cachedModelMetadata('anthropic/claude-mythos-5')).toMatchObject({
+			context: 1_000_000,
+			family: 'claude-mythos',
+			sources: [{ provider: 'azure', status: 'beta' }],
+		})
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}

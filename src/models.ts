@@ -141,8 +141,33 @@ import { STATE_DIR, ensureDir } from './state.ts'
 import { ason } from './utils/ason.ts'
 
 const DEFAULT_CONTEXT = 200_000
+
+interface ModelSource {
+	provider: string
+	context: number
+	output?: number
+	status?: string
+}
+
+interface ModelMetadata {
+	context: number
+	output?: number
+	name?: string
+	description?: string
+	family?: string
+	releaseDate?: string
+	updatedAt?: string
+	sources: ModelSource[]
+}
+
+interface ModelsDevCache {
+	version: 1
+	models: Record<string, ModelMetadata>
+}
+
 const state = {
 	cache: null as Record<string, number> | null,
+	metadata: null as Record<string, ModelMetadata> | null,
 }
 
 interface RefreshModelsResult {
@@ -182,16 +207,33 @@ function modelsFile(): string {
 	return `${process.env.HAL_STATE_DIR ?? STATE_DIR}/models.ason`
 }
 
-// Lazy-loaded context window map from models.dev (state/models.ason).
-// Keys are bare model IDs (without provider prefix), values are token counts.
+// Lazy-loaded models.dev metadata. Context windows remain a separate in-memory
+// map because the rest of the registry intentionally only needs that one field.
 function loadModelsDevCache(): Record<string, number> {
 	if (state.cache) return state.cache
 	try {
-		state.cache = ason.parse(readFileSync(modelsFile(), 'utf-8')) as Record<string, number>
+		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as ModelsDevCache | Record<string, number>
+		const structured = parsed as ModelsDevCache
+		if (structured.version === 1 && structured.models) {
+			state.metadata = structured.models
+			state.cache = {}
+			for (const [id, model] of Object.entries(structured.models)) state.cache[id] = model.context
+		} else {
+			// The next refresh rewrites this former context-only cache in the v1 format.
+			state.cache = parsed as Record<string, number>
+			state.metadata = {}
+		}
 	} catch {
 		state.cache = {}
+		state.metadata = {}
 	}
-	return state.cache
+	return state.cache!
+}
+
+function cachedModelMetadata(fullId: string): ModelMetadata | undefined {
+	loadModelsDevCache()
+	const bare = fullId.includes('/') ? fullId.slice(fullId.indexOf('/') + 1) : fullId
+	return state.metadata?.[bare] ?? state.metadata?.[fullId]
 }
 
 function formatContext(n: number): string {
@@ -449,29 +491,61 @@ function modelChangeMessages(previous: Record<string, number>, next: Record<stri
 	return changes
 }
 
-/** Fetch context windows from models.dev and save to state/models.ason.
- *  Fire-and-forget on startup. The file persists across restarts. */
+function contextWindows(metadata: Record<string, ModelMetadata>): Record<string, number> {
+	const contexts: Record<string, number> = {}
+	for (const [id, model] of Object.entries(metadata)) contexts[id] = model.context
+	return contexts
+}
+
+function modelsDevMetadata(data: Record<string, { models?: Record<string, any> }>): Record<string, ModelMetadata> {
+	const metadata: Record<string, ModelMetadata> = {}
+	for (const [provider, catalog] of Object.entries(data)) {
+		for (const [id, raw] of Object.entries(catalog.models ?? {})) {
+			const context = raw.limit?.context
+			if (typeof context !== 'number') continue
+			let model = metadata[id]
+			if (!model) {
+				model = { context, sources: [] }
+				metadata[id] = model
+			}
+			if (context > model.context) model.context = context
+			if (typeof raw.limit?.output === 'number' && (!model.output || raw.limit.output > model.output)) model.output = raw.limit.output
+			if (typeof raw.name === 'string') model.name = raw.name
+			if (typeof raw.description === 'string') model.description = raw.description
+			if (typeof raw.family === 'string') model.family = raw.family
+			if (typeof raw.release_date === 'string') model.releaseDate = raw.release_date
+			if (typeof raw.last_updated === 'string') model.updatedAt = raw.last_updated
+			const source: ModelSource = { provider, context }
+			if (typeof raw.limit?.output === 'number') source.output = raw.limit.output
+			if (typeof raw.status === 'string') source.status = raw.status
+			model.sources.push(source)
+		}
+	}
+	for (const model of Object.values(metadata)) model.sources.sort((a, b) => a.provider.localeCompare(b.provider))
+	return metadata
+}
+
+// Fetch models.dev's catalog metadata and save it in a versioned cache. The
+// context map is derived at load time for existing registry consumers.
 async function refreshModels(): Promise<RefreshModelsResult> {
 	const hadCache = existsSync(modelsFile())
 	const previous = hadCache ? loadModelsDevCache() : {}
 	const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(10_000) })
 	const data = (await res.json()) as Record<string, { models?: Record<string, any> }>
-	const ctx: Record<string, number> = {}
-	for (const provider of Object.values(data)) {
-		for (const [id, model] of Object.entries(provider.models ?? {})) {
-			if (model.limit?.context) ctx[id] = model.limit.context
-		}
-	}
+	const metadata = modelsDevMetadata(data)
+	const next = contextWindows(metadata)
 	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
-	writeFileSync(modelsFile(), ason.stringify(ctx) + '\n')
-	state.cache = ctx
+	const cache: ModelsDevCache = { version: 1, models: metadata }
+	writeFileSync(modelsFile(), ason.stringify(cache) + '\n')
+	state.cache = next
+	state.metadata = metadata
 	return {
 		fetched: true,
-		changes: hadCache ? modelChangeMessages(previous, ctx) : [],
-		modelCount: Object.keys(ctx).length,
+		changes: hadCache ? modelChangeMessages(previous, next) : [],
+		modelCount: Object.keys(next).length,
 		hadCache,
 		previous,
-		next: ctx,
+		next,
 	}
 }
 
@@ -765,6 +839,7 @@ export const models = {
 	reasoningEffort,
 	contextWindow,
 	cachedContextWindow,
+	cachedModelMetadata,
 	computeCost,
 	formatCost,
 	formatTokenCount,
