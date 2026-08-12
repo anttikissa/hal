@@ -154,19 +154,14 @@ function changedPatchLines(patch: string): { added: Map<string, string[]>; remov
 	return { added, removed }
 }
 
-// LOC counting knows only this repo's languages, comment syntax, and budget,
-// so it is reported for Hal's own commits and omitted everywhere else.
-function countsLoc(cwd: string): boolean {
-	const root = runGit(cwd, ['rev-parse', '--show-toplevel'])
-	return !!root && resolve(root) === resolve(HAL_DIR)
-}
 
 function commitMetadata(cwd: string): CommitMetadata | null {
 	const hash = runGit(cwd, ['show', '-s', '--format=%h', 'HEAD'])
 	if (!hash) return null
 	const branch = runGit(cwd, ['branch', '--show-current']) || 'HEAD'
 	const message = runGit(cwd, ['show', '-s', '--format=%B', 'HEAD'])
-	const countLoc = bash.countsLoc(cwd)
+	// LOC counting knows only this repo's languages, comment syntax, and budget.
+	const countLoc = resolve(runGit(cwd, ['rev-parse', '--show-toplevel'])) === resolve(HAL_DIR)
 	const files = changedFiles(cwd, countLoc)
 	const meta: CommitMetadata = { branch, hash, message, summary: commitSummary(files), files }
 	if (!countLoc) return meta
@@ -321,4 +316,4 @@ function init(): void {
 	toolRegistry.registerTool(bashTool)
 }
 
-export const bash = { config, stripCdCwd, killProcessTree, countsLoc, execute, init }
+export const bash = { config, stripCdCwd, killProcessTree, execute, init }
