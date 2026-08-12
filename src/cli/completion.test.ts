@@ -131,28 +131,28 @@ test('/model completes model arguments like opus without crashing', () => {
 
 test('/model completes current model aliases and bare model ids', () => {
 	const alias = completion.complete('/model gemini', '/model gemini'.length)
-	const bare = completion.complete('/model gemini-3.5-f', '/model gemini-3.5-f'.length)
+	const bare = completion.complete('/model gemini-3.6-f', '/model gemini-3.6-f'.length)
 
 	expect(alias).not.toBeNull()
 	expect(alias!.items).toContain('/model gemini')
-	expect(alias!.items).toContain('/model gemini-3.5-flash')
+	expect(alias!.items).toContain('/model gemini-3.6-flash')
 	expect(bare).not.toBeNull()
-	expect(bare!.items).toContain('/model gemini-3.5-flash')
+	expect(bare!.items).toContain('/model gemini-3.6-flash')
 })
 
 
-test('/model completes latest cached Opus shortcut before older versions', () => {
+test('/model completes the latest cached Opus shortcut before older versions', () => {
 	models.state.cache = {
-		'claude-opus-4-7': 1_000_000,
-		'claude-opus-4-8': 1_000_000,
+		'claude-opus-5': 1_000_000,
+		'claude-opus-5-1': 1_000_000,
 	}
 
-	const result = completion.complete('/model opus-4', '/model opus-4'.length)
+	const result = completion.complete('/model opus-5', '/model opus-5'.length)
 
 	expect(result).not.toBeNull()
-	expect(result!.items).toContain('/model opus-4-8')
-	expect(result!.items).not.toContain('/model opus-4-7')
-	expect(result!.prefix).toBe('/model opus-4-8')
+	expect(result!.items).toContain('/model opus-5-1')
+	expect(result!.items).not.toContain('/model opus-5')
+	expect(result!.prefix).toBe('/model opus-5-1')
 })
 
 

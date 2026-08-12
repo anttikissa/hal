@@ -21,7 +21,7 @@ interface CatalogEntry {
 }
 
 const CATALOG: CatalogEntry[] = [
-	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-4-8', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
+	{ group: 'Anthropic', alias: 'opus', aliases: ['anthropic', 'claude'], fullId: 'anthropic/claude-opus-5', fallbackContext: 1_000_000, pricing: { input: 5, output: 25 }, track: 'opus' },
 	{ group: 'Anthropic', alias: 'sonnet', fullId: 'anthropic/claude-sonnet-5', fallbackContext: 1_000_000, pricing: { input: 3, output: 15 }, track: 'sonnet' },
 	{ group: 'Anthropic', alias: 'haiku', fullId: 'anthropic/claude-haiku-4-5', fallbackContext: 200_000, pricing: { input: 1, output: 5 }, track: 'haiku' },
 	{ group: 'Anthropic', alias: 'fable', fullId: 'anthropic/claude-fable-5', fallbackContext: 1_000_000, pricing: { input: 10, output: 50 }, track: 'fable' },
@@ -32,9 +32,11 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'OpenAI', alias: 'luna', fullId: 'openai/gpt-5.6-luna', fallbackContext: 1_050_000, pricing: { input: 1, output: 6 }, track: 'luna' },
 	{ group: 'OpenAI', alias: 'gpt-5.5', fullId: 'openai/gpt-5.5', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-5.4', fullId: 'openai/gpt-5.4', fallbackContext: 1_050_000 },
+	{ group: 'OpenAI', alias: 'gpt-5.6', fullId: 'openai/gpt-5.6', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-instant', fullId: 'openai/gpt-5.5-instant', fallbackContext: 400_000, pricing: { input: 5, output: 30 } },
 	{ group: 'OpenAI', alias: 'codex', fullId: 'openai/gpt-5.3-codex', fallbackContext: 128_000, track: 'codex' },
-	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.5-flash', fallbackContext: 1_000_000, track: 'gemini' },
+	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.6-flash', fallbackContext: 1_000_000, track: 'gemini' },
+	{ group: 'Google', alias: 'gemini-3.5-flash-lite', fullId: 'google/gemini-3.5-flash-lite', fallbackContext: 1_000_000 },
 	{ group: 'Google', alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview', fallbackContext: 1_000_000, track: 'gemini-pro' },
 	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.20', fallbackContext: 2_000_000, track: 'grok' },
 	{ group: 'OpenRouter', alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-chat' },

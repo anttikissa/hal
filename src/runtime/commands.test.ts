@@ -217,11 +217,11 @@ test('/clients lists server and client versions', async () => {
 test('/check refreshes model metadata and reports alias updates', async () => {
 	models.refreshModels = async () => ({
 		fetched: true,
-		changes: ['new Claude model claude-opus-4-9 (1000k)'],
+		changes: ['new Claude model claude-opus-5-1 (1000k)'],
 		modelCount: 257,
 		hadCache: true,
-		previous: { 'claude-opus-4-8': 1_000_000 },
-		next: { 'claude-opus-4-8': 1_000_000, 'claude-opus-4-9': 1_000_000 },
+		previous: { 'claude-opus-5': 1_000_000 },
+		next: { 'claude-opus-5': 1_000_000, 'claude-opus-5-1': 1_000_000 },
 	})
 	const progress: string[] = []
 
@@ -232,10 +232,10 @@ test('/check refreshes model metadata and reports alias updates', async () => {
 	expect(result.handled).toBe(true)
 	expect(progress).toEqual(['Checking models.dev for model updates...'])
 	expect(result.output).toContain('[models.dev] fetched model metadata')
-	expect(result.output).toContain('new Claude model claude-opus-4-9 (1000k)')
+	expect(result.output).toContain('new Claude model claude-opus-5-1 (1000k)')
 	expect(result.output).toContain('Recommended updates:')
-	expect(result.output).toContain('anthropic/claude-opus-4-9')
-	expect(result.output).toContain('anthropic/claude-opus-4-8')
+	expect(result.output).toContain('anthropic/claude-opus-5-1')
+	expect(result.output).toContain('anthropic/claude-opus-5')
 	expect(result.output).toContain('Model updates available through your configured accounts.')
 	expect(result.output).toContain('Say “yes” to apply these updates.')
 	expect(result.output).not.toContain('🚨')
