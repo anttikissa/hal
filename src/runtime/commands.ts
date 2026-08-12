@@ -204,7 +204,7 @@ function closedSessionLines(): string[] {
 		.filter((meta) => !openIds.has(meta.id))
 		.sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
 	if (closed.length === 0) return ['No closed sessions.']
-	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => `  ${meta.id}`)]
+	return ['Closed sessions:', ...closed.slice(0, 20).map((meta) => `  ${meta.id}  ${sessionDisplayName(meta, meta.id)}`)]
 }
 
 interface ResumeLookup {
