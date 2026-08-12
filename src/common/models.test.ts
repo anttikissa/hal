@@ -79,9 +79,26 @@ test('model picker lists updated frontier aliases', () => {
 	expect(models.listModelChoices().find((item) => item.value === 'gemini-3.5-flash-lite')).toMatchObject({ search: expect.stringContaining('google/gemini-3.5-flash-lite') })
 	expect(models.listModelChoices().find((item) => item.value === 'grok')).toMatchObject({
 		value: 'grok',
-		search: expect.stringContaining('openrouter/x-ai/grok-4.20'),
+		search: expect.stringContaining('openrouter/x-ai/grok-4.6'),
 	})
 })
+test('model picker lists Grok 4.5 and 4.6 and ranks 4.6 above 4.20', () => {
+	const grok = models.listModelChoices().filter((item) => item.path.join('/') === 'openrouter/grok')
+	const values = grok.map((item) => item.value)
+	expect(values).toContain('grok')
+	expect(values).toContain('grok-4.5')
+	expect(values).toContain('grok-4.20')
+	expect(grok.find((item) => item.value === 'grok')).toMatchObject({
+		fullId: 'openrouter/x-ai/grok-4.6',
+		search: expect.stringContaining('openrouter/x-ai/grok-4.6'),
+	})
+	expect(values.indexOf('grok')).toBeLessThan(values.indexOf('grok-4.5'))
+	expect(values.indexOf('grok-4.5')).toBeLessThan(values.indexOf('grok-4.20'))
+	expect(models.resolveModel('grok')).toBe('openrouter/x-ai/grok-4.6')
+	expect(models.resolveModel('grok-4.5')).toBe('openrouter/x-ai/grok-4.5')
+})
+
+
 
 
 test('model picker choices list newest curated versions first', () => {
@@ -159,7 +176,7 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 			'claude-sonnet-5': 1_000_000,
 			'google/gemini-3.5-flash': 1_000_000,
 			'google/gemini-3-flash-preview': 1_000_000,
-			'x-ai/grok-4.20': 2_000_000,
+			'x-ai/grok-4.6': 2_000_000,
 		},
 		{
 			'gpt-5.5': 1_050_000,
@@ -170,14 +187,14 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 			'claude-sonnet-5-1': 1_000_000,
 			'google/gemini-3.5-flash': 1_000_000,
 			'google/gemini-4-flash-preview': 1_000_000,
-			'x-ai/grok-4.20': 2_000_000,
-			'x-ai/grok-4.21': 2_000_000,
+			'x-ai/grok-4.6': 2_000_000,
+			'x-ai/grok-4.7': 2_000_000,
 		},
 	)).toEqual([
 		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-5', newModel: 'anthropic/claude-opus-5-1' },
 		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-5', newModel: 'anthropic/claude-sonnet-5-1' },
 		{ aliases: ['gemini'], oldModel: 'google/gemini-3.6-flash', newModel: 'google/gemini-4-flash-preview' },
-		{ aliases: ['grok'], oldModel: 'openrouter/x-ai/grok-4.20', newModel: 'openrouter/x-ai/grok-4.21' },
+		{ aliases: ['grok'], oldModel: 'openrouter/x-ai/grok-4.6', newModel: 'openrouter/x-ai/grok-4.7' },
 	])
 })
 

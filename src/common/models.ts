@@ -37,7 +37,9 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.6-flash', fallbackContext: 1_000_000, track: 'gemini' },
 	{ group: 'Google', alias: 'gemini-3.5-flash-lite', fullId: 'google/gemini-3.5-flash-lite', fallbackContext: 1_000_000 },
 	{ group: 'Google', alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview', fallbackContext: 1_000_000, track: 'gemini-pro' },
-	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.20', fallbackContext: 2_000_000, track: 'grok' },
+	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.6', fallbackContext: 2_000_000, track: 'grok' },
+	{ group: 'OpenRouter', alias: 'grok-4.5', fullId: 'openrouter/x-ai/grok-4.5', fallbackContext: 2_000_000 },
+	{ group: 'OpenRouter', alias: 'grok-4.20', fullId: 'openrouter/x-ai/grok-4.20', fallbackContext: 2_000_000 },
 	{ group: 'OpenRouter', alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-chat' },
 	{ group: 'OpenRouter', alias: 'llama', fullId: 'openrouter/meta-llama/llama-4-maverick' },
 ]
@@ -113,6 +115,8 @@ const DISPLAY_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 	[/^gpt-(\d+\.\d+)-([a-z0-9.-]+)$/, (m) => `GPT ${m[1]} ${displayTitleSuffix(m[2]!)}`],
 	// gpt-5.4 → GPT 5.4
 	[/^gpt-(\d+\.\d+)$/, (m) => `GPT ${m[1]}`],
+	// x-ai/grok-4.6 → Grok 4.6
+	[/^(?:x-ai\/)?grok-((?:\d+\.)*\d+)$/, (m) => `Grok ${m[1]}`],
 ]
 
 function displayModel(fullId: string | undefined): string {
@@ -324,13 +328,22 @@ function parseGeminiCandidate(kind: 'flash' | 'pro', modelId: string): ModelCand
 	}
 }
 
+function parseGrokVersion(text: string): number[] {
+	const parts = text.split('.')
+	// 4.20/4.21 are 4.2.x marketing ids, not minor version 20/21.
+	if (parts.length === 2 && /^2\d$/.test(parts[1]!)) {
+		return [Number(parts[0]), 2, Number(parts[1]!.slice(1))]
+	}
+	return parseVersionParts(text)
+}
+
 function parseGrokCandidate(modelId: string): ModelCandidate | null {
-	const match = modelId.match(/^(x-ai|xai)\/grok-((?:\d+\.)*\d+)(-fast)?$/)
+	const match = modelId.match(/^(?:(?:openrouter\/)?(?:x-ai|xai)\/)?grok-((?:\d+\.)*\d+)(-fast)?$/)
 	if (!match) return null
 	return {
-		canonical: `x-ai/grok-${match[2]}${match[3] ?? ''}`,
-		version: parseVersionParts(match[2]!),
-		stability: match[3] ? 0 : 1,
+		canonical: `x-ai/grok-${match[1]}${match[2] ?? ''}`,
+		version: parseGrokVersion(match[1]!),
+		stability: match[2] ? 0 : 1,
 	}
 }
 
@@ -643,8 +656,28 @@ function addOpenAiChoices(items: ModelChoice[]): void {
 function addStaticProviderChoices(items: ModelChoice[], group: CatalogEntry['group'], providerPath: string): void {
 	for (const entry of CATALOG) {
 		if (entry.group !== group) continue
+		if (entry.track === 'grok' || entry.alias.startsWith('grok-')) continue
 		const fullId = aliasFullId(entry.alias) ?? entry.fullId
 		addModelChoice(items, entry.alias, fullId, [providerPath], entry.alias)
+	}
+}
+
+function addGrokChoices(items: ModelChoice[]): void {
+	const best = new Map<string, ModelCandidate>()
+	function consider(id: string): void {
+		const candidate = parseGrokCandidate(id)
+		if (!candidate) return
+		const existing = best.get(candidate.canonical)
+		if (!existing || compareCandidates(candidate, existing) > 0) best.set(candidate.canonical, candidate)
+	}
+	for (const entry of CATALOG) consider(entry.fullId)
+	for (const id of Object.keys(modelCache())) consider(id)
+	const candidates = [...best.values()].sort((a, b) => compareCandidates(b, a))
+	for (const candidate of candidates) {
+		const versionText = candidate.canonical.slice('x-ai/grok-'.length)
+		const fullId = `openrouter/${candidate.canonical}`
+		const value = aliasFullId('grok') === fullId ? 'grok' : `grok-${versionText}`
+		addModelChoice(items, value, fullId, ['openrouter', 'grok'], versionText)
 	}
 }
 
@@ -667,6 +700,7 @@ function listModelChoices(): ModelChoice[] {
 	addAnthropicChoices(items)
 	addStaticProviderChoices(items, 'Google', 'google')
 	addStaticProviderChoices(items, 'OpenRouter', 'openrouter')
+	addGrokChoices(items)
 	return items
 }
 
