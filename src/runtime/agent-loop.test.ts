@@ -365,7 +365,7 @@ test('writes thinking blobs while streaming and replays them into API history', 
 })
 
 
-test('provider errors save full payload in a blob but show only the short message', async () => {
+test('provider errors show their full ASON payload and save it in a blob', async () => {
 	const sessionId = `test-error-blob-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)
 	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
@@ -373,26 +373,20 @@ test('provider errors save full payload in a blob but show only the short messag
 	const events: any[] = []
 	const origGetProvider = providerLoader.getProvider
 	const origAppendEvent = ipc.appendEvent
+	const payload = {
+		type: 'error',
+		error: { type: 'not_found_error', message: 'model: claude-mythos-5' },
+		request_id: 'req_011Cdxix8LyGnHX6ucNx3eip',
+	}
 
 	providerLoader.getProvider = async () => ({
 		async *generate() {
 			yield {
 				type: 'error',
-				message: '400: Bad Request',
-				status: 400,
-				endpoint: 'https://api.example.test/v1/responses',
-				body: JSON.stringify({
-					type: 'response.failed',
-					detail: 'Our servers are currently overloaded. Please try again later.',
-					response: {
-						status: 'failed',
-						error: {
-							code: 'server_is_overloaded',
-							message: 'Our servers are currently overloaded. Please try again later.',
-						},
-						instructions: '# SYSTEM.md\nvery long prompt here',
-					},
-				}),
+				message: 'Anthropic API 404',
+				status: 404,
+				endpoint: 'https://api.anthropic.com/v1/messages?beta=true',
+				body: JSON.stringify(payload),
 			}
 			yield { type: 'done' }
 		},
@@ -414,32 +408,22 @@ test('provider errors save full payload in a blob but show only the short messag
 		expect(responseEvent).toMatchObject({
 			type: 'response',
 			isError: true,
-			text: '400: (https://api.example.test/v1/responses)\nOur servers are currently overloaded. Please try again later.',
+			text: `404: (https://api.anthropic.com/v1/messages?beta=true)\n${ason.stringify(payload)}`,
 		})
-		expect(responseEvent.text).not.toContain('instructions')
-		expect(responseEvent.text).not.toContain('response.failed')
 		expect(responseEvent.blobId).toBeTruthy()
 		const streamEnd = events.find((event) => event.type === 'stream-end')
 		expect(streamEnd).toMatchObject({ phase: 'failed' })
 		expect(blob.readBlob(sessionId, responseEvent.blobId)).toMatchObject({
 			type: 'provider_error',
-			message: '400: Bad Request',
-			status: 400,
-			endpoint: 'https://api.example.test/v1/responses',
-			payload: {
-				type: 'response.failed',
-				response: {
-					status: 'failed',
-					error: {
-						code: 'server_is_overloaded',
-					},
-				},
-			},
+			message: 'Anthropic API 404',
+			status: 404,
+			endpoint: 'https://api.anthropic.com/v1/messages?beta=true',
+			payload,
 		})
 		const history = sessions.loadHistory(sessionId)
 		expect(history.at(-2)).toMatchObject({
 			type: 'error',
-			text: '400: (https://api.example.test/v1/responses)\nOur servers are currently overloaded. Please try again later.',
+			text: `404: (https://api.anthropic.com/v1/messages?beta=true)\n${ason.stringify(payload)}`,
 		})
 		expect(history.at(-1)).toMatchObject({ type: 'turn_end', status: 'failed' })
 		expect(sessions.loadLive(sessionId).blocks).toEqual([])

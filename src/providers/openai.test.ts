@@ -278,6 +278,38 @@ test('openai provider streams text while rotating accounts', async () => {
 })
 
 
+test('openai unknown-model errors retain the API payload', async () => {
+	const payload = {
+		error: {
+			message: 'The model `hal-does-not-exist` does not exist or you do not have access to it.',
+			type: 'invalid_request_error',
+			param: null,
+			code: 'model_not_found',
+		},
+	}
+	installFetchMock(async () => new Response(JSON.stringify(payload), { status: 404, statusText: 'Not Found' }) as any)
+	auth.ensureFresh = async () => {}
+	auth.getCredential = () => ({ value: 'sk-test', type: 'api-key' })
+	auth.getEntry = () => ({})
+
+	const events: any[] = []
+	for await (const event of openaiProvider.generate({
+		messages: [{ role: 'user', content: 'hi' }],
+		model: 'hal-does-not-exist',
+		systemPrompt: 'system',
+		tools: [],
+		sessionId: 'sid_unknown_model',
+	})) events.push(event)
+
+	expect(events[0]).toMatchObject({
+		type: 'error',
+		message: 'openai 404: Not Found',
+		status: 404,
+		body: JSON.stringify(payload),
+		endpoint: 'https://api.openai.com/v1/responses',
+	})
+})
+
 test('openai 429 shows failed and next account when another account is available', async () => {
 	const credential: Credential = { value: 'sk-test', type: 'api-key', email: 'burned@test.com', _key: 'openai:0', index: 0, total: 3 }
 	const next: Credential = { value: 'sk-next', type: 'api-key', email: 'next@test.com', _key: 'openai:1', index: 1, total: 3 }
