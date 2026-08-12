@@ -469,12 +469,13 @@ test('/resume lists closed session names next to their IDs', async () => {
 	sessionStore.loadAllSessionMetas = () => [
 		{ id: '04-aaa', createdAt: '2026-04-14T09:00:00.000Z', name: 'open tab' },
 		{ id: '04-zzz', createdAt: '2026-04-13T09:00:00.000Z', closedAt: '2026-04-13T10:00:00.000Z', name: 'closed tab' },
+		{ id: '04-unnamed', createdAt: '2026-04-13T08:00:00.000Z', closedAt: '2026-04-13T09:00:00.000Z' },
 	]
 	sessionStore.loadSessionList = () => ['04-aaa']
 
 	const result = await commands.executeCommand('/resume', makeSession())
 
-	expect(result).toEqual({ handled: true, output: 'Closed sessions:\n  04-zzz  closed tab' })
+	expect(result).toEqual({ handled: true, output: 'Closed sessions:\n  04-zzz  closed tab\n  04-unnamed' })
 })
 
 test('/resume validates the target before queueing', async () => {
