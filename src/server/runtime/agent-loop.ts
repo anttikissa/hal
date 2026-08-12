@@ -7,8 +7,8 @@
 // are loaded lazily via providers/provider.ts.
 
 import { ipc } from '../../ipc.ts'
-import { protocol } from '../../protocol.ts'
-import type { ProviderStreamEvent, Message, TokenUsage, TurnEndMeta } from '../../protocol.ts'
+import { protocol } from '../../common/protocol.ts'
+import type { ProviderStreamEvent, Message, TokenUsage, TurnEndMeta } from '../../common/protocol.ts'
 import { models } from '../../models.ts'
 import { context } from './system-prompt.ts'
 import { provider as providerLoader } from '../providers/provider.ts'

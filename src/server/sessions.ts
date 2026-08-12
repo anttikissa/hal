@@ -9,7 +9,7 @@ import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { liveEventBlocks } from '../live-event-blocks.ts'
-import type { PartialTokenUsage, SpawnKind, TurnEndMeta } from '../protocol.ts'
+import type { PartialTokenUsage, SpawnKind, TurnEndMeta } from '../common/protocol.ts'
 import { models } from '../models.ts'
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'

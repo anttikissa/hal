@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import type { Message } from '../../protocol.ts'
+import type { Message } from '../../common/protocol.ts'
 import { apiMessages } from './api-messages.ts'
 
 test('formatLocalTime returns "Mon DD HH:MM" in local time', () => {

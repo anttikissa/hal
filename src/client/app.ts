@@ -3,8 +3,8 @@
 
 import { ipc } from '../ipc.ts'
 import type { SharedSessionInfo, SharedState } from '../ipc.ts'
-import type { TokenUsage } from '../protocol.ts'
-import { version, type VersionStatus } from '../version.ts'
+import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
+import { version } from '../version.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import { replay } from '../server/session/replay.ts'
 import { draft as draftModule, type DraftPromptEdit } from './terminal/draft.ts'

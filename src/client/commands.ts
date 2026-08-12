@@ -1,4 +1,4 @@
-import type { Command, CommandType } from '../protocol.ts'
+import type { Command, CommandType } from '../common/protocol.ts'
 
 export type ClientCommandType = Exclude<CommandType, 'client-exit' | 'client-status' | 'compact' | 'focus' | 'reset' | 'spawn' | 'tool-confirm'>
 

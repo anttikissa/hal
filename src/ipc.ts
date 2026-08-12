@@ -7,8 +7,7 @@ import { liveFiles } from './utils/live-file.ts'
 import { tails } from './utils/tail-file.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
-import type { Command } from './protocol.ts'
-import type { VersionStatus } from './version.ts'
+import type { Command, VersionStatus } from './common/protocol.ts'
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`

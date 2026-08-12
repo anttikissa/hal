@@ -3,6 +3,10 @@
 // Defines the contract between client and server. Commands flow client→server,
 // events flow server→client. Both are serialized to ASONL files via ipc.ts.
 
+// Keep shared status values in this browser-safe contract. Runtime code may
+// implement version discovery, but clients only need its serialized state.
+export type VersionStatus = 'idle' | 'pending' | 'ready' | 'error'
+
 // ── Event types (server → client) ──
 
 export type EventType =
@@ -165,7 +169,7 @@ export interface ClientStatusCommand extends CommandBase {
 	startedAt: string
 	updatedAt: string
 	cwd?: string
-	versionStatus: import('./version.ts').VersionStatus
+	versionStatus: VersionStatus
 	version?: string
 	error?: string
 }

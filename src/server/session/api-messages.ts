@@ -4,7 +4,7 @@
 
 import type { HistoryEntry } from '../sessions.ts'
 import { sessions } from '../sessions.ts'
-import type { Message, ContentBlock } from '../../protocol.ts'
+import type { Message, ContentBlock } from '../../common/protocol.ts'
 import { blob } from './blob.ts'
 import { sessionEntry } from './entry.ts'
 import { time } from '../../utils/time.ts'

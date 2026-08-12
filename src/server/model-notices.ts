@@ -2,7 +2,7 @@
 // synthetic assistant suggestions for alias updates and new model discoveries.
 
 import { ipc } from '../ipc.ts'
-import { protocol } from '../protocol.ts'
+import { protocol } from '../common/protocol.ts'
 import { models } from '../models.ts'
 import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
 import { agentLoop } from './runtime/agent-loop.ts'

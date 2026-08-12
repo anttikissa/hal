@@ -8,7 +8,7 @@
 // of this loader avoids cycles where concrete providers import the loader while
 // the loader dynamically imports those providers.
 
-import type { Provider } from '../../protocol.ts'
+import type { Provider } from '../../common/protocol.ts'
 import { providerShared } from './shared.ts'
 
 // ── Provider cache ──

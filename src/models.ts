@@ -1,5 +1,5 @@
 // Model registry — aliases, display names, pricing, context windows.
-import type { PartialTokenUsage } from './protocol.ts'
+import type { PartialTokenUsage } from './common/protocol.ts'
 import { auth } from './auth.ts'
 //
 // Models are identified as "provider/model-id" (e.g. "anthropic/claude-opus-4-6").

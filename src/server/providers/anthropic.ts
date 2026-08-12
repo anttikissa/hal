@@ -6,7 +6,7 @@
 // - Error handling with retry-after parsing
 // - Extended thinking (adaptive for Opus 4.6+, enabled for other thinking models)
 
-import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '../../protocol.ts'
+import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '../../common/protocol.ts'
 import { providerShared } from './shared.ts'
 import { auth } from '../../auth.ts'
 import { anthropicUsage } from '../../anthropic-usage.ts'

@@ -7,7 +7,7 @@
 // OpenAI-compatible providers (OpenRouter, Google, Grok, Ollama, etc.) still
 // use the Chat Completions API because that is the broadest common denominator.
 
-import type { Message, Provider, ProviderRequest, ProviderStreamEvent, TurnEndStatus } from '../../protocol.ts'
+import type { Message, Provider, ProviderRequest, ProviderStreamEvent, TurnEndStatus } from '../../common/protocol.ts'
 import { auth, type Credential } from '../../auth.ts'
 import { providerShared } from './shared.ts'
 import { openaiUsage } from '../../openai-usage.ts'

@@ -13,7 +13,7 @@ import { performance } from 'perf_hooks'
 import { openaiProvider, openai } from '../src/server/providers/openai.ts'
 import { builtins } from '../src/server/tools/builtins.ts'
 import { toolRegistry } from '../src/server/tools/tool.ts'
-import type { ContentBlock, Message, TokenUsage, ToolDef } from '../src/protocol.ts'
+import type { ContentBlock, Message, TokenUsage, ToolDef } from '../src/common/protocol.ts'
 import { ason } from '../src/utils/ason.ts'
 
 interface Args {

@@ -47,7 +47,7 @@ import { HAL_DIR, STATE_DIR } from '../../state.ts'
 import { sessions } from '../sessions.ts'
 import { models } from '../../models.ts'
 import { tokenCalibration } from '../../token-calibration.ts'
-import type { Message, ContentBlock } from '../../protocol.ts'
+import type { Message, ContentBlock } from '../../common/protocol.ts'
 import { time } from '../../utils/time.ts'
 
 // ── AGENTS.md loading ─────────────────────────────────────────────────────────

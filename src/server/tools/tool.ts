@@ -3,7 +3,7 @@
 // Tool modules are pure on import. They expose init() hooks, and a bootstrap
 // module decides when to register them with the shared registry.
 
-import type { JsonSchemaProperties, ToolDef } from '../../protocol.ts'
+import type { JsonSchemaProperties, ToolDef } from '../../common/protocol.ts'
 import { helpers } from '../../utils/helpers.ts'
 
 // ── Interfaces ──
