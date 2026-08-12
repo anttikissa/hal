@@ -12,6 +12,7 @@ import { render } from './client/render.ts'
 import { renderStatus } from './client/render-status.ts'
 import { renderHistory } from './client/render-history.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
+import { inbox } from './runtime/inbox.ts'
 import { memory } from './memory.ts'
 import { models } from './models.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
@@ -32,6 +33,7 @@ const modules: Record<string, Record<string, any>> = {
 	renderStatus: renderStatus.config,
 	renderHistory: renderHistory.config,
 	agentLoop: agentLoop.config,
+	inbox: inbox.config,
 	memory: memory.config,
 	models: models.config,
 	subscriptionUsage: subscriptionUsage.config,

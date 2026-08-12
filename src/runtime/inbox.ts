@@ -21,6 +21,13 @@ interface InboxMessage {
 
 type OnMessage = (sessionId: string, text: string, from?: string, queue?: boolean) => void
 
+const config = {
+	// How often to rescan all inboxes even if no fs event arrived.
+	pollIntervalMs: 2000,
+	// Coalesce a burst of fs events into a single rescan.
+	debounceMs: 50,
+}
+
 function parseInboxMessage(raw: unknown): InboxMessage | null {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
 	const msg = raw as Record<string, unknown>
@@ -60,50 +67,47 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 	}
 }
 
+/** Process pending messages in every session inbox directory. */
+function scanAll(onMessage: OnMessage): void {
+	try {
+		for (const sessionId of readdirSync(INBOX_DIR)) {
+			processInbox(`${INBOX_DIR}/${sessionId}`, sessionId, onMessage)
+		}
+	} catch {}
+}
+
 /** Start watching the inbox directory for new messages. */
 function startWatching(signal: AbortSignal, onMessage: OnMessage): void {
 	ensureDir(INBOX_DIR)
 
 	// Process any messages that arrived before we started watching
+	scanAll(onMessage)
+
+	// Poll as the safety net: fs.watch is not available everywhere and macOS
+	// drops or coalesces events under load, so watching alone loses messages.
+	const interval = setInterval(() => scanAll(onMessage), config.pollIntervalMs)
+	signal.addEventListener('abort', () => clearInterval(interval), { once: true })
+
+	// The watcher just makes delivery fast in the common case. We deliberately
+	// ignore the reported filename: when a session directory is created and the
+	// message written into it in quick succession, macOS reports only the
+	// directory, so a filename-based dispatch would miss the first message to a
+	// freshly spawned session.
+	let timer: ReturnType<typeof setTimeout> | undefined
+	function scheduleScan(): void {
+		if (timer || signal.aborted) return
+		timer = setTimeout(() => {
+			timer = undefined
+			if (!signal.aborted) scanAll(onMessage)
+		}, config.debounceMs)
+	}
+	signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
+
 	try {
-		const sessionDirs = readdirSync(INBOX_DIR)
-		for (const sessionId of sessionDirs) {
-			const sessionDir = `${INBOX_DIR}/${sessionId}`
-			processInbox(sessionDir, sessionId, onMessage)
-		}
-	} catch {}
-
-	// Watch for new files
-	try {
-		const watcher = watch(INBOX_DIR, { recursive: true, persistent: false }, (_event, filename) => {
-			if (signal.aborted) return
-			if (!filename || !filename.endsWith('.ason')) return
-
-			// filename is like "session-id/message.ason"
-			const slashIdx = filename.indexOf('/')
-			if (slashIdx === -1) return
-			const sessionId = filename.slice(0, slashIdx)
-			const sessionDir = `${INBOX_DIR}/${sessionId}`
-			processInbox(sessionDir, sessionId, onMessage)
-		})
-
-		// Close watcher when signal aborts
+		const watcher = watch(INBOX_DIR, { recursive: true, persistent: false }, scheduleScan)
 		signal.addEventListener('abort', () => watcher.close(), { once: true })
 	} catch {
-		// fs.watch might not be supported on all platforms — fall back to polling
-		const interval = setInterval(() => {
-			if (signal.aborted) {
-				clearInterval(interval)
-				return
-			}
-			try {
-				const sessionDirs = readdirSync(INBOX_DIR)
-				for (const sessionId of sessionDirs) {
-					processInbox(`${INBOX_DIR}/${sessionId}`, sessionId, onMessage)
-				}
-			} catch {}
-		}, 2000)
-		signal.addEventListener('abort', () => clearInterval(interval), { once: true })
+		// fs.watch unsupported here — the poll above still delivers messages.
 	}
 }
 
@@ -124,4 +128,4 @@ function queueMessage(sessionId: string, text: string, from?: string, queue?: bo
 	Bun.write(path, ason.stringify(msg) + '\n')
 }
 
-export const inbox = { startWatching, queueMessage }
+export const inbox = { config, startWatching, queueMessage, scanAll }

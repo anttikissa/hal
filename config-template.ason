@@ -74,6 +74,13 @@
 		// HTTP statuses treated as transient provider errors.
 		retryableStatuses: [429, 500, 503, 529]
 	},
+	inbox: {
+		// How often to rescan session inboxes even if no filesystem event arrived.
+		// fs.watch drops and coalesces events, so this poll is the delivery guarantee.
+		pollIntervalMs: 2000,
+		// Coalesce a burst of filesystem events into a single rescan.
+		debounceMs: 50
+	},
 	memory: {
 		// RSS threshold for showing a high-memory warning; set to 0 to disable warnings.
 		warnBytes: 1500000000,
