@@ -8,7 +8,7 @@ import { ipc } from '../../ipc.ts'
 import { sessions } from '../sessions.ts'
 import { blob } from '../session/blob.ts'
 import { apiMessages } from '../session/api-messages.ts'
-import { tokenCalibration } from '../../token-calibration.ts'
+import { tokenCalibration } from '../token-calibration.ts'
 import { toolRegistry } from '../tools/tool.ts'
 import { ason } from '../../utils/ason.ts'
 

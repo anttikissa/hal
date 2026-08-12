@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { context } from './system-prompt.ts'
-import { tokenCalibration } from '../../token-calibration.ts'
+import { tokenCalibration } from '../token-calibration.ts'
 
 let tempDir = ''
 let origHalDir = ''

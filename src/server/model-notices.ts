@@ -8,7 +8,7 @@ import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { HAL_DIR } from '../state.ts'
 import { log } from '../utils/log.ts'
-import { modelRefresh } from '../model-refresh.ts'
+import { modelRefresh } from './model-refresh.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'

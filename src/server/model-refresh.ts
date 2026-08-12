@@ -1,5 +1,5 @@
-import { config } from './config.ts'
-import { models } from './models.ts'
+import { config } from '../config.ts'
+import { models } from '../models.ts'
 
 function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
 	if (changes.length === 0) return `Fetched recent data from models.dev (${modelCount ?? 0} models)`

@@ -9,7 +9,7 @@ import { ipc } from '../ipc.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { context } from './runtime/system-prompt.ts'
 import { models } from '../models.ts'
-import { modelRefresh } from '../model-refresh.ts'
+import { modelRefresh } from './model-refresh.ts'
 import { config } from '../config.ts'
 import { HAL_DIR } from '../state.ts'
 

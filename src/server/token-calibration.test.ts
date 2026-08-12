@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { tokenCalibration } from './token-calibration.ts'
-import { ason } from './utils/ason.ts'
+import { ason } from '../utils/ason.ts'
 
 const origStateDir = process.env.HAL_STATE_DIR
 let tempStateDir: string | null = null
