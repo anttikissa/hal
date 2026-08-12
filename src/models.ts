@@ -421,6 +421,14 @@ function catalogAliases(entry: CatalogEntry): string[] {
 	return [...(entry.aliases ?? []), entry.alias]
 }
 
+
+function aliasesForModel(fullId: string): string[] {
+	for (const entry of CATALOG) {
+		if (entry.fullId === fullId) return catalogAliases(entry)
+	}
+	return []
+}
+
 function catalogEntryForAlias(alias: string): CatalogEntry | undefined {
 	return CATALOG.find((entry) => catalogAliases(entry).includes(alias))
 }
@@ -847,6 +855,7 @@ export const models = {
 	cachedContextWindow,
 	cachedModelMetadata,
 	hasConfiguredDirectSource,
+	aliasesForModel,
 	computeCost,
 	formatCost,
 	formatTokenCount,

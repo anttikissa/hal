@@ -10,8 +10,8 @@ import { agentLoop } from '../runtime/agent-loop.ts'
 import { context } from '../runtime/system-prompt.ts'
 import { models } from '../models.ts'
 import { modelRefresh } from '../model-refresh.ts'
-import { HAL_DIR } from '../state.ts'
 import { config } from '../config.ts'
+import { HAL_DIR } from '../state.ts'
 
 test('formatModelRefreshMessage summarizes models.dev changes for the user', () => {
 	const msg = modelRefresh.formatModelRefreshMessage([
@@ -35,6 +35,20 @@ test('new model discovery labels keep raw model ids', () => {
 	])
 	expect(text).toContain('Anthropic claude-opus4-8')
 	expect(text).not.toContain('Claude Opus4 8')
+		expect(text).toContain('Recommended things to do:')
+		expect(text).toContain('Say “yes” to apply these updates.')
+})
+
+
+test('new model report explains the configured default', () => {
+	const original = config.data
+	config.data = { models: { default: 'gpt' } }
+	try {
+		const text = modelRefresh.buildNewModelDiscoveryText([])
+		expect(text).toContain('Your default model is `gpt` (config.ason), which resolves to openai/gpt-5.6-terra.')
+	} finally {
+		config.data = original
+	}
 })
 
 
@@ -84,7 +98,6 @@ test('model metadata refresh notice goes only to focused session', async () => {
 
 test('automatic model metadata refresh checks new model ids for configured routes', async () => {
 	const origRefreshModels = models.refreshModels
-	const origSuggestAliasUpdates = modelNotices.suggestAliasUpdates
 	const origSuggestModelDiscoveries = modelNotices.suggestModelDiscoveries
 	let discoveryPrompts = 0
 	models.refreshModels = async () => ({
@@ -95,86 +108,20 @@ test('automatic model metadata refresh checks new model ids for configured route
 		previous: {},
 		next: { 'gpt-6': 1_000_000 },
 	})
-	modelNotices.suggestAliasUpdates = () => {}
 	modelNotices.suggestModelDiscoveries = () => { discoveryPrompts++ }
 	try {
 		await modelNotices.refreshModelMetadata()
 		expect(discoveryPrompts).toBe(1)
 	} finally {
 		models.refreshModels = origRefreshModels
-		modelNotices.suggestAliasUpdates = origSuggestAliasUpdates
 		modelNotices.suggestModelDiscoveries = origSuggestModelDiscoveries
 	}
 })
 
 
-test('buildAliasUpdateSuggestionText mentions config mapping and subagent only outside ~/.hal', () => {
-	const origConfigData = config.data
-	config.data = { models: { default: 'gpt' } } as Record<string, any>
-	const updates = [
-		{ aliases: ['openai', 'gpt'], oldModel: 'openai/gpt-5.4', newModel: 'openai/gpt-5.5' },
-		{ aliases: ['claude', 'opus'], oldModel: 'anthropic/claude-opus-4-6', newModel: 'anthropic/claude-opus-4-7' },
-	]
-
-	try {
-		const outside = modelRefresh.buildAliasUpdateSuggestionText(updates, '/work/project')
-		expect(outside).toContain('openai**, **gpt')
-		expect(outside).toContain('openai/gpt-5.4')
-		expect(outside).toContain('openai/gpt-5.5')
-		expect(outside).toContain("config.ason sets the default model to **gpt**, which currently maps to **openai/gpt-5.6-terra**.")
-		expect(outside).toContain('spawn a subagent in ~/.hal')
-
-		const inside = modelRefresh.buildAliasUpdateSuggestionText(updates, HAL_DIR)
-		expect(inside).toContain('update those aliases in ~/.hal')
-		expect(inside).not.toContain('spawn a subagent')
-	} finally {
-		config.data = origConfigData
-	}
-})
 
 
-test('suggestAliasUpdates emits one synthetic notice, preferring an open ~/.hal tab', () => {
-	const origOpenSessionIds = [...runtime.state.openSessionIds]
-	const origAliasUpdateSuggestions = models.aliasUpdateSuggestions
-	const origLoadSessionMeta = sessions.loadSessionMeta
-	const origAppendHistorySync = sessions.appendHistorySync
-	const origAppendEvent = ipc.appendEvent
-	const histories: any[] = []
-	const events: any[] = []
-
-	runtime.state.openSessionIds = ['04-work', '04-hal', '04-other']
-	models.aliasUpdateSuggestions = () => [
-		{ aliases: ['gemini'], oldModel: 'google/gemini-3-flash-preview', newModel: 'google/gemini-3.5-flash' },
-	]
-	sessions.loadSessionMeta = (sessionId: string) => {
-		const cwd = sessionId === '04-hal' ? HAL_DIR : '/work/project'
-		return { id: sessionId, createdAt: '2026-05-20T10:00:00.000Z', workingDir: cwd, model: 'openai/gpt-5.5' }
-	}
-	sessions.appendHistorySync = (sessionId: string, entries: any[]) => {
-		histories.push({ sessionId, entries })
-	}
-	ipc.appendEvent = (event: any) => {
-		events.push(event)
-	}
-
-	try {
-		modelNotices.suggestAliasUpdates({}, {})
-		expect(histories).toHaveLength(1)
-		expect(events).toHaveLength(1)
-		expect(histories[0].sessionId).toBe('04-hal')
-		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-hal', synthetic: true })
-		expect(events[0].text).toContain('update those aliases in ~/.hal')
-	} finally {
-		runtime.state.openSessionIds = origOpenSessionIds
-		models.aliasUpdateSuggestions = origAliasUpdateSuggestions
-		sessions.loadSessionMeta = origLoadSessionMeta
-		sessions.appendHistorySync = origAppendHistorySync
-		ipc.appendEvent = origAppendEvent
-	}
-})
-
-
-test('suggestModelDiscoveries emits a low-key informational notice for new Anthropic and OpenAI model ids', () => {
+test('suggestModelDiscoveries shows configured aliases and ignores unavailable models', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origLoadSessionMeta = sessions.loadSessionMeta
@@ -213,12 +160,13 @@ test('suggestModelDiscoveries emits a low-key informational notice for new Anthr
 		expect(events).toHaveLength(1)
 		expect(histories[0].sessionId).toBe('04-work')
 		expect(events[0]).toMatchObject({ type: 'response', sessionId: '04-work', synthetic: true })
-		expect(events[0].text).toContain('ℹ️ New model ids found in models.dev')
-		expect(events[0].text).toContain('Anthropic claude-fable-5')
+		expect(events[0].text).toContain('Model updates available through your configured accounts.')
+		expect(events[0].text).toContain('`fable`')
 		expect(events[0].text).toContain('OpenAI gpt-5.5-instant')
 		expect(events[0].text).not.toContain('claude-mythos-5')
-		expect(events[0].text).toContain('This is informational')
-		expect(events[0].text).not.toContain('Would you like')
+		expect(events[0].text).toContain('Already configured:')
+		expect(events[0].text).toContain('No update is needed.')
+		expect(events[0].text).not.toContain('ℹ️')
 		expect(events[0].text).not.toContain('🚨')
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds

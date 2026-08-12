@@ -1,6 +1,5 @@
 import { config } from './config.ts'
 import { models } from './models.ts'
-import { HAL_DIR } from './state.ts'
 
 function formatModelRefreshMessage(changes: string[], modelCount?: number): string {
 	if (changes.length === 0) return `Fetched recent data from models.dev (${modelCount ?? 0} models)`
@@ -9,30 +8,25 @@ function formatModelRefreshMessage(changes: string[], modelCount?: number): stri
 	return `[models.dev] fetched model metadata; relevant changes: ${shown.join('; ')}${more}`
 }
 
-function buildAliasUpdateSuggestionText(updates: Array<{ aliases: string[]; oldModel: string; newModel: string }>, cwd: string): string {
-	const lines = [
-		'It looks like some of your model aliases got updates:',
-		'',
-		...updates.map((update) => `- **${update.aliases.join('**, **')}**: **${update.oldModel}** → **${update.newModel}**`),
-	]
-	const configuredDefault = config.data.models?.default
-	if (typeof configuredDefault === 'string') {
-		lines.push('', `config.ason sets the default model to **${configuredDefault}**, which currently maps to **${models.resolveModel(configuredDefault)}**.`)
-	}
-	lines.push('')
-	if (cwd === HAL_DIR) lines.push('Would you like me to update those aliases in ~/.hal?')
-	else lines.push('Would you like me to spawn a subagent in ~/.hal and update those aliases?')
-	return lines.join('\n')
-}
 
-function buildNewModelDiscoveryText(discoveries: Array<{ provider: string; model: string; context: number }>): string {
-	const lines = [
-		'ℹ️ New model ids found in models.dev',
-		'',
-		...discoveries.map((discovery) => `- **${discovery.provider} ${discovery.model}** (${models.formatTokenCount(discovery.context)} context)`),
-		'',
-		'This is informational. Hal already cached the context windows; alias or model-picker changes are only needed if you want to use one of these models explicitly.',
-	]
+function buildNewModelDiscoveryText(discoveries: Array<{ provider: string; model: string; context: number }>, updates: Array<{ aliases: string[]; oldModel: string; newModel: string }> = []): string {
+	const configured = discoveries.filter((item) => models.aliasesForModel(`${item.provider.toLowerCase()}/${item.model}`).length > 0)
+	const additions = discoveries.filter((item) => {
+		const fullId = `${item.provider.toLowerCase()}/${item.model}`
+		return !configured.includes(item) && !updates.some((update) => update.newModel === fullId)
+	})
+	const line = (item: typeof discoveries[number]) => {
+		const aliases = models.aliasesForModel(`${item.provider.toLowerCase()}/${item.model}`)
+		const prefix = aliases.length ? `\`${aliases.join('`, `')}\` — ` : ''
+		return `- ${prefix}${item.provider} ${item.model} (${models.formatTokenCount(item.context)} context)`
+	}
+	const lines = ['Model updates available through your configured accounts.']
+	if (updates.length) lines.push('', 'Recommended updates:', ...updates.map((update) => `- change \`${update.aliases.join('`, `')}\`: ${update.oldModel} → ${update.newModel}`))
+	if (configured.length) lines.push('', 'Already configured:', ...configured.map(line))
+	if (additions.length) lines.push('', 'Recommended things to do:', ...additions.map((item) => `- add ${item.provider} ${item.model} to the model picker`))
+	const configuredDefault = config.data.models?.default
+	if (typeof configuredDefault === 'string') lines.push('', `Your default model is \`${configuredDefault}\` (config.ason), which resolves to ${models.resolveModel(configuredDefault)}.`)
+	lines.push('', updates.length || additions.length ? 'Say “yes” to apply these updates.' : 'No update is needed.')
 	return lines.join('\n')
 }
 
@@ -46,7 +40,6 @@ async function checkModels(): Promise<{ result: Awaited<ReturnType<typeof models
 
 export const modelRefresh = {
 	formatModelRefreshMessage,
-	buildAliasUpdateSuggestionText,
 	buildNewModelDiscoveryText,
 	checkModels,
 }

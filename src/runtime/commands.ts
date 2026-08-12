@@ -672,9 +672,8 @@ handlers['check'] = async (args, session, hooks) => {
 		const lines = [checked.message]
 		if (checked.result.hadCache) {
 			const updates = models.aliasUpdateSuggestions(checked.result.previous, checked.result.next)
-			if (updates.length > 0) lines.push('', modelRefresh.buildAliasUpdateSuggestionText(updates, session.cwd))
-			const discoveries = models.modelDiscoveries(checked.result.previous, checked.result.next)
-			if (discoveries.length > 0) lines.push('', modelRefresh.buildNewModelDiscoveryText(discoveries))
+			const discoveries = models.modelDiscoveries(checked.result.previous, checked.result.next).filter((item) => models.hasConfiguredDirectSource(item.model))
+			if (updates.length || discoveries.length) lines.push('', modelRefresh.buildNewModelDiscoveryText(discoveries, updates))
 		}
 		return { output: lines.join('\n'), handled: true }
 	} catch (err: any) {

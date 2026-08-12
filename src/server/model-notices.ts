@@ -38,15 +38,6 @@ function emitSyntheticAssistant(sessionId: string, text: string, syntheticKind: 
 	})
 }
 
-function suggestAliasUpdates(previous: Record<string, number>, next: Record<string, number>): void {
-	const updates = models.aliasUpdateSuggestions(previous, next)
-	if (updates.length === 0) return
-	const metas = tabs.openSessionMetas()
-	const meta = metas.find((item) => item.workingDir === HAL_DIR) ?? metas[0]
-	if (!meta) return
-	const model = meta.model ?? models.defaultModel()
-	emitSyntheticAssistant(meta.id, modelRefresh.buildAliasUpdateSuggestionText(updates, meta.workingDir ?? process.cwd()), 'alias-update-suggestion', model)
-}
 
 function sessionWillProduceOutput(sessionId: string): boolean {
 	if (agentLoop.isWorking(sessionId)) return true
@@ -66,12 +57,15 @@ function modelDiscoveryTarget(): SessionMeta | null {
 }
 
 function suggestModelDiscoveries(previous: Record<string, number>, next: Record<string, number>): void {
-	const discoveries = models.modelDiscoveries(previous, next).filter((item) => models.hasConfiguredDirectSource(item.model))
-	if (discoveries.length === 0) return
+	const discoveries = models.modelDiscoveries(previous, next).filter((item) => {
+		return models.hasConfiguredDirectSource(item.model) && item.context > 0 && !/(embedding|image|tts|live|realtime|computer|robotics|omni)/.test(item.model)
+	})
+	const updates = models.aliasUpdateSuggestions(previous, next)
+	if (discoveries.length === 0 && updates.length === 0) return
 	const meta = modelDiscoveryTarget()
 	if (!meta) return
 	const model = meta.model ?? models.defaultModel()
-	modelNotices.emitSyntheticAssistant(meta.id, modelRefresh.buildNewModelDiscoveryText(discoveries), 'model-discovery', model)
+	modelNotices.emitSyntheticAssistant(meta.id, modelRefresh.buildNewModelDiscoveryText(discoveries, updates), 'model-discovery', model)
 }
 
 async function refreshModelMetadata(): Promise<void> {
@@ -90,7 +84,6 @@ async function refreshModelMetadata(): Promise<void> {
 			emitFocusedInfo(message)
 		}
 		if (result.hadCache) {
-			modelNotices.suggestAliasUpdates(result.previous, result.next)
 			modelNotices.suggestModelDiscoveries(result.previous, result.next)
 		}
 	} catch (err) {
@@ -100,7 +93,6 @@ async function refreshModelMetadata(): Promise<void> {
 
 export const modelNotices = {
 	refreshModelMetadata,
-	suggestAliasUpdates,
 	suggestModelDiscoveries,
 	emitSyntheticAssistant,
 }
