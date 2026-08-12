@@ -1,4 +1,4 @@
-import { blockData } from '../cli/block-data.ts'
+import { blockData } from './terminal/block-data.ts'
 import { perf } from '../perf.ts'
 
 async function load(ctx: any): Promise<void> {

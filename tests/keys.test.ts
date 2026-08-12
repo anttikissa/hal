@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { keys } from '../src/cli/keys.ts'
+import { keys } from '../src/client/terminal/keys.ts'
 
 describe('keys', () => {
 	test('parses alt-left and alt-right word navigation', () => {

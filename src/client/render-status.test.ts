@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { renderStatus } from './render-status.ts'
-import { client } from '../client.ts'
+import { client } from './app.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { promptEdit } from './prompt-edit.ts'
 

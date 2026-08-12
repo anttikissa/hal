@@ -1,5 +1,5 @@
 import type { SharedSessionInfo } from '../ipc.ts'
-import type { Tab } from '../client.ts'
+import type { Tab } from './app.ts'
 import { clientTabs } from './tabs.ts'
 
 type PendingOpen = 'open' | 'fork' | 'resume' | false

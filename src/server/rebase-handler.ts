@@ -6,10 +6,10 @@
 import { createHash } from 'crypto'
 import { ipc } from '../ipc.ts'
 import { sessions as sessionStore, type HistoryEntry } from './sessions.ts'
-import { agentLoop } from '../runtime/agent-loop.ts'
-import { apiMessages } from '../session/api-messages.ts'
-import { rebase, type RebaseSnapshot } from '../session/rebase.ts'
-import { openai } from '../providers/openai.ts'
+import { agentLoop } from './runtime/agent-loop.ts'
+import { apiMessages } from './session/api-messages.ts'
+import { rebase, type RebaseSnapshot } from './session/rebase.ts'
+import { openai } from './providers/openai.ts'
 // Circular import is safe: we only access queueRunner.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { queueRunner } from './queue-runner.ts'

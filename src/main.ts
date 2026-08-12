@@ -5,18 +5,18 @@ import { ensureStateDir, HAL_DIR } from './state.ts'
 import { ipc } from './ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
-import { client } from './client.ts'
+import { client } from './client/app.ts'
 import { memory } from './memory.ts'
 import { version } from './version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
 import { config } from './config.ts'
-import { builtins } from './tools/builtins.ts'
-import { colors } from './cli/colors.ts'
+import { builtins } from './server/tools/builtins.ts'
+import { colors } from './client/terminal/colors.ts'
 import { openaiUsage } from './openai-usage.ts'
 import { startup } from './startup.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
-import { cliArgs } from './cli/args.ts'
+import { cliArgs } from './client/terminal/args.ts'
 import { terminalOutput } from './client/terminal-output.ts'
 
 const parsedArgs = cliArgs.parse(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
@@ -125,7 +125,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	startupTarget.preferredSessionId = started.sessionId
 	if (parsedArgs.ok && parsedArgs.webPort) {
 		const port = parsedArgs.webPort
-		void import('./web-client/server.ts')
+		void import('./server/web.ts')
 			.then(({ web }) => web.start(port, ac.signal))
 			.catch((error) => log.error('web client startup failed', { error: String(error) }))
 	}

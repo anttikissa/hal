@@ -4,7 +4,7 @@ import { ason } from './utils/ason.ts'
 import { config } from './config.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { models } from './models.ts'
-import { client } from './client.ts'
+import { client } from './client/app.ts'
 import { render } from './client/render.ts'
 
 test('config-template.ason matches module config defaults', () => {

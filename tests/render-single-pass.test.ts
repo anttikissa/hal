@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { render } from '../src/client/render.ts'
-import { client } from '../src/client.ts'
-import { prompt } from '../src/cli/prompt.ts'
+import { client } from '../src/client/app.ts'
+import { prompt } from '../src/client/terminal/prompt.ts'
 import { popup } from '../src/client/popup.ts'
-import { blocks as blockRenderer } from '../src/cli/blocks.ts'
+import { blocks as blockRenderer } from '../src/client/terminal/blocks.ts'
 
 describe('render single pass', () => {
 	beforeEach(() => {

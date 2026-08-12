@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { clipboard } from '../src/cli/clipboard.ts'
+import { clipboard } from '../src/client/terminal/clipboard.ts'
 
 let dir = ''
 

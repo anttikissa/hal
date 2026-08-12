@@ -1,6 +1,6 @@
 // Shared helpers and config for OAuth subscription usage displays.
 
-import { colors } from './cli/colors.ts'
+import { colors } from './client/terminal/colors.ts'
 import { oklch } from './utils/oklch.ts'
 
 const BAR_PARTIALS = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇']

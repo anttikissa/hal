@@ -1,4 +1,4 @@
-import type { Block } from '../cli/block-data.ts'
+import type { Block } from './terminal/block-data.ts'
 
 export type PromptEditMode = 'amend' | 'cancel' | 'copy' | 'side-effect-copy'
 

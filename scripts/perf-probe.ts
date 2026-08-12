@@ -14,8 +14,8 @@ log('probe start')
 
 // Import the app modules
 const { perf } = await import('../src/perf.ts')
-const { client } = await import('../src/client.ts')
-const { blockData } = await import('../src/cli/block-data.ts')
+const { client } = await import('../src/client/app.ts')
+const { blockData } = await import('../src/client/terminal/block-data.ts')
 await import('../src/config.ts')
 const { sessions } = await import('../src/server/sessions.ts')
 

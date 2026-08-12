@@ -14,14 +14,14 @@
 // prompt can be multiline, so all cursor positioning goes through
 // positionCursor() which updates cursorRow and cursorCol atomically.
 
-import { client } from '../client.ts'
-import { prompt } from '../cli/prompt.ts'
+import { client } from './app.ts'
+import { prompt } from './terminal/prompt.ts'
 import { popup } from './popup.ts'
-import type { Block } from '../client.ts'
+import type { Block } from './app.ts'
 import { renderHistory } from './render-history.ts'
 import type { BlockRenderCache, HistoryRenderContext } from './render-history.ts'
 import { renderStatus } from './render-status.ts'
-import { cursor } from '../cli/cursor.ts'
+import { cursor } from './terminal/cursor.ts'
 import { terminalOutput } from './terminal-output.ts'
 
 const config = {

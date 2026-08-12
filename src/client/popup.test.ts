@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { colors } from '../cli/colors.ts'
+import { colors } from './terminal/colors.ts'
 import { popup } from './popup.ts'
 import { visLen } from '../utils/strings.ts'
-import type { KeyEvent } from '../cli/keys.ts'
+import type { KeyEvent } from './terminal/keys.ts'
 import { models } from '../models.ts'
 
 colors.init()

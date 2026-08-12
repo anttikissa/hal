@@ -1,6 +1,6 @@
-import { keyHelp } from '../cli/key-help.ts'
+import { keyHelp } from './terminal/key-help.ts'
 import { visLen } from '../utils/strings.ts'
-import { commands } from '../runtime/commands.ts'
+import { commands } from '../server/runtime/commands.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import type { ClientCommandType } from './commands.ts'
 

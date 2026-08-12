@@ -1,5 +1,5 @@
-import { draft as draftModule } from '../cli/draft.ts'
-import { blockData } from '../cli/block-data.ts'
+import { draft as draftModule } from './terminal/draft.ts'
+import { blockData } from './terminal/block-data.ts'
 
 function handle(event: any, ctx: any): void {
 	if (event.type === 'host-released') return

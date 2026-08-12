@@ -2,8 +2,8 @@
 // slash command, and draining queued prompts after a turn completes.
 // Storage lives in runtime/prompt-queue.ts; this module owns the behavior.
 
-import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
-import { promptQueue, type QueuedPrompt } from '../runtime/prompt-queue.ts'
+import { agentLoop, type AgentLoopResult } from './runtime/agent-loop.ts'
+import { promptQueue, type QueuedPrompt } from './runtime/prompt-queue.ts'
 import { sessions } from './sessions.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).

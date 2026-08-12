@@ -9,7 +9,7 @@ Prompt-file notes (this comment is removed before SYSTEM.md is sent to the model
     :::
   Names include agent, model, cwd, hal_source, and the path variables below.
 - HTML comments are maintenance notes; directive lines in an HTML comment do nothing.
-See src/runtime/system-prompt.ts for load order, all variables, directive limits,
+See src/server/runtime/system-prompt.ts for load order, all variables, directive limits,
 substitutions, and the different treatment of project-file comments.
 -->
 
@@ -62,7 +62,7 @@ Example 1: Check whether tab #3 is working:
 
 ```ts
 let { runtime } = require('~/server/runtime.ts')
-let { agentLoop } = require('~/runtime/agent-loop.ts')
+let { agentLoop } = require('~/server/runtime/agent-loop.ts')
 return agentLoop.isWorking(runtime.state.openSessionIds[2])
 ```
 
@@ -86,7 +86,7 @@ Some useful commands you can run like that:
 Example 3: Pattern for monkey-patching functions so the change can be reverted:
 
 ```ts
-let { toolRegistry } = require('~/tools/tool.ts')
+let { toolRegistry } = require('~/server/tools/tool.ts')
 let { runtime } = require('~/server/runtime.ts')
 
 toolRegistry._dispatch ??= toolRegistry.dispatch

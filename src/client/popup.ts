@@ -1,11 +1,11 @@
 // Small popup layer for transient UI that should draw over the normal frame.
 // Kept intentionally narrow: one active popup, list-style rows, optional input.
 
-import { lineEditor } from '../cli/line-editor.ts'
-import { colors } from '../cli/colors.ts'
+import { lineEditor } from './terminal/line-editor.ts'
+import { colors } from './terminal/colors.ts'
 import { models } from '../models.ts'
 import { clipVisual, hardWrap, visLen } from '../utils/strings.ts'
-import type { KeyEvent } from '../cli/keys.ts'
+import type { KeyEvent } from './terminal/keys.ts'
 
 interface PopupItem {
 	value: string

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { render } from '../src/client/render.ts'
-import { client } from '../src/client.ts'
-import { prompt } from '../src/cli/prompt.ts'
+import { client } from '../src/client/app.ts'
+import { prompt } from '../src/client/terminal/prompt.ts'
 
 function captureOutput(fn: () => void): string {
 	const writes: string[] = []

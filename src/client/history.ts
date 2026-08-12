@@ -1,4 +1,4 @@
-import type { Block } from '../cli/blocks.ts'
+import type { Block } from './terminal/blocks.ts'
 import { ason } from '../utils/ason.ts'
 
 interface LiveTab {

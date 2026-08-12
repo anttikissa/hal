@@ -1,0 +1,118 @@
+import { expect, test } from 'bun:test'
+import { colors } from './colors.ts'
+import { liveFiles } from '../../utils/live-file.ts'
+
+test('colors.init loads lazily and only once', () => {
+	const state = (colors as any).state
+	if (!state || typeof colors.init !== 'function') throw new Error('colors.init() is required')
+
+	const origInitialized = state.initialized
+	const origWatcher = state.watcher
+	const origLiveFile = liveFiles.liveFile
+	const origOnChange = liveFiles.onChange
+	let liveFileCalls = 0
+	let onChangeCalls = 0
+
+	liveFiles.liveFile = ((path: string, defaults: Record<string, any>, opts?: { watch?: boolean }) => {
+		liveFileCalls++
+		expect(path.endsWith('/colors.ason')).toBe(true)
+		expect(defaults).toEqual({})
+		expect(opts).toEqual({ watch: true })
+		return { watched: true } as any
+	}) as typeof liveFiles.liveFile
+	liveFiles.onChange = ((watcher: object, cb: () => void) => {
+		onChangeCalls++
+		expect(watcher).toEqual({ watched: true })
+		expect(typeof cb).toBe('function')
+	}) as typeof liveFiles.onChange
+
+	try {
+		state.initialized = false
+		state.watcher = null
+		expect(liveFileCalls).toBe(0)
+		expect(onChangeCalls).toBe(0)
+
+		colors.init()
+		expect(state.initialized).toBe(true)
+		expect(liveFileCalls).toBe(1)
+		expect(onChangeCalls).toBe(1)
+
+		colors.init()
+		expect(liveFileCalls).toBe(1)
+		expect(onChangeCalls).toBe(1)
+	} finally {
+		state.initialized = origInitialized
+		state.watcher = origWatcher
+		liveFiles.liveFile = origLiveFile
+		liveFiles.onChange = origOnChange
+	}
+})
+
+test('colors reload notifies callbacks', () => {
+	const state = (colors as any).state
+	const origInitialized = state.initialized
+	const origWatcher = state.watcher
+	const origCallbacks = state.callbacks
+	const origLiveFile = liveFiles.liveFile
+	const origOnChange = liveFiles.onChange
+	let watchedCallback: any = null
+	let calls = 0
+
+	liveFiles.liveFile = (() => ({ watched: true })) as typeof liveFiles.liveFile
+	liveFiles.onChange = ((_: object, cb: () => void) => {
+		watchedCallback = cb
+	}) as typeof liveFiles.onChange
+
+	try {
+		state.initialized = false
+		state.watcher = null
+		state.callbacks = []
+		colors.onChange(() => { calls++ })
+		colors.init()
+
+		expect(calls).toBe(0)
+		if (!watchedCallback) throw new Error('missing colors watcher callback')
+		watchedCallback()
+		expect(calls).toBe(1)
+	} finally {
+		state.initialized = origInitialized
+		state.watcher = origWatcher
+		state.callbacks = origCallbacks
+		liveFiles.liveFile = origLiveFile
+		liveFiles.onChange = origOnChange
+	}
+})
+
+
+test('colors.load exposes help bar colors from colors.ason', () => {
+	colors.load()
+	expect(colors.help.key).toStartWith('\x1b[')
+	expect(colors.help.description).toStartWith('\x1b[')
+	expect(colors.help.key).not.toBe('\x1b[97m')
+})
+
+
+test('colors.load exposes assistant HAL cursor colors from colors.ason', () => {
+	colors.load()
+	expect(colors.assistant.cursor).toStartWith('\x1b[')
+	expect(colors.assistant.cursorIdle).toStartWith('\x1b[')
+	expect(colors.assistant.cursorIdle).not.toBe(colors.assistant.cursor)
+})
+
+
+test('colors.load derives black backgrounds from OKLCH lightness and chroma', () => {
+	colors.load()
+	expect(colors.assistant.bgIsBlack).toBe(true)
+	expect(colors.thinking.bgIsBlack).toBe(true)
+	expect(colors.info.bgIsBlack).toBe(false)
+})
+
+
+test('colors.load exposes tab, popup tone, and diff colors from colors.ason', () => {
+	colors.load()
+	expect(colors.tab.activeFg).toStartWith('\x1b[')
+	expect(colors.tab.pausedFg).toStartWith('\x1b[')
+	expect(colors.popup.warningFg).toStartWith('\x1b[')
+	expect(colors.popup.modelCurrent.bg).toStartWith('\x1b[')
+	expect(colors.diff.addFg).toStartWith('\x1b[')
+})

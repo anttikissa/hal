@@ -11,24 +11,24 @@ import { protocol } from '../protocol.ts'
 import type { Command, SpawnCommandData, SpawnKind } from '../protocol.ts'
 import { models } from '../models.ts'
 import { sessions as sessionStore, type HistoryEntry, type SessionMeta, type UserPart } from './sessions.ts'
-import { commands } from '../runtime/commands.ts'
-import type { SessionState } from '../runtime/commands.ts'
-import { agentLoop, type AgentLoopResult } from '../runtime/agent-loop.ts'
-import { context } from '../runtime/system-prompt.ts'
-import { apiMessages } from '../session/api-messages.ts'
-import { attachments } from '../session/attachments.ts'
-import { sessionIds } from '../session/ids.ts'
-import { replay } from '../session/replay.ts'
+import { commands } from './runtime/commands.ts'
+import type { SessionState } from './runtime/commands.ts'
+import { agentLoop, type AgentLoopResult } from './runtime/agent-loop.ts'
+import { context } from './runtime/system-prompt.ts'
+import { apiMessages } from './session/api-messages.ts'
+import { attachments } from './session/attachments.ts'
+import { sessionIds } from './session/ids.ts'
+import { replay } from './session/replay.ts'
 import { openaiUsage } from '../openai-usage.ts'
-import { toolRegistry } from '../tools/tool.ts'
+import { toolRegistry } from './tools/tool.ts'
 import { log } from '../utils/log.ts'
 import { startup } from '../startup.ts'
-import { promptQueue } from '../runtime/prompt-queue.ts'
-import { openai } from '../providers/openai.ts'
+import { promptQueue } from './runtime/prompt-queue.ts'
+import { openai } from './providers/openai.ts'
 import { paths } from '../utils/paths.ts'
-import { openingSummary } from '../session/opening-summary.ts'
-import { blob } from '../session/blob.ts'
-import { whatSummary } from '../session/what.ts'
+import { openingSummary } from './session/opening-summary.ts'
+import { blob } from './session/blob.ts'
+import { whatSummary } from './session/what.ts'
 
 type PendingContinuation = { canceled: boolean }
 type PendingPrompt = {
@@ -900,7 +900,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 			}
 		}
 	})()
-	void import('../mcp/client.ts')
+	void import('./mcp/client.ts')
 		.then(({ mcp }) => {
 			mcp.initServers().catch((err: any) => {
 				log.error('mcp init failed', { error: err?.message ?? String(err) })
@@ -912,7 +912,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		.catch((err) => {
 			log.error('mcp client module load failed', { error: errorMessage(err) })
 		})
-	void import('../runtime/inbox.ts')
+	void import('./runtime/inbox.ts')
 		.then(({ inbox }) => {
 			inbox.startWatching(signal, (sessionId, text, source, queue) => {
 				if (!state.openSessionIds.includes(sessionId)) return

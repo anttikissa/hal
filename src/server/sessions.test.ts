@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'fs'
 import { sessions } from './sessions.ts'
-import { replay } from '../session/replay.ts'
+import { replay } from './session/replay.ts'
 import { ipc } from '../ipc.ts'
 import { models } from '../models.ts'
 

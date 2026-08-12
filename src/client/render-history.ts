@@ -10,10 +10,10 @@
 // passed in so reset/diff/fullscreen behavior remains centralized.
 
 import { oklch } from '../utils/oklch.ts'
-import { blocks as blockRenderer } from '../cli/blocks.ts'
-import { colors } from '../cli/colors.ts'
-import { cursor } from '../cli/cursor.ts'
-import type { Block, Tab } from '../client.ts'
+import { blocks as blockRenderer } from './terminal/blocks.ts'
+import { colors } from './terminal/colors.ts'
+import { cursor } from './terminal/cursor.ts'
+import type { Block, Tab } from './app.ts'
 
 export type BlockRenderCache = {
 	version: number

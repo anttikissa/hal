@@ -8,7 +8,7 @@
 import type { Message, ContentBlock } from '../src/protocol.ts'
 import { models } from '../src/models.ts'
 import { sessions } from '../src/server/sessions.ts'
-import { apiMessages } from '../src/session/api-messages.ts'
+import { apiMessages } from '../src/server/session/api-messages.ts'
 
 const READ_LIKE = new Set(['read', 'grep', 'glob', 'bash', 'read_url'])
 

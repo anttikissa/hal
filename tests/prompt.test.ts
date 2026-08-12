@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { readFileSync } from 'fs'
-import { clipboard } from '../src/cli/clipboard.ts'
-import { prompt } from '../src/cli/prompt.ts'
-import type { KeyEvent } from '../src/cli/keys.ts'
+import { clipboard } from '../src/client/terminal/clipboard.ts'
+import { prompt } from '../src/client/terminal/prompt.ts'
+import type { KeyEvent } from '../src/client/terminal/keys.ts'
 
 function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }

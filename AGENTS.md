@@ -108,7 +108,7 @@ Avoid import-time snapshots of values that may change at runtime, such as env-de
 
 Example:
 ```ts
-// src/runtime/agent-loop.ts
+// src/server/runtime/agent-loop.ts
 const config = {
 	maxIterations: 50,
 }
