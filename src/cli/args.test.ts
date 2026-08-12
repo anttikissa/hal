@@ -36,6 +36,14 @@ test('parse supports --state-dir with a following path or equals form', () => {
 	})
 })
 
+test('parse enables the local web client with an optional port', () => {
+	const env = { cwd: '/work/project', halDir: '/hal' }
+
+	expect(cliArgs.parse(['--web'], env)).toEqual({ ok: true, help: false, targetCwd: '/work/project', webPort: 3000 })
+	expect(cliArgs.parse(['--web=4545'], env)).toEqual({ ok: true, help: false, targetCwd: '/work/project', webPort: 4545 })
+	expect(cliArgs.parse(['--web=wrong'], env)).toEqual({ ok: false, error: '--web port must be a number from 1 to 65535' })
+})
+
 test('parse rejects unknown options and positional parameters', () => {
 	expect(cliArgs.parse(['asdf'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
 		ok: false,

@@ -123,6 +123,12 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
 	startupTarget.preferredSessionId = started.sessionId
+	if (parsedArgs.ok && parsedArgs.webPort) {
+		const port = parsedArgs.webPort
+		void import('./web-client/server.ts')
+			.then(({ web }) => web.start(port, ac.signal))
+			.catch((error) => log.error('web client startup failed', { error: String(error) }))
+	}
 	ipc.appendEvent({
 		type: 'runtime-start',
 		pid: process.pid,
