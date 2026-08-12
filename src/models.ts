@@ -212,17 +212,9 @@ function modelsFile(): string {
 function loadModelsDevCache(): Record<string, number> {
 	if (state.cache) return state.cache
 	try {
-		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as ModelsDevCache | Record<string, number>
-		const structured = parsed as ModelsDevCache
-		if (structured.version === 1 && structured.models) {
-			state.metadata = structured.models
-			state.cache = {}
-			for (const [id, model] of Object.entries(structured.models)) state.cache[id] = model.context
-		} else {
-			// The next refresh rewrites this former context-only cache in the v1 format.
-			state.cache = parsed as Record<string, number>
-			state.metadata = {}
-		}
+		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as unknown as ModelsDevCache
+		state.metadata = parsed.models
+		state.cache = contextWindows(parsed.models)
 	} catch {
 		state.cache = {}
 		state.metadata = {}

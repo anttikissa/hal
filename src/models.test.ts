@@ -316,6 +316,8 @@ test('refreshModels stores model metadata and source providers in the ASON cache
 		expect(saved).toContain("releaseDate: '2026-06-09'")
 		expect(saved).toContain("provider: 'azure'")
 		expect(saved).toContain("status: 'beta'")
+		models.state.cache = null
+		models.state.metadata = null
 		expect(models.cachedModelMetadata('anthropic/claude-mythos-5')).toMatchObject({
 			context: 1_000_000,
 			family: 'claude-mythos',
