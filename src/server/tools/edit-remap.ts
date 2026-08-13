@@ -249,8 +249,8 @@ function applyTrackerUpdate(sessionId: string, path: string, update: TrackerUpda
 
 function buildResult(edit: PreparedEdit): string {
 	return [
-		edit.remapNotice,
 		edit.diff,
+		edit.remapNotice,
 		`Changed lines after edit:\n${formatChangedLines(edit.resultLines, edit.changedStartLine, edit.changedLineCount)}`,
 	]
 		.filter(Boolean)
