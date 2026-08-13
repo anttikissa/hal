@@ -104,9 +104,8 @@ function formatToolCommand(cmd: string, cols: number, shellContinuations: boolea
 }
 
 function clipLine(line: string, cols: number): string {
-	return visLen(expandTabs(line, blockConfig.tabWidth)) <= cols
-		? line
-		: clipVisual(expandTabs(line, blockConfig.tabWidth), cols)
+	const expanded = expandTabs(line, blockConfig.tabWidth)
+	return visLen(expanded) <= cols ? expanded : clipVisual(expanded, cols)
 }
 
 function blockContent(block: Block, cols: number): string[] {

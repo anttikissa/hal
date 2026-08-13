@@ -356,6 +356,16 @@ test('rendered block lines without tabs do not embed carriage returns', () => {
 	expect(lines.some((line) => line.includes('\r'))).toBe(false)
 })
 
+test('rendered tool lines expand tabs even when they fit', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'edit',
+		output: '--- before\n1:abc \tshort\n\n+++ after\n1:def \tshort',
+	}
+
+	expect(blocks.renderBlock(block, 80).some((line) => line.includes('\t'))).toBe(false)
+})
+
 test('block header uses plain layout without horizontal rules', () => {
 	const block: Block = {
 		type: 'thinking',
