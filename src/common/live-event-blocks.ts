@@ -15,6 +15,7 @@ export interface LiveUserBlock extends LiveBlockBase {
 	actualText?: string
 	source?: string
 	status?: string
+	sourceTab?: number
 }
 
 export interface LiveAssistantBlock extends LiveBlockBase {

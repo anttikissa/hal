@@ -1,10 +1,13 @@
 import { afterEach, expect, test } from 'bun:test'
 import { inbox } from './inbox.ts'
+import { ipc } from '../../ipc.ts'
 
 const origPollInterval = inbox.config.pollIntervalMs
+const origReadState = ipc.readState
 
 afterEach(() => {
 	inbox.config.pollIntervalMs = origPollInterval
+	ipc.readState = origReadState
 })
 
 async function waitFor(check: () => boolean, timeoutMs = 10_000): Promise<void> {
@@ -34,3 +37,25 @@ test('message to a session directory that did not exist yet is delivered', async
 	controller.abort()
 	expect(seen).toEqual([[sessionId, 'hello there']])
 }, 15_000)
+
+
+test('message delivery preserves the sender tab', async () => {
+	inbox.config.pollIntervalMs = 20
+	ipc.readState = () => ({
+		sessions: [{ id: 'sender', tab: 6, cwd: '/tmp' }],
+		working: {},
+		updatedAt: new Date().toISOString(),
+	})
+	const controller = new AbortController()
+	const sessionId = `sender-tab-${Date.now()}`
+	const seen: Array<{ source?: string; sourceTab?: number }> = []
+	inbox.startWatching(controller.signal, (receivedId, _text, source, _queue, sourceTab) => {
+		if (receivedId === sessionId) seen.push({ source, sourceTab })
+	})
+
+	inbox.queueMessage(sessionId, 'hello there', 'sender')
+	await waitFor(() => seen.length > 0)
+	controller.abort()
+
+	expect(seen).toEqual([{ source: 'sender', sourceTab: 6 }])
+})

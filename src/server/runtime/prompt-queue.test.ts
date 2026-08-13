@@ -9,10 +9,10 @@ afterEach(() => {
 })
 
 test('append, load, clear', () => {
-	const count = promptQueue.append(sessionId, { text: 'do next', source: 'user', createdAt: '2026-05-20T00:00:00.000Z' })
+	const count = promptQueue.append(sessionId, { text: 'do next', source: 'sender', sourceTab: 4, createdAt: '2026-05-20T00:00:00.000Z' })
 
 	expect(count).toBe(1)
-	expect(promptQueue.load(sessionId)).toEqual([{ text: 'do next', source: 'user', createdAt: '2026-05-20T00:00:00.000Z' }])
+	expect(promptQueue.load(sessionId)).toEqual([{ text: 'do next', source: 'sender', sourceTab: 4, createdAt: '2026-05-20T00:00:00.000Z' }])
 
 	promptQueue.clear(sessionId)
 	expect(promptQueue.load(sessionId)).toEqual([])

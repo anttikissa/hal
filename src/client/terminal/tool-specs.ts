@@ -217,8 +217,8 @@ function isGitCommitAmendCommand(input: any): boolean {
 
 function sendTargetLabel(input?: any, output?: string): string {
 	const target = input?.sessionId ?? '?'
-	const tabMatch = output?.match(/\btab (\d+) \(([^)]+)\)/)
-	if (tabMatch && tabMatch[2] === target) return `tab ${tabMatch[1]} (${target})`
+	const tabMatch = output?.match(/\btab (\d+) · ([^\s]+)/)
+	if (tabMatch && tabMatch[2] === target) return `tab ${tabMatch[1]} · ${target}`
 	return target
 }
 
@@ -274,13 +274,13 @@ const specs: Record<string, ToolSpec> = {
 	send: {
 		title(input, output) {
 			const target = sendTargetLabel(input, output)
-			if (input?.queue) return `Queue to ${target}`
-			return `Send to ${target}`
+			return input?.queue ? `Message queued for ${target}` : `Message sent to ${target}`
 		},
 		command(input) {
 			if (typeof input?.text !== 'string') return undefined
 			return input.text
 		},
+		format: () => ({ bodyLines: [], suppressOutput: true }),
 	},
 }
 

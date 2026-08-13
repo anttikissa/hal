@@ -196,7 +196,7 @@ function sendToSession(from: SessionState, target: SessionRef, text: string): Co
 		return { error: 'Cannot send to the current session.', handled: true }
 	}
 	inbox.queueMessage(target.id, text, from.id)
-	return { output: `Sent to ${target.name} (${target.id})`, handled: true }
+	return { output: `Message sent to ${target.name} · ${target.id}`, handled: true }
 }
 
 function closedSessionLines(): string[] {

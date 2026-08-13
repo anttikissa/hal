@@ -165,7 +165,10 @@ const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.
 function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
-	if (block.type === 'user') return colors.user
+	if (block.type === 'user') {
+		if (block.source && block.source !== 'user' && block.source !== 'system') return colors.messageIncoming
+		return colors.user
+	}
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
 }
 
@@ -203,7 +206,11 @@ const fixedLabels = { log: 'Log', info: 'System', warning: 'Warning', error: 'Er
 function blockLabel(block: Block): string {
 	if (block.type === 'user') {
 		if (block.canceled) return 'You (canceled)'
-		if (block.source && block.source !== 'user' && block.source !== 'system') return `Inbox · ${block.source}`
+		if (block.source && block.source !== 'user' && block.source !== 'system') {
+			const sender = block.sourceTab ? `tab ${block.sourceTab} · ${block.source}` : block.source
+			const queued = block.status === 'queued' ? ' · queued in this tab' : ''
+			return `Message received from ${sender}${queued}`
+		}
 		if (block.status === 'editing') return 'You (editing this prompt)'
 		if (block.status === 'steering') return 'You (steering)'
 		if (block.status === 'queued') return 'You (queued)'

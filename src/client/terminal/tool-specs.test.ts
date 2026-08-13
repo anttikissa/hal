@@ -49,25 +49,28 @@ test('spawn_agent block renders full input args', () => {
 	expect(body).toContain('Queued subagent spawn from 04-lfp')
 })
 
-test('send block renders target session and message text', () => {
-	const block: Block = {
+test('send block identifies delivered and queued messages without repeating its status in the body', () => {
+	const sent: Block = {
 		type: 'tool',
 		name: 'send',
-		input: {
-			sessionId: '33-270',
-			text: 'Stop. Do not do any analysis or file access.',
-			queue: false,
-		},
-		output: 'Sent message to tab 4 (33-270)',
+		input: { sessionId: '33-270', text: 'Stop. Do not do any analysis or file access.', queue: false },
+		output: 'Message sent to tab 4 · 33-270',
+	}
+	const queued: Block = {
+		type: 'tool',
+		name: 'send',
+		input: { sessionId: '33-270', text: 'Wait until the current work finishes.', queue: true },
+		output: 'Message queued for tab 4 · 33-270',
 	}
 
-	const lines = blocks.renderBlock(block, 100).map((l) => stripAnsi(l))
-	const header = lines.find((line) => line.trim()) ?? ''
-	const body = lines.slice(1).join('\n')
+	const sentLines = blocks.renderBlock(sent, 100).map((line) => stripAnsi(line))
+	const queuedLines = blocks.renderBlock(queued, 100).map((line) => stripAnsi(line))
 
-	expect(header).toContain('Send to tab 4 (33-270)')
-	expect(body).toContain('Stop. Do not do any analysis or file access.')
-	expect(body).toContain('Sent message to tab 4 (33-270)')
+	expect(headerLine(sentLines)).toContain('Message sent to tab 4 · 33-270')
+	expect(sentLines.join('\n')).toContain('Stop. Do not do any analysis or file access.')
+	expect(contentLines(sentLines).join('\n')).not.toContain('Message sent to')
+	expect(headerLine(queuedLines)).toContain('Message queued for tab 4 · 33-270')
+	expect(queuedLines.join('\n')).toContain('Wait until the current work finishes.')
 })
 
 test('grep block quotes its search pattern in header', () => {

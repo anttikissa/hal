@@ -138,19 +138,23 @@ test('long notices render a blank line after the header', () => {
 	expect(lines[blockBodyStart(lines)]?.trim()).toBe('')
 })
 
-test('incoming user block shows inbox source instead of You', () => {
-	const block: Block = {
+test('incoming user blocks identify the sender and local queueing', () => {
+	const received: Block = {
 		type: 'user',
 		text: 'hello from another session',
 		source: '09-bx8',
+		sourceTab: 9,
 		ts: new Date('2026-01-01T17:37:00Z').getTime(),
 	}
+	const queued: Block = { ...received, status: 'queued' }
 
-	const lines = blocks.renderBlock(block, 80)
-	const header = headerLine(lines)
+	const receivedHeader = headerLine(blocks.renderBlock(received, 80))
+	const queuedHeader = headerLine(blocks.renderBlock(queued, 80))
 
-	expect(header).toContain('Inbox · 09-bx8')
-	expect(header).not.toContain('You')
+	expect(receivedHeader).toContain('Message received from tab 9 · 09-bx8')
+	expect(queuedHeader).toContain('Message received from tab 9 · 09-bx8 · queued in this tab')
+	expect(receivedHeader).not.toContain('Inbox')
+	expect(receivedHeader).not.toContain('You')
 })
 
 test('user blocks use user colors', () => {
@@ -161,6 +165,16 @@ test('user blocks use user colors', () => {
 	expect(rendered).toContain(colors.user.fg)
 	expect(rendered).toContain(colors.user.bg)
 	expect(rendered).not.toContain(colors.info.bg)
+})
+
+
+test('incoming messages use their distinct color card', () => {
+	colors.load()
+	const rendered = blocks.renderBlock({ type: 'user', text: 'hello', source: '09-bx8' }, 80).join('\n')
+
+	expect(rendered).toContain(colors.messageIncoming.fg)
+	expect(rendered).toContain(colors.messageIncoming.bg)
+	expect(rendered).not.toContain(colors.user.bg)
 })
 
 test('thinking block renders markdown and trims trailing blank lines', () => {

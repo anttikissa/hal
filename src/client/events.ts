@@ -34,6 +34,7 @@ function handlePrompt(event: any, ctx: any): void {
 		text: event.text,
 		actualText: typeof event.actualText === 'string' ? event.actualText : undefined,
 		source: typeof event.source === 'string' ? event.source : undefined,
+		sourceTab: typeof event.sourceTab === 'number' ? event.sourceTab : undefined,
 		status: event.label,
 		ts: event.createdAt ? Date.parse(event.createdAt) : undefined,
 	})

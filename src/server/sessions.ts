@@ -61,7 +61,7 @@ export interface PendingToolsState {
 }
 
 export type HistoryEntry = EntryIdentity & (
-	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; status?: string; ts?: string }
+	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; sourceTab?: number; status?: string; ts?: string }
 	| {
 			type: 'thinking'
 			text?: string

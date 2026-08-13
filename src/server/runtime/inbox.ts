@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync, unlinkSync } from 'fs'
 import { watch } from 'fs'
 import { STATE_DIR, ensureDir } from '../../state.ts'
+import { ipc } from '../../ipc.ts'
 import { ason } from '../../utils/ason.ts'
 
 const INBOX_DIR = `${STATE_DIR}/inbox`
@@ -17,9 +18,10 @@ interface InboxMessage {
 	from?: string
 	ts?: string
 	queue?: boolean
+	sourceTab?: number
 }
 
-type OnMessage = (sessionId: string, text: string, from?: string, queue?: boolean) => void
+type OnMessage = (sessionId: string, text: string, from?: string, queue?: boolean, sourceTab?: number) => void
 
 const config = {
 	// How often to rescan all inboxes even if no fs event arrived.
@@ -38,6 +40,7 @@ function parseInboxMessage(raw: unknown): InboxMessage | null {
 		from: typeof msg.from === 'string' ? msg.from : undefined,
 		ts: typeof msg.ts === 'string' ? msg.ts : undefined,
 		queue: msg.queue === true,
+		sourceTab: typeof msg.sourceTab === 'number' && Number.isInteger(msg.sourceTab) && msg.sourceTab > 0 ? msg.sourceTab : undefined,
 	}
 }
 
@@ -52,7 +55,7 @@ function processInbox(sessionDir: string, sessionId: string, onMessage: OnMessag
 			try {
 				const content = readFileSync(path, 'utf-8')
 				const msg = parseInboxMessage(ason.parse(content))
-				if (msg?.text) onMessage(sessionId, msg.text, msg.from, msg.queue)
+				if (msg?.text) onMessage(sessionId, msg.text, msg.from, msg.queue, msg.sourceTab)
 				// Delete after processing
 				unlinkSync(path)
 			} catch {
@@ -116,12 +119,14 @@ function queueMessage(sessionId: string, text: string, from?: string, queue?: bo
 	const dir = `${INBOX_DIR}/${sessionId}`
 	ensureDir(dir)
 	const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}.ason`
+	const sourceTab = from ? ipc.readState().sessions.find((session) => session.id === from)?.tab : undefined
 	const msg: InboxMessage = {
 		sessionId,
 		text,
 		from: from ?? 'external',
 		ts: new Date().toISOString(),
 		...(queue ? { queue: true } : {}),
+		...(sourceTab ? { sourceTab } : {}),
 	}
 	// Write atomically: write to temp, then rename
 	const path = `${dir}/${filename}`

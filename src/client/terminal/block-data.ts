@@ -61,6 +61,7 @@ function historyToBlocks(
 					actualText: editText === displayText ? undefined : editText,
 					source: isSystem ? 'system' : entry.source ?? undefined,
 					status: entry.status,
+					sourceTab: entry.sourceTab,
 					ts,
 					dimmed,
 					canceled: entry.canceled,

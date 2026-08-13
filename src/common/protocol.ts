@@ -49,6 +49,7 @@ export interface PromptCommand extends CommandBase {
 	displayText?: string
 	queue?: boolean
 	source?: string
+	sourceTab?: number
 }
 
 export interface PromptAmendCommand extends CommandBase {

@@ -16,22 +16,23 @@ function queuePreviewResult(text: string, max = 80): { text: string; truncated: 
 	return { text: truncated ? `${first}...` : first, truncated }
 }
 
-function queueEntry(text: string, source?: string, displayText?: string): QueuedPrompt {
+function queueEntry(text: string, source?: string, displayText?: string, sourceTab?: number): QueuedPrompt {
 	return {
 		text,
 		createdAt: new Date().toISOString(),
 		...(source ? { source } : {}),
 		...(displayText ? { displayText } : {}),
+		...(sourceTab ? { sourceTab } : {}),
 	}
 }
 
-async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
+async function enqueuePrompt(sessionId: string, text: string, source?: string, displayText?: string, sourceTab?: number): Promise<void> {
 	if (!text.trim()) return
 	if (!agentLoop.isWorking(sessionId) && !promptQueue.isHeld(sessionId)) {
-		await runtime.startPromptCommand(sessionId, text, source, displayText)
+		await runtime.startPromptCommand(sessionId, text, source, displayText, undefined, sourceTab)
 		return
 	}
-	const count = promptQueue.append(sessionId, queueEntry(text, source, displayText))
+	const count = promptQueue.append(sessionId, queueEntry(text, source, displayText, sourceTab))
 	runtime.emitInfo(sessionId, `Queued ${count}: ${queuePreviewResult(text).text}`)
 }
 
@@ -64,7 +65,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 		return false
 	}
 	promptQueue.setHeld(sessionId, false)
-	await runtime.startPromptCommand(sessionId, next.text, next.source, next.displayText ?? next.text, 'queued')
+	await runtime.startPromptCommand(sessionId, next.text, next.source, next.displayText ?? next.text, 'queued', next.sourceTab)
 	return true
 }
 

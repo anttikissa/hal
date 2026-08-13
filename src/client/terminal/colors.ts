@@ -26,6 +26,7 @@ type DiffColors = { addFg: string; removeFg: string }
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
+const messageIncoming: BlockColors = { fg: '', bg: '' }
 const input = { bg: '', cursor: '', cursorDim: '' }
 const system: BlockColors = { fg: '', bg: '' }
 const logColors: BlockColors = { fg: '', bg: '' }
@@ -118,6 +119,7 @@ function load(): void {
 	resolveMd(raw.assistant, assistant)
 	resolveMd(raw.thinking, thinking)
 	resolveBlock(raw.user, user)
+	resolveBlock(raw.messageIncoming, messageIncoming)
 	resolveBlock(raw.system, system)
 	resolveBlock(raw.error, error)
 	resolveBlock(raw.popup?.current, popup.current)
@@ -197,6 +199,7 @@ export const colors = {
 	assistant,
 	thinking,
 	user,
+	messageIncoming,
 	input,
 	system,
 	log: logColors,

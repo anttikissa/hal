@@ -31,9 +31,9 @@ function targetTab(sessionId: string): number | undefined {
 
 function resultText(targetId: string, queued: boolean): string {
 	const tab = targetTab(targetId)
-	const action = queued ? 'Queued message for' : 'Sent message to'
-	if (tab) return `${action} tab ${tab} (${targetId})`
-	return `${action} session ${targetId}`
+	const action = queued ? 'Message queued for' : 'Message sent to'
+	if (tab) return `${action} tab ${tab} · ${targetId}`
+	return `${action} ${targetId}`
 }
 
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {

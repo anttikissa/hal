@@ -172,7 +172,7 @@ function buildSpawnPrompt(parentId: string, task: string, kind: SpawnKind): stri
 	].join('\n')
 }
 
-function queuePromptCommand(sessionId: string, text: string, source?: string, queue?: boolean): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, queue, createdAt: new Date().toISOString() }) }
+function queuePromptCommand(sessionId: string, text: string, source?: string, queue?: boolean, sourceTab?: number): void { ipc.appendCommand({ type: 'prompt', sessionId, text, source, queue, sourceTab, createdAt: new Date().toISOString() }) }
 
 function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 	const mode = spec.mode === 'fresh' ? 'fresh' : 'fork'
@@ -262,7 +262,7 @@ function buildSessionState(meta: SessionMeta): SessionState {
 	}
 }
 
-async function handlePrompt(sessionId: string, text: string, label?: 'steering' | 'queued', source?: string, displayText?: string, pending?: PendingPrompt): Promise<void> {
+async function handlePrompt(sessionId: string, text: string, label?: 'steering' | 'queued', source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
@@ -306,27 +306,28 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		actualText: displayText && displayText !== text ? text : undefined,
 		label,
 		source,
+		sourceTab,
 		sessionId,
 		createdAt: new Date().toISOString(),
 	})
-	await runGeneration(sessionId, text, source, displayText, pending)
+	await runGeneration(sessionId, text, source, displayText, pending, sourceTab)
 }
 
-async function dispatchPromptCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, label?: 'queued'): Promise<void> {
+async function dispatchPromptCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, label?: 'queued', sourceTab?: number): Promise<void> {
 	const steering = agentLoop.isWorking(sessionId)
 	if (steering && await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, true)) {
 		persistCommandInput(sessionId, text, source)
 		return
 	}
 	if (steering && commands.canRunWhileWorking(text)) {
-		await handlePrompt(sessionId, text, undefined, source, displayText)
+		await handlePrompt(sessionId, text, undefined, source, displayText, undefined, sourceTab)
 		return
 	}
 	if (steering) {
 		const settled = agentLoop.abortAndWait(sessionId)
 		if (settled) await settled
 	}
-	await runtime.handlePrompt(sessionId, text, label ?? (steering ? 'steering' : undefined), source, displayText, pending)
+	await runtime.handlePrompt(sessionId, text, label ?? (steering ? 'steering' : undefined), source, displayText, pending, sourceTab)
 }
 
 function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
@@ -341,8 +342,8 @@ function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, pre
 	return pending.task
 }
 
-function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued'): Promise<void> {
-	return trackPendingPrompt(sessionId, (pending) => dispatchPromptCommand(sessionId, text, source, displayText, pending, label))
+function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued', sourceTab?: number): Promise<void> {
+	return trackPendingPrompt(sessionId, (pending) => dispatchPromptCommand(sessionId, text, source, displayText, pending, label, sourceTab))
 }
 
 function startPromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
@@ -487,7 +488,7 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 	}
 }
 
-async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt): Promise<void> {
+async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
@@ -501,6 +502,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 			type: 'user',
 			parts: await resolvePromptParts(sessionId, text, displayText),
 			source,
+			sourceTab,
 			ts: new Date().toISOString(),
 		}])
 	}
@@ -645,8 +647,8 @@ function handleCommand(cmd: Command): void {
 	switch (cmd.type) {
 		case 'prompt': {
 			if (!sessionId) return
-			if (cmd.queue) void queueRunner.enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText)
-			else startPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText)
+			if (cmd.queue) void queueRunner.enqueuePrompt(sessionId, cmd.text, cmd.source, cmd.displayText, cmd.sourceTab)
+			else startPromptCommand(sessionId, cmd.text, cmd.source, cmd.displayText, undefined, cmd.sourceTab)
 			break
 		}
 		case 'prompt-amend': {
@@ -914,9 +916,9 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 		})
 	void import('./runtime/inbox.ts')
 		.then(({ inbox }) => {
-			inbox.startWatching(signal, (sessionId, text, source, queue) => {
+			inbox.startWatching(signal, (sessionId, text, source, queue, sourceTab) => {
 				if (!state.openSessionIds.includes(sessionId)) return
-				queuePromptCommand(sessionId, text, source, queue)
+				queuePromptCommand(sessionId, text, source, queue, sourceTab)
 			})
 		})
 		.catch((err) => {

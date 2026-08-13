@@ -6,6 +6,7 @@ export interface QueuedPrompt {
 	text: string
 	source?: string
 	displayText?: string
+	sourceTab?: number
 	createdAt: string
 }
 
@@ -29,6 +30,7 @@ function clean(entry: QueuedPrompt): QueuedPrompt {
 	const out: QueuedPrompt = { text: entry.text, createdAt: entry.createdAt }
 	if (entry.source !== undefined) out.source = entry.source
 	if (entry.displayText !== undefined) out.displayText = entry.displayText
+	if (entry.sourceTab !== undefined) out.sourceTab = entry.sourceTab
 	return out
 }
 
@@ -48,6 +50,7 @@ function load(sessionId: string): QueuedPrompt[] {
 				createdAt: raw.createdAt,
 				source: typeof raw.source === 'string' ? raw.source : undefined,
 				displayText: typeof raw.displayText === 'string' ? raw.displayText : undefined,
+				sourceTab: typeof raw.sourceTab === 'number' && Number.isInteger(raw.sourceTab) && raw.sourceTab > 0 ? raw.sourceTab : undefined,
 			}))
 		}
 		return entries
