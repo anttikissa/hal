@@ -29,7 +29,7 @@ import { pausedNotices } from './paused-notices.ts'
 import { blockData } from './terminal/block-data.ts'
 import type { Block } from './terminal/blocks.ts'
 import type { HistoryEntry } from '../common/history.ts'
-import type { SessionMeta } from '../server/sessions.ts'
+import type { SessionMeta } from '../common/session.ts'
 export type { Block }
 
 export interface Tab {

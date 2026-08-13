@@ -1,5 +1,5 @@
 import { resolve } from 'path'
-import type { SessionMeta } from './server/sessions.ts'
+import type { SessionMeta } from './common/session.ts'
 import type { SharedSessionInfo } from './ipc.ts'
 
 // Startup policy lives here so the CLI wrapper, client and runtime agree on the

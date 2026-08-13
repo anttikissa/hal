@@ -10,33 +10,17 @@ import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import type { HistoryEntry } from '../common/history.ts'
 import { liveEventBlocks, type LiveBlock, type LiveEvent } from '../common/live-event-blocks.ts'
-import type { PartialTokenUsage, SpawnKind } from '../common/protocol.ts'
+import type { PartialTokenUsage } from '../common/protocol.ts'
+import type { SessionMeta } from '../common/session.ts'
 import { models } from '../common/models.ts'
 
 export type { EntryIdentity, HistoryEntry, UserPart } from '../common/history.ts'
+export type { SessionMeta } from '../common/session.ts'
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
 const DEFAULT_LOG = 'history.asonl'
 const liveSessionMetas = new Map<string, SessionMeta>()
 const liveSessionState = new Map<string, SessionLive>()
 
-export interface SessionMeta {
-	id: string
-	workingDir?: string
-	createdAt: string
-	name?: string
-	model?: string
-	currentLog?: string
-	closedAt?: string
-	forkedFrom?: string
-	spawnKind?: SpawnKind
-	attention?: 'new'
-	// 1-based visible tab position at close time. Used to put Ctrl-Shift-T
-	// restores back where the tab was instead of appending at the end.
-	closedTabPosition?: number
-	parentSessionId?: string
-	// Last known context window usage, persisted so it survives restarts.
-	context?: { used: number; max: number }
-}
 
 const SIDE_EFFECT_TOOL_NAMES = new Set(['bash', 'edit', 'write', 'eval', 'send', 'spawn_agent'])
 
