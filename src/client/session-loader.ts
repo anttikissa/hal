@@ -1,4 +1,4 @@
-import type { SharedSessionInfo } from '../ipc.ts'
+import type { SharedSessionInfo } from '../common/ipc.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import type { HistoryEntry } from '../common/history.ts'
 import type { Block } from './terminal/blocks.ts'

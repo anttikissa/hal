@@ -7,52 +7,15 @@ import { liveFiles } from './utils/live-file.ts'
 import { tails } from './utils/tail-file.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
-import type { Command, VersionStatus } from './common/protocol.ts'
+import type { SharedState } from './common/ipc.ts'
+import type { Command } from './common/protocol.ts'
+
+export type { SharedClientInfo, SharedHostInfo, SharedSessionInfo, SharedState } from './common/ipc.ts'
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`
 const COMMANDS_FILE = `${IPC_DIR}/commands.asonl`
 const STATE_FILE = `${IPC_DIR}/state.ason`
-
-export interface SharedSessionInfo {
-	// 1-based visible tab number. Stored explicitly so humans and agents do not
-	// need to count large session arrays by hand.
-	id: string
-	tab?: number
-	name?: string
-	cwd: string
-	model?: string
-	currentLog?: string
-	attention?: 'new'
-}
-
-export interface SharedHostInfo {
-	pid: number | null
-	startedAt: string
-	versionStatus: VersionStatus
-	version?: string
-	error?: string
-}
-
-export interface SharedClientInfo {
-	pid: number
-	startedAt: string
-	updatedAt: string
-	sessionId?: string
-	cwd?: string
-	versionStatus: VersionStatus
-	version?: string
-	error?: string
-}
-
-export interface SharedState {
-	sessions: SharedSessionInfo[]
-	working: Record<string, boolean>
-	summarizing?: Record<string, boolean>
-	host?: SharedHostInfo
-	clients?: SharedClientInfo[]
-	updatedAt: string
-}
 
 function defaultState(): SharedState {
 	return {

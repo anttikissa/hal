@@ -24,7 +24,7 @@ import { visLen } from '../../utils/strings.ts'
 import { HAL_DIR } from '../../state.ts'
 import { authLogin } from '../auth-login.ts'
 import { isPidAlive } from '../../utils/is-pid-alive.ts'
-import type { SharedClientInfo } from '../../ipc.ts'
+import type { SharedClientInfo } from '../../common/ipc.ts'
 import { modelRefresh } from '../model-refresh.ts'
 import { paths } from '../../utils/paths.ts'
 

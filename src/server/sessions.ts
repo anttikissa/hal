@@ -3,7 +3,7 @@
 
 import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync, writeFileSync, renameSync } from 'fs'
 import { randomBytes } from 'crypto'
-import type { SharedSessionInfo } from '../ipc.ts'
+import type { SharedSessionInfo } from '../common/ipc.ts'
 import { STATE_DIR, ensureDir } from '../state.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'

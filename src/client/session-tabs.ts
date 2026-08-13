@@ -1,4 +1,4 @@
-import type { SharedSessionInfo } from '../ipc.ts'
+import type { SharedSessionInfo } from '../common/ipc.ts'
 import type { Tab } from './app.ts'
 import { clientTabs } from './tabs.ts'
 

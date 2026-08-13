@@ -1,6 +1,6 @@
 import { resolve } from 'path'
 import type { SessionMeta } from './common/session.ts'
-import type { SharedSessionInfo } from './ipc.ts'
+import type { SharedSessionInfo } from './common/ipc.ts'
 
 // Startup policy lives here so the CLI wrapper, client and runtime agree on the
 // same fatal rule: never attach the user to a different project silently.

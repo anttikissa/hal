@@ -2,7 +2,7 @@
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
 import { ipc } from '../ipc.ts'
-import type { SharedSessionInfo, SharedState } from '../ipc.ts'
+import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
