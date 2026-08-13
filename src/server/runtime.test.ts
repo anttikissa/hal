@@ -530,9 +530,11 @@ test('enqueuePrompt stores prompts while session is working', async () => {
 		agentLoop.isWorking = () => true
 
 		await queueRunner.enqueuePrompt(sessionId, 'do this later', 'user')
+		await queueRunner.enqueuePrompt(sessionId, 'message from another tab', '04-sender', undefined, 4)
 
-		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['do this later'])
-		expect(events.some((event) => event.type === 'info' && event.text === 'Queued 1: do this later')).toBe(true)
+		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['do this later', 'message from another tab'])
+		expect(events.some((event) => event.type === 'info' && event.text === 'Prompt queued\ndo this later')).toBe(true)
+		expect(events.some((event) => event.type === 'info' && event.text === 'Prompt queued · from tab 4 · 04-sender\nmessage from another tab')).toBe(true)
 	} finally {
 		ipc.appendEvent = origAppendEvent
 		ipc.ownsHostLock = origOwnsHostLock
@@ -553,7 +555,7 @@ test('drained queued prompts keep raw text so slash commands stay commands', asy
 		}
 		promptQueue.append(sessionId, {
 			text: '/rename after queue',
-			source: 'user',
+			source: '04-sender',
 			displayText: '/rename after queue',
 			createdAt: '2026-05-20T00:00:00.000Z',
 		})
@@ -563,8 +565,8 @@ test('drained queued prompts keep raw text so slash commands stay commands', asy
 		expect(calls).toEqual([{
 			id: sessionId,
 			text: '/rename after queue',
-			label: 'queued',
-			source: 'user',
+			label: undefined,
+			source: undefined,
 			displayText: '/rename after queue',
 		}])
 	} finally {
@@ -762,7 +764,7 @@ test('continue releases a held queue so completion drains it', async () => {
 		runtime.handleCommand({ type: 'continue', sessionId })
 		await Bun.sleep(10)
 
-		expect(calls).toEqual([{ id: sessionId, text: 'run after continue', label: 'queued' }])
+		expect(calls).toEqual([{ id: sessionId, text: 'run after continue', label: undefined }])
 		expect(promptQueue.load(sessionId)).toEqual([])
 		expect(promptQueue.isHeld(sessionId)).toBe(false)
 	} finally {

@@ -16,6 +16,12 @@ function queuePreviewResult(text: string, max = 80): { text: string; truncated: 
 	return { text: truncated ? `${first}...` : first, truncated }
 }
 
+function queueNotice(text: string, source?: string, sourceTab?: number): string {
+	if (!source || source === 'user') return `Prompt queued\n${text}`
+	const sender = sourceTab ? `tab ${sourceTab} · ${source}` : source
+	return `Prompt queued · from ${sender}\n${text}`
+}
+
 function queueEntry(text: string, source?: string, displayText?: string, sourceTab?: number): QueuedPrompt {
 	return {
 		text,
@@ -32,8 +38,8 @@ async function enqueuePrompt(sessionId: string, text: string, source?: string, d
 		await runtime.startPromptCommand(sessionId, text, source, displayText, undefined, sourceTab)
 		return
 	}
-	const count = promptQueue.append(sessionId, queueEntry(text, source, displayText, sourceTab))
-	runtime.emitInfo(sessionId, `Queued ${count}: ${queuePreviewResult(text).text}`)
+	promptQueue.append(sessionId, queueEntry(text, source, displayText, sourceTab))
+	runtime.emitInfo(sessionId, queueNotice(text, source, sourceTab))
 }
 
 function buildQueuePausedNotice(entries: QueuedPrompt[]): string {
@@ -65,7 +71,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 		return false
 	}
 	promptQueue.setHeld(sessionId, false)
-	await runtime.startPromptCommand(sessionId, next.text, next.source, next.displayText ?? next.text, 'queued', next.sourceTab)
+	await runtime.startPromptCommand(sessionId, next.text, undefined, next.displayText ?? next.text)
 	return true
 }
 

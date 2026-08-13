@@ -39,12 +39,6 @@
 		bg: [0.29, 0.05, 220],
 	},
 
-	// Incoming inter-tab messages — teal distinguishes received messages from local input and sent tools.
-	messageIncoming: {
-		fg: [0.80, 0.13, 185],
-		bg: [0.25, 0.04, 185],
-	},
-
 	input: {
 		bg: [0.29, 0.05, 220],
 		cursor: [0.82, 0.11, 220],

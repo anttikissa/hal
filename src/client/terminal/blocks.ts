@@ -34,10 +34,11 @@ function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'for
 		const text = blockText.sanitizeTerminalText(block.text)
 		return subscriptionUsage.replaceUsageBarMarkers(text, terminalSubscriptionUsage.usageBar)
 	}
-	const text =
+	let text =
 		block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error'
 			? blockText.stripAnsiSequences(block.text)
 			: block.text
+	if (block.type === 'log' && text.startsWith('Prompt queued')) text = text.slice(text.indexOf('\n') + 1)
 	return blockText.sanitizeTerminalText(text)
 }
 
@@ -168,10 +169,8 @@ const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.
 function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
-	if (block.type === 'user') {
-		if (block.source && block.source !== 'user' && block.source !== 'system') return colors.messageIncoming
-		return colors.user
-	}
+	if (block.type === 'user') return colors.user
+	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return colors.warning
 	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
 }
 
@@ -207,12 +206,12 @@ function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | 
 const fixedLabels = { log: 'Log', info: 'System', warning: 'Warning', error: 'Error', fork: 'Fork' }
 
 function blockLabel(block: Block): string {
+	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return block.text.split('\n', 1)[0]!
 	if (block.type === 'user') {
 		if (block.canceled) return 'You (canceled)'
 		if (block.source && block.source !== 'user' && block.source !== 'system') {
 			const sender = block.sourceTab ? `tab ${block.sourceTab} · ${block.source}` : block.source
-			const queued = block.status === 'queued' ? ' · queued in this tab' : ''
-			return `Message received from ${sender}${queued}`
+			return `Message received from ${sender}`
 		}
 		if (block.status === 'editing') return 'You (editing this prompt)'
 		if (block.status === 'steering') return 'You (steering)'
@@ -269,6 +268,11 @@ function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefin
 
 function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | 'warning' | 'error' }>>, cols: number): string[] {
 	if (group.length === 0) return []
+	if (group.some((block) => block.type === 'log' && block.text.startsWith('Prompt queued'))) {
+		const lines: string[] = []
+		for (const block of group) lines.push(...renderBlock(block, cols))
+		return lines
+	}
 	if (group.length === 1) return renderBlock(group[0]!, cols)
 	const inlineLines: string[] = []
 	let allInline = true

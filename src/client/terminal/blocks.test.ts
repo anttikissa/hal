@@ -138,23 +138,24 @@ test('long notices render a blank line after the header', () => {
 	expect(lines[blockBodyStart(lines)]?.trim()).toBe('')
 })
 
-test('incoming user blocks identify the sender and local queueing', () => {
-	const received: Block = {
+test('incoming prompts use the normal prompt card and retain their sender label', () => {
+	colors.load()
+	const block: Block = {
 		type: 'user',
 		text: 'hello from another session',
 		source: '09-bx8',
 		sourceTab: 9,
 		ts: new Date('2026-01-01T17:37:00Z').getTime(),
 	}
-	const queued: Block = { ...received, status: 'queued' }
 
-	const receivedHeader = headerLine(blocks.renderBlock(received, 80))
-	const queuedHeader = headerLine(blocks.renderBlock(queued, 80))
+	const lines = blocks.renderBlock(block, 80)
+	const header = headerLine(lines)
+	const rendered = lines.join('\n')
 
-	expect(receivedHeader).toContain('Message received from tab 9 · 09-bx8')
-	expect(queuedHeader).toContain('Message received from tab 9 · 09-bx8 · queued in this tab')
-	expect(receivedHeader).not.toContain('Inbox')
-	expect(receivedHeader).not.toContain('You')
+	expect(header).toContain('Message received from tab 9 · 09-bx8')
+	expect(rendered).toContain(colors.user.fg)
+	expect(rendered).toContain(colors.user.bg)
+	expect(rendered).not.toContain(colors.info.bg)
 })
 
 test('user blocks use user colors', () => {
@@ -168,14 +169,22 @@ test('user blocks use user colors', () => {
 })
 
 
-test('incoming messages use their distinct color card', () => {
+test('queued prompts use the warning card regardless of source', () => {
 	colors.load()
-	const rendered = blocks.renderBlock({ type: 'user', text: 'hello', source: '09-bx8' }, 80).join('\n')
-
-	expect(rendered).toContain(colors.messageIncoming.fg)
-	expect(rendered).toContain(colors.messageIncoming.bg)
-	expect(rendered).not.toContain(colors.user.bg)
+	const queued = [
+		{ block: { type: 'log', text: 'Prompt queued\nfoobar' } as const, header: 'Prompt queued' },
+		{ block: { type: 'log', text: 'Prompt queued · from tab 9 · 09-bx8\nfoobar' } as const, header: 'Prompt queued · from tab 9 · 09-bx8' },
+	]
+	for (const { block, header } of queued) {
+		const lines = blocks.renderBlock(block, 80)
+		const rendered = lines.join('\n')
+		expect(headerLine(lines)).toContain(header)
+		expect(contentLines(lines)).toContain(' foobar')
+		expect(rendered).toContain(colors.warning.fg)
+		expect(rendered).toContain(colors.warning.bg)
+	}
 })
+
 
 test('thinking block renders markdown and trims trailing blank lines', () => {
 	const block: Block = {
