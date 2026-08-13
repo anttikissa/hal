@@ -15,13 +15,32 @@ function add(type, text) {
 	messages.append(article)
 }
 
+function historyText(entry) {
+	if (entry.type === 'user') {
+		const parts = []
+		for (const part of entry.parts) {
+			if (part.type === 'text') parts.push(part.displayText ?? part.text)
+		}
+		return parts.join('\n')
+	}
+	if (entry.type === 'assistant' || entry.type === 'info' || entry.type === 'log' || entry.type === 'warning' || entry.type === 'error') {
+		return typeof entry.text === 'string' ? entry.text : ''
+	}
+	return ''
+}
+
+function addIfText(item, text) {
+	if (text) add(item.type, text)
+}
+
 async function refresh() {
 	if (!selected) return
 	const response = await fetch(`/api/session?id=${encodeURIComponent(selected)}`)
 	if (!response.ok) return
 	const data = await response.json()
 	messages.replaceChildren()
-	for (const entry of [...data.history, ...data.live]) add(entry.type, entry.text)
+	for (const entry of data.history) addIfText(entry, historyText(entry))
+	for (const block of data.live) addIfText(block, block.text)
 	messages.scrollTop = messages.scrollHeight
 }
 

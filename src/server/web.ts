@@ -1,6 +1,7 @@
 // Local browser client. This module is imported only for `hal --web`; browser code
 // is bundled lazily on the first request so it never affects normal startup.
 
+import type { ClientSessionSnapshot } from '../common/snapshots.ts'
 import { ipc } from '../ipc.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
@@ -13,20 +14,20 @@ function openSession(sessionId: string): boolean {
 	return ipc.readState().sessions.some((session) => session.id === sessionId)
 }
 
-function textEntry(entry: any): { type: string; text: string } | null {
-	if (entry.type === 'user') {
-		const text = entry.parts?.filter((part: any) => part.type === 'text').map((part: any) => part.displayText ?? part.text).join('\n') ?? ''
-		return text ? { type: 'user', text } : null
+function sessionSnapshot(sessionId: string): ClientSessionSnapshot | null {
+	const session = ipc.readState().sessions.find((item) => item.id === sessionId)
+	if (!session) return null
+	return {
+		session,
+		history: sessions.loadAllHistory(sessionId),
+		live: sessions.loadLive(sessionId).blocks,
 	}
-	if (['assistant', 'info', 'log', 'warning', 'error'].includes(entry.type) && typeof entry.text === 'string') return { type: entry.type, text: entry.text }
-	return null
 }
 
-function snapshot(sessionId: string): Response {
-	if (!openSession(sessionId)) return new Response('Unknown open session', { status: 404 })
-	const history = sessions.loadAllHistory(sessionId).map(textEntry).filter(Boolean)
-	const live = sessions.loadLive(sessionId).blocks.filter((block: any) => typeof block.text === 'string').map((block: any) => ({ type: block.type, text: block.text }))
-	return Response.json({ sessions: ipc.readState(), history, live })
+function snapshotResponse(sessionId: string): Response {
+	const snapshot = web.sessionSnapshot(sessionId)
+	if (!snapshot) return new Response('Unknown open session', { status: 404 })
+	return Response.json(snapshot)
 }
 
 async function bundleClient(): Promise<string> {
@@ -56,7 +57,7 @@ function start(port: number, signal: AbortSignal): void {
 				catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
 			}
 			if (url.pathname === '/api/state' && request.method === 'GET') return Response.json(ipc.readState())
-			if (url.pathname === '/api/session' && request.method === 'GET') return snapshot(url.searchParams.get('id') ?? '')
+			if (url.pathname === '/api/session' && request.method === 'GET') return snapshotResponse(url.searchParams.get('id') ?? '')
 			if (url.pathname === '/api/prompt' && request.method === 'POST') {
 				let body: any
 				try { body = await request.json() } catch { return new Response('Expected JSON', { status: 400 }) }
@@ -85,4 +86,4 @@ function start(port: number, signal: AbortSignal): void {
 	runtime.emitInfo(ipc.readState().sessions[0]?.id ?? '', `Web client: http://127.0.0.1:${port}`)
 }
 
-export const web = { start, nextPort }
+export const web = { start, nextPort, sessionSnapshot }
