@@ -1,6 +1,5 @@
 // Terminal rendering for semantic subscription usage bars.
 
-import { subscriptionUsage } from '../../common/subscription-usage.ts'
 import { oklch } from '../../utils/oklch.ts'
 import { colors } from './colors.ts'
 
@@ -20,8 +19,4 @@ function usageBar(totalEighths: number, width: number): string {
 	return `${BAR_EMPTY_BG}${BAR_FILL_FG}${fill}${BAR_EMPTY_BG}${' '.repeat(Math.max(0, empty))}${colors.log.fg}${colors.log.bg}`
 }
 
-function renderMarkers(text: string): string {
-	return subscriptionUsage.replaceUsageBarMarkers(text, terminalSubscriptionUsage.usageBar)
-}
-
-export const terminalSubscriptionUsage = { usageBar, renderMarkers }
+export const terminalSubscriptionUsage = { usageBar }

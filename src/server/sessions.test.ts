@@ -60,13 +60,14 @@ test('createSession and loadHistory round-trip', async () => {
 })
 
 
-test('appendHistory writes id and omits undefined fields', async () => {
+test('appendHistory writes id, omits undefined fields, and persists trusted usage bars', async () => {
 	const id = await makeSession()
-	await sessions.appendHistory(id, [{ type: 'user', id: '000001-aaa', parts: [{ type: 'text', text: 'hello', displayText: undefined }], source: undefined, ts: '2026-05-25T10:00:00.000Z' }])
+	await sessions.appendHistory(id, [{ type: 'log', id: '000001-aaa', text: 'hello', level: undefined, usageBars: true, ts: '2026-05-25T10:00:00.000Z' }])
 
 	const text = readFileSync(`${sessions.sessionDir(id)}/history.asonl`, 'utf-8')
 
 	expect(text).toContain("id: '000001-aaa'")
+	expect(text).toContain('usageBars: true')
 	expect(text).not.toContain('undefined')
 })
 

@@ -5,6 +5,7 @@
 
 import { clipVisual, expandTabs, hardWrap, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, resolveMarkers, visLen, wordWrap } from '../../utils/strings.ts'
 import { models } from '../../common/models.ts'
+import { subscriptionUsage } from '../../common/subscription-usage.ts'
 import { time } from '../../utils/time.ts'
 import { terminalSubscriptionUsage } from './subscription-usage.ts'
 import { colors } from './colors.ts'
@@ -31,7 +32,7 @@ function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'for
 		// Sanitize account labels before turning server-authored semantic markers into
 		// terminal escape sequences. The server never needs to know about ANSI.
 		const text = blockText.sanitizeTerminalText(block.text)
-		return terminalSubscriptionUsage.renderMarkers(text)
+		return subscriptionUsage.replaceUsageBarMarkers(text, terminalSubscriptionUsage.usageBar)
 	}
 	const text =
 		block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error'
