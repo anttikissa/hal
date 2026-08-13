@@ -9,7 +9,7 @@ import { sessions as sessionStore } from '../server/sessions.ts'
 import { replay } from '../server/session/replay.ts'
 import { draft as draftModule, type DraftPromptEdit } from './terminal/draft.ts'
 import { perf } from '../perf.ts'
-import { liveEventBlocks } from '../live-event-blocks.ts'
+import { liveEventBlocks, type LiveEvent } from '../common/live-event-blocks.ts'
 import { startup } from '../startup.ts'
 import { sessionLoader } from './session-loader.ts'
 import { clientTabs } from './tabs.ts'
@@ -279,15 +279,16 @@ function tabForSession(sessionId: string | null): Tab | null {
 	return currentTab()
 }
 
-function applyLiveEventToTab(tab: Tab, event: any): { changed: boolean; toolBlock?: any } {
-	return liveEventBlocks.applyEvent({
-		blocks: tab.history,
-		event,
+function applyLiveEventToTab(tab: Tab, event: LiveEvent) {
+	const result = liveEventBlocks.reduce(tab.history, event, {
 		sessionId: tab.sessionId,
 		defaultModel: tab.model,
-		touchBlock: blockData.touch,
-		onChange: () => touchTab(tab),
 	})
+	if (result.changed) {
+		tab.history = result.blocks
+		touchTab(tab)
+	}
+	return result
 }
 
 function isWorking(): boolean {

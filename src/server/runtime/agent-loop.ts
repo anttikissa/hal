@@ -10,6 +10,7 @@ import { ipc } from '../../ipc.ts'
 import { protocol } from '../../common/protocol.ts'
 import type { ProviderStreamEvent, Message, TokenUsage, TurnEndMeta } from '../../common/protocol.ts'
 import { models } from '../../common/models.ts'
+import type { LiveEvent } from '../../common/live-event-blocks.ts'
 import { context } from './system-prompt.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { toolRegistry } from '../tools/tool.ts'
@@ -102,7 +103,7 @@ interface ToolCall {
 
 // ── IPC helpers ──
 
-function emitEvent(sessionId: string, event: Record<string, any>): void {
+function emitEvent(sessionId: string, event: LiveEvent): void {
 	const fullEvent = {
 		id: protocol.eventId(),
 		sessionId,

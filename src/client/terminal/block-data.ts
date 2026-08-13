@@ -6,6 +6,7 @@
 
 import { ason } from '../../utils/ason.ts'
 import { models } from '../../common/models.ts'
+import type { LiveBlock } from '../../common/live-event-blocks.ts'
 import type { HistoryEntry } from '../../server/sessions.ts'
 import { sessionEntry } from '../../server/session/entry.ts'
 import { STATE_DIR } from '../../state.ts'
@@ -13,21 +14,13 @@ import { STATE_DIR } from '../../state.ts'
 // module convention — all access happens at call time, never at import time.
 import { blocks } from './blocks.ts'
 
-interface BlockBase { ts?: number; dimmed?: boolean; renderVersion?: number; canceled?: boolean; usageBars?: true }
-interface TextBlock extends BlockBase { text: string }
-interface BlobRef { blobId?: string; sessionId?: string; blobLoaded?: boolean }
-type NoticeBlock<T extends 'log' | 'info' | 'warning' | 'fork'> = { type: T } & TextBlock
+interface PresentationBlock {
+	dimmed?: boolean
+	renderVersion?: number
+	blobLoaded?: boolean
+}
 
-export type Block =
-	| ({ type: 'user'; source?: string; status?: string; actualText?: string } & TextBlock)
-	| ({ type: 'assistant'; model?: string; id?: string; continue?: string; streaming?: boolean; synthetic?: boolean; syntheticKind?: string } & TextBlock)
-	| ({ type: 'thinking'; model?: string; thinkingEffort?: string; streaming?: boolean } & TextBlock & BlobRef)
-	| ({ type: 'tool'; name: string; input?: any; output?: string; toolId?: string; running?: boolean } & BlockBase & BlobRef)
-	| NoticeBlock<'log'>
-	| NoticeBlock<'info'>
-	| NoticeBlock<'warning'>
-	| NoticeBlock<'fork'>
-	| ({ type: 'error' } & TextBlock & Pick<BlobRef, 'blobId' | 'sessionId'>)
+export type Block = LiveBlock & PresentationBlock
 
 function touch(block: Block): void {
 	block.renderVersion = (block.renderVersion ?? 0) + 1

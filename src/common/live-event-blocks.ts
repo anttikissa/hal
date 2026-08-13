@@ -1,0 +1,382 @@
+import { models } from './models.ts'
+
+// Browser-safe semantic blocks produced from live server events. Terminal and web
+// clients can enrich or render these blocks independently, but they share this
+// projection so a snapshot and a live event stream always converge.
+export interface LiveBlockBase {
+	ts?: number
+	canceled?: boolean
+	usageBars?: true
+}
+
+export interface LiveUserBlock extends LiveBlockBase {
+	type: 'user'
+	text: string
+	actualText?: string
+	source?: string
+	status?: string
+}
+
+export interface LiveAssistantBlock extends LiveBlockBase {
+	type: 'assistant'
+	text: string
+	model?: string
+	id?: string
+	continue?: string
+	streaming?: boolean
+	synthetic?: boolean
+	syntheticKind?: string
+	sessionId?: string
+}
+
+export interface LiveThinkingBlock extends LiveBlockBase {
+	type: 'thinking'
+	text: string
+	model?: string
+	thinkingEffort?: string
+	streaming?: boolean
+	blobId?: string
+	sessionId?: string
+}
+
+export interface LiveToolBlock extends LiveBlockBase {
+	type: 'tool'
+	name: string
+	input?: unknown
+	output?: string
+	blobId?: string
+	sessionId?: string
+	toolId?: string
+	running?: boolean
+}
+
+export interface LiveNoticeBlock extends LiveBlockBase {
+	type: 'log' | 'info' | 'warning'
+	text: string
+}
+
+export interface LiveErrorBlock extends LiveBlockBase {
+	type: 'error'
+	text: string
+	blobId?: string
+	sessionId?: string
+	retryable?: false
+}
+
+export interface LiveForkBlock extends LiveBlockBase {
+	type: 'fork'
+	text: string
+}
+
+export type LiveBlock = LiveUserBlock | LiveAssistantBlock | LiveThinkingBlock | LiveToolBlock | LiveNoticeBlock | LiveErrorBlock | LiveForkBlock
+
+export interface LiveEventBase {
+	type: string
+	id?: string
+	sessionId?: string
+	createdAt?: string
+}
+
+export interface StreamStartEvent extends LiveEventBase {
+	type: 'stream-start'
+}
+
+export interface StreamDeltaEvent extends LiveEventBase {
+	type: 'stream-delta'
+	channel: 'assistant' | 'thinking'
+	text?: string
+	model?: string
+	thinkingEffort?: string
+	blobId?: string
+}
+
+export interface StreamEndEvent extends LiveEventBase {
+	type: 'stream-end'
+	phase?: 'done' | 'failed'
+	usage?: { input: number; output: number; cacheRead?: number; cacheCreation?: number }
+	contextUsed?: number
+	contextMax?: number
+	message?: string
+}
+
+export interface ToolCallEvent extends LiveEventBase {
+	type: 'tool-call'
+	toolId?: string
+	name: string
+	input?: unknown
+	blobId?: string
+	phase?: 'running'
+}
+
+export interface ToolResultEvent extends LiveEventBase {
+	type: 'tool-result'
+	toolId?: string
+	output?: string
+	blobId?: string
+	name?: string
+	phase?: 'running' | 'done'
+}
+
+export interface InfoEvent extends LiveEventBase {
+	type: 'info'
+	text?: string
+	level?: 'info' | 'warning' | 'error'
+	ui?: 'notice'
+	usageBars?: boolean
+	retryable?: boolean
+}
+
+export interface ResponseEvent extends LiveEventBase {
+	type: 'response'
+	text?: string
+	model?: string
+	synthetic?: boolean
+	isError?: boolean
+	blobId?: string
+}
+
+export interface ToolConfirmRequestEvent extends LiveEventBase {
+	type: 'tool-confirm-request'
+	requestId: string
+	body: string[]
+}
+
+export type LiveEvent = StreamStartEvent | StreamDeltaEvent | StreamEndEvent | ToolCallEvent | ToolResultEvent | ToolConfirmRequestEvent | InfoEvent | ResponseEvent
+
+export interface LiveProjectionOptions {
+	sessionId?: string
+	defaultModel?: string
+}
+
+export interface LiveProjectionResult {
+	blocks: LiveBlock[]
+	changed: boolean
+	toolBlock?: LiveToolBlock
+}
+
+function assistantChainId(block: LiveBlock | undefined): string | null {
+	if (block?.type !== 'assistant') return null
+	return block.continue ?? block.id ?? null
+}
+
+function lastInterruptedAssistantId(blocks: readonly LiveBlock[]): string | null {
+	for (let i = blocks.length - 1; i >= 0; i--) {
+		const block = blocks[i]
+		if (!block || block.type === 'tool') continue
+		if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
+		return block.type === 'assistant' ? liveEventBlocks.assistantChainId(block) : null
+	}
+	return null
+}
+
+function closeStreamingBlock(blocks: readonly LiveBlock[]): LiveProjectionResult {
+	const last = blocks.at(-1)
+	if ((last?.type !== 'assistant' && last?.type !== 'thinking') || !last.streaming) {
+		return { blocks: blocks as LiveBlock[], changed: false }
+	}
+	const closed = { ...last }
+	delete closed.streaming
+	const next = blocks.slice()
+	next[next.length - 1] = closed
+	return { blocks: next, changed: true }
+}
+
+function trailingAssistantText(blocks: readonly LiveBlock[]): string | null {
+	const parts: string[] = []
+	let chainId: string | null = null
+	let sawAssistant = false
+	for (let i = blocks.length - 1; i >= 0; i--) {
+		const block = blocks[i]
+		if (!block || block.type === 'tool') continue
+		if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error') {
+			if (!sawAssistant) continue
+			continue
+		}
+		if (block.type !== 'assistant') break
+		const blockChainId = liveEventBlocks.assistantChainId(block)
+		if (!sawAssistant) {
+			sawAssistant = true
+			chainId = blockChainId
+			parts.unshift(block.text)
+			continue
+		}
+		if (chainId && blockChainId === chainId) {
+			parts.unshift(block.text)
+			continue
+		}
+		break
+	}
+	if (!sawAssistant) return null
+	return parts.join('')
+}
+
+function assistantId(blocks: readonly LiveBlock[], event: StreamDeltaEvent): string {
+	if (event.id) return event.id
+	// Production events have IDs. The positional fallback keeps direct callers and
+	// tests deterministic without consulting clocks or randomness.
+	return `assistant-${event.sessionId ?? 'session'}-${event.createdAt ?? 'event'}-${blocks.length}`
+}
+
+function timestamp(event: LiveEventBase): number | undefined {
+	return event.createdAt ? Date.parse(event.createdAt) : undefined
+}
+
+function appendBlock(blocks: readonly LiveBlock[], block: LiveBlock): LiveProjectionResult {
+	return { blocks: [...blocks, block], changed: true }
+}
+
+function applyAssistantResponse(blocks: readonly LiveBlock[], event: ResponseEvent, options: LiveProjectionOptions): LiveProjectionResult {
+	const last = blocks.at(-1)
+	const ts = liveEventBlocks.timestamp(event)
+	if (last?.type === 'assistant' && last.streaming && event.text?.startsWith(last.text)) {
+		const updated: LiveAssistantBlock = { ...last, text: event.text }
+		if (!updated.model && (event.model ?? options.defaultModel)) updated.model = event.model ?? options.defaultModel
+		if (!updated.ts && ts !== undefined) updated.ts = ts
+		delete updated.streaming
+		const next = blocks.slice()
+		next[next.length - 1] = updated
+		return { blocks: next, changed: true }
+	}
+	if (event.text && liveEventBlocks.trailingAssistantText(blocks) === event.text) return liveEventBlocks.closeStreamingBlock(blocks)
+
+	const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+	const block: LiveAssistantBlock = {
+		type: 'assistant',
+		text: event.text!,
+		synthetic: event.synthetic === true,
+	}
+	const model = event.model ?? options.defaultModel
+	const sessionId = event.sessionId ?? options.sessionId
+	if (model) block.model = model
+	if (sessionId) block.sessionId = sessionId
+	if (ts !== undefined) block.ts = ts
+	return liveEventBlocks.appendBlock(closed, block)
+}
+
+function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LiveProjectionOptions = {}): LiveProjectionResult {
+	const sessionId = event.sessionId ?? options.sessionId
+	const ts = liveEventBlocks.timestamp(event)
+
+	if (event.type === 'stream-start') return liveEventBlocks.closeStreamingBlock(blocks)
+
+	if (event.type === 'stream-delta' && event.text) {
+		const last = blocks.at(-1)
+		if (event.channel === 'thinking') {
+			if (last?.type === 'thinking' && last.streaming) {
+				const updated: LiveThinkingBlock = { ...last, text: last.text + event.text }
+				if (event.blobId) updated.blobId = event.blobId
+				if (!updated.sessionId && sessionId) updated.sessionId = sessionId
+				if (!updated.ts && ts !== undefined) updated.ts = ts
+				if (!updated.model && (event.model ?? options.defaultModel)) updated.model = event.model ?? options.defaultModel
+				if (!updated.thinkingEffort) updated.thinkingEffort = event.thinkingEffort ?? models.reasoningEffort(updated.model)
+				const next = blocks.slice()
+				next[next.length - 1] = updated
+				return { blocks: next, changed: true }
+			}
+			const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+			const model = event.model ?? options.defaultModel
+			const block: LiveThinkingBlock = { type: 'thinking', text: event.text, streaming: true }
+			if (model) block.model = model
+			const effort = event.thinkingEffort ?? models.reasoningEffort(model)
+			if (effort) block.thinkingEffort = effort
+			if (event.blobId) block.blobId = event.blobId
+			if (sessionId) block.sessionId = sessionId
+			if (ts !== undefined) block.ts = ts
+			return liveEventBlocks.appendBlock(closed, block)
+		}
+
+		if (last?.type === 'assistant' && last.streaming) {
+			const updated: LiveAssistantBlock = { ...last, text: last.text + event.text }
+			if (!updated.ts && ts !== undefined) updated.ts = ts
+			if (!updated.model && (event.model ?? options.defaultModel)) updated.model = event.model ?? options.defaultModel
+			const next = blocks.slice()
+			next[next.length - 1] = updated
+			return { blocks: next, changed: true }
+		}
+
+		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+		const interruptedId = liveEventBlocks.lastInterruptedAssistantId(closed)
+		const block: LiveAssistantBlock = { type: 'assistant', text: event.text, streaming: true }
+		const model = event.model ?? options.defaultModel
+		if (model) block.model = model
+		if (interruptedId) block.continue = interruptedId
+		else block.id = liveEventBlocks.assistantId(closed, event)
+		if (ts !== undefined) block.ts = ts
+		return liveEventBlocks.appendBlock(closed, block)
+	}
+
+	if (event.type === 'tool-call') {
+		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+		const block: LiveToolBlock = { type: 'tool', name: event.name, running: true }
+		if (event.input !== undefined) block.input = event.input
+		if (event.blobId) block.blobId = event.blobId
+		if (sessionId) block.sessionId = sessionId
+		if (event.toolId) block.toolId = event.toolId
+		if (ts !== undefined) block.ts = ts
+		return liveEventBlocks.appendBlock(closed, block)
+	}
+
+	if (event.type === 'tool-result') {
+		const index = blocks.findLastIndex((block) => block.type === 'tool' && block.toolId === event.toolId)
+		const existing = blocks[index]
+		if (existing?.type !== 'tool') return { blocks: blocks as LiveBlock[], changed: false }
+		const toolBlock: LiveToolBlock = { ...existing }
+		if (event.output !== undefined) toolBlock.output = event.output
+		if (event.phase === 'running') toolBlock.running = true
+		else delete toolBlock.running
+		if (event.blobId) toolBlock.blobId = event.blobId
+		const next = blocks.slice()
+		next[index] = toolBlock
+		return { blocks: next, changed: true, toolBlock }
+	}
+
+	if (event.type === 'info' && event.text) {
+		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+		const type = liveEventBlocks.infoBlockType(event)
+		if (type === 'error') {
+			const block: LiveErrorBlock = { type, text: event.text }
+			if (event.retryable === false) block.retryable = false
+			if (ts !== undefined) block.ts = ts
+			return liveEventBlocks.appendBlock(closed, block)
+		}
+		const block: LiveNoticeBlock = { type, text: event.text }
+		if (event.usageBars === true) block.usageBars = true
+		if (ts !== undefined) block.ts = ts
+		return liveEventBlocks.appendBlock(closed, block)
+	}
+
+	if (event.type === 'response' && event.text) {
+		if (event.isError) {
+			const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+			const block: LiveErrorBlock = { type: 'error', text: event.text }
+			if (event.blobId) block.blobId = event.blobId
+			if (sessionId) block.sessionId = sessionId
+			if (ts !== undefined) block.ts = ts
+			return liveEventBlocks.appendBlock(closed, block)
+		}
+		return liveEventBlocks.applyAssistantResponse(blocks, event, options)
+	}
+
+	if (event.type === 'stream-end') return liveEventBlocks.closeStreamingBlock(blocks)
+	return { blocks: blocks as LiveBlock[], changed: false }
+}
+
+function infoBlockType(event: InfoEvent): 'log' | 'info' | 'warning' | 'error' {
+	if (event.ui === 'notice') return 'info'
+	if (event.level === 'error') return 'error'
+	if (event.level === 'warning') return 'warning'
+	return 'log'
+}
+
+export const liveEventBlocks = {
+	assistantChainId,
+	lastInterruptedAssistantId,
+	closeStreamingBlock,
+	trailingAssistantText,
+	assistantId,
+	timestamp,
+	appendBlock,
+	applyAssistantResponse,
+	reduce,
+	infoBlockType,
+}

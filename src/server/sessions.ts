@@ -8,7 +8,7 @@ import { STATE_DIR, ensureDir } from '../state.ts'
 import { ipc } from '../ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
-import { liveEventBlocks } from '../live-event-blocks.ts'
+import { liveEventBlocks, type LiveBlock, type LiveEvent } from '../common/live-event-blocks.ts'
 import type { PartialTokenUsage, SpawnKind, TurnEndMeta } from '../common/protocol.ts'
 import { models } from '../common/models.ts'
 const SESSIONS_DIR = `${STATE_DIR}/sessions`
@@ -100,7 +100,7 @@ export type HistoryEntry = EntryIdentity & (
 )
 
 export interface SessionLive {
-	blocks: any[]
+	blocks: LiveBlock[]
 }
 
 function sessionDir(sessionId: string): string { return `${SESSIONS_DIR}/${sessionId}` }
@@ -240,9 +240,9 @@ function updateLive(sessionId: string, mutator: (live: SessionLive) => void): Se
 	return live
 }
 
-function applyLiveEvent(sessionId: string, event: any): void {
+function applyLiveEvent(sessionId: string, event: LiveEvent): void {
 	updateLive(sessionId, (live) => {
-		liveEventBlocks.applyEvent({ blocks: live.blocks, event, sessionId })
+		live.blocks = liveEventBlocks.reduce(live.blocks, event, { sessionId }).blocks
 	})
 }
 

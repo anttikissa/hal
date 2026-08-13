@@ -221,7 +221,7 @@ test('live snapshot stores uncommitted streaming blocks', async () => {
 		{ type: 'assistant', text: 'hello', ts: Date.parse('2026-04-09T20:01:00.000Z') },
 		{ type: 'tool', toolId: 'tool-1', name: 'read', blobId: '000001-abc', input: { path: 'notes.txt' } },
 	])
-	expect(live.blocks[0]?.streaming).toBeUndefined()
+	expect(live.blocks[0]?.type === 'assistant' ? live.blocks[0].streaming : undefined).toBeUndefined()
 
 	sessions.clearLive(id)
 	expect(sessions.loadLive(id).blocks).toEqual([])
