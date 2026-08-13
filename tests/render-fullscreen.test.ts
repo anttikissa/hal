@@ -124,4 +124,30 @@ describe('render fullscreen growth', () => {
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
 		}
 	})
+
+	test('keeps cursor coordinates valid after a fullscreen prompt shrink', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
+		try {
+			for (let i = 0; i < 20; i++) tab.history.push({ type: 'log', text: `old-${i}` })
+			prompt.setText('one line\nanother line')
+			const state = terminalLines(captureOutput(() => render.draw()), 8)
+
+			prompt.setText('one line')
+			terminalLines(captureOutput(() => render.draw()), 8, state)
+			prompt.setText('one line!')
+			terminalLines(captureOutput(() => render.draw()), 8, state)
+
+			render.resetRenderer()
+			const canonical = terminalLines(captureOutput(() => render.draw(true)), 8)
+			expect(state.screen).toEqual(canonical.screen)
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
 })

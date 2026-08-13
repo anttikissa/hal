@@ -182,7 +182,7 @@ function repaintVisibleScreen(lines: string[], cursor: { row: number; col: numbe
 		if (row > 0) out.push('\r\n')
 		out.push(`${CSI}2K${lines[viewportTop + row] ?? ''}`)
 	}
-	out.push(positionCursor(rows - 1, cursor))
+	out.push(positionCursor(lines.length - 1, cursor))
 	out.push(`${CSI}?2026l`)
 	prevLines = lines
 	writeTerminal(out.join(''))
