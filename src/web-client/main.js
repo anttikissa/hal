@@ -1,5 +1,6 @@
 import { transcriptTitles } from '../common/transcript-titles.ts'
 import { webMessages } from '../common/web.ts'
+import { webPresentation } from './presentation.ts'
 
 const tabs = document.querySelector('#tabs')
 const messages = document.querySelector('#messages')
@@ -21,19 +22,6 @@ function add(item, text) {
 	messages.append(article)
 }
 
-function valueText(value) {
-	if (typeof value === 'string') return value
-	if (value === undefined) return ''
-	return JSON.stringify(value, null, 2)
-}
-
-function toolText(item) {
-	if (typeof item.input?.command === 'string') return item.input.command
-	if (typeof item.input?.code === 'string') return item.input.code
-	if (item.input !== undefined) return valueText(item.input)
-	return valueText(item.output)
-}
-
 function historyText(entry) {
 	if (entry.type === 'user') {
 		const parts = []
@@ -43,7 +31,7 @@ function historyText(entry) {
 		return parts.join('\n')
 	}
 	if (entry.type === 'thinking') return entry.text ?? ''
-	if (entry.type === 'tool_call' || entry.type === 'tool_result') return toolText(entry)
+	if (entry.type === 'tool' || entry.type === 'tool_call' || entry.type === 'tool_result') return webPresentation.toolText(entry)
 	if (entry.type === 'assistant' || entry.type === 'info' || entry.type === 'log' || entry.type === 'warning' || entry.type === 'error') {
 		return typeof entry.text === 'string' ? entry.text : ''
 	}
@@ -57,8 +45,8 @@ function addIfText(item, text) {
 function renderSnapshot() {
 	messages.replaceChildren()
 	if (!snapshot) return
-	for (const entry of snapshot.history) addIfText(entry, historyText(entry))
-	for (const block of snapshot.live) addIfText(block, block.type === 'tool' ? toolText(block) : block.text)
+	for (const entry of webPresentation.historyItems(snapshot.history)) addIfText(entry, historyText(entry))
+	for (const block of snapshot.live) addIfText(block, block.type === 'tool' ? webPresentation.toolText(block) : block.text)
 	messages.scrollTop = messages.scrollHeight
 }
 

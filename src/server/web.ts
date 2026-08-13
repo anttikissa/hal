@@ -4,6 +4,8 @@
 import type { LiveEvent } from '../common/live-event-blocks.ts'
 import type { ClientSessionSnapshot } from '../common/snapshots.ts'
 import type { WebClientMessage, WebServerMessage } from '../common/web.ts'
+import type { HistoryEntry } from '../common/history.ts'
+import { blob } from './session/blob.ts'
 import { ipc } from '../ipc.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
@@ -18,12 +20,20 @@ function openSession(sessionId: string): boolean {
 	return ipc.readState().sessions.some((session) => session.id === sessionId)
 }
 
+function hydrateHistory(sessionId: string, history: HistoryEntry[]): HistoryEntry[] {
+	return history.map((entry) => {
+		if (entry.type !== 'tool_result' || entry.output !== undefined || !entry.blobId) return entry
+		const output = blob.readBlobFromChain(sessionId, entry.blobId)?.result?.content
+		return typeof output === 'string' ? { ...entry, output } : entry
+	})
+}
+
 function sessionSnapshot(sessionId: string): ClientSessionSnapshot | null {
 	const session = ipc.readState().sessions.find((item) => item.id === sessionId)
 	if (!session) return null
 	return {
 		session,
-		history: sessions.loadAllHistory(sessionId),
+		history: web.hydrateHistory(sessionId, sessions.loadAllHistory(sessionId)),
 		live: sessions.loadLive(sessionId).blocks,
 	}
 }
@@ -159,6 +169,7 @@ export const web = {
 	start,
 	nextPort,
 	pageHtml,
+	hydrateHistory,
 	sessionSnapshot,
 	parseClientMessage,
 	isLiveEvent,

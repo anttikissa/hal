@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { SharedState } from '../common/ipc.ts'
 import { ipc } from '../ipc.ts'
+import { blob } from './session/blob.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
 
@@ -39,6 +40,34 @@ test('session snapshot exposes typed history and live blocks without lossy mappi
 		ipc.readState = originalReadState
 		sessions.loadAllHistory = originalLoadAllHistory
 		sessions.loadLive = originalLoadLive
+	}
+})
+
+test('session snapshot hydrates persisted tool output for browser presentation', () => {
+	const originalReadState = ipc.readState
+	const originalLoadAllHistory = sessions.loadAllHistory
+	const originalLoadLive = sessions.loadLive
+	const originalReadBlobFromChain = blob.readBlobFromChain
+	ipc.readState = () => ({
+		sessions: [{ id: '04-work', cwd: '/work' }],
+		working: {},
+		updatedAt: '2026-08-13T12:00:00.000Z',
+	})
+	sessions.loadAllHistory = () => [{ type: 'tool_result', toolId: 'tool-1', blobId: 'blob-1' }]
+	sessions.loadLive = () => ({ blocks: [] })
+	blob.readBlobFromChain = () => ({ result: { content: 'line 1\nline 2' } })
+	try {
+		expect(web.sessionSnapshot('04-work')?.history).toEqual([{
+			type: 'tool_result',
+			toolId: 'tool-1',
+			blobId: 'blob-1',
+			output: 'line 1\nline 2',
+		}])
+	} finally {
+		ipc.readState = originalReadState
+		sessions.loadAllHistory = originalLoadAllHistory
+		sessions.loadLive = originalLoadLive
+		blob.readBlobFromChain = originalReadBlobFromChain
 	}
 })
 
