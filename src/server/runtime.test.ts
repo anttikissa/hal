@@ -1076,7 +1076,7 @@ test('recordTabClosed emits info when no turn is working', () => {
 		expect(events[0]).toMatchObject({
 			type: 'info',
 			sessionId: '04-idle',
-			text: 'Tab closed',
+			text: 'Tab closed.',
 			level: 'info',
 		})
 	} finally {

@@ -51,7 +51,7 @@ const state = {
 const USER_PAUSED_TEXT = '[paused]'
 const RESUMING_TEXT = '[resuming]'
 const RESTARTED_TEXT = '[restarted]'
-const TAB_CLOSED_TEXT = 'Tab closed'
+const TAB_CLOSED_TEXT = 'Tab closed.'
 
 const pendingWhatResults = new Map<string, string[]>()
 
