@@ -6,62 +6,8 @@ import { ipc } from '../ipc.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 
-function pageHtml(): string {
-	return `<!doctype html>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HAL</title>
-<style>
-* { box-sizing: border-box; }
-body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; }
-#tabs {
-	position: fixed;
-	z-index: 1;
-	top: 0;
-	left: 0;
-	right: 0;
-	display: flex;
-	gap: 8px;
-	padding: 12px;
-	overflow-x: auto;
-	white-space: nowrap;
-	background: #111;
-	border-bottom: 1px solid #444;
-}
-button, input { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
-button { cursor: pointer; }
-button.selected { background: #456; }
-#tabs button { flex: none; }
-main {
-	max-width: 900px;
-	margin: 0 auto;
-	padding: 78px 12px 76px;
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-}
-article { padding: 10px 0; border-bottom: 1px solid #333; }
-.user { color: #9cf; }
-.assistant { color: #eee; }
-.info { color: #aaa; }
-label { font-size: 12px; color: #aaa; }
-#form {
-	position: fixed;
-	z-index: 1;
-	bottom: 0;
-	left: 50%;
-	width: min(100%, 900px);
-	transform: translateX(-50%);
-	display: flex;
-	gap: 8px;
-	padding: 12px;
-	background: #111;
-	border-top: 1px solid #444;
-}
-#prompt { flex: 1; min-width: 0; }
-</style>
-<header id="tabs"></header>
-<main id="messages"></main>
-<form id="form"><input id="prompt" autocomplete="off" placeholder="Message" autofocus><button>Send</button></form>
-<script type="module" src="/main.js"></script>`
+function pageHtml(): Promise<string> {
+	return Bun.file(`${import.meta.dir}/../web-client/main.html`).text()
 }
 
 let clientBuild: Promise<string> | null = null
@@ -107,7 +53,7 @@ function start(port: number, signal: AbortSignal): void {
 		port,
 		fetch: async (request, server) => {
 			const url = new URL(request.url)
-			if (url.pathname === '/') return new Response(web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8' } })
+			if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8' } })
 			if (url.pathname === '/main.js') {
 				try { return new Response(await bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8' } }) }
 				catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
