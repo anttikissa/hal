@@ -10,6 +10,14 @@ test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9003, 2, () => 0)).toBe(9004)
 })
 
+test('web page keeps full-width tabs and composer visible around the scrolling transcript', () => {
+	const page = web.pageHtml()
+	expect(page).toMatch(/#tabs\s*\{[^}]*position:\s*fixed;[^}]*left:\s*0;[^}]*right:\s*0;/s)
+	expect(page).toMatch(/#form\s*\{[^}]*position:\s*fixed;[^}]*bottom:\s*0;/s)
+	expect(page).toMatch(/main\s*\{[^}]*max-width:\s*900px;[^}]*padding:\s*78px 12px 76px;/s)
+	expect(page).not.toMatch(/body\s*\{[^}]*max-width:/s)
+})
+
 test('session snapshot exposes typed history and live blocks without lossy mapping', () => {
 	const originalReadState = ipc.readState
 	const originalLoadAllHistory = sessions.loadAllHistory
