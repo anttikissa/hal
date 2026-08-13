@@ -310,7 +310,7 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		sessionId,
 		createdAt: new Date().toISOString(),
 	})
-	await runGeneration(sessionId, text, source, displayText, pending, sourceTab)
+	await runGeneration(sessionId, text, source, displayText, pending, sourceTab, label)
 }
 
 async function dispatchPromptCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, label?: 'queued', sourceTab?: number): Promise<void> {
@@ -488,7 +488,7 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 	}
 }
 
-async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number): Promise<void> {
+async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number, label?: 'steering' | 'queued'): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
@@ -503,6 +503,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 			parts: await resolvePromptParts(sessionId, text, displayText),
 			source,
 			sourceTab,
+			status: label,
 			ts: new Date().toISOString(),
 		}])
 	}

@@ -333,6 +333,34 @@ test('a missing /cd path emits a synthetic creation suggestion', async () => {
 	}
 })
 
+test('steering prompt status survives history reload', async () => {
+	const sessionId = '04-steering-status'
+	const meta: SessionMeta = { id: sessionId, workingDir: '/work', createdAt: '2026-05-21T10:00:00.000Z', model: 'openai/gpt-5.5' }
+	const history: any[] = []
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origAppendEvent = ipc.appendEvent
+	const origAppendHistory = sessions.appendHistory
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	try {
+		ipc.ownsHostLock = () => true
+		ipc.appendEvent = () => {}
+		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
+		sessions.appendHistory = async (_id, entries) => { history.push(...entries) }
+		agentLoop.runAgentLoop = async () => 'completed'
+
+		await runtime.handlePrompt(sessionId, 'continue this', 'steering')
+
+		expect(history).toContainEqual(expect.objectContaining({ type: 'user', parts: [{ type: 'text', text: 'continue this' }], status: 'steering' }))
+	} finally {
+		ipc.ownsHostLock = origOwnsHostLock
+		ipc.appendEvent = origAppendEvent
+		sessions.appendHistory = origAppendHistory
+		sessions.loadSessionMeta = origLoadSessionMeta
+		agentLoop.runAgentLoop = origRunAgentLoop
+	}
+})
+
 
 test('slash command state changes are persisted as structural history entries', async () => {
 	const sessionId = '04-structural-meta'
