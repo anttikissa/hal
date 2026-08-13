@@ -36,6 +36,10 @@
 		// Delay between fade animation frames; 67ms is about 15fps.
 		halCursorFadeFrameMs: 67
 	},
+	terminalOutput: {
+		// Temporarily record terminal writes (including prompt/history text) to state/terminal-output.asonl for ANSI diagnostics.
+		capture: false
+	},
 	renderHistory: {
 		// Brightness multiplier for inherited fork history; lower values look dimmer.
 		forkHistoryDimFactor: 0.85,

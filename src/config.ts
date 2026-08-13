@@ -9,6 +9,7 @@ import { blocks } from './client/terminal/blocks.ts'
 import { prompt } from './client/terminal/prompt.ts'
 import { clipboard } from './client/terminal/clipboard.ts'
 import { render } from './client/render.ts'
+import { terminalOutput } from './client/terminal-output.ts'
 import { renderStatus } from './client/render-status.ts'
 import { renderHistory } from './client/render-history.ts'
 import { agentLoop } from './server/runtime/agent-loop.ts'
@@ -30,6 +31,7 @@ const modules: Record<string, Record<string, any>> = {
 	prompt: prompt.config,
 	clipboard: clipboard.config,
 	render: render.config,
+	terminalOutput: terminalOutput.config,
 	renderStatus: renderStatus.config,
 	renderHistory: renderHistory.config,
 	agentLoop: agentLoop.config,
