@@ -125,7 +125,7 @@ function blockContent(block: Block, cols: number): string[] {
 		const spec = toolSpecs.getToolSpec(block.name)
 		const command = spec.command?.(block.input, block.output)
 		if (command) lines.push(...formatToolCommand(command, cols, spec.shellContinuations?.(block.input, block.output) ?? block.name === 'bash'))
-		const details = spec.details?.(block.input)
+		const details = spec.details?.(block.input, block.output)
 		if (details) pushWrapped(lines, details, cols)
 		if (!block.output) return lines
 		const output = blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.output))

@@ -24,16 +24,18 @@ function lineCount(content: unknown, insert = false): number {
 	return normalized.split('\n').length
 }
 
-function editDetails(input: any): string | undefined {
+function editDetails(input: any, output?: string): string | undefined {
 	if (input?.operation === 'replace') {
-		const start = String(input.start ?? '')
-		const end = String(input.end ?? '')
+		const accepted = output?.match(/Line numbers changed; edit accepted as (\d+:[A-Za-z0-9]+)(?:-(\d+:[A-Za-z0-9]+))?\./)
+		const start = accepted?.[1] ?? String(input.start ?? '')
+		const end = accepted?.[2] ?? accepted?.[1] ?? String(input.end ?? '')
 		const range = start === end ? start : `${start}...${end}`
 		const oldCount = Number(end.split(':')[0]) - Number(start.split(':')[0]) + 1
 		const newCount = lineCount(input.new_content)
 		if (newCount === 0) return `Delete lines ${range}`
+		if (start === end) return `Replace line ${start}`
 		const counts = oldCount === newCount ? String(oldCount) : `${oldCount} -> ${newCount}`
-		return `Replace ${range} (${counts} ${newCount === 1 ? 'line' : 'lines'})`
+		return `Replace lines ${range} (${counts} ${newCount === 1 ? 'line' : 'lines'})`
 	}
 	if (input?.operation !== 'insert') return undefined
 	const after = String(input.after ?? '')
@@ -85,7 +87,7 @@ export interface ToolFormatResult { bodyLines: string[]; hiddenIndicator?: strin
 export type ToolSpec = {
 	title?: (input?: any, output?: string) => string
 	command?: (input?: any, output?: string) => string | undefined
-	details?: (input?: any) => string | undefined
+	details?: (input?: any, output?: string) => string | undefined
 	shellContinuations?: (input?: any, output?: string) => boolean
 	format?: (output: string, cols: number, input?: any) => ToolFormatResult
 	// Which side of long raw output stays visible after truncation.

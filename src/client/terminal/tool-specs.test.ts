@@ -301,7 +301,7 @@ test('edit block summarizes replace input on one line', () => {
 
 	const lines = blocks.renderBlock(block, 100).map(stripAnsi)
 	expect(headerLine(lines)).toContain('Edit src/app.ts')
-	expect(contentLines(lines)).toEqual([' Replace 37:fGG...179:uCm (143 -> 2 lines)'])
+	expect(contentLines(lines)).toEqual([' Replace lines 37:fGG...179:uCm (143 -> 2 lines)'])
 })
 
 test('edit block omits unchanged line-count comparison', () => {
@@ -311,7 +311,18 @@ test('edit block omits unchanged line-count comparison', () => {
 		input: { path: 'src/app.ts', operation: 'replace', start: '140:3Bb', end: '140:3Bb', new_content: 'next' },
 	}
 
-	expect(contentLines(blocks.renderBlock(block, 100))).toEqual([' Replace 140:3Bb (1 line)'])
+	expect(contentLines(blocks.renderBlock(block, 100))).toEqual([' Replace line 140:3Bb'])
+})
+
+test('edit block counts the accepted remapped range', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'edit',
+		input: { path: 'tetris.ts', operation: 'replace', start: '116:nFz', end: '113:K6l', new_content: Array(18).fill('line').join('\n') },
+		output: '--- before\n116:nFz first\n129:K6l last\n\n+++ after\n116:nFz first\n133:K6l last\n\nLine numbers changed; edit accepted as 116:nFz-129:K6l.',
+	}
+
+	expect(contentLines(blocks.renderBlock(block, 100))[0]).toBe(' Replace lines 116:nFz...129:K6l (14 -> 18 lines)')
 })
 
 test('edit block describes empty replacement as deletion', () => {
