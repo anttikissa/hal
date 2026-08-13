@@ -18,17 +18,24 @@ function humanizeName(name: string): string {
 	return name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ')
 }
 
-function editLineRange(input: any): string {
+function lineCount(content: unknown, insert = false): number {
+	const normalized = String(content ?? '').replace(/\n$/, '')
+	if (!normalized && !insert) return 0
+	return normalized.split('\n').length
+}
+
+function editDetails(input: any): string | undefined {
 	if (input?.operation === 'replace') {
-		const start = String(input.start_ref ?? '').trim()
-		const end = String(input.end_ref ?? '').trim()
-		if (!start || !end) return ''
-		return start === end ? ` (${start})` : ` (${start}-${end})`
+		const start = String(input.start ?? '')
+		const end = String(input.end ?? '')
+		const oldCount = Number(end.split(':')[0]) - Number(start.split(':')[0]) + 1
+		const newCount = lineCount(input.new_content)
+		return `Replace from ${start} to ${end} (${oldCount} -> ${newCount} ${newCount === 1 ? 'line' : 'lines'})`
 	}
-	if (input?.operation !== 'insert') return ''
-	const after = String(input.after_ref ?? '').trim()
-	if (!after) return ''
-	return after === '0:000' ? ' (before 1)' : ` (after ${after})`
+	if (input?.operation !== 'insert') return undefined
+	const after = String(input.after ?? '')
+	const count = lineCount(input.new_content, true)
+	return `Insert ${count} ${count === 1 ? 'line' : 'lines'} ${after === '0:000' ? 'before line 1' : `after ${after}`}`
 }
 
 function stripRedundantCd(command: string, cwd: string | undefined): string {
@@ -252,16 +259,8 @@ const specs: Record<string, ToolSpec> = {
 	},
 	read_blob: { title: readBlobTitle },
 	edit: {
-		title: (input) => `Edit ${input?.path ?? '?'}${editLineRange(input)}`,
-		details(input) {
-			if (input == null) return undefined
-			const details: Record<string, string> = {}
-			if (typeof input.operation === 'string') details.operation = input.operation
-			if (typeof input.start_ref === 'string') details.start_ref = input.start_ref
-			if (typeof input.end_ref === 'string') details.end_ref = input.end_ref
-			if (typeof input.after_ref === 'string') details.after_ref = input.after_ref
-			return Object.keys(details).length ? ason.stringify(details, 'long') : undefined
-		},
+		title: (input) => `Edit ${input?.path ?? '?'}`,
+		details: editDetails,
 		format: formatEdit,
 	},
 	eval: { title: () => 'Eval', command: (input) => input?.code ?? undefined, format: formatEval },

@@ -37,7 +37,7 @@ test('common secret-bearing paths produce reasons', () => {
 test('write/edit only check path, not body content', () => {
 	const writeBody = risk.analyzeToolCall('write', { path: 'src/foo.ts', content: 'const s = "auth.ason"' })
 	expect(writeBody).toEqual([])
-	const editBody = risk.analyzeToolCall('edit', { path: 'src/foo.test.ts', operation: 'insert', after_ref: '0:000', new_content: 'read auth.ason example' })
+	const editBody = risk.analyzeToolCall('edit', { path: 'src/foo.test.ts', operation: 'insert', after: '0:000', new_content: 'read auth.ason example' })
 	expect(editBody).toEqual([])
 	// path itself still flagged
 	expect(risk.analyzeToolCall('write', { path: 'auth.ason', content: 'x' }).map((item) => item.reason)).toContain('auth.ason contains provider credentials')

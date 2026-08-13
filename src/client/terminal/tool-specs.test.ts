@@ -286,44 +286,32 @@ test('failed shell-substitution commit renders as ordinary bash', () => {
 	expect(lines.join('\n')).toContain('bash: unexpected EOF')
 })
 
-test('edit block header shows affected hashline refs', () => {
+test('edit block summarizes replace input on one line', () => {
 	const block: Block = {
 		type: 'tool',
 		name: 'edit',
 		input: {
 			path: 'src/app.ts',
 			operation: 'replace',
-			start_ref: '12:abc',
-			end_ref: '15:def',
-			new_content: 'next',
+			start: '37:fGG',
+			end: '179:uCm',
+			new_content: 'one\ntwo\n',
 		},
 	}
 
-	const header = headerLine(blocks.renderBlock(block, 100))
-	expect(header).toContain('Edit src/app.ts (12:abc-15:def)')
+	const lines = blocks.renderBlock(block, 100).map(stripAnsi)
+	expect(headerLine(lines)).toContain('Edit src/app.ts')
+	expect(contentLines(lines)).toEqual([' Replace from 37:fGG to 179:uCm (143 -> 2 lines)'])
 })
 
-test('edit block shows hashline refs for debugging', () => {
+test('edit block summarizes insert input on one line', () => {
 	const block: Block = {
 		type: 'tool',
 		name: 'edit',
-		input: {
-			path: 'src/app.ts',
-			operation: 'replace',
-			start_ref: '12:abc',
-			end_ref: '15:def',
-			new_content: 'next',
-		},
+		input: { path: 'src/app.ts', operation: 'insert', after: '5:DVT', new_content: 'one line' },
 	}
 
-	const body = blocks
-		.renderBlock(block, 100)
-		.map((l) => stripAnsi(l))
-		.slice(1)
-		.join('\n')
-	expect(body).toContain("operation: 'replace'")
-	expect(body).toContain("start_ref: '12:abc'")
-	expect(body).toContain("end_ref: '15:def'")
+	expect(contentLines(blocks.renderBlock(block, 100))).toEqual([' Insert 1 line after 5:DVT'])
 })
 
 test('edit block keeps failure details visible after diff preview', () => {

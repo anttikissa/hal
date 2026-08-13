@@ -113,7 +113,7 @@ describe('edit via hashline', () => {
 		setup('alpha\nbeta\ngamma\n')
 		const ref = `2:${hashLine('beta')}`
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: ref, end_ref: ref, new_content: 'BETA' },
+			{ path: file, operation: 'replace', start: ref, end: ref, new_content: 'BETA' },
 			ctx,
 		)
 		expect(result).toContain('+++ after')
@@ -126,7 +126,7 @@ describe('edit via hashline', () => {
 		const startRef = `2:${hashLine('b')}`
 		const endRef = `3:${hashLine('c')}`
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: startRef, end_ref: endRef, new_content: 'X\nY' },
+			{ path: file, operation: 'replace', start: startRef, end: endRef, new_content: 'X\nY' },
 			ctx,
 		)
 		expect(result).toContain('+++ after')
@@ -139,7 +139,7 @@ describe('edit via hashline', () => {
 		const startRef = `2:${hashLine('b')}`
 		const endRef = `3:${hashLine('c')}`
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: startRef, end_ref: endRef, new_content: '' },
+			{ path: file, operation: 'replace', start: startRef, end: endRef, new_content: '' },
 			ctx,
 		)
 		expect(result).toContain('+++ after')
@@ -151,7 +151,7 @@ describe('edit via hashline', () => {
 		setup('a\nb\n')
 		const ref = `1:${hashLine('a')}`
 		const result = await executeEdit(
-			{ path: file, operation: 'insert', after_ref: ref, new_content: 'mid' },
+			{ path: file, operation: 'insert', after: ref, new_content: 'mid' },
 			ctx,
 		)
 		expect(result).toContain('+++ after')
@@ -162,7 +162,7 @@ describe('edit via hashline', () => {
 	test('insert at beginning with 0:000', async () => {
 		setup('a\nb\n')
 		const result = await executeEdit(
-			{ path: file, operation: 'insert', after_ref: '0:000', new_content: 'top' },
+			{ path: file, operation: 'insert', after: '0:000', new_content: 'top' },
 			ctx,
 		)
 		expect(result).toContain('+++ after')
@@ -176,7 +176,7 @@ describe('edit via hashline', () => {
 		// Modify file behind our back
 		writeFileSync(file, 'a\nchanged\nc\n')
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: ref, end_ref: ref, new_content: 'X' },
+			{ path: file, operation: 'replace', start: ref, end: ref, new_content: 'X' },
 			ctx,
 		)
 		expect(result).toContain('Hash mismatch')
@@ -188,7 +188,7 @@ describe('edit via hashline', () => {
 		const ref = `2:${hashLine('b')}`
 		writeFileSync(file, 'a\nchanged\nc\n')
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: ref, end_ref: ref, new_content: 'X' },
+			{ path: file, operation: 'replace', start: ref, end: ref, new_content: 'X' },
 			ctx,
 		)
 		expect(result).toContain('Hash mismatch')
@@ -202,7 +202,7 @@ describe('edit via hashline', () => {
 		const ref = `2:${hashLine('b')}`
 		writeFileSync(file, 'a\nchanged\nc\n')
 		const result = await executeEdit(
-			{ path: file, operation: 'insert', after_ref: ref, new_content: 'X' },
+			{ path: file, operation: 'insert', after: ref, new_content: 'X' },
 			ctx,
 		)
 		expect(result).toContain('Hash mismatch')
@@ -224,7 +224,7 @@ describe('edit via hashline', () => {
 		setup('  keep  \n\nö\n')
 		const ref = `3:${hashLine('ö')}`
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: ref, end_ref: ref, new_content: '🙂' },
+			{ path: file, operation: 'replace', start: ref, end: ref, new_content: '🙂' },
 			ctx,
 		)
 		expect(result).toContain('+++ after')
@@ -237,13 +237,13 @@ describe('edit via hashline', () => {
 		await executeRead({ path: file, start: 1, end: 10 }, ctx)
 
 		await executeEdit(
-			{ path: file, operation: 'insert', after_ref: '0:000', new_content: 'top' },
+			{ path: file, operation: 'insert', after: '0:000', new_content: 'top' },
 			ctx,
 		)
 
 		const oldRef = `2:${hashLine('two')}`
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: oldRef, end_ref: oldRef, new_content: 'TWO' },
+			{ path: file, operation: 'replace', start: oldRef, end: oldRef, new_content: 'TWO' },
 			ctx,
 		)
 
@@ -258,14 +258,14 @@ describe('edit via hashline', () => {
 		await executeRead({ path: file, start: 1, end: 10 }, ctx)
 
 		await executeEdit(
-			{ path: file, operation: 'insert', after_ref: '0:000', new_content: 'top' },
+			{ path: file, operation: 'insert', after: '0:000', new_content: 'top' },
 			ctx,
 		)
 		await executeRead({ path: file, start: 1, end: 10 }, ctx)
 
 		const oldRef = `2:${hashLine('two')}`
 		const result = await executeEdit(
-			{ path: file, operation: 'replace', start_ref: oldRef, end_ref: oldRef, new_content: 'TWO' },
+			{ path: file, operation: 'replace', start: oldRef, end: oldRef, new_content: 'TWO' },
 			ctx,
 		)
 
@@ -285,8 +285,8 @@ describe('edit via hashline', () => {
 				{
 					path: file,
 					operation: 'replace',
-					start_ref: ref,
-					end_ref: ref,
+					start: ref,
+					end: ref,
 					new_content: "export const value: number = 'oops'",
 				},
 				ctx,
@@ -310,8 +310,8 @@ describe('edit via hashline', () => {
 				{
 					path: file,
 					operation: 'replace',
-					start_ref: ref,
-					end_ref: ref,
+					start: ref,
+					end: ref,
 					new_content: "console.log('lint me')",
 				},
 				ctx,
@@ -335,8 +335,8 @@ describe('edit via hashline', () => {
 				{
 					path: file,
 					operation: 'replace',
-					start_ref: ref,
-					end_ref: ref,
+					start: ref,
+					end: ref,
 					new_content: "export const value: number = 'oops'",
 				},
 				ctx,

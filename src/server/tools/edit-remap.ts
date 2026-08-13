@@ -119,8 +119,8 @@ function validateReplaceRange(lines: string[], start: HashlineRef, end: Hashline
 function resolveReplace(lines: string[], sessionId: string, path: string, startRef: string, endRef: string, newLineCount: number): string | ResolvedReplace {
 	const start = hashline.parseRef(startRef)
 	const end = hashline.parseRef(endRef)
-	if (!start) return `error: invalid start_ref: ${startRef}`
-	if (!end) return `error: invalid end_ref: ${endRef}`
+	if (!start) return `error: invalid start: ${startRef}`
+	if (!end) return `error: invalid end: ${endRef}`
 
 	const rawError = validateReplaceRange(lines, start, end)
 	if (!rawError) {
@@ -158,7 +158,7 @@ function resolveInsert(lines: string[], sessionId: string, path: string, afterRe
 	}
 
 	const after = hashline.parseRef(afterRef)
-	if (!after) return `error: invalid after_ref: ${afterRef}`
+	if (!after) return `error: invalid after: ${afterRef}`
 
 	const rawError = hashline.validateRef(after, lines)
 	if (!rawError) {
@@ -224,12 +224,12 @@ function applyInsert(lines: string[], resolved: ResolvedInsert, newContent: stri
 
 function prepareEdit(input: EditRequest): string | PreparedEdit {
 	if (input.operation === 'replace') {
-		if (!input.startRef || !input.endRef) return 'error: replace requires start_ref and end_ref'
+		if (!input.startRef || !input.endRef) return 'error: replace requires start and end'
 		const resolved = resolveReplace(input.lines, input.sessionId, input.path, input.startRef, input.endRef, normalizeReplaceLines(input.newContent).length)
 		return typeof resolved === 'string' ? resolved : applyReplace(input.lines, resolved, input.newContent)
 	}
 
-	if (!input.afterRef) return 'error: insert requires after_ref'
+	if (!input.afterRef) return 'error: insert requires after'
 	const resolved = resolveInsert(input.lines, input.sessionId, input.path, input.afterRef, normalizeInsertLines(input.newContent).length)
 	return typeof resolved === 'string' ? resolved : applyInsert(input.lines, resolved, input.newContent)
 }

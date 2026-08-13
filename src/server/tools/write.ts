@@ -154,9 +154,9 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 			sessionId: ctx.sessionId,
 			path,
 			operation,
-			startRef: input?.start_ref,
-			endRef: input?.end_ref,
-			afterRef: input?.after_ref,
+			startRef: input?.start,
+			endRef: input?.end,
+			afterRef: input?.after,
 			newContent,
 		})
 		if (typeof prepared === 'string') return truncateUtf8(prepared, MAX_OUTPUT_BYTES)
@@ -177,16 +177,16 @@ async function executeEdit(input: any, ctx: ToolContext): Promise<string> {
 const editTool = {
 	name: 'edit',
 	description: `Edit a file using hashline refs from read. Hashes are verified; line numbers may be remapped after prior edits in the same session.
-- replace: replace start_ref..end_ref (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
-- insert: insert new_content after after_ref. Use "0:000" for beginning of file.
+- replace: replace start..end (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
+- insert: insert new_content after after. Use "0:000" for beginning of file.
 - if the edited file ends in .ts or .tsx, run tsgo-file and oxlint on it and return errors if broken.
 new_content is raw file content — no hashline prefixes. A trailing newline in new_content is stripped.`,
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },
 		operation: { type: 'string', description: '"replace" or "insert"' },
-		start_ref: { type: 'string', description: 'LINE:HASH of first line to replace' },
-		end_ref: { type: 'string', description: 'LINE:HASH of last line to replace' },
-		after_ref: { type: 'string', description: 'LINE:HASH to insert after (or "0:000" for start)' },
+		start: { type: 'string', description: 'LINE:HASH of first line to replace' },
+		end: { type: 'string', description: 'LINE:HASH of last line to replace' },
+		after: { type: 'string', description: 'LINE:HASH to insert after (or "0:000" for start)' },
 		new_content: { type: 'string', description: 'Replacement text (raw, no hashline prefixes)' },
 	},
 	required: ['path', 'operation', 'new_content'],

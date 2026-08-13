@@ -25,7 +25,7 @@ test('read refuses the protected auth file without reading it', async () => {
 
 test('write and edit refuse the protected auth file before opening it', async () => {
 	const writeOut = await write.executeWrite({ path: 'auth.ason', content: 'x' }, { sessionId: 's', cwd: HAL_DIR })
-	const editOut = await write.executeEdit({ path: 'auth.ason', operation: 'insert', after_ref: '0:000', new_content: 'x' }, { sessionId: 's', cwd: HAL_DIR })
+	const editOut = await write.executeEdit({ path: 'auth.ason', operation: 'insert', after: '0:000', new_content: 'x' }, { sessionId: 's', cwd: HAL_DIR })
 
 	expect(writeOut).toContain('refusing to write protected credentials file')
 	expect(editOut).toContain('refusing to edit protected credentials file')
