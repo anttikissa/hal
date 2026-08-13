@@ -30,7 +30,8 @@ function editDetails(input: any): string | undefined {
 		const end = String(input.end ?? '')
 		const oldCount = Number(end.split(':')[0]) - Number(start.split(':')[0]) + 1
 		const newCount = lineCount(input.new_content)
-		return `Replace from ${start} to ${end} (${oldCount} -> ${newCount} ${newCount === 1 ? 'line' : 'lines'})`
+		const counts = oldCount === newCount ? String(oldCount) : `${oldCount} -> ${newCount}`
+		return `Replace from ${start} to ${end} (${counts} ${newCount === 1 ? 'line' : 'lines'})`
 	}
 	if (input?.operation !== 'insert') return undefined
 	const after = String(input.after ?? '')

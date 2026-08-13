@@ -304,6 +304,16 @@ test('edit block summarizes replace input on one line', () => {
 	expect(contentLines(lines)).toEqual([' Replace from 37:fGG to 179:uCm (143 -> 2 lines)'])
 })
 
+test('edit block omits unchanged line-count comparison', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'edit',
+		input: { path: 'src/app.ts', operation: 'replace', start: '140:3Bb', end: '140:3Bb', new_content: 'next' },
+	}
+
+	expect(contentLines(blocks.renderBlock(block, 100))).toEqual([' Replace from 140:3Bb to 140:3Bb (1 line)'])
+})
+
 test('edit block summarizes insert input on one line', () => {
 	const block: Block = {
 		type: 'tool',
