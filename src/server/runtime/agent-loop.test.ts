@@ -266,6 +266,50 @@ test('completed final response does not remain in live scratch state', async () 
 	}
 })
 
+
+test('tool iterations do not re-emit streamed assistant text as responses', async () => {
+	const sessionId = `test-stream-once-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+
+	const events: any[] = []
+	const origGetProvider = providerLoader.getProvider
+	const origAppendEvent = ipc.appendEvent
+	const origDispatch = toolRegistry.dispatch
+	let generation = 0
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			generation++
+			if (generation <= 2) {
+				yield { type: 'text', text: `marker ${generation}` }
+				yield { type: 'tool_call', id: `tool-${generation}`, name: 'bash', input: { command: `printf ${generation}` } }
+			} else {
+				yield { type: 'text', text: 'complete' }
+			}
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	ipc.appendEvent = (event: any) => { events.push(event) }
+	toolRegistry.dispatch = async () => 'done'
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'run two tools' }],
+		})
+		expect(result).toBe('completed')
+		expect(events.filter((event) => event.type === 'stream-delta' && event.channel === 'assistant').map((event) => event.text)).toEqual(['marker 1', 'marker 2', 'complete'])
+		expect(events.filter((event) => event.type === 'response' && !event.isError)).toEqual([])
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		ipc.appendEvent = origAppendEvent
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
 test('logs an empty completed provider response so the user can retry', async () => {
 	const sessionId = `test-empty-response-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 	createdSessions.push(sessionId)

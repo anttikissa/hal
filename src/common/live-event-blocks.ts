@@ -175,32 +175,6 @@ function appendBlock(blocks: readonly LiveBlock[], block: LiveBlock): LiveProjec
 	return { blocks: [...blocks, block], changed: true }
 }
 
-function applyAssistantResponse(blocks: readonly LiveBlock[], event: ResponseEvent, options: LiveProjectionOptions): LiveProjectionResult {
-	const last = blocks.at(-1)
-	const ts = liveEventBlocks.timestamp(event)
-	if (last?.type === 'assistant' && last.streaming && event.text?.startsWith(last.text)) {
-		const updated: LiveAssistantBlock = { ...last, text: event.text }
-		if (!updated.model && (event.model ?? options.defaultModel)) updated.model = event.model ?? options.defaultModel
-		if (!updated.ts && ts !== undefined) updated.ts = ts
-		delete updated.streaming
-		const next = blocks.slice()
-		next[next.length - 1] = updated
-		return { blocks: next, changed: true }
-	}
-
-	const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
-	const block: LiveAssistantBlock = {
-		type: 'assistant',
-		text: event.text!,
-		synthetic: event.synthetic === true,
-	}
-	const model = event.model ?? options.defaultModel
-	const sessionId = event.sessionId ?? options.sessionId
-	if (model) block.model = model
-	if (sessionId) block.sessionId = sessionId
-	if (ts !== undefined) block.ts = ts
-	return liveEventBlocks.appendBlock(closed, block)
-}
 
 function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LiveProjectionOptions = {}): LiveProjectionResult {
 	const sessionId = event.sessionId ?? options.sessionId
@@ -300,7 +274,13 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 			if (ts !== undefined) block.ts = ts
 			return liveEventBlocks.appendBlock(closed, block)
 		}
-		return liveEventBlocks.applyAssistantResponse(blocks, event, options)
+		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+		const block: LiveAssistantBlock = { type: 'assistant', text: event.text, synthetic: event.synthetic === true }
+		const model = event.model ?? options.defaultModel
+		if (model) block.model = model
+		if (sessionId) block.sessionId = sessionId
+		if (ts !== undefined) block.ts = ts
+		return liveEventBlocks.appendBlock(closed, block)
 	}
 
 	if (event.type === 'stream-end') return liveEventBlocks.closeStreamingBlock(blocks)
@@ -318,7 +298,6 @@ export const liveEventBlocks = {
 	closeStreamingBlock,
 	timestamp,
 	appendBlock,
-	applyAssistantResponse,
 	reduce,
 	infoBlockType,
 }

@@ -129,29 +129,6 @@ describe('client streaming blocks', () => {
 	})
 
 
-	test('response extends streamed assistant text instead of duplicating it', () => {
-		client.handleEvent({
-			type: 'stream-delta',
-			sessionId: 's1',
-			channel: 'assistant',
-			text: 'Done.',
-			createdAt: '2026-04-05T17:31:00.000Z',
-		})
-		client.handleEvent({
-			type: 'response',
-			sessionId: 's1',
-			text: 'Done. Committed it.',
-			createdAt: '2026-04-05T17:31:01.000Z',
-		})
-
-		const tab = client.currentTab()!
-		expect(tab.history).toHaveLength(1)
-		expect(tab.history[0]).toMatchObject({
-			type: 'assistant',
-			text: 'Done. Committed it.',
-		})
-	})
-
 
 	test('info during assistant streaming preserves both chunks in event order', () => {
 		client.handleEvent({
@@ -181,49 +158,6 @@ describe('client streaming blocks', () => {
 			{ type: 'log', text: 'system.md was reloaded' },
 			{ type: 'assistant', text: 'world' },
 		])
-	})
-
-	test('response after a tool does not duplicate the latest assistant segment', () => {
-		client.handleEvent({
-			type: 'stream-delta',
-			sessionId: 's1',
-			channel: 'assistant',
-			text: 'before tool',
-			createdAt: '2026-04-05T17:31:00.000Z',
-		})
-		client.handleEvent({
-			type: 'tool-call',
-			sessionId: 's1',
-			toolId: 'tool-1',
-			name: 'bash',
-			input: { command: 'date' },
-			createdAt: '2026-04-05T17:31:01.000Z',
-		})
-		client.handleEvent({
-			type: 'tool-result',
-			sessionId: 's1',
-			toolId: 'tool-1',
-			output: 'done',
-			createdAt: '2026-04-05T17:31:02.000Z',
-		})
-		client.handleEvent({
-			type: 'stream-delta',
-			sessionId: 's1',
-			channel: 'assistant',
-			text: 'after tool',
-			createdAt: '2026-04-05T17:31:03.000Z',
-		})
-		client.handleEvent({
-			type: 'response',
-			sessionId: 's1',
-			text: 'after tool',
-			createdAt: '2026-04-05T17:31:04.000Z',
-		})
-
-		const tab = client.currentTab()!
-		expect(tab.history.map((block) => block.type)).toEqual(['assistant', 'tool', 'assistant'])
-		expect(tab.history[0]).toMatchObject({ type: 'assistant', text: 'before tool' })
-		expect(tab.history[2]).toMatchObject({ type: 'assistant', text: 'after tool' })
 	})
 
 

@@ -662,8 +662,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				return 'failed'
 			}
 
-			// No tool calls — we're done. Emit a response event so the client
-			// can display the assistant's text (client listens for 'response' events).
+			// No tool calls — save the final streamed blocks and finish.
 			if (toolCalls.length === 0) {
 				// Save the streamed blocks exactly as flat history entries.
 				// Thinking stays separate from assistant text; large payloads still live in blobs.
@@ -697,12 +696,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				}
 				if (emptyResponseMessage) emitInfo(sessionId, emptyResponseMessage)
 
-				if (assistantText) {
-					emitEvent(sessionId, { type: 'response', text: assistantText, model })
-				}
-				// response events update live.ason for crash/restart recovery while a turn is active.
-				// Once the same response is durable history, live must be cleared last or the
-				// next prompt edit can mistake stale completed text for current partial output.
 				if (historyEntries.length > 0) {
 					sessions.clearLive(sessionId)
 				}
@@ -778,13 +771,6 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			}
 			await sessions.appendHistory(sessionId, historyEntries)
 
-			// Emit response event for intermediate text so the client can
-			// create a proper block and clear streaming buffers. Without
-			// this, text from successive iterations concatenates in the
-			// streaming buffer (e.g. "controls.Now" with no separator).
-			if (assistantText) {
-				emitEvent(sessionId, { type: 'response', text: assistantText, model })
-			}
 			sessions.clearLive(sessionId)
 
 			if (pauseBeforeTools) {
