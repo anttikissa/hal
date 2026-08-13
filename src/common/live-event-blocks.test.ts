@@ -10,20 +10,19 @@ function project(events: LiveEvent[]): LiveBlock[] {
 describe('live event block projection', () => {
 	test('projects the same event sequence deterministically', () => {
 		const events: LiveEvent[] = [
-			{ id: 'event-1', type: 'stream-delta', sessionId: 'session-1', channel: 'assistant', text: 'hello ', createdAt: '2026-08-13T09:00:00.000Z' },
-			{ id: 'event-2', type: 'info', sessionId: 'session-1', text: 'system.md was reloaded', createdAt: '2026-08-13T09:00:01.000Z' },
-			{ id: 'event-3', type: 'stream-delta', sessionId: 'session-1', channel: 'assistant', text: 'world', createdAt: '2026-08-13T09:00:02.000Z' },
-			{ id: 'event-4', type: 'response', sessionId: 'session-1', text: 'hello world', createdAt: '2026-08-13T09:00:03.000Z' },
+			{ type: 'stream-delta', sessionId: 'session-1', channel: 'assistant', text: 'hello ', createdAt: '2026-08-13T09:00:00.000Z' },
+			{ type: 'info', sessionId: 'session-1', text: 'system.md was reloaded', createdAt: '2026-08-13T09:00:01.000Z' },
+			{ type: 'stream-delta', sessionId: 'session-1', channel: 'assistant', text: 'world', createdAt: '2026-08-13T09:00:02.000Z' },
 		]
 
 		const first = project(events)
 		const second = project(events)
 
 		expect(first).toEqual(second)
-		expect(first).toMatchObject([
-			{ type: 'assistant', text: 'hello ', id: 'event-1' },
-			{ type: 'log', text: 'system.md was reloaded' },
-			{ type: 'assistant', text: 'world', continue: 'event-1' },
+		expect(first).toEqual([
+			{ type: 'assistant', text: 'hello ', ts: Date.parse('2026-08-13T09:00:00.000Z') },
+			{ type: 'log', text: 'system.md was reloaded', ts: Date.parse('2026-08-13T09:00:01.000Z') },
+			{ type: 'assistant', text: 'world', streaming: true, ts: Date.parse('2026-08-13T09:00:02.000Z') },
 		])
 	})
 

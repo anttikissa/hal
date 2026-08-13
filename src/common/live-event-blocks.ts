@@ -22,8 +22,6 @@ export interface LiveAssistantBlock extends LiveBlockBase {
 	type: 'assistant'
 	text: string
 	model?: string
-	id?: string
-	continue?: string
 	streaming?: boolean
 	synthetic?: boolean
 	syntheticKind?: string
@@ -155,20 +153,6 @@ export interface LiveProjectionResult {
 	toolBlock?: LiveToolBlock
 }
 
-function assistantChainId(block: LiveBlock | undefined): string | null {
-	if (block?.type !== 'assistant') return null
-	return block.continue ?? block.id ?? null
-}
-
-function lastInterruptedAssistantId(blocks: readonly LiveBlock[]): string | null {
-	for (let i = blocks.length - 1; i >= 0; i--) {
-		const block = blocks[i]
-		if (!block || block.type === 'tool') continue
-		if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error') continue
-		return block.type === 'assistant' ? liveEventBlocks.assistantChainId(block) : null
-	}
-	return null
-}
 
 function closeStreamingBlock(blocks: readonly LiveBlock[]): LiveProjectionResult {
 	const last = blocks.at(-1)
@@ -182,41 +166,6 @@ function closeStreamingBlock(blocks: readonly LiveBlock[]): LiveProjectionResult
 	return { blocks: next, changed: true }
 }
 
-function trailingAssistantText(blocks: readonly LiveBlock[]): string | null {
-	const parts: string[] = []
-	let chainId: string | null = null
-	let sawAssistant = false
-	for (let i = blocks.length - 1; i >= 0; i--) {
-		const block = blocks[i]
-		if (!block || block.type === 'tool') continue
-		if (block.type === 'log' || block.type === 'info' || block.type === 'warning' || block.type === 'error') {
-			if (!sawAssistant) continue
-			continue
-		}
-		if (block.type !== 'assistant') break
-		const blockChainId = liveEventBlocks.assistantChainId(block)
-		if (!sawAssistant) {
-			sawAssistant = true
-			chainId = blockChainId
-			parts.unshift(block.text)
-			continue
-		}
-		if (chainId && blockChainId === chainId) {
-			parts.unshift(block.text)
-			continue
-		}
-		break
-	}
-	if (!sawAssistant) return null
-	return parts.join('')
-}
-
-function assistantId(blocks: readonly LiveBlock[], event: StreamDeltaEvent): string {
-	if (event.id) return event.id
-	// Production events have IDs. The positional fallback keeps direct callers and
-	// tests deterministic without consulting clocks or randomness.
-	return `assistant-${event.sessionId ?? 'session'}-${event.createdAt ?? 'event'}-${blocks.length}`
-}
 
 function timestamp(event: LiveEventBase): number | undefined {
 	return event.createdAt ? Date.parse(event.createdAt) : undefined
@@ -238,7 +187,6 @@ function applyAssistantResponse(blocks: readonly LiveBlock[], event: ResponseEve
 		next[next.length - 1] = updated
 		return { blocks: next, changed: true }
 	}
-	if (event.text && liveEventBlocks.trailingAssistantText(blocks) === event.text) return liveEventBlocks.closeStreamingBlock(blocks)
 
 	const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
 	const block: LiveAssistantBlock = {
@@ -296,12 +244,9 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		}
 
 		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
-		const interruptedId = liveEventBlocks.lastInterruptedAssistantId(closed)
 		const block: LiveAssistantBlock = { type: 'assistant', text: event.text, streaming: true }
 		const model = event.model ?? options.defaultModel
 		if (model) block.model = model
-		if (interruptedId) block.continue = interruptedId
-		else block.id = liveEventBlocks.assistantId(closed, event)
 		if (ts !== undefined) block.ts = ts
 		return liveEventBlocks.appendBlock(closed, block)
 	}
@@ -370,11 +315,7 @@ function infoBlockType(event: InfoEvent): 'log' | 'info' | 'warning' | 'error' {
 }
 
 export const liveEventBlocks = {
-	assistantChainId,
-	lastInterruptedAssistantId,
 	closeStreamingBlock,
-	trailingAssistantText,
-	assistantId,
 	timestamp,
 	appendBlock,
 	applyAssistantResponse,

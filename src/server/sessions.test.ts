@@ -242,7 +242,7 @@ test('sessionOpenInfo includes tab number and effective model', () => {
 })
 
 
-test('live snapshot links assistant chunks across info interruptions', async () => {
+test('live snapshot preserves assistant chunks around info events', async () => {
 	const id = await makeSession()
 	sessions.applyLiveEvent(id, {
 		type: 'stream-delta',
@@ -266,12 +266,11 @@ test('live snapshot links assistant chunks across info interruptions', async () 
 	})
 
 	const live = sessions.loadLive(id)
-	expect(live.blocks).toHaveLength(3)
-	expect(live.blocks[0]).toMatchObject({ type: 'assistant', text: 'hello ' })
-	expect(live.blocks[1]).toMatchObject({ type: 'log', text: 'system.md was reloaded' })
-	expect(live.blocks[2]).toMatchObject({ type: 'assistant', text: 'world' })
-	expect((live.blocks[0] as any).id).toEqual(expect.any(String))
-	expect((live.blocks[2] as any).continue).toBe((live.blocks[0] as any).id)
+	expect(live.blocks).toMatchObject([
+		{ type: 'assistant', text: 'hello ' },
+		{ type: 'log', text: 'system.md was reloaded' },
+		{ type: 'assistant', text: 'world' },
+	])
 })
 
 

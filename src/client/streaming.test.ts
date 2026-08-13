@@ -128,41 +128,6 @@ describe('client streaming blocks', () => {
 		expect(repaints).toBe(0)
 	})
 
-	test('streamed assistant text stays before live tool blocks and response does not duplicate it', () => {
-		client.handleEvent({
-			type: 'stream-delta',
-			sessionId: 's1',
-			channel: 'assistant',
-			text: 'hello',
-			createdAt: '2026-04-05T17:31:00.000Z',
-		})
-		client.handleEvent({
-			type: 'tool-call',
-			sessionId: 's1',
-			toolId: 'tool-1',
-			name: 'read',
-			input: { path: 'notes.txt' },
-			blobId: '000002-def',
-			createdAt: '2026-04-05T17:31:01.000Z',
-		})
-		client.handleEvent({
-			type: 'response',
-			sessionId: 's1',
-			text: 'hello',
-			createdAt: '2026-04-05T17:31:02.000Z',
-		})
-
-		const tab = client.currentTab()!
-		expect(tab.history.map((block) => block.type)).toEqual(['assistant', 'tool'])
-		expect(tab.history[0]).toMatchObject({ type: 'assistant', text: 'hello' })
-		expect(tab.history[1]).toMatchObject({
-			type: 'tool',
-			toolId: 'tool-1',
-			blobId: '000002-def',
-			sessionId: 's1',
-			input: { path: 'notes.txt' },
-		})
-	})
 
 	test('response extends streamed assistant text instead of duplicating it', () => {
 		client.handleEvent({
@@ -188,7 +153,7 @@ describe('client streaming blocks', () => {
 	})
 
 
-	test('info during assistant streaming starts a continuation chunk and response does not duplicate it', () => {
+	test('info during assistant streaming preserves both chunks in event order', () => {
 		client.handleEvent({
 			type: 'stream-delta',
 			sessionId: 's1',
@@ -209,20 +174,13 @@ describe('client streaming blocks', () => {
 			text: 'world',
 			createdAt: '2026-04-05T17:31:02.000Z',
 		})
-		client.handleEvent({
-			type: 'response',
-			sessionId: 's1',
-			text: 'hello world',
-			createdAt: '2026-04-05T17:31:03.000Z',
-		})
 
 		const tab = client.currentTab()!
-		expect(tab.history).toHaveLength(3)
-		expect(tab.history[0]).toMatchObject({ type: 'assistant', text: 'hello ' })
-		expect(tab.history[1]).toMatchObject({ type: 'log', text: 'system.md was reloaded' })
-		expect(tab.history[2]).toMatchObject({ type: 'assistant', text: 'world' })
-		expect((tab.history[0] as any).id).toEqual(expect.any(String))
-		expect((tab.history[2] as any).continue).toBe((tab.history[0] as any).id)
+		expect(tab.history).toMatchObject([
+			{ type: 'assistant', text: 'hello ' },
+			{ type: 'log', text: 'system.md was reloaded' },
+			{ type: 'assistant', text: 'world' },
+		])
 	})
 
 	test('response after a tool does not duplicate the latest assistant segment', () => {

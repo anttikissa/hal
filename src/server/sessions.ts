@@ -75,7 +75,6 @@ export type HistoryEntry = EntryIdentity & (
 			type: 'assistant'
 			text: string
 			model?: string
-			continue?: string
 			usage?: PartialTokenUsage
 			synthetic?: boolean
 			syntheticKind?: string
