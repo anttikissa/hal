@@ -301,7 +301,7 @@ test('edit block summarizes replace input on one line', () => {
 
 	const lines = blocks.renderBlock(block, 100).map(stripAnsi)
 	expect(headerLine(lines)).toContain('Edit src/app.ts')
-	expect(contentLines(lines)).toEqual([' Replace from 37:fGG to 179:uCm (143 -> 2 lines)'])
+	expect(contentLines(lines)).toEqual([' Replace 37:fGG...179:uCm (143 -> 2 lines)'])
 })
 
 test('edit block omits unchanged line-count comparison', () => {
@@ -311,7 +311,17 @@ test('edit block omits unchanged line-count comparison', () => {
 		input: { path: 'src/app.ts', operation: 'replace', start: '140:3Bb', end: '140:3Bb', new_content: 'next' },
 	}
 
-	expect(contentLines(blocks.renderBlock(block, 100))).toEqual([' Replace from 140:3Bb to 140:3Bb (1 line)'])
+	expect(contentLines(blocks.renderBlock(block, 100))).toEqual([' Replace 140:3Bb (1 line)'])
+})
+
+test('edit block describes empty replacement as deletion', () => {
+	const block: Block = {
+		type: 'tool',
+		name: 'edit',
+		input: { path: 'src/app.ts', operation: 'replace', start: '10:abc', end: '12:def', new_content: '' },
+	}
+
+	expect(contentLines(blocks.renderBlock(block, 100))).toEqual([' Delete lines 10:abc...12:def'])
 })
 
 test('edit block summarizes insert input on one line', () => {

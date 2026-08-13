@@ -28,10 +28,12 @@ function editDetails(input: any): string | undefined {
 	if (input?.operation === 'replace') {
 		const start = String(input.start ?? '')
 		const end = String(input.end ?? '')
+		const range = start === end ? start : `${start}...${end}`
 		const oldCount = Number(end.split(':')[0]) - Number(start.split(':')[0]) + 1
 		const newCount = lineCount(input.new_content)
+		if (newCount === 0) return `Delete lines ${range}`
 		const counts = oldCount === newCount ? String(oldCount) : `${oldCount} -> ${newCount}`
-		return `Replace from ${start} to ${end} (${counts} ${newCount === 1 ? 'line' : 'lines'})`
+		return `Replace ${range} (${counts} ${newCount === 1 ? 'line' : 'lines'})`
 	}
 	if (input?.operation !== 'insert') return undefined
 	const after = String(input.after ?? '')
