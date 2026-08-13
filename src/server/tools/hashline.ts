@@ -1,6 +1,6 @@
 // Hashline — line-level addressing for file edits.
 //
-// Each line gets a short hash derived from its normalized content.
+// Each line gets a short hash derived from its exact source text.
 // The read tool outputs "LINE:HASH content" and the edit tool uses
 // LINE:HASH refs to identify lines. If the file changes between
 // read and edit, the hash won't match and the edit is rejected.
@@ -18,10 +18,9 @@ export interface HashlineRef {
 	hash: string
 }
 
-// Hash a single line: normalize whitespace, MD5, take 3 base-62 chars.
+// Hash a single source line: MD5, then take 3 base-62 chars.
 function hashLine(line: string): string {
-	const norm = line.trim().replace(/\s+/g, ' ')
-	const md5 = createHash('md5').update(norm).digest()
+	const md5 = createHash('md5').update(line).digest()
 	const n = (md5[0]! << 16) | (md5[1]! << 8) | md5[2]!
 	return ALPHA[n % BASE]! + ALPHA[Math.floor(n / BASE) % BASE]! + ALPHA[Math.floor(n / (BASE * BASE)) % BASE]!
 }

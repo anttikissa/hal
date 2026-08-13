@@ -14,9 +14,10 @@ describe('hashline', () => {
 		expect(hashLine('foo')).toBe(hashLine('foo'))
 	})
 
-	test('hashLine normalizes whitespace', () => {
-		expect(hashLine('  hello  world  ')).toBe(hashLine('hello world'))
-		expect(hashLine('\thello\tworld')).toBe(hashLine('hello world'))
+	test('hashLine preserves whitespace', () => {
+		expect(hashLine('  hello  world  ')).not.toBe(hashLine('hello world'))
+		expect(hashLine('\thello\tworld')).not.toBe(hashLine('hello world'))
+		expect(hashLine('}')).not.toBe(hashLine('\t}'))
 	})
 
 	test('hashLine differs for different content', () => {
