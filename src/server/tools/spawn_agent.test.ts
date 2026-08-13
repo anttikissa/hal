@@ -107,7 +107,7 @@ test('spawn_agent rejects an unknown model before reserving a child session', as
 	)
 
 	expect(result).toContain('Unknown model: openai/gpt-5.6-mini')
-	expect(result).toContain('/check')
+	expect(result).not.toContain('/check')
 	expect(appended).toHaveLength(0)
 	expect(existsSync(`${stateDir}/sessions`)).toBe(false)
 })

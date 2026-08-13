@@ -42,7 +42,7 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalize(input, ctx)
 	if (spec.kind !== 'interactive' && !spec.task) return 'error: task is required unless kind is interactive'
 	if (spec.model && !models.modelCompletionNames().includes(models.resolveModel(spec.model))) {
-		return `error: Unknown model: ${spec.model}. Run /check to update Hal's model metadata, then try again.`
+		return `error: Unknown model: ${spec.model}`
 	}
 	const childSessionId = sessionIds.reserve()
 	const spawn: SpawnCommandData = { ...spec, childSessionId }
