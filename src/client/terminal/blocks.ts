@@ -135,13 +135,14 @@ function blockContent(block: Block, cols: number): string[] {
 		if (format.suppressOutput) return lines
 		const outputLines = output.trimEnd().split('\n')
 		if (outputLines.length > blockConfig.maxToolOutputLines) {
-			const hidden = format.hiddenIndicator ?? `[+ ${outputLines.length - blockConfig.maxToolOutputLines} lines]`
 			if (spec.overflow === 'head') {
 				for (const line of outputLines.slice(0, blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
-				lines.push(hidden)
+				lines.push(format.hiddenIndicator ?? `[+ ${outputLines.length - blockConfig.maxToolOutputLines} lines]`)
 			} else {
-				lines.push(hidden)
-				for (const line of outputLines.slice(-blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
+				const tailStart = Math.max(4, outputLines.length - blockConfig.maxToolOutputLines)
+				for (const line of outputLines.slice(0, 4)) lines.push(clipLine(line, cols))
+				if (tailStart > 4) lines.push(format.hiddenIndicator ?? `[+ ${tailStart - 4} lines]`)
+				for (const line of outputLines.slice(tailStart)) lines.push(clipLine(line, cols))
 			}
 			return lines
 		}

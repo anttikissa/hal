@@ -63,27 +63,27 @@ test('bodyless tool blocks do not add a separator row', () => {
 })
 
 
-test('tool output truncation keeps tail by default', () => {
+test('tool output truncation keeps four head lines and the tail by default', () => {
 	const oldMax = blocks.config.maxToolOutputLines
 	blocks.config.maxToolOutputLines = 2
 	try {
-		const clean = blocks.renderBlock({ type: 'tool', name: 'bash', output: 'one\ntwo\nthree\nfour' }, 80).map(stripAnsi)
+		const output = Array.from({ length: 8 }, (_, index) => `line ${index + 1}`).join('\n')
+		const clean = blocks.renderBlock({ type: 'tool', name: 'bash', output }, 80).map(stripAnsi)
+		expect(clean.some((line) => line.trim() === 'line 1')).toBe(true)
 		expect(clean.some((line) => line.trim() === '[+ 2 lines]')).toBe(true)
-		expect(clean.some((line) => line.trim() === 'one')).toBe(false)
-		expect(clean.some((line) => line.trim() === 'three')).toBe(true)
-		expect(clean.some((line) => line.trim() === 'four')).toBe(true)
+		expect(clean.some((line) => line.trim() === 'line 5')).toBe(false)
+		expect(clean.some((line) => line.trim() === 'line 7')).toBe(true)
 	} finally {
 		blocks.config.maxToolOutputLines = oldMax
 	}
 })
 
 
-test('default tool output tail shows 16 lines', () => {
+test('default tool output shows all lines when protected head and tail overlap', () => {
 	const output = Array.from({ length: 17 }, (_, index) => `line ${index + 1}`).join('\n')
 	const clean = blocks.renderBlock({ type: 'tool', name: 'bash', output }, 80).map(stripAnsi)
-	expect(clean.some((line) => line.trim() === '[+ 1 lines]')).toBe(true)
-	expect(clean.some((line) => line.trim() === 'line 1')).toBe(false)
-	expect(clean.some((line) => line.trim() === 'line 2')).toBe(true)
+	expect(clean.some((line) => line.trim().startsWith('[+ '))).toBe(false)
+	expect(clean.some((line) => line.trim() === 'line 1')).toBe(true)
 	expect(clean.some((line) => line.trim() === 'line 17')).toBe(true)
 })
 
