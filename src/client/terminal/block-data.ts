@@ -7,7 +7,7 @@
 import { ason } from '../../utils/ason.ts'
 import { models } from '../../common/models.ts'
 import type { LiveBlock } from '../../common/live-event-blocks.ts'
-import type { HistoryEntry } from '../../server/sessions.ts'
+import type { HistoryEntry } from '../../common/history.ts'
 import { sessionEntry } from '../../server/session/entry.ts'
 import { STATE_DIR } from '../../state.ts'
 // Sibling import for blocks.config; circular with blocks.ts but safe per
