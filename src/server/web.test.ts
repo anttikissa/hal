@@ -18,6 +18,10 @@ test('web page keeps full-width tabs and composer visible around the scrolling t
 	expect(page).not.toMatch(/body\s*\{[^}]*max-width:/s)
 })
 
+test('web page uses a fixed-width font throughout', () => {
+	expect(web.pageHtml()).toMatch(/body\s*\{[^}]*font:\s*15px ui-monospace,/s)
+})
+
 test('session snapshot exposes typed history and live blocks without lossy mapping', () => {
 	const originalReadState = ipc.readState
 	const originalLoadAllHistory = sessions.loadAllHistory

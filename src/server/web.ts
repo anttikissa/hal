@@ -12,7 +12,7 @@ function pageHtml(): string {
 <title>HAL</title>
 <style>
 * { box-sizing: border-box; }
-body { margin: 0; font: 15px system-ui; background: #111; color: #eee; }
+body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; }
 #tabs {
 	position: fixed;
 	z-index: 1;
