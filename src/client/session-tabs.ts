@@ -25,6 +25,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 		const existing = previousById.get(s.id)
 		if (existing) {
 			existing.name = s.name ?? s.id
+			existing.title = s.name
 			existing.cwd = s.cwd || existing.cwd
 			existing.model = s.model || existing.model
 			existing.currentLog = s.currentLog || existing.currentLog

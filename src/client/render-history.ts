@@ -19,12 +19,15 @@ export type BlockRenderCache = {
 	version: number
 	cols: number
 	lines: string[]
+	sessionLabelVersion: number
 }
 
 export type HistoryRenderContext = {
 	blockCache: WeakMap<Block, BlockRenderCache>
 	cursorTick: number
 	workingSessions: ReadonlyMap<string, boolean>
+	sessionLabel: (sessionId: string) => string
+	sessionLabelVersion: number
 }
 
 const config = {
@@ -46,12 +49,12 @@ function renderEntry(block: Block, cols: number, context: HistoryRenderContext):
 	const streamingCursor = hasInlineHalCursor(block)
 	const cached = streamingCursor ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
-	if (cached && cached.version === version && cached.cols === cols) return cached.lines
+	if (cached && cached.version === version && cached.cols === cols && cached.sessionLabelVersion === context.sessionLabelVersion) return cached.lines
 	const slowCursorVisible = cursor.isVisible(context.cursorTick)
 	const fastCursorVisible = cursor.isFastVisible(context.cursorTick)
-	const lines = blockRenderer.renderBlock(block, cols, streamingCursor ? fastCursorVisible : slowCursorVisible)
+	const lines = blockRenderer.renderBlock(block, cols, streamingCursor ? fastCursorVisible : slowCursorVisible, context.sessionLabel)
 	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
-	if (!streamingCursor) context.blockCache.set(block, { version, cols, lines: rendered })
+	if (!streamingCursor) context.blockCache.set(block, { version, cols, lines: rendered, sessionLabelVersion: context.sessionLabelVersion })
 	return rendered
 }
 
@@ -66,7 +69,7 @@ function logGroupKey(block: Block): string | null {
 function renderGroup(group: Block[], cols: number, context: HistoryRenderContext): string[] {
 	const lines = group.length === 1
 		? renderEntry(group[0]!, cols, context)
-		: blockRenderer.renderBlockGroup(group as Array<{ type: 'log' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols)
+		: blockRenderer.renderBlockGroup(group as Array<{ type: 'log' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols, context.sessionLabel)
 	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
 	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 }

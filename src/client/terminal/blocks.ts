@@ -27,6 +27,8 @@ const blockConfig = {
 export type { Block } from './block-data.ts'
 import type { Block } from './block-data.ts'
 
+export type SessionLabel = (sessionId: string) => string
+
 function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'fork' }>): string {
 	if (block.usageBars) {
 		// Sanitize account labels before turning server-authored semantic markers into
@@ -205,14 +207,11 @@ function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | 
 
 const fixedLabels = { log: 'Log', info: 'System', warning: 'Warning', error: 'Error', fork: 'Fork' }
 
-function blockLabel(block: Block): string {
+function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return block.text.split('\n', 1)[0]!
 	if (block.type === 'user') {
 		if (block.canceled) return 'You (canceled)'
-		if (block.source && block.source !== 'user' && block.source !== 'system') {
-			const sender = block.sourceTab ? `tab ${block.sourceTab} · ${block.source}` : block.source
-			return `Message received from ${sender}`
-		}
+		if (block.source && block.source !== 'user' && block.source !== 'system') return sessionLabel?.(block.source) ?? block.source
 		if (block.status === 'editing') return 'You (editing this prompt)'
 		if (block.status === 'steering') return 'You (steering)'
 		if (block.status === 'queued') return 'You (queued)'
@@ -238,7 +237,7 @@ function blockLabel(block: Block): string {
 		return block.canceled ? 'Thinking (canceled)' : 'Thinking'
 	}
 	if (block.type === 'tool') {
-		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, block.output) ?? toolSpecs.humanizeName(block.name)
+		const title = toolSpecs.getToolSpec(block.name).title?.(block.input, block.output, sessionLabel) ?? toolSpecs.humanizeName(block.name)
 		return block.canceled ? `${title} (canceled)` : title
 	}
 	return fixedLabels[block.type]
@@ -266,14 +265,14 @@ function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefin
 	return [`${bgLine(`${fg}${header}`, cols, bg)}${FG_OFF}`]
 }
 
-function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | 'warning' | 'error' }>>, cols: number): string[] {
+function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | 'warning' | 'error' }>>, cols: number, sessionLabel?: SessionLabel): string[] {
 	if (group.length === 0) return []
 	if (group.some((block) => block.type === 'log' && block.text.startsWith('Prompt queued'))) {
 		const lines: string[] = []
-		for (const block of group) lines.push(...renderBlock(block, cols))
+		for (const block of group) lines.push(...renderBlock(block, cols, false, sessionLabel))
 		return lines
 	}
-	if (group.length === 1) return renderBlock(group[0]!, cols)
+	if (group.length === 1) return renderBlock(group[0]!, cols, false, sessionLabel)
 	const inlineLines: string[] = []
 	let allInline = true
 	for (const block of group) {
@@ -346,7 +345,7 @@ function addInlineCursor(lines: string[], block: Block, cols: number, visible: b
 	lines.splice(lines.length - 1, 1, ...withInlineCursor(last, block, cols, visible))
 }
 
-function renderBlock(block: Block, cols: number, cursorVisible = false): string[] {
+function renderBlock(block: Block, cols: number, cursorVisible = false, sessionLabel?: SessionLabel): string[] {
 	const inlineNotice = renderInlineNoticeBlock(block, cols)
 	if (inlineNotice) return inlineNotice
 
@@ -355,7 +354,7 @@ function renderBlock(block: Block, cols: number, cursorVisible = false): string[
 			? `${block.sessionId}/${block.blobId}`
 			: ''
 	const { fg, bg, bgIsBlack } = blockColors(block)
-	const label = blockLabel(block)
+	const label = blockLabel(block, sessionLabel)
 	const blockTime = formatBlockTime(block.ts)
 	const header = buildHeader(label, blockTime, blobRef, cols)
 	const lines = [bgLine(`${fg}${header}`, cols, bg)]

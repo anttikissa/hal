@@ -35,6 +35,7 @@ export type { Block }
 export interface Tab {
 	sessionId: string
 	name: string
+	title?: string
 	history: Block[]
 	// Per-tab prompt history for up-arrow recall. Extracted from session
 	// history entries on load, appended to on each prompt submission.
@@ -94,6 +95,7 @@ const config = {
 const state = {
 	tabs: [] as Tab[],
 	focusedTabIndex: 0,
+	sessionLabelVersion: 0,
 	role: 'server' as 'server' | 'client',
 	pid: process.pid,
 	startedAt: new Date().toISOString(),
@@ -278,6 +280,14 @@ function showServerPromotion(pid: number, startedAt?: string): void {
 function tabForSession(sessionId: string | null): Tab | null {
 	if (sessionId) return state.tabs.find((tab) => tab.sessionId === sessionId) ?? null
 	return currentTab()
+}
+
+function sessionLabel(sessionId: string): string {
+	const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId)
+	const tab = state.tabs[index]
+	if (!tab) return sessionId
+	const details = [tab.title, index >= 0 ? `tab ${index + 1}` : ''].filter(Boolean).join(', ')
+	return details ? `${sessionId} (${details})` : sessionId
 }
 
 function applyLiveEventToTab(tab: Tab, event: LiveEvent) {
@@ -525,6 +535,7 @@ function canContinueCurrentTurn(): boolean {
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const snapshot = sessionLoader.load(info)
 	const tab = makeTab(snapshot.id, snapshot.name, { cwd: snapshot.cwd, model: snapshot.model, currentLog: snapshot.currentLog })
+	tab.title = info.name
 	tab.rawHistory = snapshot.history
 	tab.parentEntryCount = snapshot.parentEntryCount
 	tab.lastActiveTs = snapshot.lastActiveTs
@@ -540,6 +551,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 }
 
 function applySessionList(items: SharedSessionInfo[], preferredSession = ''): void {
+	const previousLabels = state.tabs.map((tab) => `${tab.sessionId}\0${tab.title ?? ''}`).join('\n')
 	sessionTabs.apply(items, preferredSession, {
 		model: state,
 		makeTabFromDisk,
@@ -554,6 +566,7 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		onTabSwitch: (from: string, to: string) => onTabSwitch?.(from, to),
 		onChange,
 	})
+	if (previousLabels !== state.tabs.map((tab) => `${tab.sessionId}\0${tab.title ?? ''}`).join('\n')) state.sessionLabelVersion++
 }
 
 function applySharedStatus(shared: SharedState): void {
@@ -596,6 +609,7 @@ function handleEvent(event: any): void {
 		},
 		currentTab,
 		tabForSession,
+		sessionLabel,
 		addBlockToTab,
 		showServerRestart,
 		showServerPromotion,
@@ -694,6 +708,7 @@ function resetForTests(): void {
 	sessionTabs.reset()
 	clientProcess.reset()
 	state.recentTabs = []
+	state.sessionLabelVersion = 0
 	state.hostVersionStatus = 'idle'
 	state.hostVersion = ''
 	state.toolConfirmPending.clear()
@@ -728,6 +743,7 @@ export const client = {
 	setOnTabSwitch,
 	setOnDraftArrived,
 	currentTab,
+	sessionLabel,
 	isWorking,
 	markToolConfirmPending,
 	clearToolConfirmPending,

@@ -55,6 +55,8 @@ function historyContext(): HistoryRenderContext {
 		blockCache,
 		cursorTick: cursor.tick(),
 		workingSessions: client.state.working,
+		sessionLabel: client.sessionLabel,
+		sessionLabelVersion: client.state.sessionLabelVersion,
 	}
 }
 

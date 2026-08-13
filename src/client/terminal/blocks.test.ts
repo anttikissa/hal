@@ -148,11 +148,11 @@ test('incoming prompts use the normal prompt card and retain their sender label'
 		ts: new Date('2026-01-01T17:37:00Z').getTime(),
 	}
 
-	const lines = blocks.renderBlock(block, 80)
+	const lines = blocks.renderBlock(block, 80, false, (sessionId) => `${sessionId} (Architecture revamp, tab 3)`)
 	const header = headerLine(lines)
 	const rendered = lines.join('\n')
 
-	expect(header).toContain('Message received from tab 9 · 09-bx8')
+	expect(header).toContain('09-bx8 (Architecture revamp, tab 3)')
 	expect(rendered).toContain(colors.user.fg)
 	expect(rendered).toContain(colors.user.bg)
 	expect(rendered).not.toContain(colors.info.bg)

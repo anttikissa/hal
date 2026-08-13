@@ -63,13 +63,14 @@ test('send block identifies delivered and queued messages without repeating its 
 		output: 'Message queued for tab 4 · 33-270',
 	}
 
-	const sentLines = blocks.renderBlock(sent, 100).map((line) => stripAnsi(line))
-	const queuedLines = blocks.renderBlock(queued, 100).map((line) => stripAnsi(line))
+	const label = (sessionId: string) => `${sessionId} (Architecture revamp, tab 3)`
+	const sentLines = blocks.renderBlock(sent, 100, false, label).map((line) => stripAnsi(line))
+	const queuedLines = blocks.renderBlock(queued, 100, false, label).map((line) => stripAnsi(line))
 
-	expect(headerLine(sentLines)).toContain('Message sent to tab 4 · 33-270')
+	expect(headerLine(sentLines)).toContain('Sent message to 33-270 (Architecture revamp, tab 3)')
 	expect(sentLines.join('\n')).toContain('Stop. Do not do any analysis or file access.')
-	expect(contentLines(sentLines).join('\n')).not.toContain('Message sent to')
-	expect(headerLine(queuedLines)).toContain('Message queued for tab 4 · 33-270')
+	expect(contentLines(sentLines).join('\n')).not.toContain('Sent message to')
+	expect(headerLine(queuedLines)).toContain('Queued message for 33-270 (Architecture revamp, tab 3)')
 	expect(queuedLines.join('\n')).toContain('Wait until the current work finishes.')
 })
 

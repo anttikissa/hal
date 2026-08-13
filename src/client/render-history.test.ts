@@ -12,6 +12,8 @@ function context(): HistoryRenderContext {
 		blockCache: new WeakMap(),
 		cursorTick: 0,
 		workingSessions: new Map(),
+		sessionLabel: (sessionId) => sessionId,
+		sessionLabelVersion: 0,
 	}
 }
 
@@ -53,4 +55,19 @@ test('adjacent assistant blocks use a Hal-colored rule separator', () => {
 	expect(clean[ruleIndex]).toBe('─'.repeat(20))
 	expect(lines[ruleIndex]).toStartWith(colors.assistant.fg)
 	expect(clean[secondIndex]).toContain('Hal (synthetic)')
+})
+
+
+test('session labels refresh when tab metadata changes', () => {
+	const history = [{ type: 'user', text: 'hello', source: '110-gmt' }] as Tab['history']
+	const first = { ...context(), sessionLabel: () => '110-gmt (Architecture revamp, tab 3)' }
+	const lines: string[] = []
+
+	renderHistory.renderLines(lines, tab(history), 80, first)
+	expect(lines.map(stripAnsi).join('\n')).toContain('110-gmt (Architecture revamp, tab 3)')
+
+	const updated = { ...first, sessionLabel: () => '110-gmt (Architecture revamp, tab 2)', sessionLabelVersion: 1 }
+	const refreshed: string[] = []
+	renderHistory.renderLines(refreshed, tab(history), 80, updated)
+	expect(refreshed.map(stripAnsi).join('\n')).toContain('110-gmt (Architecture revamp, tab 2)')
 })
