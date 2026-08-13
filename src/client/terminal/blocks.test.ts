@@ -356,14 +356,17 @@ test('rendered block lines without tabs do not embed carriage returns', () => {
 	expect(lines.some((line) => line.includes('\r'))).toBe(false)
 })
 
-test('rendered tool lines expand tabs even when they fit', () => {
+test('rendered hashline tabs preserve source indentation', () => {
 	const block: Block = {
 		type: 'tool',
 		name: 'edit',
-		output: '--- before\n1:abc \tshort\n\n+++ after\n1:def \tshort',
+		output: '--- before\n360:IS6 \tshort\n361:ZUg \t\tnested\n\n+++ after\n360:def \tshort\n361:ghi \t\tnested',
 	}
 
-	expect(blocks.renderBlock(block, 80).some((line) => line.includes('\t'))).toBe(false)
+	const rendered = blocks.renderBlock(block, 80).map(stripAnsi).join('\n')
+	expect(rendered).toContain('− 360:IS6     short')
+	expect(rendered).toContain('− 361:ZUg         nested')
+	expect(rendered).not.toContain('\t')
 })
 
 test('block header uses plain layout without horizontal rules', () => {

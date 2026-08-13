@@ -104,7 +104,9 @@ function formatToolCommand(cmd: string, cols: number, shellContinuations: boolea
 }
 
 function clipLine(line: string, cols: number): string {
-	const expanded = expandTabs(line, blockConfig.tabWidth)
+	const hashline = line.match(/^(.*?\d+:[A-Za-z0-9]+ )(.*)$/)
+	// Hashline metadata is not part of the source column where indentation starts.
+	const expanded = hashline ? `${hashline[1]}${expandTabs(hashline[2]!, blockConfig.tabWidth)}` : expandTabs(line, blockConfig.tabWidth)
 	return visLen(expanded) <= cols ? expanded : clipVisual(expanded, cols)
 }
 
