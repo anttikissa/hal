@@ -232,18 +232,19 @@ writing new content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows.
 Do NOT use `\r\n` here — if the new frame ends on the viewport bottom edge,
 newline scrolls the screen and creates a stray blank row.
 
-### 9. Frame shrinks in fullscreen must NOT clear scrollback
+### 9. Frame shrinks in fullscreen must not erase the display
 
 When the frame shrinks in fullscreen mode, the scrollback/visible boundary
 always shifts. The diff engine cannot patch that in place: patching only the
 bottom rows leaves the old viewport anchored and creates a blank row below the
-help bar. Recover with a visible-screen repaint (`CSI 2J` + `CSI H`) that
-rewrites the full current frame, but **do not emit `CSI 3J`**.
+help bar. Repaint every physical screen row from `CSI H`, erasing each row with
+`CSI 2K` before writing the current visible frame suffix. Do not append a final
+CRLF, because that would scroll the viewport.
 
-`CSI 3J` clears terminal scrollback. In Ghostty/Kitty-like terminals that also
-snaps a user who scrolled up back to the bottom. This was the exact regression:
-streaming output occasionally shrank/reflowed and a fullscreen force repaint
-cleared scrollback while the user was reading earlier text.
+Do **not** emit any `CSI J` erase-display command for this recovery. `CSI 2J`
+makes Ghostty scroll an inspected viewport to bottom; `CSI 3J` additionally
+clears terminal scrollback. Both cause exactly the regression where streaming
+output interrupts a user reading earlier text.
 
 Frame growth in fullscreen is straightforward only when it is a pure append. If
 an existing row also changes, repaint the old visible screen in place first, then

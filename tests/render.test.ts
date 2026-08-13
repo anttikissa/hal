@@ -960,8 +960,7 @@ describe('render', () => {
 			tab.history.splice(0, tab.history.length, { type: 'log', text: 'new' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).toContain('\x1b[2J\x1b[H')
-			expect(output).not.toContain('\x1b[3J')
+			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
 			expect(stripAnsi(output)).toContain('new')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
@@ -983,8 +982,7 @@ describe('render', () => {
 			prompt.setText('one line')
 			const output = captureOutput(() => render.draw())
 
-			expect(output).toContain('\x1b[2J\x1b[H')
-			expect(output).not.toContain('\x1b[3J')
+			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

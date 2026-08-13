@@ -173,17 +173,16 @@ function positionCursor(from: number, target: { row: number; col: number }): str
 // All three end with positionCursor() to place the cursor and update
 // cursorRow/cursorCol. The cursor target is computed ONCE at the top.
 
-function repaintVisibleScreen(lines: string[], cursor: { row: number; col: number }): void {
-	// Recovery repaint for fullscreen frame shrinks that move the viewport
-	// boundary. This intentionally clears only the visible screen, not scrollback:
-	// CSI 3J destroys terminal scroll position and snaps users back to bottom in
-	// Ghostty/Kitty-like terminals while they are reading older output.
-	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}2J${CSI}H`]
-	for (let i = 0; i < lines.length; i++) {
-		if (i > 0) out.push('\r\n')
-		out.push(lines[i]!)
+function repaintVisibleScreen(lines: string[], cursor: { row: number; col: number }, rows: number): void {
+	// A fullscreen shrink moves the frame/scrollback boundary. Repaint every physical
+	// screen row in place: CSI J makes Ghostty scroll an inspected viewport to bottom.
+	const viewportTop = Math.max(0, lines.length - rows)
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}H`]
+	for (let row = 0; row < rows; row++) {
+		if (row > 0) out.push('\r\n')
+		out.push(`${CSI}2K${lines[viewportTop + row] ?? ''}`)
 	}
-	out.push(positionCursor(lines.length - 1, cursor))
+	out.push(positionCursor(rows - 1, cursor))
 	out.push(`${CSI}?2026l`)
 	prevLines = lines
 	writeTerminal(out.join(''))
@@ -269,7 +268,7 @@ function draw(force = false): void {
 	// Patching only the changed bottom rows leaves the old viewport anchored and
 	// produces a blank row below the help bar, so repaint the visible screen.
 	if (fullscreen && frameShrunk && first !== -1) {
-		repaintVisibleScreen(lines, cursor)
+		repaintVisibleScreen(lines, cursor, rows)
 		return
 	}
 	if (fullscreen && frameGrew && lines.length > rows && first >= 0 && first < prevLines.length) {
