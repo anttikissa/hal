@@ -72,7 +72,7 @@ test('spawn_agent passes through fresh mode and subagent-leave-open kind', async
 	}
 
 	const result = await spawnAgent.execute(
-		{ task: 'Research bar', kind: 'subagent-leave-open', mode: 'fresh', model: 'openai/gpt-5', cwd: '/work', title: 'Bar scout' },
+		{ task: 'Research bar', kind: 'subagent-leave-open', mode: 'fresh', model: 'openai/gpt-5.4', cwd: '/work', title: 'Bar scout' },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
 	const spawn = appended[0]?.spawn
@@ -87,10 +87,29 @@ test('spawn_agent passes through fresh mode and subagent-leave-open kind', async
 		task: 'Research bar',
 		kind: 'subagent-leave-open',
 		mode: 'fresh',
-		model: 'openai/gpt-5',
+		model: 'openai/gpt-5.4',
 		cwd: '/work',
 		title: 'Bar scout',
 	})
+})
+
+
+test('spawn_agent rejects an unknown model before reserving a child session', async () => {
+	const stateDir = useTempStateDir()
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+
+	const result = await spawnAgent.execute(
+		{ task: 'Research bar', model: 'openai/gpt-5.6-mini' },
+		{ sessionId: '04-parent', cwd: '/tmp/project' },
+	)
+
+	expect(result).toContain('Unknown model: openai/gpt-5.6-mini')
+	expect(result).toContain('/check')
+	expect(appended).toHaveLength(0)
+	expect(existsSync(`${stateDir}/sessions`)).toBe(false)
 })
 
 test('spawn_agent can open an interactive session without a task', async () => {

@@ -2,6 +2,7 @@ import { ipc } from '../../ipc.ts'
 import type { SpawnCommandData, SpawnKind } from '../../common/protocol.ts'
 import { sessionIds } from '../session/ids.ts'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
+import { models } from '../../common/models.ts'
 
 function normalize(input: unknown, ctx: ToolContext): SpawnCommandData {
 	const raw = toolRegistry.inputObject(input)
@@ -40,6 +41,9 @@ function spawnResult(childSessionId: string, parentSessionId: string, kind: Spaw
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const spec = normalize(input, ctx)
 	if (spec.kind !== 'interactive' && !spec.task) return 'error: task is required unless kind is interactive'
+	if (spec.model && !models.modelCompletionNames().includes(models.resolveModel(spec.model))) {
+		return `error: Unknown model: ${spec.model}. Run /check to update Hal's model metadata, then try again.`
+	}
 	const childSessionId = sessionIds.reserve()
 	const spawn: SpawnCommandData = { ...spec, childSessionId }
 	ipc.appendCommand({
