@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { blocks, type Block } from './blocks.ts'
 import { blockData } from './block-data.ts'
 import { colors } from './colors.ts'
-import { subscriptionUsage } from '../../subscription-usage.ts'
+import { subscriptionUsage } from '../../common/subscription-usage.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -119,8 +119,9 @@ test('multiword status notices also drop marker brackets', () => {
 	expect(lines[0]).not.toContain('[paused before local tools]')
 })
 
-test('usage bars preserve their generated background color only when marked trusted', () => {
-	const bar = subscriptionUsage.usageBar(50, 2)
+test('usage bar markers gain terminal color only when marked trusted', () => {
+	const bar = subscriptionUsage.usageBarMarker(50, 2)
+	expect(bar).not.toContain('\x1b[')
 	const trusted = blocks.renderBlock({ type: 'log', text: bar, usageBars: true }, 80).join('\n')
 	const untrusted = blocks.renderBlock({ type: 'log', text: bar }, 80).join('\n')
 

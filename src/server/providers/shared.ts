@@ -3,7 +3,7 @@
 // Kept separate from providers/provider.ts so concrete providers can use these
 // helpers without creating a cycle back into the lazy provider loader.
 
-import type { Credential } from '../../auth.ts'
+import type { Credential } from '../auth.ts'
 
 const config = {
 	// Generous timeout: chunks normally arrive every ~100ms, but allows for slow starts.

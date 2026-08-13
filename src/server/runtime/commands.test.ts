@@ -3,8 +3,8 @@ import { commands, type SessionState } from './commands.ts'
 import { inbox } from './inbox.ts'
 import { config } from '../../config.ts'
 import { agentLoop } from './agent-loop.ts'
-import { anthropicUsage } from '../../anthropic-usage.ts'
-import { openaiUsage } from '../../openai-usage.ts'
+import { anthropicUsage } from '../anthropic-usage.ts'
+import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../../memory.ts'
 import { models } from '../../common/models.ts'
 import { serverModels } from '../models.ts'
@@ -309,7 +309,7 @@ test('/status hints /login when a provider has no credentials', async () => {
 })
 
 test('/login anthropic returns auth URL on the first call', async () => {
-	const { authLogin } = await import('../../auth-login.ts')
+	const { authLogin } = await import('../auth-login.ts')
 	const result = await commands.executeCommand('/login anthropic', makeSession())
 
 	expect(result.handled).toBe(true)
@@ -325,7 +325,7 @@ test('/login with no provider rejects', async () => {
 })
 
 test('/login anthropic <code> without a pending session errors out', async () => {
-	const { authLogin } = await import('../../auth-login.ts')
+	const { authLogin } = await import('../auth-login.ts')
 	authLogin.state.anthropicPending = null
 	const result = await commands.executeCommand('/login anthropic abc#xyz', makeSession())
 	expect(result.error).toContain('No pending Anthropic login')

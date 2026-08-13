@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { renderStatus } from './render-status.ts'
 import { client } from './app.ts'
-import { openaiUsage } from '../openai-usage.ts'
+import { openaiUsage } from '../server/openai-usage.ts'
 import { promptEdit } from './prompt-edit.ts'
 
 function tab(overrides: any = {}): any {

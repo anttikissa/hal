@@ -3,7 +3,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { models } from '../common/models.ts'
-import { auth } from '../auth.ts'
+import { auth } from './auth.ts'
 import { serverModels } from './models.ts'
 
 const origFetch = globalThis.fetch

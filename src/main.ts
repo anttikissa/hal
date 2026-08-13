@@ -13,7 +13,8 @@ import { log } from './utils/log.ts'
 import { config } from './config.ts'
 import { builtins } from './server/tools/builtins.ts'
 import { colors } from './client/terminal/colors.ts'
-import { openaiUsage } from './openai-usage.ts'
+import { openaiUsage } from './server/openai-usage.ts'
+import { anthropicUsage } from './server/anthropic-usage.ts'
 import { startup } from './startup.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './client/terminal/args.ts'
@@ -45,6 +46,8 @@ colors.init()
 perf.mark('Colors initialized')
 openaiUsage.init()
 perf.mark('OpenAI usage initialized')
+anthropicUsage.init()
+perf.mark('Anthropic usage initialized')
 builtins.init()
 perf.mark('Built-in tools registered')
 

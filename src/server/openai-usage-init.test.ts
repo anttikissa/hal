@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { openaiUsage } from './openai-usage.ts'
-import { liveFiles } from './utils/live-file.ts'
+import { liveFiles } from '../utils/live-file.ts'
 
 test('openaiUsage.init loads lazily and only once', () => {
 	const runtime = (openaiUsage as any).runtime

@@ -1,7 +1,7 @@
 // Model metadata infrastructure: models.dev cache, refresh, credentials, and context limits.
 
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { auth } from '../auth.ts'
+import { auth } from './auth.ts'
 import { models } from '../common/models.ts'
 import { STATE_DIR, ensureDir } from '../state.ts'
 import { ason } from '../utils/ason.ts'

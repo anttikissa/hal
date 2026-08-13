@@ -8,8 +8,8 @@
 
 import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '../../common/protocol.ts'
 import { providerShared } from './shared.ts'
-import { auth } from '../../auth.ts'
-import { anthropicUsage } from '../../anthropic-usage.ts'
+import { auth } from '../auth.ts'
+import { anthropicUsage } from '../anthropic-usage.ts'
 import { STATE_DIR } from '../../state.ts'
 import { appendFileSync } from 'node:fs'
 

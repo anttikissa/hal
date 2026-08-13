@@ -1,11 +1,11 @@
 // OpenAI ChatGPT subscription usage via chatgpt.com/backend-api/wham/usage.
 
 import { auth, type Credential } from './auth.ts'
-import { ipc } from './ipc.ts'
-import { STATE_DIR } from './state.ts'
-import { liveFiles } from './utils/live-file.ts'
-import { subscriptionUsage } from './subscription-usage.ts'
-import { time } from './utils/time.ts'
+import { ipc } from '../ipc.ts'
+import { STATE_DIR } from '../state.ts'
+import { liveFiles } from '../utils/live-file.ts'
+import { subscriptionUsage } from '../common/subscription-usage.ts'
+import { time } from '../utils/time.ts'
 
 const CACHE_PATH = `${STATE_DIR}/openai-usage.ason`
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -177,7 +177,7 @@ function displaySlot(account: AccountUsage): string {
 }
 
 function usageBar(usedPercent: number): string {
-	return subscriptionUsage.usageBar(usedPercent, config.progressBarWidth)
+	return subscriptionUsage.usageBarMarker(usedPercent, config.progressBarWidth)
 }
 
 function formatWindowText(window: UsageWindow | undefined): string {

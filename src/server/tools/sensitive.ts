@@ -88,7 +88,7 @@ function commandMentionsProtectedPath(command: string): boolean {
 function evalMentionsProtectedAccess(code: string): boolean {
 	const lower = code.toLowerCase()
 	if (commandMentionsProtectedPath(code)) return true
-	if (lower.includes('/src/auth.ts') || lower.includes('~/auth.ts') || lower.includes('../auth.ts')) return true
+	if (lower.includes('/src/server/auth.ts') || lower.includes('~/server/auth.ts') || lower.includes('../auth.ts')) return true
 	if (lower.includes('auth.getcredential') || lower.includes('auth.listcredentials') || lower.includes('auth.getentry')) return true
 	return false
 }

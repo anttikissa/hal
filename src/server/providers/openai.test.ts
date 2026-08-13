@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { auth, type Credential } from '../../auth.ts'
+import { auth, type Credential } from '../auth.ts'
 import { createCompatProvider, openai, openaiProvider } from './openai.ts'
 import { providerShared } from './shared.ts'
 

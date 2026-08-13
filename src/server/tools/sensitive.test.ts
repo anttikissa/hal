@@ -60,9 +60,11 @@ test('bash refuses obvious auth access requests before spawning a shell', async 
 })
 
 test('eval refuses obvious auth access code', async () => {
-	const out = await evalTool.execute({ code: `return Bun.file('${protectedPath}').text()` }, { sessionId: 's', cwd: HAL_DIR })
+	const fileOut = await evalTool.execute({ code: `return Bun.file('${protectedPath}').text()` }, { sessionId: 's', cwd: HAL_DIR })
+	const moduleOut = await evalTool.execute({ code: "return require('~/server/auth.ts').auth.store()" }, { sessionId: 's', cwd: HAL_DIR })
 
-	expect(out).toContain('refusing to run eval code that mentions protected credentials access')
+	expect(fileOut).toContain('refusing to run eval code that mentions protected credentials access')
+	expect(moduleOut).toContain('refusing to run eval code that mentions protected credentials access')
 })
 
 test('sensitive shell profile denies the protected path when present without reading it', () => {

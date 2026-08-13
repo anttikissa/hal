@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
 import { openaiUsage } from './openai-usage.ts'
-import { subscriptionUsage } from './subscription-usage.ts'
+import { subscriptionUsage } from '../common/subscription-usage.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
@@ -108,12 +108,11 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 
 	expect(text).toContain('OpenAI subscriptions:')
 	expect(text).toContain('| Slot | Account | 5h | 7d |')
-	expect(text).toContain('| 1/2 | a@test.com (plus) | \x1b[48;2')
+	expect(text).toContain(`| 1/2 | a@test.com (plus) | ${subscriptionUsage.usageBarMarker(20, 14)}`)
 	expect(text).toContain('<br>20% used (resets ')
-	expect(text).toContain('| 2/2 * | b@test.com (plus) | \x1b[48;2')
+	expect(text).toContain(`| 2/2 * | b@test.com (plus) | ${subscriptionUsage.usageBarMarker(21, 14)}`)
 	expect(text).toContain('<br>61% used (resets ')
-	expect(/[▁▂▃▄▅▆▇]/.test(text)).toBe(true)
-	expect(text).not.toContain('▌')
+	expect(text).not.toContain('\x1b[')
 })
 
 test('refreshAll drops cached rows for old credential keys', async () => {
@@ -225,8 +224,7 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
 	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
 	expect(text).toContain('l\\*\\*\\*@g\\*\\*\\*\\*.com')
-	expect(text).toContain('| 1/3 * | a\\*\\*\\*@l\\*\\*\\*.fi (plus) | \x1b[48;2')
+	expect(text).toContain(`| 1/3 * | a\\*\\*\\*@l\\*\\*\\*.fi (plus) | ${subscriptionUsage.usageBarMarker(68, 14)}`)
 	expect(text).toContain('<br>68% used (resets ')
-	expect(/[▁▂▃▄▅▆▇]/.test(text)).toBe(true)
-	expect(text).not.toContain('▌')
+	expect(text).not.toContain('\x1b[')
 })

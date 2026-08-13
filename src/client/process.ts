@@ -1,5 +1,5 @@
 import { ipc } from '../ipc.ts'
-import { openaiUsage } from '../openai-usage.ts'
+import { openaiUsage } from '../server/openai-usage.ts'
 import { STATE_DIR } from '../state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { log } from '../utils/log.ts'

@@ -1,7 +1,7 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { auth, type Credential } from './auth.ts'
 import { anthropicUsage } from './anthropic-usage.ts'
-import { subscriptionUsage } from './subscription-usage.ts'
+import { subscriptionUsage } from '../common/subscription-usage.ts'
 
 const origFetch = globalThis.fetch
 const origListCredentials = auth.listCredentials
@@ -17,6 +17,10 @@ function makeCredential(index: number, email: string): Credential {
 		_key: `anthropic:${index}`,
 	}
 }
+
+beforeEach(() => {
+	anthropicUsage.init()
+})
 
 afterEach(() => {
 	globalThis.fetch = origFetch
@@ -78,9 +82,9 @@ test('refreshAll caches all accounts and status text marks the current one', asy
 
 	expect(text).toContain('Anthropic subscriptions:')
 	expect(text).toContain('| Slot | Account | 5h | 7d | Sonnet 7d |')
-	expect(text).toContain('| 1/2 | a@test.com | \x1b[48;2')
+	expect(text).toContain(`| 1/2 | a@test.com | ${subscriptionUsage.usageBarMarker(20, 14)}`)
 	expect(text).toContain('<br>20% used')
-	expect(text).toContain('| 2/2 * | b@test.com | \x1b[48;2')
+	expect(text).toContain(`| 2/2 * | b@test.com | ${subscriptionUsage.usageBarMarker(21, 14)}`)
 	expect(text).toContain('<br>61% used')
 	expect(text).toContain('<br>11% used')
 })
@@ -150,5 +154,5 @@ test('formatStatusText can censor emails for screenshot-safe output', () => {
 
 	expect(text).toContain('a\\*\\*\\*@l\\*\\*\\*.fi')
 	expect(text).toContain('a\\*\\*\\*@g\\*\\*\\*\\*.com')
-	expect(text).toContain('| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | \x1b[48;2')
+	expect(text).toContain(`| 1/2 * | a\\*\\*\\*@l\\*\\*\\*.fi | ${subscriptionUsage.usageBarMarker(68, 14)}`)
 })

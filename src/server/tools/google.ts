@@ -4,7 +4,7 @@
 // Returns organic results with title, link, and snippet for each hit.
 
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
-import { auth } from '../../auth.ts'
+import { auth } from '../auth.ts'
 
 const SERPER_URL = 'https://google.serper.dev/search'
 
