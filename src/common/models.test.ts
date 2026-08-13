@@ -97,6 +97,22 @@ test('model picker lists Grok 4.5 and 4.6 and ranks 4.6 above 4.20', () => {
 	expect(models.resolveModel('grok')).toBe('openrouter/x-ai/grok-4.6')
 	expect(models.resolveModel('grok-4.5')).toBe('openrouter/x-ai/grok-4.5')
 })
+test('model picker lists new open-weight OpenRouter aliases', () => {
+	expect(models.resolveModel('deepseek')).toBe('openrouter/deepseek/deepseek-v3.2')
+	expect(models.resolveModel('deepseek-4')).toBe('openrouter/deepseek/deepseek-v4-pro')
+	expect(models.resolveModel('qwen')).toBe('openrouter/qwen/qwen3-max')
+	expect(models.resolveModel('qwen-coder')).toBe('openrouter/qwen/qwen3-coder')
+	expect(models.resolveModel('kimi')).toBe('openrouter/moonshotai/kimi-k3')
+	expect(models.resolveModel('glm')).toBe('openrouter/z-ai/glm-5.2')
+	expect(models.resolveModel('minimax')).toBe('openrouter/minimax/minimax-m3')
+	expect(models.resolveModel('mistral')).toBe('openrouter/mistralai/mistral-large-2512')
+	const values = models.listModelChoices().map((item) => item.value)
+	for (const value of ['deepseek', 'deepseek-4', 'qwen', 'qwen-coder', 'kimi', 'glm', 'minimax', 'mistral', 'llama']) {
+		expect(values).toContain(value)
+	}
+})
+
+
 
 
 

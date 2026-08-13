@@ -40,8 +40,15 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.6', fallbackContext: 2_000_000, track: 'grok' },
 	{ group: 'OpenRouter', alias: 'grok-4.5', fullId: 'openrouter/x-ai/grok-4.5', fallbackContext: 2_000_000 },
 	{ group: 'OpenRouter', alias: 'grok-4.20', fullId: 'openrouter/x-ai/grok-4.20', fallbackContext: 2_000_000 },
-	{ group: 'OpenRouter', alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-chat' },
+	{ group: 'OpenRouter', alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-v3.2' },
+	{ group: 'OpenRouter', alias: 'deepseek-4', fullId: 'openrouter/deepseek/deepseek-v4-pro', fallbackContext: 1_000_000 },
 	{ group: 'OpenRouter', alias: 'llama', fullId: 'openrouter/meta-llama/llama-4-maverick' },
+	{ group: 'OpenRouter', alias: 'qwen', fullId: 'openrouter/qwen/qwen3-max' },
+	{ group: 'OpenRouter', alias: 'qwen-coder', fullId: 'openrouter/qwen/qwen3-coder', fallbackContext: 1_000_000 },
+	{ group: 'OpenRouter', alias: 'kimi', fullId: 'openrouter/moonshotai/kimi-k3', fallbackContext: 1_000_000 },
+	{ group: 'OpenRouter', alias: 'glm', fullId: 'openrouter/z-ai/glm-5.2', fallbackContext: 1_000_000 },
+	{ group: 'OpenRouter', alias: 'minimax', fullId: 'openrouter/minimax/minimax-m3', fallbackContext: 1_000_000 },
+	{ group: 'OpenRouter', alias: 'mistral', fullId: 'openrouter/mistralai/mistral-large-2512', fallbackContext: 262_144 },
 ]
 
 // Pattern-based alias: opus-X → anthropic/claude-opus-X, etc.
