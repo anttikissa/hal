@@ -7,6 +7,28 @@ function project(events: LiveEvent[]): LiveBlock[] {
 	return blocks
 }
 
+test('projects prompt events as user blocks', () => {
+	const result = liveEventBlocks.reduce([], {
+		type: 'prompt',
+		sessionId: 'session-1',
+		text: 'shown',
+		actualText: 'expanded',
+		source: 'inbox',
+		sourceTab: 2,
+		label: 'queued',
+		createdAt: '2026-08-13T08:59:00.000Z',
+	})
+	expect(result.blocks).toEqual([{
+		type: 'user',
+		text: 'shown',
+		actualText: 'expanded',
+		source: 'inbox',
+		sourceTab: 2,
+		status: 'queued',
+		ts: Date.parse('2026-08-13T08:59:00.000Z'),
+	}])
+})
+
 describe('live event block projection', () => {
 	test('projects the same event sequence deterministically', () => {
 		const events: LiveEvent[] = [

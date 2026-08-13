@@ -76,6 +76,15 @@ export interface LiveEventBase {
 	createdAt?: string
 }
 
+export interface PromptEvent extends LiveEventBase {
+	type: 'prompt'
+	text: string
+	actualText?: string
+	label?: 'steering' | 'queued'
+	source?: string
+	sourceTab?: number
+}
+
 export interface StreamStartEvent extends LiveEventBase {
 	type: 'stream-start'
 }
@@ -140,7 +149,7 @@ export interface ToolConfirmRequestEvent extends LiveEventBase {
 	body: string[]
 }
 
-export type LiveEvent = StreamStartEvent | StreamDeltaEvent | StreamEndEvent | ToolCallEvent | ToolResultEvent | ToolConfirmRequestEvent | InfoEvent | ResponseEvent
+export type LiveEvent = PromptEvent | StreamStartEvent | StreamDeltaEvent | StreamEndEvent | ToolCallEvent | ToolResultEvent | ToolConfirmRequestEvent | InfoEvent | ResponseEvent
 
 export interface LiveProjectionOptions {
 	sessionId?: string
@@ -179,6 +188,17 @@ function appendBlock(blocks: readonly LiveBlock[], block: LiveBlock): LiveProjec
 function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LiveProjectionOptions = {}): LiveProjectionResult {
 	const sessionId = event.sessionId ?? options.sessionId
 	const ts = liveEventBlocks.timestamp(event)
+
+	if (event.type === 'prompt') {
+		const closed = liveEventBlocks.closeStreamingBlock(blocks).blocks
+		const block: LiveUserBlock = { type: 'user', text: event.text }
+		if (event.actualText) block.actualText = event.actualText
+		if (event.source) block.source = event.source
+		if (event.sourceTab !== undefined) block.sourceTab = event.sourceTab
+		if (event.label) block.status = event.label
+		if (ts !== undefined) block.ts = ts
+		return liveEventBlocks.appendBlock(closed, block)
+	}
 
 	if (event.type === 'stream-start') return liveEventBlocks.closeStreamingBlock(blocks)
 

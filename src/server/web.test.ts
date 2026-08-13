@@ -41,3 +41,35 @@ test('session snapshot exposes typed history and live blocks without lossy mappi
 		sessions.loadLive = originalLoadLive
 	}
 })
+
+test('websocket live messages preserve complete typed events', () => {
+	const event = {
+		type: 'tool-result' as const,
+		sessionId: '04-work',
+		toolId: 'tool-1',
+		output: 'done',
+		blobId: 'blob-1',
+		phase: 'done' as const,
+		createdAt: '2026-08-13T12:00:01.000Z',
+	}
+	expect(web.liveEventMessage(event)).toEqual({ type: 'event', event })
+	expect(web.liveEventMessage({ type: 'history-rebased', sessionId: '04-work' })).toBeNull()
+	expect(web.liveEventMessage({ type: 'prompt', sessionId: '04-work', text: 'hello' })).toEqual({
+		type: 'event',
+		event: { type: 'prompt', sessionId: '04-work', text: 'hello' },
+	})
+})
+
+test('websocket snapshots refresh only at persisted-history boundaries', () => {
+	expect(web.isSnapshotBoundary({ type: 'prompt', sessionId: '04-work' })).toBe(false)
+	expect(web.isSnapshotBoundary({ type: 'stream-end', sessionId: '04-work' })).toBe(true)
+	expect(web.isSnapshotBoundary({ type: 'history-rebased', sessionId: '04-work' })).toBe(true)
+	expect(web.isSnapshotBoundary({ type: 'stream-delta', sessionId: '04-work' })).toBe(false)
+})
+
+test('websocket subscription parser accepts only a valid open-session request', () => {
+	expect(web.parseClientMessage(JSON.stringify({ type: 'subscribe', sessionId: '04-work' }))).toEqual({ type: 'subscribe', sessionId: '04-work' })
+	expect(web.parseClientMessage(JSON.stringify({ type: 'subscribe', sessionId: '' }))).toBeNull()
+	expect(web.parseClientMessage(JSON.stringify({ type: 'other', sessionId: '04-work' }))).toBeNull()
+	expect(web.parseClientMessage('not json')).toBeNull()
+})

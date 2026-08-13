@@ -300,16 +300,6 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
 		return
 	}
-	ipc.appendEvent({
-		type: 'prompt',
-		text: displayText ?? text,
-		actualText: displayText && displayText !== text ? text : undefined,
-		label,
-		source,
-		sourceTab,
-		sessionId,
-		createdAt: new Date().toISOString(),
-	})
 	await runGeneration(sessionId, text, source, displayText, pending, sourceTab, label)
 }
 
@@ -498,14 +488,28 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 	if (text) {
 		const pendingTools = sessionStore.findPendingTools(sessionId)
 		if (pendingTools) sessionStore.resolvePendingTools(sessionId, pendingTools.id)
+		const parts = await resolvePromptParts(sessionId, text, displayText)
+		const createdAt = new Date().toISOString()
 		sessionStore.appendHistory(sessionId, [{
 			type: 'user',
-			parts: await resolvePromptParts(sessionId, text, displayText),
+			parts,
 			source,
 			sourceTab,
 			status: label,
-			ts: new Date().toISOString(),
+			ts: createdAt,
 		}])
+		// Persist before publishing so snapshots taken in response to this event
+		// always include the prompt that caused it.
+		ipc.appendEvent({
+			type: 'prompt',
+			text: displayText ?? text,
+			actualText: displayText && displayText !== text ? text : undefined,
+			label,
+			source,
+			sourceTab,
+			sessionId,
+			createdAt,
+		})
 	}
 	const messages = apiMessages.toProviderMessages(sessionId)
 	ipc.appendEvent({ type: 'stream-start', sessionId, createdAt: new Date().toISOString() })
