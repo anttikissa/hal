@@ -83,6 +83,16 @@ function formatAfterRef(ref: HashlineRef | '0:000'): string {
 	return ref === '0:000' ? ref : `${ref.line}:${ref.hash}`
 }
 
+function relocateRef(lines: string[], ref: HashlineRef): HashlineRef | null {
+	let line = 0
+	for (let i = 0; i < lines.length; i++) {
+		if (hashline.hashLine(lines[i]!) !== ref.hash) continue
+		if (line) return null // Repeated lines are ambiguous; never guess which one the model meant.
+		line = i + 1
+	}
+	return line ? { ...ref, line } : null
+}
+
 function planReplaceTrackerUpdate(sessionId: string, path: string, currentStartLine: number, currentEndLine: number, newLineCount: number): TrackerUpdate {
 	if (!editTracker.has(sessionId, path)) return { kind: 'skip' }
 	const baseRange = editTracker.mapCurrentRangeToBase(sessionId, path, currentStartLine, currentEndLine)
@@ -124,17 +134,16 @@ function resolveReplace(lines: string[], sessionId: string, path: string, startR
 	if (rawError.startsWith('error: start line')) return rawError
 
 	const mapped = editTracker.mapBaseRangeToCurrent(sessionId, path, start.line, end.line)
-	if (!mapped) return staleRefError(lines, rawError, start.line, end.line)
-
-	const mappedStart = { line: mapped.startLine, hash: start.hash }
-	const mappedEnd = { line: mapped.endLine, hash: end.hash }
+	const mappedStart = mapped ? { line: mapped.startLine, hash: start.hash } : relocateRef(lines, start)
+	const mappedEnd = mapped ? { line: mapped.endLine, hash: end.hash } : relocateRef(lines, end)
+	if (!mappedStart || !mappedEnd) return staleRefError(lines, rawError, start.line, end.line)
 	const mappedError = validateReplaceRange(lines, mappedStart, mappedEnd)
 	if (mappedError) return staleRefError(lines, rawError, start.line, end.line)
 
 	return {
 		currentStart: mappedStart,
 		currentEnd: mappedEnd,
-		trackerUpdate: { kind: 'replace', start: start.line, end: end.line, newLineCount },
+		trackerUpdate: planReplaceTrackerUpdate(sessionId, path, mappedStart.line, mappedEnd.line, newLineCount),
 		remapNotice: `Line numbers changed; edit accepted as ${formatRangeRef(mappedStart, mappedEnd)}.`,
 	}
 }
@@ -161,15 +170,14 @@ function resolveInsert(lines: string[], sessionId: string, path: string, afterRe
 	}
 
 	const mappedLine = editTracker.mapBaseLineToCurrent(sessionId, path, after.line)
-	if (mappedLine === null) return staleRefError(lines, rawError, after.line)
-
-	const mappedAfter = { line: mappedLine, hash: after.hash }
+	const mappedAfter = mappedLine === null ? relocateRef(lines, after) : { line: mappedLine, hash: after.hash }
+	if (!mappedAfter) return staleRefError(lines, rawError, after.line)
 	const mappedError = hashline.validateRef(mappedAfter, lines)
 	if (mappedError) return staleRefError(lines, rawError, after.line)
 
 	return {
 		currentAfter: mappedAfter,
-		trackerUpdate: { kind: 'insert', afterLine: after.line, newLineCount },
+		trackerUpdate: planInsertTrackerUpdate(sessionId, path, mappedAfter.line, newLineCount),
 		remapNotice: `Line numbers changed; edit accepted after ${formatAfterRef(mappedAfter)}.`,
 	}
 }

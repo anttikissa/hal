@@ -51,6 +51,21 @@ describe('editRemap', () => {
 		expect(replaceTwo.resultLines).toEqual(['top', 'one', 'TWO', 'three', 'four'])
 	})
 
+	test('relocates a unique stale hash when restart lost the tracker', () => {
+		const oldRef = `2:${hashline.hashLine('two')}`
+		const edit = requirePrepared(editRemap.prepareEdit({
+			lines: ['top', 'one', 'two'],
+			sessionId,
+			path,
+			operation: 'replace',
+			startRef: oldRef,
+			endRef: oldRef,
+			newContent: 'TWO',
+		}))
+
+		expect(edit.resultLines).toEqual(['top', 'one', 'TWO'])
+	})
+
 	test('remaps insert refs after earlier inserts shift line numbers', () => {
 		editTracker.resetForRead(sessionId, path)
 		let lines = ['one', 'two', 'three']
@@ -126,17 +141,5 @@ describe('editRemap', () => {
 		lines = replaceTop.resultLines
 		editRemap.applyTrackerUpdate(sessionId, path, replaceTop.trackerUpdate)
 		expect(editTracker.has(sessionId, path)).toBe(false)
-
-		const staleBaseRef = `2:${hashline.hashLine('two')}`
-		const staleResult = editRemap.prepareEdit({
-			lines,
-			sessionId,
-			path,
-			operation: 'replace',
-			startRef: staleBaseRef,
-			endRef: staleBaseRef,
-			newContent: 'TWO',
-		})
-		expect(staleResult).toContain('Hash mismatch')
 	})
 })
