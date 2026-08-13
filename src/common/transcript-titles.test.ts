@@ -1,0 +1,13 @@
+import { expect, test } from 'bun:test'
+import { transcriptTitles } from './transcript-titles.ts'
+
+test("transcript titles use the terminal's time and model vocabulary", () => {
+	expect(transcriptTitles.label({ type: 'assistant', text: 'Done', model: 'openai/gpt-5.6-sol', ts: '2026-08-13T15:17:00.000Z' })).toBe('15:17 Hal (GPT 5.6 Sol)')
+	expect(transcriptTitles.label({ type: 'thinking', text: 'Checking', model: 'openai/gpt-5.6-terra', thinkingEffort: 'high', ts: '2026-08-13T15:11:00.000Z' })).toBe('15:11 Hal (GPT 5.6 Terra, thinking high)')
+})
+
+test('transcript titles name tools and terminal-style notices', () => {
+	expect(transcriptTitles.label({ type: 'tool', name: 'bash', ts: Date.parse('2026-08-13T15:11:00.000Z') })).toBe('15:11 Bash')
+	expect(transcriptTitles.label({ type: 'log', text: 'Prompt queued\n/model sol', ts: '2026-08-13T15:09:00.000Z' })).toBe('15:09 Prompt queued')
+	expect(transcriptTitles.label({ type: 'info', text: 'model: old -> new', ts: '2026-08-13T15:10:00.000Z' })).toBe('15:10 System')
+})

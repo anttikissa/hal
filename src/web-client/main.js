@@ -1,18 +1,32 @@
 const tabs = document.querySelector('#tabs')
+import { transcriptTitles } from '../common/transcript-titles.ts'
 const messages = document.querySelector('#messages')
 const form = document.querySelector('#form')
 const prompt = document.querySelector('#prompt')
 let selected = ''
 
-function add(type, text) {
+function add(item, text) {
 	const article = document.createElement('article')
-	article.className = type
+	article.className = item.type
 	const label = document.createElement('label')
-	label.textContent = type
+	label.textContent = transcriptTitles.label(item)
 	const body = document.createElement('div')
 	body.textContent = text
 	article.append(label, body)
 	messages.append(article)
+}
+
+function valueText(value) {
+	if (typeof value === 'string') return value
+	if (value === undefined) return ''
+	return JSON.stringify(value, null, 2)
+}
+
+function toolText(item) {
+	if (typeof item.input?.command === 'string') return item.input.command
+	if (typeof item.input?.code === 'string') return item.input.code
+	if (item.input !== undefined) return valueText(item.input)
+	return valueText(item.output)
 }
 
 function historyText(entry) {
@@ -23,6 +37,8 @@ function historyText(entry) {
 		}
 		return parts.join('\n')
 	}
+	if (entry.type === 'thinking') return entry.text ?? ''
+	if (entry.type === 'tool_call' || entry.type === 'tool_result') return toolText(entry)
 	if (entry.type === 'assistant' || entry.type === 'info' || entry.type === 'log' || entry.type === 'warning' || entry.type === 'error') {
 		return typeof entry.text === 'string' ? entry.text : ''
 	}
@@ -30,7 +46,7 @@ function historyText(entry) {
 }
 
 function addIfText(item, text) {
-	if (text) add(item.type, text)
+	if (text) add(item, text)
 }
 
 async function refresh() {
@@ -40,7 +56,7 @@ async function refresh() {
 	const data = await response.json()
 	messages.replaceChildren()
 	for (const entry of data.history) addIfText(entry, historyText(entry))
-	for (const block of data.live) addIfText(block, block.text)
+	for (const block of data.live) addIfText(block, block.type === 'tool' ? toolText(block) : block.text)
 	messages.scrollTop = messages.scrollHeight
 }
 
