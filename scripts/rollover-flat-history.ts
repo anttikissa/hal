@@ -89,7 +89,6 @@ function migrateFlatEntry(entry: any): any[] {
 				text: entry.text,
 				model: entry.model,
 				id: entry.id,
-				continue: entry.continue,
 				usage: entry.usage,
 				ts: entry.ts,
 			})]

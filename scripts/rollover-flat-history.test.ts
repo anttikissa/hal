@@ -28,7 +28,7 @@ test('migrateHistoryEntries converts legacy history to flat entries', () => {
 		},
 		{ type: 'assistant', text: 'hello ', id: 'xyz-123', ts },
 		{ type: 'info', text: 'system.md reloaded', ts },
-		{ type: 'assistant', text: 'world', continue: 'xyz-123', ts },
+		{ type: 'assistant', text: 'world', ts },
 	]
 
 	expect(migrateHistoryEntries(entries)).toEqual([
@@ -40,7 +40,7 @@ test('migrateHistoryEntries converts legacy history to flat entries', () => {
 		{ type: 'thinking', blobId: '000ccc-333', provider: 'anthropic', ts },
 		{ type: 'assistant', text: 'hello ', id: 'xyz-123', ts },
 		{ type: 'log', text: 'system.md reloaded', ts },
-		{ type: 'assistant', text: 'world', continue: 'xyz-123', ts },
+		{ type: 'assistant', text: 'world', ts },
 	])
 })
 
