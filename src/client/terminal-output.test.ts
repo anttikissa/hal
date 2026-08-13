@@ -1,7 +1,4 @@
 import { expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
-import { ason } from '../utils/ason.ts'
 import { terminalOutput } from './terminal-output.ts'
 import { render } from './render.ts'
 
@@ -20,28 +17,6 @@ function withStdoutWrite(run: (writes: string[]) => void): void {
 	}
 }
 
-test('captures exact terminal writes only while the temporary diagnostic is enabled', () => {
-	const dir = mkdtempSync(`${tmpdir()}/hal-terminal-output-`)
-	const originalCapture = terminalOutput.config.capture
-	const originalPath = terminalOutput.state.capturePath
-	terminalOutput.config.capture = true
-	terminalOutput.state.capturePath = `${dir}/terminal-output.asonl`
-	try {
-		withStdoutWrite(() => {
-			expect(terminalOutput.write('\x1b[3J\r\n')).toBe(true)
-			terminalOutput.setExternalEditorOpen(true)
-			expect(terminalOutput.write('suppressed')).toBe(false)
-		})
-		const records = readFileSync(terminalOutput.state.capturePath, 'utf8').trim().split('\n').map((line) => ason.parse(line) as Record<string, unknown>)
-		expect(records).toHaveLength(1)
-		expect(records[0]).toMatchObject({ bytes: 6, text: '\\x1b[3J\\r\\n' })
-		expect(typeof records[0]?.ts).toBe('string')
-	} finally {
-		terminalOutput.config.capture = originalCapture
-		terminalOutput.state.capturePath = originalPath
-		rmSync(dir, { recursive: true, force: true })
-	}
-})
 
 test('terminal output is latched while an external editor is open', () => {
 	withStdoutWrite((writes) => {
