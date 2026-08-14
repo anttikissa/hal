@@ -7,7 +7,7 @@ import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
 import { client } from './client/app.ts'
 import { clientBackend, type SubscriptionStatus } from './client/backend.ts'
-import { memory } from './memory.ts'
+import { memory } from './server/memory.ts'
 import { version } from './version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
@@ -87,6 +87,7 @@ clientBackend.install({
 		onChange: (callback) => openaiUsage.onChange(callback),
 	},
 })
+memory.io.addEntry = (text, type) => client.addEntry(text, type)
 builtins.init()
 perf.mark('Built-in tools registered')
 

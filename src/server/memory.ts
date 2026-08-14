@@ -3,10 +3,9 @@
 // them without editing code.
 
 import { appendFileSync, mkdirSync } from 'fs'
-import { client } from './client/app.ts'
-import { STATE_DIR } from './state.ts'
-import { ason } from './utils/ason.ts'
-import { log } from './utils/log.ts'
+import { STATE_DIR } from '../state.ts'
+import { ason } from '../utils/ason.ts'
+import { log } from '../utils/log.ts'
 
 const config = {
 	warnBytes: 1_500_000_000,
@@ -26,9 +25,7 @@ const DIAGNOSTIC_PATH = `${STATE_DIR}/oom.asonl`
 
 const io = {
 	readRss: (): number => process.memoryUsage().rss,
-	addEntry: (text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log'): void => {
-		client.addEntry(text, type)
-	},
+	addEntry: (_text: string, _type: 'log' | 'info' | 'warning' | 'error' = 'log'): void => {},
 	scheduleExit: (delayMs: number): void => {
 		setTimeout(() => process.exit(0), delayMs)
 	},
