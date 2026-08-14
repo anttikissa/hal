@@ -26,8 +26,16 @@ test('hal exits when piped stdin closes', async () => {
 			HOME: process.env.HOME,
 		},
 	})
+	const reader = proc.stdout!.getReader()
 	try {
-		await Bun.sleep(150)
+		// Under the full parallel suite startup can take longer than the old 150ms
+		// sleep. Closing stdin before the terminal has installed its reader tests a
+		// process-start race, not EOF handling.
+		const ready = await Promise.race([
+			reader.read(),
+			Bun.sleep(5_000).then(() => 'timeout' as const),
+		])
+		expect(ready).not.toBe('timeout')
 		proc.stdin!.end()
 		const code = await Promise.race([
 			proc.exited,
@@ -35,6 +43,7 @@ test('hal exits when piped stdin closes', async () => {
 		])
 		expect(code).not.toBe('timeout')
 	} finally {
+		await reader.cancel()
 		await cleanup(proc)
 		rmSync(stateDir, { recursive: true, force: true })
 	}
