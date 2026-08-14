@@ -14,6 +14,10 @@ function pageHtml(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
 }
 
+function styleCss(): Promise<string> {
+	return Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
+}
+
 
 function openSession(sessionId: string): boolean {
 	return ipc.readState().sessions.some((session) => session.id === sessionId)
@@ -128,6 +132,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 				fetch: async (request, server) => {
 					const url = new URL(request.url)
 					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+					if (url.pathname === '/styles.css') return new Response(await web.styleCss(), { headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' } })
 					if (url.pathname === '/main.js') {
 						try { return new Response(await bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } }) }
 						catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
@@ -190,6 +195,7 @@ export const web = {
 	nextPort,
 	announce,
 	pageHtml,
+	styleCss,
 	bundleClient,
 	hydrateHistory,
 	sessionSnapshot,

@@ -1,0 +1,50 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #111; color: #eee; }
+
+.SessionTabs > button, .PromptComposer > button, .PromptComposer > input { font: inherit; padding: 8px; background: #222; color: inherit; border: 1px solid #555; }
+.SessionTabs > button, .PromptComposer > button { cursor: pointer; }
+
+.SessionTabs {
+	position: fixed;
+	z-index: 1;
+	top: 0;
+	left: 0;
+	right: 0;
+	display: flex;
+	gap: 8px;
+	padding: 12px;
+	overflow-x: auto;
+	white-space: nowrap;
+	background: #111;
+	border-bottom: 1px solid #444;
+}
+.SessionTabs > button { flex: none; }
+.SessionTabs > button.selected { background: #456; }
+
+.Transcript {
+	max-width: 900px;
+	margin: 0 auto;
+	padding: 78px 12px 76px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.TranscriptItem { padding: 10px 0; border-bottom: 1px solid #333; }
+.TranscriptItem.user { color: #9cf; }
+.TranscriptItem.assistant { color: #eee; }
+.TranscriptItem.info { color: #aaa; }
+.TranscriptItem > label { font-size: 12px; color: #aaa; }
+
+.PromptComposer {
+	position: fixed;
+	z-index: 1;
+	bottom: 0;
+	left: 50%;
+	width: min(100%, 900px);
+	transform: translateX(-50%);
+	display: flex;
+	gap: 8px;
+	padding: 12px;
+	background: #111;
+	border-top: 1px solid #444;
+}
+.PromptComposer > input { flex: 1; min-width: 0; }

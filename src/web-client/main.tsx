@@ -1,84 +1,20 @@
-import { createEffect, createMemo, createSignal, For, onSettled } from 'solid-js'
+import { createMemo, createSignal, onSettled } from 'solid-js'
 import { render } from '@solidjs/web'
-import type { HistoryEntry } from '../common/history.ts'
-import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
-import type { LiveBlock } from '../common/live-event-blocks.ts'
+import type { SharedState } from '../common/ipc.ts'
 import type { ClientSessionSnapshot } from '../common/snapshots.ts'
-import { transcriptTitles } from '../common/transcript-titles.ts'
 import { webMessages, type WebServerMessage } from '../common/web.ts'
-import { webPresentation } from './presentation.ts'
-
-type TranscriptItem = HistoryEntry | LiveBlock
-type RenderedItem = { item: TranscriptItem; text: string }
-
-type SessionTabsProps = {
-	sessions: SharedSessionInfo[]
-	selected: string
-	onSelect: (sessionId: string) => void
-}
-
-type MessageProps = {
-	item: TranscriptItem
-	text: string
-}
-
-function historyText(item: TranscriptItem): string {
-	if (item.type === 'user') {
-		if (!('parts' in item)) return item.text
-		const parts: string[] = []
-		for (const part of item.parts) {
-			if (part.type === 'text') parts.push(part.displayText ?? part.text)
-		}
-		return parts.join('\n')
-	}
-	if (item.type === 'thinking') return item.text ?? ''
-	if (item.type === 'tool' || item.type === 'tool_call' || item.type === 'tool_result') return webPresentation.toolText(item)
-	if (item.type === 'assistant' || item.type === 'info' || item.type === 'log' || item.type === 'warning' || item.type === 'error') {
-		return typeof item.text === 'string' ? item.text : ''
-	}
-	return ''
-}
-
-function transcriptItems(snapshot: ClientSessionSnapshot | null): RenderedItem[] {
-	if (!snapshot) return []
-	const items: RenderedItem[] = []
-	for (const item of webPresentation.historyItems(snapshot.history)) {
-		const text = historyText(item)
-		if (text) items.push({ item, text })
-	}
-	for (const item of snapshot.live) {
-		const text = item.type === 'tool' ? webPresentation.toolText(item) : item.text
-		if (text) items.push({ item, text })
-	}
-	return items
-}
-
-function SessionTabs(props: SessionTabsProps) {
-	return <header id="tabs">
-		<For each={props.sessions}>
-			{(session) => <button class={{ selected: session.id === props.selected }} onClick={() => props.onSelect(session.id)}>
-				{session.tab ?? ''} {session.name || session.id}
-			</button>}
-		</For>
-	</header>
-}
-
-function Message(props: MessageProps) {
-	return <article class={props.item.type}>
-		<label>{transcriptTitles.label(props.item)}</label>
-		<div>{props.text}</div>
-	</article>
-}
+import { PromptComposer } from './components/PromptComposer.tsx'
+import { SessionTabs } from './components/SessionTabs.tsx'
+import { Transcript } from './components/Transcript.tsx'
+import { webTranscript } from './utils/transcript.ts'
 
 function App() {
 	const [selected, setSelected] = createSignal('')
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
-	const transcript = createMemo(() => transcriptItems(snapshot()))
+	const transcript = createMemo(() => webTranscript.items(snapshot()))
 	let subscribed = ''
 	let socket: WebSocket | undefined
-	let messages: HTMLElement | undefined
-	let prompt: HTMLInputElement | undefined
 
 	function subscribe(sessionId: string): void {
 		if (!sessionId || socket?.readyState !== WebSocket.OPEN || subscribed === sessionId) return
@@ -123,26 +59,17 @@ function App() {
 		await refresh(applyState(state))
 	}
 
-	async function submitPrompt(event: SubmitEvent): Promise<void> {
-		event.preventDefault()
-		const text = prompt?.value.trim() ?? ''
+	async function submitPrompt(text: string): Promise<boolean> {
 		const sessionId = selected()
-		if (!text || !sessionId || !prompt) return
-		prompt.value = ''
+		if (!sessionId) return false
 		await fetch('/api/prompt', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ sessionId, text }),
 		})
 		if (socket?.readyState !== WebSocket.OPEN) void refresh(sessionId)
+		return true
 	}
-
-	createEffect(
-		() => snapshot(),
-		() => {
-			if (messages) messages.scrollTop = messages.scrollHeight
-		},
-	)
 
 	onSettled(() => {
 		const connection = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`)
@@ -171,13 +98,8 @@ function App() {
 
 	return <>
 		<SessionTabs sessions={sharedState().sessions} selected={selected()} onSelect={selectSession} />
-		<main id="messages" ref={(element) => { messages = element }}>
-			<For each={transcript()}>{(item) => <Message item={item.item} text={item.text} />}</For>
-		</main>
-		<form id="form" onSubmit={submitPrompt}>
-			<input id="prompt" ref={(element) => { prompt = element }} autocomplete="off" placeholder="Message" autofocus />
-			<button>Send</button>
-		</form>
+		<Transcript items={transcript()} />
+		<PromptComposer onSubmit={submitPrompt} />
 	</>
 }
 

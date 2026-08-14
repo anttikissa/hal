@@ -31,6 +31,11 @@ test('web page serves the web client HTML', async () => {
 	expect(page).toBe(source)
 })
 
+test('web page serves the shared component stylesheet', async () => {
+	const source = await Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
+	expect(await web.styleCss()).toBe(source)
+})
+
 test('web bundle compiles the Solid TSX entry', async () => {
 	expect((await web.bundleClient()).length).toBeGreaterThan(1_000)
 })

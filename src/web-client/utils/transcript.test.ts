@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test'
-import type { HistoryEntry } from '../common/history.ts'
-import { webPresentation } from './presentation.ts'
+import type { HistoryEntry } from '../../common/history.ts'
+import { webTranscript } from './transcript.ts'
 
 test('live tool text includes cumulative output below the command', () => {
-	expect(webPresentation.toolText({
+	expect(webTranscript.toolText({
 		type: 'tool',
 		name: 'bash',
 		input: { command: 'for i in {1..5}; do echo "$i"; done' },
@@ -17,7 +17,7 @@ test('history tool results merge into their call block', () => {
 		{ type: 'tool_call', toolId: 'tool-1', name: 'bash', input: { command: 'printf hello' }, blobId: 'blob-1', ts: '2026-08-13T12:00:00.000Z' },
 		{ type: 'tool_result', toolId: 'tool-1', output: 'hello', blobId: 'blob-1', ts: '2026-08-13T12:00:01.000Z' },
 	]
-	expect(webPresentation.historyItems(history)).toEqual([{
+	expect(webTranscript.historyItems(history)).toEqual([{
 		type: 'tool',
 		name: 'bash',
 		input: { command: 'printf hello' },
