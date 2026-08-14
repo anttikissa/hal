@@ -15,6 +15,7 @@ Meanwhile, it tries to be reasonably feature complete, have a nice terminal and 
 - [Provider support](#provider-support)
 - [Installation](#installation)
 - [Possible README improvements](#possible-readme-improvements)
+- [License](#license)
 
 ## Highlights
 
@@ -101,3 +102,7 @@ Hal picks up API keys from your environment. You can also use `/login` for OpenA
 - Add a "Development" section with `bun install`, `./test`, `bun cloc`, and the module/export conventions from [`AGENTS.md`](AGENTS.md).
 - Add a "Security model" section that explains local file access, confirmation prompts, auth storage, `eval`, and the current lack of sandboxing.
 - Add a "Configuration" section linking [`config-template.ason`](config-template.ason), local `config.ason`, and provider environment variables.
+
+## License
+
+[MIT](LICENSE)
