@@ -2,7 +2,7 @@ import { anthropicUsage } from '../anthropic-usage.ts'
 import { models } from '../../common/models.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { time } from '../../utils/time.ts'
-import { paths } from '../../utils/paths.ts'
+import { paths } from '../paths.ts'
 
 function titleWords(text: string): string {
 	return text.split(/[-_\s]+/).filter(Boolean).map((word) => word[0]!.toUpperCase() + word.slice(1).toLowerCase()).join(' ')

@@ -43,7 +43,7 @@
 
 import { existsSync, readFileSync, realpathSync, watch } from 'fs'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
-import { HAL_DIR, STATE_DIR } from '../../state.ts'
+import { HAL_DIR, STATE_DIR } from '../state.ts'
 import { sessions } from '../sessions.ts'
 import { models } from '../../common/models.ts'
 import { serverModels } from '../models.ts'

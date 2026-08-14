@@ -7,7 +7,7 @@
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
-import { STATE_DIR } from '../../state.ts'
+import { STATE_DIR } from '../state.ts'
 import { ason } from '../../utils/ason.ts'
 import { sensitive } from './sensitive.ts'
 

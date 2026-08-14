@@ -7,7 +7,7 @@
 
 import { existsSync } from 'fs'
 import { basename, resolve } from 'path'
-import { HAL_DIR } from '../../state.ts'
+import { HAL_DIR } from '../state.ts'
 
 const config = {
 	protectedBasenames: ['auth.ason'],

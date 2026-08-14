@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
-import { STATE_DIR, ensureDir } from '../../state.ts'
+import { STATE_DIR, ensureDir } from '../state.ts'
 import { ason } from '../../utils/ason.ts'
 
 export interface QueuedPrompt {

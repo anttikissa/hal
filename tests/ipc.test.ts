@@ -88,7 +88,7 @@ test('readState refreshes state.ason after another process writes it', () => {
 		cmd: ['bun', '-e', `
 			import { writeFileSync } from 'fs'
 			import { join } from 'path'
-			import { ensureStateDir, IPC_DIR } from './src/state.ts'
+			import { ensureStateDir, IPC_DIR } from './src/server/state.ts'
 			import { ipc } from './src/server/file-ipc.ts'
 			import { ason } from './src/utils/ason.ts'
 			ensureStateDir()

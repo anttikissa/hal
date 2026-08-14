@@ -1,7 +1,7 @@
 // Anthropic Claude subscription usage via api.anthropic.com/api/oauth/usage.
 
 import { auth, type Credential } from './auth.ts'
-import { STATE_DIR } from '../state.ts'
+import { STATE_DIR } from './state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'
 import { time } from '../utils/time.ts'

@@ -1,6 +1,5 @@
 import { clientTransport } from './transport.ts'
 import { clientBackend } from './backend.ts'
-import { STATE_DIR } from '../state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { log } from '../utils/log.ts'
 
@@ -20,7 +19,7 @@ function syncHostPid(ctx: any): void {
 
 function startWatchingHostLock(ctx: any): void {
 	if (state.hostLockState) return
-	state.hostLockState = liveFiles.liveFile(`${STATE_DIR}/ipc/host.lock`, { pid: null, createdAt: '' })
+	state.hostLockState = liveFiles.liveFile(`${clientBackend.paths.stateDir}/ipc/host.lock`, { pid: null, createdAt: '' })
 	syncHostPid(ctx)
 	liveFiles.onChange(state.hostLockState, () => {
 		syncHostPid(ctx)
@@ -30,7 +29,7 @@ function startWatchingHostLock(ctx: any): void {
 
 function startWatchingIpcState(ctx: any) {
 	if (!state.ipcStateFile) {
-		state.ipcStateFile = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, clientTransport.io.readState())
+		state.ipcStateFile = liveFiles.liveFile(`${clientBackend.paths.stateDir}/ipc/state.ason`, clientTransport.io.readState())
 		liveFiles.onChange(state.ipcStateFile, () => {
 			ctx.applySharedState(state.ipcStateFile!)
 			ctx.onChange(false)

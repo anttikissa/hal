@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { STATE_DIR } from '../../state.ts'
+import { STATE_DIR } from '../state.ts'
 import { replay } from './replay.ts'
 
 test('input history includes persisted slash-command retries', () => {

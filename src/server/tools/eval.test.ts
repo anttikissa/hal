@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { rmSync } from 'fs'
 import { join } from 'path'
-import { STATE_DIR } from '../../state.ts'
+import { STATE_DIR } from '../state.ts'
 import { ipc } from '../file-ipc.ts'
 import { evalTool } from './eval.ts'
 

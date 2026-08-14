@@ -1,7 +1,8 @@
 import type { HistoryEntry } from '../common/history.ts'
 import type { LiveBlock } from '../common/live-event-blocks.ts'
 import type { SessionMeta } from '../common/session.ts'
-import { STATE_DIR } from '../state.ts'
+import { resolve } from 'path'
+import { tmpdir } from 'os'
 
 export interface SubscriptionStatus {
 	index?: number
@@ -29,8 +30,14 @@ function unavailable(): never {
 	throw new Error('Client backend is not installed')
 }
 
+const defaultHalDir = process.env.HAL_DIR ?? resolve(import.meta.dir, '../..')
+const paths = {
+	halDir: defaultHalDir,
+	stateDir: process.env.HAL_STATE_DIR ?? (process.env.NODE_ENV === 'test' ? `${tmpdir()}/hal-test-state-${process.pid}` : `${defaultHalDir}/state`),
+}
+
 const sessions: SessionBackend = {
-	sessionDir: (sessionId) => `${STATE_DIR}/sessions/${sessionId}`,
+	sessionDir: (sessionId) => `${paths.stateDir}/sessions/${sessionId}`,
 	loadAllSessionMetas: unavailable,
 	loadSessionMeta: unavailable,
 	loadHistoryLog: unavailable,
@@ -47,10 +54,11 @@ const subscriptions: SubscriptionBackend = {
 
 const state = { installed: false }
 
-function install(backend: { sessions?: Partial<SessionBackend>; subscriptions?: Partial<SubscriptionBackend> }): void {
+function install(backend: { paths?: Partial<typeof paths>; sessions?: Partial<SessionBackend>; subscriptions?: Partial<SubscriptionBackend> }): void {
+	if (backend.paths) Object.assign(paths, backend.paths)
 	if (backend.sessions) Object.assign(sessions, backend.sessions)
 	if (backend.subscriptions) Object.assign(subscriptions, backend.subscriptions)
 	state.installed = true
 }
 
-export const clientBackend = { state, sessions, subscriptions, install }
+export const clientBackend = { state, paths, sessions, subscriptions, install }

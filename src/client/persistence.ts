@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync } from 'fs'
-import { STATE_DIR } from '../state.ts'
+import { clientBackend } from './backend.ts'
 import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
 
-const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
+function clientStatePath(): string { return `${clientBackend.paths.stateDir}/client.ason` }
 type ClientStateFile = { lastTab: string | null; restartTab: string | null; peak: number; peakCols: number; model: string | null; doneUnseen: string[] }
 
 function defaults(): ClientStateFile {
@@ -20,7 +20,7 @@ function isMissingFileError(err: unknown): boolean {
 
 function load(): ClientStateFile {
 	try {
-		const data = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as any
+		const data = ason.parse(readFileSync(clientStatePath(), 'utf-8')) as any
 		return {
 			lastTab: data?.lastTab ?? null,
 			restartTab: typeof data?.restartTab === 'string' ? data.restartTab : null,
@@ -37,7 +37,7 @@ function load(): ClientStateFile {
 
 function save(data: ClientStateFile): void {
 	try {
-		writeFileSync(CLIENT_STATE_PATH, ason.stringify(data) + '\n')
+		writeFileSync(clientStatePath(), ason.stringify(data) + '\n')
 	} catch (err) {
 		log.error('failed to save client state', { error: errorMessage(err) })
 	}

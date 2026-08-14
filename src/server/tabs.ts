@@ -9,7 +9,7 @@ import { sessionIds } from './session/ids.ts'
 import { openingSummary } from './session/opening-summary.ts'
 import { startup } from '../startup.ts'
 import { log } from '../utils/log.ts'
-import { paths } from '../utils/paths.ts'
+import { paths } from './paths.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'

@@ -12,7 +12,7 @@ import { models } from '../common/models.ts'
 import { serverModels } from './models.ts'
 import { modelRefresh } from './model-refresh.ts'
 import { config } from '../config.ts'
-import { HAL_DIR } from '../state.ts'
+import { HAL_DIR } from './state.ts'
 
 test('formatModelRefreshMessage summarizes models.dev changes for the user', () => {
 	const msg = modelRefresh.formatModelRefreshMessage([

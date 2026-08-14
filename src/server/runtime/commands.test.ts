@@ -11,7 +11,7 @@ import { serverModels } from '../models.ts'
 import { ipc } from '../file-ipc.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../sessions.ts'
-import { paths } from '../../utils/paths.ts'
+import { paths } from '../paths.ts'
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'

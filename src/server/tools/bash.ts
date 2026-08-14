@@ -11,7 +11,7 @@ import { processOutput } from '../../utils/process-output.ts'
 import { sensitive } from './sensitive.ts'
 import { ason } from '../../utils/ason.ts'
 import { cloc } from '../../utils/cloc.ts'
-import { HAL_DIR } from '../../state.ts'
+import { HAL_DIR } from '../state.ts'
 
 const config = {
 	/** Default timeout in milliseconds. */

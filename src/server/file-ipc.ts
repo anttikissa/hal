@@ -1,7 +1,7 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
 import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs'
-import { IPC_DIR, ensureDir } from '../state.ts'
+import { IPC_DIR, ensureDir } from './state.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { tails } from '../utils/tail-file.ts'

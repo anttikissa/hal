@@ -3,7 +3,7 @@
 // resolve pending requests by id.
 
 import { readFile } from 'fs/promises'
-import { HAL_DIR } from '../../state.ts'
+import { HAL_DIR } from '../state.ts'
 import { toolRegistry, type Tool, type ToolContext } from '../tools/tool.ts'
 import { ason } from '../../utils/ason.ts'
 import { log } from '../../utils/log.ts'

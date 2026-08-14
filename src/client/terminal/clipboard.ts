@@ -2,9 +2,8 @@
 // (no spawn, ~ms). Linux shells out to wl-paste/xclip. Windows: text only.
 
 import { dlopen, FFIType, ptr, toArrayBuffer } from 'bun:ffi'
-import { existsSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
-import { ensureDir } from '../../state.ts'
 
 const IMAGE_DIR = '/tmp/hal/images'
 const PASTE_DIR = '/tmp/hal/paste'
@@ -157,14 +156,14 @@ function pasteFromClipboard(): string {
 	if (text) return text
 	const image = getClipboardImage()
 	if (!image) return ''
-	ensureDir(IMAGE_DIR)
+	mkdirSync(IMAGE_DIR, { recursive: true })
 	const path = `${IMAGE_DIR}/${Math.random().toString(36).slice(2, 8)}.png`
 	writeFileSync(path, image)
 	return `[${path}]`
 }
 
 function saveMultilinePaste(text: string): string {
-	ensureDir(PASTE_DIR)
+	mkdirSync(PASTE_DIR, { recursive: true })
 	const existing = readdirSync(PASTE_DIR)
 		.filter((f) => /^\d{4}\.txt$/.test(f))
 		.map((f) => parseInt(f.slice(0, 4), 10))

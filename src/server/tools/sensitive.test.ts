@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { HAL_DIR } from '../../state.ts'
+import { HAL_DIR } from '../state.ts'
 import { bash } from './bash.ts'
 import { evalTool } from './eval.ts'
 import { glob } from './glob.ts'

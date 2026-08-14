@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync } from 'fs'
-import { STATE_DIR, ensureDir } from '../../state.ts'
+import { STATE_DIR, ensureDir } from '../state.ts'
 import { liveFiles } from '../../utils/live-file.ts'
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'

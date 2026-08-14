@@ -1,4 +1,4 @@
-import { STATE_DIR } from '../state.ts'
+import { STATE_DIR } from './state.ts'
 
 function formatHomePath(path: string): string {
 	const home = process.env.HOME

@@ -21,7 +21,7 @@ import { openai } from './server/providers/openai.ts'
 import { subscriptionUsage } from './common/subscription-usage.ts'
 import { toolRegistry } from './server/tools/tool.ts'
 import { log } from './utils/log.ts'
-import { HAL_DIR } from './state.ts'
+import { HAL_DIR } from './server/state.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {

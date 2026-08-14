@@ -1,7 +1,7 @@
 import { perf } from './client/perf.ts'
 perf.mark('First line of code executed')
 
-import { ensureStateDir, HAL_DIR } from './state.ts'
+import { ensureStateDir, HAL_DIR, STATE_DIR } from './server/state.ts'
 import { ipc } from './server/file-ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
@@ -61,6 +61,7 @@ if (parsedArgs.stateDir && process.env.HAL_STATE_DIR !== parsedArgs.stateDir) {
 const startupCwd = startup.normalizeCwd(parsedArgs.targetCwd)
 
 ensureStateDir()
+log.state.path = `${STATE_DIR}/hal.log`
 perf.mark('State directories exist')
 config.init()
 perf.mark('Config initialized')
@@ -73,6 +74,7 @@ perf.mark('OpenAI usage initialized')
 anthropicUsage.init()
 perf.mark('Anthropic usage initialized')
 clientBackend.install({
+	paths: { halDir: HAL_DIR, stateDir: STATE_DIR },
 	sessions: {
 		sessionDir: (sessionId) => sessionStore.sessionDir(sessionId),
 		loadAllSessionMetas: () => sessionStore.loadAllSessionMetas(),

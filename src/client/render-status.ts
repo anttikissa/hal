@@ -14,7 +14,6 @@ import { client } from './app.ts'
 import { models } from '../common/models.ts'
 import type { TokenUsage } from '../common/protocol.ts'
 import { clientBackend } from './backend.ts'
-import { HAL_DIR } from '../state.ts'
 import { colors } from './terminal/colors.ts'
 import { prompt } from './terminal/prompt.ts'
 import { cursor } from './terminal/cursor.ts'
@@ -260,7 +259,7 @@ function hasCustomSessionName(tab: Tab): boolean {
 }
 
 function currentHalDir(): string {
-	return process.env.HAL_DIR ?? HAL_DIR
+	return clientBackend.paths.halDir
 }
 
 function sessionStatusLabel(tab: Tab, base: string): string {

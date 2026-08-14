@@ -6,7 +6,7 @@
 
 import { readdirSync, readFileSync, unlinkSync } from 'fs'
 import { watch } from 'fs'
-import { STATE_DIR, ensureDir } from '../../state.ts'
+import { STATE_DIR, ensureDir } from '../state.ts'
 import { ipc } from '../file-ipc.ts'
 import { ason } from '../../utils/ason.ts'
 

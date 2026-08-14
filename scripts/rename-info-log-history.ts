@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync, readdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { join } from 'path'
-import { STATE_DIR } from '../src/state.ts'
+import { STATE_DIR } from '../src/server/state.ts'
 import { ason } from '../src/utils/ason.ts'
 
 function convertHistoryEntry(entry: any): any {

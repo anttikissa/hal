@@ -3,7 +3,7 @@
 import { writeFile } from 'fs/promises'
 import { existsSync, readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
-import { ensureDir } from '../../state.ts'
+import { ensureDir } from '../state.ts'
 import { sessions } from '../sessions.ts'
 import { ason } from '../../utils/ason.ts'
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { client } from './app.ts'
 import type { SharedState } from '../common/ipc.ts'
 import { clientTransport } from './transport.ts'
@@ -7,9 +7,10 @@ import { clientBackend } from './backend.ts'
 import { draft } from './terminal/draft.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { blockData } from './terminal/block-data.ts'
-import { STATE_DIR, ensureDir } from '../state.ts'
 import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
+
+const STATE_DIR = clientBackend.paths.stateDir
 
 type TestLiveFileChange = { path: string; previous: Record<string, any>; next: Record<string, any> }
 
@@ -87,7 +88,7 @@ describe('client startup', () => {
 		// Individual tests can override this stub to assert what would be sent.
 		clientTransport.io.appendCommand = () => {}
 		savedClientState = existsSync(CLIENT_STATE_PATH) ? readFileSync(CLIENT_STATE_PATH, 'utf-8') : null
-		ensureDir(STATE_DIR)
+		mkdirSync(STATE_DIR, { recursive: true })
 		rmSync(CLIENT_STATE_PATH, { force: true })
 	})
 
@@ -604,7 +605,7 @@ describe('client startup', () => {
 	})
 
 	test('restores unseen-done checkmarks from client state on startup', async () => {
-		ensureDir(STATE_DIR)
+		mkdirSync(STATE_DIR, { recursive: true })
 		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
 			lastTab: 's1',
 			peak: 0,

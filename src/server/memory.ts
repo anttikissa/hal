@@ -3,7 +3,7 @@
 // them without editing code.
 
 import { appendFileSync, mkdirSync } from 'fs'
-import { STATE_DIR } from '../state.ts'
+import { STATE_DIR } from './state.ts'
 import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
 

@@ -7,7 +7,7 @@
 
 import { readFileSync } from 'fs'
 import { dirname, extname, resolve } from 'path'
-import { ensureDir } from '../../state.ts'
+import { ensureDir } from '../state.ts'
 import { helpers } from '../../utils/helpers.ts'
 import { toolRegistry, type ToolContext } from './tool.ts'
 import { editRemap } from './edit-remap.ts'

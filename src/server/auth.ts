@@ -14,7 +14,7 @@
 // Call markCooldown() after a 429 to rotate to the next account.
 
 import { liveFiles } from '../utils/live-file.ts'
-import { HAL_DIR } from '../state.ts'
+import { HAL_DIR } from './state.ts'
 import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
 
@@ -63,7 +63,7 @@ interface Credential {
 // Persisted to STATE_DIR/cooldowns.ason so cooldowns survive restarts.
 // Loaded lazily on first access, written on every markCooldown call.
 
-import { STATE_DIR } from '../state.ts'
+import { STATE_DIR } from './state.ts'
 import { readFileSync, writeFileSync } from 'fs'
 
 const COOLDOWN_PATH = `${STATE_DIR}/cooldowns.ason`

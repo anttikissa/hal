@@ -1,4 +1,4 @@
-import { STATE_DIR, ensureDir } from '../state.ts'
+import { STATE_DIR, ensureDir } from './state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 
 const DEFAULT_BYTES_PER_TOKEN = 4

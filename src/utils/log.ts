@@ -4,12 +4,15 @@
 // Rotates (truncates) when file exceeds 5MB.
 
 import { appendFileSync, statSync, writeFileSync } from 'fs'
-import { STATE_DIR } from '../state.ts'
+import { resolve } from 'path'
+import { tmpdir } from 'os'
 
 type Level = 'info' | 'error' | 'debug'
 type ConfigLevel = Level | 'off' | ''
 
-const LOG_PATH = `${STATE_DIR}/hal.log`
+const halDir = process.env.HAL_DIR ?? resolve(import.meta.dir, '../..')
+const defaultStateDir = process.env.HAL_STATE_DIR ?? (process.env.NODE_ENV === 'test' ? `${tmpdir()}/hal-test-state-${process.pid}` : `${halDir}/state`)
+const state = { path: `${defaultStateDir}/hal.log` }
 const MAX_SIZE = 5_000_000 // 5MB rotation threshold
 
 const config = {
@@ -41,8 +44,8 @@ function write(level: Level, msg: string, data?: Record<string, unknown>): void 
 	if (!isEnabled(level)) return
 	// Rotate if file too large (check every write — cheap stat call).
 	try {
-		const st = statSync(LOG_PATH)
-		if (st.size > MAX_SIZE) writeFileSync(LOG_PATH, '')
+		const st = statSync(state.path)
+		if (st.size > MAX_SIZE) writeFileSync(state.path, '')
 	} catch {
 		// File doesn't exist yet, that's fine.
 	}
@@ -50,7 +53,7 @@ function write(level: Level, msg: string, data?: Record<string, unknown>): void 
 	const dataStr = data ? ' ' + JSON.stringify(data) : ''
 	const line = `[${ts}] [${level.toUpperCase()}] ${msg}${dataStr}\n`
 	try {
-		appendFileSync(LOG_PATH, line)
+		appendFileSync(state.path, line)
 	} catch {
 		// Silently fail — logging should never crash the app.
 	}
@@ -68,4 +71,4 @@ function debug(msg: string, data?: Record<string, unknown>): void {
 	write('debug', msg, data)
 }
 
-export const log = { config, info, error, debug, isEnabled, LOG_PATH }
+export const log = { config, info, error, debug, isEnabled, state }

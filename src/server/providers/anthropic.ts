@@ -10,7 +10,7 @@ import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '..
 import { providerShared } from './shared.ts'
 import { auth } from '../auth.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
-import { STATE_DIR } from '../../state.ts'
+import { STATE_DIR } from '../state.ts'
 import { appendFileSync } from 'node:fs'
 
 // Per-API-call usage log. One JSON line per call: timestamp, sessionId,

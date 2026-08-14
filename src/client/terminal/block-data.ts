@@ -9,7 +9,7 @@ import { models } from '../../common/models.ts'
 import type { LiveBlock } from '../../common/live-event-blocks.ts'
 import type { HistoryEntry } from '../../common/history.ts'
 import { historyProjection } from '../../common/history-projection.ts'
-import { STATE_DIR } from '../../state.ts'
+import { clientBackend } from '../backend.ts'
 // Sibling import for blocks.config; circular with blocks.ts but safe per
 // module convention — all access happens at call time, never at import time.
 import { blocks } from './blocks.ts'
@@ -31,7 +31,7 @@ function parseTs(ts?: string): number | undefined {
 }
 
 function blobPath(sessionId: string, blobId: string): string {
-	return `${STATE_DIR}/sessions/${sessionId}/blobs/${blobId}.ason`
+	return `${clientBackend.paths.stateDir}/sessions/${sessionId}/blobs/${blobId}.ason`
 }
 
 function historyToBlocks(

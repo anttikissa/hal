@@ -22,12 +22,12 @@ import { memory } from '../memory.ts'
 import { version } from '../version.ts'
 import { time } from '../../utils/time.ts'
 import { visLen } from '../../utils/strings.ts'
-import { HAL_DIR } from '../../state.ts'
+import { HAL_DIR } from '../state.ts'
 import { authLogin } from '../auth-login.ts'
 import { isPidAlive } from '../../utils/is-pid-alive.ts'
 import type { SharedClientInfo } from '../../common/ipc.ts'
 import { modelRefresh } from '../model-refresh.ts'
-import { paths } from '../../utils/paths.ts'
+import { paths } from '../paths.ts'
 
 // ── Types ──
 

@@ -65,7 +65,7 @@ async function run(): Promise<number> {
 	const failedFiles: string[] = []
 
 	const tasks = files.map(async (file) => {
-		// Each test file gets its own isolated state dir. Many tests import src/state.ts
+		// Each test file gets its own isolated state dir. Many tests import server/state.ts
 		// directly, which captures HAL_STATE_DIR at module load time. If we don't set
 		// this before spawning bun test, in-process tests can write to the developer's
 		// real ~/.hal/state and leak commands into the live runtime.

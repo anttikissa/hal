@@ -4,7 +4,7 @@ import { visLen } from '../../utils/strings.ts'
 import { time } from '../../utils/time.ts'
 import { sessionEntry } from './entry.ts'
 import { attachments } from './attachments.ts'
-import { STATE_DIR } from '../../state.ts'
+import { STATE_DIR } from '../state.ts'
 
 const ID_RE = /^[a-z0-9]{6}-[a-z0-9]{3}$/
 const COMMENT_COLUMN = 66

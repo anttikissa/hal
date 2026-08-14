@@ -4,7 +4,7 @@ import { provider as providerLoader } from '../providers/provider.ts'
 import { protocol, type Message } from '../../common/protocol.ts'
 import { sessions, type HistoryEntry, type SessionMeta } from '../sessions.ts'
 import { ason } from '../../utils/ason.ts'
-import { paths } from '../../utils/paths.ts'
+import { paths } from '../paths.ts'
 import { sessionEntry } from './entry.ts'
 
 interface ResolvedTargets {
