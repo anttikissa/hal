@@ -43,16 +43,17 @@ function hasInlineHalCursor(block: Block | undefined): boolean {
 	return (block?.type === 'assistant' || block?.type === 'thinking') && !!block.streaming
 }
 
-function renderEntry(block: Block, cols: number, context: HistoryRenderContext): string[] {
-	// Streaming text/thinking blocks include the blinking HAL cursor. Do not cache
-	// them across blink phases, even when the streamed text did not change.
-	const streamingCursor = hasInlineHalCursor(block)
+function renderEntry(block: Block, cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined): string[] {
+	// Only the current active stream includes the blinking HAL cursor. Do not cache
+	// it across blink phases, even when the streamed text did not change.
+	const streamingCursor = block === activeStreamingBlock
+	let renderedBlock = block
+	if ((block.type === 'assistant' || block.type === 'thinking') && block.streaming && !streamingCursor) renderedBlock = { ...block, streaming: false }
 	const cached = streamingCursor ? undefined : context.blockCache.get(block)
 	const version = block.renderVersion ?? 0
 	if (cached && cached.version === version && cached.cols === cols && cached.sessionLabelVersion === context.sessionLabelVersion) return cached.lines
-	const slowCursorVisible = cursor.isVisible(context.cursorTick)
 	const fastCursorVisible = cursor.isFastVisible(context.cursorTick)
-	const lines = blockRenderer.renderBlock(block, cols, streamingCursor ? fastCursorVisible : slowCursorVisible, context.sessionLabel)
+	const lines = blockRenderer.renderBlock(renderedBlock, cols, streamingCursor && fastCursorVisible, context.sessionLabel)
 	const rendered = block.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
 	if (!streamingCursor) context.blockCache.set(block, { version, cols, lines: rendered, sessionLabelVersion: context.sessionLabelVersion })
 	return rendered
@@ -66,9 +67,9 @@ function logGroupKey(block: Block): string | null {
 	return 'log'
 }
 
-function renderGroup(group: Block[], cols: number, context: HistoryRenderContext): string[] {
+function renderGroup(group: Block[], cols: number, context: HistoryRenderContext, activeStreamingBlock: Block | undefined): string[] {
 	const lines = group.length === 1
-		? renderEntry(group[0]!, cols, context)
+		? renderEntry(group[0]!, cols, context, activeStreamingBlock)
 		: blockRenderer.renderBlockGroup(group as Array<{ type: 'log' | 'warning' | 'error'; text: string; ts?: number; dimmed?: boolean }>, cols, context.sessionLabel)
 	// Dim grouped blocks if any block in the group is dimmed (groups are same-type, so all or none)
 	return group[0]?.dimmed ? lines.map((l) => oklch.dimAnsi(l, config.forkHistoryDimFactor)) : lines
@@ -117,6 +118,10 @@ function halCursorLine(sessionId: string, visible: boolean, working: boolean): s
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {
 	const start = lines.length
 	const history = visibleHistory(tab.history)
+	const working = context.workingSessions.get(tab.sessionId) ?? false
+	const last = history.at(-1)
+	let activeStreamingBlock: Block | undefined
+	if (working && hasInlineHalCursor(last)) activeStreamingBlock = last
 	for (let i = 0; i < history.length; ) {
 		const group = [history[i]!]
 		const key = logGroupKey(group[0]!)
@@ -127,14 +132,12 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 		}
 		if (lines.length > 0 && history[i - 1]?.type === 'assistant' && group[0]?.type === 'assistant') lines.push('', `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}\x1b[39m`, '')
 		else if (lines.length > 0) lines.push('')
-		const rendered = renderGroup(group, cols, context)
+		const rendered = renderGroup(group, cols, context, activeStreamingBlock)
 		lines.push(...rendered)
 		i += group.length
 	}
 
-	const working = context.workingSessions.get(tab.sessionId) ?? false
-	const last = history.at(-1)
-	if (hasInlineHalCursor(last)) {
+	if (activeStreamingBlock) {
 		// Streaming blocks carry an inline cursor, but still need breathing room
 		// before the tab bar when they are the last visible history row.
 		lines.push('')

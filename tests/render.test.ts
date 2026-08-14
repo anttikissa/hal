@@ -791,23 +791,24 @@ describe('render', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'assistant', text: 'hello', streaming: true })
 		tab.history.push({ type: 'thinking', text: 'hmm', streaming: true })
+		client.state.working.set(tab.sessionId, true)
 
 		const originalTick = cursor.tick
-		const originalAssistantCursor = colors.assistant.cursor
+		const originalThinkingCursor = colors.thinking.cursor
 		try {
 			cursor.tick = () => 0
 			render.resetRenderer()
 			const visiblePhase = stripAnsi(captureOutput(() => render.draw(true)))
 			expect(visiblePhase).toContain('hmm█')
 			const visibleLines = visiblePhase.split('\n')
-			const visibleTabBar = visibleLines.findIndex((line) => line.includes('[1]'))
+			const visibleTabBar = visibleLines.findIndex((line) => line.includes('Tabs:'))
 			expect(visibleTabBar).toBeGreaterThan(0)
 			expect(visibleLines[visibleTabBar - 1]).toBe('')
 
-			colors.assistant.cursor = oklch.toFg(0.78, 0.14, 55)
+			colors.thinking.cursor = oklch.toFg(0.78, 0.14, 55)
 			render.resetRenderer()
 			const activeColorPhase = captureOutput(() => render.draw(true))
-			expect(activeColorPhase).toContain(`${colors.assistant.cursor}█`)
+			expect(activeColorPhase).toContain(`${colors.thinking.cursor}█`)
 
 			cursor.tick = () => 1
 			render.resetRenderer()
@@ -816,7 +817,8 @@ describe('render', () => {
 			expect(hiddenPhase).not.toContain('hmm█')
 		} finally {
 			cursor.tick = originalTick
-			colors.assistant.cursor = originalAssistantCursor
+			colors.thinking.cursor = originalThinkingCursor
+			client.state.working.delete(tab.sessionId)
 		}
 	})
 	test('error-level info on an inactive finished tab shows an alert indicator', () => {

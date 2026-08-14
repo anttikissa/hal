@@ -58,6 +58,39 @@ test('adjacent assistant blocks use a Hal-colored rule separator', () => {
 })
 
 
+test('idle session renders a stale stream like completed text', () => {
+	colors.load()
+	const stale: string[] = []
+	renderHistory.renderLines(stale, tab([
+		{ type: 'assistant', text: 'partial response', streaming: true },
+		{ type: 'info', text: 'Server restarted' },
+	]), 20, context())
+	const completed: string[] = []
+	renderHistory.renderLines(completed, tab([
+		{ type: 'assistant', text: 'partial response' },
+		{ type: 'info', text: 'Server restarted' },
+	]), 20, context())
+
+	expect(stale).toEqual(completed)
+	expect(stale.map(stripAnsi).join('\n').match(/█/g)).toHaveLength(1)
+})
+
+
+test('working session renders a cursor only on the current streaming block', () => {
+	colors.load()
+	const lines: string[] = []
+	const active = context()
+	active.workingSessions = new Map([['test', true]])
+	renderHistory.renderLines(lines, tab([
+		{ type: 'assistant', text: 'orphaned response', streaming: true },
+		{ type: 'info', text: 'intervening event' },
+		{ type: 'assistant', text: 'current response', streaming: true },
+	]), 20, active)
+
+	expect(lines.map(stripAnsi).join('\n').match(/█/g)).toHaveLength(1)
+})
+
+
 test('session labels refresh when tab metadata changes', () => {
 	const history = [{ type: 'user', text: 'hello', source: '110-gmt' }] as Tab['history']
 	const first = { ...context(), sessionLabel: () => '110-gmt (Architecture revamp, tab 3)' }
