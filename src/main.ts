@@ -182,7 +182,9 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
 	client.state.role = 'server'
 	client.state.localCommandHandler = (command) => { runtime.handleCommand(command) }
-	const announceWeb = kind === 'start' && ipc.readState().sessions.length === 0
+	// Ctrl-R exits and `./run` creates a new host; that deserves a fresh URL announcement.
+	// A client promoted after host loss does not: it is only taking over an existing service.
+	const announceWeb = kind === 'start'
 	syncHostVersionState()
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
