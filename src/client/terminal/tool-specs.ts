@@ -7,7 +7,7 @@ import { resolveMarkers, toLines } from '../../utils/strings.ts'
 import { ason } from '../../utils/ason.ts'
 import { colors } from './colors.ts'
 import { md } from './md.ts'
-import { bash } from '../../server/tools/bash.ts'
+import { shellCommand } from '../../utils/shell-command.ts'
 // Sibling import for blocks.config; circular with blocks.ts but safe per
 // module convention — all access happens at call time, never at import time.
 import { blocks } from './blocks.ts'
@@ -45,7 +45,7 @@ function editDetails(input: any, output?: string): string | undefined {
 
 function stripRedundantCd(command: string, cwd: string | undefined): string {
 	if (!cwd) return command
-	return bash.stripCdCwd(command, cwd) ?? command
+	return shellCommand.stripCdCwd(command, cwd) ?? command
 }
 
 function commitSubject(message: string): string {

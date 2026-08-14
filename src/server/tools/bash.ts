@@ -4,7 +4,7 @@
 // and 1MB output limit with middle-truncation.
 
 import { resolve } from 'path'
-import { homedir } from 'os'
+import { shellCommand } from '../../utils/shell-command.ts'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
 import { helpers } from '../../utils/helpers.ts'
 import { processOutput } from '../../utils/process-output.ts'
@@ -48,20 +48,8 @@ interface CommitMetadata {
 const COMMIT_META_START = '[hal-commit]'
 const COMMIT_META_END = '[/hal-commit]'
 
-const HOME = homedir()
-
-function shellPath(text: string, cwd: string): string {
-	let path = text.replace(/^['"]|['"]$/g, '')
-	if (path === '~') path = HOME
-	if (path.startsWith('~/')) path = HOME + path.slice(1)
-	return resolve(cwd, path)
-}
-
 function stripCdCwd(command: string | undefined, cwd: string): string | undefined {
-	const match = command?.match(/^cd\s+(.+?)\s*&&\s*/)
-	if (!match) return command
-	const target = shellPath(match[1]!, cwd)
-	return target === resolve(cwd) ? command!.slice(match[0].length) : command
+	return shellCommand.stripCdCwd(command, cwd)
 }
 
 function hasEscapedCommitMessageNewline(command: string): boolean {
