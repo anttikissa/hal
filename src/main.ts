@@ -1,4 +1,4 @@
-import { perf } from './perf.ts'
+import { perf } from './client/perf.ts'
 perf.mark('First line of code executed')
 
 import { ensureStateDir, HAL_DIR } from './state.ts'

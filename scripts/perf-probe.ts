@@ -13,7 +13,7 @@ writeFileSync(LOG, '')
 log('probe start')
 
 // Import the app modules
-const { perf } = await import('../src/perf.ts')
+const { perf } = await import('../src/client/perf.ts')
 const { client } = await import('../src/client/app.ts')
 const { blockData } = await import('../src/client/terminal/block-data.ts')
 await import('../src/config.ts')
