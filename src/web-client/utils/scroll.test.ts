@@ -17,3 +17,21 @@ test('scrolls the document viewport to its bottom', () => {
 		else delete (globalThis as { document?: unknown }).document
 	}
 })
+
+test('recognizes a viewport within 25 pixels of the bottom', () => {
+	const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window')
+	const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document')
+	const browser = { innerHeight: 1_000, scrollTo: () => {}, scrollY: 210 }
+	Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
+	Object.defineProperty(globalThis, 'document', { configurable: true, value: { documentElement: { scrollHeight: 1_234 } } })
+	try {
+		expect(webScroll.isNearBottom()).toBe(true)
+		browser.scrollY = 209
+		expect(webScroll.isNearBottom()).toBe(false)
+	} finally {
+		if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor)
+		else delete (globalThis as { window?: unknown }).window
+		if (documentDescriptor) Object.defineProperty(globalThis, 'document', documentDescriptor)
+		else delete (globalThis as { document?: unknown }).document
+	}
+})

@@ -2,4 +2,8 @@ function toBottom(): void {
 	window.scrollTo({ top: document.documentElement.scrollHeight })
 }
 
-export const webScroll = { toBottom }
+function isNearBottom(): boolean {
+	return document.documentElement.scrollHeight - window.innerHeight - window.scrollY < 25
+}
+
+export const webScroll = { toBottom, isNearBottom }
