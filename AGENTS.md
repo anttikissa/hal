@@ -136,6 +136,14 @@ Read docs/terminal.md BEFORE touching any rendering or terminal code. It
 contains hard-won rules about scrollback, line width, diffing, and the
 fullscreen flag. Violating them causes visual corruption.
 
+# Web rules (see docs/web.md)
+
+Read docs/web.md BEFORE writing any web or SolidJS code. We use SolidJS 2 RC,
+which no model has been trained on. Solid 1.x and React habits generate
+confidently wrong code: createEffect has a different signature, setters do not
+update reads immediately, createResource/Suspense/batch/produce are gone, and
+imports moved packages. Do not write Solid code from memory.
+
 # Terminal width
 
 ALL terminal width calculations MUST use `visLen()` from `src/utils/strings.ts`.
