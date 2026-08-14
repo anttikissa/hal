@@ -4,7 +4,7 @@ import { basename, resolve, dirname } from 'path'
 import { readdirSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { config as runtimeConfig } from '../../config.ts'
-import { commands } from '../../server/runtime/commands.ts'
+import { commandMetadata } from '../../common/command-metadata.ts'
 import { models } from '../../common/models.ts'
 import { clientLocalCommands } from '../local-commands.ts'
 import { ipc } from '../../ipc.ts'
@@ -113,7 +113,7 @@ function modelNames(): string[] {
 }
 
 function commandNamesForPrompt(): string[] {
-	return [...new Set([...commands.commandNames(), ...clientLocalCommands.commandNames()])].sort()
+	return [...new Set([...commandMetadata.commandNames(), ...clientLocalCommands.commandNames()])].sort()
 }
 
 function addUnique(values: string[], seen: Set<string>, value: string | undefined): void {
@@ -169,7 +169,7 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	}
 
 	const command = parts[0]!
-	const arg = clientLocalCommands.commandArg(command) ?? commands.commandArg(command)
+	const arg = clientLocalCommands.commandArg(command) ?? commandMetadata.commandArg(command)
 	if (!arg) return null
 	if (parts.length > 2 && arg !== 'dir' && arg !== 'session' && arg !== 'closed-session') return null
 

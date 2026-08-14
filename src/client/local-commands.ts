@@ -1,6 +1,6 @@
 import { keyHelp } from './terminal/key-help.ts'
 import { visLen } from '../utils/strings.ts'
-import { commands } from '../server/runtime/commands.ts'
+import { commandMetadata } from '../common/command-metadata.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
 import type { ClientCommandType } from './commands.ts'
 
@@ -219,7 +219,7 @@ function detailedHelp(name: string): string | null {
 }
 
 function combinedHelp(): string {
-	const serverHelp = commands.helpText('') ?? 'Available commands:'
+	const serverHelp = commandMetadata.helpText('') ?? 'Available commands:'
 	return [serverHelp, localCommandHelp(), 'Keyboard shortcuts:', '  Type /keys for the full terminal shortcut reference.'].join('\n\n')
 }
 
@@ -231,7 +231,7 @@ function runHelp(args: string, _ctx: ClientLocalCommandContext): ClientLocalComm
 	const local = detailedHelp(commandName)
 	if (local) return { handled: true, output: local }
 
-	const server = commands.helpText(commandName)
+	const server = commandMetadata.helpText(commandName)
 	if (server) return { handled: true, output: server }
 	return { handled: true, error: `No detailed help for /${commandName}. Try /help.` }
 }
