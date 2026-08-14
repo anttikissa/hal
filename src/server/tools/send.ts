@@ -4,7 +4,7 @@
 // the inbox handler picks up and feeds into the agent loop.
 
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 import { inbox } from '../runtime/inbox.ts'
 
 interface SendInput {

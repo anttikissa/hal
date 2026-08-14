@@ -4,11 +4,11 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { draft } from './draft.ts'
 import { clientBackend } from '../backend.ts'
-import { ipc } from '../../ipc.ts'
+import { clientTransport } from '../transport.ts'
 import { log } from '../../utils/log.ts'
 
 const origSessionDir = clientBackend.sessions.sessionDir
-const origAppendEvent = ipc.appendEvent
+const origNotifyDraftSaved = clientTransport.io.notifyDraftSaved
 const origLogError = log.error
 
 let dir: string
@@ -19,7 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	clientBackend.sessions.sessionDir = origSessionDir
-	ipc.appendEvent = origAppendEvent
+	clientTransport.io.notifyDraftSaved = origNotifyDraftSaved
 	log.error = origLogError
 	rmSync(dir, { recursive: true, force: true })
 })
@@ -30,7 +30,7 @@ test('saveDraft logs write failures and skips the draft_saved event', () => {
 	log.error = (message: string, data?: Record<string, unknown>) => {
 		errors.push({ message, data })
 	}
-	ipc.appendEvent = (event: any) => {
+	clientTransport.io.notifyDraftSaved = (event: any) => {
 		events.push(event)
 	}
 	// Point at a missing session directory so writeFileSync fails with ENOENT.
@@ -50,7 +50,7 @@ test('saveDraft preserves prompt edit metadata for restart restore', () => {
 	const sessionDir = join(dir, '04-test')
 	mkdirSync(sessionDir, { recursive: true })
 	clientBackend.sessions.sessionDir = () => sessionDir
-	ipc.appendEvent = () => {}
+	clientTransport.io.notifyDraftSaved = () => {}
 
 	draft.saveDraft('04-test', 'edited prompt', {
 		mode: 'cancel',
@@ -96,7 +96,7 @@ test('clearDraft logs unexpected unlink failures and skips the draft_saved event
 	log.error = (message: string, data?: Record<string, unknown>) => {
 		errors.push({ message, data })
 	}
-	ipc.appendEvent = (event: any) => {
+	clientTransport.io.notifyDraftSaved = (event: any) => {
 		events.push(event)
 	}
 	clientBackend.sessions.sessionDir = () => sessionDir

@@ -2,11 +2,12 @@ import { perf } from './client/perf.ts'
 perf.mark('First line of code executed')
 
 import { ensureStateDir, HAL_DIR } from './state.ts'
-import { ipc } from './ipc.ts'
+import { ipc } from './server/file-ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
 import { client } from './client/app.ts'
 import { clientBackend, type SubscriptionStatus } from './client/backend.ts'
+import { clientTransport } from './client/transport.ts'
 import { memory } from './server/memory.ts'
 import { version } from './server/version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
@@ -86,6 +87,12 @@ clientBackend.install({
 		noteActivity: () => openaiUsage.noteActivity(),
 		onChange: (callback) => openaiUsage.onChange(callback),
 	},
+})
+clientTransport.install({
+	appendCommand: (command) => ipc.appendCommand(command),
+	notifyDraftSaved: (sessionId) => ipc.appendCommand({ type: 'draft-saved', sessionId }),
+	readState: () => ipc.readState(),
+	tailEvents: (signal) => ipc.tailEvents(signal),
 })
 memory.io.addEntry = (text, type) => client.addEntry(text, type)
 builtins.init()

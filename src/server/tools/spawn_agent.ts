@@ -1,4 +1,4 @@
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 import type { SpawnCommandData, SpawnKind } from '../../common/protocol.ts'
 import { sessionIds } from '../session/ids.ts'
 import { toolRegistry, type Tool, type ToolContext } from './tool.ts'

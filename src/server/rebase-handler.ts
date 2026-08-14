@@ -4,7 +4,7 @@
 // rebase-apply validates the snapshot is still current and rewrites history.
 
 import { createHash } from 'crypto'
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { sessions as sessionStore, type HistoryEntry } from './sessions.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { apiMessages } from './session/api-messages.ts'

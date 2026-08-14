@@ -3,7 +3,7 @@
 
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
 import { clientBackend } from '../backend.ts'
-import { ipc } from '../../ipc.ts'
+import { clientTransport } from '../transport.ts'
 import { ason } from '../../utils/ason.ts'
 import { log } from '../../utils/log.ts'
 
@@ -49,7 +49,7 @@ function saveDraft(sessionId: string, text: string, promptEdit?: DraftPromptEdit
 		return
 	}
 	// Only notify other clients after the file is definitely on disk.
-	ipc.appendEvent({ type: 'draft_saved', sessionId })
+	clientTransport.io.notifyDraftSaved(sessionId)
 }
 
 function emptyDraftFile(): DraftFile {
@@ -88,7 +88,7 @@ function clearDraft(sessionId: string): void {
 			return
 		}
 	}
-	ipc.appendEvent({ type: 'draft_saved', sessionId })
+	clientTransport.io.notifyDraftSaved(sessionId)
 }
 
 export const draft = { saveDraft, loadDraft, loadDraftState, clearDraft }

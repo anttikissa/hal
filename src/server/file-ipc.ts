@@ -1,16 +1,16 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
 import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs'
-import { IPC_DIR, ensureDir } from './state.ts'
-import { ason } from './utils/ason.ts'
-import { liveFiles } from './utils/live-file.ts'
-import { tails } from './utils/tail-file.ts'
-import { isPidAlive } from './utils/is-pid-alive.ts'
-import { log } from './utils/log.ts'
-import type { SharedState } from './common/ipc.ts'
-import type { Command } from './common/protocol.ts'
+import { IPC_DIR, ensureDir } from '../state.ts'
+import { ason } from '../utils/ason.ts'
+import { liveFiles } from '../utils/live-file.ts'
+import { tails } from '../utils/tail-file.ts'
+import { isPidAlive } from '../utils/is-pid-alive.ts'
+import { log } from '../utils/log.ts'
+import type { SharedState } from '../common/ipc.ts'
+import type { Command } from '../common/protocol.ts'
 
-export type { SharedClientInfo, SharedHostInfo, SharedSessionInfo, SharedState } from './common/ipc.ts'
+export type { SharedClientInfo, SharedHostInfo, SharedSessionInfo, SharedState } from '../common/ipc.ts'
 
 const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`

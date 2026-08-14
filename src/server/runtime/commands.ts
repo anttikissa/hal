@@ -7,7 +7,7 @@
 import { existsSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 import { models } from '../../common/models.ts'
 import { commandMetadata, type CommandArg } from '../../common/command-metadata.ts'
 import { serverModels } from '../models.ts'

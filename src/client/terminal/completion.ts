@@ -7,7 +7,7 @@ import { config as runtimeConfig } from '../../config.ts'
 import { commandMetadata } from '../../common/command-metadata.ts'
 import { models } from '../../common/models.ts'
 import { clientLocalCommands } from '../local-commands.ts'
-import { ipc } from '../../ipc.ts'
+import { clientTransport } from '../transport.ts'
 import { clientBackend } from '../backend.ts'
 import { completionHints } from './completion-hints.ts'
 
@@ -125,7 +125,7 @@ function addUnique(values: string[], seen: Set<string>, value: string | undefine
 function sessionTargets(closedOnly = false): string[] {
 	const values: string[] = []
 	const seen = new Set<string>()
-	const openSessions = ipc.readState().sessions
+	const openSessions = clientTransport.io.readState().sessions
 	const openIds = new Set<string>()
 	for (const session of openSessions) {
 		openIds.add(session.id)

@@ -6,7 +6,7 @@ import { rebaseHandler } from './rebase-handler.ts'
 import { tabs } from './tabs.ts'
 import { queueRunner } from './queue-runner.ts'
 import { modelNotices } from './model-notices.ts'
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { protocol } from '../common/protocol.ts'
 import type { Command, SpawnCommandData, SpawnKind } from '../common/protocol.ts'
 import { models } from '../common/models.ts'
@@ -642,6 +642,10 @@ function handleCommand(cmd: Command): void {
 	}
 	if (cmd.type === 'client-exit') {
 		removeClient(cmd.pid)
+		return
+	}
+	if (cmd.type === 'draft-saved') {
+		if (cmd.sessionId) ipc.appendEvent({ type: 'draft_saved', sessionId: cmd.sessionId })
 		return
 	}
 	tabs.focusSession(cmd.sessionId)

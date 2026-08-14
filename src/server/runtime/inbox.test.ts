@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { inbox } from './inbox.ts'
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 
 const origPollInterval = inbox.config.pollIntervalMs
 const origReadState = ipc.readState

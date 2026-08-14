@@ -1,7 +1,7 @@
 // OpenAI ChatGPT subscription usage via chatgpt.com/backend-api/wham/usage.
 
 import { auth, type Credential } from './auth.ts'
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { STATE_DIR } from '../state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { subscriptionUsage } from '../common/subscription-usage.ts'

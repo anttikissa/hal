@@ -3,7 +3,7 @@ import { runtime } from './runtime.ts'
 import { queueRunner } from './queue-runner.ts'
 import { tabs } from './tabs.ts'
 import { sessions, type SessionMeta } from './sessions.ts'
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { agentLoop } from './runtime/agent-loop.ts'
 import { context } from './runtime/system-prompt.ts'
 import { toolRegistry } from './tools/tool.ts'
@@ -62,6 +62,18 @@ test('client status commands update shared client process list', () => {
 		expect(shared.clients).toEqual([])
 	} finally {
 		ipc.updateState = origUpdateState
+	}
+})
+
+test('draft-saved commands become server-produced events', () => {
+	const original = ipc.appendEvent
+	const events: any[] = []
+	try {
+		ipc.appendEvent = (event) => { events.push(event) }
+		runtime.handleCommand({ type: 'draft-saved', sessionId: '04-one' })
+		expect(events).toEqual([{ type: 'draft_saved', sessionId: '04-one' }])
+	} finally {
+		ipc.appendEvent = original
 	}
 })
 

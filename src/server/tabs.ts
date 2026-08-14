@@ -2,7 +2,7 @@
 // session tabs. Tab order state lives in runtime.state; this module owns the
 // operations on it.
 
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { models } from '../common/models.ts'
 import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
 import { sessionIds } from './session/ids.ts'

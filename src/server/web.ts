@@ -6,7 +6,7 @@ import type { ClientSessionSnapshot } from '../common/snapshots.ts'
 import type { WebClientMessage, WebServerMessage } from '../common/web.ts'
 import type { HistoryEntry } from '../common/history.ts'
 import { blob } from './session/blob.ts'
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 

@@ -1,7 +1,7 @@
 // Client -- state manager for tabs, entries, prompt.
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
-import { ipc } from '../ipc.ts'
+import { clientTransport } from './transport.ts'
 import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { clientBackend } from './backend.ts'
@@ -195,7 +195,7 @@ function currentTab(): Tab | null {
 
 function focusSession(sessionId: string | undefined): void {
 	if (!sessionId) return
-	ipc.appendCommand({ type: 'focus', sessionId })
+	clientTransport.io.appendCommand({ type: 'focus', sessionId })
 }
 
 function focusCurrentTab(): void {
@@ -205,7 +205,7 @@ function focusCurrentTab(): void {
 function publishStatus(): void {
 	if (state.role !== 'client') return
 	const tab = currentTab()
-	ipc.appendCommand({
+	clientTransport.io.appendCommand({
 		type: 'client-status',
 		sessionId: tab?.sessionId,
 		pid: state.pid,
@@ -220,7 +220,7 @@ function publishStatus(): void {
 
 function publishExit(): void {
 	if (state.role !== 'client') return
-	ipc.appendCommand({ type: 'client-exit', sessionId: currentTab()?.sessionId, pid: state.pid })
+	clientTransport.io.appendCommand({ type: 'client-exit', sessionId: currentTab()?.sessionId, pid: state.pid })
 }
 
 function rememberTab(sessionId: string): void {
@@ -510,7 +510,7 @@ function sendCommand(type: ClientCommandType, text?: string, displayText?: strin
 	const command = clientCommands.makeCommand(type, tab?.sessionId, text, displayText, queue)
 	const isTurnControl = type === 'prompt' || type === 'prompt-amend' || type === 'abort' || type === 'continue'
 	if (isTurnControl && state.localCommandHandler) state.localCommandHandler(command)
-	else ipc.appendCommand(command)
+	else clientTransport.io.appendCommand(command)
 	const isPromptTurn = type === 'prompt' || type === 'prompt-amend'
 	if (isPromptTurn && tab && text && !text.trimStart().startsWith('/') && (type === 'prompt-amend' || !queue || !isWorking())) {
 		state.pendingPromptTexts.set(tab.sessionId, text)

@@ -26,10 +26,11 @@ export type EventType =
 	| 'rebase-result'
 	| 'history-rebased'
 	| 'background-activity'
+	| 'draft_saved'
 
 // ── Command types (client → server) ──
 
-export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'run-next-from-queue' | 'pause-before-tools' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'client-status' | 'client-exit'
+export type CommandType = 'prompt' | 'prompt-amend' | 'continue' | 'run-next-from-queue' | 'pause-before-tools' | 'open' | 'close' | 'resume' | 'abort' | 'reset' | 'compact' | 'rebase-start' | 'rebase-apply' | 'move' | 'spawn' | 'tool-confirm' | 'focus' | 'what' | 'draft-saved' | 'client-status' | 'client-exit'
 
 export type SpawnMode = 'fork' | 'fresh'
 export type SpawnKind = 'subagent' | 'subagent-leave-open' | 'interactive'
@@ -164,6 +165,9 @@ export interface WhatCommand extends CommandBase {
 	target?: string
 }
 
+export interface DraftSavedCommand extends CommandBase {
+	type: 'draft-saved'
+}
 export interface ClientStatusCommand extends CommandBase {
 	type: 'client-status'
 	pid: number
@@ -203,6 +207,7 @@ export type Command =
 	| ToolConfirmCommand
 	| FocusCommand
 	| WhatCommand
+	| DraftSavedCommand
 
 // ── Tool call types ──
 

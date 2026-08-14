@@ -2,20 +2,20 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { ipc } from '../../ipc.ts'
+import { clientTransport } from '../transport.ts'
 import { clientBackend } from '../backend.ts'
 import { completion } from './completion.ts'
 import { completionHints } from './completion-hints.ts'
 import { models } from '../../common/models.ts'
 
-const origReadState = ipc.readState
+const origReadState = clientTransport.io.readState
 const origLoadAllSessionMetas = clientBackend.sessions.loadAllSessionMetas
 
 beforeEach(() => {
 	models.state.cache = {}
 })
 afterEach(() => {
-	ipc.readState = origReadState
+	clientTransport.io.readState = origReadState
 	clientBackend.sessions.loadAllSessionMetas = origLoadAllSessionMetas
 	completion.dismiss()
 	models.state.cache = null
@@ -75,7 +75,7 @@ test('/help st completes command names from runtime command list', () => {
 
 
 test('/go completes all sessions and /resume completes closed sessions', () => {
-	ipc.readState = () => ({
+	clientTransport.io.readState = () => ({
 		sessions: [
 			{ id: '04-one', tab: 1, name: 'main', cwd: '/tmp/main' },
 			{ id: '04-two', tab: 2, name: 'pause fix', cwd: '/tmp/pause' },

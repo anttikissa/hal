@@ -19,7 +19,7 @@ import { perf } from './perf.ts'
 import { clientBackend } from './backend.ts'
 import { startup } from '../startup.ts'
 import { models } from '../common/models.ts'
-import { ipc } from '../ipc.ts'
+import { clientTransport } from './transport.ts'
 import type { KeyEvent } from './terminal/keys.ts'
 import { time } from '../utils/time.ts'
 import { terminalOutput } from './terminal-output.ts'
@@ -256,7 +256,7 @@ function openToolConfirm(event: any): void {
 		['Yes', 'No'],
 		(choice) => {
 			client.clearToolConfirmPending(event.sessionId)
-			ipc.appendCommand({ type: 'tool-confirm', sessionId: event.sessionId, requestId: String(event.requestId), approved: choice === 'Yes' })
+			clientTransport.io.appendCommand({ type: 'tool-confirm', sessionId: event.sessionId, requestId: String(event.requestId), approved: choice === 'Yes' })
 			draw()
 		},
 		'danger',

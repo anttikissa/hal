@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { client } from './app.ts'
 import type { SharedState } from '../common/ipc.ts'
-import { ipc } from '../ipc.ts'
+import { clientTransport } from './transport.ts'
 import { clientBackend } from './backend.ts'
 import { draft } from './terminal/draft.ts'
 import { liveFiles } from '../utils/live-file.ts'
@@ -52,9 +52,9 @@ describe('client startup', () => {
 	const origLoadAllHistoryWithOrigin = clientBackend.sessions.loadAllHistoryWithOrigin
 	const origLoadDraft = draft.loadDraft
 	const origLoadDraftState = draft.loadDraftState
-	const origReadState = ipc.readState
-	const origAppendCommand = ipc.appendCommand
-	const origTailEvents = ipc.tailEvents
+	const origReadState = clientTransport.io.readState
+	const origAppendCommand = clientTransport.io.appendCommand
+	const origTailEvents = clientTransport.io.tailEvents
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = clientBackend.sessions.loadLive
@@ -85,7 +85,7 @@ describe('client startup', () => {
 		draft.loadDraftState = () => ({ text: '', savedAt: '' })
 		// Client tests must never append to the real shared IPC command log.
 		// Individual tests can override this stub to assert what would be sent.
-		ipc.appendCommand = () => {}
+		clientTransport.io.appendCommand = () => {}
 		savedClientState = existsSync(CLIENT_STATE_PATH) ? readFileSync(CLIENT_STATE_PATH, 'utf-8') : null
 		ensureDir(STATE_DIR)
 		rmSync(CLIENT_STATE_PATH, { force: true })
@@ -97,9 +97,9 @@ describe('client startup', () => {
 		clientBackend.sessions.loadAllHistoryWithOrigin = origLoadAllHistoryWithOrigin
 		draft.loadDraft = origLoadDraft
 		draft.loadDraftState = origLoadDraftState
-		ipc.readState = origReadState
-		ipc.appendCommand = origAppendCommand
-		ipc.tailEvents = origTailEvents
+		clientTransport.io.readState = origReadState
+		clientTransport.io.appendCommand = origAppendCommand
+		clientTransport.io.tailEvents = origTailEvents
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
 		clientBackend.sessions.loadLive = origLoadLive
@@ -114,10 +114,10 @@ describe('client startup', () => {
 		clientBackend.sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
 
 		const shared = makeSharedState(['s1'])
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -132,10 +132,10 @@ describe('client startup', () => {
 		clientBackend.sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
 
 		const shared = makeSharedState([])
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -152,10 +152,10 @@ describe('client startup', () => {
 			errors.push({ message, data })
 		}
 		writeFileSync(CLIENT_STATE_PATH, '{ definitely not valid ason')
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -183,10 +183,10 @@ describe('client startup', () => {
 			working: {},
 				updatedAt: '2026-04-09T20:00:00.000Z',
 		}
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal, { preferredCwd: '/work/project', preferredSessionId: 's1' })
@@ -201,15 +201,15 @@ describe('client startup', () => {
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
-		ipc.readState = () => shared
-		ipc.appendCommand = (command) => {
+		clientTransport.io.readState = () => shared
+		clientTransport.io.appendCommand = (command) => {
 			appendedCommands.push(command)
 		}
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal, { preferredCwd: '/work/project', openCwd: '/work/project' })
@@ -244,10 +244,10 @@ describe('client startup', () => {
 			working: {},
 				updatedAt: '2026-04-09T20:00:00.000Z',
 		}
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal, { preferredCwd: '/work/project', preferredSessionId: 's35' })
@@ -273,10 +273,10 @@ describe('client startup', () => {
 			})
 			const shared = makeSharedState(['s1'])
 			const hostLock = { pid: null, createdAt: '' }
-			ipc.readState = () => shared
+			clientTransport.io.readState = () => shared
 			liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 			liveFiles.onChange = () => {}
-			ipc.tailEvents = async function* () {}
+			clientTransport.io.tailEvents = async function* () {}
 
 			const ac = new AbortController()
 			client.startClient(ac.signal)
@@ -303,10 +303,10 @@ describe('client startup', () => {
 			})
 			const shared = makeSharedState(['s1'])
 			const hostLock = { pid: null, createdAt: '' }
-			ipc.readState = () => shared
+			clientTransport.io.readState = () => shared
 			liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 			liveFiles.onChange = () => {}
-			ipc.tailEvents = async function* () {}
+			clientTransport.io.tailEvents = async function* () {}
 
 			const ac = new AbortController()
 			client.startClient(ac.signal)
@@ -332,10 +332,10 @@ describe('client startup', () => {
 		})
 
 		const shared = makeSharedState([])
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -361,12 +361,12 @@ describe('client startup', () => {
 		const shared = makeSharedState(['s1'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const blobLoads: string[][] = []
 		blockData.loadBlobs = async (blocks) => {
@@ -392,12 +392,12 @@ describe('client startup', () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -417,12 +417,12 @@ describe('client startup', () => {
 		const shared = makeSharedState(['s1', 's2', 's3'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -444,15 +444,15 @@ describe('client startup', () => {
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
-		ipc.readState = () => shared
-		ipc.appendCommand = (command) => {
+		clientTransport.io.readState = () => shared
+		clientTransport.io.appendCommand = (command) => {
 			appendedCommands.push(command)
 		}
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -483,15 +483,15 @@ describe('client startup', () => {
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
-		ipc.readState = () => shared
-		ipc.appendCommand = (command) => {
+		clientTransport.io.readState = () => shared
+		clientTransport.io.appendCommand = (command) => {
 			appendedCommands.push(command)
 		}
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -520,12 +520,12 @@ describe('client startup', () => {
 		const shared = makeSharedState(['s1', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -546,15 +546,15 @@ describe('client startup', () => {
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
 		const appendedCommands: any[] = []
-		ipc.readState = () => shared
-		ipc.appendCommand = (command) => {
+		clientTransport.io.readState = () => shared
+		clientTransport.io.appendCommand = (command) => {
 			appendedCommands.push(command)
 		}
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -579,12 +579,12 @@ describe('client startup', () => {
 		const shared = makeSharedState(['s1', 's3', 's2'])
 		const hostLock = { pid: null, createdAt: '' }
 		let onIpcChange: ((change: TestLiveFileChange) => void) | undefined
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = (path) => path.endsWith('/ipc/state.ason') ? shared as any : hostLock as any
 		liveFiles.onChange = (file, cb) => {
 			if (file === shared) onIpcChange = cb
 		}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -614,10 +614,10 @@ describe('client startup', () => {
 		}) + '\n')
 
 		const shared = makeSharedState(['s1', 's2'])
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -632,12 +632,12 @@ describe('client startup', () => {
 
 	test('tails events from the end without replaying the whole event log', async () => {
 		const shared = makeSharedState(['s1'])
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
 
 		let tailCalls = 0
-		ipc.tailEvents = async function* () {
+		clientTransport.io.tailEvents = async function* () {
 			tailCalls++
 		}
 
@@ -662,10 +662,10 @@ describe('client startup', () => {
 		})
 
 		const shared = makeSharedState(['s1'])
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)
@@ -686,10 +686,10 @@ describe('client startup', () => {
 
 		const shared = makeSharedState(['s1'])
 		shared.working.s1 = true
-		ipc.readState = () => shared
+		clientTransport.io.readState = () => shared
 		liveFiles.liveFile = () => shared as any
 		liveFiles.onChange = () => {}
-		ipc.tailEvents = async function* () {}
+		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
 		client.startClient(ac.signal)

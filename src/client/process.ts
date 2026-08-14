@@ -1,4 +1,4 @@
-import { ipc } from '../ipc.ts'
+import { clientTransport } from './transport.ts'
 import { clientBackend } from './backend.ts'
 import { STATE_DIR } from '../state.ts'
 import { liveFiles } from '../utils/live-file.ts'
@@ -30,7 +30,7 @@ function startWatchingHostLock(ctx: any): void {
 
 function startWatchingIpcState(ctx: any) {
 	if (!state.ipcStateFile) {
-		state.ipcStateFile = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, ipc.readState())
+		state.ipcStateFile = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, clientTransport.io.readState())
 		liveFiles.onChange(state.ipcStateFile, () => {
 			ctx.applySharedState(state.ipcStateFile!)
 			ctx.onChange(false)
@@ -44,13 +44,13 @@ function start(signal: AbortSignal, opts: any, ctx: any): void {
 	const shared = startWatchingIpcState(ctx)
 	clientBackend.subscriptions.onChange(() => ctx.onChange(false))
 	void (async () => {
-		for await (const event of ipc.tailEvents(signal)) ctx.handleEvent(event)
+		for await (const event of clientTransport.io.tailEvents(signal)) ctx.handleEvent(event)
 	})()
 	ctx.initializeSessions(shared, opts)
 	if (!opts.openCwd) ctx.focusCurrentTab()
 	if (opts.openCwd) {
 		ctx.onStartupOpen()
-		ipc.appendCommand({ type: 'open', cwd: opts.openCwd, sessionId: ctx.currentSessionId() })
+		clientTransport.io.appendCommand({ type: 'open', cwd: opts.openCwd, sessionId: ctx.currentSessionId() })
 		log.info('Client queued startup open command', { cwd: opts.openCwd, sessionId: ctx.currentSessionId() ?? null })
 	}
 	ctx.onChange(false)

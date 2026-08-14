@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { sessions } from '../sessions.ts'
 import { whatSummary } from './what.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 
 const createdIds: string[] = []
 

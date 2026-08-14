@@ -1,4 +1,4 @@
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 import { models } from '../../common/models.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { protocol, type Message } from '../../common/protocol.ts'

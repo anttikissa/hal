@@ -5,7 +5,7 @@ import { readFileSync, existsSync, readdirSync, rmSync, appendFileSync, writeFil
 import { randomBytes } from 'crypto'
 import type { SharedSessionInfo } from '../common/ipc.ts'
 import { STATE_DIR, ensureDir } from '../state.ts'
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import type { HistoryEntry } from '../common/history.ts'

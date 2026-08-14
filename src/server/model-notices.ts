@@ -1,7 +1,7 @@
 // Model metadata refresh notices — models.dev refresh on startup plus
 // synthetic assistant suggestions for alias updates and new model discoveries.
 
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { protocol } from '../common/protocol.ts'
 import { models } from '../common/models.ts'
 import { sessions as sessionStore, type SessionMeta } from './sessions.ts'

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 import { spawnAgent } from './spawn_agent.ts'
 
 const origAppendCommand = ipc.appendCommand

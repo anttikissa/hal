@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { ipc } from '../../ipc.ts'
+import { ipc } from '../file-ipc.ts'
 import { inbox } from '../runtime/inbox.ts'
 import { send } from './send.ts'
 

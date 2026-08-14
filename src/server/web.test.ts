@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import type { SharedState } from '../common/ipc.ts'
-import { ipc } from '../ipc.ts'
+import { ipc } from './file-ipc.ts'
 import { blob } from './session/blob.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'

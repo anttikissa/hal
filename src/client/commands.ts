@@ -1,6 +1,6 @@
 import type { Command, CommandType } from '../common/protocol.ts'
 
-export type ClientCommandType = Exclude<CommandType, 'client-exit' | 'client-status' | 'compact' | 'focus' | 'reset' | 'spawn' | 'tool-confirm'>
+export type ClientCommandType = Exclude<CommandType, 'client-exit' | 'client-status' | 'compact' | 'draft-saved' | 'focus' | 'reset' | 'spawn' | 'tool-confirm'>
 
 type PendingTabAction = 'open' | 'fork' | 'resume' | false
 

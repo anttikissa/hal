@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { cli } from './cli.ts'
 import { client } from './app.ts'
-import { ipc } from '../ipc.ts'
+import { clientTransport } from './transport.ts'
 import { prompt } from './terminal/prompt.ts'
 import { render } from './render.ts'
 import { cursor } from './terminal/cursor.ts'
@@ -108,7 +108,7 @@ test('external editor suppresses resize redraws', () => {
 
 test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origTabs = client.state.tabs.slice()
 	const origFocusedTab = client.state.focusedTabIndex
 
@@ -131,14 +131,14 @@ test('ctrl-shift-t queues resume of the most recently closed tab', () => {
 		model: 'openai/gpt-5.4',
 	})
 	client.state.focusedTabIndex = 0
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 't', shift: true, ctrl: true, alt: false, cmd: false })
 		expect(handled).toBe(true)
 		expect(commands).toEqual([{ type: 'resume', sessionId: '04-bbb' }])
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
 		client.state.focusedTabIndex = origFocusedTab
@@ -244,11 +244,11 @@ test('idle up uses normal prompt history without edit mode hint', () => {
 
 test('just-sent edit mode survives tab switching', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origSaveDraft = client.saveDraft
 	const tab1 = makeTab({ sessionId: 's1', inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }, { type: 'assistant', text: 'partial' }] as any[] })
 	const tab2 = makeTab({ sessionId: 's2', inputDraft: 'second draft' })
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.saveDraft = () => {}
 	client.state.working.set('s1', true)
 
@@ -275,7 +275,7 @@ test('just-sent edit mode survives tab switching', () => {
 			expect(promptEdit.hint('s1')).toContain('editing just-sent prompt')
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.saveDraft = origSaveDraft
 		client.state.working.clear()
 		client.setOnTabSwitch(() => {})
@@ -287,12 +287,12 @@ test('just-sent edit mode survives tab switching', () => {
 
 test('model picker keeps the prompt draft and skips unchanged model', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	prompt.setText('draft prompt')
 
 	withPatched(render, 'draw', (() => {}) as typeof render.draw, () => {
 		withOneTab(makeTab(), () => {
-			ipc.appendCommand = (command) => { commands.push(command) }
+			clientTransport.io.appendCommand = (command) => { commands.push(command) }
 			try {
 				const opened = cli.forTests.handleAppKey({ key: 'm', shift: false, ctrl: true, alt: false, cmd: false })
 				expect(opened).toBe(true)
@@ -304,7 +304,7 @@ test('model picker keeps the prompt draft and skips unchanged model', () => {
 				expect(commands).toEqual([])
 				expect(prompt.text()).toBe('draft prompt')
 			} finally {
-				ipc.appendCommand = origAppendCommand
+				clientTransport.io.appendCommand = origAppendCommand
 			}
 		})
 	})
@@ -314,11 +314,11 @@ test('model picker keeps the prompt draft and skips unchanged model', () => {
 test('ctrl-f saves the current prompt draft before forking', () => {
 	const commands: any[] = []
 	const drafts: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origSaveDraft = client.saveDraft
 	const tab = makeTab({ sessionId: 's1' })
 
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.saveDraft = (text, sessionId) => { drafts.push({ text, sessionId }) }
 
 	try {
@@ -331,16 +331,16 @@ test('ctrl-f saves the current prompt draft before forking', () => {
 			expect(commands).toEqual([{ type: 'open', sessionId: 's1', forkSessionId: 's1' }])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.saveDraft = origSaveDraft
 	}
 })
 
 test('alt-enter queues prompt without binding cmd-enter', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab()
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		withOneTab(tab, () => {
@@ -356,15 +356,15 @@ test('alt-enter queues prompt without binding cmd-enter', () => {
 			expect(commands).toHaveLength(1)
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 	}
 })
 
 test('up while working before output edits the just-sent prompt', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -383,7 +383,7 @@ test('up while working before output edits the just-sent prompt', () => {
 			expect(promptEdit.state.active).toBe(null)
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -391,12 +391,12 @@ test('up while working before output edits the just-sent prompt', () => {
 
 test('up immediately after submit pauses before shared working state arrives', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		inputHistory: ['old prompt'],
 		history: [{ type: 'user', text: 'old prompt' }, { type: 'assistant', text: 'old answer' }] as any[],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		withOneTab(tab, () => {
@@ -411,7 +411,7 @@ test('up immediately after submit pauses before shared working state arrives', (
 			])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		client.state.pendingPromptTexts.clear()
 		promptEdit.cancel()
@@ -421,9 +421,9 @@ test('up immediately after submit pauses before shared working state arrives', (
 test('host delivers prompt and abort directly instead of waiting for disk IPC', () => {
 	const disk: any[] = []
 	const urgent: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab()
-	ipc.appendCommand = (command) => { disk.push(command) }
+	clientTransport.io.appendCommand = (command) => { disk.push(command) }
 	client.state.localCommandHandler = (command) => { urgent.push(command) }
 
 	try {
@@ -437,7 +437,7 @@ test('host delivers prompt and abort directly instead of waiting for disk IPC', 
 			expect(disk).toEqual([])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.localCommandHandler = null
 	}
 })
@@ -445,14 +445,14 @@ test('host delivers prompt and abort directly instead of waiting for disk IPC', 
 
 test('up while working edits pasted prompt contents instead of display marker', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const actual = 'Analyze this:\n\nline one\nline two\nline three'
 	const display = 'Analyze this:\n\n[/tmp/hal/paste/0002.txt]'
 	const tab = makeTab({
 		inputHistory: [actual],
 		history: [{ type: 'user', text: display, actualText: actual }] as any[],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -465,7 +465,7 @@ test('up while working edits pasted prompt contents instead of display marker', 
 			expect(commands.at(-1)).toEqual({ type: 'prompt-amend', sessionId: 's1', text: actual, displayText: undefined })
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -474,12 +474,12 @@ test('up while working edits pasted prompt contents instead of display marker', 
 
 test('up while working edits the visible latest prompt when local input history is stale', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		inputHistory: ['older prompt'],
 		history: [{ type: 'user', text: 'latest visible prompt' }] as any[],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -492,7 +492,7 @@ test('up while working edits the visible latest prompt when local input history 
 			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -500,7 +500,7 @@ test('up while working edits the visible latest prompt when local input history 
 
 test('up while working does not copy an inbox handoff as a prompt', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		inputHistory: ['my prompt'],
 		history: [
@@ -508,7 +508,7 @@ test('up while working does not copy an inbox handoff as a prompt', () => {
 			{ type: 'user', text: 'handoff from another tab', source: 'other-session' },
 		] as any[],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -522,7 +522,7 @@ test('up while working does not copy an inbox handoff as a prompt', () => {
 			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -531,9 +531,9 @@ test('up while working does not copy an inbox handoff as a prompt', () => {
 
 test('up on newline draft while working stays in the prompt', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -548,7 +548,7 @@ test('up on newline draft while working stays in the prompt', () => {
 			expect(commands).toEqual([])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -557,7 +557,7 @@ test('up on newline draft while working stays in the prompt', () => {
 
 test('up while working after visible output edits by canceling old turn', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		inputHistory: ['original prompt'],
 		history: [
@@ -565,7 +565,7 @@ test('up while working after visible output edits by canceling old turn', () => 
 			{ type: 'assistant', text: 'partial answer' },
 		] as any[],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -581,7 +581,7 @@ test('up while working after visible output edits by canceling old turn', () => 
 			expect(commands.at(-1)).toEqual({ type: 'prompt-amend', sessionId: 's1', text: 'edited prompt', displayText: undefined })
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -590,12 +590,12 @@ test('up while working after visible output edits by canceling old turn', () => 
 
 test('history navigation inside just-sent edit skips the already loaded prompt', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		inputHistory: ['older prompt', 'original prompt'],
 		history: [{ type: 'user', text: 'original prompt' }] as any[],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -615,7 +615,7 @@ test('history navigation inside just-sent edit skips the already loaded prompt',
 			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -623,9 +623,9 @@ test('history navigation inside just-sent edit skips the already loaded prompt',
 
 test('down from just-sent edit continues the original prompt', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -643,7 +643,7 @@ test('down from just-sent edit continues the original prompt', () => {
 			])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -652,13 +652,13 @@ test('down from just-sent edit continues the original prompt', () => {
 
 test('down from restored just-sent edit continues the original prompt', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		inputDraft: 'edited but discarded',
 		inputDraftEdit: { mode: 'cancel', originalText: 'original prompt', pausedWorkingTurn: true },
 		history: [{ type: 'user', text: 'original prompt' }, { type: 'assistant', text: 'partial' }] as any[],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		withOneTab(tab, () => {
@@ -674,7 +674,7 @@ test('down from restored just-sent edit continues the original prompt', () => {
 			expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		promptEdit.cancel()
 	}
 })
@@ -712,9 +712,9 @@ test('tab switch loads empty draft when prompt-edit metadata exists', () => {
 
 test('down in just-sent edit moves through blank prompt lines before continuing', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({ inputHistory: ['original prompt'], history: [{ type: 'user', text: 'original prompt' }] as any[] })
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	client.state.working.set('s1', true)
 
 	try {
@@ -731,7 +731,7 @@ test('down in just-sent edit moves through blank prompt lines before continuing'
 			expect(commands).toEqual([{ type: 'abort', sessionId: 's1', abortText: '' }])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		promptEdit.cancel()
 	}
@@ -739,8 +739,8 @@ test('down in just-sent edit moves through blank prompt lines before continuing'
 
 test('ctrl-q runs the next queued prompt', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
-	ipc.appendCommand = (command) => { commands.push(command) }
+	const origAppendCommand = clientTransport.io.appendCommand
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		withOneTab(makeTab(), () => {
@@ -749,16 +749,16 @@ test('ctrl-q runs the next queued prompt', () => {
 			expect(commands).toEqual([{ type: 'run-next-from-queue', sessionId: 's1' }])
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 	}
 })
 
 
 test('/keys is local terminal help and does not send a prompt while working', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab()
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		client.state.working.set('s1', true)
@@ -773,14 +773,14 @@ test('/keys is local terminal help and does not send a prompt while working', ()
 			expect(tab.history.at(-1)).toMatchObject({ type: 'log', text: expect.stringContaining('cmd+c') })
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 	}
 })
 
 test('enter on empty paused tab sends continue', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origTabs = client.state.tabs.slice()
 	const origFocusedTab = client.state.focusedTabIndex
 
@@ -789,14 +789,14 @@ test('enter on empty paused tab sends continue', () => {
 	client.state.focusedTabIndex = 0
 	prompt.clear()
 	client.state.working.clear()
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 		expect(handled).toBe(true)
 		expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
 		client.state.focusedTabIndex = origFocusedTab
@@ -805,7 +805,7 @@ test('enter on empty paused tab sends continue', () => {
 
 test('enter on empty working error tab does not retry again', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origTabs = client.state.tabs.slice()
 	const origFocusedTab = client.state.focusedTabIndex
 
@@ -814,14 +814,14 @@ test('enter on empty working error tab does not retry again', () => {
 	client.state.focusedTabIndex = 0
 	prompt.clear()
 	client.state.working.set('s1', true)
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 		expect(handled).toBe(true)
 		expect(commands).toEqual([])
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
@@ -832,7 +832,7 @@ test('enter on empty working error tab does not retry again', () => {
 
 test('enter on empty error tab hides retry action immediately', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origTabs = client.state.tabs.slice()
 	const origFocusedTab = client.state.focusedTabIndex
 
@@ -841,7 +841,7 @@ test('enter on empty error tab hides retry action immediately', () => {
 	client.state.focusedTabIndex = 0
 	prompt.clear()
 	client.state.working.clear()
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
@@ -849,7 +849,7 @@ test('enter on empty error tab hides retry action immediately', () => {
 		expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
 		expect(client.continueActionForCurrentTurn()).toBe(false)
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
@@ -859,7 +859,7 @@ test('enter on empty error tab hides retry action immediately', () => {
 
 test('enter on empty working retry status does not interrupt backoff', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origTabs = client.state.tabs.slice()
 	const origFocusedTab = client.state.focusedTabIndex
 
@@ -873,14 +873,14 @@ test('enter on empty working retry status does not interrupt backoff', () => {
 	client.state.focusedTabIndex = 0
 	prompt.clear()
 	client.state.working.set('s1', true)
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 		expect(handled).toBe(true)
 		expect(commands).toEqual([])
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.working.clear()
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
@@ -890,7 +890,7 @@ test('enter on empty working retry status does not interrupt backoff', () => {
 
 test('enter on empty normal tab does not send continue', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const origTabs = client.state.tabs.slice()
 	const origFocusedTab = client.state.focusedTabIndex
 
@@ -899,14 +899,14 @@ test('enter on empty normal tab does not send continue', () => {
 	client.state.focusedTabIndex = 0
 	prompt.clear()
 	client.state.working.clear()
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
 		const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
 		expect(handled).toBe(true)
 		expect(commands).toEqual([])
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
 		client.state.focusedTabIndex = origFocusedTab
@@ -916,13 +916,13 @@ test('enter on empty normal tab does not send continue', () => {
 
 test('large stale Claude session opens overage confirmation before sending', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		model: 'anthropic/claude-opus-4-7',
 		contextUsed: 170_000,
 		history: [{ type: 'assistant', text: 'old', model: 'anthropic/claude-opus-4-7', ts: Date.now() - 24 * 60 * 60 * 1000 }],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	try {
 		withOneTab(tab, () => {
 			prompt.setText('hi')
@@ -934,19 +934,19 @@ test('large stale Claude session opens overage confirmation before sending', () 
 			expect(prompt.text()).toBe('hi')
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 	}
 })
 
 test('large stale Claude confirmation sends when accepted', () => {
 	const commands: any[] = []
-	const origAppendCommand = ipc.appendCommand
+	const origAppendCommand = clientTransport.io.appendCommand
 	const tab = makeTab({
 		model: 'anthropic/claude-opus-4-7',
 		contextUsed: 170_000,
 		history: [{ type: 'assistant', text: 'old', model: 'anthropic/claude-opus-4-7', ts: Date.now() - 24 * 60 * 60 * 1000 }],
 	})
-	ipc.appendCommand = (command) => { commands.push(command) }
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 	try {
 		withOneTab(tab, () => {
 			prompt.setText('hi')
@@ -956,6 +956,6 @@ test('large stale Claude confirmation sends when accepted', () => {
 			expect(prompt.text()).toBe('')
 		})
 	} finally {
-		ipc.appendCommand = origAppendCommand
+		clientTransport.io.appendCommand = origAppendCommand
 	}
 })
