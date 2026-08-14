@@ -13,6 +13,7 @@ import { renderStatus } from './client/render-status.ts'
 import { renderHistory } from './client/render-history.ts'
 import { agentLoop } from './server/runtime/agent-loop.ts'
 import { inbox } from './server/runtime/inbox.ts'
+import { tabLimit } from './server/tab-limit.ts'
 import { memory } from './server/memory.ts'
 import { models } from './common/models.ts'
 import { anthropicUsage } from './server/anthropic-usage.ts'
@@ -26,6 +27,7 @@ import { HAL_DIR } from './server/state.ts'
 // Module name → config object. Add new modules here as they gain configs.
 const modules: Record<string, Record<string, any>> = {
 	client: client.config,
+	tabs: tabLimit.config,
 	blocks: blocks.config,
 	prompt: prompt.config,
 	clipboard: clipboard.config,

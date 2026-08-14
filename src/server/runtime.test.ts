@@ -472,6 +472,29 @@ test('open command inherits cwd and model from opener tab', () => {
 })
 
 
+test('server rejects a new tab when the shared tab limit is reached', () => {
+	const originalOpenSessionIds = runtime.state.openSessionIds
+	const originalMaxTabs = tabs.config.maxTabs
+	const originalCreateSessionTab = tabs.createSessionTab
+	let created = false
+	runtime.state.openSessionIds = ['04-open']
+	tabs.config.maxTabs = 1
+	tabs.createSessionTab = (() => {
+		created = true
+		throw new Error('must not create beyond the shared tab limit')
+	}) as typeof tabs.createSessionTab
+
+	try {
+		runtime.handleCommand({ type: 'open', sessionId: '04-open' })
+		expect(created).toBe(false)
+	} finally {
+		runtime.state.openSessionIds = originalOpenSessionIds
+		tabs.config.maxTabs = originalMaxTabs
+		tabs.createSessionTab = originalCreateSessionTab
+	}
+})
+
+
 test('shouldAutoContinue resumes only restarted interrupted turns', () => {
 	expect(runtime.shouldAutoContinue([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },

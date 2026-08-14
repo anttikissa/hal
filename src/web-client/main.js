@@ -135,5 +135,8 @@ socket.onmessage = (event) => {
 	snapshot = next
 	renderSnapshot()
 }
+// TODO: Reconnect in place before URL-based session selection is added. A route is
+// one-shot open/resume intent and must not be replayed if another client closed the
+// session while this client was disconnected.
 socket.onclose = () => setTimeout(() => location.reload(), 1000)
 void refreshTabs().then(refresh)

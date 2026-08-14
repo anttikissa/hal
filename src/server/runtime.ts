@@ -22,7 +22,6 @@ import { replay } from './session/replay.ts'
 import { openaiUsage } from './openai-usage.ts'
 import { toolRegistry } from './tools/tool.ts'
 import { log } from '../utils/log.ts'
-import { startup } from '../startup.ts'
 import { promptQueue } from './runtime/prompt-queue.ts'
 import { openai } from './providers/openai.ts'
 import { paths } from './paths.ts'
@@ -751,6 +750,17 @@ function handleCommand(cmd: Command): void {
 				openSessionIds: state.openSessionIds.length,
 				commandCreatedAt: cmd.createdAt,
 			})
+			const needsNewSession = 'forkSessionId' in cmd
+				|| ('cwd' in cmd && !!cmd.cwd && !!cmd.forceNew)
+				|| 'afterSessionId' in cmd
+				|| !cmd.cwd
+			let limitReason: string | null = null
+			if (needsNewSession) limitReason = tabs.openLimitReason()
+			if (limitReason) {
+				const sid = sessionId ?? state.openSessionIds[0]
+				if (sid) emitInfo(sid, limitReason, 'error')
+				break
+			}
 			if ('forkSessionId' in cmd) {
 				const child = tabs.createSessionTab({ sourceId: cmd.forkSessionId, workingDir: cmd.cwd })
 				emitInfo(cmd.forkSessionId, `Tab forked to ${tabs.sessionLabel(child)}.`, 'info', 'notice')
@@ -759,7 +769,7 @@ function handleCommand(cmd: Command): void {
 			} else if ('afterSessionId' in cmd) {
 				tabs.createSessionTab({ openerId: sessionId, afterId: cmd.afterSessionId })
 			} else if (cmd.cwd) {
-				const target = tabs.activateTargetForCwd(cmd.cwd)
+				const target = tabs.openSessionForCwd(cmd.cwd)
 				if (!target.ok) {
 					const sid = sessionId ?? state.openSessionIds[0]
 					if (sid) emitInfo(sid, target.reason, 'error')
@@ -814,6 +824,11 @@ function handleCommand(cmd: Command): void {
 				)
 				break
 			}
+			const limitReason = tabs.openLimitReason()
+			if (limitReason) {
+				emitInfo(sessionId ?? state.openSessionIds[0] ?? resumeId, limitReason, 'error')
+				break
+			}
 			const resumed = sessionStore.activateSession(resumeId)
 			if (!resumed) {
 				emitInfo(sessionId ?? state.openSessionIds[0] ?? resumeId, `Session ${resumeId} not found`, 'error')
@@ -854,7 +869,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	state.pendingToolRuns.clear()
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
-		const target = tabs.activateTargetForCwd(opts.targetCwd)
+		const target = tabs.openSessionForCwd(opts.targetCwd)
 		if (!target.ok) return target
 		startupSessionId = target.sessionId
 	} else if (state.openSessionIds.length === 0) {

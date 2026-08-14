@@ -168,7 +168,7 @@ describe('client startup', () => {
 		expect(errors.some((entry) => entry.message === 'failed to load client state')).toBe(true)
 	})
 
-	test('saved last tab wins on restart when it is in the requested cwd', async () => {
+	test('peer-selected open session overrides ordinary persisted focus', async () => {
 		writeFileSync(CLIENT_STATE_PATH, ason.stringify({
 			lastTab: 's2',
 			peak: 0,
@@ -190,11 +190,11 @@ describe('client startup', () => {
 		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
-		client.startClient(ac.signal, { preferredCwd: '/work/project', preferredSessionId: 's1' })
+		client.startClient(ac.signal, { preferredSessionId: 's1' })
 		await Bun.sleep(10)
 		ac.abort()
 
-		expect(client.currentTab()?.sessionId).toBe('s2')
+		expect(client.currentTab()?.sessionId).toBe('s1')
 	})
 
 	test('startup openCwd queues without blocking and focuses the host-created tab', async () => {
@@ -213,7 +213,7 @@ describe('client startup', () => {
 		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
-		client.startClient(ac.signal, { preferredCwd: '/work/project', openCwd: '/work/project' })
+		client.startClient(ac.signal, { openCwd: '/work/project' })
 		await Bun.sleep(10)
 		expect(client.currentTab()?.sessionId).toBe('s1')
 		expect(appendedCommands).toEqual([{ type: 'open', cwd: '/work/project', sessionId: 's1' }])
@@ -251,7 +251,7 @@ describe('client startup', () => {
 		clientTransport.io.tailEvents = async function* () {}
 
 		const ac = new AbortController()
-		client.startClient(ac.signal, { preferredCwd: '/work/project', preferredSessionId: 's35' })
+		client.startClient(ac.signal, { preferredSessionId: 's35' })
 		await Bun.sleep(10)
 		ac.abort()
 

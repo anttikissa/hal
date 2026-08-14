@@ -18,6 +18,10 @@
 		// Treat Anthropic prompt cache as cold after this many milliseconds.
 		claudeCacheWarningStaleMs: 300000
 	},
+	tabs: {
+		// Maximum number of sessions in the shared open-tab list.
+		maxTabs: 40
+	},
 	blocks: {
 		// Display width for tab characters in rendered blocks.
 		tabWidth: 4,

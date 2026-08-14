@@ -74,12 +74,12 @@ export interface PauseBeforeToolsCommand extends CommandBase {
 
 export interface OpenNewCommand extends CommandBase {
 	type: 'open'
-	// Startup can request a tab for the client's directory. The host process may
-	// have a different cwd, so this must travel over IPC explicitly.
+	// A same-machine peer can request a tab for its shell directory. The active
+	// server process may have a different cwd, so the peer sends its path explicitly.
 	cwd?: string
-	// Slash commands such as /self need a genuinely new tab even if another
-	// open/closed session already has this cwd. Startup leaves this false so a
-	// second terminal still attaches to the existing project session safely.
+	// Slash commands such as /self need a genuinely new tab even when another open
+	// session has this cwd. Peer startup leaves this false and reuses the first open
+	// match; dormant sessions are resumed only by an explicit resume operation.
 	forceNew?: boolean
 }
 export interface OpenForkCommand extends CommandBase {

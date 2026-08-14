@@ -17,7 +17,8 @@ import { builtins } from './server/tools/builtins.ts'
 import { colors } from './client/terminal/colors.ts'
 import { openaiUsage } from './server/openai-usage.ts'
 import { anthropicUsage } from './server/anthropic-usage.ts'
-import { startup } from './startup.ts'
+import { resolve } from 'path'
+import { tabs } from './server/tabs.ts'
 import { auth } from './server/auth.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './client/terminal/args.ts'
@@ -58,7 +59,7 @@ if (parsedArgs.stateDir && process.env.HAL_STATE_DIR !== parsedArgs.stateDir) {
 	process.stderr.write('--state-dir must be handled by the hal wrapper so HAL_STATE_DIR is set before startup. Use `hal --state-dir <dir>`.\n')
 	process.exit(2)
 }
-const startupCwd = startup.normalizeCwd(parsedArgs.targetCwd)
+const startupCwd = resolve(parsedArgs.targetCwd || '.')
 
 ensureStateDir()
 log.state.path = `${STATE_DIR}/hal.log`
@@ -119,29 +120,29 @@ function failStartup(message: string, code = 1): never {
 	process.exit(code)
 }
 
+// This executable is a same-machine peer: it shares the server's path namespace
+// and may be promoted to server. A future remote terminal client must select by
+// server URL/session ID instead of comparing its local cwd.
+
 function prepareClientStartupTarget(cwd: string): { preferredSessionId?: string; openCwd?: string } {
 	const shared = ipc.readState()
-	const plan = startup.planTarget({
-		cwd,
-		openSessions: shared.sessions,
-		allSessions: sessionStore.loadAllSessionMetas(),
-	})
-
-	if (plan.kind === 'use-open') {
+	const openId = tabs.findOpenSessionForCwd(shared.sessions, cwd)
+	if (openId) {
 		log.info('Client startup target already open', {
 			cwd,
-			sessionId: plan.sessionId,
+			sessionId: openId,
 			openSessions: shared.sessions.length,
 			stateUpdatedAt: shared.updatedAt,
 		})
-		return { preferredSessionId: plan.sessionId }
+		return { preferredSessionId: openId }
 	}
 
-	if (plan.kind === 'refuse') failStartup(plan.reason)
+	if (shared.sessions.length >= tabs.config.maxTabs) {
+		failStartup(`Cannot open ${cwd}: max tabs reached (${tabs.config.maxTabs}). Close one first.`)
+	}
 
 	log.info('Client startup target queued for host', {
 		cwd,
-		plan: plan.kind,
 		hostPid,
 		openSessions: shared.sessions.length,
 		stateUpdatedAt: shared.updatedAt,
@@ -263,5 +264,5 @@ queueMemoryCheck()
 
 electionTimer = setInterval(tickElection, 100)
 
-cli.startCli(ac.signal, { preferredCwd: startupCwd, ...startupTarget })
+cli.startCli(ac.signal, startupTarget)
 if (!isHost) client.publishStatus()

@@ -9,7 +9,6 @@ import { historyProjection } from '../common/history-projection.ts'
 import { draft as draftModule, type DraftPromptEdit } from './terminal/draft.ts'
 import { perf } from './perf.ts'
 import { liveEventBlocks, type LiveEvent } from '../common/live-event-blocks.ts'
-import { startup } from '../startup.ts'
 import { sessionLoader } from './session-loader.ts'
 import { clientTabs } from './tabs.ts'
 import { clientCommands, type ClientCommandType } from './commands.ts'
@@ -646,7 +645,7 @@ function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInf
 	}
 }
 
-function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; preferredSessionId?: string } = {}): void {
+function initializeSessions(shared: SharedState, opts: { preferredSessionId?: string } = {}): void {
 	const items = shared.sessions.length > 0
 		? shared.sessions
 		: clientBackend.sessions.loadAllSessionMetas().map(sessionInfoFromMeta)
@@ -657,16 +656,10 @@ function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; 
 
 	const saved = clientPersistence.load()
 	const restartTab = saved.restartTab ? items.find((item) => item.id === saved.restartTab) : undefined
-	const savedTab = saved.lastTab ? items.find((item) => item.id === saved.lastTab) : undefined
-	const savedTabFitsRequest = savedTab && (!opts.preferredCwd || startup.sameCwd(savedTab.cwd, opts.preferredCwd))
-	const cwdPreferredSession = opts.preferredSessionId
-		?? (opts.preferredCwd ? startup.findOpenSessionForCwd(items, opts.preferredCwd) ?? '' : '')
-	// Ctrl-R is an explicit restart of the current UI, not a fresh attach from the
-	// shell cwd. If the saved restart tab still exists, it wins even when another
-	// tab matches the requested cwd more closely.
-	const preferredSession = restartTab
-		? restartTab.id
-		: savedTabFitsRequest ? saved.lastTab! : (cwdPreferredSession || saved.lastTab || '')
+	// Ctrl-R restarts this UI and therefore preserves its current tab. A fresh peer
+	// invocation supplies a preferred session explicitly; only then do we override
+	// ordinary persisted focus with the session selected for the peer's cwd.
+	const preferredSession = restartTab?.id ?? opts.preferredSessionId ?? saved.lastTab ?? undefined
 	const t0 = performance.now()
 	applySessionList(items, preferredSession)
 	const focused = currentTab()
@@ -721,7 +714,7 @@ function resetForTests(): void {
 	state.whatDoneUnseen.clear()
 }
 
-function startClient(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {
+function startClient(signal: AbortSignal, opts: { preferredSessionId?: string; openCwd?: string } = {}): void {
 	clientProcess.start(signal, opts, {
 		setHostPid: (pid: number | null) => { state.hostPid = pid },
 		applySharedState,

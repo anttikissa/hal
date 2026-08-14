@@ -7,12 +7,15 @@ import { models } from '../common/models.ts'
 import { sessions as sessionStore, type SessionMeta } from './sessions.ts'
 import { sessionIds } from './session/ids.ts'
 import { openingSummary } from './session/opening-summary.ts'
-import { startup } from '../startup.ts'
+import { resolve } from 'path'
 import { log } from '../utils/log.ts'
 import { paths } from './paths.ts'
+import { tabLimit } from './tab-limit.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'
+
+type OpenSessionLike = { id: string; cwd: string }
 
 function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name'>): string {
 	return meta.name ?? meta.id
@@ -76,28 +79,39 @@ function moveSessionToIndex(sessionId: string, targetIndex: number): boolean {
 	return true
 }
 
-function planTargetForCwd(cwd: string): ReturnType<typeof startup.planTarget> {
-	return startup.planTarget({
-		cwd,
-		openSessions: openSessionMetas().map((meta) => sessionStore.sessionOpenInfo(meta)),
-		allSessions: sessionStore.loadAllSessionMetas(),
-	})
+function normalizeCwd(cwd: string | undefined): string {
+	return resolve(cwd || '.')
 }
 
-function activateTargetForCwd(cwd: string): { ok: true; sessionId: string } | { ok: false; reason: string } {
-	const plan = planTargetForCwd(cwd)
-	log.info('Runtime planned cwd activation', { cwd, plan: plan.kind, sessionId: 'sessionId' in plan ? plan.sessionId : undefined })
-	if (plan.kind === 'use-open') return { ok: true, sessionId: plan.sessionId }
-	if (plan.kind === 'refuse') return { ok: false, reason: plan.reason }
-	if (plan.kind === 'resume') {
-		const resumed = sessionStore.activateSession(plan.sessionId)
-		if (!resumed) return { ok: false, reason: `Session ${plan.sessionId} not found` }
-		runtime.state.openSessionIds = restoredSessionOrder(runtime.state.openSessionIds, plan.sessionId, resumed.closedTabPosition)
-		sessionStore.updateMeta(plan.sessionId, { closedAt: undefined })
-		focusSession(plan.sessionId)
-		return { ok: true, sessionId: plan.sessionId }
+function sameCwd(a: string | undefined, b: string | undefined): boolean {
+	return tabs.normalizeCwd(a) === tabs.normalizeCwd(b)
+}
+
+function findOpenSessionForCwd(openSessions: OpenSessionLike[], cwd: string): string | null {
+	return openSessions.find((session) => tabs.sameCwd(session.cwd, cwd))?.id ?? null
+}
+
+function openLimitReason(cwd?: string): string | null {
+	if (runtime.state.openSessionIds.length < tabs.config.maxTabs) return null
+	if (cwd) return `Cannot open ${tabs.normalizeCwd(cwd)}: max tabs reached (${tabs.config.maxTabs}). Close one first.`
+	return `Max tabs reached (${tabs.config.maxTabs}). Close one first.`
+}
+
+function openSessionForCwd(cwd: string): { ok: true; sessionId: string } | { ok: false; reason: string } {
+	const normalizedCwd = tabs.normalizeCwd(cwd)
+	const openSessions = tabs.openSessionMetas().map((meta) => sessionStore.sessionOpenInfo(meta))
+	const openId = tabs.findOpenSessionForCwd(openSessions, normalizedCwd)
+	if (openId) {
+		tabs.focusSession(openId)
+		log.info('Runtime selected open session for cwd', { cwd: normalizedCwd, sessionId: openId })
+		return { ok: true, sessionId: openId }
 	}
-	const created = tabs.createSessionTab({ workingDir: cwd })
+
+	const limitReason = tabs.openLimitReason(normalizedCwd)
+	if (limitReason) return { ok: false, reason: limitReason }
+
+	const created = tabs.createSessionTab({ workingDir: normalizedCwd })
+	log.info('Runtime created session for cwd', { cwd: normalizedCwd, sessionId: created.id })
 	return { ok: true, sessionId: created.id }
 }
 
@@ -169,6 +183,11 @@ function syncSharedState(): void {
 }
 
 export const tabs = {
+	config: tabLimit.config,
+	normalizeCwd,
+	sameCwd,
+	findOpenSessionForCwd,
+	openLimitReason,
 	sessionTitle,
 	sessionLabel,
 	openSessionMetas,
@@ -177,7 +196,7 @@ export const tabs = {
 	insertSessionAfter,
 	restoredSessionOrder,
 	moveSessionToIndex,
-	activateTargetForCwd,
+	openSessionForCwd,
 	recordSessionInfo,
 	createSessionTab,
 	closeSession,

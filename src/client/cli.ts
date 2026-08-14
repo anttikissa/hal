@@ -17,7 +17,6 @@ import { blocks } from './terminal/blocks.ts'
 import { colors } from './terminal/colors.ts'
 import { perf } from './perf.ts'
 import { clientBackend } from './backend.ts'
-import { startup } from '../startup.ts'
 import { models } from '../common/models.ts'
 import { clientTransport } from './transport.ts'
 import type { KeyEvent } from './terminal/keys.ts'
@@ -612,10 +611,8 @@ function handleCompletionKey(k: KeyEvent): boolean {
 }
 
 
-function sendTabCommandIfRoom(type: 'open' | 'resume', text?: string): void {
-	const maxTabs = startup.config.maxTabs
-	if (client.state.tabs.length < maxTabs) client.sendCommand(type, text)
-	else client.addEntry(`Max tabs reached (${maxTabs}). Close one first.`, 'error')
+function sendTabCommand(type: 'open' | 'resume', text?: string): void {
+	client.sendCommand(type, text)
 }
 
 function chooseModelWithoutClearingDraft(model: string): void {
@@ -710,7 +707,7 @@ function handleAppKey(k: KeyEvent): boolean {
 		// Ctrl-T: new tab. Ctrl-Shift-T restores the most recently closed tab,
 		// matching Chrome, so plain Ctrl-T must require no shift.
 		if (k.key === 't') {
-			sendTabCommandIfRoom(k.shift ? 'resume' : 'open')
+			sendTabCommand(k.shift ? 'resume' : 'open')
 			return true
 		}
 		// Ctrl-F: fork tab
@@ -718,7 +715,7 @@ function handleAppKey(k: KeyEvent): boolean {
 			const tab = client.currentTab()
 			if (tab) {
 				client.saveDraft(prompt.draftText(), tab.sessionId, promptEditDraftFor(tab.sessionId))
-				sendTabCommandIfRoom('open', `fork:${tab.sessionId}`)
+				sendTabCommand('open', `fork:${tab.sessionId}`)
 			}
 			return true
 		}
@@ -773,7 +770,7 @@ function handleAppKey(k: KeyEvent): boolean {
 	return false
 }
 
-function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredSessionId?: string; openCwd?: string } = {}): void {
+function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; openCwd?: string } = {}): void {
 	// Wire state changes to repaint.
 	client.setOnChange(draw)
 	client.setOnToolConfirmRequest(openToolConfirm)
