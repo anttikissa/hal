@@ -125,6 +125,32 @@ describe('render fullscreen growth', () => {
 		}
 	})
 
+	test('anchors changed fullscreen growth to the physical viewport', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 10, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 40, configurable: true })
+		try {
+			for (let i = 0; i < 20; i++) tab.history.push({ type: 'log', text: `old-${i}` })
+			tab.history.push({ type: 'thinking', text: 'first\n\nsecond\n\nthird', streaming: true })
+			const state = terminalLines(captureOutput(() => render.draw()), 10)
+
+			// A delayed autowrap or another terminal-side cursor adjustment can move the
+			// physical cursor without changing the renderer's logical cursorRow.
+			state.row = Math.min(9, state.row + 1)
+			tab.history[tab.history.length - 1] = { type: 'thinking', text: 'first\n\nsecond\n\nthird\n\nfourth', streaming: true }
+			terminalLines(captureOutput(() => render.draw()), 10, state)
+
+			render.resetRenderer()
+			const canonical = terminalLines(captureOutput(() => render.draw(true)), 10)
+			expect(physicalLines(state)).toEqual(physicalLines(canonical))
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
 	test('keeps cursor coordinates valid after a fullscreen prompt shrink', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows

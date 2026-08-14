@@ -193,10 +193,11 @@ function repaintVisibleScreen(lines: string[], cursor: { row: number; col: numbe
 function repaintFullscreenGrowth(lines: string[], cursor: { row: number; col: number }, rows: number): void {
 	const oldLength = prevLines.length
 	const viewportTop = Math.max(0, oldLength - rows)
-	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, moveCursor(cursorRow, viewportTop), '\r']
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}H`]
 
-	// Commit the old viewport before growth pushes any of it into immutable
-	// scrollback, then append only the new suffix and let it scroll naturally.
+	// Anchor at the physical viewport top instead of trusting cursorRow: delayed
+	// autowrap or terminal-side cursor movement can make that logical coordinate
+	// stale. Commit the old viewport, then append only the new suffix.
 	for (let i = viewportTop; i < oldLength; i++) {
 		if (i > viewportTop) out.push('\r\n')
 		out.push(`${CSI}2K${lines[i]!}`)

@@ -247,10 +247,11 @@ clears terminal scrollback. Both cause exactly the regression where streaming
 output interrupts a user reading earlier text.
 
 Frame growth in fullscreen is straightforward only when it is a pure append. If
-an existing row also changes, repaint the old visible screen in place first, then
-append only the new suffix via `\r\n`. This works for growth of any size: every
-old visible row has its final value before it scrolls, and no new row is written
-twice.
+an existing row also changes, anchor at the physical viewport top with `CSI H`,
+repaint the old visible screen in place, then append only the new suffix via
+`\r\n`. Do not derive that anchor from `cursorRow`: delayed autowrap or other
+terminal-side cursor movement can make the logical coordinate stale. The
+absolute anchor prevents stale visible rows from being copied into scrollback.
 
 ### 10. Kitty keyboard protocol
 

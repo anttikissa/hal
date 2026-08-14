@@ -329,13 +329,12 @@ function withInlineCursor(line: string, block: Block, cols: number, visible: boo
 	if (eraseIndex >= 0) {
 		const beforeErase = line.slice(0, eraseIndex)
 		const afterErase = line.slice(eraseIndex)
-		if (visLen(beforeErase) < cols) return [beforeErase + glyph + afterErase]
+		if (visLen(beforeErase) < cols - 1) return [beforeErase + glyph + afterErase]
 	}
 
-	// If the rendered row is already full-width, adding another printable cell
-	// would trigger terminal auto-wrap and break the one-array-line = one-row
-	// invariant. Put the HAL cursor on its own row instead.
-	if (visLen(line) >= cols) return [line, glyph]
+	// Keep the final terminal column unused. Filling it enters delayed-autowrap
+	// state on real terminals and can invalidate the renderer's cursor row.
+	if (visLen(line) >= cols - 1) return [line, glyph]
 	return [line + glyph]
 }
 

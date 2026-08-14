@@ -43,6 +43,12 @@ test('block headers keep a right margin', () => {
 	expect(stripAnsi(withBlobRef[0]!).length).toBe(39)
 })
 
+
+test('streaming cursor leaves the terminal last column unused', () => {
+	const lines = blocks.renderBlock({ type: 'thinking', text: '1234567', streaming: true }, 9, true)
+	for (const line of lines) expect(stripAnsi(line).length).toBeLessThanOrEqual(8)
+})
+
 test('body blocks render a blank line after the header', () => {
 	const samples: Block[] = [
 		{ type: 'user', text: 'hello' },
