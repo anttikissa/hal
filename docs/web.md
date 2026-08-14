@@ -40,10 +40,9 @@ SSR data), we can adopt `@solidjs/router@2.0.0-next` or the TanStack equivalent
 
 ## Sources
 
-1. **Part 1** below is the official cheatsheet, copied verbatim from
-   `node_modules/solid-js/CHEATSHEET.md` as shipped in `solid-js@2.0.0-rc.0`
-   (MIT, © Ryan Carniato / SolidJS contributors). It is kept verbatim and
-   unshifted so it can be diffed against future RC releases.
+1. **Part 1** below is the official cheatsheet by Ryan Carniato, shipped as
+   `node_modules/solid-js/CHEATSHEET.md` in `solid-js@2.0.0-rc.0`
+   (<https://github.com/solidjs/solid/blob/main/packages/solid/CHEATSHEET.md>).
 2. **Part 2** is extra material from
    <https://v2.solidjs.com/migration/from-solid-1> that the cheatsheet omits.
 3. **Part 3** is our own verification notes — things we hit in practice that the
@@ -55,14 +54,10 @@ instead of scraping HTML. `sitemap.xml` lists all 141 pages.
 
 ---
 
-# Part 1 — Official Solid 2.0 cheatsheet (verbatim)
+# Part 1 — Official Solid 2.0 cheatsheet
 
-Copied verbatim from `node_modules/solid-js/CHEATSHEET.md` in `solid-js@2.0.0-rc.0`.
-MIT licensed, © Ryan Carniato and SolidJS contributors.
-Upstream: <https://github.com/solidjs/solid/blob/main/packages/solid/CHEATSHEET.md>
-
-Do not edit this part — replace it wholesale on upgrade so diffs stay readable.
-Our own corrections go in Part 3.
+Currently verbatim from upstream, so it can be diffed against future releases.
+Edit it freely when that makes it clearer to read.
 
 ---
 
