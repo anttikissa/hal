@@ -6,6 +6,7 @@ import { ipc } from './server/file-ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
 import { client } from './client/app.ts'
+import { clientPersistence } from './client/persistence.ts'
 import { clientBackend, type SubscriptionStatus } from './client/backend.ts'
 import { clientTransport } from './client/transport.ts'
 import { memory } from './server/memory.ts'
@@ -189,10 +190,17 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
 	startupTarget.preferredSessionId = started.sessionId
+	const savedTabs = clientPersistence.load()
+	let announcementSessionId = started.sessionId
+	for (const sessionId of [savedTabs.restartTab, savedTabs.lastTab]) {
+		if (!sessionId || !ipc.readState().sessions.some((session) => session.id === sessionId)) continue
+		announcementSessionId = sessionId
+		break
+	}
 	if (parsedArgs.ok && parsedArgs.webPort) {
 		const port = parsedArgs.webPort
 		void import('./server/web.ts')
-			.then(({ web }) => web.start(port, ac.signal, announceWeb ? started.sessionId : undefined))
+			.then(({ web }) => web.start(port, ac.signal, announceWeb ? announcementSessionId : undefined))
 			.catch((error) => log.error('web client startup failed', { error: String(error) }))
 	}
 	ipc.appendEvent({
