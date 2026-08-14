@@ -42,7 +42,7 @@ SSR data), we can adopt `@solidjs/router@2.0.0-next` or the TanStack equivalent
 
 1. **Part 1** below is the official cheatsheet by Ryan Carniato, shipped as
    `node_modules/solid-js/CHEATSHEET.md` in `solid-js@2.0.0-rc.0`
-   (<https://github.com/solidjs/solid/blob/main/packages/solid/CHEATSHEET.md>).
+   (<https://github.com/solidjs/solid/blob/next/packages/solid/CHEATSHEET.md>).
 2. **Part 2** is extra material from
    <https://v2.solidjs.com/migration/from-solid-1> that the cheatsheet omits.
 3. **Part 3** is our own verification notes — things we hit in practice that the
@@ -56,7 +56,8 @@ instead of scraping HTML. `sitemap.xml` lists all 141 pages.
 
 # Part 1 — Official Solid 2.0 cheatsheet
 
-Currently verbatim from upstream, so it can be diffed against future releases.
+Near-verbatim from upstream, so it can be diffed against future releases; the
+only change is the two "See also" links, which point at `main` upstream and 404.
 Edit it freely when that makes it clearer to read.
 
 ---
@@ -724,8 +725,8 @@ If your training data is 1.x, these are the corrections. **Read this before gene
 
 ## See also
 
-- [`MIGRATION.md`](https://github.com/solidjs/solid/blob/main/documentation/solid-2.0/MIGRATION.md) — full beta-tester migration guide.
-- [Solid 2.0 RFCs](https://github.com/solidjs/solid/tree/main/documentation/solid-2.0) — deep-dive design docs by subsystem.
+- [`MIGRATION.md`](https://github.com/solidjs/solid/blob/next/documentation/solid-2.0/MIGRATION.md) — full beta-tester migration guide.
+- [Solid 2.0 RFCs](https://github.com/solidjs/solid/tree/next/documentation/solid-2.0) — deep-dive design docs by subsystem.
 
 ---
 
