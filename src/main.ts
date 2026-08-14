@@ -182,6 +182,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
 	client.state.role = 'server'
 	client.state.localCommandHandler = (command) => { runtime.handleCommand(command) }
+	const announceWeb = kind === 'start' && ipc.readState().sessions.length === 0
 	syncHostVersionState()
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
@@ -189,7 +190,7 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	if (parsedArgs.ok && parsedArgs.webPort) {
 		const port = parsedArgs.webPort
 		void import('./server/web.ts')
-			.then(({ web }) => web.start(port, ac.signal))
+			.then(({ web }) => web.start(port, ac.signal, announceWeb ? started.sessionId : undefined))
 			.catch((error) => log.error('web client startup failed', { error: String(error) }))
 	}
 	ipc.appendEvent({

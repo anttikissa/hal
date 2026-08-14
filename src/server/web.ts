@@ -98,7 +98,12 @@ function nextPort(previousPort: number, tries: number, random = Math.random): nu
 	return previousPort + Math.floor((1 + random() * 2) ** tries)
 }
 
-function start(port: number, signal: AbortSignal): void {
+function announce(sessionId: string | undefined, port: number): void {
+	if (!sessionId) return
+	runtime.emitInfo(sessionId, `Web interface available at http://127.0.0.1:${port}/`)
+}
+
+function start(port: number, signal: AbortSignal, announcementSessionId?: string): void {
 	let server: Bun.Server<{ id: string; sessionId?: string }>
 	for (let tries = 1;; tries++) {
 		try {
@@ -162,12 +167,13 @@ function start(port: number, signal: AbortSignal): void {
 		}
 	})()
 	signal.addEventListener('abort', () => server.stop(), { once: true })
-	runtime.emitInfo(ipc.readState().sessions[0]?.id ?? '', `Web client: http://127.0.0.1:${port}`)
+	web.announce(announcementSessionId, port)
 }
 
 export const web = {
 	start,
 	nextPort,
+	announce,
 	pageHtml,
 	hydrateHistory,
 	sessionSnapshot,
