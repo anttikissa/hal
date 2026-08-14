@@ -8,7 +8,7 @@ import { commandMetadata } from '../../common/command-metadata.ts'
 import { models } from '../../common/models.ts'
 import { clientLocalCommands } from '../local-commands.ts'
 import { ipc } from '../../ipc.ts'
-import { sessions as sessionStore } from '../../server/sessions.ts'
+import { clientBackend } from '../backend.ts'
 import { completionHints } from './completion-hints.ts'
 
 export interface CompletionResult {
@@ -133,7 +133,7 @@ function sessionTargets(closedOnly = false): string[] {
 		addUnique(values, seen, session.id)
 		addUnique(values, seen, session.name)
 	}
-	for (const meta of sessionStore.loadAllSessionMetas()) {
+	for (const meta of clientBackend.sessions.loadAllSessionMetas()) {
 		if (closedOnly && openIds.has(meta.id)) continue
 		addUnique(values, seen, meta.id)
 		addUnique(values, seen, meta.name)

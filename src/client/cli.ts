@@ -16,7 +16,7 @@ import { popup } from './popup.ts'
 import { blocks } from './terminal/blocks.ts'
 import { colors } from './terminal/colors.ts'
 import { perf } from '../perf.ts'
-import { openaiUsage } from '../server/openai-usage.ts'
+import { clientBackend } from './backend.ts'
 import { startup } from '../startup.ts'
 import { models } from '../common/models.ts'
 import { ipc } from '../ipc.ts'
@@ -625,7 +625,7 @@ function chooseModelWithoutClearingDraft(model: string): void {
 		return
 	}
 	client.sendCommand('prompt', `/model ${model}`)
-	openaiUsage.noteActivity()
+	clientBackend.subscriptions.noteActivity()
 	draw()
 }
 
@@ -670,7 +670,7 @@ function installPromptTabSwitchHandler(): void {
 		promptStates.set(fromSession, prompt.snapshotState())
 		saveCurrentPromptDraft(fromSession)
 		restorePromptForCurrentTab()
-		openaiUsage.noteActivity()
+		clientBackend.subscriptions.noteActivity()
 	})
 }
 
@@ -786,7 +786,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 
 	// Wire prompt to trigger repaint on async paste resolve.
 	prompt.setRenderCallback(() => {
-		openaiUsage.noteActivity()
+		clientBackend.subscriptions.noteActivity()
 		draw()
 	})
 
@@ -850,7 +850,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 			const tab = client.currentTab()
 			if (tab) tab.inputDraftEdit = savedEdit
 			if (tab) restorePromptEditForTab(tab)
-			openaiUsage.noteActivity()
+			clientBackend.subscriptions.noteActivity()
 			draw()
 		}
 	})
@@ -863,13 +863,13 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 		for (const k of keys.parseKeys(text)) {
 			// Popup keys first — an active modal owns the keyboard.
 			if (popup.state.active && popup.handleKey(k)) {
-				openaiUsage.noteActivity()
+				clientBackend.subscriptions.noteActivity()
 				draw()
 				continue
 			}
 			// Completion keys next (tab, arrows in popup, etc.)
 			if (handleCompletionKey(k)) {
-				openaiUsage.noteActivity()
+				clientBackend.subscriptions.noteActivity()
 				draw()
 				continue
 			}
@@ -878,7 +878,7 @@ function startCli(signal: AbortSignal, opts: { preferredCwd?: string; preferredS
 			// Then prompt editing
 			if (prompt.handleKey(k, promptInputWidth())) {
 				client.clearRestoreTabHint()
-				openaiUsage.noteActivity()
+				clientBackend.subscriptions.noteActivity()
 				draw()
 			}
 		}

@@ -1,5 +1,5 @@
 import type { SharedSessionInfo } from '../common/ipc.ts'
-import { sessions as sessionStore } from '../server/sessions.ts'
+import { clientBackend } from './backend.ts'
 import type { HistoryEntry } from '../common/history.ts'
 import type { Block } from './terminal/blocks.ts'
 import { time } from '../utils/time.ts'
@@ -55,13 +55,16 @@ function addLastActiveNotice(tab: any): void {
 }
 
 function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: number } = {}) {
-	const meta = sessionStore.loadSessionMeta(info.id)
-	let loaded = opts.logName || opts.entryLimit !== undefined
-		? { entries: sessionStore.loadHistoryLog(info.id, opts.logName, opts.entryLimit), parentCount: 0, parentId: undefined as string | undefined }
-		: sessionStore.loadAllHistoryWithOrigin(info.id)
+	const meta = clientBackend.sessions.loadSessionMeta(info.id)
+	let loaded: { entries: HistoryEntry[]; parentCount: number; parentId?: string }
+	if (opts.logName || opts.entryLimit !== undefined) {
+		loaded = { entries: clientBackend.sessions.loadHistoryLog(info.id, opts.logName, opts.entryLimit), parentCount: 0 }
+	} else {
+		loaded = clientBackend.sessions.loadAllHistoryWithOrigin(info.id)
+	}
 	const first = loaded.entries[0]
 	if ((opts.logName || opts.entryLimit !== undefined) && first?.type === 'forked_from' && first.parent) {
-		const parent = sessionStore.loadAllHistoryWithOrigin(first.parent)
+		const parent = clientBackend.sessions.loadAllHistoryWithOrigin(first.parent)
 		const before = first.ts ? parent.entries.filter((entry) => !entry.ts || entry.ts < first.ts!) : parent.entries
 		loaded = { entries: [...before, ...loaded.entries.slice(1)], parentCount: before.length, parentId: first.parent }
 	}
@@ -77,7 +80,7 @@ function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: nu
 	return {
 		id: info.id, name: meta?.name ?? info.name ?? info.id, cwd: info.cwd || meta?.workingDir, model: info.model || meta?.model,
 		currentLog: meta?.currentLog ?? info.currentLog ?? 'history.asonl',
-		history, parentEntryCount: parentCount, liveHistory: sessionStore.loadLive(info.id).blocks as Block[], usage,
+		history, parentEntryCount: parentCount, liveHistory: clientBackend.sessions.loadLive(info.id).blocks as Block[], usage,
 		contextUsed: meta?.context?.used ?? 0, contextMax: meta?.context?.max ?? 0, forkedFrom: meta?.forkedFrom ?? parentId, lastActiveTs: lastActiveTs(history),
 	}
 }

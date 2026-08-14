@@ -1,5 +1,5 @@
 import { ipc } from '../ipc.ts'
-import { openaiUsage } from '../server/openai-usage.ts'
+import { clientBackend } from './backend.ts'
 import { STATE_DIR } from '../state.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { log } from '../utils/log.ts'
@@ -42,7 +42,7 @@ function startWatchingIpcState(ctx: any) {
 function start(signal: AbortSignal, opts: any, ctx: any): void {
 	startWatchingHostLock(ctx)
 	const shared = startWatchingIpcState(ctx)
-	openaiUsage.onChange(() => ctx.onChange(false))
+	clientBackend.subscriptions.onChange(() => ctx.onChange(false))
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) ctx.handleEvent(event)
 	})()

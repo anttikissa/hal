@@ -1,7 +1,7 @@
 import { keyHelp } from './terminal/key-help.ts'
 import { visLen } from '../utils/strings.ts'
 import { commandMetadata } from '../common/command-metadata.ts'
-import { sessions as sessionStore } from '../server/sessions.ts'
+import { clientBackend } from './backend.ts'
 import type { ClientCommandType } from './commands.ts'
 
 export interface ClientLocalTabRef {
@@ -107,7 +107,7 @@ function closedMatches(raw: string, ctx: ClientLocalCommandContext): GoMatch[] {
 
 	const needle = normalize(raw)
 	const matches: GoMatch[] = []
-	for (const meta of sessionStore.loadAllSessionMetas()) {
+	for (const meta of clientBackend.sessions.loadAllSessionMetas()) {
 		if (openIds.has(meta.id)) continue
 		const name = meta.name || meta.id
 		if (meta.id === raw || normalize(name) === needle || normalize(name).includes(needle)) {

@@ -3,20 +3,20 @@ import { mkdtempSync, mkdirSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { ipc } from '../../ipc.ts'
-import { sessions as sessionStore } from '../../server/sessions.ts'
+import { clientBackend } from '../backend.ts'
 import { completion } from './completion.ts'
 import { completionHints } from './completion-hints.ts'
 import { models } from '../../common/models.ts'
 
 const origReadState = ipc.readState
-const origLoadAllSessionMetas = sessionStore.loadAllSessionMetas
+const origLoadAllSessionMetas = clientBackend.sessions.loadAllSessionMetas
 
 beforeEach(() => {
 	models.state.cache = {}
 })
 afterEach(() => {
 	ipc.readState = origReadState
-	sessionStore.loadAllSessionMetas = origLoadAllSessionMetas
+	clientBackend.sessions.loadAllSessionMetas = origLoadAllSessionMetas
 	completion.dismiss()
 	models.state.cache = null
 })
@@ -85,7 +85,7 @@ test('/go completes all sessions and /resume completes closed sessions', () => {
 		working: {},
 		updatedAt: new Date().toISOString(),
 	})
-	sessionStore.loadAllSessionMetas = () => [
+	clientBackend.sessions.loadAllSessionMetas = () => [
 		{ id: '04-one', name: 'main', workingDir: '/tmp/main', createdAt: '2026-01-01T00:00:00.000Z' },
 		{ id: '04-old', name: 'old work', workingDir: '/tmp/old', createdAt: '2026-01-01T00:00:00.000Z', closedAt: '2026-01-01T01:00:00.000Z' },
 	]

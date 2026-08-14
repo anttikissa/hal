@@ -13,9 +13,7 @@ import { helpBar } from './terminal/help-bar.ts'
 import { client } from './app.ts'
 import { models } from '../common/models.ts'
 import type { TokenUsage } from '../common/protocol.ts'
-import { auth } from '../server/auth.ts'
-import { openaiUsage } from '../server/openai-usage.ts'
-import { anthropicUsage } from '../server/anthropic-usage.ts'
+import { clientBackend } from './backend.ts'
 import { version } from '../version.ts'
 import { HAL_DIR } from '../state.ts'
 import { colors } from './terminal/colors.ts'
@@ -333,36 +331,15 @@ function tokenUsageLabel(usage: TokenUsage): string {
 }
 
 function subscriptionStatusLabel(provider: string, base: string): string {
-	let index: number | undefined
-	let total: number | undefined
+	const current = clientBackend.subscriptions.current(provider)
+	if (!current) return ''
 	const windows: string[] = []
-	if (provider === 'openai') {
-		const current = openaiUsage.current()
-		if (!current) return ''
-		index = current.index
-		total = current.total
-		for (const item of openaiUsage.displayWindows(current)) {
-			const pct = Math.round(item.window.usedPercent)
-			windows.push(`${item.label} ${renderStatus.heatText(`${pct}%`, pct, base)}`)
-		}
-	} else if (provider === 'anthropic') {
-		const current = anthropicUsage.current()
-		if (!current) return ''
-		index = current.index
-		total = current.total
-		if (current.fiveHour?.usedPercent != null) {
-			const pct = Math.round(current.fiveHour.usedPercent)
-			windows.push(`5h ${renderStatus.heatText(`${pct}%`, pct, base)}`)
-		}
-		if (current.sevenDay?.usedPercent != null) {
-			const pct = Math.round(current.sevenDay.usedPercent)
-			windows.push(`7d ${renderStatus.heatText(`${pct}%`, pct, base)}`)
-		}
-	} else {
-		return ''
+	for (const item of current.windows) {
+		const pct = Math.round(item.usedPercent)
+		windows.push(`${item.label} ${renderStatus.heatText(`${pct}%`, pct, base)}`)
 	}
 	// Show the slot as index/total when multiple subscription accounts exist.
-	const slot = index != null && total && total > 1 ? ` ${index + 1}/${total}` : ''
+	const slot = current.index != null && current.total && current.total > 1 ? ` ${current.index + 1}/${current.total}` : ''
 	if (windows.length === 0) return `Sub${slot}`
 	return `Sub${slot}: ${windows.join(', ')}`
 }
@@ -378,7 +355,7 @@ function renderStatusLine(lines: string[]): void {
 
 	const modelId = tab.model || models.defaultModel()
 	const provider = models.providerName(modelId)
-	const isSub = !auth.isApiKey(provider)
+	const isSub = !clientBackend.subscriptions.isApiKey(provider)
 	const left = renderStatus.joinStatusParts([
 		renderStatus.config.showSession ? renderStatus.sessionStatusLabel(tab, base) : '',
 		renderStatus.config.showCwd ? renderStatus.cwdStatusLabel(tab, base) : '',

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { client } from './app.ts'
 import type { SharedState } from '../common/ipc.ts'
 import { ipc } from '../ipc.ts'
-import { sessions } from '../server/sessions.ts'
+import { clientBackend } from './backend.ts'
 import { draft } from './terminal/draft.ts'
 import { liveFiles } from '../utils/live-file.ts'
 import { blockData } from './terminal/block-data.ts'
@@ -47,9 +47,9 @@ function nonBookkeepingHistory() {
 const CLIENT_STATE_PATH = `${STATE_DIR}/client.ason`
 
 describe('client startup', () => {
-	const origLoadAllSessionMetas = sessions.loadAllSessionMetas
-	const origLoadSessionMeta = sessions.loadSessionMeta
-	const origLoadAllHistoryWithOrigin = sessions.loadAllHistoryWithOrigin
+	const origLoadAllSessionMetas = clientBackend.sessions.loadAllSessionMetas
+	const origLoadSessionMeta = clientBackend.sessions.loadSessionMeta
+	const origLoadAllHistoryWithOrigin = clientBackend.sessions.loadAllHistoryWithOrigin
 	const origLoadDraft = draft.loadDraft
 	const origLoadDraftState = draft.loadDraftState
 	const origReadState = ipc.readState
@@ -57,7 +57,7 @@ describe('client startup', () => {
 	const origTailEvents = ipc.tailEvents
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
-	const origLoadLive = sessions.loadLive
+	const origLoadLive = clientBackend.sessions.loadLive
 	const origLoadBlobs = blockData.loadBlobs
 	const origLogError = log.error
 	const origClientConfig = { ...client.config }
@@ -77,10 +77,10 @@ describe('client startup', () => {
 		client.setOnTabSwitch(() => {})
 		client.setOnDraftArrived(() => {})
 		Object.assign(client.config, origClientConfig)
-		sessions.loadAllSessionMetas = () => []
-		sessions.loadSessionMeta = (id) => makeSessionMeta(id)
-		sessions.loadAllHistoryWithOrigin = () => ({ entries: [], parentCount: 0 })
-		sessions.loadLive = () => ({ blocks: [] })
+		clientBackend.sessions.loadAllSessionMetas = () => []
+		clientBackend.sessions.loadSessionMeta = (id) => makeSessionMeta(id)
+		clientBackend.sessions.loadAllHistoryWithOrigin = () => ({ entries: [], parentCount: 0 })
+		clientBackend.sessions.loadLive = () => ({ blocks: [] })
 		draft.loadDraft = () => ''
 		draft.loadDraftState = () => ({ text: '', savedAt: '' })
 		// Client tests must never append to the real shared IPC command log.
@@ -92,9 +92,9 @@ describe('client startup', () => {
 	})
 
 	afterEach(() => {
-		sessions.loadAllSessionMetas = origLoadAllSessionMetas
-		sessions.loadSessionMeta = origLoadSessionMeta
-		sessions.loadAllHistoryWithOrigin = origLoadAllHistoryWithOrigin
+		clientBackend.sessions.loadAllSessionMetas = origLoadAllSessionMetas
+		clientBackend.sessions.loadSessionMeta = origLoadSessionMeta
+		clientBackend.sessions.loadAllHistoryWithOrigin = origLoadAllHistoryWithOrigin
 		draft.loadDraft = origLoadDraft
 		draft.loadDraftState = origLoadDraftState
 		ipc.readState = origReadState
@@ -102,7 +102,7 @@ describe('client startup', () => {
 		ipc.tailEvents = origTailEvents
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
-		sessions.loadLive = origLoadLive
+		clientBackend.sessions.loadLive = origLoadLive
 		blockData.loadBlobs = origLoadBlobs
 		log.error = origLogError
 		Object.assign(client.config, origClientConfig)
@@ -111,7 +111,7 @@ describe('client startup', () => {
 	})
 
 	test('bootstraps tabs from shared state instead of replaying old events', async () => {
-		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
+		clientBackend.sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
 
 		const shared = makeSharedState(['s1'])
 		ipc.readState = () => shared
@@ -129,7 +129,7 @@ describe('client startup', () => {
 
 
 	test('falls back to disk session metadata when shared state is temporarily empty', async () => {
-		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
+		clientBackend.sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
 
 		const shared = makeSharedState([])
 		ipc.readState = () => shared
@@ -263,8 +263,8 @@ describe('client startup', () => {
 		const lastActive = new Date(2026, 3, 10, 20, 0)
 		Date.now = () => now
 		try {
-			sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
-			sessions.loadAllHistoryWithOrigin = () => ({
+			clientBackend.sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
+			clientBackend.sessions.loadAllHistoryWithOrigin = () => ({
 				entries: [
 					{ type: 'assistant', text: 'old work', synthetic: true, model: 'openai/gpt-5.4', ts: lastActive.toISOString() },
 					{ type: 'info', text: '[models.dev] fetched model metadata', ts: new Date(2026, 3, 11, 23, 0).toISOString() },
@@ -296,8 +296,8 @@ describe('client startup', () => {
 		const originalNow = Date.now
 		Date.now = () => new Date(2026, 3, 12, 0, 0).getTime()
 		try {
-			sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
-			sessions.loadAllHistoryWithOrigin = () => ({
+			clientBackend.sessions.loadAllSessionMetas = () => [makeSessionMeta('s1')]
+			clientBackend.sessions.loadAllHistoryWithOrigin = () => ({
 				entries: [{ type: 'assistant', text: 'recent work', synthetic: true, model: 'openai/gpt-5.4', ts: new Date(2026, 3, 11, 12, 30).toISOString() }],
 				parentCount: 0,
 			})
@@ -320,9 +320,9 @@ describe('client startup', () => {
 	})
 
 	test('startup fallback uses fork-aware history loading', async () => {
-		sessions.loadAllSessionMetas = () => [{ ...makeSessionMeta('child'), forkedFrom: 'parent' }]
-		sessions.loadSessionMeta = () => ({ ...makeSessionMeta('child'), forkedFrom: 'parent' })
-		sessions.loadAllHistoryWithOrigin = () => ({
+		clientBackend.sessions.loadAllSessionMetas = () => [{ ...makeSessionMeta('child'), forkedFrom: 'parent' }]
+		clientBackend.sessions.loadSessionMeta = () => ({ ...makeSessionMeta('child'), forkedFrom: 'parent' })
+		clientBackend.sessions.loadAllHistoryWithOrigin = () => ({
 			entries: [
 				{ type: 'user', parts: [{ type: 'text', text: 'before fork' }], ts: '2026-04-09T20:00:00.000Z' },
 				{ type: 'user', parts: [{ type: 'text', text: 'after fork' }], ts: '2026-04-09T20:01:00.000Z' },
@@ -350,8 +350,8 @@ describe('client startup', () => {
 	})
 
 	test('loads blobs for tabs opened after startup', async () => {
-		sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
-		sessions.loadAllHistoryWithOrigin = (id) => id === 's2'
+		clientBackend.sessions.loadAllSessionMetas = () => [makeSessionMeta('s1'), makeSessionMeta('s2')]
+		clientBackend.sessions.loadAllHistoryWithOrigin = (id) => id === 's2'
 			? {
 				entries: [{ type: 'tool_call', toolId: 'tool-1', name: 'read', blobId: 'blob-1', ts: '2026-04-09T20:01:00.000Z' }],
 				parentCount: 0,
@@ -650,13 +650,13 @@ describe('client startup', () => {
 	})
 
 	test('startup merge drops live blocks already persisted to history', async () => {
-		sessions.loadAllHistoryWithOrigin = () => ({
+		clientBackend.sessions.loadAllHistoryWithOrigin = () => ({
 			entries: [
 				{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.', ts: '2026-04-09T20:01:00.000Z' },
 			],
 			parentCount: 0,
 		})
-		sessions.loadLive = () => ({
+		clientBackend.sessions.loadLive = () => ({
 						blocks: [{ type: 'assistant', text: 'Focused tests are green. Running `./test` again for repo state.', ts: Date.parse('2026-04-09T20:01:00.000Z') }],
 			updatedAt: '2026-04-09T20:01:00.000Z',
 		})
@@ -678,7 +678,7 @@ describe('client startup', () => {
 	})
 
 	test('loads live session blocks on startup for tabs opened mid-turn', async () => {
-		sessions.loadLive = () => ({
+		clientBackend.sessions.loadLive = () => ({
 			working: true,
 			blocks: [{ type: 'assistant', text: 'hello', streaming: true, ts: Date.parse('2026-04-09T20:01:00.000Z') }],
 			updatedAt: '2026-04-09T20:01:00.000Z',

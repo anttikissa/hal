@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { renderStatus } from './render-status.ts'
 import { client } from './app.ts'
-import { openaiUsage } from '../server/openai-usage.ts'
+import { clientBackend } from './backend.ts'
 import { promptEdit } from './prompt-edit.ts'
 
 function tab(overrides: any = {}): any {
@@ -25,29 +25,17 @@ function tab(overrides: any = {}): any {
 	}
 }
 
-test('subscriptionStatusLabel labels OpenAI windows from their returned duration', () => {
-	openaiUsage.init()
-	const currentKey = openaiUsage.state.currentKey
-	const accounts = openaiUsage.state.accounts
+test('subscriptionStatusLabel renders normalized subscription windows', () => {
+	const current = clientBackend.subscriptions.current
 	try {
-		openaiUsage.state.currentKey = 'openai:0'
-		openaiUsage.state.accounts = {
-			'openai:0': {
-				key: 'openai:0',
-				index: 0,
-				total: 1,
-				pendingTokens: 0,
-				primary: { usedPercent: 24, windowMinutes: 10_080, resetAt: 1 },
-			},
-		}
+		clientBackend.subscriptions.current = () => ({ index: 0, total: 1, windows: [{ label: '7d', usedPercent: 24 }] })
 
 		const label = renderStatus.subscriptionStatusLabel('openai', '')
 
 		expect(label).toContain('7d')
 		expect(label).not.toContain('5h')
 	} finally {
-		openaiUsage.state.currentKey = currentKey
-		openaiUsage.state.accounts = accounts
+		clientBackend.subscriptions.current = current
 	}
 })
 

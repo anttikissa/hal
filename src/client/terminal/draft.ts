@@ -2,7 +2,7 @@
 // draft_saved lets other clients refresh their in-memory copy.
 
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
-import { sessions } from '../../server/sessions.ts'
+import { clientBackend } from '../backend.ts'
 import { ipc } from '../../ipc.ts'
 import { ason } from '../../utils/ason.ts'
 import { log } from '../../utils/log.ts'
@@ -20,7 +20,7 @@ interface DraftFile {
 }
 
 function draftPath(sessionId: string): string {
-	return `${sessions.sessionDir(sessionId)}/draft.ason`
+	return `${clientBackend.sessions.sessionDir(sessionId)}/draft.ason`
 }
 
 function errorMessage(err: unknown): string {

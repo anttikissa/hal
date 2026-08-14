@@ -6,13 +6,12 @@ import { client } from '../src/client/app.ts'
 import { prompt } from '../src/client/terminal/prompt.ts'
 import { cursor } from '../src/client/terminal/cursor.ts'
 import { popup } from '../src/client/popup.ts'
-import { openaiUsage } from '../src/server/openai-usage.ts'
+import { clientBackend } from '../src/client/backend.ts'
 import { colors } from '../src/client/terminal/colors.ts'
 import { completionHints } from '../src/client/terminal/completion-hints.ts'
 import { oklch } from '../src/utils/oklch.ts'
 import { version } from '../src/version.ts'
 
-openaiUsage.init()
 function stripAnsi(s: string): string {
 	return s
 		.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')
@@ -60,16 +59,10 @@ beforeEach(() => {
 		showSubscription: true,
 		promptCursorShape: 'block',
 	})
-	openaiUsage.state.currentKey = 'openai:1'
-	openaiUsage.state.accounts = {
-		'openai:1': {
-			key: 'openai:1',
-			index: 1,
-			total: 3,
-			pendingTokens: 0,
-			primary: { usedPercent: 23, windowMinutes: 300, resetAt: 1 },
-			secondary: { usedPercent: 61, windowMinutes: 10080, resetAt: 1 },
-		},
+	clientBackend.subscriptions.isApiKey = () => false
+	clientBackend.subscriptions.current = (provider) => {
+		if (provider !== 'openai') return null
+		return { index: 1, total: 3, windows: [{ label: '5h', usedPercent: 23 }, { label: '7d', usedPercent: 61 }] }
 	}
 })
 	version.resetForTests()

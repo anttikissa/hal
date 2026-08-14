@@ -6,6 +6,7 @@ import { ipc } from './ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/cli.ts'
 import { client } from './client/app.ts'
+import { clientBackend, type SubscriptionStatus } from './client/backend.ts'
 import { memory } from './memory.ts'
 import { version } from './version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
@@ -16,10 +17,32 @@ import { colors } from './client/terminal/colors.ts'
 import { openaiUsage } from './server/openai-usage.ts'
 import { anthropicUsage } from './server/anthropic-usage.ts'
 import { startup } from './startup.ts'
+import { auth } from './server/auth.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './client/terminal/args.ts'
 import { terminalOutput } from './client/terminal-output.ts'
 import { serverModels } from './server/models.ts'
+
+function subscriptionStatus(provider: string): SubscriptionStatus | null {
+	if (provider === 'openai') {
+		const account = openaiUsage.current()
+		if (!account) return null
+		return {
+			index: account.index,
+			total: account.total,
+			windows: openaiUsage.displayWindows(account).map((item) => ({ label: item.label, usedPercent: item.window.usedPercent })),
+		}
+	}
+	if (provider === 'anthropic') {
+		const account = anthropicUsage.current()
+		if (!account) return null
+		const windows: SubscriptionStatus['windows'] = []
+		if (account.fiveHour?.usedPercent != null) windows.push({ label: '5h', usedPercent: account.fiveHour.usedPercent })
+		if (account.sevenDay?.usedPercent != null) windows.push({ label: '7d', usedPercent: account.sevenDay.usedPercent })
+		return { index: account.index, total: account.total, windows }
+	}
+	return null
+}
 
 const parsedArgs = cliArgs.parse(process.argv.slice(2), { cwd: process.cwd(), halDir: HAL_DIR })
 if (!parsedArgs.ok) {
@@ -48,6 +71,22 @@ openaiUsage.init()
 perf.mark('OpenAI usage initialized')
 anthropicUsage.init()
 perf.mark('Anthropic usage initialized')
+clientBackend.install({
+	sessions: {
+		sessionDir: (sessionId) => sessionStore.sessionDir(sessionId),
+		loadAllSessionMetas: () => sessionStore.loadAllSessionMetas(),
+		loadSessionMeta: (sessionId) => sessionStore.loadSessionMeta(sessionId),
+		loadHistoryLog: (sessionId, logName, limit) => sessionStore.loadHistoryLog(sessionId, logName, limit),
+		loadAllHistoryWithOrigin: (sessionId) => sessionStore.loadAllHistoryWithOrigin(sessionId),
+		loadLive: (sessionId) => sessionStore.loadLive(sessionId),
+	},
+	subscriptions: {
+		isApiKey: (provider) => auth.isApiKey(provider),
+		current: subscriptionStatus,
+		noteActivity: () => openaiUsage.noteActivity(),
+		onChange: (callback) => openaiUsage.onChange(callback),
+	},
+})
 builtins.init()
 perf.mark('Built-in tools registered')
 

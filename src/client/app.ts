@@ -5,7 +5,7 @@ import { ipc } from '../ipc.ts'
 import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { version } from '../version.ts'
-import { sessions as sessionStore } from '../server/sessions.ts'
+import { clientBackend } from './backend.ts'
 import { historyProjection } from '../common/history-projection.ts'
 import { draft as draftModule, type DraftPromptEdit } from './terminal/draft.ts'
 import { perf } from '../perf.ts'
@@ -647,7 +647,7 @@ function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInf
 function initializeSessions(shared: SharedState, opts: { preferredCwd?: string; preferredSessionId?: string } = {}): void {
 	const items = shared.sessions.length > 0
 		? shared.sessions
-		: sessionStore.loadAllSessionMetas().map(sessionInfoFromMeta)
+		: clientBackend.sessions.loadAllSessionMetas().map(sessionInfoFromMeta)
 	if (items.length === 0) {
 		applySharedStatus(shared)
 		return

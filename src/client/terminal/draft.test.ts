@@ -3,11 +3,11 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { draft } from './draft.ts'
-import { sessions } from '../../server/sessions.ts'
+import { clientBackend } from '../backend.ts'
 import { ipc } from '../../ipc.ts'
 import { log } from '../../utils/log.ts'
 
-const origSessionDir = sessions.sessionDir
+const origSessionDir = clientBackend.sessions.sessionDir
 const origAppendEvent = ipc.appendEvent
 const origLogError = log.error
 
@@ -18,7 +18,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	sessions.sessionDir = origSessionDir
+	clientBackend.sessions.sessionDir = origSessionDir
 	ipc.appendEvent = origAppendEvent
 	log.error = origLogError
 	rmSync(dir, { recursive: true, force: true })
@@ -34,7 +34,7 @@ test('saveDraft logs write failures and skips the draft_saved event', () => {
 		events.push(event)
 	}
 	// Point at a missing session directory so writeFileSync fails with ENOENT.
-	sessions.sessionDir = () => join(dir, 'missing-session-dir')
+	clientBackend.sessions.sessionDir = () => join(dir, 'missing-session-dir')
 
 	draft.saveDraft('04-test', 'hello')
 
@@ -49,7 +49,7 @@ test('saveDraft logs write failures and skips the draft_saved event', () => {
 test('saveDraft preserves prompt edit metadata for restart restore', () => {
 	const sessionDir = join(dir, '04-test')
 	mkdirSync(sessionDir, { recursive: true })
-	sessions.sessionDir = () => sessionDir
+	clientBackend.sessions.sessionDir = () => sessionDir
 	ipc.appendEvent = () => {}
 
 	draft.saveDraft('04-test', 'edited prompt', {
@@ -76,7 +76,7 @@ test('loadDraft logs parse failures and falls back to an empty draft', () => {
 	log.error = (message: string, data?: Record<string, unknown>) => {
 		errors.push({ message, data })
 	}
-	sessions.sessionDir = () => sessionDir
+	clientBackend.sessions.sessionDir = () => sessionDir
 
 	const text = draft.loadDraft('04-test')
 
@@ -99,7 +99,7 @@ test('clearDraft logs unexpected unlink failures and skips the draft_saved event
 	ipc.appendEvent = (event: any) => {
 		events.push(event)
 	}
-	sessions.sessionDir = () => sessionDir
+	clientBackend.sessions.sessionDir = () => sessionDir
 
 	draft.clearDraft('04-test')
 
