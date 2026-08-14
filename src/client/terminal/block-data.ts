@@ -8,7 +8,7 @@ import { ason } from '../../utils/ason.ts'
 import { models } from '../../common/models.ts'
 import type { LiveBlock } from '../../common/live-event-blocks.ts'
 import type { HistoryEntry } from '../../common/history.ts'
-import { sessionEntry } from '../../server/session/entry.ts'
+import { historyProjection } from '../../common/history-projection.ts'
 import { STATE_DIR } from '../../state.ts'
 // Sibling import for blocks.config; circular with blocks.ts but safe per
 // module convention — all access happens at call time, never at import time.
@@ -49,8 +49,8 @@ function historyToBlocks(
 		const blobOwner = i < parentEntryCount && parentId ? parentId : sessionId
 		switch (entry.type) {
 			case 'user': {
-				const text = sessionEntry.userText(entry, { images: 'path-or-image', display: 'ui' })
-				const actualText = sessionEntry.userText(entry, { images: 'path-or-image' })
+				const text = historyProjection.userText(entry, { images: 'path-or-image', display: 'ui' })
+				const actualText = historyProjection.userText(entry, { images: 'path-or-image' })
 				if (!text) break
 				const isSystem = text.startsWith('[system] ')
 				const displayText = isSystem ? text.slice(9) : text

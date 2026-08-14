@@ -1,4 +1,5 @@
 import type { HistoryEntry } from '../sessions.ts'
+import { historyProjection, type UserTextOptions } from '../../common/history-projection.ts'
 import { blob } from './blob.ts'
 
 /**
@@ -7,28 +8,8 @@ import { blob } from './blob.ts'
  * so keep them here instead of carrying slightly different copies.
  */
 
-type UserTextOptions = {
-	separator?: string
-	images?: 'omit' | 'path-or-image' | 'path-or-blob-or-image'
-	display?: 'actual' | 'ui'
-}
-
 function userText(entry: Extract<HistoryEntry, { type: 'user' }>, opts: UserTextOptions | string = {}): string {
-	const options = typeof opts === 'string' ? { separator: opts } : opts
-	const separator = options.separator ?? ''
-	const images = options.images ?? 'omit'
-	return entry.parts
-		.map((part) => {
-			if (part.type === 'text') return options.display === 'ui' ? part.displayText ?? part.text : part.text
-			if (images === 'path-or-image') return part.originalFile ? `[${part.originalFile}]` : '[image]'
-			if (images === 'path-or-blob-or-image') {
-				const ref = part.originalFile ?? part.blobId
-				return ref ? `[${ref}]` : '[image]'
-			}
-			return ''
-		})
-		.filter(Boolean)
-		.join(separator)
+	return historyProjection.userText(entry, opts)
 }
 
 function loadEntryBlob(sessionId: string, entry: { blobId?: string }): any | null {

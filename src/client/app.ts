@@ -6,7 +6,7 @@ import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { version } from '../version.ts'
 import { sessions as sessionStore } from '../server/sessions.ts'
-import { replay } from '../server/session/replay.ts'
+import { historyProjection } from '../common/history-projection.ts'
 import { draft as draftModule, type DraftPromptEdit } from './terminal/draft.ts'
 import { perf } from '../perf.ts'
 import { liveEventBlocks, type LiveEvent } from '../common/live-event-blocks.ts'
@@ -377,7 +377,7 @@ function switchTab(index: number): void {
 // Also extracts per-tab input history for up-arrow recall.
 function ensureTabLoaded(tab: Tab): void {
 	if (tab.loaded) return
-	tab.inputHistory = replay.inputHistoryFromEntries(tab.rawHistory!)
+	tab.inputHistory = historyProjection.inputHistoryFromEntries(tab.rawHistory!)
 	tab.history = clientHistory.withLive(blockData.historyToBlocks(tab.rawHistory!, tab.sessionId, tab.parentEntryCount, tab.forkedFrom, tab.model), tab)
 	sessionLoader.addLastActiveNotice(tab)
 	tab.rawHistory = undefined

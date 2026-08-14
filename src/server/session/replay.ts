@@ -3,6 +3,7 @@
 import type { HistoryEntry } from '../sessions.ts'
 import { sessions } from '../sessions.ts'
 import { models } from '../../common/models.ts'
+import { historyProjection } from '../../common/history-projection.ts'
 import { sessionEntry } from './entry.ts'
 
 export interface ReplayBlock {
@@ -322,18 +323,7 @@ function buildCompactionContext(sessionId: string, entries: HistoryEntry[]): str
 }
 
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
-	return entries
-		.map((entry) => {
-			if (entry.type === 'input_history') return entry.text
-			// Up-arrow recall is for things the human typed. Inbox / subagent handoffs
-			// are persisted as user entries with a source session id, but they should
-			// never show up in local editing history. Reconstruct attachments as the
-			// bracketed placeholders the user typed, not as missing spaces.
-			if (entry.type !== 'user' || entry.source) return ''
-			return sessionEntry.userText(entry, { images: 'path-or-blob-or-image', display: 'ui' })
-		})
-		.filter((text) => text && !text.startsWith('[system]'))
-		.slice(-200)
+	return historyProjection.inputHistoryFromEntries(entries)
 }
 
 export const replay = {
