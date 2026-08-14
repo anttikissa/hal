@@ -1,7 +1,7 @@
 # Terminal Rendering Rules
 
 Requirements for anyone who touches terminal code.
-Implementation: `term.ts` (will move to `src/` later).
+Implementation: `src/client/render.ts` and `src/client/terminal/`.
 
 These are HOLY TRUTHS that you must obey. You often have a hard time
 understanding how terminals work, and especially what the USER wants from a
