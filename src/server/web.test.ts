@@ -27,8 +27,12 @@ test('web announcement is opt-in and names the actual loopback URL', () => {
 
 test('web page serves the web client HTML', async () => {
 	const page = await web.pageHtml()
-	const source = await Bun.file(`${import.meta.dir}/../web-client/main.html`).text()
+	const source = await Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
 	expect(page).toBe(source)
+})
+
+test('web bundle compiles the Solid TSX entry', async () => {
+	expect((await web.bundleClient()).length).toBeGreaterThan(1_000)
 })
 
 test('session snapshot exposes typed history and live blocks without lossy mapping', () => {

@@ -2,6 +2,8 @@ import { transcriptTitles } from '../common/transcript-titles.ts'
 import { webMessages } from '../common/web.ts'
 import { webPresentation } from './presentation.ts'
 
+export function startLegacyClient() {
+
 const tabs = document.querySelector('#tabs')
 const messages = document.querySelector('#messages')
 const form = document.querySelector('#form')
@@ -140,3 +142,5 @@ socket.onmessage = (event) => {
 // session while this client was disconnected.
 socket.onclose = () => setTimeout(() => location.reload(), 1000)
 void refreshTabs().then(refresh)
+
+}

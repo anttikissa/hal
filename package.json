@@ -18,5 +18,10 @@
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@dom-expressions/compiler": "0.50.0-next.40",
+    "@solidjs/web": "2.0.0-rc.0",
+    "solid-js": "^2.0.0-rc.0"
   }
 }

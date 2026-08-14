@@ -2,11 +2,12 @@
   "exclude": ["examples", "previous", "prev", "node_modules", "state"],
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.AsyncIterable"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
     "allowJs": true,
 
     // Bundler mode

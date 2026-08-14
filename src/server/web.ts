@@ -11,7 +11,7 @@ import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 
 function pageHtml(): Promise<string> {
-	return Bun.file(`${import.meta.dir}/../web-client/main.html`).text()
+	return Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
 }
 
 let clientBuild: Promise<string> | null = null
@@ -87,10 +87,29 @@ function sessionTopic(sessionId: string): string {
 }
 
 async function bundleClient(): Promise<string> {
-	clientBuild ??= Bun.build({ entrypoints: [`${import.meta.dir}/../web-client/main.js`], target: 'browser', minify: true }).then(async (result) => {
+	clientBuild ??= (async () => {
+		const { transform } = await import('@dom-expressions/compiler')
+		const result = await Bun.build({
+			entrypoints: [`${import.meta.dir}/../web-client/main.tsx`],
+			target: 'browser',
+			minify: true,
+			plugins: [{
+				name: 'solid-oxc',
+				setup(build) {
+					build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+						const source = await Bun.file(args.path).text()
+						return {
+							contents: transform(source, { filename: args.path, moduleName: '@solidjs/web', generate: 'dom' }).code,
+							// Oxc consumes JSX; Bun's TypeScript loader strips any remaining types.
+							loader: 'ts',
+						}
+					})
+				},
+			}],
+		})
 		if (!result.success || !result.outputs[0]) throw new Error(result.logs.map(String).join('\n'))
 		return result.outputs[0].text()
-	})
+	})()
 	return clientBuild
 }
 
@@ -175,6 +194,7 @@ export const web = {
 	nextPort,
 	announce,
 	pageHtml,
+	bundleClient,
 	hydrateHistory,
 	sessionSnapshot,
 	parseClientMessage,
