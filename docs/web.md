@@ -12,6 +12,30 @@ of truth; re-read it after upgrades.
   `@solidjs/web`. `solid-js/web` and `solid-js/store` are gone.
 - The client-only app has no router. Use browser history until one is justified.
 
+## Components, files, and CSS
+
+- `components/` is for files that each export **one JSX component**. It is a useful
+  strict boundary: do not put helpers, state primitives, protocol code, or a group of
+  unrelated components there.
+- Put non-component helpers in a purpose-named directory such as `utils/` only when
+  they exist and are shared. Do not create empty category directories in advance.
+- Keep shared component styling in one `styles.css` until separate stylesheets earn
+  their complexity. Scope selectors to the component's root class, not generic tags:
+
+  ```tsx
+  function SessionTabs() {
+  return <header class="SessionTabs">...</header>
+  }
+  ```
+
+  ```css
+  .SessionTabs > button { ... }
+  .SessionTabs > button.selected { ... }
+  ```
+
+  The root class matches the component name, so styles have an obvious owner and do
+  not leak into another component's `button`, `h1`, or `main`.
+
 ## Reactivity
 
 - Call signals and memos to read them. Writes are microtask-batched; do not rely
