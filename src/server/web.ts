@@ -14,7 +14,6 @@ function pageHtml(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
 }
 
-let clientBuild: Promise<string> | null = null
 
 function openSession(sessionId: string): boolean {
 	return ipc.readState().sessions.some((session) => session.id === sessionId)
@@ -87,30 +86,27 @@ function sessionTopic(sessionId: string): string {
 }
 
 async function bundleClient(): Promise<string> {
-	clientBuild ??= (async () => {
-		const { transform } = await import('@dom-expressions/compiler')
-		const result = await Bun.build({
-			entrypoints: [`${import.meta.dir}/../web-client/main.tsx`],
-			target: 'browser',
-			minify: true,
-			plugins: [{
-				name: 'solid-oxc',
-				setup(build) {
-					build.onLoad({ filter: /\.tsx$/ }, async (args) => {
-						const source = await Bun.file(args.path).text()
-						return {
-							contents: transform(source, { filename: args.path, moduleName: '@solidjs/web', generate: 'dom' }).code,
-							// Oxc consumes JSX; Bun's TypeScript loader strips any remaining types.
-							loader: 'ts',
-						}
-					})
-				},
-			}],
-		})
-		if (!result.success || !result.outputs[0]) throw new Error(result.logs.map(String).join('\n'))
-		return result.outputs[0].text()
-	})()
-	return clientBuild
+	const { transform } = await import('@dom-expressions/compiler')
+	const result = await Bun.build({
+		entrypoints: [`${import.meta.dir}/../web-client/main.tsx`],
+		target: 'browser',
+		minify: true,
+		plugins: [{
+			name: 'solid-oxc',
+			setup(build) {
+				build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+					const source = await Bun.file(args.path).text()
+					return {
+						contents: transform(source, { filename: args.path, moduleName: '@solidjs/web', generate: 'dom' }).code,
+						// Oxc consumes JSX; Bun's TypeScript loader strips any remaining types.
+						loader: 'ts',
+					}
+				})
+			},
+		}],
+	})
+	if (!result.success || !result.outputs[0]) throw new Error(result.logs.map(String).join('\n'))
+	return result.outputs[0].text()
 }
 
 function nextPort(previousPort: number, tries: number, random = Math.random): number {
@@ -131,9 +127,9 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 				port,
 				fetch: async (request, server) => {
 					const url = new URL(request.url)
-					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8' } })
+					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
 					if (url.pathname === '/main.js') {
-						try { return new Response(await bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8' } }) }
+						try { return new Response(await bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } }) }
 						catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
 					}
 					if (url.pathname === '/api/state' && request.method === 'GET') return Response.json(ipc.readState())

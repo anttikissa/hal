@@ -35,6 +35,21 @@ test('web bundle compiles the Solid TSX entry', async () => {
 	expect((await web.bundleClient()).length).toBeGreaterThan(1_000)
 })
 
+test('web rebuilds the client for each browser request', async () => {
+	const originalBuild = Bun.build
+	let builds = 0
+	Bun.build = async () => {
+		builds++
+		return { success: true, outputs: [{ text: async () => `bundle ${builds}` }] } as any
+	}
+	try {
+		expect(await web.bundleClient()).toBe('bundle 1')
+		expect(await web.bundleClient()).toBe('bundle 2')
+	} finally {
+		Bun.build = originalBuild
+	}
+})
+
 test('session snapshot exposes typed history and live blocks without lossy mapping', () => {
 	const originalReadState = ipc.readState
 	const originalLoadAllHistory = sessions.loadAllHistory
