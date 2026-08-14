@@ -73,7 +73,7 @@ test('model picker lists updated frontier aliases', () => {
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'gemini')).toMatchObject({
 		value: 'gemini',
-		search: expect.stringContaining('google/gemini-3.6-flash'),
+		search: expect.stringContaining('google/gemini-3.7-flash'),
 	})
 	expect(models.listModelChoices().find((item) => item.value === 'gpt-5.6')).toMatchObject({ search: expect.stringContaining('openai/gpt-5.6') })
 	expect(models.listModelChoices().find((item) => item.value === 'gemini-3.5-flash-lite')).toMatchObject({ search: expect.stringContaining('google/gemini-3.5-flash-lite') })
@@ -171,8 +171,8 @@ test('models.dev Anthropic and OpenAI entries resolve without polluting picker c
 
 test('model completions include aliases, full ids, and bare ids', () => {
 	expect(models.modelCompletionNames()).toContain('gemini')
-	expect(models.modelCompletionNames()).toContain('google/gemini-3.6-flash')
-	expect(models.modelCompletionNames()).toContain('gemini-3.6-flash')
+	expect(models.modelCompletionNames()).toContain('google/gemini-3.7-flash')
+	expect(models.modelCompletionNames()).toContain('gemini-3.7-flash')
 	expect(models.modelCompletionNames()).toContain('sonnet-5')
 })
 
@@ -209,7 +209,7 @@ test('aliasUpdateSuggestions detects alias-family upgrades without moving pinned
 	)).toEqual([
 		{ aliases: ['anthropic', 'claude', 'opus'], oldModel: 'anthropic/claude-opus-5', newModel: 'anthropic/claude-opus-5-1' },
 		{ aliases: ['sonnet'], oldModel: 'anthropic/claude-sonnet-5', newModel: 'anthropic/claude-sonnet-5-1' },
-		{ aliases: ['gemini'], oldModel: 'google/gemini-3.6-flash', newModel: 'google/gemini-4-flash-preview' },
+		{ aliases: ['gemini'], oldModel: 'google/gemini-3.7-flash', newModel: 'google/gemini-4-flash-preview' },
 		{ aliases: ['grok'], oldModel: 'openrouter/x-ai/grok-4.6', newModel: 'openrouter/x-ai/grok-4.7' },
 	])
 })

@@ -34,7 +34,7 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'OpenAI', alias: 'gpt-5.6', fullId: 'openai/gpt-5.6', fallbackContext: 1_050_000 },
 	{ group: 'OpenAI', alias: 'gpt-instant', fullId: 'openai/gpt-5.5-instant', fallbackContext: 400_000, pricing: { input: 5, output: 30 } },
 	{ group: 'OpenAI', alias: 'codex', fullId: 'openai/gpt-5.3-codex', fallbackContext: 128_000, track: 'codex' },
-	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.6-flash', fallbackContext: 1_000_000, track: 'gemini' },
+	{ group: 'Google', alias: 'gemini', fullId: 'google/gemini-3.7-flash', fallbackContext: 1_000_000, track: 'gemini' },
 	{ group: 'Google', alias: 'gemini-3.5-flash-lite', fullId: 'google/gemini-3.5-flash-lite', fallbackContext: 1_000_000 },
 	{ group: 'Google', alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview', fallbackContext: 1_000_000, track: 'gemini-pro' },
 	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.6', fallbackContext: 2_000_000, track: 'grok' },
