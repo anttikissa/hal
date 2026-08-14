@@ -9,7 +9,7 @@ import { memory } from '../memory.ts'
 import { models } from '../../common/models.ts'
 import { serverModels } from '../models.ts'
 import { ipc } from '../../ipc.ts'
-import { version } from '../../version.ts'
+import { version } from '../version.ts'
 import { sessions as sessionStore } from '../sessions.ts'
 import { paths } from '../../utils/paths.ts'
 

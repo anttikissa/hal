@@ -1,9 +1,9 @@
 import { mkdtemp, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { HAL_DIR } from './state.ts'
-import { processOutput } from './utils/process-output.ts'
-import type { VersionStatus } from './common/protocol.ts'
+import { HAL_DIR } from '../state.ts'
+import { processOutput } from '../utils/process-output.ts'
+import type { VersionStatus } from '../common/protocol.ts'
 
 interface VersionState {
 	status: VersionStatus

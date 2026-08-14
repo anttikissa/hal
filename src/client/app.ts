@@ -4,7 +4,6 @@
 import { ipc } from '../ipc.ts'
 import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
-import { version } from '../version.ts'
 import { clientBackend } from './backend.ts'
 import { historyProjection } from '../common/history-projection.ts'
 import { draft as draftModule, type DraftPromptEdit } from './terminal/draft.ts'
@@ -102,6 +101,9 @@ const state = {
 	hostPid: null as number | null,
 	hostVersionStatus: 'idle' as VersionStatus,
 	hostVersion: '',
+	localVersionStatus: 'idle' as VersionStatus,
+	localVersion: '',
+	localVersionError: '',
 	// Persisted across restarts so the prompt stays at a stable position.
 	// Invalidated if terminal width changed since last save.
 	peak: 0,
@@ -210,9 +212,9 @@ function publishStatus(): void {
 		startedAt: state.startedAt,
 		updatedAt: new Date().toISOString(),
 		cwd: tab?.cwd,
-		versionStatus: version.state.status,
-		version: version.state.combined || undefined,
-		error: version.state.error || undefined,
+		versionStatus: state.localVersionStatus,
+		version: state.localVersion || undefined,
+		error: state.localVersionError || undefined,
 	})
 }
 
@@ -711,6 +713,9 @@ function resetForTests(): void {
 	state.sessionLabelVersion = 0
 	state.hostVersionStatus = 'idle'
 	state.hostVersion = ''
+	state.localVersionStatus = 'idle'
+	state.localVersion = ''
+	state.localVersionError = ''
 	state.toolConfirmPending.clear()
 	state.summarizing.clear()
 	state.whatDoneUnseen.clear()

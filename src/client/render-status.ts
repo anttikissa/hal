@@ -14,7 +14,6 @@ import { client } from './app.ts'
 import { models } from '../common/models.ts'
 import type { TokenUsage } from '../common/protocol.ts'
 import { clientBackend } from './backend.ts'
-import { version } from '../version.ts'
 import { HAL_DIR } from '../state.ts'
 import { colors } from './terminal/colors.ts'
 import { prompt } from './terminal/prompt.ts'
@@ -298,9 +297,9 @@ function joinStatusParts(parts: string[]): string {
 function hostMismatchBadge(): string {
 	if (client.state.role !== 'client') return ''
 	if (client.state.hostVersionStatus !== 'ready') return ''
-	if (version.state.status !== 'ready') return ''
-	if (!client.state.hostVersion || !version.state.combined) return ''
-	return client.state.hostVersion === version.state.combined ? '' : ' ≠host'
+	if (client.state.localVersionStatus !== 'ready') return ''
+	if (!client.state.hostVersion || !client.state.localVersion) return ''
+	return client.state.hostVersion === client.state.localVersion ? '' : ' ≠host'
 }
 
 function serverStatusLabel(): string {

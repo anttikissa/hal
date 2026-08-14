@@ -10,7 +10,6 @@ import { clientBackend } from '../src/client/backend.ts'
 import { colors } from '../src/client/terminal/colors.ts'
 import { completionHints } from '../src/client/terminal/completion-hints.ts'
 import { oklch } from '../src/utils/oklch.ts'
-import { version } from '../src/version.ts'
 
 function stripAnsi(s: string): string {
 	return s
@@ -64,8 +63,10 @@ beforeEach(() => {
 		if (provider !== 'openai') return null
 		return { index: 1, total: 3, windows: [{ label: '5h', usedPercent: 23 }, { label: '7d', usedPercent: 61 }] }
 	}
+	client.state.localVersionStatus = 'idle'
+	client.state.localVersion = ''
+	client.state.localVersionError = ''
 })
-	version.resetForTests()
 
 describe('render', () => {
 	test('diff engine only rewrites changed lines', () => {
@@ -398,8 +399,8 @@ describe('render', () => {
 		client.state.hostPid = 222
 		client.state.hostVersionStatus = 'ready'
 		client.state.hostVersion = 'host5678'
-		version.state.status = 'ready'
-		version.state.combined = 'local1234'
+		client.state.localVersionStatus = 'ready'
+		client.state.localVersion = 'local1234'
 		const clean = stripAnsi(captureOutput(() => render.draw()))
 		expect(clean).toContain('client ≠host')
 	})
@@ -488,8 +489,8 @@ describe('render', () => {
 		client.state.hostPid = 222
 		client.state.hostVersionStatus = 'ready'
 		client.state.hostVersion = 'host5678'
-		version.state.status = 'ready'
-		version.state.combined = 'local1234'
+		client.state.localVersionStatus = 'ready'
+		client.state.localVersion = 'local1234'
 		const originalCols = process.stdout.columns
 		try {
 			Object.defineProperty(process.stdout, 'columns', { value: 86, configurable: true })

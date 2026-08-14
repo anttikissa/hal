@@ -8,7 +8,7 @@ import { cli } from './client/cli.ts'
 import { client } from './client/app.ts'
 import { clientBackend, type SubscriptionStatus } from './client/backend.ts'
 import { memory } from './server/memory.ts'
-import { version } from './version.ts'
+import { version } from './server/version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
 import { config } from './config.ts'
@@ -155,7 +155,14 @@ function syncHostVersionState(): void {
 	})
 }
 
+function syncLocalVersionState(): void {
+	client.state.localVersionStatus = version.state.status
+	client.state.localVersion = version.state.combined
+	client.state.localVersionError = version.state.error
+}
+
 version.onChange(() => {
+	syncLocalVersionState()
 	if (isHost) syncHostVersionState()
 	else client.publishStatus()
 	client.requestRender(false)
