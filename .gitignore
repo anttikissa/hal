@@ -1,14 +1,17 @@
 # dependencies (bun install)
 node_modules
 
-# IntelliJ based IDEs
+# IntelliJ based IDEs (.run holds their run configurations)
 .idea
+.run/
+
+# Claude Code local settings
+.claude/
 
 # Finder (MacOS) folder config
 .DS_Store
 
 examples/*
-prev
 state/
 
 # Local user config; install copies config-template.ason here.
