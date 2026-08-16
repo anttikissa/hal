@@ -167,14 +167,3 @@ uses `charWidth()` internally which is the same width logic as `visLen()`.
 
 Tool call results must never exceed 1 MB. Truncate or summarize if needed. Error message must
 make clear that agent can use eval to change the limit if necessary.
-
-# TODO (random ideas)
-
-AGENTS.md change - should send a summary of changes to agent at start of next turn (like /cd,
-model changes, etc)
-
-colgrep https://github.com/lightonai/next-plaid?tab=readme-ov-file#colgrep
-
-IPC log truncation / compaction
-
-Autocomplete should be better: at minimum, if completion is not unique, show/print all available completions instead of appearing to do nothing.

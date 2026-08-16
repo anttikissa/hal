@@ -13,7 +13,7 @@ afterEach(() => {
 
 test('eval renders returned objects as readable multiline ASON instead of JSON', async () => {
 	const out = await evalTool.execute({
-		code: "return [{ number: 7, sessionId: '04-cxx', name: 'review prompt.ts plan round2', title: null, doneUnseen: true, greenCheckmark: true, cwd: '/Users/antti/.hal' }]",
+		code: "return [{ number: 7, sessionId: '04-cxx', name: 'review prompt.ts plan round2', title: null, doneUnseen: true, greenCheckmark: true, cwd: '/home/user/.hal' }]",
 	}, { sessionId: testSessionId, cwd: process.cwd() })
 
 	expect(out).toContain('\n')

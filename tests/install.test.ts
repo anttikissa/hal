@@ -2,6 +2,9 @@ import { describe, test, expect } from 'bun:test'
 import { $ } from 'bun'
 
 let halDir = import.meta.dir.replace(/\/tests$/, '')
+// HAL_SKIP_PATH makes the installer pretend this entry is missing from PATH, so
+// it has to match the real entry the installer looks for on this machine.
+let localBin = `${process.env.HOME}/.local/bin`
 
 test('installer creates local config from tracked template', async () => {
 	let install = await Bun.file(`${halDir}/install`).text()
@@ -72,7 +75,7 @@ describe.skip('install script', () => {
 
 	test('shows [ ] for PATH when not set', async () => {
 		let result =
-			await $`HAL_DRY_RUN=1 HAL_SKIP_PATH=/Users/antti/.local/bin ${halDir}/install -y 2>&1`.text()
+			await $`HAL_DRY_RUN=1 HAL_SKIP_PATH=${localBin} ${halDir}/install -y 2>&1`.text()
 		expect(result).toMatch(/\[ \] ~\/\.local\/bin.*PATH/)
 	})
 
@@ -100,14 +103,16 @@ describe.skip('install script', () => {
 
 	test('suggests restarting shell when PATH was modified', async () => {
 		let result =
-			await $`HAL_DRY_RUN=1 HAL_SKIP_PATH=/Users/antti/.local/bin ${halDir}/install -y 2>&1`.text()
-		expect(result).toContain('restart your shell')
-		expect(result).not.toContain('exec')
+			await $`HAL_DRY_RUN=1 HAL_SKIP_PATH=${localBin} ${halDir}/install -y 2>&1`.text()
+		expect(result).toContain('Restart your shell')
+		// Word boundary: the checklist says "hal executable symlinked", which is not
+		// a suggestion to exec anything.
+		expect(result).not.toMatch(/\bexec\b/)
 	})
 
 	test('does NOT suggest restarting shell when PATH already set', async () => {
 		let result = await $`HAL_DRY_RUN=1 ${halDir}/install -y 2>&1`.text()
-		expect(result).not.toContain('restart your shell')
+		expect(result).not.toContain('Restart your shell')
 	})
 
 	test('grep for .local/bin ignores commented-out lines', async () => {

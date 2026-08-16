@@ -429,13 +429,13 @@ test('info history entries render as system blocks', () => {
 
 test('structural cwd and model entries render as system blocks', () => {
 	const history: any[] = [
-		{ type: 'cwd', from: '/tmp', to: '/Users/antti/.hal/src', ts: '2026-04-09T20:00:00.000Z' },
+		{ type: 'cwd', from: '/tmp', to: '/home/user/.hal/src', ts: '2026-04-09T20:00:00.000Z' },
 		{ type: 'model', from: 'openai/gpt-5.5', to: 'anthropic/claude-opus-4-7', ts: '2026-04-09T20:01:00.000Z' },
 	]
 
 	const result = blockData.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([
-		{ type: 'info', text: 'cwd: /tmp -> /Users/antti/.hal/src' },
+		{ type: 'info', text: 'cwd: /tmp -> /home/user/.hal/src' },
 		{ type: 'info', text: 'model: openai/gpt-5.5 -> anthropic/claude-opus-4-7' },
 	])
 })

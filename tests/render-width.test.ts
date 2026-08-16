@@ -38,7 +38,7 @@ beforeEach(() => {
 		usage: { input: 1234567, output: 7654321, cacheRead: 0, cacheCreation: 0 },
 		contextUsed: 999999,
 		contextMax: 1000000,
-		cwd: '/Users/antti/projects/some/really/long/path/that/should/not/wrap/in/the/status/line',
+		cwd: '/home/user/projects/some/really/long/path/that/should/not/wrap/in/the/status/line',
 		model: 'openai/gpt-5.4',
 	})
 	client.state.focusedTabIndex = 0

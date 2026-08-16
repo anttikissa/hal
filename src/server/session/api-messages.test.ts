@@ -123,14 +123,14 @@ test('toProviderMessages wraps next-user info in meta tags', () => {
 	const entries: any[] = [
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts },
 		{ type: 'assistant', text: 'hello there', ts },
-		{ type: 'info', text: 'cwd changed from /tmp to /Users/antti/.hal', visibility: 'next-user', ts },
+		{ type: 'info', text: 'cwd changed from /tmp to /home/user/.hal', visibility: 'next-user', ts },
 		{ type: 'user', parts: [{ type: 'text', text: 'what now?' }], ts },
 	]
 
 	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
 		{ role: 'user', content: '[13 Apr 14:43]\nhello' },
 		{ role: 'assistant', content: [{ type: 'text', text: 'hello there' }] },
-		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /Users/antti/.hal</meta>\nwhat now?' },
+		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /home/user/.hal</meta>\nwhat now?' },
 	])
 })
 
@@ -138,13 +138,13 @@ test('toProviderMessages wraps next-user info in meta tags', () => {
 test('toProviderMessages wraps structural next-user state in meta tags', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [
-		{ type: 'cwd', from: '/tmp', to: '/Users/antti/.hal', visibility: 'next-user', ts },
+		{ type: 'cwd', from: '/tmp', to: '/home/user/.hal', visibility: 'next-user', ts },
 		{ type: 'model', from: 'openai/gpt-5.4', to: 'openai/gpt-5.5', visibility: 'next-user', ts },
 		{ type: 'user', parts: [{ type: 'text', text: 'what now?' }], ts },
 	]
 
 	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
-		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /Users/antti/.hal</meta>\n<meta>model changed from openai/gpt-5.4 to openai/gpt-5.5</meta>\nwhat now?' },
+		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /home/user/.hal</meta>\n<meta>model changed from openai/gpt-5.4 to openai/gpt-5.5</meta>\nwhat now?' },
 	])
 })
 
