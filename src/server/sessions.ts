@@ -99,6 +99,10 @@ function makeEntryId(used = new Set<string>()): string {
 	}
 }
 
+// Whitelist of history fields that survive to disk. cleanHistoryEntry() drops
+// everything else, so adding a field to HistoryEntry is not enough: without an
+// entry here it is written, read back as undefined, and the loss is silent.
+// A field can therefore work in a live session and vanish across a restart.
 const historyTopLevelKeys = new Set([
 	'id', 'type', 'parts', 'text', 'source', 'status', 'ts', 'canceled',
 	'blobId', 'signature', 'model', 'thinkingEffort',
