@@ -5,7 +5,6 @@
 // provider credentials, but read/grep/glob/bash/eval/write/edit should not expose
 // or modify it by accident.
 
-import { existsSync } from 'fs'
 import { basename, resolve } from 'path'
 import { HAL_DIR, STATE_DIR } from '../state.ts'
 
@@ -61,20 +60,6 @@ function filterPathList(text: string): string {
 	return kept.join('\n')
 }
 
-function shellProfile(): string | null {
-	const paths = protectedPaths().filter((path) => existsSync(path))
-	if (paths.length === 0) return null
-
-	const lines = ['(version 1)', '(allow default)']
-	for (const path of paths) {
-		// sandbox-exec literals are not shell-quoted; escape for the SBPL string.
-		const escaped = path.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-		lines.push(`(deny file-read* (literal "${escaped}"))`)
-		lines.push(`(deny file-write* (literal "${escaped}"))`)
-	}
-	return lines.join('\n')
-}
-
 function commandMentionsProtectedPath(command: string): boolean {
 	const lower = command.toLowerCase()
 	for (const path of protectedPaths()) {
@@ -102,7 +87,6 @@ export const sensitive = {
 	denyMessage,
 	denyIfProtected,
 	filterPathList,
-	shellProfile,
 	commandMentionsProtectedPath,
 	evalMentionsProtectedAccess,
 }

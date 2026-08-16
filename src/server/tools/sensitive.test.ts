@@ -7,7 +7,6 @@ import { evalTool } from './eval.ts'
 import { glob } from './glob.ts'
 import { grep } from './grep.ts'
 import { read } from './read.ts'
-import { sensitive } from './sensitive.ts'
 import { write } from './write.ts'
 
 const TEST_DIR = '/tmp/hal-test-sensitive-tools'
@@ -65,12 +64,4 @@ test('eval refuses obvious auth access code', async () => {
 
 	expect(fileOut).toContain('refusing to run eval code that mentions protected credentials access')
 	expect(moduleOut).toContain('refusing to run eval code that mentions protected credentials access')
-})
-
-test('sensitive shell profile denies the protected path when present without reading it', () => {
-	const profile = sensitive.shellProfile()
-	if (!profile) return
-
-	expect(profile).toContain('(deny file-read*')
-	expect(profile).toContain(protectedPath)
 })
