@@ -121,6 +121,16 @@ test('/login completes provider names', () => {
 })
 
 
+test('/web completes its subcommands', () => {
+	const all = completion.complete('/web ', '/web '.length)
+	const partial = completion.complete('/web re', '/web re'.length)
+
+	expect(all).not.toBeNull()
+	expect(all!.items).toEqual(['/web auth', '/web revoke'])
+	expect(partial!.items).toEqual(['/web revoke'])
+})
+
+
 test('/model completes model arguments like opus without crashing', () => {
 	const result = completion.complete('/model opus', '/model opus'.length)
 

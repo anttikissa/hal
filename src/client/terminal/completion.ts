@@ -192,6 +192,9 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 	} else if (arg === 'login-provider') {
 		// Aliases anthropic/openai also work, but only the product names are offered.
 		values = ['claude', 'chatgpt'].filter((provider) => provider.startsWith(argPrefix))
+	} else if (arg === 'web-action') {
+		// Bare /web lists the tokens, so only the subcommands need completing.
+		values = ['auth', 'revoke'].filter((action) => action.startsWith(argPrefix))
 	} else {
 		values = runtimeConfig.listPaths().filter((path) => path.startsWith(argPrefix))
 	}

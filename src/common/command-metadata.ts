@@ -2,7 +2,7 @@
 
 import { visLen } from '../utils/strings.ts'
 
-export type CommandArg = 'model' | 'dir' | 'command' | 'config' | 'login-provider' | 'closed-session'
+export type CommandArg = 'model' | 'dir' | 'command' | 'config' | 'login-provider' | 'closed-session' | 'web-action'
 
 interface CommandSpec {
 	usage?: string | string[]
@@ -91,7 +91,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 		].join('\n'),
 	},
 	help: { usage: '[<command>]', summary: 'Show help; try /help config.', arg: 'command' },
-	web: { usage: ['', 'auth [<purpose…>]', 'revoke <number>'], summary: 'Show or manage web interface access tokens.', detail: 'With no arguments, shows authenticated local web URLs. New tokens are independent browser/device capabilities.' },
+	web: { usage: ['', 'auth [<purpose…>]', 'revoke <number>'], summary: 'Show or manage web interface access tokens.', detail: 'With no arguments, shows authenticated local web URLs. New tokens are independent browser/device capabilities.', arg: 'web-action' },
 	quit: { summary: 'Quit Hal.' },
 	exit: { summary: 'Quit Hal.' },
 }
