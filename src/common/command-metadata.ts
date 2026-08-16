@@ -56,6 +56,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 		].join('\n'),
 	},
 	mem: { summary: 'Show current RSS memory and the warn/kill thresholds.' },
+	todo: { usage: '<item…>', summary: 'Add a TODO item to the project; if TODO.md exists, append to that file; otherwise prompt Hal to add it.', detail: 'While the session is generating, the prompt goes to a forked tab instead of interrupting the current turn.' },
 	pause: { summary: 'Pause at the next local tool batch before running tools.' },
 	send: { usage: '<target> <message…>', summary: 'Send a message to another tab.', detail: 'Target can be a tab number, full session id, or session name.' },
 	queue: { usage: ['<prompt…>', 'next', 'clear'], summary: 'Queue, run, clear, or list queued prompts.', detail: 'With no prompt, lists queued prompts. /queue next (or Ctrl-Q) runs queued prompts. /queue clear removes all queued prompts.' },
@@ -98,7 +99,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 
 const commandSections: CommandSection[] = [
 	{ title: 'Common', names: ['exit', 'help', 'model', 'pause', 'quit', 'status'] },
-	{ title: 'Conversation', names: ['clear', 'compact', 'history', 'rebase', 'system'] },
+	{ title: 'Conversation', names: ['clear', 'compact', 'history', 'rebase', 'system', 'todo'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
 	{ title: 'Setup & diagnostics', names: ['cd', 'check', 'clients', 'config', 'login', 'mem', 'web'] },

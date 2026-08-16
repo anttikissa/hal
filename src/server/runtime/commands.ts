@@ -4,7 +4,7 @@
 // is recognized, it's handled directly and the prompt is not forwarded
 // to the model.
 
-import { existsSync } from 'fs'
+import { appendFileSync, existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { ipc } from '../file-ipc.ts'
@@ -16,6 +16,7 @@ import { config } from '../../config.ts'
 import { context } from './system-prompt.ts'
 import { sessions as sessionStore } from '../sessions.ts'
 import { inbox } from './inbox.ts'
+import { agentLoop } from './agent-loop.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
 import { openaiUsage } from '../openai-usage.ts'
 import { memory } from '../memory.ts'
@@ -125,6 +126,7 @@ const workingSafeCommands = new Set([
 	'status',
 	'system',
 	'tabs',
+	'todo',
 	'web',
 ])
 
@@ -406,6 +408,35 @@ handlers['fork'] = (_args, session) => {
 		forkSessionId: session.id,
 		sessionId: session.id,
 	})
+	return { handled: true }
+}
+
+// /todo — record a project TODO. A TODO.md in the session cwd is the source of
+// truth when it exists; otherwise Hal is asked to file the item wherever the
+// project keeps them. Asking a busy session would interrupt its turn, so a
+// working session gets a forked tab that carries the same context.
+handlers['todo'] = (args, session) => {
+	const item = args.trim()
+	if (!item) return { error: 'Usage: /todo <item>', handled: true }
+
+	const todoPath = resolve(session.cwd, 'TODO.md')
+	if (existsSync(todoPath)) {
+		const current = readFileSync(todoPath, 'utf8')
+		const separator = !current || current.endsWith('\n') ? '' : '\n'
+		appendFileSync(todoPath, `${separator}- ${item}\n`)
+		return { output: `Added to ${todoPath}`, handled: true }
+	}
+
+	const task = `Add a TODO item to this project: ${item}`
+	if (agentLoop.isWorking(session.id)) {
+		ipc.appendCommand({
+			type: 'spawn',
+			sessionId: session.id,
+			spawn: { task, kind: 'interactive', mode: 'fork', cwd: session.cwd },
+		})
+		return { output: 'Session is working; forking a tab to add the TODO...', handled: true }
+	}
+	ipc.appendCommand({ type: 'prompt', sessionId: session.id, text: task })
 	return { handled: true }
 }
 

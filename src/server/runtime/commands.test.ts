@@ -13,7 +13,7 @@ import { version } from '../version.ts'
 import { sessions as sessionStore } from '../sessions.ts'
 import { paths } from '../paths.ts'
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 const sent: Array<{ sessionId: string; text: string; from?: string }> = []
@@ -22,6 +22,7 @@ const origAppendCommand = ipc.appendCommand
 const origConfigData = config.data
 const origConfigSave = config.save
 const origMaxIterations = agentLoop.config.maxIterations
+const origIsWorking = agentLoop.isWorking
 const origAnthropicRenderStatus = anthropicUsage.renderStatus
 const origRenderStatus = openaiUsage.renderStatus
 const origAnthropicHasCredentials = anthropicUsage.hasCredentials
@@ -69,6 +70,7 @@ afterEach(() => {
 	config.data = origConfigData
 	config.save = origConfigSave
 	agentLoop.config.maxIterations = origMaxIterations
+	agentLoop.isWorking = origIsWorking
 	anthropicUsage.renderStatus = origAnthropicRenderStatus
 	openaiUsage.renderStatus = origRenderStatus
 	anthropicUsage.hasCredentials = origAnthropicHasCredentials
@@ -946,3 +948,82 @@ test('/rename clear resets the current session name', async () => {
 })
 
 
+
+test('/todo appends to TODO.md when the project has one', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-todo-file-'))
+	writeFileSync(join(dir, 'TODO.md'), '# TODO\n\n- existing\n')
+	const session = makeSession()
+	session.cwd = dir
+	try {
+		const result = await commands.executeCommand('/todo wire up the widget', session)
+
+		expect(result.handled).toBe(true)
+		expect(result.error).toBeUndefined()
+		expect(readFileSync(join(dir, 'TODO.md'), 'utf8')).toBe('# TODO\n\n- existing\n- wire up the widget\n')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test('/todo starts a new line when TODO.md lacks a trailing newline', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-todo-nonewline-'))
+	writeFileSync(join(dir, 'TODO.md'), '- existing')
+	const session = makeSession()
+	session.cwd = dir
+	try {
+		await commands.executeCommand('/todo second item', session)
+
+		expect(readFileSync(join(dir, 'TODO.md'), 'utf8')).toBe('- existing\n- second item\n')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test('/todo without TODO.md prompts the current session when it is idle', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+	agentLoop.isWorking = () => false
+	const dir = mkdtempSync(join(tmpdir(), 'hal-todo-prompt-'))
+	const session = makeSession()
+	session.cwd = dir
+	try {
+		const result = await commands.executeCommand('/todo document the flags', session)
+
+		expect(result.handled).toBe(true)
+		expect(appended).toEqual([{ type: 'prompt', sessionId: '04-aaa', text: 'Add a TODO item to this project: document the flags' }])
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test('/todo without TODO.md forks a tab when the session is generating', async () => {
+	const appended: any[] = []
+	ipc.appendCommand = (command) => {
+		appended.push(command)
+	}
+	agentLoop.isWorking = () => true
+	const dir = mkdtempSync(join(tmpdir(), 'hal-todo-fork-'))
+	const session = makeSession()
+	session.cwd = dir
+	try {
+		const result = await commands.executeCommand('/todo document the flags', session)
+
+		expect(result.handled).toBe(true)
+		expect(appended).toEqual([{
+			type: 'spawn',
+			sessionId: '04-aaa',
+			spawn: { task: 'Add a TODO item to this project: document the flags', kind: 'interactive', mode: 'fork', cwd: dir },
+		}])
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test('/todo requires an item and stays runnable while working', async () => {
+	const result = await commands.executeCommand('/todo', makeSession())
+
+	expect(result.error).toBe('Usage: /todo <item>')
+	expect(commands.canRunWhileWorking('/todo something')).toBe(true)
+})
