@@ -10,6 +10,7 @@ import type { Provider, ProviderRequest, ProviderStreamEvent, Message } from '..
 import { providerShared } from './shared.ts'
 import { auth } from '../auth.ts'
 import { anthropicUsage } from '../anthropic-usage.ts'
+import { version } from '../version.ts'
 import { STATE_DIR } from '../state.ts'
 import { appendFileSync } from 'node:fs'
 
@@ -35,6 +36,13 @@ const MAX_TOKENS = 16384
 // Claude Code version we report in the OAuth user-agent (see the header block in generate()).
 // Tracks the version bundled with the Agent SDK we verified against.
 const CLAUDE_CODE_VERSION = '2.1.233'
+
+// Hal has no release versions, so identify the build by its git version:
+// "hal/<head>+<working-copy-hash>", or bare "hal" before version.start() has resolved it.
+function halVersionTag(): string {
+	if (!version.state.combined) return 'hal'
+	return `hal/${version.state.combined}`
+}
 
 // Map Anthropic error types to HTTP status codes for consistent retry logic
 const ERROR_TYPE_STATUS: Record<string, number> = {
@@ -310,7 +318,8 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		// same `claude-code-20250219,oauth-2025-04-20` beta list, `x-app: cli`, and a user-agent of
 		// the form `claude-cli/<version> (external, <entrypoint>[, agent-sdk/<version>])`. The SDK
 		// puts its own entrypoint (`sdk-ts`) in that slot rather than pretending to be the CLI, so we
-		// do the same with `hal` — same client contract, honest about who is calling. Probed against
+		// do the same with `hal/<git version>` — same client contract, honest about who is calling,
+		// and precise about which build, since Hal has no release versions beyond git. Probed against
 		// the live endpoint: the entrypoint string is not validated, so this is disclosure, not a
 		// workaround.
 		//
@@ -321,7 +330,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		// with its own user's subscription, so it stays on the personal-use side of that line.
 		// Terms change — consult the page above before shipping Hal as a product to other users, and
 		// use an API key (x-api-key branch above) for anything beyond personal use.
-		...(isOAuth ? { 'user-agent': `claude-cli/${CLAUDE_CODE_VERSION} (external, hal)`, 'x-app': 'cli' } : {}),
+		...(isOAuth ? { 'user-agent': `claude-cli/${CLAUDE_CODE_VERSION} (external, ${halVersionTag()})`, 'x-app': 'cli' } : {}),
 	}
 
 	let res: Response

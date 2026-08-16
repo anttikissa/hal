@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { auth, type Credential } from '../auth.ts'
 import { anthropicProvider } from './anthropic.ts'
+import { version } from '../version.ts'
 
 const origFetch = globalThis.fetch
 const origGetCredential = auth.getCredential
@@ -8,8 +9,11 @@ const origEnsureFresh = auth.ensureFresh
 const origMarkCooldown = auth.markCooldown
 const origHasAvailableCredential = auth.hasAvailableCredential
 
+const origCombined = version.state.combined
+
 afterEach(() => {
 	globalThis.fetch = origFetch
+	version.state.combined = origCombined
 	auth.getCredential = origGetCredential
 	auth.ensureFresh = origEnsureFresh
 	auth.markCooldown = origMarkCooldown
@@ -279,4 +283,29 @@ test('anthropic provider streams web_search use and result at block stops', asyn
 		tool_use_id: 'srvtoolu_1',
 		content: [{ title: 'HN', url: 'https://news.ycombinator.com/' }],
 	})
+})
+
+
+test('anthropic OAuth user-agent discloses hal and its git version', async () => {
+	let seenUserAgent = ''
+	installFetchMock(async (_input, init) => {
+		seenUserAgent = String((init!.headers as Record<string, string>)['user-agent'] ?? '')
+		return new Response(anthropicSse(), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	})
+	version.state.combined = 'abcd1234+ef567890'
+
+	await collect({ value: 'tok-test', type: 'token' })
+	expect(seenUserAgent).toBe('claude-cli/2.1.233 (external, hal/abcd1234+ef567890)')
+})
+
+test('anthropic OAuth user-agent omits the version until it is known', async () => {
+	let seenUserAgent = ''
+	installFetchMock(async (_input, init) => {
+		seenUserAgent = String((init!.headers as Record<string, string>)['user-agent'] ?? '')
+		return new Response(anthropicSse(), { status: 200, headers: { 'content-type': 'text/event-stream' } }) as any
+	})
+	version.state.combined = ''
+
+	await collect({ value: 'tok-test', type: 'token' })
+	expect(seenUserAgent).toBe('claude-cli/2.1.233 (external, hal)')
 })
