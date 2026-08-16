@@ -52,6 +52,16 @@ test('records use and revokes tokens by their displayed one-based position', () 
 	expect(webTokens.list()).toHaveLength(1)
 })
 
+test('rejects wrong tokens of any length without matching', () => {
+	useTokenFile()
+	webTokens.init()
+	const [token] = webTokens.list()
+	expect(webTokens.authenticate(token!.token, '127.0.0.1')).not.toBeNull()
+	expect(webTokens.authenticate('', '127.0.0.1')).toBeNull()
+	expect(webTokens.authenticate(token!.token.slice(0, 11), '127.0.0.1')).toBeNull()
+	expect(webTokens.authenticate(token!.token + 'x', '127.0.0.1')).toBeNull()
+})
+
 test('creates a fresh local token when an authenticated URL is requested after revocation', () => {
 	useTokenFile()
 	webTokens.init()

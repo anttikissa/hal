@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { randomBytes, timingSafeEqual } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { dirname } from 'path'
 import { ason } from '../utils/ason.ts'
@@ -89,9 +89,18 @@ function ensureLocalToken(): WebToken {
 	init()
 	return state.tokens[0] ?? mint('local web token')
 }
+// Constant-time comparison so a wrong token cannot be discovered byte by byte from response timing.
+// Length is not secret (tokens are always 12 chars), so bailing out on a length mismatch is fine.
+function equalsConstantTime(a: string, b: string): boolean {
+	const left = Buffer.from(a, 'utf8')
+	const right = Buffer.from(b, 'utf8')
+	if (left.length !== right.length) return false
+	return timingSafeEqual(left, right)
+}
+
 function authenticate(token: string, ip: string): WebToken | null {
 	init()
-	const found = state.tokens.find((item) => item.token === token)
+	const found = state.tokens.find((item) => equalsConstantTime(item.token, token))
 	if (!found) return null
 	found.lastUsedAt = new Date().toISOString()
 	found.lastUsedIp = ip
