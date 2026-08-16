@@ -2,9 +2,7 @@
 
 Hal is a terminal-based coding agent with the following goals:
 
-- small TypeScript code base (currently <21k lines); the terminal agent and server import no
-  third-party packages, only Bun and Node built-ins — SolidJS is used by the web client and is
-  loaded lazily, when `hal --web` bundles the browser app
+- small TypeScript code base (currently <21k lines), starts with zero dependencies imported
 - starts in 100ms on my 6 year old basic Mac laptop (reality: under 200ms, but that's tolerable)
 - no auto update nagging; if you want to update, just pull the latest code
 
