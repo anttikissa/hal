@@ -21,7 +21,7 @@ liveFiles.onChange(data, (change) => {
 // Keep a plain object synced with an ASON file. Mutations write back on the next
 // microtask, and optional watching patches external edits into the same object.
 
-import { readFileSync, writeFileSync, renameSync, watch } from 'fs'
+import { readFileSync, writeFileSync, renameSync, chmodSync, watch } from 'fs'
 import { dirname } from 'path'
 import { ason } from './ason.ts'
 
@@ -68,7 +68,7 @@ function loadFromDisk(path: string, data: Record<string, any>, notify = false, c
 		if (change) for (const cb of callbacks) cb(change)
 	} catch {}
 }
-function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts?: { watch?: boolean }): T {
+function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts?: { watch?: boolean; mode?: number }): T {
 	const data: Record<string, any> = { ...defaults }
 	loadFromDisk(path, data, false, [], false)
 
@@ -83,7 +83,10 @@ function liveFile<T extends Record<string, any>>(path: string, defaults: T, opts
 			if (!state.dirty) return
 			state.dirty = false
 			const tmp = `${path}.tmp.${process.pid}`
-			writeFileSync(tmp, ason.stringify(data) + '\n')
+			// Mode goes on the temp file so the secret is never briefly world-readable after rename.
+			// chmod too: writeFileSync's mode is ignored when a stale temp file from a crashed run exists.
+			writeFileSync(tmp, ason.stringify(data) + '\n', opts?.mode === undefined ? undefined : { mode: opts.mode })
+			if (opts?.mode !== undefined) chmodSync(tmp, opts.mode)
 			renameSync(tmp, path)
 		},
 	}

@@ -1,6 +1,6 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
 import { liveFiles } from './live-file.ts'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, renameSync } from 'fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, renameSync, statSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { ason } from './ason.ts'
@@ -181,4 +181,12 @@ test('save preserves ASON comments from disk', () => {
 	expect(disk).toContain('// model defaults')
 	expect(disk).toContain('// preferred alias')
 	expect(disk).toContain("default: 'gpt'")
+})
+
+test('mode option restricts file permissions', () => {
+	const path = join(dir, 'secret.ason')
+	const data = liveFiles.liveFile(path, { token: '' }, { watch: false, mode: 0o600 })
+	data.token = 'sekret'
+	liveFiles.save(data)
+	expect(statSync(path).mode & 0o777).toBe(0o600)
 })

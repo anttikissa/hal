@@ -30,7 +30,7 @@ const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 // Live-reloaded auth store — external edits and /login updates are picked up automatically.
 let _store: Record<string, any> | null = null
 function store(): Record<string, any> {
-	if (!_store) _store = liveFiles.liveFile(AUTH_PATH, {})
+	if (!_store) _store = liveFiles.liveFile(AUTH_PATH, {}, { mode: 0o600 }) // contains OAuth tokens and API keys
 	return _store
 }
 
