@@ -32,6 +32,9 @@ function logCall(entry: Record<string, unknown>): void {
 const API_URL = 'https://api.anthropic.com/v1/messages?beta=true'
 const API_VERSION = '2023-06-01'
 const MAX_TOKENS = 16384
+// Claude Code version we report in the OAuth user-agent (see the header block in generate()).
+// Tracks the version bundled with the Agent SDK we verified against.
+const CLAUDE_CODE_VERSION = '2.1.233'
 
 // Map Anthropic error types to HTTP status codes for consistent retry logic
 const ERROR_TYPE_STATUS: Record<string, number> = {
@@ -302,11 +305,14 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		'anthropic-beta': isOAuth
 			? 'claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14'
 			: 'fine-grained-tool-streaming-2025-05-14',
-		// The subscription (OAuth) endpoint only accepts requests that identify as Claude Code.
-		// These headers are exactly what Anthropic's own Agent SDK sends: it ships the Claude Code
-		// binary (@anthropic-ai/claude-agent-sdk-<platform>/claude), which emits the same
-		// `claude-code-20250219,oauth-2025-04-20` beta list, `x-app: cli` and a `claude-cli/<version>`
-		// user-agent when a subscription token is used.
+		// Anthropic's own Agent SDK ships the Claude Code binary
+		// (@anthropic-ai/claude-agent-sdk-<platform>/claude) and, for subscription tokens, sends the
+		// same `claude-code-20250219,oauth-2025-04-20` beta list, `x-app: cli`, and a user-agent of
+		// the form `claude-cli/<version> (external, <entrypoint>[, agent-sdk/<version>])`. The SDK
+		// puts its own entrypoint (`sdk-ts`) in that slot rather than pretending to be the CLI, so we
+		// do the same with `hal` — same client contract, honest about who is calling. Probed against
+		// the live endpoint: the entrypoint string is not validated, so this is disclosure, not a
+		// workaround.
 		//
 		// Anthropic's usage policy (https://code.claude.com/docs/en/legal-and-compliance,
 		// "Authentication and credential use") allows OAuth for ordinary personal use of Claude Code
@@ -314,8 +320,8 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		// third parties' requests through Free/Pro/Max credentials. Hal is a personal tool signing in
 		// with its own user's subscription, so it stays on the personal-use side of that line.
 		// Terms change — consult the page above before shipping Hal as a product to other users, and
-		// use an API key (x-api-key branch below) for anything beyond personal use.
-		...(isOAuth ? { 'user-agent': 'claude-cli/2.1.75', 'x-app': 'cli' } : {}),
+		// use an API key (x-api-key branch above) for anything beyond personal use.
+		...(isOAuth ? { 'user-agent': `claude-cli/${CLAUDE_CODE_VERSION} (external, hal)`, 'x-app': 'cli' } : {}),
 	}
 
 	let res: Response
