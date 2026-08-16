@@ -411,6 +411,16 @@ handlers['fork'] = (_args, session) => {
 	return { handled: true }
 }
 
+// Commit the appended TODO line. The item is typed by the user, not written by
+// a model, so the footer says who filed it rather than which model generated it.
+// The pathspec form of `git commit` ignores whatever else a sibling session has
+// staged. Any git failure (no repo, TODO.md ignored, nothing to commit) is
+// silent: recording a TODO must never depend on git state.
+function commitTodo(cwd: string, todoPath: string, item: string, sessionId: string): void {
+	const message = `TODO: ${item}\n\nFiled via /todo (session ${sessionId})\n`
+	Bun.spawnSync(['git', 'commit', '-m', message, '--', todoPath], { cwd, stdout: 'ignore', stderr: 'ignore' })
+}
+
 // /todo — record a project TODO. A TODO.md in the session cwd is the source of
 // truth when it exists; otherwise Hal is asked to file the item wherever the
 // project keeps them. Asking a busy session would interrupt its turn, so a
@@ -424,6 +434,7 @@ handlers['todo'] = (args, session) => {
 		const current = readFileSync(todoPath, 'utf8')
 		const separator = !current || current.endsWith('\n') ? '' : '\n'
 		appendFileSync(todoPath, `${separator}- ${item}\n`)
+		commitTodo(session.cwd, todoPath, item, session.id)
 		return { output: `Added to ${todoPath}`, handled: true }
 	}
 

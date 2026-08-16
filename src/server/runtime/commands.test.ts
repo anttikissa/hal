@@ -979,6 +979,43 @@ test('/todo starts a new line when TODO.md lacks a trailing newline', async () =
 	}
 })
 
+test('/todo commits TODO.md when the project is a git repo', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-todo-git-'))
+	Bun.spawnSync(['git', 'init'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' })
+	Bun.spawnSync(['git', 'config', 'user.email', 'a@test.com'], { cwd: dir })
+	Bun.spawnSync(['git', 'config', 'user.name', 'Test'], { cwd: dir })
+	writeFileSync(join(dir, 'TODO.md'), '- existing\n')
+	Bun.spawnSync(['git', 'add', 'TODO.md'], { cwd: dir })
+	Bun.spawnSync(['git', 'commit', '-m', 'init'], { cwd: dir, stdout: 'ignore', stderr: 'ignore' })
+	const session = makeSession()
+	session.cwd = dir
+	try {
+		await commands.executeCommand('/todo wire up the widget', session)
+
+		const message = new TextDecoder().decode(Bun.spawnSync(['git', 'show', '-s', '--format=%B', 'HEAD'], { cwd: dir }).stdout)
+		expect(message).toBe('TODO: wire up the widget\n\nFiled via /todo (session 04-aaa)\n\n')
+		const status = new TextDecoder().decode(Bun.spawnSync(['git', 'status', '--porcelain'], { cwd: dir }).stdout)
+		expect(status).toBe('')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test('/todo still records the item outside a git repo', async () => {
+	const dir = mkdtempSync(join(tmpdir(), 'hal-todo-nogit-'))
+	writeFileSync(join(dir, 'TODO.md'), '- existing\n')
+	const session = makeSession()
+	session.cwd = dir
+	try {
+		const result = await commands.executeCommand('/todo lonely item', session)
+
+		expect(result.error).toBeUndefined()
+		expect(readFileSync(join(dir, 'TODO.md'), 'utf8')).toBe('- existing\n- lonely item\n')
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
+
 test('/todo without TODO.md prompts the current session when it is idle', async () => {
 	const appended: any[] = []
 	ipc.appendCommand = (command) => {
