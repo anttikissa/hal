@@ -43,7 +43,7 @@ always had the margin.
 
 Two painters implement this, and they are deliberately not shared:
 
-- `bgLine()` in `src/cli/blocks.ts` fills the rest of the row with `CSI K`
+- `bgLine()` in `src/client/terminal/blocks.ts` fills the rest of the row with `CSI K`
   (erase to end of line) while the background color is active. History is
   append-only and fully rewritten by the diff engine on every paint, so this
   is far cheaper than emitting explicit spaces.
@@ -181,7 +181,7 @@ No exceptions.
 
 Do not hard-code RGB colors, 16/256-color ANSI codes, or named ANSI color
 choices in terminal UI code. Define color choices as OKLCH triples in
-`colors.ason`, load them through `src/cli/colors.ts`, and use the exported
+`colors.ason`, load them through `src/client/terminal/colors.ts`, and use the exported
 `colors` object at render time. Mixing raw ANSI colors with OKLCH-derived
 colors makes the palette inconsistent and hard to tune.
 
@@ -272,7 +272,7 @@ the event loop is saturated with frame builds + stdout writes, and stdin
 events (keypresses) **never fire**. The user cannot type, abort, or even
 Ctrl-C while the assistant is generating.
 
-**Fix**: `draw()` in `cli.ts` uses a trailing-edge throttle. Non-force draws
+**Fix**: `draw()` in `src/client/cli.ts` uses a trailing-edge throttle. Non-force draws
 are coalesced to at most one per 16ms (~60 fps). Force draws (tab switch,
 resize, Ctrl-L) execute immediately.
 

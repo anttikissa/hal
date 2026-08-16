@@ -69,7 +69,7 @@ return agentLoop.isWorking(runtime.state.openSessionIds[2])
 Example 2: Run a command to change current session cwd as if user had typed it:
 
 ```ts
-require('~/ipc.ts').ipc.appendCommand({ type: 'prompt', sessionId: ctx.sessionId, text: '/cd /tmp', queue: true })
+require('~/server/file-ipc.ts').ipc.appendCommand({ type: 'prompt', sessionId: ctx.sessionId, text: '/cd /tmp', queue: true })
 ```
 
 Use `queue: true` for a prompt issued by your own eval call: it runs after the current turn completes instead of steering and pausing that turn.

@@ -12,6 +12,7 @@ Meanwhile, it tries to be reasonably feature complete, have a nice terminal and 
 ## Contents
 
 - [Highlights](#highlights)
+- [Architecture](#architecture)
 - [Provider support](#provider-support)
 - [Installation](#installation)
 - [Possible README improvements](#possible-readme-improvements)
@@ -45,6 +46,50 @@ What's not implemented:
 - Skills are not supported yet, ask Hal to add support if you need them
 - Hooks are missing too. The `edit` tool automatically tests for TypeScript errors in .ts files and reports them. Ask Hal to extend itself if you have more complex needs.
 - Sandboxing or more complex security infrastructure
+
+## Architecture
+
+`src/main.ts` is the composition root. It decides whether this process is the server or a
+client, wires the pieces together, and starts them. Everything else lives in one of five layers:
+
+```
+   terminal UI                            browser UI
+  (src/client)                        (src/web-client)
+        |                                     |
+        |  file IPC (state/ipc)               |  HTTP + WebSocket
+        v                                     v
+  +-----------------------------------------------------+
+  |                  server (src/server)                |
+  |   runtime · tabs · sessions · tools · providers     |
+  +-----------------------------------------------------+
+                            |
+                            v
+                  state/sessions/<id>/
+              (durable history, live, blobs)
+
+  src/common  shared contracts + deterministic projections
+  src/utils   generic helpers: ason, strings, time, logging
+```
+
+- **`src/server`** owns everything stateful: the agent runtime, tabs, session persistence and
+  replay, providers, tools, auth/models/usage, and both transports (the file IPC bus and the
+  `--web` HTTP/WebSocket server).
+- **`src/client`** is the terminal UI. It never imports server internals: the composition root
+  injects narrow backend and transport ports, so the client depends on interfaces, not modules.
+- **`src/common`** holds Hal-specific but runtime-neutral contracts: the command/event protocol,
+  session snapshots, the persisted history shape, and deterministic projections that turn
+  server events into renderable blocks. No Bun or Node APIs, so the browser can use it too.
+- **`src/web-client`** is the SolidJS browser app, rendering the same snapshots and events.
+- **`src/utils`** is generic reusable code with no Hal domain knowledge.
+
+The server produces, persists, and transports semantic events; `common` projects them into
+blocks; the terminal and the browser render those blocks independently, which is why both UIs
+stay consistent without sharing rendering code. `tests/import-boundaries.test.ts` enforces the
+layering: `client`, `server`, and `web-client` can never import each other.
+
+Multiple Hal processes can run at once. The first one becomes the server; the rest are clients
+talking to it over the file IPC bus in `state/ipc/`. If the server exits, another process
+takes over, which is how you can restart Hal into new code without losing your sessions.
 
 ## Provider support
 
@@ -98,7 +143,6 @@ Hal picks up API keys from your environment. You can also use `/login` for OpenA
 - Add a screenshot or short terminal recording near the top so readers immediately see the UI.
 - Add a compact "Quick start" before the security-review installation block for people who already trust the repo.
 - Add a command reference table for `/model`, `/login`, `/cd`, `/go`, `/self`, `/rebase`, and `/queue`.
-- Add a small architecture diagram linking the client, server runtime, IPC bus, sessions, providers, and tools.
 - Add a "Development" section with `bun install`, `./test`, `bun cloc`, and the module/export conventions from [`AGENTS.md`](AGENTS.md).
 - Add a "Security model" section that explains local file access, confirmation prompts, auth storage, `eval`, and the current lack of sandboxing.
 - Add a "Configuration" section linking [`config-template.ason`](config-template.ason), local `config.ason`, and provider environment variables.

@@ -4,6 +4,18 @@ Read before editing web code. Solid 1 and React patterns are often wrong for our
 prerelease Solid 2. Use the installed `solid-js/CHEATSHEET.md` as the API source
 of truth; re-read it after upgrades.
 
+## Where the code lives
+
+- `src/web-client/` — the browser app: `main.tsx`, `components/`, `utils/`, `index.html`,
+  `styles.css`. It may import `src/common/` and `src/utils/`, never `src/server/` or
+  `src/client/`.
+- `src/server/web.ts` — HTTP and WebSocket transport, started only for `hal --web`. It serves
+  the page, bundles the browser code lazily on first request, sends a `ClientSessionSnapshot`
+  on subscribe, and streams live events after that.
+- `src/common/web.ts` — the wire message contract plus `webMessages.applySessionMessage`, which
+  folds snapshots and events into one session state. Presentation belongs in `web-client`;
+  event-to-block projection belongs in `src/common/live-event-blocks.ts`.
+
 ## Stack
 
 - Update the locked `solid-js` and `@solidjs/web` versions together.

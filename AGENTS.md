@@ -8,7 +8,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Use red-green TDD.
 - Do not write tests for exact LLM output. LLM output is indeterministic; test deterministic parsing, wiring, and fallback behavior instead.
 - Use `./test` to run all tests, typechecker and oxlint. Run the tests before writing code.
-- If tests fail, look for working sessions that might have ongoing changes (eval "require('~/ipc.ts').ipc.readState().working")
+- If tests fail, look for working sessions that might have ongoing changes (eval "require('~/server/file-ipc.ts').ipc.readState().working")
 - If no working sessions, work with the user to fix the tests.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
 - Run `bun cloc` to check line count — our budget for core code is 21 thousand lines. If you added many, see if you can do the same with less.
@@ -20,6 +20,32 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Do not leave any tech debt behind. If you have taken any shortcuts, go back and do them right.
 - Put one-off scripts in `/tmp`
 - Do not add defensive legacy/back-compat recovery code for old broken local state unless the user explicitly asks; fix future behavior only.
+
+# Source layout
+
+`src/main.ts` is the composition root: it wires the pieces together and owns startup order.
+`src/config.ts` registers cross-component configuration.
+
+Layers under `src/`:
+
+- `client/` — terminal client: rendering, prompt editing, tabs, and the narrow backend/transport
+  ports the composition root injects. `client/terminal/` holds terminal-specific pieces (blocks,
+  colors, keys, completion).
+- `common/` — Hal-specific but runtime-neutral contracts: protocol and IPC types, session metadata,
+  persisted history shape, client snapshots, and deterministic projections such as
+  `live-event-blocks.ts`. Must be browser-safe: no Bun/Node APIs, no file system.
+- `server/` — runtime, tabs, session persistence and replay, providers, tools, auth/models/usage,
+  memory/version/state paths, file IPC, and HTTP/WebSocket transport.
+- `utils/` — generic reusable utilities (ason, strings, time, logging). Not a second `common/`:
+  nothing here may be Hal-domain-specific.
+- `web-client/` — browser app and its components/presentation.
+
+The server produces, persists, and transports semantic events; `common/` projects them into blocks;
+terminal and browser clients render those blocks independently.
+
+Import direction: any layer may import `common/` and `utils/`, and sibling layers
+(`client`, `server`, `web-client`) may never import each other. `tests/import-boundaries.test.ts`
+enforces this.
 
 # Code style
 
@@ -34,14 +60,14 @@ All modules must be designed to be safely hot-patchable at runtime through the e
 
 A single mutable namespace object:
 ```
-// ipc.ts
-function appendEvent(event: any): void { ... }
-function appendCommand(command: any): void { ... }
+// service.ts (generic example, not a real file)
+function start(): void { ... }
+function stop(): void { ... }
 let state = {
-	events: [],
+	running: false,
 	// ...
 }
-export const ipc = { state, appendEvent, appendCommand, ... }
+export const service = { state, start, stop, ... }
 ```
 
 Avoid constants and private functions because those cannot be changed with eval.
@@ -63,20 +89,20 @@ Avoid constants and private functions because those cannot be changed with eval.
 Every module exports a single mutable namespace object. All cross-module calls go through these objects, so eval patches take effect immediately at runtime.
 
 ```ts
-// ipc.ts
-function appendEvent(event: any): void { ... }
-function appendCommand(command: any): void { ... }
+// service.ts (generic example, not a real file)
+function start(): void { ... }
+function stop(): void { ... }
 let state = {
-	events: [],
+	running: false,
 	// ...
 }
-export const ipc = { state, appendEvent, appendCommand, ... }
+export const service = { state, start, stop, ... }
 ```
 
 Caller:
 ```ts
-import { ipc } from './ipc.ts'
-ipc.appendEvent({ type: 'foo' })
+import { service } from './service.ts'
+service.start()
 ```
 
 Stateful modules should include a `state` field. Tweakable constants should go to a `config` field. True invariants like ANSI sequences can be `const FOO = ...`.

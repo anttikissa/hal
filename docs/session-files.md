@@ -3,6 +3,16 @@
 Hal keeps restart-surviving conversation state under `state/sessions/<id>/`.
 Provider context is rebuilt from durable history, not from live UI snapshots or IPC state.
 
+Three kinds of state are deliberately separate:
+
+- **Durable history** (`session.ason`, `history*.asonl`, `blobs/`) — conversation truth, owned and
+  written by the server, replayed into provider messages.
+- **Live snapshot** (`live.ason`) — uncommitted streaming blocks for display only.
+- **IPC** (`state/ipc/`) — process/tab coordination, never conversation truth.
+
+The serialized shapes are browser-safe contracts in `src/common/` (`history.ts`, `session.ts`,
+`live-event-blocks.ts`, `ipc.ts`); `src/server/` owns reading, writing, and transporting them.
+
 ## `session.ason`
 
 Durable session metadata:
@@ -17,7 +27,7 @@ Durable session metadata:
 
 Append-oriented logical conversation history. Each line is one short ASON record.
 The flat, UI-friendly entries are replayed into provider messages by
-`src/session/api-messages.ts`.
+`src/server/session/api-messages.ts`.
 
 Forks can inherit parent history; blob ownership follows the history origin when
 rendering inherited entries.
@@ -38,8 +48,13 @@ marks the marker `canceled: true` through the current history rewrite helper.
 
 ## `live.ason`
 
-Restart-tolerant UI snapshot for uncommitted streaming blocks. It keeps the
-terminal display useful across client/runtime restarts, but it is not the
+Restart-tolerant UI snapshot of uncommitted streaming blocks, in the shared
+`LiveBlock` shape produced by the deterministic projection in
+`src/common/live-event-blocks.ts`. The same projection reduces live events on the
+client, so a snapshot and a live event stream always converge — terminal and
+browser render the result independently.
+
+It keeps the display useful across client/runtime restarts, but it is not the
 authoritative provider context and is cleared when streamed content is committed
 to history.
 
