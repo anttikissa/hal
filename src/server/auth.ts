@@ -3,7 +3,7 @@
 //
 // Credential priority:
 // 1. auth.ason accessToken (from /login OAuth)
-// 2. auth.ason apiKey (from auth.ason or scripts/add-keys.ts)
+// 2. auth.ason apiKey (hand-edited)
 // 3. Environment variable (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
 //
 // Token rotation:
