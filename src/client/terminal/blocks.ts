@@ -11,9 +11,11 @@ import { terminalSubscriptionUsage } from './subscription-usage.ts'
 import { colors } from './colors.ts'
 import { md, type MdColors } from './md.ts'
 import { blockText } from './block-text.ts'
-// Sibling import; circular with tool-specs.ts but safe per module convention —
-// all access happens at call time, never at import time.
 import { toolSpecs } from './tool-specs.ts'
+// Sizing/limits live in ../block-config.ts so block-data.ts and tool-specs.ts
+// can read them without importing this renderer. Local alias keeps the many
+// `blockConfig.x` call sites unchanged; it is the same mutable object, so
+// config reloads and eval patches still apply.
 import { blockConfig as clientBlockConfig } from '../block-config.ts'
 
 const blockConfig = clientBlockConfig.config

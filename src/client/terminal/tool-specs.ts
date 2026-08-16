@@ -8,6 +8,7 @@ import { ason } from '../../utils/ason.ts'
 import { colors } from './colors.ts'
 import { md } from './md.ts'
 import { shellCommand } from '../../utils/shell-command.ts'
+// Shared with blocks.ts and block-data.ts; see ../block-config.ts.
 import { blockConfig } from '../block-config.ts'
 
 const FG_OFF = '\x1b[39m'

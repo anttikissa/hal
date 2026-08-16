@@ -10,6 +10,7 @@ import type { LiveBlock } from '../common/live-event-blocks.ts'
 import type { HistoryEntry } from '../common/history.ts'
 import { historyProjection } from '../common/history-projection.ts'
 import { clientBackend } from './backend.ts'
+// Shared with the terminal block renderers; see ./block-config.ts.
 import { blockConfig } from './block-config.ts'
 
 interface PresentationBlock {
