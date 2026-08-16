@@ -30,7 +30,7 @@ import { tokenCalibration } from '../token-calibration.ts'
 
 const config = {
 	/** Maximum tool→generate cycles before we force-stop. */
-	maxIterations: 50,
+	maxIterations: 200,
 	/** Max concurrent tool executions per cycle. */
 	maxToolConcurrency: 5,
 	/** Retry config for transient API errors. */

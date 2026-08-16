@@ -42,7 +42,7 @@
 	},
 	renderHistory: {
 		// Brightness multiplier for inherited fork history; lower values look dimmer.
-		forkHistoryDimFactor: 0.85,
+		forkHistoryDimFactor: 0.82,
 		// Duration of HAL cursor fade from working to idle after generation ends.
 		halCursorFadeMs: 5000
 	},
@@ -68,7 +68,7 @@
 	},
 	agentLoop: {
 		// Maximum generate/tool-result cycles before stopping a runaway agent loop.
-		maxIterations: 50,
+		maxIterations: 200,
 		// Maximum local tools to execute concurrently in one cycle.
 		maxToolConcurrency: 5,
 		// Base retry delay for transient provider errors.
@@ -89,7 +89,7 @@
 		// RSS threshold for showing a high-memory warning; set to 0 to disable warnings.
 		warnBytes: 1500000000,
 		// RSS threshold for exiting before memory grows without bound; set to 0 to disable exits.
-		killBytes: 2000000000,
+		killBytes: 5000000000,
 		// How often to check RSS.
 		checkIntervalMs: 1000,
 		// Delay between warning that Hal will exit and actually exiting.
@@ -145,6 +145,6 @@
 	},
 	clipboard: {
 		// Pasted text at or below this many lines stays inline; longer pastes become temp files.
-		multilinePasteFileLineLimit: 5
+		multilinePasteFileLineLimit: 7
 	}
 }

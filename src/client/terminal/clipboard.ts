@@ -12,7 +12,7 @@ const config = {
 	// Multiline pasted text with more than this many lines is written to
 	// /tmp/hal/paste/NNNN.txt and represented in the prompt as [path]. Pastes at
 	// or below the limit stay inline. Read at paste time so /config takes effect.
-	multilinePasteFileLineLimit: 5,
+	multilinePasteFileLineLimit: 7,
 }
 
 // ── macOS clipboard via Bun FFI ──────────────────────────────────────────────

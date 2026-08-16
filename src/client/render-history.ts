@@ -31,7 +31,7 @@ export type HistoryRenderContext = {
 }
 
 const config = {
-	forkHistoryDimFactor: 0.85,
+	forkHistoryDimFactor: 0.82,
 	halCursorFadeMs: 5000,
 }
 

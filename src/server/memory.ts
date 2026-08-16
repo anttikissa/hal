@@ -9,7 +9,7 @@ import { log } from '../utils/log.ts'
 
 const config = {
 	warnBytes: 1_500_000_000,
-	killBytes: 2_000_000_000,
+	killBytes: 5_000_000_000,
 	checkIntervalMs: 1_000,
 	exitDelayMs: 500,
 }
