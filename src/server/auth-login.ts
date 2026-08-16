@@ -135,7 +135,9 @@ async function loginOpenai(onProgress?: (msg: string) => void): Promise<{ accoun
 	authUrl.searchParams.set('state', flowState)
 	authUrl.searchParams.set('id_token_add_organizations', 'true')
 	authUrl.searchParams.set('codex_cli_simplified_flow', 'true')
-	authUrl.searchParams.set('originator', process.env.OPENAI_ORIGINATOR ?? 'pi')
+	// Identify ourselves rather than borrowing another client's name. The authorize endpoint
+	// accepts any value here (probed); the client_id is what actually selects the OAuth app.
+	authUrl.searchParams.set('originator', process.env.OPENAI_ORIGINATOR ?? 'hal')
 
 	onProgress?.(`Open this URL to log in:\n${authUrl}\n\nWaiting for callback on ${OPENAI_REDIRECT}...`)
 

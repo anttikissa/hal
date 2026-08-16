@@ -407,7 +407,12 @@ function responsesHeaders(credential: Credential, transport: OpenAITransport, op
 		const accountId = transport.accountId || openaiEntry.accountId || ''
 		if (!accountId) return { error: 'OpenAI token missing chatgpt_account_id' }
 		headers['OpenAI-Beta'] = 'responses=experimental'
-		headers.originator = 'pi'
+		// The Codex backend uses `originator` to identify the calling client. Codex CLI sends
+		// `codex_cli_rs`; we send `hal` so the traffic is attributable to what it actually is.
+		// Probed against the live endpoint: unknown originator values are not rejected, so this
+		// is a truthful label rather than a whitelist bypass. If OpenAI ever starts enforcing a
+		// first-party allowlist here, the honest fix is an API key, not a borrowed originator.
+		headers.originator = 'hal'
 		headers['chatgpt-account-id'] = accountId
 	}
 	return { headers }

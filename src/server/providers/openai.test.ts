@@ -135,7 +135,7 @@ test('openai provider routes ChatGPT OAuth tokens to the Codex backend', async (
 	const headers = new Headers(calls[0]!.init?.headers)
 	expect(headers.get('authorization')).toBe(`Bearer ${token}`)
 	expect(headers.get('openai-beta')).toBe('responses=experimental')
-	expect(headers.get('originator')).toBe('pi')
+	expect(headers.get('originator')).toBe('hal')
 	expect(headers.get('chatgpt-account-id')).toBe('acct_from_token')
 
 	expect(events).toContainEqual({ type: 'text', text: 'hello' })
