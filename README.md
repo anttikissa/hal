@@ -54,7 +54,7 @@ Use `/login claude` or `/login chatgpt` to start using your Claude or ChatGPT su
 - `/go` command goes to any current or past session / tab and resumes the session if it was closed
 - Google search supported through [Serper](https://serper.dev/) (ask Hal to implement other providers if you like)
 - New models are found automatically by checking [models.dev](https://models.dev/), and Hal suggests updating your aliases and defaults once new models become available
-- Super simple security guardrails: if model tries to read auth tokens or do `rm -rf` or the like, you'll be asked to confirm
+- Super simple security guardrails: if model tries to read auth tokens or do `rm -rf` or the like, you'll be asked to confirm. These stop accidents, not a determined adversary — any of them can be bypassed trivially, and that's fine: the threat model assumes your model provider isn't malicious.
 - You can run `hal` in multiple terminals on the same machine and one of them acts as the server
 - There's an `eval` tool that lets Hal run arbitrary JavaScript in the running process, allowing Hal to do brain surgery on itself
 
