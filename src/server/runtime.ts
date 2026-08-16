@@ -122,17 +122,17 @@ function shouldCloseSessionAfterGeneration(meta: { spawnKind?: SpawnKind } | nul
 	return meta?.spawnKind === 'subagent' && result === 'completed'
 }
 
-function restartedAfterLastTurnEnd(entries: HistoryEntry[]): boolean {
+// The restart marker is written only for sessions that were actually working when
+// the runtime went down, so a marker after the last turn_end is proof enough that
+// the turn should resume. Do not also require visible turn content: a turn resumed
+// from a pause is often restarted before it emits anything of its own.
+function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
 		if (entry.type === 'turn_end') return false
 		if (entry.type === 'log' && entry.text === RESTARTED_TEXT) return true
 	}
 	return false
-}
-
-function shouldAutoContinue(entries: HistoryEntry[]): boolean {
-	return restartedAfterLastTurnEnd(entries) && sessionStore.tailTurnState(entries).interrupted
 }
 
 function shouldShowResumingNotice(sessionId: string): boolean {

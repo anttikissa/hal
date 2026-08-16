@@ -495,16 +495,24 @@ test('server rejects a new tab when the shared tab limit is reached', () => {
 })
 
 
-test('shouldAutoContinue resumes only restarted interrupted turns', () => {
+test('shouldAutoContinue resumes only restarted turns', () => {
 	expect(runtime.shouldAutoContinue([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
 		{ type: 'log', text: '[restarted]', ts: '2026-05-27T12:00:01.000Z' },
 	])).toBe(true)
 
+	// A turn continued from a pause is restarted before it produces any history of
+	// its own. The restart marker alone proves the turn was working.
+	expect(runtime.shouldAutoContinue([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
+		{ type: 'turn_end', status: 'aborted', abortText: '[paused]', ts: '2026-05-27T12:00:01.000Z' },
+		{ type: 'log', text: '[resuming]', ts: '2026-05-27T12:00:02.000Z' },
+		{ type: 'log', text: '[restarted]', ts: '2026-05-27T12:00:03.000Z' },
+	])).toBe(true)
+
 	expect(runtime.shouldAutoContinue([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
 		{ type: 'turn_end', status: 'completed', ts: '2026-05-27T12:00:01.000Z' },
-		{ type: 'log', text: '[restarted]', ts: '2026-05-27T12:00:02.000Z' },
 	])).toBe(false)
 
 	expect(runtime.shouldAutoContinue([
