@@ -22,7 +22,10 @@ of truth; re-read it after upgrades.
 - Set `jsxImportSource` to `@solidjs/web`.
 - Import core and stores from `solid-js`; import DOM APIs and JSX types from
   `@solidjs/web`. `solid-js/web` and `solid-js/store` are gone.
-- The client-only app has no router. Use browser history until one is justified.
+- The client-only app has no router. Our URLs are a path plus a hash
+  (`/112-bad#0083pn-l13` selects a session and a message), which `location`,
+  `popstate`, and `history.pushState` cover. Add a router only if nested layouts,
+  typed params, or preloading ever justify one.
 
 ## Components, files, and CSS
 
@@ -63,11 +66,37 @@ of truth; re-read it after upgrades.
   destructuring props loses reactivity.
 - Mutate store drafts: `setStore(draft => { draft.user.name = name })`. To
   preserve server-data identity, call `reconcile(data, key)(draft.branch)` in it.
+- `snapshot(store)` takes a plain non-reactive copy for serialization or tests.
+  Note `main.tsx` already uses `snapshot` as a local name for session data, so
+  check for shadowing before importing it there.
+
+Dev builds turn the two most common Solid 1 reflexes into thrown errors, so a
+crash here means the idiom changed, not that the code is subtly broken:
+
+- `[MISSING_EFFECT_FN]` — `createEffect` got one argument. Split it into
+  `(compute, apply)`, or use `createMemo` for a derived value.
+- `[REACTIVE_WRITE_IN_OWNED_SCOPE]` — a setter ran inside a component body,
+  memo, effect compute, or `createRoot` callback. Move the write to an event
+  handler or `onSettled`, or opt in with `createSignal(v, { ownedWrite: true })`.
+
+## Async
+
+- Async work belongs in computations: `createMemo(() => fetch(...))` returning a
+  promise, read under `<Loading>`. There is no `createResource`.
+- Plain `async` handlers that call a setter are still fine, and are what
+  `main.tsx` does for fetch and WebSocket traffic. Prefer them when the data
+  arrives by push rather than by reading a value.
+- `isPending(() => x())` is not 1.x `.loading`. It reports an in-flight *change*
+  to a value that already rendered, so it stays false during a plain `refresh`.
+- `refresh(x)` silently re-asks the same question. Pair it with `affects(x)`
+  first when the reload should read as pending.
+- `action` bodies are generators: `yield` promises to stay in the transaction,
+  never `flush()` inside one, and call them from handlers, not components.
 
 ## Solid 1 traps
 
-- Async computations plus `<Loading>` replace `createResource`/`Suspense`.
-  `Errored` replaces `ErrorBoundary`; `Reveal` replaces `SuspenseList`.
+- `Errored` replaces `ErrorBoundary`; `Reveal` replaces `SuspenseList`. See
+  Async above for what replaced `createResource` and `Suspense`.
 - `merge`, `omit`, and `onSettled` replace `mergeProps`, `splitProps`, and
   `onMount`; draft setters replace `produce`.
 - Default `<For>` children get a value and index accessor; `keyed={false}` gives
@@ -77,12 +106,27 @@ of truth; re-read it after upgrades.
   callback arrays, not ref objects or `use:` directives.
 - Use lowercase HTML attributes, camelCase events, and `class` arrays/objects,
   not `classList`, namespaces, or hand-built conditional class strings.
+- `<Repeat count={n}>` renders a count with no diffing and has no Solid 1
+  equivalent, so it is easy to miss when reaching for `<For>` over an index.
 
 ## Tests
 
-- Resolve the `browser` and `development` conditions; otherwise Bun can load
-  Solid's server build and make client reactivity appear broken.
-- Give primitives an owner with `createRoot` outside render tests.
+No web test imports `solid-js` yet. The first one that does must deal with this:
+
+- **Bun resolves Solid's server build by default, and it fails silently.**
+  `solid-js` points `main`/`module` at `dist/server.js`; the client build sits
+  behind the `browser` condition. Under the server build memos never recompute
+  and effect apply never runs, so assertions pass against stale values instead
+  of erroring. Only `bun test --conditions browser --conditions development`
+  fixed it in a probe; `conditions` under `[test]`, `[run]`, or `[install]` in
+  `bunfig.toml` was ignored, so `scripts/test-parallel.ts` needs the flags when
+  it spawns a test that touches Solid.
+  Sanity check: `createMemo(() => c() * 2)` must observe a `setC(5)` after
+  `flush()`. If it returns the initial value, the build is wrong, not the test.
+- Give primitives an owner with `createRoot` outside render tests, but call
+  setters *outside* the `createRoot` callback — it is an owned scope, so writing
+  inside it throws `[REACTIVE_WRITE_IN_OWNED_SCOPE]`. Return the setter and use
+  it after.
 - `flush()` before assertions that observe queued state, effects, or DOM.
 
 Source: [Solid 2 cheatsheet](https://github.com/solidjs/solid/blob/next/packages/solid/CHEATSHEET.md).
