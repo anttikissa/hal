@@ -537,7 +537,9 @@ function tailTurnState(entries: HistoryEntry[]): { interrupted: boolean; interru
 	}
 	for (let i = start + 1; i < entries.length; i++) {
 		const entry = entries[i]!
-		if (entry.type === 'tool_call' && !completedToolIds.has(entry.toolId)) interruptedTools.push({ name: entry.name, id: entry.toolId })
+		// ui-only calls (server-side web_search) never become provider tool_use
+		// blocks, so a synthetic result for them would be an orphan.
+		if (entry.type === 'tool_call' && entry.visibility !== 'ui' && !completedToolIds.has(entry.toolId)) interruptedTools.push({ name: entry.name, id: entry.toolId })
 	}
 	return { interrupted: sawTurnContent, interruptedTools, ended }
 }

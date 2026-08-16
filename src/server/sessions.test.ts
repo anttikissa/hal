@@ -449,3 +449,14 @@ test('reset-style rotation preserves forked_from entry and writes a reset marker
 	expect(newMsgs[0]).toMatchObject({ type: 'forked_from', parent: parentId, ts: nowTs })
 	expect(newMsgs[1]).toMatchObject({ type: 'reset', ts: nowTs })
 })
+
+
+test('tailTurnState ignores ui-only tool calls like server-side web_search', () => {
+	const entries: any[] = [
+		{ type: 'turn_end', status: 'completed', ts: '2026-05-27T12:00:00.000Z' },
+		{ type: 'tool_call', toolId: 'srvtoolu_1', name: 'web_search', visibility: 'ui', ts: '2026-05-27T12:00:01.000Z' },
+		{ type: 'tool_call', toolId: 'call_1', name: 'bash', ts: '2026-05-27T12:00:02.000Z' },
+	]
+
+	expect(sessions.tailTurnState(entries)).toMatchObject({ interrupted: true, interruptedTools: [{ name: 'bash', id: 'call_1' }] })
+})

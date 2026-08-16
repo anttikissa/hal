@@ -246,3 +246,18 @@ test('resolved pending tools markers are ignored during provider replay', () => 
 		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' }] },
 	])
 })
+
+test('repairToolPairing drops tool_result blocks with no matching tool_use', () => {
+	const msgs: Message[] = [
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'bash', input: {} }] },
+		{ role: 'user', content: [
+			{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' },
+			{ type: 'tool_result', tool_use_id: 'srvtoolu_1', content: '[interrupted]' },
+		] },
+	]
+	apiMessages.repairToolPairing(msgs)
+	expect(msgs).toEqual([
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'bash', input: {} }] },
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' }] },
+	])
+})

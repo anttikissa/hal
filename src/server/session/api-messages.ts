@@ -224,6 +224,21 @@ function buildToolResultContent(
 }
 
 function repairToolPairing(msgs: Message[]): void {
+	// Every tool_result needs a tool_use; orphans are a hard API error, so drop
+	// them before filling in missing results below.
+	const allToolUseIds = new Set<string>()
+	for (const msg of msgs) {
+		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
+		for (const b of msg.content as ContentBlock[]) if (b.type === 'tool_use' && b.id) allToolUseIds.add(b.id)
+	}
+	for (const msg of msgs) {
+		if (msg.role !== 'user' || !Array.isArray(msg.content)) continue
+		const blocks = msg.content as ContentBlock[]
+		for (let i = blocks.length - 1; i >= 0; i--) {
+			if (blocks[i]!.type === 'tool_result' && !allToolUseIds.has(blocks[i]!.tool_use_id!)) blocks.splice(i, 1)
+		}
+	}
+
 	for (let i = 0; i < msgs.length; i++) {
 		const msg = msgs[i]!
 		if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
@@ -326,6 +341,7 @@ export const apiMessages = {
 	config: apiConfig,
 	toProviderMessages,
 	pruneMessages,
+	repairToolPairing,
 	findReplayStart,
 	formatLocalTime,
 	metaText,
