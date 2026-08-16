@@ -8,9 +8,7 @@ import { ason } from '../../utils/ason.ts'
 import { colors } from './colors.ts'
 import { md } from './md.ts'
 import { shellCommand } from '../../utils/shell-command.ts'
-// Sibling import for blocks.config; circular with blocks.ts but safe per
-// module convention — all access happens at call time, never at import time.
-import { blocks } from './blocks.ts'
+import { blockConfig } from '../block-config.ts'
 
 const FG_OFF = '\x1b[39m'
 
@@ -128,7 +126,7 @@ function formatEdit(output: string): ToolFormatResult {
 		[afterLines, '+', colors.diff.addFg || colors.info.fg],
 	] as const) {
 		if (!content.length) continue
-		const max = blocks.config.maxEditDiffLines
+		const max = blockConfig.config.maxEditDiffLines
 		const limit = content.length <= max + 1 ? content.length : max
 		for (const line of content.slice(0, limit)) lines.push(`${color}${prefix} ${line}${FG_OFF}`)
 		if (content.length > limit) lines.push(`  … ${content.length - limit} more`)
