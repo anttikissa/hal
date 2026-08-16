@@ -114,10 +114,10 @@ test('/go completes all sessions and /resume completes closed sessions', () => {
 
 
 test('/login completes provider names', () => {
-	const result = completion.complete('/login a', '/login a'.length)
+	const result = completion.complete('/login c', '/login c'.length)
 
 	expect(result).not.toBeNull()
-	expect(result!.items).toEqual(['/login anthropic'])
+	expect(result!.items).toEqual(['/login claude', '/login chatgpt'])
 })
 
 

@@ -190,7 +190,8 @@ function complete(text: string, cursor: number, cwd = process.cwd()): Completion
 		argPrefix = cdArgPrefix(before, command)
 		values = completeSessionTargets(argPrefix, true)
 	} else if (arg === 'login-provider') {
-		values = ['anthropic', 'openai'].filter((provider) => provider.startsWith(argPrefix))
+		// Aliases anthropic/openai also work, but only the product names are offered.
+		values = ['claude', 'chatgpt'].filter((provider) => provider.startsWith(argPrefix))
 	} else {
 		values = runtimeConfig.listPaths().filter((path) => path.startsWith(argPrefix))
 	}

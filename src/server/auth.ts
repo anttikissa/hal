@@ -20,10 +20,10 @@ import { log } from '../utils/log.ts'
 
 const AUTH_PATH = `${HAL_DIR}/auth.ason`
 
-// Anthropic OAuth client ID (shared with /login anthropic).
+// Anthropic OAuth client ID (shared with /login claude).
 const ANTHROPIC_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 
-// OpenAI OAuth client ID (shared with /login openai).
+// OpenAI OAuth client ID (shared with /login chatgpt).
 const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 

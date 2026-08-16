@@ -23,8 +23,8 @@ const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 const OPENAI_REDIRECT = 'http://localhost:1455/auth/callback'
 const OPENAI_CALLBACK_PORT = 1455
 
-// Pending Anthropic flow: holds PKCE verifier between /login anthropic (start)
-// and /login anthropic <code> (finish).
+// Pending Claude flow: holds PKCE verifier between /login claude (start)
+// and /login claude <code> (finish).
 const state: { anthropicPending: { verifier: string } | null } = {
 	anthropicPending: null,
 }
@@ -68,7 +68,7 @@ async function startAnthropic(): Promise<{ url: string }> {
 
 async function finishAnthropic(rawCode: string): Promise<{ email?: string }> {
 	if (!state.anthropicPending) {
-		throw new Error('No pending Anthropic login. Run /login anthropic first.')
+		throw new Error('No pending Claude login. Run /login claude first.')
 	}
 	const verifier = state.anthropicPending.verifier
 	const [authCode, returnedState] = rawCode.trim().split('#')

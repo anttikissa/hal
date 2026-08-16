@@ -124,7 +124,7 @@ test('anthropic oauth 401 tells user to log in again', async () => {
 	const events = await collect({ value: 'tok-test', type: 'token' })
 
 	expect(events[0]).toMatchObject({ type: 'error', status: 401 })
-	expect(events[0].message).toContain('/login anthropic')
+	expect(events[0].message).toContain('/login claude')
 })
 
 test('anthropic api-key 401 stays generic', async () => {

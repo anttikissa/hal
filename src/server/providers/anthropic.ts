@@ -247,7 +247,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 	const cred = auth.getCredential('anthropic')
 	anthropicUsage.setCurrentCredential(cred)
 	if (!cred) {
-		yield { type: 'error', message: 'No Anthropic credentials. Run /login anthropic (or set ANTHROPIC_API_KEY).' }
+		yield { type: 'error', message: 'No Anthropic credentials. Run /login claude (or set ANTHROPIC_API_KEY).' }
 		return
 	}
 
@@ -326,7 +326,7 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		if (isOAuth && res.status === 401) {
 			yield {
 				type: 'error',
-				message: 'Anthropic login expired or was revoked. Run /login anthropic.',
+				message: 'Claude login expired or was revoked. Run /login claude.',
 				status: res.status,
 				body: text,
 				endpoint: url,

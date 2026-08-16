@@ -531,8 +531,8 @@ handlers['status'] = async (_args, _session, hooks) => {
 	const hasOpenai = openaiUsage.hasCredentials()
 	let usage = sections.length > 0 ? sections.join('\n\n') : 'No OAuth subscription credentials configured.'
 	const hints: string[] = []
-	if (!hasAnthropic) hints.push('  /login anthropic   — log in to Claude')
-	if (!hasOpenai) hints.push('  /login openai      — log in to ChatGPT')
+	if (!hasAnthropic) hints.push('  /login claude    — log in to Claude')
+	if (!hasOpenai) hints.push('  /login chatgpt   — log in to ChatGPT')
 	if (hints.length > 0) {
 		usage += `\n\nAdd a subscription:\n${hints.join('\n')}`
 	}
@@ -544,13 +544,18 @@ handlers['status'] = async (_args, _session, hooks) => {
 }
 
 // /login <provider> [code] — OAuth login for Claude or ChatGPT.
-// Anthropic is two-step (paste code); OpenAI is one-step (localhost callback).
+// Claude is two-step (paste code); ChatGPT is one-step (localhost callback).
+//
+// Users subscribe to Claude and ChatGPT, not to "Anthropic" and "OpenAI", so the
+// product names are what we ask for. The company names stay as hidden aliases:
+// they name the provider prefixes in model IDs and the API key env vars, so
+// people will reasonably try them.
 handlers['login'] = async (args, _session, hooks) => {
 	const parts = args.trim().split(/\s+/).filter(Boolean)
 	const provider = parts[0]
 	const codeArg = parts.slice(1).join(' ')
 
-	if (provider === 'anthropic') {
+	if (provider === 'claude' || provider === 'anthropic') {
 		if (codeArg) {
 			try {
 				const { email } = await authLogin.finishAnthropic(codeArg)
@@ -567,14 +572,14 @@ handlers['login'] = async (args, _session, hooks) => {
 				url,
 				'',
 				'Then copy the code shown on the redirect page and run:',
-				'  /login anthropic <code#state>',
+				'  /login claude <code#state>',
 			].join('\n'),
 			handled: true,
 		}
 	}
 
-	if (provider === 'openai') {
-		hooks.info?.('Opening browser for OpenAI login (10min timeout)...')
+	if (provider === 'chatgpt' || provider === 'openai') {
+		hooks.info?.('Opening browser for ChatGPT login (10min timeout)...')
 		try {
 			await authLogin.loginOpenai((msg) => hooks.info?.(msg))
 			return { output: 'Logged in to ChatGPT. Run /status to see usage.', handled: true }
@@ -583,7 +588,7 @@ handlers['login'] = async (args, _session, hooks) => {
 		}
 	}
 
-	return { error: 'Usage: /login <anthropic|openai> [code]', handled: true }
+	return { error: 'Usage: /login <claude|chatgpt> [code]', handled: true }
 }
 
 
