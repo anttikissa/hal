@@ -9,6 +9,22 @@ import { blob } from './session/blob.ts'
 import { ipc } from './file-ipc.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
+import { webTokens, type WebToken } from './web-tokens.ts'
+
+type SocketData = {
+	id: string
+	ip: string
+	sessionId?: string
+	token?: string
+}
+
+const state: {
+	port: number
+	server: Bun.Server<SocketData> | null
+} = {
+	port: 0,
+	server: null,
+}
 
 function pageHtml(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
@@ -17,7 +33,6 @@ function pageHtml(): Promise<string> {
 function styleCss(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
 }
-
 
 function openSession(sessionId: string): boolean {
 	return ipc.readState().sessions.some((session) => session.id === sessionId)
@@ -52,8 +67,9 @@ function parseClientMessage(text: string): WebClientMessage | null {
 	try { value = JSON.parse(text) } catch { return null }
 	if (!value || typeof value !== 'object') return null
 	const message = value as Record<string, unknown>
-	if (message.type !== 'subscribe' || typeof message.sessionId !== 'string' || !message.sessionId) return null
-	return { type: 'subscribe', sessionId: message.sessionId }
+	if (message.type === 'authenticate' && typeof message.token === 'string' && message.token) return { type: 'authenticate', token: message.token }
+	if (message.type === 'subscribe' && typeof message.sessionId === 'string' && message.sessionId) return { type: 'subscribe', sessionId: message.sessionId }
+	return null
 }
 
 function isLiveEvent(event: unknown): event is LiveEvent {
@@ -119,45 +135,115 @@ function nextPort(previousPort: number, tries: number, random = Math.random): nu
 
 function announce(sessionId: string | undefined, port: number): void {
 	if (!sessionId) return
-	runtime.emitInfo(sessionId, `Web interface available at http://127.0.0.1:${port}/`)
+	runtime.emitInfo(sessionId, `Web interface available at ${web.urlForToken(webTokens.ensureLocalToken(), port)}`)
+}
+
+function authorizationToken(request: Request): string | null {
+	const value = request.headers.get('authorization')
+	const match = /^Bearer ([A-Za-z0-9]{12})$/.exec(value ?? '')
+	return match?.[1] ?? null
+}
+
+function authenticateRequest(request: Request, server: Bun.Server<SocketData>): WebToken | null {
+	const token = web.authorizationToken(request)
+	if (!token) return null
+	return webTokens.authenticate(token, server.requestIP(request)?.address ?? 'unknown')
+}
+
+function command(args: string): { output?: string; error?: string } {
+	const [action = '', ...rest] = args.trim().split(/\s+/)
+	if (!action) {
+		let tokens = webTokens.list()
+		if (tokens.length === 0) tokens = [webTokens.ensureLocalToken()]
+		const lines = ['Web interface:']
+		for (const [index, token] of tokens.entries()) lines.push(`  ${index + 1}. ${web.urlForToken(token)}  · ${token.purpose}`)
+		return { output: lines.join('\n') }
+	}
+	if (action === 'auth') {
+		try {
+			const token = webTokens.mint(rest.join(' ') || 'web token')
+			return { output: `Web token created (${token.purpose}):\n${web.urlForToken(token)}` }
+		} catch (error) {
+			return { error: String(error) }
+		}
+	}
+	if (action === 'revoke' && rest.length === 1 && /^\d+$/.test(rest[0]!)) {
+		const token = webTokens.revoke(Number(rest[0]))
+		return token ? { output: `Revoked web token ${rest[0]} (${token.purpose}).` } : { error: `No web token ${rest[0]}.` }
+	}
+	return { error: 'Usage: /web | /web auth [purpose…] | /web revoke <number>' }
+}
+
+function urlForToken(token: WebToken, port = state.port): string {
+	return `http://localhost:${port}/?auth=${token.token}`
 }
 
 function start(port: number, signal: AbortSignal, announcementSessionId?: string): void {
-	let server: Bun.Server<{ id: string; sessionId?: string }>
+	if (state.server) {
+		web.announce(announcementSessionId, state.port)
+		return
+	}
+	webTokens.init()
+	const sockets = new Map<string, Set<Bun.ServerWebSocket<SocketData>>>()
+	const unsubscribeRevocation = webTokens.onRevoke((token) => {
+		for (const socket of sockets.get(token.token) ?? []) socket.close(4001, 'Web token revoked')
+	})
+	let server: Bun.Server<SocketData>
 	for (let tries = 1;; tries++) {
 		try {
-			server = Bun.serve<{ id: string; sessionId?: string }>({
+			server = Bun.serve<SocketData>({
 				hostname: '127.0.0.1',
 				port,
 				fetch: async (request, server) => {
 					const url = new URL(request.url)
-					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
 					if (url.pathname === '/styles.css') return new Response(await web.styleCss(), { headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' } })
 					if (url.pathname === '/main.js') {
-						try { return new Response(await bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } }) }
+						try { return new Response(await web.bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } }) }
 						catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
 					}
+					if (url.pathname === '/ws') {
+						if (server.upgrade(request, { data: { id: crypto.randomUUID(), ip: server.requestIP(request)?.address ?? 'unknown' } })) return
+						return new Response('WebSocket upgrade required', { status: 426 })
+					}
+					if (!web.authenticateRequest(request, server)) return new Response('Web authentication required', { status: 401 })
 					if (url.pathname === '/api/state' && request.method === 'GET') return Response.json(ipc.readState())
 					if (url.pathname === '/api/session' && request.method === 'GET') return snapshotResponse(url.searchParams.get('id') ?? '')
 					if (url.pathname === '/api/prompt' && request.method === 'POST') {
+						if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) return new Response('Expected application/json', { status: 415 })
 						let body: any
 						try { body = await request.json() } catch { return new Response('Expected JSON', { status: 400 }) }
 						if (!body || typeof body.sessionId !== 'string' || typeof body.text !== 'string' || !body.text || body.text.length > 100_000 || !openSession(body.sessionId)) return new Response('Invalid prompt', { status: 400 })
 						runtime.handleCommand({ type: 'prompt', sessionId: body.sessionId, text: body.text })
 						return new Response(null, { status: 204 })
 					}
-					if (url.pathname === '/ws' && server.upgrade(request, { data: { id: crypto.randomUUID() } })) return
 					return new Response('Not found', { status: 404 })
 				},
 				websocket: {
 					maxPayloadLength: 1_000_000,
-					open(ws) {
-						ws.subscribe('web')
-						ws.send(web.encode({ type: 'state', state: ipc.readState() }))
-					},
+					open() {},
 					message(ws, raw) {
 						const message = web.parseClientMessage(String(raw))
-						if (!message || !openSession(message.sessionId)) return
+						if (!message) return
+						if (!ws.data.token) {
+							if (message.type !== 'authenticate') return ws.close(4003, 'Web authentication required')
+							if (!webTokens.authenticate(message.token, ws.data.ip)) {
+								ws.send(web.encode({ type: 'unauthorized' }))
+								return ws.close(4003, 'Invalid web token')
+							}
+							ws.data.token = message.token
+							let tokenSockets = sockets.get(message.token)
+							if (!tokenSockets) {
+								tokenSockets = new Set()
+								sockets.set(message.token, tokenSockets)
+							}
+							tokenSockets.add(ws)
+							ws.send(web.encode({ type: 'authenticated' }))
+							ws.subscribe('web')
+							ws.send(web.encode({ type: 'state', state: ipc.readState() }))
+							return
+						}
+						if (message.type !== 'subscribe' || !openSession(message.sessionId)) return
 						// Subscribe first, then take the synchronous snapshot. Events cannot interleave
 						// with this callback, so every later event follows this exact baseline.
 						if (ws.data.sessionId) ws.unsubscribe(web.sessionTopic(ws.data.sessionId))
@@ -166,14 +252,25 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 						const snapshot = web.sessionSnapshot(message.sessionId)
 						if (snapshot) ws.send(web.encode({ type: 'snapshot', snapshot }))
 					},
+					close(ws) {
+						if (!ws.data.token) return
+						const tokenSockets = sockets.get(ws.data.token)
+						tokenSockets?.delete(ws)
+						if (tokenSockets?.size === 0) sockets.delete(ws.data.token)
+					},
 				},
 			})
 			break
 		} catch (error: any) {
-			if (error?.code !== 'EADDRINUSE' || tries === 10) throw error
-			port = nextPort(port, tries)
+			if (error?.code !== 'EADDRINUSE' || tries === 10) {
+				unsubscribeRevocation()
+				throw error
+			}
+			port = web.nextPort(port, tries)
 		}
 	}
+	state.server = server
+	state.port = server.port ?? port
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) {
 			server.publish('web', web.encode({ type: 'state', state: ipc.readState() }))
@@ -186,14 +283,26 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 			if (snapshot) server.publish(web.sessionTopic(sessionId), web.encode({ type: 'snapshot', snapshot }))
 		}
 	})()
-	signal.addEventListener('abort', () => server.stop(), { once: true })
-	web.announce(announcementSessionId, port)
+	signal.addEventListener('abort', () => {
+		unsubscribeRevocation()
+		server.stop()
+		if (state.server === server) {
+			state.server = null
+			state.port = 0
+		}
+	}, { once: true })
+	web.announce(announcementSessionId, state.port)
 }
 
 export const web = {
+	state,
 	start,
+	command,
 	nextPort,
+	urlForToken,
 	announce,
+	authorizationToken,
+	authenticateRequest,
 	pageHtml,
 	styleCss,
 	bundleClient,

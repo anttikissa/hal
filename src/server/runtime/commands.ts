@@ -55,6 +55,7 @@ let state = {
 	scheduleExit(code: number, delayMs: number): void {
 		setTimeout(() => process.exit(code), delayMs)
 	},
+	web: async (_args: string): Promise<{ output?: string; error?: string }> => ({ error: 'Web server is unavailable.' }),
 }
 
 /** Session state that commands can read and modify. */
@@ -124,6 +125,7 @@ const workingSafeCommands = new Set([
 	'status',
 	'system',
 	'tabs',
+	'web',
 ])
 
 function normalizeSessionName(text: string): string {
@@ -750,6 +752,10 @@ handlers['config'] = (args) => {
 		return { error: `/config: could not parse value: ${err?.message ?? String(err)}`, handled: true }
 	}
 }
+
+
+// /web — show, create, or revoke browser access tokens
+handlers['web'] = async (args) => ({ ...await state.web(args), handled: true })
 
 
 

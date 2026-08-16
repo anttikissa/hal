@@ -7,10 +7,10 @@
 
 import { existsSync } from 'fs'
 import { basename, resolve } from 'path'
-import { HAL_DIR } from '../state.ts'
+import { HAL_DIR, STATE_DIR } from '../state.ts'
 
 const config = {
-	protectedBasenames: ['auth.ason'],
+	protectedBasenames: ['auth.ason', 'auth-tokens.ason'],
 }
 
 function normalized(path: string): string {
@@ -20,6 +20,7 @@ function normalized(path: string): string {
 function protectedPaths(): string[] {
 	const paths: string[] = []
 	for (const name of config.protectedBasenames) paths.push(resolve(HAL_DIR, name))
+	paths.push(resolve(STATE_DIR, 'auth-tokens.ason'))
 	return paths
 }
 

@@ -5,23 +5,41 @@ import { blob } from './session/blob.ts'
 import { sessions } from './sessions.ts'
 import { web } from './web.ts'
 import { runtime } from './runtime.ts'
+import { webTokens } from './web-tokens.ts'
 
+import { ensureStateDir } from './state.ts'
 test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9001, 1, () => 0)).toBe(9002)
 	expect(web.nextPort(9001, 1, () => 0.99)).toBe(9003)
 	expect(web.nextPort(9003, 2, () => 0)).toBe(9004)
 })
 
-test('web announcement is opt-in and names the actual loopback URL', () => {
+test('web announcement is opt-in and includes an authenticated local URL', () => {
 	const originalEmitInfo = runtime.emitInfo
 	const calls: Array<[string, string]> = []
 	runtime.emitInfo = (sessionId: string, text: string) => { calls.push([sessionId, text]) }
 	try {
 		web.announce('', 9001)
 		web.announce('04-fresh', 9002)
-		expect(calls).toEqual([['04-fresh', 'Web interface available at http://127.0.0.1:9002/']])
+		expect(calls).toHaveLength(1)
+		expect(calls[0]?.[0]).toBe('04-fresh')
+		expect(calls[0]?.[1]).toMatch(/^Web interface available at http:\/\/localhost:9002\/\?auth=[A-Za-z0-9]{12}$/)
 	} finally {
 		runtime.emitInfo = originalEmitInfo
+	}
+})
+
+test('web API rejects requests without a bearer token', async () => {
+	const controller = new AbortController()
+	ensureStateDir()
+	web.start(0, controller.signal)
+	try {
+		const base = `http://127.0.0.1:${web.state.port}`
+		expect((await fetch(`${base}/api/state`)).status).toBe(401)
+		const token = webTokens.list()[0]!
+		expect((await fetch(`${base}/api/state`, { headers: { authorization: `Bearer ${token.token}` } })).status).toBe(200)
+	} finally {
+		controller.abort()
 	}
 })
 
@@ -134,8 +152,10 @@ test('websocket snapshots refresh only at persisted-history boundaries', () => {
 	expect(web.isSnapshotBoundary({ type: 'stream-delta', sessionId: '04-work' })).toBe(false)
 })
 
-test('websocket subscription parser accepts only a valid open-session request', () => {
+test('websocket parser accepts authentication before a session subscription', () => {
+	expect(web.parseClientMessage(JSON.stringify({ type: 'authenticate', token: 'aBcDeFgHiJkL' }))).toEqual({ type: 'authenticate', token: 'aBcDeFgHiJkL' })
 	expect(web.parseClientMessage(JSON.stringify({ type: 'subscribe', sessionId: '04-work' }))).toEqual({ type: 'subscribe', sessionId: '04-work' })
+	expect(web.parseClientMessage(JSON.stringify({ type: 'authenticate', token: '' }))).toBeNull()
 	expect(web.parseClientMessage(JSON.stringify({ type: 'subscribe', sessionId: '' }))).toBeNull()
 	expect(web.parseClientMessage(JSON.stringify({ type: 'other', sessionId: '04-work' }))).toBeNull()
 	expect(web.parseClientMessage('not json')).toBeNull()

@@ -2,14 +2,21 @@ import { liveEventBlocks, type LiveEvent } from './live-event-blocks.ts'
 import type { SharedState } from './ipc.ts'
 import type { ClientSessionSnapshot } from './snapshots.ts'
 
+export interface WebAuthenticateMessage {
+	type: 'authenticate'
+	token: string
+}
+
 export interface WebSubscribeMessage {
 	type: 'subscribe'
 	sessionId: string
 }
 
-export type WebClientMessage = WebSubscribeMessage
+export type WebClientMessage = WebAuthenticateMessage | WebSubscribeMessage
 
 export type WebServerMessage =
+	| { type: 'authenticated' }
+	| { type: 'unauthorized' }
 	| { type: 'state'; state: SharedState }
 	| { type: 'snapshot'; snapshot: ClientSessionSnapshot }
 	| { type: 'event'; event: LiveEvent }

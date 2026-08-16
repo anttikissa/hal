@@ -91,6 +91,7 @@ const commandSpecs: Record<string, CommandSpec> = {
 		].join('\n'),
 	},
 	help: { usage: '[<command>]', summary: 'Show help; try /help config.', arg: 'command' },
+	web: { usage: ['', 'auth [<purpose…>]', 'revoke <number>'], summary: 'Show or manage web interface access tokens.', detail: 'With no arguments, shows authenticated local web URLs. New tokens are independent browser/device capabilities.' },
 	quit: { summary: 'Quit Hal.' },
 	exit: { summary: 'Quit Hal.' },
 }
@@ -100,7 +101,7 @@ const commandSections: CommandSection[] = [
 	{ title: 'Conversation', names: ['clear', 'compact', 'history', 'rebase', 'system'] },
 	{ title: 'Tabs & sessions', names: ['fork', 'move', 'open', 'rename', 'resume', 'self', 'tabs'] },
 	{ title: 'Messaging & queue', names: ['broadcast', 'queue', 'send'] },
-	{ title: 'Setup & diagnostics', names: ['cd', 'check', 'clients', 'config', 'login', 'mem'] },
+	{ title: 'Setup & diagnostics', names: ['cd', 'check', 'clients', 'config', 'login', 'mem', 'web'] },
 ]
 
 function helpUsageLines(name: string): string[] {

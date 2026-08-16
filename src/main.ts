@@ -26,6 +26,7 @@ import { cliArgs } from './client/terminal/args.ts'
 import { terminalOutput } from './client/terminal/terminal-output.ts'
 import { serverModels } from './server/models.ts'
 
+import { commands } from './server/runtime/commands.ts'
 function subscriptionStatus(provider: string): SubscriptionStatus | null {
 	if (provider === 'openai') {
 		const account = openaiUsage.current()
@@ -183,6 +184,11 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
 	client.state.role = 'server'
 	client.state.localCommandHandler = (command) => { runtime.handleCommand(command) }
+	commands.state.web = async (args) => {
+		const { web } = await import('./server/web.ts')
+		web.start(parsedArgs.ok && parsedArgs.webPort ? parsedArgs.webPort : 9001, ac.signal)
+		return web.command(args)
+	}
 	// Ctrl-R exits and `./run` creates a new host; that deserves a fresh URL announcement.
 	// A client promoted after host loss does not: it is only taking over an existing service.
 	const announceWeb = kind === 'start'

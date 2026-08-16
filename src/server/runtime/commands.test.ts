@@ -32,6 +32,7 @@ const origDefaultModel = models.config.default
 const origVersionState = { ...version.state }
 const origScheduleExit = commands.state.scheduleExit
 const origReadState = ipc.readState
+const origWeb = commands.state.web
 const origOwnsHostLock = ipc.ownsHostLock
 
 const origRefreshModels = serverModels.refreshModels
@@ -79,6 +80,7 @@ afterEach(() => {
 	Object.assign(version.state, origVersionState)
 	commands.state.scheduleExit = origScheduleExit
 	ipc.readState = origReadState
+	commands.state.web = origWeb
 	ipc.ownsHostLock = origOwnsHostLock
 	version.state.repoDir = origVersionState.repoDir
 	serverModels.refreshModels = origRefreshModels
@@ -92,6 +94,16 @@ afterEach(() => {
 	if (origVisual === undefined) delete process.env.VISUAL
 	else process.env.VISUAL = origVisual
 	rmSync('/tmp/some.txt', { force: true })
+})
+
+test('/web delegates token management to the host web service', async () => {
+	const calls: string[] = []
+	commands.state.web = async (args) => {
+		calls.push(args)
+		return { output: 'http://localhost:9001/?auth=token' }
+	}
+	expect(await commands.executeCommand('/web auth laptop browser', makeSession())).toEqual({ output: 'http://localhost:9001/?auth=token', handled: true })
+	expect(calls).toEqual(['auth laptop browser'])
 })
 
 test('/history reports the active session history log', async () => {
