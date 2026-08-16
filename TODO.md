@@ -20,3 +20,4 @@ Random ideas, in no particular order
   Gemini were probed live and work; Grok uses the same compat path but is untested.
 - /what is probably more complicated than it should be; should just probably open a subagent to do it
 - Most of config.ason can be ditched. Nobody ever gonna change them. Hardcode more stuff
+- The OPUS context usage warning must go. It's not that bad anymore. Instead, think of a generic "this session isn't hitting cache any more" hint in UI
