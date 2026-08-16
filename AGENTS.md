@@ -23,29 +23,15 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 
 # Source layout
 
-`src/main.ts` is the composition root: it wires the pieces together and owns startup order.
-`src/config.ts` registers cross-component configuration.
+- `main.ts` — composition root and startup order.
+- `config.ts` — cross-component configuration.
+- `client/` — terminal client; terminal-specific UI lives in `client/terminal/`.
+- `server/` — runtime, persistence, providers, tools, and transports.
+- `web-client/` — browser app.
+- `common/` — Hal-specific types and utilities; must be browser-safe.
+- `utils/` — generic utilities that could live outside Hal.
 
-Layers under `src/`:
-
-- `client/` — terminal client: rendering, prompt editing, tabs, and the narrow backend/transport
-  ports the composition root injects. `client/terminal/` holds terminal-specific pieces (blocks,
-  colors, keys, completion).
-- `common/` — Hal-specific but runtime-neutral contracts: protocol and IPC types, session metadata,
-  persisted history shape, client snapshots, and deterministic projections such as
-  `live-event-blocks.ts`. Must be browser-safe: no Bun/Node APIs, no file system.
-- `server/` — runtime, tabs, session persistence and replay, providers, tools, auth/models/usage,
-  memory/version/state paths, file IPC, and HTTP/WebSocket transport.
-- `utils/` — generic reusable utilities (ason, strings, time, logging). Not a second `common/`:
-  nothing here may be Hal-domain-specific.
-- `web-client/` — browser app and its components/presentation.
-
-The server produces, persists, and transports semantic events; `common/` projects them into blocks;
-terminal and browser clients render those blocks independently.
-
-Import direction: any layer may import `common/` and `utils/`, and sibling layers
-(`client`, `server`, `web-client`) may never import each other. `tests/import-boundaries.test.ts`
-enforces this.
+`client/`, `server/`, and `web-client/` may import `common/` and `utils/`, never each other. `common/` may import `utils/`. `tests/import-boundaries.test.ts` enforces this.
 
 # Code style
 
