@@ -19,3 +19,4 @@ Random ideas, in no particular order
 - Verify the `grok/` provider against a real `GROK_API_KEY`. Anthropic, OpenAI, OpenRouter, and
   Gemini were probed live and work; Grok uses the same compat path but is untested.
 - /what is probably more complicated than it should be; should just probably open a subagent to do it
+- Most of config.ason can be ditched. Nobody ever gonna change them. Hardcode more stuff
