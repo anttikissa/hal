@@ -1,4 +1,5 @@
 import { keyHelp } from './key-help.ts'
+import { perf } from './perf.ts'
 import { visLen } from '../utils/strings.ts'
 import { commandMetadata } from '../common/command-metadata.ts'
 import { clientBackend } from './backend.ts'
@@ -166,6 +167,10 @@ function runKeys(_args: string, _ctx: ClientLocalCommandContext): ClientLocalCom
 	return { handled: true, output: keyHelp.render() }
 }
 
+function runPerf(_args: string, _ctx: ClientLocalCommandContext): ClientLocalCommandResult {
+	return { handled: true, output: perf.trace() }
+}
+
 function runQuit(_args: string, _ctx: ClientLocalCommandContext): ClientLocalCommandResult {
 	return { handled: true, output: 'Goodbye.', quit: true }
 }
@@ -286,6 +291,11 @@ specs['what'] = {
 specs['keys'] = {
 	summary: 'Show terminal keyboard shortcuts.',
 	run: runKeys,
+}
+
+specs['perf'] = {
+	summary: 'Show the startup timing waterfall for this terminal.',
+	run: runPerf,
 }
 
 specs['quit'] = {

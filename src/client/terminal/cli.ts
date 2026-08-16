@@ -107,10 +107,6 @@ function draw(force = false): void {
 }
 
 function exitCli(code: number): void {
-	// Flush any buffered perf marks before the final repaint. Without this,
-	// fast exits can drop startup telemetry because the 100ms sink timer has
-	// not fired yet.
-	perf.stop()
 	// Preserve the last fully up-to-date frame for copy/paste on exit.
 	draw(true)
 	cleanupTerminal()

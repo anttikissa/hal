@@ -118,7 +118,6 @@ let startupTarget: { preferredSessionId?: string; openCwd?: string } = {}
 function failStartup(message: string, code = 1): never {
 	process.stderr.write(`${message}\n`)
 	if (isHost) ipc.releaseHost()
-	perf.stop()
 	process.exit(code)
 }
 
@@ -239,7 +238,6 @@ function cleanup(): void {
 	} else {
 		client.publishExit()
 	}
-	perf.stop()
 }
 
 function tickElection(): void {

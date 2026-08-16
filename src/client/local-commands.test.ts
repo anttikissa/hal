@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { clientLocalCommands, type ClientLocalCommandContext } from './local-commands.ts'
+import { perf } from './perf.ts'
 
 function ctx(): ClientLocalCommandContext {
 	return {
@@ -89,4 +90,12 @@ test('/help includes terminal-local commands and shortcut hint', () => {
 	expect(result.output).toContain('/go <target>')
 	expect(result.output).toContain('/help [<command>]')
 	expect(result.output).toContain('Keyboard shortcuts')
+})
+
+test('/perf reports recorded startup marks', () => {
+	perf.mark('test mark')
+	const result = clientLocalCommands.execute('/perf', ctx())
+
+	expect(result.handled).toBe(true)
+	expect(result.output).toContain('test mark')
 })
