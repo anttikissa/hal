@@ -33,7 +33,7 @@ export type HistoryEntry = EntryIdentity & (
 	| { type: 'tool_result'; toolId: string; output?: any; blobId?: string; isError?: boolean; visibility?: 'ui'; ts?: string }
 	| { type: 'pending_tools'; toolIds: string[]; cwd: string; model?: string; usage?: PartialTokenUsage; reason?: 'soft-pause'; ts?: string }
 	| ({ type: 'turn_end'; ts?: string } & TurnEndMeta)
-	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; usageBars?: true; visibility?: 'ui' | 'next-user'; ts?: string }
+	| { type: 'log'; text: string; level?: 'info' | 'warning' | 'error'; retryable?: false; usageBars?: true; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'info'; text: string; level?: 'info' | 'warning' | 'error'; usageBars?: true; visibility?: 'ui' | 'next-user'; ui?: 'notice'; ts?: string }
 	| { type: 'warning' | 'error'; text: string; blobId?: string; visibility?: 'ui' | 'next-user'; ts?: string }
 	| { type: 'reset' | 'compact'; ts?: string }

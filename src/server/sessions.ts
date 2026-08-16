@@ -104,7 +104,7 @@ const historyTopLevelKeys = new Set([
 	'blobId', 'signature', 'model', 'thinkingEffort',
 	'usage', 'abortText', 'synthetic', 'syntheticKind',
 	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
-	'level', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
+	'level', 'retryable', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
 ])
 
 function stripUndefined(value: unknown): unknown {

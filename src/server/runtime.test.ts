@@ -849,6 +849,11 @@ test('continue waits for an in-flight abort and coalesces duplicate requests', a
 			workingDir: '/tmp',
 			model: 'openai/gpt-5.5',
 		})
+		// A paused turn is what makes continue reach the provider at all.
+		sessions.appendHistorySync(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-20T00:00:01.000Z' },
+			{ type: 'turn_end', status: 'aborted', abortText: '[paused]', ts: '2026-05-20T00:00:02.000Z' },
+		])
 
 		runtime.handleCommand({ type: 'continue', sessionId })
 		runtime.handleCommand({ type: 'continue', sessionId })
@@ -1469,5 +1474,77 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 		rmSync(base, { recursive: true, force: true })
 		if (prevState === undefined) delete process.env.HAL_STATE_DIR
 		else process.env.HAL_STATE_DIR = prevState
+	}
+})
+
+
+test('emitInfo persists retryable:false so Enter does not retry a command error after restart', () => {
+	const sessionId = `test-retryable-${Date.now().toString(36)}`
+	const origAppendEvent = ipc.appendEvent
+	try {
+		ipc.appendEvent = (() => {}) as typeof ipc.appendEvent
+		sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: '2026-05-20T00:00:00.000Z',
+			currentLog: 'history.asonl',
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.5',
+		})
+		runtime.emitInfo(sessionId, '/todo: Usage: /todo <item>', 'error', undefined, false)
+		expect(sessions.loadAllHistory(sessionId).at(-1)).toMatchObject({ type: 'log', level: 'error', retryable: false })
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		sessions.deleteSession(sessionId)
+	}
+})
+
+test('continuing a session whose last turn completed does not call the provider', async () => {
+	const sessionId = `test-continue-completed-${Date.now().toString(36)}`
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origIsWorking = agentLoop.isWorking
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origAppendEvent = ipc.appendEvent
+	let runs = 0
+	try {
+		ipc.ownsHostLock = () => true
+		ipc.appendEvent = (() => {}) as typeof ipc.appendEvent
+		agentLoop.isWorking = () => false
+		agentLoop.runAgentLoop = async () => { runs++; return 'completed' }
+		sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: '2026-05-20T00:00:00.000Z',
+			currentLog: 'history.asonl',
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.5',
+		})
+		sessions.appendHistorySync(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-20T00:00:01.000Z' },
+			{ type: 'assistant', text: 'hi', ts: '2026-05-20T00:00:02.000Z' },
+			{ type: 'turn_end', status: 'completed', ts: '2026-05-20T00:00:03.000Z' },
+			// Command output after the turn is incidental activity, not new turn content.
+			{ type: 'log', text: '/todo: Usage: /todo <item>', level: 'error', retryable: false, ts: '2026-05-20T00:00:04.000Z' },
+		])
+
+		runtime.handleCommand({ type: 'continue', sessionId })
+		await Bun.sleep(10)
+
+		expect(runs).toBe(0)
+		expect(sessions.loadAllHistory(sessionId).at(-1)).toMatchObject({ type: 'log', text: 'Nothing to continue' })
+
+		// An aborted turn left work behind, so continue must still reach the provider.
+		sessions.appendHistorySync(sessionId, [
+			{ type: 'user', parts: [{ type: 'text', text: 'again' }], ts: '2026-05-20T00:00:05.000Z' },
+			{ type: 'turn_end', status: 'aborted', abortText: '[paused]', ts: '2026-05-20T00:00:06.000Z' },
+		])
+		runtime.handleCommand({ type: 'continue', sessionId })
+		await Bun.sleep(10)
+		expect(runs).toBe(1)
+	} finally {
+		agentLoop.runAgentLoop = origRunAgentLoop
+		agentLoop.isWorking = origIsWorking
+		ipc.ownsHostLock = origOwnsHostLock
+		ipc.appendEvent = origAppendEvent
+		sessions.deleteSession(sessionId)
+		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })

@@ -103,7 +103,10 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 	const createdAt = new Date().toISOString()
 	const entry: HistoryEntry = ui === 'notice'
 		? { type: 'info', text, ts: createdAt, ui, ...(usageBars ? { usageBars } : {}) }
-		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}), ...(usageBars ? { usageBars } : {}) }
+		// retryable must be persisted too: after a restart the client rebuilds
+		// blocks from history, and without it a command-usage error would offer
+		// "Enter: retry" and re-run a turn that already finished.
+		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}), ...(retryable === false ? { retryable: false as const } : {}), ...(usageBars ? { usageBars } : {}) }
 	sessionStore.appendHistorySync(sessionId, [entry])
 	ipc.appendEvent({
 		id: protocol.eventId(),
@@ -477,10 +480,33 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 	}
 }
 
+// A generation with no new prompt only makes sense when there is an unfinished
+// turn to resume. Otherwise the provider messages end with an assistant message,
+// which some providers reject outright (Anthropic: "does not support assistant
+// message prefill"). The last *completed* turn is the boundary: turns that ended
+// aborted or failed left work behind, so anything after that boundary is
+// something to continue from.
+function hasNothingToContinue(sessionId: string, entries: HistoryEntry[]): boolean {
+	if (sessionStore.findPendingTools(sessionId)) return false
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i]!
+		if (entry.type === 'turn_end' && entry.status === 'completed') return true
+		if (entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result') return false
+	}
+	return true
+}
+
 async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number, label?: 'steering' | 'queued'): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
+	if (!text && hasNothingToContinue(sessionId, sessionStore.loadAllHistory(sessionId))) {
+		// Continue with no unfinished turn: the only remaining work is a queued
+		// prompt that the paused turn was holding back.
+		if (queueRunner.shouldDrainQueuedPrompt(sessionId, 'completed')) await queueRunner.runNextQueuedPrompt(sessionId)
+		else emitInfo(sessionId, 'Nothing to continue')
+		return
+	}
 	const cwd = meta.workingDir ?? process.cwd()
 	const model = meta.model ?? models.defaultModel()
 	const promptResult = context.buildSystemPrompt({ model, cwd, sessionId })
