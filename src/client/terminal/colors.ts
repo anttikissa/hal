@@ -186,10 +186,9 @@ function init(): void {
 	liveFiles.onChange(state.watcher, reload)
 }
 
-// Get colors for a tool by name. Strips mcp__ prefix.
+// Get colors for a tool by name.
 function tool(name: string): BlockColors {
-	const stripped = name.startsWith('mcp__') ? name.replace(/^mcp__[^_]+__/, '') : name
-	return tools[stripped] ?? tools.default ?? { fg: '', bg: '' }
+	return tools[name] ?? tools.default ?? { fg: '', bg: '' }
 }
 
 export const colors = {

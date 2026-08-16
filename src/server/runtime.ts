@@ -926,18 +926,6 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 			}
 		}
 	})()
-	void import('./mcp/client.ts')
-		.then(({ mcp }) => {
-			mcp.initServers().catch((err: any) => {
-				log.error('mcp init failed', { error: err?.message ?? String(err) })
-			})
-			signal.addEventListener('abort', () => {
-				void mcp.shutdown()
-			}, { once: true })
-		})
-		.catch((err) => {
-			log.error('mcp client module load failed', { error: errorMessage(err) })
-		})
 	void import('./runtime/inbox.ts')
 		.then(({ inbox }) => {
 			inbox.startWatching(signal, (sessionId, text, source, queue, sourceTab) => {
