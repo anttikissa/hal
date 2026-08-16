@@ -31,7 +31,7 @@ cd ~/my/project
 hal
 ```
 
-Use `/login anthropic` or `/login openai` to start using your Claude or ChatGPT subscription. If you would rather pay per token, API keys found in the environment (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, and others) are picked up automatically — see [Provider support](#provider-support).
+Use `/login anthropic` or `/login openai` to start using your Claude or ChatGPT subscription. API keys found in the environment (`GEMINI_API_KEY`, `OPENROUTER_API_KEY`, and others) work too — see [Provider support](#provider-support). A subscription takes precedence over an API key for the same provider.
 
 ## Highlights
 
@@ -115,8 +115,10 @@ Supported out of the box:
 - `anthropic/...` — Claude through Anthropic. Supports Anthropic OAuth subscriptions via `/login anthropic` and `ANTHROPIC_API_KEY`.
 - `openai/...` — OpenAI models. `OPENAI_API_KEY` uses OpenAI's official Responses API; `/login openai` uses ChatGPT/Codex subscription OAuth and may route through the ChatGPT Codex backend when the token is not scoped for the public API.
 - `openrouter/...` — OpenRouter through its OpenAI-compatible Chat Completions API. Uses `OPENROUTER_API_KEY`.
-- `google/...` — Gemini through the Gemini API's OpenAI compatibility endpoint, using Chat Completions syntax. Uses `GOOGLE_API_KEY`.
+- `google/...` — Gemini through the Gemini API's OpenAI compatibility endpoint, using Chat Completions syntax. Uses `GOOGLE_API_KEY`, or `GEMINI_API_KEY` if that is unset.
 - `grok/...` — xAI/Grok through its OpenAI-compatible Chat Completions API. Uses `GROK_API_KEY`. This one shares the same compat path as OpenRouter and Gemini, but is the one provider I have not verified recently; let me know if it misbehaves.
+
+If a provider has both a subscription from `/login` and an API key in the environment, the subscription wins; the environment key is only used when no account is configured for that provider. When several accounts are configured for one provider, Hal rotates between them as they hit rate limits.
 
 Hal also fetches model metadata from [models.dev](https://models.dev/) for context windows and newly released model IDs. A model appearing there does not by itself mean Hal can use it; the provider still needs to be one of the supported prefixes above, or a custom OpenAI-compatible provider configured with `BASE_URL` and `API_KEY`.
 
