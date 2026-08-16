@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { client } from './app.ts'
-import { blockData } from './terminal/block-data.ts'
+import { blockData } from './block-data.ts'
 function makeTab(sessionId = 's1') {
 	return {
 		sessionId,

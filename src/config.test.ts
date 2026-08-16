@@ -5,7 +5,7 @@ import { config } from './config.ts'
 import { liveFiles } from './utils/live-file.ts'
 import { models } from './common/models.ts'
 import { client } from './client/app.ts'
-import { render } from './client/render.ts'
+import { render } from './client/terminal/render.ts'
 
 test('config-template.ason matches module config defaults', () => {
 	const template = ason.parse(readFileSync(`${import.meta.dir}/../config-template.ason`, 'utf-8')) as Record<string, any>

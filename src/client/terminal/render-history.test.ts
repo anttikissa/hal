@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
-import { colors } from './terminal/colors.ts'
+import { colors } from './colors.ts'
 import { renderHistory, type HistoryRenderContext } from './render-history.ts'
-import type { Tab } from './app.ts'
+import type { Tab } from '../app.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')

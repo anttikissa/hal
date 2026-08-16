@@ -4,7 +4,7 @@ perf.mark('First line of code executed')
 import { ensureStateDir, HAL_DIR, STATE_DIR } from './server/state.ts'
 import { ipc } from './server/file-ipc.ts'
 import { runtime } from './server/runtime.ts'
-import { cli } from './client/cli.ts'
+import { cli } from './client/terminal/cli.ts'
 import { client } from './client/app.ts'
 import { clientPersistence } from './client/persistence.ts'
 import { clientBackend, type SubscriptionStatus } from './client/backend.ts'
@@ -23,7 +23,7 @@ import { tabs } from './server/tabs.ts'
 import { auth } from './server/auth.ts'
 import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './client/terminal/args.ts'
-import { terminalOutput } from './client/terminal-output.ts'
+import { terminalOutput } from './client/terminal/terminal-output.ts'
 import { serverModels } from './server/models.ts'
 
 function subscriptionStatus(provider: string): SubscriptionStatus | null {

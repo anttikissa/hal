@@ -1,18 +1,16 @@
 // Block data model — converts history records to Block objects and hydrates
-// tool/thinking blocks from blob sidecar files. Rendering lives in blocks.ts.
+// tool/thinking blocks from blob sidecar files. Rendering lives in terminal/blocks.ts.
 //
 // A single assistant history record can produce multiple blocks:
 //   thinking → tool₁ → tool₂ → assistant text
 
-import { ason } from '../../utils/ason.ts'
-import { models } from '../../common/models.ts'
-import type { LiveBlock } from '../../common/live-event-blocks.ts'
-import type { HistoryEntry } from '../../common/history.ts'
-import { historyProjection } from '../../common/history-projection.ts'
-import { clientBackend } from '../backend.ts'
-// Sibling import for blocks.config; circular with blocks.ts but safe per
-// module convention — all access happens at call time, never at import time.
-import { blocks } from './blocks.ts'
+import { ason } from '../utils/ason.ts'
+import { models } from '../common/models.ts'
+import type { LiveBlock } from '../common/live-event-blocks.ts'
+import type { HistoryEntry } from '../common/history.ts'
+import { historyProjection } from '../common/history-projection.ts'
+import { clientBackend } from './backend.ts'
+import { blockConfig } from './block-config.ts'
 
 interface PresentationBlock {
 	dimmed?: boolean
@@ -175,8 +173,8 @@ async function loadBlobs(items: Block[]): Promise<number> {
 			(block.type === 'tool' || block.type === 'thinking') && !block.blobLoaded && !!block.blobId,
 	)
 	if (pending.length === 0) return 0
-	for (let i = 0; i < pending.length; i += blocks.config.blobBatchSize) {
-		const batch = pending.slice(i, i + blocks.config.blobBatchSize)
+	for (let i = 0; i < pending.length; i += blockConfig.config.blobBatchSize) {
+		const batch = pending.slice(i, i + blockConfig.config.blobBatchSize)
 		const files = batch.map((block) => Bun.file(blobPath(block.sessionId ?? '', block.blobId!)))
 		const sizes = await Promise.allSettled(files.map((file) => file.size))
 		const reads = files.map((file, index) => {

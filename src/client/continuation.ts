@@ -1,4 +1,4 @@
-import type { Block } from './terminal/blocks.ts'
+import type { Block } from './block-data.ts'
 
 export type ContinueAction = 'continue' | 'retry'
 

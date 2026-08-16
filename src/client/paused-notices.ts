@@ -1,4 +1,4 @@
-import type { Block } from './terminal/blocks.ts'
+import type { Block } from './block-data.ts'
 
 type PausedBlock = Extract<Block, { type: 'log' }>
 type DelayedPausedNotice = { timer: ReturnType<typeof setTimeout>; block: PausedBlock }

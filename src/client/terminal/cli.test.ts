@@ -1,13 +1,13 @@
 import { expect, test } from 'bun:test'
 import { cli } from './cli.ts'
-import { client } from './app.ts'
-import { clientTransport } from './transport.ts'
-import { prompt } from './terminal/prompt.ts'
+import { client } from '../app.ts'
+import { clientTransport } from '../transport.ts'
+import { prompt } from './prompt.ts'
 import { render } from './render.ts'
-import { cursor } from './terminal/cursor.ts'
+import { cursor } from './cursor.ts'
 import { popup } from './popup.ts'
-import { promptEdit } from './prompt-edit.ts'
-import { draft } from './terminal/draft.ts'
+import { promptEdit } from '../prompt-edit.ts'
+import { draft } from '../draft.ts'
 
 function key(key: string, mods: any = {}): any {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }

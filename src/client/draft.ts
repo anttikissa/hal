@@ -2,10 +2,10 @@
 // draft_saved lets other clients refresh their in-memory copy.
 
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
-import { clientBackend } from '../backend.ts'
-import { clientTransport } from '../transport.ts'
-import { ason } from '../../utils/ason.ts'
-import { log } from '../../utils/log.ts'
+import { clientBackend } from './backend.ts'
+import { clientTransport } from './transport.ts'
+import { ason } from '../utils/ason.ts'
+import { log } from '../utils/log.ts'
 
 export type DraftPromptEdit = {
 	mode: 'amend' | 'cancel' | 'copy' | 'side-effect-copy'

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { blocks, type Block } from './blocks.ts'
-import { blockData } from './block-data.ts'
+import { blockData } from '../block-data.ts'
 import { colors } from './colors.ts'
 import { subscriptionUsage } from '../../common/subscription-usage.ts'
 

@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 import { renderStatus } from './render-status.ts'
-import { client } from './app.ts'
-import { clientBackend } from './backend.ts'
-import { promptEdit } from './prompt-edit.ts'
+import { client } from '../app.ts'
+import { clientBackend } from '../backend.ts'
+import { promptEdit } from '../prompt-edit.ts'
 
 function tab(overrides: any = {}): any {
 	return {

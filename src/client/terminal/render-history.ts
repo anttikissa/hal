@@ -9,11 +9,11 @@
 // in render.ts. Renderer-owned cache state is still allocated by render.ts and
 // passed in so reset/diff/fullscreen behavior remains centralized.
 
-import { oklch } from '../utils/oklch.ts'
-import { blocks as blockRenderer } from './terminal/blocks.ts'
-import { colors } from './terminal/colors.ts'
-import { cursor } from './terminal/cursor.ts'
-import type { Block, Tab } from './app.ts'
+import { oklch } from '../../utils/oklch.ts'
+import { blocks as blockRenderer } from './blocks.ts'
+import { colors } from './colors.ts'
+import { cursor } from './cursor.ts'
+import type { Block, Tab } from '../app.ts'
 
 export type BlockRenderCache = {
 	version: number

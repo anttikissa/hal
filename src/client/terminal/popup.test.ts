@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { colors } from './terminal/colors.ts'
+import { colors } from './colors.ts'
 import { popup } from './popup.ts'
-import { visLen } from '../utils/strings.ts'
-import type { KeyEvent } from './terminal/keys.ts'
-import { models } from '../common/models.ts'
+import { visLen } from '../../utils/strings.ts'
+import type { KeyEvent } from './keys.ts'
+import { models } from '../../common/models.ts'
 
 colors.init()
 function key(key: string, mods: Partial<KeyEvent> = {}): KeyEvent {

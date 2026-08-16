@@ -14,18 +14,14 @@ import { blockText } from './block-text.ts'
 // Sibling import; circular with tool-specs.ts but safe per module convention —
 // all access happens at call time, never at import time.
 import { toolSpecs } from './tool-specs.ts'
+import { blockConfig as clientBlockConfig } from '../block-config.ts'
 
-const blockConfig = {
-	tabWidth: 4,
-	blobBatchSize: 64,
-	maxToolOutputLines: 16,
-	maxEditDiffLines: 3,
-}
+const blockConfig = clientBlockConfig.config
 
 // Block type lives in block-data.ts; re-exported so renderers can keep
 // importing it from blocks.ts.
-export type { Block } from './block-data.ts'
-import type { Block } from './block-data.ts'
+export type { Block } from '../block-data.ts'
+import type { Block } from '../block-data.ts'
 
 export type SessionLabel = (sessionId: string) => string
 

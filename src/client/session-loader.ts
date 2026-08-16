@@ -1,7 +1,7 @@
 import type { SharedSessionInfo } from '../common/ipc.ts'
 import { clientBackend } from './backend.ts'
 import type { HistoryEntry } from '../common/history.ts'
-import type { Block } from './terminal/blocks.ts'
+import type { Block } from './block-data.ts'
 import { time } from '../utils/time.ts'
 
 const LAST_ACTIVE_THRESHOLD_MS = 24 * 60 * 60 * 1000

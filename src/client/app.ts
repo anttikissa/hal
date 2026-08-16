@@ -6,7 +6,7 @@ import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { clientBackend } from './backend.ts'
 import { historyProjection } from '../common/history-projection.ts'
-import { draft as draftModule, type DraftPromptEdit } from './terminal/draft.ts'
+import { draft as draftModule, type DraftPromptEdit } from './draft.ts'
 import { perf } from './perf.ts'
 import { liveEventBlocks, type LiveEvent } from '../common/live-event-blocks.ts'
 import { sessionLoader } from './session-loader.ts'
@@ -24,8 +24,8 @@ import { pausedNotices } from './paused-notices.ts'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-import { blockData } from './terminal/block-data.ts'
-import type { Block } from './terminal/blocks.ts'
+import { blockData } from './block-data.ts'
+import type { Block } from './block-data.ts'
 import type { HistoryEntry } from '../common/history.ts'
 import type { SessionMeta } from '../common/session.ts'
 export type { Block }
@@ -645,7 +645,7 @@ function sessionInfoFromMeta(meta: SessionMeta, index: number): SharedSessionInf
 	}
 }
 
-function initializeSessions(shared: SharedState, opts: { preferredSessionId?: string } = {}): void {
+function initializeSessions(shared: SharedState, opts: { preferredSessionId?: string; viewportCols?: number } = {}): void {
 	const items = shared.sessions.length > 0
 		? shared.sessions
 		: clientBackend.sessions.loadAllSessionMetas().map(sessionInfoFromMeta)
@@ -671,7 +671,7 @@ function initializeSessions(shared: SharedState, opts: { preferredSessionId?: st
 		perf.mark(`Focused tab replayed (${focused.history.length} blocks, ${replayMs}ms)`)
 	}
 
-	const cols = process.stdout.columns || 80
+	const cols = opts.viewportCols ?? 80
 	if (saved.peakCols === cols && saved.peak > 0) state.peak = saved.peak
 	state.peakCols = cols
 	applySharedStatus(shared)
@@ -714,7 +714,7 @@ function resetForTests(): void {
 	state.whatDoneUnseen.clear()
 }
 
-function startClient(signal: AbortSignal, opts: { preferredSessionId?: string; openCwd?: string } = {}): void {
+function startClient(signal: AbortSignal, opts: { preferredSessionId?: string; openCwd?: string; viewportCols?: number } = {}): void {
 	clientProcess.start(signal, opts, {
 		setHostPid: (pid: number | null) => { state.hostPid = pid },
 		applySharedState,

@@ -1,7 +1,7 @@
 # Terminal Rendering Rules
 
 Requirements for anyone who touches terminal code.
-Implementation: `src/client/render.ts` and `src/client/terminal/`.
+Implementation: `src/client/terminal/`.
 
 These are HOLY TRUTHS that you must obey. You often have a hard time
 understanding how terminals work, and especially what the USER wants from a
@@ -47,7 +47,7 @@ Two painters implement this, and they are deliberately not shared:
   (erase to end of line) while the background color is active. History is
   append-only and fully rewritten by the diff engine on every paint, so this
   is far cheaper than emitting explicit spaces.
-- `paddedLine()` in `src/client/render-status.ts` pads with real spaces,
+- `paddedLine()` in `src/client/terminal/render-status.ts` pads with real spaces,
   because chrome rows compose segments with different backgrounds and `CSI K`
   would flood the row with whichever background happened to be active.
 
@@ -272,7 +272,7 @@ the event loop is saturated with frame builds + stdout writes, and stdin
 events (keypresses) **never fire**. The user cannot type, abort, or even
 Ctrl-C while the assistant is generating.
 
-**Fix**: `draw()` in `src/client/cli.ts` uses a trailing-edge throttle. Non-force draws
+**Fix**: `draw()` in `src/client/terminal/cli.ts` uses a trailing-edge throttle. Non-force draws
 are coalesced to at most one per 16ms (~60 fps). Force draws (tab switch,
 resize, Ctrl-L) execute immediately.
 

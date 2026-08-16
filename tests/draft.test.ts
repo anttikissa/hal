@@ -1,7 +1,7 @@
 import { expect, test, beforeEach, afterEach } from 'bun:test'
 import { mkdirSync, rmSync, existsSync, readFileSync } from 'fs'
 import { sessions } from '../src/server/sessions.ts'
-import { draft } from '../src/client/terminal/draft.ts'
+import { draft } from '../src/client/draft.ts'
 import { ason } from '../src/utils/ason.ts'
 
 const TEST_SESSION = '__draft_test__'

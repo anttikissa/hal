@@ -1,4 +1,4 @@
-import { keyHelp } from './terminal/key-help.ts'
+import { keyHelp } from './key-help.ts'
 import { visLen } from '../utils/strings.ts'
 import { commandMetadata } from '../common/command-metadata.ts'
 import { clientBackend } from './backend.ts'

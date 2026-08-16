@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { render } from '../src/client/render.ts'
+import { render } from '../src/client/terminal/render.ts'
 import { client } from '../src/client/app.ts'
 import { prompt } from '../src/client/terminal/prompt.ts'
 

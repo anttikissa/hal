@@ -27,6 +27,13 @@ function layer(path: string): Layer | null {
 	return null
 }
 
+function clientArea(path: string): 'app' | 'terminal' | null {
+	const sourcePath = relative(sourceRoot, path).replaceAll('\\', '/')
+	if (sourcePath.startsWith('client/terminal/')) return 'terminal'
+	if (sourcePath.startsWith('client/')) return 'app'
+	return null
+}
+
 function importedPath(file: string, specifier: string): string | null {
 	let path: string
 	if (specifier.startsWith('.')) path = resolve(dirname(file), specifier)
@@ -53,14 +60,35 @@ function violations(): string[] {
 			const targetPath = importedPath(file, item.fileName)
 			if (!targetPath) continue
 			const targetLayer = layer(targetPath)
-			if (!targetLayer || allowed(sourceLayer, targetLayer)) continue
+			if (!targetLayer) continue
+			if (sourceLayer === 'client' && targetLayer === 'client' && clientArea(file) === 'app' && clientArea(targetPath) === 'terminal') {
+				found.push(`${relative(root, file)} -> ${relative(root, targetPath)} (client app cannot import terminal implementation)`)
+				continue
+			}
+			if (allowed(sourceLayer, targetLayer)) continue
 			found.push(`${relative(root, file)} -> ${relative(root, targetPath)} (${sourceLayer} cannot import ${targetLayer})`)
 		}
 	}
 	return found.sort()
 }
 
+function terminalLeaks(): string[] {
+	const found: string[] = []
+	for (const file of sourceFiles(resolve(sourceRoot, 'client'))) {
+		if (clientArea(file) !== 'app' || file.endsWith('.test.ts')) continue
+		const text = readFileSync(file, 'utf8')
+		if (/\\x1b|process\.(?:stdin|stdout)/.test(text)) found.push(relative(root, file))
+	}
+	return found
+}
+
 test('source layers only import in allowed directions', () => {
 	const found = violations()
+	expect(found, found.join('\n')).toEqual([])
+})
+
+
+test('terminal escape and stdio access stay in client/terminal', () => {
+	const found = terminalLeaks()
 	expect(found, found.join('\n')).toEqual([])
 })

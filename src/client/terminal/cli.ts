@@ -3,27 +3,27 @@
 
 import { readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { client } from './app.ts'
+import { client } from '../app.ts'
 import { render } from './render.ts'
 import { renderStatus } from './render-status.ts'
-import { cursor } from './terminal/cursor.ts'
-import { keys } from './terminal/keys.ts'
-import { prompt, type PromptEditorState } from './terminal/prompt.ts'
-import { completion } from './terminal/completion.ts'
-import { completionHints } from './terminal/completion-hints.ts'
-import { clientLocalCommands } from './local-commands.ts'
+import { cursor } from './cursor.ts'
+import { keys } from './keys.ts'
+import { prompt, type PromptEditorState } from './prompt.ts'
+import { completion } from './completion.ts'
+import { completionHints } from './completion-hints.ts'
+import { clientLocalCommands } from '../local-commands.ts'
 import { popup } from './popup.ts'
-import { blocks } from './terminal/blocks.ts'
-import { colors } from './terminal/colors.ts'
-import { perf } from './perf.ts'
-import { clientBackend } from './backend.ts'
-import { models } from '../common/models.ts'
-import { clientTransport } from './transport.ts'
-import type { KeyEvent } from './terminal/keys.ts'
-import { time } from '../utils/time.ts'
+import { blocks } from './blocks.ts'
+import { colors } from './colors.ts'
+import { perf } from '../perf.ts'
+import { clientBackend } from '../backend.ts'
+import { models } from '../../common/models.ts'
+import { clientTransport } from '../transport.ts'
+import type { KeyEvent } from './keys.ts'
+import { time } from '../../utils/time.ts'
 import { terminalOutput } from './terminal-output.ts'
-import { promptEdit } from './prompt-edit.ts'
-import type { DraftPromptEdit } from './terminal/draft.ts'
+import { promptEdit } from '../prompt-edit.ts'
+import type { DraftPromptEdit } from '../draft.ts'
 
 const RESTART_CODE = 100
 
@@ -787,7 +787,7 @@ function startCli(signal: AbortSignal, opts: { preferredSessionId?: string; open
 		draw()
 	})
 
-	client.startClient(signal, opts)
+	client.startClient(signal, { ...opts, viewportCols: process.stdout.columns || 80 })
 
 	// Initialize prompt history and draft from the focused tab.
 	// (Tab switch handler takes care of swapping these later.)

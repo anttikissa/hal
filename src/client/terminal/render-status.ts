@@ -7,19 +7,19 @@
 // namespace, and intra-module calls go through it. That way any helper
 // (e.g. tokenUsageLabel) can be hot-patched at runtime without restart.
 
-import { visLen, clipVisual } from '../utils/strings.ts'
-import { oklch } from '../utils/oklch.ts'
-import { helpBar } from './terminal/help-bar.ts'
-import { client } from './app.ts'
-import { models } from '../common/models.ts'
-import type { TokenUsage } from '../common/protocol.ts'
-import { clientBackend } from './backend.ts'
-import { colors } from './terminal/colors.ts'
-import { prompt } from './terminal/prompt.ts'
-import { cursor } from './terminal/cursor.ts'
-import { promptEdit } from './prompt-edit.ts'
-import { completionHints } from './terminal/completion-hints.ts'
-import type { Tab } from './app.ts'
+import { visLen, clipVisual } from '../../utils/strings.ts'
+import { oklch } from '../../utils/oklch.ts'
+import { helpBar } from './help-bar.ts'
+import { client } from '../app.ts'
+import { models } from '../../common/models.ts'
+import type { TokenUsage } from '../../common/protocol.ts'
+import { clientBackend } from '../backend.ts'
+import { colors } from './colors.ts'
+import { prompt } from './prompt.ts'
+import { cursor } from './cursor.ts'
+import { promptEdit } from '../prompt-edit.ts'
+import { completionHints } from './completion-hints.ts'
+import type { Tab } from '../app.ts'
 
 const RESET = '\x1b[0m'
 

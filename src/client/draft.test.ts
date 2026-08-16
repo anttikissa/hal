@@ -3,9 +3,9 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { draft } from './draft.ts'
-import { clientBackend } from '../backend.ts'
-import { clientTransport } from '../transport.ts'
-import { log } from '../../utils/log.ts'
+import { clientBackend } from './backend.ts'
+import { clientTransport } from './transport.ts'
+import { log } from '../utils/log.ts'
 
 const origSessionDir = clientBackend.sessions.sessionDir
 const origNotifyDraftSaved = clientTransport.io.notifyDraftSaved
