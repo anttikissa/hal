@@ -302,7 +302,19 @@ async function* generate(req: ProviderRequest): AsyncGenerator<ProviderStreamEve
 		'anthropic-beta': isOAuth
 			? 'claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14'
 			: 'fine-grained-tool-streaming-2025-05-14',
-		// OAuth requires these headers to identify as Claude Code
+		// The subscription (OAuth) endpoint only accepts requests that identify as Claude Code.
+		// These headers are exactly what Anthropic's own Agent SDK sends: it ships the Claude Code
+		// binary (@anthropic-ai/claude-agent-sdk-<platform>/claude), which emits the same
+		// `claude-code-20250219,oauth-2025-04-20` beta list, `x-app: cli` and a `claude-cli/<version>`
+		// user-agent when a subscription token is used.
+		//
+		// Anthropic's usage policy (https://code.claude.com/docs/en/legal-and-compliance,
+		// "Authentication and credential use") allows OAuth for ordinary personal use of Claude Code
+		// by a subscriber; what it forbids is offering claude.ai login to other people or routing
+		// third parties' requests through Free/Pro/Max credentials. Hal is a personal tool signing in
+		// with its own user's subscription, so it stays on the personal-use side of that line.
+		// Terms change — consult the page above before shipping Hal as a product to other users, and
+		// use an API key (x-api-key branch below) for anything beyond personal use.
 		...(isOAuth ? { 'user-agent': 'claude-cli/2.1.75', 'x-app': 'cli' } : {}),
 	}
 
