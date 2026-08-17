@@ -79,7 +79,7 @@ if command -v rg &>/dev/null; then
 	log "[x] ripgrep ($rg_version)"
 else
 	need_rg=1
-	log "[ ] ripgrep (the gold standard of code search)"
+	log "[ ] ripgrep (fast code search)"
 fi
 
 if command -v bun &>/dev/null; then
