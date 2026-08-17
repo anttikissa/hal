@@ -107,10 +107,11 @@ function draw(force = false): void {
 }
 
 function exitCli(code: number): void {
-	// Preserve the last fully up-to-date frame for copy/paste on exit.
+	// Leave the submitted input visible, then start the shell at the status row.
 	draw(true)
+	const p = prompt.buildPrompt(promptInputWidth())
+	terminalOutput.write(`\x1b[${p.lines.length + 1 - p.cursor.rowOffset}B\r\x1b[J`)
 	cleanupTerminal()
-	terminalOutput.write('\r\n')
 	process.exit(code)
 }
 
