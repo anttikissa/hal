@@ -6,7 +6,7 @@
 //   earlier edits in the same session, we can remap them in memory.
 
 import { readFileSync } from 'fs'
-import { dirname, extname, resolve, sep } from 'path'
+import { dirname, extname, resolve } from 'path'
 import { ensureDir } from '../state.ts'
 import { helpers } from '../../utils/helpers.ts'
 import { toolRegistry, type ToolContext } from './tool.ts'
@@ -50,14 +50,9 @@ function truncateUtf8(text: string, limit: number): string {
 	return helpers.truncateUtf8(text, limit, TRUNCATED_SUFFIX)
 }
 
-// Typecheck and lint only inside the Hal repo: both run with Hal's own
-// tsconfig.json and .oxlintrc.json, which say nothing about other projects.
-// Running them on, say, a plain script in ~/tetris produced errors from rules
-// that project never opted into.
 function shouldTypecheckEditedPath(path: string): boolean {
 	const ext = extname(path)
-	if (ext !== '.ts' && ext !== '.tsx') return false
-	return path === REPO_ROOT || path.startsWith(REPO_ROOT + sep)
+	return ext === '.ts' || ext === '.tsx'
 }
 
 function decodeOutput(bytes: Uint8Array<ArrayBufferLike> | null | undefined): string {
@@ -184,7 +179,7 @@ const editTool = {
 	description: `Edit a file using hashline refs from read. Hashes are verified; line numbers may be remapped after prior edits in the same session.
 - replace: replace start..end (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
 - insert: insert new_content after after. Use "0:000" for beginning of file.
-- if the edited file is a .ts/.tsx file inside the Hal repo, run tsc-file and oxlint on it and return errors if broken.
+- if the edited file ends in .ts or .tsx, run tsc-file and oxlint on it and return errors if broken.
 new_content is raw file content — no hashline prefixes. A trailing newline in new_content is stripped.`,
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },
@@ -203,4 +198,4 @@ function init(): void {
 	toolRegistry.registerTool(editTool)
 }
 
-export const write = { executeWrite, executeEdit, shouldTypecheckEditedPath, init }
+export const write = { executeWrite, executeEdit, init }
