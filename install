@@ -295,6 +295,7 @@ if [ -n "$need_path" ]; then
 				echo "" >> "$config_file"
 				echo "# Added by hal installer" >> "$config_file"
 				echo "$path_line" >> "$config_file"
+				log
 				log "Added $(prettify "$bin_dir") to PATH in $(prettify "$config_file")"
 			fi
 		fi
