@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hal installer. Keep this preamble updated when changing installer behavior.
-# Installs missing tools when needed: Homebrew, git, ripgrep, unzip, bun, and tsgo.
+# Installs missing tools when needed: Homebrew, git, ripgrep, unzip, and bun.
 # Sets up Hal: creates config.ason, installs project deps, links ~/.local/bin/hal, and updates PATH.
 set -euo pipefail
 
@@ -59,7 +59,6 @@ log
 need_git=""
 need_rg=""
 need_bun=""
-need_tsgo=""
 need_deps=""
 need_symlink=""
 need_config=""
@@ -89,14 +88,6 @@ if command -v bun &>/dev/null; then
 else
 	need_bun=1
 	log "[ ] bun (a snappy JS runtime)"
-fi
-
-tsgo_version="$(bunx --bun tsgo --version 2>/dev/null || true)"
-if [ -n "$tsgo_version" ]; then
-	log "[x] tsgo ($tsgo_version)"
-else
-	need_tsgo=1
-	log "[ ] tsgo (analyze TS files at the speed of light)"
 fi
 
 log
@@ -130,7 +121,7 @@ else
 	log "[ ] $(prettify "$bin_dir") in PATH"
 fi
 
-need_any="${need_git}${need_rg}${need_bun}${need_tsgo}${need_deps}${need_config}${need_symlink}${need_path}"
+need_any="${need_git}${need_rg}${need_bun}${need_deps}${need_config}${need_symlink}${need_path}"
 
 log
 
@@ -152,7 +143,7 @@ fi
 
 # --- ask to install ---
 
-need_packages="${need_git}${need_rg}${need_bun}${need_tsgo}"
+need_packages="${need_git}${need_rg}${need_bun}"
 need_setup="${need_deps}${need_config}${need_symlink}${need_path}"
 
 if [ -n "$need_packages" ] && [ -n "$need_setup" ]; then
@@ -256,13 +247,6 @@ if [ -n "$need_deps" ]; then
 	log "Installing project dependencies..."
 	log
 	run bun install --cwd "$hal_dir"
-fi
-
-# --- tsgo (needs bun) ---
-
-if [ -n "$need_tsgo" ]; then
-	log "Installing tsgo..."
-	run bun install -g @typescript/native-preview
 fi
 
 # --- symlink ---

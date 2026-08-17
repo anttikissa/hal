@@ -1,7 +1,10 @@
 import { expect, test } from 'bun:test'
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 import { dirname, relative, resolve } from 'path'
-import * as ts from 'typescript'
+
+// TypeScript 7's npm package is the native compiler and ships no JS parser API,
+// so imports are scanned with Bun's transpiler instead of ts.preProcessFile.
+const transpiler = new Bun.Transpiler({ loader: 'tsx' })
 
 type Layer = 'common' | 'server' | 'client' | 'web-client'
 
@@ -34,6 +37,22 @@ function clientArea(path: string): 'app' | 'terminal' | null {
 	return null
 }
 
+// All module specifiers a file imports, including type-only ones.
+// The transpiler erases type-only imports because they vanish at runtime, but a
+// type-only import still couples two layers, so the `type` markers are dropped
+// first to make those imports visible again.
+function scanImports(source: string): string[] {
+	const runtimeSource = source
+		.replace(/\bimport\s+type\b/g, 'import')
+		.replace(/\bexport\s+type\s*\{/g, 'export {')
+		// Inline markers: `import { type A, b }`. Only rewrite braces that belong to
+		// an import or export clause, never object literals or type bodies.
+		.replace(/\b(import|export)\s*\{([^}]*)\}/g, (_all, keyword: string, clause: string) => {
+			return `${keyword} {${clause.replace(/\btype\s+/g, '')}}`
+		})
+	return transpiler.scanImports(runtimeSource).map((item) => item.path)
+}
+
 function importedPath(file: string, specifier: string): string | null {
 	let path: string
 	if (specifier.startsWith('.')) path = resolve(dirname(file), specifier)
@@ -55,9 +74,8 @@ function violations(): string[] {
 	for (const file of sourceFiles(sourceRoot)) {
 		const sourceLayer = layer(file)
 		if (!sourceLayer) continue
-		const imports = ts.preProcessFile(readFileSync(file, 'utf8'), true, true).importedFiles
-		for (const item of imports) {
-			const targetPath = importedPath(file, item.fileName)
+		for (const specifier of scanImports(readFileSync(file, 'utf8'))) {
+			const targetPath = importedPath(file, specifier)
 			if (!targetPath) continue
 			const targetLayer = layer(targetPath)
 			if (!targetLayer) continue

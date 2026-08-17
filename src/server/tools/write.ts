@@ -20,7 +20,7 @@ import { sensitive } from './sensitive.ts'
 const MAX_OUTPUT_BYTES = 1_000_000
 const TRUNCATED_SUFFIX = '\n[… truncated]'
 const REPO_ROOT = resolve(import.meta.dir, '../../..')
-const TSGO_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/tsgo-file.ts')
+const TSC_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/tsc-file.ts')
 const OXLINT_CONFIG = resolve(REPO_ROOT, '.oxlintrc.json')
 const textDecoder = new TextDecoder()
 
@@ -45,7 +45,7 @@ function withLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
 	return result
 }
 
-// Keep tool outputs under the 1 MB cap even when tsgo prints a long error list.
+// Keep tool outputs under the 1 MB cap even when tsc prints a long error list.
 function truncateUtf8(text: string, limit: number): string {
 	return helpers.truncateUtf8(text, limit, TRUNCATED_SUFFIX)
 }
@@ -63,7 +63,7 @@ function decodeOutput(bytes: Uint8Array<ArrayBufferLike> | null | undefined): st
 function runTypecheckForEdit(path: string): string | null {
 	if (!shouldTypecheckEditedPath(path)) return null
 
-	const proc = Bun.spawnSync(['bun', TSGO_FILE_SCRIPT, path], {
+	const proc = Bun.spawnSync(['bun', TSC_FILE_SCRIPT, path], {
 		cwd: REPO_ROOT,
 		stdin: 'ignore',
 		stdout: 'pipe',
@@ -74,7 +74,7 @@ function runTypecheckForEdit(path: string): string | null {
 	const stdout = decodeOutput(proc.stdout).trim()
 	const stderr = decodeOutput(proc.stderr).trim()
 	const details = [stdout, stderr].filter(Boolean).join('\n')
-	const fallback = `bun scripts/tsgo-file.ts exited ${proc.exitCode ?? 1}`
+	const fallback = `bun scripts/tsc-file.ts exited ${proc.exitCode ?? 1}`
 	return truncateUtf8(details || fallback, MAX_OUTPUT_BYTES)
 }
 
@@ -179,7 +179,7 @@ const editTool = {
 	description: `Edit a file using hashline refs from read. Hashes are verified; line numbers may be remapped after prior edits in the same session.
 - replace: replace start..end (inclusive) with new_content. Same ref for single line. Empty new_content to delete.
 - insert: insert new_content after after. Use "0:000" for beginning of file.
-- if the edited file ends in .ts or .tsx, run tsgo-file and oxlint on it and return errors if broken.
+- if the edited file ends in .ts or .tsx, run tsc-file and oxlint on it and return errors if broken.
 new_content is raw file content — no hashline prefixes. A trailing newline in new_content is stripped.`,
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },

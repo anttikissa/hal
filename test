@@ -4,7 +4,7 @@ set -uo pipefail
 dir="$(cd "$(dirname "$0")" && pwd)"
 
 # Type check
-type_errors=$(bunx --bun tsgo --noEmit 2>&1)
+type_errors=$(cd "$dir" && ./node_modules/.bin/tsc --noEmit 2>&1)
 type_exit=$?
 
 # Lint. Oxlint currently does not discover files when this repo lives in a

@@ -16,7 +16,7 @@ function fail(message: string): never {
 
 function main(): void {
 	const arg = process.argv[2]
-	if (!arg) fail('usage: bun scripts/tsgo-file.ts <file>')
+	if (!arg) fail('usage: bun scripts/tsc-file.ts <file>')
 
 	const root = resolve(import.meta.dir, '..')
 	const filePath = resolve(process.cwd(), arg)
@@ -24,7 +24,7 @@ function main(): void {
 
 	const config = {
 		extends: './tsconfig.json',
-		// Keep the full project config, but make tsgo treat this file as the only
+		// Keep the full project config, but make tsc treat this file as the only
 		// root input. `types: ["bun"]` makes the Bun ambient globals explicit.
 		compilerOptions: {
 			types: ['bun'],
@@ -35,10 +35,10 @@ function main(): void {
 
 	// The temp config must live under the repo root because TypeScript resolves
 	// relative `extends` and `files` entries from the config file location.
-	const tempPath = resolve(root, `.tsgo-file-${process.pid}-${Date.now()}.json`)
+	const tempPath = resolve(root, `.tsc-file-${process.pid}-${Date.now()}.json`)
 	writeFileSync(tempPath, JSON.stringify(config, null, 2))
 
-	const proc = Bun.spawnSync(['bunx', '--bun', 'tsgo', '-p', tempPath, '--noEmit'], {
+	const proc = Bun.spawnSync(['./node_modules/.bin/tsc', '-p', tempPath, '--noEmit'], {
 		cwd: root,
 		stdin: 'inherit',
 		stdout: 'inherit',

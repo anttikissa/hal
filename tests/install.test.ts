@@ -58,11 +58,6 @@ describe.skip('install script', () => {
 		expect(result).toMatch(/\[x\] ripgrep/)
 	})
 
-	test('shows tsgo in checklist', async () => {
-		let result = await $`HAL_DRY_RUN=1 ${halDir}/install -y 2>&1`.text()
-		expect(result).toMatch(/\[.\] tsgo/)
-	})
-
 	test('shows symlink status in checklist', async () => {
 		let result = await $`HAL_DRY_RUN=1 ${halDir}/install -y 2>&1`.text()
 		expect(result).toMatch(/\[.\] .*hal.*~\/\.local\/bin/)
