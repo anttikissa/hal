@@ -91,6 +91,17 @@ function findOpenSessionForCwd(openSessions: OpenSessionLike[], cwd: string): st
 	return openSessions.find((session) => tabs.sameCwd(session.cwd, cwd))?.id ?? null
 }
 
+// A plain restart should land on the tab we left. The remembered tab only wins
+// while it still serves the launch cwd; otherwise the cwd decides, exactly as it
+// does for a fresh `hal <dir>` in a directory we have never focused.
+function rememberedTabForCwd(saved: { restartTab: string | null; lastTab: string | null }, openSessions: OpenSessionLike[], cwd: string): string | null {
+	const remembered = saved.restartTab ?? saved.lastTab
+	if (!remembered) return null
+	const session = openSessions.find((item) => item.id === remembered)
+	if (!session || !tabs.sameCwd(session.cwd, cwd)) return null
+	return remembered
+}
+
 function openLimitReason(cwd?: string): string | null {
 	if (runtime.state.openSessionIds.length < tabs.config.maxTabs) return null
 	if (cwd) return `Cannot open ${tabs.normalizeCwd(cwd)}: max tabs reached (${tabs.config.maxTabs}). Close one first.`
@@ -187,6 +198,7 @@ export const tabs = {
 	normalizeCwd,
 	sameCwd,
 	findOpenSessionForCwd,
+	rememberedTabForCwd,
 	openLimitReason,
 	sessionTitle,
 	sessionLabel,

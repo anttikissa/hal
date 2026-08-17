@@ -194,18 +194,15 @@ function becomeHost(kind: 'start' | 'promote'): void {
 	syncHostVersionState()
 	const started = runtime.startRuntime(ac.signal, { targetCwd: startupCwd })
 	if (!started.ok) failStartup(started.reason)
-	startupTarget.preferredSessionId = started.sessionId
-	const savedTabs = clientPersistence.load()
-	let announcementSessionId = started.sessionId
-	for (const sessionId of [savedTabs.restartTab, savedTabs.lastTab]) {
-		if (!sessionId || !ipc.readState().sessions.some((session) => session.id === sessionId)) continue
-		announcementSessionId = sessionId
-		break
-	}
+	// startRuntime picks the first tab matching the launch cwd, which is right for a
+	// fresh `hal <dir>` but wrong after a plain quit-and-relaunch: we want the tab we
+	// left. Prefer it while it still serves this cwd; otherwise keep the cwd's tab.
+	const remembered = tabs.rememberedTabForCwd(clientPersistence.load(), ipc.readState().sessions, startupCwd)
+	startupTarget.preferredSessionId = remembered ?? started.sessionId
 	if (parsedArgs.ok && parsedArgs.webPort) {
 		const port = parsedArgs.webPort
 		void import('./server/web.ts')
-			.then(({ web }) => web.start(port, ac.signal, announceWeb ? announcementSessionId : undefined))
+			.then(({ web }) => web.start(port, ac.signal, announceWeb ? startupTarget.preferredSessionId : undefined))
 			.catch((error) => log.error('web client startup failed', { error: String(error) }))
 	}
 	ipc.appendEvent({

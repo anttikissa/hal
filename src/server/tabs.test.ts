@@ -56,3 +56,21 @@ test('openSessionForCwd enforces the shared open-tab limit', () => {
 		runtime.state.openSessionIds = originalOpenSessionIds
 	}
 })
+
+test('rememberedTabForCwd prefers the remembered tab over the first tab with the same cwd', () => {
+	const open = [
+		{ id: '04-first', cwd: '/work/project' },
+		{ id: '04-last', cwd: '/work/project' },
+	]
+
+	expect(tabs.rememberedTabForCwd({ restartTab: null, lastTab: '04-last' }, open, '/work/project')).toBe('04-last')
+	expect(tabs.rememberedTabForCwd({ restartTab: '04-last', lastTab: null }, open, '/work/project')).toBe('04-last')
+})
+
+test('rememberedTabForCwd ignores a remembered tab that is closed or in another cwd', () => {
+	const open = [{ id: '04-first', cwd: '/work/project' }]
+
+	expect(tabs.rememberedTabForCwd({ restartTab: null, lastTab: '04-gone' }, open, '/work/project')).toBe(null)
+	expect(tabs.rememberedTabForCwd({ restartTab: null, lastTab: '04-first' }, open, '/work/other')).toBe(null)
+	expect(tabs.rememberedTabForCwd({ restartTab: null, lastTab: null }, open, '/work/project')).toBe(null)
+})
