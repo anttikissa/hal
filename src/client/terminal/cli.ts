@@ -110,7 +110,10 @@ function exitCli(code: number): void {
 	// Leave the submitted input visible, then start the shell at the status row.
 	draw(true)
 	const p = prompt.buildPrompt(promptInputWidth())
-	terminalOutput.write(`\x1b[${p.lines.length + 1 - p.cursor.rowOffset}B\r\x1b[J`)
+	// Move cursor to just below the prompt (p.lines.length - p.cursor.rowOffset)
+	// plus one line so that the prompt bottom bar also stays visible (+ 1).
+	// Change to +2 if you want to leave the status row too.
+	terminalOutput.write(`\x1b[${p.lines.length - p.cursor.rowOffset + 1}B\r\x1b[J`)
 	cleanupTerminal()
 	process.exit(code)
 }
