@@ -104,6 +104,13 @@ describe('prompt editor', () => {
 		prompt.clear()
 	})
 
+	test('tab indents a row the cursor rests on at column 0', () => {
+		select('one\ntwo', 1, 4)
+		prompt.handleKey(key('tab'), 80)
+		expect(prompt.text()).toBe('\tone\n\ttwo')
+		prompt.clear()
+	})
+
 	test('shift-tab deindents selected rows by one four-column level', () => {
 		const text = '\tone\n  \ttwo\n   three\nfour'
 		select(text, text.length, 0)

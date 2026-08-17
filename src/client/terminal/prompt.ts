@@ -351,8 +351,9 @@ function indentRows(deindent: boolean): void {
 	const sel = selRange()
 	const first = buf.lastIndexOf('\n', (sel?.start ?? cursor) - 1) + 1
 	let end = sel?.end ?? cursor
-	// A selection ending at the next row's first column does not select that row.
-	if (sel && buf[end - 1] === '\n') end--
+	// A selection ending at the next row's first column does not select that row —
+	// unless the cursor is the end, because the block cursor makes that row look selected.
+	if (sel && buf[end - 1] === '\n' && end !== cursor) end--
 	let last = buf.indexOf('\n', end)
 	if (last < 0) last = buf.length
 	const before = buf.slice(first, last)
