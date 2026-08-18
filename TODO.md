@@ -21,3 +21,4 @@ Random ideas, in no particular order
 - /what is probably more complicated than it should be; should just probably open a subagent to do it
 - Most of config.ason can be ditched. Nobody ever gonna change them. Hardcode more stuff
 - The OPUS context usage warning must go. It's not that bad anymore. Instead, think of a generic "this session isn't hitting cache any more" hint in UI
+- Fix popup rendering so all underlying frame rows are rendered normally behind the popup; the popup should be a true overlay rather than replacing or omitting the obscured rows.
