@@ -8,14 +8,17 @@ function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
-test('wrapped URLs use OSC 8 links for every visual segment', () => {
+test('wrapped URLs use one OSC 8 link identity for every visual segment', () => {
 	const url = `https://claude.ai/oauth/authorize?client_id=${'a'.repeat(80)}`
 	const lines = blocks.renderBlock({ type: 'log', text: url }, 40)
 	const rendered = lines.join('\n')
-	const openLink = `\x1b]8;;${url}\x07`
+	const links = Array.from(rendered.matchAll(/\x1b\]8;id=([^;]+);(.*?)\x07/g), (match) => ({ id: match[1]!, target: match[2]! }))
 
-	expect(rendered).toContain(`${openLink}https://`)
-	expect(rendered.split(openLink).length - 1).toBeGreaterThan(1)
+	expect(links.length).toBeGreaterThan(1)
+	for (const link of links) {
+		expect(link.id).toBe(links[0]!.id)
+		expect(link.target).toBe(url)
+	}
 	for (const line of lines) expect(visLen(line)).toBeLessThanOrEqual(40)
 })
 
@@ -25,7 +28,7 @@ test('styled wrapped URLs keep ANSI sequences out of OSC 8 targets', () => {
 	expect(url).toHaveLength(200)
 	const text = `\`\`\`text\n${url}\n\`\`\``
 	const rendered = blocks.renderBlock({ type: 'assistant', text }, 40).join('\n')
-	const targets = Array.from(rendered.matchAll(/\x1b\]8;;(.*?)\x07/g), (match) => match[1]!).filter(Boolean)
+	const targets = Array.from(rendered.matchAll(/\x1b\]8;(?:id=[^;]+)?;(.*?)\x07/g), (match) => match[1]!).filter(Boolean)
 
 	expect(targets.length).toBeGreaterThan(1)
 	for (const target of targets) expect(target).toBe(url)

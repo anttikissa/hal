@@ -52,10 +52,19 @@ function stripAnsiSequences(text: string): string {
 	return out
 }
 
-interface LinkSpan { line: number; start: number; end: number; url: string }
+interface LinkSpan { line: number; start: number; end: number; url: string; id: string }
 
 const URL_RE = /https?:\/\/[^\s<>"'\x1b]+/g
 const TRAILING_URL_PUNCT = '.,!?;:)]}'
+
+function hyperlinkId(url: string, line: number, start: number): string {
+	let hash = 2166136261
+	for (const ch of url) {
+		hash ^= ch.codePointAt(0)!
+		hash = Math.imul(hash, 16777619)
+	}
+	return `hal-${line}-${start}-${(hash >>> 0).toString(36)}`
+}
 
 function firstWhitespaceIndex(s: string): number {
 	for (let i = 0; i < s.length; i++) {
@@ -120,7 +129,7 @@ function trimTrailingUrlPunctuation(url: string, spans: LinkSpan[], lines: strin
 
 function pushUrlSpans(spans: LinkSpan[], lines: string[], lineIndex: number, start: number, end: number, cols: number): void {
 	let url = stripAnsiSequences(lines[lineIndex]!.slice(start, end))
-	const urlSpans: LinkSpan[] = [{ line: lineIndex, start, end, url: '' }]
+	const urlSpans: LinkSpan[] = [{ line: lineIndex, start, end, url: '', id: '' }]
 	let currentLine = lineIndex
 	let currentEnd = end
 
@@ -133,21 +142,23 @@ function pushUrlSpans(spans: LinkSpan[], lines: string[], lineIndex: number, sta
 		const whitespace = firstWhitespaceIndex(plainNext)
 		if (whitespace >= 0) break
 		url += plainNext
-		urlSpans.push({ line: currentLine + 1, start: 0, end: next.length, url: '' })
+		urlSpans.push({ line: currentLine + 1, start: 0, end: next.length, url: '', id: '' })
 		currentLine++
 		currentEnd = next.length
 	}
 
 	url = trimTrailingUrlPunctuation(url, urlSpans, lines)
 	if (!url || url === 'http://' || url === 'https://') return
+	const id = hyperlinkId(url, lineIndex, start)
 	for (const span of urlSpans) {
 		span.url = url
+		span.id = id
 		spans.push(span)
 	}
 }
 
-function osc8(url: string, label: string): string {
-	return `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`
+function osc8(url: string, label: string, id: string): string {
+	return `\x1b]8;id=${id};${url}\x07${label}\x1b]8;;\x07`
 }
 
 function insideOsc8Link(line: string, index: number): boolean {
@@ -182,7 +193,7 @@ function hyperlinkUrls(lines: string[], cols: number): string[] {
 		lineSpans.sort((a, b) => b.start - a.start)
 		let line = linked[lineIndex]!
 		for (const span of lineSpans) {
-			line = line.slice(0, span.start) + osc8(span.url, line.slice(span.start, span.end)) + line.slice(span.end)
+			line = line.slice(0, span.start) + osc8(span.url, line.slice(span.start, span.end), span.id) + line.slice(span.end)
 		}
 		linked[lineIndex] = line
 	}
