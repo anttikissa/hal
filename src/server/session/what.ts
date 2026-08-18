@@ -288,7 +288,12 @@ function parseSummary(text: string): SummaryResult {
 }
 
 function sanitizeTitle(text: string): string {
-	return text.trim().replace(/\s+/g, ' ').slice(0, 60).trim()
+	const normalized = text.trim().replace(/\s+/g, ' ')
+	if (normalized.length <= 60) return normalized
+	// Break on the last whitespace before the limit so a long title never ends mid-word.
+	const cut = normalized.slice(0, 60)
+	const lastSpace = cut.lastIndexOf(' ')
+	return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim()
 }
 
 

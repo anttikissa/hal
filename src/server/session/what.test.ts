@@ -256,3 +256,21 @@ test('digest highlights commit evidence before routine tool details', () => {
 	expect(digest).toContain('[main abc1234] Add what command')
 	expect(digest.indexOf('Commit evidence:')).toBeLessThan(digest.indexOf('Tool/action details:'))
 })
+
+
+test('parseSummary breaks an overlong title on a word boundary instead of mid-word', () => {
+	const title = 'Diagnose subagent inbox delivery bug, then build a SolidJS web client'
+	const result = whatSummary.parseSummary(`${title}\n\nSummary body.`)
+
+	expect(result.title.length).toBeLessThanOrEqual(60)
+	expect(title.startsWith(result.title)).toBe(true)
+	expect(result.title.endsWith(' ')).toBe(false)
+	expect(/\S$/.test(result.title)).toBe(true)
+})
+
+test('parseSummary hard-truncates a title with no early whitespace to break on', () => {
+	const title = `x${'y'.repeat(80)}`
+	const result = whatSummary.parseSummary(`${title}\n\nSummary body.`)
+
+	expect(result.title).toBe(title.slice(0, 60))
+})
