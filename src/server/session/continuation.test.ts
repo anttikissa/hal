@@ -16,6 +16,18 @@ test('failed continue after a completed turn has no continuation action', () => 
 	])).toBe(false)
 })
 
+
+test('UI-only assistant output does not create a continuation action', () => {
+	expect(action([
+		{ type: 'user', parts: [{ type: 'text', text: 'hello' }] },
+		{ type: 'assistant', text: 'hi' },
+		{ type: 'turn_end', status: 'completed' },
+		{ type: 'error', text: 'assistant prefill rejected' },
+		{ type: 'turn_end', status: 'failed' },
+		{ type: 'assistant', text: '/what summary', visibility: 'ui', synthetic: true },
+	])).toBe(false)
+})
+
 test('failed unfinished turn is retryable', () => {
 	expect(action([
 		{ type: 'turn_end', status: 'completed' },

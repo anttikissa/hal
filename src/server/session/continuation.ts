@@ -16,6 +16,7 @@ function actionForHistory(entries: HistoryEntry[]): ContinuationAction | false {
 			outcome ??= entry.status
 			continue
 		}
+		if ((entry.type === 'assistant' || entry.type === 'tool_call' || entry.type === 'tool_result') && entry.visibility === 'ui') continue
 		if (entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result') contentAfterCompleted = true
 	}
 	if (!contentAfterCompleted) return false

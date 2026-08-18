@@ -136,15 +136,14 @@ function shouldCloseSessionAfterGeneration(meta: { spawnKind?: SpawnKind } | nul
 	return meta?.spawnKind === 'subagent' && result === 'completed'
 }
 
-// The restart marker is written only for sessions that were actually working when
-// the runtime went down, so a marker after the last turn_end is proof enough that
-// the turn should resume. Do not also require visible turn content: a turn resumed
-// from a pause is often restarted before it emits anything of its own.
+// A restart marker can resume only the unfinished turn that precedes it. Checking
+// the same projection used by manual continue prevents later UI-only history from
+// reviving an old marker that was already rejected as "Nothing to continue".
 function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const entry = entries[i]!
 		if (entry.type === 'turn_end') return false
-		if (entry.type === 'log' && entry.text === RESTARTED_TEXT) return true
+		if (entry.type === 'log' && entry.text === RESTARTED_TEXT) return continuation.actionForHistory(entries.slice(0, i + 1)) !== false
 	}
 	return false
 }

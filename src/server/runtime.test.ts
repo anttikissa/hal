@@ -515,6 +515,17 @@ test('shouldAutoContinue resumes only restarted turns', () => {
 		{ type: 'turn_end', status: 'completed', ts: '2026-05-27T12:00:01.000Z' },
 	])).toBe(false)
 
+	// A stale restart marker cannot be revived by later UI-only /what output.
+	expect(runtime.shouldAutoContinue([
+		{ type: 'user', parts: [{ type: 'text', text: 'done' }] },
+		{ type: 'assistant', text: 'done' },
+		{ type: 'turn_end', status: 'completed' },
+		{ type: 'error', text: 'invalid empty continuation' },
+		{ type: 'turn_end', status: 'failed' },
+		{ type: 'log', text: '[restarted]' },
+		{ type: 'assistant', text: '/what summary', visibility: 'ui', synthetic: true },
+	])).toBe(false)
+
 	expect(runtime.shouldAutoContinue([
 		{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-05-27T12:00:00.000Z' },
 	])).toBe(false)
