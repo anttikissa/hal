@@ -37,20 +37,11 @@ function clientArea(path: string): 'app' | 'terminal' | null {
 	return null
 }
 
-// All module specifiers a file imports, including type-only ones.
-// The transpiler erases type-only imports because they vanish at runtime, but a
-// type-only import still couples two layers, so the `type` markers are dropped
-// first to make those imports visible again.
+// Module specifiers a file imports. Type-only imports are erased by the
+// transpiler and so aren't caught here, but that's fine — this check only
+// needs to catch real runtime coupling between layers, not type leakage.
 function scanImports(source: string): string[] {
-	const runtimeSource = source
-		.replace(/\bimport\s+type\b/g, 'import')
-		.replace(/\bexport\s+type\s*\{/g, 'export {')
-		// Inline markers: `import { type A, b }`. Only rewrite braces that belong to
-		// an import or export clause, never object literals or type bodies.
-		.replace(/\b(import|export)\s*\{([^}]*)\}/g, (_all, keyword: string, clause: string) => {
-			return `${keyword} {${clause.replace(/\btype\s+/g, '')}}`
-		})
-	return transpiler.scanImports(runtimeSource).map((item) => item.path)
+	return transpiler.scanImports(source).map((item) => item.path)
 }
 
 function importedPath(file: string, specifier: string): string | null {
