@@ -4,6 +4,7 @@ import { client } from '../app.ts'
 import { clientBackend } from '../backend.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import { visLen } from '../../utils/strings.ts'
+import { blockText } from './block-text.ts'
 
 function tab(overrides: any = {}): any {
 	return {
@@ -136,7 +137,7 @@ test('activityStatusLabel combines working and summarizing', () => {
 	}
 })
 
-test('buildTabText compact mode drops the padding spaces and underlines the active tab instead of bracketing it', () => {
+test('buildTabText compact mode separates tabs with one space and underlines the active tab instead of bracketing it', () => {
 	const origTabs = client.state.tabs.slice()
 	const origFocused = client.state.focusedTabIndex
 	client.state.tabs.length = 0
@@ -144,9 +145,7 @@ test('buildTabText compact mode drops the padding spaces and underlines the acti
 	client.state.focusedTabIndex = 1
 	try {
 		const compact = renderStatus.buildTabText(true)
-		// no space-padding between tab numbers in compact mode
-		expect(compact).not.toContain(' 1 ')
-		expect(compact).not.toContain('[2]')
+		expect(blockText.stripAnsiSequences(compact)).toBe('1 2 3')
 		expect(compact).toContain('\x1b[4m2\x1b[24m')
 	} finally {
 		client.state.tabs.length = 0

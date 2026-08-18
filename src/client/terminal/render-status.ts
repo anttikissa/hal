@@ -134,9 +134,9 @@ function tabLabel(tab: Tab, i: number, compact = false): string {
 		if (isActive) return `${base}[${content}]${RESET}`
 		return `${base} ${content} ${RESET}`
 	}
-	// Compact mode drops the space padding around each tab (that's what makes
-	// them fit) and marks the active tab with an underline instead of
-	// brackets, since brackets would cost the same width they're meant to save.
+	// Compact mode halves the padding: buildTabText puts a single space between
+	// labels instead of the two spaces this padding produces, and the active tab
+	// gets an underline instead of brackets, which would cost the width we save.
 	if (isActive) return `${base}\x1b[4m${content}\x1b[24m${RESET}`
 	return `${base}${content}${RESET}`
 }
@@ -198,6 +198,8 @@ function fitTabHelpText(tabCount: number, base: string, cols: number): string {
 function buildTabText(compact = false): string {
 	let text = ''
 	for (let i = 0; i < client.state.tabs.length; i++) {
+		// Compact labels carry no padding of their own, so separate them here.
+		if (compact && i > 0) text += ' '
 		text += renderStatus.tabLabel(client.state.tabs[i]!, i, compact)
 	}
 	return text
