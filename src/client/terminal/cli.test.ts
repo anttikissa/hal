@@ -8,6 +8,7 @@ import { cursor } from './cursor.ts'
 import { popup } from './popup.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import { draft } from '../draft.ts'
+import { completion } from './completion.ts'
 
 function key(key: string, mods: any = {}): any {
 	return { key, shift: false, alt: false, ctrl: false, cmd: false, ...mods }
@@ -32,6 +33,28 @@ test('prompt key handling uses rendered prompt content width', () => {
 		expect(cli.forTests.promptInputWidth()).toBe(109)
 	} finally {
 		Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+	}
+})
+
+test('failed slash completion consumes only a plain unselected tab', () => {
+	completion.dismiss()
+	try {
+		prompt.setText('/does-not-exist')
+		expect(cli.forTests.handleCompletionKey(key('tab'))).toBe(true)
+		expect(prompt.text()).toBe('/does-not-exist')
+
+		prompt.setText('hello')
+		expect(cli.forTests.handleCompletionKey(key('tab'))).toBe(false)
+
+		prompt.setText('/does-not-exist')
+		prompt.restoreState({ ...prompt.snapshotState(), selAnchor: 0 })
+		expect(cli.forTests.handleCompletionKey(key('tab'))).toBe(false)
+
+		prompt.setText('/does-not-exist')
+		expect(cli.forTests.handleCompletionKey(key('tab', { shift: true }))).toBe(false)
+	} finally {
+		completion.dismiss()
+		prompt.clear()
 	}
 })
 

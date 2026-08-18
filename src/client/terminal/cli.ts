@@ -540,8 +540,15 @@ function handleCompletionKey(k: KeyEvent): boolean {
 	if (k.key === 'tab' && !k.ctrl && !k.alt && !k.cmd) {
 		if (!completion.state.active) {
 			// Trigger new completion
-			const result = completion.complete(prompt.text(), prompt.cursorPos(), client.currentTab()?.cwd)
-			if (!result || result.items.length === 0) return false
+			const text = prompt.text()
+			const cursor = prompt.cursorPos()
+			const result = completion.complete(text, cursor, client.currentTab()?.cwd)
+			if (!result || result.items.length === 0) {
+				// Slash commands are the only completion syntax. A plain, unselected Tab
+				// in that syntax is an attempted completion even if nothing matches.
+				const before = text.slice(0, cursor)
+				return !k.shift && prompt.snapshotState().selAnchor === null && before.startsWith('/') && !before.includes('\n')
+			}
 			completion.state.active = true
 			completion.state.lastResult = result
 			completionHints.set(result.hints)
@@ -889,6 +896,7 @@ export const cli = {
 	startCli,
 	forTests: {
 		handleAppKey,
+		handleCompletionKey,
 		claudeCacheWarning,
 		kittyOnSequence: () => KITTY_ON,
 		installPromptTabSwitchHandler,
