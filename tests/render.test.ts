@@ -896,6 +896,28 @@ describe('render', () => {
 		expect(clean).toContain('anthropic')
 	})
 
+	test('opening and closing a popup force canonical repaint across soft-wrap layout changes', () => {
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 40, configurable: true })
+		try {
+			client.currentTab()!.history.push({ type: 'info', text: `https://example.com/${'a'.repeat(120)}` })
+			captureOutput(() => render.draw(true))
+
+			popup.openModelPicker(() => {})
+			const opened = captureOutput(() => render.draw())
+			popup.close()
+			const closed = captureOutput(() => render.draw())
+
+			expect(opened).toContain('\x1b[2J\x1b[H\x1b[3J')
+			expect(closed).toContain('\x1b[2J\x1b[H\x1b[3J')
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
 	test('empty help bar still reserves the help-bar row', () => {
 		render.resetRenderer()
 		const empty = stripAnsi(captureOutput(() => render.draw(true))).split('\n')

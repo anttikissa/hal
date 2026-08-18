@@ -74,6 +74,7 @@ let prevLines: string[] = []
 let cursorRow = 0
 let cursorCol = 0
 let fullscreen = false
+let paintedPopupActive = false
 let blockCache = new WeakMap<Block, BlockRenderCache>()
 let fadeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -106,6 +107,7 @@ function resetRenderer(): void {
 	cursorRow = 0
 	cursorCol = 0
 	fullscreen = false
+	paintedPopupActive = false
 	blockCache = new WeakMap<Block, BlockRenderCache>()
 	renderHistory.resetAnimation()
 	if (fadeTimer) clearTimeout(fadeTimer)
@@ -236,6 +238,11 @@ function draw(force = false): void {
 	const screen = buildFrame()
 	const lines = screen.lines
 	const cursor = screen.cursor
+	// Popup frames hard-wrap soft URLs, so never diff across the two layouts.
+	if (popup.state.active !== paintedPopupActive) {
+		paintedPopupActive = popup.state.active
+		force = true
+	}
 	// ── Force repaint ──
 	if (force) {
 		const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
