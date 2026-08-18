@@ -18,6 +18,8 @@ import {
 	M_BOLD_OFF,
 	M_ITALIC,
 	M_ITALIC_OFF,
+	M_UNDERLINE,
+	M_UNDERLINE_OFF,
 } from '../../utils/strings.ts'
 
 // ── ANSI style pairs ─────────────────────────────────────────────────────────
@@ -163,7 +165,7 @@ function inlineSpans(s: string, c: MdColors): string {
 	// the final code pass also reaches placeholders inside labels.
 	s = s.replace(/\x00L(\d+)\x00/g, (_, rawIndex) => {
 		const link = links[+rawIndex]!
-		return `\x1b]8;;${link.url}\x07${emphasis(link.label, c)}\x1b]8;;\x07`
+		return `\x1b]8;;${link.url}\x07${M_UNDERLINE}${emphasis(link.label, c)}${M_UNDERLINE_OFF}\x1b]8;;\x07`
 	})
 	return s.replace(/\x00C(\d+)\x00/g, (_, i) => codes[+i]!)
 }
