@@ -3,6 +3,7 @@ import { renderStatus } from './render-status.ts'
 import { client } from '../app.ts'
 import { clientBackend } from '../backend.ts'
 import { promptEdit } from '../prompt-edit.ts'
+import { visLen } from '../../utils/strings.ts'
 
 function tab(overrides: any = {}): any {
 	return {
@@ -63,6 +64,14 @@ test('tabIndicator shows blinking amber diamond for new working tab', () => {
 	}
 })
 
+
+test('tabIndicator uses the server continuation action instead of error blocks', () => {
+	const failed = tab({ history: [{ type: 'error', text: 'provider error' }] })
+	expect(renderStatus.tabIndicator(failed).char).toBe('')
+	failed.continuation = 'retry'
+	expect(renderStatus.tabIndicator(failed).char).toBe('✗')
+})
+
 test('activityStatusLabel names visible working phases', () => {
 	const origWorking = client.state.working
 	const origToolConfirm = client.state.toolConfirmPending
@@ -110,13 +119,7 @@ test('activityStatusLabel describes a prompt edit while its turn is pausing or p
 })
 
 test('activityStatusLabel identifies an idle continuable turn as paused', () => {
-	const origWorking = client.state.working
-	client.state.working = new Map()
-	try {
-		expect(renderStatus.activityStatusLabel(tab({ history: [{ type: 'log', text: '[paused]' }] }))).toBe('paused')
-	} finally {
-		client.state.working = origWorking
-	}
+	expect(renderStatus.activityStatusLabel(tab({ continuation: 'continue' }))).toBe('paused')
 })
 
 
@@ -130,5 +133,40 @@ test('activityStatusLabel combines working and summarizing', () => {
 	} finally {
 		client.state.working = origWorking
 		client.state.summarizing = origSummarizing
+	}
+})
+
+test('buildTabText compact mode drops the padding spaces and underlines the active tab instead of bracketing it', () => {
+	const origTabs = client.state.tabs.slice()
+	const origFocused = client.state.focusedTabIndex
+	client.state.tabs.length = 0
+	client.state.tabs.push(tab({ sessionId: 'a' }), tab({ sessionId: 'b' }), tab({ sessionId: 'c' }))
+	client.state.focusedTabIndex = 1
+	try {
+		const compact = renderStatus.buildTabText(true)
+		// no space-padding between tab numbers in compact mode
+		expect(compact).not.toContain(' 1 ')
+		expect(compact).not.toContain('[2]')
+		expect(compact).toContain('\x1b[4m2\x1b[24m')
+	} finally {
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.focusedTabIndex = origFocused
+	}
+})
+
+test('buildTabBarLines switches to compact mode when even the bare tab numbers overflow the width', () => {
+	const origTabs = client.state.tabs.slice()
+	const origFocused = client.state.focusedTabIndex
+	client.state.tabs.length = 0
+	for (let i = 0; i < 40; i++) client.state.tabs.push(tab({ sessionId: `s${i}` }))
+	client.state.focusedTabIndex = 30
+	try {
+		const [line] = renderStatus.buildTabBarLines(80)
+		expect(visLen(line!)).toBeLessThanOrEqual(80)
+	} finally {
+		client.state.tabs.length = 0
+		client.state.tabs.push(...origTabs)
+		client.state.focusedTabIndex = origFocused
 	}
 })

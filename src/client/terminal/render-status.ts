@@ -68,23 +68,16 @@ function tabIndicator(tab: Tab): TabIndicator {
 
 	if (working && tab.attention === 'new') return { char: '◆', color: colors.tab.warningFg || colors.warning.fg, blinks: true }
 	if (working) return { char: '▪', color: renderStatus.halCursorColor(), blinks: true }
-	// Alerts beat the generic "done unseen" checkmark. This matters for cases
-	// like "Hit max iterations" where generation finished, but the tab still
-	// needs attention.
+	// Explicit warnings beat turn status, but retry/continue comes only from the
+	// server's authoritative history projection.
 	for (let i = tab.history.length - 1; i >= 0; i--) {
-		const b = tab.history[i]!
-		// Skip trailing info blocks that aren't status-relevant.
-		if ((b.type === 'log' || b.type === 'info') && b.text !== '[paused]' && b.text !== '[paused before local tools]' && !b.text?.startsWith('[interrupted]')) continue
-		if (b.type === 'warning') return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
-		if (b.type === 'error') {
-			if ((b as any).retryable === false) return { char: '', color: '', blinks: false }
-			return { char: '✗', color: colors.tab.errorFg || colors.error.fg, blinks: true }
-		}
-		if (b.type === 'log' && (b.text === '[paused]' || b.text === '[paused before local tools]' || b.text?.startsWith('[interrupted]'))) {
-			return { char: '!', color: colors.tab.pausedFg || colors.tab.warningFg || colors.warning.fg, blinks: false }
-		}
-		break
+		const block = tab.history[i]!
+		if (block.type === 'warning') return { char: '!', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
+		if (block.type !== 'log' && block.type !== 'info') break
 	}
+	const action = client.continueActionForTab(tab)
+	if (action === 'retry') return { char: '✗', color: colors.tab.errorFg || colors.error.fg, blinks: true }
+	if (action === 'continue') return { char: '!', color: colors.tab.pausedFg || colors.tab.warningFg || colors.warning.fg, blinks: false }
 
 	if (tab.attention === 'new') return { char: '◆', color: colors.tab.warningFg || colors.warning.fg, blinks: false }
 	if (tab.doneUnseen) return { char: '✓', color: colors.tab.doneFg || colors.info.fg, blinks: false }
@@ -131,13 +124,21 @@ function tabInner(num: number, ind: string): string {
 	return `${num}${ind}`
 }
 
-function tabLabel(tab: Tab, i: number): string {
+function tabLabel(tab: Tab, i: number, compact = false): string {
 	const focusedIndex = client.state.focusedTabIndex
-	const base = i === focusedIndex ? colors.tab.activeFg || colors.status.highlight : colors.tab.inactiveFg || colors.status.fg
+	const isActive = i === focusedIndex
+	const base = isActive ? colors.tab.activeFg || colors.status.highlight : colors.tab.inactiveFg || colors.status.fg
 	const ind = renderStatus.renderIndicator(tab, base)
 	const content = renderStatus.tabInner(i + 1, ind)
-	if (i === focusedIndex) return `${base}[${content}]${RESET}`
-	return `${base} ${content} ${RESET}`
+	if (!compact) {
+		if (isActive) return `${base}[${content}]${RESET}`
+		return `${base} ${content} ${RESET}`
+	}
+	// Compact mode drops the space padding around each tab (that's what makes
+	// them fit) and marks the active tab with an underline instead of
+	// brackets, since brackets would cost the same width they're meant to save.
+	if (isActive) return `${base}\x1b[4m${content}\x1b[24m${RESET}`
+	return `${base}${content}${RESET}`
 }
 
 function tabHelpHints(tabCount: number): TabHelpHint[] {
@@ -194,20 +195,28 @@ function fitTabHelpText(tabCount: number, base: string, cols: number): string {
 	return ''
 }
 
-function buildTabText(): string {
+function buildTabText(compact = false): string {
 	let text = ''
 	for (let i = 0; i < client.state.tabs.length; i++) {
-		text += renderStatus.tabLabel(client.state.tabs[i]!, i)
+		text += renderStatus.tabLabel(client.state.tabs[i]!, i, compact)
 	}
 	return text
 }
 
 function buildTabBarLines(cols: number): string[] {
+	const width = renderStatus.contentWidth(cols)
 	const tabText = renderStatus.buildTabText()
 	const prefixed = `Tabs: ${tabText}`
 	let content = prefixed + renderStatus.fitTabHelpText(client.state.tabs.length, prefixed, cols)
-	if (visLen(content) > renderStatus.contentWidth(cols)) {
+	if (visLen(content) > width) {
 		content = tabText + renderStatus.fitTabHelpText(client.state.tabs.length, tabText, cols)
+	}
+	// Even the bare tab numbers (no "Tabs:" label, no help hints) don't fit:
+	// switch to compact mode, which drops the space padding between tabs and
+	// underlines the active tab instead of bracketing it, rather than
+	// clipping tabs off the end.
+	if (visLen(tabText) > width) {
+		content = renderStatus.buildTabText(true)
 	}
 	return [renderStatus.paddedLine(content, cols)]
 }
