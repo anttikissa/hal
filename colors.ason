@@ -24,7 +24,7 @@
 		bg: [0, 0, 55],
 		bold: [0.90, 0.06, 55],
 		code: [0.86, 0.04, 55],
-		linkBg: [0.22, 0.035, 55],
+		linkBg: [0.30, 0.05, 55],
 	},
 
 	// Thinking — muted blue-grey, recedes visually
