@@ -15,7 +15,7 @@ const COLORS_PATH = `${HAL_DIR}/colors.ason`
 
 // ── Public color objects — mutated in place by load() ────────────────────────
 
-type BlockColors = { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; cursor?: string; cursorIdle?: string }
+type BlockColors = { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; linkBg?: string; cursor?: string; cursorIdle?: string }
 type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
@@ -103,6 +103,8 @@ function load(): void {
 		else delete target.bold
 		if (def?.code) target.code = fg(def.code, vars)
 		else delete target.code
+		if (def?.linkBg) target.linkBg = bg(def.linkBg, vars)
+		else delete target.linkBg
 		if (def?.cursor) target.cursor = fg(def.cursor, vars)
 		else delete target.cursor
 		if (def?.cursorIdle) target.cursorIdle = fg(def.cursorIdle, vars)

@@ -32,6 +32,9 @@ test('styled wrapped URLs keep ANSI sequences out of OSC 8 targets', () => {
 })
 
 test('wrapped Markdown links keep their target hidden and clickable on every line', () => {
+	colors.load()
+	const linkBg = colors.assistant.linkBg
+	if (!linkBg) throw new Error('missing assistant link background')
 	const url = 'https://example.com/reference'
 	const label = 'read this detailed reference before continuing'
 	const lines = blocks.renderBlock({ type: 'assistant', text: `[${label}](${url})` }, 24)
@@ -42,8 +45,8 @@ test('wrapped Markdown links keep their target hidden and clickable on every lin
 	expect(targets.length).toBeGreaterThan(1)
 	for (const target of targets) expect(target).toBe(url)
 	for (const line of lines.filter((line) => line.includes(`\x1b]8;;${url}\x07`))) {
-		expect(line).toContain('\x1b[4m')
-		expect(line).toContain('\x1b[24m')
+		expect(line).toContain(linkBg)
+		expect(line).not.toContain('\x1b[4m')
 	}
 	expect(plain.replace(/\s+/g, ' ')).toContain(label)
 	expect(plain).not.toContain(url)

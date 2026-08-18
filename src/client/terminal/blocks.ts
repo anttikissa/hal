@@ -54,6 +54,7 @@ function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' |
 		bold: [M_BOLD, M_BOLD_OFF],
 		italic: [M_ITALIC, M_ITALIC_OFF],
 		code: palette.code ? [palette.code, palette.fg] : [palette.fg, palette.fg],
+		link: palette.linkBg ? [palette.linkBg, palette.bg] : undefined,
 	}
 }
 
@@ -81,7 +82,10 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 		} else if (span.type === 'table') {
 			lines.push(...md.mdTable(span.lines, cols, mdColors))
 		} else {
-			for (const line of span.lines) lines.push(...wordWrap(md.mdInline(line, mdColors), cols))
+			for (const line of span.lines) {
+				const wrapped = wordWrap(md.mdInline(line, mdColors), cols)
+				lines.push(...md.containWrappedAnsiStyle(wrapped, mdColors.link))
+			}
 		}
 	}
 	while (lines[0]?.trim() === '') lines.shift()
@@ -166,7 +170,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 
 const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.warning, error: colors.error, fork: colors.fork }
 
-function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string } {
+function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; linkBg?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.user

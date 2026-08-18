@@ -18,8 +18,6 @@ import {
 	M_BOLD_OFF,
 	M_ITALIC,
 	M_ITALIC_OFF,
-	M_UNDERLINE,
-	M_UNDERLINE_OFF,
 } from '../../utils/strings.ts'
 
 // ── ANSI style pairs ─────────────────────────────────────────────────────────
@@ -28,12 +26,14 @@ export interface MdColors {
 	bold: [on: string, off: string]
 	italic: [on: string, off: string]
 	code: [on: string, off: string]
+	link?: [on: string, off: string]
 }
 
 const DEFAULT_COLORS: MdColors = {
 	bold: [M_BOLD, M_BOLD_OFF],
 	italic: [M_ITALIC, M_ITALIC_OFF],
 	code: ['', ''],
+	link: [M_BOLD, M_BOLD_OFF],
 }
 
 // ── Block-level: split into spans ────────────────────────────────────────────
@@ -160,12 +160,13 @@ function inlineSpans(s: string, c: MdColors): string {
 	})
 
 	s = emphasis(s, c)
+	const linkStyle = c.link ?? [M_BOLD, M_BOLD_OFF]
 
 	// Labels can contain emphasis and code placeholders. Restore links first so
 	// the final code pass also reaches placeholders inside labels.
 	s = s.replace(/\x00L(\d+)\x00/g, (_, rawIndex) => {
 		const link = links[+rawIndex]!
-		return `\x1b]8;;${link.url}\x07${M_UNDERLINE}${emphasis(link.label, c)}${M_UNDERLINE_OFF}\x1b]8;;\x07`
+		return `\x1b]8;;${link.url}\x07${linkStyle[0]}${emphasis(link.label, c)}${linkStyle[1]}\x1b]8;;\x07`
 	})
 	return s.replace(/\x00C(\d+)\x00/g, (_, i) => codes[+i]!)
 }
@@ -313,7 +314,8 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 		const out: string[] = []
 		for (const line of lines.length > 0 ? lines : ['']) {
 			const wrapped = visLen(line) <= colWidth ? [line] : wordWrap(line, colWidth)
-			out.push(...resolveMarkers(containWrappedAnsiStyle(wrapped, colors?.code)))
+			const contained = containWrappedAnsiStyle(containWrappedAnsiStyle(wrapped, colors?.code), colors?.link)
+			out.push(...resolveMarkers(contained))
 		}
 		return out.length > 0 ? out : ['']
 	}
@@ -349,4 +351,4 @@ function mdTable(lines: string[], width: number, colors?: MdColors): string[] {
 
 // ── Namespace ────────────────────────────────────────────────────────────────
 
-export const md = { mdSpans, mdInline, mdTable }
+export const md = { mdSpans, mdInline, mdTable, containWrappedAnsiStyle }

@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test'
-import { md } from './md.ts'
+import { md, type MdColors } from './md.ts'
 import {
 	visLen,
 	hardWrap,
@@ -8,8 +8,6 @@ import {
 	M_BOLD_OFF,
 	M_ITALIC,
 	M_ITALIC_OFF,
-	M_UNDERLINE,
-	M_UNDERLINE_OFF,
 } from '../../utils/strings.ts'
 
 // mdInline outputs PUA marker chars, not raw ANSI.
@@ -18,11 +16,16 @@ const B = M_BOLD,
 	B_OFF = M_BOLD_OFF
 const I = M_ITALIC,
 	I_OFF = M_ITALIC_OFF
-const U = M_UNDERLINE,
-	U_OFF = M_UNDERLINE_OFF
+const LINK_COLORS: MdColors = {
+	bold: [M_BOLD, M_BOLD_OFF],
+	italic: [M_ITALIC, M_ITALIC_OFF],
+	code: ['', ''],
+	link: ['<link>', '</link>'],
+}
+
 /** Strip ANSI escapes AND marker chars for plain-text assertions. */
 function strip(s: string): string {
-	return s.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\uE000-\uE005]/g, '')
+	return s.replace(/\x1b\[[0-9;]*m/g, '').replace(/[\uE000-\uE003]/g, '')
 }
 
 // ── mdInline ─────────────────────────────────────────────────────────────────
@@ -92,15 +95,15 @@ test('mdInline: multiple bold spans', () => {
 
 test('mdInline: links render their label as an OSC 8 hyperlink', () => {
 	const url = 'https://example.com/docs'
-	expect(md.mdInline(`Read [the docs](${url}).`)).toBe(
-		`Read \x1b]8;;${url}\x07${U}the docs${U_OFF}\x1b]8;;\x07.`,
+	expect(md.mdInline(`Read [the docs](${url}).`, LINK_COLORS)).toBe(
+		`Read \x1b]8;;${url}\x07<link>the docs</link>\x1b]8;;\x07.`,
 	)
 })
 
 test('mdInline: formatting works inside link labels', () => {
 	const url = 'https://example.com'
-	expect(md.mdInline(`[**important**](${url})`)).toBe(
-		`\x1b]8;;${url}\x07${U}${B}important${B_OFF}${U_OFF}\x1b]8;;\x07`,
+	expect(md.mdInline(`[**important**](${url})`, LINK_COLORS)).toBe(
+		`\x1b]8;;${url}\x07<link>${B}important${B_OFF}</link>\x1b]8;;\x07`,
 	)
 })
 

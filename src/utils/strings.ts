@@ -300,16 +300,12 @@ export const M_BOLD = '\uE000'
 export const M_BOLD_OFF = '\uE001'
 export const M_ITALIC = '\uE002'
 export const M_ITALIC_OFF = '\uE003'
-export const M_UNDERLINE = '\uE004'
-export const M_UNDERLINE_OFF = '\uE005'
 
 const MARKER_ANSI: Record<string, string> = {
 	[M_BOLD]: '\x1b[1m',
 	[M_BOLD_OFF]: '\x1b[22m',
 	[M_ITALIC]: '\x1b[3m',
 	[M_ITALIC_OFF]: '\x1b[23m',
-	[M_UNDERLINE]: '\x1b[4m',
-	[M_UNDERLINE_OFF]: '\x1b[24m',
 }
 
 /** Convert style markers to ANSI escapes, ensuring each line is
