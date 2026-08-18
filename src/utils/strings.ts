@@ -141,6 +141,21 @@ export function visLen(s: string, startColumn = 0): number {
 	return n - startColumn
 }
 
+/** Keep OSC 8 links self-contained so differential repaints cannot leak a link
+ * into adjacent terminal rows. The returned rows retain the same visible text. */
+function containOsc8Links(lines: string[]): string[] {
+	let active = ''
+	const close = '\x1b]8;;\x07'
+	const out: string[] = []
+	for (const source of lines) {
+		let line = active ? `\x1b]8;;${active}\x07${source}` : source
+		for (const match of line.matchAll(/\x1b\]8;;([^\x07]*)\x07/g)) active = match[1] ?? ''
+		if (active) line += close
+		out.push(line)
+	}
+	return out
+}
+
 /** Word-wrap an ANSI string. Walks codepoints, skips escapes, breaks at word boundaries. */
 export function wordWrap(text: string, width: number): string[] {
 	if (width <= 0) return text.split('\n')
@@ -154,6 +169,7 @@ export function wordWrap(text: string, width: number): string[] {
 			wordStart = 0,
 			lineStart = 0,
 			esc = false,
+			osc = false,
 			wrappedTrailingSpace = false
 		for (let i = 0; i < raw.length; ) {
 			const cp = raw.codePointAt(i)!
@@ -165,7 +181,17 @@ export function wordWrap(text: string, width: number): string[] {
 				continue
 			}
 			if (esc) {
-				if (cp === 0x6d) esc = false
+				if (cp === 0x5d) {
+					osc = true
+					esc = false
+				} else if (cp !== 0x5b && cp >= 0x40 && cp <= 0x7e) {
+					esc = false
+				}
+				i += cl
+				continue
+			}
+			if (osc) {
+				if (cp === 0x07) osc = false
 				i += cl
 				continue
 			}
@@ -184,7 +210,7 @@ export function wordWrap(text: string, width: number): string[] {
 		if (lineStart < raw.length) out.push(raw.slice(lineStart))
 		else if (wrappedTrailingSpace) out.push('')
 	}
-	return out
+	return containOsc8Links(out)
 }
 
 /** Clip string to fit within max visual width, adding '…' if truncated. ANSI-aware. */

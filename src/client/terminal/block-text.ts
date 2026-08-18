@@ -150,12 +150,21 @@ function osc8(url: string, label: string): string {
 	return `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`
 }
 
+function insideOsc8Link(line: string, index: number): boolean {
+	const start = line.lastIndexOf('\x1b]8;;', index)
+	if (start < 0) return false
+	const end = line.indexOf('\x07', start)
+	if (end < 0 || index < end) return true
+	return line.slice(start + 5, end) !== ''
+}
+
 function hyperlinkUrls(lines: string[], cols: number): string[] {
 	const spans: LinkSpan[] = []
 	for (let i = 0; i < lines.length; i++) {
 		URL_RE.lastIndex = 0
 		let match: RegExpExecArray | null
 		while ((match = URL_RE.exec(lines[i]!))) {
+			if (insideOsc8Link(lines[i]!, match.index)) continue
 			pushUrlSpans(spans, lines, i, match.index, match.index + match[0].length, cols)
 		}
 	}

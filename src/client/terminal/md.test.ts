@@ -86,6 +86,30 @@ test('mdInline: multiple bold spans', () => {
 	expect(md.mdInline('**a** and **b**')).toBe(`${B}a${B_OFF} and ${B}b${B_OFF}`)
 })
 
+test('mdInline: links render their label as an OSC 8 hyperlink', () => {
+	const url = 'https://example.com/docs'
+	expect(md.mdInline(`Read [the docs](${url}).`)).toBe(
+		`Read \x1b]8;;${url}\x07the docs\x1b]8;;\x07.`,
+	)
+})
+
+test('mdInline: formatting works inside link labels', () => {
+	const url = 'https://example.com'
+	expect(md.mdInline(`[**important**](${url})`)).toBe(
+		`\x1b]8;;${url}\x07${B}important${B_OFF}\x1b]8;;\x07`,
+	)
+})
+
+test('mdInline: pasted image placeholders stay unchanged', () => {
+	expect(md.mdInline('See [/tmp/hal/images/abc123.png]')).toBe('See [/tmp/hal/images/abc123.png]')
+})
+
+test('mdInline: non-web and malformed links stay unchanged', () => {
+	expect(md.mdInline('[run](javascript:alert(1)) and [broken](https://example.com')).toBe(
+		'[run](javascript:alert(1)) and [broken](https://example.com',
+	)
+})
+
 // ── mdSpans ──────────────────────────────────────────────────────────────────
 
 test('mdSpans: text only', () => {

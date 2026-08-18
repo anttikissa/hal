@@ -37,3 +37,13 @@ test('wrapping and clipping measure literal tabs at their displayed width', () =
 	expect(hardWrap('abc\tX', 4)).toEqual(['abc\t', 'X'])
 	expect(clipVisual('ab\tX', 4)).toBe('ab…')
 })
+
+test('word wrap contains OSC 8 hyperlinks within each visual line', () => {
+	const url = 'https://example.com'
+	const open = `\x1b]8;;${url}\x07`
+	const close = '\x1b]8;;\x07'
+	expect(wordWrap(`${open}abcdefghij${close}`, 5)).toEqual([
+		`${open}abcde${close}`,
+		`${open}fghij${close}`,
+	])
+})

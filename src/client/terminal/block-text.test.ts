@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { blocks, type Block } from './blocks.ts'
 import { colors } from './colors.ts'
 import { visLen } from '../../utils/strings.ts'
+import { blockText } from './block-text.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -28,6 +29,22 @@ test('styled wrapped URLs keep ANSI sequences out of OSC 8 targets', () => {
 
 	expect(targets.length).toBeGreaterThan(1)
 	for (const target of targets) expect(target).toBe(url)
+})
+
+test('wrapped Markdown links keep their target hidden and clickable on every line', () => {
+	const url = 'https://example.com/reference'
+	const label = 'read this detailed reference before continuing'
+	const lines = blocks.renderBlock({ type: 'assistant', text: `[${label}](${url})` }, 24)
+	const rendered = lines.join('\n')
+	const targets = Array.from(rendered.matchAll(/\x1b\]8;;(.*?)\x07/g), (match) => match[1]!).filter(Boolean)
+	const plain = blockText.stripAnsiSequences(rendered)
+
+	expect(targets.length).toBeGreaterThan(1)
+	for (const target of targets) expect(target).toBe(url)
+	expect(plain.replace(/\s+/g, ' ')).toContain(label)
+	expect(plain).not.toContain(url)
+	expect(plain).not.toContain(`[${label}]`)
+	for (const line of lines) expect(visLen(line)).toBeLessThanOrEqual(24)
 })
 
 test('tool output strips ANSI escapes but keeps other control bytes visible', () => {

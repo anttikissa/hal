@@ -1,7 +1,7 @@
 // Mini markdown → ANSI renderer for LLM output.
 //
 // Block-level: ```code fences```, | tables |
-// Inline: **bold**, *italic*, `code`, # headers
+// Inline: **bold**, *italic*, `code`, [links](https://example.com), # headers
 //
 // Design: parse first (mdSpans), render second (mdInline/mdTable).
 // The caller (render.ts) decides word-wrapping and layout per span type:
@@ -103,7 +103,7 @@ function mdSpans(text: string): MdSpan[] {
 
 // ── Inline formatting ────────────────────────────────────────────────────────
 
-/** Apply inline markdown: **bold**, *italic*, `code`, # headers.
+/** Apply inline markdown: **bold**, *italic*, `code`, # headers, links.
  *  Supports backslash-escaped literal markdown markers like \* and \`. */
 function mdInline(line: string, colors?: MdColors): string {
 	const c = colors ?? DEFAULT_COLORS
@@ -111,7 +111,7 @@ function mdInline(line: string, colors?: MdColors): string {
 	const ph = (i: number) => `\x00E${i}\x00`
 
 	// Code spans come first because Markdown treats backslashes in them literally.
-	line = line.replace(/`[^`\n]+`|\\([\\`*#])/g, (match, marker) => {
+	line = line.replace(/`[^`\n]+`|\\([\\`*#\[\]()])/g, (match, marker) => {
 		if (!marker) return match
 		const i = escaped.length
 		escaped.push(marker)
@@ -124,37 +124,48 @@ function mdInline(line: string, colors?: MdColors): string {
 	return rendered.replace(/\x00E(\d+)\x00/g, (_, i) => escaped[+i]!)
 }
 
+function emphasis(s: string, c: MdColors): string {
+	s = s.replace(/\*\*(.+?)\*\*/g, `${c.bold[0]}$1${c.bold[1]}`)
+	return s.replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, `${c.italic[0]}$1${c.italic[1]}`)
+}
+
 function inlineSpans(s: string, c: MdColors): string {
-	// Step 1: Extract code spans into numbered placeholders so that
-	// bold/italic regexes can't see characters inside backticks.
-	// E.g. `state/sessions/*/foo` won't trigger italic on the *.
+	// Extract code and links before emphasis so markdown-looking characters in
+	// their contents cannot affect surrounding text.
 	const codes: string[] = []
-	const ph = (i: number) => `\x00C${i}\x00`
+	const codePh = (i: number) => `\x00C${i}\x00`
 
 	// **`bold code`** → bold only (no dim code style)
 	s = s.replace(/\*\*`([^`]+)`\*\*/g, (_, g) => {
 		const i = codes.length
 		codes.push(`${c.bold[0]}${g}${c.bold[1]}`)
-		return ph(i)
+		return codePh(i)
 	})
 
 	// `inline code`
 	s = s.replace(/`([^`\n]+)`/g, (_, g) => {
 		const i = codes.length
 		codes.push(`${c.code[0]}${g}${c.code[1]}`)
-		return ph(i)
+		return codePh(i)
 	})
 
-	// **bold**
-	s = s.replace(/\*\*(.+?)\*\*/g, `${c.bold[0]}$1${c.bold[1]}`)
+	const links: Array<{ label: string; url: string }> = []
+	const linkPh = (i: number) => `\x00L${i}\x00`
+	s = s.replace(/(?<!!)\[([^\]\n]+)\]\((https?:\/\/[^\s)\x00-\x1f]+)\)/g, (_, label, url) => {
+		const i = links.length
+		links.push({ label, url })
+		return linkPh(i)
+	})
 
-	// *italic* — but not **bold** stars (negative lookbehind/lookahead)
-	s = s.replace(/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/g, `${c.italic[0]}$1${c.italic[1]}`)
+	s = emphasis(s, c)
 
-	// Step 2: Restore code span placeholders
-	s = s.replace(/\x00C(\d+)\x00/g, (_, i) => codes[+i]!)
-
-	return s
+	// Labels can contain emphasis and code placeholders. Restore links first so
+	// the final code pass also reaches placeholders inside labels.
+	s = s.replace(/\x00L(\d+)\x00/g, (_, rawIndex) => {
+		const link = links[+rawIndex]!
+		return `\x1b]8;;${link.url}\x07${emphasis(link.label, c)}\x1b]8;;\x07`
+	})
+	return s.replace(/\x00C(\d+)\x00/g, (_, i) => codes[+i]!)
 }
 
 // ── Table formatting ─────────────────────────────────────────────────────────
