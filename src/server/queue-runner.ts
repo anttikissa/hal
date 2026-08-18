@@ -71,7 +71,7 @@ async function runNextQueuedPrompt(sessionId: string, quiet = true): Promise<boo
 		return false
 	}
 	promptQueue.setHeld(sessionId, false)
-	await runtime.startPromptCommand(sessionId, next.text, undefined, next.displayText ?? next.text)
+	await runtime.startPromptCommand(sessionId, next.text, next.source, next.displayText ?? next.text, undefined, next.sourceTab)
 	return true
 }
 

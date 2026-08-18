@@ -598,20 +598,20 @@ test('enqueuePrompt stores prompts while session is working', async () => {
 })
 
 
-test('drained queued prompts keep raw text so slash commands stay commands', async () => {
+test('drained queued prompts retain their source and raw command text', async () => {
 	const sessionId = `test-queue-raw-${Date.now().toString(36)}`
 	const calls: any[] = []
 	const origHandlePrompt = runtime.handlePrompt
-
 	try {
-		runtime.handlePrompt = async (id, text, label, source, displayText) => {
-			calls.push({ id, text, label, source, displayText })
+		runtime.handlePrompt = async (id, text, label, source, displayText, _pending, sourceTab) => {
+			calls.push({ id, text, label, source, displayText, sourceTab })
 		}
 		promptQueue.append(sessionId, {
 			text: '/rename after queue',
 			source: '04-sender',
 			displayText: '/rename after queue',
 			createdAt: '2026-05-20T00:00:00.000Z',
+			sourceTab: 4,
 		})
 
 		expect(await queueRunner.runNextQueuedPrompt(sessionId, false)).toBe(true)
@@ -620,8 +620,9 @@ test('drained queued prompts keep raw text so slash commands stay commands', asy
 			id: sessionId,
 			text: '/rename after queue',
 			label: undefined,
-			source: undefined,
+			source: '04-sender',
 			displayText: '/rename after queue',
+			sourceTab: 4,
 		}])
 	} finally {
 		runtime.handlePrompt = origHandlePrompt
