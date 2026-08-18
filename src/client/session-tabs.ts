@@ -30,6 +30,7 @@ function apply(items: SharedSessionInfo[], preferredSession: string, ctx: any): 
 			existing.model = s.model || existing.model
 			existing.currentLog = s.currentLog || existing.currentLog
 			existing.attention = s.attention
+			existing.continuation = s.continuation
 			newTabs.push(existing)
 		} else {
 			openedSessionId = s.id

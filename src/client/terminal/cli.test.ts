@@ -812,6 +812,7 @@ test('enter on empty paused tab sends continue', () => {
 	client.state.focusedTabIndex = 0
 	prompt.clear()
 	client.state.working.clear()
+	client.state.tabs[0]!.continuation = 'continue'
 	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {
@@ -820,6 +821,7 @@ test('enter on empty paused tab sends continue', () => {
 		expect(commands).toEqual([{ type: 'continue', sessionId: 's1' }])
 	} finally {
 		clientTransport.io.appendCommand = origAppendCommand
+		client.state.working.delete('s1')
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
 		client.state.focusedTabIndex = origFocusedTab
@@ -864,6 +866,7 @@ test('enter on empty error tab hides retry action immediately', () => {
 	client.state.focusedTabIndex = 0
 	prompt.clear()
 	client.state.working.clear()
+	client.state.tabs[0]!.continuation = 'retry'
 	clientTransport.io.appendCommand = (command) => { commands.push(command) }
 
 	try {

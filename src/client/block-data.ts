@@ -101,7 +101,7 @@ function historyToBlocks(
 				})
 				break
 			case 'log':
-				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'log', text: entry.text, ts, dimmed, usageBars: entry.usageBars, ...(entry.retryable === false ? { retryable: false as const } : {}) })
+				result.push({ type: entry.level === 'error' ? 'error' : entry.level === 'warning' ? 'warning' : 'log', text: entry.text, ts, dimmed, usageBars: entry.usageBars })
 				break
 			case 'info':
 				result.push({ type: 'info', text: entry.text, ts, dimmed, usageBars: entry.usageBars })

@@ -2,7 +2,7 @@
 // Display-agnostic: a terminal CLI or web UI can drive this.
 
 import { clientTransport } from './transport.ts'
-import type { SharedSessionInfo, SharedState } from '../common/ipc.ts'
+import type { ContinuationAction, SharedSessionInfo, SharedState } from '../common/ipc.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { clientBackend } from './backend.ts'
 import { historyProjection } from '../common/history-projection.ts'
@@ -12,8 +12,6 @@ import { liveEventBlocks, type LiveEvent } from '../common/live-event-blocks.ts'
 import { sessionLoader } from './session-loader.ts'
 import { clientTabs } from './tabs.ts'
 import { clientCommands, type ClientCommandType } from './commands.ts'
-import { continuation } from './continuation.ts'
-import type { ContinueAction } from './continuation.ts'
 import { clientHistory } from './history.ts'
 import { clientEvents } from './events.ts'
 import { clientPersistence } from './persistence.ts'
@@ -52,6 +50,7 @@ export interface Tab {
 	// Generation finished on a non-focused tab — show ✓ until user switches to it
 	doneUnseen: boolean
 	attention?: 'new'
+	continuation?: ContinuationAction
 	// Bumped whenever history contents change. The renderer uses this to
 	// invalidate cached line counts when a block grows in place.
 	historyVersion: number
@@ -520,11 +519,12 @@ function sendCommand(type: ClientCommandType, text?: string, displayText?: strin
 }
 
 
-function continueActionForTab(tab: Tab | null): ContinueAction | false {
-	return continuation.actionForTab(tab, tab ? (state.working.get(tab.sessionId) ?? false) : false)
+function continueActionForTab(tab: Tab | null): ContinuationAction | false {
+	if (!tab || state.working.get(tab.sessionId)) return false
+	return tab.continuation ?? false
 }
 
-function continueActionForCurrentTurn(): ContinueAction | false {
+function continueActionForCurrentTurn(): ContinuationAction | false {
 	return continueActionForTab(currentTab())
 }
 
@@ -537,6 +537,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const snapshot = sessionLoader.load(info)
 	const tab = makeTab(snapshot.id, snapshot.name, { cwd: snapshot.cwd, model: snapshot.model, currentLog: snapshot.currentLog })
 	tab.title = info.name
+	tab.continuation = info.continuation
 	tab.rawHistory = snapshot.history
 	tab.parentEntryCount = snapshot.parentEntryCount
 	tab.lastActiveTs = snapshot.lastActiveTs
@@ -778,9 +779,7 @@ function addBlockToTab(sessionId: string | null, block: Block): void {
 	onChange(false)
 }
 
-function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log', retryable?: boolean): void {
-	const block: any = { type, text, ts: Date.now() }
-	if (type === 'error' && retryable === false) block.retryable = false
-	queueLocalBlock(block)
+function addEntry(text: string, type: 'log' | 'info' | 'warning' | 'error' = 'log'): void {
+	queueLocalBlock({ type, text, ts: Date.now() })
 }
 

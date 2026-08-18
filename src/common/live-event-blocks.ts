@@ -59,7 +59,6 @@ export interface LiveErrorBlock extends LiveBlockBase {
 	text: string
 	blobId?: string
 	sessionId?: string
-	retryable?: false
 }
 
 export interface LiveForkBlock extends LiveBlockBase {
@@ -131,7 +130,6 @@ export interface InfoEvent extends LiveEventBase {
 	level?: 'info' | 'warning' | 'error'
 	ui?: 'notice'
 	usageBars?: boolean
-	retryable?: boolean
 }
 
 export interface ResponseEvent extends LiveEventBase {
@@ -275,7 +273,6 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		const type = liveEventBlocks.infoBlockType(event)
 		if (type === 'error') {
 			const block: LiveErrorBlock = { type, text: event.text }
-			if (event.retryable === false) block.retryable = false
 			if (ts !== undefined) block.ts = ts
 			return liveEventBlocks.appendBlock(closed, block)
 		}

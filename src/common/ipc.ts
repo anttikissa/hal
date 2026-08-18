@@ -1,5 +1,7 @@
 import type { VersionStatus } from './protocol.ts'
 
+export type ContinuationAction = 'continue' | 'retry'
+
 // Browser-safe snapshot stored by the file IPC transport and exposed to clients.
 // Transport implementations own serialization and delivery, not these contracts.
 export interface SharedSessionInfo {
@@ -11,6 +13,7 @@ export interface SharedSessionInfo {
 	cwd: string
 	model?: string
 	currentLog?: string
+	continuation?: ContinuationAction
 	attention?: 'new'
 }
 

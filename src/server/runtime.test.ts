@@ -1477,27 +1477,6 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 	}
 })
 
-
-test('emitInfo persists retryable:false so Enter does not retry a command error after restart', () => {
-	const sessionId = `test-retryable-${Date.now().toString(36)}`
-	const origAppendEvent = ipc.appendEvent
-	try {
-		ipc.appendEvent = (() => {}) as typeof ipc.appendEvent
-		sessions.createSession(sessionId, {
-			id: sessionId,
-			createdAt: '2026-05-20T00:00:00.000Z',
-			currentLog: 'history.asonl',
-			workingDir: '/tmp',
-			model: 'openai/gpt-5.5',
-		})
-		runtime.emitInfo(sessionId, '/todo: Usage: /todo <item>', 'error', undefined, false)
-		expect(sessions.loadAllHistory(sessionId).at(-1)).toMatchObject({ type: 'log', level: 'error', retryable: false })
-	} finally {
-		ipc.appendEvent = origAppendEvent
-		sessions.deleteSession(sessionId)
-	}
-})
-
 test('continuing a session whose last turn completed does not call the provider', async () => {
 	const sessionId = `test-continue-completed-${Date.now().toString(36)}`
 	const origRunAgentLoop = agentLoop.runAgentLoop
@@ -1522,7 +1501,7 @@ test('continuing a session whose last turn completed does not call the provider'
 			{ type: 'assistant', text: 'hi', ts: '2026-05-20T00:00:02.000Z' },
 			{ type: 'turn_end', status: 'completed', ts: '2026-05-20T00:00:03.000Z' },
 			// Command output after the turn is incidental activity, not new turn content.
-			{ type: 'log', text: '/todo: Usage: /todo <item>', level: 'error', retryable: false, ts: '2026-05-20T00:00:04.000Z' },
+			{ type: 'log', text: '/todo: Usage: /todo <item>', level: 'error', ts: '2026-05-20T00:00:04.000Z' },
 		])
 
 		runtime.handleCommand({ type: 'continue', sessionId })

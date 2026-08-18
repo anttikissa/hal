@@ -13,6 +13,7 @@ import { liveEventBlocks, type LiveBlock, type LiveEvent } from '../common/live-
 import type { PartialTokenUsage } from '../common/protocol.ts'
 import type { SessionMeta } from '../common/session.ts'
 import { models } from '../common/models.ts'
+import { continuation } from './session/continuation.ts'
 
 export type { EntryIdentity, HistoryEntry, UserPart } from '../common/history.ts'
 export type { SessionMeta } from '../common/session.ts'
@@ -108,7 +109,7 @@ const historyTopLevelKeys = new Set([
 	'blobId', 'signature', 'model', 'thinkingEffort',
 	'usage', 'abortText', 'synthetic', 'syntheticKind',
 	'toolId', 'toolIds', 'name', 'input', 'output', 'isError', 'cwd', 'reason',
-	'level', 'retryable', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
+	'level', 'visibility', 'ui', 'usageBars', 'parent', 'child', 'log', 'from', 'to',
 ])
 
 function stripUndefined(value: unknown): unknown {
@@ -291,6 +292,7 @@ function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, i
 		cwd: meta.workingDir ?? process.cwd(),
 		model: meta.model ?? models.defaultModel(),
 		currentLog: meta.currentLog ?? DEFAULT_LOG,
+		continuation: continuation.actionForHistory(loadAllHistory(meta.id)) || undefined,
 		attention: meta.attention,
 	}
 }

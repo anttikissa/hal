@@ -85,12 +85,3 @@ test('historyToBlocks keeps rebase lineage out of the transcript', () => {
 
 	expect(result).toEqual([expect.objectContaining({ type: 'user', text: 'hello' })])
 })
-
-
-test('historyToBlocks keeps command errors non-retryable after a restart', () => {
-	const result = blockData.historyToBlocks([
-		{ type: 'log', text: '/todo: Usage: /todo <item>', level: 'error', retryable: false },
-	] as any, 's1')
-
-	expect(result.at(-1)).toMatchObject({ type: 'error', retryable: false })
-})

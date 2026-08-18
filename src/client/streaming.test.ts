@@ -67,20 +67,6 @@ describe('client streaming blocks', () => {
 		expect(client.currentTab()!.history[0]).toMatchObject({ type: 'user', text: 'Steer', status: 'steering' })
 	})
 
-	test('command error info events are not retryable', () => {
-		client.handleEvent({
-			type: 'info',
-			sessionId: 's1',
-			level: 'error',
-			text: 'Name may contain letters, digits, spaces, dot, dash, and underscore only.',
-			retryable: false,
-			createdAt: '2026-04-05T17:31:00.000Z',
-		})
-
-		expect(client.currentTab()!.history.at(-1)).toMatchObject({ type: 'error', retryable: false })
-		expect(client.continueActionForCurrentTurn()).toBe(false)
-	})
-
 	test('thinking stream becomes a real block with blob metadata and survives stream end', () => {
 		const createdAt = '2026-04-05T17:31:00.000Z'
 		client.handleEvent({

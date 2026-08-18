@@ -18,6 +18,8 @@ import { context } from './runtime/system-prompt.ts'
 import { apiMessages } from './session/api-messages.ts'
 import { attachments } from './session/attachments.ts'
 import { sessionIds } from './session/ids.ts'
+import { continuation } from './session/continuation.ts'
+import type { ContinuationAction, SharedState } from '../common/ipc.ts'
 import { replay } from './session/replay.ts'
 import { openaiUsage } from './openai-usage.ts'
 import { toolRegistry } from './tools/tool.ts'
@@ -99,14 +101,24 @@ function formatCommandError(text: string, error: string): string {
 
 function broadcastSessions(): void { tabs.syncSharedState(); restartPromptWatch() }
 
-function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', retryable?: boolean, usageBars?: true): void {
+function continueActionForSession(sessionId: string): ContinuationAction | false {
+	return continuation.actionForHistory(sessionStore.loadAllHistory(sessionId))
+}
+
+function updateSharedTurnStatus(shared: SharedState, sessionId: string, working: boolean): void {
+	if (working) shared.working[sessionId] = true
+	else delete shared.working[sessionId]
+	const info = shared.sessions.find((item) => item.id === sessionId)
+	if (!info) return
+	info.continuation = undefined
+	if (!working) info.continuation = continueActionForSession(sessionId) || undefined
+}
+
+function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'info', ui?: 'notice', usageBars?: true): void {
 	const createdAt = new Date().toISOString()
 	const entry: HistoryEntry = ui === 'notice'
 		? { type: 'info', text, ts: createdAt, ui, ...(usageBars ? { usageBars } : {}) }
-		// retryable must be persisted too: after a restart the client rebuilds
-		// blocks from history, and without it a command-usage error would offer
-		// "Enter: retry" and re-run a turn that already finished.
-		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}), ...(retryable === false ? { retryable: false as const } : {}), ...(usageBars ? { usageBars } : {}) }
+		: { type: 'log', text, ts: createdAt, ...(level === 'error' ? { level: 'error' as const } : {}), ...(usageBars ? { usageBars } : {}) }
 	sessionStore.appendHistorySync(sessionId, [entry])
 	ipc.appendEvent({
 		id: protocol.eventId(),
@@ -114,7 +126,6 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 		text,
 		level,
 		...(ui ? { ui } : {}),
-		...(retryable === false ? { retryable: false } : {}),
 		...(usageBars ? { usageBars } : {}),
 		sessionId,
 		createdAt,
@@ -295,10 +306,10 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 			if (cmdResult.syntheticKind) {
 				modelNotices.emitSyntheticAssistant(sessionId, cmdResult.output, cmdResult.syntheticKind, sessionState.model ?? models.defaultModel())
 			} else {
-				emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui, undefined, cmdResult.usageBars)
+				emitInfo(sessionId, cmdResult.output, 'info', cmdResult.ui, cmdResult.usageBars)
 			}
 		}
-		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error', undefined, false)
+		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error')
 		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
 		return
 	}
@@ -459,9 +470,7 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 	// interruption and inject synthetic [interrupted] results.
 	const ac = new AbortController()
 	state.pendingToolRuns.set(sessionId, ac)
-	ipc.updateState((shared) => {
-		shared.working[sessionId] = true
-	})
+	ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, true))
 	try {
 		const blobMap = new Map<string, string>()
 		const calls = pending.toolCalls.map((call) => {
@@ -474,37 +483,24 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 		return true
 	} finally {
 		if (state.pendingToolRuns.get(sessionId) === ac) state.pendingToolRuns.delete(sessionId)
-		ipc.updateState((shared) => {
-			delete shared.working[sessionId]
-		})
+		ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, false))
 	}
 }
 
-// A generation with no new prompt only makes sense when there is an unfinished
-// turn to resume. Otherwise the provider messages end with an assistant message,
-// which some providers reject outright (Anthropic: "does not support assistant
-// message prefill"). The last *completed* turn is the boundary: turns that ended
-// aborted or failed left work behind, so anything after that boundary is
-// something to continue from.
-function hasNothingToContinue(sessionId: string, entries: HistoryEntry[]): boolean {
-	if (sessionStore.findPendingTools(sessionId)) return false
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const entry = entries[i]!
-		if (entry.type === 'turn_end' && entry.status === 'completed') return true
-		if (entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result') return false
-	}
-	return true
-}
 
 async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number, label?: 'steering' | 'queued'): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
-	if (!text && hasNothingToContinue(sessionId, sessionStore.loadAllHistory(sessionId))) {
+	const continueAction = text ? false : continueActionForSession(sessionId)
+	if (!text && !continueAction) {
 		// Continue with no unfinished turn: the only remaining work is a queued
 		// prompt that the paused turn was holding back.
 		if (queueRunner.shouldDrainQueuedPrompt(sessionId, 'completed')) await queueRunner.runNextQueuedPrompt(sessionId)
-		else emitInfo(sessionId, 'Nothing to continue')
+		else {
+			ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, false))
+			emitInfo(sessionId, 'Nothing to continue')
+		}
 		return
 	}
 	const cwd = meta.workingDir ?? process.cwd()
@@ -537,6 +533,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		})
 	}
 	const messages = apiMessages.toProviderMessages(sessionId)
+	if (continueAction) continuation.bridgeAssistantTail(messages)
 	ipc.appendEvent({ type: 'stream-start', sessionId, createdAt: new Date().toISOString() })
 	let result: AgentLoopResult = 'failed'
 	try {
@@ -548,10 +545,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 			messages,
 			signal: pending?.controller.signal,
 			onStatus: async (working) => {
-				ipc.updateState((state) => {
-					if (working) state.working[sessionId] = true
-					else delete state.working[sessionId]
-				})
+				ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, working))
 			},
 		})
 	} catch (err: any) {
@@ -757,7 +751,7 @@ function handleCommand(cmd: Command): void {
 					const result = await whatSummary.run({ requesterSessionId: sessionId, target: cmd.target ?? '', targetIds: resolved.ok ? activityIds : undefined, openSessionIds: state.openSessionIds, persist: persistWhatResult })
 					if (result.renamed) broadcastSessions()
 				} catch (err) {
-					emitInfo(sessionId, `/what failed: ${errorMessage(err)}`, 'error', undefined, false)
+					emitInfo(sessionId, `/what failed: ${errorMessage(err)}`, 'error')
 				} finally {
 					for (const id of activityIds) {
 						if (!pendingWhatResults.has(id)) emitBackgroundActivity(id, 'summarizing', false)
@@ -948,7 +942,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 				handleCommand(cmd)
 			} catch (err: any) {
 				const sid = cmd.sessionId ?? state.openSessionIds[0]
-				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error', undefined, false)
+				if (sid) emitInfo(sid, `Command error: ${err?.message ?? String(err)}`, 'error')
 			}
 		}
 	})()

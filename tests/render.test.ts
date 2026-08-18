@@ -189,6 +189,7 @@ describe('render', () => {
 	test('help bar says enter continue on paused tabs with empty prompt', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
+		tab.continuation = 'continue'
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: continue')
 		expect(clean).not.toContain('press enter to continue')
@@ -198,6 +199,7 @@ describe('render', () => {
 	test('help bar says enter retry after errors', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
+		tab.continuation = 'retry'
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: retry')
 		expect(clean).not.toContain('press enter to retry')
@@ -208,6 +210,7 @@ describe('render', () => {
 		// was already running new tool calls.
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'timed out after 60000ms', ts: Date.now() })
+		tab.continuation = 'retry'
 		tab.history.push({ type: 'tool', toolId: 't1', name: 'read', input: {}, ts: Date.now() })
 		client.state.working.set(tab.sessionId, true)
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
@@ -218,6 +221,7 @@ describe('render', () => {
 	test('help bar says enter continue after max iteration stop', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'error', text: 'Hit max iterations (50). Stopping.', ts: Date.now() })
+		tab.continuation = 'continue'
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: continue')
 		expect(clean).not.toContain('enter: retry')
@@ -226,6 +230,7 @@ describe('render', () => {
 	test('continue hint matches enter behavior for whitespace-only prompts', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
+		tab.continuation = 'continue'
 		prompt.setText('   ')
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('enter: continue')
@@ -689,6 +694,7 @@ describe('render', () => {
 		colors.load()
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
+		tab.continuation = 'continue'
 		const originalIsVisible = cursor.isVisible
 		cursor.isVisible = () => true
 		try {
@@ -846,6 +852,7 @@ describe('render', () => {
 			createdAt: new Date(0).toISOString(),
 		})
 		client.state.working.delete('other')
+		client.state.tabs[1]!.continuation = 'continue'
 
 		expect(client.state.tabs[1]?.history[0]).toMatchObject({
 			type: 'error',
@@ -856,22 +863,22 @@ describe('render', () => {
 		cursor.isVisible = () => true
 		try {
 			const clean = stripAnsi(captureOutput(() => render.draw()))
-			const tabBar = clean.split('\n').find((line) => line.includes('2✗'))
+			const tabBar = clean.split('\n').find((line) => line.includes('2!'))
 			expect(tabBar).toBeDefined()
-			expect(tabBar).toContain('2✗')
+			expect(tabBar).toContain('2!')
 			expect(tabBar).not.toContain('2✓')
 		} finally {
 			cursor.isVisible = originalIsVisible
 		}
 	})
 
-	test('non-retryable command errors do not show alert indicators', () => {
+	test('command errors do not replace unseen done indicators', () => {
 		const tab = client.state.tabs[0]!
 		tab.doneUnseen = true
-		tab.history.push({ type: 'error', text: '/rename: Name may contain letters only.', retryable: false } as any)
+		tab.history.push({ type: 'error', text: '/rename: Name may contain letters only.' })
 
-		expect(renderStatus.tabIndicator(tab)).toEqual({ char: '', color: '', blinks: false })
-		expect(stripAnsi(renderStatus.tabLabel(tab, 0))).toBe('[1]')
+		expect(renderStatus.tabIndicator(tab).char).toBe('✓')
+		expect(stripAnsi(renderStatus.tabLabel(tab, 0))).toBe('[1✓]')
 	})
 
 	test('model picker popup draws over the normal frame', () => {
