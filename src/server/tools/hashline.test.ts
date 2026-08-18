@@ -110,6 +110,21 @@ describe('edit via hashline', () => {
 		rmSync(dir, { recursive: true, force: true })
 	}
 
+	test('does not apply Hal lint rules to an unconfigured TypeScript edit', async () => {
+		setup('console.log("before")\n')
+		file = join(dir, 'test.ts')
+		writeFileSync(file, 'console.log("before")\n')
+		const ref = `1:${hashLine('console.log("before")')}`
+
+		const result = await executeEdit(
+			{ path: file, operation: 'replace', start: ref, end: ref, new_content: 'console.log("after")' },
+			ctx,
+		)
+
+		expect(result).not.toContain('Oxlint check failed')
+		cleanup()
+	})
+
 	test('replace a single line', async () => {
 		setup('alpha\nbeta\ngamma\n')
 		const ref = `2:${hashLine('beta')}`

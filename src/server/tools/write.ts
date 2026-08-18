@@ -21,7 +21,7 @@ const MAX_OUTPUT_BYTES = 1_000_000
 const TRUNCATED_SUFFIX = '\n[… truncated]'
 const REPO_ROOT = resolve(import.meta.dir, '../../..')
 const TSC_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/tsc-file.ts')
-const OXLINT_CONFIG = resolve(REPO_ROOT, '.oxlintrc.json')
+const OXLINT_FILE_SCRIPT = resolve(REPO_ROOT, 'scripts/oxlint-file.ts')
 const textDecoder = new TextDecoder()
 
 function ensureParent(path: string): void {
@@ -81,9 +81,7 @@ function runTypecheckForEdit(path: string): string | null {
 function runLintForEdit(path: string): string | null {
 	if (!shouldTypecheckEditedPath(path)) return null
 
-	// Use the repo-local binary directly to avoid Bun's extra "error: oxlint exited"
-	// wrapper noise. Passing the file explicitly keeps this single-file and fast.
-	const proc = Bun.spawnSync(['./node_modules/.bin/oxlint', path, '--config', OXLINT_CONFIG], {
+	const proc = Bun.spawnSync(['bun', OXLINT_FILE_SCRIPT, path], {
 		cwd: REPO_ROOT,
 		stdin: 'ignore',
 		stdout: 'pipe',
@@ -94,7 +92,7 @@ function runLintForEdit(path: string): string | null {
 	const stdout = decodeOutput(proc.stdout).trim()
 	const stderr = decodeOutput(proc.stderr).trim()
 	const details = [stdout, stderr].filter(Boolean).join('\n')
-	const fallback = `oxlint exited ${proc.exitCode ?? 1}`
+	const fallback = `bun scripts/oxlint-file.ts exited ${proc.exitCode ?? 1}`
 	return truncateUtf8(details || fallback, MAX_OUTPUT_BYTES)
 }
 
