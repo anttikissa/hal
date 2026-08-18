@@ -54,7 +54,7 @@ function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' |
 		bold: [M_BOLD, M_BOLD_OFF],
 		italic: [M_ITALIC, M_ITALIC_OFF],
 		code: palette.code ? [palette.code, palette.fg] : [palette.fg, palette.fg],
-		link: palette.linkBg ? [`${palette.code ?? palette.fg}${palette.linkBg}`, `${palette.fg}${palette.bg}`] : undefined,
+		link: palette.linkBg ? [`${palette.linkFg ?? palette.code ?? palette.fg}${palette.linkBg}`, `${palette.fg}${palette.bg}`] : undefined,
 	}
 }
 
@@ -170,7 +170,7 @@ function bgLine(content: string, cols: number, bg: string): string {
 
 const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.warning, error: colors.error, fork: colors.fork }
 
-function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; linkBg?: string } {
+function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; linkFg?: string; linkBg?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.user

@@ -16,7 +16,7 @@
 	// fg colors assistant text. cursor colors the active HAL cursor while Hal is
 	// thinking/streaming or shown as a busy tab marker. cursorIdle colors the
 	// idle cursor after Hal has finished its final message.
-	// linkBg highlights Markdown link labels without fighting the terminal's hover underline.
+	// linkFg/linkBg style Markdown link labels without fighting the terminal's hover underline.
 	assistant: {
 		fg: ["$fgL", "$fgC", 55],
 		cursor: ["$fgL", "$fgC", 55],
@@ -24,6 +24,7 @@
 		bg: [0, 0, 55],
 		bold: [0.90, 0.06, 55],
 		code: [0.86, 0.04, 55],
+		linkFg: [0.83, 0.06, 55],
 		linkBg: [0.30, 0.05, 55],
 	},
 

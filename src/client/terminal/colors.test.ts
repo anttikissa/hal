@@ -98,6 +98,7 @@ test('colors.load exposes assistant HAL cursor colors from colors.ason', () => {
 	expect(colors.assistant.cursorIdle).toStartWith('\x1b[')
 	expect(colors.assistant.cursorIdle).not.toBe(colors.assistant.cursor)
 	expect(colors.assistant.linkBg).toStartWith('\x1b[48;2;')
+	expect(colors.assistant.linkFg).toStartWith('\x1b[38;2;')
 })
 
 
