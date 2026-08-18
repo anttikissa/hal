@@ -50,7 +50,6 @@ const state = {
 }
 
 const USER_PAUSED_TEXT = '[paused]'
-const RESUMING_TEXT = '[resuming]'
 const RESTARTED_TEXT = '[restarted]'
 const TAB_CLOSED_TEXT = 'Tab closed.'
 
@@ -144,17 +143,6 @@ function shouldAutoContinue(entries: HistoryEntry[]): boolean {
 		const entry = entries[i]!
 		if (entry.type === 'turn_end') return false
 		if (entry.type === 'log' && entry.text === RESTARTED_TEXT) return continuation.actionForHistory(entries.slice(0, i + 1)) !== false
-	}
-	return false
-}
-
-function shouldShowResumingNotice(sessionId: string): boolean {
-	for (const entry of sessionStore.loadHistory(sessionId).toReversed()) {
-		if (entry.type === 'log' && entry.text === RESUMING_TEXT) return false
-		if (entry.type === 'pending_tools' && entry.reason === 'soft-pause') return true
-		if (entry.type === 'turn_end' && entry.status === 'aborted' && !!entry.abortText) return true
-		if (entry.type === 'log' && (entry.text === USER_PAUSED_TEXT || entry.text === '[paused before local tools]' || entry.text.startsWith('[interrupted]'))) return true
-		if (entry.type !== 'log' && entry.type !== 'info') return false
 	}
 	return false
 }
@@ -398,7 +386,6 @@ async function continueTurn(sessionId: string, continuation: PendingContinuation
 	// Continuing resumes the paused turn that held the queue. If it completes,
 	// queued prompts should drain immediately instead of staying stuck behind
 	// the paused-turn safety hold.
-	if (shouldShowResumingNotice(sessionId)) emitInfo(sessionId, RESUMING_TEXT)
 	promptQueue.setHeld(sessionId, false)
 	await continuePendingTools(sessionId)
 	if (continuation.canceled) return

@@ -984,37 +984,6 @@ test('abort cancels a prompt before its agent controller is registered', async (
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })
-test('continue records a resuming notice after a paused turn', async () => {
-	const sessionId = `test-continue-resuming-${Date.now().toString(36)}`
-	const origRunAgentLoop = agentLoop.runAgentLoop
-	const origIsWorking = agentLoop.isWorking
-	const origOwnsHostLock = ipc.ownsHostLock
-	try {
-		ipc.ownsHostLock = () => true
-		agentLoop.isWorking = () => false
-		agentLoop.runAgentLoop = async () => 'completed'
-		sessions.createSession(sessionId, {
-			id: sessionId,
-			createdAt: '2026-05-20T00:00:00.000Z',
-			currentLog: 'history.asonl',
-			workingDir: '/tmp',
-			model: 'openai/gpt-5.5',
-		})
-		sessions.appendHistorySync(sessionId, [{ type: 'turn_end', status: 'aborted', abortText: '[paused]', ts: '2026-05-20T00:00:01.000Z' }])
-
-		runtime.handleCommand({ type: 'continue', sessionId })
-		await Bun.sleep(10)
-
-		const logs = sessions.loadHistory(sessionId).filter((entry) => entry.type === 'log').map((entry) => entry.text)
-		expect(logs).toContain('[resuming]')
-	} finally {
-		agentLoop.runAgentLoop = origRunAgentLoop
-		agentLoop.isWorking = origIsWorking
-		ipc.ownsHostLock = origOwnsHostLock
-		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
-	}
-})
-
 
 test('pending tools execute before provider replay can repair them as interrupted', async () => {
 	const sessionId = `test-pending-runtime-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`

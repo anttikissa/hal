@@ -139,6 +139,16 @@ test('multiword status notices also drop marker brackets', () => {
 	expect(lines[0]).not.toContain('[paused before local tools]')
 })
 
+test('status markers lose brackets inside mixed log groups', () => {
+	const lines = blocks.renderBlockGroup([
+		{ type: 'log', text: '[restarted]' },
+		{ type: 'log', text: 'Nothing to continue' },
+	], 80).map(stripAnsi)
+
+	expect(lines.join('\n')).toContain('Restarted')
+	expect(lines.join('\n')).not.toContain('[restarted]')
+})
+
 test('usage bar markers gain terminal color only when marked trusted', () => {
 	const bar = subscriptionUsage.usageBarMarker(50, 2)
 	expect(bar).not.toContain('\x1b[')

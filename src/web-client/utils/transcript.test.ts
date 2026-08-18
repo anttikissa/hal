@@ -27,3 +27,13 @@ test('history tool results merge into their call block', () => {
 		ts: Date.parse('2026-08-13T12:00:00.000Z'),
 	}])
 })
+
+test('status markers render as prose in history and live notices', () => {
+	const result = webTranscript.items({
+		session: { id: 's1', cwd: '/tmp' },
+		history: [{ type: 'log', text: '[restarted]' }],
+		live: [{ type: 'log', text: '[paused before local tools]' }],
+	})
+
+	expect(result.map((item) => item.text)).toEqual(['Restarted', 'Paused before local tools'])
+})

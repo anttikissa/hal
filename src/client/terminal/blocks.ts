@@ -5,6 +5,7 @@
 
 import { clipVisual, expandTabs, hardWrap, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, resolveMarkers, visLen, wordWrap } from '../../utils/strings.ts'
 import { models } from '../../common/models.ts'
+import { historyProjection } from '../../common/history-projection.ts'
 import { subscriptionUsage } from '../../common/subscription-usage.ts'
 import { time } from '../../utils/time.ts'
 import { terminalSubscriptionUsage } from './subscription-usage.ts'
@@ -39,6 +40,7 @@ function markdownSourceText(block: Exclude<Block, { type: 'tool' | 'user' | 'for
 			? blockText.stripAnsiSequences(block.text)
 			: block.text
 	if (block.type === 'log' && text.startsWith('Prompt queued')) text = text.slice(text.indexOf('\n') + 1)
+	if (block.type === 'log' || block.type === 'info') text = historyProjection.noticeText(text)
 	return blockText.sanitizeTerminalText(text)
 }
 
@@ -264,7 +266,7 @@ function inlineNoticeText(block: Block): string | undefined {
 	if (text.includes('`')) return undefined
 	if ((block.type === 'log' || block.type === 'info') && !marker) return undefined
 	if (visLen(text) > 50) return undefined
-	if (marker) return `${marker[1]!.slice(0, 1).toUpperCase()}${marker[1]!.slice(1)}`
+	if (marker) return historyProjection.noticeText(text)
 	return text
 }
 

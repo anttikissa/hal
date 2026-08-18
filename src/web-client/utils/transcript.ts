@@ -1,4 +1,5 @@
 import type { HistoryEntry } from '../../common/history.ts'
+import { historyProjection } from '../../common/history-projection.ts'
 import type { LiveBlock, LiveToolBlock } from '../../common/live-event-blocks.ts'
 import type { ClientSessionSnapshot } from '../../common/snapshots.ts'
 
@@ -81,9 +82,8 @@ function entryText(entry: TranscriptEntry): string {
 	}
 	if (entry.type === 'thinking') return entry.text ?? ''
 	if (entry.type === 'tool' || entry.type === 'tool_call' || entry.type === 'tool_result') return toolText(entry)
-	if (entry.type === 'assistant' || entry.type === 'info' || entry.type === 'log' || entry.type === 'warning' || entry.type === 'error') {
-		return typeof entry.text === 'string' ? entry.text : ''
-	}
+	if (entry.type === 'info' || entry.type === 'log') return historyProjection.noticeText(entry.text)
+	if (entry.type === 'assistant' || entry.type === 'warning' || entry.type === 'error' || entry.type === 'fork') return typeof entry.text === 'string' ? entry.text : ''
 	return ''
 }
 
@@ -95,7 +95,7 @@ function items(snapshot: ClientSessionSnapshot | null): RenderedTranscriptItem[]
 		if (text) result.push({ entry, text })
 	}
 	for (const entry of snapshot.live) {
-		const text = entry.type === 'tool' ? toolText(entry) : entry.text
+		const text = entryText(entry)
 		if (text) result.push({ entry, text })
 	}
 	return result

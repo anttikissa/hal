@@ -150,11 +150,11 @@ function replayEntries(sessionId: string, entries: HistoryEntry[], opts?: { mode
 	const tail = sessions.tailTurnState(entries)
 	const interrupted = tail.interruptedTools
 	if (tail.interrupted) {
-		let text = '[interrupted] Press Enter to continue'
+		let text = 'Interrupted. Press Enter to continue'
 		if (interrupted.length > 0) {
 			const names: string[] = []
 			for (const tool of interrupted) names.push(tool.name)
-			text = `[interrupted] during tools (${names.join(', ')}). Press Enter to continue`
+			text = `Interrupted during tools (${names.join(', ')}). Press Enter to continue`
 		}
 		blocks.push({ type: 'info', text })
 	}

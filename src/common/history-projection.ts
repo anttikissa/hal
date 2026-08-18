@@ -29,6 +29,12 @@ function userText(entry: Extract<HistoryEntry, { type: 'user' }>, opts: UserText
 	return parts.join(separator)
 }
 
+function noticeText(text: string): string {
+	const marker = text.match(/^\[([A-Za-z][^\]\n]*)\]$/)
+	if (!marker) return text
+	return marker[1]![0]!.toUpperCase() + marker[1]!.slice(1)
+}
+
 function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	const history: string[] = []
 	for (const entry of entries) {
@@ -44,4 +50,4 @@ function inputHistoryFromEntries(entries: HistoryEntry[]): string[] {
 	return history.slice(-200)
 }
 
-export const historyProjection = { userText, inputHistoryFromEntries }
+export const historyProjection = { userText, noticeText, inputHistoryFromEntries }
