@@ -54,7 +54,7 @@ function markdownColors(block: Extract<Block, { type: 'assistant' | 'thinking' |
 		bold: [M_BOLD, M_BOLD_OFF],
 		italic: [M_ITALIC, M_ITALIC_OFF],
 		code: palette.code ? [palette.code, palette.fg] : [palette.fg, palette.fg],
-		link: palette.linkBg ? [palette.linkBg, palette.bg] : undefined,
+		link: palette.linkBg ? [`${palette.bold ?? palette.fg}${palette.linkBg}`, `${palette.fg}${palette.bg}`] : undefined,
 	}
 }
 

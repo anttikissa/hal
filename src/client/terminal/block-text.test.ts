@@ -50,6 +50,7 @@ test('wrapped Markdown links keep their target hidden and clickable on every lin
 	for (const line of lines.filter((line) => line.includes(`\x1b]8;;${url}\x07`))) {
 		expect(line).toContain(linkBg)
 		expect(line).not.toContain('\x1b[4m')
+		expect(line).toContain(colors.assistant.bold)
 	}
 	expect(plain.replace(/\s+/g, ' ')).toContain(label)
 	expect(plain).not.toContain(url)
