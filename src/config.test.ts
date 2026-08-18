@@ -16,6 +16,12 @@ test('config-template.ason matches module config defaults', () => {
 	// environment that happens to run it.
 	defaults.log.level = template.log.level
 
+	// Terminal capture may contain private transcript text and is intentionally a
+	// local-only opt-in rather than an advertised install default.
+	expect(template.terminalOutput).toBeUndefined()
+	expect(defaults.terminalOutput).toEqual({ capture: false })
+	delete defaults.terminalOutput
+
 	expect(template).toEqual(defaults)
 })
 
