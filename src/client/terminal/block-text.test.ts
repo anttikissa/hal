@@ -8,18 +8,14 @@ function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
 }
 
-test('wrapped URLs use one OSC 8 link identity for every visual segment', () => {
+test('standalone URLs use one OSC 8 link and one logical line', () => {
 	const url = `https://claude.ai/oauth/authorize?client_id=${'a'.repeat(80)}`
 	const lines = blocks.renderBlock({ type: 'log', text: url }, 40)
-	const rendered = lines.join('\n')
-	const links = Array.from(rendered.matchAll(/\x1b\]8;id=([^;]+);(.*?)\x07/g), (match) => ({ id: match[1]!, target: match[2]! }))
+	const urlLines = lines.filter((line) => line.includes('claude.ai'))
 
-	expect(links.length).toBeGreaterThan(1)
-	for (const link of links) {
-		expect(link.id).toBe(links[0]!.id)
-		expect(link.target).toBe(url)
-	}
-	for (const line of lines) expect(visLen(line)).toBeLessThanOrEqual(40)
+	expect(urlLines).toHaveLength(1)
+	expect(urlLines[0]).toContain(`\x1b]8;;${url}\x07${url}\x1b]8;;\x07`)
+	expect(visLen(urlLines[0]!)).toBe(url.length)
 })
 
 test('styled wrapped URLs keep ANSI sequences out of OSC 8 targets', () => {

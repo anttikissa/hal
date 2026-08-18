@@ -76,6 +76,7 @@ function pushCodeWrapped(lines: string[], text: string, cols: number, mdColors: 
 function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinking' | 'log' | 'info' | 'warning' | 'error' }>, cols: number): string[] {
 	const lines: string[] = []
 	const mdColors = markdownColors(block)
+	const finished = !('streaming' in block && block.streaming)
 	for (const span of md.mdSpans(markdownSourceText(block))) {
 		if (span.type === 'code') {
 			for (const raw of span.lines) pushCodeWrapped(lines, raw, cols, mdColors, isTextCodeLang(span.lang))
@@ -83,6 +84,11 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 			lines.push(...md.mdTable(span.lines, cols, mdColors))
 		} else {
 			for (const line of span.lines) {
+				const standalone = finished && blockText.standaloneHyperlink(line)
+				if (standalone) {
+					lines.push(standalone)
+					continue
+				}
 				const wrapped = wordWrap(md.mdInline(line, mdColors), cols)
 				lines.push(...md.containWrappedAnsiStyle(wrapped, mdColors.link))
 			}
@@ -201,6 +207,11 @@ function padBlockLine(line: string): string {
 	return ` ${line}`
 }
 
+function bodyLine(line: string, fg: string, bg: string, cols: number, fullWidth = visLen(line) > cols - 2): string {
+	if (!fullWidth) return bgLine(`${fg}${padBlockLine(line)}`, cols, bg)
+	return `${bg}${fg}${line}\x1b[K${RESET_BG}`
+}
+
 function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | undefined, cols: number): void {
 	if (!bg || bgIsBlack) return
 	lines.unshift(bgLine(`${fg} `, cols, bg))
@@ -301,7 +312,7 @@ function renderBlockGroup(group: Array<Extract<Block, { type: 'log' | 'info' | '
 			lines.push(bgLine(`${fg} `, cols, bg))
 			hasContent = true
 		}
-		for (const line of content) lines.push(bgLine(`${fg}${padBlockLine(line)}`, cols, bg))
+		for (const line of content) lines.push(bodyLine(line, fg, bg, cols))
 	}
 	padBlock(lines, fg, bg, bgIsBlack, cols)
 	lines[lines.length - 1]! += FG_OFF
@@ -363,9 +374,9 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
 	if (content.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
+		const fullWidth = visLen(line) > contentCols
 		const text = block.canceled ? `${STRIKE}${line}${STRIKE_OFF}` : line
-		const body = padBlockLine(text)
-		lines.push(bgLine(`${fg}${body}`, cols, bg))
+		lines.push(bodyLine(text, fg, bg, cols, fullWidth))
 	}
 	// Streaming cursors blink on the shared pulse so active output feels alive
 	// without adding a separate rendering clock.

@@ -30,6 +30,13 @@ function captureOutput(fn: () => void): string {
 	return writes.join('')
 }
 
+test('frame height counts terminal-soft-wrapped logical lines', () => {
+	const linkedUrl = '\x1b]8;;https://example.com/\x07https://example.com/\x1b]8;;\x07'
+
+	expect(render.physicalRows(linkedUrl, 12)).toBe(2)
+	expect(render.physicalHeight(['short', linkedUrl, 'tail'], 12)).toBe(4)
+})
+
 beforeEach(() => {
 	render.resetRenderer()
 	client.state.tabs.length = 0
@@ -950,7 +957,7 @@ describe('render', () => {
 		}
 	})
 
-	test('fullscreen shrink repaints without clearing scrollback', () => {
+	test('fullscreen shrink rebuilds the canonical frame', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -963,7 +970,7 @@ describe('render', () => {
 			tab.history.splice(0, tab.history.length, { type: 'log', text: 'new' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
+			expect(output).toContain('\x1b[2J\x1b[H\x1b[3J')
 			expect(stripAnsi(output)).toContain('new')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
@@ -971,7 +978,7 @@ describe('render', () => {
 		}
 	})
 
-	test('fullscreen prompt shrink repaints so the viewport stays bottom anchored', () => {
+	test('fullscreen prompt shrink rebuilds the canonical frame', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -985,7 +992,8 @@ describe('render', () => {
 			prompt.setText('one line')
 			const output = captureOutput(() => render.draw())
 
-			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
+			expect(output).toContain('\x1b[2J\x1b[H\x1b[3J')
+			expect(stripAnsi(output)).toContain('old-0')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })

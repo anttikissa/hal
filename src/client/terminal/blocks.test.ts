@@ -3,6 +3,7 @@ import { blocks, type Block } from './blocks.ts'
 import { blockData } from '../block-data.ts'
 import { colors } from './colors.ts'
 import { subscriptionUsage } from '../../common/subscription-usage.ts'
+import { blockText } from './block-text.ts'
 
 function stripAnsi(s: string): string {
 	return s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '')
@@ -29,6 +30,19 @@ function blockBodyStart(lines: string[]): number {
 test('block body keeps left and right margins when wrapping', () => {
 	expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo bar' }, 9))).toEqual([' foo bar'])
 	expect(contentLines(blocks.renderBlock({ type: 'user', text: 'foo bar' }, 8))).toEqual([' foo', ' bar'])
+})
+
+test('standalone plain URLs use one full-width logical line for terminal soft wrapping', () => {
+	const url = 'https://example.com/abcdefghijklmnopqrstuvwxyz'
+	const rendered = blocks.renderBlock({ type: 'info', text: `Open this URL:\n\n${url}` }, 20)
+	const urlLines = rendered.filter((line) => line.includes('example.com'))
+
+	expect(urlLines).toHaveLength(1)
+	expect(urlLines[0]).toContain(url)
+	expect(urlLines[0]).toContain(`;${url}\x07${url}\x1b]8;;\x07`)
+	expect(blockText.stripAnsiSequences(urlLines[0]!)).toBe(url)
+	const streaming = blocks.renderBlock({ type: 'assistant', text: url, streaming: true }, 20)
+	expect(streaming.filter((line) => line.includes('example.com')).length).toBeGreaterThan(1)
 })
 
 test('block headers keep a right margin', () => {

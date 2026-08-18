@@ -26,7 +26,7 @@ Chrome = tab bar + prompt box + status + help bar.
 
 ### Horizontal box model
 
-Every section — history blocks, prompt, status, help — uses the same one
+Every ordinary section — history blocks, prompt, status, help — uses the same one
 column of padding on each side. For a terminal of `cols` columns:
 
 ```
@@ -35,11 +35,11 @@ col 1..cols-2  content — text starts and ends here
 col cols-1     right padding (always blank)
 ```
 
-So content width is `cols - 2`, and no text may occupy the last column.
-Backgrounds still paint the full row, including both padding columns; it is
-only the *text* that stops short. Getting this wrong is very visible: blocks
-whose text runs to the right edge look wrong next to the prompt, which has
-always had the margin.
+Ordinary content width is `cols - 2`, and ordinary text must not occupy the last
+column. An over-width source line containing only a plain HTTP(S) URL is the
+deliberate exception: it has no horizontal margins and may exceed `cols`, so the
+terminal soft-wraps and copies it as one logical line. Backgrounds still paint
+every physical row, including the final wrapped row's unused columns.
 
 Two painters implement this, and they are deliberately not shared:
 
@@ -50,6 +50,9 @@ Two painters implement this, and they are deliberately not shared:
 - `paddedLine()` in `src/client/terminal/render-status.ts` pads with real spaces,
   because chrome rows compose segments with different backgrounds and `CSI K`
   would flood the row with whichever background happened to be active.
+- `bodyLine()` in `src/client/terminal/blocks.ts` handles the standalone-URL
+  exception: one OSC 8 link stays open across native wraps, then `CSI K` paints
+  the remainder of its final physical row before the background is reset.
 
 Do not "unify" these into one helper with a mode flag: it adds code and slows
 down the hottest repaint path. Do keep their widths in agreement.
@@ -83,8 +86,9 @@ nearest valid source boundary.
 `peak` is a high-water mark: the tallest any tab's history has ever been.
 It grows but never shrinks (even if the tall tab is closed).
 
-Padding = `min(peak, rows - chrome) - activeTab.history.length`. This keeps
-the prompt at a stable row when switching between tabs of different heights.
+Padding = `min(peak, rows - chrome) - activeTab.historyPhysicalHeight`. Physical
+height is derived from the current frame and terminal width; it is never stored
+on history blocks or URL lines. This keeps the prompt stable across tabs.
 
 ### Tab switching
 
@@ -97,19 +101,20 @@ We do NOT clear-and-redraw a viewport-sized window. That destroys scrollback.
 
 Instead:
 
-1. Build the full frame: all history lines + padding + chrome.
-2. Diff against the previously-painted lines.
-3. Find the first changed line.
-4. Move the cursor there and rewrite from that point to the end.
+1. Build the full frame: all history logical lines + padding + chrome.
+2. Diff its logical strings against the previously-painted frame.
+3. Find the first changed logical line.
+4. Derive its physical row from the unchanged prefix and rewrite to the end.
 
-New lines are appended with `\r\n`, which lets the terminal scroll naturally.
-Old content enters scrollback — the user can scroll up and see everything.
+New logical lines are appended with `\r\n`, which lets the terminal scroll
+naturally. A standalone URL may occupy several physical rows without internal
+newlines. Old content enters scrollback for the user to inspect.
 
 Key state:
-- `prevLines[]` — what we painted last time (the full logical array, not a
-  viewport slice).
-- `cursorRow` — which frame line the terminal cursor is physically on.
-  Updated after EVERY cursor move (see rule 6).
+- `prevLines[]` — the full logical frame painted last time, not a viewport slice.
+- `cursorRow` — the terminal cursor's physical row within the rendered frame.
+  Logical indices are translated by summing `physicalRows()` over their prefix.
+  Update it after EVERY cursor move (see rule 6).
 
 ## Force repaint: two modes
 
@@ -166,16 +171,21 @@ THREE TIMES already. It is the cardinal sin of this renderer.
 Do not do it. Not in the normal path. Not in the force path. Not in a helper
 function. Not behind a flag. Not "just for performance." NEVER.
 
-### 4. No line may exceed terminal width
+### 4. Only standalone plain URLs may exceed terminal width
 
-Every line in the frame array MUST be <= terminal width in visible columns.
-The diff engine assumes 1 array entry = 1 physical terminal row. A line
-wider than the terminal auto-wraps to multiple rows, breaking cursor
-positioning on every subsequent repaint. This causes cascading visual
-corruption that gets worse with every paint cycle.
+Ordinary frame lines MUST be at most terminal width in visible columns. Use
+`visLen()` to measure, `wordWrap()` to wrap, and `clipVisual()` to truncate.
 
-Use `visLen()` to measure, `wordWrap()` to wrap, `clipVisual()` to truncate.
-No exceptions.
+A completed source line consisting solely of a plain HTTP(S) URL is the one
+exception. Keep it as one logical frame string and let the terminal soft-wrap it,
+so native selection copies the URL without inserted newlines. Streaming URLs
+remain hard-wrapped until complete, ensuring a soft logical line is immutable.
+`physicalRows()` derives its height using `ceil(visLen(line) / cols)`. This
+assumes URL labels contain only single-column printable characters; do not extend
+the exception to arbitrary prose, code, tabs, or wide characters.
+
+Diffing remains logical, while cursor positioning, peak/padding, fullscreen
+thresholds, and shrink/growth decisions always use derived physical heights.
 
 ### 4a. Terminal colors come from `colors.ason`
 
@@ -218,40 +228,29 @@ audit.
 
 ### 8. Append vs rewrite in the diff engine
 
-When the frame grows (e.g. prompt goes from 1 to 2 lines), the new lines
-are beyond `prevLines.length`. You CANNOT use `CSI B` (cursor down) to
-move past the bottom of the visible screen — the terminal clamps it. If
-you try, the cursor stays on the last visible row and you overwrite the
-wrong line.
+When the frame grows, appended logical lines may be beyond `prevLines.length`.
+You CANNOT use `CSI B` past the bottom of the visible screen because the terminal
+clamps it. Move to the last existing **physical** row, then use `\r\n` to append
+and scroll naturally.
 
-For appends (`first >= prevLines.length`): move to the last existing line,
-then `\r\n` to scroll into new territory.
+For non-fullscreen frame shrink, compare physical heights. After writing new
+content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows. Do not use
+`\r\n` there: at the viewport bottom it scrolls and creates a stray blank row.
 
-For non-fullscreen frame shrinks (`lines.length < prevLines.length`): after
-writing new content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows.
-Do NOT use `\r\n` here — if the new frame ends on the viewport bottom edge,
-newline scrolls the screen and creates a stray blank row.
+### 9. Fullscreen shrink rebuilds the canonical frame
 
-### 9. Frame shrinks in fullscreen must not erase the display
+A fullscreen shrink changes the scrollback/visible boundary. Prompt shrink is
+user-driven, so assume the user is at the live prompt rather than inspecting
+scrollback. Use the normal fullscreen force repaint: clear screen/scrollback,
+write every logical frame line, and let native wrapping and scrolling establish
+the canonical viewport. Do not segment a soft-wrapped URL merely to preserve an
+inspected viewport in this insignificant corner case.
 
-When the frame shrinks in fullscreen mode, the scrollback/visible boundary
-always shifts. The diff engine cannot patch that in place: patching only the
-bottom rows leaves the old viewport anchored and creates a blank row below the
-help bar. Repaint every physical screen row from `CSI H`, erasing each row with
-`CSI 2K` before writing the current visible frame suffix. Do not append a final
-CRLF, because that would scroll the viewport.
-
-Do **not** emit any `CSI J` erase-display command for this recovery. `CSI 2J`
-makes Ghostty scroll an inspected viewport to bottom; `CSI 3J` additionally
-clears terminal scrollback. Both cause exactly the regression where streaming
-output interrupts a user reading earlier text.
-
-Frame growth in fullscreen is straightforward only when it is a pure append. If
-an existing row also changes, anchor at the physical viewport top with `CSI H`,
-repaint the old visible screen in place, then append only the new suffix via
-`\r\n`. Do not derive that anchor from `cursorRow`: delayed autowrap or other
-terminal-side cursor movement can make the logical coordinate stale. The
-absolute anchor prevents stale visible rows from being copied into scrollback.
+Fullscreen growth is straightforward only for a pure append. If an existing
+logical line also changes, anchor at the physical viewport top with `CSI H`,
+repaint independently addressable logical lines, then append the suffix with
+`\r\n`. If a soft-wrapped URL begins above the viewport, leave its unchanged
+visible tail alone and start at the next complete logical line.
 
 ### 10. Kitty keyboard protocol
 

@@ -169,6 +169,15 @@ function insideOsc8Link(line: string, index: number): boolean {
 	return line.slice(start + 5, end) !== ''
 }
 
+function standaloneHyperlink(line: string): string | null {
+	URL_RE.lastIndex = 0
+	const match = URL_RE.exec(line)
+	if (!match || match.index !== 0 || match[0].length !== line.length) return null
+	if (TRAILING_URL_PUNCT.includes(line.at(-1)!)) return null
+	return `\x1b]8;;${line}\x07${line}\x1b]8;;\x07`
+}
+
+
 function hyperlinkUrls(lines: string[], cols: number): string[] {
 	const spans: LinkSpan[] = []
 	for (let i = 0; i < lines.length; i++) {
@@ -203,5 +212,6 @@ function hyperlinkUrls(lines: string[], cols: number): string[] {
 export const blockText = {
 	sanitizeTerminalText,
 	stripAnsiSequences,
+	standaloneHyperlink,
 	hyperlinkUrls,
 }
