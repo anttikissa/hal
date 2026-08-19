@@ -97,14 +97,10 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 			continue
 		}
 
-		if (entry.type === 'forked_from' || entry.type === 'forked_to') {
-			pendingInfos.push(metaText(structuralMetaText(entry)))
-			continue
-		}
-
-		if (entry.type === 'cwd' || entry.type === 'model') {
+		if (entry.type === 'cwd' || entry.type === 'model' || entry.type === 'forked_from' || entry.type === 'forked_to') {
+			const isFork = entry.type === 'forked_from' || entry.type === 'forked_to'
 			const turnsRemaining = totalUserTurns - userTurnsSeen
-			if (entry.visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
+			if (isFork || (entry.visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl)) {
 				pendingInfos.push(metaText(structuralMetaText(entry)))
 			}
 			continue
