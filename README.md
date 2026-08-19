@@ -3,9 +3,9 @@
 Hal is a terminal-based coding agent with the following philosophy:
 
 - small and fast - zero dependencies imported at startup
-- don’t reinvent the wheel: native terminal scrolling, search, copy and paste, and hyperlinks just work
+- don't reinvent the wheel: native terminal scrolling, search, hyperlinks etc. just work
 - no auto-update nagging: if you want to update, just pull the latest code
-- no plugins or extensions - ask it to extend itself; you own the changes
+- no plugins or extensions - self-modification is the way. Ask Hal to extend itself; you own the changes
 - persistent sessions by default - hit Ctrl-C, restart Hal, and continue where you left off
 
 The one thing it implements itself is tabs - Ctrl-T spawns a new tab, Ctrl-F forks the
