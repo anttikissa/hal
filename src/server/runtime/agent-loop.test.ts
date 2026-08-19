@@ -30,6 +30,12 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
 })
 
+test('confirmation body colors the exact offending fragment', () => {
+	const call = { id: 't1', name: 'bash', input: { command: 'cd /tmp\ngit checkout -- . 2>/dev/null; true' } }
+	const findings = [{ severity: 'danger' as const, reason: 'DESTRUCTIVE GIT CHECKOUT/RESTORE PATH', match: 'git checkout -- . 2>/dev/null' }]
+	expect(agentLoop.toolConfirmationBody('s1', call, findings)).toContain('cd /tmp\n\x1b[93mgit checkout -- . 2>/dev/null\x1b[39m; true')
+})
+
 	test('settles unstarted tool calls when a batch is aborted', async () => {
 		const sessionId = `test-aborted-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 		createdSessions.push(sessionId)

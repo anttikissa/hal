@@ -190,7 +190,9 @@ function resolveToolConfirmation(requestId: string, approved: boolean): boolean 
 function toolConfirmationBody(sessionId: string, call: ToolCall, findings: RiskFinding[]): string[] {
 	// Render with ason so multi-line strings stay readable (real newlines, not "\n").
 	// JSON.stringify is forbidden in this codebase for human-facing output.
-	const text = call.name === 'bash' ? String(call.input?.command ?? '') : ason.stringify(call.input ?? {})
+	let text = call.name === 'bash' ? String(call.input?.command ?? '') : ason.stringify(call.input ?? {})
+	// Paint the exact fragment that tripped the check bright yellow; popup width math is ANSI-aware.
+	for (const finding of findings) text = text.replaceAll(finding.match, `\x1b[93m${finding.match}\x1b[39m`)
 	const tab = ipc.readState().sessions.find((item) => item.id === sessionId)?.tab
 	const lines = [`Session ${sessionId}${tab ? ` (tab ${tab})` : ''} wants to do this:`, '', `${call.name}:`, text, '', "I'm asking because:"]
 	for (const finding of findings) lines.push(`- ${finding.reason}`)
@@ -206,7 +208,6 @@ async function confirmToolCall(sessionId: string, call: ToolCall, signal: AbortS
 		type: 'tool-confirm-request',
 		requestId,
 		body: toolConfirmationBody(sessionId, call, findings),
-		highlights: findings.map((finding) => finding.match).filter(Boolean),
 	})
 	const approved = await new Promise<boolean>((resolve) => {
 		function done(value: boolean): void {
@@ -996,4 +997,5 @@ export const agentLoop = {
 	hasPauseBeforeTools,
 	executeToolBatch,
 	sanitizeToolCallInput,
+	toolConfirmationBody,
 }

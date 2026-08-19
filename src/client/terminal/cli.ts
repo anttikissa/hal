@@ -259,7 +259,6 @@ function openToolConfirm(event: any): void {
 			draw()
 		},
 		'danger',
-		Array.isArray(event.highlights) ? event.highlights.map(String) : [],
 	)
 	draw()
 }
