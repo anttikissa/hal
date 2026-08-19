@@ -258,7 +258,7 @@ function systemPrompt(): string {
 		'You write compact session-recall briefs for Hal coding-agent sessions.',
 		'Output plain text only: a bare session name on the first line, one blank line, then the summary.',
 		'Do not use ASON, JSON, YAML, code fences, or labels such as "name:" and "summary:".',
-		'Name must state the initiating user problem or task, not merely the last follow-up; 60 characters if possible. For example "Review rendering regression".',
+		'The digest gives the current session name. Repeat it exactly unless the session’s dominant scope materially changed and a clearer name is needed. A name should describe the dominant task, not merely the latest follow-up; 60 characters if possible. For example "Review rendering regression".',
 		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
 		`Use descriptive, colorful, realistic examples, e.g. 'You asked to humanize these markers, for example "[restarted]" -> "Restarted", and so we did.'`,
 		'Short, plain sentences. Omit needless words. Split long sentences.',
@@ -321,7 +321,7 @@ function formatSection(sessionId: string, result: SummaryResult): string {
 function maybeNameSession(sessionId: string, name: string): boolean {
 	if (!name) return false
 	const meta = sessions.loadSessionMeta(sessionId)
-	if (!meta || meta.name) return false
+	if (!meta || meta.name === name) return false
 	sessions.updateMeta(sessionId, { name })
 	return true
 }
@@ -373,8 +373,12 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean; targetIds: st
 		try {
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
 			const summary = await whatSummary.summarizeDigest(model, digest)
-			if (whatSummary.maybeNameSession(sessionId, summary.name)) renamed = true
-			persist(sessionId, [sessionId], formatSection(sessionId, summary))
+			const previousName = sessions.loadSessionMeta(sessionId)?.name
+			const nameChanged = whatSummary.maybeNameSession(sessionId, summary.name)
+			if (nameChanged) renamed = true
+			let text = formatSection(sessionId, summary)
+			if (nameChanged && previousName) text += `\n\nThe session was previously named "${previousName}"; I chose to change it to "${summary.name}".`
+			persist(sessionId, [sessionId], text)
 		} catch (err) {
 			persist(sessionId, [sessionId], [`## /what summary: ${sessionId}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))
 		}

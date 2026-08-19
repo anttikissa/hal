@@ -83,6 +83,38 @@ test('run writes ui-only summary to target and fills empty target name', async (
 })
 
 
+test('run renames an existing session and appends a factual rename sentence', async () => {
+	const requester = makeSession('requester', 'requester')
+	const target = makeSession('target', 'Marker cleanup')
+	const origAppendEvent = ipc.appendEvent
+	const origGetProvider = providerLoader.getProvider
+	ipc.appendEvent = () => {}
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'text' as const, text: 'Notice presentation\n\nYou simplified ordinary notices.' }
+			yield { type: 'done' as const, usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+
+	try {
+		await whatSummary.run({ requesterSessionId: requester, target, openSessionIds: [requester, target] })
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		providerLoader.getProvider = origGetProvider
+	}
+
+	expect(sessions.loadSessionMeta(target)?.name).toBe('Notice presentation')
+	const summary = sessions.loadHistory(target).find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
+	expect(summary?.type === 'assistant' ? summary.text : '').toBe([
+		'## /what summary: Notice presentation',
+		'',
+		'You simplified ordinary notices.',
+		'',
+		'The session was previously named "Marker cleanup"; I chose to change it to "Notice presentation".',
+	].join('\n'))
+})
+
+
 test('run persists per-target summary errors', async () => {
 	const requester = makeSession('requester', 'requester')
 	const target = makeSession('target', 'target')
@@ -133,7 +165,7 @@ test('summaries ask provider for stateless calls', async () => {
 	expect(stateless).toEqual([true, true])
 })
 
-test('run does not overwrite existing target name', async () => {
+test('run leaves an unchanged target name unremarked', async () => {
 	const requester = makeSession('requester', 'requester')
 	const target = makeSession('target', 'manual name')
 	const origAppendEvent = ipc.appendEvent
@@ -141,7 +173,7 @@ test('run does not overwrite existing target name', async () => {
 	ipc.appendEvent = () => {}
 	providerLoader.getProvider = async () => ({
 		async *generate() {
-			yield { type: 'text' as const, text: 'New name\n\nSummary.' }
+			yield { type: 'text' as const, text: 'manual name\n\nSummary.' }
 			yield { type: 'done' as const, usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
@@ -154,6 +186,8 @@ test('run does not overwrite existing target name', async () => {
 	}
 
 	expect(sessions.loadSessionMeta(target)?.name).toBe('manual name')
+	const summary = sessions.loadHistory(target).find((entry) => entry.type === 'assistant' && entry.syntheticKind === 'what-summary')
+	expect(summary?.type === 'assistant' ? summary.text : '').not.toContain('The session was previously named')
 })
 
 
