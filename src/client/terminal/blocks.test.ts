@@ -124,18 +124,28 @@ test('search tool output truncation keeps head', () => {
 	}
 })
 
-test('short status notices render on one line without marker brackets', () => {
-	const lines = blocks.renderBlock({ type: 'log', text: '[paused]', ts: new Date('2026-01-01T17:38:00Z').getTime() }, 80).map(stripAnsi)
+test('short status notices share one unlabelled transparent style without marker brackets', () => {
+	colors.load()
+	const block = { type: 'log', text: '[paused]', ts: new Date('2026-01-01T17:38:00Z').getTime() } as const
+	const rendered = blocks.renderBlock(block, 80)
+	const lines = rendered.map(stripAnsi)
+	const info = blocks.renderBlock({ ...block, type: 'info' }, 80)
 
 	expect(lines).toHaveLength(1)
-	expect(lines[0]).toContain('Log: Paused')
+	expect(lines[0]).toContain('Paused')
+	expect(lines[0]).not.toContain('Log')
 	expect(lines[0]).not.toContain('[paused]')
+	expect(info).toEqual(rendered)
+	expect(rendered.join('\n')).toContain(colors.log.fg)
+	expect(rendered.join('\n')).not.toContain(colors.log.bg)
+	expect(stripAnsi(rendered.join('\n'))).not.toContain('System')
 })
 
 test('multiword status notices also drop marker brackets', () => {
 	const lines = blocks.renderBlock({ type: 'log', text: '[paused before local tools]' }, 80).map(stripAnsi)
 
-	expect(lines[0]).toContain('Log: Paused before local tools')
+	expect(lines[0]).toContain('Paused before local tools')
+	expect(lines[0]).not.toContain('Log')
 	expect(lines[0]).not.toContain('[paused before local tools]')
 })
 
@@ -161,11 +171,11 @@ test('usage bar markers gain terminal color only when marked trusted', () => {
 	expect(unsafe).not.toContain('\x1b[2J')
 })
 
-test('long notices render a blank line after the header', () => {
+test('long notices render without card padding', () => {
 	const block: Block = { type: 'info', text: 'First line of a longer notice.\nSecond line.' }
 	const lines = blocks.renderBlock(block, 80).map(stripAnsi)
 
-	expect(lines[blockBodyStart(lines)]?.trim()).toBe('')
+	expect(lines.map((line) => line.trim())).toEqual(['First line of a longer notice.', 'Second line.'])
 })
 
 test('incoming prompts use the normal prompt card and retain their sender label', () => {
@@ -353,7 +363,7 @@ test('markdown code fences use block code color instead of dim style', () => {
 	colors.load()
 	for (const type of markdownBlockTypes) {
 		const block = { type, text: 'before\n```ts\nconst x = 1\n```\nafter' } as Block
-		const palette = (colors as any)[type]
+		const palette = type === 'log' || type === 'info' ? colors.log : (colors as any)[type]
 		const rendered = blocks.renderBlock(block, 80).join('\n')
 
 		expect(palette.code).toBeTruthy()
@@ -366,7 +376,7 @@ test('inline markdown code uses block code color instead of dim style', () => {
 	colors.load()
 	for (const type of markdownBlockTypes) {
 		const block = { type, text: 'run `bun test` now' } as Block
-		const palette = (colors as any)[type]
+		const palette = type === 'log' || type === 'info' ? colors.log : (colors as any)[type]
 		const rendered = blocks.renderBlock(block, 80).join('\n')
 
 		expect(palette.code).toBeTruthy()
@@ -442,13 +452,13 @@ test('forked_to history entry renders as a Fork block', () => {
 	expect(headerLine(lines)).toContain('Fork')
 })
 
-test('info history entries render as system blocks', () => {
+test('info history entries render without a category label', () => {
 	const history: any[] = [{ type: 'info', text: 'Model set to GPT 5.5.', ts: '2026-04-09T20:00:00.000Z' }]
 
 	const result = blockData.historyToBlocks(history as any, 'child')
 	expect(result).toMatchObject([{ type: 'info', text: 'Model set to GPT 5.5.' }])
 	const lines = blocks.renderBlock(result[0]!, 80)
-	expect(headerLine(lines)).toContain('System')
+	expect(headerLine(lines)).not.toContain('System')
 })
 
 test('structural cwd and model entries render as system blocks', () => {
@@ -464,7 +474,7 @@ test('structural cwd and model entries render as system blocks', () => {
 	])
 })
 
-test('info block renders a System header', () => {
+test('short info blocks render as unlabelled timeline entries', () => {
 	const block: Block = {
 		type: 'info',
 		text: 'Server started (pid 123) · ready 99.9ms',
@@ -472,8 +482,8 @@ test('info block renders a System header', () => {
 	}
 
 	const lines = blocks.renderBlock(block, 80)
-	expect(headerLine(lines)).toContain('System')
-	expect(stripAnsi(lines.slice(1).join('\n'))).toContain('Server started')
+	expect(headerLine(lines)).not.toContain('System')
+	expect(headerLine(lines)).toContain('Server started')
 })
 
 test('warning block renders a Warning header', () => {

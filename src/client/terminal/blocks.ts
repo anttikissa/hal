@@ -176,18 +176,17 @@ function bgLine(content: string, cols: number, bg: string): string {
 	return `${bg}\x1b[K\r${content}${RESET_BG}`
 }
 
-const fixedNoticeColors = { log: colors.log, info: colors.info, warning: colors.warning, error: colors.error, fork: colors.fork }
+const fixedNoticeColors = { warning: colors.warning, error: colors.error, fork: colors.fork }
 
 function blockColors(block: Block): { fg: string; bg: string; bgIsBlack?: boolean; bold?: string; code?: string; linkFg?: string; linkBg?: string } {
 	if (block.type === 'assistant') return colors.assistant
 	if (block.type === 'thinking') return colors.thinking
 	if (block.type === 'user') return colors.user
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return colors.warning
-	return block.type === 'tool' ? colors.tool(block.name) : fixedNoticeColors[block.type]
-}
-
-function formatBlockTime(ts?: number): string {
-	return time.formatTimestamp(ts)
+	if (block.type === 'log' && block.usageBars) return colors.log
+	if (block.type === 'log' || block.type === 'info') return { ...colors.log, bg: '' }
+	if (block.type === 'tool') return colors.tool(block.name)
+	return fixedNoticeColors[block.type]
 }
 
 function formatBlockTimeRange(first?: number, last?: number): string {
@@ -220,7 +219,7 @@ function padBlock(lines: string[], fg: string, bg: string, bgIsBlack: boolean | 
 	lines.push(bgLine(`${fg} `, cols, bg))
 }
 
-const fixedLabels = { log: 'Log', info: 'System', warning: 'Warning', error: 'Error', fork: 'Fork' }
+const fixedLabels = { log: '', info: '', warning: 'Warning', error: 'Error', fork: 'Fork' }
 
 function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return block.text.split('\n', 1)[0]!
@@ -259,15 +258,13 @@ function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 }
 
 function inlineNoticeText(block: Block): string | undefined {
-	if (block.type !== 'log' && block.type !== 'info' && block.type !== 'fork') return undefined
+	if (block.type !== 'log' && block.type !== 'info') return undefined
+	if (block.usageBars) return undefined
 	const text = expandTabs(blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.text)), blockConfig.tabWidth).trim()
-	const marker = text.match(/^\[([^\]\n]+)\]$/)
 	if (!text || text.includes('\n')) return undefined
 	if (text.includes('`')) return undefined
-	if ((block.type === 'log' || block.type === 'info') && !marker) return undefined
 	if (visLen(text) > 50) return undefined
-	if (marker) return historyProjection.noticeText(text)
-	return text
+	return historyProjection.noticeText(text)
 }
 
 function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefined {
@@ -276,7 +273,7 @@ function renderInlineNoticeBlock(block: Block, cols: number): string[] | undefin
 	const blobRef = 'blobId' in block && 'sessionId' in block && block.blobId && block.sessionId ? `${block.sessionId}/${block.blobId}` : ''
 	if (blobRef) return undefined
 	const { fg, bg } = blockColors(block)
-	const header = buildHeader(`${blockLabel(block)}: ${text}`, formatBlockTime(block.ts), '', cols)
+	const header = buildHeader(text, time.formatTimestamp(block.ts), '', cols)
 	return [`${bgLine(`${fg}${header}`, cols, bg)}${FG_OFF}`]
 }
 
@@ -369,12 +366,14 @@ function renderBlock(block: Block, cols: number, cursorVisible = false, sessionL
 			: ''
 	const { fg, bg, bgIsBlack } = blockColors(block)
 	const label = blockLabel(block, sessionLabel)
-	const blockTime = formatBlockTime(block.ts)
+	const blockTime = time.formatTimestamp(block.ts)
 	const header = buildHeader(label, blockTime, blobRef, cols)
-	const lines = [bgLine(`${fg}${header}`, cols, bg)]
+	const plainNotice = block.type === 'info' || (block.type === 'log' && !block.text.startsWith('Prompt queued'))
+	const lines: string[] = []
+	if (!plainNotice || blockTime) lines.push(bgLine(`${fg}${header}`, cols, bg))
 	const contentCols = Math.max(1, cols - 2)
 	const content = blockText.hyperlinkUrls(blockContent(block, contentCols), contentCols)
-	if (content.length > 0) lines.push(bgLine(`${fg} `, cols, bg))
+	if (content.length > 0 && !plainNotice) lines.push(bgLine(`${fg} `, cols, bg))
 	for (const line of content) {
 		const fullWidth = visLen(line) > contentCols
 		const text = block.canceled ? `${STRIKE}${line}${STRIKE_OFF}` : line

@@ -110,10 +110,10 @@ describe('render', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
 		expect(clean).toContain('31.0ms First line of code executed')
 		expect(clean).toContain('31.0ms State directories exist')
-		expect(clean.match(/Log/g)?.length ?? 0).toBe(1)
+		expect(clean).not.toContain(' Log')
 	})
 
-	test('consecutive info blocks across days collapse with a date range header', () => {
+	test('short notices retain their individual timestamps across days', () => {
 		const originalNow = Date.now
 		Date.now = () => new Date(2026, 4, 6, 13, 0).getTime()
 		try {
@@ -121,10 +121,9 @@ describe('render', () => {
 			tab.history.push({ type: 'log', text: 'first metadata refresh', ts: new Date(2026, 4, 4, 19, 30).getTime() })
 			tab.history.push({ type: 'log', text: 'second metadata refresh', ts: new Date(2026, 4, 6, 12, 10).getTime() })
 			const clean = stripAnsi(captureOutput(() => render.draw(true)))
-			expect(clean).toContain('4 May 19:30 - 6 May 12:10 Log')
-			expect(clean).toContain('first metadata refresh')
-			expect(clean).toContain('second metadata refresh')
-			expect(clean.match(/Log/g)?.length ?? 0).toBe(1)
+			expect(clean).toContain('4 May 19:30 first metadata refresh')
+			expect(clean).toContain('12:10 second metadata refresh')
+			expect(clean).not.toContain(' Log')
 		} finally {
 			Date.now = originalNow
 		}
@@ -156,7 +155,7 @@ describe('render', () => {
 		expect(clean).toContain('Ready')
 		expect(clean).toContain('Current config:')
 		expect(clean).not.toContain('[Current config:]')
-		expect(clean.match(/Log/g)?.length ?? 0).toBe(2)
+		expect(clean).not.toContain(' Log')
 	})
 
 	test('paused info before a steering prompt is hidden', () => {
@@ -178,7 +177,7 @@ describe('render', () => {
 		const raw = captureOutput(() => render.draw(true))
 		const clean = stripAnsi(raw)
 		expect(clean).not.toContain('[paused]')
-		expect(clean).toContain('System')
+		expect(clean).not.toContain('System')
 		expect(clean).toContain('Next: foo')
 		expect(clean).not.toContain('**foo**')
 		expect(clean).not.toContain('**ctrl-q**')
@@ -189,7 +188,8 @@ describe('render', () => {
 		const tab = client.currentTab()!
 		tab.history.push({ type: 'log', text: '[paused]', ts: Date.now() })
 		const clean = stripAnsi(captureOutput(() => render.draw(true)))
-		expect(clean).toContain('Log: Paused')
+		expect(clean).toContain('Paused')
+		expect(clean).not.toContain('Log')
 		expect(clean).not.toContain('[paused]')
 	})
 

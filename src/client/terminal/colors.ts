@@ -27,7 +27,6 @@ const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const thinking: MdColors = { fg: '', bg: '', bold: '', code: '' }
 const user: BlockColors = { fg: '', bg: '' }
 const input = { bg: '', cursor: '', cursorDim: '' }
-const system: BlockColors = { fg: '', bg: '' }
 const logColors: BlockColors = { fg: '', bg: '' }
 const info: BlockColors = { fg: '', bg: '' }
 const warning: BlockColors = { fg: '', bg: '' }
@@ -122,7 +121,6 @@ function load(): void {
 	resolveMd(raw.assistant, assistant)
 	resolveMd(raw.thinking, thinking)
 	resolveBlock(raw.user, user)
-	resolveBlock(raw.system, system)
 	resolveBlock(raw.error, error)
 	resolveBlock(raw.popup?.current, popup.current)
 	resolveBlock(raw.popup?.modelCurrent ?? raw.popup?.current, popup.modelCurrent)
@@ -201,7 +199,6 @@ export const colors = {
 	thinking,
 	user,
 	input,
-	system,
 	log: logColors,
 	info,
 	warning,

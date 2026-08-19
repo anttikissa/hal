@@ -32,8 +32,8 @@ function title(item: TranscriptItem): string {
 	if (item.type === 'tool') return humanize(item.name)
 	if (item.type === 'tool_call') return humanize(item.name)
 	if (item.type === 'tool_result') return 'Tool result'
-	if (item.type === 'log') return item.text.startsWith('Prompt queued') ? item.text.split('\n', 1)[0]! : 'Log'
-	if (item.type === 'info' || item.type === 'cwd' || item.type === 'model') return 'System'
+	if (item.type === 'log') return item.text.startsWith('Prompt queued') ? item.text.split('\n', 1)[0]! : ''
+	if (item.type === 'info' || item.type === 'cwd' || item.type === 'model') return ''
 	if (item.type === 'warning') return 'Warning'
 	if (item.type === 'error') return 'Error'
 	if (item.type === 'fork' || item.type === 'forked_from' || item.type === 'forked_to') return 'Fork'
@@ -42,7 +42,7 @@ function title(item: TranscriptItem): string {
 
 function label(item: TranscriptItem): string {
 	const time = formatTime(item.ts)
-	return time ? `${time} ${title(item)}` : title(item)
+	return `${time} ${title(item)}`.trim()
 }
 
 export const transcriptTitles = { formatTime, title, label }
