@@ -4,7 +4,7 @@
 import { lineEditor } from './line-editor.ts'
 import { colors } from './colors.ts'
 import { models } from '../../common/models.ts'
-import { clipVisual, hardWrap, visLen } from '../../utils/strings.ts'
+import { clipVisual, expandTabs, hardWrap, visLen } from '../../utils/strings.ts'
 import type { KeyEvent } from './keys.ts'
 
 interface PopupItem {
@@ -400,8 +400,10 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	if (state.kind === 'confirm' && state.body.length > 0) bodyContent.push({ text: '', active: false })
 	// Split on embedded newlines so multi-line bash commands (e.g. heredocs) render
 	// inside the popup box instead of breaking the border at column 1.
+	// Expand tabs first: a tab's width depends on the column it starts at, and rows
+	// are measured in isolation but drawn inset, which would desync the right border.
 	for (const line of state.body) {
-		for (const sub of String(line).split('\n')) bodyContent.push({ text: sub, active: false })
+		for (const sub of expandTabs(String(line)).split('\n')) bodyContent.push({ text: sub, active: false })
 	}
 	if (state.body.length > 0 && state.items.length > 0) tailContent.push({ text: '', active: false })
 	for (let i = 0; i < state.items.length; i++) tailContent.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex, current: state.items[i]!.isCurrent })

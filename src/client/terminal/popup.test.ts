@@ -203,6 +203,15 @@ describe('popup', () => {
 		expect(clean).toContain(' No')
 	})
 
+	test('tabs in body text keep every row the same rendered width', () => {
+		// A tab's width depends on the column it starts at. The popup measures content
+		// in isolation but draws it inset after '│ ', so raw tabs would desync the border.
+		popup.openConfirm('Risky tool call', ['bash:', "const a = [\n\t'first',\n\t\t'second',\n]"], ['Yes', 'No'], () => {}, 'danger')
+		const overlay = popup.buildOverlay(60, 20)
+		const widths = new Set(overlay!.lines.map((line) => visLen(line)))
+		expect(widths.size).toBe(1)
+	})
+
 	test('confirm popup gives text horizontal and vertical breathing room', () => {
 		popup.openConfirm('Claude cache likely cold', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
 		const overlay = popup.buildOverlay(100, 30)
