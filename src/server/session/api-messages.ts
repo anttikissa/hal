@@ -98,11 +98,7 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 		}
 
 		if (entry.type === 'cwd' || entry.type === 'model' || entry.type === 'forked_from' || entry.type === 'forked_to') {
-			const isFork = entry.type === 'forked_from' || entry.type === 'forked_to'
-			const turnsRemaining = totalUserTurns - userTurnsSeen
-			if (isFork || (entry.visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl)) {
-				pendingInfos.push(metaText(structuralMetaText(entry)))
-			}
+			pendingInfos.push(metaText(structuralMetaText(entry)))
 			continue
 		}
 

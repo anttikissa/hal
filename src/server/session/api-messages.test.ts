@@ -138,8 +138,8 @@ test('toProviderMessages wraps next-user info in meta tags', () => {
 test('toProviderMessages wraps structural next-user state in meta tags', () => {
 	const ts = '2026-04-13T14:43:49.970Z'
 	const entries: any[] = [
-		{ type: 'cwd', from: '/tmp', to: '/home/user/.hal', visibility: 'next-user', ts },
-		{ type: 'model', from: 'openai/gpt-5.4', to: 'openai/gpt-5.5', visibility: 'next-user', ts },
+		{ type: 'cwd', from: '/tmp', to: '/home/user/.hal', visibility: 'ui', ts },
+		{ type: 'model', from: 'openai/gpt-5.4', to: 'openai/gpt-5.5', visibility: 'ui', ts },
 		{ type: 'forked_from', parent: '114-mad', ts },
 		{ type: 'forked_to', child: '116-see', ts },
 		{ type: 'user', parts: [{ type: 'text', text: 'what now?' }], ts },
