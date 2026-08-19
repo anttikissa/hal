@@ -86,6 +86,7 @@ Some useful server commands you can run this way:
 - `/cd [path]` — change cwd; no arg means go to `hal_dir`
 - `/model [model]` — switch model
 - `/move <n>` — move current tab to position
+- `/resume [<target>]` — resume a closed session; no target lists recently closed sessions
 - `/send <target> <message>` — send prompt to another tab/session; you can also send commands: "/send 3 /rename Review rendering regression"
 - `/queue <prompt> | next | clear` — manage queued prompts
 
