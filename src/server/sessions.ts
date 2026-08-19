@@ -503,7 +503,7 @@ function forkSession(sourceId: string, newId: string, atIndex?: number): Session
 		id: newId,
 		workingDir: sourceMeta.workingDir,
 		createdAt: forkTs,
-		name: sourceMeta.name ? `fork of ${sourceMeta.name}` : undefined,
+		name: sourceMeta.name ? `Fork of ${sourceMeta.name}` : undefined,
 		model: sourceMeta.model ?? models.defaultModel(),
 		forkedFrom: sourceId,
 	})
