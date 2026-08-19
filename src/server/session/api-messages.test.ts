@@ -140,11 +140,13 @@ test('toProviderMessages wraps structural next-user state in meta tags', () => {
 	const entries: any[] = [
 		{ type: 'cwd', from: '/tmp', to: '/home/user/.hal', visibility: 'next-user', ts },
 		{ type: 'model', from: 'openai/gpt-5.4', to: 'openai/gpt-5.5', visibility: 'next-user', ts },
+		{ type: 'forked_from', parent: '114-mad', ts },
+		{ type: 'forked_to', child: '116-see', ts },
 		{ type: 'user', parts: [{ type: 'text', text: 'what now?' }], ts },
 	]
 
 	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
-		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /home/user/.hal</meta>\n<meta>model changed from openai/gpt-5.4 to openai/gpt-5.5</meta>\nwhat now?' },
+		{ role: 'user', content: '[13 Apr 14:43]\n<meta>cwd changed from /tmp to /home/user/.hal</meta>\n<meta>model changed from openai/gpt-5.4 to openai/gpt-5.5</meta>\n<meta>session forked from 114-mad</meta>\n<meta>session forked to 116-see</meta>\nwhat now?' },
 	])
 })
 
@@ -189,6 +191,20 @@ test('toProviderMessages starts after the last reset marker', () => {
 	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
 		{ role: 'user', content: '[15 Apr 00:00]\n[system] Session was reset. Previous conversation: history.asonl' },
 		{ role: 'user', content: '[15 Apr 00:00]\nfresh prompt' },
+	])
+})
+
+
+test('toProviderMessages retains a fork marker immediately before reset', () => {
+	const ts = '2026-04-15T00:00:00.000Z'
+	const entries: any[] = [
+		{ type: 'forked_from', parent: '114-mad', ts },
+		{ type: 'reset', ts },
+		{ type: 'user', parts: [{ type: 'text', text: 'fresh prompt' }], ts },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'user', content: '[15 Apr 00:00]\n<meta>session forked from 114-mad</meta>\nfresh prompt' },
 	])
 })
 

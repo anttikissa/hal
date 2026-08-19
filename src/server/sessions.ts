@@ -281,7 +281,7 @@ function loadAllHistoryWithOrigin(sessionId: string): {
 	if (first?.type !== 'forked_from' || !first.parent) return { entries, parentCount: 0 }
 	const parent = loadAllHistoryWithOrigin(first.parent)
 	const before = first.ts ? parent.entries.filter((entry) => !entry.ts || entry.ts < first.ts!) : parent.entries
-	return { entries: [...before, ...entries.slice(1)], parentCount: before.length, parentId: first.parent }
+	return { entries: [...before, first, ...entries.slice(1)], parentCount: before.length, parentId: first.parent }
 }
 
 function sessionOpenInfo(meta: Pick<SessionMeta, 'id'> & Partial<SessionMeta>, index?: number): SharedSessionInfo {

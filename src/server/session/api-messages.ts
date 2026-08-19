@@ -21,7 +21,9 @@ function syntheticText(text: string): string {
 	return `<synthetic>${text}</synthetic>`
 }
 
-function structuralMetaText(entry: Extract<HistoryEntry, { type: 'cwd' | 'model' }>): string {
+function structuralMetaText(entry: Extract<HistoryEntry, { type: 'cwd' | 'model' | 'forked_from' | 'forked_to' }>): string {
+	if (entry.type === 'forked_from') return `session forked from ${entry.parent}`
+	if (entry.type === 'forked_to') return `session forked to ${entry.child}`
 	return `${entry.type} changed from ${entry.from} to ${entry.to}`
 }
 
@@ -41,7 +43,10 @@ const apiConfig = {
 function findReplayStart(entries: HistoryEntry[]): number {
 	for (let i = entries.length - 1; i >= 0; i--) {
 		const e = entries[i]!
-		if (e.type === 'reset' || e.type === 'compact') return i + 1
+		if (e.type === 'reset' || e.type === 'compact') {
+			if (entries[i - 1]?.type === 'forked_from') return i - 1
+			return i + 1
+		}
 	}
 	return 0
 }
@@ -89,6 +94,11 @@ function toProviderMessages(sessionId: string, allEntries?: HistoryEntry[], opts
 			if (visibility === 'next-user' && turnsRemaining <= apiConfig.injectTurnTtl) {
 				pendingInfos.push(metaText(entry.text))
 			}
+			continue
+		}
+
+		if (entry.type === 'forked_from' || entry.type === 'forked_to') {
+			pendingInfos.push(metaText(structuralMetaText(entry)))
 			continue
 		}
 

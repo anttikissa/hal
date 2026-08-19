@@ -66,7 +66,7 @@ function load(info: SharedSessionInfo, opts: { logName?: string; entryLimit?: nu
 	if ((opts.logName || opts.entryLimit !== undefined) && first?.type === 'forked_from' && first.parent) {
 		const parent = clientBackend.sessions.loadAllHistoryWithOrigin(first.parent)
 		const before = first.ts ? parent.entries.filter((entry) => !entry.ts || entry.ts < first.ts!) : parent.entries
-		loaded = { entries: [...before, ...loaded.entries.slice(1)], parentCount: before.length, parentId: first.parent }
+		loaded = { entries: [...before, first, ...loaded.entries.slice(1)], parentCount: before.length, parentId: first.parent }
 	}
 	const { entries: history, parentCount, parentId } = loaded
 	const usage = emptyUsage()

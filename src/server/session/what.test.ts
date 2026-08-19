@@ -215,6 +215,16 @@ test('digest includes deterministic attribution metadata', () => {
 })
 
 
+test('digest describes the fork transition in the shared history', () => {
+	const parent = makeSession('parent')
+	const child = uniqueId('child')
+	createdIds.push(child)
+	sessions.forkSession(parent, child)
+
+	expect(whatSummary.buildDigest(child, [child], {})).toContain(`At this point, session ${child} was forked from ${parent}.`)
+})
+
+
 test('digest marks prompts sent from another session', () => {
 	const target = makeSession('source', 'source')
 	sessions.appendHistory(target, [

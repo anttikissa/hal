@@ -149,6 +149,8 @@ function entryLine(sessionId: string, entry: HistoryEntry): string {
 	if (entry.type === 'log' || entry.type === 'info' || entry.type === 'warning' || entry.type === 'error') return `${entry.type}${ts}: ${clip(entry.text)}`
 	if (entry.type === 'cwd') return `cwd${ts}: ${entry.from} -> ${entry.to}`
 	if (entry.type === 'model') return `model${ts}: ${entry.from} -> ${entry.to}`
+	if (entry.type === 'forked_from') return `At this point, session ${sessionId} was forked from ${entry.parent}.`
+	if (entry.type === 'forked_to') return `At this point, session ${sessionId} was forked to ${entry.child}.`
 	return `${entry.type}${ts}`
 }
 
@@ -265,6 +267,7 @@ function systemPrompt(): string {
 		'Address the reader as "you". Do not write "the user" unless quoting text.',
 		'If a prompt came from another session, say that plainly when it matters, for example "Session 47-abc asked this session to ...".',
 		'Lead with what you asked for and the main conversation arc, then mention major pivots or follow-ups only if they matter for continuing the work.',
+		'Mention visible session forks with their parent ID.',
 		'Include why/context, clarifications, design or architectural decisions, and plan approval only when they are actually visible and useful.',
 		'Every sentence must help a human remember the user intent or continue the session; omit zero-information lines such as "no next steps", "no plan visible", or metadata inventories.',
 		'Do not show session id, tab, cwd, model, history path, entry counts, state, or role unless that provenance directly explains who did the work.',

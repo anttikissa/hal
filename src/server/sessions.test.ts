@@ -162,6 +162,20 @@ test('forkSession appends fork markers to parent and child history', async () =>
 })
 
 
+test('loadAllHistory retains the fork transition between parent and child history', async () => {
+	const parentId = await makeSession()
+	const childId = uniqueId()
+	createdIds.push(childId)
+	sessions.appendHistory(parentId, [userEntry('parent work', '2026-01-01T00:00:00.000Z')])
+	sessions.forkSession(parentId, childId)
+
+	expect(sessions.loadAllHistory(childId)).toMatchObject([
+		{ type: 'user' },
+		{ type: 'forked_from', parent: parentId },
+	])
+})
+
+
 test('forkSession names child as a lowercase fork of a named parent', async () => {
 	const parentId = await makeSession()
 	const childId = uniqueId()
