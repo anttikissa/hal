@@ -141,7 +141,7 @@ export interface SpawnCommandData {
 	mode: SpawnMode
 	model?: string
 	cwd?: string
-	title?: string
+	name?: string
 	childSessionId?: string
 }
 

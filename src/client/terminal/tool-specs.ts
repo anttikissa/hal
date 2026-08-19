@@ -271,7 +271,7 @@ const specs: Record<string, ToolSpec> = {
 	google: { title: (input) => `Google ${quoteToolArg(input?.query)}`, overflow: 'head' },
 	web_search: { title: (input) => `web_search ${quoteToolArg(input?.query)}`, overflow: 'head' },
 	ls: { title: (input) => `Ls ${input?.path ?? '.'}`, format: (output) => countIndicator(output, '(empty directory)', 'entries') },
-	spawn_agent: { title: (input) => input?.title ? `Spawn agent · ${input.title}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
+	spawn_agent: { title: (input) => input?.name ? `Spawn agent · ${input.name}` : 'Spawn agent', details: (input) => input == null ? undefined : ason.stringify(input, 'long') },
 	send: {
 		title(input, _output, sessionLabel) {
 			const target = sendTargetLabel(input, sessionLabel)

@@ -191,7 +191,7 @@ function spawnSession(parent: SessionMeta, spec: SpawnSpec): SessionMeta {
 			},
 	)
 	const workingDir = spec.cwd || child.workingDir || process.cwd()
-	const name = spec.title || child.name
+	const name = spec.name || child.name
 	sessionStore.updateMeta(child.id, {
 		workingDir,
 		model,
@@ -258,7 +258,7 @@ function buildSessionState(meta: SessionMeta): SessionState {
 		model: meta.model,
 		cwd: meta.workingDir ?? process.cwd(),
 		createdAt: meta.createdAt,
-		sessions: tabs.openSessionMetas().map((item) => ({ id: item.id, name: tabs.sessionTitle(item) })),
+		sessions: tabs.openSessionMetas().map((item) => ({ id: item.id, name: tabs.sessionName(item) })),
 	}
 }
 
@@ -803,7 +803,7 @@ function handleCommand(cmd: Command): void {
 				mode: cmd.spawn.mode === 'fresh' ? 'fresh' : 'fork',
 				model: cmd.spawn.model,
 				cwd: cmd.spawn.cwd,
-				title: cmd.spawn.title,
+				name: cmd.spawn.name,
 				childSessionId:
 					typeof cmd.spawn.childSessionId === 'string' && cmd.spawn.childSessionId.trim()
 						? cmd.spawn.childSessionId.trim()

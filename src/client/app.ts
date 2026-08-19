@@ -31,7 +31,6 @@ export type { Block }
 export interface Tab {
 	sessionId: string
 	name: string
-	title?: string
 	history: Block[]
 	// Per-tab prompt history for up-arrow recall. Extracted from session
 	// history entries on load, appended to on each prompt submission.
@@ -286,7 +285,7 @@ function sessionLabel(sessionId: string): string {
 	const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId)
 	const tab = state.tabs[index]
 	if (!tab) return sessionId
-	const details = [tab.title, index >= 0 ? `tab ${index + 1}` : ''].filter(Boolean).join(', ')
+	const details = [tab.name === tab.sessionId ? '' : tab.name, index >= 0 ? `tab ${index + 1}` : ''].filter(Boolean).join(', ')
 	return details ? `${sessionId} (${details})` : sessionId
 }
 
@@ -536,7 +535,6 @@ function canContinueCurrentTurn(): boolean {
 function makeTabFromDisk(info: SharedSessionInfo): Tab {
 	const snapshot = sessionLoader.load(info)
 	const tab = makeTab(snapshot.id, snapshot.name, { cwd: snapshot.cwd, model: snapshot.model, currentLog: snapshot.currentLog })
-	tab.title = info.name
 	tab.continuation = info.continuation
 	tab.rawHistory = snapshot.history
 	tab.parentEntryCount = snapshot.parentEntryCount
@@ -553,7 +551,7 @@ function makeTabFromDisk(info: SharedSessionInfo): Tab {
 }
 
 function applySessionList(items: SharedSessionInfo[], preferredSession = ''): void {
-	const previousLabels = state.tabs.map((tab) => `${tab.sessionId}\0${tab.title ?? ''}`).join('\n')
+	const previousLabels = state.tabs.map((tab) => `${tab.sessionId}\0${tab.name}`).join('\n')
 	sessionTabs.apply(items, preferredSession, {
 		model: state,
 		makeTabFromDisk,
@@ -568,7 +566,7 @@ function applySessionList(items: SharedSessionInfo[], preferredSession = ''): vo
 		onTabSwitch: (from: string, to: string) => onTabSwitch?.(from, to),
 		onChange,
 	})
-	if (previousLabels !== state.tabs.map((tab) => `${tab.sessionId}\0${tab.title ?? ''}`).join('\n')) state.sessionLabelVersion++
+	if (previousLabels !== state.tabs.map((tab) => `${tab.sessionId}\0${tab.name}`).join('\n')) state.sessionLabelVersion++
 }
 
 function applySharedStatus(shared: SharedState): void {

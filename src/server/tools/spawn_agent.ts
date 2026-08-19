@@ -14,7 +14,7 @@ function normalize(input: unknown, ctx: ToolContext): SpawnCommandData {
 		mode: raw.mode === 'fresh' ? 'fresh' : 'fork',
 		model: raw.model ? String(raw.model) : undefined,
 		cwd: raw.cwd ? String(raw.cwd) : ctx.cwd,
-		title: raw.title ? String(raw.title) : undefined,
+		name: raw.name ? String(raw.name) : undefined,
 	}
 }
 
@@ -64,7 +64,7 @@ const spawnAgentTool: Tool = {
 		mode: { type: 'string', enum: ['fork', 'fresh'], description: 'Whether to fork this session or start with fresh context.' },
 		model: { type: 'string', description: 'Optional model override for the child session.' },
 		cwd: { type: 'string', description: 'Optional working directory override for the child session.' },
-		title: { type: 'string', description: 'Optional tab title for the child session.' },
+		name: { type: 'string', description: 'Optional session name for the child, brief but descriptive, e.g. "Review rendering regression".' },
 	},
 	execute,
 }

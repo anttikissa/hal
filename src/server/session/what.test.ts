@@ -141,7 +141,7 @@ test('run does not overwrite existing target name', async () => {
 	ipc.appendEvent = () => {}
 	providerLoader.getProvider = async () => ({
 		async *generate() {
-			yield { type: 'text' as const, text: 'new title\n\nSummary.' }
+			yield { type: 'text' as const, text: 'New name\n\nSummary.' }
 			yield { type: 'done' as const, usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
 		},
 	})
@@ -258,19 +258,19 @@ test('digest highlights commit evidence before routine tool details', () => {
 })
 
 
-test('parseSummary breaks an overlong title on a word boundary instead of mid-word', () => {
-	const title = 'Diagnose subagent inbox delivery bug, then build a SolidJS web client'
-	const result = whatSummary.parseSummary(`${title}\n\nSummary body.`)
+test('parseSummary breaks an overlong name on a word boundary instead of mid-word', () => {
+	const name = 'Diagnose subagent inbox delivery bug, then build a SolidJS web client'
+	const result = whatSummary.parseSummary(`${name}\n\nSummary body.`)
 
-	expect(result.title.length).toBeLessThanOrEqual(60)
-	expect(title.startsWith(result.title)).toBe(true)
-	expect(result.title.endsWith(' ')).toBe(false)
-	expect(/\S$/.test(result.title)).toBe(true)
+	expect(result.name.length).toBeLessThanOrEqual(60)
+	expect(name.startsWith(result.name)).toBe(true)
+	expect(result.name.endsWith(' ')).toBe(false)
+	expect(/\S$/.test(result.name)).toBe(true)
 })
 
-test('parseSummary hard-truncates a title with no early whitespace to break on', () => {
-	const title = `x${'y'.repeat(80)}`
-	const result = whatSummary.parseSummary(`${title}\n\nSummary body.`)
+test('parseSummary hard-truncates a name with no early whitespace to break on', () => {
+	const name = `x${'y'.repeat(80)}`
+	const result = whatSummary.parseSummary(`${name}\n\nSummary body.`)
 
-	expect(result.title).toBe(title.slice(0, 60))
+	expect(result.name).toBe(name.slice(0, 60))
 })

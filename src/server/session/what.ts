@@ -27,7 +27,7 @@ interface RunWhatOpts {
 }
 
 interface SummaryResult {
-	title: string
+	name: string
 	summary: string
 }
 
@@ -256,9 +256,9 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 function systemPrompt(): string {
 	return [
 		'You write compact session-recall briefs for Hal coding-agent sessions.',
-		'Output plain text only: a bare title on the first line, one blank line, then the summary.',
-		'Do not use ASON, JSON, YAML, code fences, or labels such as "title:" and "summary:".',
-		'Title must name the initiating user problem or task, not merely the last follow-up; keep it short, descriptive, and at most 60 characters.',
+		'Output plain text only: a bare session name on the first line, one blank line, then the summary.',
+		'Do not use ASON, JSON, YAML, code fences, or labels such as "name:" and "summary:".',
+		'Name must state the initiating user problem or task, not merely the last follow-up; keep it brief but descriptive, capitalized, and at most 60 characters, for example "Review rendering regression".',
 		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
 		'Write like Strunk and White: short, plain sentences. Omit needless words. Split long sentences.',
 		'Address the reader as "you". Do not write "the user" unless quoting text.',
@@ -273,7 +273,7 @@ function systemPrompt(): string {
 		'Do not invent missing why, approval, files, commits, or decisions; say less rather than filling checklist sections.',
 		'Ignore routine tool noise, raw command output, repetitive file listings, and implementation detail unless it explains a decision, changed file, final commit, failure, or current state.',
 		'Use exact quotes only when the wording itself matters.',
-		'Do not copy any examples or unrelated prior summaries; the title and first paragraph must be grounded in the provided digest for the target session.',
+		'Do not copy any examples or unrelated prior summaries; the name and first paragraph must be grounded in the provided digest for the target session.',
 	].join('\n')
 }
 
@@ -283,14 +283,14 @@ function userPrompt(digest: string): string {
 
 function parseSummary(text: string): SummaryResult {
 	const lines = text.trim().split('\n')
-	const title = sanitizeTitle(lines.shift() ?? '')
-	return { title, summary: lines.join('\n').trim() }
+	const name = sanitizeName(lines.shift() ?? '')
+	return { name, summary: lines.join('\n').trim() }
 }
 
-function sanitizeTitle(text: string): string {
+function sanitizeName(text: string): string {
 	const normalized = text.trim().replace(/\s+/g, ' ')
 	if (normalized.length <= 60) return normalized
-	// Break on the last whitespace before the limit so a long title never ends mid-word.
+	// Break on the last whitespace before the limit so a long name never ends mid-word.
 	const cut = normalized.slice(0, 60)
 	const lastSpace = cut.lastIndexOf(' ')
 	return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim()
@@ -313,15 +313,15 @@ async function summarizeDigest(model: string, digest: string): Promise<SummaryRe
 
 function formatSection(sessionId: string, result: SummaryResult): string {
 	const meta = sessions.loadSessionMeta(sessionId)
-	const title = result.title || meta?.name || sessionId
-	return [`## /what summary: ${title}`, '', result.summary].join('\n')
+	const name = result.name || meta?.name || sessionId
+	return [`## /what summary: ${name}`, '', result.summary].join('\n')
 }
 
-function maybeNameSession(sessionId: string, title: string): boolean {
-	if (!title) return false
+function maybeNameSession(sessionId: string, name: string): boolean {
+	if (!name) return false
 	const meta = sessions.loadSessionMeta(sessionId)
 	if (!meta || meta.name) return false
-	sessions.updateMeta(sessionId, { name: title })
+	sessions.updateMeta(sessionId, { name })
 	return true
 }
 
@@ -372,7 +372,7 @@ async function run(opts: RunWhatOpts): Promise<{ renamed: boolean; targetIds: st
 		try {
 			const digest = whatSummary.buildDigest(sessionId, opts.openSessionIds, shared.working ?? {})
 			const summary = await whatSummary.summarizeDigest(model, digest)
-			if (whatSummary.maybeNameSession(sessionId, summary.title)) renamed = true
+			if (whatSummary.maybeNameSession(sessionId, summary.name)) renamed = true
 			persist(sessionId, [sessionId], formatSection(sessionId, summary))
 		} catch (err) {
 			persist(sessionId, [sessionId], [`## /what summary: ${sessionId}`, '', `Summary failed: ${errorMessage(err)}`].join('\n'))

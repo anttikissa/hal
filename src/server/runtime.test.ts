@@ -1200,7 +1200,7 @@ test('spawnSession creates a fresh child with auto-close marker', async () => {
 			mode: 'fresh',
 			model: 'openai/gpt-5',
 			cwd: '/work/child',
-			title: 'Child tab',
+			name: 'Child tab',
 			childSessionId: '04-kid',
 		})
 
@@ -1401,7 +1401,7 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 			mode: 'fresh' as const,
 			model: 'openai/gpt-5',
 			cwd: '/work/child',
-			title: 'Child tab',
+			name: 'Child tab',
 		}
 		const child = await runtime.spawnSession(parent, spec)
 		await runtime.startSpawnedSession(parent, child, spec)
@@ -1422,7 +1422,7 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 			task: '',
 			kind: 'interactive' as const,
 			mode: 'fresh' as const,
-			title: 'Scratch tab',
+			name: 'Scratch tab',
 		}
 		const interactiveChild = await runtime.spawnSession(parent, interactiveSpec)
 		await runtime.startSpawnedSession(parent, interactiveChild, interactiveSpec)
@@ -1433,7 +1433,7 @@ test('startSpawnedSession writes the child prompt to history without a prompt ev
 			task: 'MAKE MODEL PICKER GREAT AGAIN',
 			kind: 'interactive' as const,
 			mode: 'fresh' as const,
-			title: 'Prompted tab',
+			name: 'Prompted tab',
 		}
 		const promptedInteractiveChild = await runtime.spawnSession(parent, promptedInteractiveSpec)
 		await runtime.startSpawnedSession(parent, promptedInteractiveChild, promptedInteractiveSpec)

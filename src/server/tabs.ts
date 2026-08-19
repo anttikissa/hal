@@ -17,14 +17,14 @@ import { runtime } from './runtime.ts'
 
 type OpenSessionLike = { id: string; cwd: string }
 
-function sessionTitle(meta: Pick<SessionMeta, 'id' | 'name'>): string {
+function sessionName(meta: Pick<SessionMeta, 'id' | 'name'>): string {
 	return meta.name ?? meta.id
 }
 
 function sessionLabel(meta: Pick<SessionMeta, 'id' | 'name'>): string {
-	const title = sessionTitle(meta)
-	if (title === meta.id) return meta.id
-	return `${title} (${meta.id})`
+	const name = sessionName(meta)
+	if (name === meta.id) return meta.id
+	return `${name} (${meta.id})`
 }
 
 function openSessionMetas(): SessionMeta[] {
@@ -200,7 +200,7 @@ export const tabs = {
 	findOpenSessionForCwd,
 	rememberedTabForCwd,
 	openLimitReason,
-	sessionTitle,
+	sessionName,
 	sessionLabel,
 	openSessionMetas,
 	focusSession,

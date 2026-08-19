@@ -72,7 +72,7 @@ test('spawn_agent passes through fresh mode and subagent-leave-open kind', async
 	}
 
 	const result = await spawnAgent.execute(
-		{ task: 'Research bar', kind: 'subagent-leave-open', mode: 'fresh', model: 'openai/gpt-5.4', cwd: '/work', title: 'Bar scout' },
+		{ task: 'Research bar', kind: 'subagent-leave-open', mode: 'fresh', model: 'openai/gpt-5.4', cwd: '/work', name: 'Bar scout' },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
 	const spawn = appended[0]?.spawn
@@ -89,7 +89,7 @@ test('spawn_agent passes through fresh mode and subagent-leave-open kind', async
 		mode: 'fresh',
 		model: 'openai/gpt-5.4',
 		cwd: '/work',
-		title: 'Bar scout',
+		name: 'Bar scout',
 	})
 })
 
@@ -120,7 +120,7 @@ test('spawn_agent can open an interactive session without a task', async () => {
 	}
 
 	const result = await spawnAgent.execute(
-		{ kind: 'interactive', mode: 'fresh', title: 'Scratch' },
+		{ kind: 'interactive', mode: 'fresh', name: 'Scratch' },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
 	const spawn = appended[0]?.spawn
@@ -132,7 +132,7 @@ test('spawn_agent can open an interactive session without a task', async () => {
 		kind: 'interactive',
 		mode: 'fresh',
 		cwd: '/tmp/project',
-		title: 'Scratch',
+		name: 'Scratch',
 	})
 })
 
@@ -150,7 +150,7 @@ test('spawn_agent sends an initial prompt to interactive sessions when task is p
 	})
 
 	const result = await spawnAgent.execute(
-		{ task: 'MAKE MODEL PICKER GREAT AGAIN', kind: 'interactive', mode: 'fresh', title: 'fix picker' },
+		{ task: 'MAKE MODEL PICKER GREAT AGAIN', kind: 'interactive', mode: 'fresh', name: 'Fix model picker' },
 		{ sessionId: '04-parent', cwd: '/tmp/project' },
 	)
 	const spawn = appended[0]?.spawn
@@ -162,6 +162,6 @@ test('spawn_agent sends an initial prompt to interactive sessions when task is p
 		task: 'MAKE MODEL PICKER GREAT AGAIN',
 		kind: 'interactive',
 		mode: 'fresh',
-		title: 'fix picker',
+		name: 'Fix model picker',
 	})
 })
