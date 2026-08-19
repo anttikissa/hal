@@ -105,4 +105,21 @@ describe('render single pass', () => {
 			blockRenderer.renderBlock = origRenderBlock
 		}
 	})
+
+	test('cached 1,000-entry history leaves prompt redraw responsive', () => {
+		const tab = client.currentTab()!
+		const body = 'x'.repeat(80)
+		for (let i = 0; i < 1000; i++) tab.history.push({ type: 'info', text: `${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}\n${body}` })
+		const originalWrite = process.stdout.write.bind(process.stdout)
+		;(process.stdout as any).write = () => true
+		try {
+			render.draw() // Populate the per-block cache outside the measurement.
+			prompt.setText('x')
+			const started = performance.now()
+			render.draw()
+			expect(performance.now() - started).toBeLessThan(10)
+		} finally {
+			;(process.stdout as any).write = originalWrite
+		}
+	})
 })

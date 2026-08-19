@@ -43,18 +43,45 @@ function physicalHeight(lines: string[], cols: number, end = lines.length): numb
 	return height
 }
 
-function visibleLineStart(lines: string[], cols: number, rows: number): { index: number; row: number } {
-	const viewportTop = Math.max(0, physicalHeight(lines, cols) - rows)
-	let lineTop = 0
+type Frame = {
+	lines: string[]
+	lineTops: number[]
+	height: number
+	cols: number
+	cursor: { row: number; col: number }
+}
+
+// A frame's strings are compared repeatedly. Reuse row heights for its unchanged
+// prefix, then measure only new lines; keeping prefix heights makes cursor movement O(1).
+function lineTops(lines: string[], cols: number, previous?: Frame): number[] {
+	const tops = [0]
+	const canReuse = previous?.cols === cols
 	for (let i = 0; i < lines.length; i++) {
-		const nextTop = lineTop + physicalRows(lines[i]!, cols)
-		if (nextTop > viewportTop) {
-			if (lineTop < viewportTop) return { index: i + 1, row: nextTop - viewportTop }
-			return { index: i, row: lineTop - viewportTop }
-		}
-		lineTop = nextTop
+		let rows: number
+		if (canReuse && lines[i] === previous.lines[i]) rows = previous.lineTops[i + 1]! - previous.lineTops[i]!
+		else rows = physicalRows(lines[i]!, cols)
+		tops.push(tops[tops.length - 1]! + rows)
 	}
-	return { index: lines.length, row: 0 }
+	return tops
+}
+
+function appendLineTops(tops: number[], lines: string[], cols: number, start: number): void {
+	for (let i = start; i < lines.length; i++) tops.push(tops[tops.length - 1]! + physicalRows(lines[i]!, cols))
+}
+
+function visibleLineStart(frame: Frame, rows: number): { index: number; row: number } {
+	const viewportTop = Math.max(0, frame.height - rows)
+	let low = 0
+	let high = frame.lines.length
+	while (low < high) {
+		const mid = Math.floor((low + high) / 2)
+		if (frame.lineTops[mid + 1]! <= viewportTop) low = mid + 1
+		else high = mid
+	}
+	const lineTop = frame.lineTops[low]!
+	const nextTop = frame.lineTops[low + 1]!
+	if (lineTop < viewportTop) return { index: low + 1, row: nextTop - viewportTop }
+	return { index: low, row: lineTop - viewportTop }
 }
 
 // ── Diff engine state ────────────────────────────────────────────────────────
@@ -70,7 +97,7 @@ function visibleLineStart(lines: string[], cols: number, rows: number): { index:
 //                back to grow mode (scrollback is tainted). One-way flag.
 //   blockCache — rendered block lines keyed by block object + width.
 
-let prevLines: string[] = []
+let prevFrame: Frame = { lines: [], lineTops: [0], height: 0, cols: 0, cursor: { row: 0, col: 0 } }
 let cursorRow = 0
 let cursorCol = 0
 let fullscreen = false
@@ -103,7 +130,7 @@ function writeTerminal(s: string): void {
 }
 
 function resetRenderer(): void {
-	prevLines = []
+	prevFrame = { lines: [], lineTops: [0], height: 0, cols: 0, cursor: { row: 0, col: 0 } }
 	cursorRow = 0
 	cursorCol = 0
 	fullscreen = false
@@ -145,7 +172,7 @@ function applyPopupOverlay(lines: string[]): { row: number; col: number } | null
 	return overlay.cursor ? { row: viewportTop + overlay.cursor.row, col: overlay.cursor.col } : null
 }
 
-function buildFrame(): { lines: string[]; cursor: { row: number; col: number } } {
+function buildFrame(): Frame {
 	const rows = process.stdout.rows || 24
 	const cols = process.stdout.columns || 80
 	const chrome = renderStatus.chromeLines()
@@ -154,7 +181,8 @@ function buildFrame(): { lines: string[]; cursor: { row: number; col: number } }
 
 	// 1. History — all entries, all lines, NEVER sliced. See terminal.md rule 3.
 	if (tab) renderHistory.renderLines(lines, tab, cols, historyContext())
-	const historyHeight = physicalHeight(lines, cols)
+	let tops = lineTops(lines, cols, prevFrame)
+	const historyHeight = tops[tops.length - 1]!
 
 	// Update peak lazily: the focused tab now, other tabs on switch.
 	if (historyHeight > client.state.peak) {
@@ -165,25 +193,32 @@ function buildFrame(): { lines: string[]; cursor: { row: number; col: number } }
 	// 2. Padding — blank lines to keep prompt at a stable row across tabs.
 	const contentHeight = Math.min(client.state.peak, Math.max(0, rows - chrome))
 	const padding = Math.max(0, contentHeight - historyHeight)
+	const paddingStart = lines.length
 	for (let i = 0; i < padding; i++) lines.push('')
+	appendLineTops(tops, lines, cols, paddingStart)
 
 	// Once the frame exceeds terminal height, fullscreen is permanent.
-	if (physicalHeight(lines, cols) + chrome > rows) fullscreen = true
+	if (tops[tops.length - 1]! + chrome > rows) fullscreen = true
 
 	// 3. Chrome: tab bar, prompt box, status line, help bar.
+	const chromeStart = lines.length
 	renderStatus.renderTabBar(lines)
 	renderStatus.renderPrompt(lines)
 	renderStatus.renderStatusLine(lines)
 	renderStatus.renderHelpBar(lines)
+	appendLineTops(tops, lines, cols, chromeStart)
 
 	const popupCursor = applyPopupOverlay(lines)
-	if (popupCursor) return { lines, cursor: popupCursor }
+	if (popupCursor) {
+		tops = lineTops(lines, cols, prevFrame)
+		return { lines, lineTops: tops, height: tops[tops.length - 1]!, cols, cursor: popupCursor }
+	}
 
 	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
 	// Prompt sits between two rule rows, immediately above status + help.
 	const promptStartIndex = lines.length - p.lines.length - 3
-	const promptStart = physicalHeight(lines, cols, promptStartIndex)
-	return { lines, cursor: { row: promptStart + p.cursor.rowOffset, col: Math.min(cols, p.cursor.col + 2) } }
+	const promptStart = tops[promptStartIndex]!
+	return { lines, lineTops: tops, height: tops[tops.length - 1]!, cols, cursor: { row: promptStart + p.cursor.rowOffset, col: Math.min(cols, p.cursor.col + 2) } }
 }
 
 function moveCursor(from: number, to: number): string {
@@ -212,9 +247,9 @@ function positionCursor(from: number, target: { row: number; col: number }): str
 // cursorRow/cursorCol. The cursor target is computed ONCE at the top.
 
 
-function repaintFullscreenGrowth(lines: string[], cursor: { row: number; col: number }, rows: number, cols: number): void {
-	const oldLength = prevLines.length
-	const start = visibleLineStart(prevLines, cols, rows)
+function repaintFullscreenGrowth(frame: Frame, rows: number): void {
+	const oldLength = prevFrame.lines.length
+	const start = visibleLineStart(prevFrame, rows)
 	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}H`]
 
 	// A logical URL can start above the viewport and soft-wrap into it. Its visible
@@ -223,21 +258,20 @@ function repaintFullscreenGrowth(lines: string[], cursor: { row: number; col: nu
 	let wroteLine = false
 	for (let i = start.index; i < oldLength; i++) {
 		if (wroteLine) out.push('\r\n')
-		out.push(`${CSI}2K${lines[i]!}`)
+		out.push(`${CSI}2K${frame.lines[i]!}`)
 		wroteLine = true
 	}
-	for (let i = oldLength; i < lines.length; i++) out.push(`\r\n${CSI}2K${lines[i]!}`)
-	out.push(positionCursor(physicalHeight(lines, cols) - 1, cursor), `${CSI}?2026l`)
-	prevLines = lines
+	for (let i = oldLength; i < frame.lines.length; i++) out.push(`\r\n${CSI}2K${frame.lines[i]!}`)
+	out.push(positionCursor(frame.height - 1, frame.cursor), `${CSI}?2026l`)
+	prevFrame = frame
 	writeTerminal(out.join(''))
 }
 function draw(force = false): void {
 	if (terminalOutput.isExternalEditorOpen()) return
 	const rows = process.stdout.rows || 24
-	const cols = process.stdout.columns || 80
-	const screen = buildFrame()
-	const lines = screen.lines
-	const cursor = screen.cursor
+	const frame = buildFrame()
+	const lines = frame.lines
+	const cursor = frame.cursor
 	// Popup frames hard-wrap soft URLs, so never diff across the two layouts.
 	if (popup.state.active !== paintedPopupActive) {
 		paintedPopupActive = popup.state.active
@@ -264,9 +298,9 @@ function draw(force = false): void {
 		}
 		// After writing all lines, cursor is on the last frame line.
 		// positionCursor moves it to the prompt cursor position.
-		out.push(positionCursor(physicalHeight(lines, cols) - 1, cursor))
+		out.push(positionCursor(frame.height - 1, cursor))
 		out.push(`${CSI}?2026l`)
-		prevLines = lines
+		prevFrame = frame
 		writeTerminal(out.join(''))
 		return
 	}
@@ -278,24 +312,22 @@ function draw(force = false): void {
 	// ── Diff: find changed range ──
 	let first = -1
 	let last = -1
-	const max = Math.max(lines.length, prevLines.length)
+	const max = Math.max(lines.length, prevFrame.lines.length)
 	for (let i = 0; i < max; i++) {
 		// Compare with null so we can distinguish "line is empty string"
-		// from "line doesn't exist". Without this, appending an empty line
-		// (e.g. shift+enter at end of prompt → new blank prompt line) is
-		// invisible to the diff because `undefined ?? ''` === `''`.
-		if ((lines[i] ?? null) !== (prevLines[i] ?? null)) {
+		// from "line doesn't exist".
+		if ((lines[i] ?? null) !== (prevFrame.lines[i] ?? null)) {
 			if (first === -1) first = i
 			last = i
 		}
 	}
 
 	// If the first changed logical line is already in scrollback, terminals clamp
-	// cursor-up at the top of the visible screen. Work in physical heights because
-	// one standalone URL may occupy several terminal rows.
-	const prevHeight = physicalHeight(prevLines, cols)
-	const nextHeight = physicalHeight(lines, cols)
-	const viewportTop = visibleLineStart(prevLines, cols, rows).index
+	// cursor-up at the top of the visible screen. Frame prefix heights preserve the
+	// native soft-wrap semantics without repeatedly parsing every ANSI line.
+	const prevHeight = prevFrame.height
+	const nextHeight = frame.height
+	const viewportTop = visibleLineStart(prevFrame, rows).index
 	const frameShrunk = nextHeight < prevHeight
 	const frameGrew = nextHeight > prevHeight
 	// Prompt shrink is user-driven, so a full canonical repaint is preferable to
@@ -304,24 +336,22 @@ function draw(force = false): void {
 		draw(true)
 		return
 	}
-	if (fullscreen && frameGrew && nextHeight > rows && first >= 0 && first < prevLines.length) {
-		repaintFullscreenGrowth(lines, cursor, rows, cols)
+	if (fullscreen && frameGrew && nextHeight > rows && first >= 0 && first < prevFrame.lines.length) {
+		repaintFullscreenGrowth(frame, rows)
 		return
 	}
 	if (first !== -1 && first < viewportTop) {
-		if (last < viewportTop) {
-			first = -1
-		} else {
-			first = viewportTop
-		}
+		if (last < viewportTop) first = -1
+		else first = viewportTop
 	}
 
 	// ── Cursor-only: no lines changed ──
+
 	// Common case: user moved cursor within the prompt without changing text
 	// (e.g. arrow keys, Ctrl-A/E). Frame lines are identical but cursor
-	// position changed. We skip the full diff machinery and just reposition.
+	// position changed, so only the terminal cursor moves.
 	if (first === -1) {
-		if (cursorRow === cursor.row && cursorCol === cursor.col && prevLines.length > 0) {
+		if (cursorRow === cursor.row && cursorCol === cursor.col && prevFrame.lines.length > 0) {
 			scheduleFade()
 			return
 		}
@@ -331,26 +361,13 @@ function draw(force = false): void {
 
 	// ── Diff repaint: rewrite from first change ──
 	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`]
-
-	// Two sub-cases: rewriting existing lines vs appending new ones.
-	//
-	// APPEND: first >= prevLines.length. All old lines match; we just need
-	// to add new lines at the end. We move to the last existing line and
-	// use \r\n to scroll into new territory. We CANNOT use CSI B to move
-	// past the bottom of the screen — it's clamped and silently ignored,
-	// which would make us overwrite the wrong line.
-	//
-	// REWRITE: first < prevLines.length. Some existing line changed. Move
-	// there, overwrite from that point forward.
-	const isAppend = first >= prevLines.length && prevLines.length > 0
+	const isAppend = first >= prevFrame.lines.length && prevFrame.lines.length > 0
 	if (isAppend) {
 		// Move to the last existing line, then \r\n into new territory.
 		out.push(moveCursor(cursorRow, prevHeight - 1))
-		for (let i = first; i < lines.length; i++) {
-			out.push(`\r\n${CSI}2K${lines[i]!}`)
-		}
+		for (let i = first; i < lines.length; i++) out.push(`\r\n${CSI}2K${lines[i]!}`)
 	} else {
-		out.push(moveCursor(cursorRow, physicalHeight(prevLines, cols, first)))
+		out.push(moveCursor(cursorRow, prevFrame.lineTops[first]!))
 		out.push('\r')
 		for (let i = first; i < lines.length; i++) {
 			if (i > first) out.push('\r\n')
@@ -359,9 +376,6 @@ function draw(force = false): void {
 	}
 
 	// Frame shrunk (e.g. multiline prompt collapsed to single line).
-	// Move to the first leftover row and clear from there. Use cursor-down,
-	// not CRLF: when the prompt is at the bottom of the viewport, CRLF scrolls
-	// the terminal and leaves a stray blank row below the help bar.
 	let lastWrittenRow = nextHeight - 1
 	if (frameShrunk) {
 		out.push(`\r${CSI}1B${CSI}J`)
@@ -370,7 +384,7 @@ function draw(force = false): void {
 
 	out.push(positionCursor(lastWrittenRow, cursor))
 	out.push(`${CSI}?2026l`)
-	prevLines = lines
+	prevFrame = frame
 	writeTerminal(out.join(''))
 }
 
@@ -380,7 +394,7 @@ function draw(force = false): void {
 // so the new process can paint fresh without leftover content.
 function clearFrame(): void {
 	if (terminalOutput.isExternalEditorOpen()) return
-	if (prevLines.length === 0) return
+	if (prevFrame.lines.length === 0) return
 	const rows = process.stdout.rows || 24
 	if (!fullscreen) {
 		const up = Math.min(cursorRow, rows - 1)
@@ -391,7 +405,7 @@ function clearFrame(): void {
 	} else {
 		terminalOutput.write(`${CSI}2J${CSI}H${CSI}3J`)
 	}
-	prevLines = []
+	prevFrame = { lines: [], lineTops: [0], height: 0, cols: 0, cursor: { row: 0, col: 0 } }
 	cursorRow = 0
 }
 
