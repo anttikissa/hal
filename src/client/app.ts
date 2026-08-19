@@ -79,12 +79,6 @@ const config = {
 	backgroundLoadBlobs: true,
 	repaintAfterBlobLoad: true,
 	pausedNoticeDelayMs: 50,
-	claudeCacheWarningEnabled: true,
-	// Derived from the observed 2026-05-01 Opus incident: ~170k cache-write
-	// tokens moved the 5h subscription meter by about 24%.
-	claudeCacheWarningTokensPerFiveHourPercent: 7_100,
-	claudeCacheWarningQuotaPercent: 10,
-	claudeCacheWarningStaleMs: 5 * 60 * 1000,
 }
 
 

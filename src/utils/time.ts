@@ -2,7 +2,6 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 const MINUTE_MS = 60 * 1000
 const HOUR_MS = 60 * MINUTE_MS
-const DAY_MS = 24 * HOUR_MS
 
 function pad2(n: number): string {
 	return String(n).padStart(2, '0')
@@ -80,14 +79,6 @@ function formatAge(ms: number): string {
 	return `${unit(Math.max(1, totalHours), 'hour')} ago`
 }
 
-function formatShortAge(ms: number): string {
-	if (ms >= 2 * DAY_MS) return `${Math.round(ms / DAY_MS)} days ago`
-	if (ms >= DAY_MS) return 'yesterday'
-	if (ms >= HOUR_MS) return `${Math.round(ms / HOUR_MS)}h ago`
-	if (ms >= MINUTE_MS) return `${Math.round(ms / MINUTE_MS)}m ago`
-	return 'just now'
-}
-
 function formatLastActiveNotice(ts: number, now = Date.now()): string {
 	return `This session was last active ${formatDateTime(ts)} (${formatAge(now - ts)}). Run /what if you would like a summary of what happened here.`
 }
@@ -124,7 +115,6 @@ export const time = {
 	formatDateTime,
 	formatLocalDateTime,
 	formatAge,
-	formatShortAge,
 	formatLastActiveNotice,
 	formatResetAt,
 	formatSystemDate,

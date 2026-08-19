@@ -250,8 +250,6 @@ test('tab switching preserves the full prompt editor state', () => {
 		prompt.clear()
 	}
 })
-
-
 test('idle up uses normal prompt history without edit mode hint', () => {
 	const tab = makeTab({ inputHistory: ['old prompt'] })
 	client.state.working.clear()
@@ -464,8 +462,6 @@ test('host delivers prompt and abort directly instead of waiting for disk IPC', 
 		client.state.localCommandHandler = null
 	}
 })
-
-
 test('up while working edits pasted prompt contents instead of display marker', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -493,8 +489,6 @@ test('up while working edits pasted prompt contents instead of display marker', 
 		promptEdit.cancel()
 	}
 })
-
-
 test('up while working edits the visible latest prompt when local input history is stale', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -550,8 +544,6 @@ test('up while working does not copy an inbox handoff as a prompt', () => {
 		promptEdit.cancel()
 	}
 })
-
-
 test('up on newline draft while working stays in the prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -576,8 +568,6 @@ test('up on newline draft while working stays in the prompt', () => {
 		promptEdit.cancel()
 	}
 })
-
-
 test('up while working after visible output edits by canceling old turn', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -609,8 +599,6 @@ test('up while working after visible output edits by canceling old turn', () => 
 		promptEdit.cancel()
 	}
 })
-
-
 test('history navigation inside just-sent edit skips the already loaded prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -671,8 +659,6 @@ test('down from just-sent edit continues the original prompt', () => {
 		promptEdit.cancel()
 	}
 })
-
-
 test('down from restored just-sent edit continues the original prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -731,8 +717,6 @@ test('tab switch loads empty draft when prompt-edit metadata exists', () => {
 		client.state.focusedTabIndex = origFocusedTab
 	}
 })
-
-
 test('down in just-sent edit moves through blank prompt lines before continuing', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -775,8 +759,6 @@ test('ctrl-q runs the next queued prompt', () => {
 		clientTransport.io.appendCommand = origAppendCommand
 	}
 })
-
-
 test('/keys is local terminal help and does not send a prompt while working', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -853,8 +835,6 @@ test('enter on empty working error tab does not retry again', () => {
 		client.state.focusedTabIndex = origFocusedTab
 	}
 })
-
-
 test('enter on empty error tab hides retry action immediately', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand
@@ -936,52 +916,5 @@ test('enter on empty normal tab does not send continue', () => {
 		client.state.tabs.length = 0
 		client.state.tabs.push(...origTabs)
 		client.state.focusedTabIndex = origFocusedTab
-	}
-})
-
-
-test('large stale Claude session opens overage confirmation before sending', () => {
-	const commands: any[] = []
-	const origAppendCommand = clientTransport.io.appendCommand
-	const tab = makeTab({
-		model: 'anthropic/claude-opus-4-7',
-		contextUsed: 170_000,
-		history: [{ type: 'assistant', text: 'old', model: 'anthropic/claude-opus-4-7', ts: Date.now() - 24 * 60 * 60 * 1000 }],
-	})
-	clientTransport.io.appendCommand = (command) => { commands.push(command) }
-	try {
-		withOneTab(tab, () => {
-			prompt.setText('hi')
-			const handled = cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
-			expect(handled).toBe(true)
-			expect(commands).toEqual([])
-			expect(popup.state.active).toBe(true)
-			expect(popup.state.title).toBe('Claude cache likely cold')
-			expect(prompt.text()).toBe('hi')
-		})
-	} finally {
-		clientTransport.io.appendCommand = origAppendCommand
-	}
-})
-
-test('large stale Claude confirmation sends when accepted', () => {
-	const commands: any[] = []
-	const origAppendCommand = clientTransport.io.appendCommand
-	const tab = makeTab({
-		model: 'anthropic/claude-opus-4-7',
-		contextUsed: 170_000,
-		history: [{ type: 'assistant', text: 'old', model: 'anthropic/claude-opus-4-7', ts: Date.now() - 24 * 60 * 60 * 1000 }],
-	})
-	clientTransport.io.appendCommand = (command) => { commands.push(command) }
-	try {
-		withOneTab(tab, () => {
-			prompt.setText('hi')
-			cli.forTests.handleAppKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
-			popup.handleKey({ key: 'enter', shift: false, ctrl: false, alt: false, cmd: false })
-			expect(commands).toMatchObject([{ type: 'prompt', text: 'hi' }])
-			expect(prompt.text()).toBe('')
-		})
-	} finally {
-		clientTransport.io.appendCommand = origAppendCommand
 	}
 })

@@ -154,18 +154,18 @@ describe('popup', () => {
 		expect(overlay!.lines.find((line) => line.includes('Opus 5'))).toContain(colors.popup.modelCurrent.bg)
 	})
 
-	test('warning popup uses the same highlighted row layout', () => {
+	test('confirm popup uses the same highlighted row layout', () => {
 		popup.openConfirm('Looks suspicious', ['read auth.ason'], ['Yes', 'No'], () => {})
 		const overlay = popup.buildOverlay(80, 24)
 		expect(overlay).not.toBeNull()
 		expect(overlay?.lines.join('\n')).toContain('[Yes]')
-		expect(overlay?.lines[0]).toContain(colors.popup.warningFg)
+		expect(overlay?.lines[0]).toContain(colors.popup.dangerFg)
 	})
 
 	test('danger confirm popup wraps long lines instead of truncating them', () => {
 		// A single long line that exceeds the popup width must be wrapped, not clipped with '…'.
 		const longTail = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
-		popup.openConfirm('Risky tool call', [`start ${longTail} end`], ['Yes', 'No'], () => {}, 'danger')
+		popup.openConfirm('Risky tool call', [`start ${longTail} end`], ['Yes', 'No'], () => {})
 		const overlay = popup.buildOverlay(60, 40)
 		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))
 		expect(clean.join('\n')).not.toContain('…')
@@ -174,7 +174,7 @@ describe('popup', () => {
 
 	test('confirm popup splits body lines that contain embedded newlines', () => {
 		const body = ['Session x (tab 1) wants to do this:', '', 'bash:', "python3 - <<'PY'\nfrom pathlib import Path\np=Path('hello')\nPY"]
-		popup.openConfirm('Risky tool call', body, ['Yes', 'No'], () => {}, 'danger')
+		popup.openConfirm('Risky tool call', body, ['Yes', 'No'], () => {})
 		const overlay = popup.buildOverlay(100, 40)
 		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))
 		for (let i = 1; i < clean.length - 1; i++) {
@@ -189,7 +189,7 @@ describe('popup', () => {
 		const body = ['start']
 		for (let i = 0; i < 30; i++) body.push(`body line ${i}`)
 		body.push('important reason at the bottom')
-		popup.openConfirm('Risky tool call', body, ['Yes', 'No'], () => {}, 'danger')
+		popup.openConfirm('Risky tool call', body, ['Yes', 'No'], () => {})
 		const overlay = popup.buildOverlay(80, 12)
 		expect(overlay).not.toBeNull()
 		expect(overlay!.y + overlay!.lines.length).toBeLessThan(12)
@@ -206,14 +206,14 @@ describe('popup', () => {
 	test('tabs in body text keep every row the same rendered width', () => {
 		// A tab's width depends on the column it starts at. The popup measures content
 		// in isolation but draws it inset after '│ ', so raw tabs would desync the border.
-		popup.openConfirm('Risky tool call', ['bash:', "const a = [\n\t'first',\n\t\t'second',\n]"], ['Yes', 'No'], () => {}, 'danger')
+		popup.openConfirm('Risky tool call', ['bash:', "const a = [\n\t'first',\n\t\t'second',\n]"], ['Yes', 'No'], () => {})
 		const overlay = popup.buildOverlay(60, 20)
 		const widths = new Set(overlay!.lines.map((line) => visLen(line)))
 		expect(widths.size).toBe(1)
 	})
 
 	test('confirm popup gives text horizontal and vertical breathing room', () => {
-		popup.openConfirm('Claude cache likely cold', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
+		popup.openConfirm('Risky tool call', ['Sending this may write 170k tokens.'], ['Send anyway', 'Cancel'], () => {})
 		const overlay = popup.buildOverlay(100, 30)
 		expect(overlay).not.toBeNull()
 		const clean = overlay!.lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, ''))

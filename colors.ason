@@ -116,7 +116,6 @@
 
 	popup: {
 		neutralFg: [0.64, 0, 0],
-		warningFg: [0.78, 0.14, 85],
 		dangerFg: [0.86, 0.16, 85],
 		current: {
 			fg: [0.98, 0.04, 55],

@@ -39,7 +39,6 @@ const state = {
 	active: false,
 	kind: null as 'model' | 'confirm' | null,
 	title: '',
-	tone: 'neutral' as 'neutral' | 'warning' | 'danger',
 	body: [] as string[],
 	items: [] as PopupItem[],
 	selectedIndex: 0,
@@ -198,19 +197,17 @@ function openModelPicker(onChoose: (value: string) => void, currentModel?: strin
 	state.currentModel = currentModel ? models.resolveModel(currentModel) : ''
 	resetOpenModelCategories()
 	state.title = state.currentModel ? `Pick a model (current: ${state.currentModel})` : 'Pick a model'
-	state.tone = 'neutral'
 	state.onChoose = onChoose
 	state.preferredInnerWidth = MODEL_PICKER_INNER_WIDTH
 	refreshModelItems()
 	if (currentModel) selectModelValue(models.resolveModel(currentModel))
 }
 
-function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void, tone: 'warning' | 'danger' = 'warning'): void {
+function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void): void {
 	close()
 	state.active = true
 	state.kind = 'confirm'
 	state.title = title
-	state.tone = tone
 	state.body = body
 	state.items = choices.map((choice) => ({ value: choice, label: choice, kind: 'model' }))
 	state.onChoose = onChoose
@@ -301,9 +298,11 @@ function handleKey(k: KeyEvent): boolean {
 	return false
 }
 
+// Confirms are always risky actions, so they use the danger color; the model
+// picker is informational and stays neutral.
 function toneColor(): string {
-	if (state.tone === 'danger') return colors.popup.dangerFg || colors.warning.fg
-	return state.tone === 'warning' ? colors.popup.warningFg || colors.warning.fg : colors.popup.neutralFg || colors.status.fg
+	if (state.kind === 'confirm') return colors.popup.dangerFg || colors.warning.fg
+	return colors.popup.neutralFg || colors.status.fg
 }
 
 function rowText(item: PopupItem, active: boolean): string {

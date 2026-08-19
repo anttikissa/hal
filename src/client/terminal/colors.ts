@@ -20,7 +20,7 @@ type MdColors = BlockColors & { bold: string; code: string }
 type StatusColors = { fg: string; highlight: string }
 type HelpColors = { key: string; description: string }
 type TabColors = { activeFg: string; inactiveFg: string; doneFg: string; warningFg: string; errorFg: string; pausedFg: string }
-type PopupColors = { current: { fg: string; bg: string }; modelCurrent: { fg: string; bg: string }; neutralFg: string; warningFg: string; dangerFg: string }
+type PopupColors = { current: { fg: string; bg: string }; modelCurrent: { fg: string; bg: string }; neutralFg: string; dangerFg: string }
 type DiffColors = { addFg: string; removeFg: string }
 
 const assistant: MdColors = { fg: '', bg: '', bold: '', code: '' }
@@ -35,7 +35,7 @@ const fork: BlockColors = { fg: '', bg: '' }
 const status: StatusColors = { fg: '', highlight: '' }
 const help: HelpColors = { key: '', description: '' }
 const tab: TabColors = { activeFg: '', inactiveFg: '', doneFg: '', warningFg: '', errorFg: '', pausedFg: '' }
-const popup: PopupColors = { current: { fg: '', bg: '' }, modelCurrent: { fg: '', bg: '' }, neutralFg: '', warningFg: '', dangerFg: '' }
+const popup: PopupColors = { current: { fg: '', bg: '' }, modelCurrent: { fg: '', bg: '' }, neutralFg: '', dangerFg: '' }
 const diff: DiffColors = { addFg: '', removeFg: '' }
 
 // Tool colors keyed by tool name. Unknown tools fall back to 'default'.
@@ -141,7 +141,6 @@ function load(): void {
 	tab.errorFg = raw.tab?.errorFg ? fg(raw.tab.errorFg, vars) : error.fg
 	tab.pausedFg = raw.tab?.pausedFg ? fg(raw.tab.pausedFg, vars) : warning.fg
 	popup.neutralFg = raw.popup?.neutralFg ? fg(raw.popup.neutralFg, vars) : status.fg
-	popup.warningFg = raw.popup?.warningFg ? fg(raw.popup.warningFg, vars) : warning.fg
 	popup.dangerFg = raw.popup?.dangerFg ? fg(raw.popup.dangerFg, vars) : warning.fg
 	diff.addFg = raw.diff?.addFg ? fg(raw.diff.addFg, vars) : info.fg
 	diff.removeFg = raw.diff?.removeFg ? fg(raw.diff.removeFg, vars) : error.fg
