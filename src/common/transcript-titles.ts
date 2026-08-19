@@ -11,12 +11,25 @@ function formatTime(ts: string | number | undefined): string {
 	return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+function senderLabel(source: string, sourceTab?: number, sourceName?: string): string {
+	if (sourceTab) {
+		let details = `tab ${sourceTab}`
+		if (sourceName) details += `: ${sourceName}`
+		return `${source} (${details})`
+	}
+	if (sourceName) return `${source} (${sourceName})`
+	return source
+}
+
 function humanize(name: string): string {
 	return name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ')
 }
 
 function title(item: TranscriptItem): string {
-	if (item.type === 'user') return 'You'
+	if (item.type === 'user') {
+		if (item.source && item.source !== 'system') return `Message from ${senderLabel(item.source, item.sourceTab, item.sourceName)}`
+		return 'You'
+	}
 	if (item.type === 'assistant') {
 		if (item.synthetic) return 'Hal (synthetic)'
 		const model = models.displayModel(item.model)
@@ -45,4 +58,4 @@ function label(item: TranscriptItem): string {
 	return `${time} ${title(item)}`.trim()
 }
 
-export const transcriptTitles = { formatTime, title, label }
+export const transcriptTitles = { formatTime, senderLabel, title, label }

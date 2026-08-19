@@ -16,6 +16,7 @@ export interface LiveUserBlock extends LiveBlockBase {
 	source?: string
 	status?: string
 	sourceTab?: number
+	sourceName?: string
 }
 
 export interface LiveAssistantBlock extends LiveBlockBase {
@@ -82,6 +83,7 @@ export interface PromptEvent extends LiveEventBase {
 	label?: 'steering' | 'queued'
 	source?: string
 	sourceTab?: number
+	sourceName?: string
 }
 
 export interface StreamStartEvent extends LiveEventBase {
@@ -193,6 +195,7 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		if (event.actualText) block.actualText = event.actualText
 		if (event.source) block.source = event.source
 		if (event.sourceTab !== undefined) block.sourceTab = event.sourceTab
+		if (event.sourceName) block.sourceName = event.sourceName
 		if (event.label) block.status = event.label
 		if (ts !== undefined) block.ts = ts
 		return liveEventBlocks.appendBlock(closed, block)

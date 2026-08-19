@@ -178,21 +178,22 @@ test('long notices render without card padding', () => {
 	expect(lines.map((line) => line.trim())).toEqual(['First line of a longer notice.', 'Second line.'])
 })
 
-test('incoming prompts use the normal prompt card and retain their sender label', () => {
+test('incoming prompts name their sender, tab, and optional tab name', () => {
 	colors.load()
 	const block: Block = {
 		type: 'user',
 		text: 'hello from another session',
 		source: '09-bx8',
 		sourceTab: 9,
+		sourceName: 'Architecture revamp',
 		ts: new Date('2026-01-01T17:37:00Z').getTime(),
 	}
 
-	const lines = blocks.renderBlock(block, 80, false, (sessionId) => `${sessionId} (Architecture revamp, tab 3)`)
+	const lines = blocks.renderBlock(block, 80)
 	const header = headerLine(lines)
 	const rendered = lines.join('\n')
 
-	expect(header).toContain('09-bx8 (Architecture revamp, tab 3)')
+	expect(header).toContain('Message from 09-bx8 (tab 9: Architecture revamp)')
 	expect(rendered).toContain(colors.user.fg)
 	expect(rendered).toContain(colors.user.bg)
 	expect(rendered).not.toContain(colors.info.bg)
@@ -213,7 +214,7 @@ test('queued prompts use the warning card regardless of source', () => {
 	colors.load()
 	const queued = [
 		{ block: { type: 'log', text: 'Prompt queued\nfoobar' } as const, header: 'Prompt queued' },
-		{ block: { type: 'log', text: 'Prompt queued · from tab 9 · 09-bx8\nfoobar' } as const, header: 'Prompt queued · from tab 9 · 09-bx8' },
+		{ block: { type: 'log', text: 'Prompt queued from 09-bx8 (tab 9: Architecture revamp)\nfoobar' } as const, header: 'Prompt queued from 09-bx8 (tab 9: Architecture revamp)' }
 	]
 	for (const { block, header } of queued) {
 		const lines = blocks.renderBlock(block, 80)

@@ -6,6 +6,7 @@
 import { clipVisual, expandTabs, hardWrap, M_BOLD, M_BOLD_OFF, M_ITALIC, M_ITALIC_OFF, resolveMarkers, visLen, wordWrap } from '../../utils/strings.ts'
 import { models } from '../../common/models.ts'
 import { historyProjection } from '../../common/history-projection.ts'
+import { transcriptTitles } from '../../common/transcript-titles.ts'
 import { subscriptionUsage } from '../../common/subscription-usage.ts'
 import { time } from '../../utils/time.ts'
 import { terminalSubscriptionUsage } from './subscription-usage.ts'
@@ -225,7 +226,11 @@ function blockLabel(block: Block, sessionLabel?: SessionLabel): string {
 	if (block.type === 'log' && block.text.startsWith('Prompt queued')) return block.text.split('\n', 1)[0]!
 	if (block.type === 'user') {
 		if (block.canceled) return 'You (canceled)'
-		if (block.source && block.source !== 'user' && block.source !== 'system') return sessionLabel?.(block.source) ?? block.source
+		if (block.source && block.source !== 'user' && block.source !== 'system') {
+			let sender = transcriptTitles.senderLabel(block.source, block.sourceTab, block.sourceName)
+			if (!block.sourceTab && !block.sourceName) sender = sessionLabel?.(block.source) ?? sender
+			return `Message from ${sender}`
+		}
 		if (block.status === 'editing') return 'You (editing this prompt)'
 		if (block.status === 'steering') return 'You (steering)'
 		if (block.status === 'queued') return 'You (queued)'

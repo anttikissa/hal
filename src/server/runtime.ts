@@ -496,12 +496,15 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		const pendingTools = sessionStore.findPendingTools(sessionId)
 		if (pendingTools) sessionStore.resolvePendingTools(sessionId, pendingTools.id)
 		const parts = await resolvePromptParts(sessionId, text, displayText)
+		let sourceName: string | undefined
+		if (source) sourceName = sessionStore.loadSessionMeta(source)?.name
 		const createdAt = new Date().toISOString()
 		sessionStore.appendHistory(sessionId, [{
 			type: 'user',
 			parts,
 			source,
 			sourceTab,
+			sourceName,
 			status: label,
 			ts: createdAt,
 		}])
@@ -514,6 +517,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 			label,
 			source,
 			sourceTab,
+			sourceName,
 			sessionId,
 			createdAt,
 		})

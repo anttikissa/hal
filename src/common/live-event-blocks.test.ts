@@ -15,6 +15,7 @@ test('projects prompt events as user blocks', () => {
 		actualText: 'expanded',
 		source: 'inbox',
 		sourceTab: 2,
+		sourceName: 'Inbox sender',
 		label: 'queued',
 		createdAt: '2026-08-13T08:59:00.000Z',
 	})
@@ -24,6 +25,7 @@ test('projects prompt events as user blocks', () => {
 		actualText: 'expanded',
 		source: 'inbox',
 		sourceTab: 2,
+		sourceName: 'Inbox sender',
 		status: 'queued',
 		ts: Date.parse('2026-08-13T08:59:00.000Z'),
 	}])

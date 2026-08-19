@@ -12,3 +12,15 @@ test('transcript titles reserve labels for actionable notices', () => {
 	expect(transcriptTitles.label({ type: 'log', text: 'Restarted', ts: Date.parse('2026-08-13T15:10:00.000Z') })).toBe('15:10')
 	expect(transcriptTitles.label({ type: 'info', text: 'model: old -> new', ts: Date.parse('2026-08-13T15:10:00.000Z') })).toBe('15:10')
 })
+
+
+test('transcript titles identify incoming messages with source details', () => {
+	expect(transcriptTitles.label({
+		type: 'user',
+		text: 'handoff',
+		source: '116-aye',
+		sourceTab: 6,
+		sourceName: 'Risky tool confirmation highlighting',
+		ts: Date.parse('2026-08-19T08:08:00.000Z'),
+	})).toBe('08:08 Message from 116-aye (tab 6: Risky tool confirmation highlighting)')
+})

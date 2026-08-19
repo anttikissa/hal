@@ -577,22 +577,28 @@ test('enqueuePrompt stores prompts while session is working', async () => {
 	const origAppendEvent = ipc.appendEvent
 	const origIsWorking = agentLoop.isWorking
 	const origOwnsHostLock = ipc.ownsHostLock
+	const origLoadSessionMeta = sessions.loadSessionMeta
 
 	try {
 		ipc.ownsHostLock = () => true
 		ipc.appendEvent = (event: any) => { events.push(event) }
 		agentLoop.isWorking = () => true
+		sessions.loadSessionMeta = (id) => {
+			if (id === '04-sender') return { id, name: 'Risky tool confirmation highlighting' } as SessionMeta
+			return origLoadSessionMeta(id)
+		}
 
 		await queueRunner.enqueuePrompt(sessionId, 'do this later', 'user')
 		await queueRunner.enqueuePrompt(sessionId, 'message from another tab', '04-sender', undefined, 4)
 
 		expect(promptQueue.load(sessionId).map((entry) => entry.text)).toEqual(['do this later', 'message from another tab'])
 		expect(events.some((event) => event.type === 'info' && event.text === 'Prompt queued\ndo this later')).toBe(true)
-		expect(events.some((event) => event.type === 'info' && event.text === 'Prompt queued · from tab 4 · 04-sender\nmessage from another tab')).toBe(true)
+		expect(events.some((event) => event.type === 'info' && event.text === 'Prompt queued from 04-sender (tab 4: Risky tool confirmation highlighting)\nmessage from another tab')).toBe(true)
 	} finally {
 		ipc.appendEvent = origAppendEvent
 		ipc.ownsHostLock = origOwnsHostLock
 		agentLoop.isWorking = origIsWorking
+		sessions.loadSessionMeta = origLoadSessionMeta
 		rmSync(`${promptQueue.config.sessionsDir}/${sessionId}`, { recursive: true, force: true })
 	}
 })

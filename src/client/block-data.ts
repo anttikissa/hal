@@ -61,6 +61,7 @@ function historyToBlocks(
 					source: isSystem ? 'system' : entry.source ?? undefined,
 					status: entry.status,
 					sourceTab: entry.sourceTab,
+					sourceName: entry.sourceName,
 					ts,
 					dimmed,
 					canceled: entry.canceled,

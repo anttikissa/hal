@@ -5,6 +5,7 @@
 import { agentLoop, type AgentLoopResult } from './runtime/agent-loop.ts'
 import { promptQueue, type QueuedPrompt } from './runtime/prompt-queue.ts'
 import { sessions } from './sessions.ts'
+import { transcriptTitles } from '../common/transcript-titles.ts'
 // Circular import with runtime.ts is safe: we only access runtime.* at call time
 // (module convention — all cross-module calls go through namespace objects).
 import { runtime } from './runtime.ts'
@@ -18,8 +19,9 @@ function queuePreviewResult(text: string, max = 80): { text: string; truncated: 
 
 function queueNotice(text: string, source?: string, sourceTab?: number): string {
 	if (!source || source === 'user') return `Prompt queued\n${text}`
-	const sender = sourceTab ? `tab ${sourceTab} · ${source}` : source
-	return `Prompt queued · from ${sender}\n${text}`
+	const sourceName = sessions.loadSessionMeta(source)?.name
+	const sender = transcriptTitles.senderLabel(source, sourceTab, sourceName)
+	return `Prompt queued from ${sender}\n${text}`
 }
 
 function queueEntry(text: string, source?: string, displayText?: string, sourceTab?: number): QueuedPrompt {

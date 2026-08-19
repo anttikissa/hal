@@ -9,7 +9,7 @@ export type UserPart =
 export type EntryIdentity = { id?: string; canceled?: true }
 
 export type HistoryEntry = EntryIdentity & (
-	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; sourceTab?: number; status?: string; ts?: string }
+	| { type: 'user'; parts: UserPart[]; text?: never; source?: string; sourceTab?: number; sourceName?: string; status?: string; ts?: string }
 	| {
 			type: 'thinking'
 			text?: string
