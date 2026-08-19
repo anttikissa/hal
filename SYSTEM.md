@@ -75,7 +75,7 @@ require('~/server/file-ipc.ts').ipc.appendCommand({ type: 'prompt', sessionId: c
 Use `queue: true` for a prompt issued by your own eval call: it runs after the current turn completes instead of steering and pausing that turn.
 
 Some useful commands you can run like that:
-- `/rename <name>` — set current session name. Names are brief but descriptive, capitalized, at most 60 chars: "Review rendering regression", "Implement /rebase". Sessions have names, not titles; use "name" everywhere.
+- `/rename <name>` — set current session name, examples: "Review rendering regression", "Implement /rebase"
 - `/cd [path]` — change cwd; no arg means go to `hal_dir`
 - `/model [model]` — switch model
 - `/go [<tab>|<sessionId>]` — go to a tab or session, resume it if closed
