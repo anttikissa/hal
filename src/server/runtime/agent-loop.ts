@@ -206,6 +206,7 @@ async function confirmToolCall(sessionId: string, call: ToolCall, signal: AbortS
 		type: 'tool-confirm-request',
 		requestId,
 		body: toolConfirmationBody(sessionId, call, findings),
+		highlights: findings.map((finding) => finding.match).filter(Boolean),
 	})
 	const approved = await new Promise<boolean>((resolve) => {
 		function done(value: boolean): void {

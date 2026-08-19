@@ -28,6 +28,14 @@ test('destructive git commands warn but plain stash does not', () => {
 	expect(reasons('git restore src/foo.ts')).toContain('DESTRUCTIVE GIT CHECKOUT/RESTORE PATH')
 })
 
+test('findings carry the exact offending text so the UI can highlight it', () => {
+	const findings = risk.analyzeToolCall('bash', { command: 'cd /tmp\ngit checkout -- . 2>/dev/null; true\necho done' })
+	expect(findings[0]?.match).toBe('git checkout -- . 2>/dev/null')
+	expect(risk.analyzeToolCall('bash', { command: 'rm -rf /' })[0]?.match).toBe('rm -rf /')
+	const sshFindings = risk.analyzeToolCall('read', { path: '~/.ssh/id_rsa' })
+	expect(sshFindings.find((item) => item.severity === 'secret')?.match).toBe('.ssh/id_rsa')
+})
+
 test('common secret-bearing paths produce reasons', () => {
 	expect(reasons('cat ~/.ssh/id_rsa')).toContain('SSH private key likely contains secrets')
 	expect(risk.analyzeToolCall('read', { path: '.npmrc' }).map((item) => item.reason)).toContain('.npmrc often contains registry auth tokens')

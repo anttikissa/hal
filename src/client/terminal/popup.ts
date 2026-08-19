@@ -4,7 +4,7 @@
 import { lineEditor } from './line-editor.ts'
 import { colors } from './colors.ts'
 import { models } from '../../common/models.ts'
-import { clipVisual, hardWrap, visLen } from '../../utils/strings.ts'
+import { clipVisual, hardWrap, resolveMarkers, visLen, M_HIGHLIGHT, M_HIGHLIGHT_OFF } from '../../utils/strings.ts'
 import type { KeyEvent } from './keys.ts'
 
 interface PopupItem {
@@ -41,6 +41,8 @@ const state = {
 	title: '',
 	tone: 'neutral' as 'neutral' | 'warning' | 'danger',
 	body: [] as string[],
+	// Substrings of the body that caused the warning; rendered highlighted.
+	highlights: [] as string[],
 	items: [] as PopupItem[],
 	selectedIndex: 0,
 	onChoose: null as ((value: string) => void) | null,
@@ -57,6 +59,7 @@ function close(): void {
 	state.kind = null
 	state.title = ''
 	state.body = []
+	state.highlights = []
 	state.items = []
 	state.selectedIndex = 0
 	state.onChoose = null
@@ -205,13 +208,14 @@ function openModelPicker(onChoose: (value: string) => void, currentModel?: strin
 	if (currentModel) selectModelValue(models.resolveModel(currentModel))
 }
 
-function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void, tone: 'warning' | 'danger' = 'warning'): void {
+function openConfirm(title: string, body: string[], choices: string[], onChoose: (value: string) => void, tone: 'warning' | 'danger' = 'warning', highlights: string[] = []): void {
 	close()
 	state.active = true
 	state.kind = 'confirm'
 	state.title = title
 	state.tone = tone
 	state.body = body
+	state.highlights = highlights
 	state.items = choices.map((choice) => ({ value: choice, label: choice, kind: 'model' }))
 	state.onChoose = onChoose
 }
@@ -315,6 +319,29 @@ function pad(text: string, width: number): string {
 	return text + ' '.repeat(Math.max(0, width - visLen(text)))
 }
 
+// Wrap every occurrence of a highlight substring in style markers. Markers are
+// zero-width, so wrapping and padding still measure the real text width, and
+// resolveMarkers() re-opens the style when a highlight spans wrapped rows.
+function markHighlights(text: string): string {
+	if (state.highlights.length === 0) return text
+	let out = ''
+	let i = 0
+	while (i < text.length) {
+		let hit = ''
+		for (const highlight of state.highlights) {
+			if (highlight && text.startsWith(highlight, i) && highlight.length > hit.length) hit = highlight
+		}
+		if (hit) {
+			out += `${M_HIGHLIGHT}${hit}${M_HIGHLIGHT_OFF}`
+			i += hit.length
+		} else {
+			out += text[i]
+			i++
+		}
+	}
+	return out
+}
+
 function withOuterPadding(rows: PopupRow[]): { rows: PopupRow[]; topAdded: boolean } {
 	const out = [...rows]
 	if (out.length === 0) out.push({ text: '', active: false })
@@ -401,7 +428,7 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	// Split on embedded newlines so multi-line bash commands (e.g. heredocs) render
 	// inside the popup box instead of breaking the border at column 1.
 	for (const line of state.body) {
-		for (const sub of String(line).split('\n')) bodyContent.push({ text: sub, active: false })
+		for (const sub of String(line).split('\n')) bodyContent.push({ text: markHighlights(sub), active: false })
 	}
 	if (state.body.length > 0 && state.items.length > 0) tailContent.push({ text: '', active: false })
 	for (let i = 0; i < state.items.length; i++) tailContent.push({ text: rowText(state.items[i]!, i === state.selectedIndex), active: i === state.selectedIndex, current: state.items[i]!.isCurrent })
@@ -439,11 +466,17 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	const titleWidth = visLen(title)
 	const top = `┌${title}${'─'.repeat(Math.max(0, innerWidth - titleWidth))}┐`
 	const lines = [top]
+	// Resolve highlight markers once over all rows so a highlight that wrapped
+	// across rows is re-opened at the start of each continuation row.
+	const paddedRows: string[] = []
 	for (const line of displayContent) {
 		const clipped = clipVisual(line.text, contentWidth)
 		const paddedContent = pad(clipped, contentWidth)
-		const padded = `${' '.repeat(xMargin)}${paddedContent}${' '.repeat(xMargin)}`
-		lines.push(`│${styleRow(padded, line)}│`)
+		paddedRows.push(`${' '.repeat(xMargin)}${paddedContent}${' '.repeat(xMargin)}`)
+	}
+	const resolved = resolveMarkers(paddedRows)
+	for (let i = 0; i < displayContent.length; i++) {
+		lines.push(`│${styleRow(resolved[i]!, displayContent[i]!)}│`)
 	}
 	lines.push(bottomBorder(innerWidth, hint))
 	const totalWidth = innerWidth + 2

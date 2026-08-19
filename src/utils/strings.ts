@@ -300,12 +300,18 @@ export const M_BOLD = '\uE000'
 export const M_BOLD_OFF = '\uE001'
 export const M_ITALIC = '\uE002'
 export const M_ITALIC_OFF = '\uE003'
+// Highlight marks the exact text that triggered a warning, e.g. the risky
+// fragment of a shell command inside a confirmation popup.
+export const M_HIGHLIGHT = '\uE004'
+export const M_HIGHLIGHT_OFF = '\uE005'
 
-const MARKER_ANSI: Record<string, string> = {
+export const MARKER_ANSI: Record<string, string> = {
 	[M_BOLD]: '\x1b[1m',
 	[M_BOLD_OFF]: '\x1b[22m',
 	[M_ITALIC]: '\x1b[3m',
 	[M_ITALIC_OFF]: '\x1b[23m',
+	[M_HIGHLIGHT]: '\x1b[1m\x1b[93m',
+	[M_HIGHLIGHT_OFF]: '\x1b[22m\x1b[39m',
 }
 
 /** Convert style markers to ANSI escapes, ensuring each line is

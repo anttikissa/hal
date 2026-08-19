@@ -145,6 +145,8 @@ export interface ToolConfirmRequestEvent extends LiveEventBase {
 	type: 'tool-confirm-request'
 	requestId: string
 	body: string[]
+	// Exact substrings of `body` that triggered the warning, for highlighting.
+	highlights?: string[]
 }
 
 export type LiveEvent = PromptEvent | StreamStartEvent | StreamDeltaEvent | StreamEndEvent | ToolCallEvent | ToolResultEvent | ToolConfirmRequestEvent | InfoEvent | ResponseEvent

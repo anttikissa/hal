@@ -5,7 +5,9 @@
 import { resolve } from 'path'
 
 export type RiskSeverity = 'danger' | 'secret' | 'maybe-secret'
-export interface RiskFinding { severity: RiskSeverity; reason: string }
+// `match` is the exact offending substring of the inspected text, so the
+// confirmation UI can highlight it instead of only naming the category.
+export interface RiskFinding { severity: RiskSeverity; reason: string; match: string }
 
 const secretPatterns: Array<[RegExp, RiskSeverity, string]> = [
 	[/auth\.ason\b/i, 'secret', 'auth.ason contains provider credentials'],
@@ -23,8 +25,8 @@ const secretPatterns: Array<[RegExp, RiskSeverity, string]> = [
 	[/\.(pem|p12|pfx|jks|agekey)\b/i, 'secret', 'private key/certificate file likely contains secrets'],
 ]
 
-function add(out: RiskFinding[], severity: RiskSeverity, reason: string): void {
-	if (!out.some((item) => item.reason === reason)) out.push({ severity, reason })
+function add(out: RiskFinding[], severity: RiskSeverity, reason: string, match: string): void {
+	if (!out.some((item) => item.reason === reason)) out.push({ severity, reason, match })
 }
 
 function textOf(value: unknown): string {
@@ -72,22 +74,30 @@ function rmRfIsOnlySafeTmp(command: string): boolean {
 
 function checkText(text: string, out: RiskFinding[]): void {
 	for (const [pattern, severity, reason] of secretPatterns) {
-		if (pattern.test(text)) add(out, severity, reason)
+		const match = text.match(pattern)
+		if (match) add(out, severity, reason, match[0].trim())
 	}
 }
 
 function checkShell(command: string, out: RiskFinding[]): void {
 	checkText(command, out)
-	const lower = command.toLowerCase()
-	const hasRmRf = /\brm\s+[^\n;&|]*-[^\n;&|]*r[^\n;&|]*f|\brm\s+[^\n;&|]*-[^\n;&|]*f[^\n;&|]*r/.test(lower)
-	if (hasRmRf && !rmRfIsOnlySafeTmp(command)) add(out, 'danger', 'DESTRUCTIVE RM -RF COMMAND')
-	if (/\bgit\s+reset\s+--hard\b/i.test(command)) add(out, 'danger', 'DESTRUCTIVE GIT RESET --HARD')
-	if (/\bgit\s+clean\b[^\n;&|]*-[^\n;&|]*[xfd]/i.test(command)) add(out, 'danger', 'DESTRUCTIVE GIT CLEAN')
-	if (/\bgit\s+stash\s+(drop|clear)\b/i.test(command)) add(out, 'danger', 'DESTRUCTIVE GIT STASH DROP/CLEAR')
-	if (/\bgit\s+push\b[^\n;&|]*(--force|-f\b)/i.test(command)) add(out, 'danger', 'DESTRUCTIVE GIT PUSH --FORCE')
+	// Each check matches against the original command so the finding can report
+	// the offending text verbatim for highlighting.
+	const rmRf = command.match(/\brm\s+[^\n;&|]*-[^\n;&|]*r[^\n;&|]*f[^\n;&|]*|\brm\s+[^\n;&|]*-[^\n;&|]*f[^\n;&|]*r[^\n;&|]*/i)
+	if (rmRf && !rmRfIsOnlySafeTmp(command)) add(out, 'danger', 'DESTRUCTIVE RM -RF COMMAND', rmRf[0].trim())
+	const patterns: Array<[RegExp, string]> = [
+		[/\bgit\s+reset\s+--hard\b[^\n;&|]*/i, 'DESTRUCTIVE GIT RESET --HARD'],
+		[/\bgit\s+clean\b[^\n;&|]*-[^\n;&|]*[xfd][^\n;&|]*/i, 'DESTRUCTIVE GIT CLEAN'],
+		[/\bgit\s+stash\s+(drop|clear)\b[^\n;&|]*/i, 'DESTRUCTIVE GIT STASH DROP/CLEAR'],
+		[/\bgit\s+push\b[^\n;&|]*(--force|-f\b)[^\n;&|]*/i, 'DESTRUCTIVE GIT PUSH --FORCE'],
+	]
+	for (const [pattern, reason] of patterns) {
+		const match = command.match(pattern)
+		if (match) add(out, 'danger', reason, match[0].trim())
+	}
 	for (const match of command.matchAll(/\bgit\s+(checkout|restore)\b([^\n;&|]*)/gi)) {
 		const args = match[2] ?? ''
-		if (/--\s+\S/.test(args) || /\s(\.|\/|[^\s]+\.[A-Za-z0-9]+)\b/.test(args)) add(out, 'danger', 'DESTRUCTIVE GIT CHECKOUT/RESTORE PATH')
+		if (/--\s+\S/.test(args) || /\s(\.|\/|[^\s]+\.[A-Za-z0-9]+)\b/.test(args)) add(out, 'danger', 'DESTRUCTIVE GIT CHECKOUT/RESTORE PATH', match[0].trim())
 	}
 }
 

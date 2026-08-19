@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { colors } from './colors.ts'
 import { popup } from './popup.ts'
-import { visLen } from '../../utils/strings.ts'
+import { visLen, MARKER_ANSI, M_HIGHLIGHT, M_HIGHLIGHT_OFF } from '../../utils/strings.ts'
 import type { KeyEvent } from './keys.ts'
 import { models } from '../../common/models.ts'
 
@@ -160,6 +160,27 @@ describe('popup', () => {
 		expect(overlay).not.toBeNull()
 		expect(overlay?.lines.join('\n')).toContain('[Yes]')
 		expect(overlay?.lines[0]).toContain(colors.popup.warningFg)
+	})
+
+	test('confirm popup highlights the offending fragment of the command', () => {
+		const body = ['bash:', 'cd /tmp && git checkout -- . && echo done']
+		popup.openConfirm('Risky tool call', body, ['Yes', 'No'], () => {}, 'danger', ['git checkout -- .'])
+		const overlay = popup.buildOverlay(80, 24)
+		const line = overlay!.lines.find((row) => row.includes('git checkout'))!
+		expect(line).toContain(`${MARKER_ANSI[M_HIGHLIGHT]}git checkout -- .${MARKER_ANSI[M_HIGHLIGHT_OFF]}`)
+		expect(cleanLines([line])[0]).toContain('cd /tmp && git checkout -- . && echo done')
+	})
+
+	test('highlight is re-opened when the offending fragment wraps to the next row', () => {
+		const filler = 'x'.repeat(50)
+		popup.openConfirm('Risky tool call', [`${filler} git checkout -- some/very/long/path.ts`], ['Yes', 'No'], () => {}, 'danger', ['git checkout -- some/very/long/path.ts'])
+		const overlay = popup.buildOverlay(60, 24)
+		const rows = overlay!.lines.filter((row) => row.includes(MARKER_ANSI[M_HIGHLIGHT]!))
+		// Both the row where the fragment starts and its continuation must carry the style.
+		expect(rows.length).toBe(2)
+		const clean = cleanLines(rows)
+		expect(clean[0]).toContain('git')
+		expect(clean[1]).toContain('checkout -- some/very/long/path.ts')
 	})
 
 	test('danger confirm popup wraps long lines instead of truncating them', () => {
