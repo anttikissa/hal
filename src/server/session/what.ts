@@ -260,6 +260,7 @@ function systemPrompt(): string {
 		'Do not use ASON, JSON, YAML, code fences, or labels such as "name:" and "summary:".',
 		'Name must state the initiating user problem or task, not merely the last follow-up; 60 characters if possible. For example "Review rendering regression".',
 		'Summary should be a short narrative: usually 1-3 compact paragraphs plus at most 4 continuation-level bullets when useful.',
+		`Use descriptive, colorful, realistic examples, e.g. 'You asked to humanize these markers, for example "[restarted]" -> "Restarted", and so we did.'`,
 		'Short, plain sentences. Omit needless words. Split long sentences.',
 		'Address the reader as "you". Do not write "the user" unless quoting text.',
 		'If a prompt came from another session, say that plainly when it matters, for example "Session 47-abc asked this session to ...".',

@@ -1,12 +1,16 @@
 # HAL 9001
 
-Hal is a terminal-based coding agent with the following goals:
+Hal is a terminal-based coding agent with the following philosophy:
 
-- small TypeScript code base (currently <21k lines), starts with zero dependencies imported
-- starts in 100ms on my 6 year old basic Mac laptop (reality: under 200ms, but that's tolerable)
-- no auto update nagging; if you want to update, just pull the latest code
+- small and fast - zero dependencies imported at startup
+- don’t reinvent the wheel: native terminal scrolling, search, copy and paste, and hyperlinks just work
+- no auto-update nagging: if you want to update, just pull the latest code
+- no plugins or extensions - ask it to extend itself; you own the changes
+- persistent sessions by default - hit Ctrl-C, restart Hal, and continue where you left off
 
-Meanwhile, it tries to be reasonably feature complete, have a nice terminal and web UI.
+The one thing it implements itself is tabs - Ctrl-T spawns a new tab, Ctrl-F forks the
+current session, and Ctrl-W closes a tab. It's a bit like using a browser. You'll only need
+one terminal, though you can use more if you like; they all connect to the same instance.
 
 ## Contents
 
@@ -21,7 +25,7 @@ Meanwhile, it tries to be reasonably feature complete, have a nice terminal and 
 ```
 git clone https://github.com/anttikissa/hal.git ~/.hal
 cd ~/.hal
-# Don't trust the code? I wouldn't either. Do something like this:
+# Optionally, do something like this:
 # claude -p "I just downloaded this project, check that it does what it claims to do and that there are no backdoors"
 
 # Installs prerequisites and adds 'hal' to PATH
