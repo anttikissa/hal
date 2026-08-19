@@ -8,7 +8,7 @@ Comments like this are stripped.
 SYSTEM.md is included first in the system prompt, followed by project specific AGENTS.md/CLAUDE.md
 files.
 
-You can inject variables ${agent}, ${model}, ${date} etc.
+You can inject variables ${harness}, ${model}, ${date} etc.
 
 You can use conditional blocks, feature designed to give specific instructions to certain models.
 This also works in AGENTS.md but is not portable to other harnesses of course.
@@ -22,8 +22,8 @@ Use the /system command to see the actual preprocessed system prompt.
 For more details, see system-prompt.ts.
 -->
 
-<!-- Preamble - who am I, where am I, current date? Keep this (relatively) stable: cache misses cost tokens. -->
-<agent>${agent}</agent>
+<!-- Preamble - which harness and model am I using? Where am I? Keep this (relatively) stable: cache misses cost tokens. -->
+<harness>${harness}</harness>
 <model>${model}</model>
 <cwd>${cwd}</cwd>
 <session_dir>${session_dir}</session_dir>

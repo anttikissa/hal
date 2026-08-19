@@ -62,10 +62,14 @@ test('buildSystemPrompt omits the self-switch instruction inside the Hal source 
 	expect(projectPrompt).toContain(instruction)
 })
 
-test('substitutes the Hal agent identity', () => {
-	writeFileSync(join(tempDir, 'SYSTEM.md'), 'Agent: ${agent}')
+test('substitutes and conditions on the Hal harness identity', () => {
+	writeFileSync(join(tempDir, 'SYSTEM.md'), [
+		'::: if harness="hal"',
+		'Harness: ${harness}',
+		':::',
+	].join('\n'))
 
-	expect(context.buildSystemPrompt({ cwd: tempDir }).text).toContain('Agent: hal')
+	expect(context.buildSystemPrompt({ cwd: tempDir }).text).toContain('Harness: hal')
 })
 
 test('directives treat non-glob pattern characters literally', () => {

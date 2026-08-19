@@ -18,7 +18,7 @@
  *
  * These placeholders are replaced after conditional blocks are selected (with examples):
  *
- * - `${agent}`       → `hal`
+ * - `${harness}`     → `hal`
  * - `${model}`       → `openai/gpt-5.6-terra`
  * - `${date}`        → `2026-08-06, Thursday`
  * - `${cwd}`         → `~/project/lib`
@@ -210,7 +210,7 @@ function buildSystemPrompt(opts: {
 	sessionId?: string
 }): SystemPromptResult {
 	const model = opts.model ?? ''
-	const agent = 'hal'
+	const harness = 'hal'
 	const cwd = opts.cwd ?? process.cwd()
 	const sessionDir = opts.sessionId ? sessions.sessionDir(opts.sessionId) : ''
 	const currentHalDir = halDir()
@@ -220,7 +220,7 @@ function buildSystemPrompt(opts: {
 
 	// Variables available for substitution in agent files
 	const vars: Record<string, string> = {
-		agent,
+		harness,
 		model,
 		date,
 		cwd,
@@ -233,7 +233,7 @@ function buildSystemPrompt(opts: {
 	// Substitute ${var} placeholders
 	const sub = (s: string) =>
 		s
-			.replace(/\$\{agent\}/g, agent)
+			.replace(/\$\{harness\}/g, harness)
 			.replace(/\$\{model\}/g, model)
 			.replace(/\$\{cwd\}/g, cwd)
 			.replace(/\$\{date\}/g, date)
