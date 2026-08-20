@@ -76,7 +76,7 @@ const BMP_WIDE_RANGES: Array<[number, number]> = [
 	[0x2b50, 0x2b50], [0x2b55, 0x2b55],
 ]
 
-const VS16_WIDE_BASES = new Set([0x2600, 0x2708, 0x2764, 0x26a0, 0x27a1, 0x2b05, 0x2b06, 0x2b07])
+const VS16_WIDE_BASES = new Set([0x2600, 0x263a, 0x2708, 0x2764, 0x26a0, 0x27a1, 0x2b05, 0x2b06, 0x2b07])
 
 function inRanges(cp: number, ranges: Array<[number, number]>): boolean {
 	for (const [from, to] of ranges) {
