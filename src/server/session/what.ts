@@ -141,7 +141,7 @@ function entryLine(sessionId: string, entry: HistoryEntry): string {
 		const who = entry.source ? `prompt from session ${entry.source}` : 'user'
 		return `${who}${ts}: ${clip(sessionEntry.userText(entry, { images: 'path-or-blob-or-image' }))}`
 	}
-	if (entry.type === 'assistant') return `assistant${ts}: ${clip(entry.text)}`
+	if (entry.type === 'assistant') return `assistant${entry.model ? ` (${entry.model})` : ''}${ts}: ${clip(entry.text)}`
 	if (entry.type === 'thinking') return `thinking${ts}: ${entry.blobId ? `[blob ${entry.blobId}]` : clip(entry.text ?? '')}`
 	if (entry.type === 'tool_call') return `tool_call${ts}: ${entry.name} ${clip(ason.stringify(entry.input ?? sessionEntry.loadEntryBlob(sessionId, entry)?.call?.input ?? {}, 'short'))}`
 	if (entry.type === 'tool_result') return `tool_result${ts}: ${clip(toolResultText(sessionId, entry))}`
@@ -268,9 +268,9 @@ function systemPrompt(): string {
 		'If a prompt came from another session, say that plainly when it matters, for example "Session 47-abc asked this session to ...".',
 		'Lead with what you asked for and the main conversation arc, then mention major pivots or follow-ups only if they matter for continuing the work.',
 		'Mention visible session forks with their parent ID.',
+		'Integrate visible cwd and model changes into the conversation arc: connect each change to the work that followed, and do not append changes or unchanged current values as detached metadata.',
 		'Include why/context, clarifications, design or architectural decisions, and plan approval only when they are actually visible and useful.',
 		'Every sentence must help a human remember the user intent or continue the session; omit zero-information lines such as "no next steps", "no plan visible", or metadata inventories.',
-		'Do not show session id, tab, cwd, model, history path, entry counts, state, or role unless that provenance directly explains who did the work.',
 		'Mention files/actions only at continuation-level detail; do not create a separate file/evidence section unless there is an unresolved issue.',
 		'When commits are visible, mention only the final relevant abbreviated commit hash and one-line title; omit amended/intermediate commits, commit bodies, and trailers. If no commit matters, omit commits entirely.',
 		'For successful validation, write "Tests passed." Do not list pass counts unless a failure or count mismatch matters.',

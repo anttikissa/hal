@@ -215,6 +215,14 @@ test('digest includes deterministic attribution metadata', () => {
 })
 
 
+test('digest attributes assistant responses to their models', () => {
+	const target = makeSession('assistant-model', 'assistant model')
+	sessions.appendHistory(target, [{ type: 'assistant', model: 'openai/gpt-5.6-terra', text: 'I would change the methodology.', ts: '2026-06-10T12:01:00.000Z' }])
+
+	expect(whatSummary.buildDigest(target, [target], {})).toContain('assistant (openai/gpt-5.6-terra) 2026-06-10T12:01:00.000Z: I would change the methodology.')
+})
+
+
 test('digest describes the fork transition in the shared history', () => {
 	const parent = makeSession('parent')
 	const child = uniqueId('child')
