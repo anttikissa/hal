@@ -83,6 +83,16 @@ test('bodyless tool blocks do not add a separator row', () => {
 })
 
 
+test('tool output wraps long lines instead of clipping them', () => {
+	const output = 'Waiting for the next subagent. Active: 118-mar (Wait display smoke test A, tab 15), 118-der (Wait display smoke test B, tab 14)'
+	const content = contentLines(blocks.renderBlock({ type: 'tool', name: 'wait', output }, 42)).map((line) => line.trim())
+
+	expect(content.length).toBeGreaterThan(1)
+	expect(content.join(' ')).toBe(output)
+	expect(content.join('\n')).not.toContain('…')
+})
+
+
 test('tool output truncation keeps four head lines and the tail by default', () => {
 	const oldMax = blocks.config.maxToolOutputLines
 	blocks.config.maxToolOutputLines = 2

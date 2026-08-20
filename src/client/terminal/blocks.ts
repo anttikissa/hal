@@ -118,11 +118,11 @@ function formatToolCommand(cmd: string, cols: number, shellContinuations: boolea
 	return result
 }
 
-function clipLine(line: string, cols: number): string {
+function wrapToolLine(line: string, cols: number): string[] {
 	const hashline = line.match(/^(.*?\d+:[A-Za-z0-9]+ )(.*)$/)
 	// Hashline metadata is not part of the source column where indentation starts.
 	const expanded = hashline ? `${hashline[1]}${expandTabs(hashline[2]!, blockConfig.tabWidth)}` : expandTabs(line, blockConfig.tabWidth)
-	return visLen(expanded) <= cols ? expanded : clipVisual(expanded, cols)
+	return wordWrap(expanded, cols)
 }
 
 function blockContent(block: Block, cols: number): string[] {
@@ -146,22 +146,22 @@ function blockContent(block: Block, cols: number): string[] {
 		if (!block.output) return lines
 		const output = blockText.sanitizeTerminalText(blockText.stripAnsiSequences(block.output))
 		const format = spec.format?.(output, cols, block.input) ?? { bodyLines: [] }
-		for (const line of format.bodyLines) lines.push(clipLine(line, cols))
+		for (const line of format.bodyLines) lines.push(...wrapToolLine(line, cols))
 		if (format.suppressOutput) return lines
 		const outputLines = output.trimEnd().split('\n')
 		if (outputLines.length > blockConfig.maxToolOutputLines) {
 			if (spec.overflow === 'head') {
-				for (const line of outputLines.slice(0, blockConfig.maxToolOutputLines)) lines.push(clipLine(line, cols))
+				for (const line of outputLines.slice(0, blockConfig.maxToolOutputLines)) lines.push(...wrapToolLine(line, cols))
 				lines.push(format.hiddenIndicator ?? `[+ ${outputLines.length - blockConfig.maxToolOutputLines} lines]`)
 			} else {
 				const tailStart = Math.max(4, outputLines.length - blockConfig.maxToolOutputLines)
-				for (const line of outputLines.slice(0, 4)) lines.push(clipLine(line, cols))
+				for (const line of outputLines.slice(0, 4)) lines.push(...wrapToolLine(line, cols))
 				if (tailStart > 4) lines.push(format.hiddenIndicator ?? `[+ ${tailStart - 4} lines]`)
-				for (const line of outputLines.slice(tailStart)) lines.push(clipLine(line, cols))
+				for (const line of outputLines.slice(tailStart)) lines.push(...wrapToolLine(line, cols))
 			}
 			return lines
 		}
-		for (const line of outputLines) lines.push(clipLine(line, cols))
+		for (const line of outputLines) lines.push(...wrapToolLine(line, cols))
 		return lines
 	}
 	const lines: string[] = []
