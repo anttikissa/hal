@@ -260,10 +260,10 @@ fullscreen force-repaint path. Never invoke that path from prompt, streaming,
 tool, animation, or popup updates.
 
 Fullscreen growth is straightforward only for a pure append. If an existing
-logical line also changes, anchor at the physical viewport top with `CSI H`,
-repaint independently addressable logical lines, then append the suffix with
-`\r\n`. If a soft-wrapped URL begins above the viewport, leave its unchanged
-visible tail alone and start at the next complete logical line.
+logical line also changes, use the same clamped relative move to the physical
+viewport top, repaint independently addressable logical lines, then append the
+suffix with `\r\n`. If a soft-wrapped URL begins above the viewport, leave its
+unchanged visible tail alone and start at the next complete logical line.
 
 ### 10. Kitty keyboard protocol
 

@@ -250,7 +250,7 @@ function positionCursor(from: number, target: { row: number; col: number }): str
 function repaintFullscreenGrowth(frame: Frame, rows: number): void {
 	const oldLength = prevFrame.lines.length
 	const start = visibleLineStart(prevFrame, rows)
-	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}H`]
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `\r${CSI}${rows}A`]
 
 	// A logical URL can start above the viewport and soft-wrap into it. Its visible
 	// tail is already correct, so leave it untouched and begin at the next whole line.
@@ -281,7 +281,9 @@ function repaintVisibleScreen(frame: Frame, rows: number): void {
 		if (row > 0) out.push('\r\n')
 		out.push(`${CSI}2K${physicalLines[viewportTop + row] ?? ''}`)
 	}
-	out.push(positionCursor(frame.height - 1, frame.cursor), `${CSI}?2026l`)
+	// A once-fullscreen frame may be shorter than an enlarged viewport; painting
+	// blank rows still leaves the cursor at the viewport bottom.
+	out.push(positionCursor(Math.max(frame.height, rows) - 1, frame.cursor), `${CSI}?2026l`)
 	prevFrame = frame
 	writeTerminal(out.join(''))
 }

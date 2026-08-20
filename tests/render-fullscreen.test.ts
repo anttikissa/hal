@@ -96,7 +96,8 @@ describe('render fullscreen growth', () => {
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
 			expect(output).not.toContain('\x1b[3J')
-			expect(output).not.toContain('\x1b[2J\x1b[H')
+			expect(output).not.toContain('\x1b[H')
+			expect(output).toContain('\r\x1b[6A')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
@@ -174,6 +175,33 @@ describe('render fullscreen growth', () => {
 
 			render.resetRenderer()
 			const canonical = terminalLines(captureOutput(() => render.draw(true)), 8)
+			expect(state.screen).toEqual(canonical.screen)
+		} finally {
+			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
+			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
+		}
+	})
+
+	test('keeps cursor coordinates valid after recovery in an enlarged viewport', () => {
+		const tab = client.currentTab()!
+		const originalRows = process.stdout.rows
+		const originalCols = process.stdout.columns
+		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
+		Object.defineProperty(process.stdout, 'columns', { value: 80, configurable: true })
+		try {
+			for (let i = 0; i < 20; i++) tab.history.push({ type: 'log', text: `old-${i}` })
+			prompt.setText('one line\nanother line')
+			captureOutput(() => render.draw())
+
+			Object.defineProperty(process.stdout, 'rows', { value: 40, configurable: true })
+			const state = terminalLines(captureOutput(() => render.draw(true)), 40)
+			prompt.setText('one line')
+			terminalLines(captureOutput(() => render.draw()), 40, state)
+			prompt.setText('one line!')
+			terminalLines(captureOutput(() => render.draw()), 40, state)
+
+			render.resetRenderer()
+			const canonical = terminalLines(captureOutput(() => render.draw(true)), 40)
 			expect(state.screen).toEqual(canonical.screen)
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
