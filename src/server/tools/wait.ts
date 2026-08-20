@@ -4,7 +4,7 @@ import { sessionLabel } from '../../common/session-label.ts'
 
 async function execute(_input: unknown, ctx: ToolContext): Promise<string> {
 	const active = agentLoop.runningSubagents(ctx.sessionId)
-	if (active.length === 0) return 'No active subagents. Waiting for a message; send a prompt or spawn a subagent to resume.'
+	if (active.length === 0) return 'Waiting for the next subagent. But there are none; the model probably issued this tool call accidentally. Send a message to continue.'
 	return `Waiting for the next subagent. Active: ${active.map(sessionLabel.format).join(', ')}`
 }
 
