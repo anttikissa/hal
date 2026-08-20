@@ -237,14 +237,24 @@ For non-fullscreen frame shrink, compare physical heights. After writing new
 content, use `CR`, `CSI 1B`, then `CSI J` to erase leftover rows. Do not use
 `\r\n` there: at the viewport bottom it scrolls and creates a stray blank row.
 
-### 9. Fullscreen shrink rebuilds the canonical frame
+### 9. Automatic fullscreen recovery must preserve inspected scrollback
 
-A fullscreen shrink changes the scrollback/visible boundary. Prompt shrink is
-user-driven, so assume the user is at the live prompt rather than inspecting
-scrollback. Use the normal fullscreen force repaint: clear screen/scrollback,
-write every logical frame line, and let native wrapping and scrolling establish
-the canonical viewport. Do not segment a soft-wrapped URL merely to preserve an
-inspected viewport in this insignificant corner case.
+A fullscreen shrink changes the scrollback/visible boundary. An automatic repaint
+must **never** call the fullscreen force-repaint path: it emits `CSI 2J` and
+`CSI 3J`, and Ghostty snaps a user who is reading scrollback to the live bottom
+(`CSI 3J` also destroys that scrollback). This bit us again when prompt clearing
+on submit shrank a fullscreen frame.
+
+Instead, derive the visible **physical** rows, move to `CSI H`, and rewrite each
+with `CSI 2K`; do not append a final CRLF. The recovery temporarily hard-wraps a
+native-wrapped URL into independently addressable OSC 8 rows, just as popup
+layout does. Ordinary rendering must still leave completed standalone URLs
+native-wrapped for copy/paste; the recovery is the exceptional safe rewrite.
+
+This rule also covers popup open/close, which changes the URL layout. Only an
+explicit full rebuild — Ctrl-L, tab switch, or terminal resize — may use the
+fullscreen force-repaint path. Never invoke that path from prompt, streaming,
+tool, animation, or popup updates.
 
 Fullscreen growth is straightforward only for a pure append. If an existing
 logical line also changes, anchor at the physical viewport top with `CSI H`,

@@ -266,6 +266,23 @@ function repaintFullscreenGrowth(frame: Frame, rows: number): void {
 	prevFrame = frame
 	writeTerminal(out.join(''))
 }
+
+// Recovery repaints must not use CSI J: Ghostty follows erase-display controls by
+// returning an inspected scrollback viewport to the live bottom. Split native-wrapped
+// URLs just for this repaint so every physical row remains independently addressable.
+function repaintVisibleScreen(frame: Frame, rows: number): void {
+	const physicalLines: string[] = []
+	for (const line of frame.lines) physicalLines.push(...wordWrap(line, frame.cols))
+	const viewportTop = Math.max(0, physicalLines.length - rows)
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}H`]
+	for (let row = 0; row < rows; row++) {
+		if (row > 0) out.push('\r\n')
+		out.push(`${CSI}2K${physicalLines[viewportTop + row] ?? ''}`)
+	}
+	out.push(positionCursor(frame.height - 1, frame.cursor), `${CSI}?2026l`)
+	prevFrame = frame
+	writeTerminal(out.join(''))
+}
 function draw(force = false): void {
 	if (terminalOutput.isExternalEditorOpen()) return
 	const rows = process.stdout.rows || 24
@@ -275,6 +292,10 @@ function draw(force = false): void {
 	// Popup frames hard-wrap soft URLs, so never diff across the two layouts.
 	if (popup.state.active !== paintedPopupActive) {
 		paintedPopupActive = popup.state.active
+		if (fullscreen) {
+			repaintVisibleScreen(frame, rows)
+			return
+		}
 		force = true
 	}
 	// ── Force repaint ──
@@ -330,10 +351,10 @@ function draw(force = false): void {
 	const viewportTop = visibleLineStart(prevFrame, rows).index
 	const frameShrunk = nextHeight < prevHeight
 	const frameGrew = nextHeight > prevHeight
-	// Prompt shrink is user-driven, so a full canonical repaint is preferable to
-	// segmenting a native soft-wrapped URL just to preserve an inspected viewport.
+	// A shrink moves the scrollback/viewport boundary. Repaint physical rows in
+	// place; CSI J would pull an inspected Ghostty viewport back to the bottom.
 	if (fullscreen && frameShrunk && first !== -1) {
-		draw(true)
+		repaintVisibleScreen(frame, rows)
 		return
 	}
 	if (fullscreen && frameGrew && nextHeight > rows && first >= 0 && first < prevFrame.lines.length) {

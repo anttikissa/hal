@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { render } from '../src/client/terminal/render.ts'
 import { client } from '../src/client/app.ts'
 import { prompt } from '../src/client/terminal/prompt.ts'
+import { popup } from '../src/client/terminal/popup.ts'
 
 function captureOutput(fn: () => void): string {
 	const writes: string[] = []
@@ -76,6 +77,7 @@ beforeEach(() => {
 	client.state.peakCols = 0
 	client.state.working = new Map()
 	prompt.clear()
+	popup.close()
 })
 
 describe('render fullscreen growth', () => {

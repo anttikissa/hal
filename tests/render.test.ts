@@ -896,7 +896,7 @@ describe('render', () => {
 		expect(clean).toContain('anthropic')
 	})
 
-	test('opening and closing a popup force canonical repaint across soft-wrap layout changes', () => {
+	test('opening and closing a fullscreen popup does not erase scrollback', () => {
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
 		Object.defineProperty(process.stdout, 'rows', { value: 8, configurable: true })
@@ -910,8 +910,8 @@ describe('render', () => {
 			popup.close()
 			const closed = captureOutput(() => render.draw())
 
-			expect(opened).toContain('\x1b[2J\x1b[H\x1b[3J')
-			expect(closed).toContain('\x1b[2J\x1b[H\x1b[3J')
+			expect(opened).not.toMatch(/\x1b\[[0-9;?]*J/)
+			expect(closed).not.toMatch(/\x1b\[[0-9;?]*J/)
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
@@ -979,7 +979,7 @@ describe('render', () => {
 		}
 	})
 
-	test('fullscreen shrink rebuilds the canonical frame', () => {
+	test('fullscreen shrink repaints without erasing scrollback', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -992,7 +992,7 @@ describe('render', () => {
 			tab.history.splice(0, tab.history.length, { type: 'log', text: 'new' })
 			tab.historyVersion++
 			const output = captureOutput(() => render.draw())
-			expect(output).toContain('\x1b[2J\x1b[H\x1b[3J')
+			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
 			expect(stripAnsi(output)).toContain('new')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
@@ -1000,7 +1000,7 @@ describe('render', () => {
 		}
 	})
 
-	test('fullscreen prompt shrink rebuilds the canonical frame', () => {
+	test('fullscreen prompt shrink does not erase an inspected viewport', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
 		const originalCols = process.stdout.columns
@@ -1014,8 +1014,8 @@ describe('render', () => {
 			prompt.setText('one line')
 			const output = captureOutput(() => render.draw())
 
-			expect(output).toContain('\x1b[2J\x1b[H\x1b[3J')
-			expect(stripAnsi(output)).toContain('old-0')
+			expect(output).not.toMatch(/\x1b\[[0-9;?]*J/)
+			expect(stripAnsi(output)).toContain('one line')
 		} finally {
 			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
 			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
