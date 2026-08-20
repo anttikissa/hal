@@ -10,6 +10,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - Use `./test` to run all tests, typechecker and oxlint. Run the tests before writing code.
 - If tests fail, look for working sessions that might have ongoing changes (eval "require('~/server/file-ipc.ts').ipc.readState().working")
 - If no working sessions, work with the user to fix the tests.
+- Never forge host-lock ownership or run state-writing probes against live shared IPC/session files. Runtime reproductions must use an isolated state directory or test harness.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
 - Hal is a simple developer tool, not a nuclear reactor: cover realistic failure cases, but keep solutions and tests proportionate rather than engineering away every remote race.
 - Run `bun cloc` to check line count — our budget for core code is 21 thousand lines. If you added many, see if you can do the same with less.
