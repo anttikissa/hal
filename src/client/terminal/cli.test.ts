@@ -599,6 +599,27 @@ test('up while working after visible output edits by canceling old turn', () => 
 		promptEdit.cancel()
 	}
 })
+test('a just-sent prompt edited into a slash command runs as a command', () => {
+	const commands: any[] = []
+	const origAppendCommand = clientTransport.io.appendCommand
+	const tab = makeTab({ inputHistory: ['-what'], history: [{ type: 'user', text: '-what' }] as any[] })
+	clientTransport.io.appendCommand = (command) => { commands.push(command) }
+	client.state.working.set('s1', true)
+
+	try {
+		withOneTab(tab, () => {
+			prompt.clear()
+			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
+			prompt.setText('/model gpt-5')
+			cli.forTests.handleAppKey(key('enter'))
+			expect(commands.at(-1)).toMatchObject({ type: 'prompt', sessionId: 's1', text: '/model gpt-5' })
+		})
+	} finally {
+		clientTransport.io.appendCommand = origAppendCommand
+		client.state.working.clear()
+		promptEdit.cancel()
+	}
+})
 test('history navigation inside just-sent edit skips the already loaded prompt', () => {
 	const commands: any[] = []
 	const origAppendCommand = clientTransport.io.appendCommand

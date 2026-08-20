@@ -376,20 +376,11 @@ function continueAfterPromptEdit(active: NonNullable<typeof promptEdit.state.act
 }
 
 function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, queue?: boolean): void {
-	const text = prompt.submitText().trim()
-	const displayText = prompt.text().trim()
-	if (!text) return
-	if (active.mode === 'amend' || active.mode === 'cancel') {
-		prompt.pushHistory(text)
-		promptEdit.cancel()
-		client.sendCommand('prompt-amend', text, displayText === text ? undefined : displayText)
-		prompt.clear()
-		clearSavedPromptState()
-		client.onSubmit(text)
-		return
-	}
+	// Amend rewrites the just-sent prompt, but only for plain text: an edit that
+	// turned into a slash command must run as a command, so it takes the normal path.
+	const amend = (active.mode === 'amend' || active.mode === 'cancel') && !prompt.submitText().trim().startsWith('/')
 	promptEdit.cancel()
-	submit(text, queue)
+	submit(undefined, queue, amend)
 }
 
 function plainKey(k: KeyEvent, key: string): boolean {
@@ -415,7 +406,7 @@ function handlePromptEditKey(k: KeyEvent, contentWidth: number): boolean {
 	return false
 }
 
-function submitPromptText(text: string, displayText: string | undefined, queue?: boolean): void {
+function submitPromptText(text: string, displayText: string | undefined, queue?: boolean, type: 'prompt' | 'prompt-amend' = 'prompt'): void {
 	completion.dismiss()
 	popup.close()
 	promptEdit.cancel()
@@ -423,7 +414,7 @@ function submitPromptText(text: string, displayText: string | undefined, queue?:
 	prompt.pushHistory(text)
 	// Human typing now uses the same prompt command path as inbox messages.
 	// The runtime decides whether an working turn makes this behave like steering.
-	client.sendCommand('prompt', text, displayText === text ? undefined : displayText, queue)
+	client.sendCommand(type, text, displayText === text ? undefined : displayText, queue)
 	prompt.clear()
 	clearSavedPromptState()
 	// Update tab's inputHistory + clear persisted draft
@@ -460,12 +451,12 @@ function handleLocalCommand(text: string): boolean {
 	return true
 }
 
-function submit(override?: string, queue?: boolean): void {
+function submit(override?: string, queue?: boolean, amend?: boolean): void {
 	const text = (override ?? prompt.submitText()).trim()
 	const displayText = override === undefined ? prompt.text().trim() : undefined
 	if (!text) return
 	if (handleLocalCommand(text)) return
-	submitPromptText(text, displayText, queue)
+	submitPromptText(text, displayText, queue, amend ? 'prompt-amend' : 'prompt')
 }
 
 // ── Tab completion key handling ──────────────────────────────────────────────
