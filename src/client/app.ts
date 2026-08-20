@@ -3,6 +3,7 @@
 
 import { clientTransport } from './transport.ts'
 import type { ContinuationAction, SharedSessionInfo, SharedState } from '../common/ipc.ts'
+import { sessionLabel as sharedSessionLabel } from '../common/session-label.ts'
 import type { TokenUsage, VersionStatus } from '../common/protocol.ts'
 import { clientBackend } from './backend.ts'
 import { historyProjection } from '../common/history-projection.ts'
@@ -279,8 +280,7 @@ function sessionLabel(sessionId: string): string {
 	const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId)
 	const tab = state.tabs[index]
 	if (!tab) return sessionId
-	const details = [tab.name === tab.sessionId ? '' : tab.name, index >= 0 ? `tab ${index + 1}` : ''].filter(Boolean).join(', ')
-	return details ? `${sessionId} (${details})` : sessionId
+	return sharedSessionLabel.format({ id: sessionId, name: tab.name, tab: index + 1 })
 }
 
 function applyLiveEventToTab(tab: Tab, event: LiveEvent) {

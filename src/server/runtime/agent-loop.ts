@@ -9,6 +9,8 @@
 import { ipc } from '../file-ipc.ts'
 import { protocol } from '../../common/protocol.ts'
 import type { ProviderStreamEvent, Message, TokenUsage, TurnEndMeta } from '../../common/protocol.ts'
+import type { SharedSessionInfo } from '../../common/ipc.ts'
+import { sessionLabel } from '../../common/session-label.ts'
 import { models } from '../../common/models.ts'
 import type { LiveEvent } from '../../common/live-event-blocks.ts'
 import { context } from './system-prompt.ts'
@@ -62,17 +64,23 @@ const state = {
 	pauseBeforeTools: new Set<string>(),
 }
 
-function runningSubagentNotice(parentSessionId: string): string {
-	const ids: string[] = []
-	for (const [sessionId, working] of Object.entries(ipc.readState().working)) {
+function runningSubagents(parentSessionId: string): SharedSessionInfo[] {
+	const shared = ipc.readState()
+	const active: SharedSessionInfo[] = []
+	for (const [sessionId, working] of Object.entries(shared.working)) {
 		if (!working) continue
 		const meta = sessions.loadSessionMeta(sessionId)
 		if (meta?.parentSessionId !== parentSessionId) continue
 		if (meta.spawnKind !== 'subagent' && meta.spawnKind !== 'subagent-leave-open') continue
-		ids.push(sessionId)
+		active.push(shared.sessions.find((session) => session.id === sessionId) ?? { id: sessionId, cwd: '' })
 	}
-	if (ids.length === 0) return ''
-	return `<meta>Subagents running: ${ids.join(', ')}</meta>`
+	return active
+}
+
+function runningSubagentNotice(parentSessionId: string): string {
+	const active = runningSubagents(parentSessionId)
+	if (active.length === 0) return ''
+	return `<meta>Subagents running: ${active.map(sessionLabel.format).join(', ')}</meta>`
 }
 
 const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) => void }>()
@@ -1027,5 +1035,6 @@ export const agentLoop = {
 	executeToolBatch,
 	sanitizeToolCallInput,
 	runningSubagentNotice,
+	runningSubagents,
 	toolConfirmationBody,
 }

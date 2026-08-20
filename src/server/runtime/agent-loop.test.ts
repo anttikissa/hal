@@ -34,7 +34,7 @@ test('reports only running subagents belonging to the parent', () => {
 	const origReadState = ipc.readState
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	ipc.readState = () => ({
-		sessions: [],
+		sessions: [{ id: 'child', tab: 4, name: 'Inspect terminal rendering', cwd: '/tmp' }],
 		working: { parent: true, child: true, inspector: true, unrelated: true },
 		updatedAt: new Date().toISOString(),
 	})
@@ -47,7 +47,7 @@ test('reports only running subagents belonging to the parent', () => {
 	sessions.loadSessionMeta = (id) => metas[id] ?? null
 
 	try {
-		expect(agentLoop.runningSubagentNotice('parent')).toBe('<meta>Subagents running: child</meta>')
+		expect(agentLoop.runningSubagentNotice('parent')).toBe('<meta>Subagents running: child (Inspect terminal rendering, tab 4)</meta>')
 	} finally {
 		ipc.readState = origReadState
 		sessions.loadSessionMeta = origLoadSessionMeta

@@ -1,7 +1,11 @@
-import { toolRegistry, type Tool } from './tool.ts'
+import { toolRegistry, type Tool, type ToolContext } from './tool.ts'
+import { agentLoop } from '../runtime/agent-loop.ts'
+import { sessionLabel } from '../../common/session-label.ts'
 
-async function execute(): Promise<string> {
-	return 'Waiting for the next subagent.'
+async function execute(_input: unknown, ctx: ToolContext): Promise<string> {
+	const active = agentLoop.runningSubagents(ctx.sessionId)
+	if (active.length === 0) return 'Waiting for the next subagent.'
+	return `Waiting for the next subagent. Active: ${active.map(sessionLabel.format).join(', ')}`
 }
 
 const waitTool: Tool = {
