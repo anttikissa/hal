@@ -141,3 +141,36 @@ test('bash interruption without output has no leading blank line', async () => {
 
 	expect(await command).toBe('[interrupted]')
 })
+
+test('bash interruption kills a background job after its shell exits', async () => {
+	const controller = new AbortController()
+	let childPid = 0
+	let outputStarted!: () => void
+	const outputReady = new Promise<void>((resolve) => { outputStarted = resolve })
+	const command = bash.execute(
+		{ command: 'sleep 30 & echo $!' },
+		{
+			sessionId: 's',
+			cwd: process.cwd(),
+			signal: controller.signal,
+			onOutput: (output) => {
+				childPid = Number(output.trim())
+				outputStarted()
+			},
+		},
+	)
+
+	try {
+		await outputReady
+		// The foreground shell has returned; the background job alone owns the pipes.
+		await Bun.sleep(25)
+		controller.abort()
+		const result = await Promise.race([command, Bun.sleep(500).then(() => '[timed out]')])
+		expect(result).toMatch(/\[interrupted\]$/)
+	} finally {
+		try {
+			process.kill(childPid, 'SIGKILL')
+		} catch {}
+		await command
+	}
+})

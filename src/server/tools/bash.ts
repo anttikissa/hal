@@ -196,8 +196,13 @@ function childPids(parentPid: number): number[] {
 		.filter((pid) => Number.isInteger(pid) && pid > 0)
 }
 
-/** Recursively kill a process tree. */
+/** Kill a detached process group, including jobs whose shell has already exited. */
 function killProcessTree(rootPid: number, signal: 'SIGTERM' | 'SIGKILL'): void {
+	try {
+		// A negative PID targets the POSIX process group whose leader is rootPid.
+		process.kill(-rootPid, signal)
+		return
+	} catch {}
 	for (const pid of childPids(rootPid)) killProcessTree(pid, signal)
 	try {
 		process.kill(rootPid, signal)
@@ -222,6 +227,8 @@ async function execute(input: unknown, ctx: ToolContext): Promise<string> {
 	const timeout = spec.timeout ?? config.defaultTimeout
 
 	const proc = Bun.spawn(['bash', '-lc', command], {
+		// Isolate commands so abort can signal background jobs after bash itself exits.
+		detached: true,
 		cwd: ctx.cwd,
 		stdout: 'pipe',
 		stderr: 'pipe',
