@@ -52,7 +52,7 @@ test('/what sends non-interrupting what command with target text', () => {
 	c.sendCommand = (type, text) => { sent.push({ type, text }) }
 	const result = clientLocalCommands.execute('/what 5-9', c)
 
-	expect(result).toMatchObject({ handled: true, output: 'Summarizing session(s)...' })
+	expect(result).toEqual({ handled: true })
 	expect(sent).toEqual([{ type: 'what', text: '5-9' }])
 })
 

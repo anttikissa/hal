@@ -160,7 +160,7 @@ function runGo(args: string, ctx: ClientLocalCommandContext): ClientLocalCommand
 
 function runWhat(args: string, ctx: ClientLocalCommandContext): ClientLocalCommandResult {
 	ctx.sendCommand('what', args.trim())
-	return { handled: true, output: 'Summarizing session(s)...' }
+	return { handled: true }
 }
 
 function runKeys(_args: string, _ctx: ClientLocalCommandContext): ClientLocalCommandResult {

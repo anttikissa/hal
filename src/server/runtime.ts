@@ -740,6 +740,7 @@ function handleCommand(cmd: Command): void {
 			const summarizing = ipc.readState().summarizing ?? {}
 			const activityIds = ids.filter((id) => !summarizing[id])
 			const skippedIds = ids.filter((id) => summarizing[id])
+			emitInfo(sessionId, 'Summarizing session(s)...')
 			if (skippedIds.length > 0) emitInfo(sessionId, `Already summarizing: ${skippedIds.join(', ')}`)
 			if (resolved.ok && activityIds.length === 0) return
 			for (const id of activityIds) emitBackgroundActivity(id, 'summarizing', true)

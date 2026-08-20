@@ -136,6 +136,7 @@ test('/what stores summarizing in shared state and skips duplicate targets', asy
 		runtime.state.openSessionIds = ['04-requester', '04-target']
 		runtime.handleCommand({ type: 'what', sessionId: '04-requester', target: '2' })
 		expect(shared.summarizing).toEqual({ '04-target': true })
+		expect(events).toContainEqual(expect.objectContaining({ type: 'info', text: 'Summarizing session(s)...' }))
 		runtime.handleCommand({ type: 'what', sessionId: '04-requester', target: '2' })
 		expect(runs).toEqual([['04-target']])
 		expect(events).toContainEqual(expect.objectContaining({ type: 'info', text: 'Already summarizing: 04-target' }))
