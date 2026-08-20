@@ -303,7 +303,16 @@ function reduce(blocks: readonly LiveBlock[], event: LiveEvent, options: LivePro
 		return liveEventBlocks.appendBlock(closed, block)
 	}
 
-	if (event.type === 'stream-end') return liveEventBlocks.closeStreamingBlock(blocks)
+	if (event.type === 'stream-end') {
+		const closed = liveEventBlocks.closeStreamingBlock(blocks)
+		const next = closed.blocks.map((block) => {
+			if (block.type !== 'tool' || !block.running) return block
+			const finished = { ...block }
+			delete finished.running
+			return finished
+		})
+		return { blocks: next, changed: closed.changed || next.some((block, index) => block !== closed.blocks[index]) }
+	}
 	return { blocks: blocks as LiveBlock[], changed: false }
 }
 

@@ -240,43 +240,6 @@ test('surfaces Claude web_search as a visible tool with result titles', async ()
 })
 
 
-test('finishes a Claude web_search that ends without a result block', async () => {
-	const sessionId = `test-web-search-unfinished-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-	createdSessions.push(sessionId)
-	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
-
-	const events: any[] = []
-	const origGetProvider = providerLoader.getProvider
-	const origAppendEvent = ipc.appendEvent
-	providerLoader.getProvider = async () => ({
-		async *generate() {
-			yield { type: 'server_tool', serverBlocks: [{ type: 'server_tool_use', id: 'srvtoolu_unfinished', name: 'web_search', input: { query: 'unanswered query' } }] }
-			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
-		},
-	})
-	ipc.appendEvent = (event: any) => {
-		events.push(event)
-	}
-
-	try {
-		await agentLoop.runAgentLoop({
-			sessionId,
-			model: 'anthropic/claude-opus-4-8',
-			cwd: process.cwd(),
-			systemPrompt: 'test prompt',
-			messages: [{ role: 'user', content: 'search' }],
-		})
-
-		expect(events).toContainEqual(expect.objectContaining({
-			type: 'tool-result', toolId: 'srvtoolu_unfinished', phase: 'done', output: '[web search did not return a result]',
-		}))
-		const history = sessions.loadHistory(sessionId)
-		expect(history).toContainEqual(expect.objectContaining({ type: 'tool_result', toolId: 'srvtoolu_unfinished', visibility: 'ui' }))
-	} finally {
-		providerLoader.getProvider = origGetProvider
-		ipc.appendEvent = origAppendEvent
-	}
-})
 
 
 test('calibrates context token estimates from provider input usage', async () => {

@@ -99,4 +99,11 @@ describe('live event block projection', () => {
 		expect(result.toolBlock).toEqual({ type: 'tool', name: 'edit', toolId: 'tool-1', output: 'done' })
 		expect(result.blocks[0]).toBe(result.toolBlock)
 	})
+
+
+	test('finishes running tools when their stream ends', () => {
+		const result = liveEventBlocks.reduce([{ type: 'tool', name: 'web_search', toolId: 'search-1', running: true }], { type: 'stream-end' })
+
+		expect(result.blocks).toEqual([{ type: 'tool', name: 'web_search', toolId: 'search-1' }])
+	})
 })
