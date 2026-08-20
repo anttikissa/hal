@@ -82,7 +82,7 @@ Example 2: Run a command to change current session cwd as if user had typed it:
 require('~/server/file-ipc.ts').ipc.appendCommand({ type: 'prompt', sessionId: ctx.sessionId, text: '/cd /tmp', queue: true })
 ```
 
-Use `queue: true` for a prompt issued by your own eval call: it runs after the current turn completes instead of steering and pausing that turn.
+Use `queue: true` for ordinary prompts and slash commands that must run after the current turn, such as `/cd` above; this avoids steering and pausing the turn. `/rename` is safe while working, so omit `queue` (or use `queue: false`) to rename immediately without creating a queued prompt.
 
 Some useful server commands you can run this way:
 - `/rename <name>` — set current session name, examples: "Review rendering regression", "Implement /rebase"
