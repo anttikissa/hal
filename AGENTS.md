@@ -11,7 +11,7 @@ Hal is a coding agent. If you're Hal, you already saw the system prompt - otherw
 - If tests fail, look for working sessions that might have ongoing changes (eval "require('~/server/file-ipc.ts').ipc.readState().working")
 - If no working sessions, work with the user to fix the tests.
 - Always write the MINIMAL amount of code to achieve your goal. YAGNI. No unnecessary abstractions, parameters, or flags that won't be used by feature at hand.
-- Hal is a rugged developer tool, not a nuclear reactor: cover realistic failure cases, but keep solutions and tests proportionate rather than engineering away every remote race.
+- Hal is a simple developer tool, not a nuclear reactor: cover realistic failure cases, but keep solutions and tests proportionate rather than engineering away every remote race.
 - Run `bun cloc` to check line count — our budget for core code is 21 thousand lines. If you added many, see if you can do the same with less.
 - Put a timeout on long-running manual commands. If a command is meant to stay open (TUI, server, watch mode), run it with a short timeout or another bounded harness.
 - Tabs, not spaces (except for package.json)
