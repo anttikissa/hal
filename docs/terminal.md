@@ -297,6 +297,10 @@ Background-tab `stream-delta` / `stream-end` updates should also skip repaint
 entirely. Their history is invisible until tab switch, so redrawing the active
 tab is wasted work.
 
+Parallel tool cards must update independently as their output arrives. Never serialize
+one card's preview or result behind an earlier tool to work around repaint corruption;
+that changes required UI behavior instead of fixing the renderer.
+
 This was discovered the hard way: without throttling, keypresses were
 completely unresponsive during assistant output.
 
