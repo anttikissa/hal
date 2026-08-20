@@ -62,6 +62,19 @@ const state = {
 	pauseBeforeTools: new Set<string>(),
 }
 
+function runningSubagentNotice(parentSessionId: string): string {
+	const ids: string[] = []
+	for (const [sessionId, working] of Object.entries(ipc.readState().working)) {
+		if (!working) continue
+		const meta = sessions.loadSessionMeta(sessionId)
+		if (meta?.parentSessionId !== parentSessionId) continue
+		if (meta.spawnKind !== 'subagent' && meta.spawnKind !== 'subagent-leave-open') continue
+		ids.push(sessionId)
+	}
+	if (ids.length === 0) return ''
+	return `<meta>Subagents running: ${ids.join(', ')}</meta>`
+}
+
 const pendingToolConfirmations = new Map<string, { resolve: (approved: boolean) => void }>()
 
 const DEFAULT_ABORT_TEXT = '[paused]'
@@ -802,6 +815,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					content: [{ type: 'tool_result', tool_use_id: call.id, content: result }],
 				})
 			}
+			const subagentNotice = runningSubagentNotice(sessionId)
+			if (subagentNotice) messages.push({ role: 'user', content: subagentNotice })
 
 			await ctx.onStatus?.(true)
 			if (toolCalls.some((call) => call.name === 'wait')) {
@@ -1011,5 +1026,6 @@ export const agentLoop = {
 	hasPauseBeforeTools,
 	executeToolBatch,
 	sanitizeToolCallInput,
+	runningSubagentNotice,
 	toolConfirmationBody,
 }

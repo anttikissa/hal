@@ -30,6 +30,30 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
 })
 
+test('reports only running subagents belonging to the parent', () => {
+	const origReadState = ipc.readState
+	const origLoadSessionMeta = sessions.loadSessionMeta
+	ipc.readState = () => ({
+		sessions: [],
+		working: { parent: true, child: true, inspector: true, unrelated: true },
+		updatedAt: new Date().toISOString(),
+	})
+	const metas: Record<string, any> = {
+		parent: { id: 'parent', createdAt: '' },
+		child: { id: 'child', createdAt: '', parentSessionId: 'parent', spawnKind: 'subagent' },
+		inspector: { id: 'inspector', createdAt: '', parentSessionId: 'parent', spawnKind: 'interactive' },
+		unrelated: { id: 'unrelated', createdAt: '', parentSessionId: 'other', spawnKind: 'subagent' },
+	}
+	sessions.loadSessionMeta = (id) => metas[id] ?? null
+
+	try {
+		expect(agentLoop.runningSubagentNotice('parent')).toBe('<meta>Subagents running: child</meta>')
+	} finally {
+		ipc.readState = origReadState
+		sessions.loadSessionMeta = origLoadSessionMeta
+	}
+})
+
 test('confirmation body colors the exact offending fragment', () => {
 	const call = { id: 't1', name: 'bash', input: { command: 'cd /tmp\ngit checkout -- . 2>/dev/null; true' } }
 	const findings = [{ severity: 'danger' as const, reason: 'DESTRUCTIVE GIT CHECKOUT/RESTORE PATH', match: 'git checkout -- . 2>/dev/null' }]
