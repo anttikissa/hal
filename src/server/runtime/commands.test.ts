@@ -772,6 +772,7 @@ test('/cd offers to create a missing directory', async () => {
 		output: `/cd: ${target} not found. Would you like to create that directory and then /cd into it?`,
 		syntheticKind: 'cd-create-suggestion',
 		handled: true,
+		resumeTurn: true,
 	})
 	expect(session.cwd).toBe(process.cwd())
 })
@@ -809,6 +810,7 @@ test('/cd reports an unclosed quoted path', async () => {
 
 	expect(result.handled).toBe(true)
 	expect(result.error).toBe('cd failed: missing closing quote')
+	expect(result.resumeTurn).toBe(true)
 })
 
 
@@ -1063,4 +1065,9 @@ test('/todo requires an item and stays runnable while working', async () => {
 
 	expect(result.error).toBe('Usage: /todo <item>')
 	expect(commands.canRunWhileWorking('/todo something')).toBe(true)
+})
+
+
+test('/cd is a context switch and cannot run inside an active turn', () => {
+	expect(commands.canRunWhileWorking('/cd /tmp')).toBe(false)
 })

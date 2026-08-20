@@ -35,6 +35,7 @@ type PendingContinuation = { canceled: boolean }
 type PendingPrompt = {
 	controller: AbortController
 	task: Promise<void>
+	contextSwitch: boolean
 }
 const state = {
 	openSessionIds: [] as string[],
@@ -47,6 +48,8 @@ const state = {
 	pendingToolRuns: new Map<string, AbortController>(),
 	/** Continuations that are waiting for the turn they replace to finish. */
 	continuingTurns: new Map<string, PendingContinuation>(),
+	/** Sessions whose interrupted turn is being replaced across a cwd boundary. */
+	contextSwitching: new Set<string>(),
 }
 
 const USER_PAUSED_TEXT = '[paused]'
@@ -297,14 +300,14 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 			}
 		}
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error')
-		if (label === 'steering' && !cmdResult.error && /^\/model\b/.test(text.trimStart())) void runGeneration(sessionId, '', source)
+		if (label === 'steering' && (cmdResult.resumeTurn || (!cmdResult.error && /^\/model\b/.test(text.trimStart())))) void runGeneration(sessionId, '', source)
 		return
 	}
 	await runGeneration(sessionId, text, source, displayText, pending, sourceTab, label)
 }
 
-async function dispatchPromptCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, label?: 'queued', sourceTab?: number): Promise<void> {
-	const steering = agentLoop.isWorking(sessionId)
+async function dispatchPromptCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, previous?: PendingPrompt, label?: 'queued', sourceTab?: number): Promise<void> {
+	let steering = agentLoop.isWorking(sessionId) || (pending.contextSwitch && !!previous)
 	if (steering && await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, true)) {
 		persistCommandInput(sessionId, text, source)
 		return
@@ -313,16 +316,29 @@ async function dispatchPromptCommand(sessionId: string, text: string, source: st
 		await handlePrompt(sessionId, text, undefined, source, displayText, undefined, sourceTab)
 		return
 	}
-	if (steering) {
-		const settled = agentLoop.abortAndWait(sessionId)
-		if (settled) await settled
+	try {
+		if (steering) {
+			if (pending.contextSwitch) {
+				state.contextSwitching.add(sessionId)
+				previous?.controller.abort('')
+			}
+			const settled = pending.contextSwitch
+				? agentLoop.abortAndWait(sessionId, '')
+				: agentLoop.abortAndWait(sessionId)
+			if (settled) await settled
+			if (previous) await previous.task
+			else if (!settled) steering = false
+		}
+		if (pending.contextSwitch) state.contextSwitching.delete(sessionId)
+		await runtime.handlePrompt(sessionId, text, label ?? (steering ? 'steering' : undefined), source, displayText, pending, sourceTab)
+	} finally {
+		if (pending.contextSwitch) state.contextSwitching.delete(sessionId)
 	}
-	await runtime.handlePrompt(sessionId, text, label ?? (steering ? 'steering' : undefined), source, displayText, pending, sourceTab)
 }
 
-function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
+function trackPendingPrompt(sessionId: string, contextSwitch: boolean, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
 	const previous = state.pendingPrompts.get(sessionId)
-	const pending: PendingPrompt = { controller: new AbortController(), task: Promise.resolve() }
+	const pending: PendingPrompt = { controller: new AbortController(), task: Promise.resolve(), contextSwitch }
 	state.pendingPrompts.set(sessionId, pending)
 	pending.task = run(pending, previous)
 	function clear(): void {
@@ -333,11 +349,12 @@ function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, pre
 }
 
 function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued', sourceTab?: number): Promise<void> {
-	return trackPendingPrompt(sessionId, (pending) => dispatchPromptCommand(sessionId, text, source, displayText, pending, label, sourceTab))
+	const contextSwitch = /^\/cd(?:\s|$)/.test(text.trimStart())
+	return trackPendingPrompt(sessionId, contextSwitch, (pending, previous) => dispatchPromptCommand(sessionId, text, source, displayText, pending, previous, label, sourceTab))
 }
 
 function startPromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
-	return trackPendingPrompt(sessionId, (pending, previous) => handlePromptAmendCommand(sessionId, text, source, displayText, pending, previous))
+	return trackPendingPrompt(sessionId, false, (pending, previous) => handlePromptAmendCommand(sessionId, text, source, displayText, pending, previous))
 }
 
 function abortPendingPrompt(sessionId: string, abortText: string): Promise<void> | false {
@@ -553,7 +570,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		tabs.closeSession(sessionId)
 		return
 	}
-	if (result !== 'completed') queueRunner.emitQueuePausedNotice(sessionId)
+	if (result !== 'completed' && !state.contextSwitching.has(sessionId)) queueRunner.emitQueuePausedNotice(sessionId)
 	if (!agentLoop.isWorking(sessionId) && queueRunner.shouldDrainQueuedPrompt(sessionId, result)) await queueRunner.runNextQueuedPrompt(sessionId)
 }
 
@@ -885,6 +902,7 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	state.pendingPrompts.clear()
 	for (const controller of state.pendingToolRuns.values()) controller.abort()
 	state.pendingToolRuns.clear()
+	state.contextSwitching.clear()
 	let startupSessionId: string | undefined
 	if (opts.targetCwd) {
 		const target = tabs.openSessionForCwd(opts.targetCwd)

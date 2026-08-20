@@ -45,6 +45,8 @@ export interface CommandResult {
 	syntheticKind?: string
 	/** Whether the command was recognized and handled. */
 	handled: boolean
+	/** Continue an active turn after this command has forced it across a context boundary. */
+	resumeTurn?: boolean
 }
 
 export interface CommandHooks {
@@ -112,7 +114,6 @@ const workingSafeCommands = new Set([
 	'broadcast',
 	'clients',
 	'check',
-	'cd',
 	'fork',
 	'help',
 	'history',
@@ -713,7 +714,7 @@ function parseCdPathArg(args: string): { path?: string; error?: string } {
 // directory as a quick recovery when a self-edit prompt was typed elsewhere.
 handlers['cd'] = (args, session) => {
 	const parsed = parseCdPathArg(args)
-	if (parsed.error) return { error: `cd failed: ${parsed.error}`, handled: true }
+	if (parsed.error) return { error: `cd failed: ${parsed.error}`, handled: true, resumeTurn: true }
 	const target = resolve(session.cwd, parsed.path!)
 
 	if (!existsSync(target)) {
@@ -721,6 +722,7 @@ handlers['cd'] = (args, session) => {
 			output: `/cd: ${target} not found. Would you like to create that directory and then /cd into it?`,
 			syntheticKind: 'cd-create-suggestion',
 			handled: true,
+			resumeTurn: true,
 		}
 	}
 
@@ -737,6 +739,7 @@ handlers['cd'] = (args, session) => {
 	return {
 		output: parts.join('\n'),
 		handled: true,
+		resumeTurn: true,
 	}
 }
 

@@ -384,7 +384,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	const slashIdx = model.indexOf('/')
 	const providerName = slashIdx >= 0 ? model.slice(0, slashIdx) : 'stub'
 	const modelId = slashIdx >= 0 ? model.slice(slashIdx + 1) : model
-	const provider = await providerLoader.getProvider(providerName)
+	const providerPromise = providerLoader.getProvider(providerName)
 
 	// Abort any existing generation for this session. This prevents two
 	// concurrent generations on the same session (race between client
@@ -422,6 +422,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 	await ctx.onStatus?.(true)
 
 	try {
+		const provider = await providerPromise
 		const totalUsage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 }
 		let lastDoneMeta: TurnEndMeta | null = null
 		let retryAttempt = 0

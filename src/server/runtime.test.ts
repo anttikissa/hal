@@ -15,7 +15,8 @@ import { promptQueue } from './runtime/prompt-queue.ts'
 import { paths } from './paths.ts'
 import { whatSummary } from './session/what.ts'
 import { apiMessages } from './session/api-messages.ts'
-import { mkdtempSync, rmSync } from 'fs'
+import { attachments } from './session/attachments.ts'
+import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { openai } from './providers/openai.ts'
@@ -697,8 +698,9 @@ test('working queue slash command does not abort the running turn', async () => 
 })
 
 
-test('working-safe /cd does not abort the running turn', async () => {
-	const sessionId = `test-working-safe-${Date.now().toString(36)}`
+test('working /cd settles the old turn and resumes it with the new cwd', async () => {
+	const sessionId = `test-cd-context-switch-${Date.now().toString(36)}`
+	const target = process.cwd()
 	const meta: SessionMeta = {
 		id: sessionId,
 		createdAt: '2026-05-20T00:00:00.000Z',
@@ -707,6 +709,8 @@ test('working-safe /cd does not abort the running turn', async () => {
 		model: 'openai/gpt-5.5',
 	}
 	let aborts = 0
+	const settled = Promise.withResolvers<void>()
+	const continued = Promise.withResolvers<string>()
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
 	const origCurrentSessionId = runtime.state.currentSessionId
 	const origStopPromptWatch = runtime.state.stopPromptWatch
@@ -718,6 +722,9 @@ test('working-safe /cd does not abort the running turn', async () => {
 	const origUpdateMeta = sessions.updateMeta
 	const origSessionOpenInfo = sessions.sessionOpenInfo
 	const origWatchPromptFiles = context.watchPromptFiles
+	const origLoadAllHistory = sessions.loadAllHistory
+	const origToProviderMessages = apiMessages.toProviderMessages
+	const origRunAgentLoop = agentLoop.runAgentLoop
 	try {
 		runtime.state.openSessionIds = [sessionId]
 		runtime.state.currentSessionId = sessionId
@@ -727,18 +734,32 @@ test('working-safe /cd does not abort the running turn', async () => {
 		agentLoop.isWorking = (id) => id === sessionId
 		agentLoop.abortAndWait = () => {
 			aborts++
-			return false
+			return settled.promise
 		}
 		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
 		sessions.updateMeta = (_id, patch) => { Object.assign(meta, patch) }
 		sessions.sessionOpenInfo = (item) => ({ id: item.id, tab: 1, name: item.name, cwd: item.workingDir ?? '', model: item.model })
 		context.watchPromptFiles = () => () => {}
+		sessions.loadAllHistory = () => [
+			{ type: 'user', parts: [{ type: 'text', text: 'work' }] },
+			{ type: 'turn_end', status: 'aborted' },
+		]
+		apiMessages.toProviderMessages = () => [{ role: 'user', content: 'work' }]
+		agentLoop.runAgentLoop = async (ctx) => {
+			continued.resolve(ctx.cwd)
+			return 'completed'
+		}
 
-		runtime.handleCommand({ type: 'prompt', sessionId, text: '/cd /tmp' })
+		runtime.handleCommand({ type: 'prompt', sessionId, text: `/cd ${target}` })
 		await Bun.sleep(0)
 
-		expect(aborts).toBe(0)
+		expect(aborts).toBe(1)
 		expect(meta.workingDir).toBe('/tmp')
+
+		settled.resolve()
+
+		expect(await continued.promise).toBe(target)
+		expect(meta.workingDir).toBe(target)
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
@@ -751,6 +772,165 @@ test('working-safe /cd does not abort the running turn', async () => {
 		sessions.updateMeta = origUpdateMeta
 		sessions.sessionOpenInfo = origSessionOpenInfo
 		context.watchPromptFiles = origWatchPromptFiles
+		sessions.loadAllHistory = origLoadAllHistory
+		apiMessages.toProviderMessages = origToProviderMessages
+		agentLoop.runAgentLoop = origRunAgentLoop
+	}
+})
+
+
+test('working /cd waits for pending prompt preprocessing', async () => {
+	const sessionId = `test-cd-preprocessing-${Date.now().toString(36)}`
+	const target = process.cwd()
+	const entered = Promise.withResolvers<void>()
+	const release = Promise.withResolvers<void>()
+	const resumed = Promise.withResolvers<void>()
+	const runs: Array<{ cwd: string; aborted: boolean }> = []
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origResolve = attachments.resolve
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origWatchPromptFiles = context.watchPromptFiles
+	try {
+		await sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: new Date().toISOString(),
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.5',
+		})
+		ipc.ownsHostLock = () => true
+		attachments.resolve = async (_id, text) => {
+			entered.resolve()
+			await release.promise
+			return { apiContent: text, logParts: [{ type: 'text', text }] }
+		}
+		agentLoop.runAgentLoop = async (ctx) => {
+			runs.push({ cwd: ctx.cwd, aborted: ctx.signal?.aborted ?? false })
+			if (runs.length === 2) resumed.resolve()
+			return ctx.signal?.aborted ? 'aborted' : 'completed'
+		}
+		context.watchPromptFiles = () => () => {}
+
+		const prompt = runtime.startPromptCommand(sessionId, 'start work')
+		await entered.promise
+		const cd = runtime.startPromptCommand(sessionId, `/cd ${target}`)
+		await Bun.sleep(0)
+		expect(sessions.loadSessionMeta(sessionId)?.workingDir).toBe('/tmp')
+
+		release.resolve()
+		await Promise.all([prompt, cd, resumed.promise])
+
+		expect(runs).toEqual([
+			{ cwd: '/tmp', aborted: true },
+			{ cwd: target, aborted: false },
+		])
+		expect(sessions.loadSessionMeta(sessionId)?.workingDir).toBe(target)
+	} finally {
+		ipc.ownsHostLock = origOwnsHostLock
+		attachments.resolve = origResolve
+		agentLoop.runAgentLoop = origRunAgentLoop
+		context.watchPromptFiles = origWatchPromptFiles
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
+test('working /cd does not pause an existing prompt queue', async () => {
+	const sessionId = `test-cd-queue-${Date.now().toString(36)}`
+	const target = process.cwd()
+	const contexts: string[] = []
+	const events: any[] = []
+	const started = Promise.withResolvers<void>()
+	const queueStarted = Promise.withResolvers<void>()
+	const firstResult = Promise.withResolvers<'aborted'>()
+	let working = false
+	const origAppendEvent = ipc.appendEvent
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origIsWorking = agentLoop.isWorking
+	const origAbortAndWait = agentLoop.abortAndWait
+	const origRunAgentLoop = agentLoop.runAgentLoop
+	const origWatchPromptFiles = context.watchPromptFiles
+	try {
+		await sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: new Date().toISOString(),
+			workingDir: '/tmp',
+			model: 'openai/gpt-5.5',
+		})
+		promptQueue.append(sessionId, { text: 'queued work', createdAt: new Date().toISOString() })
+		ipc.appendEvent = (event: any) => { events.push(event) }
+		ipc.ownsHostLock = () => true
+		agentLoop.isWorking = () => working
+		agentLoop.runAgentLoop = async (ctx) => {
+			contexts.push(ctx.cwd)
+			working = true
+			if (contexts.length === 1) {
+				started.resolve()
+				const result = await firstResult.promise
+				working = false
+				return result
+			}
+			if (contexts.length === 3) queueStarted.resolve()
+			working = false
+			return 'completed'
+		}
+		agentLoop.abortAndWait = (_id, text) => {
+			expect(text).toBe('')
+			firstResult.resolve('aborted')
+			return Promise.resolve()
+		}
+		context.watchPromptFiles = () => () => {}
+
+		runtime.handleCommand({ type: 'prompt', sessionId, text: 'start work' })
+		await started.promise
+		runtime.handleCommand({ type: 'prompt', sessionId, text: `/cd ${target}` })
+		await queueStarted.promise
+
+		expect(contexts).toEqual(['/tmp', target, target])
+		expect(promptQueue.load(sessionId)).toEqual([])
+		expect(promptQueue.isHeld(sessionId)).toBe(false)
+		expect(events.some((event) => event.type === 'info' && event.text?.startsWith('Paused.'))).toBe(false)
+	} finally {
+		ipc.appendEvent = origAppendEvent
+		ipc.ownsHostLock = origOwnsHostLock
+		agentLoop.isWorking = origIsWorking
+		agentLoop.abortAndWait = origAbortAndWait
+		agentLoop.runAgentLoop = origRunAgentLoop
+		context.watchPromptFiles = origWatchPromptFiles
+		promptQueue.clear(sessionId)
+		sessions.deleteSession(sessionId)
+	}
+})
+
+
+test('back-to-back /cd commands resolve relative paths in order', async () => {
+	const sessionId = `test-cd-order-${Date.now().toString(36)}`
+	const root = mkdtempSync(join(tmpdir(), 'hal-cd-order-'))
+	const firstDir = join(root, 'first')
+	const secondDir = join(firstDir, 'second')
+	mkdirSync(secondDir, { recursive: true })
+	const origOwnsHostLock = ipc.ownsHostLock
+	const origWatchPromptFiles = context.watchPromptFiles
+	try {
+		await sessions.createSession(sessionId, {
+			id: sessionId,
+			createdAt: new Date().toISOString(),
+			workingDir: root,
+			model: 'openai/gpt-5.5',
+		})
+		ipc.ownsHostLock = () => true
+		context.watchPromptFiles = () => () => {}
+
+		await Promise.all([
+			runtime.startPromptCommand(sessionId, '/cd first'),
+			runtime.startPromptCommand(sessionId, '/cd second'),
+		])
+
+		expect(sessions.loadSessionMeta(sessionId)?.workingDir).toBe(secondDir)
+	} finally {
+		ipc.ownsHostLock = origOwnsHostLock
+		context.watchPromptFiles = origWatchPromptFiles
+		sessions.deleteSession(sessionId)
+		rmSync(root, { recursive: true, force: true })
 	}
 })
 

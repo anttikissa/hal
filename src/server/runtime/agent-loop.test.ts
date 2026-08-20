@@ -30,6 +30,31 @@ test('sanitizes redundant bash cd prefix before saving tool calls', () => {
 	expect(agentLoop.sanitizeToolCallInput('bash', input, '/var')).toBe(input)
 })
 
+
+test('registers a turn before asynchronous provider loading finishes', async () => {
+	const sessionId = `test-provider-load-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origGetProvider = providerLoader.getProvider
+	const loaded = Promise.withResolvers<any>()
+	providerLoader.getProvider = () => loaded.promise
+	try {
+		const turn = agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'hello' }],
+		})
+		expect(agentLoop.isWorking(sessionId)).toBe(true)
+		agentLoop.abort(sessionId, '')
+		loaded.resolve({ async *generate() {} })
+		expect(await turn).toBe('aborted')
+	} finally {
+		providerLoader.getProvider = origGetProvider
+	}
+})
+
 test('reports only running subagents belonging to the parent', () => {
 	const origReadState = ipc.readState
 	const origLoadSessionMeta = sessions.loadSessionMeta
