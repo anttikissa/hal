@@ -81,7 +81,7 @@ Example 2: Rename the current session:
 require('~/server/file-ipc.ts').ipc.appendCommand({ type: 'prompt', sessionId: ctx.sessionId, text: '/rename Investigate terminal corruption' })
 ```
 
-Use `queue: true` for `/cd` and `/model`.
+Use `queue: true` for `/cd`.
 
 Some useful server commands you can run this way:
 - `/rename <name>` — set current session name, examples: "Review rendering regression", "Implement /rebase"
