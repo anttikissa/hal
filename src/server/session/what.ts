@@ -141,7 +141,7 @@ function entryLine(sessionId: string, entry: HistoryEntry): string {
 		const who = entry.source ? `prompt from session ${entry.source}` : 'user'
 		return `${who}${ts}: ${clip(sessionEntry.userText(entry, { images: 'path-or-blob-or-image' }))}`
 	}
-	if (entry.type === 'assistant') return `assistant${entry.model ? ` (${entry.model})` : ''}${ts}: ${clip(entry.text)}`
+	if (entry.type === 'assistant') return `assistant${ts}: ${clip(entry.text)}`
 	if (entry.type === 'thinking') return `thinking${ts}: ${entry.blobId ? `[blob ${entry.blobId}]` : clip(entry.text ?? '')}`
 	if (entry.type === 'tool_call') return `tool_call${ts}: ${entry.name} ${clip(ason.stringify(entry.input ?? sessionEntry.loadEntryBlob(sessionId, entry)?.call?.input ?? {}, 'short'))}`
 	if (entry.type === 'tool_result') return `tool_result${ts}: ${clip(toolResultText(sessionId, entry))}`
