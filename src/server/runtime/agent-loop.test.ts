@@ -84,6 +84,40 @@ test('abort before tool dispatch keeps the tool from starting', async () => {
 })
 
 
+test('wait tool completes the turn without another model request', async () => {
+	const sessionId = `test-wait-tool-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const origGetProvider = providerLoader.getProvider
+	const origDispatch = toolRegistry.dispatch
+	let generations = 0
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			generations++
+			yield { type: 'tool_call', id: 'wait-1', name: 'wait', input: {} }
+			yield { type: 'done', usage: { input: 1, output: 1, cacheRead: 0, cacheCreation: 0 } }
+		},
+	})
+	toolRegistry.dispatch = async () => 'Waiting for the next subagent.'
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'openai/gpt-5.4',
+			cwd: process.cwd(),
+			systemPrompt: 'test prompt',
+			messages: [{ role: 'user', content: 'delegate and wait' }],
+		})
+		expect(result).toBe('completed')
+		expect(generations).toBe(1)
+		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'completed' })
+	} finally {
+		providerLoader.getProvider = origGetProvider
+		toolRegistry.dispatch = origDispatch
+	}
+})
+
+
 	test('streams partial output for each concurrent tool call', async () => {
 		const sessionId = `test-tool-output-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 		createdSessions.push(sessionId)

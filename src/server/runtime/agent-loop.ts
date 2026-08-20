@@ -824,6 +824,19 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			}
 
 			await ctx.onStatus?.(true)
+			if (toolCalls.some((call) => call.name === 'wait')) {
+				const est = context.estimateContext(messages, model, overheadBytes)
+				emitEvent(sessionId, {
+					type: 'stream-end',
+					phase: 'done',
+					usage: usageOrUndefined(totalUsage),
+					contextUsed: est.used,
+					contextMax: est.max,
+				})
+				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+				appendTurnEnd(sessionId, { status: 'completed', usage: usageOrUndefined(totalUsage) })
+				return 'completed'
+			}
 
 			// Continue to next iteration (re-invoke the model with tool results)
 		}

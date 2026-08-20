@@ -14,6 +14,7 @@ import { send } from './send.ts'
 import { google } from './google.ts'
 import { readUrl } from './read_url.ts'
 import { spawnAgent } from './spawn_agent.ts'
+import { wait } from './wait.ts'
 
 const state = {
 	initialized: false,
@@ -34,6 +35,7 @@ function init(): void {
 	google.init()
 	readUrl.init()
 	spawnAgent.init()
+	wait.init()
 }
 
 export const builtins = { state, init }
