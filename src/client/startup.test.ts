@@ -256,6 +256,8 @@ describe('client startup', () => {
 		ac.abort()
 
 		expect(client.currentTab()?.sessionId).toBe('s34')
+		const saved = ason.parse(readFileSync(CLIENT_STATE_PATH, 'utf-8')) as { restartTab: string | null }
+		expect(saved.restartTab).toBeNull()
 	})
 
 	test('adds an ephemeral last-active notice for stale sessions', async () => {

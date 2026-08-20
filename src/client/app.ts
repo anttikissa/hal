@@ -648,6 +648,9 @@ function initializeSessions(shared: SharedState, opts: { preferredSessionId?: st
 	}
 
 	const saved = clientPersistence.load()
+	// A restart hint belongs to the immediately replacing UI, not future clients.
+	// Clear it before rendering so a separately launched `hal` cannot inherit it.
+	if (saved.restartTab) clientPersistence.save({ ...saved, restartTab: null })
 	const restartTab = saved.restartTab ? items.find((item) => item.id === saved.restartTab) : undefined
 	// Ctrl-R restarts this UI and therefore preserves its current tab. A fresh peer
 	// invocation supplies a preferred session explicitly; only then do we override
