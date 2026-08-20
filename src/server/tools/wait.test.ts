@@ -20,3 +20,15 @@ test('wait identifies active subagents by tab and name', async () => {
 		;(agentLoop as any).runningSubagents = original
 	}
 })
+
+
+test('wait warns when no subagents are active', async () => {
+	const original = (agentLoop as any).runningSubagents
+	;(agentLoop as any).runningSubagents = () => []
+
+	try {
+		expect(await wait.execute({}, { sessionId: 'parent', cwd: '/tmp' })).toBe('No active subagents. Waiting for a message; send a prompt or spawn a subagent to resume.')
+	} finally {
+		;(agentLoop as any).runningSubagents = original
+	}
+})
