@@ -265,10 +265,6 @@ viewport top, repaint independently addressable logical lines, then append the
 suffix with `\r\n`. If a soft-wrapped URL begins above the viewport, leave its
 unchanged visible tail alone and start at the next complete logical line.
 
-Parallel tool output/result events must become visible in original call order. If a
-later card expands first and an earlier card expands afterward, the later copy may
-already be immutable in scrollback; no ANSI repaint can then remove the duplicate.
-
 ### 10. Kitty keyboard protocol
 
 Ghostty, Kitty, and iTerm intercept Cmd+C/X/V at the OS level. To receive

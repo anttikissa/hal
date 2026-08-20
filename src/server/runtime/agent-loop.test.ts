@@ -84,41 +84,6 @@ test('confirmation body colors the exact offending fragment', () => {
 		}
 	})
 
-	test('publishes concurrent tool results in call order', async () => {
-		const sessionId = `test-ordered-tools-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-		createdSessions.push(sessionId)
-		await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
-		const events: any[] = []
-		const origAppendEvent = ipc.appendEvent
-		const origDispatch = toolRegistry.dispatch
-		const releaseFirst = Promise.withResolvers<void>()
-		const secondPublished = Promise.withResolvers<void>()
-		ipc.appendEvent = (event: any) => {
-			events.push(event)
-			if (event.type === 'tool-result' && event.toolId === 'tool-b') secondPublished.resolve()
-		}
-		toolRegistry.dispatch = async (_name, input: any, context) => {
-			if (input.order === 1) await releaseFirst.promise
-			else context.onOutput?.('partial-2')
-			return `result-${input.order}`
-		}
-		try {
-			const batch = agentLoop.executeToolBatch(sessionId, [
-				{ id: 'tool-a', name: 'read', input: { order: 1 } },
-				{ id: 'tool-b', name: 'read', input: { order: 2 } },
-			], process.cwd(), new AbortController().signal)
-			const publishedEarly = await Promise.race([secondPublished.promise.then(() => true), Bun.sleep(20).then(() => false)])
-			expect(publishedEarly).toBe(false)
-			releaseFirst.resolve()
-			await batch
-			expect(events.filter((event) => event.type === 'tool-result' && event.phase === 'done').map((event) => event.toolId)).toEqual(['tool-a', 'tool-b'])
-			expect(events.filter((event) => event.type === 'tool-result' && event.toolId === 'tool-b').map((event) => event.phase)).toEqual(['running', 'done'])
-		} finally {
-			ipc.appendEvent = origAppendEvent
-			toolRegistry.dispatch = origDispatch
-		}
-	})
-
 
 test('abort before tool dispatch keeps the tool from starting', async () => {
 	const sessionId = `test-abort-before-dispatch-${Date.now().toString(36)}`

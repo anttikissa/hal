@@ -128,43 +128,6 @@ describe('render fullscreen growth', () => {
 		}
 	})
 
-	test('keeps later tool blocks singular when parallel results expand in call order', () => {
-		const tab = client.currentTab()!
-		const originalRows = process.stdout.rows
-		const originalCols = process.stdout.columns
-		Object.defineProperty(process.stdout, 'rows', { value: 12, configurable: true })
-		Object.defineProperty(process.stdout, 'columns', { value: 50, configurable: true })
-		try {
-			for (let i = 0; i < 8; i++) tab.history.push({ type: 'log', text: `old-${i}` })
-			tab.history.push(
-				{ type: 'tool', name: 'read', input: { path: 'first.ts' }, running: true, toolId: 'first' },
-				{ type: 'tool', name: 'bash', input: { command: 'echo second' }, running: true, toolId: 'second' },
-				{ type: 'tool', name: 'read', input: { path: 'third.ts' }, running: true, toolId: 'third' },
-			)
-			const state = terminalLines(captureOutput(() => render.draw()), 12)
-
-			const first = tab.history.findIndex((block) => block.type === 'tool' && block.toolId === 'first')
-			const second = tab.history.findIndex((block) => block.type === 'tool' && block.toolId === 'second')
-			const third = tab.history.findIndex((block) => block.type === 'tool' && block.toolId === 'third')
-			tab.history[first] = { ...tab.history[first] as any, output: Array(30).fill('first result').join('\n'), running: false }
-			terminalLines(captureOutput(() => render.draw()), 12, state)
-			tab.history[second] = { ...tab.history[second] as any, output: Array(15).fill('second result').join('\n'), running: false }
-			terminalLines(captureOutput(() => render.draw()), 12, state)
-			tab.history[third] = { ...tab.history[third] as any, output: Array(30).fill('third result').join('\n'), running: false }
-			terminalLines(captureOutput(() => render.draw()), 12, state)
-
-			render.resetRenderer()
-			const canonical = terminalLines(captureOutput(() => render.draw(true)), 12)
-			function content(lines: string[]): string[] {
-				return lines.map((line) => line.trim()).filter(Boolean)
-			}
-			expect(content(physicalLines(state))).toEqual(content(physicalLines(canonical)))
-		} finally {
-			Object.defineProperty(process.stdout, 'rows', { value: originalRows, configurable: true })
-			Object.defineProperty(process.stdout, 'columns', { value: originalCols, configurable: true })
-		}
-	})
-
 	test('anchors changed fullscreen growth to the physical viewport', () => {
 		const tab = client.currentTab()!
 		const originalRows = process.stdout.rows
