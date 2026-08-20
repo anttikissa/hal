@@ -211,7 +211,7 @@ function buildDigest(sessionId: string, openSessionIds: string[], working: Recor
 	const meta = sessions.loadSessionMeta(sessionId)
 	if (!meta) return `Session ${sessionId} not found.`
 	const entries = sessions.loadAllHistory(sessionId)
-	const recent = entries.slice(-config.maxEntries)
+	const recent = entries.filter((entry, index) => index >= entries.length - config.maxEntries || entry.type === 'cwd' || entry.type === 'model')
 	const opening: string[] = []
 	const userRequests: string[] = []
 	const recentHighlights: string[] = []
