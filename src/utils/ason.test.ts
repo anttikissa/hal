@@ -59,7 +59,7 @@ describe('stringify', () => {
 				delta: 'fourth item',
 			}
 			expect(stringify(obj)).toBe(
-				"{\n  alpha: 'something long',\n  beta: 'another thing',\n  gamma: 'third value',\n  delta: 'fourth item'\n}",
+				"{\n\talpha: 'something long',\n\tbeta: 'another thing',\n\tgamma: 'third value',\n\tdelta: 'fourth item'\n}",
 			)
 		})
 
@@ -73,7 +73,7 @@ describe('stringify', () => {
 				},
 			}
 			expect(stringify(obj)).toBe(
-				"{\n  outer: {\n    alpha: 'something',\n    beta: 'another',\n    gamma: 'third',\n    delta: 'fourth'\n  }\n}",
+				"{\n\touter: {\n\t\talpha: 'something',\n\t\tbeta: 'another',\n\t\tgamma: 'third',\n\t\tdelta: 'fourth'\n\t}\n}",
 			)
 		})
 		test('nested stays inline if short', () => {
@@ -91,7 +91,7 @@ describe('stringify', () => {
 		test('wide array breaks lines', () => {
 			const obj = ['something longer', 'another thing here', 'third value is big', 'fourth item too']
 			expect(stringify(obj)).toBe(
-				"[\n  'something longer',\n  'another thing here',\n  'third value is big',\n  'fourth item too'\n]",
+				"[\n\t'something longer',\n\t'another thing here',\n\t'third value is big',\n\t'fourth item too'\n]",
 			)
 		})
 		test('array of objects', () => {
@@ -104,7 +104,7 @@ describe('stringify', () => {
 				{ name: 'charlie', score: 300 },
 			]
 			expect(stringify(obj)).toBe(
-				"[\n  { name: 'alice', score: 100 },\n  { name: 'bob', score: 200 },\n  { name: 'charlie', score: 300 }\n]",
+				"[\n\t{ name: 'alice', score: 100 },\n\t{ name: 'bob', score: 200 },\n\t{ name: 'charlie', score: 300 }\n]",
 			)
 		})
 	})
@@ -136,7 +136,7 @@ describe('stringify modes', () => {
 	test('long always uses multi-line', () => {
 		const result = stringify({ a: 1 }, 'long')
 		expect(result).toContain('\n')
-		expect(result).toBe('{\n  a: 1\n}')
+		expect(result).toBe('{\n\ta: 1\n}')
 	})
 
 	test('default is smart', () => {
@@ -610,14 +610,14 @@ describe('comments', () => {
 	describe('stringify with comments', () => {
 		test('object with comments', () => {
 			const obj = { a: 1, b: 2, [COMMENTS]: { a: '/* greeting */' } }
-			expect(stringify(obj)).toBe('{\n  /* greeting */\n  a: 1,\n  b: 2\n}')
+			expect(stringify(obj)).toBe('{\n\t/* greeting */\n\ta: 1,\n\tb: 2\n}')
 		})
 
 		test('array with comments', () => {
 			const arr = Object.assign([1, 2, 3], {
 				[COMMENTS]: ['/* first */', , ,],
 			})
-			expect(stringify(arr)).toBe('[\n  /* first */\n  1,\n  2,\n  3\n]')
+			expect(stringify(arr)).toBe('[\n\t/* first */\n\t1,\n\t2,\n\t3\n]')
 		})
 
 		test('short mode skips comments', () => {
@@ -627,26 +627,26 @@ describe('comments', () => {
 
 		test('multi-line comment indented correctly', () => {
 			const obj = { a: { b: 1, [COMMENTS]: { b: '// inner\n' } } }
-			expect(stringify(obj)).toBe('{\n  a: {\n    // inner\n    b: 1\n  }\n}')
+			expect(stringify(obj)).toBe('{\n\ta: {\n\t\t// inner\n\t\tb: 1\n\t}\n}')
 		})
 	})
 
 	describe('roundtrip', () => {
 		test('object comments survive roundtrip', () => {
-			const src = '{\n  /* greeting */\n  a: 1,\n  b: 2\n}'
+			const src = '{\n\t/* greeting */\n\ta: 1,\n\tb: 2\n}'
 			const parsed = parse(src, { comments: true })
 			expect(stringify(parsed)).toBe(src)
 		})
 
 		test('blank line before comment survives roundtrip', () => {
-			const src = '{\n  a: 1,\n\n  // section two\n  b: 2\n}'
+			const src = '{\n\ta: 1,\n\n\t// section two\n\tb: 2\n}'
 			const parsed = parse(src, { comments: true }) as AsonObject
 			expect(parsed[COMMENTS]).toEqual({ b: '\n// section two\n' })
 			expect(stringify(parsed)).toBe(src)
 		})
 
 		test('no blank line before first comment', () => {
-			const src = '{\n  // first key\n  a: 1,\n  b: 2\n}'
+			const src = '{\n\t// first key\n\ta: 1,\n\tb: 2\n}'
 			const parsed = parse(src, { comments: true }) as AsonObject
 			expect(parsed[COMMENTS]).toEqual({ a: '// first key\n' })
 			expect(stringify(parsed)).toBe(src)
