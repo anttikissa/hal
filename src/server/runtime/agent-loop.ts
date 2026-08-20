@@ -455,6 +455,22 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			let iterationDone = false
 			let terminalErrorEntry: any | null = null
 
+
+			async function finishUnreturnedServerTools(): Promise<void> {
+				// Anthropic can finish a response without returning a result for a server tool it announced.
+				// Close such cards explicitly; otherwise their live `running` state survives later turns.
+				const completed = new Set(serverToolHistory.filter((entry) => entry.type === 'tool_result').map((entry) => entry.toolId))
+				for (const entry of serverToolHistory) {
+					if (entry.type !== 'tool_call' || completed.has(entry.toolId)) continue
+					const output = '[web search did not return a result]'
+					await writeToolResultBlob(sessionId, entry.blobId, output)
+					serverToolHistory.push({ type: 'tool_result', toolId: entry.toolId, blobId: entry.blobId, visibility: 'ui', ts: new Date().toISOString() })
+
+					completed.add(entry.toolId)
+					emitEvent(sessionId, { type: 'tool-result', toolId: entry.toolId, name: 'web_search', output, blobId: entry.blobId, phase: 'done' })
+				}
+			}
+
 			try {
 				for await (const event of gen) {
 					if (loopSignal.aborted) {
@@ -619,6 +635,8 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					const message = err?.message ? String(err.message) : String(err)
 					log.error('Agent loop error', { sessionId, message })
 					emitInfo(sessionId, message, 'error')
+
+					await finishUnreturnedServerTools()
 					emitEvent(sessionId, { type: 'stream-end', phase: 'failed', message })
 					if (!thinkingText && !assistantText && toolCalls.length === 0) {
 						sessions.appendHistory(sessionId, [errorHistoryEntry(message)])
@@ -628,6 +646,9 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 					return 'failed'
 				}
 			}
+
+
+			await finishUnreturnedServerTools()
 
 			// If aborted, emit partial output and exit.
 			if (aborted) {
