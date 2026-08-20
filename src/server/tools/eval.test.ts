@@ -17,8 +17,8 @@ test('eval renders returned objects as readable multiline ASON instead of JSON',
 	}, { sessionId: testSessionId, cwd: process.cwd() })
 
 	expect(out).toContain('\n')
-	expect(out).toContain("  {")
-	expect(out).toContain("    sessionId: '04-cxx'")
+	expect(out).toContain('\t{')
+	expect(out).toContain("\t\tsessionId: '04-cxx'")
 	expect(out).not.toContain('"tabs"')
 })
 
