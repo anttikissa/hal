@@ -425,8 +425,16 @@ async function amendLastPrompt(sessionId: string, text: string, source?: string,
 	return false
 }
 
+function cancelAmendedPrompt(sessionId: string): void {
+	const canceled = sessionStore.cancelTailTurn(sessionId)
+	if (!canceled) return
+	resetProviderConversation(sessionId)
+	sessionStore.clearLive(sessionId)
+	ipc.appendEvent({ type: 'history-rebased', sessionId, newLog: canceled.logName, entryCount: canceled.entryCount })
+	ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, false))
+}
+
 async function handlePromptAmendCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, previous?: PendingPrompt): Promise<void> {
-	if (!text.trim()) return
 	if (previous) {
 		previous.controller.abort('')
 		await previous.task
@@ -435,13 +443,12 @@ async function handlePromptAmendCommand(sessionId: string, text: string, source:
 		const settled = agentLoop.abortAndWait(sessionId, '')
 		if (settled) await settled
 	}
+	if (!text.trim()) {
+		cancelAmendedPrompt(sessionId)
+		return
+	}
 	if (!await amendLastPrompt(sessionId, text, source, displayText)) {
-		const canceled = sessionStore.cancelTailTurn(sessionId)
-		if (canceled) {
-			resetProviderConversation(sessionId)
-			sessionStore.clearLive(sessionId)
-			ipc.appendEvent({ type: 'history-rebased', sessionId, newLog: canceled.logName, entryCount: canceled.entryCount })
-		}
+		cancelAmendedPrompt(sessionId)
 		await handlePrompt(sessionId, text, undefined, source, displayText, pending)
 		return
 	}
@@ -962,6 +969,7 @@ export const runtime = {
 	handlePrompt,
 	runCompact,
 	handleCommand,
+	cancelAmendedPrompt,
 	continuePendingTools,
 	startPromptCommand,
 	// Used by sibling server modules (tabs, model-notices) at call time.

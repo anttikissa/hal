@@ -18,6 +18,7 @@ import { apiMessages } from './session/api-messages.ts'
 import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { openai } from './providers/openai.ts'
 
 test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	const origOpenSessionIds = [...runtime.state.openSessionIds]
@@ -26,6 +27,35 @@ test('runtime exposes in-memory focused sessions for eval helpers', () => {
 		expect(runtime.state.openSessionIds[2]).toBe('04-three')
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds
+	}
+})
+
+test('discarding an amended prompt clears its paused continuation', () => {
+	const sessionId = '04-discard-amend'
+	const shared: any = { working: {}, sessions: [{ id: sessionId, continuation: 'continue' }] }
+	const origCancelTailTurn = sessions.cancelTailTurn
+	const origClearLive = sessions.clearLive
+	const origLoadAllHistory = sessions.loadAllHistory
+	const origAppendEvent = ipc.appendEvent
+	const origUpdateState = ipc.updateState
+	const origResetSession = openai.resetSession
+	try {
+		sessions.cancelTailTurn = () => ({ logName: 'rewritten.asonl', entryCount: 1 })
+		sessions.clearLive = () => {}
+		sessions.loadAllHistory = () => [{ type: 'user', parts: [], canceled: true } as any]
+		ipc.appendEvent = () => {}
+		ipc.updateState = ((mutate: (state: any) => void) => { mutate(shared); return shared }) as typeof ipc.updateState
+		openai.resetSession = () => {}
+
+		runtime.cancelAmendedPrompt(sessionId)
+		expect(shared.sessions[0].continuation).toBeUndefined()
+	} finally {
+		sessions.cancelTailTurn = origCancelTailTurn
+		sessions.clearLive = origClearLive
+		sessions.loadAllHistory = origLoadAllHistory
+		ipc.appendEvent = origAppendEvent
+		ipc.updateState = origUpdateState
+		openai.resetSession = origResetSession
 	}
 })
 

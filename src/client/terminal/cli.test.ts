@@ -610,9 +610,13 @@ test('a just-sent prompt edited into a slash command runs as a command', () => {
 		withOneTab(tab, () => {
 			prompt.clear()
 			expect(cli.forTests.handleAppKey(key('up'))).toBe(true)
-			prompt.setText('/model gpt-5')
+			prompt.setText('/what')
 			cli.forTests.handleAppKey(key('enter'))
-			expect(commands.at(-1)).toMatchObject({ type: 'prompt', sessionId: 's1', text: '/model gpt-5' })
+			expect(commands).toEqual([
+				{ type: 'abort', sessionId: 's1', abortText: '' },
+				{ type: 'prompt-amend', sessionId: 's1', text: '', displayText: undefined },
+				{ type: 'what', sessionId: 's1', target: '' },
+			])
 		})
 	} finally {
 		clientTransport.io.appendCommand = origAppendCommand

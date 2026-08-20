@@ -376,11 +376,11 @@ function continueAfterPromptEdit(active: NonNullable<typeof promptEdit.state.act
 }
 
 function submitPromptEdit(active: NonNullable<typeof promptEdit.state.active>, queue?: boolean): void {
-	// Amend rewrites the just-sent prompt, but only for plain text: an edit that
-	// turned into a slash command must run as a command, so it takes the normal path.
-	const amend = (active.mode === 'amend' || active.mode === 'cancel') && !prompt.submitText().trim().startsWith('/')
+	const text = prompt.submitText().trim()
+	const amend = active.mode === 'amend' || active.mode === 'cancel'
 	promptEdit.cancel()
-	submit(undefined, queue, amend)
+	if (amend && text.startsWith('/')) client.sendCommand('prompt-amend', '')
+	submit(undefined, queue, amend && !text.startsWith('/'))
 }
 
 function plainKey(k: KeyEvent, key: string): boolean {
