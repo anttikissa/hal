@@ -35,7 +35,6 @@ type PendingContinuation = { canceled: boolean }
 type PendingPrompt = {
 	controller: AbortController
 	task: Promise<void>
-	contextSwitch: boolean
 }
 const state = {
 	openSessionIds: [] as string[],
@@ -300,14 +299,15 @@ async function handlePrompt(sessionId: string, text: string, label?: 'steering' 
 			}
 		}
 		if (cmdResult.error) emitInfo(sessionId, formatCommandError(text, cmdResult.error), 'error')
-		if (label === 'steering' && (cmdResult.resumeTurn || (!cmdResult.error && /^\/model\b/.test(text.trimStart())))) void runGeneration(sessionId, '', source)
+		if (label === 'steering' && (/^\/cd(?:\s|$)/.test(text.trimStart()) || (!cmdResult.error && /^\/model\b/.test(text.trimStart())))) void runGeneration(sessionId, '', source)
 		return
 	}
 	await runGeneration(sessionId, text, source, displayText, pending, sourceTab, label)
 }
 
 async function dispatchPromptCommand(sessionId: string, text: string, source: string | undefined, displayText: string | undefined, pending: PendingPrompt, previous?: PendingPrompt, label?: 'queued', sourceTab?: number): Promise<void> {
-	let steering = agentLoop.isWorking(sessionId) || (pending.contextSwitch && !!previous)
+	const contextSwitch = /^\/cd(?:\s|$)/.test(text.trimStart())
+	let steering = agentLoop.isWorking(sessionId) || !!previous
 	if (steering && await queueRunner.handleQueueSlashCommand(sessionId, text, source, displayText, true)) {
 		persistCommandInput(sessionId, text, source)
 		return
@@ -318,27 +318,23 @@ async function dispatchPromptCommand(sessionId: string, text: string, source: st
 	}
 	try {
 		if (steering) {
-			if (pending.contextSwitch) {
-				state.contextSwitching.add(sessionId)
-				previous?.controller.abort('')
-			}
-			const settled = pending.contextSwitch
-				? agentLoop.abortAndWait(sessionId, '')
-				: agentLoop.abortAndWait(sessionId)
+			if (contextSwitch) state.contextSwitching.add(sessionId)
+			previous?.controller.abort('')
+			const settled = agentLoop.abortAndWait(sessionId, '')
 			if (settled) await settled
 			if (previous) await previous.task
 			else if (!settled) steering = false
 		}
-		if (pending.contextSwitch) state.contextSwitching.delete(sessionId)
+		if (contextSwitch) state.contextSwitching.delete(sessionId)
 		await runtime.handlePrompt(sessionId, text, label ?? (steering ? 'steering' : undefined), source, displayText, pending, sourceTab)
 	} finally {
-		if (pending.contextSwitch) state.contextSwitching.delete(sessionId)
+		if (contextSwitch) state.contextSwitching.delete(sessionId)
 	}
 }
 
-function trackPendingPrompt(sessionId: string, contextSwitch: boolean, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
+function trackPendingPrompt(sessionId: string, run: (pending: PendingPrompt, previous?: PendingPrompt) => Promise<void>): Promise<void> {
 	const previous = state.pendingPrompts.get(sessionId)
-	const pending: PendingPrompt = { controller: new AbortController(), task: Promise.resolve(), contextSwitch }
+	const pending: PendingPrompt = { controller: new AbortController(), task: Promise.resolve() }
 	state.pendingPrompts.set(sessionId, pending)
 	pending.task = run(pending, previous)
 	function clear(): void {
@@ -349,12 +345,11 @@ function trackPendingPrompt(sessionId: string, contextSwitch: boolean, run: (pen
 }
 
 function startPromptCommand(sessionId: string, text: string, source?: string, displayText?: string, label?: 'queued', sourceTab?: number): Promise<void> {
-	const contextSwitch = /^\/cd(?:\s|$)/.test(text.trimStart())
-	return trackPendingPrompt(sessionId, contextSwitch, (pending, previous) => dispatchPromptCommand(sessionId, text, source, displayText, pending, previous, label, sourceTab))
+	return trackPendingPrompt(sessionId, (pending, previous) => dispatchPromptCommand(sessionId, text, source, displayText, pending, previous, label, sourceTab))
 }
 
 function startPromptAmendCommand(sessionId: string, text: string, source?: string, displayText?: string): Promise<void> {
-	return trackPendingPrompt(sessionId, false, (pending, previous) => handlePromptAmendCommand(sessionId, text, source, displayText, pending, previous))
+	return trackPendingPrompt(sessionId, (pending, previous) => handlePromptAmendCommand(sessionId, text, source, displayText, pending, previous))
 }
 
 function abortPendingPrompt(sessionId: string, abortText: string): Promise<void> | false {
