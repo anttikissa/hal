@@ -267,14 +267,16 @@ function repaintFullscreenGrowth(frame: Frame, rows: number): void {
 	writeTerminal(out.join(''))
 }
 
-// Recovery repaints must not use CSI J: Ghostty follows erase-display controls by
-// returning an inspected scrollback viewport to the live bottom. Split native-wrapped
-// URLs just for this repaint so every physical row remains independently addressable.
+// Recovery repaints must not use CSI J or CSI H: Ghostty follows both erase-display
+// and cursor-home controls by returning an inspected scrollback viewport to the live
+// bottom. A relative move up by the viewport height clamps at its physical top while
+// preserving the inspected position. Split native-wrapped URLs just for this repaint
+// so every physical row remains independently addressable.
 function repaintVisibleScreen(frame: Frame, rows: number): void {
 	const physicalLines: string[] = []
 	for (const line of frame.lines) physicalLines.push(...wordWrap(line, frame.cols))
 	const viewportTop = Math.max(0, physicalLines.length - rows)
-	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `${CSI}H`]
+	const out: string[] = [`${CSI}?2026h`, `${CSI}?25l`, `\r${CSI}${rows}A`]
 	for (let row = 0; row < rows; row++) {
 		if (row > 0) out.push('\r\n')
 		out.push(`${CSI}2K${physicalLines[viewportTop + row] ?? ''}`)

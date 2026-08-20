@@ -165,7 +165,10 @@ describe('render fullscreen growth', () => {
 			const state = terminalLines(captureOutput(() => render.draw()), 8)
 
 			prompt.setText('one line')
-			terminalLines(captureOutput(() => render.draw()), 8, state)
+			const shrink = captureOutput(() => render.draw())
+			expect(shrink).not.toContain('\x1b[H')
+			expect(shrink).toContain('\r\x1b[8A')
+			terminalLines(shrink, 8, state)
 			prompt.setText('one line!')
 			terminalLines(captureOutput(() => render.draw()), 8, state)
 

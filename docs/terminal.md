@@ -245,11 +245,14 @@ must **never** call the fullscreen force-repaint path: it emits `CSI 2J` and
 (`CSI 3J` also destroys that scrollback). This bit us again when prompt clearing
 on submit shrank a fullscreen frame.
 
-Instead, derive the visible **physical** rows, move to `CSI H`, and rewrite each
-with `CSI 2K`; do not append a final CRLF. The recovery temporarily hard-wraps a
-native-wrapped URL into independently addressable OSC 8 rows, just as popup
-layout does. Ordinary rendering must still leave completed standalone URLs
-native-wrapped for copy/paste; the recovery is the exceptional safe rewrite.
+Instead, derive the visible physical rows, return to column one, and use a relative
+cursor-up move by the terminal height (which clamps at the physical viewport top),
+then rewrite each row with `CSI 2K`; do not append a final CRLF. Do **not** use
+`CSI H`: Ghostty follows cursor-home by returning an inspected viewport to live
+output too. The recovery temporarily hard-wraps a native-wrapped URL into
+independently addressable OSC 8 rows, just as popup layout does. Ordinary rendering must
+still leave completed standalone URLs native-wrapped for copy/paste; the recovery is the
+exceptional safe rewrite.
 
 This rule also covers popup open/close, which changes the URL layout. Only an
 explicit full rebuild — Ctrl-L, tab switch, or terminal resize — may use the
