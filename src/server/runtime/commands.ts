@@ -112,6 +112,7 @@ const workingSafeCommands = new Set([
 	'broadcast',
 	'clients',
 	'check',
+	'cd',
 	'fork',
 	'help',
 	'history',

@@ -666,7 +666,7 @@ test('working queue slash command does not abort the running turn', async () => 
 })
 
 
-test('working-safe slash command does not abort the running turn', async () => {
+test('working-safe /cd does not abort the running turn', async () => {
 	const sessionId = `test-working-safe-${Date.now().toString(36)}`
 	const meta: SessionMeta = {
 		id: sessionId,
@@ -682,7 +682,7 @@ test('working-safe slash command does not abort the running turn', async () => {
 	const origAppendEvent = ipc.appendEvent
 	const origOwnsHostLock = ipc.ownsHostLock
 	const origIsWorking = agentLoop.isWorking
-	const origAbort = agentLoop.abort
+	const origAbortAndWait = agentLoop.abortAndWait
 	const origLoadSessionMeta = sessions.loadSessionMeta
 	const origUpdateMeta = sessions.updateMeta
 	const origSessionOpenInfo = sessions.sessionOpenInfo
@@ -694,20 +694,20 @@ test('working-safe slash command does not abort the running turn', async () => {
 		ipc.appendEvent = () => {}
 		ipc.ownsHostLock = () => true
 		agentLoop.isWorking = (id) => id === sessionId
-		agentLoop.abort = () => {
+		agentLoop.abortAndWait = () => {
 			aborts++
-			return true
+			return false
 		}
 		sessions.loadSessionMeta = (id) => id === sessionId ? meta : null
 		sessions.updateMeta = (_id, patch) => { Object.assign(meta, patch) }
 		sessions.sessionOpenInfo = (item) => ({ id: item.id, tab: 1, name: item.name, cwd: item.workingDir ?? '', model: item.model })
 		context.watchPromptFiles = () => () => {}
 
-		runtime.handleCommand({ type: 'prompt', sessionId, text: '/rename foo bar' })
+		runtime.handleCommand({ type: 'prompt', sessionId, text: '/cd /tmp' })
 		await Bun.sleep(0)
 
 		expect(aborts).toBe(0)
-		expect(meta.name).toBe('foo bar')
+		expect(meta.workingDir).toBe('/tmp')
 	} finally {
 		runtime.state.openSessionIds = origOpenSessionIds
 		runtime.state.currentSessionId = origCurrentSessionId
@@ -715,7 +715,7 @@ test('working-safe slash command does not abort the running turn', async () => {
 		ipc.appendEvent = origAppendEvent
 		ipc.ownsHostLock = origOwnsHostLock
 		agentLoop.isWorking = origIsWorking
-		agentLoop.abort = origAbort
+		agentLoop.abortAndWait = origAbortAndWait
 		sessions.loadSessionMeta = origLoadSessionMeta
 		sessions.updateMeta = origUpdateMeta
 		sessions.sessionOpenInfo = origSessionOpenInfo
