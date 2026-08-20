@@ -34,8 +34,9 @@ function spawnResult(childSessionId: string, parentSessionId: string, kind: Spaw
 		if (tab) return `Opened interactive session ${childSessionId} in tab ${tab} ${action}.`
 		return `Opened interactive session ${childSessionId} ${action}.`
 	}
-	if (tab) return `Queued subagent spawn ${childSessionId} to tab ${tab} from ${parentSessionId}`
-	return `Queued subagent spawn ${childSessionId} from ${parentSessionId}`
+	let queued = `Queued subagent spawn ${childSessionId} from ${parentSessionId}`
+	if (tab) queued = `Queued subagent spawn ${childSessionId} to tab ${tab} from ${parentSessionId}`
+	return `${queued}. Subagent ${childSessionId} is working asynchronously and will report back through an inbox message when finished.`
 }
 
 async function execute(input: unknown, ctx: ToolContext): Promise<string> {

@@ -49,6 +49,7 @@ test('spawn_agent reserves a child session ID and queues it in the spawn command
 	expect(result).toContain('04-parent')
 	expect(result).toContain(childSessionId)
 	expect(result).toContain('tab 3')
+	expect(result).toContain(`Subagent ${childSessionId} is working asynchronously and will report back through an inbox message when finished.`)
 	expect(appended).toHaveLength(1)
 	expect(queued).toMatchObject({
 		type: 'spawn',
