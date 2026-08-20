@@ -939,23 +939,11 @@ async function executeToolBatch(
 	for (const call of toolCalls) {
 		if (!blobs.has(call.id)) blobs.set(call.id, blob.makeBlobId(sessionId))
 	}
-	async function saveCompletedTool(call: ToolCall, result: string): Promise<void> {
-		const blobId = blobs.get(call.id)!
-		const existing = blob.readBlob(sessionId, blobId) ?? { call: { name: call.name, input: call.input } }
-		existing.result = { content: result, status: 'done' }
-		await blob.writeBlob(sessionId, blobId, existing)
-		await sessions.appendHistory(sessionId, [{ type: 'tool_result', toolId: call.id, blobId, ts: new Date().toISOString() }])
-		emitEvent(sessionId, {
-			type: 'tool-result',
-			toolId: call.id,
-			name: call.name,
-			output: result.slice(0, 500),
-			blobId,
-			phase: 'done',
-		})
-	}
-
-	const results = await executeToolsConcurrently(toolCalls, signal, cwd, sessionId, (call, output) => {
+	const savedInOrder = toolCalls.map(() => Promise.withResolvers<void>())
+	const callIndexes = new Map(toolCalls.map((call, index) => [call.id, index]))
+	const pendingOutputs = new Map<number, string>()
+	let publishedThrough = -1
+	function publishOutput(call: ToolCall, output: string): void {
 		emitEvent(sessionId, {
 			type: 'tool-result',
 			toolId: call.id,
@@ -964,6 +952,43 @@ async function executeToolBatch(
 			blobId: blobs.get(call.id),
 			phase: 'running',
 		})
+	}
+	async function saveCompletedTool(call: ToolCall, result: string): Promise<void> {
+		const index = callIndexes.get(call.id)!
+		// A later parallel tool can finish first, but expanding its transcript card
+		// before an earlier card can strand copies in immutable terminal scrollback.
+		// Saving and publishing in call order keeps live transcript growth monotonic.
+		if (index > 0) await savedInOrder[index - 1]!.promise
+		try {
+			const blobId = blobs.get(call.id)!
+			const existing = blob.readBlob(sessionId, blobId) ?? { call: { name: call.name, input: call.input } }
+			existing.result = { content: result, status: 'done' }
+			await blob.writeBlob(sessionId, blobId, existing)
+			await sessions.appendHistory(sessionId, [{ type: 'tool_result', toolId: call.id, blobId, ts: new Date().toISOString() }])
+			emitEvent(sessionId, {
+				type: 'tool-result',
+				toolId: call.id,
+				name: call.name,
+				output: result.slice(0, 500),
+				blobId,
+				phase: 'done',
+			})
+		} finally {
+			pendingOutputs.delete(index)
+			publishedThrough = index
+			const nextOutput = pendingOutputs.get(index + 1)
+			if (nextOutput !== undefined) {
+				pendingOutputs.delete(index + 1)
+				publishOutput(toolCalls[index + 1]!, nextOutput)
+			}
+			savedInOrder[index]!.resolve()
+		}
+	}
+
+	const results = await executeToolsConcurrently(toolCalls, signal, cwd, sessionId, (call, output) => {
+		const index = callIndexes.get(call.id)!
+		if (index === publishedThrough + 1) publishOutput(call, output)
+		else pendingOutputs.set(index, output)
 	}, saveCompletedTool)
 	const saved: { call: ToolCall; result: string; blobId: string }[] = []
 	for (const { call, result } of results) {
