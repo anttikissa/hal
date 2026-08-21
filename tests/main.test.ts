@@ -77,19 +77,6 @@ describe('main', () => {
 		expect(stdout).toContain('hello')
 	})
 
-	test('warns on every startup when terminal diagnostics are enabled', async () => {
-		writeFileSync(join(tmpDir, 'config.ason'), '{ terminalOutput: { capture: true } }\n')
-		const proc = spawnHal({ HAL_DIR: tmpDir })
-		await Bun.sleep(200)
-		proc.stdin!.write(new Uint8Array([0x03]))
-		proc.stdin!.flush()
-		const stdout = stripAnsi(await new Response(proc.stdout).text())
-		await proc.exited
-		expect(stdout).toContain('Terminal diagnostics enabled')
-		expect(stdout).toContain('temporary CPU/disk overhead')
-		expect(stdout.replace(/\s+/g, '')).toContain('terminal-diagnostics')
-	})
-
 	test('exits with 100 on ctrl-r', async () => {
 		const proc = spawnHal()
 		await Bun.sleep(100)

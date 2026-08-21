@@ -2,7 +2,6 @@ import { perf } from './client/perf.ts'
 perf.mark('First line of code executed')
 
 import { ensureStateDir, HAL_DIR, STATE_DIR } from './server/state.ts'
-import { paths } from './server/paths.ts'
 import { ipc } from './server/file-ipc.ts'
 import { runtime } from './server/runtime.ts'
 import { cli } from './client/terminal/cli.ts'
@@ -307,8 +306,5 @@ queueMemoryCheck()
 
 electionTimer = setInterval(tickElection, 100)
 
-if (terminalOutput.config.capture) {
-	client.addStartupEntry(`Terminal diagnostics enabled — recording private terminal output to ${paths.formatHomePath(terminalOutput.state.capturePath)} (temporary CPU/disk overhead).`)
-}
 cli.startCli(ac.signal, startupTarget)
 if (!isHost) client.publishStatus()

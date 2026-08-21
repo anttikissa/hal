@@ -11,7 +11,6 @@ import { clipboard } from './client/terminal/clipboard.ts'
 import { render } from './client/terminal/render.ts'
 import { renderStatus } from './client/terminal/render-status.ts'
 import { renderHistory } from './client/terminal/render-history.ts'
-import { terminalOutput } from './client/terminal/terminal-output.ts'
 import { agentLoop } from './server/runtime/agent-loop.ts'
 import { inbox } from './server/runtime/inbox.ts'
 import { tabLimit } from './server/tab-limit.ts'
@@ -34,7 +33,6 @@ const modules: Record<string, Record<string, any>> = {
 	clipboard: clipboard.config,
 	render: render.config,
 	renderStatus: renderStatus.config,
-	terminalOutput: terminalOutput.config,
 	renderHistory: renderHistory.config,
 	agentLoop: agentLoop.config,
 	inbox: inbox.config,

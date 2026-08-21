@@ -109,12 +109,6 @@ toolRegistry.dispatch = async (name, input, toolCtx) => {
 }
 ```
 
-<!-- A reminder of some temporary diagnostic code indented to catch a rarely occurring terminal corruption bug. Will be gone one day -->
-## Temporary terminal-rendering flight recorder
-- This is temporary diagnostic code from commit `a12d1d1`, not a permanent feature. Only the user's ignored `config.ason` enables `terminalOutput.capture`; the install template must remain capture-free.
-- When another terminal duplication/corruption is reported, inspect the newest `${state_dir}/terminal-diagnostics/terminal-output-*.asonl` files before restarting affected clients. Each ASON line contains timestamp, PID, rows, columns, byte count, and the exact terminal write as base64. Parse with `ason`, decode each `base64` field, and concatenate records in segment-number order for replay through Ghostty/libghostty.
-- Treat captures as private transcript data. Files rotate at 32 MiB, retain two segments per active client, and keep the two newest inactive client runs.
-- After one useful capture permits diagnosis and validation, remove the recorder, its tests/config registration, the local `terminalOutput` config block, and this section. On or after 2026-09-18, if it still exists, proactively remind the user that it costs CPU/disk/core LOC and ask whether to remove it rather than silently retaining it.
 <!-- TODO - verify that these are actually needed. Some agent added this stuff -->
 Transcript markup:
 - `<meta>...</meta>` messages are Hal-generated environment/session metadata, not user-authored text.
