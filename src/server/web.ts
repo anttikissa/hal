@@ -241,10 +241,13 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 						const message = web.parseClientMessage(String(raw))
 						if (!message) return
 						if (!ws.data.token) {
-							if (message.type !== 'authenticate') return ws.close(4003, 'Web authentication required')
+							if (message.type !== 'authenticate') {
+								ws.send(web.encode({ type: 'error', message: 'Web authentication required' }))
+								return
+							}
 							if (!webTokens.authenticate(message.token, ws.data.ip)) {
-								ws.send(web.encode({ type: 'unauthorized' }))
-								return ws.close(4003, 'Invalid web token')
+								ws.send(web.encode({ type: 'error', message: 'Invalid authentication token' }))
+								return
 							}
 							ws.data.token = message.token
 							let tokenSockets = sockets.get(message.token)

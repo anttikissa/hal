@@ -123,9 +123,9 @@ function connect(input: string, signal: AbortSignal): Promise<void> {
 		socket.onmessage = (event) => {
 			const message = webProtocol.decode(String(event.data)) as WebServerMessage | null
 			if (!message || typeof message !== 'object' || !('type' in message)) return
-			if (message.type === 'unauthorized') {
+			if (message.type === 'error') {
 				socket.close()
-				reject(new Error('Remote HAL authentication failed'))
+				reject(new Error(message.message))
 				return
 			}
 			if (message.type === 'authenticated') {
@@ -141,7 +141,7 @@ function connect(input: string, signal: AbortSignal): Promise<void> {
 			if (!authenticated) reject(new Error(`Could not connect to ${parsed.baseUrl}`))
 		}
 		socket.onclose = () => {
-			if (!authenticated) reject(new Error(`Remote HAL connection closed before authentication`))
+			reject(new Error('Connection closed'))
 			state.wakeEvent?.()
 			state.wakeEvent = null
 		}

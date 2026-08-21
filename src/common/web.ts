@@ -18,7 +18,7 @@ export type WebClientMessage = WebAuthenticateMessage | WebCommandMessage
 
 export type WebServerMessage =
 	| { type: 'authenticated'; bootstrap: ClientBootstrap }
-	| { type: 'unauthorized' }
+	| { type: 'error'; message: string }
 	| { type: 'state'; state: SharedState }
 	| { type: 'snapshot'; snapshot: ClientSessionSnapshot }
 	| { type: 'event'; event: any }

@@ -64,7 +64,7 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 		connection.onmessage = (event) => {
 			const message = webProtocol.decode(String(event.data)) as WebServerMessage | null
 			if (!message || typeof message !== 'object' || !('type' in message)) return
-			if (message.type === 'unauthorized') {
+			if (message.type === 'error') {
 				unauthorized = true
 				props.onUnauthorized()
 				connection.close()
