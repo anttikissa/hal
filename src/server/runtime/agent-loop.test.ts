@@ -226,7 +226,7 @@ test('wait tool completes the turn without another model request', async () => {
 				bStarted.resolve()
 				await new Promise<void>((resolve) => { releaseB = resolve })
 			}
-			return `${input.command}: finished`
+			return `${input.command}: ${'x'.repeat(600)} finished`
 		}
 
 		try {
@@ -250,6 +250,7 @@ test('wait tool completes the turn without another model request', async () => {
 				expect(events[partial]!.output).toStartWith('[+14 earlier lines; showing last 16]\n')
 				expect(Buffer.byteLength(events[partial]!.output, 'utf8')).toBeLessThanOrEqual(1024)
 				expect(done).toBeGreaterThan(partial)
+				expect(events[done]!.output).toEndWith(' finished')
 			}
 		} finally {
 			providerLoader.getProvider = origGetProvider

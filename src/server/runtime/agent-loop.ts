@@ -958,7 +958,7 @@ async function executeToolBatch(
 			type: 'tool-result',
 			toolId: call.id,
 			name: call.name,
-			output: toolOutputPreview(result).slice(0, 500),
+			output: toolRegistry.outputText(result),
 			blobId,
 			phase: 'done',
 		})
