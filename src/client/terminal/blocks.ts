@@ -80,7 +80,11 @@ function renderMarkdownLines(block: Extract<Block, { type: 'assistant' | 'thinki
 	const lines: string[] = []
 	const mdColors = markdownColors(block)
 	const finished = !('streaming' in block && block.streaming)
-	for (const span of md.mdSpans(markdownSourceText(block))) {
+	let source = markdownSourceText(block)
+	// Do not paint a partial code-fence delimiter as transcript content: the third
+	// backtick would remove that row after it may already be frozen in scrollback.
+	if (!finished) source = source.replace(/(^|\n)`{1,2}$/, '$1')
+	for (const span of md.mdSpans(source)) {
 		if (span.type === 'code') {
 			for (const raw of span.lines) pushCodeWrapped(lines, raw, cols, mdColors, isTextCodeLang(span.lang))
 		} else if (span.type === 'table') {

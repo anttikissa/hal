@@ -265,6 +265,12 @@ viewport top, repaint independently addressable logical lines, then append the
 suffix with `\r\n`. If a soft-wrapped URL begins above the viewport, leave its
 unchanged visible tail alone and start at the next complete logical line.
 
+Streaming Markdown must not paint one- or two-backtick fragments of a code-fence
+delimiter. The completed third backtick removes that transient logical row; if the
+row has reached scrollback, the removal instead appears as duplicated transcript
+content. Hide the partial delimiter until it either completes or becomes ordinary
+text.
+
 ### 10. Kitty keyboard protocol
 
 Ghostty, Kitty, and iTerm intercept Cmd+C/X/V at the OS level. To receive

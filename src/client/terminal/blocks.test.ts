@@ -383,6 +383,25 @@ test('markdown code fences use block code color instead of dim style', () => {
 	}
 })
 
+test('streaming code-fence delimiters never create transient rows', () => {
+	function rendered(text: string): string[] {
+		return blocks.renderBlock({ type: 'assistant', text, streaming: true }, 40, true)
+			.map(stripAnsi)
+			.filter((line) => line.trim() !== '█')
+			.map((line) => line.replace('█', ''))
+	}
+
+	const beforeFence = rendered('before')
+	expect(rendered('before\n\n`')).toEqual(beforeFence)
+	expect(rendered('before\n\n``')).toEqual(beforeFence)
+	expect(rendered('before\n\n```')).toEqual(beforeFence)
+
+	const insideFence = rendered('before\n\n```\nhost')
+	expect(rendered('before\n\n```\nhost\n`')).toEqual(insideFence)
+	expect(rendered('before\n\n```\nhost\n``')).toEqual(insideFence)
+	expect(rendered('before\n\n```\nhost\n```')).toEqual(insideFence)
+})
+
 test('inline markdown code uses block code color instead of dim style', () => {
 	colors.load()
 	for (const type of markdownBlockTypes) {
