@@ -8,14 +8,14 @@ import { sessions } from '../sessions.ts'
 import { ason } from '../../utils/ason.ts'
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
-const startCache = new Map<string, number>()
+const state = { starts: new Map<string, number>(), forkParents: new Map<string, string | null>() }
 
 function sessionStart(sessionId: string): number {
-	let ts = startCache.get(sessionId)
+	let ts = state.starts.get(sessionId)
 	if (ts !== undefined) return ts
 	const meta = sessions.loadSessionMeta(sessionId)
 	ts = meta ? new Date(meta.createdAt).getTime() : Date.now()
-	startCache.set(sessionId, ts)
+	state.starts.set(sessionId, ts)
 	return ts
 }
 
@@ -49,19 +49,27 @@ function readBlob(sessionId: string, blobId: string): any | null {
 	}
 }
 
+// Forks share history but do not copy blobs, so walk back to the parent on demand.
+// The parent never changes, so cache it: resolving it per blob re-parsed the entire
+// history file, which cost seconds once a session had hundreds of tool results.
+function forkParent(sessionId: string): string | null {
+	let parent = state.forkParents.get(sessionId)
+	if (parent !== undefined) return parent
+	const first = sessions.loadHistory(sessionId)[0]
+	parent = first?.type === 'forked_from' ? (first.parent ?? null) : null
+	state.forkParents.set(sessionId, parent)
+	return parent
+}
+
 function readBlobFromChain(sessionId: string, blobId: string): any | null {
 	const local = readBlob(sessionId, blobId)
 	if (local) return local
-
-	// Forks share history but do not copy blobs, so walk back to the parent on demand.
-	const history = sessions.loadHistory(sessionId)
-	if (history.length > 0 && history[0]?.type === 'forked_from' && history[0].parent) {
-		return readBlobFromChain(history[0].parent, blobId)
-	}
-	return null
+	const parent = forkParent(sessionId)
+	return parent ? readBlobFromChain(parent, blobId) : null
 }
 
 export const blob = {
+	state,
 	makeBlobId,
 	writeBlob,
 	readBlob,

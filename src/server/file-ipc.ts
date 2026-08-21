@@ -1,6 +1,6 @@
 // File-backed IPC bus. Host appends events, clients append commands.
 
-import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs'
+import { appendFileSync, readFileSync, existsSync, writeFileSync, unlinkSync, statSync, truncateSync } from 'fs'
 import { IPC_DIR, ensureDir } from './state.ts'
 import { ason } from '../utils/ason.ts'
 import { liveFiles } from '../utils/live-file.ts'
@@ -16,6 +16,9 @@ const HOST_LOCK = `${IPC_DIR}/host.lock`
 const EVENTS_FILE = `${IPC_DIR}/events.asonl`
 const COMMANDS_FILE = `${IPC_DIR}/commands.asonl`
 const STATE_FILE = `${IPC_DIR}/state.ason`
+
+// Keep the tailed bus bounded; entries older than this are not replayed anyway.
+const config = { maxLogBytes: 10_000_000 }
 
 function defaultState(): SharedState {
 	return {
@@ -45,6 +48,9 @@ function stripUndefined(value: unknown): unknown {
 function append(file: string, item: unknown): void {
 	ensureDir(IPC_DIR)
 	ensureFile(file)
+	// The bus is a live tail, not an archive: drop old entries instead of growing forever.
+	// Tailers reset to offset 0 when the file shrinks, so truncating in place is safe.
+	if (statSync(file).size > config.maxLogBytes) truncateSync(file)
 	appendFileSync(file, ason.stringify(stripUndefined(item), 'short') + '\n')
 }
 
@@ -177,6 +183,7 @@ function releaseHost(): void {
 }
 
 export const ipc = {
+	config,
 	appendEvent,
 	appendCommand,
 	tailEvents,

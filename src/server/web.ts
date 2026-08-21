@@ -200,6 +200,9 @@ function urlForToken(token: WebToken, port = state.port): string {
 }
 
 function publishSnapshot(server: Bun.Server<SocketData>, sessionId: string): void {
+	// Building a snapshot reloads and hydrates the whole session, so skip it entirely
+	// when nobody is listening: the host runs this server even with no client attached.
+	if (server.subscriberCount('web') === 0) return
 	const snapshot = web.sessionSnapshot(sessionId)
 	if (snapshot) server.publish('web', web.encode({ type: 'snapshot', snapshot }))
 }

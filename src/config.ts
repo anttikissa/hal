@@ -19,9 +19,11 @@ import { models } from './common/models.ts'
 import { anthropicUsage } from './server/anthropic-usage.ts'
 import { openaiUsage } from './server/openai-usage.ts'
 import { openai } from './server/providers/openai.ts'
+import { halProvider } from './server/providers/hal.ts'
 import { subscriptionUsage } from './common/subscription-usage.ts'
 import { toolRegistry } from './server/tools/tool.ts'
 import { log } from './utils/log.ts'
+import { ipc } from './server/file-ipc.ts'
 import { HAL_DIR } from './server/state.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
@@ -42,8 +44,10 @@ const modules: Record<string, Record<string, any>> = {
 	anthropicUsage: anthropicUsage.config,
 	openaiUsage: openaiUsage.config,
 	openai: openai.config,
+	halProvider: halProvider.config,
 	toolRegistry: toolRegistry.config,
 	log: log.config,
+	ipc: ipc.config,
 }
 
 // config.ason lives at the Hal root — it's user-facing config.

@@ -130,6 +130,10 @@
 		// Hard cap for any tool result sent back to the model.
 		maxOutputBytes: 65536
 	},
+	ipc: {
+		// Truncate the IPC event/command bus once it exceeds this size (bytes).
+		maxLogBytes: 10000000
+	},
 	log: {
 		// File log level: '', 'off', 'info', 'error', or 'debug'.
 		level: 'info'
