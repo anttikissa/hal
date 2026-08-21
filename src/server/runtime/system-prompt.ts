@@ -349,25 +349,22 @@ function resetForTests(): void {
 
 // ── Message building ──────────────────────────────────────────────────────────
 
-/** Estimate byte size of a message (for rough token estimation). */
-function messageBytes(msg: Message): number {
-	if (typeof msg.content === 'string') return msg.content.length
-	if (Array.isArray(msg.content)) {
-		let bytes = 0
-		for (const block of msg.content) {
-			if (block.type === 'text') bytes += block.text?.length ?? 0
-			else if (block.type === 'thinking') bytes += block.thinking?.length ?? 0
-			else if (block.type === 'tool_use') bytes += JSON.stringify(block.input ?? {}).length
-			else if (block.type === 'tool_result') {
-				bytes +=
-					typeof block.content === 'string'
-						? block.content.length
-						: JSON.stringify(block.content ?? '').length
-			}
-		}
-		return bytes
+/** Estimate content size without counting base64 image bytes as text tokens. */
+function contentBytes(content: Message['content']): number {
+	if (typeof content === 'string') return content.length
+	let bytes = 0
+	for (const block of content) {
+		if (block.type === 'text') bytes += block.text?.length ?? 0
+		else if (block.type === 'thinking') bytes += block.thinking?.length ?? 0
+		else if (block.type === 'tool_use') bytes += JSON.stringify(block.input ?? {}).length
+		else if (block.type === 'tool_result') bytes += contentBytes(block.content ?? '')
+		else if (block.type === 'image') bytes += 4800
 	}
-	return 0
+	return bytes
+}
+
+function messageBytes(msg: Message): number {
+	return contentBytes(msg.content)
 }
 
 /** Estimate total tokens for a list of messages + overhead. */

@@ -73,8 +73,22 @@ test('keeps truncated output at or below 1MB', async () => {
 	await Bun.write(path, line)
 
 	const out = await read.execute({ path }, { sessionId: 's', cwd: TEST_DIR })
-	const bytes = Buffer.byteLength(out, 'utf8')
+	if (typeof out !== 'string') throw new Error('expected text output')
 
 	expect(out.endsWith('[… truncated]')).toBe(true)
-	expect(bytes).toBeLessThanOrEqual(1_000_000)
+	expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(1_000_000)
+})
+
+test('returns image files as native tool content', async () => {
+	mkdirSync(TEST_DIR, { recursive: true })
+	const path = join(TEST_DIR, 'pixel.png')
+	const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgIAdUe+WQAAAABJRU5ErkJggg==', 'base64')
+	await Bun.write(path, image)
+
+	const out = await read.execute({ path }, { sessionId: 's', cwd: TEST_DIR })
+
+	expect(out).toEqual([
+		{ type: 'text', text: 'Read image file [image/png]' },
+		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: image.toString('base64') } },
+	])
 })

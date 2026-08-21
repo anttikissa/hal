@@ -34,6 +34,43 @@ afterEach(() => {
 	openai.resetResponsesWebSocketsForTests()
 })
 
+test('responses sends image tool results as native output content', () => {
+	const image = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } }
+	const messages: any[] = [{ role: 'user', content: [{
+		type: 'tool_result',
+		tool_use_id: 'call-1',
+		content: [{ type: 'text', text: 'Read image file [image/png]' }, image],
+	}] }]
+
+	expect(openai.convertResponsesMessages(messages)).toEqual([{
+		type: 'function_call_output',
+		call_id: 'call-1',
+		output: [
+			{ type: 'input_text', text: 'Read image file [image/png]' },
+			{ type: 'input_image', detail: 'auto', image_url: 'data:image/png;base64,aGVsbG8=' },
+		],
+	}])
+})
+
+test('compat sends tool-result images after the paired text result', () => {
+	const messages: any[] = [{ role: 'user', content: [{
+		type: 'tool_result',
+		tool_use_id: 'call-1',
+		content: [
+			{ type: 'text', text: 'Read image file [image/png]' },
+			{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+		],
+	}] }]
+
+	expect((openai as any).convertCompatMessages(messages)).toEqual([
+		{ role: 'tool', tool_call_id: 'call-1', content: 'Read image file [image/png]' },
+		{ role: 'user', content: [
+			{ type: 'text', text: 'Attached image(s) from tool result:' },
+			{ type: 'image_url', image_url: { url: 'data:image/png;base64,aGVsbG8=' } },
+		] },
+	])
+})
+
 test('resetSession closes the cached websocket chain for one session', () => {
 	let closed = 0
 	openai.state.webSockets.set('s1', { ws: { close: () => { closed++ } } } as any)

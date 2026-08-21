@@ -138,3 +138,15 @@ test('estimateContext uses per-model token calibration', () => {
 
 	expect(est.used).toBe(200)
 })
+
+test('messageBytes estimates images without counting their base64 payload as text', () => {
+	const content: any[] = [{
+		type: 'tool_result',
+		content: [
+			{ type: 'text', text: 'image' },
+			{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'x'.repeat(100_000) } },
+		],
+	}]
+
+	expect(context.messageBytes({ role: 'user', content })).toBe(4805)
+})

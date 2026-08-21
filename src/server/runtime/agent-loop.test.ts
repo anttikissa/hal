@@ -133,6 +133,32 @@ test('abort before tool dispatch keeps the tool from starting', async () => {
 })
 
 
+test('persists image tool results while live output stays textual', async () => {
+	const sessionId = `test-image-tool-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const content: any[] = [
+		{ type: 'text', text: 'Read image file [image/png]' },
+		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+	]
+	const events: any[] = []
+	const originalDispatch = toolRegistry.dispatch
+	const originalAppendEvent = ipc.appendEvent
+	toolRegistry.dispatch = async () => content
+	ipc.appendEvent = (event: any) => { events.push(event) }
+
+	try {
+		const [result] = await agentLoop.executeToolBatch(sessionId, [{ id: 'image-1', name: 'read', input: { path: 'image.png' } }], process.cwd(), new AbortController().signal)
+		expect(result?.result).toEqual(content)
+		expect(blob.readBlob(sessionId, result!.blobId)?.result?.content).toEqual(content)
+		expect(events.find((event) => event.type === 'tool-result' && event.phase === 'done')?.output).toBe('Read image file [image/png]')
+	} finally {
+		toolRegistry.dispatch = originalDispatch
+		ipc.appendEvent = originalAppendEvent
+	}
+})
+
+
 test('wait tool completes the turn without another model request', async () => {
 	const sessionId = `test-wait-tool-${Date.now().toString(36)}`
 	createdSessions.push(sessionId)

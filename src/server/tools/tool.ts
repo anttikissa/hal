@@ -3,12 +3,13 @@
 // Tool modules are pure on import. They expose init() hooks, and a bootstrap
 // module decides when to register them with the shared registry.
 
-import type { JsonSchemaProperties, ToolDef } from '../../common/protocol.ts'
+import type { ContentBlock, JsonSchemaProperties, ToolDef } from '../../common/protocol.ts'
 import { helpers } from '../../utils/helpers.ts'
 
 // ── Interfaces ──
 
 export type ToolInput = Record<string, unknown>
+export type ToolOutput = string | ContentBlock[]
 
 export interface Tool {
 	name: string
@@ -17,8 +18,7 @@ export interface Tool {
 	parameters: JsonSchemaProperties
 	/** Which parameters are required. */
 	required?: string[]
-	/** Execute the tool. Returns output string. */
-	execute(input: unknown, context: ToolContext): Promise<string>
+	execute(input: unknown, context: ToolContext): Promise<ToolOutput>
 }
 
 export interface ToolContext {
@@ -43,14 +43,13 @@ function errorMessage(err: unknown): string {
 // ── Registry ──
 const config = {
 	/**
-	 * Hard cap for any tool result that is sent back to the model.
-	 *
-	 * Individual tools may impose smaller limits for efficiency, but this final
-	 * registry-level guard prevents one forgotten tool or shell pipeline from
-	 * stuffing megabytes into the next provider request.
+	 * Text-output cap. Rich results have a separate absolute 1MB cap so useful
+	 * images do not inherit the much smaller shell-output budget.
 	 */
 	maxOutputBytes: 64 * 1024,
 }
+
+const MAX_RESULT_BYTES = 1_000_000
 
 function capOutput(text: string): string {
 	const bytes = Buffer.byteLength(text, 'utf8')
@@ -98,15 +97,25 @@ function toToolDefs(): ToolDef[] {
 	}))
 }
 
-/** Dispatch a tool call by name. Returns the tool's output string. */
-async function dispatch(name: string, input: unknown, context: ToolContext): Promise<string> {
+/** Dispatch a tool call and enforce the text-output cap. */
+async function dispatch(name: string, input: unknown, context: ToolContext): Promise<ToolOutput> {
 	const tool = getTool(name)
 	if (!tool) return `error: unknown tool "${name}"`
 	try {
-		return capOutput(await tool.execute(input, context))
+		const output = await tool.execute(input, context)
+		if (typeof output === 'string') return capOutput(output)
+		if (Buffer.byteLength(JSON.stringify(output), 'utf8') > MAX_RESULT_BYTES) return 'error: tool result exceeds the 1MB limit'
+		const text = outputText(output)
+		return Buffer.byteLength(text, 'utf8') > config.maxOutputBytes ? capOutput(text) : output
 	} catch (err: unknown) {
 		return `error: ${errorMessage(err)}`
 	}
 }
 
-export const toolRegistry = { config, registerTool, getTool, allTools, toToolDefs, dispatch, clearForTests, inputObject, errorMessage }
+function outputText(output: ToolOutput): string {
+	if (typeof output === 'string') return output
+	const text = output.filter((block) => block.type === 'text').map((block) => block.text ?? '').join('\n')
+	return text || '[image]'
+}
+
+export const toolRegistry = { config, registerTool, getTool, allTools, toToolDefs, dispatch, outputText, clearForTests, inputObject, errorMessage }

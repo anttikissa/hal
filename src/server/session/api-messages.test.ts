@@ -263,6 +263,23 @@ test('resolved pending tools markers are ignored during provider replay', () => 
 	])
 })
 
+test('provider replay preserves structured image tool results', () => {
+	const content: any[] = [
+		{ type: 'text', text: 'Read image file [image/png]' },
+		{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+	]
+	const entries: any[] = [
+		{ type: 'tool_call', toolId: 'tool-1', name: 'read', input: { path: 'image.png' } },
+		{ type: 'tool_result', toolId: 'tool-1', output: content },
+	]
+
+	expect(apiMessages.toProviderMessages('test-session', entries, { prune: false })).toEqual([
+		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'read', input: { path: 'image.png' } }] },
+		{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content }] },
+	])
+})
+
+
 test('repairToolPairing drops tool_result blocks with no matching tool_use', () => {
 	const msgs: Message[] = [
 		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'bash', input: {} }] },

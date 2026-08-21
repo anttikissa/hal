@@ -258,7 +258,8 @@ export interface ContentBlock {
 	name?: string // tool_use name
 	input?: Record<string, unknown> // tool_use input
 	tool_use_id?: string // tool_result reference
-	content?: string | Record<string, unknown>[] // tool_result content
+	content?: string | ContentBlock[] // tool_result content
+	source?: { type: 'base64'; media_type: string; data: string } // image source
 }
 
 export interface Message {

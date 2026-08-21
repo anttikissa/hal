@@ -15,7 +15,7 @@ import { models } from '../../common/models.ts'
 import type { LiveEvent } from '../../common/live-event-blocks.ts'
 import { context } from './system-prompt.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
-import { toolRegistry } from '../tools/tool.ts'
+import { toolRegistry, type ToolOutput } from '../tools/tool.ts'
 import { bash } from '../tools/bash.ts'
 import { risk, type RiskFinding } from '../tools/risk.ts'
 import { sessions } from '../sessions.ts'
@@ -140,7 +140,8 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 }
 
 
-function toolOutputPreview(output: string): string {
+function toolOutputPreview(output: ToolOutput): string {
+	output = toolRegistry.outputText(output)
 	const limit = 1024
 	const suffix = '\n[… output continues; preview limited]'
 	if (Buffer.byteLength(output, 'utf8') <= limit) return output
@@ -169,7 +170,7 @@ async function writeToolCallBlob(sessionId: string, blobId: string, name: string
 	await blob.writeBlob(sessionId, blobId, existing)
 }
 
-async function writeToolResultBlob(sessionId: string, blobId: string, output: string): Promise<void> {
+async function writeToolResultBlob(sessionId: string, blobId: string, output: ToolOutput): Promise<void> {
 	const existing = blob.readBlob(sessionId, blobId) ?? {}
 	existing.result = { content: output, status: 'done' }
 	await blob.writeBlob(sessionId, blobId, existing)
@@ -817,13 +818,12 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			await ctx.onStatus?.(true)
 			const results = await executeToolBatch(sessionId, toolCalls, ctx.cwd, loopSignal, toolBlobMap)
 
-			// Add tool results to messages.
-			for (const { call, result } of results) {
-				messages.push({
-					role: 'user',
-					content: [{ type: 'tool_result', tool_use_id: call.id, content: result }],
-				})
-			}
+			// Tool results from one assistant turn must stay together; compat providers
+			// append image blocks only after every paired text result.
+			messages.push({
+				role: 'user',
+				content: results.map(({ call, result }) => ({ type: 'tool_result' as const, tool_use_id: call.id, content: result })),
+			})
 			const subagentNotice = runningSubagentNotice(sessionId)
 			if (subagentNotice) messages.push({ role: 'user', content: subagentNotice })
 
@@ -893,9 +893,9 @@ async function executeToolsConcurrently(
 	cwd?: string,
 	sessionId?: string,
 	onOutput?: (call: ToolCall, output: string) => void,
-	onDone?: (call: ToolCall, result: string) => Promise<void>,
-): Promise<{ call: ToolCall; result: string }[]> {
-	const results: { call: ToolCall; result: string }[] = []
+	onDone?: (call: ToolCall, result: ToolOutput) => Promise<void>,
+): Promise<{ call: ToolCall; result: ToolOutput }[]> {
+	const results: { call: ToolCall; result: ToolOutput }[] = []
 	const context = { sessionId: sessionId ?? 'unknown', cwd: cwd ?? process.cwd(), signal }
 
 	// Process in batches of maxToolConcurrency
@@ -911,7 +911,7 @@ async function executeToolsConcurrently(
 		const batch = toolCalls.slice(i, i + config.maxToolConcurrency)
 		const batchResults = await Promise.all(
 			batch.map(async (call) => {
-				async function finish(result: string): Promise<{ call: ToolCall; result: string }> {
+				async function finish(result: ToolOutput): Promise<{ call: ToolCall; result: ToolOutput }> {
 					await onDone?.(call, result)
 					return { call, result }
 				}
@@ -943,12 +943,12 @@ async function executeToolBatch(
 	cwd: string,
 	signal: AbortSignal,
 	toolBlobMap?: Map<string, string>,
-): Promise<{ call: ToolCall; result: string; blobId: string }[]> {
+): Promise<{ call: ToolCall; result: ToolOutput; blobId: string }[]> {
 	const blobs = toolBlobMap ?? new Map<string, string>()
 	for (const call of toolCalls) {
 		if (!blobs.has(call.id)) blobs.set(call.id, blob.makeBlobId(sessionId))
 	}
-	async function saveCompletedTool(call: ToolCall, result: string): Promise<void> {
+	async function saveCompletedTool(call: ToolCall, result: ToolOutput): Promise<void> {
 		const blobId = blobs.get(call.id)!
 		const existing = blob.readBlob(sessionId, blobId) ?? { call: { name: call.name, input: call.input } }
 		existing.result = { content: result, status: 'done' }
@@ -958,7 +958,7 @@ async function executeToolBatch(
 			type: 'tool-result',
 			toolId: call.id,
 			name: call.name,
-			output: result.slice(0, 500),
+			output: toolOutputPreview(result).slice(0, 500),
 			blobId,
 			phase: 'done',
 		})
@@ -974,7 +974,7 @@ async function executeToolBatch(
 			phase: 'running',
 		})
 	}, saveCompletedTool)
-	const saved: { call: ToolCall; result: string; blobId: string }[] = []
+	const saved: { call: ToolCall; result: ToolOutput; blobId: string }[] = []
 	for (const { call, result } of results) {
 		saved.push({ call, result, blobId: blobs.get(call.id)! })
 	}

@@ -109,6 +109,19 @@ function convertResponsesUserPart(block: any): any {
 	return { type: 'input_text', text: JSON.stringify(block) }
 }
 
+function convertResponsesToolContent(content: any): any {
+	if (typeof content === 'string') return content
+	if (!Array.isArray(content)) return stringifyToolContent(content)
+	return content.map(convertResponsesUserPart)
+}
+
+function toolContentText(content: any): string {
+	if (typeof content === 'string') return content
+	if (!Array.isArray(content)) return stringifyToolContent(content)
+	const text = content.filter((block) => block.type === 'text').map((block) => block.text ?? '').join('\n')
+	return text || (content.some((block) => block.type === 'image') ? '(see attached image)' : '(no tool output)')
+}
+
 function convertResponsesMessages(messages: Message[]): any[] {
 	const input: any[] = []
 	const seenReasoningIds = new Set<string>()
@@ -119,7 +132,7 @@ function convertResponsesMessages(messages: Message[]): any[] {
 				continue
 			}
 			const { toolResults, others } = splitUserBlocks(msg.content)
-			for (const tr of toolResults) input.push({ type: 'function_call_output', call_id: tr.tool_use_id, output: stringifyToolContent(tr.content) })
+			for (const tr of toolResults) input.push({ type: 'function_call_output', call_id: tr.tool_use_id, output: convertResponsesToolContent(tr.content) })
 			if (others.length > 0) input.push({ role: 'user', content: others.map(convertResponsesUserPart) })
 			continue
 		}
@@ -168,12 +181,16 @@ function convertCompatMessages(messages: Message[]): any[] {
 				continue
 			}
 			const { toolResults, others } = splitUserBlocks(msg.content)
-			for (const tr of toolResults) out.push({ role: 'tool', tool_call_id: tr.tool_use_id, content: stringifyToolContent(tr.content) })
-			if (others.length === 0) continue
+			for (const tr of toolResults) out.push({ role: 'tool', tool_call_id: tr.tool_use_id, content: toolContentText(tr.content) })
 			const parts: any[] = []
 			for (const block of others) {
 				if (block.type === 'text') parts.push({ type: 'text', text: block.text })
 				else if (block.type === 'image' && block.source?.type === 'base64') parts.push({ type: 'image_url', image_url: { url: imageDataUrl(block) } })
+			}
+			const toolImages = toolResults.flatMap((tr) => Array.isArray(tr.content) ? tr.content.filter((block: any) => block.type === 'image') : [])
+			if (toolImages.length > 0) {
+				parts.push({ type: 'text', text: 'Attached image(s) from tool result:' })
+				for (const image of toolImages) parts.push({ type: 'image_url', image_url: { url: imageDataUrl(image) } })
 			}
 			if (parts.length === 1 && parts[0]!.type === 'text') out.push({ role: 'user', content: parts[0]!.text })
 			else if (parts.length > 0) out.push({ role: 'user', content: parts })
@@ -791,4 +808,4 @@ export function createCompatProvider(providerName: string, baseUrl?: string): Pr
 	return { generate: (req) => generateCompat(providerName, url, req) }
 }
 
-export const openai = { config, state, openaiProvider, createCompatProvider, convertResponsesMessages, resetSession, resetResponsesWebSocketsForTests }
+export const openai = { config, state, openaiProvider, createCompatProvider, convertResponsesMessages, convertCompatMessages, resetSession, resetResponsesWebSocketsForTests }

@@ -5,10 +5,10 @@
 // these hashes to prevent stale edits.
 
 import { statSync } from 'fs'
-import { stat, open } from 'fs/promises'
+import { stat, open, readFile } from 'fs/promises'
 import { isAbsolute, resolve } from 'path'
 import { homedir } from 'os'
-import { toolRegistry, type ToolContext } from './tool.ts'
+import { toolRegistry, type ToolContext, type ToolOutput } from './tool.ts'
 import { hashline } from './hashline.ts'
 import { helpers } from '../../utils/helpers.ts'
 import { editTracker } from './edit-tracker.ts'
@@ -105,7 +105,7 @@ async function readSelectedLines(path: string, start: number, end: number | unde
 	}
 }
 
-async function execute(input: any, ctx: ToolContext): Promise<string> {
+async function execute(input: any, ctx: ToolContext): Promise<ToolOutput> {
 	const path = resolvePath(input?.path, ctx.cwd)
 	const denied = ctx.approvedRisk ? null : sensitive.denyIfProtected(path, 'read')
 	if (denied) return denied
@@ -116,27 +116,27 @@ async function execute(input: any, ctx: ToolContext): Promise<string> {
 		const info = await stat(path)
 		if (info.isDirectory()) return `error: ${path} is a directory, not a file`
 		if (info.size > MAX_FILE_SIZE) return `error: file too large (${info.size} bytes)`
+		const mime = Bun.file(path).type
+		if (/^image\/(png|jpeg|gif|webp)$/.test(mime)) {
+			if (info.size * 4 / 3 > MAX_OUTPUT_BYTES) return `error: image is too large for the 1MB tool result limit (${info.size} bytes); resize it first`
+			const data = await readFile(path)
+			return [
+				{ type: 'text', text: `Read image file [${mime}]` },
+				{ type: 'image', source: { type: 'base64', media_type: mime, data: data.toString('base64') } },
+			]
+		}
+		const selection = await readSelectedLines(path, start, end, ctx.signal)
+		if (selection.sawBinary) return `error: ${path} appears to be a binary file`
+		editTracker.resetForRead(ctx.sessionId, path)
+		return helpers.truncateUtf8(formatSelectedLines(selection.lines, Math.max(1, start)), MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 	} catch (e: any) {
 		return `error: ${e.message}`
 	}
-
-	let selection: { lines: string[]; sawBinary: boolean }
-	try {
-		selection = await readSelectedLines(path, start, end, ctx.signal)
-	} catch (e: any) {
-		return `error: ${e.message}`
-	}
-
-	if (selection.sawBinary) return `error: ${path} appears to be a binary file`
-
-	const result = formatSelectedLines(selection.lines, Math.max(1, start))
-	editTracker.resetForRead(ctx.sessionId, path)
-	return helpers.truncateUtf8(result, MAX_OUTPUT_BYTES, TRUNCATED_SUFFIX)
 }
 
 const readTool = {
 	name: 'read',
-	description: 'Read a file with line numbers. Use optional start/end for a line range.',
+	description: 'Read a text file with line numbers, or return a supported image as an image attachment. Use optional start/end for a text line range.',
 	parameters: {
 		path: { type: 'string', description: 'File path (absolute or relative to cwd)' },
 		start: { type: 'integer', description: 'First line number (1-based, inclusive)' },
