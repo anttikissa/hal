@@ -104,3 +104,25 @@ test('session labels refresh when tab metadata changes', () => {
 	renderHistory.renderLines(refreshed, tab(history), 80, updated)
 	expect(refreshed.map(stripAnsi).join('\n')).toContain('110-gmt (Architecture revamp, tab 2)')
 })
+test('unchanged history is not re-derived on every draw', () => {
+	colors.load()
+	const ctx = context()
+	const t = tab([
+		{ type: 'user', text: 'hello' },
+		{ type: 'assistant', text: 'hi there' },
+	])
+
+	const first: string[] = []
+	renderHistory.renderLines(first, t, 40, ctx)
+
+	// A second draw with untouched history must reuse the assembled lines: this ran
+	// per block on every paint, which cost more than rendering the blocks themselves.
+	let walked = 0
+	const history = t.history
+	Object.defineProperty(t, 'history', { get() { walked++; return history }, configurable: true })
+	const second: string[] = []
+	renderHistory.renderLines(second, t, 40, ctx)
+
+	expect(second).toEqual(first)
+	expect(walked).toBe(0)
+})

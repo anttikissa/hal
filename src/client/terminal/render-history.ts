@@ -38,6 +38,7 @@ const config = {
 const LAST_ACTIVE_NOTICE_PREFIX = 'This session was last active '
 let workingSeen = new Set<string>()
 let fadeStart = new Map<string, number>()
+const bodyCache = new WeakMap<Tab, { key: string; lines: string[]; streaming: boolean }>()
 
 function hasInlineHalCursor(block: Block | undefined): boolean {
 	return (block?.type === 'assistant' || block?.type === 'thinking') && !!block.streaming
@@ -117,25 +118,35 @@ function halCursorLine(sessionId: string, visible: boolean, working: boolean): s
 
 function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRenderContext): number {
 	const start = lines.length
-	const history = visibleHistory(tab.history)
 	const working = context.workingSessions.get(tab.sessionId) ?? false
-	const last = history.at(-1)
-	let activeStreamingBlock: Block | undefined
-	if (working && hasInlineHalCursor(last)) activeStreamingBlock = last
-	for (let i = 0; i < history.length; ) {
-		const group = [history[i]!]
-		const key = logGroupKey(group[0]!)
-		if (key) {
-			for (let j = i + 1; j < history.length && logGroupKey(history[j]!) === key; j++) {
-				group.push(history[j]!)
+	// Everything above the cursor depends only on these. Rebuilding it per paint meant
+	// walking the whole history on every keystroke and every stream delta from any tab.
+	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${working}:${context.sessionLabelVersion}`
+	let body = bodyCache.get(tab)
+	if (!body || body.key !== key || (working && body.streaming)) {
+		const history = visibleHistory(tab.history)
+		const last = history.at(-1)
+		let activeStreamingBlock: Block | undefined
+		if (working && hasInlineHalCursor(last)) activeStreamingBlock = last
+		const built: string[] = []
+		for (let i = 0; i < history.length; ) {
+			const group = [history[i]!]
+			const groupKey = logGroupKey(group[0]!)
+			if (groupKey) {
+				for (let j = i + 1; j < history.length && logGroupKey(history[j]!) === groupKey; j++) {
+					group.push(history[j]!)
+				}
 			}
+			if (built.length > 0 && history[i - 1]?.type === 'assistant' && group[0]?.type === 'assistant') built.push('', `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}\x1b[39m`, '')
+			else if (built.length > 0) built.push('')
+			built.push(...renderGroup(group, cols, context, activeStreamingBlock))
+			i += group.length
 		}
-		if (lines.length > 0 && history[i - 1]?.type === 'assistant' && group[0]?.type === 'assistant') lines.push('', `${colors.assistant.fg}${'─'.repeat(Math.max(0, cols))}\x1b[39m`, '')
-		else if (lines.length > 0) lines.push('')
-		const rendered = renderGroup(group, cols, context, activeStreamingBlock)
-		lines.push(...rendered)
-		i += group.length
+		body = { key, lines: built, streaming: !!activeStreamingBlock }
+		bodyCache.set(tab, body)
 	}
+	lines.push(...body.lines)
+	const activeStreamingBlock = body.streaming
 
 	if (activeStreamingBlock) {
 		// Streaming blocks carry an inline cursor, but still need breathing room
