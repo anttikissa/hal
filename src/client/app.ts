@@ -96,6 +96,7 @@ const state = {
 	localVersionStatus: 'idle' as VersionStatus,
 	localVersion: '',
 	localVersionError: '',
+	remoteUrl: null as string | null,
 	// Persisted across restarts so the prompt stays at a stable position.
 	// Invalidated if terminal width changed since last save.
 	peak: 0,
@@ -415,6 +416,7 @@ function saveClientState(opts: { restart?: boolean } = {}): void {
 		peakCols: state.peakCols,
 		model: state.model,
 		doneUnseen: state.tabs.filter((item) => item.doneUnseen).map((item) => item.sessionId),
+		remoteUrl: state.remoteUrl,
 	})
 }
 
@@ -648,6 +650,7 @@ function initializeSessions(shared: SharedState, opts: { preferredSessionId?: st
 	}
 
 	const saved = clientPersistence.load()
+	state.remoteUrl = saved.remoteUrl
 	// A restart hint belongs to the immediately replacing UI, not future clients.
 	// Clear it before rendering so a separately launched `hal` cannot inherit it.
 	if (saved.restartTab) clientPersistence.save({ ...saved, restartTab: null })
@@ -705,6 +708,7 @@ function resetForTests(): void {
 	state.localVersionStatus = 'idle'
 	state.localVersion = ''
 	state.localVersionError = ''
+	state.remoteUrl = null
 	state.toolConfirmPending.clear()
 	state.summarizing.clear()
 	state.whatDoneUnseen.clear()

@@ -52,7 +52,7 @@ test('parse selects a remote web server from a copied authenticated URL', () => 
 		targetCwd: '/work/project',
 		remoteUrl: 'http://localhost:9001/?auth=aBcDeFgHiJkL',
 	})
-	expect(cliArgs.parse(['-r'], env)).toEqual({ ok: false, error: '-r requires a remote URL' })
+	expect(cliArgs.parse(['-r'], env)).toEqual({ ok: true, help: false, targetCwd: '/work/project', remoteUrl: null })
 })
 
 test('parse rejects unknown options and positional parameters', () => {

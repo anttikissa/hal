@@ -66,7 +66,14 @@ if (parsedArgs.stateDir && process.env.HAL_STATE_DIR !== parsedArgs.stateDir) {
 }
 const startupCwd = resolve(parsedArgs.targetCwd || '.')
 
-if (parsedArgs.remoteUrl) {
+if (parsedArgs.remoteUrl !== undefined) {
+	ensureStateDir()
+	const saved = clientPersistence.load()
+	const remoteUrl = parsedArgs.remoteUrl ?? saved.remoteUrl
+	if (!remoteUrl) {
+		process.stderr.write('No remembered remote URL; use hal -r <url>\n')
+		process.exit(2)
+	}
 	const remoteAbort = new AbortController()
 	config.init()
 	colors.init()
@@ -74,11 +81,13 @@ if (parsedArgs.remoteUrl) {
 	blockData.state.blobLoadingEnabled = false
 	try {
 		const { webConnection } = await import('./client/web-connection.ts')
-		await webConnection.connect(parsedArgs.remoteUrl, remoteAbort.signal)
+		await webConnection.connect(remoteUrl, remoteAbort.signal)
 	} catch (error) {
 		process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
 		process.exit(1)
 	}
+	client.state.remoteUrl = remoteUrl
+	if (parsedArgs.remoteUrl) clientPersistence.save({ ...saved, remoteUrl })
 	client.state.role = 'client'
 	process.on('exit', () => remoteAbort.abort())
 	process.on('SIGTERM', () => {

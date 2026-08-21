@@ -4,10 +4,10 @@ import { ason } from '../utils/ason.ts'
 import { log } from '../utils/log.ts'
 
 function clientStatePath(): string { return `${clientBackend.paths.stateDir}/client.ason` }
-type ClientStateFile = { lastTab: string | null; restartTab: string | null; peak: number; peakCols: number; model: string | null; doneUnseen: string[] }
+type ClientStateFile = { lastTab: string | null; restartTab: string | null; peak: number; peakCols: number; model: string | null; doneUnseen: string[]; remoteUrl: string | null }
 
 function defaults(): ClientStateFile {
-	return { lastTab: null, restartTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [] }
+	return { lastTab: null, restartTab: null, peak: 0, peakCols: 0, model: null, doneUnseen: [], remoteUrl: null }
 }
 
 function errorMessage(err: unknown): string {
@@ -28,6 +28,7 @@ function load(): ClientStateFile {
 			peakCols: data?.peakCols ?? 0,
 			model: data?.model ?? null,
 			doneUnseen: Array.isArray(data?.doneUnseen) ? data.doneUnseen.filter((item: any) => typeof item === 'string') : [],
+			remoteUrl: typeof data?.remoteUrl === 'string' ? data.remoteUrl : null,
 		}
 	} catch (err) {
 		if (!isMissingFileError(err)) log.error('failed to load client state', { error: errorMessage(err) })
