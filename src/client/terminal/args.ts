@@ -4,7 +4,7 @@ type ParseEnv = {
 }
 
 type ParseResult =
-	| { ok: true; help: boolean; targetCwd: string; stateDir?: string; webPort?: number }
+	| { ok: true; help: boolean; targetCwd: string; stateDir?: string; webPort?: number; remoteUrl?: string }
 	| { ok: false; error: string }
 
 function helpText(): string {
@@ -14,6 +14,7 @@ function helpText(): string {
 		'Options:',
 		'  -s, --self       Open Hal in its own directory instead of the current directory.',
 		'  -f, --fresh      Use a fresh isolated temporary state directory.',
+		'  -r <url>         Connect this terminal to a HAL web server.',
 		'  -h, -?, --help   Show this help and exit.',
 		'      --state-dir <dir>  Use an existing state directory (or create it).',
 		'      --web[=<port>]    Serve the local web client (default port: 9001).',
@@ -27,6 +28,7 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 	let help = false
 	let stateDir: string | undefined
 	let webPort: number | undefined
+	let remoteUrl: string | undefined
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i]!
 		if (arg === '-s' || arg === '--self') {
@@ -35,6 +37,11 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 		}
 		if (arg === '-h' || arg === '-?' || arg === '--help') {
 			help = true
+			continue
+		}
+		if (arg === '-r') {
+			remoteUrl = args[++i]
+			if (!remoteUrl) return { ok: false, error: '-r requires a remote URL' }
 			continue
 		}
 		if (arg === '--state-dir') {
@@ -61,9 +68,10 @@ function parse(args: string[], env: ParseEnv): ParseResult {
 		return { ok: false, error: `Unexpected argument: ${arg}` }
 	}
 
-	const result: { ok: true; help: boolean; targetCwd: string; stateDir?: string; webPort?: number } = { ok: true, help, targetCwd: self ? env.halDir : env.cwd }
+	const result: { ok: true; help: boolean; targetCwd: string; stateDir?: string; webPort?: number; remoteUrl?: string } = { ok: true, help, targetCwd: self ? env.halDir : env.cwd }
 	if (stateDir) result.stateDir = stateDir
 	if (webPort) result.webPort = webPort
+	if (remoteUrl) result.remoteUrl = remoteUrl
 	return result
 }
 

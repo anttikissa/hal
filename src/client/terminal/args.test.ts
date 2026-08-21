@@ -44,6 +44,17 @@ test('parse enables the local web client with an optional port', () => {
 	expect(cliArgs.parse(['--web=wrong'], env)).toEqual({ ok: false, error: '--web port must be a number from 1 to 65535' })
 })
 
+test('parse selects a remote web server from a copied authenticated URL', () => {
+	const env = { cwd: '/work/project', halDir: '/hal' }
+	expect(cliArgs.parse(['-r', 'http://localhost:9001/?auth=aBcDeFgHiJkL'], env)).toEqual({
+		ok: true,
+		help: false,
+		targetCwd: '/work/project',
+		remoteUrl: 'http://localhost:9001/?auth=aBcDeFgHiJkL',
+	})
+	expect(cliArgs.parse(['-r'], env)).toEqual({ ok: false, error: '-r requires a remote URL' })
+})
+
 test('parse rejects unknown options and positional parameters', () => {
 	expect(cliArgs.parse(['asdf'], { cwd: '/work/project', halDir: '/hal' })).toEqual({
 		ok: false,

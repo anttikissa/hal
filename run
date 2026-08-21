@@ -6,6 +6,7 @@ hal_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
 args=()
 web=false
+remote=false
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		-f|--fresh)
@@ -30,6 +31,12 @@ while [ "$#" -gt 0 ]; do
 			args+=("$1")
 			shift
 			;;
+		-r)
+			[ "$#" -ge 2 ] || { echo "hal: -r requires a remote URL" >&2; exit 2; }
+			remote=true
+			args+=("$1" "$2")
+			shift 2
+			;;
 		*)
 			args+=("$1")
 			shift
@@ -39,7 +46,7 @@ done
 
 # The local browser client is part of the normal `./run` experience. Direct
 # `bun src/main.ts` remains useful for tests and starts without it.
-if [ "$web" = false ]; then
+if [ "$web" = false ] && [ "$remote" = false ]; then
 	args+=("--web")
 fi
 

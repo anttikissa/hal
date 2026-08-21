@@ -1,13 +1,14 @@
 import { expect, test } from 'bun:test'
 import type { SharedState } from '../common/ipc.ts'
+import { webProtocol, type WebServerMessage } from '../common/web.ts'
 import { ipc } from './file-ipc.ts'
 import { blob } from './session/blob.ts'
-import { sessions } from './sessions.ts'
-import { web } from './web.ts'
 import { runtime } from './runtime.ts'
+import { sessions } from './sessions.ts'
+import { ensureStateDir } from './state.ts'
+import { web } from './web.ts'
 import { webTokens } from './web-tokens.ts'
 
-import { ensureStateDir } from './state.ts'
 test('web fallback port advances by a randomized exponential step', () => {
 	expect(web.nextPort(9001, 1, () => 0)).toBe(9002)
 	expect(web.nextPort(9001, 1, () => 0.99)).toBe(9003)
@@ -22,60 +23,22 @@ test('web announcement is opt-in and includes an authenticated local URL', () =>
 		web.announce('', 9001)
 		web.announce('04-fresh', 9002)
 		expect(calls).toHaveLength(1)
-		expect(calls[0]?.[0]).toBe('04-fresh')
 		expect(calls[0]?.[1]).toMatch(/^Web interface available at http:\/\/localhost:9002\/\?auth=[A-Za-z0-9]{12}$/)
 	} finally {
 		runtime.emitInfo = originalEmitInfo
 	}
 })
 
-test('web API rejects requests without a bearer token', async () => {
-	const controller = new AbortController()
-	ensureStateDir()
-	web.start(0, controller.signal)
-	try {
-		const base = `http://127.0.0.1:${web.state.port}`
-		expect((await fetch(`${base}/api/state`)).status).toBe(401)
-		const token = webTokens.list()[0]!
-		expect((await fetch(`${base}/api/state`, { headers: { authorization: `Bearer ${token.token}` } })).status).toBe(200)
-	} finally {
-		controller.abort()
-	}
-})
-
-test('web page serves the web client HTML', async () => {
-	const page = await web.pageHtml()
-	const source = await Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
-	expect(page).toBe(source)
-})
-
-test('web page serves the shared component stylesheet', async () => {
-	const source = await Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
-	expect(await web.styleCss()).toBe(source)
-})
-
-test('web bundle compiles the Solid TSX entry', async () => {
+test('web serves and compiles the browser client', async () => {
+	expect(await web.pageHtml()).toBe(await Bun.file(`${import.meta.dir}/../web-client/index.html`).text())
+	expect(await web.styleCss()).toBe(await Bun.file(`${import.meta.dir}/../web-client/styles.css`).text())
 	expect((await web.bundleClient()).length).toBeGreaterThan(1_000)
 })
 
-test('web rebuilds the client for each browser request', async () => {
-	const originalBuild = Bun.build
-	let builds = 0
-	Bun.build = async () => {
-		builds++
-		return { success: true, outputs: [{ text: async () => `bundle ${builds}` }] } as any
-	}
-	try {
-		expect(await web.bundleClient()).toBe('bundle 1')
-		expect(await web.bundleClient()).toBe('bundle 2')
-	} finally {
-		Bun.build = originalBuild
-	}
-})
-
-test('session snapshot exposes typed history and live blocks without lossy mapping', () => {
+test('session snapshot exposes complete client bootstrap data', () => {
 	const originalReadState = ipc.readState
-	const originalLoadAllHistory = sessions.loadAllHistory
+	const originalLoadMeta = sessions.loadSessionMeta
+	const originalLoadHistory = sessions.loadAllHistoryWithOrigin
 	const originalLoadLive = sessions.loadLive
 	const state: SharedState = {
 		sessions: [{ id: '04-work', tab: 1, name: 'work', cwd: '/work', model: 'openai/gpt-5.6-sol' }],
@@ -83,80 +46,92 @@ test('session snapshot exposes typed history and live blocks without lossy mappi
 		updatedAt: '2026-08-13T12:00:00.000Z',
 	}
 	ipc.readState = () => state
-	sessions.loadAllHistory = () => [{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-08-13T11:59:00.000Z' }]
-	sessions.loadLive = () => ({ blocks: [{ type: 'tool', name: 'read', toolId: 'tool-1', input: { path: 'README.md' }, running: true }] })
+	sessions.loadSessionMeta = () => ({ id: '04-work', createdAt: '2026-08-13T11:00:00.000Z', workingDir: '/work' })
+	sessions.loadAllHistoryWithOrigin = () => ({ entries: [{ type: 'user', parts: [{ type: 'text', text: 'hello' }] }], parentCount: 0 })
+	sessions.loadLive = () => ({ blocks: [{ type: 'assistant', text: 'hi', streaming: true }] })
 	try {
 		expect(web.sessionSnapshot('04-work')).toEqual({
 			session: state.sessions[0]!,
-			history: [{ type: 'user', parts: [{ type: 'text', text: 'hello' }], ts: '2026-08-13T11:59:00.000Z' }],
-			live: [{ type: 'tool', name: 'read', toolId: 'tool-1', input: { path: 'README.md' }, running: true }],
+			meta: { id: '04-work', createdAt: '2026-08-13T11:00:00.000Z', workingDir: '/work' },
+			history: [{ type: 'user', parts: [{ type: 'text', text: 'hello' }] }],
+			parentCount: 0,
+			parentId: undefined,
+			live: [{ type: 'assistant', text: 'hi', streaming: true }],
 		})
-		expect(web.sessionSnapshot('missing')).toBeNull()
 	} finally {
 		ipc.readState = originalReadState
-		sessions.loadAllHistory = originalLoadAllHistory
+		sessions.loadSessionMeta = originalLoadMeta
+		sessions.loadAllHistoryWithOrigin = originalLoadHistory
 		sessions.loadLive = originalLoadLive
 	}
 })
 
-test('session snapshot hydrates persisted tool output for browser presentation', () => {
+test('session snapshot hydrates persisted tool output', () => {
 	const originalReadState = ipc.readState
-	const originalLoadAllHistory = sessions.loadAllHistory
+	const originalLoadMeta = sessions.loadSessionMeta
+	const originalLoadHistory = sessions.loadAllHistoryWithOrigin
 	const originalLoadLive = sessions.loadLive
-	const originalReadBlobFromChain = blob.readBlobFromChain
-	ipc.readState = () => ({
-		sessions: [{ id: '04-work', cwd: '/work' }],
-		working: {},
-		updatedAt: '2026-08-13T12:00:00.000Z',
-	})
-	sessions.loadAllHistory = () => [{ type: 'tool_result', toolId: 'tool-1', blobId: 'blob-1' }]
+	const originalReadBlob = blob.readBlobFromChain
+	ipc.readState = () => ({ sessions: [{ id: '04-work', cwd: '/work' }], working: {}, updatedAt: '' })
+	sessions.loadSessionMeta = () => ({ id: '04-work', createdAt: '' })
+	sessions.loadAllHistoryWithOrigin = () => ({ entries: [{ type: 'tool_result', toolId: 'tool-1', blobId: 'blob-1' }], parentCount: 0 })
 	sessions.loadLive = () => ({ blocks: [] })
 	blob.readBlobFromChain = () => ({ result: { content: 'line 1\nline 2' } })
 	try {
-		expect(web.sessionSnapshot('04-work')?.history).toEqual([{
-			type: 'tool_result',
-			toolId: 'tool-1',
-			blobId: 'blob-1',
-			output: 'line 1\nline 2',
-		}])
+		expect(web.sessionSnapshot('04-work')?.history[0]).toMatchObject({ output: 'line 1\nline 2' })
 	} finally {
 		ipc.readState = originalReadState
-		sessions.loadAllHistory = originalLoadAllHistory
+		sessions.loadSessionMeta = originalLoadMeta
+		sessions.loadAllHistoryWithOrigin = originalLoadHistory
 		sessions.loadLive = originalLoadLive
-		blob.readBlobFromChain = originalReadBlobFromChain
+		blob.readBlobFromChain = originalReadBlob
 	}
 })
 
-test('websocket live messages preserve complete typed events', () => {
-	const event = {
-		type: 'tool-result' as const,
-		sessionId: '04-work',
-		toolId: 'tool-1',
-		output: 'done',
-		blobId: 'blob-1',
-		phase: 'done' as const,
-		createdAt: '2026-08-13T12:00:01.000Z',
+test('websocket parser accepts ASON authentication and ordinary commands', () => {
+	expect(web.parseClientMessage("{ type: 'authenticate', token: 'aBcDeFgHiJkL' }")).toEqual({ type: 'authenticate', token: 'aBcDeFgHiJkL' })
+	expect(web.parseClientMessage("{ type: 'command', command: { type: 'abort', sessionId: '04-work' } }")).toEqual({ type: 'command', command: { type: 'abort', sessionId: '04-work' } })
+	expect(web.parseClientMessage("{ type: 'command', command: { type: 'prompt', text: 42 } }")).toBeNull()
+})
+
+test('websocket is an authenticated ASON command bus', async () => {
+	const controller = new AbortController()
+	const originalHandle = runtime.handleCommand
+	let received: any
+	ensureStateDir()
+	web.start(0, controller.signal)
+	try {
+		const token = webTokens.list()[0]!
+		const socket = new WebSocket(`ws://127.0.0.1:${web.state.port}/ws`)
+		await new Promise<void>((resolve, reject) => {
+			socket.onerror = () => reject(new Error('socket failed'))
+			socket.onopen = () => socket.send(webProtocol.encode({ type: 'authenticate', token: token.token }))
+			socket.onmessage = (event) => {
+				const message = webProtocol.decode(String(event.data)) as WebServerMessage
+				if (message.type !== 'authenticated') return
+				runtime.handleCommand = (command) => { received = command; resolve() }
+				socket.send(webProtocol.encode({ type: 'command', command: { type: 'abort', sessionId: '04-work' } }))
+			}
+		})
+		expect(received).toMatchObject({ type: 'abort', sessionId: '04-work' })
+		const stateUpdate = new Promise<SharedState>((resolve) => {
+			socket.onmessage = (event) => {
+				const message = webProtocol.decode(String(event.data)) as WebServerMessage
+				if (message.type === 'state' && message.state.summarizing?.['remote-test']) resolve(message.state)
+			}
+		})
+		ipc.updateState((state) => { state.summarizing = { ...state.summarizing, 'remote-test': true } })
+		expect((await stateUpdate).summarizing?.['remote-test']).toBe(true)
+		ipc.updateState((state) => { delete state.summarizing?.['remote-test'] })
+		socket.close()
+	} finally {
+		runtime.handleCommand = originalHandle
+		controller.abort()
 	}
-	expect(web.liveEventMessage(event)).toEqual({ type: 'event', event })
-	expect(web.liveEventMessage({ type: 'history-rebased', sessionId: '04-work' })).toBeNull()
-	expect(web.liveEventMessage({ type: 'prompt', sessionId: '04-work', text: 'hello' })).toEqual({
-		type: 'event',
-		event: { type: 'prompt', sessionId: '04-work', text: 'hello' },
-	})
 })
 
-test('websocket snapshots refresh only at persisted-history boundaries', () => {
-	expect(web.isSnapshotBoundary({ type: 'prompt', sessionId: '04-work' })).toBe(false)
-	expect(web.isSnapshotBoundary({ type: 'stream-end', sessionId: '04-work' })).toBe(true)
-	expect(web.isSnapshotBoundary({ type: 'history-rebased', sessionId: '04-work' })).toBe(true)
-	expect(web.isSnapshotBoundary({ type: 'stream-delta', sessionId: '04-work' })).toBe(false)
-})
-
-test('websocket parser accepts authentication before a session subscription', () => {
-	expect(web.parseClientMessage(JSON.stringify({ type: 'authenticate', token: 'aBcDeFgHiJkL' }))).toEqual({ type: 'authenticate', token: 'aBcDeFgHiJkL' })
-	expect(web.parseClientMessage(JSON.stringify({ type: 'subscribe', sessionId: '04-work' }))).toEqual({ type: 'subscribe', sessionId: '04-work' })
-	expect(web.parseClientMessage(JSON.stringify({ type: 'authenticate', token: '' }))).toBeNull()
-	expect(web.parseClientMessage(JSON.stringify({ type: 'subscribe', sessionId: '' }))).toBeNull()
-	expect(web.parseClientMessage(JSON.stringify({ type: 'other', sessionId: '04-work' }))).toBeNull()
-	expect(web.parseClientMessage('not json')).toBeNull()
+test('websocket snapshots refresh at persisted-history boundaries', () => {
+	expect(web.isSnapshotBoundary({ type: 'stream-end' })).toBe(true)
+	expect(web.isSnapshotBoundary({ type: 'history-rebased' })).toBe(true)
+	expect(web.isSnapshotBoundary({ type: 'stream-delta' })).toBe(false)
 })

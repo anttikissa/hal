@@ -19,6 +19,8 @@ interface DraftFile {
 	promptEdit?: DraftPromptEdit
 }
 
+const state = { enabled: true }
+
 function draftPath(sessionId: string): string {
 	return `${clientBackend.sessions.sessionDir(sessionId)}/draft.ason`
 }
@@ -36,6 +38,7 @@ function logDraftError(action: 'save' | 'load' | 'clear', sessionId: string, err
 }
 
 function saveDraft(sessionId: string, text: string, promptEdit?: DraftPromptEdit): void {
+	if (!state.enabled) return
 	if (!text && !promptEdit) {
 		clearDraft(sessionId)
 		return
@@ -57,6 +60,7 @@ function emptyDraftFile(): DraftFile {
 }
 
 function loadDraftState(sessionId: string): DraftFile {
+	if (!state.enabled) return emptyDraftFile()
 	const path = draftPath(sessionId)
 	if (!existsSync(path)) return emptyDraftFile()
 	try {
@@ -77,6 +81,7 @@ function loadDraft(sessionId: string): string {
 }
 
 function clearDraft(sessionId: string): void {
+	if (!state.enabled) return
 	const path = draftPath(sessionId)
 	try {
 		if (existsSync(path)) unlinkSync(path)
@@ -91,4 +96,4 @@ function clearDraft(sessionId: string): void {
 	clientTransport.io.notifyDraftSaved(sessionId)
 }
 
-export const draft = { saveDraft, loadDraft, loadDraftState, clearDraft }
+export const draft = { state, saveDraft, loadDraft, loadDraftState, clearDraft }

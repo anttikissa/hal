@@ -14,6 +14,7 @@ import { memory } from './server/memory.ts'
 import { version } from './server/version.ts'
 import { isPidAlive } from './utils/is-pid-alive.ts'
 import { log } from './utils/log.ts'
+import { liveFiles } from './utils/live-file.ts'
 import { config } from './config.ts'
 import { builtins } from './server/tools/builtins.ts'
 import { colors } from './client/terminal/colors.ts'
@@ -26,6 +27,8 @@ import { sessions as sessionStore } from './server/sessions.ts'
 import { cliArgs } from './client/terminal/args.ts'
 import { terminalOutput } from './client/terminal/terminal-output.ts'
 import { serverModels } from './server/models.ts'
+import { draft } from './client/draft.ts'
+import { blockData } from './client/block-data.ts'
 
 import { commands } from './server/runtime/commands.ts'
 function subscriptionStatus(provider: string): SubscriptionStatus | null {
@@ -64,6 +67,29 @@ if (parsedArgs.stateDir && process.env.HAL_STATE_DIR !== parsedArgs.stateDir) {
 }
 const startupCwd = resolve(parsedArgs.targetCwd || '.')
 
+if (parsedArgs.remoteUrl) {
+	const remoteAbort = new AbortController()
+	config.init()
+	colors.init()
+	draft.state.enabled = false
+	blockData.state.blobLoadingEnabled = false
+	try {
+		const { webConnection } = await import('./client/web-connection.ts')
+		await webConnection.connect(parsedArgs.remoteUrl, remoteAbort.signal)
+	} catch (error) {
+		process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+		process.exit(1)
+	}
+	client.state.role = 'client'
+	process.on('exit', () => remoteAbort.abort())
+	process.on('SIGTERM', () => {
+		remoteAbort.abort()
+		process.exit(0)
+	})
+	cli.startCli(remoteAbort.signal)
+	await new Promise<void>(() => {})
+}
+
 ensureStateDir()
 log.state.path = `${STATE_DIR}/hal.log`
 perf.mark('State directories exist')
@@ -98,6 +124,10 @@ clientTransport.install({
 	appendCommand: (command) => ipc.appendCommand(command),
 	notifyDraftSaved: (sessionId) => ipc.appendCommand({ type: 'draft-saved', sessionId }),
 	readState: () => ipc.readState(),
+	watchState: (callback) => {
+		const shared = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, ipc.readState()) as ReturnType<typeof ipc.readState>
+		liveFiles.onChange(shared, () => callback(shared))
+	},
 	tailEvents: (signal) => ipc.tailEvents(signal),
 })
 memory.io.addEntry = (text, type) => client.addEntry(text, type)

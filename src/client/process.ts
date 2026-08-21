@@ -1,46 +1,25 @@
 import { clientTransport } from './transport.ts'
 import { clientBackend } from './backend.ts'
-import { liveFiles } from '../utils/live-file.ts'
 import { log } from '../utils/log.ts'
 
-const state = {
-	hostLockState: null as { pid: number | null; createdAt: string } | null,
-	ipcStateFile: null as any,
-}
+const state = { started: false }
 
 function reset(): void {
-	state.hostLockState = null
-	state.ipcStateFile = null
+	state.started = false
 }
 
-function syncHostPid(ctx: any): void {
-	ctx.setHostPid(state.hostLockState?.pid ?? null)
-}
-
-function startWatchingHostLock(ctx: any): void {
-	if (state.hostLockState) return
-	state.hostLockState = liveFiles.liveFile(`${clientBackend.paths.stateDir}/ipc/host.lock`, { pid: null, createdAt: '' })
-	syncHostPid(ctx)
-	liveFiles.onChange(state.hostLockState, () => {
-		syncHostPid(ctx)
-		ctx.onChange(false)
-	})
-}
-
-function startWatchingIpcState(ctx: any) {
-	if (!state.ipcStateFile) {
-		state.ipcStateFile = liveFiles.liveFile(`${clientBackend.paths.stateDir}/ipc/state.ason`, clientTransport.io.readState())
-		liveFiles.onChange(state.ipcStateFile, () => {
-			ctx.applySharedState(state.ipcStateFile!)
-			ctx.onChange(false)
-		})
-	}
-	return state.ipcStateFile
+function applyState(shared: ReturnType<typeof clientTransport.io.readState>, ctx: any): void {
+	ctx.setHostPid(shared.host?.pid ?? null)
+	ctx.applySharedState(shared)
+	ctx.onChange(false)
 }
 
 function start(signal: AbortSignal, opts: any, ctx: any): void {
-	startWatchingHostLock(ctx)
-	const shared = startWatchingIpcState(ctx)
+	if (state.started) return
+	state.started = true
+	const shared = clientTransport.io.readState()
+	ctx.setHostPid(shared.host?.pid ?? null)
+	clientTransport.io.watchState((next) => clientProcess.applyState(next, ctx), signal)
 	clientBackend.subscriptions.onChange(() => ctx.onChange(false))
 	void (async () => {
 		for await (const event of clientTransport.io.tailEvents(signal)) ctx.handleEvent(event)
@@ -56,4 +35,4 @@ function start(signal: AbortSignal, opts: any, ctx: any): void {
 	void ctx.loadInBackground()
 }
 
-export const clientProcess = { state, reset, syncHostPid, startWatchingHostLock, startWatchingIpcState, start }
+export const clientProcess = { state, reset, applyState, start }

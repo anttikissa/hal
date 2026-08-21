@@ -56,6 +56,7 @@ describe('client startup', () => {
 	const origReadState = clientTransport.io.readState
 	const origAppendCommand = clientTransport.io.appendCommand
 	const origTailEvents = clientTransport.io.tailEvents
+	const origWatchState = clientTransport.io.watchState
 	const origLiveFile = liveFiles.liveFile
 	const origOnChange = liveFiles.onChange
 	const origLoadLive = clientBackend.sessions.loadLive
@@ -87,6 +88,10 @@ describe('client startup', () => {
 		// Client tests must never append to the real shared IPC command log.
 		// Individual tests can override this stub to assert what would be sent.
 		clientTransport.io.appendCommand = () => {}
+		clientTransport.io.watchState = (callback) => {
+			const shared = liveFiles.liveFile(`${STATE_DIR}/ipc/state.ason`, clientTransport.io.readState()) as SharedState
+			liveFiles.onChange(shared, () => callback(shared))
+		}
 		savedClientState = existsSync(CLIENT_STATE_PATH) ? readFileSync(CLIENT_STATE_PATH, 'utf-8') : null
 		mkdirSync(STATE_DIR, { recursive: true })
 		rmSync(CLIENT_STATE_PATH, { force: true })
@@ -101,6 +106,7 @@ describe('client startup', () => {
 		clientTransport.io.readState = origReadState
 		clientTransport.io.appendCommand = origAppendCommand
 		clientTransport.io.tailEvents = origTailEvents
+		clientTransport.io.watchState = origWatchState
 		liveFiles.liveFile = origLiveFile
 		liveFiles.onChange = origOnChange
 		clientBackend.sessions.loadLive = origLoadLive

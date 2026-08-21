@@ -166,10 +166,12 @@ function applyThinkingBlob(block: Extract<Block, { type: 'thinking' }>, text: st
 }
 
 const MAX_BLOB_SIZE = 1024 * 1024
+const state = { blobLoadingEnabled: true }
 
 type BlobBlock = Extract<Block, { type: 'tool' | 'thinking' }>
 
 async function loadBlobs(items: Block[]): Promise<number> {
+	if (!state.blobLoadingEnabled) return 0
 	const pending = items.filter(
 		(block): block is BlobBlock =>
 			(block.type === 'tool' || block.type === 'thinking') && !block.blobLoaded && !!block.blobId,
@@ -200,6 +202,7 @@ async function loadBlobs(items: Block[]): Promise<number> {
 }
 
 export const blockData = {
+	state,
 	historyToBlocks,
 	touch,
 	loadBlobs,

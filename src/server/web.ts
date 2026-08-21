@@ -1,10 +1,10 @@
-// Local browser client. This module is imported only for `hal --web`; browser code
-// is bundled lazily on the first request so it never affects normal startup.
+// Local web transport. Browser assets are bundled lazily, so normal startup
+// does not pay for the web client.
 
-import type { LiveEvent } from '../common/live-event-blocks.ts'
-import type { ClientSessionSnapshot } from '../common/snapshots.ts'
+import type { Command } from '../common/protocol.ts'
+import type { ClientBootstrap, ClientSessionSnapshot } from '../common/snapshots.ts'
 import type { WebClientMessage, WebServerMessage } from '../common/web.ts'
-import type { HistoryEntry } from '../common/history.ts'
+import { webProtocol } from '../common/web.ts'
 import { blob } from './session/blob.ts'
 import { ipc } from './file-ipc.ts'
 import { runtime } from './runtime.ts'
@@ -12,9 +12,7 @@ import { sessions } from './sessions.ts'
 import { webTokens, type WebToken } from './web-tokens.ts'
 
 type SocketData = {
-	id: string
 	ip: string
-	sessionId?: string
 	token?: string
 }
 
@@ -34,11 +32,22 @@ function styleCss(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
 }
 
-function openSession(sessionId: string): boolean {
-	return ipc.readState().sessions.some((session) => session.id === sessionId)
+function sessionSnapshot(sessionId: string): ClientSessionSnapshot | null {
+	const session = ipc.readState().sessions.find((item) => item.id === sessionId)
+	const meta = sessions.loadSessionMeta(sessionId)
+	if (!session || !meta) return null
+	const history = sessions.loadAllHistoryWithOrigin(sessionId)
+	return {
+		session,
+		meta,
+		history: hydrateHistory(sessionId, history.entries),
+		parentCount: history.parentCount,
+		parentId: history.parentId,
+		live: sessions.loadLive(sessionId).blocks,
+	}
 }
 
-function hydrateHistory(sessionId: string, history: HistoryEntry[]): HistoryEntry[] {
+function hydrateHistory(sessionId: string, history: ReturnType<typeof sessions.loadAllHistory>): ReturnType<typeof sessions.loadAllHistory> {
 	return history.map((entry) => {
 		if (entry.type !== 'tool_result' || entry.output !== undefined || !entry.blobId) return entry
 		const output = blob.readBlobFromChain(sessionId, entry.blobId)?.result?.content
@@ -46,63 +55,88 @@ function hydrateHistory(sessionId: string, history: HistoryEntry[]): HistoryEntr
 	})
 }
 
-function sessionSnapshot(sessionId: string): ClientSessionSnapshot | null {
-	const session = ipc.readState().sessions.find((item) => item.id === sessionId)
-	if (!session) return null
-	return {
-		session,
-		history: web.hydrateHistory(sessionId, sessions.loadAllHistory(sessionId)),
-		live: sessions.loadLive(sessionId).blocks,
+function bootstrap(): ClientBootstrap {
+	const shared = ipc.readState()
+	const snapshots: ClientSessionSnapshot[] = []
+	for (const session of shared.sessions) {
+		const snapshot = web.sessionSnapshot(session.id)
+		if (snapshot) snapshots.push(snapshot)
+	}
+	return { state: shared, metas: sessions.loadAllSessionMetas(), snapshots }
+}
+
+function isObject(value: unknown): value is Record<string, any> {
+	return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function optionalString(value: unknown): boolean {
+	return value === undefined || typeof value === 'string'
+}
+
+function validBaseCommand(value: Record<string, any>): boolean {
+	return optionalString(value.sessionId) && optionalString(value.createdAt)
+}
+
+function parseCommand(value: unknown): Command | null {
+	if (!isObject(value) || typeof value.type !== 'string' || !validBaseCommand(value)) return null
+	const text = typeof value.text === 'string' && value.text.length <= 100_000
+	const request = typeof value.requestId === 'string' && value.requestId.length <= 1_000
+	switch (value.type) {
+		case 'prompt':
+			return text && optionalString(value.displayText) && optionalString(value.source) && (value.queue === undefined || typeof value.queue === 'boolean') && (value.sourceTab === undefined || Number.isInteger(value.sourceTab)) ? value as Command : null
+		case 'prompt-amend':
+			return text && optionalString(value.displayText) && optionalString(value.source) ? value as Command : null
+		case 'continue':
+		case 'run-next-from-queue':
+		case 'pause-before-tools':
+		case 'close':
+		case 'reset':
+		case 'compact':
+		case 'focus':
+		case 'draft-saved':
+			return value as Command
+		case 'open':
+			return optionalString(value.cwd) && optionalString(value.forkSessionId) && optionalString(value.afterSessionId) && (value.forceNew === undefined || typeof value.forceNew === 'boolean') ? value as Command : null
+		case 'resume':
+			return optionalString(value.selector) ? value as Command : null
+		case 'abort':
+			return optionalString(value.abortText) ? value as Command : null
+		case 'move':
+			return Number.isInteger(value.position) ? value as Command : null
+		case 'what':
+			return optionalString(value.target) ? value as Command : null
+		case 'tool-confirm':
+			return request && typeof value.approved === 'boolean' ? value as Command : null
+		case 'rebase-start':
+			return request && Number.isInteger(value.clientPid) ? value as Command : null
+		case 'rebase-apply':
+			return request && Number.isInteger(value.clientPid) && typeof value.todo === 'string' && (value.edits === undefined || isObject(value.edits)) ? value as Command : null
+		case 'spawn': {
+			const spawn = value.spawn
+			return isObject(spawn) && typeof spawn.task === 'string' && ['subagent', 'subagent-leave-open', 'interactive'].includes(spawn.kind) && ['fork', 'fresh'].includes(spawn.mode) && optionalString(spawn.model) && optionalString(spawn.cwd) && optionalString(spawn.name) && optionalString(spawn.childSessionId) ? value as Command : null
+		}
+		case 'client-status':
+			return Number.isInteger(value.pid) && typeof value.startedAt === 'string' && typeof value.updatedAt === 'string' && typeof value.versionStatus === 'string' && optionalString(value.cwd) && optionalString(value.version) && optionalString(value.error) ? value as Command : null
+		case 'client-exit':
+			return Number.isInteger(value.pid) ? value as Command : null
+		default:
+			return null
 	}
 }
 
-function snapshotResponse(sessionId: string): Response {
-	const snapshot = web.sessionSnapshot(sessionId)
-	if (!snapshot) return new Response('Unknown open session', { status: 404 })
-	return Response.json(snapshot)
-}
-
 function parseClientMessage(text: string): WebClientMessage | null {
-	let value: unknown
-	try { value = JSON.parse(text) } catch { return null }
-	if (!value || typeof value !== 'object') return null
-	const message = value as Record<string, unknown>
-	if (message.type === 'authenticate' && typeof message.token === 'string' && message.token) return { type: 'authenticate', token: message.token }
-	if (message.type === 'subscribe' && typeof message.sessionId === 'string' && message.sessionId) return { type: 'subscribe', sessionId: message.sessionId }
+	const value = webProtocol.decode(text)
+	if (!isObject(value)) return null
+	if (value.type === 'authenticate' && typeof value.token === 'string' && value.token) return { type: 'authenticate', token: value.token }
+	if (value.type === 'command') {
+		const command = web.parseCommand(value.command)
+		if (command) return { type: 'command', command }
+	}
 	return null
 }
 
-function isLiveEvent(event: unknown): event is LiveEvent {
-	if (!event || typeof event !== 'object') return false
-	const value = event as Record<string, unknown>
-	if (typeof value.sessionId !== 'string' || !value.sessionId) return false
-	return value.type === 'prompt'
-		|| value.type === 'stream-start'
-		|| value.type === 'stream-delta'
-		|| value.type === 'stream-end'
-		|| value.type === 'tool-call'
-		|| value.type === 'tool-result'
-		|| value.type === 'tool-confirm-request'
-		|| value.type === 'info'
-		|| value.type === 'response'
-}
-
-function liveEventMessage(event: unknown): Extract<WebServerMessage, { type: 'event' }> | null {
-	return isLiveEvent(event) ? { type: 'event', event } : null
-}
-
-function isSnapshotBoundary(event: unknown): boolean {
-	if (!event || typeof event !== 'object') return false
-	const type = (event as { type?: unknown }).type
-	return type === 'stream-end' || type === 'history-rebased'
-}
-
 function encode(message: WebServerMessage): string {
-	return JSON.stringify(message)
-}
-
-function sessionTopic(sessionId: string): string {
-	return `session:${sessionId}`
+	return webProtocol.encode(message)
 }
 
 async function bundleClient(): Promise<string> {
@@ -118,7 +152,6 @@ async function bundleClient(): Promise<string> {
 					const source = await Bun.file(args.path).text()
 					return {
 						contents: transform(source, { filename: args.path, moduleName: '@solidjs/web', generate: 'dom' }).code,
-						// Oxc consumes JSX; Bun's TypeScript loader strips any remaining types.
 						loader: 'ts',
 					}
 				})
@@ -136,18 +169,6 @@ function nextPort(previousPort: number, tries: number, random = Math.random): nu
 function announce(sessionId: string | undefined, port: number): void {
 	if (!sessionId) return
 	runtime.emitInfo(sessionId, `Web interface available at ${web.urlForToken(webTokens.ensureLocalToken(), port)}`)
-}
-
-function authorizationToken(request: Request): string | null {
-	const value = request.headers.get('authorization')
-	const match = /^Bearer ([A-Za-z0-9]{12})$/.exec(value ?? '')
-	return match?.[1] ?? null
-}
-
-function authenticateRequest(request: Request, server: Bun.Server<SocketData>): WebToken | null {
-	const token = web.authorizationToken(request)
-	if (!token) return null
-	return webTokens.authenticate(token, server.requestIP(request)?.address ?? 'unknown')
 }
 
 function command(args: string): { output?: string; error?: string } {
@@ -178,6 +199,11 @@ function urlForToken(token: WebToken, port = state.port): string {
 	return `http://localhost:${port}/?auth=${token.token}`
 }
 
+function publishSnapshot(server: Bun.Server<SocketData>, sessionId: string): void {
+	const snapshot = web.sessionSnapshot(sessionId)
+	if (snapshot) server.publish('web', web.encode({ type: 'snapshot', snapshot }))
+}
+
 function start(port: number, signal: AbortSignal, announcementSessionId?: string): void {
 	if (state.server) {
 		web.announce(announcementSessionId, state.port)
@@ -203,19 +229,8 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 						catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
 					}
 					if (url.pathname === '/ws') {
-						if (server.upgrade(request, { data: { id: crypto.randomUUID(), ip: server.requestIP(request)?.address ?? 'unknown' } })) return
+						if (server.upgrade(request, { data: { ip: server.requestIP(request)?.address ?? 'unknown' } })) return
 						return new Response('WebSocket upgrade required', { status: 426 })
-					}
-					if (!web.authenticateRequest(request, server)) return new Response('Web authentication required', { status: 401 })
-					if (url.pathname === '/api/state' && request.method === 'GET') return Response.json(ipc.readState())
-					if (url.pathname === '/api/session' && request.method === 'GET') return snapshotResponse(url.searchParams.get('id') ?? '')
-					if (url.pathname === '/api/prompt' && request.method === 'POST') {
-						if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) return new Response('Expected application/json', { status: 415 })
-						let body: any
-						try { body = await request.json() } catch { return new Response('Expected JSON', { status: 400 }) }
-						if (!body || typeof body.sessionId !== 'string' || typeof body.text !== 'string' || !body.text || body.text.length > 100_000 || !openSession(body.sessionId)) return new Response('Invalid prompt', { status: 400 })
-						runtime.handleCommand({ type: 'prompt', sessionId: body.sessionId, text: body.text })
-						return new Response(null, { status: 204 })
 					}
 					return new Response('Not found', { status: 404 })
 				},
@@ -238,19 +253,11 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 								sockets.set(message.token, tokenSockets)
 							}
 							tokenSockets.add(ws)
-							ws.send(web.encode({ type: 'authenticated' }))
 							ws.subscribe('web')
-							ws.send(web.encode({ type: 'state', state: ipc.readState() }))
+							ws.send(web.encode({ type: 'authenticated', bootstrap: web.bootstrap() }))
 							return
 						}
-						if (message.type !== 'subscribe' || !openSession(message.sessionId)) return
-						// Subscribe first, then take the synchronous snapshot. Events cannot interleave
-						// with this callback, so every later event follows this exact baseline.
-						if (ws.data.sessionId) ws.unsubscribe(web.sessionTopic(ws.data.sessionId))
-						ws.data.sessionId = message.sessionId
-						ws.subscribe(web.sessionTopic(message.sessionId))
-						const snapshot = web.sessionSnapshot(message.sessionId)
-						if (snapshot) ws.send(web.encode({ type: 'snapshot', snapshot }))
+						if (message.type === 'command') runtime.handleCommand({ ...message.command, createdAt: new Date().toISOString() })
 					},
 					close(ws) {
 						if (!ws.data.token) return
@@ -271,20 +278,25 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 	}
 	state.server = server
 	state.port = server.port ?? port
+	let openIds = new Set(ipc.readState().sessions.map((session) => session.id))
+	const unsubscribeState = ipc.onStateChange((shared) => {
+		const nextIds = new Set(shared.sessions.map((session) => session.id))
+		for (const sessionId of nextIds) {
+			if (!openIds.has(sessionId)) web.publishSnapshot(server, sessionId)
+		}
+		server.publish('web', web.encode({ type: 'state', state: shared }))
+		openIds = nextIds
+	})
 	void (async () => {
 		for await (const event of ipc.tailEvents(signal)) {
-			server.publish('web', web.encode({ type: 'state', state: ipc.readState() }))
 			const sessionId = event && typeof event.sessionId === 'string' ? event.sessionId : ''
-			if (!sessionId) continue
-			const live = web.liveEventMessage(event)
-			if (live) server.publish(web.sessionTopic(sessionId), web.encode(live))
-			if (!web.isSnapshotBoundary(event)) continue
-			const snapshot = web.sessionSnapshot(sessionId)
-			if (snapshot) server.publish(web.sessionTopic(sessionId), web.encode({ type: 'snapshot', snapshot }))
+			if (sessionId && web.isSnapshotBoundary(event) && openIds.has(sessionId)) web.publishSnapshot(server, sessionId)
+			server.publish('web', web.encode({ type: 'event', event }))
 		}
 	})()
 	signal.addEventListener('abort', () => {
 		unsubscribeRevocation()
+		unsubscribeState()
 		server.stop()
 		if (state.server === server) {
 			state.server = null
@@ -294,6 +306,11 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 	web.announce(announcementSessionId, state.port)
 }
 
+function isSnapshotBoundary(event: unknown): boolean {
+	if (!isObject(event)) return false
+	return event.type === 'stream-end' || event.type === 'history-rebased'
+}
+
 export const web = {
 	state,
 	start,
@@ -301,17 +318,15 @@ export const web = {
 	nextPort,
 	urlForToken,
 	announce,
-	authorizationToken,
-	authenticateRequest,
 	pageHtml,
 	styleCss,
 	bundleClient,
 	hydrateHistory,
 	sessionSnapshot,
+	bootstrap,
+	parseCommand,
 	parseClientMessage,
-	isLiveEvent,
-	liveEventMessage,
 	isSnapshotBoundary,
 	encode,
-	sessionTopic,
+	publishSnapshot,
 }

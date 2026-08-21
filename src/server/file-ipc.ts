@@ -79,6 +79,7 @@ interface HostLock {
 }
 
 let stateFile: SharedState | null = null
+const stateListeners = new Set<(state: SharedState) => void>()
 
 function getStateFile(): SharedState {
 	if (stateFile) return stateFile
@@ -105,7 +106,13 @@ function updateState(mutator: (state: SharedState) => void): SharedState {
 	// Callers often append a matching event right after updating state. Force the
 	// flush here so new clients never observe the event before the bootstrap file.
 	liveFiles.save(state)
+	for (const listener of stateListeners) listener(state)
 	return state
+}
+
+function onStateChange(listener: (state: SharedState) => void): () => void {
+	stateListeners.add(listener)
+	return () => stateListeners.delete(listener)
 }
 
 // Delete a stale lock left by a dead process. Call this before claimHost().
@@ -176,6 +183,7 @@ export const ipc = {
 	tailCommands,
 	readState,
 	updateState,
+	onStateChange,
 	cleanupStaleLock,
 	claimHost,
 	readHostLock,

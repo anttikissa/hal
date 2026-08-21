@@ -2,7 +2,7 @@ import { createMemo, createSignal, onSettled, Show } from 'solid-js'
 import { render } from '@solidjs/web'
 import type { SharedState } from '../common/ipc.ts'
 import type { ClientSessionSnapshot } from '../common/snapshots.ts'
-import { webMessages, type WebServerMessage } from '../common/web.ts'
+import { webProtocol, type WebServerMessage } from '../common/web.ts'
 import { AuthGate } from './components/AuthGate.tsx'
 import { PromptComposer } from './components/PromptComposer.tsx'
 import { SessionTabs } from './components/SessionTabs.tsx'
@@ -33,84 +33,37 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 	const [sharedState, setSharedState] = createSignal<SharedState>({ sessions: [], working: {}, updatedAt: '' })
 	const [snapshot, setSnapshot] = createSignal<ClientSessionSnapshot | null>(null)
 	const transcript = createMemo(() => webTranscript.items(snapshot()))
-	let subscribed = ''
+	const snapshots = new Map<string, ClientSessionSnapshot>()
 	let socket: WebSocket | undefined
 	let unauthorized = false
 
-	async function request(path: string, init?: RequestInit): Promise<Response> {
-		const headers = new Headers(init?.headers)
-		headers.set('authorization', `Bearer ${props.token}`)
-		const response = await fetch(path, { ...init, headers })
-		if (response.status === 401) {
-			unauthorized = true
-			props.onUnauthorized()
-		}
-		return response
-	}
-
-	function subscribe(sessionId: string): void {
-		if (!sessionId || socket?.readyState !== WebSocket.OPEN || subscribed === sessionId) return
-		subscribed = sessionId
-		socket.send(JSON.stringify({ type: 'subscribe', sessionId }))
-	}
-
 	function selectSession(sessionId: string): void {
-		if (selected() === sessionId && snapshot()?.session.id === sessionId) return
-		setSelected(sessionId)
-		setSnapshot(null)
-		subscribe(sessionId)
-	}
-
-	function applyState(state: SharedState): string {
-		let sessionId = selected()
-		if (!state.sessions.some((session) => session.id === sessionId)) {
-			sessionId = state.sessions[0]?.id ?? ''
-			setSelected(sessionId)
-			setSnapshot(null)
-			subscribed = ''
-		}
-		setSharedState(state)
-		subscribe(sessionId)
-		return sessionId
-	}
-
-	async function refresh(sessionId: string): Promise<void> {
 		if (!sessionId) return
-		const response = await request(`/api/session?id=${encodeURIComponent(sessionId)}`)
-		if (!response.ok) return
-		if (socket?.readyState === WebSocket.OPEN && subscribed === sessionId) return
-		const next = await response.json() as ClientSessionSnapshot
-		if (next.session.id !== sessionId) return
-		setSnapshot(next)
+		setSelected(sessionId)
+		setSnapshot(snapshots.get(sessionId) ?? null)
 	}
 
-	async function refreshTabs(): Promise<void> {
-		const response = await request('/api/state')
-		if (!response.ok) return
-		const state = await response.json() as SharedState
-		await refresh(applyState(state))
+	function applyState(state: SharedState): void {
+		let sessionId = selected()
+		if (!state.sessions.some((session) => session.id === sessionId)) sessionId = state.sessions[0]?.id ?? ''
+		setSharedState(state)
+		if (sessionId !== selected()) selectSession(sessionId)
 	}
 
-	async function submitPrompt(text: string): Promise<boolean> {
+	function submitPrompt(text: string): Promise<boolean> {
 		const sessionId = selected()
-		if (!sessionId) return false
-		const response = await request('/api/prompt', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ sessionId, text }),
-		})
-		if (!response.ok) return false
-		if (socket?.readyState !== WebSocket.OPEN) void refresh(sessionId)
-		return true
+		if (!sessionId || socket?.readyState !== WebSocket.OPEN) return Promise.resolve(false)
+		socket.send(webProtocol.encode({ type: 'command', command: { type: 'prompt', sessionId, text } }))
+		return Promise.resolve(true)
 	}
 
 	onSettled(() => {
 		const connection = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`)
 		socket = connection
-		connection.onopen = () => connection.send(JSON.stringify({ type: 'authenticate', token: props.token }))
+		connection.onopen = () => connection.send(webProtocol.encode({ type: 'authenticate', token: props.token }))
 		connection.onmessage = (event) => {
-			let message: WebServerMessage
-			try { message = JSON.parse(event.data) as WebServerMessage } catch { return }
+			const message = webProtocol.decode(String(event.data)) as WebServerMessage | null
+			if (!message || typeof message !== 'object' || !('type' in message)) return
 			if (message.type === 'unauthorized') {
 				unauthorized = true
 				props.onUnauthorized()
@@ -118,17 +71,23 @@ function AuthenticatedApp(props: AuthenticatedAppProps) {
 				return
 			}
 			if (message.type === 'authenticated') {
-				void refreshTabs()
+				for (const item of message.bootstrap.snapshots) snapshots.set(item.session.id, item)
+				applyState(message.bootstrap.state)
+				if (!selected()) selectSession(message.bootstrap.state.sessions[0]?.id ?? '')
 				return
 			}
 			if (message.type === 'state') {
 				applyState(message.state)
 				return
 			}
-			if ((message.type === 'snapshot' && message.snapshot.session.id !== selected())
-				|| (message.type === 'event' && message.event.sessionId !== selected())) return
+			if (message.type === 'snapshot') {
+				snapshots.set(message.snapshot.session.id, message.snapshot)
+				if (message.snapshot.session.id === selected()) setSnapshot(message.snapshot)
+				return
+			}
+			if (message.event?.sessionId !== selected()) return
 			const current = snapshot()
-			const next = webMessages.applySessionMessage(current, message)
+			const next = webProtocol.applySessionMessage(current, message)
 			if (next !== current) setSnapshot(next)
 		}
 		connection.onclose = (event) => {

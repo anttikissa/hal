@@ -31,6 +31,8 @@ test('history tool results merge into their call block', () => {
 test('status markers render as prose in history and live notices', () => {
 	const result = webTranscript.items({
 		session: { id: 's1', cwd: '/tmp' },
+		meta: { id: 's1', createdAt: '' },
+		parentCount: 0,
 		history: [{ type: 'log', text: '[restarted]' }],
 		live: [{ type: 'log', text: '[paused before local tools]' }],
 	})
