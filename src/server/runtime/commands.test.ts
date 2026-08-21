@@ -737,17 +737,6 @@ test('/model is quiet when the resolved model is unchanged', async () => {
 })
 
 
-test('/model rejects an unknown model and suggests /check', async () => {
-	const session = makeSession()
-	session.model = 'openai/gpt-5.6-terra'
-	const result = await commands.executeCommand('/model openai/gpt-5.6-mini', session)
-
-	expect(result.error).toContain('Unknown model: openai/gpt-5.6-mini')
-	expect(result.error).toContain('/check')
-	expect(session.model).toBe('openai/gpt-5.6-terra')
-})
-
-
 test('/cd changes session cwd without command metadata', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-cd-meta-'))
 	const session = makeSession()

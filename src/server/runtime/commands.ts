@@ -365,10 +365,8 @@ handlers['model'] = (args, session) => {
 	}
 
 	const oldModel = models.resolveModel(session.model ?? models.defaultModel())
+	// No validation: allow arbitrary model IDs so new models work before /check refreshes metadata
 	const newModel = models.resolveModel(args)
-	if (!models.modelCompletionNames().includes(newModel)) {
-		return { error: `Unknown model: ${args}. Run /check to update Hal's model metadata, then try again.`, handled: true }
-	}
 	if (newModel === oldModel) return { handled: true }
 	session.model = newModel
 	const oldDisplay = models.displayModel(oldModel)
