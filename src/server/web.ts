@@ -243,12 +243,12 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 						if (!ws.data.token) {
 							if (message.type !== 'authenticate') {
 								ws.send(web.encode({ type: 'error', message: 'Web authentication required' }))
-								ws.close(4003)
+								ws.close()
 								return
 							}
 							if (!webTokens.authenticate(message.token, ws.data.ip)) {
 								ws.send(web.encode({ type: 'error', message: 'Invalid authentication token' }))
-								ws.close(4003)
+								ws.close()
 								return
 							}
 							ws.data.token = message.token
