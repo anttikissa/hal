@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { colors } from './colors.ts'
+import { blocks } from './blocks.ts'
 import { renderHistory, type HistoryRenderContext } from './render-history.ts'
 import type { Tab } from '../app.ts'
 
@@ -115,14 +116,21 @@ test('unchanged history is not re-derived on every draw', () => {
 	const first: string[] = []
 	renderHistory.renderLines(first, t, 40, ctx)
 
-	// A second draw with untouched history must reuse the assembled lines: this ran
-	// per block on every paint, which cost more than rendering the blocks themselves.
-	let walked = 0
-	const history = t.history
-	Object.defineProperty(t, 'history', { get() { walked++; return history }, configurable: true })
+	// A second draw with untouched history must reuse the assembled lines instead of
+	// regrouping and re-rendering every block, which dominated paint cost.
+	let rendered = 0
+	const origRenderBlock = blocks.renderBlock
+	blocks.renderBlock = ((...args: Parameters<typeof origRenderBlock>) => {
+		rendered++
+		return origRenderBlock(...args)
+	}) as typeof origRenderBlock
 	const second: string[] = []
-	renderHistory.renderLines(second, t, 40, ctx)
+	try {
+		renderHistory.renderLines(second, t, 40, ctx)
+	} finally {
+		blocks.renderBlock = origRenderBlock
+	}
 
 	expect(second).toEqual(first)
-	expect(walked).toBe(0)
+	expect(rendered).toBe(0)
 })

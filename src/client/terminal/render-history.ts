@@ -121,7 +121,10 @@ function renderLines(lines: string[], tab: Tab, cols: number, context: HistoryRe
 	const working = context.workingSessions.get(tab.sessionId) ?? false
 	// Everything above the cursor depends only on these. Rebuilding it per paint meant
 	// walking the whole history on every keystroke and every stream delta from any tab.
-	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${working}:${context.sessionLabelVersion}`
+	// Streaming mutates the last block in place and bumps renderVersion without touching
+	// historyVersion, so the tail's identity has to be part of the key.
+	const tail = tab.history.at(-1)
+	const key = `${tab.sessionId}:${tab.historyVersion}:${cols}:${working}:${context.sessionLabelVersion}:${tab.history.length}:${tail?.renderVersion ?? 0}`
 	let body = bodyCache.get(tab)
 	if (!body || body.key !== key || (working && body.streaming)) {
 		const history = visibleHistory(tab.history)
