@@ -492,13 +492,21 @@ async function continuePendingTools(sessionId: string): Promise<boolean> {
 	}
 }
 
+function isIntroStart(model: string, entries: HistoryEntry[]): boolean {
+	if (model !== 'hal/intro') return false
+	return !entries.some((entry) => entry.type === 'user' || entry.type === 'assistant' || entry.type === 'thinking' || entry.type === 'tool_call' || entry.type === 'tool_result')
+}
+
 
 async function runGeneration(sessionId: string, text: string, source?: string, displayText?: string, pending?: PendingPrompt, sourceTab?: number, label?: 'steering' | 'queued'): Promise<void> {
 	if (!ipc.ownsHostLock()) return
 	const meta = sessionStore.loadSessionMeta(sessionId)
 	if (!meta) return
-	const continueAction = text ? false : continueActionForSession(sessionId)
-	if (!text && !continueAction) {
+	const model = meta.model ?? models.defaultModel()
+	const introStart = !text && isIntroStart(model, sessionStore.loadAllHistory(sessionId))
+	let continueAction: ContinuationAction | false = false
+	if (!text && !introStart) continueAction = continueActionForSession(sessionId)
+	if (!text && !introStart && !continueAction) {
 		// Continue with no unfinished turn: the only remaining work is a queued
 		// prompt that the paused turn was holding back.
 		if (queueRunner.shouldDrainQueuedPrompt(sessionId, 'completed')) await queueRunner.runNextQueuedPrompt(sessionId)
@@ -509,7 +517,6 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		return
 	}
 	const cwd = meta.workingDir ?? process.cwd()
-	const model = meta.model ?? models.defaultModel()
 	const promptResult = context.buildSystemPrompt({ model, cwd, sessionId })
 	if (text) {
 		const pendingTools = sessionStore.findPendingTools(sessionId)
@@ -553,6 +560,15 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 			systemPrompt: promptResult.text,
 			messages,
 			signal: pending?.controller.signal,
+			onConfig: (key, value) => {
+				const write = commands.writeConfigValue(key, value)
+				if (write.error) throw new Error(write.error)
+				// The intro hands the session to a real model once it is finished.
+				if (key === 'models.default') {
+					sessionStore.updateMeta(sessionId, { model: models.resolveModel(value) })
+					broadcastSessions()
+				}
+			},
 			onStatus: async (working) => {
 				ipc.updateState((shared) => updateSharedTurnStatus(shared, sessionId, working))
 			},
@@ -899,12 +915,14 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	state.pendingToolRuns.clear()
 	state.contextSwitching.clear()
 	let startupSessionId: string | undefined
+	let createdStartupSession = false
 	if (opts.targetCwd) {
 		const target = tabs.openSessionForCwd(opts.targetCwd)
 		if (!target.ok) return target
 		startupSessionId = target.sessionId
 	} else if (state.openSessionIds.length === 0) {
 		startupSessionId = tabs.createSessionTab({}).id
+		createdStartupSession = true
 		if (!signal.aborted && state.activeRuntimePid === process.pid) broadcastSessions()
 	}
 	restartPromptWatch()
@@ -925,6 +943,11 @@ function startRuntime(signal: AbortSignal, opts: { targetCwd?: string } = {}): {
 	if (state.openSessionIds.length > 0) tabs.syncSharedState()
 	void modelNotices.refreshModelMetadata()
 	openaiUsage.start(signal)
+	if (createdStartupSession && startupSessionId && sessionStore.loadSessionMeta(startupSessionId)?.model === 'hal/intro') {
+		setTimeout(() => {
+			if (!signal.aborted && state.activeRuntimePid === process.pid) void runGeneration(startupSessionId!, '')
+		}, 0)
+	}
 	if (metas.length > 0) {
 		setTimeout(() => {
 			if (signal.aborted || state.activeRuntimePid !== process.pid) return
@@ -975,6 +998,7 @@ export const runtime = {
 	startRuntime,
 	emitInfo,
 	shouldAutoContinue,
+	isIntroStart,
 	shouldCloseSessionAfterGeneration,
 	recordTabClosed,
 	spawnSession,

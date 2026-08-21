@@ -775,6 +775,11 @@ function parseConfigArgs(args: string): { help: boolean; temp: boolean; path: st
 	}
 }
 
+function writeConfigValue(path: string, rawValue: string, temp = false): { output?: string; error?: string } {
+	const value = config.parseValue(path, rawValue)
+	return config.writePath(path, value, { temp })
+}
+
 // /config — inspect or change runtime config
 handlers['config'] = (args) => {
 	const parsed = parseConfigArgs(args)
@@ -786,8 +791,7 @@ handlers['config'] = (args) => {
 		return { output: `${parsed.path}:\n${ason.stringify(read.value, 'long')}`, handled: true }
 	}
 	try {
-		const value = config.parseValue(parsed.path, parsed.value)
-		const write = config.writePath(parsed.path, value, { temp: parsed.temp })
+		const write = writeConfigValue(parsed.path, parsed.value, parsed.temp)
 		if (write.error) return { error: write.error, handled: true }
 		return { output: write.output, handled: true }
 	} catch (err: any) {
@@ -848,6 +852,7 @@ export const commands = {
 	state,
 	parseCommand,
 	executeCommand,
+	writeConfigValue,
 	canRunWhileWorking,
 	commandNames,
 	commandArg,

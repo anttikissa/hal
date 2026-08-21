@@ -31,6 +31,13 @@ test('runtime exposes in-memory focused sessions for eval helpers', () => {
 	}
 })
 
+
+test('fresh HAL intro sessions may generate without a user prompt', () => {
+	expect(runtime.isIntroStart('hal/intro', [])).toBe(true)
+	expect(runtime.isIntroStart('hal/intro', [{ type: 'assistant', text: 'started' } as any])).toBe(false)
+	expect(runtime.isIntroStart('openai/gpt-5.6-terra', [])).toBe(false)
+})
+
 test('discarding an amended prompt clears its paused continuation', () => {
 	const sessionId = '04-discard-amend'
 	const shared: any = { working: {}, sessions: [{ id: sessionId, continuation: 'continue' }] }

@@ -16,6 +16,15 @@ test('config-template.ason matches module config defaults', () => {
 	// environment that happens to run it.
 	defaults.log.level = template.log.level
 
+	// Fresh installs start in the built-in intro with hidden chrome. Runtime
+	// defaults remain normal so upgrades with older config files stay usable.
+	expect(template.models.default).toBe('intro')
+	template.models.default = defaults.models.default
+	for (const key of ['tabsOpacity', 'promptOpacity', 'statusOpacity', 'helpOpacity']) {
+		expect(template.renderStatus[key]).toBe(0)
+		template.renderStatus[key] = defaults.renderStatus[key]
+	}
+
 	expect(template).toEqual(defaults)
 })
 

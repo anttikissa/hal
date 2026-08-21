@@ -55,7 +55,12 @@
 		// Sub 2/3: 5h 23%, 7d 61%
 		showSubscription: true,
 		// Prompt cursor shape: 'block', 'blinking-block', 'underline', 'blinking-underline', 'bar', 'blinking-bar', or 'native'.
-		promptCursorShape: 'block'
+		promptCursorShape: 'block',
+		// Binary chrome visibility for the guided intro. New installs start hidden.
+		tabsOpacity: 0,
+		promptOpacity: 0,
+		statusOpacity: 0,
+		helpOpacity: 0
 	},
 	agentLoop: {
 		// Maximum generate/tool-result cycles before stopping a runaway agent loop.
@@ -87,9 +92,9 @@
 		exitDelayMs: 500
 	},
 	models: {
-		// Default model alias or full model ID for new sessions.
-		// 'gpt' tracks the newest GPT everyday tier (currently openai/gpt-5.6-terra).
-		default: 'gpt'
+		// New installations start with HAL's guided intro. The intro changes this to
+		// 'gpt' after it has revealed the interface.
+		default: 'intro'
 	},
 	subscriptionUsage: {
 		// Mask account email addresses in usage and status output.
@@ -125,6 +130,10 @@
 		responsesTransport: 'auto',
 		// Maximum time to wait for the initial WebSocket connection before falling back to HTTP.
 		responsesConnectTimeoutMs: 10000
+	},
+	halProvider: {
+		// Number of words streamed per second by HAL's built-in scripted models.
+		wordsPerSecond: 4
 	},
 	toolRegistry: {
 		// Hard cap for any tool result sent back to the model.

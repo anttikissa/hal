@@ -161,7 +161,7 @@ function createSessionTab(opts: { openerId?: string; afterId?: string; sourceId?
 	sessionStore.updateMeta(sessionId, { attention: 'new' })
 	insertSessionAfter(sessionId, opts.sourceId ?? opts.afterId)
 	if (opts.focus !== false) focusSession(sessionId)
-	if (!opts.sourceId) recordOpeningSummary(sessionStore.loadSessionMeta(sessionId) ?? meta)
+	if (!opts.sourceId && inheritedModel !== 'hal/intro') recordOpeningSummary(sessionStore.loadSessionMeta(sessionId) ?? meta)
 	const related = sourceMeta ?? openerMeta
 	const text = opts.sourceId
 		? related ? `Tab forked from ${sessionLabel(related)}; now writing to ${paths.historyDisplayPath(sessionId, meta.currentLog)}` : ''

@@ -112,6 +112,8 @@ export interface AgentContext {
 	signal?: AbortSignal
 	/** Callback for session-level working state updates. */
 	onStatus?: (working: boolean) => void | Promise<void>
+	/** Applies persistent config controls emitted by HAL's internal provider. */
+	onConfig?: (key: string, value: string) => void
 }
 
 export type AgentLoopResult = 'completed' | 'aborted' | 'failed' | 'paused'
@@ -476,6 +478,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 			let aborted = false
 			let shouldRetry = false
 			let iterationDone = false
+			let providerPaused = false
 			let terminalErrorEntry: any | null = null
 
 
@@ -613,6 +616,15 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 						break
 					}
 
+					case 'pause':
+						providerPaused = true
+						iterationDone = true
+						break
+
+					case 'config':
+						if (providerName === 'hal' && event.key && event.value != null) ctx.onConfig?.(event.key, event.value)
+						break
+
 						case 'done': {
 							// Only reset retry state on actual success, not when we're about to retry
 							if (!shouldRetry) {
@@ -735,6 +747,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				})
 				// Persist context so it survives restarts
 				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
+				if (providerPaused) return 'paused'
 				if (hadTerminalError) appendTurnEnd(sessionId, { status: 'failed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 				else appendTurnEnd(sessionId, lastDoneMeta ?? { status: 'completed', usage: hasUsage(totalUsage) ? totalUsage : undefined })
 				return hadTerminalError ? 'failed' : 'completed'

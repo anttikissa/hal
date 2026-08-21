@@ -302,8 +302,10 @@ export interface ToolDef {
 // can reference it without circular imports.
 
 export interface ProviderStreamEvent {
-	type: 'text' | 'thinking' | 'thinking_signature' | 'tool_call' | 'server_tool' | 'error' | 'done'
+	type: 'text' | 'thinking' | 'thinking_signature' | 'tool_call' | 'server_tool' | 'pause' | 'config' | 'error' | 'done'
 	text?: string
+	key?: string
+	value?: string
 	signature?: string
 	// tool_call fields
 	id?: string

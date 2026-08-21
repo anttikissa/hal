@@ -193,6 +193,45 @@ test('wait tool completes the turn without another model request', async () => {
 })
 
 
+test('provider pause preserves streamed output as an Enter-continuable turn', async () => {
+	const sessionId = `test-provider-pause-${Date.now().toString(36)}`
+	createdSessions.push(sessionId)
+	await sessions.createSession(sessionId, { id: sessionId, createdAt: new Date().toISOString(), workingDir: process.cwd() })
+	const originalGetProvider = providerLoader.getProvider
+	const originalAppendEvent = ipc.appendEvent
+	const events: any[] = []
+	const configChanges: Array<[string, string]> = []
+	providerLoader.getProvider = async () => ({
+		async *generate() {
+			yield { type: 'text', text: 'Press enter to continue.' }
+			yield { type: 'config', key: 'renderStatus.tabsOpacity', value: '1' }
+			yield { type: 'pause' }
+		},
+	})
+	ipc.appendEvent = (event: any) => { events.push(event) }
+
+	try {
+		const result = await agentLoop.runAgentLoop({
+			sessionId,
+			model: 'hal/intro',
+			cwd: process.cwd(),
+			systemPrompt: 'unused',
+			onConfig: (key, value) => { configChanges.push([key, value]) },
+			messages: [{ role: 'user', content: 'start' }],
+		})
+		expect(result).toBe('paused')
+		expect(sessions.loadHistory(sessionId)).toEqual([
+			expect.objectContaining({ type: 'assistant', text: 'Press enter to continue.', model: 'hal/intro' }),
+		])
+		expect(configChanges).toEqual([['renderStatus.tabsOpacity', '1']])
+		expect(events).toContainEqual(expect.objectContaining({ type: 'stream-end', phase: 'done' }))
+	} finally {
+		providerLoader.getProvider = originalGetProvider
+		ipc.appendEvent = originalAppendEvent
+	}
+})
+
+
 	test('streams partial output for each concurrent tool call', async () => {
 		const sessionId = `test-tool-output-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 		createdSessions.push(sessionId)

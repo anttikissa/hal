@@ -22,7 +22,10 @@ async function getProvider(providerName: string): Promise<Provider> {
 	if (cached) return cached
 
 	let p: Provider
-	if (providerName === 'anthropic') {
+	if (providerName === 'hal') {
+		const { halProvider } = await import('./hal.ts')
+		p = halProvider.provider
+	} else if (providerName === 'anthropic') {
 		const { anthropicProvider } = await import('./anthropic.ts')
 		p = anthropicProvider
 	} else if (providerName === 'openai') {

@@ -36,6 +36,10 @@ const config = {
 	showTokenCache: false,
 	showSubscription: true,
 	promptCursorShape: 'block',
+	tabsOpacity: 1,
+	promptOpacity: 1,
+	statusOpacity: 1,
+	helpOpacity: 1,
 }
 
 function halCursorColor(): string {
@@ -225,6 +229,10 @@ function buildTabBarLines(cols: number): string[] {
 
 function renderTabBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
+	if (renderStatus.config.tabsOpacity <= 0) {
+		lines.push(renderStatus.paddedLine('', cols))
+		return
+	}
 	lines.push(renderStatus.buildTabBarLines(cols)[0] ?? '')
 }
 
@@ -353,6 +361,10 @@ function subscriptionStatusLabel(provider: string, base: string): string {
 
 function renderStatusLine(lines: string[]): void {
 	const cols = process.stdout.columns || 80
+	if (renderStatus.config.statusOpacity <= 0) {
+		lines.push(renderStatus.paddedLine('', cols))
+		return
+	}
 	const base = renderStatus.statusBaseColor()
 	const tab = client.currentTab()
 	if (!tab) {
@@ -419,6 +431,10 @@ function renderStatusLine(lines: string[]): void {
 
 function renderHelpBar(lines: string[]): void {
 	const cols = process.stdout.columns || 80
+	if (renderStatus.config.helpOpacity <= 0) {
+		lines.push(renderStatus.paddedLine('', cols))
+		return
+	}
 	const working = client.isWorking()
 	const hasText = prompt.text().trim().length > 0
 	const continueAction = client.continueActionForCurrentTurn()
@@ -555,6 +571,10 @@ function paddedPromptLine(line: string, cols: number): string {
 function renderPrompt(lines: string[]): void {
 	const cols = process.stdout.columns || 80
 	const p = prompt.buildPrompt(renderStatus.promptContentWidth(cols))
+	if (renderStatus.config.promptOpacity <= 0) {
+		for (let i = 0; i < p.lines.length + 2; i++) lines.push(renderStatus.paddedLine('', cols))
+		return
+	}
 	const above = p.fold.above > 0 ? `↑${p.fold.above}` : ''
 	const below = p.fold.below > 0 ? `↓${p.fold.below}` : ''
 	lines.push(renderStatus.promptRule(cols, above, renderStatus.activityStatusLabel()))

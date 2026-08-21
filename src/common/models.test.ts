@@ -22,6 +22,16 @@ test('sol, terra, and luna aliases resolve to gpt-5.6 tier models', () => {
 })
 
 
+test('intro alias resolves to the local synthetic model and appears in the picker', () => {
+	expect(models.resolveModel('intro')).toBe('hal/intro')
+	expect(models.modelCompletionNames()).toContain('hal/intro')
+	expect(models.listModelChoices().find((item) => item.value === 'intro')).toMatchObject({
+		fullId: 'hal/intro',
+		path: ['hal'],
+	})
+})
+
+
 test('hydrated tier aliases track newer generations but ignore pro variants', () => {
 	models.hydrate({
 		'gpt-5.6-sol': 1_050_000,

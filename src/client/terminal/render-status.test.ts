@@ -178,7 +178,36 @@ test('buildTabBarLines switches to compact mode when even the bare tab numbers o
 		expect(visLen(line!)).toBeLessThanOrEqual(80)
 	} finally {
 		client.state.tabs.length = 0
+
 		client.state.tabs.push(...origTabs)
 		client.state.focusedTabIndex = origFocused
+	}
+})
+
+
+test('zero opacity hides chrome content without changing its row count', () => {
+	const original = {
+		tabs: renderStatus.config.tabsOpacity,
+		prompt: renderStatus.config.promptOpacity,
+		status: renderStatus.config.statusOpacity,
+		help: renderStatus.config.helpOpacity,
+	}
+	try {
+		renderStatus.config.tabsOpacity = 0
+		renderStatus.config.promptOpacity = 0
+		renderStatus.config.statusOpacity = 0
+		renderStatus.config.helpOpacity = 0
+		const lines: string[] = []
+		renderStatus.renderTabBar(lines)
+		renderStatus.renderPrompt(lines)
+		renderStatus.renderStatusLine(lines)
+		renderStatus.renderHelpBar(lines)
+		expect(lines).toHaveLength(renderStatus.chromeLines())
+		for (const line of lines) expect(blockText.stripAnsiSequences(line).trim()).toBe('')
+	} finally {
+		renderStatus.config.tabsOpacity = original.tabs
+		renderStatus.config.promptOpacity = original.prompt
+		renderStatus.config.statusOpacity = original.status
+		renderStatus.config.helpOpacity = original.help
 	}
 })
