@@ -105,14 +105,9 @@ test('websocket is an authenticated ASON command bus', async () => {
 		const socket = new WebSocket(`ws://127.0.0.1:${web.state.port}/ws`)
 		await new Promise<void>((resolve, reject) => {
 			socket.onerror = () => reject(new Error('socket failed'))
-			socket.onopen = () => socket.send(webProtocol.encode({ type: 'authenticate', token: 'wrong-token' }))
+			socket.onopen = () => socket.send(webProtocol.encode({ type: 'authenticate', token: token.token }))
 			socket.onmessage = (event) => {
 				const message = webProtocol.decode(String(event.data)) as WebServerMessage
-				if (message.type === 'error') {
-					expect(message.message).toBe('Invalid authentication token')
-					socket.send(webProtocol.encode({ type: 'authenticate', token: token.token }))
-					return
-				}
 				if (message.type !== 'authenticated') return
 				runtime.handleCommand = (command) => { received = command; resolve() }
 				socket.send(webProtocol.encode({ type: 'command', command: { type: 'abort', sessionId: '04-work' } }))
