@@ -27,6 +27,19 @@ function tab(overrides: any = {}): any {
 	}
 }
 
+
+test('status identifies host, local peer, and remote client', () => {
+	const original = client.state.role
+	try {
+		for (const role of ['host', 'peer', 'client'] as const) {
+			client.state.role = role
+			expect(renderStatus.serverStatusLabel()).toBe(role)
+		}
+	} finally {
+		client.state.role = original
+	}
+})
+
 test('subscriptionStatusLabel renders normalized subscription windows', () => {
 	const current = clientBackend.subscriptions.current
 	try {

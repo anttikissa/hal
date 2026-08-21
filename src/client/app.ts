@@ -87,7 +87,7 @@ const state = {
 	tabs: [] as Tab[],
 	focusedTabIndex: 0,
 	sessionLabelVersion: 0,
-	role: 'server' as 'server' | 'client',
+	role: 'host' as 'host' | 'peer' | 'client',
 	pid: process.pid,
 	startedAt: new Date().toISOString(),
 	hostPid: null as number | null,
@@ -195,7 +195,7 @@ function focusCurrentTab(): void {
 }
 
 function publishStatus(): void {
-	if (state.role !== 'client') return
+	if (state.role === 'host') return
 	const tab = currentTab()
 	clientTransport.io.appendCommand({
 		type: 'client-status',
@@ -211,7 +211,7 @@ function publishStatus(): void {
 }
 
 function publishExit(): void {
-	if (state.role !== 'client') return
+	if (state.role === 'host') return
 	clientTransport.io.appendCommand({ type: 'client-exit', sessionId: currentTab()?.sessionId, pid: state.pid })
 }
 

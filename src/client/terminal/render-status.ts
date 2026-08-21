@@ -305,7 +305,7 @@ function joinStatusParts(parts: string[]): string {
 }
 
 function hostMismatchBadge(): string {
-	if (client.state.role !== 'client') return ''
+	if (client.state.role === 'host') return ''
 	if (client.state.hostVersionStatus !== 'ready') return ''
 	if (client.state.localVersionStatus !== 'ready') return ''
 	if (!client.state.hostVersion || !client.state.localVersion) return ''
@@ -313,9 +313,7 @@ function hostMismatchBadge(): string {
 }
 
 function serverStatusLabel(): string {
-	const badge = renderStatus.hostMismatchBadge()
-	if (client.state.role === 'client') return `client${badge}`
-	return 'server'
+	return `${client.state.role}${renderStatus.hostMismatchBadge()}`
 }
 
 function formatTotalTokens(count: number): string {

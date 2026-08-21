@@ -307,7 +307,7 @@ describe('render', () => {
 		prompt.setText('hello')
 		const lines = stripAnsi(captureOutput(() => render.draw(true))).split('\n')
 		const promptLine = lines.findIndex((line) => line.trim() === 'hello')
-		const statusLine = lines.findIndex((line) => line.includes('server'))
+		const statusLine = lines.findIndex((line) => line.includes('host'))
 		const helpLine = lines.findIndex((line) => line.includes('enter: send'))
 		expect(promptLine).toBeGreaterThanOrEqual(0)
 		expect(statusLine).toBe(promptLine + 2)
@@ -394,8 +394,8 @@ describe('render', () => {
 
 	test('status line shows host role without pid', () => {
 		const clean = stripAnsi(captureOutput(() => render.draw()))
-		expect(clean).toContain('server')
-		expect(clean).not.toContain('server:111')
+		expect(clean).toContain('host')
+		expect(clean).not.toContain('host:111')
 		expect(clean).not.toContain('lock:')
 	})
 

@@ -137,7 +137,7 @@ perf.mark('Built-in tools registered')
 ipc.cleanupStaleLock()
 let isHost = ipc.claimHost()
 const hostPid = ipc.readHostLock()?.pid ?? null
-perf.mark(`Host status established (I am ${isHost ? 'host' : 'client'}, server pid ${hostPid})`)
+perf.mark(`Host status established (I am ${isHost ? 'host' : 'peer'}, host pid ${hostPid})`)
 log.info('Startup', { isHost, hostPid, pid: process.pid })
 
 const ac = new AbortController()
@@ -212,7 +212,7 @@ version.onChange(() => {
 
 function becomeHost(kind: 'start' | 'promote'): void {
 	isHost = true
-	client.state.role = 'server'
+	client.state.role = 'host'
 	client.state.localCommandHandler = (command) => { runtime.handleCommand(command) }
 	commands.state.web = async (args) => {
 		const { web } = await import('./server/web.ts')
@@ -272,7 +272,7 @@ function tickElection(): void {
 	if (isHost) {
 		if (ipc.ownsHostLock()) return
 		isHost = false
-		client.state.role = 'client'
+		client.state.role = 'peer'
 		client.state.localCommandHandler = null
 		log.info('Lost host lock, exiting', { pid: process.pid, lockPid: ipc.readHostLock()?.pid ?? null })
 		process.exit(0)
@@ -284,7 +284,7 @@ function tickElection(): void {
 	if (ipc.claimHost()) becomeHost('promote')
 }
 
-client.state.role = isHost ? 'server' : 'client'
+client.state.role = isHost ? 'host' : 'peer'
 version.start()
 if (isHost) {
 	becomeHost('start')
