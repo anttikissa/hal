@@ -16,6 +16,17 @@ test('remote connection requires HTTP and the copied authentication token', () =
 	expect(() => webConnection.parseUrl('http://localhost:9001')).toThrow('Remote URL must contain ?auth=<token>')
 })
 
+
+test('remote reconnect delay starts at one second and grows by 60 percent', () => {
+	let delay = 0
+	const delays: number[] = []
+	for (let i = 0; i < 10; i++) {
+		delay = webConnection.nextRetryDelay(delay)
+		delays.push(delay)
+	}
+	expect(delays).toEqual([1_000, 1_600, 2_560, 4_096, 6_554, 10_486, 16_778, 26_845, 30_000, 30_000])
+})
+
 test('remote bootstrap installs the same state and session ports as file IPC', () => {
 	webConnection.applyBootstrap({
 		state: { sessions: [{ id: '04-work', cwd: '/srv/work' }], working: {}, updatedAt: 'now' },

@@ -305,7 +305,9 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 	signal.addEventListener('abort', () => {
 		unsubscribeRevocation()
 		unsubscribeState()
-		server.stop()
+		// Close live sockets too: the server is going away, and remote clients should
+		// see the disconnect immediately instead of waiting on a dead connection.
+		server.stop(true)
 		if (state.server === server) {
 			state.server = null
 			state.port = 0

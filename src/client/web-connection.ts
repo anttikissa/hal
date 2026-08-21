@@ -12,6 +12,7 @@ type ParsedRemoteUrl = {
 	token: string
 }
 
+const config = { retryMultiplier: 1.6, maxRetryDelayMs: 30_000 }
 const state = {
 	socket: null as WebSocket | null,
 	shared: { sessions: [], working: {}, updatedAt: '' } as SharedState,
@@ -20,6 +21,7 @@ const state = {
 	events: [] as any[],
 	wakeEvent: null as (() => void) | null,
 	stateListener: null as ((shared: SharedState) => void) | null,
+	reconnecting: false,
 }
 
 function parseUrl(input: string): ParsedRemoteUrl {
@@ -53,6 +55,19 @@ function queueEvent(event: any): void {
 	state.events.push(event)
 	state.wakeEvent?.()
 	state.wakeEvent = null
+}
+
+
+function nextRetryDelay(delay: number): number {
+	if (delay === 0) return 1_000
+	return Math.min(Math.round(delay * webConnection.config.retryMultiplier), webConnection.config.maxRetryDelayMs)
+}
+
+function applyReconnectBootstrap(bootstrap: ClientBootstrap): void {
+	state.events = []
+	webConnection.applyBootstrap(bootstrap)
+	state.stateListener?.(bootstrap.state)
+	for (const snapshot of bootstrap.snapshots) webConnection.queueEvent({ type: 'history-rebased', sessionId: snapshot.session.id })
 }
 
 function applyMessage(message: WebServerMessage): void {
@@ -113,8 +128,7 @@ async function* tailEvents(signal?: AbortSignal): AsyncGenerator<any> {
 	}
 }
 
-function connect(input: string, signal: AbortSignal): Promise<void> {
-	const parsed = webConnection.parseUrl(input)
+function openSocket(parsed: ParsedRemoteUrl, signal: AbortSignal, reconnect: boolean): Promise<void> {
 	return new Promise((resolve, reject) => {
 		let authenticated = false
 		const socket = new WebSocket(parsed.webSocketUrl)
@@ -128,7 +142,10 @@ function connect(input: string, signal: AbortSignal): Promise<void> {
 				return
 			}
 			if (message.type === 'authenticated') {
-				webConnection.applyBootstrap(message.bootstrap)
+				// A reconnect replaces stale cached sessions, so the whole bootstrap wins
+				// over whatever this client believed before the host went away.
+				if (reconnect) webConnection.applyReconnectBootstrap(message.bootstrap)
+				else webConnection.applyBootstrap(message.bootstrap)
 				webConnection.install()
 				authenticated = true
 				resolve()
@@ -143,9 +160,36 @@ function connect(input: string, signal: AbortSignal): Promise<void> {
 			reject(new Error('Connection closed'))
 			state.wakeEvent?.()
 			state.wakeEvent = null
+			if (authenticated) void webConnection.reconnect(parsed, signal)
 		}
 		signal.addEventListener('abort', () => socket.close(), { once: true })
 	})
+}
+
+// The host restarts often (Ctrl-R, upgrades), so a closed socket is normal rather
+// than fatal. Retry immediately, then back off until the host answers again.
+async function reconnect(parsed: ParsedRemoteUrl, signal: AbortSignal): Promise<void> {
+	if (state.reconnecting) return
+	state.reconnecting = true
+	let delay = 0
+	try {
+		while (!signal.aborted) {
+			if (delay > 0) await Bun.sleep(delay)
+			if (signal.aborted) return
+			try {
+				await webConnection.openSocket(parsed, signal, true)
+				return
+			} catch {
+				delay = webConnection.nextRetryDelay(delay)
+			}
+		}
+	} finally {
+		state.reconnecting = false
+	}
+}
+
+function connect(input: string, signal: AbortSignal): Promise<void> {
+	return webConnection.openSocket(webConnection.parseUrl(input), signal, false)
 }
 
 function reset(): void {
@@ -157,18 +201,24 @@ function reset(): void {
 	state.events = []
 	state.wakeEvent = null
 	state.stateListener = null
+	state.reconnecting = false
 }
 
 export const webConnection = {
 	state,
+	config,
 	parseUrl,
 	applySnapshot,
 	applyBootstrap,
+	applyReconnectBootstrap,
+	nextRetryDelay,
 	queueEvent,
 	applyMessage,
 	install,
 	sendCommand,
 	tailEvents,
+	openSocket,
+	reconnect,
 	connect,
 	reset,
 }
