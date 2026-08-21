@@ -124,7 +124,6 @@ function connect(input: string, signal: AbortSignal): Promise<void> {
 			const message = webProtocol.decode(String(event.data)) as WebServerMessage | null
 			if (!message || typeof message !== 'object' || !('type' in message)) return
 			if (message.type === 'error') {
-				socket.close()
 				reject(new Error(message.message))
 				return
 			}
