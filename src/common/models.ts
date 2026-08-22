@@ -39,12 +39,10 @@ const CATALOG: CatalogEntry[] = [
 	{ group: 'Google', alias: 'gemini-3.5-flash-lite', fullId: 'google/gemini-3.5-flash-lite', fallbackContext: 1_000_000 },
 	{ group: 'Google', alias: 'gemini-pro', fullId: 'google/gemini-3.1-pro-preview', fallbackContext: 1_000_000, track: 'gemini-pro' },
 	{ group: 'OpenRouter', alias: 'grok', fullId: 'openrouter/x-ai/grok-4.6', fallbackContext: 2_000_000, track: 'grok' },
-	{ group: 'OpenRouter', alias: 'grok-4.5', fullId: 'openrouter/x-ai/grok-4.5', fallbackContext: 2_000_000 },
-	{ group: 'OpenRouter', alias: 'grok-4.20', fullId: 'openrouter/x-ai/grok-4.20', fallbackContext: 2_000_000 },
 	{ group: 'OpenRouter', alias: 'deepseek', fullId: 'openrouter/deepseek/deepseek-v3.2' },
 	{ group: 'OpenRouter', alias: 'deepseek-4', fullId: 'openrouter/deepseek/deepseek-v4-pro', fallbackContext: 1_000_000 },
 	{ group: 'OpenRouter', alias: 'llama', fullId: 'openrouter/meta-llama/llama-4-maverick' },
-	{ group: 'OpenRouter', alias: 'qwen', fullId: 'openrouter/qwen/qwen3-max' },
+	{ group: 'OpenRouter', alias: 'qwen', fullId: 'openrouter/qwen/qwen3.8-max' },
 	{ group: 'OpenRouter', alias: 'qwen-coder', fullId: 'openrouter/qwen/qwen3-coder', fallbackContext: 1_000_000 },
 	{ group: 'OpenRouter', alias: 'kimi', fullId: 'openrouter/moonshotai/kimi-k3', fallbackContext: 1_000_000 },
 	{ group: 'OpenRouter', alias: 'glm', fullId: 'openrouter/z-ai/glm-5.2', fallbackContext: 1_000_000 },
@@ -63,8 +61,17 @@ const PATTERNS: [RegExp, string][] = [
 	[/^grok-(.+)$/, 'openrouter/x-ai/grok-$1'],
 ]
 
+// Providers with their own Hal backend, so "vendor/model" is already routable.
+const DIRECT_PROVIDERS = ['hal', 'anthropic', 'openai', 'google', 'openrouter']
+
 function resolveModel(input: string): string {
-	if (input.includes('/')) return input
+	// models.dev lists OpenRouter models as "vendor/model"; Hal routes them as "openrouter/vendor/model".
+	// Vendors Hal talks to directly keep their own ids — models.dev also resells those through OpenRouter.
+	if (input.includes('/')) {
+		const vendor = input.slice(0, input.indexOf('/'))
+		if (DIRECT_PROVIDERS.includes(vendor) || !state.openrouterIds.includes(input)) return input
+		return `openrouter/${input}`
+	}
 	const alias = aliasFullId(input)
 	if (alias) return alias
 	for (const [re, replacement] of PATTERNS) {
@@ -152,14 +159,17 @@ const DEFAULT_CONTEXT = 200_000
 
 const state = {
 	cache: null as Record<string, number> | null,
+	// Every OpenRouter model id known to models.dev ("vendor/model"), newest first.
+	openrouterIds: [] as string[],
 }
 
 function modelCache(): Record<string, number> {
 	return state.cache ?? {}
 }
 
-function hydrate(cache: Record<string, number>): void {
+function hydrate(cache: Record<string, number>, openrouterIds: string[] = []): void {
 	state.cache = cache
+	state.openrouterIds = openrouterIds
 }
 
 interface FrontierModelInfo {
@@ -560,8 +570,6 @@ function addModelCompletionNames(names: Set<string>, model: ModelEntry): void {
 	if (!model.static) return
 	const anthropic = model.fullId.match(/^anthropic\/claude-(opus|sonnet|haiku|fable)-(.+)$/)
 	if (anthropic) names.add(`${anthropic[1]}-${anthropic[2]}`)
-	const grok = model.fullId.match(/^openrouter\/x-ai\/grok-(.+)$/)
-	if (grok) names.add(`grok-${grok[1]}`)
 }
 
 function allKnownModelIds(): string[] {
@@ -665,28 +673,30 @@ function addOpenAiChoices(items: ModelChoice[]): void {
 function addStaticProviderChoices(items: ModelChoice[], group: CatalogEntry['group'], providerPath: string): void {
 	for (const entry of CATALOG) {
 		if (entry.group !== group) continue
-		if (entry.track === 'grok' || entry.alias.startsWith('grok-')) continue
 		const fullId = aliasFullId(entry.alias) ?? entry.fullId
 		addModelChoice(items, entry.alias, fullId, [providerPath], entry.alias)
 	}
 }
 
-function addGrokChoices(items: ModelChoice[]): void {
-	const best = new Map<string, ModelCandidate>()
-	function consider(id: string): void {
-		const candidate = parseGrokCandidate(id)
-		if (!candidate) return
-		const existing = best.get(candidate.canonical)
-		if (!existing || compareCandidates(candidate, existing) > 0) best.set(candidate.canonical, candidate)
+// OpenRouter models are whatever models.dev knows about, grouped by vendor.
+// A catalog alias (grok, qwen, …) replaces the value of the model it points at,
+// so every model is listed exactly once and aliases stay typeable.
+function addOpenRouterChoices(items: ModelChoice[]): void {
+	const aliases = new Map<string, string>()
+	for (const entry of CATALOG) {
+		if (entry.group !== 'OpenRouter') continue
+		const fullId = aliasFullId(entry.alias) ?? entry.fullId
+		aliases.set(fullId.slice('openrouter/'.length), entry.alias)
 	}
-	for (const entry of CATALOG) consider(entry.fullId)
-	for (const id of Object.keys(modelCache())) consider(id)
-	const candidates = [...best.values()].sort((a, b) => compareCandidates(b, a))
-	for (const candidate of candidates) {
-		const versionText = candidate.canonical.slice('x-ai/grok-'.length)
-		const fullId = `openrouter/${candidate.canonical}`
-		const value = aliasFullId('grok') === fullId ? 'grok' : `grok-${versionText}`
-		addModelChoice(items, value, fullId, ['openrouter', 'grok'], versionText)
+	const seen = new Set<string>()
+	// Catalog ids first so aliased models are listed even before /check fetches models.dev.
+	for (const id of [...aliases.keys(), ...state.openrouterIds]) {
+		if (seen.has(id)) continue
+		seen.add(id)
+		const slash = id.indexOf('/')
+		// Resold Anthropic/OpenAI/Google models already have their own picker sections.
+		if (slash < 0 || DIRECT_PROVIDERS.includes(id.slice(0, slash))) continue
+		addModelChoice(items, aliases.get(id) ?? id, `openrouter/${id}`, ['openrouter', id.slice(0, slash)], id.slice(slash + 1))
 	}
 }
 
@@ -709,8 +719,7 @@ function listModelChoices(): ModelChoice[] {
 	addOpenAiChoices(items)
 	addAnthropicChoices(items)
 	addStaticProviderChoices(items, 'Google', 'google')
-	addStaticProviderChoices(items, 'OpenRouter', 'openrouter')
-	addGrokChoices(items)
+	addOpenRouterChoices(items)
 	return items
 }
 
@@ -720,6 +729,11 @@ function modelCompletionNames(): string[] {
 		for (const model of groupModelEntries(group)) {
 			addModelCompletionNames(names, model)
 		}
+	}
+	// Every OpenRouter model completes both bare ("vendor/model") and prefixed.
+	for (const id of state.openrouterIds) {
+		names.add(id)
+		names.add(`openrouter/${id}`)
 	}
 	return [...names].sort()
 }

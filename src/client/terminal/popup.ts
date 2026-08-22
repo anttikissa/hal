@@ -418,7 +418,9 @@ function buildOverlay(cols: number, rows: number): Overlay | null {
 	const xMargin = state.kind === 'confirm' ? 1 : 0
 	const rawWidth = Math.max(visLen(state.title) + 2, visLen(hint) + 2, ...content.map((line) => visLen(line.text) + xMargin * 2))
 	const maxInnerWidth = Math.max(18, cols - rightSlack - 2)
-	const preferredWidth = Math.max(state.preferredInnerWidth ?? rawWidth, rawWidth)
+	// The model picker keeps a fixed width and clips long rows: its content width
+	// swings wildly while filtering, and a jumping popup border is worse than '…'.
+	const preferredWidth = state.preferredInnerWidth ?? rawWidth
 	const innerWidth = Math.max(18, Math.min(maxInnerWidth, preferredWidth))
 	const contentWidth = Math.max(0, innerWidth - xMargin * 2)
 	// For confirm popups, hard-wrap each row to the inner content width so long

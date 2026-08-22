@@ -737,6 +737,16 @@ test('/model is quiet when the resolved model is unchanged', async () => {
 })
 
 
+test('/model accepts an unknown provider/model id without validation', async () => {
+	const session = makeSession()
+	session.model = 'openai/gpt-5.6-terra'
+	const result = await commands.executeCommand('/model openai/gpt-5.7-terra', session)
+
+	expect(result.error).toBeUndefined()
+	expect(session.model).toBe('openai/gpt-5.7-terra')
+})
+
+
 test('/cd changes session cwd without command metadata', async () => {
 	const dir = mkdtempSync(join(tmpdir(), 'hal-cd-meta-'))
 	const session = makeSession()

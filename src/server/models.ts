@@ -52,13 +52,25 @@ function contextWindows(metadata: Record<string, ModelMetadata>): Record<string,
 	return contexts
 }
 
+/** Every "vendor/model" id OpenRouter serves, newest release first. */
+function openrouterIds(metadata: Record<string, ModelMetadata>): string[] {
+	const ids: string[] = []
+	for (const [id, model] of Object.entries(metadata)) {
+		if (!id.includes('/')) continue
+		if (!model.sources.some((source) => source.provider === 'openrouter')) continue
+		ids.push(id)
+	}
+	ids.sort((a, b) => (metadata[b]!.releaseDate ?? '').localeCompare(metadata[a]!.releaseDate ?? '') || a.localeCompare(b))
+	return ids
+}
+
 /** Load persisted discovery data and hydrate the runtime-neutral model registry. */
 function loadModelsDevCache(): Record<string, number> {
 	if (models.state.cache) return models.state.cache
 	try {
 		const parsed = ason.parse(readFileSync(modelsFile(), 'utf-8')) as unknown as ModelsDevCache
 		state.metadata = parsed.models
-		models.hydrate(contextWindows(parsed.models))
+		models.hydrate(contextWindows(parsed.models), openrouterIds(parsed.models))
 	} catch {
 		models.hydrate({})
 		state.metadata = {}
@@ -124,7 +136,7 @@ async function refreshModels(): Promise<RefreshModelsResult> {
 	ensureDir(process.env.HAL_STATE_DIR ?? STATE_DIR)
 	const cache: ModelsDevCache = { version: 1, models: metadata }
 	writeFileSync(modelsFile(), ason.stringify(cache) + '\n')
-	models.hydrate(next)
+	models.hydrate(next, openrouterIds(metadata))
 	state.metadata = metadata
 	return {
 		fetched: true,

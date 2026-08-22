@@ -365,7 +365,7 @@ handlers['model'] = (args, session) => {
 	}
 
 	const oldModel = models.resolveModel(session.model ?? models.defaultModel())
-	// No validation: allow arbitrary model IDs so new models work before /check refreshes metadata
+	// No validation: arbitrary provider/model IDs pass through so new models work before /check refreshes metadata
 	const newModel = models.resolveModel(args)
 	if (newModel === oldModel) return { handled: true }
 	session.model = newModel

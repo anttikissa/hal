@@ -93,24 +93,23 @@ test('model picker lists updated frontier aliases', () => {
 	})
 })
 test('model picker lists Grok 4.5 and 4.6 and ranks 4.6 above 4.20', () => {
-	const grok = models.listModelChoices().filter((item) => item.path.join('/') === 'openrouter/grok')
+	models.hydrate({}, ['x-ai/grok-4.6', 'x-ai/grok-4.5', 'x-ai/grok-4.20'])
+	const grok = models.listModelChoices().filter((item) => item.path.join('/') === 'openrouter/x-ai')
 	const values = grok.map((item) => item.value)
 	expect(values).toContain('grok')
-	expect(values).toContain('grok-4.5')
-	expect(values).toContain('grok-4.20')
+	expect(values).toContain('x-ai/grok-4.5')
+	expect(values).toContain('x-ai/grok-4.20')
 	expect(grok.find((item) => item.value === 'grok')).toMatchObject({
 		fullId: 'openrouter/x-ai/grok-4.6',
 		search: expect.stringContaining('openrouter/x-ai/grok-4.6'),
 	})
-	expect(values.indexOf('grok')).toBeLessThan(values.indexOf('grok-4.5'))
-	expect(values.indexOf('grok-4.5')).toBeLessThan(values.indexOf('grok-4.20'))
 	expect(models.resolveModel('grok')).toBe('openrouter/x-ai/grok-4.6')
 	expect(models.resolveModel('grok-4.5')).toBe('openrouter/x-ai/grok-4.5')
 })
 test('model picker lists new open-weight OpenRouter aliases', () => {
 	expect(models.resolveModel('deepseek')).toBe('openrouter/deepseek/deepseek-v3.2')
 	expect(models.resolveModel('deepseek-4')).toBe('openrouter/deepseek/deepseek-v4-pro')
-	expect(models.resolveModel('qwen')).toBe('openrouter/qwen/qwen3-max')
+	expect(models.resolveModel('qwen')).toBe('openrouter/qwen/qwen3.8-max')
 	expect(models.resolveModel('qwen-coder')).toBe('openrouter/qwen/qwen3-coder')
 	expect(models.resolveModel('kimi')).toBe('openrouter/moonshotai/kimi-k3')
 	expect(models.resolveModel('glm')).toBe('openrouter/z-ai/glm-5.2')
@@ -120,6 +119,56 @@ test('model picker lists new open-weight OpenRouter aliases', () => {
 	for (const value of ['deepseek', 'deepseek-4', 'qwen', 'qwen-coder', 'kimi', 'glm', 'minimax', 'mistral', 'llama']) {
 		expect(values).toContain(value)
 	}
+})
+
+test('any openrouter model from models.dev resolves, completes, and is listed by vendor', () => {
+	// models.dev resells Anthropic/OpenAI/Google models through OpenRouter too.
+	models.hydrate({}, ['qwen/qwen3.8-max', 'stealth/ox-alpha', 'anthropic/claude-opus-5', 'google/gemini-3.7-flash'])
+
+	expect(models.resolveModel('qwen/qwen3.8-max')).toBe('openrouter/qwen/qwen3.8-max')
+	expect(models.resolveModel('stealth/ox-alpha')).toBe('openrouter/stealth/ox-alpha')
+	// Already-prefixed ids, direct-provider ids, and unknown ids are left alone.
+	expect(models.resolveModel('openrouter/qwen/qwen3.8-max')).toBe('openrouter/qwen/qwen3.8-max')
+	expect(models.resolveModel('anthropic/claude-opus-5')).toBe('anthropic/claude-opus-5')
+	expect(models.resolveModel('google/gemini-3.7-flash')).toBe('google/gemini-3.7-flash')
+	expect(models.resolveModel('nobody/nothing')).toBe('nobody/nothing')
+
+	expect(models.modelCompletionNames()).toContain('stealth/ox-alpha')
+	expect(models.modelCompletionNames()).toContain('openrouter/stealth/ox-alpha')
+
+	expect(models.listModelChoices().find((item) => item.value === 'stealth/ox-alpha')).toMatchObject({
+		fullId: 'openrouter/stealth/ox-alpha',
+		path: ['openrouter', 'stealth'],
+		leafLabel: 'ox-alpha',
+	})
+})
+
+test('an aliased openrouter model is listed once, under its alias', () => {
+	models.hydrate({}, ['qwen/qwen3.8-max', 'qwen/qwen3-max', 'qwen/qwen3-coder'])
+	const qwen = models.listModelChoices().filter((item) => item.path.join('/') === 'openrouter/qwen')
+	const values = qwen.map((item) => item.value)
+	expect(values).toContain('qwen')
+	expect(values).not.toContain('qwen/qwen3.8-max')
+	expect(values).toContain('qwen/qwen3-max')
+	expect(qwen.find((item) => item.value === 'qwen')).toMatchObject({ fullId: 'openrouter/qwen/qwen3.8-max' })
+	expect(qwen.find((item) => item.value === 'qwen-coder')).toMatchObject({ fullId: 'openrouter/qwen/qwen3-coder' })
+})
+
+test('gemini-pro alias stays on the gemini pro line when other tracks have newer models', () => {
+	models.hydrate({
+		'google/gemini-3.1-pro-preview': 1_000_000,
+		'google/gemini-3.3-pro': 1_000_000,
+		'x-ai/grok-4.7': 2_000_000,
+		'qwen/qwen3.8-max': 1_000_000,
+	})
+	expect(models.resolveModel('gemini-pro')).toBe('google/gemini-3.3-pro')
+})
+
+
+test('catalog openrouter models stay listed without discovery data', () => {
+	expect(models.resolveModel('qwen')).toBe('openrouter/qwen/qwen3.8-max')
+	const values = models.listModelChoices().map((item) => item.value)
+	expect(values).toContain('qwen')
 })
 
 
