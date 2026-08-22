@@ -10,6 +10,7 @@ import { ipc } from './file-ipc.ts'
 import { runtime } from './runtime.ts'
 import { sessions } from './sessions.ts'
 import { webTokens, type WebToken } from './web-tokens.ts'
+import { webUpload } from './web-upload.ts'
 
 type SocketData = {
 	ip: string
@@ -274,9 +275,9 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 				port,
 				fetch: async (request, server) => {
 					const url = new URL(request.url)
-					if (url.pathname === '/api/update') return handleUpdateRequest(request)
+				if (url.pathname === '/api/update') return handleUpdateRequest(request)
+					if (url.pathname === '/upload') return webUpload.handleUploadRequest(request, server.requestIP(request)?.address ?? 'unknown')
 					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
-					if (url.pathname === '/styles.css') return new Response(await web.styleCss(), { headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' } })
 					if (url.pathname === '/main.js') {
 						try { return new Response(await web.bundleClient(), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } }) }
 						catch (error) { return new Response(`Web client build failed: ${String(error)}`, { status: 500 }) }
@@ -386,6 +387,10 @@ export const web = {
 	bootstrap,
 	parseCommand,
 	parseClientMessage,
+	uploadDir: () => webUpload.uploadDir(),
+	config: webUpload.config,
+	saveUpload: (name: string, type: string, data: ArrayBuffer) => webUpload.saveUpload(name, type, data),
+	handleUploadRequest: (request: Request, ip: string) => webUpload.handleUploadRequest(request, ip),
 	isSnapshotBoundary,
 	runGit,
 	gitOut,

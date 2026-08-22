@@ -150,5 +150,9 @@
 	clipboard: {
 		// Pasted text at or below this many lines stays inline; longer pastes become temp files.
 		multilinePasteFileLineLimit: 7
+	},
+	web: {
+		// Maximum size accepted for images uploaded through the web client's attach button.
+		maxUploadBytes: 8388608
 	}
 }

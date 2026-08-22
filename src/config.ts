@@ -24,6 +24,7 @@ import { subscriptionUsage } from './common/subscription-usage.ts'
 import { toolRegistry } from './server/tools/tool.ts'
 import { log } from './utils/log.ts'
 import { ipc } from './server/file-ipc.ts'
+import { webUpload } from './server/web-upload.ts'
 import { HAL_DIR } from './server/state.ts'
 
 // Module name → config object. Add new modules here as they gain configs.
@@ -48,6 +49,7 @@ const modules: Record<string, Record<string, any>> = {
 	toolRegistry: toolRegistry.config,
 	log: log.config,
 	ipc: ipc.config,
+	web: webUpload.config,
 }
 
 // config.ason lives at the Hal root — it's user-facing config.
