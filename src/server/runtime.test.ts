@@ -573,6 +573,9 @@ test('shouldAutoContinue resumes only restarted turns', () => {
 
 
 test('subagent closes after a clean completion while leave-open and interactive sessions remain', () => {
+	// A subagent that called wait is parked ('waiting'), not finished: its tab
+	// must stay open even though the history turn_end says 'completed'.
+	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'waiting')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'completed')).toBe(true)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'aborted')).toBe(false)
 	expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'failed')).toBe(false)

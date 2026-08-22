@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { agentLoop } from './agent-loop.ts'
+import { runtime } from '../runtime.ts'
 import { provider as providerLoader } from '../providers/provider.ts'
 import { ipc } from '../file-ipc.ts'
 import { sessions } from '../sessions.ts'
@@ -184,8 +185,12 @@ test('wait tool completes the turn without another model request', async () => {
 			systemPrompt: 'test prompt',
 			messages: [{ role: 'user', content: 'delegate and wait' }],
 		})
-		expect(result).toBe('completed')
+		// A waiting turn is not a finished generation: it parks without
+		// triggering shouldCloseSessionAfterGeneration, and history turn_end
+		// stays 'completed'.
+		expect(result).toBe('waiting')
 		expect(generations).toBe(1)
+		expect(runtime.shouldCloseSessionAfterGeneration({ spawnKind: 'subagent' }, 'waiting')).toBe(false)
 		expect(sessions.loadHistory(sessionId).at(-1)).toMatchObject({ type: 'turn_end', status: 'completed' })
 	} finally {
 		providerLoader.getProvider = origGetProvider

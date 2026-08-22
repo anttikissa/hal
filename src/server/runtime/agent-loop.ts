@@ -116,7 +116,7 @@ export interface AgentContext {
 	onConfig?: (key: string, value: string) => void
 }
 
-export type AgentLoopResult = 'completed' | 'aborted' | 'failed' | 'paused'
+export type AgentLoopResult = 'completed' | 'waiting' | 'aborted' | 'failed' | 'paused'
 
 interface ToolCall {
 	id: string
@@ -858,7 +858,7 @@ async function runAgentLoop(ctx: AgentContext): Promise<AgentLoopResult> {
 				})
 				void sessions.updateMeta(sessionId, { context: { used: est.used, max: est.max } })
 				appendTurnEnd(sessionId, { status: 'completed', usage: usageOrUndefined(totalUsage) })
-				return 'completed'
+				return 'waiting'
 			}
 
 			// Continue to next iteration (re-invoke the model with tool results)

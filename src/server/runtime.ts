@@ -134,6 +134,8 @@ function emitInfo(sessionId: string, text: string, level: 'info' | 'error' = 'in
 }
 
 function shouldCloseSessionAfterGeneration(meta: { spawnKind?: SpawnKind } | null | undefined, result: AgentLoopResult): boolean {
+	// 'waiting' is a parked turn (the model called wait); it is not a finished
+	// generation, so a waiting subagent must not be auto-closed.
 	return meta?.spawnKind === 'subagent' && result === 'completed'
 }
 
@@ -581,7 +583,7 @@ async function runGeneration(sessionId: string, text: string, source?: string, d
 		tabs.closeSession(sessionId)
 		return
 	}
-	if (result !== 'completed' && !state.contextSwitching.has(sessionId)) queueRunner.emitQueuePausedNotice(sessionId)
+	if (result !== 'completed' && result !== 'waiting' && !state.contextSwitching.has(sessionId)) queueRunner.emitQueuePausedNotice(sessionId)
 	if (!agentLoop.isWorking(sessionId) && queueRunner.shouldDrainQueuedPrompt(sessionId, result)) await queueRunner.runNextQueuedPrompt(sessionId)
 }
 

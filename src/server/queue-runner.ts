@@ -62,6 +62,8 @@ function emitQueuePausedNotice(sessionId: string): void {
 	runtime.emitInfo(sessionId, buildQueuePausedNotice(entries), 'info', 'notice')
 }
 
+// A waiting turn (model called wait) is parked, not finished: don't drain the
+// queue into it and don't emit a queue-paused notice for it.
 function shouldDrainQueuedPrompt(sessionId: string, result: AgentLoopResult): boolean {
 	return result === 'completed' && !sessions.findPendingTools(sessionId) && !promptQueue.isHeld(sessionId) && promptQueue.load(sessionId).length > 0
 }
