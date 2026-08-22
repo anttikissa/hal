@@ -5,6 +5,8 @@ import { clientBackend } from '../backend.ts'
 import { promptEdit } from '../prompt-edit.ts'
 import { visLen } from '../../utils/strings.ts'
 import { blockText } from './block-text.ts'
+import { cursor } from './cursor.ts'
+
 
 function tab(overrides: any = {}): any {
 	return {
@@ -209,5 +211,24 @@ test('zero opacity hides chrome content without changing its row count', () => {
 		renderStatus.config.promptOpacity = original.prompt
 		renderStatus.config.statusOpacity = original.status
 		renderStatus.config.helpOpacity = original.help
+	}
+})
+
+test('blinkGlyph falls back to presence/absence when color cannot carry the blink', () => {
+	const origTick = cursor.tick
+	try {
+		// Truecolor: dim and lit differ, so the glyph stays put and only changes color.
+		cursor.tick = () => 0
+		expect(blockText.stripAnsiSequences(renderStatus.blinkGlyph('*', '\x1b[38;2;9;9;9m', '\x1b[38;2;4;4;4m', ''))).toBe('*')
+		cursor.tick = () => 2
+		expect(blockText.stripAnsiSequences(renderStatus.blinkGlyph('*', '\x1b[38;2;9;9;9m', '\x1b[38;2;4;4;4m', ''))).toBe('*')
+
+		// 16-color (screen): dimming is a no-op, so the glyph itself has to blink.
+		cursor.tick = () => 0
+		expect(renderStatus.blinkGlyph('*', '\x1b[93m', '\x1b[93m', '')).toContain('*')
+		cursor.tick = () => 2
+		expect(renderStatus.blinkGlyph('*', '\x1b[93m', '\x1b[93m', '')).toBe(' ')
+	} finally {
+		cursor.tick = origTick
 	}
 })

@@ -46,12 +46,25 @@ function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
 	return [gamma(rl), gamma(gl), gamma(bl)]
 }
 
+// Hue → the 16-color palette's chromatic slots, in 60° steps from red.
+const BASE_HUES = [31, 33, 32, 36, 34, 35]
+
 // ANSI color escape: `ground` is 38 for foreground, 48 for background.
-// Without truecolor (GNU screen), all color drops: screen has no
-// back-color-erase, so tinted blocks smear into unreadable washed-out
-// rectangles, and its 16-color downgrade of dim colors is illegible.
+//
+// Without truecolor (GNU screen) we drop to the 16 base colors, which screen
+// forwards faithfully. Backgrounds are dropped entirely instead: screen has no
+// back-color-erase, so a tinted block paints only behind the text and smears
+// the rest of the row. Losing block backgrounds costs nothing here, because
+// foreground hue still separates Hal from you from an error.
 function toAnsi(ground: number, L: number, C: number, H: number): string {
-	if (!termCaps.config.truecolor) return ''
+	if (!termCaps.config.truecolor) {
+		if (ground === 48) return ''
+		// Achromatic text is white; anything tinted keeps its hue. Bright
+		// variants for normal text, dim ones only for genuinely dark colors,
+		// since screen renders "dim" as an unreadable gray.
+		const base = C < 0.02 ? 37 : BASE_HUES[Math.round(((H % 360) + 360) % 360 / 60) % 6]!
+		return `\x1b[${L >= 0.5 ? base + 60 : base}m`
+	}
 	const [r, g, b] = oklchToRgb(L, C, H)
 	return `\x1b[${ground};2;${r};${g};${b}m`
 }

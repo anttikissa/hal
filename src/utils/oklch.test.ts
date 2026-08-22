@@ -76,11 +76,18 @@ test('mixFg interpolates foreground escapes', () => {
 	expect(oklch.mixFg(start, end, 1)).toBe(end)
 })
 
-test('drops color entirely when the terminal has no truecolor', () => {
+test('maps foregrounds to the 16 base colors and drops backgrounds without truecolor', () => {
 	termCaps.config.truecolor = false
 	try {
-		expect(oklch.toAnsi(38, 0.5, 0, 0)).toBe('')
-		expect(oklch.toAnsi(48, 0.5, 0, 0)).toBe('')
+		// Backgrounds vanish: screen has no back-color-erase to paint them with.
+		expect(oklch.toAnsi(48, 0.3, 0.08, 25)).toBe('')
+		// Hal's orange, an error's red and a user's blue stay distinguishable.
+		expect(oklch.toAnsi(38, 0.75, 0.15, 55)).toBe('\x1b[93m')
+		expect(oklch.toAnsi(38, 0.70, 0.20, 25)).toBe('\x1b[91m')
+		expect(oklch.toAnsi(38, 0.70, 0.12, 245)).toBe('\x1b[94m')
+		// Achromatic text is white, and dark text never becomes black-on-black.
+		expect(oklch.toAnsi(38, 0.64, 0, 0)).toBe('\x1b[97m')
+		expect(oklch.toAnsi(38, 0.25, 0, 0)).toBe('\x1b[37m')
 	} finally {
 		termCaps.config.truecolor = true
 	}

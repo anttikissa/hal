@@ -101,11 +101,19 @@ function backgroundIndicatorColor(): string {
 	return colors.status.fg || colors.tab.inactiveFg || colors.info.fg
 }
 
+// A blink has to survive terminals that cannot vary color: when the dim and
+// lit colors would render identically, drop the glyph instead so the blink
+// stays visible as presence/absence.
+function blinkGlyph(char: string, litColor: string, dimColor: string, baseColor: string): string {
+	if (cursor.isVisible()) return `${litColor}${char}${baseColor}`
+	if (dimColor !== litColor) return `${dimColor}${char}${baseColor}`
+	return ' '.repeat(visLen(char))
+}
+
 function renderBackgroundIndicator(tab: Tab, baseColor: string): string {
 	const color = renderStatus.backgroundIndicatorColor()
 	if (client.state.summarizing.has(tab.sessionId)) {
-		const visibleColor = cursor.isVisible() ? color : oklch.dimAnsi(color, 0.65)
-		return `${visibleColor}▪${baseColor}`
+		return renderStatus.blinkGlyph('▪', color, oklch.dimAnsi(color, 0.65), baseColor)
 	}
 	if (client.state.whatDoneUnseen.has(tab.sessionId)) return `${color}✓${baseColor}`
 	return ''
@@ -115,10 +123,10 @@ function renderIndicator(tab: Tab, baseColor: string): string {
 	const ind = renderStatus.tabIndicator(tab)
 	let out = ''
 	if (ind.char) {
-		if (!ind.blinks || cursor.isVisible()) out += `${ind.color}${ind.char}${baseColor}`
+		if (!ind.blinks) out += `${ind.color}${ind.char}${baseColor}`
 		else {
-			const color = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : oklch.dimAnsi(ind.color, 0.65)
-			out += `${color}${ind.char}${baseColor}`
+			const dim = ind.color === renderStatus.halCursorColor() ? colors.input.cursorDim || ind.color : oklch.dimAnsi(ind.color, 0.65)
+			out += renderStatus.blinkGlyph(ind.char, ind.color, dim, baseColor)
 		}
 	}
 	return out + renderStatus.renderBackgroundIndicator(tab, baseColor)
@@ -608,6 +616,7 @@ export const renderStatus = {
 	tabIndicator,
 	renderIndicator,
 	backgroundIndicatorColor,
+	blinkGlyph,
 	renderBackgroundIndicator,
 	tabInner,
 	tabLabel,
