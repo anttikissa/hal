@@ -34,12 +34,12 @@ test('orange hue produces warm color', () => {
 })
 
 test('toFg produces ANSI foreground escape', () => {
-	const esc = oklch.toFg(0.5, 0, 0)
+	const esc = oklch.toAnsi(38, 0.5, 0, 0)
 	expect(esc).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m$/)
 })
 
 test('toBg produces ANSI background escape', () => {
-	const esc = oklch.toBg(0.5, 0, 0)
+	const esc = oklch.toAnsi(48, 0.5, 0, 0)
 	expect(esc).toMatch(/^\x1b\[48;2;\d+;\d+;\d+m$/)
 })
 
@@ -64,26 +64,23 @@ test('usageFg moves from green toward red as usage rises', () => {
 })
 
 test('fgHex extracts a cursor color from an OKLCH-derived foreground escape', () => {
-	const color = oklch.toFg(0.5, 0.1, 90)
+	const color = oklch.toAnsi(38, 0.5, 0.1, 90)
 	expect(oklch.fgHex(color)).toMatch(/^[0-9a-f]{6}$/)
 })
 
 test('mixFg interpolates foreground escapes', () => {
-	const start = oklch.toFg(0.4, 0, 0)
-	const end = oklch.toFg(0.8, 0, 0)
+	const start = oklch.toAnsi(38, 0.4, 0, 0)
+	const end = oklch.toAnsi(38, 0.8, 0, 0)
 	expect(oklch.mixFg(start, end, 0.5)).toMatch(/^\x1b\[38;2;\d+;\d+;\d+m$/)
 	expect(oklch.mixFg(start, end, 0)).toBe(start)
 	expect(oklch.mixFg(start, end, 1)).toBe(end)
 })
 
-test('falls back to 256-color escapes when the terminal has no truecolor', () => {
+test('drops color entirely when the terminal has no truecolor', () => {
 	termCaps.config.truecolor = false
 	try {
-		expect(oklch.toFg(0.5, 0, 0)).toMatch(/^\x1b\[38;5;\d+m$/)
-		expect(oklch.toBg(0.5, 0, 0)).toMatch(/^\x1b\[48;5;\d+m$/)
-		// Pure black and pure white land on the ends of the xterm palette.
-		expect(oklch.toFg(0, 0, 0)).toBe('\x1b[38;5;16m')
-		expect(oklch.toFg(1, 0, 0)).toBe('\x1b[38;5;231m')
+		expect(oklch.toAnsi(38, 0.5, 0, 0)).toBe('')
+		expect(oklch.toAnsi(48, 0.5, 0, 0)).toBe('')
 	} finally {
 		termCaps.config.truecolor = true
 	}

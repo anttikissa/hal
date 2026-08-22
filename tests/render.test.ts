@@ -375,14 +375,14 @@ describe('render', () => {
 	})
 
 	test('prompt cursor color uses the input cursor color', () => {
-		const cursorColor = oklch.toFg(0.45, 0.14, 35)
+		const cursorColor = oklch.toAnsi(38, 0.45, 0.14, 35)
 		expect(renderStatus.promptCursorColorSequence(cursorColor)).toBe(`\x1b]12;#${oklch.fgHex(cursorColor)}\x07`)
 	})
 
 	test('draw applies the configured prompt cursor shape and color', () => {
 		const originalCursor = colors.input.cursor
 		renderStatus.config.promptCursorShape = 'block'
-		colors.input.cursor = oklch.toFg(0.45, 0.14, 35)
+		colors.input.cursor = oklch.toAnsi(38, 0.45, 0.14, 35)
 		try {
 			const output = captureOutput(() => render.draw(true))
 			expect(output).toContain('\x1b[2 q')
@@ -548,8 +548,8 @@ describe('render', () => {
 		const originalIsVisible = cursor.isVisible
 		const originalCursor = colors.input.cursor
 		const originalCursorDim = colors.input.cursorDim
-		colors.input.cursor = oklch.toFg(0.72, 0.12, 245)
-		colors.input.cursorDim = oklch.toFg(0.46, 0.10, 245)
+		colors.input.cursor = oklch.toAnsi(38, 0.72, 0.12, 245)
+		colors.input.cursorDim = oklch.toAnsi(38, 0.46, 0.10, 245)
 		try {
 			cursor.isVisible = () => true
 			render.resetRenderer()
@@ -659,9 +659,9 @@ describe('render', () => {
 		const originalAssistant = colors.assistant.fg
 		const originalAssistantCursor = colors.assistant.cursor
 		const originalIsVisible = cursor.isVisible
-		colors.input.cursor = oklch.toFg(0.70, 0.20, 330)
-		colors.assistant.fg = oklch.toFg(0.70, 0.18, 55)
-		colors.assistant.cursor = oklch.toFg(0.78, 0.14, 55)
+		colors.input.cursor = oklch.toAnsi(38, 0.70, 0.20, 330)
+		colors.assistant.fg = oklch.toAnsi(38, 0.70, 0.18, 55)
+		colors.assistant.cursor = oklch.toAnsi(38, 0.78, 0.14, 55)
 		cursor.isVisible = () => true
 		try {
 			const output = captureOutput(() => render.draw())
@@ -734,8 +734,8 @@ describe('render', () => {
 		const originalTick = cursor.tick
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
-		colors.assistant.cursor = oklch.toFg(0.70, 0.18, 55)
-		colors.assistant.cursorIdle = oklch.toFg(0.56, 0, 55)
+		colors.assistant.cursor = oklch.toAnsi(38, 0.70, 0.18, 55)
+		colors.assistant.cursorIdle = oklch.toAnsi(38, 0.56, 0, 55)
 		cursor.tick = () => 0
 		try {
 			const output = captureOutput(() => render.draw(true))
@@ -755,8 +755,8 @@ describe('render', () => {
 		const originalTick = cursor.tick
 		const originalCursor = colors.assistant.cursor
 		const originalIdleCursor = colors.assistant.cursorIdle
-		colors.assistant.cursor = oklch.toFg(0.70, 0.18, 55)
-		colors.assistant.cursorIdle = oklch.toFg(0.56, 0, 55)
+		colors.assistant.cursor = oklch.toAnsi(38, 0.70, 0.18, 55)
+		colors.assistant.cursorIdle = oklch.toAnsi(38, 0.56, 0, 55)
 		cursor.tick = () => 0
 		try {
 			const output = captureOutput(() => render.draw(true))
@@ -780,8 +780,8 @@ describe('render', () => {
 		const originalFadeMs = renderHistory.config.halCursorFadeMs
 		let now = 0
 		Date.now = () => now
-		colors.assistant.cursor = oklch.toFg(0.48, 0, 0)
-		colors.assistant.cursorIdle = oklch.toFg(0.66, 0.14, 55)
+		colors.assistant.cursor = oklch.toAnsi(38, 0.48, 0, 0)
+		colors.assistant.cursorIdle = oklch.toAnsi(38, 0.66, 0.14, 55)
 		renderHistory.config.halCursorFadeMs = 2000
 		try {
 			captureOutput(() => render.draw(true))
@@ -818,7 +818,7 @@ describe('render', () => {
 			expect(visibleTabBar).toBeGreaterThan(0)
 			expect(visibleLines[visibleTabBar - 1]).toBe('')
 
-			colors.thinking.cursor = oklch.toFg(0.78, 0.14, 55)
+			colors.thinking.cursor = oklch.toAnsi(38, 0.78, 0.14, 55)
 			render.resetRenderer()
 			const activeColorPhase = captureOutput(() => render.draw(true))
 			expect(activeColorPhase).toContain(`${colors.thinking.cursor}█`)

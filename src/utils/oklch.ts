@@ -46,47 +46,14 @@ function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
 	return [gamma(rl), gamma(gl), gamma(bl)]
 }
 
-// Nearest xterm-256 palette index, for terminals without truecolor.
-// The 6x6x6 cube (16-231) uses unevenly spaced levels, and the gray ramp
-// (232-255) is often the closer match for our dark tinted backgrounds, so just
-// search both by squared distance instead of quantizing per channel.
-const CUBE_LEVELS = [0, 95, 135, 175, 215, 255]
-
-function toXterm256(r: number, g: number, b: number): number {
-	let best = 16
-	let bestDistance = Infinity
-	for (let i = 16; i < 256; i++) {
-		let cr, cg, cb
-		if (i < 232) {
-			const n = i - 16
-			cr = CUBE_LEVELS[Math.floor(n / 36)]!
-			cg = CUBE_LEVELS[Math.floor(n / 6) % 6]!
-			cb = CUBE_LEVELS[n % 6]!
-		} else {
-			cr = cg = cb = 8 + (i - 232) * 10
-		}
-		const distance = (cr - r) ** 2 + (cg - g) ** 2 + (cb - b) ** 2
-		if (distance < bestDistance) {
-			bestDistance = distance
-			best = i
-		}
-	}
-	return best
-}
-
 // ANSI color escape: `ground` is 38 for foreground, 48 for background.
+// Without truecolor (GNU screen), all color drops: screen has no
+// back-color-erase, so tinted blocks smear into unreadable washed-out
+// rectangles, and its 16-color downgrade of dim colors is illegible.
 function toAnsi(ground: number, L: number, C: number, H: number): string {
+	if (!termCaps.config.truecolor) return ''
 	const [r, g, b] = oklchToRgb(L, C, H)
-	if (!termCaps.config.truecolor) return `\x1b[${ground};5;${toXterm256(r, g, b)}m`
 	return `\x1b[${ground};2;${r};${g};${b}m`
-}
-
-function toFg(L: number, C: number, H: number): string {
-	return toAnsi(38, L, C, H)
-}
-
-function toBg(L: number, C: number, H: number): string {
-	return toAnsi(48, L, C, H)
 }
 
 function isBlack(L: number, C: number): boolean {
@@ -135,7 +102,7 @@ function usageFg(usedPercent: number): string {
 	const L = 0.78
 	const C = 0.04 + t * 0.12
 	const H = 145 - t * 120
-	return toFg(L, C, H)
+	return toAnsi(38, L, C, H)
 }
 
-export const oklch = { oklchToRgb, toFg, toBg, isBlack, fgHex, mixFg, dimAnsi, usageFg }
+export const oklch = { oklchToRgb, toAnsi, isBlack, fgHex, mixFg, dimAnsi, usageFg }

@@ -62,16 +62,16 @@ function resolveTriple(t: Triple, vars: Record<string, number>): [number, number
 }
 
 function fg(t: Triple, vars: Record<string, number>): string {
-	return oklch.toFg(...resolveTriple(t, vars))
+	return oklch.toAnsi(38, ...resolveTriple(t, vars) as [number, number, number])
 }
 
 function bg(t: Triple, vars: Record<string, number>): string {
-	return oklch.toBg(...resolveTriple(t, vars))
+	return oklch.toAnsi(48, ...resolveTriple(t, vars) as [number, number, number])
 }
 
 function dimFg(t: Triple, vars: Record<string, number>, factor: number): string {
 	const [L, C, H] = resolveTriple(t, vars)
-	return oklch.toFg(Math.max(0, Math.min(1, L * factor)), C, H)
+	return oklch.toAnsi(38, Math.max(0, Math.min(1, L * factor)), C, H)
 }
 
 // ── Load + resolve ───────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ function load(): void {
 		if (def?.fg) target.fg = fg(def.fg, vars)
 		if (def?.bg) {
 			const triple = resolveTriple(def.bg, vars)
-			target.bg = oklch.toBg(...triple)
+			target.bg = oklch.toAnsi(48, ...triple as [number, number, number])
 			target.bgIsBlack = oklch.isBlack(triple[0], triple[1])
 		}
 		if (def?.bold) target.bold = fg(def.bold, vars)

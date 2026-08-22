@@ -4,8 +4,8 @@ import { oklch } from '../../utils/oklch.ts'
 import { colors } from './colors.ts'
 
 const BAR_PARTIALS = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇']
-const BAR_FILL_FG = oklch.toFg(0.84, 0, 0)
-const BAR_EMPTY_BG = oklch.toBg(0.36, 0, 0)
+const BAR_FILL_FG = oklch.toAnsi(38, 0.84, 0, 0)
+const BAR_EMPTY_BG = oklch.toAnsi(48, 0.36, 0, 0)
 
 function usageBar(totalEighths: number, width: number): string {
 	const clampedEighths = Math.max(0, Math.min(width * 8, totalEighths))
