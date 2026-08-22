@@ -28,6 +28,25 @@ function pageHtml(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/index.html`).text()
 }
 
+// Exit code the `hal` wrapper watches for: "restart me so it can git pull first".
+// Anything else is a real crash and just exits.
+const UPDATE_EXIT_CODE = 42
+
+/**
+ * Self-update hook: CI calls this after tests pass. Exiting makes the wrapper
+ * pull and relaunch us. With no UPDATE_TOKEN configured (the normal local case)
+ * every request is rejected, so the endpoint only exists where it was armed.
+ */
+function handleUpdateRequest(request: Request): Response {
+	if (request.method !== 'POST') return new Response('Not found', { status: 404 })
+	const expected = process.env.UPDATE_TOKEN
+	if (!expected || request.headers.get('authorization') !== `Bearer ${expected}`) {
+		return new Response('Unauthorized', { status: 401 })
+	}
+	setTimeout(() => process.exit(UPDATE_EXIT_CODE), 100)
+	return new Response('Updating\n')
+}
+
 function styleCss(): Promise<string> {
 	return Bun.file(`${import.meta.dir}/../web-client/styles.css`).text()
 }
@@ -225,6 +244,7 @@ function start(port: number, signal: AbortSignal, announcementSessionId?: string
 				port,
 				fetch: async (request, server) => {
 					const url = new URL(request.url)
+					if (url.pathname === '/api/update') return handleUpdateRequest(request)
 					if (url.pathname === '/') return new Response(await web.pageHtml(), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } })
 					if (url.pathname === '/styles.css') return new Response(await web.styleCss(), { headers: { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' } })
 					if (url.pathname === '/main.js') {
@@ -337,6 +357,7 @@ export const web = {
 	parseCommand,
 	parseClientMessage,
 	isSnapshotBoundary,
+	handleUpdateRequest,
 	encode,
 	publishSnapshot,
 }

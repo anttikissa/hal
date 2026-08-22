@@ -65,5 +65,14 @@ while true; do
 
 	code=$?
 	# Exit code 100 restarts - used by Ctrl-R.
-	[ "$code" -ne 100 ] && exit "$code"
+	if [ "$code" -ne 100 ] && [ "$code" -ne 42 ]; then
+		exit "$code"
+	fi
+	# Exit code 42 asks for a self-update (POST /api/update in src/server/web.ts):
+	# pull first, then relaunch. A failed pull must never take a running deploy
+	# down, so we keep serving the current checkout.
+	if [ "$code" -eq 42 ]; then
+		echo "hal: update requested, pulling"
+		git -C "$hal_dir" pull --ff-only || echo "hal: pull failed, keeping current checkout"
+	fi
 done
